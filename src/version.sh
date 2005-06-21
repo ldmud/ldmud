@@ -3,11 +3,11 @@
 
 # The checkin date
 # $Format: "version_date=\"$ProjectDate$\""$ 
-version_date=$(echo "\$Date: 2005-06-20 19:17:56 $" | sed -e 's/\$Date: \([0-9]*-[0-9]*-[0-9]*\) \([0-9]*:[0-9]*:[0-9]*\).*\$/\1 \2/')
+version_date=$(echo "\$Date$" | sed -e 's/\$Date: \([0-9]*-[0-9]*-[0-9]*\) \([0-9]*:[0-9]*:[0-9]*\).*\$/\1 \2/')
 
 # The checkin revision
 # $Format: "version_revision=\"$ProjectVersion$\""$ 
-version_revision=$(echo "\$Revision: 0 $" | sed -e 's/\$Revision: \([0-9][0-9]*\) *\$/\1/')
+version_revision=$(echo "\$Revision$" | sed -e 's/\$Revision: \([0-9][0-9]*\) *\$/\1/')
 
 # The version type: dev, stable, maint release
 # $Format: "version_type=\"$ReleaseType$\""$ 
