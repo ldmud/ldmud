@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Settings for a compat-mode driver.
+#
+# configure will strip this part from the script.
+
+exec ./configure --with-setting=compat $*
+exit 1
+
+# --- The actual settings ---
+
+with_master_name=obj/master
+enable_compat_mode=yes
+enable_strict_euids=no
+enable_lpc_nosave=no
+enable_use_alists=yes
+enable_use_pcre=no

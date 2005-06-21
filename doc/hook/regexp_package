@@ -1,0 +1,23 @@
+SYNOPSIS
+        #include <sys/driver_hooks.h>
+        #include <sys/regexp.h>
+
+        set_driver_hook(H_PRINT_PROMPT, value)
+
+        <value> being an integer:
+          0
+          RE_PCRE
+          RE_TRADITIONAL
+
+DESCRIPTION
+        Optional hook to select the default regexp package to use
+        for regular expression functions.
+
+        If set to 0, the default package determined by the driver's
+        configuration/commandline options is used.
+
+HISTORY
+        Introduced in LDMud 3.3.595.
+
+SEE ALSO
+        hooks(C), default_prompt(H), invocation(D), regexp(C)

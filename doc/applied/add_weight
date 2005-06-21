@@ -1,0 +1,24 @@
+DEPRECATED
+SYNOPSIS
+        int add_weight(int w)
+
+DESCRIPTION
+        In compat mode, this function is used by the efun transfer().
+
+        An object that can contain other objects and is not a room
+        must define this function. It is called with the extra weight
+        of the object that is moved into it. If this is ok, then it
+        has to increment the local weight count, and return true.
+        Otherwise, return false, and the new object can not be entered
+        into this object.
+
+        The function is also called with the negative weight in the
+        object that the moving leaves.
+
+        Note that no set_weight() is required by the parser.
+
+HISTORY
+        Deprecated in LDMud 3.3 as transfer() has been deprecated.
+
+SEE ALSO
+        transfer(E), query_weight(A), prevent_insert(A)

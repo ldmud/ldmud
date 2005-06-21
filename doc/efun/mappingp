@@ -1,0 +1,11 @@
+SYNOPSIS
+        int mappingp(mixed arg)
+
+DESCRIPTION
+        Returns 1 if the argument is a mapping, or 0 if it is not.
+
+SEE ALSO
+        mkmapping(E), m_indices(E), m_values(E), m_add(E),
+        m_delete(E), sizeof(E), widthof(E).  clonep(E), closurep(E),
+        floatp(E), objectp(E), intp(E), referencep(E), pointerp(E),
+        stringp(E), symbolp(E), structp(E)

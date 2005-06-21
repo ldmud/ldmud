@@ -1,0 +1,49 @@
+SYNOPSIS
+        mixed apply(closure cl, ...)
+
+DESCRIPTION
+        Evaluates the closure <cl> with the following arguments.
+        If the last argument is an array or struct, it will be
+        flattened: ie. the array/struct itself will be removed and its
+        contents added to the argument list of <cl>
+
+        If <cl> is not a closure, it will simply be returned (and all
+        other arguments are ignored).
+
+EXAMPLES
+        The flattening of the last argument is the important difference
+        between apply() and funcall(). For example:
+
+        mixed eval(object ob, string func, mixed *args)
+        {
+            return apply(#'call_other, ob, func, args);
+        }
+
+        This will result in calling
+
+          ob->func(args[0],args[1],...,args[sizeof(args)-1]).
+
+        Using funcall() instead of apply() would have given us
+
+          ob->func(args).
+
+
+        Of course, with the '...' operator we could also write
+
+        mixed eval(object ob, string func, mixed *args)
+        {
+            return funcall(#'call_other, ob, func, args...);
+        }
+
+        and achieve the same result.
+
+HISTORY
+        Introduced in 3.2@70
+        LDMud 3.2.8 adds the returning of a non-closure as first
+        argument.
+        LDMud 3.3 added the '...' operator and thus made apply() in fact
+        redundant.
+        LDMud 3.3.266 added support for structs.
+
+SEE ALSO
+        funcall(E), closures(LPC), varargs(LPC)

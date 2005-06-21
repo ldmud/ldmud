@@ -1,0 +1,76 @@
+#!/bin/sh
+#
+# Settings for the BatMUD
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/bat --libdir=/bat/mudlib --with-setting=bat $*
+
+exit 1
+
+# --- The actual settings ---
+
+#
+# mudlib compatibility etc options
+#
+
+with_portno=1234
+with_max_players=1000
+
+with_master_name=secure/master
+with_input_escape="@"
+
+enable_erq=erq
+enable_use_mysql=1
+enable_malloc_sbrk=no
+
+enable_use_parse_command=0
+enable_compat_mode=no
+enable_strict_euids=no
+enable_use_deprecated=yes
+enable_use_alists=yes
+enable_use_pcre=no
+with_time_to_reset=3600
+with_time_to_clean_up=7200
+
+
+
+#
+# debug
+#
+enable_malloc_trace=1
+enable_malloc_lpc_trace=1
+# /debug
+
+with_malloc=sysmalloc
+
+
+#
+# performance options
+#
+
+#no swapping
+with_time_to_swap=0
+with_time_to_swap_variables=0
+
+# 1/5 of distinct strings
+with_htable_size=274566
+
+with_itable_size=16384
+
+# 1/4 of objects
+with_otable_size=32768
+
+with_evaluator_stack_size=3000
+with_compiler_stack_size=600
+with_max_user_trace=120
+with_max_trace=125
+with_max_malloced=0
+
+with_max_cost=20000000
+with_catch_reserved_cost=150000
+
+with_max_array_size=50000
+with_max_mapping_keys=50000
+with_max_mapping_size=150000
+with_max_bits=20000

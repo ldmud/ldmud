@@ -1,0 +1,2 @@
+virtual inherit "/a";
+

@@ -1,0 +1,19 @@
+SYNOPSIS
+        void catch_msg(mixed *|struct|mapping|object msg, object obj)
+
+DESCRIPTION
+        When say(), tell_room() or tell_object() are used with an
+        non-string as message, the value will be passed to catch_msg()
+        in all living objects that can hear it, instead of writing to
+        the user resp.  sending to catch_tell(). This can be used to
+        implement communication protocols between livings. The second
+        argument denotes the object that has sent the message.
+
+HISTORY
+        LDMud 3.2.11 added tell_object() to the efuns calling this
+        lfun for symmetry reasons.
+        LDMud 3.3.686 added the use of a mapping/struct/object as message
+        value.
+
+SEE ALSO
+        say(E), tell_room(E), catch_tell(A)

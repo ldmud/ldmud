@@ -1,0 +1,55 @@
+SYNOPSIS
+        mixed catch(expr, expr, ...);
+        mixed catch(expr, expr, ...; modifiers);
+
+BESCHREIBUNG
+        Wertet die Ausdruecke <expr> aus. Wenn kein Fehler auftritt, wird 0
+        zurueck geliefert. Wenn ein Fehler auftritt, wird die Ausfuehrung an
+        diesem Punkt abgebrochen und ein String mit der Fehlermeldung wird
+        zurueck gegeben.
+
+        Systemeigene Fehlermeldungen beginnen mit einem "*", benutzerdefinierte
+        Fehlermeldungen aus throw() und raise_error() (sofern von 0
+        verschieden), werden unveraendert zurueck geliefert.
+
+        Wenn zum Zeitpunkt, zu dem catch() aufgerufen wird, weniger als
+        __CATCH_EVAL_COST__ Rechenticks uebrig sind, wird ein Laufzeitfehler
+        RTE innerhalb von catch() erzeugt (und somit wie jeder andere
+        Fehler abgefangen) und es werden keine Ausdruecke <expr> aus catch()
+        ausgewertet. Der Modifikator 'reserve' kann verwendet werden,
+        einen anderen Wert fuer die Reserve anzugeben.
+
+        Das Verhalten von catch() kann durch <modifiers> veraendert werden:
+
+            'nolog':    Normalerweise wird der Fehler im Fehlerlog
+                        gespeichert, um die Fehlersuche zu erleichtern. Wird
+                        'nolog' gesetzt, wird dieser Log-Eintrag unterdrueckt.
+            'publish':  Normalerweise wird master::runtime_error() fuer einen
+                        Fehler innerhalb eines catch() nicht aufgerufen. Mit
+                        diesem <modifier> wird runtime_error() trotzdem
+                        aufgerufen.
+            'reserve <expr>': <expr> muss eine ganzen Zahl groesser 0
+                        ergeben, welche dann als Rechenreserve anstelle
+                        von __CATCH_EVAL_COST__ verwendet wird. Das Minimum
+                        ist 2 * __MASTER_EVAL_COST__ .
+
+        Catch ist nicht im eigentlichen Sinne eine Efun, sondern eine Compiler
+        Anweisung.
+
+BEISPIEL
+        object obj;
+        string err;
+        if(err = catch(obj = clone_object("/foo/bar/baz")))
+            write("Kann das Objekt nicht clonen. Grund: "+err+"\n");
+
+AENDERUNGEN
+        LDMud 3.2.9 fuehrte den 'nolog' catch() als experimentelles Feature
+            ein.
+        LDMud 3.2.10 implementierte 'nolog' als offizielle Form und fuehrte
+            zudem 'publish' ein.
+        LDMud 3.3.559 verlegte den Test auf verbleibende Rechenticks in die
+            vom catch() umschlossenen Ausfuehrung.
+        LDMud 3.3.560 fuegte den Modifikator 'reserve' ein.
+
+SIEHE AUCH
+        throw(E), raise_error(E), predefined(D), runtime_error(M)

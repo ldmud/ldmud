@@ -1,0 +1,10 @@
+NAME
+        obsolete
+
+DESCRIPTION
+        This directory contains descriptions for features removed from
+        the game driver, since they can come in handy when reworking
+        old LPC code.
+
+SEE ALSO
+        applied(A), efun(E), master(M), concepts(C), lpc(LPC), driver(D)

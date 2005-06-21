@@ -1,0 +1,52 @@
+VORLAEUFIG, GESCHUETZT
+SYNOPSIS
+        #include <sys/rtlimits.h>
+
+        mixed limited(closure fun);
+        mixed limited(closure fun, int tag, int value, ...);
+        mixed limited(closure fun, int *limits [, mixed *args]);
+
+BESCHREIBUNG
+        limited() ruft die Funktion <fun> mit den bezeichneten Argumenten
+        <args> auf und fuehrt sie mit den gegebenen Laufzeitlimiten aus.
+
+        Beim Ende der Funktion <fun> werden die momentan aktiven
+        Laufzeitlimiten wiederhergestellt. limited() liefert den
+        Rueckgabewert der Closure <fun> zurueck.
+
+        Die Laufzeitlimiten koennen in zwei Formen angegeben werden: als
+        Array (wie es von query_limits() geliefert wird) oder als Liste von
+        Werten mit Tags. Wird limited() ohne Angabe von Limits aufgerufen,
+        gelten die Laufzeitlimiten als 'unlimitiert'.
+
+        Die Limiteneinstellung kennt drei spezielle Werte aus <rtlimits.h>:
+            LIMIT_UNLIMITED:    es gibt kein Limit
+            LIMIT_KEEP:         das zuletzt gesetzte Limit wird beibehalten
+            LIMIT_DEFAULT:      die 'globalen' Limiten werden verwendet
+
+        Fuer LIMIT_COST, die Spezialwerte haben diese Bedeutung:
+            LIMIT_UNLIMITED: die Ausfuehrung kosten lediglich einen Tick
+            LIMIT_KEEP:      LIMIT_COST wird auf 0 gesetzt
+            LIMIT_DEFAULT:   LIMIT_COST wird auf -100 gesetzt
+
+        limited() erzeugt eine Schutzverletzung ("limited", current_object,
+        fun, limits-array).
+
+BEISPIELE
+        limited(#'function)
+        --> fuehrt die Funktion ohne Limiten aus.
+
+        limited(#'function, ({ 200000 }), "foo")
+        --> fuehrt die Funktion mit einem Eval-Kosten Limit von 200000 Ticks
+            aus. Die Funktion wird als 'function("foo")' aufgerufen.
+
+        limited(lambda(0, ({#'function, "foo"})), LIMIT_EVAL, 200000)
+        --> fuehrt die Funktion mit einem Eval-Kosten Limit von 200000 Ticks
+            aus. Die Funktion wird als 'function("foo")' aufgerufen.
+
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.7.
+        LDMud 3.3.563 fuehrte LIMIT_COST ein.
+
+SIEHE AUCH
+        query_limits(E), set_limits(E)

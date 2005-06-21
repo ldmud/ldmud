@@ -1,0 +1,46 @@
+SYNOPSIS
+        #include <regexp.h>
+
+        string  regmatch (string text, string pattern)
+        string  regmatch (string text, string pattern, int opt)
+        string  regmatch (string text, string pattern, int opt, int start)
+        string *regmatch (string text, string pattern, int opt)
+        string *regmatch (string text, string pattern, int opt, int start)
+
+DESCRIPTION
+        Match the string <txt> against <pattern> (interpreted according
+        to <opt> if given). If <start> is given, it is the start
+        position for the match and must be in the range [0..strlen(text)].
+
+        If there is no match, the result is 0. If there is a match, the exact
+        result is determined by the flag RE_MATCH_SUBS:
+
+        If the flag RE_MATCH_SUBS is not set, the result is the matched
+        expression.
+
+        If the flag RE_MATCH_SUBS is set, the result is an array of the
+        matched string(s) of the first match. Entry [0] is the full string
+        matching the <pattern>, following entries are the string segments
+        matching parenthesized subexpressions in <pattern>. If a particular
+        subexpression didn't have a match, the corresponding array entry will
+        be 0.
+
+        The last entry in the array will be the new start index in case you
+        want to repeat the match on the remaining parts of the string. This
+        new index is usually equal the length of the match, but at least one
+        higher than the original start index.
+
+EXAMPLE
+        regmatch("abcdefcdf", "cd")    -> "cd"
+        regmatch("abcdefcdf", "cd(e)") -> "cde"
+
+        regmatch("abcdefcdf", "cd", RE_MATCH_SUBS)    -> ({ "cd" })
+        regmatch("abcdefcdf", "cd(e)", RE_MATCH_SUBS) -> ({ "cde", "e" })
+
+HISTORY
+        Introduced in LDMud 3.3.198.
+        Modified in 3.3.214 to return 0 for non-matches, and to take and
+        return a start position.
+
+SEE ALSO
+        regexplode(E), regreplace(E), regexp(E), regexp_package(E), regexp(C)

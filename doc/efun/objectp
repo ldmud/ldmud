@@ -1,0 +1,9 @@
+SYNOPSIS
+        int objectp(mixed arg)
+
+DESCRIPTION
+        Return 1 if arg is an object.
+
+SEE ALSO
+        clonep(E), closurep(E), floatp(E), mappingp(E), intp(E),
+        referencep(E), pointerp(E), stringp(E), symbolp(E), structp(E)

@@ -1,0 +1,22 @@
+This directory holds various example and support files for mudlibs.
+Especially important is the sys/ subdirectory with the driver-related
+include files.
+
+Other files are:
+
+  ACCESS.ALLOW     : a typical access control file.
+  master_skeleton.c: a skeleton master, documenting all master lfuns.
+  telnet.h, telnetneg.c: the Wunderland telnet module, a complete implementation
+                     of the telnet protocol.
+  test_master.c    : a minimal test master for driver tests.
+  simul_efun-dr.c  : a very old simul_efun file for a very old DR mudlib.
+  erq-tool.c       : for 2.4.5 muds, a tool for interactive erq experiments.
+  dhrystone.c      : an implementation of Dhrystone, called by the
+                     test_master.
+  astar.c          : an implementation of the A* pathfinding algorithm.
+  pgsql.c          : example for using PostgreSQL
+  dns_resolve.c    : a simul-efun for non-block DNS lookups
+  query_ip_name.c  : a simul-efun for IPv4/IPv6 name lookups
+
+  uni-crasher/     : A stress test program, see the README in this dir.
+

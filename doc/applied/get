@@ -1,0 +1,18 @@
+DEPRECATED
+SYNOPSIS
+        int get()
+
+DESRIPTION
+        In compat mode, this function is used by the efun transfer().
+
+        If an object wants control over when it is possible to pick it
+        up, i.e. moved into a living object, then it must define
+        get(), and return 1 if ok to pick up.
+
+        id() has been called before this to identify the object.
+
+HISTORY
+        Deprecated in LDMud 3.3 as transfer() has been deprecated.
+
+SEE ALSO
+        transfer(E), drop(A)

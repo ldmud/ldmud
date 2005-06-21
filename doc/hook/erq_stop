@@ -1,0 +1,20 @@
+SYNOPSIS
+        #include <sys/driver_hooks.h>
+
+        set_driver_hook(H_ERQ_STOP, value)
+
+        <value> being:
+
+          void <closure>()
+
+DESCRIPTION
+        Optional hook to notify the mudlib about the termination of
+        the erq demon.  Hook setting may be any closure.
+
+        The closure is called without arguments and may do whatever it
+        likes to clean-up after the erq.
+
+HISTORY
+
+SEE ALSO
+        hooks(C)

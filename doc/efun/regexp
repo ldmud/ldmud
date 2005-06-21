@@ -1,0 +1,41 @@
+SYNOPSIS
+        #include <regexp.h>
+
+        string *regexp(string *list, string pattern)
+        string *regexp(string *list, string pattern, int opt)
+
+DESCRIPTION
+        Match the pattern <pattern> (interpreted according to <opt> if
+        given) against all strings in list, and return a new array with all
+        strings that matched.
+
+        If there is an error in the regular expression, a runtime
+        error will be raised.
+
+EXAMPLE
+        string strs;
+        string pattern;
+        
+        if (regexp_package() == RE_PCRE)
+            pattern = "\\<help\\>.*\\<me\\>";
+        else
+            pattern = "\\bhelp\\b.*\\bme\\b";
+
+        if (strs = regexp( ({"please, help me Sir John."}),
+                         , pattern
+                         ))
+        {
+           if (sizeof(strs)
+              write("It matches.\n");
+        }
+
+        The regular expression will test the given string (which is
+        packed into an array) if there is something like "help ... me"
+        inside of it.
+
+HISTORY
+        LDMud 3.3 added the optional <opt> argument.
+
+SEE ALSO
+        regexplode(E), regmatch(E), regreplace(E), regexp_package(E), sscanf(E),
+        regexp(C)

@@ -1,0 +1,41 @@
+SYNOPSIS
+        #include <sys/driver_hooks.h>
+
+        set_driver_hook(H_TELNET_NEG, value)
+
+        <value> being:
+
+          void <name>(int flag, object user, int no_telnet)
+          void <closure>(int flag, object user, int no_telnet)
+
+DESCRIPTION
+        Optional hook to specifiy how to perform the telnet actions to
+        switch the echo mode (used for e.g. password input_to()s).
+        Hook setting may be any closure or a string.  If not set, a
+        default handling is performed.
+
+        If the setting is a string, it used as name of an lfun to call
+        in the interactive <user>, where <flag> is the echo-flag
+        passed to the input_to() statement.
+
+        If the setting is a closure, it is called with the same
+        arguments, and unbound lambda-closures being bound to
+        this_player() prior to execution.
+
+        <local> is a boolean flag: it is TRUE when input_to() was
+        called with the INPUT_NO_TELNET flag.
+
+        When set, the hook is called whenever the driver needs to
+        change the echo mode, thus you can negotiate about things that
+        are coupled with it, like LINEMODE or character-at-a-time.
+
+        IMPORTANT: If this hook is used, the control of all telnet
+        negotiation is transferred to the mudlib: all incoming negotiations
+        are passed to H_TELNET_NEG, and the sending of no-echo negotiations
+        is handled by this hook.
+
+HISTORY
+        LDMud 3.2.11/LDMud 3.3.593 added the <no_telnet> argument.
+
+SEE ALSO
+        hooks(C), telnet(C), telnet_neg(H)

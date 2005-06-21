@@ -1,0 +1,10 @@
+A group is defined as one or more stones of the same colour, that are
+connected along the lines. Stones besides each other are connected,
+but stones positioned diagonally from each other are not.
+
+A liberty is an empty space beside a stone. Again, an empty space diagonally
+from a stone does not count.
+
+The liberties of a group, are the number of liberties that a group have.
+
+Liberties can be shared by more than one group.

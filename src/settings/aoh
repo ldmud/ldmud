@@ -1,0 +1,60 @@
+#!/bin/sh
+#
+# Settings for the AoH mudlib.
+#
+# configure will strip this part from the script.
+#
+# The exported compiler flags are needed on (at least) FreeBSD 5.4
+# (assuming default installpaths are used for the ports)
+#
+# Modify the First EXTRA_CFLAGS to match your architecture
+#
+EXTRA_CFLAGS="-mtune=pentium4 -march=pentium4"
+export EXTRA_CFLAGS="$EXTRA_CFLAGS -I/usr/local/include -I/usr/include"
+export LDFLAGS="-L/usr/local/lib -L/usr/local/lib/mysql -L/usr/lib"
+export CPPFLAGS="-I/usr/local/include -I/usr/include"
+
+exec ./configure \
+--prefix=/home/ralph/mud \
+--bindir=/home/ralph/mud/bin \
+--libdir=/home/ralph/mud/mudlib \
+--libexec=/home/ralph/mud/libexec \
+--enable-strict-euids \
+--enable-erq=xerq \
+--enable-lpc-nosave \
+--enable-use-alists \
+--enable-use-deprecated=no \
+--enable-use-pgsql=yes \
+--enable-use-mysql=yes \
+--enable-use-mccp=yes \
+--enable-dynamic-costs=yes \
+--enable-malloc-trace \
+--enable-malloc-lpc-trace \
+--enable-use-system-crypt=no \
+--enable-use-pcre=yes \
+--enable-use-set-is-wizard=yes \
+--enable-use-parse-command=no \
+--enable-use-set-light=no \
+--enable-use-new-inlines=yes \
+--enable-opcprof=yes \
+--enable-filename-spaces=yes \
+--enable-use-tls=gnu \
+--enable-synchronous-heart-beat=no \
+--enable-use-pthreads=yes \
+--with-malloc=ptmalloc \
+--with-optimize=high \
+--with-time-to-swap=0 \
+--with-time-to-swap-variables=0 \
+--with-otable-size=8192 \
+--with-htable-size=32768 \
+--with-apply-cache-bits=14 \
+--with-master-name=secure/master \
+--with-time-to-reset=900 \
+--with-portno=2345 \
+--with-udp-port=2347 \
+--with-max-cost=3000000 \
+--without-wizlist-file \
+--with-max-array-size=0 \
+--with-max-mapping-size=0 \
+--with-swap-file=AoH $*
+exit 1

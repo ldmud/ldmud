@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Settings for a compat-mode driver.
+#
+# configure will strip this part from the script.
+
+exec ./configure --with-setting=alatia $*
+exit 1
+
+# --- The actual settings ---
+
+with_master_name=kernel/master
+with_max_array_size=10000
+with_max_mapping_keys=10000
+with_max_mapping_size=30000
+with_time_to_reset=3600
+with_portno=2000
+with_udp_port=4246
+enable_compat_mode=yes
+enable_strict_euids=no
+enable_lpc_nosave=yes
+enable_use_alists=yes
+enable_use_pcre=no

@@ -1,0 +1,18 @@
+REMOVED EFUN
+SYNOPSIS
+        mixed *slice_array(mixed *array, int from, int to)
+
+DESCRIPTION
+        Returns an array that is a slice of the array <arr> from the
+        index <from> to the index <to>.
+
+        This is the old notation for arr[from..to] and supported
+        only for hysterical raisins.
+
+        DO NOT USE THIS EFUN ANYMORE.
+
+HISTORY
+        Removed in LDMud 3.3.
+
+SEE ALSO
+        [](E)

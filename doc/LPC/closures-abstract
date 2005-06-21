@@ -1,0 +1,82 @@
+Procedural elements:
+====================
+
+definition of terms:
+  <block>     : zero or more values to be evaluated.
+  <test>      : one value to be evaluated as branch or loop condition.
+  <result>    : one value to be evaluated at the end of the execution of
+                the form; the value is returned.
+  <lvalue>    : local variable/parameter, global variable, or an indexed
+                lvalue.
+  <expression>: one value to be evaluated.
+  <integer>   : an integer constant
+  <string>    : a string constant, or 0.
+used EBNF operators:
+{ }        iteration
+[ ]        option
+|        alternative
+
+forms:
+  ({#', <body> <result>})
+  ({#'? { <test> <result> } [ <result> ] })
+  ({#'?! { <test> <result> } [ <result> ] })
+  ({#'&& { test } })
+  ({#'|| { test } })
+  ({#'while <test> <result> <body>...})        loop while test evaluates non-zero.
+  ({#'do <body> <test> <result>})        loop till test evaluates zero.
+  ({#'foreach <var> <expr> <body>...})        loop over all values of <expr>.
+  ({#'foreach ({ <var>...<var> }) <expr> <body>...})
+  ({#'= { <lvalue> <value> } })                assignment
+                			other assignment operators work too.
+  case_label: <integer> | <string> | #'default
+  generalized_case_label: case_label | <integer> #'.. <integer>
+  case_label_list: case_label | ({ { generalized_case_label } })
+  case_delimiter: #', | #'break
+  ({#'switch <expression> { case_label_list <result> case_delimiter } })
+        Evaluate expression, then evaluate the result form labeled with
+        the value equal to the value evaluated from expression.
+        If no matching label exists, the value of #'switch is 0.
+  ({#'catch, <body> [, 'nolog ] [, 'publish ], [, 'reserve, <expr>  })
+        Evaluates the <body> and catches any runtime error. If the symbol
+        'nolog is also given, a caught error is not logged. If the
+        symbol 'publish is also given, master::runtime_error() is
+        called for the caught error. If the symbol 'reserve with a
+        following expression is given, this value is used as the
+        computing reserve.
+
+
+lisp similars:
+  #',                progn
+  #'?                cond
+  #'&&                and
+  #'||                or
+  #'while        do         /* but lisp has more syntactic candy here */
+  #'=                setq
+
+A parameter / local variable 'foo' is referenced as 'foo , a global
+variable as ({#'foo}) . In lvalue positions (assignment), you need not
+enclose global variable closures in arrays.
+
+Call by reference parameters are given with ({#'&, <lvalue>})
+
+Some special efuns:
+#'[                indexing
+#'[<                indexing from the end
+#'negate        unary -
+
+Unbound lambda closures
+=======================
+
+These closures are not bound to any object. They are created with the efun
+unbound_lambda() . They cannot contain references to global variables, and
+all lfun closures are inserted as is, since there is no native object for
+this closure.
+You can bind and rebind unbound lambda closures to an object with efun
+bind_lambda() You need to bind it before it can be called. Ordinary objects
+can obly bind to themselves, binding to other objects causes a privilege
+violation().
+The point is that previous_object for calls done from inside the closure
+will reflect the object doing bind_lambda(), and all object / uid based
+security will also refer to this object.
+
+

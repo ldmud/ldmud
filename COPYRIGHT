@@ -1,0 +1,71 @@
+LDMud, a LPmud gamedriver.
+Copyright 1997-2004 by Lars Duening.
+
+LDMud is based on LPmud, which is
+Copyright 1989-1991 by Lars Pensj|, and, starting with version 3.1.2,
+Copyright 1991-1997 by Joern Rennecke.
+
+Source code herein refers to the source code, and any executables
+created from the same source code.
+
+All rights reserved.  Permission is granted to use, extend and modify the
+source code provided subject to the restriction that the source code may
+not be used in any way whatsoever for monetary gain.
+
+ ------------------------------------------------------------------------
+
+LDMud contains contributions of many volunteers as listed in the file CREDITS.
+Of these, the following packages are subject of their own copyright when
+used outside the context of this gamedriver; please refer to the appropriate
+files for details.
+
+The regexp package is based on the code written by Henry Spencer.
+
+The portable crypt() implementation is Copyright by Eric Young.
+
+The smalloc allocator was written by Sean T. Barrett and put into the
+public domain.
+
+The 'ed' editor (with the exception of the indentation code) is Copyright
+by Brian Beattie, Kees Bot and others.
+
+The non-corrupting indentation code for the 'ed' editor was written and
+contributed by Felix A. Croes (<felix@dworkin.nl>) from his DGD gamedriver.
+
+The sprintf() efun was written by Sean A. Reith and put into the public
+domain.
+
+All code taken from the MudOS driver is Copyright by Tim Hollebeek and
+the original authors. Use for other purposes than LPmud drivers or under
+licenses significantly different from the original LPmud license needs
+explicite permission.
+
+The random() efun is implemented using the Mersenne Twister generator which is
+Copyright (C) 1997 - 2002, Makoto Matsumoto and Takuji Nishimura, and subject
+to a BSD-style license. The implementation is the faster implementation based
+on Shawn Cokus and Matthew Belle's improvements.  See random.c for the full
+text of the license.
+
+The xerq demon is Copyright (C) 1995 by Brian Gerst. Use of the source
+code is subject to the restriction that it must not be used for monetary
+gain.
+
+The MD5 message digest algorithm is Copyright (C) 1991-2, RSA Data Security,
+Inc.
+
+The Apache-compatible MD5 password encryption is Copyright (C) 2000 Apache
+Software Foundation.
+
+The PCRE (Perl Compatible Regular Expression) is Copyright (C) 1997-2001 by
+Philip Hazel. LDMud contains just the files required for the driver (with
+small modifications); see pcre/LICENCE for the licence terms and the location
+of the full package, and pcre/README.LDMUD for an explanation of the changes.
+
+The lpc-mode.el for EMACS is Copyright (C) 2002 Vivek Dasmohapatra
+<vivek@etla.org>, and distributed under the GPL.
+
+The PostgreSQL package is based on code written and donated 2001 by Florian
+Heinz.
+
+The MCCP implementation was originally written for Finalfrontier by
+Bastian Hoyer.

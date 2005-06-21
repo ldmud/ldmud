@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# Settings for the SPiN mudlib.
+
+exec ./configure --prefix=/home/mud  --enable-erq=xerq --with-setting=theland $*
+
+exit 1
+
+# --- The settings
+enable_access_control=no
+enable_use_parse_command=no
+enable_use_set_light=no
+enable_use_deprecated=no
+enable_use_process_string=yes
+enable_malloc_trace=yes
+enable_malloc_lpc_trace=yes
+enable_use_structs=yes
+enable_use_pcre=yes
+enable_use_alists=yes
+enable_use_mysql=/usr/include/mysql
+enable_dynamic_costs=yes
+enable_use_pthreads=yes
+with_udp_port=6664
+with_portno=6666
+with_read_file_max_size=100000
+with_master_name=kernel/master
+with_swap_file=kernel/.swap

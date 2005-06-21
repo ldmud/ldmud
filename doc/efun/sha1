@@ -1,0 +1,16 @@
+SYNOPSIS
+        string sha1(string arg)
+
+DESCRIPTION
+        Create and return a SHA1 message digest from the string <arg>.
+
+EXAMPLES
+        string s;
+
+        s = sha1("Hello, world!");
+
+HISTORY
+        Introduced in LDMud 3.3.523.
+
+SEE ALSO
+        crypt(E), md5(E), sha1(E)

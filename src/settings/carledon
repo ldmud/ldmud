@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Settings for the Carledon mudlib.
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/u/carledon --libexec=/u/carledon/erq --with-setting=carledon $*
+exit 1
+
+# --- The actual settings ---
+
+enable_access_control=no
+enable_access_log=no
+
+with_master_name=s/secure/master
+with_time_to_clean_up=21600
+with_time_to_swap=5400
+with_time_to_swap_variables=10800
+with_time_to_reset=2700
+with_max_bits=1200
+with_portno=4444
+with_maxnumports=1
+with_max_local=20
+with_swap_file=../swap/swapfile.136
+with_max_array_size=5000
+
+enable_compat_mode=no
+enable_strict_euids=yes
+enable_use_parse_command=no
+enable_use_alists=yes
+enable_use_pcre=no
+
+with_udp_port=8000

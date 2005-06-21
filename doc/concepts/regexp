@@ -1,0 +1,121 @@
+SYNOPSIS
+        Regular Expressions
+
+
+DESCRIPTION
+        LDMud supports both the traditional regular expressions as
+        implemented by Henry Spencer ("HS" or "traditional"), and the
+        Perl-compatible regular expressions by Philip Hazel ("PCRE").
+        Both packages can be used concurrently, with the selection
+        being made through extra option flags argument to the efuns.
+        One of the two packages can be selected at compile time, by
+        commandline argument, and by driver hook to be the default
+        package.
+
+        The packages differ in the expressivity of their expressions
+        (PCRE offering more options that Henry Spencer's package),
+        though they both implement the common subset outlined below.
+
+        All regular expression efuns take an additional options
+        parameter, which is a an number composed of bitflags, and is
+        used to modify the exact behaviour of the expression
+        evaluation. In addition, certain efuns may accept additional
+        specific options.
+
+        For details, refer to the detailed manpages: hsregexp(C) for
+        the Henry Spencer package, pcre(C) for the PCRE package.
+
+
+REGULAR EXPRESSION DETAILS
+        A regular expression is a pattern that is matched against  a
+        subject string from left to right. Most characters stand for
+        themselves in a pattern, and match the corresponding charac-
+        ters in the subject. As a trivial example, the pattern
+
+          The quick brown fox
+
+        matches a portion of a subject string that is  identical  to
+        itself.  The  power  of  regular  expressions comes from the
+        ability to include alternatives and repetitions in the  pat-
+        tern.  These  are encoded in the pattern by the use of meta-
+        characters, which do not stand for  themselves  but  instead
+        are interpreted in some special way.
+
+        The following metacharacters are 'universal' in that both regexp
+        packages understand them in the same way:
+
+          .       Match any character.
+
+          ^       Match begin of line.
+
+          $       Match end of line.
+
+          x|y     Match regexp x or regexp y.
+
+          ()      Match enclosed regexp like a 'simple' one.
+
+          x*      Match any number (0 or more) of regexp x.
+
+          x+      Match any number (1 or more) of regexp x.
+
+          [..]    Match one of the characters enclosed.
+
+          [^ ..]  Match none of the characters enclosed. The .. are to
+                  replaced by single characters or character ranges:
+
+          [abc]   matches a, b or c.
+
+          [ab0-9] matches a, b or any digit.
+
+          [^a-z]  does not match any lowercase character.
+
+          \B      not a word boundary
+
+          \c      match character c even if it's one of the special
+                  characters.
+
+        The following metacharacters or metacharacter combinations implement
+        similar functions in the two regexp packages;
+
+          \b      PCRE: word boundary, also used inconjunction with
+                        \w (any "word" character) and \W (any "non-word"
+                        character).
+
+          \<      HS: Match begin of word.
+          \>      HS: Match end of word.
+
+
+OPTIONS
+        The package is selected with these option flags:
+
+          RE_PCRE
+          RE_TRADITIONAL
+
+        These flags are also used for the H_REGEXP_PACKAGE driver
+        hook.
+
+
+        Traditional regular expressions understand one option:
+
+          RE_EXCOMPATIBLE
+
+
+        PCRE understands these options:
+
+          RE_ANCHORED
+          RE_CASELESS
+          RE_DOLLAR_ENDONLY
+          RE_DOTALL
+          RE_EXTENDED
+          RE_MULTILINE
+          RE_UNGREEDY
+          RE_NOTBOL
+          RE_NOTEOL
+          RE_NOTEMPTY
+
+HISTORY
+        LDMud 3.3.596 implemented the concurrent use of both packages.
+
+SEE ALSO
+        hsregexp(C), pcre(C), regexp_package(H), regexp(E), regexplode(E),
+        regmatch(E), regreplace(E), regexp_package(E), invocation(D)

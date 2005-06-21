@@ -1,0 +1,36 @@
+SYNOPSIS
+        mixed to_struct(mixed *|mapping data)
+        mixed to_struct(mixed *|mapping data, struct template)
+        mixed to_struct(struct)
+
+DESCRIPTION
+        The given array or mapping <data> is returned as a struct. If a
+        <template> struct is given, the returned struct is of the same
+        type; without a template, an anonymous struct is returned.
+
+        Structs are returned unchanged.
+
+        If <data> is an array, its elements are assigned in order to the
+        resulting struct. For an anonymous struct, all elements of <data>
+        are assigned, for a templated struct only as many as fit into
+        the struct.
+
+        If <data> is a mapping and no template is given, the resulting
+        anonymous struct contains all elements from <data> with a string
+        key; the key name is used as struct member name.
+
+        If <data> is a mapping and a template is given, the struct
+        member names are used as keys for lookups in <data>; the found
+        data is assigned to the struct members.
+
+        Since the returned struct can't be known at compile time, the
+        efun is declared to return 'mixed'.
+
+HISTORY
+        Introduced in LDMud 3.3.250 .
+        LDMud 3.3.344 added the template argument.
+        LDMud 3.3.433 added the conversion from mappings.
+
+
+SEE ALSO
+        to_array(E), to_string(E), mkmapping(E), structs(LPC)

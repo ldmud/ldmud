@@ -1,0 +1,86 @@
+# Wunderland Driver-Konfiguration fuer Driver ldmud-3.2.9
+#
+# Starte dieses Script (anstatt 'configure' direkt!) und dann
+# die restlichen Anweisungen in 'INSTALL' befolgen. Eventuell
+# muessen die Pfade auf deiner Plattform geaendert werden!
+#
+# Holger@Wunderland 8/00
+#
+# letzte Aenderung: 13.02.03 Fiona
+#
+./configure \
+--prefix=/mud \
+--exec-prefix=/mud \
+--bindir=/mud/bin \
+--libexecdir=/mud/bin/erq_dir \
+--libdir=/mud/mudlib \
+--enable-erq=xerq \
+--disable-access-control \
+--disable-access-log \
+--enable-align-functions \
+--disable-compat-mode \
+--enable-strict-euids \
+--enable-supply-parse-command \
+--enable-initialization-by-__init \
+--enable-udp-send \
+--enable-comm-stat \
+--enable-apply-cache_stat \
+--disable-smalloc-trace \
+--disable-smalloc-lpc-trace \
+--enable-max-malloced \
+--disable-min-malloced \
+--disable-dynamic-costs \
+--enable-catch-udp-port \
+--enable-rxcache_table \
+--with-access-file=ACCESS.ALLOW \
+--with-access-log=access.allow.log \
+--with-erq-max-reply=1024 \
+--with-erq-max-send=1024 \
+--with-max-log-size=50000 \
+--with-read-file-max-size=50000 \
+--with-master-name=secure/master \
+--with-time-to-clean_up=14400 \
+--with-time-to-swap=5400 \
+--with-time-to-swap-variables=7200 \
+--with-time-to-reset=5400 \
+--with-evaluator-stack-size=2000 \
+--with-max-user-trace=60 \
+--with-max-trace=65 \
+--with-compiler-stack-size=400 \
+--with-max-bits=6144 \
+--with-portno=4711 \
+--with-maxnumports=3 \
+--with-max-cost=1000000 \
+--with-catch-reserved-cost=2000 \
+--with-master-reserved-cost=0x200 \
+--with-swap-file=/mud/swapfiles/Mudswapfile \
+--with-max-array-size=5000 \
+--with-max-mapping-keys=5000 \
+--with-max-mapping-size=15000 \
+--with-max-players=60 \
+--with-max-local=50 \
+--with-allowed-ed-cmds=20 \
+--with-reserved-user-size=800000 \
+--with-reserved-master-size=100000 \
+--with-reserved-system-size=200000 \
+--with-htable-size=8192 \
+--with-itable-size=256 \
+--with-otable-size=4096 \
+--with-defmax=65000 \
+--with-apply-cache-bits=12 \
+--with-rxcache-table=8192 \
+--with-max-byte-transfer=200000 \
+--with-catch-udp-port=4246 \
+--with-set-buffer-size-max=65536 \
+--with-min-malloced=0x1000000 \
+--with-max-malloced=0x6000000 \
+--with-total-trace-length=0x1000 \
+--enable-use-ipv6 \
+--disable-use-mysql \
+--disable-supply-parse-command \
+--enable-use-pcre \
+--disable-debug \
+--disable-check-strings \
+--disable-use-set-light \
+--disable-use-process-string \
+--disable-use-deprecated

@@ -1,0 +1,88 @@
+CONCEPT
+        pgsql - PostgreSQL support
+
+DESCRIPTION
+        On hosts with the PostgreSQL package installed, the driver can be
+        configured to interface with the PostgreSQL database. If that is done,
+        the driver defines the macro __PGSQL__ for LPC programs and
+        activates a number of related efuns.
+
+        -- Usage --
+
+        The interface to the PostgreSQL database is implemented
+        through the concept of a controlling object: when opening a
+        database connection, the LPC code has to provide a callback
+        function. The object this function is bound to is the
+        controlling object: all queries to the database will be issued
+        by this object, and the responses will be sent to the callback
+        function.
+
+        The interface is also asynchronous: the pg_query() efun just
+        queues the query with the database connection, and returns
+        immediately. When the database has finished working the query,
+        the callback function is called with the results.
+
+        The callback function can be defined by name or by closure,
+        and can be defined with extra parameters:
+
+
+          #include <pgsql.h>
+
+          void <callback>(int type, mixed ret, int id [, mixed extra...])
+
+            <type> is the type of the call, <id> identifies the query
+            for which this call is executed:
+
+              PGRES_TUPLES_OK: <ret> is the result from a query.
+                               It is either a mapping (field name as
+                               key, indexing <n> values for n returned
+                               tuples), or an array of arrays (one per
+                               row).
+
+              PGRES_COMMAND_OK: <ret> is a string which contains the
+                                server response (e.g. on INSERT or DELETE) 
+
+              PGRES_BAD_RESPONSE,
+              PGRES_NONFATAL_ERROR,
+              PGRES_FATAL_ERROR: ret is the error-string
+
+
+          void <callback>(int type, mixed ret [, mixed extra...])
+
+            <type> is the type of the call, which is not related a
+            specific query:
+
+              PGCONN_SUCCESS: The database-connection was established,
+                              <ret> is a dummy string.
+              PGCONN_FAILED:  The database-connection failed, <ret> is
+                              the error message.
+                The first message to the callback after a call to
+                pg_connect() is always one of these two.
+
+              PGRES_NOTICE: <ret> is a informational text.
+
+              PGCONN_ABORTED: If the connection to the backend fails
+                              we try to re-establish (reset) it. If the
+                              reset fails, the connection is closed and
+                              this value is returned. Consider the
+                              connection gone and don't try to close or 
+                              otherwise operate further on it.
+                              <ret> is a dummy string.
+
+        -- Security --
+
+        All SQL efuns (unless execute by the master or the simul-efun object)
+        trigger a privilege_violation ("pgsql", "<efun_name>"). If a more
+        finegrained control is desired, overload the individual efuns with a
+        nomask simul-efun.
+
+AUTHOR
+        Florian Heinz and others.
+
+HISTORY
+        Added as package in LDMud 3.3.445.
+        LDMud 3.3.640 added a privilege_violation() call for each efun.
+
+SEE ALSO
+        mysql(C), pg_connect(E), pg_conv_string(E), pg_query(E), pg_pending(E),
+        pg_close(E), privilege_violation(M)

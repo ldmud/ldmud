@@ -1,0 +1,20 @@
+REMOVED EFUN
+SYNOPSIS
+        void add_verb(string str)
+
+DESCRIPTION
+        This function is connected to the add_action() function. It
+        will set up the command str to trigger a call to the function
+        set up by the previous call to add_action().
+
+        This function is now obsolete as the verb can be given directly
+        with add_action(). add_verb() remains for compatibility.
+
+        [marion Sun Jan 19 1992 Don't use it. This file is retained
+        because of somewhat nostalgic reasons.]
+
+HISTORY
+        Removed in LDMud 3.3, obsoleted by add_action().
+
+SEE ALSO
+        add_action(E), query_verb(E), add_xverb(O), remove_action(E)

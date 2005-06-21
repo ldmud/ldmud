@@ -1,0 +1,14 @@
+REMOVED MASTER APPLY
+SYNOPSIS
+        string get_root_uid(void)
+
+DESCRIPTION
+        Return the string to be used as root-uid.
+        Under !native, the function is expendable.
+
+HISTORY
+        In 3.2.1@40, get_root_uid() was renamed to get_master_uid()
+        and recieved a new semantic.
+
+SEE ALSO
+        get_bb_uid(M), get_master_uid(M), uids(C), creator_file(M), creator(E)

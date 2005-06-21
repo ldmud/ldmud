@@ -1,0 +1,52 @@
+SYNOPSIS
+        string valid_write(string path, string uid, string func, object ob)
+
+DESCRIPTION
+        This function is called to check if the object ob with the
+        user-id uid has write permissions to the file given by path
+        for the operation named by func. It should return 0 if
+        permission is denied, or the normalized path if permission is
+        granted. You can also return 1 to indicate that the path can
+        be used unchanged.
+
+        The returned pathname must not contain ``..'', a leading /
+        will be stripped by the interpreter. By default, the returned
+        path must also not contain space characters; if the driver
+        is instructed to allow them, the preprocessor macro
+        __FILENAME_SPACES__ is defined.
+
+        Func denotes the efun call or other operation that caused
+        valid_write() to be called:
+
+          copy_file (for the target file or directory name)
+          rename_from (efun rename(), for the original name)
+          rename_to   (efun rename(), for the new name)
+          ed_start (whenever the builtin ed tries to write to a file),
+          garbage_collection
+          mkdir,
+          memdump
+          objdump
+          opcdump
+          remove_file (efun rm()),
+          rmdir,
+          save_object,
+          write_bytes,
+          write_file.
+
+        For save_object(), the <path> passed is the filename as given
+        in the efun call. If for this efun a filename ending in ".c" is
+        returned, the ".c" will be stripped from the filename.
+
+        This function is called in compat mode as well. If
+        you need to be compatible with the old 2.4.5-mudlib, redirect
+        these calls to the valid_read/valid_write in the user
+        object.
+
+HISTORY
+        LDMud 3.2.8 adds operation "copy_file", and replaces "do_rename"
+        by "rename_from" and "rename_to".
+        LDMud 3.2.9 adds operation "garbage_collection".
+        LDMud 3.3.526 adds operation "memdump".
+
+SEE ALSO
+        valid_read(M), make_path_absolute(M)

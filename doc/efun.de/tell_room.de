@@ -1,0 +1,50 @@
+SYNOPSIS
+        void tell_room(string|object obj, string str);
+        void tell_room(string|object obj, string str, object *exclude);
+
+        void tell_room(string|object obj, mixed *|mapping|struct|object msg)
+        void tell_room(string|object obj, mixed *|mapping|struct|object  msg
+                                        , object *exlcude);
+
+BESCHREIBUNG
+        Gibt einen Text <str> an den Raum <obj> aus. <obj> kann auch der
+        Name des Raumes als String sein. Wenn das Objekt, das die Meldung
+        erhaelt, nicht ein interaktives Objekt (also kein User) ist, wird
+        im Empfaenger die Funktion catch_tell() mit dem Text als Argument
+        aufgerufen. Falls ein Lebewesen die Funktion catch_tell() definiert,
+        wird der Text hier ausgewertet und nicht an den User ausgegeben.
+        Wenn das Empfaengerobjekt mit seinem Namen angegeben ist, sucht der
+        Driver das Objekt unter diesem Namen und laedt es, falls notwendig.
+        Wenn das Array <*exclude> angegeben ist, wird der Text an die
+        Objekte in <*exclude> nicht ausgegeben.
+
+        Wenn das zweite Argument ein nicht-String ist, wird in allen
+        Lebewesen, die den Text erhalten, catch_msg() aufgerufen (statt
+        catch_tell()).
+
+BEISPIELE
+        An alle Lebewesen im Raum soll ein simples "Hi!" gesendet werden:
+
+            tell_object(environment(this_player()), "Hi!\n");
+
+        Folgendes Beispiel zeigt, wie tell_room() zusammen mit catch_tell()
+        funktioniert.
+
+        Objekt1 (ein Lebewesen):
+            void catch_tell(string str)
+            {
+                write("Empfangen: "+str+"\n");
+            }
+
+        Objekt2:
+            void fun()
+            {
+                tell_room(environment(this_player()), "Hallo Welt!\n");
+            }
+
+GESCHICHTE
+        LDMud 3.3.686 erlaubt die Verwendung eines mapping/struct/object als
+        zweites Argument.
+
+SIEHE AUCH
+        write(E), say(E), tell_object(E), catch_tell(A), catch_msg(A)

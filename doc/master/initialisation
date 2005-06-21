@@ -1,0 +1,17 @@
+SYNOPSIS
+        Initialization of the master object.
+
+DESCRIPTION
+        As the lfuns which are called to initialize
+        objects after a load are defined through driver hooks, and
+        these hooks are cleared prior to a master (re)load, the first
+        function called is inaugurate_master(). Anyway it's not very
+        sensible to do anything earlier as the master is not
+        recognized as such at that time, and so a number of
+        (important) things would not work.
+        Which lfun is called during runtime to reset the master is also
+        depending on the driverhook settings. Arbitrary actions may be done
+        on a reset.
+
+SEE ALSO
+        inaugurate_master(M)

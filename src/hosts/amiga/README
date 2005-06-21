@@ -1,0 +1,15 @@
+ hosts/amiga/README
+
+This directory contains all specials needed for LDMud to compile on Amiga.
+For detailed information, see README.Amiga.
+
+You'll find here:
+
+  README       : this file.
+  README.Amiga : A general description of the port.
+  config.h     : a 'standard' config.h
+  machine.h    : a 'standard' machine.h to compile the driver.
+  StartMUD     : a script to (re)start the mud.
+
+All machine.h and config.h are the Amiga-Replacements for the
+corresponding Unix files in the top directory.

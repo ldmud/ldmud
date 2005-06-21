@@ -1,0 +1,66 @@
+Operating Systems:
+-----------------
+SunOS .. 4.1:		sun		(abbr.: SunOS4)
+Solaris:		sun __svr4__	(abbr.: solaris)
+Silicon Graphics:	sgi
+AIX:                    _AIX
+Atari ST/TT MiNT:	atarist
+Amiga, DICE:		AMIGA _DCC
+Amiga, SAS/C:		AMIGA __SASC
+BeOS                    __BEOS__
+FreeBSD:                __FreeBSD__
+Linux:			linux
+NeXT:			NeXT
+Sequent:		_SEQUENT_
+Ultrix:			ultrix
+IBM RS6000		_AIX _IBMR2
+HP-UX			hpux
+OS/2			OS2 (not set by all compilers; for some the configure
+                             script adds it to the EXTRA_CFLAGS)
+???			M_UNIX
+Apple Unix		AUX		/* add -D_POSIX_SOURCE to CFLAGS */
+Apple Darwin            __APPLE__, __MACH__
+Windows NT/95/98        _WIN32, WINNT, _WINNT
+
+Program Loaders:
+---------------
+msdos:			MSDOS
+
+Processor Hardware:
+------------------
+Sparc			sparc
+x86 (MWerks/Be)         __INTEL__
+x86 (gcc)               i386, __i386__
+x86 (icc)               _M_IX86
+PowerPC (Darwin)        __ppc__
+Itanium (ecc)           _M_IA64
+
+compilers:
+---------
+gcc:			__GNUC__
+Apple CC:               __GNUC__, __APPLE_CC__
+Cygnus gcc for Win32    __CYGWIN32__ resp. __CYGWIN__
+Metrowerks (Be)         __MWERKS__
+EMX gcc for OS/2        __EMX__
+Intel C/C++ Compiler    __INTEL_COMPILER (expands to version, e.g. 500)
+
+-----------------------------------------------------------------------------
+
+von HP-UX haben wills, hier der Output von gcc -E -dM < /dev/null:
+
+#define __hp9000s800__ 1
+#define __unix__ 1
+#define __unix 1
+#define __hppa 1
+#define __hppa__ 1
+#define __hpux 1
+#define __hpux__ 1
+#define __hp9000s700 1
+#define __hp9000s700__ 1
+#define __hp9000s800 1
+#define _ILP32 1
+#define __STDC_HOSTED__ 1
+#define _PA_RISC1_1 1
+#define _HPUX_SOURCE 1
+
+-----------------------------------------------------------------------------

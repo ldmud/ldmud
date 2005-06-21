@@ -1,0 +1,118 @@
+SYNOPSIS
+        #include <files.h>
+
+        string *get_dir(string str)
+        string *get_dir(string str, int mask)
+
+BESCHREIBUNG
+        Benoetigt einen Pfad als erstes Argument und liefert ein Feld
+        (Array) mit Dateinamen bzw. Eigenschaften der gefundenen Dateien im
+        angegebenen Verzeichnis.
+
+        Liefert 0 zurueck, wenn es das Verzeichnis, in dem gesucht werden
+        soll, nicht gibt.
+
+        Der Dateinamen-Teil des Pfades darf "*" und "?" als Platzhalter
+        enthalten: jeder "*" steht fuer eine beliebige Anzahl Zeichen (oder
+        sich selber), "?" fuer ein beliebiges Zeichen. Entsprechend liefert
+        get_dir("/pfad/*") ein alphabetisch sortiertes Feld aller Dateien
+        im Verzeichnis "/pfad" oder ({ "/pfad/*" }), wenn es diese Datei
+        geben sollte.
+
+        Gibt man den Pfad eines Verzeichnisses mit abschliessendem "/" oder
+        "/." an (z. B. get_dir("/pfad/.")), so erhaelt man den Inhalt des
+        Verzeichnisses. Um Informationen ueber das Verzeichnis selber zu
+        erhalten, muss man den Pfad des Verzeichnisses angeben.
+
+        Das optionale zweite Argument ist eine Bitmaske, mit der man
+        angeben kann, welche Informationen man ueber die angegebenen
+        Dateien erhalten moechte.
+
+        GETDIR_EMPTY    (0x00)  get_dir() liefert ein leeres Feld (nicht
+                                wirklich sinnvoll)
+        GETDIR_NAMES    (0x01)  liefert die alphabetisch sortierten
+                                Dateinamen.
+        GETDIR_SIZES    (0x02)  liefert die unsortierten Dateigroessen
+                                (file_size()), Verzeichnisse haben die
+                                Dateigroesse FSIZE_DIR (-2).
+        GETDIR_DATES    (0x04)  liefert die unsortierten Zeiten der jeweils
+                                letzten Aenderung in Sekunden seit dem
+                                01.01.1970.
+        GETDIR_ACCESS   (0x40)  liefert die unsortierten Zeiten des jeweils
+                                letzten Zugriffes in Sekunden seit dem
+                                01.01.1970.
+        GETDIR_MODES    (0x80)  liefert die Filemode-Maske
+
+        GETDIR_ALL      (0xDF)  Liefert all Werte zurueck.
+
+        GETDIR_PATH     (0x10)  Dateinamen werden als volle Pfade geliefert.
+                                (ein ev. fehlendes GETDIR_NAMES wird als
+                                vorhanden angenommen).
+        GETDIR_UNSORTED (0x20)  Das Ergebnis wird nicht sortiert.
+
+        Wichtig: Man muss GETDIR_NAMES|GETDIR_UNSORTED verwenden, wenn man
+        die Eintraege in der selben Reihenfolge wie bei GETDIR_SIZES und
+        GETDIR_DATES haben moechte.
+
+        Die Eintraege in der Bitmaske koennen miteinander kombiniert
+        werden.
+
+BEISPIELE
+        Funktion                         Rueckgabewert
+        -------------------------------------------------------------------
+        get_dir("/obj/.")                Alle Dateien, die im Verzeichnis
+                                         /obj enthalten sind.
+        get_dir("/obj/")                 Wie get_dir("/obj/").
+
+        get_dir("/obj/schwert.c")        ({ "schwert.c" }), sofern
+                                         /obj/schwert.c existiert (als
+                                         Datei oder Verzeichnis), ansonsten
+                                         ({}), sofern /obj ein Verzeichnis
+                                         ist, ansonsten 0.
+
+        get_dir("/obj/*")                ({ "*" }), sofern * existiert.
+                                         Ansonsten und normalerweise ein
+                                         alphabetisch sortiertes Feld mit
+                                         den Namen aller Dateien und
+                                         Verzeichnisse in /obj, sofern /obj
+                                         ein Verzeichnis ist, ansonsten 0.
+
+        get_dir("/obj/schwert.c", GETDIR_SIZES)
+                                         ({ <Groesse von /obj/schwert.c> }),
+                                         sofern /obj/schwert.c existiert.
+        get_dir("/obj/.", GETDIR_NAMES)  Wie get_dir("/obj/.").
+        get_dir("/obj/.", GETDIR_SIZES)  Ein unsortiertes Feld mit den
+                                         Groessen der Dateien in /obj.
+        get_dir("/obj/.", GETDIR_NAMES|GETDIR_SIZES|GETDIR_DATES)
+            oder kuerzer
+        get_dir("/obj/.", GETDIR_ALL)    Ein eindimensionales und nach
+                                         Namen sortiertes Feld, das fuer
+                                         jede Datei in /obj den Namen, die
+                                         Groesse und den Zeitpunkt der
+                                         letzten Aenderung enthaelt, z.B.
+                                         ({
+                                             "axt.c"    ,  927, 994539583,
+                                             "schwert.c", 1283, 998153903,
+                                             }).
+
+        get_dir("/obj/schwert.c", GETDIR_NAMES|GETDIR_PATH)
+                                         ({ "/obj/sword.c" }), sofern
+                                         vorhanden.
+        get_dir("/obj/schwert.c", GETDIR_PATH)  Kurzform dafuer.
+
+        transpose_array(({ get_dir(str, GETDIR_NAMES|GETDIR_UNSORTED)
+                         , get_dir(str, GETDIR_SIZES)
+                         , get_dir(str, GETDIR_DATES) }));
+        Liefert ein unsortiertes Feld mit Feldern, von denen ein jedes
+        Name, Groesse und Zeit einer Datei enthaelt, z. B.
+        ({
+            ({ "schwert.c", 1283, 998153903 }),
+            ({ "axt.c"    ,  927, 994539583 }),
+            }).
+
+AENDERUNGEN
+        LDMud 3.2.9: GETDIR_PATH eingefuehrt.
+        LDMud 3.2.11: GETDIR_ACCESS und GETDIR_MODES eingefuehrt.
+
+SIEHE AUCH
+        cat(E), mkdir(E), rmdir(E), file_size(E)

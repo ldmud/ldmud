@@ -1,0 +1,67 @@
+#!/bin/sh
+#
+# Settings for the Morgengrauen mudlib.
+#
+# If the environment variable DEBUG is set to a non-empty string, the
+# driver is configured to use short intervals for reset, swap and cleanup
+# and with a larger array size limit.
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/home/mud/mud --libdir=/home/mud/mud/mudlib --bindir=/home/mud/mud/bin --libexecdir=/home/mud/mud/bin/erq.d --with-setting=morgengrauen $*
+exit 1
+
+# --- The actual settings ---
+
+enable_erq=no
+enable_access_control=no
+
+with_read_file_max_size=200000
+with_max_byte_transfer=200000
+
+if test "x$DEBUG" = "x"; then
+    with_time_to_clean_up=36000
+    with_time_to_swap=14000
+    with_time_to_swap_variables=22000
+    with_time_to_reset=3600 
+else
+    with_time_to_clean_up=540
+    with_time_to_swap=90
+    with_time_to_swap_variables=180
+    with_time_to_reset=360 
+fi
+
+with_portno=23
+with_max_cost=1500000
+with_catch_reserved_cost=4000
+with_master_reserved_cost=1024
+with_swap_file=/home/mud/mud/swapfiles/SwapFile
+
+if test "x$DEBUG" = "x"; then
+    with_max_array_size=10000
+# with_max_mapping_keys=10000 ?
+# with_max_mapping_size=30000 ?
+else
+    with_max_array_size=100000
+# with_max_mapping_size=300000 ?
+fi
+with_max_players=225
+
+with_reserved_user_size=8500000
+with_reserved_master_size=500000
+with_reserved_system_size=1000000
+
+with_htable_size=32768
+with_otable_size=16384
+
+enable_compat_mode=no
+enable_strict_euids=yes
+
+enable_use_parse_command=no
+enable_share_variables=no
+enable_use_alists=yes
+enable_use_pcre=no
+
+with_min_malloced=0x80000
+with_max_malloced=0x1f000000
+

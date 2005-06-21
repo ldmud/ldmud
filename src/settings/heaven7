@@ -1,0 +1,45 @@
+#!/bin/sh
+#
+# $Author: lars $
+# $Revision: 1.7 $
+# $Date: Thu, 15 Apr 2004 22:27:56 -0600 $
+# 
+# Purpose: This is the settings file to use when compiling LDMud for H7.
+# 
+# Settings for the Heaven7 mudlib.
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/heaven7 --with-setting=heaven7 $*
+exit 1
+
+
+# --- The actual settings ---
+
+with_master_name=secure/master
+enable_compat_mode=no
+enable_strict_euids=no
+enable_lpc_nosave=yes
+
+with_portno=7000
+with_max_cost=900000
+with_swap_file=log/SWAP
+with_udp_port=7002
+with_time_to_clean_up=5400
+with_time_to_reset=900
+with_max_bits=1200
+with_reserved_user_size=800000
+with_reserved_master_size=50000
+with_reserved_system_size=100000
+
+enable_initialization_by___init=no
+enable_erq=xerq
+enable_supply_parse_command=yes
+enable_use_system_crypt=no
+enable_use_deprecated=no
+
+# --- Access Control ---
+enable_access_control=yes
+with_access_file=secure/ACCESS.ALLOW
+enable_access_log=yes
+with_access_log=secure/access.allow.log

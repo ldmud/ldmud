@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# Settings for the StickLib
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/home/sticklib --with-setting=sticklib $*
+exit 1
+
+# --- The actual settings ---
+
+with_portno=7690
+enable_erq=erq
+with_udp_port=7691
+with_max_players=200
+enable_access_control=no
+
+with_time_to_swap=0
+with_time_to_swap_variables=0
+with_time_clean_up=3600
+with_time_to_reset=1800
+with_read_file_max_size=100000
+with_max_byte_transfer=100000
+with_otable_size=4096
+enable_dynamic_costs=yes
+
+enable_compat_mode=yes
+enable_strict_euids=no
+enable_use_alists=yes
+enable_use_pcre=no
+with_master_name=secure/master
+
+enable_use_parse_command=no
+enable_share_variables=yes
+
+enable_malloc_trace=no
+enable_malloc_lpc_trace=no
+enable_comm_stat=yes
+enable_apply_cache_stat=yes
+
+with_htable_size=4096
+with_otable_size=4096
+

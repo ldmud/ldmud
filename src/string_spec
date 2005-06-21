@@ -1,0 +1,231 @@
+/*---------------------------------------------------------------------------
+ * Specification of the standard shared strings.
+ *
+ *---------------------------------------------------------------------------
+ * For a full explanation, see make_func.y
+ *---------------------------------------------------------------------------
+ */
+
+    /* General strings */
+
+DEFAULT "This string is used as a substitute if allocating another one failed."
+EMPTY           ""
+
+ANONYMOUS         "anonymous"
+ATAT              "@@"
+CALL_OTHER        "call_other"
+CATCH             "CATCH"
+CL_OBJ_DESTR      "Object the closure was bound to has been destructed"
+CRPATTERN         "\015$"
+DANGLING_V_CL     "dangling var closure"
+DEFAULT_PROMPT    "> "
+DESTRUCTED        "destructed"
+EFUN              "efun"
+EFUN_CLOSURE      "<efun closure>"
+FATAL_ERROR       "Fatal Error"
+FROM              " from "
+FUNCTIONS         "functions"
+HEART_BEAT        "heart_beat"
+IN                "in"
+LINE              " line "
+MEMORY            "memory"
+MEMDUMP           "memdump"
+MYSQL             "mysql"
+NEWLINE           "\n"
+NONAME            "NONAME"
+NO_PROG_TRACE     "No program to trace."
+NO_TRACE          "No trace."
+NOLOG             "nolog"
+PUBLISH           "publish"
+OBJDUMP_FNAME     "/OBJ_DUMP"
+DESTOBJDUMP_FNAME "/DEST_OBJ_DUMP"
+OPCDUMP_FNAME     "/OPC_DUMP"
+MEMDUMP_FNAME     "/MEMORY_DUMP"
+OBJECTS           "objects"
+OPCODES           "opcodes"
+OUT_OF_MEMORY     "(s)sprintf() error: Out of memory.\n"
+PERCENT           "%"
+PERCENT_S         "%s"
+PERIOD            "."
+PGSQL             "pgsql"
+PROG_DEALLOCATED  "program deallocated"
+PTMALLOC          "ptmalloc"
+RESERVE           "reserve"
+SEFUN_CLOSURE     "<simul_efun closure>"
+SLABALLOC         "slaballoc"
+SMALLOC           "smalloc"
+SLASH             "/"
+SPACE             " "
+SYSTEM_MALLOC     "system malloc"
+TRACE             "trace"
+TRACEPREFIX       "traceprefix"
+UNDEFINED         "UNDEFINED"
+UNKNOWN_LAMBDA    "<lambda ?>"
+VARIABLES         "variables"
+
+    /* Privilege violation names */
+
+ATTACH_ERQ_DEMON   "attach_erq_demon"
+BIND_LAMBDA        "bind_lambda"
+CALL_OUT_INFO      "call_out_info"
+SEND_ERQ           "erq"
+INPUT_TO           "input_to"
+SEND_UDP           "send_udp"
+ENABLE_TELNET      "enable_telnet"
+EXECUTE_COMMAND    "execute_command"
+GET_EXTRA_WIZINFO  "get_extra_wizinfo"
+LIMITED            "limited"
+NET_CONNECT        "net_connect"
+NOMASK_SIMUL_EFUN  "nomask simul_efun"
+RENAME_OBJECT      "rename_object"
+SET_AUTO_INCLUDE   "set_auto_include_string"
+SET_DRIVER_HOOK    "set_driver_hook"
+SET_EXTRA_WIZINFO  "set_extra_wizinfo"
+SET_EXTRA_WIZINFO_SIZE  "set_extra_wizinfo_size"
+SET_LIMITS         "set_limits"
+SET_THIS_OBJECT    "set_this_object"
+SHADOW_ADD_ACTION  "shadow_add_action"
+SYMBOL_VARIABLE    "symbol_variable"
+VARIABLE_LIST      "variable_list"
+WIZLIST_INFO       "wizlist_info"
+
+    /* check_valid_path function names */
+
+COPY_FILE          "copy_file"
+ED_START           "ed_start"
+FILE_SIZE          "file_size"
+GARBAGE_COLLECTION "garbage_collection"
+GET_DIR            "get_dir"
+MKDIR              "mkdir"
+OBJDUMP            "objdump"
+OPCDUMP            "opcdump"
+PRINT_FILE         "print_file"
+READ_BYTES         "read_bytes"
+READ_FILE          "read_file"
+REMOVE_FILE        "remove_file"
+RENAME_FROM        "rename_from"
+RENAME_TO          "rename_to"
+RESTORE_OBJECT     "restore_object"
+RMDIR              "rmdir"
+SAVE_OBJECT        "save_object"
+TAIL               "tail"
+WRITE_BYTES        "write_bytes"
+WRITE_FILE         "write_file"
+
+    /* Editor strings */
+
+ED_PROMPT          ":"
+ED_APPEND_PROMPT   "*\b"
+
+    /* Object lfuns */
+
+CATCH_TELL      "catch_tell"
+CATCH_MSG       "catch_msg"
+ID              "id"
+VARINIT         "__INIT"
+
+    /* Master lfuns */
+
+ABS_PATH        "make_path_absolute"
+COMP_OBJ        "compile_object"
+CONNECT         "connect"
+DANGLING_LFUN   "dangling_lfun_closure"
+DISCONNECT      "disconnect"
+EPILOG          "epilog"
+EXT_RELOAD      "external_master_reload"
+FLAG            "flag"
+GET_BB_UID      "get_bb_uid"
+GET_ED_FNAME    "get_ed_buffer_save_file_name"
+GET_M_UID       "get_master_uid"
+GET_SEFUN       "get_simul_efun"
+GET_WNAME       "get_wiz_name"
+HEART_ERROR     "heart_beat_error"
+INAUGURATE      "inaugurate_master"
+INCLUDE_FILE    "include_file"
+INHERIT_FILE    "inherit_file"
+LOG_ERROR       "log_error"
+LOGON           "logon"
+PRELOAD         "preload"
+PREP_DEST       "prepare_destruct"
+PRINTF_OBJ_NAME "printf_obj_name"
+PRIVILEGE       "privilege_violation"
+QUERY_SHADOW    "query_allow_shadow"
+QUOTA_DEMON     "quota_demon"
+RETR_ED         "retrieve_ed_setup"
+REACTIVATE      "reactivate_destructed_master"
+RECEIVE_UDP     "receive_udp"
+REMOVE_PL       "remove_player"
+RUNTIME         "runtime_error"
+SAVE_ED         "save_ed_setup"
+SET_MAX_CMDS    "set_max_commands"
+SHUTDOWN        "notify_shutdown"
+SLOW_SHUT       "slow_shut_down"
+STALE_ERQ       "stale_erq"
+VALID_EXEC      "valid_exec"
+VALID_QSNOOP    "valid_query_snoop"
+VALID_READ      "valid_read"
+VALID_SETEUID   "valid_seteuid"
+VALID_SNOOP     "valid_snoop"
+VALID_TRACE     "valid_trace"
+VALID_WRITE     "valid_write"
+WARNING         "runtime_warning"
+
+#ifdef USE_DEPRECATED
+
+    /* Compat mode lfuns used by transfer() */
+
+ADD_WEIGHT      "add_weight"
+CANPUTGET       "can_put_and_get"
+DROP            "drop"
+GET             "get"
+QUERY_WEIGHT    "query_weight"
+PREVENT_INSERT  "prevent_insert"
+
+#endif
+
+
+#ifdef USE_PARSE_COMMAND
+
+    /* parse_command() lfuns */
+
+PC_FIND_LIVING  "find_living"
+PC_FIND_PLAYER  "find_player"
+
+PC_ID_LIST      "parse_command_id_list"
+PC_P_ID_LIST    "parse_command_plural_id_list"
+PC_ADJ_LIST     "parse_command_adjectiv_id_list"
+PC_PREPOS       "parse_command_prepos_list"
+PC_ALLWORD      "parse_command_all_word"
+
+PC_PLURAL_ID    "plural_id"
+PC_ADJ_ID       "adjectiv_id"
+PC_SHORT        "short"
+
+  /* parse_command() special words */
+
+PC_OF           "of"
+PC_CORPSE       "corpse"
+PC_CORPSES      "corpses"
+PC_TOOTH        "tooth"
+PC_TEETH        "teeth"
+PC_FOOT         "foot"
+PC_FEET         "feet"
+PC_MAN          "man"
+PC_MEN          "men"
+PC_WOMAN        "woman"
+PC_WOMEN        "women"
+PC_CHILD        "child"
+PC_CHILDREN     "children"
+PC_SHEEP        "sheep"
+
+#endif /* SUPPLY_PARSE_COMMAND */
+
+#ifdef USE_PGSQL
+
+PGCONNECT	"pgconnect"
+PG_RESET_FAILED "Reset failed, connection aborted."
+SUCCESS         "success"
+
+#endif
+
+/***************************************************************************/

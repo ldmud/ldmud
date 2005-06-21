@@ -1,0 +1,417 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<meta name="GENERATOR" content="Microsoft FrontPage 4.0">
+<title>MUD Sound Protocol</title>
+<link rel="stylesheet" type="text/css" href="../common/master.css">
+</head>
+
+<body stylesrc="../zuggsoft/zuggsoft.htm" bgcolor="#FFFFFF" text="#000000" link="#FF0000" vlink="#0080C0" alink="#FF8080">
+<script language="JavaScript" SRC="/common/js_dynMenuFunctions.js">
+</script>
+<script language="JavaScript">
+<!--
+	var garyMenuData = new Array()
+	var garyMenuNames = new Array()
+	garyMenuData["News"] = new Array()
+	garyMenuNames.push( new Array("News", 12, 14, 95, 80) )
+	garyMenuData["News"].push( new Array("Privacy","/zuggsoft/privacy.htm") )
+	garyMenuData["News"].push( new Array("Press","/zmud/press.htm") )
+	garyMenuData["News"].push( new Array("About us","/zuggsoft/about.htm") )
+	garyMenuData["Products"] = new Array()
+	garyMenuNames.push( new Array("Products", 63, 65, 160, 145) )
+	garyMenuData["Products"].push( new Array("zMUD","/zmud/zmudinfo.htm") )
+	garyMenuData["Products"].push( new Array("AC Explorer","/ac/ac.asp") )
+	garyMenuData["Products"].push( new Array("DoctorZ","/doctorz/doctorzinfo.htm") )
+	garyMenuData["Products"].push( new Array("zMUD Developer's Kit","/devkit/devkitinfo.htm") )
+	garyMenuData["Products"].push( new Array("zChat","/zchat/zchatinfo.htm") )
+	garyMenuData["Buy"] = new Array()
+	garyMenuNames.push( new Array("Buy", 147, 149, 160, 145) )
+	garyMenuData["Buy"].push( new Array("zMUD","/zmud/order_zmud.htm") )
+	garyMenuData["Buy"].push( new Array("AC Explorer","/zmud/order_ac.htm") )
+	garyMenuData["Buy"].push( new Array("DoctorZ","/doctorz/register.htm") )
+	garyMenuData["Buy"].push( new Array("zMUD Developer's Kit","/zmud/order_devkit.htm") )
+	garyMenuData["Downloads"] = new Array()
+	garyMenuNames.push( new Array("Downloads", 224, 226, 105, 90) )
+	garyMenuData["Downloads"].push( new Array("zMUD","/zmud/down.asp#zMUD") )
+	garyMenuData["Downloads"].push( new Array("AC Explorer","/zmud/down.asp#ACX") )
+	garyMenuData["Downloads"].push( new Array("DoctorZ","/zmud/down.asp#DoctorZ") )
+	garyMenuData["Support"] = new Array()
+	garyMenuNames.push( new Array("Support", 322, 324, 160, 145) )
+	garyMenuData["Support"].push( new Array("Support Library","/library") )
+	garyMenuData["Support"].push( new Array("Bug reports","/zmud/bugs.htm") )
+	garyMenuData["Support"].push( new Array("Lost Registration code","/zuggsoft/regcode.htm") )	
+	garyMenuData["Support"].push( new Array("Links","/links/links.cfm") )
+	garyMenuData["Support"].push( new Array("MUDs","/muds/links.cfm") )
+	garyMenuData["Forums"] = new Array()
+	garyMenuNames.push( new Array("Forums", 396, 398, 120, 105) )
+	garyMenuData["Forums"].push( new Array("zMUD General","/forum/FORUM.asp?FORUM_ID=7&CAT_ID=1&Forum_Title=zMUD+General+Discussion") )
+	garyMenuData["Forums"].push( new Array("zMUD Beta","/forum/FORUM.asp?FORUM_ID=8&CAT_ID=1&Forum_Title=zMUD+Beta+Forum") )
+	garyMenuData["Forums"].push( new Array("AC Explorer","/forum/FORUM.asp?FORUM_ID=13&CAT_ID=3&Forum_Title=AC+Explorer+Discussion") )
+	garyMenuData["Forums"].push( new Array("DoctorZ","/forum/FORUM.asp?FORUM_ID=12&CAT_ID=3&Forum_Title=DoctorZ+Discussion") )
+	garyMenuData["Forums"].push( new Array("Developers","/forum/FORUM.asp?FORUM_ID=10&CAT_ID=1&Forum_Title=zMUD+Developers") )
+	garyMenuData["Contact"] = new Array()
+	garyMenuNames.push( new Array("Contact", 400, 403, 160, 145) )
+	garyMenuData["Contact"].push( new Array("Feedback","/zuggsoft/feedback.htm") )
+	garyMenuData["Contact"].push( new Array("Bug reports","/zmud/bugs.htm") )
+	garyMenuData["Contact"].push( new Array("Lost Registration code","/zuggsoft/regcode.htm") )	
+	garyMenuData["Contact"].push( new Array("Email","mailto:support@zuggsoft.com") )
+//-->
+</script>
+<script language="JavaScript">
+<!--
+	var gstrBrowserType = null
+	if( document.layers )   gstrBrowserType="Netscape";
+	else if( document.all )	gstrBrowserType="IE";
+	gstrMenuColor = "#F3E9EF"
+	gstrMenuColorOn = "#D2AEC4"
+	gstrBorderColor = "#993366"
+	var strAlignment = "left"
+	if( gstrBrowserType == "Netscape" )
+	{
+		for (var intCnt=0; intCnt<garyMenuNames.length; intCnt++) {
+			if( intCnt == (garyMenuNames.length - 1) ){
+				//All menus are left-aligned except the last menu
+				strAlignment = "right"
+			}
+			//Pass the menu name, the menu left position Netscape, the Netscape width, and the alignment of text in the menu
+			createNetscapeMenu(garyMenuNames[intCnt][0], garyMenuNames[intCnt][1], garyMenuNames[intCnt][3], strAlignment)
+		}
+	}
+	else if( gstrBrowserType == "IE" )
+	{
+		for (var intCnt=0; intCnt<garyMenuNames.length; intCnt++) {
+			if( intCnt == (garyMenuNames.length - 1) ){
+				//All menus are left-aligned except the last menu
+				strAlignment = "right"
+			}
+			//Pass the menu name, the menu left position for IE, the IE width, and the alignment of text in the menu
+			createIEMenu(garyMenuNames[intCnt][0], garyMenuNames[intCnt][2], garyMenuNames[intCnt][4], strAlignment)
+		}
+	}
+//-->
+</script>
+
+<table width="100%" border="0" cellpadding="0">
+  <tr>
+    <td>
+      <table border="0" cellpadding="0" width="100%" background="/common/background.gif">
+        <tr>
+          <td width="260"><a href="/zuggsoft/zuggsoft.htm" target="_top"><img border="0" src="/common/zs.gif" width="130" height="53"></a> <img border="0" src="/common/flag.gif" width="100" height="55"></td>
+          <td>
+            <font face="Verdana" size="2" color="#0000FF"><b>Customer&nbsp;driven&nbsp;Internet&nbsp;Software<br>
+            Upgrades&nbsp;are&nbsp;always&nbsp;FREE,&nbsp;FOREVER!</b></font>
+          </td>
+          <td valign="middle" align="right"><font size="-2" face="Arial">
+            [<a href="http://www.mudconnector.com/" target="_blank">The&nbsp;MUD&nbsp;Connector</a>]<br>
+            [<a href="http://www.themudjournal.com/" target="_blank">The&nbsp;MUD&nbsp;Journal</a>]<br>
+            [<a href="http://www.mudcompanion.com/" target="_blank">The&nbsp;MUD&nbsp;Companion</a>]</font></td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <table border="0" width="100%" cellpadding="0">
+        <tr>
+          <td width="48" valign="top">
+            <a href="/zuggsoft/whatsnew.htm" onmouseover="showMenu('News')" onmouseout="hideMenu('News')">
+            <img src="/common/newsbutton.gif" width="49" height="21" alt="" border="0"></a></td>
+          <td width="81" valign="top">
+            <a href="/zuggsoft/product.htm" onmouseover="showMenu('Products')" onmouseout="hideMenu('Products')">
+            <img src="/common/productbutton.gif" width="82" height="21" alt="" border="0"></a></td>
+          <td width="74" valign="top">
+            <a href="/zmud/register.htm" onmouseover="showMenu('Buy')" onmouseout="hideMenu('Buy')">
+            <img src="/common/buybutton.gif" width="75" height="21" alt="" border="0"></a></td>
+          <td width="95" valign="top">
+            <a href="/zmud/down.htm" onmouseover="showMenu('Downloads')" onmouseout="hideMenu('Downloads')">
+            <img src="/common/downloadbutton.gif" width="96" height="21" alt="" border="0"></a></td>
+          <td width="71" valign="top">
+            <a href="/library" onmouseover="showMenu('Support')" onmouseout="hideMenu('Support')">
+            <img src="/common/supportbutton.gif" width="72" height="21" alt="" border="0"></a></td>
+          <td width="67" valign="top">
+            <a href="/forum/default.asp" onmouseover="showMenu('Forums')" onmouseout="hideMenu('Forums')">
+            <img src="/common/forumbutton.gif" width="68" height="21" alt="" border="0"></a></td>
+          <td width="93" valign="top">
+            <a href="/zuggsoft/feedback.htm" onmouseover="showMenu('Contact')" onmouseout="hideMenu('Contact')">
+            <img src="/common/contactbutton.gif" width="94" height="21" alt="" border="0"></a></td>
+          <td width="9999" bgcolor="#9C3163" align="right">
+            <font size="-2" face="Arial" color="#FFFFDE">©&nbsp;2001&nbsp;Zugg&nbsp;Software&nbsp;</font>
+          </td>
+        </tr>
+        <noscript>
+          <tr>
+          <td bgcolor="#F5F5F5" width="48">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/zuggsoft/privacy.htm">Privacy</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/press.htm">Press</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zuggsoft/about.htm">About&nbsp;us</a></font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="81">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/zmud/zmudinfo.htm">zMUD</a></font></td></tr>
+              <tr><td><font size="1"><a href="/ac/ac.asp">AC&nbsp;Explorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/doctorz/doctorzinfo.htm">DoctorZ</a></font></td></tr>
+              <tr><td><font size="1"><a href="/devkit/devkitinfo.htm">Developer's&nbsp;Kit</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zchat/zchatinfo.htm">zChat</a></font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="74">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/zmud/order_zmud.htm">zMUD</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/order_ac.htm">AC&nbsp;Explorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/doctorz/register.htm">DoctorZ</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/order_devkit.htm">Developer's&nbsp;Kit</a></font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="95">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/zmud/down.asp#zMUD">zMUD</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/down.asp#ACX">AC&nbsp;Explorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/down.asp#DoctorZ">DoctorZ</a></font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="71">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/library">Library</a></font></td></tr>
+              <tr><td><font size="1"><a href="/links/links.cfm">Links</a></font></td></tr>
+              <tr><td><font size="1"><a href="/muds/links.cfm">MUDs</a></font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="67">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=7&amp;CAT_ID=1&amp;Forum_Title=zMUD+General+Discussion">zMUD&nbsp;General</a></font></td></tr>
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=8&amp;CAT_ID=1&amp;Forum_Title=zMUD+Beta+Forum">zMUD&nbsp;Beta</a></font></td></tr>
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=13&amp;CAT_ID=3&amp;Forum_Title=AC+Explorer+Discussion">AC&nbsp;Explorer</a></font></td></tr>
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=12&amp;CAT_ID=3&amp;Forum_Title=DoctorZ+Discussion">DoctorZ</a></font></td></tr>
+              <tr><td><font size="1"><a href="/forum/FORUM.asp?FORUM_ID=10&amp;CAT_ID=1&amp;Forum_Title=zMUD+Developers">Developers</a></font></td></tr>
+            </table></td>
+          <td bgcolor="#F5F5F5" width="93">
+            <table border="0" cellpadding="0">
+              <tr><td><font size="1"><a href="/zuggsoft/suggest.cfm">Feedback</a></font></td></tr>
+              <tr><td><font size="1"><a href="/zmud/bugs.cfm">Bug&nbsp;reports</a></font></td></tr>
+              <tr><td><font size="1"><a href="mailto:support@zuggsoft.com">Email</a></font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+              <tr><td><font size="1">&nbsp;</font></td></tr>
+            </table></td>
+          <td width="9999" bgcolor="#F5F5F5">&nbsp;</td>
+          </tr>
+        </noscript>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td bgcolor="808080" height="2"><img border="0" src="/common/1x1.gif" width="1" height="2"></td>
+  </tr>
+</table>
+
+
+<h1>MUD Sound Protocol (MSP)</h1>
+
+<p>The MUD Sound Protocol (MSP) was developed jointly between many
+people, including implementers of various MUDs and MUD clients. Leading the MSP design
+effort was&nbsp; <a href="msplist.htm#Medievia">Medievia MUD</a> and the zMUD and MUD Master MUD
+clients.&nbsp; This document provides the complete MSP specification, as well as zMUD
+implementation notes. 
+
+<dl>
+  <dd><img border="0" src="../common/diamond.gif" align="bottom" width="14" height="14">  
+    <a href="msplist.htm">List of MUDs with MSP support</a></dd>
+  <dd><img border="0" src="../common/diamond.gif" align="bottom" width="14" height="14">  
+    <a href="msplist.htm#MUD Clients that support MSP">List of MUD Clients with
+    MSP support</a></dd>
+  <dd><img border="0" src="../common/diamond.gif" align="bottom" width="14" height="14">  
+    <a href="#MSP Specification">MSP specification</a></dd>
+  <dd><img border="0" src="../common/diamond.gif" align="bottom" width="14" height="14">  
+    <a href="mspzmud.htm">zMUD Implementation notes</a></dd>
+</dl>
+
+<h3><img src="../common/red_bar.gif" width="100%" height="2"><br>
+<a name="MSP Specification">MSP Specification</a> v0.3</h3>
+
+<dl>
+  <dt>Changes from v0.2:</dt>
+  <dd>Added U=URL optional parameter for !!SOUND and !!MUSIC to download
+    sounds via the web</dd>
+</dl>
+
+<h4>!!SOUND:</h4>
+
+<dl>
+  <dt>Syntax:</dt>
+  <dd>!!SOUND(fname V=vol L=repeats P=priority T=type U=URL)</dd>
+  <dt>Where:</dt>
+  <dd>&quot;fname&quot; is the name of the sound file to be played</dd>
+  <dd>&quot;vol&quot; is the volume level to play the sound at</dd>
+  <dd>&quot;repeats&quot; is the number of times to play the sound</dd>
+  <dd>&quot;priority&quot; is the priority of the sound</dd>
+  <dd>&quot;type&quot; is the sound class</dd>
+  <dd>&quot;URL&quot; is the optional download URL for the sound file</dd>
+</dl>
+
+<p>Parameters: 
+
+<dl>
+  <dt>fname:</dt>
+  <dd>&quot;fname&quot; may contain relative path information and
+    wildcards, but may not contain absolute path information. Any directory information should
+    be specified using &quot;/&quot; rather than &quot;\&quot;, since this avoids all of those
+    nasty problems with escape characters. If multiple wave files match a wildcard, one of
+    them should be chosen at random. Wildcards should work just like DOS wildcards; * should
+    match the remainder of the file name, and ? should match exactly one character. If no
+    extension is specified, &quot;.wav&quot; should be assumed.</dd>
+  <dd>Following are some valid fname values:<dl>
+      <dd>weather/thund*</dd>
+      <dd>lightning.wav</dd>
+      <dd>zone231/room22.wav</dd>
+    </dl>
+  </dd>
+  <dd>And some invalid ones:<dl>
+      <dd>weather\lightning.wav # uses \ rather than /</dd>
+      <dd>*x*.wav # wildcards stop after the first *</dd>
+      <dd>c:\sounds\m.wav # no absolute paths</dd>
+    </dl>
+  </dd>
+  <dt>vol:</dt>
+  <dd>&quot;vol&quot; may range from 0 (0%, off) to 100 (100%, full). This
+    parameter may be omitted, in which case it defaults to 100.</dd>
+  <dt>repeats:</dt>
+  <dd>&quot;repeats&quot; controls the number of times to play the sound.
+    It may be omitted, in which case it defaults to 1. It may also be set to -1, which causes
+    sounds to be looped until otherwise instructed.</dd>
+  <dt>priority:</dt>
+  <dd>&quot;priority&quot; is the priority of the sound. If a sound is
+    requested while another sound is being played, whichever sound has the higher priority
+    wins. In the case of a tie, the sound that is already playing wins. This is to prevent
+    combat sounds from degenerating into a mishmash of sound fragments. Priority may range
+    from 0 to 100, and defaults to 50 if not set.</dd>
+  <dt>type:</dt>
+  <dd>The class of the sound. This is mud specific. Some example classes
+    might be combat, zone, death, clan. This parameter may be omitted, but if a MUD opts to
+    use it, it's recommended that it be used everywhere. The actual type is a string, and
+    should be case insensitive.&nbsp; If this parameter is omitted, the subdirectory of the
+    fName is used as the class.</dd>
+  <dt>URL:</dt>
+  <dd>The URL is used to download the sound if it does not exist on the
+    local system.&nbsp; If can be a full URL for the file, or a URL path to which the fname is
+    appended.&nbsp; Using a global path and putting the subdirectory information into the
+    fName is a good way to maintain a directory structure on both the web server and the local
+    disk.&nbsp;</dd>
+</dl>
+
+<p>Notes: 
+
+<ol>
+  <li>If a wildcard pattern is requested for multiple repeats, the actual
+    sound played should be picked randomly for each iteration.</li>
+  <li>The sound name Off is reserved, and should cause all wave files to
+    stop playing.</li>
+</ol>
+
+<p>Examples: 
+
+<dl>
+  <dd>!!SOUND(thunder V=100 L=1 P=30 T=weather)</dd>
+  <dd>!!SOUND(weather/rain.wav V=80 P=20 T=weather)</dd>
+  <dd>!!SOUND(alarm P=100 T=utility)</dd>
+  <dd>!!SOUND(Off)</dd>
+</dl>
+
+<h4>!!MUSIC:</h4>
+
+<dl>
+  <dt>Syntax:</dt>
+  <dd>!!MUSIC(fname V=vol L=repeats C=continue T=type U=URL)</dd>
+  <dt>Where:</dt>
+  <dd>&quot;fname&quot; is the name of the music file to be played</dd>
+  <dd>&quot;vol&quot; is the volume level to play the music at
+    &quot;repeats&quot; is the number of times to play the music file</dd>
+  <dd>&quot;continue&quot; specifies whether the file should be restarted
+    if requested again</dd>
+  <dd>&quot;type&quot; is the sound class</dd>
+  <dd>&quot;URL&quot; is the optional download URL for the sound file</dd>
+</dl>
+
+<p>Parameters: 
+
+<dl>
+  <dt>fname:</dt>
+  <dd>&quot;fname&quot; may contain relative path information and
+    wildcards, but may not contain absolute path information. Any directory information should
+    be specified using &quot;/&quot; rather than &quot;\&quot;, since this avoids all of those
+    nasty problems with escape characters. If multiple music files match a wildcard, one of
+    them should be chosen at random. Wildcards should work just like DOS wildcards; * should
+    match the remainder of the file name, and ? should match exactly one character. If no
+    extension is specified, &quot;.mid&quot; should be assumed.</dd>
+  <dd>Following are some valid fname values:<dl>
+      <dd>bach/fugue*.mid</dd>
+      <dd>zone231/room22.mid</dd>
+    </dl>
+  </dd>
+  <dd>And some invalid ones:<dl>
+      <dd>tchai\1812.mid # uses \ rather than /</dd>
+      <dd>*x*.mid # wildcards stop after the first *</dd>
+      <dd>c:\midi\m.mid # no absolute paths</dd>
+    </dl>
+  </dd>
+  <dt>vol:</dt>
+  <dd>&quot;vol&quot; may range from 0 (0%, off) to 100 (100%, full). This
+    parameter may be omitted, in which case it defaults to 100.</dd>
+  <dt>repeats:</dt>
+  <dd>&quot;repeats&quot; controls the number of times to play the sound.
+    It may be omitted, in which case it defaults to 1. It may also be set to -1, which causes
+    the midi file to be looped continuously until otherwise instructed.</dd>
+  <dt>continue:</dt>
+  <dd>&quot;continue&quot; specifies whether the file should simply
+    continue playing if requested again (1), or if it should restart (0). In either case, the
+    new repeat count should take precedence over the old one, and the &quot;number of plays
+    thus far&quot; counter should be reset to 0. By way of illustration, assume two rooms,
+    room 110, and room 111. Room 110 is set to play bach/fugue.mid 3 times, while room 111 is
+    set to play bach/fugue.mid 5 times. If a character enters room 110, fugue starts playing;
+    if during halfway through the second refrain the character moves to room 111, fugue would
+    either continue or restart based on the continue setting. fugue should play either 4.5
+    times (if continue was 1) or 5 times (if continue was 0). Similarly, the volume of the
+    most recent MUSIC escape should be used. If &quot;continue&quot; isn't specified, it
+    defaults to 1.</dd>
+  <dt>type:</dt>
+  <dd>The class of the sound. This is mud specific. Some example classes
+    might be combat, zone, death, clan. This parameter may be omitted, but if a MUD opts to
+    use it, it's recommended that it be used everywhere. The actual type is a string, and
+    should be case insensitive. If this parameter is omitted, the subdirectory of the fName is
+    used as the class.</dd>
+  <dt>URL:</dt>
+  <dd>The URL is used to download the sound if it does not exist on the
+    local system.&nbsp; If can be a full URL for the file, or a URL path to which the fname is
+    appended.&nbsp; Using a global path and putting the subdirectory information into the
+    fName is a good way to maintain a directory structure on both the web server and the local
+    disk.&nbsp;</dd>
+</dl>
+
+<p>Notes: 
+
+<ol>
+  <li>If a wildcard pattern is requested for multiple repeats, the actual
+    music file played should be picked randomly for each iteration.</li>
+  <li>The music name Off is reserved, and should cause all midi files to
+    stop playing.</li>
+</ol>
+
+<p>Examples: 
+
+<dl>
+  <dd>!!MUSIC(fugue.mid V=100 L=1 C=1 T=music)</dd>
+  <dd>!!MUSIC(berlioz/fantas1 V=80 L=-1 C=1 T=music)</dd>
+  <dd>!!MUSIC(Off)</dd>
+</dl>
+
+<p align="right"><img src="../common/red_bar.gif" width="100%" height="2"><br>
+<font size="2" face="Arial">This page last updated on <!--webbot bot="Timestamp"
+S-Type="EDITED" S-Format="%B %d, %Y" startspan -->July 25, 2001<!--webbot bot="Timestamp" endspan i-checksum="14336" -->
+</font> </p>
+</body>
+</html>

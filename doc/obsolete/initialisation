@@ -1,0 +1,44 @@
+OBSOLETE
+CONCEPT
+
+        VARIABLE INITIALIZATION
+
+DESCRIPTION
+
+        There are two different flavours of initialisations, selectable
+        in config.h :
+
+        i)  #undef INITIALIZATION_BY___INIT
+        ------------------------------------
+        Initialisation is done at compile time. This is fast and costs
+        no extra code in the program.
+        Allowed expressions currently include integer literals,
+        string literals, integer operators, string addition, bracketing,
+        array constructors, the empty mapping and structs.
+        When an object with initialised variables is cloned or inherited,
+        all initialised variables are copied from the blueprint.
+        A special application of this feature is to have an initialised
+        non-empty array or a mapping; it will be shared by all clones or
+        inheriting objects unless an assignment to the variable -
+        as opposed to an assignment to an element of the array/mapping -
+        is done in all clones etc.
+        To prevent unauthorised changes in initialised arrays/mappings,
+        you can declare the variables as private or use
+        a nomask reset/create that checks for undesired inheritance.
+
+        ii) #define INITIALIZATION_BY___INIT
+        -------------------------------------
+        Creates a function names __INIT() from all variable
+        initialisations and from calls to __INIT() in all inherited
+        objects, and runs this function at object creation time.
+        Any efun can be used in the expressions for variable
+        initialisations, even ones with severe side effects, like
+        destruct() or shutdown().  The code created for __INIT() is
+        a little worse than a medium-skilled lpc-programmer would
+        generate, because it is scattered all over the program.
+
+HISTORY
+        Since LDMud 3.3, order_alist() is no longer accepted without
+          INITIALIZATION_BY___INIT.
+        LDMud 3.3.378 replaced this static choice of initialisation
+          methods by compile-time pragmas.
