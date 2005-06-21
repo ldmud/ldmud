@@ -1,0 +1,61 @@
+SYNOPSIS
+        string *regexp(string *list, string pattern)
+
+BESCHREIBUNG
+        Liefert ein neues Array mit all jenen Strings aus list zurueck,
+	welche auf das Muster pattern passen. Diese Funktion verwendet
+	dieselbe Syntax fuer regulaere Ausdruecke wie ed():
+
+        . Passt auf jedes beliebige Zeichen.
+
+        ^ Passt auf den Beginn einer Zeile.
+
+        $ Passt auf das Ende einer Zeile.
+
+        \< Passt auf das Beginn eines Wortes.
+
+        \> Passt auf das Ende eines Wortes.
+
+        \B Passt auf eine leere Zeichenkette an einem Wortrand
+	   (sollte aehnlich wie das Symbol zur Emacs-Kompatibilitaet in
+	   GNU egrep sein), seit 3.2@249
+
+        x|y Passt entweder auf den regulaeren Ausdruck x oder y.
+
+        () Verwendet den eingeschlossenen regulaeren Ausdruck wie einen
+	   'simplen' Ausdruck.
+
+        x* Der regulaere Ausdruck x passt beliebig oft (0 oder mehr).
+
+        x+ Der regulaere Ausdruck x passt mindestens einmal (1 oder mehr).
+
+        [..] Passt auf jedes in den Klammern eingeschlossenes Zeichen.
+
+        [^ ..] Passt auf jedes Zeichen, welches nicht in den Klammern
+	       eingeschlossen ist. Das .. ist durch einzelne Zeichen oder
+	       Bereiche von Zeichen zu ersten:
+        [abc] Passt auf a, b oder c.
+        [ab0-9] Passt auf a, b, c oder eine beliebige Ziffer.
+        [^a-z] Passt auf keinen klein geschriebenen Buchstaben.
+
+        \c Passt auf das Zeichen c, selbst wenn es eines der Sonderzeichen ist.
+
+        Wenn es einen Fehler im regulaeren Ausdruck gibt, wird ein
+	Laufzeitfehler ausgeloest.
+
+BEISPIEL
+        string strs;
+        if (strs = regexp( ({"Bitte helfen sie mir, Sir John."}),
+                                 "\\<helfen\\>.*\\<mir\\>"))
+           if (sizeof(strs)
+              write("Es passt.\n");
+
+        Der regulaere Ausdruck wird den uebergebenen String (welcher in
+	einem Array verpackt wurde) daraufhin ueberpruefen, ob
+	sowas wie "helfen ... mir" darin vorkommt.
+
+AENDERUNG
+        LDMud 3.2.9 fuegte das Sonderzeichen '+' hinzu.
+
+SIEHE AUCH
+        regexplode(E), regreplace(E), sscanf(E)

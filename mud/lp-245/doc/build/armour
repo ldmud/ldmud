@@ -1,0 +1,44 @@
+To get an armour do:
+    object aobj;
+
+    aobj = clone_object("obj/armour");
+
+For customization the following routines are available :
+
+You must call these functions (use call_other()):
+
+set_name(n)
+    string n. Sets the name and short description to n.
+    Sets long description to short + ".\n"
+
+These are the optional functions:
+
+set_short(s)
+    string s. Sets the short description to s and the long to short + ".\n"
+
+set_long(l)
+    string l. Sets the long description to l.
+
+set_value(v)
+    int v. Sets the selling value to v.
+
+set_weight(w)
+    int w. Sets the weight to w.
+
+set_ac(a) { ac = a; }
+    int a. Sets the armour class to a. A random value up to 'a' is subtracted
+    from the hit.
+
+set_alias(a) { alias = a; }
+    string a. Sets an alias name if armour.
+
+set_type(t) { type = t };
+    string t. Sets the type of armour to t. Only one of every type can be worn.
+    These are the types you can use: helmet, amulet, armour, shield, ring,
+    glove, cloak and boot.
+	You can set an arbitrary name but we strongly suggest that you only
+    use these. Default is armour. The armour class of every worn armour is added
+    together.
+
+set_arm_light(l)
+    int l. Makes the armour shine like a lamp of strenght l.

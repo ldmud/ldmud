@@ -1,0 +1,19 @@
+GESCHUETZT
+SYNOPSIS
+        int snoop(object snooper);
+        int snoop(object snooper, object snoopee);
+
+BESCHREIBUNG
+        Beginnt die Beobachtung des Objekts <snoopee> durch <snooper>. Wenn
+        <snoopee> nicht angegeben wird, werden alle Beobachtungen von
+        <snooper> beendet.
+
+        Die Funktion liefert 1 bei Erfolg, -1 wenn eine Schleife entstehen
+        wuerde und 0 fuer alle anderen Fehler.
+
+        Die Beobachtung wird mit dem Master-Objekt auf Gueltigkeit geprueft.
+        Es wird auch ein Fehler verursacht, wenn eine Beobachtung zu einer
+        Rekursion fuehren wuerde.
+
+SIEHE AUCH
+        query_snoop(E)

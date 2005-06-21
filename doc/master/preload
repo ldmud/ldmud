@@ -1,0 +1,18 @@
+SYNOPSIS
+        void preload(string file)
+
+DESCRIPTION
+        Load the object with the given file name, that was returned by
+        epilog(). It is task of the epilog()/preload() pair to ensure
+        the validity of the given strings (e.g. filtering out comments
+        and blank lines). For preload itself a call_other(file, "???")
+        s sufficient, but it should be guarded by a catch() to avoid
+        premature blockings. Also it is wise to change the master's
+        euid from root_uid to something less privileged for the time
+        of the preload.
+
+        You can of course do anything else with the passed strings -
+        preloading is just the traditional task.
+
+SEE ALSO
+        epilog(M), master(M)

@@ -1,0 +1,10 @@
+SYNOPSIS
+        object query_input_pending(object ob)
+
+DESCRIPTION
+        If ob is interactive and currently has an input_to() pending,
+        the object that has called the input_to() is returned,
+        else 0.
+
+SEE ALSO
+        input_to(E), find_input_to(E), input_to_info(E), remove_input_to(E)
