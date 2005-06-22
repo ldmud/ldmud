@@ -1454,7 +1454,7 @@ static char buff[BUFF_SIZE];         /* For error messages */
     char          format_char;     /* format type */
     unsigned int  nelemno;         /* next offset into array */
     unsigned int  fpos;            /* position in format_str */
-    unsigned long fs;              /* field size */
+    unsigned int  fs;              /* field size */
     int           pres;            /* precision */
     unsigned int  err_num;         /* error code */
     char         *pad;             /* fs pad string */

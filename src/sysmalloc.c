@@ -169,17 +169,6 @@ mem_dinfo_data (svalue_t *svp, int value)
         put_ref_string(svp, STR_SYSTEM_MALLOC);
 } /* mem_dinfo_data() */
 
-/*-------------------------------------------------------------------------*/
-void
-mem_dump_extdata (strbuf_t *sbuf)
-
-/* For the status commands and functions: add the extended smalloc statistic
- * to the buffer <sbuf>.
- */
-
-{
-    strbuf_add(sbuf, "No detailed blocks statistics available.\n");
-} /* mem_dump_extdata() */
 
 /*-------------------------------------------------------------------------*/
 Bool

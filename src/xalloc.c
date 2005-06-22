@@ -148,12 +148,10 @@ static t_stat xalloc_stat = {0,0};
   /* Total number and size of allocations done by the driver (incl overhead).
    */
 
-#if defined(SBRK_OK)
 static t_stat clib_alloc_stat = {0,0};
   /* Number and size of allocations done through the clib emulation
    * functions (incl overhead).
    */
-#endif
 
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
@@ -162,9 +160,7 @@ static t_stat clib_alloc_stat = {0,0};
 static void write_lpc_trace (int d, word_t *p, int oneline);
 #endif
 
-#ifdef GC_SUPPORT
 static void print_block (int d, word_t *block);
-#endif /* GC_SUPPORT */
 
 /*-------------------------------------------------------------------------*/
 #ifdef MALLOC_SBRK_TRACE

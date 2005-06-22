@@ -25,6 +25,10 @@ extern mapping_t *stale_mappings;
 
 /* --- Macros --- */
 
+#define DEFAULT_CLEANUP_TIME 1800
+/* Default interval for a data-clean of all objects.
+ */
+
 /* void GC_REF_DUMP(type, pointer, txt, function)
  *
  * In order to be able to dump the references found in a GC, the
@@ -119,12 +123,6 @@ extern void new_default_gc_log (int fd);
 
 #endif /* GC_SUPPORT */
 
-/* --- Macros --- */
-
-#define DEFAULT_CLEANUP_TIME 1800
-/* Default interval for a data-clean of all objects.
- */
-
 /* --- Variables --- */
 
 extern time_t time_last_gc;
@@ -132,7 +130,6 @@ extern time_t time_last_gc;
 /* --- Prototypes --- */
 
 extern void cleanup_object (object_t * obj);
-extern void cleanup_all_objects (void);
 extern void cleanup_driver_structures (void);
 extern void garbage_collection(void);
 extern void setup_print_block_dispatcher(void);

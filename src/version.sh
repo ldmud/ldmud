@@ -15,8 +15,8 @@ version_type="dev"
 
 # The version number information
 # $Format: "version_micro=\"$ReleaseMicro$\""$ 
-version_micro=710
+version_micro=0
 # $Format: "version_minor=\"$ReleaseMinor$\""$ 
-version_minor=3
+version_minor=4
 # $Format: "version_major=\"$ReleaseMajor$\""$ 
 version_major=3

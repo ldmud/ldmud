@@ -89,7 +89,7 @@ New Themis: IBM RS6000/?/?, AIX 3.4, LDMud 3.3.206
 
 
 
-Needa: PIII/766MHz/768MByte, Beos 5.0, LDMud 3.3.206:
+Vader: PIII/766MHz/768MByte, Beos 5.0, LDMud 3.3.206:
 
                                          o0        o1        o2        o4
   Gcc 2.95.2                           829.2    1067.2    1059.3    1082.3
@@ -152,80 +152,4 @@ ldmud -N -e -m. -Mtest_master.c -s-1 -f dhry -sv-1 6666
   S = enable-smalloc-trace
   L = enable-smalloc-lpc-trace
   O = with-optimize=high (- = med)
-
-
-Tarkin: G4/800MHz/1GByte, Mac OS X 10.3.6, LDMud 3.3.704, gcc 3.3:
-
-  Dhrystone                        o0        o1        o2        o4
-  -                              4967.7    8992.4    9037.3    8909.5
-  -  -   MC                      5069.0    9068.5    8937.3    9097.5
-  -  -   MC, MT                  4910.7    8609.7    8878.7    8855.6
-  -  -   MC, MT, ML              4870.6    8851.0    8798.3    8670.7
-  D  -   MC, MT, ML              4225.8    7444.8    7773.7    7501.8
-  D, TC, MC, MT, ML              2830.6    4808.6    5397.5    5061.2
-
-  Dhrystone2
-  -                              6772.9   11673.5   11545.0   11721.3
-  -  -   MC                      6850.2   12146.1   11719.1   11677.5
-  -  -   MC, MT                  6834.0   11858.1   11583.4   11677.5
-  -  -   MC, MT, ML              6787.6   11859.2   11364.6   11279.6
-  D  -   MC, MT, ML              5736.3    9741.7    9901.0    9496.2
-  D, TC, MC, MT, ML              3533.7    6343.2    6727.3    6356.3
-
-
-Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.3.704, gcc 3.3:
-
-  Dhrystone                        o0        o1        o2        o4
-  -                              5016.0    9208.6    9085.8    9061.0
-  -  -   MC                      5049.0    9259.8    9042.2    9004.2
-  -  -   MC, MT                  4982.8    9044.9    9017.8    9012.5
-  -  -   MC, MT, ML              4946.0    8918.8    8943.1    8853.0
-  D  -   MC, MT, ML              4235.8    7703.2    7870.8    7657.8
-  D, TC, MC, MT, ML              2754.7    4861.4    5246.9    5155.8
-
-  Dhrystone2
-  -                              6863.4   11961.9   11737.2   11787.9
-  -  -   MC                      6934.8   12106.7   11862.6   11750.9
-  -  -   MC, MT                  6885.5   11853.1   11787.9   11677.2
-  -  -   MC, MT, ML              6843.1   11732.5   11709.8   11393.9
-  D  -   MC, MT, ML              5710.0    9842.7   10070.6    9609.4
-  D, TC, MC, MT, ML              3413.0    6443.7    6674.9    6368.7
-
-
-Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.3.704, gcc 4.0:
-
-  Dhrystone2 (slaballoc)           o0        o1        o2        o4
-  -                              6628.5   13152.3   13748.9   14111.1
-  -  -   MC, MT, ML              6600.7   12690.5   13477.3   13680.1
-  D  -   MC, MT, ML              5324.9   10787.8   11312.4   10842.2
-  D, TC, MC, MT, ML              3711.7    7029.6    7878.9    8143.8
-
-  Dhrystone2 (sysmalloc)
-  -                              6640.2   12739.3   13642.7   13940.8
-  -  -   MC, MT, ML              6593.5   12335.6   13216.0   13642.2
-  D  -   MC, MT, ML              5324.8   10745.2   11295.3   10799.2
-  D, TC, MC, MT, ML              3712.6    5572.3    7851.8    7878.6
-
-
-Tarkin: G4/800MHz/1GByte, Mac OS X 10.4.1, LDMud 3.2.11, gcc 4.0:
-
-  Dhrystone2 (slaballoc)           o0        o1        o2        o4
-  -                              8391.8   18259.9   19433.1   19711.4
-  -  -   MC, MT, ML              8043.0   16959.6   15923.8   16147.1
-  D  -   MC, MT, ML              4989.4   11398.3   12058.0   12575.8
-  D, TC, MC, MT, ML              3571.2    7129.5    6028.9    6780.2
-
-  Dhrystone2 (sysmalloc)
-  -                              8314.9   17386.2   18553.4   18785.6
-  -  -   MC, MT, ML              8296.5   17311.2   18461.9   18820.6
-  D  -   MC, MT, ML              5111.7   12048.8   13163.8   13357.3
-  D, TC, MC, MT, ML              3498.6    7218.9    6747.8    7380.2
-
-Legend:
-  D: DEBUG
-  TC: TRACE_CODE
-  MC: MALLOC_CHECK
-  MT: MALLOC_TRACE
-  ML: MALLOC_LPC_TRACE
-
 

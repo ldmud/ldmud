@@ -137,10 +137,12 @@ struct shadow_s
 /* --- Prototypes --- */
 
 /* In actions.c: */
+extern void purge_action_sent(void);
 extern void remove_action_sent(object_t *ob, object_t *player);
 extern void remove_environment_sent(object_t *player);
 
 /* In simulate.c */
+extern void purge_shadow_sent(void);
 extern void check_shadow_sent (object_t *ob);
 extern void assert_shadow_sent (object_t *ob);
 

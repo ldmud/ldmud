@@ -92,7 +92,7 @@ int  Func_3(int i1);
 
 //===========================================================================
 
-float main(int Number_Of_Runs, int silent) {
+void main(int Number_Of_Runs) {
   int    Int_1_Loc, Int_2_Loc, Int_3_Loc;
   int    Ch_Index;
   int    Enum_Loc;
@@ -115,10 +115,8 @@ float main(int Number_Of_Runs, int silent) {
   Ptr_Glob[M_STR_COMP]  = "DHRYSTONE PROGRAM, SOME STRING";
   Str_1_Loc        = "DHRYSTONE PROGRAM, 1'ST STRING";
   Arr_2_Glob[8][7] = 10;
-  if (!silent) {
-      write("Dhrystone Benchmark, Version 2.1 (Language: LPC)\n");
-      write("Execution starts, " + Number_Of_Runs + " runs through Dhrystone\n");
-  }
+  write("Dhrystone Benchmark, Version 2.1 (Language: LPC)\n");
+  write("Execution starts, " + Number_Of_Runs + " runs through Dhrystone\n");
   Begin_Time = times();
   for (Run_Index = 1; Run_Index <= Number_Of_Runs; ++Run_Index) {
     Proc_5();
@@ -149,87 +147,75 @@ float main(int Number_Of_Runs, int silent) {
     Int_1_Loc = Proc_2(Int_1_Loc);
   }
   End_Time = times();
-  if (!silent)
-  {
-      write("Execution ends.\n");
-      write("Final values of the variables used in the benchmark:\n\n");
-      printf("Int_Glob:            %d\n", Int_Glob);
-      printf("        should be:   %d\n", 5);
-      printf("Bool_Glob:           %d\n", Bool_Glob);
-      printf("        should be:   %d\n", 1);
-      printf("Ch_1_Glob:           %c\n", Ch_1_Glob);
-      printf("        should be:   %c\n", 'A');
-      printf("Ch_2_Glob:           %c\n", Ch_2_Glob);
-      printf("        should be:   %c\n", 'B');
-      printf("Arr_1_Glob[8]:       %d\n", Arr_1_Glob[8]);
-      printf("        should be:   %d\n", 7);
-      printf("Arr_2_Glob[8][7]:    %d\n", Arr_2_Glob[8][7]);
-      printf("        should be:   Number_Of_Runs + 10\n");
+  write("Execution ends.\n");
+  write("Final values of the variables used in the benchmark:\n\n");
+  printf("Int_Glob:            %d\n", Int_Glob);
+  printf("        should be:   %d\n", 5);
+  printf("Bool_Glob:           %d\n", Bool_Glob);
+  printf("        should be:   %d\n", 1);
+  printf("Ch_1_Glob:           %c\n", Ch_1_Glob);
+  printf("        should be:   %c\n", 'A');
+  printf("Ch_2_Glob:           %c\n", Ch_2_Glob);
+  printf("        should be:   %c\n", 'B');
+  printf("Arr_1_Glob[8]:       %d\n", Arr_1_Glob[8]);
+  printf("        should be:   %d\n", 7);
+  printf("Arr_2_Glob[8][7]:    %d\n", Arr_2_Glob[8][7]);
+  printf("        should be:   Number_Of_Runs + 10\n");
 #if 0
-      printf("Ptr_Glob->\n");
-      printf("  Ptr_Comp:          %O\n", Ptr_Glob[M_PTR_COMP]);
-      printf("        should be:   (implementation-dependent)\n");
+  printf("Ptr_Glob->\n");
+  printf("  Ptr_Comp:          %O\n", Ptr_Glob[M_PTR_COMP]);
+  printf("        should be:   (implementation-dependent)\n");
 #endif
-      printf("  Discr:             %d\n", Ptr_Glob[M_DISCR]);
-      printf("        should be:   %d\n", 0);
-      printf("  Enum_Comp:         %d\n", Ptr_Glob[M_ENUM_COMP]);
-      printf("        should be:   %d\n", 2);
-      printf("  Int_Comp:          %d\n", Ptr_Glob[M_INT_COMP]);
-      printf("        should be:   %d\n", 17);
-      printf("  Str_Comp:          %s\n", Ptr_Glob[M_STR_COMP]);
-      printf("        should be:   DHRYSTONE PROGRAM, SOME STRING\n");
+  printf("  Discr:             %d\n", Ptr_Glob[M_DISCR]);
+  printf("        should be:   %d\n", 0);
+  printf("  Enum_Comp:         %d\n", Ptr_Glob[M_ENUM_COMP]);
+  printf("        should be:   %d\n", 2);
+  printf("  Int_Comp:          %d\n", Ptr_Glob[M_INT_COMP]);
+  printf("        should be:   %d\n", 17);
+  printf("  Str_Comp:          %s\n", Ptr_Glob[M_STR_COMP]);
+  printf("        should be:   DHRYSTONE PROGRAM, SOME STRING\n");
 #if 0
-      printf("Next_Ptr_Glob->\n");
-      printf("  Ptr_Comp:          %O\n", Next_Ptr_Glob[M_PTR_COMP]);
-      printf("        should be:   (implementation-dependent), same as above\n");
+  printf("Next_Ptr_Glob->\n");
+  printf("  Ptr_Comp:          %O\n", Next_Ptr_Glob[M_PTR_COMP]);
+  printf("        should be:   (implementation-dependent), same as above\n");
 #endif
-      printf("  Discr:             %d\n", Next_Ptr_Glob[M_DISCR]);
-      printf("        should be:   %d\n", 0);
-      printf("  Enum_Comp:         %d\n", Next_Ptr_Glob[M_ENUM_COMP]);
-      printf("        should be:   %d\n", 1);
-      printf("  Int_Comp:          %d\n", Next_Ptr_Glob[M_INT_COMP]);
-      printf("        should be:   %d\n", 18);
-      printf("  Str_Comp:          %s\n", Next_Ptr_Glob[M_STR_COMP]);
-      printf("        should be:   DHRYSTONE PROGRAM, SOME STRING\n");
-      printf("Int_1_Loc:           %d\n", Int_1_Loc);
-      printf("        should be:   %d\n", 5);
-      printf("Int_2_Loc:           %d\n", Int_2_Loc);
-      printf("        should be:   %d\n", 13);
-      printf("Int_3_Loc:           %d\n", Int_3_Loc);
-      printf("        should be:   %d\n", 7);
-      printf("Enum_Loc:            %d\n", Enum_Loc);
-      printf("        should be:   %d\n", 1);
-      printf("Str_1_Loc:           %s\n", Str_1_Loc);
-      printf("        should be:   DHRYSTONE PROGRAM, 1'ST STRING\n");
-      printf("Str_2_Loc:           %s\n", Str_2_Loc);
-      printf("        should be:   DHRYSTONE PROGRAM, 2'ND STRING\n");
-      printf("\n");
-  }
+  printf("  Discr:             %d\n", Next_Ptr_Glob[M_DISCR]);
+  printf("        should be:   %d\n", 0);
+  printf("  Enum_Comp:         %d\n", Next_Ptr_Glob[M_ENUM_COMP]);
+  printf("        should be:   %d\n", 1);
+  printf("  Int_Comp:          %d\n", Next_Ptr_Glob[M_INT_COMP]);
+  printf("        should be:   %d\n", 18);
+  printf("  Str_Comp:          %s\n", Next_Ptr_Glob[M_STR_COMP]);
+  printf("        should be:   DHRYSTONE PROGRAM, SOME STRING\n");
+  printf("Int_1_Loc:           %d\n", Int_1_Loc);
+  printf("        should be:   %d\n", 5);
+  printf("Int_2_Loc:           %d\n", Int_2_Loc);
+  printf("        should be:   %d\n", 13);
+  printf("Int_3_Loc:           %d\n", Int_3_Loc);
+  printf("        should be:   %d\n", 7);
+  printf("Enum_Loc:            %d\n", Enum_Loc);
+  printf("        should be:   %d\n", 1);
+  printf("Str_1_Loc:           %s\n", Str_1_Loc);
+  printf("        should be:   DHRYSTONE PROGRAM, 1'ST STRING\n");
+  printf("Str_2_Loc:           %s\n", Str_2_Loc);
+  printf("        should be:   DHRYSTONE PROGRAM, 2'ND STRING\n");
+  printf("\n");
   User_Time = End_Time - Begin_Time;
   if (User_Time <= 0) {
-    if (!silent) {
-        printf("Your rusage() doesn't seem to work: User_Time is %d.\n", User_Time);
-        write("\n");
-    }
+    printf("Your rusage() doesn't seem to work: User_Time is %d.\n", User_Time);
+    write("\n");
   } else if (User_Time < (2*100)) {
-    if (!silent) {
-        write("Measured time too small to obtain meaningful results\n");
-        write("Please increase number of runs\n");
-        write("\n");
-    }
+    write("Measured time too small to obtain meaningful results\n");
+    write("Please increase number of runs\n");
+    write("\n");
   } else {
     Milliseconds = to_float(User_Time) / Number_Of_Runs;
     Dhrystones_Per_Second = 1000.0 * Number_Of_Runs / User_Time;
-    if (!silent)
-    {
-        printf ("Milliseconds for one run through Dhrystone: ");
-        printf ("%6.1f \n", Milliseconds);
-        printf ("Dhrystones per Second:                      ");
-        printf ("%6.1f \n", Dhrystones_Per_Second);
-    }
+    printf ("Milliseconds for one run through Dhrystone: ");
+    printf ("%6.1f \n", Milliseconds);
+    printf ("Dhrystones per Second:                      ");
+    printf ("%6.1f \n", Dhrystones_Per_Second);
   }
-
-  return Dhrystones_Per_Second;
 }
 
 void Proc_1(mixed * Ptr_Val_Par) {

@@ -628,6 +628,8 @@ main (int argc, char **argv)
         unlink_swap_file();
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
         remove_all_objects();
+        purge_action_sent();
+        purge_shadow_sent();
         remove_wiz_list();
 #if defined(MALLOC_smalloc)
         dump_malloc_data();

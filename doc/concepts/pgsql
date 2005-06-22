@@ -84,5 +84,5 @@ HISTORY
         LDMud 3.3.640 added a privilege_violation() call for each efun.
 
 SEE ALSO
-        mysql(C), pg_connect(E), pg_conv_string(E), pg_query(E), pg_pending(E),
+        mysql(C), pg_connect(E), pg_query(E), pg_pending(E),
         pg_close(E), privilege_violation(M)

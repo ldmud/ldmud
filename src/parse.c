@@ -1401,7 +1401,6 @@ prepos_parse (vector_t *wvec, size_t *cix_in, Bool *fail, svalue_t *prepos)
       stmp = pvec->item[0];
       pvec->item[0] = pvec->item[pix];
       pvec->item[pix] = stmp;
-      ref_array(pvec); /* The caller will free the prepos at some point. */
       *fail = MY_FALSE;
   }
   else

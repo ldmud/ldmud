@@ -1450,8 +1450,7 @@ v_function_exists (svalue_t *sp, int num_arg)
 
 {
     string_t *str, *prog_name;
-    uint32 prog_line = 0;
-    uint32 flags;
+    uint32 prog_line, flags;
     svalue_t *argp;
     object_t *ob;
 
@@ -1598,7 +1597,7 @@ v_function_exists (svalue_t *sp, int num_arg)
 
         default:
             fatal("function_exists(): flags value %ld (from %ld) not implemented.\n"
-                 , (long)(flags & ~NAME_HIDDEN), (long)flags);
+                 , flags & ~NAME_HIDDEN, flags);
             /* NOTREACHED */
         }
     }

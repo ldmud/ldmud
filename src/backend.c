@@ -507,9 +507,6 @@ backend (void)
 
         check_for_out_connections();
 
-        if (num_listed_objs <= num_destructed)
-            cleanup_all_objects();
-
         if (extra_jobs_to_do) {
 
             current_interactive = NULL;
@@ -923,14 +920,11 @@ static Bool did_swap;
     /* Determine how many objects to data-clean at max in this cycle, since
      * sometimes hundreds of objects can become eligible at a time (despite
      * the random factor in the timing). The number is determined so that all
-     * objects are cleaned within half of the configured cleanup period,
-     * but at least the number of recently destructed objects in this cycle.
+     * objects are cleaned within half of the configured cleanup period.
      */
     limit_data_clean = 2 * num_listed_objs / time_to_data_cleanup;
     if (limit_data_clean < 2)
         limit_data_clean = 2;
-    if (limit_data_clean < num_newly_destructed)
-        limit_data_clean = num_newly_destructed;
 
     /* The processing loop, runs until either time or objects
      * run short.

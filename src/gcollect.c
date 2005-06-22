@@ -775,12 +775,11 @@ static mp_int time_cleanup = 0;
 } /* cleanup_driver_structures() */
 
 /*-------------------------------------------------------------------------*/
-void
+static void
 cleanup_all_objects (void)
 
 /* Cleanup all objects in the game, and force the mapping compaction.
- * This function is called by the garbage-collector right at the start,
- * and also by the backend.
+ * This function is called by the garbage-collector right at the start.
  */
 
 {
@@ -2938,6 +2937,8 @@ garbage_collection (void)
     free_defines();
     free_all_local_names();
     remove_unknown_identifier();
+    purge_action_sent();
+    purge_shadow_sent();
     check_wizlist_for_destr();
     cleanup_all_objects();
     if (current_error_trace)

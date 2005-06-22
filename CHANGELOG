@@ -1,38 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-20-Jun-2005 (Lars Duening)  (3.3.710)
-  - (patchlevel.h.in, version.sh, mk-patchlevel.sh, Makefiles)
-      Modified the version numbering system to be compatible between
-      Subversion and PRCS.
+15-May-2005 (Lars Duening)  (3.4.0 = 3.3.705)
+  - Release 3.4.0
 
-20-Jun-2005 (Lars Duening)  (3.3.709)
-  - (xalloc.c) xalloc used REPLACE_MALLOC before it was defined,
-      leading to compilation errors on systems supporting it (Bug #0000393).
-
-19-Jun-2005 (Lars Duening)  (3.3.708)
-  - (pkg-pgsql, func_spec) Added new efun pg_conv_string(), courtesy
-      of Philipp.
-  - (efuns.c) Added new flag setting '4' to get_type_info() for closures
-      (Bug #0000392).
-  - (parse.c) Possibly corrected a refcounting bug in handling prepositions
-      (Bug #0000391).
-  - (closure.c) Since the operators #'&, #'|, #'^ and #'! are now considered
-      efuns, the closure compiler skipped the special treatment of these.
-      As an added bonus of the correction, #'| and #'^ can now take
-      an arbitrary number of arguments, too. (Bug #0000389)
-
-10-Jun-2005 (Lars Duening)  (3.3.707)
-  - (gcollect, backend.c) If the number of destructed pending objects
-      exceeds the number of active objects, a cleanup of all objects
-      is triggered. Also, the incremental cleanup in each cycle
-      cleans at least the number of objects destructed in the cycle.
-
-06-Jun-2005 (Lars Duening)  (3.3.706)
-  - (object.c, sprintf.c, structs.c) Removed a couple compilation warnings
-      on x86-64.
-
-15-May-2005 (Lars Duening)  (3.3.705 = 3.4.0)
+15-May-2005 (Lars Duening)  (3.3.705)
   - (simulate.c) runtime_error(), runtime_warning() and heart_beat_error()
       received a new argument 'caught' (Bug #0000385).
 
