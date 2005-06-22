@@ -198,12 +198,13 @@ DESCRIPTION
          If relative, <pathname> is interpreted relative to <mudlib>.
 
       --tls-trustfile <pathname>
-        Use <pathname> as the filename holding your trusted PEM certificates.
+        Use <pathname> as the directory where your trusted certificate
+        PEM resides.
         If relative, <pathname> is interpreted relative to <mudlib>.
       
       --tls-trustdirectory <pathname>
         Use <pathname> as the directory where your trusted
-        PEM certificates reside, default is '/etc/ssl/certs'.
+        certificates reside, default is '/etc/ssl/certs'.
         If relative, <pathname> is interpreted relative to <mudlib>.
 
       --wizlist-file <filename>

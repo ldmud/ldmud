@@ -765,7 +765,7 @@ notify_no_command (char *command, object_t *save_command_giver)
             free_object(error_obj, "notify_no_command");
         error_obj = NULL;
 
-        errorf("Missing H_NOTIFY_FAIL hook, and no notify_fail() given.\n");
+        error("Missing H_NOTIFY_FAIL hook, and no notify_fail() given.\n");
         /* NOTREACHED */
         useHook = MY_FALSE;
     }
@@ -954,7 +954,7 @@ parse_command (char *buff, Bool from_efun)
             sa->short_verb++;
             free_action_sent(marker_sent);
             current_object = sa->ob; /* For a proper error handling */
-            errorf("The action defined by %s and bound to %s has an undefined "
+            error("The action defined by %s and bound to %s has an undefined "
                   "verb.\n", sa->ob->name, command_giver->name);
         }
         else
@@ -1084,7 +1084,7 @@ parse_command (char *buff, Bool from_efun)
 
         if (ret == 0)
         {
-            errorf("function %s not found.\n", sa->function);
+            error("function %s not found.\n", sa->function);
         }
 
         /* Restore the old current_object and command_giver */
@@ -1212,7 +1212,7 @@ execute_command (char *str, object_t *ob)
         svp = sapply_int(driver_hook[H_COMMAND].u.string, ob, 1, MY_TRUE);
         if (!svp)
         {
-            errorf("Can't find H_COMMAND lfun '%s' in object '%s'.\n"
+            error("Can't find H_COMMAND lfun '%s' in object '%s'.\n"
                  , driver_hook[H_COMMAND].u.string, ob->name
                  );
             res = 0;
@@ -1270,7 +1270,7 @@ e_command (char *str, object_t *ob)
     /* Make a copy of the given command as the parser might change it */
 
     if (strlen(str) > sizeof(buff) - 1)
-        errorf("Command too long: '%.200s...'\n", str);
+        error("Command too long: '%.200s...'\n", str);
     xstrncpy(buff, str, sizeof buff);
     buff[sizeof buff - 1] = '\0';
 
@@ -1343,7 +1343,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
      && (ob->super == NULL || ob->super != command_giver->super)
        /* above condition includes the check command_giver->super == NULL */
      && ob != command_giver->super)
-        errorf("add_action from object '%s' that was not present to '%s'.\n"
+        error("add_action from object '%s' that was not present to '%s'.\n"
              , ob->name, command_giver->name);
 
 #ifdef DEBUG
@@ -1353,14 +1353,14 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
 
     /* Sanity checks */
     if (*func->u.string == ':')
-        errorf("Illegal function name: %s\n", func->u.string);
+        error("Illegal function name: %s\n", func->u.string);
 
     if (compat_mode)
     {
         str = func->u.string;
         if (*str++=='e' && *str++=='x' && *str++=='i' && *str++=='t' && !*str)
         {
-            errorf("Illegal to define a command to the exit() function.\n");
+            error("Illegal to define a command to the exit() function.\n");
             /* NOTREACHED */
             return MY_TRUE;
         }
@@ -1423,7 +1423,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
                 if (-flag >= strlen(p->verb))
                 {
                     free_action_sent(p);
-                    errorf("Bad arg 3 to add_action(): value %ld larger than verb '%s'.\n"
+                    error("Bad arg 3 to add_action(): value %ld larger than verb '%s'.\n"
                          , (long)flag, p->verb);
                     /* NOTREACHED */
                     return MY_TRUE;
@@ -1437,7 +1437,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
             else
             {
                 free_action_sent(p);
-                errorf("Bad arg 3 to add_action(): value %ld too big.\n"
+                error("Bad arg 3 to add_action(): value %ld too big.\n"
                      , (long)flag);
                 /* NOTREACHED */
                 return MY_TRUE;
@@ -1509,20 +1509,20 @@ f_execute_command (svalue_t *sp)
         bad_xefun_arg(3, sp);
 
     if (svalue_strlen(argp) >= COMMAND_FOR_OBJECT_BUFSIZE)
-        errorf("Command too long: '%.200s...'\n", argp->u.string);
+        error("Command too long: '%.200s...'\n", argp->u.string);
     strcpy(buf, argp->u.string);
 
     origin = check_object(argp[1].u.ob);
     if (!origin)
-        errorf("origin '%s' destructed.\n", argp[1].u.ob->name);
+        error("origin '%s' destructed.\n", argp[1].u.ob->name);
     if (!(O_ENABLE_COMMANDS & origin->flags))
-        errorf("origin '%s' not a living.\n", origin->name);
+        error("origin '%s' not a living.\n", origin->name);
 
     player = check_object(argp[2].u.ob);
     if (!player)
-        errorf("player '%s' destructed.\n", argp[2].u.ob->name);
+        error("player '%s' destructed.\n", argp[2].u.ob->name);
     if (!(O_ENABLE_COMMANDS & player->flags))
-        errorf("player '%s' not a living.\n", player->name);
+        error("player '%s' not a living.\n", player->name);
 
     res = MY_FALSE;  /* default result */
 
@@ -2051,7 +2051,7 @@ f_command_stack (svalue_t *sp)
     /* Get the array */
     result = allocate_uninit_array(num);
     if (!result)
-        errorf("(command_stack) Out of memory: array[%d] for result.\n", num);
+        error("(command_stack) Out of memory: array[%d] for result.\n", num);
 
     for ( i = num-1, entry = result->item + num - 1, context = rt_context
         ; i >= 0
@@ -2068,7 +2068,7 @@ f_command_stack (svalue_t *sp)
         /* Create the entry array */
         sub = allocate_array(CMD_SIZE);
         if (!sub)
-            errorf("(command_stack) Out of memory: array[%d] for entry.\n"
+            error("(command_stack) Out of memory: array[%d] for entry.\n"
                  , CMD_SIZE);
 
         put_array(entry, sub);
@@ -2150,9 +2150,9 @@ static svalue_t *add_verb(sp, type)
         if (command_giver->flags & O_SHADOW)
             sent = (action_t *)sent->sent.next;
         if (!sent)
-            errorf("No add_action().\n");
+            error("No add_action().\n");
         if (sent->verb != 0)
-            errorf("Tried to set verb again.\n");
+            error("Tried to set verb again.\n");
         sent->verb = make_shared_string(sp->u.string);
         sent->sent.type = (sent_type_t)type;
         if (d_flag > 1)

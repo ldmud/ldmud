@@ -256,7 +256,7 @@ logon (object_t *ob)
     ret = apply(STR_LOGON, ob, 0);
     if (ret == 0) {
         /* add_message("prog %s:\n", ob->name); */
-        errorf("Could not find logon() on the player %s\n", ob->name);
+        error("Could not find logon() on the player %s\n", ob->name);
     }
     current_object = save;
 } /* logon() */
@@ -1369,13 +1369,13 @@ e_write_file (char *file, char *str)
             emsg = strerror(err);
             if (emsg)
             {
-                errorf("Could not open %s for append: (%d) %s.\n"
+                error("Could not open %s for append: (%d) %s.\n"
                      , file, err, emsg);
             }
             else
             {
                 perror("write_file");
-                errorf("Could not open %s for append: errno %d.\n"
+                error("Could not open %s for append: errno %d.\n"
                      , file, err);
             }
             /* NOTREACHED */
@@ -1458,7 +1458,7 @@ e_read_file (char *file, int start, int len)
       /* allow a trailing \0 and leading ' ' */
     if (!str) {
         fclose(f);
-        errorf("(read_file) Out of memory (%ld bytes) for buffer\n", size+2);
+        error("(read_file) Out of memory (%ld bytes) for buffer\n", size+2);
         /* NOTREACHED */
         return NULL;
     }
@@ -1574,7 +1574,7 @@ e_read_file (char *file, int start, int len)
     p2 = string_copy(str); /* TODO: string_n_copy() */
     mb_free(mbFile);
     if (!p2)
-        errorf("(read_file) Out of memory for result\n");
+        error("(read_file) Out of memory for result\n");
 
     return p2;
 } /* e_read_file() */
@@ -1833,7 +1833,7 @@ f_regreplace (svalue_t *sp)
     if (!buf) { \
         xfree(oldbuf); \
         if (pat) REGFREE(pat); \
-        errorf("(regreplace) Out of memory (%lu bytes) for buffer\n"\
+        error("(regreplace) Out of memory (%lu bytes) for buffer\n"\
              , (unsigned long)origspace); \
     } \
     new = buf + (new-oldbuf)
@@ -1882,7 +1882,7 @@ f_regreplace (svalue_t *sp)
                         xfree(buf);
                         if (pat)
                             REGFREE(pat);
-                        errorf("Out of memory for matched string (%lu bytes)\n"
+                        error("Out of memory for matched string (%lu bytes)\n"
                              , (unsigned long)patsize+1);
                         /* NOTREACHED */
                         return NULL;
@@ -1918,7 +1918,7 @@ f_regreplace (svalue_t *sp)
                         REGFREE(pat);
                     if (match)
                         xfree(match);
-                    errorf("Invalid type for string replacement\n");
+                    error("Invalid type for string replacement\n");
                     /* NOTREACHED */
                     return NULL;
                 }
@@ -1947,7 +1947,7 @@ f_regreplace (svalue_t *sp)
                         REGFREE(pat);
                     if (match)
                         xfree(match);
-                    errorf("Internal error in regreplace().\n");
+                    error("Internal error in regreplace().\n");
                     /* NOTREACHED */
                     return NULL;
                 }

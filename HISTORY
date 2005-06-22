@@ -4,32 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-15-May-2005 (Lars Duening) -- upcoming Release 3.2.12
-
-    - Changed efuns:
-
-    - Corrected efuns:
-      + call_out(), input_to(): Local references are no longer
-          accepted as extra arguments.
-      + restore_value(): Restoring one-character operator closures
-          in arrays works again.
-
-    - New efuns:
-
-    - Master Object:
-       + runtime_error(), heart_beat_error(): A new argument 'caught'
-          signals if the error is caught or not.
-
-    - Fixed Crashers:
-
-    - Language:
-
-    - Runtime:
-
-    - Other Changes:
-
-
-19-Mar-2005 (Lars Duening) -- Release 3.2.11
+10-Mar-2005 (Lars Duening) -- upcoming Release 3.2.11
 
     - Changed efuns:
        + db_*(): mySQL efuns trigger a privilege violation ("mysql", "<efun

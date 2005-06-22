@@ -214,7 +214,7 @@ find_add_pointer (struct pointer_table *ptable, void *pointer, Bool bAdd)
 
             table = mempool_alloc(ptable->pool, sizeof *table);
             if (!table)
-                errorf("(pointertable) Out of memory (%lu bytes pooled) "
+                error("(pointertable) Out of memory (%lu bytes pooled) "
                       "for subtable.\n", (unsigned long) sizeof *table);
             *insert = (struct pointer_record *)table;
             memset(table->used, 0, sizeof table->used);
@@ -247,7 +247,7 @@ find_add_pointer (struct pointer_table *ptable, void *pointer, Bool bAdd)
     usage_p[0] |= mask;
     new = mempool_alloc(ptable->pool, sizeof *new);
     if (!new)
-        errorf("(pointertable) Out of memory (%lu bytes pooled) for "
+        error("(pointertable) Out of memory (%lu bytes pooled) for "
               "new entry.\n", (unsigned long) sizeof *new);
     *insert = new;
     new->key = key;

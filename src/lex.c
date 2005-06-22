@@ -5458,7 +5458,7 @@ add_permanent_define (char *name, short nargs, void *exps, Bool special)
     p = make_shared_identifier(name, I_TYPE_DEFINE, 0);
     if (!p)
     {
-        errorf("Out of memory\n");
+        error("Out of memory\n");
     }
 
     /* If such a macro already exists with different meaning,
@@ -5470,7 +5470,7 @@ add_permanent_define (char *name, short nargs, void *exps, Bool special)
          || p->u.define.special
          || strcmp(exps,p->u.define.exps.str) != 0)
         {
-            errorf("Permanent #define %s already defined\n", name);
+            error("Permanent #define %s already defined\n", name);
         }
         return;
     }
@@ -6524,7 +6524,7 @@ set_inc_list (vector_t *v)
     {
         if (svp->type != T_STRING)
         {
-            errorf("H_INCLUDE_DIRS argument has a non-string array element\n");
+            error("H_INCLUDE_DIRS argument has a non-string array element\n");
         }
 
         /* Set p to the beginning of the pathname, skipping leading
@@ -6543,21 +6543,21 @@ set_inc_list (vector_t *v)
         /* Is the path legal? */
         if (!legal_path(p))
         {
-            errorf("H_INCLUDE_DIRS path contains '..'\n");
+            error("H_INCLUDE_DIRS path contains '..'\n");
         }
         if (*p == '.' && !p[1])
-            errorf("H_INCLUDE_DIRS path is a single prefix dot\n");
+            error("H_INCLUDE_DIRS path is a single prefix dot\n");
 
         len = (mp_int)strlen(p);
         if (max < len)
             max = len;
         if (len >= 2 && p[len -1] == '.' && p[len - 2] == '/')
-            errorf("H_INCLUDE_DIRS path ends in single prefix dot\n");
+            error("H_INCLUDE_DIRS path ends in single prefix dot\n");
 
         /* Get and store our own copy of the pathname */
         p = string_copy(p);
         if (!p)
-            errorf("Out of memory\n");
+            error("Out of memory\n");
 
         free_svalue(svp);
         svp->type = T_STRING;

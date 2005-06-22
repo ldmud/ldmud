@@ -2004,7 +2004,7 @@ tab_conversion (int from, int to, int tabsize, Bool do_detab)
  *  -- Dworkin 920510
  */
 
-# define add_error(s)        { add_message(s, lineno); errs++; return; }
+# define error(s)        { add_message(s, lineno); errs++; return; }
 
 static int lineno, errs;
 static int shi;        /* the current shift (negative for left shift) */
@@ -2089,7 +2089,7 @@ shift (char *text)
             }
         }
 
-        add_error("Result of shift would be too long, line %d\n");
+        error("Result of shift would be too long, line %d\n");
     }
 }
 
@@ -2219,7 +2219,7 @@ indent (char *buf)
                 }
                 else if (*p == '\0')
                 {
-                    add_error("Unterminated string in line %d\n");
+                    error("Unterminated string in line %d\n");
                 }
                 else if (*p == '\\' && *++p == '\0')
                 {
@@ -2368,7 +2368,7 @@ indent (char *buf)
 
                         if (symbol_operator(p, &end) < 0)
                         {
-                            add_error("Missing function name after #' in line %d\n");
+                            error("Missing function name after #' in line %d\n");
                         }
                         p = end;
                     }
@@ -2427,7 +2427,7 @@ indent (char *buf)
                 if (sp == stackbot)
                 {
                     /* out of stack */
-                    add_error("Nesting too deep in line %d\n");
+                    error("Nesting too deep in line %d\n");
                 }
 
                 /* handle indentation */
@@ -3042,10 +3042,10 @@ ed_start (char *file_arg, char *exit_fn, object_t *exit_ob)
     ed_buffer_t *old_ed_buffer;
 
     if (!command_giver || !(O_IS_INTERACTIVE(command_giver)))
-        errorf("Tried to start an ed session on a non-interative player.\n");
+        error("Tried to start an ed session on a non-interative player.\n");
 
     if (EXTERN_ED_BUFFER)
-        errorf("Tried to start an ed session, when already active.\n");
+        error("Tried to start an ed session, when already active.\n");
 
     /* Check for read on startup, since the buffer is read in. But don't
      * check for write, since we may want to change the file name.

@@ -93,9 +93,8 @@ time_string (mp_int t)
 
     if (t != last_time)
     {
-        time_t ti = (time_t)t;
         last_time = t;
-        tm = localtime(&ti);
+        tm = localtime((time_t *)&t);
         strftime(result, sizeof(result)-1, "%a %b %d %H:%M:%S %Y", tm);
     }
     return result;
@@ -115,10 +114,9 @@ utime_string (mp_int t, mp_int ut)
 
     if (t != last_t || ut != last_ut)
     {
-        time_t ti = (time_t)t;
-        last_t = t;
+        last_t= t;
         last_ut= ut;
-        tm = localtime(&ti);
+        tm = localtime((time_t *)&t);
         len = strftime(result, sizeof(result)-1, "%a %b %d %H:%M:%S:", tm);
         sprintf(result+len, "%06ld", ut);
         strftime(result+len+6, sizeof(result)-7-len, " %Y", tm);
@@ -146,9 +144,8 @@ time_stamp (void)
     t = get_current_time();
     if (t != last_time)
     {
-        time_t ti = (time_t)t;
         last_time = t;
-        tm = localtime(&ti);
+        tm = localtime((time_t *)&t);
         strftime( current_time_stamp, sizeof(current_time_stamp)-1
                 , "%Y.%m.%d %H:%M:%S", tm);
     }

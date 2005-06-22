@@ -255,7 +255,7 @@ data_size (object_t *ob, mp_int * pTotal)
         return 0;
     ptable = new_pointer_table();
     if (!ptable)
-        errorf("(dumpstat) Out of memory for new pointer table.\n");
+        error("(dumpstat) Out of memory for new pointer table.\n");
     for (svp = ob->variables; --i >= 0; svp++)
     {
         mp_int tmp;

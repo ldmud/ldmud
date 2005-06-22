@@ -79,7 +79,7 @@ object_t *current_heart_beat = NULL;
    * of heartbeat executions.
    *
    * interpret.c needs to know this for the heart-beat tracing, and
-   * simulate.c test this in the errorf() function to react properly.
+   * simulate.c test this in the error() function to react properly.
    */
 
 static struct hb_info * hb_list = NULL;

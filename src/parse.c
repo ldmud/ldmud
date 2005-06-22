@@ -326,7 +326,7 @@ find_living_object (char *name, Bool player)
         /* We have to create the closure */
         put_string(sp, make_shared_string(function_names[player ? 1 : 0]));
         if (!sp->u.string)
-            errorf("(parse_command) Out of memory (%lu bytes) for string\n"
+            error("(parse_command) Out of memory (%lu bytes) for string\n"
                  , (unsigned long)strlen(function_names[player ? 1 : 0]));
         inter_sp = sp;
         symbol_efun(sp);
@@ -337,7 +337,7 @@ find_living_object (char *name, Bool player)
     /* Call the closure */
     put_string(sp, make_shared_string(name));
     if ( !sp->u.string)
-        errorf("(parse_command) Out of memory (%lu bytes) for result\n"
+        error("(parse_command) Out of memory (%lu bytes) for result\n"
              , (unsigned long)strlen(name));
     inter_sp = sp;
     call_lambda(svp, 1);
@@ -559,7 +559,7 @@ load_lpc_info (size_t ix, object_t *ob)
 
                 tmp = allocate_array(VEC_SIZE(ret->u.vec));
                 if (!tmp)
-                    errorf("(parse_command) Out of memory: array[%lu] for "
+                    error("(parse_command) Out of memory: array[%lu] for "
                           "plural names.\n", VEC_SIZE(ret->u.vec));
                 sing = ret->u.vec;
                 for (il = 0; il < VEC_SIZE(tmp); il++)
@@ -1671,7 +1671,7 @@ e_parse_command ( char     *cmd          /* Command to parse */
         free_array(wvec);
         free_array(patvec);
         xfree(old);
-        errorf("Bad second argument to parse_command()\n");
+        error("Bad second argument to parse_command()\n");
     }
 
     /* Save the previous context and set up the error handler */

@@ -4,7 +4,7 @@
  *---------------------------------------------------------------------------
  * TODO: Rewrite the low-level functions (like allocate_mapping()) to return
  * TODO:: failure codes (errno like) instead of throwing errors. In addition,
- * TODO:: provide wrapper functions which do throw errorf()s, so that every
+ * TODO:: provide wrapper functions which do throw error()s, so that every
  * TODO:: caller can handle the errors himself (like the swapper).
  * Mappings, or 'associative arrays', are similar to normal arrays, with
  * the principal difference that they can use every value to index their
@@ -1089,7 +1089,7 @@ static svalue_t local_const0;
             }
             if (msize >= max_mapping_size)
             {
-                errorf("Illegal mapping size: %ld\n", msize+1);
+                error("Illegal mapping size: %ld\n", msize+1);
                 return NULL;
             }
         }
@@ -1198,7 +1198,7 @@ static svalue_t local_const0;
             }
             if (msize >= max_mapping_size)
             {
-                errorf("Illegal mapping size: %ld\n", msize+1);
+                error("Illegal mapping size: %ld\n", msize+1);
                 return NULL;
             }
         }
@@ -1446,7 +1446,7 @@ check_map_for_destr (mapping_t *m)
                     hm = (struct hash_mapping *)xalloc(sizeof *hm);
                     if (!hm)
                     {
-                        errorf("Out of memory\n");
+                        error("Out of memory\n");
                         /* NOTREACHED */
                         return;
                     }
@@ -1809,7 +1809,7 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
                         hm = (struct hash_mapping *)xalloc(sizeof *hm);
                         if (!hm)
                         {
-                            errorf("Out of memory\n");
+                            error("Out of memory\n");
                             /* NOTREACHED */
                             return;
                         }
@@ -1958,7 +1958,7 @@ copy_mapping (mapping_t *m)
           xalloc(sizeof *hm - sizeof *mcp + sizeof *mcp * size);
         if (!hm2)
         {
-            errorf("Out of memory.\n");
+            error("Out of memory.\n");
             /* NOTREACHED */
             return NULL;
         }
@@ -1983,7 +1983,7 @@ copy_mapping (mapping_t *m)
                 mc2 = (struct map_chain *)xalloc((size_t)linksize);
                 if (!mc2)
                 {
-                    errorf("Out of memory.\n");
+                    error("Out of memory.\n");
                     /* NOTREACHED */
                     return NULL;
                 }
@@ -2025,7 +2025,7 @@ copy_mapping (mapping_t *m)
     cm2 = xalloc((size_t)size);
     if (!cm2)
     {
-        errorf("Out of memory.\n");
+        error("Out of memory.\n");
         /* NOTREACHED */
         return NULL;
     }
@@ -2140,7 +2140,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
         if (new_width > SSIZE_MAX /* TODO: SIZET_MAX, see port.h */
          || (new_width != 0 && (SSIZE_MAX - sizeof(struct map_chain)) / new_width < sizeof(svalue_t))
            )
-            errorf("New mapping width %ld too big.\n", (long)new_width);
+            error("New mapping width %ld too big.\n", (long)new_width);
     }
 
     /* --- Copy the hash part, if existent ---
@@ -2158,7 +2158,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
           xalloc(sizeof *hm - sizeof *mcp + sizeof *mcp * size);
         if (!hm2)
         {
-            errorf("Out of memory.\n");
+            error("Out of memory.\n");
             /* NOTREACHED */
             return NULL;
         }
@@ -2183,7 +2183,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
                 mc2 = (struct map_chain *)xalloc((size_t)linksize);
                 if (!mc2)
                 {
-                    errorf("Out of memory.\n");
+                    error("Out of memory.\n");
                     /* NOTREACHED */
                     return NULL;
                 }
@@ -2226,7 +2226,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
 
     if (!cm2)
     {
-        errorf("Out of memory.\n");
+        error("Out of memory.\n");
         /* NOTREACHED */
         return NULL;
     }
@@ -2396,7 +2396,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
             return copy_mapping(m1);
         }
 
-        errorf("Mappings to be added are of different width: %ld vs. %ld\n"
+        error("Mappings to be added are of different width: %ld vs. %ld\n"
              , (long)num_values, (long)m2->num_values);
     }
 
@@ -3312,7 +3312,7 @@ compact_mappings (mp_int num, Bool force)
             );
             if (!condensed_start)
             {
-                errorf("Out of memory.\n");
+                error("Out of memory.\n");
                 /* NOTREACHED */
                 return;
             }
@@ -3769,7 +3769,7 @@ set_mapping_user (mapping_t *m, object_t *owner)
     locals.hairy = first_hairy = (svalue_t *)alloca((size_t)cm->misc_size);
     if (!first_hairy)
     {
-        errorf("Stack overflow.\n");
+        error("Stack overflow.\n");
         /* NOTREACHED */
         return;
     }
@@ -4194,7 +4194,7 @@ add_to_mapping (mapping_t *m1, mapping_t *m2)
             }
             else
             {
-                errorf("Mappings to be added are of different width: %ld vs. %ld\n"
+                error("Mappings to be added are of different width: %ld vs. %ld\n"
                      , (long)m1->num_values, (long)m2->num_values);
                 /* NOTREACHED */
                 return;
@@ -4507,7 +4507,7 @@ walk_mapping_prologue (mapping_t *m, svalue_t *sp, callback_t *cb)
     pointers = (svalue_t *)xalloc( (i * 2 + 4) * sizeof(svalue_t) );
     if (!pointers)
     {
-        errorf("Out of memory.\n");
+        error("Out of memory.\n");
         /* NOTREACHED */
         return NULL;
     }
@@ -4593,7 +4593,7 @@ f_walk_mapping (svalue_t *sp, int num_arg)
 
         if (!callback_object(&cb))
         {
-            errorf("Object used by walk_mapping destructed.\n");
+            error("Object used by walk_mapping destructed.\n");
             /* NOTREACHED */
             return NULL;
         }
@@ -4706,7 +4706,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
         {
             inter_sp = sp;
             free_callback(&cb);
-            errorf("Out of memory\n");
+            error("Out of memory\n");
         }
         ++sp;
         put_array(sp, dvec);
@@ -4719,7 +4719,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
     if (!m)
     {
         inter_sp = sp + 1;
-        errorf("Out of memory\n");
+        error("Out of memory\n");
     }
     sp += 2;
     put_mapping(sp, m);
@@ -4749,7 +4749,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
                 put_number(dvec_sp, 0);
                 inter_sp = sp;
                 free_callback(&cb);
-                errorf("Out of memory\n");
+                error("Out of memory\n");
             }
             else
                 put_array(dvec_sp, dvec);
@@ -4782,7 +4782,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
         }
 
         if (!callback_object(&cb))
-            errorf("Object used by %s destructed"
+            error("Object used by %s destructed"
                  , bFull ? "filter" : "filter_mapping");
 
 
@@ -4946,7 +4946,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
         if (!dvec)
         {
             inter_sp = sp;
-            errorf("Out of memory\n");
+            error("Out of memory\n");
         }
         ++sp;
         put_array(sp, dvec);
@@ -4957,7 +4957,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
     if (!m)
     {
         inter_sp = sp;
-        errorf("Out of memory\n");
+        error("Out of memory\n");
     }
     ++sp;
     put_mapping(sp, m);
@@ -4984,7 +4984,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
             {
                 put_number(dvec_sp, 0);
                 inter_sp = sp;
-                errorf("Out of memory\n");
+                error("Out of memory\n");
             }
             else
                 put_array(dvec_sp, dvec);
@@ -5024,7 +5024,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
         }
 
         if (!callback_object(&cb))
-            errorf("Object used by %s destructed"
+            error("Object used by %s destructed"
                  , bFull ? "map" : "map_mapping");
 
         data = apply_callback(&cb, 1 + bFull);
@@ -5104,7 +5104,7 @@ f_m_reallocate (svalue_t *sp)
     new_width = sp->u.number;
     if (new_width < 0)
     {
-        errorf("Illegal width to m_reallocate()\n");
+        error("Illegal width to m_reallocate()\n");
         /* NOTREACHED */
         return sp;
     }
@@ -5124,7 +5124,7 @@ f_m_reallocate (svalue_t *sp)
     new_m = resize_mapping(m, new_width);
     if (!new_m)
     {
-        errorf("Out of memory.\n");
+        error("Out of memory.\n");
         /* NOTREACHED */
         return sp;
     }

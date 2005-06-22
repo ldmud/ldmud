@@ -1,52 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-20-Jun-2005 (Lars Duening)  (3.2.12-dev.725)
-  - (patchlevel.h.in, version.sh, mk-patchlevel.sh, Makefiles)
-      Modified the version numbering system to be compatible between
-      Subversion and PRCS.
+19-Mar-2005 (Lars Duening)  (3.2.11)
+  - The Release.
 
-13-Jun-2005 (Lars Duening)  (3.2.12-dev.724)
-  - (comm.c) Adapted for Mac OS X 10.4.
-
-15-May-2005 (Lars Duening)  (3.2.12-dev.723)
-  - (simulate.c) runtime_error() and heart_beat_error() received
-      a new argument 'caught' (Bug #0000385).
-
-15-May-2005 (Lars Duening)  (3.2.12-dev.722)
-  - (comm.c) Corrected the error messages for errors in the extra
-      arguments of input_tl(). (Bug #0000379).
-
-15-May-2005 (Lars Duening)  (3.2.12-dev.721)
-  - (call_out.c) Corrected the error messages for errors in the extra
-      arguments of call_out(). (Bug #0000379).
-
-15-May-2005 (Lars Duening)  (3.2.12-dev.720)
-  - (object.c) Single-character operator closures like #'- couldn't
-      be restored in arrays due to some outdated hack in the parser
-      (Bug #0000384 and #0000386).
-  - (configure) Link in the crypto libs only if actually needed (reported
-      by Coogan).
-
-24-Apr-2005 (Lars Duening)  (3.2.12-dev.719)
-  - (main.c, pkg-tls.c) Improved the documentation for the TLS commandline
-      options, removed a crasher when only one of the two cert locations
-      is specified (thanks, Coogan!).
-  - (configure) New configuration parameter '--with-tls-path' allows
-      to specifiy a non-standard location for the TLS installation.
-
-01-Apr-2005 (Lars Duening)  (3.2.12-dev.718)
-  - (pkg-tls.c) Added FreeBSD 5.4 compatibility (thanks, Ralph!).
-  - (simulate, many files) Renamed error() to errorf() due to a collision
-      with gnutls.h include files under newer compilers.
-  - (port.c) Corrected a C99 incompatibility (thanks, Ralph!).
-
-25-Mar-2005 (Lars Duening)  (3.2.12-dev.717)
-  - (simulate.c) Modified the callback setup so that efun callbacks
-       can take normal lvalues; and timed function/closure callbacks
-       take protected lvalues - but not vice versa.
-
-10-Mar-2005 (Lars Duening)  (3.2.11-dev.716 == 3.2.11)
+10-Mar-2005 (Lars Duening)  (3.2.11-dev.716)
   - (interpret.c) The efun tell_object() can now take an array as
       second argument, calling catch_msg() in the target in that case
       (Bug #0000354).

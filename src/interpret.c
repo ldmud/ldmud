@@ -307,9 +307,9 @@ struct mvf_info
 /*-------------------------------------------------------------------------*/
 /* Macros */
 
-#define ERRORF(s) {inter_pc = pc; inter_sp = sp; errorf s ;}
+#define ERRORF(s) {inter_pc = pc; inter_sp = sp; error s ;}
 #define ERROR(s) ERRORF((s))
-  /* ERRORF((...)) acts like errorf(...), except that first the local pc and sp
+  /* ERRORF((...)) acts like error(...), except that first the local pc and sp
    * are copied into the global variables.
    * ERROR() is an easier to type form of ERRORF() when your error message
    * is just one string. It will be redefined below for the tabled
@@ -1189,7 +1189,7 @@ check_for_ref_loop (svalue_t * dest)
             if (rover1 == rover2)
             {
                 free_svalue(dest);
-                errorf("Assignment would create reference loop.\n");
+                error("Assignment would create reference loop.\n");
             }
         } while (rover1
              && (rover1->type == T_LVALUE || rover1->type == T_PROTECTED_LVALUE)
@@ -1237,7 +1237,7 @@ _assign_svalue_no_free (svalue_t *to, svalue_t *from)
               if (!p)
               {
                   put_number(to, 0);
-                  errorf("Out of memory\n");
+                  error("Out of memory\n");
               }
               strcpy(p, str);
               to->u.string = p;
@@ -1248,7 +1248,7 @@ _assign_svalue_no_free (svalue_t *to, svalue_t *from)
             if (!to->u.string)
             {
                 put_number(to, 0);
-                errorf("Out of memory\n");
+                error("Out of memory\n");
             }
             break;
         case STRING_SHARED:        /* It already is shared */
@@ -1334,7 +1334,7 @@ copy_svalue_no_free (svalue_t *to, svalue_t *from)
             DYN_MAPPING_COST(MAP_SIZE(old));
             new = copy_mapping(old);
             if (!new)
-                errorf("Out of memory: mapping[%lu] for copy.\n"
+                error("Out of memory: mapping[%lu] for copy.\n"
                      , MAP_SIZE(old));
             free_mapping(old);
             to->u.map = new;
@@ -1353,7 +1353,7 @@ copy_svalue_no_free (svalue_t *to, svalue_t *from)
             DYN_ARRAY_COST(size);
             new = allocate_uninit_array((int)size);
             if (!new)
-                errorf("Out of memory: array[%lu] for copy.\n"
+                error("Out of memory: array[%lu] for copy.\n"
                      , (unsigned long) size);
             for (i = 0; i < size; i++)
                 assign_svalue_no_free( &new->item[i]
@@ -1401,7 +1401,7 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from
                 put_number(to, 0);
                 inter_sp = sp;
                 inter_pc = pc;
-                errorf("Out of memory\n");
+                error("Out of memory\n");
             }
             (void)strcpy(p, str);
             put_malloced_string(to, p);
@@ -1421,7 +1421,7 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from
               put_ref_string(to, STR_DEFAULT);
               inter_sp = sp;
               inter_pc = pc;
-              errorf("Out of memory\n");
+              error("Out of memory\n");
           }
           put_string(to, str);
           break;
@@ -1506,7 +1506,7 @@ assign_from_lvalue:
                 put_number(to, 0);
                 inter_sp = sp;
                 inter_pc = pc;
-                errorf("Out of memory\n");
+                error("Out of memory\n");
             }
             (void)strcpy(p, str);
             put_malloced_string(sp, p);
@@ -1524,7 +1524,7 @@ assign_from_lvalue:
                 put_ref_string(to, STR_DEFAULT);
                 inter_sp = sp;
                 inter_pc = pc;
-                errorf("Out of memory\n");
+                error("Out of memory\n");
             }
             put_string(to, str);
             break;
@@ -1746,7 +1746,7 @@ assign_svalue (svalue_t *dest, svalue_t *v)
             if (v->type == T_NUMBER)
             {
                 if (!v->u.number)
-                    errorf("Can't assign 0 to a string character.\n");
+                    error("Can't assign 0 to a string character.\n");
                 else
                     *dest->u.string = (char)v->u.number;
             }
@@ -1763,7 +1763,7 @@ assign_svalue (svalue_t *dest, svalue_t *v)
                 if (v->type == T_NUMBER)
                 {
                     if (!v->u.number)
-                        errorf("Can't assign 0 to a string character.\n");
+                        error("Can't assign 0 to a string character.\n");
                     else
                         *p->v.u.string = (char)v->u.number;
                 }
@@ -1827,7 +1827,7 @@ _transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
         if ( !dest->u.string )
         {
             put_number(dest, 0);
-            errorf("Out of memory\n");
+            error("Out of memory\n");
         }
     }
     else /* just copy the data */
@@ -1871,7 +1871,7 @@ transfer_svalue_no_free_spc ( svalue_t *dest, svalue_t *v
             put_number(dest, 0);
             inter_sp = sp;
             inter_pc = pc;
-            errorf("Out of memory\n");
+            error("Out of memory\n");
         }
     }
     else
@@ -1964,7 +1964,7 @@ transfer_svalue (svalue_t *dest, svalue_t *v)
             if (v->type == T_NUMBER)
             {
                 if (!v->u.number)
-                    errorf("Can't assign 0 to a string character.\n");
+                    error("Can't assign 0 to a string character.\n");
                 else
                     *dest->u.string = (char)v->u.number;
             }
@@ -1983,7 +1983,7 @@ transfer_svalue (svalue_t *dest, svalue_t *v)
                 if (v->type == T_NUMBER)
                 {
                     if (!v->u.number)
-                        errorf("Can't assign 0 to a string character.\n");
+                        error("Can't assign 0 to a string character.\n");
                     else
                         *p->v.u.string = (char)v->u.number;
                     return;
@@ -2072,7 +2072,7 @@ transfer_pointer_range (svalue_t *source)
 
 #ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
-            errorf("Illegal range [%ld..%ld] for assignment.\n"
+            error("Illegal range [%ld..%ld] for assignment.\n"
                  , index1, index2-1
                  );
 #endif /* NO_NEGATIVE_RANGES */
@@ -2188,7 +2188,7 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
 
 #ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
-            errorf("Illegal range [%ld..%ld] for assignment.\n"
+            error("Illegal range [%ld..%ld] for assignment.\n"
                  , index1, index2-1
                  );
 #endif /* NO_NEGATIVE_RANGES */
@@ -2294,7 +2294,7 @@ assign_string_range (svalue_t *source, Bool do_free)
 
 #ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
-            errorf("Illegal range [%ld..%ld] for assignment.\n"
+            error("Illegal range [%ld..%ld] for assignment.\n"
                  , index1, index2-1
                  );
 #endif /* NO_NEGATIVE_RANGES */
@@ -2304,7 +2304,7 @@ assign_string_range (svalue_t *source, Bool do_free)
         if (!rs)
         {
             /* We don't pop the stack here --> don't free source */
-            errorf("Out of memory\n");
+            error("Out of memory\n");
         }
 
         if (index1)
@@ -2366,7 +2366,7 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
 
 #ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
-            errorf("Illegal range [%ld..%ld] for assignment.\n"
+            error("Illegal range [%ld..%ld] for assignment.\n"
                  , index1, index2-1
                  );
 #endif /* NO_NEGATIVE_RANGES */
@@ -2389,7 +2389,7 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
         rs = xalloc((size_t)(dsize + ssize + index1 - index2 + 1));
         if (!rs)
         {
-            errorf("Out of memory\n");
+            error("Out of memory\n");
         }
 
         if (index1)
@@ -2445,7 +2445,7 @@ add_number_to_lvalue (svalue_t *dest, int i, svalue_t *pre, svalue_t *post)
     switch (dest->type)
     {
     default:
-        errorf("Reference to bad type to ++/--\n");
+        error("Reference to bad type to ++/--\n");
         break;
 
     case T_NUMBER:
@@ -2484,7 +2484,7 @@ add_number_to_lvalue (svalue_t *dest, int i, svalue_t *pre, svalue_t *post)
 
     case T_CHAR_LVALUE:
         if (((*dest->u.string + i) & 0xff) == 0)
-            errorf("Can't set string character to 0.\n");
+            error("Can't set string character to 0.\n");
         if (pre) put_number(pre, ((unsigned char)(*dest->u.string)));
         (*dest->u.string) += i;
         if (post) put_number(post, ((unsigned char)(*dest->u.string)));
@@ -2499,7 +2499,7 @@ add_number_to_lvalue (svalue_t *dest, int i, svalue_t *pre, svalue_t *post)
          && p->lvalue->u.string == p->start)
         {
             if (((*p->v.u.string + i) & 0xff) == 0)
-                errorf("Can't set string character to 0.\n");
+                error("Can't set string character to 0.\n");
             if (pre) put_number(pre, (unsigned char)(*p->v.u.string));
             i = (unsigned char)(*p->v.u.string += i);
             if (post) put_number(post, i);
@@ -2545,7 +2545,7 @@ inter_add_array (vector_t *q, vector_t **vpp)
 
     if (max_array_size && p_size + q_size > max_array_size)
     {
-        errorf("Illegal array size: %ld.\n", (long)(p_size + q_size));
+        error("Illegal array size: %ld.\n", (long)(p_size + q_size));
     }
 
     /* The optimized array-adding will transfer elements around, rendering
@@ -2593,7 +2593,7 @@ inter_add_array (vector_t *q, vector_t **vpp)
                 }
                 free_array(r);
                 free_array(q);
-                errorf("Illegal array size: %ld.\n", (long)(p_size + q_size));
+                error("Illegal array size: %ld.\n", (long)(p_size + q_size));
             }
         } else
 #endif
@@ -3302,7 +3302,7 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
     /* Illegal type to index */
     inter_sp = sp;
     inter_pc = pc;
-    errorf("(lvalue)Indexing on illegal type.\n");
+    error("(lvalue)Indexing on illegal type.\n");
     /* TODO: Print the type */
     return sp;
 } /* push_indexed_lvalue() */
@@ -3367,7 +3367,7 @@ push_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
     /* Indexing on illegal type */
     inter_sp = sp;
     inter_pc = pc;
-    errorf("(lvalue)Indexing on illegal type.\n");
+    error("(lvalue)Indexing on illegal type.\n");
     /* TODO: Print type */
     return NULL;
 } /* push_rindexed_lvalue() */
@@ -3495,7 +3495,7 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    errorf("(lvalue)Indexing on illegal type.\n");
+    error("(lvalue)Indexing on illegal type.\n");
     /* TODO: Print type */
     return NULL;
 } /* push_protected_indexed_lvalue() */
@@ -3561,7 +3561,7 @@ push_protected_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    errorf("(lvalue)Indexing on illegal type.\n");
+    error("(lvalue)Indexing on illegal type.\n");
     /* TODO: Print type */
     return NULL;
 } /* push_protected_rindexed_lvalue() */
@@ -3633,7 +3633,7 @@ push_protected_indexed_map_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    errorf("(lvalue)Indexing on illegal type.\n");
+    error("(lvalue)Indexing on illegal type.\n");
     /* TODO: Print type */
     return NULL;
 } /* push_protected_indexed_map_lvalue() */
@@ -3776,7 +3776,7 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    errorf("(lvalue)Indexing on illegal type.\n");
+    error("(lvalue)Indexing on illegal type.\n");
     /* TODO: Print type */
     return NULL;
 } /* index_lvalue() */
@@ -3878,7 +3878,7 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    errorf("(lvalue)Indexing on illegal type.\n");
+    error("(lvalue)Indexing on illegal type.\n");
     /* TODO: Print the type */
     return NULL;
 } /* rindex_lvalue() */
@@ -4158,7 +4158,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
         /* Indexing on illegal type */
         inter_sp = sp;
         inter_pc = pc;
-        errorf("(lvalue)Indexing on illegal type.\n");
+        error("(lvalue)Indexing on illegal type.\n");
         /* TODO: Print type */
         return NULL;
     } /* for(ever) */
@@ -4381,7 +4381,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
         /* Indexing on illegal type */
         inter_sp = sp;
         inter_pc = pc;
-        errorf("(lvalue)Indexing on illegal type.\n");
+        error("(lvalue)Indexing on illegal type.\n");
         /* TODO: Print the type */
         return NULL;
     } /* for(ever) */
@@ -4423,7 +4423,7 @@ range_lvalue (int code, svalue_t *sp)
 #ifdef DEBUG
     if (sp->type != T_LVALUE) {
         inter_sp = sp;
-        errorf("wrong type to range_lvalue\n");
+        error("wrong type to range_lvalue\n");
         /* TODO: Print type */
         return NULL;
     }
@@ -4450,7 +4450,7 @@ range_lvalue (int code, svalue_t *sp)
         break;
     default:
         inter_sp = sp;
-        errorf("(lvalue)Range index on illegal type.\n");
+        error("(lvalue)Range index on illegal type.\n");
         /* TODO: Print type */
         return NULL;
     }
@@ -4460,7 +4460,7 @@ range_lvalue (int code, svalue_t *sp)
     if (i->type != T_NUMBER)
     {
         inter_sp = sp;
-        errorf("Illegal upper range index: not a number.\n");
+        error("Illegal upper range index: not a number.\n");
         /* TODO: Print type */
         return NULL;
     }
@@ -4477,7 +4477,7 @@ range_lvalue (int code, svalue_t *sp)
     if (++ind2 < 0 || ind2 > size+1)
     {
         inter_sp = sp;
-        errorf("Upper range index out of bounds: %ld, size: %ld.\n"
+        error("Upper range index out of bounds: %ld, size: %ld.\n"
              , (long)i->u.number, (long)size);
         return NULL;
     }
@@ -4487,7 +4487,7 @@ range_lvalue (int code, svalue_t *sp)
     if ((--i)->type != T_NUMBER)
     {
         inter_sp = sp;
-        errorf("Illegal lower range index: not a number.\n");
+        error("Illegal lower range index: not a number.\n");
         /* TODO: Print the type */
         return NULL;
     }
@@ -4504,7 +4504,7 @@ range_lvalue (int code, svalue_t *sp)
     if (ind1 < 0 || ind1 > size)
     {
         inter_sp = sp;
-        errorf("Lower range index out of bounds: %ld, size: %ld.\n"
+        error("Lower range index out of bounds: %ld, size: %ld.\n"
              , (long)i->u.number, (long)size);
         return NULL;
     }
@@ -4514,7 +4514,7 @@ range_lvalue (int code, svalue_t *sp)
     if (ind2 < ind1)
     {
         inter_sp = sp;
-        errorf("Range of negative size given: %ld..%ld .\n"
+        error("Range of negative size given: %ld..%ld .\n"
              , (long)i->u.number, (long)(i+1)->u.number);
         return NULL;
     }
@@ -4524,7 +4524,7 @@ range_lvalue (int code, svalue_t *sp)
     else if (ind2 > size)
     {
         inter_sp = sp;
-        errorf("Upper range index out of bounds: %ld, size: %ld.\n"
+        error("Upper range index out of bounds: %ld, size: %ld.\n"
              , (long)(i+1)->u.number, (long)size);
         return NULL;
     }
@@ -4587,7 +4587,7 @@ protected_range_lvalue (int code, svalue_t *sp)
     if (sp->type != T_LVALUE)
     {
         inter_sp = sp;
-        errorf("wrong type to protected_range_lvalue\n");
+        error("wrong type to protected_range_lvalue\n");
         /* TODO: Print type */
         return NULL;
     }
@@ -4647,7 +4647,7 @@ protected_range_lvalue (int code, svalue_t *sp)
 
     default:
         inter_sp = sp;
-        errorf("(lvalue)Range index on illegal type.\n");
+        error("(lvalue)Range index on illegal type.\n");
         /* TODO: Print type */
         return NULL;
     }
@@ -4657,7 +4657,7 @@ protected_range_lvalue (int code, svalue_t *sp)
     if (i->type != T_NUMBER)
     {
         inter_sp = sp;
-        errorf("Illegal upper range index: not a number.\n");
+        error("Illegal upper range index: not a number.\n");
         /* TODO: Print type. */
         return NULL;
     }
@@ -4673,7 +4673,7 @@ protected_range_lvalue (int code, svalue_t *sp)
 
     if (++ind2 < 0 || ind2 > size) {
         inter_sp = sp;
-        errorf("Upper range index out of bounds: %ld, size: %ld.\n"
+        error("Upper range index out of bounds: %ld, size: %ld.\n"
              , (long)i->u.number, (long)size);
         return NULL;
     }
@@ -4683,7 +4683,7 @@ protected_range_lvalue (int code, svalue_t *sp)
     if ((--i)->type != T_NUMBER)
     {
         inter_sp = sp;
-        errorf("Illegal lower range index: not a number.\n");
+        error("Illegal lower range index: not a number.\n");
         /* TODO: Print type. */
         return NULL;
     }
@@ -4701,7 +4701,7 @@ protected_range_lvalue (int code, svalue_t *sp)
     {
         /* Appending (ind1 == size) is allowed */
         inter_sp = sp;
-        errorf("Lower range index out of bounds: %ld, size: %ld.\n"
+        error("Lower range index out of bounds: %ld, size: %ld.\n"
              , (long)i->u.number, (long)size);
         return NULL;
     }
@@ -4848,7 +4848,7 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
         {
             inter_sp = sp;
             inter_pc = pc;
-            errorf("(value)Indexing a mapping of width 0.\n");
+            error("(value)Indexing a mapping of width 0.\n");
             return NULL;
         }
 
@@ -4882,7 +4882,7 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
     default:
         inter_sp = sp;
         inter_pc = pc;
-        errorf("(value)Indexing on illegal type.\n");
+        error("(value)Indexing on illegal type.\n");
         /* TODO: Print type */
         return NULL;
     }
@@ -4994,7 +4994,7 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
     default:
         inter_sp = sp;
         inter_pc = pc;
-        errorf("(value)Indexing on illegal type.\n");
+        error("(value)Indexing on illegal type.\n");
         /* TODO: Print type */
         return NULL;
     }
@@ -5206,7 +5206,7 @@ find_value (int num)
      */
     if (is_sto_context())
     {
-        errorf("find_value: Can't execute with "
+        error("find_value: Can't execute with "
               "set_this_object() in effect.\n"
              );
     }
@@ -5251,7 +5251,7 @@ find_virtual_value (int num)
      */
     if (is_sto_context())
     {
-        errorf("find_virtual_value: Can't execute with "
+        error("find_virtual_value: Can't execute with "
               "set_this_object() in effect.\n"
              );
     }
@@ -5297,7 +5297,7 @@ find_virtual_value (int num)
                   "w/o variables, num %d\n"
                  , time_stamp(), current_object, current_object->name, num);
         else
-            errorf("%s Error: find_virtual_value() on object %p '%s' "
+            error("%s Error: find_virtual_value() on object %p '%s' "
                   "w/o variables, num %d\n"
                  , time_stamp(), current_object, current_object->name, num);
     }
@@ -5376,7 +5376,7 @@ bad_efun_arg (int arg, int instr, svalue_t *sp)
         if (instr <= F_VEFUN)
             instr = pc[1] | (instr << F_ESCAPE_BITS);
     }
-    errorf("Bad argument %d to %s()\n", arg, get_f_name(instr));
+    error("Bad argument %d to %s()\n", arg, get_f_name(instr));
 }
 
 /*-------------------------------------------------------------------------*/
@@ -5452,7 +5452,7 @@ privilege_violation3 (char *what, svalue_t *where, svalue_t *sp)
     if (!svp || svp->type != T_NUMBER || svp->u.number < 0)
     {
         inter_sp = sp-3;
-        errorf("privilege violation: %s\n", what);
+        error("privilege violation: %s\n", what);
         /* TODO: Print full args and types */
     }
 
@@ -5528,7 +5528,7 @@ privilege_violation4 ( char *what,    object_t *whom
     if (!svp || svp->type != T_NUMBER || svp->u.number < 0)
     {
         inter_sp = sp-4;
-        errorf("privilege violation : %s\n", what);
+        error("privilege violation : %s\n", what);
         /* TODO: Print full args and types */
     }
 
@@ -8670,7 +8670,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                     FATAL("Buffer overflow in F_ADD: float number too big.\n")
                 res = xalloc(svalue_strlen(sp) + (len1 = strlen(buff)) + 1);
                 if (!res)
-                    errorf("Out of memory\n");
+                    error("Out of memory\n");
                 strcpy(res, buff);
                 strcpy(res+len1, (sp)->u.string);
                 free_string_svalue(sp);
@@ -9614,7 +9614,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 break;
             default:
                 if (sp->type == T_LVALUE)
-                    errorf("Reference passed to !=\n");
+                    error("Reference passed to !=\n");
                 fatal("Illegal type to !=\n");
                   /* TODO: Give type and value */
                 /* NOTREACHED */
@@ -9686,7 +9686,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 break;
             default:
                 if (sp->type == T_LVALUE)
-                    errorf("Reference passed to !=\n");
+                    error("Reference passed to !=\n");
                 fatal("Illegal type to !=\n");
                 /* NOTREACHED */
                 return MY_FALSE;
@@ -12113,7 +12113,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             inter_pc = pc;
             if ( !(ob = get_simul_efun_object(MY_FALSE)) )
             {
-                errorf("Couldn't load simul_efun object\n");
+                error("Couldn't load simul_efun object\n");
             }
         }
 
@@ -14166,7 +14166,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             curpos = xalloc(num_dim * sizeof(*curpos));
             if (!curpos)
             {
-                errorf("Out of memory (%lu bytes).\n"
+                error("Out of memory (%lu bytes).\n"
                      , (unsigned long)num_dim * sizeof(*curpos));
                 /* NOTREACHED */
             }
@@ -14174,7 +14174,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (!sizes)
             {
                 xfree(curpos);
-                errorf("Out of memory (%lu bytes).\n"
+                error("Out of memory (%lu bytes).\n"
                      , (unsigned long)num_dim * sizeof(*sizes));
                 /* NOTREACHED */
             }
@@ -14183,7 +14183,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 xfree(curpos);
                 xfree(sizes);
-                errorf("Out of memory (%lu bytes).\n"
+                error("Out of memory (%lu bytes).\n"
                      , (unsigned long)num_dim * sizeof(*curvec));
                 /* NOTREACHED */
             }
@@ -14203,7 +14203,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                     xfree(curpos);
                     xfree(sizes);
                     xfree(curvec);
-                    errorf("Bad argument to allocate(): size[%d] is not an int.\n"
+                    error("Bad argument to allocate(): size[%d] is not an int.\n"
                          , (int)dim);
                     /* NOTREACHED */
                 }
@@ -14215,7 +14215,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                     xfree(curpos);
                     xfree(sizes);
                     xfree(curvec);
-                    errorf("Illegal array size: %ld\n", (long)size);
+                    error("Illegal array size: %ld\n", (long)size);
                     /* NOTREACHED */
                 }
 
@@ -14224,7 +14224,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                     xfree(curpos);
                     xfree(sizes);
                     xfree(curvec);
-                    errorf("Only the last dimension can have empty arrays.\n");
+                    error("Only the last dimension can have empty arrays.\n");
                     /* NOTREACHED */
                 }
 
@@ -14234,7 +14234,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                     xfree(curpos);
                     xfree(sizes);
                     xfree(curvec);
-                    errorf("Illegal total array size: %lu\n", (unsigned long)count);
+                    error("Illegal total array size: %lu\n", (unsigned long)count);
                     /* NOTREACHED */
                 }
 
@@ -14317,7 +14317,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         }
         else
         {
-            errorf("Illegal arg 1 to allocate(): neither 'int' nore 'int*'.\n");
+            error("Illegal arg 1 to allocate(): neither 'int' nore 'int*'.\n");
         } /* if (argp->type) */
 
         if (num_arg > 1)
@@ -14450,7 +14450,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
             default:
                 if (sp[-1].type == T_LVALUE)
-                    errorf("Reference passed to member_array()\n");
+                    error("Reference passed to member_array()\n");
                 fatal("Bad type to member_array(): %d\n", sp[-1].type);
             }
 
@@ -14617,7 +14617,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
             default:
                 if (sp->type == T_LVALUE)
-                    errorf("Reference passed to member()\n");
+                    error("Reference passed to member()\n");
                 fatal("Bad type to member(): %d\n", sp->type);
             }
 
@@ -14798,7 +14798,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
             default:
                 if (sp->type == T_LVALUE)
-                    errorf("Reference passed to member()\n");
+                    error("Reference passed to member()\n");
                 fatal("Bad type to member(): %d\n", sp->type);
             }
 
@@ -15973,7 +15973,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             inter_pc = pc;
             ob = get_object(sp->u.string);
             if (!ob)
-                errorf("Object '%s' not found.\n", sp->u.string);
+                error("Object '%s' not found.\n", sp->u.string);
             free_svalue(sp);
             put_ref_object(sp, ob, "symbol_function");
         }
@@ -15989,7 +15989,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (load_ob_from_swap(ob) < 0)
             {
                 inter_sp = sp;
-                errorf("Out of memory\n");
+                error("Out of memory\n");
             }
         }
 
@@ -16012,7 +16012,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             l = xalloc(sizeof *l);
             if (!l)
             {
-                errorf("Out of memory.\n");
+                error("Out of memory.\n");
                 /* NOTREACHED */
                 break;
             }
@@ -17680,7 +17680,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             item = get_object((sp-1)->u.string);
             if (!item)
-                errorf("move_object failed\n");
+                error("move_object failed\n");
             free_string_svalue(sp-1);
             put_ref_object(sp-1, item, "move_object");
         }
@@ -17693,7 +17693,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             dest = get_object(sp->u.string);
             if (!dest)
-                errorf("move_object failed\n");
+                error("move_object failed\n");
             free_string_svalue(sp);
             put_ref_object(sp, dest, "move_object");
         }
@@ -18188,7 +18188,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             TYPE_TEST1(arg, T_STRING);
             ob = get_object(arg[0].u.string);
             if (!ob)
-                errorf("query_actions() failed\n");
+                error("query_actions() failed\n");
         }
 
         /* Get the actions */
@@ -20377,7 +20377,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 #ifdef DEBUG
             if (i < depth)
             {
-                errorf("Computed stack depth to %d, but found only %d objects\n"
+                error("Computed stack depth to %d, but found only %d objects\n"
                      , depth, i);
                 /* NOTREACHED */
                 break;
@@ -21334,7 +21334,7 @@ retry_for_shadow:
     if (ob->flags & O_SWAPPED)
     {
         if (load_ob_from_swap(ob) < 0)
-            errorf("Out of memory\n");
+            error("Out of memory\n");
     }
 
     progp = ob->prog;
@@ -21562,7 +21562,7 @@ retry_for_shadow:
 
 failure:
     if (fun[0] == ':')
-        errorf("Illegal function call\n");
+        error("Illegal function call\n");
 
 failure2:
     /* Failure. Deallocate stack. */
@@ -22186,7 +22186,7 @@ void
 call_lambda (svalue_t *lsvp, int num_arg)
 
 /* Call the closure <lsvp> with <num_arg> arguments on the stack. On
- * success, the arguments are replaced with the result, else an errorf()
+ * success, the arguments are replaced with the result, else an error()
  * is generated.
  */
 
@@ -22227,7 +22227,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            errorf("Object '%s' the closure was bound to has been "
+            error("Object '%s' the closure was bound to has been "
                   "destructed\n", l->ob->name);
             /* NOTREACHED */
             return;
@@ -22245,7 +22245,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            errorf("Out of memory\n");
+            error("Out of memory\n");
             /* NOTREACHED */
             return;
         }
@@ -22283,7 +22283,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            errorf("Object '%s' the closure was bound to has been "
+            error("Object '%s' the closure was bound to has been "
                   "destructed\n", l->ob->name);
             /* NOTREACHED */
             return;
@@ -22301,7 +22301,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            errorf("Object '%s' holding the closure has been "
+            error("Object '%s' holding the closure has been "
                   "destructed\n", l->function.alien.ob->name);
             /* NOTREACHED */
             return;
@@ -22316,7 +22316,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            errorf("Out of memory\n");
+            error("Out of memory\n");
             /* NOTREACHED */
             return;
         }
@@ -22385,12 +22385,12 @@ call_lambda (svalue_t *lsvp, int num_arg)
 
         CLEAN_CSP  /* no call will be done */
         if (num_arg)
-            errorf("Arguments passed to variable closure.\n");
+            error("Arguments passed to variable closure.\n");
 
         /* Don't use variables in a destructed object */
         if (l->ob->flags & O_DESTRUCTED)
         {
-            errorf("Object '%s' the closure was bound to has been destructed\n"
+            error("Object '%s' the closure was bound to has been destructed\n"
                  , l->ob->name);
             /* NOTREACHED */
             return;
@@ -22401,7 +22401,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
              && load_ob_from_swap(l->ob) < 0
            )
         {
-            errorf("Out of memory.\n");
+            error("Out of memory.\n");
             /* NOTREACHED */
             return;
         }
@@ -22409,7 +22409,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
         /* Do we have the variable? */
         if ( (i = (short)l->function.lfun.index) < 0)
         {
-            errorf("Variable not inherited\n");
+            error("Variable not inherited\n");
             /* NOTREACHED */
             return;
         }
@@ -22448,7 +22448,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            errorf("Object '%s' the closure was bound to has been "
+            error("Object '%s' the closure was bound to has been "
                   "destructed\n", l->ob->name);
             /* NOTREACHED */
             return;
@@ -22462,7 +22462,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            errorf("Out of memory\n");
+            error("Out of memory\n");
             /* NOTREACHED */
             return;
         }
@@ -22504,7 +22504,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            errorf("Object '%s' the closure was bound to has been "
+            error("Object '%s' the closure was bound to has been "
                   "destructed\n", current_object->name);
             /* NOTREACHED */
             return;
@@ -22516,7 +22516,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
         {
             /* inter_sp == sp */
             CLEAN_CSP
-            errorf("Out of memory\n");
+            error("Out of memory\n");
             /* NOTREACHED */
             return;
         }
@@ -22535,7 +22535,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
                  * object and thus disabled.
                  */
                 CLEAN_CSP
-                errorf("Object the closure was bound to has been destructed\n");
+                error("Object the closure was bound to has been destructed\n");
                 /* NOTREACHED */
                 return;
             }
@@ -22589,7 +22589,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
                             csp->extern_call = MY_TRUE;
                             inter_pc = csp->funstart = EFUN_FUNSTART;
                             csp->instruction = i;
-                            errorf("Too few arguments to %s\n", instrs[i].name);
+                            error("Too few arguments to %s\n", instrs[i].name);
                         }
                     }
                 }
@@ -22598,7 +22598,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
                     csp->extern_call = MY_TRUE;
                     inter_pc = csp->funstart = EFUN_FUNSTART;
                     csp->instruction = i;
-                    errorf("Too many arguments to %s\n", instrs[i].name);
+                    error("Too many arguments to %s\n", instrs[i].name);
                 }
 
                 /* Store the instruction code */
@@ -22646,7 +22646,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
                 /* inter_sp == sp */
                 if ( !(ob = get_simul_efun_object(MY_FALSE)) ) {
                     csp->extern_call = MY_TRUE;
-                    errorf("Couldn't load simul_efun object\n");
+                    error("Couldn't load simul_efun object\n");
                     /* NOTREACHED */
                     return;
                 }
@@ -22659,7 +22659,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
       }
 
     }
-    errorf("Uncallable closure\n");
+    error("Uncallable closure\n");
     /* NOTREACHED */
     return;
 
@@ -22738,7 +22738,7 @@ call_simul_efun (int code, object_t *ob, int num_arg)
             {
                 if (--i <= 0 || v->type != T_STRING)
                 {
-                    errorf("Calling a vanished simul_efun\n");
+                    error("Calling a vanished simul_efun\n");
                     return;
                 }
                 if ( !(ob = get_object(v->u.string)) )
@@ -22748,7 +22748,7 @@ call_simul_efun (int code, object_t *ob, int num_arg)
             }
             return;
         }
-        errorf("Calling a vanished simul_efun\n");
+        error("Calling a vanished simul_efun\n");
         return;
     }
     /*
@@ -23149,7 +23149,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
         struct traceentry * var; \
         var = alloca(sizeof(*var)); \
         if (!var) \
-            errorf("Stack overflow in collect_trace()"); \
+            error("Stack overflow in collect_trace()"); \
         var->vec = allocate_array_unlimited(TRACE_MAX); \
         var->next = NULL; \
         if (!first_entry) \
@@ -23709,7 +23709,7 @@ last_instr_output (char *str, svalue_t **svpp)
     if (svpp)
     {
         if ( !(str = string_copy(str)) )
-            errorf("Out of memory\n");
+            error("Out of memory\n");
         put_malloced_string((*svpp), str);
         (*svpp)++;
     }
@@ -24392,7 +24392,7 @@ check_a_lot_ref_counts (program_t *search_prog)
  */
 
 #undef ERROR
-#define ERROR(s) {inter_sp = sp; errorf(s);}
+#define ERROR(s) {inter_sp = sp; error(s);}
 
 #undef TYPE_TEST1
 #define TYPE_TEST1(arg1, type1, instruction) {\

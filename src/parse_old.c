@@ -248,7 +248,7 @@ find_living_object (char *name, Bool player)
         /* We have to create the closure */
         put_string(sp, make_shared_string(function_names[player ? 1 : 0]));
         if (!sp->u.string)
-            errorf("(old_parse_command) Out of memory (%lu bytes) for string\n"
+            error("(old_parse_command) Out of memory (%lu bytes) for string\n"
                  , (unsigned long)strlen(function_names[player ? 1 : 0]));
         inter_sp = sp;
         symbol_efun(sp);
@@ -259,7 +259,7 @@ find_living_object (char *name, Bool player)
     /* Call the closure */
     put_string(sp, make_shared_string(name));
     if ( !sp->u.string)
-        errorf("(old_parse_command) Out of memory (%lu bytes) for result\n"
+        error("(old_parse_command) Out of memory (%lu bytes) for result\n"
              , (unsigned long)strlen(name));
     inter_sp = sp;
     call_lambda(svp, 1);
@@ -1370,7 +1370,7 @@ e_old_parse_command ( char     *cs           /* Command to parse */
 
     /* In mudlib 3.0 we will not have this. */
     if (cs[0] == '@')
-        errorf("Unsupported @ construct.\n");
+        error("Unsupported @ construct.\n");
 
     ocs = cmd = string_copy(cs);
 

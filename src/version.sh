@@ -11,11 +11,11 @@ version_revision=$(echo "\$Revision$" | sed -e 's/\$Revision: \([0-9][0-9]*\) *\
 
 # The version type: dev, stable, maint release
 # $Format: "version_type=\"$ReleaseType$\""$ 
-version_type="dev"
+version_type="rel"
 
 # The version number information
 # $Format: "version_micro=\"$ReleaseMicro$\""$ 
-version_micro=12
+version_micro=11
 # $Format: "version_minor=\"$ReleaseMinor$\""$ 
 version_minor=2
 # $Format: "version_major=\"$ReleaseMajor$\""$ 

@@ -127,11 +127,8 @@ tags: $(SRC)
 TAGS: $(SRC)
 	etags $(SRC)
 
-patchlevel.h: patchlevel.h.in version.sh
-	./mk-patchlevel.sh
-
-version.sh: ../lpmud.prj
-	-(cd ..; prcs rekey lpmud src/version.sh)
+patchlevel.h: ../lpmud.prj
+	-(cd ..; prcs rekey lpmud src/patchlevel.h)
 
 make_func.c: make_func.y
 	$(YACC) make_func.y

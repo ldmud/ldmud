@@ -294,7 +294,7 @@ f_start_mccp_compress (svalue_t * sp)
      && (mccpver != TELOPT_COMPRESS2)
        )
     {
-        errorf("Illegal value to arg 1 of start_mccp_compress(): %ld, "
+        error("Illegal value to arg 1 of start_mccp_compress(): %ld, "
               "expected TELOPT_COMPRESS (%d) or TELOPT_COMPRESS2 (%d).\n"
              , (long)mccpver, TELOPT_COMPRESS, TELOPT_COMPRESS2
              );
@@ -304,13 +304,13 @@ f_start_mccp_compress (svalue_t * sp)
     
     if (!O_SET_INTERACTIVE(ip, current_object))
     {
-        errorf("start_mccp_compress() called for non-interactive object.\n");
+        error("start_mccp_compress() called for non-interactive object.\n");
         return sp;
     }
     
     if (!ip->tn_enabled)
     {
-        errorf("start_mccp_compress() called for object with telnet disabled.\n");
+        error("start_mccp_compress() called for object with telnet disabled.\n");
         return sp;
     }
 
@@ -341,14 +341,14 @@ f_end_mccp_compress (svalue_t * sp)
     
     if (!O_SET_INTERACTIVE(ip, current_object))
     {
-        errorf("end_mccp_compress() called for non-interactive object.\n");
+        error("end_mccp_compress() called for non-interactive object.\n");
         /* NOTREACHED */
         return sp;
     }
     
     if (!ip->tn_enabled)
     {
-        errorf("end_mccp_compress() called for object with telnet disabled.\n");
+        error("end_mccp_compress() called for object with telnet disabled.\n");
         return sp;
     }
 
@@ -387,7 +387,7 @@ f_query_mccp (svalue_t * sp)
     /* Make sure the object is interactive */
     if (!(O_SET_INTERACTIVE (ip, sp->u.ob)) || ip->closing)
     {
-        errorf("Bad arg 1 to query_mccp(): object not interactive.\n");
+        error ("Bad arg 1 to query_mccp(): object not interactive.\n");
         return sp;
     }
     
@@ -420,7 +420,7 @@ f_query_mccp_stats (svalue_t * sp)
     /* Make sure the object is interactive */
     if (!(O_SET_INTERACTIVE (ip, sp->u.ob)) || ip->closing)
     {
-        errorf("Bad arg 1 to query_mccp_stats(): object not interactive.\n");
+        error ("Bad arg 1 to query_mccp_stats(): object not interactive.\n");
         return sp;
     }
     

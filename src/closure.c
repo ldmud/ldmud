@@ -984,7 +984,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
                 lrpp->block.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
                 lrpp->block.u.lambda = l2;
 
-                errorf("Cannot adjust lambda closure after replace_program(), "
+                error("Cannot adjust lambda closure after replace_program(), "
                       "object %s\n", r_ob->ob->name);
             }
 
@@ -1043,8 +1043,8 @@ closure_literal (svalue_t *dest, int ix, unsigned short inhIndex)
     if (!l)
     {
     	put_number(dest, 0);
-        errorf("Out of memory (%lu bytes) for closure literal"
-              , (unsigned long) sizeof(*l));
+    	error("Out of memory (%lu bytes) for closure literal"
+             , (unsigned long) sizeof(*l));
     	/* NOTREACHED */
     	return;
     }
@@ -1181,7 +1181,7 @@ realloc_code (void)
 static void
 lambda_error(char *error_str, ...)
 
-/* Raise an errorf(error_str, ...) with 0 or 1 extra argument from within
+/* Raise an error(error_str, ...) with 0 or 1 extra argument from within
  * the lambda compiler.
  *
  * The function takes care that all memory is deallocated.
@@ -1207,7 +1207,7 @@ lambda_error(char *error_str, ...)
 
     /* Now raise the error */
     va_start(va, error_str);
-    errorf(error_str, va_arg(va, char *)); /* One arg or nothing :-) */
+    error(error_str, va_arg(va, char *)); /* One arg or nothing :-) */
     /* TODO: a verror() would be handy here */
     va_end(va);
 } /* lambda_error() */
@@ -1216,7 +1216,7 @@ lambda_error(char *error_str, ...)
 static void
 lambda_cerror (char *s)
 
-/* Callback for store_case_labels: raise an errorf(s) from within the
+/* Callback for store_case_labels: raise an error(s) from within the
  * lambda compiler.
  *
  * The function takes care that all memory is deallocated.
@@ -1231,7 +1231,7 @@ static void
 lambda_cerrorl ( char *s1, char *s2 UNUSED
                , int line1 UNUSED, int line2 UNUSED)
 
-/* Callback for store_case_labels(): Raise an errorf(s1) from within the lambda
+/* Callback for store_case_labels(): Raise an error(s1) from within the lambda
  * compiler. store_case_labels() also passes line numbers and filename, but
  * when compiling a lambda that information is not very useful.
  *
@@ -4863,7 +4863,7 @@ closure_lookup_lfun_prog ( lambda_t * l
     if (O_PROG_SWAPPED(ob)) {
         ob->time_of_ref = current_time;
         if (load_ob_from_swap(ob) < 0)
-            errorf("Out of memory\n");
+            error("Out of memory\n");
     }
 
     /* Find the true definition of the function */
@@ -5074,7 +5074,7 @@ closure_to_string (svalue_t * sp, Bool compact)
         {
             l->ob->time_of_ref = current_time;
             if (load_ob_from_swap(l->ob) < 0)
-                errorf("Out of memory.\n");
+                error("Out of memory.\n");
         }
 
         sprintf(buf, "#'%s->%s"
@@ -5180,7 +5180,7 @@ closure_to_string (svalue_t * sp, Bool compact)
         int type = sp->x.closure_type;
 
         if (type >= 0)
-            errorf("Bad arg 1 to to_string(): closure type %d.\n"
+            error("Bad arg 1 to to_string(): closure type %d.\n"
                  , sp->x.closure_type);
         else
         {
@@ -5656,7 +5656,7 @@ symbol_efun (svalue_t *sp)
         if ( !(p = make_shared_identifier(str, I_TYPE_GLOBAL, 0)) )
         {
             inter_sp = sp;
-            errorf("Out of memory (%lu bytes) for identifier\n"
+            error("Out of memory (%lu bytes) for identifier\n"
                  , (unsigned long) strlen(str));
         }
 
@@ -5771,7 +5771,7 @@ undefined_function:
             if (!res || res->type != T_NUMBER || res->u.number < 0)
             {
             	/* Override attempt is fatal */
-                errorf(
+                error(
                   "Privilege violation: nomask simul_efun %s\n",
                   p->name
                 );
@@ -6015,7 +6015,7 @@ f_symbol_variable (svalue_t *sp)
     if (!l)
     {
         inter_sp = sp - 1;
-        errorf("Out of memory (%lu bytes) for variable symbol\n"
+        error("Out of memory (%lu bytes) for variable symbol\n"
              , (unsigned long) sizeof(*l));
     }
 
