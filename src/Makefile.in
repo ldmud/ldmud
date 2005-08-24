@@ -131,7 +131,7 @@ patchlevel.h: patchlevel.h.in version.sh
 	./mk-patchlevel.sh
 
 version.sh: ../lpmud.prj
-	-(cd ..; prcs rekey lpmud src/version.sh)
+	-which prcs > /dev/null && (cd ..; prcs rekey lpmud src/version.sh)
 
 make_func.c: make_func.y
 	$(YACC) make_func.y

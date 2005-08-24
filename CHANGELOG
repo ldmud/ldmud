@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Aug-2005 (Lars Duening)
+  - (Makefile.in) The PRCS rules first check if PRCS is available.
+
 20-Jun-2005 (Lars Duening)  (3.2.12-dev.725)
   - (patchlevel.h.in, version.sh, mk-patchlevel.sh, Makefiles)
       Modified the version numbering system to be compatible between
