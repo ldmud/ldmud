@@ -7,7 +7,7 @@ DESCRIPTION
         object.
 
         Since 3.2.1, the innards of move_object() are implemented in
-        the mudlib, using the M_MOVE_OBJECT driver hooks, and move_object()
+        the mudlib, using the M_MOVE_OBJECT0/1 driver hooks, and move_object()
         might as well be an simul-efun.
 
         The traditional implementation restricted for !compat mode
