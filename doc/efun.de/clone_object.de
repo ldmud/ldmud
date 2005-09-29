@@ -22,6 +22,33 @@ BESCHREIBUNG
         Wenn strikte EUIDs gefordert werden, muss das clonende Objekt eine
         EUID != 0 haben.
 
+
+        -- Variable Initialization --
+
+        If variables are initialized with __INIT(), blueprints and clones are
+        initialized alike.
+
+        If variables are not initialized with __INIT(), however, the variables
+        of clones will be initialized from the _current_ values of the
+        blueprint. This behaviour may be surprising at first, but can come in
+        quite handy.
+
+        Variables without explicit initializers are always initialized to 0.
+
+
+        -- Variablen Initialisierung --
+
+        Werden die Variablen durch __INIT() initialisert, erhalten Blueprints
+        und Klone stets dieselben Werte.
+
+        Wird allerdings __INIT() nicht verwendet, werden die Werte fuer die
+        Klonvariable aus den _aktuellen_ Variablen der Blueprint kopiert.
+        Diese Verhalten mag anfangs ueberraschen, ist aber sehr nuetzlich.
+
+        Variablen ohne explizite Initialisierung sind hiervon unbetroffen und
+        werden stets auf 0 gesetzt.
+
+
 BEISPIELE
         // Clone eine Fackel (Name des Files nicht im Compat Format)
         object fackel;
@@ -32,13 +59,18 @@ BEISPIELE
         key1 = clone_object(load_object("obj/key"));
         key2 = clone_object(key1);
 
-BUGS
-        Wird bei der Initialisierung der Variablen nicht __INIT() verwendet,
-        wird die Initialisierung auf Basis der _aktuellen_ Variablen des
-        Blueprints durchgefuehrt. Dies ist konsistent mit der Definition
-        eines Blueprints, kann aber zu schwer zu findenden Fehlern fuehren.
-        Variablen ohne Initialisierung bleiben unbeeinflusst und werden
-        zu 0 initialisiert.
+        // Create a specialized weapons blueprint (only without __INIT()!).
+        --- std/weapon.c: --- 
+        int weapon_class = 1;
+
+        --- broadsword.c: ---
+        inherit "/std/weapon";
+
+        int create() {
+            weapon_class = 2;
+            replace_program("/std/weapon");
+        }
+
 
 AENDERUNGEN
         Modifiziert in LDMud 3.2.6: es werden auch Objekte als Argument

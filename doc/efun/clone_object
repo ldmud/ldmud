@@ -23,6 +23,20 @@ DESCRIPTION
         If strict euids are enforced, the cloning object must have
         a non-zero euid.
 
+
+        -- Variable Initialization --
+
+        If variables are initialized with __INIT(), blueprints and clones are
+        initialized alike.
+
+        If variables are not initialized with __INIT(), however, the variables
+        of clones will be initialized from the _current_ values of the
+        blueprint. This behaviour may be surprising at first, but can come in
+        quite handy.
+
+        Variables without explicit initializers are always initialized to 0.
+
+
 EXAMPLE
         // Clone a torch (filename in non-compat format)
         object torch;
@@ -33,12 +47,19 @@ EXAMPLE
         key1 = clone_object(load_object("obj/key"));
         key2 = clone_object(key1);
 
-BUGS
-        If variable initialization is not done with __INIT(), the initializers
-        are copied from the _current_ variables of the blueprint. This is in
-        line with the meaning of 'blueprint', but can lead to hard-to-find
-        errors. Variables without initializer are unaffected and always
-        initialized to 0.
+
+        // Create a specialized weapons blueprint (only without __INIT()!).
+        --- std/weapon.c: --- 
+        int weapon_class = 1;
+
+        --- broadsword.c: ---
+        inherit "/std/weapon";
+
+        int create() {
+            weapon_class = 2;
+            replace_program("/std/weapon");
+        }
+
 
 HISTORY
         Modified in LDMud 3.2.6 to take an object as argument.
