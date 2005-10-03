@@ -791,7 +791,7 @@ init_lexer(void)
     add_permanent_define("__VERSION_MAJOR__", -1, string_copy(VERSION_MAJOR), MY_FALSE);
     add_permanent_define("__VERSION_MINOR__", -1, string_copy(VERSION_MINOR), MY_FALSE);
     add_permanent_define("__VERSION_MICRO__", -1, string_copy(VERSION_MICRO), MY_FALSE);
-    if (IS_RELEASE())
+    if (IS_RELEASE)
         add_permanent_define("__VERSION_PATCH__", -1, string_copy("0"), MY_FALSE);
     else
         add_permanent_define("__VERSION_PATCH__", -1, string_copy(VERSION_PATCH), MY_FALSE);
@@ -6688,7 +6688,7 @@ get_version(char ** args UNUSED)
     size_t len;
     short bIsRelease;
 
-    bIsRelease = IS_RELEASE();
+    bIsRelease = IS_RELEASE;
     if (bIsRelease)
         len = strlen(GAME_VERSION LOCAL_LEVEL);
     else

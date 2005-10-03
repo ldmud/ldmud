@@ -336,10 +336,10 @@ main (int argc, char **argv)
     }
 
     printf("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
-          , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
+          , time_stamp(), IS_RELEASE ? GAME_VERSION : LONG_VERSION
           );
     debug_message("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
-          , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
+          , time_stamp(), IS_RELEASE ? GAME_VERSION : LONG_VERSION
           );
       /* This also assures the existance of the fd for the debug log */
 
@@ -1150,7 +1150,7 @@ version (void)
 {
   fputs("LDMud ", stdout);
 
-  if (IS_RELEASE())
+  if (IS_RELEASE)
       fputs(GAME_VERSION, stdout);
   else
       fputs(LONG_VERSION, stdout);

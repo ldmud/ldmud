@@ -2857,7 +2857,6 @@ put_c_string (svalue_t *sp, const char *p)
 
     s = xalloc(strlen(p)+1);
     strcpy(s, p);
-    sp++;
     put_malloced_string(sp, s);
 } /* put_c_string() */
 
