@@ -1,7 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-02-Oct-2005 (Lars Duening)  (3.2.12-dev.726)
+04-Oct-2005 (Lars Duening)
+  - (doc/concepts/overloading) New man page (thanks, Coogan!).
+
+02-Oct-2005 (Lars Duening)  (3.2.12-rev.24)
   - (main.c, lex.c, version.sh) Updated to display the correct revision
       number.
   - (interpret.c) put_c_string() incremented the target location pointer

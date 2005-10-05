@@ -518,6 +518,7 @@
   (doc/concepts/native (lpmud/n/36_native 1.6.1.2 644))
   (doc/concepts/negotiation (lpmud/n/37_negotiatio 1.7 644))
   (doc/concepts/objects (lpmud/n/38_objects 1.2.1.3 644))
+  (doc/concepts/overloading ())
   (doc/concepts/rtfm (lpmud/n/39_rtfm 1.1 644))
   (doc/concepts/simul_efun (lpmud/n/40_simul_efun 1.1.1.1 644))
   (doc/concepts/tls (lpmud/d/c/21_tls 1.1 644))
