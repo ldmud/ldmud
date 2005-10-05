@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Oct-2005 (Lars Duening)
+  - (doc/concepts/overloading) New man page (thanks, Coogan!).
+
 28-Sep-2005 (Lars Duening)
   - (doc/efun/clone_object) Clarified the variable initialisation.
 

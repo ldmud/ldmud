@@ -1,14 +1,26 @@
 #!/bin/sh
 #
-# Settings for the TubMud mudlib.
+# Settings for the Tubmud mudlib.
 #
 # configure will strip this part from the script.
 
 exec ./configure --prefix=/home/tubmud --bindir=/home/tubmud/mudbin --libdir=/home/tubmud/mudlib --libexec=/home/tubmud/mudbin/erqdir --with-setting=tubmud $*
 exit 1
 
-# --- The actual settings ---
+# --- Commandline argument defaults ---
 with_master_name=kernel/master
+enable_compat_mode=yes
+enable_filename_spaces=no
+
+# --- Runtime limits ---
+with_max_array_size=0
+with_max_mapping_size=0
+with_catch_reserved_cost=0x8000
+with_master_reserved_cost=0x2000
+enable_dynamic_costs=no
+with_max_user_trace=110
+with_max_trace=120
+with_max_players=70
 
 # --- Timing ---
 with_time_to_clean_up=10800
@@ -16,41 +28,55 @@ with_time_to_swap=900
 with_time_to_swap_variables=2000
 with_time_to_reset=2700
 
+# --- Memory ---
+with_reserved_user_size=0x100000
+with_max_malloced=0x06000000
+
 # --- Interpreter ---
-with_max_user_trace=110
-with_max_trace=120
-with_max_local=50
+enable_strict_euids=no
+with_max_cost=1000000
 
 # --- Communication ---
 with_portno=7680
 with_udp_port=7683
-
-# --- Memory ---
-with_reserved_user_size=800000
-
-# --- Runtime limits ---
-with_catch_reserved_cost=0x8000
-with_master_reserved_cost=0x2000
-with_max_players=70
-with_max_malloced=0x06000000
-
-# --- Internal Tables ---
-with_max_array_size=0
-with_max_mapping_keys=0
-with_max_mapping_size=0
-with_htable_size=16384
-
-# --- Language ---
-enable_compat_mode=yes
-enable_strict_euids=no
-enable_lpc_nosave=yes
-enable_share_variables=yes
-enable_use_parse_command=no
-enable_use_deprecated=no
-enable_use_alists=yes
-enable_use_pcre=no
+enable_erq=erq
 
 # --- Compilation Options ---
-enable_malloc_trace=yes
-enable_malloc_lpc_trace=yes
-enable_malloc_sbrk_trace=yes
+with_optimize=med
+enable_malloc_trace=no
+enable_malloc_lpc_trace=no
+enable_malloc_sbrk_trace=no
+enable_trace_code=no
+
+# --- Language ---
+enable_supply_parse_command=no
+enable_share_variables=yes
+enable_lpc_nosave=yes
+enable_use_deprecated=no
+enable_use_pcre=no
+enable_use_set_light=yes
+enable_use_mccp=yes
+enable_use_tls=yes
+with_tls_path=/usr/local/ssl
+
+# --- Compiler ---
+with_max_local=50
+
+# --- Internal Tables ---
+with_htable_size=16384
+with_otable_size=4096
+
+# --- Standard Debugging ---
+enable_debug=yes
+enable_no_inlines=no
+enable_check_strings=no
+enable_debug_telnet=no
+with_erq_debug=0
+
+# -- Specific Debugging ---
+enable_check_object_gc_ref=no
+enable_dump_gc_refs=no
+
+# --- this is for ldmud-3.3 ---
+enable_use_alists=yes
+
