@@ -3,7 +3,7 @@
 
 # The checkin date
 # $Format: "version_date=\"$ProjectDate$\""$ 
-version_date=$(echo "\$Date$" | sed -e 's/\$Date: \([0-9]*-[0-9]*-[0-9]*\).*\$/\1/')
+version_date=$(echo "\$Date$" | sed -e 's/\$Date: \([0-9]*-[0-9]*-[0-9]*\) \([0-9]*:[0-9]*:[0-9]*\).*\$/\1 \2/')
 
 # The checkin time
 version_time=$(echo "\$Date$" | sed -e 's/\$Date: \([0-9]*-[0-9]*-[0-9]*\) \([0-9]*:[0-9]*:[0-9]*\).*\$/\2/')
