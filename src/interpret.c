@@ -2646,7 +2646,7 @@ put_c_n_string (svalue_t *sp, const char *p, size_t len)
 
     memsafe(str = new_n_mstring(p, len), len, "string");
     put_string(sp, str);
-} /* put_c_string() */
+} /* put_c_n_string() */
 
 /*-------------------------------------------------------------------------*/
 void

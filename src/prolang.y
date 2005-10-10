@@ -4385,7 +4385,7 @@ static void
 struct_epilog (void)
 
 /* After a successful parse, make sure that all structs are defined,
- * try to reactive existing structs, and publish the new ones.
+ * try to reactivate existing structs, and publish the new ones.
  *
  * If an error occures, num_parse_error will be incremented.
  */

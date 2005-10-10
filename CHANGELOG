@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-Oct-2005 (Lars Duening)
+  - (simulate.c) If the catch() handling notices an out-of-memory
+      situation, the catch() is ignored. This also fixes an endless
+      recursion (Bug #0000406).
+
 04-Oct-2005 (Lars Duening)
   - (doc/concepts/overloading) New man page (thanks, Coogan!).
 
