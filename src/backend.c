@@ -952,6 +952,8 @@ static Bool did_swap;
         mp_int min_time_to_swap; /* Variable swap exclusion time before reset */
         Bool bResetCalled;  /* TRUE: reset() called */
 
+        clear_state();
+
         num_last_processed++;
 
         /* Move obj to the end of the list */
