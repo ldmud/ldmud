@@ -16,6 +16,11 @@ version_revision=$(echo "\$Revision$" | sed -e 's/[$]Revision: \([0-9][0-9]*\) *
 # $Format: "version_type=\"$ReleaseType$\""$ 
 version_type="dev"
 
+# A timestamp, to be used by bumpversion and other scripts.
+# It can be used, for example, to 'touch' this file on every build, thus
+# forcing revision control systems to add it on every checkin automatically.
+version_stamp="Wed Oct 12 00:31:43 MDT 2005"
+
 # The version number information
 # $Format: "version_micro=$ReleaseMicro$"$ 
 version_micro=710
