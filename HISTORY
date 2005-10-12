@@ -202,7 +202,7 @@ For a detailed list of all changes see the file CHANGELOG.
            the maxinum number of entries in a mapping.
 
 
-15-May-2005 (Lars Duening) -- Release 3.2.12
+11-Oct-2005 (Lars Duening) -- Release 3.2.12
 
     - Changed efuns:
 
@@ -211,6 +211,7 @@ For a detailed list of all changes see the file CHANGELOG.
           accepted as extra arguments.
       + restore_value(): Restoring one-character operator closures
           in arrays works again.
+      + to_int(): No longer accepts "x<num>" as valid sedecimal notation.
 
     - New efuns:
 
