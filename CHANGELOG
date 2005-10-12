@@ -3,6 +3,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
 
 11-Oct-2005 (Lars Duening)
   - (erq/erq.c, erq/Makefile, xerq/socket.c) Corrected compilation warnings.
+  - (lex.c) to_int() no longer accepts "x<num>" as valid sedecimal
+       notation (Bug #0000402).
 
 04-Oct-2005 (Lars Duening)
   - (doc/concepts/overloading) New man page (thanks, Coogan!).

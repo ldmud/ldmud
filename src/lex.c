@@ -2896,7 +2896,6 @@ lex_parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
  *   <decimal>
  *   0o<octal>
  *   0x<sedecimal>
- *   x<sedecimal>
  *   0b<binary>
  *
  * with <cp> pointing to the first character.
@@ -2911,7 +2910,7 @@ lex_parse_number (char * cp, unsigned long * p_num, Bool * p_overflow)
 {
     char c = *cp;
     *p_overflow = MY_FALSE;
-    if (isdigit(c) || c == 'X' || c == 'x')
+    if (isdigit(c))
         return parse_number(cp, p_num, p_overflow);
     return cp;
 } /* lex_parse_number() */
