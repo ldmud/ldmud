@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Oct-2005 (Lars Duening)
+  - (erq/erq.c, erq/Makefile, xerq/socket.c) Corrected compilation warnings.
+
 04-Oct-2005 (Lars Duening)
   - (doc/concepts/overloading) New man page (thanks, Coogan!).
 
