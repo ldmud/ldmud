@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Oct-2005 (Lars Duening)
+  - (erq/erq.c, xerq/socket.c) Corrected compilation warnings.
+
 10-Oct-2005 (Lars Duening)
   - (backend.c) Added a clear_state() at the beginning of the
     process_objects() loop, so that errors during the cleanup find
@@ -603,7 +606,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 
 13-Nov-2004 (Lars Duening)  (3.3.613)
   - (lex.c, efuns.c) Embarassing: the number parsing method assumed that the
-       string at least started with a digit - this broken to_int().
+       string at least started with a digit - this broke to_int().
        (Bug #0000141)
 
 12-Nov-2004 (Lars Duening)  (3.3.612)
