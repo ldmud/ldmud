@@ -11,7 +11,8 @@ DESCRIPTION
         object's catch_tell() lfun, _if it has one_. If the receiver
         (or one of its shadows) doesn't have that lfun, the text is sent
         to the socket directly. Only messages sent by an interactive
-        object to itself is always written to the socket immediately.
+        object to itself inside a catch_tell always written to the socket
+        immediately.
 
         This allows to filter and process text before it is written
         to a player.
