@@ -14,6 +14,7 @@
 #include "closure.h"
 #include "comm.h"
 #include "exec.h"
+#include "filestat.h"
 #include "interpret.h"
 #include "main.h"
 #include "mapping.h"
@@ -710,6 +711,8 @@ void save_object(ob, file)
     if (f < 0) {
 	error("Could not open %s for a save.\n", tmp_name);
     }
+    FCOUNT_SAVE(tmp_name);
+
     /* identify arrays/mappings that are used more than once.*/
     init_pointer_table(pointer_table_space);
     v = ob->variables;
@@ -1121,6 +1124,8 @@ int restore_object(ob, file)
 	(void)fclose(f);
 	return 0;
     }
+    FCOUNT_REST(name);
+
     buff = xalloc(st.st_size + 1);
     if (!buff) {
         error("Out of memory.\n");

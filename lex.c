@@ -15,6 +15,7 @@
 #include "closure.h"
 #include "comm.h"
 #include "exec.h"
+#include "filestat.h"
 #include "gcollect.h"
 #include "hash.h"
 #include "instrs.h"
@@ -30,6 +31,13 @@
 #include "hosts/amiga/socket.h"
 #endif
 
+/* TODO: Implement the # and ## operators.
+ * TODO: Comment delimiters must not be recognized in char or string literals
+ * TODO: New predefs' __DRIVER_VERSION__, _REVISION__, _PATCHLEVEL__.
+ * TODO: Build the list of global predefs just once.
+ * TODO: #define macro(a,b,...) -> ... is assigned to __VA_ARGS__ (see oncoming
+ * TODO:: C standard).
+ */
 #if defined(hpux) && !defined(__GNUC__)
 /* This compilers handling of (char) is broken */
 #define CHAR_EOF EOF
@@ -568,7 +576,10 @@ inc_open(buf, name, namelen, delim)
     if (delim == '"') {
 	merge(name, namelen, buf);
 	if ((fd = ixopen(buf, O_RDONLY|O_BINARY)) >= 0)
+        {
+            FCOUNT_INCL(buf);
 	    return fd;
+        }
 	if (errno == EMFILE)
 	    lexerror("File descriptors exhausted");
 #ifdef ENFILE
@@ -592,7 +603,10 @@ inc_open(buf, name, namelen, delim)
 	    sprintf(buf, "%s%s", inc_list[i].u.string, name);
 	    fd = ixopen(buf, O_RDONLY|O_BINARY);
 	    if (fd >= 0)
+            {
+                FCOUNT_INCL(buf);
 		return fd;
+            }
 	    if (errno == EMFILE) lexerror("File descriptors exhausted");
 #if ENFILE
 	    if (errno == ENFILE) lexerror("File table overflow");
@@ -613,7 +627,10 @@ inc_open(buf, name, namelen, delim)
 	    if (legal_path(buf)) {
 		fd = ixopen(buf, O_RDONLY|O_BINARY);
 		if (fd >= 0)
+                {
+                    FCOUNT_INCL(buf);
 		    return fd;
+                }
 		if (errno == EMFILE) lexerror("File descriptors exhausted");
 #if ENFILE
 		if (errno == ENFILE) lexerror("File table overflow");

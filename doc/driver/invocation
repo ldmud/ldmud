@@ -2,7 +2,7 @@ NAME
     driver/invocation
 
 LAST UPDATE
-    14. Sep 1998
+    21. Sep 1998
 
 PURPOSE
     Description of the invocation of the gamedriver, especially of the command
@@ -92,6 +92,12 @@ DESCRIPTION
         Swap into file <name> instead of <mudlib>/LP_SWAP.<host> .
         Only available if compiled with TIME_TO_SWAP > 0.
     
+      -s c       | --swap-compact
+        Reuse free space in the swap file immediately.
+        Giving this option results in smaller, but also more fragmented
+        swapfiles, and the swap performance may degrade.
+        
+
       --max-malloc <size>
         Restrict total memory allocations to <size> bytes.
         Only available if compiled with MAX_MALLOCED.

@@ -49,6 +49,7 @@
 #include "backend.h"
 #include "ed.h"
 #include "exec.h"
+#include "filestat.h"
 #include "gcollect.h"
 #include "interpret.h"
 #include "main.h"
@@ -1381,6 +1382,7 @@ static void new_player(new_socket, addr, len)
 	FILE *log_file = fopen (ACCESS_LOG, "a");
 
 	if (log_file) {
+            FCOUNT_WRITE(log_file);
 	    fprintf(log_file, "%s: %s\n",
 		inet_ntoa(addr->sin_addr), message ? "denied" : "granted");
 	    fclose(log_file);

@@ -7,6 +7,7 @@
 #include "array.h"
 #include "comm.h"
 #include "exec.h"
+#include "filestat.h"
 #include "interpret.h"
 #include "instrs.h"
 #include "mapping.h"
@@ -185,6 +186,7 @@ void dumpstat() {
     f = fopen("OBJ_DUMP", "w");
     if (f == 0)
 	return;
+    FCOUNT_WRITE("OBJ_DUMP");
     add_message("Dumping to OBJ_DUMP ...");
     for (ob = obj_list; ob; ob = ob->next_all) {
 	mp_int tmp;

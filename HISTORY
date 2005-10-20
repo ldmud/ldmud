@@ -4,6 +4,16 @@ the host system. This means new features as well as bug fixes.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+21-Sep-1998 (Lars Duening)
+    - Bugfix: mapping_contains() no longer returns destructed objects.
+        (found by Zora).
+    - New special command 'status files' to append file usage statistics
+        from within the mud to the file /FILESTAT.
+    - New commandline option:
+        --swap-compact: reuse free space in the swapfile immediately.
+      Giving this option results in smaller, but also more fragmented
+      swapfiles, and the swap performance may degrade.
+
 14-Sep-1998 (Lars Duening) -- Release 3.2.2
     - Version number pattern changed from 03.02.1@<patchlevel>
       to 3.2.<patchlevel>. This affects all uses of the __VERSION__

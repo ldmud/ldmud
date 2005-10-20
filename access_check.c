@@ -1,7 +1,7 @@
 /*---------------------------------------------------------------------------
  * IP/time based access control.
  *
- * Copyright 1995 by Joern Rennecke.
+ * Copyright (C) 1995 by Joern Rennecke.
  *---------------------------------------------------------------------------
  * Access to the game is based on the user's IP address and the current time.
  * These are matched against a set of rules and if a match is detected, a
@@ -93,6 +93,7 @@
 #include "access_check.h"
 
 #include "comm.h"
+#include "filestat.h"
 
 /* #define DEBUG_ACCESS_CHECK */ /* define to activate debug output */
 
@@ -218,6 +219,7 @@ read_access_file (void)
     all_access_classes = NULL;
 
     infp = fopen(ACCESS_FILE, "r");
+    FCOUNT_READ(ACCESS_FILE);
     last = &all_access_addresses;
       /* *last will be set to NULL at the end, so no dangling pointer
        * will exist.

@@ -1,6 +1,32 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Sep-1998 (Lars Duening) -- Release 3.2.3
+    - (array.c) Changed order_alist() to use Standard conformant pointer
+        arithmetics.
+    - (backend) Added the statistic 'total_player_commands'.
+    - (filestat.*) Statistics module counting the number and type of
+        file usages (read, write, delete, read for compilation, read
+        for inclusion, read for restore_object, write for save_object).
+        The statistic is enabled by defining FILE_STAT in config.h.
+        The statistic is appended to the file /FILESTAT when the
+        special command 'status files' is given.
+    - (access_check.c, backend.c, comm1.c, dumpstat.c, main.c, gcollect.c,
+       lex.c, main.c, object.c, simulate.c, various Makefiles)
+         Adapted for filestat.
+    - (main.c) Beautified the --options output.
+    - (swap.*, main.c) New commandline option '--swap-compact' to put
+         the swapper in the "compact mode". In this mode, free space in
+         the swapfile is reused immediately; in contrast to the default
+         mode in which the reuse is determined by low/high watermarks.
+
+20-Sep-1998 (Lars Duening)
+    - (interpret.c) F_MAPPING_CONTAINS returned destructed objects since
+        it didn't check the results of get_map_lvalue() properly (thanks,
+        Fiona and Zora!).
+    - (backend.c) Reallocation of the heartbeat array now conforms more
+        to the standard.
+
 14-Sep-1998 (Lars Duening) -- Release 3.2.2
     - (array.c) One statement was at the wrong place in order_alist(), 
         causing a malfunction in explode().
@@ -8,9 +34,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
         time two loops assumed that the variables local to their body
         keep their values between two iterations.
     - (interpret.c) As in closure.c, loop body variables are moved
-        outside their loops if they are meant to be persistant. Don't
-        know if the Standard requires that, but at least it makes the
-        code clearer.
+        outside their loops if they are meant to be persistant.
     - (interpret.c) A misplaced cast broke sscanf().
     - (backend.*, hash.*) Beautified and commented.
     - (main.*) Marked the boolean commandline parameters as such.

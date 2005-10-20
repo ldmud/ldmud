@@ -78,12 +78,12 @@ SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\
     comm1.c ed.c regexp.c mapping.c wiz_list.c swap.c $(MALLOC).c\
     call_out.c otable.c dumpstat.c stralloc.c hash.c port.c\
     access_check.c parse_old.c parse.c prolang.y\
-    simul_efun.c sprintf.c gcollect.c closure.c
+    simul_efun.c sprintf.c gcollect.c closure.c filestat.c
 OBJ=lang.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
     comm1.o ed.o regexp.o mapping.o wiz_list.o swap.o $(MALLOC).o\
     call_out.o otable.o dumpstat.o stralloc.o hash.o port.o\
     access_check.o parse_old.o parse.o simul_efun.o sprintf.o\
-    gcollect.o closure.o 
+    gcollect.o closure.o filestat.o
 
 driver: $(OBJ)
 	$(CC) $(OPTIMIZE) $(LDFLAGS) $(OBJ) -o $@ -lpml

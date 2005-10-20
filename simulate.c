@@ -1,5 +1,6 @@
-#include "config.h"
+#include "driver.h"
 
+#include "my-alloca.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -14,7 +15,6 @@
 #else
 #include <signal.h>
 #endif
-#include "port.h"
 #if defined(DIRENT) || defined(_POSIX_VERSION)
 #include <dirent.h>
 #define generic_dirent dirent
@@ -32,17 +32,35 @@
 #include <ndir.h>
 #endif /* NDIR */
 #endif /* not (DIRENT or _POSIX_VERSION) */
+#if defined(__CYGWIN32__)
+extern int lstat PROT((char *, struct stat *));
+#endif
 
-#include "lint.h"
+#include "simulate.h"
+
+#include "array.h"
+#include "backend.h"
+#include "call_out.h"
+#include "closure.h"
+#include "comm.h"
+#include "dumpstat.h"
+#include "ed.h"
+#include "exec.h"
+#include "filestat.h"
 #include "interpret.h"
 #include "instrs.h"
+#include "lex.h"
+#include "main.h"
+#include "mapping.h"
 #include "object.h"
-#include "sent.h"
-#include "wiz_list.h"
-#include "exec.h"
-#include "comm.h"
-#include "stralloc.h"
+#include "otable.h"
+#include "prolang.h"
 #include "rxcache.h"
+#include "sent.h"
+#include "simul_efun.h"
+#include "stralloc.h"
+#include "swap.h"
+#include "wiz_list.h"
 
 #ifdef atarist
 #define CONST const
@@ -58,12 +76,6 @@
 #define S_ISREG(m)	(((m)&S_IFMT) == S_IFREG)
 #endif
 
-extern int errno;
-extern int comp_flag;
-extern int trace_level;
-
-char *inherit_file;
-int is_wizard_used = 0;
 
 #ifdef SunOS4
 #if ! defined (__GNUC__) || __GNUC__ < 2 || __GNUC__ == 2 && __GNUC_MINOR__ < 7
@@ -77,30 +89,20 @@ extern int fchmod PROT((int, int));
 
 #define COMMAND_FOR_OBJECT_BUFSIZE 1000
 
+static void free_sentence PROT((struct sentence *p)); /* forward */
+static void remove_sent PROT((struct object *ob, struct object *player));
+static void remove_environment_sent PROT((struct object *));
+static int special_parse PROT((char *buff));
+
+
 char *last_verb = 0;
-
-#ifdef INITIALIZATION_BY___INIT
-struct object *get_empty_object PROT((int, struct variable *));
-#else
-struct object *get_empty_object PROT((int, struct variable *, struct svalue *));
-#endif
-int special_parse PROT((char *)),
-    set_call PROT((struct object *, struct input_to *, int)),
-    legal_path PROT((char *));
-
-void pre_compile PROT((char *)),
-    remove_interactive PROT((struct object *)),
-    add_light PROT((struct object *, int)),
-    ipc_remove(),
-    remove_all_players(), start_new_file PROT((int)), end_new_file(),
-#if defined(MALLOC_smalloc) || defined(MALLOC_malloc)
-    dump_malloc_data(),
-#endif
-    print_svalue PROT((struct svalue *)),
-    debug_message_value PROT((struct svalue *)),
-    destruct2();
-
-extern int d_flag;
+char *inherit_file;
+/*
+ * 'inherit_file' is used as a flag. If it is set to a string
+ * after yyparse(), this string should be loaded as an object,
+ * and the original object must be loaded again.
+ */
+int is_wizard_used = 0;
 
 struct object *obj_list, *master_ob = 0;
 p_int new_destructed = 0;
@@ -112,8 +114,6 @@ struct object *current_interactive; /* The user who caused this execution */
 int num_parse_error;		/* Number of errors in the parser. */
 
 struct svalue closure_hook[NUM_CLOSURE_HOOKS];
-
-void shutdowngame();
 
 #if 0
 struct variable *find_status(str, must_find)
@@ -139,7 +139,7 @@ struct give_uid_error_context {
     struct object *new_object;
 };
 
-void give_uid_error_handler(arg)
+static void give_uid_error_handler(arg)
     struct svalue *arg;
 {
     struct give_uid_error_context *ecp;
@@ -152,11 +152,9 @@ void give_uid_error_handler(arg)
 	emergency_destruct(ob);
 }
 
-void push_give_uid_error_context(ob)
+static void push_give_uid_error_context(ob)
     struct object *ob;
 {
-    extern struct svalue *inter_sp;
-
     struct give_uid_error_context *ecp;
 
     ecp = (struct give_uid_error_context *)xalloc(sizeof *ecp);
@@ -175,19 +173,16 @@ void push_give_uid_error_context(ob)
 /*
  * Give the correct uid and euid to a created object.
  */
-int give_uid_to_object(ob, x, n)
+static int give_uid_to_object(ob, x, n)
     struct object *ob;
     int x, n;
 {
-    extern struct svalue *inter_sp;
-    extern struct wiz_list default_wizlist_entry;
-
     struct lambda *l;
     char *err;
     struct svalue arg, *ret;
 
     ob->user = &default_wizlist_entry;
-    if (l = closure_hook[x].u.lambda) {
+    if ( (l = closure_hook[x].u.lambda) ) {
 	if (closure_hook[x].x.closure_type == CLOSURE_LAMBDA)
 	    l->ob = ob;
 	call_lambda(&closure_hook[x], n);
@@ -276,16 +271,9 @@ struct object *load_object(lname, dont_reset, depth)
     int depth;
 {
     int fd;
-    extern int total_lines;
-    extern int approved_object;
 
     struct object *ob, *save_command_giver = command_giver;
-    extern struct program *compiled_prog;
-#ifndef INITIALIZATION_BY___INIT
-    extern struct svalue *prog_variable_values;
-#endif
     int i;
-    extern char *current_file;
     struct stat c_st;
     int name_length;
     char name[200];
@@ -296,17 +284,38 @@ struct object *load_object(lname, dont_reset, depth)
 	&& current_object->name)
 	error("Can't load objects when no effective user.\n");
 #endif
-    /* Truncate possible .c in the object name. */
-    /* Remove leading '/' if any. */
+    /* Massage the filename a bit to bring it into a sane format:
+     *  - Remove leading '/'
+     *  - Remove a trailing '.c'
+     *  - Collapse multiple '/' into just one.
+     * There will be a legality check later on, so don't care about
+     * that now.
+     */
+
     while(lname[0] == '/')
 	lname++;
-    name_length = strlen(lname);
-    if (name_length >= 2 &&
-      lname[name_length-2] == '.' && lname[name_length-1] == 'c')
+
     {
-	name_length -= 2;
+        char *from, *to;
+
+        for (from = to = lname; '\0' != *from; from++, to++)
+        {
+            if ('/' == *from)
+            {
+                *to = '/';
+                while ('/' == *from) from++;
+                from--;
+            }
+            else if ('.' == *from && 'c' == *(from+1) && '\0' == *(from+2))
+                break;
+            else if (from != to)
+              *to = *from;
+        }
+        *to = '\0';
+        name_length = to - lname;
     }
-    if (name_length > sizeof name - 4)
+
+    if ((size_t)name_length > sizeof name - 4)
 	name_length = sizeof name - 4;
     if (name_length)
 	memcpy(name, lname, name_length);
@@ -319,7 +328,7 @@ struct object *load_object(lname, dont_reset, depth)
 	assert_master_ob_loaded();
 	/* has the object been loaded by assert_master_ob_loaded ? */
 	name[name_length] = '\0';
-	if (ob = find_object2(name)) {
+	if ( (ob = find_object2(name)) ) {
 	    if (ob->flags & O_SWAPPED && load_ob_from_swap(ob) < 0)
 		    /* The master has swapped this object and used up most
 		     * memory... strange, but thinkable */
@@ -355,7 +364,7 @@ struct object *load_object(lname, dont_reset, depth)
 	svp = apply_master_ob(STR_COMP_OBJ, 1);
 	if (svp && svp->type == T_OBJECT) {
 	    name[name_length] = '\0';
-	    if (ob = lookup_object_hash(name)) {
+	    if ( (ob = lookup_object_hash(name)) ) {
 		if (ob == svp->u.ob)
 		    return ob;
 	    } else if (ob != master_ob) {
@@ -389,6 +398,8 @@ struct object *load_object(lname, dont_reset, depth)
 	perror(name);
 	error("Could not read the file.\n");
     }
+    FCOUNT_COMP(name);
+
     current_file = alloca(strlen(name)+1); /* error in compile_file could */
     strcpy(current_file, name); 	   /* inhibit freeing.		  */
     /* The file name is needed before start_new_file(), in case there is
@@ -411,9 +422,6 @@ struct object *load_object(lname, dont_reset, depth)
      * "inherit_file" will be set by lang.y to point to a file name.
      */
     if (inherit_file) {
-	extern void push_referenced_shared_string PROT((char *));
-	extern struct svalue *inter_sp;
-
 	char *tmp, *tmp2;
 
 	tmp = tmp2 = inherit_file;
@@ -466,8 +474,6 @@ struct object *load_object(lname, dont_reset, depth)
     push_give_uid_error_context(ob);
     push_string_shared(ob->name);
     if (give_uid_to_object(ob, H_LOAD_UIDS, 1)) {
-	extern struct object dummy_current_object_for_loads;
-
 	struct svalue *svp;
 	int j;
 	struct object *save_current;
@@ -512,9 +518,6 @@ void set_svalue_user(svp, owner)
 #ifdef MAPPINGS
       case T_MAPPING:
       {
-	extern void set_mapping_user
-	  PROT((struct mapping *, struct object *));
-
 	set_mapping_user(svp->u.map, owner);
 	break;
       }
@@ -526,7 +529,7 @@ void set_svalue_user(svp, owner)
     }
 }
 
-char *make_new_name(str)
+static char *make_new_name(str)
     char *str;
 {
     static long i = 0;
@@ -606,7 +609,7 @@ struct object *clone_object(str1)
     if (!new_ob)
 	error("Out of memory\n");
     new_ob->name = make_new_name(ob->name);
-    new_ob->flags |= O_CLONE | ob->flags & ( O_APPROVED | O_WILL_CLEAN_UP ) ;
+    new_ob->flags |= O_CLONE | (ob->flags & ( O_APPROVED | O_WILL_CLEAN_UP )) ;
     new_ob->prog = ob->prog;
     reference_prog (ob->prog, "clone_object");
 #ifdef DEBUG
@@ -631,7 +634,6 @@ struct object *clone_object(str1)
 struct svalue *f_rename_object(sp)
     struct svalue *sp;
 {
-    extern struct svalue *inter_sp;
     struct object *ob;
     char *name;
     mp_int length;
@@ -722,7 +724,6 @@ int command_for_object(str, ob)
     struct object *ob;
 {
     char buff[COMMAND_FOR_OBJECT_BUFSIZE];
-    extern int eval_cost;
     int save_eval_cost = eval_cost - 1000;
     struct interactive *ip;
 
@@ -801,8 +802,6 @@ static struct object *object_present2(str, ob)
     char *str;
     struct object *ob;
 {
-    extern struct svalue *inter_sp;
-
     struct svalue *ret;
     char *p;
     int count = 0, length;
@@ -888,8 +887,6 @@ void destruct_object(v)
 	if (ip->sent.type == SENT_INTERACTIVE)
 	    trace_level |= ip->trace_level;
 	if (ip->sent.ed_buffer) {
-	    extern void save_ed_buffer();
-
 	    save_ed_buffer();
 	}
 	command_giver=save;
@@ -906,13 +903,11 @@ void destruct_object(v)
 void emergency_destruct(ob)
     struct object *ob;
 {
-    extern struct object *simul_efun_object;
     struct object **pp, *item, *next;
 
     if (ob->flags & O_DESTRUCTED)
 	return;
     if (ob->flags & O_SWAPPED) {
-	extern int malloc_privilege;
 	int save_privilege;
 
 	save_privilege = malloc_privilege;
@@ -927,7 +922,6 @@ void emergency_destruct(ob)
 	shadow_sent = O_GET_SHADOW(ob);
 
 	if (shadow_sent->ed_buffer) {
-	    extern void free_ed_buffer();
 	    struct object *save=command_giver;
 
 	    command_giver = ob;
@@ -938,7 +932,7 @@ void emergency_destruct(ob)
 	 * The chain of shadows is a double linked list. Take care to update
 	 * it correctly.
 	 */
-	if (shadowing = shadow_sent->shadowing) {
+	if ( (shadowing = shadow_sent->shadowing) ) {
 	    struct shadow_sentence *shadowing_sent;
 
 	    shadowing_sent = O_GET_SHADOW(shadowing);
@@ -952,7 +946,7 @@ void emergency_destruct(ob)
 		free_shadow_sent(shadowing_sent);
 	    }
 	}
-	if (shadowed_by = shadow_sent->shadowed_by) {
+	if ( (shadowed_by = shadow_sent->shadowed_by) ) {
 	    struct shadow_sentence *shadowed_by_sent;
 
 	    shadowed_by_sent = O_GET_SHADOW(shadowed_by);
@@ -1058,13 +1052,13 @@ void destruct2(ob)
      * isn't released. It must be here because gcollect doesn't expect
      * sentences in destructed objects.
      */
-    if (sent = ob->sent) {
+    if ( (sent = ob->sent) ) {
 	struct sentence *next;
 	do {
 
 	    next = sent->next;
 	    free_sentence(sent);
-	} while (sent = next);
+	} while ( (sent = next) );
 	ob->sent = 0;
     }
 
@@ -1090,7 +1084,6 @@ void say(v, avoid)
     struct svalue *v;
     struct vector *avoid;
 {
-    extern int assoc PROT((struct svalue *key, struct vector *));
     static struct svalue ltmp = { T_POINTER };
     static struct svalue stmp = { T_OBJECT };
     struct object *ob, *save_command_giver = command_giver;
@@ -1133,7 +1126,7 @@ void say(v, avoid)
     avoid = order_alist(&ltmp, 1, 1);
     push_referenced_vector(avoid);
     avoid = avoid->item[0].u.vec;
-    if (ob = origin->super) {
+    if ( (ob = origin->super) ) {
 	struct interactive *ip;
 
 	if (ob->flags & O_ENABLE_COMMANDS ||
@@ -1195,9 +1188,7 @@ void say(v, avoid)
 	message = buff;
 	break;
     case T_POINTER:
-	for (curr_recipient = recipients; ob = *curr_recipient++; ) {
-	    extern void push_vector PROT((struct vector *));
-
+	for (curr_recipient = recipients; (ob = *curr_recipient++) ; ) {
 	    if (ob->flags & O_DESTRUCTED) continue;
 	    stmp.u.ob = ob;
 	    if (assoc(&stmp, avoid) >= 0) continue;
@@ -1211,7 +1202,7 @@ void say(v, avoid)
     default:
 	error("Invalid argument %d to say()\n", v->type);
     }
-    for (curr_recipient = recipients; ob = *curr_recipient++; ) {
+    for (curr_recipient = recipients; (ob = *curr_recipient++); ) {
 	struct interactive *ip;
 
 	if (ob->flags & O_DESTRUCTED) continue;
@@ -1296,9 +1287,7 @@ void tell_room(room, v, avoid)
 	struct object *origin = command_giver;
 	if (!origin)
 	    origin = current_object;
-	for (curr_recipient = recipients; ob = *curr_recipient++; ) {
-	    extern void push_vector PROT((struct vector *));
-
+	for (curr_recipient = recipients; (ob = *curr_recipient++); ) {
 	    if (ob->flags & O_DESTRUCTED) continue;
 	    stmp.u.ob = ob;
 	    if (assoc(&stmp, avoid) >= 0) continue;
@@ -1311,7 +1300,7 @@ void tell_room(room, v, avoid)
       default:
 	error("Invalid argument %d to tell_room()\n", v->type);
     }
-    for (curr_recipient = recipients; ob = *curr_recipient++; ) {
+    for (curr_recipient = recipients; (ob = *curr_recipient++); ) {
 	struct interactive *ip;
 
 	if (ob->flags & O_DESTRUCTED) continue;
@@ -1491,7 +1480,7 @@ typedef struct
 
 static long olddta;
 
-XDIR *xopendir(path)
+static XDIR *xopendir(path)
 char *path;
 {
     char pattern[PATH_MAX];
@@ -1514,7 +1503,7 @@ char *path;
 
 #define XOPENDIR(dest, path) ((dest) = xopendir(path))
 
-struct xdirect *xreaddir(d)
+static struct xdirect *xreaddir(d)
 XDIR *d;
 {
     static struct xdirect xde;
@@ -1532,14 +1521,14 @@ XDIR *d;
     return &xde;
 }
 
-void xclosedir(d)
+static void xclosedir(d)
 XDIR *d;
 {
     Fsetdta(olddta);
     xfree(d->dirname);
     xfree(d);
 }
-void xrewinddir(d)
+static void xrewinddir(d)
 XDIR *d;
 {
     long status;
@@ -1562,11 +1551,9 @@ struct xdirect {
 	int   time;
 };
 
-extern char *mud_lib;
-
 #define XOPENDIR(dest, path) (\
-    !chdir(path) &&\
-    ((dest) = opendir(".")) ||\
+    (!chdir(path) &&\
+    ((dest) = opendir("."))) ||\
 	(chdir(mud_lib),MY_FALSE)\
 )
 
@@ -1574,7 +1561,7 @@ extern char *mud_lib;
 #define xrewinddir(dir_ptr)  rewinddir(dir_ptr)
 #define XDIR DIR
 
-struct xdirect *xreaddir(dir_ptr, mask)
+static struct xdirect *xreaddir(dir_ptr, mask)
 XDIR *dir_ptr;
 int mask;
 {
@@ -1610,7 +1597,7 @@ struct get_dir_error_context {
     struct vector *v;
 };
 
-void get_dir_error_handler(arg)
+static void get_dir_error_handler(arg)
     struct svalue *arg;
 {
     struct get_dir_error_context *ecp;
@@ -1648,10 +1635,9 @@ struct vector *get_dir(path, mask)
     struct stat st;
     char *temppath;
     char *p;
-    char *regexp = 0;
+    char *regexpr = 0;
     int nqueries;
     static struct get_dir_error_context ec;
-    extern struct svalue *inter_sp;
 
     if (!path)
 	return 0;
@@ -1678,8 +1664,8 @@ struct vector *get_dir(path, mask)
 	 */
 	if ((p = strrchr(temppath, '/')) == 0)
 	    p = temppath;
-	if (p[0] == '/' && p[1] == '.' && p[2] == '\0' ||
-	    p[0] == '/' && p[1] == '\0')
+	if ((p[0] == '/' && p[1] == '.' && p[2] == '\0') ||
+	    (p[0] == '/' && p[1] == '\0') )
 	    *p = '\0';
     }
 
@@ -1687,12 +1673,12 @@ struct vector *get_dir(path, mask)
     if (strchr(p, '*') || ixstat(temppath, &st) < 0) {
 	if (*p == '\0')
 	    return 0;
-	regexp = (char *)alloca(strlen(p)+2);
+	regexpr = (char *)alloca(strlen(p)+2);
 	if (p != temppath) {
-	    strcpy(regexp, p + 1);
+	    strcpy(regexpr, p + 1);
 	    *p = '\0';
 	} else {
-	    strcpy(regexp, p);
+	    strcpy(regexpr, p);
 	    strcpy(temppath, ".");
 	}
 	do_match = 1;
@@ -1745,7 +1731,7 @@ struct vector *get_dir(path, mask)
     for (de = xreaddir(dirp, 1); de; de = xreaddir(dirp, 1)) {
 	namelen = de->d_namlen;
 	if (do_match) {
-	    if ( !match_string(regexp, de->d_name, namelen) )
+	    if ( !match_string(regexpr, de->d_name, namelen) )
 		continue;
 	} else {
 	    if (namelen <= 2 && *de->d_name == '.' &&
@@ -1777,7 +1763,7 @@ struct vector *get_dir(path, mask)
 
 	namelen = de->d_namlen;
 	if (do_match) {
-	    if ( !match_string(regexp, de->d_name, namelen) )
+	    if ( !match_string(regexpr, de->d_name, namelen) )
 		continue;
 	} else {
 	    if (namelen <= 2 && *de->d_name == '.' &&
@@ -1845,6 +1831,7 @@ int tail(path)
     f = fopen(path, "r");
     if (f == 0)
 	return 0;
+    FCOUNT_READ(path);
     if (fstat(fileno(f), &st) == -1)
 	fatal("Could not stat an open file.\n");
     if ( !S_ISREG(st.st_mode) ) {
@@ -1886,6 +1873,8 @@ int print_file(path, start, len)
     f = fopen(path, "r");
     if (f == 0)
 	return 0;
+    FCOUNT_READ(path);
+
     if (len == 0)
 	len = MAX_LINES;
     if (len > MAX_LINES)
@@ -1915,6 +1904,7 @@ int remove_file(path)
 	return 0;
     if (unlink(path) == -1)
 	return 0;
+    FCOUNT_DEL(path);
     return 1;
 }
 
@@ -2020,7 +2010,7 @@ struct object *find_object2(str)
 	str = p;
 	str[length-2] = '\0';
     }
-    if (ob = lookup_object_hash(str)) {
+    if ( (ob = lookup_object_hash(str)) ) {
 	/* Unswapping the object means possible out of memory conditions.
 	 * This is very hard to pass to the caller. It's easier to test
 	 * for swapping there if needed.
@@ -2055,16 +2045,13 @@ void apply_command(com)
 
 void move_object()
 {
-    extern struct svalue *inter_sp;
-
     struct lambda *l;
-
     struct object *save_command = command_giver;
 
-    if (l = closure_hook[H_MOVE_OBJECT1].u.lambda) {
+    if (( l = closure_hook[H_MOVE_OBJECT1].u.lambda) ) {
 	l->ob = inter_sp[-1].u.ob;
 	call_lambda(&closure_hook[H_MOVE_OBJECT1], 2);
-    } else if (l = closure_hook[H_MOVE_OBJECT0].u.lambda) {
+    } else if (( l = closure_hook[H_MOVE_OBJECT0].u.lambda) ) {
 	l->ob = current_object;
 	call_lambda(&closure_hook[H_MOVE_OBJECT0], 2);
     }
@@ -2109,8 +2096,6 @@ struct svalue *f_efun308(sp)
 	int okey = 0;
 
 	if (item->sent) {
-	    void remove_environment_sent PROT((struct object *));
-
 	    remove_environment_sent(item);
 	}
 	if (item->super->sent)
@@ -2176,11 +2161,11 @@ void add_light(p, n)
 	return;
     do {
 	p->total_light += n;
-    } while (p = p->super);
+    } while ( (p = p->super) );
 }
 
-struct sentence *sent_free = 0;
-int tot_alloc_sentence;
+static struct sentence *sent_free = 0;
+static int tot_alloc_sentence;
 
 struct sentence *alloc_sentence() {
     struct sentence *p;
@@ -2207,7 +2192,7 @@ void free_all_sent() {
     }
 }
 
-void free_sentence(p)
+static void free_sentence(p)
     struct sentence *p;
 {
     free_string(p->function);
@@ -2488,8 +2473,6 @@ int add_action(func, cmd, flag)
 	do {
 	    ob = O_GET_SHADOW(ob)->shadowing;
 	    if (find_function(str, ob->prog) >= 0) {
-		extern struct svalue *inter_sp;
-
 		if ( !privilege_violation4(
 		    "shadow_add_action", ob, str, 0, inter_sp)
 		)
@@ -2599,8 +2582,6 @@ struct svalue *f_add_xverb(sp)
 struct svalue *f_remove_action(sp)
     struct svalue *sp;
 {
-    extern void free_object_svalue PROT((struct svalue *));
-
     struct object *ob;
     char *verb;
     struct sentence **sentp, *s;
@@ -2616,7 +2597,7 @@ struct svalue *f_remove_action(sp)
 	    verb = (char *)f_remove_action; /* won't be found */
     sentp = &ob->sent;
     ob = current_object;
-    while (s = *sentp) {
+    while ( (s = *sentp) ) {
 	if (s->ob == ob && s->verb == verb) {
 	    *sentp = s->next;
 	    free_sentence(s);
@@ -2636,7 +2617,7 @@ struct svalue *f_remove_action(sp)
  * Remove all commands (sentences) defined by object 'ob' in object
  * 'player'
  */
-void remove_sent(ob, player)
+static void remove_sent(ob, player)
     struct object *ob, *player;
 {
     struct sentence **s;
@@ -2660,7 +2641,7 @@ void remove_sent(ob, player)
  * Remove all commands (sentences) defined by objects that have the same
  * environment as object 'player' in object 'player'
  */
-void remove_environment_sent(player)
+static void remove_environment_sent(player)
     struct object *player;
 {
     struct sentence **p, *s;
@@ -2668,7 +2649,7 @@ void remove_environment_sent(player)
 
     super = player->super;
     p= &player->sent;
-    if (s = *p) for(;;) {
+    if ( (s = *p) ) for(;;) {
 	ob = s->ob;
 	if (!SENT_IS_INTERNAL(s->type) &&
 	    ((ob->super == super && ob != player) || ob == super ) )
@@ -2698,13 +2679,13 @@ void remove_environment_sent(player)
     }
 }
 
-void no_op(p, size)
-    char *p;
-    long size;
+static void no_op(p, size)
+    char *p UNUSED;
+    long size UNUSED;
 {
 }
 
-void show_memory_block(p, size)
+static void show_memory_block(p, size)
     char *p;
     long size;
 {
@@ -2717,37 +2698,16 @@ int status_parse(buff)
     char *buff;
 {
     if (*buff == 0 || strcmp(buff, "tables") == 0) {
-	int tot, res, verbose = 0;
-	extern long total_array_size PROT((void));
-	extern char *reserved_user_area, *reserved_master_area,
-		    *reserved_system_area;
-	extern mp_int reserved_user_size, reserved_master_size,
-		      reserved_system_size;
-	extern int tot_alloc_sentence, tot_alloc_object,
-		tot_alloc_object_size,
-		num_arrays;
-	extern mp_int num_swapped, num_unswapped,
-		total_bytes_swapped, total_bytes_unswapped,
-		num_vb_swapped, total_vb_bytes_swapped;
-	extern mp_int total_num_prog_blocks, total_prog_block_size;
-#ifdef COMM_STAT
-	extern int add_message_calls,inet_packets,inet_volume;
-#endif
-#ifdef APPLY_CACHE_STAT
-	extern int apply_cache_hit, apply_cache_miss;
-#endif
+	int tot, res;
+	int /* TODO: BOOL */ verbose = MY_FALSE;
 #if defined( COMM_STAT ) || defined( APPLY_CACHE_STAT )
 	/* passing floats/doubles to add_message is not portable */
 
 	char print_buff[90];
 #endif
-#ifdef MAPPINGS
-	extern mp_int total_mapping_size PROT((void));
-	extern mp_int num_mappings;
-#endif
 
 	if (strcmp(buff, "tables") == 0)
-	    verbose = 1;
+	    verbose = MY_TRUE;
 	res = 0;
 	if (reserved_user_area)
 	    res = reserved_user_size;
@@ -2814,15 +2774,15 @@ int status_parse(buff)
 	}
 	return 1;
     }
+    if (strcmp(buff, "files") == 0) {
+#ifdef FILE_STAT
+        fstat_status();
+#else
+        add_message("File statistics not available.\n");
+#endif
+        return 1;
+    }
     if (strcmp(buff, "swap") == 0) {
-	extern mp_int num_swapped, num_unswapped,
-	  total_bytes_swapped, total_bytes_unswapped,
-	num_vb_swapped, total_vb_bytes_swapped,
-	  num_swapfree, total_bytes_swapfree,
-	  swapfile_size, total_swap_reused;
-	extern long swap_num_searches, swap_total_searchlength;
-	extern long swap_free_searches, swap_free_searchlength;
-
 	char print_buff[128];
 	
 	/* maximum seen so far: 10664 var blocks swapped,    5246112 bytes */
@@ -2865,11 +2825,11 @@ Total reused space:%18ld bytes\n\
  * to be used in the game.
  */
 
-char debug_parse_buff[50]; /* Used for debugging */
+static char debug_parse_buff[50]; /* Used for debugging */
 
 int first_showsmallnewmalloced_call = 1;
 
-int special_parse(buff)
+static int special_parse(buff)
     char *buff;
 {
     struct interactive *ip;
@@ -2904,8 +2864,6 @@ int special_parse(buff)
 #endif
 #if defined(MALLOC_malloc) || defined(MALLOC_smalloc)
 	if (strcmp(buff,  "showsmallnewmalloced") == 0) {
-	    extern void walk_new_small_malloced
-		PROT(( void (*)(char *, long) ));
 
 #if !defined(DEBUG) || defined(SHOWSMALLNEWMALLOCED_RESTRICTED)
 	    struct svalue *arg;
@@ -2925,7 +2883,6 @@ int special_parse(buff)
 	    return 1;
 	}
 	if (strcmp(buff, "debugmalloc") == 0) {
-	    extern int debugmalloc;
 	    debugmalloc = !debugmalloc;
 	    if (debugmalloc)
 		add_message("On.\n");
@@ -2957,8 +2914,6 @@ int special_parse(buff)
 	if (!command_giver) return 1;
     } else {
 	if (closure_hook[H_MODIFY_COMMAND].type == T_CLOSURE) {
-	    extern struct svalue *inter_sp, apply_return_value;
-
 	    struct lambda *l;
 
 	    l = closure_hook[H_MODIFY_COMMAND].u.lambda;
@@ -2976,19 +2931,14 @@ int special_parse(buff)
 	    if (!svp) return 0;
 	    if (!command_giver) return 1;
 	} else if (closure_hook[H_MODIFY_COMMAND].type == T_MAPPING) {
-	    extern struct svalue *get_map_lvalue
-		PROT((struct mapping*, struct svalue*, int));
-
 	    struct svalue sv;
 
-	    if (sv.u.string = findstring(buff)) {
+	    if ( (sv.u.string = findstring(buff)) ) {
 		sv.type = T_STRING;
 		sv.x.string_type = STRING_SHARED;
 		svp =
 		  get_map_lvalue(closure_hook[H_MODIFY_COMMAND].u.map, &sv, 0);
 		if (svp->type == T_CLOSURE) {
-		    extern struct svalue *inter_sp, apply_return_value;
-
 		    push_shared_string(sv.u.string);
 		    push_object(command_giver);
 		    call_lambda(svp, 2);
@@ -3071,7 +3021,7 @@ struct vector *get_all_actions(ob, mask)
 	if (SENT_IS_INTERNAL(s->type))
 	    continue;
 	if (mask & 1) {
-	    if (p->u.string = s->verb) {
+	    if ( (p->u.string = s->verb) ) {
 		increment_string_ref(p->u.string);
 		p->type = T_STRING;
 		p->x.string_type = STRING_SHARED;
@@ -3186,9 +3136,8 @@ void fatal(fmt, a, b, c, d, e, f, g, h)
     /* we want a core dump, and abort() seems to fail for linux and sun */
     (void)signal(SIGFPE, SIG_DFL);
     *((char*)0) = 0/0;
-#else
-    abort();
 #endif
+    abort();
 }
 
 int num_error = 0;
@@ -3230,8 +3179,6 @@ static void remove_command_giver_markers()
  */
 
 void throw_error() {
-    extern struct svalue catch_value;
-
     if (error_recovery_pointer->type >= ERROR_RECOVERY_CATCH) {
 	remove_command_giver_markers();
 	longjmp(error_recovery_pointer->con.text, 1);
@@ -3279,17 +3226,13 @@ void error(fmt, a, b, c, d, e, f, g, h)
     int a, b, c, d, e, f, g, h;
 #endif
 {
-    extern struct object *current_heart_beat;
-    extern struct svalue catch_value;
-    extern int out_of_memory;
-
     char *object_name;
     struct object *save_cmd;
     struct svalue *svp;
     int do_save_error;
     char *file, *malloced_error, *malloced_file = 0, *malloced_name = 0;
     char fixed_fmt[200];
-    mp_int line_number;
+    mp_int line_number = 0;
 #ifdef __STDC__
     int a;
     va_list va;
@@ -3335,7 +3278,7 @@ void error(fmt, a, b, c, d, e, f, g, h)
 	fatal("Too many simultaneous errors.\n");
     debug_message("%s", emsg_buf+1);
     do_save_error = 0;
-    if ( malloced_error = xalloc(strlen(emsg_buf)/* -1 for *, +1 for \0 */) ) {
+    if ( (malloced_error = xalloc(strlen(emsg_buf)/* -1 for *, +1 for \0 */)) ) {
 	strcpy(malloced_error, emsg_buf+1);
     }
     if (current_object) {
@@ -3347,10 +3290,10 @@ void error(fmt, a, b, c, d, e, f, g, h)
 	if (current_prog && num_error < 3) {
 	    do_save_error = 1;
 	}
-	if ( malloced_file = xalloc(strlen(file) + 1) ) {
+	if ( (malloced_file = xalloc(strlen(file) + 1)) ) {
 	    strcpy(malloced_file, file);
 	}
-	if ( malloced_name = xalloc(strlen(current_object->name) + 1) ) {
+	if ( (malloced_name = xalloc(strlen(current_object->name) + 1)) ) {
 	    strcpy(malloced_name, current_object->name);
 	}
     }
@@ -3403,8 +3346,6 @@ void error(fmt, a, b, c, d, e, f, g, h)
     if (num_error == 3) {
 	debug_message("Master failure: %s", emsg_buf+1);
     } else if (!out_of_memory) {
-	extern int32 eval_cost, assigned_eval_cost;
-
 	assigned_eval_cost = eval_cost -= MASTER_RESERVED_COST;
 	push_volatile_string(malloced_error);
 	a = 1;
@@ -3546,7 +3487,7 @@ char *check_valid_path(path, caller, call_fun, writeflg)
     {
 #ifdef EUIDS
     struct wiz_list *eff_user;
-    if (eff_user = caller->eff_user)
+    if ( (eff_user = caller->eff_user) )
 	push_shared_string(eff_user->name);
     else
 #endif
@@ -3582,24 +3523,20 @@ char *check_valid_path(path, caller, call_fun, writeflg)
 /*
  * This one is called from HUP.
  */
-extern int extra_jobs_to_do;
 int game_is_being_shut_down = 0;
 int master_will_be_updated = 0;
 
 struct svalue *f_shutdown(sp)
     struct svalue *sp;
 {
-    extra_jobs_to_do = 1;
+    extra_jobs_to_do = MY_TRUE;
     game_is_being_shut_down = 1;
     return sp;
 }
 
 /* this will be activated by SIGUSR1 */
 void startmasterupdate() {
-    extern int initial_eval_cost;
-    extern void add_eval_cost PROT((int));
-
-    extra_jobs_to_do = 1;
+    extra_jobs_to_do = MY_TRUE;
     master_will_be_updated = 1;
     add_eval_cost(-initial_eval_cost >> 3);
     (void)signal(SIGUSR1, (RETSIGTYPE(*)PROT((int)))startmasterupdate);
@@ -3830,7 +3767,7 @@ int match_string(match, str, len)
  * See the GNU General Public License for more details.
  */
 
-int
+static int
 isdir (path)
      char *path;
 {
@@ -3839,7 +3776,7 @@ isdir (path)
   return ixstat (path, &stats) == 0 && S_ISDIR (stats.st_mode);
 }
 
-void
+static void
 strip_trailing_slashes (path)
      char *path;
 {
@@ -3850,9 +3787,9 @@ strip_trailing_slashes (path)
     path[last--] = '\0';
 }
 
-struct stat to_stats, from_stats;
+static struct stat to_stats, from_stats;
 
-int
+static int
 copy (from, to)
      char *from, *to;
 {
@@ -3896,6 +3833,8 @@ copy (from, to)
       return 1;
     }
 #endif
+  FCOUNT_READ(from);
+  FCOUNT_WRITE(to);
 
   while ((len = read (ifd, buf, sizeof (buf))) > 0)
     {
@@ -3953,7 +3892,7 @@ copy (from, to)
    If TO is a directory, FROM must be also.
    Return 0 if successful, 1 if an error occurred.  */
 
-int
+static int
 do_move (from, to)
      char *from;
      char *to;
@@ -4003,6 +3942,7 @@ do_move (from, to)
 #endif /* RENAME_HANDLES_DIRECTORIES */
   if (rename (from, to) == 0)
     {
+      FCOUNT_DEL(from);
       return 0;
     }
 
@@ -4024,6 +3964,7 @@ do_move (from, to)
       error ("cannot remove `%s'", from);
       return 1;
     }
+  FCOUNT_DEL(from);
 
   return 0;
 
@@ -4040,7 +3981,6 @@ int
 do_rename(fr, t)
     char *fr, *t;
 {
-    extern void push_apply_value(), pop_apply_value();
     char *from, *to;
     int i;
 
@@ -4085,8 +4025,6 @@ do_rename(fr, t)
 struct svalue *f_set_driver_hook(sp)
     struct svalue *sp;
 {
-    extern short hook_type_map[];
-
     p_int n;
     struct svalue old;
 
@@ -4113,7 +4051,7 @@ struct svalue *f_set_driver_hook(sp)
 
 	if ( !((1 << T_STRING) & hook_type_map[n]) )
 	    goto bad_arg_2;
-	if (str = make_shared_string(sp->u.string)) {
+	if ( (str = make_shared_string(sp->u.string)) ) {
 	    closure_hook[n].u.string = str;
 	    closure_hook[n].type = T_STRING;
 	    closure_hook[n].x.string_type = STRING_SHARED;
@@ -4140,8 +4078,6 @@ struct svalue *f_set_driver_hook(sp)
 	    sp->u.vec = v = slice_array(v, 0, VEC_SIZE(v)-1);
 	}
 	if (n == H_INCLUDE_DIRS) {
-	    extern struct svalue *inter_sp;
-
 	    inter_sp = sp;
 	    set_inc_list(v);
 	}
@@ -4194,8 +4130,6 @@ void init_closure_hooks() {
 static int validate_shadowing(ob)
     struct object *ob;
 {
-    extern int out_of_memory;
-
     int i, j;
     struct object *cob;
     struct program *shadow, *victim;
@@ -4265,8 +4199,6 @@ static int validate_shadowing(ob)
 struct svalue *f_shadow(sp)
     struct svalue *sp;
 {
-    extern struct svalue *inter_sp;
-
     struct object *ob;
 
     if (sp[-1].type != T_OBJECT)
@@ -4368,7 +4300,7 @@ struct svalue *f_unshadow(sp)
     {
 	shadowing_sent = O_GET_SHADOW(shadowing);
 	shadowed_by = shadow_sent->shadowed_by;
-	if (shadowing_sent->shadowed_by = shadowed_by) {
+	if ( (shadowing_sent->shadowed_by = shadowed_by) ) {
 	    O_GET_SHADOW(shadowed_by)->shadowing = shadow_sent->shadowing;
 	    shadow_sent->shadowed_by = 0;
 	} else {

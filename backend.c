@@ -32,6 +32,7 @@
 
 #include "driver.h"
 
+#include <stddef.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -54,6 +55,7 @@
 #include "comm.h"
 #include "ed.h"
 #include "exec.h"
+#include "filestat.h"
 #include "gcollect.h"
 #include "interpret.h"
 #include "lex.h"
@@ -102,6 +104,10 @@ volatile /* TODO: BOOL */ int comm_time_to_call_heart_beat = MY_FALSE;
 
 volatile mp_int total_alarms = 0;
   /* The total number of alarm()s so far, incremented from the alarm handler.
+   */
+
+uint32 total_player_commands = 0;
+  /* Total number of player commands so far.
    */
 
 /* TODO: *eval_cost belongs into interpret.c */
@@ -409,6 +415,7 @@ backend (void)
          */
 
 	if (get_message(buff)) {
+            total_player_commands++;
 	    update_load_av();
 
 	    /*
@@ -1008,7 +1015,11 @@ set_heart_beat (struct object *ob, int to)
                 /* Double the size of the current allocation */
 
 		struct object **new;
-		mp_int diff;
+                ptrdiff_t tail_diff, called_diff, to_call_diff;
+
+                tail_diff    = hb_tail         - hb_list;
+                called_diff  = hb_last_called  - hb_list;
+                to_call_diff = hb_last_to_call - hb_list;
 
 		hb_max <<= 1;
 		new = (struct object **)
@@ -1019,11 +1030,10 @@ set_heart_beat (struct object *ob, int to)
 		}
 
                 /* Adjust the hb_* ptr to point into the new memory block. */
-		diff = new - hb_list;
-		hb_list = new;
-		hb_tail += diff;
-		hb_last_called += diff;
-		hb_last_to_call += diff;
+                hb_list = new;
+                hb_tail         = new + tail_diff;
+                hb_last_called  = new + called_diff;
+                hb_last_to_call = new + to_call_diff;
 	    }
 	}
 
@@ -1112,8 +1122,8 @@ heart_beat_status (int /* TODO: BOOL */ verbose)
     if (verbose) {
 	add_message("\nHeart beat information:\n");
 	add_message("-----------------------\n");
-	add_message("Number of objects with heart beat: %ld, starts: %ld\n",
-		    (long)num_hb_objs, (long)num_hb_calls);
+	add_message("Number of objects with heart beat: %ld, starts: %ld, reserved %ld\n",
+		    (long)num_hb_objs, (long)num_hb_calls, (long)hb_max);
 	sprintf(buf, "%.2f",
 	  avg_num_hb_objs ?
 	    100 * (double) avg_num_hb_done / avg_num_hb_objs :
@@ -1205,6 +1215,7 @@ write_file (char *file, char *str)
 	    error("Wrong permissions for opening file %s for append.\n", file);
 	}
     }
+    FCOUNT_WRITE(file);
     fwrite(str, strlen(str), 1, f);
     fclose(f);
     return 1;
@@ -1250,6 +1261,7 @@ read_file (char *file, int start, int len)
     f = fopen(file, "rb");
     if (f == NULL)
 	return NULL;
+    FCOUNT_READ(file);
 
     /* Check if the file is small enough to be read. */
 
@@ -1429,6 +1441,7 @@ read_bytes (char *file, int start, int len)
     f = ixopen(file, O_RDONLY);
     if (f < 0)
 	return NULL;
+    FCOUNT_READ(file);
 
     if (fstat(f, &st) == -1)
 	fatal("Could not stat an open file.\n");
@@ -1511,6 +1524,7 @@ write_bytes (char *file, int start, char *str)
     f = ixopen(file, O_WRONLY);
     if (f < 0)
 	return 0;
+    FCOUNT_WRITE(file);
 
     if (fstat(f, &st) == -1)
 	fatal("Could not stat an open file.\n");

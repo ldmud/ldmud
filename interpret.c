@@ -9786,8 +9786,17 @@ program to replace the current one with has to be inherited\n")
 	    }
 	    free_svalue(--sp); /* free key */
 	    for (i = -num_arg + 1; ++i < 0; ) {
-		/* mapping must have been freed yet */
-		assign_svalue(sp[i].u.lvalue, item++);
+                /* get_map_lvalue() may return destructed objects. */
+                /* TODO: May this cause problems elsewhere, too? */
+                if (T_OBJECT == item->type
+                 && (O_DESTRUCTED & item->u.ob->flags))
+                {
+                    assign_svalue(sp[i].u.lvalue, &const0);
+                    item++;
+                }
+                else
+                    /* mapping must not have been freed yet */
+                    assign_svalue(sp[i].u.lvalue, item++);
 		free_svalue(&sp[i]);
 	    }
 	    free_svalue(--sp); /* free mapping */

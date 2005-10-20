@@ -19,6 +19,7 @@ extern struct object *current_heart_beat;
 extern int    current_time;
 extern /* TODO: BOOL */ int    time_to_call_heart_beat;
 extern volatile /* TODO: BOOL */ int    comm_time_to_call_heart_beat;
+extern uint32 total_player_commands;
 extern volatile mp_int total_alarms;
 extern int32  initial_eval_cost;
 extern int32  eval_cost;

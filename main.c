@@ -47,6 +47,7 @@
 #include "backend.h"
 #include "array.h"
 #include "comm.h"
+#include "filestat.h"
 #include "gcollect.h"
 #include "interpret.h"
 #include "lex.h"
@@ -176,6 +177,10 @@ main (int argc, char **argv)
 #ifdef RXCACHE_TABLE
     rxcache_init();
 #endif
+#ifdef FILE_STAT
+    init_filestat();
+#endif
+
     const0.type = T_NUMBER; const0.u.number = 0;
     const1.type = T_NUMBER; const1.u.number = 1;
     assoc_shared_string_key.type = T_STRING;
@@ -659,6 +664,7 @@ typedef enum OptNumber {
  , cSwapTime      /* --swap-time          */
  , cSwapVars      /* --swap-variables     */
  , cSwapFile      /* --swap-file          */
+ , cSwapCompact   /* --swap-compact       */
 #endif
 #ifdef MALLOC_smalloc
  , cGcollectFD    /* --gcollect-outfd     */
@@ -732,6 +738,7 @@ static LongOpt aLongOpts[]
     , { "swap-time",          cSwapTime,      MY_TRUE }
     , { "swap-variables",     cSwapVars,      MY_TRUE }
     , { "swap-file",          cSwapFile,      MY_TRUE }
+    , { "swap-compact",       cSwapCompact,   MY_FALSE }
 #endif
 #ifdef MALLOC_smalloc
     , { "gcollect-outfd",     cGcollectFD,    MY_TRUE }
@@ -765,7 +772,8 @@ version (void)
 {
   fputs("LDMud " GAME_VERSION PATCH_LEVEL LOCAL_LEVEL 
         " - an LPMud Game Driver.\n"
-        "Released: " RELEASE_DATE ", compiled: " __DATE__
+        "\nReleased: " RELEASE_DATE 
+        "\nCompiled: " __DATE__
 #ifdef __TIME__
         " " __TIME__
 #endif
@@ -782,7 +790,7 @@ options (void)
  
 {
   version();
-  fputs("\nMode: "
+  fputs("\n           Mode: "
 #ifdef COMPAT_MODE
 #    ifdef NATIVE_MODE
         "Compat+Native"
@@ -801,94 +809,96 @@ options (void)
 #endif
        , stdout);
 
-  fputs("Mudlib path: " MUD_LIB "\n"
-        "Binary path: " BINDIR "\n"
-        "Master object: <mudlib>/" MASTER_NAME "\n"
+  fputs("    Mudlib path: " MUD_LIB "\n"
+        "    Binary path: " BINDIR "\n"
+        "  Master object: <mudlib>/" MASTER_NAME "\n"
        , stdout);
 
 #ifdef MAXNUMPORTS
-  printf("Multiple ports: %d ports max, default is %d.\n", MAXNUMPORTS, PORTNO);
+  printf(" Multiple ports: %d ports max, default is %d.\n", MAXNUMPORTS, PORTNO);
 #else
-  printf("Single port: default is %d\n", PORTNO);
+  printf("    Single port: default is %d\n", PORTNO);
 #endif
 
 #ifdef CATCH_UDP_PORT
 #    ifdef UDP_SEND
-  printf("UDP enabled, default port is %d.\n", CATCH_UDP_PORT);
+  printf("            UDP: default port is %d.\n", CATCH_UDP_PORT);
 #    else
-  printf("UDP enabled (recv only), default port is: %d.\n", CATCH_UDP_PORT);
+  printf("            UDP: recv only, default port is: %d.\n", CATCH_UDP_PORT);
 #    endif
 #else
-  fputs("UDP disabled.\n");
+  fputs("            UDP: disabled.\n");
 #endif
 
 #ifdef ERQ_DEMON
-  printf("ERQ enabled: max reply length: %d bytes, directory: %s.\n"
+  printf("            ERQ: max reply length: %d bytes, directory: %s.\n"
         , ERQ_MAX_REPLY, ERQ_DIR);
 #else
-  fputs("ERQ disabled.\n", stdout);
+  fputs("            ERQ: disabled.\n", stdout);
 #endif
 
 #ifdef ACCESS_CONTROL
-  fputs("Access control enabled, using <mudlib>/" ACCESS_FILE
+  fputs(" Access control: using <mudlib>/" ACCESS_FILE
 #    ifdef ACCESS_LOG
         ", logs into <mudlib>/" ACCESS_LOG "\n"
 #    else
         ", no logs.\n"
 #    endif
         , stdout);
+#else
+  fputs(" Access control: disabled.\n", stdout);
 #endif
 
-  fputs("Language: "
+  fputs("       Language: "
 #ifdef OLD_PREVIOUS_OBJECT_BEHAVIOUR
-                  "old previous_object()\n"
+                         "old previous_object()\n"
 #else
-                  "new previous_object()\n"
+                         "new previous_object()\n"
 #endif
 #ifdef OLD_EXPLODE_BEHAVIOUR
-        "          old explode()\n"
+        "                 old explode()\n"
 #else
-        "          new explode()\n"
+        "                 new explode()\n"
 #endif
 #ifdef SUPPLY_PARSE_COMMAND
-        "          parse_command() enabled\n"
+        "                 parse_command() enabled\n"
 #endif
 #ifdef INITIALIZATION_BY___INIT
-        "          initialization by __INIT()\n"
+        "                 initialization by __INIT()\n"
 #else
-        "          static initialization\n"
+        "                 static initialization\n"
 #endif
 #ifdef MAPPINGS
-        "          mappings enabled\n"
+        "                 mappings enabled\n"
 #endif
 #ifdef FLOATS
 #    ifdef TRANSCENDENT_FUNCTIONS
-        "          floats and transcendent functions enabled\n"
+        "                 floats and transcendent functions enabled\n"
 #    else
-        "          floats enabled\n"
+        "                 floats enabled\n"
 #    endif
 #endif
 #ifndef NO_XVARARGS
-        "          varargs enabled\n"
+        "                 varargs enabled\n"
 #endif
        , stdout);
 
-  printf("Runtime limits: max log size:        %7d\n"
-         "                max read file size:  %7d\n"
-         "                max byte read/write: %7d\n"
-         "                max socket buf size: %7d\n"
-         "                max eval cost:       %7d\n"
-         "                catch eval cost:     %7d\n"
-         "                master eval cost:    %7d\n"
-         "                eval stack:          %7d\n"
-         "                user call depth:     %7d\n"
-         "                max call depth:      %7d\n"
-         "                max bitfield length: %7d\n"
-         "                max array size:      %7d\n"
-         "                max number players:  %7d\n"
-         "                ed cmd/cmd ratio:    %7d:1\n"
+  printf(" Runtime limits: max log size:          %7d\n"
+         "                 max read file size:    %7d\n"
+         "                 max byte read/write:   %7d\n"
+         "                 max socket buf size:   %7d\n"
+         "                 max eval cost:         %7d\n"
+         "                 catch eval cost:       %7d\n"
+         "                 master eval cost:      %7d\n"
+         "                 eval stack:            %7d\n"
+         "                 user call depth:       %7d\n"
+         "                 max call depth:        %7d\n"
+         "                 max bitfield length:   %7d\n"
+         "                 max array size:        %7d\n"
+         "                 max number players:    %7d\n"
+         "                 ed cmd/cmd ratio:      %7d:1\n"
 #if defined(TRACE_CODE)
-         "                max trace length:    %7d\n"
+         "                 max trace length:      %7d\n"
 #endif
         , MAX_LOG_SIZE, READ_FILE_MAX_SIZE, MAX_BYTE_TRANSFER
         , SET_BUFFER_SIZE_MAX
@@ -903,13 +913,15 @@ options (void)
 #endif
         );
 
-  printf("Timing: reset: %d s (granularity %d s), clean up: %d s.\n"
+  printf("         Timing: reset:                 %7d s (granularity %d s)\n"
+         "                 clean up:              %7d s\n"
         , TIME_TO_RESET, RESET_GRANULARITY, TIME_TO_CLEAN_UP
         );
 
 #if TIME_TO_SWAP > 0
-  printf("Swapping: objects after %d s, variables after %d s.\n"
-         "          file: <mudlib>/%s.<host>\n"
+  printf("       Swapping: objects             after %4d s\n"
+         "                 variables           after %4d s\n"
+         "                 file: <mudlib>/%s.<host>\n"
         , TIME_TO_SWAP, TIME_TO_SWAP_VARIABLES
         , SWAP_FILE
         );
@@ -917,27 +929,27 @@ options (void)
   fputs("Swapping disabled.\n", stdout);
 #endif
 
-  printf("Compiler: max stack size:      %6d\n"
-         "          max local variables: %6d\n"
-         "          max define length:   %6d\n"
+  printf("       Compiler: max stack size:         %6d\n"
+         "                 max local variables:    %6d\n"
+         "                 max define length:      %6d\n"
 #ifdef ALIGN_FUNCTIONS
-         "          functions are aligned.\n"
+         "                 functions are aligned.\n"
 #endif
         , COMPILER_STACK_SIZE
         , MAX_LOCAL
         , DEFMAX
         );
 
-  printf("Memory: using %s\n"
-         "        reserved user size:   %8d\n"
-         "        reserved master size: %8d\n"
-         "        reserved system size: %8d\n"
+  printf("         Memory: using %s\n"
+         "                 reserved user size:   %8d\n"
+         "                 reserved master size: %8d\n"
+         "                 reserved system size: %8d\n"
 #ifdef MIN_MALLOCED
-         "        initial allocation:   %8d\n"
+         "                 initial allocation:   %8d\n"
 #endif
 #if defined(MALLOC_smalloc) && defined(MAX_MALLOCED)
-         "        max allocation:       %8d\n"
-         "        max small allocation: %8d\n"
+         "                 max allocation:       %8d\n"
+         "                 max small allocation: %8d\n"
 #endif
 #ifdef MALLOC_sysmalloc
         , "system malloc"
@@ -966,12 +978,12 @@ options (void)
 #endif
         );
 
-  printf("Internal tables: shared string hash: %6d entries\n"
-         "                 object hash:        %6d entries\n"
-         "                 reserved name hash: %6d entries\n"
-         "                 apply cache:        %6d entries\n"
+  printf("Internal tables: shared string hash:     %6d entries\n"
+         "                 object hash:            %6d entries\n"
+         "                 reserved name hash:     %6d entries\n"
+         "                 apply cache:            %6d entries\n"
 #ifdef RXCACHE_TABLE
-         "                 regexp cache:       %6d entries\n"
+         "                 regexp cache:           %6d entries\n"
 #endif
         , HTABLE_SIZE
         , OTABLE_SIZE
@@ -982,49 +994,53 @@ options (void)
 #endif
         );
 
-#if defined(DEBUG) || defined(YYDEBUG) || defined(TRACE_CODE) \
-    || defined(COMM_STAT) || defined(APPLY_CACHE_STAT)
-#    undef ATLEASTONE
-  fputs("Other options: "
-#    ifdef DEBUG
-         "DEBUG"
-#        undef ATLEASTONE
-#        define ATLEASTONE
-#    endif
-#    ifdef YYDEBUG
-#        ifdef ATLEASTONE
-        ", "
-#        endif
-        "YYDEBUG"
-#        undef ATLEASTONE
-#        define ATLEASTONE
-#    endif
-#    ifdef TRACE_CODE
-#        ifdef ATLEASTONE
-        ", "
-#        endif
-        "TRACE_CODE"
-#        undef ATLEASTONE
-#        define ATLEASTONE
-#    endif
-#    ifdef COMM_STAT 
-#        ifdef ATLEASTONE
-        ", "
-#        endif
-        "COMM_STAT"
-#        undef ATLEASTONE
-#        define ATLEASTONE
-#    endif
-#    ifdef APPLY_CACHE_STAT
-#        ifdef ATLEASTONE 
-        ", "
-#        endif
-        "APPLY_CACHE_STAT"
-#        undef ATLEASTONE
-#        define ATLEASTONE
-#    endif
-        ".\n", stdout);
-#endif
+    /* Print the other options, nicely formatted. */
+    {
+        char * optstrings[] = { "  Other options: "
+#       if defined(DEBUG)
+                              , "DEBUG"
+#       endif
+#       if defined(YYDEBUG)
+                              , "YYDEBUG"
+#       endif
+#       if defined(TRACECODE)
+                              , "TRACECODE"
+#       endif
+#       if defined(COMM_STAT)
+                              , "COMM_STAT"
+#       endif
+#       if defined(APPLY_CACHE_STAT)
+                              , "APPLY_CACHE_STAT"
+#       endif
+#       if defined(FILE_STAT)
+                              , "FILE_STAT"
+#       endif
+                              };
+        size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
+        size_t iInitial = strlen(optstrings[0]);
+        size_t curlen = 0;
+        size_t i;
+
+        if (nStrings > 1)
+        {
+            fputs(optstrings[0], stdout);
+            curlen = iInitial;
+
+            for (i = 1; i < nStrings; i++)
+            {
+                curlen += strlen(optstrings[i]) + 2;
+                if (curlen > 78)
+                {
+                    printf("\n%*s", iInitial, " ");
+                    curlen = iInitial;
+                }
+                fputs(optstrings[i], stdout);
+                if (i < nStrings-1)
+                    fputs(", ", stdout);
+            }
+            fputs(".\n", stdout);
+        }
+    }
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1064,6 +1080,7 @@ shortusage (void)
 "  -s <time>  | --swap-time <time>\n"
 "  -s v<time> | --swap-variables <time>\n"
 "  -s f<name> | --swap-file <name>\n"
+"  -s c       | --swap-compact\n"
 #endif
 #ifdef MAX_MALLOCED
 "  --max-malloc <size>\n"
@@ -1163,6 +1180,9 @@ usage (void)
 "\n"
 "  -s f<name> | --swap-file <name>\n"
 "    Swap into file <name> instead of LP_SWAP.<host> .\n"
+"\n"
+"  -s c | --swap-compact\n"
+"    Reuse free space in the swap file immediately.\n"
 "\n"
 #endif
 #ifdef MAX_MALLOCED
@@ -1304,15 +1324,17 @@ firstscan (int eOption, const char * pValue)
     case cSwap:
         /* Compatibility vs. one-char-only options *sigh* */
         switch (*pValue) {
-        case 'v': eOption = cSwapVars; pValue++; break;
-        case 'f': eOption = cSwapFile; pValue++; break;
-        default:  eOption = cSwapTime; break;
+        case 'c': eOption = cSwapCompact; break;
+        case 'v': eOption = cSwapVars;    pValue++; break;
+        case 'f': eOption = cSwapFile;    pValue++; break;
+        default:  eOption = cSwapTime;    break;
         }
         /* FALLTHROUGH */
 
     case cSwapVars:
     case cSwapFile:
     case cSwapTime:
+    case cSwapCompact:
         if (cSwapTime == eOption)
         {
             time_to_swap = atoi(pValue);
@@ -1325,8 +1347,10 @@ firstscan (int eOption, const char * pValue)
             if (time_to_swap_variables < 0)
                 time_to_swap_variables = 0;
         }
-        else
+        else if (cSwapFile == eOption)
             name_swap_file(pValue);
+        else /* cSwapCompact */
+            swap_compact_mode = MY_TRUE;
         break;
 #endif
 

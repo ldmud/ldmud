@@ -48,6 +48,7 @@
 #include "ed.h"
 #include "closure.h"
 #include "comm.h"
+#include "filestat.h"
 #include "gcollect.h"
 #include "interpret.h"
 #include "main.h"
@@ -684,6 +685,7 @@ char	*fname;
 		add_message(" isn't readable.\n");
 		return( ERR );
 	}
+        FCOUNT_READ(fname);
 	_setCurLn( lin );
 	for(lines = 0, bytes = 0;(err = egets(str,MAXLINE,fp)) > 0;) {
 		bytes += err;
@@ -730,6 +732,7 @@ int	apflg;
 		add_message(" can't be opened for writing!\n");
 		return( ERR );
 	}
+        FCOUNT_WRITE(fname);
 
 	lptr = getptr(from);
 	for(lin = from; lin <= to; lin++) {

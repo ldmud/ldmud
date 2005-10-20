@@ -7,6 +7,8 @@
 #include "object.h"  /* struct object */
 
 /* --- Variables --- */
+extern /* TODO: bool */ short swap_compact_mode;
+
 /* Statistics */
 extern mp_int num_swapped;
 extern mp_int num_unswapped;

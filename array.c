@@ -112,6 +112,7 @@
 #include "driver.h"
 
 #include "my-alloca.h"
+#include <stddef.h>
 
 #include "array.h"
 #include "backend.h"
@@ -1227,6 +1228,8 @@ alist_cmp (struct svalue *p1, struct svalue *p2)
  *
  * TODO: Is the assumption '.number is big enough to hold everything
  * TODO:: in the svalue' true for future hardware?
+ * TODO: Reinterpreting the pointers as 'integer' may not be portable
+ * TODO:: enough.
  */
 
 {
@@ -1271,16 +1274,21 @@ order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
     struct vector *outlist;   /* The result vector of vectors */
     struct vector *v;         /* Aux vector pointer */
     struct svalue *outlists;  /* Next element in outlist to fill in */
+    ptrdiff_t * sorted;
+      /* The vector elements in sorted order, given as the offsets of the array
+       * element in question to the start of the vector. This way,
+       * sorted[] needs only to be <keynum> elements long.
+       * sorted[] is created from root[] after sorting.
+       */
+
     struct svalue **root;
       /* Auxiliary array with the sorted keys as svalue* into inlists[0].vec.
-       * The data elements can then be found by adding the offset between
-       * inlists[i].vec and inlists[0].vec to the key svalue*.
-       * TODO: Is this kind of address arithmetic legal under STDC?
-       * TODO:: After all, the vectors may lie in different segments.
        * This way the sorting is given by the order of the pointers, while
-       * the original position is givein by (pointer-inlists[0].vec->item).
-       * The first <keynum> elements are scratch areay, the second <keynum>
-       * elements hold the sorted keys.
+       * the original position is given by (pointer-inlists[0].vec->item).
+       * The very first element is a dummy (heapsort uses array indexing
+       * starting with index 1), the next <keynum> elements are scratch
+       * area, the final <keynum> elements hold the sorted keys in reverse
+       * order.
        */
     struct svalue **root2;   /* Aux pointer into *root. */
     struct svalue *inpnt;    /* Pointer to the value to copy into the result */
@@ -1290,13 +1298,21 @@ order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
     keynum = VEC_SIZE(inlists[0].u.vec);
 
     /* Allocate the auxiliary array. */
-    root = (struct svalue **)alloca(keynum * sizeof(struct svalue *[2]));
+    root = (struct svalue **)alloca(keynum * sizeof(struct svalue *[2])
+                                           + sizeof(struct svalue)
+                                   );
+    sorted = alloca(keynum * sizeof(ptrdiff_t));
+
+    if (!root || !sorted)
+    {
+        fatal("Stack overflow in order_alist()");
+        /* NOTREACHED */
+        return NULL;
+    }
 
     /* 
      * Heapsort inlists[0].vec into *root.
      */
-
-    root--; /* Heapsort uses 1 as lowest index */
 
     /* Heapify the keys into the first half of root */
     for ( j = 1, inpnt = inlists->u.vec->item
@@ -1331,7 +1347,8 @@ order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
 	}
 	root[curix] = inpnt;
     }
-    root++;
+
+    root++; /* Adjust root to ignore the heapsort-dummy element */
 
     /* Sort the heaped keys from the first into the second half of root. */
     root2 = &root[keynum];
@@ -1366,7 +1383,12 @@ order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
 	}
 	root[curix] = 0;
     }
-    root = &root[keynum];
+
+    /* Compute the sorted offsets from root[] into sorted[].
+     * Note that root[] is in reverse order.
+     */
+    for (root = &root[keynum], j = 0; j < keynum; j++)
+        sorted[j] = root[keynum-j-1] - inlists[0].u.vec->item;
 
     /* 
      * Generate the result vectors from the sorted keys in root.
@@ -1385,7 +1407,6 @@ order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
     v = allocate_array(keynum);
     for (i = listnum; --i >= 0; ) {
 
-	int offs;              /* Offset of this data vector to the key vector */
 	struct svalue *outpnt; /* Next result value element to fill in */
 
         /* Set the new array v as the next 'out' vector, and init outpnt
@@ -1394,8 +1415,8 @@ order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
 	outlists[i].type  = T_POINTER;
 	outlists[i].u.vec = v;
 	outpnt = v->item;
-        v = inlists[i].u.vec;
-	offs = (char *)v - (char *)inlists[0].u.vec;
+
+        v = inlists[i].u.vec; /* Next vector to fill if reusable */
 
         /* Copy the elements.
          * For a reusable 'in' vector, a simple memory copy is sufficient.
@@ -1404,11 +1425,11 @@ order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
          */
 	if (reuse && inlists[i].u.vec->ref == 1) {
 
-	    if (i)
+	    if (i)/* not the last iteration */
 		inlists[i].type = T_INVALID;
 
-	    for (root2 = root, j = keynum; --j >= 0; ) {
-		inpnt = (struct svalue *)((char *)*root2++ + offs);
+	    for (j = keynum; --j >= 0; ) {
+		inpnt = inlists[i].u.vec->item + sorted[j];
 		if (inpnt->type == T_OBJECT &&
 		    inpnt->u.ob->flags & O_DESTRUCTED)
 		{
@@ -1424,11 +1445,11 @@ order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
 
 	} else {
 
-	    if (i)
+	    if (i) /* not the last iteration */
 		v = allocate_array(keynum);
 
-	    for (root2 = root, j = keynum; --j >= 0; ) {
-		inpnt = (struct svalue *)((char *)*root2++ + offs);
+	    for (j = keynum; --j >= 0; ) {
+		inpnt = inlists[i].u.vec->item + sorted[j];
 		if (inpnt->type == T_OBJECT &&
 		    inpnt->u.ob->flags & O_DESTRUCTED)
 		{

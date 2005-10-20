@@ -12,6 +12,7 @@
 #include "comm.h"
 #include "ed.h"
 #include "exec.h"
+#include "filestat.h"
 #include "interpret.h"
 #include "instrs.h"
 #include "lex.h"
@@ -28,6 +29,8 @@
 #include "stralloc.h"
 #include "swap.h"
 #include "wiz_list.h"
+
+/* TODO: Allow to deactivate the dump of unreferenced memory on freeing. */
 
 /* The referencing code for dynamic data should mirror the destructor code,
  * thus, memory leaks can show up as soon as the memory has allocated.
@@ -776,6 +779,9 @@ void garbage_collection()
     count_heart_beat_refs();
 #ifdef RXCACHE_TABLE
     count_rxcache_refs();
+#endif
+#ifdef FILE_STAT
+    count_fstat_refs();
 #endif
     if (reserved_user_area)
 	NOTE_REF(reserved_user_area);

@@ -29,11 +29,6 @@
 #include "hosts/amiga/socket.h"
 #endif
 
-/* TODO: The Watermark usage should be done via commandline option,
- * TODO:: as it potentially reduces swapfile fragmentation at the
- * TODO:: expense of swapfile size.
- */
-/* #define USE_WATERMARKS */
 #define LOW_WATER_MARK  (swapfile_size >> 2)
 #define HIGH_WATER_MARK (swapfile_size >> 1)
 
@@ -53,11 +48,10 @@ mp_int total_swap_reused = 0;
 long swap_num_searches, swap_total_searchlength;
 long swap_free_searches, swap_free_searchlength;
 
-#ifdef USE_WATERMARKS
+/* TODO: bool */ short swap_compact_mode = MY_FALSE;
 static int /* TODO: bool */ recycle_free_space = MY_FALSE; 
   /* True when freespace should be re-used, false if not
    */
-#endif
 
 static char file_name[100] = "";
 
@@ -210,18 +204,21 @@ static int swap_alloc(size)
 
   save_privilege = malloc_privilege;
   malloc_privilege = MALLOC_SYSTEM;
-#ifdef USE_WATERMARKS
-  if (!recycle_free_space) {
-      if (total_bytes_swapfree < HIGH_WATER_MARK)
-          goto alloc_new_space;
-      recycle_free_space = 1;
-  } else {
-      if (total_bytes_swapfree < LOW_WATER_MARK) {
-          recycle_free_space = 0;
-          goto alloc_new_space;
+
+  if (!swap_compact_mode)
+  {
+      if (!recycle_free_space) {
+          if (total_bytes_swapfree < HIGH_WATER_MARK)
+              goto alloc_new_space;
+          recycle_free_space = 1;
+      } else {
+          if (total_bytes_swapfree < LOW_WATER_MARK) {
+              recycle_free_space = 0;
+              goto alloc_new_space;
+          }
       }
-  }
-#endif
+  } /* if (swap_compact_mode) */
+
   swap_num_searches++;
   mark = swap_rover;
   for (;;)
@@ -260,9 +257,7 @@ static int swap_alloc(size)
     swap_rover = swap_rover->next;
     if (swap_rover == mark) /* Once around the list without success */
     {
-#ifdef USE_WATERMARKS
 alloc_new_space:
-#endif
       last = swap_previous;
       while ( (mark = last->next) )
         last = mark;

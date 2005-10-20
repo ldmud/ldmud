@@ -1,13 +1,13 @@
 #ifndef __PATCHLEVEL_H__
 #define __PATCHLEVEL_H__ 1
 
-#define RELEASE_DATE "Mon Sep 14 23:29:00 GMT 1998"
+#define RELEASE_DATE "Mon Sep 21 23:45:00 BST 1998"
 
 /* Version of the game in the form <ver>.<rev>.<patchlvl>, without
  * leading zeroes.
  */
 #define GAME_VERSION "3.2"
-#define PATCH_LEVEL ".2"
+#define PATCH_LEVEL ".3"
 /* $Format: "#define LOCAL_LEVEL \"\""$ */
 #define LOCAL_LEVEL ""
 

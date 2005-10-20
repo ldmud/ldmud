@@ -40,7 +40,7 @@
  *
  * This time should be substantially longer than the swapping time.
  */
-#define TIME_TO_CLEAN_UP	1800 /* 3600 */
+#define TIME_TO_CLEAN_UP	3600
 
 /*
  * How long time until an unused object is swapped out.
@@ -48,8 +48,8 @@
  * Machine with few players and lot of memory: 10000
  * Machine with infinite memory: 0 (never swap).
  */
-#define TIME_TO_SWAP		3600
-#define TIME_TO_SWAP_VARIABLES	3600
+#define TIME_TO_SWAP		 900
+#define TIME_TO_SWAP_VARIABLES	1800
 
 /*
  * How many seconds until an object is reset again.
@@ -229,7 +229,7 @@
  * at cloning, while the former allows to use efuns, e.g. shutdown().
  */
 
-#undef INITIALIZATION_BY___INIT
+#define INITIALIZATION_BY___INIT
 
 /* Define MASTER_NAME if you want something different from "obj/master" resp.
  * "secure/master" as default.
@@ -271,8 +271,14 @@
  */
 #define SET_BUFFER_SIZE_MAX 65536
 
+/* Runtime statistics:
+ *  COMM_STAT: count number and size of outgoing packets.
+ *  APPLY_CACHE_STAT: count number of hits and misses in the apply cache.
+ *  FILE_STAT: account the file usage.
+ */
 #define COMM_STAT
 #define APPLY_CACHE_STAT
+#define FILE_STAT
 
 /* When smalloc is used without SBRK_OK, MIN_MALLOCED will lower large block
  * fragmentation. The value should be a multiple of the large chunk size.

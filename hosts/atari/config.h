@@ -239,6 +239,7 @@
 
 #define COMM_STAT
 #define APPLY_CACHE_STAT
+#define FILE_STAT
 
 /* When smalloc is used without SBRK_OK, MIN_MALLOCED will lower large block
  * fragmentation. The value should be a multiple of the large chunk size.
