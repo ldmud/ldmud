@@ -2,10 +2,15 @@ Short: vararg tefun recognition faulty
 Date: 990320
 From: Lars
 Type: Bug
-State: Acknowledged
+State: Done - corrected in 3.2.8-dev.150
 
 In the %tefun part of func_spec, a definition of the form
 
     type foo(void|type)
 
 is not recognized as varargs tefun.
+
+--- Solution ---
+
+The check for "tefun or vefun" just checked the flag limit_max,
+but not the actual number of arguments. The fix is obvious.

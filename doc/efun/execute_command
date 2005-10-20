@@ -17,8 +17,8 @@ DESCRIPTION
         this_object(), origin, command).
 
         Note that this function does not use the H_MODIFY_COMMAND
-        and H_NOTIFY_FAIL hooks; the notify_fail() efun is available, but
-        it has to be evaluated by the caller.
+        and H_NOTIFY_FAIL hooks; the notify_fail() efun is can be used,
+        but must be evaluated by the caller.
 
 HISTORY
         Introduced in LDMud 3.2.7

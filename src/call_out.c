@@ -26,6 +26,7 @@
  */
 
 #include "driver.h"
+#include "typedefs.h"
 
 #include "call_out.h"
 #include "actions.h"
@@ -41,9 +42,13 @@
 #include "simulate.h"
 #include "stralloc.h"
 #include "strfuns.h"
+#include "svalue.h"
 #include "swap.h"
 #include "wiz_list.h"
+#include "xalloc.h"
 
+#include "../mudlib/sys/debug_info.h"
+ 
 /*-------------------------------------------------------------------------*/
 
   /* The description of one callout.
@@ -53,22 +58,9 @@
 
 struct call {
     /* TODO: p_int or mp_int */ int delta;           /* Delay in relation to the previous structure */
-    union {              /* The function to call */
-        struct {
-            char          *name;  /* a shared string */
-            struct object *ob;
-        } named;
-        struct svalue lambda;
-    } function;
-    Bool is_lambda; /* Closure or named function? */
-    struct svalue v;
-      /* The argument value to pass to the function.
-       * To pass several arguments, v is of type LVALUE,
-       * v.u.lvalue points to the real arguments values,
-       * v.x.num_args gives the number of arguments.
-       */
+    callback_t fun;
     struct call *next;   /* link to next structure */
-    struct object *command_giver;  /* the saved command_giver */
+    object_t *command_giver;  /* the saved command_giver */
 };
 
 
@@ -89,84 +81,32 @@ static long num_call = 0;
   /* Number of allocated callouts.
    */
 
-static struct object call_out_nil_object;
+static object_t call_out_nil_object;
   /* Callouts with no argument let call.v use this variable as
    * placeholder.
    */
 
 /*-------------------------------------------------------------------------*/
-/*
- * Free a call out structure.
- */
-static void
+static INLINE void
 free_call (struct call *cop)
 
 /* Deallocate all resources bound to <cop> and put <cop> into the free list.
+ * This can be used for used and unused callouts alike.
  */
 
 {
-    /* Free the argument(s) listed in cop.v */
-
-    if (cop->v.type == T_LVALUE)
-    {
-        int i;
-        struct svalue *v;
-
-        i = cop->v.x.num_arg;
-        v = cop->v.u.lvalue;
-        do {
-            free_svalue(v++);
-        } while (--i);
-        xfree((char *)cop->v.u.lvalue);
-    }
-    else
-    {
-        if (cop->v.u.ob != &call_out_nil_object || cop->v.type != T_OBJECT)
-            free_svalue(&cop->v);
-    }
-
-    /* Free the function designation */
-
-    if (cop->is_lambda)
-    {
-        free_closure(&cop->function.lambda);
-    }
-    else
-    {
-        free_string(cop->function.named.name);
-        free_object(cop->function.named.ob, "free_call");
-    }
+    free_callback(&(cop->fun));
 
     if (cop->command_giver)
         free_object(cop->command_giver, "free_call");
 
-    /* Put cop into the free list */
-
     cop->next = call_list_free;
     call_list_free = cop;
-}
+} /* free_call() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE void
-free_used_call (struct call *cop)
-
-/* Free <cop> after it was used: deallocate the remaining(!)
- * resources and put it into the free list.
- */
-
-{
-    if (cop->command_giver)
-        free_object(cop->command_giver, "free_call");
-
-    /* Everything else was already deallocated by using it */
-
-    cop->next = call_list_free;
-    call_list_free = cop;
-}
-
-/*-------------------------------------------------------------------------*/
-struct svalue *
-new_call_out (struct svalue *sp, short num_arg)
+svalue_t *
+new_call_out (svalue_t *sp, short num_arg)
 
 /* EFUN: call_out()
  *
@@ -180,11 +120,12 @@ new_call_out (struct svalue *sp, short num_arg)
  */
 
 {
-    struct svalue  *arg;    /* Pointer to efun arguments */
+    svalue_t       *arg;    /* Pointer to efun arguments */
     int             delay;
     struct call    *cop;    /* New callout structure */
     struct call   **copp;   /* Auxiliary pointers for list insertion */
     struct call    *cop2;
+    int             error_index;
 
     arg = sp - num_arg + 1;
 
@@ -198,8 +139,7 @@ new_call_out (struct svalue *sp, short num_arg)
     {
         int i;
 
-        cop = call_list_free =
-            (struct call *)permanent_xalloc(CHUNK_SIZE * sizeof (struct call));
+        cop = call_list_free = pxalloc(CHUNK_SIZE * sizeof (struct call));
         for ( i = 0; i < CHUNK_SIZE - 1; i++)
             call_list_free[i].next = &call_list_free[i+1];
         call_list_free[CHUNK_SIZE-1].next = NULL;
@@ -207,36 +147,13 @@ new_call_out (struct svalue *sp, short num_arg)
         num_call += CHUNK_SIZE;
     }
 
-    /* Get the function designation from the stack */
+    /* Test if the expected arguments are on the stack */
 
-    if (arg[0].type == T_STRING)
-    {
-        struct object *ob;
-
-        if (arg[0].x.string_type == STRING_SHARED) {
-            cop->function.named.name = arg[0].u.string;
-        } else {
-            cop->function.named.name = make_shared_string(arg[0].u.string);
-            if (arg[0].x.string_type == STRING_MALLOC)
-                xfree(arg[0].u.string);
-            arg[0].u.string = cop->function.named.name;
-            arg[0].x.string_type = STRING_SHARED;
-        }
-        cop->function.named.ob = ob = ref_object(current_object, "call_out");
-        cop->is_lambda = MY_FALSE;
-    }
-    else if(arg[0].type == T_CLOSURE && CLOSURE_CALLABLE(arg->x.closure_type))
-    {
-        cop->function.lambda = arg[0];
-        cop->is_lambda = MY_TRUE;
-    }
-    else
+    if (arg[0].type != T_STRING && arg[0].type != T_CLOSURE)
     {
         bad_efun_vararg(1, sp);
         /* NOTREACHED */
     }
-
-    /* Test if the delay time is on the stack */
 
     if (arg[1].type != T_NUMBER)
     {
@@ -250,74 +167,46 @@ new_call_out (struct svalue *sp, short num_arg)
 
     if (current_object->flags & O_DESTRUCTED)
     {
-        if (!cop->is_lambda)
-        {
-            /* ref count was incremented above */
-            deref_object(current_object, "new_call_out");
-        }
-        do
-        {
+        do {
             free_svalue(sp--);
         } while (--num_arg);
         return sp;
     }
 
-    num_arg -= 2;  /* How many arguments to pass to the function? */
+    /* Get the function designation from the stack */
 
-    /* We can do the callout, so lets get it from the freelist and
-     * store the arguments to pass on the call.
+    if (arg[0].type == T_STRING)
+    {
+        error_index = setup_function_callback(&(cop->fun), current_object
+                                             , arg[0].u.string
+                                             , num_arg-2, arg+2
+                                             , MY_TRUE
+                                             );
+        free_string_svalue(arg);
+    }
+    else
+        error_index = setup_closure_callback(&(cop->fun), arg
+                                             , num_arg-2, arg+2
+                                             , MY_TRUE
+                                             );
+
+    if (error_index >= 0)
+    {
+        /* call structure is still in the free list, and the
+         * callback structure was invalidated automatically.
+         */
+        bad_efun_vararg(error_index, arg - 1);
+        /* NOTREACHED */
+    }
+
+    /* We can do the callout, so lets remove it from the freelist and
+     * store the missing data.
      */
 
     call_list_free = cop->next;
     cop->command_giver = command_giver; /* save current player context */
     if (command_giver)
         ref_object(command_giver, "new_call_out");  /* Bump its ref */
-
-    if (num_arg > 1)
-    {
-        /* Multiple arguments: wrap them into a pseudo-LVALUE */
-
-        struct svalue *v, *w;
-
-        v = xalloc(num_arg * sizeof *v);
-        if (!v)
-        {
-            fatal("Out of memory.");
-            /* NOTREACHED */
-        }
-        cop->v.type = T_LVALUE;
-        cop->v.x.num_arg = num_arg;
-        cop->v.u.lvalue = v;
-        w = &arg[2];
-        do {
-            if (w->type == T_LVALUE)
-            {
-                free_svalue(w);
-                put_number(w, 0);
-            }
-            transfer_svalue_no_free(v++, w++);
-        } while (--num_arg);
-    }
-    else if (num_arg)
-    {
-        /* Get the one argument from the stack */
-
-        if (arg[2].type != T_LVALUE)
-        {
-            transfer_svalue_no_free(&cop->v, &arg[2]);
-        }
-        else
-        {
-            free_svalue(&arg[2]);
-            put_number(&(cop->v), 0);
-        }
-    }
-    else
-    {
-        /* Use the 'no argument' argument */
-
-        put_object(&(cop->v), &call_out_nil_object);
-    }
 
     /* Adjust the stack and get the delay */
     sp = arg - 1;
@@ -367,8 +256,10 @@ call_out (void)
     static struct call *current_call_out;
       /* Current callout, static so that longjmp() won't clobber it. */
 
+    static object_t *called_object;
+      /* Object last called, static so that longjmp() won't clobber it */
+
     struct error_recovery_info error_recovery_info;
-    struct svalue *sp;
 
     /* No calls pending: just update the last_time and return */
 
@@ -401,39 +292,33 @@ call_out (void)
         /* An error occured: recover and delete the guilty callout */
 
         struct call *cop;
-        struct object *ob;
-        struct wiz_list *user;
+        object_t *ob;
+        wiz_list_t *user;
 
         clear_state();
-        debug_message("Error in call out.\n");
+        debug_message("%s: Error in call out.\n", time_stamp());
         cop = current_call_out;
-        if (cop->is_lambda)
+        ob = called_object;
+        if (ob)
         {
-            ob = !CLOSURE_MALLOCED(cop->function.lambda.x.closure_type) ?
-                cop->function.lambda.u.ob :
-                cop->function.lambda.u.lambda->ob;
-        } else {
-            ob = cop->function.named.ob;
+            user = ob->user;
+            user->call_out_cost = eval_cost;
         }
-        user = ob->user;
-        user->call_out_cost = eval_cost;
-        cop->v.type = T_INVALID;
         free_call(cop);
     }
 
     /* (Re)initialize stack and tracing */
 
     tracedepth = 0;
-    sp = inter_sp+1;
 
     /* Loop over the call list until it is empty or until all
      * due callouts are processed.
      */
     while (call_list && call_list->delta <= 0)
     {
+        object_t    *ob;
         struct call *cop;
-        ph_int       type;
-        int          num_arg;
+        wiz_list_t  *user;
 
         /* Move the first callout out of the chain.
          */
@@ -449,6 +334,26 @@ call_out (void)
         if (cop->delta < 0 && call_list)
             call_list->delta += cop->delta;
 
+
+        /* Get the object for the function call and make sure it's valid */
+
+        ob = callback_object(&(cop->fun));
+        if (!ob)
+        {
+            /* Nothing to call */
+            free_call(cop);
+            continue;
+        }
+
+        if (O_PROG_SWAPPED(ob)
+         && load_ob_from_swap(ob) < 0)
+        {
+            debug_message("%s: Error in call_out: out of memory: "
+                          "unswap object '%s'.\n", time_stamp(), ob->name);
+            free_call(cop);
+            continue;
+        }
+
         /* Determine the command_giver for the call.
          * If a command_giver is given in the callout structure, use that one.
          * Else test the object to be called or the object it's shadowing for
@@ -461,245 +366,77 @@ call_out (void)
             if (!(cop->command_giver->flags & O_DESTRUCTED))
             {
                 command_giver = cop->command_giver;
-                if (O_GET_INTERACTIVE(command_giver)
-                 && O_GET_INTERACTIVE(command_giver)->sent.type == SENT_INTERACTIVE)
-                {
+                if (O_IS_INTERACTIVE(command_giver))
                     trace_level = O_GET_INTERACTIVE(command_giver)->trace_level;
-                }
             }
             else
                 command_giver = NULL;
         }
-        else
+        else if (ob->flags & O_SHADOW)
         {
-            struct object *ob;
+            /* Look at the object which is at the end of the shadow chain.
+             */
+            shadow_t *shadow_sent;
+            object_t *sob;
 
-            /* Get the object for the function call */
+            sob = ob;
+            while ((shadow_sent = O_GET_SHADOW(sob)), shadow_sent->shadowing)
+                sob = shadow_sent->shadowing;
 
-            if (cop->is_lambda)
-                ob = !CLOSURE_MALLOCED(cop->function.lambda.x.closure_type)
-                      ? cop->function.lambda.u.ob
-                      : cop->function.lambda.u.lambda->ob;
-            else
+            if (sob->flags & O_ENABLE_COMMANDS)
             {
-                ob = cop->function.named.ob;
-                if (ob->flags & O_DESTRUCTED)
-                {
-                    free_call(cop);
-                    continue;
-                }
-            }
-
-            if (ob->flags & O_SHADOW)
-            {
-                /* Look at the object which is at the end of the shadow chain.
-                 */
-                struct shadow_sentence *shadow_sent;
-
-                while((shadow_sent = O_GET_SHADOW(ob)), shadow_sent->shadowing)
-                    ob = shadow_sent->shadowing;
-
-                if (ob->flags & O_ENABLE_COMMANDS)
-                {
-                    command_giver = ob;
-                    if (shadow_sent->type == SENT_INTERACTIVE)
-                        trace_level =
-                          ((struct interactive *)shadow_sent)->trace_level;
-                    else
-                        trace_level = 0;
-                }
+                command_giver = sob;
+                if (shadow_sent->ip)
+                    trace_level = shadow_sent->ip->trace_level;
                 else
-                {
-                    command_giver = NULL;
                     trace_level = 0;
-                }
             }
             else
             {
-                /* If at all, this object must be the command_giver */
-
-                if (ob->flags & O_ENABLE_COMMANDS)
-                {
-                    command_giver = ob;
-                }
-                else
-                {
-                    command_giver = NULL;
-                }
+                command_giver = NULL;
                 trace_level = 0;
             }
         }
-
-        /* Put the arguments for the call onto the stack.
-         */
-
-        if ((type = cop->v.type) == T_LVALUE)
-        {
-            /* Multiple arguments */
-
-            struct svalue *v;
-            int i;
-            struct object *ob;
-
-            v = cop->v.u.lvalue;
-            num_arg = i = cop->v.x.num_arg;
-            sp--;
-            do {
-                if (v->type == T_OBJECT &&
-                    (ob = v->u.ob)->flags & O_DESTRUCTED)
-                {
-                    sp++;
-                    free_object(ob, "call_out");
-                    put_number(sp, 0);
-                    v++;
-                }
-                else
-                {
-                    *++sp = *v++;
-                }
-            } while (--i);
-            xfree((char *)cop->v.u.lvalue);
-            inter_sp = sp;
-            sp -= num_arg - 1;
-        }
         else
         {
-            /* Single argument */
+            /* If at all, this object must be the command_giver */
 
-            struct object *ob;
-
-            num_arg = 1;
-            inter_sp = sp;
-            if (type == T_OBJECT)
-            {
-                ob = cop->v.u.ob;
-                if (ob->flags & O_DESTRUCTED)
-                {
-                    if (ob == &call_out_nil_object)
-                    {
-                        num_arg = 0;
-                        inter_sp = sp - 1;
-                    }
-                    else
-                    {
-                        free_object(ob, "call_out");
-                        put_number(sp, 0);
-                    }
-                }
-                else
-                    put_object(sp, ob);
-            }
+            if (ob->flags & O_ENABLE_COMMANDS)
+                command_giver = ob;
             else
-            {
-                *sp = cop->v;
-            }
+                command_giver = NULL;
+            trace_level = 0;
         }
 
         /* Finally, call the function (unless the object was destructed).
          */
 
-        if (cop->is_lambda)
+        called_object = current_object = ob;
+        user = ob->user;
+        if (user->last_call_out != current_time)
         {
-            struct object *ob;
-            struct wiz_list *user;
-
-            ob = !CLOSURE_MALLOCED(cop->function.lambda.x.closure_type)
-                  ? cop->function.lambda.u.ob
-                  : cop->function.lambda.u.lambda->ob;
-            if (ob->flags & O_DESTRUCTED)
-            {
-                while (--num_arg >= 0)
-                    pop_stack();
-            }
-            else
-            {
-                Bool dontcall = MY_FALSE;
-
-                current_object = ob;
-                user = ob->user;
-                if (user->last_call_out != current_time)
-                {
-                    user->last_call_out = current_time;
-                    CLEAR_EVAL_COST;
-                }
-                else
-                {
-                    assigned_eval_cost = eval_cost = user->call_out_cost;
-                }
-                if (cop->function.lambda.x.closure_type < CLOSURE_SIMUL_EFUN
-                 && cop->function.lambda.x.closure_type >= CLOSURE_EFUN)
-                {
-                    /* efun, operator or sefun closure: we need the program
-                     * for a proper traceback
-                     */
-                    if (O_PROG_SWAPPED(ob)
-                     && load_ob_from_swap(ob) < 0)
-                    {
-                        debug_message("Error in call_out: out of memory.\n");
-                        dontcall = MY_TRUE;
-                    }
-                    current_prog = ob->prog;
-                }
-
-                if (!dontcall)
-                {
-                    RESET_LIMITS;
-                    call_lambda(&cop->function.lambda, num_arg);
-                    user->call_out_cost = eval_cost;
-                    free_svalue(sp);
-                }
-                else
-                    while (--num_arg >= 0)
-                        pop_stack();
-            }
-            free_closure(&cop->function.lambda);
+            user->last_call_out = current_time;
+            CLEAR_EVAL_COST;
         }
         else
-        {
-            struct object *ob;
+            assigned_eval_cost = eval_cost = user->call_out_cost;
 
-            if ((ob = cop->function.named.ob)->flags & O_DESTRUCTED)
-            {
-                while (--num_arg >= 0)
-                    pop_stack();
-            }
-            else
-            {
-                struct wiz_list *user;
-
-                current_object = ob;
-                user = ob->user;
-                if (user->last_call_out != current_time)
-                {
-                    user->last_call_out = current_time;
-                    CLEAR_EVAL_COST;
-                }
-                else
-                {
-                    assigned_eval_cost = eval_cost = user->call_out_cost;
-                }
-                RESET_LIMITS;
-                sapply(cop->function.named.name, ob, num_arg);
-                user->call_out_cost = eval_cost;
-            }
-            free_string(cop->function.named.name);
-            free_object(cop->function.named.ob, "free_call");
-        }
+        (void)backend_callback(&(cop->fun), 0);
+        user->call_out_cost = eval_cost;
 
         /* The function call used up all the arguments, now free
-         * the rest */
-        free_used_call(cop);
+         * the rest
+         */
+        free_call(cop);
 
     } /* while (callouts pending) */
 
-    inter_sp = sp - 1;
     rt_context = error_recovery_info.rt.last;
-
-}
+} /* call_out() */
 
 /*-------------------------------------------------------------------------*/
 void
-find_call_out (struct object *ob, struct svalue *fun, Bool do_free_call)
+find_call_out (object_t *ob, svalue_t *fun, Bool do_free_call)
 
 /* Find the (first) callout for <ob>/<fun> (or <fun> if it is a closure).
  * If <do_free_call> is true, the found callout is removed.
@@ -727,9 +464,9 @@ find_call_out (struct object *ob, struct svalue *fun, Bool do_free_call)
                 for (copp = &call_list; NULL != (cop = *copp); copp = &cop->next)
                 {
                     delay += cop->delta;
-                    if (cop->is_lambda
-                     && cop->function.lambda.x.closure_type == type
-                     && cop->function.lambda.u.ob == ob)
+                    if (cop->fun.is_lambda
+                     && cop->fun.function.lambda.x.closure_type == type
+                     && cop->fun.function.lambda.u.ob == ob)
                     {
                         goto found;
                     }
@@ -738,7 +475,7 @@ find_call_out (struct object *ob, struct svalue *fun, Bool do_free_call)
             }
             else if (type != CLOSURE_UNBOUND_LAMBDA)
             {
-                struct lambda *l;
+                lambda_t *l;
 
                 l = fun->u.lambda;
                 if (type != CLOSURE_LFUN)
@@ -746,11 +483,11 @@ find_call_out (struct object *ob, struct svalue *fun, Bool do_free_call)
                 for (copp = &call_list; NULL != (cop = *copp); copp = &cop->next)
                 {
                     delay += cop->delta;
-                    if (cop->is_lambda
-                     && (   cop->function.lambda.u.lambda == l
-                         || (   cop->function.lambda.x.closure_type == type
-                             && cop->function.lambda.u.lambda->ob == l->ob
-                             && cop->function.lambda.u.lambda->function.index
+                    if (cop->fun.is_lambda
+                     && (   cop->fun.function.lambda.u.lambda == l
+                         || (   cop->fun.function.lambda.x.closure_type == type
+                             && cop->fun.function.lambda.u.lambda->ob == l->ob
+                             && cop->fun.function.lambda.u.lambda->function.index
                                 == l->function.index)
                         )
                        )
@@ -801,11 +538,11 @@ found:
     for (copp = &call_list; NULL != (cop = *copp); copp = &cop->next)
     {
         delay += cop->delta;
-        if (cop->function.named.ob == ob
-         && cop->function.named.name == fun_name
-         && !cop->is_lambda)
+        if (cop->fun.function.named.ob == ob
+         && cop->fun.function.named.name == fun_name
+         && !cop->fun.is_lambda)
         {
-            decrement_string_ref(fun_name);
+            deref_string(fun_name);
             if (do_free_call)
             {
                 if (cop->next)
@@ -855,6 +592,27 @@ print_call_out_usage (strbuf_t *sbuf, Bool verbose)
 }
 
 /*-------------------------------------------------------------------------*/
+void
+callout_dinfo_status (svalue_t *svp)
+
+/* Return the callout information for debug_info(DINFO_DATA, DID_STATUS).
+ * <svp> points to the svalue block for the result, this function fills in
+ * the spots for the object table.
+ */
+
+{
+    long i;
+    struct call *cop;
+    
+    for (i=0, cop = call_list; cop; cop = cop->next)
+        i++;
+
+    svp[DID_ST_CALLOUTS].u.number      = i;
+    svp[DID_ST_CALLOUT_SLOTS].u.number = num_call;
+    svp[DID_ST_CALLOUT_SIZE].u.number  = num_call * sizeof(struct call);
+} /* callout_dinfo_status() */
+
+/*-------------------------------------------------------------------------*/
 #ifdef DEBUG
 
 void
@@ -866,20 +624,9 @@ count_extra_ref_from_call_outs (void)
 {
     struct call *cop;
 
-    for (cop = call_list; cop; cop = cop->next) {
-        if (cop->v.type == T_LVALUE)
-        {
-            count_extra_ref_in_vector(cop->v.u.lvalue, cop->v.x.num_arg);
-        } else if (cop->v.u.ob != &call_out_nil_object ||
-                   cop->v.type != T_OBJECT)
-        {
-            count_extra_ref_in_vector(&cop->v, 1);
-        }
-        if (cop->is_lambda) {
-            count_extra_ref_in_vector(&cop->function.lambda, 1);
-        } else {
-            count_extra_ref_in_object(cop->function.named.ob);
-        }
+    for (cop = call_list; cop; cop = cop->next)
+    {
+        count_callback_extra_refs(&(cop->fun));
         if (cop->command_giver)
             count_extra_ref_in_object(cop->command_giver);
     }
@@ -899,12 +646,10 @@ remove_stale_call_outs (void)
 
     for (copp = &call_list; NULL != (cop = *copp); )
     {
-        if ( (cop->is_lambda
-              ? (CLOSURE_MALLOCED(cop->function.lambda.x.closure_type)
-                 ? cop->function.lambda.u.lambda->ob
-                 : cop->function.lambda.u.ob)
-              : cop->function.named.ob
-             )->flags & O_DESTRUCTED)
+        object_t *ob;
+
+        ob = callback_object(&(cop->fun));
+        if (!ob)
         {
             if (cop->next)
                 cop->next->delta += cop->delta;
@@ -914,10 +659,10 @@ remove_stale_call_outs (void)
         }
         copp = &cop->next;
     }
-}
+} /* remove_stale_call_outs() */
 
 
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
 
 /*-------------------------------------------------------------------------*/
 void
@@ -929,28 +674,19 @@ clear_ref_from_call_outs (void)
 {
     struct call *cop;
 
-    for (cop = call_list; cop; cop = cop->next) {
-        struct object *ob;
+    for (cop = call_list; cop; cop = cop->next)
+    {
+        object_t *ob;
 
-        if (cop->v.type == T_LVALUE) {
-            struct svalue *v;
+        clear_ref_in_callback(&(cop->fun));
 
-            v = cop->v.u.lvalue;
-            clear_ref_in_vector(v, cop->v.x.num_arg);
-        } else {
-            if (cop->v.u.ob != &call_out_nil_object || cop->v.type != T_OBJECT)
-                clear_ref_in_vector(&cop->v, 1);
-        }
-        if (cop->is_lambda) {
-            clear_ref_in_vector(&cop->function.lambda, 1);
-            /* else: cop->function.named.ob isn't destructed */
-        }
-        if (NULL != (ob = cop->command_giver) && ob->flags & O_DESTRUCTED) {
+        if (NULL != (ob = cop->command_giver) && ob->flags & O_DESTRUCTED)
+        {
             ob->ref = 0;
-            ob->prog->ref = 0;
+            clear_inherit_ref(ob->prog);
         }
     }
-}
+} /* clear_ref_from_call_outs() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -961,30 +697,17 @@ count_ref_from_call_outs (void)
 
 {
     struct call *cop;
-    struct object *ob;
+    object_t *ob;
 
-    for (cop = call_list; cop; cop = cop->next) {
-        if (cop->v.type == T_LVALUE) {
-            struct svalue *v;
+    for (cop = call_list; cop; cop = cop->next)
+    {
+        count_ref_in_callback(&(cop->fun));
 
-            v = cop->v.u.lvalue;
-            note_malloced_block_ref((char *)v);
-            count_ref_in_vector(v, cop->v.x.num_arg);
-        } else {
-            if (cop->v.u.ob != &call_out_nil_object || cop->v.type != T_OBJECT)
-                count_ref_in_vector(&cop->v, 1);
-        }
-        if (cop->is_lambda) {
-            count_ref_in_vector(&cop->function.lambda, 1);
-        } else {
-            /* destructed objects have been taken care of beforehand */
-            cop->function.named.ob->ref++;
-            count_ref_from_string(cop->function.named.name);
-        }
-        if ( NULL != (ob = cop->command_giver) ) {
+        if ( NULL != (ob = cop->command_giver) )
+        {
             if (ob->flags & O_DESTRUCTED) {
                 reference_destructed_object(ob);
-                cop->command_giver = 0;
+                cop->command_giver = NULL;
             } else {
                 ob->ref++;
             }
@@ -992,10 +715,10 @@ count_ref_from_call_outs (void)
     }
 }
 
-#endif /* MALLOC_smalloc */
+#endif /* GC_SUPPORT */
 
 /*-------------------------------------------------------------------------*/
-struct vector *
+vector_t *
 get_all_call_outs (void)
 
 /* Construct an array of all pending call_outs (whose object is not
@@ -1009,14 +732,14 @@ get_all_call_outs (void)
 {
     int i, next_time;
     struct call *cop;
-    struct vector *v;
+    vector_t *v;
 
     /* Count the number of pending callouts and allocate
      * the result array.
      */
     for (i = 0, cop = call_list; cop; cop = cop->next)
     {
-        if (!cop->is_lambda && cop->function.named.ob->flags & O_DESTRUCTED)
+        if (!callback_object(&(cop->fun)))
             continue;
         i++;
     }
@@ -1028,56 +751,46 @@ get_all_call_outs (void)
     next_time = 0;
     for (i=0, cop = call_list; cop; cop = cop->next)
     {
-        struct vector *vv;
+        vector_t *vv;
+        object_t *ob;
 
         next_time += cop->delta;
 
+        ob = callback_object(&(cop->fun));
+        if (!ob)
+            continue;
+            
         /* Get the subarray */
 
-        vv = allocate_array(
-          cop->v.type == T_LVALUE
-           ? 3 + cop->v.x.num_arg
-           : (cop->v.u.ob == &call_out_nil_object && cop->v.type == T_OBJECT
-              ? 3 : 4)
-        );
+        vv = allocate_array(3 + cop->fun.num_arg);
 
-        if (cop->is_lambda)
+        if (cop->fun.is_lambda)
         {
-            assign_svalue_no_free(&vv->item[1], &cop->function.lambda);
+            assign_svalue_no_free(&vv->item[1], &cop->fun.function.lambda);
             /* assuming that item[0] was inited to 0 */
         }
         else
         {
-            struct object *ob;
-
-            ob = cop->function.named.ob;
-            if (ob->flags & O_DESTRUCTED)
-            {
-                free_array(vv);
-                continue;
-            }
             put_ref_object(vv->item, ob, "get_all_call_outs");
-            put_ref_string(vv->item + 1, cop->function.named.name);
+            put_ref_string(vv->item + 1, cop->fun.function.named.name);
         }
 
         vv->item[2].u.number = next_time;
 
-        if (cop->v.type == T_LVALUE)
+        if (cop->fun.num_arg > 0)
         {
-            struct svalue *source, *dest;
-            int j;
+            svalue_t *source, *dest;
+            int nargs;
 
-            source = cop->v.u.lvalue;
+            nargs = cop->fun.num_arg;
+            if (nargs > 1)
+                source = cop->fun.arg.u.lvalue;
+            else
+                source = &(cop->fun.arg);
             dest = &vv->item[3];
-            j = cop->v.x.num_arg;
             do {
                 assign_svalue_no_free(dest++, source++);
-            } while (--j);
-        }
-        else if (cop->v.u.ob != &call_out_nil_object
-              || cop->v.type != T_OBJECT)
-        {
-            assign_svalue_no_free(&vv->item[3], &cop->v);
+            } while (--nargs);
         }
 
         put_array(v->item + i, vv);

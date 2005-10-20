@@ -136,10 +136,14 @@ make_func: make_func.o hash.o
 	$(CC) $(OPTIMIZE) $(LDFLAGS) make_func.o hash.o -o make_func
 	fixstk 96k make_func
 
-lang.y efun_defs.c instrs.h: func_spec make_func prolang.y config.h
-	$(RM) efun_defs.c
+lang.y: make_func prolang.y config.h
 	$(RM) lang.y
-	./make_func
+	./make_func lang
+
+efun_defs.c instrs.h: func_spec make_func config.h
+	$(RM) efun_defs.c
+	$(RM) instrs.h
+	./make_func instrs
 
 lang.c lang.h: lang.y
 	$(YACC) -d -v lang.y

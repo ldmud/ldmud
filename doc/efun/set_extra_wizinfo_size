@@ -3,7 +3,13 @@ SYNOPSIS
 
 DESCRIPTION
 	Indicate that the wizlist should contain an array of this size
-	with extra info foreach wizard. Causes a privilege violation.
+	with extra info foreach wizard. A negative value indicates
+        a non-array value.
+
+        Causes a privilege violation.
+
+        The value is only used to allocate a proper empty 'extra' value
+        for newly created wizlist entries.
 
 SEE ALSO
 	get_extra_wizinfo(E), set_extra_wizinfo(E), wizlist_info(E)

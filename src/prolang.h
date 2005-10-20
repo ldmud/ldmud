@@ -1,19 +1,10 @@
-#ifndef __PROLANG_H__
-#define __PROLANG_H__ 1
+#ifndef PROLANG_H__
+#define PROLANG_H__ 1
 
 #include "driver.h"
+#include "typedefs.h"
 
-#include "interpret.h"
-
-#ifndef LANG
-
-/* Needed in lang.h, but lang.c itself must not include
- * lang.h.
- */
-struct s_lrvalue { struct s_lrvalue *fake_member; };
-#include "lang.h"
-
-#endif
+#include "exec.h"  /* fulltype_t, vartype_t */
 
 /* --- Variables --- */
 extern int yychar;
@@ -21,36 +12,34 @@ extern int32 current_id_number;
 extern int approved_object;
 extern int num_virtual_variables;
 extern short hook_type_map[];
+extern char *inherit_file;
+extern int num_parse_error;
+extern program_t *compiled_prog;
 
-extern struct program *compiled_prog;
 #ifndef INITIALIZATION_BY___INIT
-extern struct svalue *prog_variable_values;
+extern svalue_t *prog_variable_values;
 #endif
 
-/* These are in efun_defs.c, created by make_func.y */
-extern struct instr instrs[];
-extern short efun_aliases[];
-extern int efun_arg_types[];
-extern struct svalue *(*efun_table[]) PROT((struct svalue *));
-extern struct svalue *(*vefun_table[]) PROT((struct svalue *, int));
-
 /* --- Prototypes --- */
+extern int proxy_efun(int, int);
 extern void yyerrorf VARPROT((char *format, ...), printf, 1, 2);
-extern int proxy_efun PROT((int, int));
-extern void yyerror PROT((char *str));
-extern void free_all_local_names PROT((void));
-extern void store_line_number_info PROT((void));
-extern void store_include_info PROT((char *name));
-extern void store_include_end PROT((void));
-extern void compile_file PROT((void));
+extern void yyerror(char *str);
+extern void yywarnf VARPROT((char *format, ...), printf, 1, 2);
+extern void yywarn(char *str);
+extern void free_all_local_names(void);
+extern void store_line_number_info(void);
+extern void store_line_number_backward(int offset);
+extern void store_include_info(char *name);
+extern void store_include_end(void);
+extern void compile_file(void);
 
 #if defined( DEBUG ) && defined ( TRACE_CODE )
-extern void set_code_window PROT((void));
-extern void show_code_window PROT((void));
+extern void set_code_window(void);
+extern void show_code_window(void);
 #endif
 
 #ifdef MALLOC_smalloc
-extern void count_compiler_refs PROT((void));
+extern void count_compiler_refs(void);
 #endif
 
-#endif /* __PROLANG_H__ */
+#endif /* PROLANG_H__ */

@@ -31,3 +31,9 @@ arr1 ^ arr2 == ({ 5, 6 })
 
 I don't know how the order of the values would precisely end up...
 
+
+This should also work with strings (interpreted as int*).
+For example
+
+  if (filename & "$,&" != "") { write ("Illegal filename"); }
+

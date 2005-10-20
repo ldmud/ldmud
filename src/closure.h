@@ -1,22 +1,29 @@
-#ifndef __CLOSURE_H__
-#define __CLOSURE_H__ 1
+#ifndef CLOSURE_H__
+#define CLOSURE_H__ 1
 
 #include "driver.h"
-#include "exec.h"      /* struct program */
-#include "interpret.h" /* struct lambda, svalue, symbol, vector */
-#include "object.h"    /* struct object, replace_ob */
+#include "typedefs.h"
+#include "exec.h"
 
 /* --- Types --- */
 
-/* --- struct lambda:  ---
+/* --- struct lambda_s:  ---
  *
  * If the closure uses constant values, they are stored in an svalue[]
  * right before the struct lambda and indexed from the end.
  */
 
-struct lambda {
+struct lambda_s
+{
+    /* svalue_t values[]
+     *
+     * For lambda closures, the constant values used by the function
+     * which are indexed from the end. That means that value #x can
+     * be found at address ((svalue_t *)lambda_t)[-x-1].
+     */
+     
     p_int ref;          /* ref count */
-    struct object *ob;
+    object_t *ob;
       /* Object the closure is bound to (for bound UNBOUND_LAMBDAs just
        * during the execution of the lambda).
        */
@@ -25,48 +32,55 @@ struct lambda {
         unsigned short index;
           /* _LFUN/_ALIEN_LFUN: index in the function table
            * _IDENTIFIER: index in the variable table
-           *              special (short)-1: vanished variable closure
-           *              TODO: it's tested with >=0 partially :-(,
-           *              TODO:: should be a constant.
            */
-        unsigned char code[1];
+#       define VANISHED_VARCLOSURE_INDEX ((unsigned short)-1)
+          /*              Special value for vanished variable closures.
+           *              TODO: it's tested with >=0 partially :-(,
+           */
+        bytecode_t code[1];
           /* LAMBDA and UNBOUND_LAMBDA closures: the function code, starting
-           * with uint8 'num_values' and continuing with FUNCTION_NUM_ARGS.
+           * with uint8 'num_values' and continuing with FUNCTION_NUM_ARGS
+           * (which is where the fun_hdr_p will point to).
            * 'num_values' is the size of the svalue[] preceeding the lambda;
            * if it is 0xff, the actual size is stored in
            * svalue[-0xff].u.number.
            */
-        struct lambda *lambda;
+#       define LAMBDA_NUM_VALUES(p)  EXTRACT_UCHAR((char *)p)
+#       define LAMBDA_NUM_ARGS(p)    EXTRACT_SCHAR((char *)p + sizeof(char))
+#       define LAMBDA_NUM_VARS(p)    (*((unsigned char *)((char *)p + 2*sizeof(char))))
+#       define LAMBDA_CODE(p)        ((bytecode_p)((unsigned char *)p + 3*sizeof(char)))
+
+        lambda_t *lambda;
           /* BOUND_LAMBDA: pointer to the UNBOUND_LAMBDA structure.
            */
         struct
         {
             /* CLOSURE_ALIEN_LFUN: */
-            struct object  *ob;     /* Originating object */
+            object_t       *ob;     /* Originating object */
             unsigned short  index;  /* Index in the objects variable table */
         } alien;
     } function;
 };
 
 #define LAMBDA_VALUE_OFFSET \
-  (sizeof(struct svalue) + offsetof(struct lambda, function.code[1]))
+  (sizeof(svalue_t) + offsetof(lambda_t, function.code[1]))
   /* Offset from the fun_hdr_p of a lambda closure to the first
-   * constant value.
+   * constant value (the one with index number 0).
    */
 
 /* --- Prototypes --- */
 
-extern int find_function PROT((char *name, struct program *prog));
-extern int lambda_ref_replace_program(struct lambda *l, int type, p_int size, struct vector *args, struct svalue *block);
-extern void set_closure_user PROT((struct svalue *svp, struct object *owner));
-extern void replace_program_lambda_adjust PROT((struct replace_ob *r_ob));
-extern void closure_literal PROT((struct svalue *dest, int ix));
-extern struct lambda *lambda PROT((struct vector *args, struct svalue *block, struct object *origin));
-extern void free_closure PROT((struct svalue *svp));
-extern int symbol_operator PROT((char *symbol, char **endp));
-extern void symbol_efun PROT((struct svalue *sp));
-extern struct svalue *f_unbound_lambda PROT((struct svalue *sp));
-extern struct svalue *f_symbol_variable PROT((struct svalue *sp));
-extern void align_switch PROT((unsigned char *pc));
+extern long      find_function(char *name, program_t *prog);
+extern Bool      lambda_ref_replace_program(lambda_t *l, int type, p_int size, vector_t *args, svalue_t *block);
+extern void      set_closure_user(svalue_t *svp, object_t *owner);
+extern void      replace_program_lambda_adjust(replace_ob_t *r_ob);
+extern void      closure_literal(svalue_t *dest, int ix);
+extern lambda_t *lambda(vector_t *args, svalue_t *block, object_t *origin);
+extern void      free_closure(svalue_t *svp);
+extern int       symbol_operator(char *symbol, char **endp);
+extern void      symbol_efun(svalue_t *sp);
+extern svalue_t *f_unbound_lambda(svalue_t *sp);
+extern svalue_t *f_symbol_variable(svalue_t *sp);
+extern void      align_switch(bytecode_p pc);
 
-#endif /* __CLOSURE_H__ */
+#endif /* CLOSURE_H__ */

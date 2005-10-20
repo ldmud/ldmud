@@ -77,6 +77,9 @@
 
 #define MALLOC_ALIGN 4
 
+/* does the compiler know of a 'ssize_t' type? */
+#undef HAVE_SSIZE_T
+
 /* does the compiler know of a 'long long' type? */
 #undef HAVE_LONG_LONG
 
@@ -102,8 +105,20 @@
 #undef USE_FCNTL_O_NDELAY
 #undef USE_FCNTL_FNDELAY
 
+/* Can F_SETOWN be used on a socket? */
+#undef USE_FCNTL_SETOWN
+
+/* Can SO_OOBINLINE be used on a socket? */
+#undef USE_OOBINLINE
+
+/* Does the machine offer IPv6? */
+#undef HAS_IPV6
+
 /* define the erq include file. */
 #undef ERQ_INCLUDE
+
+/* define the host-specific include file */
+#undef HOST_INCLUDE
 
 /* The number of bytes in a char *.  */
 #undef SIZEOF_CHAR_P
@@ -164,6 +179,9 @@
 
 /* Define if you have the strcspn function.  */
 #undef HAVE_STRCSPN
+
+/* Define if you have the strdup function.  */
+#undef HAVE_STRDUP
 
 /* Define if you have the strrchr function.  */
 #undef HAVE_STRRCHR

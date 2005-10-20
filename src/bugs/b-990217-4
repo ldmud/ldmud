@@ -6,3 +6,9 @@ State: Unclassified
 
 The driver seems to 'bug' when an object is destructed for which a reply
 from the erq is expected. Investigate this.
+
+---------- Analysis ----------
+
+According to the sources, the secure_call_lambda() will throw an error
+in this case, which calls master::runtime() for notification,but in
+effect is caught.

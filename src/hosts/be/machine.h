@@ -71,7 +71,7 @@
 #endif /* BeOS version >= 4.5 */
 
 /* Can ru_utime / ru_stime be accessed as a timeval with tv_sec and tv_usec ? */
-#ifdef __MWERKS__
+#if defined(__MWERKS__) || defined(B_BEOS_VERSION_5)
 #    define RUSAGE_USEC 1
 #endif
 
@@ -96,6 +96,9 @@
 #else
 #    define MALLOC_ALIGN 8
 #endif
+
+/* does the compiler know of a 'ssize_t' type? */
+#define HAVE_SSIZE_T 1
 
 /* does the compiler know of a 'long long' type? */
 #define HAVE_LONG_LONG 1
@@ -122,8 +125,22 @@
 /* #undef USE_FCNTL_O_NDELAY */
 /* #undef USE_FCNTL_FNDELAY */
 
+/* Can F_SETOWN be used on a socket? */
+/* TODO: DOes it? */
+#define USE_FCNTL_SETOWN 1
+
+/* Can SO_OOBINLINE be used on a socket? */
+/* TODO: Can it? */
+#define USE_OOBINLINE 1
+
+/* Does the machine offer IPv6? */
+/* #undef HAS_IPV6 */
+
 /* define the erq include file. */
 #define ERQ_INCLUDE "util/erq/erq.h"
+
+/* define the host-specific include file */
+/* #undef HOST_INCLUDE */
 
 /* The number of bytes in a char *.  */
 #define SIZEOF_CHAR_P 4
@@ -181,6 +198,9 @@
 
 /* Define if you have the strcspn function.  */
 #define HAVE_STRCSPN 1
+
+/* Define if you have the strdup function.  */
+#define HAVE_STRDUP 1
 
 /* Define if you have the strrchr function.  */
 #define HAVE_STRRCHR 1
@@ -246,7 +266,7 @@
 #define HAVE_UNISTD_H 1
 
 /* Define if you have the <values.h> header file.  */
-#ifndef __MWERKS__
+#if !defined(__MWERKS__) && !defined(B_BEOS_VERSION_5)
 #    define HAVE_VALUES_H 1
 #endif
 

@@ -6,5 +6,7 @@ DESCRIPTION
 	If str2 is not found in str, -1 is returned. The returned
 	index is relativ to the beginning of the string.
 
+        If pos is negativ, it counts from the end of the string.
+
 SEE ALSO
 	strlen(E), sscanf(E), sprintf(E), explode(E)

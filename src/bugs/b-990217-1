@@ -10,3 +10,5 @@ liste ein wenig sauberer zu machen (vielleicht alle extra virtual zuerst
 und die dann auch nicht mehr als einmal). Man koennte den lookup zur
 Laufzeit optimieren und f_inherit_list() verbessern (die gibt naemlich
 auch die extra inherits aus).
+
+With the current one-pass compiler this is not that easy.

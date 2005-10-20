@@ -1,15 +1,14 @@
-#ifndef __HEARTBEAT_H__
-#define __HEARTBEAT_H__ 1
+#ifndef HEARTBEAT_H__
+#define HEARTBEAT_H__ 1
 
 #include "driver.h"
 
-#include "datatypes.h"  /* struct svalue */
-#include "object.h"     /* struct object */
-#include "strfuns.h"
+#include "typedefs.h" 
+#include "strfuns.h"    /* strbuf_t */
 
 /* --- Variables --- */
 
-extern struct object *current_heart_beat;
+extern object_t *current_heart_beat;
 
 #if defined(DEBUG)
 extern mp_int num_hb_objs;
@@ -18,12 +17,13 @@ extern mp_int num_hb_objs;
 /* --- Prototypes --- */
 
 extern void  call_heart_beat(void);
-extern int   set_heart_beat (struct object *ob, Bool to);
+extern int   set_heart_beat (object_t *ob, Bool to);
 extern int   heart_beat_status (strbuf_t *sbuf, Bool verbose);
-extern struct svalue *f_heart_beat_info (struct svalue *sp);
+extern void  hbeat_dinfo_status(svalue_t *svp);
+extern svalue_t *f_heart_beat_info (svalue_t *sp);
 
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
 extern void  count_heart_beat_refs (void);
 #endif
 
-#endif /* __HEARTBEAT_H__ */
+#endif /* HEARTBEAT_H__ */

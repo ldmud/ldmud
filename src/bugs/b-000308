@@ -1,0 +1,14 @@
+Short: call_out handling freezes
+From: Manu Maeki (Cendor)
+Date: 000308
+Type: Bug
+State: New
+Driver: 3.2.8-dev.163
+
+After some time, the call_out handling stops and doesn't restart until
+a reboot. This happens only if this change is in effect: heartbeats are
+stopped while players are not in the vicinity.
+
+Ask Cendor to sent again their monster.c
+
+Does the call_out handling skip objets which eval_costs are expired?

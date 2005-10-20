@@ -10,6 +10,10 @@ DESCRIPTION
 
 	Returns 1 on success, 0 on failure.
 
+        Note: On some machines a failed send_imp() will not be registered
+        until the next send_imp() - the latter one might return '0' even
+        if itself was successful.
+
 SEE ALSO
 	receive_imp(M)
 

@@ -96,6 +96,9 @@
 
 #define MALLOC_ALIGN 4
 
+/* does the compiler know of a 'ssize_t' type? */
+/* #undef HAVE_SSIZE_T  */
+
 /* does the compiler know of a 'long long' type? */
 /* #undef HAVE_LONG_LONG */
 
@@ -118,6 +121,12 @@
 #define USE_IOCTL_FIONBIO 1
 /* #undef USE_FCNTL_O_NDELAY */
 /* #undef USE_FCNTL_FNDELAY */
+
+/* Can F_SETOWN be used on a socket? */
+/* #undef USE_FCNTL_SETOWN */
+
+/* Can SO_OOBINLINE be used on a socket? */
+/* #undef USE_OOBINLINE */
 
 /* #undef inline */
 
@@ -162,6 +171,9 @@
 
 /* Define if you have strcspn.  */
 #define HAVE_STRCSPN 1
+
+/* Define if you have the strdup function.  */
+#define HAVE_STRDUP 1
 
 /* Define if you have strrchr.  */
 #define HAVE_STRRCHR 1

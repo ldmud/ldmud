@@ -1,0 +1,11 @@
+SYNOPSIS
+        string db_conv_string(string str)
+
+DESCRIPTION
+        Convert the string <str> into a string that is correctly interpretated
+        for usage as a string in db_exec(), e.g. ' is replaced with \' and so
+        on.
+
+SEE ALSO
+        db_affected_rows(E), db_close(E), db_connect(E),
+        db_exec(E), db_fetch(E), db_handles(E)

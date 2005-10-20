@@ -14,7 +14,7 @@ DESCRIPTION
 	  Bit 0 (value 1): when set, add_message() is used instead of
 	    write(). Thus no previous flushing of the buffer is
 	    needed, but the output is not immediate, nor can the
-	    number of bytes actualle sent be determined - the return
+	    number of bytes actually sent be determined - the return
 	    value is undefined.
 	  Bit 1 (value 2): The buffer is flushed _after_ adding the
 	    message. Useful only in conjunction with Bit 0.

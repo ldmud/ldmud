@@ -21,7 +21,9 @@ extern int ioctl(int, ...); /* should be in <ioctl.h> */
 #endif
 
 #if defined(SunOS4) || defined(ultrix) || defined(__CYGWIN__)
+#if !defined(__CYGWIN32__)
 extern int gethostname(char *, int);
+#endif
 extern char *getdomainname(char *, int);
 #endif
 
@@ -33,6 +35,10 @@ extern long int strtol(const char *, char **, int);
 
 #if defined(__CYGWIN__) || defined(sun)
 extern time_t time(time_t *tloc);
+#endif
+
+#if defined(AMIGA) && defined(__GNUC__)
+#undef AMIGA
 #endif
 
 #if 0 && defined(__CYGWIN__)

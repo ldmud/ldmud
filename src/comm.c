@@ -7,10 +7,8 @@
  * numbers.
  *
  * All information needed for an interactive object are stored in
- * a 'struct interactive'. This struct is a special kind of shadow_sentence
- * and as such is stored in the first place of an object->sent list.
- * If the object is shadowed as well, these shadows are linked to the
- * interactive struct as head of the shadow list.
+ * a 'interactive_t'. This struct is linked to by the shadow sentence
+ * of the interactive object.
  *
  * Sending data is performed through the function add_message().
  * The function collects the data in interactive.message_buf[] until
@@ -36,8 +34,8 @@
  * took off.
  *
  * There are some variations to this scheme, but you get the idea. It is
- * possible to do all telnet negotiations on mudlib level, but can only
- * be either the driver or the mudlib doing it.
+ * possible to do all telnet negotiations on mudlib level, but it must
+ * be either the driver or the mudlib, not both.
  *
  * To understand get_message() itself fully, think of it as a coroutine
  * with its own state. It does not really return to the caller (though
@@ -49,7 +47,7 @@
  * loop, waiting in 1 second intervals for incoming data. An alarm() is
  * triggered by backend.c every 2 seconds and sets the flag variable
  * comm_time_to_call_heart_beat. The loop checks this variable every second
- * and, it it is set, aborts its input loop and returns to the backend.
+ * and, if it is set, aborts its input loop and returns to the backend.
  * To mark the cause of the return, the variable time_to_call_heart_beat is
  * set before return.
  *
@@ -59,6 +57,7 @@
  */
 
 #include "driver.h"
+#include "typedefs.h"
 
 #include "my-alloca.h"
 
@@ -103,6 +102,8 @@
 #    include SOCKET_INC
 #endif
 
+#define USES_SVALUE_STRLEN
+
 #include "comm.h"
 #include "access_check.h"
 #include "actions.h"
@@ -118,8 +119,14 @@
 #include "object.h"
 #include "sent.h"
 #include "simulate.h"
+#include "smalloc.h"  /* svalue_strlen() */
+#include "stdstrings.h"
 #include "stralloc.h"
+#include "swap.h"
 #include "wiz_list.h"
+#include "xalloc.h"
+
+#include "../mudlib/sys/driver_hook.h"
 
 /* if driver is compiled for ERQ demon then include the necessary file
  */
@@ -137,7 +144,12 @@
 #if !defined (SOCKET_LIB) && !defined(SOCKET_INC)
 #    define socket_number(s) (s)
 #    define socket_ioctl  ioctl
-#    define socket_select select
+#    ifndef hpux
+#        define socket_select select
+#    else
+#        define socket_select(n,r,w,x,t) select(n, (int *)r, (int *)w, (int *)x, t)
+         /* Silences the compiler */
+#    endif
 #    define socket_read   read
 #    define socket_write  write
 #    define socket_close  close
@@ -154,6 +166,12 @@ extern int listen(SOCKET_T, int);
 extern SOCKET_T accept(SOCKET_T, struct sockaddr *, int *);
 extern int select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 #endif /* SunOS4 */
+
+#ifdef _AIX
+typedef unsigned long length_t;  /* *sigh* */
+#else
+typedef int length_t;
+#endif
 
 #if defined(__CYGWIN__)
 extern int socketpair(int, int, int, int[2]);
@@ -174,7 +192,7 @@ extern int socketpair(int, int, int, int[2]);
 
 /*-------------------------------------------------------------------------*/
 
-struct interactive *all_players[MAX_PLAYERS];
+interactive_t *all_players[MAX_PLAYERS];
   /* Pointers to the structures of the interactive users.
    * Unused entries are NULL.
    * TODO: A list would be nicer
@@ -239,7 +257,7 @@ static unsigned long erq_pending_len = 0;
    * to be cleared by stop_erq_demon().
    */
 
-static struct svalue pending_erq[MAX_PENDING_ERQ+1];
+static svalue_t pending_erq[MAX_PENDING_ERQ+1];
   /* ERQ callback handles. The last one is reserved for callback-free
    * requests.
    * The free entries are organised in a singly linked list of
@@ -247,16 +265,36 @@ static struct svalue pending_erq[MAX_PENDING_ERQ+1];
    * free entry.
    */
 
-static struct svalue *free_erq;
+static svalue_t *free_erq;
   /* The first free entry in the freelist in pending_erq[] */
 
-#define IPSIZE 200
+/* The size of the IPTABLE depends on the number of users,
+ * and is at least 200.
+ */
+#if MAX_PLAYERS > 700
+#    define IPSIZE MAX_PLAYERS
+#else
+#    if MAX_PLAYERS > 100
+#        define IPSIZE (MAX_PLAYERS*2)
+#    else
+#        define IPSIZE 200
+#    endif
+#endif
+
 static struct ipentry {
     long addr;  /* TODO: make this an struct in_addr */
     char *name;  /* shared string with the hostname for <addr> */
 } iptable[IPSIZE] = { {0, 0}, };
   /* Cache of known names for given IP addresses.
-   * It is used as a ringbuffer.
+   * It is used as a ringbuffer, indexed by ipcur.
+   * TODO: Null all entries in the table? Std-C should do that automatically.
+   * TODO: Instead of a simple circular buffer, the lookup should be
+   * TODO:: hashed over the IP address. Worst case would still be O(IPSIZE),
+   * TODO:: but best case would be O(1).
+   */
+
+static int ipcur = 0;
+  /* Index of the next entry to use in the iptable[].
    */
 
 #endif /* ERQ_DEMON */
@@ -288,7 +326,7 @@ static struct sockaddr_in host_ip_addr;
    * TODO: Can't this be local?
    */
 
-char * domain_name;
+char * domain_name = NULL;
   /* This computer's domain name, as needed by lex.c::get_domainname().
    */
 
@@ -298,6 +336,18 @@ static int min_nfds = 0;
    */
 
 /* --- Telnet handling --- */
+
+#ifdef DEBUG_TELNET
+
+#define DT(x) printf("%s TDEBUG: ", time_stamp()); printf x 
+#define DTF(x) printf x 
+
+#else
+
+#define DT(x) 
+#define DTF(x) 
+
+#endif
 
 static Bool sending_telnet_command = MY_FALSE;
   /* Mutex queried in add_message() to hide telnet commands
@@ -350,7 +400,7 @@ static volatile mp_int urgent_data_time;
   /* The backend::current_time when urgent_data was set last.
    */
 
-static struct object *first_player_for_flush = NULL;
+static object_t *first_player_for_flush = NULL;
   /* First interactive user object to flush. Marks the head
    * of the list formed by interactive.{next,previous}_player_for_flush
    */
@@ -378,24 +428,69 @@ static char destruct_add_message_format[]
 
 /* Forward declarations */
 
-static void free_input_to(struct input_to *);
-static void telnet_neg(struct interactive *);
+static void free_input_to(input_to_t *);
+static void telnet_neg(interactive_t *);
 static void send_will(int);
 static void send_wont(int);
 static void send_do(int);
 static void send_dont(int);
-static void remove_flush_entry(struct interactive *ip);
+static void remove_flush_entry(interactive_t *ip);
 static void new_player(SOCKET_T new_socket, struct sockaddr_in *addr, size_t len, int login_port);
-static void add_ip_entry(long addr, char *name);
 
 #ifdef ERQ_DEMON
 
 static long read_32(char *);
 static Bool send_erq(int handle, int request, char *arg, size_t arglen);
 static void stop_erq_demon(Bool);
+static char * lookup_ip_entry (long addr, Bool useErq);
+static void add_ip_entry(long addr, char *name);
 
 #endif /* ERQ_DEMON */
 
+
+#ifdef USE_IPV6
+
+/*-------------------------------------------------------------------------*/
+#ifndef CREATE_IPV6_MAPPED  /* not defined on AIX 4.3 */
+
+#define CREATE_IPV6_MAPPED(v6,v4) \
+    ((v6).s6_addr32[0] = 0, \
+     (v6).s6_addr32[1] = 0, \
+     (v6).s6_addr32[2] = 0x0000ffff, \
+     (v6).s6_addr32[3] = v4 )
+
+#endif
+
+/*-------------------------------------------------------------------------*/
+static char *
+inet6_ntoa (struct in6_addr in)
+
+/* Convert the ipv6 address <in> into a string and return it.
+ * Note: the string is stored in a local buffer.
+ */
+
+{
+    static char str[4097];
+
+    inet_ntop(AF_INET6, &in, str, 4096);
+    return str;
+} /* inet6_ntoa() */
+
+/*-------------------------------------------------------------------------*/
+static struct in6_addr
+inet6_addr (char *to_host)
+
+/* Convert the name <to_host> into a ipv6 address and return it.
+ */
+
+{
+    struct in6_addr addr;
+
+    inet_pton(AF_INET6, to_host, &addr);
+    return addr;
+} /* inet6_addr() */
+
+#endif /* USE_IPV6 */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -468,16 +563,19 @@ set_socket_own (SOCKET_T new_socket)
  */
 
 {
-#ifdef F_SETOWN
-    if (fcntl(new_socket, F_SETOWN, getpid())) {
+#if defined(F_SETOWN) && defined(USE_FCNTL_SETOWN)
+    if (0 > fcntl(new_socket, F_SETOWN, getpid()))
+    {
         perror("fcntl SETOWN");
     }
 #endif
-#ifdef SO_OOBINLINE
+#if defined(SO_OOBINLINE) && defined(USE_OOBINLINE)
     {
         int on = 1;
-        if (setsockopt(new_socket, SOL_SOCKET, SO_OOBINLINE, (char *)&on, sizeof on))
+        if (0 > setsockopt(new_socket, SOL_SOCKET, SO_OOBINLINE, (char *)&on, sizeof on))
+        {
             perror("setsockopt SO_OOBINLINE");
+        }
     }
 #endif
     new_socket = 0; /* Prevent 'not used' warning */
@@ -497,7 +595,7 @@ initialize_host_ip_number (void)
     char host_name[MAXHOSTNAMELEN+1];
     struct hostent *hp;
     char *p;
-    int tmp;
+    length_t tmp;
 
     if (gethostname(host_name, sizeof host_name) == -1) {
         perror("gethostname");
@@ -505,7 +603,7 @@ initialize_host_ip_number (void)
     }
     hp = gethostbyname(host_name);
     if (!hp) {
-        fprintf(stderr, "gethostbyname: unknown host '%s'.\n", host_name);
+        fprintf(stderr, "%s gethostbyname: unknown host '%s'.\n", time_stamp(), host_name);
         exit(1);
     }
     memset(&host_ip_addr, 0, sizeof host_ip_addr);
@@ -529,9 +627,17 @@ initialize_host_ip_number (void)
      */
     if (udp_port != -1)
     {
+        memset(&host_ip_addr.sin_addr, 0, sizeof(host_ip_addr.sin_addr));
+#ifndef USE_IPV6
         host_ip_addr.sin_addr.s_addr = INADDR_ANY;
+        host_ip_addr.sin_family = AF_INET;
+#else
+        host_ip_addr.sin_addr = in6addr_any;
+        host_ip_addr.sin_family = AF_INET6;
+#endif
         host_ip_addr.sin_port = htons((u_short)udp_port);
-        debug_message("UDP recv-socket requested for port: %d\n", udp_port);
+        debug_message("%s UDP recv-socket requested for port: %d\n"
+                     , time_stamp(), udp_port);
         udp_s = socket(host_ip_addr.sin_family, SOCK_DGRAM, 0);
         if (udp_s == -1)
         {
@@ -554,11 +660,11 @@ initialize_host_ip_number (void)
          */
         for(;;) {
             if (-1 == bind(udp_s, (struct sockaddr *)&host_ip_addr
-                          , sizeof host_ip_addr))
+                          , sizeof(host_ip_addr)))
             {
                 if (errno == EADDRINUSE) {
-                    fprintf(stderr, "UDP Socket already bound!\n");
-                    debug_message("UDP Socket already bound!\n");
+                    fprintf(stderr, "%s UDP Socket already bound!\n", time_stamp());
+                    debug_message("%s UDP Socket already bound!\n", time_stamp());
                     if (host_ip_addr.sin_port) {
                         host_ip_addr.sin_port = 0;
                         continue;
@@ -585,7 +691,8 @@ initialize_host_ip_number (void)
 
             udp_port = ntohs(host_ip_addr.sin_port);
             if (oldport != udp_port)
-                debug_message("UDP recv-socket on port: %d\n", udp_port);
+                debug_message("%s UDP recv-socket on port: %d\n"
+                             , time_stamp(), udp_port);
         }
         set_socket_nonblocking(udp_s);
         set_close_on_exec(udp_s);
@@ -610,7 +717,7 @@ ignore_handler (int signo)
 #ifdef DEBUG
     if (signo != SIGPIPE) /* the only ignored signal so far */
     {
-        fprintf(stderr, "Error: OS passes signo %d instead of SIGPIPE (%d) to handler.\n", signo, SIGPIPE);
+        fprintf(stderr, "%s Error: OS passes signo %d instead of SIGPIPE (%d) to handler.\n", time_stamp(), signo, SIGPIPE);
         signo = SIGPIPE;
     }
 #endif
@@ -641,7 +748,7 @@ prepare_ipc(void)
  */
 
 {
-    int tmp;
+    length_t tmp;
     int i;
 
     /* Initialize the telnet machine unless mudlib_telopts() already
@@ -659,23 +766,30 @@ prepare_ipc(void)
 
             /* Real port number */
 
-            host_ip_addr.sin_port = htons((u_short)port_numbers[i]);
+            memset(&host_ip_addr.sin_addr, 0, sizeof(host_ip_addr.sin_addr));
+#ifndef USE_IPV6
             host_ip_addr.sin_addr.s_addr = INADDR_ANY;
+            host_ip_addr.sin_family = AF_INET;
+#else
+            host_ip_addr.sin_addr = in6addr_any;
+            host_ip_addr.sin_family = AF_INET6;
+#endif
+            host_ip_addr.sin_port = htons((u_short)port_numbers[i]);
             sos[i] = socket(host_ip_addr.sin_family, SOCK_STREAM, 0);
             if ((int)sos[i] == -1) {
                 perror("socket");
                 exit(1);
             }
             tmp = 1;
-            if (setsockopt (sos[i], SOL_SOCKET, SO_REUSEADDR
-                           , (char *) &tmp, sizeof (tmp)) < 0) {
+            if (setsockopt(sos[i], SOL_SOCKET, SO_REUSEADDR
+                          , (char *) &tmp, sizeof (tmp)) < 0) {
                 perror ("setsockopt");
                 exit (1);
             }
             if (bind(sos[i], (struct sockaddr *)&host_ip_addr, sizeof host_ip_addr) == -1) {
                 if (errno == EADDRINUSE) {
-                    fprintf(stderr, "Socket already bound!\n");
-                    debug_message("Socket already bound!\n");
+                    fprintf(stderr, "%s Socket already bound!\n", time_stamp());
+                    debug_message("%s Socket already bound!\n", time_stamp());
                     exit(errno);
                 } else {
                     perror("bind");
@@ -721,9 +835,6 @@ prepare_ipc(void)
 } /* prepare_ipc() */
 
 /*-------------------------------------------------------------------------*/
-/*
- * This one is called when shutting down the MUD.
- */
 void
 ipc_remove (void)
 
@@ -734,7 +845,7 @@ ipc_remove (void)
 {
     int i;
 
-    printf("Shutting down ipc...\n");
+    printf("%s Shutting down ipc...\n", time_stamp());
     for (i = 0; i < numports; i++)
         socket_close(sos[i]);
 
@@ -796,8 +907,8 @@ add_message (char *fmt, ...)
     char *end;                 /* One char past the end of .message_buf[] */
     char *dest;                /* First free char in .message_buf[] */
     va_list va;
-    struct interactive *ip;       /* The interactive user */
-    struct object      *snooper;  /* Snooper of <ip> */
+    interactive_t *ip;       /* The interactive user */
+    object_t      *snooper;  /* Snooper of <ip> */
     int   n;
 
     va_start(va, fmt);
@@ -811,8 +922,7 @@ add_message (char *fmt, ...)
      || (   command_giver->flags & O_DESTRUCTED
          && fmt != destruct_add_message_format
          && fmt != message_flush )
-     || !(ip = O_GET_INTERACTIVE(command_giver))
-     || ip->sent.type != SENT_INTERACTIVE
+     || !(O_SET_INTERACTIVE(ip, command_giver))
      || (ip->do_close && fmt != message_flush)
        )
     {
@@ -895,11 +1005,9 @@ add_message (char *fmt, ...)
              && !(snooper->flags & O_DESTRUCTED))
             {
                 buff[0] = '%';
-                if (NULL != O_GET_INTERACTIVE(snooper)
-                 && O_GET_INTERACTIVE(snooper)->sent.type == SENT_INTERACTIVE
-                   )
+                if (O_IS_INTERACTIVE(snooper))
                 {
-                    struct object *save;
+                    object_t *save;
 
                     save = command_giver;
                     command_giver = snooper;
@@ -942,8 +1050,9 @@ add_message (char *fmt, ...)
 
 #ifdef DEBUG
     if (d_flag > 1)
-        debug_message("[%s(%ld)]: %s", command_giver->name,
-                        (long)strlen(source), source);
+        debug_message("%s [%s(%ld)]: %s"
+                     , time_stamp(), command_giver->name
+                     , (long)strlen(source), source);
 #endif
 
     /* --- Send the final message --- */
@@ -959,6 +1068,18 @@ add_message (char *fmt, ...)
      * Every character encountered is copied, translated or fed
      * into the telnet machine.
      */
+
+#ifdef DEBUG_TELNET
+if (sending_telnet_command)
+{
+    char *cp;
+    printf("%s TDEBUG: '%s' Sending telnet (%d bytes): "
+          , time_stamp(), ip->ob->name, strlen(source));
+    for (cp = source; *cp; cp++)
+        printf(" %02x", *cp);
+    printf("\n");
+}
+#endif
 
     do {
         int    retries;   /* Number of retries left when sending data */
@@ -979,7 +1100,7 @@ add_message (char *fmt, ...)
              *    or if it's part of a telnet command.
              *  - translate a '\n' into '\r\n'
              *  - double an IAC if quote_iac is active.
-             *  - stop this loop if a '\0' is encountered of if
+             *  - stop this loop if a '\0' is encountered or if
              *    the buffer is full.
              *
              * If c is not '\0' after this loop, it will be added
@@ -1039,43 +1160,45 @@ add_message (char *fmt, ...)
                 if (--retries)
                     continue;
                 fprintf(stderr,
-                  "comm: write EINTR. Message discarded.\n");
+                  "%s comm: write EINTR. Message discarded.\n", time_stamp());
                 if (old_message_length)
                     remove_flush_entry(ip);
                 return;
 
               case EWOULDBLOCK:
-                fprintf(stderr,
-                  "comm: write EWOULDBLOCK. Message discarded.\n");
+                if (d_flag)
+                    fprintf(stderr,
+                      "%s comm: write EWOULDBLOCK. Message discarded.\n", time_stamp());
                 if (old_message_length)
                     remove_flush_entry(ip);
                 return;
 
               case EMSGSIZE:
-                fprintf(stderr, "comm: write EMSGSIZE.\n");
+                fprintf(stderr, "%s comm: write EMSGSIZE.\n", time_stamp());
                 return;
 
               case EINVAL:
-                fprintf(stderr, "comm: write EINVAL.\n");
+                fprintf(stderr, "%s comm: write EINVAL.\n", time_stamp());
                 break;
 
               case ENETUNREACH:
-                fprintf(stderr, "comm: write ENETUNREACH.\n");
+                fprintf(stderr, "%s comm: write ENETUNREACH.\n", time_stamp());
                 break;
 
               case EHOSTUNREACH:
-                fprintf(stderr, "comm: write EHOSTUNREACH.\n");
+                fprintf(stderr, "%s comm: write EHOSTUNREACH.\n", time_stamp());
                 break;
 
               case EPIPE:
-                fprintf(stderr, "comm: write EPIPE detected\n");
+                fprintf(stderr, "%s comm: write EPIPE detected\n", time_stamp());
                 break;
 
               default:
                 {
                   int e = errno;
                   perror("write");
-                  fprintf(stderr, "comm: write: unknown errno %d\n", e);
+                  fprintf(stderr, "%s comm: write: unknown errno %d\n"
+                                , time_stamp(), e);
                 }
             }
             if (old_message_length)
@@ -1090,8 +1213,8 @@ add_message (char *fmt, ...)
         inet_volume += n;
 #endif
         if (n != chunk)
-            fprintf(stderr, "write socket: wrote %ld, should be %ld.\n",
-                    (long)n, (long)chunk);
+            fprintf(stderr, "%s write socket: wrote %ld, should be %ld.\n"
+                          , time_stamp(), (long)n, (long)chunk);
 
         /* Continue with the processing of source */
         dest = &ip->message_buf[0];
@@ -1126,7 +1249,7 @@ add_message (char *fmt, ...)
 
 /*-------------------------------------------------------------------------*/
 static void
-remove_flush_entry (struct interactive *ip)
+remove_flush_entry (interactive_t *ip)
 
 /* Remove the given interactive <ip> from the list of 'dirty' interactives
  * and make sure it is really clean.
@@ -1164,8 +1287,8 @@ flush_all_player_mess (void)
  */
 
 {
-    struct object *p, *np;
-    struct object *save = command_giver;
+    object_t *p, *np;
+    object_t *save = command_giver;
 
     for ( p = first_player_for_flush; p != NULL; p = np)
     {
@@ -1242,7 +1365,7 @@ get_message (char *buff)
 #   define IncCmdGiver    NextCmdGiver--
 
     int    i;
-    struct interactive * ip = NULL;
+    interactive_t * ip = NULL;
     fd_set exceptfds;
 
 
@@ -1251,7 +1374,7 @@ get_message (char *buff)
     while(MY_TRUE)
     {
         struct sockaddr_in addr;
-        int                length; /* length of <addr> */
+        length_t length; /* length of <addr> */
         struct timeval timeout;
 
         /* --- select() on the sockets and handle ERQ --- */
@@ -1357,6 +1480,7 @@ get_message (char *buff)
              */
             if (urgent_data)
             {
+                DT(("telnet wants to sync\n"));
                 urgent_data = MY_FALSE;
                 timeout.tv_sec = 0;
                 timeout.tv_usec = 0;
@@ -1370,6 +1494,7 @@ get_message (char *buff)
                             continue;
                         if (FD_ISSET(ip->socket, &exceptfds))
                         {
+                            DT(("'%s' ts_data = TS_SYNCH\n", ip->ob->name));
                             ip->ts_data = TS_SYNCH;
                             switch (ip->tn_state)
                             {
@@ -1378,6 +1503,7 @@ get_message (char *buff)
                               case TS_READY:
                                 ip->tn_state = TS_SYNCH;
                                 ip->gobble_char = '\0';
+                                DT(("'%s' tn_state = TS_SYNCH\n", ip->ob->name));
                             }
                         }
                     } /* for (all players) */
@@ -1428,7 +1554,8 @@ get_message (char *buff)
                 if (l <= 0)
                 {
 #ifdef DEBUG_ERQ
-                    fprintf(stderr, "read %ld bytes from erq demon\n", l);
+                    fprintf(stderr, "%s read %ld bytes from erq demon\n"
+                                  , time_stamp(), l);
                     if (l)
                         perror("");
 #endif /* DEBUG_ERQ */
@@ -1457,9 +1584,9 @@ get_message (char *buff)
                         if (msglen < 8) {
 #ifdef DEBUG_ERQ
                             fprintf( stderr
-                                   , "invalid length of message from"
+                                   , "%s invalid length of message from"
                                      "erq demon: %ld bytes\n"
-                                   , msglen);
+                                   , time_stamp(), msglen);
 #endif /* DEBUG_ERQ */
                             stop_erq_demon(MY_TRUE);
                             break;
@@ -1491,9 +1618,11 @@ get_message (char *buff)
 #ifdef DEBUG
                               if (msglen == 12) {
                                 if (d_flag > 1)
-                                  debug_message("Host lookup failed\n");
+                                  debug_message("%s Host lookup failed\n"
+                                               , time_stamp());
                               } else {
-                                debug_message("Bogus reverse name lookup.\n");
+                                debug_message("%s Bogus reverse name lookup.\n"
+                                             , time_stamp());
                               }
 #endif
                             } else {
@@ -1519,12 +1648,12 @@ get_message (char *buff)
                              || !max_array_size)
                          && pending_erq[handle].type != T_INVALID)
                         {
-                            struct svalue *erqp = &pending_erq[handle];
+                            svalue_t *erqp = &pending_erq[handle];
                             char *cp;
-                            struct vector *v;
-                            struct svalue *svp;
-                            struct object *ob;
-                            struct wiz_list *user;
+                            vector_t *v;
+                            svalue_t *svp;
+                            object_t *ob;
+                            wiz_list_t *user;
 
                             command_giver = 0;
                             current_interactive = 0;
@@ -1533,7 +1662,7 @@ get_message (char *buff)
                                  : erqp->u.lambda->ob;
                             current_object = ob;
                             v = allocate_array(rest);
-                            current_object = 0;
+                            current_object = NULL;
                             push_referenced_vector(v);
                             push_number(rest);
                             cp = rp + 8;
@@ -1552,7 +1681,7 @@ get_message (char *buff)
                             RESET_LIMITS;
                             secure_call_lambda(erqp, 2);
                             user->call_out_cost = eval_cost;
-                            if (!keep_handle)
+                            if (!keep_handle || (ob->flags & O_DESTRUCTED))
                             {
                                 free_svalue(erqp);
                                 erqp->type = T_INVALID;
@@ -1620,6 +1749,7 @@ get_message (char *buff)
          * Note for BeOS and Cygwin: since making sockets non-blocking
          *   is a bit tricky, we check if the socket is actually ready,
          *   to prevent freezing.
+         * TODO: Always use the readfds information.
          */
 #if !defined(__BEOS__) && !defined(__CYGWIN__)
         if (udp_s >= 0)
@@ -1641,7 +1771,11 @@ get_message (char *buff)
                 trace_level = 0;
                 udp_buf[sizeof(udp_buf) - 1] = '\0';
                 udp_buf[cnt] = '\0';
+#ifndef USE_IPV6
                 st = inet_ntoa(addr.sin_addr);
+#else
+                st = inet6_ntoa(addr.sin_addr);
+#endif
                 push_string_malloced(st);
                 push_string_malloced(udp_buf);
                 push_number(ntohs(addr.sin_port));
@@ -1655,7 +1789,7 @@ get_message (char *buff)
 
         for (; NextCmdGiver >= 0; IncCmdGiver)
         {
-            struct object *snooper;
+            object_t *snooper;
 
             ip = all_players[NextCmdGiver];
             if (ip == 0) {
@@ -1672,43 +1806,47 @@ get_message (char *buff)
                 l = socket_read(ip->socket, ip->text + ip->text_end, (size_t)l);
                 if (l == -1) {
                     if (errno == ENETUNREACH) {
-                        debug_message("Net unreachable detected.\n");
+                        debug_message("%s Net unreachable detected.\n"
+                                     , time_stamp());
                         remove_interactive(ip->ob);
                         continue;
                     }
                     if (errno == EHOSTUNREACH) {
-                        debug_message("Host unreachable detected.\n");
+                        debug_message("%s Host unreachable detected.\n"
+                                     , time_stamp());
                         remove_interactive(ip->ob);
                         continue;
                     }
                     if (errno == ETIMEDOUT) {
-                        debug_message("Connection timed out detected.\n");
+                        debug_message("%s Connection timed out detected.\n"
+                                     , time_stamp());
                         remove_interactive(ip->ob);
                         continue;
                     }
                     if (errno == ECONNRESET) {
-                        debug_message("Connection reset by peer detected.\n");
+                        debug_message("%s Connection reset by peer detected.\n"
+                                     , time_stamp());
                         remove_interactive(ip->ob);
                         continue;
                     }
                     if (errno == EWOULDBLOCK) {
-                        debug_message("read would block socket %d!\n",
-                                      ip->socket);
+                        debug_message("%s read would block socket %d!\n"
+                                     , time_stamp(), ip->socket);
                         remove_interactive(ip->ob);
                         continue;
                     }
                     if (errno == EMSGSIZE) {
-                        debug_message("read EMSGSIZE !\n");
+                        debug_message("%s read EMSGSIZE\n", time_stamp());
                         continue;
                     }
                     if (errno == ESHUTDOWN) {
-                        debug_message("Connection to socket %d lost.\n"
-                                     , ip->socket);
+                        debug_message("%s Connection to socket %d lost.\n"
+                                     , time_stamp(), ip->socket);
                         remove_interactive(ip->ob);
                         continue;
                     }
                     perror("read");
-                    debug_message("Unknown errno %d\n", errno);
+                    debug_message("%s Unknown errno %d\n", time_stamp(), errno);
                     remove_interactive(ip->ob);
                     continue;
                 }
@@ -1732,12 +1870,17 @@ get_message (char *buff)
              */
             if (ip->noecho & CHARMODE_REQ)
             {
-                if (ip->text[0] != '!' || ip->noecho & IGNORE_BANG )
+                DT(("'%s' CHARMODE_REQ\n", ip->ob->name));
+                if (ip->text[0] != '!' || find_no_bang(ip) & IGNORE_BANG )
                 {
                     /* Unescaped input.
-                     * Puts the next character (addressed by
-                     * .command_start) into buff[0] and returns it.
+                     * Puts the next character(s) (addressed by
+                     * .command_start) into buff[0] and return the data.
                      */
+
+                    int destix;  /* Save index */
+                    DT(("'%s'   Unescaped input\n", ip->ob->name));
+                    
                     if (ip->tn_state != TS_READY)
                     {
                         /* .text[] contains an incomplete negotiation.
@@ -1748,40 +1891,100 @@ get_message (char *buff)
                                    ? ip->tn_start
                                    : ip->command_end
                                  ) - ip->command_start;
+                        DT(("'%s'     incomplete negotiation: length %d\n"
+                           , ip->ob->name, length));
                         if (!length)
                             continue;
+                        if (length < 0)
+                            fatal("comm: data length < 0: %ld\n", (long)length);
                         ip->save_tn_state = ip->tn_state;
                         ip->chars_ready = length;
                         ip->tn_state = TS_READY;
                     }
 
-                    if ( !(buff[0] = ip->text[ip->command_start++]) )
+                    /* Copy as many characters from the text[] into
+                     * the buff[].
+                     */
+                    DT(("'%s'   %d chars ready\n", ip->ob->name
+                       , ip->chars_ready));
+                    for (destix = 0; destix < ip->chars_ready; )
+                    {
+                        char ch;
+
+                        ch = ip->text[ip->command_start++];
+                        buff[destix++] = ch;
+                        if (!(ip->combine_cset[(ch&0xff) / 8] & (1 << (ch % 8)))
+                         || !ch
+                           )
+                        {
+                            /* This character can't be combined (or it is the
+                             * end of the line).
+                             * If it is not the first character encountered,
+                             * undo the previous store; in either case break
+                             * the loop.
+                             */
+                            if (destix != 1)
+                            {
+                                destix--;
+                                ip->command_start--;
+                            }
+                            break;
+                        }
+                    }
+
+                    /* destix is now the number of characters stored in
+                     * buff[], and it is at least 1.
+                     */
+                    
+                    if (!buff[destix-1])
                     {
                         /* End of line. Reinitialise the telnet machine
                          */
-                        buff[0] = '\n';
+                        DT(("'%s'     reinit telnet machine\n", ip->ob->name));
+                        buff[destix-1] = '\n';
                         ip->command_start = 0;
                         ip->tn_state = TS_DATA;
                         telnet_neg(ip);
                     }
 
-                    buff[1] = '\0';
+                    buff[destix] = '\0';
 
-                    if (!--ip->chars_ready)
+                    ip->chars_ready -= destix;
+                    DT(("'%s'   %d chars left ready\n", ip->ob->name
+                       , ip->chars_ready));
+                    if (!ip->chars_ready)
                     {
                         /* All the pure data was read, now restore the
                          * old telnet machine state.
                          * Leave the first char in to make '!' possible
                          */
+                        DT(("'%s'     restore old telnet machine day\n"
+                           , ip->ob->name));
                         ip->tn_state = ip->save_tn_state;
                         ip->save_tn_state = TS_INVALID;
                         ip->tn_start -= ip->command_start - 1;
-                        move_memory( ip->text
-                                   , ip->text+ip->command_start
-                                   , ( ip->text_end = ip->tn_end =
-                              ip->command_end -= ip->command_start - 1)
-                                   );
+                        ip->command_end -= ip->command_start - 1;
+
+                        if (ip->command_end > 0)
+                        {
+                            move_memory( ip->text, ip->text+ip->command_start
+                                       , ip->command_end
+                                       );
+                        }
+
                         ip->command_start = 1;
+
+                        /* When receiving a pure data line in charmode, starting
+                         * with the second char, these two values may become
+                         * negative. We have to correct them then to point
+                         * to ip->command_start.
+                         */
+                        if (ip->tn_start < 1)
+                            ip->tn_start = 1;
+                        if (ip->command_end < 1)
+                            ip->command_end = 1;
+
+                        ip->text_end = ip->tn_end = ip->command_end;
                     }
 
                     command_giver = ip->ob;
@@ -1789,6 +1992,7 @@ get_message (char *buff)
                     IncCmdGiver;
                     CmdsGiven = 0;
                     ip->last_time = current_time;
+                    DT(("'%s'    return with command\n", ip->ob->name));
                     return MY_TRUE;
                 }
                 else if (ip->tn_state != TS_READY)
@@ -1797,6 +2001,9 @@ get_message (char *buff)
                               ? ip->tn_start
                               : ip->command_end
                              ) - ip->command_start;
+                    DT(("'%s'   data length %d\n", ip->ob->name, length));
+                    if (length < 0)
+                        fatal("comm: data length < 0: %ld\n", (long)length);
                     if (length > ip->chars_ready)
                     {
                         socket_write(ip->socket, ip->text + ip->chars_ready
@@ -1816,6 +2023,7 @@ get_message (char *buff)
                  * possible snooper and return.
                  */
 
+                DT(("'%s' telnet machine ready\n", ip->ob->name));
                 strcpy(buff, ip->text);
                 command_giver = ip->ob;
                 trace_level = ip->trace_level;
@@ -1829,7 +2037,8 @@ get_message (char *buff)
                 /* If the user is not in ed, don't let him issue another command
                  * before the poll comes again.
                  */
-                if (ip->sent.ed_buffer && CmdsGiven < ALLOWED_ED_CMDS)
+                if (O_GET_SHADOW(ip->ob)->ed_buffer
+                 && CmdsGiven < ALLOWED_ED_CMDS)
                 {
                     CmdsGiven++;
                     FD_CLR(ip->socket, &readfds);
@@ -1848,8 +2057,7 @@ get_message (char *buff)
                  && !(ip->noecho & NOECHO_REQ)
                    )
                 {
-                    if (O_GET_INTERACTIVE(snooper)
-                     && O_GET_INTERACTIVE(snooper)->sent.type == SENT_INTERACTIVE)
+                    if (O_IS_INTERACTIVE(snooper))
                     {
                         command_giver = snooper;
                         add_message("%% %s\n", buff);
@@ -1857,12 +2065,13 @@ get_message (char *buff)
                     else
                     {
                         char *snoop_message = alloca(strlen(buff) + 4);
-                        (void)sprintf(snoop_message, "%% %s\n", buff);
+                        sprintf(snoop_message, "%% %s\n", buff);
                         tell_npc(snooper, snoop_message);
                     }
                     command_giver = ip->ob;
                 }
                 ip->last_time = current_time;
+                DT(("'%s'    return with command\n", ip->ob->name));
                 return MY_TRUE;
             } /* if (have a command) */
 
@@ -1882,16 +2091,16 @@ get_message (char *buff)
 
 /*-------------------------------------------------------------------------*/
 void
-remove_interactive (struct object *ob)
+remove_interactive (object_t *ob)
 
 /* Remove the interactive user <ob> immediately.
  * This function should not be called from within a LPC command execution.
  */
 
 {
-    struct object *save = command_giver;
+    object_t *save = command_giver;
     int i;
-    struct interactive *interactive;
+    interactive_t *interactive;
     int save_privilege;
 
     interactive = O_GET_INTERACTIVE(ob);
@@ -1910,12 +2119,12 @@ remove_interactive (struct object *ob)
     current_object = ob;
     save_privilege = malloc_privilege;
 
-    /* If the object is not destruct, inform the master */
+    /* If the object is not destructed, inform the master */
 
     if ( !(ob->flags & O_DESTRUCTED) )
     {
-        command_giver = 0;
-        current_interactive = 0;
+        command_giver = NULL;
+        current_interactive = NULL;
         push_object(ob);
         malloc_privilege = MALLOC_MASTER;
         apply_master_ob(STR_DISCONNECT, 1);
@@ -1929,9 +2138,7 @@ remove_interactive (struct object *ob)
 
     if (interactive->snoop_by)
     {
-        if (O_GET_INTERACTIVE(interactive->snoop_by)
-         && O_GET_INTERACTIVE(interactive->snoop_by)->sent.type ==
-            SENT_INTERACTIVE)
+        if (O_IS_INTERACTIVE(interactive->snoop_by))
         {
             O_GET_INTERACTIVE(interactive->snoop_by)->snoop_on = NULL;
         }
@@ -1968,9 +2175,6 @@ remove_interactive (struct object *ob)
     {
         /* Say goodbye to the user. */
         trace_level |= interactive->trace_level;
-#if 0
-        add_message(destruct_add_message_format, "Closing down.\n");
-#endif
         add_message(message_flush);
         shutdown(interactive->socket, 2);
         socket_close(interactive->socket);
@@ -1985,9 +2189,12 @@ remove_interactive (struct object *ob)
 
     /* Release all associated resources */
 
-    if (interactive->input_to)
+    while (interactive->input_to)
     {
-        free_input_to(interactive->input_to);
+        input_to_t * it = interactive->input_to;
+
+        interactive->input_to = it->next;
+        free_input_to(it);
     }
 
     if (interactive->modify_command)
@@ -1995,32 +2202,16 @@ remove_interactive (struct object *ob)
         free_object(interactive->modify_command, "remove_interactive");
     }
 
+    prompt_from_ed_buffer(interactive);
     free_svalue(&interactive->prompt);
 
-    /* If the shadow_sentence in the interactive structure is used
-     * for its real purposes, or if there is still an ed buffer open,
-     * create a copy of the shadow_sentence and put it into the place
-     * of the interactive structure.
-     * Else, just remove the interactive structure.
+    /* Unlink the interactive structure from the shadow sentence
+     * of the object.
      */
-    if (interactive->sent.ed_buffer
-     || interactive->sent.shadowing || interactive->sent.shadowed_by)
-    {
-        struct shadow_sentence *shadow_sent;
+    O_GET_INTERACTIVE(ob) = NULL;
+    check_shadow_sent(ob);
 
-        malloc_privilege = MALLOC_SYSTEM;
-        shadow_sent = (struct shadow_sentence *)alloc_sentence();
-        *shadow_sent = interactive->sent;
-        shadow_sent->type = SENT_SHADOW;
-        ob->sent = (struct sentence *)shadow_sent;
-    }
-    else
-    {
-        ob->sent = interactive->sent.next;
-        ob->flags &= ~O_SHADOW;
-    }
-
-    xfree((char *)interactive);
+    xfree(interactive);
     all_players[i] = NULL;
     while (max_player && !all_players[max_player])
         max_player--;
@@ -2043,7 +2234,7 @@ refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) )
  */
 
 {
-    struct interactive **user, *this;
+    interactive_t **user, *this;
     int n;
 
     user = all_players;
@@ -2053,7 +2244,12 @@ refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) )
         if (this)
         {
             struct sockaddr_in addr;
-            int length, port;
+            int port;
+#           ifndef _AIX
+              int length;
+#           else
+              size_t length;
+#           endif
 
             length = sizeof(addr);
             getsockname(this->socket, (struct sockaddr *)&addr, &length);
@@ -2066,7 +2262,7 @@ refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) )
 #endif /* ACCESS_CONTROL */
 
 /*-------------------------------------------------------------------------*/
-struct vector *
+vector_t *
 users (void)
 
 /* EFUN users()
@@ -2075,11 +2271,11 @@ users (void)
  */
 
 {
-    struct object *ob;
+    object_t *ob;
     int n, num;
-    struct vector *ret;
-    struct interactive **user;
-    struct svalue *svp;
+    vector_t *ret;
+    interactive_t **user;
+    svalue_t *svp;
 
     /* Count the active users */
     num = 0;
@@ -2142,11 +2338,10 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
 
     int   i;             /* Index of free slot in all_players[] */
     char *message;       /* Failure message */
-    struct object *ob;   /* Login object */
-    struct svalue *ret;  /* LPC call results */
-    struct interactive *new_interactive;
+    object_t *ob;        /* Login object */
+    svalue_t *ret;       /* LPC call results */
+    interactive_t *new_interactive;
                          /* The new interactive structure */
-    struct shadow_sentence *save_shadow;
 #ifdef ACCESS_CONTROL
     long class;     /* Access class */
 #endif
@@ -2165,8 +2360,14 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
 
         if (log_file) {
             FCOUNT_WRITE(log_file);
-            fprintf(log_file, "%s: %s\n",
-                inet_ntoa(addr->sin_addr), message ? "denied" : "granted");
+            fprintf(log_file, "%s %s: %s\n"
+                   , time_stamp()
+#ifndef USE_IPV6
+                   , inet_ntoa(addr->sin_addr)
+#else
+                   , inet6_ntoa(addr->sin_addr)
+#endif
+                   , message ? "denied" : "granted");
             fclose(log_file);
         }
     }
@@ -2181,7 +2382,8 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
 #endif /* ACCESS_CONTROL */
 
     if (d_flag > 1)
-        debug_message("New player at socket %d.\n", new_socket);
+        debug_message("%s New player at socket %d.\n"
+                     , time_stamp(), new_socket);
 
     /* Look for an empty slot in all_players[] */
     for (i = 0; i < MAX_PLAYERS && all_players[i] != NULL; i++) NOOP;
@@ -2200,8 +2402,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
 
     /* The master must be loaded and free to accept a login */
     assert_master_ob_loaded();
-    if (O_GET_INTERACTIVE(master_ob)
-     && O_GET_INTERACTIVE(master_ob)->sent.type == SENT_INTERACTIVE)
+    if (O_IS_INTERACTIVE(master_ob))
     {
         message = "Cannot accept connections. Come back later.\r\n";
         socket_write(new_socket, message, strlen(message));
@@ -2211,33 +2412,22 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
 
     command_giver = master_ob;
     trace_level = 0;
-    new_interactive = xalloc(sizeof (struct interactive));
+    new_interactive = xalloc(sizeof (interactive_t));
     if (!new_interactive)
     {
         message = "Cannot accept connection (out of memory). Come back later.\r\n";
         socket_write(new_socket, message, strlen(message));
         socket_close(new_socket);
+        debug_message("%s Out of memory (%lu bytes) for new connection.\n"
+                     , time_stamp(), (unsigned long) sizeof(interactive_t));
         return;
     }
 
-    /* If the master is shadowed, copy the shadow into the interactive
-     * structure, else enter the structure as _the_ shadow to the master.
-     */
-    if (master_ob->flags & O_SHADOW)
-    {
-        new_interactive->sent = *O_GET_SHADOW(master_ob);
-        free_shadow_sent(O_GET_SHADOW(master_ob));
-    }
-    else
-    {
-        new_interactive->sent.next = master_ob->sent;
-        new_interactive->sent.shadowed_by = NULL;
-        new_interactive->sent.shadowing = NULL;
-        new_interactive->sent.ed_buffer = NULL;
-    }
-    new_interactive->sent.type = SENT_INTERACTIVE;
-    master_ob->sent = (struct sentence *)new_interactive;
-    master_ob->flags |= O_ONCE_INTERACTIVE|O_SHADOW;
+    /* Link the interactive to the master */
+
+    assert_shadow_sent(master_ob);
+    O_GET_INTERACTIVE(master_ob) = new_interactive;
+    master_ob->flags |= O_ONCE_INTERACTIVE;
     new_interactive->ob = master_ob;
 
     /* Initialize the rest of the interactive structure */
@@ -2245,6 +2435,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     new_interactive->input_to = NULL;
     put_volatile_string(&new_interactive->prompt, "> ");
     new_interactive->modify_command = NULL;
+    new_interactive->set_input_to = MY_FALSE;
     new_interactive->closing = MY_FALSE;
     new_interactive->do_close = 0;
     new_interactive->noecho = 0;
@@ -2268,8 +2459,9 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     memset(new_interactive->charset, 255, sizeof new_interactive->charset);
     new_interactive->charset['\n'/8] &= ~(1 << '\n' % 8);
     new_interactive->charset['\0'/8] &= ~(1 << '\0' % 8);
+    memset(new_interactive->combine_cset, 0, sizeof new_interactive->combine_cset);
     new_interactive->text[0] = '\0';
-    memcpy((char *)&new_interactive->addr, (char *)addr, addrlen);
+    memcpy(&new_interactive->addr, addr, addrlen);
 #if defined(ACCESS_CONTROL)
     new_interactive->access_class = class;
 #endif
@@ -2292,8 +2484,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
         return;
     if (ret == NULL
      || ret->type != T_OBJECT
-     || ( O_GET_INTERACTIVE(ob = ret->u.ob) &&
-          O_GET_INTERACTIVE(ob)->sent.type == SENT_INTERACTIVE) )
+     || (ob = ret->u.ob, O_IS_INTERACTIVE(ob)))
     {
         remove_interactive(master_ob);
         return;
@@ -2301,60 +2492,20 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     command_giver = master_ob;
     add_message(message_flush);
 
-    /* There was an object returned from connect(). Use this as the
-     * user object.
+    /* There was an non-interactive object returned from connect().
+     * Relink the interactive from the master to this as the user object.
      */
 
-    /* Remember that this shadow sentence belongs to the master! */
-    save_shadow = (struct shadow_sentence *)alloc_sentence();
-    *save_shadow = new_interactive->sent;
-
-    /* If the new user object already has a shadow, copy its data
-     * into the interactive structure, else use the interactive
-     * structure as the first shadow of the user object.
-     * Any existing ed buffer is preserved.
-     */
-    if (ob->flags & O_SHADOW)
-    {
-        struct ed_buffer *buf = new_interactive->sent.ed_buffer;
-
-        new_interactive->sent = *O_GET_SHADOW(ob);
-        if (buf)
-        {
-            save_shadow->ed_buffer = new_interactive->sent.ed_buffer;
-            new_interactive->sent.ed_buffer = buf;
-        }
-        new_interactive->sent.type = SENT_INTERACTIVE;
-        free_shadow_sent(O_GET_SHADOW(ob));
-    }
-    else
-    {
-        new_interactive->sent.next = ob->sent;
-        new_interactive->sent.shadowed_by = NULL;
-        new_interactive->sent.shadowing = NULL;
-        save_shadow->ed_buffer = NULL;
-    }
-    ob->sent = (struct sentence *)new_interactive;
-    new_interactive->ob = ob;
-    ob->flags |= O_ONCE_INTERACTIVE|O_SHADOW;
-
-    /* Restore the shadow setting of the master.
-     */
+    O_GET_INTERACTIVE(master_ob) = NULL;
     master_ob->flags &= ~O_ONCE_INTERACTIVE;
-    if (save_shadow->shadowing
-     || save_shadow->shadowed_by
-     || save_shadow->ed_buffer)
-    {
-        save_shadow->type = SENT_SHADOW;
-        master_ob->sent = (struct sentence *)save_shadow;
-    }
-    else
-    {
-        master_ob->sent = save_shadow->next;
-        free_shadow_sent(save_shadow);
-        master_ob->flags &= ~O_SHADOW;
-    }
-    free_object(master_ob, "reconnect");
+    check_shadow_sent(master_ob);
+
+    assert_shadow_sent(ob);
+    O_GET_INTERACTIVE(ob) = new_interactive;
+    new_interactive->ob = ob;
+    ob->flags |= O_ONCE_INTERACTIVE;
+
+    free_object(master_ob, "new_player");
 
     /* Prepare to call logon() in the new user object.
      */
@@ -2365,17 +2516,16 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
         new_interactive->snoop_on->snoop_by = ob;
     }
 #ifdef ERQ_DEMON
-    send_erq(ERQ_HANDLE_RLOOKUP, ERQ_RLOOKUP,
-      (char *)&new_interactive->addr.sin_addr.s_addr, 4
-    );
+    (void) lookup_ip_entry((long)(new_interactive->addr.sin_addr.s_addr), MY_TRUE);
+    /* TODO: We could pass the retrieved hostname right to login */
 #endif
     logon(ob);
     flush_all_player_mess();
-}
+} /* new_player() */
 
 /*-------------------------------------------------------------------------*/
 void
-set_noecho (struct interactive *i, char noecho)
+set_noecho (interactive_t *i, char noecho)
 
 /* Change the input mode <i>->noecho to the given <noecho>, performing all
  * necessary telnet negotiations. If the driverhook H_NOECHO is set,
@@ -2384,12 +2534,14 @@ set_noecho (struct interactive *i, char noecho)
 
 {
     char old, confirm;
-    struct object *ob;
+    object_t *ob;
 
     old = i->noecho;
 
     confirm = (char)(
       noecho | CHARMODE_REQ_TO_CHARMODE(noecho & (NOECHO_REQ|CHARMODE_REQ)));
+    DT(("'%s' set_noecho(%02x) old %02x -> confirm: %02x -> %02x\n"
+       , i->ob->name, noecho, old, confirm, confirm | NOECHO_ACKSHIFT(confirm)));
     i->noecho = confirm;
 
     confirm |= NOECHO_ACKSHIFT(confirm);
@@ -2398,12 +2550,14 @@ set_noecho (struct interactive *i, char noecho)
         ob = i->ob;
         if (closure_hook[H_NOECHO].type == T_STRING)
         {
+            DT(("'%s' set_noecho():   calling H_NOECHO\n", i->ob->name));
             push_number(noecho);
             push_object(ob);
             secure_apply(closure_hook[H_NOECHO].u.string, ob, 2);
         }
         else if (closure_hook[H_NOECHO].type == T_CLOSURE)
         {
+            DT(("'%s' set_noecho():   calling H_NOECHO\n", i->ob->name));
             if (closure_hook[H_NOECHO].x.closure_type == CLOSURE_LAMBDA)
                 closure_hook[H_NOECHO].u.lambda->ob = ob;
             push_number(noecho);
@@ -2412,20 +2566,23 @@ set_noecho (struct interactive *i, char noecho)
         }
         else
         {
-            struct object *save;
+            object_t *save;
 
             save = command_giver;
             command_giver = ob;
             if (~confirm & old & NOECHO)
             {
+                DT(("'%s' set_noecho():   WONT TELOPT_ECHO\n", i->ob->name));
                 send_wont(TELOPT_ECHO);
             }
             else if (confirm & ~old & NOECHO_MASK)
             {
+                DT(("'%s' set_noecho():   WILL TELOPT_ECHO\n", i->ob->name));
                 send_will(TELOPT_ECHO);
             }
             if (i->supress_go_ahead && !(confirm & (NOECHO|CHARMODE)))
             {
+                DT(("'%s' set_noecho():   WONT TELOPT_SGA\n", i->ob->name));
                 i->supress_go_ahead = MY_FALSE;
                 send_wont(TELOPT_SGA);
             }
@@ -2435,21 +2592,34 @@ set_noecho (struct interactive *i, char noecho)
              */
             if (~confirm & old & CHARMODE_MASK)
             {
+                DT(("'%s' set_noecho():   turn off charmode\n", i->ob->name));
                 if (old & CHARMODE)
+                {
+                    DT(("'%s' set_noecho():     DONT TELOPT_SGA\n", i->ob->name));
                     send_dont(TELOPT_SGA);
+                }
                 if (i->save_tn_state != TS_INVALID)
                 {
+                    DT(("'%s' set_noecho():     0 chars ready, saved state %d\n", i->ob->name,  i->save_tn_state));
                     i->chars_ready = 0;
                     i->tn_state = i->save_tn_state;
                 }
                 if (i->command_start)
                 {
+                    DT(("'%s' set_noecho():     cmd_start %d, tn_start %d, tn_end %d\n", i->ob->name,  i->command_start, i->tn_start, i->tn_end));
                     i->tn_start -= i->command_start;
-                    move_memory(
-                      i->text,
-                      i->text + i->command_start,
-                      ( i->text_end = i->tn_end -= i->command_start )
-                    );
+                    i->tn_end -= i->command_start;
+                    if (i->tn_start < 0)
+                        i->tn_start = 0;
+                    if (i->tn_end <= 0)
+                        i->tn_end = 0;
+                    else
+                    {
+                        move_memory( i->text, i->text + i->command_start
+                                   , i->tn_end
+                                   );
+                    }
+                    i->text_end = i->tn_end;
                     if (i->command_end)
                         i->command_end = i->tn_end;
                     i->command_start = 0;
@@ -2457,6 +2627,8 @@ set_noecho (struct interactive *i, char noecho)
             }
             else if (confirm & ~old & CHARMODE_MASK)
             {
+                DT(("'%s' set_noecho():   turn on charmode\n", i->ob->name));
+                DT(("'%s' set_noecho():     DO+WILL TELOPT_SGA\n", i->ob->name));
                 send_do(TELOPT_SGA);
                 /* some telnet implementations mix up DO and WILL SGA, thus
                  * we send WILL SGA as well.
@@ -2467,11 +2639,32 @@ set_noecho (struct interactive *i, char noecho)
             command_giver = save;
         }
     }
-}
+} /* set_noecho() */
+
+/*-------------------------------------------------------------------------*/
+int
+find_no_bang (interactive_t *ip)
+
+/* Find the most recent input_to in *<ip> which specified "IGNORE_BANG" and
+ * return its full "noecho" flags. This may be the ip->noecho itself!
+ * If there is none, return 0.
+ */
+
+{
+    input_to_t *it;
+
+    if (ip->noecho & IGNORE_BANG)
+        return ip->noecho;
+        
+    for (it = ip->input_to; it; it = it->next)
+        if (it->noecho & IGNORE_BANG)
+            return it->noecho;
+    return 0;
+} /* find_no_bang() */
 
 /*-------------------------------------------------------------------------*/
 Bool
-call_function_interactive (struct interactive *i, char *str)
+call_function_interactive (interactive_t *i, char *str)
 
 /* Perform a pending input_to() for this user <i> and the input <str>
  * Return TRUE if an input_to() was pending and executed, and FALSE
@@ -2481,101 +2674,166 @@ call_function_interactive (struct interactive *i, char *str)
  */
 
 {
-    char *function;     /* actual input_to function */
-    struct object *ob;  /* object holding <function> */
-    int extra;
+    static input_to_t current_it;
+      /* Current input_to, static so that longjmp() won't clobber it. */
 
-    /* _Is_ there an input_to() pending? */
-    if (!i->input_to)
+    struct error_recovery_info error_recovery_info;
+
+    input_to_t *it;
+    object_t   *ob;   /* object holding <function> */
+
+    it = i->input_to;
+    
+    /* _Are_ there an input_to() pending? */
+    if (!it)
         return MY_FALSE;
 
-    /* Yes, there is. Check if it's still valid. */
+    /* Yes, there are. Check if we have to handle '!'. */
+    if (*str == '!')
+    {
+        input_to_t * prev;
 
-    function = i->input_to->function;
-    ob = i->input_to->ob;
-    if (ob->flags & O_DESTRUCTED)
+        for (prev = NULL
+            ; it && !(it->noecho & IGNORE_BANG)
+            ; prev = it, it = it->next)
+            NOOP;
+
+        if (it)
+        {
+            /* Move this 'IGNORE_BANG' input_to to the top of list
+             * since it's the one we're going to execute.
+             */
+            if (prev)
+            {
+                prev->next = it->next;
+                it->next = i->input_to;
+                i->input_to = it;
+            }
+
+            if (!(i->noecho & NOECHO) != !(it->noecho & NOECHO_REQ)) {
+                /* !message for ECHO-context  while in NOECHO - simulate the
+                 * echo by sending the (remaining) raw data we got.
+                 */
+                add_message("%s\n", str + i->chars_ready);
+                i->chars_ready = 0;
+            }
+
+            /* Don't hide the leading '!' */
+        }
+        else
+        {
+            /* Bang-input but no matching input_to(): return */
+            return MY_FALSE;
+        }
+    }
+
+    /* We got the right input_to_t. Check if it's still valid. */
+    ob = callback_object(&(it->fun));
+    if (!ob)
     {
         /* Sorry, the object has selfdestructed ! */
-        set_noecho(i, 0);
-        free_input_to(i->input_to);
-        i->input_to = NULL;
+        set_noecho(i, it->next ? it->next->noecho : 0);
+        i->input_to = it->next;
+        free_input_to(it);
         return MY_FALSE;
     }
 
-    if (i->noecho) {
-        /* if there is a series of noecho/charmode input, we should only
-         * negotiate when we know that the state actually should change.
-         * In other words: should the input_to function request NOECHO
-         * again, the NOECHO_STALE bit will be cleared and we will not
-         * turn NOECHO off after the call.
-         */
-        i->noecho |= NOECHO_STALE;
+    if (O_PROG_SWAPPED(ob)
+     && load_ob_from_swap(ob) < 0)
+    {
+        set_noecho(i, it->next ? it->next->noecho : 0);
+        i->input_to = it->next;
+        free_input_to(it);
+        error("Out of memory: unswap object '%s'.\n", ob->name);
+        return MY_FALSE;
     }
-    free_object(ob, "call_function_interactive");
 
-    /* Setup the call to the input_to function. */
-
-    push_volatile_string(str);
-    if ( 0 != (extra = i->input_to->num_arg) ) {
-        memcpy(
-          (char *)(inter_sp + 1),
-          (char *)i->input_to->arg,
-          extra * sizeof *inter_sp
-        );
-        inter_sp += extra;
+    /* if there is a series of noecho/charmode input, we should only
+     * negotiate when we know that the state actually should change.
+     * In other words: should the input_to function request NOECHO
+     * again, the NOECHO_STALE bit will be cleared and we will not
+     * turn NOECHO off after the call.
+     */
+    if (i->noecho)
+    {
+        i->noecho |= NOECHO_STALE;
     }
 
     /* Clear the input_to() reference in case the function called
      * sets up a new one.
      */
+    current_it = *it;
+    i->input_to = it->next;
+    xfree(it);
 
-    xfree((char *)i->input_to);
-    i->input_to = NULL;
+    /* Activate the local error recovery context */
 
-    /* Call the function. current_object is set to the object holding
-     * the function so that static functions can be used.
-     */
-    current_object = ob;
-    (void)apply(function, ob, 1 + extra);
-    free_string(function);
+    error_recovery_info.rt.last = rt_context;
+    error_recovery_info.rt.type = ERROR_RECOVERY_BACKEND;
+    rt_context = (rt_context_t *)&error_recovery_info;
+
+    if (setjmp(error_recovery_info.con.text))
+    {
+        /* An error occured: free the remaining data,
+         * restore the error stack and return
+         */
+
+        clear_state();
+        debug_message("%s Error in input_to().\n", time_stamp());
+        free_callback(&(current_it.fun));
+        rt_context = error_recovery_info.rt.last;
+        return MY_TRUE;
+    }
+
+    /* Call the input_to() function with the newly input string */
+
+    push_volatile_string(str);
+    (void)backend_callback(&(current_it.fun), 1);
+
+    rt_context = error_recovery_info.rt.last;
 
     /* If NOECHO is no longer needed, turn it off. */
 
     if (i->noecho & NOECHO_STALE)
     {
-        set_noecho(i, 0);
+        set_noecho(i, i->input_to ? i->input_to->noecho : 0);
     }
 
+    /* Done */
     return MY_TRUE;
-}
+} /* call_function_interactive() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
-set_call (struct object *ob, struct input_to *it, char noecho)
+set_call (object_t *ob, input_to_t *it, char noecho)
 
-/* Set a a new input_to <it> with <noecho> on or off to the interactive
- * object <ob>. It is assumed that <ob> has no input_to pending.
+/* Set a a new input_to <it> with the flags <noecho> (mainly really NOECHO,
+ * but also IGNORE_BANG or not) to the interactive object <ob>.
  * Return TRUE on success.
+ *
+ * Called for efun input_to().
  */
 
 {
-    struct interactive *ip;
+    interactive_t *ip;
 
     if (ob == NULL || it == NULL)
         return MY_FALSE;
-    ip = O_GET_INTERACTIVE(ob);
-    if (!ip || ip->sent.type != SENT_INTERACTIVE || ip->input_to
-     || ip->closing)
+    if (!(O_SET_INTERACTIVE(ip, ob))
+     || ip->closing || ip->set_input_to)
     {
         return MY_FALSE;
     }
+
+    it->noecho = noecho;
+    it->next = ip->input_to;
     ip->input_to = it;
-    if (noecho)
-    {
+    ip->set_input_to = MY_TRUE;
+
+    if (noecho || ip->noecho)
         set_noecho(ip, noecho);
-    }
     return MY_TRUE;
-}
+} /* set_call() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -2583,7 +2841,7 @@ remove_all_players (void)
 
 /* Destruct all user objects. This is first tried by calling master->remove()
  * for every object. If this doesn't destruct the user object,
- * emergency_destruct() is used.
+ * destruct() is used.
  * The function is called when the game is shut down.
  */
 
@@ -2600,7 +2858,7 @@ remove_all_players (void)
         push_object(all_players[i]->ob);
         (void)apply_master_ob(STR_REMOVE_PL, 1);
         if ( !(all_players[i]->ob->flags & O_DESTRUCTED) ) {
-            emergency_destruct(all_players[i]->ob);
+            destruct(all_players[i]->ob);
         }
     }
 }
@@ -2609,15 +2867,16 @@ remove_all_players (void)
 void
 set_prompt (char *str)
 
-/* Set the prompt of the current command_giver to <str>.
+/* Set the prompt of the current command_giver to volatile string <str>.
+ * This function is not called for the efun set_prompt().
  */
 
 {
-    struct svalue *promptp;
+    svalue_t *promptp;
 
 #ifdef DEBUG
-    if (O_GET_INTERACTIVE(command_giver)->sent.type != SENT_INTERACTIVE)
-        fatal("set_prompt() of non-interactive object\n");
+    if (!O_IS_INTERACTIVE(command_giver))
+        fatal("set_prompt() of non-interactive object.\n");
 #endif
     promptp = &O_GET_INTERACTIVE(command_giver)->prompt;
     free_svalue(promptp);
@@ -2625,8 +2884,8 @@ set_prompt (char *str)
 }
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-query_prompt (struct object *ob)
+svalue_t *
+query_prompt (object_t *ob)
 
 /* Return the prompt setting of interactive object <ob>.
  * Note that you will get a pointer to the very svalue the object
@@ -2635,7 +2894,7 @@ query_prompt (struct object *ob)
 
 {
 #ifdef DEBUG
-    if (O_GET_INTERACTIVE(ob)->sent.type != SENT_INTERACTIVE)
+    if (!O_IS_INTERACTIVE(ob))
         fatal("query_prompt() of non-interactive object\n");
 #endif
     return &O_GET_INTERACTIVE(ob)->prompt;
@@ -2649,23 +2908,24 @@ print_prompt (void)
  * by input_to. If the prompt is set to a closure, the closure
  * is called and expected to return the actual prompt string or
  * to print the prompt itself.
+ * TODO: Add a prompt to "input_to()" - best make it a completely new
+ * TODO:: efun. Or special parameters to set_prompt().
  */
 
 {
-    struct interactive *ip;
+    interactive_t *ip;
 
 #ifdef DEBUG
     if (command_giver == 0)
         fatal("command_giver == 0.\n");
 #endif
-    ip = O_GET_INTERACTIVE(command_giver);
-#ifdef DEBUG
-    if (ip->sent.type != SENT_INTERACTIVE)
+
+    if (!(O_SET_INTERACTIVE(ip, command_giver)))
         fatal("print_prompt() of non-interactive object\n");
-#endif
+
     if (ip->input_to == NULL)
     {
-        struct svalue *prompt;
+        svalue_t *prompt;
 
         prompt = &ip->prompt;
         if (prompt->type == T_CLOSURE)
@@ -2691,11 +2951,11 @@ print_prompt (void)
             add_message("%s", prompt->u.string);
         }
     } /* if (no input_to) */
-}
+} /* print_prompt() */
 
 /*-------------------------------------------------------------------------*/
 int
-set_snoop (struct object *me, struct object *you)
+set_snoop (object_t *me, object_t *you)
 
 /* Set a snoop from <me> on the IO of <you>. If <you> is NULL, an
  * existing snoop is terminated. <me> need not to be an interactive
@@ -2709,10 +2969,10 @@ set_snoop (struct object *me, struct object *you)
  */
 
 {
-    struct interactive *on = NULL; /* interactive struct of <you> */
-    struct interactive *by = NULL; /* interactive struct of <me> */
-    struct interactive *tmp;
-    struct svalue *ret;
+    interactive_t *on = NULL; /* interactive struct of <you> */
+    interactive_t *by = NULL; /* interactive struct of <me> */
+    interactive_t *tmp;
+    svalue_t *ret;
 
     /* Stop if people managed to quit before we got this far */
     if (me->flags & O_DESTRUCTED)
@@ -2722,7 +2982,7 @@ set_snoop (struct object *me, struct object *you)
 
     /* Check for permissions with valid_snoop in master */
     push_object(me);
-    if (you == 0)
+    if (you == NULL)
         push_number(0);
     else
         push_object(you);
@@ -2734,16 +2994,11 @@ set_snoop (struct object *me, struct object *you)
     if (me->flags & O_DESTRUCTED)
         return 0;
 
-
     /* Test is <me> is able to snoop anyway.
      * Set <by> to <me>'s interactive struct if yes.
      */
-    if ( NULL != (by = O_GET_INTERACTIVE(me)) ) {
-        if (by->sent.type != SENT_INTERACTIVE)
-            by = NULL;
-        else if (by->closing)
-            return 0;
-    }
+    if (O_SET_INTERACTIVE(by, me) && by->closing)
+        return 0;
 
     if (you)
     {
@@ -2752,18 +3007,15 @@ set_snoop (struct object *me, struct object *you)
          */
         if (you->flags & O_DESTRUCTED)
             return 0;
-        if (!(on = O_GET_INTERACTIVE(you))
-         || on->sent.type != SENT_INTERACTIVE || on->closing)
-        {
+        if (!(O_SET_INTERACTIVE(on, you)) || on->closing)
             return 0;
-        }
     }
     else
     {
         /* Stop snoop.
          * For this, set <on> to the interactive struct of the snoops
          * victim. If <by> is NULL, <me> is propably a netdead user
-         * and we have to scan the list of users for the victim.
+         * or a NPC and we have to scan the list of users for the victim.
          */
 
         if (!by)
@@ -2779,16 +3031,16 @@ set_snoop (struct object *me, struct object *you)
             }
             if (on->closing)
                 return 0;
-            free_object(me, "new_set_snoop");
+            free_object(me, "set_snoop");
         }
         else
         {
             on = by->snoop_on;
             if (!on || on->closing)
                 return 0;
-            by->snoop_on = 0;
+            by->snoop_on = NULL;
         }
-        on->snoop_by = 0;
+        on->snoop_by = NULL;
         return 1;
     }
 
@@ -2805,10 +3057,9 @@ set_snoop (struct object *me, struct object *you)
     /* Terminate previous snoop, if any */
     if (on->snoop_by)
     {
-        struct interactive *ip;
+        interactive_t *ip;
 
-        if (NULL != (ip = O_GET_INTERACTIVE(on->snoop_by))
-         && ip->sent.type == SENT_INTERACTIVE)
+        if (O_SET_INTERACTIVE(ip, on->snoop_by))
         {
             if (ip->closing)
                 return 0;
@@ -2816,7 +3067,7 @@ set_snoop (struct object *me, struct object *you)
         }
         else
         {
-            free_object(on->snoop_by, "new_set_snoop");
+            free_object(on->snoop_by, "set_snoop");
         }
         on->snoop_by = NULL;
     }
@@ -2835,12 +3086,12 @@ set_snoop (struct object *me, struct object *you)
     }
     else
     {
-        ref_object(me, "new_set_snoop");
+        ref_object(me, "set_snoop");
     }
 
     on->snoop_by = me;
     return 1;
-}
+} /* set_snoop() */
 
 /*=========================================================================*/
 /*                      Telnet Support
@@ -2859,6 +3110,7 @@ send_wont (int option)
 /* Send IAC WONT <option> */
 
 {
+    DTF(("%s TDEBUG: send IAC WONT %02x\n", time_stamp(), option));
     SEND_TELNET_COMMAND(
       add_message("%c", IAC);
       add_message("%c%c", WONT, option);
@@ -2873,6 +3125,7 @@ send_dont (int option)
 /* Send IAC DONT <option> */
 
 {
+    DTF(("%s TDEBUG: send IAC DONT %02x\n", time_stamp(), option));
     SEND_TELNET_COMMAND(
       add_message("%c", IAC);
       add_message("%c%c", DONT, option);
@@ -2887,6 +3140,7 @@ send_will (int option)
 /* Send IAC WILL <option> */
 
 {
+    DTF(("%s TDEBUG: send IAC WILL %02x\n", time_stamp(), option));
     SEND_TELNET_COMMAND(
       add_message("%c", IAC);
       add_message("%c%c", WILL, option);
@@ -2901,6 +3155,7 @@ send_do (int option)
 /* Send IAC DO <option> */
 
 {
+    DTF(("%s TDEBUG: send IAC DO %02x\n", time_stamp(), option));
     SEND_TELNET_COMMAND(
       add_message("%c", IAC);
       add_message("%c%c", DO, option);
@@ -2929,13 +3184,15 @@ reply_to_do_echo (int option)
  */
 
 {
-    struct interactive *ip = O_GET_INTERACTIVE(command_giver);
+    interactive_t *ip = O_GET_INTERACTIVE(command_giver);
 
+    DT(("'%s' reply to DO ECHO\n", ip->ob->name));
     if (ip->noecho & NOECHO_MASK) {
         if ( !(ip->noecho & NOECHO) ) {
             /* We were previously told not to echo */
             send_will(option);
         }
+        DT(("'%s'   we already said WILL\n", ip->ob->name));
         /* If we already said that we will echo, be quiet */
         ip->noecho |= NOECHO_MASK;
     } else {
@@ -2951,13 +3208,15 @@ reply_to_dont_echo (int option)
  */
 
 {
-    struct interactive *ip = O_GET_INTERACTIVE(command_giver);
+    interactive_t *ip = O_GET_INTERACTIVE(command_giver);
 
+    DT(("'%s' reply to DONT ECHO\n", ip->ob->name));
     if (ip->noecho & NOECHO_MASK) {
         if (~(ip->noecho | ~NOECHO_MASK)) {
             /* We were granted the option before */
             send_wont(option);
         }
+        DT(("'%s'   we already said WONT\n", ip->ob->name));
         ip->noecho = (char)((ip->noecho & ~NOECHO) | NOECHO_ACK);
     }
 }
@@ -2972,13 +3231,15 @@ reply_to_do_sga (int option)
  */
 
 {
-    struct interactive *ip = O_GET_INTERACTIVE(command_giver);
+    interactive_t *ip = O_GET_INTERACTIVE(command_giver);
 
+    DT(("'%s' reply to DO SGA\n", ip->ob->name));
     if (ip->noecho & (NOECHO_MASK|CHARMODE_MASK)) {
         if (!ip->supress_go_ahead) {
             ip->supress_go_ahead = MY_TRUE;
             send_will(option);
         }
+        DT(("'%s'   we already said WILL\n", ip->ob->name));
     } else {
         send_wont(option);
     }
@@ -2993,8 +3254,9 @@ reply_to_dont_sga (int option)
  */
 
 {
-    struct interactive *ip = O_GET_INTERACTIVE(command_giver);
+    interactive_t *ip = O_GET_INTERACTIVE(command_giver);
 
+    DT(("'%s' reply to DONT SGA\n", ip->ob->name));
     if (ip->supress_go_ahead) {
         ip->supress_go_ahead = 0;
         send_wont(option);
@@ -3010,12 +3272,14 @@ reply_to_will_sga (int option)
  */
 
 {
-    struct interactive *ip = O_GET_INTERACTIVE(command_giver);
+    interactive_t *ip = O_GET_INTERACTIVE(command_giver);
 
+    DT(("'%s' reply to WILL SGA\n", ip->ob->name));
     if (ip->noecho & CHARMODE_MASK) {
         if ( !(ip->noecho & CHARMODE) ) {
             send_do(option);
         }
+        DT(("'%s'   we already said DO\n", ip->ob->name));
         ip->noecho |= CHARMODE_MASK;
     } else {
         send_dont(option);
@@ -3030,28 +3294,30 @@ reply_to_wont_sga (int option)
  */
 
 {
-    struct interactive *ip = O_GET_INTERACTIVE(command_giver);
+    interactive_t *ip = O_GET_INTERACTIVE(command_giver);
 
+    DT(("'%s' reply to WONT SGA\n", ip->ob->name));
     if (ip->noecho & CHARMODE_MASK) {
         if (!(ip->noecho | ~CHARMODE_MASK)) {
             /* We were granted the option before */
             send_dont(option);
         }
+        DT(("'%s'   we already said DONT\n", ip->ob->name));
         ip->noecho = (char)((ip->noecho & ~CHARMODE) | CHARMODE_ACK);
     }
 }
 
 /*-------------------------------------------------------------------------*/
-static struct svalue *
+static svalue_t *
 h_telnet_neg (int n)
 
 /* Call the H_TELNET_NEG driverhook with <n> arguments on the interpreter
  * stack. Return the result from that call, or NULL if the hook isn't
- * set.
+ * set. The arguments are removed from the stack in any case.
  */
 
 {
-    struct svalue *svp;
+    svalue_t *svp;
 
     RESET_LIMITS;
     CLEAR_EVAL_COST;
@@ -3068,6 +3334,8 @@ h_telnet_neg (int n)
     }
     else
     {
+        while (--n >= 0)
+            pop_stack();
         svp = NULL;
     }
     return svp;
@@ -3083,36 +3351,47 @@ reply_h_telnet_neg (int option)
  */
 
 {
-    struct interactive *ip = O_GET_INTERACTIVE(command_giver);
+    interactive_t *ip = O_GET_INTERACTIVE(command_giver);
     int i = 0;
 
     switch(ip->tn_state) {
       case TS_DO:
+        DT(("'%s' reply to telnet_neg: DO %02x\n", ip->ob->name, option));
         i = DO;
         break;
       case TS_DONT:
+        DT(("'%s' reply to telnet_neg: DONT %02x\n", ip->ob->name, option));
         i = DONT;
         break;
       case TS_WILL:
+        DT(("'%s' reply to telnet_neg: WILL %02x\n", ip->ob->name, option));
         i = WILL;
         break;
       case TS_WONT:
+        DT(("'%s' reply to telnet_neg: WONT %02x\n", ip->ob->name, option));
         i = WONT;
+        break;
+      default:
+        debug_message("%s Invalid tn_state %d for interactive '%s'\n"
+             , time_stamp(), ip->tn_state, ip->ob->name);
         break;
     }
     push_number(i);
     push_number(option);
     if (!h_telnet_neg(2)) {
+        DT(("'%s'   using default methods\n", ip->ob->name));
         switch(ip->tn_state) {
           case TS_DO:
+            DT(("'%s'     -> WONT %02x\n", ip->ob->name, option));
             send_wont(option);
             break;
           case TS_WILL:
+            DT(("'%s'     -> DONT %02x\n", ip->ob->name, option));
             send_dont(option);
             break;
         }
     }
-}
+} /* reply_h_telnet_neg() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -3204,20 +3483,22 @@ mudlib_telopts (void)
 
 /* Set all telopts_xxx[] entries to reply_h_telnet_neg().
  * This means that the mudlib does all the telnet negotiation.
+ * It is called whenever driver hook H_NOECHO is set.
  */
 
 {
     int i;
 
+    DT(("All telnet options set to the mudlib.\n"));
     for (i = NTELOPTS; --i >= 0; ) {
         telopts_do[i] = telopts_dont[i] =
           telopts_will[i] = telopts_wont[i] = reply_h_telnet_neg;
     }
-}
+} /* mudlib_telopts() */
 
 /*-------------------------------------------------------------------------*/
 static void
-telnet_neg (struct interactive *ip)
+telnet_neg (interactive_t *ip)
 
 /* Process the data read from the socket, performing any telnet negotiations
  * necessary, and extract the 'pure' command text. When the function returns,
@@ -3241,6 +3522,8 @@ telnet_neg (struct interactive *ip)
     from = &first[ip->tn_end];
     end = &first[ip->text_end];
 
+    DT(("'%s' telnet_neg: state %d\n", ip->ob->name, ip->tn_state));
+
     /* Gobble the character *from if gobble_char is set.
      * Also test for the end of current buffer content.
      */
@@ -3254,6 +3537,8 @@ telnet_neg (struct interactive *ip)
             return;
         }
         if (ip->gobble_char) {
+            DT(("'%s' t_n: gobble char %02x (in buf: %02x)\n"
+               , ip->ob->name, ip->gobble_char, *from));
             if (*from == ip->gobble_char) {
                 from++;
             }
@@ -3284,10 +3569,15 @@ telnet_neg (struct interactive *ip)
                 ip->text_end = ip->tn_end = ip->command_end = (short)(to - first);
                 if (ip->text_end >= MAX_TEXT)
                 {
-                    ip->text_end = ip->tn_end = ip->command_end = 0;
                     /* this looks like a super-long command.
-                     * Return the text so far as partial command.
+                     * Return the text so far as partial command and restart
+                     * input from the beginning.
+                     * In charmode, we must not reset command_end, otherwise
+                     * it might fall under command_start.
                      */
+                    ip->text_end = ip->tn_end = 0;
+                    if (!(ip->noecho & CHARMODE_REQ))
+                        ip->command_end = 0;
                     *to = '\0';
                     ip->tn_state = TS_READY;
                     return;
@@ -3304,6 +3594,7 @@ telnet_neg (struct interactive *ip)
             new_iac:
                   state = TS_IAC;
         change_state:
+                  DT(("'%s' t_n: new state %d\n", ip->ob->name, state));
                   ip->tn_state = (char)state;
                   continue;
 
@@ -3322,7 +3613,7 @@ telnet_neg (struct interactive *ip)
                     goto ts_data;
                 }
 
-                if (ip->text[0] == '!' && ! (ip->noecho & IGNORE_BANG) )
+                if (ip->text[0] == '!' && ! (find_no_bang(ip) & IGNORE_BANG) )
                 {
                     if (to > &ip->text[ip->chars_ready])
                     {
@@ -3337,6 +3628,7 @@ telnet_neg (struct interactive *ip)
                     }
                     goto ts_data;
                 }
+                /* FALLTHROUGH */
 
             default:
                 *to++ = (char)ch;
@@ -3345,7 +3637,7 @@ telnet_neg (struct interactive *ip)
             case '\0':
                 goto ts_data;
 
-              case '\r':
+            case '\r':
                 if (from >= end)
                 {
                     /* This might be a fragmented CR NL, CR NUL, or
@@ -3355,7 +3647,7 @@ telnet_neg (struct interactive *ip)
                      * next character to make our decisions.
                      */
                     if ( !(ip->noecho & CHARMODE_REQ) ||
-                         (ip->text[0] == '!' && ! (ip->noecho & IGNORE_BANG)) )
+                         (ip->text[0] == '!' && ! (find_no_bang(ip) & IGNORE_BANG)) )
                     {
                         ip->gobble_char = '\n';
                         goto full_newline;
@@ -3371,8 +3663,26 @@ telnet_neg (struct interactive *ip)
                     {
                         from--;
                         if ((ip->noecho & CHARMODE_REQ) &&
-                            (ip->text[0] != '!' || ip->noecho & IGNORE_BANG))
+                            (ip->text[0] != '!' || find_no_bang(ip) & IGNORE_BANG))
                         {
+                            if (from == to)
+                            {
+                                /* The client sent a single CR in CHARMODE,
+                                 * there were no previous negotiations and thus
+                                 * we have to make space to insert the CR.
+                                 */
+                                char * cp;
+
+                                if (ip->text_end < MAX_TEXT-1)
+                                {
+                                    ip->text_end++;
+                                    end++;
+                                }
+                                from++;
+                                for (cp = end; cp != from-1; cp--)
+                                    *cp = *(cp-1);
+                            }
+                                
                             ip->tn_state = TS_DATA;
                             *to++ = '\r';
                             goto ts_data;
@@ -3394,7 +3704,7 @@ telnet_neg (struct interactive *ip)
 
             case '\n':
                 if ( !(ip->noecho & CHARMODE_REQ) ||
-                     (ip->text[0] == '!' && ! (ip->noecho & IGNORE_BANG)) )
+                     (ip->text[0] == '!' && ! (find_no_bang(ip) & IGNORE_BANG)) )
                 {
                     ip->gobble_char = '\r';
                 }
@@ -3409,26 +3719,38 @@ telnet_neg (struct interactive *ip)
 
         ts_iac:
         case TS_IAC:
+            DT(("'%s' t_n: state IAC\n", ip->ob->name));
             /* Begin a telnet negotiation */
             switch(ch)
             {
+            case IAC:
+                DT(("'%s' t_n: got IAC\n", ip->ob->name));
+                *to++ = ch;
+                ip->tn_state = state = TS_DATA;
+                goto ts_data;
             case WILL:
+                DT(("'%s' t_n: got WILL\n", ip->ob->name));
                 state = TS_WILL;
                 goto change_state;
             case WONT:
+                DT(("'%s' t_n: got WONT\n", ip->ob->name));
                 state = TS_WONT;
                 goto change_state;
             case DO:
+                DT(("'%s' t_n: got DO\n", ip->ob->name));
                 state = TS_DO;
                 goto change_state;
             case DONT:
+                DT(("'%s' t_n: got DONT\n", ip->ob->name));
                 state = TS_DONT;
                 goto change_state;
             case SB:
+                DT(("'%s' t_n: got SB\n", ip->ob->name));
                 ip->tn_start = (short)(to - first);
                 state = TS_SB;
                 goto change_state;
             case DM:
+                DT(("'%s' t_n: got DM\n", ip->ob->name));
             data_mark:
                 if (ip->ts_data == TS_SYNCH)
                 {
@@ -3442,14 +3764,18 @@ telnet_neg (struct interactive *ip)
                         &timeout))
                     {
                         if (d_flag)
-                            debug_message("Synch operation finished.\n");
+                            debug_message("%s Synch operation finished.\n"
+                                         , time_stamp());
                         ip->ts_data = TS_DATA;
                     }
                 }
                 break;
             case NOP:
+                DT(("'%s' t_n: got NOP\n", ip->ob->name)); break;
             case GA:
+                DT(("'%s' t_n: got GA\n", ip->ob->name)); break;
             default:
+                DT(("'%s' t_n: got %02x\n", ip->ob->name, ch)); break;
                 break;
             } /* switch(ch) */
             state = ip->ts_data;
@@ -3458,10 +3784,14 @@ telnet_neg (struct interactive *ip)
         case TS_WILL:
             command_giver = ip->ob;
             if (ch < NTELOPTS) {
-                if (d_flag) debug_message("Will %s\n", telopts[ch]);
+                DT(("'%s' t_n: state WILL got %s (%02x)\n"
+                   , ip->ob->name, telopts[ch], ch));
+                if (d_flag)
+                    debug_message("%s Will %s\n", time_stamp(), telopts[ch]);
                 (*telopts_will[ch])(ch);
             } else {
-                debug_message("Unknown telnet option Will %d\n", ch);
+                debug_message("%s Unknown telnet option Will %d\n"
+                             , time_stamp(), ch);
                 send_dont(ch);
             }
             state = ip->ts_data;
@@ -3470,10 +3800,14 @@ telnet_neg (struct interactive *ip)
         case TS_WONT:
             command_giver = ip->ob;
             if (ch < NTELOPTS) {
-                if (d_flag) debug_message("Wont %s\n", telopts[ch]);
+                DT(("'%s' t_n: state WONT got %s (%02x)\n"
+                   , ip->ob->name, telopts[ch], ch));
+                if (d_flag)
+                    debug_message("%s Wont %s\n", time_stamp(), telopts[ch]);
                 (*telopts_wont[ch])(ch);
             } else {
-                debug_message("Unknown telnet option Wont %d\n", ch);
+                debug_message("%s Unknown telnet option Wont %d\n"
+                             , time_stamp(), ch);
             }
             state = ip->ts_data;
             goto change_state;
@@ -3481,10 +3815,14 @@ telnet_neg (struct interactive *ip)
         case TS_DO:
             command_giver = ip->ob;
             if (ch < NTELOPTS) {
-                if (d_flag) debug_message("Do %s\n", telopts[ch]);
+                DT(("'%s' t_n: state DO got %s (%02x)\n"
+                   , ip->ob->name, telopts[ch], ch));
+                if (d_flag)
+                    debug_message("%s Do %s\n", time_stamp(), telopts[ch]);
                 (*telopts_do[ch])(ch);
             } else {
-                debug_message("Unknown telnet option Do %d\n", ch);
+                debug_message("%s Unknown telnet option Do %d\n"
+                             , time_stamp(), ch);
                 send_wont(ch);
             }
             state = ip->ts_data;
@@ -3493,15 +3831,20 @@ telnet_neg (struct interactive *ip)
         case TS_DONT:
             command_giver = ip->ob;
             if (ch < NTELOPTS) {
-                if (d_flag) debug_message("Dont %s\n", telopts[ch]);
+                DT(("'%s' t_n: state DONT got %s (%02x)\n"
+                   , ip->ob->name, telopts[ch], ch));
+                if (d_flag)
+                    debug_message("%s Dont %s\n", time_stamp(), telopts[ch]);
                 (*telopts_dont[ch])(ch);
             } else {
-                debug_message("Unknown telnet option Dont %d\n", ch);
+                debug_message("%s Unknown telnet option Dont %d\n"
+                             , time_stamp(), ch);
             }
             state = ip->ts_data;
             goto change_state;
 
         case TS_SB:
+            DT(("'%s' t_n: state TS_SB got %02x\n", ip->ob->name, ch));
             if (ch == IAC) {
                 state = TS_SB_IAC;
                 goto change_state;
@@ -3512,9 +3855,12 @@ telnet_neg (struct interactive *ip)
         case TS_SB_IAC:
           {
             mp_int size;
-            struct vector *v;
+            vector_t *v;
 
+            DT(("'%s' t_n: state TS_SB_IAC got %02x\n", ip->ob->name, ch));
             if (ch == IAC) {
+                DT(("'%s' t_n: that is: state TS_SB_IAC got IAC\n"
+                   , ip->ob->name));
                 *to++ = (char)ch;
                 state = TS_SB;
                 goto change_state;
@@ -3525,9 +3871,10 @@ telnet_neg (struct interactive *ip)
                 && (current_object = ip->ob,  v = allocate_array(size)) )
             {
                 unsigned char *str;
-                struct svalue *svp;
+                svalue_t *svp;
 
                 str = (unsigned char *)&ip->text[ip->tn_start];
+                DT(("'%s' t_n: that is: state TS_SB_IAC got useful SE or SB: neg SB %02x (%d bytes)\n", ip->ob->name, *str, size));
                 push_number(SB);
                 push_number(*str++);
                 svp = v->item;
@@ -3547,12 +3894,14 @@ telnet_neg (struct interactive *ip)
           }
 
         case TS_SYNCH:
+            DT(("'%s' t_n: state TS_SYNCH got %02x\n", ip->ob->name, ch));
             if (ch == IAC) goto new_iac;
             if (ch == DM) goto data_mark;
             continue;
 
         default:
-            if (d_flag) debug_message("Bad state: 0x%x\n", ip->tn_state);
+            if (d_flag)
+                debug_message("%s Bad state: 0x%x\n", time_stamp(), ip->tn_state);
             state = TS_DATA;
             goto change_state;
         } /* switch (ip->tn_state) */
@@ -3570,6 +3919,7 @@ telnet_neg (struct interactive *ip)
          * Ignore all data altogether and return to text mode.
          */
         ip->text_end = ip->tn_end = ip->command_end = 0;
+        ip->tn_start = ip->command_start = 0;
         ip->tn_state = TS_DATA;
     }
 } /* telnet_neg() */
@@ -3589,8 +3939,8 @@ start_erq_demon (char *suffix)
  */
 
 {
-    struct svalue *erqp;
-    char path[MAXPATHLEN];
+    svalue_t *erqp;
+    char path[MAXPATHLEN+1];
     int sockets[2];
     int pid;
     char c;
@@ -3606,6 +3956,7 @@ start_erq_demon (char *suffix)
     pending_erq[0].u.lvalue = NULL;
 
     /* Create the sockets to talk to the ERQ */
+/* TODO: Add tests to configure if the system really implements AF_UNIX or socketpair() */
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) < 0)
     {
         perror("socketpair");
@@ -3627,7 +3978,7 @@ start_erq_demon (char *suffix)
             execl((char *)path, "erq", "--forked", 0);
         }
         write(1, "0", 1);  /* indicate failure back to the driver */
-        fprintf(stderr, "exec of erq demon failed.\n");
+        printf("%s exec of erq demon failed.\n", time_stamp());
         _exit(1);
     }
 
@@ -3662,7 +4013,7 @@ stop_erq_demon (Bool notify)
  */
 
 {
-    struct svalue *erqp;
+    svalue_t *erqp;
     int i;
 
     if (erq_demon < 0)
@@ -3704,8 +4055,8 @@ stop_erq_demon (Bool notify)
 } /* stop_erq_demon() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_attach_erq_demon (struct svalue *sp)
+svalue_t *
+f_attach_erq_demon (svalue_t *sp)
 
 /* TEFUN: attach_erq_demon()
  *
@@ -3725,14 +4076,13 @@ f_attach_erq_demon (struct svalue *sp)
  */
 
 {
-    struct object *ob;
-    struct interactive *ip;
+    object_t *ob;
+    interactive_t *ip;
     char *suffix;
 
     /* Test for the first form: (object ob, int do_close) */
     if (sp[-1].type == T_OBJECT
-     && NULL != (ip = O_GET_INTERACTIVE(ob=sp[-1].u.ob))
-     && ip->sent.type == SENT_INTERACTIVE)
+     && (ob = sp[-1].u.ob, O_SET_INTERACTIVE(ip, ob)))
     {
         if (sp->type != T_NUMBER)
         {
@@ -3821,7 +4171,7 @@ send_erq (int handle, int request, char *arg, size_t arglen)
 
 {
     static char buf[ERQ_MAX_SEND], *pending;
-    size_t wrote;
+    long wrote;
 
     if (erq_demon < 0)
         return MY_FALSE;
@@ -3858,8 +4208,8 @@ send_erq (int handle, int request, char *arg, size_t arglen)
 }
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_send_erq (struct svalue *sp)
+svalue_t *
+f_send_erq (svalue_t *sp)
 
 /* TEFUN: send_erq()
  *
@@ -3877,7 +4227,7 @@ f_send_erq (struct svalue *sp)
 {
     char  *arg;
     size_t arglen;
-    struct svalue *new_erq;
+    svalue_t *new_erq;
     int i;
 
     if (sp[-2].type != T_NUMBER)
@@ -3894,8 +4244,8 @@ f_send_erq (struct svalue *sp)
     }
     else if (sp[-1].type == T_POINTER)
     {
-        struct vector *v;
-        struct svalue *svp;
+        vector_t *v;
+        svalue_t *svp;
         char *cp;
         mp_int j;
 
@@ -3959,9 +4309,6 @@ failure:
 }
 
 /*-------------------------------------------------------------------------*/
-/* read a 32 bit value from (possibly unaligned)
- * network byte order representation
- */
 static long
 read_32 (char *str)
 
@@ -3980,21 +4327,95 @@ static void
 add_ip_entry (long addr, char *name)
 
 /* Add a new IP address <addr>/hostname <name> pair to the cache iptable[].
+ * If the <addr> already exists in the table, replace the old tabled name
+ * with the new one.
  */
 
 {
-    static int ipcur = 0;
-    int i;
+    int i, ix;
+    Bool new_entry;
 
-    for(i = 0; i < IPSIZE; i++) {
+    ix = -1;
+    new_entry = MY_FALSE;
+    for (i = 0; i < IPSIZE; i++)
+    {
         if (iptable[i].addr == addr)
-            return;
+        {
+            ix = i;
+            break;
+        }
     }
+
+    if (ix < 0)
+    {
+        ix = ipcur;
+        new_entry = MY_TRUE;
+    }
+
+    iptable[ix].addr = addr;
+    if (iptable[ix].name)
+        free_string(iptable[ix].name);
+    iptable[ix].name = make_shared_string(name);
+
+    if (new_entry)
+        ipcur = (ipcur+1) % IPSIZE;
+} /* add_ip_entry() */
+
+/*-------------------------------------------------------------------------*/
+static char *
+lookup_ip_entry (long addr, Bool useErq)
+
+/* Lookup the IP address <addr> and return an uncounted pointer to
+ * a shared string with the hostname. The function looks first in the
+ * iptable[], then, if not found there and <useErq> is true, asks the ERQ.
+ * If the hostname can not be found, NULL is returned.
+ */
+
+{
+    int i;
+    struct in_addr tmp;
+
+    /* Search for the address backwards from the last added entry,
+     * hoping that its one of the more recently added ones.
+     */
+    i = ipcur;
+    do {
+        i--;
+        if (i < 0)
+            i += IPSIZE;
+
+        if (iptable[i].addr == addr && iptable[i].name)
+            return iptable[i].name;
+    } while (i != ipcur );
+
+    /* The address is new to us.
+     * Add a temporary entry into the iptable[] to bridge
+     * the time until the erq has finished the lookup.
+     * This also handles the case of an unresolvable hostname.
+     */
+
+    tmp.s_addr = addr;
+
     iptable[ipcur].addr = addr;
     if (iptable[ipcur].name)
         free_string(iptable[ipcur].name);
-    iptable[ipcur].name = make_shared_string(name);
+
+#ifndef USE_IPV6
+    iptable[ipcur].name = make_shared_string(inet_ntoa(tmp));
+#else
+    iptable[ipcur].name = make_shared_string(inet6_ntoa(tmp));
+#endif
+
     ipcur = (ipcur+1) % IPSIZE;
+
+    /* If we have the erq and may use it, lookup the real hostname */
+    if (erq_demon >= 0 && useErq)
+    {
+
+        send_erq(ERQ_HANDLE_RLOOKUP, ERQ_RLOOKUP, (char *)&addr, 4);
+    }
+
+    return iptable[ipcur].name;
 }
 
 #endif /* ERQ_DEMON */
@@ -4002,7 +4423,44 @@ add_ip_entry (long addr, char *name)
 /* End of ERQ Support */
 /*=========================================================================*/
 
-#ifdef MALLOC_smalloc
+/*-------------------------------------------------------------------------*/
+size_t
+show_comm_status (strbuf_t * sbuf, Bool verbose UNUSED)
+
+/* Return the amount of memory used by the comm module.
+ */
+
+{
+#if defined(__MWERKS__)
+#    pragma unused(verbose)
+#endif
+    size_t sum;
+    int i;
+
+    sum = 0;
+
+    for (i = 0; i <= max_player; i++)
+    {
+        interactive_t *pl;
+        input_to_t *it;
+
+        pl = all_players[i];
+        if (!pl)
+            continue;
+
+        sum += sizeof(*pl);
+
+        for (it = pl->input_to; it != NULL; it = it->next)
+            sum += sizeof(*it);
+
+        sum += ed_buffer_size(O_GET_EDBUFFER(pl->ob));
+    }
+
+    strbuf_addf(sbuf, "Comm structures\t\t\t\t %8lu\n", sum);
+    return sum;
+} /* show_lexer_status() */
+
+#ifdef GC_SUPPORT
 
 /*-------------------------------------------------------------------------*/
 void
@@ -4014,7 +4472,7 @@ clear_comm_refs (void)
 {
 #ifdef ERQ_DEMON
     clear_ref_in_vector(
-      pending_erq, sizeof pending_erq / sizeof (struct svalue)
+      pending_erq, sizeof pending_erq / sizeof (svalue_t)
     );
 #endif /* ERQ_DEMON */
 }
@@ -4034,19 +4492,19 @@ count_comm_refs (void)
             count_ref_from_string(iptable[i].name);
     }
     count_ref_in_vector(
-      pending_erq, sizeof pending_erq / sizeof (struct svalue)
+      pending_erq, sizeof pending_erq / sizeof (svalue_t)
     );
 #endif /* ERQ_DEMON */
 }
 
-#endif /* MALLOC_smalloc */
+#endif /* GC_SUPPORT */
 
 
 /*=========================================================================*/
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-query_ip_name (struct svalue *sp, Bool lookup)
+svalue_t *
+query_ip_name (svalue_t *sp, Bool lookup)
 
 /* Lookup the IP address (<lookup> is false) or IP hostname (<lookup> is
  * true) of object <sp> and return it. If <sp> is the number 0 or a
@@ -4067,16 +4525,16 @@ query_ip_name (struct svalue *sp, Bool lookup)
  */
 
 {
-    struct object *ob;
+    object_t *ob;
     int i;
-    struct interactive *ip;
+    interactive_t *ip;
     char *str;
 
     /* Set <ob> to the object passed on the stack. */
 
     if (sp->type != T_OBJECT)
     {
-        struct svalue *svp;
+        svalue_t *svp;
 
         if (sp->type == T_NUMBER && !sp->u.number)
             return sp;
@@ -4098,7 +4556,7 @@ query_ip_name (struct svalue *sp, Bool lookup)
     }
 
     /* Return 0 for non-interactive objects */
-    if ( !(ip = O_GET_INTERACTIVE(ob)) || ip->sent.type != SENT_INTERACTIVE)
+    if (!(O_SET_INTERACTIVE(ip, ob)))
     {
         free_svalue(sp);
         put_number(sp, 0);
@@ -4110,8 +4568,8 @@ query_ip_name (struct svalue *sp, Bool lookup)
      */
     if (sp->type == T_LVALUE)
     {
-        struct svalue array, *svp;
-        struct vector *v;
+        svalue_t array, *svp;
+        vector_t *v;
         char *cp;
 
         v = allocate_array(sizeof ip->addr);
@@ -4139,13 +4597,13 @@ query_ip_name (struct svalue *sp, Bool lookup)
     if (lookup)
     {
 #ifdef ERQ_DEMON
-        for (i = 0; i < IPSIZE; i++)
+        char * hname;
+
+        hname = lookup_ip_entry((long)(ip->addr.sin_addr.s_addr), MY_FALSE);
+        if (hname)
         {
-            if (iptable[i].addr == (long)(ip->addr.sin_addr.s_addr) && iptable[i].name)
-            {
-                put_ref_string(sp, iptable[i].name);
-                return sp;
-            }
+            put_ref_string(sp, hname);
+            return sp;
         }
 #else
         /* The if(lookup) gets rid of a 'lookup unused' warning. */
@@ -4155,11 +4613,15 @@ query_ip_name (struct svalue *sp, Bool lookup)
     /* Return the IP address as string.
      */
 
+#ifndef USE_IPV6
     str = string_copy(inet_ntoa(ip->addr.sin_addr));
+#else
+    str = string_copy(inet6_ntoa(ip->addr.sin_addr));
+#endif
     if (!str)
     {
         inter_sp = sp - 1;
-        error("Out of memory\n");
+        error("Out of memory for IP address\n");
     }
     put_malloced_string(sp, str);
     return sp;
@@ -4197,13 +4659,17 @@ get_host_ip_number (void)
 {
     char buf[20];
 
+#ifndef USE_IPV6
     sprintf(buf, "\"%s\"", inet_ntoa(host_ip_number));
+#else
+    sprintf(buf, "\"%s\"", inet6_ntoa(host_ip_number));
+#endif
     return string_copy(buf);
 }
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_query_snoop (struct svalue *sp)
+svalue_t *
+f_query_snoop (svalue_t *sp)
 
 /* TEFUN: query_snoop()
  *
@@ -4214,8 +4680,8 @@ f_query_snoop (struct svalue *sp)
  */
 
 {
-    struct svalue *arg1;
-    struct object *ob;
+    svalue_t *arg1;
+    object_t *ob;
 
     if (sp->type != T_OBJECT)
     {
@@ -4229,7 +4695,7 @@ f_query_snoop (struct svalue *sp)
       default:
         ob = sp->u.ob;
         if ((ob->flags & (O_DESTRUCTED|O_SHADOW)) != O_SHADOW
-         || ob->sent->type != SENT_INTERACTIVE)
+         || O_GET_SHADOW(ob)->ip == NULL)
         {
             zero_object_svalue(sp);
             return sp;
@@ -4244,7 +4710,7 @@ f_query_snoop (struct svalue *sp)
             {
                 if (out_of_memory)
                 {
-                    error("Out of memory\n");
+                    error("Out of memory detected.\n");
                 }
                 ob = NULL;
                 break;
@@ -4266,8 +4732,8 @@ f_query_snoop (struct svalue *sp)
 }
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_query_idle (struct svalue *sp)
+svalue_t *
+f_query_idle (svalue_t *sp)
 
 
 /* TEFUN: query_idle()
@@ -4279,7 +4745,7 @@ f_query_idle (struct svalue *sp)
 
 {
     int i;
-    struct object *ob;
+    object_t *ob;
 
     if (sp->type != T_OBJECT)
     {
@@ -4288,7 +4754,7 @@ f_query_idle (struct svalue *sp)
     }
 
     ob = sp->u.ob;
-    if (!ob->sent || ob->sent->type != SENT_INTERACTIVE)
+    if (!O_IS_INTERACTIVE(ob))
     {
         inter_sp = sp;
         error("query_idle() of non-interactive object.\n");
@@ -4302,8 +4768,8 @@ f_query_idle (struct svalue *sp)
 }
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_remove_interactive (struct svalue *sp)
+svalue_t *
+f_remove_interactive (svalue_t *sp)
 
 /* TEFUN: remove_interactive()
  *
@@ -4317,7 +4783,7 @@ f_remove_interactive (struct svalue *sp)
  */
 
 {
-    struct interactive *victim;
+    interactive_t *victim;
 
     if (sp->type != T_OBJECT)
     {
@@ -4325,8 +4791,7 @@ f_remove_interactive (struct svalue *sp)
         /* NOTREACHED */
     }
 
-    if (NULL != (victim = O_GET_INTERACTIVE(sp->u.ob))
-     && victim->sent.type == SENT_INTERACTIVE
+    if (O_SET_INTERACTIVE(victim, sp->u.ob)
      && !victim->closing
      && !victim->do_close)
     {
@@ -4346,7 +4811,7 @@ f_remove_interactive (struct svalue *sp)
 
 /*-------------------------------------------------------------------------*/
 int
-replace_interactive (struct object *ob, struct object * obfrom, char *name)
+replace_interactive (object_t *ob, object_t * obfrom, char *name)
 
 /* EFUN: exec()
  *
@@ -4361,10 +4826,9 @@ replace_interactive (struct object *ob, struct object * obfrom, char *name)
  */
 
 {
-    struct svalue *v;
-    struct interactive *stale_interactive, *ip;
-    struct object *save_command;
-    struct shadow_sentence *save_shadow;
+    svalue_t *v;
+    interactive_t *stale_interactive, *ip;
+    object_t *save_command;
 
     /* Ask the master if this exec() is ok. */
     push_volatile_string(name);
@@ -4374,19 +4838,22 @@ replace_interactive (struct object *ob, struct object * obfrom, char *name)
     if (!v || v->type != T_NUMBER || v->u.number == 0)
         return 0;
 
-    if (NULL != (stale_interactive = O_GET_INTERACTIVE(ob))
-     && stale_interactive->sent.type != SENT_INTERACTIVE)
+    /* stale_interactive becomes the former interactive _if_ it
+     * still is an interactive_t.
+     */
+    if (!(O_SET_INTERACTIVE(stale_interactive, ob)))
     {
         stale_interactive = NULL;
     }
-    if (!(ip = O_GET_INTERACTIVE(obfrom))
-     || ip->sent.type != SENT_INTERACTIVE)
+
+    if (!(O_SET_INTERACTIVE(ip, obfrom)))
         error("Bad argument 2 to exec()\n");
 
     /* When we have to have an out of memory error, have it before pointers
      * get changed.
      */
-    save_shadow = (struct shadow_sentence *)alloc_sentence();
+    assert_shadow_sent(ob);
+
     save_command = command_giver;
 
     /* If <ob> has a connection, flush it */
@@ -4412,35 +4879,13 @@ replace_interactive (struct object *ob, struct object * obfrom, char *name)
     /* Switch a possible snooper */
 
     if (ip->snoop_on)
-    {
         ip->snoop_on->snoop_by = ob;
-    }
 
-    /* The usual shadow_sentence juggling. */
+    /* Switch the interactive */
 
-    *save_shadow = ip->sent;
-    if (ob->flags & O_SHADOW) {
-        struct ed_buffer *buf = ip->sent.ed_buffer;
-
-        ip->sent = *O_GET_SHADOW(ob);
-        if (buf) {
-            save_shadow->ed_buffer = ip->sent.ed_buffer;
-            ip->sent.ed_buffer = buf;
-        }
-        if (ip->sent.type != SENT_INTERACTIVE) {
-            ip->sent.type = SENT_INTERACTIVE;
-            free_shadow_sent(O_GET_SHADOW(ob));
-        }
-    }
-    else
-    {
-        ip->sent.shadowed_by = NULL;
-        ip->sent.shadowing = NULL;
-        save_shadow->ed_buffer = NULL;
-        ip->sent.next = ob->sent;
-    }
-    ob->sent = (struct sentence *)ip;
-
+    O_GET_INTERACTIVE(ob) = ip;
+    O_GET_INTERACTIVE(obfrom) = NULL;
+    ob->flags |= O_ONCE_INTERACTIVE;
     ip->ob = ob;
     ip->catch_tell_activ = MY_TRUE;
 
@@ -4448,14 +4893,10 @@ replace_interactive (struct object *ob, struct object * obfrom, char *name)
     {
         /* Tie <ob>s stale connection to <obfrom>. */
 
-        stale_interactive->sent = *save_shadow;
-        free_shadow_sent(save_shadow);
-        obfrom->sent = (struct sentence *)stale_interactive;
-        if (stale_interactive->snoop_on)
-        {
-            stale_interactive->snoop_on->snoop_by = obfrom;
-        }
+        O_GET_INTERACTIVE(obfrom) = stale_interactive;
         stale_interactive->ob = obfrom;
+        if (stale_interactive->snoop_on)
+            stale_interactive->snoop_on->snoop_by = obfrom;
         stale_interactive->catch_tell_activ = MY_TRUE;
         prompt_to_ed_buffer(stale_interactive);
     }
@@ -4463,22 +4904,11 @@ replace_interactive (struct object *ob, struct object * obfrom, char *name)
     {
         /* Clean up <obfrom> after the loss of connection */
 
+        obfrom->flags &= ~O_ONCE_INTERACTIVE;
+        check_shadow_sent(obfrom);
+
         ref_object(ob, "exec");
         free_object(obfrom, "exec");
-        ob->flags |= O_ONCE_INTERACTIVE|O_SHADOW;
-        obfrom->flags &= ~O_ONCE_INTERACTIVE;
-        if (save_shadow->shadowed_by || save_shadow->shadowing
-         || save_shadow->ed_buffer)
-        {
-            save_shadow->type = SENT_SHADOW;
-            obfrom->sent = (struct sentence *)save_shadow;
-        }
-        else
-        {
-            obfrom->sent = save_shadow->next;
-            free_shadow_sent(save_shadow);
-            obfrom->flags &= ~O_SHADOW;
-        }
     }
 
     prompt_to_ed_buffer(ip);
@@ -4503,46 +4933,44 @@ count_comm_extra_refs (void)
 
 #ifdef ERQ_DEMON
     count_extra_ref_in_vector(
-      pending_erq, sizeof pending_erq / sizeof (struct svalue)
+      pending_erq, sizeof pending_erq / sizeof (svalue_t)
     );
 #endif /* ERQ_DEMON */
 
     for (i = 0; i < MAX_PLAYERS; i++)
     {
-        struct object *ob;
-        struct input_to *it;
+        object_t *ob;
+        input_to_t *it;
 
         if (all_players[i] == 0)
             continue;
         all_players[i]->ob->extra_ref++;
         if ( NULL != (ob = all_players[i]->snoop_by) ) {
-            struct interactive *ip;
+            interactive_t *ip;
 
-            if (!(ip = O_GET_INTERACTIVE(current_object)) ||
-                ip->sent.type != SENT_INTERACTIVE)
+            if (!(O_SET_INTERACTIVE(ip, current_object)))
             {
                 /* snooping monster */
                 ob->extra_ref++;
             }
         } /* end of snoop-processing */
 
-        if ( NULL != (it = all_players[i]->input_to) ) {
-            it->ob->extra_ref++;
-            count_extra_ref_in_vector(it->arg, (size_t)it->num_arg);
+        for ( it = all_players[i]->input_to; it; it = it->next) {
+            count_callback_extra_refs(&(it->fun));
         }
         if ( NULL != (ob = all_players[i]->modify_command) )
             count_extra_ref_in_object(ob);
         count_extra_ref_in_vector(&all_players[i]->prompt, 1);
     }
-}
+} /* count_comm_extra_refs() */
 
 #endif /* DEBUG */
 
 /*-------------------------------------------------------------------------*/
 #ifdef UDP_SEND
 
-struct svalue *
-f_send_imp (struct svalue *sp)
+svalue_t *
+f_send_imp (svalue_t *sp)
 
 /* TEFUN: send_imp()
  *
@@ -4554,6 +4982,10 @@ f_send_imp (struct svalue *sp)
  * The message can be given either as string, or as array of
  * bytes. The latter variant allows to send binary data as well.
  * Returns 1 on success, 0 on failure.
+ *
+ * Note: On some machines a failed send_imp() will not be registered
+ * until the next send_imp() - the latter one might return '0' even
+ * if itself was successful.
  */
 
 {
@@ -4580,8 +5012,8 @@ f_send_imp (struct svalue *sp)
         }
         else if (sp->type == T_POINTER)
         {
-            struct vector *v;
-            struct svalue *svp;
+            vector_t *v;
+            svalue_t *svp;
             char *cp;
             mp_int j;
 
@@ -4612,6 +5044,7 @@ f_send_imp (struct svalue *sp)
         to_host = (sp-2)->u.string;
         to_port = (sp-1)->u.number;
 
+#ifndef USE_IPV6
         if (sscanf(to_host, "%d.%d.%d.%d", &ip1, &ip2, &ip3, &ip4) == 4)
         {
             name.sin_addr.s_addr = inet_addr(to_host);
@@ -4619,12 +5052,29 @@ f_send_imp (struct svalue *sp)
         }
         else
         {
+            /* TODO: Uh-oh, blocking DNS in the execution thread */
             hp = gethostbyname(to_host);
             if (hp == 0)
                 break;
             memcpy(&name.sin_addr, hp->h_addr, (size_t)hp->h_length);
             name.sin_family = AF_INET;
         }
+
+#else /* USE_IPV6 */
+        
+        /* TODO: Uh-oh, blocking DNS in the execution thread */
+        hp = gethostbyname2(to_host, AF_INET6);
+        if (hp == 0) hp = gethostbyname2(to_host, AF_INET);
+        if (hp == 0) break;
+        memcpy(&name.sin_addr, hp->h_addr, (size_t)hp->h_length);
+
+        if (hp->h_addrtype == AF_INET)
+        {
+            CREATE_IPV6_MAPPED(name.sin_addr, (uint32_t)hp->h_addr_list[0]);
+        }
+        name.sin_family = AF_INET6;
+#endif /* USE_IPV6 */
+        
         name.sin_port = htons(to_port);
 
         /* Send the message. */
@@ -4647,8 +5097,8 @@ f_send_imp (struct svalue *sp)
 #endif /* UDP_SEND */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_set_buffer_size (struct svalue *sp)
+svalue_t *
+f_set_buffer_size (svalue_t *sp)
 
 /* TEFUN: set_buffer_size()
  *
@@ -4678,11 +5128,11 @@ f_set_buffer_size (struct svalue *sp)
 
 #ifdef SO_SNDBUF
     {
-        int old, optlen;
-        struct interactive *ip;
+        int old;
+        length_t optlen;
+        interactive_t *ip;
 
-        if (!(ip = O_GET_INTERACTIVE(current_object))
-         || ip->sent.type != SENT_INTERACTIVE
+        if (!(O_SET_INTERACTIVE(ip, current_object))
          || ip->do_close)
         {
             return sp;
@@ -4702,8 +5152,8 @@ f_set_buffer_size (struct svalue *sp)
 }
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_binary_message (struct svalue *sp)
+svalue_t *
+f_binary_message (svalue_t *sp)
 
 /* TEFUN: binary_message()
  *
@@ -4712,7 +5162,7 @@ f_binary_message (struct svalue *sp)
  * Flush output and send output directly with write WITHOUT IAC QUOTING.
  * The message may contain zeroes if given as int *.
  * The messages goes to this_object(), but only if interactive.
- * return value: number of characters actually written.
+ * Returned value: number of characters actually written.
  * Any 'allowed charset' setting is ignored.
  *
  * Flag settings are interpreted bitwise and may be ored
@@ -4729,16 +5179,16 @@ f_binary_message (struct svalue *sp)
  * The idea behind the flag settings is that sending command
  * codes for colours and other things needs to bypass the allowed
  * charset filters, but isn't important enough to waste bandwith
- * on a synchronous trasmission.
+ * on a synchronous transmission.
  */
 
 {
     char *message, *p;
     size_t size;
     mp_int wrote = 0, i;
-    struct svalue *svp;
-    struct interactive *ip;
-    struct object *save_command_giver;
+    svalue_t *svp;
+    interactive_t *ip;
+    object_t *save_command_giver;
 
     /* Set message to the data to be sent, and size to its length. */
 
@@ -4779,8 +5229,7 @@ f_binary_message (struct svalue *sp)
     /* Send the message */
 
     i = 0;
-    if (NULL != (ip = O_GET_INTERACTIVE(current_object))
-     && ip->sent.type == SENT_INTERACTIVE
+    if (O_SET_INTERACTIVE(ip, current_object)
      && !ip->do_close)
     {
         save_command_giver = command_giver;
@@ -4855,20 +5304,24 @@ f_binary_message (struct svalue *sp)
                     break;
                 switch(errno)
                 {
-                  case EINTR:
+                case EINTR:
                     if (--i)
                         continue;
-                    fprintf(stderr, "comm: write EINTR. Message discarded.\n");
+                    fprintf(stderr
+                           , "%s comm: write EINTR. Message discarded.\n"
+                           , time_stamp());
                     break;
-                  case EWOULDBLOCK:
+                case EWOULDBLOCK:
                     fprintf(stderr,
-                      "comm: write EWOULDBLOCK. Message discarded.\n");
+                      "%s comm: write EWOULDBLOCK. Message discarded.\n"
+                           , time_stamp());
                     size = 0;
                     break;
-                  case EMSGSIZE:
-                    fprintf(stderr, "comm: write EMSGSIZE.\n");
+                case EMSGSIZE:
+                    fprintf(stderr, "%s comm: write EMSGSIZE.\n"
+                           , time_stamp());
                     break;
-                  default:
+                default:
                     perror("write");
                     ip->do_close = FLAG_DO_CLOSE;
                     break;
@@ -4884,23 +5337,98 @@ f_binary_message (struct svalue *sp)
     free_svalue(sp);
     put_number(sp, wrote);
     return sp;
-}
+} /* f_binary_message() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_set_connection_charset (struct svalue *sp)
+svalue_t *
+f_set_combine_charset (svalue_t *sp)
+
+/* TEFUN: set_combine_charset()
+ *
+ *   void set_combine_charset (int* bitvector)
+ *   void set_combine_charset (string chars)
+ *
+ * Set the set of characters which can be combined into a single string
+ * when received en-bloc in charmode from the current interactive user.
+ * Non-combinable characters and single received characters are returned
+ * in separate strings as usual. The function must be called with the
+ * interactive user being the command giver.
+ *
+ * The newline '\n' and the NUL character '\0' are always non-combinable.
+ *
+ * The charset can be given either directly as a string, or indirectly
+ * as a bitvector.
+ *
+ * The bitvector is interpreted as an array of 8-bit-values and might
+ * contain up to 32 elements. Character n is "combinable"
+ * if sizeof(bitvector) > n/8 && bitvector[n/8] & (1 << n%8) .
+ */
+
+{
+    mp_int i;
+    svalue_t *svp;
+    char *p;
+    interactive_t *ip;
+
+    i = 0;
+    if (sp->type != T_STRING
+     && (sp->type != T_POINTER || (i = (mp_int)VEC_SIZE(sp->u.vec)) > 32))
+    {
+        bad_xefun_arg(1, sp);
+        /* NOTREACHED */
+    }
+
+    if (command_giver && O_SET_INTERACTIVE(ip, command_giver))
+    {
+        if (sp->type == T_STRING)
+        {
+            memset(ip->combine_cset, 0, sizeof ip->combine_cset);
+            for ( i = svalue_strlen(sp), p = sp->u.string
+                ; i > 0
+                ; i--, p++)
+                ip->combine_cset[(*p & 0xff) / 8] |= 1 << (*p % 8);
+        }
+        else
+        {
+            /* i was set in the typecheck above */
+            for ( svp = sp->u.vec->item, p = ip->combine_cset
+                ; --i >= 0
+                ; svp++, p++)
+            {
+                if (svp->type == T_NUMBER)
+                    *p = (char)svp->u.number;
+            }
+            memset(p, 0, (size_t)(&ip->combine_cset[sizeof ip->combine_cset] - p));
+        }
+
+        ip->combine_cset['\n'/8] &= ~(1 << '\n' % 8);
+        ip->combine_cset['\0'/8] &= ~(1 << '\0' % 8);
+    }
+    free_svalue(sp);
+    sp--;
+    return sp;
+} /* f_set_combine_charset() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_set_connection_charset (svalue_t *sp)
 
 /* TEFUN: set_connection_charset()
  *
- *   void set_connection_charset(int* bitvector, int quote_iac)
+ *   void set_connection_charset (int* bitvector, int quote_iac)
+ *   void set_connection_charset (string charset, int quote_iac)
  *
- * Set the set of characters that can be output to the
- * interactive user (this does not apply to binary_message() ) .
- * bitvector is interpreted as an array of 8-bit-values and might
+ * Set the set of characters that can be output to the interactive user
+ * (this does not apply to binary_message() ). The function must be called
+ * by the interactive user object itself.
+ *
+ * The charset can be given either directly as a string, or indirectly
+ * as a bitvector.
+ *
+ * The bitvector is interpreted as an array of 8-bit-values and might
  * contain up to 32 elements. Character n is allowed to be output
  * if sizeof(bitvector) > n/8 && bitvector[n/8] & (1 << n%8) .
- * This affects the interactive struct of this_object(), if
- * present.
+ *
  * If quote_iac is 0 and char 255 is allowed to be output, IAC
  * will be output unmodified.
  * If quote_iac is 1 and char 255 is allowed to be output,
@@ -4910,11 +5438,13 @@ f_set_connection_charset (struct svalue *sp)
 
 {
     mp_int i;
-    struct svalue *svp;
+    svalue_t *svp;
     char *p;
-    struct interactive *ip;
+    interactive_t *ip;
 
-    if (sp[-1].type != T_POINTER || (i = (mp_int)VEC_SIZE(sp[-1].u.vec)) > 32)
+    i = 0;
+    if ( sp[-1].type != T_STRING
+     && (sp[-1].type != T_POINTER || (i = (mp_int)VEC_SIZE(sp[-1].u.vec)) > 32))
     {
         bad_xefun_arg(1, sp);
         /* NOTREACHED */
@@ -4925,16 +5455,32 @@ f_set_connection_charset (struct svalue *sp)
         /* NOTREACHED */
     }
 
-    if (NULL != (ip = O_GET_INTERACTIVE(current_object))
-     && ip->sent.type == SENT_INTERACTIVE)
+    if (O_SET_INTERACTIVE(ip, current_object))
     {
-        for (svp = sp[-1].u.vec->item, p = ip->charset; --i >= 0; svp++, p++) {
-            if (svp->type == T_NUMBER)
-                *p = (char)svp->u.number;
+        if (sp[-1].type == T_STRING)
+        {
+            memset(ip->charset, 0, sizeof ip->charset);
+            for ( i = svalue_strlen(sp-1), p = sp[-1].u.string
+                ; i > 0
+                ; i--, p++)
+                ip->charset[(*p & 0xff) / 8] |= 1 << (*p % 8);
         }
-        memset(p, 0, (size_t)(&ip->charset[sizeof ip->charset] - p));
+        else
+        {
+            /* i was set in the typecheck above */
+            for ( svp = sp[-1].u.vec->item, p = ip->charset
+                ; --i >= 0
+                ; svp++, p++)
+            {
+                if (svp->type == T_NUMBER)
+                    *p = (char)svp->u.number;
+            }
+            memset(p, 0, (size_t)(&ip->charset[sizeof ip->charset] - p));
+        }
+
         ip->charset['\n'/8] &= ~(1 << '\n' % 8);
         ip->charset['\0'/8] &= ~(1 << '\0' % 8);
+
         if ( 0 != (ip->quote_iac = (char)sp->u.number) )
         {
             if (ip->charset[IAC/8] & (1 << IAC % 8))
@@ -4947,30 +5493,30 @@ f_set_connection_charset (struct svalue *sp)
     free_svalue(sp);
     sp--;
     return sp;
-}
+} /* f_set_connection_charset() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-input_to (struct svalue *sp, int num_arg)
+svalue_t *
+e_input_to (svalue_t *sp, int num_arg)
 
 /* EFUN: input_to()
  *
  * Set up a function in the current object to be called with the
  * next user input.
  *
- * The function can do a lot - I won't repeat the external
+ * This function can do a lot - I won't repeat the external
  * man page here :-)
  */
 
 {
-    struct svalue *arg;  /* Pointer to the arguments of the efun */
-    struct svalue *dest;
+    svalue_t *arg;  /* Pointer to the arguments of the efun */
     int flags;           /* The flags passed to input_to() */
-    struct input_to *it;
+    input_to_t *it;
     int extra;           /* Number of extra arguments */
+    int error_index;
 
     arg = sp - num_arg + 1;
-    if (arg[0].type != T_STRING)
+    if (arg[0].type != T_STRING && arg[0].type != T_CLOSURE)
     {
         bad_efun_vararg(1, sp);
         /* NOTREACHED */
@@ -4993,37 +5539,32 @@ input_to (struct svalue *sp, int num_arg)
 
     /* Allocate and setup the input_to structure */
 
-    it = (struct input_to *)xalloc(
-        sizeof *it - sizeof *sp + sizeof *sp * extra );
-    if (!it)
-        fatal("Out of memory.");
+    xallocate(it, sizeof *it, "new input_to");
 
-    it->function = make_shared_string(arg[0].u.string);
-    free_string_svalue(arg);
-    it->num_arg = extra;
-    it->ob = ref_object(current_object, "input_to");
-
-    sp = arg;
-    arg += 2;
-    dest = it->arg;
-    while (--extra >= 0)
+    if (arg[0].type == T_STRING)
     {
-        if (arg->type == T_LVALUE)
-        {
-            int error_index = arg - sp + 1;
-            do {
-                free_svalue(arg++);
-                (dest++)->type = T_INVALID;
-            } while (--extra >= 0);
-            free_input_to(it);
-            bad_efun_vararg(error_index, sp - 1);
-            /* NOTREACHED */
-        }
-        transfer_svalue_no_free(dest++, arg++);
+        error_index = setup_function_callback(&(it->fun), current_object
+                                             , arg[0].u.string
+                                             , extra, arg + 2
+                                             , MY_TRUE
+                                             );
+        free_string_svalue(arg);
+    }
+    else
+        error_index = setup_closure_callback(&(it->fun), arg
+                                            , extra, arg + 2
+                                            , MY_TRUE
+                                            );
+
+    if (error_index >= 0)
+    {
+        free_input_to(it);
+        bad_efun_vararg(error_index, arg - 1);
+        /* NOTREACHED */
     }
 
     /* If the master agrees (only in case of IGNORE_BANG) the
-     * the input_to could be set - return 1.
+     * the input_to can be set - return 1.
      */
 
     sp->type = T_NUMBER;
@@ -5031,40 +5572,33 @@ input_to (struct svalue *sp, int num_arg)
      || privilege_violation4("input_to", command_giver, 0, flags, sp))
     {
         if (set_call(command_giver, it, (char)flags)) {
-            put_number(sp, 1);
-            return sp;
+            put_number(arg, 1);
+            return arg;
         }
     }
 
     /* input_to() was not allowed - return 0. */
 
     free_input_to(it);
-    put_number(sp, 0);
-    return sp;
-}
+    put_number(arg, 0);
+    return arg;
+} /* e_input_to() */
 
 /*-------------------------------------------------------------------------*/
 static void
-free_input_to (struct input_to *it)
+free_input_to (input_to_t *it)
 
 /* Deallocate the input_to structure <it> and all referenced memory.
  */
 
 {
-    struct svalue *arg;
-    int i;
-
-    free_object(it->ob, "free_input_to");
-    free_string(it->function);
-    for (arg = it->arg, i = it->num_arg; --i >= 0; ) {
-        free_svalue(arg++);
-    }
-    xfree((char *)it);
-}
+    free_callback(&(it->fun));
+    xfree(it);
+} /* free_input_to() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-query_ip_port (struct svalue *sp)
+svalue_t *
+query_ip_port (svalue_t *sp)
 
 /* EFUN: query_mud_port()
  *
@@ -5089,10 +5623,10 @@ query_ip_port (struct svalue *sp)
  */
 
 {
-    struct object *ob;
-    struct interactive *ip;
+    object_t *ob;
+    interactive_t *ip;
     struct sockaddr_in addr;
-    int length;
+    length_t length;
 
     length = sizeof(addr);
 
@@ -5111,7 +5645,7 @@ query_ip_port (struct svalue *sp)
     ob = sp->u.ob;
     deref_object(ob, "query_ip_port");
 
-    if ( !(ip = O_GET_INTERACTIVE(ob)) || ip->sent.type != SENT_INTERACTIVE) {
+    if ( !(O_SET_INTERACTIVE(ip, ob))) {
         put_number(sp, port_numbers[0]);
         return sp;
     }

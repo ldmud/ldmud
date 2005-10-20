@@ -3,6 +3,8 @@ SYNOPSIS
         object to_object(closure arg)
         object to_object(object arg)
 
+        (object)<value>
+
 DESCRIPTION
         The argument is converted into an object, if possible.
         For strings, the object with a matching file_name() is

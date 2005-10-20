@@ -2,6 +2,7 @@ Short: shadow on destructed object with heartbeat
 Date: Mon, 12 Jul 1999 23:04:45 +0200
 From: Thorsten Klose <Thorsten.Klose@gmx.de>
 Type: Bug
+See also: b-990305-01 and b-981028.
 
 Momentan laeuft Avalon mit der dev-110. Was uns (bis auf den bereits
 gemeldeten Bugs) aufgefallen ist:

@@ -1,10 +1,19 @@
 Short: slow_shut_down is not used
 Date: 981209
 Type: Bug
-State: Unclassified
+State: Done - fixed in 3.2.8-dev.217
 
 When the driver runs out of memory, it rapidly uses
 up all reserves and then aborts. Something somehow eats
 memory fast enough to prevent slow_shut_down from being
 reached at all.
 
+This is certainly the case when the garbage_collector runs into
+a MAX_MALLOCED limit when swapping in all the objects.
+
+3.2.8-dev.202 added an additional diagnostic for this case, printing
+the amount of memory requested.
+
+The reason: if the driver ran out of memory in a small block allocation
+during a GC, the reserves were freed but the allocator didn't check the
+freelists after doing so.

@@ -138,6 +138,9 @@
 /* Define if you have strcspn.  */
 #define HAVE_STRCSPN 1
 
+/* Define if you have the strdup function.  */
+#define HAVE_STRDUP 1
+
 /* Define if you have strrchr.  */
 #define HAVE_STRRCHR 1
 

@@ -1,11 +1,10 @@
-From:    Fiona@Wunderland
 Short: [..x] as shortcut to [0..x]
+From:    Fiona@Wunderland
 Date:    Fri Apr  9 14:41:25 1999
 Type: Feature
-State: Unclassified
+State: Done - implemented in 3.2.8-dev.162
 
 Hi Mateese!
 Also laut Manpage soll der [] Operator auch sowas annehmen wie [..x].
 Allerdings geht seit ich denken kann nur [x..] und [x..y].
 
-Note: implement it internally as '[0..<expr>]'

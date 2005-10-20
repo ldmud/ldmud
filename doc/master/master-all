@@ -123,6 +123,12 @@ DESCRIPTION
 	object compile_object (string filename)
 	  Compile an virtual object.
 
+        mixed include_file (string file, string compiled_file, int sys_include)
+          Return the full pathname for an included file. // 3.2.8 and later
+
+        mixed inherit_file (string file, string compiled_file)
+          Return the full pathname for an inherited object. // 3.2.8 and later
+
 	string get_wiz_name (string file)
 	  Return the author of a file.
 
@@ -151,8 +157,8 @@ DESCRIPTION
 	void dangling_lfun_closure ()
 	  Handle a dangling lfun-closure.
 
-	void log_error (string file, string err)
-	  Announce a compiler-time error.
+	void log_error (string file, string err, int warn)
+	  Announce a compiler-time error or warning.
 
 	mixed heart_beat_error (object culprit, string err,
 				string prg, string curobj, int line)
@@ -169,9 +175,6 @@ DESCRIPTION
 
 	int query_allow_shadow (object victim)
 	  Validate a shadowing.
-
-	int query_player_level (string what)
-	  Check if the user is of high enough level for several things.
 
 	int valid_exec (string name)
 	  Validate the rebinding of an IP connection by usage of efun

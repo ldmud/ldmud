@@ -23,4 +23,4 @@ EXAMPLE
 	rename("/players/wizard/obj.c", "/players/wizard/newobj.c");
 
 SEE ALSO
-	mkdir(E), rmdir(E), rm(E)
+	copy_file(E), mkdir(E), rmdir(E), rm(E)

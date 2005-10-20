@@ -1,9 +1,11 @@
-Short: New efun: previous_program()
+Short: New efun: previous_program(), program_stack()
 From: Daniel Sloan <sloand@alphalink.com.au>
 From: Michael <virus@mpinet.net>
 Date: Tue, 23 Mar 1999 15:29:14 +0000
 Type: Feature
 State: Unclassified
+
+Maybe also an efun program_stack()?
 
 Daniel writes:
 
@@ -58,4 +60,50 @@ follow up on it more.
 
 -- Michael
 
+Rodney writes:
+
+> When you use extern_call() within a module which is inherited, it is
+> difficult to tell when a function is being called externally or not.
+> 
+> For example, if you had two modules A and B which contained:
+> 
+>     // File : /obj/modules/a
+>     // Module A
+> 
+>     query_extern() { return extern_call(); }
+> 
+>     // File : /obj/modules/b
+>     // Module B
+> 
+>     inherit "obj/modules/a";
+> 
+>     query_extern() { return ::query_extern(); }
+> 
+> 
+> If you call query_extern(), in Module A, it will return 1 or 0 depending on
+> whether you used call_other(), or some external function, as documented.
+> If you call query_extern() using call_other(), in Module B, it will always
+> return 0.
+> 
+> One possible solution is to modify extern_call() so that its behaviour
+> changes depending on the situation. If a function Y calls a function X,
+> which calls extern_call(), it should either:
+> 
+>     (1) KEEPS ITS CURRENT BEHAVIOUR.
+>         if X != Y (i.e. X has not got the same name, or is from a
+>         different object to Y)
+> 
+>     (2) BEHAVE AS IF IT WAS CALLED FROM Y.
+>         if X == Y (i.e. X has the same name as Y and is from the same
+>         object).
+> 
+> Another solution is to create a new function e.g.
+> 
+>     extern_func_call()
+> 
+> which behaves in the manner just described.
+> 
+> Or yet another solution is to provide a efun which returns a list of
+> function names in the current call stack, and the objects they came from.
+ 
 

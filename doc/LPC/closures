@@ -134,17 +134,24 @@ DESCRIPTION
 
         There are also loops:
 
-                ({ #'do, loopbody, loopcond, loopresult })
+                ({ #'do, loopbody1, ..., loopbodyN, loopcond, loopresult })
 
-        will evaluate loopbody until loopcond evaluates to 0 and
+        will evaluate the loopbodies until loopcond evaluates to 0 and
         then return the value of loopresult. Symbols my be used as
         variables, of course.
 
-                ({ #'while, loopcond, loopresult, loopbody })
+                ({ #'while, loopcond, loopresult, loopbody1, ..., loopbodyN })
 
-        works similar but evaluates loopcond before loopbody.
+        works similar but evaluates loopcond before the loopbodies.
 
-        There are, however, some questions open:
+        The foreach() loop also exists:
+
+                ({ #'foreach, 'var, expr, loopbody1, ..., loopbodyN })
+                ({ #'foreach, ({ 'var1, ..., 'varN}) , expr
+                                        , loopbody1, ..., loopbodyN })
+
+
+        Now on to a couple of tricky things:
 
         a) How do I write down an array within a lambda closure to
            avoid interpretation as a subclosure?
@@ -257,28 +264,24 @@ DESCRIPTION
 
         Finally, there are some special efun/operator closures:
 
-        #'[ or CL_INDEX or CL_L_INDEX: indexes an array.
-        #'[< of CL_R_INDEX: does the same, but starting at the end.
-        #'[..] or CL_RANGE or CL_RR_RANGE: gets an array and two numbers
+        #'[ : indexes an array.
+        #'[< : does the same, but starting at the end.
+        #'[..] : gets an array and two numbers
                 and returns a sub-array.
-        #'[..<] of CL_LR_RANGE: same as above but the second index is
+        #'[..<] : same as above but the second index is
                 interpreted as counted from the left end.
-        #'[<..] or CL_RL_RANGE and
-        #'[<..<] or CL_RR_RANGE: should be clear now.
-        #'[.. or CL_L_RANGE: takes only one index and returns the sub-
+        #'[<..]  and
+        #'[<..<] : should be clear now.
+        #'[.. : takes only one index and returns the sub-
                 array from this index to the end.
-        #'[<.. of CL_R_RANGE: same as above but the index is interpreted
+        #'[<.. : same as above but the index is interpreted
                 as counted from the left end.
-        #'({ or CL_ARRAY: puts all arguments into an array.
-        #'([ or CL_MAPPING: gets an unquoted (!) array which must include
+        #'({ : puts all arguments into an array.
+        #'([ : gets an unquoted (!) array which must include
                 at least one element as argument and returns a mapping of
                 the width of the given array's size with one entry that
                 contains the first element as key and the other elements
                 as values to the key.
-        All the names starting with CL_ are defined in /sys/closures.h;
-        so you should #include <closures.h> and use these macros instead
-        of the #'-versions which confuse a lot of editors that try to
-        find matching parentheses.
 
         #'negate is for unary minus.
         #', may be followed by any number of closures,
@@ -290,112 +293,112 @@ DESCRIPTION
 
         An example from Amylaar:
 
-        #I have tested the replace_program() functionality with one
-        #example, which I include below. The room is commonly known as
-        #/room/orc_valley.c .  A prerequisite to make this work is to
-        #have valued properties in room.c .
+        I have tested the replace_program() functionality with one
+        example, which I include below. The room is commonly known as
+        /room/orc_valley.c .  A prerequisite to make this work is to
+        have valued properties in room.c .
 
-        #The property C_EXTRA_RESET, if defined, is evaluated at reset
-        #time in the reset() of the used room.c .  Moreover, you need
-        #a function to query an unprocessed property to use
-        #orc_valley.c from fortress.c (That is, don't do an automatic
-        #funcall there.)  If you can't supply such a function, you
-        #have to set the property "get_orc" at the end of orc_valley.c
-        #'s extra_reset() with: add_prop("get_orc", lambda(0, get_orc)
-        #); which will set the property to a function that returns the
-        #function that is in the variable get_orc at the time you do
-        #the add_prop() call.
-        #
-        #Back to fortress.c : Assume you have the function
-        #successfully queried and stored in the variable get_orc. Now
-        #you can compute your extra_reset() function by: get_orc =
-        #lambda( 0, ({#'funcall, get_orc, 8, 40}) ); which creates the
-        #usual 8 orcs with an a_chat chance of 40.
-        #
-        #Here comes the orc_valley.c source:
-        #
-        #    ----------- cut here ------- cut here -------- cut here ---
-        #
-        ##include "room.h"
-        ##include "/sys/stdproperties.h"
-        ##undef EXTRA_RESET
-        ##define EXTRA_RESET extra_reset();
-        #
-        #extra_reset() {
-        #    closure get_orc;
-        #
-        #    replace_program("room/room"); /* Must come first. */
-        #    get_orc = lambda( ({'num_orcs, 'chat_chance}),
-        #       ({#'?!, ({#'present, "orc", ({#'previous_object}) }),
-        #           ({#'do,
-        #               ({#'=, 'orc, ({#'clone_object, "obj/monster"}) }),
-        #               ({#'=, 'i, 9}),
-        #               ({#'do,
-        #                   ({#'call_other, 'orc, "set_level",
-        #                       ({#'+, ({#'random, 2}), 1}) }),
-        #                   ({#'call_other, 'orc,
-        #                       ({#'[,
-        #                           quote(({"set_aggressive",
-        #                                       "set_ac", "set_short",
-        #                                       "set_al", "set_ep", "set_hp",
-        #                                       "set_race",
-        #                                       "set_alias", "set_name"})),
-        #                          ({#'-=, 'i, 1}) }),
-        #                       ({#'[,
-        #                           quote(({1, 0, "An orc", -60, 1014,
-        #                                   30, "orc",
-        #                              "dirty crap", "orc"})), 'i}) }),
-        #               'i, 0}),
-        #               ({#'call_other, 'orc, "load_a_chat", 'chat_chance,
-        #                   quote(({ "Orc says: Kill 'em!\n",
-        #                       "Orc says: Bloody humans!\n",
-        #                       "Orc says: Stop 'em!\n",
-        #                       "Orc says: Get 'em!\n",
-        #                       "Orc says: Let's rip out his guts!\n",
-        #                       "Orc says: Kill 'em before they run away!\n",
-        #                       "Orc says: What is that human doing here!\n",
-        #                   })) }),
-        #               ({#'=, 'n, ({#'*, ({#'random, 3}), 5}) }),
-        #               ({#'=, 'weapon, ({#'clone_object, "obj/weapon"}) }),
-        #               ({#'=, 'i, 5}),
-        #               ({#'do,
-        #                   ({#'call_other, 'weapon,
-        #                       ({#'[,
-        #                           quote(({ "set_alt_name",
-        #                               "set_weight", "set_value",
-        #                               "set_class", "set_name"})),
-        #                               ({#'-=, 'i, 1}) }),
-        #                       ({#'[,
-        #                           quote(({ "knife", 1, 8,  5, "knife",
-        #                               "knife", 1, 15, 7, "curved knife",
-        #                               "axe",   2, 25, 9, "hand axe",  })),
-        #                           ({#'+, 'n, 'i}) }) }),
-        #               'i, 0}),
-        #               ({#'transfer, 'weapon, 'orc}),
-        #               ({#'command,
-        #                   ({#'+, "wield ",
-        #                       ({#'call_other, 'weapon,
-        #                       "query_name"}) }), 'orc}),
-        #               ({#'move_object, 'orc, ({#'previous_object}) }),
-        #           ({#'-=, 'num_orcs, 1}), 0})
-        #       })
-        #    );
-        #    add_prop("get_orc", get_orc);
-        #    get_orc = lambda( 0, ({#'funcall, get_orc, 2, 50}) );
-        #    add_prop(C_EXTRA_RESET, get_orc);
-        #    funcall(get_orc);
-        #}
-        #
-        #TWO_EXIT("room/slope", "east",
-        #        "room/fortress", "north",
-        #        "The orc valley",
-        #        "You are in the orc valley. This place is inhabited"
-        #        "by orcs.\n"
-        #        "There is a fortress to the north, with lot of signs
-        #        of orcs.\n", 1)
-        #
-        #    ----------- cut here ------- cut here -------- cut here ----
-        #
+        The property C_EXTRA_RESET, if defined, is evaluated at reset
+        time in the reset() of the used room.c .  Moreover, you need
+        a function to query an unprocessed property to use
+        orc_valley.c from fortress.c (That is, don't do an automatic
+        funcall there.)  If you can't supply such a function, you
+        have to set the property "get_orc" at the end of orc_valley.c
+        's extra_reset() with: add_prop("get_orc", lambda(0, get_orc)
+        ); which will set the property to a function that returns the
+        function that is in the variable get_orc at the time you do
+        the add_prop() call.
+        
+        Back to fortress.c : Assume you have the function
+        successfully queried and stored in the variable get_orc. Now
+        you can compute your extra_reset() function by: get_orc =
+        lambda( 0, ({#'funcall, get_orc, 8, 40}) ); which creates the
+        usual 8 orcs with an a_chat chance of 40.
+        
+        Here comes the orc_valley.c source:
+        
+            ----------- cut here ------- cut here -------- cut here ---
+        
+        #include "room.h"
+        #include "/sys/stdproperties.h"
+        #undef EXTRA_RESET
+        #define EXTRA_RESET extra_reset();
+        
+        extra_reset() {
+            closure get_orc;
+        
+            replace_program("room/room"); /* Must come first. */
+            get_orc = lambda( ({'num_orcs, 'chat_chance}),
+               ({#'?!, ({#'present, "orc", ({#'previous_object}) }),
+                   ({#'do,
+                       ({#'=, 'orc, ({#'clone_object, "obj/monster"}) }),
+                       ({#'=, 'i, 9}),
+                       ({#'do,
+                           ({#'call_other, 'orc, "set_level",
+                               ({#'+, ({#'random, 2}), 1}) }),
+                           ({#'call_other, 'orc,
+                               ({#'[,
+                                   quote(({"set_aggressive",
+                                               "set_ac", "set_short",
+                                               "set_al", "set_ep", "set_hp",
+                                               "set_race",
+                                               "set_alias", "set_name"})),
+                                  ({#'-=, 'i, 1}) }),
+                               ({#'[,
+                                   quote(({1, 0, "An orc", -60, 1014,
+                                           30, "orc",
+                                      "dirty crap", "orc"})), 'i}) }),
+                       'i, 0}),
+                       ({#'call_other, 'orc, "load_a_chat", 'chat_chance,
+                           quote(({ "Orc says: Kill 'em!\n",
+                               "Orc says: Bloody humans!\n",
+                               "Orc says: Stop 'em!\n",
+                               "Orc says: Get 'em!\n",
+                               "Orc says: Let's rip out his guts!\n",
+                               "Orc says: Kill 'em before they run away!\n",
+                               "Orc says: What is that human doing here!\n",
+                           })) }),
+                       ({#'=, 'n, ({#'*, ({#'random, 3}), 5}) }),
+                       ({#'=, 'weapon, ({#'clone_object, "obj/weapon"}) }),
+                       ({#'=, 'i, 5}),
+                       ({#'do,
+                           ({#'call_other, 'weapon,
+                               ({#'[,
+                                   quote(({ "set_alt_name",
+                                       "set_weight", "set_value",
+                                       "set_class", "set_name"})),
+                                       ({#'-=, 'i, 1}) }),
+                               ({#'[,
+                                   quote(({ "knife", 1, 8,  5, "knife",
+                                       "knife", 1, 15, 7, "curved knife",
+                                       "axe",   2, 25, 9, "hand axe",  })),
+                                   ({#'+, 'n, 'i}) }) }),
+                       'i, 0}),
+                       ({#'transfer, 'weapon, 'orc}),
+                       ({#'command,
+                           ({#'+, "wield ",
+                               ({#'call_other, 'weapon,
+                               "query_name"}) }), 'orc}),
+                       ({#'move_object, 'orc, ({#'previous_object}) }),
+                   ({#'-=, 'num_orcs, 1}), 0})
+               })
+            );
+            add_prop("get_orc", get_orc);
+            get_orc = lambda( 0, ({#'funcall, get_orc, 2, 50}) );
+            add_prop(C_EXTRA_RESET, get_orc);
+            funcall(get_orc);
+        }
+        
+        TWO_EXIT("room/slope", "east",
+                "room/fortress", "north",
+                "The orc valley",
+                "You are in the orc valley. This place is inhabited"
+                "by orcs.\n"
+                "There is a fortress to the north, with lot of signs
+                of orcs.\n", 1)
+        
+            ----------- cut here ------- cut here -------- cut here ----
+        
 
         Procedural elements:
         ====================

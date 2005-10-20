@@ -1,0 +1,10 @@
+SYNOPSIS
+        int db_close(int handle)
+
+DESCRIPTION
+        Close the server-connection with the handle <handle>
+        Return the handle-number on success.
+
+SEE ALSO
+        db_affected_rows(E), db_conv_string(E), db_connect(E),
+        db_exec(E), db_fetch(E), db_handles(E)

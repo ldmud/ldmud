@@ -19,7 +19,7 @@ Table of Contents
 	3.1 Lfun-Closure
 	3.2 Lambda-Closure
 
-1 Indroduction, Overview and Efun-Closures
+1 Introduction, Overview and Efun-Closures
 
   A closure is a pointer to a function. That means that it is data like an
   int or a string are. It may be assigned to a variable or given to anoth-
@@ -391,6 +391,28 @@ Table of Contents
 
       NOTE: There is no #'for in LPC, you should use #'while for this.
 
+      #'foreach is like the foreach() statement in LPC. It evaluates one or
+           more bodies repeatedly for every value in a giving string, array
+           or mapping. The result of the closure is 0.
+
+           #'foreach expects two or more arguments:
+            - a single variable symbol, or an array with several variable
+              symbols
+            - the value to iterate over
+            - zero or more bodes to evaluate in each iteration.
+
+           The single values retrieved from the given value are assigned
+           one after another to the variable(s), then the bodies are executed
+           for each assignment.
+
+           lambda(0, ({#'foreach, 'o, ({#'users})
+                                    , ({'#call_other, 'o, "die" })
+                     }));
+
+           lambda(0, ({#'foreach, ({'k, 'v}), ({ ...mapping...})
+                                    , ({'#printf, "%O:%O\n", 'k, 'v })
+                     }));
+
       #'return gets one argument and acts like the "return" statement in LPC
                in the function that is created by lambda(). It aborts the
                execution of this function and returns the argument.
@@ -493,43 +515,37 @@ Table of Contents
 
              This returns ({ -1,-2,-3 }).
 
-    #'[, #'[<, #'[..], #'[..<], #'[<..], #'[<..<], #'[.., #'[<.. #'({ and
-    #'([, #'[,] are the technical names that the macros given below stand
-         for. Please use the given macros instead. They are defined in
-         /sys/closures.h and you can use them if you #include <closures.h>
-
-    CL_INDEX or CL_L_INDEX is used for the things that in LPC are done with
+    #'[ is used for the things that in LPC are done with
              the []-operator (it indexes an array or a mapping).
 
-             lambda(0,({ CL_INDEX,quote(({ 10,50,30,70 })),2 })) ==> 30
-             lambda(0,({ CL_INDEX,([ "x":10;50, "y":30;70 ]),"x",1 })) ==> 50
+             lambda(0,({ #'[,quote(({ 10,50,30,70 })),2 })) ==> 30
+             lambda(0,({ #'[,([ "x":10;50, "y":30;70 ]),"x",1 })) ==> 50
 
-    CL_R_INDEX is the same as CL_INDEX but counts the elements from the
+    #'[< is the same as #'[ but counts the elements from the
                end (like indexing with [] and the "<").
 
-    CL_RANGE or CL_LL_RANGE returns a subarray of the argument from the one
+    #'[..] returns a subarray of the argument from the one
              given index to the other given index, both counted from the
              beginning of the array.
 
-    CL_LR_RANGE
-    CL_RL_RANGE
-    CL_RR_RANGE same as above, but the indexes are counted from the end,
-                according to the R and L (from left and from right).
+    #'[..<]
+    #'[<..]
+    #'[<..<] same as above, but the indexes are counted from the end,
 
-                lambda(0,({ CL_LR_RANGE,
+                lambda(0,({ #'[..<],
                             quote(({ 0,1,2,3,4,5,6,7 })),2,3
                          }))
 
                 This will return ({ 2,3,4,5 }).
-    CL_L_RANGE
-    CL_R_RANGE same as above, but only the first index is given, the
+    #'[..
+    #'[<.. same as above, but only the first index is given, the
                subarray will go till the end of the original (like with
                [x..]).
 
-    CL_ARRAY is used to create arrays (as with ({ }) in LPC). All arguments
+    #'({ is used to create arrays (as with ({ }) in LPC). All arguments
              become the elements of the array.
 
-             lambda(0,({ CL_ARRAY,
+             lambda(0,({ #'({,
                          ({ (#'random),10 }),
                          ({ (#'random),50 }),
                          ({ (#'random),30 }),
@@ -538,31 +554,46 @@ Table of Contents
 
              This returns ({ random(10),random(50),random(30),random(70) }).
 
-    CL_MAPPING is used to create mappings out of single entries (with seve-
+    #'([ is used to create mappings out of single entries (with seve-
                ral values) like the ([ ]) in LPC. Very unusual is the fact
                that this closure gets arrays as argument that are not eval-
                uated, although they are not quoted.
 
-               lambda(0,({ CL_MAPPING,
+               lambda(0,({ #'([,
                            ({ "x",1,2,3 }),
                            ({ "y",4,5,6 })
                         }));
 
                This returns ([ "x": 1;2;3,
                                "y": 4;5;6 ]).
+               
+               However, the elements of the arrays are evaluated as lambda
+               expressions, so if you want to create a mapping from values
+               evaluated at call time, write them as lambda closures:
 
-    CL_MAPPING_INDEX is nearly the same as CL_INDEX. The only difference
+               lambda(0, ({ #'([, ({ 1, ({ #'ctime }) }) }) )
+
+               will return ([ 1: <result of ctime() at call time ]).
+
+               Arrays can be put into the mapping by quoting:
+
+               lambda(0, ({ #'([, ({ 1, '({ 2 }) }) }) )
+
+               will return ([ 1: ({ 2 }) ])
+
+
+    #'[,] is nearly the same as #'[. The only difference
                      shows up if you want to index a mapping with a width
                      greater than 1 (with more than just one value per
                      key) directly with funcall(). Example:
-                     funcall(CL_INDEX,([ 0:1;2, 3:4;5 ]),0,1)
-                     This will not work. Use CL_MAPPING_INDEX and it will
+                     funcall(#'[,([ 0:1;2, 3:4;5 ]),0,1)
+                     This will not work. Use #'[,] and it will
                      work. If you want to use it in a lambda closure you
-                     do not have to use CL_MAPPING_INDEX and CL_INDEX will
-                     do fine. On the other hand, CL_MAPPING_INDEX cannot
-                     work with arrays, so in nearly all cases use CL_INDEX
+                     do not have to use #'[,] and #'[ will
+                     do fine. On the other hand, #'[,] cannot
+                     work with arrays, so in nearly all cases use #'[
                      and just in the described special case, use
-                     CL_MAPPING_INDEX.
+                     #'[,].
                      This is a strange thing and I deem it a bug, so it
                      might change in the future.
 
@@ -597,16 +628,16 @@ Table of Contents
     #'return
     #'switch
     #'while
-    CL_ARRAY
-    CL_MAPPING
-    CL_R_RANGE (but not the other versions of CL*RANGE !)
+    #'({
+    #'([
+    #'[<..] (but not the other versions !)
     #'!        (this really is an operator which could be a flaw, too;
                 thanx to Fiona@Wunderland for reporting this :-)
 
     #'.. is very likely to be an operator closure too, but since it is
     not implemented yet, I cannot say for sure.
 
-    I also deem the fact that CL_R_RANGE is an operator closure a bug.
+    I also deem the fact that #'([<.. is an operator closure a bug.
 
 2.6 Variable-Closures
 

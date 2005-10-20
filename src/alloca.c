@@ -1,27 +1,19 @@
 /*---------------------------------------------------------------------------
- * alloca -- (mostly) portable alloca() implementation
- * Written and put into the public-domain by D.A. Gwyn.
- * This version modified for Standard C.
+ * Gamedriver alloca -- a portable alloca() implementation
+ * Based on the public-domain version by D.A. Gwyn.
  *
  *---------------------------------------------------------------------------
  * This implementation of the PWB library alloca() function,
  * which is used to allocate space off the run-time stack so
  * that it is automatically reclaimed upon procedure exit,
- * was inspired by discussions with J. Q. Johnson of Cornell.
+ * was inspired by discussions with J. Q. Johnson of Cornell
+ * and later extended by Lars Duening.
  *
  * It should work under any C implementation that uses an
  * actual procedure stack (as opposed to a linked list of
  * frames).  There are some preprocessor constants that can
  * be defined when compiling for your specific system, for
  * improved efficiency; however, the defaults should be okay.
- *
- * CAVEAT: Modern C compilers often recognize uses of alloca() and
- *   generate special code instead of a normal function call. To
- *   turn off this feature (and thus make use of this alloca()
- *   implementation), you can try doing the following things:
- *     - define C_ALLOCA when compiling your program
- *     - make sure the compiler sees the prototype for alloca()
- *     - don't include <alloca.h>
  *
  * The general concept of this implementation is to keep
  * track of all alloca()-allocated blocks, and reclaim any
@@ -30,15 +22,19 @@
  * soon as it becomes invalid, but it will do so eventually.
  *
  * As a special case, alloca(0) reclaims storage without
- * allocating any.  It is a good idea to use alloca(0) in
+ * allocating any, including storage 'cached' by the implementation
+ * for fast reuse. It is a good idea to use alloca(0) in
  * your main control loop, etc. to force garbage collection.
+ *
+ * As opposed to the original implementaion using malloc()/free(),
+ * this version utilizes the 'mempools' module to allocate the memory.
  *---------------------------------------------------------------------------
  */
 
 #include <stdlib.h>
 #include <stdio.h>
 
-extern void * alloca(size_t size);
+#include "mempools.h"
 
 typedef void *pointer;  /* generic pointer type */
 
@@ -76,26 +72,17 @@ static int stack_dir;                   /* 1 or -1 once known */
 /* An "alloca header" is used to:
  * (a) chain together all alloca()ed blocks;
  * (b) keep track of stack depth.
- *
- * It is very important that sizeof(header) agree with malloc()
- * alignment chunk size.  The following default should work okay.
  */
 
-#ifndef ALIGN_SIZE
-#  define  ALIGN_SIZE  sizeof(double)  /* it's a guess */
-#endif
-
-typedef union hdr
+typedef struct hdr
 {
-  char   align[ALIGN_SIZE];      /* to force sizeof(header) */
-  struct
-  {
-      union hdr *next;           /* for chaining headers */
-      char *deep;                /* for stack depth measure */
-  } h;
+    struct hdr * next;  /* for chaining headers */
+    char       * deep;  /* for stack depth measure */
+    mempool_t  * pool;  /* the memory pool */
 } header;
 
 static header *last_alloca_header = NULL; /* -> last alloca header */
+static header *free_header = NULL; /* List of unused structures */
 
 /*-------------------------------------------------------------------------*/
 #if STACK_DIRECTION == 0
@@ -109,27 +96,25 @@ find_stack_direction (void)
 
 {
     static char *addr = NULL;  /* address of first `dummy', once known */
-    auto char    dummy;        /* to get stack address */
+    char        dummy;         /* to get stack address */
 
-
-    if (addr == NULL) /* initial entry */
+    if (addr == NULL)  /* initial call */
     {
         addr = &dummy;
-
-        find_stack_direction ();        /* recurse once */
+        find_stack_direction ();  /* recurse once */
     }
-    else              /* second entry */
+    else  /* second entry */
     if (&dummy > addr)
-        stack_dir = 1;                  /* stack grew upward */
+        stack_dir = 1;    /* stack grew upward */
     else
-        stack_dir = -1;                 /* stack grew downward */
+        stack_dir = -1;   /* stack grew downward */
 }
 
-#endif /* STACK_DIRECTION == 0 */
+#endif  /* STACK_DIRECTION == 0 */
 
 /*-------------------------------------------------------------------------*/
 pointer
-alloca (size_t size)
+palloca (size_t size)
 
 /* Allocate at least <size> bytes of memory "on the stack" and return a
  * pointer to the start of the memory block. Return NULL if running out
@@ -147,11 +132,12 @@ alloca (size_t size)
  */
 
 {
-    auto char        probe;                /* probes stack depth: */
-    register char   *depth = &probe;
+    char              probe;         /* probes stack depth: */
+    register char   * depth = &probe;
+    register header * hp;            /* current header structure */
 
 #if STACK_DIRECTION == 0
-    if (STACK_DIR == 0)  /* unknown growth direction */
+    if (STACK_DIR == 0)  /* (yet)unknown growth direction */
         find_stack_direction ();
 #endif
 
@@ -159,45 +145,75 @@ alloca (size_t size)
      * was allocated from deeper in the stack than currently.
      */
 
+    for (hp = last_alloca_header; hp != NULL;)
     {
-        register header *hp;   /* traverses linked list */
+        if ((STACK_DIR > 0 && hp->deep > depth)
+         || (STACK_DIR < 0 && hp->deep < depth))
+        {
+            register header *np = hp->next;
 
-        for (hp = last_alloca_header; hp != NULL;)
-            if (STACK_DIR > 0 && hp->h.deep > depth
-             || STACK_DIR < 0 && hp->h.deep < depth)
-            {
-                register header        *np = hp->h.next;
-
-                free ((pointer) hp);  /* collect garbage */
-                hp = np;              /* -> next header */
-            }
-            else
-                break;               /* rest are not deeper */
-
-        last_alloca_header = hp;  /* -> last valid storage */
+            mempool_reset(hp->pool);  /* collect garbage */
+            hp->next = free_header;
+            free_header = hp;
+            hp = np;              /* -> next header */
+        }
+        else
+            break; /* rest are not deeper */
     }
+
+    last_alloca_header = hp;  /* -> last valid storage */
+
+    /* From here on, hp is always == last_alloca_header; the
+     * use of the local however is a hint for the optimizer.
+     */
 
     if (size == 0)
     {
+        while (free_header != NULL)
+        {
+            header * this = free_header;
+            free_header = free_header->next;
+            if (this->pool)
+            {
+                mempool_delete(this->pool);
+            }
+            free(this);
+        }
         return NULL;  /* no allocation required */
     }
 
-    /* Allocate combined header + user data storage. */
+    /* Allocate a new header structure if there is non for
+     * this particular stack depth. The new structure will
+     * be the new bottom of the header list.
+     */
 
+    if (hp == NULL || hp->deep != depth)
     {
-        register pointer new = malloc (sizeof (header) + size);
-        /* address of header */
-        if (!new) { fprintf(stderr,"alloca: failed!"); return NULL; }
+        if (free_header == NULL)
+        {
+            hp = malloc (sizeof (*hp));
+            if (!hp) { fprintf(stderr, "alloca: failed!\n"); return NULL; }
+            hp->pool = new_mempool(1024);
+            if (!hp->pool)
+            {
+                free(hp);
+                fprintf(stderr, "alloca: failed!\n");
+                return NULL;
+            }
+        }
+        else
+        {
+            hp = free_header;
+            free_header = hp->next;
+        }
 
-        ((header *)new)->h.next = last_alloca_header;
-        ((header *)new)->h.deep = depth;
-
-        last_alloca_header = (header *)new;
-
-        /* User storage begins just after header. */
-
-        return (pointer)((char *)new + sizeof(header));
+        hp->next = last_alloca_header;
+        hp->deep = depth;
+        last_alloca_header = hp;
     }
+
+    /* The actual allocation is easy: */
+    return mempool_alloc(hp->pool, size);
 }
 
 /***************************************************************************/

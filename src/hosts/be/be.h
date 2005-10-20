@@ -1,6 +1,8 @@
 #ifndef HOSTS_BE_H
 #define HOSTS_BE_H
 
+#include <BeBuild.h>
+
 #define SOCKET_HEADER "hosts/be/socketinc.h"
 #define SOCKET_LIB 1
 
@@ -11,7 +13,9 @@
 
 
 #ifdef __MWERKS__
-#define isascii(c) !((unsigned long)c & 0xFFFFFF80)
+#    if !defined(B_BEOS_VERSION_5)
+#        define isascii(c) !((unsigned long)c & 0xFFFFFF80)
+#    endif
 #    ifndef EMSGSIZE
 #        define EMSGSIZE 42
 #    endif

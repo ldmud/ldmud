@@ -1,352 +1,624 @@
+/*---------------------------------------------------------------------------
+ * XErq - Main module.
+ * (C) Copyright 1995 by Brian Gerst.
+ *---------------------------------------------------------------------------
+ * This module implements the main() function with the central loop, plus
+ * a bunch of utility functions.
+ *
+ * Dispatch of the various ERQ requests is implemented with a lookup table
+ * holding the addresses of the request functions.
+ *---------------------------------------------------------------------------
+ */
+
 #include "defs.h"
-#include "random.c"
 
-struct child_s *childs;
-struct socket_s *sockets;
-struct retry_s *retries;
-struct queue_s *stdout_queue;
-void erq_cmd();
-void sig_child();
+#include "random.c" /* Compile the driver's random module */
 
-int in_select, seq_number, seq_interval;
+/*-------------------------------------------------------------------------*/
+void (*erq_table[])(char *, int)
+  = { erq_rlookup
+    , erq_execute
+    , erq_fork
+    , erq_auth
+    , erq_spawn
+    , erq_send
+    , erq_kill
+    , erq_open_udp
+    , erq_open_tcp
+    , erq_listen
+    , erq_accept
+    , erq_lookup
+};
+  /* Dispatchtable for the ERQ request functions.
+   * Arguments are (message, msg_len).
+   */
 
-int main(int argc, char *argv[])
+#define ERQ_REQUEST_MAX ERQ_LOOKUP
+
+/*-------------------------------------------------------------------------*/
+child_t *childs;
+  /* List of active children. The main loop will remove _EXITED children.
+   */
+
+socket_t *sockets;
+  /* List of opened sockets, including those to communicate with spawned
+   * commands.
+   */
+
+retry_t *retries;
+  /* List of function calls to retry at a later point of time.
+   */
+
+equeue_t *stdout_queue;
+  /* List of messages pending to write to stdout.
+   */
+
+int in_select;
+  /* TRUE while erq is in select() - during this time sig_child()
+   * can write its replies directly.
+   */
+
+int seq_number;
+  /* The last sequence number assigned to ticket, incremented
+   * in <seq_interval>s, initialized with a random number.
+   */
+
+int seq_interval;
+  /* The interval used to increment seq_number, initialized with
+   * an odd random number.
+   */
+
+/*-------------------------------------------------------------------------*/
+char *
+time_stamp (void)
+
+/* Return a textual representation of the current time
+ * in the form "YYYY.MM.DD HH:MM:SS [xerq]".
+ * Result is a pointer to a static buffer.
+ *
+ * Putting this function in strfuns is not a good idea, because
+ * it is need by almost every module anyway.
+ */
+
+{
+    time_t t;
+    static char result[27];
+    struct tm *tm;
+
+    t = time(NULL);
+    tm = localtime(&t);
+    strftime(result, sizeof(result), "%Y.%m.%d %H:%M:%S [xerq]", tm);
+    return result;
+} /* time_stamp() */
+
+/*-------------------------------------------------------------------------*/
+int
+main(int argc, char *argv[])
+
+/* The main program and -loop of the ERQ.
+ */
+
 {
     int num;
 
-    if (argc > 1 && !strcmp(argv[1], "--forked")) {
+    /* Only "--forked" use is supported. */
+    if (argc > 1 && !strcmp(argv[1], "--forked"))
+    {
         write(1, "1", 1);
-    } else {
-        fprintf(stderr, "dynamic attatchment unimplemented\n");
+    }
+    else
+    {
+        fprintf(stderr, "%s dynamic attatchment unimplemented\n"
+                      , time_stamp());
         die();
     }
-    in_select=0;
+
+    /* Initialize */
+    
+    in_select = 0;
     signal(SIGCLD, sig_child);
     signal(SIGPIPE, SIG_IGN);
 
-    childs=0;
-    retries=0;
-    stdout_queue=0;
+    sockets = NULL;
+    childs = NULL;
+    retries = NULL;
+    stdout_queue = NULL;
+    
     randomize(time(0));
-    seq_number=get_ticket();
-    seq_interval=get_ticket() | 1; /* make sure it is odd */
+    seq_number = get_ticket();
+    seq_interval = get_ticket() | 1; /* make sure it is odd */
 
 #ifdef DETACH
+    /* Detach from console */
     num = open("/dev/tty", O_RDWR);
     if (num >= 0) {
         ioctl(num, TIOCNOTTY, 0);
         close(num);
     }
 #endif
-    while(1) {
+
+    /* The main loop */
+    
+    while(1)
+    {
         fd_set read_fds, write_fds;
         int num_fds;
-        struct child_s *chp, **chpp;
-        struct retry_s *rtp, **rtpp;
-        struct socket_s *sp;
+        child_t *chp, **chpp;
+        retry_t *rtp, **rtpp;
+        socket_t *sp;
         struct timeval timeout;
 
-        /* look for sockets */
+        /* look for sockets to select on */
+
         FD_ZERO(&read_fds);
         FD_ZERO(&write_fds);
+
         FD_SET(0, &read_fds);
-        if (stdout_queue) FD_SET(1, &write_fds);
-        num_fds=2;
-        for (sp=sockets; sp; sp=sp->next) {
-            switch(sp->type) {
-              case SOCKET_WAIT_CONNECT:
-              case SOCKET_WAIT_AUTH:
+        if (stdout_queue)
+            FD_SET(1, &write_fds);
+
+        num_fds = 2;
+        for (sp = sockets; sp; sp = sp->next)
+        {
+            switch(sp->type)
+            {
+            case SOCKET_WAIT_CONNECT:
+            case SOCKET_WAIT_AUTH:
                 FD_SET(sp->fd, &write_fds);
-              default:
                 FD_SET(sp->fd, &read_fds);
-                if (sp->fd > num_fds) num_fds=sp->fd+1;
-              case SOCKET_WAIT_ACCEPT:
+                if (sp->fd >= num_fds)
+                    num_fds=sp->fd+1;
+                break;
+
+            default:
+                FD_SET(sp->fd, &read_fds);
+                if (sp->fd >= num_fds)
+                    num_fds=sp->fd+1;
+                break;
+
+            case SOCKET_WAIT_ACCEPT:
                 /* do nothing */;
                 /* Without the ; above, Metrowerks Codewarrior reports
                  * an error :-( */
             }
-            if (sp->queue) FD_SET(sp->fd, &write_fds);
-        }
-        for (chpp=&childs; *chpp;) {
-            chp=*chpp;
-            if (chp->status==CHILD_EXITED) {
-                *chpp=chp->next;
+
+            if (sp->queue)
+                FD_SET(sp->fd, &write_fds);
+        } /* for (sockets) */
+
+        /* Clean up the list of children */
+        
+        for (chpp = &childs; *chpp;)
+        {
+            chp = *chpp;
+            if (chp->status==CHILD_EXITED)
+            {
+                *chpp = chp->next;
                 remove_child(chp);
-            } else {
-                chpp=&chp->next;
+            }
+            else
+            {
+                chpp = &chp->next;
             }
         }
 
-        if (retries) {
+        /* Scan the list of pending retries for the soonest one.
+         * Put the time till then into timeout.
+         * (If the list is empty, select() will receive NULL for timeout).
+         */
+        if (retries)
+        {
             time_t t;
 
-            t=retries->time;
-            for (rtp=retries; rtp; rtp=rtp->next) {
-                if (rtp->time < t) t=rtp->time;
+            t = retries->time;
+            for (rtp = retries; rtp; rtp = rtp->next)
+            {
+                if (rtp->time < t)
+                    t = rtp->time;
             }
-            timeout.tv_sec=t-time(0);
-            timeout.tv_usec=0;
+            timeout.tv_sec = t - time(NULL);
+            timeout.tv_usec = 0;
         }
 
 #ifdef DEBUG
-        fprintf(stderr, "Starting select...\n");
+        fprintf(stderr, "%s Starting select...\n", time_stamp());
 #endif
-        in_select=1; /* so sig_child() can write reply directly */
-        num=select(num_fds, &read_fds, &write_fds, 0, retries ? &timeout : 0);
-        in_select=0; /* don't wnat sig_child() writing now */
+        in_select = 1; /* so sig_child() can write reply directly */
+        num = select(num_fds, &read_fds, &write_fds, 0, retries ? &timeout : 0);
+        in_select = 0; /* don't want sig_child() writing now */
 
 #ifdef DEBUG
-        fprintf(stderr, "Select returns %d\n", num);
-        if (num<0) fprintf(stderr, " errno=%d.\n", errno);
+        fprintf(stderr, "%s Select returns %d\n", time_stamp(), num);
+        if (num < 0)
+            fprintf(stderr, "%s  errno=%d.\n", time_stamp(), errno);
 #endif
 
-        /* check for stdout */
+        /* Is stdout ready to write? Then flush the queue. */
         if (FD_ISSET(1, &write_fds))
             flush_queue(&stdout_queue, 1);
 
-        /* check for retries */
-        for (rtpp=&retries; *rtpp; ) {
-            rtp=*rtpp;
-            if (rtp->time <= time(0)) {
+        /* Check for retries */
+        for (rtpp = &retries; *rtpp; )
+        {
+            rtp = *rtpp;
+            if (rtp->time <= time(NULL))
+            {
                 (*(rtp->func))(rtp->mesg, read_32(rtp->mesg));
-                *rtpp=rtp->next;
+                *rtpp = rtp->next;
                 free(rtp);
-            } else {
-                rtpp=&rtp->next;
+            }
+            else
+            {
+                rtpp = &rtp->next;
             }
         }
 
         /* check for input from driver */
-        if (FD_ISSET(0, &read_fds)) erq_cmd();
+        if (FD_ISSET(0, &read_fds))
+            erq_cmd();
 
-        /* check sockets */
+        /* Handle the ready sockets */
 
-        for (sp=sockets; sp; sp=sp->next) {
-            if (FD_ISSET(sp->fd, &read_fds)) read_socket(sp, 0);
+        for (sp = sockets; sp; sp = sp->next)
+        {
+            if (FD_ISSET(sp->fd, &read_fds))  read_socket(sp, 0);
             if (FD_ISSET(sp->fd, &write_fds)) read_socket(sp, 1);
         }
-    }
+    } /* while(1) */
 
+    /* NOTREACHED */
+    
     return 0;
-}
+} /* main() */
 
-#define ERQ_REQUEST_MAX ERQ_LOOKUP
+/*-------------------------------------------------------------------------*/
+void
+erq_cmd (void)
 
-void (*erq_table[])(char *, int)={
-    erq_rlookup,
-    erq_execute,
-    erq_fork,
-    erq_auth,
-    erq_spawn,
-    erq_send,
-    erq_kill,
-    erq_open_udp,
-    erq_open_tcp,
-    erq_listen,
-    erq_accept,
-    erq_lookup
-};
+/* There is data ready from the driver - read and execute it when complete.
+ * The function maintains a static buffer for the data read - incomplete
+ * messages are buffered until they are complete.
+ */
 
-void erq_cmd()
 {
-    char request;
     static char buf[ERQ_MAX_SEND];
-    static int pos=0;
+    static int pos = 0;
+      /* Position in buf[]. If it extends beyond the end of buf,
+       * it is because the message is too long and the function
+       * is in the process of skipping the extraneous characters.
+       */
+
     int len, mesg_len;
+    char request;
 
-    if (pos < 9) {
-        len=read(0, buf+pos, 9-pos);
-        if (len <= 0) {
+    /* Read the message header */
+    if (pos < 9)
+    {
+        len = read(0, buf+pos, 9-pos);
+        if (len <= 0)
+        {
             perror("read");
             die();
         }
-        pos+=len;
-        if (pos < 9) return;
+        pos += len;
+        if (pos < 9)
+            return;
     }
 
-    mesg_len=read_32(buf);
+    mesg_len = read_32(buf);
+    if (mesg_len > sizeof(buf))
+    {
+        /* This doesn't happen in a functioning system */
+        fprintf(stderr
+               , "%s: Received too long packet: %d bytes.\n"
+               , time_stamp(), mesg_len);
+        die();
+    }
 
-    if (pos < mesg_len) {
-        len=read(0, buf+pos, mesg_len-pos);
-        if (len <= 0) {
+    /* Get the rest of the message */
+
+    if (pos < mesg_len)
+    {
+        len = read(0, buf+pos, mesg_len-pos);
+        if (len <= 0)
+        {
             perror("read");
             die();
         }
-        pos+=len;
-        if (pos < mesg_len) return;
+        pos += len;
+        if (pos < mesg_len)
+            return;
     }
-    pos=0;
-    request=buf[8];
-    if (request<=ERQ_REQUEST_MAX) {
+
+    pos = 0; /* Message complete */
+
+    /* Branch on the request */
+    request = buf[8];
+    if (request <= ERQ_REQUEST_MAX)
+    {
 #ifdef DEBUG
         char *mesg, *mesgs[]={
             "rlookup","fork","auth","execute","spawn","send","kill",
             "open_udp","open_tcp","listen","accept","lookup"};
         mesg=mesgs[(int)request];
-        fprintf(stderr, "command: %s\n", mesg);
+        fprintf(stderr, "%s command: %s\n", time_stamp(), mesg);
 #endif
         (*erq_table[(int)request])(buf, mesg_len);
-    } else bad_request(buf);
-}
+    }
+    else
+        bad_request(buf);
+} /* erq_cmd() */
 
-void die()
+/*-------------------------------------------------------------------------*/
+void
+die(void)
+
+/* Terminate the ERQ with status 1.
+ */
+
 {
-    fprintf(stderr, "Erq demon exiting.\n");
+    fprintf(stderr, "%s Demon exiting.\n", time_stamp());
     exit(1);
-}
+} /* die() */
 
-void sig_child()
+/*-------------------------------------------------------------------------*/
+#ifndef _AIX
+void
+sig_child()
+#else
+void
+sig_child(int sig)
+#endif
+
+/* A child process exited - update its child structure.
+ */
+
 {
     wait_status_t status;
     pid_t pid;
     struct child_s *chp;
 
-    pid=wait(&status);
+    pid = wait(&status);
+
 #ifdef DEBUG
-    fprintf(stderr, "Erq: sigchild called, pid=%d status=%d\n", pid, status);
+    fprintf(stderr, "%s sigchild called, pid=%d status=%d\n"
+                  , time_stamp(), pid, status);
 #endif
-    for (chp=childs; chp; chp=chp->next) {
-        if (chp->pid!=pid) continue;
-        chp->status=CHILD_EXITED;
-        chp->return_code=status;
-        if (in_select) remove_child(chp); /* safe to do it from here */
+
+    /* Look for the child and mark it as exited */
+    for (chp = childs; chp; chp = chp->next)
+    {
+        if (chp->pid != pid)
+            continue;
+        chp->status = CHILD_EXITED;
+        chp->return_code = status;
+        if (in_select)
+            remove_child(chp); /* safe to do it from here */
         /*  if we're in select, we know we're not going to be messing up
             the main loop with stuff we're doing here */
         break;
     }
-    if (!chp) fprintf(stderr,
-        "Caught SIGCLD for pid %d, not in child list.\n", pid);
-    signal(SIGCLD, sig_child);
-}
 
-void add_retry(void (*func)(char *, int), char *mesg, int len, int t)
+    if (!chp)
+        fprintf(stderr, "%s Caught SIGCLD for pid %d, not in child list.\n"
+                      , time_stamp(), pid);
+
+    /* Restore the signal handler */
+    signal(SIGCLD, sig_child);
+} /* sig_child() */
+
+/*-------------------------------------------------------------------------*/
+void
+add_retry (void (*func)(char *, int), char *mesg, int len, int t)
+
+/* Add a new retry: function <func> is to be executed in <t> seconds
+ * with (<mesg>, <len>) as arguments.
+ */
+
 {
     struct retry_s *retry;
 
-    retry=(struct retry_s *)malloc(sizeof(struct retry_s)+len);
-    retry->time=time(NULL)+t;
-    retry->func=func;
+    retry = malloc(sizeof(struct retry_s)+len);
+    retry->time = time(NULL)+t;
+    retry->func = func;
     memcpy(&retry->mesg, mesg, len);
-    retry->next=retries;
-    retries=retry;
-}
+    retry->next = retries;
+    retries = retry;
+} /* add_retry() */
 
-void bad_request(char *mesg)
+/*-------------------------------------------------------------------------*/
+void
+bad_request (char *mesg)
+
+/* ERQ received a bad message in <mesg> - print some diagnostics.
+ */
+
 {
-    fprintf(stderr, "Bad request %d\n", mesg[8]);
-    fprintf(stderr, "%x %x %x %x %x %x %x %x %x\n",
+    fprintf(stderr, "%s Bad request %d\n", time_stamp(), mesg[8]);
+    fprintf(stderr, "%s %x %x %x %x %x %x %x %x %x\n", time_stamp(),
         mesg[0], mesg[1], mesg[2], mesg[3], mesg[4],
         mesg[5], mesg[6], mesg[7], mesg[8]);
-    fprintf(stderr, "%c %c %c %c %c %c %c %c %c\n",
+    fprintf(stderr, "%s %c %c %c %c %c %c %c %c %c\n", time_stamp(),
         mesg[0], mesg[1], mesg[2], mesg[3], mesg[4],
         mesg[5], mesg[6], mesg[7], mesg[8]);
     reply1(get_handle(mesg), "", 0);
-    return;
-}
+} /* bad_request() */
 
-void reply1(int32 handle, const char *data, int32 len)
+/*-------------------------------------------------------------------------*/
+void
+reply1 (int32 handle, const void *data, int32 len)
+
+/* Compose a reply message from <handle> and the <len> bytes of <data>
+ * and send it back to the driver.
+ */
+
 {
     char reply[ERQ_MAX_REPLY];
+
     write_32(reply,   len+8);
     write_32(reply+4, handle);
     memcpy(reply+8, data, len);
     write1(reply, len+8);
-    return;
-}
+} /* reply1() */
 
-void reply1keep(int32 handle, const char *data, int32 len)
+/*-------------------------------------------------------------------------*/
+void
+reply1keep (int32 handle, const void *data, int32 len)
+
+/* Compose a reply message from <handle> and the <len> bytes of <data>
+ * and send it back to the driver. The message will be an _KEEP_HANDLE
+ * message.
+ */
+
 {
     char reply[ERQ_MAX_REPLY];
+
     write_32(reply,   len+12);
     write_32(reply+4, ERQ_HANDLE_KEEP_HANDLE);
     write_32(reply+8, handle);
     memcpy(reply+12, data, len);
     write1(reply, len+12);
-    return;
-}
+} /* reply1keep() */
 
-void replyn(int32 handle, int keep, int num, ...)
+/*-------------------------------------------------------------------------*/
+void
+replyn (int32 handle, int keep, int num, ...)
+
+/* Compose and send to the driver a replymessage for <handle> with
+ * the <num> data arguments concatenated as body. If <keep> is true,
+ * a _KEEP_HANDLE message is composed.
+ *
+ * Each data argument is a tuple (char *data, int len).
+ */
+
 {
     char reply[ERQ_MAX_REPLY];
-    register char *p;
-    register int total;
+    char *p;
+    int total;
     va_list va;
 
-    p=reply+(total=(keep ? 12 : 8));
+    /* Determine the size of the header */
+    total = (keep ? 12 : 8);
+    p = reply+total;
+
+    /* Catenate the data arguments */
     va_start(va, num);
-    while(num--) {
+    while (num--)
+    {
         char *data;
         int len;
 
-        data=va_arg(va, char *);
-        len=va_arg(va, int);
+        data = va_arg(va, char *);
+        len = va_arg(va, int);
         memcpy(p, data, len);
-        p+=len;
-        total+=len;
+        p += len;
+        total += len;
     }
     va_end(va);
+
+    /* Create the header */
     write_32(reply, total);
-    if (keep) {
+    if (keep)
+    {
         write_32(reply+4, ERQ_HANDLE_KEEP_HANDLE);
         write_32(reply+8, handle);
-    } else {
+    }
+    else
+    {
         write_32(reply+4, handle);
     }
-    write1(reply, total);
-    return;
-}
 
-void reply_errno(int32 handle)
+    /* Send the reply */
+    write1(reply, total);
+} /* replyn() */
+
+/*-------------------------------------------------------------------------*/
+void
+reply_errno (int32 handle)
+
+/* Send a (errcode, errno) message to the driver for <handle>.
+ */
+
 {
     char mesg[2];
 
-    switch(errno) {
-      case EWOULDBLOCK:
+    switch(errno)
+    {
+    case EWOULDBLOCK:
 #if EAGAIN != EWOULDBLOCK
-      case EAGAIN:
+    case EAGAIN:
 #endif
-          mesg[0]=ERQ_E_WOULDBLOCK;
-          break;
-        case EPIPE:
-          mesg[0]=ERQ_E_PIPE;
-          break;
-        default:
-          mesg[0]=ERQ_E_UNKNOWN;
-          break;
-    }
-    mesg[1]=errno;
-    reply1(handle, mesg, 2);
-    return;
-}
+        mesg[0] = ERQ_E_WOULDBLOCK;
+        break;
 
-int writen(int fd, char *mesg, int len, struct queue_s **qpp)
-{
-    int l=0;
-    if (!(*qpp)) {
-        do
-          l=write(fd, mesg, len);
-        while (l==-1 && errno==EINTR);
-        if (l<0 || l==len) return l;
-        mesg+=l;
-        len-=l;
+    case EPIPE:
+        mesg[0] = ERQ_E_PIPE;
+        break;
+
+    default:
+        mesg[0] = ERQ_E_UNKNOWN;
+        break;
     }
+    mesg[1] = errno;
+    reply1(handle, mesg, 2);
+} /* reply_errno() */
+
+/*-------------------------------------------------------------------------*/
+int
+writen (int fd, char *mesg, int len, struct equeue_s **qpp)
+
+/* Send or queue the message <mesg> (length <len> bytes) to <fd>.
+ * If *<qpp> is non-NULL, the message is queued immediately.
+ * Otherwise, the function tries to send as much of the message
+ * as possible, and the queues whatever is left.
+ */
+
+{
+    int l = 0;
+
+    if (!(*qpp))
+    {
+        /* Send as much of the message as possible */
+        do
+            l = write(fd, mesg, len);
+        while (l == -1 && errno == EINTR);
+        if (l < 0 || l == len)
+            return l;
+        mesg += l;
+        len -= l;
+    }
+
     if (!len)
         return 0;
+
     add_to_queue(qpp, mesg, len);
     return l;
-}
+} /* writen() */
 
-void write1(char *mesg, int len)
+/*-------------------------------------------------------------------------*/
+void
+write1 (void *mesg, int len)
+
+/* Write the <len> bytes of <mesg> to stdout, ie to the driver.
+ */
+
 {
     int l;
-    l=writen(1, mesg, len, &stdout_queue);
-    if (l<0) {
-        fprintf(stderr, "Error occurred on driver socket, errno=%d.\n",
-                errno);
+
+    l = writen(1, mesg, len, &stdout_queue);
+    if (l < 0)
+    {
+        fprintf(stderr, "%s Error occurred on driver socket, errno=%d.\n",
+                time_stamp(), errno);
         die();
     }
 #ifdef DEBUG
-    if (l!=len) fprintf(stderr,
-        "Driver-erq socket blocked, queueing %d bytes\n", len);
+    if (l != len)
+        fprintf( stderr
+               , "%s Driver-erq socket blocked, queueing %d bytes\n"
+               , time_stamp(), len);
 #endif
-}
+} /* write1() */
+
+/***************************************************************************/
+

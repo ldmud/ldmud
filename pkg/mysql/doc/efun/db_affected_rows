@@ -1,0 +1,11 @@
+SYNOPSIS
+        int db_affected_rows(int handle)
+
+DESCRIPTION
+        Return the number of affected rows of the last SQL-statement that
+        has been sent to the SQL-server via handle <handle>.
+        Only useful for DELETE- or UPDATE-operations.
+
+SEE ALSO
+        db_conv_string(E), db_close(E), db_connect(E),
+        db_exec(E), db_fetch(E), db_handles(E)

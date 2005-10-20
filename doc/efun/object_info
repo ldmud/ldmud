@@ -76,6 +76,8 @@ DESCRIPTION
           int    [OIM_NUM_INHERITED]:  number of inherited programs.
           int    [OIM_SIZE_INHERITED]: size needed for the inherit structs.
           int    [OIM_TOTAL_SIZE]:     total size of the program.
+          int    [OIM_DATA_SIZE]:      total size of the values held in the
+                                       object's variables
 
           This call swaps in the program if necessary.
           Note that the OIM_SIZE_xxx entries only give the size spent on
@@ -89,6 +91,7 @@ HISTORY
           - basic result OIB_IS_WIZARD is always 0 if set_is_wizard()
               is not available.
           - basic result OIB_APPROVED is gone.
+        LDMud 3.2.8 added OIM_DATA_SIZE to the result of OINFO_MEMORY.
 
 SEE ALSO
         debug_info(E)

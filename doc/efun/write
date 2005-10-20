@@ -11,6 +11,8 @@ DESCRIPTION
 	form: "OBJ("+file_name((object)mix)+")"
 	
 	If it is an array just "<ARRAY>" will be printed.
+	If it is a mapping just "<MAPPING>" will be printed.
+	If it is a closure just "<CLOSURE>" will be printed.
 	
 	If the write() function is invoked by a command of an living
 	but not interactive object and the given argument is a string

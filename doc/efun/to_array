@@ -4,6 +4,8 @@ SYNOPSIS
 	mixed *to_array(quotedarray)
 	mixed *to_array(mixed *)
 
+        (int*)<value>
+
 DESCRIPTION
 	Strings and symbols are converted to an int array that
 	consists of the args characters, with 0 == '\0' as last

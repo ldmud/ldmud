@@ -12,4 +12,4 @@ DESCRIPTION
 	the loop.
 
 SEE ALSO
-	for(LPC), do-while(LPC)
+        for(LPC), foreach(LPC), do-while(LPC), if(LPC), switch(LPC)

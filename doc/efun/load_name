@@ -1,11 +1,19 @@
 SYNOPSIS
 	string load_name()
 	string load_name(object obj)
+	string load_name(string obj)
 
 DESCRIPTION
+        Return the load name for the object <obj> which may be given
+        directly or by its name.
+        
         If <obj> is a clone, return the load_name() of <obj>'s blueprint.
         If <obj> is a blueprint, return the filename from which the
         blueprint was compiled.
+
+        If <obj> is given by name but not/no longer existing, the
+        function synthesizes the load name as it should be and returns
+        that. If the given name is illegal, the function returns 0.
 
         For virtual objects this efun of course returns the virtual filename.
         If <obj> is omitted, the name for the current object is returned.
@@ -22,9 +30,12 @@ EXAMPLE
 	o = clone_object("/std/thing");
 	write(load_name(o));  --> writes "/std/thing" in !compat mode
 	                             and "std/thing"  in compat mode
+        write(load_name("/std/thing"));  --> same as above
+        write(load_name("/std/thing#4n5")); --> writes 0 
 
 HISTORY
 	Introduced in LDMud 3.2.6.
+        Strings are accepted as arguments since 3.2.8.
 
 SEE ALSO
 	clone_object(E), clonep(E), object_name(E), load_object(E),

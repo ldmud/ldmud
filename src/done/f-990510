@@ -2,7 +2,8 @@ Short: Namespace correction
 Date: Tue, 4 May 1999 09:08:15 +0200 (MET DST)
 From: Fini <ujastrow@mail.desy.de>
 Type: Feature
-State: Unclassified
+State: Done - implemented in 3.2.8-dev.152
+See also: f-991019-0
 
 Hmm, mir ist grade aufgefallen, dass es in Lpc anscheinend nicht getrennte
 Namensraeume fuer Variablen und Funktionen gibt? Also es ist nicht

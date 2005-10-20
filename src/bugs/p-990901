@@ -1,0 +1,288 @@
+Short: New statement catch_no_log()
+From: Michael Fedrowitz
+Date: 990901, updated 991109
+Type: Patch
+State: Unclassified
+
+- catch_no_log.diff implementiert ein catch_no_log(), daß genauso
+funktioniert wie catch(), aber keinen stack trace ausgibt. Damit kann man
+z.B. verhindern, daß wiztools, die ausgiebigen Gebrauch von catch() machen,
+das debug log unnötig vollspammen. (by Vejar & Guandalug@ForgottenDreams)
+
+diff -ur src.orig/closure.c src/closure.c
+--- src.orig/closure.c	Fri Nov  5 00:20:38 1999
++++ src/closure.c	Mon Nov  8 10:43:47 1999
+@@ -2659,6 +2659,7 @@
+                 /* ({#'catch, <body> })
+                  */
+                 case F_CATCH:
++                case F_CATCH_NO_LOG:
+                   {
+                     /* This is compiled as:
+                      *
+@@ -2676,7 +2677,7 @@
+                     if (current.code_left < 2)
+                         realloc_code();
+                     current.code_left -= 2;
+-                    STORE_CODE(current.codep, F_CATCH);
++                    STORE_CODE(current.codep, type - CLOSURE_OPERATOR);
+                     STORE_UINT8(current.codep, 0);
+                     start = current.code_max - current.code_left;
+ 
+@@ -4834,6 +4835,9 @@
+ #endif
+                 case L_CATCH:
+                     code = F_CATCH;
++                    break;
++                case L_CATCH_NO_LOG:
++                    code = F_CATCH_NO_LOG;
+                     break;
+                 }
+ 
+diff -ur src.orig/func_spec src/func_spec
+--- src.orig/func_spec	Sun Oct 31 03:10:52 1999
++++ src/func_spec	Mon Nov  8 10:43:47 1999
+@@ -63,6 +63,7 @@
+ #endif
+ 	local
+ 	catch
++	catch_no_log
+ "++"    inc
+ "--"    dec
+ "x++"   post_inc
+diff -ur src.orig/interpret.c src/interpret.c
+--- src.orig/interpret.c	Fri Nov  5 00:15:42 1999
++++ src/interpret.c	Mon Nov  8 10:43:47 1999
+@@ -5212,7 +5212,7 @@
+ 
+ /*-------------------------------------------------------------------------*/
+ static INLINE struct longjump_s *
+-push_error_context (svalue_t *sp)
++push_error_context (svalue_t *sp, int catch_token)
+ 
+ /* Create a catch recovery context, using <sp> as the stackpointer to save,
+  * link it into the recovery stack and return the longjmp context struct.
+@@ -5226,7 +5226,9 @@
+     p->save_csp = csp;
+     p->save_command_giver = command_giver;
+     p->recovery_info.rt.last = rt_context;
+-    p->recovery_info.rt.type = ERROR_RECOVERY_CATCH;
++    p->recovery_info.rt.type = (catch_token != F_CATCH_NO_LOG)
++       ? ERROR_RECOVERY_CATCH
++       : ERROR_RECOVERY_CATCH_NO_LOG;
+     rt_context = (rt_context_t *)&p->recovery_info;
+     return &p->recovery_info.con;
+ } /* push_error_context() */
+@@ -5247,7 +5249,7 @@
+     p = (struct catch_context *)rt_context;
+ 
+ #ifdef DEBUG
+-    if (p->recovery_info.rt.type != ERROR_RECOVERY_CATCH)
++    if (!ERROR_RECOVERY_CAUGHT(p->recovery_info.rt.type))
+         fatal("Catch: runtime stack underflow");
+     if (csp != p->save_csp-1)
+         fatal("Catch: Lost track of csp");
+@@ -5278,7 +5280,7 @@
+ 
+     p = (struct catch_context *)rt_context;
+ 
+-    if (p->recovery_info.rt.type != ERROR_RECOVERY_CATCH)
++    if (!ERROR_RECOVERY_CAUGHT(p->recovery_info.rt.type))
+         fatal("Catch: runtime stack underflow");
+ 
+     /* If there was a call_other() or similar, previous_ob and current_object
+@@ -6946,6 +6948,7 @@
+         break;
+ 
+     CASE(F_CATCH);        /* --- catch <offset> <guarded code> --- */
++    CASE(F_CATCH_NO_LOG);
+     {
+         /* catch(...instructions...)
+          *
+@@ -7008,7 +7011,7 @@
+         /* Save some globals on the error stack that must be restored
+          * separately after a longjmp, then set the jump.
+          */
+-        if ( setjmp( push_error_context(sp)->text ) )
++        if ( setjmp( push_error_context(sp, instruction)->text ) )
+         {
+             /* A throw() or error occured. We have to restore the
+              * control and error stack manually here.
+diff -ur src.orig/lex.c src/lex.c
+--- src.orig/lex.c	Mon Nov  1 18:05:16 1999
++++ src/lex.c	Mon Nov  8 10:43:47 1999
+@@ -418,6 +418,7 @@
+  = { { "break",          L_BREAK         }
+    , { "case",           L_CASE          }
+    , { "catch",          L_CATCH         }
++   , { "catch_no_log",   L_CATCH_NO_LOG  }
+    , { "closure",        L_CLOSURE_DECL  }
+    , { "continue",       L_CONTINUE      }
+    , { "default",        L_DEFAULT       }
+@@ -2803,6 +2804,9 @@
+                             break;
+                         case L_CATCH:
+                             code = F_CATCH  + CLOSURE_EFUN_OFFS;
++                            break;
++                        case L_CATCH_NO_LOG:
++                            code = F_CATCH_NO_LOG  + CLOSURE_EFUN_OFFS;
+                             break;
+                         case L_SWITCH:
+                             code = F_SWITCH  + CLOSURE_EFUN_OFFS;
+diff -ur src.orig/prolang.y src/prolang.y
+--- src.orig/prolang.y	Fri Nov  5 22:52:52 1999
++++ src/prolang.y	Mon Nov  8 11:05:31 1999
+@@ -2338,6 +2338,7 @@
+ %token L_BREAK
+ %token L_CASE
+ %token L_CATCH
++%token L_CATCH_NO_LOG
+ %token L_CLOSURE
+ %token L_CLOSURE_DECL
+ %token L_COLON_COLON
+@@ -2559,7 +2560,7 @@
+ %type <type>         decl_cast cast
+ %type <lrvalue>      note_start comma_expr expr0 expr4
+ %type <lrvalue>      function_call inline_fun
+-%type <lrvalue>      catch sscanf
++%type <lrvalue>      catch catch_no_log sscanf
+ %ifdef SUPPLY_PARSE_COMMAND
+ %type <lrvalue>      parse_command
+ %endif
+@@ -5996,6 +5997,7 @@
+       function_call  %prec '~'
+     | inline_fun
+     | catch          %prec '~'
++    | catch_no_log   %prec '~'
+     | sscanf         %prec '~'
+ %ifdef SUPPLY_PARSE_COMMAND
+     | parse_command  %prec '~'
+@@ -8482,6 +8484,74 @@
+           $$.code = -1;
+       }
+ ; /* catch */
++
++
++/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
++/* The catch_no_log()-statement
++ */
++
++catch_no_log:
++      L_CATCH_NO_LOG
++      {
++          $<address>$ = CURRENT_PROGRAM_SIZE;
++          ins_byte(F_CATCH_NO_LOG);
++          ins_byte(0);
++      }
++
++      '(' comma_expr ')'
++
++      {
++%line
++          p_int start, offset;
++
++          ins_f_code(F_END_CATCH);
++
++          /* Update the offset field of the CATCH instruction */
++          start = $<address>2;
++          offset = CURRENT_PROGRAM_SIZE - (start + 2);
++          if (offset >= 0x100)
++          {
++              /* Too big offset, change
++               *
++               *      CATCH l
++               *      <expr>
++               *   l: END_CATCH
++               *
++               * to
++               *
++               *      CATCH l0
++               *      BRANCH l1
++               *  l0: LBRANCH l2
++               *  l1: <expr>
++               *  l2: END_CATCH
++               */
++
++              int i;
++              bytecode_p p;
++
++              if (CURRENT_PROGRAM_SIZE + 5 > mem_block[A_PROGRAM].max_size)
++                  realloc_a_program();
++              CURRENT_PROGRAM_SIZE += 5;
++              p = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE - 1;
++              for( i = offset; --i >= 0; --p ) *p = p[-5];
++              p[-5] = 2;
++              p[-4] = F_BRANCH ;
++              p[-3] = 3;
++              p[-2] = F_LBRANCH;
++              upd_short(start + 5, offset+2);
++              if (offset > 0x7ffd)
++                  yyerror("offset overflow");
++          }
++          else
++          {
++              mem_block[A_PROGRAM].block[start+1] = offset;
++          }
++
++          $$.start = start;
++          $$.type  = TYPE_ANY;
++          $$.code = -1;
++      }
++; /* catch_no_log */
+ 
+ 
+ /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+diff -ur src.orig/simulate.c src/simulate.c
+--- src.orig/simulate.c	Mon Nov  1 02:40:02 1999
++++ src/simulate.c	Mon Nov  8 10:43:48 1999
+@@ -709,11 +709,14 @@
+         /* Even though caught, dump the backtrace - it makes mudlib
+          * debugging much easier.
+          */
+-        debug_message("Caught error: %s", emsg_buf + 1);
+-        printf("Caught error: %s", emsg_buf + 1);
+-        dump_trace(MY_FALSE);
+-        debug_message("... execution continues.\n");
+-        printf("... execution continues.\n");
++        if(rt->type != ERROR_RECOVERY_CATCH_NO_LOG)
++        {
++            debug_message("Caught error: %s", emsg_buf + 1);
++            printf("Caught error: %s", emsg_buf + 1);
++            dump_trace(MY_FALSE);
++            debug_message("... execution continues.\n");
++            printf("... execution continues.\n");
++        }
+ 
+         unroll_context_stack();
+         longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
+@@ -962,7 +965,7 @@
+ 
+ {
+     unroll_context_stack();
+-    if (rt_context->type >= ERROR_RECOVERY_CATCH)
++    if (ERROR_RECOVERY_CAUGHT(rt_context->type))
+     {
+         longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
+         fatal("Throw_error failed!");
+diff -ur src.orig/simulate.h src/simulate.h
+--- src.orig/simulate.h	Mon Nov  1 19:11:56 1999
++++ src/simulate.h	Mon Nov  8 10:43:48 1999
+@@ -67,7 +67,18 @@
+    * This is in fact an extended error_recovery_info structure which
+    * is allocated on the heap.
+    */
++#define ERROR_RECOVERY_CATCH_NO_LOG     4
++  /* Same as above, but do not dump this error into the log files
++   * (needed for objects which are known for catching user-typing-
++   * errors with 'catch')
++   */
+ 
++#define ERROR_RECOVERY_CAUGHT(t) ((t) == ERROR_RECOVERY_CATCH || \
++                                  (t) == ERROR_RECOVERY_CATCH_NO_LOG)
++/* True if the error is to be 'caught', thus indicating extended error
++ * recovery structure.
++ */
++ 
+ #define ERROR_RECOVERY_CONTEXT(t) ((t) >= ERROR_RECOVERY_NONE)
+   /* True, if rt_context_s.type 't' denotes a error recovery context.
+    */

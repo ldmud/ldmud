@@ -1,17 +1,23 @@
 SYNOPSIS
+	#include "sys/wizlist.h"
+
 	mixed *wizlist_info()
 
 DESCRIPTION
-	Returns an array with all entries of the wizlist.
+	Returns an array with the interesting entries of the wizlist.
 	Needs to be privileged by the master object.
 
-	w[0] = Name of the wizard.
-	w[1] = Number of commands execute by objects of this wizard.
-	w[2] = Total sum of eval_costs.
-	w[3] = Total count of heart_beats.
-	w[4] = Reserved for call_out() (unused yet).
-	w[5] = Total size of arrays in elements.
-	w[6..] = Extra wizlist-info if set.
+        The result is an array with one entry for every wizard (uid).
+        Every entry is an array itself:
+
+	  string w[WL_NAME]        = Name of the wizard.
+	  int    w[WL_COMMANDS]    = Number of commands execute by objects
+                                     of this wizard.
+	  int    w[WL_EVAL_COST]   = Total sum of eval_costs.
+	  int    w[WL_HEART_BEATS] = Total count of heart_beats.
+	  int    w[WL_CALL_OUT]    = Reserved for call_out() (unused yet).
+	  int    w[WL_ARRAY_TOTAL] = Total size of arrays in elements.
+	  mixed  w[WL_EXTRA]       = Extra wizlist-info if set.
 
 SEE ALSO
 	wizlist(E), privilege_violation(M), set_extra_wizinfo_size(E)

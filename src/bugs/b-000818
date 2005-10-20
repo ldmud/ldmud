@@ -1,0 +1,33 @@
+Short: INPUT_CHARMODE problems with TinyFugue
+Date: 18 Aug 2000 12:44:48 +0200 (CEST)
+From: Unholy Lands mud <mud@pc181.iaee.tuwien.ac.at>
+Type: Bug
+State: New
+
+
+I noticed a change in the behaviour of the input_to function from 3.2.7 to
+3.2.8.dev.221(checked)
+
+i used the INPUT_CHARMODE option to receive a single char.
+
+Continues working fine if i use it in pure telnet mode.
+But if i use a clinet (tinyfugue), which forces a \n to accept the input
+i got strange results.
+With 3.2.7 i got the key i typed, but with 3.2.8 i got back a strange string
+containing -3 (hex $FC) and at the second call a +3 (hex $03) if i type
+just return. 
+The result is the same, if i entered another key before i type return.
+
+I'm confused with the output, all i want is a code which detects just the
+key i type, wether with or without a client. worked fine with 3.2.7, but no idea
+how to do in 3.2.8. Please help !
+
+Anyway, u did a great work, updating to 3.2.8 discovers many coding
+errors :)
+Keep goind on to bring us soon the official 3.2.8
+
+Happy coding, have fun
+
+Nathan@Unholy.Lands
+
+

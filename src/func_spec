@@ -3,6 +3,8 @@
  *
  *---------------------------------------------------------------------------
  * For a full explanation, see make_func.y
+ * TODO: Let func_spec be aware of machine.h, so that it could react
+ * TODO:: on HAVE_LIBMYSQL and similar.
  *---------------------------------------------------------------------------
  */
 
@@ -17,22 +19,7 @@
  */
 
 /*---------------------------------------------------------------------------
- * The tokens used by the lexer but with no code representation.
- */
-
-%tokens
-
-if else
-case default
-while do for continue
-int status string_decl float_decl object closure_decl symbol_decl void mixed
-static private no_mask protected public varargs virtual
-inherit colon_colon
-arrow quoted_aggregate mapping inline_fun
-
-/*---------------------------------------------------------------------------
- * The codes which are used both by the compiler/lexer as well as
- * by the interpreter.
+ * The basic machine codes.
  */
 
 %codes
@@ -43,10 +30,10 @@ arrow quoted_aggregate mapping inline_fun
   /* prefix bytes for multi-byte codes are required to have fixed values
    * for simple bit manipulation to be applicable.
    */
-	dummy
-	escape
-	tefun
-	vefun
+	dummy     /* = 0x01 */
+	escape    /* = 0x02 */
+	tefun     /* = 0x03 */
+	vefun     /* = 0x04 */
 
   /* These are the predefined functions and statements that have a direct
    * counterpart in LPC.
@@ -110,6 +97,8 @@ arrow quoted_aggregate mapping inline_fun
 "..<"   nr_range
 "<.."   rn_range
 "<..<"  rr_range
+        nx_range
+        rx_range
 "(void)+=" void_add_eq
 "+="    add_eq
 "-="    sub_eq
@@ -122,9 +111,11 @@ arrow quoted_aggregate mapping inline_fun
 "<<="   lsh_eq
 ">>="   rsh_eq
 
-  /* These values are used by the stack machine, and can not be directly
-   * called from LPC.
-   */
+/*---------------------------------------------------------------------------
+/* These values are used by the stack machine, and can not be directly
+ * called from LPC.
+ */
+
         pop_value
         dup
         clear_locals
@@ -154,16 +145,20 @@ arrow quoted_aggregate mapping inline_fun
         nr_range_lvalue
         rn_range_lvalue
         rr_range_lvalue
+        nx_range_lvalue
+        rx_range_lvalue
         simul_efun
         aggregate
         m_aggregate
         m_caggregate
-        extract2
         previous_object0
         lambda_cconstant
         lambda_constant
         map_index
         push_indexed_map_lvalue
+        foreach
+        foreach_next
+        foreach_end
 
 #ifdef INITIALIZATION_BY___INIT
         jump
@@ -177,7 +172,7 @@ arrow quoted_aggregate mapping inline_fun
 
         /* Miscellaneous */
 
-int     clonep(string|object default: F_THIS_OBJECT);
+int     clonep(mixed default: F_THIS_OBJECT);
 int     closurep(mixed);
 int     floatp(mixed);
 int     intp(mixed);
@@ -206,7 +201,7 @@ string  lower_case(string);
 string *regexp(string *, string);
 string  sprintf(string, ...);
 int     strlen(string);
-string  terminal_colour(string, mapping, void|int, void|int );
+string  terminal_colour(string, int|mapping, void|int, void|int );
 
 string  clear_bit(string, int);
 string  set_bit(string, int);
@@ -222,14 +217,6 @@ int     count_bits(string);
         /* Arrays and Mapings */
 
 mixed  *allocate(int);
-mixed   filter(mapping|mixed *, string|closure|mapping, ...);
-mixed  *filter_array(mixed *, string|closure|mapping, ...);
-mapping filter_indices(mapping, string|closure,  ...);
-mapping filter_mapping F_FILTER_INDICES (mapping, string|closure,  ...);
-mixed   map(mixed *|mapping, string|closure, ...);
-mixed  *map_array(mixed *, string|closure, ...);
-mapping map_indices(mapping, string|closure, ...);
-mapping map_mapping F_MAP_INDICES (mapping, string|closure, ...);
 int     member_array(mixed, mixed *|string);
 int     member(mixed *|string|mapping, mixed);
 mapping mkmapping(mixed *, ...);
@@ -238,16 +225,15 @@ mixed  *m_indices(mapping);
 int     m_sizeof F_SIZEOF (mapping);
 mixed  *m_values(mapping, int default: F_CONST0);
 int     sizeof(mixed *|mapping);
-mixed  *sort_array(mixed *,string|closure,object|string default: F_THIS_OBJECT);
 mixed  *unique_array(mixed *, string, mixed default: F_CONST0);
 mixed  *unmkmapping(mapping);
 int     widthof(mapping);
 
         /* Functions and Closures */
 
-mixed   apply(closure, mixed|mixed &, ...);
+mixed   apply(closure, ...);
 closure bind_lambda(closure, object default: F_CONST1);
-unknown call_other(object|string, string, ...);
+unknown call_other(object|string|object *|string *, string, ...);
 mixed   funcall (closure, ...);
   /* funcall accepts mixed as a single argument, but the only useful application
    * is with mixed variables that might hold closures, which will work anyways.
@@ -272,7 +258,7 @@ object  find_object(string);
 string  function_exists(string, object default: F_THIS_OBJECT);
 int     input_to(string, void|int, ...);
 int     interactive(object default: F_THIS_OBJECT);
-string  load_name(object default: F_THIS_OBJECT);
+string  load_name(string|object default: F_THIS_OBJECT);
 object  load_object(string);
 string  object_name(object default: F_THIS_OBJECT);
 string  file_name F_OBJECT_NAME (object default: F_THIS_OBJECT);
@@ -295,10 +281,8 @@ int     mkdir(string);
 string  read_bytes(string, void|int, void|int);
 string  read_file(string, void|int, void|int);
 int     rename(string, string);
-int     restore_object(string);
 int     rm(string);
 int     rmdir(string);
-void    save_object(string);
 int     tail(string);
 int     write_bytes(string, int, string);
 int     write_file(string, string);
@@ -339,13 +323,8 @@ int     seteuid(string|int);
 
 #ifndef COMPAT_MODE
 string  getuid(object default: F_THIS_OBJECT);
-#endif
-
-        /* Functions only used in compatibility mode. */
-
-#ifdef COMPAT_MODE
-string  creator (object);
-int     transfer(object, object|string);
+#else
+string  creator (object); /* Same function, different name */
 #endif
 
 
@@ -367,7 +346,6 @@ mixed  *order_alist(mixed *, void|mixed *, ...);
 
         /* Misc */
 
-string  process_string(string);
 int     set_light(int);
 
         /* Backwards compatibility */
@@ -376,6 +354,8 @@ mixed  *slice_array F_RANGE (mixed *,int,int);
 
 /*---------------------------------------------------------------------------
  * Machine instructions with 'escape' prefixed codes.
+ * Be careful: the compiler simply assumes that these functions are xcodes.
+ * TODO: All xcodes/tcodes should become normal codes.
  */
 
 %xcodes
@@ -383,6 +363,7 @@ mixed  *slice_array F_RANGE (mixed *,int,int);
         end_catch
         break_continue
         breakn_continue
+        extract2  /* not needed when efun extract() is not defined */
         extract1  /* not needed when efun extract() is not defined */
         push_protected_indexed_lvalue
         push_protected_rindexed_lvalue
@@ -393,7 +374,8 @@ mixed  *slice_array F_RANGE (mixed *,int,int);
         protected_nr_range_lvalue
         protected_rn_range_lvalue
         protected_rr_range_lvalue
-        protected_extract_lvalue
+        protected_nx_range_lvalue
+        protected_rx_range_lvalue
         undef
 
 /*---------------------------------------------------------------------------
@@ -422,14 +404,12 @@ float   pow(float,float);
 mixed   get_type_info(mixed, int default: F_THIS_OBJECT);
 void    raise_error(string);
 int     referencep(mixed &);
-int     typeof(mixed);
+int     typeof(mixed|mixed &);
 
 int     to_int(int|string|float|closure);
 float   to_float(float|string|int);
 string  to_string(mixed);
 int    *to_array(string);
-
-void    set_extra_wizinfo_size(int);
 
         /* Strings */
 
@@ -493,8 +473,6 @@ string  extract(string, int, int);
 
 %tcodes
 
-extract_lvalue
-
 /*---------------------------------------------------------------------------
  * Tabled efuns with 'tefun'/'vefun' prefixed codes.
  */
@@ -505,10 +483,13 @@ extract_lvalue
 
 mixed   copy(mixed);
 mixed   deep_copy(mixed);
+string  save_value(mixed);
+mixed   restore_value(string);
 object  to_object(object|string|closure);
 
 mixed   get_extra_wizinfo(object|string);
 void    set_extra_wizinfo(object|string, mixed);
+void    set_extra_wizinfo_size(int);
 mixed  *wizlist_info();
 
         /* Strings */
@@ -521,7 +502,16 @@ string  upper_case(string);
 
         /* Arrays and Mappings */
 
+mixed   filter(mapping|mixed *, string|closure|mapping, ...);
+mixed  *filter_array(mixed *, string|closure|mapping, ...);
+mapping filter_indices(mapping, string|closure,  ...);
+mapping filter_mapping F_FILTER_INDICES (mapping, string|closure,  ...);
 mapping m_reallocate(mapping, int);
+mixed   map(mixed *|mapping, mapping|string|closure, ...);
+mixed  *map_array(mixed *, mapping|string|closure, ...);
+mapping map_indices(mapping, string|closure, ...);
+mapping map_mapping F_MAP_INDICES (mapping, string|closure, ...);
+mixed  *sort_array(mixed *,string|closure, ...);
 mixed  *transpose_array(mixed *);
 void    walk_mapping(mapping, string|closure, ...);
 
@@ -532,8 +522,9 @@ closure unbound_lambda(mixed *, mixed);
 
         /* Objects */
 
+object *clones(void|int|string|object, void|int);
 mixed  *filter_objects(mixed *, string, ...);
-string *functionlist(object|string, int default: F_CONST1);
+mixed  *functionlist(object|string, int default: F_CONST1);
 string *inherit_list(object default: F_THIS_OBJECT);
 mixed  *map_objects(mixed *, string, ...);
 mixed  *object_info(object, int);
@@ -542,8 +533,10 @@ mixed   query_editing(object);
 int     query_idle(object);
 object  query_shadowing(object);
 object  query_snoop(object);
+mixed   save_object(void|string);
 void    remove_interactive(object);
 void    rename_object(object, string);
+int     restore_object(string);
 object  shadow(object, int);
 void    unshadow();
 
@@ -551,7 +544,8 @@ void    unshadow();
 
 int     binary_message(int *|string, int default: F_CONST0);
 int     set_buffer_size(int);
-void    set_connection_charset(int *, int default: F_CONST1);
+void    set_combine_charset(int *|string);
+void    set_connection_charset(int *|string, int default: F_CONST1);
 string  set_prompt(string|closure|int, object default: F_THIS_PLAYER);
 
 #ifdef ERQ_DEMON
@@ -564,6 +558,10 @@ int     send_erq(int, int*|string, closure default: F_CONST0);
 int     send_imp(string, int, string|int*);
 #endif
 #endif
+
+        /* Files */
+
+int     copy_file(string, string);
 
         /* Driver and System functions */
 
@@ -595,11 +593,17 @@ mixed  *command_stack();
 int     command_stack_depth();
 int     execute_command(string, object, object);
 int     notify_fail(string|closure);
-mixed   query_notify_fail();
+mixed   query_notify_fail(int default: F_CONST0);
 int     remove_action(string, object default: F_THIS_PLAYER);
 object  set_modify_command(object|string default: F_THIS_OBJECT);
 void    set_this_player(int|object);
 
+
+        /* Functions only used in compatibility mode. */
+
+#ifdef COMPAT_MODE
+int     transfer(object, object|string);
+#endif
 
 /* The following functions are optional. Comment out the ones not wanted.
  * Beware that some may be used in mudlib 2.4.5.
@@ -609,6 +613,7 @@ void    add_verb(string);
 void    add_xverb(string);
   /* TODO: Get rid of add_verb(), add_xverb()
    */
+string  process_string(string);
 int     set_is_wizard(object, int default: F_CONST1);
 
 /***************************************************************************/

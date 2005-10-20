@@ -21,3 +21,9 @@ memory issue.
 
 
 Maybe a more efficient storage method for arrays would help?
+No, it wouldn't. Current overhead for arrays is 2 words (3 in DEBUG),
+plus the malloc overhead which is unavoidable anyway. Minimum overhead
+would be 1 word + malloc overhead.
+
+Hmm, but maybe tuples which are copied by value? Would be a nice
+complement to structs.

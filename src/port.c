@@ -32,7 +32,7 @@ get_current_time (void)
  * But this game uses the 'current_time', which is an integer number
  * of seconds. To make this more portable, the following functions
  * should be defined in such a way as to return the number of seconds since
- * some chosen year. The old behaviour of time(), is to return the number
+ * some chosen year. The old behaviour of time() is to return the number
  * of seconds since 1970.
  * On a SUN Sparc I, a negative time offset of 22 seconds between two
  * sucessive calls to time() has been observed. Negative time offsets
@@ -61,7 +61,7 @@ get_current_time (void)
      * anomaly.
      */
     last_time += offset;
-    now = (mp_int)time((time_t *)NULL);        /* Just use the old time() for now */
+    now = (mp_int)time(NULL);        /* Just use the old time() for now */
     if (now >= last_time) {
         last_time = now;
         return now;
@@ -79,6 +79,29 @@ time_string (int t)
 {
     return ctime((time_t *)&t);
 }
+
+/*-------------------------------------------------------------------------*/
+char *
+time_stamp (void)
+
+/* Return a textual representation of the current time
+ * in the form "YYYY.MM.DD HH:MM:SS".
+ * Result is a pointer to a static buffer.
+ *
+ * Putting this function in strfuns is not a good idea, because
+ * it is need by almost every module anyway.
+ */
+
+{
+    mp_int t;
+    static char result[21];
+    struct tm *tm;
+
+    t = get_current_time();
+    tm = localtime((time_t *)&t);
+    strftime(result, sizeof(result)-1, "%Y.%m.%d %H:%M:%S", tm);
+    return result;
+} /* time_stamp() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef STRTOL_BROKEN
@@ -169,6 +192,25 @@ strcspn(char *s, char *set)
 #endif /* !HAVE_STRCSPN */
 
 /*-------------------------------------------------------------------------*/
+#ifndef HAVE_STRDUP
+
+char *
+strdup (const char *str)
+
+/* Copy <str> into a freshly allocated memory block and return that one.
+ */
+
+{
+    char *copy = malloc(strlen(str)+1);
+    if (!copy)
+        fatal("strdup failed\n");
+    strcpy(copy, str);
+    return copy;
+}
+
+#endif /* !HAVE_STRDUP */
+
+/*-------------------------------------------------------------------------*/
 #ifndef HAVE_MEMSET
 
 char *
@@ -189,15 +231,12 @@ memset (char *s, int c, size_t n)
 /*-------------------------------------------------------------------------*/
 #ifndef HAVE_MEMMEM
 
-/* This implementation is not very efficient, but still better than the old
- * match_string() .
- */
 char *
 memmem (char *needle, size_t needlelen, char *haystack, size_t haystacklen)
 {
     mp_int i;
 
-    i = (signed)(haystacklen - needlelen);
+    i = (mp_int)(haystacklen - needlelen);
     if (i >= 0) do {
         if ( !strncmp(needle, haystack, needlelen) )
             return haystack;
@@ -231,7 +270,7 @@ move_memory (char *dest, char *src, size_t n)
 #endif /* !HAVE_MEMMOVE */
 
 /*-------------------------------------------------------------------------*/
-#if !defined(HAVE_CRYPT) && !defined(HAVE__CRYPT)
+#if (!defined(HAVE_CRYPT) && !defined(HAVE__CRYPT)) || !defined(USE_SYSTEM_CRYPT)
 #include "hosts/crypt.c"
 #endif
 
@@ -291,7 +330,7 @@ getrusage (int who, struct rusage *rusage)
 }
 #endif /* getrusage implemented using times() */
 
-#if defined(AMIGA)
+#if defined(AMIGA) || defined(__CYGWIN__)
 /*-----------------------------------------------------------------------
 ** void init_rusage (void)
 ** int getrusage (int who, struct rusage *rusage)
@@ -336,7 +375,7 @@ getrusage (int who, struct rusage *rusage) {
   return 0;
 }
 
-#endif /* AMIGA */
+#endif /* AMIGA || CYGWIN */
 
 /***************************************************************************/
 

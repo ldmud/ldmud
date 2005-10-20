@@ -1,0 +1,49 @@
+Short: Memoryleak in the actions?
+Date: Thu, 02 Mar 2000 12:35:50 -0700
+From: Lars Duening <Lars.Duening@wcom.com>
+Type: Bug
+State: New
+
+A memory leak in the action handling?
+
+This is OSB, running .156 - 34M for actions??
+
+Today is the 5th day of Early Great Heat. It is currently sunrise.
+Real World time is: Thu  2-Mar-00 20:08:11 CET
+Usenet time is: Thu 2375-Sep-93 20:08:11 CET
+[ Time since genesis: 102 days 13 hours 28 minutes 5 seconds ]
+> status
+Actions:                         1456558 34957392
+Shadows:                               1       20
+Objects:                             990   883072 (357 swapped, 225 Kbytes)
+Arrays:                             5012   244976
+Mappings:                           7244   731336
+Prog blocks:                         296   859376 (68 swapped, 127 Kbytes)
+Memory reserved:                          1000000
+hash table overhead                          4096
+Strings malloced                   19765   584698 + 134974 overhead
+call out:                            360    11520 (current length 12)
+Regexp cache:                        275   147649
+                                         --------
+Total:                                   39435417
+> malloc
+Type                   Count      Space (bytes)
+sbrk requests:         2612          48039768 (a)
+large blocks:         13982          46659952 (b)
+large free blocks:      998           1379708 (c)
+
+small chunks:          2597          42570024 (d)
+small blocks:       1501736          41771632 (e)
+small free blocks:    33337            760520 (f)
+unused from current chunk                7172 (g)
+[Mateese:d-code] Hmm. Wenn ihr bei auch auf den Status schaut, habt 
+ihr auch
+   so irre hohe Werte unter 'Actions'?
+   [Coogan@TubMud:d-code] nein ... Actions:           7433   178392
+   [Freaky@UNItopia:d-code] Actions: 257878  6189072 (Gesamt: 86092935)
+   [Mateese:d-code] Uptime?
+   [Freaky@UNItopia:d-code] 10 Tage
+   [Mateese:d-code] Hmm, wenn es ein schleichendes Leck ist, faellt es 
+   nach nur
+      10 Tagen wahrscheinlich noch nicht auf.
+

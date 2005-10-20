@@ -1,0 +1,7 @@
+From: Lars
+Short: 'static <var>' should be 'nosave <var>'
+Date: 000302
+Type: Feature
+State: New
+
+As MudOS does it

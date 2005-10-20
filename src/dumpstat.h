@@ -1,11 +1,10 @@
-#ifndef __DUMPSTAT_H__
-#define __DUMPSTAT_H__ 1
+#ifndef DUMPSTAT_H__
+#define DUMPSTAT_H__ 1
 
 #include "driver.h"
+#include "typedefs.h"
 
-#include "object.h"     /* struct object */
-
-extern mp_int data_size(struct object *ob);
+extern mp_int data_size(object_t *ob);
 extern Bool dumpstat(char *name);
 
-#endif
+#endif /* DUMPSTAT_H__ */

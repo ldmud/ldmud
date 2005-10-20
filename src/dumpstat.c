@@ -8,6 +8,7 @@
  */
 
 #include "driver.h"
+#include "typedefs.h"
 
 #include <stdio.h>
 
@@ -15,21 +16,19 @@
 #include "dumpstat.h"
 #include "array.h"
 #include "closure.h"
-#include "comm.h"
 #include "exec.h"
 #include "filestat.h"
-#include "interpret.h"
 #include "instrs.h"
 #include "mapping.h"
 #include "object.h"
-#include "prolang.h"
 #include "ptrtable.h"
 #include "simulate.h"
 #include "smalloc.h"
+#include "svalue.h"
 
 /*-------------------------------------------------------------------------*/
 
-static size_t svalue_size(struct svalue *); /* forward */
+static size_t svalue_size(svalue_t *); /* forward */
 
 /* Auxiliary structure for counting a mapping */
 
@@ -47,7 +46,7 @@ static struct pointer_table *ptable;
 
 /*-------------------------------------------------------------------------*/
 static void
-svalue_size_map_filter (struct svalue *key, struct svalue *values, void *extra)
+svalue_size_map_filter (svalue_t *key, svalue_t *values, void *extra)
 
 /* Called for all keys in a mapping, it counts the size of the values
  * and returns the total in extra->num_values.
@@ -61,13 +60,13 @@ svalue_size_map_filter (struct svalue *key, struct svalue *values, void *extra)
     locals->total += svalue_size(key);
     for(i = locals->num_values; --i >= 0; )
     {
-        locals->total += svalue_size(values++) + sizeof(struct svalue);
+        locals->total += svalue_size(values++) + sizeof(svalue_t);
     }
 }
 
 /*-------------------------------------------------------------------------*/
 static size_t
-svalue_size (struct svalue *v)
+svalue_size (svalue_t *v)
 
 /* Compute the memory usage of *<v>, calling svalue_size() recursively
  * if necessary, and return it. The size of *v itself is not included.
@@ -110,7 +109,7 @@ svalue_size (struct svalue *v)
               sizeof(struct hash_mapping) +
                 v->u.map->hash->mask * sizeof(struct map_chain *) +
                   v->u.map->hash->used *
-                    (sizeof (struct map_chain) - sizeof(struct svalue));
+                    (sizeof (struct map_chain) - sizeof(svalue_t));
         return locals.total;
     }
 
@@ -123,7 +122,7 @@ svalue_size (struct svalue *v)
         total = malloced_size(v->u.vec) * sizeof(p_int);
 #else
         total = sizeof *v->u.vec - sizeof v->u.vec->item +
-          sizeof(struct svalue) * v->u.vec->size + sizeof(char *);
+          sizeof(svalue_t) * v->u.vec->size + sizeof(char *);
 #endif
         for (i=0; i < (mp_int)VEC_SIZE(v->u.vec); i++) {
             total += svalue_size(&v->u.vec->item[i]);
@@ -134,8 +133,8 @@ svalue_size (struct svalue *v)
     case T_CLOSURE:
     {
         int num_values;
-        struct svalue *svp;
-        struct lambda *l;
+        svalue_t *svp;
+        lambda_t *l;
 
         if (!CLOSURE_MALLOCED(v->x.closure_type)) return 0;
         if (!CLOSURE_REFERENCES_CODE(v->x.closure_type)) {
@@ -152,27 +151,28 @@ svalue_size (struct svalue *v)
         }
         num_values = EXTRACT_UCHAR(&l->function.code[0]);
         if (num_values == 0xff)
-            num_values = ((struct svalue *)l)[-0xff].u.number;
-        svp = (struct svalue *)l - num_values;
+            num_values = ((svalue_t *)l)[-0xff].u.number;
+        svp = (svalue_t *)l - num_values;
         if (NULL == register_pointer(ptable, svp)) return 0;
 #ifdef MALLOC_smalloc
         total += malloced_size(svp) * sizeof(p_int);
 #else
-        total += sizeof(struct svalue) * num_values + sizeof (char *);
+        total += sizeof(svalue_t) * num_values + sizeof (char *);
         {
-            char *p = &l->function.code[2];
+            bytecode_p p = &l->function.code[2];
             do {
-                switch(*++p) {
-                  case F_RETURN -F_OFFSET:
-                  case F_RETURN0-F_OFFSET:
+                ++p;
+                switch(GET_CODE(p)) {
+                  case F_RETURN:
+                  case F_RETURN0:
                     break;
                   default:
                     continue;
                 }
                 break;
             } while (1);
-            total += p - (char *)l + (sizeof(char *) - 1) &
-                ~(sizeof(char *) - 1);
+            total += p - (bytecode_p)l
+                     + (sizeof(bytecode_p) - 1) & ~(sizeof(bytecode_p) - 1);
         }
 #endif
         while (--num_values >= 0) {
@@ -191,7 +191,7 @@ svalue_size (struct svalue *v)
 
 /*-------------------------------------------------------------------------*/
 mp_int
-data_size (struct object *ob)
+data_size (object_t *ob)
 
 /* Compute the memory usage of the data held by object <ob> and
  * return it. If the object is swapped out or has no variables,
@@ -201,15 +201,15 @@ data_size (struct object *ob)
 {
     mp_int total = sizeof(p_int); /* smalloc overhead */
     int i;
-    struct svalue *svp;
+    svalue_t *svp;
 
     if (ob->flags & O_SWAPPED || !(i = ob->prog->num_variables) )
         return 0;
     ptable = new_pointer_table();
     if (!ptable)
-        error("Out of memory.\n");
+        error("(dumpstat) Out of memory for new pointer table.\n");
     for (svp = ob->variables; --i >= 0; svp++)
-        total += svalue_size(svp) + sizeof (struct svalue);
+        total += svalue_size(svp) + sizeof (svalue_t);
     free_pointer_table(ptable);
     return total;
 }
@@ -225,7 +225,7 @@ dumpstat(char *fname)
 
 {
     FILE *f;
-    struct object *ob;
+    object_t *ob;
 
     static char *swapstrings[] =
         {"", "PROG SWAPPED", "VAR SWAPPED", "SWAPPED", };
@@ -255,7 +255,7 @@ dumpstat(char *fname)
             tmp = 0;
         }
         fprintf(f, "%-20s %5ld ref %2ld %s %s ", ob->name,
-                tmp + (long)data_size(ob) + sizeof (struct object) +
+                tmp + (long)data_size(ob) + sizeof (object_t) +
                 sizeof(p_int) /* smalloc overhead */ ,
                 ob->ref,
                 ob->flags & O_HEART_BEAT ? "HB" : "  ",

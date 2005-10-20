@@ -3,28 +3,6 @@ grundlegende Mudlibfiles von Tub noch parse_command() benutzen, und die wollen
 erstmal umgeschrieben werden ... ansonsten buggt jeder look-Befehl.
 
 
-Dann noch ein paar Anmerkungen zum letzten Treiberpaket
-- Bei der clonep()-manpage ist noch ein Fehler drin. Durch die
-  unterschiedlichen Treiber-Modi bedingt, muesste das Beispiel genaugenommen
-  so heissen:
-
-  #if __COMPAT_MODE__
-
-    o = clone_object("std/thing");
-    write(clonep(o));                   --> writes "std/thing"
-
-  #else  // __NATIVE_MODE__
-
-    o = clone_object("/std/thing");
-    write(clonep(o));                   --> writes "/std/thing"
-
-  #endif
-
-  Man beachte den Unterschied mit '/' am Anfang bzw. eben nicht. Aehnliches
-  ist in noch mehr manpages zu finden.
-
-
-
 
 SYNOPSIS
         varargs mixed apply_function(mixed func, mixed arg, ...);

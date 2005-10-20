@@ -38,7 +38,7 @@
  * "" as short verb, which would match every input.
  *
  * Internally all added actions are stored in a linear list of
- * struct sentence attributes (this is actually why the sentences were
+ * sentence_t attributes (this is actually why the sentences were
  * introduced in the first place). While the parser is searching for
  * an action, a special SENT_MARKER sentence is introduced into this
  * list to mark how far the search has progressed.
@@ -49,6 +49,9 @@
  */
 
 #include "driver.h"
+#include "typedefs.h"
+
+#include <stddef.h>
 
 #define USES_SVALUE_STRLEN
 #include "actions.h"
@@ -56,8 +59,9 @@
 #include "backend.h"
 #include "closure.h"
 #include "comm.h"
-#include "datatypes.h"
 #include "dumpstat.h"
+#include "efuns.h"
+#include "exec.h"
 #include "interpret.h"
 #include "mapping.h"
 #include "object.h"
@@ -66,6 +70,10 @@
 #include "smalloc.h"
 #include "stralloc.h"
 #include "wiz_list.h"
+#include "xalloc.h"
+
+#include "../mudlib/sys/commands.h"
+#include "../mudlib/sys/driver_hook.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -83,13 +91,14 @@
 
 struct command_context_s
 {
-    rt_context_t rt;              /* the rt_context superclass */
-    struct object * this_player;  /* the command_giver */
-    struct object * mark_player;  /* the marked command_giver */
-    struct sentence * marker;     /* the marker sentence */
-    char * cmd;                   /* the full command, a stack buffer */
-    char * verb;                  /* the shared verb */
-    struct svalue errmsg;         /* the error message */
+    rt_context_t rt;         /* the rt_context superclass */
+    object_t * this_player;  /* the command_giver */
+    object_t * mark_player;  /* the marked command_giver */
+    action_t * marker;       /* the marker sentence */
+    char * cmd;              /* the full command, a stack buffer */
+    char * verb;             /* the shared verb */
+    svalue_t errmsg;         /* the error message */
+    object_t * errobj;       /* object which set the error message */
 };
 
 /*-------------------------------------------------------------------------*/
@@ -98,7 +107,7 @@ struct command_context_s
  * and are saved during the execution of nested commands.
  */
 
-struct object *command_giver;
+object_t *command_giver;
   /* The object for which the current command is executed.
    * The reference is not counted.
    */
@@ -113,23 +122,129 @@ char *last_command = NULL;
    * the full command.
    */
 
-static struct svalue error_msg = { T_INVALID };
+static svalue_t error_msg = { T_INVALID };
   /* The error message to be printed when the command can't be found.
    */
 
-static struct sentence * command_marker = NULL;
+static object_t * error_obj = NULL;
+  /* The object which set the error message (counted reference).
+   */
+
+static action_t * command_marker = NULL;
   /* During a command search/execution, when the search reaches the
    * end of the sentence list, the marker is stored in this variable
    * instead of in the list.
    * The 'ob' in this sentence is the current value of rt_context.
    */
 
-static struct object * marked_command_giver = NULL;
+static object_t * marked_command_giver = NULL;
   /* During a command search/execution, this points to the object
    * which sentence list is searched (and thus augmented with the
    * marker sentence). Usually, this value is identical to command_giver.
    * The reference is not counted.
    */
+
+p_int alloc_action_sent = 0;
+  /* Statistic: how many action sentences have been allocated.
+   */
+
+static sentence_t * free_sent = NULL;
+  /* List of allocated but unused action sentences.
+   */
+
+/*-------------------------------------------------------------------------*/
+void
+free_action_temporaries (void)
+
+/* GC support: Free the global variables which keep references to objects
+ * and svalues. Outside of a command execution these are usually 0, but
+ * unfortunately not always (using notify_fail() outside of a command
+ * execution for example leaves a value behind).
+ */
+
+{
+    if (error_msg.type != T_INVALID)
+        free_svalue(&error_msg);
+    error_msg.type = T_INVALID;
+
+    if (error_obj)
+        free_object(error_obj, "free_action_temporaries");
+    error_obj = NULL;
+
+    if (last_verb)
+        free_string(last_verb);
+    last_verb = NULL;
+
+} /* free_action_temporaries() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE action_t *
+new_action_sent(void)
+
+/* Allocate a new empty action sentence and return it.
+ */
+
+{
+    action_t *p;
+
+    if (free_sent == NULL)
+    {
+        xallocate(p, sizeof *p, "new action sentence");
+        alloc_action_sent++;
+    }
+    else
+    {
+        p = (action_t *)free_sent;
+        free_sent = free_sent->next;
+    }
+    p->verb = NULL;
+    p->function = NULL;
+    return p;
+} /* new_action_sent() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+_free_action_sent (action_t *p)
+
+/* Free the action sentence <p> and all data held by it.
+ */
+
+{
+#ifdef DEBUG
+    if (SENT_IS_INTERNAL(p->sent.type) && SENT_MARKER != p->sent.type)
+        fatal("free_action_sent() received internal sent %d\n", p->sent.type);
+#endif
+
+    if (p->function)
+        free_string(p->function);
+    if (p->verb)
+        free_string(p->verb);
+    p->sent.next = free_sent;
+    free_sent = (sentence_t *)p;
+} /* _free_action_sent() */
+
+void free_action_sent (action_t *p)
+  {  _free_action_sent(p); }
+
+#define free_action_sent(p) _free_action_sent(p)
+
+/*-------------------------------------------------------------------------*/
+void
+purge_action_sent(void)
+
+/* Actually deallocate all action sentences held in the free list.
+ * Called during a GC and shutdown.
+ */
+
+{
+    sentence_t *p;
+    
+    for (;free_sent; free_sent = p) {
+        p = free_sent->next;
+        xfree(free_sent);
+        alloc_action_sent--;
+    }
+} /* purge_action_sent() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -151,6 +266,7 @@ save_command_context (struct command_context_s * context)
         ref_object(command_giver, "save_command_context");
     context->marker = command_marker;
     transfer_svalue_no_free(&(context->errmsg), &error_msg);
+    context->errobj = error_obj;
 
     command_giver = NULL;
     last_verb = NULL;
@@ -158,6 +274,7 @@ save_command_context (struct command_context_s * context)
     marked_command_giver = NULL;
     command_marker = NULL;
     error_msg.type = T_INVALID;
+    error_obj = NULL;
 } /* save_command_context() */
 
 /*-------------------------------------------------------------------------*/
@@ -174,9 +291,9 @@ _restore_command_context (struct command_context_s * context)
         free_string(last_verb);
 
     if (command_marker)
-        free_sentence(command_marker);
+        free_action_sent(command_marker);
     else if (marked_command_giver && !(O_DESTRUCTED & marked_command_giver->flags))
-        remove_sent((struct object *)context, marked_command_giver);
+        remove_action_sent((object_t *)context, marked_command_giver);
 
     /* Restore the previous context */
     last_verb = context->verb;
@@ -189,6 +306,9 @@ _restore_command_context (struct command_context_s * context)
         free_object(context->mark_player, "restore_command_context");
     command_marker = context->marker;
     transfer_svalue(&error_msg, &(context->errmsg));
+    if (error_obj)
+        free_object(error_obj, "_restore_command_context");
+    error_obj = context->errobj;
 } /* _restore_command_context() */
 
 
@@ -199,77 +319,94 @@ void restore_command_context (rt_context_t *context)
 
 /*-------------------------------------------------------------------------*/
 void
-remove_sent (struct object *ob, struct object *player)
+remove_action_sent (object_t *ob, object_t *player)
 
 /* Remove all actions defined by <ob> and attached to <player>.
  */
 
 {
-    struct sentence **s;
+    sentence_t **s;
 
     /* A simple list walk */
     for (s = &player->sent; *s;)
     {
-        struct sentence *tmp;
-        if ((*s)->ob == ob)
+        action_t *tmp;
+
+        tmp = (action_t *)*s;
+        
+        if (tmp->ob == ob)
         {
 #ifdef DEBUG
             if (d_flag > 1)
-                debug_message("--Unlinking sentence %s\n", (*s)->function);
+            {
+                if (tmp->function && tmp->verb)
+                    debug_message("%s --Unlinking sentence fun='%s', verb='%s'\n"
+                                 , time_stamp(), tmp->function, tmp->verb);
+                else if (tmp->function)
+                    debug_message("%s --Unlinking sentence fun='%s', verb=0\n"
+                                 , time_stamp(), tmp->function);
+                else if (tmp->verb)
+                    debug_message("%s --Unlinking sentence fun=0, verb='%s'\n"
+                                 , time_stamp(), tmp->verb);
+                else 
+                    debug_message("%s --Unlinking sentence fun=0, verb=0\n"
+                                 , time_stamp());
+            }
 #endif
-            tmp = *s;
-            *s = tmp->next;
-            free_sentence(tmp);
+            *s = tmp->sent.next;
+            free_action_sent(tmp);
         }
         else
             s = &((*s)->next);
     }
-} /* remove_sent() */
+} /* remove_action_sent() */
 
 /*-------------------------------------------------------------------------*/
 void
-remove_environment_sent (struct object *player)
+remove_environment_sent (object_t *player)
 
 /* Remove all actions on <player> defined by objects with the same
  * environment (which includes the environment object).
  */
 
 {
-    struct sentence **p, *s;
-    struct object *super, *ob;
+    sentence_t **p;
+    action_t *s;
+    object_t *super, *ob;
 
     super = player->super;
     p= &player->sent;
 
-    if ( NULL != (s = *p) ) for(;;)
+    if ( NULL != (s = (action_t *)*p) ) for(;;)
     {
         ob = s->ob;
-        if (!SENT_IS_INTERNAL(s->type)
+        if (!SENT_IS_INTERNAL(s->sent.type)
          && ((ob->super == super && ob != player) || ob == super )
            )
         {
             do {
-                struct sentence *tmp;
+                action_t *tmp;
 
 #ifdef DEBUG
                 if (d_flag > 1)
-                    debug_message("--Unlinking sentence %s\n", s->function);
+                    debug_message("%s --Unlinking sentence %s\n"
+                                 , time_stamp(), s->function);
 #endif
                 tmp = s;
-                s = s->next;
-                free_sentence(tmp);
+                s = (action_t *)s->sent.next;
+                free_action_sent(tmp);
                 if (!s) {
                     *p = NULL;
                     return;
                 }
             } while (s->ob == ob);
-            *p = s;
+            *p = (sentence_t *)s;
         }
         else
         {
             do {
-                p = &s->next;
-                if (!(s = *p)) return;
+                p = &s->sent.next;
+                if (!(s = (action_t *)*p)) return;
             } while (s->ob == ob);
         }
     }
@@ -288,16 +425,15 @@ call_modify_command (char *buff)
  */
 
 {
-    struct interactive *ip;
-    struct svalue *svp;
+    interactive_t *ip;
+    svalue_t *svp;
 
     svp = NULL;
 
-    if (NULL != (ip = O_GET_INTERACTIVE(command_giver))
-     && ip->sent.type == SENT_INTERACTIVE
+    if (O_SET_INTERACTIVE(ip, command_giver)
      && ip->modify_command )
     {
-        struct object *ob = ip->modify_command;
+        object_t *ob = ip->modify_command;
 
         if (ob->flags & O_DESTRUCTED)
         {
@@ -317,7 +453,7 @@ call_modify_command (char *buff)
     {
         if (closure_hook[H_MODIFY_COMMAND].type == T_CLOSURE)
         {
-            struct lambda *l;
+            lambda_t *l;
 
             l = closure_hook[H_MODIFY_COMMAND].u.lambda;
             if (closure_hook[H_MODIFY_COMMAND].x.closure_type == CLOSURE_LAMBDA)
@@ -340,7 +476,7 @@ call_modify_command (char *buff)
         }
         else if (closure_hook[H_MODIFY_COMMAND].type == T_MAPPING)
         {
-            struct svalue sv;
+            svalue_t sv;
             char * str;
 
             if ( NULL != (str = findstring(buff)) )
@@ -453,7 +589,7 @@ special_parse (char *buff)
 
 /*-------------------------------------------------------------------------*/
 static void
-notify_no_command (char *command, struct object *save_command_giver)
+notify_no_command (char *command, object_t *save_command_giver)
 
 /* No action could be found for <command>, thus print a failure notice
  * to the command_giver. <save_command_giver> is the object for which
@@ -465,7 +601,7 @@ notify_no_command (char *command, struct object *save_command_giver)
  */
 
 {
-    struct svalue *svp;
+    svalue_t *svp;
 
     svp = &error_msg;
 
@@ -498,8 +634,13 @@ notify_no_command (char *command, struct object *save_command_giver)
         pop_stack();
     }
 
-    free_svalue(svp);
+    free_svalue(svp); /* remember: this is &error_msg */
     svp->type = T_INVALID;
+
+    if (error_obj)
+        free_object(error_obj, "notify_no_command");
+    error_obj = NULL;
+
 } /* notify_no_command() */
 
 /*-------------------------------------------------------------------------*/
@@ -529,18 +670,21 @@ parse_command (char *buff, Bool from_efun)
 
 {
     char *p;                       /* handy string pointer */
-    struct sentence *s;            /* handy sentence pointer */
-    struct sentence *marker_sent;  /* the marker sentence */
-    long length;                   /* length of the verb */
-    struct object *save_current_object = current_object;
-    struct object *save_command_giver  = command_giver;
+    sentence_t *s;                 /* handy sentence pointer */
+    action_t *marker_sent;         /* the marker sentence */
+    ptrdiff_t length;              /* length of the verb */
+    object_t *save_current_object = current_object;
+    object_t *save_command_giver  = command_giver;
 
 #ifdef DEBUG
     if (d_flag > 1)
-        debug_message("cmd [%s]: %s\n", command_giver->name, buff);
+        debug_message("%s cmd [%s]: %s\n", time_stamp()
+                     , command_giver->name, buff);
 #endif
 
-    /* strip trailing spaces. */
+    /* Strip trailing spaces.
+     * Afterwards, p will point to the last non-space character.
+     */
     for (p = buff + strlen(buff) - 1; p >= buff; p--)
     {
         if (*p != ' ')
@@ -567,11 +711,11 @@ parse_command (char *buff, Bool from_efun)
     if (last_verb)
         free_string(last_verb);
 
-    length = (p_int)p;
+    length = p - buff;
     p = strchr(buff, ' ');
     if (p == NULL)
     {
-        length += 1 - (int)(p_int)buff;
+        length += 1;
         last_verb = make_shared_string(buff);
     }
     else
@@ -585,43 +729,67 @@ parse_command (char *buff, Bool from_efun)
     last_command = buff;
 
     /* Get the empty marker sentence */
-    marker_sent = alloc_sentence();
+    marker_sent = new_action_sent();
+    marker_sent->sent.type = SENT_MARKER;
 
     /* Scan the list of sentences for the saved command giver */
     for (s = marked_command_giver->sent; s; s = s->next)
     {
-        struct svalue *ret;
-        struct object *command_object;
+        svalue_t *ret;
+        object_t *command_object;
+        action_t *sa;            /* (action_t *)s */
         unsigned char type;      /* s->type */
-        struct sentence *next;   /* used only as flag */
-        struct sentence *insert; /* insertion point */
+        sentence_t *next;        /* used only as flag */
+        sentence_t *insert;      /* insertion point */
+
+        sa = (action_t *)s;
 
         /* Test the current sentence */
         if ((type = s->type) == SENT_PLAIN)
         {
-            if (s->verb != last_verb)
+            if (sa->verb != last_verb)
                 continue;
         }
         else if (type == SENT_SHORT_VERB)
         {
+            /* The verb may be shortened to a few leading characters,
+             * but not shorter than .short_verb.
+             */
             size_t len;
-            len = strlen(s->verb);
-            if (strncmp(s->verb, buff, len) != 0)
-                continue;
+            if (sa->short_verb)
+            {
+                len = strlen(last_verb);
+                if (len < sa->short_verb
+                 || len > strlen(sa->verb)
+                 || (   sa->verb != last_verb
+                     && strncmp(sa->verb, last_verb, len) != 0))
+                    continue;
+            }
+            else
+            {
+                len = strlen(sa->verb);
+                if (strncmp(buff, sa->verb, len) != 0)
+                    continue;
+            }
         }
         else if (type == SENT_NO_SPACE)
         {
+            /* The arguments may follow the verb without space,
+             * that means we just have to check if buff[] begins
+             * with sa->verb.
+             */
             size_t len;
-            len = strlen(s->verb);
-            if (strncmp(buff, s->verb, len) != 0)
+            len = strlen(sa->verb);
+            if (strncmp(buff, sa->verb, len) != 0)
                 continue;
         }
         else if (type == SENT_NO_VERB)
         {
+            /* TODO: Without add_(x)verb(), this case can go, too. */
             /* Give an error only the first time we scan this sentence */
-            if (s->short_verb)
+            if (sa->short_verb)
                 continue;
-            s->short_verb++;
+            sa->short_verb++;
             error("An 'action' had an undefined verb.\n");
         }
         else
@@ -636,7 +804,8 @@ parse_command (char *buff, Bool from_efun)
 
 #ifdef DEBUG
         if (d_flag > 1)
-            debug_message("Local command %s on %s\n", s->function, s->ob->name);
+            debug_message("%s Local command %s on %s\n", time_stamp()
+                         , sa->function, sa->ob->name);
 #endif
 
         /* If the function is static and not defined by current object,
@@ -645,11 +814,11 @@ parse_command (char *buff, Bool from_efun)
          * current_object is reset just after the call to apply().
          */
         if (current_object == NULL)
-            current_object = s->ob;
+            current_object = sa->ob;
 
         /* Remember the object, to update score.
          */
-        command_object = s->ob;
+        command_object = sa->ob;
 
         /* If the next sentence(s) are of type SENT_MARKER themselves,
          * skip them.
@@ -669,7 +838,7 @@ parse_command (char *buff, Bool from_efun)
              * And since new commands are always added at the start,
              * the end will remain the end.
              */
-            marker_sent->next = NULL;
+            marker_sent->sent.next = NULL;
             command_marker = marker_sent;
         }
         else
@@ -679,38 +848,51 @@ parse_command (char *buff, Bool from_efun)
              * the marker will be freed.
              * Take care not to alter marker addresses.
              */
-            insert->next = marker_sent;
+            insert->next = (sentence_t *)marker_sent;
 
-            marker_sent->ob = (struct object *)rt_context;
-            marker_sent->next = next;
-            marker_sent->type = SENT_MARKER;
+            marker_sent->ob = (object_t *)rt_context;
+            marker_sent->sent.next = next;
+            marker_sent->sent.type = SENT_MARKER;
         }
 
         /* Clear the other struct elements - after all, this might be
          * a reused command sentence.
          */
+        marker_sent->sent.type = SENT_MARKER;
         marker_sent->verb = NULL;
         marker_sent->function = NULL;
 
-        /* Call the command function */
+        /* Push the argument and call the command function.
+         *
+         * For NO_SPACE commands it would be logical to cut off the
+         * actual verb part from the first word and add it to the arguments,
+         * but this would break all existing mudlibs.
+         */
         if (s->type == SENT_NO_SPACE)
         {
-            push_volatile_string(&buff[strlen(s->verb)]);
-            ret = sapply(s->function, s->ob, 1);
+            if (strlen(buff) > strlen(sa->verb))
+            {
+                push_volatile_string(&buff[strlen(sa->verb)]);
+                ret = sapply(sa->function, sa->ob, 1);
+            }
+            else
+            {
+                ret = sapply(sa->function, sa->ob, 0);
+            }
         }
         else if (buff[length] == ' ')
         {
             push_volatile_string(&buff[length+1]);
-            ret = sapply(s->function, s->ob, 1);
+            ret = sapply(sa->function, sa->ob, 1);
         }
         else
         {
-            ret = sapply(s->function, s->ob, 0);
+            ret = sapply(sa->function, sa->ob, 0);
         }
 
         if (ret == 0)
         {
-            error("function %s not found.\n", s->function);
+            error("function %s not found.\n", sa->function);
         }
 
         /* Restore the old current_object and command_giver */
@@ -727,16 +909,16 @@ parse_command (char *buff, Bool from_efun)
         }
 
         /* Remove the marker from the sentence chain, and make s->next valid */
-        if ( NULL != (s = marker_sent->next) && s->type != SENT_MARKER)
+        if ( NULL != (s = marker_sent->sent.next) && s->type != SENT_MARKER)
         {
             /* The following sentence is a non-SENT_MARKER: the data from
              * that sentence is copied into the place of the SENT_MARKER; the
              * storage of the sentence will then be reused for the new
              * SENT_MARKER.
              */
-            *marker_sent = *s;
-            s->next = marker_sent;
-            marker_sent = s;
+            *marker_sent = *((action_t *)s);
+            s->next = (sentence_t *)marker_sent;
+            marker_sent = (action_t *)s;
         }
         else
         {
@@ -747,15 +929,15 @@ parse_command (char *buff, Bool from_efun)
                  * s->type == SENT_MARKER : There was a delimiter sentence
                  * between the two markers, which has been removed.
                  */
-                struct sentence **pp;
+                sentence_t **pp;
 
                 for (pp = &marked_command_giver->sent
-                    ; (s = *pp) != marker_sent;
+                    ; (s = *pp) != (sentence_t *)marker_sent;
                     )
                     pp = &s->next;
                 *pp = s->next;
             }
-            s = marker_sent;
+            s = (sentence_t *)marker_sent;
         }
 
         /* If we get fail from the call, it was wrong second argument. */
@@ -764,8 +946,7 @@ parse_command (char *buff, Bool from_efun)
         }
 
         /* Command was found */
-        if (O_GET_INTERACTIVE(command_giver) &&
-            O_GET_INTERACTIVE(command_giver)->sent.type == SENT_INTERACTIVE
+        if (O_IS_INTERACTIVE(command_giver)
 #ifdef O_IS_WIZARD
             && !(command_giver->flags & O_IS_WIZARD)
 #endif
@@ -779,6 +960,7 @@ parse_command (char *buff, Bool from_efun)
     /* At this point, the marker_sent is not part of the sentence
      * list anymore. Make sure it will be freed.
      */
+    marker_sent->sent.type = SENT_MARKER;
     marker_sent->verb = NULL;
     marker_sent->function = NULL;
     command_marker = marker_sent;
@@ -796,7 +978,7 @@ parse_command (char *buff, Bool from_efun)
 
 /*-------------------------------------------------------------------------*/
 Bool
-execute_command (char *str, struct object *ob)
+execute_command (char *str, object_t *ob)
 
 /* Parse and execute the command <str> for object <ob> as command_giver.
  * <ob> may be an interactive player or a NPC.
@@ -832,7 +1014,7 @@ execute_command (char *str, struct object *ob)
     /* Execute the command */
     if (closure_hook[H_COMMAND].type == T_STRING)
     {
-        struct svalue *svp;
+        svalue_t *svp;
 
         push_volatile_string(str);
         svp = sapply_int(closure_hook[H_COMMAND].u.string, ob, 1, MY_TRUE);
@@ -840,7 +1022,7 @@ execute_command (char *str, struct object *ob)
     }
     else if (closure_hook[H_COMMAND].type == T_CLOSURE)
     {
-        struct lambda *l;
+        lambda_t *l;
 
         l = closure_hook[H_COMMAND].u.lambda;
         if (closure_hook[H_COMMAND].x.closure_type == CLOSURE_LAMBDA)
@@ -864,7 +1046,7 @@ execute_command (char *str, struct object *ob)
 
 /*-------------------------------------------------------------------------*/
 int
-e_command (char *str, struct object *ob)
+e_command (char *str, object_t *ob)
 
 /* EFUN command()
  *
@@ -877,7 +1059,7 @@ e_command (char *str, struct object *ob)
 {
     char buff[COMMAND_FOR_OBJECT_BUFSIZE];
     int save_eval_cost = eval_cost - 1000;
-    struct interactive *ip;
+    interactive_t *ip;
 
     if (ob == NULL)
         ob = current_object;
@@ -892,8 +1074,7 @@ e_command (char *str, struct object *ob)
     strncpy(buff, str, sizeof buff);
     buff[sizeof buff - 1] = '\0';
 
-    if (NULL != (ip = O_GET_INTERACTIVE(ob))
-      && ip->sent.type == SENT_INTERACTIVE)
+    if (O_SET_INTERACTIVE(ip, ob))
         trace_level |= ip->trace_level;
 
     if (execute_command(buff, ob))
@@ -904,7 +1085,7 @@ e_command (char *str, struct object *ob)
 
 /*-------------------------------------------------------------------------*/
 Bool
-e_add_action (struct svalue *func, struct svalue *cmd, int flag)
+e_add_action (svalue_t *func, svalue_t *cmd, int flag)
 
 /* EFUN add_action()
  *
@@ -919,15 +1100,15 @@ e_add_action (struct svalue *func, struct svalue *cmd, int flag)
  * Attempting to add an action from a shadow causes a privilege violation
  * ("shadow_add_action", shadow, func).
  *
- * TODO: In the long run, get rid of actions.
+ * TODO: In the long run, make actions an optional feature.
  */
 {
-    struct sentence *p;
-    struct object *ob;
+    action_t *p;
+    object_t *ob;
     char *str;
     short string_type;
 
-    /* Can't take actions from destruct objects */
+    /* Can't take actions from destructed objects */
     if (current_object->flags & O_DESTRUCTED)
         return MY_TRUE;
 
@@ -964,7 +1145,7 @@ e_add_action (struct svalue *func, struct svalue *cmd, int flag)
 
 #ifdef DEBUG
     if (d_flag > 1)
-        debug_message("--Add action %s\n", func->u.string);
+        debug_message("%s --Add action %s\n", time_stamp(), func->u.string);
 #endif
 
     /* Sanity checks */
@@ -974,11 +1155,15 @@ e_add_action (struct svalue *func, struct svalue *cmd, int flag)
 #ifdef COMPAT_MODE
     str = func->u.string;
     if (*str++=='e' && *str++=='x' && *str++=='i' && *str++=='t' && !*str)
+    {
         error("Illegal to define a command to the exit() function.\n");
+        /* NOTREACHED */
+        return MY_TRUE;
+    }
 #endif
 
     /* Allocate and initialise a new sentence */
-    p = alloc_sentence();
+    p = new_action_sent();
 
     /* Set str to the function, made shared */
     str = func->u.string;
@@ -1009,14 +1194,41 @@ e_add_action (struct svalue *func, struct svalue *cmd, int flag)
             }
         }
         p->verb = str;
-        p->type = SENT_PLAIN;
+        p->sent.type = SENT_PLAIN;
+        p->short_verb = 0;
 
         if (flag)
         {
-            p->type = SENT_SHORT_VERB;
-            p->short_verb = (unsigned short)flag;
-            if (flag == 2) /* TODO: Obsolete? */
-                p->type = SENT_NO_SPACE;
+            if (flag == AA_SHORT)
+            {
+                p->sent.type = SENT_SHORT_VERB;
+            }
+            else if (flag == AA_NOSPACE)
+            {
+                p->sent.type = SENT_NO_SPACE;
+            }
+            else if (flag < AA_VERB)
+            {
+                if (-flag >= strlen(p->verb))
+                {
+                    error("Bad arg 3 to add_action(): value %ld larger than verb '%s'.\n"
+                         , (long)flag, p->verb);
+                    /* NOTREACHED */
+                    return MY_TRUE;
+                }
+                else
+                {
+                    p->sent.type = SENT_SHORT_VERB;
+                    p->short_verb = 0 - (unsigned short)flag;
+                }
+            }
+            else
+            {
+                error("Bad arg 3 to add_action(): value %ld too big.\n"
+                     , (long)flag);
+                /* NOTREACHED */
+                return MY_TRUE;
+            }
         }
     }
     else
@@ -1024,29 +1236,29 @@ e_add_action (struct svalue *func, struct svalue *cmd, int flag)
         /* No verb given */
         p->short_verb = 0;
         p->verb = NULL;
-        p->type = SENT_NO_VERB;
+        p->sent.type = SENT_NO_VERB;
     }
 
     /* Now chain in the sentence */
     if (command_giver->flags & O_SHADOW)
     {
-        struct sentence *previous = command_giver->sent;
+        sentence_t *previous = command_giver->sent;
 
-        p->next = previous->next;
-        previous->next = p;
+        p->sent.next = previous->next;
+        previous->next = (sentence_t *)p;
     }
     else
     {
-        p->next = command_giver->sent;
-        command_giver->sent = p;
+        p->sent.next = command_giver->sent;
+        command_giver->sent = (sentence_t *)p;
     }
 
     return MY_FALSE;
 } /* e_add_action() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_execute_command (struct svalue *sp)
+svalue_t *
+f_execute_command (svalue_t *sp)
 
 /* TEFUN execute_command()
  *
@@ -1060,12 +1272,16 @@ f_execute_command (struct svalue *sp)
  * The efun raises a privilege violation ("execute_command", this_object(),
  * origin, command).
  *
+ * Note that this function does not use the H_MODIFY_COMMAND
+ * and H_NOTIFY_FAIL hooks; the notify_fail() efun can be used,
+ * but must be evaluated by the caller.
+ *
  * Return TRUE if the command was found, and FALSE if not.
  */
 
 {
-    struct svalue *argp;
-    struct object *origin, *player;
+    svalue_t *argp;
+    object_t *origin, *player;
     char buf[COMMAND_FOR_OBJECT_BUFSIZE];
     Bool res;
 
@@ -1098,17 +1314,17 @@ f_execute_command (struct svalue *sp)
     res = MY_FALSE;  /* default result */
 
     /* Test if we are allowed to use this function */
-    if (privilege_violation4("execute_command", origin, buf, 0, sp+1))
+    if (privilege_violation4("execute_command", origin, buf, 0, sp))
     {
         marked_command_giver = origin;
         command_giver = player;
         res = parse_command(buf, MY_TRUE);
     }
 
-    /* Clean up the stack and push the result */
-    free_object_svalue(argp+2);
-    free_object_svalue(argp+1);
-    free_string_svalue(argp);
+    /* Clean up the stack and push the result. */
+    free_svalue(argp+2);
+    free_svalue(argp+1);
+    free_svalue(argp);
 
     put_number(argp, res ? 1 : 0);
 
@@ -1116,8 +1332,8 @@ f_execute_command (struct svalue *sp)
 } /* f_execute_command() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_remove_action (struct svalue *sp)
+svalue_t *
+f_remove_action (svalue_t *sp)
 
 /* TEFUN: remove_action()
  *
@@ -1129,9 +1345,10 @@ f_remove_action (struct svalue *sp)
  */
 
 {
-    struct object *ob;
+    object_t *ob;
     char *verb;
-    struct sentence **sentp, *s;
+    sentence_t **sentp;
+    action_t *s;
 
     /* Get and test the arguments */
     if (sp[-1].type != T_STRING)
@@ -1149,15 +1366,15 @@ f_remove_action (struct svalue *sp)
     /* Now search and remove the sentence */
     sentp = &ob->sent;
     ob = current_object;
-    while ( NULL != (s = *sentp) )
+    while ( NULL != (s = (action_t *)*sentp) )
     {
         if (s->ob == ob && s->verb == verb)
         {
-            *sentp = s->next;
-            free_sentence(s);
+            *sentp = s->sent.next;
+            free_action_sent(s);
             break;
         }
-        sentp = &s->next;
+        sentp = &s->sent.next;
     }
 
     /* Clean up the stack and push the result */
@@ -1171,8 +1388,8 @@ f_remove_action (struct svalue *sp)
 } /* f_remove_action() */
 
 /*-------------------------------------------------------------------------*/
-struct vector *
-e_get_action (struct object *ob, char *verb)
+vector_t *
+e_get_action (object_t *ob, char *verb)
 
 /* EFUN query_actions()
  *
@@ -1185,16 +1402,23 @@ e_get_action (struct object *ob, char *verb)
  */
 
 {
-    struct vector *v;
-    struct sentence *s;
-    struct svalue *p;
+    vector_t *v;
+    sentence_t *s;
+    svalue_t *p;
 
     if ( !(verb = findstring(verb)) )
         return NULL;
 
     for (s = ob->sent; s; s = s->next)
     {
-        if (verb != s->verb)
+        action_t *sa;
+        
+        if (SENT_IS_INTERNAL(s->type))
+            continue;
+        
+        sa = (action_t *)s;
+        
+        if (verb != sa->verb)
             continue;
         /* verb will be 0 for SENT_MARKER */
 
@@ -1203,11 +1427,11 @@ e_get_action (struct object *ob, char *verb)
 
         put_number(p, s->type);
         p++;
-        put_number(p, s->type != SENT_PLAIN ? s->short_verb : 0);
+        put_number(p, s->type != SENT_PLAIN ? sa->short_verb : 0);
         p++;
-        put_ref_object(p, s->ob, "get_action");
+        put_ref_object(p, sa->ob, "get_action");
         p++;
-        put_ref_string(p, s->function);
+        put_ref_string(p, sa->function);
 
         return v;
     }
@@ -1216,8 +1440,8 @@ e_get_action (struct object *ob, char *verb)
 } /* e_get_action() */
 
 /*-------------------------------------------------------------------------*/
-struct vector *
-e_get_all_actions (struct object *ob, int mask)
+vector_t *
+e_get_all_actions (object_t *ob, int mask)
 
 /* EFUN query_actions()
  *
@@ -1230,10 +1454,10 @@ e_get_all_actions (struct object *ob, int mask)
  */
 
 {
-    struct vector *v;
-    struct sentence *s;
+    vector_t *v;
+    sentence_t *s;
     int num;
-    struct svalue *p;
+    svalue_t *p;
     int nqueries;
 
     /* Set nqueries to the number of set bit in mask */
@@ -1255,12 +1479,17 @@ e_get_all_actions (struct object *ob, int mask)
     p = v->item;
     for (s = ob->sent; s; s = s->next)
     {
+        action_t * sa;
+        
         if (SENT_IS_INTERNAL(s->type))
             continue;
+
+        sa = (action_t *)s;
+        
         if (mask & 1)
         {
             char * str;
-            if ( NULL != (str = s->verb) ) {
+            if ( NULL != (str = sa->verb) ) {
                 put_ref_string(p, str);
             }
             p++;
@@ -1272,17 +1501,17 @@ e_get_all_actions (struct object *ob, int mask)
         }
         if (mask & 4)
         {
-            p->u.number = s->short_verb;
+            p->u.number = sa->short_verb;
             p++;
         }
         if (mask & 8)
         {
-            put_ref_object(p, s->ob, "get_action");
+            put_ref_object(p, sa->ob, "get_action");
             p++;
         }
         if (mask & 16)
         {
-            put_ref_string(p, s->function);
+            put_ref_string(p, sa->function);
             p++;
         }
     }
@@ -1292,8 +1521,8 @@ e_get_all_actions (struct object *ob, int mask)
 } /* e_get_all_actions() */
 
 /*-------------------------------------------------------------------------*/
-struct vector *
-e_get_object_actions (struct object *ob1, struct object *ob2)
+vector_t *
+e_get_object_actions (object_t *ob1, object_t *ob2)
 
 /* EFUN query_actions()
  *
@@ -1306,15 +1535,15 @@ e_get_object_actions (struct object *ob1, struct object *ob2)
  */
 
 {
-    struct vector *v;
-    struct sentence *s;
+    vector_t *v;
+    sentence_t *s;
     int num;
-    struct svalue *p;
+    svalue_t *p;
 
     /* Count the number of actions */
     num = 0;
     for (s = ob1->sent; s; s = s->next)
-        if (s->ob == ob2)
+        if (!SENT_IS_INTERNAL(s->type) && ((action_t *)s)->ob == ob2)
             num += 2;
 
     /* Allocate and fill in the result array */
@@ -1322,11 +1551,18 @@ e_get_object_actions (struct object *ob1, struct object *ob2)
     p = v->item;
     for (s = ob1->sent; s; s = s->next)
     {
-        if (s->ob == ob2) {
-            put_ref_string(p, s->verb);
+        action_t *sa;
+
+        if (SENT_IS_INTERNAL(s->type))
+            continue;
+
+        sa = (action_t *)s;
+        
+        if (sa->ob == ob2) {
+            put_ref_string(p, sa->verb);
             p++;
 
-            put_ref_string(p, s->function);
+            put_ref_string(p, sa->function);
             p++;
         }
     }
@@ -1349,18 +1585,18 @@ enable_commands (Bool num)
         return;
 
     if (d_flag > 1) {
-        debug_message("Enable commands %s (ref %ld)\n",
-            current_object->name, current_object->ref);
+        debug_message("%s Enable commands %s (ref %ld)\n"
+                     , time_stamp(), current_object->name
+                     , current_object->ref);
     }
 
     if (num)
     {
-        struct interactive *ip;
+        interactive_t *ip;
 
         current_object->flags |= O_ENABLE_COMMANDS;
         command_giver = current_object;
-        if (NULL != (ip = O_GET_INTERACTIVE(command_giver))
-         && ip->sent.type == SENT_INTERACTIVE)
+        if (O_SET_INTERACTIVE(ip, command_giver))
         {
             trace_level |= ip->trace_level;
         }
@@ -1373,8 +1609,8 @@ enable_commands (Bool num)
 } /* enable_commands() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_notify_fail (struct svalue *sp)
+svalue_t *
+f_notify_fail (svalue_t *sp)
 
 /* TEFUN notify_fail()
  *
@@ -1398,7 +1634,21 @@ f_notify_fail (struct svalue *sp)
         bad_xefun_arg(1, sp);
 
     if (command_giver && !(command_giver->flags & O_DESTRUCTED))
-        transfer_svalue(&error_msg, sp);
+    {
+        if (error_msg.type == T_CLOSURE)
+            /* It might be the closure we're just executing, so
+             * keep it around for now.
+             * TODO: It'd be safer if the interpreter would keep
+             * TODO:: an additional ref on all closures it is executing.
+             */
+            free_closure_hooks(&error_msg, 1);
+        else
+            free_svalue(&error_msg);
+        transfer_svalue_no_free(&error_msg, sp);
+        if (error_obj)
+            free_object(error_obj, "notify_fail");
+        error_obj = ref_object(current_object, "notify_fail");
+    }
 
     put_number(sp, 0);
 
@@ -1406,30 +1656,51 @@ f_notify_fail (struct svalue *sp)
 } /* f_notify_fail() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_query_notify_fail (struct svalue *sp)
+svalue_t *
+f_query_notify_fail (svalue_t *sp)
 
 /* TEFUN query_notify_fail()
  *
  *   mixed query_notify_fail()
+ *   mixed query_notify_fail(int flag = 0)
  *
- * Return the last error message set with notify_fail(). If nothing was
- * set yet, return 0.
+ * If no flag is given, or flag is 0: return the last error message
+ * resp. closure set with notify_fail().
+ * If flag is non-zero, return the object which executed the last notify_fail().
+ *
+ * If nothing was set yet, return 0.
  */
 
 {
-    sp++;
-    if (error_msg.type == T_STRING || error_msg.type == T_CLOSURE)
-        assign_svalue_no_free(sp, &error_msg);
+    p_int flag;
+    
+    if (sp->type != T_NUMBER)
+        bad_xefun_arg(1, sp);
+
+    flag = sp->u.number;
+    free_svalue(sp);
+
+    if (flag)
+    {
+        if (error_obj && !(error_obj->flags & O_DESTRUCTED))
+            put_ref_object(sp, error_obj, "query_notify_fail");
+        else
+            put_number(sp, 0);
+    }
     else
-        put_number(sp, 0);
+    {
+        if (error_msg.type == T_STRING || error_msg.type == T_CLOSURE)
+            assign_svalue_no_free(sp, &error_msg);
+        else
+            put_number(sp, 0);
+    }
 
     return sp;
 } /* f_query_notify_fail() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_set_this_player (struct svalue *sp)
+svalue_t *
+f_set_this_player (svalue_t *sp)
 
 /* TEFUN set_this_player()
  *
@@ -1445,8 +1716,8 @@ f_set_this_player (struct svalue *sp)
  */
 
 {
-    struct object *ob;
-    struct interactive *ip;
+    object_t *ob;
+    interactive_t *ip;
 
     /* Special case, can happen if a function tries to restore
      * an old this_player() setting which happens to be 0.
@@ -1462,8 +1733,7 @@ f_set_this_player (struct svalue *sp)
 
     ob = sp->u.ob;
     command_giver = ob;
-    if (NULL != (ip = O_GET_INTERACTIVE(ob))
-     && ip->sent.type == SENT_INTERACTIVE)
+    if (O_SET_INTERACTIVE(ip, ob))
     {
         trace_level |= ip->trace_level;
     }
@@ -1472,8 +1742,8 @@ f_set_this_player (struct svalue *sp)
 } /* f_set_this_player() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_command_stack_depth (struct svalue *sp)
+svalue_t *
+f_command_stack_depth (svalue_t *sp)
 
 /* TEFUN command_stack_depth()
  *
@@ -1501,8 +1771,8 @@ f_command_stack_depth (struct svalue *sp)
 } /* f_command_stack_depth() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_command_stack (struct svalue *sp)
+svalue_t *
+f_command_stack (svalue_t *sp)
 
 /* TEFUN command_stack()
  *
@@ -1514,17 +1784,18 @@ f_command_stack (struct svalue *sp)
  *
  * Each entry is an array itself with these entries:
  *
- *   string [CMD_VERB]:   the verb of this command
- *   string [CMD_TEXT]:   the full command text
- *   object [CMD_ORIGIN]: the original command giver
- *   object [CMD_PLAYER]: the current command giver
- *   mixed  [CMD_FAIL]:   the notify_fail setting
+ *   string [CMD_VERB]:    the verb of this command
+ *   string [CMD_TEXT]:    the full command text
+ *   object [CMD_ORIGIN]:  the original command giver
+ *   object [CMD_PLAYER]:  the current command giver
+ *   mixed  [CMD_FAIL]:    the notify_fail setting
+ *   mixed  [CMD_FAILOBJ]: the object which set the notify_fail
  */
 
 {
     rt_context_t * context;
-    struct vector * result;
-    struct svalue * entry;
+    vector_t * result;
+    svalue_t * entry;
     int num, i;
 
     /* Count the number of COMMAND_CONTEXT entries on
@@ -1537,23 +1808,25 @@ f_command_stack (struct svalue *sp)
     /* Get the array */
     result = allocate_uninit_array(num);
     if (!result)
-        error("Out of memory.\n");
+        error("(command_stack) Out of memory: array[%d] for result.\n", num);
 
     for ( i = num-1, entry = result->item + num - 1, context = rt_context
         ; i >= 0
         ; i--, entry--
         )
     {
-        struct vector * sub;
-        struct svalue * svp;
+        vector_t * sub;
+        svalue_t * svp;
         char * t_verb, * t_cmd; /* current verb and command */
-        struct object * t_player, * t_mplayer; /* current command givers */
-        struct svalue * t_errmsg;  /* current error message */
+        object_t * t_player, * t_mplayer; /* current command givers */
+        svalue_t * t_errmsg;  /* current error message */
+        object_t * t_errobj;  /* current error message giver */
 
         /* Create the entry array */
-        sub = allocate_array(5);
+        sub = allocate_array(CMD_SIZE);
         if (!sub)
-            error("Out of memory.\n");
+            error("(command_stack) Out of memory: array[%d] for entry.\n"
+                 , CMD_SIZE);
 
         put_array(entry, sub);
 
@@ -1567,6 +1840,7 @@ f_command_stack (struct svalue *sp)
             t_player = check_object(command_giver);
             t_mplayer = check_object(marked_command_giver);
             t_errmsg = &error_msg;
+            t_errobj = check_object(error_obj);
         }
         else
         {
@@ -1583,23 +1857,28 @@ f_command_stack (struct svalue *sp)
             t_player = check_object(cmd->this_player);
             t_mplayer = check_object(cmd->mark_player);
             t_errmsg = &(cmd->errmsg);
+            t_errobj = check_object(cmd->errobj);
         }
 
         /* Now put the data into the array */
         if (t_verb)
-            put_ref_string(svp, t_verb);
+            put_ref_string(svp+CMD_VERB, t_verb);
 
         if (t_cmd)
-            put_malloced_string(svp+1, string_copy(t_cmd));
+            put_malloced_string(svp+CMD_TEXT, string_copy(t_cmd));
 
         if (t_mplayer)
-            put_ref_object(svp+2, t_mplayer, "command_stack");
+            put_ref_object(svp+CMD_ORIGIN, t_mplayer, "command_stack");
 
         if (t_player)
-            put_ref_object(svp+3, t_player, "command_stack");
+            put_ref_object(svp+CMD_PLAYER, t_player, "command_stack");
 
         if (t_errmsg->type == T_STRING || t_errmsg->type == T_CLOSURE)
-            assign_svalue_no_free(svp+4, t_errmsg);
+            assign_svalue_no_free(svp+CMD_FAIL, t_errmsg);
+
+        if (t_errobj)
+            put_ref_object(svp+CMD_FAILOBJ, t_errobj, "command_stack");
+
     }
 
     /* Put the result onto the stack */
@@ -1615,27 +1894,27 @@ f_command_stack (struct svalue *sp)
  */
 
 #if defined(F_ADD_VERB) || defined(F_ADD_XVERB)
-static struct svalue *add_verb(sp, type)
-    struct svalue *sp;
+static svalue_t *add_verb(sp, type)
+    svalue_t *sp;
     int type;
 {
     if (sp->type != T_STRING)
         bad_xefun_arg(1, sp);
     if (command_giver  && !(command_giver->flags & O_DESTRUCTED)) {
-        struct sentence *sent;
+        action_t *sent;
 
-        sent = command_giver->sent;
+        sent = (action_t *)command_giver->sent;
         if (command_giver->flags & O_SHADOW)
-            sent = sent->next;
+            sent = (action_t *)sent->sent.next;
         if (!sent)
             error("No add_action().\n");
         if (sent->verb != 0)
             error("Tried to set verb again.\n");
         sent->verb = make_shared_string(sp->u.string);
-        sent->type = (unsigned char)type;
+        sent->sent.type = (sent_type_t)type;
         if (d_flag > 1)
-            debug_message("--Adding verb %s to action %s\n", sp->u.string,
-                command_giver->sent->function);
+            debug_message("%s --Adding verb %s to action %s\n"
+                         , time_stamp(), sp->u.string, sent->function);
     }
     free_svalue(sp--);
     return sp;
@@ -1643,16 +1922,14 @@ static struct svalue *add_verb(sp, type)
 #endif
 
 #ifdef F_ADD_VERB
-struct svalue *f_add_verb(sp)
-    struct svalue *sp;
+svalue_t *f_add_verb (svalue_t *sp)
 {
     return add_verb(sp, SENT_PLAIN);
 }
 #endif
 
 #ifdef F_ADD_XVERB
-struct svalue *f_add_xverb(sp)
-    struct svalue *sp;
+svalue_t *f_add_xverb (svalue_t *sp)
 {
     return add_verb(sp, SENT_NO_SPACE);
 }

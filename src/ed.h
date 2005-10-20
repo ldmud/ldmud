@@ -1,35 +1,28 @@
-#ifndef __ED_H__
-#define __ED_H__ 1
+#ifndef ED_H__
+#define ED_H__ 1
 
 #include "driver.h"
-
-#include "comm.h"      /* struct interactive */
-#include "interpret.h" /* struct svalue */
-#include "object.h"    /* struct object */
-
-/* --- Types --- */
-
-struct ed_buffer;
+#include "typedefs.h"
 
 /* --- Prototypes --- */
 
-extern void prompt_from_ed_buffer(struct interactive *ip);
-extern void prompt_to_ed_buffer(struct interactive *ip);
-extern void regerror(char *s);
-extern void ed_start(char *file_arg, char *exit_fn, struct object *exit_ob);
+extern size_t ed_buffer_size (ed_buffer_t *buffer);
+extern void prompt_from_ed_buffer(interactive_t *ip);
+extern void prompt_to_ed_buffer(interactive_t *ip);
+extern void ed_start(char *file_arg, char *exit_fn, object_t *exit_ob);
 
-#ifdef MALLOC_smalloc
-extern void clear_ed_buffer_refs(struct ed_buffer *b);
-extern void count_ed_buffer_refs(struct ed_buffer *b);
-#endif /* MALLOC_smalloc */
+#ifdef GC_SUPPORT
+extern void clear_ed_buffer_refs(ed_buffer_t *b);
+extern void count_ed_buffer_refs(ed_buffer_t *b);
+#endif /* GC_SUPPORT */
 
 #ifdef DEBUG
-extern void count_ed_buffer_extra_refs(struct ed_buffer *b);
+extern void count_ed_buffer_extra_refs(ed_buffer_t *b);
 #endif
 
 extern void free_ed_buffer(void);
 extern void ed_cmd(char *str);
 extern void save_ed_buffer(void);
-extern struct svalue *f_query_editing(struct svalue *sp);
+extern svalue_t *f_query_editing(svalue_t *sp);
 
-#endif /* __ED_H__ */
+#endif /* ED_H__ */

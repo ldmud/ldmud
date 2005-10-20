@@ -1,5 +1,6 @@
 SYNOPSIS
-	void walk_mapping(mapping m, string func, object ob, mixed extra,...)
+	void walk_mapping(mapping m, string func, string|object ob
+                                                , mixed extra,...)
 	void walk_mapping(mapping m, closure cl, mixed extra,...)
 
 DESCRIPTION
@@ -7,7 +8,11 @@ DESCRIPTION
 	the closure to every entry in the mapping. The keys are passed
 	by value, the values are passed by reference and can be
 	changed in the function.
+
 	Any number of extra arguments is accepted and passed.
+
+	If <ob> is omitted, or neither a string nor an object, it
+        defaults to this_object().
 
 HISTORY
 	Introduced in 3.2@61

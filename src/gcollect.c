@@ -27,28 +27,28 @@
  * modules in this, the collector offers a set of primitives to clearing
  * and marking:
  *
- *     void clear_memory_reference(char *p)
+ *     void clear_memory_reference(void *p)
  *         Clear the memory block marker for <p>.
  *
- *     void note_malloced_block_ref(char *p)
+ *     void note_malloced_block_ref(void *p)
  *         Note the reference to memory block <p>.
  *
- *     void clear_inherit_ref(struct program *p)
+ *     void clear_inherit_ref(program_t *p)
  *         Clear the refcounts of all inherited programs of <p>.
  *
- *     void mark_program_ref(struct program *p);
+ *     void mark_program_ref(program_t *p);
  *         Set the marker of program <p> and of all data referenced by <p>.
  *
- *     void reference_destructed_object(struct object *ob)
+ *     void reference_destructed_object(object_t *ob)
  *         Note the reference to a destructed object <ob>.
  *
  *     void count_ref_from_string(char *p);
  *         Count the reference to shared string <p>.
  *
- *     void clear_ref_in_vector(struct svalue *svp, size_t num);
+ *     void clear_ref_in_vector(svalue_t *svp, size_t num);
  *         Clear the refs of the <num> elements of vector <svp>.
  *
- *     void count_ref_in_vector(struct svalue *svp, size_t num)
+ *     void count_ref_in_vector(svalue_t *svp, size_t num)
  *         Count the references the <num> elements of vector <p>.
  *
  * The referencing code for dynamic data should mirror the destructor code,
@@ -60,12 +60,15 @@
  */
 
 #include "driver.h"
+#include "typedefs.h"
 
 #include <sys/types.h>
 #include <sys/time.h>
+#include <stdio.h>
 
 #define NO_REF_STRING
 #include "gcollect.h"
+#include "actions.h"
 #include "array.h"
 #include "backend.h"
 #include "call_out.h"
@@ -75,23 +78,27 @@
 #include "exec.h"
 #include "filestat.h"
 #include "heartbeat.h"
-#include "interpret.h"
 #include "instrs.h"
+#include "interpret.h"
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
 #include "object.h"
 #include "otable.h"
+#include "parse.h"
 #include "prolang.h"
 #include "rxcache.h"
 #include "sent.h"
 #include "simulate.h"
 #include "simul_efun.h"
 #include "smalloc.h"
+#include "stdstrings.h"
 #include "stralloc.h"
 #include "swap.h"
 #include "wiz_list.h"
+#include "xalloc.h"
 
+#include "../mudlib/sys/driver_hook.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -101,7 +108,7 @@ time_t time_last_gc = 0;
    */
 
 
-#if defined(MALLOC_smalloc)
+#if defined(GC_SUPPORT)
 
 int gcollect_outfd = 2;
 #define gout gcollect_outfd
@@ -118,56 +125,34 @@ int garbage_collection_in_progress = 0;
    * swap uses this information when swapping in objects.
    */
 
-struct object *gc_obj_list_destructed;
+object_t *gc_obj_list_destructed;
   /* List of referenced but destructed objects.
    * Scope is global so that the GC support functions in mapping.c can
    * add their share of information.
    */
 
-struct lambda *stale_misc_closures;
+lambda_t *stale_misc_closures;
   /* List of non-lambda closures bound to a destructed object.
    * The now irrelevant .ob pointer is used to link the list elements.
    * Scope is global so that the GC support functions in mapping.c can
    * add their share of information.
    */
 
-static struct lambda *stale_lambda_closures;
+static lambda_t *stale_lambda_closures;
   /* List of lambda closures bound to a destructed object.
    * The now irrelevant .ob pointer is used to link the list elements.
    */
 
-#endif /* MALLOC_smalloc */
+static size_t size_alloc_strings;
+static size_t num_alloc_strings;
+  /* Number and size of unshared strings encountered.
+   */
+
+#endif /* GC_SUPPORT */
 
 /*-------------------------------------------------------------------------*/
 
 #if defined(MALLOC_smalloc)
-
-#define STRING_REFS(str)  (*(unsigned short *)((char *) (str)\
-                           - sizeof(unsigned short)))
-  /* Return the refcount of shared string <str>
-   */
-
-#define MARK_STRING_REF(str) ((void)(\
-    STRING_REFS(str)++ || (\
-        CHECK_REF( (str)-sizeof(short)-sizeof(char *) ) ||\
-            /* reached max ref count, which is given as 0... */ \
-            STRING_REFS(str)--\
-    ))\
-)
-  /* Increment the refcount of shared string <str>
-   */
-
-#ifdef SMALLOC_TRACE
-#    define WRITES(d, s) write((d), (s), strlen(s))
-#    define WRITE_SMALLOC_TRACE(p)  (WRITES(gout, ((char **)(p))[-3]), \
-            WRITES(gout, " "), \
-            ((p_uint (*)(int, int))writed)(gout, (int)((p_uint *)(p))[-2]), \
-            WRITES(gout, "\n") ),
-#else
-#    define WRITE_SMALLOC_TRACE(p)
-#endif
-  /* Dump the allocation information for <p>, if any.
-   */
 
 #define CLEAR_REF(p) ( ((p_uint *)(p))[-SMALLOC_OVERHEAD] &= ~M_REF )
   /* Clear the memory block marker for <p>
@@ -186,34 +171,62 @@ static struct lambda *stale_lambda_closures;
    * Return TRUE if the marker was not set, FALSE else.
    */
 
-#ifdef __GNUC__
-/* typecast would strip NORETURN */
-#    define ifatal(s) (fatal(s),0)
-#else
-#    define ifatal(s) (((p_uint (*)(char *))fatal)(s))
-#endif
-  /* A fatal() which can be used in an expression.
+#define STRING_REFS(str)  (*(unsigned short *)((char *) (str)\
+                           - sizeof(unsigned short)))
+  /* Return the refcount of shared string <str>
    */
 
-#define NOTE_REF(p) \
-    ( \
-        TEST_REF(p) ? \
-            MARK_REF(p) \
-        : time_to_swap_variables + 1 == 0 && \
-          ( WRITE_SMALLOC_TRACE(p) \
-            ifatal("memory block referenced twice\n") ) \
-    )
-  /* Reference a memory block <p>, but fatal() if it is the
-   * second reference.
-   * TODO: What does 'time_to_swap_variables' do in here?
+#if !defined(CHECK_STRINGS) && !defined(DEBUG)
+
+#define MARK_STRING_REF(str) ((void)(\
+    STRING_REFS(str)++ || (\
+        CHECK_REF( (str)-sizeof(short)-sizeof(char *) ) ||\
+            /* reached max ref count, which is given as 0... */ \
+            STRING_REFS(str)--\
+    ))\
+)
+  /* Increment the refcount of shared string <str>. How it works:
+   * If STRING_REFS() is 0, the refcount either overflowed or it is
+   * the first visit to the block. If it's the first visit, CHECK_REF
+   * will return TRUE, otherwise we have an overflow and the STRING_REFS--
+   * will undo the ++ from earlier.
    */
+#else
+
+static void MARK_STRING_REF (char * str)
+{
+    if (CHECK_REF( (str)-sizeof(short)-sizeof(char *) ) )
+    {
+        /* First visit to this block */
+        STRING_REFS(str)++;
+#ifdef CHECK_STRINGS
+        mark_shadow_string_ref(str);
+#endif
+    }
+    else if (STRING_REFS(str))
+    {
+        /* Not the first visit, and refcounts didn't overrun either */
+        STRING_REFS(str)++;
+        if (!STRING_REFS(str))
+        {
+            /* Refcount overflow */
+            dprintf2(gout, "DEBUG: mark string: %x '%s' refcount reaches max!\n"
+                    , (p_int)str, (p_int)str);
+        }
+#ifdef CHECK_STRINGS
+        inc_shadow_string_ref(str);
+#endif
+    }
+}
+
+#endif /* DEBUG || CHECK_STRINGS */
 
 
 /* Forward declarations */
 
-static void clear_map_ref_filter (struct svalue *, struct svalue *, void *);
-static void clear_ref_in_closure (struct lambda *l, ph_int type);
-static void count_ref_in_closure (struct svalue *csvp);
+static void clear_map_ref_filter (svalue_t *, svalue_t *, void *);
+static void clear_ref_in_closure (lambda_t *l, ph_int type);
+static void count_ref_in_closure (svalue_t *csvp);
 
 #endif /* MALLOC_smalloc */
 
@@ -225,9 +238,34 @@ static void count_ref_in_closure (struct svalue *csvp);
 
 #if defined(MALLOC_smalloc)
 
+#if defined(MALLOC_TRACE)
+
+#define WRITES(d, s) write((d), (s), strlen(s))
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+write_malloc_trace (void * p)
+
+/* Dump the allocation information for <p>, if any.
+ */
+
+{
+    WRITES(gout, ((char **)(p))[-3]);
+    WRITES(gout, " ");
+    writed(gout, (int)((p_uint *)(p))[-2]);
+    WRITES(gout, "\n");
+} /* write_malloc_trace() */
+
+#else
+
+#define write_malloc_trace(p) 
+#define WRITES(d, s)
+
+#endif /* MALLOC_TRACE */
+
 /*-------------------------------------------------------------------------*/
 void
-clear_memory_reference (char *p)
+clear_memory_reference (void *p)
 
 /* Clear the memory block marker for block <p>.
  */
@@ -237,19 +275,39 @@ clear_memory_reference (char *p)
 }
 
 /*-------------------------------------------------------------------------*/
-void
-note_malloced_block_ref (char *p)
+static INLINE void
+note_ref (void *p)
 
 /* Note the reference to memory block <p>.
+ * Reference a memory block <p>, and write a diagnostic if it is the
+ * second reference.
  */
 
 {
-    NOTE_REF(p);
-}
+    if (TEST_REF(p))
+    {
+        MARK_REF(p);
+        return;
+    }
+
+    /* This was:
+
+    write_malloc_trace(p);
+    WRITES(gout, "memory block referenced twice or more\n");
+
+     * This situation arises during the mark phase if an object
+     * swapped in, marked, swapped out, and the next swapped-in
+     * object reuses the memory block released from the one
+     * before.
+     */
+
+} /* note_ref() */
+
+void note_malloced_block_ref (void *p) { note_ref(p); }
 
 /*-------------------------------------------------------------------------*/
 void
-clear_inherit_ref (struct program *p)
+clear_inherit_ref (program_t *p)
 
 /* Clear the refcounts of all inherited programs of <p>.
  */
@@ -262,7 +320,7 @@ clear_inherit_ref (struct program *p)
         /* Inherited programs are never swapped. Only programs with blueprints
          * are swapped, and a blueprint and one inheritance makes two refs.
          */
-        struct program *p2;
+        program_t *p2;
 
         p2 = p->inherit[i].prog;
         if (p2->ref)
@@ -275,7 +333,7 @@ clear_inherit_ref (struct program *p)
 
 /*-------------------------------------------------------------------------*/
 void
-mark_program_ref (struct program *p)
+mark_program_ref (program_t *p)
 
 /* Set the marker of program <p> and of all data referenced by <p>.
  */
@@ -288,13 +346,13 @@ mark_program_ref (struct program *p)
         unsigned char *program = p->program;
         uint32 *functions = p->functions;
         char **strings;
-        struct variable *variable_names;
+        variable_t *variable_names;
 
         if (p->ref++)
             fatal("First reference to program, but ref count != 0\n");
 
         if (p->swap_num != -1 && p->line_numbers)
-            NOTE_REF(p->line_numbers);
+            note_ref(p->line_numbers);
 
         /* Non-inherited functions */
 
@@ -333,7 +391,7 @@ mark_program_ref (struct program *p)
         for (i=0; i< p->num_inherited; i++)
             mark_program_ref(p->inherit[i].prog);
 
-        NOTE_REF(p->name);
+        note_ref(p->name);
     }
     else
     {
@@ -344,7 +402,7 @@ mark_program_ref (struct program *p)
 
 /*-------------------------------------------------------------------------*/
 void
-reference_destructed_object (struct object *ob)
+reference_destructed_object (object_t *ob)
 
 /* Note the reference to a destructed object <ob>. The referee has to
  * replace its reference by a svalue.number 0 since all these objects
@@ -362,7 +420,7 @@ reference_destructed_object (struct object *ob)
         gc_obj_list_destructed = ob;
         MARK_REF(ob);
         mark_program_ref(ob->prog);
-        NOTE_REF(ob->name);
+        note_ref(ob->name);
         MARK_STRING_REF(ob->load_name);
         ob->ref++;
     }
@@ -370,8 +428,8 @@ reference_destructed_object (struct object *ob)
     {
         if (!ob->ref)
         {
-            WRITE_SMALLOC_TRACE(ob)
-            ifatal("Destructed object referenced as something else\n");
+            write_malloc_trace(ob);
+            fatal("Destructed object referenced as something else\n");
         }
     }
 }
@@ -389,7 +447,7 @@ count_ref_from_string (char *p)
 
 /*-------------------------------------------------------------------------*/
 static void
-clear_map_ref_filter (struct svalue *key, struct svalue *data, void *extra)
+clear_map_ref_filter (svalue_t *key, svalue_t *data, void *extra)
 
 /* Auxiliary function to clear the refs in a mapping.
  * It is called with the <key> and <data> vector, the latter of
@@ -402,13 +460,16 @@ clear_map_ref_filter (struct svalue *key, struct svalue *data, void *extra)
 
 /*-------------------------------------------------------------------------*/
 void
-clear_ref_in_vector (struct svalue *svp, size_t num)
+clear_ref_in_vector (svalue_t *svp, size_t num)
 
 /* Clear the refs of the <num> elements of vector <svp>.
  */
 
 {
-    struct svalue *p;
+    svalue_t *p;
+
+    if (!svp) /* e.g. when called for obj->variables */
+        return;
 
     for (p = svp; p < svp+num; p++)
     {
@@ -438,7 +499,7 @@ clear_ref_in_vector (struct svalue *svp, size_t num)
         case T_MAPPING:
             if (p->u.map->ref)
             {
-                struct mapping *m;
+                mapping_t *m;
                 p_int num_values;
 
                 m = p->u.map;
@@ -451,7 +512,7 @@ clear_ref_in_vector (struct svalue *svp, size_t num)
         case T_CLOSURE:
             if (CLOSURE_MALLOCED(p->x.closure_type))
             {
-                struct lambda *l;
+                lambda_t *l;
 
                 l = p->u.lambda;
                 if (l->ref)
@@ -473,20 +534,23 @@ clear_ref_in_vector (struct svalue *svp, size_t num)
 
 /*-------------------------------------------------------------------------*/
 void
-count_ref_in_vector (struct svalue *svp, size_t num)
+count_ref_in_vector (svalue_t *svp, size_t num)
 
 /* Count the references the <num> elements of vector <p>.
  */
 
 {
-    struct svalue *p;
+    svalue_t *p;
+
+    if (!svp) /* e.g. when called for obj->variables */
+        return;
 
     for (p = svp; p < svp+num; p++) {
         switch(p->type)
         {
         case T_OBJECT:
           {
-            struct object *ob;
+            object_t *ob;
 
             ob = p->u.ob;
             if (ob->flags & O_DESTRUCTED)
@@ -514,14 +578,14 @@ count_ref_in_vector (struct svalue *svp, size_t num)
         case T_MAPPING:
             if (CHECK_REF(p->u.map))
             {
-                struct mapping *m;
+                mapping_t *m;
                 struct condensed_mapping *cm;
                 int num_values;
 
                 m = p->u.map;
                 cm = m->condensed;
                 num_values = m->num_values;
-                NOTE_REF((char *)CM_MISC(cm) - cm->misc_size *(num_values + 1));
+                note_ref((char *)CM_MISC(cm) - cm->misc_size *(num_values + 1));
                 /* hash mappings have been eleminated at the start */
                 count_ref_in_mapping(m);
             }
@@ -532,7 +596,9 @@ count_ref_in_vector (struct svalue *svp, size_t num)
               switch(p->x.string_type)
               {
               case STRING_MALLOC:
-                  NOTE_REF(p->u.string);
+                  note_ref(p->u.string);
+                  size_alloc_strings += strlen(p->u.string)+1;
+                  num_alloc_strings++;
                   break;
               case STRING_SHARED:
                   MARK_STRING_REF(p->u.string);
@@ -550,12 +616,12 @@ count_ref_in_vector (struct svalue *svp, size_t num)
               }
               else
               {
-                  struct object *ob;
+                  object_t *ob;
 
                   ob = p->u.ob;
                   if (ob->flags & O_DESTRUCTED)
                   {
-                      p->x.closure_type = F_UNDEF-F_OFFSET+CLOSURE_EFUN;
+                      p->x.closure_type = F_UNDEF+CLOSURE_EFUN;
                       p->u.ob = master_ob;
                       master_ob->ref++;
                       reference_destructed_object(ob);
@@ -585,20 +651,31 @@ remove_unreferenced_string (char *start, char *string)
 {
     if (TEST_REF(start))
     {
-        dprintf1(gout,
-"'%s' was left unreferenced in the shared string table, freeing now.\n",
-          (p_int)string
+#ifdef KEEP_STRINGS
+        dprintf1(gout, "shared string %x was left unreferenced.\n",
+          (p_int) string
         );
 
         MARK_REF(start);
+#else
+        dprintf2(gout,
+"shared string %x '%s' was left unreferenced, freeing now.\n",
+          (p_int) string, (p_int)string
+        );
+
+        MARK_REF(start);
+#ifdef CHECK_STRINGS
+        mark_shadow_string_ref(string);
+#endif
         STRING_REFS(string)++;
         free_string(string);
+#endif
     }
 }
 
 /*-------------------------------------------------------------------------*/
 static void
-note_sentence_ref (struct sentence *p)
+note_action_ref (action_t *p)
 
 /* Mark the strings of function and verb of all sentences in list <p>.
  */
@@ -609,13 +686,13 @@ note_sentence_ref (struct sentence *p)
             MARK_STRING_REF(p->function);
         if (p->verb)
             MARK_STRING_REF(p->verb);
-        NOTE_REF(p);
-    } while ( NULL != (p = p->next) );
+        note_ref(p);
+    } while ( NULL != (p = (action_t *)p->sent.next) );
 }
 
 /*-------------------------------------------------------------------------*/
 static void
-count_ref_in_closure (struct svalue *csvp)
+count_ref_in_closure (svalue_t *csvp)
 
 /* Count the reference to closure <csvp> and all referenced data.
  * Closures using a destructed object are stored in the stale_ lists
@@ -623,7 +700,7 @@ count_ref_in_closure (struct svalue *csvp)
  */
 
 {
-    struct lambda *l = csvp->u.lambda;
+    lambda_t *l = csvp->u.lambda;
     ph_int type = csvp->x.closure_type;
 
     if (!l->ref)
@@ -639,7 +716,7 @@ count_ref_in_closure (struct svalue *csvp)
         }
         else
         {
-            csvp->x.closure_type = F_UNDEF-F_OFFSET+CLOSURE_EFUN;
+            csvp->x.closure_type = F_UNDEF+CLOSURE_EFUN;
             csvp->u.ob = master_ob;
             master_ob->ref++;
         }
@@ -652,7 +729,7 @@ count_ref_in_closure (struct svalue *csvp)
 
     if (type != CLOSURE_UNBOUND_LAMBDA)
     {
-        struct object *ob;
+        object_t *ob;
 
         ob = l->ob;
         if (ob->flags & O_DESTRUCTED
@@ -662,12 +739,12 @@ count_ref_in_closure (struct svalue *csvp)
             l->ref = -1;
             if (type == CLOSURE_LAMBDA)
             {
-                l->ob = (struct object *)stale_lambda_closures;
+                l->ob = (object_t *)stale_lambda_closures;
                 stale_lambda_closures = l;
             }
             else
             {
-                l->ob = (struct object *)stale_misc_closures;
+                l->ob = (object_t *)stale_misc_closures;
                 stale_misc_closures = l;
                 if (type == CLOSURE_ALIEN_LFUN)
                 {
@@ -686,7 +763,7 @@ count_ref_in_closure (struct svalue *csvp)
             }
             else
             {
-                csvp->x.closure_type = F_UNDEF-F_OFFSET+CLOSURE_EFUN;
+                csvp->x.closure_type = F_UNDEF+CLOSURE_EFUN;
                 csvp->u.ob = master_ob;
                 master_ob->ref++;
             }
@@ -706,24 +783,24 @@ count_ref_in_closure (struct svalue *csvp)
     if (CLOSURE_HAS_CODE(type))
     {
         mp_int num_values;
-        struct svalue *svp;
+        svalue_t *svp;
 
-        svp = (struct svalue *)l;
+        svp = (svalue_t *)l;
         if ( (num_values = EXTRACT_UCHAR(l->function.code)) == 0xff)
-            num_values = svp[-0xff].u.number;
+            num_values = svp[-0x100].u.number;
         svp -= num_values;
-        NOTE_REF(svp);
+        note_ref(svp);
         count_ref_in_vector(svp, (size_t)num_values);
     }
     else
     {
-        NOTE_REF(l);
+        note_ref(l);
         if (type == CLOSURE_BOUND_LAMBDA)
         {
-            struct lambda *l2 = l->function.lambda;
+            lambda_t *l2 = l->function.lambda;
 
             if (!l2->ref++) {
-                struct svalue sv;
+                svalue_t sv;
 
                 sv.type = T_CLOSURE;
                 sv.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
@@ -736,7 +813,7 @@ count_ref_in_closure (struct svalue *csvp)
 
 /*-------------------------------------------------------------------------*/
 static void
-clear_ref_in_closure (struct lambda *l, ph_int type)
+clear_ref_in_closure (lambda_t *l, ph_int type)
 
 /* Clear the references in closure <l> which is of type <type>.
  */
@@ -745,17 +822,17 @@ clear_ref_in_closure (struct lambda *l, ph_int type)
     if (CLOSURE_HAS_CODE(type))
     {
         mp_int num_values;
-        struct svalue *svp;
+        svalue_t *svp;
 
-        svp = (struct svalue *)l;
+        svp = (svalue_t *)l;
         if ( (num_values = EXTRACT_UCHAR(l->function.code)) == 0xff)
-            num_values = svp[-0xff].u.number;
+            num_values = svp[-0x100].u.number;
         svp -= num_values;
         clear_ref_in_vector(svp, (size_t)num_values);
     }
     else if (type == CLOSURE_BOUND_LAMBDA)
     {
-        struct lambda *l2 = l->function.lambda;
+        lambda_t *l2 = l->function.lambda;
 
         if (l2->ref) {
             l2->ref = 0;
@@ -808,13 +885,18 @@ garbage_collection(void)
  */
 
 {
-    struct object *ob, *next_ob;
-    struct lambda *l, *next_l;
+    object_t *ob, *next_ob;
+    lambda_t *l, *next_l;
     int i;
+    long dobj_count; /* DEBUG: of Object count */
+
+    size_alloc_strings = 0;
+    num_alloc_strings = 0;
 
     /* --- Pass 0: dispose of some unnecessary stuff ---
      */
 
+printf("DEBUG: %s GC start: %ld objects in list, %ld allocated\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object); /* TODO: Remove this line */
     malloc_privilege = MALLOC_MASTER;
     RESET_LIMITS;
     CLEAR_EVAL_COST;
@@ -824,15 +906,18 @@ garbage_collection(void)
     if (obj_list_replace)
         replace_programs();
     remove_destructed_objects();
-    free_all_sent();
-    compact_mappings(num_dirty_mappings);
     free_interpreter_temporaries();
+    free_action_temporaries();
     remove_stale_call_outs();
     free_defines();
     free_all_local_names();
     remove_unknown_identifier();
     free_old_driver_hooks();
+    purge_action_sent();
+    purge_shadow_sent();
+    compact_mappings(num_dirty_mappings);
 
+printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object); /* TODO: Remove this line */
     /* --- Pass 1: clear the M_REF flag in all malloced blocks ---
      */
     clear_M_REF_flags();
@@ -843,7 +928,7 @@ garbage_collection(void)
     garbage_collection_in_progress = 2;
     if (d_flag > 3)
     {
-        debug_message("start of garbage_collection\n");
+        debug_message("%s start of garbage_collection\n", time_stamp());
     }
 
     /* Process the list of all objects */
@@ -853,7 +938,8 @@ garbage_collection(void)
 
         if (d_flag > 4)
         {
-            debug_message("clearing refs for object '%s'\n",ob->name);
+            debug_message("%s clearing refs for object '%s'\n"
+                         , time_stamp(), ob->name);
         }
         was_swapped = 0;
         if (ob->flags & O_SWAPPED
@@ -877,9 +963,9 @@ garbage_collection(void)
         clear_ref_in_vector(ob->variables, ob->prog->num_variables);
         if (ob->flags & O_SHADOW)
         {
-            struct ed_buffer *buf;
+            ed_buffer_t *buf;
 
-            if ( NULL != (buf = O_GET_SHADOW(ob)->ed_buffer) )
+            if ( NULL != (buf = O_GET_EDBUFFER(ob)) )
             {
                 clear_ed_buffer_refs(buf);
             } /* end of ed-buffer processing */
@@ -889,34 +975,29 @@ garbage_collection(void)
     }
     if (d_flag > 3)
     {
-        debug_message("ref counts referenced by obj_list cleared\n");
+        debug_message("%s ref counts referenced by obj_list cleared\n"
+                     , time_stamp());
     }
 
     /* Process the interactives */
 
     for(i = 0 ; i < MAX_PLAYERS; i++)
     {
-        struct input_to * it;
+        input_to_t * it;
 
         if (all_players[i] == NULL)
             continue;
 
-        if ( NULL != (it = all_players[i]->input_to) )
+        for ( it = all_players[i]->input_to; it != NULL; it = it->next)
         {
-            clear_ref_in_vector(it->arg, (size_t)it->num_arg);
-            if (it->ob->flags & O_DESTRUCTED && it->ob->ref)
-            {
-                it->ob->ref = 0;
-                it->ob->prog->ref = 0;
-                clear_inherit_ref(it->ob->prog);
-            }
+            clear_memory_reference(it);
+            clear_ref_in_callback(&(it->fun));
         }
         clear_ref_in_vector(&all_players[i]->prompt, 1);
 
         if ( NULL != (ob = all_players[i]->snoop_by) )
         {
-            if (!O_GET_INTERACTIVE(ob) ||
-                O_GET_INTERACTIVE(ob)->sent.type != SENT_INTERACTIVE)
+            if (!O_IS_INTERACTIVE(ob))
             {
                 /* snooping monster */
                 if (ob->flags & O_DESTRUCTED && ob->ref) {
@@ -952,6 +1033,9 @@ garbage_collection(void)
     clear_shared_string_refs();
     clear_ref_from_wiz_list();
     clear_ref_from_call_outs();
+#if defined(SUPPLY_PARSE_COMMAND)
+    clear_parse_refs();
+#endif
     clear_simul_efun_refs();
     clear_interpreter_refs();
     clear_comm_refs();
@@ -988,10 +1072,12 @@ garbage_collection(void)
             }
         }
         ob->ref++;
-        NOTE_REF(ob);
+        note_ref(ob);
 
         if (ob->prog->num_variables)
-            NOTE_REF(ob->variables);
+        {
+            note_ref(ob->variables);
+        }
 
         mark_program_ref(ob->prog);
 
@@ -999,24 +1085,30 @@ garbage_collection(void)
 
         if (ob->sent)
         {
-            struct sentence *sent;
-            struct ed_buffer *buf;
+            sentence_t *sent;
+            ed_buffer_t *buf;
 
             sent = ob->sent;
             if (ob->flags & O_SHADOW)
             {
-                NOTE_REF(sent);
-                if ( NULL != (buf = ((struct shadow_sentence *)sent)->ed_buffer) )
+                note_ref(sent);
+                if ( NULL != (buf = ((shadow_t *)sent)->ed_buffer) )
                 {
-                    NOTE_REF(buf);
+                    note_ref(buf);
                     count_ed_buffer_refs(buf);
                 } /* end of ed-buffer processing */
+
+                /* If there is a ->ip, it will be processed as
+                 * part of the player object handling below.
+                 */
+
                 sent = sent->next;
             }
-            if (sent) note_sentence_ref(sent);
+            if (sent)
+                note_action_ref((action_t *)sent);
         }
 
-        NOTE_REF(ob->name);
+        note_ref(ob->name);
         MARK_STRING_REF(ob->load_name);
 
         if (was_swapped)
@@ -1027,27 +1119,26 @@ garbage_collection(void)
 
     if (d_flag > 3)
     {
-        debug_message("obj_list evaluated\n");
+        debug_message("%s obj_list evaluated\n", time_stamp());
     }
 
     /* Process the interactives. */
 
     for(i = 0 ; i < MAX_PLAYERS; i++)
     {
-        struct input_to * it;
+        input_to_t * it;
 
         if (all_players[i] == NULL)
             continue;
 
-        NOTE_REF(all_players[i]);
+        note_ref(all_players[i]);
 
         /* There are no destructed interactives */
 
         all_players[i]->ob->ref++;
         if ( NULL != (ob = all_players[i]->snoop_by) )
         {
-            if (!O_GET_INTERACTIVE(ob) ||
-                O_GET_INTERACTIVE(ob)->sent.type != SENT_INTERACTIVE)
+            if (!O_IS_INTERACTIVE(ob))
             {
                 /* snooping monster */
                 if (ob->flags & O_DESTRUCTED) {
@@ -1059,25 +1150,14 @@ garbage_collection(void)
             }
         } /* end of snoop-processing */
 
-        if ( NULL != (it = all_players[i]->input_to) )
+        for ( it = all_players[i]->input_to; it != NULL; it = it->next)
         {
             /* To avoid calling too high-level functions, we want the
-             * struct input_to not to be freed by now.
+             * input_to_t not to be freed by now.
              * Thus, we reference the object even if it is destructed.
              */
-            NOTE_REF(it);
-            ob = it->ob;
-            if (!ob->ref)
-            {
-                /* destructed */
-                NOTE_REF(ob);
-                mark_program_ref(ob->prog);
-                NOTE_REF(ob->name);
-                MARK_STRING_REF(ob->load_name);
-            }
-            ob->ref++;
-            MARK_STRING_REF(it->function);
-            count_ref_in_vector(it->arg, (size_t)it->num_arg);
+            note_ref(it);
+            count_ref_in_callback(&(it->fun));
         } /* end of input_to processing */
 
         if ( NULL != (ob = all_players[i]->modify_command) )
@@ -1120,6 +1200,9 @@ garbage_collection(void)
     count_lex_refs();
     count_compiler_refs();
     count_simul_efun_refs();
+#if defined(SUPPLY_PARSE_COMMAND)
+    count_parse_refs();
+#endif
     note_shared_string_table_ref();
     note_otable_ref();
     count_comm_refs();
@@ -1130,13 +1213,13 @@ garbage_collection(void)
 #endif
 
     if (reserved_user_area)
-        NOTE_REF(reserved_user_area);
+        note_ref(reserved_user_area);
     if (reserved_master_area)
-        NOTE_REF(reserved_master_area);
+        note_ref(reserved_master_area);
     if (reserved_system_area)
-        NOTE_REF(reserved_system_area);
+        note_ref(reserved_system_area);
 
-    NOTE_REF(mud_lib);
+    note_ref(mud_lib);
     null_vector.ref++;
 
     /* Process the driver hooks */
@@ -1164,28 +1247,32 @@ garbage_collection(void)
      * as referenced, so we won't free it a second time in pass 6.
      */
 
+    dobj_count = 0;
     for (ob = gc_obj_list_destructed; ob; ob = next_ob)
     {
+#define W(s) write(1,s,strlen(s)) /* DEBUG: */
+W("DEBUG: GC frees destructed '"); W(ob->name); W("'\n");
         next_ob = ob->next_all;
         free_object(ob, "garbage collection");
+        dobj_count++;
     }
 
     for (l = stale_lambda_closures; l; )
     {
-        struct svalue sv;
+        svalue_t sv;
 
-        next_l = (struct lambda *)l->ob;
+        next_l = (lambda_t *)l->ob;
         l->ref = 1;
         sv.type = T_CLOSURE;
         sv.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
         sv.u.lambda = l;
-        l = (struct lambda *)l->ob;
+        l = (lambda_t *)l->ob;
         free_closure(&sv);
     }
 
     for (l = stale_misc_closures; l; l = next_l)
     {
-        next_l = (struct lambda *)l->ob;
+        next_l = (lambda_t *)l->ob;
         xfree((char *)l);
     }
 
@@ -1198,7 +1285,7 @@ garbage_collection(void)
     reallocate_reserved_areas();
     if (!reserved_user_area)
     {
-        struct svalue *res = NULL;
+        svalue_t *res = NULL;
         if (reserved_system_area)
         {
             RESET_LIMITS;
@@ -1213,10 +1300,12 @@ garbage_collection(void)
 
     reallocate_reserved_areas();
     time_last_gc = time(NULL);
+printf("DEBUG: %s GC end: %ld objects in list, %ld allocated; %ld destructed removed\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object, dobj_count); /* TODO: Remove this line */
+printf("DEBUG: %s         %ld malloced strings using %ld bytes.\n", time_stamp(), (long)num_alloc_strings, (long)size_alloc_strings); /* TODO: Remove this line */
 }
 
 
-#if defined(SMALLOC_TRACE)
+#if defined(MALLOC_TRACE)
 
 /* Some functions to print the tracing data from the memory blocks.
  * The show_ functions are called from smalloc directly.
@@ -1273,16 +1362,16 @@ show_object (int d, char *block, int depth)
  */
 
 {
-    struct object *ob;
+    object_t *ob;
 
-    ob = (struct object *)block;
+    ob = (object_t *)block;
     if (depth) {
-        struct object *o;
+        object_t *o;
 
         for (o = obj_list; o && o != ob; o = o->next_all) NOOP;
         if (!o || o->flags & O_DESTRUCTED) {
             WRITES(d, "Destructed object in block 0x");
-            writex(d, (unsigned)((unsigned *)block - SMALLOC_OVERHEAD));
+            write_x(d, (p_uint)((unsigned *)block - SMALLOC_OVERHEAD));
             WRITES(d, "\n");
             return;
         }
@@ -1303,20 +1392,20 @@ show_array(int d, char *block, int depth)
  */
 
 {
-    struct vector *a;
+    vector_t *a;
     mp_int i, j;
-    struct svalue *svp;
-    struct wiz_list *user;
+    svalue_t *svp;
+    wiz_list_t *user;
     mp_int a_size;
 
-    a = (struct vector *)block;
-    a_size = (signed)VEC_SIZE(a);
+    a = (vector_t *)block;
+    a_size = (mp_int)VEC_SIZE(a);
     if (depth && a != &null_vector)
     {
         int freed;
-        struct wiz_list *wl;
+        wiz_list_t *wl;
 
-        freed = is_freed(block, sizeof(struct vector) );
+        freed = is_freed(block, sizeof(vector_t) );
         if (!freed)
         {
             user = a->user;
@@ -1326,10 +1415,10 @@ show_array(int d, char *block, int depth)
         }
         if (freed || !wl || a_size <= 0 || a_size > MAX_ARRAY_SIZE
          || (malloced_size((char *)a) - SMALLOC_OVERHEAD) << 2 !=
-              sizeof(struct vector) + sizeof(struct svalue) * (a_size - 1) )
+              sizeof(vector_t) + sizeof(svalue_t) * (a_size - 1) )
         {
             WRITES(d, "Array in freed block 0x");
-            writex(d, (unsigned)((unsigned *)block - SMALLOC_OVERHEAD));
+            write_x(d, (p_uint)((unsigned *)block - SMALLOC_OVERHEAD));
             WRITES(d, "\n");
             return;
         }
@@ -1339,7 +1428,7 @@ show_array(int d, char *block, int depth)
         user = a->user;
     }
 
-    WRITES(d, "Array size ");writed(d, (unsigned)a_size);
+    WRITES(d, "Array size ");writed(d, (p_uint)a_size);
     WRITES(d, ", uid: ");show_string(d, user ? user->name : "0", 0);
     WRITES(d, "\n");
     if (depth > 2)
@@ -1359,7 +1448,7 @@ show_array(int d, char *block, int depth)
             break;
 
         case T_NUMBER:
-            writed(d, (unsigned)svp->u.number);
+            writed(d, (p_uint)svp->u.number);
             WRITES(d, "\n");
             break;
 
@@ -1368,7 +1457,7 @@ show_array(int d, char *block, int depth)
                   is_freed(svp->u.string, 1) )
             {
                 WRITES(d, "Malloced string in freed block 0x");
-                writex(d, (unsigned)((unsigned *)block - SMALLOC_OVERHEAD));
+                write_x(d, (p_uint)((unsigned *)block - SMALLOC_OVERHEAD));
                 WRITES(d, "\n");
                 break;
             }
@@ -1378,7 +1467,7 @@ show_array(int d, char *block, int depth)
             {
 
                 WRITES(d, "Shared string in freed block 0x");
-                writex(d, (unsigned)(
+                write_x(d, (p_uint)(
                   (unsigned *)(block-sizeof(char *)-sizeof(short))
                   - SMALLOC_OVERHEAD
                 ));
@@ -1406,7 +1495,9 @@ void
 setup_print_block_dispatcher (void)
 
 /* Setup the tracing data dispatcher in smalloc with the show_ functions
- * above.
+ * above. Remember that the data dispatcher works by storing the file
+ * and line information of sample allocations. We just have to make sure
+ * to cover all possible allocation locations.
  *
  * This is here because I like to avoid smalloc calling closures, and
  * gcollect.c is already notorious for including almost every header file
@@ -1414,12 +1505,12 @@ setup_print_block_dispatcher (void)
  */
 
 {
-    struct svalue tmp_closure;
-    struct vector *a, *b;
+    svalue_t tmp_closure;
+    vector_t *a, *b;
 
     assert_master_ob_loaded();
     tmp_closure.type = T_CLOSURE;
-    tmp_closure.x.closure_type = CLOSURE_EFUN + F_ADD - F_OFFSET;
+    tmp_closure.x.closure_type = CLOSURE_EFUN + F_ADD;
     tmp_closure.u.ob = master_ob;
     push_volatile_string("");
     push_volatile_string("");
@@ -1434,7 +1525,7 @@ setup_print_block_dispatcher (void)
     free_array(b);
     store_print_block_dispatch_info((char *)master_ob, show_object);
 }
-#endif /* SMALLOC_TRACE */
+#endif /* MALLOC_TRACE */
 
 #endif /* MALLOC_smalloc */
 
@@ -1443,7 +1534,7 @@ setup_print_block_dispatcher (void)
 /*       Default functions when not using the smalloc allocator
  */
 
-#if !defined(MALLOC_smalloc)
+#if !defined(GC_SUPPORT)
 
 void
 garbage_collection (void)
@@ -1455,20 +1546,23 @@ garbage_collection (void)
 {
     assert_master_ob_loaded();
     remove_destructed_objects();
-    free_all_sent();
-    compact_mappings(num_dirty_mappings);
     free_interpreter_temporaries();
+    free_action_temporaries();
     remove_stale_call_outs();
     free_defines();
     free_all_local_names();
     remove_unknown_identifier();
+    purge_action_sent();
+    purge_shadow_sent();
+    compact_mappings(num_dirty_mappings);
+
     reallocate_reserved_areas();
     time_last_gc = time(NULL);
 }
-#endif /* MALLOC_smalloc */
+#endif /* GC_SUPPORT */
 
 
-#if !defined(SMALLOC_TRACE) || !defined(MALLOC_smalloc)
+#if !defined(MALLOC_TRACE) || !defined(GC_SUPPORT)
 
 void setup_print_block_dispatcher (void) { NOOP }
 

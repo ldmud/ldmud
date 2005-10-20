@@ -3,7 +3,7 @@ SYNOPSIS
 
 DESCRIPTION
 	Constructs a lambda closure, like lambda function in LISP.
-	The closure is bound the creating object, and thus can contain
+	The closure is bound to the creating object, and thus can contain
 	references to global variables.
 
 	The first argument is an array describing the arguments

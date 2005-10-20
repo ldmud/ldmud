@@ -1,5 +1,5 @@
 SYNOPSIS
-	valid_query_snoop(object ob)
+	int valid_query_snoop(object ob)
 
 DESCRIPTION
 	Should return 1 if previous_object() (the one that called the

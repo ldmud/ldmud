@@ -19,3 +19,7 @@ enable_strict_euids=no
 
 enable_supply_parse_command=yes
 enable_initialization_by___init=no
+enable_use_system_crypt=no
+
+enable_erq=xerq
+

@@ -14,33 +14,36 @@
  * are the functions to save an object into a save file, and restoring
  * it from there.
  *
- * -- struct object --
+ * -- object_t --
  *
- *   struct object {
- *       unsigned short    flags;
- *       p_int             ref;
+ *   object_t {
+ *       unsigned short  flags;
+ *       p_int           ref;
 #ifdef F_SET_LIGHT
- *       short             total_light;
+ *       short           total_light;
 #endif
- *       mp_int            time_reset;
- *       mp_int            time_of_ref;
- *       mp_int            load_time;
- *       p_int             extra_ref;            (ifdef DEBUG)
- *       struct program  * prog;
- *       char            * name;
- *       char            * load_name;
- *       struct object   * next_all;
- *       struct object   * prev_all;
- *       struct object   * next_hash;
- *       struct object   * next_inv;
- *       struct object   * contains;
- *       struct object   * super;
- *       struct sentence * sent;
- *       struct wiz_list * user;
- *       struct wiz_list * eff_user;
- *       int               extra_num_variables;  (ifdef DEBUG)
- *       struct svalue   * variables;
- *       unsigned long     ticks, gigaticks;
+ *       mp_int          time_reset;
+ *       mp_int          time_of_ref;
+ *       mp_int          load_time;
+ *       p_int           load_id;
+ *       p_int           extra_ref;            (ifdef DEBUG)
+ *       program_t     * prog;
+ *       char          * name;
+ *       char          * load_name;
+ *       object_t      * next_all;
+ *       object_t      * prev_all;
+ *       object_t      * next_hash;
+ *       object_t      * next_inv;
+ *       object_t      * contains;
+ *       object_t      * super;
+ * TODO: The environment members (plus light) could be put into a special
+ * TODO:: sentence and thus concentrated in a separated source file.
+ *       sentence_t    * sent;
+ *       wiz_list_t    * user;
+ *       wiz_list_t    * eff_user;
+ *       int             extra_num_variables;  (ifdef DEBUG)
+ *       svalue_t      * variables;
+ *       unsigned long   ticks, gigaticks;
  *   }
  *
  * The .flags collect some vital information about the object:
@@ -63,7 +66,7 @@
  *
  * .ref counts the number of references to this object: it is this count
  * which can keep a destructed object around. Destructed objects are
- * stripped of everything but the basic struct object, but this one
+ * stripped of everything but the basic object_t, but this one
  * is kept until the last reference is gone.
  *
  * .time_of_ref is the time() of the last apply on this object. The swapper
@@ -80,9 +83,11 @@
  * in the reset_table sorted by their time_reset. The .next_reset pointer
  * is used to built the table.
  *
- * .load_time simply is the time when the object was created.
+ * .load_time simply is the time when the object was created. .load_id
+ * serves to determine the creation order of objects created at the
+ * same .load_time - this is used mostly for efuns like clones().
  *
- * .prog is a pointer to the struct programm, the bunch of bytecode for
+ * .prog is a pointer to the program_tm, the bunch of bytecode for
  * this object. The program is shared between the master object (the
  * blueprint) and its clones. It is possible to replace the program
  * of a single object with a different one, but special care has
@@ -107,10 +112,8 @@
  * .sent is the list of annotations to the object. Primary use is to
  * hold the list of commands ("sentences") defined by this object. Just
  * the first entry in this list has a special role: if the object is
- * shadowed, it is a "shadow_sentence" and keeps the list of shadows,
- * if the object is interactive, it is a "struct interactive" which
- * the comm.c module uses to store its data in. The interactive struct
- * also doubles as shadow_sentence.
+ * shadowed, interactive, or using the editor, it is a "shadow_t"
+ * and keeps the list of shadows resp. the other information.
  *
  * .user points to the wizlist entry of the wizard who 'owns' this
  * object. The entry is used to collect several stats for this user.
@@ -151,7 +154,8 @@
  */
 
 #include "driver.h"
-
+#include "typedefs.h"
+ 
 #include "my-alloca.h"
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -159,6 +163,7 @@
 #include <fcntl.h>
 
 #define NO_REF_STRING
+#define USES_SVALUE_STRLEN
 #include "object.h"
 
 #include "actions.h"
@@ -176,14 +181,21 @@
 #include "ptrtable.h"
 #include "random.h"
 #include "sent.h"
+#include "smalloc.h"
 #include "simulate.h"
+#include "stdstrings.h"
 #include "stralloc.h"
+#include "strfuns.h"
 #include "swap.h"
+#include "svalue.h"
 #include "wiz_list.h"
+#include "xalloc.h"
+
+#include "../mudlib/sys/driver_hook.h"
 
 /*-------------------------------------------------------------------------*/
 
-struct replace_ob *obj_list_replace = NULL;
+replace_ob_t *obj_list_replace = NULL;
   /* List of scheduled program replacements.
    */
 
@@ -192,7 +204,7 @@ int tot_alloc_object_size = 0;
   /* Total number of allocated object, and the sum of memory they use.
    */
 
-struct object NULL_object = { 0 };
+object_t NULL_object = { 0 };
   /* static null object for initialisations. memset() is not sufficient
    * because some machines (e.g. Bull) have a (char*)0 which is not
    * binary zero. Structure assignment otoh works.
@@ -200,7 +212,7 @@ struct object NULL_object = { 0 };
 
 /*-------------------------------------------------------------------------*/
 void
-_free_object (struct object *ob)
+_free_object (object_t *ob)
 
 /* Deallocate/dereference all memory and structures held by <ob>.
  * At the time of call, the object must be have no refcounts lefts,
@@ -217,9 +229,9 @@ _free_object (struct object *ob)
         fatal("Object with %ld refs passed to _free_object()\n", ob->ref);
 
     if (d_flag)
-        printf("free_object: %s.\n", ob->name);
+        printf("%s free_object: %s.\n", time_stamp(), ob->name);
 
-    /* Freeing a non-destruct object should never happen */
+    /* Freeing a non-destructed object should never happen */
 
     if (!(ob->flags & O_DESTRUCTED)) {
         fatal("Object 0x%lx %s ref count 0, but not destructed.\n"
@@ -236,10 +248,10 @@ _free_object (struct object *ob)
      */
     if (ob->prog)
     {
-        struct program *prog = ob->prog;
+        program_t *prog = ob->prog;
         tot_alloc_object_size -=
-            prog->num_variables * sizeof (struct svalue) +
-            sizeof (struct object);
+            prog->num_variables * sizeof (svalue_t) +
+            sizeof (object_t);
         free_prog(prog, MY_TRUE);
         ob->prog = NULL;
     }
@@ -248,9 +260,10 @@ _free_object (struct object *ob)
     if (ob->name)
     {
         if (d_flag > 1)
-            debug_message("Free object %s\n", ob->name);
+            debug_message("%s Free object %s\n", time_stamp(), ob->name);
         if (lookup_object_hash(ob->name) == ob)
             fatal("Freeing object %s but name still in name table\n", ob->name);
+        tot_alloc_object_size -= strlen(ob->name)+1;
         xfree(ob->name);
         ob->name = NULL;
     }
@@ -270,15 +283,15 @@ _free_object (struct object *ob)
 /*-------------------------------------------------------------------------*/
 #ifdef INITIALIZATION_BY___INIT
 
-struct object *
+object_t *
 get_empty_object (int num_var)
 
 #else
 
-struct object *
+object_t *
 get_empty_object ( int num_var
-                 , struct variable *variables
-                 , struct svalue *initializers)
+                 , variable_t *variables
+                 , svalue_t *initializers)
 
 #endif
 
@@ -290,26 +303,29 @@ get_empty_object ( int num_var
  *          in <initializers>. Both <variables> and <initializers>
  *          are arrays of size <num_var>.
  *
- * !__INIT: All variables are set to 0.
+ *  __INIT: All variables are set to 0.
  */
 
 {
-    struct object *ob;
-    size_t size = sizeof (struct object);
-    size_t size2 = num_var * sizeof (struct svalue);
+static mp_int last_time = 0;
+static mp_int last_id = 0;
+
+    object_t *ob;
+    size_t size = sizeof (object_t);
+    size_t size2 = num_var * sizeof (svalue_t);
     int i;
-    struct svalue *ob_vars;
+    svalue_t *ob_vars;
 
     /* Allocate the object structure */
 
-    if ( !(ob = (struct object *)xalloc(size)) )
+    if ( !(ob = xalloc(size)) )
         return NULL;
 
     ob_vars = NULL;
 
     /* Allocated the variable block */
 
-    if (size2 && !(ob_vars = (struct svalue *)xalloc(size2)) )
+    if (size2 && !(ob_vars = xalloc(size2)) )
     {
         xfree(ob);
         return NULL;
@@ -323,6 +339,13 @@ get_empty_object ( int num_var
     *ob = NULL_object;
     ob->ref = 1;
     ob->load_time = current_time;
+    if (last_time == current_time)
+        ob->load_id = ++last_id;
+    else
+    {
+        ob->load_id = last_id = 0;
+        last_time = current_time;
+    }
 #ifdef DEBUG
     ob->extra_num_variables = num_var;
 #endif
@@ -338,11 +361,12 @@ get_empty_object ( int num_var
             assign_svalue_no_free(&ob_vars[i], &initializers[i]);
         } else
 #endif
+        {
             ob_vars[i] = const0;
+        }
     }
 
     /* That's it. */
-
     return ob;
 }  /* get_empty_object() */
 
@@ -359,8 +383,8 @@ remove_all_objects (void)
  */
 
 {
-    struct object *ob;
-    struct svalue v;
+    object_t *ob;
+    svalue_t v;
 
     v.type = T_OBJECT;
     for (ob = obj_list; ob; ob = ob->next_all)
@@ -381,7 +405,7 @@ remove_all_objects (void)
 
 /*-------------------------------------------------------------------------*/
 void
-reference_prog (struct program *progp, char *from)
+reference_prog (program_t *progp, char *from)
 
 /* Increment the refcount of program <progp>, called from location <from>.
  */
@@ -389,14 +413,14 @@ reference_prog (struct program *progp, char *from)
 {
     progp->ref++;
     if (d_flag)
-        printf("reference_prog: %s ref %ld (%s)\n",
-            progp->name, progp->ref, from);
+        printf("%s reference_prog: %s ref %ld (%s)\n"
+              , time_stamp(), progp->name, progp->ref, from);
 }
 
 /*-------------------------------------------------------------------------*/
 void
 do_free_sub_strings (int num_strings,   char **strings
-                    ,int num_variables, struct variable *variable_names
+                    ,int num_variables, variable_t *variable_names
                     )
 
 /* Free a bunch of shared strings used in connection with an object:
@@ -422,7 +446,7 @@ do_free_sub_strings (int num_strings,   char **strings
 
 /*-------------------------------------------------------------------------*/
 void
-free_prog (struct program *progp, Bool free_sub_strings)
+free_prog (program_t *progp, Bool free_sub_strings)
 
 /* Decrement the refcount for program <progp>. If it reaches 0, the program
  * is freed.
@@ -447,7 +471,7 @@ free_prog (struct program *progp, Bool free_sub_strings)
         return;
 
     if (d_flag)
-        printf("free_prog: %s\n", progp->name);
+        printf("%s free_prog: %s\n", time_stamp(), progp->name);
     if (progp->ref < 0)
         fatal("Negative ref count for prog ref.\n");
 
@@ -472,7 +496,7 @@ free_prog (struct program *progp, Bool free_sub_strings)
     {
         int i;
         bytecode_p program;
-        /* TODO: funflags */ uint32 *functions;
+        funflag_t *functions;
 
         /* Remove the swap entry */
         if (progp->swap_num != -1)
@@ -489,8 +513,8 @@ free_prog (struct program *progp, Bool free_sub_strings)
                 char *name;
 
                 memcpy(
-                  (char *)&name,
-                  &FUNCTION_NAME(program + (functions[i] & FUNSTART_MASK)),
+                  &name,
+                  FUNCTION_NAMEP(program + (functions[i] & FUNSTART_MASK)),
                   sizeof name
                 );
                 free_string(name);
@@ -507,6 +531,7 @@ free_prog (struct program *progp, Bool free_sub_strings)
             free_prog(progp->inherit[i].prog, MY_TRUE);
 
         /* Free the program name */
+        total_prog_block_size -= strlen(progp->name)+1;
         xfree(progp->name);
     }
 
@@ -516,7 +541,7 @@ free_prog (struct program *progp, Bool free_sub_strings)
 
 /*-------------------------------------------------------------------------*/
 void
-reset_object (struct object *ob, int arg)
+reset_object (object_t *ob, int arg)
 
 /* Depending on <arg>, call one of the initialisation functions in <ob>.
  * The actual function is given in <arg> through its hook index.
@@ -548,7 +573,7 @@ reset_object (struct object *ob, int arg)
     /* Be sure to update time first ! */
     if (time_to_reset > 0)
         ob->time_reset = current_time + time_to_reset/2
-                         + (signed)random_number((unsigned)time_to_reset/2);
+                         + (mp_int)random_number((uint32)time_to_reset/2);
 
 #ifdef INITIALIZATION_BY___INIT
 
@@ -564,7 +589,7 @@ reset_object (struct object *ob, int arg)
 
     if (closure_hook[arg].type == T_CLOSURE)
     {
-        struct lambda *l;
+        lambda_t *l;
 
         l = closure_hook[arg].u.lambda;
         if (l->function.code[1] && arg != H_RESET)
@@ -609,29 +634,29 @@ reset_object (struct object *ob, int arg)
 void
 replace_programs (void)
 
-/* Called from backend::remove_destructed_objects(), this function
+/* Called from the backend loop, this function
  * performs all pending program replacements listed in obj_list_replace.
  *
  * If the function runs out of memory, the processing ends at that point
  * and will be retried in the next call.
  *
- * Sideeffects of this action are: the objects are marked as clones,
+ * Sideeffects of this action are: the objects are marked as 'replaced',
  * and current shadows are removed.
  */
 
 {
-    struct replace_ob *r_ob, *r_next;  /* List pointers */
-    struct svalue *svp;
+    replace_ob_t *r_ob, *r_next;  /* List pointers */
+    svalue_t *svp;
     int i, j;
 
 #ifdef DEBUG
     if (d_flag)
-        debug_message("start of replace_programs\n");
+        debug_message("%s start of replace_programs\n", time_stamp());
 #endif
 
     for (r_ob = obj_list_replace; r_ob; r_ob = r_next)
     {
-        struct program *old_prog;
+        program_t *old_prog;
 
         /* Swap in the program. This can't fail when called during
          * a garbage collection because then the malloc privilege
@@ -645,30 +670,38 @@ replace_programs (void)
 
         /* If the number of variables changes, allocate a new variables
          * block and copy the old values over as far as possible.
-         * Note that the change can only be a reduction.
+         * Note that the change can only be a reduction, and that
+         * the new program may not have variables at all. However, if
+         * 'i' is not 0, the old program is guaranteed to have vars.
          */
         i = r_ob->ob->prog->num_variables - r_ob->new_prog->num_variables;
         if (i)
         {
-            struct svalue *new_vars;
+            svalue_t *new_vars;
 
             /* Get the memory */
-            new_vars = xalloc(  r_ob->new_prog->num_variables
-                              * sizeof *new_vars);
 
-            if (!new_vars)
+            if (r_ob->new_prog->num_variables)
             {
-                obj_list_replace = r_ob;
-                return; /* Hope for more memory next time... */
+                new_vars = xalloc(  r_ob->new_prog->num_variables
+                                  * sizeof *new_vars);
+
+                if (!new_vars)
+                {
+                    obj_list_replace = r_ob;
+                    return; /* Hope for more memory next time... */
+                }
             }
+            else
+                new_vars = NULL;
 #ifdef DEBUG
             if (d_flag)
-                debug_message("%d less variables\n",i);
+                debug_message("%s %d less variables\n", time_stamp(), i);
             r_ob->ob->extra_num_variables = r_ob->new_prog->num_variables;
 #endif
 
             /* Adjust the statistics */
-            tot_alloc_object_size -= i * sizeof(struct svalue[1]);
+            tot_alloc_object_size -= i * sizeof(svalue_t[1]);
 
             svp = r_ob->ob->variables; /* the old variables */
 
@@ -679,32 +712,35 @@ replace_programs (void)
 
 #ifdef DEBUG
             if (d_flag)
-                debug_message("freeing %d variables:\n",j);
+                debug_message("%s freeing %d variables:\n", time_stamp(), j);
 #endif
             while (--j >= 0) free_svalue(svp++);
 #ifdef DEBUG
             if (d_flag)
-                debug_message("freed.\n");
+                debug_message("%s freed.\n", time_stamp());
 #endif
 
             /* Copy the others */
             j = r_ob->new_prog->num_variables;
-            memcpy(
-                (char *)new_vars,
-                (char *)svp,
-                j * sizeof(struct svalue[1])
-            );
-            svp += j;
+            if (j)
+            {
+                memcpy(
+                    (char *)new_vars,
+                    (char *)svp,
+                    j * sizeof(svalue_t[1])
+                );
+                svp += j;
+            }
 #ifdef DEBUG
             if (d_flag)
-                debug_message("freeing %d variables:\n",i);
+                debug_message("%s freeing %d variables:\n", time_stamp(), i);
 #endif
 
             /* Deref the remaining non-copied variables */
             while (--i >= 0) free_svalue(svp++);
 #ifdef DEBUG
             if (d_flag)
-                debug_message("freed.\n");
+                debug_message("%s freed.\n", time_stamp());
 #endif
 
             /* Free the old variable block and set the new one */
@@ -732,14 +768,14 @@ replace_programs (void)
 
 #ifdef DEBUG
         if (d_flag)
-            debug_message("program freed.\n");
+            debug_message("%s program freed.\n", time_stamp());
 #endif
 
         /* Remove current shadows */
 
         if (r_ob->ob->flags & O_SHADOW)
         {
-            struct shadow_sentence *shadow_sent;
+            shadow_t *shadow_sent;
 
             if ((shadow_sent = O_GET_SHADOW(r_ob->ob))->shadowing)
             {
@@ -766,7 +802,7 @@ replace_programs (void)
                 shadow_sent->shadowing = NULL;
             }
         }
-        xfree((char *)r_ob);
+        xfree(r_ob);
     }
 
     /* Done with the list */
@@ -774,14 +810,14 @@ replace_programs (void)
 
 #ifdef DEBUG
     if (d_flag)
-        debug_message("end of replace_programs\n");
+        debug_message("%s end of replace_programs\n", time_stamp());
 #endif
 
 }  /* replace_programs() */
 
 /*-------------------------------------------------------------------------*/
 void
-tell_npc (struct object *ob, char *str)
+tell_npc (object_t *ob, char *str)
 
 /* Call the lfun 'catch_tell()' in object <ob> with <str> as argument.
  *
@@ -796,7 +832,7 @@ tell_npc (struct object *ob, char *str)
 
 /*-------------------------------------------------------------------------*/
 void
-tell_object (struct object *ob, char *str)
+tell_object (object_t *ob, char *str)
 
 /* Send message <str> to object <ob>. If <ob> is an interactive player,
  * it will go to his screen (unless a shadow catches it - see shadow_catch_
@@ -805,15 +841,14 @@ tell_object (struct object *ob, char *str)
  */
 
 {
-    struct object *save_command_giver;
-    struct interactive *ip;
+    object_t *save_command_giver;
+    interactive_t *ip;
 
     if (ob->flags & O_DESTRUCTED)
         return;
 
-    if (NULL != (ip = O_GET_INTERACTIVE(ob))
-     && ip->sent.type == SENT_INTERACTIVE)
-     {
+    if (O_SET_INTERACTIVE(ip, ob))
+    {
         save_command_giver = command_giver;
         command_giver = ob;
         add_message("%s", str);
@@ -825,13 +860,16 @@ tell_object (struct object *ob, char *str)
 
 /*-------------------------------------------------------------------------*/
 Bool
-shadow_catch_message (struct object *ob, char *str)
+shadow_catch_message (object_t *ob, char *str)
 
-
-/* Called by comm:add_message() when it is detected that the
- * interactive object <ob> is shadowed. This function checks all shadows
- * of <ob> if they contain the lfun catch_tell(), and calls the lfun
- * in the first shadow where it exists with message <str> as argument.
+/* Called by comm:add_message() to handle the case that messages <str> sent
+ * to interactive objects <ob> are to be delivered to shadows of the
+ * OR to a function in the interactive itself.
+ *
+ * This function checks all shadows of <ob> if they contain the lfun
+ * catch_tell(), and calls the lfun in the first shadow where it exists
+ * with message <str> as argument.
+ *
  * Result is true if there is such a function, and false if not. In
  * the latter case, the flag ob->ip.catch_tell_activ is cleared to
  * speed up later calls.
@@ -842,13 +880,17 @@ shadow_catch_message (struct object *ob, char *str)
  * Beware that one of the shadows may be the originator of the message,
  * which means that we must not send the message to that shadow, or any
  * shadows in the linked list before that shadow.
+ *
+ * If the interactive user itself contains the lfun catch_tell(), the
+ * messages counts as caught, too.
  */
+
 {
-    struct interactive *ip;
+    interactive_t *ip;
 
     ip = O_GET_INTERACTIVE(ob);
 
-    if (!ip->catch_tell_activ || ob == current_object)
+    if (!ip || !ip->catch_tell_activ || ob == current_object)
         return MY_FALSE;
 
     trace_level |= ip->trace_level;
@@ -867,11 +909,11 @@ shadow_catch_message (struct object *ob, char *str)
         ip->catch_tell_activ = MY_FALSE;
     }
     return MY_FALSE;
-}
+} /* shadow_catch_message() */
 
 /*-------------------------------------------------------------------------*/
 static void
-clear_program_id (struct program *p)
+clear_program_id (program_t *p)
 
 /* Clear the id_number of program <p> and all inherited programs.
  */
@@ -891,7 +933,7 @@ clear_program_id (struct program *p)
 
 /*-------------------------------------------------------------------------*/
 static void
-renumber_program (struct program *p)
+renumber_program (program_t *p)
 
 /* Renumber program <p> and all inherited programs.
  * Assumes that all id_numbers have been cleared before.
@@ -921,7 +963,7 @@ renumber_programs (void)
  */
 
 {
-    struct object *ob;
+    object_t *ob;
 
     current_id_number = 0;
     for (ob = obj_list; ob; ob = ob->next_all)
@@ -950,8 +992,7 @@ renumber_programs (void)
 /*=========================================================================*/
 /*                        Save/Restore an Object                           */
 
-/* TODO: Adapt these functions so that saving/restoring of single variables
- * TODO:: to strings are possible.
+/*
  * TODO: The function don't work properly if an object contains several
  * TODO:: variables of the same name, and their order/location in the
  * TODO:: variable block change between save and restore.
@@ -988,13 +1029,13 @@ renumber_programs (void)
 /*-------------------------------------------------------------------------*/
 /* Forward Declarations */
 
-static void save_svalue(struct svalue *, char);
-static void save_array(struct vector *);
+static Bool save_svalue(svalue_t *, char, Bool);
+static void save_array(vector_t *);
 static int restore_size(char **str);
-INLINE static Bool restore_array(struct svalue *, char **str);
-static int restore_svalue(struct svalue *, char **, char);
-static void register_array(struct vector *);
-static void register_mapping (struct mapping *map);
+INLINE static Bool restore_array(svalue_t *, char **str);
+static int restore_svalue(svalue_t *, char **, char);
+static void register_array(vector_t *);
+static void register_mapping (mapping_t *map);
 
 /*-------------------------------------------------------------------------*/
 
@@ -1007,11 +1048,7 @@ static const char save_file_suffix[] = ".o";
    * (sizeof() vs. strlen().
    */
 
-#if defined(MSDOS_FS)
-static int old_format;
-#endif
-
-static struct pointer_table *ptable;
+static struct pointer_table *ptable = NULL;
   /* The pointer_table used to register all arrays and mappings.
    */
 
@@ -1020,7 +1057,7 @@ static char number_buffer[36];
    */
 
 static char *save_object_bufstart;
-  /* Start of the write buffer.
+  /* Start of the write buffer (which lives on the stack).
    */
 
 static char *buf_pnt;
@@ -1032,15 +1069,19 @@ static int buf_left;
    */
 
 static mp_int bytes_written;
-  /* Number of bytes so far written to the file.
+  /* Number of bytes so far written to the file or strbuf.
    */
 
 static Bool failed;
   /* An IO error occured.
    */
 
-static int save_object_descriptor;
-  /* FD of the savefile.
+static int save_object_descriptor = -1;
+  /* FD of the savefile, -1 if not assigned.
+   */
+
+static strbuf_t save_string_buffer;
+  /* When saving to a string: the string buffer.
    */
 
 static mp_int current_sv_id_number;
@@ -1056,7 +1097,7 @@ static long current_shared_restored;
   /* ID of the shared value currently restored
    */
 
-static struct svalue *shared_restored_values;
+static svalue_t *shared_restored_values = NULL;
   /* Array of restored shared values, so that later references
    * can do a simple lookup by ID-1 (IDs start at 1).
    */
@@ -1084,8 +1125,8 @@ static long max_shared_restored;
  * through local variables to achieve a greater speed:
  */
 
-#define L_PUTC_PROLOG register char *l_buf_pnt = buf_pnt;\
-                      register int  l_buf_left = buf_left;
+#define L_PUTC_PROLOG char *l_buf_pnt = buf_pnt;\
+                      int  l_buf_left = buf_left;
 /* Declare and initialize the local variables.
  */
 
@@ -1113,7 +1154,7 @@ static char*
 write_buffer (void)
 
 /* Write the current content of the write buffer to the savefile
- * and return a pointer to its start.
+ * resp. to the string buffer and return a pointer to its start.
  *
  * On an error, set failed to TRUE.
  */
@@ -1122,9 +1163,16 @@ write_buffer (void)
     char *start;
 
     start = save_object_bufstart;
-    if (write( save_object_descriptor, start, SAVE_OBJECT_BUFSIZE )
-      != SAVE_OBJECT_BUFSIZE )
-        failed = MY_TRUE;
+    if (save_object_descriptor >= 0)
+    {
+    
+        if (write( save_object_descriptor, start, SAVE_OBJECT_BUFSIZE )
+          != SAVE_OBJECT_BUFSIZE )
+            failed = MY_TRUE;
+    }
+    else
+        strbuf_addn(&save_string_buffer, start, SAVE_OBJECT_BUFSIZE);
+
     bytes_written += SAVE_OBJECT_BUFSIZE;
     return start;
 } /* write_buffer() */
@@ -1201,7 +1249,7 @@ recall_pointer (void *pointer)
     }
 
     /* NOTREACHED */
-}
+} /* recall_pointer() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1239,7 +1287,7 @@ save_string (char *src)
 
 /*-------------------------------------------------------------------------*/
 static void
-save_mapping_filter (struct svalue *key, struct svalue *data, void *extra)
+save_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
 
 /* Filter used by save_mapping: write <key> and (p_int)<extra> values
  * in <data>[] to the write buffer.
@@ -1249,14 +1297,16 @@ save_mapping_filter (struct svalue *key, struct svalue *data, void *extra)
     int i;
 
     i = (p_int)extra;
-    save_svalue(key, (char)(i ? ':' : ',') );
-    while (--i >= 0)
-        save_svalue(data++, (char)(i ? ';' : ',') );
+    if (save_svalue(key, (char)(i ? ':' : ','), MY_TRUE))
+    {
+        while (--i >= 0)
+            save_svalue(data++, (char)(i ? ';' : ','), MY_FALSE );
+    }
 }
 
 /*-------------------------------------------------------------------------*/
 static void
-save_mapping (struct mapping *m)
+save_mapping (mapping_t *m)
 
 /* Write the mapping <m> to the write buffer.
  * Empty mappings with width != 1 are written as '([:<width>])'.
@@ -1299,7 +1349,7 @@ save_mapping (struct mapping *m)
 
 /*-------------------------------------------------------------------------*/
 static void
-register_mapping_filter (struct svalue *key, struct svalue *data, void *extra)
+register_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
 
 /* Callback to register one mapping entry of (p_int)<extra> values.
  */
@@ -1331,7 +1381,7 @@ register_mapping_filter (struct svalue *key, struct svalue *data, void *extra)
 
 /*-------------------------------------------------------------------------*/
 static void
-register_mapping (struct mapping *map)
+register_mapping (mapping_t *map)
 
 /* Register the mapping <map> in the pointer table. If it was not
  * in there, also register all array/mapping values.
@@ -1344,14 +1394,20 @@ register_mapping (struct mapping *map)
 }
 
 /*-------------------------------------------------------------------------*/
-static void
-save_svalue (struct svalue *v, char delimiter)
+static Bool
+save_svalue (svalue_t *v, char delimiter, Bool writable)
 
 /* Encode the value <v> and write it to the write buffer, terminate
  * the output with <delimiter>.
+ * If <writable> is false, unwritable svalues like objects are written
+ * as '0'. If <writable> is true, unwritable svalues are not written at all.
+ *
+ * Return is true if something was written, and false otherwise.
  */
 
 {
+    Bool rc = MY_TRUE;
+
     switch(v->type)
     {
     case T_STRING:
@@ -1373,7 +1429,7 @@ save_svalue (struct svalue *v, char delimiter)
         do L_PUTC(c) while ( '\0' != (c = *source++) );
         L_PUTC(delimiter);
         L_PUTC_EPILOG
-        return;
+        return rc;
     }
 
     case T_FLOAT:
@@ -1394,7 +1450,7 @@ save_svalue (struct svalue *v, char delimiter)
         do L_PUTC(c) while ( '\0' != (c = *source++) );
         L_PUTC(delimiter);
         L_PUTC_EPILOG
-        return;
+        return rc;
       }
 
     case T_MAPPING:
@@ -1404,27 +1460,35 @@ save_svalue (struct svalue *v, char delimiter)
     default:
       {
         /* Objects and closures can't be saved */
-        L_PUTC_PROLOG
-        L_PUTC('0');
-        L_PUTC(delimiter);
-        L_PUTC_EPILOG
-        return;
+        if (writable)
+            rc = MY_FALSE;
+        else
+        {
+            L_PUTC_PROLOG
+            L_PUTC('0');
+            L_PUTC(delimiter);
+            L_PUTC_EPILOG
+        }
+        return rc;
       }
     }
 
-    MY_PUTC(delimiter);
+    if (rc)
+        MY_PUTC(delimiter);
+
+    return rc;
 }  /* save_svalue() */
 
 /*-------------------------------------------------------------------------*/
 static void
-save_array (struct vector *v)
+save_array (vector_t *v)
 
 /* Encode the array <v> and write it to the write buffer.
  */
 
 {
     long i;
-    struct svalue *val;
+    svalue_t *val;
 
     /* Recall the array from the pointer table.
      * If it is a shared one, there's nothing else to do.
@@ -1441,9 +1505,9 @@ save_array (struct vector *v)
     }
 
     /* ... the values ... */
-    for (i = (signed)VEC_SIZE(v), val = v->item; --i >= 0; )
+    for (i = (long)VEC_SIZE(v), val = v->item; --i >= 0; )
     {
-        save_svalue(val++, ',');
+        save_svalue(val++, ',', MY_FALSE);
     }
 
     /* ... and the '})' */
@@ -1457,21 +1521,21 @@ save_array (struct vector *v)
 
 /*-------------------------------------------------------------------------*/
 static void
-register_array (struct vector *vec)
+register_array (vector_t *vec)
 
 /* Register the array <vec> in the pointer table. If it was not
  * in there, also register all array/mapping values.
  */
 
 {
-    struct svalue *v;
+    svalue_t *v;
     long i;
 
     if (NULL == register_pointer(ptable, vec))
         return;
 
     v = vec->item;
-    for (i = (signed)VEC_SIZE(vec); --i >= 0; v++)
+    for (i = (long)VEC_SIZE(vec); --i >= 0; v++)
     {
         if (v->type == T_POINTER)
         {
@@ -1485,16 +1549,28 @@ register_array (struct vector *vec)
 } /* register_array() */
 
 /*-------------------------------------------------------------------------*/
-void
-save_object (struct object *ob, char *file)
+svalue_t *
+f_save_object (svalue_t *sp, int numarg)
 
-/* Save the variables of object <ob> to the file <file> (the suffix ".o"
- * will be appended.
+/* VEFUN save_object()
+ *
+ *   int    save_object (string file)
+ *   string save_object ()
+ *
+ * Save the variables of the current object to the file <file> (the suffix
+ * ".o" will be appended. Returns 0 if the save file could be created,
+ * and non-zero otherwise (file could not be written, or current object
+ * is destructed).
  *
  * The <file>.o will not be written immediately: first the savefile will
  * be created as <file>.o.tmp, which is after completion renamed to <file>.o.
  *
  * The validity of the filename is checked with a call to check_valid_path().
+ *
+ * In the second form, the a string with all variables and values is
+ * returned directly, or 0 if an error occurs. This string can be used
+ * with restore_object() to restore the variable values.
+ * TODO: "save_object()" looks nice, but maybe call that "save_variables()"?
  */
 
 {
@@ -1504,6 +1580,13 @@ save_object (struct object *ob, char *file)
       /* The version string to write
        */
 
+    object_t *ob;
+      /* The object to save - just a local copy of current_object.
+       */
+    char *file;
+      /* The filename read from the stack, NULL if not saving
+       * to a file.
+       */
     char *name;
       /* Buffer for the final and the temporary filename.
        * name itself points to the final filename.
@@ -1517,63 +1600,140 @@ save_object (struct object *ob, char *file)
     long len;
     int i;
     int f;
-    struct svalue *v;
-    struct variable *names;
+    svalue_t *v;
+    variable_t *names;
 
+    f = -1;
+    file = NULL;
+    name = NULL;
+    tmp_name = NULL;
+    
+    /* Test the arguments */
+    if (!numarg)
+    {
+        strbuf_zero(&save_string_buffer);
+    }
+    else if (sp->type != T_STRING)
+    {
+        bad_xefun_arg(1, sp);
+        /* NOTREACHED */
+        return sp;
+    }
+    else
+      file = sp->u.string;
+    
     /* No need in saving destructed objects */
 
+    ob = current_object;
     if (ob->flags & O_DESTRUCTED)
-        return;
+    {
+        if (numarg)
+            free_string_svalue(sp);
+        else
+            sp++;
+        put_number(sp, 0);
+        return sp;
+    }
+
+    /* If saving to a file, get the proper name and open it
+     */
+    if (file)
+    {
+        /* Get a valid filename */
+
+        file = check_valid_path(file, ob, "save_object", MY_TRUE);
+        if (file == NULL)
+        {
+            error("Illegal use of save_object()\n");
+            /* NOTREACHED */
+            return sp;
+        }
 
 
-    /* Get a valid filename */
+        /* Create the final and the temporary filename */
 
-    file = check_valid_path(file, ob, "save_object", MY_TRUE);
-    if (file == NULL)
-        error("Illegal use of save_object()\n");
+        len = (long)strlen(file);
+        name = alloca(len + (sizeof save_file_suffix) +
+                      len + (sizeof save_file_suffix) + 4);
 
+        if (!name)
+        {
+            error("Stack overflow in save_object()\n");
+            /* NOTREACHED */
+            return sp;
+        }
 
-    /* Create the final and the temporary filename */
-
-    len = (signed)strlen(file);
-    name = alloca(len + (sizeof save_file_suffix) +
-                  len + (sizeof save_file_suffix) + 4);
-
-    if (!name)
-        error("Stack overflow in save_object()\n");
-
-    tmp_name = name + len + sizeof save_file_suffix;
-    (void)strcpy(name, file);
+        tmp_name = name + len + sizeof save_file_suffix;
+        strcpy(name, file);
 
 #ifndef MSDOS_FS
-    (void)strcpy(name+len, save_file_suffix);
+        strcpy(name+len, save_file_suffix);
 #endif
-    sprintf(tmp_name, "%s.tmp", name);
+        sprintf(tmp_name, "%s.tmp", name);
 #ifdef MSDOS_FS
-    (void)strcpy(name+len, save_file_suffix);
+        strcpy(name+len, save_file_suffix);
 #endif
 
 
-    /* Open the file */
+        /* Open the file */
 
-    save_object_descriptor =
-      f = ixopen3(tmp_name, O_CREAT|O_TRUNC|O_WRONLY|O_TEXT, 0640);
-    if (f < 0) {
-        error("Could not open %s for a save.\n", tmp_name);
-    }
-    FCOUNT_SAVE(tmp_name);
+#ifdef MSDOS_FS
+        /* We have to use O_BINARY with cygwin to be sure we have no CRs
+         * the file. See cygwin-faq for more information.
+         */
+        f = ixopen3(tmp_name, O_CREAT|O_TRUNC|O_WRONLY|O_BINARY, 0640);
+#else
+        f = ixopen3(tmp_name, O_CREAT|O_TRUNC|O_WRONLY|O_TEXT, 0640);
+#endif
 
+        if (f < 0) {
+            char * emsg, * buf;
+
+            emsg = strerror(errno);
+            buf = alloca(strlen(emsg+1));
+            if (buf)
+            {
+                strcpy(buf, emsg);
+                error("Could not open %s for a save: %s.\n", tmp_name, buf);
+            }
+            else
+            {
+                perror("save object");
+                error("Could not open %s for a save: errno %d.\n"
+                     , tmp_name, errno);
+            }
+            /* NOTREACHED */
+            return sp;
+        }
+        FCOUNT_SAVE(tmp_name);
+    } /* if (file) */
+
+    /* Publish where we are going to save the data (-1 means using
+     * the string buffer.
+     */
+    save_object_descriptor = f;
 
     /* First pass through the variables to identify arrays/mappings
      * that are used more than once.
      */
 
+    if (ptable)
+    {
+        debug_message("(save_object) Freeing lost pointertable\n");
+        free_pointer_table(ptable);
+    }
+
     ptable = new_pointer_table();
     if (!ptable)
     {
-        close(f);
-        unlink(tmp_name);
-        error("Out of memory.\n");
+        if (file)
+        {
+            close(f);
+            unlink(tmp_name);
+        }
+        error("(save_object) Out of memory for pointer table.\n");
+        /* NOTREACHED */
+        return sp;
     }
 
     v = ob->variables;
@@ -1584,13 +1744,9 @@ save_object (struct object *ob, char *file)
             continue;
 
         if (v->type == T_POINTER)
-        {
             register_array  (v->u.vec);
-        }
         else if (v->type == T_MAPPING)
-        {
             register_mapping(v->u.map);
-        }
     }
 
     /* Prepare the actual save */
@@ -1625,53 +1781,228 @@ save_object (struct object *ob, char *file)
             L_PUTC(' ')
             L_PUTC_EPILOG
         }
-        save_svalue(v, '\n');
+        save_svalue(v, '\n', MY_FALSE);
     }
 
     free_pointer_table(ptable);
+    ptable = NULL;
 
-
-    /* Finish up the file */
-
-    len =  write( save_object_descriptor
-                , save_object_bufstart
-                , (unsigned)(SAVE_OBJECT_BUFSIZE-buf_left));
-    if (len != SAVE_OBJECT_BUFSIZE-buf_left )
-        failed = MY_TRUE;
-
-
-    /* On failure, delete the temporary file and return */
-
-    if (failed)
+    if (file)
     {
-        (void)close(f);
+        /* Finish up the file */
+
+        len =  write( save_object_descriptor
+                    , save_object_bufstart
+                    , (size_t)(SAVE_OBJECT_BUFSIZE-buf_left));
+        if (len != SAVE_OBJECT_BUFSIZE-buf_left )
+            failed = MY_TRUE;
+
+
+        /* On failure, delete the temporary file and return */
+
+        if (failed)
+        {
+            close(f);
+            unlink(tmp_name);
+            add_message("Failed to save to file '%s'. Disk could be full.\n", file);
+            if (numarg)
+                free_string_svalue(sp);
+            else
+                sp++;
+            put_number(sp, 1);
+            return sp;
+        }
+
+        /* Delete any existing savefile, then rename the temporary
+         * file to the real name.
+         */
+
+        i = 0; /* Result from efun */
+    
+        unlink(name);
+#if !defined(MSDOS_FS) && !defined(AMIGA) && !defined(OS2) && !defined(__BEOS__)
+        if (link(tmp_name, name) == -1)
+#else
+        close(f);
+        if (rename(tmp_name,name) < 0)
+#endif
+        {
+            perror(name);
+            printf("%s Failed to link %s to %s\n"
+                  , time_stamp(), tmp_name, name);
+            add_message("Failed to save object !\n");
+            i = 1;
+        }
+#if !defined(MSDOS_FS) && !defined(AMIGA) && !defined(OS2) && !defined(__BEOS__)
+        close(f);
         unlink(tmp_name);
-        add_message("Failed to save to file. Disk could be full.\n");
-        return;
+#endif
+
+        if (numarg)
+            free_string_svalue(sp);
+        put_number(sp, i);
+    }
+    else
+    {
+        /* Finish up the operation. Note that there propably is some
+         * data pending in the save_buffer.
+         */
+
+        sp++; /* We're returning a result. */
+        
+        if (failed)
+            put_number(sp, 0); /* Shouldn't happen */
+        else if (buf_left != SAVE_OBJECT_BUFSIZE)
+        {
+            /* Data pending in the save_buffer. */
+            if (!bytes_written)
+            {
+                /* Less than SAVE_OBJECT_BUFSIZE bytes generated
+                 * we bypass the strbuf for speed.
+                 */
+                char *s;
+
+                len = SAVE_OBJECT_BUFSIZE-buf_left;
+
+                xallocate(s, len+1, "resulting value string");
+                memcpy(s, save_object_bufstart, len);
+                s[len] = '\0';
+                put_malloced_string(sp, s);
+                strbuf_free(&save_string_buffer);
+            }
+            else
+            {
+                /* More than SAVE_OBJECT_BUFSIZE of data generated
+                 * Fill up the stringbuffer and create the result.
+                 */
+                strbuf_addn(&save_string_buffer, save_object_bufstart
+                       , SAVE_OBJECT_BUFSIZE-buf_left);
+                strbuf_store(&save_string_buffer, sp);
+            }
+        }
+        else
+            /* The save_buffer[] is empty, what means
+             * that at least one buffer full was written into
+             * the strbuf.
+             */
+            strbuf_store(&save_string_buffer, sp);
+    } /* if (file or not file) */
+    
+    return sp;
+} /* f_save_object() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_save_value (svalue_t *sp)
+
+/* TEFUN save_value()
+ *
+ *   string save_value(mixed value)
+ *
+ * Encode the <value> into a string suitable for restoration with
+ * restore_value() and return it.
+ *
+ * The created string consists of two lines, each terminated with a newline
+ * character: the first line describes the format used to save the value in
+ * the '#x:y' notation; the second line is the representation of the value
+ * itself.
+ */
+
+{
+    static char save_value_header[]
+      = { '#', SAVE_OBJECT_VERSION, ':', SAVE_OBJECT_HOST, '\n'
+        };
+      /* The version string to write
+       */
+
+    char save_buffer[SAVE_OBJECT_BUFSIZE];
+      /* The write buffer.
+       */
+
+    /* Set up the globals */
+    if (ptable)
+    {
+        debug_message("(save_value) Freeing lost pointer table.\n");
+        free_pointer_table(ptable);
+    }
+    ptable = new_pointer_table();
+    if (!ptable)
+    {
+        error("(save_value) Out of memory for pointer table.\n");
+        return sp; /* flow control hint */
     }
 
-    /* Delete any existing savefile, then rename the temporary
-     * file to the real name.
+    strbuf_zero(&save_string_buffer);
+    save_object_descriptor = -1;
+
+    /* First look at the value for arrays and mappings
+     */
+    if (sp->type == T_POINTER)
+        register_array(sp->u.vec);
+    else if (sp->type == T_MAPPING)
+        register_mapping(sp->u.map);
+
+    /* Prepare the actual save */
+
+    failed = MY_FALSE;
+    current_sv_id_number = 0;
+    bytes_written = 0;
+    save_object_bufstart = save_buffer;
+    memcpy(save_buffer, save_value_header, sizeof(save_value_header));
+    buf_left = SAVE_OBJECT_BUFSIZE - sizeof(save_value_header);
+    buf_pnt = save_buffer + sizeof(save_value_header);
+
+    /* Save the value */
+    save_svalue(sp, '\n', MY_FALSE);
+
+    /* Finish up the operation. Note that there propably is some
+     * data pending in the save_buffer.
      */
 
-    (void)unlink(name);
-#if !defined(MSDOS_FS) && !defined(AMIGA) && !defined(OS2) && !defined(__BEOS__)
-    if (link(tmp_name, name) == -1)
-#else
-    (void) close(f);
-    if (rename(tmp_name,name) < 0)
-#endif
-    {
-        perror(name);
-        printf("Failed to link %s to %s\n", tmp_name, name);
-        add_message("Failed to save object !\n");
-    }
-#if !defined(MSDOS_FS) && !defined(AMIGA) && !defined(OS2) && !defined(__BEOS__)
-    (void)close(f);
-    unlink(tmp_name);
-#endif
-} /* save_object() */
+    free_svalue(sp);  /* No longer needed */
 
+    if (failed)
+        put_number(sp, 0); /* Shouldn't happen */
+    else if (buf_left != SAVE_OBJECT_BUFSIZE)
+    {
+        /* Data pending in the save_buffer. */
+        if (!bytes_written)
+        {
+            /* Less than SAVE_OBJECT_BUFSIZE bytes generated
+             * we bypass the strbuf for speed.
+             */
+            char *s;
+            size_t len = SAVE_OBJECT_BUFSIZE-buf_left;
+
+            xallocate(s, len+1, "resulting value string");
+            memcpy(s, save_object_bufstart, len);
+            s[len] = '\0';
+            put_malloced_string(sp, s);
+            strbuf_free(&save_string_buffer);
+        }
+        else
+        {
+            /* More than SAVE_OBJECT_BUFSIZE of data generated
+             * Fill up the stringbuffer and create the result.
+             */
+            strbuf_addn(&save_string_buffer, save_object_bufstart
+                       , SAVE_OBJECT_BUFSIZE-buf_left);
+            strbuf_store(&save_string_buffer, sp);
+        }
+    }
+    else
+        /* The save_buffer[] is empty, what means
+         * that at least one buffer full was written into
+         * the strbuf.
+         */
+        strbuf_store(&save_string_buffer, sp);
+        
+    /* Clean up */
+    free_pointer_table(ptable);
+    ptable = NULL;
+
+    return sp;
+} /* f_save_value() */
 
 /*-------------------------------------------------------------------------*/
 /* Structure used by restore_mapping() and restore_map_size()
@@ -1878,11 +2209,12 @@ free_shared_restored_values (void)
     while (current_shared_restored > 0)
         free_svalue(&shared_restored_values[--current_shared_restored]);
     xfree(shared_restored_values);
+    shared_restored_values = NULL;
 }
 
 /*-------------------------------------------------------------------------*/
 INLINE static Bool
-restore_mapping (struct svalue *svp, char **str)
+restore_mapping (svalue_t *svp, char **str)
 
 /* Restore a mapping from the text starting at *<str> (which points
  * just after the leading '([') and store it into *<svp>.
@@ -1893,8 +2225,8 @@ restore_mapping (struct svalue *svp, char **str)
  */
 
 {
-    struct mapping *z;
-    struct svalue key, *data;
+    mapping_t *z;
+    svalue_t key, *data;
     int i;
     struct rms_parameters tmp_par;
     int siz;
@@ -1913,7 +2245,7 @@ restore_mapping (struct svalue *svp, char **str)
     {
         *svp = const0;
         free_shared_restored_values();
-        error("Illegal array size: %ld.\n", (long int)siz);
+        error("Illegal mapping size: %ld.\n", (long int)siz);
         return MY_FALSE;
     }
 
@@ -1924,7 +2256,8 @@ restore_mapping (struct svalue *svp, char **str)
     {
         *svp = const0;
         free_shared_restored_values();
-        error("Out of memory\n");
+        error("(restore) Out of memory: mapping[%u, %u]\n"
+             , siz, tmp_par.num_values);
         return MY_FALSE;
     }
 
@@ -1939,17 +2272,22 @@ restore_mapping (struct svalue *svp, char **str)
         if (!restore_svalue(&key, str, (char)(i ? ':' : ',') ))
         {
             free_svalue(&key);
-            return 0;
+            return MY_FALSE;
         }
         data = get_map_lvalue_unchecked(z, &key);
         free_svalue(&key);
         while (--i >= 0) {
+            if (data->type != T_INVALID && data->type != T_NUMBER)
+            {
+                /* Duplicate key: this shouldn't happen - but it did */
+                free_svalue(data);
+            }
             if (!restore_svalue(data++, str, (char)(i ? ';' : ',') ))
-                return 0;
+                return MY_FALSE;
         }
     }
     *str = tmp_par.str;
-    return 1;
+    return MY_TRUE;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -2067,7 +2405,7 @@ restore_size (char **str)
 
 /*-------------------------------------------------------------------------*/
 INLINE static Bool
-restore_array (struct svalue *svp, char **str)
+restore_array (svalue_t *svp, char **str)
 
 /* Restore an array from the text starting at *<str> (which points
  * just after the leading '({') and store it into *<svp>.
@@ -2078,7 +2416,7 @@ restore_array (struct svalue *svp, char **str)
  */
 
 {
-    struct vector *v;
+    vector_t *v;
     char *pt, *end;
     int siz;
 
@@ -2132,11 +2470,11 @@ restore_array (struct svalue *svp, char **str)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-restore_svalue (struct svalue *svp, char **pt, char delimiter)
+restore_svalue (svalue_t *svp, char **pt, char delimiter)
 
 /* Restore an svalue from the text starting at *<pt> up to the <delimiter>,
  * storing the value in *<svp>.
- * On success, set *<pt> to the character after the <deliminter> and return
+ * On success, set *<pt> to the character after the <delimiter> and return
  * TRUE, else return FALSE.
  */
 
@@ -2163,9 +2501,6 @@ restore_svalue (struct svalue *svp, char **pt, char delimiter)
 
 #ifndef MSDOS_FS
             if (c == '\r')
-                c = '\n';
-#else
-            if (c == CTRLZ && old_format)
                 c = '\n';
 #endif
 
@@ -2196,7 +2531,8 @@ restore_svalue (struct svalue *svp, char **pt, char delimiter)
         {
             *svp = const0;
             free_shared_restored_values();
-            error("Out of memory\n");
+            error("(restore) Out of memory (%lu bytes) for string.\n"
+                 , (unsigned long) strlen(start));
         }
         break;
       }
@@ -2309,19 +2645,21 @@ restore_svalue (struct svalue *svp, char **pt, char delimiter)
 
             if (id > max_shared_restored)
             {
-                struct svalue *new;
+                svalue_t *new;
 
-                max_shared_restored <<= 1;
-                new = (struct svalue *)
-                  rexalloc((char*)shared_restored_values
-                  , sizeof(struct svalue)*max_shared_restored
-                  );
+                max_shared_restored *= 2;
+                new = rexalloc(shared_restored_values
+                              , sizeof(svalue_t)*max_shared_restored
+                              );
                 if (!new)
                 {
                     current_shared_restored--;
                     free_shared_restored_values();
                     *svp = const0;
-                    error("Out of memory\n");
+                    error("(restore) Out of memory (%lu bytes) for "
+                          "%lu shared values.\n"
+                          , max_shared_restored * sizeof(svalue_t)
+                          , max_shared_restored);
                     return MY_FALSE;
                 }
                 shared_restored_values = new;
@@ -2368,7 +2706,7 @@ restore_svalue (struct svalue *svp, char **pt, char delimiter)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-old_restore_string (struct svalue *v, char *str)
+old_restore_string (svalue_t *v, char *str)
 
 /* Called to restore the string starting at <str> into the *<v>
  * from old-format savefiles
@@ -2401,7 +2739,8 @@ old_restore_string (struct svalue *v, char *str)
             {
                 *v = const0;
                 free_shared_restored_values();
-                error("Out of memory\n");
+                error("(restore) Out of memory (%lu bytes) for string\n"
+                     , (unsigned long) strlen(str));
             }
             return MY_TRUE;
         }
@@ -2411,147 +2750,245 @@ old_restore_string (struct svalue *v, char *str)
 }
 
 /*-------------------------------------------------------------------------*/
-Bool
-restore_object (struct object *ob, char *file)
+svalue_t *
+f_restore_object (svalue_t *sp)
 
-/* Restore the variables of <object> from file <file>.o (if <file> ends
- * in ".c", this is stripped).
+/* TEFUN restore_object()
  *
- * The validity of the filename is checked with a call to check_valid_path().
+ *   int restore_object (string name)
+ *   int restore_object (string str)
+ *
+ * Restore values of variables for current object from the file <name>,
+ * or directly from the string <str>.
+ *
+ * To restore directly from a string <str>, the string must begin
+ * with the typical line "#x:y" as it is created by the save_object()
+ * efun.
+ *
+ * When restoring from a file, the name may end in ".c" which is stripped
+ * off by the parser. The master object will probably append a .o to the
+ * <name>. The validity of the filename is checked with a call to
+ * check_valid_path().
+ *
+ * Return 1 on success, 0 if there was nothing to restore.
+ * TODO: This double-mode is rather ugly, maybe call the restoring
+ * TODO:: from string-mode "restore_variables()"?
  */
 
 {
+    int restored_version; /* Formatversion of the saved data */
     char *name;      /* Full name of the file to read */
+    char *file;      /* Filename passed, NULL if restoring from a string */
     char *var;
-    char *buff;      /* Current line read from the savefile */
+    char *buff;      /* Current line read from the savefile
+                      * resp. a copy of the string passed.
+                      */
+    char *cur;       /* Current position in the string passed */
     char *space;
+    object_t *ob;    /* Local copy of current_object */
     size_t len;
     FILE *f;
     struct stat st;  /* stat() info of the savefile */
 
     int var_rest;    /* Number of variables left after rover */
     int num_var;     /* Number of variables in the object */
-    struct variable *rover = NULL;
+    variable_t *rover = NULL;
       /* Roving pointer through the variable block. The next variable
        * to restore is searched from here, taking advantage of
        * the locality of save_object().
        */
 
-#ifndef MSDOS_FS
-    Bool old_format;
-#endif
-
     struct discarded {
-        struct svalue v;
+        svalue_t v;
         struct discarded *next;
     } * dp = NULL;
       /* List of values for which the variables no longer exist. */
 
 
-    /* No use in restoring a destruct object */
-
-    if (ob->flags & O_DESTRUCTED)
-        return MY_FALSE;
-
-
-    /* Get a valid filename */
-
-    file = check_valid_path(file, ob, "restore_object", MY_FALSE);
-    if (file == NULL)
-        error("Illegal use of restore_object()\n");
-
-
-    /* Create the full filename */
-
-    len = strlen(file);
-    name = alloca(len + (sizeof save_file_suffix));
-
-    if (!name)
-        error("Stack overflow in restore_object()\n");
-
-    (void)strcpy(name, file);
-    if (name[len-2] == '.' && name[len-1] == 'c')
-        len -= 2;
-    (void)strcpy(name+len, save_file_suffix);
-
-
-    /* Open the file and gets its length */
-
-    f = fopen(name, "r");
-    if (!f || fstat(fileno(f), &st) == -1) {
-        if (f)
-            (void)fclose(f);
-        return MY_FALSE;
-    }
-    if (st.st_size == 0) {
-        (void)fclose(f);
-        return MY_FALSE;
-    }
-    FCOUNT_REST(name);
-
-
-    /* Allocate the linebuffer. Unfortunately, the whole file
-     * can be one single line.
-     */
-
-    buff = xalloc((size_t)(st.st_size + 1));
-    if (!buff)
+    /* Test the arguments */
+    if (sp->type != T_STRING)
     {
-        fclose(f);
-        error("Out of memory.\n");
-        /* NOTREACHED */
-        return MY_FALSE; /* flow control hint */
+        bad_xefun_arg(1, sp);
+        return sp;
     }
 
+    /* Check if got a filename or the value string itself */
+    buff = NULL;
+    name = NULL;
+    file = NULL;
+    f = NULL;
+    if (sp->u.string[0] == '#')
+    {
+        /* We need a copy of the value string because we're
+         * going to modify it a bit.
+         */
+        if (sp->x.string_type != STRING_MALLOC)
+        {
+            len = svalue_strlen(sp);
+            xallocate(buff, len+1, "copy of value string");
+            memcpy(buff, sp->u.string, len);
+            buff[len] = '\0';
+        }
+        else
+        {
+            /* We can adopt the string */
+            buff = sp->u.string;
+            put_number(sp, 0);
+        }
+    }
+    else
+        file = sp->u.string;
+    
+    
+    /* No use in restoring a destructed object, or an object
+     * with no variables.
+     */
+    ob = current_object;
+    if (ob->flags & O_DESTRUCTED)
+    {
+        free_svalue(sp);
+        put_number(sp, 0);
+        return sp;
+    }
+
+    if (ob->prog->num_variables == 0)
+    {
+        free_svalue(sp);
+        put_number(sp, 1);
+        return sp;
+    }
+
+    /* If restoring from a file, set it up */
+
+    if (file)
+    {
+        /* Get a valid filename */
+
+        file = check_valid_path(file, ob, "restore_object", MY_FALSE);
+        if (file == NULL)
+        {
+            error("Illegal use of restore_object()\n");
+            /* NOTREACHED */
+            return sp;
+        }
+
+
+        /* Create the full filename */
+
+        len = strlen(file);
+        name = alloca(len + (sizeof save_file_suffix));
+
+        if (!name)
+        {
+            error("Stack overflow in restore_object()\n");
+            /* NOTREACHED */
+            return sp;
+        }
+
+        strcpy(name, file);
+        if (name[len-2] == '.' && name[len-1] == 'c')
+            len -= 2;
+        strcpy(name+len, save_file_suffix);
+
+
+        /* Open the file and gets its length */
+
+        f = fopen(name, "r");
+        if (!f || fstat(fileno(f), &st) == -1) {
+            if (f)
+                fclose(f);
+            free_svalue(sp);
+            put_number(sp, 0);
+            return sp;
+        }
+        if (st.st_size == 0)
+        {
+            fclose(f);
+            free_svalue(sp);
+            put_number(sp, 0);
+            return sp;
+        }
+        FCOUNT_REST(name);
+
+        /* Allocate the linebuffer. Unfortunately, the whole file
+         * can be one single line.
+         */
+
+        buff = xalloc((size_t)(st.st_size + 1));
+        if (!buff)
+        {
+            fclose(f);
+            error("(restore) Out of memory (%lu bytes) for linebuffer.\n"
+                 , (unsigned long) st.st_size+1);
+            /* NOTREACHED */
+            return sp;
+        }
+    } /* if (file) */
 
     /* Initialise the variables */
 
-    shared_restored_values = (struct svalue *)
-                             xalloc(sizeof(struct svalue)*256);
-
-    if (!shared_restored_values)
-    {
-        fclose(f);
-        xfree(buff);
-        error("Out of memory.\n");
-        return MY_FALSE; /* flow control hint */
-    }
-
     max_shared_restored = 256;
     current_shared_restored = 0;
+
+    if (shared_restored_values)
+    {
+        debug_message("(restore) Freeing lost shared_restored_values.\n");
+        free_shared_restored_values();
+    }
+
+    shared_restored_values = xalloc(sizeof(svalue_t)*max_shared_restored);
+    if (!shared_restored_values)
+    {
+        if (f)
+            fclose(f);
+        xfree(buff);
+        error("(restore) Out of memory (%lu bytes) for shared values.\n"
+             , sizeof(svalue_t)*max_shared_restored);
+        /* NOTREACHED */
+        return sp;
+    }
+
     num_var = ob->prog->num_variables;
     var_rest = 0;
-#ifndef MSDOS_FS
-    old_format = MY_TRUE;
-#endif
+    restored_version = -1;
     restored_host = -1;
 
     /* Loop until we run out of text to parse */
 
+    cur = buff;
     while(1)
     {
-        struct svalue *v;
+        svalue_t *v;
         char *pt;
 
-        /* Get the next line from the text */
-        if (fgets(buff, (int)st.st_size + 1, f) == NULL)
+        if (file)
+        {
+            /* Get the next line from the text */
+            if (fgets(buff, (int)st.st_size + 1, f) == NULL)
+                break;
+            cur = buff;
+        }
+        else if (cur[0] == '\0')
             break;
 
         /* Remember that we have a newline at end of buff! */
 
-        space = strchr(buff, ' ');
-        if (space == NULL)
+        space = strchr(cur, ' ');
+        if (!file)
+            pt = strchr(cur, '\n');
+        if (space == NULL || (!file && pt && pt < space))
         {
             /* No space? It must be the version line! */
 
-            if (buff[0] == '#')
+            if (cur[0] == '#')
             {
                 int i;
-                int restored_version;
 
-                i = sscanf(buff+1, "%d:%d", &restored_version, &restored_host);
-                if (i <= 0 || (i == 2 && restored_version <= CURRENT_VERSION) ) {
-                    old_format = MY_FALSE;
+                i = sscanf(cur+1, "%d:%d", &restored_version, &restored_host);
+                if (i > 0 && (i == 2 || restored_version >= CURRENT_VERSION) )
+                {
+                    if (pt)
+                        cur = pt+1;
                     continue;
                 }
             }
@@ -2559,7 +2996,8 @@ restore_object (struct object *ob, char *file)
             /* No version line: illegal format.
              * Deallocate what we allocated so far and return.
              */
-            (void)fclose(f);
+            if (f)
+                fclose(f);
             if (dp)
                 do
                     free_svalue(&dp->v);
@@ -2567,9 +3005,10 @@ restore_object (struct object *ob, char *file)
 
             free_shared_restored_values();
             xfree(buff);
-            error("Illegal format when restoring %s.\n", name);
+            error("Illegal format (version line) when restoring %s.\n"
+                  , file ? name : current_object->name);
             /* NOTREACHED */
-            return MY_FALSE; /* flow control hint */
+            return sp;
         }
 
         /* Split the line at the position of the space.
@@ -2583,7 +3022,7 @@ restore_object (struct object *ob, char *file)
 
         do { /* A simple try.. environment */
 
-            if ( NULL != (var = findstring(buff)) )
+            if ( NULL != (var = findstring(cur)) )
             {
                 /* The name exists in an object somewhere, now check if it
                  * is one of our variables
@@ -2636,7 +3075,8 @@ restore_object (struct object *ob, char *file)
                 {
                     free_shared_restored_values();
                     xfree(buff);
-                    fclose(f);
+                    if (f)
+                        fclose(f);
                     if (tmp)
                     {
                         do
@@ -2644,7 +3084,8 @@ restore_object (struct object *ob, char *file)
                         while (NULL != (tmp = tmp->next));
                     }
                     error("Stack overflow in restore_object()\n");
-                    return MY_FALSE; /* flow control hint */
+                    /* NOTREACHED */
+                    return sp;
                 }
 
                 dp->next = tmp;
@@ -2663,7 +3104,7 @@ restore_object (struct object *ob, char *file)
         /* ...and set it to the new one */
 
         pt = space+1;
-        if ( (old_format && pt[0] == '\"')
+        if ( (restored_version < 0 && pt[0] == '\"')
              ? !old_restore_string(v, pt)
              : !restore_svalue(v, &pt, '\n')
            )
@@ -2671,7 +3112,8 @@ restore_object (struct object *ob, char *file)
 
             /* Whoops, illegal format */
 
-            fclose(f);
+            if (f)
+                fclose(f);
             if (dp)
             {
                 do
@@ -2680,10 +3122,14 @@ restore_object (struct object *ob, char *file)
             }
             free_shared_restored_values();
             xfree(buff);
-            error("Illegal format when restoring %s.\n", name);
-            return MY_FALSE;
+            error("Illegal format (value string) when restoring %s.\n"
+                 , file ? name : current_object->name);
+            /* NOTREACHED */
+            return sp;
         }
-    }
+
+        cur = pt;
+    } /* while(1) */
 
     /* Restore complete - now clean up */
 
@@ -2694,13 +3140,132 @@ restore_object (struct object *ob, char *file)
         while ( NULL != (dp=dp->next) );
     }
     if (d_flag > 1)
-        debug_message("Object %s restored from %s.\n", ob->name, name);
-    (void)fclose(f);
+        debug_message("%s Object %s restored from %s.\n"
+                     , time_stamp(), ob->name, file ? name : "passed value");
+    if (f)
+        fclose(f);
     free_shared_restored_values();
     xfree(buff);
 
-    return MY_TRUE;
-}
+    free_svalue(sp);
+    put_number(sp, 1);
+    return sp;
+} /* f_restore_object() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_restore_value (svalue_t *sp)
+
+/* TEFUN restore_value()
+ *
+ *   mixed restore_value (string str)
+ *
+ * Decode the string representation <str> of a value back into the value
+ * itself and return it. <str> is a string as generated by save_value(),
+ * the '#x:y' specification of the saveformat however is optional.
+ */
+
+{
+    int restored_version; /* Formatversion of the saved data */
+    char *buff;  /* The string to parse */
+    char *p;
+
+    if (sp->type != T_STRING)
+    {
+        bad_xefun_arg(1, sp);
+        return sp; /* flow control hint */
+    }
+
+    /* The restore routines will put \0s into the string, so we
+     * need to make a copy of all but malloced strings.
+     */
+    if (sp->x.string_type != STRING_MALLOC)
+    {
+        size_t len;
+
+        len = strlen(sp->u.string);
+        buff = alloca(len+1);
+        if (!buff)
+        {
+            error("(restore) Out of stack (%lu bytes).\n"
+                 , (unsigned long) len+1);
+            /* NOTREACHED */
+            return sp;
+        }
+        memcpy(buff, sp->u.string, len);
+        buff[len] = '\0';
+    }
+    else
+        buff = sp->u.string;
+
+    restored_version = -1;
+    restored_host = -1;
+
+    /* Check if there is a version line */
+    if (buff[0] == '#')
+    {
+        int i;
+
+        i = sscanf(buff+1, "%d:%d", &restored_version, &restored_host);
+
+        /* Advance to the next line */
+        p = strchr(buff, '\n');
+        if (!p)
+        {
+            error("No data given.\n");
+            return sp-1;
+        }
+        buff = p+1;
+    }
+    
+    /* Initialise the shared value table */
+
+    max_shared_restored = 256;
+
+    if (shared_restored_values)
+    {
+        debug_message("(restore) Freeing lost shared_restored_values.\n");
+        free_shared_restored_values();
+    }
+
+    shared_restored_values = xalloc(sizeof(svalue_t)*max_shared_restored);
+    if (!shared_restored_values)
+    {
+        error("(restore) Out of memory (%lu bytes) for shared values.\n"
+             , max_shared_restored * sizeof(svalue_t));
+        return sp; /* flow control hint */
+    }
+    current_shared_restored = 0;
+
+    /* Place the result variable onto the stack */
+    inter_sp = ++sp;
+    *sp = const0;
+    
+    /* Now parse the value in buff[] */
+
+    p = buff;
+    if ( (restored_version < 0 && p[0] == '\"')
+         ? !old_restore_string(sp, p)
+         : !restore_svalue(sp, &p, '\n')
+       )
+    {
+        /* Whoops, illegal format */
+
+        free_shared_restored_values();
+        error("Illegal format when restoring a value.\n");
+        /* NOTREACHED */
+        return sp; /* flow control hint */
+    }
+
+    /* Restore complete - now clean up and return the result */
+
+    free_shared_restored_values();
+    inter_sp = --sp;
+    free_string_svalue(sp);
+    *sp = sp[1];
+
+    return sp;
+} /* f_restore_value() */
 
 /***************************************************************************/
 

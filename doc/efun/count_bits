@@ -1,5 +1,5 @@
 SYNOPSIS
-        int and_bits (string str)
+        int count_bits (string str)
 
 DESTRIPTION
         Count the number of set bits in bitstring <str> and return the number

@@ -1,14 +1,15 @@
 SYNOPSIS
         #include <sys/input_to.h>
 
-        void input_to(string fun)
-        void input_to(string fun, int flag, ...)
+        void input_to(string|closure fun)
+        void input_to(string|closure fun, int flag, ...)
 
 DESCRIPTION
-        Enable next line of user input to be sent to the local
-        function fun as an argument. The input line will not be
-        parsed, only when it starts with a "!" (like a kind of shell
-        escape) (this feature may be disabled).
+        Enable next line of user input to be sent to the function <fun>
+        as an argument. Exception: if the next input
+        line starts with a "!", it will be parsed as a command resp.
+        passed to the most recent input_to() given with the
+        INPUT_IGNORE_BANG flag.
         The function <fun> may be static, but must not be private (or
         it won't be found).
 
@@ -16,7 +17,11 @@ DESCRIPTION
         RETURN key.
 
         If input_to() is called more than once in the same execution,
-        only the first call has any effect.
+        only the first call has any effect. On the other hand, if
+        a command given during an input_to() (using the "!" escape)
+        issues its own input_to(), the previous input_to() is suspended
+        until the new input_to() has been handled, then the previous
+        one becomes active again.
 
         The optional argument <flag> may be a binary-OR ('|') of the
         following option values:
@@ -29,13 +34,21 @@ DESCRIPTION
               The connection is switched from line- into charmode to
               retrieve a single character(!) from the player; newlines
               read as two characters, "\r" followed by "\n".
+
               After execution of <fun>, the connection is switched
               back into linemode unless a subsequent input_to( , 2)
               has been issued.
+
               Note that the players frontend is free to stay in
               linemode all the time: even if you request a single
               character, the player might be forced to type (and send)
               that character plus the return key.
+
+              If you plan to stay in charmode a longer time , you can
+              reduce the call overhead by using set_combine_charset()
+              to retrieve sequences of certain characters as one string
+              instead of one-by-one. In a screen-oriented editor for
+              example this would be most of the printable characters.
 
           INPUT_IGNORE_BANG  (128):
               Input lines starting with '!' will _not_ be parsed as
@@ -65,6 +78,10 @@ EXAMPLE
 
 HISTORY
         The meaning of the flag parameter was extended in 3.2.1@93.
+        The limited "stacking" of input_to()s issued from !-commands
+        was implemented in LDMud 3.2.8.
+        Since LDMud 3.2.8 the function can be given as a closure.
 
 SEE ALSO
-        call_other(E), sscanf(E), privilege_violation(M)
+        call_other(E), sscanf(E), privilege_violation(M),
+        set_combine_charset(E)

@@ -1,5 +1,5 @@
 SYNOPSIS
-	mapping filter_indices(mapping, string func, object ob, ...)
+	mapping filter_indices(mapping, string func, string|object ob, ...)
 	mapping filter_indices(mapping, closure cl, ...)
 
 DESCRIPTION
@@ -8,8 +8,10 @@ DESCRIPTION
 	element, and then the extra args that were given to
 	filter_mapping. If the function returns true, the element is
 	added to the result mapping. ob can also be a file_name of an
-	object. If the second arg is a string and the third is not an
-	object, this_object() will be used as default.
+	object.
+
+	If <ob> is omitted, or neither a string nor an object, it
+        defaults to this_object().
 
 HISTORY
         In LDMud 3.2.6 renamed from filter_mapping() and generalised

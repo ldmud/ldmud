@@ -85,12 +85,19 @@ Joern Rennecke ( amylaar@cs.tu-berlin.de ) gives this credit:
 
 Lars Duening thanks:
 
- - Dana Durkee and the magnificient Wessex for enhancing my life (though
-     I had to look up that 'l'-word first).
+ - Dana Durkee and the magnificient Wessex for enhancing my life.
  - the citizens of One Step Beyond, PK-Mud and UNItopia for enduring my
      driver experiments.
  - Malc (mehbisdokutie@geocities.com) for providing me with access to
      a Solaris system for testing.
+ - Elric (elric@lpmud.com) for providing me with access to
+     a FreeBSD system for testing.
+ - Blackcat (?) for providing me with access to a Linux system for testing.
+ - Freaky for providing me with access to an Irix system for testing, numerous
+     bug reports, and lots of patience when new versions crashed even faster
+     than the old ones.
+ - Kees Leune for providing me with access to a Linux/Sparc system for
+     testing.
  - Stefan Petri and contributors for the extensive documentation of the
      Amylaar driver (see also doc/README).
  - the MudOS programmers for the efun terminal_colour() and Michael Schaefer
@@ -101,45 +108,78 @@ Lars Duening thanks:
  - Reinhard Pfau (Reinhard.Pfau@unix-ag.org, Mubo@SiliconDream) brought
      the autoconf mechanism up to date.
  - Ron Koerner (ron.koerner@gmx.de, Righ@FinalFrontier) provided the
-     initial implementation of functionals modelled after MudOS' syntax.
- - Uwe (mai94cch@studserv.uni-leipzig.de) did the first IPv6 changes.
- - for bug reports, critics, fixes, patches and other support from:
+     initial implementation of inline closures modelled after MudOS' syntax.
+ - Uwe (mai94cch@studserv.uni-leipzig.de) provided the basic IPv6 support.
+ - for bug reports, critics, fixes, patches and other support:
      Alex@TubMud (at16@st-andrews.ac.uk)
      Alexander Fetke (alfebtcd@cs.tu-berlin.de, Alfe@Tubmud)
+     Anders Strandloev Elkjaer (ase@cs.auc.dk)
      Andreas Grammlich (andreas.grammlich@prepress.de, Gum@Wunderland)
      Andreas Weller (aw6@informatik.uni-ulm.de, Zwirch@Carledon)
      Andres Cvitkovich (ac@twig.mond.at, Woody@Silberland)
      Andrew Weisz (elarke01@snet.net)
+     Andy Zeneski (jaz@zsolv.com)
+     Bastian Hoyer (hoyer@wisc.de, dafire@dafire.de)
      Blackcat@PK-Mud (amuelle1@htwm.de)
      Brandon (pothole@darkspyre.quad.net)
+     Bruce Mitchell (mitchell@manly.delconet.com, Klahn@Manly Mud)
+     Carlo von Loesch (cvl@symlynX.com, lynx@high.impact.pages.de)
+     Casey Zacek (cz@8000hosting.com, zippo@eotl)
      Christian Kirschbaum (chrissy@cs.tu-berlin.de, Chameloid@Tubmud)
      Christian Mudra (c_mudra@informatik.uni-kl.de, Coogan@Tubmud)
+     croft@UNItopia.rus.uni-stuttgart.de
      Dale Perkins (dale-perkins@home.net)
      Daniel von Dincklage (daniel@ozet.de, Sunblade@SiliconDream),
      Daniel Sloan (sloand@alphalink.com.au)
+     Daryth Kendrickson (stavros@deadofnight.com)
+     David Gibbs (ishara@btinternet.com)
+     David 'Greyelk' Gibby (oop_apprentice@yahoo.com)
+     DiEHARD (slava@intersfera.lt)
+     Enrico Bauermeister (ebauermeister@t-online.de, Enrico@FinalFrontier)
+     Erik Meusel (emeusel@prinz-atm.CS.Uni-Magdeburg.De)
      Fiona@Wunderland (ujastrow@mail.desy.de)
      Frank Kirschner (freaky@unitopia.uni-stuttgart.de)
      Frank Stolze (fstolze@iName.com)
+     Gerhard Schmidt (estartu@augusta.de)
+     "Gnomi" (gnomi@UNItopia.rus.uni-stuttgart.de)
+     Gunnar Kreitz (gunnark@chello.se)
      Heiko Kopp (hkopp@informatik.uni-rostock.de, Bardioc@Evermore)
+     Henk Stokhorst (Tha@wxs.nl)
      Holger Kremss (jur94ewp@studserv.uni-leipzig.de, Holger@Wunderland)
      Joern Rennecke (amylaar@cygnus.co.uk)
      Juergen Weickert (Sissi@UNItopia)
+     Karl N. Matthias (karmat@matthias.org)
+     Kathrin Paschen (paschen@ira.uka.de)
+     Kees Leune (c.j.leune@kub.nl)
+     Mark Daniel Reidel (Karm@Nightfall,
+       reidelm@rbg.informatik.tu-darmstadt.de)
      Kirnan@Avalon
-     Largo@Wunderland
+     Largo@Wunderland (emeusel@csmd.cs.uni-magdeburg.de)
      Logic (logic@logic.net)
+     "Mammi" (mammi@unitopia.uni-stuttgart.de)
      Manu Mäki (mtmaki@pultti.turkuai.fi, Cendor@Winterkill)
+     Mat@Maethos
      Matthew Julius (julius.2@wright.edu)
+     Michael Fedrowitz (mfedrowi@ix.urz.uni-heidelberg.de,
+       Michael_Fedrowiz@gmx.net, Rhodry@ForgottenDreams)
      Michael Sporn (sporn@mathematik.hu-berlin.de, sunblood@tubmud)
+     Mike Conley (mpc@sgi.net, Tamarindo@Sovereign)
+     "Nathan@Unholy Lands" (mud@pc181.iaee.tuwien.ac.at)
      Nepomuck@UNItopia
+     Nick Derewianka (nickd@e-media.com.au)
      Parsec
      Patrick May (patrick.may@cedelgroup.com)
+     Paul Apgar (tiresius@usa.net, tiresius@Cosmos)
      Ralph (ralphi@vkr.k-net.dk)
+     Ralph Zitz (RZ@zitz.dk, Nostradamus@OSB)
      Reimer Behrends (Macbeth@Tubmud)
      Reinhard Pfau (reinhard@netlab1.hrz.uni-siegen.de, mubo@SiliconDream),
      Robb Townsend (meecham@infonline.net)
+     Robert (mud@pc181.iaee.tuwien.ac.at, Nathan@Unholy Lands)
      Robert Reither (e8925573@student.tuwien.ac.at, Nathan@Unholy.Lands)
+     Rodney Quaye (sark@oberon.krans.com)
      Stephan Lichtenhagen (lichti@amethyst.chemie.uni-dortmund.de,
-       Tiamak@Morgengrauen)
+       stephan@lichtenhagen.de, Tiamak@Morgengrauen)
      Sieni (sampsa@netsonic.fi)
      Stefan Riemer (stefan.riemer@bauing.uni-weimar.de, Peng@FinalFrontier)
      Tatu P. Saloranta (doomdark@cc.hut.fi)

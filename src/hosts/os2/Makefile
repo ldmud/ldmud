@@ -20,16 +20,6 @@ RM = rm -f
 MV = mv
 CP = cp
 #
-# Chose one of these mallocs:
-# Satoria's malloc. Uses little memory. With FAST_FIT, it is also one of the
-# fastest. Required for garbage collection.
-MALLOC=smalloc
-# must not #define SBRK_OK without static linking on __RS6000__
-# How can static linking be done?
-#
-# Use the standard malloc on your system:
-#MALLOC=sysmalloc
-#
 # Set MUD_LIB to the directory which contains the mud data. Was formerly
 # defined in config.h !
 MUD_LIB = /games/mud/lib
@@ -53,21 +43,21 @@ PROFIL=
 OPTIMIZE = -O -g -fstrength-reduce -fomit-frame-pointer # high optimization
 #OPTIMIZE= -O -g -fstrength-reduce # for better debugging
 #OPTIMIZE= -g # no optimization; for frequent recompilations.
-#
-# debugging options: [-DDEBUG] [-DYYDEBUG|-DYYDEBUG=1] [-DTRACE_CODE]
-# -DDEBUG: Enable run time debugging. It will use more time and space.
-# When the flag is changed, be sure to recompile everything.
-# Simply comment out this line if not wanted.
-# If you change anything in the source, you are strongly encouraged to have
-# DEBUG defined.
-# If you will not change anything, you are still encouraged to have
-# it defined, if you want to locate any game driver bugs.
-#DEBUG=-DDEBUG -DTRACE_CODE
-DEBUG=
+
+# Debugging options:
+#   -DDEBUG: Enable run time debugging. It will use more time and space.
+#            Nevertheless you are strongly encouraged to keep it defined.
+#   -DYYDEBUG[=1]: Debug output for the LPC compiler.
+#   -DTRACE_CODE: Enable the LPC code tracing.
+#   -DCHECK_STRINGS: Enable the shared string checking.
+#   -DKEEP_STRINGS: Shared strings are never really freed.
+#   -DDEBUG_TELNET: Activates debug prints in the telnet machine
+DEBUG = -DDEBUG -DTRACE_CODE -DCHECK_STRINGS # -DKEEP_STRINGS -DDEBUG_TELNET
+
 #
 MPATH=-DMUD_LIB='"$(MUD_LIB)"' -DBINDIR='"$(BINDIR)"'
 #
-CFLAGS=  $(OPTIMIZE) $(DEBUG) -DMALLOC_$(MALLOC) $(WARN) $(MPATH) $(PROFIL)
+CFLAGS=  $(OPTIMIZE) $(DEBUG) $(WARN) $(MPATH) $(PROFIL)
 #
 #LIBS hides GNULIB on atari.
 #LIBS=
@@ -80,15 +70,15 @@ LDFLAGS=
 MFLAGS = "BINDIR=$(BINDIR)" "MUD_LIB=$(MUD_LIB)"
 #
 SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\
-    comm.c ed.c regexp.c mapping.c wiz_list.c swap.c $(MALLOC).c\
+    comm.c ed.c regexp.c mapping.c wiz_list.c swap.c xalloc.c\
     call_out.c otable.c dumpstat.c stralloc.c hash.c port.c\
-    ptrtable.c heartbeat.c actions.c \
+    ptrtable.c heartbeat.c actions.c mempools.c \
     access_check.c parse_old.c parse.c prolang.y\
     efuns.c simul_efun.c strfuns.c sprintf.c gcollect.c closure.c
 OBJ=lang.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
-    comm.o ed.o regexp.o mapping.o wiz_list.o swap.o $(MALLOC).o\
+    comm.o ed.o regexp.o mapping.o wiz_list.o swap.o xalloc.o\
     call_out.o otable.o dumpstat.o stralloc.o hash.o port.o\
-    ptrtable.o heartbeat.o actions.o \
+    ptrtable.o heartbeat.o actions.o mempools.o \
     access_check.o parse_old.o parse.o simul_efun.o strfuns.o sprintf.o\
     efuns.o gcollect.o closure.o
 
@@ -125,7 +115,8 @@ parse: driver
 #	fixstk 16k frontend
 
 #distclean: clean
-#	$(RM) driver config.status machine.h Makefile
+#	$(RM) driver config.status config.log config.cache machine.h Makefile
+#	$(RM) config.h
 
 #tags: $(SRC)
 #	ctags $(SRC)
@@ -161,194 +152,188 @@ lang.c lang.h: lang.y
 	
 	$(MV) $(YACCTAB)h lang.h
 
-$(MALLOC).o : $(MALLOC).c driver.h config.h machine.h port.h
-	$(RM) smalloc.o
-	$(RM) sysmalloc.o
-	$(CC) $(CFLAGS) -c $(MALLOC).c
-
 #--------------------------------------------------------
 # Dependencies, manual and automatic.
 
-array.o : instrs.h lang.h
-
-closure.o : instrs.h lang.h
-
-dumpstat.o : instrs.h lang.h
-
-gcollect.o : instrs.h lang.h
-
-interpret.o : instrs.h lang.h
-
-lang.o : driver.h config.h machine.h lex.h interpret.h object.h \
-    instrs.h port.h switch.h stralloc.h
-
-lex.o : instrs.h lang.h efun_defs.c
-
-simul_efun.o : instrs.h lang.h
-
-simulate.o : instrs.h
-
-sprintf.o : instrs.h
-
 # --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS FOLLOW ---
-access_check.o : filestat.h comm.h access_check.h driver.h sent.h object.h \
-    interpret.h config.h port.h exec.h instrs.h datatypes.h hosts/unix.h \
-    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
-    ./hosts/amiga/ixfile.h
+access_check.o : xalloc.h filestat.h comm.h access_check.h driver.h \
+    svalue.h simulate.h typedefs.h config.h port.h strfuns.h sent.h \
+    instrs.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
+    hosts/amiga/patchfloat.h machine.h exec.h ./hosts/amiga/ixfile.h
 
-actions.o : wiz_list.h stralloc.h smalloc.h simulate.h sent.h object.h \
-    mapping.h interpret.h dumpstat.h datatypes.h comm.h closure.h backend.h \
-    array.h actions.h driver.h strfuns.h instrs.h exec.h main.h port.h \
-    config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
+actions.o : ../mudlib/sys/driver_hook.h ../mudlib/sys/commands.h xalloc.h \
+    wiz_list.h stralloc.h smalloc.h simulate.h sent.h object.h mapping.h \
+    interpret.h exec.h efuns.h dumpstat.h comm.h closure.h backend.h \
+    array.h actions.h typedefs.h driver.h svalue.h strfuns.h instrs.h \
+    main.h port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
     hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
 
-array.o : wiz_list.h swap.h stralloc.h simulate.h rxcache.h regexp.h \
-    prolang.h object.h mapping.h main.h interpret.h instrs.h exec.h \
-    datatypes.h backend.h array.h my-alloca.h driver.h smalloc.h strfuns.h \
-    sent.h lang.h port.h config.h hosts/unix.h hosts/be/be.h \
+array.o : smalloc.h xalloc.h wiz_list.h swap.h stralloc.h svalue.h \
+    simulate.h rxcache.h regexp.h object.h mempools.h mapping.h main.h \
+    interpret.h instrs.h backend.h array.h my-alloca.h typedefs.h driver.h \
+    strfuns.h sent.h exec.h port.h config.h hosts/unix.h hosts/be/be.h \
     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
-backend.o : wiz_list.h swap.h stralloc.h smalloc.h simulate.h rxcache.h \
-    regexp.h random.h otable.h object.h my-alloca.h mapping.h main.h lex.h \
+backend.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h \
+    stralloc.h stdstrings.h smalloc.h simulate.h rxcache.h regexp.h \
+    random.h otable.h object.h my-alloca.h mapping.h main.h lex.h \
     interpret.h heartbeat.h gcollect.h filestat.h exec.h ed.h comm.h \
     closure.h call_out.h array.h actions.h backend.h hosts/amiga/nsignal.h \
-    driver.h strfuns.h datatypes.h sent.h instrs.h port.h config.h \
+    typedefs.h driver.h svalue.h strfuns.h sent.h instrs.h port.h config.h \
     hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
     machine.h ./hosts/amiga/ixfile.h
 
-call_out.o : wiz_list.h swap.h strfuns.h stralloc.h simulate.h object.h \
-    main.h interpret.h gcollect.h exec.h comm.h closure.h backend.h array.h \
-    actions.h call_out.h driver.h datatypes.h smalloc.h sent.h instrs.h \
-    port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
-    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
+call_out.o : ../mudlib/sys/debug_info.h xalloc.h wiz_list.h swap.h svalue.h \
+    strfuns.h stralloc.h simulate.h object.h main.h interpret.h gcollect.h \
+    exec.h comm.h closure.h backend.h array.h actions.h call_out.h \
+    typedefs.h driver.h smalloc.h sent.h instrs.h port.h config.h \
+    hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
+    machine.h ./hosts/amiga/ixfile.h
 
-closure.o : switch.h simul_efun.h simulate.h stralloc.h prolang.h object.h \
-    main.h lex.h instrs.h interpret.h exec.h backend.h array.h closure.h \
-    my-alloca.h driver.h ptrtable.h strfuns.h sent.h smalloc.h lang.h \
-    datatypes.h port.h config.h hosts/unix.h hosts/be/be.h \
-    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+closure.o : xalloc.h switch.h svalue.h stralloc.h stdstrings.h simul_efun.h \
+    simulate.h prolang.h object.h main.h lex.h lang.h interpret.h instrs.h \
+    exec.h backend.h array.h closure.h my-alloca.h typedefs.h driver.h \
+    smalloc.h strfuns.h ptrtable.h sent.h port.h config.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
-comm.o : util/erq/erq.h wiz_list.h stralloc.h simulate.h sent.h object.h \
+comm.o : util/erq/erq.h ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
+    swap.h stralloc.h stdstrings.h smalloc.h simulate.h sent.h object.h \
     main.h interpret.h gcollect.h filestat.h exec.h ed.h closure.h \
     backend.h array.h actions.h access_check.h comm.h hosts/amiga/nsignal.h \
-    telnet.h my-alloca.h driver.h smalloc.h strfuns.h instrs.h datatypes.h \
+    telnet.h my-alloca.h typedefs.h driver.h svalue.h strfuns.h instrs.h \
     config.h port.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
     hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
 
-dumpstat.o : smalloc.h simulate.h ptrtable.h prolang.h object.h mapping.h \
-    instrs.h interpret.h filestat.h exec.h comm.h closure.h array.h \
-    dumpstat.h driver.h strfuns.h datatypes.h sent.h lang.h port.h config.h \
-    hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
-    machine.h ./hosts/amiga/ixfile.h
+dumpstat.o : svalue.h smalloc.h simulate.h ptrtable.h object.h mapping.h \
+    instrs.h filestat.h exec.h closure.h array.h dumpstat.h typedefs.h \
+    driver.h strfuns.h sent.h port.h config.h hosts/unix.h hosts/be/be.h \
+    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
 
-ed.o : stralloc.h simulate.h rxcache.h regexp.h object.h main.h interpret.h \
-    gcollect.h filestat.h comm.h closure.h actions.h ed.h driver.h \
-    smalloc.h strfuns.h sent.h instrs.h exec.h datatypes.h backend.h port.h \
-    config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
-    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
+ed.o : xalloc.h svalue.h stralloc.h stdstrings.h simulate.h rxcache.h \
+    regexp.h object.h main.h interpret.h gcollect.h filestat.h comm.h \
+    closure.h actions.h ed.h typedefs.h driver.h smalloc.h strfuns.h sent.h \
+    instrs.h exec.h port.h config.h hosts/unix.h hosts/be/be.h \
+    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
 
 efuns.o : ../mudlib/sys/strings.h ../mudlib/sys/objectinfo.h \
-    ../mudlib/sys/debug_info.h swap.h strfuns.h stralloc.h smalloc.h \
-    simulate.h ptrtable.h mapping.h main.h prolang.h instrs.h interpret.h \
-    dumpstat.h datatypes.h comm.h closure.h array.h efuns.h driver.h \
-    object.h exec.h sent.h lang.h port.h config.h hosts/unix.h \
-    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
-    ./hosts/amiga/ixfile.h
+    ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h swap.h \
+    strfuns.h stralloc.h stdstrings.h smalloc.h simulate.h rxcache.h \
+    ptrtable.h otable.h object.h mapping.h main.h interpret.h instrs.h \
+    heartbeat.h dumpstat.h comm.h closure.h call_out.h backend.h array.h \
+    actions.h efuns.h my-alloca.h typedefs.h driver.h sent.h regexp.h \
+    exec.h port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
+    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
 
-gcollect.o : wiz_list.h swap.h stralloc.h smalloc.h simul_efun.h simulate.h \
-    sent.h rxcache.h prolang.h otable.h object.h mapping.h main.h lex.h \
-    instrs.h interpret.h heartbeat.h filestat.h exec.h ed.h comm.h \
-    closure.h call_out.h backend.h array.h gcollect.h driver.h strfuns.h \
-    datatypes.h ptrtable.h regexp.h lang.h port.h config.h hosts/unix.h \
-    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
-    ./hosts/amiga/ixfile.h
+gcollect.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h \
+    stralloc.h stdstrings.h smalloc.h simul_efun.h simulate.h sent.h \
+    rxcache.h prolang.h parse.h otable.h object.h mapping.h main.h lex.h \
+    interpret.h instrs.h heartbeat.h filestat.h exec.h ed.h comm.h \
+    closure.h call_out.h backend.h array.h actions.h gcollect.h typedefs.h \
+    driver.h svalue.h strfuns.h ptrtable.h regexp.h port.h config.h \
+    hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
+    machine.h ./hosts/amiga/ixfile.h
 
 hash.o : hash.h
 
-heartbeat.o : wiz_list.h strfuns.h simulate.h sent.h object.h gcollect.h \
-    datatypes.h comm.h backend.h array.h actions.h heartbeat.h driver.h \
-    interpret.h instrs.h exec.h main.h smalloc.h port.h config.h \
-    hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
-    machine.h ./hosts/amiga/ixfile.h
+heartbeat.o : ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h \
+    strfuns.h simulate.h sent.h object.h interpret.h gcollect.h comm.h \
+    backend.h array.h actions.h heartbeat.h typedefs.h driver.h instrs.h \
+    main.h port.h config.h exec.h hosts/unix.h hosts/be/be.h \
+    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
 
-interpret.o : ../mudlib/sys/trace.h wiz_list.h switch.h swap.h sprintf.h \
-    smalloc.h stralloc.h simul_efun.h simulate.h sent.h random.h ptrtable.h \
+interpret.o : ../mudlib/sys/trace.h ../mudlib/sys/driver_hook.h xalloc.h \
+    wiz_list.h switch.h swap.h svalue.h sprintf.h smalloc.h stralloc.h \
+    stdstrings.h simul_efun.h simulate.h sent.h random.h ptrtable.h \
     prolang.h parse.h otable.h object.h mapping.h main.h lex.h instrs.h \
     heartbeat.h gcollect.h filestat.h exec.h efuns.h ed.h comm.h closure.h \
     call_out.h backend.h array.h actions.h interpret.h my-rusage.h \
-    my-alloca.h driver.h strfuns.h datatypes.h lang.h port.h config.h \
-    hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
-    machine.h ./hosts/amiga/ixfile.h
-
-lang.o : wiz_list.h switch.h swap.h stralloc.h simul_efun.h simulate.h \
-    object.h mapping.h main.h lex.h instrs.h interpret.h gcollect.h exec.h \
-    closure.h backend.h array.h prolang.h my-alloca.h driver.h smalloc.h \
-    strfuns.h ptrtable.h sent.h datatypes.h lang.h port.h config.h \
-    hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
-    machine.h ./hosts/amiga/ixfile.h
-
-lex.o : efun_defs.c hosts/amiga/socket.h strfuns.h stralloc.h simul_efun.h \
-    simulate.h prolang.h patchlevel.h main.h instrs.h hash.h gcollect.h \
-    filestat.h exec.h comm.h closure.h backend.h array.h lex.h my-alloca.h \
-    driver.h ./hosts/amiga/socket_sim.h ./hosts/amiga/socket_tcp.h \
-    datatypes.h smalloc.h ptrtable.h object.h interpret.h sent.h lang.h \
-    port.h config.h ./hosts/amiga/socket_sim_protos.h hosts/unix.h \
+    my-alloca.h typedefs.h driver.h strfuns.h port.h config.h hosts/unix.h \
     hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
-main.o : wiz_list.h swap.h stralloc.h simul_efun.h simulate.h rxcache.h \
-    random.h patchlevel.h otable.h object.h mapping.h lex.h interpret.h \
-    gcollect.h filestat.h comm.h array.h backend.h main.h \
-    hosts/amiga/socket.h my-alloca.h driver.h exec.h smalloc.h strfuns.h \
-    ptrtable.h sent.h instrs.h regexp.h datatypes.h \
+lang.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h switch.h swap.h \
+    svalue.h stralloc.h stdstrings.h simul_efun.h simulate.h object.h \
+    mapping.h main.h lex.h instrs.h interpret.h gcollect.h exec.h closure.h \
+    backend.h array.h prolang.h my-alloca.h typedefs.h driver.h smalloc.h \
+    strfuns.h ptrtable.h sent.h port.h config.h hosts/unix.h hosts/be/be.h \
+    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
+
+lex.o : efun_defs.c hosts/amiga/socket.h ../mudlib/sys/driver_hook.h \
+    xalloc.h strfuns.h stralloc.h stdstrings.h simul_efun.h simulate.h \
+    prolang.h patchlevel.h object.h mempools.h main.h lang.h interpret.h \
+    instrs.h hash.h gcollect.h filestat.h exec.h comm.h closure.h backend.h \
+    array.h lex.h my-alloca.h typedefs.h driver.h \
+    ./hosts/amiga/socket_sim.h ./hosts/amiga/socket_tcp.h smalloc.h \
+    ptrtable.h svalue.h sent.h port.h config.h \
+    ./hosts/amiga/socket_sim_protos.h hosts/unix.h hosts/be/be.h \
+    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
+
+main.o : xalloc.h wiz_list.h swap.h svalue.h stralloc.h stdstrings.h \
+    simul_efun.h simulate.h rxcache.h random.h patchlevel.h otable.h \
+    object.h mapping.h lex.h interpret.h gcollect.h filestat.h comm.h \
+    array.h backend.h main.h hosts/amiga/socket.h my-alloca.h typedefs.h \
+    driver.h smalloc.h strfuns.h ptrtable.h exec.h sent.h instrs.h regexp.h \
     ./hosts/amiga/socket_sim.h ./hosts/amiga/socket_tcp.h port.h config.h \
     ./hosts/amiga/socket_sim_protos.h hosts/unix.h hosts/be/be.h \
     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
-make_func.o : hash.h exec.h my-alloca.h driver.h datatypes.h port.h \
+make_func.o : ../mudlib/sys/driver_hook.h hash.h exec.h my-alloca.h \
+    driver.h typedefs.h port.h config.h hosts/unix.h hosts/be/be.h \
+    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
+
+mapping.o : xalloc.h wiz_list.h svalue.h stralloc.h smalloc.h simulate.h \
+    regexp.h object.h main.h interpret.h gcollect.h closure.h backend.h \
+    array.h mapping.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
+    instrs.h exec.h port.h config.h hosts/unix.h hosts/be/be.h \
+    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
+
+mempools.o : xalloc.h gcollect.h mempools.h driver.h typedefs.h port.h \
     config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
     hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
 
-mapping.o : wiz_list.h stralloc.h smalloc.h simulate.h regexp.h object.h \
-    main.h interpret.h gcollect.h datatypes.h closure.h backend.h array.h \
-    mapping.h my-alloca.h driver.h strfuns.h sent.h instrs.h exec.h port.h \
-    config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
-    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
-
-object.o : wiz_list.h swap.h stralloc.h simulate.h sent.h random.h \
+object.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h svalue.h swap.h \
+    strfuns.h stralloc.h stdstrings.h simulate.h smalloc.h sent.h random.h \
     ptrtable.h prolang.h otable.h mapping.h main.h interpret.h filestat.h \
     exec.h comm.h closure.h backend.h array.h actions.h object.h \
-    my-alloca.h driver.h smalloc.h strfuns.h instrs.h lang.h datatypes.h \
-    port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
-    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
-
-otable.o : simulate.h strfuns.h object.h interpret.h hash.h gcollect.h \
-    backend.h otable.h driver.h sent.h instrs.h datatypes.h exec.h main.h \
-    port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
-    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
-
-parse.o : wiz_list.h stralloc.h simulate.h object.h main.h instrs.h \
-    interpret.h closure.h array.h actions.h parse.h driver.h smalloc.h \
-    strfuns.h sent.h exec.h datatypes.h backend.h port.h config.h \
-    hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
-    machine.h ./hosts/amiga/ixfile.h
-
-parse_old.o : wiz_list.h simulate.h random.h object.h main.h interpret.h \
-    array.h actions.h parse.h driver.h strfuns.h sent.h instrs.h exec.h \
-    datatypes.h smalloc.h backend.h port.h config.h hosts/unix.h \
+    my-alloca.h typedefs.h driver.h instrs.h port.h config.h hosts/unix.h \
     hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
-port.o : hosts/crypt.c main.h backend.h my-rusage.h driver.h interpret.h \
-    object.h datatypes.h port.h config.h instrs.h sent.h exec.h \
-    hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
-    machine.h ./hosts/amiga/ixfile.h
+otable.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h simulate.h \
+    strfuns.h object.h hash.h gcollect.h backend.h otable.h typedefs.h \
+    driver.h sent.h instrs.h main.h port.h config.h exec.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
 
-ptrtable.o : simulate.h ptrtable.h driver.h strfuns.h sent.h object.h \
-    instrs.h interpret.h port.h config.h datatypes.h exec.h hosts/unix.h \
+parse.o : xalloc.h wiz_list.h svalue.h stralloc.h stdstrings.h simulate.h \
+    object.h main.h interpret.h instrs.h gcollect.h closure.h array.h \
+    actions.h parse.h typedefs.h driver.h smalloc.h strfuns.h sent.h exec.h \
+    port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
+    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
+
+parse_old.o : xalloc.h wiz_list.h svalue.h stralloc.h stdstrings.h \
+    simulate.h random.h object.h main.h gcollect.h interpret.h closure.h \
+    array.h actions.h parse.h typedefs.h driver.h smalloc.h strfuns.h \
+    sent.h instrs.h exec.h port.h config.h hosts/unix.h hosts/be/be.h \
+    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
+
+port.o : hosts/crypt.c main.h backend.h my-rusage.h driver.h typedefs.h \
+    port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
+    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
+
+ptrtable.o : simulate.h mempools.h ptrtable.h driver.h svalue.h strfuns.h \
+    sent.h instrs.h typedefs.h port.h config.h exec.h hosts/unix.h \
     hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
@@ -356,65 +341,143 @@ random.o : random.h driver.h port.h config.h hosts/unix.h hosts/be/be.h \
     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
-regexp.o : regexp.h driver.h port.h config.h hosts/unix.h hosts/be/be.h \
+regexp.o : xalloc.h simulate.h comm.h regexp.h driver.h svalue.h strfuns.h \
+    sent.h instrs.h typedefs.h port.h config.h exec.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
+
+rxcache.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h \
+    stralloc.h smalloc.h regexp.h hash.h gcollect.h rxcache.h driver.h \
+    typedefs.h port.h config.h hosts/unix.h hosts/be/be.h \
     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
-rxcache.o : strfuns.h stralloc.h smalloc.h regexp.h hash.h gcollect.h \
-    rxcache.h driver.h datatypes.h object.h interpret.h exec.h port.h \
-    config.h sent.h instrs.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
-    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
-
-simul_efun.o : swap.h stralloc.h simulate.h prolang.h parse.h object.h \
-    lex.h instrs.h interpret.h gcollect.h exec.h array.h simul_efun.h \
-    my-alloca.h driver.h smalloc.h strfuns.h sent.h lang.h datatypes.h \
-    ptrtable.h port.h config.h hosts/unix.h hosts/be/be.h \
+simul_efun.o : xalloc.h swap.h svalue.h stralloc.h stdstrings.h simulate.h \
+    ptrtable.h object.h lex.h interpret.h instrs.h gcollect.h exec.h \
+    array.h simul_efun.h my-alloca.h typedefs.h driver.h smalloc.h \
+    strfuns.h sent.h port.h config.h hosts/unix.h hosts/be/be.h \
     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
-simulate.o : ../mudlib/sys/rtlimits.h wiz_list.h swap.h strfuns.h \
-    stralloc.h simul_efun.h sent.h rxcache.h prolang.h otable.h object.h \
-    mapping.h main.h lex.h instrs.h interpret.h heartbeat.h filestat.h \
+simulate.o : ../mudlib/sys/rtlimits.h ../mudlib/sys/files.h \
+    ../mudlib/sys/driver_hook.h ../mudlib/sys/debug_info.h xalloc.h \
+    wiz_list.h svalue.h swap.h strfuns.h stralloc.h stdstrings.h \
+    simul_efun.h sent.h rxcache.h prolang.h otable.h object.h mapping.h \
+    main.h lex.h instrs.h interpret.h heartbeat.h gcollect.h filestat.h \
     exec.h ed.h dumpstat.h comm.h closure.h call_out.h backend.h array.h \
-    actions.h simulate.h hosts/amiga/nsignal.h my-alloca.h driver.h \
-    datatypes.h smalloc.h ptrtable.h regexp.h lang.h port.h config.h \
-    hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
-    machine.h ./hosts/amiga/ixfile.h
+    actions.h simulate.h hosts/amiga/nsignal.h my-alloca.h typedefs.h \
+    driver.h smalloc.h ptrtable.h regexp.h port.h config.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
 
-smalloc.o : object.h exec.h simulate.h main.h gcollect.h backend.h comm.h \
-    smalloc.h driver.h sent.h interpret.h datatypes.h strfuns.h instrs.h \
-    port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
+sprintf.o : xalloc.h swap.h stralloc.h stdstrings.h simul_efun.h simulate.h \
+    sent.h ptrtable.h object.h mapping.h main.h instrs.h interpret.h exec.h \
+    closure.h array.h sprintf.h typedefs.h driver.h smalloc.h strfuns.h \
+    svalue.h port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
     hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
 
-sprintf.o : swap.h stralloc.h simul_efun.h simulate.h sent.h prolang.h \
-    object.h mapping.h main.h instrs.h interpret.h exec.h closure.h array.h \
-    sprintf.h driver.h smalloc.h strfuns.h ptrtable.h lang.h datatypes.h \
-    port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
-    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
+stdstrings.o : stralloc.h stdstrings.h driver.h smalloc.h strfuns.h port.h \
+    config.h svalue.h typedefs.h hosts/unix.h hosts/be/be.h \
+    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
 
-stralloc.o : strfuns.h simulate.h hash.h gcollect.h stralloc.h driver.h \
-    datatypes.h sent.h object.h instrs.h interpret.h exec.h smalloc.h \
-    port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
-    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
+stralloc.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h \
+    stdstrings.h smalloc.h simulate.h main.h hash.h gcollect.h stralloc.h \
+    driver.h typedefs.h sent.h instrs.h port.h config.h exec.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
 
-strfuns.o : smalloc.h simulate.h datatypes.h comm.h strfuns.h driver.h \
-    sent.h object.h instrs.h interpret.h port.h config.h exec.h \
-    hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
-    machine.h ./hosts/amiga/ixfile.h
+strfuns.o : xalloc.h smalloc.h svalue.h simulate.h comm.h strfuns.h \
+    typedefs.h driver.h sent.h instrs.h port.h config.h exec.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
 
-swap.o : hosts/amiga/socket.h wiz_list.h stralloc.h simul_efun.h simulate.h \
-    prolang.h random.h otable.h object.h mapping.h main.h interpret.h \
-    gcollect.h exec.h comm.h backend.h array.h swap.h driver.h \
+swap.o : hosts/amiga/socket.h ../mudlib/sys/debug_info.h xalloc.h \
+    wiz_list.h svalue.h strfuns.h stralloc.h simul_efun.h simulate.h \
+    random.h prolang.h otable.h object.h mapping.h main.h interpret.h \
+    gcollect.h exec.h comm.h backend.h array.h swap.h typedefs.h driver.h \
     ./hosts/amiga/socket_sim.h ./hosts/amiga/socket_tcp.h smalloc.h \
-    strfuns.h ptrtable.h sent.h instrs.h lang.h datatypes.h port.h config.h \
+    ptrtable.h sent.h instrs.h port.h config.h \
     ./hosts/amiga/socket_sim_protos.h hosts/unix.h hosts/be/be.h \
     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
-wiz_list.o : stralloc.h object.h main.h interpret.h gcollect.h backend.h \
-    array.h wiz_list.h driver.h smalloc.h strfuns.h sent.h exec.h instrs.h \
-    datatypes.h port.h config.h hosts/unix.h hosts/be/be.h \
-    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
-    ./hosts/amiga/ixfile.h
+wiz_list.o : xalloc.h svalue.h stralloc.h stdstrings.h object.h main.h \
+    interpret.h gcollect.h backend.h array.h ../mudlib/sys/wizlist.h \
+    wiz_list.h typedefs.h driver.h smalloc.h strfuns.h instrs.h sent.h \
+    port.h config.h exec.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
+    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
+
+xalloc.o : smalloc.c simulate.h interpret.h xalloc.h driver.h \
+    ../mudlib/sys/debug_info.h object.h exec.h svalue.h main.h gcollect.h \
+    backend.h smalloc.h typedefs.h strfuns.h sent.h instrs.h port.h \
+    config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
+    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
 
 # --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS PRECEDE ---
+# --- DO NOT MODIFY THIS LINE -- SELECTED AUTO-DEPENDS FOLLOW ---
+access_check.o : instrs.h
+
+actions.o : instrs.h
+
+array.o : instrs.h
+
+backend.o : stdstrings.h instrs.h
+
+call_out.o : instrs.h
+
+closure.o : stdstrings.h lang.h instrs.h
+
+comm.o : stdstrings.h instrs.h
+
+dumpstat.o : instrs.h
+
+ed.o : stdstrings.h instrs.h
+
+efuns.o : stdstrings.h instrs.h
+
+gcollect.o : stdstrings.h instrs.h
+
+heartbeat.o : instrs.h
+
+interpret.o : stdstrings.h instrs.h
+
+lang.o : stdstrings.h instrs.h
+
+lex.o : efun_defs.c stdstrings.h lang.h instrs.h
+
+main.o : stdstrings.h instrs.h
+
+mapping.o : instrs.h
+
+object.o : stdstrings.h instrs.h
+
+otable.o : instrs.h
+
+parse.o : stdstrings.h instrs.h
+
+parse_old.o : stdstrings.h instrs.h
+
+ptrtable.o : instrs.h
+
+regexp.o : instrs.h
+
+simul_efun.o : stdstrings.h instrs.h
+
+simulate.o : stdstrings.h instrs.h
+
+sprintf.o : stdstrings.h instrs.h
+
+stdstrings.o : stdstrings.h
+
+stralloc.o : stdstrings.h instrs.h
+
+strfuns.o : instrs.h
+
+swap.o : instrs.h
+
+wiz_list.o : stdstrings.h instrs.h
+
+xalloc.o : instrs.h
+
+# --- DO NOT MODIFY THIS LINE -- SELECTED AUTO-DEPENDS PRECEDE ---

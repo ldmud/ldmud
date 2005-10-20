@@ -10,13 +10,22 @@ The provided settings:
   compat:   settings used for a generic compat-mode driver
   native:   settings used for a generic native-mode driver
 
-  avalon:     settings for Avalon
-  carledon:   settings for Carledon
-  osb:        settings for OSB
-  pkmud:      settings for PkMud
-  silberland: settings for SilberLand
-  sticklib:   settings for StickLib
-  tubmud:     settings for TubMud
-  unitopia:   settings for UNItopia
-  wunderland: settings for WunderLand
+  avalon:          settings for Avalon
+  carledon:        settings for Carledon
+  dt2:             settings for Deeper Trouble II
+  eotl:            settings for End of the Line
+  evermore:        settings for Evermore
+  evermore-native: settings for Evermore (Native version)
+  finalfrontier:   settings for FinalFrontier (generic driver only)
+  forgottendreams: settings for ForgottenDreams
+  hyperborea:      settings for Hyperborea
+  osb:             settings for OSB
+  pkmud:           settings for PkMud
+  psycmuve:        settings for PSYC
+  quovadis:        settings for Quo Vadis
+  silberland:      settings for SilberLand
+  sticklib:        settings for StickLib
+  tubmud:          settings for TubMud
+  unitopia:        settings for UNItopia
+  wunderland:      settings for WunderLand
 

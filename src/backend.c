@@ -8,10 +8,6 @@
  * like garbage collection, swapping, heart beats and the triggers of
  * call outs and mapping compaction.
  *
- * The error recovery stack is placed here since on the top level any
- * uncaught error will reset the virtual machine and restart the backend
- * loop.
- *
  * Timing is implemented using a one-shot 2 second alarm(). When the
  * alarm is triggered, the handler sets the variable comm_time_to_call_heart-
  * _beat which is monitored by various functions.
@@ -38,6 +34,7 @@
  */
 
 #include "driver.h"
+#include "typedefs.h"
 
 #include <stddef.h>
 #include <ctype.h>
@@ -80,34 +77,17 @@
 #include "rxcache.h"
 #include "simulate.h"
 #include "smalloc.h"
+#include "stdstrings.h"
 #include "stralloc.h"
 #include "swap.h"
 #include "wiz_list.h"
+#include "xalloc.h"
+
+#include "../mudlib/sys/driver_hook.h"
 
 /*-------------------------------------------------------------------------*/
 
 #define ALARM_TIME  2  /* The granularity of alarm() calls */
-
-/*-------------------------------------------------------------------------*/
-
-/* The runtime context stack.
- *
- * Runtime context informations are maintained in a linked list, with
- * cur_context pointing to the most recently pushed context.
- * From there, the links go back through the less recently pushed contexts
- * and end with the toplevel_context.
- * TODO: Move this stack into interpret.c or simulate.c?
- */
-
-struct error_recovery_info toplevel_context
- = {
-     { NULL,
-       ERROR_RECOVERY_NONE
-     }
- };
-
-rt_context_t * rt_context
- = (rt_context_t *)&toplevel_context;
 
 /*-------------------------------------------------------------------------*/
 mp_int current_time;
@@ -168,21 +148,6 @@ static double compile_av = 0.0;
    * of time.
    */
 
-static struct svalue *old_hooks = NULL;
-  /* Array of entries holding all the old driver hook closures replaced
-   * during this and the previous execution threads. The closures are
-   * not freed immediately on replacement in case they are still used.
-   * Instead, the backend frees them explicitely.
-   */
-
-static int num_old_hooks = 0;
-  /* The current number of entries in <old_hooks>
-   */
-
-static int max_old_hooks = 0;
-  /* The allocated length of <old_hooks>
-   */
-
 /*-------------------------------------------------------------------------*/
 
 /* --- Forward declarations --- */
@@ -214,8 +179,41 @@ clear_state (void)
 }
 
 /*-------------------------------------------------------------------------*/
+#ifdef DEBUG
+
+static void
+do_state_check (int minlvl, const char *where)
+
+/* Perform the simplistic interpret::check_state() if the check_state_lvl
+ * is at least <minlvl>. If an inconsistency is detected, the message
+ * "<timestamp> Inconsistency <where>" and a trace of the last instructions
+ * is logged, then the state is cleared.
+ *
+ * Be careful that the call to check_state()/clear_state() is
+ * not too costly, as it is done in every loop.
+ */
+{
+    if (check_state_level >= minlvl && check_state() )
+    {
+        debug_message("%s Inconsistency %s\n", time_stamp(), where);
+        printf("%s Inconsistency %s\n", time_stamp(), where);
+        dump_trace(MY_TRUE);
+#ifdef TRACE_CODE
+        last_instructions(TOTAL_TRACE_LENGTH, 1, 0);
+#endif
+        clear_state();
+    }
+} /* do_state_check() */
+
+#else
+
+#define do_state_check(minlvl, where)
+
+#endif
+
+/*-------------------------------------------------------------------------*/
 void
-logon (struct object *ob)
+logon (object_t *ob)
 
 /* Call the logon() lfun in the object <ob>.
  *
@@ -227,8 +225,8 @@ logon (struct object *ob)
  */
 
 {
-    struct svalue *ret;
-    struct object *save = current_object;
+    svalue_t *ret;
+    object_t *save = current_object;
 
     current_object = ob;
     ret = apply(STR_LOGON, ob, 0);
@@ -256,73 +254,52 @@ exit_alarm_timer (void)
 #endif
 
 /*-------------------------------------------------------------------------*/
-void
-free_closure_hooks (struct svalue *svp, int count)
+static RETSIGTYPE
+handle_hup (int sig UNUSED)
 
-/* "Free" the <count> closures in <svp>[], ie. store them for later
- * deletion by the backend.
- * TODO: Can this be done better by introducing a refcount in the
- * TODO:: closures?
+/* SIGHUP handler: request a game shutdown.
  */
-
 {
-    struct svalue *new;
-
-    if (max_old_hooks < num_old_hooks + count)
-    {
-        int delta;
-
-        delta = (count > NUM_CLOSURE_HOOKS) ? count : NUM_CLOSURE_HOOKS;
-
-        if (old_hooks)
-            new = rexalloc(old_hooks
-                          , (max_old_hooks + delta) * sizeof(*new));
-        else
-            new = xalloc(delta * sizeof(*new));
-        if (!new)
-            return;
-        old_hooks = new;
-        max_old_hooks += delta;
-    }
-    memcpy(old_hooks + num_old_hooks, svp, count * sizeof(*svp));
-    num_old_hooks += count;
-}
+#ifdef __MWERKS__
+#    pragma unused(sig)
+#endif
+    extra_jobs_to_do = MY_TRUE;
+    game_is_being_shut_down = MY_TRUE;
+#ifndef __MWERKS__
+#if RETSIGTYPE != void
+    return 0;
+#endif
+#endif
+} /* handle_hup() */
 
 /*-------------------------------------------------------------------------*/
-void
-free_old_driver_hooks (void)
+static RETSIGTYPE
+handle_usr1 (int sig UNUSED)
 
-/* Free all closures queued in <old_hooks>, and the <old_hooks> array itself.
- * This function is called from the backend and from the garbage collector.
+/* SIGUSR1 handler: request a master update.
  */
 
 {
-    int i;
-
-    if (!old_hooks)
-        return;
-
-    for (i = num_old_hooks; i--;)
-    {
-        if (old_hooks[i].type == T_CLOSURE
-         && old_hooks[i].x.closure_type == CLOSURE_LAMBDA)
-        {
-            old_hooks[i].x.closure_type = CLOSURE_UNBOUND_LAMBDA;
-        }
-        free_svalue(&old_hooks[i]);
-    }
-
-    xfree(old_hooks);
-    old_hooks = NULL;
-    num_old_hooks = max_old_hooks = 0;
-}
+#ifdef __MWERKS__
+#    pragma unused(sig)
+#endif
+    extra_jobs_to_do = MY_TRUE;
+    master_will_be_updated = MY_TRUE;
+    eval_cost += max_eval_cost >> 3;
+    (void)signal(SIGUSR1, handle_usr1);
+#ifndef __MWERKS__
+#if RETSIGTYPE != void
+    return 0;
+#endif
+#endif
+} /* handle_usr1() */
 
 /*-------------------------------------------------------------------------*/
 void
 backend (void)
 
 /* The backend loop, the backbone of the driver's operations.
- * It never returns (at least not the normal way).
+ * It only returns when the game has to be shut down.
  */
 
 {
@@ -333,13 +310,13 @@ backend (void)
      * Set up.
      */
 
-    (void)printf("Setting up ipc.\n");
+    printf("%s Setting up ipc.\n", time_stamp());
     fflush(stdout);
 
     prepare_ipc();
 
-    (void)signal(SIGHUP,  (RETSIGTYPE(*)PROT((int)))f_shutdown);
-    (void)signal(SIGUSR1, (RETSIGTYPE(*)PROT((int)))startmasterupdate);
+    (void)signal(SIGHUP,  handle_hup);
+    (void)signal(SIGUSR1, handle_usr1);
     if (!t_flag) {
         ALARM_HANDLER_FIRST_CALL(catch_alarm);
         current_time = get_current_time();
@@ -366,20 +343,7 @@ backend (void)
      */
     while(1)
     {
-#if 0 && defined(DEBUG)
-        /* The call to check_state()/clear_state() should not be done
-         * in every loop as it is quite costly. However, it is helpful
-         * when debugging the driver.
-         */
-        if ( check_state() ) {
-            debug_message("Inconsistency in main loop\n");
-            dump_trace(MY_TRUE);
-#ifdef TRACE_CODE
-            last_instructions(TOTAL_TRACE_LENGTH, 1, 0);
-#endif
-            clear_state();
-        }
-#endif
+        do_state_check(1, "in main loop");
 
         RESET_LIMITS;
         CLEAR_EVAL_COST;
@@ -408,6 +372,10 @@ backend (void)
             check_a_lot_ref_counts(NULL);
             /* after removing destructed objects! */
 #endif
+#ifdef CHECK_STRINGS
+        if (check_string_table_flag)
+            check_string_table();
+#endif
 
         /*
          * Do the extra jobs, if any.
@@ -415,15 +383,16 @@ backend (void)
 
         if (extra_jobs_to_do) {
 
-            current_interactive = 0;
-            if (game_is_being_shut_down) {
+            current_interactive = NULL;
+            if (game_is_being_shut_down)
+            {
                 command_giver = NULL;
                 current_object = NULL;
-                shutdowngame();
+                return;
             }
 
             if (master_will_be_updated) {
-                emergency_destruct(master_ob);
+                destruct(master_ob);
                 master_will_be_updated = MY_FALSE;
                 command_giver = NULL;
                 current_object = &dummy_current_object_for_loads;
@@ -437,7 +406,7 @@ backend (void)
 
                 if (time_now - time_last_gc >= 300)
                 {
-                  sprintf(buf, "Garbage collection, slow_shut: %d\n", slow_shut_down_to_do);
+                  sprintf(buf, "%s Garbage collection, slow_shut: %d\n", time_stamp(), slow_shut_down_to_do);
                   write(1, buf, strlen(buf));
                   command_giver = NULL;
                   current_object = NULL;
@@ -445,18 +414,24 @@ backend (void)
                 }
                 else
                 {
-                  sprintf(buf, "No garbage collection, slow_shut: %d\n", slow_shut_down_to_do);
+                  sprintf(buf, "%s No garbage collection, slow_shut: %d\n", time_stamp(), slow_shut_down_to_do);
                   write(1, buf, strlen(buf));
                   reallocate_reserved_areas();
                 }
 
                 garbage_collect_to_do = MY_FALSE;
 
-                if (slow_shut_down_to_do) {
-                    int tmp = slow_shut_down_to_do;
+                if (slow_shut_down_to_do)
+                {
+                    int minutes = slow_shut_down_to_do;
+                    char shut_msg[90];
+
                     slow_shut_down_to_do = 0;
                     malloc_privilege = MALLOC_MASTER;
-                    slow_shut_down(tmp);
+                    sprintf(shut_msg, "%s slow_shut_down(%d)\n", time_stamp(), minutes);
+                    write(1, shut_msg, strlen(shut_msg));
+                    push_number(minutes);
+                    apply_master_ob(STR_SLOW_SHUT, 1);
                 }
                 malloc_privilege = MALLOC_USER;
             }
@@ -469,6 +444,8 @@ backend (void)
             }
         } /* if (extra_jobs_to_do */
 
+        do_state_check(2, "before get_message()");
+
         /*
          * Call comm.c and wait for player input, or until the next
          * heart beat is due.
@@ -476,6 +453,8 @@ backend (void)
 
         if (get_message(buff))
         {
+            interactive_t *ip;
+
             /* Note that the size of buff[] is determined by MAX_TEXT, which
              * is the max size of the network receive buffer. Iow: no
              * buffer overruns possible.
@@ -499,57 +478,66 @@ backend (void)
             current_object = NULL;
             current_interactive = command_giver;
 
+            (void)O_SET_INTERACTIVE(ip, command_giver);
 #ifdef DEBUG
-            if (!O_GET_INTERACTIVE(command_giver)
-             ||  O_GET_INTERACTIVE(command_giver)->sent.type != SENT_INTERACTIVE)
+            if (!ip)
             {
                 fatal("Non interactive player in main loop !\n");
                 /* NOTREACHED */
             }
 #endif
+
+            ip->set_input_to = MY_FALSE;
             tracedepth = 0;
 
             if (buff[0] == '!'
              && buff[1] != '\0'
              && command_giver->super
-             && !(O_GET_INTERACTIVE(command_giver)->noecho & IGNORE_BANG))
+             && !call_function_interactive(ip, buff))
             {
-                if (O_GET_INTERACTIVE(command_giver)->noecho & NOECHO) {
-                    add_message("%s\n",
-                          buff + O_GET_INTERACTIVE(command_giver)->chars_ready);
-                    O_GET_INTERACTIVE(command_giver)->chars_ready = 0;
+                /* We got a bang-input, but no input context wants
+                 * to handle it - treat it as a normal command.
+                 */
+                if (ip->noecho & NOECHO)
+                {
+                    /* !message while in NOECHO - simulate the
+                     * echo by sending the (remaining) raw data we got.
+                     */
+                    add_message("%s\n", buff + ip->chars_ready);
+                    ip->chars_ready = 0;
                 }
                 execute_command(buff+1, command_giver);
             }
-            else if (O_GET_INTERACTIVE(command_giver)->sent.ed_buffer)
+            else if (O_GET_EDBUFFER(command_giver))
                 ed_cmd(buff);
             else if (
-              call_function_interactive(O_GET_INTERACTIVE(command_giver),buff))
+              call_function_interactive(ip, buff))
                 NOOP;
             else
                 execute_command(buff, command_giver);
+
+            /* ip might be invalid again here */
 
             /*
              * Print a prompt if player is still here.
              */
             if (command_giver)
             {
-                struct interactive *ip;
-
-                if (NULL != (ip = O_GET_INTERACTIVE(command_giver))
-                 && ip->sent.type == SENT_INTERACTIVE
+                if (O_SET_INTERACTIVE(ip, command_giver)
                  && !ip->do_close)
                 {
                     print_prompt();
                 }
             }
+        
+            do_state_check(2, "after handling message");
         } /* if (get_message()) */
 
         /* Do the periodic functions if it's time.
          */
         if (time_to_call_heart_beat)
         {
-            struct object *hide_current = current_object;
+            object_t *hide_current = current_object;
               /* TODO: Is there any point to this? */
 
             current_time = get_current_time();
@@ -562,13 +550,17 @@ backend (void)
             alarm(ALARM_TIME);
 
             /* Do the timed events */
+            do_state_check(2, "before heartbeat");
             call_heart_beat();
+            do_state_check(2, "after heartbeat");
             call_out();
+            do_state_check(2, "after call_out");
 
             /* Reset/cleanup/swap objects.
              * TODO: Reset and cleanup/swap should be separated.
              */
             process_objects();
+            do_state_check(2, "after swap/cleanup/reset");
 
             command_giver = NULL;
             trace_level = 0;
@@ -663,7 +655,7 @@ static Bool did_swap;
    * static so that errors won't clobber it.
    */
 
-    struct object *obj;   /* Current object worked on */
+    object_t *obj;   /* Current object worked on */
 
     struct error_recovery_info error_recovery_info;
       /* Local error recovery info */
@@ -681,7 +673,7 @@ static Bool did_swap;
     if (setjmp(error_recovery_info.con.text))
     {
         clear_state();
-        debug_message("Error in process_objects().\n");
+        debug_message("%s Error in process_objects().\n", time_stamp());
     }
 
     /* The processing loop, runs until either time or objects
@@ -739,7 +731,7 @@ static Bool did_swap;
             {
 #ifdef DEBUG
                 if (d_flag)
-                    fprintf(stderr, "RESET (virtual) %s\n", obj->name);
+                    fprintf(stderr, "%s RESET (virtual) %s\n", time_stamp(), obj->name);
 #endif
                 obj->time_reset = current_time+time_to_reset/2
                                   +(mp_int)random_number((uint32)time_to_reset/2);
@@ -748,7 +740,7 @@ static Bool did_swap;
             {
 #ifdef DEBUG
                 if (d_flag)
-                    fprintf(stderr, "RESET %s\n", obj->name);
+                    fprintf(stderr, "%s RESET %s\n", time_stamp(), obj->name);
 #endif
                 if (obj->flags & O_SWAPPED
                  && load_ob_from_swap(obj) < 0)
@@ -795,11 +787,11 @@ static Bool did_swap;
         {
             int was_swapped = obj->flags & O_SWAPPED ;
             int save_reset_state = obj->flags & O_RESET_STATE;
-            struct svalue *svp;
+            svalue_t *svp;
 
 #ifdef DEBUG
             if (d_flag)
-                fprintf(stderr, "clean up %s\n", obj->name);
+                fprintf(stderr, "%s CLEANUP %s\n", time_stamp(), obj->name);
 #endif
 
             did_swap = MY_TRUE;
@@ -818,7 +810,7 @@ static Bool did_swap;
             trace_level = 0;
             if (closure_hook[H_CLEAN_UP].type == T_CLOSURE)
             {
-                struct lambda *l;
+                lambda_t *l;
 
                 l = closure_hook[H_CLEAN_UP].u.lambda;
                 if (closure_hook[H_CLEAN_UP].x.closure_type == CLOSURE_LAMBDA)
@@ -885,7 +877,7 @@ no_clean_up:
             {
 #ifdef DEBUG
                 if (d_flag)
-                   fprintf(stderr, "swap vars of %s\n", obj->name);
+                   fprintf(stderr, "%s swap vars of %s\n", time_stamp(), obj->name);
 #endif
                 swap_variables(obj);
                 if (O_VAR_SWAPPED(obj))
@@ -900,14 +892,14 @@ no_clean_up:
             {
 #ifdef DEBUG
                 if (d_flag)
-                    fprintf(stderr, "swap %s\n", obj->name);
+                    fprintf(stderr, "%s swap %s\n", time_stamp(), obj->name);
 #endif
                 swap_program(obj);
                 if (O_PROG_SWAPPED(obj))
                     did_swap = MY_TRUE;
             }
         } /* if (obj can be swapped) */
-#endif
+#endif /* TIME_TO_SWAP > 0 || TIME_TO_SWAP_VARIABLES > 0 */
 
         /* TODO: Here would be nice place to convert all strings in an
          * TODO:: object to shared strings, if the object was reset, cleant
@@ -948,8 +940,8 @@ preload_objects (int eflag)
  */
 
 {
-    struct vector *prefiles;
-    struct svalue *ret;
+    vector_t *prefiles;
+    svalue_t *ret;
     static mp_int ix0;
     static size_t num_prefiles;
     mp_int ix;
@@ -1090,8 +1082,8 @@ static char buff[100];
 }
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_debug_message (struct svalue *sp)
+svalue_t *
+f_debug_message (svalue_t *sp)
 
 /* TEFUN debug_message()
  *
@@ -1110,7 +1102,7 @@ f_debug_message (struct svalue *sp)
 
 /*-------------------------------------------------------------------------*/
 int
-write_file (char *file, char *str)
+e_write_file (char *file, char *str)
 
 /* EFUN write_file()
  *
@@ -1129,18 +1121,17 @@ write_file (char *file, char *str)
 
     f = fopen(file, "a");
     if (f == NULL) {
-        if (errno == EMFILE
+        if ((errno == EMFILE
 #ifdef ENFILE
-         || errno == ENFILE
+             || errno == ENFILE
+            ) && current_file
 #endif
         ) {
-            /* lex_close() calls lexerror(). lexerror() calls yyerror().
-             * yyerror calls smart_log(). smart_log calls apply_master_ob(),
-             * which might call us again.
-             * This is why the value of file needs to be preserved.
-             * TODO: Why is lex_close() called at all - just for the nice
-             * TODO:: message? Hmm, it could happen during the processing
-             * TODO:: of a compilation error on mudlib level.
+            /* We are called from within the compiler, probably to write
+             * an error message into a log.
+             * Call lex_close() (-> lexerror() -> yyerror() -> parse_error()
+             * -> apply_master_ob() ) to try to close some files, the try
+             * again.
              */
             push_apply_value();
             lex_close(NULL);
@@ -1148,19 +1139,33 @@ write_file (char *file, char *str)
             f = fopen(file, "a");
         }
         if (f == NULL) {
-            perror("write_file");
-            error("Wrong permissions for opening file %s for append.\n", file);
+            char * emsg, * buf;
+
+            emsg = strerror(errno);
+            buf = alloca(strlen(emsg+1));
+            if (buf)
+            {
+                strcpy(buf, emsg);
+                error("Could not open %s for append: %s.\n", file, buf);
+            }
+            else
+            {
+                perror("write_file");
+                error("Could not open %s for append: errno %d.\n"
+                     , file, errno);
+            }
+            /* NOTREACHED */
         }
     }
     FCOUNT_WRITE(file);
     fwrite(str, strlen(str), 1, f);
     fclose(f);
     return 1;
-}
+} /* e_write_file() */
 
 /*-------------------------------------------------------------------------*/
 char *
-read_file (char *file, int start, int len)
+e_read_file (char *file, int start, int len)
 
 /* EFUN read_file()
  *
@@ -1228,7 +1233,7 @@ read_file (char *file, int start, int len)
     str = xalloc((size_t)size + 2); /* allow a trailing \0 and leading ' ' */
     if (!str) {
         fclose(f);
-        error("Out of memory\n");
+        error("(read_file) Out of memory (%ld bytes) for buffer\n", size+2);
         /* NOTREACHED */
         return NULL;
     }
@@ -1342,14 +1347,14 @@ read_file (char *file, int start, int len)
     p2 = string_copy(str); /* TODO: string_n_copy() */
     xfree(str-1);
     if (!p2)
-        error("Out of memory\n");
+        error("(read_file) Out of memory for result\n");
 
     return p2;
-} /* read_file() */
+} /* e_read_file() */
 
 /*-------------------------------------------------------------------------*/
 char *
-read_bytes (char *file, int start, int len)
+e_read_bytes (char *file, int start, int len)
 
 /* EFUN read_bytes()
  *
@@ -1431,11 +1436,11 @@ read_bytes (char *file, int start, int len)
     xfree(str);
 
     return p;
-} /* read_bytes() */
+} /* e_read_bytes() */
 
 /*-------------------------------------------------------------------------*/
 int
-write_bytes (char *file, int start, char *str)
+e_write_bytes (char *file, int start, char *str)
 
 /* EFUN write_bytes()
  *
@@ -1491,11 +1496,11 @@ write_bytes (char *file, int start, char *str)
     }
 
     return 1;
-} /* write_bytes() */
+} /* e_write_bytes() */
 
 /*-------------------------------------------------------------------------*/
 long
-file_size (char *file)
+e_file_size (char *file)
 
 /* EFUN file_size()
  *
@@ -1515,11 +1520,11 @@ file_size (char *file)
     if (S_IFDIR & st.st_mode)
         return -2;
     return (long)st.st_size;
-}
+} /* e_file_size() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue*
-f_regreplace (struct svalue *sp)
+svalue_t*
+f_regreplace (svalue_t *sp)
 
 /* TEFUN regreplace()
  *
@@ -1583,8 +1588,9 @@ f_regreplace (struct svalue *sp)
     buf = (char*)rexalloc(buf,origspace);\
     if (!buf) { \
         xfree(oldbuf); \
-        if (pat) xfree(pat); \
-        error("Out of memory\n"); \
+        if (pat) REGFREE(pat); \
+        error("(regreplace) Out of memory (%lu bytes) for buffer\n"\
+             , (unsigned long)origspace); \
     } \
     new = buf + (new-oldbuf)
 
@@ -1596,14 +1602,9 @@ f_regreplace (struct svalue *sp)
  * is one thing to try.
  */
 
-    new = buf = xalloc((size_t)space);
-    if (!new)
-    {
-        error("Out of memory.\n");
-        /* NOTREACHED */
-        return NULL;
-    }
-    pat = REGCOMP(sp[-2].u.string,(flags & F_EXCOMPAT) ? 1 : 0);
+    xallocate(buf, (size_t)space, "buffer");
+    new = buf;
+    pat = REGCOMP(sp[-2].u.string,(flags & F_EXCOMPAT) ? 1 : 0, MY_FALSE);
     /* regcomp returns NULL on bad regular expressions. */
 
     if (pat && regexec(pat,curr,start)) {
@@ -1626,7 +1627,6 @@ f_regreplace (struct svalue *sp)
              * still there on failure, it is a real failure.
              * if not, increase space. The player could get
              * some irritating messages from regerror()
-             * ... (should we switch them off?)
              */
             while (NULL == (new = regsub(pat, sub, new, space, 1)) )
             {

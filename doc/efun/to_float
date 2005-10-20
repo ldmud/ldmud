@@ -3,6 +3,8 @@ SYNOPSIS
 	float to_float(string)
 	float to_float(float)
 
+        (float)<value>
+
 DESCRIPTION
 	Ints are expanded to floats, strings are converted up to the
 	first character that doesnt belong into a float.

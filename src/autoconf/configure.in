@@ -89,11 +89,14 @@ AC_MY_ARG_ENABLE(compat-mode,no,,)
 AC_MY_ARG_ENABLE(strict-euids,no,,)
 AC_MY_ARG_ENABLE(supply-parse-command,yes,,)
 AC_MY_ARG_ENABLE(initialization-by-__init,yes,,)
+AC_MY_ARG_ENABLE(use-system-crypt,yes,,)
 AC_MY_ARG_ENABLE(udp-send,yes,,)
+AC_MY_ARG_ENABLE(use-ipv6,no,,)
+AC_MY_ARG_ENABLE(lpc-nosave,yes,,[Enables the 'nosave' keyword])
 AC_MY_ARG_ENABLE(comm-stat,yes,,)
 AC_MY_ARG_ENABLE(apply-cache_stat,yes,,)
-AC_MY_ARG_ENABLE(smalloc-trace,no,,)
-AC_MY_ARG_ENABLE(smalloc-lpc-trace,no,,)
+AC_MY_ARG_ENABLE(malloc-trace,no,,)
+AC_MY_ARG_ENABLE(malloc-lpc-trace,no,,)
 AC_MY_ARG_ENABLE(max-malloced,yes,,)
 AC_MY_ARG_ENABLE(min-malloced,no,,)
 AC_MY_ARG_ENABLE(dynamic-costs,no,,)
@@ -144,9 +147,9 @@ AC_MY_ARG_WITH(rxcache-table,16384,,)
 AC_MY_ARG_WITH(max-byte-transfer,50000,,)
 AC_MY_ARG_WITH(catch-udp-port,4246,,)
 AC_MY_ARG_WITH(set-buffer-size-max,65536,,)
+AC_MY_ARG_WITH(malloc,smalloc,[smalloc/sysmalloc],[memory manager to use])
 AC_MY_ARG_WITH(min-malloced,0x1000000,,)
 AC_MY_ARG_WITH(max-malloced,0x4000000,,)
-AC_MY_ARG_WITH(max-small-malloced,0x1000000,,)
 AC_MY_ARG_WITH(total-trace-length,0x1000,,)
 
 AC_ARG_WITH(setting,[  --with-setting=SETTING  include a predefined setting],[
@@ -192,11 +195,14 @@ AC_CDEF_FROM_ENABLE(compat_mode)
 AC_CDEF_FROM_ENABLE(strict_euids)
 AC_CDEF_FROM_ENABLE(supply_parse_command)
 AC_CDEF_FROM_ENABLE(initialization_by___init)
+AC_CDEF_FROM_ENABLE(use_system_crypt)
 AC_CDEF_FROM_ENABLE(udp_send)
+AC_CDEF_FROM_ENABLE(use_ipv6)
+AC_CDEF_FROM_ENABLE(lpc_nosave)
 AC_CDEF_FROM_ENABLE(comm_stat)
 AC_CDEF_FROM_ENABLE(apply_cache_stat)
-AC_CDEF_FROM_ENABLE(smalloc_trace)
-AC_CDEF_FROM_ENABLE(smalloc_lpc_trace)
+AC_CDEF_FROM_ENABLE(malloc_trace)
+AC_CDEF_FROM_ENABLE(malloc_lpc_trace)
 AC_CDEF_FROM_ENABLE(max_malloced)
 AC_CDEF_FROM_ENABLE(min_malloced)
 AC_CDEF_FROM_ENABLE(dynamic_costs)
@@ -244,9 +250,9 @@ AC_INT_VAL_FROM_WITH(rxcache_table)
 AC_INT_VAL_FROM_WITH(max_byte_transfer)
 AC_INT_VAL_FROM_WITH(catch_udp_port)
 AC_INT_VAL_FROM_WITH(set_buffer_size_max)
+AC_INT_VAL_FROM_WITH(malloc)
 AC_INT_VAL_FROM_WITH(min_malloced)
 AC_INT_VAL_FROM_WITH(max_malloced)
-AC_INT_VAL_FROM_WITH(max_small_malloced)
 AC_INT_VAL_FROM_WITH(total_trace_length)
 
 if test "x$cdef_access_control" = "x#undef"; then
@@ -268,7 +274,6 @@ fi
 
 if test "x$cdef_max_malloced" = "x#undef"; then
   val_max_malloced=
-  val_max_small_malloced=
 fi
 
 if test "x$cdef_rxcache_table" = "x#undef"; then
@@ -343,7 +348,7 @@ dnl Checking for programs and headers
 AC_PROG_INSTALL
 AC_CONFIG_HEADER(machine.h)
 dnl bison -y is incompatible in functionality & Copyright
-dnl (Mubo: copyright changed, this should no longer be a problem, but...)
+dnl TODO: (Mubo: copyright changed, this should no longer be a problem, but...)
 AC_CHECK_PROGS(YACC, byacc, yacc)
 AC_PROG_CPP
 AC_CHECK_HEADERS(sys/rusage.h sys/time.h unistd.h stdlib.h libc.h memory.h)
@@ -365,6 +370,15 @@ int i = 96/(sizeof(struct ts)-20);
 lp_cv_sys_malloc_align=8,
 lp_cv_sys_malloc_align=4))
 AC_DEFINE_UNQUOTED(MALLOC_ALIGN,$lp_cv_sys_malloc_align)
+
+AC_CACHE_CHECK(for ssize_t,lp_cv_type_ssize_t,
+AC_TRY_COMPILE([#include <sys/types.h>
+ssize_t i;],,
+lp_cv_type_ssize_t=yes,
+lp_cv_type_ssize_t=no))
+if test $lp_cv_type_ssize_t = yes; then
+  AC_DEFINE(HAVE_SSIZE_T)
+fi
 
 AC_CACHE_CHECK(for long long,lp_cv_type_long_long,
 AC_TRY_COMPILE([long long i;],,
@@ -399,7 +413,7 @@ if test $ac_cv_lib_socket_main = "yes" || test $ac_cv_lib_ucb_main = "yes"; then
       AC_CHECK_LIB(nsl,main)
 fi
 AC_FUNC_ALLOCA
-AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strcspn crypt _crypt)
+AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strdup strcspn crypt _crypt)
 AC_CHECK_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
 AC_CHECK_FUNCS(fcntl getdomainname)
 
@@ -442,11 +456,33 @@ char *inet_ntoa(ad)
 #else
 use inet_ntoa() from the library.
 #endif
-],lp_cv_func_inet_ntoa_ok=no,
+],,lp_cv_func_inet_ntoa_ok=no,
 lp_cv_func_inet_ntoa_ok=yes
 )))
 if test $lp_cv_func_inet_ntoa_ok = yes ; then
   AC_DEFINE(INET_NTOA_OK)
+fi
+
+AC_CACHE_CHECK(for IPv6 support,lp_cv_has_ipv6,
+saveflags="$CFLAGS"
+CFLAGS="$CFLAGS -I/usr/inet6/include"
+AC_TRY_COMPILE([
+#include <sys/types.h>
+#include <netinet/in.h>
+
+struct sockaddr_in6 foo(void)
+{
+    static struct sockaddr_in6 ad;
+    
+    return ad;
+}
+],,lp_cv_has_ipv6=yes,
+lp_cv_has_ipv6=no
+CFLAGS="$saveflags"
+))
+if test $lp_cv_has_ipv6 = yes; then
+  AC_DEFINE(HAS_IPV6)
+  AC_CHECK_LIB(inet6,main, LIBS="$LIBS -linet6")
 fi
 
 AC_CACHE_CHECK(if rename handles directories,
@@ -597,13 +633,13 @@ AC_TRY_COMPILE([
 #ifdef HAVE_VALUES_H
 #include <values.h>
 #endif
-int i[1/(CHAR_BIT-8)];
+int i=[1/(CHAR_BIT-8)];
 ],,lp_cv_prop_charbits_eq_8=no, lp_cv_prop_charbits_eq_8=yes))
 if test $lp_cv_prop_charbits_eq_8 = yes; then
   AC_DEFINE(CHARBIT_MASK, 0xff)
 else
-dnl this is something I don't really understand... am I too stupid?
-dnl bitmask set to number of bits ?????? *shudder* [Mubo]
+dnl TODO: this is something I don't really understand... am I too stupid?
+dnl TODO:: bitmask set to number of bits ?????? *shudder* [Mubo]
   AC_DEFINE(CHARBIT_MASK, CHAR_BIT)
 fi
 
@@ -639,6 +675,7 @@ AC_TRY_RUN([
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <stdio.h>
+#include <stdlib.h>
 main() {
     int port, tmp, s;
     struct sockaddr_in my_sin;
@@ -716,6 +753,7 @@ AC_TRY_RUN([
 #include <netdb.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdlib.h>
 main() {
     int port, tmp, s;
     struct sockaddr_in my_sin;
@@ -766,7 +804,7 @@ if test $lp_cv_prop_use_fnctl_o_ndelay = yes; then
   AC_DEFINE(USE_FCNTL_O_NDELAY)
 fi
 
-AC_CACHE_CHECK(nonblocking wusing fcntl with FNDELAY,
+AC_CACHE_CHECK(nonblocking using fcntl with FNDELAY,
 lp_cv_prop_use_fcntl_fndelay,
 AC_TRY_RUN([
 #include <sys/types.h> /* needed for netinet/in.h */
@@ -775,6 +813,7 @@ AC_TRY_RUN([
 #include <netdb.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdlib.h>
 main() {
     int port, tmp, s;
     struct sockaddr_in my_sin;
@@ -826,6 +865,124 @@ if test $lp_cv_prop_use_fcntl_fndelay = yes; then
 fi
 
 
+AC_CACHE_CHECK(if fcntl with SETOWN works,
+lp_cv_prop_use_fcntl_setown,
+AC_TRY_RUN([
+#include <sys/types.h> /* needed for netinet/in.h */
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+main() {
+    int port, tmp, s;
+    struct sockaddr_in my_sin;
+    struct hostent *hp;
+    char *host_name;
+
+    host_name = malloc(100);
+    if (gethostname(host_name, 100) == -1) exit(1);
+    hp = gethostbyname(host_name);
+    if (hp == 0) exit(1);
+    memset((char *)&my_sin, '\0', sizeof my_sin);
+    memcpy((char *)&my_sin.sin_addr, hp->h_addr, hp->h_length);
+    my_sin.sin_family = hp->h_addrtype;
+    my_sin.sin_addr.s_addr = INADDR_ANY;
+    alarm(10);
+    for (port = 2000; port < 10000; port++) {
+        my_sin.sin_port = htons((u_short)port);
+        s = socket(hp->h_addrtype, SOCK_STREAM, 0);
+        if (s == -1) exit(1);
+        tmp = 1;
+        if (setsockopt (s, SOL_SOCKET, SO_REUSEADDR,
+                        (char *) &tmp, sizeof (tmp)) < 0)
+            exit (1);
+        if (bind(s, (struct sockaddr *)&my_sin, sizeof my_sin) == -1) {
+            if (errno == EADDRINUSE) {
+                close(s);
+		continue;
+            }
+            exit(1);
+        }
+	if (listen(s, 5) == -1) exit(1);
+#ifndef F_SETOWN
+        exit(1);
+#else
+	if (fcntl(s, F_SETOWN, getpid()) == -1) exit(1);
+        exit(0);
+#endif
+    }
+    exit(1);
+}
+],lp_cv_prop_use_fcntl_setown=yes,
+lp_cv_prop_use_fcntl_setown=no,
+lp_cv_prop_use_fcntl_setown=unknown))
+if test $lp_cv_prop_use_fcntl_setown = yes; then
+  AC_DEFINE(USE_FCNTL_SETOWN)
+fi
+
+AC_CACHE_CHECK(if OOBINLINE works,
+lp_cv_prop_use_oobinline,
+AC_TRY_RUN([
+#include <sys/types.h> /* needed for netinet/in.h */
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+main() {
+    int port, tmp, s;
+    struct sockaddr_in my_sin;
+    struct hostent *hp;
+    char *host_name;
+
+    host_name = malloc(100);
+    if (gethostname(host_name, 100) == -1) exit(1);
+    hp = gethostbyname(host_name);
+    if (hp == 0) exit(1);
+    memset((char *)&my_sin, '\0', sizeof my_sin);
+    memcpy((char *)&my_sin.sin_addr, hp->h_addr, hp->h_length);
+    my_sin.sin_family = hp->h_addrtype;
+    my_sin.sin_addr.s_addr = INADDR_ANY;
+    alarm(10);
+    for (port = 2000; port < 10000; port++) {
+        int on;
+        my_sin.sin_port = htons((u_short)port);
+        s = socket(hp->h_addrtype, SOCK_STREAM, 0);
+        if (s == -1) exit(1);
+        tmp = 1;
+        if (setsockopt (s, SOL_SOCKET, SO_REUSEADDR,
+                        (char *) &tmp, sizeof (tmp)) < 0)
+            exit (1);
+        if (bind(s, (struct sockaddr *)&my_sin, sizeof my_sin) == -1) {
+            if (errno == EADDRINUSE) {
+                close(s);
+		continue;
+            }
+            exit(1);
+        }
+	if (listen(s, 5) == -1) exit(1);
+#ifndef SO_OOBINLINE
+        exit(1);
+#else
+        on = 1;
+        if (setsockopt(s, SOL_SOCKET, SO_OOBINLINE, (char *)&on, sizeof on) == -1)
+            exit(1);
+        exit(0);
+#endif
+    }
+    exit(1);
+}
+],lp_cv_prop_use_oobinline=yes,
+lp_cv_prop_use_oobinline=no,
+lp_cv_prop_use_oobinline=unknown))
+if test $lp_cv_prop_use_oobinline = yes; then
+  AC_DEFINE(USE_OOBINLINE)
+fi
+
+
 AC_CACHE_CHECK(for overlapping bcopy,
 lp_cv_prop_overlapping_bcopy,
 AC_TRY_RUN([
@@ -845,13 +1002,6 @@ lp_cv_prop_overlapping_bcopy=yes))
 if test $lp_cv_prop_overlapping_bcopy = yes; then
   AC_DEFINE(OVERLAPPING_BCOPY)
 fi
-
-dnl AC_COMPILE_CHECK([random],[long random();],[return random() % 7;]
-dnl , AC_DEFINE(RANDOM),
-dnl AC_COMPILE_CHECK([rand],[],[return rand() % 7;]
-dnl , AC_DEFINE(RAND),
-dnl AC_COMPILE_CHECK([drand48],[double drand48();],
-dnl [return (int)(drand48() * 7);], AC_DEFINE(DRAND48))))
 
 AC_CACHE_CHECK(if strtol needs const char*,
 lp_cv_prop_strtol_const_charp,
@@ -876,9 +1026,9 @@ main() { printf("hello world\n"); }
 EOF
 AC_MSG_CHECKING(medium optimization CFLAGS)
 changequote(,)dnl
-for TESTFLAG in -O4 -O3 -xO2 -O2 -O; do
+for TESTFLAG in -O2 -O; do
   if eval $tcomp; then
-    if echo `eval $tcomp2` | egrep '[uU]nrecognized [oO]ption' >/dev/null; then
+    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
       :
       #the [e]grep option -v will not give a failure exit status on the atari
     else
@@ -889,9 +1039,24 @@ for TESTFLAG in -O4 -O3 -xO2 -O2 -O; do
     fi
   fi
 done
+for TESTFLAG in -qmaxmem=65536; do
+  if eval $tcomp; then
+    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+      :
+      #the [e]grep option -v will not give a failure exit status on the atari
+    else
+      if eval $tcomp; then
+        OPTFLAGS="$OPTFLAGS $TESTFLAG"
+        CFLAGS="$CFLAGS $TESTFLAG"
+        break
+      fi
+    fi
+  fi
+done
 changequote([,])dnl
 for TESTFLAG in -g -fstrength-reduce -fno-force-mem -fno-force-addr -fomit-default-branch; do
   if eval $tcomp; then
+    OPTFLAGS="$OPTFLAGS $TESTFLAG"
     CFLAGS="$CFLAGS $TESTFLAG"
   fi
 done
@@ -900,10 +1065,11 @@ done
 # -print-libgcc-filename to test for gcc.
 TESTFLAG='-print-libgcc-filename -O3 -fno-inline-functions'
 if eval $tcomp; then
-  if echo `eval $tcomp2` | egrep '[uU]nrecognized [oO]ption' >/dev/null; then
+  if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
     :
   else
     if eval $tcomp; then
+      OPTFLAGS="$OPTFLAGS -fno-inline-functions"
       CFLAGS="$CFLAGS -fno-inline-functions"
     fi
   fi
@@ -912,12 +1078,40 @@ MCFLAGS=$CFLAGS
 AC_MSG_RESULT($MCFLAGS)
 
 AC_MSG_CHECKING(highest optimization CFLAGS)
+changequote(,)dnl
+for TESTFLAG in -O4 -O3 -O2 -O; do
+  if eval $tcomp; then
+    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+      :
+      #the [e]grep option -v will not give a failure exit status on the atari
+    else
+      if eval $tcomp; then
+        CFLAGS=$TESTFLAG
+        break
+      fi
+    fi
+  fi
+done
+for TESTFLAG in -qstrict -qipa; do
+  if eval $tcomp; then
+    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+      :
+      #the [e]grep option -v will not give a failure exit status on the atari
+    else
+      if eval $tcomp; then
+        CFLAGS="$CFLAGS $TESTFLAG"
+        break
+      fi
+    fi
+  fi
+done
+changequote([,])dnl
 for TESTFLAG in -fomit-frame-pointer; do
   if eval $tcomp; then
     CFLAGS="$CFLAGS $TESTFLAG"
   fi
 done
-OCFLAGS=$CFLAGS
+OCFLAGS="$CFLAGS $OPTFLAGS"
 AC_MSG_RESULT($OCFLAGS)
 if ${CC-cc} -g -c conftest.c ; then
   DCFLAGS='-g'
@@ -1056,7 +1250,7 @@ int main() {
     /* linking in printf called with variable format makes shared libs
      * worthwhile. Moreover, calling it is a good test
      */
-    printf(f?"Redefinition of malloc() %f%% successful\n":(char*)f, 100.);
+    printf(f?"%f%% successful\n":(char*)f, 100.);
     exit(0);
 }
 POINTER malloc(size)
@@ -1205,11 +1399,14 @@ AC_SUBST(cdef_compat_mode)
 AC_SUBST(cdef_strict_euids)
 AC_SUBST(cdef_supply_parse_command)
 AC_SUBST(cdef_initialization_by___init)
+AC_SUBST(cdef_use_system_crypt)
 AC_SUBST(cdef_udp_send)
+AC_SUBST(cdef_use_ipv6)
+AC_SUBST(cdef_lpc_nosave)
 AC_SUBST(cdef_comm_stat)
 AC_SUBST(cdef_apply_cache_stat)
-AC_SUBST(cdef_smalloc_trace)
-AC_SUBST(cdef_smalloc_lpc_trace)
+AC_SUBST(cdef_malloc_trace)
+AC_SUBST(cdef_malloc_lpc_trace)
 AC_SUBST(cdef_dynamic_costs)
 
 AC_SUBST(cdef_min_malloced)
@@ -1258,9 +1455,9 @@ AC_SUBST(val_master_name)
 AC_SUBST(val_max_byte_transfer)
 AC_SUBST(val_catch_udp_port)
 AC_SUBST(val_set_buffer_size_max)
+AC_SUBST(val_malloc)
 AC_SUBST(val_min_malloced)
 AC_SUBST(val_max_malloced)
-AC_SUBST(val_max_small_malloced)
 AC_SUBST(val_total_trace_length)
 
 dnl finally: some remaining stuff

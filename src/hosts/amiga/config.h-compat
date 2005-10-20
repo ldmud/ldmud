@@ -220,6 +220,16 @@
 
 #undef INITIALIZATION_BY___INIT
 
+/* Define USE_SYSTEM_CRYPT if you want crypt() to be implemented by your
+ * operating system (assuming it offers this function). This makes your
+ * programm smaller and may even let you take advantage of improvements
+ * of your OS, but may also prohibit transporting encrypted date like
+ * passwords between different systems.
+ * Undefine USE_SYSTEM_CRYPT if you want to use the driver's portable
+ * crypt() implementation.
+ */
+#define USE_SYSTEM_CRYPT
+
 /* Define MASTER_NAME if you want somethind different from "obj/master" resp.
  * "secure/master" as default.
  */
@@ -245,6 +255,15 @@
 
 #define SET_BUFFER_SIZE_MAX    65536
 
+/* Define this if you want IPv6 support (assuming that your host
+ * actually offers this.
+ */
+#undef USE_IPV6
+
+/* Define this if you want the 'nosave' keyword.
+ */
+#define USE_LPC_NOSAVE
+
 /* Profiling:
  * Define COMM_STAT to gather statistics about the network-io.
  * Define APPLY_CACHE_STAT to gather statistics about the hit/miss-rate
@@ -252,6 +271,14 @@
  */
 #define COMM_STAT
 #define APPLY_CACHE_STAT
+
+/* Which memory manager to use. Possible defines are
+ *   MALLOC_smalloc:   Satoria's malloc. Fastest, uses the least memory,
+ *                     supports garbage collection.
+ *   MALLOC_sysmalloc: the normal system malloc()
+ */
+
+#define MALLOC_smalloc
 
 /* When smalloc is used without SBRK_OK and MIN_MALLOCED is defined,
  * the gamedriver will reserve this amount of memory on startup for
@@ -266,10 +293,18 @@
  * functioning process limit).
  */
 #define MAX_MALLOCED       0x4000000
-#define MAX_SMALL_MALLOCED 0x1000000
 
-#undef SMALLOC_TRACE      /* do 'make clean' after changing this... */
-#undef SMALLOC_LPC_TRACE  /* do 'make clean' after changing this... */
+/* Define this to annotate all allocations with file:line of the driver
+ * source responsible for it.
+ * Supported by: MALLOC_smalloc
+ */
+#undef MALLOC_TRACE
+
+/* Define this to annotate all allocations with file:line of the lpc program
+ * responsible for it.
+ * Supported by: MALLOC_smalloc
+ */
+#undef MALLOC_LPC_TRACE
 
 /* If using TRACE_CODE , how many instructions should be kept?
  */

@@ -15,21 +15,31 @@ DESCRIPTION
 	Func denotes the efun call or other operation that caused
 	valid_write() to be called:
 
-	do_rename (efun rename(), for the old and then for the new name),
-	ed_start (whenever the builtin ed tries to write to a file),
-	mkdir,
-        objdump
-        opcdump
-	remove_file (efun rm()),
-	rmdir,
-	save_object,
-	write_bytes,
-	write_file.
+          copy_file (for the target file or directory name)
+          rename_from (efun rename(), for the original name)
+          rename_to   (efun rename(), for the new name)
+	  ed_start (whenever the builtin ed tries to write to a file),
+	  mkdir,
+          objdump
+          opcdump
+	  remove_file (efun rm()),
+	  rmdir,
+	  save_object,
+	  write_bytes,
+	  write_file.
 
-	Note that this function is called in compat mode as well. If
+        For save_object(), the <path> passed is the filename as given
+        in the efun call. If for this efun a filename ending in ".c" is
+        returned, the ".c" will be stripped from the filename.
+
+	This function is called in compat mode as well. If
 	you need to be compatible with the old 2.4.5-mudlib, redirect
 	these calls to the valid_read/valid_write in the user
 	object.
+
+HISTORY
+        LDMud 3.2.8 adds operation "copy_file", and replaces "do_rename"
+        by "rename_from" and "rename_to".
 
 SEE ALSO
 	valid_read(M), make_path_absolute(M)

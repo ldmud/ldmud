@@ -30,6 +30,7 @@
  */
 
 #include "driver.h"
+#include "typedefs.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -43,13 +44,17 @@
 #include "array.h"
 #include "backend.h"
 #include "comm.h"
-#include "datatypes.h"
 #include "gcollect.h"
+#include "interpret.h"
 #include "object.h"
 #include "sent.h"
 #include "simulate.h"
 #include "strfuns.h"
+#include "svalue.h"
 #include "wiz_list.h"
+#include "xalloc.h"
+
+#include "../mudlib/sys/debug_info.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -60,7 +65,7 @@ struct hb_info {
     struct hb_info * next;  /* next node in list */
     struct hb_info * prev;  /* previous node in list */
     mp_int           tlast; /* time of last heart_beat */
-    struct object  * obj;   /* the object itself */
+    object_t  * obj;   /* the object itself */
 };
 
 /* Allocation block for a bunch of listnodes.
@@ -75,7 +80,7 @@ struct hb_block {
 };
 
 /*-------------------------------------------------------------------------*/
-struct object *current_heart_beat = NULL;
+object_t *current_heart_beat = NULL;
   /* The object whose heart_beat() is currently executed. It is NULL outside
    * of heartbeat executions.
    *
@@ -166,7 +171,7 @@ call_heart_beat (void)
 
     while (num_hb_objs && !comm_time_to_call_heart_beat)
     {
-        struct object * obj;
+        object_t * obj;
 
         /* If 'this' object is NULL, we reached the end of the
          * list and have to wrap around.
@@ -201,7 +206,7 @@ call_heart_beat (void)
         if (obj->flags & O_SWAPPED)
             fatal("Heart beat in swapped object '%s'.\n", obj->name);
         if (obj->flags & O_DESTRUCTED)
-            fatal("Heart beat in destruct object '%s'.\n", obj->name);
+            fatal("Heart beat in destructed object '%s'.\n", obj->name);
 #endif
 
         if (obj->prog->heart_beat == -1)
@@ -239,13 +244,14 @@ call_heart_beat (void)
             command_giver = obj;
             if (command_giver->flags & O_SHADOW)
             {
-                struct shadow_sentence *shadow_sent;
+                shadow_t *shadow_sent;
 
                 while(shadow_sent = O_GET_SHADOW(command_giver),
                       shadow_sent->shadowing)
                 {
                     command_giver = shadow_sent->shadowing;
                 }
+
                 if (!(command_giver->flags & O_ENABLE_COMMANDS))
                 {
                     command_giver = NULL;
@@ -253,9 +259,9 @@ call_heart_beat (void)
                 }
                 else
                 {
-                    trace_level =
-                      shadow_sent->type == SENT_INTERACTIVE ?
-                        ((struct interactive *)shadow_sent)->trace_level : 0;
+                    trace_level = shadow_sent->ip
+                                  ? shadow_sent->ip->trace_level
+                                  : 0;
                 }
             }
             else
@@ -285,7 +291,7 @@ call_heart_beat (void)
 
 /*-------------------------------------------------------------------------*/
 int
-set_heart_beat (struct object *ob, Bool to)
+set_heart_beat (object_t *ob, Bool to)
 
 /* EFUN set_heart_beat() and internal use.
  *
@@ -396,7 +402,7 @@ set_heart_beat (struct object *ob, Bool to)
 }
 
 /*-------------------------------------------------------------------------*/
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
 
 void
 count_heart_beat_refs (void)
@@ -448,16 +454,41 @@ heart_beat_status (strbuf_t * sbuf, Bool verbose)
 #    pragma warn_largeargs reset
 #endif
     }
-    return 0;
+    return num_blocks * sizeof(struct hb_block);
 }
+
+/*-------------------------------------------------------------------------*/
+void
+hbeat_dinfo_status (svalue_t *svp)
+
+/* Return the heartbeat information for debug_info(DINFO_DATA, DID_STATUS).
+ * <svp> points to the svalue block for the result, this function fills in
+ * the spots for the object table.
+ */
+
+{
+    STORE_DOUBLE_USED;
+    
+    svp[DID_ST_HBEAT_OBJS].u.number      = num_hb_objs;
+    svp[DID_ST_HBEAT_CALLS].u.number     = num_hb_calls;
+    svp[DID_ST_HBEAT_SLOTS].u.number     = num_blocks * NUM_NODES;
+    svp[DID_ST_HBEAT_SIZE].u.number      = num_blocks * sizeof(struct hb_block);
+    svp[DID_ST_HBEAT_PROCESSED].u.number = hb_num_done;
+    svp[DID_ST_HBEAT_AVG_PROC].type = T_FLOAT;
+    STORE_DOUBLE(svp+DID_ST_HBEAT_AVG_PROC
+                , avg_num_hb_objs
+                  ? avg_num_hb_done / avg_num_hb_objs
+                  : 1.0
+                );
+} /* hbeat_dinfo_status() */
 
 /*=========================================================================*/
 
 /*                               EFUNS                                     */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_heart_beat_info (struct svalue *sp)
+svalue_t *
+f_heart_beat_info (svalue_t *sp)
 
 /* EFUN heart_beat_info()
  *
@@ -473,8 +504,8 @@ f_heart_beat_info (struct svalue *sp)
 
 {
     int i;
-    struct vector *vec;
-    struct svalue *v;
+    vector_t *vec;
+    svalue_t *v;
     struct hb_info *this;
 
     vec = allocate_array(i = num_hb_objs);

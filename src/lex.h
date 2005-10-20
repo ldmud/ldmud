@@ -1,8 +1,8 @@
-#ifndef __LEX_H__
-#define __LEX_H__ 1
+#ifndef LEX_H__
+#define LEX_H__ 1
 
 #include "driver.h"
-#include "interpret.h"  /* struct vector, struct svalue */
+#include "typedefs.h"
 #include "strfuns.h"
 
 /* --- Types --- */
@@ -79,7 +79,7 @@ struct defn
 };
 
 
-/* --- struct ident: known identifiers ---
+/* --- struct ident_s: known identifiers ---
  *
  * The structure is used to keep the information about all identifiers
  * encountered so far (including reserved words, efuns, etc).
@@ -96,35 +96,45 @@ struct defn
  * own 'all_...' lists, linked by the '.next_all' field.
  */
 
-struct ident
+struct ident_s
 {
     char *name;              /* Name of the identifier (shared string) */
     short type;              /* Type of this entry */
     short hash;              /* Hashvalue of this identifier */
-    struct ident *next;      /* Next in hash chain */
-    struct ident *inferior;  /* Ident of same name, but lower type */
+    ident_t *next;           /* Next in hash chain */
+    ident_t *inferior;       /* Ident of same name, but lower type */
     union {                  /* Type-depend data: */
         struct defn define;  /*   Macro definition */
         int code;            /*   Reserved word: lexem code */
         struct {             /*   Global identifier: */
             short function;
-              /* TODO: lfun: Index in ???[], negative else */
-            short variable; /* TODO: efun: -2 */
-              /* TODO: object var: Index in ???[], negative else */
+              /* >= 0: lfun: Index number of the lfun in den function table,
+               * < 0: -2: efun/sefun, -1: gvar
+               */
+            short variable;
+              /* >= 0: variable: Index number in the variable table.
+               *       During compilation, virtual variables are offset
+               *       by VIRTUAL_VAR_TAG.
+               * < 0: -2: efun/sefun, -1: lfun/inherited hidden var
+               */
             short efun;
-              /* efun: Index in instrs[], negative else */
+              /* efun: Index in instrs[], negative else
+               * < 0: -1: lfun/gvar/sefun
+               */
             short sim_efun;
-              /* simul-efun: Index in simul_efun[], negative else */
+              /* simul-efun: Index in simul_efun[], negative else
+               * < 0: -1: efun/lfun/gvar
+               */
         } global;
         struct {             /*   Local identifier: */
-            int num;         /*     TODO: index? */
+            int num;         /*     Number, also the index on the stack */
             int depth;       /*     Definition depth */
         } local;
     } u;
-    struct ident *next_all;  /* 'all_...' list link */
+    ident_t *next_all;       /* 'all_...' list link */
 };
 
-/* struct ident.type values: */
+/* ident_t.type values: */
 
 #define I_TYPE_UNKNOWN    0
 #define I_TYPE_GLOBAL     2  /* function, variable or efuns/simul_efuns */
@@ -162,8 +172,10 @@ extern Bool pragma_combine_strings;
 extern Bool pragma_verbose_errors;
 extern Bool pragma_no_clone;
 extern Bool pragma_no_inherit;
+extern Bool pragma_no_shadow;
+extern Bool pragma_pedantic;
 extern char *last_lex_string;
-extern struct ident *all_efuns;
+extern ident_t *all_efuns;
 extern struct inline_fun * first_inline_fun;
 extern Bool insert_inline_fun_now;
 extern int next_inline_fun;
@@ -178,23 +190,24 @@ extern int next_inline_fun;
 /* --- Prototypes --- */
 
 extern void init_lexer(void);
-extern struct ident *make_shared_identifier(char *, int, int);
-extern void free_shared_identifier(struct ident*);
+extern ident_t *make_shared_identifier(char *, int, int);
+extern void free_shared_identifier(ident_t*);
 extern int yylex(void);
 extern void end_new_file(void);
 extern void lex_close(char *msg);
 extern void start_new_file(int fd);
 extern char *get_f_name(int n);
 extern void free_defines(void);
-extern void set_inc_list(struct vector *v);
+extern size_t show_lexer_status (strbuf_t * sbuf, Bool verbose);
+extern void set_inc_list(vector_t *v);
 extern void clear_auto_include_string(void);
-extern struct svalue *f_set_auto_include_string(struct svalue *sp);
+extern svalue_t *f_set_auto_include_string(svalue_t *sp);
 extern void remove_unknown_identifier(void);
 extern char *lex_error_context(void);
-extern struct svalue *f_expand_define(struct svalue *sp);
+extern svalue_t *f_expand_define(svalue_t *sp);
 
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
 extern void count_lex_refs(void);
-#endif /* MALLOC_smalloc */
+#endif /* GC_SUPPORT */
 
-#endif /* __LEX_H__ */
+#endif /* LEX_H__ */

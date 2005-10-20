@@ -1,0 +1,12 @@
+SYNOPSIS
+        int db_connect(string database)
+
+DESCRIPTION
+        Connect to the database <database> on the local mySQL-server.
+        The return-value is the handle for this connection.
+        If the database does not exist or the server is NOT started,
+        a runtime-error is raised.
+
+SEE ALSO
+        db_affected_rows(E), db_conv_string(E), db_close(E), db_connect(E),
+        db_exec(E), db_fetch(E), db_handles(E)

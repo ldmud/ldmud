@@ -10,7 +10,7 @@ CC=@CC@
 prefix=@prefix@
 exec_prefix=@exec_prefix@
 
-SUBDIRS = indent make_docs xerq
+SUBDIRS = 
 SED = sed
 
 BINDIR=@bindir@
@@ -45,7 +45,7 @@ OPTIMIZE = @OCFLAGS@ # high optimization
 #DEBUG=-DDEBUG -DTRACE_CODE
 DEBUG=
 #
-MPATH=-DMUD_LIB='"$(MUD_LIB)"' -DBINDIR='"$(BINDIR)"' -DERQ_DIR='"$(ERQ_DIR)"'
+MPATH=-I../.. -DMUD_LIB='"$(MUD_LIB)"' -DBINDIR='"$(BINDIR)"' -DERQ_DIR='"$(ERQ_DIR)"'
 #
 CFLAGS= @EXTRA_CFLAGS@ $(OPTIMIZE) $(DEBUG) $(WARN) $(MPATH) $(PROFIL)
 #
@@ -61,7 +61,7 @@ erq:	$(OBJ)
 %.o : %.c
 	$(CC) -I@top_srcdir@ $(CFLAGS) -c $< -o $@
 
-*.o: erq.h erq-config.h defs.h \
+*.o: erq.h defs.h \
 	@top_srcdir@/config.h \
 	@top_srcdir@/machine.h \
 	@top_srcdir@/port.h
@@ -74,4 +74,4 @@ clean:
 	rm -f erq *.o *~
 
 realclean: clean
-	rm -f erq-config.h
+	

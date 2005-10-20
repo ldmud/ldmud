@@ -49,7 +49,7 @@ f-990203-17: explains p-990204-1:deep_call_other() a bit.
 p-990204-1: raise_caller_error(): as it says
 f-990203-28: explains p-990204-1:raise_caller_error()
 p-990423-0: previous_program(): returns the previous programs
-f-990324-1: explains p-990423-0:previous_program()
+f-990324-1: explains p-990423-0:previous_program(), program_stack()
 f-981209:   OBJ_DUMP needs reformatting
 f-981226-1: TCP efuns.
 f-981229-25: receive(): other comm efuns are put into the mudlib
@@ -58,21 +58,33 @@ p-990204-0: reload_object(): re-initializes an object as if just loaded
 f-981229-09: additional arguments to allocate(), clone(), load()
 f-990203-24: objects(): return objects from the list of objects
 f-981229-26: find_objects(): find object by name pattern
-f-990203-00: children(): finds children of objects
-f-990203-26: clones(): similar to children() (f-990203-00)
 f-990217-0: deep_present(), deep_present_clone()
-f-981229-10: truncate_file(), copy_file()
+f-981229-10: truncate_file()
 f-981208:   read_bytes()/write_bytes() should handle int*, too.
 f-981229-06: explains f-981208 a bit
 f-990203-19: get_dir(): extended functionality
 f-981229-15: set_environment(): third arg specifying where in the list
-f-981229-19: save_value(), restore_value()
-f-990203-25: save_object(), restore_object(): changed meaning
-f-981229-21: input_to() should accept closures
 f-990203-10: shutdown(), garbage_collection() should be privileged
 f-990211:   top(): statistics efun
-f-990217-2: query_notify_fail_object()
 f-990424-1: call_out(): uses handles in parallel to names.
+f-991020-0: More functionality for inherit_list() 
+f-000113-1: LDmud: efun reverse()
+f-000113-2: More file efuns
+f-000207: Finalfrontier efuns
+f-000214-2: Add mappings to wizlist info
+f-000306-1: Modify terminal_colour() to take the delimiter string
+f-000306-2: Extension to command_stack()
+f-000306-4: copy_file() should return error values
+f-000326: Allow the use of masks with mkdir()
+f-000401-0: get_dir() should return the full pathname
+f-000405: sort_array(&arr) sorts in-place
+f-000406: Get rid of save_object()
+f-000421: Expand cat() and tail() to take limits
+f-000505: Improve set_auto_include_string()
+f-000530: New input_to() efuns
+f-000616: Allow to set a certain umask
+f-000627: Search efun
+f-000716: New efun 'call_trace()' or so
 
 
 Language
@@ -83,17 +95,20 @@ f-990203-02: dito
 p-990710-0: Handles (objects associated with a string)
 f-981229-05: struct foo {} type
 f-990203-31: re: f-981229-05: better saving method for small arrays?
-f-981229-18: foreach()
 f-981229-27: m[x;y], m[x][y] as alternatives to m[x,y]
-f-990419:  Implement [..x] as shortcut of [0..x].
 f-981229-29: MudOS 'ref's instead of Amylaars '&'s.
 f-990303-2: New syntax for ref parameters, see also f-981229-29
-f-990203-01: Various operators should work on mixed*.
-f-990203-1: Explains f-990203-01 a bit.
+f-990203-1: Various operators should work on mixed* and string.
 f-990213:   Extended value range for ints.
-f-990323-0: inherits use relative paths.
-f-990605:  Use '<expr>->(<expr>)()' for computed call_others.
 f-990727:  Enums.
+f-990813-0: Operator ':=:' for swaps
+f-990813-1: Operator '<=>' for comparisons.
+p-990901:  Alternative to catch(): catch_no_log()
+f-000106: Special -> for array calls
+f-000221: LDMUD foreach idea
+f-000302: 'static <var>' should be 'nosave <var>'
+f-000430-1: C++-style variable definitions
+f-000430-2: C-style prototypes
 
 
 Compiler
@@ -103,9 +118,10 @@ f-981027-1: Spaces after \ should give a better error message.
 f-981110-1: static evalstack sizecheck for functions and closures
 f-981229-30: Preprocessor lacks: #, ##, and two bugs
 f-990203-04: \octal and \hex codes in strings
-f-990203-08: Add __DIR__ and __PATH__ to __FILE__
 f-990228:  Replace __INIT by a nameless function with special callpattern
-f-990510:  Is 'string name; ob->name()' possible?
+f-991104-1: Inline closures are not real closures.
+b-000217-1: F_M_CAGGREGATE acts strange
+p-000316: Binary codefile support
 
 
 Runtime
@@ -120,7 +136,7 @@ f-990317-0: H_MODIFY_OUTPUT: hook for output, see also receive() (f-981229-25)
 p-990204-1: Lots of hooks for pre/post create and remove handling.
 f-990204-0: explains p-990204-1:create hooks
 f-981114-0: Query compilation and runtime options at runtime
-f-981208:   f-98114-0 again
+f-981208:   f-981114-0 again
 f-981222:   'Apply on destructed object' should be a runtime error, not a fatal
 f-981229-00: Get rid of hardcoded modes.
 f-981229-02: Get rid of hardcoded commands.
@@ -140,10 +156,29 @@ f-990417-0: Can the driver find private functions in the master?
 f-990424-0: Precompiled binaries.
 f-990629-0: Immediate error handling independant from catch().
 f-990721-0: Stacked input_to()s.
-
+f-990816: Use poll() instead of select()
+f-991019-0: diagnostic() functionality
+f-991104-0: Synchronous write()
+f-991122:   Filenames in master-apply in !compat mode
+f-991123:   restore_value() should accept looser syntax
+f-991126-1: Selective NOECHO in Charmode
+f-000121:   Output hook
+f-000208-1: H_MODIFY_OUTPUT
+f-000301: String Table topics
+p-000306-1: EotL Changes
+f-000327-0: Controlled reopening of the logfile
+f-000327-1: Driver should pass signals to the mudlib
+p-000401-0: xerq: new request ERQ_INET6_ATON
+f-000413-0: Use ID numbers for error messages
+f-000814-1: net_connect()
 
 Installation
 --------------------------------------------------------------------------
 f-981226-2: Check for and use <arpa/telnet.h>
 f-990708-3: Improved options selection process.
+f-000407: More options for setting files
+f-000814: configure-with_portno should take a string
 
+Other
+--------------------------------------------------------------------------
+p-000630: Morgengrauen diffs

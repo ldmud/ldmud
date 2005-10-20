@@ -2,7 +2,9 @@ SYNOPSIS
 	mixed apply(closure cl, ...)
 
 DESCRIPTION
-	Evaluates the closure.
+	Evaluates the closure <cl>.
+	If <cl> is not a closure, it will simply be returned (and all
+        other arguments are ignored).
 
 	One might wonder why there are two functions, funcall() and
 	apply(), to perform the seemingly same job, namely evaluating
@@ -26,6 +28,8 @@ DESCRIPTION
 
 HISTORY
 	Introduced in 3.2@70
+        LDMud 3.2.8 adds the returning of a non-closure as first
+        argument.
 
 SEE ALSO
 	funcall(E), closures(LPC), varargs(LPC)

@@ -11,4 +11,5 @@ file to a new one until the truncate position is reached and then removing
 the original and renaming the copy.  for copying it also has to work
 around the read/write_bytes limitation.
 
-Note: this would also make a nice copy_file() efun.
+Note: make this a special mode of copy_file(),
+e.g. copy_file(from,to,start,len)?

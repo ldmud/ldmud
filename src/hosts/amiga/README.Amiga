@@ -265,11 +265,9 @@ Compiling with DICE 2.06/2.07/3.0:
       as '(int)char_var, value'. Proper bracketing '(int)(char_var = value)'
       helps as stopgap cure.
     - structure aggregate initialisations may not end with a trailing ','.
-    The changes necessary due to these bugs are NOT part of the distributed
-    sources to keep them clean. Instead, hosts/amiga/dice30.diff contains
-    the necessary changes and has to be applied using 'patch' prior to
-    compilation. The file was meant to vanish as soon as DICE would get
-    fixed, but it's unlikely now that that is ever going to happen.
+    The changes necessary due to these bugs have been integrated into the
+    distributed sources, but it is not guaranteed that new code won't break
+    over the same errors.
 
 
 Compiling with SAS/C 6.55:
@@ -302,10 +300,6 @@ In effect, a complete own signal handling has been implemented.
 To avoid interferences with the system supplied by the compiler - especially
 the checking for Ctrl-C - the code in amiga.c and signal.c has to overlay
 the routines supplied by the standard libraries.
-
-The crypt() function was implemented using the free BSD-crypt().
-As alternative, fcrypt() from the 'Crack' package by Alec Muffet is also
-available, but may not run on some machine-compiler combinations.
 
 The implementation of floats in the driver uses a special storage format
 of 48 bits, which is then mapped onto the compiler's double format.

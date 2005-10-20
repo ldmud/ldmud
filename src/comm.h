@@ -1,14 +1,16 @@
-#ifndef __COMM_H__
-#define __COMM_H__ 1
+#ifndef COMM_H__
+#define COMM_H__ 1
 
 #include "driver.h"
+#include "typedefs.h"
 #include <sys/types.h>
 
-#include "interpret.h"  /* struct svalue, struct vector */
-#include "object.h"     /* struct object */
-#include "sent.h"       /* struct shadow_sentence */
+#include "simulate.h"   /* callback_t for input_to_t */
+#include "svalue.h"
 
-
+/* TODO: Make the following a separate "my-socket.h" include, also
+ * TODO:: to be used in access_check.h instead of comm.h.
+ */
 #ifdef SOCKET_HEADER
 #    include SOCKET_HEADER
 #endif
@@ -35,6 +37,25 @@
 #endif /* MAX_SOCKET_PACKET_SIXE */
 
 
+/* --- IPv6 --- */
+
+#ifdef USE_IPV6
+
+/* For IPv6 we defined macros for the 'old' sockaddr member names
+ * which expand into the ipv6 names.
+ */
+
+#define sockaddr_in sockaddr_in6
+
+#define sin_port    sin6_port
+#define sin_addr    sin6_addr
+#define sin_family  sin6_family
+#define s_addr      s6_addr
+#define in_addr     in6_addr
+
+#endif /* USE_IPV6 */
+
+
 /* --- Macros --- */
 
 /* Size of a users text buffer for incoming data.
@@ -51,39 +72,34 @@
  * input-to structures describe a pending input_to() for a given
  * interactive object. Every object can have one input-to pending, the
  * pointer to the structure is stored in the interactive sentence structure.
- *
- * The structure is allocated big enough to hold all the arguments
- * to the function.
  */
 
-struct input_to {
-    struct object *ob;         /* Object to call */
-    char          *function;   /* Name of the function to call */
-    int            num_arg;    /* Number of arguments */
-    struct svalue  arg[1];     /* Arguments to pass */
+struct input_to_s {
+    input_to_t *next;
+    char        noecho;     /* the requested "noecho" state */
+    callback_t  fun;        /* The function to call, and its args */
+    /* TODO: add: svalue_t prompt */
 };
 
-/* --- struct interactive: an interactive connection
+/* --- struct interactive_s: an interactive connection
  *
- * The structure is an expanded shadow_sentence, and as such is
- * always the first of an objects shadow_sentences as well as the first
- * of its sentences in general.
+ * The structure is linked to by a shadow sentence of the interactive
+ * object.
  *
  * When changing struct members, take care that you don't introduce
  * unnecessary padding.
  */
 
-struct interactive {
-    struct shadow_sentence sent;
-
+struct interactive_s {
     SOCKET_T socket;            /* The socket structure */
-    struct object *ob;          /* Points back to the associated object */
-    struct input_to *input_to;  /* != NULL: defines function to be
+    object_t *ob;               /* Points back to the associated object */
+    input_to_t *input_to;       /* != NULL: defines function to be
                                    called with next input line */
-    struct object *modify_command;  /* modify_command() handler() */
-    struct svalue prompt;       /* The prompt to print. */
+    object_t *modify_command;   /* modify_command() handler() */
+    svalue_t prompt;            /* The prompt to print. */
     struct sockaddr_in addr;    /* Address of connected user */
 
+    CBool set_input_to;         /* True if input_to was set in this cycle */
     CBool closing;              /* True when closing this socket. */
     char do_close;              /* Bitflags: Close this down; Proto-ERQ. */
     char noecho;                /* Input mode bitflags */
@@ -97,17 +113,19 @@ struct interactive {
     short command_end;          /* where we are up to in player cmd buffer */
     short tn_start;             /* first char of pending telnet neg */
     short tn_end;               /* first char to check for telnet negotiation */
-    int32 chars_ready;          /* 32 bits so that it won't underflow twice */
-    struct interactive *snoop_on; /* whom we're snooping */
-    struct object      *snoop_by; /* by whom we're snooped */
+    int32 chars_ready;          /* amount of pure data available. In charmode
+                                 * this is the amount of data already echoed
+                                 * back to the sender. */
+    interactive_t *snoop_on;    /* whom we're snooping */
+    object_t *snoop_by;         /* by whom we're snooped */
     mp_int last_time;           /* Time of last command executed */
     int trace_level;            /* Trace flags. 0 means no tracing */
     char *trace_prefix;         /* Trace only objects which have this string
                                    as name prefix. NULL traces everything. */
     int message_length;         /* Current length of message in message_buf[] */
 
-    struct object *next_player_for_flush;
-    struct object *previous_player_for_flush;
+    object_t *next_player_for_flush;
+    object_t *previous_player_for_flush;
       /* Double linked list of all active user objects with data pending
        * in message_buf[].
        */
@@ -119,6 +137,13 @@ struct interactive {
       /* A bitflag array: every non-zero flag allows the corresponding
        * character to be sent. Characters whose flag is 0 are excluded
        * from the sent data.
+       */
+    char combine_cset[32];
+      /* A bitflag array: all characters with their corresponding flag
+       * set to non-zero flag may be combined into one string in
+       * char-mode when received en-bloc anyway. Characters whose flag
+       * is 0 are always returned in charmode in separate strings.
+       * TODO: The code for these two thingies assume 8 Bits per character.
        */
     CBool quote_iac;
     CBool catch_tell_activ;
@@ -163,7 +188,7 @@ struct interactive {
    */
 
 #define NOECHO_REQ        1
-  /* noecho required
+  /* noecho requested
    */
 #define NOECHO         /* 4 */ CHARMODE_REQ_TO_CHARMODE(NOECHO_REQ)
   /* noecho active (requested via telnet negotiation)
@@ -181,7 +206,7 @@ struct interactive {
    */
 
 #define CHARMODE_REQ      2
-  /* charmode required
+  /* charmode requested
    */
 #define CHARMODE       /* 8 */ CHARMODE_REQ_TO_CHARMODE(CHARMODE_REQ)
   /* charmode active (requested via telnet negotiation)
@@ -195,7 +220,7 @@ struct interactive {
 
 /* --- Variables --- */
 
-extern struct interactive *all_players[MAX_PLAYERS];
+extern interactive_t *all_players[MAX_PLAYERS];
 extern int num_player;
 extern char *message_flush;
 extern char *domain_name;
@@ -214,53 +239,57 @@ extern void  ipc_remove(void);
 extern void  add_message VARPROT((char *, ...), printf, 1, 2);
 extern void  flush_all_player_mess(void);
 extern Bool get_message(char *buff);
-extern void  remove_interactive(struct object *ob);
-extern struct vector *users(void);
-extern void  set_noecho(struct interactive *i, char noecho);
-extern Bool call_function_interactive(struct interactive *i, char *str);
-extern void  remove_all_players(void);
-extern void  set_prompt(char *str);
-extern struct svalue *query_prompt(struct object *ob);
+extern void remove_interactive(object_t *ob);
+extern vector_t *users(void);
+extern void set_noecho(interactive_t *i, char noecho);
+extern int  find_no_bang (interactive_t *ip);
+extern Bool call_function_interactive(interactive_t *i, char *str);
+extern void remove_all_players(void);
+extern void set_prompt(char *str);
+extern svalue_t *query_prompt(object_t *ob);
 extern void  print_prompt(void);
-extern int   set_snoop(struct object *me, struct object *you);
+extern int   set_snoop(object_t *me, object_t *you);
 extern void  init_telopts(void);
 extern void  mudlib_telopts(void);
-extern struct svalue *query_ip_name(struct svalue *sp, Bool lookup);
-extern struct svalue *input_to (struct svalue *sp, int num_arg);
+extern svalue_t *query_ip_name(svalue_t *sp, Bool lookup);
+extern svalue_t *e_input_to (svalue_t *sp, int num_arg);
 
 #ifdef ERQ_DEMON
 extern void  start_erq_demon(char *suffix);
-extern struct svalue *f_attach_erq_demon(struct svalue *sp);
-extern struct svalue *f_send_erq(struct svalue *sp);
+extern svalue_t *f_attach_erq_demon(svalue_t *sp);
+extern svalue_t *f_send_erq(svalue_t *sp);
 #endif
 
-#ifdef MALLOC_smalloc
+extern size_t show_comm_status (strbuf_t * sbuf, Bool verbose);
+
+#ifdef GC_SUPPORT
 extern void  clear_comm_refs(void);
 extern void  count_comm_refs(void);
-#endif /* MALLOC_smalloc */
+#endif /* GC_SUPPORT */
 
 extern char *query_host_name(void);
 extern char *get_host_ip_number(void);
-extern struct svalue *f_query_snoop(struct svalue *sp);
-extern struct svalue *f_query_idle(struct svalue *sp);
-extern struct svalue *f_remove_interactive(struct svalue *sp);
-extern int   replace_interactive(struct object *ob, struct object *obfrom, char *name);
+extern svalue_t *f_query_snoop(svalue_t *sp);
+extern svalue_t *f_query_idle(svalue_t *sp);
+extern svalue_t *f_remove_interactive(svalue_t *sp);
+extern int   replace_interactive(object_t *ob, object_t *obfrom, char *name);
 
 #ifdef DEBUG
 extern void  count_comm_extra_refs(void);
 #endif /* DEBUG */
 
 #ifdef UDP_SEND
-extern struct svalue *f_send_imp(struct svalue *sp);
+extern svalue_t *f_send_imp(svalue_t *sp);
 #endif /* UDP_SEND */
 
-extern struct svalue *f_set_buffer_size(struct svalue *sp);
-extern struct svalue *f_binary_message(struct svalue *sp);
-extern struct svalue *f_set_connection_charset(struct svalue *sp);
-extern struct svalue *query_ip_port(struct svalue *sp);
+extern svalue_t *f_set_buffer_size(svalue_t *sp);
+extern svalue_t *f_binary_message(svalue_t *sp);
+extern svalue_t *f_set_combine_charset(svalue_t *sp);
+extern svalue_t *f_set_connection_charset(svalue_t *sp);
+extern svalue_t *query_ip_port(svalue_t *sp);
 
 #if defined(ACCESS_CONTROL)
 extern void refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) );
 #endif /* ACCESS_CONTROL */
 
-#endif /* __COMM_H__ */
+#endif /* COMM_H__ */

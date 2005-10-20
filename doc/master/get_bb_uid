@@ -17,4 +17,4 @@ HISTORY
 	if no this_object() is present.
 
 SEE ALSO
-	uids(C), creator_file(M), creator(E), get_root_id(M)
+	uids(C), creator_file(M), creator(E), get_master_uid(M)

@@ -2,7 +2,7 @@ Short: Change efuns {save,restore}_object()
 From: Matthew Julius <julius.2@wright.edu>
 Date: Fri, 08 Jan 1999 16:29:08 -0500
 Type: Feature
-State: Unclassified
+State: Done - implemented in 3.2.8-dev.150
 
 string|void save_object(int|string)
   If the argument is an integer (!0), instead of writing to a file, return

@@ -158,8 +158,27 @@ mp_uint reloadMT (void)
 uint32
 random_number (uint32 n)
 
+/* Return a random number in the range 0..n-1.
+ *
+ * The key return an evenly distributed random number in
+ * the given range is not to use the low bits of the raw random
+ * number, as these are distressingly non-random.
+ * The C-FAQ 13.16 gives a solution ('rc / (RANDOM_MAX / n + 1)'), which
+ * unfortunately doesn't work too well for large ranges.
+ */
+
 {
+#define RANDOM_MAX 0xFFFFFFFFU
+
     uint32 y, rc;
+#if !defined(HAVE_LONG_LONG) || SIZEOF_CHAR_P != 4
+    uint32 rmax;
+
+    rmax = (RANDOM_MAX / (n+1)) * n;
+      /* rmax = 0 if n >= RANDOM_MAX */
+
+    do {
+#endif
 
     if(--left < 0)
         rc = reloadMT();
@@ -175,9 +194,11 @@ random_number (uint32 n)
 #if defined(HAVE_LONG_LONG) && SIZEOF_CHAR_P == 4
     return (uint32)
            ((unsigned long long)rc * (unsigned long long)n
-                                    >> sizeof(uint32) * 8);
+                                    >> sizeof(uint32) * CHAR_BIT);
 #else
-    return rc % n;
+    } while (rmax && rc > rmax);
+
+    return rmax ? ((rc * n) / rmax) : rc;
 #endif
 }
 

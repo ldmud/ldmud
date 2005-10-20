@@ -1,0 +1,104 @@
+#!/bin/sh
+#
+# Settings for psycMUVE, the LPC server and client implementation of the
+#			 protocol for synchronous conferencing.
+#
+# Information and download on:	http://psyc.pages.tm
+#
+# the PSYC implementation and library is designed in a way that it should
+# easily co-host in a running LPMUD, it just needs a few patches to the
+# master object and #includes in simul_efun.
+#
+# how to multiplex InterMUD and PSYC on the same udp port:
+# PSYC UDP packets always start with ".\n", just forward them to
+# the PSYC UDP server daemon.
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/ve --bindir=/ve/bin --libdir=/ve/world --libexec=/ve/erq --with-setting=psycmuve $*
+exit 1
+
+#-- FILE PATHES
+
+with_master_name=obj/master
+with_swap_file=log/ldmud.swap
+
+#-- SYSTEM SPECIFIC
+
+enable_use_system_crypt=yes
+
+#-- NETWORKING
+
+# getting real close to the edge
+# further users are distributed across several servers
+with_max_players=900
+
+# The maximum number of ports to listen for connections on.
+with_maxnumports=20
+
+# how can i set all the other port numbers? 
+# still using the historic dirty command line hack?
+with_portno=4404
+
+# Maximum size of a socket send buffer.
+with_set_buffer_size_max=65536
+
+# the PSYC port
+with_catch_udp_port=4404
+enable_catch_udp_port=yes
+enable_udp_send=yes
+
+#-- RUNTIME LIMITS
+
+# in productive use this will only hurt
+# (like interrupting in the middle of a 1000 user conference)
+# during debugging i use a much lower value
+with_max_cost=900900900
+
+# disabled "mud" limits
+with_max_array_size=0
+with_max_mapping_size=0
+with_read_file_max_size=0
+with_max_byte_transfer=0
+
+#-- MEMORY ALLOCATION
+
+# disabled, sort of
+with_reserved_user_size=100000
+
+# hash table sizes. we have many chat strings (like lastlogs), but few objects
+with_htable_size=16384
+with_otable_size=256
+
+# i think i have one or two regexps in the lib, literally
+enable_rxcache_table=yes
+with_rxcache_table=4096
+
+enable_align_functions=yes
+
+#-- TIMER MECHANISMS
+
+# short resets, not strictly necessary but useful
+with_time_to_reset=1000
+with_time_to_swap=1500
+with_time_to_swap_variables=2500
+with_time_to_clean_up=9000
+
+#-- MUD FEATURES
+
+# should work in "native" too, after a tweak or two
+enable_compat_mode=yes
+enable_strict_euids=no
+enable_initialization_by___init=no
+
+#-- EXTRAS
+
+# cool tool that does external name server resolution and more
+enable_erq=xerq
+
+# the "sorry" message of the built-in ACL isn't flexible enough:
+# it cannot output a properly formatted HTTP or PSYC message
+# and why shouldn't this be done in LPC anyway?
+enable_access_control=no
+
+enable_supply_parse_command=no

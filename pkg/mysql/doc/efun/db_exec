@@ -1,0 +1,11 @@
+SYNOPSIS
+        int db_exec(int handle, string statement)
+
+DESCRIPTION
+        Execute the SQL-statement <statement> for the connection <handle> to
+        the SQL-server. The result is the handle if all went okay. If there
+        was an error in the statement, 0 is returned.
+
+SEE ALSO
+        db_affected_rows(E), db_conv_string(E), db_close(E), db_connect(E),
+        db_fetch(E), db_handles(E)

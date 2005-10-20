@@ -1,30 +1,49 @@
-#ifndef __EFUNS_H__
-#define __EFUNS_H__ 1
+#ifndef EFUNS_H__
+#define EFUNS_H__ 1
 
 #include "driver.h"
-#include "datatypes.h"
+#include "typedefs.h"
+#include "instrs.h"     /* F_SET_IS_WIZARD */
+
+/* --- Variables --- */
+
+#ifdef F_SET_IS_WIZARD
+extern Bool is_wizard_used;
+#endif
 
 /* --- Prototypes --- */
 
-extern struct svalue *f_make_shared_string(struct svalue *);
-extern struct svalue *f_trim(struct svalue *, int num_arg);
-extern struct svalue *f_upper_case(struct svalue *);
-extern char          *e_terminal_colour (char * text, struct mapping * map
-                                        , int indent, int wrap);
-extern int            e_sscanf(int num_arg, struct svalue *sp);
+extern svalue_t *f_make_shared_string(svalue_t *);
+extern svalue_t *f_trim(svalue_t *, int num_arg);
+extern svalue_t *f_upper_case(svalue_t *);
+extern char     *e_terminal_colour (char * text, mapping_t * map
+                                   , int indent, int wrap);
+extern svalue_t *f_process_string(svalue_t *sp);  /* optional */
+extern int       e_sscanf(int num_arg, svalue_t *sp);
 
-extern struct svalue *f_copy (struct svalue *sp);
-extern struct svalue *f_deep_copy (struct svalue *sp);
+extern svalue_t *f_copy (svalue_t *sp);
+extern svalue_t *f_deep_copy (svalue_t *sp);
+extern svalue_t *f_filter (svalue_t *sp, int num_arg);
+extern svalue_t *f_map (svalue_t *sp, int num_arg);
 
-extern struct svalue *x_all_environment(struct svalue *, int);
-extern struct svalue *f_object_info (struct svalue *sp);
-extern struct svalue *f_present_clone (struct svalue *sp);
-extern struct svalue *f_to_object(struct svalue *sp);
-extern struct svalue *f_set_is_wizard(struct svalue *sp);
-extern struct svalue *f_set_modify_command(struct svalue *sp);
-extern struct svalue *f_set_prompt(struct svalue *sp);
+extern svalue_t *x_all_environment(svalue_t *, int);
+extern svalue_t *f_clones (svalue_t *sp, int num_args);
+extern svalue_t *f_object_info (svalue_t *sp);
+extern object_t *e_object_present(svalue_t *v, object_t *ob);
+extern svalue_t *f_present_clone (svalue_t *sp);
+extern svalue_t *f_to_object(svalue_t *sp);
+extern svalue_t *f_set_is_wizard(svalue_t *sp);  /* optional */
+extern svalue_t *f_set_modify_command(svalue_t *sp);
+extern svalue_t *f_set_prompt(svalue_t *sp);
+#ifdef F_TRANSFER
+extern svalue_t *f_transfer(svalue_t *svp);
+#endif /* F_TRANSFER */
+extern void e_say(svalue_t *v, vector_t *avoid);
+extern void e_tell_room(object_t *room, svalue_t *v, vector_t *avoid);
+extern svalue_t *tell_room(svalue_t *sp);
 
-extern struct svalue *f_debug_info(struct svalue *sp, int num_arg);
+extern svalue_t *f_debug_info(svalue_t *sp, int num_arg);
+extern svalue_t *f_shutdown(svalue_t *sp);
 
-#endif /* __EFUNS_H__ */
+#endif /* EFUNS_H__ */
 

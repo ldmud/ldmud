@@ -1,6 +1,6 @@
 OBSOLETE
 SYNOPSIS
-	mixed *filter_array(mixed *arr, string fun, object ob,
+	mixed *filter_array(mixed *arr, string fun, string|object ob,
 			    mixed extra, ...)
 	mixed *filter_array(mixed *arr, closure cl, mixed extra, ...)
 	mixed *filter_array(mixed *arr, mapping map, mixed extra, ...)
@@ -18,8 +18,9 @@ DESCRIPTION
 	
 	If arr is not an array, an error occurs.
 	
-	The extra argument(s) are optional. ob can also be a
-	file_name. If ob is omitted, this_object() is default.
+	The extra argument(s) are optional.
+	If <ob> is omitted, or neither a string nor an object, it
+        defaults to this_object().
 
 	Since 3.2.1@36, the second arg can also be a mapping. Then
 	only the elements of the array which belong to the map (as

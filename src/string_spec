@@ -1,0 +1,100 @@
+/*---------------------------------------------------------------------------
+ * Specification of the standard shared strings.
+ *
+ *---------------------------------------------------------------------------
+ * For a full explanation, see make_func.y
+ *---------------------------------------------------------------------------
+ */
+
+    /* General strings */
+
+DEFAULT "This string is used as a substitute if allocating another one failed."
+EMPTY           ""
+CALL_OTHER      "call_other"
+
+    /* Object lfuns */
+
+CATCH_TELL      "catch_tell"
+CATCH_MSG       "catch_msg"
+ID              "id"
+VARINIT         "__INIT"
+
+    /* Master lfuns */
+
+ABS_PATH        "make_path_absolute"
+COMP_OBJ        "compile_object"
+CONNECT         "connect"
+DISCONNECT      "disconnect"
+EPILOG          "epilog"
+EXT_RELOAD      "external_master_reload"
+FLAG            "flag"
+GET_BB_UID      "get_bb_uid"
+GET_ED_FNAME    "get_ed_buffer_save_file_name"
+GET_M_UID       "get_master_uid"
+GET_SEFUN       "get_simul_efun"
+GET_WNAME       "get_wiz_name"
+HEART_ERROR     "heart_beat_error"
+INAUGURATE      "inaugurate_master"
+INCLUDE_FILE    "include_file"
+INHERIT_FILE    "inherit_file"
+LOG_ERROR       "log_error"
+LOGON           "logon"
+PRELOAD         "preload"
+PREP_DEST       "prepare_destruct"
+PRINTF_OBJ_NAME "printf_obj_name"
+PRIVILEGE       "privilege_violation"
+QUERY_SHADOW    "query_allow_shadow"
+QUOTA_DEMON     "quota_demon"
+RETR_ED         "retrieve_ed_setup"
+REACTIVATE      "reactivate_destructed_master"
+RECEIVE_IMP     "receive_imp"
+REMOVE_PL       "remove_player"
+RUNTIME         "runtime_error"
+SAVE_ED         "save_ed_setup"
+SHUTDOWN        "notify_shutdown"
+SLOW_SHUT       "slow_shut_down"
+STALE_ERQ       "stale_erq"
+VALID_EXEC      "valid_exec"
+VALID_QSNOOP    "valid_query_snoop"
+VALID_READ      "valid_read"
+VALID_SETEUID   "valid_seteuid"
+VALID_SNOOP     "valid_snoop"
+VALID_TRACE     "valid_trace"
+VALID_WRITE     "valid_write"
+
+#ifdef COMPAT_MODE
+
+    /* Compat mode lfuns */
+
+ADD_WEIGHT      "add_weight"
+CANPUTGET       "can_put_and_get"
+DROP            "drop"
+GET             "get"
+QUERY_WEIGHT    "query_weight"
+PREVENT_INSERT  "prevent_insert"
+
+#endif
+
+#ifdef SUPPLY_PARSE_COMMAND
+
+
+    /* parse_command() lfuns */
+
+#ifndef COMPAT_MODE
+
+PC_ID_LIST      "parse_command_id_list"
+PC_P_ID_LIST    "parse_command_plural_id_list"
+PC_ADJ_LIST     "parse_command_adjectiv_id_list"
+PC_PREPOS       "parse_command_prepos_list"
+PC_ALLWORD      "parse_command_all_word"
+
+#else
+
+PC_PLURAL_ID    "plural_id"
+PC_ADJ_ID       "adjectiv_id"
+PC_SHORT        "short"
+
+#endif /* COMPAT_MODE */
+#endif /* SUPPLY_PARSE_COMMAND */
+
+/***************************************************************************/

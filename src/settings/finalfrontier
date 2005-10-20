@@ -1,0 +1,67 @@
+#!/bin/sh
+#
+# Settings for the FinalFrontier mudlib.
+#
+# The generated config.h will not contain the additional definitions
+# required by the FinalFrontier driver extensions.
+#
+# These additional defines are (as of 17-July-2000):
+#
+#  #define SET_CORE_VIA_RLIMIT
+#
+#  /* Include code for EFun int get_eval_time(). This EFun returns the number of
+#     miliseconds since the start of the current evaluation loop. */
+#  #define GET_EVAL_TIME
+#
+#  /* includes code that assumes that the driver process was started with
+#   * super user privileges
+#   */
+#  #define SUPER_USER
+#
+#  #ifdef SUPER_USER
+#  /* the user and group ID to change to if the privileged tasks are done */
+#  #define UID "mud"
+#  #define GID "mud"
+#
+#  /* should the driver use the getrlimit()/setrlimit() system calls to set
+#   * the maximum number of files a process can have open to the hard limit */
+#  #define USE_RLIMIT
+#
+#  #endif /* SUPER_USER */
+#
+#
+#  /* da in func_spec die defines nur aus config.h gelten hier nochmal ein 
+#   * schalter mit denen die mysql_funktionen aktiviert werden.
+#     (wird in func_spec und in lex.c benutzt)                      	*/
+#
+#  #define COMPILE_MYSQL_EFUNS
+#
+# TODO: Find a way to specify and #include host specific files into
+# TOOD:: config.h - maybe test for setting/<name>.h and include if existing.
+#
+# configure will strip this part from the script.
+
+exec ./configure --with-setting=finalfrontier $*
+
+exit 1
+
+# --- The actual settings ---
+
+with_time_to_swap=1800
+with_time_to_swap_variables=2400
+with_max_user_trace=80
+with_max_trace=85
+with_compiler_stack_size=1000
+with_portno=7600
+with_catch_reserved_cost=4000
+with_master_reserved_cost=1024
+with_max_players=200
+with_allowed_ed_cmds=40
+with_reserved_user_size=800000
+with_htable_size=28672
+with_itable_size=1024
+with_otable_size=7168
+with_catch_udp_port=7610
+enable_malloc_trace=yes
+enable_malloc_lpc_trace=yes
+

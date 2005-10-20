@@ -1,8 +1,8 @@
-Subject: x-erq doesnt work
+Subject: Socket functions for erq.
 From: Gokhan Moral <gm@Bilkent.EDU.TR>
 Date: Sat, 12 Dec 1998 21:26:26 +0200 (EET)
 Type: Bug
-State: Unclassified
+State: Done - discovered to be implemented in 3.2.8-dev.150.
 
 sorry to bother you again, but i want to ask a question.
 I was using xerq-1.4 with amylaar driver

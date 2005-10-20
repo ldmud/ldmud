@@ -1,8 +1,11 @@
 SYNOPSIS
-	mixed * map(mixed *arg, string func, object ob, mixed extra...)
+	mixed * map(mixed *arg, string func, string|object ob
+                                           , mixed extra...)
 	mixed * map(mixed *arg, closure cl, mixed extra...)
+	mixed * map(mixed *arg, mapping m)
 
-	mapping map(mapping arg, string func, object ob, mixed extra...)
+	mapping map(mapping arg, string func, string|object ob
+                                            , mixed extra...)
 	mapping map(mapping arg, closure cl, mixed extra...)
 
 
@@ -11,7 +14,8 @@ DESCRIPTION
 	every element of the array or mapping <arg>, and return a result
 	made up from the returned values.
 
-	If <ob> is omitted, it defaults	to this_object().
+	If <ob> is omitted, or neither a string nor an object, it
+        defaults to this_object().
 
 
 	If <arg> is an array, the function will be called with each
@@ -21,6 +25,17 @@ DESCRIPTION
 	operation could be described as:
 
 	  foreach(index) result[index] = ob->func(arg[index], extra...)
+
+        If <arg> is an array, and a mapping is specified instead
+        of a function, the result is an array with the values found
+        in the mapping for the original values, resp. with the original
+        values for which no mapping entry exists. In other words:
+
+          foreach(index)
+             if (arg[index] exists as key in map)
+                 result[index] = map[arg[index]]
+             else
+                 result[index] = arg[index]
 
 
 	If <arg> is a mapping, the function will be called with
@@ -52,8 +67,17 @@ DESCRIPTION
 	with mappings generalises map_indices()!
 
 
+EXAMPLES
+        arr = ({ 1, 2, 3, 4 });
+        m = ([ 1:-1, 3:-3 ]);
+
+        map(arr, #'%, 2)  --> returns ({ 1, 0, 1, 0 })
+        map(arr, m)       --> returns ([ -1, 2, -3, 4 })
+
+
 HISTORY
 	Introduced in LDMud 3.2.6, obsoletes map_array().
+        LDMud 3.2.8 added the feature of mapping an array through a mapping.
 
 SEE ALSO
 	filter(E), filter_indices(E), map_indices(E), map_objects(E)

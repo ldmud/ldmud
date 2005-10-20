@@ -19,9 +19,9 @@ The files in this directory are:
   doc/    : the collected documentation
   src/    : the driver source
   pkg/    : additional packages (unsupported and supported) for the driver.
-  mudlib/ : standard files to copy into your mudlib.
+  mudlib/ : various LPC (example) files.
   mudlib/sys/:
-            include files to copy into your mudlib. Some of these are
+            standard include files to copy into your mudlib. Some of these are
             also used by the src/ files. 
   mud/    : the lp-245 mudlib, and support files for other mudlibs.
 

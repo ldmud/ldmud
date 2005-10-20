@@ -1,5 +1,5 @@
-#ifndef __MY_ALLOCA_H__
-#define __MY_ALLOCA_H__
+#ifndef MY_ALLOCA_H__
+#define MY_ALLOCA_H__
 
 /*------------------------------------------------------------------
  * Portable definition of alloca().
@@ -33,7 +33,7 @@
 
 #define GC_ALLOCA NOOP
 
-#else
+#else /* defined(C_ALLOCA) && !defined(MAKE_FUNC) */
 
 #include <sys/types.h>
 
@@ -47,5 +47,5 @@ extern void * alloca(size_t);
 
 #endif  /* C_ALLOCA */
 
-#endif /* __MY_ALLOCA_H__ */
+#endif /* MY_ALLOCA_H__ */
 

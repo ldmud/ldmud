@@ -1,10 +1,10 @@
-#ifndef __INTERPRET_H__
-#define __INTERPRET_H__ 1
+#ifndef INTERPRET_H__
+#define INTERPRET_H__ 1
 
 #include <setjmp.h>
 
 #include "driver.h"
-#include "datatypes.h"
+#include "typedefs.h"
 #include "instrs.h"
 
 /* --- Types --- */
@@ -21,11 +21,11 @@
  */
 
 struct control_stack {
-    struct object *ob;          /* Current object */
-    struct object *prev_ob;     /* Save previous object */
-    struct program *prog;       /* Current program, NULL in the bottom entry */
-    bytecode_p pc;              /* Program counter, points to next bytecode */
-    struct svalue *fp;          /* Frame pointer: first arg on stack */
+    object_t *ob;          /* Current object */
+    object_t *prev_ob;     /* Save previous object */
+    program_t *prog;       /* Current program, NULL in the bottom entry */
+    bytecode_p pc;         /* Program counter, points to next bytecode */
+    svalue_t *fp;          /* Frame pointer: first arg on stack */
     bytecode_p funstart;
       /* Start of the function code.
        * Two magic values (SIMUL_EFUN_FUNSTART and EFUN_FUNSTART) mark
@@ -36,7 +36,7 @@ struct control_stack {
       /* Index of current program's function block within the functions of the
        * current objects program (needed for inheritance).
        */
-    struct svalue *current_variables;        /* Same */
+    svalue_t *current_variables;        /* Same */
     int   extern_call;
       /* TRUE if the call came from outside the object (call_others to
        * oneself are a special case of this). Only entries with this flag
@@ -58,7 +58,7 @@ struct control_stack {
       /* Points to address to branch to at next F_BREAK, which is also
        * the actual bottom of the break stack.
        */
-    struct object *pretend_to_be;
+    object_t *pretend_to_be;
       /* After set_this_object(), the this_object imposter.
        */
 };
@@ -76,20 +76,20 @@ struct control_stack {
 
 /* --- Variables --- */
 
-extern struct program *current_prog;
+extern program_t *current_prog;
 extern int tracedepth;
 extern int trace_level;
-#ifdef SMALLOC_LPC_TRACE
+#ifdef MALLOC_LPC_TRACE
 extern bytecode_p inter_pc;
 #endif
-extern struct svalue *inter_sp;
+extern svalue_t *inter_sp;
 extern int function_index_offset;
-extern struct svalue *current_variables;
+extern svalue_t *current_variables;
 extern int32  eval_cost;
 extern int32  assigned_eval_cost;
-extern struct svalue apply_return_value;
-extern struct svalue catch_value;
-extern struct svalue last_indexing_protector;
+extern svalue_t apply_return_value;
+extern svalue_t catch_value;
+extern svalue_t last_indexing_protector;
 
 #ifdef APPLY_CACHE_STAT
 extern p_int apply_cache_hit;
@@ -100,89 +100,91 @@ extern p_int apply_cache_miss;
 
 extern void assign_eval_cost(void);
 
-extern void free_string_svalue(struct svalue *v);
-extern void free_object_svalue(struct svalue *v);
-extern void zero_object_svalue(struct svalue *v);
-extern void free_svalue(struct svalue *v);
-extern void assign_svalue_no_free(struct svalue *to, struct svalue *from);
-extern void assign_svalue(struct svalue *dest, struct svalue *v);
-extern void transfer_svalue_no_free(struct svalue *dest, struct svalue *v);
-extern void transfer_svalue(struct svalue *dest, struct svalue *v);
+extern void free_string_svalue(svalue_t *v);
+extern void free_object_svalue(svalue_t *v);
+extern void zero_object_svalue(svalue_t *v);
+extern void free_svalue(svalue_t *v);
+extern void assign_svalue_no_free(svalue_t *to, svalue_t *from);
+extern void assign_svalue(svalue_t *dest, svalue_t *v);
+extern void transfer_svalue_no_free(svalue_t *dest, svalue_t *v);
+extern void transfer_svalue(svalue_t *dest, svalue_t *v);
 
-extern void push_object(struct object *ob);
-extern void push_valid_ob(struct object *ob);
+extern void push_object(object_t *ob);
+extern void push_valid_ob(object_t *ob);
 extern void push_number(p_int n);
 extern void push_shared_string(char *p);
 extern void push_referenced_shared_string(char *p);
-extern void push_svalue(struct svalue *v);
-extern void push_svalue_block(int num, struct svalue *v);
-extern struct svalue *pop_n_elems (int n, struct svalue *sp);
+extern void push_svalue(svalue_t *v);
+extern void push_svalue_block(int num, svalue_t *v);
+extern svalue_t *pop_n_elems (int n, svalue_t *sp);
 extern void pop_stack(void);
-extern void push_vector(struct vector *v);
-extern void push_referenced_vector(struct vector *v);
+extern void push_vector(vector_t *v);
+extern void push_referenced_vector(vector_t *v);
 extern void push_string_malloced(char *p);
 extern void push_string_shared(char *p);
 extern void push_malloced_string(char *p);
 extern void push_volatile_string(char *p);
 
 extern void init_interpret(void);
-extern void bad_efun_arg(int arg, int instr, struct svalue *sp) NORETURN;
-extern void bad_xefun_arg(int arg, struct svalue *sp) NORETURN;
-extern void bad_xefun_vararg(int arg, struct svalue *sp) NORETURN;
-extern Bool _privilege_violation(char *what, struct svalue *where, struct svalue *sp);
-extern Bool privilege_violation4(char *what, struct object *whom, char *how_str, int how_num, struct svalue *sp);
-#if defined(SUPPLY_PARSE_COMMAND) && !defined(COMPAT_MODE)
-extern void check_for_destr(struct vector *v);
-#endif
+extern void bad_efun_arg(int arg, int instr, svalue_t *sp) NORETURN;
+extern void bad_xefun_arg(int arg, svalue_t *sp) NORETURN;
+extern void bad_xefun_vararg(int arg, svalue_t *sp) NORETURN;
+#define bad_efun_vararg   bad_xefun_arg
+extern Bool _privilege_violation(char *what, svalue_t *where, svalue_t *sp);
+extern Bool privilege_violation4(char *what, object_t *whom, char *how_str, int how_num, svalue_t *sp);
 extern void push_apply_value(void);
 extern void pop_apply_value (void);
-extern struct svalue *sapply_int(char *fun, struct object *ob, int num_arg, Bool b_ign_prot);
+extern svalue_t *sapply_int(char *fun, object_t *ob, int num_arg, Bool b_ign_prot);
 #define sapply(f,o,n) sapply_int(f,o,n, MY_FALSE)
-extern struct svalue *apply(char *fun, struct object *ob, int num_arg);
-extern char *function_exists(char *fun, struct object *ob);
-extern void call_function(struct program *progp, int fx);
-extern int get_line_number(bytecode_p p, struct program *progp, char **namep);
+extern svalue_t *apply(char *fun, object_t *ob, int num_arg);
+extern char *function_exists(char *fun, object_t *ob);
+extern void call_function(program_t *progp, int fx);
+extern int get_line_number(bytecode_p p, program_t *progp, char **namep);
 extern char *dump_trace(Bool how);
 extern int get_line_number_if_any(char **name);
 extern void reset_machine(Bool first);
-extern struct svalue *secure_apply(char *fun, struct object *ob, int num_arg);
-extern struct svalue *apply_master_ob(char *fun, int num_arg);
+extern svalue_t *secure_apply(char *fun, object_t *ob, int num_arg);
+extern svalue_t *apply_master_ob(char *fun, int num_arg);
 extern void assert_master_ob_loaded(void);
-extern struct svalue *secure_call_lambda(struct svalue *closure, int num_arg);
-extern void remove_object_from_stack(struct object *ob);
-extern void call_lambda(struct svalue *lsvp, int num_arg);
+extern svalue_t *secure_call_lambda(svalue_t *closure, int num_arg);
+extern void remove_object_from_stack(object_t *ob);
+extern void call_lambda(svalue_t *lsvp, int num_arg);
 extern void free_interpreter_temporaries(void);
 extern void invalidate_apply_low_cache(void);
 extern void add_eval_cost(int num);
-extern void push_referenced_mapping(struct mapping *m);
-extern void m_indices_filter (struct svalue* key, struct svalue* data, void *extra);
-extern int last_instructions(int length, Bool verbose, struct svalue **svpp);
-extern struct svalue *f_last_instructions(struct svalue *sp);
-extern struct svalue *f_extract_lvalue(struct svalue *sp);
-extern struct svalue *f_trace(struct svalue *sp);
-extern struct svalue *f_traceprefix(struct svalue *sp);
+extern void push_referenced_mapping(mapping_t *m);
+extern void m_indices_filter (svalue_t *key, svalue_t *data, void *extra);
+extern int last_instructions(int length, Bool verbose, svalue_t **svpp);
+extern svalue_t *f_last_instructions(svalue_t *sp);
+extern svalue_t *f_trace(svalue_t *sp);
+extern svalue_t *f_traceprefix(svalue_t *sp);
+
+#ifndef COMPAT_MODE
+extern char *add_slash (char *str);
+#endif
 
 #ifdef OPCPROF
 extern Bool opcdump(char *fname);
 #endif
 
 #ifdef TRACE_CODE
-extern int last_instructions(int length, int verbose, struct svalue **svpp);
+extern int last_instructions(int length, int verbose, svalue_t **svpp);
 #endif
 
 #ifdef DEBUG
 extern int check_state(void);
-extern void count_inherits(struct program *progp);
-extern void count_extra_ref_in_object(struct object *ob);
-extern void count_extra_ref_in_vector(struct svalue *svp, size_t num);
-extern void check_a_lot_ref_counts(struct program *search_prog);
+extern void count_inherits(program_t *progp);
+extern void count_extra_ref_in_object(object_t *ob);
+extern void count_extra_ref_in_vector(svalue_t *svp, size_t num);
+extern void check_a_lot_ref_counts(program_t *search_prog);
 #endif
 
-#ifdef MALLOC_smalloc
+extern size_t interpreter_overhead(void);
+
+#ifdef GC_SUPPORT
 extern void clear_interpreter_refs(void);
 extern void count_interpreter_refs(void);
 #endif
 
-#define bad_efun_vararg           bad_xefun_arg
 
-#endif /* __INTERPRET_H__ */
+#endif /* INTERPRET_H__ */

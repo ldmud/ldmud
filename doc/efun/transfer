@@ -21,6 +21,9 @@ DESCRIPTION
 	sure that the new object first is transfered to it's
 	destination.
 
+        The efun calls add_weight(), drop(), get(), prevent_insert(),
+        add_weight(), and can_put_and_get() where needed.
+
 SEE ALSO
 	 move_object(E), drop(A), get(A), prevent_insert(A),
 	 can_put_and_get(A), add_weight(A)

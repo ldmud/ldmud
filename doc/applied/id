@@ -8,7 +8,7 @@ DESCRIPTION
 
 EXAMPLE
 	int id(string str) {
-	   return "sword" == str" || "sword of fire" == str;
+	   return "sword" == str || "sword of fire" == str;
 	}
 	
 SEE ALSO

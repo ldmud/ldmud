@@ -7,8 +7,8 @@
 /* does the compiler provide inline functions? */
 #undef HAS_INLINE
 
-/* Is the library function inet_ntoa() compatible with the compiler ?
- * Is there any platform where this is not the case?
+/* Is the library function inet_ntoa() compatible with the compiler?
+ * TODO: Is there any platform where this is not the case?
  */
 #undef INET_NTOA_OK
 
@@ -40,6 +40,9 @@
 
 #define MALLOC_ALIGN 4
 
+/* does the compiler know of a 'ssize_t' type? */
+#undef HAVE_SSIZE_T
+
 /* does the compiler know of a 'long long' type? */
 #undef HAVE_LONG_LONG
 
@@ -65,17 +68,20 @@
 #undef USE_FCNTL_O_NDELAY
 #undef USE_FCNTL_FNDELAY
 
-/* Define what random number generator to use.
- * If no one is specified, a probably good one will be used.
- * possible choices: RANDOM DRAND48 RAND
- */
-#undef RANDOM
-#undef DRAND48
-#undef RAND
+/* Can F_SETOWN be used on a socket? */
+#undef USE_FCNTL_SETOWN
+
+/* Can SO_OOBINLINE be used on a socket? */
+#undef USE_OOBINLINE
+
+/* Does the machine offer IPv6? */
+#undef HAS_IPV6
 
 /* define the erq include file. */
 #undef ERQ_INCLUDE
 
+/* define the host-specific include file */
+#undef HOST_INCLUDE
 
 @BOTTOM@
 

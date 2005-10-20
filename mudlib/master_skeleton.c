@@ -71,6 +71,12 @@
 // string get_wiz_name (string file)
 //   Return the author of a file.
 //
+// mixed include_file (string file, string compiled_file, int sys_include)
+//   Return the full pathname for an included file.
+//
+// mixed inherit_file (string file, string compiled_file)
+//   Return the full pathname for an inherited object.
+//
 // string object_name (object obj)
 //   Return a printable name for an object.
 //
@@ -95,8 +101,8 @@
 // void dangling_lfun_closure ()
 //   Handle a dangling lfun-closure.
 //
-// void log_error (string file, string err)
-//   Announce a compiler-time error.
+// void log_error (string file, string err, int warn)
+//   Announce a compiler-time error or warning.
 //
 // mixed heart_beat_error (object culprit, string err,
 //                         string prg, string curobj, int line)
@@ -472,6 +478,42 @@ object compile_object (string filename)
 
 
 //---------------------------------------------------------------------------
+mixed include_file (string file, string compiled_file, int sys_include)
+
+// Generate the pathname of an included file.
+//
+// Arguments:
+//   previous_object(): The object causing the compile.
+//   file             : The name given in the #include directive.
+//   compiled_file    : The object file which is just compiled
+//                      (compat: name without leading "/").
+//   sys_include      : TRUE for #include <> directives.
+//
+// Result:
+//   0:      use the normal include filename generation (""-includes are used
+//           as they are, <>-includes are handled according to H_INCLUDE_DIRS).
+//   <path>: the full absolute pathname of the file to include without
+//           parentdir parts ("/../"). Leading slashes ("/") are ignored.
+//   else:   The include directive is not legal.
+
+//---------------------------------------------------------------------------
+mixed inherit_file (string file, string compiled_file)
+
+// Generate the pathname of an inherited file.
+//
+// Arguments:
+//   previous_object(): The object causing the compile.
+//   file             : The name given in the inherit directive.
+//   compiled_file    : The object file which is just compiled
+//                      (compat: name without leading "/").
+//
+// Result:
+//   0:      use the filename as it is.
+//   <path>: the full absolute pathname of the file to inherit without
+//           parentdir parts ("/../"). Leading slashes ("/") are ignored.
+//   else:   The include directive is not legal.
+
+//---------------------------------------------------------------------------
 string get_wiz_name (string file)
 
 // Return the author of a file.
@@ -639,17 +681,19 @@ void dangling_lfun_closure ()
 }
 
 //---------------------------------------------------------------------------
-void log_error (string file, string err)
+void log_error (string file, string err, int warn)
 
-// Announce a compiler-time error.
+// Announce a compiler-time error or warning.
 //
 // Arguments:
-//   file: The name of file containing the error (it needn't be an object
-//         file!).
-//   err : The error message.
+//   file: The name of file containing the error/warning (it needn't be
+//         an object file!).
+//   err : The error/warning message.
+//   warn: non-zero if this is a warning, zero if it is an error.
 //
-// Whenever the LPC compiler detects an error, this function is called.
-// It should at least log the error in a file, and also announce it
+// Whenever the LPC compiler detects an error or wants to issue a warning,
+// this function is called.
+// It should at least log the message in a file, and also announce it
 // to the active player if it is an wizard.
 
 
@@ -920,6 +964,7 @@ mixed valid_write (string path, string euid, string fun, object caller)
 // calls to the valid_read/valid_write in the player object.
 //
 // valid_read() is called for these operations:
+//   copy_file       (for the source file)
 //   ed_start        (when reading a file)
 //   file_size
 //   get_dir
@@ -929,9 +974,15 @@ mixed valid_write (string path, string euid, string fun, object caller)
 //   restore_object
 //   tail
 //
+// For restore_object(), the <path> passed is the filename as given
+// in the efun call.
+//
+//
 // valid_write() is called for these operations:
+//   copy_file    (for the target file resp. directory name)
 //   ed_start     (when writing a file)
-//   do_rename    (twice for each the old and new name)
+//   rename_from  (for each the old name of a rename())
+//   rename_to    (for the new name of a rename())
 //   mkdir
 //   objdump
 //   opcdump
@@ -940,6 +991,11 @@ mixed valid_write (string path, string euid, string fun, object caller)
 //   rmdir
 //   write_bytes
 //   write_file
+//
+// For save_object(), the <path> passed is the filename as given
+// in the efun call. If for this efun a filename ending in ".c" is
+// returned, the ".c" will be stripped from the filename.
+
 
 
 //===========================================================================

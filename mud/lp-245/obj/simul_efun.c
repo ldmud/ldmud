@@ -214,7 +214,7 @@ mixed *unique_array(mixed *arr,string func,mixed skipnum)
 }
 
 //---------------------------------------------------------------------------
-mixed snoop(mixed snoopee)
+varargs mixed snoop(mixed snoopee)
 {
     int result;
 
@@ -227,10 +227,13 @@ mixed snoop(mixed snoopee)
     switch (result) {
 	case -1:
 	    write("Busy.\n");
+	    break;
 	case  0:
 	    write("Failed.\n");
+	    break;
 	case  1:
 	    write("Ok.\n");
+	    break;
     }
     if (result > 0) return snoopee;
 }
@@ -266,7 +269,7 @@ nomask void set_environment() {}
 nomask void set_this_player() {}
 
 //---------------------------------------------------------------------------
-void add_worth(int value, object ob)
+varargs void add_worth(int value, object ob)
 {
     mixed old;
 #ifdef __COMPAT_MODE__
@@ -289,7 +292,7 @@ void add_worth(int value, object ob)
 }
 
 //---------------------------------------------------------------------------
-void wizlist(string name)
+varargs void wizlist(string name)
 {
     int i, pos, total_cmd;
     int *cmds;
@@ -465,6 +468,18 @@ string program_name(object ob)
 
     rc = efun::program_name(ob);
     return stringp(rc) ? rc[1..] : 0;
+}
+
+//---------------------------------------------------------------------------
+string* inherit_list(object ob)
+{
+    string *rc;
+    int i;
+
+    rc = efun::inherit_list(ob);
+    for (i = sizeof(rc); i-- > 0; )
+        rc[i] = rc[i][1..];
+    return rc;
 }
 
 //---------------------------------------------------------------------------

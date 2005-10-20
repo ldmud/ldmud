@@ -49,7 +49,9 @@ DESCRIPTION
 
 	expr1 & expr2	The result is the bitwise and of 'expr1' and
 			'expr2'.
-                        For arrays, the intersection set is computed.
+                        For arrays and strings, the intersection set
+                        (all elements resp. characters from expr1 which
+                        which are also in the expr2) is computed.
 
 	expr1 == expr2	Compare values. Valid for strings and numbers.
 
@@ -73,16 +75,18 @@ DESCRIPTION
 			concatenated with the other value.
                         If the expressions are arrays, the result is
                         the right array appended to the left.
-                        If the expressions are mappings, the result
-                        is merger of the two mappings. If one key exists
-                        in both mappings, the element from the right mapping
-                        appears in the result.
+                        If the expressions are mappings of equal width,
+                        the result is merger of the two mappings. If one
+                        key exists in both mappings, the element from the
+                        right mapping appears in the result. If the two
+                        mappings are of different width, the result is
+                        <expr1> if non-empty, and <expr2> otherwise.
 
 	expr1 - expr2	Subtract 'expr2' from 'expr1'. Valid for
 			numbers, strings, arrays, mappings.
-			For arrays, all occurences of the
-			elements in 'expr2' are removed from 'expr1',
-			and the result is returned.
+			For arrays and strings, all occurences of the
+			elements resp. characters in 'expr2' are removed
+                        from 'expr1', and the result is returned.
                         For mapping, all occurances of elemens in 'expr1'
                         which have a matching key in 'expr2' are removed, and
                         the result is returned.
@@ -108,6 +112,16 @@ DESCRIPTION
 
 	~ var		The boolean 'not' of an integer.
 
+        ( type ) var    Return the value of <var> converted to <type>.
+                        <type> can be 'string', 'int', 'object', 'float'
+                        or 'int*'. The operator acts like the efuns
+                        to_string(), to_int(), to_object(), to_float()
+                        and to_array().
+
+        ({ type }) var  <var> is now assumed to have the type <type>.
+                        This is purely declarative, the actual value
+                        of <var> is not changed.
+
 	var ++		Increment the value of variable 'var', and
 			return the old value.
 
@@ -118,9 +132,10 @@ DESCRIPTION
 			indexed by 'expr2'.
 
 	expr1[expr2..expr3] The symbolic form of extract(). Extracts a
-			piece from an array or string. expr3 may be omitted,
-                        default is the end of expr1. Negative numbers for
-                        expr2 or expr3
+			piece from an array or string.
+                        expr2 or expr3 may be omitted, default is the begin
+                        or end of expr1.
+                        Negative numbers for expr2 or expr3
 			mean ``count from before the beginning'', i.e.
 			foo[-2..-1] is an empty array or string.
 			foo[<2..<1] gives the 2nd and last element of

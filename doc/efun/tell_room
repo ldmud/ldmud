@@ -1,8 +1,8 @@
 SYNOPSIS
-	void tell_room(object ob, string str)
-	void tell_room(object ob, string str, object *exclude)
-	void tell_room(object ob, mixed *msg)
-	void tell_room(object ob, mixed *msg, object *exclude)
+	void tell_room(string|object ob, string str)
+	void tell_room(string|object ob, string str, object *exclude)
+	void tell_room(string|object ob, mixed *msg)
+	void tell_room(string|object ob, mixed *msg, object *exclude)
 
 DESCRIPTION
 	Send a message str to all living objects in the room ob. ob
@@ -11,7 +11,8 @@ DESCRIPTION
 	catch_tell() of the object will be invoked with the message as
 	argument. If living objects define catch_tell(), the string
 	will also be sent to that instead of being written to the
-	user.
+	user. If the object is given as its filename, the driver
+        looks up the object under that name, loading it if necessary.
 	If array *exclude is given, all objects contained in
 	*exclude are excluded from the message str.
 

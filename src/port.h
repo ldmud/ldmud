@@ -1,5 +1,5 @@
-#ifndef __PORT_H__
-#define __PORT_H__
+#ifndef PORT_H__
+#define PORT_H__
 
 /*------------------------------------------------------------------
  * Global Portability Include File.
@@ -17,6 +17,8 @@
  * Not everything system dependent is defined here, some stuff
  * are kept in separate my-foo.h files.
  *
+ * TODO: Distinguish 'DEBUG' (sanity checks, no inlines), 'NORMAL'
+ * TODO:: (sanity checks, inlines), and 'BUGFREE' (no sanity checks, inlines).
  * TODO: Make a NOTREACHED(code) macro, which allows the insertion
  * TODO:: of <code> for compilers without reachability-detection to
  * TODO:: aid the optimizer.
@@ -25,13 +27,14 @@
  *------------------------------------------------------------------
  */
 
-#if !defined(__DRIVER_H__)
+#if !defined(DRIVER_H__)
 #error You must include driver.h instead of port.h
 Thats it.
 #endif
 
 #if !defined(__STDC__)
-/* On useful systems, the configure script catches this, too. */
+/* On useful systems, the configure script catches this, too.
+ */
 #error You need a Standard-C compiler.
 Thats it.
 #endif
@@ -120,6 +123,7 @@ extern int errno;
 
 #include <sys/types.h>
 
+
 /*------------------------------------------------------------------
  * Define some macros:
  *   CHAR_BIT     number of bits in a char, if not defined already.
@@ -134,6 +138,8 @@ extern int errno;
  *                HAS_INLINE (autoconf) and NO_INLINES (Makefile).
  *   EXTRACT_UCHAR(), EXTRACT_SCHAR():
  *                extract a character from a memory location.
+ *   USE_IPV6     check the definition from config.h in relation
+ *                to HAS_IPV6 from autoconf.
  *   MSDOS_FS     if the filesystem uses MS-DOS semantics
  *                (i.e. backslashes as directory separators)
  */
@@ -174,12 +180,7 @@ extern int errno;
 #    define FORMATDEBUG(f,a,b)
 #endif
 
-#ifdef __STDC__
-/* TODO: Remove VARPROT */
-#    define VARPROT(proto,like,form,var) proto FORMATDEBUG(like,form,var)
-#else
-#    define VARPROT(proto, like,form,var) ()
-#endif
+#define VARPROT(proto,like,form,var) proto FORMATDEBUG(like,form,var)
 
 #if defined(HAS_INLINE) && !defined(NO_INLINES)
 #    define INLINE inline
@@ -194,9 +195,14 @@ extern int errno;
 #define EXTRACT_UCHAR(p) (*(unsigned char *)(p))
 #define EXTRACT_SCHAR(p) (*(signed char *)(p))
 
+#if !defined(HAS_IPV6) && defined(USE_IPV6)
+#    undef USE_IPV6
+#endif
+
 #if ( defined( atarist ) && !defined ( minix ) ) || defined( MSDOS ) || defined(__CYGWIN__)
 #define MSDOS_FS
 #endif
+
 
 /*------------------------------------------------------------------
  * Integral types:
@@ -247,7 +253,9 @@ typedef p_uint        mp_uint;
 #ifndef __BEOS__
 /* int32 : an integer with 32 bits. */
 #    if SIZEOF_LONG == 4
+#        if !defined(_AIX)
 typedef long                int32;
+#        endif
 typedef unsigned long       uint32;
 #    else
 #        if SIZEOF_INT == 4
@@ -283,9 +291,14 @@ typedef char  CBool;
 #    define PTRTYPE char *
 #endif
 
+
 /*------------------------------------------------------------------
- * Provide functions and defines missing from the system headers.
+ * Provide functions, types and defines missing from the system headers.
  */
+
+#ifndef HAVE_SSIZE_T
+typedef signed long ssize_t;
+#endif
 
 #ifndef HAVE_MEMCPY
 /* The following 'implementation' is suitable for throwing away a value,
@@ -365,6 +378,15 @@ typedef char  CBool;
 
 extern mp_int get_current_time(void);
 extern char * time_string(int);
+extern char * time_stamp(void);
+
+#ifndef HAVE_STRCSPN
+extern size_t strcspn(char *s, char *set);
+#endif
+
+#ifndef HAVE_STRDUP
+extern char *strdup(const char *);
+#endif
 
 #ifndef HAVE_MEMMEM
 extern char *memmem(char *, size_t, char *, size_t);
@@ -375,9 +397,16 @@ extern void move_memory(char *, char *, size_t);
 #endif
 
 #if ((!defined(HAVE_CRYPT) && !defined(HAVE__CRYPT))) || \
+    !defined(USE_SYSTEM_CRYPT) || \
     (defined(sgi) && !defined(_MODERN_C)) || defined(ultrix) \
     || defined(sun)
 extern char *crypt(const char *, const char *);
 #endif
 
-#endif /* __PORT_H__ */
+#if defined(AMIGA) || defined(__CYGWIN__)
+extern void init_rusage(void);
+#else
+#define init_rusage()
+#endif
+
+#endif /* PORT_H__ */

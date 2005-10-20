@@ -43,6 +43,7 @@
 #define ED_VERSION 5        /* used only in the "set" function, for id */
 
 #include "driver.h"
+#include "typedefs.h"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -60,7 +61,10 @@
 #include "regexp.h"
 #include "rxcache.h"
 #include "simulate.h"
+#include "stdstrings.h"
 #include "stralloc.h"
+#include "svalue.h"
+#include "xalloc.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -172,7 +176,7 @@ typedef struct line LINE;
 /* The ed_buffer holds all the information for one editor session.
  */
 
-struct ed_buffer
+struct ed_buffer_s
 {
     Bool    diag;              /* True: diagnostic-output?*/
     Bool    truncflg;          /* True: truncate long line flag
@@ -180,7 +184,7 @@ struct ed_buffer
     int     nonascii;          /* count of non-ascii chars read */
     int     nullchar;          /* count of null chars read */
     int     truncated;         /* count of lines truncated */
-    char    fname[MAXFNAME];   /* name of the file */
+    char    fname[MAXFNAME+1]; /* name of the file */
     Bool    fchanged;          /* True: file-changed */
     int     nofname;
     int     mark['z'-'a'+1];
@@ -200,8 +204,8 @@ struct ed_buffer
                                   using autoindentation. */
     int     cur_autoindent;
     char    *exit_fn;          /* Function to be called when player exits */
-    struct object *exit_ob;    /* Object holding <exit_fn> */
-    struct svalue old_prompt;  /* Original prompt */
+    object_t *exit_ob;    /* Object holding <exit_fn> */
+    svalue_t old_prompt;  /* Original prompt */
 };
 
 /* ed_buffer.flag values
@@ -293,7 +297,7 @@ static struct tbl tbl[]
 
 /*-------------------------------------------------------------------------*/
 
-static struct ed_buffer *current_ed_buffer;
+static ed_buffer_t *current_ed_buffer;
   /* The current ed_buffer
    */
 
@@ -357,17 +361,28 @@ static void prntln(char *str, int vflg, int lin);
 static regexp *optpat(void);
 
 /*-------------------------------------------------------------------------*/
-void
-regerror (char *s)
+size_t
+ed_buffer_size (ed_buffer_t *buffer)
 
-/* Called from the regexp package with an error message <s> regarding
- * a regexp operation.
+/* Return the size of the memory allocated for the <buffer>
  */
 
 {
-    add_message("ed: %s\n", s );
-}
+    size_t sum;
+    long line;
+    LINE *pLine;
 
+    if (!buffer)
+        return 0;
+
+    sum = sizeof(*buffer);
+    for (line = 1, pLine = buffer->Line0.l_next
+        ; line < buffer->LastLn
+        ; line++, pLine = pLine->l_next)
+        sum += sizeof(*pLine) + strlen(pLine->l_buff);
+
+    return sum;
+} /* ed_buffer_size() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -444,15 +459,16 @@ more_append (char *str)
 
 /*-------------------------------------------------------------------------*/
 void
-prompt_from_ed_buffer (struct interactive *ip)
+prompt_from_ed_buffer (interactive_t *ip)
 
 /* Restore the <ip>->prompt from the saved prompt of <ip>->ed_buffer.
  */
 
 {
-    struct ed_buffer *ed_buffer;
+    ed_buffer_t *ed_buffer;
 
-    if (NULL != (ed_buffer = ip->sent.ed_buffer) )
+    if (NULL != (ed_buffer = O_GET_EDBUFFER(ip->ob))
+     && ed_buffer->old_prompt.type != T_INVALID)
     {
         transfer_svalue(&ip->prompt, &ed_buffer->old_prompt);
         ed_buffer->old_prompt.type = T_INVALID;
@@ -461,16 +477,16 @@ prompt_from_ed_buffer (struct interactive *ip)
 
 /*-------------------------------------------------------------------------*/
 void
-prompt_to_ed_buffer (struct interactive *ip)
+prompt_to_ed_buffer (interactive_t *ip)
 
 /* Save the current <ip>->prompt in the ed_buffer and change the prompt
  * to '*\b' (append mode) or ':' (normal command mode).
  */
 
 {
-    struct ed_buffer *ed_buffer;
+    ed_buffer_t *ed_buffer;
 
-    if ( NULL != (ed_buffer = ip->sent.ed_buffer) ) {
+    if ( NULL != (ed_buffer = O_GET_EDBUFFER(ip->ob)) ) {
         transfer_svalue(&ed_buffer->old_prompt, &ip->prompt);
         put_volatile_string(&ip->prompt, ed_buffer->appending ? "*\b" : ":");
     }
@@ -847,6 +863,7 @@ doread (int lin, char *fname)
     if (P_DIAG) add_message("\"%s\" ",fname);
     if ((fp = fopen(fname, "r")) == NULL )
     {
+        if (!P_DIAG) add_message("\"%s\" ",fname);
         add_message(" isn't readable.\n");
         return ERR ;
     }
@@ -1020,10 +1037,10 @@ getfn (Bool writeflg)
  */
 
 {
-    static char  file[MAXFNAME]; /* TODO: make this ed_buffer based? */
+    static char  file[MAXFNAME+1]; /* TODO: make this ed_buffer based? */
     char        *cp;
     char        *file2;
-    struct svalue *ret;
+    svalue_t *ret;
 
     if (*inptr == NL)
     {
@@ -1055,7 +1072,7 @@ getfn (Bool writeflg)
         if (!ret || (ret->type == T_NUMBER && ret->u.number == 0))
         {
             if (out_of_memory)
-                error("Out of memory\n");
+                error("(ed) Out of memory detected.\n");
             return NULL;
         }
 
@@ -1070,8 +1087,8 @@ getfn (Bool writeflg)
     file2 = check_valid_path(file, command_giver, "ed_start", writeflg);
     if (!file2)
         return NULL;
-    strncpy(file, file2, MAXFNAME-1);
-    file[MAXFNAME-1] = 0;
+    strncpy(file, file2, MAXFNAME);
+    file[MAXFNAME] = 0;
 
     if(strlen(file) == 0) {
         add_message("no file name\n");
@@ -1080,7 +1097,6 @@ getfn (Bool writeflg)
 
     return file;
 }  /* getfn */
-
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -1606,7 +1622,7 @@ optpat (void)
         return(P_OLDPAT);
     if(P_OLDPAT)
         REGFREE(P_OLDPAT);
-    return P_OLDPAT = REGCOMP(str,P_EXCOMPAT);
+    return P_OLDPAT = REGCOMP(str,P_EXCOMPAT, MY_TRUE);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1672,7 +1688,7 @@ set (void)
     /* Option not found in table, try the special ones. */
 
     if ( !strcmp(word,"save") ) {
-        struct svalue *ret;
+        svalue_t *ret;
         push_object(command_giver);
         push_number( P_SHIFTWIDTH | P_FLAGS );
         ret = apply_master_ob(STR_SAVE_ED,2);
@@ -2516,6 +2532,19 @@ docmd (Bool glob)
         P_FCHANGED = TRUE;
         break;
 
+    case 'M':
+        if (deflt(1, P_LASTLN) < 0)
+            return ERR;
+        if (*inptr != NL)
+            return ERR;
+
+        nchng = subst(REGCOMP("\015$", P_EXCOMPAT, MY_TRUE), "", 0, 0);
+
+        if (nchng < 0)
+            return ERR;
+        P_FCHANGED = TRUE;
+        break;
+
       case 'n':
         if (P_NFLG)
             P_FLAGS &= ~( NFLG_MASK | LFLG_MASK );
@@ -2742,7 +2771,7 @@ doglob (void)
 
 /*-------------------------------------------------------------------------*/
 void
-ed_start (char *file_arg, char *exit_fn, struct object *exit_ob)
+ed_start (char *file_arg, char *exit_fn, object_t *exit_ob)
 
 /* Start the editor on file <file_arg>. Because several players can edit
  * simultaneously, they will each need a separate editor data block.
@@ -2754,10 +2783,10 @@ ed_start (char *file_arg, char *exit_fn, struct object *exit_ob)
 
 {
     char *new_path;
-    struct svalue *setup, *prompt;
-    struct ed_buffer *old_ed_buffer;
+    svalue_t *setup, *prompt;
+    ed_buffer_t *old_ed_buffer;
 
-    if (!command_giver || !(command_giver->flags & O_SHADOW))
+    if (!command_giver || !(O_IS_INTERACTIVE(command_giver)))
         error("Tried to start an ed session on a non-interative player.\n");
 
     if (EXTERN_ED_BUFFER)
@@ -2784,9 +2813,9 @@ ed_start (char *file_arg, char *exit_fn, struct object *exit_ob)
 
     old_ed_buffer = ED_BUFFER;
     EXTERN_ED_BUFFER =
-      ED_BUFFER = (struct ed_buffer *)xalloc(sizeof (struct ed_buffer));
+      ED_BUFFER = (ed_buffer_t *)xalloc(sizeof (ed_buffer_t));
 
-    memset((char *)ED_BUFFER, '\0', sizeof (struct ed_buffer));
+    memset(ED_BUFFER, '\0', sizeof (ed_buffer_t));
 
     ED_BUFFER->truncflg = MY_TRUE;
     ED_BUFFER->flags |= EIGHTBIT_MASK | TABINDENT_MASK;
@@ -2830,8 +2859,8 @@ ed_start (char *file_arg, char *exit_fn, struct object *exit_ob)
 
     if (new_path)
     {
-        strncpy(P_FNAME, new_path, MAXFNAME-1);
-        P_FNAME[MAXFNAME-1] = 0;
+        strncpy(P_FNAME, new_path, MAXFNAME);
+        P_FNAME[MAXFNAME] = 0;
         add_message("/%s, %d lines\n", new_path, P_LASTLN);
     }
     else
@@ -2843,17 +2872,17 @@ ed_start (char *file_arg, char *exit_fn, struct object *exit_ob)
 }
 
 
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
 
 /*-------------------------------------------------------------------------*/
 void
-clear_ed_buffer_refs (struct ed_buffer *b)
+clear_ed_buffer_refs (ed_buffer_t *b)
 
 /* GC Support: Clear all references from ed_buffer <b>.
  */
 
 {
-    struct object *ob;
+    object_t *ob;
 
     if (b->exit_fn)
     {
@@ -2880,13 +2909,13 @@ clear_ed_buffer_refs (struct ed_buffer *b)
 
 /*-------------------------------------------------------------------------*/
 void
-count_ed_buffer_refs (struct ed_buffer *b)
+count_ed_buffer_refs (ed_buffer_t *b)
 
 /* GC Support: Count all references from ed_buffer <b>.
  */
 
 {
-    struct object *ob;
+    object_t *ob;
     LINE *line;
 
     if (b->LastLn)
@@ -2926,24 +2955,24 @@ count_ed_buffer_refs (struct ed_buffer *b)
     count_ref_in_vector(&b->old_prompt, 1);
 }
 
-#endif /* MALLOC_smalloc */
+#endif /* GC_SUPPORT */
 
 #ifdef DEBUG
 /*-------------------------------------------------------------------------*/
 void
-count_ed_buffer_extra_refs (struct ed_buffer *b)
+count_ed_buffer_extra_refs (ed_buffer_t *b)
 
 /* Count refs in ed_buffer <b> to debug refcounts.
  */
 
 {
-    struct object *ob;
+    object_t *ob;
 
     if ( NULL != (ob = b->exit_ob) )
         ob->extra_ref++;
 }
 
-#endif /* MALLOC_smalloc */
+#endif /* DEBUG */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -2958,15 +2987,14 @@ free_ed_buffer (void)
 
 {
     char *name;
-    struct object *ob;
+    object_t *ob;
 
     ED_BUFFER = EXTERN_ED_BUFFER;
 
     clrbuf();
     ob   = ED_BUFFER->exit_ob;
     name = ED_BUFFER->exit_fn;
-    if (O_GET_INTERACTIVE(command_giver)
-      && O_GET_INTERACTIVE(command_giver)->sent.type == SENT_INTERACTIVE)
+    if (O_IS_INTERACTIVE(command_giver))
     {
         transfer_svalue( query_prompt(command_giver), &ED_BUFFER->old_prompt );
     }
@@ -2981,18 +3009,18 @@ free_ed_buffer (void)
         P_OLDPAT = NULL;
     }
 
-    xfree((char *)ED_BUFFER);
+    xfree(ED_BUFFER);
     EXTERN_ED_BUFFER = NULL;
 
     if (name)
     {
         if (!ob || ob->flags & O_DESTRUCTED)
         {
-            debug_message("ed: exit_ob destructed at eof.\n");
+            debug_message("%s ed: exit_ob destructed at eof.\n", time_stamp());
         }
         else
         {
-            struct object *save = current_object;
+            object_t *save = current_object;
 
             current_object = ob;
             secure_apply(name, ob, 0);
@@ -3019,7 +3047,7 @@ ed_cmd (char *str)
 
 {
     int status;
-    struct ed_buffer *old_ed_buffer;
+    ed_buffer_t *old_ed_buffer;
 
     old_ed_buffer = ED_BUFFER;
     ED_BUFFER = EXTERN_ED_BUFFER;
@@ -3125,14 +3153,15 @@ save_ed_buffer (void)
  */
 
 {
-    struct svalue *stmp;
+    svalue_t *stmp;
     char *fname;
-    struct interactive *save = O_GET_INTERACTIVE(command_giver);
+    interactive_t *save = O_GET_INTERACTIVE(command_giver);
 
+    (void)O_SET_INTERACTIVE(save, command_giver);
     ED_BUFFER = EXTERN_ED_BUFFER;
     push_string_shared(P_FNAME);
     stmp = apply_master_ob(STR_GET_ED_FNAME,1);
-    if (save->sent.type == SENT_INTERACTIVE)
+    if (save)
     {
         save->catch_tell_activ = MY_FALSE;
         command_giver = save->ob;
@@ -3147,8 +3176,8 @@ save_ed_buffer (void)
 }
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_query_editing (struct svalue *sp)
+svalue_t *
+f_query_editing (svalue_t *sp)
 
 /* EFUN: query_editing()
  *
@@ -3161,8 +3190,8 @@ f_query_editing (struct svalue *sp)
  */
 
 {
-    struct object *ob;
-    struct shadow_sentence *sent;
+    object_t *ob;
+    shadow_t *sent;
 
     if (sp->type != T_OBJECT)
     {
@@ -3349,6 +3378,15 @@ print_help (char arg)
 "location just after the specified ADDRESS.  Address 0 is the\n"
 "beginning of the file and the default destination is the\n"
 "current line.\n"
+                   );
+        break;
+
+    case 'M':
+        add_message(
+"Command: M   Usage: M or [range]M\n"
+"The command removes in the whole file (or in the range of lines if\n"
+"specified) any trailing ^M from the line end. This change converts MS-DOS\n"
+"line ends into Unix-style lineends.\n"
                    );
         break;
 
@@ -3542,6 +3580,7 @@ print_help2 (void)
 "k\tmark this line with a character - later referenced as 'a\n"
 "l\tline line(s) with control characters displayed\n"
 "m\tmove line(s) to specified line\n"
+"M\tremove all ^M at lineends (DOS -> Unix lineconversion)\n"
 "n\ttoggle line numbering\n"
 "p\tprint line(s) in range\n"
 "q\tquit editor\n"

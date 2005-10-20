@@ -1,0 +1,11 @@
+SYNOPSIS
+        mixed db_fetch(int handle)
+
+DESCRIPTION
+        Retrieve _ONE_ line of result of the latest SQL-action to the server
+        based on the handle <handle>. If not more results are on the server,
+        0 is returned.
+
+SEE ALSO
+        db_affected_rows(E), db_conv_string(E), db_close(E), db_connect(E),
+        db_exec(E), db_handles(E)

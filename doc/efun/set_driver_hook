@@ -5,7 +5,7 @@ SYNOPSIS
 
 DESCRIPTION
 	This privileged efun sets the driver hook 'what' (values are
-	defined in /sys/driverhooks.h) to 'arg'.
+	defined in /sys/driver_hook.h) to 'arg'.
 	The exact meanings and types of 'arg' depend of the hook set.
 	To remove a hook, set 'arg' to 0.
 

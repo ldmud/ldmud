@@ -1,6 +1,6 @@
 OBSOLETE
 SYNOPSIS
-	mixed *map_array(mixed *arr, string fun, object ob, mixed extra)
+	mixed *map_array(mixed *arr, string fun, string|object ob, mixed extra)
 	mixed *map_array(mixed *arr, closure cl, mixed extra)
 
 DESCRIPTION
@@ -16,8 +16,9 @@ DESCRIPTION
 	existing element in the array. If arr is not an array, then 0
 	will be returned.
 
-	The extra argument is optional. ob can also be a file_name. If
-	ob is omitted, this_object() is default.
+	The extra argument is optional.	If <ob> is omitted, or neither
+        a string nor an object, it defaults to this_object().
+
 
 EXAMPLE
 	string ask_for_uid(object obj) {

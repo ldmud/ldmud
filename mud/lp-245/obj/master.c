@@ -10,6 +10,10 @@
 ** you shouldn't inherit an other object (as most files expect the master
 ** to exist), nor is the compiler able to search include files
 ** (read: they must be specified with full path).
+**
+** This master was written specifically for the 2.4.5 compat mode mudlib.
+** However it contains in comments marked with 'PLAIN' explanations how
+** a non-compat master differs from a compat one.
 */
 
 #include "/sys/wizlist.h"
@@ -19,6 +23,8 @@
 
 #define INIT_FILE "/room/init_file"
 #define BACKBONE_WIZINFO_SIZE 5
+#define MUDWHO_INDEX 1
+  /* Index of the mudwho information in the extra wizinfo */
 #define SIMUL_EFUN_FILE "obj/simul_efun"
 #define SPARE_SIMUL_EFUN_FILE "obj/spare_simul_efun"
 
@@ -32,9 +38,42 @@
 #    define TRANSFER(a,b) funcall(symbol_function('transfer), a,b)
 #endif
 
+#ifdef MUDWHO
+static void mudwho_init(int arg);
+static void mudwho_connect (object ob);
+static void mudwho_disconnect (object ob);
+static void mudwho_shutdown();
+static void mudwho_exec(object obfrom, object ob);
+#else
+#    define mudwho_init(arg)       0
+#    define mudwho_connect(ob)     0
+#    define mudwho_disconnect(ob)  0
+#    define mudwho_shutdown()      0
+#    define mudwho_exec(a,b)       0
+#endif
 
-void save_wiz_file();
-int query_player_level (string what);
+void save_wiz_file(); // forward
+int query_player_level (string what); // forward
+
+//===========================================================================
+// Compatmode compat functions
+//
+// The functions here adapt a handful of efuns which differ between compat
+// and plain mode. They are a subset of the functions in simul_efun.c
+//===========================================================================
+
+#ifndef __COMPAT_MODE__
+
+//---------------------------------------------------------------------------
+string file_name(object ob)
+{
+    string rc;
+
+    rc = efun::file_name(ob);
+    return stringp(rc) ? rc[1..] : 0;
+}
+
+#endif /* __COMPAT_MODE__ */
 
 //===========================================================================
 //  Hooks
@@ -93,11 +132,18 @@ static void _move_hook_fun (object item, object dest)
   object *others;
   int i;
 
+  /* PLAIN:
+  if (item != this_object)
+      raise_error("Illegal to move other object than this_object()\n");
+  */
+
+  /* PLAIN: the call to exit() is needed in compat mode only */
   if (living(item) && environment(item))
   {
       efun::set_this_player(item);
       environment(item)->exit(item);
   }
+
   efun::set_environment(item, dest);
   if (living(item)) {
     efun::set_this_player(item);
@@ -163,12 +209,11 @@ static mixed _load_uids_fun (mixed object_name, object prev)
 }
 
 #if 0
-// The following code fragment is used in OSB to give 'backbone'
-// objects (e.g. objects from /obj, /room) the uids of the loader.
-// Other objects get their uid as normal, but a 0 euid.
-// One important effect is that when user A loads his own objects,
-// the come with a valid euid, but other users objects come
-// with a 0 euid.
+// PLAIN: The following code fragment is used in OSB to give 'backbone'
+// objects (e.g. objects from /obj, /room) the uids of the loader.  Other
+// objects get their uid as normal, but a 0 euid.  One important effect is
+// that when user A loads his own objects, the come with a valid euid, but
+// other users objects come with a 0 euid.
 
 {
   string creator_name;
@@ -206,12 +251,11 @@ static mixed _clone_uids_fun (object blueprint, string new_name, object prev)
 }
 
 #if 0
-// The following code fragment is used in OSB to give 'backbone'
-// objects (e.g. objects from /obj, /room) the uids of the cloner.
-// Other objects get their uid as normal, but a 0 euid.
-// One important effect is that when user A clones his own objects,
-// the come with a valid euid, but other users objects come
-// with a 0 euid.
+// PLAIN: The following code fragment is used in OSB to give 'backbone'
+// objects (e.g. objects from /obj, /room) the uids of the cloner.  Other
+// objects get their uid as normal, but a 0 euid.  One important effect is
+// that when user A clones his own objects, the come with a valid euid, but
+// other users objects come with a 0 euid.
 
 {
   string creator_name;
@@ -305,6 +349,8 @@ void inaugurate_master (int arg)
         set_extra_wizinfo(0, allocate(BACKBONE_WIZINFO_SIZE));
     }
 
+    mudwho_init(arg);
+
   // Wizlist simulation
   if (find_call_out("wiz_decay") < 0)
     call_out("wiz_decay", 3600);
@@ -330,6 +376,9 @@ void inaugurate_master (int arg)
   set_driver_hook(H_CREATE_SUPER, "reset");
   set_driver_hook(H_CREATE_OB,    "reset");
   set_driver_hook(H_CREATE_CLONE, "reset");
+    /* PLAIN: Non-compat muds like OSB use "create" or other functions
+     * for the above.
+     */
   set_driver_hook(H_RESET,        "reset");
   set_driver_hook(H_CLEAN_UP,     "clean_up");
   set_driver_hook(H_MODIFY_COMMAND,
@@ -567,11 +616,12 @@ object connect ()
 	write(ret + "\n");
 	return 0;
     }
+    mudwho_connect(ob);
     return ob;
 }
 
 //---------------------------------------------------------------------------
-// void disconnect (object obj)
+void disconnect (object obj)
 
 // Handle the loss of an IP connection.
 //
@@ -583,6 +633,9 @@ object connect ()
 // calls to exec() or remove_interactive().
 // The connection will be unbound upon return from this call.
 
+{
+    mudwho_disconnect(ob);
+}
 
 //---------------------------------------------------------------------------
 void remove_player (object player)
@@ -754,11 +807,17 @@ void move_or_destruct(object what, object to)
 
 {
     int res;
+
+    /* PLAIN: the following loop is for compat mode only */
     do {
         if (catch( res = TRANSFER(what, to) )) res = 5;
         if ( !(res && what) ) return;
     } while( (res == 1 || res == 4 || res == 5) && (to = environment(to)) );
-
+    /* PLAIN: native muds make this
+    if (!catch(what->move(to, 1)))
+        return;
+    */
+    
     /*
      * Failed to move the object. Therefore it is destroyed.
      */
@@ -801,6 +860,7 @@ mixed prepare_destruct (object ob)
 
     super = environment(ob);
 
+    /* PLAIN: This whole if (super) {...} block is for compat muds only */
     if (super) {
 	mixed error;
 	mixed weight;
@@ -826,6 +886,7 @@ mixed prepare_destruct (object ob)
 	}
 	set_this_object(me);
     }
+    /* PLAIN: end of compat-mud block */
 
     if (!super) {
 	object item;
@@ -838,6 +899,10 @@ mixed prepare_destruct (object ob)
 	while ( first_inventory(ob) )
 	    move_or_destruct(first_inventory(ob), super);
     }
+
+    if (interactive(ob))
+        disconnect(ob);
+
     return 0; /* success */
 }
 
@@ -934,6 +999,7 @@ void notify_shutdown ()
     filter_array(users(), #'tell_object,
       "Game driver shouts: LPmud shutting down immediately.\n");
     save_wiz_file();
+    mudwho_shutdown();
 }
 
 //===========================================================================
@@ -1262,6 +1328,7 @@ int valid_exec (string name, object ob, object obfrom)
       case "secure/login.c":
       case "obj/master.c":
 	if (!interactive(ob)) {
+            mudwho_exec(obfrom, ob);
 	    return 1;
         }
     }
@@ -1305,6 +1372,10 @@ int valid_snoop (object snoopee, object snooper)
 // It is up to the simul_efun object to start/stop snoops.
 
 {
+    /* PLAIN:
+    if (!geteuid(previous_object()))
+        return 0;
+    */
     if (file_name(previous_object()) == get_simul_efun())
         return 1;
 }
@@ -1462,7 +1533,8 @@ mixed valid_write (string path, string euid, string fun, object caller)
 //
 // valid_write() is called for these operations:
 //   ed_start     (when writing a file)
-//   do_rename    (twice for each the old and new name)
+//   rename_from  (for each the old name of a rename())
+//   rename_to    (for the new name of a rename())
 //   mkdir
 //   save_object
 //   objdump
@@ -1476,58 +1548,61 @@ mixed valid_write (string path, string euid, string fun, object caller)
     string user;
 
     switch ( fun ) {
-        case "objdump":
-            if (path == "/OBJ_DUMP") return path;
-            return 0;
+    case "objdump":
+        if (path == "/OBJ_DUMP") return path;
+        return 0;
 
-        case "opcdump":
-            if (path == "/OPC_DUMP") return path;
-            return 0;
+    case "opcdump":
+        if (path == "/OPC_DUMP") return path;
+        return 0;
 
-        case "save_object":
-	    if ( user = GETUID(previous_object()) ) {
-		if ( path[ 0 .. strlen(user)+7 ] == "players/" + user &&
-		     sscanf(path, ".%s", user) == 0)
-			return path;
-	    } else {
-		user = file_name(previous_object());
-		if ( user[0..3] == "obj/"  ||
-		     user[0..4] == "room/" ||
-		     user[0..3] == "std/"  )
-			return path;
-	    }
-        default:
-            return 0; /* deny access */
-	case "write_file":
-            if (caller == this_object()) return 1;
-	    if(path[0..4] == "/log/" && !(
-	      sizeof(regexp(({path[5..34]}), "/")) ||
-	      path[5] == '.' ||
-	      strlen(path) > 35
+    case "save_object":
+        if ( user = GETUID(previous_object()) ) {
+            if ( path[0 .. strlen(user)+8] == "/players/" + user
+             &&  sscanf(path, ".%s", user) == 0)
+                return path;
+        } else {
+            user = file_name(previous_object());
+            if ( user[0..3] == "obj/"
+             ||  user[0..4] == "room/"
+             ||  user[0..3] == "std/"  )
+                return path;
+        }
+        return 0; /* deny access */
+    default:
+        return 0; /* deny access */
+    case "write_file":
+        if (caller == this_object()) return 1;
+        if (path[0..4] == "/log/"
+         && !(   sizeof(regexp(({path[5..34]}), "/"))
+              || path[5] == '.'
+              || strlen(path) > 35
 	    ) ) {
-	        return path;
-	    }
-	    break;
-	case "ed_start":
-	    if (path[0] != '/')
-		path = "/"+path;
-	    break;
-	case "do_rename":
-	    if((file_name(caller) == SIMUL_EFUN_FILE ||
-		file_name(caller) == SPARE_SIMUL_EFUN_FILE) &&
-	     path[0..4] == "/log/" && !(
-	      sizeof(regexp(({path[5..34]}), "/")) ||
-	      path[5] == '.' ||
-	      strlen(path) > 35
+            return path;
+        }
+        break;
+    case "ed_start":
+        if (path[0] != '/')
+            path = "/"+path;
+        break;
+    case "rename_from":
+    case "rename_to":
+        if ((   file_name(caller) == SIMUL_EFUN_FILE
+             || file_name(caller) == SPARE_SIMUL_EFUN_FILE)
+         && path[0..4] == "/log/"
+         && !(   sizeof(regexp(({path[5..34]}), "/"))
+              || path[5] == '.'
+              || strlen(path) > 35
 	    ) ) {
-		return 1;
-	    }
-	case "mkdir":
-	case "rmdir":
-	case "write_bytes":
-	case "remove_file":
-            if (caller == this_object()) return 1;
-	}
+            return 1;
+        }
+    case "mkdir":
+    case "rmdir":
+    case "write_bytes":
+    case "remove_file":
+        if (caller == this_object()) return 1;
+    }
+
     set_this_object(caller);
     if( this_player() && query_ip_number(this_player()) ) {
 	path = (string)this_player()->valid_write(path);
@@ -1710,6 +1785,122 @@ string parse_command_all_word()
 {
   return "all";
 }
+
+#ifdef MUDWHO
+
+//===========================================================================
+// Mudwho support functions
+//
+// Mudwho was (is?) a system of interconnected servers which keep track
+// who is in which mud. Once quite popular, it is now propably defunct.
+// But anyway, here is the code once used by Nightfall.
+//===========================================================================
+
+#define MUDWHO_SERVER   "134.2.62.161"
+#define MUDWHO_PORT     6888
+  /* IP and port of the closest mudwho server */
+
+#define MUDWHO_NAME     "TestNase"
+#define MUDWHO_PASSWORD "TestPassword"
+  /* Participation in the mudwho service required registration */
+
+#define MUDWHO_REFRESH_TIME 100
+
+#define QUOTE_PERCENT(s) (implode(explode(s, "%"), "%%"))
+
+private string mudwho_ping;
+private mapping mudwho_info = ([]);
+private closure send_mudwho_info;
+
+//---------------------------------------------------------------------------
+static void mudwho_init (int arg)
+{
+    send_mudwho_info
+      = lambda( ({'key, 'info})
+              , ({#'send_imp, MUDWHO_SERVER, MUDWHO_PORT, 'info }));
+    if (!arg)
+    {
+        send_imp(MUDWHO_SERVER, MUDWHO_PORT
+                , sprintf("U\t%.20s\t%.20s\t%.20s\t%:010d\t0\t%.25s"
+                         , MUDWHO_NAME, MUDWHO_PASSWORD, MUDWHO_NAME
+                         , time(), __VERSION__)
+                );
+        get_extra_wizinfo(0)[MUDWHO_INDEX] = mudwho_info;
+    }
+    else
+    {
+        mudwho_info = get_extra_wizinfo(0)[MUDWHO_INDEX];
+    }
+
+    mudwho_ping = sprintf("M\t%.20s\t%.20s\t%.20s\t%%:010d\t0\t%.25s"
+                         , QUOTE_PERCENT(MUDWHO_NAME)
+                         , QUOTE_PERCENT(MUDWHO_PASSWORD)
+                         , QUOTE_PERCENT(MUDWHO_NAME)
+                         , QUOTE_PERCENT(__VERSION__)
+                         );
+
+    if (find_call_out("send_mudwho_info") < 0)
+        call_out("send_mudwho_info", MUDWHO_REFRESH_TIME);
+}
+
+//---------------------------------------------------------------------------
+static void mudwho_shutdown()
+{
+    send_imp(MUDWHO_SERVER, MUDWHO_PORT
+            , sprintf("D\t%.20s\t%.20s\t%.20s"
+                     , MUDWHO_NAME, MUDWHO_PASSWORD, MUDWHO_NAME));
+}
+
+//---------------------------------------------------------------------------
+static void mudwho_connect (object ob)
+{
+    mudwho_info[ob] = sprintf("A\t%.20s\t%.20s\t%.20s\t%:010d\t0\tlogin"
+                             , MUDWHO_NAME, MUDWHO_PASSWORD, MUDWHO_NAME
+                             , explode(object_name(ob), "#")[<1]
+                               + "@" MUDWHO_NAME
+                             , time()
+                             );
+}
+
+//---------------------------------------------------------------------------
+static void send_mudwho_info()
+{
+    send_imp(MUDWHO_SERVER, MUDWHO_PORT, sprintf(mudwho_ping, time()));
+    walk_mapping(mudwho_info, send_mudwho_info);
+    call_out("send_mudwho_info", MUDWHO_REFRESH_TIME);
+}
+
+//---------------------------------------------------------------------------
+static void adjust_mudwho (object ob)
+{
+    if (ob && interactive(ob) && mudwho_info[ob][<5..] == "login")
+    {
+        mudwho_info[ob][<5..] = ob->query_real_name()[0..24];
+        send_imp(MUDWHO_SERVER, MUDWHO_PORT, mudwho_info[ob]);
+    }
+}
+
+//---------------------------------------------------------------------------
+static void mudwho_exec (object obfrom, object ob)
+{
+    if (interactive(obfrom))
+    {
+        mudwho_info[ob] = mudwho_info[obfrom];
+        efun::m_delete(mudwho_info, obfrom);
+        call_out("adjust_mudwho", 0, ob);
+    }
+}
+
+//---------------------------------------------------------------------------
+static void mudwho_disconnect (object ob)
+{
+    send_imp(MUDWHO_SERVER, MUDWHO_PORT
+            , "Z\t"+implode(explode(mudwho_info[ob], "\t")[1..4], "\t"));
+}
+
+//---------------------------------------------------------------------------
+
+#endif /* MUDWHO */
 
 //===========================================================================
 // 2.4.5-Lib related functions

@@ -31,3 +31,6 @@ DESCRIPTION
 	A 'break' in the 'statement' will terminate the loop. A
 	'continue' will continue the execution from the beginning of
 	the loop.
+
+SEE ALSO
+    foreach(LPC), if(LPC), do-while(LPC), while(LPC), switch(LPC)

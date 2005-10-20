@@ -6,4 +6,8 @@ DESCRIPTION
         object instead of the default ``> ''. If the second argument
         is omitted, this_player() is used as default. The first arg
         can be a string or a closure.
+
         The result returned is the old prompt.
+
+        If the first arg is the number 0, the prompt is not changed,
+        just returned.

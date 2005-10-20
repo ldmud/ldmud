@@ -31,6 +31,8 @@ HISTORY
 	Introduced in 3.2@127
 	Flag setting 2 was introduced in 3.2.1@84.
         Secondary string information was introduced in 3.2.7.
+        Up to 3.2.7 inclusive, get_type_info(closure,2) did not return
+          the object from a lambda closure or bound-lambda closure.
 
 SEE ALSO
 	debug_info(E), typeof(E)

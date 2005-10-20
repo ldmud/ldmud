@@ -10,5 +10,11 @@ DESCRIPTION
         <ob>s 'own filename' is that of the object providing the replacement
         program.
 
+	The returned names always begin with '/' (absolute path),
+	except when the parser runs in COMPAT mode.
+
+HISTORY
+        Before 3.2.8, the returned names never started with a '/'.
+
 SEE ALSO
 	debug_info(E)

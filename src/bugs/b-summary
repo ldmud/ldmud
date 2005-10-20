@@ -2,15 +2,27 @@ Crasher
 --------------------------------------------------------------------------
 b-981028:  3.2.4 crashes on Solaris 2.6
 b-990305-01: 3.2-dev.38 and 3.2.1@139 crash in find_string()
-b-990430: Crash on too much input/output in combination with charmode
+b-991123-0: 3.2.7-dev.104 and 3.2.8-dev.156 crash in find_string()
+b-991214: GC crashed on lambda closure with illegal data
+b-991219: Gamedriver fatal()s.
+b-000207: Finalfrontier cores
+b-000218: Finalfrontier: illegal mapping size
+b-000503: dev.185 cores in free_string().
+b-000603: Evermore: bad stack at F_RETURN
+b-000611: dev.20x crashes on Hyperborea (Maybe fixed)
+b-000616: heart_beat prototype causes spurious crashers
+b-000622: Cygwin und dev209
+b-000702: dev.200 in UNItopia cores on fast connects (Probably fixed)
+b-000701: dev.200 cores in UNItopia (due to an inherit?)
+b-000607: dev.20x fails magic match in xfree()
+b-000718: dev.216 crashes on illegal string svalue in Unitopia (Maybe fixed)
 
 
 Efuns
 --------------------------------------------------------------------------
 b-981202-3: Array-indexing malfunctions on rare occasions.
-b-981208: inherit_list() stumbles over multiple virtual inherits (solved?)
-b-990217-3: random() is not random enough
-b-990523: regexp() must not print error messages.
+b-000214: regexp() error?
+b-000304: Various bugs
 
 
 Language
@@ -19,27 +31,35 @@ Language
 
 Compiler
 --------------------------------------------------------------------------
-b-990113-0: 'varargs' attribute on simul_efuns
-b-990204-1: '++' operator on wide mappings.
-b-990217-0: '*::' with virtual inherits (solved?)
 b-990217-1: virtual inherits need cleaner implementation.
-b-990320-0: in make_funcs, varargs tefuns are not always recognized
-b-990505-1: #include messes up line numbers
 
 
 Runtime
 --------------------------------------------------------------------------
-b-981209-0: slow_shut_down() not used.
-b-981212: xerq-1.4 crashes often
 b-990217-4: erq-replies for destructed objects 'bug'.
 b-990429: Memory leaks
 b-990505-0: Memory leak in call_lambda()/send_erq()?
 b-990505-1: Memory leak in load_object()?
 b-990605: In a lot of error places, inter_sp/inter_pc are wrong.
-b-990713-0: Too fast call_outs/heart_beats?
-b-990713-1: shadow on destructed object with heartbeat
+b-991226: Search lengths too long.
+b-000104: Memory leak in clone_object()?
+b-000217-3: Memoryleak in Finalfrontier
+b-000306-3: Memoryleak in the actions?
+b-000308: call_out freezes totally
+b-000818: INPUT_CHARMODE problems with TinyFugue
 
 
 Installation
 --------------------------------------------------------------------------
+
+
+Not Reproducible
+--------------------------------------------------------------------------
+b-990713-1: shadow on destructed object with heartbeat
+b-000207-2: query_notify_fail() fails
+b-000326: EotL: set_prompt() causes check-refcounts to fail
+b-000411-0: sprintf() tables don't work properly
+b-000221-2: foreach() and redeclarations
+b-000718-1: Driver doesn't compile on Cygwin
+b-000718-2: Indirect virtual inherits clobber global variables
 

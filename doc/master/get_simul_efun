@@ -1,5 +1,5 @@
 SYNOPSIS
-	mixed get_     simul_efun(void)      // 3.2
+	mixed          get_simul_efun(void)  // 3.2
 	string|string* get_simul_efun(void)  // 3.2.1
 
 DESCRIPTION

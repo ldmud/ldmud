@@ -1,9 +1,11 @@
 SYNOPSIS
-	mixed * filter (mixed *arg, string fun, object ob, mixed extra...)
+	mixed * filter (mixed *arg, string fun, string|object ob
+                                              , mixed extra...)
 	mixed * filter (mixed *arg, closure cl, mixed extra...)
 	mixed * filter (mixed *arg, mapping map, mixed extra...)
 
-	mapping filter (mapping arg, string func, object ob, mixed extra...)
+	mapping filter (mapping arg, string func, string|object ob
+                                                , mixed extra...)
 	mapping filter (mapping arg, closure cl, mixed extra...)
 
 DESCRIPTION
@@ -12,7 +14,8 @@ DESCRIPTION
 	a result made from those elements for which the function
 	call returns TRUE.
 
-	If <ob> is omitted, it defaults to this_object().
+	If <ob> is omitted, or neither a string nor an object, it
+        defaults to this_object().
 
 
 	If <arg> is an array, the function will be called with

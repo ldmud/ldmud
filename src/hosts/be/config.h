@@ -1,5 +1,5 @@
-#ifndef __CONFIG_H__
-#define __CONFIG_H__ 1
+#ifndef CONFIG_H__
+#define CONFIG_H__ 1
 
 /* Should code for the external request demon be included?
  */
@@ -244,6 +244,16 @@
 
 #define INITIALIZATION_BY___INIT
 
+/* Define USE_SYSTEM_CRYPT if you want crypt() to be implemented by your
+ * operating system (assuming it offers this function). This makes your
+ * programm smaller and may even let you take advantage of improvements
+ * of your OS, but may also prohibit transporting encrypted date like
+ * passwords between different systems.
+ * Undefine USE_SYSTEM_CRYPT if you want to use the driver's portable
+ * crypt() implementation.
+ */
+#define USE_SYSTEM_CRYPT
+
 /* Define MASTER_NAME if you want something different from "obj/master" resp.
  * "secure/master" as default.
  */
@@ -271,12 +281,29 @@
  */
 #define SET_BUFFER_SIZE_MAX      65536
 
+/* Define this if you want IPv6 support (assuming that your host
+ * actually offers this.
+ */
+#undef USE_IPV6
+
+/* Define this if you want the 'nosave' keyword.
+ */
+#define USE_LPC_NOSAVE
+
 /* Runtime statistics:
  *  COMM_STAT: count number and size of outgoing packets.
  *  APPLY_CACHE_STAT: count number of hits and misses in the apply cache.
  */
 #define COMM_STAT
 #define APPLY_CACHE_STAT
+
+/* Which memory manager to use. Possible defines are
+ *   MALLOC_smalloc:   Satoria's malloc. Fastest, uses the least memory,
+ *                     supports garbage collection.
+ *   MALLOC_sysmalloc: the normal system malloc()
+ */
+
+#define MALLOC_smalloc
 
 /* When smalloc is used without SBRK_OK and MIN_MALLOCED is defined,
  * the gamedriver will reserve this amount of memory on startup for
@@ -291,19 +318,20 @@
  * functioning process limit).
  */
 #define MAX_MALLOCED         0x4000000
-#define MAX_SMALL_MALLOCED   0x1000000
 
 /* Define this to annotate all allocations with file:line of the driver
  * source responsible for it.
+ * Supported by: MALLOC_smalloc
  */
-#define SMALLOC_TRACE
+#undef MALLOC_TRACE
 
 /* Define this to annotate all allocations with file:line of the lpc program
  * responsible for it.
+ * Supported by: MALLOC_smalloc
  */
-#define SMALLOC_LPC_TRACE
+#undef MALLOC_LPC_TRACE
 
 /* If using TRACE_CODE , how many instructions should be kept? */
 #define TOTAL_TRACE_LENGTH      0x1000
 
-#endif /* __CONFIG_H__ */
+#endif /* CONFIG_H__ */

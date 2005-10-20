@@ -1,5 +1,5 @@
-#ifndef __MY_RUSAGE_H__
-#define __MY_RUSAGE_H__
+#ifndef MY_RUSAGE_H__
+#define MY_RUSAGE_H__
 
 /*------------------------------------------------------------------
  * Portable rusage related definitions and prototypes.
@@ -89,4 +89,4 @@ extern int getrusage(int, struct rusage*);
 #    define RUSAGE_SELF 0
 #endif
 
-#endif /* __MY_RUSAGE_H__ */
+#endif /* MY_RUSAGE_H__ */

@@ -1,5 +1,5 @@
-#ifndef __FILESTAT_H__
-#define __FILESTAT_H__ 1
+#ifndef FILESTAT_H__
+#define FILESTAT_H__ 1
 
 #include "driver.h"
 
@@ -48,6 +48,4 @@ extern void count_fstat_refs (void);
 
 #endif /* FILE_STAT */
 
-#endif /* __FILE_STAT_H__ */
-
-
+#endif /* FILE_STAT_H__ */

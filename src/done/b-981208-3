@@ -1,10 +1,29 @@
 Short: virtual inherit vs. inherit_list
 Date: 981208
 Type: Bug
-State: Unclassified
+State: Done - handled in 3.2.8-dev.151
 From: Coogan
 
 Files which are inherited virtually are listed at least twice in the lists
-of inherits. This makes (non-virtual) nomask functions in this file impossible.
+of inherits. -- This is an artifact of the breadth-search in inherit_list().
 
-The change made in p-990217 might help here.
+This makes (non-virtual) nomask functions in this file impossible.
+
+Abridged scenario:
+
+  ------ c.c ------
+  nomask mixed inh_c() { return ...; }
+  ------ a.c ------
+  virtual inherit "c";
+  virtual inherit "c";
+
+  Yields the error message: "Illegal to inherit 'nomask' function inh_c twice"
+
+---------- Analysis ----------
+
+This problem is not that the files are listed multiple times, but instead
+that the virtuality of the second inherit is taken in to account.
+Reason is a malformed check in prolang.y::copy_functions(), which was corrected
+in 3.2.8-dev.151 .
+
+

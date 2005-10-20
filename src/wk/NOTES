@@ -1,3 +1,6 @@
+ - Use the "Don't stop the Bibop" allocator with GC, in conjuntion with
+   C++.
+
  - NOn-shared strings should be refcounted in order to implement
    copy-on-write. At the moment, the strings are copied with every
    assignment of svalue :-( See MudOS.

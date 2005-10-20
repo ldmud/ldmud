@@ -22,8 +22,10 @@ forms:
   ({#'?! { <test> <result> } [ <result> ] })
   ({#'&& { test } })
   ({#'|| { test } })
-  ({#'while <test> <result> <body>})	loop while test evaluates non-zero.
+  ({#'while <test> <result> <body>...})	loop while test evaluates non-zero.
   ({#'do <body> <test> <result>})	loop till test evaluates zero.
+  ({#'foreach <var> <expr> <body>...})	loop over all values of <expr>.
+  ({#'foreach ({ <var>...<var> }) <expr> <body>...})
   ({#'= { <lvalue> <value> } })		assignment
 					other assignment operators work too.
   case_label: <integer> | <string> | #'default

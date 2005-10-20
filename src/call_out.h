@@ -1,27 +1,27 @@
-#ifndef __CALL_OUT_H__
-#define __CALL_OUT_H__ 1
+#ifndef CALL_OUT_H__
+#define CALL_OUT_H__ 1
 
 #include "driver.h"
-#include "interpret.h" /* struct svalue, struct vector */
-#include "object.h"    /* struct object */
-#include "strfuns.h"
+#include "typedefs.h"
+#include "strfuns.h"  /* strbuf_t */
 
 /* --- Prototypes --- */
 
-extern struct svalue *new_call_out(struct svalue *sp, short num_arg);
+extern svalue_t *new_call_out(svalue_t *sp, short num_arg);
 extern void  call_out(void);
-extern void  find_call_out(struct object *ob, struct svalue *fun, Bool do_free_call);
-extern size_t   print_call_out_usage(strbuf_t *sbuf, Bool verbose);
+extern void  find_call_out(object_t *ob, svalue_t *fun, Bool do_free_call);
+extern size_t  print_call_out_usage(strbuf_t *sbuf, Bool verbose);
+extern void  callout_dinfo_status(svalue_t *svp);
 extern void  remove_stale_call_outs(void);
-extern struct vector *get_all_call_outs(void);
+extern vector_t *get_all_call_outs(void);
 
 #ifdef DEBUG
 extern void count_extra_ref_from_call_outs(void);
 #endif
 
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
 extern void  clear_ref_from_call_outs(void);
 extern void  count_ref_from_call_outs(void);
 #endif
 
-#endif /* __CALL_OUT_H__ */
+#endif /* CALL_OUT_H__ */

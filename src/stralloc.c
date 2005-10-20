@@ -1,4 +1,48 @@
-#define STRALLOC
+/*---------------------------------------------------------------------------
+ * Shared String Management
+ *
+ *---------------------------------------------------------------------------
+ * To reduce the memory used for string storage, the driver implements
+ * string sharing: a particular string is allocated once, and a refcount
+ * keeps track how many users it has. If the refcount reaches 0, the string
+ * safely be deallocated again.
+ *
+ * To convert non-shared strings into shared strings quickly, the shared
+ * strings are hashed over their first 20 characters and arranged in
+ * a hash table with HTABLE_SIZE entries. Every entry points to the head
+ * of a chain of strings with equal hash. To make access even faster,
+ * the chains are rearranged after every search so that the recently found
+ * string is right at the head.
+ *
+ * The disadvantage is of course that it is not simply possible the strings
+ * once they have been shared.
+ *
+ * The strings are allocated together with a header structure :
+ *
+ *    struct shared_string
+ *    {
+ *        char   * next;
+ *        ushort   refs;
+ *        char     str[];
+ *    }
+ *
+ * and all shared string pointers, including the .next, point to
+ * the address of .str[]. To not waste memory on pad bytes, the structure
+ * elements are accessed implicite through pointer arithmetic.
+ *
+ * .next is the pointer to the next element in the hash chain (NULL for
+ * the last element), and .refs is the number of references. If .refs
+ * accumulates enough references to overflow into value 0, the string is
+ * considered constant and excepted from refcounting until the next
+ * garbage collection.
+ *
+ * The overhead of the management structure is expressed with the symbol
+ * SHSTR_OVERHEAD, and interpret::apply_low() uses it for a heuristic
+ * recognition of shared strings.
+ *---------------------------------------------------------------------------
+ */
+
+#define NO_REF_STRING
 #include "driver.h"
 
 #include <stdio.h>
@@ -7,149 +51,780 @@
 
 #include "gcollect.h"
 #include "hash.h"
+#include "main.h"
 #include "simulate.h"
+#include "smalloc.h"
+#include "stdstrings.h"
 #include "strfuns.h"
+#include "svalue.h"
+#include "xalloc.h"
 
-#ifndef DEBUG
-#define BUG_FREE
-#endif
-
-/*
- * stralloc.c - string management.
- *
- * All strings are stored in an extensible hash table, with reference counts.
- * free_string decreases the reference count; if it gets to zero, the string
- * will be deallocated.  add_string increases the ref count if it finds a
- * matching string, or allocates it if it cant.  There is no way to allocate
- * a string of a particular size to fill later (hash wont work!), so you'll
- * have to copy things from a static (or malloced and later freed) buffer -
- * that is, if you want to avoid space leaks...
- *
- * Current overhead:
- *        8 bytes per string (next pointer, and 2 shorts for length and refs)
- *        Strings are nearly all fairly short, so this is a significant overhead-
- *        there is also the 4 byte malloc overhead and the fact that malloc
- *        generally allocates blocks which are a power of 2 (should write my
- *        own best-fit malloc specialised to strings); then again, GNU malloc
- *        is bug free...
- * Actually, the above is not true in 3.2.1: the overhead is 6 bytes
- * (next poniter and one short for refs), upon which the heuristic in
- * interpret.c::apply_low() builds. The string length can be deduced from
- * the size of the allocated memory block when using smalloc.c .
- */
-
-/*
- * there is also generic hash table management code, but strings can be shared
- * (that was the point of this code), will be unique in the table,
- * require a reference count, and are malloced, copied and freed at
- * will by the string manager.  Besides, I wrote this code first :-).
- * Look at htable.c for the other code.  It uses the Hash() function
- * defined here, and requires hashed objects to have a pointer to the
- * next element in the chain (which you specify when you call the functions).
- */
-
-#define        WORD_ALIGN_BIT        0x3        /* these are 0 for aligned ptrs */
-
-static mp_int num_distinct_strings = 0;
-static mp_int bytes_distinct_strings = 0;
-mp_int stralloc_allocd_strings = 0;
-mp_int stralloc_allocd_bytes = 0;
-static int search_len = 0;
-static int num_str_searches = 0;
-
-/*
- * strings are stored:
- *        (char * next) (short numrefs) string
- *                                      ^
- *                                pointer points here
- */
+#include "../mudlib/sys/debug_info.h"
 
 #define NEXT(p) SHSTR_NEXT(p)
 #define REFS(p) SHSTR_REFS(p)
 
-/*
- * hash table - list of pointers to heads of string chains.
- * Each string in chain has a pointer to the next string and a
- * reference count (char *, int) stored just before the start of the string.
- * HTABLE_SIZE is in config.h, and should be a prime, probably between
- * 1000 and 5000.
+/*-------------------------------------------------------------------------*/
+
+static char ** base_table = NULL;
+  /* The string hash table: an array of pointers to the heads of
+   * the string chains.
+   */
+
+static int hash_index;
+  /* Hash index computed last in findstring().
+   */
+
+/* Statistics */
+
+mp_uint stralloc_allocd_strings = 0;
+  /* Number of virtually allocated strings - every reference counts
+   * as separate copy.
+   */
+   
+mp_uint stralloc_allocd_bytes = 0;
+  /* Total virtual size of allocated strings counted in multiples
+   * of sizeof(char*) - every reference counts as separate copy.
+   */
+
+static mp_uint num_distinct_strings = 0;
+  /* Number of distinct strings in the string table.
+   */
+   
+static mp_uint bytes_distinct_strings = 0;
+  /* Total memory held in the string table.
+   */
+
+static mp_uint search_len = 0;
+  /* Number of search steps along hash chains.
+   */
+
+static mp_uint num_str_searches = 0;
+  /* Number of searches in the string table.
+   */
+
+/*-------------------------------------------------------------------------*/
+
+/* Hash function, adapted to our table size.
  */
 
-static char ** base_table = 0;    /* The hash table */
-char *shstring[SHSTR_NOSTRINGS];  /* the table of common strings */
+#if !( (HTABLE_SIZE) & (HTABLE_SIZE)-1 )
+#    define StrHash(s) (whashstr((s), 100) & ((HTABLE_SIZE)-1))
+#else
+#    define StrHash(s) (whashstr((s), 100) % HTABLE_SIZE)
+#endif
 
-void init_shared_strings()
+/*-------------------------------------------------------------------------*/
+
+#ifdef KEEP_STRINGS
+
+/* As another debugging aid, this defined keeps the strings in the
+ * table if if their refcount is zero.
+ */
+
+#endif
+
+#ifdef CHECK_STRINGS
+
+/* As a debug measure, the structures of the string table are mirrored
+ * in a second table, and every access to the strings checks if the
+ * mirrored data still matches the original.
+ *
+ * The idea is to catch wild memory writes, for which the string table
+ * seems to be the prime target, as soon as possible after they occured.
+ *
+ * Define VERBOSE_CS to get lots of debug output.
+ */
+
+#undef VERBOSE_CS
+
+/* --- struct str_shadow_s: Descriptor for one shared string */
+
+typedef struct str_shadow_s str_shadow_t;
+
+struct str_shadow_s {
+    str_shadow_t   *next;  /* Next shadow in hash chain */
+    char           *str;   /* The shadowed string */
+    unsigned short  ref;   /* The shadowed refcount */
+    char           *snext; /* The "next" pointer of the shadowed string */
+};
+
+static str_shadow_t ** shadow_table = NULL;
+  /* The shadow hash table: an array of pointers to the heads of
+   * the shadow chains.
+   */
+
+static str_shadow_t * last_shadow = NULL;
+  /* Last shadow found in findstring() or alloc_new_string().
+   */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+check_string (char * s, str_shadow_t *sh)
+
+/* Check the shared string <s> against its shadow <sh>
+ */
+
+{
+    if (!s && !sh)
+        return;
+
+    if (s && !sh)
+        fatal("check_string: String %p vs shadow %p\n", s, sh);
+
+    if (!s && sh)
+        fatal("check_string: String %p vs shadow %p (s %p, r%hu, n %p)\n"
+             , s, sh, sh->str, sh->ref, sh->snext);
+
+#ifdef VERBOSE_CS
+    printf("DEBUG: compare sh %p (s %p, r %hu, n %p)\n", sh, sh->str, sh->ref, sh->snext);
+    printf("DEBUG:   with  s  %p (r %hu, n %p)\n", s, REFS(s), NEXT(s));
+#endif
+    if (sh->str != s)
+        fatal("check_string: String %p '%s', shadow expected string %p '%s'\n"
+             , s, s, sh->str, sh->str);
+
+    if (sh->ref != REFS(s))
+        fatal("check_string: String %p '%s' has %hu refs, shadow expected %hu refs\n", s, s, REFS(s), sh->ref);
+
+    if (sh->snext != NEXT(s))
+        fatal("check_string: String %p '%s's next is %p, shadow expected %p\n", s, s, NEXT(s), sh->snext);
+
+} /* check_string() */
+
+/*-------------------------------------------------------------------------*/
+static str_shadow_t *
+find_shadow (char *s)
+
+/* Find the shadow for shared string <s>, return its pointer and also store
+ * the pointer in last_shadow().
+ * All but the string searched are checked.
+ */
+
+{
+    char * curr, *prev;
+    int h;
+    str_shadow_t *scurr, *sprev;
+    
+
+    h = StrHash(s);
+
+    curr = base_table[h];
+    prev = NULL;
+    scurr = shadow_table[h];
+    sprev = NULL;
+
+    while (curr)
+    {
+        if (curr == s)
+        {
+            /* found it */
+            last_shadow = scurr;
+            return scurr;
+        }
+        check_string(curr, scurr);
+        prev = curr;
+        curr = NEXT(curr);
+        sprev = scurr;
+        scurr = scurr->next;
+    }
+    check_string(curr, scurr);
+
+    return NULL;
+} /* find_shadow() */
+
+/*-------------------------------------------------------------------------*/
+void
+check_string_table (void)
+
+/* Check the whole string table against the shadow table.
+ */
+
+{
+    int           h;
+    char         *curr;
+    str_shadow_t *scurr;
+
+#ifdef VERBOSE_CS
+    printf("DEBUG: checking string table\n");
+#endif
+    for (h = 0; h < HTABLE_SIZE; h++)
+    {
+        curr = base_table[h];
+        scurr = shadow_table[h];
+        while (curr)
+        {
+            check_string(curr, scurr);
+            curr = NEXT(curr);
+            scurr = scurr->next;
+        }
+        check_string(curr, scurr);
+    }
+#ifdef VERBOSE_CS
+    printf("DEBUG: checking string table done\n");
+#endif
+} /* check_string_table() */
+
+/*-------------------------------------------------------------------------*/
+void
+ref_shadow_string (char *s)
+
+/* Increment the refcount for string <s> in the shadow table.
+ */
+
+{
+    str_shadow_t *sh;
+    
+    sh = find_shadow(s);
+    if (sh->ref)
+        sh->ref++;
+    check_string(s, sh);
+#ifdef VERBOSE_CS
+    printf("DEBUG: ref'd s %p (%hu, %p) and sh %p (%p, %hu, %p)\n", s, REFS(s), NEXT(s), sh, sh->str, sh->ref, sh->snext);
+#endif
+} /* ref_shadow_string() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef GC_SUPPORT
+
+void
+mark_shadow_string_ref (char *s)
+
+/* GC Support: Mark the reference for string <s> in the shadow table.
+ * This function is to be used for yet-unreferenced strings.
+ */
+
+{
+    str_shadow_t *sh;
+    
+    sh = find_shadow(s);
+    sh->ref++;
+    if (!sh->ref)
+    {
+        dprintf2(gcollect_outfd, "String shadow (mark): %x '%s' refcount reaches max!\n"
+                , (p_int)sh, (p_int)sh->str);
+        sh->ref--;
+    }
+} /* mark_shadow_string_ref() */
+
+/*-------------------------------------------------------------------------*/
+void
+inc_shadow_string_ref (char *s)
+
+/* GC Support: Increment the refcound for string <s> in the shadow table.
+ * This function is to be used for already referenced strings.
+ */
+
+{
+    str_shadow_t *sh;
+    
+    sh = find_shadow(s);
+    if (sh->ref)
+    {
+        sh->ref++;
+        if (!sh->ref)
+        {
+            dprintf2(gcollect_outfd, "String shadow (inc): %x '%s' refcount reaches max!\n"
+                    , (p_int)sh, (p_int)sh->str);
+        }
+    }
+} /* inc_shadow_string_ref() */
+
+#endif /* GC_SUPPORT */
+
+#endif /* CHECK_STRINGS */
+
+/*-------------------------------------------------------------------------*/
+void
+init_shared_strings (void)
+
+/* Initialize all datastructures and the common strings.
+ */
+
 {
     int x;
-    base_table = (char **) xalloc(sizeof(char *) * HTABLE_SIZE);
+
+    base_table = xalloc(sizeof(char *) * HTABLE_SIZE);
 
     if (!base_table)
-        fatal("Out of memory\n");
-    for (x=0; x<HTABLE_SIZE; x++)
-        base_table[x] = 0;
+        fatal("Out of memory (%lu bytes) for shared string table\n"
+             , (unsigned long) sizeof(char*)*HTABLE_SIZE);
 
-    /* Generic game strings */
-    shstring[SHX_DEFAULT] = make_shared_string(
-"This string is used as a substitute if allocating another one failed."
-    );
-    shstring[SHX_EMPTY]   = make_shared_string("");
+    for (x = 0; x < HTABLE_SIZE; x++)
+        base_table[x] = NULL;
 
-    /* Object lfuns */
-    shstring[SHX_CATCH_TELL] = make_shared_string("catch_tell");
-    shstring[SHX_CATCH_MSG]  = make_shared_string("catch_msg");
-    shstring[SHX_ID]         = make_shared_string("id");
-    shstring[SHX_VARINIT]    = make_shared_string("__INIT");
+#ifdef CHECK_STRINGS
+    shadow_table = xalloc(sizeof(str_shadow_t *) * HTABLE_SIZE);
 
-    /* Master lfuns */
-    shstring[SHX_ABS_PATH]   = make_shared_string("make_path_absolute");
-    shstring[SHX_COMP_OBJ]   = make_shared_string("compile_object");
-    shstring[SHX_CONNECT]    = make_shared_string("connect");
-    shstring[SHX_DISCONNECT] = make_shared_string("disconnect");
-    shstring[SHX_EPILOG]     = make_shared_string("epilog");
-    shstring[SHX_EXT_RELOAD] = make_shared_string("external_master_reload");
-    shstring[SHX_FLAG]       = make_shared_string("flag");
-    shstring[SHX_GET_BB_UID] = make_shared_string("get_bb_uid");
-    shstring[SHX_GET_ED_FNAME] = make_shared_string("get_ed_buffer_save_file_name");
-    shstring[SHX_GET_M_UID]  = make_shared_string("get_master_uid");
-    shstring[SHX_GET_SEFUN]  = make_shared_string("get_simul_efun");
-    shstring[SHX_GET_WNAME]  = make_shared_string("get_wiz_name");
-    shstring[SHX_HEART_ERROR] = make_shared_string("heart_beat_error");
-    shstring[SHX_INAUGURATE] = make_shared_string("inaugurate_master");
-    shstring[SHX_LOG_ERROR]  = make_shared_string("log_error");
-    shstring[SHX_LOGON]      = make_shared_string("logon");
-    shstring[SHX_PRELOAD]    = make_shared_string("preload");
-    shstring[SHX_PREP_DEST]  = make_shared_string("prepare_destruct");
-    shstring[SHX_PRINTF_OBJ_NAME] = make_shared_string("printf_obj_name");
-    shstring[SHX_PRIVILEGE]  = make_shared_string("privilege_violation");
-    shstring[SHX_QUERY_SHADOW] = make_shared_string("query_allow_shadow");
-    shstring[SHX_QUOTA_DEMON] = make_shared_string("quota_demon");
-    shstring[SHX_RETR_ED]    = make_shared_string("retrieve_ed_setup");
-    shstring[SHX_REACTIVATE] = make_shared_string("reactivate_destructed_master");
-    shstring[SHX_RECEIVE_IMP] = make_shared_string("receive_imp");
-    shstring[SHX_REMOVE_PL]  = make_shared_string("remove_player");
-    shstring[SHX_RUNTIME]    = make_shared_string("runtime_error");
-    shstring[SHX_SAVE_ED]    = make_shared_string("save_ed_setup");
-    shstring[SHX_SHUTDOWN]   = make_shared_string("notify_shutdown");
-    shstring[SHX_SLOW_SHUT]  = make_shared_string("slow_shut_down");
-    shstring[SHX_STALE_ERQ]  = make_shared_string("stale_erq");
-    shstring[SHX_VALID_EXEC] = make_shared_string("valid_exec");
-    shstring[SHX_VALID_QSNOOP] = make_shared_string("valid_query_snoop");
-    shstring[SHX_VALID_READ] = make_shared_string("valid_read");
-    shstring[SHX_VALID_SETEUID] = make_shared_string("valid_seteuid");
-    shstring[SHX_VALID_SNOOP] = make_shared_string("valid_snoop");
-    shstring[SHX_VALID_TRACE] = make_shared_string("valid_trace");
-    shstring[SHX_VALID_WRITE] = make_shared_string("valid_write");
+    if (!shadow_table)
+        fatal("Out of memory (%lu bytes) for shared string shadow table\n"
+             , (unsigned long) sizeof(char*)*HTABLE_SIZE);
 
-    /* Compat mode lfuns */
-    shstring[SHX_ADD_WEIGHT] = make_shared_string("add_weight");
-    shstring[SHX_CANPUTGET]  = make_shared_string("can_put_and_get");
-    shstring[SHX_DROP]       = make_shared_string("drop");
-    shstring[SHX_GET]        = make_shared_string("get");
-    shstring[SHX_QUERY_WEIGHT] = make_shared_string("query_weight");
-    shstring[SHX_PREVENT_INSERT] = make_shared_string("prevent_insert");
-}
+    for (x = 0; x < HTABLE_SIZE; x++)
+        shadow_table[x] = NULL;
+#endif
 
-void clear_shared_string_refs()
+    init_standard_strings();
+} /* init_shared_strings() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef DEBUG
+
+static void checked (char * s, char *str) NORETURN;
+
+static void
+checked (char * s, char *str)
+
+/* Print the error message "<s> (<str>)" and abort.
+ * For brutal debugging.
+ */
+
+{
+    fprintf(stderr, "%s (\"%s\")\n", s, str);
+    fatal(s);
+    /* NOTREACHED */
+} /* checked() */
+
+#endif
+
+/*-------------------------------------------------------------------------*/
+char *
+findstring (char *s)
+
+/* Find the shared version of string <s> (which might be <s> itself) in
+ * the string table and return its pointer (not counted as reference!).
+ * Return NULL if not found.
+ *
+ * If found, also move the string to the head of its chain and leave
+ * the hashindex in the global hash_index.
+ */
+
+{
+    char * curr, *prev;
+    int h;
+#ifdef CHECK_STRINGS
+    str_shadow_t *scurr, *sprev;
+#endif
+    
+
+    h = StrHash(s);
+    hash_index = h;
+
+    curr = base_table[h];
+    prev = NULL;
+    num_str_searches++;
+#ifdef CHECK_STRINGS
+    scurr = shadow_table[h];
+    sprev = NULL;
+#endif
+
+    while (curr)
+    {
+#ifdef CHECK_STRINGS
+        check_string(curr, scurr);
+        last_shadow = scurr;
+#endif
+        search_len++;
+        if (curr == s || (*curr == *s && !strcmp(curr, s)))
+        {
+            /* found it */
+            if (prev)
+            {
+                /* not at head of list */
+                NEXT(prev) = NEXT(curr);
+                NEXT(curr) = base_table[h];
+                base_table[h] = curr;
+#ifdef CHECK_STRINGS
+                sprev->next = scurr->next;
+                sprev->snext = NEXT(prev);
+                scurr->next = shadow_table[h];
+                scurr->snext = NEXT(curr);
+                shadow_table[h] = scurr;
+#endif
+            }
+#ifdef VERBOSE_CS
+            printf("DEBUG: found s %p (%hu, %p) and sh %p (%p, %hu, %p)\n", curr, REFS(curr), NEXT(curr), scurr, scurr->str, scurr->ref, scurr->snext);
+#endif
+            return curr;
+        }
+        prev = curr;
+        curr = NEXT(curr);
+#ifdef CHECK_STRINGS
+        sprev = scurr;
+        scurr = scurr->next;
+#endif
+    }
+#ifdef CHECK_STRINGS
+    check_string(curr, scurr);
+#endif
+
+    return NULL;
+} /* findstring() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE char *
+alloc_new_string (char *str)
+
+/* Enter new string <str> into the hash table at index <str> computed
+ * by a previous call to findstring(). Return the pointer to the
+ * new shared string with one refcount.
+ *
+ * Return NULL when out of memory.
+ */
+
+{
+    size_t length;
+    char *s;
+    int h;
+
+    h = hash_index;
+
+    /* Get the memory */
+    length = strlen(str);
+    s = xalloc(1 + length + SHSTR_OVERHEAD);
+    if (!s)
+        return NULL;
+    s += SHSTR_OVERHEAD;
+
+    /* Copy the string and add it to the string table */
+    strcpy(s, str);
+    NEXT(s) = base_table[h];
+    base_table[h] = s;
+
+#ifdef CHECK_STRINGS
+    {
+        str_shadow_t *sh;
+
+        sh = xalloc(sizeof(*sh));
+        if (!sh)
+            return NULL;
+        sh->str = s;
+        sh->ref = 1;
+        sh->snext = NEXT(s);
+        sh->next = shadow_table[h];
+        shadow_table[h] = sh;
+        last_shadow = sh;
+#ifdef VERBOSE_CS
+        printf("DEBUG: new s  %p (r 1, n %p) '%s'\n", s, NEXT(s), s);
+        printf("DEBUG:  -> sh %p (s %p, r 1, n %p)\n", sh, sh->str, sh->snext);
+#endif
+    }
+#endif
+    
+    num_distinct_strings++;
+    bytes_distinct_strings += (
+            (SHSTR_OVERHEAD + length + 1 + (sizeof(char *)-1)))
+            & (~(sizeof(char *)-1));
+
+    REFS(s) = 1;
+
+    stralloc_allocd_strings++;
+    stralloc_allocd_bytes += shstr_malloced_length(s);
+    return s;
+} /* alloc_new_string() */
+
+/*-------------------------------------------------------------------------*/
+char *
+make_shared_string (char *str)
+
+/* Find or make a shared string for <str> and return its pointer
+ * with one (more) refcount.
+ *
+ * Use this function when <str> may be shared or unshared.
+ * If you know that a string is shared, ref_string() is the
+ * better and faster function.
+ */
+
+{
+    char * s;
+
+    s = findstring(str);
+    if (!s)
+    {
+        return alloc_new_string(str);
+    }
+    else
+    {
+#ifndef KEEP_STRINGS
+        if (REFS(s))
+        {
+            REFS(s)++;
+            if (!REFS(s))
+                printf("DEBUG: make_shared_string(): found %p '%s' "
+                       "refcount reaches max!\n", s, s);
+        }
+        else
+            printf("DEBUG: make_shared_string(): found %p '%s' has 0 refs.\n"
+                  , s, s);
+
+#ifdef CHECK_STRINGS
+        if (last_shadow->ref)
+        {
+            last_shadow->ref++;
+            if (!last_shadow->ref)
+                printf("DEBUG: make_shared_string(): shadow %p: "
+                       "refcount reaches max!\n", last_shadow);
+        }
+#endif
+
+#else /* KEEP_STRINGS */
+        if (REFS(s))
+        {
+            REFS(s)++;
+            if (!REFS(s))
+                printf("DEBUG: make_shared_string(): found %p '%s' "
+                       "refcount reaches max!\n", s, s);
+        }
+        else
+        {
+            REFS(s)++;
+        }
+
+#ifdef CHECK_STRINGS
+            last_shadow->ref++;
+            if (!last_shadow->ref)
+                printf("DEBUG: make_shared_string(): shadow %p: "
+                       "refcount reaches max!\n", last_shadow);
+#endif
+
+#endif /* KEEP_STRINGS */
+
+#ifdef VERBOSE_CS
+        printf("DEBUG: made old s %p (%hu, %p) and sh %p (%p, %hu, %p)\n", s, REFS(s), NEXT(s), last_shadow, last_shadow->str, last_shadow->ref, last_shadow->snext);
+#endif
+    }
+    stralloc_allocd_strings++;
+    stralloc_allocd_bytes += shstr_malloced_length(s);
+    return(s);
+} /* make_shared_string() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+_deref_string (char *str)
+
+/* Decrement the refcount of shared <str>, but don't check for refcount 0.
+ */
+
+{
+    stralloc_allocd_strings--;
+    stralloc_allocd_bytes -= shstr_malloced_length(str);
+    if (REFS(str))
+    {
+        REFS(str)--;
+        if (!REFS(str))
+            printf("DEBUG: deref_string(): %x '%s' fell to 0 refs!\n", (unsigned int)str, str);
+    }
+    else
+        printf("DEBUG: deref_string(): %x '%s' has 0 refs.\n", (unsigned int)str, str);
+
+#ifdef CHECK_STRINGS
+    {
+        str_shadow_t *sh;
+
+        sh = find_shadow(str);
+        if (sh->ref)
+            sh->ref--;
+        check_string(str, sh);
+#ifdef VERBOSE_CS
+        printf("DEBUG: deref'd s %p (%hu, %p) and sh %p (%p, %hu, %p)\n", str, REFS(str), NEXT(str), sh, sh->str, sh->ref, sh->snext);
+#endif
+    }
+#endif
+} /* _deref_string() */
+
+void
+deref_string (char *str)
+  { _deref_string(str); }
+
+#define deref_string(str) _deref_string(str)
+
+/*-------------------------------------------------------------------------*/
+void
+free_string (char *str)
+
+/* Decrement the refcount of the shared string <str> and free it
+ * if the count reaches zero.
+ *
+#ifdef DEBUG
+ * The function applies various sanity checks.
+#endif
+ */
+
+{
+    char * s;
+
+    stralloc_allocd_strings--;
+    stralloc_allocd_bytes -= shstr_malloced_length(str);
+
+#ifdef DEBUG
+    if (!REFS(str))
+    {
+        printf("DEBUG: free_string(): %p '%s' has 0 refs.\n"
+              , str, str);
+    }
+
+#endif
+
+#ifdef CHECK_STRINGS
+    {
+        str_shadow_t *sh;
+
+        sh = find_shadow(str);
+        check_string(str, sh);
+#ifdef VERBOSE_CS
+        printf("DEBUG: free s %p (%hu-1, %p) and sh %p (%p, %hu, %p)\n", str, REFS(str), NEXT(str), sh, sh->str, sh->ref, sh->snext);
+#endif
+    }
+#endif
+
+#ifdef DEBUG
+    s = findstring(str); /* moves it to head of table if found */
+    if (!s)
+    {
+        checked("Free string: not found in string table!", str);
+        return;
+    }
+
+    if (s != str)
+    {
+        /* Either a duplicate entry in the table or the table
+         * pointers are messed up. In any case, something fatal.
+         */
+        checked("Free string: string didnt hash to the same spot!", str);
+        return;
+    }
+
+    if (REFS(s) <= 0 && d_flag)
+    {
+        fprintf(stderr
+               , "%s Free String: String refs zero or negative! (\"%s\")\n"
+               , time_stamp(), str
+               );
+    }
+#endif
+    
+#ifdef CHECK_STRINGS
+    {
+        if (last_shadow->ref)
+            last_shadow->ref--;
+    }
+#endif
+
+    if (!REFS(str) || --REFS(str) > 0)
+        return; /* Don't deallocate yet */
+
+#ifndef DEBUG
+    s = findstring(str); /* moves it to head of table if found */
+#endif
+
+#ifndef KEEP_STRINGS
+    base_table[hash_index] = NEXT(str);
+#ifdef CHECK_STRINGS
+    shadow_table[hash_index] = last_shadow->next;
+    xfree(last_shadow);
+#endif
+    
+    num_distinct_strings--;
+    /* We know how much overhead malloc has */
+    bytes_distinct_strings -= (shstr_malloced_length(str) & malloc_size_mask())* sizeof(char *);
+    xfree(str - SHSTR_OVERHEAD);
+#endif
+
+} /* free_string() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE mp_uint
+overhead_bytes (void)
+
+/* For add_string_status(): the overhead of the string table.
+ */
+
+{
+    return (sizeof(char *) * HTABLE_SIZE) +
+#ifdef CHECK_STRINGS
+      sizeof(str_shadow_t *) * HTABLE_SIZE +
+      num_distinct_strings * sizeof(str_shadow_t) +
+#endif
+      num_distinct_strings * SHSTR_OVERHEAD;
+} /* overhead_bytes() */
+
+/*-------------------------------------------------------------------------*/
+mp_int
+add_string_status (strbuf_t *sbuf, Bool verbose)
+{
+    mp_uint net_bytes_distinct_strings, net_allocd_bytes;
+
+    if (verbose)
+    {
+        strbuf_add(sbuf, "\nShared string hash table:\n");
+        strbuf_add(sbuf, "-------------------------\t Strings    Bytes\n");
+    }
+
+    net_bytes_distinct_strings
+      =   (bytes_distinct_strings & (malloc_size_mask() * sizeof (char *)))
+        - num_distinct_strings * SHSTR_OVERHEAD;
+    strbuf_addf(sbuf, "Strings malloced\t\t%8lu %8lu + %lu overhead\n",
+                num_distinct_strings, net_bytes_distinct_strings, overhead_bytes());
+
+    if (verbose)
+    {
+        stralloc_allocd_bytes &= malloc_size_mask();
+        net_allocd_bytes =   (stralloc_allocd_bytes * sizeof(char*))
+                           - stralloc_allocd_strings * SHSTR_OVERHEAD;
+        strbuf_addf(sbuf, "Total asked for\t\t\t%8lu %8lu\n",
+                    stralloc_allocd_strings, net_allocd_bytes );
+        strbuf_addf(sbuf, "Space actually required/total string bytes %lu%%\n",
+                    (net_bytes_distinct_strings + overhead_bytes())*100L /
+                            net_allocd_bytes );
+        strbuf_addf(sbuf, "Searches: %d    Average search length:%7.3f\n",
+                    num_str_searches
+                    , (float)search_len / (float)num_str_searches);
+    }
+
+    return net_bytes_distinct_strings + overhead_bytes();
+} /* add_string_status() */
+
+/*-------------------------------------------------------------------------*/
+void
+string_dinfo_status (svalue_t *svp)
+
+/* Return the string table information for debug_info(DINFO_DATA, DID_STATUS).
+ * <svp> points to the svalue block for the result, this function fills in
+ * the spots for the object table.
+ */
+
+{
+    mp_uint net_bytes_distinct_strings, net_allocd_bytes;
+
+    net_bytes_distinct_strings
+      =   (bytes_distinct_strings & (malloc_size_mask() * sizeof (char *)))
+        - num_distinct_strings * SHSTR_OVERHEAD;
+
+    stralloc_allocd_bytes &= malloc_size_mask();
+    net_allocd_bytes = (stralloc_allocd_bytes * sizeof(char*))
+                       - stralloc_allocd_strings * SHSTR_OVERHEAD;
+
+    svp[DID_ST_STRINGS].u.number       = num_distinct_strings;
+    svp[DID_ST_STRING_SIZE].u.number   = net_bytes_distinct_strings;
+    svp[DID_ST_STR_TABLE_SIZE].u.number = overhead_bytes();
+
+    stralloc_allocd_bytes &= malloc_size_mask();
+    svp[DID_ST_STR_REQ].u.number      = stralloc_allocd_strings;
+    svp[DID_ST_STR_REQ_SIZE].u.number = net_allocd_bytes;
+
+    svp[DID_ST_STR_SEARCHES].u.number   = num_str_searches;
+    svp[DID_ST_STR_SEARCH_LEN].u.number = search_len;
+} /* string_dinfo_status() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef GC_SUPPORT
+
+void
+clear_shared_string_refs (void)
+
+/* GC support: clear all refs of memory in the string table.
+ */
+
 {
     int x;
     char *p;
@@ -157,272 +832,66 @@ void clear_shared_string_refs()
     for (x=0; x<HTABLE_SIZE; x++)
         for (p = base_table[x]; p; p = NEXT(p) )
             REFS(p) = 0;
-}
 
-#ifdef MALLOC_smalloc
-void note_shared_string_table_ref() {
+#ifdef CHECK_STRINGS
+    for (x = 0; x<HTABLE_SIZE; x++)
+    {
+        str_shadow_t *sh;
+        for (sh = shadow_table[x]; sh; sh = sh->next )
+            sh->ref = 0;
+    }
+#endif
+} /* clear_shared_string_refs() */
+
+/*-------------------------------------------------------------------------*/
+void
+note_shared_string_table_ref (void)
+
+/* GC support: count all refs of memory in the string table.
+ */
+
+{
     int i;
 
-    note_malloced_block_ref((char *)base_table);
+    note_malloced_block_ref(base_table);
     for (i = 0; i < SHSTR_NOSTRINGS; i++)
-      count_ref_from_string(shstring[i]);
-}
+        count_ref_from_string(shstring[i]);
 
-void walk_shared_strings(func)
-    void (*func) PROT((char *, char *));
+#ifdef CHECK_STRINGS
+    note_malloced_block_ref(shadow_table);
+    for (i = 0; i < HTABLE_SIZE; i++)
+    {
+        str_shadow_t *sh;
+        for (sh = shadow_table[i]; sh; sh = sh->next )
+            note_malloced_block_ref(sh);
+    }
+#endif
+} /* note_shared_string_refs() */
+
+/*-------------------------------------------------------------------------*/
+void
+walk_shared_strings (void (*func) (char *, char *))
+
+/* GC support: Call (*func)(str-SHSTR_OVERHEAD, str) for all shared
+ * strings in the string table.
+ *
+ * Usually the function is "remove_unreferenced_strings()" which removes
+ * unref'd strings from the table.
+ */
+
 {
     int x;
     char *p, *n;
 
-    for (x=0; x<HTABLE_SIZE; x++)
-        for (n = base_table[x]; NULL != (p = n); ) {
+    for (x = 0; x < HTABLE_SIZE; x++)
+        for (n = base_table[x]; NULL != (p = n); )
+        {
             n = NEXT(p); /* p may be freed by (*func)() . */
-            (*func)(p-sizeof(short)-sizeof(char *), p);
+            (*func)(p-SHSTR_OVERHEAD, p);
         }
-}
-#endif /* MALLOC_smalloc */
+} /* walk_shared_strings() */
 
-static mp_int overhead_bytes() {
-    return (sizeof(char *) * HTABLE_SIZE) +
-      num_distinct_strings * (sizeof(char *) + sizeof(short));
-}
+#endif /* GC_SUPPORT */
 
-/*
- * generic hash function.  This is probably overkill; I haven't checked the
- * stats for different prime numbers, etc.
- */
+/***************************************************************************/
 
-/* some compilers can't grasp #if BITNUM(HTABLE_SIZE) == 1 */
-/* some compilers can't even grasp #if BITNUM_IS_1(HTABLE_SIZE) *sigh* */
-#if !( (HTABLE_SIZE) & (HTABLE_SIZE)-1 )
-#define StrHash(s) (whashstr((s), 20) & ((HTABLE_SIZE)-1))
-#else
-#define StrHash(s) (whashstr((s), 20) % HTABLE_SIZE)
-#endif
-
-/*
- * Looks for a string in the table.  If it finds it, returns a pointer to
- * the start of the string part, and moves the entry for the string to
- * the head of the pointer chain.  One thing (blech!) - puts the previous
- * pointer on the hash chain into fs_prev.
- */
-
-static int hash_index;        /* to be used by alloc_new_string
-                           without further notice                   */
-                        /* is also used opaque inside free_string */
-
-char * findstring(s)
-char * s;
-{
-        char * curr, *prev;
-        int h = StrHash(s);
-        hash_index = h;
-
-        curr = base_table[h];
-        prev = 0;
-        num_str_searches++;
-
-        while (curr) {
-            search_len++;
-            if (*curr == *s && !strcmp(curr, s)) { /* found it */
-                if (prev) { /* not at head of list */
-                    NEXT(prev) = NEXT(curr);
-                    NEXT(curr) = base_table[h];
-                    base_table[h] = curr;
-                    }
-                return(curr);        /* pointer to string */
-                }
-            prev = curr;
-            curr = NEXT(curr);
-            }
-
-        return(0); /* not found */
-}
-
-/*
- * Make a space for a string.  This is rather nasty, as we want to use
- * alloc/free, but malloc overhead is generally severe.  Later, we
- * will have to compact strings...
- */
-
-static INLINE char * alloc_new_string(string)
-char * string;
-{
-        mp_int length;
-        char *s;
-        int h;
-
-        length = strlen(string);
-        s = xalloc(1 + length + sizeof(char *) + sizeof(short));
-        if (!s)
-            return s;
-        h = hash_index;
-        s += sizeof(char *) + sizeof(short);
-        strcpy(s, string);
-#if 0
-        REFS(s) = 0;
-#endif
-        NEXT(s) = base_table[h];
-        base_table[h] = s;
-        num_distinct_strings++;
-        bytes_distinct_strings += (
-#ifdef MALLOC_smalloc
-          SMALLOC_OVERHEAD * sizeof(char *) +
-#else
-          sizeof(char *) +
-#endif
-            (sizeof(char *) + sizeof(short) +
-            length + 1 + (sizeof(char *)-1))) & (~(sizeof(char *)-1));
-        REFS(s) = 1;
-        stralloc_allocd_strings++;
-        stralloc_allocd_bytes += shstr_malloced_size(s);
-        return(s);
-}
-
-char * make_shared_string(str)
-char * str;
-{
-        char * s;
-
-        s = findstring(str);
-        if (!s) {
-                return alloc_new_string(str);
-        } else {
-            if (REFS(s))
-                REFS(s)++;
-        }
-        stralloc_allocd_strings++;
-        stralloc_allocd_bytes += shstr_malloced_size(s);
-        return(s);
-}
-
-static INLINE
-void _decrement_string_ref(str)
-char *str;
-{
-        stralloc_allocd_strings--;
-        stralloc_allocd_bytes -= shstr_malloced_size(str);
-        if (REFS(str))
-            REFS(str)--;
-}
-
-void decrement_string_ref(char *str) { _decrement_string_ref(str); }
-
-#define decrement_string_ref(str) _decrement_string_ref(str)
-
-/*
- * free_string - reduce the ref count on a string.  Various sanity
- * checks applied, the best of them being that a add_string allocated
- * string will point to a word boundary + sizeof(int)+sizeof(short),
- * since malloc always allocates on a word boundary.
- * On systems where a short is 1/2 a word, this gives an easy check
- * to see whather we did in fact allocate it.
- *
- * Don't worry about the overhead for all those checks!
- */
-
-/*
- * function called on free_string detected errors; things return checked(s).
- */
-
-#ifndef BUG_FREE
-static void checked(s, str) char * s, *str;
-{
-        fprintf(stderr, "%s (\"%s\")\n", s, str);
-        fatal(s); /* brutal - debugging */
-}
-#endif
-
-void free_string(str)
-char * str;
-{
-#ifndef BUG_FREE
-        extern int d_flag;
-#endif
-
-        char * s;
-
-        stralloc_allocd_strings--;
-        stralloc_allocd_bytes -= shstr_malloced_size(str);
-
-#ifndef        BUG_FREE
-#ifdef        dcheck        /* GNU malloc range check flag */
-        { int align;
-        align = (((int)str) - sizeof(int) - sizeof(short)) & WORD_B_MASK;
-        if (align)
-                checked("Free string: improperly aligned string!", str);
-        }
-#endif /* dcheck */
-#endif
-
-#ifndef        BUG_FREE
-        s = findstring(str); /* moves it to head of table if found */
-        if (!s) {
-            checked("Free string: not found in string table!", str);
-            return;
-        }
-        if (s != str) {
-            checked("Free string: string didnt hash to the same spot!", str);
-            return;
-        }
-
-        if (REFS(s) <= 0 && d_flag) {
-            fprintf(
-              stderr,
-              "Free String: String refs zero or -ve! (\"%s\")\n",
-              str
-            );
-        }
-#endif        /* BUG_FREE */
-
-        if (!REFS(str) || --REFS(str) > 0) return;
-
-        s = findstring(str); /* moves it to head of table if found */
-#ifndef BUG_FREE
-        /* It will be at the head of the hash chain */
-        base_table[StrHash(str)] = NEXT(str);
-#else
-        base_table[hash_index] = NEXT(str);
-#endif
-        num_distinct_strings--;
-        /* We know how much overhead malloc has */
-        bytes_distinct_strings -= shstr_malloced_size(str) * sizeof(char *);
-        xfree(str-sizeof(short)-sizeof(char *));
-
-        return;
-}
-
-/*
- * you think this looks bad!  and we didn't even tell them about the
- * GNU malloc overhead!  tee hee!
- */
-
-int add_string_status(strbuf_t *sbuf, Bool verbose)
-{
-    mp_int net_bytes_distinct_strings, net_allocd_bytes;
-
-    if (verbose) {
-        strbuf_add(sbuf, "\nShared string hash table:\n");
-        strbuf_add(sbuf, "-------------------------\t Strings    Bytes\n");
-    }
-    net_bytes_distinct_strings = (bytes_distinct_strings &
-        (malloc_size_mask() * sizeof (char *))) -
-      num_distinct_strings * (sizeof(char*) + sizeof(short));
-    strbuf_addf(sbuf, "Strings malloced\t\t%8ld %8ld + %ld overhead\n",
-                num_distinct_strings, net_bytes_distinct_strings, overhead_bytes());
-    if (verbose) {
-
-        stralloc_allocd_bytes &= malloc_size_mask();
-        net_allocd_bytes = (stralloc_allocd_bytes * sizeof(char*)) -
-          stralloc_allocd_strings * (sizeof(char*) + sizeof(short));
-        strbuf_addf(sbuf, "Total asked for\t\t\t%8ld %8ld\n",
-                    stralloc_allocd_strings, net_allocd_bytes );
-        strbuf_addf(sbuf, "Space actually required/total string bytes %ld%%\n",
-                    (net_bytes_distinct_strings + overhead_bytes())*100L /
-                            net_allocd_bytes );
-        strbuf_addf(sbuf, "Searches: %d    Average search length:%7.3f\n",
-                    num_str_searches
-                    , (float)search_len / (float)num_str_searches);
-    }
-    return net_bytes_distinct_strings + overhead_bytes();
-}

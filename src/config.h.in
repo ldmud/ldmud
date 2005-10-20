@@ -4,8 +4,8 @@
  * in config.h.in.
  */
 
-#ifndef __CONFIG_H__
-#define __CONFIG_H__ 1
+#ifndef CONFIG_H__
+#define CONFIG_H__ 1
 
 /* Should code for the external request demon be included?
  */
@@ -250,8 +250,17 @@
  * at compile time; the latter is more memory efficient for loading and faster
  * at cloning, while the former allows to use efuns, e.g. shutdown().
  */
-
 @cdef_initialization_by___init@ INITIALIZATION_BY___INIT
+
+/* Define USE_SYSTEM_CRYPT if you want crypt() to be implemented by your
+ * operating system (assuming it offers this function). This makes your
+ * programm smaller and may even let you take advantage of improvements
+ * of your OS, but may also prohibit transporting encrypted date like
+ * passwords between different systems.
+ * Undefine USE_SYSTEM_CRYPT if you want to use the driver's portable
+ * crypt() implementation.
+ */
+@cdef_use_system_crypt@ USE_SYSTEM_CRYPT
 
 /* The name of the master object.
  */
@@ -264,16 +273,22 @@
 
 #define MAX_BYTE_TRANSFER        @val_max_byte_transfer@
 
-/*
- * CATCH_UDP_PORT
- *
- * Define this if the mud are to catch incoming udp messages on a
+/* Define this if the mud are to catch incoming udp messages on a
  * specific port. If == -1 it will not be used unless the mud is started
  * with the -u### flag. Where ### is the portnumber for the udp port.
  * If undefined the -u flag will be ignored.
  */
 @cdef_catch_udp_port@ CATCH_UDP_PORT            @val_catch_udp_port@
 @cdef_udp_send@ UDP_SEND
+
+/* Define this if you want IPv6 support (assuming that your host
+ * actually offers this.
+ */
+@cdef_use_ipv6@ USE_IPV6
+
+/* Define this if you want the 'nosave' keyword.
+ */
+@cdef_lpc_nosave@ USE_LPC_NOSAVE
 
 /* Maximum size of a socket send buffer.
  */
@@ -286,7 +301,15 @@
 @cdef_comm_stat@ COMM_STAT
 @cdef_apply_cache_stat@ APPLY_CACHE_STAT
 
-/* When smalloc is used without SBRK_OK and MIN_MALLOCED is defined,
+/* Which memory manager to use. Possible defines are
+ *   MALLOC_smalloc:   Satoria's malloc. Fastest, uses the least memory,
+ *                     supports garbage collection.
+ *   MALLOC_sysmalloc: the normal system malloc()
+ */
+
+#define MALLOC_@val_malloc@
+
+/* If  MIN_MALLOCED is defined,
  * the gamedriver will reserve this amount of memory on startup for
  * large blocks, thus reducing the large block fragmentation. The value
  * therefore should be a significantly large multiple of the large
@@ -294,24 +317,25 @@
  */
 @cdef_min_malloced@ MIN_MALLOCED  @val_min_malloced@
 
-/* When smalloc is used, these two values give the upper limits for
+/* These two values give the upper limits for
  * large and small block allocation (useful for systems with no
  * functioning process limit).
  */
 @cdef_max_malloced@ MAX_MALLOCED         @val_max_malloced@
-@cdef_max_malloced@ MAX_SMALL_MALLOCED   @val_max_small_malloced@
 
 /* Define this to annotate all allocations with file:line of the driver
  * source responsible for it.
+ * Supported by: MALLOC_smalloc
  */
-@cdef_smalloc_trace@ SMALLOC_TRACE
+@cdef_malloc_trace@ MALLOC_TRACE
 
 /* Define this to annotate all allocations with file:line of the lpc program
  * responsible for it.
+ * Supported by: MALLOC_smalloc
  */
-@cdef_smalloc_lpc_trace@ SMALLOC_LPC_TRACE
+@cdef_malloc_lpc_trace@ MALLOC_LPC_TRACE
 
 /* If using TRACE_CODE , how many instructions should be kept? */
 #define TOTAL_TRACE_LENGTH      @val_total_trace_length@
 
-#endif /* __CONFIG_H__ */
+#endif /* CONFIG_H__ */

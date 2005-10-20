@@ -310,6 +310,8 @@ DESCRIPTION
 	  If the closure is a lambda closure, it is bound to
 	  this_object() prior to execution.
 
+          See also: master apply include_file()
+
 
 	H_TELNET_NEG
 	  Optional hook to specifiy how to perform a single telnet
@@ -338,6 +340,9 @@ DESCRIPTION
 	  WONT), the second the actual option in question.
 	  The returned result from the call is irrelevant.
 
+          Alternatively, if H_NOECHO is set, this hook is called
+          for all telnet data received.
+
 
 	H_NOECHO
 	  Optional hook to specifiy how to perform the telnet actions
@@ -362,10 +367,11 @@ DESCRIPTION
 	  When set, the hook is called whenever the driver needs to
 	  change the echo mode, thus you can negotiate about things
 	  that are coupled with it, like LINEMODE or
-	  character-at-a-time. However, if this hook is used, the
-	  control of all telnet negotiation is transferred to the
-	  mudlib (you must combine it with H_TELNET_NEG to conform to
-	  the telnet protocol).
+	  character-at-a-time.
+          
+          IMPORTANT: If this hook is used, the control of all telnet
+          negotiation is transferred to the mudlib (you must combine it
+          with H_TELNET_NEG to conform to the telnet protocol).
 
 
 	H_ERQ_STOP

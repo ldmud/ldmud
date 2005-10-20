@@ -20,6 +20,7 @@ with_time_to_reset=2700
 
 with_max_user_trace=90
 with_max_trace=100
+with_max_local=50
 
 with_portno=7680
 
@@ -27,15 +28,16 @@ with_max_players=70
 
 with_reserved_user_size=800000
 
-catch_reserved_cost=20000
-master_reserved_cost=0x2000
+with_catch_reserved_cost=20000
+with_master_reserved_cost=0x2000
 
-max_array_size=4000
-max_mapping_size=0
-htable_size=16384
+with_max_array_size=4000
+with_max_mapping_size=0
+with_htable_size=16384
 
 enable_compat_mode=yes
 enable_strict_euids=no
 
+enable_lpc_nosave=no
 enable_supply_parse_command=yes
 enable_initialization_by___init=no

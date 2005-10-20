@@ -7,7 +7,8 @@ DESCRIPTION
 	file_name(ob) if the function is defined in an inherited
 	object. In !compat mode, the returned name always begins with a
 	'/' (absolute path). 0 is returned if the function was not
-	defined, or was defined as static.
+	defined, or was defined as static (protected function on the
+        other hand are found).
 
 SEE ALSO
 	call_other(E), call_resolved(E), functionlist(E)

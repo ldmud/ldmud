@@ -1,57 +1,56 @@
-#ifndef __OBJECT_H__
-#define __OBJECT_H__ 1
+#ifndef OBJECT_H__
+#define OBJECT_H__ 1
 
 #include "driver.h"
+#include "typedefs.h"
+
+#include "sent.h"    /* O_GET_* */
+#include "instrs.h"  /* F_SET_LIGHT */
 
 #ifdef DEBUG
 #include <stdio.h>      /* printf() for refcount tracing */
 #endif
-
-#include "exec.h"       /* struct program */
-#include "interpret.h"  /* struct svalue, struct variable */
-#include "sent.h"       /* struct sentence */
-
-/* TODO: See also sent.h and comm.h */
 
 /* --- Types --- */
 
 /* --- struct object: the base structure of every object
  */
 
-struct object
+struct object_s
 {
-    unsigned short flags;      /* Bits or'ed together, see below */
-    p_int ref;                 /* Reference count. */
+    unsigned short flags; /* Bits or'ed together, see below */
+    p_int ref;            /* Reference count. */
 #ifdef F_SET_LIGHT
-    short total_light;         /* Total light */
+    short total_light;    /* Total light */
 #endif
-    mp_int time_reset;         /* Time of next reset, or 0 if none */
-    mp_int time_of_ref;        /* Time when last referenced. Used by swap */
-    mp_int load_time;          /* Time when the object was created. */
+    mp_int time_reset;    /* Time of next reset, or 0 if none */
+    mp_int time_of_ref;   /* Time when last referenced. Used by swap */
+    mp_int load_time;     /* Time when the object was created. */
+    p_int  load_id;       /* Load-ID within the time the object was created */
 #ifdef DEBUG
-    p_int extra_ref;           /* Used to check ref count. */
+    p_int extra_ref;      /* Used to check ref count. */
 #endif
-    struct program *prog;      /* Program code for this object */
+    program_t *prog;      /* Program code for this object */
     char *name;
       /* name of the object (allocated), always w/o leading '/' */
     char *load_name;
       /* name of the object's blueprint (shared string), in compat
        * mode without leading '/'
        */
-    struct object *next_all;   /* Next object in global list */
-    struct object *prev_all;   /* Previous object in global list */
-    struct object *next_hash;  /* Next object in chain in the otable */
-    struct object *next_inv;   /* Next object in the current environment */
-    struct object *contains;   /* First contained object */
-    struct object *super;      /* Current environment */
-    struct sentence *sent;     /* Sentences, shadows, interactive data */
-    struct wiz_list *user;     /* What wizard defined this object */
-    struct wiz_list *eff_user; /* Effective user */
+    object_t *next_all;   /* Next object in global list */
+    object_t *prev_all;   /* Previous object in global list */
+    object_t *next_hash;  /* Next object in chain in the otable */
+    object_t *next_inv;   /* Next object in the current environment */
+    object_t *contains;   /* First contained object */
+    object_t *super;      /* Current environment */
+    sentence_t *sent;     /* Sentences, shadows, interactive data */
+    wiz_list_t *user;     /* What wizard defined this object */
+    wiz_list_t *eff_user; /* Effective user */
 #ifdef DEBUG
     int extra_num_variables;
     /* amylaar : used to determine where to check ref counts at all... */
 #endif
-    struct svalue *variables;
+    svalue_t *variables;
       /* All variables to this object: an array of svalues, allocated
        * in a separate block.
        */
@@ -62,7 +61,7 @@ struct object
 };
 
 
-/* Values of struct object.flags: */
+/* Values of object_t.flags: */
 
 #define O_HEART_BEAT         0x01   /* Does it have an heart beat? */
 #ifdef F_SET_IS_WIZARD
@@ -85,6 +84,7 @@ struct object
  * of .prog resp. .variables are replaced with the associated (even)
  * swap number assigned by the swapper, and the lowest bit of the number
  * is set. The swap number '-1' means 'not swapped'.
+ * TODO: This assumes that pointers are always even.
  */
 
 #define P_PROG_SWAPPED(p) ((p_int)(p) & 1)
@@ -104,8 +104,24 @@ struct object
   /* The swap number for the program of <ob>.
    */
 
+#define O_IS_INTERACTIVE(o) \
+  (((o)->flags & O_SHADOW) && (NULL != O_GET_INTERACTIVE(o)) )
 
-/* --- struct replace_ob: one scheduled program replacement
+  /* Bool O_IS_INTERACTIVE(object_t *o)
+   *   Return TRUE if ob is an interactive object.
+   */
+
+#define O_SET_INTERACTIVE(ip,o) \
+  (   ( ((o)->flags & O_SHADOW) && (NULL != (ip = O_GET_INTERACTIVE(o))) ) \
+   || ( (ip = NULL), MY_FALSE ) )
+
+  /* Bool O_SET_INTERACTIVE(interactive_t *ip, object_t *o)
+   *   Return TRUE if ob is an interactive object and set ip to the interactive
+   *   structure. Return FALSE is not and clear ip.
+   */
+
+
+/* --- struct replace_ob_s: one scheduled program replacement
  *
  * A list of this structure (obj_list_replace) keeps track of all
  * requested replace_program()s during one backend round.
@@ -114,21 +130,24 @@ struct object
  * program by the very same program.
  */
 
-struct replace_ob
+struct replace_ob_s
 {
-    struct object *ob;         /* Object requesting the new program */
-    struct program *new_prog;  /* Requested new program */
-    int var_offset;            /* Variable offset of .new_prog */
-    int fun_offset;            /* Function offset of .new_prog */
-    struct replace_ob *next;   /* Link pointer for list */
+    object_t *ob;         /* Object requesting the new program */
+    program_t *new_prog;  /* Requested new program */
+    int var_offset;       /* Variable offset of .new_prog */
+    int fun_offset;       /* Function offset of .new_prog */
+    replace_ob_t *next;   /* Link pointer for list */
     struct lambda_replace_program_protector *lambda_rpp;
-      /* TODO: ??? */
+      /* Additional information about lambdas bound to the program
+       * after the replacement was scheduled. The exact information
+       * is private to closure.c.
+       */
 };
 
 
 /* --- Macros --- */
 
-/* struct object *ref_object(struct object *o, char *from)
+/* object_t *ref_object(object_t *o, char *from)
  *   Add another ref to object <o> from function <from>
  *   and return the object <o>.
  */
@@ -147,7 +166,7 @@ struct replace_ob
 
 #endif
 
-/* void free_object(struct object *o, char *)
+/* void free_object(object_t *o, char *)
  *   Subtract one ref from object <o> from function <o>, and free the
  *   object fully if the refcount reaches zero.
  */
@@ -167,7 +186,7 @@ struct replace_ob
 
 #endif
 
-/* void deref_object(struct object *o, char *from)
+/* void deref_object(object_t *o, char *from)
  *   Subtract one ref from object <o> from function <from>, but don't
  *   check if it needs to be freed.
  */
@@ -185,45 +204,47 @@ struct replace_ob
 #endif
 
 
-#define check_object(o) ((o)&&(o)->flags&O_DESTRUCTED ? 0 :(o))
+#define check_object(o) ((o)&&(o)->flags&O_DESTRUCTED ? NULL :(o))
 
-  /* Return 0, if object <o> is NULL or destructed,
+  /* Return NULL, if object <o> is NULL or destructed,
    * return <o> else.
    */
 
 
 /* --- Variables --- */
 
-extern struct replace_ob *obj_list_replace;
+extern replace_ob_t *obj_list_replace;
 extern int tot_alloc_object;
 extern int tot_alloc_object_size;
-extern struct object NULL_object;
+extern object_t NULL_object;
 
 
 /* --- Prototypes --- */
 
 extern int32 renumber_programs(void);
-extern Bool restore_object(struct object *, char *);
 extern void remove_destructed_objects(void);
-extern void save_object(struct object *, char *);
-extern void move_object(void);
-extern void tell_object(struct object *, char *);
-extern void tell_npc(struct object *, char *);
-extern void reference_prog(struct program *, char *);
+extern void tell_object(object_t *, char *);
+extern void tell_npc(object_t *, char *);
+extern void reference_prog(program_t *, char *);
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
 extern void remove_all_objects(void);
 #endif
-extern void do_free_sub_strings(int num_strings, char ** strings, int num_variables, struct variable *variable_names);
-extern void free_prog(struct program *progp, Bool free_sub_strings);
-extern void reset_object(struct object *ob, int arg);
+extern void do_free_sub_strings(int num_strings, char ** strings, int num_variables, variable_t *variable_names);
+extern void free_prog(program_t *progp, Bool free_sub_strings);
+extern void reset_object(object_t *ob, int arg);
 extern void replace_programs(void);
-extern Bool shadow_catch_message(struct object *ob, char *str);
+extern Bool shadow_catch_message(object_t *ob, char *str);
 
-extern void _free_object(struct object *);
+extern void _free_object(object_t *);
 #ifdef INITIALIZATION_BY___INIT
-extern struct object *get_empty_object(int num_var);
+extern object_t *get_empty_object(int num_var);
 #else
-extern struct object *get_empty_object(int num_var, struct variable * variables, struct svalue *initialisers);
+extern object_t *get_empty_object(int num_var, variable_t * variables, svalue_t *initialisers);
 #endif
 
-#endif /* __OBJECT_H__ */
+extern svalue_t *f_save_object(svalue_t *sp, int numarg);
+extern svalue_t *f_save_value(svalue_t *sp);
+extern svalue_t *f_restore_object(svalue_t *sp);
+extern svalue_t *f_restore_value(svalue_t *sp);
+
+#endif /* OBJECT_H__ */

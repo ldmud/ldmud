@@ -1,5 +1,5 @@
-#ifndef __TELNET_H__
-#define __TELNET_H__ 1
+#ifndef TELNET_H__
+#define TELNET_H__ 1
 
 /*
  * Copyright (c) 1983 Regents of the University of California.
@@ -185,4 +185,4 @@ char *telopts[NTELOPTS] = {
 #define  SLC_FLUSHIN      0x40
 #define  SLC_FLUSHOUT     0x20
 
-#endif  /* __TELNET_H__ */
+#endif  /* TELNET_H__ */

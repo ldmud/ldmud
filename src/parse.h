@@ -1,21 +1,22 @@
-#ifndef __PARSE_H__
-#define __PARSE_H__ 1
+#ifndef PARSE_H__
+#define PARSE_H__ 1
 
 #include "driver.h"
+#include "typedefs.h"
 
 #include "instrs.h"      /* F_PROCESS_STRING, F_DESCRIBE */
-#include "interpret.h"   /* struct svalue */
 
 #if defined(SUPPLY_PARSE_COMMAND)
 
-extern struct svalue find_living_closures[2];
-extern struct object *find_living_object PROT((char *name, int player));
-extern int parse PROT((char *cmd, struct svalue *ob_or_array, char *pattern, struct svalue *stack_args, int num_arg));
+/* implemented in parse.c (!compat) resp. parse_old.c (compat) */
+extern Bool e_parse_command(char *cmd, svalue_t *ob_or_array, char *pattern
+                          , svalue_t *stack_args, int num_arg);
+
+#if defined(GC_SUPPORT)
+extern void clear_parse_refs(void);
+extern void count_parse_refs(void);
+#endif
 
 #endif /* SUPPLY_PARSE_COMMAND */
 
-#ifdef F_PROCESS_STRING
-extern char * process_string PROT((char *str));
-#endif /* F_PROCESS_STRING */
-
-#endif  /* __PARSE_H__ */
+#endif  /* PARSE_H__ */

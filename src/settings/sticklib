@@ -33,8 +33,8 @@ with_master_name=secure/master
 enable_supply_parse_command=no
 enable_initialization_by___init=no
 
-enable_smalloc_trace=no
-enable_smalloc_lpc_trace=no
+enable_malloc_trace=no
+enable_malloc_lpc_trace=no
 enable_comm_stat=yes
 enable_apply_cache_stat=yes
 

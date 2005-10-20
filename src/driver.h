@@ -1,5 +1,5 @@
-#ifndef __DRIVER_H__
-#define __DRIVER_H__
+#ifndef DRIVER_H__
+#define DRIVER_H__
 
 /*------------------------------------------------------------------
  * Global mandatory include file.
@@ -17,22 +17,58 @@
 /* Verify some of the definitions in config.h */
 
 #ifndef MASTER_NAME
-#ifdef COMPAT_MODE
-#define MASTER_NAME "obj/master"
-#else
-#define MASTER_NAME "secure/master"
-#endif
+#  ifdef COMPAT_MODE
+#    define MASTER_NAME "obj/master"
+#  else
+#    define MASTER_NAME "secure/master"
+#  endif
 #endif
 
+#if !defined(MALLOC_smalloc) && !defined(MALLOC_sysmalloc)
+#  define MALLOC_smalloc
+#endif
+
+#if defined(MALLOC_sysmalloc)
+   /* TODO: Implement allocation tracing for sysmalloc. This
+    * TODO:: would also allow us a generic malloced_size().
+    */
+#  if defined(MALLOC_TRACE)
+#    undef MALLOC_TRACE
+#  endif
+#  if defined(MALLOC_LPC_TRACE)
+#    undef MALLOC_LPC_TRACE
+#  endif
+#endif
+
+/* Do we have full GC support? */
+
+#if defined(MALLOC_smalloc)
+#  define GC_SUPPORT 1
+#endif
+ 
+
 /* This one is for backwards compatibility with old config.hs */
+
 #if defined(NATIVE_MODE) && !defined(STRICT_EUIDS)
-#define STRICT_EUIDS
+#  define STRICT_EUIDS
 #elif defined(COMPAT_MODE)
-#undef STRICT_EUIDS
+#  undef STRICT_EUIDS
 #endif
 
 #if !defined(CATCH_UDP_PORT)
-#undef UDP_SEND
+#  undef UDP_SEND
+#endif
+
+/* The string table is shadowed only in DEBUG mode */
+
+#if !defined(DEBUG) && defined(CHECK_STRINGS)
+#  undef CHECK_STRINGS
+#endif
+
+/* Define some macros needed in the headers included from ../mudlib/sys */
+
+#ifdef USE_IPV6
+#    define __IPV6__
 #endif
 
 /* Include the portability headers */
@@ -62,58 +98,4 @@ extern unsigned char _my_ctype[];
 /* A macro to wrap statements */
 #define MACRO(x) do { x ; } while(0)
 
-/* TODO: -> mallocator */
-#if defined(MALLOC_smalloc) && !defined(MAKE_FUNC)
-#    if !defined( SMALLOC ) || defined( SBRK_OK )
-#        undef malloc
-#    endif
-#    undef calloc
-#    ifdef SBRK_OK
-#        define amalloc  malloc
-#        define afree    free
-#    else  /* SBRK_OK */
-         POINTER amalloc(size_t);
-         POINTER smalloc_calloc(size_t, size_t);
-         FREE_RETURN_TYPE afree(POINTER);
-#        ifndef SMALLOC
-#            define malloc  amalloc
-#        endif
-#        define calloc  smalloc_calloc
-#        define free    afree
-#    endif /* SBRK_OK */
-     void xfree(POINTER);
-     POINTER rexalloc(POINTER, size_t);
-#    if MALLOC_ALIGN > SIZEOF_CHAR_P || FREE_NULL_POINTER
-#        define PFREE_RETURN_TYPE void
-#        define PFREE_RETURN return;
-         PFREE_RETURN_TYPE pfree(POINTER);
-#    else  /* MALLOC_ALIGN */
-#        define PFREE_RETURN_TYPE FREE_RETURN_TYPE
-#        define PFREE_RETURN FREE_RETURN
-#        define pfree  afree
-#    endif /* MALLOC_ALIGN */
-     POINTER permanent_xalloc(size_t);
-     PFREE_RETURN_TYPE pfree(POINTER);
-#else  /* MALLOC_smalloc && !MAKE_FUNC */
-#    define xfree            free
-#    define rexalloc         realloc
-#    define amalloc          xalloc
-#    define permanent_xalloc xalloc
-#    define afree            free
-#    define pfree            free
-#endif /* MALLOC_smalloc && !MAKE_FUNC */
-
-#if defined(MALLOC_smalloc) && defined(SMALLOC_TRACE)
-#    define xalloc(size) (smalloc((size), __FILE__, __LINE__))
-     POINTER smalloc(size_t, const char *, int);
-#endif /* SMALLOC_TRACE */
-#ifndef xalloc
-     POINTER xalloc(size_t);
-#endif
-
-/* TODO: MALLOC_* -> malloc.h */
-#define MALLOC_USER   (0)
-#define MALLOC_MASTER (1)
-#define MALLOC_SYSTEM (2)
-
-#endif /* __DRIVER_H__ */
+#endif /* DRIVER_H__ */

@@ -1,0 +1,25 @@
+Short: More functionality for inherit_list() 
+Date: 991020
+Type: Feature
+State: Unclassified
+From: Lars
+See also: b-981028-3.
+
+inherit_list() should offer options which control which data is returned
+how: flat/depth/width search, flat or nested result, with or without flags.
+This may require a redesign in the handling of inherit structures.
+
+A particular nasty scenario is:
+
+  ------ c.c ------
+  int j;
+  ------ b.c ------
+  virtual inherit "c";
+  ------ a.c ------
+  inherit "b";
+  virtual inherit "c";
+
+inherit_list("a") returns ({ "a.c", "c.c", "b.c", "c.c" })
+The last "c.c" is the same as the first "c.c", but is found when doing
+the search in "b.c" - the connection is not visible there.
+

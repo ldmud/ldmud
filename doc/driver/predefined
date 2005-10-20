@@ -17,6 +17,10 @@ DESCRIPTION
       __FILE__          : the name of the compiled file (in compat mode
                           without leading '/').
       __LINE__          : the actual line number.
+      __DIR__           : the directory path of the compiled file (in
+                          compat mode without leading '/').
+      __PATH__(n)       : the <n> leading directory path elements of the
+                          compiled file (in compat mode without leading '/').
       __VERSION__       : the version string of the driver.
 
       __DOMAIN_NAME__    : the domain the host is part of.
@@ -33,6 +37,12 @@ DESCRIPTION
       __ERQ_MAX_SEND__  : the max size of the send buffer
       __ERQ_MAX_REPLY__ : the max size of the reply buffer
 
+    The following macros are defined if their associated package
+    has been compiled into the driver:
+      
+      __IPV6__ :      support for IP v 6
+      __LPC_NOSAVE__: support for the 'nosave' keyword
+
 
 HISTORY
     3.2.1 added __DOMAIN_NAME__, __HOST_IP_NUMBER__, __HOST_NAME__,
@@ -40,7 +50,8 @@ HISTORY
     3.2.5 added __COMPAT_MODE__, __NATIVE_MODE__, __EUIDS__,
         __ERQ_MAX_SEND__ and __ERQ_MAX_REPLY__.
     3.2.6 added __MAX_EVAL_COST__.
-    3.2.7 added __STRICT_EUIDS__ and make __EUIDS__ standard.
+    3.2.7 added __STRICT_EUIDS__ and made __EUIDS__ standard.
+    3.2.8 added __IPV6__, __LPC_NOSAVE__, __DIR__, __PATH__().
 
 SEE ALSO
     query_host_name(E), version(E), pragma(LPC), preprocessor(LPC)

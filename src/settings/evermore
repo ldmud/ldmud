@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Settings for the Evermore mudlib.
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/home/evermore/ --bindir=/home/evermore/bin --libdir=/home/evermore/lib/mudlib --libexec=/home/evermore/bin/erq_dir --with-setting=evermore $*
+exit 1
+
+# --- The actual settings ---
+
+with_max_array_size=0
+with_max_mapping_size=0
+with_read_file_max_size=0
+with_max_byte_transfer=0
+with_portno=7777
+with_catch_udp_port=7780
+enable_compat_mode=yes
+with_master_name=kernel/master
+enable_supply_parse_command=no
+enable_initialization_by___init=no
+enable_dynamic_costs=yes
+with_max_players=70
+with_max_local=100
+

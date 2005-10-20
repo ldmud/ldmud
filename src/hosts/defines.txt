@@ -3,10 +3,12 @@ Operating Systems:
 SunOS .. 4.1:		sun		(abbr.: SunOS4)
 Solaris:		sun __svr4__	(abbr.: solaris)
 Silicon Graphics:	sgi
+AIX:                    _AIX
 Atari ST/TT MiNT:	atarist
 Amiga, DICE:		AMIGA _DCC
 Amiga, SAS/C:		AMIGA __SASC
 BeOS                    __BEOS__
+FreeBSD:                __FreeBSD__
 Linux:			linux
 NeXT:			NeXT
 Sequent:		_SEQUENT_

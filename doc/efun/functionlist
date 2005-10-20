@@ -5,7 +5,8 @@ SYNOPSIS
 	functionlist() returns an array with information about an
 	object's functions.
 
-	The first arg is an object or a file_name.
+	The first arg is an object or a file_name (the object must
+        already be loaded in that case).
 
 	The second (optional) arg flags specifies, what info is to be
 	returned (function names, or return types, or number of args

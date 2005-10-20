@@ -13,7 +13,7 @@ object wolf;
 	wolf->set_wc(7);\
 	wolf->set_move_at_reset();\
 	wolf->set_whimpy();\
-	move_object(wolf->room/ruin");\
+	move_object(wolf, "room/ruin");\
     }
 
 TWO_EXIT("room/clearing", "south",

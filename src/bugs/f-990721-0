@@ -2,7 +2,10 @@ Short: Stackable input_to()s.
 From: Lars, ugh, Tatu, Logic
 Date: 990721
 Type: Feature
-State: Acknowledged
+State: Acknowledged.
+
+Note: input_to()s can be sort-of-stacked since 3.2.8-dev.151, but that
+is no replacement for the stacked input system described below.
 
 Once the command handling is a hook, it is time to make input_to()s stacked,
 too.

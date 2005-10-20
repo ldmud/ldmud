@@ -123,17 +123,6 @@ NETLIB= lib=lib:netnb.lib
 
 # ---------------- Now for the real, the Mud stuff ----------------------
 
-# Chose one of these mallocs:
-#
-# Satoria's malloc, tries to prevent fragmentation.
-# Uses little memory. With FAST_FIT, it is also one of the fastest.
-# Required for garbage collection.
-
-MALLOC=smalloc
-
-# Use the standard malloc on your system.
-# MALLOC=sysmalloc
-
 # Set MUD_LIB to the directory which contains the mud data.
 
 MUD_LIB = mudlib:
@@ -154,16 +143,15 @@ ERQDIR = mudbin:erq
 
 PROFIL=
 
-# Debugging options: [-DDEBUG] [-DYYDEBUG|-DYYDEBUG=1] [-DTRACE_CODE]
-# Defining DEBUG enables run time debugging. It will use more time and space.
-# When the flag is changed, be sure to recompile everything.
-# Simply comment out this line if not wanted.
-# If you change anything in the source, you are strongly encouraged to have
-# DEBUG defined.
-# If you will not change anything, you are still encouraged to have
-# it defined, if you want to locate any game driver bugs.
-
-DEBUG= def=DEBUG def=TRACE_CODE Debug=symbolflush
+# Debugging options:
+#   DEBUG: Enable run time debugging. It will use more time and space.
+#            Nevertheless you are strongly encouraged to keep it defined.
+#   YYDEBUG[=1]: Debug output for the LPC compiler.
+#   TRACE_CODE: Enable the LPC code tracing.
+#   CHECK_STRINGS: Enable the shared string checking.
+#   KEEP_STRINGS: Shared strings are never really freed.
+#   DEBUG_TELNET: Activates debug prints in the telnet machine
+DEBUG = DEBUG=symbolflush def=DEBUG def=TRACE_CODE def=CHECK_STRINGS # def=KEEP_STRINGS def=DEBUG_TELNET
 
 # Extra object files and libraries.
 
@@ -179,23 +167,23 @@ LIBS= $(NETLIB) lib=lib:scmffpnb.lib
 
 MPATH=def=MUD_LIB="\"$(MUD_LIB)\"" def=BINDIR="\"$(BINDIR)\" def=ERQ_DIR="\"$(ERQDIR)\""
 LDFLAGS= afp Data=FAR Code=FAR link
-DEFINES= $(DEBUG) $(PROFIL) def=MALLOC_$(MALLOC) $(MPATH) $(NETDEF)
+DEFINES= $(DEBUG) $(PROFIL) $(MPATH) $(NETDEF)
 CFLAGS= $(CCOPTS) $(DEFINES)
 YFLAGS= -d
 
 SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\
-    comm.c ed.c regexp.c mapping.c wiz_list.c swap.c $(MALLOC).c\
+    comm.c ed.c regexp.c mapping.c wiz_list.c swap.c xalloc.c\
     call_out.c otable.c dumpstat.c stralloc.c hash.c port.c\
-    ptrtable.c heartbeat.c actions.c \
+    ptrtable.c heartbeat.c actions.c mempools.c \
     access_check.c parse_old.c parse.c prolang.y rxcache.c\
     simul_efun.c strfuns.c sprintf.c gcollect.c closure.c random.c \
-    efuns.c $(XSRC)
+    efuns.c stdstrings.c $(XSRC)
 OBJ=lang.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
-comm.o ed.o regexp.o mapping.o wiz_list.o swap.o $(MALLOC).o\
+comm.o ed.o regexp.o mapping.o wiz_list.o swap.o xalloc.o\
 call_out.o otable.o dumpstat.o stralloc.o hash.o port.o\
-ptrtable.o heartbeat.o actions.o \
+ptrtable.o heartbeat.o actions.o mempools.o \
 access_check.o parse_old.o parse.o simul_efun.o strfuns.o sprintf.o\
-rxcache.o efuns.o gcollect.o closure.o random.o $(XOBJ)
+rxcache.o efuns.o gcollect.o closure.o random.o stdstrings.o $(XOBJ)
 
 driver: $(OBJ)
 	$(CC) $(LDFLAGS) $(LIBS) $(OBJ) to=$@
@@ -216,6 +204,7 @@ parse: driver
 
 clean:
 	-$(RMF) *.o *.a lang.c lang.h lang.y instrs.h efun_defs.c y.output
+	-$(RMF) stdstrings.c stdstrings.h
 	-$(RMF) make_func.c make_func driver PlayMud
 
 tags: $(SRC)
@@ -242,45 +231,90 @@ make_func: make_func.o hash.o ixfile.o alloca.o exec.h
 #  so compiles lang.c, interpret.c and lex.c :-(, so I changed it.
 #  inserted right here (and so changed the dependencies !)
 
-lang.c lang.h: func_spec make_func prolang.y config.h
-	-$(RMF) efun_defs.c
+lang.c lang.h: make_func prolang.y config.h
 	-$(RMF) lang.y
-	-$(RMF) instrs.h
-	make_func
+	make_func lang
 	$(YACC) $(YFLAGS) -v lang.y
 	-$(RMF) lang.c
 	-$(RMF) lang.h
 	$(MV) $(YTAB).c lang.c
 	$(MV) $(YTAB).h lang.h
 
-$(MALLOC).o: $(MALLOC).c driver.h config.h machine.h port.h
-	-$(RMF) smalloc.o
-	-$(RMF) sysmalloc.o
-	$(CC) $(CFLAGS) csrc=$(MALLOC).c
+efun_defs.c instrs.h: func_spec make_func config.h
+	-$(RMF) efun_defs.c
+	-$(RMF) instrs.h
+	make_func instrs
+
+stdstrings.c stdstrings.h: string_spec make_func config.h
+	$(RM) stdstrings.c
+	$(RM) stdstrings.h
+	./make_func strings
 
 #--------------------------------------------------------
 # Dependencies, manual and automatic.
 
-array.o : instrs.h lang.h
+access_check.o : instrs.h
 
-closure.o : instrs.h lang.h
+actions.o : instrs.h
 
-dumpstat.o : instrs.h lang.h
+array.o : instrs.h
 
-gcollect.o : instrs.h lang.h
+backend.o : instrs.h stdstrings.h
 
-interpret.o : instrs.h lang.h
+call_out.o : instrs.h
+
+closure.o : instrs.h lang.h stdstrings.h
+
+comm.o : instrs.h stdstrings.h
+
+dumpstat.o : instrs.h
+
+ed.o : instrs.h stdstrings.h
+
+efuns.o : instrs.h stdstrings.h
+
+gcollect.o : instrs.h stdstrings.h
+
+heartbeat.o : instrs.h
+
+interpret.o : instrs.h stdstrings.h
 
 lang.o : driver.h config.h machine.h lex.h interpret.h object.h \
-    instrs.h port.h switch.h stralloc.h
+    instrs.h port.h switch.h stralloc.h stdstrings.h
 
-lex.o : instrs.h lang.h efun_defs.c
+lex.o : instrs.h lang.h efun_defs.c stdstrings.h
 
-simul_efun.o : instrs.h lang.h
+main.o : instrs.h stdstrings.h
 
-simulate.o : instrs.h
+mapping.o : instrs.h
 
-sprintf.o : instrs.h
+object.o : instrs.h stdstrings.h
+
+otable.o : instrs.h
+
+parse.o : instrs.h stdstrings.h
+
+parse_old.o : instrs.h stdstrings.h
+
+ptrtable.o : instrs.h
+
+xalloc.o : instrs.h
+
+simul_efun.o : instrs.h stdstrings.h
+
+simulate.o : instrs.h stdstrings.h
+
+sprintf.o : instrs.h stdstrings.h
+
+stdstrings.o : stdstrings.h stralloc.h driver.h
+
+stralloc.o : instrs.h
+
+strfuns.o : instrs.h
+
+swap.o : instrs.h
+
+wiz_list.o : stdstrings.h
 
 #--------------------------------------------------------------------
 # Rules for extra object files.

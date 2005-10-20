@@ -6,12 +6,12 @@
  * programs. The machine is implemented as a stackmachine with separate
  * stacks for values and control.
  *
- * See also 'exec.h' for the details of program storage, and 'datatypes.h'
+ * See also 'exec.h' for the details of program storage, and 'svalue.h'
  * for the details of value storage.
  *
  * --- Evaluator Stack ---
  *
- *    The evaluation stack is an array of 'struct svalue's (see datatypes.h
+ *    The evaluation stack is an array of 'svalue_t's (see datatypes.h
  *    for information about this type) with EVALUATOR_SIZE<<1 elements.
  *    <inter_sp> resp. <sp> points to the last (that is topmost) valid
  *    entry in the stack, the framepointer <inter_fp> resp. <fp> points
@@ -37,7 +37,8 @@
  *
  *    The interpreter assumes that there are no destructed objects
  *    on the stack - to aid in this, the functions remove_object_from_stack()
- *    and check_for_destr() replace destructed objects by value 0.
+ *    and (in array.c) check_for_destr() replace destructed objects by
+ *    value 0.
  *
  *
  * --- Control Stack ---
@@ -151,11 +152,15 @@
  * TODO: The virtual machine should be reconsidered, using the DGD and MudOS
  * TODO:: machines for inspiration. This applies to implementation as well
  * TODO:: as to the instruction set.
+ * TODO: Let all assign_ and transfer_ functions check for destruct objects.
+ * TODO:: The speed difference to assign_checked_ and transfer_checked_ is
+ * TODO:: not big enough to justify the extra set of functions.
  */
 
 /*-------------------------------------------------------------------------*/
 
 #include "driver.h"
+#include "typedefs.h"
 
 #include "my-alloca.h"
 #include "my-rusage.h"
@@ -179,9 +184,9 @@
 #    define crypt(pass, salt) _crypt(pass, salt)
 #endif
 
-#define INTERPRET
 #define USES_SVALUE_STRLEN
 #include "interpret.h"
+     
 #include "actions.h"
 #include "array.h"
 #include "backend.h"
@@ -207,15 +212,18 @@
 #include "sent.h"
 #include "simulate.h"
 #include "simul_efun.h"
+#include "stdstrings.h"
 #include "stralloc.h"
-#include "smalloc.h"
+#include "smalloc.h" /* USES_SVALUE_STRLEN, malloc_increment_size() */
 #include "sprintf.h"
+#include "svalue.h"
 #include "swap.h"
 #include "switch.h"
 #include "wiz_list.h"
+#include "xalloc.h"
 
+#include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/trace.h"
-
 
 /*-------------------------------------------------------------------------*/
 /* Types */
@@ -236,8 +244,8 @@ struct catch_context
       /* The subclassed recovery info.
        */
     struct control_stack * save_csp;
-    struct object        * save_command_giver;
-    struct svalue        * save_sp;
+    object_t        * save_command_giver;
+    svalue_t        * save_sp;
       /* The saved global values
        */
 };
@@ -254,14 +262,14 @@ struct cache
       /* The name of the cached function, shared for existing functions,
        * allocated if the object does not have the function.
        */
-    struct program *progp;
+    program_t *progp;
       /* The pointer to the program code of the function, or NULL if the
        * object does not implement the function.
        */
     int id;
       /* The id_number of the program. */
 
-    /* TODO: funflags */ uint32 flags;
+    funflag_t flags;
       /* Copy of the _MOD_STATIC and _MOD_PROTECTED flags of the function.
        */
     fun_hdr_p funstart;
@@ -281,7 +289,7 @@ struct cache
  */
 struct mvf_info
 {
-    struct svalue * svp;
+    svalue_t * svp;
       /* m_values_filter: Pointer to next result vector entry
        * m_unmake_filter: Pointer to result array of svalues
        */
@@ -376,10 +384,11 @@ static Bool trace_exec_active = MY_FALSE;
  */
 
 static int              previous_instruction[TOTAL_TRACE_LENGTH];
-static int              stack_size[TOTAL_TRACE_LENGTH];
+static ptrdiff_t        stack_size[TOTAL_TRACE_LENGTH];
+static ptrdiff_t        abs_stack_size[TOTAL_TRACE_LENGTH];
 static bytecode_p       previous_pc[TOTAL_TRACE_LENGTH];
-static struct program * previous_programs[TOTAL_TRACE_LENGTH];
-static struct object  * previous_objects[TOTAL_TRACE_LENGTH];
+static program_t * previous_programs[TOTAL_TRACE_LENGTH];
+static object_t  * previous_objects[TOTAL_TRACE_LENGTH];
   /* These arrays, organized as ring buffers, hold the vitals of the
    * last TOTAL_TRACE_LENGTH instructions executed. Yet unused entries
    * are 0 resp. NULL.
@@ -440,17 +449,17 @@ static int              last = TOTAL_TRACE_LENGTH - 1;
  * The affected variables are: inter_pc, inter_sp, TODO: which else?
  */
 
-struct svalue *inter_sp;
+svalue_t *inter_sp;
   /* Points to last valid value on the value stack.
    */
-#ifndef SMALLOC_LPC_TRACE
+#ifndef MALLOC_LPC_TRACE
 static
 #endif
        bytecode_p inter_pc;
   /* Next bytecode to interpret.
    */
 
-static struct svalue *inter_fp;
+static svalue_t *inter_fp;
   /* Framepointer: pointer to first argument.
    */
 
@@ -458,14 +467,14 @@ static bytecode_p *break_sp;
   /* Points to address to branch to at next F_BREAK from within a switch().
    * This is actually a stack of addresses with break_sp pointing to the
    * bottom with the most recent entry. This break stack is stored on
-   * the evaluator stack, one address per struct svalue (which incidentally
+   * the evaluator stack, one address per svalue_t (which incidentally
    * stored in the u.string field), between the functions temporary values
    * and its local variables.
    * TODO: Since this stores an opcode* in a svalue, it should get its
-   * TODO:: own union type, and break_sp should be an struct svalue *.
+   * TODO:: own union type, and break_sp should be an svalue_t *.
    */
 
-struct program *current_prog;
+program_t *current_prog;
   /* The current program. This is usually current_object->prog, but can
    * differ when executing an inherited program.
    */
@@ -485,7 +494,7 @@ static int variable_index_offset;
    * of the current object (needed for inheritance).
    */
 
-struct svalue *current_variables;
+svalue_t *current_variables;
   /* Pointer to begin of the current variable block.
    * This is current_object->variables + variable_index_offset for
    * faster access.
@@ -510,20 +519,24 @@ int32 assigned_eval_cost;
    * assign_eval_cost().
    */
 
-struct svalue apply_return_value = { T_NUMBER };
+svalue_t apply_return_value = { T_NUMBER };
   /* This variable holds the result from a call to apply(), transferred
    * properly from the interpreter stack where the called function
    * left it.
    * push_ and pop_apply_value() handle this particular transfer.
+   * Note: The process_string() helper function process_value() takes
+   * direct advantage of this variable.
    */
 
-static struct svalue start_of_stack[EVALUATOR_STACK_SIZE<<1];
+#define SIZEOF_STACK (EVALUATOR_STACK_SIZE<<1)
+
+static svalue_t start_of_stack[SIZEOF_STACK];
   /* The evaluator stack, sized with (hopefully) enough fudge to handle
    * function arguments and overflows.
    * The stack grows upwards, and <inter_sp> points to last valid entry.
    */
 
-struct svalue catch_value = { T_INVALID } ;
+svalue_t catch_value = { T_INVALID } ;
   /* Holds the value throw()n from within a catch() while the throw
    * is executed.
    */
@@ -538,6 +551,10 @@ static struct control_stack *csp;
    * is NULL to mark the bottom.
    */
 
+static void (*caught_error)(svalue_t **, bytecode_p *, svalue_t **) = NULL;
+  /* The function pointer for the handler of a caught error.
+   * See handle_caught_error() for a detailed explanation.
+   */
 
 #ifdef APPLY_CACHE_STAT
 p_int apply_cache_hit  = 0;
@@ -552,7 +569,7 @@ static struct cache cache[CACHE_SIZE];
 
 static struct
   {
-    struct svalue v;
+    svalue_t v;
       /* The target value:
        *   .v.type: T_CHAR_LVALUE
        *   .v.u.string: the char to modify
@@ -575,7 +592,7 @@ special_lvalue;
    *                    add_number_to_svalue(), F_VOID_ASSIGN.
    */
 
-static struct svalue indexing_quickfix = { T_NUMBER };
+static svalue_t indexing_quickfix = { T_NUMBER };
   /* When indexing arrays and mappings with just one ref, especially
    * for the purpose of getting a lvalue, the indexed item is copied
    * into this variable and indexed from here.
@@ -591,7 +608,7 @@ static struct svalue indexing_quickfix = { T_NUMBER };
    * TODO:: by definition volatile.
    */
 
-struct svalue last_indexing_protector = { T_NUMBER };
+svalue_t last_indexing_protector = { T_NUMBER };
   /* When indexing a protected non-string-lvalue, this variable receives
    * the protecting svalue for the duration of the operation (actually
    * until the next indexing operation (TODO: not nice)).
@@ -616,7 +633,7 @@ static int opcount[MAXOPC];
 
 #ifdef DEBUG
 
-static struct program *check_a_lot_ref_counts_search_prog;
+static program_t *check_a_lot_ref_counts_search_prog;
   /* Program you developer are especially interested in.
    */
 
@@ -630,10 +647,11 @@ static struct pointer_table *ptable;
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
-static Bool apply_low(char *, struct object *, int, Bool);
-static void call_simul_efun(int code, struct object *ob, int num_arg);
+static Bool apply_low(char *, object_t *, int, Bool);
+static void call_simul_efun(int code, object_t *ob, int num_arg);
+static void handle_caught_error (svalue_t ** spp, bytecode_p * pcp, svalue_t **fpp);
 #ifdef DEBUG
-static void check_extra_ref_in_vector(struct svalue *svp, size_t num);
+static void check_extra_ref_in_vector(svalue_t *svp, size_t num);
 #endif
 
 /*-------------------------------------------------------------------------*/
@@ -673,13 +691,16 @@ init_interpret (void)
     struct cache invalid_entry;
     int i;
 
+    /* Setup the catch handling */
+    caught_error = handle_caught_error;
+
     /* The cache is inited to hold entries for 'functions' in a non-existing
      * program (id 0). The first real apply calls will thus see a (virtual)
      * collision with 'older' cache entries.
      */
 
     invalid_entry.id = 0;
-    invalid_entry.progp = (struct program *)1;
+    invalid_entry.progp = (program_t *)1;
 
     for (i = 0; i < CACHE_SIZE; i++)
         cache[i] = invalid_entry;
@@ -691,8 +712,8 @@ init_interpret (void)
 
 /*-------------------------------------------------------------------------*/
 /* The following functions handle svalues, ie. the data referenced
- * by the struct svalues. 'Freeing' in this context therefore never means
- * a struct svalue, only the data referenced by it.
+ * by the svalue_ts. 'Freeing' in this context therefore never means
+ * a svalue_t, only the data referenced by it.
  *
  * free_string_svalue(v): free string svalue <v>.
  * free_object_svalue(v): free object svalue <v>.
@@ -748,23 +769,23 @@ init_interpret (void)
  */
 struct protected_lvalue
 {
-    struct svalue v;
+    svalue_t v;
       /* .v.type: T_PROTECTED_LVALUE
        * .v.u.lvalue: the protected value
        */
-    struct svalue protector; /* protects .v.u.lvalue (or its holder) */
+    svalue_t protector; /* protects .v.u.lvalue (or its holder) */
 };
 
 /* --- struct protected_char_lvalue: protect a char in a string
  */
 struct protected_char_lvalue
 {
-    struct svalue v;
+    svalue_t v;
       /* .v.type: T_PROTECTED_CHAR_LVALUE
        * .v.u.string: points to the char to access
        */
-    struct svalue protector; /* protects .lvalue */
-    struct svalue *lvalue;   /* the string containing the char */
+    svalue_t protector; /* protects .lvalue */
+    svalue_t *lvalue;   /* the string containing the char */
     char *start;
       /* must be == lvalue->u.string, otherwise the string has been
        * changed and this lvalue is invalid
@@ -774,12 +795,12 @@ struct protected_char_lvalue
 /* --- struct protected_range_lvalue: protect a range in a string or vector
  */
 struct protected_range_lvalue {
-    struct svalue v;
+    svalue_t v;
       /* .v.type: T_PROTECTED_{POINTER,STRING}_RANGE_LVALUE
        * .v.u.{string,vec}: the target value holding the range
        */
-    struct svalue protector; /* protects .lvalue */
-    struct svalue *lvalue;   /* the value holding the range */
+    svalue_t protector; /* protects .lvalue */
+    svalue_t *lvalue;   /* the value holding the range */
     int index1, index2;      /* first and last index of the range */
     int size;                /* original size of .lvalue */
 
@@ -792,16 +813,16 @@ struct protected_range_lvalue {
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
-static void transfer_pointer_range(struct svalue *source);
+static void transfer_pointer_range(svalue_t *source);
 static void transfer_protected_pointer_range(
-    struct protected_range_lvalue *dest, struct svalue *source);
-static void assign_string_range(struct svalue *source, Bool do_free);
+    struct protected_range_lvalue *dest, svalue_t *source);
+static void assign_string_range(svalue_t *source, Bool do_free);
 static void assign_protected_string_range(
-    struct protected_range_lvalue *dest,struct svalue *source, Bool do_free);
+    struct protected_range_lvalue *dest,svalue_t *source, Bool do_free);
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-_free_string_svalue (struct svalue *v)
+_free_string_svalue (svalue_t *v)
 
 /* Free the string svalue <v>; <v> must be of type T_STRING.
  */
@@ -818,32 +839,32 @@ _free_string_svalue (struct svalue *v)
     }
 }
 
-void free_string_svalue (struct svalue *v) { _free_string_svalue(v); }
+void free_string_svalue (svalue_t *v) { _free_string_svalue(v); }
 
 #define free_string_svalue(v) _free_string_svalue(v)
 
 /*-------------------------------------------------------------------------*/
 void
-free_object_svalue (struct svalue *v)
+free_object_svalue (svalue_t *v)
 
 /* Free the object svalue <v>; <v> must be of type T_OBJECT.
  */
 
 {
-    struct object *ob = v->u.ob;
+    object_t *ob = v->u.ob;
 
     free_object(ob, "free_object_svalue");
 }
 
 /*-------------------------------------------------------------------------*/
 void
-zero_object_svalue (struct svalue *v)
+zero_object_svalue (svalue_t *v)
 
 /* Change <v> from an object svalue to the svalue-number 0.
  */
 
 {
-    struct object *ob = v->u.ob;
+    object_t *ob = v->u.ob;
 
     free_object(ob, "zero_object_svalue");
     put_number(v, 0);
@@ -851,7 +872,7 @@ zero_object_svalue (struct svalue *v)
 
 /*-------------------------------------------------------------------------*/
 static void
-free_protector_svalue (struct svalue *v)
+free_protector_svalue (svalue_t *v)
 
 /* Free the svalue <v> which contains a protective reference to a vector
  * or to a mapping.
@@ -874,7 +895,7 @@ free_protector_svalue (struct svalue *v)
 
 /*-------------------------------------------------------------------------*/
 void
-free_svalue (struct svalue *v)
+free_svalue (svalue_t *v)
 
 /* Free the svalue <v>, which may be of any type.
  * Afterwards, the content of <v> is undefined.
@@ -897,7 +918,7 @@ free_svalue (struct svalue *v)
 
     case T_OBJECT:
       {
-        struct object *ob = v->u.ob;
+        object_t *ob = v->u.ob;
         free_object(ob, "free_svalue");
         break;
       }
@@ -919,6 +940,10 @@ free_svalue (struct svalue *v)
         free_closure(v);
         break;
 
+    case T_CALLBACK:
+        free_callback(v->u.cb);
+        break;
+        
     case T_LVALUE:
         switch (v->u.lvalue->type)
         {
@@ -983,7 +1008,7 @@ free_svalue (struct svalue *v)
 
         case T_ERROR_HANDLER:
           {
-              struct svalue *p;
+              svalue_t *p;
 
               p = v->u.lvalue;
               (*p->u.error_handler)(p);
@@ -997,11 +1022,14 @@ free_svalue (struct svalue *v)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-_assign_svalue_no_free (struct svalue *to, struct svalue *from)
+_assign_svalue_no_free (svalue_t *to, svalue_t *from)
 
 /* Put a duplicate of svalue <from> into svalue <to>, meaning that the original
  * value is either copied when appropriate, or its refcount is increased.
  * <to> is considered empty at the time of call.
+ *
+ * If <from> is a destructed object, <to> is set to the number 0 but
+ * <from> is left unchanged.
  */
 
 {
@@ -1054,7 +1082,15 @@ _assign_svalue_no_free (struct svalue *to, struct svalue *from)
         break;
 
     case T_OBJECT:
-        (void)ref_object(to->u.ob, "ass to var");
+        {
+          object_t *ob = to->u.ob;
+          if ( !(ob->flags & O_DESTRUCTED) )
+              (void)ref_object(ob, "ass to var");
+          else
+              put_number(to, 0);
+
+          break;
+        }
         break;
 
     case T_QUOTED_ARRAY:
@@ -1067,10 +1103,7 @@ _assign_svalue_no_free (struct svalue *to, struct svalue *from)
         break;
 
     case T_CLOSURE:
-        if (CLOSURE_MALLOCED(to->x.closure_type))
-            to->u.lambda->ref++;
-        else
-            (void)ref_object(to->u.ob, "ass to var");
+        addref_closure(to, "ass to var");
         break;
 
     case T_MAPPING:
@@ -1079,22 +1112,23 @@ _assign_svalue_no_free (struct svalue *to, struct svalue *from)
     }
 } /* _assign_svalue_no_free() */
 
-void assign_svalue_no_free (struct svalue *to, struct svalue *from)
+void assign_svalue_no_free (svalue_t *to, svalue_t *from)
 { _assign_svalue_no_free(to,from); }
 
 #define assign_svalue_no_free(to,from) _assign_svalue_no_free(to,from)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-assign_checked_svalue_no_free (struct svalue *to, struct svalue *from
-                              , struct svalue *sp, bytecode_p pc
+assign_checked_svalue_no_free (svalue_t *to, svalue_t *from
+                              , svalue_t *sp, bytecode_p pc
                               )
 
 /* Put a duplicate of svalue <from> into svalue <to>, meaning that the original
  * value is either copied when appropriate, or its refcount is increased.
  * <to> is considered empty at the time of call.
  * <from> may point to a variable or vector element, so it might contain
- * a destructed object. In that case, <to> is set to svalue-number 0.
+ * a destructed object. In that case, <from> and <to> are set to
+ * svalue-number 0.
  *
  * <sp> and <pc> are the current stackpointer and program counter and are
  * needed to update <inter_xx> in case of errors.
@@ -1134,7 +1168,7 @@ assign_checked_svalue_no_free (struct svalue *to, struct svalue *from
 
     case T_OBJECT:
       {
-        struct object *ob = from->u.ob;
+        object_t *ob = from->u.ob;
         if ( !(ob->flags & O_DESTRUCTED) ) {
             ref_object(ob, "ass to var");
             break;
@@ -1153,10 +1187,7 @@ assign_checked_svalue_no_free (struct svalue *to, struct svalue *from
         break;
 
     case T_CLOSURE:
-        if (CLOSURE_MALLOCED(from->x.closure_type))
-            from->u.lambda->ref++;
-        else
-            (void)ref_object(from->u.ob, "ass to var");
+        addref_closure(from, "ass to var");
         break;
 
     case T_MAPPING:
@@ -1168,8 +1199,8 @@ assign_checked_svalue_no_free (struct svalue *to, struct svalue *from
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-assign_local_svalue_no_free ( struct svalue *to, struct svalue *from
-                            , struct svalue *sp, bytecode_p pc
+assign_local_svalue_no_free ( svalue_t *to, svalue_t *from
+                            , svalue_t *sp, bytecode_p pc
                             )
 
 /* Put a duplicate of svalue <from> into svalue <to>, meaning that the original
@@ -1241,10 +1272,7 @@ assign_from_lvalue:
         ref_string(from->u.string);
         break;
       case T_CLOSURE:
-        if (CLOSURE_MALLOCED(from->x.closure_type))
-            from->u.lambda->ref++;
-        else
-            (void)ref_object(from->u.ob, "ass to var");
+        addref_closure(from, "ass to var");
         break;
       case T_MAPPING:
         (void)ref_mapping(from->u.map);
@@ -1266,7 +1294,7 @@ assign_from_lvalue:
 
 /*-------------------------------------------------------------------------*/
 static INLINE
-void assign_lrvalue_no_free (struct svalue *to, struct svalue *from)
+void assign_lrvalue_no_free (svalue_t *to, svalue_t *from)
 
 /* Put a duplicate of svalue <from> into svalue <to>, meaning that the original
  * value is either copied when appropriate, or its refcount is increased.
@@ -1326,10 +1354,7 @@ void assign_lrvalue_no_free (struct svalue *to, struct svalue *from)
         break;
 
     case T_CLOSURE:
-        if (CLOSURE_MALLOCED(to->x.closure_type))
-            to->u.lambda->ref++;
-        else
-            (void)ref_object(to->u.ob, "ass to var");
+        addref_closure(to, "ass to var");
         break;
 
     case T_MAPPING:
@@ -1344,7 +1369,7 @@ void assign_lrvalue_no_free (struct svalue *to, struct svalue *from)
 
 /*-------------------------------------------------------------------------*/
 void
-assign_svalue (struct svalue *dest, struct svalue *v)
+assign_svalue (svalue_t *dest, svalue_t *v)
 
 /* Put a duplicate of svalue <v> into svalue <dest>, meaning that the
  * original value is either copied when appropriate, or its refcount is
@@ -1393,7 +1418,7 @@ assign_svalue (struct svalue *dest, struct svalue *v)
 
         case T_OBJECT:
           {
-            struct object *ob = dest->u.ob;
+            object_t *ob = dest->u.ob;
             free_object(ob, "assign_svalue");
             break;
           }
@@ -1401,7 +1426,7 @@ assign_svalue (struct svalue *dest, struct svalue *v)
         case T_QUOTED_ARRAY:
         case T_POINTER:
           {
-            struct vector *vec = dest->u.vec;
+            vector_t *vec = dest->u.vec;
             assign_svalue_no_free(dest, v);
               /* TODO: leaks vec if out of memory */
             free_array(vec);
@@ -1410,7 +1435,7 @@ assign_svalue (struct svalue *dest, struct svalue *v)
 
         case T_MAPPING:
           {
-            struct mapping *map = dest->u.map;
+            mapping_t *map = dest->u.map;
             assign_svalue_no_free(dest, v); /* leaks map if out of memory */
             free_mapping(map);
             return;
@@ -1488,7 +1513,7 @@ assign_svalue (struct svalue *dest, struct svalue *v)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-_transfer_svalue_no_free (struct svalue *dest, struct svalue *v)
+_transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
 
 /* Move the value <v> into <dest>. If <v> is an unshared string, it
  * is made shared.
@@ -1513,15 +1538,15 @@ _transfer_svalue_no_free (struct svalue *dest, struct svalue *v)
     }
 } /* _transfer_svalue_no_free() */
 
-void transfer_svalue_no_free (struct svalue *dest, struct svalue *v)
+void transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
 {  _transfer_svalue_no_free(dest,v); }
 
 #define transfer_svalue_no_free(dest,v) _transfer_svalue_no_free(dest,v)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-transfer_svalue_no_free_spc ( struct svalue *dest, struct svalue *v
-                            , struct svalue *sp, bytecode_p pc)
+transfer_svalue_no_free_spc ( svalue_t *dest, svalue_t *v
+                            , svalue_t *sp, bytecode_p pc)
 
 /* Move the value <v> into <dest>. If <v> is a volatile string, it
  * is made shared.
@@ -1552,7 +1577,7 @@ transfer_svalue_no_free_spc ( struct svalue *dest, struct svalue *v
 
 /*-------------------------------------------------------------------------*/
 void
-transfer_svalue (struct svalue *dest, struct svalue *v)
+transfer_svalue (svalue_t *dest, svalue_t *v)
 
 /* Move svalue <v> into svalue <dest>.
  *
@@ -1597,7 +1622,7 @@ transfer_svalue (struct svalue *dest, struct svalue *v)
 
         case T_OBJECT:
           {
-            struct object *ob = dest->u.ob;
+            object_t *ob = dest->u.ob;
             free_object(ob, "transfer_svalue");
             break;
           }
@@ -1692,7 +1717,7 @@ transfer_svalue (struct svalue *dest, struct svalue *v)
 
 /*-------------------------------------------------------------------------*/
 static void
-transfer_pointer_range (struct svalue *source)
+transfer_pointer_range (svalue_t *source)
 
 /* Transfer the vector <source> to the vector range defined by
  * <special_lvalue>, modifying the target vector in special_lvalue
@@ -1704,9 +1729,9 @@ transfer_pointer_range (struct svalue *source)
 {
     if (source->type == T_POINTER)
     {
-        struct vector *sv;      /* Source vector (from source) */
-        struct vector *dv;      /* Destination vector (from special_lvalue) */
-        struct vector *rv;      /* Result vector */
+        vector_t *sv;      /* Source vector (from source) */
+        vector_t *dv;      /* Destination vector (from special_lvalue) */
+        vector_t *rv;      /* Result vector */
         mp_int dsize;           /* Size of destination vector */
         mp_int ssize;           /* Size of source vector */
         mp_int index1, index2;  /* First and last index of destination range */
@@ -1724,7 +1749,7 @@ transfer_pointer_range (struct svalue *source)
         {
             /* <source> fits exactly into the target range */
 
-            struct svalue *s, *d;  /* Copy source and destination */
+            svalue_t *s, *d;  /* Copy source and destination */
 
             s = sv->item;
             d = dv->item + index1;
@@ -1749,9 +1774,13 @@ transfer_pointer_range (struct svalue *source)
                     assign_svalue(d++, s++);
                 }
 
-                deref_array(sv);
-
-                /* The if() above effectively did the 'free_svalue(source)' */
+                free_array(sv);
+                  /* deref_array() is not enough, because in situations
+                   * where one d == sv, eg
+                   *    arr = ({ ({ 1 }) });
+                   *    arr[0..0] = arr[0];
+                   * sv would be left behind with 0 refs but unfreed.
+                   */
             }
 
             free_array(dv); /* Undo the ref_array() above */
@@ -1760,7 +1789,7 @@ transfer_pointer_range (struct svalue *source)
         {
             /* Create a new vector */
 
-            struct svalue *s, *d; /* Copy source and destination */
+            svalue_t *s, *d; /* Copy source and destination */
 
             rv = allocate_array(dsize + ssize + index1 - index2);
             special_lvalue.v.u.lvalue->u.vec = rv;
@@ -1797,7 +1826,7 @@ transfer_pointer_range (struct svalue *source)
 /*-------------------------------------------------------------------------*/
 static void
 transfer_protected_pointer_range ( struct protected_range_lvalue *dest
-                                 , struct svalue *source)
+                                 , svalue_t *source)
 
 /* Transfer the vector <source> to the vector range defined by
  * <dest>, modifying the target vector in <dest>
@@ -1809,9 +1838,9 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
 {
     if (source->type == T_POINTER && dest->v.u.vec == dest->lvalue->u.vec)
     {
-        struct vector *sv;      /* Source vector (from source) */
-        struct vector *dv;      /* Dest vector (from dest) */
-        struct vector *rv;      /* Result vector */
+        vector_t *sv;      /* Source vector (from source) */
+        vector_t *dv;      /* Dest vector (from dest) */
+        vector_t *rv;      /* Result vector */
         mp_int dsize;           /* Size of the dest vector */
         mp_int ssize;           /* Size of the source vector */
         mp_int index1, index2;  /* Target range indices */
@@ -1829,7 +1858,7 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
         {
             /* <source> fits exactly into the target range */
 
-            struct svalue *s, *d; /* Copy source and destination */
+            svalue_t *s, *d; /* Copy source and destination */
 
             s = sv->item;
             d = dv->item + index1;
@@ -1860,7 +1889,7 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
         {
             /* Create a new vector */
 
-            struct svalue *s, *d;  /* Copy source and destination */
+            svalue_t *s, *d;  /* Copy source and destination */
 
             rv = allocate_array(dsize + ssize + index1 - index2);
             dest->lvalue->u.vec = rv;
@@ -1895,7 +1924,7 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
 
 /*-------------------------------------------------------------------------*/
 static void
-assign_string_range (struct svalue *source, Bool do_free)
+assign_string_range (svalue_t *source, Bool do_free)
 
 /* Transfer the string <source> to the string range defined by
  * <special_lvalue>, modifying the target string in special_lvalue
@@ -1907,7 +1936,7 @@ assign_string_range (struct svalue *source, Bool do_free)
 {
     if (source->type == T_STRING)
     {
-        struct svalue *dsvp;     /* destination svalue (from special_lvalue) */
+        svalue_t *dsvp;     /* destination svalue (from special_lvalue) */
         char *ds;                /* destination string (from dsvp) */
         char *ss;                /* source string (from source) */
         char *rs;                /* result string */
@@ -1922,7 +1951,7 @@ assign_string_range (struct svalue *source, Bool do_free)
         dsvp = special_lvalue.v.u.lvalue;
         ds = dsvp->u.string;
         ss = source->u.string;
-        ssize = (signed)svalue_strlen(source);
+        ssize = (mp_int)svalue_strlen(source);
 
         /* Create the new string */
         rs = xalloc((size_t)(dsize + ssize + index1 - index2 + 1));
@@ -1935,7 +1964,7 @@ assign_string_range (struct svalue *source, Bool do_free)
         if (index1)
             memcpy(rs, ds, (size_t)index1);
         if (ssize)
-            memcpy(rs + index1, ss, (unsigned)ssize);
+            memcpy(rs + index1, ss, (size_t)ssize);
         strcpy(rs + index1 + ssize, ds + index2);
 
         /* Assign the new string in place of the old */
@@ -1957,7 +1986,7 @@ assign_string_range (struct svalue *source, Bool do_free)
 /*-------------------------------------------------------------------------*/
 static void
 assign_protected_string_range ( struct protected_range_lvalue *dest
-                              , struct svalue *source
+                              , svalue_t *source
                               , Bool do_free
                               )
 
@@ -1974,7 +2003,7 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
 {
     if (source->type == T_STRING)
     {
-        struct svalue *dsvp;     /* destination value (from dest) */
+        svalue_t *dsvp;     /* destination value (from dest) */
         char *ss;                /* source string (from source) */
         char *ds;                /* destination string (from dsvp) */
         char *rs;                /* result string */
@@ -2003,7 +2032,7 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
 
         /* Create a new string */
         ss = source->u.string;
-        ssize = (signed)svalue_strlen(source);
+        ssize = (mp_int)svalue_strlen(source);
         rs = xalloc((size_t)(dsize + ssize + index1 - index2 + 1));
         if (!rs)
         {
@@ -2041,7 +2070,7 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
 
 /*-------------------------------------------------------------------------*/
 static int
-add_number_to_svalue (struct svalue *dest, int i)
+add_number_to_svalue (svalue_t *dest, int i)
 
 /* Add the number <i> to the (PROTECTED_)LVALUE <dest>, and return
  * the sum. If <dest> is of the wrong type, an error is generated.
@@ -2087,8 +2116,8 @@ add_number_to_svalue (struct svalue *dest, int i)
 }
 
 /*-------------------------------------------------------------------------*/
-static struct vector *
-inter_add_array (struct vector *q, struct vector **vpp)
+static vector_t *
+inter_add_array (vector_t *q, vector_t **vpp)
 
 /* Append array <q> to array *<vpp>. Both <q> and *<vpp> are freed,
  * the result vector (just one ref) is assigned to *<vpp> and also returned.
@@ -2098,10 +2127,10 @@ inter_add_array (struct vector *q, struct vector **vpp)
  */
 
 {
-    struct vector *p;       /* The second summand vector */
+    vector_t *p;       /* The second summand vector */
     mp_int cnt;
-    struct vector *r;       /* Result vector */
-    struct svalue *s, *d;   /* Pointers for copying: src and dest */
+    vector_t *r;       /* Result vector */
+    svalue_t *s, *d;   /* Pointers for copying: src and dest */
     size_t p_size, q_size;  /* Sizes of p and q */
 
     p = *vpp;
@@ -2140,6 +2169,7 @@ inter_add_array (struct vector *q, struct vector **vpp)
             /* We got the additional memory */
             r = p;
             r->ref = 1;
+            r->size = p_size + q_size;
 
             r->user->size_array -= p_size;
             r->user = current_object->user;
@@ -2147,10 +2177,10 @@ inter_add_array (struct vector *q, struct vector **vpp)
 
             if (max_array_size && p_size + q_size > max_array_size)
             {
-                /* Oops, overflow - invalidate everythings */
+                /* Oops, overflow - invalidate everything */
                 *vpp = allocate_array(0);
                 d = r->item + p_size;
-                for (cnt = (signed)q_size; --cnt >=0; )
+                for (cnt = (mp_int)q_size; --cnt >=0; )
                 {
                     d[cnt].type = T_INVALID;
                 }
@@ -2274,8 +2304,8 @@ inter_add_array (struct vector *q, struct vector **vpp)
  */
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-_push_object (struct object *ob, struct svalue *sp)
+static INLINE svalue_t *
+_push_object (object_t *ob, svalue_t *sp)
 
 /* Push the object <ob> onto the stack, currently ending at <sp>, and
  * return the new stackpointer.
@@ -2291,7 +2321,7 @@ _push_object (struct object *ob, struct svalue *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-push_object (struct object *ob)
+push_object (object_t *ob)
 
 /* Push the object <ob> onto the stack defined by <inter_sp>.
  * <ob> must not be destructed.
@@ -2304,8 +2334,8 @@ push_object (struct object *ob)
 }
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-_push_valid_ob (struct object *ob, struct svalue *sp)
+static INLINE svalue_t *
+_push_valid_ob (object_t *ob, svalue_t *sp)
 
 /* Push the object <ob> onto the stack, currently ending at <sp>, and
  * return the new stackpointer.
@@ -2324,7 +2354,7 @@ _push_valid_ob (struct object *ob, struct svalue *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-push_valid_ob (struct object *ob)
+push_valid_ob (object_t *ob)
 
 /* Push the object <ob> onto the stack defined by <inter_sp>.
  * If <ob> is destructed, the number 0 is pushed.
@@ -2340,8 +2370,8 @@ push_valid_ob (struct object *ob)
 }
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-_push_number (p_int n, struct svalue *sp)
+static INLINE svalue_t *
+_push_number (p_int n, svalue_t *sp)
 
 /* Push the number <n> onto the stack, currently ending at <sp>, and return
  * the new stackpointer.
@@ -2366,8 +2396,8 @@ push_number (p_int n)
 }
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-_push_shared_string (char *p, struct svalue *sp)
+static INLINE svalue_t *
+_push_shared_string (char *p, svalue_t *sp)
 
 /* Push the shared string <p> onto the stack, currently ending at <sp>,
  * and return the new stackpointer.
@@ -2401,7 +2431,7 @@ push_referenced_shared_string (char *p)
  */
 
 {
-    struct svalue *sp = inter_sp;
+    svalue_t *sp = inter_sp;
 
     sp++;
     put_string(sp, p);
@@ -2422,8 +2452,8 @@ push_string_shared (char *p)
 }
 
 /*-------------------------------------------------------------------------*/
-static struct svalue *
-_push_string_malloced (char *p, struct svalue *sp)
+static svalue_t *
+_push_string_malloced (char *p, svalue_t *sp)
 
 /* Malloc a copy of string <p>, push it onto the stack currently ending
  * at <sp>, and return the new stackpointer.
@@ -2448,7 +2478,7 @@ push_string_malloced (char *p)
  */
 
 {
-    struct svalue *sp;
+    svalue_t *sp;
     char *s;
 
     s = xalloc(strlen(p)+1);
@@ -2458,8 +2488,8 @@ push_string_malloced (char *p)
 }
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-_push_malloced_string (char *p, struct svalue *sp)
+static INLINE svalue_t *
+_push_malloced_string (char *p, svalue_t *sp)
 
 /* Push malloced string <p> onto the stack, currently ending at <sp>,
  * and return the new stackpointer.
@@ -2485,8 +2515,8 @@ void push_malloced_string (char *p)
 }
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-_push_volatile_string (char *p, struct svalue *sp)
+static INLINE svalue_t *
+_push_volatile_string (char *p, svalue_t *sp)
 
 /* Push the volatile string <p> onto the stack, currently ending at <sp>,
  * and return the new stackpointer.
@@ -2512,7 +2542,7 @@ push_volatile_string (char *p)
 
 /*-------------------------------------------------------------------------*/
 void
-push_svalue (struct svalue *v)
+push_svalue (svalue_t *v)
 
 /* Push the svalue <v> onto the stack as defined by <inter_sp>.
  * Same semantic as assign_svalue_no_free().
@@ -2524,14 +2554,14 @@ push_svalue (struct svalue *v)
 
 /*-------------------------------------------------------------------------*/
 void
-push_svalue_block (int num, struct svalue *v)
+push_svalue_block (int num, svalue_t *v)
 
 /* Push all <num> svalues starting at <v> onto the stack as defined by
  * <inter_sp>. Same semantic as assign_svalue_no_free().
  */
 
 {
-    struct svalue *w;
+    svalue_t *w;
 
     for (w = inter_sp; --num >= 0; v++)
     {
@@ -2552,7 +2582,7 @@ _pop_stack (void)
 {
 #ifdef DEBUG
     if (inter_sp < start_of_stack)
-        fatal("Stack underflow.\n");
+        fatal("VM Stack underflow: %ld too low.\n", (long)(start_of_stack - inter_sp));
 #endif
     free_svalue(inter_sp--);
 }
@@ -2560,8 +2590,8 @@ _pop_stack (void)
 void pop_stack (void) { _pop_stack(); }
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-_pop_n_elems (int n, struct svalue *sp)
+static INLINE svalue_t *
+_pop_n_elems (int n, svalue_t *sp)
 
 /* Pop the <n> topmost elements from the stack, currently ending at <sp>,
  * and return the new stackpointer.
@@ -2578,12 +2608,12 @@ _pop_n_elems (int n, struct svalue *sp)
     return sp;
 }
 
-struct svalue * pop_n_elems (int n, struct svalue *sp)
+svalue_t * pop_n_elems (int n, svalue_t *sp)
 { return _pop_n_elems(n, sp); }
 
 /*-------------------------------------------------------------------------*/
 static void
-stack_overflow (struct svalue *sp, struct svalue *fp, bytecode_p pc)
+stack_overflow (svalue_t *sp, svalue_t *fp, bytecode_p pc)
 
 /* Recover from a stack overflow by popping all the elements between the
  * current stack end <sp> and the begin of the frame <fp>.
@@ -2598,7 +2628,7 @@ stack_overflow (struct svalue *sp, struct svalue *fp, bytecode_p pc)
 
 /*-------------------------------------------------------------------------*/
 void
-push_vector (struct vector *v)
+push_vector (vector_t *v)
 
 /* Push vector <v> onto the stack as defined by <inter_sp>.
  * The refs of <v> are incremented.
@@ -2611,7 +2641,7 @@ push_vector (struct vector *v)
 
 /*-------------------------------------------------------------------------*/
 void
-push_referenced_vector (struct vector *v)
+push_referenced_vector (vector_t *v)
 
 /* Push vector <v> onto the stack as defined by <inter_sp>.
  * The refs of <v> are _not_ incremented.
@@ -2624,7 +2654,7 @@ push_referenced_vector (struct vector *v)
 
 /*-------------------------------------------------------------------------*/
 void
-push_referenced_mapping (struct mapping *m)
+push_referenced_mapping (mapping_t *m)
 
 /* Push mapping <m> onto the stack as defined by <inter_sp>.
  * The refs of <m> are _not_ incremented.
@@ -2659,7 +2689,6 @@ push_referenced_mapping (struct mapping *m)
 #define push_volatile_string(s) (sp = _push_volatile_string((s), sp))
 #define pop_stack()             free_svalue(sp--)
 #define pop_n_elems(n)          (sp = _pop_n_elems((n), sp))
-#define STACK_OVERFLOW(sp, fp, pc) stack_overflow(sp, fp, pc)
 #define push_vector(v) ( \
         sp++,\
         sp->type = T_POINTER,\
@@ -2721,13 +2750,11 @@ push_referenced_mapping (struct mapping *m)
  *     Return v[i].
  *   push_rindexed_value(string|vector v, int i)
  *     Return v[<i].
- *   f_extract_lvalue(string|vector &v, int i)
- *     Return &(*v[i..]), unprotected, using special_lvalue.
  */
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-push_indexed_lvalue (struct svalue *sp, bytecode_p pc)
+static INLINE svalue_t *
+push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Operator F_PUSH_INDEXED_LVALUE(vector  v=sp[-1], int   i=sp[0])
  * Operator F_PUSH_INDEXED_LVALUE(mapping v=sp[-1], mixed i=sp[0])
@@ -2738,9 +2765,9 @@ push_indexed_lvalue (struct svalue *sp, bytecode_p pc)
  */
 
 {
-    struct svalue *i;     /* the index value */
-    struct svalue *vec;   /* the indexed vector or mapping */
-    struct svalue *item;  /* the indexed element vec[i] */
+    svalue_t *i;     /* the index value */
+    svalue_t *vec;   /* the indexed vector or mapping */
+    svalue_t *item;  /* the indexed element vec[i] */
     int ind;              /* numeric value of *i */
 
     /* Get the arguments */
@@ -2788,7 +2815,7 @@ push_indexed_lvalue (struct svalue *sp, bytecode_p pc)
      */
     if (vec->type == T_MAPPING)
     {
-        struct mapping *m;
+        mapping_t *m;
 
         m = vec->u.map;
 
@@ -2827,8 +2854,8 @@ push_indexed_lvalue (struct svalue *sp, bytecode_p pc)
 } /* push_indexed_lvalue() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-push_rindexed_lvalue (struct svalue *sp, bytecode_p pc)
+static INLINE svalue_t *
+push_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Operator F_PUSH_RINDEXED_LVALUE(vector v=sp[-1], int i=sp[0])
  *
@@ -2838,9 +2865,9 @@ push_rindexed_lvalue (struct svalue *sp, bytecode_p pc)
  */
 
 {
-    struct svalue *i;     /* the index value */
-    struct svalue *vec;   /* the vector */
-    struct svalue *item;  /* the indexed item */
+    svalue_t *i;     /* the index value */
+    svalue_t *vec;   /* the vector */
+    svalue_t *item;  /* the indexed item */
     mp_int ind;           /* the numeric value of *i */
 
     /* Get the arguments */
@@ -2892,7 +2919,7 @@ push_rindexed_lvalue (struct svalue *sp, bytecode_p pc)
 } /* push_rindexed_lvalue() */
 
 /*-------------------------------------------------------------------------*/
-/* void BUILD_MAP_PROTECTOR(struct svalue *dest, struct mapping *m)
+/* void BUILD_MAP_PROTECTOR(svalue_t *dest, mapping_t *m)
  *
  * Init svalue <dest> to protectively hold mapping <m> in which one entry
  * is about to be used as target for a lvalue.
@@ -2918,8 +2945,8 @@ push_rindexed_lvalue (struct svalue *sp, bytecode_p pc)
 }
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-push_protected_indexed_lvalue (struct svalue *sp, bytecode_p pc)
+static INLINE svalue_t *
+push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Op. F_PUSH_PROTECTED_INDEXED_LVALUE(vector  v=sp[-1], int   i=sp[0])
  * Op. F_PUSH_PROTECTED_INDEXED_LVALUE(mapping v=sp[-1], mixed i=sp[0])
@@ -2929,9 +2956,9 @@ push_protected_indexed_lvalue (struct svalue *sp, bytecode_p pc)
  */
 
 {
-    struct svalue           * i;       /* the index */
-    struct svalue           * vec;     /* the vector */
-    struct svalue           * item;    /* the indexed element */
+    svalue_t           * i;       /* the index */
+    svalue_t           * vec;     /* the vector */
+    svalue_t           * item;    /* the indexed element */
     struct protected_lvalue * lvalue;  /* the protector */
     int                       ind;     /* numeric value of *i */
 
@@ -2977,7 +3004,7 @@ push_protected_indexed_lvalue (struct svalue *sp, bytecode_p pc)
      */
     if (vec->type == T_MAPPING)
     {
-        struct mapping *m;
+        mapping_t *m;
 
         m = vec->u.map;
 
@@ -3014,8 +3041,8 @@ push_protected_indexed_lvalue (struct svalue *sp, bytecode_p pc)
 } /* push_protected_indexed_lvalue() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-push_protected_rindexed_lvalue (struct svalue *sp, bytecode_p pc)
+static INLINE svalue_t *
+push_protected_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Op. F_PUSH_PROTECTED_RINDEXED_LVALUE(vector v=sp[-1], int i=sp[0])
  *
@@ -3024,9 +3051,9 @@ push_protected_rindexed_lvalue (struct svalue *sp, bytecode_p pc)
  */
 
 {
-    struct svalue           * i;       /* the index */
-    struct svalue           * vec;     /* the vector */
-    struct svalue           * item;    /* the indexed element */
+    svalue_t           * i;       /* the index */
+    svalue_t           * vec;     /* the vector */
+    svalue_t           * item;    /* the indexed element */
     struct protected_lvalue * lvalue;  /* the protector */
     mp_int                    ind;     /* numeric value of *i */
 
@@ -3080,8 +3107,8 @@ push_protected_rindexed_lvalue (struct svalue *sp, bytecode_p pc)
 } /* push_protected_rindexed_lvalue() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-push_protected_indexed_map_lvalue (struct svalue *sp, char *pc)
+static INLINE svalue_t *
+push_protected_indexed_map_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Op. F_PUSH_PROTECTED_INDEXED_MAP_LVALUE(mapping m=sp[-2], mixed i=sp[-1]
  *                                                         , int   j=sp[0])
@@ -3091,9 +3118,9 @@ push_protected_indexed_map_lvalue (struct svalue *sp, char *pc)
  */
 
 {
-    struct svalue           * i;       /* the index */
-    struct svalue           * vec;     /* the vector */
-    struct svalue           * item;    /* the indexed element */
+    svalue_t           * i;       /* the index */
+    svalue_t           * vec;     /* the vector */
+    svalue_t           * item;    /* the indexed element */
     struct protected_lvalue * lvalue;  /* the protector */
 
     /* Get the arguments */
@@ -3104,7 +3131,7 @@ push_protected_indexed_map_lvalue (struct svalue *sp, char *pc)
      */
     if (vec->type == T_MAPPING)
     {
-        struct mapping *m;
+        mapping_t *m;
 
         m = vec->u.map;
         if (sp->u.number != T_NUMBER
@@ -3145,8 +3172,8 @@ push_protected_indexed_map_lvalue (struct svalue *sp, char *pc)
 } /* push_protected_indexed_map_lvalue() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-index_lvalue (struct svalue *sp, bytecode_p pc)
+static INLINE svalue_t *
+index_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Operator F_INDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
  *          F_INDEX_LVALUE (mapping       &v=sp[0], mixed i=sp[-1])
@@ -3159,8 +3186,8 @@ index_lvalue (struct svalue *sp, bytecode_p pc)
  */
 
 {
-    struct svalue *vec;   /* the vector/mapping */
-    struct svalue *i;     /* the index */
+    svalue_t *vec;   /* the vector/mapping */
+    svalue_t *i;     /* the index */
     int            ind;   /* numeric value of <i> */
     short          type;  /* type of <vec> */
 
@@ -3179,7 +3206,7 @@ index_lvalue (struct svalue *sp, bytecode_p pc)
      */
     if (type == T_POINTER)
     {
-        struct vector *v = vec->u.vec;
+        vector_t *v = vec->u.vec;
 
         if (i->type != T_NUMBER || (ind = i->u.number) < 0)
         {
@@ -3250,8 +3277,8 @@ index_lvalue (struct svalue *sp, bytecode_p pc)
      */
     if (type == T_MAPPING)
     {
-        struct svalue *item;
-        struct mapping *m;
+        svalue_t *item;
+        mapping_t *m;
 
         m = vec->u.map;
         if (!m->num_values)
@@ -3282,8 +3309,8 @@ index_lvalue (struct svalue *sp, bytecode_p pc)
 } /* index_lvalue() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-rindex_lvalue (struct svalue *sp, bytecode_p pc)
+static INLINE svalue_t *
+rindex_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Operator F_RINDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
  *
@@ -3295,8 +3322,8 @@ rindex_lvalue (struct svalue *sp, bytecode_p pc)
  */
 
 {
-    struct svalue *vec;   /* the vector/string */
-    struct svalue *i;     /* the index */
+    svalue_t *vec;   /* the vector/string */
+    svalue_t *i;     /* the index */
     mp_int         ind;   /* numeric value of <i> */
     short          type;  /* type of <vec> */
 
@@ -3322,7 +3349,7 @@ rindex_lvalue (struct svalue *sp, bytecode_p pc)
      */
     if (type == T_POINTER)
     {
-        struct vector *v = vec->u.vec;
+        vector_t *v = vec->u.vec;
 
 
         if ( (ind = (mp_int)VEC_SIZE(v) - ind) < 0)
@@ -3384,8 +3411,8 @@ rindex_lvalue (struct svalue *sp, bytecode_p pc)
 } /* rindex_lvalue() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-protected_index_lvalue (struct svalue *sp, bytecode_p pc)
+static INLINE svalue_t *
+protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Operator F_PROTECTED_INDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
  *          F_PROTECTED_INDEX_LVALUE (mapping       &v=sp[0], mixed i=sp[-1])
@@ -3401,8 +3428,8 @@ protected_index_lvalue (struct svalue *sp, bytecode_p pc)
  */
 
 {
-    struct svalue *vec;   /* the indexed value */
-    struct svalue *i;     /* the index */
+    svalue_t *vec;   /* the indexed value */
+    svalue_t *i;     /* the index */
     int            ind;   /* numeric value of <i> */
     short          type;  /* type of <vec> */
 
@@ -3422,7 +3449,7 @@ protected_index_lvalue (struct svalue *sp, bytecode_p pc)
          */
         if (type == T_POINTER)
         {
-            struct vector *v = vec->u.vec;
+            vector_t *v = vec->u.vec;
             struct protected_lvalue *lvalue;
 
             if (i->type != T_NUMBER || (ind = i->u.number) < 0)
@@ -3516,9 +3543,9 @@ protected_index_lvalue (struct svalue *sp, bytecode_p pc)
          */
         if (type == T_MAPPING)
         {
-            struct svalue *item;
+            svalue_t *item;
             struct protected_lvalue *lvalue;
-            struct mapping *m;
+            mapping_t *m;
 
             m = vec->u.map;
             if (!m->num_values)
@@ -3662,8 +3689,8 @@ protected_index_lvalue (struct svalue *sp, bytecode_p pc)
 } /* protected_index_lvalue() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-protected_rindex_lvalue (struct svalue *sp, bytecode_p pc)
+static INLINE svalue_t *
+protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
 
 /* Operator F_PROTECTED_RINDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
  *
@@ -3678,8 +3705,8 @@ protected_rindex_lvalue (struct svalue *sp, bytecode_p pc)
  */
 
 {
-    struct svalue *vec;   /* the indexed value */
-    struct svalue *i;     /* the index */
+    svalue_t *vec;   /* the indexed value */
+    svalue_t *i;     /* the index */
     mp_int         ind;   /* numeric value of <i> */
     short          type;  /* type of <vec> */
 
@@ -3706,7 +3733,7 @@ protected_rindex_lvalue (struct svalue *sp, bytecode_p pc)
          */
         if (type == T_POINTER)
         {
-            struct vector *v = vec->u.vec;
+            vector_t *v = vec->u.vec;
             struct protected_lvalue *lvalue;
 
             if ( (ind = (mp_int)VEC_SIZE(v) - ind) < 0)
@@ -3885,8 +3912,8 @@ protected_rindex_lvalue (struct svalue *sp, bytecode_p pc)
 } /* protected_rindex_lvalue() */
 
 /*-------------------------------------------------------------------------*/
-static struct svalue *
-range_lvalue (int code, struct svalue *sp)
+static svalue_t *
+range_lvalue (int code, svalue_t *sp)
 
 /* Operator F_RANGE_LVALUE (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
  * and the operators F_{NR,RN,RR}_RANGE_LVALUE.
@@ -3904,8 +3931,8 @@ range_lvalue (int code, struct svalue *sp)
  */
 
 {
-    struct svalue *vec;         /* the indexed vector or string */
-    struct svalue *i;           /* the index */
+    svalue_t *vec;         /* the indexed vector or string */
+    svalue_t *i;           /* the index */
     int            ind1, ind2;  /* Lower and upper range index */
     short          type;        /* type of <vec> */
     mp_int         size;        /* size of <vec> in elements */
@@ -4022,13 +4049,13 @@ range_lvalue (int code, struct svalue *sp)
 } /* range_lvalue() */
 
 /*-------------------------------------------------------------------------*/
-static struct svalue *
-protected_range_lvalue (int code, struct svalue *sp)
+static svalue_t *
+protected_range_lvalue (int code, svalue_t *sp)
 
 /* X-Operator F_PROTECTED_RANGE_LVALUE
  *                       (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
  * and the x-operators F_PROTECTED_{NR,RN,RR}_RANGE_LVALUE and
- * F_PROTECTED_EXTRACT_LVALUE.
+ * F_PROTECTED_LVALUE.
  *
  * Compute the range &(v[i1..i2]) of lvalue <v>, wrap it into a protector,
  * and push the reference to the protector onto the stack.
@@ -4047,13 +4074,13 @@ protected_range_lvalue (int code, struct svalue *sp)
  */
 
 {
-    struct svalue *vec;         /* the indexed vector or string */
-    struct svalue *i;           /* the index */
+    svalue_t *vec;         /* the indexed vector or string */
+    svalue_t *i;           /* the index */
     int            ind1, ind2;  /* Lower and upper range index */
     short          type;        /* type of <vec> */
     mp_int         size;        /* size of <vec> in elements */
     short          lvalue_type; /* Result type */
-    struct svalue  protector;   /* Protecting svalue saved from v */
+    svalue_t  protector;   /* Protecting svalue saved from v */
     struct protected_range_lvalue *new_lvalue;
                                 /* Result protector structure */
 
@@ -4201,8 +4228,8 @@ protected_range_lvalue (int code, struct svalue *sp)
 } /* protected_range_lvalue() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-push_indexed_value (struct svalue *sp, bytecode_p pc)
+static INLINE svalue_t *
+push_indexed_value (svalue_t *sp, bytecode_p pc)
 
 /* Operator F_INDEX (string|vector v=sp[0], int   i=sp[-1])
  *          F_INDEX (mapping       v=sp[0], mixed i=sp[-1])
@@ -4215,8 +4242,8 @@ push_indexed_value (struct svalue *sp, bytecode_p pc)
  */
 
 {
-    struct svalue *vec;  /* the indexed value */
-    struct svalue *i;    /* the index */
+    svalue_t *vec;  /* the indexed value */
+    svalue_t *i;    /* the index */
     int            ind;  /* numeric value of <i> */
 
     /* Get arguments */
@@ -4274,7 +4301,7 @@ push_indexed_value (struct svalue *sp, bytecode_p pc)
          */
         if (vec->u.vec->ref == 1)
         {
-            struct svalue *p, tmp;
+            svalue_t *p, tmp;
 
             /* Copy the indexed element into <tmp>
              */
@@ -4314,8 +4341,8 @@ push_indexed_value (struct svalue *sp, bytecode_p pc)
 
     case T_MAPPING:
       {
-        struct svalue *item;
-        struct mapping *m;
+        svalue_t *item;
+        mapping_t *m;
 
         m = vec->u.map;
 
@@ -4367,8 +4394,8 @@ push_indexed_value (struct svalue *sp, bytecode_p pc)
 } /* push_indexed_value() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-push_rindexed_value (struct svalue *sp, bytecode_p pc)
+static INLINE svalue_t *
+push_rindexed_value (svalue_t *sp, bytecode_p pc)
 
 /* Operator F_RINDEX (string|vector v=sp[0], int   i=sp[-1])
  *
@@ -4378,8 +4405,8 @@ push_rindexed_value (struct svalue *sp, bytecode_p pc)
  */
 
 {
-    struct svalue *vec;  /* the indexed value */
-    struct svalue *i;    /* the index */
+    svalue_t *vec;  /* the indexed value */
+    svalue_t *i;    /* the index */
     mp_int         ind;  /* numeric value of <i> */
 
     /* Get arguments */
@@ -4428,7 +4455,7 @@ push_rindexed_value (struct svalue *sp, bytecode_p pc)
          */
         if (vec->u.vec->ref == 1)
         {
-            struct svalue *p, tmp;
+            svalue_t *p, tmp;
 
             /* Copy the indexed element into <tmp>
              */
@@ -4478,115 +4505,17 @@ push_rindexed_value (struct svalue *sp, bytecode_p pc)
     return NULL;
 } /* push_rindexed_value() */
 
-/*-------------------------------------------------------------------------*/
-struct svalue *
-f_extract_lvalue (struct svalue *sp)
-
-/* T-Operator F_EXTRACT_LVALUE (string|vector &v=sp[0], int i1=sp[-1])
- *
- * Compute the range &(v[i1..]) of lvalue <v> and push it into the stack.
- * The value pushed is a lvalue pointing to <special_lvalue>. <special_lvalue>
- * then is the POINTER_RANGE_- resp. STRING_RANGE_LVALUE.
- *
- * If <i1> is negative, the range begin is indexed from the end of the string
- * or vector.
- */
-
-{
-    struct svalue *vec;   /* the indexed value */
-    int            ind1;  /* the numeric value of the index */
-    short          type;  /* type of vec */
-    mp_int         size;  /* size of vec */
-
-#ifdef DEBUG
-    if (sp->type != T_LVALUE)
-    {
-        inter_sp = sp;
-        error("wrong type to range_lvalue\n");
-        /* TODO: Print type */
-        return NULL;
-    }
-#endif
-
-    /* Get the vector argument and deref the lvalue(s).
-     */
-    vec = sp;
-    do {
-        vec = vec->u.lvalue;
-        type = vec->type;
-    } while (type == T_LVALUE || type == T_PROTECTED_LVALUE);
-
-    /* Determine the type of the result, and the input's size.
-     */
-    switch(type)
-    {
-    case T_POINTER:
-        special_lvalue.v.type = T_POINTER_RANGE_LVALUE;
-        size = (mp_int)VEC_SIZE(vec->u.vec);
-        break;
-
-    case T_STRING:
-        special_lvalue.v.type = T_STRING_RANGE_LVALUE;
-        size = (mp_int)svalue_strlen(vec);
-        break;
-
-    default:
-        inter_sp = sp;
-        error("(lvalue)range lvalue on illegal type.\n");
-        /* TODO: Print type */
-        return NULL;
-    }
-
-    /* Get and test the lower range index */
-
-    sp--;
-    if (sp->type != T_NUMBER)
-    {
-        inter_sp = sp+1;
-        error("Illegal index for [..]: not a number.\n");
-        /* TODO: Print type */
-        return NULL;
-    }
-    if (sp->u.number < 0)
-    {
-        ind1 = size + sp->u.number;
-    }
-    else
-    {
-        ind1 = sp->u.number;
-    }
-
-    if (ind1 < 0 || ind1 > size)
-    {
-        /* Appending is allowed */
-        inter_sp = sp+1;
-        error("Index for [..] out of bounds: %ld, vector size: %ld\n"
-             , (long)sp->u.number, (long)size);
-        return NULL;
-    }
-
-    /* Setup and return the result */
-    special_lvalue.v.u.lvalue = vec;
-    special_lvalue.size = size;
-    special_lvalue.index1 = ind1;
-    special_lvalue.index2 = size;
-
-    sp->type = T_LVALUE;
-    sp->u.lvalue = &special_lvalue.v;
-    return sp;
-} /* f_extract_lvalue() */
-
 /*=========================================================================*/
 /*-------------------------------------------------------------------------*/
-void m_indices_filter ( struct svalue *key
-                      , struct svalue *data UNUSED
-                      , void *extra /* is a struct svalue ** */ )
+void m_indices_filter ( svalue_t *key
+                      , svalue_t *data UNUSED
+                      , void *extra /* is a svalue_t ** */ )
 
 /* Filter function used by mapping:m_indices() to implement the
  * m_indices() efun. It is here take advantage of the inline expansion
  * of assign_svalue_no_free().
  *
- * <key> points to a key in a mapping, <extra> points to a struct svalue*
+ * <key> points to a key in a mapping, <extra> points to a svalue_t*
  * pointing to a storage place. *key is assigned to **extra, *extra is
  * incremented afterwards.
  */
@@ -4595,14 +4524,14 @@ void m_indices_filter ( struct svalue *key
 #ifdef __MWERKS__
 #    pragma unused(data)
 #endif
-    struct svalue **svpp = (struct svalue **)extra;
+    svalue_t **svpp = (svalue_t **)extra;
 
     assign_svalue_no_free( (*svpp)++, key );
 }
 
 /*-------------------------------------------------------------------------*/
-static void m_values_filter ( struct svalue *key UNUSED
-                            , struct svalue *data
+static void m_values_filter ( svalue_t *key UNUSED
+                            , svalue_t *data
                             , void *extra /* is a struct mvf_info * */ )
 
 /* Filter function used by efun m_values().
@@ -4623,8 +4552,8 @@ static void m_values_filter ( struct svalue *key UNUSED
 }
 
 /*-------------------------------------------------------------------------*/
-static void m_unmake_filter ( struct svalue *key
-                            , struct svalue *data
+static void m_unmake_filter ( svalue_t *key
+                            , svalue_t *data
                             , void *extra)
 
 /* Filter function used by efun unmkmapping().
@@ -4646,8 +4575,8 @@ static void m_unmake_filter ( struct svalue *key
 }
 
 /*-------------------------------------------------------------------------*/
-static struct program *
-search_inherited (char *str, struct program *prg, int *offpnt)
+static program_t *
+search_inherited (char *str, program_t *prg, int *offpnt)
 
 /* Auxiliary function to efun replace_program(): check if program <str>
  * is inherited by <prg>. If yes, return the originating program and
@@ -4661,15 +4590,21 @@ search_inherited (char *str, struct program *prg, int *offpnt)
  */
 
 {
-    struct program *tmp;
+    program_t *tmp;
     int i;
+#ifdef DEBUG
+    char *ts;
+#endif
 
 #ifdef DEBUG
+    ts = NULL;
     if (d_flag)
     {
-        debug_message("search_inherited started\n");
-        debug_message("searching for PRG(%s) in PRG(%s)\n",str,prg->name);
-        debug_message("num_inherited=%d\n", prg->num_inherited);
+        ts = time_stamp();
+        debug_message("%s search_inherited started\n", ts);
+        debug_message("%s searching for PRG(%s) in PRG(%s)\n"
+                     , ts, str, prg->name);
+        debug_message("%s num_inherited=%d\n", ts, prg->num_inherited);
     }
 #endif
 
@@ -4681,19 +4616,20 @@ search_inherited (char *str, struct program *prg, int *offpnt)
 #ifdef DEBUG
         if (d_flag)
         {
-            debug_message("index %d:\n",i);
-            debug_message("checking PRG(%s)\n", prg->inherit[i].prog->name);
+            debug_message("%s index %d:\n", ts, i);
+            debug_message("%s checking PRG(%s)\n"
+                         , ts, prg->inherit[i].prog->name);
         }
 #endif
         /* Duplicate virtual inherits don't count */
-        if ( prg->inherit[i].is_extra )
+        if ( prg->inherit[i].inherit_type & INHERIT_TYPE_DUPLICATE )
             continue;
 
         if ( strcmp(str, prg->inherit[i].prog->name ) == 0 )
         {
 #ifdef DEBUG
             if (d_flag)
-                debug_message("match found\n");
+                debug_message("%s match found\n", ts);
 #endif
             offpnt[0] = prg->inherit[i].variable_index_offset;
             offpnt[1] = prg->inherit[i].function_index_offset;
@@ -4703,7 +4639,7 @@ search_inherited (char *str, struct program *prg, int *offpnt)
         {
 #ifdef DEBUG
             if (d_flag)
-                debug_message("deferred match found\n");
+                debug_message("%s deferred match found\n", ts);
 #endif
             offpnt[0] += prg->inherit[i].variable_index_offset;
             offpnt[1] += prg->inherit[i].function_index_offset;
@@ -4713,14 +4649,14 @@ search_inherited (char *str, struct program *prg, int *offpnt)
 
 #ifdef DEBUG
     if (d_flag)
-        debug_message("search_inherited failed\n");
+        debug_message("%s search_inherited failed\n", ts);
 #endif
 
     return NULL;
 } /* search_inherited() */
 
 /*-------------------------------------------------------------------------*/
-static struct replace_ob *
+static replace_ob_t *
 retrieve_replace_program_entry (void)
 
 /* Auxiliary function to efun replace_program(): test if a program
@@ -4729,7 +4665,7 @@ retrieve_replace_program_entry (void)
  */
 
 {
-    struct replace_ob *r_ob;
+    replace_ob_t *r_ob;
 
     for (r_ob = obj_list_replace; r_ob; r_ob = r_ob->next)
     {
@@ -4741,7 +4677,7 @@ retrieve_replace_program_entry (void)
 
 /*-------------------------------------------------------------------------*/
 #ifdef DEBUG
-static INLINE struct svalue *
+static INLINE svalue_t *
 find_value (int num)
 
 /* Return the address of object-global variable number <num> in the
@@ -4766,7 +4702,7 @@ find_value (int num)
 #endif
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
+static INLINE svalue_t *
 find_virtual_value (int num)
 
 /* For the virtually inherited variable <num> (given as index within
@@ -4785,9 +4721,9 @@ find_virtual_value (int num)
  */
 
 {
-    struct inherit *inheritp;
-    struct program *progp;
-    char *progpp; /* actually a struct program **, but some compilers... */
+    inherit_t *inheritp;
+    program_t *progp;
+    char *progpp; /* actually a program_t **, but some compilers... */
 
     /* Set inheritp to the inherited program which defines variable <num>
      */
@@ -4811,21 +4747,21 @@ find_virtual_value (int num)
      */
     progp = inheritp->prog;
     progpp = (char *)&current_object->prog->inherit->prog;
-    while (*(struct program **)progpp != progp)
-        progpp += sizeof(struct inherit);
-    inheritp = (struct inherit *)
-                 (((PTRTYPE)(progpp)) - offsetof(struct inherit, prog));
+    while (*(program_t **)progpp != progp)
+        progpp += sizeof(inherit_t);
+    inheritp = (inherit_t *)
+                 (((PTRTYPE)(progpp)) - offsetof(inherit_t, prog));
 #ifdef DEBUG
     /* TODO: Remove me if nobody reports an error. */
     {
-        struct inherit * inheritp2 = (struct inherit *)(
+        inherit_t * inheritp2 = (inherit_t *)(
                  ((PTRTYPE)(progpp))-
-                 ((PTRTYPE)(&((struct inherit *)0)->prog)-(PTRTYPE) 0)
+                 ((PTRTYPE)(&((inherit_t *)0)->prog)-(PTRTYPE) 0)
                );
         if (inheritp != inheritp2)
         {
-            fprintf(stderr, "DEBUG: inheritp %p, inheritp2 %p, progpp %p\n"
-                   , inheritp, inheritp2, progpp);
+            fprintf(stderr, "DEBUG: %s inheritp %p, inheritp2 %p, progpp %p\n"
+                   , time_stamp(), inheritp, inheritp2, progpp);
             inheritp = inheritp2;
         }
     }
@@ -4834,6 +4770,21 @@ find_virtual_value (int num)
     /* Compute the actual variable address */
 
     num += inheritp->variable_index_offset;
+
+#ifdef DEBUG
+    if (!current_object->variables)
+    {
+        if (num)
+            fatal("%s Fatal: find_virtual_value() on object %p '%s' "
+                  "w/o variables, num %d\n"
+                 , time_stamp(), current_object, current_object->name, num);
+        else
+            error("%s Error: find_virtual_value() on object %p '%s' "
+                  "w/o variables, num %d\n"
+                 , time_stamp(), current_object, current_object->name, num);
+    }
+#endif
+
     return &current_object->variables[num];
       /* TODO: Why not '&current_variables[num]'? */
 } /* find_virtual_value() */
@@ -4841,7 +4792,7 @@ find_virtual_value (int num)
 /*-------------------------------------------------------------------------*/
 #ifndef COMPAT_MODE
 
-static char *
+char *
 add_slash (char *str)
 
 /* Prepend a slash ('/') in front of string <str> and return an allocated
@@ -4863,11 +4814,11 @@ add_slash (char *str)
 
 /*-------------------------------------------------------------------------*/
 static void
-bad_arg_pc (int arg, int instr, struct svalue *sp, bytecode_p pc)
+bad_arg_pc (int arg, int instr, svalue_t *sp, bytecode_p pc)
   NORETURN;
 
 static void
-bad_arg_pc (int arg, int instr, struct svalue *sp, bytecode_p pc)
+bad_arg_pc (int arg, int instr, svalue_t *sp, bytecode_p pc)
 
 /* Argument number <arg> to instruction <instr> was "bad".
  * Set inter_sp/pc to <sp>/<pc> and raise a runtime error with
@@ -4885,7 +4836,7 @@ bad_arg_pc (int arg, int instr, struct svalue *sp, bytecode_p pc)
 
 /*-------------------------------------------------------------------------*/
 void
-bad_efun_arg (int arg, int instr, struct svalue *sp)
+bad_efun_arg (int arg, int instr, svalue_t *sp)
 
 /* Argument number <arg> to instruction <instr> was "bad".
  *
@@ -4908,7 +4859,7 @@ bad_efun_arg (int arg, int instr, struct svalue *sp)
         bytecode_p pc = inter_pc + instr;
 
         instr = *pc;
-        if (instr <= F_VEFUN - F_OFFSET)
+        if (instr <= F_VEFUN)
             instr = pc[1] | (instr << F_ESCAPE_BITS);
     }
     error("Bad argument %d to %s()\n", arg, get_f_name(instr));
@@ -4916,12 +4867,14 @@ bad_efun_arg (int arg, int instr, struct svalue *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-bad_xefun_arg (int arg, struct svalue *sp)
+bad_xefun_arg (int arg, svalue_t *sp)
 
 /* Argument number <arg> to a xefun (fixed args) or tefun was "bad".
  *
  * inter_sp is updated to <sp>, inter_pc is supposed to be correct and
  * pointing just after the opcode.
+ *
+ * This function is also defined to bad_efun_vararg().
  */
 
 {
@@ -4930,7 +4883,7 @@ bad_xefun_arg (int arg, struct svalue *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-bad_xefun_vararg (int arg, struct svalue *sp)
+bad_xefun_vararg (int arg, svalue_t *sp)
 
 /* Argument number <arg> to a xefun (var. args) or vefun was "bad".
  *
@@ -4944,7 +4897,7 @@ bad_xefun_vararg (int arg, struct svalue *sp)
 
 /*-------------------------------------------------------------------------*/
 Bool
-_privilege_violation (char *what, struct svalue *where, struct svalue *sp)
+_privilege_violation (char *what, svalue_t *where, svalue_t *sp)
 
 /* Call the mudlib to check for a privilege violation:
  *
@@ -4967,7 +4920,7 @@ _privilege_violation (char *what, struct svalue *where, struct svalue *sp)
  */
 
 {
-    struct svalue *svp;
+    svalue_t *svp;
 
     /* Trusted objects */
     if (current_object == master_ob) return MY_TRUE;
@@ -4995,9 +4948,9 @@ _privilege_violation (char *what, struct svalue *where, struct svalue *sp)
 
 /*-------------------------------------------------------------------------*/
 Bool
-privilege_violation4 ( char *what,    struct object *whom
+privilege_violation4 ( char *what,    object_t *whom
                      , char *how_str, int how_num
-                     , struct svalue *sp)
+                     , svalue_t *sp)
 
 /* Call the mudlib to check for a privilege violation:
  *
@@ -5028,7 +4981,7 @@ privilege_violation4 ( char *what,    struct object *whom
  */
 
 {
-    struct svalue *svp;
+    svalue_t *svp;
 
     /* Trust these objects */
     if (current_object == master_ob) return MY_TRUE;
@@ -5101,11 +5054,10 @@ trace_test (int b)
  */
 
 {
-    struct interactive *ip;
+    interactive_t *ip;
 
     return command_giver
-        && NULL != (ip = O_GET_INTERACTIVE(command_giver))
-        && ip->sent.type == SENT_INTERACTIVE
+        && O_SET_INTERACTIVE(ip, command_giver)
         && (ip->trace_level & b)
         && (ip->trace_prefix == NULL
             || (current_object
@@ -5159,7 +5111,7 @@ do_trace_call (fun_hdr_p funstart)
           /* TODO: Might be clobbered, but where? */
 
         /* Trace the function itself */
-        memcpy(&name, &FUNCTION_NAME(funstart), sizeof name);
+        memcpy(&name, FUNCTION_NAMEP(funstart), sizeof name);
         do_trace("Call direct ", name, " ");
 
         /* If requested, also trace the arguments */
@@ -5168,7 +5120,7 @@ do_trace_call (fun_hdr_p funstart)
             if (TRACETST(TRACE_ARGS))
             {
                 int i;
-                struct svalue *svp;
+                svalue_t *svp;
 
                 add_message(" with %d arguments: "
                            , FUNCTION_NUM_ARGS(funstart) & 0x7f);
@@ -5188,7 +5140,7 @@ do_trace_call (fun_hdr_p funstart)
 
 /*-------------------------------------------------------------------------*/
 static void
-do_trace_return (struct svalue *sp)
+do_trace_return (svalue_t *sp)
 
 /* Trace the return from a function call; <sp> is the current stack pointer,
  * pointing to the result.
@@ -5220,7 +5172,7 @@ do_trace_return (struct svalue *sp)
 
 /*-------------------------------------------------------------------------*/
 static INLINE struct longjump_s *
-push_error_context (struct svalue *sp)
+push_error_context (svalue_t *sp)
 
 /* Create a catch recovery context, using <sp> as the stackpointer to save,
  * link it into the recovery stack and return the longjmp context struct.
@@ -5268,8 +5220,8 @@ pop_error_context (void)
 } /* pop_error_context() */
 
 /*-------------------------------------------------------------------------*/
-static struct svalue *
-pull_error_context (struct svalue *sp)
+static svalue_t *
+pull_error_context (svalue_t *sp)
 
 /* Restore the context saved by a catch() after a throw() or runtime error
  * occured. <sp> is the current stackpointer and is used to pop the elements
@@ -5314,13 +5266,13 @@ pull_error_context (struct svalue *sp)
     xfree(p);
 
     return sp;
-} /* pop_error_context() */
+} /* pull_error_context() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-push_control_stack ( struct svalue *sp
+push_control_stack ( svalue_t *sp
                    , bytecode_p     pc
-                   , struct svalue *fp
+                   , svalue_t *fp
                    )
 
 /* Push the current execution context onto the control stack.
@@ -5379,7 +5331,62 @@ pop_control_stack (void)
 
 
 /*-------------------------------------------------------------------------*/
-static INLINE /* TODO: funflags */ uint32
+static void
+handle_caught_error (svalue_t ** spp, bytecode_p * pcp, svalue_t **fpp)
+
+/* Handle the error caught by the F_CATCH in the interpreter switch.
+ * *<spp>, *<pcp> and *<fpp> are to be set to the new stackpointer,
+ * programcounter and framepointer values to be used by the interpreter.
+ *
+ * The reason why this code is in a separate function is to thwart
+ * overzealous optimizers. F_CATCH is implemented with setjmp/longjmp,
+ * after which the register contents of the CPU are most likely clobbered.
+ * Some optimizers don't take this into account and neglect to reload
+ * the values into the registers. For the same reason the interpreter
+ * does not call this function directly, but over a function variabe;
+ * otherwise the same overzealous optimizer might inline this function
+ * with the same desastrous result.
+ */
+
+{
+    svalue_t * sp;
+
+    /* Remove the catch context and get the old stackpointer setting */
+    sp = pull_error_context(inter_sp);
+
+    /* beware of errors after set_this_object() */
+    current_object = csp->ob;
+
+    /* catch() fakes a subroutine call internally, which has to be
+     * undone again.
+     */
+    pop_control_stack();
+
+    /* Export the restored program counter and frame pointer */
+    *pcp = inter_pc;
+    *fpp = inter_fp;
+
+    /* Push the catch return value */
+    *(++sp) = catch_value;
+    catch_value.type = T_INVALID;
+
+    /* Restore the old eval costs */
+    eval_cost -= CATCH_RESERVED_COST;
+    assigned_eval_cost -= CATCH_RESERVED_COST;
+
+    /* If we are out of memory, throw a new error */
+    if (out_of_memory)
+    {
+        inter_sp = sp;
+        error("(catch) Out of memory detected.\n");
+    }
+
+    /* Export the new stack pointer */
+    *spp = sp;
+} /* handle_caught_error() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE funflag_t
 setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
 
 /* Setup current_prog, function_ and variable_index_offset for a call
@@ -5394,8 +5401,8 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
  */
 
 {
-    struct program *progp;
-    /* TODO: funflags */ uint32 flags;
+    program_t *progp;
+    funflag_t flags;
 
     progp = current_prog;
     flags = progp->functions[fx];
@@ -5407,7 +5414,7 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
     fun_ix_offs += fx;
     while(flags & NAME_INHERITED)
     {
-        struct inherit *inheritp;
+        inherit_t *inheritp;
 
         inheritp = &progp->inherit[flags & INHERIT_MASK];
         progp = inheritp->prog;
@@ -5429,8 +5436,8 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
 } /* setup_new_frame1() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct svalue *
-setup_new_frame2 (fun_hdr_p funstart, struct svalue *sp)
+static INLINE svalue_t *
+setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp)
 
 /* Before calling the function at <funstart>, massage the data on the
  * stack ending at <sp> to match the formal argumentlist of the function
@@ -5488,7 +5495,7 @@ setup_new_frame2 (fun_hdr_p funstart, struct svalue *sp)
             {
                 /* More actual than formal parameters */
 
-                struct vector *v;
+                vector_t *v;
 
                 csp->num_local_variables = num_arg;
 
@@ -5563,7 +5570,7 @@ setup_new_frame2 (fun_hdr_p funstart, struct svalue *sp)
 
     /* Check for stack overflow */
     if ( sp >= &start_of_stack[EVALUATOR_STACK_SIZE] )
-        STACK_OVERFLOW(sp, csp->fp, funstart);
+        stack_overflow(sp, csp->fp, funstart);
 
     /* Count the call depth for traces and handle tracing */
     tracedepth++;
@@ -5583,7 +5590,7 @@ setup_new_frame2 (fun_hdr_p funstart, struct svalue *sp)
 } /* setup_new_frame2() */
 
 /*-------------------------------------------------------------------------*/
-static /* TODO: funflag */ uint32
+static funflag_t
 setup_new_frame (int fx)
 
 /* Setup a call for function <fx> in the current program.
@@ -5591,48 +5598,24 @@ setup_new_frame (int fx)
  */
 
 {
-    /* TODO: funflag */ uint32 flags;
+    funflag_t flags;
 
     flags = setup_new_frame1(fx, 0, 0);
     inter_sp = setup_new_frame2(
       current_prog->program + (flags & FUNSTART_MASK), inter_sp
     );
-    current_variables = current_object->variables + variable_index_offset;
+#ifdef DEBUG
+    if (!current_object->variables && variable_index_offset)
+        fatal("%s Fatal: new frame for object %p '%s' w/o variables, "
+              "but offset %d\n"
+             , time_stamp(), current_object, current_object->name
+             , variable_index_offset);
+#endif
+    current_variables = current_object->variables;
+    if (current_variables)
+        current_variables += variable_index_offset;
     current_strings = current_prog->strings;
     return flags;
-}
-
-/*-------------------------------------------------------------------------*/
-#if !defined(SUPPLY_PARSE_COMMAND) || defined(COMPAT_MODE)
-static
-#endif
-       void
-check_for_destr (struct vector *v)
-
-/* Check the vector <v> for destructed objects and replace them with
- * svalue 0s. Subvectors are not checked, though.
- *
- * This function is used by certain efuns (parse_command(), unique_array(),
- * map_array()) to make sure that the data passed to the efuns is valid,
- * avoiding game crashes (though this won't happen on simple operations
- * like assign_svalue).
- * TODO: The better way is to make the affected efuns resistant against
- * TODO:: destructed objects, and keeping this only as a safeguard and
- * TODO:: to save memory.
- */
-
-{
-    mp_int i;
-    struct svalue *p;
-
-    for (p = v->item, i = (mp_int)VEC_SIZE(v); --i >= 0 ; p++ )
-    {
-        if (p->type != T_OBJECT)
-            continue;
-        if (!(p->u.ob->flags & O_DESTRUCTED))
-            continue;
-        zero_object_svalue(p);
-    }
 }
 
 /*-------------------------------------------------------------------------*/
@@ -5647,10 +5630,12 @@ reset_machine (Bool first)
 
 {
     csp = control_stack - 1;
+    /* TODO: This is illegal according to ISO C */
     traceing_recursion = -1;
     if (first)
     {
         inter_sp = start_of_stack - 1;
+        /* TODO: This is illegal according to ISO C */
         tracedepth = 0;
     }
     else
@@ -5670,19 +5655,35 @@ check_state (void)
  */
 
 {
+    int rc;
+
+    rc = 0;
+
     if (rt_context->type != ERROR_RECOVERY_BACKEND) {
-        debug_message("runtime context stack inconsistent!");
-        return 1;
+        debug_message("%s rt_context stack inconsistent: type %d instead of %d\n"
+                     , time_stamp(), rt_context->type, ERROR_RECOVERY_BACKEND);
+        printf("%s rt_context stack inconsistent: type %d instead of %d\n"
+              , time_stamp(), rt_context->type, ERROR_RECOVERY_BACKEND);
+        if (!rc) rc = 1;
     }
     if (csp != control_stack - 1) {
-        debug_message("csp inconsistent!");
-        return 2;
+        /* TODO: This can't be legal according to ISO C */
+        debug_message("%s csp inconsistent: %p instead of %p\n"
+                     , time_stamp(), csp, control_stack-1);
+        printf("%s csp inconsistent: %p instead of %p\n"
+              , time_stamp(), csp, control_stack-1);
+        if (!rc) rc = 2;
     }
     if (inter_sp != start_of_stack - 1) {
-        debug_message("sp inconsistent!");
-        return 3;
+        /* TODO: This can't be legal according to ISO C */
+        debug_message("%s sp inconsistent: %p instead of %p\n"
+                     , time_stamp(), inter_sp, start_of_stack - 1);
+        printf("%s sp inconsistent: %p instead of %p\n"
+              , time_stamp(), inter_sp, start_of_stack - 1);
+        if (!rc) rc = 3;
     }
-    return 0;
+
+    return rc;
 }
 #endif
 
@@ -5694,6 +5695,10 @@ free_interpreter_temporaries (void)
  * Usually the values are freed whenever a new value is stored, but
  * this function allows e.g. the garbage collector to free them all
  * at once.
+#ifdef TRACE_CODE
+ * The function also cleans out all destructed objects from the
+ * instruction trace.
+#endif
  */
 
 {
@@ -5703,18 +5708,39 @@ free_interpreter_temporaries (void)
     indexing_quickfix.type = T_NUMBER;
     free_svalue(&apply_return_value);
     apply_return_value.type = T_NUMBER;
-}
+
+#ifdef TRACE_CODE
+    {
+        int i;
+
+        for (i = TOTAL_TRACE_LENGTH; --i >= 0; )
+        {
+            object_t *ob;
+
+            if (NULL != (ob = previous_objects[i])
+             && ob->flags & O_DESTRUCTED
+               )
+            {
+                free_object(ob, "free_interpreter_temporaries");
+                previous_objects[i] = NULL;
+                previous_instruction[i] = 0;
+            }
+        }
+    }
+#endif
+
+} /* free_interpreter_temporaries() */
 
 /*-------------------------------------------------------------------------*/
 void
-remove_object_from_stack (struct object *ob)
+remove_object_from_stack (object_t *ob)
 
 /* Object <ob> was/will be destructed, so remove all references from
  * the stack.
  */
 
 {
-    struct svalue *svp;
+    svalue_t *svp;
 
     for (svp = start_of_stack; svp <= inter_sp; svp++)
     {
@@ -5730,7 +5756,7 @@ remove_object_from_stack (struct object *ob)
 /*-------------------------------------------------------------------------*/
 static void
 eval_instruction (bytecode_p first_instruction
-                 , struct svalue *initial_sp)
+                 , svalue_t *initial_sp)
 
 /* Evaluate the code starting at <first_instruction>, using <inital_sp>
  * as the stack pointer. All other variables like current_prog must be
@@ -5751,8 +5777,8 @@ eval_instruction (bytecode_p first_instruction
 
 {
     register bytecode_p     pc;  /* Current program pointer */
-    register struct svalue *fp;  /* Current frame pointer */
-    register struct svalue *sp;  /* Current stack pointer */
+    register svalue_t *fp;  /* Current frame pointer */
+    register svalue_t *sp;  /* Current stack pointer */
       /* For speed reasons, these variables shadow their global counterparts,
        * allowing more optimisations.
        * gcc feels better about setjmp() when variables are declared register.
@@ -5762,7 +5788,7 @@ eval_instruction (bytecode_p first_instruction
     int num_arg;      /* Number of arguments given to the current instr */
     int instruction;  /* The current instruction code */
 #ifdef DEBUG
-    struct svalue *expected_stack; /* Expected stack at the instr end */
+    svalue_t *expected_stack; /* Expected stack at the instr end */
 #endif
 
     /* Handy macros. Some of these are redefined later for multi-
@@ -5772,7 +5798,10 @@ eval_instruction (bytecode_p first_instruction
 #       define GET_NUM_ARG \
             if (num_arg != GET_UINT8(pc-1)) {\
                 fatal("Argument count error for %s: %d vs. %d.\n", get_f_name(instruction), num_arg, GET_UINT8(pc-1));}
-        /* What is the point of this macro? */
+        /* The macro catches two faults: getting num_arg for instructions
+         * which don't take arguments, and getting num_arg after incrementing
+         * the pc too far.
+         */
 #   else /* DEBUG */
 #       define GET_NUM_ARG num_arg = GET_UINT8(pc); inter_pc = ++pc;
 #   endif /* DEBUG */
@@ -5787,13 +5816,11 @@ eval_instruction (bytecode_p first_instruction
        */
 
 #   ifdef MARK
-#        define CASE(x) case (x)-F_OFFSET: MARK(x);
+#        define CASE(x) case (x): MARK(x);
 #   else
-#        define CASE(x) case (x)-F_OFFSET:
+#        define CASE(x) case (x):
 #   endif
       /* Macro to build the case: labels for the evaluator switch.
-       * Remember that the F_xxx tokens are used both in the compiler and,
-       * minus F_OFFSET, as bytecodes.
        * 'MARK' adds profiling support.
        */
 
@@ -5814,6 +5841,7 @@ again:
     instruction = LOAD_CODE(pc);
       /* If this a xcode, the second byte will be added later */
 
+    /* printf("DEBUG: %p (%p): %d %s\n", pc-1, sp, instruction, get_f_name(instruction)); */
 #   ifdef TRACE_CODE
         /* Store some vitals in the trace buffer */
 
@@ -5826,6 +5854,7 @@ again:
         previous_instruction[last] = instruction;
         previous_pc[last] = pc-1;
         stack_size[last] = sp - fp - csp->num_local_variables;
+        abs_stack_size[last] = sp - start_of_stack;
         if (previous_objects[last])
         {
             /* Need to free the previously stored object */
@@ -5835,7 +5864,7 @@ again:
         previous_programs[last] = current_prog;
 #   endif  /* ifdef TRACE_CODE */
 
-#   ifdef SMALLOC_LPC_TRACE
+#   ifdef MALLOC_LPC_TRACE
         inter_pc = pc;
 #   endif
 
@@ -5870,7 +5899,7 @@ again:
          * an error.
          */
 
-        printf("eval_cost too big %ld\n", eval_cost);
+        printf("%s eval_cost too big %ld\n", time_stamp(), eval_cost);
 
         assign_eval_cost();
 
@@ -5919,7 +5948,7 @@ again:
     }
 #endif /* DEBUG */
 
-    /* The monster switch to execute the instruction.i
+    /* The monster switch to execute the instruction.
      * The order of the cases is held (mostly) in the order
      * the instructions appear in func_spec.
      */
@@ -5995,6 +6024,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 #ifdef OPCPROF
         opcount[code+0x200]++;
 #endif
+        inter_sp = sp;
+        inter_pc = pc;
         ASSIGN_EVAL_COST
         sp = (*vefun_table[code])(sp, numarg);
         break;
@@ -6171,8 +6202,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (ix < 0xf000)
         {
             sp++;
+            inter_sp = sp;
+            inter_pc = pc;
             closure_literal(sp, ix);
-            /* If out of memory, this will set sp to svalue-0 */
+            /* If out of memory, this will set sp to svalue-0 and
+             * throw an error.
+             */
         }
         else
         {
@@ -6220,15 +6255,19 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * If this is an .extern_call, eval_instruction() is left here.
          */
 
-        struct svalue *svp; /* Save of current sp */
+        svalue_t *svp; /* Save of current sp */
 
         svp = sp;
 
         /* Deallocate frame, but not the result value.
          */
 #ifdef DEBUG
-        if (fp + csp->num_local_variables != sp)
-            fatal("Bad stack at F_RETURN: delta %ld\n", (long)(sp - (fp + csp->num_local_variables)));
+        if (fp + csp->num_local_variables > sp)
+            fatal("Bad stack at F_RETURN, %ld values too low\n"
+                 , (long)((fp + csp->num_local_variables) - sp));
+        else if (fp + csp->num_local_variables < sp)
+            fatal("Bad stack at F_RETURN, %ld values too high\n"
+                 , (long)(sp - (fp + csp->num_local_variables)));
 #endif
         while (sp != fp)
             free_svalue(--sp);
@@ -6254,6 +6293,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 do_trace_return(sp);
                 if (csp == control_stack - 2)
+                    /* TODO: This can't be legal according to ISO C */
                     traceing_recursion = -1;
             }
             csp--;
@@ -6278,7 +6318,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         pc = *break_sp;
-        break_sp += sizeof(struct svalue)/sizeof(*break_sp);
+        break_sp += sizeof(svalue_t)/sizeof(*break_sp);
         break;
     }
 
@@ -6337,6 +6377,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *            (bits 6..7): in an unaligned switch, the true value
          *                         of <len> (b1, bits 1..0).
          *  l[]: range lookup table: each <len> bytes, network byte order
+         *       (numeric switch only)
          *  v[]: case values, char* or p_int, host byte order
          *  o[]: case offsets : each <len> bytes, network byte order
          *
@@ -6359,18 +6400,18 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *                   pointing into the lookup table.
          *                   The real jump offset is then
          *                     l[o[i] + <value> - lower-bound].
-         *   TODO: I guess that lookup ranges are used for an efficient
-         *   TODO:: implementation of sparse ranges like 'case 0: case 2:
-         *   TODO:: case 4:' or the like.
-         *   TODO: This code still makes too many un-macro'ed mem accesses.
          *
+         *   The lookup ranges are used for an efficient implementation of
+         *   sparse ranges like 'case 0: case 2: case 5: ...'.
+         *
+         *   TODO: This code still makes too many un-macro'ed mem accesses.
          */
 
         mp_int offset;  /* Length of instruction and range-table area */
         mp_int def_offs;  /* Offset to code for the 'default' case */
         int tablen; /* Number of single case entries, multiplied by 4 */
-        int len;  /* Number of bytes per offset/length value (1..3) */
-        int type;  /* Start position for search */
+        int len;    /* Number of bytes per offset/length value (1..3) */
+        int type;   /* Start position for search */
         static int32 off_tab[] = {
                 0*sizeof(char*), 0x00001*sizeof(char*), 0x00003*sizeof(char*),
           0x00007*sizeof(char*), 0x0000f*sizeof(char*), 0x0001f*sizeof(char*),
@@ -6419,14 +6460,17 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         /* Extract the basic tablen and len */
         tablen = EXTRACT_UCHAR(pc);
-        if ( !(len = tablen & 3) )
+        if ( !(len = tablen & SWITCH_VALUELEN) )
         {
             /* Oops, first lets align the switch */
             align_switch(pc);
             tablen = EXTRACT_UCHAR(pc);
-            len = tablen & 3;
+            len = tablen & SWITCH_VALUELEN;
         }
-        tablen &= ~3;
+        tablen &= ~SWITCH_VALUELEN;
+        /* SWITCH_TABLEN_SHIFT is 2, so don't need to do
+         *   tablen = (tablen >> SWITCH_TABLEN_SHIFT) * 4
+         */
 
         /* Get the offset, aka the length of instruction and range table
          * part, and let p0 point after them.
@@ -6519,13 +6563,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * push the break address onto the break stack.
          */
         end_tab  = tabstart + tablen;
-        break_sp -= sizeof(struct svalue)/sizeof(*break_sp);
+        break_sp -= sizeof(svalue_t)/sizeof(*break_sp);
         *break_sp = break_addr;
 
         /* Get the search value from the argument passed on the
          * stack. This also does the type checking.
          */
-        if (type & 0x20)
+        if (type & SWITCH_TYPE)
         {
             /* String switch */
 
@@ -6572,7 +6616,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *   l points roughly into the middle of the table,
          *   d is 1/4 of the (assumed) total size of the table
          */
-        i = type & 0x1f;
+        i = type & SWITCH_START;
         l = tabstart + off_tab[i];
         d = (mp_int)((off_tab[i]+sizeof(p_int)) >> 1 & ~(sizeof(p_int)-1));
           /* '+sizeof()' to make the off_tab[] value even and non-0 */
@@ -6905,7 +6949,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * Result is TRUE if the pattern matches, and FALSE if not.
          */
         int i;
-        struct svalue *arg;
+        svalue_t *arg;
 
         assign_eval_cost();
         num_arg = LOAD_UINT8(pc);
@@ -6922,10 +6966,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         inter_sp = sp;
         inter_pc = pc;
-        i = parse(arg[0].u.string, &arg[1], arg[2].u.string, &arg[3],
-                  num_arg-3);
+        i = e_parse_command(arg[0].u.string, &arg[1], arg[2].u.string
+                           , &arg[3], num_arg-3);
         pop_n_elems(num_arg);        /* Get rid of all arguments */
-        push_number(i);                /* Push the result value */
+        push_number(i ? 1 : 0);      /* Push the result value */
         break;
     }
 #endif /* PARSE_COMMAND */
@@ -7009,37 +7053,22 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              *
              * The error value to return is stored in
              * the global <catch_value>.
+             *
+             * The actual handling has been exported into the separate,
+             * indirectly called function handle_caught_error() to
+             * protect ourself against overzealous optimizers.
              */
+            svalue_t *spl, *fpl;
+            bytecode_p pcl;
+
 #ifdef DEBUG
             /* Restore the value of expected_stack also. It is always 0
              * for catch().
              */
             expected_stack = NULL;
 #endif
-            sp = pull_error_context(inter_sp);
-
-            /* beware of errors after set_this_object() */
-            current_object = csp->ob;
-
-            pop_control_stack();
-            pc = inter_pc;
-            fp = inter_fp;
-
-            /* Push the catch return value */
-            *(++sp) = catch_value;
-            catch_value.type = T_INVALID;
-
-            /* Restore the old eval costs */
-            eval_cost -= CATCH_RESERVED_COST;
-            assigned_eval_cost -= CATCH_RESERVED_COST;
-
-
-            /* If we are out of memory, throw a new error */
-            if (out_of_memory)
-            {
-                inter_sp = sp;
-                error("Out of memory\n");
-            }
+            (*caught_error)(&spl, &pcl, &fpl);
+            sp = spl; pc = pcl; fp = fpl;
 
             /* Execution continues at the <new_pc> stored before */
         }
@@ -7069,7 +7098,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * stack (not free()!, this lvalue is just a copy).
          */
 
-        struct svalue *svp;
+        svalue_t *svp;
 
         /* Get the designated value */
 #ifdef DEBUG
@@ -7119,7 +7148,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * stack (not free()!, this lvalue is just a copy).
          */
 
-        struct svalue *svp;
+        svalue_t *svp;
 
         /* Get the designated value */
 #ifdef DEBUG
@@ -7170,7 +7199,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * free()d.
          */
 
-        struct svalue *svp;
+        svalue_t *svp;
 
         /* Get the designated value */
 #ifdef DEBUG
@@ -7214,7 +7243,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * free()d.
          */
 
-        struct svalue *svp;
+        svalue_t *svp;
 
         /* Get the designated value */
 #ifdef DEBUG
@@ -7257,7 +7286,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * value. The lvalue itself is simply removed, not free()d.
          */
 
-        struct svalue *svp;
+        svalue_t *svp;
 
         /* Get the designated value */
 #ifdef DEBUG
@@ -7300,7 +7329,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * value. The lvalue itself is simply removed, not free()d.
          */
 
-        struct svalue *svp;
+        svalue_t *svp;
 
         /* Get the designated value */
 #ifdef DEBUG
@@ -7386,7 +7415,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * assign_svalue().
          */
 
-        struct svalue *dest;
+        svalue_t *dest;
 
         /* Get the designated lvalue */
 #ifdef DEBUG
@@ -7413,7 +7442,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * assign_svalue().
          */
 
-        struct svalue *dest;
+        svalue_t *dest;
 
         /* Get the designated value */
 #ifdef DEBUG
@@ -7444,7 +7473,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         case T_OBJECT:
           {
-            struct object *ob = dest->u.ob;
+            object_t *ob = dest->u.ob;
             free_object(ob, "void_assign");
             break;
           }
@@ -7463,7 +7492,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         case T_QUOTED_ARRAY:
         case T_POINTER:
           {
-            struct vector *v = dest->u.vec;
+            vector_t *v = dest->u.vec;
 
             transfer_svalue_no_free_spc(dest, sp-1, sp, pc);
             sp -= 2;
@@ -7473,7 +7502,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         case T_MAPPING:
           {
-            struct mapping *m = dest->u.map;
+            mapping_t *m = dest->u.map;
 
             transfer_svalue_no_free_spc(dest, sp-1, sp, pc);
             sp -= 2;
@@ -7678,6 +7707,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 strcpy(res+len1, sp->u.string);
                 free_string_svalue(sp);
                 sp--;
+                /* Overwrite the number at sp */
                 put_malloced_string(sp, res);
                 break;
               }
@@ -7764,7 +7794,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         case T_MAPPING:
           {
-            struct mapping *m;
+            mapping_t *m;
 
             if (sp->type != T_MAPPING) goto bad_add;
             check_map_for_destr((sp-1)->u.map);
@@ -7801,6 +7831,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *   int         - int                -> int
          *   float       - (int,float)        -> float
          *   int         - float              -> float
+         *   string      - string             -> string
          *   vector      - vector             -> vector
          *   mapping     - mapping            -> mapping
          */
@@ -7850,7 +7881,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         }
         else if ((sp-1)->type == T_POINTER && sp->type == T_POINTER)
         {
-            struct vector *v;
+            vector_t *v;
 
             v = sp->u.vec;
             if (v->ref > 1)
@@ -7865,7 +7896,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         }
         else if ((sp-1)->type == T_MAPPING && sp->type == T_MAPPING)
         {
-            struct mapping *m;
+            mapping_t *m;
 
             m = subtract_mapping(sp[-1].u.map, sp->u.map);
             free_mapping(sp->u.map);
@@ -7874,6 +7905,19 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             sp->u.map = m;
             break;
         }
+        else if ((sp-1)->type == T_STRING && sp->type == T_STRING)
+        {
+            char * result;
+            
+            inter_sp = sp;
+            result = intersect_strings((sp-1)->u.string, sp->u.string, MY_TRUE);
+            free_string_svalue(sp);
+            sp--;
+            free_string_svalue(sp);
+            put_malloced_string(sp, result);
+            break;
+        }
+
         else
             goto bad_arg_1;
 
@@ -7884,7 +7928,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
     {
         /* Multiply sp[-1] by sp[0] pop both arguments from the stack
          * and push the result.
-         * TODO: Could be extended to cover arrays and mappings.
+         * TODO: Could be extended to cover mappings.
          *
          * Possible type combinations:
          *   int         * int                -> int
@@ -7929,7 +7973,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                     goto bad_arg_1;
                 
                 len = svalue_strlen(sp);
-                reslen = (unsigned)sp[-1].u.number * len;
+                reslen = (size_t)sp[-1].u.number * len;
                 result = xalloc(reslen+1);
                 if (!result)
                     ERROR("Out of memory.\n");
@@ -7964,7 +8008,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             }
             if (sp->type == T_POINTER)
             {
-                struct vector *result;
+                vector_t *result;
                 mp_int reslen;
                 size_t len;
                 
@@ -7974,13 +8018,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 inter_sp = sp;
                 inter_pc = pc;
                 len = VEC_SIZE(sp->u.vec);
-                reslen = sp[-1].u.number * (signed)len;
+                reslen = sp[-1].u.number * (mp_int)len;
                 result = allocate_uninit_array(reslen);
 
                 if (sp[-1].u.number > 0 && len)
                 {
                     size_t left;
-                    struct svalue *from, *to;
+                    svalue_t *from, *to;
                     
                     /* Seed result[] with one copy of the array.
                      * To save memory we make sure that all strings
@@ -7994,7 +8038,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                          && from->x.string_type == STRING_MALLOC
                            )
                         {
-                            put_string(to, from->u.string);
+                            put_string(to, make_shared_string(from->u.string));
                             if (!to->u.string)
                                 ERROR("Out of memory.\n");
                         }
@@ -8053,7 +8097,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                     goto bad_arg_2;
                 
                 len = svalue_strlen(sp-1);
-                reslen = (unsigned)sp->u.number * len;
+                reslen = (size_t)sp->u.number * len;
                 result = xalloc(reslen+1);
                 if (!result)
                     ERROR("Out of memory.\n");
@@ -8090,7 +8134,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           {
             if (sp->type == T_NUMBER)
             {
-                struct vector *result;
+                vector_t *result;
                 mp_int reslen;
                 size_t len;
                 
@@ -8100,13 +8144,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 inter_sp = sp;
                 inter_pc = pc;
                 len = VEC_SIZE(sp[-1].u.vec);
-                reslen = sp->u.number * (signed)len;
+                reslen = sp->u.number * (mp_int)len;
                 result = allocate_uninit_array(reslen);
 
                 if (sp->u.number > 0 && len)
                 {
                     size_t left;
-                    struct svalue *from, *to;
+                    svalue_t *from, *to;
                     
                     /* Seed result[] with one copy of the array.
                      * To save memory we make sure that all strings
@@ -8120,7 +8164,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                          && from->x.string_type == STRING_MALLOC
                            )
                         {
-                            put_string(to, from->u.string);
+                            put_string(to, make_shared_string(from->u.string));
                             if (!to->u.string)
                                 ERROR("Out of memory.\n");
                         }
@@ -8572,6 +8616,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *
          * Possible type combinations:
          *   int    & int    -> int
+         *   string & string -> string
          *   vector & vector -> vector
          *
          * TODO: Extend this to mappings.
@@ -8583,6 +8628,19 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             inter_sp = sp - 2;
             (sp-1)->u.vec = intersect_array(sp->u.vec, (sp-1)->u.vec);
+            sp--;
+            break;
+        }
+
+        if (sp->type == T_STRING && (sp-1)->type == T_STRING)
+        {
+            char * result;
+            
+            inter_sp = sp;
+            result = intersect_strings(sp[-1].u.string, sp->u.string, MY_FALSE);
+            free_string_svalue(sp-1);
+            free_string_svalue(sp);
+            put_malloced_string(sp-1, result);
             sp--;
             break;
         }
@@ -8712,6 +8770,16 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         put_number(sp, 0);
         break;
 
+    CASE(F_NX_RANGE);               /* --- nx_range            --- */
+    CASE(F_RX_RANGE);               /* --- rx_range            --- */
+        /* Push '1' onto the stack to make up for the missing
+         * upper range bound, then fall through to the normal
+         * range handling.
+         */
+        sp++;
+        put_number(sp, 1);
+        /* FALLTHROUGH */
+
     CASE(F_RANGE);                  /* --- range               --- */
     CASE(F_NR_RANGE);               /* --- nr_range            --- */
     CASE(F_RN_RANGE);               /* --- rn_range            --- */
@@ -8719,6 +8787,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
       {
         /* Compute the range sp[-1]..sp[0] from string/array sp[-2]
          * and leave it on the stack.
+         * This code also handles the NX/RX_RANGE, pretending that
+         * they are NR/RR_RANGEs.
          */
 
         if (sp[-1].type != T_NUMBER)
@@ -8732,19 +8802,20 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             /* Slice a range from an array */
 
-            struct vector *v;
+            vector_t *v;
             int size, i1, i2;
 
             size = (int)VEC_SIZE(sp[-2].u.vec);
 
-            if (instruction == F_RANGE-F_OFFSET
-             || instruction == F_NR_RANGE-F_OFFSET)
+            if (instruction == F_RANGE
+             || instruction == F_NR_RANGE
+             || instruction == F_NX_RANGE)
                 i1 = sp[-1].u.number;
             else
                 i1 = size - sp[-1].u.number;
 
-            if (instruction == F_RANGE-F_OFFSET
-             || instruction == F_RN_RANGE-F_OFFSET)
+            if (instruction == F_RANGE
+             || instruction == F_RN_RANGE)
                 i2 = sp[0].u.number;
             else
                 i2 = size - sp[0].u.number;
@@ -8774,8 +8845,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             char *res;
 
             len = (int)svalue_strlen(&sp[-2]);
-            if (instruction == F_RANGE-F_OFFSET
-             || instruction == F_NR_RANGE-F_OFFSET)
+            if (instruction == F_RANGE
+             || instruction == F_NR_RANGE
+             || instruction == F_NX_RANGE)
                 from = sp[-1].u.number;
             else
                 from = len - sp[-1].u.number;
@@ -8784,8 +8856,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 from = 0;
             }
 
-            if (instruction == F_RANGE-F_OFFSET
-             || instruction == F_RN_RANGE-F_OFFSET)
+            if (instruction == F_RANGE
+             || instruction == F_RN_RANGE)
                 to = sp[0].u.number;
             else
                 to = len - sp[0].u.number;
@@ -8829,16 +8901,18 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * For F_ADD_EQ, the result is also left on the stack.
          *
          * Possible type combinations:
-         *   string      + (string,int,float) -> string
-         *   int         + int                -> int
-         *   float       + (float,int)        -> float
-         *   vector      + vector             -> vector
-         *   mapping     + mapping            -> mapping
+         *   string       + (string,int,float) -> string
+         *   int          + string             -> string
+         *   int          + int                -> int
+         *   int          + float              -> float
+         *   float        + (float,int)        -> float
+         *   vector       + vector             -> vector
+         *   mapping      + mapping            -> mapping
          */
 
         short type2;         /* type and value of sp[-1] */
         union u u2;
-        struct svalue *argp; /* the actual value of sp[0] */
+        svalue_t *argp; /* the actual value of sp[0] */
 
         type2 = sp[-1].type;
         u2 = sp[-1].u;
@@ -8929,13 +9003,67 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         case T_NUMBER:  /* Add to a number */
             if (type2 == T_NUMBER)
             {
-                if (instruction == F_VOID_ADD_EQ - F_OFFSET)
+                if (instruction == F_VOID_ADD_EQ)
                 {
                     argp->u.number += u2.number;
                     sp -= 2;
                     goto again;
                 }
                 (--sp)->u.number = argp->u.number += u2.number;
+                goto again;
+            }
+            else if (type2 == T_FLOAT)
+            {
+                STORE_DOUBLE_USED
+                double sum;
+
+                sum = (double)(argp->u.number) + READ_DOUBLE(sp-1);
+                argp->type = T_FLOAT;
+                STORE_DOUBLE(argp, sum);
+                if (instruction == F_VOID_ADD_EQ)
+                {
+                    sp -= 2;
+                    goto again;
+                }
+
+                --sp;
+                sp->type = T_FLOAT;
+                STORE_DOUBLE(sp, sum);
+                goto again;
+            }
+            else if (type2 == T_STRING)
+            {
+                char buff[80], *res;
+                size_t len1;
+
+                buff[sizeof(buff)-1] = '\0';
+                sprintf(buff, "%ld", argp->u.number);
+                if (buff[sizeof(buff)-1] != '\0')
+                    FATAL("Buffer overflow in F_ADD_EQ: int number too big.\n")
+                inter_pc = pc;
+                inter_sp = sp;
+                res = xalloc(svalue_strlen(sp-1) + (len1 = strlen(buff)) + 1);
+                if (!res)
+                    ERROR("Out of memory\n")
+                strcpy(res, buff);
+                strcpy(res+len1, u2.string);
+                free_string_svalue(sp-1);
+
+                /* Overwrite the number in argp */
+                put_malloced_string(argp, res);
+
+                if (instruction == F_VOID_ADD_EQ)
+                {
+                    sp -= 2;
+                    goto again;
+                }
+
+                --sp;
+                res = string_copy(res);
+                if (!res)
+                    ERROR("Out of memory\n")
+                put_malloced_string(sp, res);
+
                 goto again;
             }
             else
@@ -8948,7 +9076,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         case T_CHAR_LVALUE:  /* Add to a character in a string */
             if (type2 == T_NUMBER)
             {
-                if (instruction == F_VOID_ADD_EQ - F_OFFSET)
+                if (instruction == F_VOID_ADD_EQ)
                 {
                     *argp->u.string += u2.number;
                     sp -= 2;
@@ -8990,12 +9118,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             }
             else
             {
-                struct vector *v;
+                vector_t *v;
 
                 inter_sp = sp;
                 inter_pc = pc;
                 v = inter_add_array(u2.vec, &argp->u.vec);
-                if (instruction == F_VOID_ADD_EQ - F_OFFSET)
+                if (instruction == F_VOID_ADD_EQ)
                 {
                     sp -= 2;
                     goto again;
@@ -9040,7 +9168,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         } /* end of switch */
 
         /* If the instruction is F_ADD_EQ, leave the result on the stack */
-        if (instruction != F_VOID_ADD_EQ - F_OFFSET)
+        if (instruction != F_VOID_ADD_EQ)
         {
             sp++;
             assign_svalue_no_free(sp, argp);
@@ -9057,13 +9185,14 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * Possible type combinations:
          *   int         - int                -> int
          *   float       - (float,int)        -> float
+         *   string      - string             -> string
          *   vector      - vector             -> vector
          *   mapping     - mapping            -> mapping
          */
 
         short type2;         /* type and value of sp[-1] */
         union u u2;
-        struct svalue *argp; /* the actual value of sp[0] */
+        svalue_t *argp; /* the actual value of sp[0] */
 
         type2 = sp[-1].type;
         u2 = sp[-1].u;
@@ -9097,9 +9226,27 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             /* TODO: May result in a 0x00 character in a string */
             break;
 
+        case T_STRING:   /* Subtract from a string */
+        {
+            char * result;
+            
+            if (type2 != T_STRING)
+                goto bad_right;
+
+            inter_sp = sp;
+            result = intersect_strings(argp->u.string, (sp-1)->u.string, MY_TRUE);
+            free_string_svalue(argp);
+            put_malloced_string(argp, result);
+            free_svalue(sp);
+            sp--;
+            free_string_svalue(sp);
+            put_malloced_string(sp, string_copy(result));
+            break;
+        }
+
         case T_POINTER:  /* Subtract from an array */
           {
-            struct vector *v, *v_old;
+            vector_t *v, *v_old;
 
             if (type2 != T_POINTER)
                 goto bad_right;
@@ -9112,7 +9259,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (v->ref > 1)
             {
                 deref_array(v);
-                v = slice_array(v, 0, (signed)VEC_SIZE(v)-1 );
+                v = slice_array(v, 0, (mp_int)VEC_SIZE(v)-1 );
             }
             sp--;
             v_old = argp->u.vec;
@@ -9153,9 +9300,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
 
         case T_MAPPING:  /* Subtract from a mapping */
-            if (type2 == T_MAPPING && !sp[-1].u.map->num_values)
+            if (type2 == T_MAPPING)
             {
-                struct mapping *m;
+                mapping_t *m;
 
                 sp--;
                 m = sp->u.map;
@@ -9194,11 +9341,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * Possible type combinations:
          *   int         * int                -> int
          *   float       * (float,int)        -> float
+         *   string      * int                -> string
+         *   array       * int                -> array
          *
-         * TODO: Extend this to arrays and mappings.
+         * TODO: Extend this to mappings.
          */
 
-        struct svalue *argp;
+        svalue_t *argp;
 
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
@@ -9255,7 +9404,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 goto bad_right;
             
             len = svalue_strlen(argp);
-            reslen = (unsigned)sp->u.number * len;
+            reslen = (size_t)sp->u.number * len;
             result = xalloc(reslen+1);
             if (!result)
                 ERROR("Out of memory.\n");
@@ -9291,7 +9440,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         if (argp->type == T_POINTER)
         {
-            struct vector *result;
+            vector_t *result;
             mp_int reslen;
             size_t len;
             
@@ -9302,13 +9451,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             inter_sp = sp;
             inter_pc = pc;
             len = VEC_SIZE(argp->u.vec);
-            reslen = sp->u.number * (signed)len;
+            reslen = sp->u.number * (mp_int)len;
             result = allocate_uninit_array(reslen);
 
             if (sp->u.number > 0 && len)
             {
                 size_t left;
-                struct svalue *from, *to;
+                svalue_t *from, *to;
                 
                 /* Seed result[] with one copy of the array.
                  * To save memory we make sure that all strings
@@ -9322,7 +9471,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                      && from->x.string_type == STRING_MALLOC
                        )
                     {
-                        put_string(to, from->u.string);
+                        put_string(to, make_shared_string(from->u.string));
                         if (!to->u.string)
                             ERROR("Out of memory.\n");
                     }
@@ -9362,7 +9511,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * TODO: Extend this to arrays and mappings.
          */
 
-        struct svalue *argp;
+        svalue_t *argp;
 
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
@@ -9433,7 +9582,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * TODO: Implement the other remainder function.
          */
 
-        struct svalue *argp;
+        svalue_t *argp;
 
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
@@ -9467,13 +9616,14 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * assign the result to sp[0] and also leave it on the stack.
          *
          * Possible type combinations:
-         *   int         & int                -> int
-         *   array       & array              -> array
+         *   int    & int    -> int
+         *   string & string -> string
+         *   array  & array  -> array
          *
          * TODO: Extend this to mappings.
          */
 
-        struct svalue *argp;
+        svalue_t *argp;
 
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
@@ -9500,7 +9650,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             /* Intersect an array */
 
-            struct vector *vec1, *vec2;
+            vector_t *vec1, *vec2;
 
             inter_sp = sp - 2;
             vec1 = argp->u.vec;
@@ -9513,6 +9663,22 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             free_svalue(sp+1);
             break;
         }
+
+        if (argp->type == T_STRING && (sp-1)->type == T_STRING)
+        {
+            char * result;
+            
+            inter_sp = sp;
+            result = intersect_strings(argp->u.string, (sp-1)->u.string, MY_FALSE);
+            free_string_svalue(argp);
+            put_malloced_string(argp, result);
+            free_svalue(sp);
+            sp--;
+            free_string_svalue(sp);
+            put_malloced_string(sp, string_copy(result));
+            break;
+        }
+
         goto bad_left;
         /* NOTREACHED */ break;
     }
@@ -9528,7 +9694,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * TODO: Extend this to mappings and arrays.
          */
 
-        struct svalue *argp;
+        svalue_t *argp;
 
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
@@ -9565,7 +9731,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * TODO: Extend this to mappings and arrays.
          */
 
-        struct svalue *argp;
+        svalue_t *argp;
 
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
@@ -9603,7 +9769,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         int i;
-        struct svalue *argp;
+        svalue_t *argp;
 
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
@@ -9643,7 +9809,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         int i;
-        struct svalue *argp;
+        svalue_t *argp;
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
             goto bad_arg_1;
@@ -9693,7 +9859,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * of nested scopes.
          */
         int first, num;
-        struct svalue *plocal;
+        svalue_t *plocal;
 
         first = LOAD_UINT8(pc);
         num = LOAD_UINT8(pc);
@@ -9883,8 +10049,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           /* function index within the current object's program.
            * This way local function may be redefined through inheritance.
            */
-        /* TODO: funflags */ uint32 flags; /* the function flags */
-        fun_hdr_p      funstart;     /* the actual function (code) */
+        funflag_t  flags;     /* the function flags */
+        fun_hdr_p  funstart;  /* the actual function (code) */
 
         /* Get the function's index */
         LOAD_SHORT(func_index, pc);
@@ -9896,7 +10062,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 #ifdef DEBUG
         if (func_offset >= current_object->prog->num_functions)
-            fatal("Illegal function index: %hu (%hu), %d functions\n"
+            fatal("call_function_by_address: "
+                  "Illegal function index: offset %hu (index %hu), %d functions\n"
                  , func_offset, func_index
                  , current_object->prog->num_functions);
 #endif
@@ -9907,7 +10074,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* If the function was cross-defined, get the real offset */
         if (flags & NAME_CROSS_DEFINED)
         {
-            func_offset += (flags & INHERIT_MASK) - ( (INHERIT_MASK + 1) >> 1);
+            func_offset += CROSSDEF_NAME_OFFSET(flags);
         }
 
         /* Save all important global stack machine registers */
@@ -9930,7 +10097,17 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         sp = setup_new_frame2(funstart, sp);
 
         /* Finish the setup */
-        current_variables = current_object->variables + variable_index_offset;
+
+#ifdef DEBUG
+        if (!current_object->variables && variable_index_offset)
+            fatal("%s Fatal: call function for object %p '%s' w/o variables, "
+                  "but offset %d\n"
+                 , time_stamp(), current_object, current_object->name
+                 , variable_index_offset);
+#endif
+        current_variables = current_object->variables;
+        if (current_variables)
+            current_variables += variable_index_offset;
         current_strings = current_prog->strings;
         fp = inter_fp;
         pc = FUNCTION_CODE(funstart);
@@ -9953,9 +10130,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         unsigned short prog_index;  /* Index within the inherit table */
         unsigned short func_index;  /* Index within the function table */
-        /* TODO: funflags */ uint32 flags;  /* the functions flags */
+        funflag_t flags;            /* the functions flags */
         fun_hdr_p funstart;         /* the actual function (code) */
-        struct inherit *inheritp;   /* the inheritance descriptor */
+        inherit_t *inheritp;        /* the inheritance descriptor */
 
         /* Get the program and function index, and determine the
          * inheritance descriptor
@@ -9968,10 +10145,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 #ifdef DEBUG
         if (func_index >= inheritp->prog->num_functions)
         {
-            fprintf(stderr, "program index : %d\n", prog_index);
-            fprintf(stderr, "function index: %d\n", func_index);
-            fprintf(stderr, "#functions    : %d\n", inheritp->prog->num_functions);
-            fatal("Illegal function index\n");
+            fatal("call_explicit_inherited: Illegal function index: "
+                  "program %d, func %d, %d functions\n"
+                 , prog_index, func_index, inheritp->prog->num_functions);
         }
 #endif
 
@@ -10002,7 +10178,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              */
 
             int i = current_object->prog->num_inherited;
-            struct inherit *inh = current_object->prog->inherit;
+            inherit_t *inh = current_object->prog->inherit;
 
             while (i)
             {
@@ -10028,13 +10204,17 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             }
 #ifdef DEBUG
             else { /* this shouldn't happen! */
+                char *ts;
+                ts = time_stamp();
                 fprintf(stderr,
-                        "Adjusting variable offsets because of virtual "
-                        "inheritance for call from %s into %s (topmost "
-                        "program %s) FAILED, please check the inherit "
-                        "tree and report it.\n",
-                        current_prog->name, inheritp->prog->name,
-                        current_object->prog->name);
+                        "%s Adjusting variable offsets because of virtual "
+                            "inheritance for call\n"
+                        "%s from %s into %s (topmost program %s) FAILED.\n"
+                        "%s Please check the inherit tree and report it.\n"
+                       , ts, ts
+                       , current_prog->name, inheritp->prog->name
+                       , current_object->prog->name
+                       , ts);
             }
 #endif
         }
@@ -10062,6 +10242,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Finish the setup */
         fp = inter_fp;
         pc = FUNCTION_CODE(funstart);
+#ifdef DEBUG
+    /* TODO: Once nobody complains, this can go */
+    if (!current_variables)
+        printf("DEBUG: %s:%d : current variables are NULL\n", __FILE__, __LINE__);
+#endif
         current_variables += variable_index_offset;
         current_strings = current_prog->strings;
         csp->extern_call = MY_FALSE;
@@ -10251,7 +10436,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         break;
 
     CASE(F_NR_RANGE_LVALUE);           /* --- nr_range_lvalue     --- */
-        /* Operator F_RANGE_LVALUE (string|vector &v=sp[0]
+        /* Operator F_NR_RANGE_LVALUE (string|vector &v=sp[0]
          *                         , int i2=sp[-1], i1=sp[-2])
          *
          * Compute the range &(v[i1..<i2]) of lvalue <v> and push it into the
@@ -10265,7 +10450,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         break;
 
     CASE(F_RN_RANGE_LVALUE);           /* --- rn_range_lvalue     --- */
-        /* Operator F_RANGE_LVALUE (string|vector &v=sp[0]
+        /* Operator F_RN_RANGE_LVALUE (string|vector &v=sp[0]
          *                         , int i2=sp[-1], i1=sp[-2])
          *
          * Compute the range &(v[<i1..i2]) of lvalue <v> and push it into the
@@ -10279,7 +10464,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         break;
 
     CASE(F_RR_RANGE_LVALUE);           /* --- rr_range_lvalue     --- */
-        /* Operator F_RANGE_LVALUE (string|vector &v=sp[0]
+        /* Operator F_RR_RANGE_LVALUE (string|vector &v=sp[0]
          *                         , int i2=sp[-1], i1=sp[-2])
          *
          * Compute the range &(v[<i1..<i2]) of lvalue <v> and push it into the
@@ -10292,6 +10477,46 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         sp = range_lvalue(0x101, sp);
         break;
 
+    CASE(F_NX_RANGE_LVALUE);           /* --- nx_range_lvalue     --- */
+        /* Operator F_NX_RANGE_LVALUE (string|vector &v=sp[0]
+         *                            , int i1=sp[-1])
+         *
+         * Compute the range &(v[i1..]) of lvalue <v> and push it into the
+         * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the POINTER_RANGE_- resp.
+         * STRING_RANGE_LVALUE.
+         *
+         * We implement this by pushing '1' onto the stack and then
+         * call F_NR_RANGE_LVALUE, effectively computing &(v[i1..<1]).
+         */
+
+        inter_pc = pc;
+        sp++;
+        sp[0] = sp[-1];       /* Pull up the 'v' */
+        put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
+        sp = range_lvalue(0x001, sp);
+        break;
+
+    CASE(F_RX_RANGE_LVALUE);           /* --- rx_range_lvalue     --- */
+        /* Operator F_RX_RANGE_LVALUE (string|vector &v=sp[0]
+         *                            , int i1=sp[-1])
+         *
+         * Compute the range &(v[<i1..]) of lvalue <v> and push it into the
+         * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the POINTER_RANGE_- resp.
+         * STRING_RANGE_LVALUE.
+         *
+         * We implement this by pushing '1' onto the stack and then
+         * call F_RR_RANGE_LVALUE, effectively computing &(v[<i1..<1]).
+         */
+
+        inter_pc = pc;
+        sp++;
+        sp[0] = sp[-1];       /* Pull up the 'v' */
+        put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
+        sp = range_lvalue(0x101, sp);
+        break;
+
     CASE(F_SIMUL_EFUN); /* --- simul_efun <code> [<num_arg>]   --- */
     {
         /* Call the simul_efun <code>. If it's a function taking varargs,
@@ -10300,19 +10525,24 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *
          * <code> is an uint8 and indexes the function list *simul_efunp.
          * <num_arg> is an uint8.
+         * TODO: Add a F_SIMUL_EFUN for codes > 0xff; right now this
+         * TODO:: is compiled as CALL_OTHER. Affected are prolang.y and
+         * TODO:: simul_efun.c
          */
 
-        int code;            /* the function index */
-        fun_hdr_p funstart;  /* the actual function */
-        struct object *ob;   /* the simul_efun object */
-        struct simul_efun_table_s *entry;
+        int                 code;      /* the function index */
+        fun_hdr_p           funstart;  /* the actual function */
+        object_t           *ob;        /* the simul_efun object */
+        simul_efun_table_t *entry;
 
         ASSIGN_EVAL_COST  /* we're changing objects */
 
         /* Get the sefun code and the number of arguments on the stack */
         code = (int)LOAD_UINT8(pc);
         num_arg = simul_efunp[code].num_arg;
-        if (num_arg == SIMUL_EFUN_VARARGS)
+        if (num_arg == SIMUL_EFUN_VARARGS
+         || simul_efunp[code].flags & TYPE_MOD_XVARARGS
+           )
         {
             num_arg = (int)LOAD_UINT8(pc);
         }
@@ -10347,10 +10577,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             /* The entry is valid: call the sefun by recursing into
              * eval_instruction(), so we can get the result from the
              * stack.
-             * TODO: Any particular reason for the recursion?
+             * We recurse because some simul_efuns are called with
+             * F_CALL_OTHER, and the functions should not be able
+             * to see any difference.
              */
-            struct program *prog;
-            struct svalue *new_sp;
+            program_t *prog;
+            svalue_t *new_sp;
 
             push_control_stack(sp, pc, fp);
             csp->ob = current_object;
@@ -10359,7 +10591,16 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             csp->num_local_variables = num_arg;
             current_prog = prog = entry->program;
             function_index_offset = entry->function_index_offset;
-            current_variables = ob->variables + entry->variable_index_offset;
+#ifdef DEBUG
+            if (!ob->variables && entry->variable_index_offset)
+                fatal("%s Fatal: call sefun for object %p '%s' w/o variables, "
+                      "but offset %ld\n"
+                     , time_stamp(), ob, ob->name
+                     , (long)(entry->variable_index_offset));
+#endif
+            current_variables = ob->variables;
+            if (current_variables)
+                current_variables += entry->variable_index_offset;
             new_sp = setup_new_frame2(funstart, sp);
             /* The simul_efun object should not use simul_efuns itself... */
             previous_ob = current_object;
@@ -10373,10 +10614,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        /* TODO: Is this true?:
-         * The simul_efun was never called before, and/or the simul_efun
-         * object was reloaded since the last use.
-         * Call the sefun the old fashioned way with apply()
+        /* The simul_efun was discarded meanwhile and not recreated
+         * - call it the old fashioned way with apply() in case it exists
+         * in a slightly different form.
          */
         inter_sp = sp;
         inter_pc = pc;
@@ -10400,13 +10640,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         int i;
-        struct vector *v;
+        vector_t *v;
         unsigned short num;
-        struct svalue *value, *item;
+        svalue_t *value, *item;
 
         /* Get the size */
         LOAD_SHORT(num, pc);
-
         /* Allocate the array */
         i = num;
         v = allocate_uninit_array(i);
@@ -10443,14 +10682,14 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * TODO:: slots to filled in, if any.
          */
         int i, j;
-        struct mapping *m;
-        struct svalue *data;
+        mapping_t *m;
+        svalue_t *data;
         int num_values;
-        struct svalue *value;
+        svalue_t *value;
 
         /* Get the size and width from the code.
          */
-        if (instruction == F_M_CAGGREGATE - F_OFFSET)
+        if (instruction == F_M_CAGGREGATE)
         {
             i = LOAD_UINT8(pc);
             num_values = LOAD_UINT8(pc);
@@ -10495,84 +10734,6 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         break;
     }
 
-    CASE(F_EXTRACT2);               /* --- extract2            --- */
-    {
-        /* Compute the range sp[0]..end from string/array sp[-1]
-         * and leave it on the stack. If sp[0] is negative, it is
-         * counted from the end of the string/array.
-         *
-         * The compiler generates this for [x..] and [<x..] ranges,
-         * and also if the efun extract() is called with just two arguments.
-         * TODO: Get rid of efun extract() and sanitize this code with
-         * TODO:: the range codes.
-         */
-
-        long len, from;
-        struct svalue *arg;
-
-        arg = sp - 1;
-
-        if (arg->type == T_STRING)
-        {
-            /* Slice an array */
-            char *res;
-
-            len = (signed)_svalue_strlen(&arg[0]);
-            if ((arg+1)->type != T_NUMBER)
-            {
-                ERRORF(("Index value must be a number.\n"));
-                /* NOTREACHED */
-                return; /* Flow control hint */
-            }
-            from = arg[1].u.number;
-            sp--;
-            if (from < 0) {
-                from = len + from;
-                if (from < 0)
-                    from = 0;
-            }
-            if (from >= len) {
-                pop_stack();
-                push_volatile_string("");
-                break;
-            }
-            res = string_copy(arg->u.string + from);
-            free_string_svalue(sp);
-            put_malloced_string(sp, res);
-            break;
-        }
-
-        if (arg->type != T_POINTER)
-        {
-            ERRORF(("Indexed value is neither string nor array.\n"));
-            /* NOTREACHED */
-            return; /* Flow control hint */
-        }
-
-        /* Slice an array */
-        {
-            struct vector *v, *res;
-
-            if ((arg+1)->type != T_NUMBER)
-            {
-                ERRORF(("Index value must be a number.\n"));
-                /* NOTREACHED */
-                return; /* Flow control hint */
-            }
-            v = arg->u.vec;
-            len = (signed)VEC_SIZE(v);
-            from = arg[1].u.number;
-            sp--;
-            if (from < 0) {
-                from = len + from;
-            }
-            res = slice_array(v, from, len-1);
-            free_array(v);
-            put_array(sp,res);
-            break;
-        }
-    }
-
     CASE(F_PREVIOUS_OBJECT0);       /* --- previous_object0    --- */
         /* EFUN previous_object(void)
          *
@@ -10600,25 +10761,25 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * function code and uint8 <num> is used to index that array
          * from the end.
          */
-#define MY_LAMBDA_VALUE_OFFSET (sizeof(struct svalue) + \
-            ((PTRTYPE)(&((struct lambda *)0)->function.code[1])-(PTRTYPE) 0) )
+#define MY_LAMBDA_VALUE_OFFSET (sizeof(svalue_t) + \
+            ((PTRTYPE)(&((lambda_t *)0)->function.code[1])-(PTRTYPE) 0) )
         int ix;
-        struct svalue * cstart;
+        svalue_t * cstart;
 
         /* Get the value index */
         ix = LOAD_UINT8(pc);
 
         /* Get the pointer to the last constant value */
-        cstart = (struct svalue *)((char *)(csp->funstart)
+        cstart = (svalue_t *)((char *)(csp->funstart)
                                    - LAMBDA_VALUE_OFFSET);
 #ifdef DEBUG
         /* TODO: Remove this if nobody complains. */
         if (MY_LAMBDA_VALUE_OFFSET != LAMBDA_VALUE_OFFSET)
         {
-           fprintf(stderr, "DEBUG: lambda offset: %ld should be %ld\n"
-                  , (long)LAMBDA_VALUE_OFFSET, (long)MY_LAMBDA_VALUE_OFFSET
+           fprintf(stderr, "DEBUG: %s:lambda offset: %ld should be %ld\n"
+                  , time_stamp(), (long)LAMBDA_VALUE_OFFSET, (long)MY_LAMBDA_VALUE_OFFSET
                   );
-            cstart = (struct svalue *)((char *)(csp->funstart)
+            cstart = (svalue_t *)((char *)(csp->funstart)
                                    - MY_LAMBDA_VALUE_OFFSET);
         }
 #endif
@@ -10636,28 +10797,24 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * function code and (16-Bit) ushort <num> is used to index
          * that array from the end.
          */
-        int ix;
-        struct svalue * cstart;
+        unsigned short ix;
+        svalue_t * cstart;
 
         /* Get the value index */
-        ix = (EXTRACT_UCHAR(pc) << 8) + EXTRACT_UCHAR(pc + 1);
-        pc += 2;
-          /* TODO: A LOAD_SHORT() would be nice, but the compiler would
-           * TODO:: have to agree.
-           */
+        LOAD_SHORT(ix, pc);
 
         /* Get the pointer to the last constant value */
-        cstart = (struct svalue *)((char *)(csp->funstart)
+        cstart = (svalue_t *)((char *)(csp->funstart)
                                    - LAMBDA_VALUE_OFFSET);
 
 #ifdef DEBUG
         /* TODO: Remove this if nobody complains. */
         if (MY_LAMBDA_VALUE_OFFSET != LAMBDA_VALUE_OFFSET)
         {
-           fprintf(stderr, "DEBUG: lambda offset: %ld should be %ld\n"
-                  , (long)LAMBDA_VALUE_OFFSET, (long)MY_LAMBDA_VALUE_OFFSET
+           fprintf(stderr, "DEBUG: %s lambda offset: %ld should be %ld\n"
+                  , time_stamp(), (long)LAMBDA_VALUE_OFFSET, (long)MY_LAMBDA_VALUE_OFFSET
                   );
-            cstart = (struct svalue *)((char *)(csp->funstart)
+            cstart = (svalue_t *)((char *)(csp->funstart)
                                    - MY_LAMBDA_VALUE_OFFSET);
         }
 #endif
@@ -10674,12 +10831,16 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * Compute m[i,j] and push it onto the stack.
          */
 
-        struct mapping *m;
+        mapping_t *m;
         mp_int n;
-        struct svalue *data;
+        svalue_t *data;
 
-        TYPE_TEST1(sp-2, T_MAPPING)
-        TYPE_TEST3(sp, T_NUMBER)
+        if (sp[-2].type != T_MAPPING)
+            ERRORF(("Illegal value for <mapping>[,]: not a mapping.\n"));
+            /* TODO: Give type and value */
+        if (sp->type != T_NUMBER)
+            ERRORF(("Illegal sub-index for <mapping>[,]: not a number.\n"));
+            /* TODO: Give type and value */
 
         m = sp[-2].u.map;
         n = sp->u.number;
@@ -10715,8 +10876,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * just one ref left, the indexed item is stored in indexing_quickfix
          * and the lvalue refers to that variable.
          */
-        struct svalue *data;
-        struct mapping *m;
+        svalue_t *data;
+        mapping_t *m;
         mp_int n;
 
         TYPE_TEST1(sp-2, T_MAPPING)
@@ -10750,6 +10911,257 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         break;
     }
 
+    CASE(F_FOREACH);           /* --- foreach <nargs> <offset> --- */
+    {
+        /* Initialize a foreach() loop. On the stack are <nargs>-1
+         * lvalues where the value(s) are to be stored. The last
+         * value on the stack is the value to loop over. (Do not
+         * confuse <nargs> with the normal NUM_ARG!).
+         *
+         * ushort <offset> is the distance to the FOREACH_NEXT
+         * instruction follwing the codeblock after the instruction,
+         * counted from the byte following this instruction. 
+         *
+         * The instruction pushes two or three more values onto
+         * the stack to store its internal status.
+         *
+         *   sp[0]  -> number 'next':  index of the next value to assign (0).
+         *   sp[-1] -> number 'count': number of values to loop over.
+         *             x.u.generic:    <nargs>, or -<nargs> if the value
+         *                             is mapping
+         *   sp[-2] -> array 'm_indices': if the value is a mapping, this
+         *                             is the array with the indices.
+         *
+         * After pushing the values onto the stack, the instruction
+         * branches to the FOREACH_NEXT instruction to start the first
+         * iteration.
+         */
+
+        int vars_required;
+        int nargs;
+        p_int count;
+        unsigned short offset;
+
+        nargs = LOAD_UINT8(pc);
+        LOAD_SHORT(offset, pc);
+
+        if (sp->type != T_STRING
+         && sp->type != T_POINTER
+         && sp->type != T_MAPPING)
+            ERROR("foreach() requires a string, array or mapping.\n");
+            /* TODO: What type did it get? */
+
+        /* Find out how many variables we require */
+
+        if (sp->type == T_STRING)
+        {
+            count = (p_int)svalue_strlen(sp);
+            vars_required = 1;
+        }
+        else if (sp->type == T_POINTER)
+        {
+            check_for_destr(sp->u.vec);
+            count = (p_int)VEC_SIZE(sp->u.vec);
+            vars_required = 1;
+        }
+        else
+        {
+            mapping_t *m;
+            vector_t  *indices;
+
+            m = sp->u.map;
+            vars_required = 1 + m->num_values;
+            indices = m_indices(m);
+
+            count = (p_int)MAP_SIZE(m);
+              /* after m_indices(), else we'd count destructed entries */
+
+            if (m->num_values == 0 || nargs-1 == 1)
+            {
+                /* Special case: we can replace the mapping
+                 * by its indices only
+                 */
+                free_svalue(sp);
+                put_array(sp, indices);
+            }
+            else
+            {
+                /* Normal case: push the indices array and
+                 * remember the fact in nargs.
+                 */
+                sp++;
+                put_array(sp, indices);
+                nargs = -nargs;
+            }
+        }
+
+        /* Push the count and the starting index */
+        push_number(count); sp->x.generic = nargs;
+        push_number(0);
+
+#ifdef DEBUG
+        /* The <nargs> lvalues and our temporaries act as hidden
+         * local variables. We therefore adapt the variable count
+         * so that a F_RETURN won't complain.
+         */
+        if (nargs >= 0)
+            csp->num_local_variables += 2 + nargs;
+        else
+            csp->num_local_variables += 3 + (-nargs);
+#endif
+
+        /* Now branch to the FOREACH_NEXT */
+        pc += offset;
+        
+        break;
+    }
+    
+    CASE(F_FOREACH_NEXT);         /* --- foreach_next <offset> --- */
+    {
+        /* Start the next (resp. the first) iteration of a foreach()
+         * loop. ushort <offset> is the distance to branch back to the
+         * loop body, counted from the first byte of the next instruction.
+         * For the stack layout, see F_FOREACH.
+         */
+
+        unsigned short offset;
+        p_int     ix;
+        svalue_t *lvalue;  /* Pointer to the first lvalue */
+        
+
+        LOAD_SHORT(offset, pc);
+
+        /* Is there something left to iterate? */
+        ix = sp->u.number;
+        sp->u.number++;
+
+        if (ix >= sp[-1].u.number)
+            break; /* Nope */
+
+        if (sp[-1].x.generic < 0)
+        {
+            /* We loop over a mapping */
+            
+            mapping_t *m;
+            vector_t  *indices;
+            svalue_t  *values;
+            int        left;
+            
+            lvalue = sp + sp[-1].x.generic - 2;
+
+            m = sp[-3].u.map;
+            indices = sp[-2].u.vec;
+
+            values = get_map_value(m, indices->item+ix);
+            if (values == &const0)
+            {
+                /* Whoops, the entry has vanished.
+                 * Start over with this instruction again, the
+                 * index on the stack has been incremented already.
+                 */
+                pc -= 3;
+                break;
+            }
+
+            /* Assign the index we used */
+            {
+                svalue_t *dest;
+
+#ifdef DEBUG
+                if (lvalue->type != T_LVALUE)
+                    fatal("Bad argument to foreach(): not a lvalue\n");
+                    /* TODO: Give type and value */
+#endif
+                dest = lvalue->u.lvalue;
+                assign_svalue(dest, indices->item+ix);
+
+                lvalue++;
+            }
+
+            /* Loop over the values and assign them */
+            left = -(sp[-1].x.generic) - 2;
+            if (left > m->num_values)
+                left = m->num_values;
+
+            for ( ; left > 0; left--, lvalue++, values++)
+            {
+                svalue_t *dest;
+
+#ifdef DEBUG
+                if (lvalue->type != T_LVALUE)
+                    fatal("Bad argument to foreach(): not a lvalue\n");
+                    /* TODO: Give type and value */
+#endif
+                dest = lvalue->u.lvalue;
+                assign_svalue(dest, values);
+            }
+
+            /* Ta-Da! */
+        }
+        else
+        {
+            lvalue = sp - sp[-1].x.generic - 1;
+#ifdef DEBUG
+            if (lvalue->type != T_LVALUE)
+                fatal("Bad argument to foreach(): not a lvalue\n");
+                /* TODO: Give type and value */
+#endif
+            lvalue = lvalue->u.lvalue;
+
+            if (sp[-2].type == T_STRING)
+            {
+                free_svalue(lvalue);
+                put_number(lvalue, sp[-2].u.string[ix]);
+            }
+            else if (sp[-2].type == T_POINTER)
+            {
+                if (ix >= (p_int)VEC_SIZE(sp[-2].u.vec))
+                    break;
+                    /* Oops, this array shrunk while we're looping over it.
+                     * We stop processing and continue with the following
+                     * FOREACH_END instruction.
+                     */
+                     
+                assign_svalue(lvalue, sp[-2].u.vec->item+ix);
+            }
+            else
+                fatal("foreach() requires a string, array or mapping.\n");
+                /* If this happens, the check in F_FOREACH failed. */
+        }
+
+        /* All that is left is to branch back. */
+        pc -= offset;
+        break;
+    }
+    
+    CASE(F_FOREACH_END);            /* --- foreach_end         --- */
+    {
+        /* The foreach() loop ended or was terminated by a break.
+         * All there's left to do is cleaning up the stack.
+         */
+
+        int nargs;
+
+        nargs = sp[-1].x.generic;
+        if (nargs < 0)
+            pop_n_elems(-nargs + 3);
+        else
+            pop_n_elems(nargs+2);
+
+#ifdef DEBUG
+        /* The <nargs> lvalues and our temporaries acted as hidden
+         * local variables. We now count back the variable count
+         * so that a F_RETURN won't complain.
+         */
+        if (nargs >= 0)
+            csp->num_local_variables -= 2 + nargs;
+        else
+            csp->num_local_variables -= 3 + (-nargs);
+#endif
+
+        break;
+    }
+    
 #ifdef F_JUMP
     CASE(F_JUMP);                   /* --- jump <dest>         --- */
     {
@@ -10777,6 +11189,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * The efun returns 1 if <obj> is a clone, and 0 if it is not.
          * The <obj> can be given as the object itself, or by its name.
          * If <obj> is omitted, the current object is tested.
+         * Arguments of other types return 0.
          */
 
         int i;
@@ -10787,7 +11200,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         }
         else if (sp->type == T_STRING)
         {
-            struct object *o;
+            object_t *o;
 
             o = find_object(sp->u.string);
             if (!o)
@@ -10795,7 +11208,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             i = o->flags & O_CLONE;
         }
         else
-            goto bad_arg_1;
+        {
+            i = 0;
+        }
         free_svalue(sp);
         put_number(sp, i ? 1 : 0);
         break;
@@ -11062,6 +11477,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         ERROR("Bad argument to unary minus\n")
 
     CASE(F_PRINTF);                 /* --- printf <nargs>      --- */
+      {
         /* EFUN printf()
          *
          *   void printf(string format, ...)
@@ -11070,15 +11486,22 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * the result string to the user.
          */
 
+        char *str;
+        
         assign_eval_cost();
         GET_NUM_ARG
         inter_pc = pc;
         inter_sp = sp;
         TYPE_TEST1(sp - num_arg + 1, T_STRING)
-        add_message("%s", string_print_formatted((sp-num_arg+1)->u.string,
-                                                 num_arg-1, sp-num_arg+2));
+        str = string_print_formatted((sp-num_arg+1)->u.string
+                                    , num_arg-1, sp-num_arg+2);
+        if (command_giver)
+            tell_object(command_giver, str);
+        else
+            add_message("%s", str);
         pop_n_elems(num_arg);
         break;
+      }
 
     CASE(F_RANDOM);                 /* --- random              --- */
         /* EFUN random()
@@ -11090,9 +11513,6 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * The random number generator is proven to deliver an equal
          * distribution of numbers over a big range, with no repetition of
          * number sequences for a long time.
-         *
-         * TODO: Implement a second generator with better distrubution over
-         * TODO:: small ranges and intervals.
          */
 
         TYPE_TEST1(sp, T_NUMBER)
@@ -11101,7 +11521,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             sp->u.number = 0;
             break;
         }
-        sp->u.number = (signed)random_number((unsigned)sp->u.number);
+        sp->u.number = (p_int)random_number((uint32)sp->u.number);
         break;
 
     CASE(F_THROW);                  /* --- throw               --- */
@@ -11178,21 +11598,23 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * The result has the first two characters as the seed.
          */
 
-        char salt[2];
+        char *salt;
         char *res;
+        char temp[3];
         static char choise[] =
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./";
 
         TYPE_TEST1(sp-1, T_STRING)
         if (sp->type == T_STRING && svalue_strlen(sp) >= 2)
         {
-            salt[0] = sp->u.string[0];
-            salt[1] = sp->u.string[1];
+            salt = sp->u.string;
         }
         else if (sp->type == T_NUMBER)
         {
-            salt[0] = choise[random_number((sizeof choise) - 1)];
-            salt[1] = choise[random_number((sizeof choise) - 1)];
+            temp[0] = choise[random_number((sizeof choise) - 1)];
+            temp[1] = choise[random_number((sizeof choise) - 1)];
+            temp[2] = '\0';
+            salt = temp;
         }
         else
             goto bad_arg_2;
@@ -11213,7 +11635,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * split into substrings as divided by del.
          */
 
-        struct vector *v;
+        vector_t *v;
 
         TYPE_TEST1(sp-1, T_STRING)
         TYPE_TEST2(sp,   T_STRING)
@@ -11298,7 +11720,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 initial_len = s - sp->u.string;
                 str = xalloc(svalue_strlen(sp)+1);
                 if (initial_len)
-                    memcpy(str, sp->u.string, (unsigned)initial_len);
+                    memcpy(str, sp->u.string, (size_t)initial_len);
                 for(d = str + initial_len; '\0' != (c = *s++) ; )
                 {
                     if (isupper((unsigned char)c))
@@ -11325,7 +11747,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * same syntax for regular expressions as ed().
          */
 
-        struct vector *v;
+        vector_t *v;
 
         TYPE_TEST1(sp-1, T_POINTER)
         TYPE_TEST2(sp,   T_STRING)
@@ -11393,7 +11815,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             i = _svalue_strlen(sp);
             free_string_svalue(sp);
-            put_number(sp, (signed)i);
+            put_number(sp, (p_int)i);
             break;
         }
         if (sp->type == T_NUMBER && sp->u.number == 0)
@@ -11416,6 +11838,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         int    indent = 0;
         int    wrap = 0;
+        mapping_t *map = NULL;
         char * str;
 
         GET_NUM_ARG;
@@ -11441,18 +11864,26 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         }
 
         TYPE_TEST1(sp-1, T_STRING);
-        TYPE_TEST2(sp, T_MAPPING);
 
-        if (sp->u.map->num_values < 1)
+        if (sp->type == T_MAPPING)
         {
-            ERROR("terminal_colour() requires a mapping with values.\n");
-            break;
+            if (sp->u.map->num_values < 1)
+            {
+                ERROR("terminal_colour() requires a mapping with values.\n");
+                break;
+            }
+            map = sp->u.map;
         }
+        else if (sp->type != T_NUMBER || sp->u.number != 0)
+        {
+            goto bad_arg_2;
+        }
+
 
         inter_sp = sp;
         inter_pc = pc;
 
-        str = e_terminal_colour(sp[-1].u.string, sp->u.map, indent, wrap);
+        str = e_terminal_colour(sp[-1].u.string, map, indent, wrap);
 
         pop_stack();
 
@@ -11483,15 +11914,17 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         char *str;
         size_t len, ind, bitnum;
-        struct svalue *strp;
+        svalue_t *strp;
 
         /* Get and test the arguments */
         TYPE_TEST1(sp-1, T_STRING)
         TYPE_TEST2(sp,   T_NUMBER)
-        bitnum = (unsigned)sp->u.number;
+        bitnum = (size_t)sp->u.number;
         sp = strp = sp-1;
         if (bitnum > MAX_BITS)
             ERRORF(("clear_bit: too big bit number: %ld\n", (long)bitnum))
+        if (bitnum < 0)
+            ERRORF(("clear_bit: negative bit number: %ld\n", (long)bitnum))
 
         len = svalue_strlen(strp);
         ind = bitnum/6;
@@ -11539,15 +11972,17 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         char *str;
         size_t len, old_len, ind, bitnum;
-        struct svalue *strp;
+        svalue_t *strp;
 
         TYPE_TEST1(sp-1, T_STRING)
         TYPE_TEST2(sp,   T_NUMBER)
 
-        bitnum = (unsigned)sp->u.number;
+        bitnum = (size_t)sp->u.number;
         sp = strp = sp-1;
         if (bitnum > MAX_BITS)
             ERRORF(("set_bit: too big bit number: %ld\n", (long)bitnum))
+        if (bitnum < 0)
+            ERRORF(("set_bit: negative bit number: %ld\n", (long)bitnum))
 
         len = svalue_strlen(strp);
         old_len = len;
@@ -11596,6 +12031,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         TYPE_TEST1(sp-1, T_STRING)
         TYPE_TEST2(sp,   T_NUMBER)
+
+        if (sp->u.number < 0)
+            ERRORF(("test_bit: negative bit number: %ld\n", (long)sp->u.number))
 
         len = svalue_strlen(sp-1);
         if (sp->u.number/6 >= len)
@@ -11650,7 +12088,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         result_len = 0;
         to_copy = NULL;
 
-        use_short = (instruction == F_AND_BITS - F_OFFSET);
+        use_short = (instruction == F_AND_BITS);
 
         /* Get and test the arguments */
         TYPE_TEST1(sp-1, T_STRING)
@@ -11730,11 +12168,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (c2 > 0x3f + ' ' || c2 < ' ')
                 ERRORF(("Illegal bit pattern in or_bits character %d\n"
                        , (int)c2))
-            if (instruction == F_AND_BITS - F_OFFSET)
+            if (instruction == F_AND_BITS)
                 result[arg_len] = (char)(c1 & c2);
-            else if (instruction == F_OR_BITS - F_OFFSET)
+            else if (instruction == F_OR_BITS)
                 result[arg_len] = (char)(c1 | c2);
-            else if (instruction == F_XOR_BITS - F_OFFSET)
+            else if (instruction == F_XOR_BITS)
                 result[arg_len] = (char)((c1 ^ c2) + ' ');
         }
 
@@ -11765,7 +12203,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         TYPE_TEST1(sp, T_STRING)
 
         src = sp->u.string;
-        len = (signed)_svalue_strlen(sp);
+        len = (size_t)_svalue_strlen(sp);
 
         /* If it is a malloced string, modify it in place,
          * otherwise allocate a copy.
@@ -11776,7 +12214,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             inter_pc = pc;
             inter_sp = sp;
-            dest = xalloc((unsigned)len+1);
+            dest = xalloc((size_t)len+1);
             if (!dest)
                 ERROR("Out of memory\n")
         }
@@ -11829,7 +12267,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         TYPE_TEST1(sp, T_STRING)
 
         str = sp->u.string;
-        len = (signed)_svalue_strlen(sp);
+        len = (long)_svalue_strlen(sp);
 
         /* First, find the last non-zero character */
         c = 0;
@@ -11892,7 +12330,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         TYPE_TEST2(sp-1, T_NUMBER)
 
         str = (sp-2)->u.string;
-        len = (signed)_svalue_strlen(sp-2);
+        len = (long)_svalue_strlen(sp-2);
 
         start = (sp-1)->u.number;
         if (start < 0)
@@ -11904,14 +12342,14 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         else if (start % 6 == 5)
         {
             pattern = 0x01;
-            pos = (unsigned)start + 1;
-            search = (unsigned)start / 6 + 1;
+            pos = (size_t)start + 1;
+            search = (size_t)start / 6 + 1;
         }
         else
         {
             pattern = 1 << (start % 6 + 1);
-            pos = (unsigned)start + 1;
-            search = (unsigned)start / 6;
+            pos = (size_t)start + 1;
+            search = (size_t)start / 6;
         }
 
         invert = 0;
@@ -11934,7 +12372,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 if (c & pattern)
                 {
-                    found = (signed)pos;
+                    found = (mp_int)pos;
                     break;
                 }
                 pattern <<= 1;
@@ -12008,7 +12446,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * Allocate an empty array of <size> elements.
          */
 
-        struct vector *v;
+        vector_t *v;
 
         TYPE_TEST1(sp, T_NUMBER)
         inter_sp = sp;
@@ -12017,182 +12455,6 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         put_array(sp, v);
         break;
     }
-
-    CASE(F_FILTER);                 /* --- filter <nargs>      --- */
-    CASE(F_FILTER_ARRAY);          /* --- filter_array <nargs> --- */
-    {
-        /* EFUN filter()
-         *
-         *   mixed * filter (mixed *arg, string fun, object ob, mixed extra...)
-         *   mixed * filter (mixed *arg, closure cl, mixed extra...)
-         *   mixed * filter (mixed *arg, mapping map, mixed extra...)
-         *
-         *  mapping filter (mapping arg, string func, object ob, mixed extra...)
-         *  mapping filter (mapping arg, closure cl, mixed extra...)
-         *
-         * Call the function <ob>-><func>() resp. the closure <cl> for
-         * every element of the array or mapping <arg>, and return
-         * a result made from those elements for which the function
-         * call returns TRUE.
-         *
-         * If <ob> is omitted, it defaults to this_object().
-         * TODO: F_FILTER_ARRAY is obsolete.
-         */
-
-        struct svalue *arg;
-
-        GET_NUM_ARG
-        ASSIGN_EVAL_COST
-        inter_pc = pc;
-        arg = sp - num_arg + 1;
-
-        if (F_FILTER-F_OFFSET == instruction && arg->type == T_MAPPING)
-        {
-            sp = filter_mapping(sp, num_arg, MY_TRUE);
-        }
-        else
-        {
-            sp = f_filter_array(sp, num_arg);
-        }
-        break;
-    }
-
-    CASE(F_FILTER_INDICES);      /* --- filter_indices <nargs> --- */
-        /* EFUN filter_indices()
-         *
-         *   mapping filter_indices(mapping, string func, object ob, ...)
-         *   mapping filter_indices(mapping, closure cl, ...)
-         *
-         * ob->func() is called resp. cl applied to every element in the
-         * mapping, with first argument being the key of the
-         * element, and then the extra args that were given to
-         * filter_mapping. If the function returns true, the element is
-         * added to the result mapping. ob can also be a file_name of an
-         * object. If the second arg is a string and the third is not an
-         * object, this_object() will be used as default.
-         */
-
-        GET_NUM_ARG
-        ASSIGN_EVAL_COST
-        inter_pc = pc; /* apply_low() needs this */
-        sp = filter_mapping(sp, num_arg, MY_FALSE);
-        break;
-
-    CASE(F_MAP);                    /* --- map <nargs>         --- */
-    CASE(F_MAP_ARRAY);              /* --- map_array <nargs>   --- */
-    {
-        /* EFUN map()
-         *
-         *   mixed * map(mixed *arg, string func, object ob, mixed extra...)
-         *   mixed * map(mixed *arg, closure cl, mixed extra...)
-         *
-         *   mapping map(mapping arg, string func, object ob, mixed extra...)
-         *   mapping map(mapping arg, closure cl, mixed extra...)
-         *
-         * Call the function <ob>-><func>() resp. the closure <cl> for
-         * every element of the array or mapping <arg>, and return a result
-         * made up from the returned values.
-         *
-         * If <ob> is omitted, it defaults to this_object().
-         * TODO: map_array() is obsolete.
-         */
-
-        struct vector *res;
-        struct svalue *arg;
-        char *func;         /* Function to call, doubles as svalue* :-( */
-        struct object *ob;
-        int num_extra;
-
-        assign_eval_cost();
-        GET_NUM_ARG
-        inter_pc = pc;
-        inter_sp = sp;
-
-        arg = sp - num_arg + 1;
-        if (F_MAP-F_OFFSET == instruction && arg->type == T_MAPPING)
-        {
-            sp = map_mapping(sp, num_arg, MY_TRUE);
-            break;
-        }
-
-        TYPE_TEST1(arg, T_POINTER)
-
-        /* Determine object and function to call */
-        ob = NULL;
-        if (arg[1].type == T_CLOSURE)
-        {
-            func = (char *)(arg + 1);
-              /* map_array() know how to deal with this *sigh* */
-            num_extra = num_arg - 2;
-        }
-        else
-        {
-            TYPE_TEST2(arg+1, T_STRING)
-            func = arg[1].u.string;
-
-            if (num_arg > 2)
-            {
-                if (arg[2].type == T_OBJECT)
-                    ob = arg[2].u.ob;
-                else if (arg[2].type == T_STRING
-                    &&   NULL != ( ob = get_object(arg[2].u.string) ))
-                    NOOP;
-                else
-                    goto bad_arg_3;
-                num_extra = num_arg - 3;
-            }
-            else
-            {
-                ob = current_object;
-                num_extra = 0;
-            }
-        }
-
-        /* Check and map the array */
-        if (arg[0].type == T_POINTER)
-        {
-            check_for_destr(arg[0].u.vec);
-            map_array (arg[0].u.vec, func, ob,
-                        num_extra, sp - num_extra + 1);
-            res = sp[1].u.vec;
-        }
-        else
-        {
-            res = NULL;
-        }
-
-        /* Clean up the stack and push the result */
-        pop_n_elems (num_arg - 1);
-        free_svalue(sp);
-        if (res)
-        {
-            put_array(sp, res);
-        }
-        else
-            put_number(sp, 0);
-        break;
-    }
-
-    CASE(F_MAP_INDICES);            /* --- map_indices <nargs> --- */
-        /* EFUN map_indices()
-         *
-         *   mapping map_indices(mapping m, string func, object ob, ...)
-         *   mapping map_indices(mapping m, closure cl, ...)
-         *
-         * ob->func() is called resp. cl applied to every element in the
-         * mapping, with the key of the element as first argument, and
-         * then the extra args that were given to map_mapping.
-         * The data item in the mapping is replaced by the return value
-         * of the function. ob can also be a file_name of an object.
-         * If the second arg is a string and the third is not an
-         * object, this_object() will be used as default.
-         */
-
-        GET_NUM_ARG
-        ASSIGN_EVAL_COST
-        inter_pc = pc; /* apply_low() needs this */
-        sp = map_mapping(sp, num_arg, MY_FALSE);
-        break;
 
     CASE (F_MEMBER_ARRAY);          /* --- member_array        --- */
     {
@@ -12211,15 +12473,15 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         if (sp->type == T_POINTER)
         {
-            struct vector *vec;   /* Vector searched */
-            struct svalue *item;  /* Pointer into the vector array */
-            struct svalue *key;   /* Item searched */
+            vector_t *vec;   /* Vector searched */
+            svalue_t *item;  /* Pointer into the vector array */
+            svalue_t *key;   /* Item searched */
             long   cnt;           /* Size of vec */
 
             vec = sp->u.vec;
             item = vec->item;
             key = sp - 1;
-            cnt = (signed)VEC_SIZE(vec);
+            cnt = (long)VEC_SIZE(vec);
             switch(key->type)
             {
             case T_STRING:
@@ -12310,7 +12572,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
             if (cnt >= 0)
             {
-                cnt = (signed)VEC_SIZE(vec) - cnt - 1;
+                cnt = (long)VEC_SIZE(vec) - cnt - 1;
             }
             /* else return -1 for failure */
 
@@ -12363,12 +12625,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (sp[-1].type == T_POINTER)
         {
 
-            struct vector *vec;
+            vector_t *vec;
             union  u       sp_u;
             long cnt;
 
             vec = sp[-1].u.vec;
-            cnt = (signed)VEC_SIZE(vec);
+            cnt = (long)VEC_SIZE(vec);
             sp_u = sp->u;
 
             switch(sp->type)
@@ -12376,7 +12638,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             case T_STRING:
               {
                 char *str;
-                struct svalue *item;
+                svalue_t *item;
 
                 str = sp_u.string;
                 for(item = vec->item; --cnt >= 0; item++)
@@ -12395,7 +12657,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
               {
                 short x_generic;
                 short type;
-                struct svalue *item;
+                svalue_t *item;
 
                 type = sp->type;
                 x_generic = sp->x.generic;
@@ -12416,7 +12678,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                      * objects
                      */
 
-                    struct svalue *item;
+                    svalue_t *item;
                     short type;
 
                     for (item = vec->item; --cnt >= 0; item++)
@@ -12444,7 +12706,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             case T_OBJECT:
             case T_POINTER:
               {
-                struct svalue *item;
+                svalue_t *item;
                 short type = sp->type;
 
                 for (item = vec->item; --cnt >= 0; item++)
@@ -12464,7 +12726,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
             if (cnt >= 0)
             {
-                cnt = (signed)VEC_SIZE(vec) - cnt - 1;
+                cnt = (long)VEC_SIZE(vec) - cnt - 1;
             }
             /* else return -1 for failure */
 
@@ -12525,8 +12787,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         long i, length, num_values;
-        struct mapping *m;
-        struct svalue *key;
+        mapping_t *m;
+        svalue_t *key;
 
         GET_NUM_ARG
 
@@ -12538,8 +12800,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             if ( sp[i].type != T_POINTER )
                 bad_arg_pc(i+num_arg, instruction, sp, pc);
-            if (length > (signed)VEC_SIZE(sp[i].u.vec))
-                length = (signed)VEC_SIZE(sp[i].u.vec);
+            if (length > (long)VEC_SIZE(sp[i].u.vec))
+                length = (long)VEC_SIZE(sp[i].u.vec);
         }
 
         if (max_mapping_size && length > max_mapping_size)
@@ -12557,7 +12819,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         key = &(sp-num_values)->u.vec->item[length];
         while (--length >= 0)
         {
-            struct svalue *dest;
+            svalue_t *dest;
 
             dest = get_map_lvalue_unchecked(m, --key);
             for (i = -num_values; ++i <= 0; )
@@ -12588,7 +12850,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * nothing is changed.
          */
 
-        struct mapping *m;
+        mapping_t *m;
 
         TYPE_TEST1(sp-1, T_MAPPING)
         m = (sp-1)->u.map;
@@ -12607,8 +12869,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * Returns an array containing the indices of mapping 'map'.
          */
 
-        struct mapping *m;
-        struct vector *v;
+        mapping_t *m;
+        vector_t *v;
 
         TYPE_TEST1(sp, T_MAPPING)
         m = sp->u.map;
@@ -12635,8 +12897,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * else the values of the first column.
          */
 
-        struct mapping *m;
-        struct vector *v;
+        mapping_t *m;
+        vector_t *v;
         struct mvf_info vip;
         mp_int size;
         int num;
@@ -12652,7 +12914,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         /* Get the size of the mapping */
         check_map_for_destr(m);
-        size = (signed)MAP_SIZE(m);
+        size = (mp_int)MAP_SIZE(m);
 
         v = allocate_array(size);
 
@@ -12683,7 +12945,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         if (sp->type == T_POINTER)
         {
-            i = (signed)VEC_SIZE(sp->u.vec);
+            i = (long)VEC_SIZE(sp->u.vec);
             free_svalue(sp);
             put_number(sp, i);
             break;
@@ -12691,9 +12953,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         if (sp->type == T_MAPPING)
         {
-            struct mapping *m = sp->u.map;
+            mapping_t *m = sp->u.map;
             check_map_for_destr(m);
-            i = (signed)MAP_SIZE(m);
+            i = (long)MAP_SIZE(m);
             free_svalue(sp);
             put_number(sp, i);
             break;
@@ -12703,80 +12965,6 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
 
         goto bad_arg_1;
-    }
-
-    CASE(F_SORT_ARRAY);             /* --- sort_array          --- */
-    {
-        /* EFUN sort_array()
-         *
-         *   mixed *sort_array(mixed *arr, string wrong_order, object|string ob)
-         *   mixed *sort_array(mixed *arr, closure cl)
-         *
-         * Returns an array sorted either by the ordering function
-         * ob->wrong_order(a, b), or by the closure expression 'cl'.
-         * If the 'arr' argument equals 0, the result is also 0.
-         * 'ob' is the object in which the ordering function is called
-         * and may be given as object or by its filename. If omitted, the
-         * function is called in the current object.
-         *
-         * The elements from the array to be sorted are passed in pairs to
-         * the function 'wrong_order' as arguments.
-         * The function should return a positive number if the elements
-         * are in the wrong order. It should return 0 or a negative
-         * number if the elements are in the correct order.
-         */
-
-        struct vector *res;
-        struct svalue *arg;
-        struct object *ob;
-        char *func;         /* Function to call, also used as struct svalue* */
-
-        assign_eval_cost();
-        inter_pc = pc;
-        TYPE_TEST1(sp-2, T_POINTER)
-        inter_sp = sp;
-        arg = sp - 2; ob = 0;
-
-        /* Get the arguments */
-
-        if (arg[1].type == T_CLOSURE)
-        {
-            func = (char *)(arg + 1);
-              /* sort_array() knows how to handle this :-( */
-        }
-        else
-        {
-            TYPE_TEST2(arg+1, T_STRING)
-            func = arg[1].u.string;
-            if (arg[2].type == T_OBJECT)
-                ob = arg[2].u.ob;
-            else if (arg[2].type == T_STRING)
-                ob = get_object(arg[2].u.string);
-
-            if (!ob)
-                goto bad_arg_3;
-        }
-
-        if (arg[0].type == T_POINTER)
-        {
-            /* sort_array already takes care of destructed objects */
-            res = sort_array (
-              slice_array(arg[0].u.vec, 0, (signed)VEC_SIZE(arg[0].u.vec)-1),
-              func, ob);
-        }
-        else
-            res = NULL;
-
-        /* Clean up the stack and push the result */
-        pop_n_elems (3);
-        sp++;
-        if (res)
-        {
-            put_array(sp, res);
-        }
-        else
-            put_number(sp, 0);
-        break;
     }
 
     CASE(F_UNIQUE_ARRAY);           /* --- unique_array        --- */
@@ -12796,7 +12984,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * included in the returned array.
          */
 
-        struct vector *res;
+        vector_t *res;
 
         assign_eval_cost();
         inter_pc = pc;
@@ -12834,9 +13022,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * The return array has the form ({ keys[], data0[], data1[], ... }).
          */
 
-        struct svalue *svp;
-        struct mapping *m;
-        struct vector *v;
+        svalue_t *svp;
+        mapping_t *m;
+        vector_t *v;
         struct mvf_info vip;
         mp_int size;
         int i;
@@ -12848,13 +13036,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         /* Determine the size of the mapping and allocate the result vector */
         check_map_for_destr(m);
-        size = (signed)MAP_SIZE(m);
+        size = (mp_int)MAP_SIZE(m);
         v = allocate_array(m->num_values+1);
 
         /* Allocate the sub vectors */
         for (i = 0, svp = v->item; i <= m->num_values; i++, svp++)
         {
-            struct vector *v2;
+            vector_t *v2;
 
             v2 = allocate_array(size);
             put_array(svp, v2);
@@ -12907,38 +13095,54 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * TODO: Use the MudOS-Notation '(*f)(...)' as alternative.
          */
 
-        struct svalue *args;
+        svalue_t *args;
 
         GET_NUM_ARG
+
+        args = sp -num_arg +1;
+
+        if (args->type != T_CLOSURE)
+        {
+            /* Not a closure: pop the excess args and return <cl>
+             * as result.
+             */
+
+            while (--num_arg)
+                free_svalue(sp--);
+            break;
+        }
 
         if (sp->type == T_POINTER)
         {
             /* The last argument is an array: flatten it */
 
-            struct vector *vec;  /* the array */
-            struct svalue *svp;  /* pointer into the array */
+            vector_t *vec;  /* the array */
+            svalue_t *svp;  /* pointer into the array */
             long i;              /* (remaining) vector size */
 
             vec = sp->u.vec;
-            i = (signed)VEC_SIZE(vec);
+            i = (long)VEC_SIZE(vec);
             num_arg += i - 1;
-            if ( num_arg > 0x100 /* TODO: MAX_something? */)
+
+            /* Check if the target closure can handle
+             * all the arguments without overflowing the stack.
+             */
+            switch( (sp - num_arg + i)->x.closure_type )
             {
-                /* Check if the target closure can handle more
-                 * than 256 args.
-                 */
-                switch( (sp - num_arg + i)->x.closure_type )
-                {
-                case CLOSURE_LFUN:
-                case CLOSURE_ALIEN_LFUN:
-                case CLOSURE_LAMBDA:
-                case CLOSURE_BOUND_LAMBDA:
-                    if (num_arg + (sp - start_of_stack) < EVALUATOR_STACK_SIZE)
-                        break;
-                default:
+            default:
+                if ((sp - num_arg + i)->x.closure_type >= 0)
                     bad_arg_pc(num_arg - i + 1, instruction, sp, pc);
                     /* TODO: Be more specific */
-                }
+                /* else: operator/sefun/efun closure: FALLTHROUGH */
+            case CLOSURE_LFUN:
+            case CLOSURE_ALIEN_LFUN:
+            case CLOSURE_LAMBDA:
+            case CLOSURE_BOUND_LAMBDA:
+                if (num_arg + (sp - start_of_stack) < EVALUATOR_STACK_SIZE)
+                    break;
+                ERRORF(("VM Stack overflow: %ld too high.\n"
+                       , (long)(num_arg + (sp - start_of_stack) - EVALUATOR_STACK_SIZE) ));
+                break;
             }
 
             /* Push the array elements onto the stack, overwriting the
@@ -12948,14 +13152,28 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 for (svp = vec->item; --i >= 0; )
                 {
-                    assign_svalue_no_free(sp++, svp++);
+                    if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
+                    {
+                        put_number(sp, 0);
+                        sp++;
+                        svp++;
+                    }
+                    else
+                        assign_svalue_no_free(sp++, svp++);
                 }
             }
             else
             {
                 /* The array will be freed, so use a faster function */
                 for (svp = vec->item; --i >= 0; ) {
-                    transfer_svalue_no_free_spc(sp++, svp++, sp, pc);
+                    if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
+                    {
+                        put_number(sp, 0);
+                        sp++;
+                        svp++;
+                    }
+                    else
+                        transfer_svalue_no_free_spc(sp++, svp++, sp, pc);
                 }
                 free_empty_vector(vec);
             }
@@ -13011,7 +13229,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * can be detected.
          */
 
-        struct object *ob;
+        object_t *ob;
 
         TYPE_TEST1(sp-1, T_CLOSURE)
         if (sp->type == T_OBJECT)
@@ -13067,14 +13285,14 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           {
             /* Rebind an already bound lambda closure */
 
-            struct lambda *l;
+            lambda_t *l;
 
             if ( (l = sp->u.lambda)->ref == 1)
             {
                 /* We are the only user of the lambda: simply rebind it.
                  */
 
-                struct object **obp;
+                object_t **obp;
 
                 obp = &l->ob;
                 free_object(*obp, "bind_lambda");
@@ -13087,7 +13305,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                  * copy, bind it and put it onto the stack in place of
                  * the original one.
                  */
-                struct lambda *l2;
+                lambda_t *l2;
 
                 l->ref--;
                 l2 = xalloc(sizeof *l);
@@ -13106,7 +13324,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              * and put it onto the stack in place of the unbound one.
              */
 
-            struct lambda *l;
+            lambda_t *l;
 
             l = xalloc(sizeof *l);
             l->ref = 1;
@@ -13127,7 +13345,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
     {
         /* EFUN call_other()
          *
-         *     unknown call_other(object ob, string str, mixed arg, ...)
+         *     unknown call_other(object|string ob, string str, mixed arg, ...)
          *     unknown ob->fun(mixed arg, ...)
          *
          * Call a member function in another object with an argument. The
@@ -13135,29 +13353,33 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * given directly or as a string (i.e. its file name). If it is given
          * by a string and the object does not exist yet, it will be loaded.
          *
-         * TODO: The -> does not care for a simul_efun call_other(), this
-         * TODO:: should be rectified in the compiler.
+         *     unknown * call_other(object|string *ob, string str, mixed arg, ...)
+         *     unknown * ob->fun(mixed arg, ...)
+         *
+         * Call a member function in other objects with the given arguments.
+         * The return values is returned collected in an array.
+         * Every object can be given directly or as a string (i.e. its file name).
+         * If it is given by a string and the object does not exist yet, it will
+         * be loaded.
+         *
+         * TODO: A VOID_CALL_OTHER would be nice to have when the result
+         * TODO:: is not used.
          */
 
-        struct svalue *arg;
-        struct object *ob;
+        svalue_t *arg;
+        object_t *ob;
 
-        ASSIGN_EVAL_COST
         GET_NUM_ARG
         inter_pc = pc;
         inter_sp = sp;
 
-        /* Get object and function to call */
         arg = sp - num_arg + 1;
-        if (arg[0].type == T_OBJECT)
-            ob = arg[0].u.ob;
-        else if (arg[0].type == T_STRING)
-        {
-            ob = get_object(arg[0].u.string);
-            if (ob == NULL)
-                ERROR("call_other() failed\n")
-        }
-        else
+
+        /* Test the arguments */
+        if (arg[0].type != T_OBJECT
+         && arg[0].type != T_STRING
+         && arg[0].type != T_POINTER
+           )
             goto bad_arg_1;
 
         TYPE_TEST2(arg+1, T_STRING)
@@ -13175,38 +13397,174 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        /* Traceing, if necessary */
-        if (TRACEP(TRACE_CALL_OTHER))
+        if (arg[0].type != T_POINTER)
         {
-            if (!++traceing_recursion)
+            /* --- The normal call other to a single object --- */
+            
+            ASSIGN_EVAL_COST
+
+            if (arg[0].type == T_OBJECT)
+                ob = arg[0].u.ob;
+            else if (arg[0].type == T_STRING)
             {
-                do_trace("Call other ", arg[1].u.string, "\n");
+                ob = get_object(arg[0].u.string);
+                if (ob == NULL)
+                    ERROR("call_other() failed\n")
             }
-            traceing_recursion--;
-        }
+            else
+                goto bad_arg_1;
 
-        /* Call the function with the remaining args on the stack.
-         */
-        if (!apply_low(arg[1].u.string, ob, num_arg-2, MY_FALSE))
+            /* Traceing, if necessary */
+            if (TRACEP(TRACE_CALL_OTHER))
+            {
+                if (!++traceing_recursion)
+                {
+                    do_trace("Call other ", arg[1].u.string, "\n");
+                }
+                traceing_recursion--;
+            }
+
+            /* Call the function with the remaining args on the stack.
+             */
+            if (!apply_low(arg[1].u.string, ob, num_arg-2, MY_FALSE))
+            {
+                /* Function not found */
+                pop_n_elems(num_arg);
+                push_number(0);
+                break;
+            }
+            sp -= num_arg - 3;
+
+            /* The result of the function call is on the stack. But so
+             * is the function name and object that was called.
+             * These have to be removed.
+             */
+            arg = sp;           /* Remember where the function call result is */
+            free_string_svalue(--sp);
+            free_svalue(--sp);  /* Remove old arguments to call_other */
+            *sp = *arg;         /* Re-insert function result */
+        }
+        else
         {
-            /* Function not found */
-            pop_n_elems(num_arg);
-            push_number(0);
-            break;
-        }
-        sp -= num_arg - 3;
+            /* --- The other call other to an array of objects --- */
 
-        /* The result of the function call is on the stack. But, so
-         * is the function name and object that was called.
-         * These have to be removed.
-         */
-        arg = sp;           /* Remember where the function call result is */
-        free_string_svalue(--sp);
-        free_svalue(--sp);  /* Remove old arguments to call_other */
-        *sp = *arg;         /* Re-insert function result */
+            svalue_t *svp;
+            size_t    size;
+
+            /* The array with the objects will also hold the results.
+             * For that, it mustn't be shared, therefore we create a
+             * copy if necessary.
+             */
+            size = VEC_SIZE(arg->u.vec);
+            if (arg->u.vec->ref != 1 && size != 0)
+            {
+                vector_t *vec;
+                svalue_t *to;
+
+                vec = allocate_array_unlimited(size);
+                if (!vec)
+                    ERROR("Out of memory.\n");
+                for (svp = arg->u.vec->item, to = vec->item
+                    ; size != 0
+                    ; size--, svp++, to++)
+                    assign_svalue_no_free(to, svp);
+                free_array(arg->u.vec);
+                arg->u.vec = vec; /* adopts the reference */
+            }
+
+            /* Now loop over the array of objects and call the function
+             * in each of it. For that, the arguments are duly replicated
+             * for every call.
+             */
+            size = VEC_SIZE(arg->u.vec);
+            svp = arg->u.vec->item;
+            for ( ; size != 0; size--, svp++)
+            {
+                int i;
+                
+                ASSIGN_EVAL_COST
+
+                if (svp->type == T_OBJECT)
+                    ob = svp->u.ob;
+                else if (svp->type == T_STRING)
+                {
+                    ob = get_object(svp->u.string);
+                    if (ob == NULL)
+                    {
+                        ERROR("call_other() failed\n")
+                        /* NOTREACHED */
+                        continue;
+                    }
+                }
+                else if (svp->type == T_NUMBER && svp->u.number == 0)
+                {
+                    free_svalue(svp);
+                    put_number(svp, 0);
+                    continue;
+                }
+                else
+                    ERRORF(("Bad argument for call_other() at index %ld\n"
+                           , (long)(svp - arg->u.vec->item)));
+
+                /* Destructed objects yield 0 */
+                if (ob->flags & O_DESTRUCTED)
+                {
+                    free_svalue(svp);
+                    put_number(svp, 0);
+                    continue;
+                }
+
+                /* Traceing, if necessary */
+                if (TRACEP(TRACE_CALL_OTHER))
+                {
+                    if (!++traceing_recursion)
+                    {
+                        do_trace("Call other ", arg[1].u.string, "\n");
+                    }
+                    traceing_recursion--;
+                }
+
+                /* Duplicate the arguments to pass, increasing sp on
+                 * the way. Optimizing this for the last pass is
+                 * dangerous as not every iteration will come here.
+                 */
+                for (i = 2; i < num_arg; i++)
+                    assign_svalue_no_free(++sp, arg+i);
+                    
+                /* Call the function with the remaining args on the stack.
+                 */
+                inter_sp = sp; /* was clobbered by the previous loop */
+                if (!apply_low(arg[1].u.string, ob, num_arg-2, MY_FALSE))
+                {
+                    /* Function not found: clean up the stack and
+                     * assign 0 as result.
+                     */
+                    pop_n_elems(num_arg-2);
+                    free_svalue(svp);
+                    put_number(svp, 0);
+                }
+                else
+                {
+                    /* Function found - assign the result from the stack */
+                    sp -= num_arg-3;
+                    free_svalue(svp);
+                    transfer_svalue_no_free(svp, sp--);
+                }
+            } /* for (objects in array) */
+
+            /* Remove the function call arguments from the stack.
+             */
+            pop_n_elems(num_arg-2);
+
+            /* Calls complete, left on the stack are now the function name
+             * and, in arg, the final result.
+             */
+            free_string_svalue(sp); sp--;
+        }
+        
         break;
     }
-
+    
     CASE(F_FUNCALL);                /* --- funcall <nargs>     --- */
     {
         /* EFUN funcall()
@@ -13218,7 +13576,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * returned.
          */
 
-        struct svalue *args;
+        svalue_t *args;
 
         GET_NUM_ARG
         args = sp -num_arg +1;
@@ -13271,8 +13629,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * or apply(). It may be 0 if no arguments are required.
          */
 
-        struct lambda *l;
-        struct vector *args;
+        lambda_t *l;
+        vector_t *args;
 
         inter_pc = pc;
         inter_sp = sp;
@@ -13366,8 +13724,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * protected lfuns only if <ob> is the current object.
          */
 
-        struct object *ob;
-        struct program *prog;
+        object_t *ob;
+        program_t *prog;
         int i;
 
         /* If 'arg' is not a symbol, make sure it's a shared string. */
@@ -13443,7 +13801,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              )
            )
         {
-            struct lambda *l;
+            lambda_t *l;
             ph_int closure_type;
 
             l = xalloc(sizeof *l);
@@ -13480,7 +13838,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
             /* Clean up the stack and push the result */
             sp--;
-            decrement_string_ref(sp->u.string);
+            deref_string(sp->u.string);
             sp->type = T_CLOSURE;
             sp->x.closure_type = closure_type;
             sp->u.lambda = l;
@@ -13621,7 +13979,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * unique name and returned.
          */
 
-        struct object *ob;
+        object_t *ob;
 
         assign_eval_cost();
         inter_sp = sp;
@@ -13721,7 +14079,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * it will not be found.
          */
 
-        struct object *ob;
+        object_t *ob;
 
         TYPE_TEST1(sp, T_STRING)
         ob = find_object(sp->u.string);
@@ -13815,7 +14173,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         GET_NUM_ARG
         inter_pc = pc;
-        sp = input_to(sp, num_arg);
+        inter_sp = sp;
+        sp = e_input_to(sp, num_arg);
         break;
     }
 
@@ -13831,13 +14190,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         int i;
-        struct object *ob;
-        struct interactive *ip;
+        object_t *ob;
+        interactive_t *ip;
 
         TYPE_TEST1(sp, T_OBJECT)
         ob = sp->u.ob;
-        ip = O_GET_INTERACTIVE(ob);
-        i = ip && ip->sent.type == SENT_INTERACTIVE && !ip->do_close;
+        (void)O_SET_INTERACTIVE(ip, ob);
+        i = ip && !ip->do_close;
         deref_object(ob, "interactive");
         put_number(sp, i);
         break;
@@ -13849,10 +14208,18 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *
          *   string load_name()
          *   string load_name(object obj)
+         *   string load_name(string obj)
+         *
+         * Return the load name for the object <obj> which may be given
+         * directly or by its name.
          *
          * If <obj> is a clone, return the load_name() of <obj>'s blueprint.
          * If <obj> is a blueprint, return the filename from which the
          * blueprint was compiled.
+         *
+         * If <obj> is given by name but not/no longer existing, the
+         * function synthesizes the load name as it should be and returns
+         * that. If the given name is illegal, the function returns 0.
          *
          * For virtual objects this efun of course returns the virtual
          * filename.  If <obj> is omitted, the name for the current object is
@@ -13867,12 +14234,120 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * in COMPAT mode.
          */
 
-        char *s;
+        char *s;       /* String argument */
+        char *name;    /* Result string, maybe 's' itself */
+        char *hash;    /* Position of the hash in the name */
+        char *mem;     /* Allocated memory blocks */
+        object_t *ob;
 
-        TYPE_TEST1(sp, T_OBJECT);
-        s = sp->u.ob->load_name;
-        free_object_svalue(sp);
-        put_ref_string(sp, s);
+        /* If the argument is an object, we just need to read the name */
+        if (sp->type == T_OBJECT)
+        {
+            s = sp->u.ob->load_name;
+            free_object_svalue(sp);
+            put_ref_string(sp, s);
+            break;
+        }
+        
+        if (sp->type != T_STRING)
+            goto bad_arg_1;
+
+        /* Argument is a string: try to find the object for it */
+        s = sp->u.string;
+        ob = find_object(s);
+        if (ob)
+        {
+            /* Got it */
+            s = ob->load_name;
+            free_string_svalue(sp);
+            put_ref_string(sp, s);
+            break;
+        }
+
+        /* There is no object for the string argument: just normalize
+         * the string. First check if it ends in #<number>.
+         */
+        mem = NULL;
+        hash = strchr(s, '#');
+        if (!hash)
+        {
+            /* No '#' at all: make the name sane directly */
+#ifdef COMPAT_MODE
+            name = (char *)make_name_sane(s, MY_FALSE);
+#else
+            name = (char *)make_name_sane(s, MY_TRUE);
+#endif
+            if (!name)
+                name = s;
+        }
+        else
+        {
+            char *p;
+            size_t len;
+            
+            /* All characters after the '#' must be digits */
+            for (p = hash+1; '\0' != *p; p++)
+                if (*p < '0' || *p > '9')
+                    /* Illegal name: break to return svalue 0 */
+                    break;
+
+            if ('\0' != *p)
+            {
+                /* Illegal name: break to return svalue 0 */
+                free_string_svalue(sp);
+                put_number(sp, 0);
+                break;
+            }
+
+            /* Good, we can slash off the '#<number>' */
+            len = (size_t)(hash - s);
+            p = mem = xalloc(len+1);
+            if (!p)
+                ERROR("Out of memory.");
+            strncpy(p, s, len);
+            p[len] = '\0';
+
+            /* Now make the name sane */
+#ifdef COMPAT_MODE
+            name = (char *)make_name_sane(p, MY_FALSE);
+#else
+            name = (char *)make_name_sane(p, MY_TRUE);
+#endif
+            if (!name)
+                name = p;
+        }
+
+        /* name now points to the synthesized load_name and
+         * may be the argument (== s), allocated (== mem), or
+         * points to a static buffer otherwise.
+         */
+
+#ifdef COMPAT_MODE
+        /* '/.c' is a legal object name, so make sure that
+         * the result will be '/'.
+         */
+        if ('\0' == *name)
+            name = "/";
+#endif
+
+        /* Now return the result */
+        if (s != name)
+        {
+            free_string_svalue(sp);
+            if (name == mem)
+            {
+                put_malloced_string(sp, name);
+                mem = NULL;  /* do not deallocate this */
+            }
+            else
+            {
+                put_volatile_string(sp, name);
+            }
+        }
+
+        if (mem)
+            xfree(mem);
+         
         break;
     }
 
@@ -13889,7 +14364,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * the efun clone_object().
          */
 
-        struct object *ob;
+        object_t *ob;
 
         ASSIGN_EVAL_COST
         inter_pc = pc;
@@ -13979,10 +14454,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * they became invalid.
          */
 
-        struct replace_ob *tmp;
+        replace_ob_t *tmp;
         long name_len;
         char *name;
-        struct program *new_prog;  /* the replacing program */
+        program_t *new_prog;  /* the replacing program */
         int offsets[2];            /* the offsets of the replacing prog */
 
         TYPE_TEST1(sp, T_STRING)
@@ -13998,8 +14473,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Create the full program name with a trailing '.c' and without
          * a leading '/' to match the internal name representation.
          */
-        name_len = (signed)svalue_strlen(sp);
-        name = alloca((unsigned)name_len+3);
+        name_len = (long)svalue_strlen(sp);
+        name = alloca((size_t)name_len+3);
         strcpy(name, sp->u.string);
         if (name[name_len-2] != '.' || name[name_len-1] != 'c')
             strcat(name,".c");
@@ -14266,7 +14741,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         assign_eval_cost();
         inter_pc = pc;
         inter_sp = sp;
-        do_write(sp);
+        e_write(sp);
         pop_stack();
         break;
 
@@ -14287,7 +14762,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         int i;
-        struct svalue *arg;
+        svalue_t *arg;
         int start, len;
 
         assign_eval_cost();
@@ -14312,7 +14787,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         }
 
         /* Print the file */
-        i = print_file(arg[0].u.string, start, len);
+        i = e_print_file(arg[0].u.string, start, len);
         pop_n_elems(num_arg);
         push_number(i);
         break;
@@ -14337,7 +14812,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         TYPE_TEST1(sp, T_STRING)
         inter_sp = sp;
         inter_pc = pc;
-        i = file_size(sp->u.string);
+        i = e_file_size(sp->u.string);
         free_svalue(sp);
         put_number(sp, i);
         break;
@@ -14371,14 +14846,14 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * The values of mask can be added together.
          */
 
-        struct vector *v;
+        vector_t *v;
 
         TYPE_TEST1(sp-1, T_STRING)
         TYPE_TEST2(sp,   T_NUMBER)
         inter_sp = sp;
         inter_pc = pc;
 
-        v = get_dir(sp[-1].u.string, sp->u.number);
+        v = e_get_dir(sp[-1].u.string, sp->u.number);
         sp--; /* think 'free_int_svalue(sp--) */
         free_string_svalue(sp);
         if (v)
@@ -14435,7 +14910,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         char *str;
-        struct svalue *arg;
+        svalue_t *arg;
         int start, len;
 
         assign_eval_cost();
@@ -14463,7 +14938,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         }
 
         /* Read the file */
-        str = read_bytes(arg[0].u.string, start, len);
+        str = e_read_bytes(arg[0].u.string, start, len);
         pop_stack();
         if (str == 0)
             push_number(0);
@@ -14491,7 +14966,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         char *str;
-        struct svalue *arg;
+        svalue_t *arg;
         int start, len;
 
         assign_eval_cost();
@@ -14519,7 +14994,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         }
 
         /* Read the file */
-        str = read_file(arg[0].u.string, start, len);
+        str = e_read_file(arg[0].u.string, start, len);
         pop_stack();
         if (str == 0)
             push_number(0);
@@ -14556,35 +15031,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         TYPE_TEST1(sp-1, T_STRING)
         TYPE_TEST2(sp,   T_STRING)
 
-        i = do_rename((sp-1)->u.string, sp->u.string);
+        i = e_rename((sp-1)->u.string, sp->u.string);
         pop_n_elems(2);
         push_number(i);
-        break;
-    }
-
-    CASE(F_RESTORE_OBJECT);         /* --- restore_object      --- */
-    {
-        /* EFUN restore_object()
-         *
-         *   int restore_object(string name)
-         *
-         * Restore values of variables for current object from file name.
-         * If name ends in ``.c'', this suffix is stripped of by the parser.
-         *
-         * The master object will probably append a .o to the name.
-         *
-         * Return 1 on success, 0 on failure.
-         */
-
-        int i;
-
-        assign_eval_cost();
-        TYPE_TEST1(sp, T_STRING)
-        inter_sp = sp;
-        inter_pc = pc;
-        i = restore_object(current_object, sp->u.string) ? 1 : 0;
-        free_svalue(sp);
-        put_number(sp, i);
         break;
     }
 
@@ -14603,7 +15052,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         TYPE_TEST1(sp, T_STRING)
         inter_sp = sp;
         inter_pc = pc;
-        i = remove_file(sp->u.string);
+        i = e_remove_file(sp->u.string);
         free_svalue(sp);
         put_number(sp, i);
         break;
@@ -14632,22 +15081,6 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         break;
     }
 
-    CASE(F_SAVE_OBJECT);            /* --- save_object         --- */
-        /* EFUN save_object()
-         *
-         *   void save_object(string name)
-         *
-         * Save values of variables of this object in the file name.
-         */
-
-        assign_eval_cost();
-        TYPE_TEST1(sp, T_STRING)
-        inter_sp = sp;
-        inter_pc = pc;
-        save_object(current_object, sp->u.string);
-        pop_stack();
-        break;
-
     CASE(F_TAIL);                   /* --- tail                --- */
         /* EFUN tail()
          *
@@ -14662,7 +15095,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         TYPE_TEST1(sp, T_STRING)
         inter_sp = sp;
         inter_pc = pc;
-        if (tail(sp->u.string))
+        if (e_tail(sp->u.string))
             assign_svalue(sp, &const1);
         else
             assign_svalue(sp, &const0);
@@ -14691,7 +15124,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (sp->type != T_STRING)
             goto bad_arg_3;
 
-        i = write_bytes((sp-2)->u.string, (sp-1)->u.number, sp->u.string);
+        i = e_write_bytes((sp-2)->u.string, (sp-1)->u.number, sp->u.string);
         pop_stack();
         sp--;
         free_svalue(sp);
@@ -14717,7 +15150,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         inter_sp = sp;
         inter_pc = pc;
 
-        i = write_file((sp-1)->u.string, sp->u.string);
+        i = e_write_file((sp-1)->u.string, sp->u.string);
         pop_stack();
         free_svalue(sp);
         put_number(sp, i);
@@ -14750,7 +15183,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * of ob.
          */
 
-        struct vector *vec;
+        vector_t *vec;
 
         TYPE_TEST1(sp, T_OBJECT)
         inter_sp = sp;
@@ -14782,7 +15215,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * of these objects, climbing down recursively.
          */
 
-        struct vector *vec;
+        vector_t *vec;
 
         TYPE_TEST1(sp, T_OBJECT)
         inter_sp = sp;
@@ -14808,7 +15241,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * Destructed objects do not have an environment.
          */
 
-        struct object *ob;
+        object_t *ob;
 
         GET_NUM_ARG
         if (num_arg)
@@ -14820,9 +15253,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             }
             else if (sp->type == T_STRING)
             {
-                inter_sp = sp;
-                inter_pc = pc;
-                ob = environment(sp);
+                ob = find_object(sp->u.string);
+                if (!ob || ob->super == NULL || (ob->flags & O_DESTRUCTED))
+                    ob = NULL;
+                else
+                    ob = ob->super;
                 free_string_svalue(sp);
             }
             else
@@ -14859,7 +15294,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * given, the current object is assumed.
          */
 
-        struct object *ob;
+        object_t *ob;
 
         if (sp->type == T_OBJECT)
         {
@@ -14868,10 +15303,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         }
         else if (sp->type == T_STRING)
         {
-            inter_sp = sp;
-            inter_pc = pc;
-            ob = first_inventory(sp);
+            ob = get_object(sp->u.string);
+            if (!ob)
+                ERRORF(("No object '%s' for first_inventory()\n", sp->u.string));
             free_string_svalue(sp);
+            ob = ob->contains;
         }
         else
             goto bad_arg_1;
@@ -14900,7 +15336,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * the mudlib, using the M_MOVE_OBJECT driver hooks.
          */
 
-        struct object *item, *dest;
+        object_t *item, *dest;
 
         ASSIGN_EVAL_COST
         inter_pc = pc;
@@ -14952,7 +15388,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * first_inventory().
          */
 
-        struct object *ob;
+        object_t *ob;
 
         TYPE_TEST1(sp, T_OBJECT)
         ob = sp->u.ob;
@@ -14968,8 +15404,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
       {
         /* EFUN present()
          *
-          * object present(mixed str)
-         * object present(mixed str, object ob)
+         *   object present(mixed str)
+         *   object present(mixed str, object ob)
          *
          * If an object that identifies (*) to the name ``str'' is present
          * in the inventory or environment of this_object (), then return
@@ -14984,8 +15420,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * Only the inventory of ob is searched, not its environment.
          */
 
-        struct svalue *arg;
-        struct object *ob;
+        svalue_t *arg;
+        object_t *ob;
 
         assign_eval_cost();
         GET_NUM_ARG
@@ -15004,7 +15440,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         }
 
         inter_sp = sp;
-        ob = object_present(arg, ob);
+        ob = e_object_present(arg, ob);
 
         free_svalue(arg);
         if (ob)
@@ -15027,45 +15463,46 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *
          * There are two major modes of calling:
          *
-         * If the first argument is a string and no second argument is
-         * given, str will be send to all livings in the current room
-         * except to the initiating object which called the say() function.
-         * If the second argument is an object the str also won't be sent
-         * to this on. If the second argument is an array of objects the
-         * message won't be sent to the objects in the array. If the
-         * receiving object(s) is not interactive, the lfun catch_tell()
-         * will be applied to the object, with str as argument.
+         * If the first argument is a string <str>, it will be send to
+         * all livings in the current room	except to the initiator.
          *
-         * If the first argument is an array, the applied lfun catch_msg()
-         * of all living objects (except the initiating one which invoked
-         * the say() function) will be called. This array will be given as
-         * first argument and the one who invoked say() as second argument to
-         * lfun catch_msg(). If the second argument to say() is an object
-         * or an array of objects then those objects will also be
-         * excluded from the call of catch_msg().
+         * If the first argument is an array <arr>, the lfun catch_msg()
+         * of all living objects except the initiator will be called.
+         * This array will be given as first argument to the lfun, and
+         * the initiating object as the second.
          *
-         * The 'initiating object' determines according to these rules:
-         *  - if the say() is called from within a living object, this
+         * By specifying a second argument to the efun one can exclude
+         * more objects than just the initiator. If the second argument
+         * is a single object <exclude>, both the given object and the
+         * initiator are excluded from the call. If the second argument
+         * is an array <excludes>, all objects and just the objects in
+         * this array are excluded from the call.
+         *
+         * The 'initiator' is determined according to these rules:
+         *   - if the say() is called from within a living object, this
          *     becomes the initiator
-         *  - if the say() is called from within a dead object as result
-         *    of a user action (i.e. this_player() is valid), this_player()
+         *   - if the say() is called from within a dead object as result
+         *     of a user action (i.e. this_player() is valid), this_player()
          *     becomes the initiator.
-         *  - Else the object calling the say() becomes the initiator.
+         *   - Else the object calling the say() becomes the initiator.
          */
 
-        static struct {
-            INIT_VEC_TYPE;
-            struct svalue second_item[1];
-        } vtmp = { VEC_INIT(2, 1, T_NUMBER), { { T_OBJECT } } };
-          /* Informational struct passed to say() giving the object
-           * to exclude in the second item.
-           * TODO: Update this after commenting say()
+        static LOCAL_VEC2(vtmp, T_NUMBER, T_OBJECT);
+          /* Default 'avoid' array passed to say() giving the object
+           * to exclude in the second item. The first entry is reserved
+           * for e_say() to insert its command_giver object.
            */
 
         ASSIGN_EVAL_COST
         GET_NUM_ARG
         inter_pc = pc;
         inter_sp = sp;
+
+#if defined(DEBUG) && defined(MALLOC_smalloc)
+        static_vector2 = &vtmp.v;
+        /* TODO: Remove this once VEC_SIZE() is proven to be accurate.
+         */
+#endif
 
         if (num_arg == 1)
         {
@@ -15077,8 +15514,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             vtmp.v.item[0].type = T_NUMBER;
               /* this marks the place for the command_giver */
             vtmp.v.item[1].type = T_NUMBER;
-              /* will not match any object... */
-            say(sp, &vtmp.v);
+              /* nothing to exclude... */
+            e_say(sp, &vtmp.v);
         }
         else
         {
@@ -15089,13 +15526,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
             if ( sp->type == T_POINTER )
             {
-                say(sp-1, sp->u.vec);
+                e_say(sp-1, sp->u.vec);
             }
             else if (sp->type == T_OBJECT)
             {
                 vtmp.v.item[0].type = T_NUMBER;
                 put_ref_object(vtmp.v.item+1, sp->u.ob, "say");
-                say(sp-1, &vtmp.v);
+                e_say(sp-1, &vtmp.v);
             }
             else
                 goto bad_arg_2;
@@ -15110,10 +15547,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
       {
         /* EFUN tell_room()
          *
-         *   void tell_room(object ob, string str)
-         *   void tell_room(object ob, string str, object *exclude)
-         *   void tell_room(object ob, mixed *msg)
-         *   void tell_room(object ob, mixed *msg, object *exclude)
+         *   void tell_room(string|object ob, string str)
+         *   void tell_room(string|object ob, string str, object *exclude)
+         *   void tell_room(string|object ob, mixed *msg)
+         *   void tell_room(string|object ob, mixed *msg, object *exclude)
          *
          * Send a message str to all living objects in the room ob. ob
          * can also be the name of the room given as a string. If a
@@ -15121,7 +15558,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * catch_tell() of the object will be invoked with the message as
          * argument. If living objects define catch_tell(), the string
          * will also be sent to that instead of being written to the
-         * user.
+	 * user. If the object is given as its filename, the driver
+         * looks up the object under that name, loading it if necessary.
          * If array *exclude is given, all objects contained in
          * *exclude are excluded from the message str.
          *
@@ -15129,9 +15567,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * all listening livings.
          */
 
-        struct svalue *arg;
-        struct vector *avoid;
-        struct object *ob;
+        svalue_t *arg;
+        vector_t *avoid;
+        object_t *ob;
 
         ASSIGN_EVAL_COST
         GET_NUM_ARG
@@ -15164,8 +15602,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              * operation.
              */
 
-            struct vector *vtmpp;
-            static struct svalue stmp = { T_POINTER };
+            vector_t *vtmpp;
+            static svalue_t stmp = { T_POINTER };
 
             if (arg[2].type != T_POINTER)
                 goto bad_arg_3;
@@ -15179,7 +15617,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             free_array(vtmpp);
         }
 
-        tell_room(ob, sp, avoid);
+        e_tell_room(ob, sp, avoid);
 
         if (num_arg > 2)
             free_array(avoid);
@@ -15201,8 +15639,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * TODO: In the long run, get rid of actions.
          */
 
-        struct svalue *arg;
-        struct svalue *verb;
+        svalue_t *arg;
+        svalue_t *verb;
 
         GET_NUM_ARG
         inter_pc = pc;
@@ -15263,7 +15701,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         int i;
-        struct svalue *arg;
+        svalue_t *arg;
 
         assign_eval_cost();
         GET_NUM_ARG
@@ -15371,9 +15809,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * SENT_MARKER      internal, won't be in the returned array
          */
 
-        struct vector *v;
-        struct svalue *arg;
-        struct object *ob;
+        vector_t *v;
+        svalue_t *arg;
+        object_t *ob;
 
         arg = sp - 1;
         inter_sp = sp;
@@ -15497,7 +15935,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * TODO:: vanish altogether.
          */
 
-        struct object *ob;
+        object_t *ob;
 
         TYPE_TEST1(sp, T_OBJECT)
         if (!current_object->eff_user)
@@ -15524,7 +15962,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * permissions. If ob is omitted, is this_object() as default.
          */
 
-        struct object *ob;
+        object_t *ob;
 
         TYPE_TEST1(sp, T_OBJECT)
         ob = sp->u.ob;
@@ -15563,8 +16001,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * Objects with euid 0 cannot load or clone other objects.
          */
 
-        struct svalue *ret;
-        struct svalue *argp;
+        svalue_t *ret;
+        svalue_t *argp;
 
         argp = sp;
         if (argp->type == T_NUMBER)
@@ -15628,7 +16066,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * this_object() as default.
          */
 
-        struct object *ob;
+        object_t *ob;
         char *name;
 
         TYPE_TEST1(sp, T_OBJECT)
@@ -15638,41 +16076,6 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             put_ref_string(sp, name);
         else
             put_number(sp, 0);
-        break;
-    }
-#endif
-
-    /* --- Efuns: Only used in Compat mode --- */
-
-#ifdef F_TRANSFER
-    CASE(F_TRANSFER);
-    {
-        int i;
-        struct object *dest;
-
-        assign_eval_cost();
-        TYPE_TEST1(sp-1, T_OBJECT)
-        inter_sp = sp;
-        inter_pc = pc;
-        if (sp->type == T_OBJECT) {
-            dest = sp->u.ob;
-        } else if (sp->type == T_STRING) {
-            dest = get_object(sp->u.string);
-            if (dest == 0)
-                ERROR("Object not found.\n")
-            free_string_svalue(sp);
-            put_ref_object(sp, dest, "transfer");
-        } else goto bad_arg_2;
-        i = transfer_object(sp-1);
-        if (i) {
-            /* the objects on the stack might have been changed into 0 if
-             * destructed, thus free_object_svalue is not applicable.
-             */
-            free_svalue(sp);
-            free_svalue(sp-1);
-        }
-        sp--;
-        put_number(sp, i);
         break;
     }
 #endif
@@ -15714,8 +16117,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         struct rusage rus;
-        struct vector *res;
-        struct svalue *v;
+        vector_t *res;
+        svalue_t *v;
 #ifndef GETRUSAGE_RESTRICTED
         int maxrss;
 #endif
@@ -15772,9 +16175,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *
          * TODO: Make the alist-efuns xefuns.
          */
-        struct svalue *args;
-        struct vector *keys,*data;
-        struct svalue *fail_val;
+        svalue_t *args;
+        vector_t *keys,*data;
+        svalue_t *fail_val;
         int ix;
 
         GET_NUM_ARG
@@ -15889,23 +16292,30 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
            order_alist to retain the alist property.
          */
         int i;
-        struct vector *list;
+        vector_t *list;
         long listsize;
         size_t keynum;
-        struct svalue *key,*key_data,*ret;
-        static struct { INIT_VEC_TYPE; } tempvec =
-          { VEC_INIT(1, 1, T_NUMBER) };
-          /* Mock-alist for the key-insertion form */
+        svalue_t *key,*key_data,*ret;
+        static LOCAL_VEC1(insert_alist_vec, T_NUMBER);
+          /* Mock-alist for the insert_alist() key-insertion form.
+           */
 
         GET_NUM_ARG
+
+#if defined(DEBUG) && defined(MALLOC_smalloc)
+        static_vector1 = &insert_alist_vec.v;
+        /* TODO: Remove this once VEC_SIZE() is proven to be accurate.
+         */
+#endif
+
         if (sp->type != T_POINTER)
-            bad_arg_pc(num_arg,F_INSERT_ALIST-F_OFFSET, sp, pc);
+            bad_arg_pc(num_arg,F_INSERT_ALIST, sp, pc);
 
         /* Make up an alist if only a key-insertion is required */
-        if ( !(listsize = (signed)VEC_SIZE(sp->u.vec))
+        if ( !(listsize = (long)VEC_SIZE(sp->u.vec))
          ||  sp->u.vec->item[0].type != T_POINTER )
         {
-            list = &tempvec.v;
+            list = &insert_alist_vec.v;
             *list->item = *sp;
             listsize = 1;
         }
@@ -15919,7 +16329,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (list->item[i].type != T_POINTER
              || VEC_SIZE(list->item[i].u.vec) != keynum)
             {
-                bad_arg_pc(num_arg,F_INSERT_ALIST-F_OFFSET, sp, pc);
+                bad_arg_pc(num_arg,F_INSERT_ALIST, sp, pc);
             }
         }
 
@@ -15967,7 +16377,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * general.
          */
 
-        struct vector *tmp;
+        vector_t *tmp;
 
         TYPE_TEST1(sp-1, T_POINTER)
         TYPE_TEST2(sp,   T_POINTER)
@@ -15999,8 +16409,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         int i;
-        struct svalue *args;
-        struct vector *list;
+        svalue_t *args;
+        vector_t *list;
         long listsize;
         Bool reuse;
         size_t keynum;
@@ -16011,7 +16421,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Get the key array to order */
         TYPE_TEST1(args, T_POINTER)
         if (num_arg == 1
-          && ((list = args->u.vec), (listsize = (signed)VEC_SIZE(list)))
+          && ((list = args->u.vec), (listsize = (long)VEC_SIZE(list)))
           && list->item[0].type == T_POINTER)
         {
             args     = list->item;
@@ -16045,46 +16455,6 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
     /* --- Optional Efuns: Miscellaneous --- */
 
-#ifdef F_PROCESS_STRING
-    CASE(F_PROCESS_STRING);         /* --- process_string      --- */
-    {
-        /* EFUN process_string()
-         *
-         * string process_string(string str)
-         *
-         * Searches string str for occurences of a "value by function
-         * call", which is @@ followed by an implicit function call. See
-         * "value_by_function_call" in the principles section.
-         *
-         * The value should contain a string like this:
-         * @@function[:filename][|arg|arg]@@
-         *
-         * function must return a string or else the string which should be
-         * processed will be returned unchanged.
-         *
-         * Note that process_string() does not recurse over returned
-         * replacement values. If a function returns another function
-         * description, that description will not be replaced.
-         *
-         * Note that both filename and args are optional.
-         */
-
-        char *str;
-
-        assign_eval_cost();
-        TYPE_TEST1(sp, T_STRING)
-        inter_sp = sp;
-        inter_pc = pc;
-        str = process_string(sp->u.string);
-        if (str != sp->u.string)
-        {
-            free_string_svalue(sp);
-            put_malloced_string(sp, str);
-        }
-        break;
-    }
-#endif /* F_PROCESS_STRING */
-
 #ifdef F_SET_LIGHT
     CASE(F_SET_LIGHT);              /* --- set_light           --- */
     {
@@ -16102,7 +16472,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * the current object.
          */
 
-        struct object *o1;
+        object_t *o1;
 
         TYPE_TEST1(sp, T_NUMBER)
         add_light(current_object, sp->u.number);
@@ -16186,7 +16556,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              */
 
             break_sp +=
-              LOAD_UINT8(pc) * (sizeof(struct svalue)/sizeof(*break_sp));
+              LOAD_UINT8(pc) * (sizeof(svalue_t)/sizeof(*break_sp));
             /* FALLTHROUGH */
 
                              /* --- esc break_continue <offset> ---*/
@@ -16208,7 +16578,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
             /* TODO: uint16 */ unsigned short offset;
 
-            break_sp += sizeof(struct svalue)/sizeof(*break_sp);
+            break_sp += sizeof(svalue_t)/sizeof(*break_sp);
             GET_SHORT(offset, pc);
             offset += pc - current_prog->program;
             pc = current_prog->program + offset;
@@ -16369,14 +16739,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             sp = protected_range_lvalue(0x101, sp);
             break;
 
-                            /* --- esc protected_extract_lvalue --- */
-        XCASE(F_PROTECTED_EXTRACT_LVALUE);
-          {
-            /* X-Op (string|vector &v=sp[0], int ix=sp[-1])
+                           /* --- esc protected_nx_range_lvalue --- */
+        XCASE(F_PROTECTED_NX_RANGE_LVALUE);
+            /* X-Op (string|vector &v=sp[0], i1=sp[-1])
              *
-             * Compute the range &(v[ix..<1]) of lvalue <v>, wrap it into a
+             * Compute the range &(v[i1..]) of lvalue <v>, wrap it into a
              * protector, and push the reference to the protector onto the
-             * stack. If <ix> is negative, compute the range &(v[<-ix..<1]).
+             * stack.
              *
              * If <v> is a protected lvalue itself, its protecting svalue will
              * be used in the result protector.
@@ -16384,26 +16753,43 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              * If <v> is a string-lvalue, it is made a malloced string if
              * necessary.
              *
-             * Used for sscanf() and parse_command() only.
+             * We implement it by pushing '1' onto the stack and then
+             * calling protected_nr_range_lvalue, effectively computing
+             * &(v[i1..<1]).
              */
 
-            sp[1] = sp[0]; /* Move the vector up */
-            put_number(sp, 1); /* Fake the second index */
+            inter_pc = pc;
             sp++;
-
-            if (sp[-2].u.number < 0 && sp[-2].type == T_NUMBER)
-            {
-                sp[-2].u.number = -sp[-2].u.number;
-                inter_pc = pc;
-                sp = protected_range_lvalue(0x101, sp);
-            }
-            else
-            {
-                inter_pc = pc;
-                sp = protected_range_lvalue(0x001, sp);
-            }
+            sp[0] = sp[-1];       /* Pull up the 'v' */
+            put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
+            sp = protected_range_lvalue(0x001, sp);
             break;
-          }
+
+                           /* --- esc protected_rx_range_lvalue --- */
+        XCASE(F_PROTECTED_RX_RANGE_LVALUE);
+            /* X-Op (string|vector &v=sp[0], int i1=sp[-1])
+             *
+             * Compute the range &(v[<i1..]) of lvalue <v>, wrap it into a
+             * protector, and push the reference to the protector onto the
+             * stack.
+             *
+             * If <v> is a protected lvalue itself, its protecting svalue will
+             * be used in the result protector.
+             *
+             * If <v> is a string-lvalue, it is made a malloced string if
+             * necessary.
+             *
+             * We implement it by pushing '1' onto the stack and then
+             * calling protected_nr_range_lvalue, effectively computing
+             * &(v[i1..<1]).
+             */
+
+            inter_pc = pc;
+            sp++;
+            sp[0] = sp[-1];       /* Pull up the 'v' */
+            put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
+            sp = protected_range_lvalue(0x101, sp);
+            break;
 
         XCASE(F_UNDEF);             /* --- esc undef           --- */
           {
@@ -16413,6 +16799,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              * instruction of the generated stub), it is also inserted
              * into closures when the object the closure is bound to
              * is destructed.
+             * Note: this instruction MUST be the first in the function.
              */
 
             char *name;
@@ -16421,15 +16808,15 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (pc > current_prog->program && pc <= PROGRAM_END(*current_prog))
             {
                 /* Copy the function name pointer into name.
-                 * TODO: This code relies on the layout of function headers.
                  */
-                memcpy(&name, pc - 5 - sizeof name, sizeof name);
-                  /* '5': two opcode bytes plus the function header */
+                memcpy(&name, FUNCTION_NAMEP(FUNCTION_FROM_CODE(pc-2)), sizeof name);
             }
             else
             {
+            	/* It is a vanished closure */
                 name = "Object the closure was bound to has been destructed";
-                /* TODO: WHich object? */
+                /* TODO: WHich object? This can also happen as result of
+                 * TODO:: a replace_program */
             }
             ERRORF(("Undefined function: %s\n", name))
           }
@@ -16773,9 +17160,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 j = sp[-1].u.map->num_values;
                 break;
             case T_CLOSURE:
-                if (sp->u.number == 2 && sp->type == T_NUMBER)
+                if ( sp->type == T_NUMBER && sp->u.number == 2)
                 {
-                    struct object *ob;
+                    object_t *ob;
 
                     sp--;
                     switch(sp->x.closure_type)
@@ -16785,6 +17172,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                         break;
                     case CLOSURE_LFUN:
                     case CLOSURE_IDENTIFIER:
+                    case CLOSURE_BOUND_LAMBDA:
+                    case CLOSURE_LAMBDA:
                         ob = sp->u.lambda->ob;
                         break;
                     case CLOSURE_ALIEN_LFUN:
@@ -16810,15 +17199,17 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 free_svalue(--sp);
                 if (sp[1].u.number != 1)
+                {
                     if (sp[1].u.number)
                         j = -1;
                     else
                         j = i;
+                }
                 put_number(sp, j);
             }
             else
             {
-                struct vector *v;
+                vector_t *v;
 
                 inter_sp = sp;
                 inter_pc = pc;
@@ -17037,12 +17428,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                  */
 
                 long size;
-                struct svalue *svp;
+                svalue_t *svp;
                 char c, *d;
 
-                size = (signed)VEC_SIZE(sp->u.vec) + 1;
+                size = (long)VEC_SIZE(sp->u.vec) + 1;
                 svp = sp->u.vec->item;
-                d = s = xalloc((unsigned)size);
+                d = s = xalloc((size_t)size);
                 for (;;)
                 {
                     if (!--size)
@@ -17069,8 +17460,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
               {
                 /* Convert the various types of closures into a string */
 
-                struct lambda *l = sp->u.lambda;
-                struct object *ob;
+                lambda_t *l = sp->u.lambda;
+                object_t *ob;
                 int ix;
 
                 switch(sp->x.closure_type)
@@ -17086,7 +17477,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                             ERROR("Out of memory.\n");
                     }
 
-                    if (((short)l->function.index) >= 0)
+                    if (l->function.index != VANISHED_VARCLOSURE_INDEX)
                     {
                         /* Get the variable name */
                         put_ref_string(sp
@@ -17104,11 +17495,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 case CLOSURE_LFUN: /* Lfun closure */
                 case CLOSURE_ALIEN_LFUN:
                   {
-                    struct program *prog;
+                    program_t *prog;
                     fun_hdr_p fun;
-                    /* TODO: funflags */ uint32 flags;
+                    funflag_t flags;
                     char *function_name;
-                    struct inherit *inheritp;
+                    inherit_t *inheritp;
 
                     if (sp->x.closure_type == CLOSURE_LFUN)
                     {
@@ -17144,11 +17535,58 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
                     /* Copy the function name pointer (a shared string) */
                     fun = prog->program + (flags & FUNSTART_MASK);
-                    memcpy((char *)&function_name, &FUNCTION_NAME(fun)
+                    memcpy(&function_name, FUNCTION_NAMEP(fun)
                           , sizeof function_name
                     );
                     put_ref_string(sp, function_name);
                     break;
+                  }
+
+                case CLOSURE_UNBOUND_LAMBDA: /* Unbound-Lambda Closure */
+                case CLOSURE_PRELIMINARY:    /* Preliminary Lambda Closure */
+                  {
+                      char *rc;
+
+                      if (sp->x.closure_type == CLOSURE_PRELIMINARY)
+                          sprintf(buf, "<prelim lambda 0x%p>", l);
+                      else
+                          sprintf(buf, "<free lambda 0x%p>", l);
+                      rc = string_copy(buf);
+                      put_malloced_string(sp, rc);
+                      break;
+                  }
+
+                case CLOSURE_LAMBDA:         /* Lambda Closure */
+                case CLOSURE_BOUND_LAMBDA:   /* Bound-Lambda Closure */
+                  {
+                      char     *rc;
+
+                      if (sp->x.closure_type == CLOSURE_BOUND_LAMBDA)
+                          sprintf(buf, "<bound lambda 0x%p:", l);
+                      else
+                          sprintf(buf, "<lambda 0x%p:", l);
+
+                      ob = l->ob;
+
+                      if (!ob)
+                      {
+                          strcat(buf, "{null}>");
+                          rc = string_copy(buf);
+                      }
+                      else
+                      {
+                          if (ob->flags & O_DESTRUCTED)
+                              strcat(buf, "{dest}");
+                          xallocate(rc, strlen(buf)+strlen(ob->name)+3
+                                   , "string-repr of lambda closure");
+                          strcat(buf, "/");
+                          strcpy(rc, buf);
+                          strcat(rc, ob->name);
+                          strcat(rc, ">");
+                      }
+
+                      put_malloced_string(sp, rc);
+                      break;
                   }
 
                 default:
@@ -17190,9 +17628,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              * are.
              */
 
-            struct vector *v;
+            vector_t *v;
             char *s, ch;
-            struct svalue *svp;
+            svalue_t *svp;
 
             if (sp->type == T_STRING || sp->type == T_SYMBOL)
             {
@@ -17200,7 +17638,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
                 inter_sp = sp;
                 inter_pc = pc;
-                v = allocate_uninit_array((signed)svalue_strlen(sp) + 1);
+                v = allocate_uninit_array((mp_int)svalue_strlen(sp) + 1);
                 s = sp->u.string;
                 svp = v->item;
                 do {
@@ -17225,31 +17663,6 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             }
             else
                 goto xbad_arg_1;
-            break;
-          }
-
-                             /* --- esc set_extra_wizinfo_size --- */
-        XCASE(F_SET_EXTRA_WIZINFO_SIZE);
-          {
-            /* XEFUN set_extra_wizinfo_size()
-             *
-             *   void set_extra_wizinfo_size(int size)
-             *
-DESCRIPTION
-             * Indicate that the wizlist should contain an array of this size
-             * with extra info foreach wizard. Causes the privilege violation
-             * ("set_extra_wizinfo_size", this_object(), size).
-             *
-             * TODO: The extra_wizinfo idea could be applied to single objects
-             * TODO:: and - ta da! - we have driver supported properties.
-             * TODO:: Which then could be used to implement uids/euids etc.
-             */
-
-            if (sp->type != T_NUMBER)
-                goto xbad_arg_1;
-            if (privilege_violation("set_extra_wizinfo_size", sp))
-                wiz_info_extra_size = sp->u.number;
-            sp--;
             break;
           }
 
@@ -17283,27 +17696,33 @@ DESCRIPTION
                 if (offs < 0)
                 {
                     offs += svalue_strlen(sp-2);
+                    if (offs < 0)
+                        offs = 0;
                 }
 
                 /* The loop is necessary because the allocated
                  * length might not be the real length.
                  * TODO: Lars sighs deeply.
                  */
-                do {
-                    if (!*p1++)
-                    {
-                        p1--;
-                        break;
-                    }
-                } while (--offs);
+                if (offs)
+                {
+                    do {
+                        if (!*p1++)
+                        {
+                            p1--;
+                            break;
+                        }
+                    } while (--offs);
+                }
             }
 
             /* Now do the search starting at p1 */
             p2 = strstr(p1, sp[-1].u.string);
+            p1 = sp[-2].u.string;
             sp--;
             pop_stack();
             free_string_svalue(sp);
-            put_number(sp, p2 ? (p2 - p1) + sp[2].u.number : -1);
+            put_number(sp, p2 ? (p2 - p1) : -1);
             break;
           }
 
@@ -17357,7 +17776,7 @@ DESCRIPTION
              * which case it has the same effect as member(E).
              */
 
-            struct svalue *item;
+            svalue_t *item;
             int i;
 
             GET_NUM_ARG
@@ -17426,8 +17845,8 @@ DESCRIPTION
             int depth, i;
             Bool done;
             struct control_stack *p;
-            struct vector *v;
-            struct svalue *svp;
+            vector_t *v;
+            svalue_t *svp;
 
             TYPE_TEST1(sp, T_NUMBER)
 
@@ -17451,7 +17870,7 @@ DESCRIPTION
             p = csp;
             for (i = 0, svp = v->item, done = MY_FALSE; i < depth; i++, svp++)
             {
-                struct object *prev;
+                object_t *prev;
                 do {
                     if (p == control_stack)
                     {
@@ -17557,8 +17976,8 @@ DESCRIPTION
              * no object with that name does exist, an error occurs.
              */
 
-            struct svalue *arg;
-            struct object *ob;
+            svalue_t *arg;
+            object_t *ob;
 
             ASSIGN_EVAL_COST
             GET_NUM_ARG
@@ -17680,7 +18099,7 @@ DESCRIPTION
 
             int i;
             struct control_stack *p;
-            struct object *prev_ob;
+            object_t *prev_ob;
 
             /* Test the arguments */
             if (sp->type != T_NUMBER)
@@ -17791,7 +18210,7 @@ DESCRIPTION
              */
 
             char *name, *res;
-            struct object *ob;
+            object_t *ob;
 
             TYPE_TEST1(sp, T_OBJECT)
 
@@ -17827,7 +18246,7 @@ DESCRIPTION
              * True if the object is or once was interactive.
              */
 
-            struct object *obj;
+            object_t *obj;
 
             if (sp->type != T_OBJECT) goto xbad_arg_1;
 
@@ -17866,16 +18285,19 @@ DESCRIPTION
              * else 0.
              */
 
-            struct object *ob;
-            struct interactive *ip;
+            object_t *ob, *cb;
+            interactive_t *ip;
 
             TYPE_TEST1(sp, T_OBJECT)
 
             ob = sp->u.ob;
-            if (NULL != (ip = O_GET_INTERACTIVE(ob))
-             && ip->sent.type == SENT_INTERACTIVE && ip->input_to)
+            if (O_SET_INTERACTIVE(ip, ob) && ip->input_to)
             {
-                sp->u.ob = ref_object(ip->input_to->ob, "query_input_pending");
+                cb = callback_object(&(ip->input_to->fun));
+                if (cb)
+                    sp->u.ob = ref_object(cb, "query_input_pending");
+                else
+                    put_number(sp, 0);
             }
             else
             {
@@ -18011,7 +18433,7 @@ DESCRIPTION
              * TODO: This efun is outdated by the copy() efun.
              */
 
-            struct mapping *m, *m2;
+            mapping_t *m, *m2;
 
             TYPE_TEST1(sp, T_MAPPING)
             m = sp->u.map;
@@ -18025,6 +18447,83 @@ DESCRIPTION
 
 #ifdef F_EXTRACT
           /* TODO: Get rid of efun extract() altogether */
+        XCASE(F_EXTRACT2);          /* --- esc extract2        --- */
+          {
+            /* Compute the range sp[0]..end from string/array sp[-1]
+             * and leave it on the stack. If sp[0] is negative, it is
+             * counted from the end of the string/array.
+             *
+             * The compiler generates this if the efun extract() is called
+             * with just two arguments.
+             * TODO: Get rid of efun extract() .
+             */
+
+            long len, from;
+            svalue_t *arg;
+
+            arg = sp - 1;
+
+            if (arg->type == T_STRING)
+            {
+                /* Slice an array */
+                char *res;
+
+                len = (long)_svalue_strlen(&arg[0]);
+                if ((arg+1)->type != T_NUMBER)
+                {
+                    ERRORF(("Index value must be a number.\n"));
+                    /* NOTREACHED */
+                    return; /* Flow control hint */
+                }
+                from = arg[1].u.number;
+                sp--;
+                if (from < 0) {
+                    from = len + from;
+                    if (from < 0)
+                        from = 0;
+                }
+                if (from >= len) {
+                    pop_stack();
+                    push_volatile_string("");
+                    break;
+                }
+                res = string_copy(arg->u.string + from);
+                free_string_svalue(sp);
+                put_malloced_string(sp, res);
+                break;
+            }
+
+            if (arg->type != T_POINTER)
+            {
+                ERRORF(("Indexed value is neither string nor array.\n"));
+                /* NOTREACHED */
+                return; /* Flow control hint */
+            }
+
+            /* Slice an array */
+            {
+                vector_t *v, *res;
+
+                if ((arg+1)->type != T_NUMBER)
+                {
+                    ERRORF(("Index value must be a number.\n"));
+                    /* NOTREACHED */
+                    return; /* Flow control hint */
+                }
+                v = arg->u.vec;
+                len = (long)VEC_SIZE(v);
+                from = arg[1].u.number;
+                sp--;
+                if (from < 0) {
+                    from = len + from;
+                }
+                res = slice_array(v, from, len-1);
+                free_array(v);
+                put_array(sp,res);
+                break;
+            }
+          }
+
         XCASE(F_EXTRACT1);          /* --- esc extract1        --- */
           {
             /* XEFUN extract1()
@@ -18066,7 +18565,7 @@ DESCRIPTION
             {
                 /* Extract from an array */
 
-                struct vector *v;
+                vector_t *v;
                 mp_int end, size;
 
                 v = sp[-2].u.vec;
@@ -18074,7 +18573,7 @@ DESCRIPTION
                   slice_array(
                     v,
                     sp[-1].u.number,
-                    (end = sp[0].u.number) >= (size = (signed)VEC_SIZE(v)) ?
+                    (end = sp[0].u.number) >= (size = (mp_int)VEC_SIZE(v)) ?
                       size - 1 :
                       end
                   );
@@ -18095,7 +18594,7 @@ DESCRIPTION
                 long len, from, to;
                 char *res;
 
-                len = (signed)_svalue_strlen(&sp[-2]);
+                len = (long)_svalue_strlen(&sp[-2]);
                 from = sp[-1].u.number;
                 if (from < 0) {
                     from = len + from;
@@ -18118,8 +18617,8 @@ DESCRIPTION
                     push_malloced_string(res);
                     break;
                 }
-                res = xalloc((unsigned)(to - from + 2));
-                strncpy(res, sp[-2].u.string + from, (unsigned)(to - from + 1));
+                res = xalloc((size_t)(to - from + 2));
+                strncpy(res, sp[-2].u.string + from, (size_t)(to - from + 1));
                 res[to - from + 1] = '\0';
                 pop_n_elems(3);
                 push_malloced_string(res);
@@ -18143,7 +18642,7 @@ DESCRIPTION
              * debugging and can cause a crash.
              */
 
-            struct object *ob;
+            object_t *ob;
 
             if (sp->type != T_OBJECT) goto xbad_arg_1;
             ob = sp->u.ob;
@@ -18167,23 +18666,38 @@ DESCRIPTION
 
     /* Instruction executed */
 
+    /* Even intermediate results could exceed the stack size.
+     * We better check for that.
+     */
+    if (sp - start_of_stack == SIZEOF_STACK - 1)
+        stack_overflow(sp, fp, pc);
+    else if ((long)(sp - start_of_stack) > (long)(SIZEOF_STACK - 1))
+    {
+        /* When we come here, we already overwrote the bounds
+         * of the stack :-(
+         */
+        fatal("Stack overflow: %ld too high\n"
+             , (long)(sp - start_of_stack - (SIZEOF_STACK - 1))
+             );
+    }
+
 #ifdef DEBUG
     if (expected_stack && expected_stack != sp)
     {
-        fatal("Bad stack after evaluation.\n"
-              "sp: %lx expected: %lx\n"
-              "Instruction %d, num arg %d\n",
-              (long)sp, (long)expected_stack,
-              instruction + F_OFFSET, num_arg);
+        fatal( "Bad stack after evaluation.\n"
+               "sp: %lx expected: %lx\n"
+               "Instruction %d(%s), num arg %d\n"
+             , (long)sp, (long)expected_stack
+             , instruction, get_f_name(instruction), num_arg);
     }
 
     if (sp < fp + csp->num_local_variables - 1)
     {
-        fatal("Bad stack after evaluation.\n"
-              "sp: %lx minimum expected: %lx\n"
-              "Instruction %d, num arg %d\n",
-              (long)sp, (long)(fp + csp->num_local_variables - 1),
-              instruction + F_OFFSET, num_arg);
+        fatal( "Bad stack after evaluation.\n"
+               "sp: %lx minimum expected: %lx\n"
+               "Instruction %d(%s), num arg %d\n"
+             , (long)sp, (long)(fp + csp->num_local_variables - 1)
+             , instruction, get_f_name(instruction), num_arg);
     }
 #endif /* DEBUG */
 
@@ -18209,7 +18723,7 @@ DESCRIPTION
 
 /*-------------------------------------------------------------------------*/
 static Bool
-apply_low (char *fun, struct object *ob, int num_arg, Bool b_ign_prot)
+apply_low (char *fun, object_t *ob, int num_arg, Bool b_ign_prot)
 
 /* The low-level implementation of function calls.
  *
@@ -18233,7 +18747,7 @@ apply_low (char *fun, struct object *ob, int num_arg, Bool b_ign_prot)
  */
 
 {
-    struct program *progp;
+    program_t *progp;
     struct control_stack *save_csp;
     p_int ix;
 
@@ -18254,7 +18768,7 @@ apply_low (char *fun, struct object *ob, int num_arg, Bool b_ign_prot)
      */
     if (ob->flags & O_SHADOW)
     {
-        struct object *shadow;
+        object_t *shadow;
 
         while (NULL != (shadow = O_GET_SHADOW(ob)->shadowed_by)
             && shadow != current_object)
@@ -18269,8 +18783,10 @@ retry_for_shadow:
 
     /* Load the object from swap */
     if (ob->flags & O_SWAPPED)
+    {
         if (load_ob_from_swap(ob) < 0)
             error("Out of memory\n");
+    }
 
     progp = ob->prog;
 
@@ -18282,7 +18798,7 @@ retry_for_shadow:
              );
 #endif
 
-    if ( !((p_int)fun & 2) )
+    if ( ((p_int)fun & 2) != ((p_int)SHSTR_OVERHEAD & 2) )
     {
         /* Heuristic to find out if fun is an unshared string,
          * building on the six-byte-overhead of shared strings.
@@ -18339,8 +18855,16 @@ retry_for_shadow:
             current_prog = cache[ix].progp;
             current_strings = current_prog->strings;
             function_index_offset = cache[ix].function_index_offset;
-            current_variables = ob->variables
-                                + cache[ix].variable_index_offset;
+#ifdef DEBUG
+            if (!ob->variables && cache[ix].variable_index_offset)
+                fatal("%s Fatal: apply (cached) for object %p '%s' "
+                      "w/o variables, but offset %d\n"
+                     , time_stamp(), ob, ob->name
+                     , cache[ix].variable_index_offset);
+#endif
+            current_variables = ob->variables;
+            if (current_variables)
+                current_variables += cache[ix].variable_index_offset;
             inter_sp = setup_new_frame2(funstart, inter_sp);
             previous_ob = current_object;
             current_object = ob;
@@ -18387,7 +18911,7 @@ retry_for_shadow:
                  * create a new cache entry.
                  */
 
-                /* TODO: funflags */ uint32 flags;
+                funflag_t flags;
                 fun_hdr_p funstart;
 
                 push_control_stack(inter_sp, inter_pc, inter_fp);
@@ -18413,20 +18937,31 @@ retry_for_shadow:
                 cache[ix].progp = current_prog;
                 cache[ix].function_index_offset = function_index_offset;
                 cache[ix].variable_index_offset = variable_index_offset;
-                current_variables = ob->variables
-                                    + variable_index_offset;
+#ifdef DEBUG
+                if (!ob->variables && variable_index_offset)
+                    fatal("%s Fatal: apply for object %p '%s' w/o variables, "
+                          "but offset %d\n"
+                         , time_stamp(), ob, ob->name, variable_index_offset);
+#endif
+                current_variables = ob->variables;
+                if (current_variables)
+                    current_variables += variable_index_offset;
                 funstart = current_prog->program + (flags & FUNSTART_MASK);
                 cache[ix].funstart = funstart;
                 cache[ix].flags = progp->functions[fx]
                                   & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED);
 
-                /* Static functions may not be called from outside. */
+                /* Static functions may not be called from outside,
+                 * Protected functions not even from the inside.
+                 */
                 if (0 != cache[ix].flags
-                  && ((cache[ix].flags & TYPE_MOD_PROTECTED)
+                  && (   (cache[ix].flags & TYPE_MOD_PROTECTED)
                       || current_object != ob)
                   && !b_ign_prot
                     )
                 {
+                    /* Not found */
+                    
                     previous_ob = csp->prev_ob;
                     current_object = csp->ob;
                     pop_control_stack();
@@ -18520,8 +19055,8 @@ pop_apply_value (void)
 }
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-sapply_int (char *fun, struct object *ob, int num_arg, Bool b_find_static)
+svalue_t *
+sapply_int (char *fun, object_t *ob, int num_arg, Bool b_find_static)
 
 /* Call function <fun> in <ob>ject with <num_arg> arguments pushed
  * onto the stack (<inter_sp> points to the last one). static and protected
@@ -18541,7 +19076,7 @@ sapply_int (char *fun, struct object *ob, int num_arg, Bool b_find_static)
 
 {
 #ifdef DEBUG
-    struct svalue *expected_sp;
+    svalue_t *expected_sp;
 #endif
 
     /* Handle tracing */
@@ -18576,8 +19111,8 @@ sapply_int (char *fun, struct object *ob, int num_arg, Bool b_find_static)
 } /* sapply_int() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-apply (char *fun, struct object *ob, int num_arg)
+svalue_t *
+apply (char *fun, object_t *ob, int num_arg)
 
 /* Call function <fun> in <ob>ject with <num_arg> arguments pushed
  * onto the stack (<inter_sp> points to the last one). static and protected
@@ -18602,7 +19137,7 @@ apply (char *fun, struct object *ob, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 static void
-secure_apply_error (struct svalue *save_sp, struct control_stack *save_csp)
+secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
 
 /* Recover from an error during a secure apply. <save_sp> and <save_csp>
  * are the saved evaluator stack and control stack pointers, saving the
@@ -18630,7 +19165,7 @@ secure_apply_error (struct svalue *save_sp, struct control_stack *save_csp)
     {
         if (!out_of_memory)
         {
-            debug_message("Master failure: %s", current_error);
+            debug_message("%s Master failure: %s", time_stamp(), current_error);
             xfree(current_error);
             xfree(current_error_file);
             xfree(current_error_object_name);
@@ -18639,7 +19174,7 @@ secure_apply_error (struct svalue *save_sp, struct control_stack *save_csp)
     else if (!out_of_memory)
     {
         int a;
-        struct object *save_cmd;
+        object_t *save_cmd;
 
         push_malloced_string(current_error);
         a = 1;
@@ -18659,8 +19194,8 @@ secure_apply_error (struct svalue *save_sp, struct control_stack *save_csp)
 } /* secure_apply_error() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-secure_apply (char *fun, struct object *ob, int num_arg)
+svalue_t *
+secure_apply (char *fun, object_t *ob, int num_arg)
 
 /* Call function <fun> in <ob>ject with <num_arg> arguments pushed
  * onto the stack (<inter_sp> points to the last one). static and protected
@@ -18680,9 +19215,9 @@ secure_apply (char *fun, struct object *ob, int num_arg)
 
 {
     struct error_recovery_info error_recovery_info;
-    struct svalue *save_sp;
+    svalue_t *save_sp;
     struct control_stack *save_csp;
-    struct svalue *result;
+    svalue_t *result;
 
     if (ob->flags & O_DESTRUCTED)
         return NULL;
@@ -18706,7 +19241,7 @@ secure_apply (char *fun, struct object *ob, int num_arg)
 } /* secure_apply() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
+svalue_t *
 apply_master_ob (char *fun, int num_arg)
 
 /* Call function <fun> in the master object with <num_arg> arguments pushed
@@ -18714,10 +19249,11 @@ apply_master_ob (char *fun, int num_arg)
  * functions can be called from the outside. The function takes care
  * of calling shadows where necessary.
  *
- * secure_apply() returns a pointer to the function result when the call was
- * successfull, or NULL on failure. The arguments are popped in any case.
+ * apply_master_object() returns a pointer to the function result when the
+ * call was successfull, or NULL on failure. The arguments are popped in
+ * any case.
  * The result pointer, if returned, points to a static area which will be
- * overwritten with the next secure_apply().
+ * overwritten with the next apply_master_object().
  *
  * The function makes sure that there is a master object to be called. If
  * necessary, a new one is compiled or, failing that, an old one is
@@ -18740,9 +19276,9 @@ apply_master_ob (char *fun, int num_arg)
     volatile Bool reserve_used = MY_FALSE;
 
     struct error_recovery_info error_recovery_info;
-    struct svalue *save_sp;
+    svalue_t *save_sp;
     struct control_stack *save_csp;
-    struct svalue *result;
+    svalue_t *result;
 
     /* Get the master object. */
     assert_master_ob_loaded();
@@ -18766,8 +19302,8 @@ apply_master_ob (char *fun, int num_arg)
     if (setjmp(error_recovery_info.con.text))
     {
         secure_apply_error(save_sp - num_arg, save_csp);
-        printf("Error in master_ob->%s()\n", fun);
-        debug_message("Error in master_ob->%s()\n", fun);
+        printf("%s Error in master_ob->%s()\n", time_stamp(), fun);
+        debug_message("%s Error in master_ob->%s()\n", time_stamp(), fun);
         result = NULL;
     }
     else
@@ -18810,7 +19346,7 @@ assert_master_ob_loaded (void)
     static Bool inside = MY_FALSE;
       /* Flag to notice recursive calls */
 
-    static struct object *destructed_master_ob = NULL;
+    static object_t *destructed_master_ob = NULL;
       /* Old, destructed master object */
 
     int i;
@@ -18822,8 +19358,8 @@ assert_master_ob_loaded (void)
          */
         if (inside || !master_ob)
         {
-            struct object *ob;
-            struct object *prev;
+            object_t *ob;
+            object_t *prev;
             Bool removed = MY_FALSE;
               /* TRUE if the old master was already on the list of
                * destructed objects.
@@ -18837,8 +19373,8 @@ assert_master_ob_loaded (void)
 
             if (!destructed_master_ob)
             {
-                fprintf(stderr, "Failed to load master object '%s'.\n"
-                              , master_name);
+                fprintf(stderr, "%s Failed to load master object '%s'.\n"
+                              , time_stamp(), master_name);
                 add_message("Failed to load master object '%s'!\n"
                            , master_name);
                 exit(1);
@@ -18854,7 +19390,7 @@ assert_master_ob_loaded (void)
              */
             if ( NULL != (ob = find_object(master_name)) )
             {
-                emergency_destruct(ob);
+                destruct(ob);
             }
 
             /* Get the destructed master */
@@ -18896,10 +19432,10 @@ assert_master_ob_loaded (void)
             {
                 int save_privilege = malloc_privilege;
                 int j;
-                struct svalue *v;
+                svalue_t *v;
 
                 malloc_privilege = MALLOC_SYSTEM;
-                ob->variables = v = (struct svalue *)
+                ob->variables = v = (svalue_t *)
                     xalloc(sizeof *v * ob->prog->num_variables);
                 malloc_privilege = save_privilege;
                 for (j = ob->prog->num_variables; --j >= 0; )
@@ -18928,7 +19464,7 @@ assert_master_ob_loaded (void)
             sapply(STR_REACTIVATE, ob, 1);
             push_number(2 - (removed ? 1 : 0));
             sapply(STR_INAUGURATE, ob, 1);
-            fprintf(stderr, "Old master reactivated.\n");
+            fprintf(stderr, "%s Old master reactivated.\n", time_stamp());
             inside = MY_FALSE;
             return;
 
@@ -18936,7 +19472,8 @@ assert_master_ob_loaded (void)
 
         /* A normal call to assert_master_ob_loaded: just load a new one */
 
-        fprintf(stderr, "assert_master_ob_loaded: Reloading master.c\n");
+        fprintf(stderr, "%s assert_master_ob_loaded: Reloading master '%s'\n"
+               , time_stamp(), master_name);
         destructed_master_ob = master_ob;
 
         /* Clear the pointer, in case the load failed.
@@ -18978,7 +19515,7 @@ assert_master_ob_loaded (void)
         if (destructed_master_ob)
             free_object(destructed_master_ob, "assert_master_ob_loaded");
 
-        fprintf(stderr, "Reloading done.\n");
+        fprintf(stderr, "%s Reloading done.\n", time_stamp());
     }
 
     /* Master exists. Nothing to see here, move along... */
@@ -18987,7 +19524,7 @@ assert_master_ob_loaded (void)
 
 /*-------------------------------------------------------------------------*/
 void
-call_lambda (struct svalue *lsvp, int num_arg)
+call_lambda (svalue_t *lsvp, int num_arg)
 
 /* Call the closure <lsvp> with <num_arg> arguments on the stack. On
  * success, the arguments are replaced with the result, else an error()
@@ -19003,8 +19540,8 @@ call_lambda (struct svalue *lsvp, int num_arg)
    * can't be called after all.
    */
 
-    struct svalue *sp;
-    struct lambda *l = lsvp->u.lambda;
+    svalue_t *sp;
+    lambda_t *l = lsvp->u.lambda;
 
     sp = inter_sp;
 
@@ -19023,14 +19560,8 @@ call_lambda (struct svalue *lsvp, int num_arg)
 
     case CLOSURE_LFUN:  /* --- lfun closure --- */
       {
-        /* TODO: funflags */ uint32 flags;
+        funflag_t flags;
         fun_hdr_p funstart;
-
-        /* Reference the object the lfun is bound to */
-        l->ob->time_of_ref = current_time;
-        l->ob->flags &= ~O_RESET_STATE;
-
-        current_object = l->ob;
 
         /* Can't call from a destructed object */
         if (l->ob->flags & O_DESTRUCTED)
@@ -19042,6 +19573,12 @@ call_lambda (struct svalue *lsvp, int num_arg)
             /* NOTREACHED */
             return;
         }
+
+        /* Reference the object the lfun is bound to */
+        l->ob->time_of_ref = current_time;
+        l->ob->flags &= ~O_RESET_STATE;
+
+        current_object = l->ob;
 
         /* Make the object resident */
         if (current_object->flags & O_SWAPPED
@@ -19068,15 +19605,8 @@ call_lambda (struct svalue *lsvp, int num_arg)
 
     case CLOSURE_ALIEN_LFUN:  /* --- alien lfun closure --- */
       {
-        /* TODO: funflags */ uint32 flags;
+        funflag_t flags;
         fun_hdr_p funstart;
-
-        /* Reference the bound and the originating object */
-        l->ob->time_of_ref = current_time;
-        l->function.alien.ob->time_of_ref = current_time;
-        l->function.alien.ob->flags &= ~O_RESET_STATE;
-
-        current_object = l->ob;
 
         /* Can't call from a destructed object */
         if (l->ob->flags & O_DESTRUCTED)
@@ -19088,6 +19618,13 @@ call_lambda (struct svalue *lsvp, int num_arg)
             /* NOTREACHED */
             return;
         }
+
+        /* Reference the bound and the originating object */
+        l->ob->time_of_ref = current_time;
+        l->function.alien.ob->time_of_ref = current_time;
+        l->function.alien.ob->flags &= ~O_RESET_STATE;
+
+        current_object = l->ob;
 
         /* Can't call a function in a destructed object */
         if (l->function.alien.ob->flags & O_DESTRUCTED)
@@ -19141,7 +19678,7 @@ call_lambda (struct svalue *lsvp, int num_arg)
 
     case CLOSURE_IDENTIFIER:  /* --- variable closure --- */
       {
-        short i; /* the signed variant of struct lambda->function.index */
+        short i; /* the signed variant of lambda_t->function.index */
 
         CLEAN_CSP  /* no call will be done */
         if (num_arg)
@@ -19175,6 +19712,12 @@ call_lambda (struct svalue *lsvp, int num_arg)
         }
 
         l->ob->time_of_ref = current_time;
+#ifdef DEBUG
+        if (!l->ob->variables)
+            fatal("%s Fatal: call_lambda on variable for object %p '%s' "
+                  "w/o variables, index %d\n"
+                 , time_stamp(), l->ob, l->ob->name, i);
+#endif
         assign_svalue_no_free(++sp, &l->ob->variables[i]);
         inter_sp = sp;
         return;
@@ -19182,7 +19725,7 @@ call_lambda (struct svalue *lsvp, int num_arg)
 
     case CLOSURE_BOUND_LAMBDA:  /* --- bound lambda closure --- */
       {
-        struct lambda *l2;
+        lambda_t *l2;
 
         /* Deref the closure and then treat the resulting unbound
          * lambda like a normal lambda
@@ -19197,8 +19740,6 @@ call_lambda (struct svalue *lsvp, int num_arg)
       {
         fun_hdr_p funstart;
 
-        current_object = l->ob;
-
         /* Can't call from a destructed object */
         if (l->ob->flags & O_DESTRUCTED)
         {
@@ -19209,6 +19750,8 @@ call_lambda (struct svalue *lsvp, int num_arg)
             /* NOTREACHED */
             return;
         }
+
+        current_object = l->ob;
 
         /* Make the object resident */
         if (current_object->flags & O_SWAPPED
@@ -19282,7 +19825,7 @@ call_lambda (struct svalue *lsvp, int num_arg)
         {
             /* It's an operator or efun */
 
-            if (i == CLOSURE_EFUN + F_UNDEF - F_OFFSET)
+            if (i == CLOSURE_EFUN + F_UNDEF)
             {
                 /* The closure was discovered to be bound to a destructed
                  * object and thus disabled.
@@ -19325,7 +19868,7 @@ call_lambda (struct svalue *lsvp, int num_arg)
                         /* We lack one argument for which a default
                          * is provided.
                          */
-                        *p++ = (bytecode_t)(def - F_OFFSET);
+                        *p++ = (bytecode_t)(def);
                         max--;
                         min--;
                     }
@@ -19346,7 +19889,7 @@ call_lambda (struct svalue *lsvp, int num_arg)
                         }
                     }
                 }
-                else if (num_arg > max && max != -1)
+                else if (num_arg > 0xff || (num_arg > max && max != -1))
                 {
                     csp->extern_call = MY_TRUE;
                     inter_pc = csp->funstart = EFUN_FUNSTART;
@@ -19365,9 +19908,9 @@ call_lambda (struct svalue *lsvp, int num_arg)
 
                 /* And finally the return instruction */
                 if ( instrs[i].ret_type == TYPE_VOID )
-                    *p++ = F_RETURN0-F_OFFSET;
+                    *p++ = F_RETURN0;
                 else
-                    *p++ = F_RETURN-F_OFFSET;
+                    *p++ = F_RETURN;
 
                 csp->instruction = i;
                 csp->funstart = EFUN_FUNSTART;
@@ -19388,7 +19931,7 @@ call_lambda (struct svalue *lsvp, int num_arg)
         else
         {
             /* simul_efun */
-            struct object *ob;
+            object_t *ob;
 
             /* Mark the call as sefun closure */
             inter_pc = csp->funstart = SIMUL_EFUN_FUNSTART;
@@ -19420,21 +19963,22 @@ call_lambda (struct svalue *lsvp, int num_arg)
 } /* call_lambda() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-secure_call_lambda (struct svalue *closure, int num_arg)
+svalue_t *
+secure_call_lambda (svalue_t *closure, int num_arg)
 
 /* Call the closure <closure> with <num_arg> arguments on the stack.
- * On success, the functions returns a pointer to the result on the stack,
- * on failure it returns NULL. The arguments are removed in either case.
+ * On success, the functions returns a pointer to the result in the
+ * global apply_return_value, on failure it returns NULL. The arguments are
+ * removed in either case.
  *
  * This error recovery is the difference to call_lambda().
  */
 
 {
     struct error_recovery_info error_recovery_info;
-    struct svalue *save_sp;
+    svalue_t *save_sp;
     struct control_stack *save_csp;
-    struct svalue *result;
+    svalue_t *result;
 
     error_recovery_info.rt.last = rt_context;
     error_recovery_info.rt.type = ERROR_RECOVERY_APPLY;
@@ -19459,13 +20003,14 @@ secure_call_lambda (struct svalue *closure, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 static void
-call_simul_efun (int code, struct object *ob, int num_arg)
+call_simul_efun (int code, object_t *ob, int num_arg)
 
 /* Call the simul_efun <code> in the sefun object <ob> with <num_arg>
  * arguments on the stack. If it can't be found in the <ob>ject, the
  * function queries the auxiliary sefun objects in <simul_efun_vector>.
  *
- * The function is looked up in the objects by name.
+ * The function is looked up in the objects by name because its original
+ * entry in the simul_efun_table[] has been marked as "discarded".
  *
  * Leave the result on the stack on return.
  */
@@ -19482,9 +20027,9 @@ call_simul_efun (int code, struct object *ob, int num_arg)
         if (simul_efun_vector)
         {
             long i;
-            struct svalue *v;
+            svalue_t *v;
 
-            i = (signed)VEC_SIZE(simul_efun_vector);
+            i = (long)VEC_SIZE(simul_efun_vector);
             for (v = simul_efun_vector->item+1; MY_TRUE; v++)
             {
                 if (--i <= 0 || v->type != T_STRING)
@@ -19509,7 +20054,7 @@ call_simul_efun (int code, struct object *ob, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 char *
-function_exists (char *fun, struct object *ob)
+function_exists (char *fun, object_t *ob)
 
 /* Search for the function <fun> in the object <ob>. If existing, return
  * the name of the program, if not return NULL.
@@ -19521,9 +20066,9 @@ function_exists (char *fun, struct object *ob)
 {
     char *shared_name;
     fun_hdr_p funstart;
-    struct program *progp;
+    program_t *progp;
     int ix;
-    /* TODO: funflags */ uint32 flags;
+    funflag_t flags;
 
 #ifdef DEBUG
     if (ob->flags & O_DESTRUCTED)
@@ -19555,7 +20100,7 @@ function_exists (char *fun, struct object *ob)
     /* Resolve inheritance */
     while (flags & NAME_INHERITED)
     {
-        struct inherit *inheritp;
+        inherit_t *inheritp;
 
         inheritp = &progp->inherit[flags & INHERIT_MASK];
         ix -= inheritp->function_index_offset;
@@ -19566,8 +20111,8 @@ function_exists (char *fun, struct object *ob)
     funstart = progp->program  + (flags & FUNSTART_MASK);
 
     /* And after all this, the function may be undefined */
-    if (FUNCTION_CODE(funstart)[0] == F_ESCAPE - F_OFFSET
-     && FUNCTION_CODE(funstart)[1] == F_UNDEF  - F_OFFSET - 0x100)
+    if (FUNCTION_CODE(funstart)[0] == F_ESCAPE
+     && FUNCTION_CODE(funstart)[1] == F_UNDEF  - 0x100)
     {
         return NULL;
     }
@@ -19578,7 +20123,7 @@ function_exists (char *fun, struct object *ob)
 
 /*-------------------------------------------------------------------------*/
 void
-call_function (struct program *progp, int fx)
+call_function (program_t *progp, int fx)
 
 /* Call the function <fx> in program <progp> for the current_object.
  * This is done with no frame set up. No arguments are passed,
@@ -19589,7 +20134,7 @@ call_function (struct program *progp, int fx)
  */
 
 {
-    /* TODO: funflags */ uint32 flags;
+    funflag_t flags;
     fun_hdr_p funstart;
 
     push_control_stack(inter_sp, inter_pc, inter_fp);
@@ -19612,7 +20157,7 @@ call_function (struct program *progp, int fx)
 
 /*-------------------------------------------------------------------------*/
 int
-get_line_number (bytecode_p p, struct program *progp, char **namep)
+get_line_number (bytecode_p p, program_t *progp, char **namep)
 
 /* Look up the line number for address <p> within the program <progp>.
  * Result is the line number, and *<namep> is set to the name of the
@@ -19624,7 +20169,6 @@ get_line_number (bytecode_p p, struct program *progp, char **namep)
  *
  * TODO: (an old comment which might no longer be true): This can be done
  * TODO:: much more efficiently, but that change has low priority.)
- * TODO: The incinfo-handling would profit from a pooled allocator.
  */
 {
     /* Datastructure to keep track of included files */
@@ -19677,17 +20221,19 @@ get_line_number (bytecode_p p, struct program *progp, char **namep)
     offset = (int)(p - progp->program);
     if (p < progp->program || p > PROGRAM_END(*progp))
     {
-        printf("get_line_number(): Illegal offset %d in object %s\n"
-              , offset, progp->name);
-        debug_message("get_line_number(): Illegal offset %d in object %s\n"
-                     , offset, progp->name);
+        printf("%s get_line_number(): Illegal offset %d in object %s\n"
+              , time_stamp(), offset, progp->name);
+        debug_message("%s get_line_number(): Illegal offset %d in object %s\n"
+                     , time_stamp(), offset, progp->name);
         return 0;
     }
 
     include_names = progp->strings + progp->num_strings;
 
     /* Decode the line number information until the line number
-     * for offset is found.
+     * for offset is found. We do this by reading the line byte codes,
+     * counting up the line number <i> while decrementing the <offset>.
+     * If the offset becomes <= 0, we found the line.
      */
     for (i = 0, p = progp->line_numbers; ; )
     {
@@ -19697,13 +20243,23 @@ get_line_number (bytecode_p p, struct program *progp, char **namep)
 
         if (o <= 63)  /* 0x00..0x3F */
         {
-            if (o >= LI_MAXOFFSET)  /* 0x3c..0x3f */
+            if (o >= LI_MAXOFFSET)  /* 0x3b..0x3f */
             {
                 if (o != LI_MAXOFFSET)
                 {
                     switch (o)
                     {
 
+                    case LI_BACK:
+                      {
+                        unsigned int off;
+
+                        p++;
+                        off = GET_CODE(p);
+                        i -= off+1;
+                        break;
+                      }
+                      
                     case LI_INCLUDE:
                       {
                         /* Included file: push the information */
@@ -19787,7 +20343,7 @@ get_line_number (bytecode_p p, struct program *progp, char **namep)
 
     if (i == relocated_to + 1)
         i = relocated_from + 1;
-        /* TODO: What is this? */
+        /* Perform the announced relocation */
 
     /* Here, i is the line number, and if inctop is not NULL, the
      * code originates from the included file pointed to by inctop.
@@ -19928,11 +20484,15 @@ dump_trace (Bool how
     int line = 0;
     char *name;
     char *file;
-    struct object *ob = NULL;
+    object_t *ob = NULL;
     bytecode_p last_catch = NULL;  /* Last found catch */
 
     if (!current_prog)
+    {
+        printf("No program to trace.\n");
+        debug_message("No program to trace.\n");
         return NULL;
+    }
 
     if (csp < &control_stack[0])
     {
@@ -19944,8 +20504,9 @@ dump_trace (Bool how
     /* Print the last instructions if required */
 #ifdef TRACE_CODE
     if (how) {
+        /* TODO: This number of instructions should be a runtime arg */
 #ifdef DEBUG
-        (void)last_instructions(60, MY_TRUE, NULL);
+        (void)last_instructions(200, MY_TRUE, NULL);
         printf("%6lx: %3d %3d %3d %3d %3d %3d %3d %3d\n", (long)pc,
           pc[0], pc[1], pc[2], pc[3], pc[4], pc[5], pc[6], pc[7] );
 #else  /* DEBUG */
@@ -19962,7 +20523,7 @@ dump_trace (Bool how
     p = &control_stack[0];
     do {
         bytecode_p      dump_pc;  /* the frame's pc */
-        struct program *prog;     /* the frame's program */
+        program_t *prog;     /* the frame's program */
 
         if (p->extern_call)
         {
@@ -20008,7 +20569,7 @@ dump_trace (Bool how
             if (!pc2)
                 goto not_catch;  /* shouldn't happen... */
 
-            if (GET_CODE(pc2) == F_LBRANCH - F_OFFSET)
+            if (GET_CODE(pc2) == F_LBRANCH)
             {
                 short offset;
                 pc2++;
@@ -20018,12 +20579,12 @@ dump_trace (Bool how
                 pc2 += offset;
             }
 
-#if F_END_CATCH - F_OFFSET >= 0x100
+#if F_END_CATCH >= 0x100
             if (pc2 - FUNCTION_CODE(p->funstart) < 2)
                 goto not_catch;
 
-            if (GET_CODE(pc2-2) != F_ESCAPE-F_OFFSET
-             || GET_CODE(pc2-1) != F_END_CATCH-F_OFFSET-0x100)
+            if (GET_CODE(pc2-2) != F_ESCAPE
+             || GET_CODE(pc2-1) != F_END_CATCH-0x100)
             {
                 goto not_catch;
             }
@@ -20031,7 +20592,7 @@ dump_trace (Bool how
             if (pc2 - FUNCTION_CODE(p->funstart) < 1)
                 goto not_catch;
 
-            if (GET_CODE(pc2-1) != F_END_CATCH-F_OFFSET)
+            if (GET_CODE(pc2-1) != F_END_CATCH)
             {
                 goto not_catch;
             }
@@ -20106,7 +20667,7 @@ not_catch:  /* The frame does not point at a catch here */
 
         /* Nothing of the above: a normal program */
         line = get_line_number(dump_pc, prog, &file);
-        memcpy(&name, &FUNCTION_NAME(p[0].funstart), sizeof name);
+        memcpy(&name, FUNCTION_NAMEP(p[0].funstart), sizeof name);
 
 name_computed: /* Jump target from the catch detection */
 
@@ -20137,10 +20698,39 @@ invalidate_apply_low_cache (void)
     int i;
 
     for (i = 0; i < CACHE_SIZE; i++)
+    {
         cache[i].id = 0;
+        if (!cache[i].progp && cache[i].name)
+            xfree(cache[i].name);
+    }
 }
 
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
+
+/*-------------------------------------------------------------------------*/
+size_t
+interpreter_overhead (void)
+
+/* Return the amount of memory allocated for the interpreter.
+ * Right now this is the apply cache overhead.
+ */
+
+{
+    size_t sum, ix;
+
+    sum = 0;
+
+    for (ix = 0; ix < CACHE_SIZE; ix++)
+    {
+        if (!cache[ix].progp && cache[ix].name)
+        {
+            sum += strlen(cache[ix].name)+1;
+        }
+
+    }
+
+    return sum;
+} /* interpreter_overhead() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -20156,7 +20746,7 @@ clear_interpreter_refs (void)
 
         for (i = TOTAL_TRACE_LENGTH; --i >= 0; )
         {
-            struct object *ob;
+            object_t *ob;
 
             if (NULL != (ob = previous_objects[i])
              && ob->flags & O_DESTRUCTED
@@ -20189,13 +20779,13 @@ count_interpreter_refs (void)
 #ifdef TRACE_CODE
     for (i = TOTAL_TRACE_LENGTH; --i >= 0; )
     {
-        struct object *ob;
+        object_t *ob;
 
         if ( NULL != (ob = previous_objects[i]) )
         {
             if (ob->flags & O_DESTRUCTED)
             {
-                previous_objects[i] = 0;
+                previous_objects[i] = NULL;
                 previous_instruction[i] = 0;
                 reference_destructed_object(ob);
             }
@@ -20209,7 +20799,7 @@ count_interpreter_refs (void)
 }
 /*-------------------------------------------------------------------------*/
 
-#endif /* MALLOC_smalloc */
+#endif /* GC_SUPPORT */
 /*=========================================================================*/
 
 /*                            D E B U G G I N G                            */
@@ -20240,9 +20830,9 @@ opcdump (char * fname)
     {
         if (opcount[i])
 #ifdef VERBOSE_OPCPROF
-            fprintf(f,"%d: \"%-16s\" %6d\n",i+F_OFFSET,get_f_name(i), opcount[i]);
+            fprintf(f,"%d: \"%-16s\" %6d\n",i, get_f_name(i), opcount[i]);
 #else
-            fprintf(f,"%d: %d\n", i+F_OFFSET, opcount[i]);
+            fprintf(f,"%d: %d\n", i, opcount[i]);
 #endif
     }
     fclose(f);
@@ -20305,7 +20895,7 @@ get_arg (int a)
 
 /*-------------------------------------------------------------------------*/
 static void
-last_instr_output (char *str, struct svalue **svpp)
+last_instr_output (char *str, svalue_t **svpp)
 
 /* <svpp> == NULL: print string <str>
  * <svpp> != NULL: store a copy of <str> as string-svalue to *<svpp>, then
@@ -20332,7 +20922,7 @@ last_instr_output (char *str, struct svalue **svpp)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-program_referenced (struct program *prog, struct program *prog2)
+program_referenced (program_t *prog, program_t *prog2)
 
 /* Return TRUE if <prog2> inherits <prog>.
  *
@@ -20340,7 +20930,7 @@ program_referenced (struct program *prog, struct program *prog2)
  */
 
 {
-    struct inherit *inh;
+    inherit_t *inh;
     int i;
 
     if (prog == prog2)
@@ -20364,7 +20954,7 @@ program_referenced (struct program *prog, struct program *prog2)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-program_exists (struct program *prog, struct object *guess)
+program_exists (program_t *prog, object_t *guess)
 
 /* Test if <prog> exists - either by itself or as inherited program.
  * Start testing with the program of <guess>, if it is not there,
@@ -20392,7 +20982,7 @@ program_exists (struct program *prog, struct object *guess)
 
 /*-------------------------------------------------------------------------*/
 int
-last_instructions (int length, Bool verbose, struct svalue **svpp)
+last_instructions (int length, Bool verbose, svalue_t **svpp)
 
 /* 'Print' a dump of the <length> last instructions. If <svpp> is NULL,
  * all the data is printed, else *<svpp> points to the evaluator stack
@@ -20408,7 +20998,7 @@ last_instructions (int length, Bool verbose, struct svalue **svpp)
 
 {
     int i;
-    struct object *old_obj;
+    object_t *old_obj;
     char old_file[160], buf[400];
     int old_line, line = 0;
 
@@ -20417,7 +21007,10 @@ last_instructions (int length, Bool verbose, struct svalue **svpp)
     old_line = 0;
     i = (last - length + TOTAL_TRACE_LENGTH) % TOTAL_TRACE_LENGTH;
 
-    /* Walk through the instructions */
+    /* Walk through the instructions.
+     * Instructions with value 0 are not used yet, or have been
+     * removed while cleaning up destructed objects.
+     */
     do {
         i = (i + 1) % TOTAL_TRACE_LENGTH;
         if (previous_instruction[i] != 0)
@@ -20425,7 +21018,7 @@ last_instructions (int length, Bool verbose, struct svalue **svpp)
             if (verbose)
             {
                 char *file;
-                struct program *ppr;
+                program_t *ppr;
                 bytecode_p ppc;
 
                 ppr = previous_programs[i];
@@ -20455,11 +21048,13 @@ last_instructions (int length, Bool verbose, struct svalue **svpp)
                     strncpy(old_file, file, sizeof old_file - 1);
                 }
             }
-            sprintf(buf, "%6lx: %3d %8s %-25s (%d)", (long)previous_pc[i],
-                   previous_instruction[i], /* instrs.h has these numbers */
-                   get_arg(i),
-                   get_f_name(previous_instruction[i]),
-                   stack_size[i] + 1
+            sprintf(buf, "%6lx: %3d %8s %-26s (%ld:%3ld)"
+                   , (long)previous_pc[i]
+                   , previous_instruction[i] /* instrs.h has these numbers */
+                   , get_arg(i)
+                   , get_f_name(previous_instruction[i])
+                   , (long) (stack_size[i] + 1)
+                   , (long) (abs_stack_size[i])
             );
             if (verbose && line != old_line)
                 sprintf(buf + strlen(buf), "\tline %d", old_line = line);
@@ -20471,8 +21066,8 @@ last_instructions (int length, Bool verbose, struct svalue **svpp)
 } /* last_instructions() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_last_instructions (struct svalue *sp)
+svalue_t *
+f_last_instructions (svalue_t *sp)
 
 /* TEFUN last_instructions()
  *
@@ -20485,6 +21080,10 @@ f_last_instructions (struct svalue *sp)
  *
  *   Opcode-Address: Opcode Operand Mnemonic (Stackdepth) Linenumber
  *
+ * The Stackdepth information consists of two numbers <rel>:<abs>:
+ * <rel> is the relative stack usage in this function, <abs> is the
+ * absolute stack usage.
+ *
  * The linenumber information is appended if requested and a new
  * source line is reached. Also, calls between objects produce a
  *
@@ -20496,9 +21095,9 @@ f_last_instructions (struct svalue *sp)
  */
 
 {
-    struct vector *v, *v2;
+    vector_t *v, *v2;
     mp_int num_instr, size;
-    struct svalue *svp;
+    svalue_t *svp;
 
     /* Test the arguments */
     if (sp[-1].type != T_NUMBER || (num_instr = sp[-1].u.number) <= 0)
@@ -20546,7 +21145,7 @@ f_last_instructions (struct svalue *sp)
 
 /*-------------------------------------------------------------------------*/
 void
-count_inherits (struct program *progp)
+count_inherits (program_t *progp)
 
 /* Check Refcounts: Increment the extra_ref of all programs inherited
  * by <progp>. If one of those programs has not been visited yet,
@@ -20558,7 +21157,7 @@ count_inherits (struct program *progp)
 
 {
     int i;
-    struct program *progp2;
+    program_t *progp2;
 
     /* Clones will not add to the ref count of inherited progs */
     for (i = 0; i < progp->num_inherited; i++)
@@ -20566,8 +21165,8 @@ count_inherits (struct program *progp)
         progp2 = progp->inherit[i].prog;
         progp2->extra_ref++;
         if (progp2 == check_a_lot_ref_counts_search_prog)
-            printf("Found prog, inherited by %s, new total ref %ld\n",
-              progp->name, progp2->ref);
+            printf("%s Found prog, inherited by %s, new total ref %ld\n"
+                  , time_stamp(), progp->name, progp2->ref);
         if (NULL == register_pointer(ptable, progp2))
             continue;
         progp2->extra_ref = 1;
@@ -20577,7 +21176,7 @@ count_inherits (struct program *progp)
 
 /*-------------------------------------------------------------------------*/
 static void
-count_extra_ref_in_mapping_filter ( struct svalue *key, struct svalue *data
+count_extra_ref_in_mapping_filter ( svalue_t *key, svalue_t *data
                                   , void * extra)
 
 /* Count the extra refs for <key> and the associated <data>. <extra>
@@ -20591,7 +21190,7 @@ count_extra_ref_in_mapping_filter ( struct svalue *key, struct svalue *data
 
 /*-------------------------------------------------------------------------*/
 static void
-check_extra_ref_in_mapping_filter (struct svalue *key, struct svalue *data
+check_extra_ref_in_mapping_filter (svalue_t *key, svalue_t *data
                                   , void * extra)
 
 /* Check the extra refs for <key> and the associated <data>. <extra>
@@ -20605,7 +21204,7 @@ check_extra_ref_in_mapping_filter (struct svalue *key, struct svalue *data
 
 /*-------------------------------------------------------------------------*/
 void
-count_extra_ref_in_object (struct object *ob)
+count_extra_ref_in_object (object_t *ob)
 
 /* Count the extra refs for object <ob>. If the object has been visited
  * before, extra_ref is just incremented. Otherwise, extra_ref is
@@ -20625,7 +21224,7 @@ count_extra_ref_in_object (struct object *ob)
     {
         ob->prog->extra_ref++;
         if (ob->prog == check_a_lot_ref_counts_search_prog)
-            printf("Found program for object %s\n", ob->name);
+            printf("%s Found program for object %s\n", time_stamp(), ob->name);
     }
 
     /* Clones will not add to the ref count of inherited progs */
@@ -20651,7 +21250,7 @@ count_extra_ref_in_object (struct object *ob)
 
     if (ob->flags & O_SHADOW)
     {
-        struct ed_buffer *buf;
+        ed_buffer_t *buf;
 
         if ( NULL != (buf = O_GET_SHADOW(ob)->ed_buffer) )
             count_ed_buffer_extra_refs(buf);
@@ -20660,7 +21259,7 @@ count_extra_ref_in_object (struct object *ob)
 
 /*-------------------------------------------------------------------------*/
 static void
-count_extra_ref_in_closure (struct lambda *l, ph_int type)
+count_extra_ref_in_closure (lambda_t *l, ph_int type)
 
 /* Count the extra refs in the closure <l> of type <type>.
  */
@@ -20671,11 +21270,11 @@ count_extra_ref_in_closure (struct lambda *l, ph_int type)
         /* We need to count the extra_refs in the constant values. */
 
         mp_int num_values;
-        struct svalue *svp;
+        svalue_t *svp;
 
-        svp = (struct svalue *)l;
+        svp = (svalue_t *)l;
         if ( (num_values = EXTRACT_UCHAR(l->function.code)) == 0xff)
-            num_values = svp[-0xff].u.number;
+            num_values = svp[-0x100].u.number;
         svp -= num_values;
         count_extra_ref_in_vector(svp, (size_t)num_values);
     }
@@ -20684,7 +21283,7 @@ count_extra_ref_in_closure (struct lambda *l, ph_int type)
         /* Count the referenced closures and objects */
         if (type == CLOSURE_BOUND_LAMBDA)
         {
-            struct lambda *l2 = l->function.lambda;
+            lambda_t *l2 = l->function.lambda;
 
             if (NULL != register_pointer(ptable, l2) )
                 count_extra_ref_in_closure(l2, CLOSURE_UNBOUND_LAMBDA);
@@ -20701,13 +21300,16 @@ count_extra_ref_in_closure (struct lambda *l, ph_int type)
 
 /*-------------------------------------------------------------------------*/
 void
-count_extra_ref_in_vector (struct svalue *svp, size_t num)
+count_extra_ref_in_vector (svalue_t *svp, size_t num)
 
 /* Count the extra_refs of all <num> values starting at <svp>.
  */
 
 {
-    struct svalue *p;
+    svalue_t *p;
+
+    if (!svp)
+        return;
 
     for (p = svp; p < svp+num; p++)
     {
@@ -20717,7 +21319,7 @@ count_extra_ref_in_vector (struct svalue *svp, size_t num)
         case T_CLOSURE:
             if (CLOSURE_MALLOCED(p->x.closure_type))
             {
-                struct lambda *l;
+                lambda_t *l;
 
                 l = p->u.lambda;
                 if ( NULL == register_pointer(ptable, l) )
@@ -20756,13 +21358,16 @@ count_extra_ref_in_vector (struct svalue *svp, size_t num)
 
 /*-------------------------------------------------------------------------*/
 static void
-check_extra_ref_in_vector (struct svalue *svp, size_t num)
+check_extra_ref_in_vector (svalue_t *svp, size_t num)
 
 /* Check the extra_refs of the <num> values starting at <svp>
  */
 
 {
-    struct svalue *p;
+    svalue_t *p;
+
+    if (!svp)
+        return;
 
     for (p = svp; p < svp+num; p++)
     {
@@ -20790,7 +21395,7 @@ check_extra_ref_in_vector (struct svalue *svp, size_t num)
 
 /*-------------------------------------------------------------------------*/
 void
-check_a_lot_ref_counts (struct program *search_prog)
+check_a_lot_ref_counts (program_t *search_prog)
 
 /* Loop through every object and variable in the game and check all
  * reference counts. This will surely take some time and should be
@@ -20807,7 +21412,7 @@ check_a_lot_ref_counts (struct program *search_prog)
  */
 
 {
-    struct object *ob;
+    object_t *ob;
     int i;
 
     check_a_lot_ref_counts_search_prog = search_prog;
@@ -20821,7 +21426,8 @@ check_a_lot_ref_counts (struct program *search_prog)
     ptable = new_pointer_table();
     if (!ptable)
     {
-        debug_message("Out of memory while checking all refcounts.\n");
+        debug_message("%s Out of memory while checking all refcounts.\n"
+                     , time_stamp());
         return;
     }
 
@@ -20832,13 +21438,13 @@ check_a_lot_ref_counts (struct program *search_prog)
         if (ob->flags & O_DESTRUCTED)
         {
             /* This shouldn't happen */
-            debug_message("Found destructed object '%s' where it shouldn't "
-                          "be.\n", ob->name);
+            debug_message("%s Found destructed object '%s' where it shouldn't "
+                          "be.\n", time_stamp(), ob->name);
             continue;
         }
         if (O_VAR_SWAPPED(ob))
             load_ob_from_swap(ob);
-        count_extra_ref_in_vector(ob->variables, (unsigned)ob->extra_num_variables);
+        count_extra_ref_in_vector(ob->variables, (size_t)ob->extra_num_variables);
         count_extra_ref_in_object(ob);
     }
 
@@ -20847,15 +21453,15 @@ check_a_lot_ref_counts (struct program *search_prog)
 
     if (d_flag > 3)
     {
-        debug_message("obj_list evaluated\n");
+        debug_message("%s obj_list evaluated\n", time_stamp());
     }
 
     /* The current stack.
      */
-    count_extra_ref_in_vector(start_of_stack, (unsigned)(inter_sp - start_of_stack + 1));
+    count_extra_ref_in_vector(start_of_stack, (size_t)(inter_sp - start_of_stack + 1));
     if (d_flag > 3)
     {
-        debug_message("stack evaluated\n");
+        debug_message("%s stack evaluated\n", time_stamp());
     }
 
 
@@ -20921,11 +21527,12 @@ check_a_lot_ref_counts (struct program *search_prog)
     ptable = new_pointer_table();
     if (!ptable)
     {
-        debug_message("Out of memory while checking all refcounts.\n");
+        debug_message("%s Out of memory while checking all refcounts.\n"
+                     , time_stamp());
         return;
     }
 
-    for (ob=obj_list; ob; ob = ob->next_all) {
+    for (ob = obj_list; ob; ob = ob->next_all) {
         if (ob->flags & O_DESTRUCTED)  /* shouldn't happen */
             continue;
 
@@ -20941,8 +21548,9 @@ check_a_lot_ref_counts (struct program *search_prog)
                 if (TIME_TO_SWAP > 0 && time_to_swap + 1 > 0
                  && ob->prog->ref > ob->prog->extra_ref)
                 {
-                    debug_message("high ref count in prog %s, %ld - %ld\n",
-                        ob->prog->name, ob->prog->ref, ob->prog->extra_ref);
+                    debug_message("%s high ref count in prog %s, %ld - %ld\n"
+                                 , time_stamp(), ob->prog->name, ob->prog->ref
+                                 , ob->prog->extra_ref);
                 }
                 else
                 {
@@ -20952,10 +21560,10 @@ check_a_lot_ref_counts (struct program *search_prog)
                 }
             }
         } /* !SWAPPED */
-        check_extra_ref_in_vector(ob->variables, (unsigned)ob->extra_num_variables);
+        check_extra_ref_in_vector(ob->variables, (size_t)ob->extra_num_variables);
     } /* for */
 
-    check_extra_ref_in_vector(start_of_stack, (unsigned)(inter_sp - start_of_stack + 1));
+    check_extra_ref_in_vector(start_of_stack, (size_t)(inter_sp - start_of_stack + 1));
 
     free_pointer_table(ptable);
 } /* check_a_lot_of_ref_counts() */
@@ -20979,20 +21587,20 @@ check_a_lot_ref_counts (struct program *search_prog)
 #undef TYPE_TEST1
 #define TYPE_TEST1(arg1, type1, instruction) {\
     if ((arg1)->type != (type1)) {\
-        bad_efun_arg(1, (instruction)-F_OFFSET, sp);\
+        bad_efun_arg(1, (instruction), sp);\
     }\
 }
 
 #undef TYPE_TEST2
 #define TYPE_TEST2(arg1, type2, instruction) {\
     if ((arg1)->type != (type2)) {\
-        bad_efun_arg(2, (instruction)-F_OFFSET, sp);\
+        bad_efun_arg(2, (instruction), sp);\
     }\
 }
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_trace (struct svalue *sp)
+svalue_t *
+f_trace (svalue_t *sp)
 
 /* TEFUN trace()
  *
@@ -21030,17 +21638,16 @@ f_trace (struct svalue *sp)
 
 {
     int ot;
-    struct interactive *ip;
+    interactive_t *ip;
 
     TYPE_TEST1(sp, T_NUMBER, F_TRACE)
     ot = -1;
 
     /* If the command_giver is allowed to do so... */
     if (command_giver
-     && NULL != (ip = O_GET_INTERACTIVE(command_giver))
-     && ip->sent.type == SENT_INTERACTIVE)
+     && O_SET_INTERACTIVE(ip, command_giver))
     {
-        struct svalue *arg;
+        svalue_t *arg;
 
         assign_eval_cost();
         inter_sp = _push_volatile_string("trace", sp);
@@ -21069,8 +21676,8 @@ f_trace (struct svalue *sp)
 } /* f_trace() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_traceprefix (struct svalue *sp)
+svalue_t *
+f_traceprefix (svalue_t *sp)
 
 /* TEFUN traceprefix()
  *
@@ -21089,7 +21696,7 @@ f_traceprefix (struct svalue *sp)
 
 {
     char *old;
-    struct interactive *ip;
+    interactive_t *ip;
 
     if (sp->type != T_STRING && sp->type != T_NUMBER)
         bad_xefun_arg(1, sp);
@@ -21098,12 +21705,11 @@ f_traceprefix (struct svalue *sp)
 
     /* If the command_giver is allowed to do that... */
     if (command_giver
-     && NULL != (ip = O_GET_INTERACTIVE(command_giver))
-     && ip->sent.type == SENT_INTERACTIVE)
+     && O_SET_INTERACTIVE(ip, command_giver))
     {
-        struct svalue *arg;
+        svalue_t *arg;
 
-        inter_sp = _push_volatile_string("trace", sp);
+        inter_sp = _push_volatile_string("traceprefix", sp);
         assign_eval_cost();
         arg = apply_master_ob(STR_VALID_TRACE,1);
         if (!arg)

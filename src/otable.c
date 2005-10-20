@@ -27,6 +27,7 @@
  */
 
 #include "driver.h"
+#include "typedefs.h"
 
 #include <stdio.h>
 
@@ -35,11 +36,13 @@
 #include "backend.h"
 #include "gcollect.h"
 #include "hash.h"
-#include "interpret.h"
 #include "object.h"
 #include "strfuns.h"
 #include "simulate.h"
+#include "svalue.h"
+#include "xalloc.h"
 
+#include "../mudlib/sys/debug_info.h"
 
 /*=========================================================================*/
 /*                           OBJECT TABLE                                  */
@@ -53,7 +56,7 @@
 /* Hash the string <s> and compute the appropriate table index
  */
 
-static struct object ** obj_table = NULL;
+static object_t ** obj_table = NULL;
   /* Pointer to the (allocated) hashtable.
    */
 
@@ -74,7 +77,7 @@ static long user_obj_found = 0;
    */
 
 /*-------------------------------------------------------------------------*/
-static struct object *
+static object_t *
 find_obj_n (char *s)
 
 /* Lookup the object with name <s> in the table and return the pointer
@@ -85,7 +88,7 @@ find_obj_n (char *s)
  */
 
 {
-    struct object * curr, *prev;
+    object_t * curr, *prev;
 
     int h = ObjHash(s);
 
@@ -119,7 +122,7 @@ find_obj_n (char *s)
 
 /*-------------------------------------------------------------------------*/
 void
-enter_object_hash (struct object *ob)
+enter_object_hash (object_t *ob)
 
 /* Add the object <ob> to the table. There must not be an object
  * with the same name in the table already (not even <ob> itself).
@@ -127,7 +130,7 @@ enter_object_hash (struct object *ob)
 
 {
 #ifdef DEBUG
-    struct object * s;
+    object_t * s;
 #endif
     int h = ObjHash(ob->name);
 
@@ -154,13 +157,13 @@ enter_object_hash (struct object *ob)
 
 /*-------------------------------------------------------------------------*/
 void
-remove_object_hash (struct object *ob)
+remove_object_hash (object_t *ob)
 
 /* Remove object <ob> from the table, where it must be in.
  */
 
 {
-    struct object * s;
+    object_t * s;
     int h = ObjHash(ob->name);
 
     s = find_obj_n(ob->name);
@@ -175,13 +178,7 @@ remove_object_hash (struct object *ob)
 }
 
 /*-------------------------------------------------------------------------*/
-/*
- * Lookup an object in the hash table; if it isn't there, return null.
- * This is only different to find_object_n in that it collects different
- * stats; more finds are actually done than the user ever asks for.
- */
-
-struct object *
+object_t *
 lookup_object_hash (char *s)
 
 /* Lookup an object by name <s>. If found, return its pointer, if not,
@@ -189,7 +186,7 @@ lookup_object_hash (char *s)
  */
 
 {
-    struct object * ob = find_obj_n(s);
+    object_t * ob = find_obj_n(s);
     user_obj_lookups++;
     if (ob)
         user_obj_found++;
@@ -225,13 +222,27 @@ show_otable_status (strbuf_t * sbuf, Bool verbose)
 #    pragma warn_largeargs reset
 #endif
     }
-    /* objs_in_table * sizeof(struct object) is already accounted for
+    /* objs_in_table * sizeof(object_t) is already accounted for
        in tot_alloc_object_size.  */
     strbuf_addf(sbuf, "hash table overhead\t\t\t %8ld\n",
-                (long)(OTABLE_SIZE * sizeof(struct object *)));
-    return OTABLE_SIZE * sizeof(struct object *);
+                (long)(OTABLE_SIZE * sizeof(object_t *)));
+    return OTABLE_SIZE * sizeof(object_t *);
 }
 
+/*-------------------------------------------------------------------------*/
+void
+otable_dinfo_status (svalue_t *svp)
+
+/* Return the object table information for debug_info(DINFO_DATA, DID_STATUS).
+ * <svp> points to the svalue block for the result, this function fills in
+ * the spots for the object table.
+ */
+
+{
+    svp[DID_ST_OTABLE].u.number       = objs_in_table;
+    svp[DID_ST_OTABLE_SLOTS].u.number = OTABLE_SIZE;
+    svp[DID_ST_OTABLE_SIZE].u.number  = OTABLE_SIZE * sizeof(object_t *);
+} /* otable_dinfo_status() */
 
 /*=========================================================================*/
 /*                           GENERAL ROUTINES                              */
@@ -245,14 +256,14 @@ init_otable (void)
 
 {
     int x;
-    obj_table = xalloc(sizeof(struct object *) * OTABLE_SIZE);
+    obj_table = xalloc(sizeof(object_t *) * OTABLE_SIZE);
 
     for (x = 0; x < OTABLE_SIZE; x++)
         obj_table[x] = NULL;
 }
 
 /*-------------------------------------------------------------------------*/
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
 void
 note_otable_ref (void)
 
@@ -263,7 +274,7 @@ note_otable_ref (void)
     note_malloced_block_ref((char *)obj_table);
 }
 
-#endif /* MALLOC_smalloc */
+#endif /* GC_SUPPORT */
 
 
 /***************************************************************************/

@@ -1,5 +1,5 @@
-#ifndef __EXEC_H__
-#define __EXEC_H__ 1
+#ifndef EXEC_H__
+#define EXEC_H__ 1
 
 /*---------------------------------------------------------------------------
  * Types and Macros used to describe and store compiled programs.
@@ -21,43 +21,65 @@
  * can be read or written in one go, with a simple relocation computation
  * on the pointers involved.
  *
- * The blocks of a program (hopefully in correct allocation order) are these:
+ * The blocks of a program in correct allocation order are these:
  *
- *   struct program: The basic structure of the program, with pointers to
+ *   struct program_s: The basic structure of the program, with pointers to
  *       the other data blocks.
+ *
+ *   bytecode program[]: the actual bytecode for the program.
+ *
+ *   unsigned short function_names[]: Lookup table of function name index
+ *       to the offset of the function within the functions[] table.
+ *       function_names[] is allocated together with and right after the
+ *       bytecode. If a function redefines an inherited function, this table
+ *       points to the redefinition.
+ *       Read 'function_name' as 'function_index'.
  *
  *   uint32 functions[]: One word for each function, giving the type
  *       and the offset within the program[] codearray. Additional information
  *       for each function is embedded into the program code.
+ *       If a program uses undefined functions, the compiler generates
+ *       dummy functions.
+ *       Through inheritance and cross-definition these functions can
+ *       be resolved on a higher level.
  *
  *   char *strings[]: An array of pointers to the string literals (stored
  *       as shared strings) used by the program. This way the program can
- *       use the strings simply by (easily swappable) index.
+ *       use the strings simply by an (easily swappable) index. The compiler
+ *       makes sure that each string is unique.
  *
  *       The last strings are the names of all files included by the programs
  *       source file, stored in reverse order of their appearance (multiply
  *       included files appear several times).
- *   TODO: Does the compiler try to minimize the array, by storing each string
- *   TODO:: ref only once?
  *
- *       When a program is swapped, the references to these strings are
+ *       When a program is swapped, the reference counts to these strings are
  *       not removed so that the string literals stay in memory all the time.
  *       This saves time on swap-in, and the string sharing saves more memory
  *       than swapping might gain.
  *
- *   struct variable variable_names[]: an array describing all variables
+ *   struct variable_s variable_names[]: an array describing all variables
  *       with type and name, inherited or own.
  *
  *   struct inherit inherit[]: an array describing all inherited programs.
  *
- *   bytecode program[]: the actual bytecode for the program.
+ *   vartype_t argument_types[]: (only with #pragma save_types)
+ *       The types of all function arguments of the program in the
+ *       order they were encountered.
  *
- *   unsigned short function_names[]: TODO: ???
+ *   unsigned short type_start[]: (only with #pragma save_types)
+ *       Lookup table [.num_function_names] function index
+ *       -> index in .argument_types[], which gives the index of
+ *       the first argument type. If this index is INDEX_START_NONE,
+ *       the function has no type information.
  *
- * The line number information is stored in a separate memory block so
- * it can be swapped out separately and loaded only in case of an error.
- * For a similar reason, the information is encoded using a kind of delta
- * compression.
+ *   bytecode_t line_numbers[]: the line number information,
+ *       encoded in a kind of delta compression. When a program
+ *       is swapped in, the line numbers are allocated separately
+ *       and not swapped in until needed.
+ *
+ * TODO: If the program_s is allocated separately from the rest,
+ * TODO:: we could swap even if a program is used by clones.
+ * TODO:: However, find out how often that would be useful.
  *
  *
  * Bytecode
@@ -116,16 +138,20 @@
  *       considered being 'the' C-desc block.
  *
  * If a program is inherited virtually several times, each virtual inherit
- * gets its own struct inherit, together with reserved space in the
- * objects variable block (TODO: is this true? If yes, what a waste).
- * To mark the virtual inherit, the variable types receive the modifier
- * TYPE_MOD_VIRTUAL.
+ * gets its own struct inherit; the variable block however is reserved
+ * just once. To mark the virtual inherit, the variable types receive the
+ * modifier TYPE_MOD_VIRTUAL. During the inheritance of the compiler, functions
+ * from non-virtual inherits temporarily receive the flag
+ * NON_VIRTUAL_OFFSET_TAG in their variable indices, too.
  *
  * However, accesses to virtually inherited variables only use the first
  * inherit instance - if the variable index in the child's program code indexes
  * the variable block associated with a later instance, the driver finds
  * the first instance by comparing the .prog entries and uses the 'real'
  * variable associated with this first instance.
+ *
+ * The compiler places virtual variables always at the begin of the variable
+ * block and limits the number to 256.
  *
  * TODO: Find a way to avoid the virtual var searching - either by encoding the
  * TODO:: inherit index in the code, or by adding a ref to the 'first
@@ -141,10 +167,60 @@
  */
 
 #include "driver.h"
-#include "datatypes.h" /* struct svalue */
+#include "typedefs.h"
 
 
-/* --- struct instr: description of stackmachine instructions ---
+/* --- Type Constants ---
+ *
+ * These constants and types are used to encode types and visibility
+ * of variables and functions. They are used by both the compiler and
+ * the interpreter.
+ *
+ * You'll find the "TYPE_MOD_" visibility constants below with the
+ * function flags.
+ */
+
+typedef unsigned short  vartype_t;   /* Basic: just the datatype */
+typedef uint32          fulltype_t;  /* Full: type and visibility */
+
+
+/* Basic type values */
+
+#define TYPE_UNKNOWN        0   /* This type must be casted */
+#define TYPE_NUMBER         1
+#define TYPE_STRING         2
+#define TYPE_VOID           3
+#define TYPE_OBJECT         4
+#define TYPE_MAPPING        5
+#define TYPE_FLOAT          6
+#define TYPE_ANY            7   /* Will match any type */
+#define TYPE_CLOSURE        8
+#define TYPE_SYMBOL         9
+#define TYPE_QUOTED_ARRAY  10
+
+#define TYPEMAP_SIZE       11   /* Number of types */
+
+/* Flags, or'ed on top of the basic type */
+
+#define TYPE_MOD_POINTER    0x0040  /* Pointer to a basic type */
+#define TYPE_MOD_REFERENCE  0x0080  /* Reference to a type */
+
+#define TYPE_MOD_MASK   0x000000ff
+  /* Mask for basic type and flags.
+   */
+
+#define TYPE_MOD_RMASK  (TYPE_MOD_MASK & ~TYPE_MOD_REFERENCE)
+  /* Mask to delete TYPE_MOD_REFERENCE and the visibility mods from
+   * a type value.
+   */
+
+#define VIRTUAL_VAR_TAG 0x4000
+  /* Flag set in virtual variables, also interpreted as offset
+   * in the variable index for virtual variables.
+   */
+
+
+/* --- struct instr_s: description of stackmachine instructions ---
  *
  * Stackmachine instructions are both 'internal' codes with no external
  * representation, as well as efuns.
@@ -157,7 +233,7 @@
  * The table is compiled into the lexer module and exported from there.
  */
 
-struct instr
+struct instr_s
 {
     short max_arg;    /* Maximum number of arguments, -1 for '...' */
     short min_arg;
@@ -174,40 +250,10 @@ struct instr
        *  -1: this whole entry describes an internal stackmachine code,
        *      not a normal efun (an 'operator' in closure lingo).
        */
-    short ret_type;   /* The return type used by the compiler. */
-    short arg_index;  /* Indexes the efun_arg_types[] array (see make_func). */
-    char *name;       /* The printable name of the instruction. */
+    vartype_t ret_type;  /* The return type used by the compiler. */
+    short arg_index;     /* Indexes the efun_arg_types[] array (see make_func). */
+    char *name;          /* The printable name of the instruction. */
 };
-
-
-/* --- Driver Hooks ---
- *
- * The hooks are a bit out of place here, but make_func.y needs them and
- * there don't really fit anywhere.
- *
- * The hooks must match mudlib/sys/driver_hook.h
- */
-
-#define H_MOVE_OBJECT0           0
-#define H_MOVE_OBJECT1           1
-#define H_LOAD_UIDS              2
-#define H_CLONE_UIDS             3
-#define H_CREATE_SUPER           4
-#define H_CREATE_OB              5
-#define H_CREATE_CLONE           6
-#define H_RESET                  7
-#define H_CLEAN_UP               8
-#define H_MODIFY_COMMAND         9
-#define H_NOTIFY_FAIL           10
-#define H_NO_IPC_SLOT           11
-#define H_INCLUDE_DIRS          12
-#define H_TELNET_NEG            13
-#define H_NOECHO                14
-#define H_ERQ_STOP              15
-#define H_MODIFY_COMMAND_FNAME  16
-#define H_COMMAND               17
-
-#define NUM_CLOSURE_HOOKS       18  /* Number of hooks */
 
 
 /* --- Byte code ---
@@ -215,7 +261,8 @@ struct instr
  * The program code is stored as byte code. The following definitions
  * and macros allow its implementation even on platforms with more than
  * 8 bits per character.
- * TODO: This portability is far from complete, and not used everywhere.
+ * TODO: This portability is far from complete, and not used everywhere,
+ * TODO:: not even in the compiler.
  *
  *   bytecode_t: an integral type holding the numbers 0..255.
  *   bytecode_p: an integral type addressing a bytecode. This need not
@@ -225,15 +272,32 @@ struct instr
  *   bytecode_t LOAD_CODE(bytecode_p p)
  *     Return the bytecode from *p, the LOAD_ variant then increments p.
  *
+ *   void PUT_CODE(bytecode_p p, bytecode_t c)
+ *   void STORE_CODE(bytecode_p p, bytecode_t c)
+ *   void RSTORE_CODE(bytecode_p p, bytecode_t c)
+ *     Store the bytecode c in *p, the STORE_ variant then increments p.
+ *     The RSTORE_ variant pre-decrements p.
+ *
  *    char GET_INT8(p) , LOAD_INT8(p)
  *   uchar GET_UINT8(p), LOAD_UINT8(p)
  *     Return the 8-Bit (unsigned) int stored at <p>, the LOAD_ variants
- *     then increments <p>.
+ *     then increment <p>.
+ *
+ *   void PUT_INT8(p, char c),   STORE_INT8(p, char c)
+ *   void PUT_UINT8(p, uchar c), STORE_UINT8(p, uchar c)
+ *     Store the 8-Bit (unsigned) int <c> into <p>, the STORE_ variants
+ *     then increment <p>.
  *
  *   void GET_SHORT ([unsigned] short d, bytecode_p p)
  *   void LOAD_SHORT([unsigned] short d, bytecode_p p)
  *     Load the (unsigned) short 'd' stored at <p>, the LOAD_ variant
  *     then increments <p>.
+ *
+ *   void PUT_SHORT (bytecode_p p, [unsigned] short d)
+ *   void STORE_SHORT(bytecode_p p, [unsigned] short d)
+ *   void RSTORE_SHORT(bytecode_p p, [unsigned] short d)
+ *     Store the (unsigned) short <d> into <p>, the STORE_ variant
+ *     then increments <p>. The RSTORE_ variant pre-decrements <p>.
  *
  *   void GET_INT16 ([unsigned] int16 d, bytecode_p p)
  *   void LOAD_INT16([unsigned] int16 d, bytecode_p p)
@@ -252,22 +316,58 @@ struct instr
 typedef unsigned char   bytecode_t;
 typedef bytecode_t    * bytecode_p;
 
-#define GET_CODE(p)    (*(p))
-#define LOAD_CODE(p)   (*(p)++)
+#define GET_CODE(p)      (*(p))
+#define LOAD_CODE(p)     (*(p)++)
 
-#define GET_UINT8(p)   (*((unsigned char *)(p)))
-#define GET_INT8(p)    (*((signed char *)(p)))
-#define LOAD_UINT8(p)   (*((unsigned char *)(p)++))
-#define LOAD_INT8(p)    (*((signed char *)(p)++))
+#define PUT_CODE(p,c)    (*(p) = (c))
+#define STORE_CODE(p,c)  (*(p)++ = (c))
+#define RSTORE_CODE(p,c)  (*--(p) = (c))
+
+/* TODO: all these casts yield rvalues, so they shouldn't compile
+ * TODO:: (and on xlc on AIX some of them indeed don't).
+ */
+#define GET_UINT8(p)     (*((unsigned char *)(p)))
+#define GET_INT8(p)      (*((signed char *)(p)))
+#define LOAD_UINT8(p)    (*((unsigned char *)(p)++))
+#define LOAD_INT8(p)     (*((signed char *)(p)++))
+
+#define PUT_UINT8(p,c)   (*((unsigned char *)(p)) = (c))
+#define PUT_INT8(p,c)    (*((signed char *)(p)) = (c))
+#define STORE_UINT8(p,c) (*((unsigned char *)(p)++) = (c))
+#define STORE_INT8(p,c)  (*((signed char *)(p)++) = (c))
 
 /* TODO: These generic mem-macros should go into a macros.h. See also
  * TODO:: how mudos does it.
+ * Note: the lowlevel BYTE macros can't use MACRO(), since this is
+ * needed on the next abstraction level, and a macro can't be nested
+ * into itself.
  */
 #define LOAD_2BYTE(d,p) ( ((char *)&(d))[0] = *(char *)(p)++, \
                           ((char *)&(d))[1] = *(char *)(p)++)
 
 #define GET_2BYTE(d,p)  ( ((char *)&(d))[0] = ((char *)(p))[0], \
                           ((char *)&(d))[1] = ((char *)(p))[1] )
+
+#define STORE_2BYTE(p,d) do {\
+                             unsigned char * _q, ** _qq; \
+                             _q = (unsigned char *)(p); \
+                             _qq = (unsigned char **)&(p); \
+                             _q[0] = ((unsigned char *)&(d))[0]; \
+                             _q[1] = ((unsigned char *)&(d))[1]; \
+                             *_qq += 2; \
+                         } while(0)
+
+#define RSTORE_2BYTE(p,d) do {\
+                             unsigned char * _q, ** _qq; \
+                             _q = (unsigned char *)(p); \
+                             _qq = (unsigned char **)&(p); \
+                             _q[-2] = ((unsigned char *)&(d))[0]; \
+                             _q[-1] = ((unsigned char *)&(d))[1]; \
+                             *_qq -= 2; \
+                         } while(0)
+
+#define PUT_2BYTE(p,d)  ( ((char *)(p))[0] = ((char *)&(d))[0], \
+                          ((char *)(p))[1] = ((char *)&(d))[1] )
 
 #define LOAD_4BYTE(d,p) ( ((char *)&(d))[0] = *(char *)(p)++, \
                           ((char *)&(d))[1] = *(char *)(p)++, \
@@ -279,13 +379,31 @@ typedef bytecode_t    * bytecode_p;
                           ((char *)&(d))[2] = ((char *)(p))[2], \
                           ((char *)&(d))[3] = ((char *)(p))[3] )
 
-#define GET_SHORT(d,p)  GET_2BYTE(d,p)
-#define LOAD_SHORT(d,p) LOAD_2BYTE(d,p)
+#define STORE_4BYTE(p,d) ( *(unsigned char *)(p)++ = ((char *)&(d))[0], \
+                           *(unsigned char *)(p)++ = ((char *)&(d))[1], \
+                           *(unsigned char *)(p)++ = ((char *)&(d))[2], \
+                           *(unsigned char *)(p)++ = ((char *)&(d))[3] )
+
+#define PUT_4BYTE(p,d)  ( ((char *)(p))[0] = ((char *)&(d))[0], \
+                          ((char *)(p))[1] = ((char *)&(d))[1], \
+                          ((char *)(p))[2] = ((char *)&(d))[2], \
+                          ((char *)(p))[3] = ((char *)&(d))[3] )
+
+
+#define GET_SHORT(d,p)    GET_2BYTE(d,p)
+#define LOAD_SHORT(d,p)   LOAD_2BYTE(d,p)
+#define PUT_SHORT(p,d)    MACRO(unsigned short _us = (unsigned short)d; \
+                                PUT_2BYTE(p,_us);)
+#define STORE_SHORT(p,d)  MACRO(unsigned short _us = (unsigned short)d; \
+                               STORE_2BYTE(p,_us);)
+#define RSTORE_SHORT(p,d) MACRO(unsigned short _us = (unsigned short)d; \
+                               RSTORE_2BYTE(p,_us);)
   /* TODO: This assumes sizeof(short) == 2. */
 
 #define LOAD_INT16(d,p) LOAD_2BYTE(d,p)
 #define LOAD_INT32(d,p) LOAD_2BYTE(d,p)
 #define GET_INT32(d,p)  GET_4BYTE(d,p)
+#define PUT_INT32(p,d)  PUT_4BYTE(p,d)
 
 #endif
 
@@ -300,13 +418,13 @@ typedef bytecode_t    * bytecode_p;
  * the flags for the function and, in one field in the low bits, the
  * address of the code.
  *
- * Some flags (TYPE_MOD_VIRTUAL) are also used for variable flags.
+ * Some flags (TYPE_MOD_*) are also used for variable types.
  *
  * Using a bitfield is tempting, but generates inefficient code due to the
  * lack of a real 'bool' datatype.
- *
- * TODO: Function flags should be its own type 'funflag', not just 'uint32'.
  */
+
+typedef fulltype_t funflag_t;  /* Function flags */
 
 #define NAME_INHERITED      0x80000000  /* defined by inheritance */
 #define TYPE_MOD_STATIC     0x40000000  /* Static function or variable    */
@@ -318,23 +436,30 @@ typedef bytecode_t    * bytecode_p;
 #define TYPE_MOD_VIRTUAL    0x02000000  /* can be re- and cross- defined  */
 #define TYPE_MOD_PROTECTED  0x01000000  /* cannot be called externally    */
 #define TYPE_MOD_XVARARGS   0x00800000  /* accepts optional arguments     */
+#define TYPE_MOD_NOSAVE     0x00400000  /* vars: can't be saved           */
 
 #define FUNSTART_MASK       0x000fffff
   /* Function not inherited: unsigned address of the function code relative
-   * to the begin of the program block (struct program->program).
+   * to the begin of the program block (struct program_s->program).
    */
 
 #define NAME_CROSS_DEFINED  0x00080000
-  /* Function from A used in B, resolved by C which inherits both A and B.
-   * If this is true, the value (flags & INHERIT_MASK) (in bias-0x800000
-   * representation) is the difference between the current function index
-   * and the real functions index.
+  /* Two functions with the same name inherited from A and B into C.
+   * The compiler usually prefers A, and the value 'flags & INHERIT_MASK'
+   * (in bias-0x20000 representation) stored as B.offset.func is the
+   * difference between to the real functions index (also see below).
+   * A special use is A uses a function from B. The function is marked
+   * in A as undefined, but the compiler will use cross-defining in C
+   * to resolve the function calls in A to call the function in B.
    */
 
 #define INHERIT_MASK        0x0003ffff
   /* Function inherited: unsigned index of the parent program descriptor
-   * in the struct program->inherit[] array. In the parent program, this
+   * in the struct program_s->inherit[] array. In the parent program, this
    * function may again be inherited.
+   * Function crossdefined: signed difference (in bias-0x20000 notation)
+   * from the current function index to the real function index
+   * (real = this + offset).
    */
 
 
@@ -343,6 +468,35 @@ typedef bytecode_t    * bytecode_p;
 #define NAME_UNDEFINED      0x00000200 /* Not defined yet                */
 #define NAME_TYPES_LOST     0x00000100 /* inherited, no save_types       */
 
+#define CROSSDEF_NAME_OFFSET(flags) \
+     (((flags) & INHERIT_MASK) - ((INHERIT_MASK + 1) >> 1))
+
+  /* For a given NAME_CROSS_DEFINED function, extract the difference to
+   * the real functions index from the flags.
+   */
+
+#define GET_CROSSDEF_OFFSET(value) \
+     ((value) - ((INHERIT_MASK + 1) >> 1))
+
+  /* The index difference <value> in bias-notation is converted back into
+   * the real number. The difference to CROSSDEF_NAME_OFFSET is that <value>
+   * is supposed to be the plain number, not a real function flags word.
+   */
+
+#define MAKE_CROSSDEF_OFFSET(value) \
+     ((value) + ((INHERIT_MASK + 1) >> 1))
+
+  /* Convert the index difference <value> into the bias-notation for storage
+   * in the function flags.
+   */
+
+#define MAKE_CROSSDEF_ROFFSET(value) \
+     ((value) - ((INHERIT_MASK + 1) >> 1))
+
+  /* Convert the reverse index difference <value> into the bias-notation for
+   * storage in the function flags.
+   * TODO: What is this exactly?
+   */
 
 /* --- Function header ---
  *
@@ -369,11 +523,14 @@ typedef bytecode_t    * bytecode_p;
  * is implemented using macros taking the 'function address', typedef'd
  * as fun_hdr_p, as argument and evaluate to the desired value.
  *
+ * WARNING: if ALIGN_FUNCTIONS is not defined, the name_of_function pointer
+ *   is not aligned properly to be directly used as a pointer!
+ *
  * Note: Changes here can affect the struct lambda layout and associated
  *       constants.
  * TODO: the other fields should have proper types, too.
  * TODO: the whole information should be in a table, and not in the
- * TODO:: bytecode. See struct program.
+ * TODO:: bytecode. See struct program_s.
  */
 
 typedef bytecode_p fun_hdr_p;
@@ -386,28 +543,30 @@ typedef bytecode_p fun_hdr_p;
    */
 
 #define EFUN_FUNSTART ((bytecode_p) -2)
-  /* Special value used for funstart to mark simul_efuns for dump_trace.
+  /* Special value used for funstart to mark efuns for dump_trace.
    */
 
 
-#define FUNCTION_NAME(p)      (*((char **)((char *)p - sizeof(char) - sizeof(char *))))
+#define FUNCTION_NAMEP(p)     ((void*)((char *)p - sizeof(char) - sizeof(char *)))
 #define FUNCTION_TYPE(p)      (*((unsigned char *)((char *)p - sizeof(char))))
 #define FUNCTION_NUM_ARGS(p)  EXTRACT_SCHAR((char *)p)
 #define FUNCTION_NUM_VARS(p)  (*((unsigned char *)((char *)p + sizeof(char))))
 #define FUNCTION_CODE(p)      ((bytecode_p)((unsigned char *)p + 2* sizeof(char)))
 #define FUNCTION_FROM_CODE(p) ((fun_hdr_p)((unsigned char *)p - 2* sizeof(char)))
 
+#define FUNCTION_HDR_SIZE     (sizeof(char*) + 3)
 
-/* --- struct variable: description of one variable
+
+/* --- struct variable_s: description of one variable
  *
  * This structure describes one variable, inherited or own.
  * The type part of the .flags is used just by the compiler.
  */
 
-struct variable
+struct variable_s
 {
-    char   *name;   /* Name of the variable (shared string) */
-    uint32  flags;
+    char       *name;   /* Name of the variable (shared string) */
+    fulltype_t  flags;
       /* Flags and type of the variable.
        * If a variable is inherited virtually, the function flag
        * TYPE_MOD_VIRTUAL is or'ed on this.
@@ -422,9 +581,9 @@ struct variable
  * programs are accessed from the childs' program code by indexing this array.
  */
 
-struct inherit
+struct inherit_s
 {
-    struct program *prog;  /* Pointer to the inherited program */
+    program_t *prog;  /* Pointer to the inherited program */
     unsigned short function_index_offset;
       /* Offset of the inherited program's function block within the
        * inheriting program's function block.
@@ -432,19 +591,31 @@ struct inherit
     unsigned short variable_index_offset;
       /* Offset of the inherited program's variables block within the
        * inheriting program's variable block.
+       * The NON_VIRTUAL_OFFSET_TAG marks the variables of non-virtual
+       * inherits temporarily during compiles.
        */
-    SBool is_extra; /* TRUE for duplicate virtual inherits */
-    /* TODO: Why no flag for 'virtual inherited'? */
+    unsigned short inherit_type;            /* Type of inherit */
+
+#   define INHERIT_TYPE_NORMAL      0x0000  /* Type: Normal inherit */
+#   define INHERIT_TYPE_EXTRA       0x0001  /* Type: Extra inherit added by
+                                             * copy_variables()
+                                             */
+#   define INHERIT_TYPE_DUPLICATE   0x0002  /* Flag: Duplicate virtual inherit */
+    unsigned short inherit_depth;           /* Depth of inherit */
 };
 
 
-/* --- struct program: the program head structure
+/* --- struct program_s: the program head structure
  *
  * This structure is actually just the head of the memory block
  * with all the programs data.
  */
 
-struct program
+/* TODO: We seem to need a datatype for program offsets (right now: unsigned short).
+ * TODO:: It shows up in quite a lot of places.
+ */
+
+struct program_s
 {
     p_int           ref;           /* Reference count */
     p_int           total_size;
@@ -464,19 +635,26 @@ struct program
        * the structure.
        */
     mp_int          load_time;     /* When has it been compiled ? */
-    bytecode_p      line_numbers;  /* Line number information */
-      /* TODO: Check if the line_numbers are allocated in a separate
-       * TODO:: block. If not, the swapper wastes memory on swapping in.
+    bytecode_p      line_numbers;
+      /* Line number information, NULL when not swapped in
        */
     unsigned short *function_names;
 #define PROGRAM_END(program) ((bytecode_p)(program).function_names)
-      /* TODO: FUnction_names? Maybe an array put at the end of the
-       * TODO:: bytecode block with the offsets of all function names
-       * TODO:: within the program?
+      /* Lookup table [.num_function_names] function-index -> offset of
+       * the function within the functions[] table. function_names[] is
+       * stored right after the the bytecode within the same allocation
+       * unit.
+       * The table is sorted in descending order of the pointers(!)
+       * of the shared function name strings. If the program contains
+       * redefinitions of inherited functions, the entry here points
+       * to the redefinition, the inherited function can then be
+       * found from there.
        */
-    /* TODO: funflags */ uint32 *functions;
+    funflag_t *functions;
       /* Array [.num_functions] with the flags and addresses of all
        * functions, inherited and own.
+       * Nameless functions (those without an entry in function_names[])
+       * are collected at the end of the table.
        * TODO: Instead of hiding the function information in the bytecode
        * TODO:: it should be tabled here.
        */
@@ -486,39 +664,45 @@ struct program
        * to the names of all included files, used when retrieving line
        * numbers.
        */
-    struct variable *variable_names;
+    variable_t *variable_names;
       /* Array [.num_variables] with the flags, types and names of all
        * variables.
        */
-    struct inherit *inherit;
+    inherit_t *inherit;
       /* Array [.num_inherited] of descriptors for inherited programs.
        */
     unsigned short flags;
       /* Flags for the program: */
 
-#   define P_REPLACE_ACTIVE   0x0001 /* Program replacement scheduled */
+#   define P_REPLACE_ACTIVE   0x0001
+      /* This program will be or has been replaced at least once.
+       * As this flag is never reset, the caller must check the
+       * obj_list_replace if his object is affected or not.
+       */
 #   define P_NO_INHERIT       0x0002 /* Program must not be inherited */
 #   define P_NO_CLONE         0x0004 /* No clones allowed */
+#   define P_NO_SHADOW        0x0008 /* No shadows allowed */
 
     short heart_beat;
       /* Index of the heart beat function. -1 means no heart beat
        */
-    /*
-     * The types of function arguments are saved where 'argument_types'
-     * points. It can be a variable number of arguments, so allocation
-     * is done dynamically. To know where first argument is found for
-     * function 'n' (number of function), use 'type_start[n]'.
-     * These two arrays will only be allocated if '#pragma save_types' has
-     * been specified. This #pragma should be specified in files that are
-     * commonly used for inheritance. There are several lines of code
-     * that depends on the type length (16 bits) of 'type_start' (sorry !).
+
+    /* The types of all function arguments are saved in the
+     * .argument_types[]. To look up the arguments types for
+     * function <n>, retrieve the start index from the .type_start[]
+     * as .type_start[n]. If this index is INDEX_START_NONE, the function
+     * has no type information.
+     *
+     * Both arrays will only be allocated if '#pragma save_types' has
+     * been specified.
      */
-    unsigned short *argument_types; /* TODO: ??? */
-#define INDEX_START_NONE                65535
-    unsigned short *type_start; /* TODO: ??? */
+    vartype_t *argument_types;
+    unsigned short *type_start;
+      /* TODO: Some code relies on this being unsigned short */
+#   define INDEX_START_NONE                65535
 
     p_int swap_num;
-      /* The swap file offset for an unswapped program
+      /* The swap number (swap file offset) for an unswapped program
        * It is set to -1 if it hasn't been swapped yet.
        */
 
@@ -526,6 +710,11 @@ struct program
      * And now some general size information.
      */
     unsigned short num_function_names;
+      /* Number of function names listed in the lookup table.
+       * This number is <= .num_functions as the redefinition of
+       * of inherited functions does not need an additional name
+       * entry. Also, private functions have no visible name.
+       */
     unsigned short num_functions;
       /* Number of functions (inherited and own) of this program */
     unsigned short num_strings;
@@ -537,27 +726,38 @@ struct program
 };
 
 
-/* --- struct function: TODO: ???
+/* --- struct function_s: Function description
+ *
+ * Structures of this type hold various important pieces of
+ * information about a function.
+ * The compiler uses this structure to collect the function information
+ * of newly defined and inherited functions, of which the former will also
+ * be compiled into the function header
+ * The simul_efun module uses this structure to look up quickly functions.
  */
 
-struct function /* TODO: used by compiler and simul_efun only? */
+struct function_s
 {
-    char *name;  /* TODO: Name of function (shared?) */
-      /* This is needed very often, therefore it should be first (allocated) */
+    char *name;  /* Name of function (shared string) */
     union {
-        uint32 pc;       /* TODO: Address of function */
-        uint32 inherit;  /* TODO: inherit table index when inherited. */
-        /*signed*/ int32 func;  /* offset to first inherited function
-                                 * with this name.
-                                 * simul_efun also uses this field as a next
-                                 * index in the simul_efun function table for
-                                 * functions that have been discarded due to a
-                                 * change in the number of arguments.
-                                 */
-        struct function *next;        /* used for mergesort */
+        uint32 pc;       /* lfuns: Address of function header */
+        uint32 inherit;  /* Inherit table index from where inherited. */
+         int32 func;
+           /* For cross-defined functions, this is the index offset
+            * to the original function in bias-0x200000 notation.
+            * Semantik: real-index = this-index + offset.
+            * The offset is also stored in the function flags in
+            * the program_t.functions[] array.
+            *
+            * simul_efun.c also uses this field as a 'next'
+            * index in the simul_efun function table for
+            * functions that have been discarded due to a
+            * change in the number of arguments.
+            */
+        function_t *next;        /* used for mergesort */
     } offset;
-    /* TODO: funflag */ uint32 flags;
-    unsigned short type;      /* Return type of function. See below. */
+    funflag_t     flags;      /* Function flags */
+    vartype_t     type;       /* Return type of function. */
     unsigned char num_local;  /* Number of local variables */
     unsigned char num_arg;    /* Number of arguments needed. */
 #   define SIMUL_EFUN_VARARGS  0xff  /* Magic num_arg value for varargs */
@@ -575,17 +775,22 @@ struct function /* TODO: used by compiler and simul_efun only? */
  * association.
  *
  * The names of included files are stored in the order of appearance
- * at the end of the string table. Multiply included files are stored
+ * at the end of the string table. Multiple included files are stored
  * several times.
  */
 
-/* Bytecodes 0x00..0x3b: The amount of program bytes generated for the
- * current line; this line is complete with that.
+/* Bytecodes 0x00..0x3a: The amount of program bytes generated for the
+ * current line; this entry is complete with that.
  */
 
-#define LI_MAXOFFSET      0x3c
-  /* The current line generated 0x3c bytes (more), but is still not
-   * complete.
+#define LI_MAXOFFSET      0x3b
+  /* The current line generated 0x3b bytes (more), but the entry
+   * is not complete. This code used after the linecodes 0xC0..0xFF.
+   */
+
+#define LI_BACK           0x3c
+  /* Followed by unsigned byte <off>.
+   * The current line counter was set back by <off>+1.
    */
 
 #define LI_INCLUDE        0x3d
@@ -608,6 +813,7 @@ struct function /* TODO: used by compiler and simul_efun only? */
  *   codesize:  1..8
  *   line incr: 2..9
  * -> bytecode = (lineincr+6) << 3 | (codesize-1)
+ * Each code is a complete entry.
  */
 
 #define LI_RELOCATED      0xc0
@@ -623,50 +829,12 @@ struct function /* TODO: used by compiler and simul_efun only? */
    */
 
 #define LI_MAXEMPTY       0x20
-
-
-/* --- Type Constants ---
- *
- * Available types, with the number '0' being valid as any type.
- * The types are used just by the compiler when type checks are
- * enabled.
- */
-
-/* Basic type values */
-
-#define TYPE_UNKNOWN        0   /* This type must be casted */
-#define TYPE_NUMBER         1
-#define TYPE_STRING         2
-#define TYPE_VOID           3
-#define TYPE_OBJECT         4
-#define TYPE_MAPPING        5
-#define TYPE_FLOAT          6
-#define TYPE_ANY            7   /* Will match any type */
-#define TYPE_SPACE          8   /* TODO: ??? */
-#define TYPE_CLOSURE        9
-#define TYPE_SYMBOL        10
-#define TYPE_QUOTED_ARRAY  11
-#define TYPE_TERM          12
-
-#define TYPEMAP_SIZE       13   /* Number of types */
-
-/* Flags, or'ed on top of the basic type */
-
-#define TYPE_MOD_POINTER    0x0040  /* Pointer to a basic type */
-#define TYPE_MOD_REFERENCE  0x0080  /* Reference to a type */
-
-#define TYPE_MOD_MASK   0x000000ff
-  /* Mask for basic type and flags.
+  /* Bytecodes 0xE0..0xFF: 'use' a number of lines between 1 and 32
+   * -> bytecode = (0x100 - lines)
+   * The entry is not complete.
    */
-
-#define TYPE_MOD_RMASK  (TYPE_MOD_MASK & ~TYPE_MOD_REFERENCE)
-  /* Mask to delete TYPE_MOD_REFERENCE from a type value
-   */
-
-
-#define VIRTUAL_VAR_TAG 0x4000  /* TODO: ??? */
 
 
 /***************************************************************************/
 
-#endif /* __EXEC_H__ */
+#endif /* EXEC_H__ */

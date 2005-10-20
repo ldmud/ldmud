@@ -29,5 +29,9 @@ DESCRIPTION
 	variables (which might hold array pointers to a global array),
 	simple arithmetic and the assignment operators.
 
+BUG
+	After set_this_object(), references to global variables and
+	local function should be actively caught and rejected.
+
 SEE ALSO
 	this_object(E), set_this_player(E)

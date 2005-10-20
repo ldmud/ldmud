@@ -1,39 +1,56 @@
-#ifndef _REGEXP_H_
-#define _REGEXP_H_
+#ifndef REGEXP_H_
+#define REGEXP_H_
 
 #include "driver.h"
 
-/*
- * Definitions etc. for regexp(3) routines.
+#define NSUBEXP  50
+  /* Number of allowed () expressions.
+   */
+
+/* --- struct regexp: regular expression basis ---
  *
- * Caveat:  this is V8 regexp(3) [actually, a reimplementation thereof],
- * not the System V one.
+ * This structure is used to hold a compiled regular expression as well
+ * intermediate results between two match calls.
+ *
+ * The structure is allocated big enough to fit the whole program
+ * starting with .program.
  */
 
-#define NSUBEXP  50                /* Number of allowed () expressions */
-
-typedef struct regexp {
-        char *startp[NSUBEXP];
-        char *endp[NSUBEXP];
-        char regstart;                /* Internal use only. */
-        char reganch;                /* Internal use only. */
-        char *regmust;                /* Internal use only. */
-        int regmlen;                /* Internal use only. */
-        long regalloc;                /* Allocated total length, used by rxcache */
-        p_uint refs;            /* Number of refs, used+maintained by rxcache */
-        char program[1];        /* Unwarranted chumminess with compiler. */
+typedef struct regexp
+{
+    char *startp[NSUBEXP];
+    char *endp[NSUBEXP];
+      /* After a match, the start and endpointers for the matched
+       * () expressions.
+       */
+    char regstart;
+      /* Internal use: char that must begin a match, '\0' if non obvious
+       */
+    char reganch;
+      /* Internal use: is the match anchored (at beginning-of-line only)?
+       */
+    char *regmust;
+      /* Internal use: string (pointer into program) that match must
+       * include, or NULL.
+       */
+    int regmlen;
+      /* Internal  use: length of regmust.
+       */
+    long regalloc;          /* Allocated total length, used by rxcache */
+    p_uint refs;            /* Number of refs, used+maintained by rxcache */
+    Bool from_ed;           /* TRUE if compiled for ed() */
+    char program[1];        /* The compiled regexp. */
 } regexp;
 
+/* --- Prototypes --- */
+#ifdef DEBUG
+extern Bool regnarrate;
+void regdump(regexp *rg);
+#endif
 
-/*
- * The first byte of the regexp internal "program" is actually this magic
- * number; the start node begins in the second byte.
- */
-#define        MAGIC        0234
+extern regexp *regcomp(char *expr, Bool excompat, Bool from_ed);
+extern Bool regexec(regexp *prog, char *string, char *start);
+extern char *regsub(regexp *prog, char *source, char *dest, int n, Bool quiet);
+extern void regerror(char *);
 
-extern regexp *regcomp PROT((char *expr, int excompat));
-extern int regexec PROT((regexp *prog, char *string, char *start));
-extern char *regsub PROT((regexp *prog, char *source, char *dest, int n, int quiet));
-extern void regerror PROT((char *));  /* defined in ed.c! */
-
-#endif /* _REGEXP_H_ */
+#endif /* REGEXP_H_ */

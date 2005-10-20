@@ -141,7 +141,7 @@ DESCRIPTION
 
 	You might be interested in TELOPT_XDISPLAYLOC and TELOPT_ENVIRON too.
 
-	Now, how to implement this using Amylaar's 3.2.1 (@67 and up)?
+	Now, how to implement this using LDMud?
 
 	0. Patch src/driver/comm1.c, function init_telopts() to include
 	    telopts_do[TELOPT_XXX] = reply_h_telnet_neg;
@@ -150,6 +150,10 @@ DESCRIPTION
 	    telopts_wont[TELOPT_XXX] = reply_h_telnet_neg;
 	   for every telnet negotiation you want to use.
 	   Do not overwrite the TELOPT_ECHO and TELOPT_SGA hooks.
+
+           Alternatively, set the driver hook H_NOECHO in master.c:
+           this diverts _all_ telnet data into the mudlib.
+
 	1. Add a new driver hook to master.c just below the others.
 		set_driver_hook(H_TELNET_NEG,"telnet_neg"),
 	2. Make a telnet.h for your mudlib... just change the arrays in

@@ -5,7 +5,7 @@ SYNOPSIS
 
 DESCRIPTION
 	Constructs an identifier (lfun) closure from the global
-	variable arg of this_object(). The variable may be given as a
+	variable arg of the current program. The variable may be given as a
 	symbol, by name or by its ordinal number in the objects
 	variable table.
 	If there is no such variable, or if it is not visible outside
@@ -21,8 +21,8 @@ HISTORY
 EXAMPLES
 	int base;
 	int var;
-	symbol_variable("var")		-> #'<this_object>->var
-	symbol_variable(0)		-> #'<this_object>->base
+	symbol_variable("var")	-> #'<this_object>->var
+	symbol_variable(0)	-> #'<this_object>->base
 
 SEE ALSO
 	lambda(E), quote(E), symbol_function(E)

@@ -2,7 +2,9 @@ Short: Driver cored on to much input/output
 From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
 Subject: Driver hat gecored
 Type: Bug
-State: Acknowledged
+State: Probably done - fixes added in 3.2.8-dev.157
+See also: b-991123-0, b-991123-1
+
 Hi,
 
 Der Driver (3.2.7-dev.81) ist bei uns gerade gecored.
@@ -42,31 +44,10 @@ UNItopia Admin                          http://UNItopia.uni-stuttgart.de/
 Freaky@UNItopia.Uni-Stuttgart.DE      telnet://UNItopia.uni-stuttgart.de/
 
 
-From Frank.Kirschner@RUS.Uni-Stuttgart.DE  Fri Apr 30 14:11:56 1999
-X-UIDL: 0="e9~WQ!!cS1!!E63!!
-Received: from artemis.rus.uni-stuttgart.de (artemis.rus.uni-stuttgart.de [129.69.1.28])
-	by cs.csoft.net (8.9.3/8.9.3) with ESMTP id OAA15957
-	for <lars@bearnip.com>; Fri, 30 Apr 1999 14:11:53 -0500
-Received: from helpdesk.rus.uni-stuttgart.de (helpdesk.rus.uni-stuttgart.de [129.69.221.120])
-	by artemis.rus.uni-stuttgart.de (8.8.8/8.8.8) with ESMTP id XAA03361
-	for <lars@bearnip.com>; Fri, 30 Apr 1999 23:03:47 +0200 (MET DST)
-	env-from (rusfrank@helpdesk.rus.uni-stuttgart.de)
-Received: (from rusfrank@localhost)
-	by helpdesk.rus.uni-stuttgart.de (8.8.8/8.8.8) id XAA24004
-	for lars@bearnip.com; Fri, 30 Apr 1999 23:03:47 +0200 (MDT)
 Date: Fri, 30 Apr 1999 23:03:47 +0200
 From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
 To: Lars Duening <lars@bearnip.com>
 Subject: Re: Driver hat gecored
-Message-ID: <19990430230346.A23891@helpdesk.rus.uni-stuttgart.de>
-Reply-To: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
-References: <19990430193525.B17762@helpdesk.rus.uni-stuttgart.de> <000349be0ab353e7_mailit@mail.csoft.net>
-Mime-Version: 1.0
-Content-Type: text/plain; charset=iso-8859-1
-Content-Transfer-Encoding: 8bit
-X-Mailer: Mutt 0.95.1i
-In-Reply-To: <000349be0ab353e7_mailit@mail.csoft.net>; from Lars Duening on Fri, Apr 30, 1999 at 09:51:42PM +0100
-Status: RO
 
 Hi,
 
@@ -226,3 +207,11 @@ From: Thorsten Klose <Thorsten.Klose@gmx.de>
      darueber brauchst, kann ich nochmal in meinen Mails kramen...
      aber vielleicht kannst Du Dir auch schon denken, woran das liegen
      koennte.
+
+---------- Analysis ----------
+
+Under certain circumstances, several indices (.tn_start, .command_start)
+and the derived .chars_ready might become negative. On lucky days, this
+caused crashes when the driver attempted to use the data read. On bad days,
+it simply wrote data where it didn't belong - this might be the cause
+for some of the strange crashes in find_string().

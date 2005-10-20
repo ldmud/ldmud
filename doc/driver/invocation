@@ -133,10 +133,6 @@ DESCRIPTION
         Restrict total memory allocations to <size> bytes.
         Only available if compiled with MAX_MALLOCED.
 
-      --max-small-malloc <size>
-        Restrict total small block allocations to <size> bytes.
-        Only available if compiled with MAX_MALLOCED.
-
       -r u<size> | --reserve-user <size>
       -r m<size> | --reserve-master <size>
       -r s<size> | --reserve-system <size>
@@ -156,6 +152,14 @@ DESCRIPTION
         Enable debugging of the LPC compiler.
         Only available if compiled with YYDEBUG.
 
+      --check-state <lvl>
+        Perform a regular simplistic check of the virtual machine according
+        to <lvl>:
+          = 0: no check
+          = 1: once per backend loop
+          = 2: at various points in the backend loop
+        Only available if compiled with DEBUG.
+
       --check-refcounts
         Every backend cycle, all refcounts in the system are checked.
         SLOW! Only available if compiled with DEBUG.
@@ -163,6 +167,10 @@ DESCRIPTION
       --gobble-descriptors <num>
         <num> (more) filedescriptors are used up. You'll know when you need it.
         Only available if compiled with DEBUG.
+
+      --check-strings
+        Every backend cycle, all shared strings in the system are checked.
+        SLOW! Only available if compiled with DEBUG and CHECK_STRINGS.
 
       -V|--version
         Print the version of the driver and exit.

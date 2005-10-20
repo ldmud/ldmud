@@ -1,3 +1,13 @@
+xlc on AIX 3.4:
+  Optimization level -O4 -qipa crashes in the code generation if a void
+  returning function is casted to a value returning one.
+
+egcs 2.91.66 on Linux 2.2.15 on Sun SparcStation4:
+  The optimizer neglects to reload CPU registers after a setjmp() in
+  complex functions (namely eval_instruction() in interpret.c). The
+  workaround is to put the setjmp()-recover branch into a separate function
+  and making sure that it can't be inlined (e.g. by calling it indirectly).
+
 gcc 2.8.1 on Solaris 5.7; egcs 2.91.16 on SunOS 4.1.3_U1, and probably
 others:
   Compiling with optimization causes the compiler (not the assembler!) to

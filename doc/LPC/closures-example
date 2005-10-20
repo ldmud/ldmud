@@ -2,7 +2,7 @@ CONCEPT
 	closures example
 
 DESCRIPTION
-	These are a small discussed examples of the usage of
+	This document contains small examples of the usage of
 	(lambda-)closures. For technical details see the closures(LPC)
 	doc. For hints when to use which type of closure, see the end
 	of this doc.
@@ -27,7 +27,7 @@ DESCRIPTION
 	                            , this_player()->QueryName()));
 
 	is not sufficient, as the 'this_player()' is executed to early
-	and just once.
+	and just once: for the player loading the room.
 
 	The solution is to use closures. First, the solution using
 	lfun-closures:
@@ -194,7 +194,7 @@ DESCRIPTION -- When to use which closure?
 	time to think about using a lambda-closure, compiling the
 	value hard into it.
 	The disadvantages of lambda closures are clear: they are damn
-	hard to read, and each lambda() statement cost extra time to
+	hard to read, and each lambda() statement requires extra time to
 	compile the closure.
 
 

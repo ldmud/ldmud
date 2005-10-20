@@ -30,14 +30,13 @@ enable_strict_euids=yes
 enable_supply_parse_command=no
 enable_initialization_by___init=yes
 
-enable_smalloc_trace=yes
-enable_smalloc_lpc_trace=yes
+enable_malloc_trace=yes
+enable_malloc_lpc_trace=yes
 
 with_htable_size=16384
 with_otable_size=4096
 
 with_max_malloced=0x20000000
-with_max_small_malloced=0x10000000
 
 with_max_array_size=6000
 with_max_mapping_size=40000

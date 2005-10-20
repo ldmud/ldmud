@@ -24,6 +24,7 @@
  */
 
 #include "driver.h"
+#include "typedefs.h"
 
 #include "my-alloca.h"
 #include <stdio.h>
@@ -59,9 +60,12 @@
 #include "rxcache.h"
 #include "simulate.h"
 #include "simul_efun.h"
+#include "stdstrings.h"
 #include "stralloc.h"
+#include "svalue.h"
 #include "swap.h"
 #include "wiz_list.h"
+#include "xalloc.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -74,6 +78,11 @@ static int e_flag = MY_FALSE;  /* Passed to preload(), usually disables it */
 Bool comp_flag = MY_FALSE;  /* Trace compilations */
 #ifdef DEBUG
 Bool check_a_lot_ref_counts_flag = MY_FALSE;  /* The name says it. */
+int check_state_level = 0;     /* how of to check the state in the loop */
+#endif
+
+#ifdef CHECK_STRINGS
+Bool check_string_table_flag = MY_FALSE;
 #endif
 
 Bool strict_euids = MY_FALSE;  /* Enforce use of the euids */
@@ -103,33 +112,15 @@ char master_name[100] = MASTER_NAME;  /* Name of the master object */
 static int new_mudlib = 0;    /* True: mudlib directory was specified */
 static int no_erq_demon = 0;  /* True: don't start the erq */
 
-/* -- Global Variables/Arguments dealing with memory -- */
-
-Bool out_of_memory = MY_FALSE;              /* True: we are out of memory */
-int malloc_privilege = MALLOC_USER; /* Priviledge for next allocation */
-
-char *reserved_user_area   = NULL;  /* Reserved memory areas */
-char *reserved_master_area = NULL;
-char *reserved_system_area = NULL;
-
-mp_int reserved_user_size   = RESERVED_USER_SIZE;   /* The reserved sizes */
-mp_int reserved_master_size = RESERVED_MASTER_SIZE;
-mp_int reserved_system_size = RESERVED_SYSTEM_SIZE;
-
-#ifdef MAX_MALLOCED
-mp_int max_malloced       = MAX_MALLOCED;           /* Allocation limits */
-mp_int max_small_malloced = MAX_SMALL_MALLOCED;
-#endif
-
 /* -- Other Global Variables -- */
-struct svalue const0, const1;
+svalue_t const0, const1;
   /* The values 0 and 1 as svalues, mem-copied when needed */
 
 double consts[5];  /* Weight constants used to compute average figures */
 
 char *debug_file;  /* Name of the debug log file. */
 
-struct object dummy_current_object_for_loads;
+object_t dummy_current_object_for_loads;
   /* Dummy object for functions, which need a current_object though
    * there is none. This is usually the case when (re)loading the
    * master object.
@@ -171,7 +162,7 @@ main (int argc, char **argv)
     assoc_shared_string_key.x.string_type = STRING_SHARED;
 
     current_time = get_current_time();
-    seed_random((unsigned)current_time);
+    seed_random((uint32)current_time);
 
     dummy_current_object_for_loads = NULL_object;
 #ifdef DEBUG
@@ -194,10 +185,11 @@ main (int argc, char **argv)
     p = (char *)&i;
     *p = -10;
     if (EXTRACT_UCHAR(p) != 0x100 - 10) {
-        fprintf(stderr, "Bad definition of EXTRACT_UCHAR() in config.h.\n");
+        fprintf(stderr, "Bad definition of EXTRACT_UCHAR().\n");
         exit(1);
     }
 
+    init_rusage();
 #ifdef HOST_DEPENDENT_INIT
     HOST_DEPENDENT_INIT
 #endif
@@ -207,6 +199,10 @@ main (int argc, char **argv)
      */
     if (getargs(argc, argv, firstscan))
       exit(1);
+
+    printf("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
+          , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
+          );
 
     /* Make sure the name of the master object is sensible.
      * This is important for modules like the lexer which
@@ -225,14 +221,12 @@ main (int argc, char **argv)
 #ifdef MIN_MALLOCED
     xfree(xalloc(MIN_MALLOCED));
 #endif
-#ifdef MALLOC_smalloc
     if (reserved_system_size > 0)
-        reserved_system_area = xalloc((unsigned)reserved_system_size);
+        reserved_system_area = xalloc((size_t)reserved_system_size);
     if (reserved_master_size > 0)
-        reserved_master_area = xalloc((unsigned)reserved_master_size);
-#endif
+        reserved_master_area = xalloc((size_t)reserved_master_size);
     if (reserved_user_size > 0)
-        reserved_user_area = xalloc((unsigned)reserved_user_size);
+        reserved_user_area = xalloc((size_t)reserved_user_size);
     init_shared_strings();
     init_otable();
     for (i = 0; i < (int)(sizeof consts / sizeof consts[0]); i++)
@@ -242,11 +236,11 @@ main (int argc, char **argv)
     RESET_LIMITS;
     CLEAR_EVAL_COST;
     if (!new_mudlib && chdir(MUD_LIB) == -1) {
-        fprintf(stderr, "Bad mudlib directory: %s\n", MUD_LIB);
+        printf("%s Bad mudlib directory: %s\n", time_stamp(), MUD_LIB);
         exit(1);
     }
     {
-        char path[MAXPATHLEN];
+        char path[MAXPATHLEN+1];
 #ifdef HAVE_GETCWD
         if (!getcwd(path, sizeof(path) ))
 #else
@@ -274,19 +268,21 @@ main (int argc, char **argv)
     if (setjmp(toplevel_context.con.text)) {
         clear_state();
         add_message("Anomaly in the fabric of world space.\n");
-    } else {
+    }
+    else
+    {
         toplevel_context.rt.type = ERROR_RECOVERY_BACKEND;
-
         master_ob = get_object(master_name);
     }
     current_object = master_ob;
     toplevel_context.rt.type = ERROR_RECOVERY_NONE;
     if (master_ob == NULL) {
-        fprintf(stderr, "The file %s must be loadable.\n", master_name);
+        printf("%s The file %s must be loadable.\n"
+              , time_stamp(), master_name);
         exit(1);
     }
-    /*
-     * Make sure master_ob is never made a dangling pointer.
+
+    /* Make sure master_ob is never made a dangling pointer.
      * Look at apply_master_ob() for more details.
      */
     ref_object(master_ob, "main");
@@ -318,8 +314,33 @@ main (int argc, char **argv)
      */
     backend();
 
-    return 0;
-}
+    /* Shutdown the game.
+     */
+
+    printf("%s LDMud shutting down.\n", time_stamp());
+
+    apply_master_ob(STR_SHUTDOWN, 0);
+    ipc_remove();
+    remove_all_players();
+    remove_destructed_objects();
+      /* Will perform the remove_interactive calls */
+    unlink_swap_file();
+#ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
+    remove_all_objects();
+    purge_action_sent();
+    purge_shadow_sent();
+    remove_wiz_list();
+#if defined(MALLOC_smalloc)
+    dump_malloc_data();
+#endif
+#endif
+
+#if defined(AMIGA)
+    amiga_end();
+#endif
+    
+    return 0; /* TODO: There are constants for this */
+} /* main() */
 
 
 /*-------------------------------------------------------------------------*/
@@ -330,7 +351,7 @@ void initialize_master_uid (void)
  */
 
 {
-    struct svalue *ret;
+    svalue_t *ret;
 
     ret = apply_master_ob(STR_GET_M_UID, 0);
     if (ret && ret->type == T_NUMBER && ret->u.number)
@@ -340,8 +361,9 @@ void initialize_master_uid (void)
     }
     else if (ret == 0 || ret->type != T_STRING)
     {
-        fprintf(stderr, "%s: get_master_uid() in %s does not work\n"
-               , strict_euids ? "Fatal" : "Warning:", master_name);
+        printf("%s %s: %s() in %s does not work\n"
+              , time_stamp(), strict_euids ? "Fatal" : "Warning"
+              , STR_GET_M_UID, master_name);
         if (strict_euids)
             exit(1);
     }
@@ -354,51 +376,17 @@ void initialize_master_uid (void)
 
 
 /*-------------------------------------------------------------------------*/
-
-/* string_copy() acts like strdup() with the additional bonus that it can
- * trace file/line of the calling place if SMALLOC_TRACE is defined.
- */
-
-#ifdef string_copy
-char *
-_string_copy (const char *str, const char *file, int line)
-{
-    char *p;
-
-    p = smalloc(strlen(str)+1, file, line);
-    if (p) {
-        (void)strcpy(p, str);
-    }
-    return p;
-}
-#else
-char *
-string_copy (const char *str)
-{
-    char *p;
-
-    p = xalloc(strlen(str)+1);
-    if (p) {
-        (void)strcpy(p, str);
-    }
-    return p;
-}
-#endif
-
-/*-------------------------------------------------------------------------*/
 void
-debug_message(char *a, ...)
+vdebug_message(char *fmt, va_list va)
 
-/* Print a message into the debug logfile, printf() style.
+/* Print a message into the debug logfile, vprintf() style.
  */
 
 {
     static FILE *fp = NULL;
     char deb[100];
     char *file;
-    va_list va;
 
-    va_start(va, a);
     if (fp == NULL) {
         if ( !(file = debug_file) ) {
             sprintf(deb,"%s.debug.log", query_host_name());
@@ -414,64 +402,24 @@ debug_message(char *a, ...)
             abort();
         }
     }
-    (void)vfprintf(fp, a, va);
-    va_end(va);
+    (void)vfprintf(fp, fmt, va);
     (void)fflush(fp);
-}
+} /* vdebug_message() */
 
 /*-------------------------------------------------------------------------*/
-#ifndef MALLOC_smalloc
-POINTER
-xalloc (size_t size)
+void
+debug_message(char *a, ...)
 
-/* Allocate <size> bytes of memory like malloc() does.
- * This function catches out of memory situations and tries to recover
- * from them by using the reserved memory areas. If it totally runs
- * out of memory, the program exit()s with code 3.
+/* Print a message into the debug logfile, printf() style.
  */
 
 {
-    char *p;
-    static int going_to_exit;
+    va_list va;
 
-    if (going_to_exit)
-        exit(3);
-    if (size == 0)
-        fatal("Tried to allocate 0 bytes.\n");
-#ifdef MAX_MALLOCED
-    {
-        static mp_int total_malloced = 0;
-
-        if ((total_malloced += size + sizeof(p_int)) > max_malloced) {
-            total_malloced -= size + sizeof(p_int);
-            p = 0;
-        } else {
-            p = malloc(size);
-        }
-    }
-#else
-    p = malloc(size);
-#endif
-    if (p == 0) {
-        if (reserved_user_area) {
-            free(reserved_user_area);
-            p = "Temporary out of MEMORY. Freeing reserve.\n";
-            write(1, p, strlen(p));
-            reserved_user_area = 0;
-            garbage_collect_to_do = MY_TRUE;
-            extra_jobs_to_do = MY_TRUE;
-            return xalloc(size);        /* Try again */
-        }
-        /* We can hardly survive out of memory without the garbage collector */
-        going_to_exit = 1;
-        p = "Totally out of MEMORY.\n";
-        write(1, p, strlen(p));
-        (void)dump_trace(MY_FALSE);
-        exit(2);
-    }
-    return p;
-}
-#endif /* MALLOC_smalloc */
+    va_start(va, a);
+    vdebug_message(a, va);
+    va_end(va);
+} /* debug_message() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -484,9 +432,8 @@ reallocate_reserved_areas (void)
 {
     char *p;
     malloc_privilege = MALLOC_USER;
-#ifdef MALLOC_smalloc
     if (reserved_system_size && !reserved_system_area) {
-        if ( !(reserved_system_area = xalloc((unsigned)reserved_system_size)) ) {
+        if ( !(reserved_system_area = xalloc((size_t)reserved_system_size)) ) {
             slow_shut_down_to_do = 1;
             return;
         }
@@ -496,7 +443,7 @@ reallocate_reserved_areas (void)
         }
     }
     if (reserved_master_size && !reserved_master_area) {
-        if ( !(reserved_master_area = xalloc((unsigned)reserved_master_size)) ) {
+        if ( !(reserved_master_area = xalloc((size_t)reserved_master_size)) ) {
             slow_shut_down_to_do = 1;
             return;
         }
@@ -505,9 +452,8 @@ reallocate_reserved_areas (void)
             write(1, p, strlen(p));
         }
     }
-#endif /* MALLOC_smalloc */
     if (reserved_user_size && !reserved_user_area) {
-        if ( !(reserved_user_area = xalloc((unsigned)reserved_user_size)) ) {
+        if ( !(reserved_user_area = xalloc((size_t)reserved_user_size)) ) {
             slow_shut_down_to_do = 6;
             return;
         }
@@ -521,7 +467,7 @@ reallocate_reserved_areas (void)
 
 /*-------------------------------------------------------------------------*/
 void
-writex (int d, p_uint i)
+write_x (int d, p_uint i)
 
 /* Memory safe function to write hexvalue <i> to fd <d>. */
 
@@ -555,6 +501,86 @@ writed (int d, p_uint i)
         j /= 10;
     } while (j > 0);
 }
+
+/*-------------------------------------------------------------------------*/
+char *
+dprintf_first (int fd, char *s, p_int a)
+
+/* Write the string <s> up to the next "%"-style argument to <fd>, the
+ * write <a> according to the %-formatter. Recognized are %s, %d, and %a.
+ * If no %-formatter is present, the whole string is written.
+ *
+ * Result is a pointer to the remaining string.
+ */
+
+{
+    char *p;
+    
+    do {
+        if ( !(p = strchr(s, '%')) )
+        {
+            write(fd, s, strlen(s));
+            return "";
+        }
+
+        write(fd, s, p - s);
+        switch(p[1])
+        {
+        case '%':
+            write(fd, p+1, 1);
+            continue;
+        case 's':
+            write(fd, (char *)a, strlen((char*)a));
+            break;
+        case 'd':
+            writed(fd, a);
+            break;
+        case 'x':
+            write_x(fd, a);
+            break;
+        }
+        return p+2;
+    } while(1);
+} /* dprintf_first() */
+
+/*-------------------------------------------------------------------------*/
+void
+dprintf1 (int fd, char *s, p_int a)
+
+/* Write a message <s> to <fd>. <s> may contain one %-style formatter.
+ * for the argument <a>.
+ */
+
+{
+    s = dprintf_first(fd, s, a);
+    write(fd, s, strlen(s));
+} /* dprintf1() */
+
+/*-------------------------------------------------------------------------*/
+void
+dprintf2 (int fd, char *s, p_int a, p_int b)
+
+/* Write a message <s> to <fd>. <s> may contain two %-style formatter.
+ * for the arguments <a> and <b>.
+ */
+
+{
+    s = dprintf_first(fd, s, a);
+    dprintf1(fd, s, b);
+} /* dprintf2() */
+
+/*-------------------------------------------------------------------------*/
+void
+dprintf3 (int fd, char *s, p_int a, p_int b, p_int c)
+
+/* Write a message <s> to <fd>. <s> may contain three %-style formatter.
+ * for the arguments <a>, <b> and <c>.
+ */
+
+{
+    s = dprintf_first(fd, s, a);
+    dprintf2(fd, s, b, c);
+} /* dprintf3() */
 
 /*=========================================================================*/
 /*                        The argument parser                              */
@@ -650,7 +676,6 @@ typedef enum OptNumber {
  , cDebugFile     /* --debug-file         */
 #ifdef MAX_MALLOCED
  , cMaxMalloc     /* --max-malloc         */
- , cMaxSmall      /* --max-small-malloc   */
 #endif
  , cMaxArray      /* --max-array          */
  , cMaxBytes      /* --max-bytes          */
@@ -673,12 +698,16 @@ typedef enum OptNumber {
  , cSwapFile      /* --swap-file          */
  , cSwapCompact   /* --swap-compact       */
 #endif
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
  , cGcollectFD    /* --gcollect-outfd     */
 #endif
 #ifdef DEBUG
  , cCheckRefs     /* --check-refcounts    */
+ , cCheckState    /* --check-state        */
  , cGobbleFDs     /* --gobble-descriptors */
+#endif
+#ifdef CHECK_STRINGS
+ , cCheckStrings  /* --check-strings      */
 #endif
 #ifdef YYDEBUG
  , cYYDebug       /* --yydebug            */
@@ -731,9 +760,7 @@ static LongOpt aLongOpts[]
     , { "mudlib",             cMudlib,        MY_TRUE }
 #ifdef MAX_MALLOCED
     , { "max-malloc",         cMaxMalloc,     MY_TRUE }
-    , { "max-small-malloc",   cMaxSmall,      MY_TRUE }
     , { "max_malloced",       cMaxMalloc,     MY_TRUE } /* TODO: COMPAT */
-    , { "max_small_malloced", cMaxSmall,      MY_TRUE } /* TODO: COMPAT */
 #endif
     , { "max-array",          cMaxArray,      MY_TRUE }
     , { "max-bytes",          cMaxBytes,      MY_TRUE }
@@ -755,7 +782,7 @@ static LongOpt aLongOpts[]
     , { "swap-file",          cSwapFile,      MY_TRUE }
     , { "swap-compact",       cSwapCompact,   MY_FALSE }
 #endif
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
     , { "gcollect-outfd",     cGcollectFD,    MY_TRUE }
     , { "gcollect_outfd",     cGcollectFD,    MY_TRUE } /* TODO: COMPAT */
 #endif
@@ -763,10 +790,14 @@ static LongOpt aLongOpts[]
     , { "udp",                cUdpPort,       MY_TRUE }
 #endif
 #ifdef DEBUG
-    , { "check-refcounts",    cCheckRefs,     MY_TRUE }
+    , { "check-refcounts",    cCheckRefs,     MY_FALSE }
+    , { "check-state",        cCheckState,    MY_TRUE }
     , { "gobble-descriptors", cGobbleFDs,     MY_TRUE }
-    , { "check_a_lot_of_ref_counts", cCheckRefs, MY_TRUE } /* TODO: COMPAT */
+    , { "check_a_lot_of_ref_counts", cCheckRefs, MY_FALSE } /* TODO: COMPAT */
     , { "gobble_descriptors", cGobbleFDs,     MY_TRUE }    /* TODO: COMPAT */
+#endif
+#ifdef CHECK_STRINGS
+    , { "check-strings",      cCheckStrings,  MY_FALSE }
 #endif
 #ifdef YYDEBUG
     , { "yydebug",            cYYDebug,       MY_FALSE }
@@ -800,7 +831,7 @@ version (void)
 #endif
         "\n"
        , stdout);
-}
+} /* version() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -849,6 +880,12 @@ options (void)
   fputs("            ERQ: disabled.\n", stdout);
 #endif
 
+#ifndef USE_IPV6
+  fputs("           IPv6: not supported.\n", stdout);
+#else
+  fputs("           IPv6: supported.\n", stdout);
+#endif
+
 #ifdef ACCESS_CONTROL
   fputs(" Access control: using <mudlib>/" ACCESS_FILE
 #    ifdef ACCESS_LOG
@@ -866,9 +903,15 @@ options (void)
                          "parse_command() enabled\n"
 #endif
 #ifdef INITIALIZATION_BY___INIT
-        "                 initialization by __INIT()\n"
+        "                 "
+                          "initialization by __INIT()\n"
 #else
-        "                 static initialization\n"
+        "                 "
+                          "static initialization\n"
+#endif
+#ifdef USE_LPC_NOSAVE
+        "                 "
+                          "'nosave' enabled\n"
 #endif
        , stdout);
 
@@ -948,21 +991,20 @@ options (void)
 #ifdef MIN_MALLOCED
          "                 initial allocation:   %8d\n"
 #endif
-#if defined(MALLOC_smalloc) && defined(MAX_MALLOCED)
+#if defined(MAX_MALLOCED)
          "                 max allocation:       %8d\n"
-         "                 max small allocation: %8d\n"
 #endif
 #ifdef MALLOC_sysmalloc
         , "system malloc"
 #elif defined(MALLOC_smalloc)
         , "smalloc"
-#    if defined(SMALLOC_TRACE)
-#        if defined(SMALLOC_LPC_TRACE)
+#    if defined(MALLOC_TRACE)
+#        if defined(MALLOC_LPC_TRACE)
                   " (trace enabled, lpc-trace enabled)"
 #        else
                   " (trace enabled)"
 #        endif
-#    elif defined(SMALLOC_LPC_TRACE)
+#    elif defined(MALLOC_LPC_TRACE)
                   " (lpc-trace enabled)"
 #    endif
 #else
@@ -974,8 +1016,8 @@ options (void)
 #ifdef MIN_MALLOCED
         , MIN_MALLOCED
 #endif
-#if defined(MALLOC_smalloc) && defined(MAX_MALLOCED)
-        , MAX_MALLOCED, MAX_SMALL_MALLOCED
+#if defined(MAX_MALLOCED)
+        , MAX_MALLOCED
 #endif
         );
 
@@ -995,11 +1037,39 @@ options (void)
 #endif
         );
 
+#ifdef DEBUG
+  printf("  Debug options: check state: %d ("
+        , check_state_level
+        );
+  switch (check_state_level)
+  {
+  case 0: fputs("never", stdout); break;
+  case 1: fputs("once per loop", stdout); break;
+  case 2: fputs("several times per loop", stdout); break;
+  default: fputs("???", stdout); break;
+  }
+  fputs(")\n", stdout);
+
+  if (check_a_lot_ref_counts_flag)
+      fputs("                 check refcounts\n", stdout);
+  else
+      fputs("                 don't check refcounts\n", stdout);
+#endif
+
     /* Print the other options, nicely formatted. */
     {
         char * optstrings[] = { "  Other options: "
 #       if defined(DEBUG)
                               , "DEBUG"
+#       endif
+#       if defined(CHECK_STRINGS)
+                              , "CHECK_STRINGS"
+#       endif
+#       if defined(KEEP_STRINGS)
+                              , "KEEP_STRINGS"
+#       endif
+#       if defined(DEBUG_TELNET)
+                              , "DEBUG_TELNET"
 #       endif
 #       if defined(YYDEBUG)
                               , "YYDEBUG"
@@ -1048,7 +1118,7 @@ options (void)
             fputs(".\n", stdout);
         }
     }
-}
+} /* options() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1093,12 +1163,11 @@ shortusage (void)
 #endif
 #ifdef MAX_MALLOCED
 "  --max-malloc <size>\n"
-"  --max-small-malloc <size>\n"
 #endif
 "  -r u<size> | --reserve-user <size>\n"
 "  -r m<size> | --reserve-master <size>\n"
 "  -r s<size> | --reserve-system <size>\n"
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
 "  --gcollect-outfd <filename>|<num>\n"
 #endif
 #ifdef YYDEBUG
@@ -1106,7 +1175,11 @@ shortusage (void)
 #endif
 #ifdef DEBUG
 "  --check-refcounts\n"
+"  --check-state <lvl>\n"
 "  --gobble-descriptors <num>\n"
+#endif
+#ifdef CHECK_STRINGS
+"  --check-strings\n"
 #endif
 "  -V|--version\n"
 "  --options\n"
@@ -1114,7 +1187,7 @@ shortusage (void)
 "  -h|-?|--help\n"
        , stdout);
 
-}
+} /* shortusage() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1173,7 +1246,7 @@ usage (void)
 "\n"
 "  -f|--funcall <word>\n"
 "    The lfun master->flag() is called with <word> as argument before the\n"
-"    gamedriver accepts netword connections.\n"
+"    gamedriver accepts network connections.\n"
 "\n"
 "  --cleanup-time <time>\n"
 "    The idle time in seconds for an object before the driver tries to\n"
@@ -1219,9 +1292,6 @@ usage (void)
 "  --max-malloc <size>\n"
 "    Restrict total memory allocations to <size> bytes.\n"
 "\n"
-"  --max-small-malloc <size>\n"
-"    Restrict total small block allocations to <size> bytes.\n"
-"\n"
 #endif
 "  -r u<size> | --reserve-user <size>\n"
 "  -r m<size> | --reserve-master <size>\n"
@@ -1233,7 +1303,7 @@ usage (void)
 "  --no-strict-euids\n"
 "    Enforce/don't enforce the proper use of euids.\n"
 "\n"
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
 "  --gcollect-outfd <filename>|<num>\n"
 "    Garbage collector output (like a log of all reclaimed memory blocks)\n"
 "    is sent to <filename> (or inherited fd <num>) instead of stderr.\n"
@@ -1249,8 +1319,21 @@ usage (void)
 "    Every backend cycle, all refcounts in the system are checked.\n"
 "    SLOW!\n"
 "\n"
+"  --check-state <lvl>\n"
+"    Perform a regular simplistic check of the virtual machine according\n"
+"    to <lvl>:\n"
+"      = 0: no check\n"
+"      = 1: once per backend loop\n"
+"      = 2: at various points in the backend loop\n"
+"\n"
 "  --gobble-descriptors <num>\n"
 "    <num> (more) filedescriptors are used up. You'll know when you need it.\n"
+"\n"
+#endif
+#ifdef CHECK_STRINGS
+"  --check-strings\n"
+"    Every backend cycle, all shared strings in the system are checked.\n"
+"    SLOW!\n"
 "\n"
 #endif
 "  -V|--version\n"
@@ -1265,7 +1348,7 @@ usage (void)
 "    Display the short help text and exit.\n"
        , stdout);
 
-}
+} /* usage() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -1451,15 +1534,6 @@ firstscan (int eOption, const char * pValue)
             return 1;
         }
         break;
-
-    case cMaxSmall:
-        max_small_malloced = strtol(pValue, (char **)0, 0);
-        if (!max_small_malloced)
-        {
-            fprintf(stderr, "Illegal value '%s' for --max-small-malloc\n", pValue);
-            return 1;
-        }
-        break;
 #endif
 
     case cMudlib:
@@ -1517,12 +1591,12 @@ firstscan (int eOption, const char * pValue)
         strict_euids = MY_FALSE;
         break;
 
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
     case cGcollectFD:
         if (isdigit((unsigned char)*pValue)) {
             gcollect_outfd = strtol(pValue, (char **)0, 0);
         } else {
-                  gcollect_outfd = ixopen3(pValue, O_CREAT|O_TRUNC|O_WRONLY, 0640);
+            gcollect_outfd = ixopen3(pValue, O_CREAT|O_TRUNC|O_WRONLY, 0640);
         }
         break;
 #endif
@@ -1550,6 +1624,21 @@ firstscan (int eOption, const char * pValue)
         check_a_lot_ref_counts_flag = MY_TRUE;
         break;
 
+    case cCheckState:
+        {
+            int n;
+            char * end;
+
+            n = strtol(pValue, &end, 0);
+            if (n < 0 || n > 2 || end == NULL || *end != '\0')
+            {
+                fprintf(stderr, "Bad check-state level: %s\n", pValue);
+                return 1;
+            }
+            check_state_level = n;
+            break;
+        }
+
     case cGobbleFDs:
         {
             int n;
@@ -1562,18 +1651,25 @@ firstscan (int eOption, const char * pValue)
         }
 #endif
 
+#ifdef CHECK_STRINGS
+    case cCheckStrings:
+        check_string_table_flag = MY_TRUE;
+        break;
+#endif
+
     case cFuncall:
         /* ignored */
         break;
 
     default:
         /* This shouldn't happen. */
-        fprintf(stderr, "driver: (firstscan) Internal error, eOption is %d\n", eOption);
+        fprintf(stderr, "%s driver: (firstscan) Internal error, eOption is %d\n"
+                      , time_stamp(), eOption);
         return 1;
     } /* switch */
 
   return 0;
-}
+} /* firstscan() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -1592,7 +1688,7 @@ secondscan (int eOption, const char * pValue)
         push_volatile_string((char *)pValue);
         (void)apply_master_ob(STR_FLAG, 1);
         if (game_is_being_shut_down) {
-            fprintf(stderr, "Shutdown by master object.\n");
+            fprintf(stderr, "%s Shutdown by master object.\n", time_stamp());
             exit(0);
         }
         /* ignored */
@@ -1604,7 +1700,7 @@ secondscan (int eOption, const char * pValue)
     } /* switch */
 
   return 0;
-}
+} /* secondscan() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -1672,7 +1768,7 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
         pValue = strchr(pArg, '=');
         if (pValue != NULL)
         {
-          iArglen = (unsigned)(pValue - pArg);
+          iArglen = (size_t)(pValue - pArg);
           pValue++;
         }
         else

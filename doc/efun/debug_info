@@ -10,47 +10,282 @@ DESCRIPTION
         to the setting of flag:
 
         DINFO_OBJECT (0): Information like heart_beat, enable_commands
-        etc. of the specified object will be printed, and 0 returned.
+            etc. of the specified object will be printed, and 0 returned.
 
         DINFO_MEMORY (1): Memory usage information like how many strings,
-        variables, inherited files, object size etc. will be printed
-        about the specified object, and 0 returned.
+            variables, inherited files, object size etc. will be printed
+            about the specified object, and 0 returned.
 
         DINFO_OBJLIST (2): Objects from the global object list are
-        returned.  If the optional second arg is omitted, the first
-        element (numbered 0) is returned. If the second arg is a
-        number n, the n'th element of the object list returned. If the
-        second arg is an object, it's successor in the object list is
-        returned.
+            returned.  If the optional second arg is omitted, the first
+            element (numbered 0) is returned. If the second arg is a
+            number n, the n'th element of the object list returned. If the
+            second arg is an object, it's successor in the object list is
+            returned.
 
         DINFO_MALLOC (3): Equivalent to typing ``malloc'' at the command
-        line. No second arg must be given. Returns 0.
+            line. No second arg must be given. Returns 0.
 
         DINFO_STATUS (4): Collect the status information of the driver.
-        The optional second arg can be 0, "tables", "swap", "malloc" or any
-        other argument accepted by the actual driver.
-        The result is a printable string with the status information,
-        or 0 if an invalid argument was given.
+            The optional second arg can be 0, "tables", "swap", "malloc"
+            or any other argument accepted by the actual driver.
+            The result is a printable string with the status information,
+            or 0 if an invalid argument was given.
 
         DINFO_DUMP (5): Dump the information specified by <arg2> into the
-        filename specified by <arg3>. If <arg3> is omitted, a default file
-        name is used. The function calls master->valid_write() to check that
-        it can write the files. The file in question is always written
-        anew.
+            filename specified by <arg3>. If <arg3> is omitted, a default
+            file name is used. The function calls master->valid_write() to
+            check that it can write the files. The file in question is
+            always written anew.
 
-        Result is 1 on success, or 0 if an error occured.
+            Result is 1 on success, or 0 if an error occured.
 
-        <arg2> == "objects": dump information about all objects. Default
-          filename is '/OBJ_DUMP', the valid_write() will read 'objdump' for
-          the function.
-        <arg2> == "opcodes": dump usage information about the opcodes. Default
-          filename is '/OPC_DUMP', the valid_write() will read 'opcdump' for
-          the function.
+            <arg2> == "objects": dump information about all objects.
+              Default filename is '/OBJ_DUMP', the valid_write() will read
+              'objdump' for the function.
+            <arg2> == "opcodes": dump usage information about the opcodes.
+              Default filename is '/OPC_DUMP', the valid_write() will read
+              'opcdump' for the function.
+
+        DINFO_DATA (6): Return raw information about an aspect of
+            the driver specified by <arg2>. The result of the function
+            is an array with the information, or 0 for unsupported values
+            of <arg2>.
+
+            Allowed values for <arg2> are: DID_STATUS, DID_SWAP, DID_MALLOC.
+
+            <arg2> == DID_STATUS (0): Returns the "status" and "status tables"
+            information. Following indices are defined:
+
+              int DID_ST_ACTIONS
+              int DID_ST_ACTIONS_SIZE
+                  Number and size of allocated actions.
+
+              int DID_ST_SHADOWS
+              int DID_ST_SHADOWS_SIZE
+                  Number and size of allocated shadows.
+
+              int DID_ST_OBJECTS
+              int DID_ST_OBJECTS_SIZE
+                  Number and size of swapped-in objects.
+
+              int DID_ST_OBJECTS_SWAPPED
+              int DID_ST_OBJECTS_SWAP_SIZE
+                  Number and size of swapped-out object variable blocks.
+
+              int DID_ST_OBJECTS_LIST
+                  Number of objects in the object list.
+
+              int DID_ST_OBJECTS_PROCESSED
+                  Number of listed objects processed in the last backend
+                  cycle.
+
+              float DID_ST_OBJECTS_AVG_PROC
+                  Average number of objects processed each cycle, expressed
+                  as percentage (0..1.0).
+
+              int DID_ST_OTABLE
+                  Number of objects listed in the object table.
+
+              int DID_ST_OTABLE_SLOTS
+                  Number of hash slots provided by the object table.
+
+              int DID_ST_OTABLE_SIZE
+                  Size occupied by the object table.
+
+              int DID_ST_HBEAT_OBJS
+                  Number of objects with a heartbeat.
+
+              int DID_ST_HBEAT_CALLS
+                  Number of heart_beats executed so far.
+
+              int DID_ST_HBEAT_SLOTS
+              int DID_ST_HBEAT_SIZE
+                  Number of allocated entries in the heart_beat table
+                  and its size.
+
+              int DID_ST_HBEAT_PROCESSED
+                  Number of heart_beats called in the last backend cycle.
+
+              float DID_ST_HBEAT_AVG_PROC
+                  Average number of heart_beats called each cycle, expressed
+                  as fraction (0..1.0).
+
+              int DID_ST_CALLOUTS
+                  Number of pending call_outs.
+
+              int DID_ST_CALLOUT_SLOTS
+              int DID_ST_CALLOUT_SIZE
+                  Number of allocated entries in the call_out table
+                  and its size.
+
+              int DID_ST_ARRAYS
+              int DID_ST_ARRAYS_SIZE
+                  Number and size of all arrays.
+
+              int DID_ST_MAPPINGS
+              int DID_ST_MAPPINGS_SIZE
+                  Number and size of all mappings.
+
+              int DID_ST_PROGS
+              int DID_ST_PROGS_SIZE
+                  Number and size of all programs.
+
+              int DID_ST_PROGS_SWAPPED
+              int DID_ST_PROGS_SWAP_SIZE
+                  Number and size of swapped-out programs.
+
+              int DID_ST_USER_RESERVE
+              int DID_ST_MASTER_RESERVE     
+              int DID_ST_SYSTEM_RESERVE
+                  Current sizes of the three memory reserves.
+
+              int DID_ST_ADD_MESSAGE
+              int DID_ST_PACKETS
+              int DID_ST_PACKET_SIZE
+                  Number of calls to add_message(), number and total size
+                  of sent packets.
+                  If the driver is not compiled with COMM_STAT, all three
+                  values are returned as -1.
+
+              int DID_ST_APPLY
+              int DID_ST_APPLY_HITS
+                  Number of calls to apply_low(), and how many of these
+                  were cache hits.
+                  If the driver is not compiled with APPLY_CACHE_STAT, all two
+                  values are returned as -1.
+
+              int DID_ST_STRINGS
+              int DID_ST_STRING_SIZE
+                  Number of distinct strings in the string table, and
+                  their size.
+
+              int DID_ST_STR_TABLE_SIZE
+                  Size of the string table.
+
+              int DID_ST_STR_REQ
+              int DID_ST_STR_REQ_SIZE
+                  Total number of string allocations, and their size.
+
+              int DID_ST_STR_SEARCHES
+              int DID_ST_STR_SEARCH_LEN
+                  Number of searches in the string table, and the
+                  accumulated search length.
+
+              int DID_ST_RX_CACHED
+                  Number of regular expressions cached.
+
+              int DID_ST_RX_TABLE
+              int DID_ST_RX_TABLE_SIZE
+                  Number of slots in the regexp cache table, and size of the
+                  memory currently held by it and the cached expressions.
+
+              int DID_ST_RX_REQUESTS
+                  Number of requests for new regexps.
+
+              int DID_ST_RX_REQ_FOUND
+                  Number of requested regexps found in the table.
+
+              int DID_ST_RX_REQ_COLL
+                  Number of requested new regexps which collided with
+                  a cached one.
+
+            <arg2> == DID_SWAP (1): Returns the "status swap" information:
+ 
+               int DID_SW_PROGS
+               int DID_SW_PROG_SIZE
+                   Number and size of swapped-out program blocks.
+ 
+               int DID_SW_PROG_UNSWAPPED
+               int DID_SW_PROG_U_SIZE
+                   Number and size of unswapped program blocks.
+ 
+               int DID_SW_VARS
+               int DID_SW_VAR_SIZE
+                   Number and size of swapped-out variable blocks.
+ 
+               int DID_SW_FREE
+               int DID_SW_FREE_SIZE
+                   Number and size of free blocks in the swap file.
+ 
+               int DID_SW_FILE_SIZE
+                   Size of the swap file.
+ 
+               int DID_SW_REUSED
+                   Total reused space in the swap file.
+ 
+               int DID_SW_SEARCHES
+               int DID_SW_SEARCH_LEN
+                   Number and total length of searches for block to reuse
+                   in the swap file.
+ 
+               int DID_SW_F_SEARCHES
+               int DID_SW_F_SEARCH_LEN
+                   Number and total length of searches for a block to free.
+ 
+               int DID_SW_COMPACT
+                   TRUE if the swapper is running in compact mode.
+ 
+               int DID_SW_RECYCLE_FREE
+                   TRUE if the swapper is currently recycling free block.
+
+
+            <arg2> == DID_MEMORY (2): Returns the "status malloc" information:
+
+               string DID_MEM_NAME
+                   The name of the allocator: "sysmalloc" or "smalloc".
+
+               int DID_MEM_SBRK
+               int DID_MEM_SBKR_SIZE
+                   Number and size of memory blocks requested from the
+                   operating system (smalloc only).
+
+               int DID_MEM_LARGE
+               int DID_MEM_LARGE_SIZE
+               int DID_MEM_LFREE
+               int DID_MEM_LFREE_SIZE
+                   Number and size of large allocated resp. free blocks.
+                   (smalloc only)
+
+               int DID_MEM_LWASTED
+               int DID_MEM_LWASTED_SIZE
+                   Number and size of unusable large memory fragments.
+                   (smalloc only).
+
+               int DID_MEM_CHUNK
+               int DID_MEM_CHUNK_SIZE
+                   Number and size of small chunk blocks (smalloc only).
+
+               int DID_MEM_UNUSED
+                   Unused space in the current small chunk block
+                   (smalloc only).
+
+               int DID_MEM_SMALL
+               int DID_MEM_SMALL_SIZE
+               int DID_MEM_SFREE
+               int DID_MEM_SFREE_SIZE
+                   Number and size of small allocated resp. free blocks
+                   (smalloc only).
+
+               int DID_MEM_SWASTED
+               int DID_MEM_SWASTED_SIZE
+                   Number and size of unusably small memory fragments.
+                   (smalloc only).
+
+               int DID_MEM_MINC_CALLS
+               int DID_MEM_MINC_SUCCESS
+               int DID_MEM_MINC_SIZE
+                   Number of calls to malloc_increment(), the number
+                   of successes and the size of memory allocated this
+                   way (smalloc only).
+
 
 HISTORY
         Since 3.2.7, DINFO_STATUS returns the status information instead
         of printing it.
         DINFO_DUMP introduced with 3.2.7.
+        LDMud 3.2.8 added the data size of the object to the result of
+        DINFO_MEMORY; the DINFO_DATA request; the DID_MEM_WASTED* stats.
 
 SEE ALSO
         trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)

@@ -22,7 +22,7 @@
  *
  * A mapping consists of three structures (defined in datatypes.h):
  *
- *  - the struct mapping is the base of all mappings.
+ *  - the mapping_t is the base of all mappings.
  *  - the struct hash_mapping keeps track of the recent changes
  *    to the mapping.
  *  - the struct condensed_mapping holds all older data in a
@@ -40,13 +40,13 @@
  * this.
  *
  *
- * -- struct mapping --
+ * -- mapping_t --
  *
- *   struct mapping {
+ *   mapping_t {
  *       p_int                     ref;
  *       struct hash_mapping      *hash;
  *       struct condensed_mapping *condensed;
- *       struct wiz_list          *user;
+ *       wiz_list_t          *user;
  *       int                       num_values;
  *   }
  *
@@ -65,17 +65,17 @@
  * -- struct condensed_mapping --
  *
  *   struct condensed_mapping {
- *       "struct svalue m_values[ ... ];"
- *       "struct svalue misc[ ... ];"
+ *       "svalue_t m_values[ ... ];"
+ *       "svalue_t misc[ ... ];"
  *       p_int misc_size;
  *       p_int string_size;
  *       "char *string[ ... ];"
- *       "struct svalue s_values[ ... ];"
+ *       "svalue_t s_values[ ... ];"
  *   }
  *
  *   Well, things are a bit more complicated than that: the actual
  *   struct condensed_mapping consists only of the members .misc_size
- *   and .string_size, with the struct mapping.condensed pointing
+ *   and .string_size, with the mapping_t.condensed pointing
  *   to struct condensed_mapping.misc_size. However, on creation the
  *   structure is always embedded in a memory block big enough to
  *   hold the implied members string[], s_values[], misc[] and m_values[]
@@ -126,7 +126,7 @@
  *       p_int condensed_deleted;
  *       p_int ref;
  *       struct map_chain *deleted;
- *       struct mapping   *next_dirty;
+ *       mapping_t   *next_dirty;
  *       struct map_chain *chains[ 1 +.mask ];
  *   }
  *
@@ -167,8 +167,8 @@
  *
  *   struct map_chain {
  *       struct map_chain *next;
- *       struct svalue key;
- *       struct svalue data[map.num_values];
+ *       svalue_t key;
+ *       svalue_t data[map.num_values];
  *   }
  *
  *   .next is the next struct map_chain in the hash chain (or .deleted list).
@@ -185,6 +185,7 @@
  */
 
 #include "driver.h"
+#include "typedefs.h"
 
 #include "my-alloca.h"
 #include <stdio.h>
@@ -194,7 +195,6 @@
 #include "array.h"
 #include "backend.h"
 #include "closure.h"
-#include "datatypes.h"
 #include "gcollect.h"
 #include "interpret.h"
 #include "main.h"
@@ -203,7 +203,9 @@
 #include "simulate.h"
 #include "smalloc.h"
 #include "stralloc.h"
+#include "svalue.h"
 #include "wiz_list.h"
+#include "xalloc.h"
 
 #define MIN_P_INT  ( (p_int)-1  << (sizeof(p_int)  * 8 - 1) )
 #define MIN_PH_INT ( (ph_int)-1 << (sizeof(ph_int) * 8 - 1) )
@@ -222,7 +224,7 @@ static struct hash_mapping dirty_mapping_head_hash;
   /* Auxiliary structure dirty_mapping_head can reference
    */
 
-static struct mapping dirty_mapping_head
+static mapping_t dirty_mapping_head
   = {
     /* ref        */ 1,
     /* hash       */ &dirty_mapping_head_hash,
@@ -234,7 +236,7 @@ static struct mapping dirty_mapping_head
    * with a hash_mapping part.
    */
 
-static struct mapping *last_dirty_mapping = &dirty_mapping_head;
+static mapping_t *last_dirty_mapping = &dirty_mapping_head;
   /* Last dirty mapping in the list.
    */
 
@@ -258,14 +260,14 @@ static mp_int empty_mapping_base = 0;
    * empty_mapping_load.
    */
 
-struct mapping *stale_mappings;
+mapping_t *stale_mappings;
   /* During a garbage collection, this is a list of mappings with
    * keys referencing destructed objects/lambdas. Since during this
    * phase all mappings are compacted, the list is linked through
    * the .hash pointers.
    */
 
-static struct svalue walk_mapping_string_svalue
+static svalue_t walk_mapping_string_svalue
   = { T_STRING };
   /* Stand-in svalue for string-keys, to be passed to the callback
    * function when doing a walk_mapping().
@@ -277,7 +279,7 @@ static struct svalue walk_mapping_string_svalue
 static void remove_empty_mappings(void);
 
 /*-------------------------------------------------------------------------*/
-struct mapping *
+mapping_t *
 allocate_mapping (mp_int size, mp_int num_values)
 
 /* Allocate a mapping with <num_values> values per key, and setup the
@@ -290,7 +292,7 @@ allocate_mapping (mp_int size, mp_int num_values)
 {
     struct hash_mapping *hm;
     struct condensed_mapping *cm;
-    struct mapping *m;
+    mapping_t *m;
 
     /* Allocate the structures */
     m = xalloc(sizeof *m);
@@ -389,7 +391,7 @@ allocate_mapping (mp_int size, mp_int num_values)
 
 /*-------------------------------------------------------------------------*/
 void
-_free_mapping (struct mapping *m)
+_free_mapping (mapping_t *m)
 
 /* The mapping and all associated memory is deallocated resp. dereferenced.
  *
@@ -402,7 +404,7 @@ _free_mapping (struct mapping *m)
     struct hash_mapping *hm;       /* Hashed part of <m> */
     struct condensed_mapping *cm;  /* Condensed part of <m> */
     char **str;                    /* First/next string key in <cm> */
-    struct svalue *svp;            /* Last+1 misc key in <cm> */
+    svalue_t *svp;            /* Last+1 misc key in <cm> */
     int num_values;                /* Number of values in <m> */
     int i, j;
 
@@ -435,7 +437,7 @@ _free_mapping (struct mapping *m)
 
     /* Dereference the values for the string keys */
 
-    svp = (struct svalue *)str;
+    svp = (svalue_t *)str;
     i = cm->string_size * num_values;
     while ( (i -= sizeof *str) >= 0)
     {
@@ -469,7 +471,7 @@ _free_mapping (struct mapping *m)
     if ( NULL != (hm = m->hash) )
     {
         struct map_chain **mcp, *mc, *next;
-        struct mapping *next_dirty;
+        mapping_t *next_dirty;
 
 #ifdef DEBUG
         if (hm->ref)
@@ -529,7 +531,7 @@ _free_mapping (struct mapping *m)
 
 /*-------------------------------------------------------------------------*/
 void
-free_empty_mapping (struct mapping *m)
+free_empty_mapping (mapping_t *m)
 
 /* Free a mapping <m> which is known to not contain any valid keys or
  * values. The ref-count is assumed to be 0, too.
@@ -561,11 +563,11 @@ free_empty_mapping (struct mapping *m)
     m->user->mapping_total -=   sizeof *m + sizeof(char *) + sizeof *cm
                               + sizeof(char *)
                               +   (   cm->string_size
-                                   * (sizeof(struct svalue)/sizeof(char*))
+                                   * (sizeof(svalue_t)/sizeof(char*))
                                    + cm->misc_size)
                                 * (1 + num_values)
                               -    cm->string_size
-                                * (sizeof(struct svalue)/sizeof(char*) - 1)
+                                * (sizeof(svalue_t)/sizeof(char*) - 1)
                             ;
 
     /* free the condensed mapping part */
@@ -579,7 +581,7 @@ free_empty_mapping (struct mapping *m)
     if ( NULL != (hm = m->hash) )
     {
         struct map_chain **mcp, *mc, *next;
-        struct mapping *next_dirty;
+        mapping_t *next_dirty;
         mp_int i;
 
 #ifdef DEBUG
@@ -643,7 +645,7 @@ check_dirty_mapping_list (void)
 
 {
     int i;
-    struct mapping *m;
+    mapping_t *m;
 
     for (m = &dirty_mapping_head, i = num_dirty_mappings; --i >= 0; )
     {
@@ -667,7 +669,7 @@ remove_empty_mappings (void)
  */
 
 {
-    struct mapping **mp, *m, *last;
+    mapping_t **mp, *m, *last;
     struct hash_mapping *hm;
 
     empty_mapping_load += empty_mapping_base - num_dirty_mappings;
@@ -721,7 +723,7 @@ remove_empty_mappings (void)
 
 /*-------------------------------------------------------------------------*/
 void
-free_protector_mapping (struct mapping *m)
+free_protector_mapping (mapping_t *m)
 
 /* Free the mapping <m> which is part of a T_PROTECTOR_MAPPING svalue.
  * Such svalues are created only for mappings with a hashed part, and
@@ -741,16 +743,16 @@ free_protector_mapping (struct mapping *m)
     if (!m->hash || m->hash->ref <= 0)
     {
         /* This shouldn't happen */
-        printf("free_protector_mapping() : no hash %s\n"
-              , m->hash ? "reference" : "part");
+        printf("%s free_protector_mapping() : no hash %s\n"
+              , time_stamp(), m->hash ? "reference" : "part");
 #ifdef TRACE_CODE
         {
             last_instructions(TOTAL_TRACE_LENGTH, MY_TRUE, NULL);
         }
 #endif
         dump_trace(MY_FALSE);
-        printf("free_protector_mapping() : no hash %s\n",
-                m->hash ? "reference" : "part");
+        printf("%s free_protector_mapping() : no hash %s\n"
+              , time_stamp(), m->hash ? "reference" : "part");
         free_mapping(m);
     }
 #endif /* DEBUG */
@@ -764,7 +766,7 @@ free_protector_mapping (struct mapping *m)
     {
         int num_values = m->num_values;
         struct map_chain *mc, *next;
-        struct svalue *svp2;
+        svalue_t *svp2;
 
         for (mc = hm->deleted; mc; mc = next)
         {
@@ -787,8 +789,8 @@ free_protector_mapping (struct mapping *m)
 } /* free_protector_mapping() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-_get_map_lvalue (struct mapping *m, struct svalue *map_index
+svalue_t *
+_get_map_lvalue (mapping_t *m, svalue_t *map_index
                 , Bool need_lvalue, Bool check_size)
 
 /* Index mapping <m> with key value <map_index> and return a pointer to the
@@ -816,7 +818,7 @@ _get_map_lvalue (struct mapping *m, struct svalue *map_index
     struct condensed_mapping *cm = m->condensed;
     struct hash_mapping *hm;
     int num_values = m->num_values;
-    struct svalue *svp;
+    svalue_t *svp;
 
 
     /* Search in the condensed part first.
@@ -884,14 +886,14 @@ _get_map_lvalue (struct mapping *m, struct svalue *map_index
             {
 #ifndef FAST_MULTIPLICATION
                 if (num_values == 1) /* speed up this case */
-                    return (struct svalue *)
+                    return (svalue_t *)
                       (keyend + (key - keystart ) *
-                        (sizeof(struct svalue)/sizeof str) );
+                        (sizeof(svalue_t)/sizeof str) );
                 else
 #endif/*FAST_MULTIPLICATION*/
-                    return (struct svalue *)
+                    return (svalue_t *)
                       (keyend + (key - keystart ) *
-                        ( num_values * (sizeof(struct svalue)/sizeof str) ));
+                        ( num_values * (sizeof(svalue_t)/sizeof str) ));
             }
 
             /* If we come here, we didn't find it */
@@ -947,19 +949,19 @@ _get_map_lvalue (struct mapping *m, struct svalue *map_index
         key = keyend - offset;
         while ( (offset >>= 1) >= (p_int)(sizeof svp)/2)
         {
-            if ( !(u_d = (((struct svalue *)key)->u.number >> 1) -
+            if ( !(u_d = (((svalue_t *)key)->u.number >> 1) -
                        (index_u >> 1)) )
             {
-                if ( !(u_d = ((struct svalue *)key)->x.generic - index_x) )
-                  if ( !(u_d = ((struct svalue *)key)->type - index_type) )
+                if ( !(u_d = ((svalue_t *)key)->x.generic - index_x) )
+                  if ( !(u_d = ((svalue_t *)key)->type - index_type) )
                   {
                       /* found */
 #ifndef FAST_MULTIPLICATION
                       if (num_values == 1) /* speed up this case */
-                          return (struct svalue *) (key - size);
+                          return (svalue_t *) (key - size);
                       else
 #endif/*FAST_MULTIPLICATION*/
-                          return (struct svalue *)
+                          return (svalue_t *)
                             (keystart - ( num_values * (keyend - key) ) );
                   }
             }
@@ -1005,11 +1007,23 @@ _get_map_lvalue (struct mapping *m, struct svalue *map_index
             return &const0;
 
         /* Size limit exceeded? */
+#ifdef DEBUG
+        {
+            mp_int msize;
+
+            msize = (mp_int)MAP_SIZE(m);
+            if (msize >= 0x10000000UL)
+            {
+                fatal("DEBUG: Illegal mapping size: %ld\n", msize+1);
+                return NULL;
+            }
+        }
+#endif
         if (check_size && max_mapping_size)
         {
             mp_int msize;
 
-            msize = (signed)MAP_SIZE(m);
+            msize = (mp_int)MAP_SIZE(m);
             if (msize >= max_mapping_size)
             {
                 error("Illegal mapping size: %ld\n", msize+1);
@@ -1085,11 +1099,23 @@ _get_map_lvalue (struct mapping *m, struct svalue *map_index
             return &const0;
 
         /* Size limit exceeded? */
+#ifdef DEBUG
+        {
+            mp_int msize;
+
+            msize = (mp_int)MAP_SIZE(m);
+            if (msize >= 0x10000000UL)
+            {
+                fatal("DEBUG: Illegal mapping size: %ld\n", msize+1);
+                return NULL;
+            }
+        }
+#endif
         if (check_size && max_mapping_size)
         {
             mp_int msize;
 
-            msize = (signed)MAP_SIZE(m);
+            msize = (mp_int)MAP_SIZE(m);
             if (msize >= max_mapping_size)
             {
                 error("Illegal mapping size: %ld\n", msize+1);
@@ -1179,7 +1205,7 @@ _get_map_lvalue (struct mapping *m, struct svalue *map_index
 
 /*-------------------------------------------------------------------------*/
 void
-check_map_for_destr (struct mapping *m)
+check_map_for_destr (mapping_t *m)
 
 /* Check the mapping <m> for references to destructed objects.
  * Where they appear as keys, both key and associated values are
@@ -1190,7 +1216,7 @@ check_map_for_destr (struct mapping *m)
 {
     struct condensed_mapping *cm;
     struct hash_mapping *hm;
-    struct svalue *svp;
+    svalue_t *svp;
     mp_int i, j;
     int num_values;
 
@@ -1206,13 +1232,13 @@ check_map_for_destr (struct mapping *m)
         --svp;
         if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
         {
-            struct svalue *data = NULL;
+            svalue_t *data = NULL;
 
             /* Clear all associated values */
 
             if ( 0 != (j = num_values) )
             {
-                data = (struct svalue *)((char *)svp - i -
+                data = (svalue_t *)((char *)svp - i -
                   num_values * ((char *)CM_MISC(cm) - (char *)svp));
                 do {
                     free_svalue(data);
@@ -1295,7 +1321,7 @@ check_map_for_destr (struct mapping *m)
      * replacing with svalue-0s where appropriate.
      */
 
-    svp = (struct svalue *)( (char *)CM_STRING(cm) + cm->string_size );
+    svp = (svalue_t *)( (char *)CM_STRING(cm) + cm->string_size );
 
     for (i = cm->string_size * num_values; (i -= sizeof(char *)) >= 0; svp++)
     {
@@ -1372,7 +1398,7 @@ check_map_for_destr (struct mapping *m)
 
 /*-------------------------------------------------------------------------*/
 void
-remove_mapping (struct mapping *m, struct svalue *map_index)
+remove_mapping (mapping_t *m, svalue_t *map_index)
 
 /* Remove from mapping <m> that entry which is index by key value
  * <map_index>. Nothing happens if it doesn't exist.
@@ -1387,7 +1413,7 @@ remove_mapping (struct mapping *m, struct svalue *map_index)
     struct condensed_mapping *cm = m->condensed;
     struct hash_mapping *hm;
     int num_values = m->num_values;
-    struct svalue *svp;
+    svalue_t *svp;
 
     /* Search in the condensed part first.
      */
@@ -1463,9 +1489,9 @@ remove_mapping (struct mapping *m, struct svalue *map_index)
 
                 /* Zero out all associated values */
 
-                svp = (struct svalue *)
+                svp = (svalue_t *)
                   (keyend + (key - keystart ) *
-                    ( num_values * (sizeof(struct svalue)/sizeof str) ));
+                    ( num_values * (sizeof(svalue_t)/sizeof str) ));
                 for (i = num_values; --i >= 0 ;svp++)
                 {
                     free_svalue(svp);
@@ -1548,11 +1574,11 @@ remove_mapping (struct mapping *m, struct svalue *map_index)
          */
         key = keyend - offset;
         while ( (offset >>= 1) >= (p_int)(sizeof svp)/2) {
-            if ( !(u_d = (((struct svalue *)key)->u.number >> 1) -
+            if ( !(u_d = (((svalue_t *)key)->u.number >> 1) -
                          (index_u >> 1)) )
             {
-              if ( !(u_d = ((struct svalue *)key)->x.generic - index_x) )
-                if ( !(u_d = ((struct svalue *)key)->type - index_type) )
+              if ( !(u_d = ((svalue_t *)key)->x.generic - index_x) )
+                if ( !(u_d = ((svalue_t *)key)->type - index_type) )
                 {
                     int i;
 
@@ -1560,8 +1586,8 @@ remove_mapping (struct mapping *m, struct svalue *map_index)
                      * its associated values
                      */
 
-                    free_svalue( (struct svalue *)key );
-                    svp = (struct svalue *)
+                    free_svalue( (svalue_t *)key );
+                    svp = (svalue_t *)
                       (keystart - ( num_values * (keyend - key) ) );
                     for (i = num_values; --i >= 0 ;svp++) {
                         free_svalue(svp);
@@ -1574,14 +1600,14 @@ remove_mapping (struct mapping *m, struct svalue *map_index)
                      * This is necessary to keep the sorting relation
                      * intact.
                      */
-                    while ( ((struct svalue *)key+1)->u.number == index_u
-                     &&     ((struct svalue *)key+1)->x.generic == index_x
-                     &&     key + sizeof(struct svalue) < keyend)
+                    while ( ((svalue_t *)key+1)->u.number == index_u
+                     &&     ((svalue_t *)key+1)->x.generic == index_x
+                     &&     key + sizeof(svalue_t) < keyend)
                     {
-                        struct svalue *svp2;
+                        svalue_t *svp2;
 
-                        *((struct svalue *)key) = *((struct svalue *)key+1);
-                        key += sizeof(struct svalue);
+                        *((svalue_t *)key) = *((svalue_t *)key+1);
+                        key += sizeof(svalue_t);
                         svp2 = svp - num_values;
                         for (i = num_values; --i >= 0 ;svp++, svp2++)
                         {
@@ -1593,7 +1619,7 @@ remove_mapping (struct mapping *m, struct svalue *map_index)
                     /* key is now the last of its (.u.number, x.generic)
                      * kind: make it invalid
                      */
-                    ((struct svalue *)key)->type = T_INVALID;
+                    ((svalue_t *)key)->type = T_INVALID;
 
                     /* Count the deleted entry in the hash part.
                      * Create it if necessary.
@@ -1701,8 +1727,8 @@ remove_mapping (struct mapping *m, struct svalue *map_index)
 } /* remove_mapping() */
 
 /*-------------------------------------------------------------------------*/
-struct mapping *
-copy_mapping (struct mapping *m)
+mapping_t *
+copy_mapping (mapping_t *m)
 
 /* Produce a shallow copy of mapping <m> and return it.
  * The copy of a protector mapping is a normal mapping.
@@ -1711,14 +1737,14 @@ copy_mapping (struct mapping *m)
  */
 
 {
-    struct mapping *m2;
+    mapping_t *m2;
     struct hash_mapping *hm, *hm2 = 0;
     struct condensed_mapping *cm, *cm2;
     mp_int num_values = m->num_values;
     mp_int size;
     mp_int i;
     char **str, **str2;
-    struct svalue *svp, *svp2;
+    svalue_t *svp, *svp2;
 
     /* --- Copy the hash part, if existent ---
      */
@@ -1753,12 +1779,12 @@ copy_mapping (struct mapping *m)
 
         mcp = hm->chains;
         mcp2 = hm2->chains;
-        linksize = (signed)MAP_CHAIN_SIZE(num_values);
+        linksize = (mp_int)MAP_CHAIN_SIZE(num_values);
         do {
             struct map_chain *last = 0, *mc, *mc2;
 
             for(mc = *mcp++; mc; mc = mc->next) {
-                mc2 = (struct map_chain *)xalloc((unsigned)linksize);
+                mc2 = (struct map_chain *)xalloc((size_t)linksize);
                 if (!mc2)
                 {
                     error("Out of memory.\n");
@@ -1790,7 +1816,7 @@ copy_mapping (struct mapping *m)
      * to hold all values, and let cm2 point to it.
      */
 #ifdef MALLOC_smalloc
-    size = (signed)
+    size = (mp_int)
       ((malloced_size(
         (char *)cm - cm->misc_size * (1 + num_values)
       ) - SMALLOC_OVERHEAD) * sizeof (p_int));
@@ -1801,7 +1827,7 @@ copy_mapping (struct mapping *m)
       cm->string_size * (sizeof *svp/sizeof(char *) - 1);
 #endif
     cm2 = (struct condensed_mapping *)
-      ( (char *)xalloc((unsigned)size) + cm->misc_size * (1 + num_values) );
+      ( (char *)xalloc((size_t)size) + cm->misc_size * (1 + num_values) );
     if (!cm2)
     {
         error("Out of memory.\n");
@@ -1829,8 +1855,8 @@ copy_mapping (struct mapping *m)
 
     /* Copy the values associated with the string keys */
 
-    svp = (struct svalue *)str;
-    svp2 = (struct svalue *)str2;
+    svp = (svalue_t *)str;
+    svp2 = (svalue_t *)str2;
     for(i = cm->string_size*num_values; (i -= sizeof *str) >= 0; ) {
         assign_svalue_no_free(svp2++, svp++);
     }
@@ -1848,7 +1874,7 @@ copy_mapping (struct mapping *m)
     /* --- Create the basis mapping structure and initialise it ---
      */
 
-    m2 = (struct mapping *)xalloc(sizeof *m2);
+    m2 = (mapping_t *)xalloc(sizeof *m2);
     if ( NULL != (m2->hash = hm2) )
     {
         num_dirty_mappings++;
@@ -1870,8 +1896,8 @@ copy_mapping (struct mapping *m)
 } /* copy_mapping() */
 
 /*-------------------------------------------------------------------------*/
-struct mapping *
-resize_mapping (struct mapping *m, mp_int new_width)
+mapping_t *
+resize_mapping (mapping_t *m, mp_int new_width)
 
 /* Produce a shallow copy of mapping <m>, adjusted to have
  * <new_width> values per key, and return it.
@@ -1884,7 +1910,7 @@ resize_mapping (struct mapping *m, mp_int new_width)
  */
 
 {
-    struct mapping *m2;
+    mapping_t *m2;
     struct hash_mapping *hm, *hm2 = NULL;
     struct condensed_mapping *cm, *cm2;
     mp_int num_values;    /* widthof(m) */
@@ -1894,7 +1920,7 @@ resize_mapping (struct mapping *m, mp_int new_width)
     mp_int size;
     mp_int i;
     char **str, **str2;
-    struct svalue *svp, *svp2;
+    svalue_t *svp, *svp2;
 
     /* Set the width variables */
     num_values = m->num_values;
@@ -1944,12 +1970,12 @@ resize_mapping (struct mapping *m, mp_int new_width)
 
         mcp = hm->chains;
         mcp2 = hm2->chains;
-        linksize = (signed)MAP_CHAIN_SIZE(new_width);
+        linksize = (mp_int)MAP_CHAIN_SIZE(new_width);
         do {
             struct map_chain *last = NULL, *mc, *mc2;
 
             for(mc = *mcp++; mc; mc = mc->next) {
-                mc2 = (struct map_chain *)xalloc((unsigned)linksize);
+                mc2 = (struct map_chain *)xalloc((size_t)linksize);
                 if (!mc2)
                 {
                     error("Out of memory.\n");
@@ -1986,13 +2012,13 @@ resize_mapping (struct mapping *m, mp_int new_width)
     /* Allocate the new condensed structure with enough space
      * to hold all values, and let cm2 point to it.
      */
-    size = (signed)(sizeof *cm2
+    size = (mp_int)(sizeof *cm2
            +   (  cm->string_size  * (sizeof *svp/sizeof(char *))
                 + cm->misc_size)
              * (1 + new_width)
            - cm->string_size * (sizeof *svp/sizeof(char *) - 1));
     cm2 = (struct condensed_mapping *)
-      ( (char *)xalloc((unsigned)size) + cm->misc_size * (1 + new_width) );
+      ( (char *)xalloc((size_t)size) + cm->misc_size * (1 + new_width) );
 
     if (!cm2)
     {
@@ -2021,8 +2047,8 @@ resize_mapping (struct mapping *m, mp_int new_width)
 
     /* Copy the values associated with the string keys */
 
-    svp = (struct svalue *)str;
-    svp2 = (struct svalue *)str2;
+    svp = (svalue_t *)str;
+    svp2 = (svalue_t *)str2;
     for (i = cm->string_size; (i -= sizeof *str) >= 0; )
     {
         mp_int j;
@@ -2070,7 +2096,7 @@ resize_mapping (struct mapping *m, mp_int new_width)
     /* --- Create the basis mapping structure and initialise it ---
      */
 
-    m2 = (struct mapping *)xalloc(sizeof *m2);
+    m2 = (mapping_t *)xalloc(sizeof *m2);
     if ( NULL != (m2->hash = hm2) )
     {
         num_dirty_mappings++;
@@ -2092,8 +2118,8 @@ resize_mapping (struct mapping *m, mp_int new_width)
 } /* resize_mapping() */
 
 /*-------------------------------------------------------------------------*/
-struct mapping *
-add_mapping (struct mapping *m1, struct mapping *m2)
+mapping_t *
+add_mapping (mapping_t *m1, mapping_t *m2)
 
 /* Merge mappings <m1> and <m2> into a new mapping and return it.
  * Entries from <m2> effectively overwrite entries <m1> if their key
@@ -2114,19 +2140,19 @@ add_mapping (struct mapping *m1, struct mapping *m2)
  */
 
 {
-    struct mapping *m3;
+    mapping_t *m3;
       /* The result mapping */
     struct condensed_mapping *cm1, *cm2, *cm3;
       /* Condensed parts of m1, m2 and m3 */
-    struct svalue *condensed_start, *condensed_end;
+    svalue_t *condensed_start, *condensed_end;
       /* Start and end of the memory block *cm3 is embedded in */
     mp_int string_size, misc_size;
       /* string- and misc- size of cm3 */
     mp_int num_values = m1->num_values;
 
     struct hash_mapping *hm;
-    struct svalue *svp1, *svp2, *svp3;
-    struct svalue *data1, *data2, *data3;
+    svalue_t *svp1, *svp2, *svp3;
+    svalue_t *data1, *data2, *data3;
     char **str1, **str2, **str3;
     mp_int size, size1, size2;
     mp_int i;
@@ -2155,14 +2181,14 @@ add_mapping (struct mapping *m1, struct mapping *m2)
 
     string_size = cm1->string_size + cm2->string_size;
     misc_size = cm1->misc_size + cm2->misc_size;
-    size = (signed)(sizeof *cm3 +
+    size = (mp_int)(sizeof *cm3 +
       (string_size * (sizeof *svp3/sizeof *str1) + misc_size) *
         (1 + num_values) -
       string_size * (sizeof *svp3/sizeof *str1 - 1));
-    if ( !(condensed_start  = (struct svalue *)xalloc((unsigned)size)) )
+    if ( !(condensed_start  = (svalue_t *)xalloc((size_t)size)) )
         return NULL;
 
-    condensed_end = (struct svalue *)((char *)condensed_start + size);
+    condensed_end = (svalue_t *)((char *)condensed_start + size);
     cm3 = (struct condensed_mapping *)
       ( (char *)condensed_start + misc_size * (1 + num_values) );
     cm3->string_size = string_size;
@@ -2177,11 +2203,11 @@ add_mapping (struct mapping *m1, struct mapping *m2)
     size1 = cm1->string_size;
     size2 = cm2->string_size;
     str1 = CM_STRING(cm1);
-    data1 = (struct svalue *)( (char *)str1 + size1 );
+    data1 = (svalue_t *)( (char *)str1 + size1 );
     str2 = CM_STRING(cm2);
-    data2 = (struct svalue *)( (char *)str2 + size2 );
+    data2 = (svalue_t *)( (char *)str2 + size2 );
     str3 = CM_STRING(cm3);
-    data3 = (struct svalue *)( (char *)str3 + string_size );
+    data3 = (svalue_t *)( (char *)str3 + string_size );
 
     for(;size1 && size2; str3++)
     {
@@ -2253,11 +2279,11 @@ add_mapping (struct mapping *m1, struct mapping *m2)
     size1 = cm1->misc_size;
     size2 = cm2->misc_size;
     svp1 = CM_MISC(cm1) - 1;
-    data1 = (struct svalue *)( (char *)svp1 - size1 );
+    data1 = (svalue_t *)( (char *)svp1 - size1 );
     svp2 = CM_MISC(cm2) - 1;
-    data2 = (struct svalue *)( (char *)svp2 - size2 );
+    data2 = (svalue_t *)( (char *)svp2 - size2 );
     svp3 = CM_MISC(cm3);
-    data3 = (struct svalue *)( (char *)svp3 - misc_size );
+    data3 = (svalue_t *)( (char *)svp3 - misc_size );
     for(;size1 && size2; ) {
         if ( !(u_d = (svp1->u.number >> 1) - (svp2->u.number >> 1)) )
           if ( !(u_d = svp1->x.generic - svp2->x.generic) )
@@ -2397,8 +2423,8 @@ add_mapping (struct mapping *m1, struct mapping *m2)
 
 /*-------------------------------------------------------------------------*/
 void
-walk_mapping ( struct mapping *m
-             , void (*func) (struct svalue *key, struct svalue *val, void *extra)
+walk_mapping ( mapping_t *m
+             , void (*func) (svalue_t *key, svalue_t *val, void *extra)
              , void *extra)
 
 /* Generic function to perform a mapping walk. The function visits every
@@ -2411,7 +2437,7 @@ walk_mapping ( struct mapping *m
 
 {
     char **str;
-    struct svalue *svp, *data;
+    svalue_t *svp, *data;
     mp_int size;
     mp_int num_values;
     struct hash_mapping *hm;
@@ -2426,7 +2452,7 @@ walk_mapping ( struct mapping *m
      */
     str = CM_STRING(m->condensed);
     size = m->condensed->string_size;
-    data = (struct svalue *)((char *)str + size);
+    data = (svalue_t *)((char *)str + size);
     while ( (size -= sizeof(char *)) >= 0)
     {
         if ( !( (p_int)(walk_mapping_string_svalue.u.string = *str++) & 1 ) )
@@ -2438,8 +2464,8 @@ walk_mapping ( struct mapping *m
      */
     svp = CM_MISC(m->condensed);
     size = m->condensed->misc_size;
-    data = (struct svalue *)((char *)svp - size);
-    while ( (size -= sizeof(struct svalue)) >= 0)
+    data = (svalue_t *)((char *)svp - size);
+    while ( (size -= sizeof(svalue_t)) >= 0)
     {
         data -= num_values;
         if ( (--svp)->type != T_INVALID )
@@ -2487,7 +2513,7 @@ compact_mappings (mp_int num)
  */
 
 {
-    struct mapping *m;  /* The current mapping to compact */
+    mapping_t *m;  /* The current mapping to compact */
 
     malloc_privilege = MALLOC_SYSTEM;
       /* compact_mappings() is called in very low memory situations,
@@ -2918,8 +2944,8 @@ compact_mappings (mp_int num)
               /* End of string-keyed value areas in cm resp. cm2 */
 
             char **str1, **str2;
-            struct svalue *key1, *key2;
-            struct svalue *data1, *data2;
+            svalue_t *key1, *key2;
+            svalue_t *data1, *data2;
               /* Auxiliaries */
 
 
@@ -2928,12 +2954,12 @@ compact_mappings (mp_int num)
             misc_deleted = 0;
             if (hm->condensed_deleted)
             {
-                struct svalue *svp;
+                svalue_t *svp;
                 mp_int size;
 
                 svp = CM_MISC(cm);
                 size = cm->misc_size;
-                while ( (size -= sizeof(struct svalue)) >= 0)
+                while ( (size -= sizeof(svalue_t)) >= 0)
                 {
                     if ( (--svp)->type == T_INVALID )
                         misc_deleted++;
@@ -2943,25 +2969,25 @@ compact_mappings (mp_int num)
 
             /* Compute the total number of entries */
 
-            string_total = (signed)
+            string_total = (mp_int)
                            (string_used + cm->string_size/sizeof(char *) -
                         (hm->condensed_deleted - misc_deleted));
-            misc_total = (signed)
-                         (misc_used + cm->misc_size/sizeof(struct svalue) -
+            misc_total = (mp_int)
+                         (misc_used + cm->misc_size/sizeof(svalue_t) -
                         misc_deleted);
 
 
             /* Allocate and initialise the new condensed structure */
 
             condensed_start = xalloc(sizeof *cm2 +
-                (string_total+misc_total)*sizeof(struct svalue)*(num_values+1)-
-                string_total * (sizeof(struct svalue)-sizeof(char *))
+                (string_total+misc_total)*sizeof(svalue_t)*(num_values+1)-
+                string_total * (sizeof(svalue_t)-sizeof(char *))
             );
             cm2 = (struct condensed_mapping *)
                    (condensed_start +
-                    misc_total * (num_values+1) * sizeof(struct svalue) );
-            cm2->string_size = (signed)(string_total * sizeof(char*));
-            cm2->misc_size = (signed)(misc_total * sizeof(struct svalue));
+                    misc_total * (num_values+1) * sizeof(svalue_t) );
+            cm2->string_size = (p_int)(string_total * sizeof(char*));
+            cm2->misc_size = (p_int)(misc_total * sizeof(svalue_t));
 
 
             /* Merge the string-keyed entries from cm with the sorted
@@ -2969,9 +2995,9 @@ compact_mappings (mp_int num)
              */
 
             str1 = CM_STRING(cm);
-            data1 = (struct svalue *)((char *)str1 + cm->string_size);
+            data1 = (svalue_t *)((char *)str1 + cm->string_size);
             str2 = CM_STRING(cm2);
-            data2 = (struct svalue *)((char *)str2 + cm2->string_size);
+            data2 = (svalue_t *)((char *)str2 + cm2->string_size);
             count1 = cm->string_size;
 
             /* For all leading invalid keys, free the associated
@@ -3000,7 +3026,7 @@ compact_mappings (mp_int num)
                         /* Take entry from string_hook1 */
 
                         struct map_chain *temp;
-                        struct svalue *data;
+                        svalue_t *data;
                         int i;
 
                         temp = string_hook1;
@@ -3094,7 +3120,7 @@ compact_mappings (mp_int num)
                 while (string_hook1)
                 {
                     struct map_chain *temp;
-                    struct svalue *data;
+                    svalue_t *data;
                     int i;
 
                     temp = string_hook1;
@@ -3105,7 +3131,7 @@ compact_mappings (mp_int num)
                         *data2++ = *data++;
                     }
                     string_hook1 = temp->next;
-                    xfree( (char *)temp );
+                    xfree(temp);
                 }
             }
 
@@ -3121,9 +3147,9 @@ compact_mappings (mp_int num)
              */
 
             key1 = CM_MISC(cm);
-            data1 = (struct svalue *)((char *)key1 - cm->misc_size);
+            data1 = (svalue_t *)((char *)key1 - cm->misc_size);
             key2 = CM_MISC(cm2);
-            data2 = (struct svalue *)((char *)key2 - cm2->misc_size);
+            data2 = (svalue_t *)((char *)key2 - cm2->misc_size);
             count1 = cm->misc_size;
 
             /* For all leading invalid keys, free the associated
@@ -3139,7 +3165,7 @@ compact_mappings (mp_int num)
                 while (--i >= 0) {
                     free_svalue(--data1);
                 }
-                count1 -= sizeof(struct svalue);
+                count1 -= sizeof(svalue_t);
             }
 
             /* Do the actual merge */
@@ -3158,7 +3184,7 @@ compact_mappings (mp_int num)
                         /* Take entry from misc_hook1 */
 
                         struct map_chain *temp;
-                        struct svalue *data;
+                        svalue_t *data;
                         int i;
 
                         temp = misc_hook1;
@@ -3184,7 +3210,7 @@ compact_mappings (mp_int num)
                         while (--i >= 0) {
                             *--data2 = *--data1;
                         }
-                        if (! (count1 -= sizeof(struct svalue)) )
+                        if (! (count1 -= sizeof(svalue_t)) )
                             break;
 
                         /* Skip eventual following invalid entries in cm */
@@ -3196,7 +3222,7 @@ compact_mappings (mp_int num)
                                 while (--i >= 0) {
                                     free_svalue(--data1);
                                 }
-                                if (! (count1 -= sizeof(struct svalue)) )
+                                if (! (count1 -= sizeof(svalue_t)) )
                                     break;
                             } while (key1[-1].type == T_INVALID);
                             if (!count1)
@@ -3222,7 +3248,7 @@ compact_mappings (mp_int num)
                     while (--i >= 0) {
                         *--data2 = *--data1;
                     }
-                    if (! (count1 -= sizeof(struct svalue)) )
+                    if (! (count1 -= sizeof(svalue_t)) )
                         break;
 
                     /* Skip eventual following invalid entries in cm */
@@ -3234,7 +3260,7 @@ compact_mappings (mp_int num)
                             while (--i >= 0) {
                                 free_svalue(--data1);
                             }
-                            if (! (count1 -= sizeof(struct svalue)) )
+                            if (! (count1 -= sizeof(svalue_t)) )
                                 break;
                         } while (key1[-1].type == T_INVALID);
                         if (!count1)
@@ -3249,7 +3275,7 @@ compact_mappings (mp_int num)
                 while (misc_hook1)
                 {
                     struct map_chain *temp;
-                    struct svalue *data;
+                    svalue_t *data;
                     int i;
 
                     temp = misc_hook1;
@@ -3260,7 +3286,7 @@ compact_mappings (mp_int num)
                         *--data2 = *--data;
                     }
                     misc_hook1 = temp->next;
-                    xfree( (char *)temp );
+                    xfree(temp);
                 }
             }
 
@@ -3270,7 +3296,7 @@ compact_mappings (mp_int num)
                 (cm2_end - (char *)data2) -
                 (cm1_end - (char *)data1);
 
-            xfree( (char *)(data1) ); /* free old condensed mapping part */
+            xfree(data1); /* free old condensed mapping part */
 
         } /* --- End of Merge --- */
 
@@ -3304,7 +3330,7 @@ total_mapping_size (void)
  */
 
 {
-    struct wiz_list *wl;
+    wiz_list_t *wl;
     mp_int total;
 
     total = default_wizlist_entry.mapping_total;
@@ -3321,14 +3347,14 @@ total_mapping_size (void)
 struct set_mapping_user_locals
 {
     int num_values;        /* Number of values per key */
-    struct object *owner;  /* Owner to set */
-    struct svalue *hairy;
+    object_t *owner;  /* Owner to set */
+    svalue_t *hairy;
       /* Next free entry in the array of keys which need manual tweaking */
 };
 
 
 static void
-set_mapping_user_filter (struct svalue *key, struct svalue *data, void *extra)
+set_mapping_user_filter (svalue_t *key, svalue_t *data, void *extra)
 
 /* walk_mapping-callback function used by set_mapping_user().
  * <extra> points in fact to a struct set_mapping_user_locals.
@@ -3344,7 +3370,7 @@ set_mapping_user_filter (struct svalue *key, struct svalue *data, void *extra)
 {
     int i;
     struct set_mapping_user_locals *locals;
-    struct object *owner;
+    object_t *owner;
 
     locals = (struct set_mapping_user_locals *)extra;
     owner = locals->owner;
@@ -3364,7 +3390,7 @@ set_mapping_user_filter (struct svalue *key, struct svalue *data, void *extra)
 }
 
 void
-set_mapping_user (struct mapping *m, struct object *owner)
+set_mapping_user (mapping_t *m, object_t *owner)
 
 /* Set the <owner> as the user of mapping <m> and all its contained
  * keys and values, and update the wizlist entry for <owner>.
@@ -3378,9 +3404,9 @@ set_mapping_user (struct mapping *m, struct object *owner)
     struct condensed_mapping *cm;
     int num_values;
     mp_int total;
-    struct wiz_list *user;
+    wiz_list_t *user;
     struct set_mapping_user_locals locals;
-    struct svalue *first_hairy;
+    svalue_t *first_hairy;
     mp_int i;
 
     num_values = m->num_values;
@@ -3389,11 +3415,11 @@ set_mapping_user (struct mapping *m, struct object *owner)
     /* Move the total size in the wizlist from the old owner
      * to the new one
      */
-    total = (signed)(
+    total = (mp_int)(
       sizeof *m + sizeof(char *) + sizeof *cm + sizeof(char *) +
-        ( cm->string_size * (sizeof(struct svalue)/sizeof(char*)) +
+        ( cm->string_size * (sizeof(svalue_t)/sizeof(char*)) +
           cm->misc_size) * (1 + num_values) -
-        cm->string_size * (sizeof(struct svalue)/sizeof(char *) - 1));
+        cm->string_size * (sizeof(svalue_t)/sizeof(char *) - 1));
     m->user->mapping_total -= total;
     user = owner->user;
     m->user = user;
@@ -3404,7 +3430,7 @@ set_mapping_user (struct mapping *m, struct object *owner)
 
     locals.owner = owner;
     locals.num_values = num_values;
-    locals.hairy = first_hairy = (struct svalue *)alloca((unsigned)cm->misc_size);
+    locals.hairy = first_hairy = (svalue_t *)alloca((size_t)cm->misc_size);
     if (!first_hairy)
     {
         error("Stack overflow.\n");
@@ -3417,7 +3443,7 @@ set_mapping_user (struct mapping *m, struct object *owner)
      */
     for (i = locals.hairy - first_hairy; --i >= 0; first_hairy++)
     {
-        struct svalue new_key, *dest, *source;
+        svalue_t new_key, *dest, *source;
         mp_int j;
 
         /* Create the new key by changing its owner */
@@ -3442,11 +3468,11 @@ set_mapping_user (struct mapping *m, struct object *owner)
     }
 } /* set_mapping_user() */
 
-#ifdef MALLOC_smalloc
+#ifdef GC_SUPPORT
 
 /*-------------------------------------------------------------------------*/
 void
-count_ref_in_mapping (struct mapping *m)
+count_ref_in_mapping (mapping_t *m)
 
 /* GC support: Count all references by the mapping <m>.
  * The GC will call this function only for compacted mappings.
@@ -3457,7 +3483,7 @@ count_ref_in_mapping (struct mapping *m)
 
 {
     char **str;
-    struct svalue *svp, *data;
+    svalue_t *svp, *data;
     mp_int size;
     mp_int num_values;
     Bool any_destructed = MY_FALSE;
@@ -3474,9 +3500,9 @@ count_ref_in_mapping (struct mapping *m)
         count_ref_from_string(*str++);
     }
 
-    data = (struct svalue *)str;
+    data = (svalue_t *)str;
     count_ref_in_vector(
-      (struct svalue *)str,
+      (svalue_t *)str,
       m->condensed->string_size / sizeof *str * num_values
     );
 
@@ -3487,7 +3513,7 @@ count_ref_in_mapping (struct mapping *m)
 
     svp = CM_MISC(m->condensed);
     size = m->condensed->misc_size;
-    while ( (size -= sizeof(struct svalue)) >= 0)
+    while ( (size -= sizeof(svalue_t)) >= 0)
     {
         --svp;
         if ( (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
@@ -3495,9 +3521,9 @@ count_ref_in_mapping (struct mapping *m)
               && ( CLOSURE_MALLOCED(svp->x.closure_type) ?
                   ( svp->x.closure_type != CLOSURE_UNBOUND_LAMBDA
                    && ( svp->u.lambda->ob->flags & O_DESTRUCTED
-                       ||    svp->x.closure_type == CLOSURE_ALIEN_LFUN
-                          && svp->u.lambda->function.alien.ob->flags
-                                                            & O_DESTRUCTED)
+                       || (    svp->x.closure_type == CLOSURE_ALIEN_LFUN
+                           && svp->u.lambda->function.alien.ob->flags
+                                                            & O_DESTRUCTED))
                   ) :
                   svp->u.ob->flags & O_DESTRUCTED ) ) )
         {
@@ -3511,14 +3537,14 @@ count_ref_in_mapping (struct mapping *m)
                 /* We don't want changing keys, even if they are still valid
                  * unbound closures
                  */
-                struct lambda *l = svp->u.lambda;
+                lambda_t *l = svp->u.lambda;
 
                 svp->x.closure_type = CLOSURE_LAMBDA;
                 svp->u.lambda = l->function.lambda;
                 if (!l->ref) {
                     l->function.lambda->ob = l->ob;
                     l->ref = -1;
-                    l->ob = (struct object *)stale_misc_closures;
+                    l->ob = (object_t *)stale_misc_closures;
                     stale_misc_closures = l;
                 } else {
                     l->function.lambda->ob = gc_obj_list_destructed;
@@ -3560,7 +3586,7 @@ count_ref_in_mapping (struct mapping *m)
 
     size = m->condensed->misc_size * num_values;
     count_ref_in_vector(
-      (struct svalue *)((char *)svp - size),
+      (svalue_t *)((char *)svp - size),
       size / sizeof *svp
     );
 } /* count_ref_in_mapping() */
@@ -3570,13 +3596,13 @@ void
 clean_stale_mappings (void)
 
 /* GC support: After count_ref_in_mapping(), the gc will free all
- * unreferenced destruct objects and lambdas. This may have changed
+ * unreferenced destructed objects and lambdas. This may have changed
  * several keys in the stale_mappings to T_INVALID. Since the objective
  * is to recover memory, these mappings are now compacted.
  */
 
 {
-    struct mapping *m, *next;
+    mapping_t *m, *next;
 
     for (m = stale_mappings; m; m = next)
     {
@@ -3590,11 +3616,11 @@ clean_stale_mappings (void)
         mp_int preserved_size;
           /* Preserved size from the string-part of cm */
         mp_int i, num_values;
-        struct svalue *svp, *svp2, *data, *data2;
+        svalue_t *svp, *svp2, *data, *data2;
         mp_int num_deleted = 0;
           /* Number of deleted misc-key entries */
 
-        next = (struct mapping *)m->hash;
+        next = (mapping_t *)m->hash;
         m->hash = NULL;
 
         num_values = m->num_values;
@@ -3604,7 +3630,7 @@ clean_stale_mappings (void)
 
         svp = CM_MISC(cm);
         i = size = cm->misc_size;
-        while ( (i -= sizeof(struct svalue)) >= 0)
+        while ( (i -= sizeof(svalue_t)) >= 0)
         {
             if ( (--svp)->type == T_INVALID)
                 num_deleted++;
@@ -3613,15 +3639,15 @@ clean_stale_mappings (void)
         /* Compute the various sizes and update the wizlist total */
 
         data_size = size * num_values;
-        deleted_size = (signed)(num_deleted * sizeof(struct svalue) * (num_values + 1));
-        preserved_size = (signed)(sizeof(*cm2) +
+        deleted_size = (mp_int)(num_deleted * sizeof(svalue_t) * (num_values + 1));
+        preserved_size = (mp_int)(sizeof(*cm2) +
           cm->string_size *
-          (1 + (sizeof(struct svalue)/sizeof(char *)) * num_values));
+          (1 + (sizeof(svalue_t)/sizeof(char *)) * num_values));
         m->user->mapping_total -= deleted_size;
 
         /* Allocate the new condensed part and initialise it */
 
-        cm2_start = xalloc((unsigned)(data_size + size - deleted_size + preserved_size));
+        cm2_start = xalloc((size_t)(data_size + size - deleted_size + preserved_size));
         if (!cm2_start)
         {
             fatal("Out of memory.\n");
@@ -3630,18 +3656,18 @@ clean_stale_mappings (void)
         }
         cm2 = (struct condensed_mapping *)
           (cm2_start + data_size + size - deleted_size);
-        memcpy((char *)cm2, (char *)cm, (unsigned)preserved_size);
-        cm2->misc_size = (signed)(size - num_deleted * sizeof(struct svalue));
+        memcpy((char *)cm2, (char *)cm, (size_t)preserved_size);
+        cm2->misc_size = (p_int)(size - num_deleted * sizeof(svalue_t));
 
         /* Copy the date for all valid misc-keys into the new
          * condensed part.
          */
         data = svp;
         svp2 = CM_MISC(cm2);
-        data2 = (struct svalue *)((char *)svp2 - size) + num_deleted;
+        data2 = (svalue_t *)((char *)svp2 - size) + num_deleted;
         svp = CM_MISC(cm);
         i = size;
-        while ( (i -= sizeof(struct svalue)) >= 0)
+        while ( (i -= sizeof(svalue_t)) >= 0)
         {
             if ( (--svp)->type == T_INVALID) {
                 mp_int j;
@@ -3654,7 +3680,7 @@ clean_stale_mappings (void)
             *--svp2 = *svp;
             data -= num_values;
             data2 -= num_values;
-            memcpy(data2, data, num_values * sizeof(struct svalue));
+            memcpy(data2, data, num_values * sizeof(svalue_t));
         }
         m->condensed = cm2;
 
@@ -3664,15 +3690,15 @@ clean_stale_mappings (void)
     }
 } /* clean_stale_mappings() */
 
-#endif /* MALLOC_smalloc */
+#endif /* GC_SUPPORT */
 
 /*=========================================================================*/
 
 /*                            EFUNS                                        */
 
 /*-------------------------------------------------------------------------*/
-struct vector *
-m_indices (struct mapping *m)
+vector_t *
+m_indices (mapping_t *m)
 
 /* Create a vector with all keys from mapping <m> and return it.
  * If the mapping contains destructed objects, m_indices() will remove
@@ -3682,12 +3708,12 @@ m_indices (struct mapping *m)
  */
 
 {
-    struct vector *v;
-    struct svalue *svp;
+    vector_t *v;
+    svalue_t *svp;
     mp_int size;
 
     check_map_for_destr(m);
-    size = (signed)MAP_SIZE(m);
+    size = (mp_int)MAP_SIZE(m);
     v = allocate_array(size); /* might cause error */
     svp = v->item;
     walk_mapping(m, m_indices_filter, &svp);
@@ -3696,18 +3722,18 @@ m_indices (struct mapping *m)
 
 /*-------------------------------------------------------------------------*/
 static void
-add_to_mapping_filter (struct svalue *key, struct svalue *data, void *extra)
+add_to_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
 
 /* Auxiliary function to add_to_mapping():
  * Add/overwrite (key:data) to mapping <extra>.
  */
 
 {
-    struct svalue *data2;
+    svalue_t *data2;
     int i;
 
-    data2 = get_map_lvalue_unchecked((struct mapping *)extra, key);
-    for (i = ((struct mapping *)extra)->num_values; --i >= 0;)
+    data2 = get_map_lvalue_unchecked((mapping_t *)extra, key);
+    for (i = ((mapping_t *)extra)->num_values; --i >= 0;)
     {
         assign_svalue(data2++, data++);
     }
@@ -3715,7 +3741,7 @@ add_to_mapping_filter (struct svalue *key, struct svalue *data, void *extra)
 
 /*-------------------------------------------------------------------------*/
 void
-add_to_mapping (struct mapping *m1, struct mapping *m2)
+add_to_mapping (mapping_t *m1, mapping_t *m2)
 
 /* Add the data from mapping <m2> to mapping <m1>, overwriting existing
  * entries.
@@ -3756,7 +3782,7 @@ add_to_mapping (struct mapping *m1, struct mapping *m2)
 
 /*-------------------------------------------------------------------------*/
 void
-sub_from_mapping_filter ( struct svalue *key, struct svalue *data UNUSED
+sub_from_mapping_filter ( svalue_t *key, svalue_t *data UNUSED
                         , void *extra)
 
 /* Auxiliary to subtract_mapping(): Delete <key> from mapping <extra>.
@@ -3767,12 +3793,12 @@ sub_from_mapping_filter ( struct svalue *key, struct svalue *data UNUSED
 #ifdef __MWERKS__
 #    pragma unused(data)
 #endif
-    remove_mapping((struct mapping *)extra, key);
+    remove_mapping((mapping_t *)extra, key);
 }
 
 /*-------------------------------------------------------------------------*/
-struct mapping *
-subtract_mapping (struct mapping *minuend, struct mapping *subtrahend)
+mapping_t *
+subtract_mapping (mapping_t *minuend, mapping_t *subtrahend)
 
 /* Create a copy of <minuend> minus all entries which are also in
  * <subtrahend>.
@@ -3792,27 +3818,27 @@ subtract_mapping (struct mapping *minuend, struct mapping *subtrahend)
 
 /*-------------------------------------------------------------------------*/
 static void
-f_walk_mapping_filter (struct svalue *key, struct svalue *data, void *extra)
+f_walk_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
 
 /* Auxiliary to efuns {walk,filter}_mapping(): callback for walk_mapping().
  *
- * <extra> is a pointer to a (struct svalue *) to an array of (numvalues+1)
+ * <extra> is a pointer to a (svalue_t *) to an array of (numvalues+1)
  * svalues. The first of these gets to hold the <key>, the others are lvalues
  * to get the <data>.
  */
 
 {
-    struct svalue *svp;
+    svalue_t *svp;
 
-    svp = *(struct svalue **)extra;
+    svp = *(svalue_t **)extra;
     assign_svalue_no_free(svp, key);
     (++svp)->u.lvalue = data;
-    *(struct svalue **)extra = ++svp;
+    *(svalue_t **)extra = ++svp;
 }
 
 /*-------------------------------------------------------------------------*/
 static void
-f_walk_mapping_cleanup (struct svalue *arg)
+f_walk_mapping_cleanup (svalue_t *arg)
 
 /* Auxiliary to efuns {walk,filter}_walk_mapping(): Cleanup.
  *
@@ -3822,11 +3848,16 @@ f_walk_mapping_cleanup (struct svalue *arg)
  */
 
 {
-    struct svalue *svp;
-    struct mapping *m;
+    svalue_t *svp;
+    mapping_t *m;
     mp_int i;
 
     svp = arg + 1;
+
+    if (svp->u.cb)
+        free_callback(svp->u.cb);
+    svp++;
+    
     m = svp[1].u.map;
 
     /* If the mapping had a hash part prior to the f_walk_mapping(),
@@ -3846,7 +3877,7 @@ f_walk_mapping_cleanup (struct svalue *arg)
             /* Last ref gone: deallocated the pending deleted entries */
 
             struct map_chain *mc, *next;
-            struct svalue *svp2;
+            svalue_t *svp2;
 
             for (mc = hm->deleted; mc; mc = next)
             {
@@ -3872,13 +3903,13 @@ f_walk_mapping_cleanup (struct svalue *arg)
     } while (--i > 0);
 
     /* Deallocate the block */
-    xfree((char *)arg);
+    xfree(arg);
 
 } /* f_walk_mapping_cleanup() */
 
 /*-------------------------------------------------------------------------*/
-static struct svalue *
-walk_mapping_prologue (struct mapping *m, struct svalue *sp)
+static svalue_t *
+walk_mapping_prologue (mapping_t *m, svalue_t *sp, callback_t *cb)
 
 /* Auxiliary to efuns {walk,filter}_walk_mapping(): Setup.
  *
@@ -3890,12 +3921,13 @@ walk_mapping_prologue (struct mapping *m, struct svalue *sp)
  * The result configuration of the array is:
  *
  *    sp+1  ->  [0] { lvalue } -> { T_ERROR_HANDLER: f_walk_mapping_cleanup }
- *              [1] { u.number: number of mapping entries }
- *              [2] { u.map: <m>, x.generic: <m> has hash part }
- *    result -> [3] { key1 }
- *              [4] { lvalue } -> values of key1
- *              [5] { key2 }
- *              [6] { lvalue } -> values of key2
+ *              [1] { u.cb: callback structure }
+ *              [2] { u.number: number of mapping entries }
+ *              [3] { u.map: <m>, x.generic: <m> has hash part }
+ *    result -> [4] { key1 }
+ *              [5] { lvalue } -> values of key1
+ *              [6] { key2 }
+ *              [7] { lvalue } -> values of key2
  *                etc
  *
  * Storing the array as error handler allows a simple cleanup in course
@@ -3907,12 +3939,12 @@ walk_mapping_prologue (struct mapping *m, struct svalue *sp)
 
 {
     struct hash_mapping *hm;
-    struct svalue *pointers;
-    struct svalue *write_pointer, *read_pointer;
+    svalue_t *pointers;
+    svalue_t *write_pointer, *read_pointer;
     mp_int i;
 
-    i = (signed)(m->condensed->string_size/sizeof(char *) +
-        m->condensed->misc_size/sizeof(struct svalue));
+    i = (mp_int)(m->condensed->string_size/sizeof(char *) +
+        m->condensed->misc_size/sizeof(svalue_t));
     if ( NULL != (hm = m->hash) ) {
         i += hm->used - hm->condensed_deleted;
         if (!m->num_values) {
@@ -3921,26 +3953,28 @@ walk_mapping_prologue (struct mapping *m, struct svalue *sp)
             hm->deleted = NULL;
         }
     }
-    pointers = (struct svalue *)xalloc( (i * 2 + 3) * sizeof(struct svalue) );
+    pointers = (svalue_t *)xalloc( (i * 2 + 4) * sizeof(svalue_t) );
     pointers[0].type = T_ERROR_HANDLER;
     pointers[0].u.error_handler = f_walk_mapping_cleanup;
-    pointers[1].u.number = i;
-    pointers[2].u.map = m;
-    pointers[2].x.generic = hm != 0;
+    pointers[1].type = T_CALLBACK;
+    pointers[1].u.cb = cb;
+    pointers[2].u.number = i;
+    pointers[3].u.map = m;
+    pointers[3].x.generic = hm != 0;
     (++sp)->type = T_LVALUE;
     sp->u.lvalue = pointers;
-    read_pointer = write_pointer = pointers + 3;
+    read_pointer = write_pointer = pointers + 4;
     walk_mapping(m, f_walk_mapping_filter, &write_pointer);
     return read_pointer;
 }
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_walk_mapping (struct svalue *sp, int num_arg)
+svalue_t *
+f_walk_mapping (svalue_t *sp, int num_arg)
 
 /* VEFUN walk_mapping()
  *
- *   void walk_mapping(mapping m, string func, object ob, mixed extra,...)
+ *   void walk_mapping(mapping m, string func, string|object ob, mixed extra,...)
  *   void walk_mapping(mapping m, closure cl, mixed extra,...)
  *
  * Calls ob->func(key, value1, ..., valueN, extra,...) resp. applies
@@ -3948,17 +3982,17 @@ f_walk_mapping (struct svalue *sp, int num_arg)
  * by value, the values are passed by reference and can be
  * changed in the function.
  * Any number of extra arguments is accepted and passed.
+ * If <ob> is omitted, or neither an object nor a string, then
+ * this_object() is used.
  */
 
 {
-    struct svalue *arg;           /* Begin of the args on the stack */
-    struct svalue *extra = NULL;  /* Begin of the 'extra' args on the stack */
-    int extra_num;                /* Number of 'extra' args */
-    struct mapping *m;            /* Mapping to walk */
-    struct object *ob;            /* Object to call */
-    char *func;                   /* Function to call */
+    svalue_t *arg;           /* Begin of the args on the stack */
+    callback_t cb;
+    int error_index;
+    mapping_t *m;            /* Mapping to walk */
     int num_values;               /* Number of values per entry */
-    struct svalue *read_pointer;  /* Prepared mapping values */
+    svalue_t *read_pointer;  /* Prepared mapping values */
     mp_int i;
 
     /* Locate the arguments on the stack and extract them */
@@ -3966,36 +4000,18 @@ f_walk_mapping (struct svalue *sp, int num_arg)
     inter_sp = sp;
     if (arg[0].type != T_MAPPING)
         bad_xefun_vararg(1, sp);
-    if (arg[1].type == T_CLOSURE)
+
+    error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
+    inter_sp = sp = arg;
+    num_arg = 1;
+
+    if (error_index >= 0)
     {
-        ob = NULL;
-        func = (char *)&arg[1];
-        extra_num = num_arg - 2;
-        extra = &arg[2];
+        bad_xefun_vararg(error_index+2, sp);
+        /* NOTREACHED */
+        return sp;
     }
-    else if (arg[1].type != T_STRING)
-    {
-        bad_xefun_vararg(2, sp);
-    }
-    else
-    {
-        if (num_arg >= 3 /* && arg[1].type == T_STRING */)
-        {
-            if (arg[2].type == T_OBJECT)
-                ob = arg[2].u.ob;
-            else if (arg[2].type != T_STRING
-             ||      !(ob = get_object(arg[2].u.string)) )
-                bad_xefun_vararg(3, sp);
-            extra_num = num_arg - 3;
-            extra = &arg[3];
-        }
-        else
-        {
-            ob = current_object;
-            extra_num = 0;
-        }
-        func = arg[1].u.string;
-    }
+
     m = arg[0].u.map;
 
 
@@ -4004,9 +4020,9 @@ f_walk_mapping (struct svalue *sp, int num_arg)
     check_map_for_destr(m);
     assign_eval_cost();
 
-    read_pointer = walk_mapping_prologue(m, sp);
+    read_pointer = walk_mapping_prologue(m, sp, &cb);
     i = read_pointer[-2].u.number;
-    sp++; /* walk_mapping_prologue() pushed on value */
+    sp++; /* walk_mapping_prologue() pushed one value */
 
     num_values = m->num_values;
 
@@ -4016,7 +4032,10 @@ f_walk_mapping (struct svalue *sp, int num_arg)
     while (--i >= 0)
     {
         int j;
-        struct svalue *sp2, *data;
+        svalue_t *sp2, *data;
+
+        if (!callback_object(&cb))
+            error("Object used by walk_mapping destructed");
 
         /* Push the key */
         assign_svalue_no_free( (sp2 = sp+1), read_pointer++ );
@@ -4028,23 +4047,14 @@ f_walk_mapping (struct svalue *sp, int num_arg)
              sp2->u.lvalue = data++;
         }
 
-        /* Push the 'extra' arguments */
-        inter_sp = sp2;
-        push_svalue_block(extra_num, extra);
-
         /* Call the function */
-        if (ob)
-        {
-            if (ob->flags & O_DESTRUCTED)
-                error("Object used by walk_mapping destructed");
-            apply( func, ob, 1 + num_values + extra_num);
-        } else {
-            call_lambda( (struct svalue *)func, 1 + num_values + extra_num);
-            free_svalue(inter_sp--);
-        }
+        inter_sp = sp2;
+        (void)apply_callback(&cb, 1 + num_values);
     }
 
-    /* This frees the whole array allocated by the prologue */
+    /* This frees the whole array allocated by the prologue,
+     * including the data help by the callback.
+     */
     free_svalue(sp);
 
     /* Free the arguments */
@@ -4054,19 +4064,18 @@ f_walk_mapping (struct svalue *sp, int num_arg)
     while (--i > 0);
 
     return sp-1;
-
 } /* f_walk_mapping() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-filter_mapping (struct svalue *sp, int num_arg, Bool bFull)
+svalue_t *
+x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
-/* EFUN filter_mapping()
+/* VEFUN filter() on mappings, filter_mapping() == filter_indices()
  *
- *   mapping filter_mapping(mapping, string func, object ob, ...)
+ *   mapping filter_mapping(mapping, string func, string|object ob, ...)
  *   mapping filter_mapping(mapping, closure cl, ...)
  *
- *   mapping filter(mapping, string func, object ob, ...)
+ *   mapping filter(mapping, string func, string|object ob, ...)
  *   mapping filter(mapping, closure cl, ...)
  *
  * ob->func() is called resp. cl applied to every element in the
@@ -4075,27 +4084,26 @@ filter_mapping (struct svalue *sp, int num_arg, Bool bFull)
  * then the extra args that were given to the efun. If the function
  * returns true, the element is added to the result mapping.
  *
+ * If <ob> is omitted, or neither an object nor a string, then
+ * this_object() is used.
+ *
  * If the data for the key is passed, it can take one of the following
  * forms:
  *    widthof(m) == 0:  nothing is passed
  *    widthof(m) == 1:  m[key] is passed
  *    widthof(m) >  1:  ({ m[key,0] .. m[key,width-1] }) is passed
- *
-
  */
 
 {
-    struct svalue *arg;           /* Start of arguments on the stack */
-    struct mapping *m;            /* Mapping to filter */
-    char *func;                   /* Function to call */
-    struct object *ob;            /* Object to call */
-    struct svalue *extra = NULL;  /* Start of 'extra' args on the stack */
-    int extra_num;                /* Number of 'extra' args */
+    svalue_t *arg;           /* Start of arguments on the stack */
+    mapping_t *m;            /* Mapping to filter */
+    int         error_index;
+    callback_t  cb;
     int num_values;               /* Width of the mapping */
-    struct vector *dvec;          /* Values of one key */
-    struct svalue *dvec_sp;       /* Stackentry of dvec */
-    struct svalue *read_pointer;  /* Prepared mapping values */
-    struct svalue *v;
+    vector_t *dvec;          /* Values of one key */
+    svalue_t *dvec_sp;       /* Stackentry of dvec */
+    svalue_t *read_pointer;  /* Prepared mapping values */
+    svalue_t *v;
     int i, j;
 
     /* Locate the arguments on the stack and extract them */
@@ -4103,39 +4111,19 @@ filter_mapping (struct svalue *sp, int num_arg, Bool bFull)
     inter_sp = sp;
     if (arg[0].type != T_MAPPING)
         bad_xefun_vararg(1, sp);
-    if (arg[1].type == T_CLOSURE)
-    {
-        ob = NULL;
-        func = (char *)&arg[1];
-        extra = &arg[2];
-        extra_num = num_arg - 2;
-    }
-    else if (arg[1].type != T_STRING)
-    {
-        bad_xefun_vararg(2, sp);
-    }
-    else
-    {
-        if (num_arg < 3)
-        {
-            ob = current_object;
-            /* let the compiler mourn: we need no extra. */
-            extra_num = 0;
-        }
-        else
-        {
-            if (arg[2].type == T_OBJECT)
-                ob = arg[2].u.ob;
-            else if (arg[2].type != T_STRING
-             ||      !(inter_sp = sp, ob = get_object(arg[2].u.string)) )
-                bad_xefun_vararg(3, sp);
-            extra = &arg[3];
-            extra_num = num_arg - 3;
-        }
-        func = arg[1].u.string;
-    }
-    m = arg[0].u.map;
 
+    error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
+    inter_sp = sp = arg;
+    num_arg = 1;
+
+    if (error_index >= 0)
+    {
+        bad_xefun_vararg(error_index+2, sp);
+        /* NOTREACHED */
+        return sp;
+    }
+
+    m = arg[0].u.map;
 
     /* Preparations */
 
@@ -4148,6 +4136,7 @@ filter_mapping (struct svalue *sp, int num_arg, Bool bFull)
     dvec = NULL;
     dvec_sp = NULL;
     bFull = bFull ? 1 : 0;
+      /* So we can use it as the number of extra arguments */
 
     if (bFull && num_values > 1)
     {
@@ -4162,9 +4151,9 @@ filter_mapping (struct svalue *sp, int num_arg, Bool bFull)
         dvec_sp = sp;
     }
 
-    read_pointer = walk_mapping_prologue(m, sp);
+    read_pointer = walk_mapping_prologue(m, sp, &cb);
 
-    m = allocate_mapping(read_pointer[-2].u.number , num_values);
+    m = allocate_mapping(read_pointer[-2].u.number, num_values);
     if (!m)
     {
         inter_sp = sp + 1;
@@ -4184,7 +4173,7 @@ filter_mapping (struct svalue *sp, int num_arg, Bool bFull)
      */
     for (i = read_pointer[-2].u.number; --i >= 0; read_pointer += 2)
     {
-        struct svalue *data;
+        svalue_t *data;
 
         /* Push the key */
         assign_svalue_no_free((inter_sp = sp + 1), read_pointer);
@@ -4201,7 +4190,7 @@ filter_mapping (struct svalue *sp, int num_arg, Bool bFull)
             }
             else
             {
-                struct svalue *svp;
+                svalue_t *svp;
 
                 v = read_pointer[1].u.lvalue;
                 for (j = 0, svp = dvec->item
@@ -4212,40 +4201,16 @@ filter_mapping (struct svalue *sp, int num_arg, Bool bFull)
             }
         }
 
-        /* Push the 'extra' args */
-        push_svalue_block( extra_num, extra);
+        if (!callback_object(&cb))
+            error("Object used by %s destructed"
+                 , bFull ? "map" : "map_mapping");
 
-        if (ob)
-        {
-            if (ob->flags & O_DESTRUCTED)
-                error("Object used by %s destructed"
-                     , bFull ? "map" : "map_mapping");
 
-            /* Call the function */
-            v = apply( func, ob, 1 + extra_num + bFull);
+        v = apply_callback(&cb, 1 + bFull);
 
-            /* Did the filter return TRUE? */
-            if (!v || (v->type == T_NUMBER && !v->u.number) )
-                continue;
-
-            /* No free_svalue(v == &apply_return_value) necessary */
-        }
-        else
-        {
-            /* Call the function */
-            call_lambda( (struct svalue *)func, 1 + extra_num + bFull);
-
-            /* Did the filter return TRUE? */
-            v = inter_sp--;
-            if (v->type == T_NUMBER) {
-                if (!v->u.number)
-                    continue;
-            }
-            else
-            {
-                free_svalue(v);
-            }
-        }
+        /* Did the filter return TRUE? */
+        if (!v || (v->type == T_NUMBER && !v->u.number) )
+            continue;
 
         /* If we come here, the filter function returned 'true'.
          * Therefore assign the pair to the new mapping.
@@ -4257,9 +4222,10 @@ filter_mapping (struct svalue *sp, int num_arg, Bool bFull)
         }
     }
 
-    /* Cleanup the read_pointer block and the arguments,
-     * but not the reference to m.
+    /* Cleanup the temporary data except for the reference to m.
+     * The arguments have been removed before already.
      */
+    free_callback(&cb);
     i = num_arg + (dvec != NULL ? 1 : 0);
     do
     {
@@ -4272,24 +4238,50 @@ filter_mapping (struct svalue *sp, int num_arg, Bool bFull)
     put_mapping(sp, m);
 
     return sp;
-}
+} /* x_filter_mapping() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-map_mapping (struct svalue *sp, int num_arg, Bool bFull)
+svalue_t *
+f_filter_indices (svalue_t *sp, int num_arg)
 
-/* EFUN map_mapping()
+/* VEFUN filter_indices()
+ *
+ *   mapping filter_indices(mapping, string func, string|object ob, ...)
+ *   mapping filter_indices(mapping, closure cl, ...)
+ *
+ * ob->func() is called resp. cl applied to every element in the
+ * mapping, with first argument being the key of the
+ * element, and then the extra args that were given to
+ * filter_mapping. If the function returns true, the element is
+ * added to the result mapping. ob can also be a file_name of an
+ * object.
+ * If <ob> is omitted, or neither an object nor a string, then
+ * this_object() is used.
+ */
+
+{
+    return x_filter_mapping(sp, num_arg, MY_FALSE);
+}  /* f_filter_indices() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
+
+/* EFUN map() on mappings, map_mapping() == map_indices()
  *
  *   mapping map_mapping(mapping m, string func, object ob, ...)
  *   mapping map_mapping(mapping m, closure cl, ...)
  *
- *   mapping map(mapping m, string func, object ob, ...)
+ *   mapping map(mapping m, string func, string|object ob, ...)
  *   mapping map(mapping m, closure cl, ...)
  *
  * ob->func() is called resp. cl applied to every element in the
  * mapping, with the key of the element as first argument, optionally
  * the data for the key as second argument (if bFull is TRUE), and
  * then the extra args that were given to the efun.
+ *
+ * If <ob> is omitted, or neither an object nor a string, then
+ * this_object() is used.
  *
  * If the data for the key is passed, it can take one of the following
  * forms:
@@ -4310,56 +4302,35 @@ map_mapping (struct svalue *sp, int num_arg, Bool bFull)
  */
 
 {
-    struct svalue *arg;           /* Begin of arguments on the stack */
-    struct mapping *arg_m;        /* Mapping to map */
-    struct mapping *m;            /* Result mapping */
-    char *func;                   /* Function to cal */
-    struct object *ob;            /* Object to call */
-    struct svalue *extra = NULL;  /* Begin of 'extra' args on the stack */
-    int extra_num;                /* Number of 'extra' args */
-    int num_values;               /* Width of the mapping */
-    struct vector *vec;           /* Indices of m */
-    struct svalue *dvec_sp;       /* Stackentry of dvec */
-    struct vector *dvec;          /* Values of one key */
+    svalue_t *arg;           /* Begin of arguments on the stack */
+    mapping_t *arg_m;        /* Mapping to map */
+    mapping_t *m;            /* Result mapping */
+    int num_values;          /* Width of the mapping */
+    vector_t *vec;           /* Indices of m */
+    svalue_t *dvec_sp;       /* Stackentry of dvec */
+    vector_t *dvec;          /* Values of one key */
     long i;
-    struct svalue *key;
+    svalue_t *key;
+    callback_t cb;
+    int error_index;
 
     /* Locate and extract arguments */
     arg = sp - num_arg + 1;
     inter_sp = sp;
     if (arg[0].type != T_MAPPING)
         bad_xefun_vararg(1, sp);
-    if (arg[1].type == T_CLOSURE)
+
+    error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
+    inter_sp = sp = arg;
+    num_arg = 1;
+
+    if (error_index >= 0)
     {
-        ob = NULL;
-        func = (char *)(arg + 1);
-        extra = &arg[2];
-        extra_num = num_arg - 2;
+        bad_xefun_vararg(error_index+2, sp);
+        /* NOTREACHED */
+        return sp;
     }
-    else if (arg[1].type != T_STRING)
-    {
-        bad_xefun_vararg(2, sp);
-    }
-    else
-    {
-        if (num_arg < 3)
-        {
-            ob = current_object;
-            /* let the compiler mourn: we need no extra. */
-            extra_num = 0;
-        }
-        else
-        {
-            if (arg[2].type == T_OBJECT)
-                ob = arg[2].u.ob;
-            else if (arg[2].type != T_STRING
-             ||      !(inter_sp = sp, ob = get_object(arg[2].u.string)) )
-                bad_xefun_vararg(3, sp);
-            extra = &arg[3];
-            extra_num = num_arg - 3;
-        }
-        func = arg[1].u.string;
-    }
+
     arg_m = arg[0].u.map;
 
 
@@ -4378,6 +4349,7 @@ map_mapping (struct svalue *sp, int num_arg, Bool bFull)
     dvec = NULL;
     dvec_sp = NULL;
     bFull = bFull ? 1 : 0;
+      /* So we can use it as the number of extra arguments */
 
     if (bFull && num_values > 1)
     {
@@ -4392,7 +4364,7 @@ map_mapping (struct svalue *sp, int num_arg, Bool bFull)
         dvec_sp = sp;
     }
 
-    m = allocate_mapping((i = (signed)VEC_SIZE(vec)), 1);
+    m = allocate_mapping((i = (long)VEC_SIZE(vec)), 1);
     if (!m)
     {
         inter_sp = sp;
@@ -4409,7 +4381,8 @@ map_mapping (struct svalue *sp, int num_arg, Bool bFull)
 
     key = vec->item;
     for (; --i >= 0; key++) {
-        struct svalue *v;
+        svalue_t *v;
+        svalue_t *data;
 
         /* Push the key */
         assign_svalue_no_free((inter_sp = sp + 1), key);
@@ -4426,7 +4399,7 @@ map_mapping (struct svalue *sp, int num_arg, Bool bFull)
             else
             {
                 int j;
-                struct svalue *svp;
+                svalue_t *svp;
 
                 v = get_map_value(arg_m, key);
                 for (j = 0, svp = dvec->item; j < num_values; j++, svp++, v++)
@@ -4435,30 +4408,25 @@ map_mapping (struct svalue *sp, int num_arg, Bool bFull)
             }
         }
 
-        /* Push the extra data */
-        push_svalue_block( extra_num, extra);
-
         /* Call the filter function */
         v = get_map_lvalue_unchecked(m, key);
-        if (ob) {
-            struct svalue *data;
 
-            if (ob->flags & O_DESTRUCTED)
-                error("Object used by %s destructed"
-                     , bFull ? "map" : "map_mapping");
-            data = apply( func, ob, 1 + extra_num + bFull);
-            if (data) {
-                transfer_svalue_no_free(v, data);
-                data->type = T_INVALID;
-            }
-        } else {
-            call_lambda( (struct svalue *)func, 1 + extra_num + bFull);
-            transfer_svalue_no_free(v, inter_sp--);
+        if (!callback_object(&cb))
+            error("Object used by %s destructed"
+                 , bFull ? "map" : "map_mapping");
+
+        data = apply_callback(&cb, 1 + bFull);
+        if (data)
+        {
+            transfer_svalue_no_free(v, data);
+            data->type = T_INVALID;
         }
     }
 
-    /* Cleanup the arguments except for the reference to m.
+    /* Cleanup the temporary data except for the reference to m.
+     * The arguments have been removed before already.
      */
+    free_callback(&cb);
     i = num_arg + (dvec != NULL ? 1 : 0);
     do
     {
@@ -4470,11 +4438,34 @@ map_mapping (struct svalue *sp, int num_arg, Bool bFull)
      */
     put_mapping(sp, m);
     return sp;
-}
+} /* x_map_mapping() */
 
 /*-------------------------------------------------------------------------*/
-struct svalue *
-f_m_reallocate (struct svalue *sp)
+svalue_t *
+f_map_indices (svalue_t *sp, int num_arg)
+
+/* VEFUN map_indices()
+ *
+ *   mapping map_indices(mapping m, string func, object ob, ...)
+ *   mapping map_indices(mapping m, closure cl, ...)
+ *
+ * ob->func() is called resp. cl applied to every element in the
+ * mapping, with the key of the element as first argument, and
+ * then the extra args that were given to map_mapping.
+ * The data item in the mapping is replaced by the return value
+ * of the function. ob can also be a file_name of an object.
+ *
+ * If <ob> is omitted, or neither an object nor a string, then
+ * this_object() is used.
+ */
+
+{
+    return x_map_mapping(sp, num_arg, MY_FALSE);
+}  /* f_map_indices() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_m_reallocate (svalue_t *sp)
 
 /* TEFUN m_reallocate()
  *
@@ -4488,8 +4479,8 @@ f_m_reallocate (struct svalue *sp)
 
 {
     int new_width;          /* Requested width of the target mapping */
-    struct mapping *m;      /* Argument mapping */
-    struct mapping *new_m;  /* New mapping */
+    mapping_t *m;      /* Argument mapping */
+    mapping_t *new_m;  /* New mapping */
 
     /* Test and get arguments */
     if (sp->type != T_NUMBER)
@@ -4532,8 +4523,7 @@ f_m_reallocate (struct svalue *sp)
     put_mapping(sp, new_m);
 
     return sp;
-
-}
+} /* f_m_reallocate() */
 
 /***************************************************************************/
 

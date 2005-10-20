@@ -30,7 +30,7 @@
 #include <sys/types.h>
 
 #include "ptrtable.h"
-
+#include "mempools.h"
 #include "simulate.h"
 
 /*-------------------------------------------------------------------------*/
@@ -51,7 +51,6 @@ struct sub_table
       /* The table of hash chains */
     char used[PTABLE_SIZE / CHAR_BIT];
       /* Bitvector denoting which record[] entries are valid */
-    struct sub_table *next_all;  /* Next subtable in global list */
 };
 
 
@@ -59,6 +58,11 @@ struct sub_table
  */
 struct pointer_table
 {
+    Mempool pool;
+      /* The memory pool from which the table and all structures are
+       * allocated.
+       */
+
     struct pointer_record *table[PTABLE_SIZE];
       /* The top-level hashtable.
        */
@@ -72,13 +76,6 @@ struct pointer_table
       * bit hash%8 each. The first bit is true if the associated entry
       * is in use, the second if the entry holds a sub table.
       */
-
-    struct pointer_record *all_pointer_records;
-    struct sub_table *all_sub_tables;
-      /* List of all allocated records and sub tables, used for final
-       * deallocation.
-       * TODO: Pooling would be nice here.
-       */
 };
 
 /*-------------------------------------------------------------------------*/
@@ -89,14 +86,20 @@ new_pointer_table (void)
  */
 
 {
+    Mempool pool;
     struct pointer_table *ptable;
 
-    ptable = xalloc(sizeof(*ptable));
-    if (!ptable)
+    pool = new_mempool(1024);
+    if (!pool)
         return NULL;
+    ptable = mempool_alloc(pool, sizeof(*ptable));
+    if (!ptable)
+    {
+        mempool_delete(pool);
+        return NULL;
+    }
     memset(ptable->hash_usage, 0, sizeof ptable->hash_usage);
-    ptable->all_pointer_records = NULL;
-    ptable->all_sub_tables = NULL;
+    ptable->pool = pool;
 
     return ptable;
 } /* new_pointer_table() */
@@ -109,24 +112,7 @@ free_pointer_table (struct pointer_table *ptable)
  */
 
 {
-    struct pointer_record *record;
-    struct sub_table *table;
-
-    for (record = ptable->all_pointer_records; record;)
-    {
-        struct pointer_record *next = record->next_all;
-        xfree(record);
-        record = next;
-    }
-
-    for (table = ptable->all_sub_tables; table;)
-    {
-        struct sub_table *next = table->next_all;
-        xfree(table);
-        table = next;
-    }
-
-    xfree(ptable);
+    mempool_delete(ptable->pool);
 } /* free_pointer_table() */
 
 /*-------------------------------------------------------------------------*/
@@ -225,12 +211,11 @@ find_add_pointer (struct pointer_table *ptable, void *pointer, Bool bAdd)
 
             usage_p[1] |= mask;
 
-            table = xalloc(sizeof *table);
+            table = mempool_alloc(ptable->pool, sizeof *table);
             if (!table)
-                error("Out of memory.\n");
+                error("(pointertable) Out of memory (%lu bytes pooled) "
+                      "for subtable.\n", (unsigned long) sizeof *table);
             *insert = (struct pointer_record *)table;
-            table->next_all = ptable->all_sub_tables;
-            ptable->all_sub_tables = table;
             memset(table->used, 0, sizeof table->used);
 
             /* Put the old entry into the new subtable */
@@ -259,17 +244,16 @@ find_add_pointer (struct pointer_table *ptable, void *pointer, Bool bAdd)
         return NULL;
 
     usage_p[0] |= mask;
-    new = xalloc(sizeof *new);
+    new = mempool_alloc(ptable->pool, sizeof *new);
     if (!new)
-        error("Out of memory.\n");
+        error("(pointertable) Out of memory (%lu bytes pooled) for "
+              "new entry.\n", (unsigned long) sizeof *new);
     *insert = new;
     new->key = key;
     new->next = old;
-    new->next_all = ptable->all_pointer_records;
     new->ref_count = -1;
     new->id_number = 0;
     new->data = NULL;
-    ptable->all_pointer_records = new;
 
     return new;
 } /* find_add_pointer() */

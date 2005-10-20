@@ -37,7 +37,7 @@ EXAMPLE
 	And YES: self-replicating call_out()s, where each call_out()
 	creates two or more other call_out()s in a loop (so called
 	'rabbits') slow the mud down very fast, and are even able
-	crash it. No need to try it yourself.
+	to crash it. No need to try it yourself.
 
 SEE ALSO
 	remove_call_out(E), call_out_info(E), find_call_out(E),

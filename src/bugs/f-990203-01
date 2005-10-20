@@ -1,9 +1,0 @@
-Short: Operator wishes
-From: Matthew Julius <julius.2@wright.edu>
-Date: Fri, 08 Jan 1999 16:29:08 -0500
-Type: Feature
-State: Unclassified
-
-|, &, ^, |=, &=, ^= support for mixed* <operator> mixed*;
-I know obs & users(), works already, but not the others.
-

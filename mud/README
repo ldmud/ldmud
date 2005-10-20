@@ -16,13 +16,18 @@ stored in the main source tree as 'settings/foo'.
 
 
 An exception is lp-245/ which contains the complete mudlib from old
-LPMud 2.4.5. Think of it as a _very_ simple example mudlib.
+LPMud 2.4.5. Think of it as a _very_ simple example mudlib, with the
+added bonus value of demonstrating a traditional compat-mode master
+(plus native-mode explanations) with mudwho support.
 
 
 Support exists for these muds:
 
-  StickLib - 0.99c (LDMud 3.2.7-dev.123)
+  StickLib - 0.99c (LDMud 3.2.7-dev.155)
     <URL:http://www.hut.fi/~doomdark/proj/sticklib/sticklib.html>
+
+  Deeper Trouble - The 2nd Generation  (LDMud 3.2.8-dev.158)
+    <URL:telnet://sunsite.auc.dk:4242/>
 
 
 The following muds run natively on LDMud:
@@ -32,3 +37,4 @@ The following muds run natively on LDMud:
     or <URL:ftp://ftp.bearnip.com/pub/mud/>
 
 TODO: Complete this list (Tubmud, Heaven7, PK-Mud, etc)
+

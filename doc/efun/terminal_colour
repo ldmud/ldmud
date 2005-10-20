@@ -1,49 +1,75 @@
 SYNOPSIS
-	varargs string terminal_colour( string str, mapping map,
-	                                int wrap, int indent )
+        varargs string terminal_colour( string str, null|mapping map,
+                                        int wrap, int indent )
 
 DESCRIPTION
-	Expands all colour-defines from the input-string and replaces them
-        by the apropriate values found for the color-key inside the given
-        mapping. The mapping has the format "KEY" : "value", non-string
-	contents are ignored.
+        If <map> is given as a non-0 value, this efun expands all
+        colour-defines of the form "%^KEY%^" from the
+        input-string and replaces them by the apropriate values found
+        for the color-key inside the given mapping. The mapping has the
+        format "KEY" : "value", non-string contents are ignored.
 
-	The parameters wrap and indent are both optional, if only wrap is
-	given then the str will be linewrapped at the column given with
-	wrap. If indent is given too, then all wrapped lines will be
-	indented with the number of blanks specified with indent.
+        The special key "%^%^" is always replaced with the literal "%^".
 
-	The wrapper itself ignores the length of the color macros and that
-	what they contain, it wraps the string based on the length of the
-	other chars inside. Therefor it is color-aware.
+        The parameters wrap and indent are both optional, if only wrap is
+        given then the str will be linewrapped at the column given with
+        wrap. If indent is given too, then all wrapped lines will be
+        indented with the number of blanks specified with indent.
+
+        The wrapper itself ignores the length of the color macros and that
+        what they contain, it wraps the string based on the length of the
+        other chars inside. Therefore it is color-aware.
+
+
+        If <map> is given as 0, the efun does no colour-define detection
+        and replacement at all, but still does linewrapping and indentation
+        if requested. This way terminal_colour() doubles as a simple
+        line wrapping function, replacing the functionality formerly
+        served by sprintf("%-=s").
+
 
 EXAMPLES
-	mapping trans;
-	string str;
+        mapping trans;
+        string str;
 
-	trans = ([ "GREEN" : "ansi-green", "RED" : "", "BLUE" : 1 ]);
+        trans = ([ "GREEN" : "ansi-green", "RED" : "", "BLUE" : 1 ]);
 
-	str = terminal_colour( "%^GREEN%^ and %^RED%^ and %^BLUE%^", trans );
+        str = terminal_colour( "%^GREEN%^ and %^RED%^ and %^BLUE%^", trans );
 
-	This will result in str == "ansi-green and  and BLUE"
+        This will result in str == "ansi-green and  and BLUE"
 
-	%^GREEN%^ is expanded to ansi-green because trans defines that,
-	%^RED%^ is stripped because trans defines that as "" and
-	%^BLUE%^ gets the %^'s removed because the contents of trans are
-	not valid (i.e. no string). The same would happen to %^DEFINES%^
-	where the key is not found inside the trans mapping.
+        %^GREEN%^ is expanded to ansi-green because trans defines that,
+        %^RED%^ is stripped because trans defines that as "" and
+        %^BLUE%^ gets the %^'s removed because the contents of trans are
+        not valid (i.e. no string). The same would happen to %^DEFINES%^
+        where the key is not found inside the trans mapping.
 
-	Some words about wrapping:
+        Caveat: to replace adjacent keys, use the efun like this:
 
-	a string wrapped without indent would look like this:
+            str = terminal_colour( "%^GREEN%^%^RED%^", trans );
 
-	"this is the first line\nand this is the second line"
+        A command like
 
-	a string wrapped with indent 3 would look like:
-	
-	"this is the first line\n   and this is the indented second one"
+            str = terminal_colour( "%^GREEN%^RED%^", trans );
+
+        will return the logical but sometimes unexpected "ansi-greenRED".
+
+
+        Some words about wrapping:
+
+        a string wrapped without indent would look like this:
+
+            "this is the first line\nand this is the second line"
+
+        a string wrapped with indent 3 would look like:
+        
+            "this is the first line\n   and this is the indented second one"
 
 AUTHOR
-        Efun idea and implementation taken from MudOS.
-
+        Efun idea and initial implementation taken from MudOS; the key
+        recognition strategy (including pure wrapping mode) was straightened
+        out in LDMud 3.2.8.
+        
 SEE ALSO
+        sprintf(E)
+

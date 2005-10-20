@@ -58,3 +58,6 @@ EXAMPLE
 	  case 42 : return;
 	  case 99 : write("It tastes good.\n";
 	}
+
+SEE ALSO
+        for(LPC), foreach(LPC), do-while(LPC), if(LPC), while(LPC)

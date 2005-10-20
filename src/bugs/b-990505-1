@@ -24,6 +24,6 @@ In /secure/simul_efun/map.inc ist in Zeile 164 folgendes:
         return ob;
 
 Er verzaehlt sich noch immer irgendwie bei den Zeilennummern, wenn man
-include verwendet. Ich denke aber, er meint die Zeile
+include verwendet (fixed in 3.2.8-dev.152). Ich denke aber, er meint die Zeile
 'ob = load_object(ob);'
 

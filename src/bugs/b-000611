@@ -1,0 +1,36 @@
+Short: dev.20x crashes on Hyperborea
+Date: 11.Jun 2000
+From: Kees Leune <C.J.Leune@kub.nl>
+Type: Bug
+State: New
+
+Analysis: Probably fixed 3.2-dev.213, together with b-000606
+
+Hi Lars,
+
+I've been looking at the cores of the crashes of today and yesterday. (11 in
+total)
+
+There is a very strong pattern that can be found:
+
+2000-06-10 16:10 stralloc.c:584 free_string
+2000-06-10 16:20 stralloc.c:584 free_string
+2000-06-10 16:30 stralloc.c:584 free_string
+2000-06-10 16:38 stralloc.c:584 free_string
+2000-06-10 16:42 stralloc.c:584 free_string
+2000-06-10 16:47 stralloc.c:584 free_string
+2000-06-10 20:16 closure.c:4339 free_closure
+2000-06-10 20:26 closure.c:4339 free_object
+2000-06-10 21:12 stralloc.c:484 free_string
+2000-06-11 04:48 interpret.c:919 free_svalue
+2000-06-11 20:50 gcollect.c:20:50 garbage_collection
+
+I have not analysed older files, but I think I roughly know what to expect. All
+the cores are saved in the directory ~hyperborea/backup/date,
+for example ~hyperborea/backup/2000-06-11_20:50/ contains the log files,
+the driver and the core of the latest crash.
+
+I'll try to get more information asap.
+
+-------------------------------------------------------------------------
+
