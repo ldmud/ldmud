@@ -4,9 +4,11 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-11-Oct-2005 (Lars Duening) -- upcoming Release 3.2.12
+19-Oct-2005 (Lars Duening) -- upcoming Release 3.2.12
 
     - Changed efuns:
+      + tls_check_certificate(): Return the low-level API results, and throw
+          an error if the connection is not secure.
 
     - Corrected efuns:
       + call_out(), input_to(): Local references are no longer
