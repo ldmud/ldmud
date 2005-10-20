@@ -2,7 +2,7 @@ Short: Improve set_auto_include_string()
 Date: Fri, 5 May 2000 22:22:03 +0200
 From: Freaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
 Type: Feature
-State: New
+State: Done - implemented in 3.2.9-dev.361
 
 Wie waere es, wenn man den auto-include-string so aendern koennte, dass
 man im Master eine Funktion aufruft, dort den Filenamen des zu

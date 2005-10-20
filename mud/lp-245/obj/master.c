@@ -19,6 +19,7 @@
 #include "/sys/wizlist.h"
 #include "/sys/driver_hook.h"
 #include "/sys/functionlist.h"
+#include "/sys/objectinfo.h"
 #include "/sys/erq.h"
 
 #define INIT_FILE "/room/init_file"
@@ -817,7 +818,7 @@ void move_or_destruct(object what, object to)
     if (!catch(what->move(to, 1)))
         return;
     */
-    
+
     /*
      * Failed to move the object. Therefore it is destroyed.
      */
@@ -975,29 +976,42 @@ void slow_shut_down (int minutes)
 //   fine, else the game is shut down by a call to this function.
 
 {
-    filter_array(users(), #'tell_object,
+    filter(users(), #'tell_object,
       "Game driver shouts: The memory is getting low !\n");
     "obj/shut"->shut(minutes);
 }
 
 //---------------------------------------------------------------------------
-void notify_shutdown ()
+varargs void notify_shutdown (string crash_reason)
 
-// Notify the master about an immediate shutdown.
+// Notify the master about an immediate shutdown. If <crash_reason> is 0,
+// it is a normal shutdown, otherwise it is a crash and <crash_reason>
+// gives a hint at the reason.
 //
-// If the gamedriver shuts down, this is the last function called before
-// the mud shuts down the udp connections and the accepting socket for new
-// players.
 // The function has the opportunity to perform any cleanup operation, like
 // informing the mudwho server that the mud is down. This can not be done
 // when remove_player() is called because the udp connectivity is already
 // gone then.
+//
+// If the gamedriver shuts down normally , this is the last function called
+// before the mud shuts down the udp connections and the accepting socket
+// for new players.
+//
+// If the gamedriver crashes, this is the last function called before the
+// mud attempts to dump core and exit. WARNING: Since the driver is in
+// an unstable state, this function may not be able to run to completion!
+// The following crash reasons are defined:
+//   "Fatal Error": an internal sanity check failed.
 
 {
     if (previous_object() && previous_object() != this_object())
         return;
-    filter_array(users(), #'tell_object,
-      "Game driver shouts: LPmud shutting down immediately.\n");
+    if (!crash_reason)
+        filter(users(), #'tell_object,
+          "Game driver shouts: LPmud shutting down immediately.\n");
+    else
+        filter(users(), #'tell_object,
+          "Game driver shouts: PANIC! "+ crash_reason+"!\n");
     save_wiz_file();
     mudwho_shutdown();
 }
@@ -1093,7 +1107,8 @@ mixed heart_beat_error (object culprit, string err,
 }
 
 //---------------------------------------------------------------------------
-void runtime_error (string err, string prg, string curobj, int line)
+void runtime_error ( string err, string prg, string curobj, int line
+                   , mixed culprit)
 
 // Announce a runtime error.
 //
@@ -1102,15 +1117,26 @@ void runtime_error (string err, string prg, string curobj, int line)
 //   prg    : The executed program.
 //   curobj : The object causing the error.
 //   line   : The line number where the error occured.
+//   culprit: -1 for runtime errors; the object holding the heart_beat()
+//            function for heartbeat errors.
 //
-// This function has to announce a runtime error to the active player.
-// If it is a wizard, it might give him the full error message together
-// with the source line; if it is a player, it should issue a decent
-// message ("Your sensitive mind notices a wrongness in the fabric of space")
-// and could also announce the error to the wizards online.
+// This function has to announce a runtime error to the active user,
+// resp. handle a runtime error which occured during the execution of
+// heart_beat() of <culprit>.
+//
+// For a normal runtime error, if the active user is a wizard, it might
+// give him the full error message together with the source line; if the
+// user is a is a player, it should issue a decent message ("Your sensitive
+// mind notices a wrongness in the fabric of space") and could also announce
+// the error to the wizards online.
+//
+// If the error is a heartbeat error, the heartbeat for the offending
+// <culprit> has been turned off. The function itself shouldn't do much, since
+// the lfun heart_beat_error() will be called right after this one.
 //
 // Note that <prg> denotes the program actually executed (which might be
-// inherited one) whereas <curobj> is just the offending object.
+// inherited) whereas <curobj> is just the offending object for which the
+// program was executed.
 
 {
   if (this_player() && query_ip_number(this_player()))
@@ -1167,9 +1193,10 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //                       is shadowed by a 'nomask'-type simul_efun.
 //   rename_object     : The current object <who> renames object <arg>
 //                       to name <arg2>.
-//   send_imp          : Send UDP-data to host <arg>.
+//   send_imp          : Send UDP-data to host arg3 (deprecated).
+//   send_udp          : Send UDP-data to host <arg>.
 //   set_auto_include_string : Set the string automatically included by
-//                       the compiler.
+//                       the compiler (deprecated).
 //   get_extra_wizinfo : Get the additional wiz-list info for wizard <arg>.
 //   set_extra_wizinfo : Set the additional wiz-list info for wizard <arg>.
 //   set_extra_wizinfo_size : Set the size of the additional wizard info
@@ -1240,6 +1267,8 @@ int query_allow_shadow (object victim)
 // This function simply asks the victim if it denies a shadow.
 
 {
+    if (object_info(victim, OINFO_MEMORY)[OIM_NO_SHADOW])
+        return 0;
     return !victim->query_prevent_shadow(previous_object());
 }
 
@@ -1376,7 +1405,7 @@ int valid_snoop (object snoopee, object snooper)
     if (!geteuid(previous_object()))
         return 0;
     */
-    if (file_name(previous_object()) == get_simul_efun())
+    if (object_name(previous_object()) == get_simul_efun())
         return 1;
 }
 
@@ -1461,47 +1490,47 @@ mixed valid_read  (string path, string euid, string fun, object caller)
     string user;
 
     switch ( fun ) {
-	case "restore_object": return 1;
-	case "ed_start":
-	    if ( previous_object() && previous_object() != this_player() )
-		return 0;
-	    if (!path) {
-		/* request for file with last error */
-		mixed *error;
+        case "restore_object": return 1;
+        case "ed_start":
+            if ( previous_object() && previous_object() != this_player() )
+                return 0;
+            if (!path) {
+                /* request for file with last error */
+                mixed *error;
 
-		error =
-		  get_error_file(({string})this_player()->query_real_name());
-		if (!error || error[3]) {
-		    write("No error.\n");
-		    return 0;
-		}
-		write(error[0][1..]+" line "+error[1]+": "+error[2]+"\n");
-		return error[0];
-	    }
-	    if (path[0] != '/')
-		path = "/"+path;
-	case "read_file":
-	case "read_bytes":
-	case "file_size":
-	case "get_dir":
-	case "do_rename":
-	    if (caller == this_object()) return 1;
-	case "tail":
-	case "print_file":
-	case "make_path_absolute": /* internal use, see below */
-	    set_this_object(caller);
-	    if( this_player() && query_ip_number(this_player()) ) {
-	        path = (string)this_player()->valid_read(path);
-	        if (!stringp(path)) {
-	            write("Bad file name.\n");
-	            return 0;
-	        }
-	        return path;
-	    }
-	    path = (string)"obj/player"->valid_read(path);
-	    if (stringp(path))
-	        return path;
-	    return 0;
+                error =
+                  get_error_file(({string})this_player()->query_real_name());
+                if (!error || error[3]) {
+                    write("No error.\n");
+                    return 0;
+                }
+                write(error[0][1..]+" line "+error[1]+": "+error[2]+"\n");
+                return ADD_SLASH(error[0]);
+            }
+            if (path[0] != '/')
+                path = "/"+path;
+        case "read_file":
+        case "read_bytes":
+        case "file_size":
+        case "get_dir":
+        case "do_rename":
+            if (caller == this_object()) return 1;
+        case "tail":
+        case "print_file":
+        case "make_path_absolute": /* internal use, see below */
+            set_this_object(caller);
+            if( this_player() && query_ip_number(this_player()) ) {
+                path = (string)this_player()->valid_read(path);
+                if (!stringp(path)) {
+                    write("Bad file name.\n");
+                    return 0;
+                }
+                return ADD_SLASH(path);
+            }
+            path = (string)"obj/player"->valid_read(path);
+            if (stringp(path))
+                return ADD_SLASH(path);
+            return 0;
     }
     /* if a case failed to return a value or the caller function wasn't
      * recognized, we come here.
@@ -1547,38 +1576,44 @@ mixed valid_write (string path, string euid, string fun, object caller)
 {
     string user;
 
+    if (path[0] == '/' && path != "/")
+        path = path[1..];
+
     switch ( fun ) {
     case "objdump":
-        if (path == "/OBJ_DUMP") return path;
+        if (path == "OBJ_DUMP") return path;
         return 0;
 
     case "opcdump":
-        if (path == "/OPC_DUMP") return path;
+        if (path == "OPC_DUMP") return path;
         return 0;
 
     case "save_object":
         if ( user = GETUID(previous_object()) ) {
-            if ( path[0 .. strlen(user)+8] == "/players/" + user
+            if ( path[0 .. strlen(user)+7] == "players/" + user
              &&  sscanf(path, ".%s", user) == 0)
-                return path;
+                return ADD_SLASH(path);
         } else {
-            user = file_name(previous_object());
+            user = efun::object_name(previous_object());
+#ifndef __COMPAT_MODE__
+            user = user[1..];
+#endif
             if ( user[0..3] == "obj/"
              ||  user[0..4] == "room/"
              ||  user[0..3] == "std/"  )
-                return path;
+                return ADD_SLASH(path);
         }
         return 0; /* deny access */
     default:
         return 0; /* deny access */
     case "write_file":
         if (caller == this_object()) return 1;
-        if (path[0..4] == "/log/"
-         && !(   sizeof(regexp(({path[5..34]}), "/"))
-              || path[5] == '.'
-              || strlen(path) > 35
-	    ) ) {
-            return path;
+        if (path[0..3] == "log/"
+         && !(   sizeof(regexp(({path[4..33]}), "/"))
+              || path[4] == '.'
+              || strlen(path) > 34
+            ) ) {
+            return ADD_SLASH(path);
         }
         break;
     case "ed_start":
@@ -1587,13 +1622,13 @@ mixed valid_write (string path, string euid, string fun, object caller)
         break;
     case "rename_from":
     case "rename_to":
-        if ((   file_name(caller) == SIMUL_EFUN_FILE
-             || file_name(caller) == SPARE_SIMUL_EFUN_FILE)
-         && path[0..4] == "/log/"
-         && !(   sizeof(regexp(({path[5..34]}), "/"))
-              || path[5] == '.'
-              || strlen(path) > 35
-	    ) ) {
+        if ((   efun::object_name(caller) == SIMUL_EFUN_FILE
+             || efun::object_name(caller) == SPARE_SIMUL_EFUN_FILE)
+         && path[0..3] == "log/"
+         && !(   sizeof(regexp(({path[4..33]}), "/"))
+              || path[4] == '.'
+              || strlen(path) > 34
+            ) ) {
             return 1;
         }
     case "mkdir":
@@ -1604,17 +1639,18 @@ mixed valid_write (string path, string euid, string fun, object caller)
     }
 
     set_this_object(caller);
-    if( this_player() && query_ip_number(this_player()) ) {
-	path = (string)this_player()->valid_write(path);
-	if (!stringp(path)) {
-	    write("Bad file name.\n");
-	    return 0;
-	}
-	return path;
+    if( this_player() && query_ip_number(this_player()) )
+    {
+        path = (string)this_player()->valid_write(path);
+        if (!stringp(path)) {
+            write("Bad file name.\n");
+            return 0;
+        }
+        return ADD_SLASH(path);
     }
     path = (string)"obj/player"->valid_write(path);
     if (stringp(path))
-	return path;
+        return ADD_SLASH(path);
 
     return 0;
 }
@@ -1934,7 +1970,7 @@ void save_wiz_file()
     write_file(
       "/WIZLIST",
       implode(
-        map_array(wizlist_info(),
+        map(wizlist_info(),
           lambda(({'a}),
             ({#'sprintf, "%s %d %d\n",
               ({#'[, 'a, WL_NAME}),
@@ -1958,8 +1994,8 @@ int verify_create_wizard (object ob)
 {
     int dummy;
 
-    if (sscanf(file_name(ob), "room/port_castle#%d", dummy) == 1
-      || sscanf(file_name(ob), "global/port_castle#%d", dummy) == 1)
+    if (sscanf(object_name(ob), "room/port_castle#%d", dummy) == 1
+      || sscanf(object_name(ob), "global/port_castle#%d", dummy) == 1)
 	return 1;
     return 0;
 }
@@ -2000,7 +2036,7 @@ string master_create_wizard(string owner, string domain, object caller)
 		    wizard + "\n");
 	mkdir(wizard);
     }
-    dest = file_name(environment(player));
+    dest = object_name(environment(player));
     def_castle = "#define NAME \"" + owner + "\"\n#define DEST \"" +
 	dest + "\"\n" + read_file("/room/def_castle.c");
     if (file_size(castle) > 0) {
@@ -2009,7 +2045,7 @@ string master_create_wizard(string owner, string domain, object caller)
 	/* The master object can do this ! */
 	if (write_file(castle, def_castle)) {
 	    tell_object(player, "You now have a castle: " + castle + "\n");
-	    if (!write_file("/room/init_file", extract(castle, 1) + "\n"))
+	    if (!write_file("/room/init_file", castle[1..] + "\n"))
 		tell_object(player, "It couldn't be loaded automatically!\n");
 	} else {
 	    tell_object(player, "Failed to make castle for you!\n");
@@ -2019,3 +2055,4 @@ string master_create_wizard(string owner, string domain, object caller)
 }
 
 /****************************************************************************/
+

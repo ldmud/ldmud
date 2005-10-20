@@ -420,7 +420,7 @@ find_function (char *name, program_t *prog)
         {
             return prog->function_names[i];
         }
-        
+
         if (o <= 1)
         {
             if (function_cmp(name, prog, i))
@@ -429,10 +429,119 @@ find_function (char *name, program_t *prog)
         }
         o = (o+1) >> 1;
     }
-    
+
     /* NOTREACHED */
     return -1;
 } /* find_function() */
+
+/*-------------------------------------------------------------------------*/
+Bool
+closure_eq (svalue_t * left, svalue_t * right)
+
+/* Compare the two closure svalues <left> and <right> and return TRUE if
+ * they refer to the same closure.
+ */
+
+{
+    int i;
+
+    /* Operator, Efun and Simul efun closures don't have a .u.lambda
+     * part.
+     */
+    i = left->x.generic == right->x.generic;
+
+    if (i
+     && (   left->x.closure_type >= 0
+         || right->x.closure_type >= 0)
+       )
+        i = left->u.lambda  == right->u.lambda;
+
+    /* Lfun- and identifier closure can be equal even if
+     * their pointers differ.
+     */
+    if (!i
+     && left->x.closure_type == right->x.closure_type
+     && (   left->x.closure_type == CLOSURE_LFUN
+         || left->x.closure_type == CLOSURE_ALIEN_LFUN
+         || left->x.closure_type == CLOSURE_IDENTIFIER
+        )
+     && left->u.lambda->ob == right->u.lambda->ob
+       )
+    {
+        if (left->x.closure_type == CLOSURE_ALIEN_LFUN)
+            i =    (   left->u.lambda->function.alien.ob
+                    == right->u.lambda->function.alien.ob)
+                && (   left->u.lambda->function.alien.index
+                    == right->u.lambda->function.alien.index);
+        else
+            i =    left->u.lambda->function.index
+                == right->u.lambda->function.index;
+    }
+
+    return (Bool)i;
+} /* closure_eq() */
+
+/*-------------------------------------------------------------------------*/
+int
+closure_cmp (svalue_t * left, svalue_t * right)
+
+/* Compare the two closure svalues <left> and <right> and return a value
+ * describing their relation:
+ *  -1: <left> is 'smaller' than <right>
+ *   0: the closures are equal
+ *   1: <left> is 'greater' than <right>
+ */
+
+{
+    if (closure_eq(left, right)) return 0;
+
+    /* First comparison criterium is the closure_type */
+    if (left->x.closure_type != right->x.closure_type)
+    {
+        return (left->x.closure_type < right->x.closure_type) ? -1 : 1;
+    }
+
+    /* The types are identical and determine the next comparison.
+     * For lfun/identifier closure, we compare the actual closure data,
+     * for other closures a comparison of the lambda pointer is sufficient.
+     */
+    if (left->x.closure_type == CLOSURE_LFUN
+     || left->x.closure_type == CLOSURE_ALIEN_LFUN
+     || left->x.closure_type == CLOSURE_IDENTIFIER
+       )
+    {
+        if (left->u.lambda->ob != right->u.lambda->ob)
+        {
+            return (left->u.lambda->ob < right->u.lambda->ob) ? -1 : 1;
+        }
+
+        if (left->x.closure_type == CLOSURE_ALIEN_LFUN)
+        {
+            if ( left->u.lambda->function.alien.ob
+              != right->u.lambda->function.alien.ob)
+            {
+                return (  left->u.lambda->function.alien.ob
+                        < right->u.lambda->function.alien.ob)
+                       ? -1 : 1;
+            }
+
+            /* This is the only field left, so it is guaranteed to differ */
+            return (  left->u.lambda->function.alien.index
+                    < right->u.lambda->function.alien.index)
+                   ? -1 : 1;
+        }
+        else
+        {
+            /* This is the only field left, so it is guaranteed to differ */
+            return (  left->u.lambda->function.index
+                    < right->u.lambda->function.index)
+                   ? -1 : 1;
+        }
+    }
+
+    /* Normal closure: compare the lambda pointers */
+    return (left->u.lambda < right->u.lambda) ? -1 : 1;
+} /* closure_cmp() */
 
 /*-------------------------------------------------------------------------*/
 Bool
@@ -460,7 +569,7 @@ lambda_ref_replace_program( lambda_t *l, int type
         if (r_ob->ob == current_object)
         {
             /* Replacement found: add the protector */
-            
+
             struct lambda_replace_program_protector *lrpp;
 
             l->ref++;
@@ -475,7 +584,7 @@ lambda_ref_replace_program( lambda_t *l, int type
                 lrpp->args = ref_array(args);
                 assign_svalue_no_free(&lrpp->block, block);
             }
-            
+
             return MY_TRUE;
         }
     } /* for() */
@@ -511,55 +620,82 @@ set_closure_user (svalue_t *svp, object_t *owner)
     	/* lambda closure under construction: rebind, but take care
     	 * of possible program replacement
     	 */
-    	 
+    	
         int ix;
         lambda_t *l;
         funflag_t flags;
         program_t *prog;
+        object_t *curobj = current_object;
 
         prog = owner->prog;
         l = svp->u.lambda;
         ix = l->function.index;
 
+        current_object = owner;
+          /* Needed by lambda_ref_replace_program().
+           * Will be restored from curobj below.
+           */
+
         /* If the program is scheduled for replacement (or has been replaced),
          * create the protector for the closure, otherwise mark the object
          * as referenced by a lambda.
          */
-        if ( !(prog->flags & P_REPLACE_ACTIVE)
-         ||  !lambda_ref_replace_program( l
-                                        , ix >= CLOSURE_IDENTIFIER_OFFS
-                                          ? CLOSURE_IDENTIFIER
-                                          : CLOSURE_LFUN
-                                        , 0, NULL, NULL)
+        type = CLOSURE_LFUN;
+
+        if ( !(prog->flags & P_REPLACE_ACTIVE) )
+        {
+            owner->flags |= O_LAMBDA_REFERENCED;
+        }
+        else if (!lambda_ref_replace_program( l
+                                            , ix >= CLOSURE_IDENTIFIER_OFFS
+                                              ? CLOSURE_IDENTIFIER
+                                              : CLOSURE_ALIEN_LFUN
+                                            , 0, NULL, NULL)
            )
         {
             owner->flags |= O_LAMBDA_REFERENCED;
         }
+        else
+        {
+            type = CLOSURE_ALIEN_LFUN;
+        }
+
+        current_object = curobj;
+
 
         /* Set the svp->x.closure_type to the type of the closure. */
-        
+
         if (ix >= CLOSURE_IDENTIFIER_OFFS)
         {
             /* Identifier closure */
             ix -= CLOSURE_IDENTIFIER_OFFS;
             svp->x.closure_type = CLOSURE_IDENTIFIER;
+
+            l->function.index = (unsigned short)ix;
         }
         else
         {
             /* lfun closure. Be careful to handle cross-defined lfuns
              * correctly.
              */
-             
+
             flags = prog->functions[ix];
             if (flags & NAME_CROSS_DEFINED)
             {
                 ix += CROSSDEF_NAME_OFFSET(flags);
             }
-            svp->x.closure_type = CLOSURE_LFUN;
-        }
+            svp->x.closure_type = type;
 
-        /* Update the closure index */
-        l->function.index = (unsigned short)ix;
+            if (type == CLOSURE_LFUN)
+            {
+                l->function.index = (unsigned short)ix;
+            }
+            else
+            {
+                l->function.alien.ob = ref_object(owner, "closure");
+                l->function.alien.index = (unsigned short)ix;
+            }
+        }
 
         /* (Re)Bind the closure */
         free_object(l->ob, "closure");
@@ -585,10 +721,10 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
 
     struct lambda_replace_program_protector *lrpp;
       /* Current protector */
-      
+
     struct lambda_replace_program_protector *next_lrpp;
       /* Next protector */
-      
+
     struct error_recovery_info error_recovery_info;
 
     /* Loop through the list of lambda protectors, adjusting
@@ -605,7 +741,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
         if ( !CLOSURE_HAS_CODE(lrpp->l.x.closure_type) )
         {
             /* Yup, it's an lfun or identifier */
-            
+
             if (lrpp->l.x.closure_type == CLOSURE_LFUN)
             {
                 lambda_t *l;
@@ -615,12 +751,15 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
                 l = lrpp->l.u.lambda;
                 i = l->function.index -= r_ob->fun_offset;
 
-                /* If the function vanished, replace it with a default */
+                /* If the function vanished, replace it with a default,
+                 * converting it into an alien-lfun closure
+                 */
                 if (i < 0 || i >= r_ob->new_prog->num_functions)
                 {
                     assert_master_ob_loaded();
                     free_object(l->ob, "replace_program_lambda_adjust");
-                    l->ob = ref_object(master_ob, "replace_program_lambda_adjust");
+                    l->ob = ref_object( master_ob
+                                      , "replace_program_lambda_adjust");
                     i = find_function( findstring("dangling_lfun_closure")
                                      , master_ob->prog);
                     l->function.index = (unsigned short)(i < 0 ? 0 : i);
@@ -646,7 +785,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
                                     , "replace_program_lambda_adjust");
                     i = find_function( findstring("dangling_lfun_closure")
                                      , master_ob->prog);
-                    l->function.index = (unsigned short)(i < 0 ? 0 :i);
+                    l->function.alien.index = (unsigned short)(i < 0 ? 0 :i);
                 }
             }
             else /* CLOSURE_IDENTIFIER */
@@ -698,7 +837,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
         free_array(lrpp->args);
         free_svalue(&lrpp->block);
         free_closure(&lrpp->l);
-        
+
         next_lrpp = lrpp->next;
         xfree(lrpp);
 
@@ -713,7 +852,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
 
 
     /* lrpp here is the next protector to handle, or NULL */
-    
+
     if (lrpp) do
     {
 
@@ -723,17 +862,17 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
             lambda_t *l, *l2;      /* Original and recompiled closure */
             svalue_t *svp, *svp2;  /* Pointer to the two closure's values */
             mp_int num_values, num_values2, code_size2;
-            
+
             current_lrpp = lrpp; /* in case an error occurs */
 
             /* Remember the original lambda, and also recompile it */
             l = lrpp->l.u.lambda;
             l2 = lambda(lrpp->args, &lrpp->block, l->ob);
-            
+
             svp = (svalue_t *)l;
             if ( (num_values = LAMBDA_NUM_VALUES(l->function.code)) == 0xff)
                 num_values = svp[-0x100].u.number;
-                
+
             svp2 = (svalue_t *)l2;
             if ( (num_values2 = LAMBDA_NUM_VALUES(l2->function.code)) == 0xff)
                 num_values2 = svp2[-0x100].u.number;
@@ -753,7 +892,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
                 lrpp->block.type = T_CLOSURE;
                 lrpp->block.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
                 lrpp->block.u.lambda = l2;
-                
+
                 error("Cannot adjust lambda closure after replace_program(), "
                       "object %s\n", r_ob->ob->name);
             }
@@ -777,12 +916,12 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
         free_closure(&lrpp->l);
         next_lrpp = lrpp->next;
         xfree(lrpp);
-        
+
     } while ( NULL != (lrpp = next_lrpp) );
 
     /* Restore the old error recovery info */
     rt_context = error_recovery_info.rt.last;
-    
+
 } /* replace_lambda_program_adjust() */
 
 /*-------------------------------------------------------------------------*/
@@ -805,7 +944,7 @@ closure_literal (svalue_t *dest, int ix)
     lambda_t *l;
     funflag_t flags;
     program_t *prog;
-
+    int lfun_type = CLOSURE_LFUN;
 
     /* Allocate an initialise a new lambda structure */
     l = xalloc(sizeof *l);
@@ -825,14 +964,22 @@ closure_literal (svalue_t *dest, int ix)
      * in lambda protector, otherwise mark the object as referenced by
      * a closure.
      */
-    if ( !(prog->flags & P_REPLACE_ACTIVE)
-     ||  !lambda_ref_replace_program( l
-                                    , ix >= CLOSURE_IDENTIFIER_OFFS
-                                      ? CLOSURE_IDENTIFIER : CLOSURE_LFUN
-                                    , 0, NULL, NULL)
+    if ( !(prog->flags & P_REPLACE_ACTIVE) )
+    {
+        current_object->flags |= O_LAMBDA_REFERENCED;
+    }
+    else if (!lambda_ref_replace_program( l
+                                        , ix >= CLOSURE_IDENTIFIER_OFFS
+                                          ? CLOSURE_IDENTIFIER
+                                          : CLOSURE_ALIEN_LFUN
+                                        , 0, NULL, NULL)
        )
     {
         current_object->flags |= O_LAMBDA_REFERENCED;
+    }
+    else
+    {
+        lfun_type = CLOSURE_ALIEN_LFUN;
     }
 
     /* Set ix to the proper index, and dest->x.closure_type to the
@@ -847,6 +994,7 @@ closure_literal (svalue_t *dest, int ix)
                * have been inherited.
                */
         dest->x.closure_type = CLOSURE_IDENTIFIER;
+        l->function.index = (unsigned short)ix;
     }
     else /* lfun closure */
     {
@@ -856,13 +1004,22 @@ closure_literal (svalue_t *dest, int ix)
         {
             ix += CROSSDEF_NAME_OFFSET(flags);
         }
-        dest->x.closure_type = CLOSURE_LFUN;
+        dest->x.closure_type = lfun_type;
+
+        if (lfun_type == CLOSURE_LFUN)
+        {
+            l->function.index = (unsigned short)ix;
+        }
+        else
+        {
+            l->function.alien.ob = ref_object(current_object, "closure");
+            l->function.alien.index = (unsigned short)ix;
+        }
     }
 
     /* Fill in the rest of the lambda and of the result svalue */
     l->ob = ref_object(current_object, "closure");
-    l->function.index = (unsigned short)ix;
-    
+
     dest->type = T_CLOSURE;
     dest->u.lambda = l;
 } /* closure_literal() */
@@ -883,12 +1040,12 @@ realloc_values (void)
     svalue_t *new_values;
 
     new_max = current.value_max * 2;
-    
+
     new_values = xalloc(new_max * sizeof(*new_values));
     if (!new_values)
         lambda_error("Out of memory (%lu bytes) for %ld new values\n"
                     , new_max, new_max * sizeof(*new_values));
-        
+
     current.values_left += current.value_max;
     memcpy( (current.valuep = new_values + current.value_max)
           , current.values
@@ -915,12 +1072,12 @@ realloc_code (void)
     ptrdiff_t curr_offset;
 
     curr_offset = current.codep - current.code;
-    
+
     new_max = current.code_max * 2;
     new_code = rexalloc(current.code, (size_t)new_max);
     if (!new_code)
         lambda_error("Out of memory (%ld bytes) for new code\n", new_max);
-        
+
     current.code_left += current.code_max;
     current.code_max = new_max;
     current.code = new_code;
@@ -1039,7 +1196,7 @@ free_symbols (void)
 /* Free the symbols in the current workarea, and also the memory allocated
  * for the case blocks.
  */
- 
+
 {
     p_int i;
     symbol_t **symp, *sym, *next;
@@ -1054,7 +1211,7 @@ free_symbols (void)
             xfree(sym);
         }
     } while (i -= sizeof sym);
-    
+
     xfree(current.symbols);
 
     /* Clean up the memory for the case blocks */
@@ -1121,7 +1278,7 @@ make_symbol (char *name)
     	/* Yup. Double the size of the hashtable and re-hash all
     	 * existing entries.
     	 */
-    	 
+    	
         symbol_t **newtab, *sym2;
         p_int i;
 
@@ -1168,7 +1325,7 @@ make_symbol (char *name)
         /* Put the new table in place of the old one */
         xfree(current.symbols);
         current.symbols = newtab;
-        
+
         sym = sym2; /* Restore the pointer to the new entry */
     }
 
@@ -1217,7 +1374,7 @@ insert_value_push (svalue_t *value)
         STORE_CODE(current.codep, F_LAMBDA_CONSTANT);
         STORE_SHORT(current.codep, offset);
     }
-    
+
     if (--current.values_left < 0)
         realloc_values();
 
@@ -1264,15 +1421,15 @@ compile_value (svalue_t *value, int opt_flags)
         {
             lambda_error("Missing function\n");
         }
-        
+
         if ( (type = argp->x.closure_type) < (ph_int)CLOSURE_SIMUL_EFUN)
         {
             /* Most common case: closure is an efun or an operator */
-            
+
             if (type < (ph_int)CLOSURE_EFUN)
             {
                 /* Closure is an operator */
-                
+
                 mp_int block_size;  /* Number of entries */
 
                 block_size = (mp_int)VEC_SIZE(block);
@@ -1281,7 +1438,7 @@ compile_value (svalue_t *value, int opt_flags)
                 default:
                     lambda_error("Unimplemented operator %s for lambda()\n",
                       instrs[type - CLOSURE_OPERATOR].name);
-                      
+
                 /* ({ #'||, arg1, ...,  argn })
                  * ({ #'&&, arg1, ...,  argn })
                  */
@@ -1530,7 +1687,7 @@ compile_value (svalue_t *value, int opt_flags)
                      * or if no result is required - they are explained
                      * below.
                      */
-                     
+
                     mp_int *branchp;
                       /* Table storing two values for every argument pair: the
                        * position after the cond-part and the position after
@@ -1567,7 +1724,7 @@ compile_value (svalue_t *value, int opt_flags)
                     	/* Ignore the default-part by hiding it */
                         block_size--;
                     }
-                    
+
                     /* Generate the code for the (cond, cond-part) pairs,
                      * and add the necessary branch instructions.
                      * Also store the positions of the inserted code
@@ -1616,7 +1773,7 @@ compile_value (svalue_t *value, int opt_flags)
                          */
                         offset =
                           current.code_max - current.code_left - last_branch;
-                          
+
                         /* Make sure that the offset won't overflow
                          * when incremented later during backpatching.
                          */
@@ -1637,7 +1794,7 @@ compile_value (svalue_t *value, int opt_flags)
                                 p--;
                                 p[1] = *p;
                             } while (--j);
-                            
+
                             current.code_left--;
                             if (current.code[last_branch] == F_BRANCH_WHEN_ZERO)
                                 PUT_CODE(current.code+last_branch
@@ -1681,7 +1838,7 @@ compile_value (svalue_t *value, int opt_flags)
                     	 * want a result or accepts a zero when we don't
                     	 * have one.
                     	 */
-                    	 
+                    	
                         mp_int offset;  /* corrective offset for the branch after
                                          * the last cond
                                          */
@@ -1742,7 +1899,7 @@ compile_value (svalue_t *value, int opt_flags)
                         }
 
                         /* Now rewrite the BRANCH_ZERO ln according to offset */
-                        
+
                         start = *--branchp;
                         code = GET_CODE(current.code+start);
                         if (code == F_LBRANCH_WHEN_ZERO
@@ -1770,7 +1927,7 @@ compile_value (svalue_t *value, int opt_flags)
                     	/* We may or may not have a default part, but
                     	 * the caller expects a result.
                     	 */
-                    	 
+                    	
                         /* the following assignment is only valid if
                          *
                          *   ( !all_void && i "no default" &&
@@ -1800,7 +1957,7 @@ compile_value (svalue_t *value, int opt_flags)
                          * after the <default>.
                          */
                         non_void_dest = current.code_max - current.code_left;
-                        
+
                         if (opt_used & VOID_GIVEN)
                         {
                             /* Whoops, <default> didn't return a result.
@@ -1854,7 +2011,7 @@ compile_value (svalue_t *value, int opt_flags)
                             	 * by 'CONST0; BRANCH end'.
                             	 */
                                 bytecode_p p;
-                                
+
                             	/* Make space for the CONST0 */
                                 current.code_left--;
                                 start = branchp[-2];
@@ -1939,7 +2096,7 @@ compile_value (svalue_t *value, int opt_flags)
                         offset = (GET_UINT8(current.code+start+1) & VOID_GIVEN)
                                  ? void_dest - start - 2
                                  : non_void_dest - start - 2;
-                                 
+
                         if (offset <= 0xff)
                         {
                             /* A short branch is sufficient. */
@@ -1975,7 +2132,7 @@ compile_value (svalue_t *value, int opt_flags)
                              */
                             p = current.code + end;
                             q = p + growth;
-                            
+
                             branchp += 2; /* have to reconsider this one */
                             do {
                             	unsigned short dist;
@@ -2009,7 +2166,7 @@ compile_value (svalue_t *value, int opt_flags)
                                 end++;
                                 void_dest++;
                                 non_void_dest++;
-                                
+
                                 if (offset > 0x7fff)
                                     UNIMPLEMENTED
 
@@ -2065,7 +2222,7 @@ compile_value (svalue_t *value, int opt_flags)
                      *
                      * If no expression is given, 'CONST0' is compiled.
                      */
-                     
+
                     mp_int i;
                     int void_given;
 
@@ -2111,7 +2268,7 @@ compile_value (svalue_t *value, int opt_flags)
                      * If the caller doesn't require a result, the last
                      * ASSIGN is compiled as VOID_ASSIGN.
                      */
-                     
+
                     mp_int i;
 
                     /* There must be at least one assignment in order to get
@@ -2160,13 +2317,13 @@ compile_value (svalue_t *value, int opt_flags)
                      *   <lvalue>
                      *   (PRE_)INC
                      */
-                     
+
                     if (block_size != 3)
                         lambda_error(
                           "Bad number of arguments to #'%s\n",
                           instrs[type - CLOSURE_OPERATOR].name
                         );
-                        
+
                     if (argp[2].type == T_NUMBER && argp[2].u.number == 1)
                     {
                         compile_lvalue(argp+1, USE_INDEX_LVALUE);
@@ -2208,13 +2365,13 @@ compile_value (svalue_t *value, int opt_flags)
                      *   <lvalue>
                      *   (PRE_)DEC
                      */
-                     
+
                     if (block_size != 3)
                         lambda_error(
                           "Bad number of arguments to #'%s\n",
                           instrs[type - CLOSURE_OPERATOR].name
                         );
-                        
+
                     if (argp[2].type == T_NUMBER && argp[2].u.number == 1)
                     {
                         compile_lvalue(argp+1, USE_INDEX_LVALUE);
@@ -2237,7 +2394,7 @@ compile_value (svalue_t *value, int opt_flags)
                     break;
 
                 /* ({#'op=, <lvalue>, <expr> })
-                 * with op: *, &, |, ^, <<, >>, /, %
+                 * with op: *, &, |, ^, <<, >>, >>>, /, %, &&, ||
                  */
                 case F_MULT_EQ:
                 case F_AND_EQ:
@@ -2245,6 +2402,7 @@ compile_value (svalue_t *value, int opt_flags)
                 case F_XOR_EQ:
                 case F_LSH_EQ:
                 case F_RSH_EQ:
+                case F_RSHL_EQ:
                 case F_DIV_EQ:
                 case F_MOD_EQ:
                     /* This is compiled as:
@@ -2253,7 +2411,7 @@ compile_value (svalue_t *value, int opt_flags)
                      *   <lvalue>
                      *   <op>_EQ
                      */
-                     
+
                     if (block_size != 3)
                     {
                         lambda_error(
@@ -2263,8 +2421,126 @@ compile_value (svalue_t *value, int opt_flags)
                     }
                     compile_value(argp+2, REF_REJECTED);
                     compile_lvalue(argp+1, USE_INDEX_LVALUE);
-                    STORE_CODE(current.codep, (bytecode_t)type);
+                    STORE_CODE(current.codep, (bytecode_t)(type - CLOSURE_OPERATOR));
                     break;
+
+                /* ({#'op=, <lvalue>, <expr> })
+                 * with op: &&, ||
+                 */
+                case F_LAND_EQ:
+                case F_LOR_EQ:
+                  {
+                    /* This is compiled as:
+                     *
+                     *      <lvalue>
+                     *      LDUP
+                     *      <op> l
+                     *      <expr>
+                     *   l: SWAP_VALUES
+                     *      ASSIGN
+                     *
+                     * respectively for long branches:
+                     *
+                     *      <lvalue>
+                     *      LDUP
+                     *      DUP
+                     *      LBRANCH l
+                     *      POP
+                     *      <expr>
+                     *   l: SWAP_VALUES
+                     *      ASSIGN
+                     */
+
+                    mp_int branchp;
+                      /* The position of the branch/operator instruction.
+                       */
+                    int code;        /* Compiled instruction */
+                    Bool is_and;     /* TRUE if the operator is F_LAND_EQ */
+                    mp_int end;      /* The branch target */
+                    mp_int offset;   /* The branch offset */
+
+                    if (type - CLOSURE_OPERATOR == F_LAND_EQ)
+                    {
+                        code = F_LAND;
+                        is_and = MY_TRUE;
+                    }
+                    else
+                    {
+                        code = F_LOR;
+                        is_and = MY_FALSE;
+                    }
+
+                    if (block_size != 3)
+                    {
+                        lambda_error(
+                          "Bad number of arguments to #'%s\n",
+                          instrs[type - CLOSURE_OPERATOR].name
+                        );
+                    }
+
+                    compile_lvalue(argp+1, USE_INDEX_LVALUE);
+                    current.code_left++; /* Don't need that extra byte */
+
+                    if (current.code_left < 3)
+                        realloc_code();
+
+                    current.code_left--;
+                    STORE_CODE(current.codep, (bytecode_t)F_LDUP);
+
+                    branchp = current.code_max - current.code_left;
+                    current.code_left -= 2;
+                    STORE_CODE(current.codep, (bytecode_t)code);
+                    STORE_CODE(current.codep, (bytecode_t)0);
+
+                    compile_value(argp+2, REF_REJECTED);
+
+                    /* Store the correct offsets for the operator/branch
+                     * instruction. If necessary, the short branch is
+                     * converted into long ones.
+                     */
+                    end = current.code_max - current.code_left;
+                      /* The target to jump to */
+                    offset = end - branchp - 2;
+                    if (offset <= 0xff)
+                    {
+                        PUT_UINT8(current.code+branchp+1, (unsigned char)offset);
+                    }
+                    else
+                    {
+                        /* We exceeded the limit of the short offsets.
+                         * Extend the offset into long branch.
+                         */
+
+                        mp_int i;
+                        bytecode_p p;
+
+                        code = is_and ? F_LBRANCH_WHEN_ZERO
+                                      : F_LBRANCH_WHEN_NON_ZERO;
+
+                        /* Prepare the copying of the code */
+                        if (current.code_left < 3)
+                            realloc_code();
+                        current.code_left -= 3;
+                        current.codep += 3;
+                        p = current.code + end + 2;
+                        for (i = offset; --i >= 0; --p )
+                            *p = p[-3];
+                        p[-4] = F_DUP;
+                        p[-3] = code;
+                        offset += 3;
+                        PUT_SHORT((p-2), offset);
+                        if (offset > 0x7fff)
+                            UNIMPLEMENTED;
+                        p[0]  = F_POP_VALUE;
+                    }
+
+                    if (current.code_left < 2)
+                        realloc_code();
+                    current.code_left -= 2;
+                    STORE_CODE(current.codep, (bytecode_t)F_SWAP_VALUES);
+                    STORE_CODE(current.codep, (bytecode_t)F_ASSIGN);
+                    break;
+                  }
 
                 /* ({#'++, <lvalue> })
                  * ({#'--, <lvalue> })
@@ -2276,7 +2552,7 @@ compile_value (svalue_t *value, int opt_flags)
                      *   <lvalue>        <lvalue>
                      *   (POST_)INC      (POST_)DEC
                      */
-                     
+
                     if (block_size != 2)
                     {
                         lambda_error(
@@ -2324,7 +2600,7 @@ compile_value (svalue_t *value, int opt_flags)
                      * returns a result in reversed logic, the branch condition
                      * is reversed.
                      */
-                     
+
                     mp_int i;
                     int    void_given;
                     mp_int offset;      /* Position of first <body> */
@@ -2332,7 +2608,7 @@ compile_value (svalue_t *value, int opt_flags)
                     i = block_size - 3;
                     if (i < 0)
                         lambda_error("Missing argument(s) to #'do\n");
-                        
+
                     offset = current.code_left - current.code_max;
 
                     /* Compile all the bodys */
@@ -2352,7 +2628,7 @@ compile_value (svalue_t *value, int opt_flags)
                     /* Compile the condition */
                     void_given = compile_value(++argp, NEGATE_ACCEPTED);
                     offset += current.code_max - current.code_left + 1;
-                    
+
                     if (current.code_left < 3)
                         realloc_code();
                     if (offset > 0xff)
@@ -2381,7 +2657,7 @@ compile_value (svalue_t *value, int opt_flags)
                     opt_flags = compile_value(++argp, opt_flags);
                     break;
                   }
-                  
+
                 /* ({#'while, <cond>, <result>, <body1>, ... <bodyn> })
                  */
                 case F_BBRANCH_WHEN_ZERO:
@@ -2407,7 +2683,7 @@ compile_value (svalue_t *value, int opt_flags)
                      * returns a result in reversed logic, the branch condition
                      * is reversed.
                      */
-                     
+
                     mp_int i;
                     int    void_given;
                     mp_int start_branch;
@@ -2480,7 +2756,7 @@ compile_value (svalue_t *value, int opt_flags)
                     /* Compile the condition and generate the branch */
                     argp = block->item;
                     void_given = compile_value(++argp, NEGATE_ACCEPTED);
-                    
+
                     if (current.code_left < 3)
                         realloc_code();
 
@@ -2546,7 +2822,7 @@ compile_value (svalue_t *value, int opt_flags)
                      * If the caller doesn't require a result, the final CONST0
                      * is omitted.
                      */
-                     
+
                     mp_int i;
                     int    void_given;
                     mp_int start;
@@ -2580,7 +2856,7 @@ compile_value (svalue_t *value, int opt_flags)
 
                         break;
                     }
-                    
+
                     /* Create the code to push the variable lvalues
                      */
                     if ((++argp)->type != T_POINTER)
@@ -2623,7 +2899,7 @@ compile_value (svalue_t *value, int opt_flags)
                     STORE_UINT8(current.codep, vars_given+1);
                     STORE_SHORT(current.codep, 0);
                     start = current.code_max - current.code_left;
-                    
+
                     /* Compile all bodies.
                      */
                     for (i = body_count; i > 0; i--)
@@ -2665,26 +2941,35 @@ compile_value (svalue_t *value, int opt_flags)
                   }
 
                 /* ({#'catch, <body> })
+                 * ({#'catch, <body>, 'nolog })
                  */
                 case F_CATCH:
                   {
                     /* This is compiled as:
                      *
-                     *      CATCH l
+                     *      CATCH l / CATCH_NO_LOG l
                      *      <body>
                      *   l: END_CATCH
                      */
-                     
+
                     mp_int start, offset;
                     int void_given;
 
-                    if (block_size != 2)
+                    if (block_size != 2 && block_size != 3)
                         lambda_error("Wrong number of arguments to #'catch\n");
-                        
+
                     if (current.code_left < 2)
                         realloc_code();
                     current.code_left -= 2;
-                    STORE_CODE(current.codep, F_CATCH);
+
+                    if (block_size == 2)
+                        STORE_CODE(current.codep, F_CATCH);
+                    else if (argp[2].type != T_SYMBOL
+                     || strcmp(argp[2].u.string, "nolog"))
+                        lambda_error("Expected 'nolog as second argument.\n");
+                    else
+                        STORE_CODE(current.codep, F_CATCH_NO_LOG);
+
                     STORE_UINT8(current.codep, 0);
                     start = current.code_max - current.code_left;
 
@@ -2717,10 +3002,10 @@ compile_value (svalue_t *value, int opt_flags)
                      * If the caller accepts reversed logic, the NOT is
                      * omitted and the fact is stored in opt_flags:NEGATE_GIVEN.
                      */
-                     
+
                     if (block_size != 2)
                         lambda_error("Wrong number of arguments to #'!\n");
-                        
+
                     opt_flags |= compile_value(++argp, opt_flags & ~ZERO_ACCEPTED);
                     if (opt_flags & (NEGATE_ACCEPTED|VOID_GIVEN) )
                     {
@@ -2796,24 +3081,24 @@ compile_value (svalue_t *value, int opt_flags)
                      *   <lvalueN>
                      *   SSCANF N+2
                      */
-                     
+
                     int lvalues;
 
                     if ( (lvalues = block_size - 3) < 0)
                         lambda_error("Missing argument(s) to #'sscanf\n");
-                        
+
                     if (lvalues > 0xff - 2)
                         lambda_error("Too many arguments to #'sscanf\n");
-                        
+
                     compile_value(++argp, 0);
                     compile_value(++argp, 0);
-                    
+
                     while (--lvalues >= 0)
                     {
                         compile_lvalue(++argp, PROTECT_LVALUE|USE_INDEX_LVALUE);
                         current.code_left++;
                     }
-                    
+
                     if (current.code_left < 2)
                         realloc_code();
                     current.code_left -= 2;
@@ -2838,25 +3123,25 @@ compile_value (svalue_t *value, int opt_flags)
                      *   <lvalueN>
                      *   SSCANF N+2
                      */
-                     
+
                     int lvalues;
 
                     if ( (lvalues = block_size - 3) < 0)
                         lambda_error("Missing argument(s) to #'sscanf\n");
-                        
+
                     if (lvalues > 0xff - 2)
                         lambda_error("Too many arguments to #'sscanf\n");
-                        
+
                     compile_value(++argp, 0);
                     compile_value(++argp, 0);
                     compile_value(++argp, 0);
-                    
+
                     while (--lvalues >= 0)
                     {
                         compile_lvalue(++argp, PROTECT_LVALUE|USE_INDEX_LVALUE);
                         current.code_left++;
                     }
-                    
+
                     if (current.code_left < 2)
                         realloc_code();
                     current.code_left -= 2;
@@ -2866,7 +3151,7 @@ compile_value (svalue_t *value, int opt_flags)
                     break;
                   }
 #endif
-                  
+
                 /* ({#'({, <expr1>, ..., <exprN> })
                  */
                 case F_AGGREGATE:
@@ -2922,7 +3207,7 @@ compile_value (svalue_t *value, int opt_flags)
 
                         if ( (++argp)->type != T_POINTER )
                             lambda_error("Bad argument to #'([\n");
-                            
+
                         element = argp->u.vec->item;
 
                         /* The first array determines the width */
@@ -2936,16 +3221,16 @@ compile_value (svalue_t *value, int opt_flags)
                                   "#'([ : Inconsistent value count.\n");
                             num_values = j;
                         }
-                        
+
                         while (--j >= 0)
                         {
                             compile_value(element++, REF_REJECTED);
                         }
                     }
-                    
+
                     if (current.code_left < 5)
                         realloc_code();
-                        
+
                     num_values--; /* one item of each subarray is the key */
                     if ( (num_keys | num_values) & ~0xff)
                     {
@@ -2976,7 +3261,7 @@ compile_value (svalue_t *value, int opt_flags)
                      *   <expr>    or    RETURN0
                      *   RETURN
                      */
-                     
+
                     if (block_size != 2)
                     {
                         if (block_size > 1)
@@ -2988,7 +3273,7 @@ compile_value (svalue_t *value, int opt_flags)
                         opt_flags =
                           compile_value(++argp, ZERO_ACCEPTED|REF_REJECTED);
                     }
-                    
+
                     if (current.code_left < 1)
                         realloc_code();
                     current.code_left--;
@@ -3019,11 +3304,11 @@ compile_value (svalue_t *value, int opt_flags)
                     Bool is_rindex;
 
                     is_rindex = ((type - CLOSURE_OPERATOR) == F_RX_RANGE);
-                    
+
                     if (block_size != 3)
                         lambda_error("Bad number of arguments to %s\n"
                                     , is_rindex ? "#'[<.." : "#'[..");
-                        
+
                     compile_value(++argp, REF_REJECTED);
 
                     /* A numeric index can be compiled directly */
@@ -3033,7 +3318,7 @@ compile_value (svalue_t *value, int opt_flags)
                     {
                         compile_value(argp, REF_REJECTED);
                     }
-                    
+
                     if (current.code_left < 2)
                         realloc_code();
                     current.code_left -= 2;
@@ -3068,7 +3353,7 @@ compile_value (svalue_t *value, int opt_flags)
                      * See interpret.c for a detailed description of the SWITCH
                      * instruction.
                      */
-                     
+
                     mp_int num_blocks;        /* Number different cases */
                     mp_int i;
                     mp_int switch_pc;         /* Position of the SWITCH+1. */
@@ -3116,13 +3401,13 @@ compile_value (svalue_t *value, int opt_flags)
                     }
 
                     /* Let's begin */
-                    
+
                     num_blocks = (block_size) / 3;
                     if (block_size != 2 + num_blocks * 3)
                         lambda_error("Bad number of arguments to #'switch\n");
-                    
+
                     compile_value(++argp, REF_REJECTED);
-                    
+
                     if (current.code_left < 3)
                         realloc_code();
                     current.code_left -= 3;
@@ -3131,10 +3416,10 @@ compile_value (svalue_t *value, int opt_flags)
 
                     /* Save position and prepare to compile the switch() */
                     switch_pc = current.code_max - current.code_left - 2;
-                    
+
                     if (++current.break_stack > current.max_break_stack)
                         current.max_break_stack = current.break_stack;
-                        
+
                     save_free_block = case_state.free_block;
                     save_next_free  = case_state.next_free;
                     save_list0 = case_state.list0;
@@ -3152,7 +3437,7 @@ compile_value (svalue_t *value, int opt_flags)
                         int opt_used;
 
                         /* Compile the case labels */
-                        
+
                         ++argp;
                         if (argp->type == T_POINTER) {
                             labels = argp->u.vec->item;
@@ -3161,7 +3446,7 @@ compile_value (svalue_t *value, int opt_flags)
                             labels = argp;
                             j = 1;
                         }
-                        
+
                         for (; j--; labels++)
                         {
 #if defined(__linux__) && defined(__GNUC__)
@@ -3190,7 +3475,7 @@ compile_value (svalue_t *value, int opt_flags)
                                       "case label range lacks end\n"
                                     );
                                 }
-                                
+
                                 if (labels[0].type != T_NUMBER
                                  || labels[2].type != T_NUMBER )
                                 {
@@ -3198,23 +3483,23 @@ compile_value (svalue_t *value, int opt_flags)
                                       "case label range must be numeric\n"
                                     );
                                 }
-                                
+
                                 if (!no_string)
                                     lambda_error(
                                       "mixed case label lists not supported\n"
                                     );
-                                    
+
                                 some_numeric = MY_TRUE;
                                 l->key = labels->u.number;
 
                                 /* Get the upper end of the range */
-                                
+
                                 j -= 2;
                                 labels += 2;
                                 if (labels[-2].u.number == labels->u.number)
                                     continue;
                                     /* Single entry sufficient */
-                                    
+
                                 if (labels[-2].u.number > labels->u.number)
                                 {
                                     /* <low> > <high>: invalid case */
@@ -3243,7 +3528,7 @@ compile_value (svalue_t *value, int opt_flags)
                                     lambda_error(
                                       "mixed case label lists not supported\n"
                                     );
-                                    
+
                                 if (--current.values_left < 0)
                                     realloc_values();
                                 no_string = MY_FALSE;
@@ -3311,7 +3596,7 @@ compile_value (svalue_t *value, int opt_flags)
                         );
 
                         /* Check and compile the delimiter #', or #'break */
-                        
+
                         if ((++argp)->type != T_CLOSURE
                          || (   argp->x.closure_type !=
                                   F_BREAK+CLOSURE_OPERATOR
@@ -3320,7 +3605,7 @@ compile_value (svalue_t *value, int opt_flags)
                         {
                             lambda_error("Bad delimiter in #'switch\n");
                         }
-                        
+
                         if ( !(opt_used & VOID_GIVEN) )
                         {
                             if (current.code_left < 1)
@@ -3362,7 +3647,7 @@ compile_value (svalue_t *value, int opt_flags)
                     case_state.list1 = save_list1;
                     current.break_stack--;
                     break;
-                    
+
 #                   undef REUSE_LIST_ENTRY
                   }
                 } /* switch(type - CLOSURE_OPERATOR) */
@@ -3378,7 +3663,7 @@ compile_value (svalue_t *value, int opt_flags)
             	 *   <argN>
             	 *   <efun>
             	 */
-            	 
+            	
                 mp_int i;
                 bytecode_p p;
                 int f;
@@ -3393,7 +3678,7 @@ compile_value (svalue_t *value, int opt_flags)
                 {
                     compile_value(++argp, 0);
                 }
-                
+
                 /* Get the instruction and check if it received the
                  * correct number of arguments.
                  */
@@ -3408,7 +3693,7 @@ compile_value (svalue_t *value, int opt_flags)
                 if (num_arg < min)
                 {
                     /* Not enough arguments... probably */
-                    
+
                     int g;
 
                     if (num_arg == min-1 && 0 != (def = instrs[f].Default))
@@ -3497,13 +3782,13 @@ compile_value (svalue_t *value, int opt_flags)
              *    <argN>                    <argN>
              *    SIMUL_EFUN <sefun> N+2    CALL_OTHER N+2
              */
-             
+
             int simul_efun;
             mp_int num_arg;
             int i;
 
             simul_efun = type - CLOSURE_SIMUL_EFUN;
-            
+
             if (simul_efun > 0xff)
             {
             	/* We have to call the sefun by name */
@@ -3517,7 +3802,7 @@ compile_value (svalue_t *value, int opt_flags)
             }
 
             /* Compile the arguments */
-            
+
             num_arg = (mp_int)VEC_SIZE(block) - 1;
             for (i = num_arg; --i >= 0; )
             {
@@ -3525,10 +3810,10 @@ compile_value (svalue_t *value, int opt_flags)
             }
 
             /* and the simul-efun instruction */
-            
+
             if (current.code_left < 3)
                 realloc_code();
-                
+
             if (simul_efun > 0xff)
             {
             	/* We need the call_other */
@@ -3543,18 +3828,25 @@ compile_value (svalue_t *value, int opt_flags)
             	/* We can call by index */
             	
                 function_t *funp;
+                Bool bVarargs = MY_FALSE;
 
                 funp = &simul_efunp[simul_efun];
-                if (num_arg > funp->num_arg)
-                    lambda_error(
-                      "Too many arguments to simul_efun %s\n", funp->name
-                    );
-                    
-                if (funp->num_arg != 0xff)
+                if (funp->num_arg == SIMUL_EFUN_VARARGS
+                 || (funp->flags & TYPE_MOD_XVARARGS)
+                   )
+                    bVarargs = MY_TRUE;
+
+                if (!bVarargs)
                 {
                     /* The function takes fixed number of args:
                      * push 0s onto the stack for missing args
                      */
+
+                    if (num_arg > funp->num_arg)
+                        lambda_error(
+                          "Too many arguments to simul_efun %s\n", funp->name
+                        );
+
                     i = funp->num_arg - num_arg;
                     if (i > 1 && current.code_left < i + 2)
                         realloc_code();
@@ -3563,12 +3855,12 @@ compile_value (svalue_t *value, int opt_flags)
                         STORE_CODE(current.codep, F_CONST0);
                     }
                 }
-                
+
                 STORE_CODE(current.codep, F_SIMUL_EFUN);
                 STORE_UINT8(current.codep, (bytecode_t)simul_efun);
 
                 /* For a varargs sefun, add the number of arguments */
-                if (funp->num_arg == 0xff)
+                if (bVarargs)
                 {
                     STORE_UINT8(current.codep, (bytecode_t)num_arg);
                     current.code_left -= 3;
@@ -3595,21 +3887,21 @@ compile_value (svalue_t *value, int opt_flags)
              *   <argN>
              *   FUNCALL N+1
              */
-             
+
             mp_int i;
             lambda_t *l;
             mp_int block_size;
 
             block_size = (mp_int)VEC_SIZE(block);
-            
+
             l = argp->u.lambda;
             insert_value_push(argp);
-            
+
             for (i = block_size; --i; )
             {
                 compile_value(++argp, 0);
             }
-            
+
             if (current.code_left < 2)
                 realloc_code();
             current.code_left -= 2;
@@ -3617,7 +3909,7 @@ compile_value (svalue_t *value, int opt_flags)
             STORE_UINT8(current.codep, (bytecode_t)block_size);
             break;
           } /* CLOSURE_ALIEN_LFUN */
-          
+
         case CLOSURE_LFUN:
           {
             /* This is compiled as
@@ -3629,7 +3921,7 @@ compile_value (svalue_t *value, int opt_flags)
              *   <argN>                   <argN>
              *   FUNCALL N+1              CALL_BY_ADDRESS <lfun-index> N
              */
-             
+
             mp_int i;
             lambda_t *l;
             mp_int block_size;
@@ -3659,7 +3951,7 @@ compile_value (svalue_t *value, int opt_flags)
                 {
                     compile_value(++argp, 0);
                 }
-                
+
                 if (current.code_left < 4)
                     realloc_code();
                 current.code_left -= 4;
@@ -3671,7 +3963,7 @@ compile_value (svalue_t *value, int opt_flags)
             }
             break;
           } /* CLOSURE_LFUN */
-          
+
         case CLOSURE_IDENTIFIER:
           {
 
@@ -3684,13 +3976,13 @@ compile_value (svalue_t *value, int opt_flags)
              * The FUNCALL will call call_lambda() which in turn will
              * recognize the CLOSURE_IDENTIFIER and act accordingly.
              */
-             
+
             lambda_t *l;
 
             l = argp->u.lambda;
             if (VEC_SIZE(block) != 1)
                 lambda_error("Argument to variable\n");
-                
+
             if (l->ob != current.lambda_origin)
             {
             	/* We need the FUNCALL */
@@ -3723,7 +4015,7 @@ compile_value (svalue_t *value, int opt_flags)
     case T_QUOTED_ARRAY:                  /* ----- T_QUOTED_ARRAY ----- */
         /* This compiles into the value itself minus one quote.
          */
-         
+
         insert_value_push(value);
         if (!--current.valuep->x.quotes)
             current.valuep->type = T_POINTER;
@@ -3735,7 +4027,7 @@ compile_value (svalue_t *value, int opt_flags)
          * Symbols with just one quote compile into 'LOCAL <index>'. This may
          * create the local variable in the first place.
          */
-    
+
         if (value->x.quotes > 1)
         {
             insert_value_push(value);
@@ -3769,7 +4061,7 @@ compile_value (svalue_t *value, int opt_flags)
       	 *
       	 * Other numbers are compiled as normal values.
       	 */
-      	 
+      	
         mp_int i;
 
         i = value->u.number;
@@ -3839,7 +4131,7 @@ is_lvalue (svalue_t *argp, int index_lvalue)
  * If <index_lvalue> is not zero, arrays compiling into an indexing
  * instruction are accepted, too.
  */
- 
+
 {
     switch(argp->type)
     {
@@ -3854,7 +4146,7 @@ is_lvalue (svalue_t *argp, int index_lvalue)
             block = argp->u.vec;
             if (VEC_SIZE(block) != 3)
                 break;
-                
+
             argp = block->item;
             if (argp->type != T_CLOSURE)
             {
@@ -3870,7 +4162,7 @@ is_lvalue (svalue_t *argp, int index_lvalue)
             }
         }
         break;
-        
+
     case T_CLOSURE:
         if (argp->x.closure_type == CLOSURE_IDENTIFIER)
             return MY_TRUE;
@@ -3887,7 +4179,8 @@ compile_lvalue (svalue_t *argp, int flags)
 
 /* Compile the <argp> into an lvalue, according to the <flags>. The function
  * allocates enough space in the code buffer to store the assignment code
- * (1 Byte) as well.
+ * (1 Byte) as well. This extra space will already be counted out of the
+ * remaining current.code_left, even though the code hasn't been stored yet!
  */
 
 {
@@ -3900,7 +4193,7 @@ compile_lvalue (svalue_t *argp, int flags)
        *
        *   PUSH_LOCAL_VARIABLE_LVALUE <index>
        */
-       
+
       {
         symbol_t *sym;
 
@@ -3911,7 +4204,7 @@ compile_lvalue (svalue_t *argp, int flags)
         sym = make_symbol(argp->u.string);
         if (sym->index < 0)
             sym->index = current.num_locals++;
-            
+
         if (current.code_left < 3)
             realloc_code();
         current.code_left -= 3;
@@ -3964,7 +4257,7 @@ compile_lvalue (svalue_t *argp, int flags)
                         }
                         return;
                     }
-                    
+
                     compile_value(argp+1, 0);
                     compile_value(argp+2, 0);
                     if (current.code_left < 3)
@@ -3996,12 +4289,12 @@ compile_lvalue (svalue_t *argp, int flags)
                     compile_value(argp+3, 0);
                     if (current.code_left < 3)
                         realloc_code();
-                        
+
                     if (flags & PROTECT_LVALUE)
                     {
                         current.code_left -= 3;
                         STORE_CODE(current.codep, F_ESCAPE);
-                        STORE_CODE(current.codep, 
+                        STORE_CODE(current.codep,
                           F_PUSH_PROTECTED_INDEXED_MAP_LVALUE  -0x100);
                     }
                     else
@@ -4024,7 +4317,7 @@ compile_lvalue (svalue_t *argp, int flags)
                 compile_value(argp += 2, 0);
                 compile_value(++argp, 0);
                 compile_lvalue(argp - 2, flags & PROTECT_LVALUE);
-                
+
                 if (current.code_left < 2)
                     realloc_code();
                 if (flags & PROTECT_LVALUE)
@@ -4074,7 +4367,7 @@ compile_lvalue (svalue_t *argp, int flags)
                 compile_value(argp += 2, 0);
                 compile_value(++argp, 0);
                 compile_lvalue(argp - 2, flags & PROTECT_LVALUE);
-                
+
                 if (current.code_left < 2)
                     realloc_code();
                 current.code_left -= 2;
@@ -4088,11 +4381,11 @@ compile_lvalue (svalue_t *argp, int flags)
             case F_MAP_INDEX +CLOSURE_EFUN:
                 if (VEC_SIZE(block) != 4)
                     break;
-                    
+
                 compile_value(++argp, 0);
                 compile_value(++argp, 0);
                 compile_value(++argp, 0);
-                
+
                 if (current.code_left < 3)
                     realloc_code();
                 if (flags & PROTECT_LVALUE)
@@ -4159,9 +4452,9 @@ compile_lvalue (svalue_t *argp, int flags)
         }
         break;
       }
-      
+
     } /* switch(argp->type) */
-    
+
     lambda_error("Illegal lvalue\n");
 } /* compile_lvalue() */
 
@@ -4189,7 +4482,7 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
     int       void_given;   /* result flags from the compiler */
 
     /* Initialize the work area */
-    
+
     current.symbols_left = current.symbol_max =
         sizeof current.symbols[0] * SYMTAB_START_SIZE;
     current.symbol_mask = (long)(current.symbol_max- sizeof(symbol_t *));
@@ -4225,7 +4518,7 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
     current.num_locals = i;  /* Args count as locals, too */
 
     /* Continue initializing the work area */
-    
+
     current.break_stack = current.max_break_stack = 0;
 
     current.code_max = CODE_BUFFER_START_SIZE;
@@ -4248,11 +4541,11 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
                     , current.value_max * sizeof current.values[0]);
     }
     current.valuep = current.values + current.value_max;
-    
+
     current.lambda_origin = origin;
 
     /* Now compile */
-    
+
     void_given = compile_value(block, ZERO_ACCEPTED|REF_REJECTED);
 
     /* Add the final F_RETURN instruction */
@@ -4347,7 +4640,7 @@ free_closure (svalue_t *svp)
     }
 
     /* Lambda closure */
-    
+
     l = svp->u.lambda;
     if (--l->ref)
         return;
@@ -4370,7 +4663,7 @@ free_closure (svalue_t *svp)
         xfree(svp);
         return;
     }
-    
+
     free_object(l->ob, "free_closure");
     if (type == CLOSURE_BOUND_LAMBDA)
     {
@@ -4378,13 +4671,13 @@ free_closure (svalue_t *svp)
     	 * Free the BOUND_LAMBDA and then deref/free the referenced
     	 * UNBOUND_LAMBDA.
     	 */
-    	 
+    	
         mp_int num_values;
         lambda_t *l2;
 
         l2 = l->function.lambda;
         xfree(l);
-        
+
         if (--l2->ref)
             return;
         svp = (svalue_t *)l2;
@@ -4395,12 +4688,12 @@ free_closure (svalue_t *svp)
         xfree(svp);
         return;
     }
-    
+
     if (type == CLOSURE_ALIEN_LFUN)
     {
         free_object(l->function.alien.ob, "free_closure");
     }
-    
+
     /* else CLOSURE_LFUN || CLOSURE_IDENTIFIER || CLOSURE_PRELIMINARY:
      * no further references held.
      */
@@ -4421,53 +4714,57 @@ symbol_operator (char *symbol, char **endp)
  *
  * Recognized are the following operators:
  *
- *   #'+=     -> F_ADD_EQ               
- *   #'++     -> F_POST_INC             
- *   #'+      -> F_ADD                  
- *   #'-=     -> F_SUB_EQ               
- *   #'--     -> F_POST_DEC             
- *   #'-      -> F_SUBTRACT             
- *   #'*=     -> F_MULT_EQ              
- *   #'*      -> F_MULTIPLY             
- *   #'/=     -> F_DIV_EQ               
- *   #'/      -> F_DIVIDE               
- *   #'%=     -> F_MOD_EQ               
- *   #'%      -> F_MOD                  
- *   #',      -> F_POP_VALUE            
- *   #'^=     -> F_XOR_EQ               
- *   #'^      -> F_XOR                  
- *   #'||     -> F_LOR                  
- *   #'|=     -> F_OR_EQ                
- *   #'|      -> F_OR                   
- *   #'&&     -> F_LAND                 
- *   #'&=     -> F_AND_EQ               
- *   #'&      -> F_AND                  
- *   #'~      -> F_COMPL                
- *   #'<=     -> F_LE                   
- *   #'<<=    -> F_LSH_EQ               
- *   #'<<     -> F_LSH                  
- *   #'<      -> F_LT                   
- *   #'>=     -> F_GE                   
- *   #'>>=    -> F_RSH_EQ               
- *   #'>>     -> F_RSH                  
- *   #'>      -> F_GT                   
- *   #'==     -> F_EQ                   
- *   #'=      -> F_ASSIGN               
- *   #'!=     -> F_NE                   
- *   #'!      -> F_NOT                  
- *   #'?!     -> F_BRANCH_WHEN_NON_ZERO 
- *   #'?      -> F_BRANCH_WHEN_ZERO     
- *   #'[<..]  -> F_RN_RANGE             
- *   #'[<..<] -> F_RR_RANGE             
- *   #'[<..   -> F_RX_RANGE       
- *   #'[<     -> F_RINDEX               
- *   #'[..]   -> F_RANGE                
- *   #'[..<]  -> F_NR_RANGE             
+ *   #'+=     -> F_ADD_EQ
+ *   #'++     -> F_POST_INC
+ *   #'+      -> F_ADD
+ *   #'-=     -> F_SUB_EQ
+ *   #'--     -> F_POST_DEC
+ *   #'-      -> F_SUBTRACT
+ *   #'*=     -> F_MULT_EQ
+ *   #'*      -> F_MULTIPLY
+ *   #'/=     -> F_DIV_EQ
+ *   #'/      -> F_DIVIDE
+ *   #'%=     -> F_MOD_EQ
+ *   #'%      -> F_MOD
+ *   #',      -> F_POP_VALUE
+ *   #'^=     -> F_XOR_EQ
+ *   #'^      -> F_XOR
+ *   #'||     -> F_LOR
+ *   #'||=    -> F_LOR_EQ
+ *   #'|=     -> F_OR_EQ
+ *   #'|      -> F_OR
+ *   #'&&     -> F_LAND
+ *   #'&&=    -> F_LAND_EQ
+ *   #'&=     -> F_AND_EQ
+ *   #'&      -> F_AND
+ *   #'~      -> F_COMPL
+ *   #'<=     -> F_LE
+ *   #'<<=    -> F_LSH_EQ
+ *   #'<<     -> F_LSH
+ *   #'<      -> F_LT
+ *   #'>=     -> F_GE
+ *   #'>>=    -> F_RSH_EQ
+ *   #'>>>=   -> F_RSHL_EQ
+ *   #'>>>    -> F_RSHL
+ *   #'>>     -> F_RSH
+ *   #'>      -> F_GT
+ *   #'==     -> F_EQ
+ *   #'=      -> F_ASSIGN
+ *   #'!=     -> F_NE
+ *   #'!      -> F_NOT
+ *   #'?!     -> F_BRANCH_WHEN_NON_ZERO
+ *   #'?      -> F_BRANCH_WHEN_ZERO
+ *   #'[<..]  -> F_RN_RANGE
+ *   #'[<..<] -> F_RR_RANGE
+ *   #'[<..   -> F_RX_RANGE
+ *   #'[<     -> F_RINDEX
+ *   #'[..]   -> F_RANGE
+ *   #'[..<]  -> F_NR_RANGE
  *   #'[..    -> F_NX_RANGE
- *   #'[,]    -> F_MAP_INDEX            
- *   #'[      -> F_INDEX                
- *   #'({     -> F_AGGREGATE            
- *   #'([     -> F_M_CAGGREGATE         
+ *   #'[,]    -> F_MAP_INDEX
+ *   #'[      -> F_INDEX
+ *   #'({     -> F_AGGREGATE
+ *   #'([     -> F_M_CAGGREGATE
  *
  * Note that all operators must have a instrs[].Default value of '0'.
  * If necessary, update the lex::init_lexer()::binary_operators[] to
@@ -4562,7 +4859,13 @@ symbol_operator (char *symbol, char **endp)
         c = *++symbol;
         if (c == '|')
         {
-            ret = F_LOR;
+            if (symbol[1] == '=')
+            {
+                symbol++;
+                ret = F_LOR_EQ;
+            }
+            else
+                ret = F_LOR;
             break;
         }
         else if (c == '=')
@@ -4578,7 +4881,13 @@ symbol_operator (char *symbol, char **endp)
         c = *++symbol;
         if (c == '&')
         {
-            ret = F_LAND;
+            if (symbol[1] == '=')
+            {
+                symbol++;
+                ret = F_LAND_EQ;
+            }
+            else
+                ret = F_LAND;
             break;
         }
         else if (c == '=')
@@ -4629,6 +4938,18 @@ symbol_operator (char *symbol, char **endp)
             {
                 symbol++;
                 ret = F_RSH_EQ;
+                break;
+            }
+            if (symbol[1] == '>')
+            {
+                symbol++;
+                if (symbol[1] == '=')
+                {
+                    symbol++;
+                    ret = F_RSHL_EQ;
+                    break;
+                }
+                ret = F_RSHL;
                 break;
             }
             ret = F_RSH;
@@ -4751,29 +5072,29 @@ symbol_efun (svalue_t *sp)
  * parse_command to lookup the (simul)efuns find_living() and find_player()
  * at runtime.
  *
- * The function takes the string svalue <sp> and looks up the efun or operator
- * given by <sp>->u.string. If the efun/operator is found, the value <sp>
- * is turned into the proper closure value, otherwise it is set to the
- * numeric value 0.
+ * The function takes the string/symbol svalue <sp> and looks up the efun
+ * or operator given by <sp>->u.string. If the efun/operator is found, the
+ * value <sp> is turned into the proper closure value, otherwise it is set
+ * to the numeric value 0.
  *
  * Accepted symbols are:
  *
  *   #'<operator>: see symbol_operator()
  *
- *   #'if       -> F_BRANCH_WHEN_ZERO       +CLOSURE_OPERATOR
- *   #'do       -> F_BBRANCH_WHEN_NON_ZERO  +CLOSURE_OPERATOR
- *   #'while    -> F_BBRANCH_WHEN_ZERO      +CLOSURE_OPERATOR
- *   #'foreach  -> F_FOREACH                +CLOSURE_OPERATOR
- *   #'continue -> F_BRANCH                 +CLOSURE_OPERATOR
- *   #'default  -> F_CSTRING0               +CLOSURE_OPERATOR
- *   #'switch   -> F_SWITCH                 +CLOSURE_OPERATOR
- *   #'break    -> F_BREAK                  +CLOSURE_OPERATOR
- *   #'return   -> F_RETURN                 +CLOSURE_OPERATOR
- *   #'sscanf   -> F_SSCANF                 +CLOSURE_OPERATOR
- *   #'catch    -> F_CATCH                  +CLOSURE_OPERATOR
+ *   #'if          -> F_BRANCH_WHEN_ZERO       +CLOSURE_OPERATOR
+ *   #'do          -> F_BBRANCH_WHEN_NON_ZERO  +CLOSURE_OPERATOR
+ *   #'while       -> F_BBRANCH_WHEN_ZERO      +CLOSURE_OPERATOR
+ *   #'foreach     -> F_FOREACH                +CLOSURE_OPERATOR
+ *   #'continue    -> F_BRANCH                 +CLOSURE_OPERATOR
+ *   #'default     -> F_CSTRING0               +CLOSURE_OPERATOR
+ *   #'switch      -> F_SWITCH                 +CLOSURE_OPERATOR
+ *   #'break       -> F_BREAK                  +CLOSURE_OPERATOR
+ *   #'return      -> F_RETURN                 +CLOSURE_OPERATOR
+ *   #'sscanf      -> F_SSCANF                 +CLOSURE_OPERATOR
+ *   #'catch       -> F_CATCH                  +CLOSURE_OPERATOR
  *
- *   #'<efun>   -> F_<efun>                          +CLOSURE_EFUN
- *   #'<sefun>  -> <function-index>                  +CLOSURE_SIMUL_EFUN
+ *   #'<efun>      -> F_<efun>                 +CLOSURE_EFUN
+ *   #'<sefun>     -> <function-index>         +CLOSURE_SIMUL_EFUN
  */
 
 {
@@ -4793,7 +5114,7 @@ symbol_efun (svalue_t *sp)
         ident_t *p;
 
         /* Take care of an leading efun override */
-        
+
         if ( !strncmp(str, "efun::", 6) )
         {
             str += 6;
@@ -4876,8 +5197,8 @@ symbol_efun (svalue_t *sp)
                 }
 
                 /* Got the reserved word: return the closure value */
-                
-                free_string_svalue(sp);
+
+                free_svalue(sp);
                 sp->type = T_CLOSURE;
                 sp->x.closure_type = (short)(code + CLOSURE_OPERATOR);
                 sp->u.ob = ref_object(current_object, "symbol_efun");
@@ -4888,7 +5209,7 @@ symbol_efun (svalue_t *sp)
         }
 
         /* It is a real identifier */
-        
+
         if (!p || p->type < I_TYPE_GLOBAL
          || (( efun_override || p->u.global.sim_efun < 0 )
              && p->u.global.efun < 0)
@@ -4899,7 +5220,7 @@ symbol_efun (svalue_t *sp)
                 free_shared_identifier(p);
 
 undefined_function:
-            free_string_svalue(sp);
+            free_svalue(sp);
             put_number(sp, 0);
             return;
         }
@@ -4916,8 +5237,8 @@ undefined_function:
             push_volatile_string("nomask simul_efun");
             push_valid_ob(current_object);
             push_shared_string(p->name);
-            res = apply_master_ob(STR_PRIVILEGE, 3);
-            
+            res = apply_master(STR_PRIVILEGE, 3);
+
             if (!res || res->type != T_NUMBER || res->u.number < 0)
             {
             	/* Override attempt is fatal */
@@ -4934,13 +5255,13 @@ undefined_function:
         }
 
         /* Symbol is ok - create the closure value */
-        
-        free_string_svalue(sp);
+
+        free_svalue(sp);
         sp->type = T_CLOSURE;
         if (!efun_override && p->u.global.sim_efun >= 0)
         {
             /* Handle non-overridden simul efuns */
-          
+
             sp->x.closure_type = (short)(p->u.global.sim_efun + CLOSURE_SIMUL_EFUN);
             sp->u.ob = ref_object(current_object, "symbol_efun");
         }
@@ -4968,7 +5289,7 @@ undefined_function:
          * Thus, we have to test for (*end || i < 0) .
          */
 
-        free_string_svalue(sp);
+        free_svalue(sp);
         if (*end || i < 0)
         {
             put_number(sp, 0);
@@ -5031,7 +5352,7 @@ f_unbound_lambda (svalue_t *sp)
     l->ob = NULL;
 
     /* Clean up the stack and push the result */
-    
+
     free_svalue(sp--);
     free_array(args);
     sp->type = T_CLOSURE;
@@ -5049,7 +5370,7 @@ f_symbol_variable (svalue_t *sp)
  *   closure symbol_variable(string arg)
  *   closure symbol_variable(symbol arg)
  *   closure symbol_variable(int arg)
- * 
+ *
  * Constructs an identifier (lfun) closure from the global
  * variable arg of this_object(). The variable may be given as a
  * symbol, by name or by its ordinal number in the objects
@@ -5061,7 +5382,7 @@ f_symbol_variable (svalue_t *sp)
  * and private in the inherited object (i.e. hidden), then a
  * privilege violation ("symbol_variable", this_object(), arg)
  * will occur.
- * 
+ *
  */
 
 {
@@ -5165,7 +5486,7 @@ f_symbol_variable (svalue_t *sp)
         error("Out of memory (%lu bytes) for variable symbol\n"
              , (unsigned long) sizeof(*l));
     }
-    
+
     l->ob = ref_object(current_object, "symbol_variable");
     l->ref = 1;
     l->function.index = (unsigned short)(n + (current_variables - current_object->variables));
@@ -5239,7 +5560,7 @@ new_case_entry (void)
     ret->next = case_state.list1;
     case_state.list1 = case_state.list0;
     case_state.list0 = ret;
-    
+
     return ret;
 } /* new_case_entry() */
 
@@ -5340,7 +5661,7 @@ store_case_labels( p_int total_length
      * The implementation combines the merge and split phase by
      * using two 'out' lists and switching them appropriately.
      */
-    
+
     for (runlength = 1; list1; runlength *= 2)
     {
         case_list_entry_t *out_hook0, *out_hook1;
@@ -5357,7 +5678,7 @@ store_case_labels( p_int total_length
         while (list1)
         {
             /* Merge the next <runlength> elements from both lists */
-            
+
             count0 = count1 = runlength;
             while (1)
             {
@@ -5367,7 +5688,7 @@ store_case_labels( p_int total_length
                     *out0 = list1;
                     out0 = &list1->next;
                     list1 = *out0;
-                    
+
                     if (!--count1 || !list1)
                     {
                         /* All elements from list1 processed, now
@@ -5414,7 +5735,7 @@ store_case_labels( p_int total_length
                 out1 = temp;
             }
         } /* while (list1) */
-        
+
         *out0 = list0;
         *out1 = NULL;
         list0 = out_hook0;
@@ -5457,7 +5778,7 @@ store_case_labels( p_int total_length
             current_key = list1->key;
             curr_line = list1->line;
             current_addr = list1->addr;
-            
+
             if (current_key == last_key && list1 != list0)
             {
                 (*cerrorl)("Duplicate case%s", " in line %d and %d",
@@ -5595,7 +5916,7 @@ store_case_labels( p_int total_length
 
             /* Btw, adapt the .addr to the offset length */
             list1->addr += len-1;
-            
+
             span = list1->key - table_start->key + 1;
             if ((p_uint)span >= (p_uint)maxspan) /* p_uint to catch span<0, too */
                 gain = -1;
@@ -5616,7 +5937,7 @@ store_case_labels( p_int total_length
                 p0 = (bytecode_p)(*get_space)(size);
                 tmp = table_start;
                 key = tmp->key;
-                
+
                 if (tmp->addr == 1)
                 {
                     /* table_start is a range start: start with
@@ -5629,7 +5950,7 @@ store_case_labels( p_int total_length
                 /* Loop over the partial list, inserting the jump address
                  * for every singular case and range, and the default_addr
                  * for every other value without a case.
-                 * The 
+                 * The
                  */
                 do {
                     if (tmp->key < key)
@@ -5639,15 +5960,22 @@ store_case_labels( p_int total_length
                     	 */
                         key_num--;
                         tmp = tmp->next;
-                        if (tmp->addr == 1)
-                        {
-                            /* It is a range: move to the range end entry.
-                             * It's .line is 0 which will force the code
-                             * to insert all values for this range.
-                             */
-                            key_num--;
-                            tmp = tmp->next;
-                        }
+                        /* This next entry might be the begin of a new range.
+                         * However, we don't want to move tmp to its end
+                         * entry quite yet, since we still have to fill in
+                         * the 'default' jump points for all interim values.
+                         */
+                    }
+                    if (key == tmp->key && tmp->addr == 1)
+                    {
+                        /* tmp is the beginning of a range, and key (finally)
+                         * caught up with it. We can now move tmp to the end
+                         * entry for this range.
+                         * It's .line is 0 which will force the code
+                         * to insert all values for this range.
+                         */
+                        key_num--;
+                        tmp = tmp->next;
                     }
 
                     /* Get the address to insert */
@@ -5732,7 +6060,7 @@ store_case_labels( p_int total_length
             last_key = current_key;
             last_line = curr_line;
         }
-        
+
         if (        !( ( total_length   | key_num*sizeof(p_int)) & ~0xff) ) {
             len = 1;
         } else if ( !( ((total_length+1) | key_num*sizeof(p_int)) & ~0xffff) ) {
@@ -5743,7 +6071,7 @@ store_case_labels( p_int total_length
             (*cerror)("offset overflow");
             return;
         }
-        
+
         if (len > 1)
         {
             (*move_instructions)(len-1, total_length);
@@ -5755,7 +6083,7 @@ store_case_labels( p_int total_length
             }
         }
     }
-    
+
     /* calculate starting index for iterative search at execution time */
     for (i = 0, o = 2; o <= key_num; )
         i++, o<<=1;
@@ -5768,7 +6096,7 @@ store_case_labels( p_int total_length
       /*   = key_num << SWITCH_TABLEN_SHIFT */
     p = (bytecode_p)get_space((long)
         (tablen + key_num * len + 2 + len + sizeof(p_int) - 4));
-        
+
     PUT_UINT8(p-total_length, (unsigned char)tablen);
     PUT_UINT8(p-total_length+1, (unsigned char)type);
 
@@ -5835,6 +6163,7 @@ align_switch (bytecode_p pc)
     int32 tablen, offset, size;
     unsigned char a2;  /* Alignment byte 2 */
     unsigned char abuf[sizeof(p_int)-1]; /* Buffer for the alignment bytes */
+    bytecode_p     off_pc;  /* Pointer after the instruction block */
     unsigned char *startu;  /* Unaligned start address */
     unsigned char *starta;  /* Aligned start address */
 
@@ -5859,7 +6188,7 @@ align_switch (bytecode_p pc)
             offset += GET_UINT8(pc+4) << 16;
         }
     }
-    
+
     if (len >=2)
     {
         tablen += GET_UINT8(pc+offset) << 8;
@@ -5870,16 +6199,22 @@ align_switch (bytecode_p pc)
     }
 
     /* Now align the tables, moving the alignment bytes around */
-    memcpy(abuf, pc+offset+len-1, 2);
-    PUT_UINT8(pc+len+1, GET_UINT8(pc+offset+len+1));
+    off_pc = pc + offset + len;
+
+    abuf[0] = off_pc[-1];
+    abuf[1] = off_pc[0];
     abuf[2] = a2;
-    PUT_UINT8(pc+offset+len+1, a2);
-    startu = pc+offset+len+2 + sizeof(p_int) - 4;
+    PUT_UINT8(pc+len+1, GET_UINT8(off_pc+1));
+    PUT_UINT8(off_pc+1, a2);
+    startu = off_pc+2 + sizeof(p_int) - 4;
     starta = (unsigned char *)((p_int)startu & ~(sizeof(char *)-1));
     size = (long)(tablen + tablen / sizeof(char*) * len);
-    move_memory(starta, startu, (size_t)size);
-    move_memory(starta+size, abuf + sizeof abuf - (startu-starta)
-               , (size_t)(startu-starta));
+    if (starta != startu)
+    {
+        move_memory(starta, startu, (size_t)size);
+        move_memory(starta+size, abuf + sizeof abuf - (startu-starta)
+                   , (size_t)(startu-starta));
+    }
 } /* align_switch() */
 
 /***************************************************************************/

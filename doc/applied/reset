@@ -1,32 +1,32 @@
 SYNOPSIS
-	void reset(int arg)	/* compat mode */
-	void reset(void)	/* native mode */
+        void reset(int arg)        /* compat mode */
+        void reset(void)        /* native mode */
 
 DESCRIPTION
-	In compat mode, reset() is called with arg 0 after the object
-	was compiled, and with arg != 0 every once in a while.	In
-	native mode, create() is called after compiling, and reset()
-	is called without arguments every once in a while.
+        In compat mode, reset() is called with arg 0 after the object
+        was compiled, and with arg != 0 every once in a while.        In
+        native mode, create() is called after compiling, and reset()
+        is called without arguments every once in a while.
 
-	So, if the argument is zero, the parser is running in compat
-	mode, and reset() may call your create() code. If create() is
-	called, you're on the new version and reset() is not called
-	for object creation. You may call reset() from create() and
-	vice versa, but make sure they do not call each other
-	recursive on either type of driver.
+        So, if the argument is zero, the parser is running in compat
+        mode, and reset() may call your create() code. If create() is
+        called, you're on the new version and reset() is not called
+        for object creation. You may call reset() from create() and
+        vice versa, but make sure they do not call each other
+        recursive on either type of driver.
 
-	reset() will be called only in objects that have been used
-	since the last call to reset(), i.e. a function in them was
-	called (other than reset() or clean_up()), or it was moved
-	around.
+        reset() will be called only in objects that have been used
+        since the last call to reset(), i.e. a function in them was
+        called (other than reset() or clean_up()), or it was moved
+        around.
 
-	This function can be used to reset the state of the object or
-	do some checks or what ever. The game wouldn't be fun if no
-	challenges remained.
+        This function can be used to reset the state of the object or
+        do some checks or what ever. The game wouldn't be fun if no
+        challenges remained.
 
-	For 3.2.1, the mudlib can be programmed to call an other lfun
-	than reset() to reset an object.
+        For 3.2.1, the mudlib can be programmed to call an other lfun
+        than reset() to reset an object.
 
 SEE ALSO
-	clean_up(A), heart_beat(A), call_out(E), create(E), __INIT(E),
-	hooks(C), initialisation(E), native(C)
+        clean_up(A), heart_beat(A), call_out(E), create(A), __INIT(A),
+        hooks(C), initialisation(M), native(C)

@@ -1,13 +1,13 @@
 SYNOPSIS
-	string to_string(mixed)
+        string to_string(mixed)
 
         (string)<value>
 
 DESCRIPTION
-	The argument is converted to a string. Works with int, float,
-	object, arrays, symbols, strings, and closures.
+        The argument is converted to a string. Works with int, float,
+        object, arrays, symbols, strings, and closures.
 
-	Converts closures into an appropriate name (this has mostly
+        Converts closures into an appropriate name (this has mostly
         debugging purposes).
 
         CAVEAT: Arrays are considered exploded strings, ie. arrays of
@@ -19,4 +19,4 @@ HISTORY
         LDMud 3.2.8 adds lambda closures to the accepted data types.
 
 SEE ALSO
-	to_array(E), to_int(E), to_object(E), sprintf(E)
+        to_array(E), to_int(E), to_object(E), sprintf(E)

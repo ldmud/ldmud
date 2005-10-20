@@ -20,7 +20,7 @@ struct mapping_s {
        * is pending for final deallocation.
        */
     wiz_list_t               *user;        /* Save who made the mapping */
-    int                       num_values;  /* Number of values per key */
+    p_int                     num_values;  /* Number of values per key */
 };
 
 
@@ -120,7 +120,7 @@ struct condensed_mapping {
    * after the last misc key in that mapping.
    */
 
-#define CM_STRING(m) ((char **)((m)+1))
+#define CM_STRING(m) ((char **) ((m)+1))
   /* For condensed_mapping <m>, return a pointer to the first
    * string key in that mapping.
    */
@@ -202,6 +202,8 @@ extern void check_dirty_mapping_list(void);
 #ifdef GC_SUPPORT
 extern void count_ref_in_mapping(mapping_t *m);
 extern void clean_stale_mappings(void);
+extern void clear_mapping_size (void);
+extern void count_mapping_size (mapping_t *m);
 #endif
 
 #endif /* MAPPING_H__ */

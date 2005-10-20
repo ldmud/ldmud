@@ -18,6 +18,14 @@
     } else {}
 
 
+/* void outofmem(const char * txt)
+ *   Throw an 'out of memory' error for an allocation of unknown size with the
+ *   description <txt>.
+ */
+
+#define outofmemory(txt) \
+    error("(%s:%d) Out of memory for %s\n", __FILE__, __LINE__, txt)
+
 /* void outofmem(size_t size, const char * txt)
  *   Throw an 'out of memory' error for an allocation of <size> with the
  *   description <txt>.
@@ -45,9 +53,10 @@ extern char *reserved_system_area;
 extern mp_int reserved_user_size;
 extern mp_int reserved_master_size;
 extern mp_int reserved_system_size;
-#ifdef MAX_MALLOCED
+extern mp_int min_malloced;
+extern mp_int min_small_malloced;
 extern mp_int max_malloced;
-#endif
+extern int stack_direction;
 
 
 /* --- SMalloc --- */
@@ -59,23 +68,23 @@ extern mp_int max_malloced;
 #define xalloc_traced(size,  file, line) smalloc((size), (file), (line))
 #define xalloc(size) (smalloc((size), __FILE__, __LINE__))
 
-extern POINTER smalloc(size_t, const char *, int);
+extern POINTER smalloc(size_t, const char *, int) MALLOC;
 
 #define string_copy_traced(s, file, line) (smalloc_string_copy(s, file, line))
 #define string_copy(s) (smalloc_string_copy(s, __FILE__ "::string_copy", __LINE__))
-extern char * smalloc_string_copy(const char *, const char *, int);
+extern char * smalloc_string_copy(const char *, const char *, int) MALLOC;
 
 #else
 
 #define xalloc_traced(size,  file, line) smalloc((size))
 #define xalloc(size) (smalloc((size)))
-extern POINTER smalloc(size_t);
+extern POINTER smalloc(size_t) MALLOC;
 
 #endif
 
 extern POINTER rexalloc(POINTER, size_t);
-extern POINTER amalloc(size_t);
-extern POINTER pxalloc(size_t);
+extern POINTER amalloc(size_t) MALLOC;
+extern POINTER pxalloc(size_t) MALLOC;
 extern void xfree(POINTER);
 extern void pfree(POINTER);
 extern void afree(POINTER);
@@ -89,7 +98,7 @@ extern void afree(POINTER);
 
 #include <stdlib.h>
 
-extern POINTER xalloc(size_t size);
+extern POINTER xalloc(size_t size) MALLOC;
 
 #if defined(MALLOC_TRACE)
 #  define xalloc_traced(size,  file, line) xalloc((size))
@@ -109,10 +118,17 @@ extern POINTER xalloc(size_t size);
 
 /* --- Associated functions --- */
 
+extern void get_stack_direction (void);
+extern void assert_stack_gap(void);
+extern void reserve_memory (void);
+extern void dump_lpc_trace (int d, void *p);
+extern void dump_malloc_trace (int d, void *adr);
+
+
 #ifndef string_copy
 
 #define string_copy_traced(s, file, line) string_copy(s)
-extern char * string_copy(const char *str);
+extern char * string_copy(const char *str) MALLOC;
 
 #endif
 

@@ -8,7 +8,7 @@
  * safely be deallocated again.
  *
  * To convert non-shared strings into shared strings quickly, the shared
- * strings are hashed over their first 20 characters and arranged in
+ * strings are hashed over their first 100 characters and arranged in
  * a hash table with HTABLE_SIZE entries. Every entry points to the head
  * of a chain of strings with equal hash. To make access even faster,
  * the chains are rearranged after every search so that the recently found
@@ -21,9 +21,9 @@
  *
  *    struct shared_string
  *    {
- *        char   * next;
- *        ushort   refs;
- *        char     str[];
+ *        char        * next;
+ *        StrRefCount   refs;
+ *        char          str[];
  *    }
  *
  * and all shared string pointers, including the .next, point to
@@ -35,10 +35,6 @@
  * accumulates enough references to overflow into value 0, the string is
  * considered constant and excepted from refcounting until the next
  * garbage collection.
- *
- * The overhead of the management structure is expressed with the symbol
- * SHSTR_OVERHEAD, and interpret::apply_low() uses it for a heuristic
- * recognition of shared strings.
  *---------------------------------------------------------------------------
  */
 
@@ -81,7 +77,7 @@ mp_uint stralloc_allocd_strings = 0;
   /* Number of virtually allocated strings - every reference counts
    * as separate copy.
    */
-   
+
 mp_uint stralloc_allocd_bytes = 0;
   /* Total virtual size of allocated strings counted in multiples
    * of sizeof(char*) - every reference counts as separate copy.
@@ -90,7 +86,7 @@ mp_uint stralloc_allocd_bytes = 0;
 static mp_uint num_distinct_strings = 0;
   /* Number of distinct strings in the string table.
    */
-   
+
 static mp_uint bytes_distinct_strings = 0;
   /* Total memory held in the string table.
    */
@@ -102,6 +98,13 @@ static mp_uint search_len = 0;
 static mp_uint num_str_searches = 0;
   /* Number of searches in the string table.
    */
+
+/* TODO: Add these statistics to debug_info() */
+static mp_uint num_found = 0;       /* Number of successful searches */
+static mp_uint num_added = 0;       /* Number of strings added */
+static mp_uint num_deleted = 0;     /* Number of strings deleted */
+static mp_uint num_collisions = 0;  /* Number of hashcollisions when adding */
+static mp_uint num_entries = 0;     /* Number of used cache entries */
 
 /*-------------------------------------------------------------------------*/
 
@@ -145,7 +148,7 @@ typedef struct str_shadow_s str_shadow_t;
 struct str_shadow_s {
     str_shadow_t   *next;  /* Next shadow in hash chain */
     char           *str;   /* The shadowed string */
-    unsigned short  ref;   /* The shadowed refcount */
+    StrRefCount     ref;   /* The shadowed refcount */
     char           *snext; /* The "next" pointer of the shadowed string */
 };
 
@@ -173,19 +176,22 @@ check_string (char * s, str_shadow_t *sh)
         fatal("check_string: String %p vs shadow %p\n", s, sh);
 
     if (!s && sh)
-        fatal("check_string: String %p vs shadow %p (s %p, r%hu, n %p)\n"
-             , s, sh, sh->str, sh->ref, sh->snext);
+        fatal("check_string: String %p vs shadow %p (s %p, r%lu, n %p)\n"
+             , s, sh, sh->str, (unsigned long)sh->ref, sh->snext);
 
 #ifdef VERBOSE_CS
-    printf("DEBUG: compare sh %p (s %p, r %hu, n %p)\n", sh, sh->str, sh->ref, sh->snext);
-    printf("DEBUG:   with  s  %p (r %hu, n %p)\n", s, REFS(s), NEXT(s));
+    printf("DEBUG: compare sh %p (s %p, r %lu, n %p)\n"
+          , sh, sh->str, (unsigned long)sh->ref, sh->snext);
+    printf("DEBUG:   with  s  %p (r %lu, n %p)\n"
+          , s, (unsigned long)REFS(s), NEXT(s));
+    fflush(stdout);
 #endif
     if (sh->str != s)
         fatal("check_string: String %p '%s', shadow expected string %p '%s'\n"
              , s, s, sh->str, sh->str);
 
     if (sh->ref != REFS(s))
-        fatal("check_string: String %p '%s' has %hu refs, shadow expected %hu refs\n", s, s, REFS(s), sh->ref);
+        fatal("check_string: String %p '%s' has %lu refs, shadow expected %lu refs\n", s, s, (unsigned long)REFS(s), (unsigned long)sh->ref);
 
     if (sh->snext != NEXT(s))
         fatal("check_string: String %p '%s's next is %p, shadow expected %p\n", s, s, NEXT(s), sh->snext);
@@ -205,7 +211,7 @@ find_shadow (char *s)
     char * curr, *prev;
     int h;
     str_shadow_t *scurr, *sprev;
-    
+
 
     h = StrHash(s);
 
@@ -247,6 +253,7 @@ check_string_table (void)
 
 #ifdef VERBOSE_CS
     printf("DEBUG: checking string table\n");
+    fflush(stdout);
 #endif
     for (h = 0; h < HTABLE_SIZE; h++)
     {
@@ -262,6 +269,7 @@ check_string_table (void)
     }
 #ifdef VERBOSE_CS
     printf("DEBUG: checking string table done\n");
+    fflush(stdout);
 #endif
 } /* check_string_table() */
 
@@ -274,13 +282,16 @@ ref_shadow_string (char *s)
 
 {
     str_shadow_t *sh;
-    
+
     sh = find_shadow(s);
     if (sh->ref)
         sh->ref++;
     check_string(s, sh);
 #ifdef VERBOSE_CS
-    printf("DEBUG: ref'd s %p (%hu, %p) and sh %p (%p, %hu, %p)\n", s, REFS(s), NEXT(s), sh, sh->str, sh->ref, sh->snext);
+    printf("DEBUG: ref'd s %p (%lu, %p) and sh %p (%p, %lu, %p)\n"
+          , s, (unsigned long)REFS(s), NEXT(s)
+          , sh, sh->str, (unsigned long)sh->ref, sh->snext);
+    fflush(stdout);
 #endif
 } /* ref_shadow_string() */
 
@@ -296,7 +307,7 @@ mark_shadow_string_ref (char *s)
 
 {
     str_shadow_t *sh;
-    
+
     sh = find_shadow(s);
     sh->ref++;
     if (!sh->ref)
@@ -317,7 +328,7 @@ inc_shadow_string_ref (char *s)
 
 {
     str_shadow_t *sh;
-    
+
     sh = find_shadow(s);
     if (sh->ref)
     {
@@ -389,7 +400,7 @@ checked (char * s, char *str)
 
 /*-------------------------------------------------------------------------*/
 char *
-findstring (char *s)
+findstring (const char *s)
 
 /* Find the shared version of string <s> (which might be <s> itself) in
  * the string table and return its pointer (not counted as reference!).
@@ -405,7 +416,7 @@ findstring (char *s)
 #ifdef CHECK_STRINGS
     str_shadow_t *scurr, *sprev;
 #endif
-    
+
 
     h = StrHash(s);
     hash_index = h;
@@ -443,8 +454,12 @@ findstring (char *s)
 #endif
             }
 #ifdef VERBOSE_CS
-            printf("DEBUG: found s %p (%hu, %p) and sh %p (%p, %hu, %p)\n", curr, REFS(curr), NEXT(curr), scurr, scurr->str, scurr->ref, scurr->snext);
+            printf("DEBUG: found s %p (%lu, %p) and sh %p (%p, %lu, %p)\n"
+                 , curr, (unsigned long)REFS(curr), NEXT(curr)
+                 , scurr, scurr->str, (unsigned long)scurr->ref, scurr->snext);
+            fflush(stdout);
 #endif
+            num_found++;
             return curr;
         }
         prev = curr;
@@ -463,7 +478,7 @@ findstring (char *s)
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
-alloc_new_string (char *str)
+alloc_new_string (const char *str)
 
 /* Enter new string <str> into the hash table at index <str> computed
  * by a previous call to findstring(). Return the pointer to the
@@ -487,6 +502,12 @@ alloc_new_string (char *str)
     s += SHSTR_OVERHEAD;
 
     /* Copy the string and add it to the string table */
+    if (base_table[h] == NULL)
+        num_entries++;
+    else
+        num_collisions++;
+    num_added++;
+
     strcpy(s, str);
     NEXT(s) = base_table[h];
     base_table[h] = s;
@@ -507,10 +528,11 @@ alloc_new_string (char *str)
 #ifdef VERBOSE_CS
         printf("DEBUG: new s  %p (r 1, n %p) '%s'\n", s, NEXT(s), s);
         printf("DEBUG:  -> sh %p (s %p, r 1, n %p)\n", sh, sh->str, sh->snext);
+        fflush(stdout);
 #endif
     }
 #endif
-    
+
     num_distinct_strings++;
     bytes_distinct_strings += (
             (SHSTR_OVERHEAD + length + 1 + (sizeof(char *)-1)))
@@ -525,7 +547,7 @@ alloc_new_string (char *str)
 
 /*-------------------------------------------------------------------------*/
 char *
-make_shared_string (char *str)
+make_shared_string (const char *str)
 
 /* Find or make a shared string for <str> and return its pointer
  * with one (more) refcount.
@@ -550,20 +572,29 @@ make_shared_string (char *str)
         {
             REFS(s)++;
             if (!REFS(s))
+            {
                 printf("DEBUG: make_shared_string(): found %p '%s' "
                        "refcount reaches max!\n", s, s);
+                fflush(stdout);
+            }
         }
         else
+        {
             printf("DEBUG: make_shared_string(): found %p '%s' has 0 refs.\n"
                   , s, s);
+            fflush(stdout);
+        }
 
 #ifdef CHECK_STRINGS
         if (last_shadow->ref)
         {
             last_shadow->ref++;
             if (!last_shadow->ref)
+            {
                 printf("DEBUG: make_shared_string(): shadow %p: "
                        "refcount reaches max!\n", last_shadow);
+                fflush(stdout);
+            }
         }
 #endif
 
@@ -572,8 +603,11 @@ make_shared_string (char *str)
         {
             REFS(s)++;
             if (!REFS(s))
+            {
                 printf("DEBUG: make_shared_string(): found %p '%s' "
                        "refcount reaches max!\n", s, s);
+                fflush(stdout);
+            }
         }
         else
         {
@@ -583,14 +617,21 @@ make_shared_string (char *str)
 #ifdef CHECK_STRINGS
             last_shadow->ref++;
             if (!last_shadow->ref)
+            {
                 printf("DEBUG: make_shared_string(): shadow %p: "
                        "refcount reaches max!\n", last_shadow);
+                fflush(stdout);
+            }
 #endif
 
 #endif /* KEEP_STRINGS */
 
 #ifdef VERBOSE_CS
-        printf("DEBUG: made old s %p (%hu, %p) and sh %p (%p, %hu, %p)\n", s, REFS(s), NEXT(s), last_shadow, last_shadow->str, last_shadow->ref, last_shadow->snext);
+        printf("DEBUG: made old s %p (%lu, %p) and sh %p (%p, %lu, %p)\n"
+              , s, (unsigned long)REFS(s), NEXT(s)
+              , last_shadow, last_shadow->str, (unsigned long)last_shadow->ref
+              , last_shadow->snext);
+        fflush(stdout);
 #endif
     }
     stralloc_allocd_strings++;
@@ -612,10 +653,16 @@ _deref_string (char *str)
     {
         REFS(str)--;
         if (!REFS(str))
-            printf("DEBUG: deref_string(): %x '%s' fell to 0 refs!\n", (unsigned int)str, str);
+        {
+            printf("DEBUG: deref_string(): %p '%s' fell to 0 refs!\n", str, str);
+            fflush(stdout);
+        }
     }
     else
-        printf("DEBUG: deref_string(): %x '%s' has 0 refs.\n", (unsigned int)str, str);
+    {
+        printf("DEBUG: deref_string(): %p '%s' has 0 refs.\n", str, str);
+        fflush(stdout);
+    }
 
 #ifdef CHECK_STRINGS
     {
@@ -626,7 +673,10 @@ _deref_string (char *str)
             sh->ref--;
         check_string(str, sh);
 #ifdef VERBOSE_CS
-        printf("DEBUG: deref'd s %p (%hu, %p) and sh %p (%p, %hu, %p)\n", str, REFS(str), NEXT(str), sh, sh->str, sh->ref, sh->snext);
+        printf("DEBUG: deref'd s %p (%lu, %p) and sh %p (%p, %lu, %p)\n"
+              , str, (unsigned long)REFS(str), NEXT(str)
+              , sh, sh->str, (unsigned long)sh->ref, sh->snext);
+        fflush(stdout);
 #endif
     }
 #endif
@@ -661,6 +711,7 @@ free_string (char *str)
     {
         printf("DEBUG: free_string(): %p '%s' has 0 refs.\n"
               , str, str);
+        fflush(stdout);
     }
 
 #endif
@@ -672,7 +723,10 @@ free_string (char *str)
         sh = find_shadow(str);
         check_string(str, sh);
 #ifdef VERBOSE_CS
-        printf("DEBUG: free s %p (%hu-1, %p) and sh %p (%p, %hu, %p)\n", str, REFS(str), NEXT(str), sh, sh->str, sh->ref, sh->snext);
+        printf("DEBUG: free s %p (%lu-1, %p) and sh %p (%p, %lu, %p)\n"
+              , str, (unsigned long)REFS(str), NEXT(str)
+              , sh, sh->str, (unsigned long)sh->ref, sh->snext);
+        fflush(stdout);
 #endif
     }
 #endif
@@ -702,7 +756,7 @@ free_string (char *str)
                );
     }
 #endif
-    
+
 #ifdef CHECK_STRINGS
     {
         if (last_shadow->ref)
@@ -717,13 +771,17 @@ free_string (char *str)
     s = findstring(str); /* moves it to head of table if found */
 #endif
 
+    num_deleted++;
+    if (NEXT(str) == NULL)
+        num_entries--;
+
 #ifndef KEEP_STRINGS
     base_table[hash_index] = NEXT(str);
 #ifdef CHECK_STRINGS
     shadow_table[hash_index] = last_shadow->next;
     xfree(last_shadow);
 #endif
-    
+
     num_distinct_strings--;
     /* We know how much overhead malloc has */
     bytes_distinct_strings -= (shstr_malloced_length(str) & malloc_size_mask())* sizeof(char *);
@@ -763,11 +821,14 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
     net_bytes_distinct_strings
       =   (bytes_distinct_strings & (malloc_size_mask() * sizeof (char *)))
         - num_distinct_strings * SHSTR_OVERHEAD;
-    strbuf_addf(sbuf, "Strings malloced\t\t%8lu %8lu + %lu overhead\n",
+    strbuf_addf(sbuf, "Strings malloced\t\t%8lu %9lu + %lu overhead\n",
                 num_distinct_strings, net_bytes_distinct_strings, overhead_bytes());
 
     if (verbose)
     {
+        mp_uint num_x_searches;
+
+        num_x_searches = num_str_searches ? num_str_searches : 1;
         stralloc_allocd_bytes &= malloc_size_mask();
         net_allocd_bytes =   (stralloc_allocd_bytes * sizeof(char*))
                            - stralloc_allocd_strings * SHSTR_OVERHEAD;
@@ -776,9 +837,20 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
         strbuf_addf(sbuf, "Space actually required/total string bytes %lu%%\n",
                     (net_bytes_distinct_strings + overhead_bytes())*100L /
                             net_allocd_bytes );
-        strbuf_addf(sbuf, "Searches: %d    Average search length:%7.3f\n",
-                    num_str_searches
-                    , (float)search_len / (float)num_str_searches);
+        strbuf_addf(sbuf, "Searches: %d - Found: %lu (%.1f%%) - Average search length:%7.3f\n"
+                   , num_str_searches
+                   , num_found, 100.0 * (float)num_found / (float) num_x_searches
+                   , (float)search_len / (float)num_x_searches);
+        strbuf_addf(sbuf, "Number of chains: %lu (%.1f%%)\n"
+                        , num_entries, 100.0 * (float)num_entries/(float)HTABLE_SIZE
+                   );
+        strbuf_addf(sbuf, "Strings added: %lu - Deleted: %lu - Coll: %lu (%.1f%% added/%.1f%% chains)\n"
+                        , num_added
+                        , num_deleted
+                        , num_collisions
+                        , 100.0 * (float)num_collisions/(float)num_added
+                        , 100.0 * (float)num_collisions/(float)num_entries
+                   );
     }
 
     return net_bytes_distinct_strings + overhead_bytes();
@@ -786,14 +858,20 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
 
 /*-------------------------------------------------------------------------*/
 void
-string_dinfo_status (svalue_t *svp)
+string_dinfo_status (svalue_t *svp, int value)
 
 /* Return the string table information for debug_info(DINFO_DATA, DID_STATUS).
  * <svp> points to the svalue block for the result, this function fills in
  * the spots for the object table.
+ * If <value> is -1, <svp> points indeed to a value block; other it is
+ * the index of the desired value and <svp> points to a single svalue.
  */
 
 {
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code
+
     mp_uint net_bytes_distinct_strings, net_allocd_bytes;
 
     net_bytes_distinct_strings
@@ -804,16 +882,24 @@ string_dinfo_status (svalue_t *svp)
     net_allocd_bytes = (stralloc_allocd_bytes * sizeof(char*))
                        - stralloc_allocd_strings * SHSTR_OVERHEAD;
 
-    svp[DID_ST_STRINGS].u.number       = num_distinct_strings;
-    svp[DID_ST_STRING_SIZE].u.number   = net_bytes_distinct_strings;
-    svp[DID_ST_STR_TABLE_SIZE].u.number = overhead_bytes();
+    ST_NUMBER(DID_ST_STRINGS, num_distinct_strings);
+    ST_NUMBER(DID_ST_STRING_SIZE, net_bytes_distinct_strings);
+    ST_NUMBER(DID_ST_STR_TABLE_SIZE, overhead_bytes());
 
     stralloc_allocd_bytes &= malloc_size_mask();
-    svp[DID_ST_STR_REQ].u.number      = stralloc_allocd_strings;
-    svp[DID_ST_STR_REQ_SIZE].u.number = net_allocd_bytes;
+    ST_NUMBER(DID_ST_STR_REQ, stralloc_allocd_strings);
+    ST_NUMBER(DID_ST_STR_REQ_SIZE, net_allocd_bytes);
 
-    svp[DID_ST_STR_SEARCHES].u.number   = num_str_searches;
-    svp[DID_ST_STR_SEARCH_LEN].u.number = search_len;
+    ST_NUMBER(DID_ST_STR_SEARCHES, num_str_searches);
+    ST_NUMBER(DID_ST_STR_SEARCH_LEN, search_len);
+    ST_NUMBER(DID_ST_STR_FOUND, num_found);
+
+    ST_NUMBER(DID_ST_STR_ENTRIES, num_entries);
+    ST_NUMBER(DID_ST_STR_ADDED, num_added);
+    ST_NUMBER(DID_ST_STR_DELETED, num_deleted);
+    ST_NUMBER(DID_ST_STR_COLLISIONS, num_collisions);
+
+#undef ST_NUMBER
 } /* string_dinfo_status() */
 
 /*-------------------------------------------------------------------------*/

@@ -30,7 +30,7 @@
  *      int32  heart_beats;
  *      mp_int size_array;
  *      mp_int mapping_total;
- *      svalue_t extra;    
+ *      svalue_t extra;
  *      int32  last_call_out;
  *      int32  call_out_cost;
  *      char *file_name;
@@ -92,13 +92,15 @@
 
 #include "wiz_list.h"
 #include "../mudlib/sys/wizlist.h"
- 
+
 #include "array.h"
 #include "backend.h"
 #include "gcollect.h"
 #include "interpret.h"
 #include "main.h"
+#include "mapping.h"
 #include "object.h"
+#include "simulate.h"
 #include "stdstrings.h"
 #include "stralloc.h"
 #include "svalue.h"
@@ -137,6 +139,25 @@ static int wiz_info_extra_size = -1;
 static int number_of_wiz = 0;
   /* Number of entries in the list.
    */
+
+char wizlist_name[MAXPATHLEN+1] = "";
+  /* Name of the wizlist file, relative to the mudlib directory.
+   */
+
+/*-------------------------------------------------------------------------*/
+void
+name_wizlist_file (const char *name)
+
+/* Set the swap file name to a copy of <name>.
+ */
+
+{
+    /* Skip leading '/' */
+    while (*name == '/') name++;
+
+    xstrncpy(wizlist_name, name, sizeof wizlist_name);
+    wizlist_name[sizeof wizlist_name - 1] = '\0';
+} /* name_wizlist_file()*/
 
 /*-------------------------------------------------------------------------*/
 size_t
@@ -221,7 +242,7 @@ add_name (char * str)
         ; prev = this, this = this->next
         )
     { NOOP; }
-    
+
     if (!prev)
     {
         wl->next = all_wiz;
@@ -232,7 +253,7 @@ add_name (char * str)
         wl->next = this;
         prev->next = wl;
     }
-    
+
     return wl;
 } /* add_name() */
 
@@ -242,6 +263,8 @@ wiz_decay (void)
 
 /* Called after every complete walkaround of the reset, this 'decays'
  * the score of every wizard once per hour.
+ * Together with the decay, the wizlist is checked for destructed extra
+ * data.
  */
 
 {
@@ -259,6 +282,8 @@ wiz_decay (void)
         wl->cost = wl->cost * .9;  /* integer is prone to overflow */
         wl->heart_beats = wl->heart_beats * 9 / 10;
     }
+
+    check_wizlist_for_destr();
 } /* wiz_decay() */
 
 /*-------------------------------------------------------------------------*/
@@ -275,11 +300,15 @@ get_wiz_name (char *file)
     svalue_t *ret;
     static char buff[50];
 
+    /* Don't call the master if it isn't loaded! */
+    if (!master_ob)
+        return NULL;
+
     push_volatile_string(file);
-    ret = apply_master_ob(STR_GET_WNAME, 1);
+    ret = apply_master(STR_GET_WNAME, 1);
     if (ret == 0 || ret->type != T_STRING)
         return NULL;
-    strncpy(buff, ret->u.string, sizeof buff - 1);
+    xstrncpy(buff, ret->u.string, sizeof buff - 1);
     buff[sizeof(buff)-1] = '\0';
     return buff;
 } /* get_wiz_name() */
@@ -288,7 +317,7 @@ get_wiz_name (char *file)
 void
 load_wiz_file (void)
 
-/* Load the old wizlist from the file "WIZLIST" and add it's data to
+/* Load the old wizlist from the wizlist file and add it's data to
  * the wizlist already in memory.
  *
  * This function is called at driver start up.
@@ -300,7 +329,10 @@ load_wiz_file (void)
     char buff[1000];
     FILE *f;
 
-    f = fopen("WIZLIST", "r");
+    if (wizlist_name[0] == '\0')
+        return;
+
+    f = fopen(wizlist_name, "r");
     if (f == NULL)
         return;
 
@@ -312,14 +344,16 @@ load_wiz_file (void)
         p = strchr(buff, ' ');
         if (p == 0)
         {
-            fprintf(stderr, "%s Bad WIZLIST file.\n", time_stamp());
+            fprintf(stderr, "%s Bad WIZLIST file '%s'.\n"
+                          , time_stamp(), wizlist_name);
             break;
         }
         *p = '\0';
         p++;
         if (*p == '\0')
         {
-            fprintf(stderr, "%s Bad WIZLIST file.\n", time_stamp());
+            fprintf(stderr, "%s Bad WIZLIST file '%s'.\n"
+                          , time_stamp(), wizlist_name);
             break;
         }
         score = atoi(p);
@@ -380,7 +414,7 @@ save_error (char *msg, char *file, int line)
     /* Set the file_name */
     if (wl->file_name)
         xfree(wl->file_name);
-        
+
     len = strlen(file);
     copy = xalloc(len + 4); /* May add .c plus the null byte, and / */
     *copy = '/';
@@ -483,10 +517,10 @@ f_set_extra_wizinfo (svalue_t *sp)
  *   void set_extra_wizinfo (object wiz, mixed extra)
  *   void set_extra_wizinfo (string wiz, mixed extra)
  *   void set_extra_wizinfo (int    wiz, mixed extra)
- * 
+ *
  * Set the value <extra> as the 'extra' information for the wizlist
  * entry of <wiz>.
- * 
+ *
  * If <wiz> is an object, the entry of its creator (uid) is used.
  * If <wiz> is a string (a creator aka uid), it names the entry
  * to use.
@@ -548,7 +582,7 @@ f_get_extra_wizinfo (svalue_t *sp)
  * The function causes a privilege violation
  * ("get_extra_wizinfo", this_object(), <wiz>).
  */
- 
+
 {
     wiz_list_t *user;
     short type;
@@ -627,7 +661,7 @@ f_get_error_file (svalue_t *sp)
  *
  * If there is no error stored for the given <name>, 0 is
  * returned.
- * 
+ *
  * If <set_forget_flag> is non-zero, the 'forget' flag is set
  * for the error message after it has been returned.
  */
@@ -677,6 +711,61 @@ f_get_error_file (svalue_t *sp)
 } /* f_get_error_file() */
 
 /*=========================================================================*/
+
+/*-------------------------------------------------------------------------*/
+void
+check_wizlist_for_destr (void)
+
+/* Check the 'extra' info in all wizinfo and remove destructed objects
+ * and closures.
+ */
+
+{
+    wiz_list_t *wl;
+
+    for (wl = &default_wizlist_entry; wl; )
+    {
+        size_t num;
+        svalue_t *item;
+
+        if (wl->extra.type == T_POINTER)
+        {
+            num = VEC_SIZE(wl->extra.u.vec);
+            item = &(wl->extra.u.vec->item[0]);
+        }
+        else
+        {
+            num = 1;
+            item = &(wl->extra);
+        }
+
+        for ( ; num != 0 ; item++, num--)
+        {
+            switch(item->type)
+            {
+            case T_POINTER:
+                check_for_destr(item->u.vec);
+                break;
+            case T_MAPPING:
+                check_map_for_destr(item->u.map);
+                break;
+            case T_OBJECT:
+            case T_CLOSURE:
+                if (destructed_object_ref(item))
+                    assign_svalue(item, &const0);
+                break;
+            default:
+                NOOP;
+                break;
+            }
+        }
+
+        if (wl == &default_wizlist_entry)
+            wl = all_wiz;
+        else
+            wl = wl->next;
+    }
+} /* check_wizlist_for_destr() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef GC_SUPPORT

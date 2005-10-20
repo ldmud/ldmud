@@ -1,5 +1,5 @@
-#ifndef __XERQ_DEFS_H__
-#define __XERQ_DEFS_H__ 1
+#ifndef XERQ_DEFS_H__
+#define XERQ_DEFS_H__ 1
 
 /* Standard include for all modules of xerq containing all possible
  * system includes, datatypes and external definitions.
@@ -7,12 +7,23 @@
 
 #include "driver.h"
 
+#ifndef ERQ_DEBUG
+#  define ERQ_DEBUG 0
+#endif
+
+#ifdef USE_IPV6
+#    define __IPV6__
+#endif
+
 #include "erq.h"
 #include "random.h"
 
 #include <stdio.h>
 #include <sys/socket.h>
-#include <sys/time.h>
+#ifdef HAVE_SYS_TIME_H
+#    include <sys/time.h>
+#endif
+#include <time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <netinet/in.h>
@@ -93,6 +104,7 @@ struct equeue_s
     equeue_t *next;
     int       pos;    /* index of next byte in buf[] to write */
     int       len;    /* remaining length to write */
+    int32     handle; /* message handle for send-ok replys */
     char      buf[1]; /* allocated big enough to hold the data */
 };
 
@@ -145,11 +157,12 @@ struct child_s
 
 #define CHILD_EXECUTE  1
 #define CHILD_SPAWN    2
+#define CHILD_FORK     3
 
 /* Values for child_t.status */
 
-#define CHILD_RUNNING  1
-#define CHILD_EXITED   2
+#define CHILD_RUNNING  1  /* Child is being started up or running */
+#define CHILD_EXITED   2  /* Child exited */
 
 /* --- struct auth_s: one auth_d query
  * auth_t is treated as subclass of socket_t.
@@ -185,9 +198,11 @@ struct retry_s
 
 /* --- Variables --- */
 
+extern const char * erq_dir;
 extern child_t *childs;
 extern socket_t *sockets;
 extern int seq_number, seq_interval;
+extern pid_t master_pid;
 
 /* --- Prototypes --- */
 
@@ -197,15 +212,15 @@ extern void bad_request(char *);
 extern void erq_cmd(void);
 extern void sig_child();
 extern void remove_child(child_t *);
-extern void read_socket(socket_t *, int);
+extern int read_socket(socket_t *, int);
 extern socket_t *new_socket(int, char);
 extern void reply_errno(int32);
 extern void reply1(int32, const void *, int32);
 extern void reply1keep(int32, const void *, int32);
 extern void replyn(int32, int, int, ...);
 extern void write1(void *, int);
-extern void add_to_queue(equeue_t **, char *, int);
-extern int flush_queue(equeue_t **, int);
+extern void add_to_queue(equeue_t **, char *, int, int32);
+extern int flush_queue(equeue_t **, int, int);
 extern void add_retry(void (*func)(char *, int), char *mesg, int len, int t);
 
 extern void erq_rlookup(char *, int);
@@ -226,6 +241,17 @@ extern void erq_rlookupv6(char *, int);
 
 extern void close_socket(socket_t *);
 
+/* --- Debug Functions --- */
+
+#ifdef XDEBUG
+#   ifndef DEBUG
+#       define DEBUG
+#   endif
+#   define XPRINTF(x) fprintf x
+#else
+#   define XPRINTF(x)
+#endif
+
 /* --- Inline Functions --- */
 
 static INLINE int32
@@ -245,5 +271,5 @@ write_32(char *a, int32 i)
 
 #define get_handle(x) read_32((x)+4)
 
-#endif /* __XERQ_DEFS_H__ */
+#endif /* XERQ_DEFS_H__ */
 

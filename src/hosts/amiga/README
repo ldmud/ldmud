@@ -42,8 +42,10 @@ You'll find here:
   DMakefile : the Makefile to use with DICE
   SMakefile : the Makefile to use with SAS/C
   config.h : the 'standard' config.h to compile the driver in cross-compat mode.
+  config.h-gcc: the config.h to use with the gcc compiler.
   config.h-compat: the 'standard' config.h to compile the driver in compat mode.
   machine.h: the 'standard' machine.h to compile the driver.
+  machine.h-gcc: the machine.h to use with the gcc compiler.
 
   NetIncl/ : Standard includes used with TCP.
 

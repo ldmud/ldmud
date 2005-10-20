@@ -9,6 +9,7 @@
 /* --- Variables --- */
 
 extern char *last_verb;
+extern char *last_action_verb;
 extern char *last_command;
 extern object_t *command_giver;
 extern p_int alloc_action_sent;
@@ -19,7 +20,9 @@ extern void free_action_temporaries(void);
 extern void free_action_sent(action_t *p);
 extern void purge_action_sent(void);
 extern void remove_action_sent(object_t *ob, object_t *player);
+extern void remove_shadow_action_sent(object_t *ob, object_t *player);
 extern void remove_environment_sent(object_t *player);
+extern void remove_shadow_actions (object_t *shadow, object_t *target);
 
 extern void restore_command_context (rt_context_t *context);
 extern Bool execute_command (char *str, object_t *ob);

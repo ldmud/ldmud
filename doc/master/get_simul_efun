@@ -1,9 +1,9 @@
 SYNOPSIS
-	mixed          get_simul_efun(void)  // 3.2
-	string|string* get_simul_efun(void)  // 3.2.1
+        mixed          get_simul_efun(void)  // 3.2
+        string|string* get_simul_efun(void)  // 3.2.1
 
 DESCRIPTION
-	Load the simul_efun object(s) and return one or more paths of it.
+        Load the simul_efun object(s) and return one or more paths of it.
 // Note that the object(s) must be loaded by this function!
 //
 // When you return an array of strings, the first string is taken as path
@@ -14,11 +14,11 @@ DESCRIPTION
 // obsolete simul_efuns. A side use of this mechanism is to provide
 // a 'spare' simul_efun object in case the normal one fails to load.
 //
-	Should return either the file_name of the simul_efun object as
-	a string, or an array containing as first element a string
-	with the file name of the simul_efun object and the following
-	elements strings with file names of alternate simul_efun
-	objects that will be used if the first one cannot be loaded.
+        Should return either the file_name of the simul_efun object as
+        a string, or an array containing as first element a string
+        with the file name of the simul_efun object and the following
+        elements strings with file names of alternate simul_efun
+        objects that will be used if the first one cannot be loaded.
 
 SEE ALSO
-	simul_efun(C)
+        simul_efun(C)

@@ -11,3 +11,8 @@ DESCRIPTION
 
         If the first arg is the number 0, the prompt is not changed,
         just returned.
+
+        The prompt is not printed if an input_to() is pending.
+
+SEE ALSO
+        input_to(E)

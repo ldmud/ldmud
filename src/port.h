@@ -60,8 +60,9 @@ Thats it.
 #    define _GNU_SOURCE
 #endif
 
-#if defined(__CYGWIN32__) && !defined(__CYGWIN__)
-#    define __CYGWIN__
+#if defined(__CYGWIN32__) || defined(__CYGWIN__)
+#    define CYGWIN
+      /* #define __CYGWIN__ messes up the Cygwin headers */
 #endif
 
 /*------------------------------------------------------------------
@@ -84,8 +85,11 @@ extern int errno;
 #if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
 #    include <memory.h>
 #endif
+#if 0
+/* TODO: Obsoleted by limits.h+floats.h - remove this and the config check */
 #ifdef HAVE_VALUES_H
 #    include <values.h>
+#endif
 #endif
 #ifdef HAVE_STDLIB_H
 #    include <stdlib.h>
@@ -99,7 +103,7 @@ extern int errno;
 #    include <bstring.h>
 #endif
 
-#ifdef AMIGA
+#if defined(AMIGA) && !defined(__GNUC__)
 #    include "hosts/amiga/patchfloat.h"
 #endif /* AMIGA */
 #ifdef ATARI_TT
@@ -107,6 +111,7 @@ extern int errno;
 #    define _MATH_H
 #endif
 #include <math.h>
+#include <float.h>
 
 #ifdef __BEOS__
      /* BeOS defines some standard non-standard types itself (like int32).
@@ -125,6 +130,34 @@ extern int errno;
 
 
 /*------------------------------------------------------------------
+ * Limits for less-standard integral types:
+ *
+ *   LONGLONG_MIN, LONGLONG_MAX, ULONGLONG_MAX
+ * TODO: Add SIZEOF_SIZET to configure, and SIZET_limits here.
+ * TODO:: Then use SIZET_limits in smalloc::smalloc().
+ */
+
+#if defined(HAVE_LONG_LONG) && !defined(LONGLONG_MIN)
+#    if defined(LONG_LONG_MAX)
+#        define LONGLONG_MIN   LONG_LONG_MIN
+#        define LONGLONG_MAX   LONG_LONG_MAX
+#        define ULONGLONG_MAX  ULONG_LONG_MAX
+#    elif SIZEOF_LONG_LONG == 8
+#        define LONGLONG_MIN   (-9223372036854775807LL - 1)
+#        define LONGLONG_MAX   (9223372036854775807LL)
+#        define ULONGLONG_MAX  (0xffffffffffffffffULL)
+#    elif SIZEOF_LONG_LONG == SIZEOF_LONG
+#        define LONGLONG_MIN   LONG_MIN
+#        define LONGLONG_MAX   LONG_MAX
+#        define ULONGLONG_MAX  ULONG_MAX
+#    elif SIZEOF_LONG_LONG == SIZEOF_INT
+#        define LONGLONG_MIN   INT_MIN
+#        define LONGLONG_MAX   INT_MAX
+#        define ULONGLONG_MAX  UINT_MAX
+#    endif
+#endif
+
+/*------------------------------------------------------------------
  * Define some macros:
  *   CHAR_BIT     number of bits in a char, if not defined already.
  *   TODO: Lookup what ISO-C says about this.
@@ -132,6 +165,7 @@ extern int errno;
  *   PROT(x)      for portable prototype definitions.
  *   NORETURN     attribute for non-returning functions.
  *   UNUSED       attribute for unused functions and variables.
+ *   MALLOC       attribute for malloc()-like functions
  *   FORMATDEBUG  attribute for printf-style prototypes.
  *   VARPROT      for portable printf-style prototype definitions.
  *   INLINE       attribute for inline functions, depending on
@@ -140,6 +174,8 @@ extern int errno;
  *                extract a character from a memory location.
  *   USE_IPV6     check the definition from config.h in relation
  *                to HAS_IPV6 from autoconf.
+ *   USE_MYSQL    check the definition from config.h in relation
+ *                to HAS_MYSQL from autoconf.
  *   MSDOS_FS     if the filesystem uses MS-DOS semantics
  *                (i.e. backslashes as directory separators)
  */
@@ -163,7 +199,7 @@ extern int errno;
 #    define PROT(x) ()
 #endif /* __STDC */
 
-#if defined(__GNUC__) && __GNUC__ >= 2 && (__GNUC_MINOR__ > 5 || __GNUC__ > 2)
+#if defined(__GNUC__) && __GNUC__ >= 2 && (__GNUC_MINOR__ > 6 || __GNUC__ > 2)
 #    define NORETURN __attribute__ ((noreturn))
 #    define UNUSED   __attribute__ ((unused))
 #elif defined(__MWERKS__)
@@ -172,6 +208,12 @@ extern int errno;
 #else
 #    define NORETURN
 #    define UNUSED
+#endif
+
+#if defined(__GNUC__) && __GNUC__ >= 3
+#    define MALLOC   __attribute__ ((malloc))
+#else
+#    define MALLOC
 #endif
 
 #ifdef __GNUC__
@@ -199,7 +241,11 @@ extern int errno;
 #    undef USE_IPV6
 #endif
 
-#if ( defined( atarist ) && !defined ( minix ) ) || defined( MSDOS ) || defined(__CYGWIN__)
+#if !defined(HAS_MYSQL) && defined(USE_MYSQL)
+#    undef USE_MYSQL
+#endif
+
+#if ( defined( atarist ) && !defined ( minix ) ) || defined( MSDOS ) || defined(CYGWIN) || defined(__EMX__) || defined(OS2)
 #define MSDOS_FS
 #endif
 
@@ -213,21 +259,33 @@ extern int errno;
  *   int32  : an integer with 32 bits
  *   PTRTYPE: a type to use with constant pointer arithmetic.
  * The unsigned versions use 'uint' instead of 'int'.
- * TODO: Add a type 'uchar', '(u)int8' and '(u)int16'., unless not already
+ * TODO: Add a type 'u/schar', '(u/s)int8' and '(u/s)int16'., unless not already
  * TODO:: defined by STDC.
- * TODO: inttypes.h and stdint.h have many interesting types...
+ * TODO: inttypes.h, stdint.h and limits.h have many interesting types...
  */
 
 /* p_int : an integer that has the same size as a pointer */
 #if SIZEOF_LONG == SIZEOF_CHAR_P
-typedef long                p_int;
-typedef unsigned long       p_uint;
+     typedef long                p_int;
+     typedef unsigned long       p_uint;
+#    define PINT_MIN  LONG_MIN
+#    define PINT_MAX  LONG_MAX
+#    define PUINT_MAX ULONG_MAX
+
 #elif SIZEOF_INT == SIZEOF_CHAR_P
-typedef int                 p_int;
-typedef unsigned int        p_uint;
+     typedef int                 p_int;
+     typedef unsigned int        p_uint;
+#    define PINT_MIN  INT_MIN
+#    define PINT_MAX  INT_MAX
+#    define PUINT_MAX UINT_MAX
+
 #elif defined(HAVE_LONG_LONG) && SIZEOF_LONG_LONG == SIZEOF_CHAR_P
-typedef long long           p_int;
-typedef unsigned long long  p_uint;
+     typedef long long           p_int;
+     typedef unsigned long long  p_uint;
+#    define PINT_MIN  LONGLONG_MIN
+#    define PINT_MAX  LONGLONG_MAX
+#    define PUINT_MAX ULONGLONG_MAX
+
 #else
 #error cannot find an integer type with same size as a pointer
 Thats it.
@@ -235,23 +293,34 @@ Thats it.
 
 /* ph_int : an integer that has half the size of a pointer */
 #if SIZEOF_CHAR_P == SIZEOF_INT * 2
-typedef int                 ph_int;
-typedef unsigned int        ph_uint;
+     typedef int                 ph_int;
+     typedef unsigned int        ph_uint;
+#    define PHINT_MIN  INT_MIN
+#    define PHINT_MAX  INT_MAX
+#    define PHUINT_MAX UINT_MAX
+
 #else
 #    if SIZEOF_CHAR_P == 4
 /* short is assumed to be always 2 bytes. */
 /* TODO: This is a dangerous assumption. */
-typedef short               ph_int;
-typedef unsigned short      ph_uint;
+         typedef short               ph_int;
+         typedef unsigned short      ph_uint;
+#        define PHINT_MIN  SHORT_MIN
+#        define PHINT_MAX  SHORT_MAX
+#        define PHUINT_MAX USHORT_MAX
 #    endif
 #endif
 
 /* mp_int : an integer that has at least the size of a pointer */
 typedef p_int        mp_int;
 typedef p_uint        mp_uint;
+#define MPINT_MIN  PINT_MIN
+#define MPINT_MAX  PINT_MAX
+#define MPUINT_MAX PUINT_MAX
 
 #ifndef __BEOS__
 /* int32 : an integer with 32 bits. */
+/* TODO: Add a configuration check for 'int32' typedef */
 #    if SIZEOF_LONG == 4
 #        if !defined(_AIX)
 typedef long                int32;
@@ -322,7 +391,7 @@ typedef signed long ssize_t;
 #    define strrchr rindex
 #endif
 
-#if !defined(__BEOS__) && !defined(__CYGWIN__)
+#if !defined(__BEOS__) && !defined(CYGWIN) && !(defined(__EMX__) || defined(OS2))
 #    define O_BINARY 0
 #    define O_TEXT 0
 #endif
@@ -364,7 +433,7 @@ typedef signed long ssize_t;
 
 #if defined(HOST_INCLUDE)
 #    include HOST_INCLUDE
-#elif defined(AMIGA)
+#elif defined(AMIGA) && !defined(__GNUC__)
 #    include "hosts/amiga/amiga.h"
 #elif defined(__BEOS__)
 #    include "hosts/be/be.h"
@@ -377,7 +446,8 @@ typedef signed long ssize_t;
  */
 
 extern mp_int get_current_time(void);
-extern char * time_string(int);
+extern char * time_string(mp_int);
+extern char * utime_string (mp_int, mp_int);
 extern char * time_stamp(void);
 
 #ifndef HAVE_STRCSPN
@@ -403,7 +473,7 @@ extern void move_memory(char *, char *, size_t);
 extern char *crypt(const char *, const char *);
 #endif
 
-#if defined(AMIGA) || defined(__CYGWIN__)
+#if (defined(AMIGA) && !defined(__GNUC__)) || defined(CYGWIN) || defined(__EMX__) || defined(OS2)
 extern void init_rusage(void);
 #else
 #define init_rusage()

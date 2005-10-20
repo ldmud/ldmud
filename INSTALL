@@ -1,3 +1,14 @@
+Topics covered:
+
+  - Unix or Unix-like systems, with additional details for FreeBSD, AIX 3.4,
+      and DEC Ultrix.
+  - IPv 6
+  - mySQL
+  - BeOS
+  - Windows 95/98/NT
+  - OS/2
+
+
 Unix or Unix-like system
 ------------------------
 
@@ -42,12 +53,21 @@ Unix or Unix-like system
   start configure with the proper commandline arguments.
 
 
+  The following environment variables can be used to tweak the behaviour
+  of the configure script:
+    CC:           the name of the C compiler
+    CFLAGS:       compiler flags to be used during the configure script
+    EXTRA_CFLAGS: compiler flags to be used when compiling the game driver
+    LDFLAGS:      linker flags to be used by configure and for linking the
+                  game driver.
+
+
   After configuration is finished, you may want to modify the Makefile
   to fine tune those parameters which are not covered by the configuration.
 
   The compilation is done using make. Following targets are implemented:
 
-    <none>:        compile the driver
+    <none>:        compile the driver, named 'ldmud'.
     install:       compile the driver and install it in ${bindir}
     utils:         compile the utilities, especially the ERQ demon
     install-utils: compile and install the utilities in ${bindir}
@@ -58,9 +78,17 @@ Unix or Unix-like system
   and make sure that the files from mudlib/sys/ all go into your lib's
   include directory (usually 'sys/').
 
-  To test the driver, start it with 'driver &'. If you see the message
+  To test the driver, start it with 'ldmud &'. If you see the message
   'Setting up ipc', the driver is up and accepting connections. Test
   it with 'telnet localhost 4242'.
+
+  pthreads:
+    If your systems supports pthreads, --enable-use-pthreads will allow to
+    compile the driver with pthread support. Currently this means that
+    background threads will be used to write data to the network.
+
+    WARNING: pthreads support is still experimental and might crash
+      your driver! I MEAN IT!
 
   FreeBSD:
     When using gcc, it can happen that the compiler
@@ -74,10 +102,32 @@ Unix or Unix-like system
 
       CC=xlc ./configure ...
 
+  DEC Ultrix:
+    Depending on the system configuration you might be unable to
+    compile 'interpret.c' with any kind of optimization at all.
+    The typical symptom is a failure during the compilation with
+    "Error code 1". When that happens, do the following steps:
+
+      - Make as usual until the "interpret" compilation
+         fails.  The symptom is "Error code 1".
+
+      - Edit the makefile.  Uncomment the compilation
+         line for debugging, and comment the compilation
+         line containing the optimization switches and
+         options.
+
+      - Command 'make interpret.o' .
+
+      - Edit the makefile again.  Re-comment the line
+         for debugging, and uncomment the line with
+         the optimization switches and options.
+
+      - Start the make again.  This time it will
+         complete as expected.
+
 
 IPv6
 ----
-
   If your machine supports IPv6, the driver can be configured to use it: give
   '--enable-use-ipv6=yes' as argument to the configure script.
   
@@ -104,6 +154,26 @@ IPv6
   (<URL:http://www.join.uni-muenster.de/>).
 
   Newer versions of AIX also come with IPv6 support.
+
+
+mySQL
+-----
+  If your machine has mySQL installed, the driver can be configured to use
+  it: give '--enable-use-mysql=yes' as argument to the configure script.
+
+  Alternatively, if your mySQL uses an unusual include/library path,
+  the option can be given as '--enable-use-mysql=/unusual/path', which
+  will use the given path as search path for both include and library
+  files in addition to the normal system search paths. The include files will
+  be searched in <path>/include and <path>, the library files will be search
+  in <path>/lib/mysql, <path>/lib, and <path>, in this order.
+
+  The username and password for the mySQL database are specified by
+  the mudlib as arguments to the efun db_connect().
+
+  Use mysqladmin to create any databases you want to provide - the
+  names are later used in the efun db_connect() to connect to
+  the databases.
 
 
 BeOS
@@ -164,8 +234,7 @@ Windows 95/98/NT
   which is a port of gcc, bash, and other GNU/Unix programs. Once it
   is installed and running, the procedure is the same as under Unix.
 
-  CygWin is available from <URL:http://sourceware.cygnus.com/cygwin/>,
-  and the homepage is <URL:http://www.cygnus.com/>.
+  CygWin is available from <URL:http://www.cygwin.com/>.
 
   One common pitfall is if the installation does not create the '/bin'
   directory in which the CygWin executables are expected. A typical
@@ -180,15 +249,48 @@ Windows 95/98/NT
     /compiler/Cygnus/B19/H-i386-cygwin32/bin . In this directory, give
     the command 'mount $PWD /bin'.
 
+  Solution 3: Use a newer version of Cygwin where this problem apparently
+    has been solved.
+
   A driver compiled by David Gibbs (ishara@btinternet.com) is available
   at <URL:http://www.einy.freeserve.co.uk/lpmud.index.html>.
 
   The following comments were provided by Robert Nurrie(?) who had
   an misconfigured Cygnus installation (Summer 2000):
 
-  "Make sure you've used the setup.exe you get when clicking the 'install
-   cygwin now' link in the upper right corner of their website, instead of the
-   setup.exe found on the ftp-site.
+    "Make sure you've used the setup.exe you get when clicking the 'install
+     cygwin now' link in the upper right corner of their website, instead of
+     the setup.exe found on the ftp-site.
    
-   Oh, and when you're given the choice of default text file type you
-   should of course chose Dos, as that seems to be the key."
+     Oh, and when you're given the choice of default text file type you
+     should of course chose Dos, as that seems to be the key."
+
+  Brandon Mathis points out, "that to compile under Windows you have to
+  use 'tar -xvfz' and not WinZIP to extract the source".
+
+
+OS/2
+----
+
+  The OS/2 port uses the EMX (a gcc version) to compile the gamedriver.
+  To compile the driver, copy the machine.h and Makefile from the hosts/os2
+  directory into the top directory and make as under Unix. The Makefile
+  is configured to install the driver in /mud - edit the variable 'prefix'
+  if you want a different directory.
+
+  Important: the Makefile must be save using the Unix lineend convention,
+  otherwise the make program will stop with an error. In the EPM editor
+  this can be achieved using the 'save -u' command.
+
+  If you have the full GNU suite installed, you can also configure the
+  driver as under Unix. Following caveats regarding the configure script:
+   - the ac_exeext variable may not be set to '.exe' as it should be;
+   - the calls to the program conftest may lack the ${ac_exeext} extension.
+
+  Additionally, configure does not properly recognize the settings for
+  HAVE_GETRUSAGE, GETRUSAGE_RESTRICTED, GETRUSAGE_VIA_SYSCALL and RUSAGE_USEC.
+  Copy these values from the provided machine.h
+
+  To recreate the configure script from configure.in, you need autoconf
+  version 2.50 or newer.
+

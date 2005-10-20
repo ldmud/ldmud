@@ -1,7 +1,7 @@
 Short: struct{} datatype
 Date: Mon, 14 Dec 1998 11:33:40 +0100
 Type: Feature
-State: Unclassified
+State: Done - implemented in 3.3.246
 
 > 2. We lack a struct/class-ish data type. This is a big win in MudOS.
 >    Essentially, a fixed-size type-checked array, with the ability to
@@ -88,3 +88,8 @@ this structure by saying:
 
 Then, the argument would be a constant struct which
 was compatible with the blah structure.
+
+--------------------------------------------------------------------------
+When doing structs, offer an 'embed' keyword for sub-structs and 
+arrays, to embed them in their full length. This would introduce 
+'fixed length' arrays.

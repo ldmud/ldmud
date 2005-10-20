@@ -1,6 +1,6 @@
 SYNOPSIS
-	int negate(int)
-	float negate(float)
+        int negate(int)
+        float negate(float)
 
 DESCRIPTION
-	Unary minus. Returns the negative argument.
+        Unary minus. Returns the negative argument.

@@ -2,7 +2,7 @@ Short: New efun m_add()
 From: Lars, Rodney
 Date: 990310
 Type: Feature
-State: Unclassified
+State: Done - implemented in 3.2.9
 
 m_add(m, key, data...) in addition to m + ([ ])
 

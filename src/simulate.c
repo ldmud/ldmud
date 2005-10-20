@@ -31,7 +31,7 @@
 #include <sys/stat.h>
 #include <stdarg.h>
 
-#ifdef AMIGA
+#if defined(AMIGA) && !defined(__GNUC__)
 #    include "hosts/amiga/nsignal.h"
 #else
 #    include <signal.h>
@@ -55,7 +55,7 @@
 #    endif /* NDIR */
 #endif /* not (HAVE_DIRENT_H or _POSIX_VERSION) */
 
-#if defined(__CYGWIN__)
+#if defined(CYGWIN)
 extern int lstat(const char *, struct stat *);
 #endif
 
@@ -75,7 +75,7 @@ extern int lstat PROT((CONST char *, struct stat *));
 extern int fchmod PROT((int, int));
 #endif
 
-#if defined(OS2)
+#if defined(OS2) || defined(__EMX__)
 #    define lstat stat
 #endif
 
@@ -135,6 +135,7 @@ struct limits_context_s
     int32  max_eval;     /* max eval cost */
     int32  max_byte;     /* max byte xfer */
     int32  max_file;     /* max file xfer */
+    int32  max_callouts; /* max callouts */
     int32  eval_cost;    /* the then-current eval costs used */
 };
 
@@ -150,6 +151,20 @@ struct give_uid_error_context
     svalue_t  head;        /* A T_ERROR_HANDLER with this struct as arg */
     object_t *new_object;  /* The object under processing */
 };
+
+
+/* --- struct namechain ---
+ *
+ * This structure is used by load_object() to build the current inheritence tree
+ * in the frames on the stack. The information is used to generate
+ * proper error messages.
+ */
+
+typedef struct namechain_s
+{
+    struct namechain_s * prev; /* Pointer to the previous element, or NULL */
+    char               * name; /* Pointer to the name to load */
+} namechain_t;
 
 /*-------------------------------------------------------------------------*/
 
@@ -182,7 +197,9 @@ static sentence_t * free_sent = NULL;
    */
 
 object_t *obj_list = NULL;
-  /* Head of the list of all objects
+  /* Head of the list of all objects. The reference by this list
+   * is counted.
+   * The first object in the list has its .prev_all member cleared.
    */
 
 object_t *obj_list_end = NULL;
@@ -191,18 +208,38 @@ object_t *obj_list_end = NULL;
    */
 
 object_t *destructed_objs = NULL;
+  /* List holding destructed but not yet fully dereferenced objects.
+   * Only the name and the program pointer are guarantueed to be valid.
+   * The reference by this list is counted.
+   * Objects with only the list reference left are finally freed by
+   * the function remove_destructed_objs() called from the backend.
+#ifdef MALLOC_smalloc
+   * They are also freed by a GC.
+#endif
+   * TODO: If this turns out to be not soon enough, modify the free_object()
+   * TODO:: call to recognize the destructed+one-ref-left situation.
+   *
+   * This list is not exactly necessary, as destructed objects would be
+   * deallcoated automatically once the last reference is gone, but it
+   * helps mud admins to figure out where all the memory goes.
+   */
+
+long num_destructed = 0;
+  /* Statistics: Number of objects in the destructed_objs list.
+   */
+
+object_t *newly_destructed_objs = NULL;
   /* List holding objects destructed in this execution thread.
-   * They are no longer part of the obj_list.
+   * They are no longer part of the obj_list, but since programs may still
+   * be executing in them, the aren't fully destructed yet.
+   */
+
+long num_newly_destructed = 0;
+  /* Statistics: Number of objects in the newly_destructed_objs list.
    */
 
 object_t *master_ob = NULL;
   /* The master object.
-   */
-
-p_int new_destructed = 0;
-  /* Number of destructed objects which are still in the object
-   * list. A value != 0 serves as flag that there are objects
-   * to clean up.
    */
 
 object_t *current_object;
@@ -217,10 +254,11 @@ object_t *previous_ob;
   /* The previous object which called the current_object.
    */
 
-svalue_t closure_hook[NUM_CLOSURE_HOOKS];
+svalue_t driver_hook[NUM_DRIVER_HOOKS];
   /* The table with all driver hooks.
    */
 
+#ifdef USE_FREE_CLOSURE_HOOK
 static svalue_t *old_hooks = NULL;
   /* Array of entries holding all the old driver hook closures replaced
    * during this and the previous execution threads. The closures are
@@ -235,6 +273,7 @@ static int num_old_hooks = 0;
 static int max_old_hooks = 0;
   /* The allocated length of <old_hooks>
    */
+#endif
 
 Bool game_is_being_shut_down = MY_FALSE;
   /* TRUE if a shutdown was requested resp. is in progress.
@@ -252,23 +291,32 @@ static char emsg_buf[2000];
   /* The buffer for the error message to be created.
    */
 
-char   *current_error;
-char   *current_error_file;
-char   *current_error_object_name;
-mp_int  current_error_line_number;
+char     *current_error;
+char     *current_error_file;
+char     *current_error_object_name;
+mp_int    current_error_line_number;
   /* When an error occured during secure_apply(), these four
    * variables receive allocated copies of the error message,
    * the name of the active program and object, and the
    * line number in the program.
    */
 
+vector_t *uncaught_error_trace = NULL;
+vector_t *current_error_trace = NULL;
+  /* When an error occured, these variables hold the call chain in the
+   * format used by efun debug_info() for evaluation by the mudlib.
+   * The variables are kept until the next error, or until a GC.
+   * 'uncaught_error_trace': the most recent uncaught error
+   * 'current_error_trace': the most recent error, caught or uncaught.
+   */
+
 /* --- Runtime limits --- */
 
 /* Each of these limits comes as pair: one def_... value which holds the
- * limit set at startup or with the set_limits() efun, and the max_... 
+ * limit set at startup or with the set_limits() efun, and the max_...
  * value which holds the limit currently in effect. Before every execution,
  * max_... are initialised from def_... with the RESET_LIMITS macro.
- * 
+ *
  * A limit of 0 usually means 'no limit'.
  */
 
@@ -300,10 +348,147 @@ int32 max_file_xfer = READ_FILE_MAX_SIZE;
   /* Maximum number of bytes to read/write in one read/write_file() call.
    */
 
+int32 def_callouts = MAX_CALLOUTS;
+int32 max_callouts = MAX_CALLOUTS;
+  /* If != 0: the max. number of callouts at one time.
+   */
+
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
 static void free_shadow_sent (shadow_t *p);
+
+/*-------------------------------------------------------------------------*/
+Bool
+catch_instruction (bytecode_t catch_inst, uint offset
+                  , volatile svalue_t ** volatile i_sp
+                  , bytecode_p i_pc, svalue_t * i_fp)
+
+/* Implement the F_CATCH/F_CATCH_NO_LOG instruction.
+ *
+ * At the time of call, all important locals from eval_instruction() are
+ * have been stored in their global locations.
+ *
+ * Result is TRUE on a normal exit (error or not), and FALSE if the
+ * guarded code terminated with a 'return' itself;
+ *
+ * Hard experience showed that it is advantageous to have the setjmp()
+ * have its own stackframe, and call the longjmp() from a deeper
+ * frame. Additionally it prevents over-optimistic optimizers from
+ * removing vital reloads of possibly clobbered local variables after
+ * the setjmp().
+ */
+
+{
+#define INTER_SP ((svalue_t *)(*i_sp))
+
+    Bool rc;
+    volatile Bool old_out_of_memory = out_of_memory;
+
+    bytecode_p new_pc;  /* Address of first instruction after the catch() */
+
+    /* Compute address of next instruction after the CATCH statement.
+     */
+    new_pc = i_pc + offset;
+
+    /* Increase the eval_cost for the duration of the catch so that
+     * there is enough time left to handle an eval-too-big error.
+     */
+    if (max_eval_cost && eval_cost + CATCH_RESERVED_COST >= max_eval_cost)
+    {
+        error("Not enough eval time left for catch(): required %ld, available %ld\n"
+             , (long)CATCH_RESERVED_COST, (long)(max_eval_cost - eval_cost)
+             );
+        /* NOTREACHED */
+        return MY_TRUE;
+    }
+
+    eval_cost += CATCH_RESERVED_COST;
+    assigned_eval_cost += CATCH_RESERVED_COST;
+
+    /* 'Fake' a subroutine call from <new_pc>
+     */
+    push_control_stack(INTER_SP, new_pc, i_fp);
+    csp->ob = current_object;
+    csp->extern_call = MY_FALSE;
+    csp->catch_call = MY_TRUE;
+#ifndef DEBUG
+    csp->num_local_variables = 0;        /* No extra variables */
+#else
+    csp->num_local_variables = (csp-1)->num_local_variables;
+      /* TODO: Marion added this, but why? For 'expected_stack'? */
+#endif
+    csp->funstart = csp[-1].funstart;
+
+    /* Save some globals on the error stack that must be restored
+     * separately after a longjmp, then set the jump.
+     */
+    if ( setjmp( push_error_context(INTER_SP, catch_inst)->text ) )
+    {
+        /* A throw() or error occured. We have to restore the
+         * control and error stack manually here.
+         *
+         * The error value to return will be stored in
+         * the global <catch_value>.
+         */
+        svalue_t *sp;
+
+        /* Remove the catch context and get the old stackpointer setting */
+        sp = pull_error_context(INTER_SP);
+
+        /* beware of errors after set_this_object() */
+        current_object = csp->ob;
+
+        /* catch() faked a subroutine call internally, which has to be
+         * undone again. This will also set the pc to the proper
+         * continuation address.
+         */
+        pop_control_stack();
+
+        /* Push the catch return value */
+        *(++sp) = catch_value;
+        catch_value.type = T_INVALID;
+
+        *i_sp = (volatile svalue_t *)sp;
+
+        /* Restore the old eval costs */
+        eval_cost -= CATCH_RESERVED_COST;
+        assigned_eval_cost -= CATCH_RESERVED_COST;
+
+        /* If we ran out of memory, throw a new error */
+        if (!old_out_of_memory && out_of_memory)
+        {
+            error("(catch) Out of memory detected.\n");
+        }
+
+        rc = MY_TRUE;
+    }
+    else
+    {
+
+        /* Recursively call the interpreter */
+        rc = eval_instruction(i_pc, INTER_SP);
+
+        if (rc)
+        {
+            /* Get rid of the code result */
+            pop_stack();
+
+            /* Restore the old execution context */
+            pop_control_stack();
+            pop_error_context();
+
+            /* Since no error happened, push 0 onto the stack */
+            push_number(0);
+        }
+
+        /* Restore the old eval costs */
+        eval_cost -= CATCH_RESERVED_COST;
+        assigned_eval_cost -= CATCH_RESERVED_COST;
+    }
+
+    return rc;
+} /* catch_instruction() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -316,6 +501,7 @@ save_limits_context (struct limits_context_s * context)
 {
     context->rt.type = LIMITS_CONTEXT;
     context->max_array = max_array_size;
+    context->max_callouts = max_callouts;
     context->max_mapping = max_mapping_size;
     context->max_eval = max_eval_cost;
     context->eval_cost = eval_cost;
@@ -344,6 +530,7 @@ restore_limits_context (struct limits_context_s * context)
     }
     max_array_size = context->max_array;
     max_mapping_size = context->max_mapping;
+    max_callouts = context->max_callouts;
     max_eval_cost = context->max_eval;
     max_byte_xfer = context->max_byte;
     max_file_xfer = context->max_file;
@@ -381,6 +568,28 @@ unroll_context_stack (void)
 } /* unroll_context_stack() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE void dump_core(void) NORETURN;
+
+static INLINE void
+dump_core(void)
+
+/* A wrapper around abort() to make sure that we indeed dump a core.
+ */
+
+{
+#if (defined(__GNUC__) || !defined(AMIGA)) && !defined(__BEOS__)
+    /* we want a core dump, and abort() seems to fail for linux and sun */
+    (void)signal(SIGFPE, SIG_DFL);
+    {
+        int a = 0;  /* avoids a pesky diagnostic */
+        *((char*)0) = 0/a;
+        *((char*)fatal) = 0/a;
+    }
+#endif
+    abort();
+} /* dump_core() */
+
+/*-------------------------------------------------------------------------*/
 void
 fatal (char *fmt, ...)
 
@@ -395,10 +604,11 @@ fatal (char *fmt, ...)
 
     /* Prevent double fatal. */
     if (in_fatal)
-        abort();
+        dump_core();
     in_fatal = MY_TRUE;
+
     ts = time_stamp();
-    
+
     va_start(va, fmt);
 
     fflush(stdout);
@@ -416,10 +626,12 @@ fatal (char *fmt, ...)
                      , ts, current_object->name
                            ? current_object->name : "<null>");
     debug_message("%s Dump of the call chain:\n", ts);
-    (void)dump_trace(MY_TRUE);
+    (void)dump_trace(MY_TRUE, NULL);
+
+    printf("%s LDMud aborting on fatal error.\n", time_stamp());
     fflush(stdout);
 
-#if !defined(AMIGA) || !defined(__SASC)
+#if defined(__GNUC__) || !defined(AMIGA) || !defined(__SASC)
     sleep(1); /* let stdout settle down... abort can ignore the buffer... */
 #else
     Delay(50);        /* Call Dos.library to wait... */
@@ -427,33 +639,29 @@ fatal (char *fmt, ...)
 
     va_end(va);
 
-#if !defined(AMIGA) && !defined(__BEOS__)
-    /* we want a core dump, and abort() seems to fail for linux and sun */
-    (void)signal(SIGFPE, SIG_DFL);
-    {
-        int a = 0;  /* avoids a pesky diagnostic */
-        *((char*)0) = 0/a;
-        *((char*)fatal) = 0/a;
-    }
-#endif
-    abort();
+    /* Before shutting down, try to inform the game about it */
+    push_volatile_string("Fatal Error");
+    callback_master(STR_SHUTDOWN, 1);
+
+    /* Dump core and exit */
+    dump_core();
 } /* fatal() */
 
 /*-------------------------------------------------------------------------*/
 char *
-limit_error_format (char *fixed_fmt, char *fmt)
+limit_error_format (char *fixed_fmt, size_t fixed_fmt_len, char *fmt)
 
 /* Safety function for error messages: in the error message <fmt>
  * every '%s' spec is changed to '%.200s' to avoid buffer overflows.
- * The modified format string is stored in <fixed_fmt> which is
- * also returned as result.
+ * The modified format string is stored in <fixed_fmt> (a caller provided
+ * buffer of size <fixed_fmd_len>) which is also returned as result.
  */
 
 {
     char *ffptr;
 
     ffptr = fixed_fmt;
-    while (*fmt)
+    while (*fmt && ffptr - fixed_fmt < fixed_fmt_len-1)
     {
       if ((*ffptr++=*fmt++)=='%')
       {
@@ -466,6 +674,19 @@ limit_error_format (char *fixed_fmt, char *fmt)
         }
       }
     }
+
+    if (*fmt)
+    {
+        /* We reached the end of the fixed_fmt buffer before
+         * the <fmt> string was complete: mark this error message
+         * as truncated.
+         * ffptr points to the last byte in the <fixed_fmt> buffer.
+         */
+        ffptr[-3] = '.';
+        ffptr[-2] = '.';
+        ffptr[-1] = '.';
+    }
+
     *ffptr = '\0';
     return fixed_fmt;
 } /* limit_error_format() */
@@ -496,12 +717,16 @@ error (char *fmt, ...)
     char     *malloced_error;        /* copy of emsg_buf+1 */
     char     *malloced_file = NULL;  /* copy of program name */
     char     *malloced_name = NULL;  /* copy of the object name */
-    char      fixed_fmt[200];
+    object_t *curobj = NULL;         /* Verified current object */
+    char      fixed_fmt[10000];
+      /* Note: When changing this buffer, also change the HEAP_STACK_GAP
+       * limit in xalloc.c!
+       */
     mp_int    line_number = 0;
     va_list   va;
 
     ts = time_stamp();
-    
+
     /* Find the last error recovery context, but do not yet unroll
      * the stack: the current command context might be needed
      * in the runtime error apply.
@@ -513,9 +738,15 @@ error (char *fmt, ...)
     va_start(va, fmt);
 
     /* Make fmt sane */
-    fmt = limit_error_format(fixed_fmt, fmt);
+    fmt = limit_error_format(fixed_fmt, sizeof(fixed_fmt), fmt);
 
-    if (current_object)
+    /* Check the current object */
+    curobj = NULL;
+    if (current_object != NULL
+     && current_object != &dummy_current_object_for_loads)
+        curobj = current_object;
+
+    if (curobj)
         assign_eval_cost();
 
     /* We allow recursive errors only from "sensitive" environments.
@@ -547,14 +778,19 @@ error (char *fmt, ...)
         put_malloced_string(&catch_value, string_copy(emsg_buf));
           /* always reallocate */
 
-        /* Even though caught, dump the backtrace - it makes mudlib
-         * debugging much easier.
-         */
-        debug_message("%s Caught error: %s", ts, emsg_buf + 1);
-        printf("%s Caught error: %s", ts, emsg_buf + 1);
-        dump_trace(MY_FALSE);
-        debug_message("%s ... execution continues.\n", ts);
-        printf("%s ... execution continues.\n", ts);
+        if (rt->type != ERROR_RECOVERY_CATCH_NOLOG)
+        {
+            /* Even though caught, dump the backtrace - it makes mudlib
+             * debugging much easier.
+             */
+            debug_message("%s Caught error: %s", ts, emsg_buf + 1);
+            printf("%s Caught error: %s", ts, emsg_buf + 1);
+            if (current_error_trace)
+                free_array(current_error_trace);
+            dump_trace(MY_FALSE, &current_error_trace);
+            debug_message("%s ... execution continues.\n", ts);
+            printf("%s ... execution continues.\n", ts);
+        }
 
         unroll_context_stack();
         longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
@@ -581,11 +817,11 @@ error (char *fmt, ...)
     /* If we have a current_object, determine the program location
      * of the fault.
      */
-    if (current_object)
+    if (curobj)
     {
         line_number = get_line_number_if_any(&file);
         debug_message("%s program: %s, object: %s line %ld\n"
-                     , ts, file, current_object->name, line_number);
+                     , ts, file, curobj->name, line_number);
         if (current_prog && num_error < 3)
         {
             do_save_error = MY_TRUE;
@@ -596,29 +832,35 @@ error (char *fmt, ...)
             strcpy(malloced_file, file);
         }
 
-        if ( NULL != (malloced_name = xalloc(strlen(current_object->name) + 1)) )
+        if ( NULL != (malloced_name = xalloc(strlen(curobj->name) + 1)) )
         {
-            strcpy(malloced_name, current_object->name);
+            strcpy(malloced_name, curobj->name);
         }
     }
 
-    /* Duplicate the error messages so far on stdout */
-    
-    if (rt->type == ERROR_RECOVERY_APPLY)
+    /* On a triple error, duplicate the error messages so far on stdout */
+
+    if (num_error == 3)
     {
         /* Error context is secure_apply() */
 
         printf("%s error in function call: %s", ts, emsg_buf+1);
-        if (current_object)
+        if (curobj)
         {
             printf("%s program: %s, object: %s line %ld\n"
-                  , ts, file, current_object->name, line_number
+                  , ts, file, curobj->name, line_number
                   );
         }
     }
 
     /* Dump the backtrace */
-    object_name = dump_trace(num_error == 3);
+    if (uncaught_error_trace)
+        free_array(uncaught_error_trace);
+    if (current_error_trace)
+        free_array(current_error_trace);
+
+    object_name = dump_trace(num_error == 3, &current_error_trace);
+    uncaught_error_trace = ref_array(current_error_trace);
     fflush(stdout);
 
     if (rt->type == ERROR_RECOVERY_APPLY)
@@ -638,6 +880,16 @@ error (char *fmt, ...)
                 xfree(malloced_file);
             if (malloced_name)
                 xfree(malloced_name);
+            if (current_error_trace)
+            {
+                free_array(current_error_trace);
+                current_error_trace = NULL;
+            }
+            if (uncaught_error_trace)
+            {
+                free_array(uncaught_error_trace);
+                uncaught_error_trace = NULL;
+            }
         }
         unroll_context_stack();
         longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
@@ -661,7 +913,7 @@ error (char *fmt, ...)
     if (object_name)
     {
         /* Error occured in a heart_beat() function */
-        
+
         object_t *ob;
 
         ob = find_object(object_name);
@@ -685,33 +937,29 @@ error (char *fmt, ...)
         /* We have memory: call master:runtime(), and maybe
          * also master:heart_beat_error().
          */
-        
+
         int a;
         object_t *save_cmd;
+        object_t *culprit = NULL;
+
 
         CLEAR_EVAL_COST;
         RESET_LIMITS;
         push_volatile_string(malloced_error);
         a = 1;
-        if (current_object)
+        if (curobj)
         {
             push_volatile_string(malloced_file);
             push_volatile_string(malloced_name);
             push_number(line_number);
             a += 3;
         }
-        save_cmd = command_giver;
-        apply_master_ob(STR_RUNTIME, a);
-        command_giver = save_cmd;
 
         if (current_heart_beat)
         {
-            /* Heartbeat error: call the master to log it
-             * and to see if the heartbeat shall be turned
-             * back on for this object.
+            /* Heartbeat error: turn off the heartbeat in the object
+             * and also pass it to RUNTIME_ERROR.
              */
-
-            object_t *culprit;
 
             culprit = current_heart_beat;
             current_heart_beat = NULL;
@@ -719,9 +967,40 @@ error (char *fmt, ...)
             debug_message("%s Heart beat in %s turned off.\n"
                          , time_stamp(), culprit->name);
             push_valid_ob(culprit);
+            a++;
+        }
+        else
+        {
+            if (!curobj)
+            {
+                /* Pass dummy values */
+                push_number(0);
+                push_number(0);
+                push_number(0);
+                a += 3;
+            }
+            /* Normal error: push -1 instead of a culprit. */
+            push_number(-1);
+            a++;
+        }
+
+        save_cmd = command_giver;
+        apply_master(STR_RUNTIME, a);
+        command_giver = save_cmd;
+
+        if (culprit)
+        {
+            /* TODO: Merge heart_beat_error() in to runtime_error() */
+
+            /* Heartbeat error: call the master to log it
+             * and to see if the heartbeat shall be turned
+             * back on for this object.
+             */
+
+            push_valid_ob(culprit);
             push_volatile_string(malloced_error);
             a = 2;
-            if (current_object)
+            if (curobj)
             {
                 push_volatile_string(malloced_file);
                 push_volatile_string(malloced_name);
@@ -729,10 +1008,12 @@ error (char *fmt, ...)
                 a += 3;
             }
 
-            svp = apply_master_ob(STR_HEART_ERROR, a);
+            svp = apply_master(STR_HEART_ERROR, a);
             command_giver = save_cmd;
             if (svp && (svp->type != T_NUMBER || svp->u.number) )
             {
+                debug_message("%s Heart beat in %s turned back on.\n"
+                             , time_stamp(), culprit->name);
                 set_heart_beat(culprit, 1);
             }
         }
@@ -772,6 +1053,69 @@ error (char *fmt, ...)
 
 /*-------------------------------------------------------------------------*/
 void
+warnf (char *fmt, ...)
+
+/* A system runtime warning occured: generate a message from printf-style
+ * <fmt> with a timestamp, and print it using debug_message().
+ *
+ * Note: Both 'warn' and 'warning' are already taken on some systems.
+ * TODO: Extend this to let the mudlib handle warnings.
+ * TODO: Add a pwarnf(<prefmt>, <postfmt>,...) function which translates the
+ * TODO:: errno into a string and calls error(<prefmt><errmsg><postfmt>, ...).
+ */
+
+{
+    char     *ts;
+    char     *file;                  /* program name */
+    object_t *curobj = NULL;         /* Verified current object */
+    char      msg_buf[2000];
+      /* The buffer for the error message to be created.
+       */
+    char      fixed_fmt[10000];
+      /* Note: When changing this buffer, also change the HEAP_STACK_GAP
+       * limit in xalloc.c!
+       */
+    mp_int    line_number = 0;
+    va_list   va;
+
+    ts = time_stamp();
+
+    va_start(va, fmt);
+
+    /* Make fmt sane */
+    fmt = limit_error_format(fixed_fmt, sizeof(fixed_fmt), fmt);
+
+    /* Check the current object */
+    curobj = NULL;
+    if (current_object != NULL
+     && current_object != &dummy_current_object_for_loads)
+        curobj = current_object;
+
+    if (curobj)
+        assign_eval_cost();
+
+    /* Generate the warning message */
+    vsprintf(msg_buf, fmt, va);
+    va_end(va);
+
+    debug_message("%s ", ts);
+    debug_message("%s", msg_buf);
+
+    /* If we have a current_object, determine the program location
+     * of the fault.
+     */
+    if (curobj)
+    {
+        line_number = get_line_number_if_any(&file);
+        debug_message("%s program: %s, object: %s line %ld\n"
+                     , ts, file, curobj->name, line_number);
+    }
+
+    fflush(stdout);
+} /* warnf() */
+
+/*-------------------------------------------------------------------------*/
+void
 parse_error (Bool warning, char *error_file, int line, char *what
             , char *context)
 
@@ -792,7 +1136,7 @@ parse_error (Bool warning, char *error_file, int line, char *what
         what = "...[too long error message]...";
     if (strlen(what) + strlen(error_file) > sizeof buff - 100)
         error_file = "...[too long filename]...";
-    sprintf(buff, "%s line %d %s:%s\n", error_file, line, context, what);
+    sprintf(buff, "%s line %d%s: %s\n", error_file, line, context, what);
 
     /* Don't call the master if it isn't loaded! */
     if (master_ob && !(master_ob->flags & O_DESTRUCTED) )
@@ -800,7 +1144,7 @@ parse_error (Bool warning, char *error_file, int line, char *what
         push_volatile_string(error_file);
         push_volatile_string(buff);
         push_number(warning ? 1 : 0);
-        apply_master_ob(STR_LOG_ERROR, 3);
+        apply_master(STR_LOG_ERROR, 3);
     }
 } /* parse_error() */
 
@@ -913,16 +1257,16 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
 
 {
     lambda_t *l;
-    char *err;
+    char *err, errtxt[1000];
     svalue_t arg, *ret;
 
     ob->user = &default_wizlist_entry;  /* Default uid */
 
-    if ( NULL != (l = closure_hook[hook].u.lambda) )
+    if ( NULL != (l = driver_hook[hook].u.lambda) )
     {
-        if (closure_hook[hook].x.closure_type == CLOSURE_LAMBDA)
+        if (driver_hook[hook].x.closure_type == CLOSURE_LAMBDA)
             l->ob = ob;
-        call_lambda(&closure_hook[hook], numarg);
+        call_lambda(&driver_hook[hook], numarg);
         ret = inter_sp;
         xfree(ret[-1].u.lvalue); /* free error context */
 
@@ -962,14 +1306,16 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
         else
         {
             pop_stack(); /* deallocate result */
-            err = "Illegal object to load.\n";
+            sprintf(errtxt, "Object '%.900s' illegal to load (no uid).\n"
+                          , ob->name);
+            err = errtxt;
         }
     }
     else
     {
         do pop_stack(); while (--numarg); /* deallocate arguments */
         xfree(inter_sp->u.lvalue);
-        err = "closure to set uid not initialized!\n";
+        err = "Closure to set uid not initialized!\n";
     }
 
     inter_sp--;  /* skip error context */
@@ -1143,12 +1489,68 @@ legal_path (char *path)
 } /* legal_path() */
 
 /*-------------------------------------------------------------------------*/
+static void load_object_error(const char *msg, const char *name, namechain_t *chain) NORETURN;
+
+static void
+load_object_error(const char *msg, const char *name, namechain_t *chain)
+
+/* Generate a compilation error message <msg>. If <name> is not NULL,
+ * ": '<name>'" is appended to the message. If <chain> is not NULL,
+ * " (inherited by <chain...>)" is appended to the message.
+ * The message is then printed to stderr and an error() with it is thrown.
+ */
+
+{
+    strbuf_t sbuf;
+    namechain_t *ptr;
+    char * buf;
+
+    strbuf_zero(&sbuf);
+
+    strbuf_add(&sbuf, msg);
+    if (name != NULL)
+    {
+        strbuf_add(&sbuf, ": '");
+        strbuf_add(&sbuf, name);
+        strbuf_add(&sbuf, "'");
+    }
+
+    if (chain != NULL)
+    {
+        strbuf_add(&sbuf, " (inherited");
+        for (ptr = chain; ptr != NULL; ptr = ptr->prev)
+        {
+            strbuf_add(&sbuf, " by '");
+            strbuf_add(&sbuf, ptr->name);
+            strbuf_add(&sbuf, "'");
+        }
+        strbuf_add(&sbuf, ")");
+    }
+
+    strbuf_add(&sbuf, ".\n");
+
+    /* Make a local copy of the message so as not to leak memory */
+    buf = alloca(strlen(sbuf.buf)+1);
+    if (!buf)
+        error("Out of stack memory (%lu bytes)\n"
+             , (unsigned long) strlen(sbuf.buf)+1);
+    strcpy(buf, sbuf.buf);
+    strbuf_free(&sbuf);
+
+    fprintf(stderr, "%s %s", time_stamp(), buf);
+    error("%.*s", (int)strlen(buf), buf);
+} /* load_object_error() */
+
+/*-------------------------------------------------------------------------*/
+#define MAX_LOAD_DEPTH 60 /* Make this a configurable constant */
+
 static object_t *
-load_object (const char *lname, Bool create_super, int depth)
+load_object (const char *lname, Bool create_super, int depth, namechain_t *chain)
 
 /* Load (compile) an object blueprint from the file <lname>. <create_super>
  * is true if the object has to be initialized with CREATE_SUPER, and false
- * if CREATE_OB is to be used. <depth> is the limit of allowed recursive loads.
+ * if CREATE_OB is to be used. <depth> is the current recursive load depth
+ * and is checked against MAX_LOAD_DEPTH.
  *
  * If the object can't be loaded because it inherits some other unloaded
  * object, call load_object() recursively to load the inherited object, then
@@ -1159,6 +1561,8 @@ load_object (const char *lname, Bool create_super, int depth)
  *
  * If there is no source file <lname>.c, the function calls
  * master:compile_object() in case it is a virtual object.
+ *
+ * <chain> is the internal list of inherits.
  *
  * Result is the pointer to the loaded object, or NULL on failure.
  */
@@ -1173,6 +1577,7 @@ load_object (const char *lname, Bool create_super, int depth)
     char       *name; /* Copy of <lname> */
     char       *fname; /* Filename for <name> */
     program_t  *prog;
+    namechain_t nlink;
 
 #ifdef DEBUG
     if ('/' == lname[0])
@@ -1197,11 +1602,13 @@ load_object (const char *lname, Bool create_super, int depth)
     fname = alloca(name_length+4);
     if (!name || !fname)
         fatal("Stack overflow in load_object()");
-#ifndef COMPAT_MODE
-    *name++ = '/';  /* Add and hide a leading '/' */
-#endif
+    if (!compat_mode)
+        *name++ = '/';  /* Add and hide a leading '/' */
     strcpy(name, lname);
     strcpy(fname, lname);
+
+    nlink.name = name;
+    nlink.prev = chain;
 
     if (strict_euids && current_object && current_object->eff_user == 0
      && current_object->name)
@@ -1227,6 +1634,18 @@ load_object (const char *lname, Bool create_super, int depth)
         }
     }
 
+    /* Check if we were already trying to compile this object */
+    if (chain != NULL)
+    {
+        namechain_t * ptr;
+
+        for (ptr = chain; ptr != NULL; ptr = ptr->prev)
+        {
+            if (!strcmp(name, ptr->name))
+                load_object_error("Recursive inherit", name, chain);
+        }
+    }
+
     /* Check if the name follows the "name#number" pattern */
     {
         char c;
@@ -1239,16 +1658,14 @@ load_object (const char *lname, Bool create_super, int depth)
             if ( (c = *--p) < '0' || c > '9' ) {
                 if (c == '#' && name_length - i > 1)
                 {
-                    fprintf(stderr, "%s Illegal file to load: %s\n"
-                                  , time_stamp(), name);
-                    error("Illegal file to load: %s.\n", name);
+                    load_object_error("Illegal file to load", name, chain);
                 }
                 break;
             }
         }
     }
 
-    /* First check that the c-file exists.
+    /* Check that the c-file exists.
      */
     (void)strcpy(fname+name_length, ".c");
     if (ixstat(fname, &c_st) == -1)
@@ -1258,7 +1675,7 @@ load_object (const char *lname, Bool create_super, int depth)
         svalue_t *svp;
 
         push_volatile_string(fname);
-        svp = apply_master_ob(STR_COMP_OBJ, 1);
+        svp = apply_master(STR_COMP_OBJ, 1);
         if (svp && svp->type == T_OBJECT)
         {
             /* We got an object from the call, but is it what it
@@ -1286,9 +1703,8 @@ load_object (const char *lname, Bool create_super, int depth)
             }
             fname[name_length] = '.';
         }
-        fprintf(stderr, "%s Could not load descr for '%s'\n"
-               , time_stamp(), name);
-        error("Failed to load file '%s'.\n", name);
+        load_object_error("Failed to load file", name, chain);
+        /* NOTREACHED */
         return NULL;
     }
 
@@ -1296,9 +1712,8 @@ load_object (const char *lname, Bool create_super, int depth)
      */
     if (!legal_path(fname))
     {
-        fprintf(stderr, "%s Illegal pathname: '%s'\n"
-               , time_stamp(), fname);
-        error("Illegal path name '%s'.\n", fname);
+        load_object_error("Illegal pathname", fname, chain);
+        /* NOTREACHED */
         return NULL;
     }
 
@@ -1323,7 +1738,8 @@ load_object (const char *lname, Bool create_super, int depth)
 
         if (current_file)
         {
-            error("Compiler is busy.\n");
+            error("Can't load '%s': compiler is busy with '%s'.\n"
+                 , name, current_file);
         }
 
         fd = ixopen(fname, O_RDONLY | O_BINARY);
@@ -1336,12 +1752,10 @@ load_object (const char *lname, Bool create_super, int depth)
 
         current_file = fname;
 
-        /* The file name is needed before start_new_file(), in case there is
+        /* The file name is needed before compile_file(), in case there is
          * an initial 'line too long' error.
          */
-        start_new_file(fd);
-        compile_file();
-        end_new_file();
+        compile_file(fd);
         if (comp_flag)
         {
             if (NULL == inherit_file)
@@ -1391,7 +1805,7 @@ load_object (const char *lname, Bool create_super, int depth)
              */
             if (num_parse_error > 0)
             {
-                error("Error in loading object '%s'\n", name);
+                load_object_error("Error in loading object", name, chain);
             }
 
             if (strcmp(pInherited, name) == 0)
@@ -1399,18 +1813,18 @@ load_object (const char *lname, Bool create_super, int depth)
                 error("Illegal to inherit self.\n");
             }
 
-            if (!depth)
+            if (depth >= MAX_LOAD_DEPTH)
             {
-                error("Too deep inheritance nesting.\n");
+                load_object_error("Too deep inheritance", name, chain);
             }
 
-            ob = load_object(pInherited, MY_TRUE, depth-1);
+            ob = load_object(pInherited, MY_TRUE, depth+1, &nlink);
             free_string(inter_sp->u.string);
             inter_sp--;
             if (!ob || ob->flags & O_DESTRUCTED)
             {
-                error("Error in loading object '%s' "
-                      "(inheritance failed)\n", name);
+                load_object_error("Error in loading object "
+                      "(inheritance failed)\n", name, chain);
             }
         } /* handling of inherit_file */
     } /* while() - compilation loop */
@@ -1418,11 +1832,28 @@ load_object (const char *lname, Bool create_super, int depth)
     /* Did the compilation succeed? */
     if (num_parse_error > 0)
     {
-        error("Error in loading object '%s'\n", name);
+        load_object_error("Error in loading object", name, chain);
     }
 
     /* We got the program. Now create the blueprint to hold it.
      */
+
+    if (NULL != (ob = lookup_object_hash(name)))
+    {
+        /* The object magically appeared!
+         * This can happen if rename_object() is used carelessly
+         * in the mudlib handler for compiler warnings.
+         */
+#ifndef INITIALIZATION_BY___INIT
+        for (i = compiled_prog->num_variables; --i >= 0; )
+            free_svalue(&prog_variable_values[i]);
+#endif
+        free_prog(compiled_prog, MY_TRUE);
+        load_object_error("Object appeared while it was compiled"
+                         , name, chain);
+        /* NOTREACHED */
+        return NULL;
+    }
 
     prog = compiled_prog;
 
@@ -1446,11 +1877,17 @@ load_object (const char *lname, Bool create_super, int depth)
     if (!ob)
         error("Out of memory for new object '%s'\n", name);
 
-    ob->name = string_copy(name);  /* Shared string is no good here */
+    ob->name = string_copy(name);
     tot_alloc_object_size += strlen(ob->name)+1;
-#ifndef COMPAT_MODE
-    name--;  /* Make the leading '/' visible again */
-#endif
+      /* Tabling this unique string is of not much use.
+       * Note that the string must be valid for the ref_object()
+       * below to work in debugging mode.
+       */
+
+    prog->blueprint = ref_object(ob, "load_object: blueprint reference");
+
+    if (!compat_mode)
+        name--;  /* Make the leading '/' visible again */
     ob->load_name = make_shared_string(name);  /* but here it is */
     ob->prog = prog;
     ob->ticks = ob->gigaticks = 0;
@@ -1504,7 +1941,7 @@ load_object (const char *lname, Bool create_super, int depth)
         }
     }
 
-    if ( !(ob->flags & O_DESTRUCTED) && function_exists("clean_up",ob) )
+    if ( !(ob->flags & O_DESTRUCTED))
         ob->flags |= O_WILL_CLEAN_UP;
 
     /* Restore the command giver */
@@ -1662,7 +2099,7 @@ clone_object (char *str1)
     new_ob->name = make_new_name(name);
     tot_alloc_object_size += strlen(new_ob->name)+1;
     new_ob->load_name = ref_string(ob->load_name);
-    new_ob->flags |= O_CLONE | (ob->flags & O_WILL_CLEAN_UP ) ;
+    new_ob->flags |= O_CLONE | O_WILL_CLEAN_UP;
     new_ob->prog = ob->prog;
     reference_prog (ob->prog, "clone_object");
     new_ob->ticks = new_ob->gigaticks = 0;
@@ -1731,7 +2168,7 @@ lookfor_object(char * str, Bool bLoad)
         return ob;
 
     if (!ob)
-        ob = load_object(pName, 0, 60);
+        ob = load_object(pName, 0, 0, NULL);
     if (!ob || ob->flags & O_DESTRUCTED)
         return NULL;
     return ob;
@@ -1777,7 +2214,7 @@ destruct_object (svalue_t *v)
     }
 
     push_object(ob);
-    result = apply_master_ob(STR_PREP_DEST, 1);
+    result = apply_master(STR_PREP_DEST, 1);
     if (!result)
         error("No prepare_destruct\n");
 
@@ -1810,9 +2247,47 @@ destruct_object (svalue_t *v)
 
 /*-------------------------------------------------------------------------*/
 void
+deep_destruct (object_t *ob)
+
+/* Destruct an object <ob> and the blueprint objects of all inherited
+ * programs. The actual destruction work is done by destruct().
+ *
+ * The objects are still kept around until the end of the execution because
+ * it might still hold a running program. The destruction will be completed
+ * from the backend by a call to handle_newly_destructed_objects().
+ */
+
+{
+    program_t *prog;
+
+    /* Destruct the object itself */
+    destruct(ob);
+
+    /* Loop through all the inherits and destruct the blueprints
+     * of the inherited programs.
+     */
+    prog = ob->prog;
+    if (prog != NULL)
+    {
+        int i;
+
+        for (i = 0; i < prog->num_inherited; ++i)
+        {
+            program_t *iprog = prog->inherit[i].prog;
+
+            if (iprog != NULL && iprog->blueprint != NULL)
+            {
+                destruct(iprog->blueprint);
+            }
+        }
+    }
+} /* deep_destruct() */
+
+/*-------------------------------------------------------------------------*/
+void
 destruct (object_t *ob)
 
-/* Really destruct an object <ob>. This function is called from
+/* Destruct an object <ob>. This function is called from
  * destruct_object() to do the actual work, and also directly in situations
  * where the master is out of order or the object not fully initialized.
  *
@@ -1826,7 +2301,7 @@ destruct (object_t *ob)
  *
  * The object is still kept around until the end of the execution because
  * it might still hold a running program. The destruction will be completed
- * from the backend by a call to remove_object().
+ * from the backend by a call to handle_newly_destructed_objects().
  */
 
 {
@@ -1872,20 +2347,39 @@ destruct (object_t *ob)
         {
             shadow_t *shadowing_sent;
 
+            /* Remove the shadow sent from the chain */
             shadowing_sent = O_GET_SHADOW(shadowing);
             shadow_sent->shadowing = NULL;
             shadowing_sent->shadowed_by = shadow_sent->shadowed_by;
             check_shadow_sent(shadowing);
+
+            /* This object, the shadow, may have added actions to
+             * the shadowee, or it's vicinity. Take care to remove
+             * them all.
+             */
+            remove_shadow_actions(ob, shadowing);
         }
 
         if ( NULL != (shadowed_by = shadow_sent->shadowed_by) )
         {
             shadow_t *shadowed_by_sent;
 
+            /* Remove the shadow sent from the chain */
             shadowed_by_sent = O_GET_SHADOW(shadowed_by);
             shadow_sent->shadowed_by = NULL;
             shadowed_by_sent->shadowing = shadowing;
             check_shadow_sent(shadowed_by);
+
+            /* Our shadows may have added actions to us or to our
+             * environment. Take care to remove them all.
+             */
+            do {
+                remove_shadow_actions(shadowed_by, ob);
+                if (O_GET_SHADOW(shadowed_by) != NULL)
+                    shadowed_by = O_GET_SHADOW(shadowed_by)->shadowed_by;
+                else
+                    shadowed_by = NULL;
+            } while (shadowed_by != NULL);
         }
 
         check_shadow_sent(ob);
@@ -1903,7 +2397,10 @@ destruct (object_t *ob)
     remove_object_from_stack(ob);
 
     if (ob == simul_efun_object)
+    {
         simul_efun_object = NULL;
+        invalidate_simul_efuns();
+    }
 
     set_heart_beat(ob, 0);
 
@@ -1915,7 +2412,7 @@ destruct (object_t *ob)
         if (ob->super->sent)
             remove_action_sent(ob, ob->super);
 
-#       ifdef F_SET_LIGHT
+#       ifdef USE_SET_LIGHT
             add_light(ob->super, - ob->total_light);
 #       endif
 
@@ -1951,14 +2448,14 @@ destruct (object_t *ob)
     ob->contains = NULL;
     ob->flags &= ~O_ENABLE_COMMANDS;
     ob->flags |= O_DESTRUCTED;  /* should come last! */
-    new_destructed++;
     if (command_giver == ob)
         command_giver = NULL;
 
-    /* Put the object into the list of destructed objects */
+    /* Put the object into the list of newly destructed objects */
     ob->prev_all = NULL;
-    ob->next_all = destructed_objs;
-    destructed_objs = ob;
+    ob->next_all = newly_destructed_objs;
+    newly_destructed_objs = ob;
+    num_newly_destructed++;
 } /* destruct() */
 
 /*-------------------------------------------------------------------------*/
@@ -1966,13 +2463,18 @@ static void
 remove_object (object_t *ob)
 
 /* This function is called from outside any execution thread to finally
- * remove object <ob>. <ob> must have been unlinked from the object list
- * with destruct() already.
+ * remove object <ob>. <ob> must have been unlinked from all object lists
+ * already (but the associated reference count must still exist).
  *
- * The function frees all variables and remaining sentences in the object
- * and the calls free_object(). The object structure and the program
- * will be freed as soon as there are no further references to the object
- * (the program must remain behind in case it was inherited).
+ * The function frees all variables and remaining sentences in the object.
+ * If then only one reference (from the original object list) remains, the
+ * object is freed immediately with a call to free_object(). If more
+ * references exist, the object is linked into the destructed_objs list
+ * for freeing at a future date.
+ *
+ * The object structure and the program will be freed as soon as there
+ * are no further references to the object (the program will remain behind
+ * in case it was inherited).
  * TODO: Distinguish data- and inheritance references?
  */
 
@@ -1986,7 +2488,17 @@ remove_object (object_t *ob)
     }
 
     if (O_IS_INTERACTIVE(ob))
-        remove_interactive(ob);
+        remove_interactive(ob, MY_FALSE);
+
+    /* If this is a blueprint object, NULL out the pointer in the program
+     * to remove the extraneous reference.
+     */
+    if (ob->prog->blueprint == ob)
+    {
+        ob->prog->blueprint = NULL;
+        remove_prog_swap(ob->prog, MY_TRUE);
+        free_object(ob, "remove_object: blueprint reference");
+    }
 
     /* We must deallocate variables here, not in 'free_object()'.
      * That is because one of the local variables may point to this object,
@@ -2034,36 +2546,86 @@ remove_object (object_t *ob)
         ob->sent = NULL;
     }
 
-    free_object(ob, "destruct_object");
+    /* Either free the object, or link it up for future freeing. */
+    if (ob->ref <= 1)
+    {
+        free_object(ob, "destruct_object");
+    }
+    else
+    {
+        if (destructed_objs != NULL)
+            destructed_objs->prev_all = ob;
+        ob->next_all = destructed_objs;
+        destructed_objs = ob;
+        ob->prev_all = NULL;
+        num_destructed++;
+    }
 } /* remove_object() */
+
+/*-------------------------------------------------------------------------*/
+void
+handle_newly_destructed_objects (void)
+
+/* Finish up all newly destructed objects kept in the newly_destructed_objs
+ * list: deallocate as many associated resources and, if there are
+ * more than one references to the object, put it into the destructed_objs list.
+ */
+
+{
+    while (newly_destructed_objs)
+    {
+        object_t *ob = newly_destructed_objs;
+
+        newly_destructed_objs = ob->next_all;
+
+#ifdef DEBUG
+        if (!(ob->flags & O_DESTRUCTED))
+            fatal("Non-destructed object %p '%s' in list of newly destructed objects.\n"
+                 , ob, ob->name ? ob->name : "<null>"
+                 );
+#endif
+        remove_object(ob);
+        num_newly_destructed--;
+    }
+}  /* handle_newly_destructed_objects() */
 
 /*-------------------------------------------------------------------------*/
 void
 remove_destructed_objects (void)
 
-/* Remove all destructed objects which are kept pending for deallocation
- * in the destructed_objs list.
+/* Scan the list of destructed objects and free those with no references
+ * remaining.
  */
 
 {
-    while (destructed_objs)
-    {
-        object_t *ob = destructed_objs;
+    object_t *ob;
 
-        destructed_objs = ob->next_all;
-#ifdef DEBUG
-        if (!(ob->flags & O_DESTRUCTED))
-            fatal("Non-destructed object %p '%s' in list of destructed objects.\n"
-                 , ob, ob->name ? ob->name : "<null>"
-                 );
-#endif
-        remove_object(ob);
-        new_destructed--;
+    for (ob = destructed_objs; ob != NULL; )
+    {
+        object_t *victim;
+
+        /* Check if only the list reference remains.
+         * If not, go to the next object.
+         */
+        if (ob->ref > 1)
+        {
+            ob = ob->next_all;
+            continue;
+        }
+
+        /* This object can be freed - remove it from the list */
+        victim = ob;
+        if (ob->prev_all != NULL)
+            ob->prev_all->next_all = ob->next_all;
+        if (ob->next_all != NULL)
+            ob->next_all->prev_all = ob->prev_all;
+        if (destructed_objs == ob)
+            destructed_objs = ob->next_all;
+        ob = ob->next_all;
+
+        free_object(victim, "remove_destructed_objects");
+        num_destructed--;
     }
-#ifdef DEBUG
-    if (new_destructed)
-        fatal("new_destructed is %ld instead of 0.\n", new_destructed);
-#endif
 }  /* remove_destructed_objects() */
 
 /*-------------------------------------------------------------------------*/
@@ -2122,7 +2684,7 @@ purge_shadow_sent(void)
 
 {
     sentence_t *p;
-    
+
     for (;free_sent; free_sent = p) {
         p = free_sent->next;
         xfree(free_sent);
@@ -2211,26 +2773,26 @@ status_parse (strbuf_t * sbuf, char * buff)
             res += reserved_system_size;
         if (!verbose)
         {
-            strbuf_addf(sbuf, "Actions:\t\t\t%8ld %8ld\n"
+            strbuf_addf(sbuf, "Actions:\t\t\t%8ld %9ld\n"
                             , alloc_action_sent
                             , alloc_action_sent * sizeof (action_t));
-            strbuf_addf(sbuf, "Shadows:\t\t\t%8ld %8ld\n"
+            strbuf_addf(sbuf, "Shadows:\t\t\t%8ld %9ld\n"
                             , alloc_shadow_sent
                             , alloc_shadow_sent * sizeof (shadow_t));
-            strbuf_addf(sbuf, "Objects:\t\t\t%8d %8d (%ld swapped, %ld Kbytes)\n"
+            strbuf_addf(sbuf, "Objects:\t\t\t%8ld %9ld (%ld swapped, %ld Kbytes)\n"
                             , tot_alloc_object, tot_alloc_object_size
                             , num_vb_swapped, total_vb_bytes_swapped / 1024);
-            strbuf_addf(sbuf, "Arrays:\t\t\t\t%8ld %8ld\n"
+            strbuf_addf(sbuf, "Arrays:\t\t\t\t%8ld %9ld\n"
                             , (long)num_arrays, total_array_size() );
-            strbuf_addf(sbuf, "Mappings:\t\t\t%8ld %8ld\n"
+            strbuf_addf(sbuf, "Mappings:\t\t\t%8ld %9ld\n"
                              , num_mappings, total_mapping_size() );
-            strbuf_addf(sbuf, "Prog blocks:\t\t\t%8ld %8ld (%ld swapped, %ld Kbytes)\n"
+            strbuf_addf(sbuf, "Prog blocks:\t\t\t%8ld %9ld (%ld swapped, %ld Kbytes)\n"
                             , total_num_prog_blocks + num_swapped - num_unswapped
                             , total_prog_block_size + total_bytes_swapped
                                                     - total_bytes_unswapped
                             , num_swapped - num_unswapped
                             , (total_bytes_swapped - total_bytes_unswapped) / 1024);
-            strbuf_addf(sbuf, "Memory reserved:\t\t\t %8d\n", res);
+            strbuf_addf(sbuf, "Memory reserved:\t\t\t %9d\n", res);
         }
         if (verbose) {
 #ifdef COMM_STAT
@@ -2259,29 +2821,86 @@ status_parse (strbuf_t * sbuf, char * buff)
         tot += tot_alloc_object_size;
         if (verbose)
         {
+#ifdef DEBUG
+            long count;
+            object_t *ob;
+#endif
+
             strbuf_add(sbuf, "\nObject status:\n");
             strbuf_add(sbuf, "--------------\n");
             strbuf_addf(sbuf, "Objects total:\t\t\t %8ld\n"
                              , (long)tot_alloc_object);
+#ifndef DEBUG
             strbuf_addf(sbuf, "Objects in list:\t\t %8ld\n"
                              , (long)num_listed_objs);
+            strbuf_addf(sbuf, "Objects newly destructed:\t\t %8ld\n"
+                             , (long)num_newly_destructed);
+            strbuf_addf(sbuf, "Objects destructed:\t\t %8ld\n"
+                             , (long)num_destructed);
+#else
+            for (count = 0, ob = obj_list; ob != NULL; ob = ob->next_all)
+                count++;
+            if (count != num_listed_objs)
+            {
+                debug_message("DEBUG: num_listed_objs mismatch: listed %ld, counted %ld\n"
+                             , (long)num_listed_objs, count);
+                strbuf_addf(sbuf, "Objects in list:\t\t %8ld (counted %ld)\n"
+                                 , (long)num_listed_objs, count);
+            }
+            else
+                strbuf_addf(sbuf, "Objects in list:\t\t %8ld\n"
+                                 , (long)num_listed_objs);
+            for (count = 0, ob = newly_destructed_objs; ob != NULL; ob = ob->next_all)
+                count++;
+            if (count != num_newly_destructed)
+            {
+                debug_message("DEBUG: num_newly_destructed mismatch: listed %ld, counted %ld\n"
+                             , (long)num_newly_destructed, count);
+                strbuf_addf(sbuf, "Objects newly destructed:\t\t %8ld (counted %ld)\n"
+                                 , (long)num_newly_destructed, count);
+            }
+            else
+                strbuf_addf(sbuf, "Objects newly destructed:\t %8ld\n"
+                                 , (long)num_newly_destructed);
+            for (count = 0, ob = destructed_objs; ob != NULL; ob = ob->next_all)
+                count++;
+            if (count != num_destructed)
+            {
+                debug_message("DEBUG: num_destructed mismatch: listed %ld, counted %ld\n"
+                             , (long)num_destructed, count);
+                strbuf_addf(sbuf, "Objects destructed:\t\t %8ld (counted %ld)\n"
+                                 , (long)num_destructed, count);
+            }
+            else
+                strbuf_addf(sbuf, "Objects destructed:\t\t %8ld\n"
+                                 , (long)num_destructed);
+#endif
+
             strbuf_addf(sbuf, "Objects processed in last cycle: "
                                "%8ld (%5.1f%% - avg. %5.1f%%)\n"
                        , (long)num_last_processed
                        , (float)num_last_processed / (float)num_listed_objs * 100.0
-                       , (avg_in_list || avg_last_processed > avg_in_list)
-                         ? 100.0
-                         : 100.0 * (float)avg_last_processed / avg_in_list
+                       , !avg_in_list
+                         ? 0.0
+                         : ((avg_in_list || avg_last_processed > avg_in_list)
+                            ? 100.0
+                            : 100.0 * (float)avg_last_processed / avg_in_list
+                           )
                        );
         }
         tot += show_otable_status(sbuf, verbose);
         tot += heart_beat_status(sbuf, verbose);
         tot += add_string_status(sbuf, verbose);
-        tot += print_call_out_usage(sbuf, verbose);
+        tot += call_out_status(sbuf, verbose);
         tot += total_mapping_size();
 #ifdef RXCACHE_TABLE
         tot += rxcache_status(sbuf, verbose);
 #endif
+        if (verbose)
+        {
+            strbuf_add(sbuf, "\nOther:\n");
+            strbuf_add(sbuf, "------\n");
+        }
         tot += show_lexer_status(sbuf, verbose);
         tot += show_comm_status(sbuf, verbose);
         if (!verbose)
@@ -2292,14 +2911,14 @@ status_parse (strbuf_t * sbuf, char * buff)
             other += swap_overhead();
             other += num_simul_efun * sizeof(function_t);
             other += interpreter_overhead();
-            strbuf_addf(sbuf, "Other structures\t\t\t %8lu\n", other);
+            strbuf_addf(sbuf, "Other structures\t\t\t %9lu\n", other);
             tot += other;
         }
         tot += res;
 
         if (!verbose) {
-            strbuf_add(sbuf, "\t\t\t\t\t --------\n");
-            strbuf_addf(sbuf, "Total:\t\t\t\t\t %8d\n", tot);
+            strbuf_add(sbuf, "\t\t\t\t\t ---------\n");
+            strbuf_addf(sbuf, "Total:\t\t\t\t\t %9d\n", tot);
         }
         return MY_TRUE;
     }
@@ -2325,65 +2944,88 @@ status_parse (strbuf_t * sbuf, char * buff)
 
 /*-------------------------------------------------------------------------*/
 void
-dinfo_data_status (svalue_t *svp)
+dinfo_data_status (svalue_t *svp, int value)
 
 /* Fill in the "status" data for debug_info(DINFO_DATA, DID_STATUS)
  * into the svalue-block <svp>.
+ * If <value> is -1, <svp> points indeed to a value block; other it is
+ * the index of the desired value and <svp> points to a single svalue.
  */
- 
+
 {
     STORE_DOUBLE_USED;
 
-    svp[DID_ST_ACTIONS].u.number      = alloc_action_sent;
-    svp[DID_ST_ACTIONS_SIZE].u.number = alloc_action_sent * sizeof (action_t);
-    svp[DID_ST_SHADOWS].u.number      = alloc_shadow_sent;
-    svp[DID_ST_SHADOWS_SIZE].u.number = alloc_shadow_sent * sizeof (shadow_t);
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code
 
-    svp[DID_ST_OBJECTS].u.number           = tot_alloc_object;
-    svp[DID_ST_OBJECTS_SIZE].u.number      = tot_alloc_object_size;
-    svp[DID_ST_OBJECTS_SWAPPED].u.number   = num_vb_swapped;
-    svp[DID_ST_OBJECTS_SWAP_SIZE].u.number = total_vb_bytes_swapped;
-    svp[DID_ST_OBJECTS_LIST].u.number = num_listed_objs;
-    svp[DID_ST_OBJECTS_PROCESSED].u.number = num_last_processed;
-    svp[DID_ST_OBJECTS_AVG_PROC].type = T_FLOAT;
-    STORE_DOUBLE(svp+DID_ST_OBJECTS_AVG_PROC
-                , (avg_in_list || avg_last_processed > avg_in_list)
+#define ST_DOUBLE(which,code) \
+    if (value == -1) { \
+        svp[which].type = T_FLOAT; \
+        STORE_DOUBLE(svp+which, code); \
+    } else if (value == which) { \
+        svp->type = T_FLOAT; \
+        STORE_DOUBLE(svp, code); \
+    }
+
+    ST_NUMBER(DID_ST_ACTIONS,           alloc_action_sent);
+    ST_NUMBER(DID_ST_ACTIONS_SIZE,      alloc_action_sent * sizeof (action_t));
+    ST_NUMBER(DID_ST_SHADOWS,           alloc_shadow_sent);
+    ST_NUMBER(DID_ST_SHADOWS_SIZE,      alloc_shadow_sent * sizeof (shadow_t));
+
+    ST_NUMBER(DID_ST_OBJECTS,           tot_alloc_object);
+    ST_NUMBER(DID_ST_OBJECTS_SIZE,      tot_alloc_object_size);
+    ST_NUMBER(DID_ST_OBJECTS_SWAPPED,   num_vb_swapped);
+    ST_NUMBER(DID_ST_OBJECTS_SWAP_SIZE, total_vb_bytes_swapped);
+    ST_NUMBER(DID_ST_OBJECTS_LIST,      num_listed_objs);
+    ST_NUMBER(DID_ST_OBJECTS_NEWLY_DEST, num_newly_destructed);
+    ST_NUMBER(DID_ST_OBJECTS_DESTRUCTED, num_destructed);
+    ST_NUMBER(DID_ST_OBJECTS_PROCESSED, num_last_processed);
+    ST_DOUBLE(DID_ST_OBJECTS_AVG_PROC
+             , !avg_in_list
+               ? 0.0
+               : ((avg_in_list || avg_last_processed > avg_in_list)
                   ? 1.0
                   : (double)avg_last_processed / avg_in_list
-                );
-        
-    svp[DID_ST_ARRAYS].u.number      = num_arrays;
-    svp[DID_ST_ARRAYS_SIZE].u.number = total_array_size();
+                 )
+             );
 
-    svp[DID_ST_MAPPINGS].u.number      = num_mappings;
-    svp[DID_ST_MAPPINGS_SIZE].u.number = total_mapping_size();
+    ST_NUMBER(DID_ST_ARRAYS,         num_arrays);
+    ST_NUMBER(DID_ST_ARRAYS_SIZE,    total_array_size());
 
-    svp[DID_ST_PROGS].u.number      = total_num_prog_blocks + num_swapped - num_unswapped;
-    svp[DID_ST_PROGS_SIZE].u.number = total_prog_block_size + total_bytes_swapped
-                                                            - total_bytes_unswapped;
-    svp[DID_ST_PROGS_SWAPPED].u.number   = num_swapped - num_unswapped;
-    svp[DID_ST_PROGS_SWAP_SIZE].u.number = total_bytes_swapped - total_bytes_unswapped;
+    ST_NUMBER(DID_ST_MAPPINGS,       num_mappings);
+    ST_NUMBER(DID_ST_MAPPINGS_SIZE,  total_mapping_size());
 
-    svp[DID_ST_USER_RESERVE].u.number   = reserved_user_size;
-    svp[DID_ST_MASTER_RESERVE].u.number = reserved_master_size;
-    svp[DID_ST_SYSTEM_RESERVE].u.number = reserved_system_size;
+    ST_NUMBER(DID_ST_PROGS,          total_num_prog_blocks + num_swapped
+                                                           - num_unswapped);
+    ST_NUMBER(DID_ST_PROGS_SIZE,     total_prog_block_size + total_bytes_swapped
+                                                           - total_bytes_unswapped);
+    ST_NUMBER(DID_ST_PROGS_SWAPPED,   num_swapped - num_unswapped);
+    ST_NUMBER(DID_ST_PROGS_SWAP_SIZE, total_bytes_swapped - total_bytes_unswapped);
+
+    ST_NUMBER(DID_ST_USER_RESERVE,   reserved_user_size);
+    ST_NUMBER(DID_ST_MASTER_RESERVE, reserved_master_size);
+    ST_NUMBER(DID_ST_SYSTEM_RESERVE, reserved_system_size);
 
 #ifdef COMM_STAT
-    svp[DID_ST_ADD_MESSAGE].u.number = add_message_calls;
-    svp[DID_ST_PACKETS].u.number     = inet_packets;
-    svp[DID_ST_PACKET_SIZE].u.number = inet_volume;
+    ST_NUMBER(DID_ST_ADD_MESSAGE, add_message_calls);
+    ST_NUMBER(DID_ST_PACKETS,     inet_packets);
+    ST_NUMBER(DID_ST_PACKET_SIZE, inet_volume);
 #else
-    svp[DID_ST_ADD_MESSAGE].u.number = -1;
-    svp[DID_ST_PACKETS].u.number     = -1
-    svp[DID_ST_PACKET_SIZE].u.number = -1;
+    ST_NUMBER(DID_ST_ADD_MESSAGE, -1);
+    ST_NUMBER(DID_ST_PACKETS,     -1);
+    ST_NUMBER(DID_ST_PACKET_SIZE, -1);
 #endif
 #ifdef APPLY_CACHE_STAT
-    svp[DID_ST_APPLY].u.number      = apply_cache_hit+apply_cache_miss;
-    svp[DID_ST_APPLY_HITS].u.number = apply_cache_hit;
+    ST_NUMBER(DID_ST_APPLY,      apply_cache_hit+apply_cache_miss);
+    ST_NUMBER(DID_ST_APPLY_HITS, apply_cache_hit);
 #else
-    svp[DID_ST_APPLY].u.number      = -1;
-    svp[DID_ST_APPLY_HITS].u.number = -1;
+    ST_NUMBER(DID_ST_APPLY,      -1);
+    ST_NUMBER(DID_ST_APPLY_HITS, -1);
 #endif
+
+#undef ST_NUMBER
+#undef ST_DOUBLE
 } /* dinfo_data_status() */
 
 /*-------------------------------------------------------------------------*/
@@ -2421,9 +3063,9 @@ check_valid_path (char *path, object_t *caller, char* call_fun, Bool writeflg)
     push_volatile_string(call_fun);
     push_valid_ob(caller);
     if (writeflg)
-        v = apply_master_ob(STR_VALID_WRITE, 4);
+        v = apply_master(STR_VALID_WRITE, 4);
     else
-        v = apply_master_ob(STR_VALID_READ, 4);
+        v = apply_master(STR_VALID_READ, 4);
 
     if (!v || (v->type == T_NUMBER && v->u.number == 0))
         return NULL;
@@ -2456,6 +3098,22 @@ check_valid_path (char *path, object_t *caller, char* call_fun, Bool writeflg)
 } /* check_valid_path() */
 
 /*-------------------------------------------------------------------------*/
+void
+init_empty_callback (callback_t *cb)
+
+/* Initialize *<cb> to be an empty initialized callback.
+ * Use this to initialize callback structures which might be freed before
+ * completely filled in.
+ */
+
+{
+    cb->num_arg = 0;
+    cb->is_lambda = MY_FALSE;
+    cb->function.named.ob = NULL;
+    cb->function.named.name = NULL;
+} /* init_empty_callback() */
+
+/*-------------------------------------------------------------------------*/
 static INLINE void
 free_callback_args (callback_t *cb)
 
@@ -2465,7 +3123,7 @@ free_callback_args (callback_t *cb)
 {
     svalue_t *dest;
     int nargs;
-    
+
     nargs = cb->num_arg;
 
     if (nargs == 1)
@@ -2521,21 +3179,25 @@ free_callback (callback_t *cb)
 /*-------------------------------------------------------------------------*/
 static INLINE int
 setup_callback_args (callback_t *cb, int nargs, svalue_t * args
-                    , Bool no_lvalues)
+                    , Bool allow_prot_lvalues)
 
 /* Setup the function arguments in the callback <cb> to hold the <nargs>
- * arguments starting from <args>. If <no_lvalues> is TRUE, no argument
- * may be an lvalue. The arguments are transferred into the callback
- * structure.
+ * arguments starting from <args>. If <allow_prot_lvalues> is FALSE, no
+ * argument may be a protected lvalue. The arguments are transferred into the
+ * callback structure.
  *
  * Result is -1 on success, or, when encountering an illegal argument,
  * the index of the faulty argument (but even then all caller arguments
  * have been transferred or freed).
+ *
+ * TODO: It should be possible to accept protected lvalues by careful
+ * TODO:: juggling of the protector structures. That, or rewriting the
+ * TODO:: lvalue system.
  */
 
 {
     svalue_t *dest;
-    
+
     cb->num_arg = nargs;
 
     if (nargs < 1)
@@ -2546,7 +3208,7 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
     else
     {
         /* Transfer the arguments into the callback structure */
-        
+
         if (nargs > 1)
         {
             xallocate(dest, sizeof(*dest) * nargs, "callback structure");
@@ -2559,13 +3221,19 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
 
         while (--nargs >= 0)
         {
-            if (no_lvalues && args->type == T_LVALUE)
+            if (!allow_prot_lvalues && args->type == T_LVALUE
+             && (   args->u.lvalue->type == T_PROTECTED_CHAR_LVALUE
+                 || args->u.lvalue->type == T_PROTECTED_STRING_RANGE_LVALUE
+                 || args->u.lvalue->type == T_PROTECTED_POINTER_RANGE_LVALUE
+                 || args->u.lvalue->type == T_PROTECTED_LVALUE
+                )
+               )
             {
-                /* We don't handle lvalues - abort the process.
+                /* We don't handle protected lvalues - abort the process.
                  * But to do that, we first have to free all
                  * remaining arguments from the caller.
                  */
-                
+
                 int error_index = cb->num_arg - nargs - 1;
 
                 do {
@@ -2589,11 +3257,11 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
 /*-------------------------------------------------------------------------*/
 int
 setup_function_callback ( callback_t *cb, object_t * ob, char * fun
-                        , int nargs, svalue_t * args, Bool no_lvalues)
+                        , int nargs, svalue_t * args, Bool allow_prot_lvalues)
 
 /* Setup the empty/uninitialized callback <cb> to hold a function
  * call to <ob>:<fun> with the <nargs> arguments starting from <args>.
- * If <no_lvalues> is TRUE, no argument may be an lvalue.
+ * If <allow_prot_lvalues> is FALSE, no argument may be a protected lvalue.
  *
  * Both <ob> and <fun> are copied from the caller, but the arguments are
  * adopted (taken away from the caller).
@@ -2605,12 +3273,12 @@ setup_function_callback ( callback_t *cb, object_t * ob, char * fun
 
 {
     int error_index;
-    
+
     cb->is_lambda = MY_FALSE;
     cb->function.named.name = make_shared_string(fun);
     cb->function.named.ob = ref_object(ob, "callback");
 
-    error_index = setup_callback_args(cb, nargs, args, no_lvalues);
+    error_index = setup_callback_args(cb, nargs, args, allow_prot_lvalues);
     if (error_index >= 0)
     {
         free_object(cb->function.named.ob, "callback");
@@ -2625,11 +3293,11 @@ setup_function_callback ( callback_t *cb, object_t * ob, char * fun
 /*-------------------------------------------------------------------------*/
 int
 setup_closure_callback ( callback_t *cb, svalue_t *cl
-                       , int nargs, svalue_t * args, Bool no_lvalues)
+                       , int nargs, svalue_t * args, Bool allow_prot_lvalues)
 
 /* Setup the empty/uninitialized callback <cb> to hold a closure
  * call to <cl> with the <nargs> arguments starting from <args>.
- * If <no_lvalues> is TRUE, no argument may be an lvalue.
+ * If <allow_prot_lvalues> is FALSE, no argument may be a protected lvalue.
  *
  * Both <cl> and the arguments are adopted (taken away from the caller).
  *
@@ -2640,11 +3308,11 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
 
 {
     int error_index;
-    
+
     cb->is_lambda = MY_TRUE;
     transfer_svalue_no_free(&(cb->function.lambda), cl);
 
-    error_index = setup_callback_args(cb, nargs, args, no_lvalues);
+    error_index = setup_callback_args(cb, nargs, args, allow_prot_lvalues);
     if (error_index >= 0)
     {
         free_svalue(&(cb->function.lambda));
@@ -2663,13 +3331,15 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
  * callbacks for efuns like map_array() and accepts these forms:
  *
  *   (string fun)
+ *   (string fun, mixed extra, ...) TODO: This form is UGLY!
  *   (string fun, string|object obj, mixed extra, ...)
  *   (closure cl, mixed extra, ...)
  *
  * If the first argument is a string and the second neither an object
  * nor a string, this_object() is used as object specification.
  *
- * All arguments are adopted (taken away from the caller).
+ * All arguments are adopted (taken away from the caller). Protected lvalues
+ * like &(i[0]) are not allowed as 'extra' arguments.
  *
  * Result is -1 on success, or, when encountering an illegal argument,
  * the index of the faulty argument (but even then all caller arguments
@@ -2705,7 +3375,11 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
                 first_arg = 2;
             }
             else
+            {
+                /* TODO: It would be better to throw an error here */
                 ob = current_object;
+                first_arg = 1;
+            }
         }
         else
             ob = current_object;
@@ -2752,7 +3426,7 @@ callback_object (callback_t *cb)
 
 {
     object_t *ob;
-    
+
     if (cb->is_lambda)
         ob = !CLOSURE_MALLOCED(cb->function.lambda.x.closure_type)
              ? cb->function.lambda.u.ob
@@ -2803,7 +3477,7 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
     /* Push the arguments, if any, onto the stack */
 
     num_arg = cb->num_arg;
-    
+
     if (num_arg)
     {
         svalue_t * argp;
@@ -2817,11 +3491,10 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
         for (j = 0; j < num_arg; j++, argp++)
         {
             inter_sp++;
-            if (argp->type == T_OBJECT && (O_DESTRUCTED & argp->u.ob->flags))
+            if (destructed_object_ref(argp))
             {
                 *inter_sp = const0;
-                free_object(argp->u.ob, "apply_callback");
-                put_number(argp, 0);
+                assign_svalue(argp, &const0);
             }
             else if (keep)
                 assign_svalue_no_free(inter_sp, argp);
@@ -2889,7 +3562,7 @@ count_callback_extra_refs (callback_t *cb)
 
 {
     if (!cb->is_lambda)
-        cb->function.named.ob->extra_ref++;
+        count_extra_ref_in_object(cb->function.named.ob);
     else
         count_extra_ref_in_vector(&cb->function.lambda, 1);
     if (cb->num_arg == 1)
@@ -2922,12 +3595,13 @@ clear_ref_in_callback (callback_t *cb)
 
     if (cb->is_lambda)
         clear_ref_in_vector(&(cb->function.lambda), 1);
-    else if (cb->function.named.ob->flags & O_DESTRUCTED
-      && cb->function.named.ob->ref)
+    else
     {
-        cb->function.named.ob->ref = 0;
-        cb->function.named.ob->prog->ref = 0;
-        clear_inherit_ref(cb->function.named.ob->prog);
+#ifdef DEBUG
+        if (!callback_object(cb))
+            fatal("GC run on callback with stale object.\n");
+#endif
+        clear_object_ref(cb->function.named.ob);
     }
 } /* clear_ref_in_callback() */
 
@@ -2949,22 +3623,15 @@ count_ref_in_callback (callback_t *cb)
             note_malloced_block_ref(cb->arg.u.lvalue);
     }
 
+#ifdef DEBUG
+    if (!callback_object(cb))
+        fatal("GC run on callback with stale object.\n");
+#endif
     if (cb->is_lambda)
         count_ref_in_vector(&(cb->function.lambda), 1);
     else
     {
-        object_t *ob;
-
-        ob = cb->function.named.ob;
-        if (!ob->ref)
-        {
-            /* destructed */
-            note_malloced_block_ref(ob);
-            mark_program_ref(ob->prog);
-            note_malloced_block_ref(ob->name);
-            count_ref_from_string(ob->load_name);
-        }
-        ob->ref++;
+        cb->function.named.ob->ref++;
         count_ref_from_string(cb->function.named.name);
     }
 } /* count_ref_in_callback() */
@@ -2973,20 +3640,21 @@ count_ref_in_callback (callback_t *cb)
 
 /*-------------------------------------------------------------------------*/
 void
-init_closure_hooks()
+init_driver_hooks()
 
-/* Init the closure hooks.
+/* Init the driver hooks.
  */
 
 {
     int i;
 
-    for (i = NUM_CLOSURE_HOOKS; --i >= 0; )
+    for (i = NUM_DRIVER_HOOKS; --i >= 0; )
     {
-        put_number(closure_hook + i, 0);
+        put_number(driver_hook + i, 0);
     }
-} /* init_closure_hooks() */
+} /* init_driver_hooks() */
 
+#ifdef USE_FREE_CLOSURE_HOOK
 /*-------------------------------------------------------------------------*/
 void
 free_closure_hooks (svalue_t *svp, int count)
@@ -3051,8 +3719,10 @@ free_old_driver_hooks (void)
     num_old_hooks = max_old_hooks = 0;
 } /* free_old_driver_hooks() */
 
+#endif /* USE_FREE_CLOSURE_HOOK */
+
 /*-------------------------------------------------------------------------*/
-#ifdef F_SET_LIGHT
+#ifdef USE_SET_LIGHT
 
 void
 add_light (object_t *p, int n)
@@ -3257,26 +3927,32 @@ validate_shadowing (object_t *ob)
     victim = ob->prog;
 
     if (victim->flags & P_NO_SHADOW)
-        error("shadow: Can't shadow a 'no_shadow' program.\n");
-    
+        error("shadow '%s' on '%s': Can't shadow a 'no_shadow' program.\n"
+             , cob->name, ob->name);
+
     if (cob->flags & O_SHADOW)
     {
         shadow_t *shadow_sent = O_GET_SHADOW(cob);
 
         if (shadow_sent->shadowing)
-            error("shadow: Already shadowing.\n");
+            error("shadow '%s' on '%s': Already shadowing.\n"
+                 , cob->name, ob->name);
         if (shadow_sent->shadowed_by)
-            error("shadow: Can't shadow when shadowed.\n");
+            error("shadow '%s' on '%s': Can't shadow when shadowed.\n"
+                 , cob->name, ob->name);
     }
 
     if (cob->super)
-        error("The shadow must not reside inside another object.\n");
+        error("shadow '%s' on '%s': The shadow resides inside another object ('%s').\n"
+             , cob->name, ob->name, cob->super->name);
 
     if (ob->flags & O_SHADOW && O_GET_SHADOW(ob)->shadowing)
-        error("Can't shadow a shadow.\n");
+        error("shadow '%s' on '%s': Can't shadow a shadow.\n"
+             , cob->name, ob->name);
 
     if (ob == cob)
-        error("Can't shadow self.\n");
+        error("shadow '%s' on '%s': Can't shadow self.\n"
+             , cob->name, ob->name);
 
     /* Make sure that we don't shadow 'nomask' functions.
      */
@@ -3306,14 +3982,13 @@ validate_shadowing (object_t *ob)
         if ( (j = find_function(name, victim)) >= 0
          && victim->functions[j] & TYPE_MOD_NO_MASK )
         {
-            error("Illegal to shadow 'nomask' function \"%s\".\n", name);
+            error("shadow '%s' on '%s: Illegal to shadow 'nomask' function \"%s\".\n"
+                 , ob->name, cob->name, name);
         }
     }
 
     push_object(ob);
-    ret = apply_master_ob(STR_QUERY_SHADOW, 1);
-    if (out_of_memory)
-        error("(shadow) Out of memory detected\n");
+    ret = apply_master(STR_QUERY_SHADOW, 1);
 
     if (!((ob->flags|cob->flags) & O_DESTRUCTED)
      && ret && !(ret->type == T_NUMBER && ret->u.number == 0))
@@ -3483,6 +4158,7 @@ f_unshadow (svalue_t *sp)
             /* Our victim is no longer shadowed, so maybe it
              * doesn't need its shadow sentence anymore.
              */
+            remove_shadow_actions(current_object, shadowing);
             check_shadow_sent(shadowing);
         }
 
@@ -3504,7 +4180,7 @@ f_set_driver_hook (svalue_t *sp)
  *   void set_driver_hook(int what, closure arg)
  * 	void set_driver_hook(int what, string arg)
  * 	void set_driver_hook(int what, string * arg)
- * 
+ *
  * This privileged efun sets the driver hook 'what' (values are
  * defined in /sys/driverhooks.h) to 'arg'.
  * The exact meanings and types of 'arg' depend of the hook set.
@@ -3521,7 +4197,7 @@ f_set_driver_hook (svalue_t *sp)
 
     /* Get the arguments */
     if (sp[-1].type != T_NUMBER
-     || (n = sp[-1].u.number) < 0 || n > NUM_CLOSURE_HOOKS)
+     || (n = sp[-1].u.number) < 0 || n > NUM_DRIVER_HOOKS)
     {
         bad_xefun_arg(1, sp);
     }
@@ -3533,7 +4209,7 @@ f_set_driver_hook (svalue_t *sp)
         return sp - 2;
     }
 
-    old = closure_hook[n]; /* Remember this for freeing */
+    old = driver_hook[n]; /* Remember this for freeing */
 
     /* Check the type of the hook and set it if ok
      */
@@ -3542,7 +4218,7 @@ f_set_driver_hook (svalue_t *sp)
     case T_NUMBER:
         if (sp->u.number != 0)
             goto bad_arg_2;
-        put_number(closure_hook + n, 0);
+        put_number(driver_hook + n, 0);
         break;
 
     case T_STRING:
@@ -3554,7 +4230,8 @@ f_set_driver_hook (svalue_t *sp)
 
         if ( NULL != (str = make_shared_string(sp->u.string)) )
         {
-            put_string(closure_hook + n, str);
+            free_svalue(sp);
+            put_string(driver_hook + n, str);
             if (n == H_NOECHO)
                 mudlib_telopts();
         }
@@ -3594,16 +4271,16 @@ f_set_driver_hook (svalue_t *sp)
       }
 
     case T_CLOSURE:
-        if (n == H_NOECHO)
-        {
-            mudlib_telopts();
-        }
         if (sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA
          && sp->u.lambda->ref == 1)
         {
-            closure_hook[n] = *sp;
-            closure_hook[n].x.closure_type = CLOSURE_LAMBDA;
-            closure_hook[n].u.lambda->ob = master_ob;
+            driver_hook[n] = *sp;
+            driver_hook[n].x.closure_type = CLOSURE_LAMBDA;
+            driver_hook[n].u.lambda->ob = master_ob;
+            if (n == H_NOECHO)
+            {
+                mudlib_telopts();
+            }
             break;
         }
         else if (!CLOSURE_IS_LFUN(sp->x.closure_type))
@@ -3621,15 +4298,90 @@ bad_arg_2:
             break; /* flow control hint */
         }
 
-        closure_hook[n] = *sp;
+        driver_hook[n] = *sp;
+        if (n == H_NOECHO)
+        {
+            mudlib_telopts();
+        }
         break;
     }
 
+#ifdef USE_FREE_CLOSURE_HOOK
     if (old.type != T_NUMBER)
         free_closure_hooks(&old, 1); /* free it in the backend */
+#else
+    /* The object reference in bound closures is not counted! */
+    if (old.type == T_CLOSURE &&
+        old.x.closure_type == CLOSURE_LAMBDA)
+    {
+        old.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
+    }
+    free_svalue(&old);
+#endif
 
     return sp - 2;
 } /* f_set_driver_hook() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef F_SET_AUTO_INCLUDE_STRING
+svalue_t *
+f_set_auto_include_string (svalue_t *sp)
+
+/* EFUN set_auto_include_string()
+ *
+ *    void set_auto_include(string arg)
+ *
+ * If <arg> is a string, it will be automatically included into every
+ * compiled LPC object.
+ *
+ * This is useful to enforce global definitions, e.g.
+ * ``#pragma combine_strings'' or ``#pragma strict_types''.  The
+ * calling object needs to be privileged by the master object.
+ *
+ * Note that this efun is just a deprecated frontend for
+ * set_driver_hook(H_AUTO_INCLUDE).
+ */
+
+{
+    if (sp->type != T_STRING)
+        bad_xefun_arg(1, sp);
+
+    if (_privilege_violation("set_auto_include_string", sp, sp) > 0)
+    {
+        char *str;
+        svalue_t old;
+
+        old = driver_hook[H_AUTO_INCLUDE]; /* Remember this for freeing */
+
+        if ( NULL != (str = make_shared_string(sp->u.string)) )
+        {
+            put_string(driver_hook + H_AUTO_INCLUDE, str);
+        }
+        else
+        {
+            error("Out of memory (%lu bytes) for driver hook\n"
+                 , (unsigned long) strlen(sp->u.string));
+        }
+
+#ifdef USE_FREE_CLOSURE_HOOK
+        if (old.type != T_NUMBER)
+            free_closure_hooks(&old, 1); /* free it in the backend */
+#else
+        /* The object reference in bound closures is not counted! */
+        if (old.type == T_CLOSURE &&
+            old.x.closure_type == CLOSURE_LAMBDA)
+        {
+            old.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
+        }
+        free_svalue(&old);
+#endif
+
+    }
+
+    return sp - 1;
+} /* set_auto_include() */
+
+#endif /* F_SET_AUTO_INCLUDE_STRING */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -3639,7 +4391,7 @@ f_rename_object (svalue_t *sp)
  *
  *   void rename_object (object ob, string new_name);
  *
- * Give the current object a new file_name. Causes a privilege
+ * Give the object <ob> a new object name <new_name>. Causes a privilege
  * violation. The new name must not contain a # character, except
  * at the end, to avoid confusion with clone numbers.
  *
@@ -3792,6 +4544,7 @@ extract_limits ( struct limits_context_s * result
     result->max_eval = max_eval_cost;
     result->max_array = max_array_size;
     result->max_mapping = max_mapping_size;
+    result->max_callouts = max_callouts;
     result->max_byte = max_byte_xfer;
     result->max_file = max_file_xfer;
 
@@ -3802,7 +4555,7 @@ extract_limits ( struct limits_context_s * result
 
         for (limit = 0; limit < LIMIT_MAX && limit < num; limit++)
         {
-        
+
             if (svp[limit].type != T_NUMBER)
                 error("Illegal %s value: not a number\n", limitnames[limit]);
                 /* TODO: Give type and value */
@@ -3811,29 +4564,32 @@ extract_limits ( struct limits_context_s * result
             {
                 switch(limit)
                 {
-                case LIMIT_EVAL:    result->max_eval = val;    break;
-                case LIMIT_ARRAY:   result->max_array = val;   break;
-                case LIMIT_MAPPING: result->max_mapping = val; break;
-                case LIMIT_BYTE:    result->max_byte = val;    break;
-                case LIMIT_FILE:    result->max_file = val;    break;
-                default: fatal("Unimplemented limit #%d\n", limit);
+                case LIMIT_EVAL:     result->max_eval = val;    break;
+                case LIMIT_ARRAY:    result->max_array = val;   break;
+                case LIMIT_MAPPING:  result->max_mapping = val; break;
+                case LIMIT_BYTE:     result->max_byte = val;    break;
+                case LIMIT_FILE:     result->max_file = val;    break;
+                case LIMIT_CALLOUTS: result->max_callouts = val; break;
+                default: error("Unimplemented limit #%d\n", limit);
                 }
             }
             else if (val == LIMIT_DEFAULT)
             {
                 switch(limit)
                 {
-                case LIMIT_EVAL:    result->max_eval = def_eval_cost;
-                                    break;
-                case LIMIT_ARRAY:   result->max_array = def_array_size;
-                                    break;
-                case LIMIT_MAPPING: result->max_mapping = def_mapping_size;
-                                    break;
-                case LIMIT_BYTE:    result->max_byte = def_byte_xfer;
-                                    break;
-                case LIMIT_FILE:    result->max_file = def_file_xfer;
-                                    break;
-                default: fatal("Unimplemented limit #%d\n", limit);
+                case LIMIT_EVAL:     result->max_eval = def_eval_cost;
+                                     break;
+                case LIMIT_ARRAY:    result->max_array = def_array_size;
+                                     break;
+                case LIMIT_MAPPING:  result->max_mapping = def_mapping_size;
+                                     break;
+                case LIMIT_BYTE:     result->max_byte = def_byte_xfer;
+                                     break;
+                case LIMIT_FILE:     result->max_file = def_file_xfer;
+                                     break;
+                case LIMIT_CALLOUTS: result->max_callouts = def_callouts;
+                                     break;
+                default: error("Unimplemented limit #%d\n", limit);
                 }
             }
             else if (val != LIMIT_KEEP)
@@ -3864,29 +4620,32 @@ extract_limits ( struct limits_context_s * result
             {
                 switch(limit)
                 {
-                case LIMIT_EVAL:    result->max_eval = val;    break;
-                case LIMIT_ARRAY:   result->max_array = val;   break;
-                case LIMIT_MAPPING: result->max_mapping = val; break;
-                case LIMIT_BYTE:    result->max_byte = val;    break;
-                case LIMIT_FILE:    result->max_file = val;    break;
-                default: fatal("Unimplemented limit #%d\n", limit);
+                case LIMIT_EVAL:     result->max_eval = val;    break;
+                case LIMIT_ARRAY:    result->max_array = val;   break;
+                case LIMIT_MAPPING:  result->max_mapping = val; break;
+                case LIMIT_BYTE:     result->max_byte = val;    break;
+                case LIMIT_FILE:     result->max_file = val;    break;
+                case LIMIT_CALLOUTS: result->max_callouts = val;    break;
+                default: error("Unimplemented limit #%d\n", limit);
                 }
             }
             else if (val == LIMIT_DEFAULT)
             {
                 switch(limit)
                 {
-                case LIMIT_EVAL:    result->max_eval = def_eval_cost;
-                                    break;
-                case LIMIT_ARRAY:   result->max_array = def_array_size;
-                                    break;
-                case LIMIT_MAPPING: result->max_mapping = def_mapping_size;
-                                    break;
-                case LIMIT_BYTE:    result->max_byte = def_byte_xfer;
-                                    break;
-                case LIMIT_FILE:    result->max_file = def_file_xfer;
-                                    break;
-                default: fatal("Unimplemented limit #%d\n", limit);
+                case LIMIT_EVAL:     result->max_eval = def_eval_cost;
+                                     break;
+                case LIMIT_ARRAY:    result->max_array = def_array_size;
+                                     break;
+                case LIMIT_MAPPING:  result->max_mapping = def_mapping_size;
+                                     break;
+                case LIMIT_BYTE:     result->max_byte = def_byte_xfer;
+                                     break;
+                case LIMIT_FILE:     result->max_file = def_file_xfer;
+                                     break;
+                case LIMIT_CALLOUTS: result->max_callouts = def_callouts;
+                                     break;
+                default: error("Unimplemented limit #%d\n", limit);
                 }
             }
             else if (val != LIMIT_KEEP)
@@ -3935,13 +4694,14 @@ f_limited (svalue_t * sp, int num_arg)
 
     if (argp->type != T_CLOSURE)
         bad_xefun_vararg(1, sp);
-    
+
     /* Get the limits */
     if (num_arg == 1)
     {
         limits.max_eval = 0;
         limits.max_array = 0;
         limits.max_mapping = 0;
+        limits.max_callouts = 0;
         limits.max_byte = 0;
         limits.max_file = 0;
     }
@@ -3972,7 +4732,7 @@ f_limited (svalue_t * sp, int num_arg)
     else
     {
         struct limits_context_s context;
-        
+
         /* Save the current runtime limits and set the new ones */
         save_limits_context(&context);
         context.rt.last = rt_context;
@@ -3986,14 +4746,15 @@ f_limited (svalue_t * sp, int num_arg)
         max_mapping_size = limits.max_mapping;
         max_byte_xfer = limits.max_byte;
         max_file_xfer = limits.max_file;
+        max_callouts = limits.max_callouts;
 
         assign_eval_cost();
         inter_sp = sp;
         call_lambda(argp, cl_args);
         sp = inter_sp;
-        
-        /* Over write the closure with the result */
-        free_closure(argp);
+
+        /* Overwrite the closure with the result */
+        free_svalue(argp); /* The closure might have self-destructed */
         *argp = *sp;
         sp--;
 
@@ -4061,6 +4822,7 @@ f_set_limits (svalue_t * sp, int num_arg)
         def_mapping_size = limits.max_mapping;
         def_byte_xfer = limits.max_byte;
         def_file_xfer = limits.max_file;
+        def_callouts = limits.max_callouts;
     }
 
     sp = pop_n_elems(num_arg, sp);
@@ -4091,21 +4853,22 @@ f_query_limits (svalue_t * sp)
 {
     vector_t *vec;
     Bool def;
-    
+
     if (sp->type != T_NUMBER)
         bad_xefun_arg(1, sp);
     def = sp->u.number != 0;
-    
+
     vec = allocate_uninit_array(LIMIT_MAX);
     if (!vec)
         error("(query_limits) Out of memory: array[%d] for result.\n"
              , LIMIT_MAX);
-    
-    put_number(vec->item+LIMIT_EVAL,    def ? def_eval_cost : max_eval_cost);
-    put_number(vec->item+LIMIT_ARRAY,   def ? def_array_size : max_array_size);
-    put_number(vec->item+LIMIT_MAPPING, def ? def_mapping_size : max_mapping_size);
-    put_number(vec->item+LIMIT_BYTE,    def ? def_byte_xfer : max_byte_xfer);
-    put_number(vec->item+LIMIT_FILE,    def ? def_file_xfer : max_file_xfer);
+
+    put_number(vec->item+LIMIT_EVAL,     def ? def_eval_cost : max_eval_cost);
+    put_number(vec->item+LIMIT_ARRAY,    def ? def_array_size : max_array_size);
+    put_number(vec->item+LIMIT_MAPPING,  def ? def_mapping_size : max_mapping_size);
+    put_number(vec->item+LIMIT_BYTE,     def ? def_byte_xfer : max_byte_xfer);
+    put_number(vec->item+LIMIT_FILE,     def ? def_file_xfer : max_file_xfer);
+    put_number(vec->item+LIMIT_CALLOUTS, def ? def_callouts : max_callouts);
 
     /* No free_svalue: sp is a number */
     put_array(sp, vec);
@@ -4131,12 +4894,12 @@ move_object (void)
     lambda_t *l;
     object_t *save_command = command_giver;
 
-    if (NULL != ( l = closure_hook[H_MOVE_OBJECT1].u.lambda) ) {
+    if (NULL != ( l = driver_hook[H_MOVE_OBJECT1].u.lambda) ) {
         l->ob = inter_sp[-1].u.ob;
-        call_lambda(&closure_hook[H_MOVE_OBJECT1], 2);
-    } else if (NULL != ( l = closure_hook[H_MOVE_OBJECT0].u.lambda) ) {
+        call_lambda(&driver_hook[H_MOVE_OBJECT1], 2);
+    } else if (NULL != ( l = driver_hook[H_MOVE_OBJECT0].u.lambda) ) {
         l->ob = current_object;
-        call_lambda(&closure_hook[H_MOVE_OBJECT0], 2);
+        call_lambda(&driver_hook[H_MOVE_OBJECT0], 2);
     }
     else
         error("Don't know how to move objects.\n");
@@ -4162,7 +4925,7 @@ f_set_environment (svalue_t *sp)
     object_t *save_cmd = command_giver;
 
     /* Get and test the arguments */
-    
+
     if (sp[-1].type != T_OBJECT)
         bad_xefun_arg(1, sp);
 
@@ -4185,7 +4948,7 @@ f_set_environment (svalue_t *sp)
             if (ob == item)
                 error("Can't move object inside itself.\n");
 
-#       ifdef F_SET_LIGHT
+#       ifdef USE_SET_LIGHT
             add_light(dest, item->total_light);
 #       endif
         dest->flags &= ~O_RESET_STATE;
@@ -4206,7 +4969,7 @@ f_set_environment (svalue_t *sp)
         if (item->super->sent)
             remove_action_sent(item, item->super);
 
-#       ifdef F_SET_LIGHT
+#       ifdef USE_SET_LIGHT
             add_light(item->super, - item->total_light);
 #       endif
 
@@ -4455,29 +5218,46 @@ e_get_dir (char *path, int mask)
 
 /* EFUN get_dir()
  *
- *   string *get_dir(string str, int mask)
+ *     string *get_dir(string str)
+ *     string *get_dir(string str, int mask)
  *
- * This function takes a path as argument and returns an array of
- * file names and attributes in that directory.
- * 
- * The filename part of the path may contain '*' or '?' as
- * wildcards: every '*' matches an arbitrary amount of characters
- * (or just itself). Thus get_dir ("/path/ *") would return an
- * array of all files in directory "/path/", or just ({ "/path/ *"
- * }) if this file happens to exist.
- * 
+ * This function takes a path as argument and returns an array of file
+ * names and attributes in that directory.
+ *
+ * Returns 0 if the directory to search in does not exist.
+ *
+ * The filename part of the path may contain '*' or '?' as wildcards:
+ * every '*' matches an arbitrary amount of characters (or just itself).
+ * Thus get_dir("/path/ *") would return an alphabetically sorted array
+ * of all files in directory "/path/", or just ({ "/path/ *" }) if this
+ * file happens to exist.
+ *
+ * To query the content of a directory, use the directory name with a
+ * trailing '/' or '/.', for example get_dir("/path/."). Use the
+ * directory name as it is to get information about the directory itself.
+ *
  * The optional second argument mask can be used to get
  * information about the specified files.
- * 
- *   GETDIR_EMPTY (0x00)  get_dir returns an emtpy array (not very useful)
- *   GETDIR_NAMES (0x01)  put the file names into the returned array.
- *   GETDIR_SIZES (0x02)  put the file sizes into the returned array.
- *                        directories have size FSIZE_DIR (-2)
- *   GETDIR_DATES (0x04)  put the file modification dates into the returned
- *                        array.
- *   GETDIR_UNSORTED (0x20)  if this mask bit is set, the result of will
- *                           _not_ be sorted.
- * 
+ *
+ * GETDIR_EMPTY    (0x00)  get_dir returns an empty array (not very
+ *                         useful).
+ * GETDIR_NAMES    (0x01)  put the alphabetically sorted file names into
+ *                         the returned array.
+ * GETDIR_SIZES    (0x02)  put the file sizes unsorted into the returned
+ *                         array. directories have size FSIZE_DIR (-2).
+ * GETDIR_DATES    (0x04)  put the file modification dates unsorted into
+ *                         the returned array.
+ * GETDIR_PATH     (0x10)  if this mask bit is set, the filenames with
+ *                         the full path will be returned
+ *                         (GETDIR_NAMES is implied).
+ * GETDIR_UNSORTED (0x20)  if this mask bit is set, the result of will
+ *                         _not_ be sorted.
+ * GETDIR_ALL      (0x07)  GETDIR_NAMES|GETDIR_SIZES|GETDIR_DATES (see
+ *                         examples).
+ *
+ * Note: You should use GETDIR_NAMES|GETDIR_UNSORTED to get the entries
+ * in the same order as with GETDIR_SIZES and GETDIR_DATES.
+ *
  * The values of mask can be added together.
  */
 
@@ -4492,9 +5272,15 @@ e_get_dir (char *path, int mask)
     struct xdirect *de;
     struct stat     st;
     char           *temppath;
-    char           *p; 
+    size_t          templen;
+    Bool            in_top_dir = MY_FALSE;
+    char           *p;
     char           *regexpr = 0;
     int             nqueries;
+
+    /* Adjust the mask for implied bits */
+    if (mask & GETDIR_PATH)
+        mask |= GETDIR_NAMES;
 
     if (!path)
         return NULL;
@@ -4514,6 +5300,7 @@ e_get_dir (char *path, int mask)
         temppath[0] = path[0] ? path[0] : '.';
         temppath[1] = '\000';
         p = temppath;
+        in_top_dir = MY_TRUE;
     }
     else
     {
@@ -4528,10 +5315,14 @@ e_get_dir (char *path, int mask)
          || (p[0] == '/' && p[1] == '\0')
            )
             *p = '\0';
+
+        in_top_dir = (p == temppath);
     }
 
     /* Number of data items per file */
-    nqueries = (mask & 1) + (mask>>1 & 1) + (mask>>2 & 1);
+    nqueries =   ((mask & GETDIR_NAMES) != 0)
+               + ((mask & GETDIR_SIZES) != 0)
+               + ((mask & GETDIR_DATES) != 0);
 
     if (strchr(p, '*') || ixstat(temppath, &st) < 0)
     {
@@ -4550,13 +5341,14 @@ e_get_dir (char *path, int mask)
         {
             strcpy(regexpr, p);
             strcpy(temppath, ".");
+            in_top_dir = MY_TRUE;
         }
         do_match = MY_TRUE;
     }
     else if (*p != '\0' && strcmp(temppath, "."))
     {
         /* We matched a single file */
-        
+
         svalue_t *stmp;
 
         if (*p == '/' && *(p + 1) != '\0')
@@ -4565,7 +5357,18 @@ e_get_dir (char *path, int mask)
         stmp = v->item;
         if (mask & GETDIR_NAMES)
         {
-            put_malloced_string(stmp, string_copy(p));
+            if (mask & GETDIR_PATH)
+            {
+                if (compat_mode)
+                    put_malloced_string(stmp, string_copy(temppath));
+                else
+                    put_malloced_string(stmp, add_slash(temppath));
+            }
+            else
+            {
+                put_malloced_string(stmp, string_copy(p));
+            }
+
             stmp++;
         }
         if (mask & GETDIR_SIZES){
@@ -4579,6 +5382,8 @@ e_get_dir (char *path, int mask)
         }
         return v;
     }
+
+    templen = strlen(temppath);
 
     if ( XOPENDIR(dirp, temppath) == 0)
         return NULL;
@@ -4666,13 +5471,36 @@ e_get_dir (char *path, int mask)
 
         if (mask & GETDIR_NAMES)
         {
+            char *result;
             char *name;
 
-            xallocate(name, (size_t)namelen+1, "getdir() names");
+            if ((mask & GETDIR_PATH) && !in_top_dir)
+            {
+                if (compat_mode)
+                {
+                    xallocate(result, (size_t)namelen+templen+2, "getdir() names");
+                    name = result;
+                }
+                else
+                {
+                    xallocate(result, (size_t)namelen+templen+3, "getdir() names");
+                    result[0] = '/';
+                    name = result+1;
+                }
+                memcpy(name, temppath, templen);
+                name[templen] = '/';
+                name += templen+1;
+            }
+            else
+            {
+                xallocate(result, (size_t)namelen+1, "getdir() names");
+                name = result;
+            }
+
             if (namelen)
                 memcpy(name, de->d_name, namelen);
             name[namelen] = '\0';
-            put_malloced_string(w->item+j, name);
+            put_malloced_string(w->item+j, result);
             j++;
         }
         if (mask & GETDIR_SIZES)
@@ -4761,7 +5589,7 @@ e_print_file (char *path, int start, int len)
  *
  * List the file found at path.
  * The optional arguments start and num are start line
- * number and number of lines. If they are not given the 
+ * number and number of lines. If they are not given the
  * file is printed from the beginning.
  *
  * Result is the number of lines printed, but never more than 50.
@@ -4869,7 +5697,7 @@ strip_trailing_slashes (char *path)
 static int
 copy_file (char *from, char *to, int mode)
 
-/* Copy the file <from> to <to> with access <mode>. 
+/* Copy the file <from> to <to> with access <mode>.
  * Return 0 on success, 1 or errno on failure.
  */
 
@@ -4881,21 +5709,21 @@ copy_file (char *from, char *to, int mode)
 
     if (unlink(to) && errno != ENOENT)
     {
-        error("cannot remove `%s'\n", to);
+        debug_message("copy_file(): cannot remove '%s'\n", to);
         return 1;
     }
 
     ifd = ixopen3(from, O_RDONLY | O_BINARY, 0);
     if (ifd < 0)
     {
-        error("%s: open failed\n", from);
+        debug_message("copy_file(): %s: open failed\n", from);
         return errno;
     }
 
     ofd = ixopen3(to, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, 0600);
     if (ofd < 0)
     {
-        error("%s: open failed\n", to);
+        debug_message("copy_file(): %s: open failed\n", to);
         close(ifd);
         return 1;
     }
@@ -4903,7 +5731,7 @@ copy_file (char *from, char *to, int mode)
 #ifdef HAVE_FCHMOD
     if (fchmod(ofd, mode))
     {
-        error("%s: fchmod failed\n", to);
+        debug_message("copy_file(): %s: fchmod failed\n", to);
         close(ifd);
         close(ofd);
         unlink(to);
@@ -4924,7 +5752,7 @@ copy_file (char *from, char *to, int mode)
             wrote = write(ofd, bp, len);
             if (wrote < 0)
             {
-                error("%s: write failed\n", to);
+                debug_message("copy_file(): %s: write failed\n", to);
                 close(ifd);
                 close(ofd);
                 unlink(to);
@@ -4937,7 +5765,7 @@ copy_file (char *from, char *to, int mode)
 
     if (len < 0)
     {
-        error("%s: read failed\n", from);
+        debug_message("copy_file(): %s: read failed\n", from);
         close(ifd);
         close(ofd);
         unlink(to);
@@ -4946,21 +5774,21 @@ copy_file (char *from, char *to, int mode)
 
     if (close (ifd) < 0)
     {
-        error("%s: close failed", from);
+        debug_message("copy_file(): %s: close failed\n", from);
         close(ofd);
         return 1;
     }
 
     if (close (ofd) < 0)
     {
-        error("%s: close failed", to);
+        debug_message("copy_file(): %s: close failed\n", to);
         return 1;
     }
 
 #ifndef HAVE_FCHMOD
     if (chmod (to, mode))
     {
-        error("%s: chmod failed\n", to);
+        debug_message("copy_file(): %s: chmod failed\n", to);
         return 1;
     }
 #endif
@@ -4981,7 +5809,7 @@ move_file (char *from, char *to)
 
     if (lstat(from, &from_stats) != 0)
     {
-        error("%s: lstat failed\n", from);
+        debug_message("move_file(): %s: lstat failed\n", from);
         return 1;
     }
 
@@ -4990,13 +5818,14 @@ move_file (char *from, char *to)
         if (from_stats.st_dev == to_stats.st_dev
           && from_stats.st_ino == to_stats.st_ino)
         {
-            error("`%s' and `%s' are the same file", from, to);
+            debug_message("move_file(): '%s' and '%s' are the same file\n"
+                         , from, to);
             return 1;
         }
 
         if (S_ISDIR (to_stats.st_mode))
         {
-            error("%s: cannot overwrite directory", to);
+            debug_message("move_file(): %s: cannot overwrite directory\n", to);
             return 1;
         }
 
@@ -5004,7 +5833,7 @@ move_file (char *from, char *to)
     else if (errno != ENOENT)
     {
         perror("do_move");
-        error("%s: unknown error\n", to);
+        debug_message("move_file(): %s: unknown error\n", to);
         return 1;
     }
 #ifndef RENAME_HANDLES_DIRECTORIES
@@ -5026,10 +5855,10 @@ move_file (char *from, char *to)
         return 0;
     }
 
-#if !defined(AMIGA)
+#if !defined(AMIGA) || defined(__GNUC__)
     if (errno != EXDEV)
     {
-        error("cannot move `%s' to `%s'", from, to);
+        debug_message("move_file(): cannot move '%s' to '%s'\n", from, to);
         return 1;
     }
 #endif
@@ -5038,7 +5867,8 @@ move_file (char *from, char *to)
 
     if (!S_ISREG(from_stats.st_mode))
     {
-        error("cannot move `%s' across filesystems: Not a regular file\n", from);
+        debug_message("move_file(): cannot move '%s' across filesystems: "
+                      "Not a regular file\n", from);
         return 1;
     }
 
@@ -5047,7 +5877,7 @@ move_file (char *from, char *to)
 
     if (unlink(from))
     {
-        error("cannot remove `%s'", from);
+        debug_message("move_file(): cannot remove '%s'\n", from);
         return 1;
     }
     FCOUNT_DEL(from);
@@ -5073,6 +5903,7 @@ e_rename (char *fr, char *t)
  *
  * On successfull completion rename() will return 0. If any error
  * occurs 1 is returned.
+ * TODO: Return useful error messages.
  */
 
 {
@@ -5140,17 +5971,18 @@ f_copy_file (svalue_t *sp)
  * for the target name to copy the file.
  *
  * On successfull completion copy_file() will return 0. If any error
- * occurs, 1 is returned, or a runtime is generated.
+ * occurs, 1 is returned.
  *
  * TODO: Add two more args: start, length to implement slicing?
  * TODO:: See f-981229-10 "truncate_file()".
+ * TODO: Return useful error messages.
  */
 
 {
     struct stat to_stats, from_stats;
     char *from, *to, *cp;
     int result;
-    
+
     /* Check the arguments */
     if (sp[-1].type != T_STRING)
         bad_xefun_arg(1, sp);
@@ -5216,13 +6048,13 @@ f_copy_file (svalue_t *sp)
             if (from_stats.st_dev == to_stats.st_dev
               && from_stats.st_ino == to_stats.st_ino)
             {
-                error("`%s' and `%s' are the same file", from, to);
+                error("'%s' and '%s' are the same file\n", from, to);
                 break;
             }
 
             if (S_ISDIR(to_stats.st_mode))
             {
-                error("%s: cannot overwrite directory", to);
+                error("%s: cannot overwrite directory\n", to);
                 break;
             }
 
@@ -5247,7 +6079,7 @@ f_copy_file (svalue_t *sp)
     free_svalue(sp);
     free_svalue(sp-1);
     put_number(sp-1, result);
-   
+
     return sp-1;
 } /* f_copy_file() */
 

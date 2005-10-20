@@ -1,8 +1,8 @@
 NAME
-	if
+        if
 
 SYNTAX
-	if (expr1) statement1;
+        if (expr1) statement1;
         else if (expr2) statement2;
         ...
         else if (exprN) statementN;
@@ -29,11 +29,11 @@ DESCRIPTION
           else do_c;
 
         is interpreted as
-        
+
           if (a) {
             if (b) do_b;
             else   do_c;
           }
 
 SEE ALSO
-	for(LPC), foreach(LPC), do-while(LPC), while(LPC), switch(LPC)
+        for(LPC), foreach(LPC), do-while(LPC), while(LPC), switch(LPC)

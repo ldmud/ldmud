@@ -18,11 +18,16 @@ extern long avg_last_processed;
 extern long avg_in_list;
 
 extern Bool extra_jobs_to_do;
-extern Bool garbage_collect_to_do;
+
+typedef enum { gcDont = 0, gcMalloc, gcEfun } GC_Request;
+extern GC_Request gc_request;
+
+extern Bool mud_is_up;
 
 /* --- Prototypes --- */
 
 extern void  clear_state (void);
+extern void check_alarm (void);
 extern void  logon (object_t *ob);
 extern void  backend (void);
 extern void  preload_objects (int eflag);

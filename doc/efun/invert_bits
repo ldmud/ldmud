@@ -1,5 +1,5 @@
 SYNOPSIS
-	string invert_bits (string str)
+        string invert_bits (string str)
 
 DESCRIPTION
         Invert the status of all bits in bitstring <str> and return the
@@ -18,4 +18,4 @@ EXAMPLES
 
 SEE ALSO
         set_bit(E), clear_bit(E), test_bit(E), last_bit(E), and_bits(E),
-        or_bits(E), xor_bits(E), count_bits(E)
+        or_bits(E), xor_bits(E), count_bits(E), copy_bits(E)

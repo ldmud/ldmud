@@ -4,6 +4,7 @@
  *---------------------------------------------------------------------------
  * A simple and fast generic string hasher based on Peter K. Pearson's
  * article in Communications of the ACM 33-6, pp. 677.
+ * TODO: Replace the Pearson hash by Ben Jenkin's Hash?
  *---------------------------------------------------------------------------
  */
 
@@ -32,7 +33,7 @@ static unsigned char T[]
 
 /*-------------------------------------------------------------------------*/
 unsigned short
-whashstr (char *s, int maxn)
+whashstr (const char *s, int maxn)
 
 /* Hash the first <maxn> characters of string <s> into a short integer and
  * return this hashed value.
@@ -57,7 +58,7 @@ whashstr (char *s, int maxn)
 
 /*-------------------------------------------------------------------------*/
 unsigned char
-chashstr (char *s, int maxn)
+chashstr (const char *s, int maxn)
 
 /* Hash the first <maxn> characters of string <s> into a char-sized integer
  * and return this hashed value.

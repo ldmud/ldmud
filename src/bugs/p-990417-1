@@ -8,6 +8,8 @@ diff-replace : A diff for the efun 'replace_string()', which does the same as
                implode(explode(X, Y), Z);, but does it faster and without
                creating an array, of course :-)
 
+MudOS uses a very efficient algorithm for it.
+
 diff -rc ldmud-dev/src/func_spec ldmud-dev-rep/src/func_spec
 *** ldmud-dev/src/func_spec	Sat Mar 27 14:27:43 1999
 --- ldmud-dev-rep/src/func_spec	Sat Apr 10 15:45:03 1999

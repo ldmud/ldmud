@@ -2,7 +2,7 @@ Short: Evermore: bad stack at F_RETURN
 Date: Sat, 27 May 2000 17:35:48 +0200
 From: Heiko Kopp <hkopp@informatik.uni-rostock.de>
 Type: Bug
-State: New
+State: Abandoned - no longer appears in 3.2.9-dev.390
 Driver: dev.203
 
 The problem lies further back than the instruction trace shows.

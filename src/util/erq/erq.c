@@ -28,9 +28,6 @@
  * TODO:: And it surely still contains bugs.
  *---------------------------------------------------------------------------
  */
- 
-/* #define DEBUG */
-/* #define DEBUG2 */
 
 #include <sys/types.h>
 #include <errno.h>
@@ -40,7 +37,7 @@
 #include <sys/wait.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <sys/time.h>
+#include <time.h>
 #include <signal.h>
 #include <sys/times.h>
 #include <fcntl.h>
@@ -48,6 +45,9 @@
 
 #include "machine.h"
 
+#ifdef HAVE_SYS_TIME_H
+#    include <sys/time.h>
+#endif
 #ifdef HAVE_UNISTD_H
 #    include <unistd.h>
 #endif
@@ -91,6 +91,12 @@ time_t time(time_t *);
 #    define SIGTERM 15
 #endif
 
+#ifdef _AIX
+typedef unsigned long length_t;  /* *sigh* */
+#else
+typedef int length_t;
+#endif
+
 #define AUTH_PORT 113 /* according to RFC 931 */
 
 #include "config.h"
@@ -103,6 +109,10 @@ time_t time(time_t *);
 
 #define randomize_tickets(n) srandom(n)
 #define get_ticket()         random()
+
+#ifndef ERQ_DEBUG
+#  define ERQ_DEBUG 0
+#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -259,6 +269,9 @@ static char buf[ERQ_BUFSIZE];
   /* The receive buffer.
    */
 
+static const char * erq_dir = ERQ_DIR;
+  /* The filename of the directory with the ERQ executables. */
+
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
@@ -378,7 +391,7 @@ readn (int s, void *buf, long expected)
            }
         }
         total += num;
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
         if (total < expected)
             fprintf(stderr, "%s read fragment %ld\n", time_stamp(), num);
 #endif
@@ -434,7 +447,9 @@ execute (char *buf, long buflen, char *status, int *sockets)
 {
     char path[256], argbuf[1024], *p, *args[96], **argp, c;
     pid_t pid;
+    int quoted;
 
+    quoted = 0;
     status[1] = 0;
 
     if (buflen >= sizeof argbuf)
@@ -460,7 +475,11 @@ execute (char *buf, long buflen, char *status, int *sockets)
                 return 0;
             }
         }
-        else if (isgraph(c))
+        else if (c == '"')
+        {
+            quoted = !quoted;
+        }
+        else if (isgraph(c) || quoted)
         {
             *p++ = c;
         }
@@ -487,13 +506,13 @@ execute (char *buf, long buflen, char *status, int *sockets)
         return 0;
     }
 
-    if (strlen(ERQ_DIR) + strlen(p) + 2 > sizeof(path))
+    if (strlen(erq_dir) + strlen(p) + 2 > sizeof(path))
     {
         status[0] = ERQ_E_PATHLEN;
         return 0;
     }
 
-    sprintf(path, "%s/%s", ERQ_DIR, p);
+    sprintf(path, "%s/%s", erq_dir, p);
     if (sockets)
     {
         if(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) < 0)
@@ -550,7 +569,7 @@ execute (char *buf, long buflen, char *status, int *sockets)
         status[1] = errno;
         return 0;
     }
-    
+
     return pid;
 } /* execute() */
 
@@ -568,7 +587,7 @@ count_sigcld (int sig)
 #ifdef __MWERKS__
 #    pragma unused(sig)
 #endif
-        
+
 #ifndef HAVE_WAITPID
     static volatile int calling_signal = 0;     /* Mutex */
     static volatile int call_signal_again = 0;  /* Number of pending calls */
@@ -588,7 +607,7 @@ count_sigcld (int sig)
     {
         call_signal_again++;
     }
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
     write(2, "child terminated\n", 17);
 #endif
     childs_terminated++;
@@ -636,7 +655,7 @@ kill_child (child_t *child)
  */
 
 {
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
     fprintf(stderr, "%s kill_child called\n", time_stamp());
 #endif
     kill(child->u.c.pid, SIGKILL);
@@ -704,7 +723,7 @@ get_subserver (void)
 {
     struct child_s *child;
 
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
     fprintf(stderr, "%s get_subserver called\n", time_stamp());
 #endif
 
@@ -756,7 +775,7 @@ get_subserver (void)
         }
 
         /* Set up the child and put it into the subserver list */
-        
+
         close(sockets[0]);
         child->u.c.pid = pid;
         child->socket = sockets[1];
@@ -817,7 +836,7 @@ start_subserver (long server_num, long seed)
     for (;;) /* The Loop (tm) */
     {
         /* select() for data */
-        
+
         if (child)
         {
             FD_SET(child_sockets[1], &readfds);
@@ -831,6 +850,44 @@ start_subserver (long server_num, long seed)
                 continue;
             perror ("select");
             abort ();
+        }
+
+        /* Look for data from our child.
+         * We do this before we wait for a died child to make sure that
+         * all the data produced by the child is received by us.
+         */
+
+        if (child)
+        {
+            int n = 3;
+            do {
+                if (FD_ISSET(child_sockets[n], &readfds))
+                {
+                    do
+                        num = read(child_sockets[n], buf+14, MAX_REPLY - 13);
+                    while (num == -1 && errno == EINTR);
+
+                    if (num <= 0)
+                    {
+                        perror("read from spawned child\n");
+                    }
+                    else
+                    {
+#if ERQ_DEBUG > 0
+                        fprintf(stderr,
+                          "%s %d bytes from socket no. %d\n", time_stamp(), num, n);
+                        fprintf(stderr,
+                          "%s '%.*s'\n", time_stamp(), num, buf+14);
+#endif
+                        write_32(buf, (num += 14) - 1);
+                        write_32(buf+4, ERQ_HANDLE_KEEP_HANDLE);
+                        buf[8] = CHILD_LISTEN;
+                        memcpy(buf+9, child_handle, 4);
+                        buf[13] = n == 1 ? ERQ_STDOUT : ERQ_STDERR;
+                        write1(buf, num);
+                    }
+                }
+            } while ((n-=2) > 0);
         }
 
         /* Check for zombie children and wait for them */
@@ -899,47 +956,12 @@ start_subserver (long server_num, long seed)
             }
             childs_waited_for++;
         } /* wait for zombies */
-        
-        if (child)
-        {
-            /* Look for data from our child */
-
-            int n = 3;
-            do {
-                if (FD_ISSET(child_sockets[n], &readfds))
-                {
-                    do
-                        num = read(child_sockets[n], buf+14, MAX_REPLY - 13);
-                    while (num == -1 && errno == EINTR);
-
-                    if (num <= 0)
-                    {
-                        perror("read from spawned child\n");
-                    }
-                    else
-                    {
-#ifdef DEBUG
-                        fprintf(stderr,
-                          "%s %d bytes from socket no. %d\n", time_stamp(), num, n);
-                        fprintf(stderr,
-                          "%s '%.*s'\n", time_stamp(), num, buf+14);
-#endif
-                        write_32(buf, (num += 14) - 1);
-                        write_32(buf+4, ERQ_HANDLE_KEEP_HANDLE);
-                        buf[8] = CHILD_LISTEN;
-                        memcpy(buf+9, child_handle, 4);
-                        buf[13] = n == 1 ? ERQ_STDOUT : ERQ_STDERR;
-                        write1(buf, num);
-                    }
-                }
-            } while ((n-=2) > 0);
-        }
 
         if (!FD_ISSET(0, &readfds))
             continue;
 
         /* Receive the new request from the master ERQ */
-        
+
         do
             num = readn(0, header, 9);
         while (num == -1 && errno == EINTR);
@@ -956,7 +978,7 @@ start_subserver (long server_num, long seed)
         request = header[8];
 
         /* ... and the rest of the data */
-        
+
         if (msglen > 0)
         {
             num = readn(0, buf, msglen);
@@ -967,13 +989,13 @@ start_subserver (long server_num, long seed)
         }
 
         /* What does the ERQ want? */
-        
+
         switch(request)
         {
         case ERQ_RLOOKUP:
           {
             /* Lookup ip -> name */
-            
+
             struct hostent *hp;
 
             /* handle stays in header[4..7] */
@@ -986,7 +1008,7 @@ start_subserver (long server_num, long seed)
                 sleep(5);
                 hp = gethostbyaddr(buf, 4, AF_INET);
             }
-            
+
             if (hp)
             {
                 /* Send the address and the name */
@@ -1008,7 +1030,7 @@ start_subserver (long server_num, long seed)
         case ERQ_LOOKUP:
           {
             /* Lookup name -> ip */
-            
+
             struct hostent *hp;
 
             /* handle stays in header[4..7] */
@@ -1039,12 +1061,70 @@ start_subserver (long server_num, long seed)
           }
 #endif
 
+#ifdef ERQ_RLOOKUPV6
+            case ERQ_RLOOKUPV6:
+              {
+                int i;
+                char *mbuff;
+                struct addrinfo req, *ai, *ai2;
+
+                /* handle stays in header[4..7] */
+                header[8] = CHILD_FREE;
+                buf[msglen] = 0;
+
+                memset(&req, 0, sizeof(struct addrinfo));
+                req.ai_family = AF_INET6;
+                req.ai_flags = AI_CANONNAME;
+
+                i = getaddrinfo(buf, NULL, &req, &ai);
+
+                if (!i)
+                    for (ai2 = ai
+                        ; ai2 && (ai2->ai_family != AF_INET)
+                              && (ai2->ai_family != AF_INET6)
+                        ; ai2 = ai2->ai_next) /* NOOP */;
+
+                if (!i && ai2 &&ai2->ai_canonname)
+                {
+                    mbuff = malloc(strlen(ai2->ai_canonname)+strlen(buf)+2);
+                    if (!mbuff)
+                    {
+                        perror("malloc");
+                        exit(errno);
+                    }
+                    strcpy(mbuff, buf);
+                    strcat(mbuff, " ");
+                    strcat(mbuff, ai2->ai_canonname);
+                    msglen = strlen(mbuff) + 1;
+                }
+                else
+                {
+                    mbuff = malloc(strlen("invalid-format")+strlen(buf)+1);
+                    if (!mbuff)
+                    {
+                        perror("malloc");
+                        exit(errno);
+                    }
+                    strcpy(mbuff, "invalid-format");
+                    msglen = strlen(mbuff) + 1;
+                }
+
+                write_32(header, msglen + 8);
+                write1(header, 9);
+                write1(mbuff, msglen);
+                free(mbuff);
+                if (!i)
+                    freeaddrinfo(ai);
+                break;
+              }
+#endif /* ERQ_RLOOKUPV6 */
+
         case ERQ_EXECUTE:
           {
             /* Execute a program, wait for its termination and
              * return the exit status.
              */
-             
+
             pid_t pid1, pid2;
 
             header[8] = CHILD_FREE;
@@ -1096,8 +1176,8 @@ start_subserver (long server_num, long seed)
              * information to the ERQ so that further communcation
              * is possible.
              */
-             
-#ifdef DEBUG
+
+#if ERQ_DEBUG > 0
             if (child) {
                 fprintf(stderr, "%s ERQ_SPAWN: busy\n", time_stamp());
                 abort();
@@ -1194,7 +1274,7 @@ start_subserver (long server_num, long seed)
             if (!child) {
 no_child:
                 /* could happen due to a race condition */
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                 fprintf(stderr, "%s ERQ_SEND/ERQ_KILL: No child\n", time_stamp());
 #endif
                 header[8] = CHILD_FREE;
@@ -1204,7 +1284,7 @@ no_child:
             header[8] = CHILD_LISTEN;
             if (memcmp(buf, ticket.c, sizeof ticket)) {
 bad_ticket:
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                 fprintf(stderr, "%s ticket.s.rnd: %x vs. %x\n",
                   time_stamp(), ((struct ticket_s *)buf)->rnd, ticket.s.rnd);
                 fprintf(stderr, "%s ticket.s.seq: %x vs. %x\n",
@@ -1216,13 +1296,13 @@ notify_bad_ticket:
                 int sig;
 
                 sig = msglen >= 4 ? read_32(buf+sizeof ticket) : SIGKILL;
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                 fprintf(stderr, "%s len: %d sig: %d\n", time_stamp(), msglen, sig);
 #endif
                 if (sig >= 0)
                     sig = kill(child, sig);
                 header[9] = sig < 0 ? ERQ_E_ILLEGAL : ERQ_OK;
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                 if (sig < 0)
                     perror("kill");
 #endif
@@ -1349,15 +1429,50 @@ main (int argc, char **argv)
     child_t *child, *next_child;
     union ticket_u ticket;
 
-    /* Check if we have been forked off the driver */
-    if (argc > 1 && !strcmp(argv[1], "--forked"))
+    /* Print information about this daemon to help debugging */
     {
-        write1("1", 1); /* indicate sucessful fork/execl */
+        fprintf(stderr, "%s Amylaar ERQ %s: Path '%s', debuglevel %d\n"
+                      , time_stamp(), __DATE__, argv[0], ERQ_DEBUG
+                );
     }
-    else
+
+    /* Quick and dirty commandline parser */
     {
-        fprintf(stderr, "%s dynamic attachement unimplemented\n", time_stamp());
-        goto die;
+        int is_forked = 0;
+        int i;
+
+        for (i = 1; i < argc; i++)
+        {
+            if (!strcmp(argv[i], "--forked"))
+                is_forked = 1;
+            else if (!strcmp(argv[i], "--execdir"))
+            {
+                if (i+1 >= argc)
+                {
+                    fprintf(stderr, "%s Missing value for --execdir.\n"
+                                  , time_stamp());
+                    goto die;
+                }
+                erq_dir = argv[i+1];
+                i++;
+            }
+            else
+            {
+                fprintf(stderr, "%s Unknown argument '%s'.\n"
+                              , time_stamp(), argv[i]);
+                goto die;
+            }
+        }
+        /* Check if we have been forked off the driver */
+        if (is_forked)
+        {
+            write1("1", 1); /* indicate sucessful fork/execl */
+        }
+        else
+        {
+            fprintf(stderr, "%s dynamic attachement unimplemented\n", time_stamp());
+            goto die;
+        }
     }
 
 #if defined(DETACH) && defined(TIOCNOTTY)
@@ -1382,7 +1497,7 @@ main (int argc, char **argv)
     (void)signal(SIGCLD, (RETSIGTYPE(*)())count_sigcld);
 
     /* The main loop */
-    
+
     for (subserver = 0;;)
     {
         int still_corked; /* Determines the select() wait time */
@@ -1404,7 +1519,7 @@ main (int argc, char **argv)
             {
                 if (child->u.s.last_recv + 3 < time(NULL))
                 {
-#ifdef DEBUG2
+#if ERQ_DEBUG > 1
                     fprintf(stderr,"%s Uncorking child\n", time_stamp());
 #endif
                     child->u.s.bytes_recv = 0;
@@ -1414,7 +1529,7 @@ main (int argc, char **argv)
                     still_corked = 1;
             }
         } /* for(tcpsockets) */
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
         fprintf(stderr,"%s still_corked = %d\n", time_stamp(), still_corked);
 #endif
 
@@ -1425,11 +1540,11 @@ main (int argc, char **argv)
         timeout.tv_sec = (still_corked ? 3 : TIME_TO_CHECK_CHILDS);
         timeout.tv_usec = 0;
 
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
         fprintf(stderr, "%s calling select (nfds = %d)\n", time_stamp(), nfds);
 #endif
         num_ready = select(nfds, &readfds, &writefds, 0, &timeout);
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
         fprintf(stderr, "%s select returns %d\n", time_stamp(), num_ready);
 #endif
         if (num_ready < 0 && errno != EINTR)
@@ -1440,7 +1555,7 @@ main (int argc, char **argv)
         current_time = time(NULL);
 
         /* Kill off idle free children */
-        
+
         {
             time_t expired;
 
@@ -1450,7 +1565,7 @@ main (int argc, char **argv)
                 next_child = child->next_free;
                 if (child->u.c.last_used > expired)
                     continue;
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                 fprintf(stderr, "%s Max child idle time expired.\n", time_stamp());
 #endif
                 kill_child(child);
@@ -1508,7 +1623,7 @@ main (int argc, char **argv)
                 s = child->socket;
                 if (!FD_ISSET(s, &readfds))
                     continue;
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                 fprintf(stderr, "%s query child %d\n", time_stamp(), child - &childs[0]);
 #endif
                 /* Read the standard erq header plus the one-byte
@@ -1557,16 +1672,16 @@ main (int argc, char **argv)
                     free_childs = child;
                 }
             }
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
             fprintf(stderr, "%s queried all children\n", time_stamp());
 #endif
 
 #ifdef ERQ_OPEN_UDP
             /* Check for data received on UDP sockets for the gamedriver */
-            
+
             for (next_child = udp_sockets; (child = next_child); )
             {
-                size_t length;
+                length_t length;
                 long replylen;
                 char replyheader[16];
                 char replybuf[ERQ_BUFSIZE];
@@ -1601,7 +1716,7 @@ main (int argc, char **argv)
 #ifdef ERQ_OPEN_TCP
 
             /* Exchange data between the TCP sockets and the driver */
-            
+
             for (next_child = tcp_sockets; (child = next_child); )
             {
                 int length;
@@ -1641,7 +1756,7 @@ main (int argc, char **argv)
                     }
 
                     /* Inform the driver that there is data pending */
-                    
+
                     replyheader[12] = ERQ_OK;
                     write_32(replyheader, 17+sizeof(child->u.s.ticket));
                     write_32(replyheader+4, ERQ_HANDLE_KEEP_HANDLE);
@@ -1662,7 +1777,7 @@ main (int argc, char **argv)
                 if (cnt <= 0)
                 {
                     /* No data there - EOF or error */
-                    
+
                     if (!cnt)
                     {
                         replyheader[8] = ERQ_EXITED;
@@ -1688,7 +1803,7 @@ main (int argc, char **argv)
                     /* We got data - send it to the driver (but make
                      * sure not to overrun it).
                      */
-                    
+
                     length = cnt;
 #if 0
                     /* Update the "data pending" strategy */
@@ -1700,7 +1815,7 @@ main (int argc, char **argv)
                     {
                         /* Cork the bottle. Let the MUD swallow first */
                         FD_CLR(s, &current_fds);
-#ifdef DEBUG2
+#if ERQ_DEBUG > 1
                         fprintf(stderr,"%s Corking child.\n", time_stamp());
 #endif
                     }
@@ -1774,7 +1889,7 @@ main (int argc, char **argv)
                     perror("read");
                 break;
             }
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
             fprintf(stderr, "%s read command %d\n", time_stamp(), header[8]);
 #endif
 
@@ -1796,7 +1911,7 @@ main (int argc, char **argv)
             {
 
                                       /* ----- Send a signal or data ----- */
-            case ERQ_SEND:  
+            case ERQ_SEND:
             case ERQ_KILL:
               {
                 long n;
@@ -1816,7 +1931,7 @@ main (int argc, char **argv)
             bad_ticket:
                 default:
                   {
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                     fprintf(stderr, "%s Ticket rejected n: 0x%x nxt: 0x%x state: %d\n",
                         time_stamp(), n, next_child_index,
                         (unsigned long)n >= (unsigned long)next_child_index ?
@@ -1863,7 +1978,7 @@ main (int argc, char **argv)
                      || memcmp(buf+4, child->u.s.ticket.c,
                           sizeof(union ticket_u)))
                     {
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                         fprintf(stderr,"%s Ticket mismatch. (%d, %d)\n", time_stamp(), msglen,sizeof(union ticket_u));
 #endif
                         goto bad_ticket;
@@ -1982,7 +2097,7 @@ main (int argc, char **argv)
             case ERQ_OPEN_UDP:
               {
                 /* Open a UDP socket */
-                
+
                 subserver = 0; /* ready for new commands */
                 write_32(header, 10);
                 do {
@@ -2045,7 +2160,7 @@ main (int argc, char **argv)
                     memcpy(child->u.s.ticket.c, ticket.c, sizeof ticket);
 
                     /* Compose the answer to the driver */
-                    
+
                     header[3] = 17 + sizeof ticket;
                     memcpy(header+8, header+4, 4);
                     write_32(header+4, ERQ_HANDLE_KEEP_HANDLE);
@@ -2123,7 +2238,7 @@ main (int argc, char **argv)
                     }
 
                     /* Got the socket, now create the child */
-                    
+
                     child = get_socket_child();
                     child->socket = s;
                     FD_SET(child->socket,&current_fds);
@@ -2141,7 +2256,7 @@ main (int argc, char **argv)
                     memcpy(child->u.s.ticket.c, ticket.c, sizeof ticket);
 
                     /* Compose the answer to the driver */
-                    
+
                     header[3] = 17 + sizeof ticket;
                     memcpy(header+8, header+4, 4);
                     write_32(header+4, ERQ_HANDLE_KEEP_HANDLE);
@@ -2252,7 +2367,7 @@ main (int argc, char **argv)
               {
 
                 /* Accept a connection from a socket */
-                
+
                 subserver = 0; /* ready for new commands */
                 write_32(header, 10);
                 do {
@@ -2260,6 +2375,7 @@ main (int argc, char **argv)
                     struct sockaddr_in host_ip_addr;
                     long tmp2;
                     int tmp;
+                    length_t len;
                     int n;
 
                     if (msglen != sizeof(union ticket_u) + 4)
@@ -2299,10 +2415,10 @@ main (int argc, char **argv)
                         break;
                     }
 
-                    tmp = sizeof(host_ip_addr);
+                    len = sizeof(host_ip_addr);
                     s = accept( parent->socket
                               , (struct sockaddr *) &host_ip_addr
-                              , (size_t *)&tmp);
+                              , &len);
                     if (s < 0)
                     {
                         header[8] = ERQ_E_UNKNOWN;
@@ -2357,65 +2473,6 @@ main (int argc, char **argv)
               }
               break;
 #endif /* ERQ_ACCEPT */
-
-#ifdef ERQ_RLOOKUPV6
-            case ERQ_RLOOKUPV6:
-              {
-                int i;
-                char *mbuff;
-                struct addrinfo req, *ai, *ai2;
-
-                /* handle stays in header[4..7] */
-                header[8] = CHILD_FREE;
-                buf[msglen] = 0;
-
-                memset(&req, 0, sizeof(struct addrinfo));
-                req.ai_family = AF_INET6;
-                req.ai_flags = AI_CANONNAME;
-
-                i = getaddrinfo(buf, NULL, &req, &ai);
-
-                if (!i)
-                    for (ai2 = ai
-                        ; ai2 && (ai2->ai_family != AF_INET)
-                              && (ai2->ai_family != AF_INET6)
-                        ; ai2 = ai2->ai_next) /* NOOP */;
-
-                if (!i && ai2 &&ai2->ai_canonname)
-                {
-                    mbuff = malloc(strlen(ai2->ai_canonname)+strlen(buf)+2);
-                    if (!mbuff)
-                    {
-                        perror("malloc");
-                        exit(errno);
-                    }
-                    strcpy(mbuff, buf);
-                    strcat(mbuff, " ");
-                    strcat(mbuff, ai2->ai_canonname);
-                    msglen = strlen(mbuff) + 1;
-                }
-                else
-                {
-                    mbuff = malloc(strlen("invalid-format")+strlen(buf)+2);
-                    if (!mbuff)
-                    {
-                        perror("malloc");
-                        exit(errno);
-                    }
-                    strcpy(mbuff, buf);
-                    strcat(mbuff, " ");
-                    strcat(mbuff, "invalid-format");
-                    msglen = strlen(mbuff) + 1;
-                }
-                write_32(header, msglen + 9);
-                write1(header, 9);
-                write1(mbuff, msglen);
-                free(mbuff);
-                if (!i)
-                    freeaddrinfo(ai);
-                break;
-              }
-#endif /* ERQ_RLOOKUPV6 */
 
             } /* switch() */
         } /* if (num_ready > 0 && FD_ISSET(1, &readfds)) */

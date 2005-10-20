@@ -36,5 +36,4 @@ enable_strict_euids=yes
 enable_supply_parse_command=no
 enable_initialization_by___init=yes
 
-enable_max_malloced=yes
 with_max_malloced=0x5000000

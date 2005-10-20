@@ -10,8 +10,8 @@
 extern svalue_t *new_call_out(svalue_t *sp, short num_arg);
 extern void  call_out(void);
 extern void  find_call_out(object_t *ob, svalue_t *fun, Bool do_free_call);
-extern size_t  print_call_out_usage(strbuf_t *sbuf, Bool verbose);
-extern void  callout_dinfo_status(svalue_t *svp);
+extern size_t  call_out_status(strbuf_t *sbuf, Bool verbose);
+extern void  callout_dinfo_status(svalue_t *svp, int value);
 extern void  remove_stale_call_outs(void);
 extern vector_t *get_all_call_outs(void);
 

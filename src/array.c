@@ -107,7 +107,8 @@
 
 #include "array.h"
 #include "backend.h"
-#include "instrs.h"     /* F_INHERIT_LIST */
+#include "closure.h"    /* closure_cmp(), closure_eq() */
+#include "instrs.h"     /* F_FILTER_ARRAY, F_MAP_ARRAY, F_INSER_ALIST */
 #include "interpret.h"  /* for the efuns */
 #include "main.h"
 #include "mapping.h"
@@ -122,6 +123,10 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 #include "smalloc.h" /* TODO: DEBUG: as long as vec_size() is used */
+
+#include "../mudlib/sys/functionlist.h"
+#include "../mudlib/sys/include_list.h"
+#include "../mudlib/sys/inherit_list.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -187,9 +192,9 @@ vec_size (vector_t *vec)
         return vec->size;
 
     memsize = (  malloced_size(vec)
-               - ( SMALLOC_OVERHEAD + 
-                   ( sizeof(vector_t) - sizeof(svalue_t) ) / SIZEOF_CHAR_P 
-                 ) 
+               - ( SMALLOC_OVERHEAD +
+                   ( sizeof(vector_t) - sizeof(svalue_t) ) / SIZEOF_CHAR_P
+                 )
 
               ) / (sizeof(svalue_t)/SIZEOF_CHAR_P);
     if (vec->size != memsize)
@@ -256,7 +261,10 @@ _allocate_array(mp_int n, char * file, int line)
 
     p->ref = 1;
     p->size = n;
-    (p->user = current_object->user)->size_array += n;
+    if (current_object)
+        (p->user = current_object->user)->size_array += n;
+    else
+        (p->user = &default_wizlist_entry)->size_array += n;
 
     svp = p->item;
     for (i = n; --i >= 0; )
@@ -320,7 +328,10 @@ _allocate_array_unlimited(mp_int n, char * file, int line)
 
     p->ref = 1;
     p->size = n;
-    (p->user = current_object->user)->size_array += n;
+    if (current_object)
+        (p->user = current_object->user)->size_array += n;
+    else
+        (p->user = &default_wizlist_entry)->size_array += n;
 
     svp = p->item;
     for (i = n; --i >= 0; )
@@ -381,7 +392,10 @@ _allocate_uninit_array (mp_int n, char *file, int line)
 
     p->ref = 1;
     p->size = n;
-    (p->user = current_object->user)->size_array += n;
+    if (current_object)
+        (p->user = current_object->user)->size_array += n;
+    else
+        (p->user = &default_wizlist_entry)->size_array += n;
 
     return p;
 }
@@ -491,8 +505,8 @@ set_vector_user (vector_t *p, object_t *owner)
 void
 check_for_destr (vector_t *v)
 
-/* Check the vector <v> for destructed objects and replace them with
- * svalue 0s. Subvectors are not checked, though.
+/* Check the vector <v> for destructed objects and closures on destructed
+ * objects and replace them with svalue 0s. Subvectors are not checked, though.
  *
  * This function is used by certain efuns (parse_command(), unique_array(),
  * map_array()) to make sure that the data passed to the efuns is valid,
@@ -509,11 +523,8 @@ check_for_destr (vector_t *v)
 
     for (p = v->item, i = (mp_int)VEC_SIZE(v); --i >= 0 ; p++ )
     {
-        if (p->type != T_OBJECT)
-            continue;
-        if (!(p->u.ob->flags & O_DESTRUCTED))
-            continue;
-        zero_object_svalue(p);
+        if (destructed_object_ref(p))
+            assign_svalue(p, &const0);
     }
 } /* check_for_destr() */
 
@@ -536,6 +547,40 @@ total_array_size (void)
     total += num_arrays * (sizeof(vector_t) - sizeof(svalue_t));
     return total;
 }
+
+/*-------------------------------------------------------------------------*/
+#if defined(GC_SUPPORT)
+
+void
+clear_array_size (void)
+
+/* Clear the statistics about the number and memory usage of all vectors
+ * in the game.
+ */
+
+{
+    wiz_list_t *wl;
+
+    num_arrays = 0;
+    default_wizlist_entry.size_array = 0;
+    for (wl = all_wiz; wl; wl = wl->next)
+        wl->size_array = 0;
+} /* clear_array_size(void) */
+
+
+/*-------------------------------------------------------------------------*/
+void
+count_array_size (vector_t *vec)
+
+/* Add the vector <vec> to the statistics.
+ */
+
+{
+    num_arrays++;
+    vec->user->size_array += VEC_SIZE(vec);
+} /* count_array_size(void) */
+
+#endif /* GC_SUPPORT */
 
 /*-------------------------------------------------------------------------*/
 vector_t *
@@ -839,8 +884,8 @@ _implode_string (vector_t *arr, char *del, char *file, int line)
     {
         if (svp->type == T_STRING) {
             size += del_len + strlen(svp->u.string);
-        } else if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED) {
-            zero_object_svalue(svp);
+        } else if (destructed_object_ref(svp)) {
+            assign_svalue(svp, &const0);
         }
     }
 
@@ -970,13 +1015,17 @@ compare_single (svalue_t *svp, vector_t *v)
         return strcmp(svp->u.string, p2->u.string) ? -1 : 0;
     }
 
+    if (svp->type == T_CLOSURE)
+    {
+        return closure_cmp(svp, p2);
+    }
+
     if (svp->u.number != p2->u.number)
         return -1;
 
     switch (svp->type)
     {
     case T_FLOAT:
-    case T_CLOSURE:
     case T_SYMBOL:
     case T_QUOTED_ARRAY:
         return svp->x.generic != p2->x.generic ? -1 : 0;
@@ -1038,8 +1087,7 @@ static svalue_t ltmp = { T_POINTER };
     /* Order the subtrahend */
     if (subtrahend_size == 1)
     {
-        if (subtrahend->item[0].type == T_OBJECT
-         && subtrahend->item[0].u.ob->flags & O_DESTRUCTED)
+        if (destructed_object_ref(&subtrahend->item[0]))
         {
             assign_svalue(&subtrahend->item[0], &const0);
         }
@@ -1064,13 +1112,13 @@ static svalue_t ltmp = { T_POINTER };
     {
         for (source = minuend->item, i = minuend_size ; i-- ; source++)
         {
-            if (source->type == T_OBJECT && source->u.ob->flags & O_DESTRUCTED)
+            if (destructed_object_ref(source))
                 assign_svalue(source, &const0);
             if ( (*assoc_function)(source, subtrahend) >-1 ) break;
         }
-        for (dest = source++; i-->0 ; source++)
+        for (dest = source++; i-- > 0 ; source++)
         {
-            if (source->type == T_OBJECT && source->u.ob->flags & O_DESTRUCTED)
+            if (destructed_object_ref(source))
                 assign_svalue(source, &const0);
             if ( (*assoc_function)(source, subtrahend) < 0 )
                 assign_svalue(dest++, source);
@@ -1085,7 +1133,7 @@ static svalue_t ltmp = { T_POINTER };
     for (source = minuend->item, dest = difference->item, i = minuend_size
         ; i--
         ; source++) {
-        if (source->type == T_OBJECT && source->u.ob->flags & O_DESTRUCTED)
+        if (destructed_object_ref(source))
             assign_svalue(source, &const0);
         if ( (*assoc_function)(source, subtrahend) < 0 )
             assign_svalue_no_free(dest++, source);
@@ -1260,15 +1308,19 @@ alist_cmp (svalue_t *p1, svalue_t *p2)
     register int d;
 
     /* Avoid a numeric overflow by first comparing the values halfed. */
+    if ( 0 != (d = p1->type - p2->type) ) return d;
+
+    if (p1->type == T_CLOSURE)
+        return closure_cmp(p1, p2);
+
     if ( 0 != (d = (p1->u.number >> 1) - (p2->u.number >> 1)) ) return d;
     if ( 0 != (d = p1->u.number - p2->u.number) ) return d;
-    if ( 0 != (d = p1->type - p2->type) ) return d;
     switch (p1->type) {
       case T_FLOAT:
-      case T_CLOSURE:
       case T_SYMBOL:
       case T_QUOTED_ARRAY:
         if ( 0 != (d = p1->x.generic - p2->x.generic) ) return d;
+        break;
     }
     return 0;
 }
@@ -1360,11 +1412,9 @@ order_alist (svalue_t *inlists, int listnum, Bool reuse)
                 inpnt->x.string_type = STRING_SHARED;
                 inpnt->u.string = str;
             }
-        } else if (inpnt->type == T_OBJECT) {
-            if (inpnt->u.ob->flags & O_DESTRUCTED) {
-                free_object_svalue(inpnt);
-                put_number(inpnt, 0);
-            }
+        } else if (destructed_object_ref(inpnt)) {
+            free_svalue(inpnt);
+            put_number(inpnt, 0);
         }
         /* propagate the new element up in the heap as much as necessary */
         for(curix = j; 0 != (parix = curix>>1); ) {
@@ -1459,10 +1509,9 @@ order_alist (svalue_t *inlists, int listnum, Bool reuse)
 
             for (j = keynum; --j >= 0; ) {
                 inpnt = inlists[i].u.vec->item + sorted[j];
-                if (inpnt->type == T_OBJECT &&
-                    inpnt->u.ob->flags & O_DESTRUCTED)
+                if (destructed_object_ref(inpnt))
                 {
-                    free_object_svalue(inpnt);
+                    free_svalue(inpnt);
                     put_number(outpnt, 0);
                     outpnt++;
                 } else {
@@ -1478,8 +1527,7 @@ order_alist (svalue_t *inlists, int listnum, Bool reuse)
 
             for (j = keynum; --j >= 0; ) {
                 inpnt = inlists[i].u.vec->item + sorted[j];
-                if (inpnt->type == T_OBJECT &&
-                    inpnt->u.ob->flags & O_DESTRUCTED)
+                if (destructed_object_ref(inpnt))
                 {
                     put_number(outpnt, 0);
                     outpnt++;
@@ -1533,14 +1581,14 @@ is_alist (vector_t *v)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_filter_array (svalue_t *sp, int num_arg)
+x_filter_array (svalue_t *sp, int num_arg)
 
-/* VEFUN: filter_array(), also filter() for arrays.
+/* VEFUN: filter() for arrays.
  *
- *   mixed *filter_array(mixed *arr, string fun)
- *   mixed *filter_array(mixed *arr, string fun, string|object obj, mixed extra, ...)
- *   mixed *filter_array(mixed *arr, closure cl, mixed extra, ...)
- *   mixed *filter_array(mixed *arr, mapping map)
+ *   mixed *filter(mixed *arr, string fun)
+ *   mixed *filter(mixed *arr, string fun, string|object obj, mixed extra, ...)
+ *   mixed *filter(mixed *arr, closure cl, mixed extra, ...)
+ *   mixed *filter(mixed *arr, mapping map)
  *
  * Filter the elements of <arr> through a filter defined by the other
  * arguments, and return an array of those elements, for which the
@@ -1615,8 +1663,8 @@ f_filter_array (svalue_t *sp, int num_arg)
 
         for (w = p->item, cnt = p_size; --cnt >= 0; )
         {
-            if (w->type == T_OBJECT && w->u.ob->flags & O_DESTRUCTED)
-                zero_object_svalue(w);
+            if (destructed_object_ref(w))
+                assign_svalue(w, &const0);
             if (get_map_value(m, w++) == &const0) {
                 flags[cnt] = 0;
                 continue;
@@ -1634,7 +1682,7 @@ f_filter_array (svalue_t *sp, int num_arg)
 
         int         error_index;
         callback_t  cb;
-        
+
         assign_eval_cost();
         inter_sp = sp;
 
@@ -1662,8 +1710,8 @@ f_filter_array (svalue_t *sp, int num_arg)
                  * flags array with 0es.
                  */
 
-            if (w->type == T_OBJECT && w->u.ob->flags & O_DESTRUCTED)
-                zero_object_svalue(w);
+            if (destructed_object_ref(w))
+                assign_svalue(w, &const0);
 
             if (!callback_object(&cb))
             {
@@ -1672,7 +1720,7 @@ f_filter_array (svalue_t *sp, int num_arg)
             }
 
             push_svalue(w++);
-            
+
             v = apply_callback(&cb, 1);
             if (!v || (v->type == T_NUMBER && !v->u.number) )
                 continue;
@@ -1702,17 +1750,24 @@ f_filter_array (svalue_t *sp, int num_arg)
     arg->u.vec = vec;
 
     return arg;
-} /* f_filter_array() */
+} /* x_filter_array() */
+
+#ifdef F_FILTER_ARRAY
+
+svalue_t * f_filter_array (svalue_t *sp, int num_arg)
+{ return x_filter_array (sp, num_arg); }
+
+#endif
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_map_array (svalue_t *sp, int num_arg)
+x_map_array (svalue_t *sp, int num_arg)
 
 /* VEFUN map() on arrays
  *
  *   mixed * map(mixed *arg, string func, string|object ob, mixed extra...)
  *   mixed * map(mixed *arg, closure cl, mixed extra...)
- *   mixed *filter_array(mixed *arr, mapping map)
+ *   mixed * map(mixed *arr, mapping map)
  *
  * Map the elements of <arr> through a filter defined by the other
  * arguments, and return an array of the elements returned by the filter.
@@ -1773,8 +1828,8 @@ f_map_array (svalue_t *sp, int num_arg)
 
         for (w = arr->item, x = res->item; --cnt >= 0; w++, x++)
         {
-            if (w->type == T_OBJECT && w->u.ob->flags & O_DESTRUCTED)
-                zero_object_svalue(w);
+            if (destructed_object_ref(w))
+                assign_svalue(w, &const0);
 
             v = get_map_value(m, w);
             if (v == &const0)
@@ -1815,11 +1870,13 @@ f_map_array (svalue_t *sp, int num_arg)
             if (current_object->flags & O_DESTRUCTED)
                 continue;
 
-            if (w->type == T_OBJECT && w->u.ob->flags & O_DESTRUCTED)
-                zero_object_svalue(w);
+            if (destructed_object_ref(w))
+                assign_svalue(w, &const0);
 
             if (!callback_object(&cb))
+            {
                 error("object used by map_array destructed");
+            }
 
             push_svalue(w);
 
@@ -1833,7 +1890,7 @@ f_map_array (svalue_t *sp, int num_arg)
 
         free_callback(&cb);
     }
-    
+
     /* The arguments have been removed already, now just replace
      * the arr on the stack with the result.
      */
@@ -1841,7 +1898,15 @@ f_map_array (svalue_t *sp, int num_arg)
     arg->u.vec = res;
 
     return arg;
-} /* f_map_array () */
+} /* x_map_array () */
+
+
+#ifdef F_MAP_ARRAY
+
+svalue_t * f_map_array (svalue_t *sp, int num_arg)
+{  return x_map_array(sp, num_arg); }
+
+#endif
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -1910,6 +1975,7 @@ f_sort_array (svalue_t * sp, int num_arg)
      */
     data = arg->u.vec;
     check_for_destr(data);
+
     if (data->ref != 1)
     {
         vector_t *vcopy;
@@ -1941,7 +2007,6 @@ f_sort_array (svalue_t * sp, int num_arg)
     dest = alloca(size*sizeof(svalue_t));
     if (!source || !dest)
     {
-        free_callback(&cb);
         error("Stack overflow in sort_array()");
         /* NOTREACHED */
         return arg;
@@ -2178,10 +2243,7 @@ f_filter_objects (svalue_t *sp, int num_arg)
         free_svalue(sp--);
     } while(--num_arg >= 0);
 
-    /* sp now points at the former <arr> argument, so the .type is
-     * already correct.
-     */
-    sp->u.vec = w;
+    put_array(sp, w);
     return sp;
 }
 
@@ -2290,7 +2352,7 @@ f_map_objects (svalue_t *sp, int num_arg)
     free_array(p);
 
     return sp;
-}
+} /* f_map_objects() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -2572,7 +2634,7 @@ match_regexp (vector_t *v, char *pattern)
         return allocate_array(0);
 
     /* Compile the regexp (or take it from the cache) */
-    reg = REGCOMP(pattern, 0, MY_FALSE);
+    reg = REGCOMP((unsigned char *)pattern, 0, MY_FALSE);
     if (reg == NULL)
         return NULL;
 
@@ -2598,7 +2660,7 @@ match_regexp (vector_t *v, char *pattern)
 
         eval_cost++;
         line = v->item[i].u.string;
-        if (regexec(reg, line, line) == 0)
+        if (hs_regexec(reg, line, line) == 0)
             continue;
 
         res[i] = MY_TRUE;
@@ -2788,7 +2850,7 @@ f_regexplode (svalue_t *sp)
     text = sp[-1].u.string;
     pattern = sp->u.string;
 
-    reg = REGCOMP(pattern, 0, MY_FALSE);
+    reg = REGCOMP((unsigned char *)pattern, 0, MY_FALSE);
     if (reg == 0) {
         inter_sp = sp;
         error("Unrecognized search pattern");
@@ -2802,17 +2864,20 @@ f_regexplode (svalue_t *sp)
     str = text;        /* Remaining <text> to analyse */
     num_match = 0;
     matchp = &matches;
-    while (regexec(reg, str, text)) {
+    while (hs_regexec(reg, str, text)) {
         eval_cost++;
         match = (struct regexplode_match *)alloca(sizeof *match);
         if (!match)
         {
+            REGFREE(reg);
             error("Stack overflow in regexplode()");
             /* NOTREACHED */
             return NULL;
         }
         match->start = reg->startp[0];
-        match->end = str = reg->endp[0];
+        str = reg->endp[0];
+        match->end = str;
+
         *matchp = match;
         matchp = &match->next;
         num_match++;
@@ -2870,43 +2935,359 @@ f_regexplode (svalue_t *sp)
     /* Return the result */
     put_array(sp, ret);
     return sp;
-}
+} /* f_regexplode() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_inherit_list (svalue_t *sp)
+f_include_list (svalue_t *sp, int num_arg)
 
-/* TEFUN inherit_list()
+/* EFUN include_list()
  *
- *   string* inherit_list (object ob = this_object())
+ *   string* include_list ()
+ *   string* include_list (object ob)
+ *   string* include_list (object ob, int flags)
  *
- * Return a list with the filenames of all programs inherited by <ob>, include
- * <ob>'s program itself.
- * TODO: Must be fixed so that any number of files can be returned, not just 256.
+ * Return a list with the names of all files included by the program
+ * of object <ob>, including <ob>'s program file itself.
  */
 
 {
+    Mempool   pool;         /* The memory pool to allocate from */
+    object_t  *ob;          /* Analyzed object */
+    vector_t  *vec;         /* Result vector */
+    int        count;       /* Total number of includes */
+    svalue_t  *argp;        /* Arguments */
+    include_t *includes;    /* Pointer to the include information */
+    p_int     flags;
+
+    /* Get the arguments */
+    argp = sp - num_arg + 1;
+
+    if (num_arg >= 1)
+    {
+        if (argp->type != T_OBJECT)
+            bad_xefun_vararg(1, sp);
+        ob = argp[0].u.ob;
+    }
+    else
+        ob = current_object;
+
+    if (num_arg >= 2)
+    {
+        if (argp[1].type != T_NUMBER)
+            bad_xefun_vararg(2, sp);
+        flags = argp[1].u.number;
+    }
+    else
+        flags = 0;
+
+    if (O_PROG_SWAPPED(ob))
+        if (load_ob_from_swap(ob) < 0)
+        {
+            error("Out of memory: unswap object '%s'\n", ob->name);
+            /* NOTREACHED */
+            return NULL;
+        }
+
+    /* Create the result.
+     * Depending on the flags value, this can be a flat list or a tree.
+     */
+
+    if (!(flags & INCLIST_TREE))
+    {
+        svalue_t *svp;
+
+        /* Get the result array */
+        vec = allocate_array((ob->prog->num_includes+1) * 3);
+        svp = vec->item;
+
+        /* Walk the includes information and copy it into the result vector
+         */
+        for (  svp = vec->item+3
+             , count = ob->prog->num_includes
+             , includes = ob->prog->includes
+            ; count > 0
+            ; count--, includes++, svp += 3
+            )
+        {
+            int depth;
+
+            put_ref_string(svp, includes->name);
+            put_ref_string(svp+1, includes->filename);
+            depth = includes->depth;
+            if (depth > 0)
+                put_number(svp+2, depth);
+            else
+                put_number(svp+2, -depth);
+        }
+    }
+    else  /* Tree-type result */
+    {
+        /* Local structure to hold the found programs */
+        struct iinfo {
+            struct iinfo * next;     /* Next structure in flat list */
+            int            depth;    /* Include depth */
+            include_t    * inc;      /* The include information */
+              /* The following members are used to recreate the inherit tree */
+            int            count;    /* Number of direct includes */
+            struct iinfo * parent;   /* Parent include, or NULL */
+            struct iinfo * child;    /* First child include */
+            struct iinfo * sibling;  /* Next include on same level */
+              /* These members are used to create the result tree */
+            size_t         index;    /* # of this include file in the parent
+                                      * vector */
+            vector_t     * vec;      /* Result vector for this include */
+        } *begin, *end;         /* Flat list of all found includes */
+
+        struct iinfo * last;    /* Last include found on this depth */
+        struct iinfo * next;    /* Next include to work */
+
+        /* Get the memory pool */
+        pool = new_mempool(sizeof(*begin) * 64);
+        if (NULL == pool)
+        {
+            error("Out of memory: memory pool\n");
+            /* NOTREACHED */
+            return NULL;
+        }
+
+
+        /* Walk the list of included files and build the tree from it.
+         */
+
+        begin = mempool_alloc(pool, sizeof(*begin));
+        if (NULL == begin)
+        {
+            mempool_delete(pool);
+            outofmem(sizeof(*begin), "allocation from mempool");
+        }
+
+        /* Root node for the object's program itself */
+        begin->next = NULL;
+        begin->child = NULL;
+        begin->sibling = NULL;
+        begin->inc = NULL;
+        begin->depth = 0;
+        begin->count = 0;
+        begin->parent = NULL;
+        begin->vec = NULL;
+        begin->index = 0;
+
+        end = begin;
+        last = begin;
+
+        includes = ob->prog->includes;
+        count = ob->prog->num_includes;
+
+        for ( ; count > 0; count--, includes++)
+        {
+            /* Get new node and put it into the flat list */
+            end->next = mempool_alloc(pool, sizeof(*end));
+            if (NULL == end->next)
+            {
+                mempool_delete(pool);
+                outofmem(sizeof(*end), "allocation from mempool");
+            }
+            end = end->next;
+            end->next = NULL;
+            end->inc = includes;
+            end->depth = includes->depth > 0 ? includes->depth : - includes->depth;
+
+            /* Handle the tree-based information */
+            end->child = NULL;
+            end->sibling = NULL;
+
+            if (last->depth > end->depth)
+            {
+                /* We reached a leaf with <last> - this new was included from
+                 * some parent above.
+                 */
+                while (last->depth > end->depth)
+                    last = last->parent;
+
+                /* Got back up to the right sibling level, no go to the end
+                 * of the sibling list (just in case - we should already
+                 * be there).
+                 */
+                while (last->sibling)
+                    last = last->sibling;
+            }
+            /* Now the new file is either a sibling or a child of <last> */
+
+            if (last->depth == end->depth)
+            {
+                /* Sibling to <last> */
+                last->sibling = end;
+                end->parent = last->parent;
+                last = end;
+                end->parent->count++;
+            }
+            else /* last->depth < end->depth */
+            {
+                /* Included from <last> */
+                last->child = end;
+                last->count++;
+                end->parent = last;
+                last = end;
+            }
+
+            /* Init the rest */
+            end->count = 0;
+            end->index = end->parent->count;
+            end->vec = NULL;
+        }
+
+        /* Get the top result array and keep a reference to it on the
+         * stack so that it will be deallocated on an error.
+         */
+        vec = allocate_array((begin->count+1) * 3);
+        begin->vec = vec;
+        sp++; put_array(sp, vec); inter_sp = sp;
+
+        /* Loop through all the include infos and copy them into
+         * their result vector. We create the subvectors when
+         * we encounter them.
+         * Invariant: <next> points to the next iinfo to work.
+         */
+        for (next = begin->child; next != NULL; )
+        {
+            /* If this child has no includes, we just copy the
+             * name into its proper place in the parent vector.
+             *
+             * Otherwise we create a vector for this include
+             * and store the names in there.
+             */
+            if (next->child == NULL)
+            {
+                svalue_t *svp;
+
+                svp = &next->parent->vec->item[next->index*3];
+                put_ref_string(svp, next->inc->name);
+                put_ref_string(svp+1, next->inc->filename);
+                put_number(svp+2, next->depth);
+
+                /* If we are in the last sibling, roll back up to
+                 * the parents.
+                 */
+                while (next->sibling == NULL && next->parent != NULL)
+                    next = next->parent;
+
+                /* Advance to the next sibling. If by  */
+                next = next->sibling;
+            }
+            else
+            {
+                svalue_t *svp;
+
+                next->vec = allocate_array((next->count+1)*3);
+
+                svp = &next->parent->vec->item[next->index*3];
+                put_array(svp, next->vec);
+                  /* svp[1] and svp[2] are already 0 */
+
+                svp = next->vec->item;
+                put_ref_string(svp, next->inc->name);
+                put_ref_string(svp+1, next->inc->filename);
+                put_number(svp+2, next->depth);
+
+                /* Descend into the first child */
+                next = next->child;
+            }
+        }
+
+        mempool_delete(pool);
+        sp--; /* Remove the temporary storage of vec on the stack */
+    }
+
+    /* Copy the information about the program file itself. */
+
+    {
+        char *str;
+        size_t slen;  /* Also used for error reporting */
+
+        slen = strlen(ob->prog->name);
+
+        if (compat_mode)
+            str = string_copy(ob->prog->name);
+        else
+            str = add_slash(ob->prog->name);
+
+        if (!str)
+        {
+            free_array(vec);
+            error("(include_list) Out of memory: (%lu bytes) for filename\n"
+                 , (unsigned long)slen);
+        }
+        put_malloced_string(vec->item, str);
+        /* vec->item[1] and vec->item[2] are already 0 */
+    }
+
+    /* Done */
+
+    sp = pop_n_elems(num_arg, sp);
+
+    sp++;
+    put_array(sp, vec);
+    return sp;
+} /* f_include_list() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_inherit_list (svalue_t *sp, int num_arg)
+
+/* EFUN inherit_list()
+ *
+ *   string* inherit_list ()
+ *   string* inherit_list (object ob)
+ *   string* inherit_list (object ob, int flags)
+ *
+ * Return a list with the filenames of all programs inherited by <ob>, include
+ * <ob>'s program itself.
+ */
+
+{
+    /* Local structure to hold the found programs */
+    struct iinfo {
+        struct iinfo * next;     /* Next structure in flat list */
+        SBool          virtual;  /* TRUE: Virtual inherit */
+        program_t    * prog;     /* Program found */
+          /* The following members are used to recreate the inherit tree */
+        int            count;    /* Number of direct inherits */
+        struct iinfo * parent;   /* Parent program, or NULL */
+          /* These members are used to create the result tree */
+        size_t         index;    /* # of this inherited program */
+        vector_t     * vec;      /* Result vector for this program */
+    } *begin, *end;         /* Flat list of all found inherits */
+    struct iinfo * next;    /* Next program to analyze */
+
+    Mempool   pool;         /* The memory pool to allocate from */
     object_t *ob;           /* Analyzed object */
     vector_t *vec;          /* Result vector */
     svalue_t *svp;          /* Pointer to next vec entry to fill in */
-    program_t *pr;          /* Next program to count */
-    program_t **prp;        /* Pointer to pr->inherit[x].prog */
-      /* Incrementing prp by sizeof(inherit) bytes walks along the
-       * the vector of inherited programs.
-       */
-    program_t *plist[256];  /* Table of found programs */
-    int next;               /* Next free entry in plist[] */
-    int cur;                /* Current plist[] entry analyzed */
+    int       count;        /* Total number of inherits found */
+    svalue_t *argp;         /* Arguments */
+    p_int     flags;
 
-    /* Get the argument */
-    if (sp->type != T_OBJECT)
-        bad_xefun_arg(1, sp);
-    ob = sp->u.ob;
+    /* Get the arguments */
+    argp = sp - num_arg + 1;
 
-    inter_sp = sp;
-      /* three possibilities for 'out of memory' follow, so clean
-       * up the stack now.
-       */
+    if (num_arg >= 1)
+    {
+        if (argp->type != T_OBJECT)
+            bad_xefun_vararg(1, sp);
+        ob = argp[0].u.ob;
+    }
+    else
+        ob = current_object;
+
+    if (num_arg >= 2)
+    {
+        if (argp[1].type != T_NUMBER)
+            bad_xefun_vararg(2, sp);
+        flags = argp[1].u.number;
+    }
+    else
+        flags = 0;
 
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0) {
@@ -2915,61 +3296,219 @@ f_inherit_list (svalue_t *sp)
             return NULL;
         }
 
-    /* Perform a breadth search on ob's inherit tree and store the
-     * program pointers into plist[] while counting them.
+    /* Get the memory pool */
+    pool = new_mempool(sizeof(*begin) * 64);
+    if (NULL == pool)
+    {
+        error("Out of memory: memory pool\n");
+        /* NOTREACHED */
+        return NULL;
+    }
+
+    /* Perform a breadth search on ob's inherit tree and append the
+     * found programs to the iinfo list while counting them.
      */
 
-    plist[0] = ob->prog;
-    next = 1;
-    for (cur = 0; cur < next; cur++)
+    begin = mempool_alloc(pool, sizeof(*begin));
+    if (NULL == begin)
+    {
+        mempool_delete(pool);
+        error("Out of memory: allocation from memory pool\n");
+        /* NOTREACHED */
+        return NULL;
+    }
+
+    begin->next = NULL;
+    begin->prog = ob->prog;
+    begin->virtual = MY_FALSE;
+    begin->count = 0;
+    begin->parent = NULL;
+    begin->vec = NULL;
+    begin->index = 0;
+
+    end = begin;
+
+    count = 1;
+
+    for (next = begin; next != NULL; next = next->next)
     {
         int cnt;
         inherit_t *inheritp;
 
-        pr = plist[cur];
-        cnt = pr->num_inherited;
-        if (next + cnt > (int)(sizeof plist/sizeof *plist))
-            break;
+        cnt = next->prog->num_inherited;
 
         /* Store the inherited programs in the list.
          */
-        for (inheritp = &pr->inherit[0]; cnt--; inheritp++)
+        for (inheritp = &next->prog->inherit[0]; cnt--; inheritp++)
         {
-            if (inheritp->inherit_type == INHERIT_TYPE_NORMAL)
-                plist[next++] = inheritp->prog;
+            if (inheritp->inherit_type == INHERIT_TYPE_NORMAL
+             || inheritp->inherit_type == INHERIT_TYPE_VIRTUAL
+               )
+            {
+                count++;
+                next->count++;
+
+                end->next = mempool_alloc(pool, sizeof(*end));
+                if (NULL == end->next)
+                {
+                    mempool_delete(pool);
+                    error("Out of memory: allocation from memory pool\n");
+                    /* NOTREACHED */
+                    return NULL;
+                }
+                end = end->next;
+                end->next = NULL;
+                end->prog = inheritp->prog;
+                end->virtual = inheritp->inherit_type == INHERIT_TYPE_VIRTUAL;
+
+                /* Handle the tree-based information */
+                end->parent = next;
+                end->count = 0;
+                end->index = next->count;
+                end->vec = NULL;
+            }
         }
     }
 
-    /* next is also the actual number of files found :-) */
-    vec = allocate_array(next);
-
-    /* Take the filenames of the program and copy them into
-     * the result vector.
-     * TODO: What? The filenames are not shared a priori?
+    /* Create the result.
+     * Depending on the flags value, this can be a flat list or a tree.
      */
-    for (svp = vec->item, prp = plist; --next >= 0; svp++) {
-        char *str;
 
-        pr = *prp++;
-#ifdef COMPAT_MODE
-        str = string_copy(pr->name);
-#else
-        str = add_slash(pr->name);
-#endif
-        if (!str)
+    if (!(flags & INHLIST_TREE))
+    {
+        /* Get the result array */
+        vec = allocate_array(count);
+
+        /* Take the filenames of the programs and copy them into
+         * the result vector.
+         */
+        for (svp = vec->item, next = begin; next != NULL; svp++, next = next->next)
         {
-            free_array(vec);
-            error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
-                 , (unsigned long)strlen(pr->name));
+            char *str;
+            size_t slen;  /* Also used for error reporting */
+
+            slen = strlen(next->prog->name);
+            if (compat_mode)
+                str = string_copy(next->prog->name);
+            else
+                str = add_slash(next->prog->name);
+
+            if (str && (flags & INHLIST_TAG_VIRTUAL))
+            {
+                char * str2;
+
+                slen = strlen(str) + 3;
+                str2 = xalloc(slen);
+
+                if (str2)
+                {
+                    if (next->virtual)
+                        strcpy(str2, "v ");
+                    else
+                        strcpy(str2, "  ");
+                    strcpy(str2+2, str);
+                }
+
+                xfree(str);
+                str = str2;
+            }
+
+            if (!str)
+            {
+                free_array(vec);
+                mempool_delete(pool);
+                error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
+                     , (unsigned long)slen);
+            }
+            put_malloced_string(svp, str);
         }
-        put_malloced_string(svp, str);
+    }
+    else
+    {
+        /* Get the top result array and keep a reference to it on the
+         * stack so that it will be deallocated on an error.
+         */
+        vec = allocate_array(begin->count+1);
+        begin->vec = vec;
+        sp++; put_array(sp, vec); inter_sp = sp;
+
+        /* Loop through all filenames and copy them into their result
+         * vector. Since the list in breadth-order, we can create the
+         * sub-vectors when we encounter them.
+         */
+        for (next = begin; next != NULL; next = next->next)
+        {
+            char *str;
+            size_t slen;  /* Also used for error reporting */
+
+            slen = strlen(next->prog->name);
+            if (compat_mode)
+                str = string_copy(next->prog->name);
+            else
+                str = add_slash(next->prog->name);
+
+            if (str && (flags & INHLIST_TAG_VIRTUAL))
+            {
+                char * str2;
+
+                slen = strlen(str) + 3;
+                str2 = xalloc(slen);
+
+                if (str2)
+                {
+                    if (next->virtual)
+                        strcpy(str2, "v ");
+                    else
+                        strcpy(str2, "  ");
+                    strcpy(str2+2, str);
+                }
+
+                xfree(str);
+                str = str2;
+            }
+
+            if (!str)
+            {
+                free_array(vec);
+                mempool_delete(pool);
+                error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
+                     , (unsigned long)slen);
+            }
+
+            /* If this child has no inherits, we just copy the
+             * name into its proper place in the parent vector.
+             * Same for the name of the top program.
+             *
+             * Otherwise we create a vector for this program
+             * and store the name in there.
+             */
+            if (begin == next)
+            {
+                put_malloced_string(next->vec->item, str);
+            }
+            else if (next->count == 0)
+            {
+                put_malloced_string(&next->parent->vec->item[next->index], str);
+            }
+            else
+            {
+                next->vec = allocate_array(next->count+1);
+                put_array(&next->parent->vec->item[next->index], next->vec);
+                put_malloced_string(next->vec->item, str);
+            }
+        }
+
+        sp--; /* Remove the temporary storage of vec on the stack */
     }
 
-    free_object_svalue(sp);
+    mempool_delete(pool);
 
+    sp = pop_n_elems(num_arg, sp);
+
+    sp++;
     put_array(sp, vec);
     return sp;
-}
+} /* f_inherit_list() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -3004,11 +3543,11 @@ f_functionlist (svalue_t *sp)
  *     The name RETURN_FUNCTION_ARGTYPE is defined but not implemented.
  *
  *   Control of listed functions:
- *     NAME_INHERITED      list if defined by inheritance
- *     TYPE_MOD_STATIC     list if static function
- *     TYPE_MOD_PRIVATE    list if private
- *     TYPE_MOD_PROTECTED  list if protected
- *     NAME_HIDDEN         list if not visible through inheritance
+ *     NAME_INHERITED      don't list if defined by inheritance
+ *     TYPE_MOD_STATIC     don't list if static function
+ *     TYPE_MOD_PRIVATE    don't list if private
+ *     TYPE_MOD_PROTECTED  don't list if protected
+ *     NAME_HIDDEN         don't list if not visible through inheritance
  *
  * The 'flags' information consists of the bin-or of the list control
  * flags given above, plus the following:
@@ -3051,6 +3590,7 @@ f_functionlist (svalue_t *sp)
 #define VISTAG_INVIS '\0'  /* Function should not be listed */
 #define VISTAG_VIS   '\1'  /* Function matches the <flags> list criterium */
 #define VISTAG_ALL   '\2'  /* Function should be listed, no list restrictions */
+#define VISTAG_NAMED '\4'  /* Function is neither hidden nor private */
 
     vector_t *list;       /* Result vector */
     svalue_t *svp;        /* Last element in list which was filled in. */
@@ -3100,6 +3640,10 @@ f_functionlist (svalue_t *sp)
         return NULL;
     }
 
+    /* Preset the visibility. By default, if there is any listing
+     * modifier, the functions are not visible. If there is none, the functions
+     * are visible.
+     */
     memset(
       vis_tags,
       mode_flags &
@@ -3110,27 +3654,53 @@ f_functionlist (svalue_t *sp)
       num_functions
     );
 
+    /* Count how many named functions need to be listed in the result.
+     * Flag every function to list in vistag[].
+     */
+    num_functions = 0;
+
+    /* First, check all functions for which we have a name */
     flags = mode_flags &
         (TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|NAME_INHERITED);
 
-    /* Count how many functions need to be listed in the result.
-     * Flag every function to list in vistag[].
-     * TODO: Document me properly when the layout of programs and functions
-     * TODO:: is clear.
-     */
     fun = prog->functions;
-    num_functions = 0;
     j = prog->num_function_names;
     for (ixp = prog->function_names + j; --j >= 0; ) {
         i = *--ixp;
-        if ( !(fun[i] & flags) ) {
-            vis_tags[i] = VISTAG_VIS;
+        if (!(fun[i] & flags) )
+        {
+            vis_tags[i] = VISTAG_NAMED|VISTAG_VIS;
             num_functions++;
+        }
+        else
+        {
+            vis_tags[i] |= VISTAG_NAMED;
+        }
+    }
+
+    /* If the user wants to see the hidden or private functions, we loop
+     * through the full function table and check all functions not yet
+     * touched by the previous 'named' scan.
+     */
+    if ((mode_flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0)
+    {
+        fun = prog->functions;
+        for (i = prog->num_functions; --i >= 0; )
+        {
+            if (!(vis_tags[i] & VISTAG_NAMED)
+             && !(fun[i] & flags)
+               )
+            {
+                vis_tags[i] = VISTAG_VIS;
+                num_functions++;
+            }
         }
     }
 
     /* If <flags> accepts all functions, use the total number of functions
      * instead of the count computed above.
+     * TODO: Due to the dedicated 'find hidden name' loop, this shouldn't
+     * TODO:: be necessary, nor the VISTAG_ALL at all.
      */
     if ( !(mode_flags &
            (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|
@@ -3162,13 +3732,14 @@ f_functionlist (svalue_t *sp)
 
         fun--;
 
-        if (!vis_tags[i]) continue; /* Don't list this one */
+        if ((vis_tags[i] & (VISTAG_ALL|VISTAG_VIS)) == VISTAG_INVIS)
+            continue; /* Don't list this one */
 
         flags = *fun;
 
         active_flags = (flags & ~INHERIT_MASK);
-        if (vis_tags[i] & VISTAG_ALL)
-            active_flags |= NAME_HIDDEN; /* TODO: Why? */
+        if (!(vis_tags[i] & VISTAG_NAMED))
+            active_flags |= NAME_HIDDEN;
 
         defprog = prog;
 
@@ -3457,9 +4028,9 @@ make_unique (vector_t *arr, char *func, svalue_t *skipnum)
     /* Special case: unifying an empty array */
     if (!arr_size)
         return allocate_array(0);
-    
+
     /* Get the memory for the arr_size unique-structures we're going
-     * to need. 
+     * to need.
      * TODO: Implement an automatic memory-cleanup in case of errors,
      * TODO:: e.g. by adding a dedicated structure on the runtime stack.
      */
@@ -3510,7 +4081,7 @@ make_unique (vector_t *arr, char *func, svalue_t *skipnum)
     }
 
     mempool_delete(pool);
-    
+
     return ret;
 } /* make_unique() */
 

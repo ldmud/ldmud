@@ -21,11 +21,11 @@ extern Bool swap_variables(object_t *ob);
 extern Bool swap(object_t *ob, int mode);
 extern int load_ob_from_swap(object_t *ob);
 extern Bool load_line_numbers_from_swap(program_t *prog);
-extern void remove_swap_file(program_t *prog);
+extern void remove_prog_swap(program_t *prog, Bool load_line_numbers);
 extern void name_swap_file(const char *name);
 extern void unlink_swap_file(void);
 extern size_t swap_overhead (void);
 extern void swap_status(strbuf_t *sbuf);
-extern void swap_dinfo_data (svalue_t *svp);
+extern void swap_dinfo_data (svalue_t *svp, int value);
 
 #endif  /* SWAP_H__ */

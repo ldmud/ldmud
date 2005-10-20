@@ -48,4 +48,3 @@ extern void * alloca(size_t);
 #endif  /* C_ALLOCA */
 
 #endif /* MY_ALLOCA_H__ */
-

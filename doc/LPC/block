@@ -1,16 +1,16 @@
 NAME
-	block
+        block
 
 DESCRIPTION
-	A block is a special statment, that begins with '{', contains
-	a list of statements, and ends with '}'.
-    
+        A block is a special statment, that begins with '{', contains
+        a list of statements, and ends with '}'.
+
         The block may define local variables. If for a variable no
         initialisation is given, the variable is initialised to 0 every
         time the block is entered. Otherwise, the initialisation
         expression is evaluated and its result assigned to the variable
         everytime the block is entered.
-        
+
         Example definitions are:
 
           int i;
@@ -41,6 +41,6 @@ HISTORY
         You can get this old behaviour back with the #pragma no_local_scopes.
         To turn it off again, use #pragma local_scopes.
 
-        
+
         Up to 3.2.8, local variables could not be initialised in their
         definition.

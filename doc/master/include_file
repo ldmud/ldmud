@@ -3,7 +3,7 @@ SYNOPSIS
 
 DESCRIPTION
         Generate the pathname of an included file.
- 
+
         Arguments:
           previous_object(): The object causing the compile.
           file             : The name given in the #include directive.
@@ -18,7 +18,7 @@ DESCRIPTION
 
           <path>: the full absolute pathname of the file to include,
                   without parentdir parts ("/../"). Leading slashes ("/")
-                  are ignored.
+                  may be omitted.
 
           else: The include directive is not legal.
 
@@ -26,5 +26,4 @@ HISTORY
         Introduced in LDMud 3.2.8.
 
 SEE ALSO
-        H_INCLUDE_DIRS(hooks), inherit_file(M)
-
+        hooks(C), inherit_file(M)

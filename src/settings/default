@@ -22,7 +22,7 @@
 # be given without surrounding quotes.
 #
 # In both cases no whitespace is allowed around the '=' and nothing
-# else may appear on the line, not even comments!
+# else may appear on the line, except a trailing comment!
 #
 # Configure will strip everything from this file which doesn't match one
 # of its option specification patterns, allowing us to make the files
@@ -58,6 +58,19 @@ with_read_file_max_size=50000
 
 with_max_byte_transfer=50000
 
+# Maximum number of callouts at one time.
+# If 0, any number is allowed.
+
+with_max_callouts=0
+
+# If PThreads are used, this is the max amount of data held pending
+# for writing. If the amount is exceeded, the oldest data blocks
+# are discarded.
+# If 0, any amount of data is allowed.
+
+with_pthread_write_max_size=100000
+
+
 # --- Timing ---
 
 # If an object is left alone for this time, it will be 'cleaned up'.
@@ -71,6 +84,7 @@ with_time_to_clean_up=3600
 # programs, because swapping variables is quite expensive.
 # Both times should be shorter than the cleanup time and are given
 # in seconds.
+# A swapping time <= 0 disables that particular swapping feature.
 
 with_time_to_swap=900
 with_time_to_swap_variables=1800
@@ -99,20 +113,20 @@ with_reserved_user_size=700000
 with_reserved_master_size=100000
 with_reserved_system_size=200000
 
-# These two values give the upper limits for large and small block
-# allocation.
+# This value gives the upper limits for the total allocated memory.
+# A value of 0 means 'unlimited'.
 
-enable_max_malloced=yes
 with_max_malloced=0x4000000 
 
-# If this is enabled, the driver will reserve this amount of memory
-# on startup for large blocks, reducing the large block fragmentation.
-# The value should be a significantly large multiple of the large
-# chunk size.
+# If these values are >0, the driver will reserve this amount of memory
+# on startup for large resp. small blocks, reducing the block fragmentation.
+# The value should be a significantly large multiple of the large resp.
+# small chunk size.
+# As a rule of thumb, reserve enough memory for the first couple of days
+# of uptime.
 
-enable_min_malloced=no
-with_min_malloced=0x1000000 
-
+with_min_malloced=0
+with_min_small_malloced=0
 
 # --- Interpreter ---
 
@@ -135,12 +149,30 @@ with_max_cost=1000000
 
 with_portno=4242
 
-# If enable_catch_udp_port=yes, this is the number of the UDP port to use.
+# This is the number of the UDP port to use.
 # If set to -1, and no number is given on the commandline, the port will
 # not be created.
 
-with_catch_udp_port=4246
+with_udp_port=4246
 
+# The maximum number of ports to listen for connections on.
+
+with_maxnumports=20
+
+# Select the ERQ service to use.
+#   'no':   the driver is compiled without erq support.
+#   'erq':  the driver is compiled with erq support, the Makefiles
+#           are set up to compile the standard erq.
+#   'xerq': the driver is compiled with erq support, the Makefiles
+#           are set up to compile Brian's xerq.
+
+enable_erq=erq
+
+# Max size of a packet received from/send to the ERQ.
+# TODO: Do the current erqs compile this in?
+
+with_erq_max_reply=1024 
+with_erq_max_send=1024 
 
 #----------- Compilation Options ----------
 # To change these options, the config.h must be recreated and the
@@ -166,9 +198,10 @@ enable_malloc_trace=no
 
 enable_malloc_lpc_trace=no
 
-# If the driver is compiled using TRACE_CODE, this is the number of
-# instructions kept.
+# If TRACE_CODE is enable, the driver keeps a log of TOTAL_TRACE_LENGTH
+# most recently execute bytecode instructions.
 
+enable_trace_code=yes
 with_total_trace_length=4096
 
 # Enable these for runtime statistics:
@@ -183,6 +216,24 @@ enable_apply_cache_stat=yes
 # '.<hostname>' to the file.
 
 with_swap_file=LP_SWAP.3
+
+# Enable support for IPv6 (assuming your system supports it).
+
+enable_use_ipv6=no
+
+# Enable the use of pthreads.
+# WARNING: This feature is HIGHLY ALPHA and can crash the driver!
+enable_use_pthreads=no
+
+
+# --- Wizlist ---
+
+# The name of the file (relative to the mudlib) to hold the Wizlist
+# information. The driver reads it on startup.
+# If disabled ('with_wizlist_file=no'), a wizlist file can still be
+# given on the commandline.
+
+with_wizlist_file=WIZLIST
 
 # --- Access Control ---
 
@@ -201,39 +252,6 @@ enable_access_log=no
 # The name of the file where all connections are logged.
 
 with_access_log=access.allow.log
-
-
-# --- Communication ---
-
-# The maximum number of ports to listen for connections on.
-
-with_maxnumports=20
-
-# To use UDP communication at all, it must be enabled.
-# In order be able to send UDP, enable udp_send as well.
-
-enable_catch_udp_port=yes
-enable_udp_send=yes
-
-# Select the ERQ service to use.
-#   'no':   the driver is compiled without erq support.
-#   'erq':  the driver is compiled with erq support, the Makefiles
-#           are set up to compile the standard erq.
-#   'xerq': the driver is compiled with erq support, the Makefiles
-#           are set up to compile Brian's xerq.
-
-enable_erq=erq
-
-# Max size of a packet received from/send to the ERQ.
-# TODO: Do the current erqs compile this in?
-
-with_erq_max_reply=1024 
-with_erq_max_send=1024 
-
-# Enable support for IPv6 (assuming your system supports it).
-
-enable_use_ipv6=no
-
 
 # --- Language ---
 
@@ -263,6 +281,42 @@ enable_use_system_crypt=yes
 # works in either case.
 
 enable_lpc_nosave=yes
+
+# Enable support for mySQL (assuming your system supports it).
+#
+#  'no'  : mySQL support is not compiled in
+#  'yes' : mySQL support is compiled in, the libmysqlclient is expected
+#          in the normal library search path.
+#  <path>: mySQL support is compiled in, <path> is added to the link paths
+#          and should be the path to libmysqlclient, 
+#          e.g. enable_use_mysql=/usr/local/lib/mysql .
+#          The include files are searched in /usr/local/include, <path>,
+#          and <path>/include.
+#          The libraries are searched in the default path, <path>/lib/mysql,
+#          <path>/lib and <path>, in this order.
+
+enable_use_mysql=no
+
+# Enable obsolete and deprecated efuns.
+
+enable_use_deprecated=yes
+
+# Enable the use of PCRE (requires Fiona's PCRE patch and PCRE installed).
+
+enable_use_pcre=no
+
+# Enable the efun set_light() and the driver-provided light system.
+
+enable_use_set_light=yes
+
+# Enable the efun set_is_wizard()
+
+enable_use_set_is_wizard=yes
+
+# Enable the efun process_string().
+
+enable_use_process_string=yes
+
 
 # --- Runtime limits ---
 
@@ -367,5 +421,70 @@ with_apply_cache_bits=12
 # how big the cache shall be (max: 65536).
 
 enable_rxcache_table=yes
-with_rxcache_table=16384
+with_rxcache_table=8192
+
+# --- Profiling ---
+# For profiling of the VM instruction implementations, refer to the Makefile
+
+# Enable usage statistics of VM instructions.
+enable_opcprof=no
+
+# If opcprof is enabled, this option includes the instruction names
+# into the statistic.
+enable_verbose_opcprof=no
+
+# --- Standard Debugging ---
+# These options are 'standard' debugging options.
+
+# Enable basic run time sanity checks. This will use more time
+# and space, but nevertheless you are strongly encouraged to keep
+# it defined.
+enable_debug=yes
+
+# Enable debug output from the LPC compiler.
+enable_yydebug=no
+
+# Disable inlining. Use this to debug obscure crashes, or for
+# speed tests.
+enable_no_inlines=no
+
+# Enable the shared string sanity checking (enables commandline option
+# --check-strings).
+enable_check_strings=yes
+
+# Shared strings are never really freed.
+enable_keep_strings=no
+
+# Activate debug prints in the telnet machine (lots of output).
+enable_debug_telnet=no
+
+# Activate allocation debug prints in the smalloc module (lots of output).
+enable_debug_smalloc_allocs=no
+
+# The DEBUG level for the ERQ daemon:
+#   0 : no debug output
+#   1 : standard debug output
+#   2 : verbose debug output
+with_erq_debug=0
+
+
+# --- Specific Debugging ---
+# These options have been introduced to debug specific problems and will
+# be removed again later.
+
+# Activate object referencing checking code during the GC. It will print error
+# messages to gcout when an object or program is referenced as something else.
+# No penalty for using.  Requires MALLOC_TRACE to work. Incompatible with
+# DUMP_GC_REFS.
+enable_check_object_gc_ref=yes
+
+# Activate total smalloc size consistency check code. This will produce
+# a lot of output in the GC log.
+enable_check_smalloc_total=no
+
+# Sometimes the GC stumbles over invalid references to memory blocks (namely
+# 'Program referenced as something else'). Define this macro to get a detailed
+# dump of all found references (Warning: LOTS of output!).
+# Incompatible with CHECK_OBJECT_GC_REF.
+enable_dump_gc_refs=no
 

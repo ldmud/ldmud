@@ -2,888 +2,88 @@ Short: Morgengrauen diffs
 From: Lars
 Date 000630
 Type: Patch
-State: New
+State: Mostly adapted in 3.2.9-dev.259
 
-This are the diffs of the Morgengrauen driver 2000.01.18 against it's
-parent version, amylaar 3.2.1@141.
+These are the simul_efuns needed to run LDMud with the Morgengrauen lib:
 
 ----------------------------------------------------
-Index: amylaar.2/telnet.h
---- amylaar.2/telnet.h Mon, 02 Nov 1998 15:38:10 -0700 lars (lpmud/22_telnet.h 1.1 644)
-+++ amylaar.2(w)/telnet.h Mon, 08 Feb 1999 08:23:11 -0700 u1000 (lpmud/22_telnet.h 1.1 644)
-@@ -91,9 +91,14 @@
- #define	TELOPT_TSPEED	32	/* terminal speed */
- #define	TELOPT_LFLOW	33	/* remote flow control */
- #define TELOPT_LINEMODE	34	/* Linemode option */
-+#define TELOPT_XDISPLOC 35      /* X Display Location */
-+#define	TELOPT_ENVIRON	36	/* Environment opt for Port ID */
-+#define TELOPT_AUTHENTICATION 37/* authentication */
-+#define TELOPT_ENCRYPT 38/* authentication */
-+#define	TELOPT_NEWENV	39	/* Environment opt for Port ID */
- #define	TELOPT_EXOPL	255	/* extended-options-list */
- 
--#define	NTELOPTS	(1+TELOPT_LINEMODE)
-+#define	NTELOPTS	(256)		/* yes */
- #ifdef TELOPTS
- char *telopts[NTELOPTS] = {
- 	"BINARY", "ECHO", "RCP", "SUPPRESS GO AHEAD", "NAME",
-Index: amylaar.2/swap.c
---- amylaar.2/swap.c Mon, 02 Nov 1998 15:49:18 -0700 lars (lpmud/25_swap.c 1.2 644)
-+++ amylaar.2(w)/swap.c Tue, 18 Jan 2000 06:37:33 -0700 u1000 (lpmud/25_swap.c 1.2 644)
-@@ -24,6 +24,7 @@
-  * Swap out programs / variables from objects.
-  */
- 
-+extern int current_time;
- mp_int num_swapped = 0, num_unswapped = 0;
- mp_int total_bytes_swapped = 0, total_bytes_unswapped = 0;
- mp_int num_swapfree = 0;
-@@ -1060,6 +1061,8 @@
-     int result;
- 
-     result = 0;
-+    if ( ob->next_reset < current_time )
-+        ob->next_reset = current_time + random_number(TIME_TO_RESET);
-     swap_num = (p_int)ob->prog;
-     if (swap_num & 1) {
- 	extern int errno;
-Index: amylaar.2/simulate.c
---- amylaar.2/simulate.c Mon, 02 Nov 1998 15:49:18 -0700 lars (lpmud/31_simulate.c 1.2 644)
-+++ amylaar.2(w)/simulate.c Sat, 06 Feb 1999 14:44:46 -0700 u1000 (lpmud/31_simulate.c 1.2 644)
-@@ -461,6 +461,7 @@
-     ob->prog = prog;
-     ob->next_all = obj_list;
-     obj_list = ob;
-+    ob->_my_cost=0; /* Kirk */
-     enter_object_hash(ob);	/* add name to fast object lookup table */
- 
-     push_give_uid_error_context(ob);
-@@ -614,6 +615,7 @@
- 	fatal("clone_object() from no current_object !\n");
- #endif
-     new_ob->next_all = obj_list;
-+    new_ob->_my_cost=0; /* Kirk */
-     obj_list = new_ob;
-     enter_object_hash(new_ob);	/* Add name to fast object lookup table */
-     push_give_uid_error_context(new_ob);
-@@ -4383,4 +4385,21 @@
- 	}
-     }
-     return sp;
-+}
-+
-+void set_next_reset(num)
-+    int num;
-+{
-+    extern int current_time;
-+
-+    if (current_object->flags & O_DESTRUCTED) return;
-+    if (num>=0) {
-+        int oldnum;
-+
-+        oldnum=num;
-+        num+=current_time;
-+        if (num<oldnum) num=MAXINT;
-+    }
-+    else num=MAXINT;
-+    current_object->next_reset = num;
- }
-Index: amylaar.2/prolang.y
---- amylaar.2/prolang.y Mon, 02 Nov 1998 15:49:18 -0700 lars (lpmud/37_prolang.y 1.2 644)
-+++ amylaar.2(w)/prolang.y Wed, 15 Dec 1999 14:39:33 -0700 u1000 (lpmud/37_prolang.y 1.2 644)
-@@ -1270,9 +1270,9 @@
- 
- struct s_lrvalue {
-     short type;
--    unsigned short start;
-+    uint32 start;
-     short code;
--    unsigned short end;
-+    uint32 end;
- };
- 
- static struct s_lrvalue indexing_argument, indexing_index1, indexing_index2;
-@@ -3328,6 +3328,8 @@
- 
- 	    check_aggregate_types($4[0]);
- 	    num_keys = $4[0] / ($4[1]+1);
-+	    if ((num_keys|$4[1]) & ~0xffff)
-+	    	yyerror("cannot handle more than 65535 keys/values in mapping aggregate");
- 	    if ( (num_keys | $4[1]) &~0xff) {
- 		ins_f_byte(F_M_AGGREGATE);
- 		ins_short(num_keys);
-@@ -4897,6 +4899,8 @@
- 				mem_block[A_PROGRAM].max_size)
- 		    {
- 			realloc_a_program();
-+            __PREPARE_INSERT__p = mem_block[A_PROGRAM].block +
-+               CURRENT_PROGRAM_SIZE;
- 		    }
- 		    CURRENT_PROGRAM_SIZE += i;
- 		    while ( --i >= 0 ) {
-Index: amylaar.2/object.h
---- amylaar.2/object.h Mon, 02 Nov 1998 15:49:18 -0700 lars (lpmud/44_object.h 1.2 644)
-+++ amylaar.2(w)/object.h Wed, 26 Nov 1997 05:45:28 -0700 u1000 (lpmud/44_object.h 1.2 644)
-@@ -55,6 +55,7 @@
-     /* amylaar : used to determine where to check ref counts at all... */
- #endif
-     struct svalue *variables;		/* All variables to this program */
-+    long long _my_cost; /* Kirk */
- };
- 
- struct replace_ob {
-Index: amylaar.2/interpret.c
---- amylaar.2/interpret.c Mon, 02 Nov 1998 15:49:18 -0700 lars (lpmud/b/14_interpret. 1.2 644)
-+++ amylaar.2(w)/interpret.c Wed, 12 Jan 2000 05:17:42 -0700 u1000 (lpmud/b/14_interpret. 1.2 644)
-@@ -122,6 +122,7 @@
- extern struct object *current_heart_beat, *current_interactive;
- extern int out_of_memory;
- extern char *out_of_memory_string;
-+extern int absolute_hb_num;
- 
- /* A function call can cause an eval_cost overflow linear to the number of
-  * shadows. Well, adding more than a million is likely to cause memory
-@@ -220,7 +221,8 @@
- #define ASSIGN_EVAL_COST \
-     if (current_object->user)\
- 	current_object->user->cost += eval_cost - assigned_eval_cost;\
--    assigned_eval_cost = eval_cost;
-+	current_object->_my_cost += eval_cost - assigned_eval_cost;\
-+    assigned_eval_cost = eval_cost; /* Kirk */
- 
- void assign_eval_cost() { ASSIGN_EVAL_COST }
- 
-@@ -3403,6 +3405,10 @@
-     CASE(F_POP_VALUE);
- 	pop_stack();
- 	break;
-+    CASE(F_SET_NEXT_RESET);
-+        TYPE_TEST1(sp, T_NUMBER)
-+        set_next_reset(sp->u.number);
-+        break;
-     CASE(F_DUP);
- 	sp++;
- 	assign_svalue_no_free(sp, sp-1);
-@@ -4416,12 +4422,15 @@
- 	bitnum = sp->u.number;
- 	sp = strp = sp-1;
- 	if (bitnum > MAX_BITS)
--	    ERRORF(("set_bit: too big bit number: %ld\n", sp->u.number))
-+	    ERRORF(("set_bit: too big bit number: %ld\n", sp->u.number));
-+    if (bitnum < 0)
-+	    ERRORF(("set_bit: illegal bit number: %ld\n", sp->u.number));
- 	len = svalue_strlen(strp);
- 	old_len = len;
- 	ind = bitnum/6;
- 	if ( (ind < len || (len = ind + 1, MY_FALSE) ) &&
- 	    strp->x.string_type == STRING_MALLOC )
-+
- 	{
- 	    str = strp->u.string;
- 	} else {
-@@ -4455,7 +4464,7 @@
- 	    ERRORF(("clear_bit: too big bit number: %ld\n", sp->u.number))
- 	len = svalue_strlen(strp);
- 	ind = bitnum/6;
--	if (ind >= len) {
-+	if (ind >= len || ind < 0) {
- 	    /* Return first argument unmodified ! */
- 	    break;
- 	}
-@@ -4480,7 +4489,7 @@
- 	TYPE_TEST1(sp-1, T_STRING)
- 	TYPE_TEST2(sp,   T_NUMBER)
- 	len = svalue_strlen(sp-1);
--	if (sp->u.number/6 >= len) {
-+	if (sp->u.number/6 >= len || sp->u.number < 0) {
- 	    sp--;
- 	    free_string_svalue(sp);
- 	    put_number(0);
-@@ -4687,10 +4696,12 @@
-     }
-     CASE(F_THIS_OBJECT);
- 	if (current_object->flags & O_DESTRUCTED) {
--	    debug_message(
--	      "current_object %s destructed\n",
--	      current_object->name
--	    );
-+	    /* not exactly needed... -Marcus
-+	     * debug_message(
-+	     * "current_object %s destructed\n",
-+	     * current_object->name
-+	     * ); 
-+	     */
- 	    push_number(0);
- 	    break;
- 	}
-@@ -7888,6 +7899,73 @@
- 	pc++;
- 	break;
-     }
-+#ifdef F_OBJECT_INFO
-+    CASE(F_OBJECT_INFO);
-+    {
-+	struct vector *oi;
-+	struct svalue *v;
-+	int flags, i;
-+	struct object *ob, *prev, *obj2;
-+	char xtmp[1024];
-+
-+	TYPE_TEST1(sp,T_OBJECT);
-+	ob=sp->u.ob;
-+	oi = allocate_array(20);
-+	v = oi->item;
-+	flags=ob->flags;
-+
-+	v[ 0].u.number = (flags & O_HEART_BEAT ? 1 : 0);
-+	v[ 1].u.number = (flags & O_IS_WIZARD ? 1 : 0);
-+	v[ 2].u.number = (flags & O_ENABLE_COMMANDS ? 1 : 0);
-+	v[ 3].u.number = (flags & O_CLONE ? 1 : 0);
-+	v[ 4].u.number = (flags & O_DESTRUCTED ? 1 : 0);
-+	v[ 5].u.number = (flags & O_SWAPPED ? 1 : 0);
-+	v[ 6].u.number = (flags & O_ONCE_INTERACTIVE ? 1 : 0);
-+	v[ 7].u.number = (flags & O_APPROVED ? 1 : 0);
-+	v[ 8].u.number = (flags & O_RESET_STATE ? 1 : 0);
-+	v[ 9].u.number = (flags & O_WILL_CLEAN_UP ? 1 : 0);
-+	v[10].u.number = ob->total_light;
-+	v[11].u.number = ob->next_reset;
-+	v[12].u.number = ob->time_of_ref;
-+	v[13].u.number = ob->ref;
-+	v[14].u.number = (int)ob->_my_cost;
-+	v[15].u.number = O_SWAP_NUM(ob);
-+
-+	v[16].type = T_STRING;
-+	v[16].x.string_type = STRING_MALLOC;
-+	v[16].u.string = string_copy(ob->name);
-+	
-+	v[17].type = T_STRING;
-+	v[17].x.string_type = STRING_MALLOC;
-+	for (obj2=ob->next_all; obj2 && obj2->flags & O_DESTRUCTED;)
-+	    obj2=obj2->next_all;
-+	sprintf(xtmp,"%s",obj2->next_all?obj2->name:"NULL");
-+	v[17].u.string = string_copy(xtmp);
-+	
-+	v[18].type = T_STRING;
-+	v[18].x.string_type = STRING_MALLOC;
-+	sprintf(xtmp,"NULL");
-+	for (prev=0,obj2=obj_list,i=0;obj2;obj2=obj2->next_all) {
-+	    if ( !(obj2->flags & O_DESTRUCTED) )
-+		prev = obj2, i++;
-+	    if (obj2->next_all == ob) {
-+		if (prev) 
-+		    sprintf(xtmp,"%s",prev->name);
-+		else 
-+		    i=-1;
-+		break;
-+	    }
-+	}
-+	v[18].u.string = string_copy(xtmp);
-+	v[19].u.number = i;
-+	
-+	pop_n_elems(1);
-+	inter_sp = sp;
-+	inter_pc = pc;
-+	push_referenced_vector(oi);
-+	break;
-+    }
-+#endif /* F_OBJECT_INFO */
- #ifdef F_RUSAGE
-     CASE(F_RUSAGE);
-     {
-@@ -10257,10 +10335,13 @@
- 	    malloc_privilege = save_privilege;
- 	}
-     offset = p - progp->program;
--#ifdef DEBUG
-     if (p < progp->program || p > PROGRAM_END(*progp))
--	fatal("Illegal offset %d in object %s\n", offset, progp->name);
--#endif
-+    {
-+      (void)printf("Illegal offset %d in object %s\n", offset, progp->name);
-+      debug_message("Illegal offset %d in object %s\n", offset, progp->name);
-+      return 0;
-+    }
-+	/*fatal("Illegal offset %d in object %s\n", offset, progp->name);*/
-     include_names = progp->strings + progp->num_strings;
-     for (i=0,p=progp->line_numbers; ; ) {
- 	int o;
-@@ -10430,6 +10511,8 @@
- 	if (p > &control_stack[0] && p->funstart == p[-1].funstart)
- 	{
- 	    unsigned char *pc = p->pc;
-+	    if (!pc) goto not_catch;/* Quickhack - Marcus */
-+	    	
- 	    if (*pc == F_LBRANCH - F_OFFSET) {
- 		union {
- 		    char bytes[2];
-@@ -11948,7 +12031,7 @@
-     p_size = VEC_SIZE(p);
-     q_size = VEC_SIZE(q);
-     s = p->item;
--    if (!--p->ref) {
-+    if (!(p->ref-1)) {
- #ifdef MALLOC_smalloc
- 	/* we must not free any old array before we did the assignment,
- 	 * thus vanilla realloc is not acepptable.
-@@ -11976,6 +12059,7 @@
- #endif
- 	{
- 	    r = allocate_uninit_array(p_size + q_size);
-+        p->ref--;
- 	    d = r->item;
- 	    for (cnt = p_size; --cnt >= 0; ) {
- 		*d++ = *s++;
-@@ -11983,6 +12067,7 @@
- 	}
-     } else {
- 	r = allocate_uninit_array(p_size + q_size);
-+    p->ref--;
- 	d = r->item;
- 	for (cnt = p_size; --cnt >= 0; ) {
- 	    assign_checked_svalue_no_free (d++, s++, inter_sp, inter_pc);
-@@ -12049,6 +12134,14 @@
-     return sp;
- }
- 
-+struct svalue *f_absolute_hb_count(sp)
-+   struct svalue *sp;
-+{   
-+    sp++;
-+    put_number(absolute_hb_num);
-+    return sp;
-+}
-+
- struct svalue *f_set_modify_command(sp)
-     struct svalue *sp;
- {
-@@ -12343,6 +12436,7 @@
- #ifdef DEBUG
- 	add_message("extra_ref   : %ld\n", ob->extra_ref);
- #endif
-+	add_message("evalcost    : %.0lf\n", (double)ob->_my_cost); /* Kirk */
- 	add_message("swap_num    : %ld\n", O_SWAP_NUM(ob));
- 	add_message("name        : '%s'\n", ob->name);
- 	for (obj2 = ob->next_all; obj2 && obj2->flags & O_DESTRUCTED; )
-Index: amylaar.2/hosts/fcrypt/crack-fcrypt.c
---- amylaar.2/hosts/fcrypt/crack-fcrypt.c Mon, 02 Nov 1998 15:38:10 -0700 lars (lpmud/b/25_crack-fcry 1.1 644)
-+++ amylaar.2(w)/hosts/fcrypt/crack-fcrypt.c Wed, 26 Nov 1997 05:22:13 -0700 u1000 (lpmud/b/25_crack-fcry 1.1 644)
-@@ -517,7 +517,7 @@
- }
- 
- char *
--fcrypt (pw, salt)
-+crypt (pw, salt)
-     char *pw;
-     char *salt;
- {
-Index: amylaar.2/func_spec
---- amylaar.2/func_spec Mon, 02 Nov 1998 15:49:18 -0700 lars (lpmud/c/31_func_spec 1.2 644)
-+++ amylaar.2(w)/func_spec Sat, 06 Feb 1999 14:42:16 -0700 u1000 (lpmud/c/31_func_spec 1.2 644)
-@@ -181,6 +181,7 @@
- mixed *filter_array(mixed *, string|closure|mapping, ...);
- int find_call_out(string|closure);
- object find_object(string);
-+mixed *object_info(object);
- string function_exists(string, object default: F_THIS_OBJECT);
- string implode(string *, string);
- int input_to(string, void|int, ...);
-@@ -220,6 +221,7 @@
- string set_bit(string, int);
- int set_heart_beat(int);
- int set_light(int);
-+void set_next_reset(int);
- void set_this_object(object);
- int sizeof(mixed *|mapping);
- mixed *slice_array F_RANGE (mixed *,int,int);
-@@ -433,6 +435,7 @@
- int attach_erq_demon(object|string, int default: F_CONST0);
- int send_erq(int, int*|string, closure default: F_CONST0);
- #endif
-+int absolute_hb_count();
- #ifdef UDP_SEND
- int send_imp(string, int, string|int*);
- #endif
-Index: amylaar.2/dumpstat.c
---- amylaar.2/dumpstat.c Mon, 02 Nov 1998 15:49:18 -0700 lars (lpmud/c/34_dumpstat.c 1.2 644)
-+++ amylaar.2(w)/dumpstat.c Wed, 26 Nov 1997 05:45:23 -0700 u1000 (lpmud/c/34_dumpstat.c 1.2 644)
-@@ -207,12 +207,13 @@
- 	} else {
- 	    tmp = 0;
- 	}
--	fprintf(f, "%-20s %5ld ref %2ld %s %s (%ld) %s\n", ob->name,
-+	fprintf(f, "%-20s %5ld ref %2ld %s %s (%.0lf) %s\n", ob->name,
- 		tmp + (long)data_size(ob) + sizeof (struct object) +
- 		sizeof(p_int) /* smalloc overhead */ ,
- 		ob->ref,
- 		ob->flags & O_HEART_BEAT ? "HB" : "  ",
--		ob->super ? ob->super->name : "--",/*ob->cpu*/ 0L,
-+		ob->super ? ob->super->name : "--",
-+                (double)ob->_my_cost, /* Kirk: was 0L */
- 		swapstrings[(O_PROG_SWAPPED(ob)?1:0) | (O_VAR_SWAPPED(ob)?2:0)]
- 	);
-     }
-Index: amylaar.2/config.h
---- amylaar.2/config.h Mon, 02 Nov 1998 15:49:18 -0700 lars (lpmud/d/1_config.h 1.2 644)
-+++ amylaar.2(w)/config.h Thu, 13 May 1999 16:01:40 -0600 u1000 (lpmud/d/1_config.h 1.2 644)
-@@ -1,27 +1,29 @@
- #ifndef CONFIG_H
- #define CONFIG_H
- 
-+#undef DRAND48
-+
- /* Should code for the external request demon be included?  */
--#define ERQ_DEMON
-+#undef ERQ_DEMON
- #define ERQ_MAX_REPLY 256
- 
- /* Only executables that are safe no matter what arguments/options
-  * are supplied should be placed in ERQ_DIR. If you want something
-  * different, consider writing a wrapper program or shell script.
-  */
--#define ERQ_DIR "/user/src/mud/erq"
-+#define ERQ_DIR "/home/mud/mud/bin/erq.d"
- 
- /* #define ACCESS_CONTROL if you want the driver to do any access control,
-  * either using the old style ACCESS.DENY or the new ACCESS.ALLOW .
-  */
--#define ACCESS_CONTROL
-+#undef ACCESS_CONTROL
- 
- /*
-  * Define this if you want to use the improved access restriction system.
-  * Look at the file ACCESS.ALLOW for information. It replaces the old
-  * ACCESS.DENY.
-  */
--#define ACCESS_RESTRICTED
-+#undef ACCESS_RESTRICTED
- 
- /* Some configurations for this system. Needn't be changed if you don't use
-  * the new access restriction system.
-@@ -43,7 +45,7 @@
- /*
-  * Max size of a file allowed to be read by 'read_file()'.
-  */
--#define READ_FILE_MAX_SIZE	50000
-+#define READ_FILE_MAX_SIZE	200000
- 
- /* Version of the game in the form xx.xx.xx (leading zeroes) gc.
-  * A dot and two digits may be appended, that is the patch level.
-@@ -58,7 +60,9 @@
-  *
-  * This time should be substantially longer than the swapping time.
-  */
--#define TIME_TO_CLEAN_UP	5400
-+
-+#ifndef JOF_DEBUG
-+#define TIME_TO_CLEAN_UP	36000
- 
- /*
-  * How long time until an unused object is swapped out.
-@@ -66,8 +70,9 @@
-  * Machine with few players and lot of memory: 10000
-  * Machine with infinite memory: 0 (never swap).
-  */
--#define TIME_TO_SWAP		900
--#define TIME_TO_SWAP_VARIABLES	1800
-+#define TIME_TO_SWAP		14000
-+/*#define TIME_TO_SWAP		0 */
-+#define TIME_TO_SWAP_VARIABLES	22000
- 
- /*
-  * How many seconds until an object is reset again.
-@@ -76,8 +81,19 @@
-  * >100 castles:10000	(almost 3 hours).
-  */
- #define TIME_TO_RESET	3600	/* one hour */
--
--#define RESET_GRANULARITY 900	/* 15 minutes */
-+#else /* JOF_DEBUG */
-+#define TIME_TO_CLEAN_UP	540
-+#define TIME_TO_SWAP		90
-+#define TIME_TO_SWAP_VARIABLES	180
-+#define TIME_TO_RESET		360
-+#endif
-+
-+#define RESET_GRANULARITY 300	/* 5 minutes */
-+
-+#ifdef JOF_DEBUG
-+#undef RESET_GRANULARITY
-+#define RESET_GRANULARITY 60
-+#endif
-  
- /*
-  * Define the maximum stack size of the stack machine. This stack will also
-@@ -103,12 +119,12 @@
-  * Maximum number of bits in a bit field. They are stored in printable
-  * strings, 6 bits per byte.
-  */
--#define MAX_BITS		1200	/* 200 bytes */
-+#define MAX_BITS		4800
- 
- /*
-  * Define what port number the game is to use.
-  */
--#define PORTNO			7680
-+#define PORTNO			23
- 
- /*
-  * Max number of local variables in a function.
-@@ -119,13 +135,13 @@
-  * If this is exceeded, the current function is halted.
-  * ls() can take about 30000 for large directories.
-  */
--#define MAX_COST	100000
-+#define MAX_COST	1000000
- /* to catch an eval_cost too big error in an object that called recursive
-  * master functions, CATCH_RESERVED_COST should be greater than
-  * MASTER_RESERVED_COST * 2.
-  */
--#define CATCH_RESERVED_COST 2000
--#define MASTER_RESERVED_COST 0x200 /* must be power of 2 */
-+#define CATCH_RESERVED_COST 4000
-+#define MASTER_RESERVED_COST 0x400 /* must be power of 2 */
- 
- /*
-  * Where to swap out objects. This file is not used if TIME_TO_SWAP is 0.
-@@ -133,17 +149,25 @@
-  * periodically either, it's a good idea to place the swap file there.
-  * The hostname will be appended to the filename defined here.
-  */
--#define SWAP_FILE		"LP_SWAP.3"
-+#ifndef BLA
-+#define SWAP_FILE		"/home/mud/mud/swapfiles/SwapFile"
-+#else
-+#define SWAP_FILE		"/tmp/MudSwap"
-+#endif
- 
- /*
-  * This is the maximum array size allowed for one single array.
-  */
--#define MAX_ARRAY_SIZE 3000
-+#if !defined(DEBUG) && !defined(XDEBUG)
-+#define MAX_ARRAY_SIZE 10000
-+#else
-+#define MAX_ARRAY_SIZE 100000
-+#endif
- 
- /*
-  * Maximum number of players in the game.
-  */
--#define MAX_PLAYERS	40
-+#define MAX_PLAYERS    225
- 
- /*
-  * When uploading files, we want fast response; however, normal players
-@@ -162,8 +186,8 @@
-  * If this value is 0, no area will be reserved.
-  */
- #define RESERVED_USER_SIZE	800000
--#define RESERVED_MASTER_SIZE	 50000
--#define RESERVED_SYSTEM_SIZE	100000
-+#define RESERVED_MASTER_SIZE   100000
-+#define RESERVED_SYSTEM_SIZE   200000
- 
- /* Define the size of the shared string hash table.  This number needn't
-  * be prime, probably between 1000 and 30000; if you set it to about 1/5
-@@ -174,7 +198,7 @@
-  * If the size is a power of two, hashing will be faster.
-  */
- 
--#define	HTABLE_SIZE	4096
-+#define	HTABLE_SIZE	32768
- 
- /* Define the size of the table of defines, reserved words, identifiers
-  * and efun names. Should be either several times smaller than HTABLE_SIZE
-@@ -189,12 +213,12 @@
-  * objects is somewhat more uniform than that of strings.
-  */
- 
--#define OTABLE_SIZE	1024
-+#define OTABLE_SIZE	16384
- 
--#define DEFMAX         12000
-+#define DEFMAX         32000
- 
- /* the number of apply_low cache entries will be 2^APPLY_CACHE_BITS */
--#define APPLY_CACHE_BITS 10
-+#define APPLY_CACHE_BITS 12
- 
- /*
-  * Should newly defined LPC functions be aligned in memory? this costs 1.5
-@@ -208,9 +232,9 @@
-  * replaces the old command line option -o.
-  */
- 
--#define COMPAT_MODE
--#undef NATIVE_MODE
--#undef EUIDS
-+#undef COMPAT_MODE
-+#define NATIVE_MODE
-+#define EUIDS
- 
- /* Define OLD_PREVIOUS_OBJECT_BEHAVIOUR if the new behaviour gives problems
-  * in your security system.
-@@ -226,7 +250,7 @@
-  * If you don't need it, better #undef it, lest some new wiz can inadvertly
-  * crash your mud or make it leak memory.
-  */
--#define SUPPLY_PARSE_COMMAND
-+#undef SUPPLY_PARSE_COMMAND
- 
- /* Define INITIALIZATION_BY___INIT if you want all initializations of variables
-  * to be suspended till the object is created ( as supposed to initialization
-@@ -234,7 +258,7 @@
-  * at cloning, while the former allows to use efuns, e.g. shutdown().
-  */
- 
--#undef INITIALIZATION_BY___INIT
-+#define INITIALIZATION_BY___INIT
- 
- /* Define MASTER_NAME if you want something different from "obj/master" resp.
-  * "secure/master" as default.
-@@ -246,7 +270,7 @@
-  * and written with read_bytes and write_bytes
-  */
- 
--#define MAX_BYTE_TRANSFER 50000
-+#define MAX_BYTE_TRANSFER 200000
- 
- /* Define FLOATS if you want code for the floating-point type
-  */
-@@ -280,9 +304,10 @@
- /* When smalloc is used without SBRK_OK, MIN_MALLOCED will lower large block
-    fragmentation.
-  */
--/* #define MIN_MALLOCED	   0x1000000 */
--#define MAX_MALLOCED	   0x4000000
--#define MAX_SMALL_MALLOCED 0x1000000
-+
-+#define MIN_MALLOCED	   0x80000
-+#define MAX_MALLOCED	   0xe000000
-+#define MAX_SMALL_MALLOCED 0x4000000
- 
- #undef SMALLOC_TRACE /* do 'make clean' after changing this... */
- #undef SMALLOC_LPC_TRACE /* do 'make clean' after changing this... */
-Index: amylaar.2/comm1.c
---- amylaar.2/comm1.c Mon, 02 Nov 1998 15:49:18 -0700 lars (lpmud/d/2_comm1.c 1.2 644)
-+++ amylaar.2(w)/comm1.c Wed, 15 Dec 1999 14:36:49 -0700 u1000 (lpmud/d/2_comm1.c 1.2 644)
-@@ -1673,13 +1673,19 @@
-     push_volatile_string(str);
-     if (extra = i->input_to->num_arg) {
- 	extern struct svalue *inter_sp;
-+        extern struct svalue const0;
-+        int j;
-+        struct svalue *argp;
- 
--	memcpy(
--	  (char *)(inter_sp + 1),
--	  (char *)i->input_to->arg,
--	  extra * sizeof *inter_sp
--	);
--	inter_sp += extra;
-+        for (j = 0, argp = i->input_to->arg; j < extra; j++, argp++){
-+            inter_sp++;
-+            if (argp->type == T_OBJECT && (O_DESTRUCTED & argp->u.ob->flags)){
-+                *inter_sp = const0;
-+                free_object(argp->u.ob, "call_interactive_function");
-+            }
-+            else
-+                transfer_svalue_no_free(inter_sp, argp);
-+        }
-     }
-     xfree((char *)i->input_to);
-     /*
-@@ -2209,6 +2215,22 @@
- 	telopts_wont[i] = reply_nil;
-     }
-     telopts_wont[TELOPT_SGA] = reply_to_wont_sga;
-+    telopts_do[TELOPT_NEWENV] = reply_h_telnet_neg;
-+    telopts_dont[TELOPT_NEWENV] = reply_h_telnet_neg;
-+    telopts_will[TELOPT_NEWENV] = reply_h_telnet_neg;
-+    telopts_wont[TELOPT_NEWENV] = reply_h_telnet_neg;
-+    telopts_do[TELOPT_ENVIRON] = reply_h_telnet_neg;
-+    telopts_dont[TELOPT_ENVIRON] = reply_h_telnet_neg;
-+    telopts_will[TELOPT_ENVIRON] = reply_h_telnet_neg;
-+    telopts_wont[TELOPT_ENVIRON] = reply_h_telnet_neg;
-+    telopts_do[TELOPT_XDISPLOC] = reply_h_telnet_neg;
-+    telopts_dont[TELOPT_XDISPLOC] = reply_h_telnet_neg;
-+    telopts_will[TELOPT_XDISPLOC] = reply_h_telnet_neg;
-+    telopts_wont[TELOPT_XDISPLOC] = reply_h_telnet_neg;
-+    telopts_do[TELOPT_LINEMODE] = reply_h_telnet_neg;
-+    telopts_dont[TELOPT_LINEMODE] = reply_h_telnet_neg;
-+    telopts_will[TELOPT_LINEMODE] = reply_h_telnet_neg;
-+    telopts_wont[TELOPT_LINEMODE] = reply_h_telnet_neg;
-     telopts_do[TELOPT_NAWS] = reply_h_telnet_neg;
-     telopts_dont[TELOPT_NAWS] = reply_h_telnet_neg;
-     telopts_will[TELOPT_NAWS] = reply_h_telnet_neg;
-@@ -2217,6 +2239,22 @@
-     telopts_dont[TELOPT_TTYPE] = reply_h_telnet_neg;
-     telopts_will[TELOPT_TTYPE] = reply_h_telnet_neg;
-     telopts_wont[TELOPT_TTYPE] = reply_h_telnet_neg;
-+    telopts_do[TELOPT_TSPEED] = reply_h_telnet_neg;
-+    telopts_dont[TELOPT_TSPEED] = reply_h_telnet_neg;
-+    telopts_will[TELOPT_TSPEED] = reply_h_telnet_neg;
-+    telopts_wont[TELOPT_TSPEED] = reply_h_telnet_neg;
-+
-+    telopts_do[TELOPT_EOR] = reply_h_telnet_neg;
-+    telopts_dont[TELOPT_EOR] = reply_h_telnet_neg;
-+    telopts_will[TELOPT_EOR] = reply_h_telnet_neg;
-+    telopts_wont[TELOPT_EOR] = reply_h_telnet_neg;
-+
-+	/* Tinyfugue can do bad things to your health */
-+    telopts_do[EOR] = reply_h_telnet_neg;
-+    telopts_dont[EOR] = reply_h_telnet_neg;
-+    telopts_will[EOR] = reply_h_telnet_neg;
-+    telopts_wont[EOR] = reply_h_telnet_neg;
-+
-     /* Go Ahead does not make any sense when coupling multiple
-      * interactive users. It is debatable if we are sending
-      * Go Ahead every time it is appropriate (i.e. , never),
-@@ -3349,11 +3387,19 @@
- 	    name.sin_addr.s_addr = inet_addr(to_host);
- 	    name.sin_family = AF_INET;
- 	} else {
-+	    break;
-+	    /* MARCUS: No. gethostbyname() MAY block the mudprocess
-+	     * (and it did, as the DNS servers of the GMD were down.
-+	     * since only the udp and whois gateway use it, we just give
-+	     * the fixed addresses for now.
-+	     */
-+#if 0
- 	    hp = gethostbyname(to_host);
- 	    if (hp == 0) 
- 		break;
- 	    memcpy(&name.sin_addr, hp->h_addr, hp->h_length);
- 	    name.sin_family = AF_INET;
-+#endif
- 	}
- 	name.sin_port = htons(to_port);
- 	/* Send message. */
-Index: amylaar.2/backend.c
---- amylaar.2/backend.c Mon, 02 Nov 1998 15:49:18 -0700 lars (lpmud/d/6_backend.c 1.2 644)
-+++ amylaar.2(w)/backend.c Tue, 18 Jan 2000 13:04:45 -0700 u1000 (lpmud/d/6_backend.c 1.2 644)
-@@ -33,6 +33,7 @@
-  * The 'current_time' is updated at every heart beat.
-  */
- int current_time;
-+int absolute_hb_num;
- 
- extern struct object *command_giver, *current_interactive;
- extern int num_player, d_flag;
-@@ -365,7 +366,11 @@
- 	/*
- 	 * Should this object have reset(1) called ?
- 	 */
--	if (ob->next_reset < current_time && !(ob->flags & O_RESET_STATE)) {
-+	if (ob->next_reset < current_time && !(ob->flags & O_SWAPPED)) {
-+	if (ob->flags & O_RESET_STATE)
-+	    ob->next_reset = current_time + TIME_TO_RESET/2
-+	    	+random_number(TIME_TO_RESET/2);
-+	else {
- 	    if (d_flag)
- 		fprintf(stderr, "RESET %s\n", ob->name);
- 	    CLEAR_EVAL_COST;
-@@ -375,6 +380,7 @@
- 	    if (ob->flags & O_DESTRUCTED)
- 		continue;
- 	}
-+	}
- #if TIME_TO_CLEAN_UP > 0
- 	/*
- 	 * Has enough time passed, to give the object a chance
-@@ -496,6 +502,7 @@
- 
-     current_time = get_current_time();
-     current_interactive = 0;
-+    absolute_hb_num++;
- 
-     hb_last_to_call = hb_last_called;
-     hb_num_done = 0;
-@@ -958,6 +965,8 @@
- 	return 0;
-     if(len > MAX_BYTE_TRANSFER)
- 	return 0;
-+    if(!len)
-+	    len=MAX_BYTE_TRANSFER;
-     file = check_valid_path(file, current_object, "read_bytes", 0);
- 
-     if (!file)
-@@ -1201,9 +1210,9 @@
- /* reallocate on the fly */
- #define XREALLOC \
- 	space  += origspace;\
--	origspace = origspace*2;\
-+	origspace *= 2;\
- 	oldbuf	= buf;\
--	buf	= (char*)rexalloc(buf,origspace*2);\
-+	buf	= (char*)rexalloc(buf,origspace);\
- 	if (!buf) { \
- 	    xfree(oldbuf); \
- 	    if (pat) xfree(pat); \
-@@ -1213,13 +1222,14 @@
- 
- 
- 	new	= buf	= (char*)xalloc(space);
--	pat	= regcomp(sp[-2].u.string,(flags&2)?1:0);
-+    if (!buf) error("Out of memory\n");
-+	pat	= regcomp(sp[-2].u.string,flags&2);
- 	/* regcomp returns NULL on bad regular expressions. */
- 	if (pat && regexec(pat,curr,start)) {
- 		do {
- 			int	diff = pat->startp[0]-curr;
--			space -= diff;
--			while (space<0) {
-+			space -= diff+1;
-+			while (space<=0) {
- 				XREALLOC;
- 			}
- 			strncpy(new,curr,diff);
-@@ -1237,21 +1247,21 @@
- 			 * ... (should we switch them off?)
- 			 */
- 			while (NULL==(new=regsub(pat,sub,new,space,1))) {
--				int	i,xold;
-+                int xold;
- 
- 				if (!*old) {
- 					xfree(buf);
- 					if (pat) xfree(pat);
--					error("Out of memory\n");
-+					error("Internal error in regreplace()\n");
- 				}
--				xold=old-buf;
-+                xold = old-buf;
- 				XREALLOC;
--				new =buf+xold;
--				old =buf+xold;
-+                new = buf+xold;
-+				old = new;
- 				*old='\0';
- 			}
- 			space -= new-old;
--			while (space<0) {
-+			while (space<=0) {
- 				XREALLOC;
- 			}
- 			if (curr == pat->endp[0]) {
-@@ -1260,7 +1270,7 @@
- 				 */
- 				if (!*curr) break;
- 				--space;
--				while (space<0) {
-+				while (space<=0) {
- 					XREALLOC;
- 				}
- 				*new++ = *curr++;
-@@ -1268,7 +1278,7 @@
- 				curr = pat->endp[0];
- 		} while ((flags&1) && !pat->reganch && regexec(pat,curr,start));
- 		space -= strlen(curr)+1;
--		if (space<0) {
-+		if (space<=0) {
- 			XREALLOC;
- 		}
- 		strcpy(new,curr);
+int absolute_hb_count()
+{
+    return debug_info(DINFO_DATA, DID_STATUS, DID_ST_HBEAT_CALLS_TOTAL);
+}
+
+varargs string read_file (string name, int start, int len)
+{
+    if (!len)
+    {
+        len = query_limits(0)[LIMIT_FILE];
+    }
+    return len > 0 ? efun::read_file(name, start, len) 
+                   : efun::read_file(name, start);
+}
+
+mixed *object_info(object ob)
+{
+    mixed *info, *res;
+
+    res = allocate(20);
+    info = efun::object_info(ob, OINFO_BASIC);
+    
+    res[ 0] = info[OIB_HEART_BEAT];
+    res[ 1] = info[OIB_IS_WIZARD];
+    res[ 2] = info[OIB_ENABLE_COMMANDS];
+    res[ 3] = info[OIB_CLONE];
+    res[ 4] = info[OIB_DESTRUCTED];
+    res[ 5] = info[OIB_SWAPPED];
+    res[ 6] = info[OIB_ONCE_INTERACTIVE];
+    res[ 7] = 0; /* No O_APPROVED in LDMud */
+    res[ 8] = info[OIB_RESET_STATE];
+    res[ 9] = info[OIB_WILL_CLEAN_UP];
+    res[10] = info[OIB_TOTAL_LIGHT];
+    res[11] = info[OIB_NEXT_RESET];
+    res[12] = info[OIB_TIME_OF_REF];
+    res[13] = info[OIB_REF];
+    res[14] = info[OIB_GIGATICKS] * 1000000000 + info[OIB_TICKS];
+    res[15] = info[OIB_SWAP_NUM];
+    res[16] = info[OIB_NAME];
+    if (info[OIB_NEXT_ALL])
+        res[17] = efun::object_info(info[OIB_NEXT_ALL], OINFO_BASIC, OIB_NAME);
+    else
+        res[17] = "";
+    if (info[OIB_PREV_ALL])
+        res[18] = efun::object_info(info[OIB_PREV_ALL], OINFO_BASIC, OIB_NAME);
+    else
+        res[18] = "";
+    res[19] = efun::object_info(ob, OINFO_POSITION, OIP_POS);
+
+    return res;
+}
+
+int send_udp(string host, int port, mixed message)
+{
+    int a, b, c, d;
+
+    /* Non-numeric hostnames require a blocking hostname lookup
+     * in the main mud thread. As for our purposes fixed addresses
+     * are sufficient, disallow everything else.
+     */
+    if (sscanf(host, "%d.%d.%d.%d", a, b, c, d) != 4)
+        return 0;
+
+    return efun::send_udp(host, port, message);
+}
+
+int send_imp(string host, int port, mixed message)
+{
+    return send_udp(host, port, message);
+}
+
+----------------------------------------------------
+
+These are those diffs of the Morgengrauen driver 2000.01.18 against it's
+parent version, amylaar 3.2.1@141, which have no counterpart in LDMud..
+
+----------------------------------------------------
 Index: amylaar.2/Makefile.in
 --- amylaar.2/Makefile.in Mon, 02 Nov 1998 15:49:18 -0700 lars (lpmud/d/17_Makefile.i 1.2 644)
 +++ amylaar.2(w)/Makefile.in Wed, 05 May 1999 02:22:24 -0600 u1000 (lpmud/d/17_Makefile.i 1.2 644)
@@ -896,15 +96,6 @@ Index: amylaar.2/Makefile.in
 +#HASH=hash.c
  # Set MUD_LIB to the directory which contains the mud data. Was formerly
  # defined in config.h !
--MUD_LIB = /user/mud/mudlib
-+MUD_LIB = /home/mud/mud/mudlib
- #
- # Set BINDIR to the directory where you want to install the executables.
--BINDIR = /mud/bin
-+BINDIR = /home/mud/mud/bin
- #
- #PROFIL= -DOPCPROF -DVERBOSE_OPCPROF
- #PROFIL=-p -DMARK
 @@ -74,7 +77,7 @@
  #
  SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\
@@ -932,131 +123,81 @@ Index: amylaar.2/Makefile.in
  
  interpret.o : interpret.c lint.h config.h machine.h interpret.h lang.h exec.h \
    object.h wiz_list.h instrs.h comm.h sent.h switch.h smalloc.h stralloc.h
-Index: amylaar.2/random.c
---- amylaar.2/random.c Mon, 02 Nov 1998 15:49:18 -0700 lars (lpmud/d/28_random.c 1.1 644)
-+++ amylaar.2(w)/random.c Thu, 18 Jun 1998 00:56:59 -0600 u1000 (lpmud/d/28_random.c 1.1 644)
-@@ -1,54 +1,71 @@
--/* Copyright 1995 Joern Rennecke */
-+#ifndef DRAND48
-+#include<stdio.h>
- 
--#include "lint.h"
--
--/* Implement a(i) = a(i-24) + a(i-55) */
--
--#define OFFSET1 24U
--#define OFFSET2 55U
--#define RAND_STATE_SIZE OFFSET2
--#define RAND_I_SHIFT (sizeof(int) * 4U)
--
--static struct {
--  mp_uint pred[RAND_STATE_SIZE];
--  unsigned int i;
--} rand_state;
--
--mp_uint random_number(n)
--    mp_uint n;
-+/* Period parameters */  
-+#define N 624
-+#define M 397
-+#define MATRIX_A 0x9908b0df   /* constant vector a */
-+#define UPPER_MASK 0x80000000 /* most significant w-r bits */
-+#define LOWER_MASK 0x7fffffff /* least significant r bits */
-+
-+/* Tempering parameters */   
-+#define TEMPERING_MASK_B 0x9d2c5680
-+#define TEMPERING_MASK_C 0xefc60000
-+#define TEMPERING_SHIFT_U(y)  (y >> 11)
-+#define TEMPERING_SHIFT_S(y)  (y << 7)
-+#define TEMPERING_SHIFT_T(y)  (y << 15)
-+#define TEMPERING_SHIFT_L(y)  (y >> 18)
-+
-+static unsigned long mt[N]; /* the array for the state vector  */
-+static int mti=N+1; /* mti==N+1 means mt[N] is not initialized */
-+
-+/* initializing the array with a NONZERO seed */
-+void
-+seed_random(seed)
-+    unsigned long seed;
- {
--    unsigned int i;
--    mp_uint sum;
--
--    i = rand_state.i;
--    i++;
--    i &= i - RAND_STATE_SIZE >> RAND_I_SHIFT;
--    rand_state.i = i;
--    sum = rand_state.pred[i];
--    i -= OFFSET2 - OFFSET1;
--    i += RAND_STATE_SIZE & i >> RAND_I_SHIFT;
--    sum = rand_state.pred[i] += sum;
--#if defined(HAVE_LONG_LONG) && SIZEOF_P_INT == 4
--    return (unsigned long long)sum * (unsigned long long)n >>
--	sizeof(mp_uint) * 8;
--#else
--    return sum % n;
--#endif
-+    /* setting initial seeds to mt[N] using         */
-+    /* the generator Line 25 of Table 1 in          */
-+    /* [KNUTH 1981, The Art of Computer Programming */
-+    /*    Vol. 2 (2nd Ed.), pp102]                  */
-+    mt[0]= seed & 0xffffffff;
-+    for (mti=1; mti<N; mti++)
-+        mt[mti] = (69069 * mt[mti-1]) & 0xffffffff;
- }
- 
--void seed_random(seed)
--    int seed;
-+unsigned long 
-+random_number(unsigned int n)
- {
--    int i;
-+    unsigned long y;
-+    static unsigned long mag01[2]={0x0, MATRIX_A};
-+    /* mag01[x] = x * MATRIX_A  for x=0,1 */
-+
-+    if (mti >= N) { /* generate N words at one time */
-+        int kk;
-+
-+        if (mti == N+1)   /* if sgenrand() has not been called, */
-+            seed_random(4357); /* a default initial seed is used   */
-+
-+        for (kk=0;kk<N-M;kk++) {
-+            y = (mt[kk]&UPPER_MASK)|(mt[kk+1]&LOWER_MASK);
-+            mt[kk] = mt[kk+M] ^ (y >> 1) ^ mag01[y & 0x1];
-+        }
-+        for (;kk<N-1;kk++) {
-+            y = (mt[kk]&UPPER_MASK)|(mt[kk+1]&LOWER_MASK);
-+            mt[kk] = mt[kk+(M-N)] ^ (y >> 1) ^ mag01[y & 0x1];
-+        }
-+        y = (mt[N-1]&UPPER_MASK)|(mt[0]&LOWER_MASK);
-+        mt[N-1] = mt[M-1] ^ (y >> 1) ^ mag01[y & 0x1];
-+
-+        mti = 0;
-+    }
-+  
-+    y = mt[mti++];
-+    y ^= TEMPERING_SHIFT_U(y);
-+    y ^= TEMPERING_SHIFT_S(y) & TEMPERING_MASK_B;
-+    y ^= TEMPERING_SHIFT_T(y) & TEMPERING_MASK_C;
-+    y ^= TEMPERING_SHIFT_L(y);
- 
--    memset(rand_state.pred, seed, sizeof rand_state.pred);
--    rand_state.pred[0] = seed;
--    rand_state.pred[RAND_STATE_SIZE-2] = seed;
--    rand_state.i = seed & RAND_STATE_SIZE - 1;
--    strcpy((char *)&rand_state.pred[1],
--      "The quick brown fox jumps over the lazy dog\n");
--    i = RAND_STATE_SIZE * 3;
--    do {
--	random_number(1);
--    } while (--i);
-+    return y%n; 
- }
-+#endif /* DRAND48 */
-Only in amylaar.2: hosts/win32/tubmud.bmp
-Only in amylaar.2: hosts/win32/machine.h
-Only in amylaar.2: hosts/win32/config.h
-Only in amylaar.2: hosts/win32/Readme.rtf
-Only in amylaar.2: hosts/win32/Makefile
+----------------------------------------------------
+
+The random.c used by Morgengrauen. LDMud uses the Mersenne Twister which
+should be as good as this one, if not better.
+
+----------------------------------------------------
+#ifndef DRAND48
+#include<stdio.h>
+
+/* Period parameters */  
+#define N 624
+#define M 397
+#define MATRIX_A 0x9908b0df   /* constant vector a */
+#define UPPER_MASK 0x80000000 /* most significant w-r bits */
+#define LOWER_MASK 0x7fffffff /* least significant r bits */
+
+/* Tempering parameters */   
+#define TEMPERING_MASK_B 0x9d2c5680
+#define TEMPERING_MASK_C 0xefc60000
+#define TEMPERING_SHIFT_U(y)  (y >> 11)
+#define TEMPERING_SHIFT_S(y)  (y << 7)
+#define TEMPERING_SHIFT_T(y)  (y << 15)
+#define TEMPERING_SHIFT_L(y)  (y >> 18)
+
+static unsigned long mt[N]; /* the array for the state vector  */
+static int mti=N+1; /* mti==N+1 means mt[N] is not initialized */
+
+/* initializing the array with a NONZERO seed */
+void
+seed_random(seed)
+    unsigned long seed;
+{
+    /* setting initial seeds to mt[N] using         */
+    /* the generator Line 25 of Table 1 in          */
+    /* [KNUTH 1981, The Art of Computer Programming */
+    /*    Vol. 2 (2nd Ed.), pp102]                  */
+    mt[0]= seed & 0xffffffff;
+    for (mti=1; mti<N; mti++)
+        mt[mti] = (69069 * mt[mti-1]) & 0xffffffff;
+}
+
+unsigned long 
+random_number(unsigned int n)
+{
+    unsigned long y;
+    static unsigned long mag01[2]={0x0, MATRIX_A};
+    /* mag01[x] = x * MATRIX_A  for x=0,1 */
+
+    if (mti >= N) { /* generate N words at one time */
+        int kk;
+
+        if (mti == N+1)   /* if sgenrand() has not been called, */
+            seed_random(4357); /* a default initial seed is used   */
+
+        for (kk=0;kk<N-M;kk++) {
+            y = (mt[kk]&UPPER_MASK)|(mt[kk+1]&LOWER_MASK);
+            mt[kk] = mt[kk+M] ^ (y >> 1) ^ mag01[y & 0x1];
+        }
+        for (;kk<N-1;kk++) {
+            y = (mt[kk]&UPPER_MASK)|(mt[kk+1]&LOWER_MASK);
+            mt[kk] = mt[kk+(M-N)] ^ (y >> 1) ^ mag01[y & 0x1];
+        }
+        y = (mt[N-1]&UPPER_MASK)|(mt[0]&LOWER_MASK);
+        mt[N-1] = mt[M-1] ^ (y >> 1) ^ mag01[y & 0x1];
+
+        mti = 0;
+    }
+  
+    y = mt[mti++];
+    y ^= TEMPERING_SHIFT_U(y);
+    y ^= TEMPERING_SHIFT_S(y) & TEMPERING_MASK_B;
+    y ^= TEMPERING_SHIFT_T(y) & TEMPERING_MASK_C;
+    y ^= TEMPERING_SHIFT_L(y);
+
+    return y%n; 
+}
+#endif /* DRAND48 */
 ----------------------------------------------------

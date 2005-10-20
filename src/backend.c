@@ -42,7 +42,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/time.h>
-#ifdef AMIGA
+#if defined(AMIGA) && !defined(__GNUC__)
 #include "hosts/amiga/nsignal.h"
 #else
 #include <signal.h>
@@ -84,6 +84,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/driver_hook.h"
+#include "../mudlib/sys/debug_message.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -98,6 +99,11 @@ mp_int current_time;
 Bool time_to_call_heart_beat;
   /* True: It's time to call the heart beat. Set by comm1.c when it recognizes
    *   an alarm(). */
+
+volatile mp_int alarm_called = MY_FALSE;
+  /* The alarm() handler sets this to TRUE whenever it is called,
+   * to allow check_alarm() to verify that the alarm is still alive.
+   */
 
 volatile Bool comm_time_to_call_heart_beat = MY_FALSE;
   /* True: An heart beat alarm() happened. Set from the alarm handler, this
@@ -130,13 +136,21 @@ Bool extra_jobs_to_do = MY_FALSE;
    *   parsing commands or calling the heart_beat.
    */
 
-Bool garbage_collect_to_do = MY_FALSE;
-  /* True: A garbage collection is due (requires extra_jobs_to_do).
+GC_Request gc_request = gcDont;
+  /* gcDont: No garbage collection is due.
+   * gcMalloc: The mallocator requested a gc (requires extra_jobs_to_do).
+   * gcEfun: GC requested by efun (requires extra_jobs_to_do).
    */
 
 /* TODO: all the 'extra jobs to do' should be collected here, in a nice
  * TODO:: struct.
  */
+
+Bool mud_is_up = MY_FALSE;
+  /* True: the driver is finished with the initial processing
+   * and has entered the main loop. This flag is currently not
+   * used by the driver, but can be useful for printf()-style debugging.
+   */
 
 static double load_av = 0.0;
   /* The load average (player commands/second), weighted over the
@@ -146,6 +160,11 @@ static double load_av = 0.0;
 static double compile_av = 0.0;
   /* The average of compiled lines/second, weighted over the last period
    * of time.
+   */
+
+static time_t time_last_slow_shut = 0;
+  /* Time of the last call to slow_shut_down(), to avoid repeated
+   * calls while the previous ones are still working.
    */
 
 /*-------------------------------------------------------------------------*/
@@ -197,7 +216,7 @@ do_state_check (int minlvl, const char *where)
     {
         debug_message("%s Inconsistency %s\n", time_stamp(), where);
         printf("%s Inconsistency %s\n", time_stamp(), where);
-        dump_trace(MY_TRUE);
+        dump_trace(MY_TRUE, NULL);
 #ifdef TRACE_CODE
         last_instructions(TOTAL_TRACE_LENGTH, 1, 0);
 #endif
@@ -235,10 +254,10 @@ logon (object_t *ob)
         error("Could not find logon() on the player %s\n", ob->name);
     }
     current_object = save;
-}
+} /* logon() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef AMIGA
+#if defined(AMIGA) && !defined(__GNUC__)
 
 static void
 exit_alarm_timer (void)
@@ -265,10 +284,8 @@ handle_hup (int sig UNUSED)
 #endif
     extra_jobs_to_do = MY_TRUE;
     game_is_being_shut_down = MY_TRUE;
-#ifndef __MWERKS__
-#if RETSIGTYPE != void
+#ifndef RETSIGTYPE_VOID
     return 0;
-#endif
 #endif
 } /* handle_hup() */
 
@@ -287,12 +304,66 @@ handle_usr1 (int sig UNUSED)
     master_will_be_updated = MY_TRUE;
     eval_cost += max_eval_cost >> 3;
     (void)signal(SIGUSR1, handle_usr1);
-#ifndef __MWERKS__
-#if RETSIGTYPE != void
+#ifndef RETSIGTYPE_VOID
     return 0;
 #endif
+} /* handle_usr1() */
+
+/*-------------------------------------------------------------------------*/
+static RETSIGTYPE
+handle_usr2 (int sig UNUSED)
+
+/* SIGUSR2 handler: reopen the debug.log file.
+ */
+
+{
+#ifdef __MWERKS__
+#    pragma unused(sig)
+#endif
+    reopen_debug_log = MY_TRUE;
+    (void)signal(SIGUSR2, handle_usr2);
+#ifndef RETSIGTYPE_VOID
+    return 0;
 #endif
 } /* handle_usr1() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+cleanup_stuff (void)
+
+/* Perform a number of clean up operations: replacing programs, freeing
+ * driver hooks, and removing destructed object.
+ * They are collected in one function so that they can be easily called from
+ * various places (backend loop and the process_objects loops); especially
+ * since it is not advisable to remove destructed objects before replacing
+ * the programs.
+ */
+
+{
+    /* Reset the VM to avoid dangling references to invalid objects */
+    clear_state();
+
+    /* Replace programs */
+    if (obj_list_replace)
+    {
+        replace_programs();
+    }
+
+#ifdef USE_FREE_CLOSURE_HOOK
+    /* Free older driver hooks
+     */
+    free_old_driver_hooks();
+#endif
+
+    /* Finish up all newly destructed objects.
+     */
+    handle_newly_destructed_objects();
+
+    /* Remove all unreferenced destructed objects.
+     */
+    remove_destructed_objects();
+
+} /* cleanup_stuff() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -304,30 +375,39 @@ backend (void)
 
 {
     char buff[MAX_TEXT+4];
+        /* Note that the size of buff[] is determined by MAX_TEXT, which
+         * is the max size of the network receive buffer. Iow: no
+         * buffer overruns possible.
+         */
+
 
 
     /*
      * Set up.
      */
 
-    printf("%s Setting up ipc.\n", time_stamp());
-    fflush(stdout);
-
     prepare_ipc();
 
     (void)signal(SIGHUP,  handle_hup);
     (void)signal(SIGUSR1, handle_usr1);
+    (void)signal(SIGUSR2, handle_usr2);
     if (!t_flag) {
+        /* Start the first alarm */
         ALARM_HANDLER_FIRST_CALL(catch_alarm);
         current_time = get_current_time();
-        /* Start the first alarm */
         comm_time_to_call_heart_beat = MY_FALSE;
         time_to_call_heart_beat = MY_FALSE;
         alarm(ALARM_TIME);
     }
-#ifdef AMIGA
+#if defined(AMIGA) && !defined(__GNUC__)
     atexit(exit_alarm_timer);
 #endif
+
+    mud_is_up = MY_TRUE;
+
+    printf("%s LDMud ready for users.\n", time_stamp());
+    fflush(stdout);
+    debug_message("%s LDMud ready for users.\n", time_stamp());
 
     toplevel_context.rt.type = ERROR_RECOVERY_BACKEND;
     setjmp(toplevel_context.con.text);
@@ -345,27 +425,18 @@ backend (void)
     {
         do_state_check(1, "in main loop");
 
+        check_alarm();
+
         RESET_LIMITS;
         CLEAR_EVAL_COST;
 
-        /* Execute pending deallocations */
 #ifdef C_ALLOCA
+        /* Execute pending deallocations */
         alloca(0); /* free alloca'd values from deeper levels of nesting */
 #endif
 
-        /* Replace programs */
-        if (obj_list_replace)
-        {
-            replace_programs();
-        }
-
-        /* Free older driver hooks
-         */
-        free_old_driver_hooks();
-
-        /* Remove all destructed objects.
-         */
-        remove_destructed_objects();
+        /* Replace programs, remove destructed objects, and similar stuff */
+        cleanup_stuff();
 
 #ifdef DEBUG
         if (check_a_lot_ref_counts_flag)
@@ -392,21 +463,28 @@ backend (void)
             }
 
             if (master_will_be_updated) {
-                destruct(master_ob);
+                deep_destruct(master_ob);
                 master_will_be_updated = MY_FALSE;
                 command_giver = NULL;
                 current_object = &dummy_current_object_for_loads;
-                apply_master_ob(STR_EXT_RELOAD, 0);
+                callback_master(STR_EXT_RELOAD, 0);
                 current_object = NULL;
             }
 
-            if (garbage_collect_to_do) {
+            if (gc_request != gcDont) {
                 time_t time_now = time(NULL);
-                char buf[90];
+                char buf[120];
 
-                if (time_now - time_last_gc >= 300)
+                if (gc_request == gcEfun
+                 || time_now - time_last_gc >= 60)
                 {
-                  sprintf(buf, "%s Garbage collection, slow_shut: %d\n", time_stamp(), slow_shut_down_to_do);
+                  sprintf(buf, "%s Garbage collection req by %s "
+                               "(slow_shut to do: %d, "
+                               "time since last gc: %ld)\n"
+                             , time_stamp()
+                             , gc_request == gcEfun ? "efun" : "allocator"
+                             , slow_shut_down_to_do
+                             , (long)(time_now - time_last_gc));
                   write(1, buf, strlen(buf));
                   command_giver = NULL;
                   current_object = NULL;
@@ -414,24 +492,48 @@ backend (void)
                 }
                 else
                 {
-                  sprintf(buf, "%s No garbage collection, slow_shut: %d\n", time_stamp(), slow_shut_down_to_do);
+                  sprintf(buf, "%s Garbage collection req by %s refused "
+                               "(slow_shut to do: %d, "
+                               "time since last gc: %ld)\n"
+                             , time_stamp()
+                             , gc_request == gcEfun ? "efun" : "allocator"
+                             , slow_shut_down_to_do
+                             , (long)(time_now - time_last_gc));
                   write(1, buf, strlen(buf));
                   reallocate_reserved_areas();
                 }
 
-                garbage_collect_to_do = MY_FALSE;
+                gc_request = gcDont;
 
                 if (slow_shut_down_to_do)
                 {
-                    int minutes = slow_shut_down_to_do;
-                    char shut_msg[90];
+                    if (time_now - time_last_slow_shut
+                        >= slow_shut_down_to_do * 60
+                       )
+                    {
+                        int minutes = slow_shut_down_to_do;
+                        char shut_msg[90];
 
-                    slow_shut_down_to_do = 0;
-                    malloc_privilege = MALLOC_MASTER;
-                    sprintf(shut_msg, "%s slow_shut_down(%d)\n", time_stamp(), minutes);
-                    write(1, shut_msg, strlen(shut_msg));
-                    push_number(minutes);
-                    apply_master_ob(STR_SLOW_SHUT, 1);
+                        slow_shut_down_to_do = 0;
+                        time_last_slow_shut = time_now;
+                        malloc_privilege = MALLOC_MASTER;
+                        sprintf(shut_msg, "%s slow_shut_down(%d)\n", time_stamp(), minutes);
+                        write(1, shut_msg, strlen(shut_msg));
+
+                        previous_ob = NULL;
+                        command_giver = NULL;
+                        current_interactive = NULL;
+
+                        push_number(minutes);
+                        callback_master(STR_SLOW_SHUT, 1);
+                    }
+                    else
+                    {
+                        sprintf(buf, "%s Last slow_shut_down() still pending.\n"
+                                   , time_stamp()
+                               );
+                        write(1, buf, strlen(buf));
+                    }
                 }
                 malloc_privilege = MALLOC_USER;
             }
@@ -455,10 +557,10 @@ backend (void)
         {
             interactive_t *ip;
 
-            /* Note that the size of buff[] is determined by MAX_TEXT, which
-             * is the max size of the network receive buffer. Iow: no
-             * buffer overruns possible.
+            /* Create the new time_stamp string in the function's local
+             * buffer.
              */
+            (void)time_stamp();
 
             total_player_commands++;
             update_load_av();
@@ -492,21 +594,22 @@ backend (void)
 
             if (buff[0] == '!'
              && buff[1] != '\0'
-             && command_giver->super
-             && !call_function_interactive(ip, buff))
+             && command_giver->super)
             {
-                /* We got a bang-input, but no input context wants
-                 * to handle it - treat it as a normal command.
-                 */
-                if (ip->noecho & NOECHO)
-                {
-                    /* !message while in NOECHO - simulate the
-                     * echo by sending the (remaining) raw data we got.
-                     */
-                    add_message("%s\n", buff + ip->chars_ready);
-                    ip->chars_ready = 0;
+                if(!call_function_interactive(ip, buff)) {
+                    /* We got a bang-input, but no input context wants
+                    * to handle it - treat it as a normal command.
+                    */
+                    if (ip->noecho & NOECHO)
+                    {
+                        /* !message while in NOECHO - simulate the
+                        * echo by sending the (remaining) raw data we got.
+                        */
+                        add_message("%s\n", buff + ip->chars_ready);
+                        ip->chars_ready = 0;
+                    }
+                    execute_command(buff+1, command_giver);
                 }
-                execute_command(buff+1, command_giver);
             }
             else if (O_GET_EDBUFFER(command_giver))
                 ed_cmd(buff);
@@ -529,8 +632,15 @@ backend (void)
                     print_prompt();
                 }
             }
-        
+
             do_state_check(2, "after handling message");
+        }
+        else
+        {
+            /* No new message, just reate the new time_stamp string in
+             * the function's local buffer.
+             */
+            (void)time_stamp();
         } /* if (get_message()) */
 
         /* Do the periodic functions if it's time.
@@ -566,6 +676,7 @@ backend (void)
             trace_level = 0;
             current_object = hide_current;
             wiz_decay();
+            comm_cleanup_interactives();
         }
 
     } /* end of main loop */
@@ -585,21 +696,71 @@ backend (void)
 
 #ifdef ALARM_HANDLER
 
-ALARM_HANDLER(catch_alarm, comm_time_to_call_heart_beat = 1; total_alarms++; )
+ALARM_HANDLER(catch_alarm, alarm_called = MY_TRUE; comm_time_to_call_heart_beat = MY_TRUE; total_alarms++; )
 
 #else
 
-void catch_alarm (int dummy UNUSED)
+RETSIGTYPE
+catch_alarm (int dummy UNUSED)
 {
 #ifdef __MWERKS__
 #    pragma unused(dummy)
 #endif
     (void)signal(SIGALRM, (RETSIGTYPE(*)(int))catch_alarm);
-    comm_time_to_call_heart_beat = 1;
+    alarm_called = MY_TRUE;
+    comm_time_to_call_heart_beat = MY_TRUE;
     total_alarms++;
+#ifndef RETSIGTYPE_VOID
+    return 0;
+#endif
 }
 
 #endif
+
+/*-------------------------------------------------------------------------*/
+void check_alarm (void)
+
+/* Check the time since the last recorded call to the alarm handler.
+ * If it is longer than a limit, assume that the alarm died and restart it.
+ *
+ * This function is necessary especially for Cygwin on Windows, where it
+ * is not unusual that the driver process receives so few cycles that it
+ * loses its alarm.
+ * TODO: It should be possible to get rid of alarms altogether if all
+ * TODO:: timebound methods check the time since the last checkpoint.
+ */
+
+{
+    static mp_int last_alarm_time = 0;
+    mp_int curtime = get_current_time();
+
+    if (t_flag)  /* Timing turned off? */
+        return;
+
+    if (!last_alarm_time) /* initialize it */
+        last_alarm_time = curtime;
+
+    if (alarm_called)
+    {
+        /* We got an alarm - restart the timer */
+        last_alarm_time = curtime;
+    }
+    else if (curtime - last_alarm_time > 15)
+    {
+        debug_message("%s Last alarm was %ld seconds ago - restarting it.\n"
+                     , time_stamp(), curtime - last_alarm_time);
+
+        alarm(0); /* stop alarm in case it is still alive, but just slow */
+        comm_time_to_call_heart_beat = MY_TRUE;
+        time_to_call_heart_beat = MY_TRUE;
+        (void)signal(SIGALRM, (RETSIGTYPE(*)(int))catch_alarm);
+        alarm(ALARM_TIME);
+
+        last_alarm_time = curtime; /* Since we just restarted it */
+    }
+
+    alarm_called = MY_FALSE;
+} /* check_alarm() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -693,6 +854,7 @@ static Bool did_swap;
           )
     {
         mp_int time_since_ref; /* Time since last reference */
+        mp_int min_time_to_swap; /* Variable swap exclusion time before reset */
         Bool bResetCalled;  /* TRUE: reset() called */
 
         num_last_processed++;
@@ -711,6 +873,13 @@ static Bool did_swap;
         /* Set Variables */
         time_since_ref = current_time - obj->time_of_ref;
         bResetCalled = MY_FALSE;
+
+        /* Variables won't be swapped if a reset is due shortly.
+         * "shortly" means half the var swap interval, but at max 5 minutes.
+         */
+        min_time_to_swap = 5 * 60;
+        if (time_to_swap_variables / 2 < min_time_to_swap)
+            min_time_to_swap = time_to_swap_variables/2;
 
         /* ------ Reset ------ */
 
@@ -750,19 +919,21 @@ static Bool did_swap;
                 RESET_LIMITS;
                 CLEAR_EVAL_COST;
                 command_giver = 0;
+                previous_ob = NULL;
                 trace_level = 0;
                 reset_object(obj, H_RESET);
                 if (obj->flags & O_DESTRUCTED)
                     continue;
 
-#if TIME_TO_SWAP > 0 || TIME_TO_SWAP_VARIABLES > 0
-                /* Restore old time_of_ref. This might result in a quick
-                 * swap-in/swap-out yoyo if this object was swapped out
-                 * in the first place. To make this less costly, variables
-                 * are not swapped out short before a reset (see below).
-                 */
-                obj->time_of_ref = current_time - time_since_ref;
-#endif
+                if (time_to_swap > 0 || time_to_swap_variables > 0)
+                {
+                    /* Restore old time_of_ref. This might result in a quick
+                     * swap-in/swap-out yoyo if this object was swapped out
+                     * in the first place. To make this less costly, variables
+                     * are not swapped out short before a reset (see below).
+                     */
+                    obj->time_of_ref = current_time - time_since_ref;
+                }
             } /* if (call reset or not) */
         } /* if (needs reset?) */
 
@@ -785,7 +956,6 @@ static Bool did_swap;
           && !bResetCalled
           && (!did_swap || !comm_time_to_call_heart_beat))
         {
-            int was_swapped = obj->flags & O_SWAPPED ;
             int save_reset_state = obj->flags & O_RESET_STATE;
             svalue_t *svp;
 
@@ -796,33 +966,48 @@ static Bool did_swap;
 
             did_swap = MY_TRUE;
 
+            /* Remove all pending destructed objects, to get a true refcount.
+             * But make sure that we don't clobber anything else while
+             * doing so.
+             */
+            cleanup_stuff();
+
             /* Supply a flag to the object that says if this program
              * is inherited by other objects. Cloned objects might as well
              * believe they are not inherited. Swapped objects will not
              * have a ref count > 1 (and will have an invalid ob->prog
-             * pointer).
+             * pointer). If the object is a blueprint, the extra reference
+             * from the program will not be counted.
              */
-            push_number(obj->flags & (O_CLONE|O_REPLACED) ? 0 :
-              ( O_PROG_SWAPPED(obj) ? 1 : obj->prog->ref) );
+            if (obj->flags & (O_CLONE|O_REPLACED))
+                push_number(0);
+            else if (O_PROG_SWAPPED(obj))
+                push_number(1);
+            else if (obj->prog->blueprint == obj)
+                push_number(obj->prog->ref - 1);
+            else
+                push_number(obj->prog->ref);
+
             RESET_LIMITS;
             CLEAR_EVAL_COST;
             command_giver = NULL;
+            previous_ob = NULL;
             trace_level = 0;
-            if (closure_hook[H_CLEAN_UP].type == T_CLOSURE)
+            if (driver_hook[H_CLEAN_UP].type == T_CLOSURE)
             {
                 lambda_t *l;
 
-                l = closure_hook[H_CLEAN_UP].u.lambda;
-                if (closure_hook[H_CLEAN_UP].x.closure_type == CLOSURE_LAMBDA)
+                l = driver_hook[H_CLEAN_UP].u.lambda;
+                if (driver_hook[H_CLEAN_UP].x.closure_type == CLOSURE_LAMBDA)
                     l->ob = obj;
                 push_object(obj);
-                call_lambda(&closure_hook[H_CLEAN_UP], 2);
+                call_lambda(&driver_hook[H_CLEAN_UP], 2);
                 svp = inter_sp;
                 pop_stack();
             }
-            else if (closure_hook[H_CLEAN_UP].type == T_STRING)
+            else if (driver_hook[H_CLEAN_UP].type == T_STRING)
             {
-                svp = apply(closure_hook[H_CLEAN_UP].u.string, obj, 1);
+                svp = apply(driver_hook[H_CLEAN_UP].u.string, obj, 1);
             }
             else
             {
@@ -832,8 +1017,9 @@ static Bool did_swap;
             if (obj->flags & O_DESTRUCTED)
                 continue;
 
-            if ((!svp || (svp->type == T_NUMBER && svp->u.number == 0)) &&
-                was_swapped )
+            if (!svp
+             || (svp->type == T_NUMBER && svp->u.number == 0)
+               )
                 obj->flags &= ~O_WILL_CLEAN_UP;
             obj->flags |= save_reset_state;
 
@@ -843,8 +1029,6 @@ no_clean_up:
         }
 
 
-#if TIME_TO_SWAP > 0 || TIME_TO_SWAP_VARIABLES > 0
-
         /* ------ Swapping ------ */
 
         /* At last, there is a possibility that the object can be swapped
@@ -852,8 +1036,8 @@ no_clean_up:
          *
          * Variables are swapped after time_to_swap_variables has elapsed
          * since the last ref, and if the object is either still reset or
-         * the next reset is at least time_to_swap_variables/2 in the
-         * future. When a reset is due, this second condition delays the
+         * the next reset is at least min(5 minutes, time_to_swap_variables/2)
+         * in the future. When a reset is due, this second condition delays the
          * costly variable swapping until after the reset.
          *
          * Programs are swapped after time_to_swap has elapsed, and if
@@ -873,7 +1057,7 @@ no_clean_up:
              && obj->variables
              && ( obj->flags & O_RESET_STATE
                || !obj->time_reset
-               || (obj->time_reset - current_time > time_to_swap_variables/2)))
+               || (obj->time_reset - current_time > min_time_to_swap)))
             {
 #ifdef DEBUG
                 if (d_flag)
@@ -899,7 +1083,6 @@ no_clean_up:
                     did_swap = MY_TRUE;
             }
         } /* if (obj can be swapped) */
-#endif /* TIME_TO_SWAP > 0 || TIME_TO_SWAP_VARIABLES > 0 */
 
         /* TODO: Here would be nice place to convert all strings in an
          * TODO:: object to shared strings, if the object was reset, cleant
@@ -949,7 +1132,7 @@ preload_objects (int eflag)
     /* Call master->epilog(<eflag>)
      */
     push_number(eflag);
-    ret = apply_master_ob(STR_EPILOG, 1);
+    ret = callback_master(STR_EPILOG, 1);
 
     if ((ret == 0) || (ret->type != T_POINTER))
         return;
@@ -984,7 +1167,7 @@ preload_objects (int eflag)
         RESET_LIMITS;
         CLEAR_EVAL_COST;
         push_string_malloced(prefiles->item[ix].u.string);
-        (void)apply_master_ob(STR_PRELOAD, 1);
+        (void)apply_master(STR_PRELOAD, 1);
 
     }
 
@@ -1088,16 +1271,51 @@ f_debug_message (svalue_t *sp)
 /* TEFUN debug_message()
  *
  *   debug_message(string text)
+ *   debug_message(string text, int flags)
  *
- * Print the <text> to stdout.
+ * Print the <text> to stdout, stderr, and/or the <host>.debug.log file.
+ *
+ * The parameter <flags> is a combination of bitflags determining the
+ * target and the mode of writing.
+ *
+ * The target flags are: DMSG_STDOUT, DMSG_STDERR and DMSG_LOGFILE.
+ * If the flag DMSG_STAMP is given, the message is prepended with the
+ * current date and time in the format 'YYYY.MM.DD HH:MM:SS '.
+ *
+ * If <flags> is given as 0, left out, or contains no target
+ * definition, debug_message() will print to stdout and to the logfile.
  */
 
 {
-    if (sp->type != T_STRING)
+    if ((sp-1)->type != T_STRING)
         bad_xefun_arg(1, sp);
-    printf("%s", sp->u.string);
+    if (sp->type != T_NUMBER
+     || (sp->u.number & ~(DMSG_STDOUT|DMSG_STDERR|DMSG_LOGFILE|DMSG_STAMP)) != 0)
+        bad_xefun_arg(2, sp);
+    if (!(sp->u.number & DMSG_TARGET) || (sp->u.number & DMSG_STDOUT))
+    {
+        if (sp->u.number & DMSG_STAMP)
+            printf("%s %s", time_stamp(), (sp-1)->u.string);
+        else
+            printf("%s", (sp-1)->u.string);
+    }
+    if (sp->u.number & DMSG_STDERR)
+    {
+        if (sp->u.number & DMSG_STAMP)
+            fprintf(stderr, "%s %s", time_stamp(), (sp-1)->u.string);
+        else
+            fprintf(stderr, "%s", (sp-1)->u.string);
+    }
+    if (!(sp->u.number & DMSG_TARGET) || (sp->u.number & DMSG_LOGFILE))
+    {
+        if (sp->u.number & DMSG_STAMP)
+            debug_message("%s %s", time_stamp(), (sp-1)->u.string);
+        else
+            debug_message("%s", (sp-1)->u.string);
+    }
     free_svalue(sp);
-    return sp - 1;
+    free_svalue(sp-1);
+    return sp - 2;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1139,20 +1357,20 @@ e_write_file (char *file, char *str)
             f = fopen(file, "a");
         }
         if (f == NULL) {
-            char * emsg, * buf;
+            char * emsg;
+            int err = errno;
 
-            emsg = strerror(errno);
-            buf = alloca(strlen(emsg+1));
-            if (buf)
+            emsg = strerror(err);
+            if (emsg)
             {
-                strcpy(buf, emsg);
-                error("Could not open %s for append: %s.\n", file, buf);
+                error("Could not open %s for append: (%d) %s.\n"
+                     , file, err, emsg);
             }
             else
             {
                 perror("write_file");
                 error("Could not open %s for append: errno %d.\n"
-                     , file, errno);
+                     , file, err);
             }
             /* NOTREACHED */
         }
@@ -1512,6 +1730,7 @@ e_file_size (char *file)
 {
     struct stat st;
 
+    st.st_mode = 0; /* Silences ZeroFault/AIX under high optimizations */
     file = check_valid_path(file, current_object, "file_size", MY_FALSE);
     if (!file)
         return -1;
@@ -1528,12 +1747,15 @@ f_regreplace (svalue_t *sp)
 
 /* TEFUN regreplace()
  *
- *     string regreplace (string txt, string pattern, string replace
+ *     string regreplace (string txt, string pattern, closure|string replace
  *                                                  , int flags)
  *
  * Search through <txt> for one/all occurences of <pattern> and replace them
- * with the <replace> pattern, returning the result. <flags> is the bit-or
- * of these values:
+ * with the <replace> pattern, returning the result.
+ * <replace> can be a string, or a closure returning a string. If it is
+ * a closure, it will be called with the matched substring and
+ * the position at which it was found as arguments.
+ * <flags> is the bit-or of these values:
  *   F_GLOBAL   = 1: when given, all occurences of <pattern> are replace,
  *                   else just the first
  *   F_EXCOMPAT = 2: when given, the expressions are ex-compatible,
@@ -1551,13 +1773,15 @@ f_regreplace (svalue_t *sp)
 
     struct regexp *pat;
     int   flags;
-    char *oldbuf, *buf, *curr, *new, *start, *old, *sub;
+    char *oldbuf, *buf, *curr, *new, *start, *old, *sub, *match;
+    size_t matchsize = 0;
+    svalue_t *subclosure = NULL;
     long  space;
     size_t  origspace;
 
     /*
-     * Must set inter_sp before call to regcomp,
-     * because it might call regerror.
+     * Must set inter_sp before call to REGCOMP,
+     * because it might call hs_regerror.
      */
     inter_sp = sp;
 
@@ -1566,9 +1790,20 @@ f_regreplace (svalue_t *sp)
         bad_xefun_arg(4, sp);
     flags = sp->u.number;
 
-    if (sp[-1].type != T_STRING)
+    if (sp[-1].type != T_STRING && sp[-1].type != T_CLOSURE)
         bad_xefun_arg(3, sp);
-    sub = sp[-1].u.string;
+    if (sp[-1].type == T_STRING)
+    {
+        sub = sp[-1].u.string;
+        subclosure = NULL;
+        match = NULL;
+    }
+    else
+    {
+        sub = NULL;
+        subclosure = sp-1;
+        match = NULL;
+    }
 
     if (sp[-2].type != T_STRING)
         bad_xefun_arg(2, sp);
@@ -1604,10 +1839,10 @@ f_regreplace (svalue_t *sp)
 
     xallocate(buf, (size_t)space, "buffer");
     new = buf;
-    pat = REGCOMP(sp[-2].u.string,(flags & F_EXCOMPAT) ? 1 : 0, MY_FALSE);
-    /* regcomp returns NULL on bad regular expressions. */
+    pat = REGCOMP((unsigned char *)(sp[-2].u.string),(flags & F_EXCOMPAT) ? 1 : 0, MY_FALSE);
+    /* REGCOMP returns NULL on bad regular expressions. */
 
-    if (pat && regexec(pat,curr,start)) {
+    if (pat && hs_regexec(pat,curr,start)) {
         do {
             size_t diff = (size_t)(pat->startp[0]-curr);
             space -= diff;
@@ -1617,7 +1852,58 @@ f_regreplace (svalue_t *sp)
             strncpy(new,curr,(size_t)diff);
             new += diff;
             old  = new;
-            *old = '\0';
+
+            /* Determine the replacement string.
+             */
+            if (subclosure != NULL)
+            {
+                size_t patsize = pat->endp[0] - pat->startp[0];
+
+                if (patsize+1 > matchsize)
+                {
+                    char * nmatch;
+
+                    matchsize = patsize+1;
+                    if (match)
+                        nmatch = rexalloc(match, matchsize);
+                    else
+                        nmatch = xalloc(matchsize);
+                    if (!nmatch)
+                    {
+                        xfree(buf);
+                        if (pat)
+                            REGFREE(pat);
+                        error("Out of memory for matched string (%lu bytes)\n"
+                             , (unsigned long)patsize+1);
+                        /* NOTREACHED */
+                        return NULL;
+                    }
+                    match = nmatch;
+                }
+
+                memcpy(match, pat->startp[0], patsize);
+                match[patsize] = '\0';
+
+                push_volatile_string(match);
+                push_number(pat->startp[0] - start);
+                call_lambda(subclosure, 2);
+                transfer_svalue(&apply_return_value, inter_sp);
+                inter_sp--;
+
+                if (apply_return_value.type != T_STRING)
+                {
+                    xfree(buf);
+                    if (pat)
+                        REGFREE(pat);
+                    if (match)
+                        xfree(match);
+                    error("Invalid type for string replacement\n");
+                    /* NOTREACHED */
+                    return NULL;
+                }
+
+                sub = apply_return_value.u.string;
+            }
 
             /* Now what may have happen here. We *could*
              * be out of mem (as in 'space') or it could be
@@ -1626,9 +1912,10 @@ f_regreplace (svalue_t *sp)
              * hack: we store a \0 into *old ... if it is
              * still there on failure, it is a real failure.
              * if not, increase space. The player could get
-             * some irritating messages from regerror()
+             * some irritating messages from hs_regerror()
              */
-            while (NULL == (new = regsub(pat, sub, new, space, 1)) )
+            *old = '\0';
+            while (NULL == (new = hs_regsub(pat, sub, new, space, 1)) )
             {
                 int xold;
 
@@ -1637,6 +1924,8 @@ f_regreplace (svalue_t *sp)
                     xfree(buf);
                     if (pat)
                         REGFREE(pat);
+                    if (match)
+                        xfree(match);
                     error("Internal error in regreplace().\n");
                     /* NOTREACHED */
                     return NULL;
@@ -1665,7 +1954,11 @@ f_regreplace (svalue_t *sp)
             }
             else
                 curr = pat->endp[0];
-        } while ((flags&F_GLOBAL) && !pat->reganch && regexec(pat,curr,start));
+        } while (  (flags & F_GLOBAL)
+                 && !pat->reganch
+                 && *curr != '\0'
+                 && hs_regexec(pat,curr,start)
+                );
         space -= strlen(curr)+1;
         if (space <= 0) {
             XREALLOC;
@@ -1678,6 +1971,8 @@ f_regreplace (svalue_t *sp)
         strcpy(buf,start);
     }
 
+    if (match)
+        xfree(match);
     if (pat)
         REGFREE(pat);
 

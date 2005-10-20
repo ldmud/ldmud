@@ -3,7 +3,7 @@
 @@ -16552,6 +16552,142 @@
      }
  #endif /* F_SET_LIGHT */
- 
+
 +#ifdef F_SUBSTITUTE_STRING
 + /* Added to support StickLib: */
 +     CASE(F_SUBSTITUTE_STRING);
@@ -141,5 +141,5 @@
 +#endif
 +
      /* --- XEfun and XCodes --- */
- 
+
      CASE(F_ESCAPE);                  /* --- escape <instr> ... --- */

@@ -14,14 +14,26 @@
 
 #include "config.h"
 
+/*----------------------------------------------------------------*/
+/* TODO: Some TODO defines */
+
+/* NO_NEGATIVE_RANGES: If defined, assignments to negative ranges
+ *   like [4..2] are not allowed. However, they are useful at times
+ *   and so this switch should be under control of a pragma or special
+ *   syntactic construct. For now and for compatibility reasons, these
+ *   ranges remain allowed.
+ */
+/* #undef NO_NEGATIVE_RANGES */
+
+/*----------------------------------------------------------------*/
 /* Verify some of the definitions in config.h */
 
-#ifndef MASTER_NAME
-#  ifdef COMPAT_MODE
-#    define MASTER_NAME "obj/master"
-#  else
-#    define MASTER_NAME "secure/master"
-#  endif
+/* Make sure that YYDEBUG is defined to 1 - just being defined
+ * is not sufficient.
+ */
+#if defined(YYDEBUG)
+#  undef YYDEBUG
+#  define YYDEBUG 1
 #endif
 
 #if !defined(MALLOC_smalloc) && !defined(MALLOC_sysmalloc)
@@ -45,7 +57,7 @@
 #if defined(MALLOC_smalloc)
 #  define GC_SUPPORT 1
 #endif
- 
+
 
 /* This one is for backwards compatibility with old config.hs */
 
@@ -53,10 +65,6 @@
 #  define STRICT_EUIDS
 #elif defined(COMPAT_MODE)
 #  undef STRICT_EUIDS
-#endif
-
-#if !defined(CATCH_UDP_PORT)
-#  undef UDP_SEND
 #endif
 
 /* The string table is shadowed only in DEBUG mode */
@@ -89,7 +97,7 @@ extern unsigned char _my_ctype[];
 #define lexdigit( c) (_my_ctype[(unsigned char)(c)]&_MCTd)
 
 #ifndef MAXINT
-#    define MAXINT (0x7fffffff)
+#    define MAXINT (0x7fffffffU)
 #endif
 
 /* A define to point out empty loop bodies. */

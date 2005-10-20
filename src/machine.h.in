@@ -41,6 +41,11 @@
 /* Define if you have the ANSI C header files.  */
 #undef STDC_HEADERS
 
+/* Set in response to the signal handler return type, since not all
+ * compilers understand direct definition comparisons
+ */
+#undef RETSIGTYPE_VOID
+
 /* does the compiler provide inline functions? */
 #undef HAS_INLINE
 
@@ -65,9 +70,6 @@
 
 /* the atari strtol() used to consider characters '9' < c < 'A' to be numeric */
 #undef STRTOL_BROKEN
-
-/* does the libc consider it normal to free a null pointer? */
-#undef FREE_NULL_POINTER
 
 /* needs the first argument of strtol be declared as const ? */
 #undef STRTOL_CONST_CHARP
@@ -113,6 +115,15 @@
 
 /* Does the machine offer IPv6? */
 #undef HAS_IPV6
+
+/* Does the machine offer mySQL? */
+#undef HAS_MYSQL
+
+/* Does the machine offer pthread library? */
+#undef HAS_PTHREADS
+
+/* Does the machine offer pcre library? */
+#undef HAS_PCRE
 
 /* define the erq include file. */
 #undef ERQ_INCLUDE

@@ -1,6 +1,2733 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+02-Feb-2002 (Lars Duening)  (3.2.9-dev.534 == 3.2.9)
+  - (many files) Some cosmetic cleanup.
+
+26-Jan-2002 (Lars Duening)  (3.2.9-dev.533)
+  - (prolang.y) Corrected a small bug in the code generation for
+       operators &&= and ||=.
+
+26-Jan-2002 (Lars Duening)  (3.2.9-dev.532)
+  - (prolang.y) One more detail to the compilation problem (reported
+       by Freaky).
+
+26-Jan-2002 (Lars Duening)  (3.2.9-dev.531)
+  - (prolang.y) Removed a compilation problem (reported by Freaky).
+
+26-Jan-2002 (Lars Duening)  (3.2.9-dev.530)
+  - (prolang.y) Removed a compilation problem.
+
+25-Jan-2002 (Lars Duening)  (3.2.9-dev.529)
+  - (object.c) Corrected a compilation problem (reported by Joseph).
+  - (prolang.y, interpret.c, func_spec) Implemented short-circuit evaluation
+       for the operators '&&=' and '||='.
+
+24-Jan-2002 (Lars Duening)  (3.2.9-dev.528)
+  - (lex) type #pragmas set in an auto-include were reset at the end of
+       it (reported by Gnomi).
+
+24-Jan-2002 (Lars Duening)  (3.2.9-dev.527)
+  - (object.c) save/restore didn't look out for shared closures.
+
+22-Jan-2002 (Lars Duening)  (3.2.9-dev.526)
+  - (etc/lpc.xml) LPC syntax highlighting for KDE's kate (thanks, Menaures!)
+
+19-Jan-2002 (Lars Duening)  (3.2.9-dev.525)
+  - (interpret.c) Changed the error thrown by replace_program()
+       to a mere debug message.
+
+19-Jan-2002 (Lars Duening)  (3.2.9-dev.524)
+  - (interpret.c) Restricted replace_program() on the first inherited
+       program if that program has virtually inherited variables.
+       See b-030119 for an explanation.
+
+16-Jan-2002 (Lars Duening)  (3.2.9-dev.523)
+  - (prolang.y) When redefining a function, the redefinition can now
+       have more arguments than the original.
+  - (lex.c) Escaping newlines in #if conditions on Windows didn't
+       work (reported by Zonk)
+
+14-Jan-2002 (Lars Duening)  (3.2.9-dev.522)
+  - (several files) Removed no longer used diagnostic code.
+
+07-Jan-2002 (Lars Duening)  (3.2.9-dev.521)
+  - (several files) Removed the 'no-blueprint' configuration option: there
+       code is stable.
+
+05-Jan-2002 (Lars Duening)  (3.2.9-dev.520)
+  - (make_func.y) When creating type/hookmaps in prolang.y, the linecounting
+       didn't count the map's continuation lines.
+  - (interpret.c) string lvalue indices can no longer index past the end
+       of the string.
+  - (interpret.c) Removed a couple sanity checks which are no longer needed.
+
+20-Dec-2002 (Lars Duening)  (3.2.9-dev.519)
+  - (lex.c) Added a workaround for an optimizer bug in Cygwin 3.2 (reported
+      by Zonk).
+
+20-Dec-2002 (Lars Duening)  (3.2.9-dev.518)
+  - (actions.c) Throw an error if H_NOTIFY_FAIL hook is missing. This also
+      prevents the driver from crashing if the H_SEND_NOTIFY hook is
+      defined (reported by Zonk).
+
+18-Dec-2002 (Lars Duening)  (3.2.9-dev.517)
+  - (object.c) When calling privilege_violation() for restoring efuns,
+      the current object is passed as 'who' argument (suggested by Gnomi).
+  - (object.c) When saving lfuns, I accidentally deleted the lookup
+      for inherited lfuns (reported by Gnomi).
+
+17-Dec-2002 (Lars Duening)  (3.2.9-dev.516)
+  - (object.c) restore_svalue() did not check if a restored efun was
+      overriden by a nomask simul-efun (reported by Gnomi).
+  - (comm.c) With pthreads, the driver could crash in remove_interactive()
+      when the write_cond was destroyed while the thread was still
+      waiting on it (reported by Lee).
+
+16-Dec-2002 (Lars Duening)  (3.2.9-dev.515)
+  - (object.c) restore_map_size() stumbled over closure entries (reported by
+      Jason).
+
+16-Dec-2002 (Lars Duening)  (3.2.9-dev.514)
+  - (comm.c) If the login object destructed itself in the logon() call,
+      the driver crashed in the print_prompt() routine (reported by Jason).
+
+15-Dec-2002 (Lars Duening)  (3.2.9-dev.513)
+  - (object.c) Corrected a compilation error (thanks, Dafire and Jason!).
+
+15-Dec-2002 (Lars Duening)  (3.2.9-dev.512)
+  - (prolang.y) It is no longer possible to defined a variable to be
+      of type 'void' (reported by Gnomi).
+
+14-Dec-2002 (Lars Duening)  (3.2.9-dev.511)
+  - (object.c) Small corrections.
+
+14-Dec-2002 (Lars Duening)  (3.2.9-dev.510)
+  - (object.c) Efuns save_() and restore_() can now handle non-lambda
+      closures, symbols and quoted arrays.  This required a new savefile
+      format, though.
+
+11-Dec-2002 (Lars Duening)  (3.2.9-dev.509)
+  - (doc/concepts/negotiation, src/wk/) Added some telnet protocol
+    related documentation.
+  - (func_spec, lex.c, prolang.y, interpret.c) New operators '&&=' and
+     '||=' (suggested by Croft).
+
+09-Dec-2002 (Lars Duening)  (3.2.9-dev.508)
+  - (mudlib/telnetneg.c) Updated (thanks, Fiona!)
+  - (mudlib/test_master.c) Added testcode for using charmode (thanks, Fiona!)
+  - (comm) Fiona provided more patches: SAVE_NOECHO, which makes sure that
+      the client can switch to CHARMODE before also setting NOECHO; and
+      SIMULATE_CHARMODE which allows the mudlib to switch to charmode even
+      if the client can do only linemode.
+  - (simulate.c) Efuns copy_file() and rename() no longer throw errors
+      on failures, but just return a non-0 value (reported by Menaures).
+
+05-Dec-2002 (Lars Duening)  (3.2.9-dev.507)
+  - (config.h, comm, gcollect.c, main.c) Replaced USE_PTHREAD by USE_PTHREADS.
+  - (comm.c) Before printing the prompt, current_object is set to NULL
+      so that the player's catch_tell() is sure to be able to see the
+      prompt (reported by mudder@Furtual.ORG).
+
+04-Dec-2002 (Lars Duening)  (3.2.9-dev.506)
+  - (make_func.y, comm.c, main.c, prolang.y) Removed warnings (reported by
+      Coogan).
+  - (comm.c) When logging on a new player, the prompt wasn't printed - in
+      particular the prompt set by input_to(INPUT_PROMPT) (reported by
+      Nostradamus).
+  - (main.c) If the reserved areas can be reallocated, the out_of_memory
+      flag is reset.
+  - (simulate.c) catch() reports an 'out_of_memory' condition only
+      if it was raised during the execution of the guarded code.
+
+03-Dec-2002 (Lars Duening)  (3.2.9-dev.505)
+  - (patch-o-matic) Updated to new executable name.
+  - (prolang.y, array.c) The filenames returned by include_list()
+      now always start with a '/' to make their reuse in include statements
+      simpler (suggested by Coogan).
+  - (mudlib/telnet) Fiona donated the telnet negotiations module from
+      Wunderland, containing a complete implementation of the telnet protocol
+      (thanks!).
+  - (sprintf.c) The %O/%Q formatter stumbled over really large arrays
+      and mappings: the top-level function ignored if the conversion
+      routine reallocated the string buffer (reported by Bardioc).
+
+03-Dec-2002 (Lars Duening)  (3.2.9-dev.504)
+  - (Makefile.in) Corrected two typos.
+
+03-Dec-2002 (Lars Duening)  (3.2.9-dev.503)
+  - (main.c) Forgot to add the configurable efuns to the '--options'
+      output.
+
+02-Dec-2002 (Lars Duening)  (3.2.9-dev.502)
+  - (func_spec, interpret.c) Efun member_array() is now deactivated
+      with !USE_DEPRECATED (suggested by Fiona).
+  - (configure, config.h, efuns, simulate, object, interpret.c): The
+      efuns set_light(), set_is_wizard() and process_string() can be
+      configured from the configure script.
+  - (Makefile) Driver executable renamed from 'driver' to 'ldmud'.
+  - (configure, Makefile) The configure script now tries to figure out
+      on its own which warning options the compiler supports.
+
+30-Nov-2002 (Lars Duening)  (3.2.9-dev.501)
+  - (comm.c) Accidentally deleted two lines in the noecho handling.
+
+30-Nov-2002 (Lars Duening)  (3.2.9-dev.500)
+  - (comm.c) Fiona provided a number of bugfixes for CHARMODE - thanks!
+
+30-Nov-2002 (Lars Duening)  (3.2.9-dev.499)
+  - (prolang.y) Brainfart: the last patch created a problem, instead of
+      solving one. The bug was that "*"::fun() looked at _all_ inherited
+      programs, not just the directly inherited ones.
+
+30-Nov-2002 (Lars Duening)  (3.2.9-dev.498)
+  - (prolang.y) When making wildcarded supercalls ("*"::fun()), the compiler
+      takes care that each function is called only once (reported by Gnomi).
+
+29-Nov-2002 (Lars Duening)  (3.2.9-dev.497)
+  - (sysmalloc.c) This file is no longer needed (actually it has been
+      useless since 3.2.8-dev.188).
+  - (lex.c) pragma_combine_strings was never initialised with a default.
+  - (lex.c) Changed the FLOAT_MIN/FLOAT_MAX predefined to reflect
+      the C-float limits, not the C-double limits, as the gamedriver's
+      floats are somewhere inbetween the two.
+
+27-Nov-2002 (Lars Duening)  (3.2.9-dev.496)
+  - (patchlevel.h, hosts/be/Makefile, hosts/be/set-version) The version
+      flags of the BeOS executable are now read from patchlevel.h and not set
+      directly in the BeOS Makefile.
+
+27-Nov-2002 (Lars Duening)  (3.2.9-dev.495)
+  - (efuns.c) Efun transfer() was still incorrect. Funny though that
+      nobody noticed it before :-) (reported by Nostradamus).
+
+27-Nov-2002 (Lars Duening)  (3.2.9-dev.494)
+  - (comm.c) The correction of the threads racing condition unfortunately
+      introduced a deadlock - Gawain found and fixed it (thanks!).
+
+27-Nov-2002 (Lars Duening)  (3.2.9-dev.493)
+  - (efuns.c) Corrected the deprecated efun transfer(): the check
+      for dest->can_put_and_get() was implemented wrong (reported by
+      Nostradamus).
+
+27-Nov-2002 (Lars Duening)  (3.2.9-dev.492)
+  - (comm.c) The thread-cleanup function now locks the structure before
+      performing the cleanup (suggested by Gawain).
+
+26-Nov-2002 (Lars Duening)
+  - (object.c) restore_object("#0:0") caught the driver in an endless loop
+      (thanks, Ctx!).
+
+22-Nov-2002 (Lars Duening)
+  - (prolang.y, interpret.c) The __INIT code is no longer restricted to
+      the first 64K of generated bytecode.
+
+21-Nov-2002 (Lars Duening)
+  - (etc/patch-o-matic) Contributed by Guandalug - thanks!
+
+20-Nov-2002 (Lars Duening)  (3.2.9-dev.491)
+  - (closure.c, interpret.c) Corrected refcount errors in the handling
+      of soon-to-be dangling alien-lfun closures.
+  - (smalloc.c) Made sure that before each call to fatal() the thread-check
+      is reset.
+
+19-Nov-2002 (Lars Duening)  (3.2.9-dev.490)
+  - (closure.c, interpret.c) In order to convert a dangling lfun closure
+      during a replace_program() into a dangling alien-lfun closure, the
+      closure needs to be created as alien-lfun in the first place (reported
+      by Pulami).
+
+17-Nov-2002 (Lars Duening)  (3.2.9-dev.489)
+  - (many files) Pure source cosmetics: removed trailing spaces at lineends.
+
+16-Nov-2002 (Lars Duening)  (3.2.9-dev.488)
+  - (smalloc.c) If the allocator ran out of memory, the exit handling
+      triggered the 'Multiple threads' safety check. Not really a problem,
+      as the driver would exit anyway, but it obscures what is happening.
+
+15-Nov-2002 (Lars Duening)  (3.2.9-dev.487)
+  - (comm.c) The call to remove_flush_entry() could clobber the list
+      of players to flush if it was called for a player not in the
+      flush list.
+
+13-Nov-2002 (Lars Duening)  (3.2.9-dev.486)
+  - (interpret.c) get_type_info(,2) on an unbound-lambda crashed the driver
+      because an uninitialized variable was used (thanks, Ctx!)
+  - (simulate.c) If the H_NOECHO hook is set, the telnet negotiations
+      are redirected only after the hook setting is verified (thanks,
+      Fiona!)
+  - (comm.c) Corrected a potential problem when an interactive object
+      with pending data is forcefully made non-interactive: from my
+      reading of the code it seems that the object remained in the
+      list of players-to-flush, even though it no longer had a valid
+      interactive_t attribute.
+
+12-Nov-2002 (Lars Duening)  (3.2.9-dev.485)
+  - (port.h) The 'malloc' attribute is now used only with gcc 3 or newer.
+  - (lex.c) Corrected the line counting with auto-includes (reported by
+      Coogan).
+
+11-Nov-2002 (Lars Duening)  (3.2.9-dev.484)
+  - (comm.c) When calling H_NOECHO, the code did not check if the
+      argument objects were still alive (reported by Fiona).
+
+08-Nov-2002 (Lars Duening)
+  - (port.h, comm.c, xalloc.h, smalloc.h) Activated GCC attributes for
+      OS-X compilations, added GCC attribute 'malloc' to the allocator
+      functions, removed some warnings.
+
+07-Nov-2002 (Lars Duening)  (3.2.9-dev.483)
+  - (configure.in) The tests regarding which libraries are needed suffered
+      from a disabling typo (reported by Nostradamus).
+  - (port.h, hosts/unix.h) Adapted to the latest Cygwin release.
+
+06-Nov-2002 (Lars Duening)  (3.2.9-dev.482)
+  - (closure.c) If a lfun-closure is left danging by a replace_program(),
+      it is now converted into an alien-lfun closure pointing to
+      master::dangling_lfun_closure(). This way the error handler has
+      a chance to determine the originating object (suggested by Gnomi).
+  - (closure.c) The handling of dangling alien-lfun closures actually
+      destroyed the alien.ob entry.
+  - (interpret.c) allocate() used with an array or mapping initialisation
+      value now creates shallow copies of the initialisation value for each
+      initialised element (suggested by Oskar).
+
+04-Nov-2002 (Lars Duening)  (3.2.9-dev.481)
+  - (smalloc.c) The thread-check in xfree() also triggered when the
+      memory reserves were released (reported by Bardioc).
+
+03-Nov-2002 (Lars Duening)
+  - (configure.in) Made the check for -lpthread more robust (reported by
+      Markus Peter).
+
+03-Nov-2002 (Lars Duening)
+  - (configure.in) Made the check for -lpthread more robust (reported by
+      Markus Peter).
+
+01-Nov-2002 (Lars Duening)  (3.2.9-dev.480)
+  - (comm.c) *blush* Deleted TELOPT_EOR handling by act of stupidity..
+
+31-Oct-2002 (Lars Duening)  (3.2.9-dev.478, -dev.479)
+  - (comm.c) Added TELOPT_BINARY to the telnet negotiations forwarded
+      to H_TELNET_NEG (suggested by Fiona).
+
+30-Oct-2002 (Lars Duening)  (3.2.9-dev.477)
+  - (lex.c) When starting a new compile, the order of initialisations
+      was wrong (in particular: auto-include was handled before the
+      lexer was set up) (reported by Freaky).
+  - (configure, (x)erq/Makefile.in) Only link in libraries actually
+      needed by the erq (suggested by Freaky).
+  - (configure) Modified the configure so that only required libraries
+      are added to the compile (suggested by Freaky).
+
+29-Oct-2002 (Lars Duening)  (3.2.9-dev.476)
+  - (comm, func_spec) find_input_to() and remove_input_to() can now
+      match on both object and string name.
+  - (interpret.c) unquote(symbol) added a quote level instead of
+      removing it (reported by Gnomi).
+  - (comm.c) Improved the 'already bound' error messages to list
+      the port number.
+  - (util/xerq) If the xerq couldn't send all data from a ERQ_SEND request
+      immediately and thus returned a ERQ_E_INCOMPLETE, it will follow it
+      up with a ERQ_OK message to the same handle later once all the pending
+      data has been send (provided by Fiona, thanks!)
+  - (util/xerq/lpc) Replaced the socketd with the Wunderland daemon
+      (thanks!).
+  - (lex.c, prolang, simulate.c) auto-includes are now handled like
+      normal includes (instead of just placing the text into the textbuffer
+      and fudging the current_line variable), correcting a source of false
+      linenumber informations.
+
+27-Oct-2002 (Lars Duening)  (3.2.9-dev.474, .475)
+  - (smalloc.c) Added a very primitive safeguard against interleaving
+      calls to the allocator - I suspect that this is the root cause
+      for the problems with pthreads.
+  - (object.c) When resetting an object, the previous_object() was
+      some random object (reported by Gnomi).
+  - (comm, func_spec) New efuns find_input_to() and input_to_info()
+      (suggested by Fiona).
+
+16-Oct-2002 (Lars Duening)  (3.2.9-dev.473)
+    - (configure) Some systems need libresolv in order to provide
+        herror() (reported by Coogan).
+    - (comm.c) Removed a compile warning (thanks, Fiona!).
+    - (array.c) regexplode: Removed a memory leak on stack overflow
+        (thanks, Fiona!).
+
+15-Oct-2002 (Lars Duening)  (3.2.9-dev.472)
+    - (exec.h, lex.c, prolang, object, gcollect.c, typedefs.h) Added
+        complete include file information to compiled programs (backported
+        from 3.3).
+    - (object.c) Implemented efun include_list() properly (backported
+        from 3.3).
+    - (prolang.y) Adapted to bison 1.5 .
+
+14-Oct-2002 (Lars Duening)
+  - (configure) If a requested option (like use-mysql) can't be used
+       because the system lacks the necessary support, the configure
+       script issues a warning and exits with return code 1 (suggested
+       by Freaky).
+
+13-Oct-2002 (Lars Duening)  (3.2.9-dev.471)
+  - (prolang.y) Removed a compiler warning.
+  - (configure.in) The test for pthread support was broken, and
+       the test for 'long long' was run twice. And if pthreads
+       are not found, USE_PTHREADS is now deactivated (reported by Freaky).
+
+10-Oct-2002 (Lars Duening)  (3.2.9-dev.470)
+  - (efuns.c, svalue.h, interpret.c) Evaluation cost of deep_copy() is
+       now proportional to size and nesting depth of copied arrays
+       and mappings, if DYNAMIC_COST is defined (suggested by Gnomi).
+
+09-Oct-2002 (Lars Duening)  (3.2.9-dev.469)
+  - (port.h, swap.c) No longer includes <values.h> which has been obsoleted
+       by <limits.h> and <float.h>.
+  - (config.h, driver.h) Removed the compilation warning when YYDEBUG
+       was not defined.
+  - (mud/lp-245) Corrected the transfer() simul-efun (thanks, Ralph!)
+
+09-Oct-2002 (Lars Duening)  (3.2.9-dev.467, .468)
+  - (lex.c, prolang) Implemented #'inh::fun lfun closures (b-010801-0).
+
+07-Oct-2002 (Lars Duening)  (3.2.9-dev.466)
+  - (comm.c) Removed compilation problems with BeOS.
+  - (prolang.y) Oh My Ghod. The range index [..<expr0>] created faulty
+       bytecode, maybe even clobbered random memory, if the expression
+       was anything complicated, like 'm++' or 'm = 4'. This bug
+       was caused by uninitialized the LPC parser not initializing
+       the internal return value from parsing <expr0>, so the bug
+       didn't manifest itself every time (reported by Zonk).
+
+04-Oct-2002 (Lars Duening)  (3.2.9-dev.465)
+  - (autoconf/configure.in) Corrected the problem with newer autoconfs.
+
+01-Oct-2002 (Lars Duening)  (3.2.9-dev.464)
+  - (comm.c) Forgot a parameter in an error message (thanks, Freaky!)
+  - (main.c, comm) The hostname was initialized to late, so the debug.log
+      file was opened with the wrong name (reported by Dafire).
+
+30-Sep-2002 (Lars Duening)  (3.2.9-dev.463)
+  - (comm.c) Changed the fprintf() in the thread cleanup routine into a
+      malloc-friendlier dprintf1().
+  - (main.c) Added a check into debug_message() if the name of the
+      debug log file has already been set (reported by Dafire).
+  - (simulate.c) The driver now checks if an object to be loaded appears
+      out of nowhere while it is being compiled (this can happen if the mudlib
+      warning handler is careless with rename_object()) and throws an error
+      (reported by Gnomi).
+  - (main.c, comm) New commandline options --hostname and --hostaddr
+      to override the values returned by the system. In particular,
+      --hostaddr will be used as the address to open to the driver
+      ports.
+
+28-Sep-2002 (Lars Duening)
+  - (config.h.in) USE_PTHREAD was permanently commented out (reported by
+      Gawain).
+
+27-Sep-2002 (Lars Duening)  (3.2.9-dev.461+.462)
+  - (comm, main.c, configure) Based on a patch by Gawain, PTHREADS and
+      PCRE (requires Fiona's patch) can now be configured like other
+      options. New commandline option --max-thread-pending to set
+      the limit for pending data to write.
+
+25-Sep-2002 (Lars Duening)
+  - (comm.c) If a connection is marked for removal (.do_close != 0),
+      telnet commands can still be sent. This is to allow the input_to()
+      handling to properly reset the connection to linemode even if
+      the input_to() handler has called remove_interactive().
+  - (backend, interpret.c, smalloc.c) Made the GC request log output
+      nicer.
+
+25-Sep-2002 (Lars Duening)  (3.2.9-dev.460)
+  - (comm, gcollect.c) Removed compiler warnings, and a crash
+      in pthreads thread cleanup (reported by Dafire)
+
+25-Sep-2002 (Lars Duening)  (3.2.9-dev.459)
+  - (interpret.c) The LPC tracing code crashed when used with lambda
+      closures or with call_resolved() (reported by Nostradamus).
+
+24-Sep-2002 (Lars Duening)  (3.2.9-dev.458)
+  - (comm, backend.c, gcollect.c) smalloc is not threadsafe, which
+      caused the implementation of USE_PTHREAD code to trash the
+      memory structures. To solve the problem, all memory allocations
+      and deallocations are done by the main thread.
+  Patches from Guandalug:
+  - (interpret.c) Converting a sefun-closure to a string looked up the
+      name in the efun table instead of the sefun table.
+
+20-Sep-2002 (Lars Duening)  (3.2.9-dev.457)
+  - (prolang.y) The test for duplicate toplevel inherits got confused
+       when virtual inherits occured (reported by Zonk via Dafire).
+
+19-Sep-2002 (Lars Duening)
+  - (etc/lpc-mode.el) LPC mode for EMACS, by Vivek Dasmohapatra.
+
+17-Sep-2002 (Lars Duening)
+  - (comm.c) ECONNREFUSED is recognized as error (suggested by Coogan).
+
+16-Sep-2002 (Lars Duening)
+  - (comm.c) With PThreads: forgot to detach new threads after creation
+       (thanks, Gawain!)
+  - (configure) The object statistic seems to be correct now, so the
+       OSTAT diagnostics are disabled by default.
+
+15-Sep-2002 (Lars Duening)  (3.2.9-dev.456)
+   - (simulate) Both 'warn' and 'warning' are already symbols on
+        some systems, so I now used 'warnf' as name of the warning
+        function.
+   - (regexp, rxcache, array.c, backend.c, ed.c) Removed name clashes
+        with system libraries.
+
+15-Sep-2002 (Lars Duening)  (3.2.9-dev.455)
+   - (prolang.y, lex, interpret.c, simulate, func_spec) New pragma
+        'warn_deprecated' causes the compiler to print warnings when
+        a deprecated efun is used (suggested by Dafire).
+
+03-Sep-2002 (Lars Duening)  (3.2.9-dev.454)
+   - (swap.c) The object statistics get messed up when the GC swaps objects.
+        Let's see if this change corrects all of the discrepancies. In
+        general the reason for the discrepancies was that variables
+        were counted more often as 'swapped in' than they had been
+        swapped out.
+
+30-Aug-2002 (Lars Duening)  (3.2.9-dev.453)
+   - (efuns.c, lex.c, make_func.y) Some chars were casted to 'unsigned int'
+        instead of 'unsigned char', breaking support for international
+        character sets (thanks, Oskar!).
+
+26-Aug-2002 (Lars Duening)
+   - (swap.c) The OSTAT diagnostic for swap-in subtracted instead of added
+        to compute the expected new tot_alloc_object_size value (reported
+        by Coogan).
+
+21-Aug-2002 (Lars Duening)
+   - (object.c) Oops, omitted one argument in one of the OSTAT outputs.
+
+21-Aug-2002 (Lars Duening)  (3.2.9-dev.452)
+   - (comm.c, object.c, simulate.c, swap.c) Corrected some warnings
+        (reported by Dafire).
+   - (interpret, and some more files) Master applies caused by external events
+        (like ERQ messages) are now distinguished from internal calls
+        (like valid_write()) so that the error handling for external calls
+        receive the full eval cost benefits (suggested by Fiona).
+   - (Makefile.in s): Added missing @EXEEXT@ tags.
+
+20-Aug-2002 (Lars Duening)  (3.2.9-dev.451)
+   - (main.c) Needed to #include <netdb.h> on Solaris to get the
+        MAXHOSTNAMELEN macro (thanks, Coogan).
+   - (util/erq/erq.c, util/xerq/erq.c) Forgot the timestamp in the
+        initial startup message.
+   - (port, simulate.c, comm.c, hosts/unix.h) Cygwin corrections.
+   - (config.h, configure, driver.h, erqs) New configuration option
+        with-erq-debug sets the new config.h macro ERQ_DEBUG which
+        defines the ERQ debug level. No more '-DDEBUG' to enable
+        the debugging code in the ERQs (suggested by Bill).
+
+19-Aug-2002 (Lars Duening)  (3.2.9-dev.450)
+   - (closure.c) Efun symbol_efun() freed symbol-svalues as strings
+        (reported by Dafire).
+
+19-Aug-2002 (Lars Duening)  (3.2.9-dev.449)
+   - (lex.c) An error in a permanent define given on the command line
+        would crash the driver because the lexer called error() before
+        the VM had been set up.
+   - (Makefile.in) Some makes don't like ':=' variable assignments (reported
+        by Coogan).
+   - (main.c) If the driver uses the default debug.log file, its (mudlib)
+        name is available in the predefined macro __DEBUG_LOG__ (suggested
+        by Mandragon).
+   - (driver.h, config.h) Made the config.h macro DEBUG invisible to the
+        ERQs as their debugging mode is controlled by their Makefiles.
+   - (util/erq/erq.c, util/xerq/erq.c) The ERQs now print their name
+        and compilation date to stderr on startup.
+
+18-Aug-2002 (Lars Duening)  (3.2.9-dev.448)
+   - (lex.c) Added predefined macros __RESET_TIME__ and __CLEANUP_TIME__
+        (suggested by Elric).
+
+14-Aug-2002 (Lars Duening)
+   - (configure) Optimization option -funroll-all-loops seems to
+        create buggy code, so I removed it from the configure.
+
+14-Aug-2002 (Lars Duening)  (3.2.9-dev.447)
+    - (comm.c) Compilation broke under BeOS.
+    - (object.c, swap.c, simulate.c) Removed warnings.
+    - (Makefile.in) Removed a GNUMake'ism (reported by Coogan).
+
+13-Aug-2002 (Lars Duening)  (3.2.9-dev.446)
+    - (configure) The VERBOSE_OPCPROF define in config.h got clobbered.
+    - (interpret.c) I removed the copy-on-write for mappings again - 
+         it broke more than it fixed.
+
+12-Aug-2002 (Lars Duening)  (3.2.9-dev.445)
+    - (lex.c) New predefined macros __CATCH_EVAL_COST__ and
+         __MASTER_EVAL_COST__ to carry the corresponding
+         configuration options over to LPC (suggested by Menaures).
+    - (Makefiles, configure, config.h) Moved the debugging options into
+         config.h to ensure clean recompilations, and made them
+         configurable through the normal configure mechanism.
+
+11-Aug-2002 (Lars Duening)
+    - (driver.h, object.c, simulate.c, swap.c) Defining debug macro
+         CHECK_OBJECT_STAT allows tracing of all changes to the
+         tot_alloc_object(_size) statistics. Aim is to find the
+         discrepancy in the 'status' command. To activate the
+         tracing, the commandline option '--check-object-stat' must
+         be given.
+    - (interpret.c) The operations <map> += <map> and <map> -= <map>
+         now implement the copy-on-write semantic to mirror the
+         behaviour of the related array operations (suggested by Dafire).
+    - (interpret.c) get_type_info(<closure>,2) did not return the
+         bound object for efun, simul-efun and operator closures 
+         (reported by Gnomi).
+    - (interpret.c) Attempting to replace a program in an object
+         which already has closures bound no longer raises an error,
+         but issues a debug_message() (suggested by Pulami).
+    - (make_func.y) Removed two warnings by bison (reported by Gawain).
+
+10-Aug-2002 (Lars Duening)  (3.2.9-dev.444)
+    - (closure.c) In efun symbol_function(), symbols were freed as
+         strings (reported by Freaky).
+    - (main, backend.c) Signal USR2 forces the driver to reopen the
+         host.debug.log file (thanks, Gawain!).
+    - (comm, gcollect.c) Experimental: Defining USE_PTHREAD (if your
+         system has pthread support) activates code which uses threads
+         to write the socket data to the network in the background.
+         Intention is to avoid EWOULDBLOCK errors on slow connections
+         (thanks, Gawain!)
+
+08-Aug-2002 (Lars Duening)
+    - (comm.c) When using IPv6, get_host_ip_number() used a too small
+         buffer (thanks, Fiona!)
+    - (backend.c) Improved the 'doing a GC' messages somewhat.
+
+05-Aug-2002 (Lars Duening)  (3.2.9-dev.443)
+    - (mapping.c) Embarassing: the bugfix broke map() and filter()
+         for all non-multi-value mappings (reported by Casey).
+
+04-Aug-2002 (Lars Duening)  (3.2.9-dev.442)
+    - (prolang.y) Inheriting the same program twice at the top level
+         now raises a warning, resp. an error in pedantic mode.
+    - (simulate.c) If a closure is called from limited() and self-destructs,
+         the driver would try to free the now-invalid closure argument
+         and crash (this happened a lot in EotL) (thanks, Casey!).
+    - (interpret.c) In DEBUG mode, the functions free_object_svalue() and
+         free_string_svalue() check that they really get the proper data type.
+    - (efuns.c) Efuns filter() and map(): when used with multi-value
+         mappings, the driver checks if the called function kept a reference
+         to the passed array with the values. If yes, a new array is
+         created for the next iteration to avoid overwriting the old
+         one (reported by Fiona).
+    - (interpret.c) When collecting the traceback in a catch(), the
+         file and line information was used, but not initialized, occasionally
+         crashing the driver. In addition, in a couple of cases when the
+         file and line information can't be determined, the file was
+         left undefined (thanks, Gnomi!)
+
+15-Jul-2002 (Lars Duening)  (3.2.9-dev.441)
+    - (mud/lp-245) The wizlist() simul-efun didn't print proper failure
+         notices (reported by Vandergnome).
+    - (gcollect.c) In a GC the list of destructed objects was handled
+         last, by which time the list might already have been clobbered.
+         Moving the handling first should plug a memory leak (reported by
+         Dafire).
+    - (prolang.y) The crasher correction from dev.439/dev.440 still had
+         a small bug which caused variables and functions to be assigned
+         wrongly (reported by Fiona and Gnomi, fixed by Menaures).
+    - (prolang.y) If a variable was inherited multiple times, the driver
+         generated a senseless warning (reported by Zora).
+    - (efuns.c, interpret.c, main.c) Added some support for locales; in
+         particular the driver now uses the locale defined in the LANG
+         environment variable for character conversions (thanks, Oskar!).
+    - (simulate.c) Efun callbacks misparsed the arguments when only the
+         function name and extra arguments, but no object was provided.
+
+14-Jul-2002 (Lars Duening)
+    - (etc/memusage) Fiona updated the script to make it more robust and
+         work with the new OBJ_DUMP format. Furthermore the constants
+         for $DOMAINS and so on do work now.
+
+05-Jun-2002 (Lars Duening)  (3.2.9-dev.440)
+    - (prolang.y) Oops, yesterday's bugfix was not quite corrected.
+
+04-Jun-2002 (Lars Duening)  (3.2.9-dev.439)
+    - (prolang.y) If a method in a virtual inherit is rendered invisible,
+         but also made available again through a parallel inherit of the same
+         program, the compiler resolved the visible function to the
+         wrong inheritance, causing the driver to crash (b-020530).
+
+13-May-2002 (Lars Duening)  (3.2.9-dev.438)
+    - (config.h.in, Makefile.in, autoconf/configure.in) TRACE_CODE
+         is now configurable through the configure script, and thus
+         is located in config.h and no longer in Makefile.
+    - (gcollect, interpret.c, func_spec) Optional filename argument
+         to efun garbage_collection() can specify a new GC log file
+         for the next GC. The filename is validated through
+         master::valid_write() (f-020312).
+
+07-May-2002 (Lars Duening)  (3.2.9-dev.437)
+    - (mapping.c) Improved the checks for empty mappings in add_mapping()
+         and add_to_mapping().
+    - (mapping.c) 'mapping += mapping' now throws an error when the
+         mappings are of differing width (reported by Alfe and Coogan).
+    - (prolang.y) New notation '([:<expr>])' as shortcut for
+         m_allocate(0, <expr>) (suggested by Alfe).
+
+06-May-2002 (Lars Duening)  (3.2.9-dev.436)
+    - (smalloc.c) With CHECK_OBJECT_GC_REF, small chunks could lead to
+         misleading diagnostics during the GC.
+
+03-May-2002 (Lars Duening)  (3.2.9-dev.435)
+    - (prolang.y) Reworked the program block reallocations to make sure
+         that their bounds won't be overwritten. This could have been
+         the reasons for the crashers on corrupted memory (reported by Coogan).
+
+01-May-2002 (Lars Duening)
+    - (settings/dt2) Updated the DeeperTrouble settings file; and also
+         removed the mud/dt2 directory since it's no longer necessary
+         (thanks, Lasse!).
+
+26-Apr-2002 (Lars Duening)  (3.2.9-dev.434)
+    - (prolang.y) Hiding an inherited private nosave variable with an
+         inherited non-private variable didn't work (reported by Gnomi).
+    - (prolang.y, lex.c, simulate.c) Compiler error and warning messages
+         all have the format '<file> line <line>: <text>' now.
+    - (prolang.y, swap.c) Oops, the linenumber structure was allocated too
+         small on creation, and read in incorrectly from swap.
+    - (driver.h) Deactivated the debug defines CHECK_MAPPING_TOTAL
+         and CHECK_OBJECT_REF since these bugs seem to be fixed.
+
+25-Apr-2002 (Lars Duening)  (3.2.9-dev.433)
+    - (comm.c) Using unbound lambdas for prompts crashed the driver
+         (reported by Gnomi).
+    - (driver.h, gcollect, smalloc) When macro CHECK_OBJECT_GC_REF is
+         activated, every supposedly non-object memory reference in a GC is
+         checked if it points to an object. If yes, a diagnostic is printed
+         to gcollect out. Requires MALLOC_TRACE to work.
+
+21-Apr-2002 (Lars Duening)  (3.2.9-dev.432)
+    - (exec.h, prolang.y, interpret.c, object.c, swap.c) Linenumbers are
+         now kept in a separate memory block, which makes swapping them
+         out and back in simpler.
+
+20-Apr-2002 (Lars Duening)  (3.2.9-dev.431)
+    - (prolang.y, lex.c) Calls to the master during a compilation now check
+         the available evaluation costs. If the limit is exceeded, a
+         compilation error is generated.
+    - (swap.c) Removing a program block from the swap no longer crashes
+         if the program doesn't have line numbers (reported by Pixie).
+    - (prolang.y) Calls to undefined functions now generate a warning
+         when detected in functions without typechecking if #pragma
+         pedantic is in effect (before the compiler silently inserted
+         a prototype).
+
+19-Apr-2002 (Lars Duening)
+    - (prolang.y) Removed a few bison warnings (reported by Menaures).
+
+18-Apr-2002 (Lars Duening)  (3.2.9-dev.430)
+    - (prolang.y) When passing a wrong argument to a varargs function, the
+         error message gave the wrong argument number (reported by Gnomi).
+    - (func_spec, interpret.c) New efun m_add().
+
+09-Apr-2002 (Lars Duening)  (3.2.9-dev.429)
+    - (prolang.y) The improved type checking on <op>= accidentally
+         broke the type checking on the plain assignment (reported by Dafire).
+
+08-Apr-2002 (Lars Duening)  (3.2.9-dev.428)
+    - (prolang.y) Improved the type checking on the <op>= operators
+         to match what the VM actually implements (reported by Menaures).
+
+04-Apr-2002 (Lars Duening)  (3.2.9-dev.427)
+    - (mapping.c) During a GC, the .hash member in a mapping does not
+         point to a mapping-hash structure - the statistics code
+         ignored that (b-011015-0).
+    - (gcollect, swap.c) Made the GC status variable less reliant
+         on magic numbers.
+    - (swap, gcollect.c, object.c, simulate.c) When removing the swap
+         entry for a modified program, the code now also makes sure
+         that the linenumbers are loaded back into memory.
+
+03-Apr-2002 (Lars Duening)  (3.2.9-dev.426)
+    - (prolang.y) '<string> *= <int>' didn't compile (reported by Dafire and
+         Menaures).
+    - (swap, gcollect.c, object.c, simulate.c) A hunch: when a program is
+         swapped for the first time, the driver writes the struct as it
+         is to the disk. On later swap-ins, this data is read directly
+         into memory, but never written again. If in the meantime
+         the prog->blueprint pointer changed, this change will be lost
+         after the next swap in. It would require a rare sequence of
+         activities to make this a problem, but it's possible. The change
+         is therefore to remove the swap block whenever prog->blueprint
+         changes; let's see if this helps (b-020228-0).
+
+31-Mar-2002 (Lars Duening)  (3.2.9-dev.425)
+    - (simulate.c) Load errors during the initial master load crashed
+         the driver in the error handling.
+
+30-Mar-2002 (Lars Duening)  (3.2.9-dev.424)
+    - (driver.h) The blueprint code helped some people (but not all), so I
+         re-activated it as a counter-check.
+    - (bugs/) Updated the files.
+
+27-Mar-2002 (Lars Duening)  (3.2.9-dev.423)
+    - (mapping.c) *sigh* The mapping check itself contained a fatal error
+         (reported by Freaky).
+    - (wiz_list.c) Don't call master::get_wiz_name() when there is no
+         master. Otherwise a simple warning during the initial master
+         load would abort the driver (reported by Frank Syse).
+    - (driver.h, lots of files) If debug macro NO_BLUEPRINT is defined,
+         the driver no longer tracks the blueprint for a program structure.
+         This somewhat disables the blueprint() efun, but if it solves
+         the object refcount problem, I know at least where to look.
+    - (func_spec, actions, interpret.c) Efun query_verb() now takes an optional
+         flag to return the verb as specified in the add_action() instead
+         of the verb given by the user (suggested by Dafire).
+
+26-Mar-2002 (Lars Duening)  (3.2.9-dev.422)
+    - (array.c, mapping.c) Made sure that the callback structures are
+         properly released on errors.
+
+25-Mar-2002 (Lars Duening)
+    - (lex.c) *sigh* 'ifstate_t' is also a system type (reported by Alwin).
+    - (comm.c) Removing the last pending input_to() did not reset the
+        'input_to pending' flag in the interactive structure (reported
+        by Gnomi).
+    - (mapping) The inaccuracy in the mappings statistics is caused
+        by impossibly high numbers of mapping elements. The checks
+        done by CHECK_MAPPING_TOTAL have been tightened around possible
+        places where the too big number could be created.
+
+21-Mar-2002 (Lars Duening)  (3.2.9-dev.421)
+    - (lex.c) The lexer's 'struct ifstate' clashes with an 'enum ifstate'
+        defined on some systems for the networking stack (reported by Alwin).
+    - (interpret.c) Removed the negative indexing on control_stack
+        and value stack by introducing dummy entries at the bottom of
+        each.
+
+19-Mar-2002 (Lars Duening)  (3.2.9-dev.420)
+    - (pkg-mysql.c) db_connect() didn't check if it got too many arguments,
+        crashing in that case (reported by Menaures).
+    - (interpret.c) CHECK_OBJECT_REF: Checking the destructed objects 
+        after every VM instruction used too much time - it is now limited
+        to F_RETURN, vefuns and tefuns.
+
+16-Mar-2002 (Lars Duening)  (3.2.9-dev.419)
+    - (lex.c) Fixed a memory leak, caused again by a piece of code which
+        relied on free_svalue() not changing the svalue .type (reported
+        by Alwin).
+    - (simulate.c) Setting a driver hook from an unshared string leaked
+        this string (reported by Alwin).
+    - (array.c) And this should be the last piece of code which made
+        assumptions about free_svalue().
+    - (func_spec, efuns) New efun blueprint().
+
+13-Mar-2002 (Lars Duening)  (3.2.9-dev.418)
+    - (mapping.c) Since free_svalue() no longer leaves the .type untouched,
+        the CHECK_MAPPINGS sanity stumbled at one point (reported by Bardioc).
+
+12-Mar-2002 (Lars Duening)  (3.2.9-dev.417)
+    - (lex.c) Efun expand_define() did not set the proper type
+        for the return value - so far undiscovered because free_svalue()
+        didn't use to change it.
+    - (Makefiles) Changed default optimization level from High (-O4)
+        to Medium (-O2), since compilers get notoriously unreliable
+        at high optimization.
+
+11-Mar-2002 (Lars Duening)  (3.2.9-dev.416)
+    - (simulate.c) The CHECK_OBJECT_REF check was still overzealous;
+        unfortunately not with the FF mudlib I tested it with. Hmpf.
+    - (xalloc.c) The heap/stack gap check didn't expect the stack to
+        be located under the heap, as Cygwin does it.
+
+10-Mar-2002 (Lars Duening)  (3.2.9-dev.415)
+    - (actions.c, simulate.c) The CHECK_OBJECT_REF check was overzealous
+        and didn't track properly the changes in object sentences. Sorry.
+    - (interpret.c) Efun all_environment() did not accept destructed objects
+        as argument as documented (reported by Pulami and Gnomi).
+
+09-Mar-2002 (Lars Duening)  (3.2.9-dev.414)
+    - (xalloc) The implementation of the heap/stack check didn't work
+        on architectures with really big address spaces - corrected that.
+    - (mapping.c, interpret.c, object.c, efuns.c) When adding new values
+        to mapping, the code didn't check if the memory could be allocated
+        (reported by Menaures).
+    - (doc/efun) More german translations from Pulami.
+
+07-Mar-2002 (Lars Duening)  (3.2.9-dev.413)
+    - (xalloc, smalloc.c interpret.c, efuns.c, object.c) Added check
+        to prevent the stack from growing into the heap.
+    - (smalloc.c) Some expected/found magic word logs were reversed.
+    - (interpret.c) atan2() did not accept an integer as first argument
+        (reported by Pulami).
+    - (doc/efun) Pulami provided a whole bunch of german translations.
+    - (interpret.c) to_int() on closures didn't work as advertised
+        (reported by Pulami)
+
+06-Mar-2002 (Lars Duening)  (3.2.9-dev.412)
+    - (simulate, interpret.c, gcollect.c) With CHECK_OBJECT_REF, the
+        driver continually checks the consistency of the list of
+        destructed objects.
+    - (doc/efun/get_dir) Updated the manpage and added the german
+        version (both provided by Pulami).
+
+05-Mar-2002 (Lars Duening)  (3.2.9-dev.411)
+    - (efuns.c) deep_copy() didn't handle quoted arrays properly (reported
+        by Gnomi).
+    - (interpret.c) New efun unquote() (suggested by Gnomi).
+    - (object, gcollect.c, driver.h) Debug macro CHECK_OBJECT_REF activates
+        a trace of blueprint allocations/deallocations, to be used to debug
+        the strange refcount bugs recently encountered (b-020228-0).
+
+04-Mar-2002 (Lars Duening)  (3.2.9-dev.410)
+    - (prolang.y) Publically inheriting functions which had been inherited
+        protected before now overrides the earlier inherit (f-020303-1).
+    - (ptrtable.c) When allocating a new ptable, the .table[] member is
+        cleared.
+    - (simulate.c) New get_dir() flag GETDIR_PATH adds the full absolute
+        pathname to the returned filenames (suggested by Pulami).
+    - (interpret.c) If a value of the wrong type is passed to a switch,
+        the driver no longer throws a runtime error but instead
+        jumps to the 'default' case (suggested by Pulami).
+
+03-Mar-2002 (Lars Duening)  (3.2.9-dev.409)
+    - (simulate.c) When the driver runs on a fatal error, it calls
+        the master lfun notify_shutdown() with "Fatal Error" as argument
+        before it dumps core.
+    - (configure) Added a check for 'bison -y' when looking for YACC.
+
+28-Feb-2002 (Lars Duening)  (3.2.9-dev.408)
+    - (simulate, efuns.c, gcollect.c, interpret.c) In addition to the
+        last uncaught-error trace, debug_info() can now also return
+        the last error trace in general.
+
+27-Feb-2002 (Lars Duening)
+    - (smalloc.c) Corrected the statistics adjustment during the freelist
+        consolidation.
+    - (backend.c) The check_alarm() method did not recognize the '--no-heart'
+        option, eventually turning the alarm() back on (reported by Dafire).
+
+26-Feb-2002 (Lars Duening)  (3.2.9-dev.407)
+    - (efuns.c) Adjusted the terminal_colour() sanity check to acknowledge
+        a certain boundary condition; added a test to make sure that
+        the indentation is smaller than the wrapping width (reported
+        by Menaures).
+    - (actions.c) An error in add_action() could cause the driver to free
+        memory twice (reported by Menaures).
+    - (mapping.c) Several allocations weren't checked for success (reported
+        by Menaures).
+
+22-Feb-2002 (Lars Duening)  (3.2.9-dev.406)
+    - (mapping.c, smalloc.c) Improved the diagnostic messages: all are
+        now printed to the GC log where they belong.
+    - (smalloc.c) Added more data to the statistics diagnostics, by
+        default deactivated since I can debug it over time in OSB.
+    - (simulate.c) Made the load_object_error() method resistant
+        against object names with printf format specifications (reported by
+        Gnomi).
+    - (mudlib/uni-crasher) Added Menaures' test object to the archive.
+
+21-Feb-2002 (Lars Duening)
+    - (smalloc.c) Oops, the statistics diagnostic lacked the 'DEBUG:'
+        tag.
+
+20-Feb-2002 (Lars Duening)  (3.2.9-dev.405)
+    - (prolang.y) Variable definitions are now normal statements and
+        as such no longer restricted to the beginning of a block (f-000430-1).
+
+17-Feb-2002 (Lars Duening)  (3.2.9-dev.404)
+    - (prolang.y) In a for() loop, variables may now be declared without
+        initialisation (e.g. 'for (int i; ...)') (suggested by Pulami).
+    - (random.c) Tentatively modified the scaling of the raw random number
+        to the desired range so as to avoid overflow problems (investigated by
+        Collin Baillie for an Alpha machine). 
+
+15-Feb-2002 (Lars Duening)
+    - (prolang.y) The byte move routine to implement call_other sefuns
+        by using call_other moved bytes in the wrong direction,
+        crashing the driver if this piece of code was executed (reported by
+        Coogan).
+    - (simul_efun.c) simul-efuns shadowing real efuns were not properly
+        discarded, making it impossible to reactive them (which in a 
+        way was lucky as it made it possible to find the call_other bug).
+    - (interpret.c) The error handling for a secure call did not
+        properly roll back the control stack, leaking any closure
+        referenced from it (b-990505-0).
+
+13-Feb-2002 (Lars Duening)  (3.2.9-dev.403)
+    - (efuns.c) Efun copy_bits(): I accidentally had deleted the lines
+        handling negative deststart values. The efun was also
+        prone to numerical overflow effects (reported by Menaures).
+    - (gcollect.c) Hmm, clear_object_ref() unconditionally cleared
+        the blueprint reference - this should happen only for
+        destructed blueprints. Dunno if this was responsible for
+        the recent crashes in FinalFrontier.
+    - (sprintf.c) sprintf("%-=10s", "a\nb\n") printed two extra
+        newlines at the end instead of just one (reported by Gnomi).
+         
+11-Feb-2002 (Lars Duening)  (3.2.9-dev.402)
+    - (comm.c) If on shutdown players were already destructed in
+        notify_shutdown(), the following remove_player() was passed
+        destructed objects (reported by Dafire).
+    - (efuns.c) Corrected a crasher in the new efun copy_bits().
+    - (efuns.c) copy_bits() malfunctioned if src range to copy ended
+        in unset bits (reported by Menaures).
+    - (efuns.c) In efun terminal_colour(), the wrapping analysis had
+        to be separated from the initial length gathering since the
+        analysis requires all lengths to be available. Without the
+        separation, the driver ran into a fatal sanity error on some
+        input values (reported by Dafire).
+    - (actions.c) Argument errors in add_action() would leak the
+        action sentence.
+
+09-Feb-2002 (Lars Duening)  (3.2.9-dev.401)
+    - (efuns, func_spec) New efun copy_bits() to copy ranges of
+         bitstrings (based on code provided by Menaures).
+    - (interpret.c) And nobody noticed that set_bit() was broken :-)
+    - (efuns.c) Efun terminal_colour(): In wrapped formatting, when a
+         word is too long to fit on a line by itself and there are at least
+         two characters space left on the current line, the long word is begun
+         immediately.  Previously, such long words were always printed on a
+         line of their own (suggested by Fiona).
+
+07-Feb-2002 (Lars Duening)  (3.2.9-dev.400)
+    - (ed, comm, efuns) Modified the print_prompt() routine so that
+         the editor prompt is take directly from the editor buffer.
+         This allows to get rid of the swapping of editor and normal command
+         prompts, which may also have been responsible for the memory
+         leaks reported in b-020205-0 (though I can't prove that). As an
+         aside, the f_set_prompt() function moved from efuns.c to comm.c .
+    - (actions.c) If notify_fail() was not used from an undestructed
+         command giver, the given failure notice value leaked (b-020205-1).
+
+07-Feb-2002 (Lars Duening)  (3.2.9-dev.399)
+    - (bugs/) Cleaned up the bug reports.
+
+06-Feb-2002 (Lars Duening)  (3.2.9-dev.398)
+    - (sprintf.c) In justified column formatting, when a word is too
+         long to fit on a line by itself and there are at least two characters
+         space left on the current line, the long word is begun immediately.
+         Previously, such long words were always printed on a line of their
+         own (suggested by Fiona).
+
+06-Feb-2002 (Lars Duening)  (3.2.9-dev.397)
+    - (bugs) Added more information about memory leaks.
+
+05-Feb-2002 (Lars Duening)  (3.2.9-dev.396)
+    - (mapping.c) The diagnostic in count_mapping_size() forgot to check
+         for a NULL uid (thanks, Ben!)
+    - (prolang.y) Inherited public but undefined function were hidden
+         by (simul-)efuns of the same name, making a resolution by
+         crossdefinition through another inherited module impossible
+         (reported by Fiona).
+
+03-Feb-2002 (Lars Duening)  (3.2.9-dev.395)
+    - (simulate, prolang.y, lex.c) Added a limit safety check to
+        limit_error_format(), and increased the buffer sizes for the
+        error messages (reported by Gnomi).
+
+01-Feb-2002 (Lars Duening)
+    - (smalloc.c) Added a check routine for the 'Total small memory'
+         statistics - I think there is a miscalculation in the
+         freelist consolidation.
+
+31-Jan-2002 (Lars Duening)  (3.2.9-dev.394)
+    - (mapping.c) Added diagnostic statements to count_mapping_size()
+         in order to find the place where the mappings statistics
+         is screwed up.
+    - (interpret.c) If input_to() was used without command giver,
+         a NULL pointer string was pushed onto the interpreter stack
+         due to a missing check in the privilege_violation4()
+         function (reported by Menaures).
+
+30-Jan-2002 (Lars Duening)  (3.2.9-dev.393)
+    - (gcollect.c) The GC forgot to clear the refcounts in the known
+         destructed objects, thus sometimes causing a 'First reference
+         to program, but refcount != 0' fatal error (reported by Coogan,
+         reproduced by Menaures).
+    - (interpret.c) replace_program() without argument can now skip
+         the extra inherits added by the compiler to accomodate
+         virtual variables (reported by Nathan).
+
+26-Jan-2002 (Lars Duening)  (3.2.9-dev.392)
+    - (prolang.y) The wildcarded supercall "*":: no longer throws an
+         error if none of the inherited objects defines the called function.
+         It fits into the semantics of the '*' wildcard ("any or none"), and
+         it is practical for supercalls like "*"::reset() (suggested by
+         Zonk@Finalfrontier via Dafire).
+
+25-Jan-2002 (Lars Duening)  (3.2.9-dev.391)
+    - (object.c) Made an error message more informative.
+
+23-Jan-2002 (Lars Duening)  (3.2.9-dev.390)
+    - (prolang.y) The '::' operator did not recognize the separate
+        namespaces of local variables and functions (reported by
+        Imp via Gnomi).
+    - (func_spec, prolang.y, interpret.c) Added new bytecode instructions
+        nconst1 and nnumber to handle negative constants better (especially
+        __INT_MIN__) (reported by Menaures).
+    - (efuns.c, interpret.c, mapping.c) check_map_for_destr() wasn't
+        called before copying or subtracting mappings (reported by Coogan).
+    - (strfuns) Added some 'const' qualifiers.
+    - (simulate.c) Improved the loadtime error messages: they now print
+        the inheritance chain (suggested by Gnomi).
+    - (etc/memusage) Provided by Fiona - thanks!
+
+17-Jan-2002 (Lars Duening)  (3.2.9-dev.389)
+    - (interpret.c) The division <int>/<float> used a random
+        value for the divident (reported by Pulami).
+    - (simul_efun, simulate.c) Destructing the simul-efun object
+        immediately invalidates all simul-efuns; this should reduce
+        the number of 'undefined function' errors when doing manual
+        reloads of the simul-efun object.
+    - (make_func.y) Removed a small memory leak.
+    - (smalloc.c, prolang.y, closure.c) Modified some memory accesses
+        in order to keep Memory Check tools like ZeroFault happy.
+    - (regexp.c) The .from_ed member in a newly compiled regexp
+        wasn't set.
+    - (object.c) One variable wasn't set.
+
+16-Jan-2002 (Lars Duening)
+    - (simul_efun) When reloading the simul-efun objects, all previous
+        sefuns are discarded and removed from the symbol table. Otherwise
+        if the simul-efun object used cross-defined sefuns itself, the
+        recompiled object would not recognize the cross-defined calls
+        and instead pick up the older inactive entry from the symbol
+        table. This problem may still occur when reloading a simul-efun
+        object by hand (reported by Coogan and some other people).
+    - (lex) Inferior identifier entries now have their own string
+        reference.
+    - (lex.h, prolang.y) The magic values for ident_t.u.global now
+        have symbolic names.
+
+15-Jan-2002 (Lars Duening)
+    - (configure) Fiona did more analysis on the rxcache hash and found
+        out that using a prime table size doesn't help. I set the size back
+        to 8192; let's see how bad the collisions are at this small table
+        size.
+
+14-Jan-2002 (Lars Duening)
+    - (interpret.c) The overflow error messages for float divisions
+        named the wrong values (thanks, Guandalug!).
+
+12-Jan-2002 (Lars Duening)  (3.2.9-dev.388)
+    - (configure.in) Fiona pointed out that just halving the rxcache
+        size doesn't seem to increase the fill ratio. As an experiment
+        I now set the default size to prime 8191.
+    - (interpret.c) The float range checks stupidly compared against
+        DBL_MIN for the low limit instead of -DBL_MAX (reported by Ben).
+    - (stralloc.c, debug_info) Added a few more string table statistics.
+
+10-Jan-2002 (Lars Duening)  (3.2.9-dev.387)
+    - (lex.c) Added new predefined macros __FLOAT_MIN__ and __FLOAT_MAX__
+        for the float value limits.
+    - (interpret.c) Added checks for numeric overflows to float operations.
+        Btw, <int> / <float> returned a wrong result.
+    - (configure.in) Reduced the default size of the RXCACHE table to 8192
+        instead of 16384 entries.
+
+08-Jan-2002 (Lars Duening)  (3.2.9-dev.386)
+    - (efuns.c) Efun terminal_colour() removed a crasher which happened
+        when too many control sequences appeared in a line (reported by Peng).
+    - (autoconf/configure.in) Added icc compiler option '-ipo' to highest
+        optimisation tests.
+    - (make_func.y, comm.c, lex.c, interpret.c) Removed a couple (but not all)
+        warnings generated by the Intel Compiler (reported by Dafire).
+
+03-Jan-2002 (Lars Duening)  (3.2.9-dev.385)
+    - (gcollect.c) Forgot to clear the refcounts in the list of
+        destructed objects. Oops.
+    - (object.c) free_prog() now also frees its blueprint reference, which
+        should remove at least one major refcount leak.
+    - (lp-245/obj/master.c, lp-245/obj/player.c) Small corrections.
+
+02-Jan-2002 (Lars Duening)  (3.2.9-dev.384)
+    - (simulate.c) Corrected the misformatting in 'status'.
+    - (simulate, comm.c) Corrected a potential crasher when bad arguments
+        are passed to efun input_to(): the embedded callback structure
+        wasn't initialized properly, so that the free_input_to() got
+        garbage data instead of pointers (reported by Menaures).
+    - (util/xerq/erq.c) Reduced the amount of crap printed in DEBUG
+        configuration.
+    - (gcollect.c) There seems to be a problem with leaking object refcounts,
+        so that destructed objects are tagged as 'referenced' even if they
+        aren't. The GC will eventually free the memory itself, but inavoidably
+        mess up the object statistics. As a first measure the GC after
+        the mark phase checks the list of destructed objects if any
+        of the objects on it haven't been referenced yet. If so, the
+        objects concerned are logged and then explicitely included into
+        the list of objects to free. This way at least the object statistics
+        will be kept in sync for the time being.
+
+01-Jan-2002 (Lars Duening)  (3.2.9-dev.383)
+    - (gcollect.c, simulate, comm) The GC now removes all stale objects
+        referenced from the interactive structures during the cleanup phase.
+        As a side effect, callbacks may no longer reference destructed
+        objects during the clearing/counting phase of a GC.
+    - (actions, main.c, backend.c, efuns.c, gcollect.c, interpret.c,
+       simulate, dumpstat, mudlib/sys/debug_info) Destructed objects
+        are now kept in a separate list in order to aid mudadmins in analysing
+        the memory usage of their muds. debug_info(DINFO_STATUS) returns the
+        statistics in the new fields DID_ST_OBJECTS_NEWLY_DEST and _DEST;
+        debug_info(DINFO_DUMP, "destructed") dumps the lists to a file; and
+        the builtin commands 'status tables' and 'dumpallobj' have been
+        updated accordingly.
+
+31-Dec-2001 (Lars Duening)  (3.2.9-dev.382)
+    - (interpret.c) to_string() can now handle operator closures (suggested
+        by Gnomi).
+
+30-Dec-2001 (Lars Duening)  (3.2.9-dev.381)
+    - (interpret.c) abs(INT_MIN) now generates an overflow error (reported
+        by Menaures).
+    - (driver.h, mapping, smalloc) If debug macro CHECK_MAPPING_TOTAL
+        is defined, ever change in the registered mapping size statistics
+        is accompanied with a sanity check. If the check fails, a
+        DEBUG message is generated on stderr.
+    - (sprintf.c) When adding columns, a one-line column ending with a
+        newline inserted the newline on-the spot instead of delaying
+        it until the end of the line as it was done with multiline
+        columns (reported by Gnomi).
+
+29-Dec-2001 (Lars Duening)
+    - (driver/dumpallobj, efun/debug_info) Explained the format of
+        the OBJDUMP file.
+    - (settings/tubmud) Updated (thanks, Coogan!)
+
+28-Dec-2001 (Lars Duening)  (3.2.9-dev.380)
+    - (interpret.c) When calling a simul_efun in a vanished object, the
+        local stackpointer of eval_instruction() was not synchronized
+        with inter_sp after the call (reported by Gnomi).
+    - (simul_efun.c) When reloading a simul_efun object, the check for
+        old sefuns to reactivate ignored changes in the TYPE_MOD_XVARARGS
+        flag. Since the exact format of the F_SIMUL_EFUN instruction depends
+        on this flag, this could trip the bytecode interpreter (reported by
+        Gnomi).
+    - (mudlib/astar.c) An implementation of the A* pathfinding algorithm,
+        donated by Acius (thanks!).
+
+21-Dec-2001 (Lars Duening)  (3.2.9-dev.379)
+    - (simulate.c) When checking the refcounts, the extra_refs in objects
+        named in callbacks weren't counted corrected (reported by Tomba).
+    - (gcollect, call_out.c, simulate.c) Removed knowledge about the
+        GC internals from call_outs and callbacks.
+
+19-Dec-2001 (Lars Duening)  (3.2.9-dev.378)
+    - (interpret.c) Corrected a wrong variable initialisation in
+         efun say() (reported by Nostradamus).
+
+14-Dec-2001 (Lars Duening)
+    - (interpret.c) Efun set_this_object() queried the master and
+         simul-efun object without checking if they actually exist.
+
+12-Dec-2001 (Lars Duening)  (3.2.9-dev.377)
+    - (call_out.c) Efun call_out_info() did not return the target object
+         if the call_out is a closure (reported by Menaures).
+    - (interpret.c) The increment and decrement operators were missing the
+         overflow checks (reported by Freaky).
+    - (lex.c) New LPC defines __INT_MAX__ and __INT_MIN__ for the numeric
+         integer limits.
+    - (interpret.c) Another overflow check, this time for __INT_MIN__ / -1
+         (reported by Menaures).
+    - (interpret.c) Corrected the bugfix to the say() refcount problem
+         (thanks, Tomba!)
+
+11-Dec-2001 (Lars Duening)
+    - (comm.c) TELOPT_TM can now be negotiated from the mudlib as well
+         (reported by Peng).
+
+11-Dec-2001 (Lars Duening)  (3.2.9-dev.376)
+    - (interpret.c) Additions, subtractions and multiplications now
+         check for numeric overflows.
+
+11-Dec-2001 (Lars Duening)  (3.2.9-dev.375)
+    - (interpret.c, mapping.c) Oops, the new checks also introduced
+         divisions by 0 (reported by Menaures).
+    - (sprintf.c) Runtime fieldsize specification by '%*' didn't check
+         if the size was given as MIN_INT: it would try to negate it
+         to get the positive number, but fail and cause the formatting
+         routines to crash under circumstances (reported by Menaures).
+
+10-Dec-2001 (Lars Duening)  (3.2.9-dev.374)
+    - (interpret.c) gcc 2.91 on Linux/x86 generates buggy code for
+         MIN_INT % -1, so this case is now explicitely check for
+         (reported by Menaures).
+    - (interpret.c) Multiplication of a string with a number was
+         not checked for numeric overflows in the computation of
+         the result length (reported by Menaures).
+    - (smalloc.c) Added a check against numeric overflows in the
+         computation of the final memory block size.
+    - (mapping.c) When allocating/resizing mappings, a check against
+         numeric overflows in the size computations has been added
+         (reported Menaures).
+    - 3.2.9-dev.373 had an extraneous debug statement.
+
+05-Dec-2001 (Lars Duening)  (3.2.9-dev.372)
+    - (backend.c) Before calling reset() or clean_up() from the backend,
+        the previous_object is cleared (reported by Gnomi).
+    - (main.c) New commandline option:
+          --random-seed <num>
+            Seed value for the random number generator. If not given, the
+            driver chooses a seed value on its own.
+            This option is for debugging.
+    - (interpret.c) The mysterious code in calling alien lfun closures to
+        create a second control frame, deactivated in dev.318, revealed
+        its purpose: when for such a closure the bound object l->ob
+        differs from the code object l->function.alien.ob, this fact
+        needs to be recorded in order to prevent security holes. So the
+        code fragment has been activated again with a small change: the
+        second control frame will be created only if the two objects
+        differ (unknowingly suggested by Menaures).
+
+04-Dec-2001 (Lars Duening)  (3.2.9-dev.371)
+    - (interpret.c) When doing a call_other on an array, inter_sp
+        was incorrect while getting the object. An error there
+        then could clobber memory.
+    - (backend) Added in internal flag 'mud_is_up' for debugging.
+    - (main.c) The initial random seed is printed for debugging
+        purposes.
+
+28-Nov-2001 (Lars Duening)  (3.2.9-dev.370)
+    - (interpret.c) In-place execution of invert_bits() returned an
+        invalid svalue.
+    - (prolang.y) Another correction to the bugfix of Gimli's problem
+        (reported by Freaky).
+    - (lex.c) Line number counting was thrown off by one by the
+        auto-include string (reported by Menaures and Nathan).
+
+27-Nov-2001 (Lars Duening)  (3.2.9-dev.369)
+    - (prolang.y) The bugfix to Gimlis problem unfortunately broke a couple
+        of muds. This version works better (reported by many people).
+    - (array.c) Removed a memory leak in inherit_list()s error handling.
+
+25-Nov-2001 (Lars Duening)  (3.2.9-dev.368)
+    - (mudlib/sys/functionlist.h) Changed the <> include of lpctypes.h
+        into a "" include (suggested by Heiko).
+    - (prolang.y) Inheriting two private functions of the same caused the
+        compiler to crossdefine the second one to the first. Not directly
+        visible to the user, this messed up any use of these functions
+        by INITIALIZATION_BY___INIT (reported by Gimli).
+    - (interpret.c) Efun replace_program() can omit the argument if the
+        object has only one inherit (suggested by Pulami).
+
+23-Nov-2001 (Lars Duening)  (3.2.9-dev.367)
+    - (object.c) Efun say() could leak object references (reported by Tomba).
+    - (mudlib/sys/functionlist.h) Changed the absolute include of lpctypes.h
+        into a <> include (suggested by Heiko).
+
+21-Nov-2001 (Lars Duening)
+    - (pkg-mysql.c) Using the mysql->thread_id as handle proved to be
+        unreliable as the thread_id may change. Instead an explicit
+        handle is now used (thanks, Fuchur!).
+    - (ed.c) Added command 'T' to perform Tab <-> Whitespace conversion
+        (thanks, Menaures!).
+
+20-Nov-2001 (Lars Duening)  (3.2.9-dev.366)
+    - (sprintf.c) Printing a table modified the internal precision information
+        without making a backup. If now the table was applied to an array
+        of data ("%#99999999999@s" format string), formatting the second
+        line would cause a crash (reported by Menaures).
+    -  (doc/efun/snoop) Corrected the manpage: snooping an already snooped
+        player terminates the previous snoop (reported by Zordiac).
+
+19-Nov-2001 (Lars Duening)  (3.2.9-dev.365)
+    - (sprintf.c) It was possible to instruct sprintf to format a string
+        as both columns and as a table. sprintf() then formatted it as
+        columns, but any error (like buffer overflow) would crash the
+        driver. The error recovery is now more robust, and such an invalid
+        format string is rejected (reported by Menaures).
+    - (sprintf.c) Max size of the result is now 128 KByte.
+    - (lex.c) A H_AUTO_INCLUDE closure also receives a flag telling if
+        it was a <>-type include or not (suggested by Freaky).
+    - (interpret.c) Efuns and_bits(), or_bits(), xor_bits() mishandled
+        the bits 5, 11, 17, ... (thanks, Fuchur!)
+    - (prolang.y) The bugfix yesterday was not quite correct: a pair
+        of missing parentheses completely changed the meaning of the
+        check for private inherited functions, causing the driver to crash
+        (reported by Freaky).
+
+18-Nov-2001 (Lars Duening)  (3.2.9-dev.364)
+    - (array.c) Efun inherit_list: the tagging of virtual inherits
+        returned a random value for the main program (reported by Freaky).
+    - (prolang.y) Inherited private functions could hide simul-efuns
+        or efuns (reported by Gnomi).
+    - (lex.c) If H_AUTO_INCLUDE is set to a closure, it will be called
+        for all files opened by the lexer. A second argument passed to
+        the closure determines whether the call is for the object file
+        itself or for an included file (suggested by Freaky).
+    - (func_spec, array, exec.h, prolang.y) New efun include_list()
+        to return the filenames read when compiling a program.
+    - (efuns.c) Added the number of included files to the result
+        of object_info(OINFO_MEMORY).
+
+17-Nov-2001 (Lars Duening)  (3.2.9-dev.363)
+    - (comm.c) Oops, two bugs found.
+
+17-Nov-2001 (Lars Duening)  (3.2.9-dev.362)
+    - (comm) Efun input_to() now accepts a prompt parameter, specifying
+        the prompt to print.
+    - (array.c, exec.h, mudlib/sys/inherit_list.h) New flag for efun
+        inherit_list() allows to tag virtual inherits in the result 
+        (rest of f-991020-0).
+    - (doc/concepts/hooks) Corrected the docs for the MODIFY_COMMAND hooks.
+
+17-Nov-2001 (Lars Duening)  (3.2.9-dev.361)
+    - (func_spec, prolang.y, make_func, lex, simulate) Replaced the efun
+        set_auto_include_string() with the driver hook H_AUTO_INCLUDE.
+        Additionally, a closure can be used to generate the auto include
+        data (f-000505, f-011026-2, f-990316-1).
+    - (simulate.c) Removed a small memory leak in set_driver_hook():
+        replacing hooks leaked the old hook data.
+
+16-Nov-2001 (Lars Duening)  (3.2.9-dev.360)
+    - (sys/debug_info.h, smalloc.c) Efun debug_info(): macro DID_SBRK_SIZE was
+        typoed as DID_SBKR_SIZE.
+    - (sys/debug_info.h, smalloc.c) Efun debug_info(): added the derived
+        statistics DID_MEM_ALLOCATED, _USED and _TOTAL_UNUSED to the
+        DINFO_DATA:DID_MEMORY data.
+    - (interpret.c) The stack overflow error handling forgot to update
+        the stack pointer after cleaning up the stack, causing some
+        svalues to be freed twice (reported by Coogan).
+    - (efuns.c) Efun terminal_colour(): Temporary values are no longer
+        held directly on the stack, but instead in an array on the stack,
+        thus greatly reducing the stack usage for strings with lots of
+        colour codes.
+
+15-Nov-2001 (Lars Duening)  (3.2.9-dev.359)
+    - (lex.c) If H_INCLUDE_DIRS is set to an array of directory names,
+        the names can now have leading '/' (reported by Nathan).
+    - (mapping.c) check_map_for_destr() didn't check if the mapping
+        actually had a condensed part - this can happen when called
+        from compact_mappings() (reported by Freaky).
+    - (interpret.c) Improved the stack overflow checking a bit, and for
+        some function calls the local variables were allocated twice.
+    - (interpret.c) member() and member_array() used with closures
+        didn't always find them (reported by Gnomi).
+
+14-Nov-2001 (Lars Duening)  (3.2.9-dev.358)
+    - (gcollect.c) Tweaks to the information dumped on fatals.
+    - (driver.h, gcollect) New debug macro DUMP_GC_REFS (in driver.h)
+        instructs the GC to list all found references on the gcollect_outfd.
+        Off by default, this macro should be defined only by people
+        getting fatal()s like 'First reference to destructed object, but
+        ref count != 0'.
+    - (main) New function dprintf4().
+    - (mapping.c) compact_mappings() did not remove destructed objects
+        and closures from the mapping (reported by Menaures).
+
+13-Nov-2001 (Lars Duening)  (3.2.9-dev.357)
+    - (gcollect.c, smalloc.c) Removed the compilation problem when
+        MALLOC_LPC_TRACE is not defined (reported by Menaures).
+    - (smalloc.c) The computation of a 'magic' word in the freelist
+        consolidation was wrong, causing bus errors in Tubmud.
+    - (mud/lp-245) Modified to no longer use deprecated functions
+        (thanks, Coogan!)
+    - (simulate.c) Added missing newlines to some error messages
+        (thanks, Freaky!)
+    - (efuns.c) Efun transfer() miscalculated the weights when the
+        target wasn't a living (reported by Zordiac).
+    - (driver.h) Since FinalFrontier is now running two weeks without
+        a problem, I deactivated the mapping check code.
+    - And Zordiac informed me that Deeper Trouble is now running natively
+        on LDMud.
+
+12-Nov-2001 (Lars Duening)  (3.2.9-dev.356)
+    - (make_func.y) Lexer now understands lines terminated with CRLFs
+        instead of just LFs (reported by Holger).
+    - (gcollect.c) When a 'First ref to' with unmatching refcount
+        is encountered, the memory allocation information is dumped, too.
+
+24-Oct-2001 (Lars Duening)  (3.2.9-dev.355)
+    - (object.c) Efun inherit_list() can now return the inheritance
+        structure as a tree (part of f-991020-0).
+    - (backend.c) If a closure is used with regreplace(), it will be
+        passed the position of the found substring, too (suggested
+        by Alfe).
+    - (comm.c) New efun remove_input_to() (part of f-000530).
+
+23-Oct-2001 (Lars Duening)
+    - (doc/efun/terminal_colour) Improved the explanation of the key
+        recognition strategy, and added a MudOS simulation function
+        courtesy of Fiona.
+
+21-Oct-2001 (Lars Duening)  (3.2.9-dev.354)
+    - (actions.c) Removed a crasher when add_action() was performed between
+        two objects with no environment (thanks, Fuchur!).
+
+18-Oct-2001 (Lars Duening)  (3.2.9-dev.353)
+    - (mapping.c) The search loops for condensed misc keys terminated one
+        iteration too late before declaring a key as not found, which
+        occasionally led to 'finding' a key which wasn't really there.
+        Especially in remove_mapping() this led to clobbered memory.
+        This probably fixes b-000218, b-000822 and b-000207; maybe
+        even some of the other strange crashers.
+    - (sprintf.c) Removed a crasher in justified formatting when the string
+        to format contained only one word (reported by Slava and Coogan).
+    - (doc/LPC/arrays, doc/efun/sprintf) Improved examples by
+        Coogan (thanks!).
+
+17-Oct-2001 (Lars Duening)  (3.2.9-dev.352)
+    - (interpret.c) I had to deactivate the check against negative
+        range assignments - this feature is in fact in use (thanks,
+        Coogan and Alfe - and sorry!)
+
+14-Oct-2001 (Lars Duening)  (3.2.9-dev.351)
+    - (mapping, xalloc.c) Didn't compile with sysmalloc as allocator.
+
+12-Oct-2001 (Lars Duening)  (3.2.9-dev.350)
+    - (sprintf.c) Improved the flushing algorithm: spaces are more
+        evenly distributed, newlines in columns didn't work properly
+        (reported by Slava).
+    - (lots of files) Renamed closure_hook[] to the more sensical
+        driver_hook[].
+    - (erq, xerq) Erq now accepts an '--execdir' argument to override
+        the default ERQ_DIR setting (suggested by Freaky).
+    - (main, comm.c) It is now possible to pass simple arguments to the
+        erq with the --erq commandline option (suggested by Freaky).
+
+11-Oct-2001 (Lars Duening)  (3.2.9-dev.349)
+    - (sprintf.c) New formatting modifier '$' allows flush formatting
+        of strings and columns of strings (f-010717).
+
+09-Oct-2001 (Lars Duening)
+    - (gcollect.c) Increased the refcount of an destructed referenced
+        object before recursing into the substructures - I have the
+        feeling that there was a possible race condition, but I can't
+        prove it.
+
+08-Oct-2001 (Lars Duening)  (3.2.9-dev.348)
+    - (prolang.y) Function definition errors and warnings now all print
+        the name of the function involved (suggested by Freaky).
+    - (simulate.c) Shadowing a nomask function now prints the names of
+        objects involved as well (suggested by Freaky).
+
+07-Oct-2001 (Lars Duening)  (3.2.9-dev.347)
+    - (mapping.c) Darn, I introduced a bug in the diagnostic code of
+        the last patch. Sorry! (reported by Freaky)
+
+06-Oct-2001 (Lars Duening)  (3.2.9-dev.346)
+    - (mapping) Added some more diagnostic regarding the Finalfrontier bug:
+        the culprit really seems to be in remove_mapping(). Now, when
+        the bug is detected, a trace of the activities in remove_mapping()
+        is printed as well.
+
+06-Oct-2001 (Lars Duening)  (3.2.9-dev.345)
+    - (prolang.y) Warnings about redefinition of visibility apply
+        to prototype/functions only, but no longer to redefinitions
+        of inherited functions.
+
+05-Oct-2001 (Lars Duening)
+    - (lex.c) Termination of a macro definition in an include file
+        with End-of-file confused the lexer (reported by Tomi).
+    - (comm) If a message had to be discarded due to contention (EWOULDBLOCK),
+        the user will receive a information message at the next possible
+        opportunity.
+
+04-Oct-2001 (Lars Duening)
+    - (efuns) Renamed efun md5_encrypt() to md5().
+
+03-Oct-2001 (Lars Duening)  (3.2.9-dev.344)
+    - (prolang.y) Prototypes no longer modify the definition of inherited
+        functions in strange ways (reported by Fiona).
+
+01-Oct-2001 (Lars Duening)  (3.2.9-dev.343)
+    - (prolang.y) The check for redefinition of 'nomask' functions no longer
+        worked (reported by Gimli).
+
+30-Sep-2001 (Lars Duening)  (3.2.9-dev.342)
+    - (lex.c) Added a warning about empty #pragmas (reported by Slava).
+    - (interpret.c) Tracing no longer crashes when the command_giver
+        turns non-interactive (reported by Dafire).
+
+28-Sep-2001 (Lars Duening)  (3.2.9-dev.341)
+    - (lex.c) Spaces before the lineend caused the lexer to complain about
+        an unrecognized pragma, even though the pragma had been recognized
+        (reported by Dafire and Slava).
+    - (efuns.c) Efun terminal_colour(): The escape sequence '%%^^' is
+        now recognized and replaced by '%^' as is '%^%^' already. This is
+        for compatibility with MudOS drivers (suggested by Fiona).
+    - (telnet.h, comm.c) Added support for mudlib negotiation of MCP, MSP
+        and MXP through the normal H_TELNET_NEG hook (suggested by Markus
+        Peter).
+    - (interpret.c, lex.c, smalloc.c) Made it work on Linux s/390 (a machine
+        where char's are by default unsigned) (provided by Freaky).
+
+27-Sep-2001 (Lars Duening)  (3.2.9-dev.340)
+    - (lex.c) Pragma recognition no longer stumbles over CRs at the line
+        end (reported by Freaky and Slava).
+    - (interpret.c) The idiom of assigning to a range [i..i-1] in order to
+        insert elements is legal again - a lot of mudlibs already use it
+        (reported by Andre).
+
+26-Sep-2001 (Lars Duening)  (3.2.9-dev.339)
+    - (mapping.c) Finalfrontier was caught by the diagnostic added in dev.337,
+        this time in remove_mapping(). I added more diagnostics there.
+    - (interpret.c) Assignments to negative length ranges (eg. [3..2]) are
+        caught and throw an error (reported by Gimli and Pulami).
+    - (gcollect.c) Printing memory information during a GC is more robust
+        against string NULL pointers (reported by Freaky).
+    - (lex.c) It is possible to specify multiple pragmas in one #pragma
+        statement, separated by commas (suggested by Largo).
+
+18-Sep-2001 (Lars Duening)  (3.2.9-dev.338)
+    - (mapping.c) Somehow a syntax error managed to get into the file
+        after I tested it :-( (reported by Dafire and Freaky).
+        
+17-Sep-2001 (Lars Duening)  (3.2.9-dev.337)
+    - (mapping.c) Some more diagnostic code for the hash->condensed_deleted
+        suspect. Also, last_instructions() is no longer called when not
+        using TRACE_CODE (reported by Fiona).
+
+08-Sep-2001 (Lars Duening)  (3.2.9-dev.336)
+    - (interpret.c) The test if a function call should be trace or not
+        was done against the command_giver, not against the
+        current_interactive as documented (reported by Gnomi).
+    - (simulate.c) When entering a fatal(), the given format string is
+        printed as is to stderr (just a precaution).
+    - (smalloc.c) The 'magic match' failed messages now give the expected
+        block address and sizes, too.
+    - (lex.c) Added warning when an unknown pragma is encountered (suggested
+        by Robert).
+
+06-Sep-2001 (Lars Duening)  (3.2.9-dev.335)
+    - (mapping.c) Some more diagnostic code for the mapping bug: at the
+        moment I suspect that hash->condensed_deleted gets out of sync.
+
+05-Sep-2001 (Lars Duening)  (3.2.9-dev.334)
+    - (prolang.y) The driver couldn't handle (multiple?) second-level inherits
+        of a 'private nomask' function, which inline closure now are (reported
+        by Bardioc).
+
+03-Sep-2001 (Lars Duening)  (3.2.9-dev.333)
+    - (interpret.c, mapping) Some more debugging code: if an illegal mapping
+        size is detected, the MALLOC_TRACE information is printed. I also added
+        checks to certain suspicious VM instructions - I hope that I won't have
+        to check all mappings after each instruction.
+    - (xalloc, smalloc) New helper function dump_malloc_trace() to, well, dump
+        the malloc trace if there is one.
+
+31-Aug-2001 (Lars Duening)  (3.2.9-dev.332)
+    - (efuns.c) Well, the recent change didn't fix terminal_colour(), so
+        I changed it back again.
+    - (lex.c) The lfuns implementing inline closures are now 'private nomask',
+      which is the real solution unlike the one implemented in 3.2.9-dev.260
+      (suggested by Freaky).
+    - (efuns.c) If terminal_colour() was used with a closure returning a
+        computed string, the ever call (but the first) within the same
+        formatting clobbered the result from the previous one (reported by Ben
+        and Elric).
+    - (swap.c) Oops, when adjusting the allocation statistics after
+        swapping out variables, the driver occasionally tried to dereference
+        a non-existing pointer (reported by Ben and Nostradamus).
+    - (mudlib/sys/lpcytpes.h) The values to be returned by functionlist() were
+        out of sync with what functionlist() really returned (reported by
+        Freaky).
+
+30-Aug-2001 (Lars Duening)  (3.2.9-dev.331)
+    - (mapping.c) Since the Finalfrontier mapping bug still occurs, 
+        I added some more instrumentation to the module.
+    - (efuns.c) Tentative change to correct an obscure bug in the
+        terminal_colour() code. Let's see if it's going to work.
+
+29-Aug-2001 (Lars Duening)  (3.2.9-dev.330)
+    - (smalloc.c) Corrected a small statistics problem in the
+        freelist consolidation: some unusable space was counted
+        twice (b-010713-0, b-000830).
+    - (swap.c) When swapping variables, the object allocation size
+        statistics wasn't updated.
+    - (lex.c) Multi-dimensional array indices in macro calls are no longer
+        confused with multiple macro arguments (reported by Freaky).
+
+28-Aug-2001 (Lars Duening)  (3.2.9-dev.329)
+    - (interpret.c) More corrections to the refcount checking code.
+        Furthermore, an failure no longer crashes the driver (but
+        generates lots of debugging output)
+        (reported by Tomba).
+    - (pkg-mysql.c) Removed a memory leak caused by the result set
+        not begin freed after all the data has been fetched.
+    - (backend.c) Added safeguard so that slow_shut_down() is not
+        called repeated while a previous one is still pending (suggested by
+        Dafire).
+
+28-Aug-2001 (Lars Duening)  (3.2.9-dev.328)
+    - (interpret.c) The reference loop check was too strict and also
+        flagged legal assignments (thanks, Dan).
+
+27-Aug-2001 (Lars Duening)  (3.2.9-dev.327)
+    - (interpret.c) Improved the check for reference loop creation on
+        assignment (suggested by Menaures).
+    - (interpret.c) When reloading the master object, the driver freed
+        through the driver hooks some object references it shouldn't free
+        (reported by Tomba).
+
+26-Aug-2001 (Lars Duening)  (3.2.9-dev.326)
+    - (simulate.c) Running the driver with '-d -d' crashed it when loading
+        objects.
+    - (interpret.c) The refcount check for got to count the blueprint
+        reference in programs (reported by Tomba).
+    - (smalloc.c) The check against MAX_MALLOCED was incomplete and
+        could lead to use of foreign memory (reported by Menaures).
+
+24-Aug-2001 (Lars Duening)
+    - (func_spec) Even though the efun get_type_info() was supposed to
+        take an arbitrary type as second argument, it wasn't declared that
+        way (thanks, Fiona!).
+
+23-Aug-2001 (Lars Duening)  (3.2.9-dev.325)
+    - (array.c) ERQ callbacks for a destructed object don't have a
+        current_object at the time the error occurs. The error handling code
+        allocates an array, but the array code was still assuming that
+        current_object is always valid (b-990217-4) (reported by Fiona).
+    - (prolang.y) Redefining an inherited private function with a non-private
+        one, and then inheriting the redefinition didn't work (reported by
+        Menaures).
+
+22-Aug-2001 (Lars Duening)  (3.2.9-dev.324)
+    - (interpret.c) The lambda protection had a bug: when a non-lambda closure
+         was called from within an executed lambda, the lambda closure was
+         accidentally freed (reported by Fiona).
+    - (sprintf.c) *blush* I completely forgot to add the terminator 0 after
+         creating the quoted representation of a string (thanks, Menaures!).
+
+21-Aug-2001 (Lars Duening)  (3.2.9-dev.323)
+    - (prolang.y) The 'private' correction caused the driver to crash
+         under obscure circumstances. I implemented the correction now
+         in a different way, and it seems to work now (reported by Bardioc and
+         many others).
+    - (prolang.y) If an efun was called with too many arguments, the
+         extraneous args were popped twice from the argument stack, so that
+         subsequent function calls clobbered memory (reported by Dafire).
+    - (sprintf.c) For the new '%Q' format, string length is now computed
+         with strlen() instead of svalue_strlen() - the latter is too
+         sensitive towards constructed strings (reported by Menaures).
+    - (simulate.c) Added an error when the time left for a catch() is less
+         than the reserved cost.
+
+19-Aug-2001 (Lars Duening)  (3.2.9-dev.322)
+    - (prolang.y) Defining a function which is also a private function in an
+         inherited object no longer redefines the inherited one (reported by
+         Bardioc and Menaures).
+    - (sprintf.c) Closures on inherited lfuns are printed with the defining
+         program for the %O format.
+    - (sprintf.c) New format specifier 'Q' acts like 'O', except that special
+         characters in strings are quoted (suggested by Menaures).
+
+15-Aug-2001 (Lars Duening)  (3.2.9-dev.321)
+    - (interpret.c) Holding a reference on a lambda works much better
+         if the code actually increment the correct refcount.
+
+14-Aug-2001 (Lars Duening)  (3.2.9-dev.320)
+    - (interpret) The VM now holds a reference on a lambda while it is
+         executed, preventing premature destructions (reported by Dan and
+         Fiona).
+    - (simulate, actions.c, backend.c, comm.c, gcollect.c) Since the VM
+         now protects lambdas during their execution, the free_closure_hooks()
+         hack is no longer needed. For now, the code has been just
+         deactivated.
+    - (interpret.c) Corrected late-night errors in efuns ceil() and floor()
+         (reported by Niels).
+
+13-Aug-2001 (Lars Duening)
+    - (mapping.c) Adding a mapping to itself via 'm += m' freed svalues first,
+      then used them as data for assignment (reported by Patryn).
+
+12-Aug-2001 (Lars Duening)
+    - (func_spec) Somehow the change for sizeof() didn't make it into
+         the distribution (reported by Menaures).
+
+07-Aug-2001 (Lars Duening)  (3.2.9-dev.319)
+    - (lex.c) The recognition of numeric character constants was slightly
+         wrong (thanks, Fiona).
+
+06-Aug-2001 (Lars Duening)
+    - (interpret.c) Efun program_name() now accepts 0 as
+         argument and pass it through (suggested by Niels).
+    - (func_spec, interpret.c) Efuns floor() and ceil() also accept integer
+         argument values  (suggested by Niels).
+
+05-Aug-2001 (Lars Duening)  (3.2.9-dev.318)
+    - (simulate.c) Destructing an object with a single shadow crashed the
+         driver (reported by Craig).
+    - (interpret.c) Efuns load_name() and object_name() now accept 0 as
+         argument and pass it through (suggested by Niels).
+    - (interpret.c) Calling an alien-lfun created two control frames instead
+         of just one, with no obvious purpose. I removed one of the frames
+         but commenting out the code, so if it is needed nonetheless, it
+         will be easy to reactivate (reported by Niels).
+    - (interpret.c) For the first 255 simul-efuns it is now permissible to
+         receive references in a varargs parameter, e.g. to implement
+         a simulated call_other(). Handle with care! (reported by Coogan)
+    - (configure) Improved the search for mySQL libraries - it is amazing in
+         how many different ways this package is installed.
+
+02-Aug-2001 (Lars Duening)
+    - (interpret.c) Corrected a wrong function argument (reported by Freaky).
+
+01-Aug-2001 (Lars Duening)  (3.2.9-dev.317)
+    - (prolang.y) The error message for the case that a wildcarded super
+         call tried to pass arguments was confusing (reported by Gimli).
+    - (interpret.c) Efun sizeof() can be used on strings (suggested by Niels).
+
+31-Jul-2001 (Lars Duening)  (3.2.9-dev.316)
+    - (pkg-mysql.c) Fixed a syntax error. It sucks that I can't compile
+         this file at home, doesn't it?
+    - (lex.c) A preprocessor statement following a macro redefinition
+         wasn't recognized because the macro parsing code clobbered
+         the newline character (thanks, Fuchur!).
+
+26-Jul-2001 (Lars Duening)  (3.2.9-dev.315)
+    - (lex.c) The redefinition of a macro messed up the list of defines,
+        eventually crashing the driver (reported by Freaky).
+    - (efuns.c) Using terminal_colour() with a closure as lookup method
+        an a non-tabled keyword crashed the driver (reported by Elric).
+    - (simulate.c) Clones no longer inherit the current O_WILL_CLEAN_UP
+        flag from their blueprint - it didn't make sense (thanks, Niels!).
+
+25-Jul-2001 (Lars Duening)  (3.2.9-dev.314)
+    - (sprintf.c) Printing numbers with leading zeroes and a sign character
+        printed the sign in the wrong place (reported by Dafire).
+    - (backend.c) The check_alarm() function did not quite work right
+        (thanks, Coogan!).
+    - (backend.c) Efun regreplace(): Pattern which could match on the
+        empty string matched once too often at string end.
+        E.g. regreplace("blah fasel", ".*", "ERSATZ", 1) returned
+        "ERSATZERSATZ" instead of just "ERSATZ" (thanks, Fiona!).
+    - (typedefs.h) Upped the StrRefCount type to 'unsigned long' (b-010320).
+    - (lex.c) Redefinition of a macro yields a warning even if the
+        definition doesn't change (suggested by Gnomi).
+    - (backend.c, simulate.c) The initial setting of the O_WILL_CLEAN_UP flag
+        checked for the hardcoded "clean_up" lfun instead for what the
+        H_CLEAN_UP hook said. Also, the documentation was slightly out
+        of sync with the reality (thanks, Niels!).
+    - (mysql.c) db_error() used a non-existing argument (thanks, Dafire!).
+
+17-Jul-2001 (Lars Duening)  (3.2.9-dev.313)
+    - (array, gcollect.c, mapping) The GC now recounts the number of arrays 
+        and mappings in the game (reported by Niels).
+    - (prolang.y) If the compiler detects a function call with too many
+        arguments, the subsequent argument type checks were wrong
+        (reported by Fiona).
+    - (sprintf.c) Instead of using the new modifier '$', the efun now
+        uses the existence of an explicite pad string specification
+        as flag whether to remove pad space before new lines or not.
+        This is actually more logical to use than a modifier (suggested
+        by Largo).
+    - (actions.c) The special command 'malloc' now follows the
+        'is_wizard' handling of the other special commands (thanks,
+        Niels).
+
+16-Jul-2001 (Lars Duening)  (3.2.9-dev.312)
+    - (gcollect.c) Oops. Freeing a circular array reference with
+        MALLOC_LPC_TRACE enabled crashed the driver in the dump
+        of the array contents.
+
+15-Jul-2001 (Lars Duening)  (3.2.9-dev.311)
+    - (actions, simulate) Removing or destructing a shadow now properly
+        removes all associated actions (reported by Nathan).
+    - (actions.c) New add_action() flag AA_IMM_ARGS implements the sane
+        NOSPACE argument handling.
+
+15-Jul-2001 (Lars Duening)  (3.2.9-dev.310)
+    - (configure) When testing for mySQL, the driver automatically checks
+         in /usr/local/include as well (some systems don't have it the
+         default include path).
+    - (configure) Added a check for 'minimal optimization' options.
+    - (configure) When compiling on Windows, link in a couple of more
+         libraries. This might not be fully correct yet.
+    - (make_func.y) Removed a couple of warnings under gcc 3.0 (thanks,
+        Largo!).
+    - (comm.c) On a regular shutdown, stop the erq demon explicitely.
+    - (main.c) When compiling for MSDOS_FS, the erq pathname wasn't built
+        correctly (reported by Coogan).
+    - (sprintf.c) Simul-efun closures printed with %O are marked as such.
+    - (closure.c) Comparison of operator, efun, and simul-efun closures
+        was instable (reported by Nathan).
+
+13-Jul-2001 (Lars Duening)  (3.2.9-dev.309)
+    - (interpret.c, comm.c, parse.c, parse_old.c) Removed a couple of
+        undefined behaviours, detected by gcc 3.0 (thanks, Largo!)
+    - (sprintf.c) Format modifier '$' instructs (s)printf() to not remove
+         padding white space before a lineend.
+    - (efuns) New efuns gmtime() and localtime() to return the time broken
+         up into its constituents (suggested by Markus Peter).
+    - (lex.c) Escaped character constants are now only parsed up to a
+         maximum length. If no valid digits are found, the whole item
+         is simply treated as escaped character (thanks, Fiona!).
+
+05-Jul-2001 (Lars Duening)  (3.2.9-dev.308)
+    - (prolang.y) It is now possible again to redefine a non-static inherited
+         variable with a static one (or vice versa), but it also generates
+         a warning.
+    - (doc/concepts/intermud*) Intermud-2 documentation added (thanks, Fiona!)
+
+03-Jul-2001 (Lars Duening)  (3.2.9-dev.307)
+    - (prolang.y) How embarrassing! The code for !INITIALIZATION_BY_INIT
+        had a bad syntax error - and I didn't notice it (thanks, Bardioc!)
+
+01-Jul-2001 (Lars Duening)  (3.2.9-dev.306)
+    - (configure) 'with_wizlist_file=no' didn't work from settings files
+        (reported by Freaky).
+    - (configure) A superfluous 'fi' broke the configure.
+    - (lex.c)  '//' comments didn't like to be terminated by the end of
+        file (reported by Matthew).
+
+30-Jun-2001 (Lars Duening)  (3.2.9-dev.304 and dev.305)
+    - (hosts/os2) Updated the OS/2 port (provided by Bart).
+
+30-Jun-2001 (Lars Duening)  (3.2.9-dev.303)
+    - (prolang.y) Relaxed type checking somewhat so that a non-mixed
+        function argument can be redefined to mixed, and vice versa
+        (suggested by Gnomi)
+    - (lex.c) Escaped character constants in inline closures weren't
+        recognized (reported by Freaky and Gnomi)
+    - (doc/LPC/comments) New.
+    - (configure.in) When using mySQL, also check for libnsl.
+    - (configure.in) The mySQL path is now used for both include
+        and library searches.
+
+29-Jun-2001 (Lars Duening)  (3.2.9-dev.302)
+    - (prolang.y) Accidentally it was no longer possible to redefine 
+        privately inherited variables (reported by Gnomi).
+    - (actions.c, simulate.c) New hook H_SEND_NOTIFY_FAIL to deliver
+        the notify fail message. It is meant for those muds who want
+        control over the command flow without having to implement everything
+        themselves via the H_COMMAND hook. This hook is still experimental
+        and may change in details (suggested by Gnomi).
+    - (prolang.y) It is now possible to define a default visibility
+        for functions and variables (see doc/LPC/modifiers) (suggested
+        by Freaky).
+
+29-Jun-2001 (Lars Duening)  (3.2.9-dev.301)
+    - (main.c) Commandline arguments can now be read from a textfile, using
+        new commandline option '--args'. These argument files can be nested.
+        (suggested by Elric)
+
+28-Jun-2001 (Lars Duening)  (3.2.9-dev.300)
+    - (configure) The evaluation of the '--with-wizlist-file' configuration
+        option was less than flawless.
+    - (main.c) Instead of scanning the arguments twice, all encountered
+        -f options are stored in a temporary list and evaluated when
+        it's time (f-010603-1).
+    - (main.c) Laid the groundwork for nested sources for the command
+        arguments.
+
+27-Jun-2001 (Lars Duening)  (3.2.9-dev.299)
+    - (simulate.c) When parsing callback arguments, the pattern 'function,
+      object, extra' was parsed such that 'object' became part of the
+      'extra' arguments (reported by Marthin).
+    - (lex.c) It is now possible to use symbols in inline closures, ie.
+        "(: 'a :)" (reported by Menaures).
+    - (main.c, lex.c, wiz_list, configure) The name of the WIZLIST file
+        can now be configured at compile time and with commandline option
+        '--wizlist-file'. The LPC macro __WIZLIST__ expands to the selected
+        name.  The WIZLIST file can also be disabled completely
+        ('--no-wizlist-file'), in which case __WIZLIST__ is not defined
+        at all (based on a patch from Elric).
+    - (call_out.c) Corrected a fatal refcount bug in the garbage collection
+        of call_outs with destructed command givers (reported by Gnomi).
+
+22-Jun-2001 (Lars Duening)
+    - (sprintf.c) Column-formatting a string with one newline
+         printed one newline too few if the formatstring didn't end
+         immediately (reported by Gnomi).
+
+21-Jun-2001 (Lars Duening)
+    - (make_func.y, lex.c) Identifier names can use the extended alpha
+         characters from the ISO 8859-1 alphabet (suggested by Elric).
+
+17-Jun-2001 (Lars Duening)  (3.2.9-dev.298)
+    - (backend.c) cleanup_stuff() also executes a clear_state() to
+         avoid dangling object references (reported by Gnomi).
+    - (pkg-mysql.c) Added efun db_error() to return the most recent
+         error string (thanks to Casey and Dafire).
+    - (efuns.c) If the driver is compiled with DYNAMIC_COSTS, the cost
+         of efun clones() is proportional to the number of objects
+         in the game.
+
+13-Jun-2001 (Lars Duening)  (3.2.9-dev.297)
+    - (prolang.y) Global variables can no longer be redefined (reported
+         by Coogan).
+    - (doc/efun/operators) Clarified the behaviour of (<type>) casts.
+    - (simulate.c, interpret.c) Normal runtime errors (and their traceback)
+         are no longer reported on stdout at all (reported by Tomi).
+    - (etc/startmud.pl) Added a simple start/keep-alive script - feel
+         free to improve on it (thanks, Krystal-Anne!)
+
+11-Jun-2001 (Lars Duening)  (3.2.9-dev.296)
+    - (interpret) Nifty little crasher: if the object holding the closure
+         currently execute is destructed, the interpreter happily tried
+         to free the closure after execution without noticing
+         that it already has been freed (as part of the object destruction
+         process) (reported by Freaky).
+
+09-Jun-2001 (Lars Duening)  (3.2.9-dev.295)
+    - (main.c) Improved the formatting of the language options in the
+         '--options' output.
+
+07-Jun-2001 (Lars Duening)
+    - (comm.c) The driver forgot that it is in noecho/charmode mode after
+         the second consecutive input_to call, sending out unnecessary
+         telnet negotiations.
+    - (interpret.c) When an object is destructed, all references to it
+         are removed from the stack - including references through
+         closures. Before, only direct T_OBJECT references were removed
+         (reported by Gnomi).
+
+04-Jun-2001 (Lars Duening)  (3.2.9-dev.294)
+    - (prolang.y) The type on function return is too strict (or the
+         type tracking in general too lacking) unfortunately,
+         so I took it out again.
+
+03-Jun-2001 (Lars Duening)  (3.2.9-dev.293)
+    - (prolang.y) A cast of a type to itself is now a no-op as it should
+         be (reported by Gnomi). 
+    - (interpret.c, prolang.y) Integers and float can now be compared
+         against each other (suggested by Gnomi).
+    - (gcollect.c) The GC forgot to trace the program->blueprint pointer
+         which was introduced dev.278 (reported by Coogan).
+
+02-Jun-2001 (Lars Duening)
+    - (backend.c) The check_alarm() function also restores the alarm
+         signal handler.
+    - (prolang.y) It is now possible to cast to '(mixed)'.
+    - (prolang.y) Improved the type tracking of '?:': it now accepts
+         operands of different types and evaluates to 'mixed' in that
+         case (reported by Dennis VanHoey)
+    - (prolang.y) Improved the type checking at function return under
+         strict_types.
+
+25-May-2001 (Lars Duening)
+    - (configure) Comments may now appear at the end of the lines in
+         a settings file (thanks, Bertram!).
+
+24-May-2001 (Lars Duening)  (3.2.9-dev.292)
+    - (efuns) Efun terminal_colour() can now use closures to translate
+         colour keys (suggested by Elric).
+    - (backend.c) Removing destructed objects in the process-objects
+         loop clobbered the list of programs to replace (reported by
+         Gnomi).
+
+22-May-2001 (Lars Duening)
+    - (backend.c) Efun regreplace() can now take a closure to produce
+         a replacement string (suggested by Fiona) (f-010516-2).
+
+16-May-2001 (Lars Duening)  (3.2.9-dev.291)
+    - (backend.c) The call to clean_up() erroreously counted the internal
+         blueprint-program reference to the reference count passed to the
+         clean_up() apply. Additionally, before the call all pending
+         destructed objects are removed (suggested by Elric).
+    - (rxcache.c) The regexp cache forgot to compare the excompat flag,
+         occasionally selecting the wrong regexp (thanks, Fiona).
+
+16-May-2001 (Lars Duening)  (3.2.9-dev.290)
+    - (closure.c) Of course I forgot to remove one debugging related
+         conditional, which effectively disabled yesterdays bugfix.
+
+15-May-2001 (Lars Duening)  (3.2.9-dev.289)
+    - (sscanf) Clarified the documentation regarding the matching of
+         '%s' (reported by Pulami and Gnomi)
+    - (closure.c) Compiling a simul_efun with extended varargs 
+         in a lambda closure created faulty bytecode (reported by Gnomi).
+
+13-May-2001 (Lars Duening)  (3.2.9-dev.288)
+    - (prolang.y) Undid the casting change, as it broke the idiom
+         's = (string)foo->bar();' where bar() may signal a failure
+         by returning integer 0. It's the old 0/nil dichotomy again.
+    - (efuns.c) Efun sscanf(): the format '%s%d' failed to parse 'ab1cd'
+         correctly (reported by Pulami).
+
+09-May-2001 (Lars Duening)  (3.2.9-dev.287)
+    - (prolang.y) Casting an unknown or mixed type now always inserts
+         a proper conversion (reported by Tomi).
+    - (heartbeat.c) The result for DID_ST_HBEAT_AVG_PROC was computed
+         as int instead of float (reported by Freaky).
+    - (mud/morgengrauen) Added basic support for the MorgenGrauen 3.2.6
+         mudlib.
+
+08-May-2001 (Lars Duening)
+    - (prolang.y) The expression 'a & b' failed to track the types if one
+         of the operands was of TYPE_ANY (reported by Gnomi).
+
+06-May-2001 (Lars Duening)
+    - (interpret.c) Added a protection against simple reference loops
+         as created by 'b = 0 || &a; b = 0 || &a;' (reported by Gnomi).
+
+28-Apr-2001 (Lars Duening)  (3.2.9-dev.286)
+    - (several files) Added modifications for the Amiga/gcc port
+         (provided by Niels).
+
+27-Apr-2001 (Lars Duening)  (3.2.9-dev.285)
+    - (sprintf.c) Duh. A typo caused '%^' to eat the next character
+         from the format string (reported by Robert).
+    - (sprintf.c) A leading '0' used to pad the whole field with 0s.
+         Now, only leading 0s are printed and this setting and the
+         explicite pad string are independent of each other (suggested
+         by Fiona).
+    - (call_out.c) Removing call_outs, or call_outs going stale, messed
+         up the 'number of callouts' statistics (provided by Gnomi).
+
+25-Apr-2001 (Lars Duening)  (3.2.9-dev.284)
+    - (prolang.y) Pre-increment or -decrement failed to terminate
+         the parser reduction, causing an internal fatal error when the
+         result was used somewhere (reported by Dafire).
+
+24-Apr-2001 (Lars Duening)  (3.2.9-dev.283)
+    - (efuns.c) Efun sgn() used on negative integers still returned +1 -
+         a simple typo (thanks, Fiona!).
+
+23-Apr-2001 (Lars Duening)
+    - (func_spec) Efun copy_mapping() is deprecated.
+
+22-Apr-2001 (Lars Duening)  (3.2.9-dev.282)
+    - (interpret.c) When using a multi-dimensional allocate(), specifying
+         0-sized dimensions could crash the driver (reported by Menaures).
+    - (Makefile.in) When doing 'make install', the driver is now installed
+         as 'driver', not 'parse' (reported by Eivind).
+    - (docs) Some corrections, provided by Fiona.
+    - (closure.c) The generation of sparse lookup ranges failed to properly
+         generate default-jumps for the values between two consecutive
+         ranges (e.g. 'case -2..-1:, case 1..2:' was smudged into 'case -2..1:
+         case 0..2:') (reported by Menaures).
+
+19-Apr-2001 (Lars Duening)  (3.2.9-dev.281)
+    - (configure, main.c, simulate, call_out.c) Runtime for the total
+         number of callouts, settable with commandline option
+         '--max-callouts'.
+
+17-Apr-2001 (Lars Duening)  (3.2.9-dev.280)
+    - (prolang.y) Redefining an inherited private heart_beat() didn't work:
+         the new heart_beat() wasn't called (reported by Gnomi).
+    - (rxcache.c) The status functions were far too slow, because they
+         counted the number of entries on each call (reported by Sissi).
+    - (prolang.y) Function calls can distinguish between variables and
+         functions of the same name (suggested by Gnomi).
+
+16-Apr-2001 (Lars Duening)  (3.2.9-dev.279)
+    - (interpret.c) The call to privilege_violation() for efun call_out_info()
+         passed some random data instead of constant 0 as argument
+         (reported by Freaky).
+
+13-Apr-2001 (Lars Duening)
+    - (simulate.c) Made the 'illegal object to load' error message
+         more informative (suggested by Freaky).
+
+12-Apr-2001 (Lars Duening)
+    - (sprintf.c) The formatter "%^" will print "%^" for compatibility
+         with terminal_colour().
+    - (closure.c, array.c) Introduced a total order on closure svalues
+         which allows their use in alists and array operations like
+         intersection. The same could be done for their use in mappings,
+         but that change is too big to be squeezed into 3.2.9 (reported
+         by Gnomi).
+
+11-Apr-2001 (Lars Duening)  (3.2.9-dev.278)
+    - (prolang.y) Additions of floats to constant 0 yielded TYPE_ANY
+         instead of TYPE_FLOAT.
+    - (interpret.c) Arguments passed to runtime_error() were wrong
+         if the error happened in a master apply (reported by Gnomi).
+
+10-Apr-2001 (Lars Duening)
+    - (exec.h, prolang.y, simulate.c) The program structure received
+        a pointer pointing to the blueprint object. Main purpose is to 
+        allow the cheap deep update of the master object, but other
+        uses will probably show up as well.
+    - (simulate.c) Added function deep_destruct() to destruct an
+        object and the blueprints of all inherited programs.
+    - (backend.c, interpret.c) The signal SIGUSR1 now destructs the
+        master object and all its inherits, to allow a clean reload.
+
+07-Apr-2001 (Lars Duening)  (3.2.9-dev.277)
+    - (smalloc.c) The multiple-of allocation was not quite correct.
+
+06-Apr-2001 (Lars Duening)  (3.2.9-dev.276)
+    - (md5.c) Removed a compiler warning.
+    - (smalloc.c) On Darwin, we get the memory from the system only
+        in multiples of 64 Bytes, which caused the creation of too-small
+        large blocks. Fixed that.
+
+05-Apr-2001 (Lars Duening)  (3.2.9-dev.275)
+    - (actions.c) If an action doesn't have a verb defined, the error
+        will list the object which created the action (suggested by Gnomi).
+
+04-Apr-2001 (Lars Duening)  (3.2.9-dev.274)
+    - (Makefiles) Corrected.
+    - (efuns, md5) New efun md5_encrypt() (thanks, Gawain!)
+    - (interpret.c) Assigning a volatile strings sometimes crashed due
+        to a faulty length computation (reported by Gnomi and Parsec!)
+    - (lex.c) An attempt to '(: ;} fun() {... :)' is now detected and
+        rejected (reported by Daniel Fischer).
+
+03-Apr-2001 (Lars Duening)  (3.2.9-dev.272, -dev.273)
+    - (lex) Corrected a bug in yesterday's change.
+    - (doc/efun) Removed references to deprecated efuns.
+    - (erq, xerq) Fixed (hopefully) a type mismatch under Darwin.
+    - (make_func, lpc parser) Wrapped the parser into wrappers which
+         selectively define 'lint' to suppress spurious warnings, and
+         under Darwin enable compilation in the first place.
+
+02-Apr-2001 (Lars Duening)  (3.2.9-dev.271)
+    - (lex) When generating names for inline closures, the compiler
+        makes sure that the name hasn't been used yet (reported by Dan).
+
+30-Mar-2001 (Lars Duening)
+    - (lex.c) The include path and filenames returned by the master the
+        and H_INCLUDE_DIRS closure can now start with leading slashes
+        (suggested by DaFire).
+    - (xerq) The incoming data buffer is cleared before each new command,
+        in order to detect errors more easily (suggested by Gawain).
+    - (comm.c) When using charmode against non-charmode clients (TinyFugue),
+        the line end wasn't handled properly. The solution is to receive
+        the data in charmode, but to pass it on to the user as if in
+        linemode.
+
+27-Mar-2001 (Lars Duening)
+    - (interpret.c) All <op>= assignment operators can now operate on a
+        char lvalue (indexed string) on the left hand side.
+
+20-Mar-2001 (Lars Duening)  (3.2.9-dev.270)
+    - (erq, xerq/execute.c) Quoted arguments are recognized and not split into
+        words (provided by Christian W., thanks!)
+    - (backend.c) The no-var-swapping time before a reset() is limited to
+        5 minutes max, otherwise a lot of muds will never swap variables.
+    - (array.c) A correction to the correction to functionlist() (thanks,
+        Fiona!).
+    - (func_spec, interpret.c) Efun allocate() now accepts an initialisation
+        value (f-981229-09a).
+    - (configure.in) When using mySQL, the script also checks for and links
+        in the libz (reported by Bardioc).
+
+16-Mar-2001 (Lars Duening)  (3.2.9-dev.269)
+    - (pkg-mysql.c) Dafire provided to new mySQL efuns: db_insert_id()
+        and db_coldefs() - thanks!.
+    - (array.c) The list control for functionlist() was documented
+        incorrectly, and also functioned incorrectly (thanks, Fiona!).
+
+15-Mar-2001 (Lars Duening)  (3.2.9-dev.268)
+    - (settings/unitopia) Updated (thanks, Freaky!).
+    - (comm.c) The pathlength safety check in the start-erq-demon routine
+        was too cautious (thanks, Freaky).
+    - (mudlib/dhrystone.c) Added a missing assignment.
+    - (xerq/Makefile.in) Accidentally left the XDEBUG option enabled.
+    - (comm.c) A prompt closure bound to a destructed object is detected
+        and restored to the default prompt. An error is still thrown, to
+        give the mudlib hackers something to do.
+    - (pkg-mysql.c) The version check did not really work (thanks, Dafire!).
+
+14-Mar-2001 (Lars Duening)  (3.2.9-dev.267)
+    - (main.c, comm.c) The command option '--erq' can now be used to
+        specify the full pathname of the erq executable (suggested 
+        by Freaky).
+    - (comm.c) Before printing a prompt via a closure, the current object
+        is set to the command giver. This avoids a crash under (admittedly
+        rare) circumstances of closure destruction.
+
+13-Mar-2001 (Lars Duening)  (3.2.9-dev.266)
+    - (dumpstat.c, gcollect.c) Added uses of StrRefCount where I forgot
+        them earlier (thanks, Freaky!)
+    - (backend.c) When calling the master apply slow_shut_down(), it is
+        made sure that previous_object(), this_player(), and
+        this_interactive() are all 0 (reported by Freaky).
+    - (comm.c, ed.c, interpret.c, simulate.c) Removed spurious checks
+        for out-of-memory condition. While the intention is noble, it hasn't
+        been implemented consequently enough to be of any use.
+    - (comm.c) If a CRLF as expansion of a NL character was to be inserted,
+         but only one character was left in the buffer, the code errorneously
+         detected a 'message shorter than minimum, needs not be send'
+         condition, thus swallowing all following characters after the NL.
+    - (interpret.c) Argl. Letting the ==/!= comparison for floats fall through
+         to the all new and improved closure comparison was not a good idea
+         (reported by Gnomi and Freaky).
+
+12-Mar-2001 (Lars Duening)  (3.2.9-dev.265)
+    - (pkg-mysql.c) db_connect() optionally takes a username and a password
+        (thanks, Andre!)
+
+09-Mar-2001 (Lars Duening)  (3.2.9-dev.264)
+    - (mud/lp-245) Small corrections.
+    - (configure) Another define for 'void' signal return types - this one
+        can be tested directly, as a comparison of the values of RETSIGTYPE
+        is not portable.
+
+05-Mar-2001 (Lars Duening)  (3.2.9-dev.263)
+    - (smalloc.c) Corrected a statistics error (reported by Freaky).
+    - (simulate, interpret, efuns.c) Added the last error trace as
+        possible return from debug_info(DINFO_TRACE) (suggested by Gnomi).
+
+04-Mar-2001 (Lars Duening)  (3.2.9-dev.262)
+    - (interpret.c) Removed a VM stack leak in ++/-- on floats (reported
+         by Dafire).
+    - (object.c) The previous object for object resets is this_object()
+         (reported by Gnomi).
+    - (Makefiles) Added 'lint' to the compiler defines to ensure a smooth
+         compilation of prolang.y.
+
+28-Feb-2001 (Lars Duening)  (3.2.9-dev.261)
+    - (backend.c) Simplified the error message output in write_file().
+    - (simulate.c) The master apply runtime_error() receives an extra
+         argument describing if the error is a normal error, or occured
+         during a heartbeat (suggested by Freaky).
+    - (func_spec) Efuns add_verb() and add_xverb() are now part of the
+         deprecated bunch.
+    - (gcollect.c) Added a dump function for closure literals.
+
+27-Feb-2001 (Lars Duening)
+    - (lex.c, gcollect.c) Cosmetics.
+    - (smalloc.c, main.c) xfree() now accepts NULL pointers. Allocation of
+         MIN_(SMALL_)MALLOCED blocks actually check if the memory is
+         allocated (reported by Freaky).
+    - (main.c, backend.c, interpret.c) Swapping is no longer an optional
+         feature, though it still can be disabled by specifying swapping
+         times of 0.
+    - (configure.in, main.c, xalloc) New commandline options '--min-malloced'
+         and '--min-small-malloced' to complement the configuration options
+         (suggested by Freaky).
+    - (hosts/win32) Updated the various files with those provided by
+         Coogan (thanks!)
+
+26-Feb-2001 (Lars Duening)
+    - (smalloc) Renamed the constant MASK to M_MASK, as MASK seems to clash
+         with one of Darwin's symbols.
+    - (smalloc.h) svalue_strlen() did not use StrRefCount in all the places
+         it should be used (reported by Freaky).
+
+22-Feb-2001 (Lars Duening)  (3.2.9-dev.260)
+    - (func_spec, efuns) The efuns debug_info() and object_info() can now
+         return single values instead of whole arrays.
+    - (backend, comm.c) Added a check method which restarts the alarm
+         after some time of activity. This is required at least for
+         Cygwin on Windows, where the alarm often gets lost (thanks, Holger!).
+    - (interpret.c) The master apply valid_trace() now receives as second
+         argument the argument passed to the efun (suggested by Coogan).
+    - (typedefs.h, interpret.c, gcollect.c, stralloc, smalloc.h) Introduced the
+        type StrRefCount for the shared string refcounts. This will make it
+        easier to switch from 16-Bit to 32-Bit refcounts (after 3.2.9
+        has been released, since it should undergo some more testing)
+        (p-010208).
+    - (lex.c, prolang) Inline closure 'inherit' the visibility modifiers
+        of their defining function (suggested by Coogan).
+    - (smalloc.c) Corrected an accounting error in consolidate_freelists().
+
+21-Feb-2001 (Lars Duening)  (3.2.9-dev.259)
+    - (autoconf/configure.in) Some more small fixes.
+    - (prolang.y) Recognize an inherited heart_beat() only if it is visible
+         (adopted from Morgengrauen).
+    - (efuns.c) debug_info(DINFO_DATA, DID_STATUS) now returns the number
+         of executed heartbeats as well as the total number of heartbeats.
+    - (settings/morgengrauen) New configuration file.
+
+20-Feb-2001 (Lars Duening)  (3.2.9-dev.258)
+    - (autoconf/configure.in) Corrected some replacement directives.
+    - (func_spec) Removed two duplicate efun definitions which caused
+        Cygwin compiles to hang.
+    - (make_func.y, lex.c) Added diagnostics to detect duplicate efun
+        and string definitions.
+    - (autoconf/configure.in) The option --enable-use-mysql now also
+        accepts a directory path under which the libmysqlclient can be
+        found (f-000918).
+
+16-Feb-2001 (Lars Duening)  (3.2.9-dev.256 and -dev.257)
+    - (main.c) Added code to unblock SIGALRM on program start - on systems
+        it is blocked randomly for no obvious reason (thanks, Fini!)
+        (maybe fixes b-000308)
+    - (efuns, func_spec) New efun sgn() to retrieve the sign of a numeric
+        argument (suggested by Croft).
+
+13-Feb-2001 (Lars Duening)
+    - (lots of files) New configuration option 'use-deprecated' allows
+        to disable obsolete and deprecated efuns. If enabled, the macro
+        __DEPRECATED__ is defined (suggested by Coogan).
+    - (lots of files) The UDP port is now a standard feature. The
+        option has been renamed from 'catch_udp_port' to just 'udp_port'.
+    - (lots of files) The UDP efuns have been renamed from send_imp()
+        and query_imp_port() to send_udp() and query_udp_port(); as were
+        the associated privilege violation string and the master apply.
+        The old names are still available with USE_DEPRECATED.
+
+12-Feb-2001 (Lars Duening)
+    - (interpret.c) Assigning volatile strings was somehow no longer
+        supported under all circumstances (reported by Gnomi).
+
+07-Feb-2001 (Lars Duening)  (3.2.9-dev.255)
+    - (smalloc.c) Removed a compilation error (reported by Coogan).
+
+06-Feb-2001 (Lars Duening)
+    - (strfuns.c) When (re)allocating the strbuf buffer, the length was
+        accidentally casted down to unsigned short, causing the program
+        to write outside the allocated memory (reported by Sebastian).
+
+05-Feb-2001 (Lars Duening)
+    - (smalloc.c) Using the time_stamp() from within the allocation routines
+        was really stupid.
+    - (smalloc.c) The large block allocator had an off-by-one error which
+        left free large blocks of 'small' size behind. These blocks could
+        never be allocated, just merged again.
+    - (smalloc.c) The routine to split largish free small blocks was faulty,
+        causing coredumps.
+    - (parse_old.c) Expanded the list of hard coded prepositions.
+    - (lex.c) Added new standard predefine __LDMUD__, expanding to an empty
+        string.
+    - (settings/heaven7, mud/heaven7/) Added basic support for Heaven7: you can
+        boot the mud and log in. There are probably still errors in the
+        areas.
+
+31-Jan-2001 (Lars Duening)
+    - (interpret.c) Attempts to set a single string character to 0
+        are now caught with a runtime error (reported by Nico).
+    - (func_spec) The result of set_prompt() can be a string or a closure,
+        yet it was declared to return only string (reported by Gnomi).
+    - (prolang.y) The type tracking for multiplication returned an 'int'
+        result even for 'mixed' operands (reported by Gnomi).
+    - (interpret.c) The relations '==' and '!=' can now compare lfun-
+        and variable closures (suggested by Gnomi).
+    - (func_spec, efuns) New efuns min() and max().
+
+30-Jan-2001 (Lars Duening)
+    - (configuration, smalloc.c) Added a new config parameter
+        MIN_SMALL_MALLOCED which defines the size of the first small chunk
+        allocated by the system.
+    - (xerq) With ERQ_FORK started subprocesses are now as well handled
+        with a child_t structure. While not exactly necessary, it allows
+        for useful diagnostics in the sig_child() handler (reported by
+        Freaky).
+    - (dumpstat, efuns.c) The internal data measuring routines now return
+        both the total data size, as well as the data size scaled down
+        according to the extend of data sharing. The results are also
+        returned by object_info(OI_MEMORY) (suggested by Freaky).
+
+26-Jan-2001 (Lars Duening)  (3.2.9-dev.254)
+    - (smalloc.c) Introduced a free list for 'oversized' small blocks which
+        is used much like the unused space in a small chunk. This list
+        allows the consolidation function to keep large free blocks
+        together even if they exceed the legal maximum size for small
+        blocks.
+
+25-Jan-2001 (Lars Duening)
+    - (smalloc, gcollect.c) New function consolidate_freelists() to
+        rebuild the small block free lists, merging adjacent free small
+        blocks where possible. Additionally, when a small chunk is exhausted
+        the small block allocator first tries to split one of the larger
+        free blocks before getting a new small chunk.
+
+25-Jan-2001 (Lars Duening)  (3.2.9-dev.253)
+    - (xerq/execute.c) Corrected some small bugs (thanks, Freaky!)
+
+24-Jan-2001 (Lars Duening)
+    - (port.c) The time_stamp routines recompute the string result only
+        if the time has changed since the last call.
+    - (efuns.c, smalloc.c) smalloc now keeps a statistic about the number
+        and size of permanent and clib allocations; and debug_info()
+        returns this statistics as part of (DINFO_DATA, DID_MEMORY).
+    - (smalloc.c) Defining the macro DEBUG_SMALLOC_ALLOCS causes smalloc
+        to log all new allocations which can't be satisfied directly
+        from the free lists. The output is written to the same stream
+        as the GC log (default is stderr).
+
+19-Jan-2001 (Lars Duening)  (3.2.9-dev.252)
+    - (main.c) Change to the default MUD_LIB directory early, so that the
+        debug.log file is opened in the right place (reported by Elric).
+    - (xerq) The parent now synchronizes with the child by sending a specific
+        byte of data.
+    - (pkg-mysql.c) Markus Peter provided a patch for backwards compatibility
+        with mySQL before 3.22.24.
+    - (main, comm.c) The name of the erq executable can now be given on the
+        commandline with the option '--erq <filename>' (suggested by Freaky).
+
+18-Jan-2001 (Lars Duening)
+    - (comm.c) In efun exec(), if this_interactive() points to one of the
+        the involved objects, it is switched over as well, like this_player()
+        already is (reported by Elric).
+    - (xerq) Freaky found and corrected a couple race conditions in the
+        clean-up loops of socket and children.
+    - (backend.c) Efun debug_message() now allows to preprend the message
+        with a timestamp for the current date and time, controlled by
+        a new bitflag (suggested by Freaky).
+
+17-Jan-2001 (Lars Duening)
+    - (xerq) Added additional diagnostic output, activated with compiler
+        option XDEBUG. Also, removed two uninitialized variables (the stdout/
+        stderr sockets in the child_t structure) in the handling of child
+        processes, and added measures against buffer overflows.
+
+16-Jan-2001 (Lars Duening)
+    - (erq.c, xerq/socket.c) When closing the connection to a child
+        process, the erq makes sure to read all still remaining data
+        from the connection (reported by Freaky).
+
+21-Dec-2000 (Lars Duening)  (3.2.9-dev.251)
+    - (comm.c) If the driver received only a NL in charmode, the first
+        following character was ignored.
+
+21-Dec-2000 (Gnomi)
+    - (comm.c) Found and corrected a problem concerning the use
+        of CHARMODE with Windows' telnet: the charmode negotiation were
+        considere a failure too early, and moreover the CHARMODE_REQ flag was
+        reset without adjusting the input buffer variables. Unfortunately
+        this re-opens b-000818. (b-001214)
+    - (comm.c) Clients sending CRLF in Charmode instead of just CR
+        are now handled properly: the LF is ignored like the NUL in CR NUL
+        already is. This also re-fixes b-000818.
+    - (comm.c) When receiving DONT ECHO or WONT SGA, the check for if
+        the option has already been granted was wrong.
+    - (comm.c) After a charmode input_to() has been received, the driver
+        did not properly reset the text pointers, causing !-escaped
+        commands to go unrecognized.
+
+20-Dec-2000 (Lars Duening)  (3.2.9-dev.250)
+    - (comm.c, interpret.c) More small corrections to the new telnet
+        error reporting.
+    - (func_spec, backend.c) Extended the efun debug_message() to take
+        a parameter telling where to log the message (suggested by Freaky).
+
+19-Dec-2000 (Lars Duening)  (3.2.9-dev.249)
+    - (mudlib/floattest.c) Unfortunately this code was a derivate of
+        a copyrighted program from Numerical Recipes, and therefore can't be
+        distributed legally.
+    - (lex.c) On solaris, strtod() does not clear errno after a successful
+        conversion, causion spurious warnings (reported by Coogan).
+    - (main.c) The driver version is now also printed in the .debug.log
+        file on startup.
+    - (comm.c) A bug in the comm_fatal() routine caused the driver to
+        abort on the second call to it. Oops. (reported by Gnomi and
+        Freaky)
+
+15-Dec-2000 (Lars Duening)  (3.2.9-dev.248)
+    - (comm, simulate.c) When the telnet machine for a player gets into
+        an inconsistent state, the driver no longer aborts. Instead, the
+        player's interactive structure is dumped to stderr, and then
+        removed the hard way.
+    - (regexp.c) Added the metacharacter '+' (match at least once'
+        to the regexp code (provided by Terry Penn, thanks!).
+    - (mudlib/floattest) This LPC program computes the floating point
+        characteristics; it can be called from the test_master (provided
+        by Croft, thanks!)
+
+14-Dec-2000 (Lars Duening)  (3.2.9-dev.247)
+    - (lex.c) Octal numbers are now prefixed by '0o' - it's cleaner
+        and avoids compatibility problems with existing code.
+
+12-Dec-2000 (Lars Duening)  (3.2.9-dev.246)
+    - (interpret.c) Omitting a check_map_for_destr() in a mapping addition
+        caused data in a wiz_info mapping to mysteriously disappear (thanks,
+        Coogan) (b-001204).
+
+10-Dec-2000 (Lars Duening)  (3.2.9-dev.245)
+    - (prolang.y) The result type for '++map[mixed]' was computed
+        incorrectly (reported by Freaky).
+    - (comm.c) If an error occurs on accept(), the driver no longer abort()s
+        but prints a better error message.
+
+06-Dec-2000 (Lars Duening)  (3.2.9-dev.244)
+    - (lots of files) Closures bound to destructed objects are now treated
+        like destructed objects and zeroed out where possible.
+    - (wiz_list) Destructed objects and closures is now removed from the
+        'extra' wizinfo in regular intervals. Note that this doesn't
+        extend to subarrays and -mappings held by the 'extra' info.
+
+06-Dec-2000 (Lars Duening)  (3.2.9-dev.243)
+    - (autoconf/configure.in, configure) If MySQL or IPv6 are not requested,
+        the configure script won't check for the libraries; consequently
+        they won't linked in unless needed (suggested by Coogan).
+    - (interpret.c, prolang.y) The operators '++' and '--' can now be
+        used on floats, too (suggested by Croft).
+
+04-Dec-2000 (Lars Duening)
+    - (interpret.c) sqrt(0.0) caused a 'bad argument' error - corrected
+        that (thanks, Andre!).
+
+30-Nov-2000 (Lars Duening)  (3.2.9-dev.242)
+    - (interpret, efuns.c) debug_info(DINFO_TRACE) returns the current
+        call stack as either string or array. (f-000716)
+
+29-Nov-2000 (Lars Duening)
+    - (interpret.c) The efuns sin(), cos(), tan(), atan(), atan2(),
+        log(), exp(), sqrt() and pow(), when given an integer argument,
+        returned a float result typed as integer. (reported by Slava)
+
+28-Nov-2000 (Lars Duening)  (3.2.9-dev.241)
+    - (lex.c) Oops, a last minute change to remove a warning broke the
+         recognition of escaped characters in strings (thanks, Slava!).
+
+27-Nov-2000 (Lars Duening)
+    - (interpret.c) Efun pow() did not properly check its arguments.
+
+27-Nov-2000 (Lars Duening)  (3.2.9-dev.240)
+    - (lex.c) Numbers can be specified in binary using the '0b' prefix.
+    - (lex.c) Moved the parsing of escaped character sequences into a
+         separate function, and implemented the specification of characters
+         through their numeric code (expressed in decimal, octal, sedecimal
+         and binary). (f-990203-04)
+
+26-Nov-2000 (Lars Duening)  (3.2.9-dev.239)
+    - (closure.c) Implemented catch-nolog as '({#'catch, <body>, 'nolog })'.
+
+21-Nov-2000 (Lars Duening)
+    - (prolang) Folded catch() and catch_nolog() back into one catch(),
+        distinguished by the keyword 'nolog'.
+
+18-Nov-2000 (Lars Duening)
+    - (func_spec, interpret.c) The efuns sin(), cos(), tan(), atan(), atan2(),
+        log(), exp(), sqrt() and pow() now accept integers as arguments, too.
+        The results remain float. (suggested by Croft).
+    - (interpret.c, mapping.c) When testing for a 'mapping too large' condition
+        on mapping addition or element assignment, it is made sure that all
+        invalid keys have been removed. (reported by Fiona)
+    - (func_spec, lex.c, interpret.c, simulate, prolang.y) New language
+        construct catch_nolog() as alternative to catch(): the new statement
+        doesn't log the error in the driver logfiles (thanks, Michael!)
+        (p-990901).
+    - (lots of files) The mode of the driver (plain or compat) can now be
+        selected with the commandline options '--no-compat' resp. '--compat'.
+        The default is still selected during configuration. (f-981229-00)
+
+17-Nov-2000 (Lars Duening)
+    - (mudlib/sys, doc/) Small corrections (thanks, Coogan!).
+
+15-Nov-2000 (Lars Duening)
+    - (mudlib/telnet_neg.txt) Added Slava's example on telnet negotiation,
+         which includes a means of measuring lag using TMs (thanks!).
+
+15-Nov-2000 (Lars Duening)  (3.2.9-dev.238)
+    - (efuns.c) The OIB_NAME returned by object_info(OINFO_BASIC) did
+         not start with a '/' in plain mode. (reported by Fiona)
+    - (mud/lp-245) Added secure/master.c as a wrapper for obj/master.c for
+         use with plain drivers.
+    - (func_spec, interpret.c, port) Added new efun utime() (provided by
+         Slava) and adapted ctime() to accepts its output.
+    - (settings/unitopia) Updated with new version provided by Freaky.
+    - (settings/default) Clean up.
+
+14-Nov-2000 (Lars Duening)
+    - (strfuns, actions.c, ed.c, efuns.c, interpret.c, swap.c, wiz_list.c)
+         New function xstrncpy() to copy a string up to a certain length, but
+         without adding extra 0 padding if the string is shorter than the
+         given length.
+
+07-Nov-2000 (Lars Duening)  (3.2.9-dev.237)
+    - (efuns.c) object_info(OINFO_MEMORY) also returns the program flags
+         NO_SHADOW, NO_CLONE and NO_INHERIT.
+    - (pkg-mysql.c) Small bugfix (thanks, Michael!)
+    - (settings/forgottendreams) Updated according to Michael.
+    - (util/[x]erq/erq.h) Around dev.220 I accidentally broke 
+         compatibility with older erq binaries by renumbering the KEEP_HANDLE
+         constant - fixed that now. (reported by Coogan)
+
+05-Nov-2000 (Lars Duening)
+    - (interpret.c) call_resolved() now accepts a destructed object as
+         second argument and returns 0 instead of throwing an error.
+         (reported by Coogan)
+    - (settings/tubmud) 'nosave' is now on by default.
+
+03-Nov-2000 (Lars Duening)  (3.2.9-dev.236)
+    - (interpret.c) When setting up the frame for a function, resolve a
+         possible cross-definition first. (b-000616, b-001004)
+    - (interpret.c, prolang.y) Right shifts of 32 or more are now properly
+         defined.
+
+02-Nov-2000 (Lars Duening)  (3.2.9-dev.235)
+    - (mapping.c) Adding two mappings of different width throws an error
+         (reported by Holger and Fiona). (b-001010)
+
+01-Nov-2000 (Lars Duening)
+    - (regexp.c) Added a patch by Marcus Meissner to make regexp more compatible
+         with 8-bit characters (thanks!).
+
+23-Oct-2000 (Lars Duening)
+    - (simulate, interpret) Moved the catch_instruction() function into
+         simulate to keep aggressive optimizers from over-optimizing this
+         function. I hope this finally cures the catch() related crashes.
+         (thanks, Coogan!) (b-001010-1)
+
+16-Oct-2000 (Lars Duening)
+    - (simulate, array.c, call_out.c, comm.c, mapping.c) Callbacks now accept
+         protected lvalues as arguments only if they are called just once.
+         Reason is that the protectors don't count references: at the first
+         return from a callback the lvalue would be freed even though it
+         is still needed.
+         (b-001002)
+
+12-Oct-2000 (Lars Duening)
+    - (main.c) New driver option '--pidfile <filename>' to write the
+         pid of the driver into a file (suggested by Freaky).
+
+10-Oct-2000 (Lars Duening)
+    - (backend.c) The IGNORE_BANG option to efun input_to() didn't
+         work (provided by Casey, thanks!).
+    - (pkg-mysql.c) Changed some xalloc()s into pxalloc()s to protect them
+         against the GC (provided by Michael Fedrowitz, thanks!).
+    - (interpret.c) Cosmetics to the traceback output (thanks, Coogan).
+    - (simulate.c) A semicolon was missing (thanks, Christian B.).
+
+13-Sep-2000 (Lars Duening)   (3.2.9-dev.234)
+    - (func_spec, lex.c, closure.c, interpret.c, prolang.y) Added the
+         operators '>>>' and its cousin '>>>=' for logical right shifts.
+
+11-Sep-2000 (Lars Duening)
+    - (configure) Removed no longer used option 'max-log-size' (reported
+         by Malcom).
+
+09-Sep-2000 (Lars Duening)  (3.2.9-dev.233)
+    - (simulate.c) Callbacks in efuns like filter() can now take references,
+         too (reported by Freaky).
+
+07-Sep-2000 (Lars Duening)  (3.2.9-dev.232)
+    - (simulate, call_out) Due to a flag inversion, call_out() was unable
+         to take lvalues as arguments. It also gave the error message
+         with an off argument count (reported by Thorsten).
+
+06-Sep-2000 (Lars Duening)
+    - (interpret) The setjmp() for a catch() instruction has been moved into
+         its own stack frame and eval_instruction() is called recursively
+         on the guarded code. This seems to prevent failures and cores
+         when using gcc as compiler, and doesn't hurt on other platforms
+         either (reported by Parsec).
+
+05-Sep-2000 (Lars Duening)
+    - (xerq/socket.c) A faulty comparison caused the xerq to ignore
+         SOCKET_STDERR and send everything on stdout (thanks, Fiona!).
+
+30-Aug-2000 (Lars Duening)  (3.2.9-dev.231)
+    - (comm.c) The driver did not fully recover from a failed INPUT_CHARMODE
+         notification - treating the input as in charmode even after the
+         failure. (b-000818)
+
+29-Aug-2000 (Lars Duening)
+    - (interpret.c) When reactivating a destructed master, the function
+         applies failed to find static functions, even though all other
+         master applies do (thanks, Daniel!)
+
+28-Aug-2000 (Lars Duening)  (3.2.9-dev.230)
+    - (pkg-mysql.c, configure, Makefile.in) Made the mySQL code work again.
+         Additionally the mysqlclient library is now part of the @PKGLIBS@
+         template in Makefile.in, so that utils like xerq don't have to
+         link it in. (thanks, Michael!)
+
+25-Aug-2000 (Lars Duening)  (3.2.9-dev.229)
+    - (xerq/lookup.c) In the IPv6 lookup, a buffer was freed twice.
+         (found by Uwe and Fiona).
+    - (pkg-mysql, doc/..., INSTALL) Integrated the mySQL efuns into the
+         driver proper. They are activated on suitable hosts with the
+         configuration switch 'use-mysql' and, when activated, define
+         the macro '__MYSQL__' in LPC programs.
+    - (lex.c) Added new LPC defines __VERSION_MAJOR__, ..._MINOR__,
+         ..._MICRO__ and ..._PATCH__ do exactly what you expect.
+
+24-Aug-2000 (Lars Duening)  (3.2.9-dev.228)
+    - (INSTALL) Added compilation notes provided by Bruce (thanks!)
+    - (xerq/erq.c) The DEBUG part was missing the data to generate proper
+         error messages for RLOOKUPV6 requests (reported by Fiona).
+    - (comm.c) Removed two warnings.
+
+23-Aug-2000 (Lars Duening)  (3.2.9-dev.227)
+    - (util/indent/, autoconf/configure.in) The Makefile is now under
+        configure control, and I removed a couple of warnings.
+    - (util/erq/erq.c) Oops, the check for HAVE_SYS_TIME came before
+        machine.h was included, so it couldn't work (reported by Betram
+        and Fiona).
+
+22-Aug-2000 (Lars Duening)  (3.2.9-dev.226)
+    - (hash, stralloc) Changed a few parameters from 'char*' to 'const char*'.
+    - (comm.c, erq, xerq) The IPv6 lookup was totally broken - fixed it.
+         (reported by Holger)
+
 20-Aug-2000 (Lars Duening)  (3.2.8-dev.225 == 3.2.8)
     - RELEASE 3.2.8
     - (func_spec, prolang.y) Efun clonep() now accepts 'mixed' arguments.
@@ -21,7 +2748,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
          memory (most of the time the compiled program) because the attributes
          of <expr> weren't promoted up by the '-' (reported by Mammi).
     - (prolang.y) In the expression '++<ident>' the opcode for '++' was
-         overwritten if the <ident> required a 2-Byte index. (b-000810)
+         overwritten if the <ident> required a 2-Byte index. (b-000803,
+         b-000810)
     - (comm.c) Looking up hostname first enters the IP address as string
          into the lookup table, to be replaced later by the ERQ. This neatly
          handles unresolved hostnames as well (provided by LynX).
@@ -884,7 +3612,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
          standard.
     - (mempools) Added an include of <sys/types.h> for ssize_t.
     - (settings/tubmud) Corrected some settings from "<foo>=<value>"
-         to the correct "with_<foo>=<value>". (thanks, Christian!)
+         to the correct "with_<foo>=<value>". (thanks, Coogan!)
     - (interpret.c) When apply() expanded an array, it didn't check
          the elements for destructed objects. (thanks, Coogan!)
     - (interpret.c) Before calling a vefun, inter_sp and inter_pc
@@ -1234,7 +3962,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
     - (configure.in, configure) Corrected (I hope!) the tests for
          inet_ntoa() and ipv6 support.
     - (func_spec, interpret.c, doc/efun/) Efun load_name() also accepts
-         strings, following a suggestion by Christian.
+         strings, following a suggestion by Coogan.
 
 16-Sep-1999 (Lars Duening)  (3.2.8-dev.143)
     - (efuns.c) Documented process_string().

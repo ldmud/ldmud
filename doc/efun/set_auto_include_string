@@ -1,15 +1,21 @@
+DEPRECATED
 SYNOPSIS
-	void set_auto_include_string(string arg)
+        void set_auto_include_string (string arg)
 
 DESCRIPTION
 
-	The arg will be automatically included into every compiled LPC
-	object. This is useful to enforce global definitions, e.g.
-	``#pragma combine_strings'' or ``#pragma strict_types''.  The
-	calling object needs to be privileged by the master object.
+        The arg will be automatically included into every compiled LPC
+        object. This is useful to enforce global definitions, e.g.
+        ``#pragma combine_strings'' or ``#pragma strict_types''.  The
+        calling object needs to be privileged by the master object.
 
-	Note that the auto-include-string is cleared when the master
-	object is reloaded.
+        Note that the auto-include-string is cleared when the master
+        object is reloaded.
+
+HISTORY
+        LDMud 3.2.9 replaced this efun with driver hook H_AUTO_INCLUDE.
+          This old version is available if the driver is compiled
+          with USE_DEPRECATED.
 
 SEE ALSO
-	privilege_violation(M), pragma(LPC), master(M)
+        set_driver_hook(E), privilege_violation(M), pragma(LPC), master(M)

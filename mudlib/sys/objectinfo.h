@@ -1,5 +1,5 @@
-#ifndef _OBJECTINFO_H_
-#define _OBJECTINFO_H_
+#ifndef LPC_OBJECTINFO_H_
+#define LPC_OBJECTINFO_H_
 
 /* Definition of argument values for object_info() and
  * of the indices in the corresponding result arrays.
@@ -41,7 +41,8 @@
 #define OIB_NEXT_ALL           23
 #define OIB_PREV_ALL           24
 
-#define OIB_MAX 25
+#define OIB_MAX 25  /* Number of OIB_ result elements */
+
 
 /* Indices in the array resulting from OINFO_POSITION
  */
@@ -49,25 +50,32 @@
 #define OIP_PREV  1
 #define OIP_POS   2
 
-#define OIP_MAX 3
+#define OIP_MAX 3  /* Number of OIP_ result elements */
 
 
 /* Indices in the array resulting from OINFO_MEMORY
  */
-#define OIM_REF              0
-#define OIM_NAME             1
-#define OIM_PROG_SIZE        2
-#define OIM_NUM_FUNCTIONS    3
-#define OIM_SIZE_FUNCTIONS   4
-#define OIM_NUM_VARIABLES    5
-#define OIM_SIZE_VARIABLES   6
-#define OIM_NUM_STRINGS      7
-#define OIM_SIZE_STRINGS     8
-#define OIM_NUM_INHERITED    9
-#define OIM_SIZE_INHERITED  10
-#define OIM_TOTAL_SIZE      11
-#define OIM_DATA_SIZE       12
+#define OIM_REF                  0
+#define OIM_NAME                 1
+#define OIM_PROG_SIZE            2
+#define OIM_NUM_FUNCTIONS        3
+#define OIM_SIZE_FUNCTIONS       4
+#define OIM_NUM_VARIABLES        5
+#define OIM_SIZE_VARIABLES       6
+#define OIM_NUM_STRINGS          7
+#define OIM_SIZE_STRINGS         8
+#define OIM_SIZE_STRINGS_DATA    9
+#define OIM_SIZE_STRINGS_TOTAL  10
+#define OIM_NUM_INHERITED       11
+#define OIM_SIZE_INHERITED      12
+#define OIM_TOTAL_SIZE          13
+#define OIM_DATA_SIZE           14
+#define OIM_TOTAL_DATA_SIZE     15
+#define OIM_NO_INHERIT          16
+#define OIM_NO_CLONE            17
+#define OIM_NO_SHADOW           18
+#define OIM_NUM_INCLUDES        19
 
-#define OIM_MAX 13
+#define OIM_MAX 20  /* Number of OIM_ result elements */
 
-#endif /* _OBJECTINFO_H_ */
+#endif /* LPC_OBJECTINFO_H_ */

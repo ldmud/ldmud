@@ -2,7 +2,7 @@ Short: dev.216 crashes on illegal string svalue in Unitopia
 Date: Tue, 18 Jul 2000 23:15:21 +0200
 From: reaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
 Type: Bug
-State: New - maybe fixed in 3.2.8-dev.224
+State: Done - fixed in 3.2.8-dev.224
 
 The faulty compilation of string ranges of the form [..<op><expr>] caused
 errors like this to happen. Maybe this one is similar.

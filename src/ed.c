@@ -16,6 +16,7 @@
  *   by Ian Phillipps.
  *
  * help files and '^' added by Ted Gaunt.
+ * Tab conversion added by Andreas Klauer.
  *
  * Original indentation algorithm replaced with adapted version from DGD
  *   editor by Dworkin (Felix A. Croes), 920510.
@@ -27,7 +28,7 @@
  * the text are stored linewise in a double-linked ring.
  *
  * The regular expressions are implemented using Henry Spencers package.
- * It was modified so that regsub() returns a pointer to the '\0' after
+ * It was modified so that hs_regsub() returns a pointer to the '\0' after
  * the destination string; and the editor knows how to deal with the
  * "private" struct regexp.reganch field. Additionally, all regexp calls
  * are wrapped up by the regexp cache for speed improvement.
@@ -40,7 +41,7 @@
  *---------------------------------------------------------------------------
  */
 
-#define ED_VERSION 5        /* used only in the "set" function, for id */
+#define ED_VERSION 6        /* used only in outputs for id */
 
 #include "driver.h"
 #include "typedefs.h"
@@ -67,6 +68,10 @@
 #include "xalloc.h"
 
 /*-------------------------------------------------------------------------*/
+
+/* Default TAB size */
+# define DEFAULT_TABSIZE   8
+
 
 /* #defines for non-printing ASCII characters */
 
@@ -121,6 +126,10 @@
 #define PP  '\"'
 #define EOL '\0'
 
+/* The two ed prompts */
+
+#define ED_PROMPT         ":"
+#define ED_APPEND_PROMPT  "*\b"
 
 /*-------------------------------------------------------------------------*/
 
@@ -204,8 +213,8 @@ struct ed_buffer_s
                                   using autoindentation. */
     int     cur_autoindent;
     char    *exit_fn;          /* Function to be called when player exits */
-    object_t *exit_ob;    /* Object holding <exit_fn> */
-    svalue_t old_prompt;  /* Original prompt */
+    object_t *exit_ob;         /* Object holding <exit_fn> */
+    svalue_t prompt;           /* Current ED prompt, a volatile string! */
 };
 
 /* ed_buffer.flag values
@@ -262,6 +271,7 @@ struct ed_buffer_s
 #define P_MORE          (ED_BUFFER->moring)
 #define P_LEADBLANKS    (ED_BUFFER->leading_blanks)
 #define P_CUR_AUTOIND   (ED_BUFFER->cur_autoindent)
+#define P_PROMPT        (ED_BUFFER->prompt)
 
 
 /*-------------------------------------------------------------------------*/
@@ -402,7 +412,7 @@ append (int line, Bool glob)
         add_message(P_SMALLNUMBER ? "%3d " : "%6d. ",P_CURLN+1);
     if (P_CUR_AUTOIND)
         add_message("%*s", P_LEADBLANKS, "");
-    set_prompt("*\b");
+    put_volatile_string(&P_PROMPT, ED_APPEND_PROMPT);
     return ED_OK;
 }
 
@@ -421,7 +431,7 @@ more_append (char *str)
     if(str[0] == '.' && str[1] == '\0')
     {
         P_APPENDING = FALSE;
-        set_prompt(":");
+        put_volatile_string(&P_PROMPT, ED_PROMPT);
         return ED_OK;
     }
 
@@ -443,7 +453,7 @@ more_append (char *str)
         }
         for (i = 0; i < P_LEADBLANKS; )
             inlin[i++]=' ';
-        strncpy(inlin+P_LEADBLANKS, str, (size_t)(MAXLINE-P_LEADBLANKS));
+        xstrncpy(inlin+P_LEADBLANKS, str, (size_t)(MAXLINE-P_LEADBLANKS));
         inlin[MAXLINE-1] = '\0';
         _count_blanks(inlin, 0);
         add_message("%*s", P_LEADBLANKS, "");
@@ -458,39 +468,23 @@ more_append (char *str)
 }
 
 /*-------------------------------------------------------------------------*/
-void
-prompt_from_ed_buffer (interactive_t *ip)
+svalue_t *
+get_ed_prompt (interactive_t *ip)
 
-/* Restore the <ip>->prompt from the saved prompt of <ip>->ed_buffer.
+/* Return a pointer to the prompt svalue in <ip>->ed_buffer.
+ * Return NULL if <ip> is not editing.
  */
 
 {
     ed_buffer_t *ed_buffer;
 
-    if (NULL != (ed_buffer = O_GET_EDBUFFER(ip->ob))
-     && ed_buffer->old_prompt.type != T_INVALID)
+    if (NULL != (ed_buffer = O_GET_EDBUFFER(ip->ob)))
     {
-        transfer_svalue(&ip->prompt, &ed_buffer->old_prompt);
-        ed_buffer->old_prompt.type = T_INVALID;
+        return &(ed_buffer->prompt);
     }
-}
 
-/*-------------------------------------------------------------------------*/
-void
-prompt_to_ed_buffer (interactive_t *ip)
-
-/* Save the current <ip>->prompt in the ed_buffer and change the prompt
- * to '*\b' (append mode) or ':' (normal command mode).
- */
-
-{
-    ed_buffer_t *ed_buffer;
-
-    if ( NULL != (ed_buffer = O_GET_EDBUFFER(ip->ob)) ) {
-        transfer_svalue(&ed_buffer->old_prompt, &ip->prompt);
-        put_volatile_string(&ip->prompt, ed_buffer->appending ? "*\b" : ":");
-    }
-}
+    return NULL;
+} /* get_ed_prompt() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -566,7 +560,7 @@ ckglob (void)
             if (glbpat)
             {
                 lin = gettxtl(ptr);
-                if (regexec(glbpat, lin, lin))
+                if (hs_regexec(glbpat, lin, lin))
                 {
                     if (c=='g') ptr->l_stat |= LGLOB;
                 }
@@ -972,7 +966,7 @@ find (regexp *pat, Bool dir)
     for (i = 0; i < P_LASTLN; i++ )
     {
         char *line_start = gettxtl(lin);
-        if( regexec(pat, line_start, line_start) )
+        if( hs_regexec(pat, line_start, line_start) )
             return(num);
         if( dir )
             num = nextln(num), lin = getnextptr(lin);
@@ -1008,7 +1002,7 @@ findg (regexp *pat, Bool dir)
 
     for (i = 0; i < P_LASTLN; i++ )
     {
-        if (regexec(pat, gettxtl(lin), gettxtl(lin)))
+        if (hs_regexec(pat, gettxtl(lin), gettxtl(lin)))
         {
             prntln( gettxtl( lin ), P_LFLG, (P_NFLG ? P_CURLN : 0));
              count++;
@@ -1068,16 +1062,14 @@ getfn (Bool writeflg)
     if (file[0] != '/')
     {
         push_string_malloced(file);
-        ret = apply_master_ob(STR_ABS_PATH, 1);
+        ret = apply_master(STR_ABS_PATH, 1);
         if (!ret || (ret->type == T_NUMBER && ret->u.number == 0))
         {
-            if (out_of_memory)
-                error("(ed) Out of memory detected.\n");
             return NULL;
         }
 
         if (ret->type == T_STRING)
-            strncpy(file, ret->u.string, sizeof file - 1);
+            xstrncpy(file, ret->u.string, sizeof file - 1);
     }
 
     /* add_message() / apply() might have nasty effects */
@@ -1087,7 +1079,7 @@ getfn (Bool writeflg)
     file2 = check_valid_path(file, command_giver, "ed_start", writeflg);
     if (!file2)
         return NULL;
-    strncpy(file, file2, MAXFNAME);
+    xstrncpy(file, file2, MAXFNAME);
     file[MAXFNAME] = 0;
 
     if(strlen(file) == 0) {
@@ -1622,7 +1614,7 @@ optpat (void)
         return(P_OLDPAT);
     if(P_OLDPAT)
         REGFREE(P_OLDPAT);
-    return P_OLDPAT = REGCOMP(str,P_EXCOMPAT, MY_TRUE);
+    return P_OLDPAT = REGCOMP((unsigned char *)str,P_EXCOMPAT, MY_TRUE);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1691,7 +1683,7 @@ set (void)
         svalue_t *ret;
         push_object(command_giver);
         push_number( P_SHIFTWIDTH | P_FLAGS );
-        ret = apply_master_ob(STR_SAVE_ED,2);
+        ret = apply_master(STR_SAVE_ED,2);
         if ( ret && ret->type==T_NUMBER && ret->u.number > 0 )
             return ED_OK;
     }
@@ -1767,7 +1759,7 @@ subst (regexp *pat, char *sub, Bool gflg, Bool pflag)
             still_running = FALSE;
 
         current = start = gettxtl(P_CURPTR);
-        if ( regexec(pat, current, start) )
+        if ( hs_regexec(pat, current, start) )
         {
             space = MAXLINE;
             do
@@ -1780,7 +1772,7 @@ subst (regexp *pat, char *sub, Bool gflg, Bool pflag)
                 new += diff;
                 /* Do substitution */
                 old = new;
-                new = regsub( pat, sub, new, space,0);
+                new = hs_regsub( pat, sub, new, space,0);
                 if (!new || (space-= new-old) < 0)
                     return SUB_FAIL;
                 if (current == pat->endp[0])
@@ -1794,7 +1786,7 @@ subst (regexp *pat, char *sub, Bool gflg, Bool pflag)
                 }
                 else
                     current = pat->endp[0];
-            } while(gflg && !pat->reganch && regexec(pat, current, start));
+            } while(gflg && !pat->reganch && hs_regexec(pat, current, start));
 
             /* Copy trailing chars */
             if ( (space -= strlen(current)+1 ) < 0)
@@ -1810,6 +1802,199 @@ subst (regexp *pat, char *sub, Bool gflg, Bool pflag)
     }
     return (( nchngd == 0 && !gflg ) ? SUB_FAIL : nchngd);
 }
+
+/*-------------------------------------------------------------------------*/
+static void
+detab_line (char *buf, int tabsize)
+
+/* replace all possible '\t'ab characters with whitespace ' '
+ * in the given string <buf> and replace the current line with
+ * the result. <tabsize> is the desired tab spacing.
+ */
+
+{
+    int i;                /* i: index of buffer */
+    int h;                 /* h: index of result */
+    int space;             /* counter for whitspace */
+    char result[MAXLINE];  /* the detabbed result */
+
+    for (i = 0, h = 0; buf[i] != '\0'; i++)
+    {
+        if (h == MAXLINE )
+        {
+            add_message("line too long.\n");
+            return;
+        }
+
+        switch (buf[i])
+        {
+        case '\t':
+            /* replace \t by up tu tabsize spaces, depending on position */
+
+            for (space = tabsize - (h % tabsize); space--; h++)
+            {
+              if (h == MAXLINE)
+              {
+                  add_message("line too long.\n");
+                  return;
+              }
+
+              result[h] = ' ';
+            }
+
+            break;
+
+        default:
+            result[h] = buf[i];
+            h++;
+            break;
+        }
+    }
+
+    /* terminate result string */
+
+    result[h] = '\0';
+
+    /* replace current line by result */
+
+    del(P_CURLN,P_CURLN);
+    ins(result);
+} /* detab_line() */
+
+/*-------------------------------------------------------------------------*/
+static void
+tab_line (char *buf, int tabsize)
+
+/* replace whitespace ' ' with '\t'ab-characters where it makes sense
+ * in the given string <buf> and replace the current line with the result.
+ * the result. <tabsize> is the desired tab spacing.
+ *
+ * TODO: whitespace to tab replacement makes only sense if the '\t'ab-char
+ * TODO:: replaces more than one whitespace ' '. Not everyone may share
+ * TODO:: this opinion, so it maybe this should be optional.
+ */
+
+{
+    int i;                 /* i: index of buffer */
+    int h;                 /* h: index of result */
+    int space, pos;        /* whitespace & position counter */
+    char result[MAXLINE];  /* the tabbed result */
+
+    for (i = 0, h = 0, space = 0, pos = 0; buf[i] != '\0'; i++)
+    {
+        switch (buf[i])
+        {
+        case ' ':
+            pos++;
+            space++;
+
+            if (! (pos % tabsize))
+            {
+                if (space == 1)
+                {
+                    /* makes no sense to replace 1 space by '\t'ab */
+                    result[h] = ' ';
+                    h++;
+                }
+                else
+                {
+                    result[h] = '\t';
+                    h++;
+                }
+
+                pos = 0;
+                space = 0;
+            }
+            break;
+
+        case '\t':
+            if (!space && (pos % tabsize) == tabsize - 1)
+            {
+                /* remove unnecessary tabs */
+                result[h] = ' ';
+                h++;
+                pos++;
+            }
+            else
+            {
+                /* don't put unnecessary spaces in result */
+                result[h] = '\t';
+                h++;
+                pos = 0;
+                space = 0;
+            }
+            break;
+
+        default:
+            /* add spaces which couldn't be replaced */
+            for (; space--; h++)
+            {
+                result[h] = ' ';
+            }
+
+            result[h] = buf[i];
+            h++;
+
+            pos++;
+            space = 0;
+
+            break;
+        }
+    }
+
+    /* terminate result string */
+
+    result[h] = '\0';
+
+    /* replace current line by result */
+
+    del(P_CURLN,P_CURLN);
+    ins(result);
+} /* tab_line() */
+
+/*-------------------------------------------------------------------------*/
+static int
+tab_conversion (int from, int to, int tabsize, Bool do_detab)
+
+/* Perform tab character conversion on the given range [<from>, <to>].
+ * <tabsize> is the desired tab spacing, or 0 for the default.
+ * <do_detab> is TRUE for the Tab->Whitespace conversion, and FALSE
+ * for the Whitespace->Tab conversion.
+ */
+
+{
+    from = (from < 1) ? 1 : from;
+    to = (to > P_LASTLN) ? P_LASTLN : to;
+
+    if (tabsize <= 0)
+    {
+        tabsize = DEFAULT_TABSIZE;
+    }
+
+    if (to != 0)
+    {
+        _setCurLn( from );
+        while( P_CURLN <= to )
+        {
+            if (do_detab)
+            {
+                detab_line( gettxtl( P_CURPTR ), tabsize );
+            }
+
+            else
+            {
+                tab_line( gettxtl( P_CURPTR ), tabsize );
+            }
+
+            if( P_CURLN == to )
+                break;
+
+            nextCurLn();
+        }
+    }
+
+    return ED_OK;
+} /* tab_conversion() */
 
 /*=========================================================================*/
 /*
@@ -2538,7 +2723,7 @@ docmd (Bool glob)
         if (*inptr != NL)
             return ERR;
 
-        nchng = subst(REGCOMP("\015$", P_EXCOMPAT, MY_TRUE), "", 0, 0);
+        nchng = subst(REGCOMP((unsigned char *)"\015$", P_EXCOMPAT, MY_TRUE), "", 0, 0);
 
         if (nchng < 0)
             return ERR;
@@ -2644,6 +2829,37 @@ docmd (Bool glob)
             return ERR;
         P_FCHANGED = TRUE;
         break;
+
+    case 'T':
+      {
+        int tabsize;
+        Bool do_detab;
+
+        switch(*inptr)
+        {
+          case '+':
+              do_detab = MY_FALSE;
+              break;
+
+          case '-':
+              do_detab = MY_TRUE;
+              break;
+
+          default:
+              return ERR;
+        }
+
+        inptr++;
+        tabsize = atoi(inptr);
+
+        if (deflt(P_CURLN,P_CURLN) < 0)
+            return ERR;
+
+        if (tab_conversion(P_LINE1, P_LINE2, tabsize, do_detab) < 0)
+            return ERR;
+
+        break;
+      }
 
     case 'W':
     case 'w':
@@ -2783,7 +2999,7 @@ ed_start (char *file_arg, char *exit_fn, object_t *exit_ob)
 
 {
     char *new_path;
-    svalue_t *setup, *prompt;
+    svalue_t *setup;
     ed_buffer_t *old_ed_buffer;
 
     if (!command_giver || !(O_IS_INTERACTIVE(command_giver)))
@@ -2820,9 +3036,7 @@ ed_start (char *file_arg, char *exit_fn, object_t *exit_ob)
     ED_BUFFER->truncflg = MY_TRUE;
     ED_BUFFER->flags |= EIGHTBIT_MASK | TABINDENT_MASK;
     ED_BUFFER->shiftwidth= 4;
-    prompt = query_prompt(command_giver);
-    ED_BUFFER->old_prompt = *prompt;
-    put_volatile_string(prompt, ":");
+    put_volatile_string(&ED_BUFFER->prompt, ED_PROMPT);
     ED_BUFFER->CurPtr = &ED_BUFFER->Line0;
     if (exit_fn)
     {
@@ -2839,7 +3053,7 @@ ed_start (char *file_arg, char *exit_fn, object_t *exit_ob)
     push_apply_value();
     push_object(command_giver);
 
-    setup = apply_master_ob(STR_RETR_ED,1);
+    setup = apply_master(STR_RETR_ED,1);
     if ( setup && setup->type==T_NUMBER && setup->u.number )
     {
         ED_BUFFER->flags      = setup->u.number & ALL_FLAGS_MASK;
@@ -2859,7 +3073,7 @@ ed_start (char *file_arg, char *exit_fn, object_t *exit_ob)
 
     if (new_path)
     {
-        strncpy(P_FNAME, new_path, MAXFNAME);
+        xstrncpy(P_FNAME, new_path, MAXFNAME);
         P_FNAME[MAXFNAME] = 0;
         add_message("/%s, %d lines\n", new_path, P_LASTLN);
     }
@@ -2904,7 +3118,7 @@ clear_ed_buffer_refs (ed_buffer_t *b)
     if (b->oldpat)
         b->oldpat->refs = 0;
 
-    clear_ref_in_vector(&b->old_prompt, 1);
+    clear_ref_in_vector(&b->prompt, 1);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -2952,7 +3166,7 @@ count_ed_buffer_refs (ed_buffer_t *b)
     if (b->oldpat)
         note_malloced_block_ref((char *)b->oldpat);
 #endif
-    count_ref_in_vector(&b->old_prompt, 1);
+    count_ref_in_vector(&b->prompt, 1);
 }
 
 #endif /* GC_SUPPORT */
@@ -2994,14 +3208,7 @@ free_ed_buffer (void)
     clrbuf();
     ob   = ED_BUFFER->exit_ob;
     name = ED_BUFFER->exit_fn;
-    if (O_IS_INTERACTIVE(command_giver))
-    {
-        transfer_svalue( query_prompt(command_giver), &ED_BUFFER->old_prompt );
-    }
-    else
-    {
-        free_svalue(&ED_BUFFER->old_prompt);
-    }
+    free_svalue(&ED_BUFFER->prompt);
 
     if(P_OLDPAT)
     {
@@ -3068,7 +3275,7 @@ ed_cmd (char *str)
     if (strlen(str) < MAXLINE)
         strcat(str, "\n");
 
-    strncpy(inlin, str, MAXLINE-1);
+    xstrncpy(inlin, str, MAXLINE-1);
     inlin[MAXLINE-1] = 0;
     inptr = inlin;
 
@@ -3112,7 +3319,6 @@ ed_cmd (char *str)
         xfree((char *)ED_BUFFER);
         EXTERN_ED_BUFFER = 0;
         add_message("FATAL ERROR\n");
-        set_prompt("> ");
         ED_BUFFER = old_ed_buffer;
         return;
 #endif
@@ -3160,7 +3366,7 @@ save_ed_buffer (void)
     (void)O_SET_INTERACTIVE(save, command_giver);
     ED_BUFFER = EXTERN_ED_BUFFER;
     push_string_shared(P_FNAME);
-    stmp = apply_master_ob(STR_GET_ED_FNAME,1);
+    stmp = apply_master(STR_GET_ED_FNAME,1);
     if (save)
     {
         save->catch_tell_activ = MY_FALSE;
@@ -3431,6 +3637,17 @@ print_help (char arg)
                    );
         break;
 
+    case 'T':
+        add_message(
+"Command: T  Usage: T{+|-}[width] or [range]T{+|-}[width]\n"
+"Replace whitespace or tabs in the current line or in the specified range.\n"
+"T+ means that whitespace will be replaced by tabs,\n"
+"T- means that tabs will be replaced by whitespace.\n"
+"The width option specifies the number of spaces a tab character represents.\n"
+"(Default value for width: 8)\n"
+                   );
+        break;
+
     case 'v':
         add_message(
 "Command: v   Usage: v/re/p\n"
@@ -3589,6 +3806,7 @@ print_help2 (void)
 "s\tsearch and replace\n"
 "set\tquery, change or save option settings\n"
 "t\tmove copy of line(s) to specified line\n"
+"T\ttab / detab line(s), see help\n"
 "v\tSearch and execute command on any non-matching line.\n"
 "x\tsave file and quit\n"
 "w\twrite to current file (or specified file)\n"

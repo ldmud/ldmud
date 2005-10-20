@@ -1,11 +1,16 @@
 SYNOPSIS
         #include <objectinfo.h>
         mixed * object_info (object ob, int what)
+        mixed * object_info (object ob, int what, int index)
 
 DESCRIPTION
         Returns some internal information about object <ob>, collected
         in an array. Argument <what> determines which information is
         returned.
+
+        The result is usually an array. However, if <index> is specified,
+        the result is the value from position <index> of the array which
+        would have been returned normally.
 
         The possible values of <what>, and the indices of the returned
         arrays are defined in the include file <objectinfo.h>, and may
@@ -28,7 +33,8 @@ DESCRIPTION
           int [OIB_RESET_STATE]:      1 if <ob> is (still) reset, 0 else.
           int [OIB_WILL_CLEAN_UP]:    1 if <ob> will call clean_up(), 0 else.
           int [OIB_LAMBDA_REFERENCED]: 1 if <ob> has lambdas, 0 else.
-          int [OIB_SHADOW]:           1 if <ob> is shadowed, 0 else.
+          int [OIB_SHADOW]:           1 if <ob> has a shadow structure tied
+                                        to it, 0 if not.
           int [OIB_REPLACED]:         1 if the program for <ob> was replaced,
                                       0 else.
           int [OIB_TOTAL_LIGHT]:  the amount of light <ob> is emitting.
@@ -73,11 +79,26 @@ DESCRIPTION
           int    [OIM_SIZE_VARIABLES]: size needed for the variable structs.
           int    [OIM_NUM_STRINGS]:    number of strings in the program.
           int    [OIM_SIZE_STRINGS]:   size needed for the string pointers.
+          int    [OIM_SIZE_STRINGS_DATA]: size needed for the string data,
+                                       scaled down according to the extend of
+                                       data sharing.
+          int    [OIM_SIZE_STRINGS_TOTAL]: unmodified size needed for the
+                                       string data.
+          int    [OIM_NUM_INCLUDES]:   number of included files in the program.
           int    [OIM_NUM_INHERITED]:  number of inherited programs.
           int    [OIM_SIZE_INHERITED]: size needed for the inherit structs.
           int    [OIM_TOTAL_SIZE]:     total size of the program.
           int    [OIM_DATA_SIZE]:      total size of the values held in the
-                                       object's variables
+                                       object's variables, scaled down
+                                       according to the extend of data
+                                       sharing.
+          int    [OIM_DATA_SIZE_TOTAL]: unmodified total size of the values
+                                       held in the object's variables
+          int    [OIM_NO_INHERIT]:     1 if the program can't be inherited.
+          int    [OIM_NO_CLONE]:       1 if the program/blueprint can't be
+                                       cloned.
+          int    [OIM_NO_SHADOW]:      1 if the program's functions can't be
+                                       shadowed.
 
           This call swaps in the program if necessary.
           Note that the OIM_SIZE_xxx entries only give the size spent on
@@ -92,6 +113,10 @@ HISTORY
               is not available.
           - basic result OIB_APPROVED is gone.
         LDMud 3.2.8 added OIM_DATA_SIZE to the result of OINFO_MEMORY.
+        LDMud 3.2.9 added the index mechanism, OIM_NUM_INCLUDES,
+          OIM_NO_INHERIT, OIM_NO_SHADOW, OIM_NO_CLONE, OIM_SIZE_STRINGS_DATA,
+          OIM_SIZE_STRINGS_TOTAL, and OIM_DATA_SIZE_TOTAL to the result
+          of OINFO_MEMORY.
 
 SEE ALSO
         debug_info(E)

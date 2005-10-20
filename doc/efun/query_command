@@ -1,9 +1,9 @@
 SYNOPSIS
-	string query_command(void)
+        string query_command(void)
 
 DESCRIPTION
-	Give the text of the current command, or 0 if not executing
-	from a command.
+        Give the text of the current command, or 0 if not executing
+        from a command.
 
         The text is the command as seen by the parser, ie. after
         modify_command and after stripping trailing spaces.
@@ -13,17 +13,17 @@ DESCRIPTION
         query_command() returns 0.
 
 EXAMPLE
-	void init() {
-	   ...
-	   add_action("sing","sing");
-	   ...
-	}
-	int sing(string str) {
-	   write("Your command was:"+query_command()+"\n");
-	   return 1;
-	}
-	
-	When ever you type "sing ..." you get "Your command was: sing ...".
+        void init() {
+           ...
+           add_action("sing","sing");
+           ...
+        }
+        int sing(string str) {
+           write("Your command was:"+query_command()+"\n");
+           return 1;
+        }
+
+        When ever you type "sing ..." you get "Your command was: sing ...".
 
 SEE ALSO
-	add_action(E), query_verb(E)
+        add_action(E), query_verb(E)

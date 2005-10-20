@@ -60,7 +60,7 @@ union u {
        *   to allow proper cleanup during error recoveries. The interpreter
        * knows how to free it, but that's all.
        */
-      
+
     svalue_t *lvalue;
       /* T_LVALUE: pointer to a (usually 'normal') svalue which
        *   this lvalue references. Also, lvalues may be chained through
@@ -85,9 +85,13 @@ union u {
        */
     void (*error_handler) (svalue_t *);
       /* T_ERROR_HANDLER: this function is
-       * executed on a free_svalue(), receiving the T_ERROR_HANDLER svalue
+       * executed on a free_svalue(), receiving the T_ERROR_HANDLER svalue*
        * as argument. This allows the transparent implemention of cleanup
-       * functions which are called even after runtime errors.
+       * functions which are called even after runtime errors. In order
+       * to pass additional information to the error_handler(), embed
+       * the T_ERROR_HANDLER svalue into a larger structure (possible since
+       * it has to be referenced by pointer) and let the error_handler()
+       * execute the appropriate casts.
        */
 
 #ifndef INITIALIZATION_BY___INIT
@@ -99,7 +103,7 @@ union u {
        * Once complete, the .u.const_list is replaced by the completed .u.vec.
        */
 #endif
-       
+
 };
 
 /* --- struct svalue_s: the LPC data structure ---
@@ -189,7 +193,8 @@ struct svalue_s
 
 #define T_ERROR_HANDLER                   0x14
   /* Not an actual value, this is used internally for cleanup
-   * operations.
+   * operations. See the description of the error_handler() member
+   * for details.
    */
 
 #define T_MOD_SWAPPED    0x80
@@ -242,7 +247,7 @@ struct svalue_s
 #define CLOSURE_LFUN            0  /* lfun in this object */
 #define CLOSURE_ALIEN_LFUN      1  /* lfun in an other object */
 #define CLOSURE_IDENTIFIER      2  /* variable in this object */
-   
+
 #define CLOSURE_PRELIMINARY     3
     /* Efun closure used in a static initialization */
 
@@ -325,7 +330,7 @@ struct svalue_s
  * as long as the accesses are consistent.
  *
  * The DICE compiler for the Amiga lacks the ldexp() and frexp() functions,
- * therefore these functions here are the only way to get things done/
+ * therefore these functions here are the only way to get things done.
  *
  * STORE_DOUBLE doesn't do any rounding, but truncates off the least
  * significant bits of the mantissa that won't fit together with the exponent
@@ -396,7 +401,7 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
    *   in the function <from>.
    */
 
-  
+
 /* void put_<type>(sp, value): Initialise svalue *sp with value of <type>.
  *   'sp' is evaluated several times and must point to an otherwise
  *   empty svalue. If <value> is a refcounted value, its refcount is
@@ -448,6 +453,33 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
 
 #define put_callback(sp,val) \
     ( (sp)->type = T_CALLBACK, (sp)->u.cb = val )
+
+/* The following macros implement the dynamic cost evaluations:
+ *
+ *   DYN_STRING_COST(l):  increase eval_cost depending on string length <l>.
+ *   DYN_ARRAY_COST(l):   increase eval_cost depending on array length <l>.
+ *   DYN_MAPPING_COST(l): increase eval_cost depending on mapping length <l>.
+ *
+ * Covered so far are:
+ *   F_ALLOCATE, F_ADD, F_ADD_EQ, F_VOID_ADD_EQ, F_MULTIPLY, F_MULT_EQ of
+ *   strings
+ *
+ * TODO: Expand this to all datatypes and sizes.
+ */
+
+#if defined(DYNAMIC_COSTS)
+
+#define DYN_STRING_COST(l)  eval_cost += (l) / 1000;
+#define DYN_ARRAY_COST(l)  eval_cost += (l) / 1000;
+#define DYN_MAPPING_COST(l)  eval_cost += (l) / 1000;
+
+#else
+
+#define DYN_STRING_COST(l)
+#define DYN_ARRAY_COST(l)
+#define DYN_MAPPING_COST(l)
+
+#endif
 
 /* --- Prototypes (in interpret.c) --- */
 

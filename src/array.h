@@ -2,8 +2,8 @@
 #define ARRAY_H__ 1
 
 #include "driver.h"
-#include "instrs.h"     /* F_INHERIT_LIST */
 #include "typedefs.h"
+#include "instrs.h"     /* F_FILTER_ARRAY, F_MAP_ARRAY, F_INSER_ALIST */
 #include "svalue.h"
 
 /* --- Macros --- */
@@ -138,9 +138,10 @@ extern int is_alist(vector_t *v);
 extern vector_t *intersect_array(vector_t *a1, vector_t *a2);
 extern vector_t *match_regexp(vector_t *v, char *pattern);
 
-extern svalue_t *f_filter_array(svalue_t *sp, int num_arg);
+extern svalue_t *x_filter_array(svalue_t *sp, int num_arg);
+extern svalue_t *x_map_array(svalue_t *sp, int num_arg);
+
 extern svalue_t *f_sort_array(svalue_t *sp, int num_arg);
-extern svalue_t *f_map_array(svalue_t *sp, int num_arg);
 extern svalue_t *f_transpose_array(svalue_t *sp);
 extern svalue_t *f_regexplode(svalue_t *sp);
 
@@ -148,12 +149,26 @@ extern svalue_t *f_regexplode(svalue_t *sp);
 extern svalue_t *insert_alist(svalue_t *key, svalue_t *key_data, vector_t *list);
 #endif
 
-extern svalue_t *f_inherit_list(svalue_t *sp);
+#ifdef F_FILTER_ARRAY
+extern svalue_t *f_filter_array(svalue_t *sp, int num_arg);
+#endif
+
+#ifdef F_MAP_ARRAY
+extern svalue_t *f_map_array(svalue_t *sp, int num_arg);
+#endif
+
+extern svalue_t *f_inherit_list (svalue_t *sp, int num_arg);
+extern svalue_t *f_include_list (svalue_t *sp, int num_arg);
 extern svalue_t *f_filter_objects(svalue_t *sp, int num_arg);
 extern svalue_t *f_map_objects(svalue_t *sp, int num_arg);
 extern svalue_t *f_functionlist(svalue_t *sp);
 
 extern void set_vector_user(vector_t *p, object_t *owner);
 extern long total_array_size(void);
+
+#if defined(GC_SUPPORT)
+extern void clear_array_size (void);
+extern void count_array_size (vector_t *vec);
+#endif
 
 #endif /* ARRAY_H__ */

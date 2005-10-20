@@ -17,7 +17,7 @@
  */
 
 #include <stdio.h>
-#ifdef HAVE_STDLIB_H
+#if defined(HAVE_STDLIB_H) || defined(AMIGA)
 #  include <stdlib.h>
 #endif
 #ifdef HAVE_LIBC_H
@@ -85,7 +85,7 @@ main (int argc, char **argv)
 
     printf(terse ? "%d" : "Suggested EXTERN_MALLOC_OVERHEAD: %d\n", d);
     if (!terse && d != min)
-	printf("Actual overhead encountered for the above setting:\n", min);
+	printf("Actual overhead encountered for the above setting:%d\n", min);
     return 0;
 } /* main() */
 

@@ -5,7 +5,6 @@
 #include "typedefs.h"
 
 #include "sent.h"    /* O_GET_* */
-#include "instrs.h"  /* F_SET_LIGHT */
 
 #ifdef DEBUG
 #include <stdio.h>      /* printf() for refcount tracing */
@@ -20,7 +19,7 @@ struct object_s
 {
     unsigned short flags; /* Bits or'ed together, see below */
     p_int ref;            /* Reference count. */
-#ifdef F_SET_LIGHT
+#ifdef USE_SET_LIGHT
     short total_light;    /* Total light */
 #endif
     mp_int time_reset;    /* Time of next reset, or 0 if none */
@@ -64,7 +63,7 @@ struct object_s
 /* Values of object_t.flags: */
 
 #define O_HEART_BEAT         0x01   /* Does it have an heart beat? */
-#ifdef F_SET_IS_WIZARD
+#ifdef USE_SET_IS_WIZARD
 #define O_IS_WIZARD          0x02   /* Is it a wizard player.c? TODO: Remove me */
 #endif
 #define O_ENABLE_COMMANDS    0x04   /* Can it execute commands? */
@@ -76,7 +75,7 @@ struct object_s
 #define O_RESET_STATE        0x100  /* Object in a 'reset':ed state ? */
 #define O_WILL_CLEAN_UP      0x200  /* clean_up will be called next time */
 #define O_LAMBDA_REFERENCED  0x400  /* be careful with replace_program() */
-#define O_SHADOW             0x800  /* Is the object shadowed? */
+#define O_SHADOW             0x800  /* Is the object shadowed/shadowing? */
 #define O_REPLACED           0x1000 /* Was the program replaced? */
 
 
@@ -210,12 +209,11 @@ struct replace_ob_s
    * return <o> else.
    */
 
-
 /* --- Variables --- */
 
 extern replace_ob_t *obj_list_replace;
-extern int tot_alloc_object;
-extern int tot_alloc_object_size;
+extern long tot_alloc_object;
+extern long tot_alloc_object_size;
 extern object_t NULL_object;
 
 
@@ -229,8 +227,11 @@ extern void reference_prog(program_t *, char *);
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
 extern void remove_all_objects(void);
 #endif
-extern void do_free_sub_strings(int num_strings, char ** strings, int num_variables, variable_t *variable_names);
-extern void free_prog(program_t *progp, Bool free_sub_strings);
+extern void do_free_sub_strings(int num_strings, char ** strings
+                               , int num_variables, variable_t *variable_names
+                               , int num_includes, include_t *includes
+                               );
+extern void free_prog(program_t *progp, Bool free_all);
 extern void reset_object(object_t *ob, int arg);
 extern void replace_programs(void);
 extern Bool shadow_catch_message(object_t *ob, char *str);

@@ -461,7 +461,7 @@ void interact()
 				} else {
 					if (mode == DEFINE || mode == THESAURUS)
 						define(buf,mode);
-					else 
+					else
 						spell(buf);
 				}
 				fflush(stdout);
@@ -653,7 +653,7 @@ int mode2;
 		}
 
 		add_message2("\n");
-		if ( fpager != stdout ) 
+		if ( fpager != stdout )
 		    pclose(fpager);
 		return;
 	}

@@ -23,13 +23,13 @@ typedef struct regexp
       /* After a match, the start and endpointers for the matched
        * () expressions.
        */
-    char regstart;
+    unsigned char regstart;
       /* Internal use: char that must begin a match, '\0' if non obvious
        */
-    char reganch;
+    unsigned char reganch;
       /* Internal use: is the match anchored (at beginning-of-line only)?
        */
-    char *regmust;
+    unsigned char *regmust;
       /* Internal use: string (pointer into program) that match must
        * include, or NULL.
        */
@@ -39,18 +39,18 @@ typedef struct regexp
     long regalloc;          /* Allocated total length, used by rxcache */
     p_uint refs;            /* Number of refs, used+maintained by rxcache */
     Bool from_ed;           /* TRUE if compiled for ed() */
-    char program[1];        /* The compiled regexp. */
+    unsigned char program[1];  /* The compiled regexp. */
 } regexp;
 
 /* --- Prototypes --- */
 #ifdef DEBUG
 extern Bool regnarrate;
-void regdump(regexp *rg);
+void hs_regdump(regexp *rg);
 #endif
 
-extern regexp *regcomp(char *expr, Bool excompat, Bool from_ed);
-extern Bool regexec(regexp *prog, char *string, char *start);
-extern char *regsub(regexp *prog, char *source, char *dest, int n, Bool quiet);
-extern void regerror(char *);
+extern regexp *hs_regcomp(unsigned char *expr, Bool excompat, Bool from_ed);
+extern Bool hs_regexec(regexp *prog, char *string, char *start);
+extern char *hs_regsub(regexp *prog, char *source, char *dest, int n, Bool quiet);
+extern void hs_regerror(char *);
 
 #endif /* REGEXP_H_ */

@@ -48,17 +48,15 @@
  *       use the strings simply by an (easily swappable) index. The compiler
  *       makes sure that each string is unique.
  *
- *       The last strings are the names of all files included by the programs
- *       source file, stored in reverse order of their appearance (multiply
- *       included files appear several times).
- *
  *       When a program is swapped, the reference counts to these strings are
  *       not removed so that the string literals stay in memory all the time.
  *       This saves time on swap-in, and the string sharing saves more memory
  *       than swapping might gain.
  *
  *   struct variable_s variable_names[]: an array describing all variables
- *       with type and name, inherited or own.
+ *       with type and name, inherited or own. When a program is swapped, the
+ *       reference counts to these strings are not removed so that the
+ *       string literals stay in memory all the time.
  *
  *   struct inherit inherit[]: an array describing all inherited programs.
  *
@@ -71,6 +69,17 @@
  *       -> index in .argument_types[], which gives the index of
  *       the first argument type. If this index is INDEX_START_NONE,
  *       the function has no type information.
+ *
+ * The linenumber information is allocated separately from the main program
+ * block so that it can be swapped separately more easily. The struct
+ * linenumbers_s is allocated to size and holds the line number information
+ * as an array of bytecodes:
+ *
+ *   include_t includes[]: an array listing all include files used
+ *       to compile the program, in the order they were encountered.
+ *       When a program is swapped, the reference counts to these strings
+ *       are not removed so that the string literals stay in memory all
+ *       the time.
  *
  *   bytecode_t line_numbers[]: the line number information,
  *       encoded in a kind of delta compression. When a program
@@ -209,6 +218,10 @@ typedef uint32          fulltype_t;  /* Full: type and visibility */
   /* Mask for basic type and flags.
    */
 
+#define PRIMARY_TYPE_MASK (TYPE_MOD_MASK & ~TYPE_MOD_REFERENCE & ~TYPE_MOD_POINTER)
+  /* Mask to retriefe the basic type value.
+   */
+
 #define TYPE_MOD_RMASK  (TYPE_MOD_MASK & ~TYPE_MOD_REFERENCE)
   /* Mask to delete TYPE_MOD_REFERENCE and the visibility mods from
    * a type value.
@@ -253,6 +266,9 @@ struct instr_s
     vartype_t ret_type;  /* The return type used by the compiler. */
     short arg_index;     /* Indexes the efun_arg_types[] array (see make_func). */
     char *name;          /* The printable name of the instruction. */
+    char *deprecated;    /* Usually NULL, for deprecated efuns this is
+                          * the warning message to print.
+                          */
 };
 
 
@@ -597,11 +613,36 @@ struct inherit_s
     unsigned short inherit_type;            /* Type of inherit */
 
 #   define INHERIT_TYPE_NORMAL      0x0000  /* Type: Normal inherit */
-#   define INHERIT_TYPE_EXTRA       0x0001  /* Type: Extra inherit added by
+#   define INHERIT_TYPE_VIRTUAL     0x0001  /* Type: Virtual inherit */
+#   define INHERIT_TYPE_EXTRA       0x0002  /* Type: Extra inherit added by
                                              * copy_variables()
                                              */
-#   define INHERIT_TYPE_DUPLICATE   0x0002  /* Flag: Duplicate virtual inherit */
+#   define INHERIT_TYPE_DUPLICATE   0x0004  /* Flag: Duplicate virtual inherit */
     unsigned short inherit_depth;           /* Depth of inherit */
+};
+
+
+/* --- struct include_s: description of one include file
+ *
+ * This structure describes one include file used to compile the
+ * program.
+ */
+
+struct include_s
+{
+    char *name;
+      /* Name (shared string) as it was found in the program. First and last
+       * character are the delimiters - either "" or <>.
+       */
+
+    char *filename;
+      /* Actual filename (shared string) of the include file, in compat mode
+       * without leading slash.
+       */
+    int   depth;
+      /* The absolute value is the include depth, counting from 1 upwards.
+       * If the include did not generate code, the value is stored negative.
+       */
 };
 
 
@@ -613,6 +654,10 @@ struct inherit_s
 
 /* TODO: We seem to need a datatype for program offsets (right now: unsigned short).
  * TODO:: It shows up in quite a lot of places.
+ * TODO: Replace the on program_s structure with a header/data couple. The
+ * TODO:: header keeps vars likes refs, blueprint, swap_num, *data; and the
+ * TODO:: data keeps the static bytecodes and similar. This way we can swap
+ * TODO:: the program even for clones.
  */
 
 struct program_s
@@ -629,14 +674,20 @@ struct program_s
       /* Name of file that defined prog (allocated, no leading '/',
        * but a trailing '.c')
        */
+    object_t       *blueprint;
+      /* Counted pointer to the (possibly destructed) blueprint object,
+       * or NULL if the blueprint has been destructed in a previous cycle.
+       */
     int32           id_number;
       /* The id-number is unique among all programs and used to store
        * information for this program without actually pointing to
        * the structure.
        */
     mp_int          load_time;     /* When has it been compiled ? */
-    bytecode_p      line_numbers;
-      /* Line number information, NULL when not swapped in
+    linenumbers_t  *line_numbers;
+      /* Line number information, NULL when not swapped in.
+       * If swapped out, the data is stored in the swap file at
+       * .swapnum+.total_size .
        */
     unsigned short *function_names;
 #define PROGRAM_END(program) ((bytecode_p)(program).function_names)
@@ -660,16 +711,19 @@ struct program_s
        */
     char **strings;
       /* Array [.num_strings] of the shared strings used by the program.
-       * Stored in reverse order at the end of the array the pointers
-       * to the names of all included files, used when retrieving line
-       * numbers.
+       * Stored in reverse order at the end of the array are the pointers
+       * to the names of all included files which generated code - these
+       * are used when retrieving line numbers.
        */
     variable_t *variable_names;
       /* Array [.num_variables] with the flags, types and names of all
        * variables.
        */
+    include_t *includes;
+      /* Array [.num_includes] of descriptors for included files.
+       */
     inherit_t *inherit;
-      /* Array [.num_inherited] of descriptors for inherited programs.
+      /* Array [.num_inherited] of descriptors for (directly) inherited programs.
        */
     unsigned short flags;
       /* Flags for the program: */
@@ -718,11 +772,30 @@ struct program_s
     unsigned short num_functions;
       /* Number of functions (inherited and own) of this program */
     unsigned short num_strings;
-      /* Number of shared strings used by the program */
+      /* Number of shared strings (including filenames) used by the program */
+    unsigned short num_includes;
+      /* Number of stored include filenames */
     unsigned short num_variables;
       /* Number of variables (inherited and own) of this program */
     unsigned short num_inherited;
-      /* Number of inherited programs */
+      /* Number of (directly) inherited programs */
+};
+
+
+/* --- struct linenumbers_s: the linenumber head structure
+ *
+ * This structure is the head of the memory block with the linenumbers
+ * data.
+ */
+
+struct linenumbers_s
+{
+    size_t     size;             /* Total allocated size of this structure */
+    bytecode_t line_numbers[1];
+      /* Array [.size - sizeof(.size)] with the delta-compressed
+       * line number information. This is actually one byte too many, but
+       * that simplifies the swapping code.
+       */
 };
 
 

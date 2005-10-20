@@ -1,22 +1,24 @@
 SYNOPSIS
-	void say(string str)
-	void say(string str, object exclude)
-	void say(string str, object *excludes)
+        void say(string str)
+        void say(string str, object exclude)
+        void say(string str, object *excludes)
 
-	void say(mixed *arr)
-	void say(mixed *arr, object exclude)
-	void say(mixed *arr, object *excludes)
+        void say(mixed *arr)
+        void say(mixed *arr, object exclude)
+        void say(mixed *arr, object *excludes)
 
 DESCRIPTION
-	There are two major modes of calling:
-	
-	If the first argument is a string <str>, it will be send to
-        all livings in the current room	except to the initiator.
+        There are two major modes of calling:
 
-	If the first argument is an array <arr>, the lfun catch_msg()
-	of all living objects except the initiator will be called.
+        If the first argument is a string <str>, it will be send to
+        all livings in the current room        except to the initiator.
+
+        If the first argument is an array <arr>, the lfun catch_msg()
+        of all living objects except the initiator will be called.
         This array will be given as first argument to the lfun, and
         the initiating object as the second.
+        CAVEAT: If the lfun catch_msg() modifies the <arr>, all subsequent
+        objects will receive the modified <arr>.
 
         By specifying a second argument to the efun one can exclude
         more objects than just the initiator. If the second argument
@@ -25,53 +27,53 @@ DESCRIPTION
         is an array <excludes>, all objects and just the objects in
         this array are excluded from the call.
 
-	The 'initiator' is determined according to these rules:
-	  - if the say() is called from within a living object, this
-	    becomes the initiator
-	  - if the say() is called from within a dead object as result
-	    of a user action (i.e. this_player() is valid), this_player()
-	    becomes the initiator.
-	  - Else the object calling the say() becomes the initiator.
+        The 'initiator' is determined according to these rules:
+          - if the say() is called from within a living object, this
+            becomes the initiator
+          - if the say() is called from within a dead object as result
+            of a user action (i.e. this_player() is valid), this_player()
+            becomes the initiator.
+          - Else the object calling the say() becomes the initiator.
 
 EXAMPLES
-	say("Hi!\n");
-	say("Hi!\n", this_player());
-	Both calls are equal when called by a not living object.
-	
-	Object 1 (living):
-	   void catch_tell(string str) {
-	      write("Received: "+str+"\n");
-	   }
-	Object 2 (not living):
-	   void func() {
-	      ...
-	      say("HiHo!\n");
-	      ...
-	   }
-	
-	This examples shows how say() together with catch_tell()
-	works. The 2nd object must not be living so the write() will
-	go to the current user.
-	
-	
-	Object 1 (living):
-	   void catch_msg(mixed *arr, object who) {
-	      int i;
-	      if(!arr) return;
-	      for(i=0;i<sizeof(arr);i++)
-		 tell_object(who, (stringp(arr[i]) ? arr[i] : "-/-")+"\n");
-	   }
-	Object 2 (not living):
-	   void func() {
-	      ...
-	      say( ({ "Hello", "there!" }) );
-	      ...
-	   }
-	
-	This is a bit complex example to demonstrate how say() and
-	catch_msg() works. Here we also use a non living object to
-	send the message so the who in catch_msg() will be the current
-	user.
+        say("Hi!\n");
+        say("Hi!\n", this_player());
+        Both calls are equal when called by a not living object.
+
+        Object 1 (living):
+           void catch_tell(string str) {
+              write("Received: "+str+"\n");
+           }
+        Object 2 (not living):
+           void func() {
+              ...
+              say("HiHo!\n");
+              ...
+           }
+
+        This examples shows how say() together with catch_tell()
+        works. The 2nd object must not be living so the write() will
+        go to the current user.
+
+
+        Object 1 (living):
+           void catch_msg(mixed *arr, object who) {
+              int i;
+              if(!arr) return;
+              for(i=0;i<sizeof(arr);i++)
+                 tell_object(who, (stringp(arr[i]) ? arr[i] : "-/-")+"\n");
+           }
+        Object 2 (not living):
+           void func() {
+              ...
+              say( ({ "Hello", "there!" }) );
+              ...
+           }
+
+        This is a bit complex example to demonstrate how say() and
+        catch_msg() works. Here we also use a non living object to
+        send the message so the who in catch_msg() will be the current
+        user.
 
 SEE ALSO
-	write(E), shout(E), tell_object(E), tell_room(E)
+        write(E), tell_object(E), tell_room(E)

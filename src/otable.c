@@ -139,10 +139,10 @@ enter_object_hash (object_t *ob)
     if (s)
     {
         if (s != ob)
-            fatal("Duplicate object \"%s\" in object hash table"
+            fatal("Duplicate object \"%s\" in object hash table.\n"
                  , ob->name);
         else
-            fatal( "Entering object \"%s\" twice in object table"
+            fatal( "Entering object \"%s\" twice in object table.\n"
                  , ob->name);
     }
     if (ob->next_hash)
@@ -224,24 +224,32 @@ show_otable_status (strbuf_t * sbuf, Bool verbose)
     }
     /* objs_in_table * sizeof(object_t) is already accounted for
        in tot_alloc_object_size.  */
-    strbuf_addf(sbuf, "hash table overhead\t\t\t %8ld\n",
+    strbuf_addf(sbuf, "hash table overhead\t\t\t %9ld\n",
                 (long)(OTABLE_SIZE * sizeof(object_t *)));
     return OTABLE_SIZE * sizeof(object_t *);
 }
 
 /*-------------------------------------------------------------------------*/
 void
-otable_dinfo_status (svalue_t *svp)
+otable_dinfo_status (svalue_t *svp, int value)
 
 /* Return the object table information for debug_info(DINFO_DATA, DID_STATUS).
  * <svp> points to the svalue block for the result, this function fills in
  * the spots for the object table.
+ * If <value> is -1, <svp> points indeed to a value block; other it is
+ * the index of the desired value and <svp> points to a single svalue.
  */
 
 {
-    svp[DID_ST_OTABLE].u.number       = objs_in_table;
-    svp[DID_ST_OTABLE_SLOTS].u.number = OTABLE_SIZE;
-    svp[DID_ST_OTABLE_SIZE].u.number  = OTABLE_SIZE * sizeof(object_t *);
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code
+
+    ST_NUMBER(DID_ST_OTABLE, objs_in_table);
+    ST_NUMBER(DID_ST_OTABLE_SLOTS, OTABLE_SIZE);
+    ST_NUMBER(DID_ST_OTABLE_SIZE, OTABLE_SIZE * sizeof(object_t *));
+
+#undef ST_NUMBER
 } /* otable_dinfo_status() */
 
 /*=========================================================================*/

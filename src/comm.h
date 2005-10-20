@@ -4,6 +4,9 @@
 #include "driver.h"
 #include "typedefs.h"
 #include <sys/types.h>
+#ifdef USE_PTHREADS
+#include <pthread.h>
+#endif
 
 #include "simulate.h"   /* callback_t for input_to_t */
 #include "svalue.h"
@@ -53,6 +56,17 @@
 #define s_addr      s6_addr
 #define in_addr     in6_addr
 
+#if defined(__APPLE__) && defined(__MACH__) && !defined(s6_addr32)
+
+/* These are non-standard defines, and some OS don't offer them
+ * by default: OS-X
+ */
+
+#  define s6_addr8  __u6_addr.__u6_addr8
+#  define s6_addr16 __u6_addr.__u6_addr16
+#  define s6_addr32 __u6_addr.__u6_addr32
+#endif
+
 #endif /* USE_IPV6 */
 
 
@@ -67,7 +81,25 @@
 
 /* --- Types --- */
 
-/* --- struct input_to: input_to() datastructure
+/* --- struct write_buffer_s: async write datastructure
+ *
+ * This data structure holds all the information for pending messages
+ * which are to be written by a background thread. The structure is
+ * allocated to the necessary length to hold the full message.
+ * The instances are kept in a linked list from the interactive_t
+ * structure.
+ */
+#ifdef USE_PTHREADS
+struct write_buffer_s
+{
+    struct write_buffer_s *next;
+    size_t length;
+    int    errorno; /* After writing, the errno */
+    char buffer[1 /* .length */ ];
+};
+#endif
+
+/* --- struct input_to_s: input_to() datastructure
  *
  * input-to structures describe a pending input_to() for a given
  * interactive object. Every object can have one input-to pending, the
@@ -76,9 +108,9 @@
 
 struct input_to_s {
     input_to_t *next;
+    svalue_t    prompt;     /* the prompt, may be 0 */
     char        noecho;     /* the requested "noecho" state */
     callback_t  fun;        /* The function to call, and its args */
-    /* TODO: add: svalue_t prompt */
 };
 
 /* --- struct interactive_s: an interactive connection
@@ -99,6 +131,7 @@ struct interactive_s {
     svalue_t prompt;            /* The prompt to print. */
     struct sockaddr_in addr;    /* Address of connected user */
 
+    CBool msg_discarded;        /* True if an earlier msg had been discarded */
     CBool set_input_to;         /* True if input_to was set in this cycle */
     CBool closing;              /* True when closing this socket. */
     char do_close;              /* Bitflags: Close this down; Proto-ERQ. */
@@ -106,7 +139,10 @@ struct interactive_s {
 
     char tn_state;              /* current state of telnet machine */
     char save_tn_state;         /* saved state of telnet machine */
-    CBool supress_go_ahead;
+    CBool supress_go_ahead;     /* Keep track of the WILL SGA negotiation state
+                                 * as some clients mix that up with DO SGA.
+                                 * Other than that, this is of no concern.
+                                 */
 
     short text_end;             /* first free char in buffer */
     short command_start;        /* used for charmode */
@@ -158,6 +194,25 @@ struct interactive_s {
 
     char message_buf[MAX_SOCKET_PACKET_SIZE];
       /* The send buffer. */
+
+#ifdef USE_PTHREADS
+    /* The data exchange with the writer thread happens through two
+     * lists: write_first/write_last hands of data to write to
+     * the thread, written_first receives the written buffers.
+     * Reason for this 2-way exchange is that the writer thread
+     * must not call xfree().
+     * TODO: These two lists + one extra can be combined into
+     * TODO:: one list, plus two roving pointers into it.
+     */
+    pthread_mutex_t        write_mutex;
+    pthread_cond_t         write_cond;
+    pthread_t              write_thread;
+    struct write_buffer_s *write_first;  /* List of buffers to write */
+    struct write_buffer_s *write_last;
+    unsigned long          write_size;
+    struct write_buffer_s *write_current; /* Buffer currently written */
+    struct write_buffer_s *written_first; /* List of written buffers */
+#endif
 };
 
 /* --- Bitflags and masks for interactive.noecho ---
@@ -165,14 +220,17 @@ struct interactive_s {
  * 'noecho' is a historical misnomer as it actually represents several
  * input modes: echo/noecho, linemode/charmode, and ignore '!' escape.
  * Echo and Charmode additionally distinguish between 'required'
- * and 'granted'.
+ * and 'granted' ('want yes' and 'yes').
  *
- * The values of NOECHO_REQ, CHARMODE_REQ and IGNORE_BANG have to match
- * those in mudlib/sys/input_to.h.
+ * xxx_REQ is set when the lib wants this state (independend from telnet state)
+ * xxx     is set when we sent out the appropirate negotiations
+ * xxx_ACK is set when the client agrees
  *
- * TODO: I admit that I'm not completely sure what the xxx_REQ, xxx and
- * xxx_ACK really mean - but I'm too tired to find out. Until it
- * becomes important, I simply accept that it works.
+ *     xxx   xxx_ACK    telnet state
+ *      0       0        NO
+ *      1       0        WANT YES
+ *      1       1        YES
+ *      0       1        WANT NO (not implemented)
  */
 
 #define CHARMODE_REQ_TO_CHARMODE(x) ((x) << 2)
@@ -194,7 +252,10 @@ struct interactive_s {
   /* noecho active (requested via telnet negotiation)
    */
 #define NOECHO_ACK    /* 16 */ NOECHO_ACKSHIFT(NOECHO)
-  /* noecho acknowledged (by telnet negotiation)
+  /* noecho negotiation complete (acknowledged)
+   * TODO: We need a _NACK flag, too, for when the negotiation is complete
+   * TODO:: but the client refused to go into NOECHO. For the time being
+   * TODO:: we might use (NOECHO_REQ|NOECHO) == (NOECHO_REQ) as check.
    */
 #define NOECHO_STALE     64
   /* Set prior to performing a noecho input, this bit causes the deactivation
@@ -206,13 +267,31 @@ struct interactive_s {
    */
 
 #define CHARMODE_REQ      2
-  /* charmode requested
+  /* Charmode requested
+   * The driver orients its behaviour according to this flag so that it
+   * can act correctly even before the negotiation is complete.
+   * Moreover, this flag serves as indicator that the input buffer
+   * variables are set up to 'charmode', so it should not be reset except
+   * through a call to set_noecho().
    */
 #define CHARMODE       /* 8 */ CHARMODE_REQ_TO_CHARMODE(CHARMODE_REQ)
-  /* charmode active (requested via telnet negotiation)
+  /* Charmode active (requested via telnet negotiation)
    */
 #define CHARMODE_ACK  /* 32 */ NOECHO_ACKSHIFT(CHARMODE)
-  /* charmode acknowledged (by telnet negotiation)
+  /* Charmode negotiation complete (acknowledged)
+   * TODO: We need a _NACK flag, too, for when the negotiation is complete
+   * TODO:: but the client refused to go into CHARMODE. For the time being
+   * TODO:: we can use (CHARMODE_REQ|CHARMODE) == CHARMODE_REQ as check.
+   */
+#define NOECHO_DELAYED  128
+  /* If NOECHO and CHARMODE is requested, we first try to establish
+   * CHARMODE and set this flag. If CHARMODE is acknoledged we try to
+   * negotiate for NOECHO. This modus operandi is enabled with SAVE_NOECHO.
+   * pro: If the user has a linemode-only client she is not left in
+   *      useless NOECHO mode
+   * con: The NOECHO is delayed by the round trip time for the negotiation
+   *      which could be imense on very slow lines.
+   * TODO: Need to defined SAVE_NOECHO in comm.c for this.
    */
 #define CHARMODE_MASK    (CHARMODE|CHARMODE_ACK)
   /* Mask for active charmode states.
@@ -225,6 +304,8 @@ extern int num_player;
 extern char *message_flush;
 extern char *domain_name;
 
+extern long pthread_write_max_size;
+
 #ifdef COMM_STAT
 extern int add_message_calls;
 extern int inet_packets;
@@ -233,26 +314,36 @@ extern int inet_volume;
 
 /* --- Prototypes --- */
 
-extern void  initialize_host_ip_number(void);
+extern void initialize_host_name (const char *hname);
+extern void initialize_host_ip_number(const char *, const char *);
 extern void  prepare_ipc(void);
 extern void  ipc_remove(void);
+#ifdef USE_PTHREADS
+extern void interactive_lock (interactive_t *ip);
+extern void interactive_unlock (interactive_t *ip);
+extern void interactive_cleanup (interactive_t *ip);
+#else
+extern void interactive_lock (interactive_t *ip UNUSED);
+extern void interactive_unlock (interactive_t *ip UNUSED);
+extern void interactive_cleanup (interactive_t *ip UNUSED);
+#endif /* USE_PTHREADS */
+extern void comm_cleanup_interactives (void);
 extern void  add_message VARPROT((char *, ...), printf, 1, 2);
 extern void  flush_all_player_mess(void);
 extern Bool get_message(char *buff);
-extern void remove_interactive(object_t *ob);
+extern void remove_interactive(object_t *ob, Bool force);
 extern vector_t *users(void);
 extern void set_noecho(interactive_t *i, char noecho);
 extern int  find_no_bang (interactive_t *ip);
 extern Bool call_function_interactive(interactive_t *i, char *str);
 extern void remove_all_players(void);
-extern void set_prompt(char *str);
-extern svalue_t *query_prompt(object_t *ob);
 extern void  print_prompt(void);
 extern int   set_snoop(object_t *me, object_t *you);
 extern void  init_telopts(void);
 extern void  mudlib_telopts(void);
 extern svalue_t *query_ip_name(svalue_t *sp, Bool lookup);
 extern svalue_t *e_input_to (svalue_t *sp, int num_arg);
+extern svalue_t *f_set_prompt(svalue_t *sp);
 
 #ifdef ERQ_DEMON
 extern void  start_erq_demon(char *suffix);
@@ -261,6 +352,7 @@ extern svalue_t *f_send_erq(svalue_t *sp);
 #endif
 
 extern size_t show_comm_status (strbuf_t * sbuf, Bool verbose);
+extern void remove_stale_player_data (void);
 
 #ifdef GC_SUPPORT
 extern void  clear_comm_refs(void);
@@ -278,10 +370,10 @@ extern int   replace_interactive(object_t *ob, object_t *obfrom, char *name);
 extern void  count_comm_extra_refs(void);
 #endif /* DEBUG */
 
-#ifdef UDP_SEND
-extern svalue_t *f_send_imp(svalue_t *sp);
-#endif /* UDP_SEND */
-
+extern svalue_t *f_find_input_to (svalue_t *sp, int num_arg);
+extern svalue_t *f_remove_input_to (svalue_t *sp, int num_arg);
+extern svalue_t *f_input_to_info (svalue_t *sp);
+extern svalue_t *f_send_udp(svalue_t *sp);
 extern svalue_t *f_set_buffer_size(svalue_t *sp);
 extern svalue_t *f_binary_message(svalue_t *sp);
 extern svalue_t *f_set_combine_charset(svalue_t *sp);

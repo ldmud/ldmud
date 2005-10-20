@@ -2,7 +2,7 @@ Short: GC crashed on lambda closure with illegal data
 Date: Mon, 13 Dec 1999 04:09:23 +0100
 From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
 Type: Bug
-State: Unclassified
+State: Abandoned - probably fixed in 3.2.9-dev.353
 
 The problem: a data value in a mapping was typed as T_CLOSURE:CLOSURE_LAMBDA,
 but the u.lambda pointed to a word before a shared-string svalue. This

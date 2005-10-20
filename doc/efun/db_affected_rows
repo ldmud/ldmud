@@ -1,3 +1,4 @@
+OPTIONAL
 SYNOPSIS
         int db_affected_rows(int handle)
 
@@ -6,6 +7,13 @@ DESCRIPTION
         has been sent to the SQL-server via handle <handle>.
         Only useful for DELETE- or UPDATE-operations.
 
+        The function is available only if the driver is compiled with
+        mySQL support. In that case, __MYSQL__ is defined.
+
+HISTORY
+        Added in 3.2.9 .
+
 SEE ALSO
-        db_conv_string(E), db_close(E), db_connect(E),
-        db_exec(E), db_fetch(E), db_handles(E)
+        db_conv_string(E), db_close(E), db_coldefs(E), db_connect(E),
+        db_exec(E), db_error(E), db_fetch(E), db_insert_id(E), db_handles(E),
+        mysql(C)

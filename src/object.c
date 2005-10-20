@@ -19,7 +19,7 @@
  *   object_t {
  *       unsigned short  flags;
  *       p_int           ref;
-#ifdef F_SET_LIGHT
+#ifdef USE_SET_LIGHT
  *       short           total_light;
 #endif
  *       mp_int          time_reset;
@@ -48,7 +48,7 @@
  *
  * The .flags collect some vital information about the object:
  *     O_HEART_BEAT       : the object has a heartbeat
-#ifdef F_SET_IS_WIZARD
+#ifdef USE_SET_IS_WIZARD
  *     O_IS_WIZARD        : the object is a 'wizard' - this bit is set with
  *                          the efun set_is_wizard()
 #endif
@@ -155,7 +155,7 @@
 
 #include "driver.h"
 #include "typedefs.h"
- 
+
 #include "my-alloca.h"
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -174,6 +174,8 @@
 #include "exec.h"
 #include "filestat.h"
 #include "interpret.h"
+#include "lang.h"
+#include "lex.h"
 #include "main.h"
 #include "mapping.h"
 #include "otable.h"
@@ -183,6 +185,7 @@
 #include "sent.h"
 #include "smalloc.h"
 #include "simulate.h"
+#include "simul_efun.h"
 #include "stdstrings.h"
 #include "stralloc.h"
 #include "strfuns.h"
@@ -199,8 +202,8 @@ replace_ob_t *obj_list_replace = NULL;
   /* List of scheduled program replacements.
    */
 
-int tot_alloc_object = 0;
-int tot_alloc_object_size = 0;
+long tot_alloc_object = 0;
+long tot_alloc_object_size = 0;
   /* Total number of allocated object, and the sum of memory they use.
    */
 
@@ -215,15 +218,15 @@ void
 _free_object (object_t *ob)
 
 /* Deallocate/dereference all memory and structures held by <ob>.
- * At the time of call, the object must be have no refcounts lefts,
- * must be destructed and removed from the object table and list.
+ * At the time of call, the object must be have at no refcount left,
+ * must be destructed and removed from the object table and lists.
  */
 
 {
 
 #ifdef DEBUG
 
-    /* Decrement and check the reference count */
+    /* Check the reference count */
 
     if (ob->ref > 0)
         fatal("Object with %ld refs passed to _free_object()\n", ob->ref);
@@ -241,7 +244,9 @@ _free_object (object_t *ob)
 #endif /* DEBUG */
 
     if (ob->sent)
-        fatal("Tried to free an object with sentences.\n");
+        fatal("free_object: Object '%s' (ref %ld, flags %08x) "
+              "still has sentences.\n"
+             , ob->name, ob->ref, ob->flags);
 
     /* If the program is freed, then we can also free the variable
      * declarations.
@@ -421,11 +426,13 @@ reference_prog (program_t *progp, char *from)
 void
 do_free_sub_strings (int num_strings,   char **strings
                     ,int num_variables, variable_t *variable_names
+                    ,int num_includes,  include_t *includes
                     )
 
 /* Free a bunch of shared strings used in connection with an object:
- * the <num_strings> strings in the array <strings>, and the
- * the <num_variables> names of the vars in array <variable_names>.
+ * the <num_strings> strings in the array <strings>,
+ * the <num_variables> names of the vars in array <variable_names>, and
+ * the <num_includes> names of the includes in array <includes>.
  *
  * The function is called from free_prog() and from the compiler epilog().
  */
@@ -442,19 +449,26 @@ do_free_sub_strings (int num_strings,   char **strings
     {
         free_string(variable_names[i].name);
     }
-}
+
+    /* Free all include names */
+    for (i = num_includes; --i >= 0; )
+    {
+        free_string(includes[i].name);
+        free_string(includes[i].filename);
+    }
+} /* do_free_sub_strings() */
 
 /*-------------------------------------------------------------------------*/
 void
-free_prog (program_t *progp, Bool free_sub_strings)
+free_prog (program_t *progp, Bool free_all)
 
 /* Decrement the refcount for program <progp>. If it reaches 0, the program
  * is freed.
  *
- * If free_sub_strings is TRUE, all object strings are freed, and
- * free_prog() is called for all inherited programs.
+ * If free_all is TRUE, all object strings and the blueprint reference are
+ * freed, and free_prog() is called for all inherited programs.
  *
- * The only case when free_sub_strings is not true, is, when the swapper
+ * The only case when free_all is not true, is, when the swapper
  * swapped out the program and now attempts to free the memory.
  * This means that the string data is kept in memory all the time.
  * TODO: Swapping the strings is tricky, as they are all shared.
@@ -475,6 +489,14 @@ free_prog (program_t *progp, Bool free_sub_strings)
     if (progp->ref < 0)
         fatal("Negative ref count for prog ref.\n");
 
+    if (free_all && progp->blueprint)
+    {
+        object_t * blueprint = progp->blueprint;
+        progp->blueprint = NULL;
+        remove_prog_swap(progp, MY_TRUE);
+        free_object(blueprint, "free_prog");
+    }
+
     /* Update the statistics */
     total_prog_block_size -= progp->total_size;
     total_num_prog_blocks -= 1;
@@ -484,23 +506,24 @@ free_prog (program_t *progp, Bool free_sub_strings)
      * This has to be done before the program is removed from the
      * swapper, else the following test would fail.
      */
-    if (progp->swap_num != -1 && progp->line_numbers)
+    if (progp->line_numbers)
     {
+        total_prog_block_size -= progp->line_numbers->size;
         xfree(progp->line_numbers);
+        progp->line_numbers = NULL;
     }
 
     /* Is it a 'real' free? Then dereference all the
      * things held by the program, too.
      */
-    if (free_sub_strings)
+    if (free_all)
     {
         int i;
         bytecode_p program;
         funflag_t *functions;
 
         /* Remove the swap entry */
-        if (progp->swap_num != -1)
-            remove_swap_file(progp);
+        remove_prog_swap(progp, MY_FALSE);
 
         program = progp->program;
         functions = progp->functions;
@@ -521,9 +544,10 @@ free_prog (program_t *progp, Bool free_sub_strings)
             }
         }
 
-        /* Free the strings and variable names */
+        /* Free the strings, variable names and include filenames. */
         do_free_sub_strings( progp->num_strings, progp->strings
                            , progp->num_variables, progp->variable_names
+                           , progp->num_includes, progp->includes
                            );
 
         /* Free all inherited objects */
@@ -537,7 +561,7 @@ free_prog (program_t *progp, Bool free_sub_strings)
 
     /* Remove the program structure */
     xfree(progp);
-}
+} /* free_prog() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -587,11 +611,14 @@ reset_object (object_t *ob, int arg)
     }
 #endif
 
-    if (closure_hook[arg].type == T_CLOSURE)
+    if (driver_hook[arg].type == T_CLOSURE)
     {
         lambda_t *l;
 
-        l = closure_hook[arg].u.lambda;
+        if (arg == H_RESET)
+            previous_ob = current_object = ob;
+
+        l = driver_hook[arg].u.lambda;
         if (l->function.code[1] && arg != H_RESET)
         {
             /* closure accepts arguments, presumably one, so
@@ -600,13 +627,13 @@ reset_object (object_t *ob, int arg)
              */
             l->ob = current_object;
             push_object(ob);
-            call_lambda(&closure_hook[arg], 1);
+            call_lambda(&driver_hook[arg], 1);
         }
         else
         {
             /* no arguments, just bind to target */
             l->ob = ob;
-            call_lambda(&closure_hook[arg], 0);
+            call_lambda(&driver_hook[arg], 0);
         }
 
         /* If the call returned a number, use it as the current
@@ -619,10 +646,13 @@ reset_object (object_t *ob, int arg)
 
         pop_stack();
     }
-    else if (closure_hook[arg].type == T_STRING)
+    else if (driver_hook[arg].type == T_STRING)
     {
+        if (arg == H_RESET)
+            previous_ob = current_object = ob;
+
         push_number(arg == H_RESET);
-        if (!sapply(closure_hook[arg].u.string, ob, 1) && arg == H_RESET)
+        if (!sapply(driver_hook[arg].u.string, ob, 1) && arg == H_RESET)
             ob->time_reset = 0;
     }
 
@@ -701,7 +731,7 @@ replace_programs (void)
 #endif
 
             /* Adjust the statistics */
-            tot_alloc_object_size -= i * sizeof(svalue_t[1]);
+            tot_alloc_object_size -= i * sizeof(svalue_t);
 
             svp = r_ob->ob->variables; /* the old variables */
 
@@ -727,7 +757,7 @@ replace_programs (void)
                 memcpy(
                     (char *)new_vars,
                     (char *)svp,
-                    j * sizeof(svalue_t[1])
+                    j * sizeof(svalue_t)
                 );
                 svp += j;
             }
@@ -763,14 +793,6 @@ replace_programs (void)
             replace_program_lambda_adjust(r_ob);
         }
 
-        /* Free the old program, finally */
-        free_prog(old_prog, MY_TRUE);
-
-#ifdef DEBUG
-        if (d_flag)
-            debug_message("%s program freed.\n", time_stamp());
-#endif
-
         /* Remove current shadows */
 
         if (r_ob->ob->flags & O_SHADOW)
@@ -803,6 +825,14 @@ replace_programs (void)
             }
         }
         xfree(r_ob);
+
+        /* Free the old program, finally */
+        free_prog(old_prog, MY_TRUE);
+
+#ifdef DEBUG
+        if (d_flag)
+            debug_message("%s program freed.\n", time_stamp());
+#endif
     }
 
     /* Done with the list */
@@ -821,7 +851,7 @@ tell_npc (object_t *ob, char *str)
 
 /* Call the lfun 'catch_tell()' in object <ob> with <str> as argument.
  *
- * This function is used to talk to non-i nteractive commandgivers
+ * This function is used to talk to non-interactive commandgivers
  * (aka NPCs).
  */
 
@@ -1005,14 +1035,16 @@ renumber_programs (void)
 /* The 'version' of each savefile is given in the first line as
  *   # <version>:<host>
  *
- * <version> is currently 0
+ * <version> is currently 1
+ *    Version 0 didn't allow the saving of non-lambda closures, symbols
+ *    or quoted arrays.
  * <host> is 1 for Atari ST and Amiga, and 0 for everything else.
  *    The difference lies in the handling of float numbers (see datatypes.h).
  */
 
-#define SAVE_OBJECT_VERSION '0'
-#define CURRENT_VERSION 0
-  /* Current version of new save files
+#define SAVE_OBJECT_VERSION '1'
+#define CURRENT_VERSION 1
+  /* Current version of new save files, expressed as char and as int.
    */
 
 #ifdef FLOAT_FORMAT_0
@@ -1032,10 +1064,8 @@ renumber_programs (void)
 static Bool save_svalue(svalue_t *, char, Bool);
 static void save_array(vector_t *);
 static int restore_size(char **str);
-INLINE static Bool restore_array(svalue_t *, char **str);
 static int restore_svalue(svalue_t *, char **, char);
-static void register_array(vector_t *);
-static void register_mapping (mapping_t *map);
+static void register_svalue(svalue_t *);
 
 /*-------------------------------------------------------------------------*/
 
@@ -1045,7 +1075,7 @@ static void register_mapping (mapping_t *map);
 
 static const char save_file_suffix[] = ".o";
   /* The suffix of the save file, in an array for easier computations.
-   * (sizeof() vs. strlen().
+   * (sizeof() vs. strlen()+1.
    */
 
 static struct pointer_table *ptable = NULL;
@@ -1111,7 +1141,7 @@ static long max_shared_restored;
 
 #define MY_PUTC(ch) {\
     *buf_pnt++ = ch;\
-    if (!--  buf_left) {\
+    if (!--buf_left) {\
         buf_pnt = write_buffer();\
         buf_left = SAVE_OBJECT_BUFSIZE;\
     }\
@@ -1165,7 +1195,7 @@ write_buffer (void)
     start = save_object_bufstart;
     if (save_object_descriptor >= 0)
     {
-    
+
         if (write( save_object_descriptor, start, SAVE_OBJECT_BUFSIZE )
           != SAVE_OBJECT_BUFSIZE )
             failed = MY_TRUE;
@@ -1283,7 +1313,7 @@ save_string (char *src)
     }
     L_PUTC('\"')
     L_PUTC_EPILOG
-}
+} /* save_string() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1302,7 +1332,7 @@ save_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
         while (--i >= 0)
             save_svalue(data++, (char)(i ? ';' : ','), MY_FALSE );
     }
-}
+} /* save_mapping_filter() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1338,7 +1368,7 @@ save_mapping (mapping_t *m)
 
         MY_PUTC(':')
         source = number_buffer;
-        (void)sprintf(source, "%d", m->num_values);
+        (void)sprintf(source, "%ld", (long)m->num_values);
         c = *source++;
         do MY_PUTC(c) while ( '\0' != (c = *source++) );
     }
@@ -1357,25 +1387,11 @@ register_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
 {
     int i;
 
-    if (key->type == T_POINTER)
-    {
-        register_array  (key->u.vec);
-    }
-    else if (key->type == T_MAPPING)
-    {
-        register_mapping(key->u.map);
-    }
+    register_svalue(key);
 
     for (i = (p_int)extra; --i >= 0; data++)
     {
-        if (data->type == T_POINTER)
-        {
-            register_array  (data->u.vec);
-        }
-        else if (data->type == T_MAPPING)
-        {
-            register_mapping(data->u.map);
-        }
+        register_svalue(data);
     }
 } /* register_mapping_filter() */
 
@@ -1408,11 +1424,26 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
 {
     Bool rc = MY_TRUE;
 
+    assert_stack_gap();
+
     switch(v->type)
     {
     case T_STRING:
         save_string(v->u.string);
         break;
+
+    case T_QUOTED_ARRAY:
+      {
+        L_PUTC_PROLOG
+        char * source, c;
+
+        source = number_buffer;
+        (void)sprintf(source, "#%hd:", v->x.quotes);
+        c = *source++;
+        do L_PUTC(c) while ( '\0' != (c = *source++) );
+        L_PUTC_EPILOG
+        /* FALLTHROUGH to T_POINTER */
+      }
 
     case T_POINTER:
         save_array(v->u.vec);
@@ -1457,9 +1488,275 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
         save_mapping(v->u.map);
         break;
 
+    case T_SYMBOL:
+      {
+        L_PUTC_PROLOG
+        char * source, c;
+
+        source = number_buffer;
+        (void)sprintf(source, "#%hd:", v->x.quotes);
+        c = *source++;
+        do L_PUTC(c) while ( '\0' != (c = *source++) );
+        L_PUTC_EPILOG
+        save_string(v->u.string);
+        break;
+      }
+
+    case T_CLOSURE:
+      {
+        int type;
+
+        switch(type = v->x.closure_type)
+        {
+        case CLOSURE_LFUN:
+          {
+            L_PUTC_PROLOG
+
+            if (recall_pointer(v->u.lambda))
+                break;
+
+            if (v->u.lambda->ob == current_object)
+            {
+                lambda_t  *l;
+                program_t *prog;
+                int        ix;
+                funflag_t  flags;
+                char      *function_name, c;
+                object_t  *ob;
+
+                l = v->u.lambda;
+                ob = l->ob;
+                ix = l->function.index;
+
+                prog = ob->prog;
+                flags = prog->functions[ix];
+                while (flags & NAME_INHERITED)
+                {
+                    inherit_t *inheritp;
+
+                    inheritp = &prog->inherit[flags & INHERIT_MASK];
+                    ix -= inheritp->function_index_offset;
+                    prog = inheritp->prog;
+                    flags = prog->functions[ix];
+                }
+
+                memcpy(&function_name
+                      , FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK))
+                      , sizeof function_name
+                      );
+
+                L_PUTC('#');
+                L_PUTC('l');
+                L_PUTC(':');
+                c = *function_name++;
+                do L_PUTC(c) while ( '\0' != (c = *function_name++) );
+                /* TODO: Once we have inherit-conscious lfun closures,
+                 * TODO:: save them as #'l:<inherit>-<name>
+                 */
+            }
+            else
+            {
+                L_PUTC('0');
+            }
+
+            L_PUTC_EPILOG
+            break;
+          }
+
+        case CLOSURE_IDENTIFIER:
+          {
+            L_PUTC_PROLOG
+            lambda_t *l;
+            char * source, c;
+
+            if (recall_pointer(v->u.lambda))
+                break;
+
+            l = v->u.lambda;
+            if (l->function.index == VANISHED_VARCLOSURE_INDEX)
+            {
+                rc = MY_FALSE;
+                break;
+            }
+            if (l->ob->flags & O_DESTRUCTED
+             || l->ob != current_object
+               )
+            {
+                rc = MY_FALSE;
+                break;
+            }
+
+            source = l->ob->prog->variable_names[l->function.index].name;
+
+            L_PUTC('#');
+            L_PUTC('v');
+            L_PUTC(':');
+            c = *source++;
+            do L_PUTC(c) while ( '\0' != (c = *source++) );
+
+            L_PUTC_EPILOG
+            break;
+          }
+
+        default:
+            if (type < 0)
+            {
+                switch(type & -0x0800)
+                {
+                case CLOSURE_OPERATOR:
+                  {
+                    char *s = NULL;
+                    switch(type - CLOSURE_OPERATOR)
+                    {
+                    case F_POP_VALUE:
+                        s = ",";
+                        break;
+
+                    case F_BBRANCH_WHEN_NON_ZERO:
+                        s = "do";
+                        break;
+
+                    case F_BBRANCH_WHEN_ZERO:
+                        s = "while";
+                        break;
+
+                    case F_BRANCH:
+                        s = "continue";
+                        break;
+
+                    case F_CSTRING0:
+                        s = "default";
+                        break;
+
+                    case F_BRANCH_WHEN_ZERO:
+                        s = "?";
+                        break;
+
+                    case F_BRANCH_WHEN_NON_ZERO:
+                        s = "?!";
+                        break;
+
+                    case F_RANGE:
+                        s = "[..]";
+                        break;
+
+                    case F_NR_RANGE:
+                        s = "[..<]";
+                        break;
+
+                    case F_RR_RANGE:
+                        s = "[<..<]";
+                        break;
+
+                    case F_RN_RANGE:
+                        s = "[<..]";
+                        break;
+
+                    case F_MAP_INDEX:
+                        s = "[,]";
+                        break;
+
+                    case F_NX_RANGE:
+                        s = "[..";
+                        break;
+
+                    case F_RX_RANGE:
+                        s = "[<..";
+                        break;
+
+                    }
+
+                    if (s)
+                    {
+                        L_PUTC_PROLOG
+                        char c;
+
+                        L_PUTC('#');
+                        L_PUTC('e');
+                        L_PUTC(':');
+
+                        c = *s++;
+                        do L_PUTC(c) while ( '\0' != (c = *s++) );
+
+                        L_PUTC_EPILOG
+                        break;
+                    }
+                    type += CLOSURE_EFUN - CLOSURE_OPERATOR;
+                  }
+                /* default action for operators: FALLTHROUGH */
+
+                case CLOSURE_EFUN:
+                  {
+                    L_PUTC_PROLOG
+                    char * source, c;
+
+                    source = instrs[type - CLOSURE_EFUN].name;
+
+                    L_PUTC('#');
+                    L_PUTC('e');
+                    L_PUTC(':');
+
+                    c = *source++;
+                    do L_PUTC(c) while ( '\0' != (c = *source++) );
+
+                    L_PUTC_EPILOG
+                    break;
+                  }
+
+                case CLOSURE_SIMUL_EFUN:
+                  {
+                    L_PUTC_PROLOG
+                    char * source, c;
+
+                    source = simul_efunp[type - CLOSURE_SIMUL_EFUN].name;
+
+                    L_PUTC('#');
+                    L_PUTC('s');
+                    L_PUTC(':');
+
+                    c = *source++;
+                    do L_PUTC(c) while ( '\0' != (c = *source++) );
+
+                    L_PUTC_EPILOG
+                    break;
+                  }
+                }
+                break;
+            }
+            else /* type >= 0: one of the lambda closures */
+            {
+                rc = MY_FALSE;
+            }
+            break;
+
+        } /* switch(closure type) */
+
+        /* We come here, we could write the closure */
+        /* 'rc' at this point signifies whether the closure could be written.
+         * If it couldn't, maybe write a default '0', and also adjust rc
+         * to serve as function result.
+         */
+        if (!rc)
+        {
+            if (writable)
+                rc = MY_FALSE;
+            else
+            {
+                L_PUTC_PROLOG
+
+                rc = MY_TRUE; /* Writing a default '0' counts */
+                L_PUTC('0');
+                L_PUTC(delimiter);
+                L_PUTC_EPILOG
+            }
+            return rc;
+        }
+        break;
+      } /* case T_CLOSURE */
+
     default:
       {
-        /* Objects and closures can't be saved */
+        /* Objects can't be saved */
         if (writable)
             rc = MY_FALSE;
         else
@@ -1521,6 +1818,31 @@ save_array (vector_t *v)
 
 /*-------------------------------------------------------------------------*/
 static void
+register_closure (svalue_t *cl)
+
+/* Register closure <cl> in the pointer table. If it was not
+ * in there, also register all associated svalues (if any).
+ */
+
+{
+    int type;
+
+    switch(type = cl->x.closure_type)
+    {
+    case CLOSURE_LFUN:
+    case CLOSURE_IDENTIFIER:
+        if (NULL == register_pointer(ptable, cl->u.lambda))
+            return;
+        break;
+
+    default:
+        /* Operator- or an unsaveable lambda closure */
+        return;
+    }
+} /* register_closure() */
+
+/*-------------------------------------------------------------------------*/
+static void
 register_array (vector_t *vec)
 
 /* Register the array <vec> in the pointer table. If it was not
@@ -1537,16 +1859,32 @@ register_array (vector_t *vec)
     v = vec->item;
     for (i = (long)VEC_SIZE(vec); --i >= 0; v++)
     {
-        if (v->type == T_POINTER)
-        {
-            register_array  (v->u.vec);
-        }
-        else if (v->type == T_MAPPING)
-        {
-            register_mapping(v->u.map);
-        }
+        register_svalue(v);
     }
 } /* register_array() */
+
+/*-------------------------------------------------------------------------*/
+static void
+register_svalue (svalue_t *svp)
+
+/* If <svp> is a struct, array, or mapping, register it in the pointer
+ * table, and also register all sub structures.
+ */
+
+{
+    if (svp->type == T_POINTER || svp->type == T_QUOTED_ARRAY)
+    {
+        register_array(svp->u.vec);
+    }
+    else if (svp->type == T_MAPPING)
+    {
+        register_mapping(svp->u.map);
+    }
+    else if (svp->type == T_CLOSURE)
+    {
+        register_closure(svp);
+    }
+} /* register_svalue() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -1607,7 +1945,7 @@ f_save_object (svalue_t *sp, int numarg)
     file = NULL;
     name = NULL;
     tmp_name = NULL;
-    
+
     /* Test the arguments */
     if (!numarg)
     {
@@ -1621,7 +1959,7 @@ f_save_object (svalue_t *sp, int numarg)
     }
     else
       file = sp->u.string;
-    
+
     /* No need in saving destructed objects */
 
     ob = current_object;
@@ -1690,7 +2028,7 @@ f_save_object (svalue_t *sp, int numarg)
             char * emsg, * buf;
 
             emsg = strerror(errno);
-            buf = alloca(strlen(emsg+1));
+            buf = alloca(strlen(emsg)+1);
             if (buf)
             {
                 strcpy(buf, emsg);
@@ -1743,10 +2081,7 @@ f_save_object (svalue_t *sp, int numarg)
         if (names->flags & TYPE_MOD_STATIC)
             continue;
 
-        if (v->type == T_POINTER)
-            register_array  (v->u.vec);
-        else if (v->type == T_MAPPING)
-            register_mapping(v->u.map);
+        register_svalue(v);
     }
 
     /* Prepare the actual save */
@@ -1818,9 +2153,9 @@ f_save_object (svalue_t *sp, int numarg)
          */
 
         i = 0; /* Result from efun */
-    
+
         unlink(name);
-#if !defined(MSDOS_FS) && !defined(AMIGA) && !defined(OS2) && !defined(__BEOS__)
+#if !defined(MSDOS_FS) && !defined(AMIGA) && !(defined(OS2) || defined(__EMX__)) && !defined(__BEOS__)
         if (link(tmp_name, name) == -1)
 #else
         close(f);
@@ -1833,7 +2168,7 @@ f_save_object (svalue_t *sp, int numarg)
             add_message("Failed to save object !\n");
             i = 1;
         }
-#if !defined(MSDOS_FS) && !defined(AMIGA) && !defined(OS2) && !defined(__BEOS__)
+#if !defined(MSDOS_FS) && !defined(AMIGA) && !(defined(__EMX__) || defined(OS2)) && !defined(__BEOS__)
         close(f);
         unlink(tmp_name);
 #endif
@@ -1849,7 +2184,7 @@ f_save_object (svalue_t *sp, int numarg)
          */
 
         sp++; /* We're returning a result. */
-        
+
         if (failed)
             put_number(sp, 0); /* Shouldn't happen */
         else if (buf_left != SAVE_OBJECT_BUFSIZE)
@@ -1887,7 +2222,7 @@ f_save_object (svalue_t *sp, int numarg)
              */
             strbuf_store(&save_string_buffer, sp);
     } /* if (file or not file) */
-    
+
     return sp;
 } /* f_save_object() */
 
@@ -1937,10 +2272,7 @@ f_save_value (svalue_t *sp)
 
     /* First look at the value for arrays and mappings
      */
-    if (sp->type == T_POINTER)
-        register_array(sp->u.vec);
-    else if (sp->type == T_MAPPING)
-        register_mapping(sp->u.map);
+    register_svalue(sp);
 
     /* Prepare the actual save */
 
@@ -1996,7 +2328,7 @@ f_save_value (svalue_t *sp)
          * the strbuf.
          */
         strbuf_store(&save_string_buffer, sp);
-        
+
     /* Clean up */
     free_pointer_table(ptable);
     ptable = NULL;
@@ -2028,7 +2360,7 @@ restore_map_size (struct rms_parameters *parameters)
  * the size (number of entries) is returned directly.
  * If the mapping text is ill formed, the function returns -1.
  *
- * The function calls itself and restore_array_size() recursively
+ * The function calls itself and restore_size() recursively
  * for embedded arrays and mappings.
  */
 
@@ -2120,6 +2452,17 @@ restore_map_size (struct rms_parameters *parameters)
                 continue;
             }
             break;
+          }
+
+        case '#': /* A closure: skip the header and restart this check
+                   * again from the data part.
+                   */
+          {
+            pt = strchr(pt, ':');
+            if (!pt)
+                return -1;
+            pt++;
+            continue;
           }
 
         case '-':  /* A negative number */
@@ -2275,6 +2618,12 @@ restore_mapping (svalue_t *svp, char **str)
             return MY_FALSE;
         }
         data = get_map_lvalue_unchecked(z, &key);
+        if (!data)
+        {
+            outofmemory("restored mapping entry");
+            /* NOTREACHED */
+            return MY_FALSE;
+        }
         free_svalue(&key);
         while (--i >= 0) {
             if (data->type != T_INVALID && data->type != T_NUMBER)
@@ -2288,7 +2637,7 @@ restore_mapping (svalue_t *svp, char **str)
     }
     *str = tmp_par.str;
     return MY_TRUE;
-}
+} /* restore_mapping() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -2301,7 +2650,7 @@ restore_size (char **str)
  * is ill formed. *<str> is set to point to the character after the
  * array text.
  *
- * The function calls itself and restore_array_size() recursively
+ * The function calls itself and restore_map_size() recursively
  * for embedded arrays and mappings.
  */
 
@@ -2388,6 +2737,15 @@ restore_size (char **str)
                 return -1;
             break;
           }
+
+        case '#': /* A closure: skip the header and restart this check
+                   * again from the data part.
+                   */
+            pt2 = strchr(pt, ':');
+            if (!pt2)
+                return -1;
+            pt = &pt2[1];
+            break;
 
         default:
             pt2 = strchr(pt, ',');
@@ -2481,8 +2839,459 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
 {
     char *cp;
 
+    assert_stack_gap();
+
     switch( *(cp = *pt) )
     {
+
+    case '#':  /* A closure or quoted thing */
+      {
+        switch(*++cp)
+        {
+        case 'e': /* An efun closure */
+        case 's': /* A sefun closure */
+        case 'v': /* A variable closure */
+        case 'l': /* A lfun closure */
+          {
+            char ct = *cp;
+            char * name, c;
+
+            /* Parse the name of the closure item */
+            if (*++cp != ':')
+            {
+                *svp = const0;
+                return MY_FALSE;
+            }
+
+            name = ++cp;
+            for(;;)
+            {
+                if ( !(c = *cp++) )
+                {
+                    *svp = const0;
+                    return MY_FALSE;
+                }
+
+                if (c == delimiter) break;
+            }
+            cp[-1] = '\0'; /* Overwrites the delimiter */
+            *pt = cp;
+
+            /* Create the proper closure */
+            switch (ct)
+            {
+            case 'e': /* An efun closure */
+              {
+                char * end;
+                int code;
+                ident_t *p, *pp;
+                Bool found;
+
+                /* Try parsing it as operator closure */
+                if ((code = symbol_operator(name, &end)) >= 0)
+                {
+                    svp->type = T_CLOSURE;
+                    svp->x.closure_type = code + CLOSURE_EFUN_OFFS;
+                    svp->u.ob = ref_object(current_object, "restore_svalue");
+                    break;
+                }
+
+                /* Not an operator: look for an efun with this name */
+                p = make_shared_identifier(name, I_TYPE_GLOBAL, 0);
+                if (!p) {
+                    *svp = const0;
+                    break; /* switch(ct) */
+                }
+
+                /* #e: can be used only on identifiers with global visibility
+                 * or better. Look along the .inferior chain for such an
+                 * identifier. If the identifier happens to be a reserved
+                 * word, the better for us.
+                 */
+                for ( pp = p, found = MY_FALSE
+                    ; !found && pp && pp->type > I_TYPE_GLOBAL
+                    ; pp = pp->inferior)
+                {
+                    if (pp->type == I_TYPE_RESWORD)
+                    {
+                        switch(code = pp->u.code)
+                        {
+                        default:
+                            /* There aren't efuns with reswords as names, and
+                             * it is impossible to define local / global vars
+                             * or functions with such a name.
+                             * Thus, !p->inferior .
+                             */
+                            code = CLOSURE_OPERATOR;
+                            break;
+                        case L_IF:
+                            code = F_BRANCH_WHEN_ZERO+CLOSURE_OPERATOR;
+                            break;
+                        case L_DO:
+                            code =
+                              F_BBRANCH_WHEN_NON_ZERO+CLOSURE_OPERATOR;
+                            break;
+                        case L_WHILE:
+                            /* the politically correct code was already taken,
+                             * see above.
+                             */
+                            code = F_BBRANCH_WHEN_ZERO+CLOSURE_OPERATOR;
+                            break;
+                        case L_FOREACH:
+                            code = F_FOREACH+CLOSURE_OPERATOR;
+                            break;
+                        case L_CONTINUE:
+                            code = F_BRANCH+CLOSURE_OPERATOR;
+                            break;
+                        case L_DEFAULT:
+                            code = F_CSTRING0+CLOSURE_OPERATOR;
+                            /* as bogus as we can possibliy get :-) */
+                            break;
+                        case L_BREAK:
+                            code = F_BREAK  + CLOSURE_OPERATOR;
+                            break;
+                        case L_RETURN:
+                            code = F_RETURN  + CLOSURE_OPERATOR;
+                            break;
+#ifdef SUPPLY_PARSE_COMMAND
+                        case L_PARSE_COMMAND:
+                            code = F_PARSE_COMMAND  + CLOSURE_OPERATOR;
+                            break;
+#endif
+                        case L_SSCANF:
+                            code = F_SSCANF  + CLOSURE_OPERATOR;
+                            break;
+                        case L_CATCH:
+                            code = F_CATCH  + CLOSURE_OPERATOR;
+                            break;
+                        case L_SWITCH:
+                            code = F_SWITCH  + CLOSURE_OPERATOR;
+                            break;
+                        }
+                        found = MY_TRUE;
+                        break; /* for() */
+                    } /* if (pp is resword) */
+                } /* for () */
+
+                /* Did we find a suitable identifier? */
+                if (found)
+                {
+                    svp->type = T_CLOSURE;
+                    svp->x.closure_type = code;
+                }
+                else if (pp)
+                {
+                    Bool efun_ok = MY_TRUE;
+
+                    /* An attempt to override a nomask simul-efun causes a
+                     * privilege violation. If it's denied, the efun can't
+                     * be restored.
+                     */
+                    if (pp->u.global.sim_efun >= 0
+                     && simul_efunp[pp->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
+                     && pp->u.global.efun >= 0
+                     && master_ob
+                     && (!EVALUATION_TOO_LONG())
+                       )
+                    {
+                        svalue_t *res;
+
+                        push_volatile_string("nomask simul_efun");
+                        push_valid_ob(current_object);
+                        push_shared_string(pp->name);
+                        res = apply_master(STR_PRIVILEGE, 3);
+                        if (!res || res->type != T_NUMBER || res->u.number <= 0)
+                        {
+                            error("Privilege violation: nomask simul_efun %s\n"
+                                 , pp->name);
+                            /* NOTREACHED */
+                            efun_ok = MY_FALSE;
+                        }
+                        else if (res->u.number == 0)
+                        {
+                            efun_ok = MY_FALSE;
+                        }
+                    }
+                    else if (EVALUATION_TOO_LONG())
+                    {
+                        /* Can't call the master to check */
+                        efun_ok = MY_FALSE;
+                    }
+
+                    if (efun_ok && pp->u.global.efun >= 0)
+                    {
+                        code = pp->u.global.efun + CLOSURE_EFUN_OFFS;
+                        if (code > LAST_INSTRUCTION_CODE + CLOSURE_EFUN_OFFS)
+                        {
+                            code =
+                              efun_aliases[
+                                code - CLOSURE_EFUN_OFFS
+                                  - LAST_INSTRUCTION_CODE - 1
+                              ] + CLOSURE_EFUN_OFFS;
+                        }
+                        svp->type = T_CLOSURE;
+                        svp->x.closure_type = code;
+                    }
+                    else
+                    {
+                        /* Can't restore the efun */
+                        *svp = const0;
+                    }
+                }
+                else
+                {
+                    /* Undefined function */
+                    *svp = const0;
+                }
+
+                if (svp->type == T_CLOSURE)
+                    svp->u.ob = ref_object(current_object, "restore_svalue");
+
+                if (p && p->type == I_TYPE_UNKNOWN)
+                    free_shared_identifier(p);
+
+                break;
+              }
+
+            case 's': /* A sefun closure */
+              {
+                ident_t *p, *pp;
+
+                /* Look for an efun with this name */
+                p = make_shared_identifier(name, I_TYPE_GLOBAL, 0);
+                if (!p) {
+                    *svp = const0;
+                    break; /* switch(ct) */
+                }
+
+                /* #s: can be used only on identifiers with global visibility
+                 * or better. Look along the .inferior chain for such an
+                 * identifier.
+                 */
+                for ( pp = p
+                    ; pp && pp->type > I_TYPE_GLOBAL
+                    ; pp = pp->inferior)
+                {
+                  NOOP;
+                } /* for () */
+
+                /* Did we find a suitable identifier? */
+                if (pp && pp->u.global.sim_efun >= 0)
+                {
+                    svp->type = T_CLOSURE;
+                    svp->x.closure_type
+                      = pp->u.global.sim_efun + CLOSURE_SIMUL_EFUN_OFFS;
+                    svp->u.ob = ref_object(current_object, "restore_svalue");
+                }
+                else
+                {
+                    /* Undefined function */
+                    *svp = const0;
+                }
+
+                if (p && p->type == I_TYPE_UNKNOWN)
+                    free_shared_identifier(p);
+
+                break;
+              }
+
+            case 'v': /* A variable closure */
+              {
+                char *str;
+                object_t *ob;
+                variable_t *var;
+                program_t *prog;
+                int num_var;
+                int n;
+                lambda_t *l;
+
+                ob = current_object;
+                if (!current_variables
+                 || !ob->variables
+                 || current_variables < ob->variables
+                 || current_variables >= ob->variables + ob->prog->num_variables)
+                {
+                    /* efun closures are called without changing current_prog
+                     * nor current_variables. This keeps the program scope for
+                     * variables for calls inside this_object(), but would
+                     * give trouble with calling from other ones if it were
+                     * not for this test.
+                     */
+                    current_prog = ob->prog;
+                    current_variables = ob->variables;
+                }
+
+                /* If the variable exists, it must exist as shared
+                 * string.
+                 */
+                str = findstring(name);
+                if (!str)
+                {
+                    *svp = const0;
+                    break; /* switch(ct) */
+                }
+
+                prog = current_prog;
+                var = prog->variable_names;
+                num_var = prog->num_variables;
+                for (n = num_var; --n >= 0; var++)
+                {
+                    if (var->name == str && !(var->flags & NAME_HIDDEN))
+                        break;
+                }
+                if (n < 0)
+                {
+                    *svp = const0;
+                    break; /* switch(ct) */
+                }
+
+                n = num_var - n - 1;
+                l = xalloc(sizeof *l);
+                if (!l)
+                {
+                    *svp = const0;
+                    break; /* switch(ct) */
+                }
+
+                l->ob = ref_object(current_object, "symbol_variable");
+                l->ref = 1;
+                l->function.index = (unsigned short)(n + (current_variables - current_object->variables));
+
+                svp->type = T_CLOSURE;
+                svp->x.closure_type = CLOSURE_IDENTIFIER;
+                svp->u.lambda = l;
+
+                /* Handle replace_program() */
+                if ( !(current_object->prog->flags & P_REPLACE_ACTIVE)
+                  || !lambda_ref_replace_program(l, svp->x.closure_type, 0, 0, 0) )
+                {
+                    current_object->flags |= O_LAMBDA_REFERENCED;
+                }
+                break;
+              }
+
+            case 'l': /* A lfun closure */
+              {
+                char *str;
+                char *super;
+                int i;
+
+                /* Check if it's an inherited lfun closure */
+                super = strchr(name, '-');
+                if (super)
+                {
+                    *super = '\0';
+                    super++;
+                }
+
+                /* If the function exists, it must exist as shared
+                 * string.
+                 */
+                str = findstring(name);
+                if (!str)
+                {
+                    *svp = const0;
+                    break; /* switch(ct) */
+                }
+
+                if (super)
+                    i = find_inherited(super, name);
+                else
+                    i = find_function(str, current_object->prog);
+
+                /* If the function exists and is visible, create the closure
+                 * TODO: Handle inherit-conscious closures.
+                 */
+                if (i >= 0)
+                {
+                    lambda_t *l;
+                    ph_int closure_type;
+
+                    l = xalloc(sizeof *l);
+                    if (!l)
+                    {
+                        *svp = const0;
+                        break; /* switch(ct) */
+                    }
+
+                    l->ref = 1;
+                    l->ob = ref_object(current_object, "restore_svalue");
+
+                    /* Set the closure */
+                    if (!(current_object->prog->flags & P_REPLACE_ACTIVE)
+                     || !lambda_ref_replace_program( l
+                                                   , CLOSURE_ALIEN_LFUN
+                                                   , 0, NULL, NULL)
+                       )
+                    {
+                        current_object->flags |= O_LAMBDA_REFERENCED;
+                        l->function.index = (unsigned short)i;
+                        closure_type = CLOSURE_LFUN;
+                    }
+                    else
+                    {
+                        l->function.alien.ob
+                          = ref_object(current_object, "restore_svalue");
+                        l->function.alien.index = (unsigned short)i;
+                        closure_type = CLOSURE_ALIEN_LFUN;
+                    }
+
+                    svp->type = T_CLOSURE;
+                    svp->x.closure_type = closure_type;
+                    svp->u.lambda = l;
+                }
+                else
+                {
+                    *svp = const0;
+                }
+                break;
+              }
+
+            default:
+                fatal("Unsupported closure-type '%c'\n", ct);
+                break;
+            }
+
+            return MY_TRUE;
+            break;
+          }
+
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+          {
+            long quotes;
+            char * end;
+            Bool   rc;
+
+            quotes = strtol(cp, &end, 10);
+            if (!end || end == cp || *end != ':')
+            {
+                *svp = const0;
+                return MY_FALSE;
+            }
+            *pt = end+1;
+            rc = restore_svalue(svp, pt, delimiter);
+            if (rc)
+            {
+                svp->x.quotes = (ph_int)quotes;
+                if (svp->type == T_STRING)
+                    svp->type = T_SYMBOL;
+                else if (svp->type == T_POINTER)
+                    svp->type = T_QUOTED_ARRAY;
+                return MY_TRUE;
+            }
+            else
+                return MY_FALSE;
+            break;
+          }
+
+        default:
+            *svp = const0;
+            return MY_FALSE;
+        }
+
+        break;
+      }
 
     case '\"':  /* A string */
       {
@@ -2551,7 +3360,9 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         case '{':
           {
             if ( !restore_array(svp, pt) )
+            {
                 return MY_FALSE;
+            }
             break;
           }
 
@@ -2747,7 +3558,7 @@ old_restore_string (svalue_t *v, char *str)
     }
     *v = const0;
     return MY_FALSE;
-}
+} /* old_restore_string() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -2838,8 +3649,8 @@ f_restore_object (svalue_t *sp)
     }
     else
         file = sp->u.string;
-    
-    
+
+
     /* No use in restoring a destructed object, or an object
      * with no variables.
      */
@@ -2976,6 +3787,9 @@ f_restore_object (svalue_t *sp)
         space = strchr(cur, ' ');
         if (!file)
             pt = strchr(cur, '\n');
+        else
+            pt = NULL;
+
         if (space == NULL || (!file && pt && pt < space))
         {
             /* No space? It must be the version line! */
@@ -2989,6 +3803,8 @@ f_restore_object (svalue_t *sp)
                 {
                     if (pt)
                         cur = pt+1;
+                    else if (!file)
+                        break;
                     continue;
                 }
             }
@@ -3217,7 +4033,7 @@ f_restore_value (svalue_t *sp)
         }
         buff = p+1;
     }
-    
+
     /* Initialise the shared value table */
 
     max_shared_restored = 256;
@@ -3240,7 +4056,7 @@ f_restore_value (svalue_t *sp)
     /* Place the result variable onto the stack */
     inter_sp = ++sp;
     *sp = const0;
-    
+
     /* Now parse the value in buff[] */
 
     p = buff;

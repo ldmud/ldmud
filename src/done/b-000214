@@ -1,7 +1,7 @@
 Date: Mon, 14 Feb 2000 10:13:24 -0700
 From: Lars Duening <Lars.Duening@wcom.com>
 Short: regexp error?
-Type: Bug
+Type: Abandoned.
 State: New
 
 2. Silberland has found a regexp error - did they report it? They 

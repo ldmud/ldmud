@@ -61,30 +61,30 @@
 #include "stdstrings.h"
 #include "stralloc.h"
 #include "strfuns.h"
+#include "wiz_list.h" /* wizlist_name[] */
 #include "xalloc.h"
 
 #include "../mudlib/sys/driver_hook.h"
 
 /* TODO: Use get_host_name() instead of gethostname()
  * TODO: Implement the # and ## operators.
- * TODO: New predefs' __DRIVER_VERSION__, _REVISION__, _PATCHLEVEL__, __PATH__
- * TODO:: and __BASENAME__.
+ * TODO: New predefs' __BASENAME__, __FUNCTION__.
  * TODO: #define macro(a,b,...) -> ... is assigned to __VA_ARGS__ (see oncoming
  * TODO:: C standard).
  * TODO: Does Standard-C allow recursive macro expansion? If not, we
  * TODO:: should disallow it, too.
  */
 
-#ifdef AMIGA
+#if defined(AMIGA) && !defined(__GNUC__)
 #    include "hosts/amiga/socket.h"
 #endif
 
-#if defined(hpux) && !defined(__GNUC__)
-/* This compilers handling of (char) is broken */
-#    define CHAR_EOF EOF
-#else
-#    define CHAR_EOF ((char)EOF)
-#endif
+/* We can't use the EOF character directly, as in its (char) representation
+ * clashes with ISO-8859 character 0xFF. Instead we use ascii SOH (0x01),
+ * which in turn is not allowed as input character.
+ */
+
+#define CHAR_EOF ((char)0x01)
 
 /*-------------------------------------------------------------------------*/
 
@@ -146,11 +146,15 @@ char *current_file;
   /* Name of the file currently compiled.
    */
 
+static char *object_file;
+  /* Name of the file for which the lexer was originally called.
+   */
+
 Bool pragma_use_local_scopes;
   /* True: treat all local scopes as one.
    */
 
-Bool pragma_strict_types;
+int pragma_strict_types;
   /* Type enforcing mode: PRAGMA_WEAK_TYPES, PRAGMA_STRONG_TYPES
    * and PRAGMA_STRICT_TYPES.
    */
@@ -180,6 +184,10 @@ Bool pragma_pedantic;
   /* True: treat a number of sloppy language constructs as errors.
    */
 
+Bool pragma_warn_deprecated;
+  /* True: warn if deprecated efuns are used.
+   */
+
 char *last_lex_string;
   /* When lexing string literals, this is the (shared) string lexed
    * so far. It is used to pass string values to lang.c and may be
@@ -192,7 +200,26 @@ struct lpc_predef_s *lpc_predefs = NULL;
    */
 
 static Mempool lexpool = NULL;
-  /* Fifopool to hold the allocations for the include and ifstate stacks.
+  /* Fifopool to hold the allocations for the include and lpc_ifstate_t stacks.
+   */
+
+/*-------------------------------------------------------------------------*/
+/* The lexer can take data from either a file or a string buffer.
+ * The handling is unified using the struct source_s structure.
+ * TODO: Use this source similar to auto-include to expand macros in the
+ * TODO:: the compile. This would make it easier to find errors caused
+ * TODO:: by macro replacements.
+ */
+
+typedef struct source_s
+{
+    int fd;         /* Filedescriptor or -1 */
+    char * buf;     /* Start pointer of the allocated text buffer or NULL */
+    char * current; /* Current position in buf[] */
+} source_t;
+
+static source_t yyin;
+  /* Current input source.
    */
 
 /*-------------------------------------------------------------------------*/
@@ -215,8 +242,8 @@ static Mempool lexpool = NULL;
  * linebufstart.
  *
  * If there are less than MAXLINE bytes left to read, the end of the file
- * is marked in the buffer with the EOF character (a \0 sentinel is not
- * necessary as compilation and thus lexing will end with the EOF
+ * is marked in the buffer with the CHAR_EOF character (a \0 sentinel is not
+ * necessary as compilation and thus lexing will end with the CHAR_EOF
  * character).
  *
  * When including files, a new area of MAXLINE bytes is reserved in defbuf,
@@ -239,10 +266,6 @@ static Mempool lexpool = NULL;
  * (signalled in insert_inline_fun_now), the text of the pending functions is
  * inserted into the input stream like a macro.
  */
-
-static int yyin_des;
-  /* Filedescriptor of the file currently read.
-   */
 
 static char *defbuf = NULL;
   /* The combined input/expansion buffer.
@@ -288,16 +311,6 @@ static size_t inc_list_size;
 
 static mp_int inc_list_maxlen;
   /* The lenght of the longest name in <inc_list>.
-   */
-
-static char * auto_include_string = NULL;
-  /* Shared string to be compiled as the very first thing in every lpc
-   * source file. It may contain any text which is valid in a file.
-   */
-
-static int auto_include_start;
-  /* Number of 'lines' contained in <auto_include_string>, stored
-   * as negative value.
    */
 
 static int nexpands;
@@ -372,7 +385,7 @@ Bool insert_inline_fun_now = MY_FALSE;
    * or after a global variable definition.
    */
 
-int next_inline_fun = 0;
+unsigned int next_inline_fun = 0;
   /* The running count of inline functions, used to 'name' the next
    * function to generate.
    */
@@ -382,16 +395,18 @@ int next_inline_fun = 0;
 /* The stack to handle nested #if...#else...#endif constructs.
  */
 
-static struct ifstate
+typedef struct lpc_ifstate_s
 {
-    struct ifstate *next;
-    int             state;  /* which token to expect */
-} *iftop = NULL;
+    struct lpc_ifstate_s *next;
+    int                   state;  /* which token to expect */
+} lpc_ifstate_t;
 
-/* struct ifstate.state values: */
+/* lpc_ifstate_t.state values: */
 
 #define EXPECT_ELSE  1
 #define EXPECT_ENDIF 2
+
+static lpc_ifstate_t *iftop = NULL;
 
 /*-------------------------------------------------------------------------*/
 
@@ -403,11 +418,18 @@ static struct incstate
 {
     struct incstate * next;
 
-    int         yyin_des;       /* The file's filedescriptor */
+    source_t    yyin;           /* The current input source */
     int         line;           /* Current line */
     char      * file;           /* Filename */
     ptrdiff_t   linebufoffset;  /* Position of linebufstart */
-    int pragma_strict_types;
+    mp_uint     inc_offset;     /* Handle returned by store_include_info() */
+    int pragma_strict_types;    /* Saved pragma_strict_types.
+                                 * If set to PRAGMA_KEEP_TYPES, the pragma
+                                 * setting at the end of the include file
+                                 * will not be reset.
+                                 * TODO: Remove this altogether as it has
+                                 * TODO:: already been done in 3.3
+                                 */
     char saved_char;
 } *inctop = NULL;
 
@@ -537,7 +559,7 @@ static char optab2[]
     , 0,      0,   QMARK,   1                 /* 68: ?         */
 };
 
-#define optab1 (_optab-' ')
+#define optab1(c) (_optab[(c)-' '])
   /* Use optab1 to index _optab with raw characters.
    */
 
@@ -629,7 +651,7 @@ init_lexer(void)
     static short binary_operators[]
       = { F_ADD, F_SUBTRACT, F_MULTIPLY, F_DIVIDE, F_MOD
         , F_LT, F_GT, F_EQ, F_GE, F_LE, F_NE
-        , F_OR, F_XOR, F_LSH, F_RSH
+        , F_OR, F_XOR, F_LSH, F_RSH, F_RSHL
         , F_INDEX, F_RINDEX, F_NX_RANGE, F_RX_RANGE
         , F_EXTRACT2
         };
@@ -639,7 +661,7 @@ init_lexer(void)
         };
 
     /* Allocate enough memory for 20 nested includes/ifs */
-    lexpool = new_fifopool(fifopool_size(sizeof(struct ifstate), 20)
+    lexpool = new_fifopool(fifopool_size(sizeof(lpc_ifstate_t), 20)
                            + fifopool_size(sizeof(struct incstate), 20));
     if (!lexpool)
         fatal("Out of memory.\n");
@@ -664,11 +686,17 @@ init_lexer(void)
         p = make_shared_identifier(instrs[n].name, I_TYPE_GLOBAL, 0);
         if (!p)
             fatal("Out of memory\n");
+        if (p->type != I_TYPE_UNKNOWN)
+        {
+            fatal("Duplicate efun '%s'.\n", instrs[n].name);
+            /* NOTREACHED */
+            continue;
+        }
         p->type = I_TYPE_GLOBAL;
         p->u.global.efun     =  (short)n;
-        p->u.global.sim_efun = -1;
-        p->u.global.function = -2;
-        p->u.global.variable = -2;
+        p->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
+        p->u.global.function = I_GLOBAL_FUNCTION_EFUN;
+        p->u.global.variable = I_GLOBAL_VARIABLE_FUN;
         p->next_all = all_efuns;
         all_efuns = p;
     }
@@ -722,30 +750,43 @@ init_lexer(void)
     /* Add the standard permanent macro definitions */
 
     add_permanent_define("LPC3", -1, string_copy(""), MY_FALSE);
-#ifdef COMPAT_MODE
+    add_permanent_define("__LDMUD__", -1, string_copy(""), MY_FALSE);
+    if (compat_mode)
+    {
         add_permanent_define("COMPAT_FLAG", -1, string_copy(""), MY_FALSE);
         add_permanent_define("__COMPAT_MODE__", -1, string_copy(""), MY_FALSE);
-#endif
+    }
     add_permanent_define("__EUIDS__", -1, string_copy(""), MY_FALSE);
     if (strict_euids)
         add_permanent_define("__STRICT_EUIDS__", -1, string_copy(""), MY_FALSE);
 
-#ifdef COMPAT_MODE
-    mtext[0] = '"';
-    strcpy(mtext+1, master_name);
-    strcat(mtext+1, "\"");
-#else
-    mtext[0] = '"';
-    mtext[1] = '/';
-    strcpy(mtext+2, master_name);
-    strcat(mtext+2, "\"");
-#endif
+    if (compat_mode)
+    {
+        mtext[0] = '"';
+        strcpy(mtext+1, master_name);
+        strcat(mtext+1, "\"");
+    }
+    else
+    {
+        mtext[0] = '"';
+        mtext[1] = '/';
+        strcpy(mtext+2, master_name);
+        strcat(mtext+2, "\"");
+    }
     add_permanent_define("__MASTER_OBJECT__", -1, string_copy(mtext), MY_FALSE);
     add_permanent_define("__FILE__", -1, (void *)get_current_file, MY_TRUE);
     add_permanent_define("__DIR__", -1, (void *)get_current_dir, MY_TRUE);
     add_permanent_define("__PATH__", 1, (void *)get_sub_path, MY_TRUE);
     add_permanent_define("__LINE__", -1, (void *)get_current_line, MY_TRUE);
     add_permanent_define("__VERSION__", -1, (void *)get_version, MY_TRUE);
+    add_permanent_define("__VERSION_MAJOR__", -1, string_copy(VERSION_MAJOR), MY_FALSE);
+    add_permanent_define("__VERSION_MINOR__", -1, string_copy(VERSION_MINOR), MY_FALSE);
+    add_permanent_define("__VERSION_MICRO__", -1, string_copy(VERSION_MICRO), MY_FALSE);
+    if (IS_RELEASE())
+        add_permanent_define("__VERSION_PATCH__", -1, string_copy("0"), MY_FALSE);
+    else
+        add_permanent_define("__VERSION_PATCH__", -1, string_copy(VERSION_PATCH), MY_FALSE);
+
     add_permanent_define("__HOST_NAME__", -1, (void *)get_hostname, MY_TRUE);
     add_permanent_define("__DOMAIN_NAME__", -1, (void *)get_domainname, MY_TRUE);
     add_permanent_define("__HOST_IP_NUMBER__", -1
@@ -759,14 +800,57 @@ init_lexer(void)
     sprintf(mtext, "%d", ERQ_MAX_REPLY);
     add_permanent_define("__ERQ_MAX_REPLY__", -1, string_copy(mtext), MY_FALSE);
 #endif
-    sprintf(mtext, "%ld", def_eval_cost);
+    sprintf(mtext, "%ld", (long)def_eval_cost);
     add_permanent_define("__MAX_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
+    sprintf(mtext, "%ld", (long)CATCH_RESERVED_COST);
+    add_permanent_define("__CATCH_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
+    sprintf(mtext, "%ld", (long)MASTER_RESERVED_COST);
+    add_permanent_define("__MASTER_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
+    sprintf(mtext, "%ld", (long)TIME_TO_RESET);
+    add_permanent_define("__RESET_TIME__", -1, string_copy(mtext), MY_FALSE);
+    sprintf(mtext, "%ld", (long)TIME_TO_CLEAN_UP);
+    add_permanent_define("__CLEANUP_TIME__", -1, string_copy(mtext), MY_FALSE);
 #ifdef USE_IPV6
     add_permanent_define("__IPV6__", -1, string_copy(""), MY_FALSE);
+#endif
+#ifdef USE_MYSQL
+    add_permanent_define("__MYSQL__", -1, string_copy(""), MY_FALSE);
 #endif
 #ifdef USE_LPC_NOSAVE
     add_permanent_define("__LPC_NOSAVE__", -1, string_copy(""), MY_FALSE);
 #endif
+#ifdef USE_DEPRECATED
+    add_permanent_define("__DEPRECATED__", -1, string_copy(""), MY_FALSE);
+#endif
+    if (wizlist_name[0] != '\0')
+    {
+        if (compat_mode)
+        {
+            mtext[0] = '"';
+            strcpy(mtext+1, wizlist_name);
+            strcat(mtext+1, "\"");
+        }
+        else
+        {
+            mtext[0] = '"';
+            mtext[1] = '/';
+            strcpy(mtext+2, wizlist_name);
+            strcat(mtext+2, "\"");
+        }
+        add_permanent_define("__WIZLIST__", -1, string_copy(mtext), MY_FALSE);
+    }
+    {
+        char buf[200];
+
+        sprintf(buf, "(%ld)", PINT_MAX);
+        add_permanent_define("__INT_MAX__", -1, string_copy(buf), MY_FALSE);
+        sprintf(buf, "(%ld)", PINT_MIN);
+        add_permanent_define("__INT_MIN__", -1, string_copy(buf), MY_FALSE);
+        sprintf(buf, "(%g)", FLT_MAX);
+        add_permanent_define("__FLOAT_MAX__", -1, string_copy(buf), MY_FALSE);
+        sprintf(buf, "(%g)", FLT_MIN);
+        add_permanent_define("__FLOAT_MIN__", -1, string_copy(buf), MY_FALSE);
+    }
 
     /* Add the permanent macro definitions given on the commandline */
 
@@ -793,21 +877,33 @@ init_lexer(void)
 
 /*-------------------------------------------------------------------------*/
 ident_t *
-make_shared_identifier (char *s, int n, int depth)
+lookfor_shared_identifier (char *s, int n, int depth, Bool bCreate)
 
-/* Find and/or add identifier <s> of type <n> to the ident_table, and
- * return a pointer to the found/generated struct ident. New generated
- * entries have their type set to I_TYPE_UNKNOWN regardless of <n>.
- * Local identifiers (<n> == I_TYPE_LOCAL) are additionally distinguished by
- * their definition <depth>.
+/* Aliases: make_shared_identifier(): bCreate passed as MY_TRUE
+ *          find_shared_identifier(): bCreate passed as MY_FALSE
  *
- * If an identifier with the same name but a lower type exists in the table,
+ * Find and/or add identifier <s> of type <n> to the ident_table, and
+ * return a pointer to the found/generated struct ident. Local identifiers
+ * (<n> == I_TYPE_LOCAL) are additionally distinguished by their definition
+ * <depth>.
+ *
+ * If bCreate is FALSE, the function just checks if the given identfier
+ * exists in the table. The identifier is considered found, if there
+ * is an entry in the table for this very name, and with a type equal
+ * or greater than <n>. If <n> is LOCAL and the found identifier is LOCAL
+ * as well, the identifier is considered found if <depth> is equal or smaller
+ * than the depth of the found identifier. The result is the pointer to the
+ * found identifier, or NULL if not found.
+ *
+ * If bCreate is TRUE, the identifier is created if not found. If an
+ * identifier with the same name but a lower type exists in the table,
  * it is shifted down: a new entry for this name created and put into the
  * table, the original entry is referenced by the .inferior pointer in the
  * new entry. The same happens when a new LOCAL of greater depth is
- * added to an existing LOCAL of smaller depth.
- *
- * Return NULL when out of memory.
+ * added to an existing LOCAL of smaller depth.  New generated
+ * entries have their type set to I_TYPE_UNKNOWN regardless of <n>.
+ * The result is the pointer to the found/new entry, or NULL when out
+ * of memory.
  */
 
 {
@@ -816,7 +912,7 @@ make_shared_identifier (char *s, int n, int depth)
     char *str;
 
 #if defined(LEXDEBUG)
-    printf("%s make_shared_identifier called: %s\n", time_stamp(), s);
+    printf("%s lookfor_shared_identifier called: %s\n", time_stamp(), s);
 #endif
 
     h = identhash(s);  /* the identifiers hash code */
@@ -843,27 +939,34 @@ make_shared_identifier (char *s, int n, int depth)
                 ident_table[h] = curr;
             }
 
-            /* If the found entry is of inferior type, shift it down */
+            /* If the found entry is of inferior type, shift it down
+             * resp. consider it 'not found'.
+             */
             if (n > curr->type
              || (   I_TYPE_LOCAL == curr->type && I_TYPE_LOCAL == n
                  && depth > curr->u.local.depth)
                )
             {
-                ident_t *inferior = curr;
+                if (bCreate)
+                {
+                    ident_t *inferior = curr;
 
 #if defined(LEXDEBUG)
-                printf("%s shifting down inferior.\n", time_stamp());
+                    printf("%s shifting down inferior.\n", time_stamp());
 #endif
-                curr = xalloc(sizeof *curr);
-                if ( NULL != curr )
-                {
-                    curr->name = inferior->name;
-                    curr->next = inferior->next;
-                    curr->type = I_TYPE_UNKNOWN;
-                    curr->inferior = inferior;
-                    curr->hash = (short)h;
-                    ident_table[h] = curr;
+                    curr = xalloc(sizeof *curr);
+                    if ( NULL != curr )
+                    {
+                        curr->name = ref_string(inferior->name);
+                        curr->next = inferior->next;
+                        curr->type = I_TYPE_UNKNOWN;
+                        curr->inferior = inferior;
+                        curr->hash = (short)h;
+                        ident_table[h] = curr;
+                    }
                 }
+                else
+                    curr = NULL;
             }
 
             /* Return the found (or generated) entry */
@@ -874,33 +977,106 @@ make_shared_identifier (char *s, int n, int depth)
         curr = curr->next;
     }
 
-    /* Identifier is not in table, so create a new entry */
-
-    str = make_shared_string(s);
-    if (!str)
-        return NULL;
-    curr = xalloc(sizeof *curr);
-    if (!curr)
+    if (bCreate)
     {
-        free_string(str);
+        /* Identifier is not in table, so create a new entry */
+
+        str = make_shared_string(s);
+        if (!str)
+            return NULL;
+        curr = xalloc(sizeof *curr);
+        if (!curr)
+        {
+            free_string(str);
+            return NULL;
+        }
+
+        curr->name = str;
+        curr->next = ident_table[h];
+        curr->type = I_TYPE_UNKNOWN;
+        curr->inferior = NULL;
+        curr->hash = (short)h;
+        ident_table[h] = curr;
+    }
+    /* else curr is NULL */
+
+    return curr;
+} /* lookfor_shared_identifier() */
+
+/*-------------------------------------------------------------------------*/
+ident_t *
+make_global_identifier (char *s, int n)
+
+/* Create an identifier <s> on level I_TYPE_GLOBAL, after searching for it
+ * using type <n>.
+ *
+ * The difference to make_shared_identifier() is that if an identifier for
+ * this name already exists and is of higher level than I_TYPE_GLOBAL (e.g.
+ * somebody created a #define for this name), the function will insert
+ * an appropriate I_TYPE_GLOBAL entry into the inferior list.
+ *
+ * Result is the pointer to the identifier, or NULL when out of memory
+ * (yyerror() is called in that situation, too).
+ */
+
+{
+    ident_t *ip, *q;
+
+    ip = make_shared_identifier(s, n, 0);
+    if (!ip)
+    {
+        yyerrorf("Out of memory: identifer '%s'", s);
         return NULL;
     }
 
-    curr->name = str;
-    curr->next = ident_table[h];
-    curr->type = I_TYPE_UNKNOWN;
-    curr->inferior = NULL;
-    curr->hash = (short)h;
-    ident_table[h] = curr;
+    if (ip->type > I_TYPE_GLOBAL)
+    {
+        /* Somebody created a #define with this name.
+         * Back-insert an ident-table entry.
+         */
+        do {
+            q = ip;
+            ip = ip->inferior;
+        } while (ip && ip->type > I_TYPE_GLOBAL);
 
-    return curr;
-} /* make_shared_identifier() */
+        if (!ip)
+        {
+            ip = xalloc(sizeof(ident_t));
+            if (!ip) {
+                yyerrorf("Out of memory: identifier (%lu bytes)"
+                        , (unsigned long) sizeof(ident_t));
+                return NULL;
+            }
+            ip->name = ref_string(q->name);
+            ip->type = I_TYPE_UNKNOWN;
+            ip->inferior = NULL;
+            ip->hash = q->hash;
+            q->inferior = ip;
+        }
+    }
+
+    return ip;
+} /* make_global_identifier() */
 
 /*-------------------------------------------------------------------------*/
-void
-free_shared_identifier (ident_t *p)
+static INLINE void
+free_identifier (ident_t *p)
 
-/* Remove the identifier <p> (which may be an inferior entry ) from the
+/* Deallocate the identifier <p> which must not be in any list or table
+ * anymore.
+ * It is a fatal error if it can't be found.
+ */
+
+{
+    free_string(p->name);
+    xfree(p);
+} /* free_identifier() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+unlink_shared_identifier (ident_t *p)
+
+/* Unlink the identifier <p> (which may be an inferior entry ) from the
  * identifier table.
  * It is a fatal error if it can't be found.
  */
@@ -917,7 +1093,7 @@ free_shared_identifier (ident_t *p)
     s = p->name;
 
 #if defined(LEXDEBUG)
-    printf("%s freeing '%s'\n", time_stamp(), s);
+    printf("%s unlinking '%s'\n", time_stamp(), s);
     fflush(stdout);
 #endif
 
@@ -926,7 +1102,7 @@ free_shared_identifier (ident_t *p)
     while (curr)
     {
         if (curr->name == s
-#if DEBUG
+#ifdef DEBUG
          || !strcmp(curr->name, s)
 #endif
 
@@ -948,23 +1124,21 @@ free_shared_identifier (ident_t *p)
                         {
                             curr->inferior->next = curr->next;
                             *q = curr->inferior;
-                            xfree(curr);
-                            return; /* success */
+                            return;
                         }
                         *q = curr->next;
-                        free_string(curr->name);
-                        xfree((char *)curr);
                         return;
                     }
 
                     *q = curr->inferior;
-                    xfree((char *)curr);
-                    return; /* success */
+                    return;
                 }
                 q = &curr->inferior;
                 curr = *q;
             }
-            fatal("free_shared_identifier: entry '%s' not found!\n", p->name);
+
+            fatal("free_shared_identifier: inferior '%s' not found!\n", p->name);
+            return;
             /* NOTREACHED */
         }
 
@@ -974,6 +1148,25 @@ free_shared_identifier (ident_t *p)
 
     fatal("free_shared_identifier: name '%s' not found!\n", p->name);
     /* NOTREACHED */
+} /* unlink_shared_identifier() */
+
+/*-------------------------------------------------------------------------*/
+void
+free_shared_identifier (ident_t *p)
+
+/* Remove the identifier <p> (which may be an inferior entry ) from the
+ * identifier table.
+ * It is a fatal error if it can't be found.
+ */
+
+{
+#if defined(LEXDEBUG)
+    printf("%s freeing '%s'\n", time_stamp(), p->name);
+    fflush(stdout);
+#endif
+
+    unlink_shared_identifier(p);
+    free_identifier(p);
 } /* free_shared_identifier() */
 
 /*-------------------------------------------------------------------------*/
@@ -1015,15 +1208,41 @@ realloc_defbuf (void)
 } /* realloc_defbuf() */
 
 /*-------------------------------------------------------------------------*/
+static void
+set_input_source (int fd, char * buf)
+
+/* Set the current input source to <fd>/<buf>.
+ */
+
+{
+    yyin.fd = fd;
+    yyin.buf = buf;
+    yyin.current = buf;
+} /* set_input_source() */
+
+/*-------------------------------------------------------------------------*/
+static void
+close_input_source (void)
+
+/* Close the current input source: a file is closed, a string is deallocated
+ */
+
+{
+    if (yyin.fd != -1)    close(yyin.fd);  yyin.fd = -1;
+    if (yyin.buf != NULL) xfree(yyin.buf); yyin.buf = NULL;
+    yyin.current = NULL;
+} /* close_input_source() */
+
+/*-------------------------------------------------------------------------*/
 static /* NO inline */ char *
 _myfilbuf (void)
 
-/* Read the next MAXLINE bytes from the inputfile <yyin_des> and store
+/* Read the next MAXLINE bytes from the input source <yyin> and store
  * them in the input-buffer. If there were the beginning of an incomplete
  * line left in the buffer, they are copied right before linebufstart.
  * The end of the last complete line in the buffer is marked with a '\0'
  * sentinel, or, if the file is exhausted, the end of data is marked
- * with the EOF char.
+ * with the CHAR_EOF char.
  *
  * outp is set to point to the new data (which may be the copied remnants
  * from the incomplete line) and also returned as result.
@@ -1056,7 +1275,18 @@ _myfilbuf (void)
 
     /* Read the next block of data */
     p = linebufstart; /* == linebufend - MAXLINE */
-    i = read(yyin_des, p, MAXLINE);
+    if (yyin.fd != -1)
+        i = read(yyin.fd, p, MAXLINE);
+    else
+    {
+        i = strlen(yyin.current);
+
+        if (i > MAXLINE)
+            i = MAXLINE;
+
+        memcpy(p, yyin.current, i);
+        yyin.current += i;
+    }
 
     if (i < MAXLINE)
     {
@@ -1070,7 +1300,7 @@ _myfilbuf (void)
         p += i;
         if (p - outp ? p[-1] != '\n' : current_line == 1)
             *p++ = '\n';
-        *p++ = EOF;
+        *p++ = CHAR_EOF;
         return outp;
     }
 
@@ -1124,7 +1354,7 @@ mygetc (void)
 
 {
 #if 0
-    fprintf(stderr, "c='%c' %x", *outp, *outp);
+    fprintf(stderr, "c='%c' %x, ", *outp, *outp);
 #endif
 #if defined(LEXDEBUG)
     putc(*outp, stderr);
@@ -1170,10 +1400,10 @@ lexerrorf (char *format, ...)
 
 {
     va_list va;
-    char buff[512];
-    char fixed_fmt[200];
+    char buff[5120];
+    char fixed_fmt[1000];
 
-    format = limit_error_format(fixed_fmt, format);
+    format = limit_error_format(fixed_fmt, sizeof(fixed_fmt), format);
     va_start(va, format);
     vsprintf(buff, format, va);
     va_end(va);
@@ -1204,7 +1434,7 @@ skip_to (char *token, char *atoken)
  *   #elif    : returns false, the statement is rewritten to #if and
  *                outp is set to point to the '#' in the new statement.
  * If an end of file occurs, an error is generated and the function returns
- * true after setting outp to the character before the EOF.
+ * true after setting outp to the character before the CHAR_EOF.
  *
  * Nested #if ... #endif blocks are skipped altogether.
  *
@@ -1330,15 +1560,170 @@ handle_cond (Bool c)
  * push a new state onto the ifstate-stack.
  */
 {
-    struct ifstate *p;
+    lpc_ifstate_t *p;
 
     if (c || skip_to("else", "endif")) {
-        p = mempool_alloc(lexpool, sizeof(struct ifstate));
+        p = mempool_alloc(lexpool, sizeof(lpc_ifstate_t));
         p->next = iftop;
         iftop = p;
         p->state = c ? EXPECT_ELSE : EXPECT_ENDIF;
     }
 }
+
+
+/*-------------------------------------------------------------------------*/
+static Bool
+start_new_include (int fd, char * buf, char * name, char * name_ext, char delim)
+
+/* The lexer is about to read data from an included source (either file
+ * <fd> or allocated string <buf>) - handle setting up the include
+ * information. <name> is the name of the file to be read, <name_ext>
+ * is NULL or a string to add to <name> as " (<name_ext>)", <delim> is
+ * the delimiter ('"', '>' or ')') of the include filename.
+ *
+ * Return TRUE on success, FALSE if something failed.
+ */
+
+{
+    struct incstate *is, *ip;
+    size_t namelen;
+    int inc_depth;
+    ptrdiff_t linebufoffset;
+
+    /* Prepare defbuf for a (nested) include */
+    linebufoffset = linebufstart - &defbuf[defbuf_len];
+    if (outp - defbuf < 3*MAXLINE)
+    {
+        realloc_defbuf();
+        /* linebufstart is invalid now */
+        if (outp - defbuf < 2*MAXLINE)
+        {
+            lexerror("Maximum total buffer size exceeded");
+            return MY_FALSE;
+        }
+    }
+
+    /* Copy the current state, but don't put it on the stack
+     * yet in case we run into an error further down.
+     */
+    is = mempool_alloc(lexpool, sizeof(struct incstate));
+    if (!is) {
+        lexerror("Out of memory");
+        return MY_FALSE;
+    }
+
+    is->yyin = yyin;
+    is->line = current_line;
+    is->file = current_file;
+    is->linebufoffset = linebufoffset;
+    is->saved_char = saved_char;
+    is->next = inctop;
+    is->pragma_strict_types = pragma_strict_types;
+
+    /* Copy the new filename into current_file */
+
+    namelen = strlen(name);
+    if (name_ext != NULL)
+        namelen += 3 + strlen(name_ext);
+
+    current_file = xalloc(namelen+1);
+    if (!current_file)
+    {
+        current_file = is->file;
+        xfree(is);
+        lexerror("Out of memory");
+        return MY_FALSE;
+    }
+    strcpy(current_file, name);
+    if (name_ext)
+    {
+        strcat(current_file, " (");
+        strcat(current_file, name_ext);
+        strcat(current_file, ")");
+    }
+
+    /* Now it is save to put the saved state onto the stack*/
+    inctop = is;
+
+    /* Compute the include depth and store the include information */
+    for (inc_depth = 0, ip = inctop; ip; ip = ip->next)
+        inc_depth++;
+
+    if (name_ext)
+        inctop->inc_offset = store_include_info(name_ext, current_file, delim, inc_depth);
+    else
+        inctop->inc_offset = store_include_info(name, current_file, delim, inc_depth);
+
+    /* Initialise the rest of the lexer state */
+    pragma_strict_types = PRAGMA_WEAK_TYPES;
+    instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
+    current_line = 0;
+    linebufend   = outp - 1; /* allow trailing zero */
+    linebufstart = linebufend - MAXLINE;
+    *(outp = linebufend) = '\0';
+    set_input_source(fd, buf);
+    _myfilbuf();
+
+    return MY_TRUE;
+} /* start_new_include() */
+
+/*-------------------------------------------------------------------------*/
+static void
+add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
+
+/* A new file <cur_file> was opened while compiling object <object_file>.
+ * Add the auto-include information if available.
+ *
+ * If <cur_file> is NULL, then the <object_file> itself has just been
+ * opened, otherwise <cur_file> is an included file. In the latter case,
+ * flag <sys_include> purveys if it was a <>-type include.
+ *
+ * The global <current_line> must be valid and will be modified.
+ */
+
+{
+    char * auto_include_string = NULL;
+
+    if (driver_hook[H_AUTO_INCLUDE].type == T_STRING
+     && cur_file == NULL
+       )
+    {
+        auto_include_string = driver_hook[H_AUTO_INCLUDE].u.string;
+
+    }
+    else if (driver_hook[H_AUTO_INCLUDE].type == T_CLOSURE)
+    {
+        svalue_t *svp;
+
+        /* Setup and call the closure */
+        push_volatile_string((char *)obj_file);
+        if (cur_file != NULL)
+        {
+            push_volatile_string((char *)cur_file);
+            push_number(sys_include ? 1 : 0);
+        }
+        else
+        {
+            push_number(0);
+            push_number(0);
+        }
+        svp = secure_call_lambda(driver_hook+H_AUTO_INCLUDE, 3);
+        if (svp && svp->type == T_STRING)
+        {
+            auto_include_string = svp->u.string;
+        }
+    }
+
+    if (auto_include_string != NULL)
+    {
+        /* The auto include string is handled like a normal include */
+        current_line++; /* Make sure to restore to line 1 */
+        (void)start_new_include(-1, string_copy(auto_include_string)
+                               , current_file, "auto include", ')');
+        inctop->pragma_strict_types = PRAGMA_KEEP_TYPES;
+        current_line++; /* Make sure to start at line 1 */
+    }
+} /* add_auto_include() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1460,7 +1845,7 @@ merge (char *name, mp_int namelen, char *deststart)
 
 /*-------------------------------------------------------------------------*/
 static int
-inc_open (char *buf, char *name, mp_int namelen, char delim)
+open_include_file (char *buf, char *name, mp_int namelen, char delim)
 
 /* Open the include file <name> (length <namelen>) and return the file
  * descriptor. On failure, generate an error message and return -1.
@@ -1484,24 +1869,27 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
      * Since simulate::load_object() makes sure that the master has been
      * loaded, this test can only fail when the master is compiled.
      */
-    if (master_ob && !(master_ob->flags & O_DESTRUCTED))
+    if (master_ob && !(master_ob->flags & O_DESTRUCTED)
+     && (!EVALUATION_TOO_LONG())
+       )
     {
         svalue_t *res;
-#ifndef COMPAT_MODE
-        char * filename;
-#endif
 
         push_string_malloced(name);
-#ifndef COMPAT_MODE
-        filename = alloca(strlen(current_file)+2);
-        *filename = '/';
-        strcpy(filename+1, current_file);
-        push_volatile_string(filename);
-#else
-        push_volatile_string(current_file);
-#endif
+
+        if (!compat_mode)
+        {
+            char * filename;
+            filename = alloca(strlen(current_file)+2);
+            *filename = '/';
+            strcpy(filename+1, current_file);
+            push_volatile_string(filename);
+        }
+        else
+            push_volatile_string(current_file);
+
         push_number((delim == '"') ? 0 : 1);
-        res = apply_master_ob(STR_INCLUDE_FILE, 3);
+        res = apply_master(STR_INCLUDE_FILE, 3);
 
         if (res && !(res->type == T_NUMBER && !res->u.number))
         {
@@ -1510,7 +1898,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
              */
 
             char * cp;
-            
+
             if (res->type != T_STRING)
             {
                 yyerrorf("Illegal to include file '%s'.", name);
@@ -1524,7 +1912,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
             }
 
             for (cp = res->u.string; *cp == '/'; cp++) NOOP;
-            
+
             if (!legal_path(cp))
             {
                 yyerrorf("Illegal path '%s'.", res->u.string);
@@ -1548,9 +1936,14 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
             return -1;
         }
     }
+    else if (EVALUATION_TOO_LONG())
+    {
+        yyerrorf("Can't call master::%s for '%s': eval cost too big"
+                , STR_INCLUDE_FILE, name);
+    }
 
     /* The master apply didn't succeed, try the manual handling */
-    
+
     if (delim == '"') /* It's a "-include */
     {
         /* Merge the <name> with the <current_file> name. */
@@ -1571,12 +1964,15 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
         if (errno == ENFILE)
             lexerror("File table overflow");
 #endif
+        /* Include not found - fall back onto <> search pattern */
     }
 
     /* Handle a '<'-include. */
 
-    if (closure_hook[H_INCLUDE_DIRS].type == T_POINTER)
+    if (driver_hook[H_INCLUDE_DIRS].type == T_POINTER)
     {
+        char * cp;
+
         /* H_INCLUDE_DIRS is a vector of include directories.
          */
 
@@ -1586,20 +1982,24 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
             return -1;
         }
 
+        for (cp = name; *cp == '/'; cp++) NOOP;
+
         /* The filename must not specifiy parent directories */
-        if (!check_no_parentdirs(name))
+        if (!check_no_parentdirs(cp))
             return -1;
 
         /* Search all include dirs specified.
          */
         for (i = 0; i < inc_list_size; i++)
         {
-            sprintf(buf, "%s%s", inc_list[i].u.string, name);
-            if (!stat(buf, &aStat)
+            char * iname;
+            sprintf(buf, "%s%s", inc_list[i].u.string, cp);
+            for (iname = buf; *iname == '/'; iname++) NOOP;
+            if (!stat(iname, &aStat)
              && S_ISREG(aStat.st_mode)
-             && (fd = ixopen(buf, O_RDONLY|O_BINARY)) >= 0 )
+             && (fd = ixopen(iname, O_RDONLY|O_BINARY)) >= 0 )
             {
-                FCOUNT_INCL(buf);
+                FCOUNT_INCL(iname);
                 return fd;
             }
             if (errno == EMFILE) lexerror("File descriptors exhausted");
@@ -1610,7 +2010,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
 
         /* If we come here, the include file was not found */
     }
-    else if (closure_hook[H_INCLUDE_DIRS].type == T_CLOSURE)
+    else if (driver_hook[H_INCLUDE_DIRS].type == T_CLOSURE)
     {
         /* H_INCLUDE_DIRS is a function generating the full
          * include file name.
@@ -1621,16 +2021,19 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
         /* Setup and call the closure */
         push_string_malloced(name);
         push_volatile_string(current_file);
-        if (closure_hook[H_INCLUDE_DIRS].x.closure_type == CLOSURE_LAMBDA)
-            closure_hook[H_INCLUDE_DIRS].u.lambda->ob = current_object;
-        svp = secure_call_lambda(&closure_hook[H_INCLUDE_DIRS], 2);
+        if (driver_hook[H_INCLUDE_DIRS].x.closure_type == CLOSURE_LAMBDA)
+            driver_hook[H_INCLUDE_DIRS].u.lambda->ob = current_object;
+        svp = secure_call_lambda(&driver_hook[H_INCLUDE_DIRS], 2);
 
         /* The result must be legal relative pathname */
 
         if (svp && svp->type == T_STRING
          && strlen(svp->u.string) < INC_OPEN_BUFSIZE)
         {
-            strcpy(buf, svp->u.string);
+            char * cp;
+
+            for (cp = svp->u.string; *cp == '/'; cp++) NOOP;
+            strcpy(buf, cp);
             if (legal_path(buf))
             {
                 if (!stat(buf, &aStat)
@@ -1652,7 +2055,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
 
     /* File not found */
     return -1;
-} /* inc_open() */
+} /* open_include_file() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -1670,7 +2073,6 @@ handle_include (char *name)
     char  delim;     /* Filename end-delimiter ('"' or '>'). */
     char *old_outp;  /* Save the original outp */
     Bool  in_buffer = MY_FALSE; /* True if macro was expanded */
-    ptrdiff_t linebufoffset;  /* Position of current linebufstart */
     char  buf[INC_OPEN_BUFSIZE];
 
 #if 0
@@ -1828,68 +2230,15 @@ handle_include (char *name)
     outp = old_outp;  /* restore outp */
     *p = '\0';        /* mark the end of the filename */
 
-    /* Prepare defbuf for a (nested) include */
-    linebufoffset = linebufstart - &defbuf[defbuf_len];
-    if (outp - defbuf < 3*MAXLINE)
-    {
-        realloc_defbuf();
-        /* linebufstart is invalid now */
-        if (outp - defbuf < 2*MAXLINE)
-        {
-            lexerror("Maximum total buffer size exceeded");
-            return;
-        }
-    }
-
     /* Open the include file, put the current lexer state onto
      * the incstack, and set up for the new file.
      */
-    if ((fd = inc_open(buf, name, p - name, delim)) >= 0)
+    if ((fd = open_include_file(buf, name, p - name, delim)) >= 0)
     {
-        struct incstate *is;
-
-        store_include_info(name);
-
-        /* Copy the current state, but don't put it on the stack
-         * yet in case we run into an error further down.
-         */
-        is = mempool_alloc(lexpool, sizeof(struct incstate));
-        if (!is) {
-            lexerror("Out of memory");
+        if (!start_new_include(fd, NULL, buf, NULL, delim))
             return;
-        }
 
-        is->yyin_des = yyin_des;
-        is->line = current_line;
-        is->file = current_file;
-        is->linebufoffset = linebufoffset;
-        is->saved_char = saved_char;
-        is->next = inctop;
-        is->pragma_strict_types = pragma_strict_types;
-
-        /* Copy the new filename into current_file */
-        current_file = xalloc(strlen(buf)+1);
-        if (!current_file)
-        {
-            current_file = is->file;
-            xfree(is);
-            lexerror("Out of memory");
-            return;
-        }
-        strcpy(current_file, buf);
-
-        /* Now it is save to put the saved state onto the stack*/
-        inctop = is;
-
-        /* Initialise the rest of the lexer state */
-        pragma_strict_types = PRAGMA_WEAK_TYPES;
-        instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
-        current_line = 0;
-        linebufend   = outp - 1; /* allow trailing zero */
-        linebufstart = linebufend - MAXLINE;
-        *(outp = linebufend) = '\0';
-        yyin_des = fd;
-        _myfilbuf();
+        add_auto_include(object_file, current_file, delim != '"');
     }
     else
     {
@@ -1920,7 +2269,7 @@ skip_comment (void)
                 nexpands = 0;
                 if ((c = *p) == CHAR_EOF) {
                     outp = p - 1;
-                    lexerror("End of file in a comment");
+                    lexerror("End of file (or 0x01 character) in a comment");
                     return;
                 }
                 current_line++;
@@ -1947,7 +2296,7 @@ skip_comment (void)
                 if ((c = *p) == CHAR_EOF)
                 {
                     outp = p - 1;
-                    lexerror("End of file in a comment");
+                    lexerror("End of file (or 0x01 character) in a comment");
                     return;
                 }
                 current_line++;
@@ -1970,7 +2319,9 @@ skip_pp_comment (char *p)
 
 /* Skip a '//' line comment. <p> points to the first character after
  * the comment introducer, the function returns a pointer to the first
- * character after the terminating newline.
+ * character after the terminating newline. If the comment is ended
+ * prematurely by the end of file, the returned pointer will point at the
+ * EOF character.
  * Note that a '\<newline>' lineend does not terminate the comment.
  */
 
@@ -1980,6 +2331,10 @@ skip_pp_comment (char *p)
     for (;;)
     {
         c = *p++;
+        if (CHAR_EOF == c)
+        {
+            return p-1;
+        }
         if (c == '\n')
         {
             store_line_number_info();
@@ -2036,81 +2391,216 @@ static void
 handle_pragma (char *str)
 
 /* Handle the pragma <str>. Unknown pragmas are ignored.
+ * One pragma string can contain multiple actual pragmas, separated
+ * with comma (and additional spaces).
  */
 
 {
+    char * base, * next;
+
 #if defined(LEXDEBUG)
     printf("%s handle pragma:'%s'\n", time_stamp(), str);
 #endif
-    if (strcmp(str, "strict_types") == 0)
+
+    /* Loop over the pragma(s).
+     * If valid, base points to the first character of the pragma name,
+     * or to spaces before it.
+     */
+    for ( base = str, next = NULL
+        ; base != NULL && *base != '\0' && *base != '\r'
+        ; base = next
+        )
     {
-        pragma_strict_types = PRAGMA_STRICT_TYPES;
-        instrs[F_CALL_OTHER].ret_type = TYPE_UNKNOWN;
-    }
-    else if (strcmp(str, "strong_types") == 0)
-    {
-        pragma_strict_types = PRAGMA_STRONG_TYPES;
-        instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
-    }
-    else if (strcmp(str, "weak_types") == 0)
-    {
-        pragma_strict_types = PRAGMA_WEAK_TYPES;
-        instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
-    }
-    else if (strcmp(str, "save_types") == 0)
-    {
-        pragma_save_types = MY_TRUE;
-    }
-    else if (strcmp(str, "combine_strings") == 0)
-    {
-        pragma_combine_strings = MY_TRUE;
-    }
-    else if (strcmp(str, "no_combine_strings") == 0)
-    {
-        pragma_combine_strings = MY_FALSE;
-    }
-    else if (strcmp(str, "verbose_errors") == 0)
-    {
-        pragma_verbose_errors = MY_TRUE;
-    }
-    else if (strcmp(str, "no_clone") == 0)
-    {
-        pragma_no_clone = MY_TRUE;
-    }
-    else if (strcmp(str, "no_inherit") == 0)
-    {
-        pragma_no_inherit = MY_TRUE;
-    }
-    else if (strcmp(str, "no_shadow") == 0)
-    {
-        pragma_no_shadow = MY_TRUE;
-    }
-    else if (strcmp(str, "pedantic") == 0)
-    {
-        pragma_pedantic = MY_TRUE;
-    }
-    else if (strcmp(str, "sloppy") == 0)
-    {
-        pragma_pedantic = MY_FALSE;
-    }
-    else if (strcmp(str, "no_local_scopes") == 0)
-    {
-        pragma_use_local_scopes = MY_FALSE;
-    }
-    else if (strcmp(str, "local_scopes") == 0)
-    {
-        pragma_use_local_scopes = MY_TRUE;
-    }
+        size_t namelen;
+        Bool validPragma;
+
+        /* Skip spaces */
+        base = base + strspn(base, " \t\r");
+        if ('\0' == *base || '\r' == *base)
+            break;
+
+        /* Find next delimiter, if any, and determine the
+         * length of the pragma name.
+         */
+        next = strpbrk(base, " \t,\r");
+        if (NULL == next)
+            namelen = strlen(base);
+        else
+            namelen = next - base;
+
+        /* Evaluate the found pragma name */
+        validPragma = MY_FALSE;
+
+        if (namelen == 0)
+        {
+            if (master_ob)
+            {
+                yywarnf("Empty #pragma");
+            }
+            else
+            {
+                debug_message("Warning: Empty #pragma"
+                              ": file %s, line %d\n"
+                             , current_file, current_line);
+            }
+            validPragma = MY_TRUE; /* Since we already issued a warning */
+        }
+        else if (strncmp(base, "strict_types", namelen) == 0)
+        {
+            pragma_strict_types = PRAGMA_STRICT_TYPES;
+            instrs[F_CALL_OTHER].ret_type = TYPE_UNKNOWN;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "strong_types", namelen) == 0)
+        {
+            pragma_strict_types = PRAGMA_STRONG_TYPES;
+            instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "weak_types", namelen) == 0)
+        {
+            pragma_strict_types = PRAGMA_WEAK_TYPES;
+            instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "save_types", namelen) == 0)
+        {
+            pragma_save_types = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "combine_strings", namelen) == 0)
+        {
+            pragma_combine_strings = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_combine_strings", namelen) == 0)
+        {
+            pragma_combine_strings = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "verbose_errors", namelen) == 0)
+        {
+            pragma_verbose_errors = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_clone", namelen) == 0)
+        {
+            pragma_no_clone = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_inherit", namelen) == 0)
+        {
+            pragma_no_inherit = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_shadow", namelen) == 0)
+        {
+            pragma_no_shadow = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "pedantic", namelen) == 0)
+        {
+            pragma_pedantic = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "sloppy", namelen) == 0)
+        {
+            pragma_pedantic = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_local_scopes", namelen) == 0)
+        {
+            pragma_use_local_scopes = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "local_scopes", namelen) == 0)
+        {
+            pragma_use_local_scopes = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "warn_deprecated", namelen) == 0)
+        {
+            pragma_warn_deprecated = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_warn_deprecated", namelen) == 0)
+        {
+            pragma_warn_deprecated = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
 #if defined( DEBUG ) && defined ( TRACE_CODE )
-    else if (strcmp(str, "set_code_window") == 0)
-    {
-        set_code_window();
-    }
-    else if (strcmp(str, "show_code_window") == 0)
-    {
-        show_code_window();
-    }
+        else if (strncmp(base, "set_code_window", namelen) == 0)
+        {
+            set_code_window();
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "show_code_window", namelen) == 0)
+        {
+            show_code_window();
+            validPragma = MY_TRUE;
+        }
 #endif
+
+        /* Advance next to the next scanning position so that the
+         * for loop increment works.
+         */
+        if (NULL != next)
+        {
+            /* Skip spaces */
+            next = next + strspn(next, " \t\r");
+
+            if (',' == *next)
+            {
+                /* Skip the one allowed comma.
+                 * We allow the comma to be followed by lineend
+                 */
+                next++;
+            }
+            else if ('\0' != *next && '\r' != *next)
+            {
+                if (master_ob)
+                {
+                    yywarnf("Missing comma between #pragma options");
+                }
+                else
+                {
+                    debug_message("Warning: Missing comma between #pragma options"
+                                  ": file %s, line %d\n"
+                                 , current_file, current_line);
+                }
+            }
+
+            if ('\0' == *next || '\r' == *next)
+            {
+                /* End of string */
+                next = NULL;
+            }
+
+            /* If next now points to something else but space or a pragma
+             * name, the next loop iteration will complain about an illegal
+             * pragma.
+             */
+        }
+
+        /* Finally check if the pragma was valid */
+        if (!validPragma)
+        {
+            if (master_ob)
+            {
+                /* Calling yywarnf() without a master can cause the game
+                 * to shut down, because yywarnf() eventually tries to call
+                 * a master lfun.
+                 */
+                yywarnf("Unknown #pragma '%.*s'", (int)namelen, base);
+            }
+            else
+            {
+                debug_message("Warning: Unknown #pragma '%.*s': file %s, line %d\n"
+                             , (int)namelen, base, current_file, current_line);
+            }
+        }
+
+    } /* for (base) */
 } /* handle_pragma() */
 
 /*-------------------------------------------------------------------------*/
@@ -2127,6 +2617,282 @@ number (long i)
     yylval.number = i;
     return L_NUMBER;
 }
+
+/*-------------------------------------------------------------------------*/
+static INLINE char *
+parse_numeric_escape (char * cp, unsigned char * p_char)
+
+/* Parse a character constant in one of the following formats:
+ *   <decimal>      (max 3 digits)
+ *   0o<octal>      (max 3 digits)
+ *   0x<sedecimal>  (max 2 digits)
+ *   x<sedecimal>   (max 2 digits)
+ *   0b<binary>     (max 8 digits)
+ *
+ * with <cp> pointing to the first character. The function parses
+ * until the first illegal character, but at max the given number of
+ * digits.
+ *
+ * The parsed number is stored in *<p_num>, the function returns the pointer
+ * to the first character after the number.
+ * If no valid character constant could be found, NULL is returned.
+ */
+
+{
+    char c;
+    int num_digits = 3;
+    unsigned long l;
+    unsigned long base = 10;
+
+    c = *cp++;
+
+    if ('0' == c)
+    {
+        /* '0' introduces decimal, octal, binary and sedecimal numbers, or it
+         * can be a float.
+         *
+         * Sedecimals are handled in a following if-clause to allow the
+         * two possible prefixes.
+         */
+
+        c = *cp++;
+
+        switch (c)
+        {
+        case 'X': case 'x':
+            /* Sedecimal number are handled below - here just fall
+             * through.
+             */
+            NOOP;
+            break;
+
+        case 'b': case 'B':
+          {
+            c = *cp++;
+            num_digits = 8;
+            base = 2;
+            break;
+          }
+
+        case 'o': case 'O':
+            c = *cp++;
+            base = 8;
+            num_digits = 3;
+            break;
+
+        default:
+            c = '0';
+            cp--;
+            break;
+        } /* switch(c) */
+    } /* if ('0' == c) */
+
+    if ( c == 'X' || c == 'x' )
+    {
+        if (!leXdigit(*cp))
+        {
+            yywarn("Character constant used with no valid digits");
+            return NULL;
+        }
+
+        /* strtol() gets the sign bit wrong,
+         * strtoul() isn't portable enough.
+         */
+        num_digits = 2;
+        l = 0;
+        while(leXdigit(c = *cp++) && num_digits-- > 0)
+        {
+            if (c > '9')
+                c = (char)((c & 0xf) + ( '9' + 1 - ('a' & 0xf) ));
+            l <<= 4;
+            l += c - '0';
+        }
+    }
+    else
+    {
+        /* Parse a normal number from here */
+
+        l = c - '0';
+        if  (l > base) /* remember: l is unsigned */
+        {
+            yywarn("Character constant used with no valid digits");
+            return NULL;
+        }
+        while (lexdigit(c = *cp++) && c < '0'+base && --num_digits > 0)
+              l = l * base + (c - '0');
+    }
+
+    if (l >= 256)
+        yywarn("Character constant out of range (> 255)");
+
+    *p_char = l & 0xff;
+    return cp-1;
+
+} /* parse_numeric_escape() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE char *
+parse_number (char * cp, unsigned long * p_num)
+
+/* Parse a positive integer number in one of the following formats:
+ *   <decimal>
+ *   0o<octal>
+ *   0x<sedecimal>
+ *   x<sedecimal>
+ *   0b<binary>
+ *
+ * with <cp> pointing to the first character.
+ *
+ * The parsed number is stored in *<p_num>, the function returns the pointer
+ * to the first character after the number.
+ */
+
+{
+    char c;
+    unsigned long l;
+    unsigned long base = 10;
+
+    c = *cp++;
+
+    if ('0' == c)
+    {
+        /* '0' introduces decimal, octal, binary and sedecimal numbers, or it
+         * can be a float.
+         *
+         * Sedecimals are handled in a following if-clause to allow the
+         * two possible prefixes.
+         */
+
+        c = *cp++;
+
+        switch (c)
+        {
+        case 'X': case 'x':
+            /* Sedecimal number are handled below - here just fall
+             * through.
+             */
+            NOOP;
+            break;
+
+        case 'b': case 'B':
+          {
+            l = 0;
+            --cp;
+            while('0' == (c = *++cp) || '1' == c)
+            {
+                l <<= 1;
+                l += c - '0';
+            }
+
+            *p_num = l;
+            return cp;
+          }
+
+        case 'o': case 'O':
+            c = '0';
+            base = 8;
+            break;
+
+        default:
+            /* If some non-digit follows, it's just the number 0.
+             */
+            if (!lexdigit(c))
+            {
+                *p_num = 0;
+                return cp-1;
+            }
+            break;
+        } /* switch(c) */
+    } /* if ('0' == c) */
+
+    if ( c == 'X' || c == 'x' )
+    {
+
+        /* strtol() gets the sign bit wrong,
+         * strtoul() isn't portable enough.
+         */
+        l = 0;
+        --cp;
+        while(leXdigit(c = *++cp))
+        {
+            if (c > '9')
+                c = (char)((c & 0xf) + ( '9' + 1 - ('a' & 0xf) ));
+            l <<= 4;
+            l += c - '0';
+        }
+        *p_num = l;
+        return cp;
+    }
+
+    /* Parse a normal number from here */
+
+    l = c - '0';
+    while (lexdigit(c = *cp++) && c < '0'+base) l = l * base + (c - '0');
+
+    *p_num = l;
+    return cp-1;
+
+} /* parse_number() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE char *
+parse_escaped_char (char * cp, char * p_char)
+
+/* Parse the sequence for an escaped character:
+ *
+ *   \a : Bell (0x07)
+ *   \b : Backspace (0x08)
+ *   \e : Escape (0x1b)
+ *   \f : Formfeed (0x0c)
+ *   \n : Newline (0x0a)
+ *   \r : Carriage-Return (0x0d)
+ *   \t : Tab (0x09)
+ *   \<decimal>, \0o<octal>, \x<sedecimal>, \0x<sedecimal>, \0b<binary>:
+ *        the character with the given code.
+ *   \<other printable character> : the printable character
+ *
+ * with <cp> pointing to the character after the '\'.
+ *
+ * The parsed character is stored in *<p_char>, the function returns the
+ * pointer to the first character after the sequence.
+ *
+ * If the sequence is not one of the recognized sequences, NULL is returned.
+ */
+
+{
+    char c;
+
+    switch (c = *cp++)
+    {
+    case '\n':
+    case CHAR_EOF:
+        return NULL; break;
+
+    case 'a': c = '\007'; break;
+    case 'b': c = '\b';   break;
+    case 'e': c = '\033'; break;
+    case 'f': c = '\014'; break;
+    case 'n': c = '\n';   break;
+    case 'r': c = '\r';   break;
+    case 't': c = '\t';   break;
+    case '0': case '1': case '2': case '3': case '4':
+    case '5': case '6': case '7': case '8': case '9':
+    case 'x': case 'X':
+      {
+        char * cp2;
+
+        /* If no valid escaped character is found, treat the sequence
+         * as a normal escaped character.
+         */
+        cp2 = parse_numeric_escape(cp-1, (unsigned char *)&c);
+        if (cp2 != NULL)
+            cp = cp2;
+      }
+    } /* switch() */
+
+    *p_char = c;
+    return cp;
+} /* parse_escaped_char() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -2243,8 +3009,7 @@ yylex1 (void)
     yyp = outp;
 
     for(;;) {
-        switch(c = *yyp++)
-
+        switch((unsigned char)(c = *yyp++))
         {
 
         /* --- End Of File --- */
@@ -2263,21 +3028,43 @@ yylex1 (void)
                     , /* PRAGMA_STRICT_TYPES: */ TYPE_UNKNOWN };
 
                 struct incstate *p;
+                Bool was_string_source = (yyin.fd == -1);
 
                 p = inctop;
 
                 /* End the lexing of the included file */
-                close(yyin_des);
+                close_input_source();
                 xfree(current_file);
                 nexpands = 0;
 
                 /* Restore the previous state */
                 current_file = p->file;
-                current_line = p->line + 1;
-                pragma_strict_types = p->pragma_strict_types;
-                instrs[F_CALL_OTHER].ret_type =
-                    call_other_return_types[pragma_strict_types];
-                yyin_des = p->yyin_des;
+                current_line = p->line;
+
+                if (!was_string_source)
+                    current_line++;
+                store_include_end(p->inc_offset);
+
+                if (was_string_source)
+                {
+                    /* 'string' includes are supposed to be inline
+                     * so correct the line number information to take out
+                     * the assumed newlines.
+                     * This has to be done after store_include_end()
+                     * since that function may remove all line number
+                     * information since the start of the include.
+                     */
+                    current_line -= 1;
+                    store_line_number_backward(1);
+                }
+
+                if (p->pragma_strict_types != PRAGMA_KEEP_TYPES)
+                {
+                    pragma_strict_types = p->pragma_strict_types;
+                    instrs[F_CALL_OTHER].ret_type =
+                        call_other_return_types[pragma_strict_types];
+                }
+                yyin = p->yyin;
                 saved_char = p->saved_char;
                 inctop = p->next;
                 *linebufend = '\n';
@@ -2290,7 +3077,6 @@ yylex1 (void)
                     outp = yyp;
                     yyp = _myfilbuf();
                 }
-                store_include_end();
                 break;
             }
 
@@ -2301,7 +3087,7 @@ yylex1 (void)
                 /* Oops, pending #if!
                  * Note the error and clean up the if-stack.
                  */
-                struct ifstate *p = iftop;
+                lpc_ifstate_t *p = iftop;
 
                 yyerror(p->state == EXPECT_ENDIF ? "Missing #endif" : "Missing #else");
                 while(iftop)
@@ -2383,8 +3169,16 @@ yylex1 (void)
         case '&':
             switch(c = *yyp++)
             {
-            case '&': outp = yyp;
-                      return L_LAND;
+            case '&':
+                switch(c = *yyp++)
+                {
+                case '=': yylval.number = F_LAND_EQ;
+                          outp = yyp;
+                          return L_ASSIGN;
+                default:  yyp--;
+                }
+                outp = yyp;
+                return L_LAND;
             case '=': yylval.number = F_AND_EQ;
                       outp = yyp;
                       return L_ASSIGN;
@@ -2396,8 +3190,16 @@ yylex1 (void)
         case '|':
             switch(c = *yyp++)
             {
-            case '|': outp = yyp;
-                      return L_LOR;
+            case '|':
+                switch(c = *yyp++)
+                {
+                case '=': yylval.number = F_LOR_EQ;
+                          outp = yyp;
+                          return L_ASSIGN;
+                default:  yyp--;
+                }
+                outp = yyp;
+                return L_LOR;
             case '=': yylval.number = F_OR_EQ;
                       outp = yyp;
                       return L_ASSIGN;
@@ -2449,6 +3251,19 @@ yylex1 (void)
                     yylval.number = F_RSH_EQ;
                     outp = yyp;
                     return L_ASSIGN;
+                }
+                if (*yyp == '>')
+                {
+                    yyp++;
+                    if (*yyp == '=')
+                    {
+                        yyp++;
+                        yylval.number = F_RSHL_EQ;
+                        outp = yyp;
+                        return L_ASSIGN;
+                    }
+                    outp = yyp;
+                    return L_RSHL;
                 }
                 outp = yyp;
                 return L_RSH;
@@ -2548,6 +3363,7 @@ yylex1 (void)
                 size_t pos_return;  /* position of the 'return' */
                 char name[256+MAXPATHLEN+1];
                 int level;       /* Nesting level of embedded (: :) */
+                int blevel;      /* Nesting level of embedded { } */
                 int first_line;  /* For error messages */
                 char *start;
 
@@ -2578,28 +3394,42 @@ yylex1 (void)
                 strbuf_zero(textbuf);
                 fun->next = NULL; /* Terminate the list properly */
 
-                /* Create the name of the new inline function */
-                sprintf(name, "__inline_%s_%d_%04x", current_file
-                             , current_line, next_inline_fun++);
-
-                /* Convert all non-alnums to '_' */
-                for (start = name; *start != '\0'; start++)
+                /* Create the name of the new inline function.
+                 * We have to make sure the name is really unique.
+                 */
+                do
                 {
-                    if (!isalnum((unsigned)(*start)))
-                        *start = '_';
+                    sprintf(name, "__inline_%s_%d_%04x", current_file
+                                 , current_line, next_inline_fun++);
+
+                    /* Convert all non-alnums to '_' */
+                    for (start = name; *start != '\0'; start++)
+                    {
+                        if (!isalnum((unsigned char)(*start)))
+                            *start = '_';
+                    }
+                } while (    find_shared_identifier(name, 0, 0)
+                          && next_inline_fun != 0);
+
+                if (next_inline_fun == 0)
+                {
+                    yyerror("Can't generate unique name for inline closure.");
+                    return -1;
                 }
 
                 /* Create the function header in the string buffer.
                  * For now we insert a 'return' which we might 'space out'
                  * later.
                  */
-                strbuf_addf(textbuf
-                           , "\n#line %d\n"
-                             "varargs mixed %s (mixed $1, mixed $2, mixed $3,"
+                strbuf_addf(textbuf, "\n#line %d\n", current_line-1);
+                strbuf_addf(textbuf,
+                             "private nomask varargs mixed %s "
+                             "(mixed $1, mixed $2, mixed $3,"
                              " mixed $4, mixed $5, mixed $6, mixed $7,"
                              " mixed $8, mixed $9) {\n"
                              "return "
-                           , current_line-1, name);
+                           , name
+                           );
                 pos_return = (size_t)textbuf->length-7;
 
                 /* Set yyp to the end of (: ... :), and also check
@@ -2607,6 +3437,7 @@ yylex1 (void)
                  */
                 yyp++;
                 level = 1;
+                blevel = 0;
                 start = yyp;
                 while (level)
                 {
@@ -2626,6 +3457,8 @@ yylex1 (void)
                          && (yyp[1] != ':' || yyp[2] == ':' || yyp[2] == ')')
                            )
                             level++, yyp++;
+                        else if (yyp[0] == '{')
+                            yyp++;
                         break;
 
                     case ':':
@@ -2636,6 +3469,22 @@ yylex1 (void)
                     case '#':
                         if (*yyp == '\'')
                             yyp++;
+                        break;
+
+                    case '{':
+                        blevel++;
+                        break;
+
+                    case '}':
+                        if (yyp[0] != ')')
+                        {
+                            if (!blevel)
+                            {
+                                yyerror("Illegal block nesting");
+                                return -1;
+                            }
+                            blevel--;
+                        }
                         break;
 
                     case '/':
@@ -2694,13 +3543,96 @@ yylex1 (void)
                       {
                         char delimiter = yyp[-1];
 
+                        /* If the delimiter is a ', we have to check
+                         * for (possibly escaped) character constants
+                         * and symbols.
+                         */
+                        if (delimiter == '\'' && *yyp == '\\')
+                        {
+                            /* Parse an escape sequence */
+
+                            if ('\n' != yyp[1] && CHAR_EOF != yyp[1])
+                            {
+                                char *cp;
+                                char lc; /* Since c is 'register' */
+
+                                cp = parse_escaped_char(yyp+1, &lc);
+                                if (!cp)
+                                    yyerror("Illegal character constant");
+                                yyp = cp;
+                            }
+
+                            /* Test if it's terminated by a quote (this also
+                             * catches the \<nl> and \<eof> case).
+                             */
+                            if (*yyp++ != '\'')
+                            {
+                                yyp--;
+                                yyerror("Illegal character constant");
+                            }
+                        }
+                        else if (delimiter == '\''
+                         && ( (    yyp[1] != '\''
+                               || (   *yyp == '\''
+                                   && (   yyp[1] == '('
+                                       || isalunum(yyp[1])
+                                       || yyp[1] == '\'')
+                                      )
+                                  )
+                            )
+                           )
+                        {
+                            /* Skip the symbol or quoted aggregate
+                             *
+                             * The test rejects all sequences of the form
+                             *   'x'
+                             * and
+                             *   '''x, with x indicating that the ' character
+                             *         itself is meant as the desired constant.
+                             *
+                             * It accepts all forms of quoted symbols, with
+                             * one or more leading ' characters.
+                             */
+
+                            /* Skip all leading quotes.
+                             */
+                            while (*yyp == '\'')
+                            {
+                                yyp++;
+                            }
+
+                            /* If the first non-quote is not an alnum, it must
+                             * be a quoted aggregrate or an error.
+                             */
+                            if (!isalpha((unsigned char)*yyp)
+                                 && *yyp != '_'
+                               )
+                            {
+                                if (*yyp == '(' && yyp[1] == '{')
+                                {
+                                    yyp += 2;
+                                }
+                                else
+                                {
+                                    lexerror("Illegal character constant");
+                                    return -1;
+                                }
+                            }
+                            else
+                            {
+                                /* Find the end of the symbol. */
+                                while (isalunum(*++yyp)) NOOP;
+                            }
+                        }
+                        else /* Normal string or character */
                         while ((c = *yyp++) != delimiter)
                         {
                             if (c == CHAR_EOF)
                             {
                                 /* Just in case... */
                                 current_line = first_line;
-                                lexerror("Unexpected end of file in string.\n");
+                                lexerror("Unexpected end of file "
+                                         "(or 0x01 character) in string.\n");
                                 return -1;
                             }
                             else if (c == '\\')
@@ -2811,9 +3743,9 @@ yylex1 (void)
                 /* --- #': Closure Symbol --- */
 
                 ident_t *p;
+                char *super_name = NULL;
                 char *wordstart = ++yyp;
-                Bool efun_override;
-                    /* True if 'efun::' is specified. */
+                Bool efun_override;  /* True if 'efun::' is specified. */
 
                 /* Set yyp to the last character of the functionname
                  * after the #'.
@@ -2825,7 +3757,7 @@ yylex1 (void)
                 /* the assignment is good for the data flow analysis :-} */
 
                 /* Just one character? It must be an operator */
-                if (yyp == wordstart)
+                if (yyp == wordstart && *yyp != ':')
                 {
                     int i;
 
@@ -2835,14 +3767,13 @@ yylex1 (void)
                     return L_CLOSURE;
                 }
 
-                /* Test for the 'efun::' override. If it is there,
+                /* Test for an inherited function name specification.
+                 * If found, set super_name to the inherit name, and
                  * reset wordstart/yyp to point to the name after the '::'.
                  */
-                efun_override = MY_FALSE;
-                if (yyp - wordstart == 4
-                 && !strncmp(wordstart, "efun::", 6))
+                if (':' == *yyp && ':' == *(yyp+1))
                 {
-                    efun_override = MY_TRUE;
+                    super_name = wordstart;
                     wordstart = yyp += 2;
                     do
                         c = *yyp++;
@@ -2850,9 +3781,39 @@ yylex1 (void)
                     c = *--yyp;
                 }
 
+                /* Test for the 'efun::' override.
+                 */
+                efun_override = MY_FALSE;
+                if (super_name != NULL && !strncmp(super_name, "efun::", 6))
+                {
+                    efun_override = MY_TRUE;
+                    super_name = NULL;
+                }
+
                 outp = yyp;
 
                 /* Lookup the name parsed from the text */
+
+                if (super_name != NULL)
+                {
+                    short ix;
+
+                    *yyp = '\0'; /* c holds the char at this place */
+                    *(wordstart-2) = '\0';
+                    ix = find_inherited(super_name, wordstart);
+                    if (ix < 0)
+                    {
+                        yyerrorf("Undefined function: %.50s::%.50s"
+                                , super_name, wordstart);
+                        ix = CLOSURE_EFUN_OFFS;
+                    }
+                    *yyp = c;
+                    *(wordstart-2) = ':';
+
+                    yylval.closure.number = ix;
+                    return L_CLOSURE;
+                }
+
                 *yyp = '\0'; /* c holds the char at this place */
                 p = make_shared_identifier(wordstart, I_TYPE_GLOBAL, 0);
                 *yyp = c;
@@ -2944,7 +3905,7 @@ yylex1 (void)
                         free_shared_identifier(p);
                     c = *yyp;
                     *yyp = '\0';
-                    yyerrorf("Undefined function: %s", wordstart);
+                    yyerrorf("Undefined function: %.50s", wordstart);
                     *yyp = c;
                     yylval.closure.number = CLOSURE_EFUN_OFFS;
                     return L_CLOSURE;
@@ -2959,14 +3920,16 @@ yylex1 (void)
                  && p->u.global.sim_efun >= 0
                  && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
                  && p->u.global.efun >= 0
-                 && master_ob)
+                 && master_ob
+                 && (!EVALUATION_TOO_LONG())
+                   )
                 {
                     svalue_t *res;
 
                     push_volatile_string("nomask simul_efun");
                     push_volatile_string(current_file);
                     push_shared_string(p->name);
-                    res = apply_master_ob(STR_PRIVILEGE, 3);
+                    res = apply_master(STR_PRIVILEGE, 3);
                     if (!res || res->type != T_NUMBER || res->u.number < 0)
                     {
                         yyerrorf(
@@ -2979,6 +3942,13 @@ yylex1 (void)
                     {
                         efun_override = MY_FALSE;
                     }
+                }
+                else if (EVALUATION_TOO_LONG())
+                {
+                    yyerrorf("Can't call master::%s for "
+                             "'nomask simul_efun %s': eval cost too big"
+                            , STR_PRIVILEGE, p->name);
+                    efun_override = MY_FALSE;
                 }
 
                 /* The code will be L_CLOSURE, now determine the right
@@ -3053,7 +4023,7 @@ yylex1 (void)
                     /* None of these all */
                     c = *yyp;
                     *yyp = 0;
-                    yyerrorf("Undefined function: %s", wordstart);
+                    yyerrorf("Undefined function: %.50s", wordstart);
                     *yyp = c;
                     yylval.closure.number = CLOSURE_EFUN_OFFS;
 
@@ -3221,7 +4191,7 @@ yylex1 (void)
 
                     if (iftop && iftop->state == EXPECT_ELSE)
                     {
-                        struct ifstate *p = iftop;
+                        lpc_ifstate_t *p = iftop;
 
                         iftop = p->next;
                         mempool_free(lexpool, p);
@@ -3236,7 +4206,7 @@ yylex1 (void)
                 {
                     if (iftop && iftop->state == EXPECT_ELSE)
                     {
-                        struct ifstate *p = iftop;
+                        lpc_ifstate_t *p = iftop;
 
                         iftop = p->next;
                         mempool_free(lexpool, p);
@@ -3261,7 +4231,7 @@ yylex1 (void)
                      && (   iftop->state == EXPECT_ENDIF
                          || iftop->state == EXPECT_ELSE))
                     {
-                        struct ifstate *p = iftop;
+                        lpc_ifstate_t *p = iftop;
 
                         iftop = p->next;
                         mempool_free(lexpool, p);
@@ -3308,9 +4278,9 @@ yylex1 (void)
                             else
                             {
                                 *q = p->next;
-                                free_string(p->name);
                             }
                             xfree(p->u.define.exps.str);
+                            free_string(p->name);
                             p->name = NULL;
                                 /* mark for later freeing by all_defines */
                             /* success */
@@ -3322,7 +4292,6 @@ yylex1 (void)
                             {
                                 p->inferior->next = p->next;
                                 *q = p->inferior;
-                                ref_string(p->name);
                             }
                             else
                             {
@@ -3341,7 +4310,6 @@ yylex1 (void)
                 }
                 else if (strncmp("pragma", yytext, wlen) == 0)
                 {
-                    deltrail(sp);
                     handle_pragma(sp);
                 }
                 else if (strncmp("line", yytext, wlen) == 0)
@@ -3386,20 +4354,22 @@ yylex1 (void)
             if (c == '\\')
             {
                 /* Parse an escape sequence */
-                switch(c = *yyp++)
+
+                if ('\n' != *yyp && CHAR_EOF != *yyp)
                 {
-                    case '\n':
-                    case CHAR_EOF:
-                        yyp--; /* this will be noted as error below */
-                        break;
-                    case 'a': c = '\007'; break;
-                    case 'b': c = '\b';   break;
-                    case 'e': c = '\033'; break;
-                    case 'f': c = '\014'; break;
-                    case 'n': c = '\n';   break;
-                    case 'r': c = '\r';   break;
-                    case 't': c = '\t';   break;
+                    char *cp;
+                    char lc; /* Since c is 'register' */
+
+                    cp = parse_escaped_char(yyp, &lc);
+                    if (!cp)
+                        yyerror("Illegal character constant");
+                    yyp = cp;
+                    c = lc;
                 }
+
+                /* Test if it's terminated by a quote (this also
+                 * catches the \<nl> and \<eof> case).
+                 */
                 if (*yyp++ != '\'')
                 {
                     yyp--;
@@ -3532,7 +4502,7 @@ yylex1 (void)
                         if (*p == CHAR_EOF )
                         {
                             outp = p;
-                            lexerror("End of file in string");
+                            lexerror("End of file (or 0x01 character) in string");
                             return string("");
                         }
                         if (!*p)
@@ -3544,14 +4514,17 @@ yylex1 (void)
                             p--;
                         break;
 
-                    case 'a': *yyp++ = '\007'; break;
-                    case 'b': *yyp++ = '\b';   break;
-                    case 'e': *yyp++ = '\033'; break;
-                    case 'f': *yyp++ = '\014'; break;
-                    case 'n': *yyp++ = '\n'; break;
-                    case 'r': *yyp++ = '\r'; break;
-                    case 't': *yyp++ = '\t'; break;
-                    default : *yyp++ = c;
+                    default:
+                      {
+                          char *cp, lc;
+
+                          cp = parse_escaped_char(p-1, &lc);
+                          if (!cp)
+                              yyerror("Illegal escaped character in string.");
+                          p = cp;
+                          *yyp++ = lc;
+                          break;
+                      }
                     }
                 }
             } /* for() */
@@ -3563,79 +4536,40 @@ yylex1 (void)
 
         /* --- Numbers --- */
 
-        case '0':
-
-            /* '0' introduces octal and sedecimal numbers, or it
-             * can be a float
-             */
-
-            c = *yyp++;
-            if ( c == 'X' || c == 'x' )
-            {
-                unsigned long l;
-
-                /* strtol() gets the sign bit wrong,
-                 * strtoul() isn't portable enough.
-                 */
-                l = 0;
-                --yyp;
-                while(leXdigit(c = *++yyp))
-                {
-                    if (c > '9')
-                        c = (char)((c & 0xf) + ( '9' + 1 - ('a' & 0xf) ));
-                    l <<= 4;
-                    l += c - '0';
-                }
-                outp = yyp;
-                return number((long)l);
-            }
-
-            /* If one '.' follows, it's the start of a float.
-             * If two '..' follow, it's one end of a range
-             * If some other non-digit follows, it's just the number 0.
-             */
-            yyp--;
-            if (!lexdigit(c) && (c != '.' || yyp[1] == '.') )
-            {
-                outp = yyp;
-                return number(0);
-            }
-            c = '0';
-
-            /* FALLTHROUGH */
-
-        case '1':case '2':case '3':case '4':
+        case '0':case '1':case '2':case '3':case '4':
         case '5':case '6':case '7':case '8':case '9':
         {
-            char *numstart = yyp;
-            long l;
+            char *numstart = yyp-1;
+            unsigned long l;
 
-            l = c - '0';
-            while(lexdigit(c = *yyp++)) l = (((l << 2)+l) << 1) +
-#if defined(atarist) || defined(sun)
-/* everybody with ascii is invited to join in... */
-                  (c & 0xf ); /* can be done in the same step as the type conversion */
-#else
-                  (c - '0');
-#endif
+            /* Scan ahead to see if this is a float number */
+            while (lexdigit(c = *yyp++)) NOOP ;
 
-            /* If it's a float (and not a range), gobble up all remaining
-             * digits and simply use atof() to convert the float.
-             * TODO: This breaks on floats in exponential repr. like 1.2E-3.
+            /* If it's a float (and not a range), simply use strtod()
+             * to convert the float and to update the text pointer.
              */
-            if (c == '.' && *yyp != '.')
+            if ('.' == c && '.' != *yyp)
             {
-                while(lexdigit(*yyp++)) NOOP;
-                c = *--yyp;
-                *yyp = 0;
-                yylval.float_number = atof(numstart-1);
-                *yyp = c;
-                outp = yyp;
+                char * numend;  /* Because yyp is 'register' */
+                errno = 0; /* Because strtod() doesn't clear it on success */
+                yylval.float_number = strtod(numstart, &numend);
+                if (errno == ERANGE)
+                {
+                    yywarn("Floating point number out of range.");
+                }
+                else if (errno == EINVAL)
+                {
+                    yyerror("Floating point number can't be represented.");
+                }
+                outp = numend;
                 return L_FLOAT;
             }
-            --yyp;
+
+            /* Nope, normal number */
+            yyp = parse_number(numstart, &l);
+
             outp = yyp;
-            return number(l);
+            return number((long)l);
         }
 
 
@@ -3649,6 +4583,22 @@ yylex1 (void)
         case 'j':case 'k':case 'l':case 'm':case 'n':case 'o':case 'p':
         case 'q':case 'r':case 's':case 't':case 'u':case 'v':case 'w':
         case 'x':case 'y':case 'z':case '_':case '$':
+        case 0xC0:case 0xC1:case 0xC2:case 0xC3:
+        case 0xC4:case 0xC5:case 0xC6:case 0xC7:
+        case 0xC8:case 0xC9:case 0xCA:case 0xCB:
+        case 0xCC:case 0xCD:case 0xCE:case 0xCF:
+        case 0xD0:case 0xD1:case 0xD2:case 0xD3:
+        case 0xD4:case 0xD5:case 0xD6:case 0xD7:
+        case 0xD8:case 0xD9:case 0xDA:case 0xDB:
+        case 0xDC:case 0xDD:case 0xDE:case 0xDF:
+        case 0xE0:case 0xE1:case 0xE2:case 0xE3:
+        case 0xE4:case 0xE5:case 0xE6:case 0xE7:
+        case 0xE8:case 0xE9:case 0xEA:case 0xEB:
+        case 0xEC:case 0xED:case 0xEE:case 0xEF:
+        case 0xF0:case 0xF1:case 0xF2:case 0xF3:
+        case 0xF4:case 0xF5:case 0xF6:case 0xF7:
+        case 0xF8:case 0xF9:case 0xFA:case 0xFB:
+        case 0xFC:case 0xFD:case 0xFE:case 0xFF:
         {
             ident_t *p;
             char *wordstart = yyp-1;
@@ -3765,12 +4715,15 @@ start_new_file (int fd)
 
 /* Start the compilation/lexing of the lpc file opened on file <fd>.
  * This must not be called for included files.
+ * The global <current_file> contains the name of the file to be compiled.
  */
 
 {
+    object_file = current_file;
+
     free_defines();
 
-    yyin_des = fd;
+    set_input_source(fd, NULL);
 
     if (!defbuf_len)
     {
@@ -3785,12 +4738,6 @@ start_new_file (int fd)
 
     lex_fatal = MY_FALSE;
 
-    if (auto_include_string)
-    {
-        add_input(auto_include_string);
-        current_line = auto_include_start;
-    }
-
     pragma_strict_types = PRAGMA_WEAK_TYPES;
     instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
     pragma_use_local_scopes = MY_TRUE;
@@ -3800,11 +4747,15 @@ start_new_file (int fd)
     pragma_no_inherit = MY_FALSE;
     pragma_no_shadow = MY_FALSE;
     pragma_pedantic = MY_FALSE;
+    pragma_warn_deprecated = MY_FALSE;
+    pragma_combine_strings = MY_TRUE;
 
     nexpands = 0;
 
     next_inline_fun = 0;
     insert_inline_fun_now = MY_FALSE;
+
+    add_auto_include(object_file, NULL, MY_FALSE);
 } /* start_new_file() */
 
 /*-------------------------------------------------------------------------*/
@@ -3819,10 +4770,10 @@ end_new_file (void)
     {
         struct incstate *p;
         p = inctop;
-        close(yyin_des);
+        close_input_source();
         xfree(current_file);
         current_file = p->file;
-        yyin_des = p->yyin_des;
+        yyin = p->yyin;
         inctop = p->next;
     }
 
@@ -3996,13 +4947,14 @@ refill (Bool quote)
             lexerror("Line too long");
             break;
         }
-    } while (c != '\n');
+    } while (c != '\n' && c != CHAR_EOF);
 
     /* Refill the input buffer */
     myfilbuf();
 
-    /* Replace the trailing \n by a newline */
-    p[-1] = ' ';
+    /* Replace the trailing \n by a space */
+    if (p[-1] == '\n')
+        p[-1] = ' ';
     *p = '\0';
 
     nexpands = 0;
@@ -4046,11 +4998,28 @@ handle_define (char *yyt, Bool quote)
 
     char namebuf[NSIZE];      /* temp buffer for read identifiers */
     char args[NARGS][NSIZE];  /* parsed argument names of function macros */
+#if defined(CYGWIN) && __GNUC__ >= 2
+    char *mtext;
+      /* replacement text, with arguments replaced by the MARKS characters.
+       * Under Cygwin and high optimization, the compiler produces faulty
+       * code if the mtext[MLEN] definition is used.
+       */
+#else
     char mtext[MLEN];
       /* replacement text, with arguments replaced by the MARKS characters
        */
+#endif
     char *p;                  /* current text pointer */
     char *q;                  /* destination for parsed text */
+
+#if defined(CYGWIN) && __GNUC__ >= 3 && __GNUC_MINOR__ >= 2
+    mtext = alloca(MLEN);
+    if (!mtext)
+    {
+        lexerror("Out of stack memory");
+        return;
+    }
+#endif /* CYGWIN */
 
     p = yyt;
     strcat(p, " "); /* Make sure GETALPHA terminates */
@@ -4115,7 +5084,7 @@ handle_define (char *yyt, Bool quote)
          * macro argument marking as necessary.
          */
 
-        for (inid = MY_FALSE, q = mtext; *p; )
+        for (inid = MY_FALSE, q = mtext; *p && *p != CHAR_EOF; )
         {
             /* Identifiers are parsed until complete, with the first
              * character pointed to by <ids>.
@@ -4197,6 +5166,14 @@ handle_define (char *yyt, Bool quote)
             }
         }
 
+        /* If the defined was ended by EOF instead of lineend,
+         * we have to pass on the EOF to the caller.
+         */
+        if (*p == CHAR_EOF)
+        {
+            myungetc(*p);
+        }
+
         /* Terminate the text and add the macro */
         *--q = '\0';
         add_define(namebuf, arg, mtext);
@@ -4208,7 +5185,7 @@ handle_define (char *yyt, Bool quote)
         /* Parse the replacement text into mtext[].
          */
 
-        for (q = mtext; *p; )
+        for (q = mtext; *p && *p != CHAR_EOF; )
         {
             *q = *p++;
             if (q < mtext+MLEN-2)
@@ -4237,6 +5214,14 @@ handle_define (char *yyt, Bool quote)
                     p = yytext;
                 }
             }
+        }
+
+        /* If the defined was ended by EOF instead of lineend,
+         * we have to pass on the EOF to the caller.
+         */
+        if (*p == CHAR_EOF)
+        {
+            myungetc(*p);
         }
 
         /* Terminate the text and add the macro */
@@ -4276,43 +5261,55 @@ add_define (char *name, short nargs, char *exps)
     }
 
     /* If such a macro already exists with different meaning,
-     * generate an error.
+     * generate an error. If the meaning doesn't change, generate
+     * a warning.
      */
     if (p->type != I_TYPE_UNKNOWN)
     {
+        char buf[200+NSIZE];
+
+        if (current_line <= 0)
+            sprintf(buf, "(in auto_include text) Redefinition of #define %s", name);
+        else
+            sprintf(buf, "Redefinition of #define %s", name);
+
         if (nargs != p->u.define.nargs
          || p->u.define.special
          || strcmp(exps,p->u.define.exps.str) != 0)
         {
-            char buf[200+NSIZE];
-            sprintf(buf, "Redefinition of #define %s", name);
             yyerror(buf);
+            return;
         }
-        return;
+        else
+        {
+            yywarn(buf);
+        }
     }
-
-    /* New macro: initialise the ident.u.define and
-     * add it to the list of defines.
-     */
-
-    p->type = I_TYPE_DEFINE;
-    p->u.define.nargs = nargs;
-    p->u.define.permanent = MY_FALSE;
-    p->u.define.special = MY_FALSE;
-    if ( !(p->u.define.exps.str = xalloc(strlen(exps)+1)) )
+    else
     {
-        free_shared_identifier(p);
-        lexerror("Out of memory");
-        return;
-    }
-    strcpy(p->u.define.exps.str, exps);
+        /* New macro: initialise the ident.u.define and
+         * add it to the list of defines.
+         */
 
-    p->next_all = all_defines;
-    all_defines = p;
+        p->type = I_TYPE_DEFINE;
+        p->u.define.nargs = nargs;
+        p->u.define.permanent = MY_FALSE;
+        p->u.define.special = MY_FALSE;
+        if ( !(p->u.define.exps.str = xalloc(strlen(exps)+1)) )
+        {
+            free_shared_identifier(p);
+            lexerror("Out of memory");
+            return;
+        }
+        strcpy(p->u.define.exps.str, exps);
+
+        p->next_all = all_defines;
+        all_defines = p;
 #if defined(LEXDEBUG)
-    fprintf(stderr, "%s define '%s' %d '%s'\n"
-           , time_stamp(), name, nargs, exps);
+        fprintf(stderr, "%s define '%s' %d '%s'\n"
+               , time_stamp(), name, nargs, exps);
 #endif
+    }
 } /* add_define() */
 
 /*-------------------------------------------------------------------------*/
@@ -4355,7 +5352,7 @@ add_permanent_define (char *name, short nargs, void *exps, Bool special)
          || p->u.define.special
          || strcmp(exps,p->u.define.exps.str) != 0)
         {
-            error("Redefinition of #define %s", name);
+            error("Redefinition of #define %s\n", name);
         }
         return;
     }
@@ -4423,7 +5420,6 @@ free_defines (void)
             if (curr->name == p->name) /* found it */
             {
                 p->next = curr->next;
-                free_string(p->name);
                 break;
             }
             prev = &curr->next;
@@ -4621,7 +5617,8 @@ _expand_define (struct defn *p, ident_t * macro)
         /* --- Function Macro --- */
 
         int c;
-        int parcnt = 0;  /* Number of pending open' (' */
+        int brakcnt = 0; /* Number of pending open '[' */
+        int parcnt = 0;  /* Number of pending open '(' */
         Bool dquote = MY_FALSE; /* true: in "" */
         Bool squote = MY_FALSE; /* true: in '' */
         int n;           /* Number of parsed macro arguments */
@@ -4711,6 +5708,24 @@ _expand_define (struct defn *p, ident_t * macro)
                     *q++ = (char)c;
                     continue;
 
+                  case '[' :
+                    /* Begin of array/mapping index.
+                     */
+                    if (!squote && !dquote)
+                        brakcnt++;
+                    *q++ = (char)c;
+                    continue;
+
+                  case ']' :
+                    /* End of array/mapping index.
+                     */
+                    if (!squote && !dquote && brakcnt > 0)
+                    {
+                        brakcnt--;
+                    }
+                    *q++ = (char)c;
+                    continue;
+
                   case '(' :
                     /* Begin of nested expression.
                      */
@@ -4788,7 +5803,7 @@ _expand_define (struct defn *p, ident_t * macro)
                   case ',':
                     /* Argument separation
                      */
-                    if (!parcnt && !dquote && !squote)
+                    if (!parcnt && !dquote && !squote && !brakcnt)
                     {
                         *q++ = '\0';
                         args[++n] = q;
@@ -4804,7 +5819,7 @@ _expand_define (struct defn *p, ident_t * macro)
                     continue;
 
                   case CHAR_EOF:
-                        lexerror("Unexpected end of file");
+                        lexerror("Unexpected end of file (or a spurious 0x01 character)");
                         DEMUTEX;
                         return MY_FALSE;
 
@@ -4823,7 +5838,7 @@ _expand_define (struct defn *p, ident_t * macro)
                         {
                             r = skip_pp_comment(r);
                         }
-                        else 
+                        else
                         {
                             --r;
                             *q++ = '/';
@@ -4986,7 +6001,7 @@ exgetc (void)
             }
             c = (unsigned char)mygetc();
         }
-        else if (c == '\\' && *outp == '\n')
+        else if (c == '\\' && (*outp == '\n' || *outp == '\r'))
         {
             /* Escaped new line: read the next line, strip
              * all comments, and then add the result again
@@ -4996,6 +6011,8 @@ exgetc (void)
             Bool quote;
 
             outp++;
+            if (outp[-1] == '\r' && *outp == '\n')
+                outp++;
             yyp = yytext;
             for(quote = MY_FALSE;;)
             {
@@ -5123,7 +6140,7 @@ cond_get_exp (int priority, svalue_t *svp)
         else
         {
             /* Is it really an operator? */
-            x = optab1[c];
+            x = optab1(c);
             if (!x)
             {
                 yyerror("illegal character in #if");
@@ -5228,7 +6245,7 @@ cond_get_exp (int priority, svalue_t *svp)
         }
 
         /* Can it be an operator at all? */
-        x = optab1[c];
+        x = optab1(c);
         if (!x)
             break;
 
@@ -5425,6 +6442,7 @@ set_inc_list (vector_t *v)
             error("Out of memory\n");
 
         free_svalue(svp);
+        svp->type = T_STRING;
         svp->x.string_type = STRING_MALLOC;
         svp->u.string = p;
     }
@@ -5451,11 +6469,10 @@ get_current_file (char ** args UNUSED)
     buf = xalloc(strlen(current_file)+4);
     if (!buf)
         return NULL;
-#ifdef COMPAT_MODE
-    sprintf(buf, "\"%s\"", current_file);
-#else
-    sprintf(buf, "\"/%s\"", current_file);
-#endif
+    if (compat_mode)
+        sprintf(buf, "\"%s\"", current_file);
+    else
+        sprintf(buf, "\"/%s\"", current_file);
     return buf;
 } /* get_current_file() */
 
@@ -5480,11 +6497,10 @@ get_current_dir (char ** args UNUSED)
     buf = xalloc(len + 4);
     if (!buf)
         return NULL;
-#ifdef COMPAT_MODE
-    sprintf(buf, "\"%.*s\"", len, current_file);
-#else
-    sprintf(buf, "\"/%.*s\"", len, current_file);
-#endif
+    if (compat_mode)
+        sprintf(buf, "\"%.*s\"", len, current_file);
+    else
+        sprintf(buf, "\"/%.*s\"", len, current_file);
     return buf;
 } /* get_current_dir() */
 
@@ -5511,11 +6527,10 @@ get_sub_path (char ** args)
             rm--;
     len = (buf - current_file) + 1;
     buf = alloca(len + 4);
-#ifdef COMPAT_MODE
-    sprintf(buf, "\"%.*s\"", len, current_file);
-#else
-    sprintf(buf, "\"/%.*s\"", len, current_file);
-#endif
+    if (compat_mode)
+        sprintf(buf, "\"%.*s\"", len, current_file);
+    else
+        sprintf(buf, "\"/%.*s\"", len, current_file);
     add_input(buf);
     return NULL;
 } /* get_sub_path() */
@@ -5702,16 +6717,28 @@ show_lexer_status (strbuf_t * sbuf, Bool verbose UNUSED)
     sum += mempool_size(lexpool);
     sum += defbuf_len;
     sum += 2 * DEFMAX; /* for the buffers in _expand_define() */
-    if (auto_include_string)
-        sum += strlen(auto_include_string)+1;
 
-    strbuf_addf(sbuf, "Lexer structures\t\t\t %8lu\n", sum);
+    if (sbuf)
+        strbuf_addf(sbuf, "Lexer structures\t\t\t %9lu\n", sum);
     return sum;
 } /* show_lexer_status() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef GC_SUPPORT
 
+static INLINE void
+count_ident_refs (ident_t *id)
+
+/* GC support: count all references held by one identifier (ignoring
+ * inferiors).
+ */
+
+{
+    count_ref_from_string(id->name);
+    note_malloced_block_ref(id);
+} /* count_ident_refs() */
+
+/*-------------------------------------------------------------------------*/
 void
 count_lex_refs (void)
 
@@ -5726,9 +6753,14 @@ count_lex_refs (void)
     for (i = ITABLE_SIZE; --i >= 0; )
     {
         id = ident_table[i];
-        for ( ; id; id = id->next) {
-            count_ref_from_string(id->name);
-            note_malloced_block_ref(id);
+        for ( ; id; id = id->next)
+        {
+            ident_t *id2;
+            count_ident_refs(id);
+            for (id2 = id->inferior; id2 != NULL; id2 = id2->next)
+            {
+                count_ident_refs(id);
+            }
         }
     }
 
@@ -5737,9 +6769,6 @@ count_lex_refs (void)
         if (!id->u.define.special)
             note_malloced_block_ref(id->u.define.exps.str);
     }
-
-    if (auto_include_string)
-        note_malloced_block_ref(auto_include_string);
 
     if (defbuf_len)
         note_malloced_block_ref(defbuf);
@@ -5758,20 +6787,22 @@ lex_error_context (void)
  */
 
 {
-    static char buf[20];
+    static char buf[21];
     char *end;
     mp_int len;
 
     if (!pragma_verbose_errors)
         return "";
 
-    strcpy(buf, yychar == -1 ? (len = 5, "near ") : (len = 7, "before "));
+    strcpy(buf, ((signed char)yychar == -1 || yychar == CHAR_EOF)
+                ? (len = 6, " near ")
+                : (len = 8, " before "));
 
     if (!yychar || !*outp)
     {
         strcpy(buf+len, "end of line");
     }
-    else if (*outp == -1)
+    else if ((signed char)*outp == -1 || *outp == CHAR_EOF)
     {
         strcpy(buf+len, "end of file");
     }
@@ -5808,60 +6839,6 @@ lex_error_context (void)
     }
     return buf;
 } /* lex_error_context() */
-
-/*-------------------------------------------------------------------------*/
-void
-clear_auto_include_string (void)
-
-/* Clear the auto_include_string if any.
- */
-
-{
-    if (auto_include_string)
-    {
-        xfree(auto_include_string);
-        auto_include_string = NULL;
-    }
-} /* clear_auto_include_string() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_set_auto_include_string (svalue_t *sp)
-
-/* EFUN set_auto_include_string()
- *
- *    void set_auto_include_string(string arg)
- *
- * The arg will be automatically included into every compiled LPC
- * object. This is useful to enforce global definitions, e.g.
- * ``#pragma combine_strings'' or ``#pragma strict_types''.  The
- * calling object needs to be privileged by the master object.
- *
- * Note that the auto-include-string is cleared when the master
- * object is reloaded.
- */
-
-{
-    char *s;
-
-    if (sp->type != T_STRING)
-        bad_xefun_arg(1, sp);
-
-    if (_privilege_violation("set_auto_include_string", sp, sp) > 0)
-    {
-        clear_auto_include_string();
-        s = sp->u.string;
-        auto_include_string = xalloc(strlen(s)+2);
-        *auto_include_string = '\n';
-        strcpy(auto_include_string+1, s);
-
-        /* Count the number of lines of the added string */
-        for (auto_include_start = 0; *s
-            ; auto_include_start -= *s++ == '\n') NOOP;
-    }
-    free_svalue(sp);
-    return sp - 1;
-} /* set_auto_include_string() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -5913,6 +6890,7 @@ f_expand_define (svalue_t *sp)
         {
             *end = '\0';
             res = string_copy(outp);
+            *end = '\n';  /* Restore the newline character */
         }
         outp = &end[1];
     }
@@ -5926,6 +6904,7 @@ f_expand_define (svalue_t *sp)
     }
     else
     {
+        sp->type = T_STRING;
         sp->x.string_type = STRING_MALLOC;
         sp->u.string = res;
     }

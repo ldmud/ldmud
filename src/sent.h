@@ -47,12 +47,13 @@
 #include "typedefs.h"
 
 enum sent_type_e {
-    SENT_PLAIN = 0   /* Normal action */
- ,  SENT_SHORT_VERB  /* Action with abbreviatable verb */
- ,  SENT_NO_SPACE    /* Action with embedded verb */
- ,  SENT_NO_VERB     /* Action with no verb given */
- ,  SENT_MARKER      /* Internal: marker for a command search */
- ,  SENT_SHADOW      /* Internal: shadow data */
+    SENT_PLAIN = 0     /* Normal action */
+ ,  SENT_SHORT_VERB    /* Action with abbreviatable verb */
+ ,  SENT_OLD_NO_SPACE  /* Action with embedded verb (old style) */
+ ,  SENT_NO_SPACE      /* Action with embedded verb */
+ ,  SENT_NO_VERB       /* Action with no verb given */
+ ,  SENT_MARKER        /* Internal: marker for a command search */
+ ,  SENT_SHADOW        /* Internal: shadow data */
 };
 
 typedef enum sent_type_e sent_type_t;
@@ -90,6 +91,14 @@ struct action_s
     object_t *ob;
       /* Object defining this sentence. This value is used for comparisons
        * only, and in case of SENT_MARKER it is in fact a *rt_context_t.
+       * The reference is not counted.
+       */
+    object_t *shadow_ob;
+      /* If the action originates from an object shadow, .ob will be the
+       * shadowed object (as the action has to seem to come from there),
+       * and this will be the actual shadow object defining the object.
+       * The reference is not counted.
+       * Otherwise, this entry is NULL.
        */
     char *function;             /* the name of the action function */
     unsigned short short_verb;

@@ -1,5 +1,5 @@
 CONCEPT
-	functions
+        functions
 
 DESCRIPTION
         Functions are named blocks of code which are be called with
@@ -83,7 +83,7 @@ DESCRIPTION
         driver will perform the necessary adaption at call time: excess
         values are ignored, missing values are substituted by the number 0.
         The values passed to the called function are massaged by the driver
-        to match the argument list 
+        to match the argument list
 
 
         FUNCTIONS AND INHERITANCE
@@ -151,8 +151,10 @@ DESCRIPTION
 
         all call both inherited create()s. The function called this way
         must not take arguments, and the single results from all calls are
-        combined into one array used as final result.
+        combined into one array used as final result. If there is no such
+        function inherited at all, the statement will just return
+        an empty array.
 
 SEE ALSO
-	types(LPC), modifiers(LPC), varargs(LPC), references(LPC),
+        types(LPC), modifiers(LPC), varargs(LPC), references(LPC),
         call_other(E), simul_efun(C), call_out(E)

@@ -1,13 +1,13 @@
 SYNOPSIS
-	int last_bit (string str)
+        int last_bit (string str)
 
 DESCRIPTION
         Return the number of the last set bit in bitstring <str>.
 
-	Each character contains 6 bits. So you can store a value
-	between 0 and 63 in one character (2^6=64). Starting character
-	is the blank " " which has the value 0. The first character in
-	the string is the one with the lowest bits (0-5).
+        Each character contains 6 bits. So you can store a value
+        between 0 and 63 in one character (2^6=64). Starting character
+        is the blank " " which has the value 0. The first character in
+        the string is the one with the lowest bits (0-5).
 
 EXAMPLES
         string s;
@@ -18,4 +18,4 @@ EXAMPLES
 
 SEE ALSO
         set_bit(E), clear_bit(E), next_bit(E), test_bit(E), count_bits(E),
-        and_bits(E), or_bits(E), xor_bits(E), invert_bits(E)
+        and_bits(E), or_bits(E), xor_bits(E), invert_bits(E), copy_bits(E)

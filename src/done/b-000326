@@ -2,7 +2,7 @@ Short: EotL: set_prompt() causes check-refcounts to fail
 Date: Mon, 27 Mar 2000 17:27:22 -0600
 From: Casey Zacek <cz@800hosting.com>
 Type: Bug
-State: New
+State: Abandoned - not reproducible.
 
 I'm starting to think so too... the crash I sent you was caused by
 using:

@@ -3,6 +3,7 @@
  * (C) Copyright 1990 JnA (jna@cd.chalmers.se)
  *
  *---------------------------------------------------------------------------
+ * TODO: Put this efun in the USE_DEPRECATED lot.
  * EFUN parse_command
  *
  *     int parse_command (string cmd, object  env, string fmt, mixed &var, ...)
@@ -101,7 +102,7 @@
 
 #include "driver.h"
 
-#if defined(SUPPLY_PARSE_COMMAND) && defined(COMPAT_MODE)
+#if defined(SUPPLY_PARSE_COMMAND)
 
 #include "typedefs.h"
 
@@ -135,7 +136,7 @@
 #define EMPTY(x) (x[0] == '\0')
 
 #define KLUDGELEN 200  /* Size of the string buffers */
- 
+
 #define LVALUE svalue_t
 
 /*-------------------------------------------------------------------------*/
@@ -183,31 +184,31 @@ static altern_objects_t *gOblist;
 static char gAdjective[4*KLUDGELEN];
   /* all adjectives before objname
    */
-   
+
 static LVALUE *gCarg;
   /* Current argument to %_
    */
-   
+
 static int gWantnum;
   /* Number of wanted items 0 = all
    */
-   
+
 static altern_objects_t *gPobjects;
   /* List of parsed objects
    */
-   
+
 static LVALUE *gTxarg;
   /* Argument of LPCvariable to store %s
    */
-   
+
 static LVALUE *gForprepos;
   /* Save arg* here for findprepos
    */
-   
+
 static LVALUE *gTopStack;
   /* arg* to arg after my last
    */
-   
+
 static svalue_t sv_tmp;
   /* Buffer for function results.
    */
@@ -247,8 +248,8 @@ find_living_object (char *name, Bool player)
         /* We have to create the closure */
         put_string(sp, make_shared_string(function_names[player ? 1 : 0]));
         if (!sp->u.string)
-            error("(parse_command) Out of memory (%lu bytes) for string\n"
-                 , strlen(function_names[player ? 1 : 0]));
+            error("(old_parse_command) Out of memory (%lu bytes) for string\n"
+                 , (unsigned long)strlen(function_names[player ? 1 : 0]));
         inter_sp = sp;
         symbol_efun(sp);
         *svp = *sp;
@@ -258,12 +259,12 @@ find_living_object (char *name, Bool player)
     /* Call the closure */
     put_string(sp, make_shared_string(name));
     if ( !sp->u.string)
-        error("(parse_command) Out of memory (%lu bytes) for result\n"
-             , strlen(name));
+        error("(old_parse_command) Out of memory (%lu bytes) for result\n"
+             , (unsigned long)strlen(name));
     inter_sp = sp;
     call_lambda(svp, 1);
     pop_stack();
-    
+
     return sp->type != T_OBJECT ? NULL : sp->u.ob;
 } /* find_living_object() */
 
@@ -272,7 +273,7 @@ find_living_object (char *name, Bool player)
 #ifdef GC_SUPPORT
 
 void
-clear_parse_refs (void)
+clear_old_parse_refs (void)
 
 /* GC support: Clear the references of all memory held by the parser.
  */
@@ -285,7 +286,7 @@ clear_parse_refs (void)
 
 /*-------------------------------------------------------------------------*/
 void
-count_parse_refs (void)
+count_old_parse_refs (void)
 
 /* GC support: Count the references of all memory held by the parser.
  */
@@ -378,7 +379,7 @@ makeobjlist (altern_objects_t **alist, object_t *src)
     object_t *env, *cur;
     altern_objects_t *this;
     int cnt;
-    
+
     *alist = NULL;
 
     if (!src)
@@ -523,7 +524,7 @@ getfirst (char **cmd)
     strcpy(gFword,"");
     if (st[0] == '\0')
         return gFword;
-  
+
     ch = ' ';
     pos = 0;
     inqoute = MY_FALSE;
@@ -538,7 +539,7 @@ getfirst (char **cmd)
         pos=1;
         st++;
     }
-    
+
     if (ch == '[')
         ch = ']';
 
@@ -559,7 +560,7 @@ getfirst (char **cmd)
 
     gFword[pos] = '\0';
     *cmd = st;
-    
+
     return gFword;
 } /* getfirst() */
 
@@ -677,7 +678,7 @@ matchadjective (char *adjs)
             }
             sp = sp2;
         }
-        
+
         if (on)
             italt_put(on);
         else
@@ -701,7 +702,7 @@ matchadjective (char *adjs)
         if (on)
             italt_put(on);
     }
-    
+
     return itnumalt();
 } /* matchadjective() */
 
@@ -762,7 +763,7 @@ order_num (char *wd)
 
     if (EMPTY(wd))
         return -1;
-        
+
     /* Test for simple textual numbers */
     for (ilop = 1; ilop < 20; ilop++)
     {
@@ -797,7 +798,7 @@ numeric (char *wd)
  *
  * The function recognizes digits, and numbers expressed in words.
  */
- 
+
 {
     static char *nums[] = {"one","two","three","four","five","six",
                     "seven","eight","nine","ten",
@@ -807,16 +808,16 @@ numeric (char *wd)
                     "eighty","ninety"};
 
     char ns[KLUDGELEN];
- 
+
     int ilop, nm;
 
     if (EMPTY(wd))
         return -1;
-  
+
     /* Test for digit numerics */
     if (sscanf(wd, "%d", &nm))
         return (nm>=0) ? nm : -1;
-      
+
     /* Test for simple textual numbers */
     if (EQ(wd,"a") || EQ(wd,"an"))
         return 1;
@@ -891,7 +892,7 @@ matchobject2 (char ** cmd, Bool plur)
             if (on)
                 italt_put(on);
         } /* for (ao) */
-        
+
         if (!itnumalt())
         {
             strcat(gAdjective, st);
@@ -904,7 +905,7 @@ matchobject2 (char ** cmd, Bool plur)
 
     if (itnumalt())
         return italt(1);
-        
+
     *cmd = ocmd;
     return NULL;
 } /* matchobject2() */
@@ -1094,7 +1095,7 @@ findobject (char **cmd)
             {
                 ob = italt(nm+1-s);
                 if (ob)
-                    put_ref_object(p->item+s, ob, "parse_command");
+                    put_ref_object(p->item+s, ob, "old_parse_command");
             }
             put_array(&sv_tmp, p);
             transfer_svalue(gCarg->u.lvalue, &sv_tmp);
@@ -1128,7 +1129,7 @@ findplay (char **cmd)
         getfirst(cmd);
         if (gCarg)
         {
-            put_ref_object(&sv_tmp, pn, "parse_command(%l)");
+            put_ref_object(&sv_tmp, pn, "old_parse_command(%l)");
             transfer_svalue(gCarg->u.lvalue, &sv_tmp);
         }
     }
@@ -1174,7 +1175,7 @@ findword (char **cmd, svalue_t *v)
     sv = p->item[0];
     p->item[0] = p->item[f];
     p->item[f] = sv;
-    
+
     return MY_TRUE;
 } /* findword() */
 
@@ -1187,7 +1188,11 @@ findprepos (char **cmd)
  */
 
 {
-    static char *hard_prep[] = {"on","in","under","from","behind","beside",0};
+    static char *hard_prep[] = { "in", "from", "on", "under", "behind", "of"
+                               , "for", "to", "with", "at", "off", "out"
+                               , "down", "up", "around", "over", "into"
+                               , "about", "inside"
+                               , 0 };
 
     char *w;
     svalue_t *v;
@@ -1217,7 +1222,7 @@ findprepos (char **cmd)
             }
         }
     }
-    
+
     return MY_FALSE;
 } /* findprepos() */
 
@@ -1234,7 +1239,7 @@ findsingle (char **cmd)
     {
         if (itnumalt() == 1 && gCarg)
         {
-            put_ref_object(&sv_tmp, italt(1), "parse_command(%o)" );
+            put_ref_object(&sv_tmp, italt(1), "old_parse_command(%o)" );
             transfer_svalue(gCarg->u.lvalue, &sv_tmp);
         }
         return MY_TRUE;
@@ -1301,7 +1306,7 @@ get1ps (char **parsep, LVALUE **lin, Bool skip)
         gCarg = NULL;
         gForprepos = NULL;
     }
-    
+
     *lin = l;
     return pt;
 } /* get1ps() */
@@ -1330,7 +1335,7 @@ addword (char *d, char *s)
 
 /*-------------------------------------------------------------------------*/
 Bool
-e_parse_command ( char     *cs           /* Command to parse */
+e_old_parse_command ( char     *cs           /* Command to parse */
                 , svalue_t *ob_or_array  /* Object or array of objects */
                 , char     *ps           /* Special parsing pattern */
                 , svalue_t *dest_args    /* Pointer to lvalue args on stack */
@@ -1339,8 +1344,8 @@ e_parse_command ( char     *cs           /* Command to parse */
 
 /* EFUN parse_command()
  *
- * This function implements the parse_command() efun, called from interpret.c.
- * Result is TRUE on success, and FALSE otherwise.
+ * This function implements the old parse_command() efun, called from
+ * interpret.c.  Result is TRUE on success, and FALSE otherwise.
  */
 
 {
@@ -1379,7 +1384,7 @@ e_parse_command ( char     *cs           /* Command to parse */
         vector_t *v;
         svalue_t *vv;
         size_t cnt;
-      
+
         v = ob_or_array->u.vec;
         italt_new();
         for (cnt = 0; cnt < VEC_SIZE(v); cnt++)
@@ -1492,7 +1497,7 @@ e_parse_command ( char     *cs           /* Command to parse */
             char *a;
             LVALUE *try;
             ptype_t tmp;
-          
+
             a = parsep;
             try = l;
             tmp = get1ps(&a, &try, MY_FALSE);
@@ -1528,7 +1533,7 @@ e_parse_command ( char     *cs           /* Command to parse */
     }
 
     if (!EMPTY(cmd))  /* No match so set ptyp != EP */
-        ptyp = ALT; 
+        ptyp = ALT;
 
     /* Now clean up our mess, no alloced mem should remain
      */
@@ -1544,9 +1549,9 @@ e_parse_command ( char     *cs           /* Command to parse */
     }
 
     return (ptyp == EP);
-} /* e_parse_command() */
+} /* e_old_parse_command() */
 
-#endif /* SUPPLY_PARSE_COMMAND && COMPAT_MODE */
+#endif /* SUPPLY_PARSE_COMMAND */
 
 /***************************************************************************/
 

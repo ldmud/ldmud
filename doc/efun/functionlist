@@ -1,38 +1,49 @@
 NAME
-	mixed *functionlist(mixed ob, int flags)
+        #include <sys/functionlist.h>
+        #include <sys/lpctypes.h>
+
+        mixed *functionlist (object ob, int flags = RETURN_FUNCTION_NAME)
 
 SYNOPSIS
-	functionlist() returns an array with information about an
-	object's functions.
+        Return an array with information about <ob>s lfunctions. For every
+        function, 1 to 4 values (depending on <flags>) are stored in
+        the result array conveying in this order:
+          - the name of the function
+          - the function flags (see below)
+          - the return type (listed in mudlib/sys/lpctypes.h)
+          - the number of accepted argumens
 
-	The first arg is an object or a file_name (the object must
-        already be loaded in that case).
+        <ob> may be given as true object or as a filename. In the latter
+        case, the efun does not try to load the object before proceeding.
 
-	The second (optional) arg flags specifies, what info is to be
-	returned (function names, or return types, or number of args
-	the functions takes, ...), and also, if info is wanted about
-	all functions, or just about public/private/varargs/...
-	functions.  The interpreter source should contain a
-	<mudlib/sys/lpctypes.h> and <mudlib/sys/functionlist.h> that
-	define the values for the flags and the returntypes of
-	functionlist().
+        <flags> determines both which information is returned for every
+        function, and which functions should be considered at all.
+        Its value is created by bin-or'ing together following flags from
+        mudlib/sys/functionlist.h:
 
-	Currently (3.2.1@40) the following symbolic values for the
-	flag are #defined, which can be ored together:
+          Control of returned information:
+            RETURN_FUNCTION_NAME    include the function name
+            RETURN_FUNCTION_FLAGS   include the function flags
+            RETURN_FUNCTION_TYPE    include the return type
+            RETURN_FUNCTION_NUMARG  include the number of arguments.
 
-	RETURN_FUNCTION_NAME
-	RETURN_FUNCTION_FLAGS
-	RETURN_FUNCTION_TYPE
-	RETURN_FUNCTION_NUMARG
-	RETURN_FUNCTION_ARGTYPE	/* not implemented */
+            The name RETURN_FUNCTION_ARGTYPE is defined but not implemented.
 
-	Also, if flags has TYPE_MOD_PRIVATE in it, then private
-	functions will not be shown. If flags has TYPE_MOD_STATIC in
-	it, then both private and static functions will not be shown.
-	If flags has TYPE_MOD_PROTECTED in it, then both static and
-	protected functions will not be shown.
-	If flags has NAME_HIDDEN in it, then functions which are
-	private when inherited will not be shown.
+          Control of listed functions:
+            NAME_INHERITED      don't list if defined by inheritance
+            TYPE_MOD_STATIC     don't list if static function
+            TYPE_MOD_PRIVATE    don't list if private
+            TYPE_MOD_PROTECTED  don't list if protected
+            NAME_HIDDEN         don't list if not visible through inheritance
+
+        The 'flags' information consists of the bin-or of the list control
+        flags given above, plus the following:
+
+            TYPE_MOD_VARARGS    function takes varargs
+            NAME_UNDEFINED      function not defined yet, but referenced.
+            NAME_CROSS_DEFINED  function is defined to be in a different program
+            TYPE_MOD_NO_MASK    function is nomask
+            TYPE_MOD_PUBLIC     function is public
 
 SEE ALSO
-	inherit_list(E), function_exists(E), call_resolved(E)
+        inherit_list(E), function_exists(E), call_resolved(E)

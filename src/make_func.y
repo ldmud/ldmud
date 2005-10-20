@@ -106,7 +106,7 @@
  *
  * An efun is defined this way:
  *
- *    ret-type name [ alias ] ([argtype-1, ... , argtype-n]);
+ *    ret-type name [ alias ] ([argtype-1, ... , argtype-n]) [ "msg" ];
  *
  *        This is the efun <name>, with the compiler source name F_<NAME>,
  *        which returns a value of type <ret-type> and takes n >= 0
@@ -129,6 +129,11 @@
  *
  *        Alternatively, the last argument can be given as '...' if the
  *        efun can handle arbitrarily many arguments.
+ *
+ *        If the efun is deprecated, <msg> is the warning message to
+ *        print when the efun is used and pragma warn_deprecated is in
+ *        effect. The message will be prefixed by the compiler
+ *        with "<name> is deprecated: ".
  *
  *---------------------------------------------------------------------------
  * make_func lang
@@ -185,6 +190,8 @@
  *---------------------------------------------------------------------------
  */
 
+#undef lint  /* undef so that precompiled headers can be used */
+
 #include "driver.h"
 
 #include "my-alloca.h"
@@ -197,6 +204,8 @@
 #include "hash.h"
 
 #include "../mudlib/sys/driver_hook.h"
+
+#define lint  /* redef again to prevent spurious warnings */
 
 /* driver.h defines its own memory management functions,
  * which we don't need.
@@ -268,12 +277,12 @@
 
 /*-------------------------------------------------------------------------*/
 
-#if defined(AMIGA)
+#if defined(AMIGA) && !defined(__GNUC__)
 #    define isascii(c) ((c) >= 0 && (c) <= 255)
 #endif
 
 #undef isalunum
-#define isalunum(c) (isascii((unsigned char)c) && (isalnum((unsigned char)c) || (c) == '_' ))
+#define isalunum(c) (isascii((unsigned char)c) && (isalnum((unsigned char)c) || (c) == '_'))
 
 #define lexwhite(c) (isascii((unsigned char)c) && isspace((unsigned char)c) && (c) != '\n')
 
@@ -356,6 +365,10 @@ static int last_current_type;
 
 /* Variables used when parsing the lines of FUNC_SPEC */
 
+static int got_error = 0;
+  /* Set to TRUE if an error was found.
+   */
+
 static int min_arg = -1;
   /* Minimum number of arguments for this function if there
    * are optional arguments, or -1 if all arguments are needed.
@@ -384,23 +397,23 @@ static int curr_arg_type_size;
 
 /* Forward declarations */
 
-static void yyerror(char *);
+static void yyerror(const char *);
 static int yylex(void);
 int yyparse(void);
 int ungetc(int c, FILE *f);
-static char *type_str(int);
-static char *etype(int);
-static char *etype1(int);
-static char *ctype(int);
+static const char *type_str(int);
+static const char *etype(int);
+static const char *etype1(int);
+static const char *ctype(int);
 #ifndef toupper
 int toupper(int);
 #endif
-static int fatal(char *str);
+static int fatal(const char *str);
 static int cond_get_exp(int);
 
 /*-------------------------------------------------------------------------*/
 static char *
-mystrdup (char *str)
+mystrdup (const char *str)
 
 /* Copy <str> into a freshly allocated memory block and return that one.
  *
@@ -417,7 +430,7 @@ mystrdup (char *str)
 
 /*-------------------------------------------------------------------------*/
 static int
-fatal (char *str)
+fatal (const char *str)
 
 /* Print <str> on stderr, flush stdout and exit the program with
  * exitcode 1.
@@ -448,10 +461,97 @@ make_f_name (char *str)
     len = strlen(f_name);
     for (i = 0; i < len; i++)
     {
-        if (islower((unsigned)f_name[i]))
+        if (islower((unsigned char)f_name[i]))
             f_name[i] = (char)toupper(f_name[i]);
     }
     return mystrdup(f_name);
+}
+
+/*-------------------------------------------------------------------------*/
+static int
+check_for_duplicate_instr (const char *f_name, const char *key, int redef_ok)
+
+/* Check if either <f_name> or <key> already appear in instr[], and print
+ * appropriate diagnostics. If <redef_ok> is true, a new <key> for an existing
+ * <f_name> is allowed.
+ * Return true if there is a duplicate for <f_name>, false if not.
+ */
+
+{
+    size_t i;
+    int rc;
+
+    rc = 0;
+
+    for (i = 0; i < (size_t)num_buff; i++)
+    {
+        if (!strcmp(f_name, instr[i].f_name))
+        {
+            if (!strcmp(key, instr[i].key))
+            {
+                rc = 1;
+                got_error = 1;
+                fprintf(stderr, "Error: Entry '%s':'%s' duplicated.\n"
+                              , f_name, key);
+            }
+            else if (!redef_ok)
+            {
+                rc = 1;
+                got_error = 1;
+                fprintf(stderr, "Error: Entry '%s':'%s' redefined to '%s'.\n"
+                              , f_name, instr[i].key, key);
+            }
+        }
+        else if (!strcmp(key, instr[i].key))
+        {
+             fprintf(stderr, "Entry '%s':'%s' duplicated as '%s':... .\n"
+                           , instr[i].f_name, instr[i].key, f_name);
+        }
+
+    }
+    return rc;
+}
+
+/*-------------------------------------------------------------------------*/
+static int
+check_for_duplicate_string (const char *key, const char *buf)
+
+/* Check if either <key> or <buf> already appear in instr[], and print
+ * appropriate diagnostics.
+ * Return true if there is a duplicate for <key>, false if not.
+ */
+
+{
+    size_t i;
+    int rc;
+
+    rc = 0;
+
+    for (i = 0; i < (size_t)num_buff; i++)
+    {
+        if (!strcmp(key, instr[i].key))
+        {
+            rc = 1;
+            got_error = 1;
+            if (!strcmp(buf, instr[i].buf))
+            {
+                fprintf(stderr, "Error: Entry '%s':'%s' duplicated.\n"
+                              , key, buf);
+            }
+            else
+            {
+                fprintf(stderr, "Error: Entry '%s':'%s' redefined to '%s'.\n"
+                              , key, instr[i].buf, buf);
+            }
+        }
+        else if (!strcmp(buf, instr[i].buf))
+        {
+             fprintf(stderr, "Warning: Entry '%s':'%s' duplicated as '%s':... .\n"
+                           , instr[i].key, instr[i].buf, key);
+        }
+
+    }
+    return rc;
 }
 
 #if defined(__MWERKS__) && !defined(WARN_ALL)
@@ -543,9 +643,10 @@ code:     optional_name ID
         if (!$1)
             $1 = mystrdup($2);
         f_name = make_f_name($2);
+        check_for_duplicate_instr(f_name, $2, 0);
         instr[num_buff].code_class = current_code_class;
         num_instr[current_code_class]++;
-        sprintf(buff, "{ 0, 0, { 0, 0 }, -1, 0, 0, \"%s\" },\n", $1);
+        sprintf(buff, "{ 0, 0, { 0, 0 }, -1, 0, 0, \"%s\", NULL },\n", $1);
         if (strlen(buff) > sizeof buff)
             fatal("Local buffer overflow!\n");
         instr[num_buff].f_name = f_name;
@@ -554,6 +655,7 @@ code:     optional_name ID
         num_buff++;
         free($1);
     }
+    ;
 
 /* --- Efuns --- */
 
@@ -566,9 +668,9 @@ optional_ID:   ID
 optional_default:   DEFAULT ':' ID { $$ = $3; }
                   | /* empty */    { $$ = "0"; } ;
 
-func: type ID optional_ID '(' arg_list optional_default ')' ';'
+func: type ID optional_ID '(' arg_list optional_default ')' optional_name ';'
     {
-        char buff[500];
+        char buff[1000];
         char *f_name;
         int i;
 
@@ -583,6 +685,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
         if ($3[0] == '\0')
         {
             f_name = make_f_name($2);
+            check_for_duplicate_instr(f_name, $2, 0);
             num_instr[
               (int)(instr[num_buff].code_class =
                 (limit_max || $5 != min_arg) && current_code_class == C_TEFUN ?
@@ -592,6 +695,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
         else
         {
             f_name = mystrdup($3);
+            check_for_duplicate_instr(f_name, $2, 1);
             instr[num_buff].code_class = C_ALIAS;
             num_instr[C_ALIAS]++;
         }
@@ -622,13 +726,25 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
             }
         }
 
-        /* Store the data */
+        /* Store the data.
+         * etype() used a static buffer, so we must separate the calls.
+         */
 
-        sprintf(buff, "{ %d, %d, { %s, %s }, %s, %s, %d, \"%s\" },\n"
+        sprintf(buff, "{ %d, %d, { %s, "
                     , limit_max ? -1 : $5, min_arg
-                    , etype(0), etype(1)
-                    , $6, ctype($1), i, $2
+                    , etype(0)
                );
+        sprintf(buff+strlen(buff), " %s }, %s, %s, %d, \"%s\""
+                                 , etype(1) , $6, ctype($1), i, $2
+               );
+        if ($8 != NULL)
+            sprintf(buff+strlen(buff), ", \"%s\""
+                                     , $8
+                   );
+        else
+            strcat(buff, ", NULL");
+
+        strcat(buff, " },\n");
 
         if (strlen(buff) > sizeof buff)
              fatal("Local buffer overwritten !\n");
@@ -695,19 +811,20 @@ stringdefs:  /* empty */
 stringdef: ID NAME
     {
         char *cp;
-        
+
         if (num_buff >= MAX_FUNC)
             yyerror("Too many string definitions!\n");
 
         /* Copy the data parsed into the instr[] array */
         /* Make the correct f_name and determine the code class
          */
+        check_for_duplicate_string($1, $2);
         instr[num_buff].key = mystrdup($1);
         instr[num_buff].buf = mystrdup($2);
 
         /* Make sure that the .key is all uppercase */
         for (cp = instr[num_buff].key; *cp != '\0'; cp++)
-            if (isalpha(*cp) && islower(*cp))
+            if (isalpha((unsigned char)*cp) && islower((unsigned char)*cp))
                 *cp = toupper(*cp);
 
         /* Prepare for next string */
@@ -738,8 +855,8 @@ stringdef: ID NAME
 /* The recognized type names */
 
 struct type {
-    char *name;  /* name of the type */
-    int   num;   /* the type's parser code */
+    const char *name;  /* name of the type */
+    int         num;   /* the type's parser code */
 };
 
 static struct type types[]
@@ -864,7 +981,7 @@ static char optab2[]=
 0,'<',LSHIFT,9,'=',LEQ,8,0,LESS,8,0,'>',RSHIFT,9,'=',GEQ,8,0,GREAT,8,
 0,'=',EQ,7,0,0,0,'&',LAND,3,0,BAND,6,0,'|',LOR,2,0,BOR,4,
 0,0,XOR,5,0,0,QMARK,1};
-#define optab1 (_optab-' ')
+#define optab1(c) (_optab[(c)-' '])
 
 /*-------------------------------------------------------------------------*/
 static char
@@ -890,7 +1007,7 @@ myungetc (char c)
 
 /*-------------------------------------------------------------------------*/
 static void
-add_input (char *p)
+add_input (const char *p)
 
 /* Insert text <p> at the current point in the input stream so that
  * the next mygetc()s will read it.
@@ -906,7 +1023,7 @@ add_input (char *p)
 
 /*-------------------------------------------------------------------------*/
 static void
-add_define (char * name, int num_arg, char *exps)
+add_define (const char * name, int num_arg, const char *exps)
 
 /* Add the definition for the macro <name> with <num_arg> arguments
  * and replacement text <exps> to the table of macros.
@@ -931,7 +1048,7 @@ add_define (char * name, int num_arg, char *exps)
 
 /*-------------------------------------------------------------------------*/
 static struct defn *
-lookup_define (char *s)
+lookup_define (const char *s)
 
 /* Lookup the macro <s> and return a pointer to its defn structure.
  * Return NULL if the macro is not defined.
@@ -1013,7 +1130,7 @@ nextword (char *str)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-skip_to (char mark, char *token, char *atoken)
+skip_to (char mark, const char *token, const char *atoken)
 
 /* Skip the file fpr linewise until one of the following control statements
  * is encountered:
@@ -1131,7 +1248,7 @@ handle_cond (char mark, int c)
 
 /*-------------------------------------------------------------------------*/
 static void
-handle_if (char mark, char *str)
+handle_if (char mark, const char *str)
 
 /* Evaluate the <mark>if condition <str>
  */
@@ -1167,7 +1284,7 @@ handle_else (char mark)
 
         iftop = p->next;
         free((char *)p);
-        skip_to(mark, "endif", (char *)0);
+        skip_to(mark, "endif", (const char *)0);
     }
     else
     {
@@ -1283,6 +1400,10 @@ name_to_hook(char *name)
         return H_MODIFY_COMMAND_FNAME;
     if ( !strcmp(name, "COMMAND") )
         return H_COMMAND;
+    if ( !strcmp(name, "SEND_NOTIFY_FAIL") )
+        return H_SEND_NOTIFY_FAIL;
+    if ( !strcmp(name, "AUTO_INCLUDE") )
+        return H_AUTO_INCLUDE;
     return -1;
 }
 
@@ -1337,6 +1458,7 @@ handle_map (char *str, int size, int (* name_to_index)(char *) )
             str = alloca(MAKE_FUNC_MAXLINE + 1);
             if (!fgets(str, MAKE_FUNC_MAXLINE, fpr))
                 break;
+            current_line++;
             if (del)
             {
                 output_del = "\n";
@@ -1388,11 +1510,11 @@ handle_map (char *str, int size, int (* name_to_index)(char *) )
     /* Write the generated map */
 
     fprintf(fpw, "{");
-    fprintf(fpw, output_del);
+    fputs(output_del, fpw);
     for (i = 0; i < size; i++)
     {
         fprintf(fpw, "%s,", map[i]);
-        fprintf(fpw, output_del);
+        fputs(output_del, fpw);
     }
     fprintf(fpw, "};\n");
 } /* handle_map() */
@@ -1412,7 +1534,7 @@ exgetc(void)
     char c;
 
     c = mygetc();
-    while (isalpha((unsigned)c) || c == '_' )
+    while (isalpha((unsigned char)c) || c == '_' )
     {
         char word[512], *p;
         int space_left;
@@ -1510,7 +1632,7 @@ cond_get_exp (int priority)
     {
         /* It is an unary operator */
 
-        x = optab1[c];
+        x = optab1(c);
         if (!x)
         {
             yyerror("illegal character in #if");
@@ -1593,7 +1715,7 @@ cond_get_exp (int priority)
             break;
 
         /* Can it be an operator at all? */
-        x = optab1[c];
+        x = optab1(c);
         if (!x)
             break;
 
@@ -1743,7 +1865,7 @@ ident (char c)
 } /* ident() */
 
 /*-------------------------------------------------------------------------*/
-static char *
+static const char *
 type_str (int n)
 
 /* Create a string representation of type <n> in a static buffer
@@ -1761,7 +1883,7 @@ type_str (int n)
             if (n & MF_TYPE_MOD_REFERENCE)
             {
                 static char buff[100];
-                char *str;
+                const char *str;
 
                 str = type_str(n & ~MF_TYPE_MOD_REFERENCE);
                 if (strlen(str) + 3 > sizeof buff)
@@ -1842,6 +1964,7 @@ yylex1 (void)
         {
         case ' ':
         case '\t':
+        case '\r':
             continue;
 
         case '#':
@@ -1979,7 +2102,7 @@ yylex (void)
 
 /*-------------------------------------------------------------------------*/
 static void
-yyerror (char *str)
+yyerror (const char *str)
 
 /* Print the error message <str> with information about the current
  * parsing position and exit.
@@ -1993,7 +2116,7 @@ yyerror (char *str)
 /*=========================================================================*/
 
 /*-------------------------------------------------------------------------*/
-static char *
+static const char *
 etype1 (int n)
 
 /* Express type <n> in the runtime type symbols of interpret.h.
@@ -2031,18 +2154,17 @@ etype1 (int n)
 }
 
 /*-------------------------------------------------------------------------*/
-static char *
+static const char *
 etype (int n)
 
 /* Express the type(s) of current function argument <n> in the
  * runtime type symbols of interpret.h, multiple types concatenated by '|'.
- * Return a pointer to a static buffer with the text.
+ * Return a pointer to a local static buffer with the text.
  */
 
 {
     int i;
-    size_t local_size = 100;
-    char *buff = malloc(local_size);
+    static char buff[100];
 
     /* Find the argument <n> in the current signature */
 
@@ -2054,14 +2176,16 @@ etype (int n)
             n--;
     }
     if (i == curr_arg_type_size || !curr_arg_types[i])
+    {
         return "0";
+    }
 
     /* Create the type string */
 
     buff[0] = '\0';
     for(; curr_arg_types[i] != 0; i++)
     {
-        char *p;
+        const char *p;
         if (curr_arg_types[i] == VOID)
             continue;
         if (buff[0] != '\0')
@@ -2070,19 +2194,19 @@ etype (int n)
         /* The number 2 below is to include the zero-byte and the next
          * '|' (which may not come).
          */
-        if (strlen(p) + strlen(buff) + 2 > local_size)
+        if (strlen(p) + strlen(buff) + 2 > sizeof(buff))
         {
             fprintf(stderr, "Buffer overflow!\n");
             exit(1);
         }
-        strcat(buff, etype1(curr_arg_types[i]));
+        strcat(buff, p);
     }
 
     return buff;
 } /* etype() */
 
 /*-------------------------------------------------------------------------*/
-static char *
+static const char *
 ctype (int n)
 
 /* Express type <n> in the compiler type symbols of exec.h.
@@ -2091,7 +2215,7 @@ ctype (int n)
 
 {
     static char buff[100];        /* 100 is such a comfortable size :-) */
-    char *p;
+    const char *p = NULL;
 
     buff[0] = '\0';
     if (n & MF_TYPE_MOD_REFERENCE)
@@ -2252,7 +2376,31 @@ read_config (void)
     fclose(fpr);
 
 #undef MATCH
-    
+
+    /* Sanity check on some of those USE_ defines: undefine
+     * those which are not supported on the host system.
+     */
+    {
+        const char * defnames[] = {
+#ifndef HAS_IPV6
+                             "USE_IPV6",
+#endif
+#ifndef HAS_MYSQL
+                             "USE_MYSQL",
+#endif
+                             NULL };
+        int i;
+
+        for (i = 0; defnames[i] != NULL; i++)
+        {
+            struct defn *old_def;
+            old_def = lookup_define(defnames[i]);
+            if (old_def)
+            {
+                old_def->name[0] = '\0';
+            }
+        }
+    }
 } /* read_config() */
 
 /*-------------------------------------------------------------------------*/
@@ -2270,6 +2418,7 @@ read_func_spec (void)
         perror(FUNC_SPEC);
         exit(1);
     }
+    got_error = 0;
     current_line = 1;
     current_file = FUNC_SPEC;
     parsetype = PARSE_FUNC_SPEC;
@@ -2330,6 +2479,7 @@ read_string_spec (void)
         perror(STRING_SPEC);
         exit(1);
     }
+    got_error = 0;
     current_line = 1;
     current_file = STRING_SPEC;
     parsetype = PARSE_STRING_SPEC;
@@ -2509,12 +2659,16 @@ create_efun_defs (void)
     do {
         if (!(c & 0xf))
             fprintf(fpw, "\n    ");
-        fprintf(fpw, "%d,", !isascii(c) ? 0 :
-                ( make_func_isescaped(c)   ? _MCTe : 0 ) |
-                ( isdigit ((unsigned)c)              ? _MCTd : 0 ) |
-                ( isspace ((unsigned)c) && c != '\n' ? _MCTs : 0 ) |
-                ( isxdigit((unsigned)c)              ? _MCTx : 0 ) |
-                ( isalnum ((unsigned)c) || c == '_'  ? _MCTa : 0 ) );
+        fprintf(fpw, "%d,"
+               ,  ( (isascii(c) && make_func_isescaped(c)) ? _MCTe : 0 )
+                | ( (isascii(c) && isdigit ((unsigned char)c))  ? _MCTd : 0 )
+                | ( (isascii(c) && isspace ((unsigned char)c) && c != '\n')
+                    ? _MCTs : 0 )
+                | ( (isascii(c) && isxdigit((unsigned char)c))  ? _MCTx : 0 )
+                | ( ((isascii(c) && (isalnum ((unsigned char)c) || c == '_'))
+                   || (((unsigned char)c) >= 0xC0 && ((unsigned char)c) <= 0xFF))
+                    ? _MCTa : 0 )
+               );
         c++;
     } while (c != '\0');
     fprintf(fpw, "\n};\n");
@@ -2686,12 +2840,12 @@ create_lang (void)
                 continue;
             }
             if MATCH("hookmap") {
-                handle_map(line_buffer+9, NUM_CLOSURE_HOOKS, name_to_hook);
+                handle_map(line_buffer+9, NUM_DRIVER_HOOKS, name_to_hook);
                 continue;
             }
             if MATCH("//") {
                 /* c++ - resembling comment */
-                fputs("", fpw);
+                fputs("\n", fpw);
                 continue;
             }
             if (!bPrintedNotice) {
@@ -2707,6 +2861,7 @@ create_lang (void)
 " */\n"
 "\n"
                          , fpw);
++                    fprintf(fpw, "#line %d \"%s\"\n", current_line+1, PRO_LANG);
                     continue;
                 }
             }
@@ -2730,7 +2885,7 @@ create_stdstrings (void)
     int i;
 
     /* Create stdstrings.h */
-    
+
     if ((fpw = fopen(STDSTRINGS ".h", "w")) == NULL)
     {
        perror(STDSTRINGS ".h");
@@ -2792,7 +2947,7 @@ create_stdstrings (void)
     fclose(fpw);
 
     /* Create stdstrings.c */
-    
+
     if ((fpw = fopen(STDSTRINGS ".c", "w")) == NULL)
     {
        perror(STDSTRINGS ".c");
@@ -2848,7 +3003,7 @@ create_stdstrings (void)
          , fpw);
 
     fclose(fpw);
-    
+
 } /* create_stdstrings() */
 
 /*-------------------------------------------------------------------------*/
@@ -2901,7 +3056,7 @@ main (int argc, char ** argv)
 %union{ int i; char *p; }\n\
 %type <p> all\n\
 %%\n\
-all: { $<p>$ = 0; } 'a'\n\
+all: { $<p>$ = 0; } 'a' ; \n\
 %%\n\
 ");
         fclose(fpw);
@@ -2929,6 +3084,9 @@ all: { $<p>$ = 0; } 'a'\n\
     if (action == MakeStrings)
         read_string_spec();
 
+    if (got_error)
+        return 1;
+
     /* --- Create the output files --- */
     if (action == MakeInstrs)
     {
@@ -2937,7 +3095,7 @@ all: { $<p>$ = 0; } 'a'\n\
     }
     if (action == MakeLang)
         create_lang();
-    
+
     if (action == MakeStrings)
         create_stdstrings();
 

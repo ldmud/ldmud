@@ -1,5 +1,5 @@
-#ifndef _TRACE_H_
-#define _TRACE_H_
+#ifndef LPC_TRACE_H_
+#define LPC_TRACE_H_
 
 /* Argument values for the trace() efun.
  */
@@ -15,4 +15,4 @@
 #define TRACE_APPLY        64  /* Trace (internal) applies */
 #define TRACE_OBJNAME     128  /* Print the object names */
 
-#endif /* _TRACE_H_ */
+#endif /* LPC_TRACE_H_ */

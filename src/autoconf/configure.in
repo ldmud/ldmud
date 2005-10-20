@@ -11,18 +11,18 @@ dnl some helper macros
 dnl
 
 AC_DEFUN(AC_UPDATE_VAR,
-if test "x$[$1]" = "x" && test "x$DEFAULT[$1]" != "x"; then
+[if test "x$[$1]" = "x" && test "x$DEFAULT[$1]" != "x"; then
   [$1]=$DEFAULT[$1]
-fi
+fi]
 )
 
 AC_DEFUN(AC_CDEF_FROM_ENABLE,
-AC_UPDATE_VAR(enable_[$1])
+[AC_UPDATE_VAR(enable_[$1])
 if test "x$enable_[$1]" = "xyes"; then
   cdef_[$1]="#define"
 else
   cdef_[$1]="#undef"
-fi
+fi]
 )
 
 AC_DEFUN(AC_INT_VAL_FROM_WITH,
@@ -69,12 +69,25 @@ AC_ARG_WITH([$1],AC_FORM_HELP([with-$1]ifelse($3,,[=VALUE],[=$3]),
 [$4]),[$5],[$6])
 ])
 
+AC_DEFUN(AC_NOT_AVAILABLE,
+[if test "x$not_available" = "x"; then
+    not_available="$1"
+else
+    not_available="[$not_available], $1"
+fi])
+
 dnl
 dnl let's start
 AC_INIT(prolang.y)
 
 dnl set the default prefix
 AC_PREFIX_DEFAULT(/usr/local/mud)
+
+dnl
+dnl This variable collects those requested features for which the system
+dnl doesn't offer the right support.
+
+not_available=""
 
 dnl
 dnl define default values for package arguments
@@ -92,25 +105,46 @@ AC_MY_ARG_ENABLE(initialization-by-__init,yes,,)
 AC_MY_ARG_ENABLE(use-system-crypt,yes,,)
 AC_MY_ARG_ENABLE(udp-send,yes,,)
 AC_MY_ARG_ENABLE(use-ipv6,no,,)
+AC_MY_ARG_ENABLE(use-mysql,no,,)
+AC_MY_ARG_ENABLE(use-pthreads,no,,[enable using of threads for socket writes - HIGHLY ALPHA!])
+AC_MY_ARG_ENABLE(use-pcre,no,,[enable using of perl compatible regexp (requires Fiona's pcre-patch)])
 AC_MY_ARG_ENABLE(lpc-nosave,yes,,[Enables the 'nosave' keyword])
+AC_MY_ARG_ENABLE(use-set-light,yes,,[enable the efun set_light()])
+AC_MY_ARG_ENABLE(use-process-string,yes,,[enable the efun process_string()])
+AC_MY_ARG_ENABLE(use-set-is-wizard,yes,,[enable the efun set_is_wizard()])
+AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
 AC_MY_ARG_ENABLE(comm-stat,yes,,)
 AC_MY_ARG_ENABLE(apply-cache_stat,yes,,)
 AC_MY_ARG_ENABLE(malloc-trace,no,,)
 AC_MY_ARG_ENABLE(malloc-lpc-trace,no,,)
-AC_MY_ARG_ENABLE(max-malloced,yes,,)
-AC_MY_ARG_ENABLE(min-malloced,no,,)
 AC_MY_ARG_ENABLE(dynamic-costs,no,,)
+AC_MY_ARG_ENABLE(trace-code,yes,,[trace the most recently executed bytecode])
 
-AC_MY_ARG_ENABLE(catch-udp-port,yes,,)
 AC_MY_ARG_ENABLE(rxcache_table,yes,,)
+
+AC_MY_ARG_ENABLE(opcprof,no,,[create VM instruction usage statistics])
+AC_MY_ARG_ENABLE(verbose-opcprof,no,,[with opcprof: include instruction names])
+AC_MY_ARG_ENABLE(debug,yes,,[enable sanity checks])
+AC_MY_ARG_ENABLE(yydebug,no,,[enable LPC compiler debug output])
+AC_MY_ARG_ENABLE(no-inlines,no,,[disable inlining])
+AC_MY_ARG_ENABLE(check-strings,yes,,[allow shared string sanity checks])
+AC_MY_ARG_ENABLE(keep-strings,no,,[don't free shared strings])
+AC_MY_ARG_ENABLE(debug-telnet,no,,[enable telnet machine diagnostics])
+AC_MY_ARG_ENABLE(debug-smalloc-allocs,no,,[enable small block diagnostics])
+
+AC_MY_ARG_ENABLE(check-object-gc-ref,yes,,[check object references in GC])
+AC_MY_ARG_ENABLE(check-smalloc-total,no,,[trace smalloc statistics])
+AC_MY_ARG_ENABLE(dump-gc-refs,no,,[trace GC references])
 
 AC_MY_ARG_WITH(access-file,ACCESS.ALLOW,,[access permissions file])
 AC_MY_ARG_WITH(access-log,access.allow.log,,[access log file])
 
+AC_MY_ARG_WITH(pthreads-write-max-size,100000,,[max size of write buffer per thread])
+
 AC_MY_ARG_WITH(erq-max-reply,1024,,)
 AC_MY_ARG_WITH(erq-max-send,1024,,)
+AC_MY_ARG_WITH(erq-debug,0,,[ERQ debug level])
 
-AC_MY_ARG_WITH(max-log-size,50000,[BYTES],[maximum size of log files])
 AC_MY_ARG_WITH(read-file-max-size,50000,[BYTES],
   [maximum size of a file allowed to be read by 'read_file()'])
 
@@ -125,6 +159,7 @@ AC_MY_ARG_WITH(max-trace,65,,)
 AC_MY_ARG_WITH(compiler-stack-size,400,,)
 AC_MY_ARG_WITH(max-bits,6144,,)
 AC_MY_ARG_WITH(portno,4242,,)
+AC_MY_ARG_WITH(udp_port,4246,,)
 AC_MY_ARG_WITH(maxnumports,20,,)
 AC_MY_ARG_WITH(max-cost,1000000,,)
 AC_MY_ARG_WITH(catch-reserved-cost,2000,,)
@@ -132,6 +167,7 @@ AC_MY_ARG_WITH(master-reserved-cost,0x200,,)
 AC_MY_ARG_WITH(swap-file,LP_SWAP.3,,[name of the swap file])
 AC_MY_ARG_WITH(max-array-size,3000,,)
 AC_MY_ARG_WITH(max-mapping-size,5000,,)
+AC_MY_ARG_WITH(max-callouts,0,,)
 AC_MY_ARG_WITH(max-players,50,,)
 AC_MY_ARG_WITH(max-local,50,,)
 AC_MY_ARG_WITH(allowed-ed-cmds,20,,[number of ed commands per backend cycle])
@@ -143,20 +179,23 @@ AC_MY_ARG_WITH(itable-size,256,,)
 AC_MY_ARG_WITH(otable-size,1024,,)
 AC_MY_ARG_WITH(defmax,65000,,)
 AC_MY_ARG_WITH(apply-cache-bits,12,,)
-AC_MY_ARG_WITH(rxcache-table,16384,,)
+AC_MY_ARG_WITH(rxcache-table,8192,,)
 AC_MY_ARG_WITH(max-byte-transfer,50000,,)
 AC_MY_ARG_WITH(catch-udp-port,4246,,)
 AC_MY_ARG_WITH(set-buffer-size-max,65536,,)
 AC_MY_ARG_WITH(malloc,smalloc,[smalloc/sysmalloc],[memory manager to use])
-AC_MY_ARG_WITH(min-malloced,0x1000000,,)
+AC_MY_ARG_WITH(min-malloced,0,,)
+AC_MY_ARG_WITH(min-small-malloced,0,,)
 AC_MY_ARG_WITH(max-malloced,0x4000000,,)
 AC_MY_ARG_WITH(total-trace-length,0x1000,,)
+AC_MY_ARG_WITH(wizlist-file,WIZLIST,,[name of the wizlist file])
 
 AC_ARG_WITH(setting,[  --with-setting=SETTING  include a predefined setting],[
 if test -f "settings/$withval" ; then
 cat >conftest.sed <<\EOF
 /^#.*/ d
 /^[[ \t]]*$/ d
+s/#.*$//
 s/disable_\([[^= \t]]*\)/enable_\1=no/
 /^enable_/ s/^/DEFAULT/p
 /^with_/ s/^/DEFAULT/p
@@ -188,6 +227,20 @@ else
   erq_sub=
 fi
 
+AC_UPDATE_VAR(enable_use_mysql)
+if test "x$enable_use_mysql" = "x" || test "x$enable_use_mysql" = "xyes"; then
+  cdef_use_mysql="#define"
+  mysql_path=
+  enable_use_mysql="yes"
+elif test "x$enable_use_mysql" = "xno"; then
+  cdef_use_mysql="#undef"
+  mysql_path=
+else
+  cdef_use_mysql="#define"
+  mysql_path="$enable_use_mysql"
+  enable_use_mysql="yes"
+fi
+
 AC_CDEF_FROM_ENABLE(access_control)
 AC_CDEF_FROM_ENABLE(access_log)
 AC_CDEF_FROM_ENABLE(align_functions)
@@ -196,28 +249,47 @@ AC_CDEF_FROM_ENABLE(strict_euids)
 AC_CDEF_FROM_ENABLE(supply_parse_command)
 AC_CDEF_FROM_ENABLE(initialization_by___init)
 AC_CDEF_FROM_ENABLE(use_system_crypt)
-AC_CDEF_FROM_ENABLE(udp_send)
 AC_CDEF_FROM_ENABLE(use_ipv6)
+AC_CDEF_FROM_ENABLE(use_pthreads)
+AC_CDEF_FROM_ENABLE(use_pcre)
 AC_CDEF_FROM_ENABLE(lpc_nosave)
+AC_CDEF_FROM_ENABLE(use_deprecated)
+AC_CDEF_FROM_ENABLE(use_set_light)
+AC_CDEF_FROM_ENABLE(use_set_is_wizard)
+AC_CDEF_FROM_ENABLE(use_process_string)
 AC_CDEF_FROM_ENABLE(comm_stat)
 AC_CDEF_FROM_ENABLE(apply_cache_stat)
 AC_CDEF_FROM_ENABLE(malloc_trace)
 AC_CDEF_FROM_ENABLE(malloc_lpc_trace)
-AC_CDEF_FROM_ENABLE(max_malloced)
-AC_CDEF_FROM_ENABLE(min_malloced)
 AC_CDEF_FROM_ENABLE(dynamic_costs)
+AC_CDEF_FROM_ENABLE(trace_code)
 
-AC_CDEF_FROM_ENABLE(catch_udp_port)
 AC_CDEF_FROM_ENABLE(rxcache_table)
+
+AC_CDEF_FROM_ENABLE(opcprof)
+AC_CDEF_FROM_ENABLE(verbose_opcprof)
+AC_CDEF_FROM_ENABLE(debug)
+AC_CDEF_FROM_ENABLE(yydebug)
+AC_CDEF_FROM_ENABLE(no_inlines)
+AC_CDEF_FROM_ENABLE(check_strings)
+AC_CDEF_FROM_ENABLE(keep_strings)
+AC_CDEF_FROM_ENABLE(debug_telnet)
+AC_CDEF_FROM_ENABLE(debug_smalloc_allocs)
+
+AC_CDEF_FROM_ENABLE(check_object_gc_ref)
+AC_CDEF_FROM_ENABLE(check_smalloc_total)
+AC_CDEF_FROM_ENABLE(dump_gc_refs)
 
 AC_STRING_VAL_FROM_WITH(access_file)
 AC_STRING_VAL_FROM_WITH(access_log)
 AC_STRING_VAL_FROM_WITH(swap_file)
+AC_STRING_VAL_FROM_WITH(wizlist_file)
 AC_STRING_VAL_FROM_WITH(master_name)
 
+AC_INT_VAL_FROM_WITH(pthreads_write_max_size)
 AC_INT_VAL_FROM_WITH(erq_max_reply)
 AC_INT_VAL_FROM_WITH(erq_max_send)
-AC_INT_VAL_FROM_WITH(max_log_size)
+AC_INT_VAL_FROM_WITH(erq_debug)
 AC_INT_VAL_FROM_WITH(read_file_max_size)
 AC_INT_VAL_FROM_WITH(time_to_clean_up)
 AC_INT_VAL_FROM_WITH(time_to_swap)
@@ -235,6 +307,7 @@ AC_INT_VAL_FROM_WITH(catch_reserved_cost)
 AC_INT_VAL_FROM_WITH(master_reserved_cost)
 AC_INT_VAL_FROM_WITH(max_array_size)
 AC_INT_VAL_FROM_WITH(max_mapping_size)
+AC_INT_VAL_FROM_WITH(max_callouts)
 AC_INT_VAL_FROM_WITH(max_players)
 AC_INT_VAL_FROM_WITH(max_local)
 AC_INT_VAL_FROM_WITH(allowed_ed_cmds)
@@ -248,10 +321,11 @@ AC_INT_VAL_FROM_WITH(defmax)
 AC_INT_VAL_FROM_WITH(apply_cache_bits)
 AC_INT_VAL_FROM_WITH(rxcache_table)
 AC_INT_VAL_FROM_WITH(max_byte_transfer)
-AC_INT_VAL_FROM_WITH(catch_udp_port)
+AC_INT_VAL_FROM_WITH(udp_port)
 AC_INT_VAL_FROM_WITH(set_buffer_size_max)
 AC_INT_VAL_FROM_WITH(malloc)
 AC_INT_VAL_FROM_WITH(min_malloced)
+AC_INT_VAL_FROM_WITH(min_small_malloced)
 AC_INT_VAL_FROM_WITH(max_malloced)
 AC_INT_VAL_FROM_WITH(total_trace_length)
 
@@ -264,20 +338,25 @@ if test "x$cdef_access_log" = "x#undef"; then
   val_access_log=
 fi
 
-if test "x$cdef_catch_udp_port" = "x#undef"; then
-  val_catch_udp_port=
-fi
-
-if test "x$cdef_min_malloced" = "x#undef"; then
-  val_min_malloced=
-fi
-
-if test "x$cdef_max_malloced" = "x#undef"; then
-  val_max_malloced=
-fi
-
 if test "x$cdef_rxcache_table" = "x#undef"; then
   val_rxcache_table=
+fi
+
+if test "x$with_wizlist_file" != "xno"; then
+  cdef_wizlist_file="#define"
+  if test "x$with_wizlist_file" = "xyes"; then
+    with_wizlist_file=""
+  fi
+else
+  cdef_wizlist_file="#undef"
+fi
+
+if test "x$cdef_wizlist_file" = "x#undef"; then
+  val_wizlist_file=
+fi
+
+if test "x$cdef_opcprof" = "x#undef"; then
+  cdef_verbose_opcprof="#undef"
 fi
 
 
@@ -343,14 +422,33 @@ AC_MSG_ERROR(You need an ANSI-C compiler! sorry..)
 )
 
 
-dnl Checking for programs and headers
+dnl Checking for programs
 
 AC_PROG_INSTALL
 AC_CONFIG_HEADER(machine.h)
-dnl bison -y is incompatible in functionality & Copyright
-dnl TODO: (Mubo: copyright changed, this should no longer be a problem, but...)
-AC_CHECK_PROGS(YACC, byacc, yacc)
+AC_CHECK_PROGS(YACC, byacc "bison -y", yacc)
 AC_PROG_CPP
+
+dnl Recognize some unusual systems.
+dnl Not all checks happen here - the check for solaris for example requires
+dnl some library checks first.
+
+AC_EGREP_CPP(yes,[
+#if defined(__EMX__)
+yes
+#endif
+],
+[ EXTRA_CFLAGS="${EXTRA_CFLAGS} -DOS2" ])
+
+AC_EGREP_CPP(yes,[
+#if defined(__CYGWIN32__) || defined(__CYGWIN__)
+yes
+#endif
+],
+[ EXTRA_CFLAGS="${EXTRA_CFLAGS} -DMSWIN" ])
+
+dnl Checking for headers
+
 AC_CHECK_HEADERS(sys/rusage.h sys/time.h unistd.h stdlib.h libc.h memory.h)
 AC_CHECK_HEADERS(values.h string.h bstring.h netdb.h crypt.h sys/param.h sys/termios.h)
 AC_HEADER_STDC
@@ -380,13 +478,9 @@ if test $lp_cv_type_ssize_t = yes; then
   AC_DEFINE(HAVE_SSIZE_T)
 fi
 
-AC_CACHE_CHECK(for long long,lp_cv_type_long_long,
-AC_TRY_COMPILE([long long i;],,
-lp_cv_type_long_long=yes,
-lp_cv_type_long_long=no))
-if test $lp_cv_type_long_long = yes; then
+AC_CHECK_SIZEOF(long long) dnl Also checks for the existance
+if test $ac_cv_type_long_long = yes; then
   AC_DEFINE(HAVE_LONG_LONG)
-  AC_CHECK_SIZEOF(long long)
 fi
 
 AC_CACHE_CHECK(for bool,lp_cv_type_bool,
@@ -405,15 +499,78 @@ fi
 AC_TYPE_SIZE_T
 AC_TYPE_PID_T
 AC_TYPE_SIGNAL
+
+if test "x$ac_cv_type_signal" = "xvoid"; then
+  cat >> confdefs.h <<EOF
+#define RETSIGTYPE_VOID 1
+EOF
+fi
+
+# --- Check for common system libraries ---
+
 AC_CHECK_LIB(m,main)
 AC_CHECK_LIB(socket,main)
+
+ERQ_LIBS="$LIBS"
+
 AC_CHECK_LIB(ucb,main, LIBS="$LIBS -lc -lucb")
-AC_CHECK_LIB(crypt,main, LIBS="$LIBS -lcrypt")
+
 if test $ac_cv_lib_socket_main = "yes" || test $ac_cv_lib_ucb_main = "yes"; then
       AC_CHECK_LIB(nsl,main)
 fi
+
+AC_CACHE_CHECK(if -lresolv is needed, lp_cv_need_lib_resolv,
+    AC_TRY_RUN([
+#include <netdb.h>
+void t (void)
+{
+    herror("foo");
+}
+int main(void)
+{
+    return 0;
+}
+    ],
+    lp_cv_need_lib_resolv=no,
+    lp_cv_need_lib_resolv=yes
+))
+if test "$lp_cv_need_lib_resolv" = "yes"; then
+    AC_CHECK_LIB(resolv,main, LIBS="$LIBS -lresolv")
+fi
+
+# --- Check if we need the crypto libraries ---
+
+if test "x$enable_use_system_crypt" = "x" || test "x$enable_use_system_crypt" = "xyes"; then
+    AC_CHECK_FUNCS(crypt _crypt)
+    AC_CACHE_CHECK(if -lcrypt is needed, lp_cv_need_lib_crypto,
+        AC_TRY_RUN([
+void t (void)
+{
+#ifdef HAS_CRYPT
+    crypt("foo", "bar");
+#endif
+#ifdef HAS__CRYPT
+    _crypt("foo", "bar");
+#endif
+}
+int main(void)
+{
+    return 0;
+}
+        ],
+        lp_cv_need_lib_crypto=no,
+        lp_cv_need_lib_crypto=yes
+    ))
+    if test "$lp_cv_need_lib_crypto" = "yes"; then
+        AC_CHECK_LIB(crypto,main, LIBS="$LIBS -lcrypto")
+        AC_CHECK_LIB(crypt,main, LIBS="$LIBS -lcrypt")
+    fi
+fi
+
+# --- Check for functions ---
+
 AC_FUNC_ALLOCA
-AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strdup strcspn crypt _crypt)
+AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strdup strcspn)
 AC_CHECK_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
 AC_CHECK_FUNCS(fcntl getdomainname)
 
@@ -463,27 +620,257 @@ if test $lp_cv_func_inet_ntoa_ok = yes ; then
   AC_DEFINE(INET_NTOA_OK)
 fi
 
+# --- IPV6 ---
+
 AC_CACHE_CHECK(for IPv6 support,lp_cv_has_ipv6,
-saveflags="$CFLAGS"
-CFLAGS="$CFLAGS -I/usr/inet6/include"
-AC_TRY_COMPILE([
+    saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS -I/usr/inet6/include"
+    AC_TRY_COMPILE([
 #include <sys/types.h>
 #include <netinet/in.h>
 
 struct sockaddr_in6 foo(void)
 {
     static struct sockaddr_in6 ad;
-    
+
     return ad;
 }
-],,lp_cv_has_ipv6=yes,
-lp_cv_has_ipv6=no
-CFLAGS="$saveflags"
+        ],,lp_cv_has_ipv6=yes,
+        lp_cv_has_ipv6=no
+        CFLAGS="$saveflags"
 ))
 if test $lp_cv_has_ipv6 = yes; then
-  AC_DEFINE(HAS_IPV6)
-  AC_CHECK_LIB(inet6,main, LIBS="$LIBS -linet6")
+    AC_DEFINE(HAS_IPV6)
+    if test $enable_use_ipv6 = yes; then
+        AC_CACHE_CHECK(if -linet6 is needed, lp_cv_need_lib_inet6,
+            AC_TRY_RUN([
+#include <sys/types.h>
+#include <netinet/in.h>
+void t (void)
+{
+    struct sockaddr_in6 ad;
+    inet6_ntoa(ad.sin_addr);
+}
+int main(void)
+{
+    return 0;
+}
+            ],
+            lp_cv_need_lib_inet6=no,
+            lp_cv_need_lib_inet6=yes
+        ))
+        if test "$lp_cv_need_lib_inet6" = "yes"; then
+            AC_CHECK_LIB(inet6,main, LIBS="$LIBS -linet6")
+        fi
+    fi
+else
+    if test $enable_use_ipv6 = yes; then
+        echo "IPV6 not supported - disabling IPV6 support."
+        AC_NOT_AVAILABLE(use-ipv6)
+    fi
+    cdef_use_ipv6="#undef"
+    enable_use_ipv6=no
 fi
+
+# --- PThreads ---
+
+AC_CACHE_CHECK(for pthreads support,lp_cv_has_pthreads,
+    saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS -I/usr/include"
+    AC_TRY_COMPILE([
+#include <pthread.h>
+
+void foo(void)
+{
+    int i = PTHREAD_CREATE_JOINABLE;
+}
+    ],,lp_cv_has_pthreads=yes,
+    lp_cv_has_pthreads=no
+    CFLAGS="$saveflags"
+))
+
+if test $lp_cv_has_pthreads = yes; then
+    AC_DEFINE(HAS_PTHREADS)
+    if test $enable_use_pthreads = yes; then
+        AC_CACHE_CHECK(if -lpthread is needed, lp_cv_need_lib_pthread,
+            AC_TRY_RUN([
+#include <pthread.h>
+void t (void)
+{
+    pthread_t pid;
+    pthread_cancel(pid);
+}
+int main(void)
+{
+    return 0;
+}
+            ],
+            lp_cv_need_lib_pthread=no,
+            lp_cv_need_lib_pthread=yes
+        ))
+        if test "$lp_cv_need_lib_pthread" = "yes"; then
+            AC_CHECK_LIB(pthread,main, LIBS="$LIBS -lpthread")
+        fi
+    fi
+else
+    if test $enable_use_pthreads = yes; then
+        echo "pthreads not supported - disabling pthreads support."
+        AC_NOT_AVAILABLE(use-pthreads)
+    fi
+    cdef_use_pthreads="#undef"
+    enable_use_pthreads=no
+fi
+
+# --- PCRE ---
+
+AC_CACHE_CHECK(for pcre support,lp_cv_has_pcre,
+    saveflags="$CFLAGS"
+    CFLAGS="$CFLAGS -I/usr/include"
+    AC_TRY_COMPILE([
+#include <pcre.h>
+
+pcre_extra foo(void)
+{
+    return;
+}
+    ],,lp_cv_has_pcre=yes,
+    lp_cv_has_pcre=no
+    CFLAGS="$saveflags"
+))
+if test $lp_cv_has_pcre = yes; then
+    AC_DEFINE(HAS_PCRE)
+    if test $enable_use_pcre = yes; then
+        AC_CHECK_LIB(pcre,main, LIBS="$LIBS -lpcre")
+    fi
+else
+    enable_use_pcre=no
+fi
+
+# --- mySQL ---
+
+AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
+for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/include" "/usr/include" "/usr/lib/mysql"; do
+    saveflags="$CFLAGS"
+    if test "x$TESTPATH" != "x"; then
+        CFLAGS="$CFLAGS -I$TESTPATH"
+    fi
+AC_TRY_COMPILE([
+#include <sys/types.h>
+#include <mysql/mysql.h>
+#include <mysql/errmsg.h>
+
+struct MYSQL * foo(void)
+{
+    static MYSQL var;
+
+    return &var;
+}
+],,
+lp_cv_has_mysql=yes
+if test "x$TESTPATH" != "x"; then
+    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
+fi
+break;
+,
+lp_cv_has_mysql=no
+CFLAGS="$saveflags"
+)
+done
+)
+
+# The system has the include files - now search for the libraries.
+if test $lp_cv_has_mysql = yes; then
+  saveflags="$CFLAGS"
+  AC_DEFINE(HAS_MYSQL)
+
+  if test $enable_use_mysql = yes; then
+    if test "x$mysql_path" = "x"; then
+        AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -lmysqlclient")
+    else
+        tmp=""
+
+        if test -d "${mysql_path}/lib/mysql"; then
+            CFLAGS="$saveflags -L${mysql_path}/lib/mysql"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L${mysql_path}/lib/mysql -lmysqlclient")
+        elif test -d "${mysql_path}/lib"; then
+            CFLAGS="$saveflags -L${mysql_path}/lib"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L${mysql_path}/lib -lmysqlclient")
+        else
+            CFLAGS="$saveflags -L$mysql_path"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L$mysql_path -lmysqlclient")
+        fi
+
+        if test "x$tmp" = "x"; then
+            echo "mysqlclient library not found - disabling mySQL support"
+            AC_NOT_AVAILABLE(use-mysql)
+            cdef_use_mysql="#undef"
+            enable_use_mysql="no"
+            mysql_path=
+            lp_cv_has_mysql="no"
+        else
+            PKGLIBS="$tmp"
+        fi
+    fi
+  fi
+
+  if test $enable_use_mysql = yes; then
+      # Some systems need additional libraries
+      savelibs="$LIBS"
+      LIBS="$LIBS $PKGLIBS"
+
+      AC_CACHE_CHECK(if -lz is needed, lp_cv_need_lib_z,
+          AC_TRY_RUN([
+#include <mysql/mysql.h>
+void t (void)
+{
+    MYSQL *dat;
+
+    mysql_real_connect(dat, "localhost", "user", "pwd", "db", 0, 0, 0);
+}
+int main(void)
+{
+    return 0;
+}
+          ],
+          lp_cv_need_lib_z=no,
+          lp_cv_need_lib_z=yes
+      ))
+      if test "$lp_cv_need_lib_z" = "yes"; then
+          AC_CHECK_LIB(z,main, PKGLIBS="$PKGLIBS -lz")
+      fi
+
+      AC_CACHE_CHECK(if -lnsl is needed, lp_cv_need_lib_nsl,
+          AC_TRY_RUN([
+#include <mysql/mysql.h>
+void t (void)
+{
+    MYSQL *dat;
+
+    mysql_real_connect(dat, "localhost", "user", "pwd", "db", 0, 0, 0);
+}
+int main(void)
+{
+    return 0;
+}
+          ],
+          lp_cv_need_lib_nsl=no,
+          lp_cv_need_lib_nsl=yes
+      ))
+      if test "$lp_cv_need_lib_nsl" = "yes"; then
+          AC_CHECK_LIB(nsl,main, PKGLIBS="$PKGLIBS -lnsl")
+      fi
+
+      LIBS="$savelibs"
+  fi
+
+  CFLAGS="$saveflags"
+else
+  if test $enable_use_mysql = yes; then
+      AC_NOT_AVAILABLE(use-mysql)
+  fi
+fi
+
+# ---
 
 AC_CACHE_CHECK(if rename handles directories,
 lp_cv_sys_rename_handles_directories,
@@ -498,6 +885,7 @@ lp_cv_sys_rename_handles_directories=no))
 if test $lp_cv_sys_rename_handles_directories = yes; then
   AC_DEFINE(RENAME_HANDLES_DIRECTORIES)
 fi
+rmdir conftestdirfrom conftestdirto 2> /dev/null
 
 if test $ac_cv_func_getrusage = "yes" ; then
 AC_CACHE_CHECK(full availability of struct rusage members,
@@ -619,8 +1007,8 @@ void free PROT((POINTER));
 #else
 int free PROT((POINTER));
 #endif
-],,lp_cv_prop_malloc_return_type='void *',
-lp_cv_prop_malloc_return_type='char *'))
+],,lp_cv_prop_malloc_return_type="void *",
+lp_cv_prop_malloc_return_type="char *"))
 AC_DEFINE_UNQUOTED(POINTER,$lp_cv_prop_malloc_return_type)
 
 AC_CACHE_CHECK(if CHAR_BIT == 8 or undef,
@@ -1015,15 +1403,75 @@ if test $lp_cv_prop_strtol_const_charp = yes; then
   AC_DEFINE(STRTOL_CONST_CHARP)
 fi
 
+# --- Check for compiler options ---
 
 tcomp='${CC-cc} ${CFLAGS} ${TESTFLAG} -o conftest conftest.c >/dev/null 2>&1'
 tcomp2='${CC-cc} ${CFLAGS} ${TESTFLAG} -o conftest conftest.c 2>&1'
 tcomp3='${CC-cc} ${CFLAGS} ${TESTFLAG} -c conftest.c >/dev/null 2>&1'
+
 cat > conftest.c <<EOF
 #include <stdio.h>
+#include <math.h>
 double d = 4.5;
-main() { printf("hello world\n"); }
+int main(void) { printf("hello world\n"); return 0; }
 EOF
+
+AC_MSG_CHECKING(warning CFLAGS)
+changequote(,)dnl
+CFLAGS=
+for TESTFLAG in -Wall -Wparentheses -Wshadow; do
+  if eval $tcomp; then
+    # The option is recognized, but if it generates warnings on the
+    # above correct program, we still can't use it. So check for that.
+    if echo `eval $tcomp2` | egrep '[a-z]' >/dev/null; then
+      :
+      # Success means 'we got output' here :-(
+    else
+        CFLAGS="$CFLAGS $TESTFLAG"
+    fi
+  fi
+done
+changequote([,])dnl
+WCFLAGS=$CFLAGS
+AC_MSG_RESULT($WCFLAGS)
+
+AC_MSG_CHECKING(low optimization CFLAGS)
+changequote(,)dnl
+for TESTFLAG in -O; do
+  if eval $tcomp; then
+    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+      :
+      #the [e]grep option -v will not give a failure exit status on the atari
+    else
+      if eval $tcomp; then
+        CFLAGS=$TESTFLAG
+        break
+      fi
+    fi
+  fi
+done
+for TESTFLAG in -qmaxmem=65536; do
+  if eval $tcomp; then
+    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+      :
+      #the [e]grep option -v will not give a failure exit status on the atari
+    else
+      if eval $tcomp; then
+        CFLAGS="$CFLAGS $TESTFLAG"
+        break
+      fi
+    fi
+  fi
+done
+changequote([,])dnl
+for TESTFLAG in -g; do
+  if eval $tcomp; then
+    CFLAGS="$CFLAGS $TESTFLAG"
+  fi
+done
+LCFLAGS=$CFLAGS
+AC_MSG_RESULT($LCFLAGS)
+
 AC_MSG_CHECKING(medium optimization CFLAGS)
 changequote(,)dnl
 for TESTFLAG in -O2 -O; do
@@ -1039,7 +1487,7 @@ for TESTFLAG in -O2 -O; do
     fi
   fi
 done
-for TESTFLAG in -qmaxmem=65536; do
+for TESTFLAG in -qmaxmem=97204; do
   if eval $tcomp; then
     if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
       :
@@ -1092,7 +1540,7 @@ for TESTFLAG in -O4 -O3 -O2 -O; do
     fi
   fi
 done
-for TESTFLAG in -qstrict -qipa; do
+for TESTFLAG in -qstrict -qipa -ipo; do
   if eval $tcomp; then
     if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
       :
@@ -1106,6 +1554,7 @@ for TESTFLAG in -qstrict -qipa; do
   fi
 done
 changequote([,])dnl
+# -funroll-all-loops causes some versions of gcc to produce buggy code
 for TESTFLAG in -fomit-frame-pointer; do
   if eval $tcomp; then
     CFLAGS="$CFLAGS $TESTFLAG"
@@ -1122,6 +1571,7 @@ OPTIMIZE_LINKING=''
 if ${CC-cc} $OFLAGS -o conftest conftest.c ; then
   OPTIMIZE_LINKING='$(OPTIMIZE)'
 fi
+
 rm -f conftest.c
 
 if test $ac_cv_lib_socket_main = "yes"; then
@@ -1130,10 +1580,10 @@ AC_EGREP_CPP(yes,[
 yes
 #endif
 ],
-[ EXTRA_CFLAGS='-Dsolaris' ])
+[ EXTRA_CFLAGS="${EXTRA_CFLAGS} -Dsolaris" ])
 fi
 
-AC_ARG_WITH(target,[  --with-target    ??], EXTRA_CFLAGS="-D${withval}")
+AC_ARG_WITH(target,[  --with-target    ??], EXTRA_CFLAGS="${EXTRA_CFLAGS} -D${withval}")
 
 AC_MSG_CHECKING(if ${YACC} includes bogus malloc prototypes)
 cat > conftest.y <<EOF
@@ -1164,7 +1614,7 @@ else
   mv y_tab.c conftest.c
   YACCTAB=y_tab.
 fi
-if eval $compile; then
+if eval $ac_compile 2>&5 ; then
   MOVE_YACC_TAB='$(MV) $(YACCTAB)c'
   CLEAN_YACC_TAB=''
   AC_MSG_RESULT(no)
@@ -1196,7 +1646,7 @@ else
   mv y_tab.c conftest.c
   YACCTAB=y_tab.
 fi
-if eval $compile; then
+if eval $ac_compile 2>&5; then
   AC_MSG_RESULT(no)
 else
   EXTRA_CFLAGS="${EXTRA_CFLAGS} -U_SGI_SOURCE"
@@ -1318,6 +1768,7 @@ done
 
 LIBS="${SAVE_LIBS}"
 CFLAGS="${SAVE_CFLAGS}"
+
 case "$EXTRA_CFLAGS" in
  *-Dsolaris*)
   if test $ac_cv_lib_ucb_main = "yes"; then
@@ -1326,30 +1777,13 @@ case "$EXTRA_CFLAGS" in
         -ltcpip -lsocket -lnsl -lgcc -lc /usr/ucblib/libucb.a"
       LDFLAGS= "-u dgettext -lintl"
   fi ;;
+ *-DOS2*)
+      LDFLAGS= "$LDFLAGS -Zbsd-signals -Zexe"
+      ;;
+ *-MSWIN*)
+      LDFLAGS= "$LDFLAGS -luser32 -lwinmm -lkernel32 -lwsock32"
+      ;;
 esac
-AC_TRY_RUN([
-#include <sys/types.h>
-#include <stdio.h>
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-#ifdef HAVE_STDLIB_H
-#include <stdlib.h>
-#endif
-#ifdef HAVE_STRING_H
-#include <string.h>
-#else
-#include <strings.h>
-#endif
-#if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
-#include <memory.h>
-#endif
-int main(){
-    free((char *)0); /* linux libc 4.5.19 does this in fclose() */
-    exit(0);
-    return 0;
-}
-],AC_DEFINE(FREE_NULL_POINTER,1))
 
 AC_CACHE_CHECK(malloc overhead,lp_cv_sys_malloc_overhead,
 cat > conftest.c <<EOF
@@ -1373,7 +1807,9 @@ fi
 
 dnl
 
+AC_SUBST(WCFLAGS)
 AC_SUBST(OCFLAGS)
+AC_SUBST(LCFLAGS)
 AC_SUBST(MCFLAGS)
 AC_SUBST(DCFLAGS)
 AC_SUBST(LDFLAGS)
@@ -1400,19 +1836,38 @@ AC_SUBST(cdef_strict_euids)
 AC_SUBST(cdef_supply_parse_command)
 AC_SUBST(cdef_initialization_by___init)
 AC_SUBST(cdef_use_system_crypt)
-AC_SUBST(cdef_udp_send)
 AC_SUBST(cdef_use_ipv6)
+AC_SUBST(cdef_use_mysql)
+AC_SUBST(cdef_use_pthreads)
+AC_SUBST(cdef_use_pcre)
+AC_SUBST(cdef_use_set_light)
+AC_SUBST(cdef_use_set_is_wizard)
+AC_SUBST(cdef_use_process_string)
 AC_SUBST(cdef_lpc_nosave)
+AC_SUBST(cdef_use_deprecated)
 AC_SUBST(cdef_comm_stat)
+AC_SUBST(cdef_trace_code)
 AC_SUBST(cdef_apply_cache_stat)
 AC_SUBST(cdef_malloc_trace)
 AC_SUBST(cdef_malloc_lpc_trace)
 AC_SUBST(cdef_dynamic_costs)
 
-AC_SUBST(cdef_min_malloced)
-AC_SUBST(cdef_max_malloced)
-AC_SUBST(cdef_catch_udp_port)
 AC_SUBST(cdef_rxcache_table)
+AC_SUBST(cdef_wizlist_file)
+
+AC_SUBST(cdef_opcprof)
+AC_SUBST(cdef_verbose_opcprof)
+AC_SUBST(cdef_debug)
+AC_SUBST(cdef_yydebug)
+AC_SUBST(cdef_no_inlines)
+AC_SUBST(cdef_check_strings)
+AC_SUBST(cdef_keep_strings)
+AC_SUBST(cdef_debug_telnet)
+AC_SUBST(cdef_debug_smalloc_allocs)
+
+AC_SUBST(cdef_check_object_gc_ref)
+AC_SUBST(cdef_check_smalloc_total)
+AC_SUBST(cdef_dump_gc_refs)
 
 dnl second: valued defines
 dnl
@@ -1420,7 +1875,8 @@ AC_SUBST(val_access_file)
 AC_SUBST(val_access_log)
 AC_SUBST(val_erq_max_reply)
 AC_SUBST(val_erq_max_send)
-AC_SUBST(val_max_log_size)
+AC_SUBST(val_erq_debug)
+AC_SUBST(val_pthreads_write_max_size)
 AC_SUBST(val_read_file_max_size)
 AC_SUBST(val_time_to_clean_up)
 AC_SUBST(val_time_to_swap)
@@ -1440,6 +1896,7 @@ AC_SUBST(val_master_reserved_cost)
 AC_SUBST(val_swap_file)
 AC_SUBST(val_max_array_size)
 AC_SUBST(val_max_mapping_size)
+AC_SUBST(val_max_callouts)
 AC_SUBST(val_max_players)
 AC_SUBST(val_allowed_ed_cmds)
 AC_SUBST(val_reserved_user_size)
@@ -1453,20 +1910,34 @@ AC_SUBST(val_apply_cache_bits)
 AC_SUBST(val_rxcache_table)
 AC_SUBST(val_master_name)
 AC_SUBST(val_max_byte_transfer)
-AC_SUBST(val_catch_udp_port)
+AC_SUBST(val_udp_port)
 AC_SUBST(val_set_buffer_size_max)
 AC_SUBST(val_malloc)
 AC_SUBST(val_min_malloced)
+AC_SUBST(val_min_small_malloced)
 AC_SUBST(val_max_malloced)
 AC_SUBST(val_total_trace_length)
+AC_SUBST(val_wizlist_file)
 
 dnl finally: some remaining stuff
 dnl
 AC_SUBST(erq_sub)
+AC_SUBST(ERQ_LIBS)
+AC_SUBST(PKGLIBS)
 
 dnl
 dnl Ok. now lets make the Makefiles; also these in subdirs! [Mubo]
 dnl make config.h, too. [Mubo]
 dnl
-AC_OUTPUT(Makefile config.h util/Makefile util/xerq/Makefile
-util/erq/Makefile)
+AC_OUTPUT(Makefile config.h util/Makefile util/indent/Makefile
+util/xerq/Makefile util/erq/Makefile)
+
+dnl
+dnl At last, warn if any feature could not be enabled
+dnl
+if test "x$not_available" != "x"; then
+    echo ""
+    echo "WARNING: The following options were disabled because the system"
+    echo "lacked the necessary support: $not_available."
+    exit 1
+fi

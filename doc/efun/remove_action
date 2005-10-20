@@ -1,14 +1,14 @@
 SYNOPSIS
-	int remove_action(string verb, object ob)
+        int remove_action(string verb, object ob)
 
 DESCRIPTION
-	Removes the action for the optional object, default is for
-	this_player().
+        Removes the action for the optional object, default is for
+        this_player().
 
         Result is 0 if there was no action to remove, and non-0 otherwise.
 
 HISTORY
-	Introduced in 3.2.1
+        Introduced in 3.2.1
 
 SEE ALSO
-	add_action(E), move_object(E)
+        add_action(E), move_object(E)

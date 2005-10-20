@@ -1009,31 +1009,6 @@ diff -c -2 -r3.2.5.1 -r3.2.5.2
 + #endif
       mtext[0] = '"';
       mtext[1] = '/';
-Index: main.c
-===================================================================
-RCS file: /usr/src/cvs/ldmud/main.c,v
-retrieving revision 3.2.5.1
-retrieving revision 3.2.5.2
-diff -c -2 -r3.2.5.1 -r3.2.5.2
-*** main.c	1998/12/30 20:17:25	3.2.5.1
---- main.c	1998/12/31 11:39:44	3.2.5.2
-***************
-*** 172,175 ****
---- 172,185 ----
-      char *p;
-
-+ #ifdef WRITE_PID
-+   /* Just to write out the PID for further use in scripts */
-+     FILE * driver_pid;
-+     if ((driver_pid = fopen (BINDIR"/driver_pid", "w")) != NULL)
-+       {
-+ 	    fprintf (driver_pid, "%d\n", (int)getpid ());
-+ 	    fclose (driver_pid);
-+       }
-+ #endif
-+
-      /* Initialisations */
-
 Index: object.c
 ===================================================================
 RCS file: /usr/src/cvs/ldmud/object.c,v

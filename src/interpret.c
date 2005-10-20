@@ -33,7 +33,7 @@
  *    (inter_)fp   -> |  Argument number 0
  *                    |
  *                    |
- *    start_of_stack  -----
+ *    VALUE_STACK  -----
  *
  *    The interpreter assumes that there are no destructed objects
  *    on the stack - to aid in this, the functions remove_object_from_stack()
@@ -47,8 +47,8 @@
  *    functions are stored on the control stack.
  *
  *    One particularity about the current implementation is that every
- *    inter-object call (ie. every 'extern_call') constitutes in a recursive
- *    call to eval_instruction().
+ *    inter-object call (ie. every 'extern_call') and every catch()
+ *    constitutes in a recursive call to eval_instruction().
  *
  *
  * --- Error Recovery Stack --- (implemented in backend.c)
@@ -65,8 +65,10 @@
  *      ERROR_RECOVERY_APPLY:    Errors fall back into the secure_apply()
  *                               function used for sensitive applies.
  *      ERROR_RECOVERY_CATCH:    Errors are caught by the catch() construct.
+ *      ERROR_RECOVERY_CATCH_NOLOG: Errors are caught by the catch_nolog()
+ *                               construct.
  *
- *    The _CATCH context differs from the others in that it allows the
+ *    The _CATCH contexts differs from the others in that it allows the
  *    continuing execution after the error. In order to achieve this, the
  *    stack entry holds the necessary additional information to re-init
  *    the interpreter.
@@ -164,6 +166,7 @@
 
 #include "my-alloca.h"
 #include "my-rusage.h"
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -186,7 +189,7 @@
 
 #define USES_SVALUE_STRLEN
 #include "interpret.h"
-     
+
 #include "actions.h"
 #include "array.h"
 #include "backend.h"
@@ -223,6 +226,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/driver_hook.h"
+#include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/trace.h"
 
 /*-------------------------------------------------------------------------*/
@@ -233,7 +237,7 @@
  * This extension of the struct error_recovery_info (see backend.h)
  * stores the additional information needed to reinitialize the global
  * variables when bailing out of a catch(). The type is always
- * ERROR_RECOVERY_CATCH.
+ * ERROR_RECOVERY_CATCH or ERROR_RECOVERY_CATCH_NOLOG.
  *
  * It is handled by the functions push_, pop_ and pull_error_context().
  */
@@ -328,29 +332,6 @@ struct mvf_info
    */
 
 
-/* The following macros implement the dynamic cost evaluations:
- *
- *   DYN_STRING_COST(l): increase eval_cost depending on stringlength <l>.
- *
- * If these are ever needed outside of interpret.c, we make them inline
- * functions.
- *
- * Covered so far are:
- *   F_ADD, F_ADD_EQ, F_VOID_ADD_EQ, F_MULTIPLY, F_MULT_EQ of strings
- *
- * TODO: Expand this to all datatypes and sizes.
- */
-
-#if defined(DYNAMIC_COSTS)
-
-#define DYN_STRING_COST(l)  eval_cost += (l) / 1000;
-
-#else
-
-#define DYN_STRING_COST(l)
-
-#endif
-
 /*-------------------------------------------------------------------------*/
 /* Tracing */
 
@@ -402,7 +383,15 @@ static int              last = TOTAL_TRACE_LENGTH - 1;
 
 /* --- Macros --- */
 
-#define TRACETST(b) (O_GET_INTERACTIVE(command_giver)->trace_level & (b))
+#define TRACE_IS_INTERACTIVE() (command_giver && O_IS_INTERACTIVE(command_giver))
+
+  /* Return TRUE if the current command_giver is interactive.
+   * TODO: Instead of disabling all traceoutput whenever the command_giver
+   * TODO:: turns non-interactive, output should be redirected (with a
+   * TODO:: special mark) to the current_interactive.
+   */
+
+#define TRACETST(b) (TRACE_IS_INTERACTIVE() && (O_GET_INTERACTIVE(command_giver)->trace_level & (b)))
 
   /* Return TRUE if the any of the tracing options <b> are requested
    * by the interactive user.
@@ -414,8 +403,7 @@ static int              last = TOTAL_TRACE_LENGTH - 1;
    */
 
 #define TRACEHB \
-  ( current_heart_beat == NULL || \
-    (O_GET_INTERACTIVE(command_giver)->trace_level & TRACE_HEART_BEAT))
+  ( current_heart_beat == NULL || TRACETST(TRACE_HEART_BEAT))
 
   /* Return TRUE if either the current execution is not caused
    * by a heart beat call, or if heartbeat tracing is allowed.
@@ -479,6 +467,12 @@ program_t *current_prog;
    * differ when executing an inherited program.
    */
 
+static svalue_t current_lambda;
+  /* If the VM is executing a lambda, this variable holds a counted
+   * reference to it to make sure that it isn't destructed while it is
+   * still executing.
+   */
+
 static char **current_strings;
   /* Pointer to the string literal block of the current program for
    * faster access.
@@ -515,7 +509,7 @@ int32 assigned_eval_cost;
    * thread leaves the object again, the difference between the actual
    * eval_cost value and the older assigned_eval_cost is accounted to
    * the current object.
-   * The implementation combines both actions in one function 
+   * The implementation combines both actions in one function
    * assign_eval_cost().
    */
 
@@ -530,10 +524,17 @@ svalue_t apply_return_value = { T_NUMBER };
 
 #define SIZEOF_STACK (EVALUATOR_STACK_SIZE<<1)
 
-static svalue_t start_of_stack[SIZEOF_STACK];
+static svalue_t value_stack_array[SIZEOF_STACK+1];
+#define VALUE_STACK (value_stack_array+1)
+
   /* The evaluator stack, sized with (hopefully) enough fudge to handle
    * function arguments and overflows.
    * The stack grows upwards, and <inter_sp> points to last valid entry.
+   *
+   * The first entry of value_stack_array[] is not used and serves as
+   * dummy so that underflows can be detected in a portable way
+   * (Standard C disallows indexing before an array). Instead, VALUE_STACK
+   * is the real bottom of the stack.
    */
 
 svalue_t catch_value = { T_INVALID } ;
@@ -541,19 +542,19 @@ svalue_t catch_value = { T_INVALID } ;
    * is executed.
    */
 
-static struct control_stack control_stack[MAX_TRACE];
-static struct control_stack *csp;
+static struct control_stack control_stack_array[MAX_TRACE+2];
+#define CONTROL_STACK (control_stack_array+2)
+struct control_stack *csp;
   /* The control stack holds copies of the machine registers for previous
    * function call levels, with <csp> pointing to the last valid
    * entry, describing the last context.
-   * This also means that control_stack[0] will have almost no interesting
-   * values as it will terminate execution. Especially control_stack[0].prog
-   * is NULL to mark the bottom.
-   */
-
-static void (*caught_error)(svalue_t **, bytecode_p *, svalue_t **) = NULL;
-  /* The function pointer for the handler of a caught error.
-   * See handle_caught_error() for a detailed explanation.
+   * This also means that CONTROL_STACK[0] (== control_stack_array[2]) will
+   * have almost no interesting values as it will terminate execution.
+   * Especially CONTROL_STACK[0].prog is NULL to mark the bottom.
+   *
+   * The first two entries of control_stack_array[] are not used and
+   * serve as dummies so that underflows can be detected in a portable
+   * way (Standard C disallows indexing before an array).
    */
 
 #ifdef APPLY_CACHE_STAT
@@ -589,7 +590,7 @@ special_lvalue;
    * Used knowingly by: (r)index_lvalue(), transfer_pointer_range(),
    *                    assign_string_range().
    * Used unknowingly by: assign_svalue(), transfer_svalue(),
-   *                    add_number_to_svalue(), F_VOID_ASSIGN.
+   *                    add_number_to_lvalue(), F_VOID_ASSIGN.
    */
 
 static svalue_t indexing_quickfix = { T_NUMBER };
@@ -649,7 +650,6 @@ static struct pointer_table *ptable;
 
 static Bool apply_low(char *, object_t *, int, Bool);
 static void call_simul_efun(int code, object_t *ob, int num_arg);
-static void handle_caught_error (svalue_t ** spp, bytecode_p * pcp, svalue_t **fpp);
 #ifdef DEBUG
 static void check_extra_ref_in_vector(svalue_t *svp, size_t num);
 #endif
@@ -691,9 +691,6 @@ init_interpret (void)
     struct cache invalid_entry;
     int i;
 
-    /* Setup the catch handling */
-    caught_error = handle_caught_error;
-
     /* The cache is inited to hold entries for 'functions' in a non-existing
      * program (id 0). The first real apply calls will thus see a (virtual)
      * collision with 'older' cache entries.
@@ -715,12 +712,16 @@ init_interpret (void)
  * by the svalue_ts. 'Freeing' in this context therefore never means
  * a svalue_t, only the data referenced by it.
  *
+ * destructed_object_ref(v): test if <v> references a destructed object.
+ * get_object_ref(v): return the object referenced by <v>, if any.
  * free_string_svalue(v): free string svalue <v>.
  * free_object_svalue(v): free object svalue <v>.
  * zero_object_svalue(v): replace the object in svalue <v> by number 0.
  * free_svalue(v):        free the svalue <v>.
  * assign_svalue_no_free(to,from): put a copy of <from> into <to>; <to>
  *                        is considered empty.
+ * copy_svalue_no_free(to,from): put a shallow value copy of <from> into <to>;
+ *                        <to> is considered empty.
  * assign_checked_svalue_no_free(to,from,sp,pc): put a copy of <from> into <to>;
  *                        <to> is considered empty, <from> may be destructed
  *                        object.
@@ -735,7 +736,7 @@ init_interpret (void)
  *                        considered empty.
  * transfer_svalue(dest,v): move <v> into <dest>; freeing <dest> first.
  *                        Also handles transfers to lvalues.
- * static add_number_to_svalue(dest,i): add <i> to lvalue <dest>.
+ * static add_number_to_lvalue(dest,i,pre,post): add <i> to lvalue <dest>.
  *
  * In addition there are some helper functions.
  *
@@ -821,6 +822,78 @@ static void assign_protected_string_range(
     struct protected_range_lvalue *dest,svalue_t *source, Bool do_free);
 
 /*-------------------------------------------------------------------------*/
+static INLINE Bool
+_destructed_object_ref (svalue_t *svp)
+
+/* Return TRUE if the svalue in <svp> references a destructed object.
+ */
+
+{
+    lambda_t *l;
+    int type;
+
+    if (svp->type != T_OBJECT && svp->type != T_CLOSURE)
+        return MY_FALSE;
+
+    if (svp->type == T_OBJECT || !CLOSURE_MALLOCED(type = svp->x.closure_type))
+        return (svp->u.ob->flags & O_DESTRUCTED) ? MY_TRUE : MY_FALSE;
+
+    /* Lambda closure */
+
+    l = svp->u.lambda;
+
+    if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
+        return MY_FALSE;
+
+    if (type == CLOSURE_ALIEN_LFUN
+     && (l->function.alien.ob->flags & O_DESTRUCTED))
+        return MY_TRUE;
+
+    return (l->ob->flags & O_DESTRUCTED) ? MY_TRUE : MY_FALSE;
+
+} /* _destructed_object_ref() */
+
+Bool destructed_object_ref (svalue_t *v) { return _destructed_object_ref(v); }
+
+#define destructed_object_ref(v) _destructed_object_ref(v)
+
+/*-------------------------------------------------------------------------*/
+static INLINE object_t *
+_get_object_ref (svalue_t *svp)
+
+/* If <svp> references an object (destructed or alive), return the object.
+ * Return NULL otherwise.
+ */
+
+{
+    lambda_t *l;
+    int type;
+
+    if (svp->type != T_OBJECT && svp->type != T_CLOSURE)
+        return NULL;
+
+    if (svp->type == T_OBJECT || !CLOSURE_MALLOCED(type = svp->x.closure_type))
+        return svp->u.ob;
+
+    /* Lambda closure */
+
+    l = svp->u.lambda;
+
+    if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
+        return NULL;
+
+    if (type == CLOSURE_ALIEN_LFUN)
+        return l->function.alien.ob;
+
+    return l->ob;
+
+} /* _get_object_ref() */
+
+object_t * get_object_ref (svalue_t *v) { return _get_object_ref(v); }
+
+#define get_object_ref(v) _get_object_ref(v)
+
+/*-------------------------------------------------------------------------*/
 static INLINE void
 _free_string_svalue (svalue_t *v)
 
@@ -828,6 +901,17 @@ _free_string_svalue (svalue_t *v)
  */
 
 {
+#ifdef DEBUG
+    if (v->type != T_STRING)
+    {
+        fatal("free_string_svalue(): Expected string, "
+              "received svalue type (%d:%hd)\n"
+            , v->type, v->x.generic);
+        /* NOTREACHED */
+        return;
+    }
+#endif
+
     switch(v->x.string_type)
     {
     case STRING_MALLOC:
@@ -852,6 +936,17 @@ free_object_svalue (svalue_t *v)
 
 {
     object_t *ob = v->u.ob;
+
+#ifdef DEBUG
+    if (v->type != T_OBJECT)
+    {
+        fatal("free_object_svalue(): Expected object, "
+              "received svalue type (%d:%hd)\n"
+            , v->type, v->x.generic);
+        /* NOTREACHED */
+        return;
+    }
+#endif
 
     free_object(ob, "free_object_svalue");
 }
@@ -902,7 +997,18 @@ free_svalue (svalue_t *v)
  */
 
 {
-    switch (v->type)
+    ph_int type = v->type;
+
+    v->type = T_INVALID;
+      /* If freeing the value throws an error, it is most likely that
+       * we run out of stack. To avoid the error handling running
+       * out of stack on the same value, we mask it before we free
+       * it - at the risk of leaking memory.
+       */
+
+    assert_stack_gap();
+
+    switch (type)
     {
     case T_STRING:
         switch(v->x.string_type)
@@ -943,7 +1049,7 @@ free_svalue (svalue_t *v)
     case T_CALLBACK:
         free_callback(v->u.cb);
         break;
-        
+
     case T_LVALUE:
         switch (v->u.lvalue->type)
         {
@@ -1019,6 +1125,51 @@ free_svalue (svalue_t *v)
 
     }
 } /* free_svalue() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+check_for_ref_loop (svalue_t * dest)
+
+/* <dest> has just been assigned to - check if this created a reference loop.
+ * If yes, free <dest> and throw an error.
+ */
+
+{
+    if (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
+    {
+        /* rover1 will scan the lvalue chain in two-steps, rover2 will
+         * scan it step by step. If there is a loop, the two will eventually
+         * meet again.
+         */
+        svalue_t * rover1, * rover2;
+
+        rover1 = rover2 = dest;
+        do {
+            if (rover1->type == T_LVALUE || rover1->type == T_PROTECTED_LVALUE)
+                rover1 = rover1->u.lvalue;
+            else
+                break;
+            if (rover1->type == T_LVALUE || rover1->type == T_PROTECTED_LVALUE)
+                rover1 = rover1->u.lvalue;
+            else
+                break;
+            if (rover2->type == T_LVALUE || rover2->type == T_PROTECTED_LVALUE)
+                rover2 = rover2->u.lvalue;
+            else
+                break;
+            if (rover1 == rover2)
+            {
+                free_svalue(dest);
+                error("Assignment would create reference loop.\n");
+            }
+        } while (rover1
+             && (rover1->type == T_LVALUE || rover1->type == T_PROTECTED_LVALUE)
+             && rover2
+             && (rover2->type == T_LVALUE || rover2->type == T_PROTECTED_LVALUE)
+                );
+    }
+
+} /* check_for_ref_loop() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -1103,12 +1254,21 @@ _assign_svalue_no_free (svalue_t *to, svalue_t *from)
         break;
 
     case T_CLOSURE:
-        addref_closure(to, "ass to var");
+        if (!destructed_object_ref(to))
+            addref_closure(to, "ass to var");
+        else
+            put_number(to, 0);
         break;
 
     case T_MAPPING:
         (void)ref_mapping(to->u.map);
         break;
+    }
+
+    /* Protection against endless reference loops */
+    if (to->type == T_LVALUE || to->type == T_PROTECTED_LVALUE)
+    {
+        check_for_ref_loop(to);
     }
 } /* _assign_svalue_no_free() */
 
@@ -1116,6 +1276,64 @@ void assign_svalue_no_free (svalue_t *to, svalue_t *from)
 { _assign_svalue_no_free(to,from); }
 
 #define assign_svalue_no_free(to,from) _assign_svalue_no_free(to,from)
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+copy_svalue_no_free (svalue_t *to, svalue_t *from)
+
+/* Put a duplicate of svalue <from> into svalue <to>, meaning that the original
+ * value is either copied when appropriate, or its refcount is increased.
+ * In particular, if <from> is a mapping (which must not contain destructed
+ * objects!) or array, a shallow copy is created.
+ * <to> is considered empty at the time of call.
+ *
+ * If <from> is a destructed object, <to> is set to the number 0 but
+ * <from> is left unchanged.
+ */
+
+{
+    assign_svalue_no_free(to, from);
+
+    /* For arrays and mappings, create a shallow copy */
+    if (from->type == T_MAPPING)
+    {
+        mapping_t *old, *new;
+
+        old = to->u.map;
+        if (old->ref != 1)
+        {
+            DYN_MAPPING_COST(MAP_SIZE(old));
+            new = copy_mapping(old);
+            if (!new)
+                error("Out of memory: mapping[%lu] for copy.\n"
+                     , MAP_SIZE(old));
+            free_mapping(old);
+            to->u.map = new;
+        }
+    }
+    else if (from->type == T_POINTER
+          || from->type == T_QUOTED_ARRAY)
+    {
+        vector_t *old, *new;
+        size_t size, i;
+
+        old = to->u.vec;
+        size = VEC_SIZE(old);
+        if (old->ref != 1 && old != &null_vector)
+        {
+            DYN_ARRAY_COST(size);
+            new = allocate_uninit_array((int)size);
+            if (!new)
+                error("Out of memory: array[%lu] for copy.\n"
+                     , (unsigned long) size);
+            for (i = 0; i < size; i++)
+                assign_svalue_no_free( &new->item[i]
+                                     , &old->item[i]);
+            free_array(old);
+            to->u.vec = new;
+        }
+    }
+} /* copy_svalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -1141,11 +1359,15 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from
         switch(from->x.string_type)
         {
         case STRING_MALLOC:        /* No idea to make the string shared */
+        case STRING_VOLATILE:
           {
             char *p;
             char *str;
 
-            p = xalloc(malloced_strlen(str = from->u.string));
+            if (from->x.string_type == STRING_MALLOC)
+                p = xalloc(malloced_strlen(str = from->u.string));
+            else
+                p = xalloc(strlen(str = from->u.string)+1);
             if (!p) {
                 put_number(to, 0);
                 inter_sp = sp;
@@ -1160,6 +1382,20 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from
         case STRING_SHARED:        /* It already is shared */
             put_ref_string(to, from->u.string);
             return;
+        }
+        case STRING_VOLATILE:
+        {
+          char *str;
+
+          str = make_shared_string(from->u.string);
+          if ( !str ) {
+              put_ref_string(to, STR_DEFAULT);
+              inter_sp = sp;
+              inter_pc = pc;
+              error("Out of memory\n");
+          }
+          put_string(to, str);
+          break;
         }
 #ifdef DEBUG
         fatal("assign_checked_svalue_no_free(): bad string type %d\n", from->x.string_type);
@@ -1187,7 +1423,10 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from
         break;
 
     case T_CLOSURE:
-        addref_closure(from, "ass to var");
+        if (!destructed_object_ref(from))
+            addref_closure(from, "ass to var");
+        else
+            assign_svalue(from, &const0);
         break;
 
     case T_MAPPING:
@@ -1195,6 +1434,12 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from
         break;
     }
     *to = *from;
+
+    /* Protection against endless reference loops */
+    if (to->type == T_LVALUE || to->type == T_PROTECTED_LVALUE)
+    {
+        check_for_ref_loop(to);
+    }
 } /* assign_checked_svalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
@@ -1280,8 +1525,8 @@ assign_from_lvalue:
       case T_LVALUE:
       case T_PROTECTED_LVALUE:
         from = from->u.lvalue;
-        if (from->type == T_OBJECT && from->u.ob->flags & O_DESTRUCTED) {
-            zero_object_svalue(from);
+        if (destructed_object_ref(from)) {
+            assign_svalue(from, &const0);
             break;
         }
         goto assign_from_lvalue;
@@ -1290,6 +1535,14 @@ assign_from_lvalue:
         return;
     }
     *to = *from;
+
+    /* Protection against endless reference loops */
+    if (to->type == T_LVALUE || to->type == T_PROTECTED_LVALUE)
+    {
+        inter_sp = sp;
+        inter_pc = pc;
+        check_for_ref_loop(to);
+    }
 } /* assign_local_svalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
@@ -1364,6 +1617,12 @@ void assign_lrvalue_no_free (svalue_t *to, svalue_t *from)
     case T_LVALUE:
         to->u.lvalue = from;
         break;
+    }
+
+    /* Protection against endless reference loops */
+    if (to->type == T_LVALUE || to->type == T_PROTECTED_LVALUE)
+    {
+        check_for_ref_loop(to);
     }
 } /* assign_lrvalue_no_free() */
 
@@ -1456,7 +1715,12 @@ assign_svalue (svalue_t *dest, svalue_t *v)
 
         case T_CHAR_LVALUE:
             if (v->type == T_NUMBER)
-                *dest->u.string = (char)v->u.number;
+            {
+                if (!v->u.number)
+                    error("Can't assign 0 to a string character.\n");
+                else
+                    *dest->u.string = (char)v->u.number;
+            }
             return;
 
         case T_PROTECTED_CHAR_LVALUE:
@@ -1468,7 +1732,12 @@ assign_svalue (svalue_t *dest, svalue_t *v)
              && p->lvalue->u.string == p->start)
             {
                 if (v->type == T_NUMBER)
-                    *p->v.u.string = (char)v->u.number;
+                {
+                    if (!v->u.number)
+                        error("Can't assign 0 to a string character.\n");
+                    else
+                        *p->v.u.string = (char)v->u.number;
+                }
             }
             return;
           }
@@ -1536,6 +1805,13 @@ _transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
     {
         *dest = *v;
     }
+
+    /* Protection against endless reference loops */
+    if (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
+    {
+        v->type = T_INVALID;
+        check_for_ref_loop(dest);
+    }
 } /* _transfer_svalue_no_free() */
 
 void transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
@@ -1573,6 +1849,16 @@ transfer_svalue_no_free_spc ( svalue_t *dest, svalue_t *v
     {
         *dest = *v;
     }
+
+    /* Protection against endless reference loops */
+    if (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
+    {
+        v->type = T_INVALID;
+        inter_sp = sp;
+        inter_pc = pc;
+        check_for_ref_loop(dest);
+    }
+
 } /* transfer_svalue_no_free_spc() */
 
 /*-------------------------------------------------------------------------*/
@@ -1591,10 +1877,11 @@ transfer_svalue (svalue_t *dest, svalue_t *v)
  */
 
 {
+    /* Unravel the T_LVALUE chain, if any. */
+    while (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
+        dest = dest->u.lvalue;
 
     /* Free the <dest> svalue.
-     * If <dest> is a lvalue, the loop will traverse the lvalue chain until
-     * the actual svalue is found.
      * If a T_xxx_LVALUE is found, the transfer will be done here
      * immediately.
      */
@@ -1603,11 +1890,6 @@ transfer_svalue (svalue_t *dest, svalue_t *v)
     {
         switch (dest->type)
         {
-        case T_LVALUE:
-        case T_PROTECTED_LVALUE:
-            dest = dest->u.lvalue;
-            continue;
-
         case T_STRING:
             switch(dest->x.string_type)
             {
@@ -1652,7 +1934,10 @@ transfer_svalue (svalue_t *dest, svalue_t *v)
         case T_CHAR_LVALUE:
             if (v->type == T_NUMBER)
             {
-                *dest->u.string = (char)v->u.number;
+                if (!v->u.number)
+                    error("Can't assign 0 to a string character.\n");
+                else
+                    *dest->u.string = (char)v->u.number;
             }
             else
                 free_svalue(v);
@@ -1668,7 +1953,10 @@ transfer_svalue (svalue_t *dest, svalue_t *v)
             {
                 if (v->type == T_NUMBER)
                 {
-                    *p->v.u.string = (char)v->u.number;
+                    if (!v->u.number)
+                        error("Can't assign 0 to a string character.\n");
+                    else
+                        *p->v.u.string = (char)v->u.number;
                     return;
                 }
             }
@@ -1713,6 +2001,14 @@ transfer_svalue (svalue_t *dest, svalue_t *v)
     {
         *dest = *v;
     }
+
+    /* Protection against endless reference loops */
+    if (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
+    {
+        v->type = T_INVALID;
+        check_for_ref_loop(dest);
+    }
+
 } /* transfer_svalue() */
 
 /*-------------------------------------------------------------------------*/
@@ -1744,6 +2040,13 @@ transfer_pointer_range (svalue_t *source)
         dv = special_lvalue.v.u.lvalue->u.vec;
         sv = source->u.vec;
         ssize = (mp_int)VEC_SIZE(sv);
+
+#ifdef NO_NEGATIVE_RANGES
+        if (index1 > index2)
+            error("Illegal range [%ld..%ld] for assignment.\n"
+                 , index1, index2-1
+                 );
+#endif /* NO_NEGATIVE_RANGES */
 
         if (ssize + index1 - index2 == 0)
         {
@@ -1854,6 +2157,13 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
         sv = source->u.vec;
         ssize = (mp_int)VEC_SIZE(sv);
 
+#ifdef NO_NEGATIVE_RANGES
+        if (index1 > index2)
+            error("Illegal range [%ld..%ld] for assignment.\n"
+                 , index1, index2-1
+                 );
+#endif /* NO_NEGATIVE_RANGES */
+
         if (ssize + index1 - index2 == 0)
         {
             /* <source> fits exactly into the target range */
@@ -1953,6 +2263,13 @@ assign_string_range (svalue_t *source, Bool do_free)
         ss = source->u.string;
         ssize = (mp_int)svalue_strlen(source);
 
+#ifdef NO_NEGATIVE_RANGES
+        if (index1 > index2)
+            error("Illegal range [%ld..%ld] for assignment.\n"
+                 , index1, index2-1
+                 );
+#endif /* NO_NEGATIVE_RANGES */
+
         /* Create the new string */
         rs = xalloc((size_t)(dsize + ssize + index1 - index2 + 1));
         if (!rs)
@@ -2018,6 +2335,13 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
         dsvp = dest->lvalue;
         ds = dest->v.u.string;
 
+#ifdef NO_NEGATIVE_RANGES
+        if (index1 > index2)
+            error("Illegal range [%ld..%ld] for assignment.\n"
+                 , index1, index2-1
+                 );
+#endif /* NO_NEGATIVE_RANGES */
+
         /* If the lvalue is no longer valid, free it */
         if (dsvp->u.string != ds)
         {
@@ -2069,11 +2393,17 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
 } /* transfer_protected_string_range() */
 
 /*-------------------------------------------------------------------------*/
-static int
-add_number_to_svalue (svalue_t *dest, int i)
+static void
+add_number_to_lvalue (svalue_t *dest, int i, svalue_t *pre, svalue_t *post)
 
-/* Add the number <i> to the (PROTECTED_)LVALUE <dest>, and return
- * the sum. If <dest> is of the wrong type, an error is generated.
+/* Add the number <i> to the (PROTECTED_)LVALUE <dest>.
+ * If <pre> is not null, the <dest> value before the addition is copied
+ * into it.
+ * If <post> is not null, the <dest> value after the addition is copied
+ * into it.
+ * Both <pre> and <post> are supposed to be empty svalues when given.
+ *
+ * If <dest> is of the wrong type, an error is generated.
  */
 
 {
@@ -2087,16 +2417,49 @@ add_number_to_svalue (svalue_t *dest, int i)
     {
     default:
         error("Reference to bad type to ++/--\n");
-        return i;
+        break;
 
     case T_NUMBER:
-        return dest->u.number += i;
+        if (pre) put_number(pre, dest->u.number);
+        dest->u.number += i;
+        if (post) put_number(post, dest->u.number);
+        break;
+
+    case T_FLOAT:
+      {
+        STORE_DOUBLE_USED
+        double d;
+
+        d = READ_DOUBLE(dest);
+
+        if (pre)
+        {
+            pre->type = T_FLOAT;
+            STORE_DOUBLE(pre, d);
+        }
+
+        d += (double)i;
+        STORE_DOUBLE(dest, d);
+
+        if (post)
+        {
+            post->type = T_FLOAT;
+            STORE_DOUBLE(post, d);
+        }
+        break;
+      }
 
     case T_PROTECTED_LVALUE:
-        return add_number_to_svalue(dest, i);
+        add_number_to_lvalue(dest, i, pre, post);
+        break;
 
     case T_CHAR_LVALUE:
-        return (*dest->u.string) += i;
+        if (((*dest->u.string + i) & 0xff) == 0)
+            error("Can't set string character to 0.\n");
+        if (pre) put_number(pre, (*dest->u.string));
+        (*dest->u.string) += i;
+        if (post) put_number(post, (*dest->u.string));
+        break;
 
     case T_PROTECTED_CHAR_LVALUE:
       {
@@ -2106,14 +2469,16 @@ add_number_to_svalue (svalue_t *dest, int i)
         if (p->lvalue->type == T_STRING
          && p->lvalue->u.string == p->start)
         {
+            if (((*p->v.u.string + i) & 0xff) == 0)
+                error("Can't set string character to 0.\n");
+            if (pre) put_number(pre, *p->v.u.string);
             i = *p->v.u.string += i;
+            if (post) put_number(post, i);
         }
-        return i;
+        break;
       }
     } /* switch() */
-
-    /* NOTREACHED */
-}
+} /* add_number_to_lvalue() */
 
 /*-------------------------------------------------------------------------*/
 static vector_t *
@@ -2161,9 +2526,8 @@ inter_add_array (vector_t *q, vector_t **vpp)
 #ifdef MALLOC_smalloc
         /* We try to expand the existing memory for p (without moving)
          * instead of allocating a completely new vector.
-         * TODO: We overallocate in anticipation of further additions?
          */
-        d = malloc_increment_size(p, q_size << 1);
+        d = malloc_increment_size(p, q_size * sizeof(svalue_t));
         if ( NULL != d)
         {
             /* We got the additional memory */
@@ -2220,8 +2584,8 @@ inter_add_array (vector_t *q, vector_t **vpp)
     {
         for (cnt = (mp_int)q_size; --cnt >= 0; )
         {
-            if (s->type == T_OBJECT && s->u.ob->flags & O_DESTRUCTED)
-                zero_object_svalue(s);
+            if (destructed_object_ref(s))
+                assign_svalue(s, &const0);
             *d++ = *s++;
         }
         *vpp = r;
@@ -2581,8 +2945,8 @@ _pop_stack (void)
 
 {
 #ifdef DEBUG
-    if (inter_sp < start_of_stack)
-        fatal("VM Stack underflow: %ld too low.\n", (long)(start_of_stack - inter_sp));
+    if (inter_sp < VALUE_STACK)
+        fatal("VM Stack underflow: %ld too low.\n", (long)(VALUE_STACK - inter_sp));
 #endif
     free_svalue(inter_sp--);
 }
@@ -2604,7 +2968,9 @@ _pop_n_elems (int n, svalue_t *sp)
         fatal("pop_n_elems: %d elements.\n", n);
 #endif
     for (; --n >= 0; )
+    {
         free_svalue(sp--);
+    }
     return sp;
 }
 
@@ -2622,7 +2988,11 @@ stack_overflow (svalue_t *sp, svalue_t *fp, bytecode_p pc)
  */
 
 {
-    _pop_n_elems(sp-fp, sp);
+    if (sp >= &VALUE_STACK[SIZEOF_STACK])
+        fatal("Fatal stack overflow: %ld too high.\n"
+             , (long)(sp - &VALUE_STACK[SIZEOF_STACK])
+             );
+    sp = _pop_n_elems(sp-fp, sp);
     ERROR("stack overflow\n")
 }
 
@@ -2827,6 +3197,12 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
         /* Compute the indexed element */
         item = get_map_lvalue(m, i);
+        if (!item)
+        {
+            outofmemory("indexed lvalue");
+            /* NOTREACHED */
+            return NULL;
+        }
 
         if (m->ref == 1)
         {
@@ -3017,6 +3393,12 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
         /* Compute the indexed item and set up the protector */
 
         item = get_map_lvalue(m, i);
+        if (!item)
+        {
+            outofmemory("indexed lvalue");
+            /* NOTREACHED */
+            return NULL;
+        }
 
         lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
         lvalue->v.type = T_PROTECTED_LVALUE;
@@ -3146,7 +3528,14 @@ push_protected_indexed_map_lvalue (svalue_t *sp, bytecode_p pc)
 
         /* Compute the indexed element and setup the protector */
 
-        item = get_map_lvalue(m, i) + sp->u.number;
+        item = get_map_lvalue(m, i);
+        if (!item)
+        {
+            outofmemory("indexed lvalue");
+            /* NOTREACHED */
+            return NULL;
+        }
+        item += sp->u.number;
 
         lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
         lvalue->v.type = T_PROTECTED_LVALUE;
@@ -3289,6 +3678,12 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
 
         /* Compute the element */
         item = get_map_lvalue(m, i);
+        if (!item)
+        {
+            outofmemory("indexed lvalue");
+            /* NOTREACHED */
+            return NULL;
+        }
 
         /* Remove the arguments and push the result. */
 
@@ -3495,7 +3890,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
                 return NULL;
             }
 
-            if (ind > svalue_strlen(vec) )
+            if (ind >= svalue_strlen(vec) )
             {
                 ERRORF(("Index for [] out of bounds: %ld, string length: %ld.\n"
                        , (long)ind, (long)_svalue_strlen(vec)))
@@ -3556,6 +3951,12 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
             /* Compute the indexed element */
             item = get_map_lvalue(m, i);
+            if (!item)
+            {
+                outofmemory("indexed lvalue");
+                /* NOTREACHED */
+                return NULL;
+            }
 
             /* Build the protector */
             ref_mapping(m);
@@ -3622,7 +4023,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
                 return NULL;
             }
 
-            if (ind > svalue_strlen(vec) )
+            if (ind >= svalue_strlen(vec) )
             {
                 ERRORF(("Index for [] out of bounds: %ld, string length: %ld\n"
                        , (long)ind, (long)_svalue_strlen(vec)))
@@ -4262,7 +4663,7 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
         }
 
         /* Index the string */
-        if (ind > _svalue_strlen(vec))
+        if (ind >= _svalue_strlen(vec))
             ind = 0;
         else
             ind = vec->u.string[ind];
@@ -4310,9 +4711,9 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
             /* gcc complains about tmp being clobbered */
 #endif
             p = &vec->u.vec->item[ind];
-            if (p->type == T_OBJECT && p->u.ob->flags & O_DESTRUCTED)
+            if (destructed_object_ref(p))
             {
-                free_object_svalue(p);
+                free_svalue(p);
                 put_number(&tmp, 0);
             }
             else
@@ -4345,7 +4746,6 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
         mapping_t *m;
 
         m = vec->u.map;
-
         if (!m->num_values)
         {
             inter_sp = sp;
@@ -4464,9 +4864,9 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
             /* gcc complains about tmp being clobbered */
 #endif
             p = &vec->u.vec->item[ind];
-            if (p->type == T_OBJECT && p->u.ob->flags & O_DESTRUCTED)
+            if (destructed_object_ref(p))
             {
-                free_object_svalue(p);
+                free_svalue(p);
                 put_number(&tmp, 0);
             }
             else
@@ -4751,21 +5151,6 @@ find_virtual_value (int num)
         progpp += sizeof(inherit_t);
     inheritp = (inherit_t *)
                  (((PTRTYPE)(progpp)) - offsetof(inherit_t, prog));
-#ifdef DEBUG
-    /* TODO: Remove me if nobody reports an error. */
-    {
-        inherit_t * inheritp2 = (inherit_t *)(
-                 ((PTRTYPE)(progpp))-
-                 ((PTRTYPE)(&((inherit_t *)0)->prog)-(PTRTYPE) 0)
-               );
-        if (inheritp != inheritp2)
-        {
-            fprintf(stderr, "DEBUG: %s inheritp %p, inheritp2 %p, progpp %p\n"
-                   , time_stamp(), inheritp, inheritp2, progpp);
-            inheritp = inheritp2;
-        }
-    }
-#endif
 
     /* Compute the actual variable address */
 
@@ -4790,8 +5175,6 @@ find_virtual_value (int num)
 } /* find_virtual_value() */
 
 /*-------------------------------------------------------------------------*/
-#ifndef COMPAT_MODE
-
 char *
 add_slash (char *str)
 
@@ -4809,8 +5192,6 @@ add_slash (char *str)
     }
     return tmp;
 } /* add_slash() */
-
-#endif
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -4932,7 +5313,7 @@ _privilege_violation (char *what, svalue_t *where, svalue_t *sp)
     sp++;
     assign_svalue_no_free(sp, where);
     inter_sp = sp;
-    svp = apply_master_ob(STR_PRIVILEGE, 3);
+    svp = apply_master(STR_PRIVILEGE, 3);
 
     /* Is there a lfun to call? */
     if (!svp || svp->type != T_NUMBER || svp->u.number < 0)
@@ -4993,7 +5374,10 @@ privilege_violation4 ( char *what,    object_t *whom
     push_valid_ob(current_object);
     if (!whom)
     {
-        push_volatile_string(how_str);
+        if (how_str)
+            push_volatile_string(how_str);
+        else
+            push_number(0);
         push_number(how_num);
     }
     else
@@ -5005,7 +5389,7 @@ privilege_violation4 ( char *what,    object_t *whom
             push_number(how_num);
     }
     inter_sp = sp;
-    svp = apply_master_ob(STR_PRIVILEGE, 4);
+    svp = apply_master(STR_PRIVILEGE, 4);
 
     /* Was it the proper lfun to call? */
     if (!svp || svp->type != T_NUMBER || svp->u.number < 0)
@@ -5056,8 +5440,8 @@ trace_test (int b)
 {
     interactive_t *ip;
 
-    return command_giver
-        && O_SET_INTERACTIVE(ip, command_giver)
+    return current_interactive
+        && O_SET_INTERACTIVE(ip, current_interactive)
         && (ip->trace_level & b)
         && (ip->trace_prefix == NULL
             || (current_object
@@ -5072,6 +5456,8 @@ do_trace (char *msg, char *fname, char *post)
 /* If not in a heartbeat, or if heartbeat tracing is allowed, generate
  * a tracemessage of the form '<tracedepth> <msg> <objname> <fname> <post>'
  * and print it to the player using add_message().
+ *
+ * Don't do anything if the current command_giver is not interactive.
  *
  * <obj_name> is filled in only if TRACE_OBJNAME is requested, else
  * the empty string is used.
@@ -5097,22 +5483,28 @@ do_trace (char *msg, char *fname, char *post)
 
 /*-------------------------------------------------------------------------*/
 static void
-do_trace_call (fun_hdr_p funstart)
+do_trace_call (fun_hdr_p funstart, Bool is_lambda)
 
 /* Trace a call to the function starting at <funstart>.
  */
 
 {
-    char *name;
 
-    if (!++traceing_recursion) /* Do not recurse! */
+    if (!++traceing_recursion || !TRACE_IS_INTERACTIVE()) /* Do not recurse! */
     {
         int save_var_ix_offset = variable_index_offset;
           /* TODO: Might be clobbered, but where? */
 
         /* Trace the function itself */
-        memcpy(&name, FUNCTION_NAMEP(funstart), sizeof name);
-        do_trace("Call direct ", name, " ");
+        if (is_lambda)
+            do_trace("Call direct ", "lambda-closure", " ");
+        else
+        {
+            char *name;
+
+            memcpy(&name, FUNCTION_NAMEP(funstart), sizeof name);
+            do_trace("Call direct ", name, " ");
+        }
 
         /* If requested, also trace the arguments */
         if (TRACEHB)
@@ -5149,7 +5541,7 @@ do_trace_return (svalue_t *sp)
 {
     tracedepth--; /* We leave this level */
 
-    if (!++traceing_recursion)
+    if (!++traceing_recursion || !TRACE_IS_INTERACTIVE())
     {
         if (trace_test(TRACE_RETURN))
         {
@@ -5171,11 +5563,13 @@ do_trace_return (svalue_t *sp)
 }
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct longjump_s *
-push_error_context (svalue_t *sp)
+struct longjump_s *
+push_error_context (svalue_t *sp, bytecode_t catch_inst)
 
 /* Create a catch recovery context, using <sp> as the stackpointer to save,
  * link it into the recovery stack and return the longjmp context struct.
+ * The actual type of the catch context is chosen on the actual
+ * <catch_inst>ruction (CATCH or CATCH_NO_LOG).
  */
 
 {
@@ -5186,13 +5580,15 @@ push_error_context (svalue_t *sp)
     p->save_csp = csp;
     p->save_command_giver = command_giver;
     p->recovery_info.rt.last = rt_context;
-    p->recovery_info.rt.type = ERROR_RECOVERY_CATCH;
+    p->recovery_info.rt.type
+      = (catch_inst == F_CATCH) ? ERROR_RECOVERY_CATCH
+                                : ERROR_RECOVERY_CATCH_NOLOG;
     rt_context = (rt_context_t *)&p->recovery_info;
     return &p->recovery_info.con;
 } /* push_error_context() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE void
+void
 pop_error_context (void)
 
 /* Pop and discard the top entry in the error recovery stack, assuming
@@ -5207,7 +5603,7 @@ pop_error_context (void)
     p = (struct catch_context *)rt_context;
 
 #ifdef DEBUG
-    if (p->recovery_info.rt.type != ERROR_RECOVERY_CATCH)
+    if (!ERROR_RECOVERY_CAUGHT(p->recovery_info.rt.type))
         fatal("Catch: runtime stack underflow");
     if (csp != p->save_csp-1)
         fatal("Catch: Lost track of csp");
@@ -5220,7 +5616,7 @@ pop_error_context (void)
 } /* pop_error_context() */
 
 /*-------------------------------------------------------------------------*/
-static svalue_t *
+svalue_t *
 pull_error_context (svalue_t *sp)
 
 /* Restore the context saved by a catch() after a throw() or runtime error
@@ -5238,7 +5634,7 @@ pull_error_context (svalue_t *sp)
 
     p = (struct catch_context *)rt_context;
 
-    if (p->recovery_info.rt.type != ERROR_RECOVERY_CATCH)
+    if (!ERROR_RECOVERY_CAUGHT(p->recovery_info.rt.type))
         fatal("Catch: runtime stack underflow");
 
     /* If there was a call_other() or similar, previous_ob and current_object
@@ -5269,7 +5665,7 @@ pull_error_context (svalue_t *sp)
 } /* pull_error_context() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE void
+void
 push_control_stack ( svalue_t *sp
                    , bytecode_p     pc
                    , svalue_t *fp
@@ -5282,9 +5678,9 @@ push_control_stack ( svalue_t *sp
 {
 
     /* Check for overflow */
-    if (csp >= &control_stack[MAX_USER_TRACE-1])
+    if (csp >= &CONTROL_STACK[MAX_USER_TRACE-1])
     {
-        if (!num_error || csp == &control_stack[MAX_TRACE-1])
+        if (!num_error || csp == &CONTROL_STACK[MAX_TRACE-1])
         {
             ERROR("Too deep recursion.\n")
         }
@@ -5297,7 +5693,9 @@ push_control_stack ( svalue_t *sp
     /* csp->funstart  has to be set later, it is used only for tracebacks. */
     csp->fp = fp;
     csp->prog = current_prog;
+    csp->lambda = current_lambda; put_number(&current_lambda, 0);
     /* csp->extern_call = MY_FALSE; It is set by eval_instruction() */
+    csp->catch_call = MY_FALSE;
     csp->pc = pc;
     csp->function_index_offset = function_index_offset;
     csp->current_variables = current_variables;
@@ -5305,7 +5703,7 @@ push_control_stack ( svalue_t *sp
 } /* push_control_stack() */
 
 /*-------------------------------------------------------------------------*/
-static void
+void
 pop_control_stack (void)
 
 /* Pop the last entry from the control stack and restore the execution
@@ -5315,12 +5713,15 @@ pop_control_stack (void)
 
 {
 #ifdef DEBUG
-    if (csp == control_stack - 1)
+    if (csp < CONTROL_STACK)
         fatal("Popped out of the control stack");
 #endif
 
     if ( NULL != (current_prog = csp->prog) ) /* is 0 when we reach the bottom */
         current_strings = current_prog->strings;
+    if (current_lambda.type == T_CLOSURE)
+        free_closure(&current_lambda);
+    current_lambda = csp->lambda;
     inter_pc = csp->pc;
     inter_fp = csp->fp;
     function_index_offset = csp->function_index_offset;
@@ -5329,61 +5730,6 @@ pop_control_stack (void)
     csp--;
 } /* pop_control_stack() */
 
-
-/*-------------------------------------------------------------------------*/
-static void
-handle_caught_error (svalue_t ** spp, bytecode_p * pcp, svalue_t **fpp)
-
-/* Handle the error caught by the F_CATCH in the interpreter switch.
- * *<spp>, *<pcp> and *<fpp> are to be set to the new stackpointer,
- * programcounter and framepointer values to be used by the interpreter.
- *
- * The reason why this code is in a separate function is to thwart
- * overzealous optimizers. F_CATCH is implemented with setjmp/longjmp,
- * after which the register contents of the CPU are most likely clobbered.
- * Some optimizers don't take this into account and neglect to reload
- * the values into the registers. For the same reason the interpreter
- * does not call this function directly, but over a function variabe;
- * otherwise the same overzealous optimizer might inline this function
- * with the same desastrous result.
- */
-
-{
-    svalue_t * sp;
-
-    /* Remove the catch context and get the old stackpointer setting */
-    sp = pull_error_context(inter_sp);
-
-    /* beware of errors after set_this_object() */
-    current_object = csp->ob;
-
-    /* catch() fakes a subroutine call internally, which has to be
-     * undone again.
-     */
-    pop_control_stack();
-
-    /* Export the restored program counter and frame pointer */
-    *pcp = inter_pc;
-    *fpp = inter_fp;
-
-    /* Push the catch return value */
-    *(++sp) = catch_value;
-    catch_value.type = T_INVALID;
-
-    /* Restore the old eval costs */
-    eval_cost -= CATCH_RESERVED_COST;
-    assigned_eval_cost -= CATCH_RESERVED_COST;
-
-    /* If we are out of memory, throw a new error */
-    if (out_of_memory)
-    {
-        inter_sp = sp;
-        error("(catch) Out of memory detected.\n");
-    }
-
-    /* Export the new stack pointer */
-    *spp = sp;
-} /* handle_caught_error() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE funflag_t
@@ -5406,6 +5752,18 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
 
     progp = current_prog;
     flags = progp->functions[fx];
+
+    /* Handle a cross-define.
+     * This is a rather rare occasion and usually happens only with functions
+     * like heart_beat() which are called by function index and not by name.
+     * This index, determined at compile time, might point to the
+     * cross-defined function entry.
+     */
+    if (flags & NAME_CROSS_DEFINED)
+    {
+        fx += CROSSDEF_NAME_OFFSET(flags);
+        flags = progp->functions[fx];
+    }
 
     /* If the function is inherited, find the real function definition
      * and adjust the offsets to point to its code and variables.
@@ -5437,12 +5795,21 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
-setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp)
+setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp
+                 , Bool allowRefs, Bool is_lambda)
 
 /* Before calling the function at <funstart>, massage the data on the
  * stack ending at <sp> to match the formal argumentlist of the function
  * (excessive args are removed, missing args are provided as 0),
  * and allocate the local variables on the stack.
+ *
+ * <is_lambda> has to be TRUE if the function is a lambda closure.
+ * This information is needed for proper tracing.
+ *
+ * If <allowRefs> is TRUE, references may be passed as extended varargs
+ * ('(varargs mixed *)'). Currently this is used only for simul efuns.
+ * TODO: Investigate if holding references in arrays is really such a
+ * TODO:: a bad thing. Maybe it's just an implementation issue.
  *
  * csp->num_local_variables is supposed to hold the number of actual
  * arguments on the stack.
@@ -5505,7 +5872,7 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp)
                 v = allocate_uninit_array(i);
                 while (--i >= 0)
                 {
-                    if (sp->type == T_LVALUE)
+                    if (!allowRefs && sp->type == T_LVALUE)
                         num_arg = -1; /* mark error condition */
                     v->item[i] = *sp--;
                 }
@@ -5520,15 +5887,6 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp)
                     ERROR("Varargs argument passed by reference.\n");
                 }
             }
-
-            /* Clear the local variables */
-            if ( 0 != (i = FUNCTION_NUM_VARS(funstart)) )
-            {
-                csp->num_local_variables += i;
-                do {
-                    *++sp = const0;
-                } while (--i > 0);
-            }
         }
         else
         {
@@ -5542,15 +5900,15 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp)
 
         } /* if(varargs or fixedargs) */
 
-       /* Clear the local variables */
+        /* Clear the local variables */
 
-       if ( 0 != (i = FUNCTION_NUM_VARS(funstart)) )
-       {
-           csp->num_local_variables += i;
-           do {
-               *++sp = const0;
-           } while (--i);
-       }
+        if ( 0 != (i = FUNCTION_NUM_VARS(funstart)) )
+        {
+            csp->num_local_variables += i;
+            do {
+                *++sp = const0;
+            } while (--i);
+        }
     }
     else
     {
@@ -5568,16 +5926,20 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp)
         }
     }
 
-    /* Check for stack overflow */
-    if ( sp >= &start_of_stack[EVALUATOR_STACK_SIZE] )
+    /* Check for stack overflow. Since the actual stack size is
+     * larger than EVALUATOR_STACK_SIZE, this check at the
+     * end should be sufficient. If not, stack_overflow() will
+     * generate a fatal error and we have to resize.
+     */
+    if ( sp >= &VALUE_STACK[EVALUATOR_STACK_SIZE] )
         stack_overflow(sp, csp->fp, funstart);
 
     /* Count the call depth for traces and handle tracing */
     tracedepth++;
-    if (TRACEP(TRACE_CALL))
+    if (TRACEP(TRACE_CALL) && TRACE_IS_INTERACTIVE())
     {
       inter_sp = sp;
-      do_trace_call(funstart);
+      do_trace_call(funstart, is_lambda);
     }
 
 
@@ -5603,6 +5965,7 @@ setup_new_frame (int fx)
     flags = setup_new_frame1(fx, 0, 0);
     inter_sp = setup_new_frame2(
       current_prog->program + (flags & FUNSTART_MASK), inter_sp
+      , MY_FALSE, MY_FALSE
     );
 #ifdef DEBUG
     if (!current_object->variables && variable_index_offset)
@@ -5629,18 +5992,28 @@ reset_machine (Bool first)
  */
 
 {
-    csp = control_stack - 1;
-    /* TODO: This is illegal according to ISO C */
     traceing_recursion = -1;
     if (first)
     {
-        inter_sp = start_of_stack - 1;
-        /* TODO: This is illegal according to ISO C */
+        csp = CONTROL_STACK - 1;
+        inter_sp = VALUE_STACK - 1;
         tracedepth = 0;
+        put_number(&current_lambda, 0);
     }
     else
-        inter_sp = _pop_n_elems(inter_sp - start_of_stack + 1, inter_sp);
-}
+    {
+        inter_sp = _pop_n_elems(inter_sp - VALUE_STACK + 1, inter_sp);
+        if (current_lambda.type == T_CLOSURE)
+            free_closure(&current_lambda);
+        put_number(&current_lambda, 0);
+        while (csp >= CONTROL_STACK)
+        {
+            if (csp->lambda.type == T_CLOSURE)
+                free_closure(&csp->lambda);
+            csp--;
+        }
+    }
+} /* reset_machine() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef DEBUG
@@ -5666,20 +6039,18 @@ check_state (void)
               , time_stamp(), rt_context->type, ERROR_RECOVERY_BACKEND);
         if (!rc) rc = 1;
     }
-    if (csp != control_stack - 1) {
-        /* TODO: This can't be legal according to ISO C */
+    if (csp != CONTROL_STACK - 1) {
         debug_message("%s csp inconsistent: %p instead of %p\n"
-                     , time_stamp(), csp, control_stack-1);
+                     , time_stamp(), csp, CONTROL_STACK-1);
         printf("%s csp inconsistent: %p instead of %p\n"
-              , time_stamp(), csp, control_stack-1);
+              , time_stamp(), csp, CONTROL_STACK-1);
         if (!rc) rc = 2;
     }
-    if (inter_sp != start_of_stack - 1) {
-        /* TODO: This can't be legal according to ISO C */
+    if (inter_sp != VALUE_STACK - 1) {
         debug_message("%s sp inconsistent: %p instead of %p\n"
-                     , time_stamp(), inter_sp, start_of_stack - 1);
+                     , time_stamp(), inter_sp, VALUE_STACK - 1);
         printf("%s sp inconsistent: %p instead of %p\n"
-              , time_stamp(), inter_sp, start_of_stack - 1);
+              , time_stamp(), inter_sp, VALUE_STACK - 1);
         if (!rc) rc = 3;
     }
 
@@ -5736,32 +6107,35 @@ void
 remove_object_from_stack (object_t *ob)
 
 /* Object <ob> was/will be destructed, so remove all references from
- * the stack.
+ * to it from the stack, including references through closures.
  */
 
 {
     svalue_t *svp;
 
-    for (svp = start_of_stack; svp <= inter_sp; svp++)
+    for (svp = VALUE_STACK; svp <= inter_sp; svp++)
     {
-        if (svp->type != T_OBJECT)
-            continue;
-        if (svp->u.ob != ob)
-            continue;
-        free_object(ob, "remove_object_from_stack");
-        put_number(svp, 0);
-    }
-}
+        if (get_object_ref(svp) == ob)
+        {
+            free_svalue(svp);
+            put_number(svp, 0);
+        }
+    } /* foreach svp in stack */
+} /* remove_object_from_stack() */
 
 /*-------------------------------------------------------------------------*/
-static void
+Bool
 eval_instruction (bytecode_p first_instruction
                  , svalue_t *initial_sp)
 
 /* Evaluate the code starting at <first_instruction>, using <inital_sp>
  * as the stack pointer. All other variables like current_prog must be
  * setup before the call. The function will return upon encountering
- * a F_RETURN instruction for which extern_call is true.
+ * a F_RETURN instruction for which .extern_call or .catch_call is true,
+ * or upon encountering a F_END_CATCH instruction.
+ *
+ * The result will state the reason for returning: FALSE for F_RETURN,
+ * and TRUE for F_END_CATCH.
  *
  * This also means that for every intra-object call eval_instruction()
  * is called recursively.
@@ -5827,7 +6201,8 @@ eval_instruction (bytecode_p first_instruction
     /* Setup the variables.
      * The next F_RETURN at this level will return out of eval_instruction().
      */
-    csp->extern_call = MY_TRUE;
+    if (!csp->catch_call)
+        csp->extern_call = MY_TRUE;
     sp = initial_sp;
     pc = first_instruction;
     fp = inter_fp;
@@ -5841,7 +6216,10 @@ again:
     instruction = LOAD_CODE(pc);
       /* If this a xcode, the second byte will be added later */
 
-    /* printf("DEBUG: %p (%p): %d %s\n", pc-1, sp, instruction, get_f_name(instruction)); */
+#if 0
+    printf("DEBUG: %p (%p): %d %s\n", pc-1, sp, instruction, get_f_name(instruction));
+#endif
+
 #   ifdef TRACE_CODE
         /* Store some vitals in the trace buffer */
 
@@ -5854,7 +6232,7 @@ again:
         previous_instruction[last] = instruction;
         previous_pc[last] = pc-1;
         stack_size[last] = sp - fp - csp->num_local_variables;
-        abs_stack_size[last] = sp - start_of_stack;
+        abs_stack_size[last] = sp - VALUE_STACK;
         if (previous_objects[last])
         {
             /* Need to free the previously stored object */
@@ -5875,7 +6253,7 @@ again:
     /* If requested, trace the instruction.
      * Print the name of the instruction, but guard against recursions.
      */
-    if (trace_exec_active && TRACE_EXEC_P)
+    if (trace_exec_active && TRACE_EXEC_P && TRACE_IS_INTERACTIVE())
     {
         if (!++traceing_recursion)
         {
@@ -5899,7 +6277,7 @@ again:
          * an error.
          */
 
-        printf("%s eval_cost too big %ld\n", time_stamp(), eval_cost);
+        printf("%s eval_cost too big %ld\n", time_stamp(), (long)eval_cost);
 
         assign_eval_cost();
 
@@ -5973,7 +6351,7 @@ bad_arg_4: bad_arg_pc(4, instruction, sp, pc);
 bad_left:  ERRORF(("Bad left type to %s.\n",  get_f_name(instruction)))
 bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* NOTREACHED */
-        return; /* hint for data flow analysis */
+        return MY_FALSE; /* hint for data flow analysis */
 
 #ifdef F_ILLEGAL
     case 255:
@@ -6038,16 +6416,18 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
     /* --- Predefined functions with counterparts in LPC --- */
 
     CASE(F_IDENTIFIER);             /* --- identifier <var_ix> --- */
+    {
         /* Push value of object variable <var_ix>.
          * It is possible that it is a variable that points to
          * a destructed object. In that case, it has to be replaced by 0.
          *
          * <var_ix> is a uint8.
          */
+        svalue_t * val = find_value((int)(LOAD_UINT8(pc)));
         sp++;
-        assign_checked_svalue_no_free(sp, find_value((int)(LOAD_UINT8(pc)))
-                                     , sp, pc);
+        assign_checked_svalue_no_free(sp, val, sp, pc);
         break;
+    }
 
     CASE(F_STRING);                /* --- string <ix>          --- */
     {
@@ -6113,6 +6493,22 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         break;
     }
 
+    CASE(F_NNUMBER);                /* --- nnumber <num>       --- */
+    {
+        /* Push the number -<num> onto the stack.
+         * <num> is a p_int stored in the host format.
+         * See also the F_CONSTx functions.
+         * TODO: It should be rewritten to use the LOAD_ macros (but
+         * TODO:: then the compiler needs to use them, too.
+         */
+        sp++;
+        sp->type = T_NUMBER;
+        memcpy(&sp->u.number, pc, sizeof sp->u.number);
+        pc += sizeof sp->u.number;
+        sp->u.number = - sp->u.number;
+        break;
+    }
+
     CASE(F_CONST0);                 /* --- const0              --- */
         /* Push the number 0 onto the stack.
          */
@@ -6123,6 +6519,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Push the number 1 onto the stack.
          */
         push_number(1);
+        break;
+
+    CASE(F_NCONST1);                /* --- nconst1             --- */
+        /* Push the number -1 onto the stack.
+         */
+        push_number(-1);
         break;
 
     CASE(F_CLIT);                   /* --- clit <num>          --- */
@@ -6213,13 +6615,27 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             sp++;
             sp->type = T_CLOSURE;
-            sp->x.closure_type = (short)
-              (ix >= CLOSURE_SIMUL_EFUN_OFFS
-                ? ix
-                : (instrs[ix - CLOSURE_EFUN_OFFS].Default == -1
-                    ? ix + CLOSURE_OPERATOR-CLOSURE_EFUN
-                    : ix));
             sp->u.ob = ref_object(current_object, "closure");
+            if (ix >= CLOSURE_SIMUL_EFUN_OFFS)
+            {
+                /* Sefun closure */
+                sp->x.closure_type = (short)ix;
+            }
+            else
+            {
+                /* Efun or operator closure */
+                if (pragma_warn_deprecated
+                 && instrs[ix - CLOSURE_EFUN_OFFS].deprecated != NULL)
+                    warnf("Warning: %s() is deprecated: %s\n"
+                         , instrs[ix - CLOSURE_EFUN_OFFS].name
+                         , instrs[ix - CLOSURE_EFUN_OFFS].deprecated
+                         );
+
+                sp->x.closure_type
+                  = (short)(  instrs[ix - CLOSURE_EFUN_OFFS].Default == -1
+                            ? ix + CLOSURE_OPERATOR-CLOSURE_EFUN
+                            : ix);
+            }
         }
         break;
     }
@@ -6252,12 +6668,20 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
     CASE(F_RETURN);                 /* --- return              --- */
     {
         /* Return from the function with the result topmost on the stack.
-         * If this is an .extern_call, eval_instruction() is left here.
+         * If this is an .extern_call, eval_instruction()
+         * is left here.
          */
 
         svalue_t *svp; /* Save of current sp */
 
         svp = sp;
+
+        /* Remove any intermediate error contexts */
+        while (csp->catch_call)
+        {
+            pop_control_stack();
+            pop_error_context();
+        }
 
         /* Deallocate frame, but not the result value.
          */
@@ -6270,15 +6694,21 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                  , (long)(sp - (fp + csp->num_local_variables)));
 #endif
         while (sp != fp)
+        {
             free_svalue(--sp);
+        }
         *sp = *svp;
 
         /* Restore the previous execution context */
         if ( NULL != (current_prog = csp->prog) ) /* is 0 when we reach the bottom */
             current_strings = current_prog->strings;
+
         function_index_offset = csp->function_index_offset;
         current_variables     = csp->current_variables;
         break_sp = csp->break_sp;
+        if (current_lambda.type == T_CLOSURE)
+            free_closure(&current_lambda);
+        current_lambda = csp->lambda;
 
         if (csp->extern_call)
         {
@@ -6292,13 +6722,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (trace_level)
             {
                 do_trace_return(sp);
-                if (csp == control_stack - 2)
+                if (csp == CONTROL_STACK - 2)
                     /* TODO: This can't be legal according to ISO C */
                     traceing_recursion = -1;
             }
             csp--;
             inter_sp = sp;
-            return;
+            return MY_FALSE;
         }
 
         /* We stay in eval_instruction() */
@@ -6407,6 +6837,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *   TODO: This code still makes too many un-macro'ed mem accesses.
          */
 
+        Bool useDefault; /* TRUE: Immediately jump to the default case */
         mp_int offset;  /* Length of instruction and range-table area */
         mp_int def_offs;  /* Offset to code for the 'default' case */
         int tablen; /* Number of single case entries, multiplied by 4 */
@@ -6569,6 +7000,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Get the search value from the argument passed on the
          * stack. This also does the type checking.
          */
+        useDefault = MY_FALSE;
         if (type & SWITCH_TYPE)
         {
             /* String switch */
@@ -6599,311 +7031,323 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             }
             else
             {
-                /* No string - bad wizard! */
-                goto bad_arg_1;
+                /* Non-string value for string switch: use default */
+                useDefault = MY_TRUE;
+                s = 0;
             }
+        }
+        else if (sp->type == T_NUMBER)
+        {
+            /* Numeric switch and number given */
+            s = sp->u.number;
         }
         else
         {
-            /* Numeric switch */
-
-            if (sp->type != T_NUMBER) goto bad_arg_1;
-            s = sp->u.number;
+            /* Non-number value for numeric switch: use default */
+            useDefault = MY_TRUE;
+            s = 0;
         }
         pop_stack();
 
-        /* Setup the binary search:
-         *   l points roughly into the middle of the table,
-         *   d is 1/4 of the (assumed) total size of the table
-         */
-        i = type & SWITCH_START;
-        l = tabstart + off_tab[i];
-        d = (mp_int)((off_tab[i]+sizeof(p_int)) >> 1 & ~(sizeof(p_int)-1));
-          /* '+sizeof()' to make the off_tab[] value even and non-0 */
-
-        /* Binary search for the value <s> in the table, starting at
-         * position <l> and first subdivision size <d>.
-         * The algorithm runs until <d> falls below the size of a case value
-         * (sizeof(p_int)).
-         *
-         * After the loop terminates, o1 will be the jump offset relative
-         * to the pc, which might be the 'default' offset if the value <s>
-         * was not found.
-         */
-        for(;;)
+        if (useDefault)
         {
-            r = *(p_int*)l; /* Get the case value */
+            o1 = def_offs;
+        }
+        else
+        {
+            /* Setup the binary search:
+             *   l points roughly into the middle of the table,
+             *   d is 1/4 of the (assumed) total size of the table
+             */
+            i = type & SWITCH_START;
+            l = tabstart + off_tab[i];
+            d = (mp_int)((off_tab[i]+sizeof(p_int)) >> 1 & ~(sizeof(p_int)-1));
+              /* '+sizeof()' to make the off_tab[] value even and non-0 */
 
-            if (s < r)
+            /* Binary search for the value <s> in the table, starting at
+             * position <l> and first subdivision size <d>.
+             * The algorithm runs until <d> falls below the size of a case value
+             * (sizeof(p_int)).
+             *
+             * After the loop terminates, o1 will be the jump offset relative
+             * to the pc, which might be the 'default' offset if the value <s>
+             * was not found.
+             */
+            for(;;)
             {
+                r = *(p_int*)l; /* Get the case value */
 
-                /* --- s < r --- */
-
-                if (d < (mp_int)sizeof(p_int))
+                if (s < r)
                 {
-                    if (!d)
+
+                    /* --- s < r --- */
+
+                    if (d < (mp_int)sizeof(p_int))
                     {
-                        /* End of search: s not found.
-                         *
-                         * Set p2 to the offset matching <l> and retrieve
-                         * o0 and o1 from there.
-                         *
-                         * s might still be in a range, then <l>/<p2> point to
-                         * the entries for the upper bound.
-                         */
-                        p2 =   tabstart + tablen
-                             + ((p_int*)l - (p_int*)tabstart)*len;
-                        o0 = EXTRACT_UCHAR(p2-1);
-                        o1 = EXTRACT_UCHAR(p2);
-                        if (len > 1)
+                        if (!d)
                         {
-                            o0 += EXTRACT_UCHAR(p2-2) << 8;
-                            o1 = EXTRACT_UCHAR(p2+1) + (o1 << 8);
-                            if (len > 2)
+                            /* End of search: s not found.
+                             *
+                             * Set p2 to the offset matching <l> and retrieve
+                             * o0 and o1 from there.
+                             *
+                             * s might still be in a range, then <l>/<p2> point to
+                             * the entries for the upper bound.
+                             */
+                            p2 =   tabstart + tablen
+                                 + ((p_int*)l - (p_int*)tabstart)*len;
+                            o0 = EXTRACT_UCHAR(p2-1);
+                            o1 = EXTRACT_UCHAR(p2);
+                            if (len > 1)
                             {
-                                o0 += EXTRACT_UCHAR(p2-3) << 16;
-                                o1 = EXTRACT_UCHAR(p2+2) + (o1 << 8);
-                            }
-                        }
-                        /* Because the pre-table alignment area is in the
-                         * indexing underflow memory region, we can't make
-                         * useful predictions on the peeked o0 value in case
-                         * of underflow.
-                         */
-
-                        /* Test for a range */
-
-                        if (o0 <= 1 && l > tabstart)
-                        {
-                            /* No indexing underflow: test if s is in range */
-
-                            r = ((p_int*)l)[-1]; /* the lower bound */
-                            if (s >= r)
-                            {
-                                /* s is in the range */
-                                if (!o0)
+                                o0 += EXTRACT_UCHAR(p2-2) << 8;
+                                o1 = EXTRACT_UCHAR(p2+1) + (o1 << 8);
+                                if (len > 2)
                                 {
-                                    /* Look up the real jump offset */
-                                    l = pc + o1 + (s-r) * len;
-                                    o1 = 0;
-                                    i = len;
-                                    do {
-                                        o1 = (o1 << 8) + *l++;
-                                    } while (--i);
+                                    o0 += EXTRACT_UCHAR(p2-3) << 16;
+                                    o1 = EXTRACT_UCHAR(p2+2) + (o1 << 8);
+                                }
+                            }
+                            /* Because the pre-table alignment area is in the
+                             * indexing underflow memory region, we can't make
+                             * useful predictions on the peeked o0 value in case
+                             * of underflow.
+                             */
+
+                            /* Test for a range */
+
+                            if (o0 <= 1 && l > tabstart)
+                            {
+                                /* No indexing underflow: test if s is in range */
+
+                                r = ((p_int*)l)[-1]; /* the lower bound */
+                                if (s >= r)
+                                {
+                                    /* s is in the range */
+                                    if (!o0)
+                                    {
+                                        /* Look up the real jump offset */
+                                        l = pc + o1 + (s-r) * len;
+                                        o1 = 0;
+                                        i = len;
+                                        do {
+                                            o1 = (o1 << 8) + *l++;
+                                        } while (--i);
+                                        break;
+                                    }
+                                    /* o1 holds jump destination */
                                     break;
                                 }
-                                /* o1 holds jump destination */
-                                break;
+                                /* s is not in the range */
                             }
-                            /* s is not in the range */
-                        }
 
-                        /* <s> not found at all: use 'default' address */
-                        o1 = def_offs;
+                            /* <s> not found at all: use 'default' address */
+                            o1 = def_offs;
 
-                        /* o1 holds jump destination */
-                        break;
-                    } /* if (!d) */
-
-                    /* Here is 0 < d < sizeof(p_int).
-                     * Set d = 0 and finish the loop in the next
-                     * iteration.
-                     * TODO: Why the delay?
-                     */
-                    d = 0;
-                }
-                else
-                {
-                    /* Move <l> down and half the partition size <d>. */
-                    l -= d;
-                    d >>= 1;
-                }
-            }
-            else if (s > r)
-            {
-
-                /* --- s > r --- */
-
-                if (d < (mp_int)sizeof(p_int))
-                {
-                    if (!d)
-                    {
-                        /* End of search: s not found.
-                         *
-                         * Set p2 to the offset matching <l> and retrieve
-                         * o0 and o1 from there.
-                         *
-                         * s might still be in a range, then <l> points to
-                         * the entry of the lower bound, and <p2> is set to
-                         * the entry for the upper bound.
-                         */
-                        p2 = tabstart + tablen
-                             + (((p_int*)l - (p_int*)tabstart) + 1)*len;
-                        o0 = EXTRACT_UCHAR(p2-1);
-                        o1 = EXTRACT_UCHAR(p2);
-                        if (len > 1)
-                        {
-                            o0 += EXTRACT_UCHAR(p2-2) << 8;
-                            o1 = EXTRACT_UCHAR(p2+1) + (o1 << 8);
-                            if (len > 2)
-                            {
-                                o0 += EXTRACT_UCHAR(p2-3) << 16;
-                                o1 = EXTRACT_UCHAR(p2+2) + (o1 << 8);
-                            }
-                        }
-
-                        /* Test for a range */
-
-                        if (o0 <= 1)
-                        {
-                            /* It is a range. */
-
-                            if (s <= ((p_int*)l)[1])
-                            {
-                                /* s is in the range, and r is already correct
-                                 * (ie the upper bound)
-                                 */
-                                if (!o0)
-                                {
-                                    /* Lookup the real jump offset */
-                                    l = pc + o1 + (s-r) * len;
-                                    o1 = 0;
-                                    i = len;
-                                    do {
-                                        o1 = (o1 << 8) + *l++;
-                                    } while (--i);
-                                    break;
-                                }
-                                /* o1 holds jump destination */
-                                break;
-                            }
-                            /* s is not in the range */
-                        }
-
-                        /* <s> not found at all: use 'default' address */
-                        o1 = def_offs;
-
-                        /* o1 holds jump destination */
-                        break;
-                    } /* !d */
-
-                    /* Here is 0 < d < sizeof(p_int).
-                     * Set d = 0 and finish the loop in the next
-                     * iteration.
-                     * TODO: Why the delay?
-                     */
-                    d = 0;
-                }
-                else
-                {
-                    /* Move <l> up, and half the partition size <d>
-                     * If this would push l beyond the table, repeat the
-                     * steps 'move <l> down and half the partition size'
-                     * until <l> is within the table again.
-                     */
-
-                    l += d;
-                    while (l >= end_tab)
-                    {
-                        d >>= 1;
-                        if (d <= (mp_int)sizeof(p_int)/2)
-                        {
-                            /* We can't move l further - finish the loop */
-                            l -= sizeof(p_int);
-                            d = 0;
+                            /* o1 holds jump destination */
                             break;
-                        }
-                        l -= d;
-                    }
-                    d >>= 1;
-                }
-            }
-            else
-            {
-                /* --- s == r --- */
+                        } /* if (!d) */
 
-                /* End of search: s found.
-                 *
-                 * Set p2 to the offset matching <l> and retrieve
-                 * o0 and o1 from there.
-                 *
-                 * We don't distinguish between a singular case match
-                 * and a match with an upper range bound, but we have
-                 * to take extra steps in case <s> matched a lower range
-                 * bound. In that light, o0 need not be an exact value.
-                 */
-                p2 = tabstart + tablen + ((p_int*)l - (p_int*)tabstart)*len;
-                o0 = EXTRACT_UCHAR(p2-1);
-                o1 = EXTRACT_UCHAR(p2);
-                if (len > 1)
-                {
-                    o0 |= EXTRACT_UCHAR(p2-2);
-                    o1 = EXTRACT_UCHAR(p2+1) + (o1 << 8);
-                    if (len > 2)
-                    {
-                        o0 |= EXTRACT_UCHAR(p2-3);
-                        o1 = EXTRACT_UCHAR(p2+2) + (o1 << 8);
-                    }
-                }
-
-                /* Test if <s> matched the end of a range with a lookup table.
-                 */
-                /* TODO: Does this mean that the compiler never creates
-                 * TODO:: an ordinary range at the beginning of v[]?
-                 */
-                if (!o0 && l > tabstart)
-                {
-                    r = ((p_int*)l)[-1]; /* the lower bound */
-                    l = pc + o1 + (s-r) * len;
-                    o1 = 0;
-                    i = len;
-                    do
-                    {
-                        o1 = (o1 << 8) + *l++;
-                    } while (--i);
-                    /* o1 holds jump destination */
-                    break;
-                }
-
-                /* Test if <s> matched the start of a range */
-                if (o1 <= 1)
-                {
-                    /* Yup. Realign p2 and reget o1 */
-                    p2 += len;
-
-                    /* Set l to point to the jump offset */
-                    if (o1)
-                    {
-                        /* start of ordinary range */
-                        l = p2;
+                        /* Here is 0 < d < sizeof(p_int).
+                         * Set d = 0 and finish the loop in the next
+                         * iteration.
+                         * TODO: Why the delay?
+                         */
+                        d = 0;
                     }
                     else
                     {
-                        /* start of range with lookup table */
-                        i = len;
-                        do {
-                            o1 = (o1 << 8) + *p2++;
-                        } while (--i);
-                        l = pc + o1;
+                        /* Move <l> down and half the partition size <d>. */
+                        l -= d;
+                        d >>= 1;
+                    }
+                }
+                else if (s > r)
+                {
+
+                    /* --- s > r --- */
+
+                    if (d < (mp_int)sizeof(p_int))
+                    {
+                        if (!d)
+                        {
+                            /* End of search: s not found.
+                             *
+                             * Set p2 to the offset matching <l> and retrieve
+                             * o0 and o1 from there.
+                             *
+                             * s might still be in a range, then <l> points to
+                             * the entry of the lower bound, and <p2> is set to
+                             * the entry for the upper bound.
+                             */
+                            p2 = tabstart + tablen
+                                 + (((p_int*)l - (p_int*)tabstart) + 1)*len;
+                            o0 = EXTRACT_UCHAR(p2-1);
+                            o1 = EXTRACT_UCHAR(p2);
+                            if (len > 1)
+                            {
+                                o0 += EXTRACT_UCHAR(p2-2) << 8;
+                                o1 = EXTRACT_UCHAR(p2+1) + (o1 << 8);
+                                if (len > 2)
+                                {
+                                    o0 += EXTRACT_UCHAR(p2-3) << 16;
+                                    o1 = EXTRACT_UCHAR(p2+2) + (o1 << 8);
+                                }
+                            }
+
+                            /* Test for a range */
+
+                            if (o0 <= 1)
+                            {
+                                /* It is a range. */
+
+                                if (s <= ((p_int*)l)[1])
+                                {
+                                    /* s is in the range, and r is already correct
+                                     * (ie the upper bound)
+                                     */
+                                    if (!o0)
+                                    {
+                                        /* Lookup the real jump offset */
+                                        l = pc + o1 + (s-r) * len;
+                                        o1 = 0;
+                                        i = len;
+                                        do {
+                                            o1 = (o1 << 8) + *l++;
+                                        } while (--i);
+                                        break;
+                                    }
+                                    /* o1 holds jump destination */
+                                    break;
+                                }
+                                /* s is not in the range */
+                            }
+
+                            /* <s> not found at all: use 'default' address */
+                            o1 = def_offs;
+
+                            /* o1 holds jump destination */
+                            break;
+                        } /* !d */
+
+                        /* Here is 0 < d < sizeof(p_int).
+                         * Set d = 0 and finish the loop in the next
+                         * iteration.
+                         * TODO: Why the delay?
+                         */
+                        d = 0;
+                    }
+                    else
+                    {
+                        /* Move <l> up, and half the partition size <d>
+                         * If this would push l beyond the table, repeat the
+                         * steps 'move <l> down and half the partition size'
+                         * until <l> is within the table again.
+                         */
+
+                        l += d;
+                        while (l >= end_tab)
+                        {
+                            d >>= 1;
+                            if (d <= (mp_int)sizeof(p_int)/2)
+                            {
+                                /* We can't move l further - finish the loop */
+                                l -= sizeof(p_int);
+                                d = 0;
+                                break;
+                            }
+                            l -= d;
+                        }
+                        d >>= 1;
+                    }
+                }
+                else
+                {
+                    /* --- s == r --- */
+
+                    /* End of search: s found.
+                     *
+                     * Set p2 to the offset matching <l> and retrieve
+                     * o0 and o1 from there.
+                     *
+                     * We don't distinguish between a singular case match
+                     * and a match with an upper range bound, but we have
+                     * to take extra steps in case <s> matched a lower range
+                     * bound. In that light, o0 need not be an exact value.
+                     */
+                    p2 = tabstart + tablen + ((p_int*)l - (p_int*)tabstart)*len;
+                    o0 = EXTRACT_UCHAR(p2-1);
+                    o1 = EXTRACT_UCHAR(p2);
+                    if (len > 1)
+                    {
+                        o0 |= EXTRACT_UCHAR(p2-2);
+                        o1 = EXTRACT_UCHAR(p2+1) + (o1 << 8);
+                        if (len > 2)
+                        {
+                            o0 |= EXTRACT_UCHAR(p2-3);
+                            o1 = EXTRACT_UCHAR(p2+2) + (o1 << 8);
+                        }
                     }
 
-                    /* Get the jump offset from where <l> points */
-                    o1 = 0;
-                    i = len;
-                    do {
-                        o1 = (o1 << 8) + *l++;
-                    } while (--i);
+                    /* Test if <s> matched the end of a range with a lookup table.
+                     */
+                    /* TODO: Does this mean that the compiler never creates
+                     * TODO:: an ordinary range at the beginning of v[]?
+                     */
+                    if (!o0 && l > tabstart)
+                    {
+                        r = ((p_int*)l)[-1]; /* the lower bound */
+                        l = pc + o1 + (s-r) * len;
+                        o1 = 0;
+                        i = len;
+                        do
+                        {
+                            o1 = (o1 << 8) + *l++;
+                        } while (--i);
+                        /* o1 holds jump destination */
+                        break;
+                    }
 
-                    /* o1 holds jump destination */
+                    /* Test if <s> matched the start of a range */
+                    if (o1 <= 1)
+                    {
+                        /* Yup. Realign p2 and reget o1 */
+                        p2 += len;
+
+                        /* Set l to point to the jump offset */
+                        if (o1)
+                        {
+                            /* start of ordinary range */
+                            l = p2;
+                        }
+                        else
+                        {
+                            /* start of range with lookup table */
+                            i = len;
+                            do {
+                                o1 = (o1 << 8) + *p2++;
+                            } while (--i);
+                            l = pc + o1;
+                        }
+
+                        /* Get the jump offset from where <l> points */
+                        o1 = 0;
+                        i = len;
+                        do {
+                            o1 = (o1 << 8) + *l++;
+                        } while (--i);
+
+                        /* o1 holds jump destination */
+                        break;
+                    }
+
+                    /* At this point, s was a match with a singular case, and
+                     * o1 already holds the jump destination.
+                     */
                     break;
                 }
-
-                /* At this point, s was a match with a singular case, and
-                 * o1 already holds the jump destination.
-                 */
-                break;
-            }
-        } /* binary search */
+            } /* binary search */
+        } /* if (useDefault) */
 
         /* o1 is now the offset to jump to. */
         pc += o1;
@@ -6966,8 +7410,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         inter_sp = sp;
         inter_pc = pc;
-        i = e_parse_command(arg[0].u.string, &arg[1], arg[2].u.string
-                           , &arg[3], num_arg-3);
+        if (compat_mode)
+            i = e_old_parse_command(arg[0].u.string, &arg[1], arg[2].u.string
+                                   , &arg[3], num_arg-3);
+        else
+            i = e_parse_command(arg[0].u.string, &arg[1], arg[2].u.string
+                               , &arg[3], num_arg-3);
         pop_n_elems(num_arg);        /* Get rid of all arguments */
         push_number(i ? 1 : 0);      /* Push the result value */
         break;
@@ -6975,17 +7423,21 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 #endif /* PARSE_COMMAND */
 
     CASE(F_LOCAL);                  /* --- local <ix>          --- */
-
+    {
         /* Fetch the value of local variable <ix> and push it
          * onto the stack.
          */
+        svalue_t * new_fp = fp + LOAD_UINT8(pc);
         sp++;
-        assign_local_svalue_no_free(sp, fp + LOAD_UINT8(pc), sp, pc);
+        assign_local_svalue_no_free(sp, new_fp, sp, pc);
         break;
+    }
 
     CASE(F_CATCH);        /* --- catch <offset> <guarded code> --- */
+    CASE(F_CATCH_NO_LOG); /* --- catch_no_log <offset> <guarded code> --- */
     {
         /* catch(...instructions...)
+         * catch_nolog(...instructions...)
          *
          * Execute the instructions (max. uint8 <offset> bytes) following the
          * catch statement. If an error occurs, or a throw() is executed,
@@ -7012,73 +7464,32 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         uint offset;
-        bytecode_p new_pc;  /* Address of first instruction after the catch() */
 
-        /* Compute address of next instruction after the CATCH statement.
+        /* Get the offset to the next instruction after the CATCH statement.
          */
         offset = LOAD_UINT8(pc);
-        new_pc = pc + offset;
 
-        /* Increase the eval_cost for the duration of the catch so that
-         * there is enough time left to handle an eval-too-big error.
-         */
-        eval_cost += CATCH_RESERVED_COST;
-        assigned_eval_cost += CATCH_RESERVED_COST;
-
-        /* 'Fake' a subroutine call from <new_pc>
-         */
-        push_control_stack(sp, new_pc, fp);
-        csp->ob = current_object;
-        csp->extern_call = MY_FALSE;
-#ifndef DEBUG
-        csp->num_local_variables = 0;        /* No extra variables */
-#else
-        csp->num_local_variables = (csp-1)->num_local_variables;
-          /* TODO: Marion added this, but why? For 'expected_stack'? */
-#endif
-        csp->funstart = csp[-1].funstart;
-
-        /* Not really necessary, but tells gcc to complain less */
+        /* Save the important variables in their global locations */
         inter_pc = pc;
         inter_sp = sp;
         inter_fp = fp;
 
-        /* Save some globals on the error stack that must be restored
-         * separately after a longjmp, then set the jump.
-         */
-        if ( setjmp( push_error_context(sp)->text ) )
-        {
-            /* A throw() or error occured. We have to restore the
-             * control and error stack manually here.
-             *
-             * The error value to return is stored in
-             * the global <catch_value>.
-             *
-             * The actual handling has been exported into the separate,
-             * indirectly called function handle_caught_error() to
-             * protect ourself against overzealous optimizers.
-             */
-            svalue_t *spl, *fpl;
-            bytecode_p pcl;
-
-#ifdef DEBUG
-            /* Restore the value of expected_stack also. It is always 0
-             * for catch().
-             */
-            expected_stack = NULL;
+        /* Perform the catch() */
+        if (!catch_instruction(instruction, offset
+#ifdef __INTEL_COMPILER
+                              , (svalue_t ** volatile) &inter_sp
+#else
+                              , (volatile svalue_t ** volatile) &inter_sp
 #endif
-            (*caught_error)(&spl, &pcl, &fpl);
-            sp = spl; pc = pcl; fp = fpl;
-
-            /* Execution continues at the <new_pc> stored before */
-        }
-        else  /* catch() setup */
+                              , inter_pc, inter_fp))
         {
-            /* Not really necessary, but tells gcc to complain less */
-            pc = inter_pc;
-            sp = inter_sp;
-            fp = inter_fp;
+            return MY_FALSE; /* Guarded code terminated with 'return' itself */
         }
+
+        /* Restore the important variables */
+        pc = inter_pc;
+        sp = inter_sp;
+        fp = inter_fp;
 
         /* Not really necessary, but tells gcc to complain less */
         instruction = F_CATCH;
@@ -7111,17 +7522,35 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Now increment where we can */
         if (svp->type == T_NUMBER)
         {
+            if (svp->u.number == PINT_MAX)
+            {
+                ERRORF(("Numeric overflow: (%ld)++\n", (long)svp->u.number));
+                /* NOTREACHED */
+                break;
+            }
             svp->u.number++;
+            sp--;
+            break;
+        }
+        else if (svp->type == T_FLOAT)
+        {
+            STORE_DOUBLE_USED
+            double d;
+
+            d = READ_DOUBLE(svp) + 1.0;
+            if (d < (-DBL_MAX) || d > DBL_MAX)
+                ERRORF(("Numeric overflow: (%g)++\n", READ_DOUBLE(svp)));
+            sp->type = T_FLOAT;
+            STORE_DOUBLE(svp, d);
             sp--;
             break;
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            (*svp->u.string)++;
-            /* TODO: This might shorten the string if *(svp->u.string) is 0xff.
-             * TODO:: And since u.string is 'signed char', overflow behaviour
-             * TODO:: isn't even defined.
-             */
+            if ((unsigned char)(*svp->u.string) == 0xff /* TODO: MAX_CHAR */ )
+                ERROR("Can't set string character to 0.\n")
+            else
+                (*svp->u.string)++;
             sp--;
             break;
         }
@@ -7129,7 +7558,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
               || svp->type == T_PROTECTED_LVALUE)
         {
             inter_sp = sp;
-            add_number_to_svalue(svp, 1);
+            add_number_to_lvalue(svp, 1, NULL, NULL);
             sp--;
             break;
         }
@@ -7161,17 +7590,35 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Now decrement where we can */
         if (svp->type == T_NUMBER)
         {
+            if (svp->u.number == PINT_MIN)
+            {
+                ERRORF(("Numeric overflow: (%ld)--\n", (long)svp->u.number));
+                /* NOTREACHED */
+                break;
+            }
             svp->u.number--;
+            sp--;
+            break;
+        }
+        else if (svp->type == T_FLOAT)
+        {
+            STORE_DOUBLE_USED
+            double d;
+
+            d = READ_DOUBLE(svp) - 1.0;
+            if (d < (-DBL_MAX) || d > DBL_MAX)
+                ERRORF(("Numeric overflow: (%g)--\n", READ_DOUBLE(svp)));
+            sp->type = T_FLOAT;
+            STORE_DOUBLE(svp, d);
             sp--;
             break;
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            (*svp->u.string)--;
-            /* TODO: This might shorten the string if *(svp->u.string) is 0x01.
-             * TODO:: And since u.string is 'signed char', underflow behaviour
-             * TODO:: isn't even defined.
-             */
+            if ((unsigned char)(*svp->u.string) == 0x01)
+                ERROR("Can't set string character to 0.\n")
+            else
+                (*svp->u.string)--;
             sp--;
             break;
         }
@@ -7179,7 +7626,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
               || svp->type == T_PROTECTED_LVALUE)
         {
             inter_sp = sp;
-            add_number_to_svalue(svp, -1);
+            add_number_to_lvalue(svp, -1,  NULL, NULL);
             sp--;
             break;
         }
@@ -7212,19 +7659,42 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Do the push and increment */
         if (svp->type == T_NUMBER)
         {
+            if (svp->u.number == PINT_MAX)
+            {
+                ERRORF(("Numeric overflow: (%ld)++\n", (long)svp->u.number));
+                /* NOTREACHED */
+                break;
+            }
             put_number(sp,  svp->u.number++ );
+            break;
+        }
+        else if (svp->type == T_FLOAT)
+        {
+            STORE_DOUBLE_USED
+            double d;
+
+            d = READ_DOUBLE(svp);
+            sp->type = T_FLOAT;
+            STORE_DOUBLE(sp, d);
+            d += 1.0;
+            if (d < (-DBL_MAX) || d > DBL_MAX)
+                ERRORF(("Numeric overflow: (%g)++\n", READ_DOUBLE(svp)));
+            STORE_DOUBLE(svp, d);
             break;
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            put_number(sp,  (*svp->u.string)++ );
+            if ((unsigned char)(*svp->u.string) == 0xff /* TODO: MAX_CHAR */ )
+                ERROR("Can't set string character to 0.\n")
+            else
+                put_number(sp, (*svp->u.string)++ );
             break;
         }
         else if (svp->type == T_LVALUE
               || svp->type == T_PROTECTED_LVALUE)
         {
             inter_sp = sp;
-            put_number(sp, add_number_to_svalue(svp, 1) - 1);
+            add_number_to_lvalue(svp, 1, sp, NULL);
             break;
         }
 
@@ -7256,19 +7726,42 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Do the push and decrement */
         if (svp->type == T_NUMBER)
         {
+            if (svp->u.number == PINT_MIN)
+            {
+                ERRORF(("Numeric overflow: (%ld)--\n", (long)svp->u.number));
+                /* NOTREACHED */
+                break;
+            }
             put_number(sp,  svp->u.number-- );
+            break;
+        }
+        else if (svp->type == T_FLOAT)
+        {
+            STORE_DOUBLE_USED
+            double d;
+
+            d = READ_DOUBLE(svp);
+            sp->type = T_FLOAT;
+            STORE_DOUBLE(sp, d);
+            d -= 1.0;
+            if (d < (-DBL_MAX) || d > DBL_MAX)
+                ERRORF(("Numeric overflow: (%g)--\n", READ_DOUBLE(svp)));
+            STORE_DOUBLE(svp, d);
             break;
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            put_number(sp,  (*svp->u.string)-- );
+            if ((unsigned char)(*svp->u.string) == 0x01)
+                ERROR("Can't set string character to 0.\n")
+            else
+                put_number(sp, (*svp->u.string)-- );
             break;
         }
         else if (svp->type == T_LVALUE
               || svp->type == T_PROTECTED_LVALUE)
         {
             inter_sp = sp;
-            put_number(sp, add_number_to_svalue(svp, -1) + 1);
+            add_number_to_lvalue(svp, -1, sp, NULL);
             break;
         }
 
@@ -7299,19 +7792,41 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Do the increment and push */
         if (svp->type == T_NUMBER)
         {
+            if (svp->u.number == PINT_MAX)
+            {
+                ERRORF(("Numeric overflow: ++(%ld)\n", (long)svp->u.number));
+                /* NOTREACHED */
+                break;
+            }
             put_number(sp,  ++(svp->u.number) );
+            break;
+        }
+        else if (svp->type == T_FLOAT)
+        {
+            STORE_DOUBLE_USED
+            double d;
+
+            d = READ_DOUBLE(svp) + 1.0;
+            if (d < (-DBL_MAX) || d > DBL_MAX)
+                ERRORF(("Numeric overflow: ++(%g)\n", READ_DOUBLE(svp)));
+            sp->type = T_FLOAT;
+            STORE_DOUBLE(sp, d);
+            STORE_DOUBLE(svp, d);
             break;
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            put_number(sp,  ++(*svp->u.string) );
+            if ((unsigned char)(*svp->u.string) == 0xff /* TODO: MAX_CHAR */ )
+                ERROR("Can't set string character to 0.\n")
+            else
+                put_number(sp, ++(*svp->u.string) );
             break;
         }
         else if (svp->type == T_LVALUE
               || svp->type == T_PROTECTED_LVALUE)
         {
             inter_sp = sp;
-            put_number(sp, add_number_to_svalue(svp, 1));
+            add_number_to_lvalue(svp, 1, NULL, sp);
             break;
         }
 
@@ -7342,19 +7857,41 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Do the decrement and push */
         if (svp->type == T_NUMBER)
         {
+            if (svp->u.number == PINT_MIN)
+            {
+                ERRORF(("Numeric overflow: --(%ld)\n", (long)svp->u.number));
+                /* NOTREACHED */
+                break;
+            }
             put_number(sp,  --(svp->u.number) );
+            break;
+        }
+        else if (svp->type == T_FLOAT)
+        {
+            STORE_DOUBLE_USED
+            double d;
+
+            d = READ_DOUBLE(svp) - 1.0;
+            if (d < (-DBL_MAX) || d > DBL_MAX)
+                ERRORF(("Numeric overflow: --(%g)\n", READ_DOUBLE(svp)));
+            sp->type = T_FLOAT;
+            STORE_DOUBLE(sp, d);
+            STORE_DOUBLE(svp, d);
             break;
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            put_number(sp,  --(*svp->u.string) );
+            if ((unsigned char)(*svp->u.string) == 0x01)
+                ERROR("Can't set string character to 0.\n")
+            else
+                put_number(sp, --(*svp->u.string) );
             break;
         }
         else if (svp->type == T_LVALUE
               || svp->type == T_PROTECTED_LVALUE)
         {
             inter_sp = sp;
-            put_number(sp, add_number_to_svalue(svp, -1));
+            add_number_to_lvalue(svp, -1, NULL, sp);
             break;
         }
 
@@ -7514,6 +8051,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           {
             if (sp[-1].type == T_NUMBER)
             {
+                if (sp[-1].u.number == 0)
+                    ERROR("Can't assign 0 to string character.\n");
                 *dest->u.string = (char)sp[-1].u.number;
             }
             else
@@ -7540,6 +8079,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 if (sp[-1].type == T_NUMBER)
                 {
+                    if (sp[-1].u.number == 0)
+                        ERROR("Can't assign 0 to string character.\n");
                     *p->v.u.string = (char)sp[-1].u.number;
                     sp -= 2;
                     goto again;
@@ -7714,8 +8255,20 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
             case T_NUMBER:
               {
-                int i;
-                i = sp->u.number + (sp-1)->u.number;
+                p_int i;
+                p_int right = sp->u.number;
+                p_int left = (sp-1)->u.number;
+
+                if ((left >= 0 && right >= 0 && PINT_MAX - left < right)
+                 || (left < 0 && right < 0 && PINT_MIN - left > right)
+                   )
+                {
+                    ERRORF(("Numeric overflow: %ld + %ld\n"
+                           , (long)left, (long)right));
+                    /* NOTREACHED */
+                    break;
+                }
+                i = left + right;
                 sp--;
                 sp->u.number = i;
                 break;
@@ -7727,6 +8280,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 double sum;
 
                 sum = (double)((sp-1)->u.number) + READ_DOUBLE(sp);
+                if (sum < (-DBL_MAX) || sum > DBL_MAX)
+                    ERRORF(("Numeric overflow: %ld + %g\n"
+                           , (long)(sp-1)->u.number, READ_DOUBLE(sp)));
                 STORE_DOUBLE(sp-1, sum);
                 sp--;
                 sp->type = T_FLOAT;
@@ -7747,6 +8303,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (sp->type == T_FLOAT)
             {
                 sum = READ_DOUBLE(sp-1) + READ_DOUBLE(sp);
+                if (sum < (-DBL_MAX) || sum > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g + %g\n"
+                           , READ_DOUBLE(sp-1), READ_DOUBLE(sp)));
                 STORE_DOUBLE(sp-1, sum);
                 sp--;
                 break;
@@ -7754,6 +8313,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (sp->type == T_NUMBER)
             {
                 sum = READ_DOUBLE(sp-1) + (double)(sp->u.number);
+                if (sum < (-DBL_MAX) || sum > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g + %ld\n"
+                           , READ_DOUBLE(sp-1), (long)sp->u.number));
                 STORE_DOUBLE(sp-1, sum);
                 sp--;
                 break;
@@ -7803,13 +8365,17 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             inter_sp = sp;
             m = add_mapping((sp-1)->u.map,sp->u.map);
             if (!m) {
-                ERROR("Out of memory.n")
+                ERROR("Out of memory.\n")
             }
             pop_n_elems(2);
             push_mapping(m); /* This will make ref count == 2 */
             deref_mapping(m);
             if (max_mapping_size && MAP_SIZE(m) > max_mapping_size)
-                ERRORF(("Illegal mapping size: %ld\n", MAP_SIZE(m)));
+            {
+                check_map_for_destr(m);
+                if (max_mapping_size && MAP_SIZE(m) > max_mapping_size)
+                    ERRORF(("Illegal mapping size: %ld\n", MAP_SIZE(m)));
+            }
             break;
           }
 
@@ -7836,13 +8402,26 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *   mapping     - mapping            -> mapping
          */
 
-        int i;
+        p_int i;
 
         if ((sp-1)->type == T_NUMBER)
         {
             if (sp->type == T_NUMBER)
             {
-                i = (sp-1)->u.number - sp->u.number;
+                p_int left = (sp-1)->u.number;
+                p_int right = sp->u.number;
+
+                if ((left >= 0 && right < 0 && PINT_MAX + right < left)
+                 || (left < 0 && right >= 0 && PINT_MIN + right > left)
+                   )
+                {
+                    ERRORF(("Numeric overflow: %ld - %ld\n"
+                           , (long)left, (long)right));
+                    /* NOTREACHED */
+                    break;
+                }
+
+                i = left - right;
                 sp--;
                 sp->u.number = i;
                 break;
@@ -7853,6 +8432,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 double diff;
 
                 diff = (double)((sp-1)->u.number) - READ_DOUBLE(sp);
+                if (diff < (-DBL_MAX) || diff > DBL_MAX)
+                    ERRORF(("Numeric overflow: %ld - %g\n"
+                           , (long)(sp-1)->u.number, READ_DOUBLE(sp)));
                 sp--;
                 STORE_DOUBLE(sp, diff);
                 sp->type = T_FLOAT;
@@ -7867,6 +8449,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (sp->type == T_FLOAT)
             {
                 diff = READ_DOUBLE(sp-1) - READ_DOUBLE(sp);
+                if (diff < (-DBL_MAX) || diff > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g - %g\n"
+                           , READ_DOUBLE(sp-1), READ_DOUBLE(sp)));
                 sp--;
                 STORE_DOUBLE(sp, diff);
                 break;
@@ -7874,6 +8459,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (sp->type == T_NUMBER)
             {
                 diff = READ_DOUBLE(sp-1) - (double)(sp->u.number);
+                if (diff < (-DBL_MAX) || diff > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g - %ld\n"
+                           , READ_DOUBLE(sp-1), (long)sp->u.number));
                 sp--;
                 STORE_DOUBLE(sp, diff);
                 break;
@@ -7908,7 +8496,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         else if ((sp-1)->type == T_STRING && sp->type == T_STRING)
         {
             char * result;
-            
+
             inter_sp = sp;
             result = intersect_strings((sp-1)->u.string, sp->u.string, MY_TRUE);
             free_string_svalue(sp);
@@ -7929,6 +8517,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Multiply sp[-1] by sp[0] pop both arguments from the stack
          * and push the result.
          * TODO: Could be extended to cover mappings.
+         * TODO:: array/string multiplied by element === implode.
          *
          * Possible type combinations:
          *   int         * int                -> int
@@ -7940,14 +8529,53 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *   int         * array              -> array
          */
 
-        int i;
+        p_int i;
 
         switch ( sp[-1].type )
         {
         case T_NUMBER:
             if (sp->type == T_NUMBER)
             {
-                i = (sp-1)->u.number * sp->u.number;
+                p_int left = (sp-1)->u.number;
+                p_int right = sp->u.number;
+
+                if (left > 0 && right > 0)
+                {
+                    if ((left != 0 && PINT_MAX / left < right)
+                     || (right != 0 && PINT_MAX / right < left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld * %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+                else if (left < 0 && right < 0)
+                {
+                    if ((left != 0 && PINT_MAX / left > right)
+                     || (right != 0 && PINT_MAX / right > left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld * %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+                else if (left != 0 && right != 0)
+                {
+                    if ((left > 0 && PINT_MIN / left > right)
+                     || (right > 0 && PINT_MIN / right > left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld * %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+                i = left * right;
                 sp--;
                 sp->u.number = i;
                 break;
@@ -7958,6 +8586,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 double product;
 
                 product = (sp-1)->u.number * READ_DOUBLE(sp);
+                if (product < (-DBL_MAX) || product > DBL_MAX)
+                    ERRORF(("Numeric overflow: %ld * %g\n"
+                           , (long)(sp-1)->u.number, READ_DOUBLE(sp)));
                 sp--;
                 STORE_DOUBLE(sp, product);
                 sp->type = T_FLOAT;
@@ -7971,13 +8602,20 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
                 if (sp[-1].u.number < 0)
                     goto bad_arg_1;
-                
+
                 len = svalue_strlen(sp);
+
+                if (len > (size_t)PINT_MAX
+                 || (len != 0             && PINT_MAX / len < sp[-1].u.number)
+                 || (sp[-1].u.number != 0 && PINT_MAX / sp[-1].u.number < len)
+                   )
+                    ERROR("Result string too long.\n");
+
                 reslen = (size_t)sp[-1].u.number * len;
                 result = xalloc(reslen+1);
                 if (!result)
                     ERROR("Out of memory.\n");
-                
+
                 if (sp[-1].u.number > 0 && len)
                 {
                     size_t curlen;
@@ -8011,7 +8649,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 vector_t *result;
                 mp_int reslen;
                 size_t len;
-                
+
                 if (sp[-1].u.number < 0)
                     goto bad_arg_1;
 
@@ -8025,7 +8663,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 {
                     size_t left;
                     svalue_t *from, *to;
-                    
+
                     /* Seed result[] with one copy of the array.
                      * To save memory we make sure that all strings
                      * are made shared.
@@ -8071,6 +8709,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (sp->type == T_FLOAT)
             {
                 product = READ_DOUBLE(sp-1) * READ_DOUBLE(sp);
+                if (product < (-DBL_MAX) || product > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g * %g\n"
+                           , READ_DOUBLE(sp-1), READ_DOUBLE(sp)));
                 STORE_DOUBLE(sp-1, product);
                 sp--;
                 break;
@@ -8078,6 +8719,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (sp->type == T_NUMBER)
             {
                 product = READ_DOUBLE(sp-1) * sp->u.number;
+                if (product < (-DBL_MAX) || product > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g * %ld\n"
+                           , READ_DOUBLE(sp-1), (long)sp->u.number));
                 STORE_DOUBLE(sp-1, product);
                 sp--;
                 break;
@@ -8095,13 +8739,20 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
                 if (sp->u.number < 0)
                     goto bad_arg_2;
-                
+
                 len = svalue_strlen(sp-1);
+
+                if (len > (size_t)PINT_MAX
+                 || (len != 0          && PINT_MAX / len < sp->u.number)
+                 || (sp->u.number != 0 && PINT_MAX / sp->u.number < len)
+                   )
+                    ERROR("Result string too long.\n");
+
                 reslen = (size_t)sp->u.number * len;
                 result = xalloc(reslen+1);
                 if (!result)
                     ERROR("Out of memory.\n");
-                
+
                 if (sp->u.number > 0 && len)
                 {
                     /* Seed result[] with one copy of the string */
@@ -8137,7 +8788,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 vector_t *result;
                 mp_int reslen;
                 size_t len;
-                
+
                 if (sp->u.number < 0)
                     goto bad_arg_2;
 
@@ -8151,7 +8802,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 {
                     size_t left;
                     svalue_t *from, *to;
-                    
+
                     /* Seed result[] with one copy of the array.
                      * To save memory we make sure that all strings
                      * are made shared.
@@ -8216,6 +8867,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (sp->type == T_NUMBER) {
                 if (sp->u.number == 0)
                     ERROR("Division by zero\n")
+                if ((sp-1)->u.number == PINT_MIN && sp->u.number == -1)
+                    ERRORF(("Numeric overflow: %ld / -1\n"
+                           , (long)(sp-1)->u.number
+                           ));
                 i = (sp-1)->u.number / sp->u.number;
                 sp--;
                 sp->u.number = i;
@@ -8230,7 +8885,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 if (dtmp == 0.)
                     ERROR("Division by zero\n")
                 sp--;
-                dtmp = sp->u.number / dtmp;
+                dtmp = (double)sp->u.number / dtmp;
+                if (dtmp < (-DBL_MAX) || dtmp > DBL_MAX)
+                    ERRORF(("Numeric overflow: %ld / %g\n"
+                           , (long)(sp)->u.number, READ_DOUBLE(sp+1)));
                 STORE_DOUBLE(sp, dtmp);
                 sp->type = T_FLOAT;
                 break;
@@ -8247,10 +8905,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 dtmp = READ_DOUBLE( sp );
                 if (dtmp == 0.) {
                     ERROR("Division by zero\n")
-                    return;
+                    return MY_FALSE;
                 }
                 sp--;
                 dtmp = READ_DOUBLE(sp) / dtmp;
+                if (dtmp < (-DBL_MAX) || dtmp > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g / %g\n"
+                           , READ_DOUBLE(sp), READ_DOUBLE(sp+1)));
                 STORE_DOUBLE(sp, dtmp);
                 break;
             }
@@ -8258,11 +8919,14 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 if (sp->u.number == 0) {
                     ERROR("Division by zero\n")
-                    return;
+                    return MY_FALSE;
                 }
-                dtmp = (float)sp->u.number;
+                dtmp = (double)sp->u.number;
                 sp--;
                 dtmp = READ_DOUBLE(sp) / dtmp;
+                if (dtmp < (-DBL_MAX) || dtmp > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g / %ld\n"
+                           , READ_DOUBLE(sp), (long)(sp+1)->u.number));
                 STORE_DOUBLE(sp, dtmp);
                 break;
             }
@@ -8276,7 +8940,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
     {
         /* Compute sp[-1] modulus sp[0] pop both arguments from the stack
          * and push the result.
-         * TODO: Could be extended to cover arrays and mappings.
+         * TODO: Could be extended to cover floats(!), arrays and mappings.
          * TODO: Define properly and add the rem operation.
          *
          * Possible type combinations:
@@ -8292,9 +8956,17 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (sp->u.number == 0)
         {
             ERROR("Modulus by zero.\n")
-            return;
+            return MY_FALSE;
         }
-        i = (sp-1)->u.number % sp->u.number;
+        else if (sp->u.number == 1
+              || sp->u.number == -1
+                )
+            i = 0;
+              /* gcc 2.91 on Linux/x86 generates buggy code
+               * for MIN_INT % -1. Might as well catch it all.
+               */
+        else
+            i = (sp-1)->u.number % sp->u.number;
         sp--;
         sp->u.number = i;
         break;
@@ -8332,6 +9004,22 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if ((sp-1)->type == T_FLOAT && sp->type == T_FLOAT)
         {
             i = READ_DOUBLE( sp-1 ) > READ_DOUBLE( sp );
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
+        if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
+        {
+            i = (double)((sp-1)->u.number) > READ_DOUBLE( sp );
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
+        if ((sp-1)->type == T_FLOAT && sp->type == T_NUMBER)
+        {
+            i = READ_DOUBLE( sp-1 ) > (double)(sp->u.number);
             sp--;
             put_number(sp, i);
             break;
@@ -8382,6 +9070,22 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
+        if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
+        {
+            i = (double)((sp-1)->u.number) >= READ_DOUBLE( sp );
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
+        if ((sp-1)->type == T_FLOAT && sp->type == T_NUMBER)
+        {
+            i = READ_DOUBLE( sp-1 ) >= (double)(sp->u.number);
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
         if (!( (sp-1)->type & (T_NUMBER|T_STRING|T_FLOAT) ))
             goto bad_arg_1;
         if (!(  sp   ->type & (T_NUMBER|T_STRING|T_FLOAT) ))
@@ -8422,6 +9126,22 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if ((sp-1)->type == T_FLOAT && sp->type == T_FLOAT)
         {
             i = READ_DOUBLE( sp-1 ) < READ_DOUBLE( sp );
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
+        if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
+        {
+            i = (double)((sp-1)->u.number) < READ_DOUBLE( sp );
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
+        if ((sp-1)->type == T_FLOAT && sp->type == T_NUMBER)
+        {
+            i = READ_DOUBLE( sp-1 ) < (double)(sp->u.number);
             sp--;
             put_number(sp, i);
             break;
@@ -8472,6 +9192,22 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
+        if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
+        {
+            i = (double)((sp-1)->u.number) <= READ_DOUBLE( sp );
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
+        if ((sp-1)->type == T_FLOAT && sp->type == T_NUMBER)
+        {
+            i = READ_DOUBLE( sp-1 ) <= (double)(sp->u.number);
+            sp--;
+            put_number(sp, i);
+            break;
+        }
+
         if (!( (sp-1)->type & (T_NUMBER|T_STRING|T_FLOAT) ))
             goto bad_arg_1;
         if (!(  sp   ->type & (T_NUMBER|T_STRING|T_FLOAT) ))
@@ -8487,52 +9223,65 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * else 0 (of course after popping both arguments).
          *
          * Comparable types are all types, each to its own. Comparisons
-         * between distinct types always yield 'unequal'.
+         * between distinct types (with the exception of int vs float)
+         * always yield 'unequal'.
          * Vectors and mappings are compared by ref only.
          */
 
         int i;
 
-        if ((sp-1)->type != sp->type)
+        if ((sp-1)->type == T_FLOAT && sp->type == T_NUMBER)
         {
-            pop_stack();
-            free_svalue(sp);
-            put_number(sp, 0);
-            break;
+            i = READ_DOUBLE( sp-1 ) == (double)(sp->u.number);
         }
-
-        switch(sp->type)
+        else if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
         {
-        case T_NUMBER:
-            i = (sp-1)->u.number == sp->u.number;
-            break;
-        case T_POINTER:
-            i = (sp-1)->u.vec == sp->u.vec;
-            break;
-        case T_STRING:
-            i = strcmp((sp-1)->u.string, sp->u.string) == 0;
-            break;
-        case T_OBJECT:
-            i = (sp-1)->u.ob == sp->u.ob;
-            break;
-        case T_FLOAT:
-            /* This is of little use... well, at least 0. == 0. ... */
-        case T_CLOSURE:
-        case T_SYMBOL:
-        case T_QUOTED_ARRAY:
-            i = (sp-1)->u.string  == sp->u.string &&
-                (sp-1)->x.generic == sp->x.generic;
-            break;
-        case T_MAPPING:
-            i = (sp-1)->u.map == sp->u.map;
-            break;
-        default:
-            if (sp->type == T_LVALUE)
-                error("Reference passed to !=\n");
-            fatal("Illegal type to !=\n");
-              /* TODO: Give type and value */
-            /* NOTREACHED */
-            return;
+            i = (double)((sp-1)->u.number) == READ_DOUBLE( sp );
+        }
+        else if ((sp-1)->type != sp->type)
+        {
+            i = 0;
+        }
+        else /* types are equal */
+        {
+            switch(sp->type)
+            {
+            case T_NUMBER:
+                i = (sp-1)->u.number == sp->u.number;
+                break;
+            case T_POINTER:
+                i = (sp-1)->u.vec == sp->u.vec;
+                break;
+            case T_STRING:
+                i = strcmp((sp-1)->u.string, sp->u.string) == 0;
+                break;
+            case T_OBJECT:
+                i = (sp-1)->u.ob == sp->u.ob;
+                break;
+            case T_FLOAT:
+                i = READ_DOUBLE( sp-1 ) == READ_DOUBLE( sp );
+                break;
+
+            case T_CLOSURE:
+                i = closure_eq(sp-1, sp);
+                break;
+
+            case T_SYMBOL:
+            case T_QUOTED_ARRAY:
+                i = (sp-1)->u.string  == sp->u.string &&
+                    (sp-1)->x.generic == sp->x.generic;
+                break;
+            case T_MAPPING:
+                i = (sp-1)->u.map == sp->u.map;
+                break;
+            default:
+                if (sp->type == T_LVALUE)
+                    error("Reference passed to !=\n");
+                fatal("Illegal type to !=\n");
+                  /* TODO: Give type and value */
+                /* NOTREACHED */
+                return MY_FALSE;
+            }
         }
 
         pop_stack();
@@ -8553,44 +9302,57 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         int i;
 
-        if ((sp-1)->type != sp->type)
+        if ((sp-1)->type == T_FLOAT && sp->type == T_NUMBER)
         {
-            pop_stack();
-            assign_svalue(sp, &const1);
-            break;
+            i = READ_DOUBLE( sp-1 ) != (double)(sp->u.number);
         }
-
-        switch(sp->type)
+        else if ((sp-1)->type == T_NUMBER && sp->type == T_FLOAT)
         {
-        case T_NUMBER:
-            i = (sp-1)->u.number != sp->u.number;
-            break;
-        case T_STRING:
-            i = strcmp((sp-1)->u.string, sp->u.string);
-            break;
-        case T_POINTER:
-            i = (sp-1)->u.vec != sp->u.vec;
-            break;
-        case T_OBJECT:
-            i = (sp-1)->u.ob != sp->u.ob;
-            break;
-        case T_FLOAT:
-            /* This is of little use... well, at least 0. == 0. ... */
-        case T_CLOSURE:
-        case T_SYMBOL:
-        case T_QUOTED_ARRAY:
-            i = (sp-1)->u.string  != sp->u.string ||
-                (sp-1)->x.generic != sp->x.generic;
-            break;
-        case T_MAPPING:
-            i = (sp-1)->u.map != sp->u.map;
-            break;
-        default:
-            if (sp->type == T_LVALUE)
-                error("Reference passed to !=\n");
-            fatal("Illegal type to !=\n");
-            /* NOTREACHED */
-            return;
+            i = (double)((sp-1)->u.number) != READ_DOUBLE( sp );
+        }
+        else if ((sp-1)->type != sp->type)
+        {
+            i = 1;
+        }
+        else /* types are equal */
+        {
+            switch(sp->type)
+            {
+            case T_NUMBER:
+                i = (sp-1)->u.number != sp->u.number;
+                break;
+            case T_STRING:
+                i = strcmp((sp-1)->u.string, sp->u.string);
+                break;
+            case T_POINTER:
+                i = (sp-1)->u.vec != sp->u.vec;
+                break;
+            case T_OBJECT:
+                i = (sp-1)->u.ob != sp->u.ob;
+                break;
+            case T_FLOAT:
+                i = READ_DOUBLE( sp-1 ) != READ_DOUBLE( sp );
+                break;
+
+            case T_CLOSURE:
+                i = !closure_eq(sp-1, sp);
+                break;
+
+            case T_SYMBOL:
+            case T_QUOTED_ARRAY:
+                i = (sp-1)->u.string  != sp->u.string ||
+                    (sp-1)->x.generic != sp->x.generic;
+                break;
+            case T_MAPPING:
+                i = (sp-1)->u.map != sp->u.map;
+                break;
+            default:
+                if (sp->type == T_LVALUE)
+                    error("Reference passed to !=\n");
+                fatal("Illegal type to !=\n");
+                /* NOTREACHED */
+                return MY_FALSE;
+            }
         }
 
         pop_stack();
@@ -8635,7 +9397,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (sp->type == T_STRING && (sp-1)->type == T_STRING)
         {
             char * result;
-            
+
             inter_sp = sp;
             result = intersect_strings(sp[-1].u.string, sp->u.string, MY_FALSE);
             free_string_svalue(sp-1);
@@ -8730,14 +9492,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
     CASE(F_RSH);                    /* --- rsh                 --- */
     {
-        /* Shift number sp[-1] right by sp[0] bits and leave
+        /* Arithmetically shift number sp[-1] right by sp[0] bits and leave
          * the result on the stack.
          *
          * Possible type combinations:
          *   int >> int    -> int
          *
          * TODO: Extend this to vectors and mappings.
-         * TODO: Implement an arithmetic shift.
          */
 
         int i;
@@ -8749,7 +9510,39 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         i = sp->u.number;
         sp--;
-        sp->u.number >>= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
+        if ((uint)i <= MAX_SHIFT)
+            sp->u.number >>= i;
+        else if (sp->u.number >= 0)
+            sp->u.number = 0;
+        else
+            sp->u.number = -1;
+        break;
+    }
+
+    CASE(F_RSHL);                   /* --- rshl                --- */
+    {
+        /* Logically shift number sp[-1] right by sp[0] bits and leave
+         * the result on the stack.
+         *
+         * Possible type combinations:
+         *   int >> int    -> int
+         *
+         * TODO: Extend this to vectors and mappings.
+         */
+
+        int i;
+
+        if ((sp-1)->type != T_NUMBER)
+            goto bad_arg_1;
+        if (sp->type != T_NUMBER)
+            goto bad_arg_2;
+
+        i = sp->u.number;
+        sp--;
+        if ((uint)i > MAX_SHIFT)
+            sp->u.number = 0;
+        else
+            sp->u.number = (p_uint)sp->u.number >> i;
         break;
     }
 
@@ -8908,6 +9701,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *   float        + (float,int)        -> float
          *   vector       + vector             -> vector
          *   mapping      + mapping            -> mapping
+         * TODO: This type mapping should be documented in 2-dim-arrays,
+         * TODO:: one each for F_ADD_EQ, F_MULT_EQ, etc. This would
+         * TODO:: also make the checks in the compiler simpler.
          */
 
         short type2;         /* type and value of sp[-1] */
@@ -9003,6 +9799,19 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         case T_NUMBER:  /* Add to a number */
             if (type2 == T_NUMBER)
             {
+                p_int left = argp->u.number;
+                p_int right = u2.number;
+
+                if ((left >= 0 && right >= 0 && PINT_MAX - left < right)
+                 || (left < 0 && right < 0 && PINT_MIN - left > right)
+                   )
+                {
+                    ERRORF(("Numeric overflow: %ld += %ld\n"
+                           , (long)left, (long)right));
+                    /* NOTREACHED */
+                    break;
+                }
+
                 if (instruction == F_VOID_ADD_EQ)
                 {
                     argp->u.number += u2.number;
@@ -9018,6 +9827,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 double sum;
 
                 sum = (double)(argp->u.number) + READ_DOUBLE(sp-1);
+                if (sum < (-DBL_MAX) || sum > DBL_MAX)
+                    ERRORF(("Numeric overflow: %ld + %g\n"
+                           , (long)argp->u.number, READ_DOUBLE(sp-1)));
                 argp->type = T_FLOAT;
                 STORE_DOUBLE(argp, sum);
                 if (instruction == F_VOID_ADD_EQ)
@@ -9076,6 +9888,21 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         case T_CHAR_LVALUE:  /* Add to a character in a string */
             if (type2 == T_NUMBER)
             {
+                p_int left = *argp->u.string;
+                p_int right = u2.number;
+
+                if ((left >= 0 && right >= 0 && PINT_MAX - left < right)
+                 || (left < 0 && right < 0 && PINT_MIN - left > right)
+                   )
+                {
+                    ERRORF(("Numeric overflow: %ld += %ld\n"
+                           , (long)left, (long)right));
+                    /* NOTREACHED */
+                    break;
+                }
+
+                if (((left + right) & 0xff) == 0)
+                    ERROR("Can't set string character to 0.\n");
                 if (instruction == F_VOID_ADD_EQ)
                 {
                     *argp->u.string += u2.number;
@@ -9083,7 +9910,6 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                     goto again;
                 }
                 (--sp)->u.number = *argp->u.string += u2.number;
-                /* TODO: This might create a 0x00 character in a string */
                 goto again;
             }
             else
@@ -9106,7 +9932,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 sp -= 2;
                 free_mapping(u2.map);
                 if (max_mapping_size && MAP_SIZE(argp->u.map) > max_mapping_size)
-                    ERRORF(("Illegal mapping size: %ld\n", MAP_SIZE(argp->u.map)));
+                {
+                    check_map_for_destr(argp->u.map);
+                    if (max_mapping_size && MAP_SIZE(argp->u.map) > max_mapping_size)
+                        ERRORF(("Illegal mapping size: %ld\n", MAP_SIZE(argp->u.map)));
+                }
             }
             break;
 
@@ -9144,6 +9974,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                     * it in a register
                     */
                 d = READ_DOUBLE(argp) + READ_DOUBLE(sp-1);
+                if (d < (-DBL_MAX) || d > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g + %g\n"
+                           , READ_DOUBLE(argp), READ_DOUBLE(sp-1)));
                 STORE_DOUBLE(argp, d);
                 sp -= 2;
             }
@@ -9153,6 +9986,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 double d;
 
                 d = READ_DOUBLE(argp) + (double)sp[-1].u.number;
+                if (d < (-DBL_MAX) || d > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g + %ld\n"
+                           , READ_DOUBLE(argp), (long)(sp-1)->u.number));
                 STORE_DOUBLE(argp, d);
                 sp -= 2;
             }
@@ -9215,21 +10051,54 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (type2 != T_NUMBER)
                 goto bad_right;
             sp--;
+
+            {
+                p_int left = argp->u.number;
+                p_int right = u2.number;
+
+                if ((left >= 0 && right < 0 && PINT_MAX + right < left)
+                 || (left < 0 && right >= 0 && PINT_MIN + right > left)
+                   )
+                {
+                    ERRORF(("Numeric overflow: %ld -= %ld\n"
+                           , (long)left, (long)right));
+                    /* NOTREACHED */
+                    break;
+                }
+            }
+
             sp->u.number = argp->u.number -= u2.number;
             break;
 
         case T_CHAR_LVALUE:  /* Subtract from a char in a string */
             if (type2 != T_NUMBER)
                 goto bad_right;
+
+            {
+                p_int left = *argp->u.string;
+                p_int right = u2.number;
+
+                if ((left >= 0 && right < 0 && PINT_MAX + right < left)
+                 || (left < 0 && right >= 0 && PINT_MIN + right > left)
+                   )
+                {
+                    ERRORF(("Numeric overflow: %ld -= %ld\n"
+                           , (long)left, (long)right));
+                    /* NOTREACHED */
+                    break;
+                }
+            }
+
+            if (((*argp->u.string - u2.number) & 0xff) == 0)
+                ERROR("Can't set string character to 0.\n");
             sp--;
             sp->u.number = *argp->u.string -= u2.number;
-            /* TODO: May result in a 0x00 character in a string */
             break;
 
         case T_STRING:   /* Subtract from a string */
         {
             char * result;
-            
+
             if (type2 != T_STRING)
                 goto bad_right;
 
@@ -9280,6 +10149,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                  */
                 sp--;
                 d = READ_DOUBLE(argp) - READ_DOUBLE(sp);
+                if (d < (-DBL_MAX) || d > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g + %g\n"
+                           , READ_DOUBLE(argp), READ_DOUBLE(sp)));
                 STORE_DOUBLE(argp, d);
                 *sp = *argp;
             }
@@ -9290,6 +10162,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
                 sp--;
                 d = READ_DOUBLE(argp) - (double)sp->u.number;
+                if (d < (-DBL_MAX) || d > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g + %ld\n"
+                           , READ_DOUBLE(argp), (long)sp->u.number));
                 STORE_DOUBLE(argp, d);
                 *sp = *argp;
             }
@@ -9306,6 +10181,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
                 sp--;
                 m = sp->u.map;
+                check_map_for_destr(m);
 
                 /* Test for the special case 'm - m' */
                 if (m == argp->u.map)
@@ -9366,6 +10242,49 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             sp--;
             if (sp->type != T_NUMBER)
                 goto bad_right;
+
+            {
+                p_int left = argp->u.number;
+                p_int right = sp->u.number;
+
+                if (left > 0 && right > 0)
+                {
+                    if ((left != 0 && PINT_MAX / left < right)
+                     || (right != 0 && PINT_MAX / right < left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld *= %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+                else if (left < 0 && right < 0)
+                {
+                    if ((left != 0 && PINT_MAX / left > right)
+                     || (right != 0 && PINT_MAX / right > left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld *= %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+                else if (left != 0 && right != 0)
+                {
+                    if ((left > 0 && PINT_MIN / left > right)
+                     || (right > 0 && PINT_MIN / right > left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld *= %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+            }
+
             sp->u.number = argp->u.number *= sp->u.number;
             break;
         }
@@ -9379,12 +10298,18 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (sp->type == T_FLOAT)
             {
                 d = READ_DOUBLE(argp) * READ_DOUBLE(sp);
+                if (d < (-DBL_MAX) || d > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g * %g\n"
+                           , READ_DOUBLE(argp), READ_DOUBLE(sp)));
                 STORE_DOUBLE(argp, d);
                 *sp = *argp;
             }
             else if (sp->type == T_NUMBER)
             {
                 d = READ_DOUBLE(argp) * (double)sp->u.number;
+                if (d < (-DBL_MAX) || d > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g * %ld\n"
+                           , READ_DOUBLE(argp), (long)sp->u.number));
                 STORE_DOUBLE(argp, d);
                 *sp = *argp;
             }
@@ -9402,13 +10327,20 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             sp--;
             if (sp->type != T_NUMBER || sp->u.number < 0)
                 goto bad_right;
-            
+
             len = svalue_strlen(argp);
+
+            if (len > (size_t)PINT_MAX
+             || (len != 0          && PINT_MAX / len < sp->u.number)
+             || (sp->u.number != 0 && PINT_MAX / sp->u.number < len)
+               )
+                ERROR("Result string too long.\n");
+
             reslen = (size_t)sp->u.number * len;
             result = xalloc(reslen+1);
             if (!result)
                 ERROR("Out of memory.\n");
-            
+
             if (sp->u.number > 0 && len)
             {
                 size_t curlen;
@@ -9438,16 +10370,70 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            sp--;
+            if (sp->type != T_NUMBER)
+                goto bad_right;
+
+            {
+                p_int left = *argp->u.string;
+                p_int right = sp->u.number;
+
+                if (left > 0 && right > 0)
+                {
+                    if ((left != 0 && PINT_MAX / left < right)
+                     || (right != 0 && PINT_MAX / right < left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld *= %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+                else if (left < 0 && right < 0)
+                {
+                    if ((left != 0 && PINT_MAX / left > right)
+                     || (right != 0 && PINT_MAX / right > left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld *= %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+                else if (left != 0 && right != 0)
+                {
+                    if ((left > 0 && PINT_MIN / left > right)
+                     || (right > 0 && PINT_MIN / right > left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld *= %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+            }
+
+            if (((*argp->u.string * sp->u.number) & 0xff) == 0)
+                ERROR("Can't set string character to 0.\n");
+            sp->u.number = *argp->u.string *= sp->u.number;
+            break;
+        }
+
         if (argp->type == T_POINTER)
         {
             vector_t *result;
             mp_int reslen;
             size_t len;
-            
+
             sp--;
             if (sp->type != T_NUMBER || sp->u.number < 0)
                 goto bad_right;
-            
+
             inter_sp = sp;
             inter_pc = pc;
             len = VEC_SIZE(argp->u.vec);
@@ -9458,7 +10444,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 size_t left;
                 svalue_t *from, *to;
-                
+
                 /* Seed result[] with one copy of the array.
                  * To save memory we make sure that all strings
                  * are made shared.
@@ -9494,7 +10480,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             assign_svalue_no_free(sp, argp);
             break;
         }
-        
+
         goto bad_left;
         /* NOTREACHED */ break;
     }
@@ -9532,7 +10518,24 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 goto bad_right;
             if (sp->u.number == 0)
                 ERROR("Division by 0\n")
+            if (argp->u.number == PINT_MIN && sp->u.number == -1)
+                ERRORF(("Numeric overflow: %ld / -1\n"
+                       , (long)argp->u.number
+                       ));
             sp->u.number = argp->u.number /= sp->u.number;
+            break;
+        }
+
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            sp--;
+            if (sp->type != T_NUMBER)
+                goto bad_right;
+            if (sp->u.number == 0)
+                ERROR("Division by 0\n")
+            if (((*argp->u.string / sp->u.number) & 0xff) == 0)
+                ERROR("Can't set string character to 0.\n");
+            sp->u.number = *argp->u.string /= sp->u.number;
             break;
         }
 
@@ -9548,6 +10551,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 if (d == 0.0)
                     ERROR("Division by 0\n")
                 d = READ_DOUBLE(argp) / d;
+                if (d < (-DBL_MAX) || d > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g / %g\n"
+                           , READ_DOUBLE(argp), READ_DOUBLE(sp)));
                 STORE_DOUBLE(argp, d);
                 *sp = *argp;
             }
@@ -9558,6 +10564,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 if (i == 0)
                     ERROR("Division by 0\n")
                 d = READ_DOUBLE(argp) / (double)i;
+                if (d < (-DBL_MAX) || d > DBL_MAX)
+                    ERRORF(("Numeric overflow: %g / %ld\n"
+                           , READ_DOUBLE(argp), (long)sp->u.number));
                 STORE_DOUBLE(argp, d);
                 *sp = *argp;
             }
@@ -9606,6 +10615,20 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             sp->u.number = argp->u.number %= sp->u.number;
             break;
         }
+
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            sp--;
+            if (sp->type != T_NUMBER)
+                goto bad_right;
+            if (sp->u.number == 0)
+                ERROR("Division by 0\n")
+            if (((*argp->u.string % sp->u.number) & 0xff) == 0)
+                ERROR("Can't set string character to 0.\n");
+            sp->u.number = *argp->u.string %= sp->u.number;
+            break;
+        }
+
         goto bad_left;
         /* NOTREACHED */ break;
     }
@@ -9667,7 +10690,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (argp->type == T_STRING && (sp-1)->type == T_STRING)
         {
             char * result;
-            
+
             inter_sp = sp;
             result = intersect_strings(argp->u.string, (sp-1)->u.string, MY_FALSE);
             free_string_svalue(argp);
@@ -9676,6 +10699,17 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             sp--;
             free_string_svalue(sp);
             put_malloced_string(sp, string_copy(result));
+            break;
+        }
+
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            if (sp[-1].type != T_NUMBER)
+                goto bad_right;
+            sp--;
+            if (((*argp->u.string & sp->u.number) & 0xff) == 0)
+                ERROR("Can't set string character to 0.\n");
+            sp->u.number = *argp->u.string &= sp->u.number;
             break;
         }
 
@@ -9716,6 +10750,17 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             sp->u.number = argp->u.number |= sp->u.number;
             break;
         }
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            if (sp[-1].type != T_NUMBER)
+                goto bad_right;
+            sp--;
+            if (((*argp->u.string | sp->u.number) & 0xff) == 0)
+                ERROR("Can't set string character to 0.\n");
+            sp->u.number = *argp->u.string |= sp->u.number;
+            break;
+        }
+
         goto bad_left;
         /* NOTREACHED */ break;
     }
@@ -9751,6 +10796,17 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (sp->type != T_NUMBER)
                 goto bad_right;
             sp->u.number = argp->u.number ^= sp->u.number;
+            break;
+        }
+
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            if (sp[-1].type != T_NUMBER)
+                goto bad_right;
+            sp--;
+            if (((*argp->u.string ^ sp->u.number) & 0xff) == 0)
+                ERROR("Can't set string character to 0.\n");
+            sp->u.number = *argp->u.string ^= sp->u.number;
             break;
         }
         goto bad_left;
@@ -9793,19 +10849,31 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             sp->u.number = argp->u.number;
             break;
         }
+
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            if (sp[-1].type != T_NUMBER)
+                goto bad_right;
+            sp--;
+            i = sp->u.number;
+            if (((*argp->u.string << ((uint)i > MAX_SHIFT ? MAX_SHIFT : i))
+                 & 0xff) == 0)
+                ERROR("Can't set string character to 0.\n");
+            *argp->u.string <<= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
+            sp->u.number = *argp->u.string;
+            break;
+        }
         goto bad_left;
         /* NOTREACHED */ break;
     }
 
     CASE(F_RSH_EQ);                 /* --- rsh_eq              --- */
     {
-        /* Shift the value designated by lvalue sp[0] right by sp[-1],
-         * assign the result to sp[0] and also leave it on the stack.
+        /* Arithmetically shift the value designated by lvalue sp[0] right by
+         * sp[-1], assign the result to sp[0] and also leave it on the stack.
          *
          * Possible type combinations:
          *   int        << int                -> int
-         *
-         * TODO: Implement an arithmetic shift.
          */
 
         int i;
@@ -9828,8 +10896,76 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (sp->type != T_NUMBER)
                 goto bad_right;
             i = sp->u.number;
-            argp->u.number >>= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
+            argp->u.number >>= (uint)i > MAX_SHIFT ? (MAX_SHIFT+1) : i;
             sp->u.number = argp->u.number;
+            break;
+        }
+
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            if (sp[-1].type != T_NUMBER)
+                goto bad_right;
+            sp--;
+            i = sp->u.number;
+            if (((*argp->u.string >> ((uint)i > MAX_SHIFT ? MAX_SHIFT : i))
+                 & 0xff) == 0)
+                ERROR("Can't set string character to 0.\n");
+            *argp->u.string >>= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
+            sp->u.number = *argp->u.string;
+            break;
+        }
+        goto bad_left;
+        /* NOTREACHED */ break;
+    }
+
+    CASE(F_RSHL_EQ);               /* --- rshl_eq              --- */
+    {
+        /* Logically shift the value designated by lvalue sp[0] right by
+         * sp[-1], assign the result to sp[0] and also leave it on the stack.
+         *
+         * Possible type combinations:
+         *   int        << int                -> int
+         */
+
+        int i;
+        svalue_t *argp;
+#ifdef DEBUG
+        if (sp->type != T_LVALUE)
+            goto bad_arg_1;
+#endif
+
+        /* Set argp to the actual value designated by sp[0] */
+        for ( argp = sp->u.lvalue
+            ; T_LVALUE == argp->type || T_PROTECTED_LVALUE == argp->type
+            ; argp = argp->u.lvalue)
+            NOOP;
+
+        /* Now do it */
+        if (argp->type == T_NUMBER)
+        {
+            sp--;
+            if (sp->type != T_NUMBER)
+                goto bad_right;
+            i = sp->u.number;
+            if ((uint)i > MAX_SHIFT)
+                argp->u.number = 0;
+            else
+                argp->u.number = (p_uint)argp->u.number >> i;
+            sp->u.number = argp->u.number;
+            break;
+        }
+
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            if (sp[-1].type != T_NUMBER)
+                goto bad_right;
+            sp--;
+            i = sp->u.number;
+            if ((uint)i > MAX_SHIFT
+             || ((*argp->u.string >> i) & 0xff) == 0)
+                ERROR("Can't set string character to 0.\n");
+            *argp->u.string = (p_uint)*argp->u.string >> i;
+            sp->u.number = *argp->u.string;
             break;
         }
         goto bad_left;
@@ -9851,6 +10987,29 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         sp++;
         assign_svalue_no_free(sp, sp-1);
         break;
+
+    CASE(F_LDUP);                   /* --- ldup                --- */
+      {
+        /* Push a duplicate of sp[0] onto the stack.
+         * If sp[0] is an lvalue, it is derefenced first.
+         */
+        svalue_t * svp = sp;
+        sp++;
+        while (svp->type == T_LVALUE || svp->type == T_PROTECTED_LVALUE)
+            svp = svp->u.lvalue;
+        assign_svalue_no_free(sp, svp);
+        break;
+      }
+
+    CASE(F_SWAP_VALUES);            /* --- swap_values         --- */
+      {
+        /* Swap sp[0] and sp[-1] on the stack.
+         */
+        svalue_t sv = sp[0];
+        sp[0] = sp[-1];
+        sp[-1] = sv;
+        break;
+      }
 
     CASE(F_CLEAR_LOCALS);    /* --- clear_locals <first> <num> --- */
       {
@@ -10094,7 +11253,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         csp->funstart = funstart;
 
         /* Setup the stack, arguments and local vars */
-        sp = setup_new_frame2(funstart, sp);
+        sp = setup_new_frame2(funstart, sp, MY_FALSE, MY_FALSE);
 
         /* Finish the setup */
 
@@ -10237,16 +11396,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         csp->funstart = funstart;
 
         /* Setup the stack, arguments and local vars */
-        sp = setup_new_frame2(funstart, sp);
+        sp = setup_new_frame2(funstart, sp, MY_FALSE, MY_FALSE);
 
         /* Finish the setup */
         fp = inter_fp;
         pc = FUNCTION_CODE(funstart);
-#ifdef DEBUG
-    /* TODO: Once nobody complains, this can go */
-    if (!current_variables)
-        printf("DEBUG: %s:%d : current variables are NULL\n", __FILE__, __LINE__);
-#endif
         current_variables += variable_index_offset;
         current_strings = current_prog->strings;
         csp->extern_call = MY_FALSE;
@@ -10266,6 +11420,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         break;
 
     CASE(F_VIRTUAL_VARIABLE);    /* --- virtual_variable <num> --- */
+    {
         /* Push the virtual object-global variable <num> onto the stack.
          * It is possible that it is a variable that points to
          * a destructed object. In that case, it has to be replaced by 0.
@@ -10273,13 +11428,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * <num> is an uint8 and used as index in the current objects
          * variable table.
          */
+        svalue_t * val = find_virtual_value((int)(LOAD_UINT8(pc)));
         sp++;
-        assign_checked_svalue_no_free(
-          sp,
-          find_virtual_value((int)(LOAD_UINT8(pc))),
-          sp, pc
-        );
+        assign_checked_svalue_no_free(sp, val, sp, pc);
         break;
+    }
 
                           /* --- push_virtual_variable_lvalue <num> --- */
     CASE(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
@@ -10601,7 +11754,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             current_variables = ob->variables;
             if (current_variables)
                 current_variables += entry->variable_index_offset;
-            new_sp = setup_new_frame2(funstart, sp);
+            new_sp = setup_new_frame2(funstart, sp, MY_TRUE, MY_FALSE);
             /* The simul_efun object should not use simul_efuns itself... */
             previous_ob = current_object;
             current_object = ob;
@@ -10621,6 +11774,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         inter_sp = sp;
         inter_pc = pc;
         call_simul_efun(code, ob, num_arg);
+        sp = inter_sp;
         /*
          * The result of the function call is on the stack.
          */
@@ -10719,6 +11873,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             /* Create/reget the mapping entry */
             data = get_map_lvalue_unchecked(m, value);
+            if (!data)
+            {
+                outofmemory("literal mapping");
+                /* NOTREACHED */
+                return MY_FALSE;
+            }
             free_svalue(value++);
             for (j = num_values; --j >= 0;)
             {
@@ -10772,17 +11932,6 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Get the pointer to the last constant value */
         cstart = (svalue_t *)((char *)(csp->funstart)
                                    - LAMBDA_VALUE_OFFSET);
-#ifdef DEBUG
-        /* TODO: Remove this if nobody complains. */
-        if (MY_LAMBDA_VALUE_OFFSET != LAMBDA_VALUE_OFFSET)
-        {
-           fprintf(stderr, "DEBUG: %s:lambda offset: %ld should be %ld\n"
-                  , time_stamp(), (long)LAMBDA_VALUE_OFFSET, (long)MY_LAMBDA_VALUE_OFFSET
-                  );
-            cstart = (svalue_t *)((char *)(csp->funstart)
-                                   - MY_LAMBDA_VALUE_OFFSET);
-        }
-#endif
         sp++;
         assign_checked_svalue_no_free(sp, cstart - ix, sp, pc);
         break;
@@ -10806,18 +11955,6 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Get the pointer to the last constant value */
         cstart = (svalue_t *)((char *)(csp->funstart)
                                    - LAMBDA_VALUE_OFFSET);
-
-#ifdef DEBUG
-        /* TODO: Remove this if nobody complains. */
-        if (MY_LAMBDA_VALUE_OFFSET != LAMBDA_VALUE_OFFSET)
-        {
-           fprintf(stderr, "DEBUG: %s lambda offset: %ld should be %ld\n"
-                  , time_stamp(), (long)LAMBDA_VALUE_OFFSET, (long)MY_LAMBDA_VALUE_OFFSET
-                  );
-            cstart = (svalue_t *)((char *)(csp->funstart)
-                                   - MY_LAMBDA_VALUE_OFFSET);
-        }
-#endif
 
         sp++;
         assign_checked_svalue_no_free(sp, cstart - ix, sp, pc);
@@ -10893,6 +12030,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         sp--; /* the key */
         data = get_map_lvalue(m, sp);
+        if (!data)
+        {
+            outofmemory("indexed lvalue");
+            /* NOTREACHED */
+            return MY_FALSE;
+        }
         pop_stack();
 
         if (!m->ref)
@@ -10920,7 +12063,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *
          * ushort <offset> is the distance to the FOREACH_NEXT
          * instruction follwing the codeblock after the instruction,
-         * counted from the byte following this instruction. 
+         * counted from the byte following this instruction.
          *
          * The instruction pushes two or three more values onto
          * the stack to store its internal status.
@@ -11012,10 +12155,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         /* Now branch to the FOREACH_NEXT */
         pc += offset;
-        
+
         break;
     }
-    
+
     CASE(F_FOREACH_NEXT);         /* --- foreach_next <offset> --- */
     {
         /* Start the next (resp. the first) iteration of a foreach()
@@ -11027,7 +12170,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         unsigned short offset;
         p_int     ix;
         svalue_t *lvalue;  /* Pointer to the first lvalue */
-        
+
 
         LOAD_SHORT(offset, pc);
 
@@ -11041,12 +12184,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (sp[-1].x.generic < 0)
         {
             /* We loop over a mapping */
-            
+
             mapping_t *m;
             vector_t  *indices;
             svalue_t  *values;
             int        left;
-            
+
             lvalue = sp + sp[-1].x.generic - 2;
 
             m = sp[-3].u.map;
@@ -11121,7 +12264,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                      * We stop processing and continue with the following
                      * FOREACH_END instruction.
                      */
-                     
+
                 assign_svalue(lvalue, sp[-2].u.vec->item+ix);
             }
             else
@@ -11133,7 +12276,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         pc -= offset;
         break;
     }
-    
+
     CASE(F_FOREACH_END);            /* --- foreach_end         --- */
     {
         /* The foreach() loop ended or was terminated by a break.
@@ -11161,17 +12304,19 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         break;
     }
-    
+
 #ifdef F_JUMP
     CASE(F_JUMP);                   /* --- jump <dest>         --- */
     {
-        /* Jump to the (16-Bit) ushort address <dest> (absolute jump).
+        /* Jump to the (48-Bit) ushort address <dest> (absolute jump).
          */
 
-        unsigned short dest;
+        unsigned long  desth;
+        unsigned short destl;
 
-        GET_SHORT(dest, pc);
-        pc = current_prog->program + dest;
+        desth = LOAD_UINT8(pc);
+        GET_SHORT(destl, pc);
+        pc = current_prog->program + (desth << 16) + destl;
         break;
     }
 #endif /* F_JUMP */
@@ -11357,21 +12502,39 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* EFUN ctime()
          *
          *   string ctime(int clock = time())
+         *   string ctime(int* uclock)
          *
          * Interpret the argument clock as number of seconds since Jan,
          * 1st, 1970, 0.00 and convert it to a nice date and time string.
+         *
+         * Alternatively, accept an array of two ints: the first is <clock>
+         * value as in the first form, the second int is the number of
+         * microseconds elapsed in the current second.
          */
 
         char *ts, *cp;
 
-        TYPE_TEST1(sp, T_NUMBER)
-        ts = time_string(sp->u.number);
-        cp = strchr(ts, '\n');
+        if (sp->type != T_NUMBER)
+        {
+            TYPE_TEST1(sp, T_POINTER)
+            if (VEC_SIZE(sp->u.vec) != 2)
+                ERRORF(("Invalid array size for argument 1: %ld, expected 2\n"
+                      , (long)VEC_SIZE(sp->u.vec)));
+            if (sp->u.vec->item[0].type != T_NUMBER
+             || sp->u.vec->item[1].type != T_NUMBER)
+                ERROR("Invalid array for argument 1\n");
+            ts = utime_string(sp->u.vec->item[0].u.number, sp->u.vec->item[1].u.number);
+        }
+        else
+        {
+            ts = time_string(sp->u.number);
+        }
 
         /* If the string contains nl characters, extract the substring
          * before the first one. Else just copy the (volatile) result
          * we got.
          */
+        cp = strchr(ts, '\n');
         if (cp)
         {
             int len = cp - ts;
@@ -11387,6 +12550,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (!cp)
                 ERROR("Out of memory\n")
         }
+        free_svalue(sp);
         put_malloced_string(sp, cp);
         break;
     }
@@ -11456,24 +12620,24 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * it sees the unary '-' used.
          */
 
-#ifdef FLOAT_FORMAT_1
         if (sp->type == T_NUMBER)
         {
+            if (sp->u.number == PINT_MIN)
+                ERRORF(("Numeric overflow: - %ld\n", sp->u.number));
             sp->u.number = - sp->u.number;
             break;
         }
         else if (sp->type == T_FLOAT)
         {
-            sp->u.mantissa ^= 0x80000000;
+            STORE_DOUBLE_USED
+            double d;
+
+            d = -READ_DOUBLE(sp);
+            if (d < (-DBL_MAX) || d > DBL_MAX)
+                ERRORF(("Numeric overflow: -(%g)\n", READ_DOUBLE(sp)));
+            STORE_DOUBLE(sp,d);
             break;
         }
-#else
-        if (sp->type == T_NUMBER || sp->type == T_FLOAT)
-        {
-            sp->u.number = - sp->u.number;
-            break;
-        }
-#endif
         ERROR("Bad argument to unary minus\n")
 
     CASE(F_PRINTF);                 /* --- printf <nargs>      --- */
@@ -11487,7 +12651,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         char *str;
-        
+
         assign_eval_cost();
         GET_NUM_ARG
         inter_pc = pc;
@@ -11534,7 +12698,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         assign_eval_cost();
-        transfer_svalue_no_free_spc(&catch_value, sp--, sp, pc);
+        sp--;
+        transfer_svalue_no_free_spc(&catch_value, sp+1, sp, pc);
         inter_sp = sp;
         inter_pc = pc;
         throw_error(); /* do the longjump, with extra checks... */
@@ -11552,6 +12717,43 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         push_number(current_time);
         break;
+
+    CASE(F_UTIME);                  /* --- utime               --- */
+      {
+        /* EFUN utime()
+         *
+         *   int* utime()
+         *
+         * Return the time since 1. Jan 1970, 00:00:00 GMT in microsecond
+         * precision.
+         *
+         * Return is an array:
+         *   int[0]: number of seconds elapsed
+         *   int[1]: number of microseconds within the current second.
+         */
+
+        svalue_t *v;
+        vector_t *res;
+        struct timeval tv;
+
+        res = allocate_array(2);
+        v = res->item;
+        if (!gettimeofday(&tv, NULL))
+        {
+            v[0].u.number = tv.tv_sec;
+            v[1].u.number = tv.tv_usec;
+        }
+        else
+        {
+            int errnum = errno;
+            fprintf(stderr, "%s gettimeofday() failed: %d %s\n"
+                   , time_stamp(), errnum, strerror(errnum));
+            v[0].u.number = current_time;
+            v[1].u.number = 0;
+        }
+        (void)push_referenced_vector(res);
+        break;
+      }
 
     /* --- Efuns: Strings --- */
 
@@ -11573,11 +12775,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              * make a copy.
              */
             if (STRING_MALLOC == sp->x.string_type)
-                sp->u.string[0] += 'A' - 'a';
+                sp->u.string[0] = toupper((unsigned char)sp->u.string[0]);
             else
             {
                 str = string_copy(sp->u.string);
-                str[0] += 'A' - 'a';
+                str[0] = toupper((unsigned char)str[0]);
                 pop_stack();
                 push_malloced_string(str);
             }
@@ -11709,7 +12911,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 /* Scan the rest of the string and lower it */
                 for ( ; '\0' != (c = *s); s++)
                     if (isupper((unsigned char)c))
-                        *s = (char)tolower(c);
+                        *s = (char)tolower((unsigned char)c);
             }
             else
             {
@@ -11724,7 +12926,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 for(d = str + initial_len; '\0' != (c = *s++) ; )
                 {
                     if (isupper((unsigned char)c))
-                        c = (char)tolower(c);
+                        c = (char)tolower((unsigned char)c);
                     *d++ = c;
 
                 }
@@ -11827,7 +13029,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
     {
         /* EFUN terminal_colour()
          *
-         *   varargs string terminal_colour( string str, mapping map,
+         *   varargs string terminal_colour( string str, mapping|closure map,
          *                                   int wrap, int indent )
          *
          * Expands all colour-defines from the input-string and replaces them
@@ -11839,6 +13041,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         int    indent = 0;
         int    wrap = 0;
         mapping_t *map = NULL;
+        svalue_t  *cl = NULL;
         char * str;
 
         GET_NUM_ARG;
@@ -11873,6 +13076,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 break;
             }
             map = sp->u.map;
+            cl = NULL;
+        }
+        else if (sp->type == T_CLOSURE)
+        {
+            map = NULL;
+            cl = sp;
         }
         else if (sp->type != T_NUMBER || sp->u.number != 0)
         {
@@ -11883,7 +13092,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         inter_sp = sp;
         inter_pc = pc;
 
-        str = e_terminal_colour(sp[-1].u.string, map, indent, wrap);
+        str = e_terminal_colour(sp[-1].u.string, map, cl, indent, wrap);
 
         pop_stack();
 
@@ -11920,11 +13129,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         TYPE_TEST1(sp-1, T_STRING)
         TYPE_TEST2(sp,   T_NUMBER)
         bitnum = (size_t)sp->u.number;
-        sp = strp = sp-1;
+        if (sp->u.number < 0)
+            ERRORF(("clear_bit: negative bit number: %ld\n", (long)sp->u.number))
         if (bitnum > MAX_BITS)
             ERRORF(("clear_bit: too big bit number: %ld\n", (long)bitnum))
-        if (bitnum < 0)
-            ERRORF(("clear_bit: negative bit number: %ld\n", (long)bitnum))
+
+        sp = strp = sp-1;
 
         len = svalue_strlen(strp);
         ind = bitnum/6;
@@ -11978,11 +13188,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         TYPE_TEST2(sp,   T_NUMBER)
 
         bitnum = (size_t)sp->u.number;
-        sp = strp = sp-1;
+        if (sp->u.number < 0)
+            ERRORF(("set_bit: negative bit number: %ld\n", (long)sp->u.number))
         if (bitnum > MAX_BITS)
             ERRORF(("set_bit: too big bit number: %ld\n", (long)bitnum))
-        if (bitnum < 0)
-            ERRORF(("set_bit: negative bit number: %ld\n", (long)bitnum))
+        sp = strp = sp-1;
 
         len = svalue_strlen(strp);
         old_len = len;
@@ -12169,11 +13379,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 ERRORF(("Illegal bit pattern in or_bits character %d\n"
                        , (int)c2))
             if (instruction == F_AND_BITS)
-                result[arg_len] = (char)(c1 & c2);
+                result[arg_len] = (char)((c1-' ') & (c2-' ')) + ' ';
             else if (instruction == F_OR_BITS)
-                result[arg_len] = (char)(c1 | c2);
+                result[arg_len] = (char)((c1-' ') | (c2-' ')) + ' ';
             else if (instruction == F_XOR_BITS)
-                result[arg_len] = (char)((c1 ^ c2) + ' ');
+                result[arg_len] = (char)((c1-' ') ^ (c2-' ')) + ' ';
         }
 
         /* Clean up the stack and push the result. */
@@ -12196,7 +13406,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * TODO: Apply to an optional range (start, length) only.
          */
 
-        char * src, * dest;
+        char * src, * dest, * result;
         long   len;
 
         /* Get and test the arguments */
@@ -12209,12 +13419,15 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * otherwise allocate a copy.
          */
         if (sp->x.string_type == STRING_MALLOC)
+        {
             dest = src;
+            result = NULL;
+        }
         else
         {
             inter_pc = pc;
             inter_sp = sp;
-            dest = xalloc((size_t)len+1);
+            result = dest = xalloc((size_t)len+1);
             if (!dest)
                 ERROR("Out of memory\n")
         }
@@ -12228,10 +13441,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         *dest = '\0';
 
         /* Push the result */
-        if (src != dest)
+        if (result != NULL)
         {
             free_svalue(sp);
-            put_malloced_string(sp, dest);
+            put_malloced_string(sp, result);
         }
 
         break;
@@ -12437,25 +13650,263 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
     /* --- Efuns: Arrays and Mappings --- */
 
-    CASE(F_ALLOCATE);               /* --- allocate            --- */
+    CASE(F_ALLOCATE);               /* --- allocate <nargs>    --- */
     {
         /* EFUN allocate()
          *
-         *     mixed *allocate(int size)
+         *     mixed *allocate(int|int* size)
+         *     mixed *allocate(int|int* size, mixed init_value)
          *
-         * Allocate an empty array of <size> elements.
+         * Allocate an array of <size> elements (if <size> is an array,
+         * the result will be a multidimensional array), either empty or all
+         * elements initialized with <init_value>. If <init_value> is a
+         * mapping or array, allocate will create shallow copies of them.
          */
 
         vector_t *v;
+        svalue_t *argp;
+        Bool hasInitValue = MY_FALSE;
 
-        TYPE_TEST1(sp, T_NUMBER)
+        GET_NUM_ARG
+
+        argp = sp - num_arg + 1;
+
         inter_sp = sp;
         inter_pc = pc;
-        v = allocate_array(sp->u.number); /* Will have ref count == 1 */
+
+        if (num_arg == 2 && (sp->type != T_NUMBER || sp->u.number != 0))
+        {
+            hasInitValue = MY_TRUE;
+
+            /* If the initialisation value is not a shared string, we
+             * better make it shared.
+             */
+            if (sp->type == T_STRING && sp->x.string_type != STRING_SHARED)
+            {
+                char * str = make_shared_string(sp->u.string);
+                if (!str)
+                {
+                    ERRORF(("Out of memory for string (%lu bytes)\n"
+                           , (unsigned long)strlen(sp->u.string) ));
+                    /* NOTREACHED */
+
+                }
+                free_string_svalue(sp);
+                put_string(sp, str);
+            }
+
+            /* If the initialisation value is a mapping, remove all
+             * destructed elements so that we can use copy_mapping()
+             * later on.
+             */
+            if (sp->type == T_MAPPING)
+            {
+                check_map_for_destr(sp->u.map);
+            }
+        }
+
+        if (argp->type == T_NUMBER)
+        {
+            if (!hasInitValue)
+                v = allocate_array(argp->u.number);
+            else
+            {
+                int i;
+                svalue_t *svp;
+
+                v = allocate_uninit_array(argp->u.number);
+                for (svp = v->item, i = 0; i < argp->u.number; i++, svp++)
+                    copy_svalue_no_free(svp, sp);
+            }
+        }
+        else if (argp->type == T_POINTER
+              && (    VEC_SIZE(argp->u.vec) == 0
+                   || (   VEC_SIZE(argp->u.vec) == 1
+                       && argp->u.vec->item->type == T_NUMBER
+                       && argp->u.vec->item->u.number == 0)
+                 )
+                )
+        {
+            /* Special case: result is the empty array.
+             * The condition catches ( ({}) ) as well as ( ({0}) )
+             * (the generic code below can't handle either of them).
+             */
+            v = allocate_array(0);
+        }
+        else if (argp->type == T_POINTER)
+        {
+            svalue_t *svp;
+            size_t dim, num_dim;
+            size_t count;
+            size_t * curpos = NULL;
+            size_t * sizes = NULL;
+            vector_t ** curvec = NULL;
+
+            num_dim = VEC_SIZE(argp->u.vec);
+
+            curpos = xalloc(num_dim * sizeof(*curpos));
+            if (!curpos)
+            {
+                error("Out of memory (%lu bytes).\n"
+                     , (unsigned long)num_dim * sizeof(*curpos));
+                /* NOTREACHED */
+            }
+            sizes = xalloc(num_dim * sizeof(*sizes));
+            if (!sizes)
+            {
+                xfree(curpos);
+                error("Out of memory (%lu bytes).\n"
+                     , (unsigned long)num_dim * sizeof(*sizes));
+                /* NOTREACHED */
+            }
+            curvec = xalloc(num_dim * sizeof(*curvec));
+            if (!curvec)
+            {
+                xfree(curpos);
+                xfree(sizes);
+                error("Out of memory (%lu bytes).\n"
+                     , (unsigned long)num_dim * sizeof(*curvec));
+                /* NOTREACHED */
+            }
+
+            /* Check the size array for consistency, and also count how many
+             * elements we're going to allocate.
+             */
+            for ( dim = 0, count = 0, svp = argp->u.vec->item
+                ; dim < num_dim
+                ; dim++, svp++
+                )
+            {
+                p_int size;
+
+                if (svp->type != T_NUMBER)
+                {
+                    xfree(curpos);
+                    xfree(sizes);
+                    xfree(curvec);
+                    error("Bad argument to allocate(): size[%d] is not an int.\n"
+                         , (int)dim);
+                    /* NOTREACHED */
+                }
+
+                size = svp->u.number;
+
+                if (size < 0 || (max_array_size && (size_t)size > max_array_size))
+                {
+                    xfree(curpos);
+                    xfree(sizes);
+                    xfree(curvec);
+                    error("Illegal array size: %ld\n", (long)size);
+                    /* NOTREACHED */
+                }
+
+                if (size == 0 && dim < num_dim-1)
+                {
+                    error("Only the last dimension can have empty arrays.\n");
+                    /* NOTREACHED */
+                }
+
+                count *= (size_t)size;
+                if (max_array_size && count > max_array_size)
+                {
+                    xfree(curpos);
+                    xfree(sizes);
+                    xfree(curvec);
+                    error("Illegal total array size: %lu\n", (unsigned long)count);
+                    /* NOTREACHED */
+                }
+
+                sizes[dim] = (size_t)size;
+                curvec[dim] = NULL;
+            }
+
+            /* Now loop over the dimensions, creating the array structure */
+            dim = 0;
+            curpos[0] = 0;
+            while (dim > 0 || curpos[0] < sizes[0])
+            {
+                if (!curvec[dim])
+                {
+                    /* We just entered this dimension.
+                     * Create a new array and initialise the loop.
+                     */
+                    if (hasInitValue || dim+1 < num_dim)
+                    {
+                        curvec[dim] = allocate_uninit_array(sizes[dim]);
+                    }
+                    else
+                    {
+                        curvec[dim] = allocate_array(sizes[dim]);
+                        /* This is the last dimension, and there is nothing
+                         * to initialize: return immediately to the higher level
+                         */
+                        curpos[dim] = sizes[dim]; /* In case dim == 0 */
+                        if (dim > 0)
+                            dim--;
+                        continue;
+                    }
+                    curpos[dim] = 0;
+                }
+
+                /* curvec[dim] is valid, and we have to put the next
+                 * element in at index curpos[dim].
+                 */
+                if (dim == num_dim-1)
+                {
+                    /* Last dimension: assign the init value */
+                    if (hasInitValue && curpos[dim] < sizes[dim])
+                    {
+                        copy_svalue_no_free( curvec[dim]->item + curpos[dim]
+                                           , sp);
+                    }
+                }
+                else if (!curvec[dim+1])
+                {
+                    /* We need a vector from a lower dimension, but it doesn't
+                     * exist yet: setup the loop parameters to go into
+                     * that lower level.
+                     */
+                    dim++;
+                    continue;
+                }
+                else if (curpos[dim] < sizes[dim])
+                {
+                    /* We got a vector from a lower lever */
+                    put_array(curvec[dim]->item+curpos[dim], curvec[dim+1]);
+                    curvec[dim+1] = NULL;
+                }
+
+                /* Continue to the next element. If we are at the end
+                 * of this dimension, return to the next higher one.
+                 */
+                curpos[dim]++;
+                if (curpos[dim] >= sizes[dim] && dim > 0)
+                {
+                    dim--;
+                }
+            } /* while() */
+
+            /* The final vector is now in curvec[0] */
+            v = curvec[0];
+
+            xfree(curpos);
+            xfree(sizes);
+            xfree(curvec);
+        }
+        else
+        {
+            error("Illegal arg 1 to allocate(): neither 'int' nore 'int*'.\n");
+        } /* if (argp->type) */
+
+        if (num_arg > 1)
+            free_svalue(sp--);
+
+        free_svalue(sp);
         put_array(sp, v);
         break;
     }
 
+#ifdef F_MEMBER_ARRAY
     CASE (F_MEMBER_ARRAY);          /* --- member_array        --- */
     {
         /* EFUN member_array()
@@ -12499,8 +13950,22 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 break;
               }
 
-            case T_FLOAT:
             case T_CLOSURE:
+              {
+                short type;
+
+                type = key->type;
+                for(; --cnt >= 0; item++)
+                {
+                    if (item->type == type
+                     && !closure_cmp(key, item)
+                       )
+                        break;
+                }
+                break;
+              }
+
+            case T_FLOAT:
             case T_SYMBOL:
             case T_QUOTED_ARRAY:
               {
@@ -12524,7 +13989,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 if (!key->u.number)
                 {
                     /* Search for 0 is special: it also finds destructed
-                     * objects
+                     * objects resp. closures on destructed objects.
                      */
                     short type;
 
@@ -12535,13 +14000,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                             if ( !item->u.number )
                                 break;
                         }
-                        else if (type == T_OBJECT)
+                        else if (destructed_object_ref(item))
                         {
-                            if (item->u.ob->flags & O_DESTRUCTED)
-                            {
-                                assign_svalue(item, &const0);
-                                break;
-                            }
+                            assign_svalue(item, &const0);
+                            break;
                         }
                     }
                     break;
@@ -12605,6 +14067,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         goto bad_arg_2;
     }
+#endif /* F_MEMBER_ARRAY */
 
     CASE (F_MEMBER);                /* --- member              --- */
     {
@@ -12650,8 +14113,23 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 break;
               }
 
-            case T_FLOAT:
             case T_CLOSURE:
+              {
+                short type;
+                svalue_t *item;
+
+                type = sp->type;
+                for(item = vec->item; --cnt >= 0; item++)
+                {
+                    if (item->type == type
+                     && !closure_cmp(sp, item)
+                       )
+                        break;
+                }
+                break;
+              }
+
+            case T_FLOAT:
             case T_SYMBOL:
             case T_QUOTED_ARRAY:
               {
@@ -12675,7 +14153,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 if (!sp_u.number)
                 {
                     /* Search for 0 is special: it also finds destructed
-                     * objects
+                     * objects and closures on destructed objects.
                      */
 
                     svalue_t *item;
@@ -12688,13 +14166,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                             if ( !item->u.number )
                                 break;
                         }
-                        else if (type == T_OBJECT)
+                        else if (destructed_object_ref(item))
                         {
-                            if (item->u.ob->flags & O_DESTRUCTED)
-                            {
-                                assign_svalue(item, &const0);
-                                break;
-                            }
+                            assign_svalue(item, &const0);
+                            break;
                         }
                     }
                     break;
@@ -12822,6 +14297,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             svalue_t *dest;
 
             dest = get_map_lvalue_unchecked(m, --key);
+            if (!dest)
+            {
+                outofmemory("mapping entry");
+                /* NOTREACHED */
+                return MY_FALSE;
+            }
             for (i = -num_values; ++i <= 0; )
             {
                 /* If a key value appears multiple times, we have to free
@@ -12835,6 +14316,61 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         pop_n_elems(num_arg);
         push_mapping(m);  /* Adds the second ref */
         deref_mapping(sp->u.map); /* This will make ref count == 1 */
+        break;
+    }
+
+    CASE(F_M_ADD);                  /* m_add <nargs>           --- */
+    {
+        /* EFUN m_add()
+         *
+         *   mapping m_add(mapping m, mixed key, mixed data...)
+         *
+         * Add (or replace) an entry with index <key> in mapping <map>.
+         * The modified mapping is also returned as result.
+         *
+         * The values for the entry are taken from the <data> arguments.
+         * Unassigned entry values default to 0, extraneous <data> arguments
+         * are ignore.
+         */
+
+        mapping_t *m;
+        svalue_t *argp;
+        svalue_t *entry;
+        int num_values;
+
+        GET_NUM_ARG
+
+        argp = sp - num_arg + 1;
+
+        /* Check the arguments. */
+        TYPE_TEST1(argp, T_MAPPING);
+        m = argp->u.map;
+
+        /* Get (or create) the mapping entry */
+        entry = get_map_lvalue(m, argp+1);
+
+        /* Transfer the given values from the stack into the mapping
+         * entry.
+         */
+        num_values = m->num_values;
+        if (num_values > num_arg - 2)
+            num_values = num_arg - 2;
+        for ( argp += 2
+            ; num_values > 0 && argp <= sp
+            ; num_values--, argp++, entry++
+            )
+        {
+            transfer_svalue_no_free(entry, argp);
+            /* And since we take out values from under sp, play it
+             * safe:
+             */
+            put_number(argp, 0);
+        }
+
+        /* We leave the reference to the mapping on the stack as result,
+         * but pop everything else.
+         */
+        pop_n_elems(num_arg-1);
         break;
     }
 
@@ -12935,13 +14471,22 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *
          *   int sizeof(mixed arr)
          *
-         * Returns the number of elements of an array or or the number of
-         * keys in a mapping.
+         * Returns the number of elements of an array, the number of
+         * keys in a mapping, or the number of characters in a string.
          *
-         * For scalar values (like integers), 0 is returned.
+         * As a special case, the number 0 can be passed, and the function
+         * will return 0.
          */
 
         long i;
+
+        if (sp->type == T_STRING)
+        {
+            i = (long)svalue_strlen(sp);
+            free_svalue(sp);
+            put_number(sp, i);
+            break;
+        }
 
         if (sp->type == T_POINTER)
         {
@@ -13138,10 +14683,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             case CLOSURE_ALIEN_LFUN:
             case CLOSURE_LAMBDA:
             case CLOSURE_BOUND_LAMBDA:
-                if (num_arg + (sp - start_of_stack) < EVALUATOR_STACK_SIZE)
+                if (num_arg + (sp - VALUE_STACK) < EVALUATOR_STACK_SIZE)
                     break;
                 ERRORF(("VM Stack overflow: %ld too high.\n"
-                       , (long)(num_arg + (sp - start_of_stack) - EVALUATOR_STACK_SIZE) ));
+                       , (long)(num_arg + (sp - VALUE_STACK) - EVALUATOR_STACK_SIZE) ));
                 break;
             }
 
@@ -13152,7 +14697,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 for (svp = vec->item; --i >= 0; )
                 {
-                    if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
+                    if (destructed_object_ref(svp))
                     {
                         put_number(sp, 0);
                         sp++;
@@ -13166,14 +14711,17 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 /* The array will be freed, so use a faster function */
                 for (svp = vec->item; --i >= 0; ) {
-                    if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
+                    if (destructed_object_ref(svp))
                     {
                         put_number(sp, 0);
                         sp++;
                         svp++;
                     }
                     else
-                        transfer_svalue_no_free_spc(sp++, svp++, sp, pc);
+                    {
+                        sp++;
+                        transfer_svalue_no_free_spc(sp-1, svp++, sp, pc);
+                    }
                 }
                 free_empty_vector(vec);
             }
@@ -13202,9 +14750,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         call_lambda(args, num_arg - 1);
 
-        /* Cleanup the stack */
+        /* Cleanup the stack (note that the closure might have
+         * been removed through object destruction)
+         */
         sp = args;
-        free_closure(sp);
+        free_svalue(sp);
         *sp = sp[1];
         break;
     }
@@ -13400,7 +14950,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (arg[0].type != T_POINTER)
         {
             /* --- The normal call other to a single object --- */
-            
+
             ASSIGN_EVAL_COST
 
             if (arg[0].type == T_OBJECT)
@@ -13415,7 +14965,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 goto bad_arg_1;
 
             /* Traceing, if necessary */
-            if (TRACEP(TRACE_CALL_OTHER))
+            if (TRACEP(TRACE_CALL_OTHER) && TRACE_IS_INTERACTIVE())
             {
                 if (!++traceing_recursion)
                 {
@@ -13481,8 +15031,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             for ( ; size != 0; size--, svp++)
             {
                 int i;
-                
+
                 ASSIGN_EVAL_COST
+                inter_sp = sp; /* Might be clobbered from previous loop */
 
                 if (svp->type == T_OBJECT)
                     ob = svp->u.ob;
@@ -13515,7 +15066,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 }
 
                 /* Traceing, if necessary */
-                if (TRACEP(TRACE_CALL_OTHER))
+                if (TRACEP(TRACE_CALL_OTHER) && TRACE_IS_INTERACTIVE())
                 {
                     if (!++traceing_recursion)
                     {
@@ -13530,10 +15081,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                  */
                 for (i = 2; i < num_arg; i++)
                     assign_svalue_no_free(++sp, arg+i);
-                    
+
                 /* Call the function with the remaining args on the stack.
                  */
-                inter_sp = sp; /* was clobbered by the previous loop */
+                inter_sp = sp; /* update to new setting */
                 if (!apply_low(arg[1].u.string, ob, num_arg-2, MY_FALSE))
                 {
                     /* Function not found: clean up the stack and
@@ -13561,10 +15112,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              */
             free_string_svalue(sp); sp--;
         }
-        
+
         break;
     }
-    
+
     CASE(F_FUNCALL);                /* --- funcall <nargs>     --- */
     {
         /* EFUN funcall()
@@ -13599,7 +15150,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             /* Call the closure and push the result */
             call_lambda(args, num_arg - 1);
             sp = args;
-            free_closure(sp);
+            free_svalue(sp);
             *sp = sp[1];
         }
         else
@@ -13697,6 +15248,40 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             }
             sp->type = T_SYMBOL;
             sp->x.quotes = 1;
+            break;
+
+        default:
+            goto bad_arg_1;
+        }
+
+        break;
+    }
+
+    CASE(F_UNQUOTE);                /* --- unquote             --- */
+    {
+        /* EFUN unquote()
+         *
+         *   mixed unquote(mixed)
+         *
+         * Removes a quote from quoted arrays and symbols. When the
+         * last quote from a symbol is removed, the result is a string.
+         */
+
+        switch (sp->type)
+        {
+        case T_QUOTED_ARRAY:
+            sp->x.quotes--;
+            if (!sp->x.quotes)
+                sp->type = T_POINTER;
+            break;
+
+        case T_SYMBOL:
+            sp->x.quotes--;
+            if (!sp->x.quotes)
+            {
+                sp->type = T_STRING;
+                sp->x.string_type = STRING_SHARED;
+            }
             break;
 
         default:
@@ -13812,29 +15397,60 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 break;
             }
 
+            l->ref = 1;
+            l->ob = current_object;
+              /* If ob == current_object, adopt the reference,
+               * otherwise a reference will be added below.
+               */
+
             /* Set the closure */
             if (ob == current_object)
             {
-                l->function.index = (unsigned short)i;
-                closure_type = CLOSURE_LFUN;
-                  /* current_object already has an extra ref from being
-                   * argument, so we don't need to add one for the l->ob
-                   * below.
-                   */
+                if (!(prog->flags & P_REPLACE_ACTIVE)
+                 || !lambda_ref_replace_program( l
+                                               , CLOSURE_ALIEN_LFUN
+                                               , 0, NULL, NULL)
+                   )
+                {
+                    current_object->flags |= O_LAMBDA_REFERENCED;
+                    l->function.index = (unsigned short)i;
+                    closure_type = CLOSURE_LFUN;
+                }
+                else
+                {
+                    l->function.alien.ob
+                      = ref_object(current_object, "symbol_function");
+                    l->function.alien.index = (unsigned short)i;
+                    closure_type = CLOSURE_ALIEN_LFUN;
+                }
             }
             else
             {
-                l->function.alien.ob = ob;
+                object_t *curobj = current_object; /* saved */
+
+                l->function.alien.ob = ob; /* adopt the ref */
                 l->function.alien.index = (unsigned short)i;
                 closure_type = CLOSURE_ALIEN_LFUN;
-                ref_object(current_object, "symbol_function");
-                  /* We adopt the ref of ob from the arguments, and
-                   * add a ref to current_object for the l->ob below.
-                   */
-            }
 
-            l->ref = 1;
-            l->ob = current_object; /* see above regarding the ref count */
+                ref_object(current_object, "symbol_function");
+                  /* The ref missing from l->ob=current_object above */
+
+                current_object = ob;
+                  /* Required by lambda_ref_replace_program()
+                   * It will be restored below from curobj.
+                   */
+
+                if (!(prog->flags & P_REPLACE_ACTIVE)
+                 || !lambda_ref_replace_program( l
+                                               , CLOSURE_ALIEN_LFUN
+                                               , 0, NULL, NULL)
+                   )
+                {
+                    ob->flags |= O_LAMBDA_REFERENCED;
+                }
+
+                current_object = curobj;
+            }
 
             /* Clean up the stack and push the result */
             sp--;
@@ -13842,13 +15458,6 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             sp->type = T_CLOSURE;
             sp->x.closure_type = closure_type;
             sp->u.lambda = l;
-
-            /* A last thing: take care of a pending replace_program */
-            if ( !(prog->flags & P_REPLACE_ACTIVE)
-             ||  !lambda_ref_replace_program(l, closure_type, 0, 0, 0) )
-            {
-                ob->flags |= O_LAMBDA_REFERENCED;
-            }
 
             break;
         }
@@ -13894,7 +15503,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         inter_sp = sp;
         inter_pc = pc;
-        if (privilege_violation("call_out_info", sp))
+        if (privilege_violation("call_out_info", &const0))
         {
             push_referenced_vector(get_all_call_outs());
         }
@@ -14124,11 +15733,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (p)
                 *p = '\0';  /* temporarily mask out the '.c' */
 
-#ifdef COMPAT_MODE
-            res = string_copy (str);
-#else
-            res = add_slash(str);
-#endif
+            if (compat_mode)
+                res = string_copy (str);
+            else
+                res = add_slash(str);
+
             if (p)
                 *p = '.';  /* undo the change above */
 
@@ -14221,6 +15830,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * function synthesizes the load name as it should be and returns
          * that. If the given name is illegal, the function returns 0.
          *
+         * As a special case, if <ob> is 0, the function returns 0.
+         *
          * For virtual objects this efun of course returns the virtual
          * filename.  If <obj> is omitted, the name for the current object is
          * returned.
@@ -14240,6 +15851,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         char *mem;     /* Allocated memory blocks */
         object_t *ob;
 
+        /* If the argument is 0, return 0. */
+        if (sp->type == T_NUMBER && sp->u.number == 0)
+        {
+            break;
+        }
+
         /* If the argument is an object, we just need to read the name */
         if (sp->type == T_OBJECT)
         {
@@ -14248,7 +15865,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             put_ref_string(sp, s);
             break;
         }
-        
+
         if (sp->type != T_STRING)
             goto bad_arg_1;
 
@@ -14272,11 +15889,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (!hash)
         {
             /* No '#' at all: make the name sane directly */
-#ifdef COMPAT_MODE
-            name = (char *)make_name_sane(s, MY_FALSE);
-#else
-            name = (char *)make_name_sane(s, MY_TRUE);
-#endif
+            name = (char *)make_name_sane(s, !compat_mode);
             if (!name)
                 name = s;
         }
@@ -14284,7 +15897,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             char *p;
             size_t len;
-            
+
             /* All characters after the '#' must be digits */
             for (p = hash+1; '\0' != *p; p++)
                 if (*p < '0' || *p > '9')
@@ -14308,11 +15921,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             p[len] = '\0';
 
             /* Now make the name sane */
-#ifdef COMPAT_MODE
-            name = (char *)make_name_sane(p, MY_FALSE);
-#else
-            name = (char *)make_name_sane(p, MY_TRUE);
-#endif
+            name = (char *)make_name_sane(p, !compat_mode);
             if (!name)
                 name = p;
         }
@@ -14322,13 +15931,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * points to a static buffer otherwise.
          */
 
-#ifdef COMPAT_MODE
         /* '/.c' is a legal object name, so make sure that
-         * the result will be '/'.
+         * the result will be '/' (in compat mode).
          */
-        if ('\0' == *name)
+        if (compat_mode && '\0' == *name)
             name = "/";
-#endif
 
         /* Now return the result */
         if (s != name)
@@ -14347,7 +15954,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         if (mem)
             xfree(mem);
-         
+
         break;
     }
 
@@ -14389,6 +15996,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * Get the name of an object <ob> or, if no argument is given, of
          * the current object.
          *
+         * As a special case, if <ob> is 0, return 0.
+         *
          * This name is the name under which the object is stored in the
          * muds object table. It is initialised at the creation of the
          * object such that blueprints are named after the file they are
@@ -14407,14 +16016,20 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         char *name,*res;
 
+        /* If the argument is 0, return 0. */
+        if (sp->type == T_NUMBER && sp->u.number == 0)
+        {
+            break;
+        }
+
         TYPE_TEST1(sp, T_OBJECT)
 
         name = sp->u.ob->name;
-#ifdef COMPAT_MODE
-        res = string_copy(name);
-#else
-        res = add_slash(name);
-#endif
+        if (compat_mode)
+            res = string_copy(name);
+        else
+            res = add_slash(name);
+
         if (!res)
             ERROR("Out of memory\n")
         free_object_svalue(sp);
@@ -14422,13 +16037,18 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         break;
     }
 
-    CASE(F_REPLACE_PROGRAM);        /* --- replace_program     --- */
+    CASE(F_REPLACE_PROGRAM);     /* --- replace_program <narg> --- */
     {
         /* EFUN replace_program()
          *
+         *   void replace_program()
          *   void replace_program(string program)
          *
-         * Substitutes a program with an inherited one. This is useful if you
+         * Substitutes a program with the inherited program <program>. If
+         * the object inherits only one program, the argument may be omitted
+         * and the efun will automatically select the one inherited program.
+         *
+         * This efun is useful if you
          * consider the performance and memory consumption of the driver. A
          * program which doesn't need any additional variables and functions
          * (except during creation) can call replace_program() to increase the
@@ -14458,50 +16078,133 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         long name_len;
         char *name;
         program_t *new_prog;  /* the replacing program */
-        int offsets[2];            /* the offsets of the replacing prog */
+        program_t *curprog;   /* the current program */
+        int offsets[2];       /* the offsets of the replacing prog */
 
-        TYPE_TEST1(sp, T_STRING)
+        GET_NUM_ARG
+        inter_pc = pc;
+        inter_sp = sp;
+
+        if (num_arg > 0)
+            TYPE_TEST1(sp, T_STRING)
 
         if (!current_object)
             ERROR("replace_program called with no current object\n")
         if (current_object == simul_efun_object)
             ERROR("replace_program on simul_efun object\n")
         if (current_object->flags & O_LAMBDA_REFERENCED)
-            ERROR(
-              "Cannot schedule replace_program after binding lambda closures\n")
-
-        /* Create the full program name with a trailing '.c' and without
-         * a leading '/' to match the internal name representation.
-         */
-        name_len = (long)svalue_strlen(sp);
-        name = alloca((size_t)name_len+3);
-        strcpy(name, sp->u.string);
-        if (name[name_len-2] != '.' || name[name_len-1] != 'c')
-            strcat(name,".c");
-        if (*name == '/')
-            name++;
-
-        new_prog = search_inherited(name, current_object->prog, offsets);
-        if (!new_prog)
         {
-            /* Given program not inherited, maybe it's the current already.
+            /* This was an ERROR(), and should be a proper warning, except
+             * that the driver doesn't have such a thing.
              */
-            if (!strcmp(name, current_object->prog->name ))
+            debug_message("%s Object '%s', program '%s': Cannot schedule "
+                          "replace_program() after binding lambda closures.\n"
+                         , time_stamp(), current_object->name
+                         , current_prog->name
+                         );
+            for ( ; num_arg != 0; num_arg--)
+                pop_stack();
+            break;
+        }
+
+        curprog = current_object->prog;
+
+        if (num_arg < 1)
+        {
+            size_t replace_index;  /* Inherit index of the replacing program */
+
+            /* Just take the first normal inherited program */
+            if (curprog->num_inherited < 1)
+                ERROR("replace_program called with no inherited program\n");
+
+            replace_index = 0;
+            if (curprog->num_inherited > 1)
             {
-                new_prog = current_object->prog;
-                offsets[0] = offsets[1] = 0;
+                /* The object might have extra inherits caused by virtual
+                 * variables. Since they preceed the associated 'real'
+                 * inherit, search forward in the inherit list for the real
+                 * one.
+                 */
+                for ( ; replace_index < curprog->num_inherited
+                      ; replace_index++)
+                {
+                    if (!(curprog->inherit[replace_index].inherit_type
+                          & INHERIT_TYPE_EXTRA))
+                        break;
+                }
+                /* replace_index must now be the last inherit for the
+                 * auto-replace_program to work.
+                 */
+                if (replace_index + 1 != curprog->num_inherited)
+                {
+                    ERROR("replace_program() requires argument for object "
+                          "with more than one inherit\n");
+                    /* NOTREACHED */
+                }
             }
-            else
+
+            new_prog = curprog->inherit[replace_index].prog;
+            offsets[0] = curprog->inherit[replace_index].variable_index_offset;
+            offsets[1] = curprog->inherit[replace_index].function_index_offset;
+        }
+        else
+        {
+            /* Create the full program name with a trailing '.c' and without
+             * a leading '/' to match the internal name representation.
+             */
+            name_len = (long)svalue_strlen(sp);
+            name = alloca((size_t)name_len+3);
+            strcpy(name, sp->u.string);
+            if (name[name_len-2] != '.' || name[name_len-1] != 'c')
+                strcat(name,".c");
+            if (*name == '/')
+                name++;
+
+            new_prog = search_inherited(name, curprog, offsets);
+            if (!new_prog)
             {
-                ERROR("program to replace the current one with has "
-                      "to be inherited\n")
+                /* Given program not inherited, maybe it's the current already.
+                 */
+                if (!strcmp(name, curprog->name ))
+                {
+                    new_prog = current_object->prog;
+                    offsets[0] = offsets[1] = 0;
+                }
+                else
+                {
+                    ERROR("program to replace the current one with has "
+                          "to be inherited\n")
+                }
+            }
+            pop_stack();
+        }
+
+        /* Program found, now check if it contains virtual variables.
+         * See b-030119 for an explanation.
+         */
+        if (offsets[0] != 0)
+        {
+            int i;
+            Bool has_virtual = MY_FALSE;
+
+            for (i = 0; !has_virtual && i < new_prog->num_variables; i++)
+            {
+                if (new_prog->variable_names[i].flags & TYPE_MOD_VIRTUAL)
+                    has_virtual = MY_TRUE;
+            }
+            if (has_virtual)
+            {
+                debug_message("replacement program '%s' has virtual variables "
+                              "and is not the first inherited program\n"
+                             , new_prog->name);
+                break;
             }
         }
 
         /* Program found, now create a new replace program entry, or
          * change an existing one.
          */
-        if (!(current_object->prog->flags & P_REPLACE_ACTIVE)
+        if (!(curprog->flags & P_REPLACE_ACTIVE)
          || !(tmp = retrieve_replace_program_entry()) )
         {
             tmp = xalloc(sizeof *tmp);
@@ -14509,14 +16212,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             tmp->ob = current_object;
             tmp->next = obj_list_replace;
             obj_list_replace = tmp;
-            current_object->prog->flags |= P_REPLACE_ACTIVE;
+            curprog->flags |= P_REPLACE_ACTIVE;
         }
 
         tmp->new_prog = new_prog;
         tmp->var_offset = offsets[0];
         tmp->fun_offset = offsets[1];
-
-        pop_stack();
         break;
     }
 
@@ -14589,8 +16290,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         TYPE_TEST1(sp, T_OBJECT)
-        if (current_variables == master_ob->variables
-         || current_variables == simul_efun_object->variables
+        if ((master_ob != NULL && current_variables == master_ob->variables)
+         || (simul_efun_object != NULL && current_variables == simul_efun_object->variables)
          || privilege_violation("set_this_object", sp))
         {
             struct control_stack *p;
@@ -14934,6 +16635,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 len = arg[2].u.number;
                 sp--;
             }
+
             sp--;
         }
 
@@ -15487,7 +17189,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          *   - Else the object calling the say() becomes the initiator.
          */
 
-        static LOCAL_VEC2(vtmp, T_NUMBER, T_OBJECT);
+        static LOCAL_VEC2(vtmp, T_NUMBER, T_NUMBER);
           /* Default 'avoid' array passed to say() giving the object
            * to exclude in the second item. The first entry is reserved
            * for e_say() to insert its command_giver object.
@@ -15537,6 +17239,18 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             else
                 goto bad_arg_2;
             pop_stack();
+        }
+
+        /* We may have received object references in vtmp - clear them */
+        if (vtmp.v.item[0].type != T_NUMBER)
+        {
+            free_svalue(&(vtmp.v.item[0]));
+            vtmp.v.item[0].type = T_NUMBER;
+        }
+        if (vtmp.v.item[1].type != T_NUMBER)
+        {
+            free_svalue(&(vtmp.v.item[1]));
+            vtmp.v.item[1].type = T_NUMBER;
         }
 
         pop_stack();
@@ -15851,24 +17565,46 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
     }
 
     CASE(F_QUERY_VERB);             /* --- query_verb          --- */
+    {
         /* EFUN query_verb()
          *
          *   string query_verb(void)
+         *   string query_verb(int flag)
+         *
+         * Return the verb of the current command, of 0 if not executing from
+         * a command. If <flag> is 0 or not given, the verb as given by the user
+         * is returned; if <flag> is non-0, the verb as specified in the
+         * add_action() statement is returned.
          *
          * Give the name of the current command, or 0 if not executing
          * from a command. This allows add_action() of several commands
+         * This efun allows add_action() of several commands
          * to the same function. query_verb() returns 0 when invoked by a
          * function which was started by a call_out or the heart beat.
          * Also when a user logs in query_verb() returns 0.
          */
-
-        if (!last_verb)
+        p_int flag = sp->u.number;
+        free_svalue(sp);
+        if (flag == 0)
         {
-            push_number(0);
-            break;
+            if (!last_verb)
+            {
+                put_number(sp, 0);
+                break;
+            }
+            put_ref_string(sp, last_verb);
         }
-        push_shared_string(last_verb);
+        else
+        {
+            if (!last_action_verb)
+            {
+                put_number(sp, 0);
+                break;
+            }
+            put_ref_string(sp, last_action_verb);
+        }
         break;
+    }
 
     CASE(F_QUERY_COMMAND);          /* --- query_command       --- */
       {
@@ -16026,15 +17762,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         inter_sp = _push_volatile_string(argp->u.string,
             _push_valid_ob(current_object, sp) );
         inter_pc = pc;
-        ret = apply_master_ob(STR_VALID_SETEUID, 2);
+        ret = apply_master(STR_VALID_SETEUID, 2);
         if (!ret || ret->type != T_NUMBER || ret->u.number != 1)
         {
-            if (out_of_memory)
-            {
-                error("Out of memory\n");
-                /* NOTREACHED */
-                break;
-            }
             free_svalue(argp);
             put_number(argp, 0);
             break;
@@ -16233,7 +17963,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             else
             {
                 ERROR ("too many args to efun assoc\n")
-                return;
+                return MY_FALSE;
             }
         }
 
@@ -16249,8 +17979,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             assign_svalue(args
                          , ix == -1
                            ? fail_val
-                           : (data->item[ix].type == T_OBJECT
-                              && data->item[ix].u.ob->flags & O_DESTRUCTED
+                           : (destructed_object_ref(&data->item[ix])
                              ? &const0
                              : &data->item[ix])
                          );
@@ -16455,7 +18184,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
     /* --- Optional Efuns: Miscellaneous --- */
 
-#ifdef F_SET_LIGHT
+#ifdef USE_SET_LIGHT
     CASE(F_SET_LIGHT);              /* --- set_light           --- */
     {
         /* EFUN set_light()
@@ -16482,7 +18211,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         sp->u.number = o1->total_light;
         break;
     }
-#endif /* F_SET_LIGHT */
+#endif /* USE_SET_LIGHT */
 
     /* --- XEfun and XCodes --- */
 
@@ -16527,22 +18256,16 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              * generates a F_END_CATCH as last instruction of the
              * guarded code.
              *
-             * Executed when no error occured, it cleans up the
+             * Executed when no error occured, it returns into
+             * catch_instruction() to clean up the
              * error recovery information pushed by the F_CATCH
-             * and leaves a 0 on the stack.
+             * and leave a 0 on the stack.
              *
              * dump_trace() checks for this bytecode, but accepts a normal
              * instruction as well as an escaped instruction.
              */
 
-            pop_stack();
-            pop_control_stack();
-            pc = inter_pc;
-            fp = inter_fp;
-            pop_error_context();
-            push_number(0);
-            eval_cost -= CATCH_RESERVED_COST;
-            assigned_eval_cost -= CATCH_RESERVED_COST;
+            return MY_TRUE;
             break;
 
                       /* --- esc breakn_continue <num> <offset> ---*/
@@ -16839,6 +18562,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 goto xbad_arg_1;
 
             case T_NUMBER:
+                if (sp->u.number == PINT_MIN)
+                {
+                    ERRORF(("Numeric overflow: abs(%ld)\n"
+                           , (long)sp->u.number));
+                    /* NOTREACHED */
+                    break;
+                }
                 if (sp->u.number < 0)
                     sp->u.number = - sp->u.number;
                 break;
@@ -16861,7 +18591,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           {
             /* XEFUN sin()
              *
-             *  float sin(float)
+             *  float sin(int|float)
              *
              * Returns the sinus of the argument.
              */
@@ -16869,8 +18599,15 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             STORE_DOUBLE_USED
             double d;
 
-            if (sp->type != T_FLOAT) goto xbad_arg_1;
-            d = sin(READ_DOUBLE(sp));
+            if (sp->type != T_FLOAT)
+            {
+                if (sp->type != T_NUMBER) goto xbad_arg_1;
+                d = sin((double)(sp->u.number));
+
+            }
+            else
+                d = sin(READ_DOUBLE(sp));
+            sp->type = T_FLOAT;
             STORE_DOUBLE(sp, d);
             break;
           }
@@ -16898,7 +18635,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           {
             /* XEFUN cos()
              *
-             *  float cos(float)
+             *  float cos(int|float)
              *
              * Returns the cosinus of the argument.
              */
@@ -16906,8 +18643,15 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             STORE_DOUBLE_USED
             double d;
 
-            if (sp->type != T_FLOAT) goto xbad_arg_1;
-            d = cos(READ_DOUBLE(sp));
+            if (sp->type != T_FLOAT)
+            {
+                if (sp->type != T_NUMBER) goto xbad_arg_1;
+                d = cos((double)(sp->u.number));
+
+            }
+            else
+                d = cos(READ_DOUBLE(sp));
+            sp->type = T_FLOAT;
             STORE_DOUBLE(sp, d);
             break;
           }
@@ -16935,7 +18679,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           {
             /* XEFUN tan()
              *
-             *  float tan(float)
+             *  float tan(int|float)
              *
              * Returns the tangens of the argument.
              */
@@ -16943,8 +18687,15 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             STORE_DOUBLE_USED
             double d;
 
-            if (sp->type != T_FLOAT) goto xbad_arg_1;
-            d = tan(READ_DOUBLE(sp));
+            if (sp->type != T_FLOAT)
+            {
+                if (sp->type != T_NUMBER) goto xbad_arg_1;
+                d = tan((double)(sp->u.number));
+
+            }
+            else
+                d = tan(READ_DOUBLE(sp));
+            sp->type = T_FLOAT;
             STORE_DOUBLE(sp, d);
             break;
           }
@@ -16953,7 +18704,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           {
             /* XEFUN atan()
              *
-             *   float atan(float)
+             *   float atan(int|float)
              *
              * Returns the inverse tangens of the argument.
              */
@@ -16961,17 +18712,26 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             STORE_DOUBLE_USED
             double d;
 
-            if (sp->type != T_FLOAT) goto xbad_arg_1;
-            d = atan(READ_DOUBLE(sp));
+            if (sp->type != T_FLOAT)
+            {
+                if (sp->type != T_NUMBER) goto xbad_arg_1;
+                d = atan((double)(sp->u.number));
+
+            }
+            else
+                d = atan(READ_DOUBLE(sp));
+            if (d < (-DBL_MAX) || d > DBL_MAX)
+                ERRORF(("Numeric overflow: atan(%g)\n", READ_DOUBLE(sp)));
+            sp->type = T_FLOAT;
             STORE_DOUBLE(sp, d);
             break;
           }
 
         XCASE(F_ATAN2);             /* --- esc atan2           --- */
           {
-            /* XEFUN atan()
+            /* XEFUN atan2()
              *
-             *   float atan(float y, float x)
+             *   float atan2(int|float y, int|float x)
              *
              * Returns the inverse tangens of the argument.
              */
@@ -16979,12 +18739,25 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             STORE_DOUBLE_USED
             double x, y, d;
 
-            if (sp->type != T_FLOAT) goto xbad_arg_2;
-            if (sp[-1].type != T_FLOAT) goto xbad_arg_1;
-            y = READ_DOUBLE(sp-1);
-            x = READ_DOUBLE(sp);
+            if (sp->type != T_FLOAT)
+            {
+                if (sp->type != T_NUMBER) goto xbad_arg_2;
+                x = (double)(sp->u.number);
+            }
+            else
+                x = READ_DOUBLE(sp);
+            if (sp[-1].type != T_FLOAT)
+            {
+                if (sp[-1].type != T_NUMBER) goto xbad_arg_1;
+                y = (double)sp[-1].u.number;
+            }
+            else
+                y = READ_DOUBLE(sp-1);
             d = atan2(y, x);
+            if (d < (-DBL_MAX) || d > DBL_MAX)
+                ERRORF(("Numeric overflow: atan2(%g, %g)\n", y, x));
             pop_stack();
+            sp->type = T_FLOAT;
             STORE_DOUBLE(sp, d);
             break;
           }
@@ -16993,18 +18766,28 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           {
             /* XEFUN log()
              *
-             *   float log(float)
+             *   float log(int|float)
              *
              * Returns the natural logarithmus of the argument.
              */
 
             STORE_DOUBLE_USED
-            double d;
+            double d, e;
 
-            if (sp->type != T_FLOAT || (d = READ_DOUBLE(sp)) <= 0.)
+            if (sp->type != T_FLOAT)
+            {
+                if (sp->type != T_NUMBER) goto xbad_arg_1;
+                d = (double)sp->u.number;
+            }
+            else
+                d = READ_DOUBLE(sp);
+            if (d <= 0.)
                 goto xbad_arg_1;
-            d = log(d);
-            STORE_DOUBLE(sp, d);
+            e = log(d);
+            if (e < (-DBL_MAX) || e > DBL_MAX)
+                ERRORF(("Numeric overflow: log(%g)\n", d));
+            sp->type = T_FLOAT;
+            STORE_DOUBLE(sp, e);
             break;
           }
 
@@ -17012,7 +18795,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           {
             /* XEFUN exp()
              *
-             *   float exp(float)
+             *   float exp(int|float)
              *
              * Returns the e to the power of the argument.
              */
@@ -17020,8 +18803,20 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             STORE_DOUBLE_USED
             double d;
 
-            if (sp->type != T_FLOAT) goto xbad_arg_1;
-            d = exp(READ_DOUBLE(sp));
+            if (sp->type != T_FLOAT)
+            {
+                if (sp->type != T_NUMBER) goto xbad_arg_1;
+                d = exp((double)sp->u.number);
+                if (d < (-DBL_MAX) || d > DBL_MAX)
+                    ERRORF(("Numeric overflow: exp(%ld)\n", sp->u.number));
+            }
+            else
+            {
+                d = exp(READ_DOUBLE(sp));
+                if (d < (-DBL_MAX) || d > DBL_MAX)
+                    ERRORF(("Numeric overflow: exp(%g)\n", READ_DOUBLE(sp)));
+            }
+            sp->type = T_FLOAT;
             STORE_DOUBLE(sp, d);
             break;
           }
@@ -17030,18 +18825,28 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           {
             /* XEFUN sqrt()
              *
-             *   float sqrt(float)
+             *   float sqrt(int|float)
              *
              * Returns the square root of the argument.
              */
 
             STORE_DOUBLE_USED
-            double d;
+            double d, e;
 
-            if (sp->type != T_FLOAT || (d = READ_DOUBLE(sp)) < 0.)
+            if (sp->type != T_FLOAT)
+            {
+                if (sp->type != T_NUMBER) goto xbad_arg_1;
+                d = (double)sp->u.number;
+            }
+            else
+                d = READ_DOUBLE(sp);
+            if (d < 0.)
                 goto xbad_arg_1;
-            d = sqrt(d);
-            STORE_DOUBLE(sp, d);
+            e = sqrt(d);
+            if (e < (-DBL_MAX) || e > DBL_MAX)
+                ERRORF(("Numeric overflow: sqrt(%g)\n", d));
+            sp->type = T_FLOAT;
+            STORE_DOUBLE(sp, e);
             break;
           }
 
@@ -17049,18 +18854,29 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           {
             /* XEFUN ceil()
              *
-             *   float ceil(float)
+             *   float ceil(int|float)
              *
              * Returns the smallest whole number which is still bigger
-             * than the argument.
+             * than the argument. For integer arguments, the result will
+             * be the argument value itself, albeit converted to a float.
              */
 
             STORE_DOUBLE_USED
             double d;
 
-            if (sp->type != T_FLOAT)
+            if (sp->type == T_FLOAT)
+            {
+                d = ceil(READ_DOUBLE(sp));
+                if (d < (-DBL_MAX) || d > DBL_MAX)
+                    ERRORF(("Numeric overflow: ceil(%g)\n", READ_DOUBLE(sp)));
+            }
+            else if (sp->type == T_NUMBER)
+            {
+                d = sp->u.number;
+                sp->type = T_FLOAT;
+            }
+            else
                 goto xbad_arg_1;
-            d = ceil(READ_DOUBLE(sp));
             STORE_DOUBLE(sp, d);
             break;
           }
@@ -17069,18 +18885,29 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           {
             /* XEFUN floor()
              *
-             *   float floor(float)
+             *   float floor(int|float)
              *
              * Returns the biggest whole number which is not larger
-             * than the argument.
+             * than the argument. For integer arguments, the result will
+             * be the argument value itself, albeit converted to a float.
              */
 
             STORE_DOUBLE_USED
             double d;
 
-            if (sp->type != T_FLOAT)
+            if (sp->type == T_FLOAT)
+            {
+                d = floor(READ_DOUBLE(sp));
+                if (d < (-DBL_MAX) || d > DBL_MAX)
+                    ERRORF(("Numeric overflow: floor(%g)\n", READ_DOUBLE(sp)));
+            }
+            else if (sp->type == T_NUMBER)
+            {
+                d = sp->u.number;
+                sp->type = T_FLOAT;
+            }
+            else
                 goto xbad_arg_1;
-            d = floor(READ_DOUBLE(sp));
             STORE_DOUBLE(sp, d);
             break;
           }
@@ -17089,7 +18916,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           {
             /* XEFUN pow()
              *
-             *   float pow(float x, float y)
+             *   float pow(int|float x, int|float y)
              *
              * Returns x to the power of y.
              */
@@ -17097,18 +18924,29 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             STORE_DOUBLE_USED
             double x, y, d;
 
-            if (sp[-1].type != T_FLOAT)
-                goto xbad_arg_1;
             if (sp->type != T_FLOAT)
-                goto xbad_arg_2;
-            x = READ_DOUBLE(sp-1);
-            y = READ_DOUBLE(sp);
+            {
+                if (sp->type != T_NUMBER) goto xbad_arg_2;
+                y = (double)(sp->u.number);
+            }
+            else
+                y = READ_DOUBLE(sp);
+            if (sp[-1].type != T_FLOAT)
+            {
+                if (sp[-1].type != T_NUMBER) goto xbad_arg_1;
+                x = (double)sp[-1].u.number;
+            }
+            else
+                x = READ_DOUBLE(sp-1);
             if (x == 0. && y < 0.)
                 ERROR("Can't raise 0 to negative powers.\n")
             if (x < 0.  && y != (double)((long)y))
                 ERROR("Can't raise negative number to fractional powers.\n")
             d = pow(x, y);
+            if (d < (-DBL_MAX) || d > DBL_MAX)
+                ERRORF(("Numeric overflow: pow(%g, %g)\n", x, y));
             pop_stack();
+            sp->type = T_FLOAT;
             STORE_DOUBLE(sp, d);
             break;
           }
@@ -17126,15 +18964,16 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              * type, as defined in <lpctypes.h>. The second entry can contain
              * additional information about arg.
              * If flag is the number 0, only the first element of that array
-             * (i.e. the data type) is returned (as int). If flag is 1, the
-             * second element is returned.
+             * (i.e. the data type) is returned (as int).
+             * If flag is 1, the second element is returned.
              * If <arg> is a closure, the <flag> setting 2 lets the efun
              * return the object the closure is bound to.
              * For every other <flag> setting, -1 is returned.
              *
              * The secondary information is:
              *   - for mappings the width, ie the number of data items per key.
-             *   - for closures, symbols and quoted arrays the number of quotes.
+             *   - for symbols and quoted arrays the number of quotes.
+             *   - for closures the closure type
              *   - for strings 0 for shared strings, and non-0 for others.
              *   - -1 for all other datatypes.
              *
@@ -17164,11 +19003,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 {
                     object_t *ob;
 
+                    ob = NULL;
                     sp--;
                     switch(sp->x.closure_type)
                     {
                     default:
-                        ob = NULL;
+                        /* efun, simul-efun, operator closure */
+                        ob = sp->u.ob;
                         break;
                     case CLOSURE_LFUN:
                     case CLOSURE_IDENTIFIER:
@@ -17178,6 +19019,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                         break;
                     case CLOSURE_ALIEN_LFUN:
                         ob = sp->u.lambda->function.alien.ob;
+                        break;
+                    case CLOSURE_UNBOUND_LAMBDA:
+                        ob = NULL;
                         break;
                     }
                     free_closure(sp);
@@ -17290,7 +19134,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              *
              * Floats are truncated to integer values, strings with leadings
              * digits are converted to integers up to the first non-digit.
-             * variable-closures are converted into their function index.
+             * variable- and lfun-closures are converted into their variable
+             * resp.function index.
              * Integers are just returned.
              */
 
@@ -17302,8 +19147,15 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 goto xbad_arg_1;
 
             case T_FLOAT:
-                n = (long)READ_DOUBLE(sp);
+              {
+                double d;
+
+                d = READ_DOUBLE(sp);
+                if (d < (-DBL_MAX) || d > DBL_MAX)
+                    ERRORF(("Numeric overflow: to_int(%g)\n", d));
+                n = (long)d;
                 break;
+              }
 
             case T_STRING:
                 n = atol(sp->u.string);
@@ -17312,9 +19164,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 break;
 
             case T_CLOSURE:
-                if (sp->x.closure_type != CLOSURE_IDENTIFIER)
+                if (sp->x.closure_type == CLOSURE_IDENTIFIER
+                 || sp->x.closure_type == CLOSURE_LFUN)
+                    n = sp->u.lambda->function.index;
+                else
                     goto xbad_arg_1;
-                n = sp->u.lambda->function.index;
                 free_closure(sp);
                 break;
 
@@ -17410,11 +19264,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 break;
 
             case T_OBJECT:
-#ifndef COMPAT_MODE
-                s = add_slash(sp->u.ob->name);
-#else
-                s = string_copy(sp->u.ob->name);
-#endif
+                if (!compat_mode)
+                    s = add_slash(sp->u.ob->name);
+                else
+                    s = string_copy(sp->u.ob->name);
                 if (!s)
                     ERROR("Out of memory\n")
                 free_object_svalue(sp);
@@ -17559,7 +19412,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 case CLOSURE_LAMBDA:         /* Lambda Closure */
                 case CLOSURE_BOUND_LAMBDA:   /* Bound-Lambda Closure */
                   {
-                      char     *rc;
+                      char *rc;
 
                       if (sp->x.closure_type == CLOSURE_BOUND_LAMBDA)
                           sprintf(buf, "<bound lambda 0x%p:", l);
@@ -17590,8 +19443,114 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                   }
 
                 default:
-                    goto xbad_arg_1;
-                }
+                  {
+                    int type = sp->x.closure_type;
+                    if (type < 0)
+                    {
+                        switch(type & -0x0800)
+                        {
+                        case CLOSURE_OPERATOR:
+                          {
+                            s = NULL;
+                            switch(type - CLOSURE_OPERATOR)
+                            {
+                            case F_POP_VALUE:
+                                s = ",";
+                                break;
+
+                            case F_BBRANCH_WHEN_NON_ZERO:
+                                s = "do";
+                                break;
+
+                            case F_BBRANCH_WHEN_ZERO:
+                                s = "while";
+                                break;
+
+                            case F_BRANCH:
+                                s = "continue";
+                                break;
+
+                            case F_CSTRING0:
+                                s = "default";
+                                break;
+
+                            case F_BRANCH_WHEN_ZERO:
+                                s = "?";
+                                break;
+
+                            case F_BRANCH_WHEN_NON_ZERO:
+                                s = "?!";
+                                break;
+
+                            case F_RANGE:
+                                s = "[..]";
+                                break;
+
+                            case F_NR_RANGE:
+                                s = "[..<]";
+                                break;
+
+                            case F_RR_RANGE:
+                                s = "[<..<]";
+                                break;
+
+                            case F_RN_RANGE:
+                                s = "[<..]";
+                                break;
+
+                            case F_MAP_INDEX:
+                                s = "[,]";
+                                break;
+
+                            case F_NX_RANGE:
+                                s = "[..";
+                                break;
+
+                            case F_RX_RANGE:
+                                s = "[<..";
+                                break;
+
+                            }
+
+                            if (s)
+                            {
+                                put_volatile_string(sp, s);
+                                break;
+                            }
+                            type += CLOSURE_EFUN - CLOSURE_OPERATOR;
+                          }
+                        /* default action for operators: FALLTHROUGH */
+
+                        case CLOSURE_EFUN:
+                          {
+                              char *rc;
+
+                              sprintf(buf, "#'%s"
+                                         , instrs[type - CLOSURE_EFUN].name);
+                              rc = string_copy(buf);
+                              put_malloced_string(sp, rc);
+                              break;
+                          }
+
+                        case CLOSURE_SIMUL_EFUN:
+                          {
+                              char *rc;
+
+                              sprintf(buf, "#'<sefun>%s"
+                                         , simul_efunp[type - CLOSURE_SIMUL_EFUN].name);
+                              rc = string_copy(buf);
+                              put_malloced_string(sp, rc);
+                              break;
+                          }
+                        }
+                        break;
+                    }
+                    else /* type >= 0 */
+                    {
+                        goto xbad_arg_1;
+                    } /* if (type) */
+                  } /* case default */
+                } /* switch(closure type) */
                 break;
               }
 
@@ -17806,8 +19765,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 /* get_map_lvalue() may return destructed objects. */
                 /* TODO: May this cause problems elsewhere, too? */
-                if (T_OBJECT == item->type
-                 && (O_DESTRUCTED & item->u.ob->flags))
+                if (destructed_object_ref(item))
                 {
                     assign_svalue(sp[i].u.lvalue, &const0);
                     item++;
@@ -17855,7 +19813,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             for (depth = 0, done = MY_FALSE; ; depth++)
             {
                 do {
-                    if (p == control_stack)
+                    if (p == CONTROL_STACK)
                     {
                         done = MY_TRUE;
                         break;
@@ -17872,7 +19830,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 object_t *prev;
                 do {
-                    if (p == control_stack)
+                    if (p == CONTROL_STACK)
                     {
                         done = MY_TRUE;
                         break;
@@ -17942,7 +19900,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             for (depth = 0, done = MY_FALSE; ; depth++)
             {
                 do {
-                    if (p == control_stack)
+                    if (p == CONTROL_STACK)
                     {
                         done = MY_TRUE;
                         break;
@@ -17989,7 +19947,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (arg[0].type != T_LVALUE)
                 goto xbad_arg_1;
 
-            if (arg[1].type == T_OBJECT)
+            if (arg[1].type == T_NUMBER && arg[1].u.number == 0)
+                ob = NULL;
+            else if (arg[1].type == T_OBJECT)
                 ob = arg[1].u.ob;
             else if (arg[1].type == T_STRING)
             {
@@ -18004,9 +19964,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 goto xbad_arg_3;
 
             /* No external calls may be done when this object is
-             * destructed.
+             * destructed, or if the called object is destructed.
              */
-            if (current_object->flags & O_DESTRUCTED)
+            if (current_object->flags & O_DESTRUCTED
+             || ob == NULL)
             {
                 pop_n_elems(num_arg);
                 push_number(0);
@@ -18014,12 +19975,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             }
 
             /* Handle traceing. */
-            if (TRACEP(TRACE_CALL_OTHER))
+            if (TRACEP(TRACE_CALL_OTHER) && TRACE_IS_INTERACTIVE())
             {
                 if (!++traceing_recursion)
                 {
                     inter_sp = sp;
-                    do_trace("Call other ", arg[1].u.string, "\n");
+                    do_trace("Call other ", arg[2].u.string, "\n");
                 }
                 traceing_recursion--;
             }
@@ -18060,7 +20021,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              * distinguished by means of the return value.
              */
 
-            push_number((csp->extern_call & ~CS_PRETEND) ? 1 : 0);
+
+            struct control_stack * pt = csp;
+
+            while (pt->catch_call) pt--;
+            push_number((pt->extern_call & ~CS_PRETEND) ? 1 : 0);
             break;
           }
 
@@ -18114,7 +20079,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             p = csp;
             do {
                 do {
-                    if (p == control_stack) {
+                    if (p == CONTROL_STACK) {
                         sp->u.number = 0;
                         goto again;
                     }
@@ -18205,12 +20170,20 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              * of <obj> was compiled (the 'load name'), but changes if an
              * object replaces its programs with the efun replace_program().
              *
+             * As a special case, if <ob> is 0, the function returns 0.
+             *
              * The name always ends in '.c'. It starts with a '/' unless the
              * driver is running in COMPAT mode.
              */
 
             char *name, *res;
             object_t *ob;
+
+            /* If the argument is 0, return 0. */
+            if (sp->type == T_NUMBER && sp->u.number == 0)
+            {
+                break;
+            }
 
             TYPE_TEST1(sp, T_OBJECT)
 
@@ -18224,11 +20197,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 }
             }
             name = ob->prog->name;
-#ifdef COMPAT_MODE
-            res = string_copy(name);
-#else
-            res = add_slash(name);
-#endif
+            if (compat_mode)
+                res = string_copy(name);
+            else
+                res = add_slash(name);
             if (!res)
                 ERROR("Out of memory\n")
             free_object_svalue(sp);
@@ -18258,12 +20230,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         /* --- XEfuns: Network IO --- */
 
-#ifdef F_QUERY_IMP_PORT
-        XCASE(F_QUERY_IMP_PORT);    /* --- esc query_imp_port  --- */
+        XCASE(F_QUERY_UDP_PORT);    /* --- esc query_udp_port  --- */
           {
-            /* XEFUN query_imp_port()
+            /* XEFUN query_udp_port()
              *
-             *   int query_imp_port(void)
+             *   int query_udp_port(void)
              *
              * Returns the port number that is used for the inter mud
              * protocol.
@@ -18272,7 +20243,6 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             push_number(udp_port);
             break;
           }
-#endif
 
         XCASE(F_QUERY_INPUT_PENDING); /* --- esc query_input_pending --- */
           {
@@ -18385,13 +20355,50 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             /* XEFUN garbage_collection()
              *
              *   void garbage_collection(void)
+             *   void garbage_collection(string filename)
              *
              * Tell the parser to initiate a garbage collection after the
              * current execution ended.
              */
 
-            extra_jobs_to_do = garbage_collect_to_do = MY_TRUE;
-            time_last_gc = 0;  /* mark it as an 'unconditional' GC */
+            GET_NUM_ARG
+            if (num_arg)
+            {
+                if (sp->type != T_STRING)
+                    goto xbad_arg_1;
+#if defined(GC_SUPPORT)
+                {
+                    int fd;
+                    char * path;
+
+                    restore_default_gc_log();
+                    path = check_valid_path( sp->u.string, current_object
+                                           , "garbage_collection", MY_TRUE);
+                    if (path == NULL)
+                    {
+                        ERRORF(("Illegal arg 1 to garbage_collection(): "
+                                "No privilege to write file '%s'.\n"
+                               , sp->u.string
+                              ));
+                        /* NOTREACHED */
+                        break;
+                    }
+                    fd = ixopen3(path, O_CREAT|O_APPEND|O_WRONLY, 0640);
+                    if (fd < 0)
+                    {
+                        ERRORF(("Can't open GC log file '%s': errno %d\n"
+                               , path, errno));
+                        /* NOTREACHED */
+                        break;
+                    }
+                    gcollect_outfd = fd;
+                }
+#endif
+                free_svalue(sp); sp--;
+            }
+
+            extra_jobs_to_do = MY_TRUE;
+            gc_request = gcEfun;
             break;
           }
 
@@ -18412,9 +20419,16 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
              */
 
             GET_NUM_ARG
-            if (num_arg && sp->type != T_OBJECT) goto xbad_arg_1;
-            inter_sp = sp;
-            sp = x_all_environment(sp, num_arg);
+            if (num_arg
+             && sp->type != T_OBJECT
+             && (sp->type != T_NUMBER || sp->u.number != 0)
+               ) goto xbad_arg_1;
+            if (!num_arg || sp->type != T_NUMBER)
+            {
+                /* Not a destructed object given: do the call */
+                inter_sp = sp;
+                sp = x_all_environment(sp, num_arg);
+            } /* else: the 0 from the destructed object is also the result */
             break;
         }
 
@@ -18473,7 +20487,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 {
                     ERRORF(("Index value must be a number.\n"));
                     /* NOTREACHED */
-                    return; /* Flow control hint */
+                    return MY_FALSE; /* Flow control hint */
                 }
                 from = arg[1].u.number;
                 sp--;
@@ -18497,7 +20511,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 ERRORF(("Indexed value is neither string nor array.\n"));
                 /* NOTREACHED */
-                return; /* Flow control hint */
+                return MY_FALSE; /* Flow control hint */
             }
 
             /* Slice an array */
@@ -18508,7 +20522,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 {
                     ERRORF(("Index value must be a number.\n"));
                     /* NOTREACHED */
-                    return; /* Flow control hint */
+                    return MY_FALSE; /* Flow control hint */
                 }
                 v = arg->u.vec;
                 len = (long)VEC_SIZE(v);
@@ -18669,15 +20683,18 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
     /* Even intermediate results could exceed the stack size.
      * We better check for that.
      */
-    if (sp - start_of_stack == SIZEOF_STACK - 1)
+    if (sp - VALUE_STACK == SIZEOF_STACK - 1)
+    {
+        /* sp ist just at then end of the stack area */
         stack_overflow(sp, fp, pc);
-    else if ((long)(sp - start_of_stack) > (long)(SIZEOF_STACK - 1))
+    }
+    else if ((long)(sp - VALUE_STACK) > (long)(SIZEOF_STACK - 1))
     {
         /* When we come here, we already overwrote the bounds
          * of the stack :-(
          */
-        fatal("Stack overflow: %ld too high\n"
-             , (long)(sp - start_of_stack - (SIZEOF_STACK - 1))
+        fatal("Fatal stack overflow: %ld too high\n"
+             , (long)(sp - VALUE_STACK - (SIZEOF_STACK - 1))
              );
     }
 
@@ -18798,22 +20815,17 @@ retry_for_shadow:
              );
 #endif
 
-    if ( ((p_int)fun & 2) != ((p_int)SHSTR_OVERHEAD & 2) )
-    {
-        /* Heuristic to find out if fun is an unshared string,
-         * building on the six-byte-overhead of shared strings.
-         * This means that every shared string has a set bit 1,
-         * whereas other strings have no overhead and thus bit 1
-         * cleared. Function names are always shared, so if there
-         * is no shared string twin for fun, the called function does
-         * not exist anywhere. As a side effect, we get the shared
-         * string for fun which makes the cache-lookup much faster.
-         */
-        fun = findstring(fun);
-        if (!fun)
-            goto failure2;
-    }
-    /* *fun is now (more or less) guaranteed to be a shared string */
+    /* Lookup the shared string for <fun>. Function names are always
+     * shared, so if there is no shared string twin for <fun>, the
+     * called function does not exist anywhere. As a side effect,
+     * we get the shared string for <fun> which makes the cache-lookup
+     * much faster.
+     */
+    fun = findstring(fun);
+    if (!fun)
+        goto failure2;
+
+    /* *fun is now guaranteed to be a shared string */
 
     /* Get the hashed index into the cache */
     ix =
@@ -18865,7 +20877,7 @@ retry_for_shadow:
             current_variables = ob->variables;
             if (current_variables)
                 current_variables += cache[ix].variable_index_offset;
-            inter_sp = setup_new_frame2(funstart, inter_sp);
+            inter_sp = setup_new_frame2(funstart, inter_sp, MY_FALSE, MY_FALSE);
             previous_ob = current_object;
             current_object = ob;
             save_csp = csp;
@@ -18892,11 +20904,8 @@ retry_for_shadow:
 #ifdef APPLY_CACHE_STAT
         apply_cache_miss++;
 #endif
-        /* This call to findstring() is not really necessary, but serves
-         * as safeguard should a non-shared string escape the attention
-         * of the 'heuristic' filter before.
-         */
-        shared_name = (cache[ix].name == fun) ? fun : findstring(fun);
+
+        shared_name = fun;
         if ( NULL != shared_name)
         {
             int fx;
@@ -18961,7 +20970,7 @@ retry_for_shadow:
                     )
                 {
                     /* Not found */
-                    
+
                     previous_ob = csp->prev_ob;
                     current_object = csp->ob;
                     pop_control_stack();
@@ -18978,7 +20987,7 @@ retry_for_shadow:
                         goto failure;
                 }
                 csp->funstart = funstart;
-                inter_sp = setup_new_frame2(funstart, inter_sp);
+                inter_sp = setup_new_frame2(funstart, inter_sp, MY_FALSE, MY_FALSE);
                 previous_ob = current_object;
                 current_object = ob;
                 save_csp = csp;
@@ -19080,7 +21089,7 @@ sapply_int (char *fun, object_t *ob, int num_arg, Bool b_find_static)
 #endif
 
     /* Handle tracing */
-    if (TRACEP(TRACE_APPLY))
+    if (TRACEP(TRACE_APPLY) && TRACE_IS_INTERACTIVE())
     {
         if (!++traceing_recursion)
         {
@@ -19137,7 +21146,8 @@ apply (char *fun, object_t *ob, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 static void
-secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
+secure_apply_error ( svalue_t *save_sp, struct control_stack *save_csp
+                   , Bool clear_costs)
 
 /* Recover from an error during a secure apply. <save_sp> and <save_csp>
  * are the saved evaluator stack and control stack pointers, saving the
@@ -19147,13 +21157,24 @@ secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
  * then calls runtime_error() in the master object with the necessary
  * information, unless it is a triple fault - in that case only a
  * debug_message() is generated.
+ *
+ * If <clear_costs> is TRUE, the eval costs and limits will be reset
+ * before runtime_error() is called. This is used for top-level master
+ * applies which should behave like normal function calls in the error
+ * handling.
  */
 
 {
     if (csp != save_csp)
     {
-        /* could be error before push */
-        csp = save_csp+1;
+        /* Could be error before push.
+         * We have to unroll the control stack in case it references
+         * lambda closures.
+         */
+
+        while (csp > save_csp+1)
+            pop_control_stack();
+
         previous_ob = csp->prev_ob;
         current_object = csp->ob;
         pop_control_stack();
@@ -19169,6 +21190,17 @@ secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
             xfree(current_error);
             xfree(current_error_file);
             xfree(current_error_object_name);
+            if (current_error_trace)
+            {
+                free_array(current_error_trace);
+                current_error_trace = NULL;
+            }
+            if (uncaught_error_trace)
+            {
+                free_array(uncaught_error_trace);
+                uncaught_error_trace = NULL;
+            }
+
         }
     }
     else if (!out_of_memory)
@@ -19185,8 +21217,46 @@ secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
             push_number(current_error_line_number);
             a += 3;
         }
+
+        if (current_heart_beat)
+        {
+            /* Heartbeat error (unlikely though): turn off the heartbeat in
+             * the object and also pass it to RUNTIME_ERROR.
+             */
+
+            object_t *culprit;
+
+            culprit = current_heart_beat;
+            current_heart_beat = NULL;
+            set_heart_beat(culprit, 0);
+            debug_message("%s Heart beat in %s turned off.\n"
+                         , time_stamp(), culprit->name);
+            inter_sp = _push_valid_ob(culprit, inter_sp);
+            a++;
+        }
+        else
+        {
+            if (!current_error_file)
+            {
+                /* Pass dummy values */
+                push_number(0);
+                push_number(0);
+                push_number(0);
+                a += 3;
+            }
+            /* Normal error: push -1 instead of a culprit. */
+            push_number(-1);
+            a++;
+        }
+
+        if (clear_costs)
+        {
+            CLEAR_EVAL_COST;
+            RESET_LIMITS;
+        }
+
         save_cmd = command_giver;
-        apply_master_ob(STR_RUNTIME, a);
+        apply_master(STR_RUNTIME, a);
         command_giver = save_cmd;
     }
     num_error--;
@@ -19229,7 +21299,7 @@ secure_apply (char *fun, object_t *ob, int num_arg)
     save_csp = csp;
     if (setjmp(error_recovery_info.con.text))
     {
-        secure_apply_error(save_sp - num_arg, save_csp);
+        secure_apply_error(save_sp - num_arg, save_csp, MY_FALSE);
         result = NULL;
     }
     else
@@ -19242,12 +21312,21 @@ secure_apply (char *fun, object_t *ob, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-apply_master_ob (char *fun, int num_arg)
+apply_master_ob (char *fun, int num_arg, Bool external)
 
-/* Call function <fun> in the master object with <num_arg> arguments pushed
+/* Aliases:
+ *   apply_master(fun, num_arg) == apply_master_ob(fun, num_arg, FALSE)
+ *   callback_master(fun, num_arg) == apply_master_ob(fun, num_arg, TRUE)
+ *
+ * Call function <fun> in the master object with <num_arg> arguments pushed
  * onto the stack (<inter_sp> points to the last one). static and protected
  * functions can be called from the outside. The function takes care
  * of calling shadows where necessary.
+ *
+ * If <external> is TRUE, it means that this call is due to some external
+ * event (like an ERQ message) instead of being caused by a running program.
+ * The effect of this flag is that the error handling is like for a normal
+ * function call (clearing the eval costs before calling runtime_error()).
  *
  * apply_master_object() returns a pointer to the function result when the
  * call was successfull, or NULL on failure. The arguments are popped in
@@ -19301,7 +21380,7 @@ apply_master_ob (char *fun, int num_arg)
     save_csp = csp;
     if (setjmp(error_recovery_info.con.text))
     {
-        secure_apply_error(save_sp - num_arg, save_csp);
+        secure_apply_error(save_sp - num_arg, save_csp, external);
         printf("%s Error in master_ob->%s()\n", time_stamp(), fun);
         debug_message("%s Error in master_ob->%s()\n", time_stamp(), fun);
         result = NULL;
@@ -19360,9 +21439,10 @@ assert_master_ob_loaded (void)
         {
             object_t *ob;
             object_t *prev;
-            Bool removed = MY_FALSE;
-              /* TRUE if the old master was already on the list of
-               * destructed objects.
+            Bool newly_removed = MY_FALSE;
+              /* TRUE if the old master was on the list of newly
+               * destructed objects. That is important to know
+               * because then it still has all its variables.
                */
 
             /* A recursive call while loading the master, or there
@@ -19383,6 +21463,10 @@ assert_master_ob_loaded (void)
             /* If we come here, we had a destructed master and failed
              * to load a new one. Now try to reactivate the
              * old one again.
+             *
+             * We don't have to reactivate any destructed inherits, though:
+             * as long as the master references their programs, that's all
+             * we need.
              */
 
             /* First, make sure that there is no half-done object
@@ -19398,15 +21482,38 @@ assert_master_ob_loaded (void)
             destructed_master_ob = NULL;
 
             /* Remove the destructed master from the list
-             * of destructed objects
+             * of newly destructed objects or destructed objects.
              */
-            if (new_destructed)
+            if (newly_destructed_objs != NULL)
+            {
+                if (ob == newly_destructed_objs)
+                {
+                    newly_destructed_objs = ob->next_all;
+                    newly_removed = MY_TRUE;
+                    num_newly_destructed--;
+                }
+                else
+                {
+                    for ( prev = newly_destructed_objs
+                        ; prev && prev->next_all != ob
+                        ; prev = prev->next_all
+                        ) NOOP;
+                    if (prev)
+                    {
+                        prev->next_all = ob->next_all;
+                        newly_removed = MY_TRUE;
+                        num_newly_destructed--;
+                    }
+                }
+            }
+            if (!newly_removed && destructed_objs != NULL)
             {
                 if (ob == destructed_objs)
                 {
                     destructed_objs = ob->next_all;
-                    removed = MY_TRUE;
-                    new_destructed--;
+                    if (destructed_objs)
+                        destructed_objs->prev_all = NULL;
+                    num_destructed--;
                 }
                 else
                 {
@@ -19417,18 +21524,19 @@ assert_master_ob_loaded (void)
                     if (prev)
                     {
                         prev->next_all = ob->next_all;
-                        removed = MY_TRUE;
-                        new_destructed--;
+                        if (prev->next_all)
+                            prev->next_all->prev_all = prev;
+                        num_destructed--;
                     }
                 }
             }
             ob->flags &= ~O_DESTRUCTED;
 
             /* Restore the old masters variable space.
-             * Remember: as long as the objects are in the 'destructed'
+             * Remember: as long as the objects are in the 'newly destructed'
              * list, they still have all variables.
              */
-            if (!removed && ob->prog->num_variables)
+            if (!newly_removed && ob->prog->num_variables)
             {
                 int save_privilege = malloc_privilege;
                 int j;
@@ -19460,10 +21568,10 @@ assert_master_ob_loaded (void)
             master_ob = ref_object(ob, "assert_master_ob_loaded");
             if (current_object == &dummy_current_object_for_loads)
                 current_object = master_ob;
-            push_number(removed);
-            sapply(STR_REACTIVATE, ob, 1);
-            push_number(2 - (removed ? 1 : 0));
-            sapply(STR_INAUGURATE, ob, 1);
+            push_number(newly_removed);
+            sapply_int(STR_REACTIVATE, ob, 1, MY_TRUE);
+            push_number(2 - (newly_removed ? 1 : 0));
+            sapply_int(STR_INAUGURATE, ob, 1, MY_TRUE);
             fprintf(stderr, "%s Old master reactivated.\n", time_stamp());
             inside = MY_FALSE;
             return;
@@ -19480,18 +21588,33 @@ assert_master_ob_loaded (void)
          */
         master_ob = NULL;
         inside = MY_TRUE;
-        clear_auto_include_string();
         if (!current_object)
         {
             current_object = &dummy_current_object_for_loads;
         }
 
+#ifdef USE_FREE_CLOSURE_HOOK
         /* don't free the closure hooks now since they might be
          * still in use - the backend will take care of them.
          */
-        free_closure_hooks(closure_hook, NUM_CLOSURE_HOOKS);
-        for (i = NUM_CLOSURE_HOOKS; i--;)
-            closure_hook[i] = const0;
+        free_closure_hooks(driver_hook, NUM_DRIVER_HOOKS);
+        for (i = NUM_DRIVER_HOOKS; i--;)
+            driver_hook[i] = const0;
+#else
+        /* Free the closure hooks.
+         */
+        for (i = NUM_DRIVER_HOOKS; i--;)
+        {
+            /* The object reference in bound closures is not counted! */
+            if (driver_hook[i].type == T_CLOSURE &&
+                driver_hook[i].x.closure_type == CLOSURE_LAMBDA)
+            {
+                driver_hook[i].x.closure_type = CLOSURE_UNBOUND_LAMBDA;
+            }
+
+            assign_svalue(driver_hook+i, &const0);
+        }
+#endif
 
         init_telopts();
 
@@ -19506,7 +21629,7 @@ assert_master_ob_loaded (void)
 
         initialize_master_uid();
         push_number(3);
-        apply_master_ob(STR_INAUGURATE, 1);
+        apply_master(STR_INAUGURATE, 1);
         assert_master_ob_loaded();
           /* ...in case inaugurate_master() destructed this object again */
         inside = MY_FALSE;
@@ -19591,6 +21714,16 @@ call_lambda (svalue_t *lsvp, int num_arg)
             return;
         }
 
+#ifdef DEBUG
+        if (l->function.index >= current_object->prog->num_functions)
+            fatal("Calling non-existing lfun closure #%hu in program '%s' "
+                  "with %hu functions.\n"
+                 , l->function.index
+                 , current_object->prog->name
+                 , current_object->prog->num_functions
+                );
+#endif
+
         /* Ok, object and program are there */
 
         current_prog = current_object->prog;
@@ -19651,17 +21784,37 @@ call_lambda (svalue_t *lsvp, int num_arg)
             return;
         }
 
+#ifdef DEBUG
+        if (l->function.alien.index >= l->function.alien.ob->prog->num_functions)
+            fatal("Calling non-existing lfun closure #%hu in program '%s' "
+                  "with %hu functions.\n"
+                 , l->function.alien.index
+                 , l->function.alien.ob->prog->name
+                 , l->function.alien.ob->prog->num_functions
+                );
+#endif
+
+        /* If the object creating the closure wasn't the one in which
+         * it will be executed, we need to record the fact in a second
+         * 'dummy' control frame. If we didn't, major security holes
+         * open up.
+         */
+
+        if (l->ob != l->function.alien.ob)
+        {
+            csp->extern_call = MY_TRUE;
+            csp->funstart = NULL;
+            push_control_stack(sp, 0, inter_fp);
+            csp->ob = current_object;
+            csp->prev_ob = previous_ob;
+            csp->num_local_variables = num_arg;
+            previous_ob = current_object;
+        }
+
         /* Finish the setup of the control frame.
-         * This is a real inter-object call, so we create a second
-         * frame to really capture the control flow.
+         * This is a real inter-object call.
          */
         csp->extern_call = MY_TRUE;
-        csp->funstart = NULL;
-        push_control_stack(sp, 0, inter_fp);
-        csp->ob = current_object;
-        csp->prev_ob = previous_ob;
-        csp->num_local_variables = num_arg;
-        previous_ob = current_object;
         current_object = l->function.alien.ob;
         current_prog = current_object->prog;
         /* inter_sp == sp */
@@ -19669,10 +21822,16 @@ call_lambda (svalue_t *lsvp, int num_arg)
         funstart = current_prog->program + (flags & FUNSTART_MASK);
         csp->funstart = funstart;
         eval_instruction(FUNCTION_CODE(funstart), inter_sp);
+
+        /* If necessary, remove the second control frame */
+        if (l->ob != l->function.alien.ob)
+        {
+            current_object = csp->ob;
+            previous_ob = csp->prev_ob;
+            pop_control_stack();
+        }
+
         /* The result is on the stack (inter_sp) */
-        current_object = csp->ob;
-        previous_ob = csp->prev_ob;
-        pop_control_stack();
         return;
       }
 
@@ -19771,11 +21930,12 @@ call_lambda (svalue_t *lsvp, int num_arg)
         /* Finish the setup */
 
         current_prog = current_object->prog;
+        current_lambda = *lsvp; addref_closure(lsvp, "call_lambda");
         variable_index_offset = 0;
         function_index_offset = 0;
         funstart = l->function.code + 1;
         csp->funstart = funstart;
-        sp = setup_new_frame2(funstart, sp);
+        sp = setup_new_frame2(funstart, sp, MY_FALSE, MY_TRUE);
         current_variables = current_object->variables;
         current_strings = current_prog->strings;
         eval_instruction(FUNCTION_CODE(funstart), sp);
@@ -19988,7 +22148,7 @@ secure_call_lambda (svalue_t *closure, int num_arg)
 
     if (setjmp(error_recovery_info.con.text))
     {
-        secure_apply_error(save_sp - num_arg, save_csp);
+        secure_apply_error(save_sp - num_arg, save_csp, MY_FALSE);
         result = NULL;
     }
     else
@@ -20141,7 +22301,7 @@ call_function (program_t *progp, int fx)
     csp->ob = current_object;
     csp->prev_ob = previous_ob;
 #ifdef DEBUG
-    if (csp != control_stack)
+    if (csp != CONTROL_STACK)
         fatal("call_function with bad csp\n");
 #endif
     csp->num_local_variables = 0;
@@ -20181,15 +22341,14 @@ get_line_number (bytecode_p p, program_t *progp, char **namep)
 
     int offset;            /* (Remaining) program offset to resolve */
     int i;                 /* Current line number */
-    char **include_names;  /* Pointer to the array of include file names */
+    include_t *includes;   /* Pointer to the next include info */
     struct incinfo *inctop = NULL;  /* The include information stack. */
     int relocated_from = 0;
     int relocated_to = -1;
-    p_int old_total;
-      /* If the line numbers needed SYSTEM privilege to be swapped in,
-       * this value is the old progp->total_size, serving as a flag
-       * that the line numbers have to be deallocated again when
-       * the function finishes.
+    Bool used_system_mem;
+      /* TRUE if the line numbers needed SYSTEM privilege to be swapped in,
+       * because this means that afterwards they need to be deallocated
+       * again.
        */
 
     if (!progp || !p)
@@ -20198,7 +22357,7 @@ get_line_number (bytecode_p p, program_t *progp, char **namep)
         return 0;
     }
 
-    old_total = 0;
+    used_system_mem = MY_FALSE;
 
     /* Get the line numbers */
     if (!progp->line_numbers)
@@ -20208,12 +22367,18 @@ get_line_number (bytecode_p p, program_t *progp, char **namep)
             /* Uhhmm, out of memory - try to pull some rank */
 
             int save_privilege;
+            Bool rc;
 
-            old_total = progp->total_size;
+            used_system_mem = MY_TRUE;
             save_privilege = malloc_privilege;
             malloc_privilege = MALLOC_SYSTEM;
-            load_line_numbers_from_swap(progp);
+            rc = load_line_numbers_from_swap(progp);
             malloc_privilege = save_privilege;
+            if (!rc)
+            {
+                *namep = "UNDEFINED";
+                return 0;
+            }
         }
     }
 
@@ -20225,17 +22390,18 @@ get_line_number (bytecode_p p, program_t *progp, char **namep)
               , time_stamp(), offset, progp->name);
         debug_message("%s get_line_number(): Illegal offset %d in object %s\n"
                      , time_stamp(), offset, progp->name);
+        *namep = "UNDEFINED";
         return 0;
     }
 
-    include_names = progp->strings + progp->num_strings;
+    includes = progp->includes;
 
     /* Decode the line number information until the line number
      * for offset is found. We do this by reading the line byte codes,
      * counting up the line number <i> while decrementing the <offset>.
      * If the offset becomes <= 0, we found the line.
      */
-    for (i = 0, p = progp->line_numbers; ; )
+    for (i = 0, p = progp->line_numbers->line_numbers; ; )
     {
         int o;
 
@@ -20259,17 +22425,23 @@ get_line_number (bytecode_p p, program_t *progp, char **namep)
                         i -= off+1;
                         break;
                       }
-                      
+
                     case LI_INCLUDE:
                       {
                         /* Included file: push the information */
 
                         struct incinfo *inc_new;
 
+                        /* Find the next include which generated code.
+                         * We know that there is one.
+                         */
+                        while (includes->depth < 0) includes++;
+
                         i++;
                         inc_new = xalloc(sizeof *inc_new);
                         /* TODO: What if this fails? */
-                        inc_new->name = *--include_names;
+                        inc_new->name = includes->filename;
+                        includes++;
                         inc_new->super = inctop;
                         inc_new->super_line = i;
                         inctop = inc_new;
@@ -20363,6 +22535,8 @@ get_line_number (bytecode_p p, program_t *progp, char **namep)
             sprintf(namebuf, "%s (%s)", progp->name, *namep);
             *namep = namebuf;
         }
+        else
+            *namep = "<program names too long>";
 
         /* Free the include stack structures */
         do {
@@ -20380,14 +22554,14 @@ get_line_number (bytecode_p p, program_t *progp, char **namep)
         *namep = progp->name;
     }
 
-    if (old_total)
+    if (used_system_mem)
     {
         /* We used SYSTEM priviledged memory - now we have to return it.
          */
-
+        total_prog_block_size -= progp->line_numbers->size;
+        total_bytes_unswapped -= progp->line_numbers->size;
         xfree(progp->line_numbers);
-        total_prog_block_size -= progp->total_size - old_total;
-        progp->total_size = old_total;
+        progp->line_numbers = NULL;
         reallocate_reserved_areas();
     }
 
@@ -20411,13 +22585,13 @@ get_line_number_if_any (char **name)
  */
 
 {
-    if (csp >= &control_stack[0] && csp->funstart == SIMUL_EFUN_FUNSTART)
+    if (csp >= &CONTROL_STACK[0] && csp->funstart == SIMUL_EFUN_FUNSTART)
     {
         *name = "<simul_efun closure>";
         return 0;
     }
 
-    if (csp >= &control_stack[0] && csp->funstart == EFUN_FUNSTART)
+    if (csp >= &CONTROL_STACK[0] && csp->funstart == EFUN_FUNSTART)
     {
         static char buf[256];
         char *iname;
@@ -20461,23 +22635,23 @@ get_line_number_if_any (char **name)
 
 /*-------------------------------------------------------------------------*/
 char *
-dump_trace (Bool how
-#ifndef TRACE_CODE
-                     UNUSED
-#endif
-           )
+collect_trace (strbuf_t * sbuf, vector_t ** rvec )
 
-/* Write out a traceback, starting from the first frame. If a heart_beat()
- * is involved, return the name of the object that had it.
+/* Collect the traceback for the current (resp. last) function call, starting
+ * from the first frame.
  *
- * If TRACE_CODE is defined and <how> is true, the last executed
- * instructions are printed, too.
+ * If <sbuf> is not NULL, traceback is written in readable form into the
+ * stringbuffer <sbuf>.
+ *
+ * If <rvec> is not NULL, the traceback is returned in a newly created array
+ * which pointer is put into *<rvec>. For the format of the array, see
+ * efun debug_info().
+ *
+ * If a heart_beat() is involved, return a pointer to the name of the object
+ * that had it, otherwise return NULL.
  */
 
 {
-#if defined(__MWERKS__) && !defined(TRACE_CODE)
-#    pragma unused(how)
-#endif
     struct control_stack *p;  /* Control frame under inspection */
     char *ret = NULL;
     bytecode_p pc = inter_pc;
@@ -20487,43 +22661,78 @@ dump_trace (Bool how
     object_t *ob = NULL;
     bytecode_p last_catch = NULL;  /* Last found catch */
 
+    /* Temporary structure to hold the tracedata before it is condensed
+     * into the result array.
+     */
+    struct traceentry {
+        vector_t          * vec;
+        struct traceentry * next;
+    } *first_entry, *last_entry;
+    size_t num_entries;
+
+#define NEW_ENTRY(var, type, progname) \
+        struct traceentry * var; \
+        var = alloca(sizeof(*var)); \
+        if (!var) \
+            error("Stack overflow in collect_trace()"); \
+        var->vec = allocate_array(TRACE_MAX); \
+        var->next = NULL; \
+        if (!first_entry) \
+            first_entry = last_entry = var; \
+        else { \
+            last_entry->next = var; \
+            last_entry = var; \
+        } \
+        num_entries++; \
+        put_number(var->vec->item+TRACE_TYPE, type); \
+        put_malloced_string(var->vec->item+TRACE_PROGRAM, string_copy(progname)); \
+        put_malloced_string(entry->vec->item+TRACE_OBJECT, string_copy(ob->name));
+
+#define PUT_LOC(entry, val) \
+        put_number(entry->vec->item+TRACE_LOC, (p_int)(val))
+
+    first_entry = last_entry = NULL;
+    num_entries = 0;
+
     if (!current_prog)
     {
-        printf("No program to trace.\n");
-        debug_message("No program to trace.\n");
+        if (sbuf)
+           strbuf_addf(sbuf, "%s\n", STR_NO_PROG_TRACE);
+        if (rvec)
+        {
+            vector_t * vec;
+
+            vec = allocate_array(1);
+            put_ref_string(vec->item, STR_NO_PROG_TRACE);
+            *rvec = vec;
+        }
         return NULL;
     }
 
-    if (csp < &control_stack[0])
+    if (csp < &CONTROL_STACK[0])
     {
-        printf("No trace.\n");
-        debug_message("No trace.\n");
+        if (sbuf)
+           strbuf_addf(sbuf, "%s\n", STR_NO_TRACE);
+        if (rvec)
+        {
+            vector_t * vec;
+
+            vec = allocate_array(1);
+            put_ref_string(vec->item, STR_NO_TRACE);
+            *rvec = vec;
+        }
         return NULL;
     }
-
-    /* Print the last instructions if required */
-#ifdef TRACE_CODE
-    if (how) {
-        /* TODO: This number of instructions should be a runtime arg */
-#ifdef DEBUG
-        (void)last_instructions(200, MY_TRUE, NULL);
-        printf("%6lx: %3d %3d %3d %3d %3d %3d %3d %3d\n", (long)pc,
-          pc[0], pc[1], pc[2], pc[3], pc[4], pc[5], pc[6], pc[7] );
-#else  /* DEBUG */
-        last_instructions(20, MY_TRUE, NULL);
-#endif /* DEBUG */
-    }
-#endif /* TRACE_CODE */
 
     /* Loop through the call stack.
      * The organisation of the control stack results in the information
      * for this frame (p[0]) being stored in the next (p[1]).
      * Confused now? Good.
      */
-    p = &control_stack[0];
+    p = &CONTROL_STACK[0];
     do {
-        bytecode_p      dump_pc;  /* the frame's pc */
-        program_t *prog;     /* the frame's program */
+        bytecode_p  dump_pc;  /* the frame's pc */
+        program_t  *prog;     /* the frame's program */
 
         if (p->extern_call)
         {
@@ -20562,7 +22771,7 @@ dump_trace (Bool how
          * The pc should point at a F_END_CATCH instruction, or at a LBRANCH
          * to that instruction.
          */
-        if (p > &control_stack[0] && p->funstart == p[-1].funstart)
+        if (p > &CONTROL_STACK[0] && p->funstart == p[-1].funstart)
         {
             bytecode_p pc2 = p->pc;
 
@@ -20601,6 +22810,8 @@ dump_trace (Bool how
                 goto not_catch;
             last_catch = pc2;
             name = "CATCH";
+            file = NULL;
+            line = 0;
             goto name_computed;
         }
 
@@ -20612,20 +22823,27 @@ not_catch:  /* The frame does not point at a catch here */
             /* TODO: See comments in call_lambda(): this code
              * TODO:: should never be reached.
              */
-            printf("<function symbol> in '%20s' ('%20s')\n"
-                  , ob->prog->name, ob->name);
-            debug_message("<function symbol> in '%20s' ('%20s')\n"
-                         , ob->prog->name, ob->name);
+            if (sbuf)
+                strbuf_addf(sbuf, "<function symbol> in '%20s' ('%20s')\n"
+                           , ob->prog->name, ob->name);
+            if (rvec)
+            {
+                NEW_ENTRY(entry, TRACE_TYPE_SYMBOL, ob->prog->name);
+            }
             continue;
         }
 
         /* simul_efun closure? */
         if (p[0].funstart == SIMUL_EFUN_FUNSTART)
         {
-            printf("<simul_efun closure> bound to '%20s' ('%20s')\n",
-                ob->prog->name, ob->name);
-            debug_message("<simul_efun closure> bound to '%20s' ('%20s')\n",
-                ob->prog->name, ob->name);
+            if (sbuf)
+                strbuf_addf( sbuf
+                           , "<simul_efun closure> bound to '%20s' ('%20s')\n"
+                           , ob->prog->name, ob->name);
+            if (rvec)
+            {
+                NEW_ENTRY(entry, TRACE_TYPE_SEFUN, ob->prog->name);
+            }
             continue;
         }
 
@@ -20637,17 +22855,25 @@ not_catch:  /* The frame does not point at a catch here */
             iname = instrs[p[0].instruction].name;
             if (iname)
             {
-                printf("#\'%-14s for '%20s' ('%20s')\n"
-                  , iname, ob->prog->name, ob->name);
-                debug_message("#\'%-14s for '%20s' ('%20s')\n"
-                  , iname, ob->prog->name, ob->name);
+                if (sbuf)
+                    strbuf_addf(sbuf, "#\'%-14s for '%20s' ('%20s')\n"
+                               , iname, ob->prog->name, ob->name);
+                if (rvec)
+                {
+                    NEW_ENTRY(entry, TRACE_TYPE_EFUN, ob->prog->name);
+                    put_volatile_string(entry->vec->item+TRACE_NAME, iname);
+                }
             }
             else
             {
-                printf("<efun closure %d> for '%20s' ('%20s')\n",
-                    p[0].instruction, ob->prog->name, ob->name);
-                debug_message("<efun closure %d> for '%20s' ('%20s')\n",
-                    p[0].instruction, ob->prog->name, ob->name);
+                if (sbuf)
+                    strbuf_addf( sbuf, "<efun closure %d> for '%20s' ('%20s')\n"
+                               , p[0].instruction, ob->prog->name, ob->name);
+                if (rvec)
+                {
+                    NEW_ENTRY(entry, TRACE_TYPE_EFUN, ob->prog->name);
+                    put_number(entry->vec->item+TRACE_NAME, p[0].instruction);
+                }
             }
             continue;
         }
@@ -20656,12 +22882,18 @@ not_catch:  /* The frame does not point at a catch here */
         if (p[0].funstart < prog->program
          || p[0].funstart > PROGRAM_END(*prog))
         {
-            printf("<lambda 0x%6lx> in '%20s' ('%20s')offset %ld\n",
-                (long)p[0].funstart, ob->prog->name, ob->name,
-                (long)(FUNCTION_FROM_CODE(dump_pc) - p[0].funstart));
-            debug_message("<lambda 0x%6lx> in '%20s' ('%20s')offset %ld\n",
-                (long)p[0].funstart, ob->prog->name, ob->name,
-                (long)(FUNCTION_FROM_CODE(dump_pc) - p[0].funstart));
+            if (sbuf)
+                strbuf_addf( sbuf
+                           , "<lambda 0x%6lx> in '%20s' ('%20s') offset %ld\n"
+                           , (long)p[0].funstart, ob->prog->name, ob->name
+                           , (long)(FUNCTION_FROM_CODE(dump_pc) - p[0].funstart)
+                           );
+            if (rvec)
+            {
+                NEW_ENTRY(entry, TRACE_TYPE_LAMBDA, ob->prog->name);
+                put_number(entry->vec->item+TRACE_NAME, (p_int)p[0].funstart);
+                PUT_LOC(entry, (FUNCTION_FROM_CODE(dump_pc) - p[0].funstart));
+            }
             continue;
         }
 
@@ -20676,15 +22908,106 @@ name_computed: /* Jump target from the catch detection */
         if (strcmp(name, "heart_beat") == 0 && p != csp)
             ret = p->extern_call ? (p->ob ? p->ob->name : NULL) : ob->name;
 
-        printf("'%15s' in '%20s' ('%20s')line %d\n",
-                     name, file, ob->name, line);
-        debug_message("'%15s' in '%20s' ('%20s')line %d\n",
-                     name, file, ob->name, line);
+        if (sbuf)
+        {
+            if (file != NULL)
+                strbuf_addf(sbuf, "'%15s' in '%20s' ('%20s') line %d\n"
+                           , name, file, ob->name, line);
+            else
+                strbuf_addf(sbuf, "'%15s' in %22s ('%20s')\n"
+                           , name, "", ob->name);
+        }
+
+        if (rvec)
+        {
+            NEW_ENTRY(entry, TRACE_TYPE_LFUN, file != NULL ? file : "");
+            put_malloced_string(entry->vec->item+TRACE_NAME, string_copy(name));
+            PUT_LOC(entry, line);
+        }
     } while (++p <= csp);
+
+    /* Condense the singular entries into the result array */
+    if (rvec)
+    {
+        vector_t * vec;
+        size_t ix;
+
+        vec = allocate_array(num_entries+1);
+
+        if (ret)
+            put_malloced_string(vec->item, string_copy(ret));
+
+        for (ix = 1; first_entry != NULL; ix++, first_entry = first_entry->next)
+        {
+            put_array(vec->item+ix, first_entry->vec);
+        }
+
+        *rvec = vec;
+    }
 
     /* Done */
     return ret;
-}
+
+#undef NEW_ENTRY
+#undef PUT_LOC
+
+} /* collect_trace() */
+
+/*-------------------------------------------------------------------------*/
+char *
+dump_trace (Bool how, vector_t ** rvec)
+
+/* Write out a traceback, starting from the first frame. If a heart_beat()
+ * is involved, return the name of the object that had it.
+ *
+ * If <how> is FALSE (the normal case), the trace is written with
+ * debug_message() only. If <how> is TRUE (used for internal errors), the
+ * trace is also written to stdout.
+ *
+ * If TRACE_CODE is defined and <how> is true, the last executed
+ * instructions are printed, too.
+ *
+ * If <rvec> is not NULL, the traceback is returned in a newly created array
+ * which pointer is put into *<rvec>. For the format of the array, see
+ * efun debug_info().
+ */
+
+{
+    strbuf_t sbuf;
+    char *hb_obj_name;
+
+    strbuf_zero(&sbuf);
+    hb_obj_name = collect_trace(&sbuf, rvec);
+
+    /* Print the last instructions if required */
+#ifdef TRACE_CODE
+    if (how) {
+        /* TODO: This number of instructions should be a runtime arg */
+#ifdef DEBUG
+        (void)last_instructions(200, MY_TRUE, NULL);
+        if (inter_pc)
+            printf("%6lx: %3d %3d %3d %3d %3d %3d %3d %3d\n"
+                  , (long)inter_pc
+                  , inter_pc[0], inter_pc[1], inter_pc[2], inter_pc[3]
+                  , inter_pc[4], inter_pc[5], inter_pc[6], inter_pc[7] );
+        else
+            printf("No program counter.\n");
+#else  /* DEBUG */
+        last_instructions(20, MY_TRUE, NULL);
+#endif /* DEBUG */
+    }
+#endif /* TRACE_CODE */
+
+    /* Print the trace */
+    if (how)
+        fputs(sbuf.buf, stdout);
+    debug_message("%s", sbuf.buf);
+
+    /* Cleanup and return */
+    strbuf_free(&sbuf);
+
+    return hb_obj_name;
+} /* dump_trace() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -20704,8 +23027,6 @@ invalidate_apply_low_cache (void)
             xfree(cache[i].name);
     }
 }
-
-#ifdef GC_SUPPORT
 
 /*-------------------------------------------------------------------------*/
 size_t
@@ -20731,6 +23052,9 @@ interpreter_overhead (void)
 
     return sum;
 } /* interpreter_overhead() */
+
+
+#ifdef GC_SUPPORT
 
 /*-------------------------------------------------------------------------*/
 void
@@ -21045,7 +23369,7 @@ last_instructions (int length, Bool verbose, svalue_t **svpp)
                     );
                     last_instr_output(buf, svpp);
                     old_obj = previous_objects[i];
-                    strncpy(old_file, file, sizeof old_file - 1);
+                    xstrncpy(old_file, file, sizeof old_file - 1);
                 }
             }
             sprintf(buf, "%6lx: %3d %8s %-26s (%ld:%3ld)"
@@ -21170,6 +23494,8 @@ count_inherits (program_t *progp)
         if (NULL == register_pointer(ptable, progp2))
             continue;
         progp2->extra_ref = 1;
+        if (progp2->blueprint)
+            count_extra_ref_in_object(progp2->blueprint);
         count_inherits(progp2);
     }
 } /* count_inherits() */
@@ -21215,6 +23541,8 @@ count_extra_ref_in_object (object_t *ob)
  */
 
 {
+    Bool was_swapped = MY_FALSE;
+
     ob->extra_ref++;
     if ( NULL == register_pointer(ptable, ob) )
         return;
@@ -21230,23 +23558,27 @@ count_extra_ref_in_object (object_t *ob)
     /* Clones will not add to the ref count of inherited progs */
     if (O_PROG_SWAPPED(ob))
     {
-        /* hmmm, what are we going to do here?
-           we could swap in the object, but this would make debugging
-           of swapping rather unrealistic.
-           At any rate, doing nothing is probably better then referencing
-           a pointer to a freed memory block... unless you can guarantee
-           that freed blocks are never reused again...
-           ... and the pointer is lost, anyway.
-        */
-        NOOP
+         if (load_ob_from_swap(ob) < 0)
+            debug_message( "%s check-refcounts: Program for '%s' can't be "
+                           "swapped in - extra refcounts may be wrong.\n"
+                         , time_stamp(), ob->name);
+         else
+             was_swapped = MY_TRUE;
     }
-    else
+
+    if (!O_PROG_SWAPPED(ob))
     {
-        if (NULL == register_pointer(ptable, ob->prog))
-            return;
-        ob->prog->extra_ref = 1;
-        count_inherits(ob->prog);
+        if (NULL != register_pointer(ptable, ob->prog))
+        {
+            ob->prog->extra_ref = 1;
+            if (ob->prog->blueprint)
+                count_extra_ref_in_object(ob->prog->blueprint);
+            count_inherits(ob->prog);
+        }
     }
+
+    if (was_swapped)
+        swap_program(ob);
 
     if (ob->flags & O_SHADOW)
     {
@@ -21407,7 +23739,6 @@ check_a_lot_ref_counts (program_t *search_prog)
  * The function must be called after removing all destructed objects.
  *
  * TODO: No extra_refs implemented in mappings.
- * TODO: Is the process still correct?
  * TODO: Put this code somewhere else.
  */
 
@@ -21458,7 +23789,7 @@ check_a_lot_ref_counts (program_t *search_prog)
 
     /* The current stack.
      */
-    count_extra_ref_in_vector(start_of_stack, (size_t)(inter_sp - start_of_stack + 1));
+    count_extra_ref_in_vector(VALUE_STACK, (size_t)(inter_sp - VALUE_STACK + 1));
     if (d_flag > 3)
     {
         debug_message("%s stack evaluated\n", time_stamp());
@@ -21491,25 +23822,25 @@ check_a_lot_ref_counts (program_t *search_prog)
     /* To cound the closure hooks properly, we have to fiddle the
      * types a bit.
      */
-    for (i = NUM_CLOSURE_HOOKS; --i >= 0; )
+    for (i = NUM_DRIVER_HOOKS; --i >= 0; )
     {
-        if (closure_hook[i].type == T_CLOSURE
-         && closure_hook[i].x.closure_type == CLOSURE_LAMBDA)
+        if (driver_hook[i].type == T_CLOSURE
+         && driver_hook[i].x.closure_type == CLOSURE_LAMBDA)
         {
-            closure_hook[i].x.closure_type = CLOSURE_UNBOUND_LAMBDA;
+            driver_hook[i].x.closure_type = CLOSURE_UNBOUND_LAMBDA;
         }
     }
 
-    count_extra_ref_in_vector(closure_hook, NUM_CLOSURE_HOOKS);
+    count_extra_ref_in_vector(driver_hook, NUM_DRIVER_HOOKS);
 
     /* Undo the type fiddling.
      */
-    for (i = NUM_CLOSURE_HOOKS; --i >= 0; )
+    for (i = NUM_DRIVER_HOOKS; --i >= 0; )
     {
-        if (closure_hook[i].type == T_CLOSURE
-         && closure_hook[i].x.closure_type == CLOSURE_UNBOUND_LAMBDA)
+        if (driver_hook[i].type == T_CLOSURE
+         && driver_hook[i].x.closure_type == CLOSURE_UNBOUND_LAMBDA)
         {
-            closure_hook[i].x.closure_type = CLOSURE_LAMBDA;
+            driver_hook[i].x.closure_type = CLOSURE_LAMBDA;
         }
     }
 
@@ -21537,15 +23868,17 @@ check_a_lot_ref_counts (program_t *search_prog)
             continue;
 
         if (ob->ref != ob->extra_ref)
-             fatal("Bad ref count in object %s, %ld - %ld\n", ob->name,
-                  ob->ref, ob->extra_ref);
-
-        if ( !(ob->flags & O_SWAPPED) )
+        {
+             debug_message("%s Bad ref count in object %s, %ld - %ld\n"
+                          , time_stamp()
+                          , ob->name, ob->ref, ob->extra_ref);
+        }
+        else if ( !(ob->flags & O_SWAPPED) )
         {
             if (ob->prog->ref != ob->prog->extra_ref)
             {
                 /* an inheriting file might be swapped */
-                if (TIME_TO_SWAP > 0 && time_to_swap + 1 > 0
+                if (time_to_swap + 1 > 0
                  && ob->prog->ref > ob->prog->extra_ref)
                 {
                     debug_message("%s high ref count in prog %s, %ld - %ld\n"
@@ -21555,15 +23888,17 @@ check_a_lot_ref_counts (program_t *search_prog)
                 else
                 {
                     check_a_lot_ref_counts(ob->prog);
-                    fatal("Bad ref count in prog %s, %ld - %ld\n",
-                        ob->prog->name, ob->prog->ref, ob->prog->extra_ref);
+                    debug_message("%s Bad ref count in prog %s, %ld - %ld\n"
+                                 , time_stamp()
+                                 , ob->prog->name
+                                 , ob->prog->ref, ob->prog->extra_ref);
                 }
             }
         } /* !SWAPPED */
         check_extra_ref_in_vector(ob->variables, (size_t)ob->extra_num_variables);
     } /* for */
 
-    check_extra_ref_in_vector(start_of_stack, (size_t)(inter_sp - start_of_stack + 1));
+    check_extra_ref_in_vector(VALUE_STACK, (size_t)(inter_sp - VALUE_STACK + 1));
 
     free_pointer_table(ptable);
 } /* check_a_lot_of_ref_counts() */
@@ -21651,13 +23986,9 @@ f_trace (svalue_t *sp)
 
         assign_eval_cost();
         inter_sp = _push_volatile_string("trace", sp);
-        arg = apply_master_ob(STR_VALID_TRACE, 1);
-        if (!arg)
-        {
-            if (out_of_memory)
-                error("Out of memory\n");
-        }
-        else
+        push_number(sp->u.number);
+        arg = apply_master(STR_VALID_TRACE, 2);
+        if (arg)
         {
             /* ... then set the new tracelevel */
             if (arg->type != T_NUMBER || arg->u.number != 0)
@@ -21710,14 +24041,10 @@ f_traceprefix (svalue_t *sp)
         svalue_t *arg;
 
         inter_sp = _push_volatile_string("traceprefix", sp);
+        inter_sp++; assign_svalue_no_free(inter_sp, sp);
         assign_eval_cost();
-        arg = apply_master_ob(STR_VALID_TRACE,1);
-        if (!arg)
-        {
-            if (out_of_memory)
-                error("Out of memory\n");
-        }
-        else
+        arg = apply_master(STR_VALID_TRACE,2);
+        if (arg)
         {
             /* ... then so shall it be */
             if (arg && (arg->type != T_NUMBER || arg->u.number))
@@ -21741,6 +24068,6 @@ f_traceprefix (svalue_t *sp)
     else
         put_number(sp, 0);
     return sp;
-} /* f_trace() */
+} /* f_traceprefix() */
 
 /***************************************************************************/

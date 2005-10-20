@@ -2,7 +2,7 @@ Short: Memoryleak in the actions?
 Date: Thu, 02 Mar 2000 12:35:50 -0700
 From: Lars Duening <Lars.Duening@wcom.com>
 Type: Bug
-State: New
+State: Superseeded by b-011113
 
 A memory leak in the action handling?
 

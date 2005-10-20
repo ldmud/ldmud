@@ -2,7 +2,8 @@ Short: heart_beat prototype causes spurious crashers
 From: N.Ehemann@wzl.rwth-aachen.de
 Date: Fri, 16 Jun 2000 10:06:19 +0200
 Type: Bug
-State: New
+State: Done - fixed in 3.2.9-dev.236
+See also: b-001004
 
 Hi Lars!
 

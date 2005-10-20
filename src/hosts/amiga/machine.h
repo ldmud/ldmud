@@ -1,6 +1,9 @@
 #ifndef MACHINE_H
 #define MACHINE_H
 
+#undef AMIGA
+#define AMIGA 1
+
 /* Define if using alloca.c.  */
 /* #undef C_ALLOCA */
 
@@ -33,6 +36,11 @@
 
 /* Define as the return type of signal handlers (int or void).  */
 #define RETSIGTYPE void
+
+/* Set in response to the signal handler return type, since not all
+ * compilers understand direct definition comparisons
+ */
+#define RETSIGTYPE_VOID 1
 
 /* Define to `unsigned' if <sys/types.h> doesn't define.  */
 /* #undef size_t */
@@ -84,9 +92,6 @@
 
 /* the atari strtol() used to consider characters '9' < c < 'A' to be numeric */
 /* #undef STRTOL_BROKEN */
-
-/* does the libc consider it normal to free a null pointer? */
-/* #undef FREE_NULL_POINTER */
 
 /* needs the first argument of strtol be declared as const ? */
 /* #undef STRTOL_CONST_CHARP */

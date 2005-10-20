@@ -1,5 +1,8 @@
+OPTIONAL
 SYNOPSIS
         int db_connect(string database)
+        int db_connect(string database, string user)
+        int db_connect(string database, string user, string password)
 
 DESCRIPTION
         Connect to the database <database> on the local mySQL-server.
@@ -7,6 +10,15 @@ DESCRIPTION
         If the database does not exist or the server is NOT started,
         a runtime-error is raised.
 
+        If specified, the connection is made for <user> with <password>.
+
+        The function is available only if the driver is compiled with
+        mySQL support. In that case, __MYSQL__ is defined.
+
+HISTORY
+        Added in 3.2.9 .
+
 SEE ALSO
-        db_affected_rows(E), db_conv_string(E), db_close(E), db_connect(E),
-        db_exec(E), db_fetch(E), db_handles(E)
+        db_affected_rows(E), db_conv_string(E), db_close(E), db_coldefs(E),
+        db_exec(E), db_error(E), db_fetch(E), db_handles(E),
+        db_insert_id(E), mysql(C)

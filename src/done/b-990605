@@ -2,7 +2,7 @@ Short: inter_sp often wrong
 From: Michael Sporn
 Date: 990605
 Type: Bug
-State: Unclassified
+State: Done.
 
 In a lot of places where an error is thrown, inter_sp points to the wrong
 address.

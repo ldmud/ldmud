@@ -1,16 +1,18 @@
 #!/bin/sh
 #
 # Settings for the Avalon MUDlib
+# Change: 22.02.2002 Alwin@avalon enabled mysql part
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/home/mud --libdir=/home/mud/mudlib --libexecdir=/home/mud/erq --with-setting=avalon $*
+export EXTRA_CFLAGS="-mcpu=i686 -march=i686"
+exec ./configure --prefix=/home/mud --libdir=/home/mud/mudlib --libexecdir=/home/mud/erq --enable-erq=xerq --with-setting=avalon $*
 exit 1
 
 # --- The actual settings ---
 
 with_portno=7777
-with_catch_udp_port=4246
+with_udp_port=4246
 with_max_players=200
 enable_access_control=no
 
@@ -32,13 +34,14 @@ enable_initialization_by___init=yes
 
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
+enable_use_mysql=/usr/lib/mysql
 
-with_htable_size=16384
-with_otable_size=4096
+with_htable_size=65536
+with_otable_size=8192
 
 with_max_malloced=0x20000000
 
-with_max_array_size=6000
+with_max_array_size=10000
 with_max_mapping_size=40000
 with_max_byte_transfer=100000
 with_read_file_max_size=100000

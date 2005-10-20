@@ -94,9 +94,18 @@
  */
 #undef USE_IPV6
 
+/* Define this if you want mySQL support (assuming that your host
+ * actually offers this.
+ */
+#undef USE_MYSQL
+
 /* Define this if you want the 'nosave' keyword.
  */
 #define USE_LPC_NOSAVE
+
+/* Define this if you want the obsolete and deprecated efuns.
+ */
+#define USE_DEPRECATED
 
 /*
  * Max number of local variables in a function.
@@ -123,10 +132,21 @@
  */
 #define SWAP_FILE		"LP_SWAP.3"
 
+/* Where to save the WIZLIST information.
+ * If not defined, and neither given on the commandline, the driver will
+ * not create the WIZLIST file.
+ */
+#define WIZLIST_FILE              "WIZLIST"
+
 /*
  * This is the maximum array size allowed for one single array.
  */
 #define MAX_ARRAY_SIZE 3000
+
+/* This is the maximum number of callouts allowed at one time.
+ * If 0, any number is allowed.
+ */
+#define MAX_CALLOUTS              0
 
 /*
  * Define LOG_SHOUT if you want all shouts to be logged in
@@ -224,16 +244,11 @@
 
 #define MAX_BYTE_TRANSFER 50000
 
-/*
- * CATCH_UDP_PORT
- *
- * Define this if the mud are to catch incoming udp messages on a
- * specific port. If == -1 it will not be used unless the mud is started
- * with the -u### flag. Where ### is the portnumber for the udp port.
- * If undefined the -u flag will be ignored.
+/* Define this to the port on which the driver can receive UDP message.
+ * If set to -1, the port will not be opened unless the mud is given a valid
+ * port number on startup with the -u commandline option.
  */
-#undef CATCH_UDP_PORT	4246
-#undef UDP_SEND
+#define UDP_PORT                 4246
 
 #define COMM_STAT
 #define APPLY_CACHE_STAT
@@ -246,17 +261,27 @@
 
 #define MALLOC_smalloc
 
-/* When smalloc is used without SBRK_OK and MIN_MALLOCED is defined,
- * the gamedriver will reserve this amount of memory on startup for
- * large blocks, thus reducing the large block fragmentation. The value
- * therefore should be a significantly large multiple of the large
- * chunk size.
+/* If MIN_MALLOCED is > 0, the gamedriver will reserve this amount of
+ * memory on startup for large blocks, thus reducing the large block
+ * fragmentation. The value therefore should be a significantly large
+ * multiple of the large chunk size.
+ * As a rule of thumb, reserve enough memory to cover the first couple
+ * of days of uptime.
  */
-/* #define MIN_MALLOCED	   0x1000000 */
+#define MIN_MALLOCED	   0
 
-/* When smalloc is used, these two values give the upper limits for
- * large and small block allocation (useful for systems with no
- * functioning process limit).
+/* If MIN_SMALL_MALLOCED is > 0, the gamedriver will reserve this
+ * amount of memory on startup for small blocks, thus reducing the small block
+ * fragmentation. The value therefore should be a significantly large
+ * multiple of the small chunk size.
+ * As a rule of thumb, reserve enough memory to cover the first couple
+ * of days of uptime.
+ */
+#define MIN_SMALL_MALLOCED   0
+
+/* This value gives the upper limit for the total allocated memory
+ * (useful for systems with no functioning process limit).
+ * A value of 0 means 'unlimited'.
  */
 #define MAX_MALLOCED	   0x4000000
 
@@ -272,7 +297,139 @@
  */
 #undef MALLOC_LPC_TRACE
 
+/* Trace the most recently executed bytecode instructions?
+ */
+#define TRACE_CODE
+
 /* If using TRACE_CODE , how many instructions should be kept? */
 #define TOTAL_TRACE_LENGTH 0x1000
+
+/* Define USE_PCRE if you want to use perl compatible regexp with
+ * your driver. This feature requires Fiona@Wunderland's pcre driver patch
+ * and PCRE installed on the machine.
+ */
+#undef USE_PCRE
+
+/* Define USE_SET_LIGHT if you want to use the efun set_light() and the
+ * driver-provided light system.
+ */
+#define USE_SET_LIGHT
+
+/* Define USE_SET_IS_WIZARD if you want to use the efun set_is_wizard().
+ */
+#define USE_SET_IS_WIZARD
+
+/* Define USE_PROCESS_STRING if you want to use the efun process_string().
+ */
+#define USE_PROCESS_STRING
+
+/* If you want to use threads to write the data to the sockets
+ * define USE_PTHREADS. To limit the memory usage of each thread
+ * define PTHREAD_WRITE_MAX_SIZE to a value greater than zero.
+ * The implementation will discard the oldest not yet written
+ * data blocks to keep memoty usage under the limit.
+ */
+#undef USE_PTHREADS
+#define PTHREAD_WRITE_MAX_SIZE 100000
+
+/*----------------------------------------------------------------*/
+/* The following macros activate various debugging and profiling
+ * code segments.
+ */
+
+/* Enable basic run time sanity checks. This will use more time
+ * and space, but nevertheless you are strongly encouraged to keep
+ * it defined.
+ */
+#define DEBUG
+
+/* The DEBUG level for the ERQ daemon: 0 means 'no debug', 1 means
+ * 'standard debug', 2 means 'verbose debug'.
+ */
+#define ERQ_DEBUG 0
+
+/* Enable debug output from the LPC compiler.
+ */
+/* #define YYDEBUG 1 */
+
+/* Disable inlining.
+ */
+/* #define NO_INLINES */
+
+/* Enable the shared string checking (enables commandline option
+ * --check-strings).
+ */
+#define CHECK_STRINGS
+
+/* Shared strings are never really freed.
+ */
+/* #define KEEP_STRINGS */
+
+/* Activate debug prints in the telnet machine.
+ */
+/* #define DEBUG_TELNET */
+
+/* Activate allocation debug prints in the smalloc module.
+ */
+/* #define DEBUG_SMALLOC_ALLOCS */
+
+/* Trace changes to the tot_alloc_object and tot_alloc_object_size
+ * statistics, in order to find the status bugs (enables commandline
+ * option --check-object-stat). Will produce a decent amount of
+ * output on stderr.
+ */
+#define CHECK_OBJECT_STAT
+
+/* Activate Mapping consistency check code. It slows the mapping
+ * activities down and was used to find the notorious FinalFrontier
+ * mapping bug.
+ */
+/* #define CHECK_MAPPINGS */
+
+/* Activate total mapping size consistency check code. It has a small
+ * impact on the execution speed. This define was used to find
+ * the inaccuracy in the mapping statistic.
+ */
+/* #define CHECK_MAPPING_TOTAL */
+
+/* Activate object refcount check code. It will produce a decent
+ * amount of log output. It will also fatal() the driver as soon
+ * as it detects an inconsistency in the list of destructed objects.
+ */
+/* #define CHECK_OBJECT_REF */
+
+/* Activate object referencing checking code during the GC. It will
+ * print error messages to gcout when an object or program is
+ * referenced as something else. No penalty for using.
+ * Requires MALLOC_TRACE to work. Incompatible with DUMP_GC_REFS.
+ */
+#ifdef MALLOC_TRACE
+#    define CHECK_OBJECT_GC_REF
+#endif
+
+/* Activate total smalloc size consistency check code. This will produce
+ * a lot of output in the GC log.
+ */
+/* #define CHECK_SMALLOC_TOTAL */
+
+/* Sometimes the GC stumbles over invalid references to memory
+ * blocks (namely 'Program referenced as something else'). Define
+ * this macro to get a detailed dump of all found references
+ * (Warning: LOTS of output!). Incompatible with CHECK_OBJECT_GC_REF.
+ */
+/* #define DUMP_GC_REFS */
+
+/* Enable usage statistics of VM instructions.
+ * For profiling of the VM instructions themselves, see the Profiling
+ * Options in the Makefile.
+ */
+/* #define OPCPROF */
+
+#ifdef OPCPROF
+/* With OPCPROF, the dump of the statistics include the names
+ * of the instructions.
+ */
+/* #define VERBOSE_OPCPROF */
+#endif
 
 #endif /* CONFIG_H */

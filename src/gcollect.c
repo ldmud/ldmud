@@ -36,6 +36,9 @@
  *     void clear_inherit_ref(program_t *p)
  *         Clear the refcounts of all inherited programs of <p>.
  *
+ *     void clear_object_ref(object_t *p)
+ *         Make sure that the refcounts in object <p> are cleared.
+ *
  *     void mark_program_ref(program_t *p);
  *         Set the marker of program <p> and of all data referenced by <p>.
  *
@@ -63,7 +66,10 @@
 #include "typedefs.h"
 
 #include <sys/types.h>
+#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
+#include <time.h>
 #include <stdio.h>
 
 #define NO_REF_STRING
@@ -110,18 +116,18 @@ time_t time_last_gc = 0;
 
 #if defined(GC_SUPPORT)
 
-int gcollect_outfd = 2;
-#define gout gcollect_outfd
-  /* The file (default is stderr) to dump the reclaimed blocks on.
+int default_gcollect_outfd = 2;
+  /* The default file (default is stderr) to dump the reclaimed blocks on.
    */
 
+int gcollect_outfd = 2;
+#define gout gcollect_outfd
+  /* The current file (default is stderr) to dump the reclaimed blocks on.
+   * After the GC, this will be reset to <default_gcollect_outfd>.
+   */
 
-/* Are the ref counts unusable, i.e. is phase 2 or two 3 in progress ? */
-int garbage_collection_in_progress = 0;
+gc_status_t gc_status = gcInactive;
   /* The current state of the garbage collection.
-   *   0 means 'no collection' is active, i.e. all refcounts are valid
-   *   2 is the 'clear refcounts' phase
-   *   3 is the 'recompute refcounts' phase
    * swap uses this information when swapping in objects.
    */
 
@@ -158,9 +164,31 @@ static size_t num_alloc_strings;
   /* Clear the memory block marker for <p>
    */
 
+#ifdef CHECK_OBJECT_GC_REF
+static unsigned long gc_mark_ref(void * p, const char * file, int line)
+{
+    if (is_object_allocation(p))
+    {
+        dprintf3(gout, "DEBUG: Object %x referenced as something else from %s:%d\n"
+               , (p_int)p, (p_int)file, (p_int)line);
+    }
+    if (is_program_allocation(p))
+    {
+        dprintf3(gout, "DEBUG: Program %x referenced as something else from %s:%d\n"
+               , (p_int)p, (p_int)file, (p_int)line);
+    }
+    return ( ((p_uint *)(p))[-SMALLOC_OVERHEAD] |= M_REF );
+}
+
+#define MARK_REF(p) gc_mark_ref(p, __FILE__, __LINE__)
+#define MARK_PLAIN_REF(p) ( ((p_uint *)(p))[-SMALLOC_OVERHEAD] |= M_REF )
+
+#else
 #define MARK_REF(p) ( ((p_uint *)(p))[-SMALLOC_OVERHEAD] |= M_REF )
   /* Set the memory block marker for <p>
    */
+#define MARK_PLAIN_REF(p) MARK_REF(p)
+#endif
 
 #define TEST_REF(p) ( !( ((p_uint *)(p))[-SMALLOC_OVERHEAD] & M_REF ) )
   /* Check the memory block marker for <p>, return TRUE if _not_ set.
@@ -171,16 +199,18 @@ static size_t num_alloc_strings;
    * Return TRUE if the marker was not set, FALSE else.
    */
 
-#define STRING_REFS(str)  (*(unsigned short *)((char *) (str)\
-                           - sizeof(unsigned short)))
+#define STRING_REFS(str)  (*(StrRefCount *)((char *) (str)\
+                           - sizeof(StrRefCount)))
   /* Return the refcount of shared string <str>
    */
 
 #if !defined(CHECK_STRINGS) && !defined(DEBUG)
 
+#ifndef DUMP_GC_REFS
+
 #define MARK_STRING_REF(str) ((void)(\
     STRING_REFS(str)++ || (\
-        CHECK_REF( (str)-sizeof(short)-sizeof(char *) ) ||\
+        CHECK_REF( (str)-sizeof(StrRefCount)-sizeof(char *) ) ||\
             /* reached max ref count, which is given as 0... */ \
             STRING_REFS(str)--\
     ))\
@@ -191,11 +221,25 @@ static size_t num_alloc_strings;
    * will return TRUE, otherwise we have an overflow and the STRING_REFS--
    * will undo the ++ from earlier.
    */
+
+#else
+
+#define MARK_STRING_REF(p) \
+    do { char *p_ = p; \
+         dprintf4(gcollect_outfd, "Mark string ref %x (%x): %s %d\n", (long)p_, (long)(p_-sizeof(StrRefCount)-sizeof(char*)), (long)__FILE__, (long)__LINE__); \
+        STRING_REFS(p_)++ \
+        || (CHECK_REF( (p_)-sizeof(StrRefCount)-sizeof(char *) ) \
+            ||  STRING_REFS(p_)-- \
+           ); \
+    } while(0)
+
+#endif /* DUMP_GC_REFS */
+
 #else
 
 static void MARK_STRING_REF (char * str)
 {
-    if (CHECK_REF( (str)-sizeof(short)-sizeof(char *) ) )
+    if (CHECK_REF( (str)-sizeof(StrRefCount)-sizeof(char *) ) )
     {
         /* First visit to this block */
         STRING_REFS(str)++;
@@ -226,7 +270,10 @@ static void MARK_STRING_REF (char * str)
 
 static void clear_map_ref_filter (svalue_t *, svalue_t *, void *);
 static void clear_ref_in_closure (lambda_t *l, ph_int type);
-static void count_ref_in_closure (svalue_t *csvp);
+static void gc_count_ref_in_closure (svalue_t *csvp);
+
+#define count_ref_in_closure(p) \
+    GC_REF_DUMP(svalue_t*, p, "Count ref in closure", gc_count_ref_in_closure)
 
 #endif /* MALLOC_smalloc */
 
@@ -258,7 +305,7 @@ write_malloc_trace (void * p)
 
 #else
 
-#define write_malloc_trace(p) 
+#define write_malloc_trace(p)
 #define WRITES(d, s)
 
 #endif /* MALLOC_TRACE */
@@ -276,34 +323,42 @@ clear_memory_reference (void *p)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-note_ref (void *p)
+gc_note_ref (void *p
+#ifdef CHECK_OBJECT_GC_REF
+            , const char * file, int line
+#endif
+            )
 
 /* Note the reference to memory block <p>.
- * Reference a memory block <p>, and write a diagnostic if it is the
- * second reference.
+ *
+ * It is no use to write a diagnostic on the second or higher reference
+ * to the memory block, as this can happen when an object is swapped in,
+ * marked, swapped out, and the next swapped-in object reuses the memory block
+ * released from the one before.
  */
 
 {
     if (TEST_REF(p))
     {
+#ifdef CHECK_OBJECT_GC_REF
+        gc_mark_ref(p, file, line);
+#else
         MARK_REF(p);
+#endif
         return;
     }
+} /* gc_note_ref() */
 
-    /* This was:
+#ifdef CHECK_OBJECT_GC_REF
+void gc_note_malloced_block_ref (void *p, const char * file, int line) { gc_note_ref(p, file, line); }
+#define note_ref(p) gc_note_ref(p, __FILE__, __LINE__)
+#define passed_note_ref(p) gc_note_ref(p, file, line)
+#else
+void gc_note_malloced_block_ref (void *p) { gc_note_ref(p); }
 
-    write_malloc_trace(p);
-    WRITES(gout, "memory block referenced twice or more\n");
-
-     * This situation arises during the mark phase if an object
-     * swapped in, marked, swapped out, and the next swapped-in
-     * object reuses the memory block released from the one
-     * before.
-     */
-
-} /* note_ref() */
-
-void note_malloced_block_ref (void *p) { note_ref(p); }
+#define note_ref(p) GC_REF_DUMP(void*, p, "Note ref", gc_note_ref)
+#define passed_note_ref(p) note_ref(p)
+#endif
 
 /*-------------------------------------------------------------------------*/
 void
@@ -329,17 +384,46 @@ clear_inherit_ref (program_t *p)
             clear_inherit_ref(p2);
         }
     }
-}
+} /* clear_inherit_ref() */
 
 /*-------------------------------------------------------------------------*/
 void
-mark_program_ref (program_t *p)
+clear_object_ref (object_t *p)
+
+/* If <p> is a destructed object, its refcounts are cleared.
+ * If <p> is a live object, its refcounts are assumed to be cleared
+ * by the GC main method.
+ */
+
+{
+    if ((p->flags & O_DESTRUCTED) && p->ref)
+    {
+        p->ref = 0;
+        p->prog->ref = 0;
+        if (p->prog->blueprint
+         && (p->prog->blueprint->flags & O_DESTRUCTED)
+         && p->prog->blueprint->ref
+           )
+        {
+            p->prog->blueprint->ref = 0;
+        }
+        clear_inherit_ref(p->prog);
+    }
+} /* clear_object_ref() */
+
+/*-------------------------------------------------------------------------*/
+void
+gc_mark_program_ref (program_t *p)
 
 /* Set the marker of program <p> and of all data referenced by <p>.
  */
 
 {
+#ifdef CHECK_OBJECT_GC_REF
+    if (TEST_REF(p) && ( MARK_PLAIN_REF(p),MY_TRUE ) )
+#else
     if (CHECK_REF(p))  /* ...then mark referenced data */
+#endif
     {
         int i;
 
@@ -349,9 +433,32 @@ mark_program_ref (program_t *p)
         variable_t *variable_names;
 
         if (p->ref++)
-            fatal("First reference to program, but ref count != 0\n");
+        {
+            dump_malloc_trace(1, p);
+            fatal("First reference to program %p '%s', but ref count %ld != 0\n"
+                 , p, p->name, (long)p->ref - 1
+                 );
+        }
 
-        if (p->swap_num != -1 && p->line_numbers)
+        /* Mark the blueprint object, if any */
+        if (p->blueprint)
+        {
+            if (p->blueprint->flags & O_DESTRUCTED)
+            {
+                reference_destructed_object(p->blueprint);
+                p->blueprint = NULL;
+                remove_prog_swap(p, MY_TRUE);
+            }
+            else
+            {
+                p->blueprint->ref++;
+                /* No note_ref() necessary: the blueprint is in
+                 * the global object list
+                 */
+            }
+        }
+
+        if (p->line_numbers)
             note_ref(p->line_numbers);
 
         /* Non-inherited functions */
@@ -391,18 +498,47 @@ mark_program_ref (program_t *p)
         for (i=0; i< p->num_inherited; i++)
             mark_program_ref(p->inherit[i].prog);
 
+        /* Included files */
+
+        for (i=0; i< p->num_includes; i++)
+        {
+            char *str;
+            str = p->includes[i].name; MARK_STRING_REF(str);
+            str = p->includes[i].filename; MARK_STRING_REF(str);
+        }
+
         note_ref(p->name);
     }
     else
     {
         if (!p->ref++)
-            fatal("Program block referenced as something else\n");
+        {
+            dump_malloc_trace(1, p);
+            fatal("Program block %p '%s' referenced as something else\n"
+                 , p, p->name);
+        }
     }
-}
+} /* gc_mark_program_ref() */
+
+/*-------------------------------------------------------------------------*/
+static void
+mark_object_ref (object_t *ob)
+
+/* Mark the object <ob> as referenced and increase its refcount.
+ * This method should be called only for destructed objects and
+ * from the GC main loop for the initial count of live objects.
+ */
+
+{
+    MARK_PLAIN_REF(ob); ob->ref++;
+    mark_program_ref(ob->prog);
+    note_ref(ob->name);
+    MARK_STRING_REF(ob->load_name);
+} /* mark_object_ref() */
 
 /*-------------------------------------------------------------------------*/
 void
-reference_destructed_object (object_t *ob)
+gc_reference_destructed_object (object_t *ob)
 
 /* Note the reference to a destructed object <ob>. The referee has to
  * replace its reference by a svalue.number 0 since all these objects
@@ -413,37 +549,41 @@ reference_destructed_object (object_t *ob)
     if (TEST_REF(ob))
     {
         if (ob->ref)
-            fatal("First reference to destructed object, but ref count != 0\n");
+        {
+            dump_malloc_trace(1, ob);
+            fatal("First reference to destructed object %p '%s', "
+                  "but ref count %ld != 0\n"
+                 , ob, ob->name, (long)ob->ref
+                 );
+        }
 
         /* Destructed objects are not swapped */
         ob->next_all = gc_obj_list_destructed;
         gc_obj_list_destructed = ob;
-        MARK_REF(ob);
-        mark_program_ref(ob->prog);
-        note_ref(ob->name);
-        MARK_STRING_REF(ob->load_name);
-        ob->ref++;
+        mark_object_ref(ob);
     }
     else
     {
         if (!ob->ref)
         {
             write_malloc_trace(ob);
-            fatal("Destructed object referenced as something else\n");
+            dump_malloc_trace(1, ob);
+            fatal("Destructed object %p '%s' referenced as something else\n"
+                 , ob, ob->name);
         }
     }
-}
+} /* gc_reference_destructed_object() */
 
 /*-------------------------------------------------------------------------*/
 void
-count_ref_from_string (char *p)
+gc_count_ref_from_string (char *p)
 
 /* Count the reference to shared string <p>.
  */
 
 {
    MARK_STRING_REF(p);
-}
+} /* gc_count_ref_from_string() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -480,12 +620,7 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
              * cleared by the obj_list because it is no longer a member
              * Alas, swapped objects must not have prog->ref cleared.
              */
-            if (p->u.ob->flags & O_DESTRUCTED && p->u.ob->ref)
-            {
-                p->u.ob->ref = 0;
-                p->u.ob->prog->ref = 0;
-                clear_inherit_ref(p->u.ob->prog);
-            }
+            clear_object_ref(p->u.ob);
             continue;
 
         case T_POINTER:
@@ -521,12 +656,8 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
                     clear_ref_in_closure(l, p->x.closure_type);
                 }
             }
-            else if (p->u.ob->flags & O_DESTRUCTED && p->u.ob->ref)
-            {
-                p->u.ob->ref = 0;
-                p->u.ob->prog->ref = 0;
-                clear_inherit_ref(p->u.ob->prog);
-            }
+            else
+                clear_object_ref(p->u.ob);
             continue;
         }
     }
@@ -534,9 +665,19 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
 
 /*-------------------------------------------------------------------------*/
 void
-count_ref_in_vector (svalue_t *svp, size_t num)
+gc_count_ref_in_vector (svalue_t *svp, size_t num
+#ifdef CHECK_OBJECT_GC_REF
+            , const char * file, int line
+#endif
+                       )
 
 /* Count the references the <num> elements of vector <p>.
+ * Closures bound to destructed objects are replaced by #'undef operator
+ * closures.
+ * TODO: Was the done to preserve sorting orders? Apart from callbacks,
+ * TODO:: replacing it by 0 would do (but see mapping.c). Or even better:
+ * TODO:: introduce an ILLEGAL svalue type for such occasions which compares
+ * TODO:: equal to svalue 0.
  */
 
 {
@@ -570,7 +711,12 @@ count_ref_in_vector (svalue_t *svp, size_t num)
             /* Don't use CHECK_REF on the null vector */
             if (p->u.vec != &null_vector && CHECK_REF(p->u.vec))
             {
+                count_array_size(p->u.vec);
+#ifdef CHECK_OBJECT_GC_REF
+                gc_count_ref_in_vector(&p->u.vec->item[0], VEC_SIZE(p->u.vec), file, line);
+#else
                 count_ref_in_vector(&p->u.vec->item[0], VEC_SIZE(p->u.vec));
+#endif
             }
             p->u.vec->ref++;
             continue;
@@ -585,9 +731,10 @@ count_ref_in_vector (svalue_t *svp, size_t num)
                 m = p->u.map;
                 cm = m->condensed;
                 num_values = m->num_values;
-                note_ref((char *)CM_MISC(cm) - cm->misc_size *(num_values + 1));
+                passed_note_ref((char *)CM_MISC(cm) - cm->misc_size *(num_values + 1));
                 /* hash mappings have been eleminated at the start */
                 count_ref_in_mapping(m);
+                count_mapping_size(m);
             }
             p->u.map->ref++;
             continue;
@@ -596,7 +743,7 @@ count_ref_in_vector (svalue_t *svp, size_t num)
               switch(p->x.string_type)
               {
               case STRING_MALLOC:
-                  note_ref(p->u.string);
+                  passed_note_ref(p->u.string);
                   size_alloc_strings += strlen(p->u.string)+1;
                   num_alloc_strings++;
                   break;
@@ -638,7 +785,7 @@ count_ref_in_vector (svalue_t *svp, size_t num)
               continue;
         }
     } /* for */
-}
+} /* gc_count_ref_in_vector() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -675,7 +822,7 @@ remove_unreferenced_string (char *start, char *string)
 
 /*-------------------------------------------------------------------------*/
 static void
-note_action_ref (action_t *p)
+gc_note_action_ref (action_t *p)
 
 /* Mark the strings of function and verb of all sentences in list <p>.
  */
@@ -690,13 +837,21 @@ note_action_ref (action_t *p)
     } while ( NULL != (p = (action_t *)p->sent.next) );
 }
 
+#define note_action_ref(p) \
+    GC_REF_DUMP(action_t*, p, "Note action ref", gc_note_action_ref)
+
 /*-------------------------------------------------------------------------*/
 static void
-count_ref_in_closure (svalue_t *csvp)
+gc_count_ref_in_closure (svalue_t *csvp)
 
 /* Count the reference to closure <csvp> and all referenced data.
  * Closures using a destructed object are stored in the stale_ lists
- * for later removal (and .ref is set to -1).
+ * for later removal (and .ref is set to -1), and the svalue is transformed
+ * into a #'undef operator closure.
+ * TODO: Was the transform done to preserve sorting orders? Apart from callbacks,
+ * TODO:: replacing it by 0 would do (but see mapping.c). Or even better:
+ * TODO:: introduce an ILLEGAL svalue type for such occasions which compares
+ * TODO:: equal to svalue 0.
  */
 
 {
@@ -840,23 +995,12 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
         }
     }
 
-    if (type != CLOSURE_UNBOUND_LAMBDA && l->ob->flags & O_DESTRUCTED
-     && l->ob->ref /* block against bad efficency due to multiple refs */ )
-    {
-        l->ob->ref = 0;
-        l->ob->prog->ref = 0;
-        clear_inherit_ref(l->ob->prog);
-    }
+    if (type != CLOSURE_UNBOUND_LAMBDA)
+        clear_object_ref(l->ob);
 
-    if (type == CLOSURE_ALIEN_LFUN
-     && l->function.alien.ob->flags & O_DESTRUCTED
-     && l->function.alien.ob->ref)
-    {
-        l->function.alien.ob->ref = 0;
-        l->function.alien.ob->prog->ref = 0;
-        clear_inherit_ref(l->function.alien.ob->prog);
-    }
-}
+    if (type == CLOSURE_ALIEN_LFUN)
+        clear_object_ref(l->function.alien.ob);
+} /* clear_ref_in_closure() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -870,6 +1014,23 @@ remove_uids (int smart UNUSED)
 #endif
     NOOP
 }
+
+/*-------------------------------------------------------------------------*/
+void
+restore_default_gc_log (void)
+
+/* If gcollect_outfd was redirected to some other file, that file is
+ * closed and the default log file is restored.
+ */
+
+{
+    if (gcollect_outfd != default_gcollect_outfd)
+    {
+        if (gcollect_outfd != 1 && gcollect_outfd != 2)
+            close(gcollect_outfd);
+        gcollect_outfd = default_gcollect_outfd;
+    }
+} /* restore_default_log() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -888,15 +1049,20 @@ garbage_collection(void)
     object_t *ob, *next_ob;
     lambda_t *l, *next_l;
     int i;
-    long dobj_count; /* DEBUG: of Object count */
+    long dobj_count;
 
     size_alloc_strings = 0;
     num_alloc_strings = 0;
 
+    if (gcollect_outfd != 1 && gcollect_outfd != 2)
+    {
+        dprintf1(gcollect_outfd, "\n%s --- Garbage Collection ---\n"
+                               , (long)time_stamp());
+    }
+
     /* --- Pass 0: dispose of some unnecessary stuff ---
      */
 
-printf("DEBUG: %s GC start: %ld objects in list, %ld allocated\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object); /* TODO: Remove this line */
     malloc_privilege = MALLOC_MASTER;
     RESET_LIMITS;
     CLEAR_EVAL_COST;
@@ -905,19 +1071,50 @@ printf("DEBUG: %s GC start: %ld objects in list, %ld allocated\n", time_stamp(),
     malloc_privilege = MALLOC_SYSTEM;
     if (obj_list_replace)
         replace_programs();
-    remove_destructed_objects();
+    handle_newly_destructed_objects();
     free_interpreter_temporaries();
     free_action_temporaries();
+    remove_stale_player_data();
     remove_stale_call_outs();
     free_defines();
     free_all_local_names();
     remove_unknown_identifier();
+#ifdef USE_FREE_CLOSURE_HOOK
     free_old_driver_hooks();
+#endif
     purge_action_sent();
     purge_shadow_sent();
+    check_wizlist_for_destr();
     compact_mappings(num_dirty_mappings);
+    if (current_error_trace)
+    {
+        free_array(current_error_trace);
+        current_error_trace = NULL;
+    }
+    if (uncaught_error_trace)
+    {
+        free_array(uncaught_error_trace);
+        uncaught_error_trace = NULL;
+    }
 
-printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object); /* TODO: Remove this line */
+    /* Lock all interactive structures (in case we're using threads)
+     * and dispose of the written buffers.
+     */
+    for (i = 0 ; i < MAX_PLAYERS; i++)
+    {
+        if (all_players[i] == NULL)
+            continue;
+
+        interactive_lock(all_players[i]);
+        interactive_cleanup(all_players[i]);
+    }
+
+    remove_destructed_objects(); /* After reducing all object references! */
+
+    clear_array_size();
+    clear_mapping_size();
+
+
     /* --- Pass 1: clear the M_REF flag in all malloced blocks ---
      */
     clear_M_REF_flags();
@@ -925,7 +1122,7 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
     /* --- Pass 2: clear the ref counts ---
      */
 
-    garbage_collection_in_progress = 2;
+    gc_status = gcClearRefs;
     if (d_flag > 3)
     {
         debug_message("%s start of garbage_collection\n", time_stamp());
@@ -950,7 +1147,7 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
         else
         {
             /* Take special care of inherited programs, the associated
-             * objects might me destructed.
+             * objects might be destructed.
              */
             ob->prog->ref = 0;
         }
@@ -971,7 +1168,9 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
             } /* end of ed-buffer processing */
         }
         if (was_swapped)
+        {
             swap(ob, was_swapped);
+        }
     }
     if (d_flag > 3)
     {
@@ -988,45 +1187,39 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
         if (all_players[i] == NULL)
             continue;
 
+#ifdef USE_PTHREADS
+        {
+            struct write_buffer_s *pwb;
+            for (pwb = all_players[i]->write_first; pwb != NULL; pwb = pwb->next)
+                clear_memory_reference(pwb);
+            if ((pwb = all_players[i]->write_current) != NULL)
+                clear_memory_reference(pwb);
+            /* .written_first has been cleaned upL */
+        }
+#endif
         for ( it = all_players[i]->input_to; it != NULL; it = it->next)
         {
             clear_memory_reference(it);
             clear_ref_in_callback(&(it->fun));
+            clear_ref_in_vector(&(it->prompt), 1);
         }
         clear_ref_in_vector(&all_players[i]->prompt, 1);
 
-        if ( NULL != (ob = all_players[i]->snoop_by) )
-        {
-            if (!O_IS_INTERACTIVE(ob))
-            {
-                /* snooping monster */
-                if (ob->flags & O_DESTRUCTED && ob->ref) {
-                    ob->ref = 0;
-                    ob->prog->ref = 0;
-                    clear_inherit_ref(ob->prog);
-                }
-            }
-        } /* end of snoop-processing */
-
-        if ( NULL != (ob = all_players[i]->modify_command) ) {
-            if (ob->flags & O_DESTRUCTED && ob->ref) {
-                ob->ref = 0;
-                ob->prog->ref = 0;
-                clear_inherit_ref(ob->prog);
-            }
-        }
+        /* snoop_by and modify_command are known to be NULL or non-destructed
+         * objects.
+         */
     }
 
     /* Process the driver hooks */
 
-    for (i = NUM_CLOSURE_HOOKS; --i >= 0; ) {
-        if (closure_hook[i].type == T_CLOSURE
-        &&  closure_hook[i].x.closure_type == CLOSURE_LAMBDA)
+    for (i = NUM_DRIVER_HOOKS; --i >= 0; ) {
+        if (driver_hook[i].type == T_CLOSURE
+        &&  driver_hook[i].x.closure_type == CLOSURE_LAMBDA)
         {
-            closure_hook[i].x.closure_type = CLOSURE_UNBOUND_LAMBDA;
+            driver_hook[i].x.closure_type = CLOSURE_UNBOUND_LAMBDA;
         }
     }
-    clear_ref_in_vector(closure_hook, NUM_CLOSURE_HOOKS);
+    clear_ref_in_vector(driver_hook, NUM_DRIVER_HOOKS);
 
     /* Let the modules process their data */
 
@@ -1035,6 +1228,7 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
     clear_ref_from_call_outs();
 #if defined(SUPPLY_PARSE_COMMAND)
     clear_parse_refs();
+    clear_old_parse_refs();
 #endif
     clear_simul_efun_refs();
     clear_interpreter_refs();
@@ -1045,15 +1239,53 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
 
     null_vector.ref = 0;
 
+    /* Finally, walk the list of destructed objects and clear all references
+     * in them.
+     */
+    for (ob = destructed_objs; ob;  ob = ob->next_all)
+    {
+        if (d_flag > 4)
+        {
+            debug_message("%s clearing refs for destructed object '%s'\n"
+                         , time_stamp(), ob->name);
+        }
+
+        ob->prog->ref = 0;
+        clear_inherit_ref(ob->prog);
+        ob->ref = 0;
+    }
+
+
     /* --- Pass 3: Compute the ref counts, and set M_REF where appropriate ---
      */
 
-    garbage_collection_in_progress = 3;
+    gc_status = gcCountRefs;
 
     gc_obj_list_destructed = NULL;
     stale_lambda_closures = NULL;
     stale_misc_closures = NULL;
     stale_mappings = NULL;
+
+
+    /* Handle the known destructed objects first, as later calls to
+     * reference_destructed_object() will clobber the list.
+     */
+    for (ob = destructed_objs; ob; )
+    {
+        object_t *next = ob->next_all;
+
+        dprintf1(gcollect_outfd
+                , "Freeing destructed object '%s'\n"
+                , (p_int)ob->name
+                );
+        reference_destructed_object(ob); /* Clobbers .next_all */
+
+        ob = next;
+    }
+
+    num_destructed = 0;
+    destructed_objs = NULL;
+
 
     /* Process the list of all objects.
      */
@@ -1067,19 +1299,20 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
             was_swapped = load_ob_from_swap(ob);
             if (was_swapped & 1)
             {
+#ifdef DUMP_GC_REFS
+                dprintf1(gcollect_outfd, "Clear ref of swapped-in program %x\n", (long)ob->prog);
+#endif
                 CLEAR_REF(ob->prog);
                 ob->prog->ref = 0;
             }
         }
-        ob->ref++;
-        note_ref(ob);
+
+        mark_object_ref(ob);
 
         if (ob->prog->num_variables)
         {
             note_ref(ob->variables);
         }
-
-        mark_program_ref(ob->prog);
 
         count_ref_in_vector(ob->variables, ob->prog->num_variables);
 
@@ -1108,9 +1341,6 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
                 note_action_ref((action_t *)sent);
         }
 
-        note_ref(ob->name);
-        MARK_STRING_REF(ob->load_name);
-
         if (was_swapped)
         {
             swap(ob, was_swapped);
@@ -1132,45 +1362,40 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
             continue;
 
         note_ref(all_players[i]);
+#ifdef USE_PTHREADS
+        {
+            struct write_buffer_s *pwb;
+            for (pwb = all_players[i]->write_first; pwb != NULL; pwb = pwb->next)
+                note_ref(pwb);
+            if ((pwb = all_players[i]->write_current) != NULL)
+                note_ref(pwb);
+            /* .written_first has been cleaned upL */
+        }
+#endif
 
-        /* There are no destructed interactives */
+        /* There are no destructed interactives, or interactives
+         * referencing destructed objects.
+         */
 
         all_players[i]->ob->ref++;
         if ( NULL != (ob = all_players[i]->snoop_by) )
         {
             if (!O_IS_INTERACTIVE(ob))
             {
-                /* snooping monster */
-                if (ob->flags & O_DESTRUCTED) {
-                    all_players[i]->snoop_by = 0;
-                    reference_destructed_object(ob);
-                } else {
-                    ob->ref++;
-                }
+                ob->ref++;
             }
         } /* end of snoop-processing */
 
         for ( it = all_players[i]->input_to; it != NULL; it = it->next)
         {
-            /* To avoid calling too high-level functions, we want the
-             * input_to_t not to be freed by now.
-             * Thus, we reference the object even if it is destructed.
-             */
             note_ref(it);
             count_ref_in_callback(&(it->fun));
+            count_ref_in_vector(&(it->prompt), 1);
         } /* end of input_to processing */
 
         if ( NULL != (ob = all_players[i]->modify_command) )
         {
-            if (ob->flags & O_DESTRUCTED)
-            {
-                all_players[i]->modify_command = 0;
-                reference_destructed_object(ob);
-            }
-            else
-            {
-                ob->ref++;
-            }
+            ob->ref++;
         }
 
         count_ref_in_vector(&all_players[i]->prompt, 1);
@@ -1201,7 +1426,7 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
     count_compiler_refs();
     count_simul_efun_refs();
 #if defined(SUPPLY_PARSE_COMMAND)
-    count_parse_refs();
+    count_old_parse_refs();
 #endif
     note_shared_string_table_ref();
     note_otable_ref();
@@ -1211,6 +1436,7 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
 #ifdef RXCACHE_TABLE
     count_rxcache_refs();
 #endif
+
 
     if (reserved_user_area)
         note_ref(reserved_user_area);
@@ -1224,17 +1450,17 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
 
     /* Process the driver hooks */
 
-    count_ref_in_vector(closure_hook, NUM_CLOSURE_HOOKS);
-    for (i = NUM_CLOSURE_HOOKS; --i >= 0; )
+    count_ref_in_vector(driver_hook, NUM_DRIVER_HOOKS);
+    for (i = NUM_DRIVER_HOOKS; --i >= 0; )
     {
-        if (closure_hook[i].type == T_CLOSURE &&
-            closure_hook[i].x.closure_type == CLOSURE_UNBOUND_LAMBDA)
+        if (driver_hook[i].type == T_CLOSURE &&
+            driver_hook[i].x.closure_type == CLOSURE_UNBOUND_LAMBDA)
         {
-            closure_hook[i].x.closure_type = CLOSURE_LAMBDA;
+            driver_hook[i].x.closure_type = CLOSURE_LAMBDA;
         }
     }
 
-    garbage_collection_in_progress = 0;
+    gc_status = gcInactive;
 
     /* --- Pass 4: remove stralloced strings with M_REF cleared ---
      */
@@ -1250,8 +1476,9 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
     dobj_count = 0;
     for (ob = gc_obj_list_destructed; ob; ob = next_ob)
     {
-#define W(s) write(1,s,strlen(s)) /* DEBUG: */
-W("DEBUG: GC frees destructed '"); W(ob->name); W("'\n");
+#ifdef DEBUG
+        dprintf1(gcollect_outfd, "DEBUG: GC frees destructed '%s'\n", (p_int)ob->name);
+#endif
         next_ob = ob->next_all;
         free_object(ob, "garbage collection");
         dobj_count++;
@@ -1291,18 +1518,38 @@ W("DEBUG: GC frees destructed '"); W(ob->name); W("'\n");
             RESET_LIMITS;
             CLEAR_EVAL_COST;
             malloc_privilege = MALLOC_MASTER;
-            res = apply_master_ob(STR_QUOTA_DEMON, 0);
+            res = callback_master(STR_QUOTA_DEMON, 0);
         }
         remove_uids(res && (res->type != T_NUMBER || res->u.number) );
     }
 
+    /* Reconsolidate the free lists */
+    consolidate_freelists();
+
     /* Finally, try to reclaim the reserved areas */
 
     reallocate_reserved_areas();
+
     time_last_gc = time(NULL);
-printf("DEBUG: %s GC end: %ld objects in list, %ld allocated; %ld destructed removed\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object, dobj_count); /* TODO: Remove this line */
-printf("DEBUG: %s         %ld malloced strings using %ld bytes.\n", time_stamp(), (long)num_alloc_strings, (long)size_alloc_strings); /* TODO: Remove this line */
-}
+    dprintf2(gcollect_outfd, "%s GC freed %d destructed objects.\n"
+            , (long)time_stamp(), dobj_count);
+
+    /* Lock all interactive structures (in case we're using threads)
+     * and dispose of the written buffers.
+     */
+    for (i = 0 ; i < MAX_PLAYERS; i++)
+    {
+        if (all_players[i] == NULL)
+            continue;
+
+        interactive_unlock(all_players[i]);
+    }
+
+    /* If the GC log was redirected, close that file and set the
+     * logging back to the default file.
+     */
+    restore_default_gc_log();
+} /* garbage_collection() */
 
 
 #if defined(MALLOC_TRACE)
@@ -1324,18 +1571,25 @@ show_string (int d, char *block, int depth UNUSED)
 #endif
     size_t len;
 
-    WRITES(d, "\"");
-    if ((len = strlen(block)) < 70)
+    if (block == NULL)
     {
-        write(d, block, len);
-        WRITES(d, "\"");
+        WRITES(d, "<null>");
     }
     else
     {
-        write(d, block, 50);
-        WRITES(d, "\" (truncated, length ");writed(d, len);WRITES(d, ")");
+        WRITES(d, "\"");
+        if ((len = strlen(block)) < 70)
+        {
+            write(d, block, len);
+            WRITES(d, "\"");
+        }
+        else
+        {
+            write(d, block, 50);
+            WRITES(d, "\" (truncated, length ");writed(d, len);WRITES(d, ")");
+        }
     }
-}
+} /* show_string() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1377,11 +1631,53 @@ show_object (int d, char *block, int depth)
         }
     }
     WRITES(d, "Object: ");
+    if (ob->flags & O_DESTRUCTED)
+        WRITES(d, "(destructed) ");
     show_string(d, ob->name, 0);
+    WRITES(d, " from ");
+    show_string(d, ob->load_name, 0);
     WRITES(d, ", uid: ");
     show_string(d, ob->user->name ? ob->user->name : "0", 0);
     WRITES(d, "\n");
-}
+} /* show_object() */
+
+/*-------------------------------------------------------------------------*/
+static void
+show_cl_literal (int d, char *block, int depth UNUSED)
+
+/* Print the data about literal closure <block> on filedescriptor <d>.
+ */
+
+{
+#ifdef __MWERKS__
+#    pragma unused(depth)
+#endif
+    lambda_t *l;
+    object_t *obj;
+
+    l = (lambda_t *)block;
+
+    WRITES(d, "Closure literal: Object ");
+
+    obj = l->ob;
+    if (obj)
+    {
+        if (obj->name)
+            show_string(d, obj->name, 0);
+        else
+            WRITES(d, "(no name)");
+        if (obj->flags & O_DESTRUCTED)
+            WRITES(d, " (destructed)");
+    }
+    else
+        WRITES(d, "<null>");
+
+    WRITES(d, ", index ");
+    writed(d, l->function.index);
+    WRITES(d, ", ref ");
+    writed(d, l->ref);
+    WRITES(d, "\n");
+} /* show_cl_literal() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1399,12 +1695,23 @@ show_array(int d, char *block, int depth)
     mp_int a_size;
 
     a = (vector_t *)block;
-    a_size = (mp_int)VEC_SIZE(a);
+
+    /* Can't use VEC_SIZE() here, as the memory block may have been
+     * partly overwritten by the smalloc pointers already.
+     */
+    a_size = (mp_int)(  malloced_size(a)
+                   - ( SMALLOC_OVERHEAD +
+                       ( sizeof(vector_t) - sizeof(svalue_t) ) / SIZEOF_CHAR_P
+                     )
+
+                  ) / (sizeof(svalue_t)/SIZEOF_CHAR_P);
+
     if (depth && a != &null_vector)
     {
         int freed;
         wiz_list_t *wl;
 
+        wl = NULL;
         freed = is_freed(block, sizeof(vector_t) );
         if (!freed)
         {
@@ -1428,7 +1735,9 @@ show_array(int d, char *block, int depth)
         user = a->user;
     }
 
-    WRITES(d, "Array size ");writed(d, (p_uint)a_size);
+    WRITES(d, "Array ");
+    write_x(d, (p_int)a);
+    WRITES(d, " size ");writed(d, (p_uint)a_size);
     WRITES(d, ", uid: ");show_string(d, user ? user->name : "0", 0);
     WRITES(d, "\n");
     if (depth > 2)
@@ -1463,12 +1772,12 @@ show_array(int d, char *block, int depth)
             }
             if (svp->x.string_type == STRING_SHARED &&
                 is_freed(SHSTR_BLOCK(svp->u.string),
-                         sizeof(char *) + sizeof(short) + 1) )
+                         sizeof(char *) + sizeof(StrRefCount) + 1) )
             {
 
                 WRITES(d, "Shared string in freed block 0x");
                 write_x(d, (p_uint)(
-                  (unsigned *)(block-sizeof(char *)-sizeof(short))
+                  (unsigned *)(block-sizeof(char *)-sizeof(StrRefCount))
                   - SMALLOC_OVERHEAD
                 ));
                 WRITES(d, "\n");
@@ -1477,6 +1786,18 @@ show_array(int d, char *block, int depth)
             WRITES(d, "String: ");
             show_string(d, svp->u.string, 0);
             WRITES(d, "\n");
+            break;
+
+        case T_CLOSURE:
+            if (svp->x.closure_type == CLOSURE_LFUN
+             || svp->x.closure_type == CLOSURE_IDENTIFIER)
+               show_cl_literal(d, (char *)svp->u.lambda, depth);
+            else
+            {
+                WRITES(d, "Closure type ");
+                writed(d, svp->x.closure_type);
+                WRITES(d, "\n");
+            }
             break;
 
         case T_OBJECT:
@@ -1488,7 +1809,7 @@ show_array(int d, char *block, int depth)
             break;
         }
     }
-}
+} /* show_array() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1509,6 +1830,7 @@ setup_print_block_dispatcher (void)
     vector_t *a, *b;
 
     assert_master_ob_loaded();
+
     tmp_closure.type = T_CLOSURE;
     tmp_closure.x.closure_type = CLOSURE_EFUN + F_ADD;
     tmp_closure.u.ob = master_ob;
@@ -1517,13 +1839,32 @@ setup_print_block_dispatcher (void)
     call_lambda(&tmp_closure, 2);
     store_print_block_dispatch_info(inter_sp->u.string, show_added_string);
     free_svalue(inter_sp--);
+
+    tmp_closure.type = T_CLOSURE;
+    tmp_closure.x.closure_type = CLOSURE_EFUN + F_ALLOCATE;
+    tmp_closure.u.ob = master_ob;
+    push_number(1);
+    call_lambda(&tmp_closure, 1);
+    store_print_block_dispatch_info(inter_sp->u.vec, show_array);
+    free_svalue(inter_sp--);
+
     a = allocate_array(1);
     store_print_block_dispatch_info((char *)a, show_array);
     b = slice_array(a, 0, 0);
     store_print_block_dispatch_info((char *)b, show_array);
     free_array(a);
     free_array(b);
+
     store_print_block_dispatch_info((char *)master_ob, show_object);
+#ifdef CHECK_OBJECT_GC_REF
+    note_object_allocation_info((char*)master_ob);
+    note_program_allocation_info((char*)(master_ob->prog));
+#endif
+
+    current_object = master_ob;
+    closure_literal(&tmp_closure, 0);
+    store_print_block_dispatch_info(tmp_closure.u.lambda, show_cl_literal);
+    free_svalue(&tmp_closure);
 }
 #endif /* MALLOC_TRACE */
 
@@ -1545,16 +1886,29 @@ garbage_collection (void)
 
 {
     assert_master_ob_loaded();
-    remove_destructed_objects();
+    handle_newly_destructed_objects();
     free_interpreter_temporaries();
     free_action_temporaries();
+    remove_stale_player_data();
     remove_stale_call_outs();
     free_defines();
     free_all_local_names();
     remove_unknown_identifier();
     purge_action_sent();
     purge_shadow_sent();
+    check_wizlist_for_destr();
     compact_mappings(num_dirty_mappings);
+    if (current_error_trace)
+    {
+        free_array(current_error_trace);
+        current_error_trace = NULL;
+    }
+    if (uncaught_error_trace)
+    {
+        free_array(uncaught_error_trace);
+        uncaught_error_trace = NULL;
+    }
+    remove_destructed_objects();
 
     reallocate_reserved_areas();
     time_last_gc = time(NULL);

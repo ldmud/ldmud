@@ -10,19 +10,23 @@
  * This version supports the following as modifiers:
  *  " "   pad positive integers with a space.
  *  "+"   pad positive integers with a plus sign.
- *  "-"   left adjusted within field size.
- *        NB: std (s)printf() defaults to right justification, which is
+ *  "-"   left aligned within field size.
+ *        NB: std (s)printf() defaults to right alignment, which is
  *            unnatural in the context of a mainly string based language
  *            but has been retained for "compatability" ;)
  *  "|"   centered within field size.
+ *  "$"   justified to field size. Makes sense only for strings and columns
+ *        of strings.
  *  "="   column mode if strings are greater than field size.  this is only
- *        meaningful with strings, all other types ignore
- *        this.  columns are auto-magically word wrapped.
+ *        meaningful with strings, all other types are ignored. The strings
+ *        are broken into the size of 'precision', and the last line is
+ *        padded to have a length of 'fs'.
+ *        columns are auto-magically word wrapped.
  *  "#"   table mode, print a list of '\n' separated 'words' in a
- *        table within the field size.  only meaningful with strings.
+ *        compact table within the field size.  Only meaningful with strings.
  *   n    specifies the field size, a '*' specifies to use the corresponding
- *        arg as the field size.  if n is prepended with a zero, then is padded
- *        zeros, else it is padded with spaces (or specified pad string).
+ *        arg as the field size.  If n is prepended with a zero, then the field
+ *        is printed with leading zeros.
  *  "."n  precision of n, simple strings truncate after this (if precision is
  *        greater than field size, then field size = precision), tables use
  *        precision to specify the number of columns (if precision not specified
@@ -34,13 +38,15 @@
  *  "'X'" The char(s) between the single-quotes are used to pad to field
  *        size (defaults to space) (if both a zero (in front of field
  *        size) and a pad string are specified, the one specified second
- *        overrules).  NOTE:  to include "'" in the pad string, you must
- *        use "\\'" (as the backslash has to be escaped past the
- *        interpreter), similarly, to include "\" requires "\\\\".
+ *        overrules).
+ *        To include "'" in the pad string, you must use "\\'" (as the
+ *        backslash has to be escaped past the interpreter), similarly, to
+ *        include "\" requires "\\\\".
  * The following are the possible type specifiers.
  *  "%"   in which case no arguments are interpreted, and a "%" is inserted, and
  *        all modifiers are ignored.
  *  "O"   the argument is an LPC datatype.
+ *  "Q"   the argument is an LPC datatype, strings are printed in LPC notation.
  *  "s"   the argument is a string.
  *  "d"   the integer arg is printed in decimal.
  *  "i"   as d.
@@ -50,12 +56,15 @@
  *  "X"   the integer arg is printed in hex (in capitals).
  * "e","E","f","F","g","G"
  *        floating point formatting like in C.
+ *  "^"   prints "%^" for compatibility with terminal_colour() strings.
+ *        No modifiers are allowed.
  *---------------------------------------------------------------------------
  */
 
 #include "driver.h"
 #include "typedefs.h"
- 
+
+#include "my-alloca.h"
 #include <stdio.h>
 #include <setjmp.h>
 #include <sys/types.h>
@@ -72,6 +81,7 @@
 #include "mapping.h"
 #include "object.h"
 #include "ptrtable.h"
+#include "random.h"
 #include "sent.h"
 #include "simulate.h"
 #include "simul_efun.h"
@@ -96,10 +106,11 @@
  *                                0100 : string;
  *                                0101 : integer;
  *                                0110 : float
- *   00000000 00xx0000 : justification INFO_J:
+ *   00000000 00xx0000 : aligment INFO_A:
  *                                00 : right;
  *                                01 : centre;
  *                                10 : left;
+ *                                11 : justified;
  *   00000000 xx000000 : positive pad char INFO_PP:
  *                                00 : none;
  *                                01 : ' ';
@@ -107,6 +118,9 @@
  *   0000000x 00000000 : array mode (INFO_ARRAY)?
  *   000000x0 00000000 : column mode (INFO_COLS)?
  *   00000x00 00000000 : table mode (INFO_TABLE)?
+ *
+ *   0000x000 00000000 : field is to be left-padded with zero
+ *   000x0000 00000000 : pad-spaces before a newline are kept
  */
 
 typedef unsigned int format_info;
@@ -115,13 +129,15 @@ typedef unsigned int format_info;
 #define INFO_T_ERROR  0x1
 #define INFO_T_NULL   0x2
 #define INFO_T_LPC    0x3
-#define INFO_T_STRING 0x4
-#define INFO_T_INT    0x5
-#define INFO_T_FLOAT  0x6
+#define INFO_T_QLPC   0x4
+#define INFO_T_STRING 0x5
+#define INFO_T_INT    0x6
+#define INFO_T_FLOAT  0x7
 
-#define INFO_J        0x30
-#define INFO_J_CENTRE 0x10
-#define INFO_J_LEFT   0x20
+#define INFO_A         0x30 /* Right alignment */
+#define INFO_A_CENTRE  0x10
+#define INFO_A_LEFT    0x20
+#define INFO_A_JUSTIFY 0x30
 
 #define INFO_PP       0xC0
 #define INFO_PP_SPACE 0x40
@@ -131,9 +147,12 @@ typedef unsigned int format_info;
 #define INFO_COLS     0x200
 #define INFO_TABLE    0x400
 
+#define INFO_PS_ZERO  0x800
+#define INFO_PS_KEEP  0x1000
+
 /*-------------------------------------------------------------------------*/
 
-#define BUFF_SIZE 65536
+#define BUFF_SIZE 0x20000  /* 128 KByte */
   /* Max size of returned string.
    */
 
@@ -203,7 +222,6 @@ struct ColumnSlashTable
     cst            *next;    /* next column structure */
 };
 
-
 /* --- struct sprintf_buffer: dynamic string buffer
  *
  * The structure implements a dynamic string buffer. The structure
@@ -212,7 +230,7 @@ struct ColumnSlashTable
  * way all the user sees is a char[] which automagically happens
  * to be of the right size.
  */
- 
+
 struct sprintf_buffer
 {
     /* char text[.size - sizeof(sprintf_buffer_t)]; */
@@ -236,6 +254,7 @@ struct stsf_locals
     sprintf_buffer_t *spb;  /* Target buffer */
     int indent;             /* Indentation */
     int num_values;         /* Mapping width */
+    Bool quote;             /* TRUE: Quote strings */
     fmt_state_t      *st;   /* sprintf state */
 };
 
@@ -282,7 +301,7 @@ struct fmt_state
 
 static sprintf_buffer_t *svalue_to_string(fmt_state_t *
                                          , svalue_t *, sprintf_buffer_t *
-                                         , int, Bool);
+                                         , int, Bool, Bool);
 
 /*-------------------------------------------------------------------------*/
 /* Macros */
@@ -299,9 +318,9 @@ static sprintf_buffer_t *svalue_to_string(fmt_state_t *
 /*-------------------------------------------------------------------------*/
 #define ADD_STRN(s, n) { \
     if (st->bpos + n > BUFF_SIZE) ERROR(ERR_BUFF_OVERFLOW); \
-    if (n >= 1 && s[0] == '\n' && st->sppos != -1) st->bpos = st->sppos; \
+    if (n >= 1 && (s)[0] == '\n' && st->sppos != -1) st->bpos = st->sppos; \
     st->sppos = -1; \
-    strncpy(st->buff+st->bpos, s, n); \
+    strncpy(st->buff+st->bpos, (s), n); \
     st->bpos += n; \
 }
 
@@ -509,11 +528,11 @@ svalue_to_string_filter(svalue_t *key, svalue_t *data, void *extra)
 
     i = locals->num_values;
     locals->spb =
-      svalue_to_string(locals->st, key, locals->spb, locals->indent, !i);
+      svalue_to_string(locals->st, key, locals->spb, locals->indent, !i, locals->quote);
     while (--i >= 0)
     {
         stradd(locals->st, &locals->spb, delimiter);
-        locals->spb = svalue_to_string(locals->st, data++, locals->spb, 1, !i);
+        locals->spb = svalue_to_string(locals->st, data++, locals->spb, 1, !i, locals->quote);
         delimiter = ";";
     }
 } /* svalue_to_string_filter() */
@@ -522,7 +541,7 @@ svalue_to_string_filter(svalue_t *key, svalue_t *data, void *extra)
 static sprintf_buffer_t *
 svalue_to_string ( fmt_state_t *st
                  , svalue_t *obj, sprintf_buffer_t *str
-                 , int indent, Bool trailing)
+                 , int indent, Bool trailing, Bool quoteStrings)
 
 /* Print the value <obj> into the buffer <str> with indentation <indent>.
  * If <trailing> is true, add ",\n" after the printed value.
@@ -543,7 +562,7 @@ svalue_to_string ( fmt_state_t *st
 
     case T_LVALUE:
         stradd(st, &str, "lvalue: ");
-        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing);
+        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings);
         break;
 
     case T_NUMBER:
@@ -561,7 +580,96 @@ svalue_to_string ( fmt_state_t *st
 
     case T_STRING:
         stradd(st, &str, "\"");
-        stradd(st, &str, obj->u.string);
+        if (!quoteStrings)
+        {
+            stradd(st, &str, obj->u.string);
+        }
+        else
+        {
+            size_t len;
+            size_t stringlen = strlen(obj->u.string);
+
+            /* Compute the size of the result string */
+            for (len = 0, i = (mp_int)stringlen; i > 0; --i)
+            {
+                unsigned char c = (unsigned char) obj->u.string[i];
+
+                switch(c)
+                {
+                case '"':
+                case '\n':
+                case '\r':
+                case '\t':
+                case '\a':
+                case 0x1b:
+                case 0x08:
+                case '\\':
+                    len += 2; break;
+                default:
+                    if (c >= 0x20 && c < 0x7F)
+                    {
+                       len++;
+                    }
+                    else
+                    {
+                       len += 4;
+                    }
+                    break;
+                }
+            }
+
+            if ( len == stringlen )
+            {
+                /* No special characters found */
+                stradd(st, &str, obj->u.string);
+            }
+            else
+            {
+                char * tmpstr, *dest;
+                unsigned char *src;
+
+                /* Allocate the temporary string */
+                tmpstr = alloca(len+1);
+
+                src = (unsigned char *)obj->u.string;
+                dest = tmpstr;
+                for (i = (mp_int)stringlen; i > 0; --i)
+                {
+                    unsigned char c = *src++;
+
+                    switch(c)
+                    {
+                    case '"': strcpy(dest, "\\\""); dest += 2; break;
+                    case '\n': strcpy(dest, "\\n"); dest += 2; break;
+                    case '\r': strcpy(dest, "\\r"); dest += 2; break;
+                    case '\t': strcpy(dest, "\\t"); dest += 2; break;
+                    case '\a': strcpy(dest, "\\a"); dest += 2; break;
+                    case 0x1b: strcpy(dest, "\\e"); dest += 2; break;
+                    case 0x08: strcpy(dest, "\\b"); dest += 2; break;
+                    case '\\': strcpy(dest, "\\\\"); dest += 2; break;
+                    default:
+                        if (c >= 0x20 && c < 0x7F)
+                        {
+                           *dest++ = (char)c;
+                        }
+                        else
+                        {
+                           static char hex[] = "0123456789abcdef";
+                           *dest++ = '\\';
+                           *dest++ = 'x';
+                           *dest++ = hex[c >> 4];
+                           *dest++ = hex[c & 0xf];
+                        }
+                        break;
+                    }
+                } /* for() */
+                *dest = '\0';
+
+                stradd(st, &str, tmpstr);
+            }
+
+        }
+
         stradd(st, &str, "\"");
         break;
 
@@ -592,15 +700,15 @@ svalue_to_string ( fmt_state_t *st
             {
                 /* New array */
                 prec->id_number = st->pointer_id++;
-                
+
                 stradd(st, &str, "({ /* #");
                 numadd(st, &str, prec->id_number);
                 stradd(st, &str, ", size: ");
                 numadd(st, &str, size);
                 stradd(st, &str, " */\n");
                 for (i = 0; i < size-1; i++)
-                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE);
-                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE);
+                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings);
+                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings);
                 stradd(st, &str, "\n");
                 add_indent(st, &str, indent);
                 stradd(st, &str, "})");
@@ -634,6 +742,7 @@ svalue_to_string ( fmt_state_t *st
             locals.indent = indent + 2;
             locals.num_values = obj->u.map->num_values;
             locals.st = st;
+            locals.quote = quoteStrings;
             check_map_for_destr(obj->u.map);
             walk_mapping(obj->u.map, svalue_to_string_filter, &locals);
             str = locals.spb;
@@ -660,12 +769,11 @@ svalue_to_string ( fmt_state_t *st
             stradd(st, &str,"0");
             break;
         }
-#ifndef COMPAT_MODE
-        stradd(st, &str, "/");
-#endif
+        if (!compat_mode)
+            stradd(st, &str, "/");
         stradd(st, &str, obj->u.ob->name);
         push_object(obj->u.ob);
-        temp = apply_master_ob(STR_PRINTF_OBJ_NAME, 1);
+        temp = apply_master(STR_PRINTF_OBJ_NAME, 1);
         if (temp && (temp->type == T_STRING)) {
             stradd(st, &str, " (\"");
             stradd(st, &str, temp->u.string);
@@ -697,6 +805,7 @@ svalue_to_string ( fmt_state_t *st
             funflag_t flags;
             char *function_name;
             object_t *ob;
+            Bool is_inherited;
 
             l = obj->u.lambda;
             if (type == CLOSURE_LFUN)
@@ -719,19 +828,28 @@ svalue_to_string ( fmt_state_t *st
                 load_ob_from_swap(ob);
             stradd(st, &str, "#'");
             stradd(st, &str, ob->name);
-            stradd(st, &str, "->");
             prog = ob->prog;
             flags = prog->functions[ix];
+            is_inherited = MY_FALSE;
             while (flags & NAME_INHERITED)
             {
                 inherit_t *inheritp;
 
+                is_inherited = MY_TRUE;
                 inheritp = &prog->inherit[flags & INHERIT_MASK];
                 ix -= inheritp->function_index_offset;
                 prog = inheritp->prog;
                 flags = prog->functions[ix];
             }
 
+            if (is_inherited)
+            {
+                stradd(st, &str, "(");
+                stradd(st, &str, prog->name);
+                str->offset -= 2; /* Remove the '.c' after the program name */
+                stradd(st, &str, ")");
+            }
+            stradd(st, &str, "->");
             memcpy(&function_name
                   , FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK))
                   , sizeof function_name
@@ -850,7 +968,7 @@ svalue_to_string ( fmt_state_t *st
 
                 case CLOSURE_SIMUL_EFUN:
                   {
-                    stradd(st, &str, "#'");
+                    stradd(st, &str, "#'<sefun>");
                     stradd(st, &str, simul_efunp[type - CLOSURE_SIMUL_EFUN].name);
                     break;
                   }
@@ -921,7 +1039,7 @@ svalue_to_string ( fmt_state_t *st
   case T_PROTECTED_CHAR_LVALUE:
     {
         stradd(st, &str, "prot char: ");
-        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing);
+        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings);
         break;
     }
 
@@ -958,15 +1076,15 @@ svalue_to_string ( fmt_state_t *st
             {
                 /* New array */
                 prec->id_number = st->pointer_id++;
-                
+
                 stradd(st, &str, "({ /* #");
                 numadd(st, &str, prec->id_number);
                 stradd(st, &str, ", size: ");
                 numadd(st, &str, size);
                 stradd(st, &str, " */\n");
                 for (i = 0; i < size-1; i++)
-                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE);
-                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE);
+                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings);
+                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings);
                 stradd(st, &str, "\n");
                 add_indent(st, &str, indent);
                 stradd(st, &str, "})");
@@ -982,9 +1100,9 @@ svalue_to_string ( fmt_state_t *st
         break;
     }
 
-  case T_PROTECTED_LVALUE:              
+  case T_PROTECTED_LVALUE:
       stradd(st, &str, "prot lvalue: ");
-      str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing);
+      str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings);
       break;
 
   default:
@@ -1002,10 +1120,117 @@ svalue_to_string ( fmt_state_t *st
 /*-------------------------------------------------------------------------*/
 static void
 add_justified ( fmt_state_t *st
-              , char *str, size_t len, char *pad, int fs
-              , format_info finfo)
+              , char *str, size_t len, int fs
+              )
 
-/* Justify string <str> (length <len>) within the fieldsize <fs> according
+/* Justify string <str> (length <len>) within the fieldsize <fs>.
+ * After that, add it to the global buff[].
+ */
+
+{
+    int i;
+    size_t sppos;
+    int num_words;    /* Number of words in the input */
+    int num_chars;    /* Number of non-space characters in the input */
+    int num_spaces;   /* Number of spaces required */
+    int min_spaces;   /* Min number of pad spaces */
+    size_t pos;
+
+    /* Check how much data we have */
+
+    num_words = 0;
+    num_chars = 0;
+
+    /* Find the first non-space character.
+     * If it's all spaces, return.
+     */
+    for (pos = 0; pos < len && *str == ' '; pos++, str++) NOOP;
+    if (pos >= len)
+        return;
+
+    len -= (size_t)pos;
+    pos = 0;
+    num_words = 1;
+
+    while (pos < len)
+    {
+        /* Find the end of the word */
+        for ( ; pos < len && str[pos] != ' '; pos++, num_chars++) NOOP;
+        if (pos >= len)
+            break;
+
+        /* Find the start of the next word */
+        for ( ; pos < len && str[pos] == ' '; pos++) NOOP;
+        if (pos >= len)
+            break;
+
+        /* We got a new word - count it */
+        num_words++;
+    }
+
+#ifdef DEBUG
+    if (fs < num_words - 1 + num_chars)
+        fatal("add_justified(): fieldsize %d < data length %d\n", fs, num_words - 1 + num_chars);
+#endif
+
+    /* Compute the number of spaces we need to insert.
+     * It is guaranteed here that we have enough space to insert
+     * at least one space between each word.
+     */
+    num_spaces = fs - num_chars;
+    if (num_words == 1)
+        min_spaces = num_spaces;
+    else
+        min_spaces = num_spaces / (num_words-1);
+        /* min_spaces * (num_words-1) <= num_spaces < min_spaces * num_words */
+
+    /* Loop again over the data, now adding spaces as we go. */
+
+    for (pos = 0; pos < len; )
+    {
+        int mark;
+        int padlength;
+
+        /* Find the end of the current word */
+        for (mark = pos ; pos < len && str[pos] != ' '; pos++) NOOP;
+
+        /* Add the word */
+        ADD_STRN(str+mark, pos - mark);
+        num_words--;
+
+        if (pos >= len || num_words < 1)
+            break;
+
+        /* There is a word following - add spaces */
+        if (num_words == 1) /* Last word: add all remaining padding */
+            padlength = (int)num_spaces;
+        else if (num_spaces < min_spaces * num_words) /* Space underrun */
+            padlength = 1;
+        else if (num_spaces == min_spaces * num_words)
+            /* Exactly the min. padlength per word avail. */
+            padlength = min_spaces;
+        else if (num_spaces >= min_spaces * num_words + 2)
+            /* Force an extra space */
+            padlength = min_spaces+1;
+        else /* Randomly add one space */
+            padlength = min_spaces + (int)random_number(2);
+        sppos = st->bpos;
+        ADD_PADDING(" ", padlength);
+        st->sppos = sppos;
+        num_spaces -= padlength;
+
+        /* Find the start of the next word */
+        for ( ; pos < len && str[pos] == ' '; pos++) NOOP;
+    }
+} /* add_justified() */
+
+/*-------------------------------------------------------------------------*/
+static void
+add_aligned ( fmt_state_t *st
+            , char *str, size_t len, char *pad, int fs
+            , format_info finfo)
+
+/* Align string <str> (length <len>) within the fieldsize <fs> according
  * to the <finfo>. After that, add it to the global buff[].
  */
 
@@ -1019,12 +1244,14 @@ add_justified ( fmt_state_t *st
 
     sppos = 0;
     is_space_pad = MY_FALSE;
-    if (pad[0] == ' ' && pad[1] == '\0')
+    if (pad[0] == ' ' && pad[1] == '\0' && !(finfo & INFO_PS_KEEP))
         is_space_pad = MY_TRUE;
 
-    switch(finfo & INFO_J)
+    switch(finfo & INFO_A)
     {
-    case INFO_J_LEFT:
+    case INFO_A_JUSTIFY:
+    case INFO_A_LEFT:
+        /* Also called for the last line of a justified block */
         ADD_STRN(str, len)
         if (is_space_pad)
             sppos = st->bpos;
@@ -1033,8 +1260,15 @@ add_justified ( fmt_state_t *st
             st->sppos = sppos;
         break;
 
-    case INFO_J_CENTRE:
-        ADD_PADDING(pad, (fs - len + 1) >> 1)
+    case INFO_A_CENTRE:
+        if (finfo & INFO_PS_ZERO)
+        {
+            ADD_PADDING("0", (fs - len + 1) >> 1)
+        }
+        else
+        {
+            ADD_PADDING(pad, (fs - len + 1) >> 1)
+        }
         ADD_STRN(str, len)
         if (is_space_pad)
             sppos = st->bpos;
@@ -1044,12 +1278,20 @@ add_justified ( fmt_state_t *st
         break;
 
     default:
-      { /* std (s)printf defaults to right justification */
-        ADD_PADDING(pad, fs - len)
+      { /* std (s)printf defaults to right alignment.
+         */
+        if (finfo & INFO_PS_ZERO)
+        {
+            ADD_PADDING("0", fs - len)
+        }
+        else
+        {
+            ADD_PADDING(pad, fs - len)
+        }
         ADD_STRN(str, len)
       }
     }
-} /* end of add_justified() */
+} /* add_aligned() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -1074,6 +1316,8 @@ add_column (fmt_state_t *st, cst **column)
     /* Set done to the actual number of characters to copy.
      */
     length = COL->pres;
+    if ((COL->info & INFO_A) == INFO_A_JUSTIFY && length > COL->size)
+        length = COL->size;
     for (p = COL_D; length && *p && *p !='\n'; p++, length--) NOOP;
     done = p - COL_D;
     if (*p && *p !='\n')
@@ -1087,17 +1331,61 @@ add_column (fmt_state_t *st, cst **column)
             /* handle larger than column size words... */
             if (!done)
             {
-                /* Sorry, it's one big word */
+                /* Sorry, it's one big word.
+                 * Print the word over the fieldsize.
+                 */
                 done = save - 1;
                 p += save;
                 break;
             }
             if (*p == ' ')
+            {
+                /* If went more than one character back, check if
+                 * the next word is longer than permitted. If that is
+                 * the case we might as well start breaking it up right
+                 * here.
+                 */
+                if (save-2 > done)
+                {
+                    char *p2;
+
+                    length = COL->pres;
+                    if ((COL->info & INFO_A) == INFO_A_JUSTIFY
+                     && length > COL->size)
+                        length = COL->size;
+                    for ( p2 = p+1, length--
+                        ; length && *p2 && *p2 !='\n' && *p2 != ' '
+                        ; p2++, length--) NOOP;
+                    if (*p2 && *p2 != '\n' && *p2 != ' ')
+                    {
+                        /* Yup, the next word is far too long. */
+                        p += save - done;
+                        done = save - 1;
+                    }
+                    /* else: the next word is not too long */
+                }
+                /* else: breaking too long word here would look silly anyway
+                 */
                 break;
-        }
+            } /* if (p == ' ') */
+        } /* for (done) */
+    } /* if (breaking needed) */
+
+    /* On justified formatting, don't format the last line that way, nor
+     * justified lines ending in NL.
+     */
+    if ((COL->info & INFO_A) == INFO_A_JUSTIFY
+     && *COL_D && *(COL_D+1)
+     && *p != '\n' && *p != '\0'
+       )
+    {
+        add_justified(st, COL_D, p - COL_D, COL->size);
+    }
+    else
+    {
+        add_aligned(st, COL_D, p - COL_D, COL->pad, COL->size, COL->info);
     }
 
-    add_justified(st, COL_D, p - COL_D, COL->pad, COL->size, COL->info);
     COL_D += done; /* inc'ed below ... */
 
     /* if this or the next character is a '\0' then take this column out
@@ -1147,7 +1435,7 @@ add_table (fmt_state_t *st, cst **table)
         /* Get the length to add */
         for (done = 0; (TAB_D[done]) && (TAB_D[done] != '\n'); done++) NOOP;
 
-        add_justified(st, TAB_D, done, TAB->pad, TAB->size, TAB->info);
+        add_aligned(st, TAB_D, done, TAB->pad, TAB->size, TAB->info);
 
         TAB_D += done; /* inc'ed next line ... */
         if (!(*TAB_D) || !(*(++TAB_D)))
@@ -1210,6 +1498,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
     int           pres;            /* precision */
     unsigned int  err_num;         /* error code */
     char         *pad;             /* fs pad string */
+    int           column_stat;     /* Most recent column add status */
 
 #   define GET_NEXT_ARG {\
         if (++arg >= argc) ERROR(ERR_TO_FEW_ARGS); \
@@ -1261,7 +1550,8 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
         while ( NULL != (tcst = st->csts) )
         {
             st->csts = tcst->next;
-            if (tcst->info & INFO_TABLE && tcst->d.tab)
+            if ((tcst->info & (INFO_COLS|INFO_TABLE)) == INFO_TABLE
+             && tcst->d.tab)
                 xfree(tcst->d.tab);
             xfree(tcst);
         }
@@ -1356,6 +1646,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
 
     format_char = 0;
     nelemno = 0;
+    column_stat = 0;
 
     arg = -1;
     st->bpos = 0;
@@ -1369,12 +1660,16 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
         {
             /* Line- or Format end */
 
-            int column_stat = 0;
-
             if (!st->csts)
             {
-                /* No columns/tables to resolve */
+                /* No columns/tables to resolve, but add a second
+                 * newline if there is one pending from an added
+                 * column
+                 */
 
+                if (column_stat == 2)
+                    ADD_CHAR('\n');
+                column_stat = 0;
                 if (!format_str[fpos])
                     break;
                 ADD_CHAR('\n');
@@ -1382,6 +1677,9 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                 continue;
             }
 
+            column_stat = 0; /* If there was a newline pending, it
+                              * will be implicitely added now.
+                              */
             ADD_CHAR('\n');
             st->line_start = st->bpos;
 
@@ -1421,7 +1719,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                 st->line_start = st->bpos;
             } /* while (csts) */
 
-            if (column_stat == 2)
+            if (column_stat == 2 && format_str[fpos] != '\n')
                 ADD_CHAR('\n');
 
             if (!format_str[fpos])
@@ -1432,10 +1730,19 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
         if (format_str[fpos] == '%')
         {
             /* Another format entry */
+
             if (format_str[fpos+1] == '%')
             {
                 ADD_CHAR('%');
                 fpos++;
+                continue;
+            }
+
+            if (format_str[fpos+1] == '^')
+            {
+                ADD_CHAR('%');
+                fpos++;
+                ADD_CHAR('^');
                 continue;
             }
 
@@ -1453,7 +1760,6 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                     finfo |= INFO_T_ERROR;
                     break;
                 }
-
                 if ((format_str[fpos] >= '0' && format_str[fpos] <= '9')
                  || (format_str[fpos] == '*'))
                 {
@@ -1486,7 +1792,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                                  && format_str[fpos+1] <= '9')
                              || format_str[fpos+1] == '*')
                            )
-                            pad = "0";
+                            finfo |= INFO_PS_ZERO;
                         else
                         {
                             if (format_str[fpos] == '*')
@@ -1495,8 +1801,11 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                                     ERROR(ERR_INVALID_STAR);
                                 if ((int)(fs = carg->u.number) < 0)
                                 {
-                                    fs = -fs;
-                                    finfo |= INFO_J_LEFT;
+                                    if (fs == PINT_MIN)
+                                        fs = PINT_MAX;
+                                    else
+                                        fs = -fs;
+                                    finfo |= INFO_A_LEFT;
                                 }
 
                                 if (pres == -2)
@@ -1520,7 +1829,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
 
                     fpos--; /* bout to get incremented */
                     continue;
-                } /* if (precision/justification field) */
+                } /* if (precision/alignment field) */
 
                 /* fpos now points to format type */
 
@@ -1528,8 +1837,9 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                 {
                 case ' ': finfo |= INFO_PP_SPACE; break;
                 case '+': finfo |= INFO_PP_PLUS; break;
-                case '-': finfo |= INFO_J_LEFT; break;
-                case '|': finfo |= INFO_J_CENTRE; break;
+                case '-': finfo |= INFO_A_LEFT; break;
+                case '|': finfo |= INFO_A_CENTRE; break;
+                case '$': finfo |= INFO_A_JUSTIFY; break;
                 case '@': finfo |= INFO_ARRAY; break;
                 case '=': finfo |= INFO_COLS; break;
                 case '#': finfo |= INFO_TABLE; break;
@@ -1537,6 +1847,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                 case ':': pres = -2; break;
                 case '%': finfo |= INFO_T_NULL; break; /* never reached */
                 case 'O': finfo |= INFO_T_LPC; break;
+                case 'Q': finfo |= INFO_T_QLPC; break;
                 case 's': finfo |= INFO_T_STRING; break;
                 case 'i': finfo |= INFO_T_INT; format_char = 'd'; break;
                 case 'd':
@@ -1558,6 +1869,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                     break;
                 case '\'':
                     pad = &(format_str[++fpos]);
+                    finfo |= INFO_PS_KEEP;
                     while (1)
                     {
                         if (!format_str[fpos])
@@ -1623,6 +1935,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                   }
 
                 case INFO_T_LPC:
+                case INFO_T_QLPC:
                   {
                     sprintf_buffer_t *b;
 #                   define CLEANSIZ 0x200
@@ -1645,7 +1958,8 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                     b->offset = -CLEANSIZ+(p_int)sizeof(sprintf_buffer_t);
                     b->size = CLEANSIZ;
                     b->start = &st->clean.u.string;
-                    svalue_to_string(st, carg, b, 0, MY_FALSE);
+                    b = svalue_to_string(st, carg, b, 0, MY_FALSE
+                                        , (finfo & INFO_T) == INFO_T_QLPC);
                     carg = &st->clean; /* passed to INFO_T_STRING */
                     free_pointer_table(st->ptable);
                     st->ptable = NULL;
@@ -1671,6 +1985,11 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                         if (!fs)
                             ERROR(ERR_CST_REQUIRES_FS);
 
+                        if ((finfo & (INFO_COLS | INFO_TABLE))
+                          == (INFO_COLS | INFO_TABLE)
+                           )
+                            ERROR(ERR_INVALID_FORMAT_STR);
+
                         /* Find the end of the list of columns/tables */
                         temp = &st->csts;
                         while (*temp)
@@ -1691,16 +2010,13 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                             (*temp)->start = st->bpos - st->line_start;
 
                             /* Format the first line from the column */
-                            if (2 == add_column(st, temp)
-                              && !format_str[fpos])
-                            {
-                                ADD_CHAR('\n');
-                            }
+                            column_stat = add_column(st, temp);
                         }
                         else
                         {
                             /* (finfo & INFO_TABLE) */
                             unsigned int n, len, max;
+                            int tpres;
                             char c, *s, *start;
                             p_uint i;
 
@@ -1744,38 +2060,46 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                              *      max = max length of the lines
                              */
 
-                            if (pres)
+                            tpres = pres;
+                            if (tpres)
                             {
-                                (*temp)->size = fs/pres;
+                                (*temp)->size = fs/tpres;
                             }
                             else
                             {
                                 len = s - start;
                                 if (len > max)
                                     max = len; /* the null terminated word */
-                                pres = fs/(max+2);
+                                tpres = fs/(max+2);
                                   /* at least two separating spaces */
-                                if (!pres)
-                                    pres = 1;
-                                (*temp)->size = fs/pres;
+                                if (!tpres)
+                                    tpres = 1;
+                                (*temp)->size = fs/tpres;
                             }
 
-                            len = n/pres; /* length of average column */
+                            len = n/tpres; /* length of average column */
 
-                            if (n < (unsigned int)pres)
-                                pres = n;
-                            if (len*pres < n)
+                            if (n < (unsigned int)tpres)
+                                tpres = n;
+                            if (len*tpres < n)
                                 len++;
-                            if (len > 1 && n%pres)
-                                pres -= (pres - n%pres)/len;
+                            /* Since the table will be filled by column,
+                             * the result will be a rectangle with as little
+                             * as possible empty space. This means we have
+                             * to adjust the no of columns (tpres) to
+                             * what the fill algorithm will actually
+                             * produce.
+                             */
+                            if (len > 1 && n%tpres)
+                                tpres -= (tpres - n%tpres)/len;
 
-                            (*temp)->d.tab = xalloc(pres*sizeof(char *));
+                            (*temp)->d.tab = xalloc(tpres*sizeof(char *));
                             if (!(*temp)->d.tab)
                                 ERROR(ERR_NOMEM);
-                            (*temp)->nocols = pres; /* heavy sigh */
+                            (*temp)->nocols = tpres; /* heavy sigh */
                             (*temp)->d.tab[0] = TABLE;
 
-                            if (pres == 1)
+                            if (tpres == 1)
                                 goto add_table_now;
 
                             /* Subformat the table, replacing some characters
@@ -1794,7 +2118,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                                         SAVE_CHAR(((TABLE)+fs));
                                         TABLE[fs] = '\0';
                                         (*temp)->d.tab[i++] = TABLE+fs+1;
-                                        if (i >= (unsigned int)pres)
+                                        if (i >= (unsigned int)tpres)
                                             goto add_table_now;
                                         n = 0;
                                     }
@@ -1808,14 +2132,45 @@ add_table_now:
                     }
                     else
                     {
+                        Bool justifyString;
+
                         /* not column or table */
                         if (pres && pres < slen)
                         {
                             slen = pres;
                         }
-                        if (fs && fs > (unsigned int)slen)
+
+                        /* Determine whether to print this string
+                         * justified, or not.
+                         */
+                        justifyString = MY_FALSE;
+                        if (fs && (finfo & INFO_A) == INFO_A_JUSTIFY)
                         {
-                            add_justified(st, carg->u.string, slen, pad, fs
+                            /* Flush the string only if it doesn't
+                             * end in a NL.
+                             * Also, strip off trailing spaces.
+                             */
+                            for ( ;    slen > 0
+                                    && carg->u.string[slen-1] == ' '
+                                  ; slen--
+                               ) NOOP;
+
+                            if ( slen != 0
+                              && (unsigned int)slen <= fs
+                              && carg->u.string[slen-1] != '\n'
+                               )
+                                justifyString = MY_TRUE;
+                        }
+
+                        /* not column or table */
+
+                        if (justifyString)
+                        {
+                            add_justified(st, carg->u.string, slen, fs);
+                        }
+                        else if (fs && fs > (unsigned int)slen)
+                        {
+                            add_aligned(st, carg->u.string, slen, pad, fs
                                          , finfo);
                         }
                         else
@@ -1897,7 +2252,25 @@ add_table_now:
                             tmpl = pres; /* well.... */
                     }
                     if ((unsigned int)tmpl < fs)
-                        add_justified(st, temp, tmpl, pad, fs, finfo);
+                    {
+                        if ((finfo & INFO_PS_ZERO) != 0
+                         && (   temp[0] == ' '
+                             || temp[0] == '+'
+                             || temp[0] == '-'
+                            )
+                         && (finfo & INFO_A) != INFO_A_LEFT
+                           )
+                        {
+                            /* Non-left alignment and we're printing
+                             * with leading zeroes: preserve the sign
+                             * character in the right place.
+                             */
+                            ADD_STRN(temp, 1);
+                            add_aligned(st, temp+1, tmpl-1, pad, fs-1, finfo);
+                        }
+                        else
+                            add_aligned(st, temp, tmpl, pad, fs, finfo);
+                    }
                     else
                         ADD_STRN(temp, tmpl)
                     break;

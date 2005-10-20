@@ -2,7 +2,7 @@ Subject: Crash mit dev.38
 From: Christian 'Chameloid' Kirschbaum <chrissy@cs.tu-berlin.de>
 Date: Thu, 4 Mar 1999 21:01:09 +0100 (MET)
 Type: Bug
-State: Unclassified
+State: Abandoned.
 See also: b-991123-0, b-981028 and b-990713-1?
 
 A similar crash happened several months ago with 3.2.1@139 .

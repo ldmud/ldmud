@@ -25,7 +25,8 @@
  * swapped.
  *
  * Programs can be swapped only if the have but one reference - that means
- * that inherited or cloned objects can't swap.
+ * that inherited or cloned objects can't swap. The line number information
+ * for a program is included in the program's swap block.
  *
  * Variables can be swapped all the time, however, some of the _values_
  * can't be removed from memory: arrays and mappings with more than one
@@ -78,9 +79,6 @@
 #include <sys/stat.h>
 #include <stddef.h>
 #include <stdio.h>
-#ifdef HAVE_VALUES_H
-#include <values.h>
-#endif
 
 #define NO_REF_STRING
 #include "swap.h"
@@ -106,9 +104,9 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/debug_info.h"
- 
+
 /* TODO: Use get_host_name() instead of gethostname() */
-#ifdef AMIGA
+#if defined(AMIGA) && !defined(__GNUC__)
 #include "hosts/amiga/socket.h"
 #endif
 
@@ -264,7 +262,7 @@ static mp_int num_swapfree = 0;
 mp_int num_vb_swapped = 0;
   /* Number of variables blocks in the swapfile.
    */
-   
+
 mp_int total_vb_bytes_swapped = 0;
   /* Total size of variables stored in the swapfile.
    */
@@ -325,21 +323,22 @@ locate_out (program_t *prog)
     {
         debug_message ("%s locate_out: %lX %lX %lX %lX %lX %lX %lX %lX\n"
             , time_stamp(),
-            (long)prog->program, (long)prog->line_numbers,
+            (long)prog->program,
             (long)prog->functions, (long)prog->strings,
             (long)prog->variable_names, (long)prog->inherit,
+            (long)prog->includes,
             (long)prog->argument_types, (long)prog->type_start);
     }
 
 #define MAKEOFFSET(type, name) (type)&p[(char *)prog->name - (char *)prog]
 
     prog->program        = MAKEOFFSET(bytecode_p, program);
-    prog->line_numbers   = MAKEOFFSET(unsigned char*, line_numbers);
     prog->functions      = MAKEOFFSET(uint32*, functions);
     prog->function_names = MAKEOFFSET(unsigned short *, function_names);
     prog->strings        = MAKEOFFSET(char**, strings);
     prog->variable_names = MAKEOFFSET(variable_t *, variable_names);
     prog->inherit        = MAKEOFFSET(inherit_t *, inherit);
+    prog->includes       = MAKEOFFSET(include_t *, includes);
     if (prog->type_start)
     {
         prog->argument_types = MAKEOFFSET(unsigned short *, argument_types);
@@ -357,7 +356,7 @@ locate_in (program_t *prog)
 
 /* After <prog> was swapped in, restore the intra-block pointers
  * from the stored offsets.
- * .line_numbers is kept at NULL, and the program will get a new
+ * .line_numbers is not modified, and the program will get a new
  * id-number.
  *
  * Return TRUE on success.
@@ -377,12 +376,12 @@ locate_in (program_t *prog)
 #define MAKEPTR(type, name) (type)&p[(char *)prog->name - (char *)0]
 
     prog->program        = MAKEPTR(bytecode_p, program);
-    prog->line_numbers   = NULL;
     prog->functions      = MAKEPTR(uint32*, functions);
     prog->function_names = MAKEPTR(unsigned short *, function_names);
     prog->strings        = MAKEPTR(char**, strings);
     prog->variable_names = MAKEPTR(variable_t*, variable_names);
     prog->inherit        = MAKEPTR(inherit_t*, inherit);
+    prog->includes       = MAKEPTR(include_t*, includes);
     if (prog->type_start)
     {
         prog->argument_types = MAKEPTR(unsigned short *, argument_types);
@@ -393,9 +392,10 @@ locate_in (program_t *prog)
     {
         debug_message ("%s locate_in: %lX %lX %lX %lX %lX %lX %lX %lX\n"
             , time_stamp(),
-            (long)prog->program, (long)prog->line_numbers,
+            (long)prog->program,
             (long)prog->functions, (long)prog->strings,
             (long)prog->variable_names, (long)prog->inherit,
+            (long)prog->includes,
             (long)prog->argument_types, (long)prog->type_start);
     }
 
@@ -417,6 +417,11 @@ swap_alloc (mp_int size)
 {
     swap_block_t *mark, *last;
     int save_privilege;
+
+    /* Make sure the size is something even, to meet the requirement
+     * that all swap offsets are even.
+     */
+    size = (size + sizeof(char*)-1) & ~(sizeof(char*)-1);
 
     save_privilege = malloc_privilege;
     malloc_privilege = MALLOC_SYSTEM;
@@ -628,6 +633,64 @@ store_swap_block (void * buffer, mp_int size)
 } /* store_swap_block() */
 
 /*-------------------------------------------------------------------------*/
+static p_int
+store_swap_block2 ( void * buffer1, mp_int size1
+                  , void * buffer2, mp_int size2 )
+
+/* Store the memory blocks <buffer1> of <size1> bytes and <buffer2> of
+ * <size2> bytes into one block in the swapfile and return the offset at
+ * which it was stored.
+ * Return -1 on a failure.
+ *
+ * The swapfile is opened it necessary.
+ */
+
+{
+    mp_int offset;
+
+    /* Make sure the swap file is open. */
+    if (swap_file == NULL)
+    {
+        if (*file_name == '\0')
+        {
+            sprintf(file_name, "%s.%s", SWAP_FILE, query_host_name());
+        }
+        swap_file = fopen(file_name, "w+b");
+        /* Leave this file pointer open! */
+        if (swap_file == NULL)
+        {
+            debug_message("%s Couldn't open swap file.\n", time_stamp());
+            return -1;
+        }
+    }
+
+    /* Find a free swap block */
+    offset = swap_alloc(size1 + size2);
+
+    /* Seek and write the data */
+    if (fseek(swap_file, offset, 0) == -1)
+    {
+        debug_message("%s Couldn't seek the swap file, errno %d, offset %ld.\n"
+                     , time_stamp(), errno, offset);
+        return -1;
+    }
+
+    if (fwrite((char *)buffer1, size1, 1, swap_file) != 1)
+    {
+        debug_message("%s I/O error in swap.\n", time_stamp());
+        return -1;
+    }
+
+    if (fwrite((char *)buffer2, size2, 1, swap_file) != 1)
+    {
+        debug_message("%s I/O error in swap.\n", time_stamp());
+        return -1;
+    }
+
+    return offset;
+} /* store_swap_block2() */
+
+/*-------------------------------------------------------------------------*/
 Bool
 swap_program (object_t *ob)
 
@@ -666,8 +729,10 @@ swap_program (object_t *ob)
     if (prog->swap_num >= 0)
     {
         total_bytes_unswapped -= prog->total_size;
+        if (prog->line_numbers)
+            total_bytes_unswapped -= prog->line_numbers->size;
         ob->prog = (program_t *)(prog->swap_num | 1);
-        free_prog(prog, MY_FALSE);        /* Do not free the strings or swapfile */
+        free_prog(prog, MY_FALSE);  /* Do not free the strings or blueprint */
         ob->flags |= O_SWAPPED;
         num_unswapped--;
         return MY_TRUE;
@@ -675,19 +740,19 @@ swap_program (object_t *ob)
 
     /* relocate the internal pointers */
     locate_out(prog);
-    swap_num = store_swap_block((char *)prog, prog->total_size);
+    swap_num = store_swap_block2(prog, prog->total_size
+                                , prog->line_numbers, prog->line_numbers->size);
     if (swap_num == -1)
     {
         locate_in(prog);
         return MY_FALSE;
     }
 
-    total_bytes_swapped += prog->total_size;
+    total_bytes_swapped += prog->total_size + prog->line_numbers->size;
     num_swapped++;
 
     /* Free the program */
-    prog->swap_num = -1; /* for free_prog() , don't free linenumbers */
-    free_prog(prog, MY_FALSE);  /* Don't free the shared strings or the swapfile */
+    free_prog(prog, MY_FALSE);  /* Don't free the shared strings or the blueprint */
 
     /* Mark the program as swapped */
     ob->prog = (program_t *)(swap_num | 1);
@@ -1019,7 +1084,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
  * collector, which means that some of the object and closure values
  * stored with swap_svalues() might have become invalid meanwhile.
  * In those cases, the stored data is adjusted.
- * 
+ *
  * Take care to not interfere with a garbage_collection in progress!
  */
 
@@ -1031,7 +1096,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_STRING | T_MOD_SWAPPED:
             if (svp->x.string_type == STRING_MALLOC)
             {
-                if (!garbage_collection_in_progress)
+                if (!gc_status)
                     xfree(svp->u.string);
                 p = (unsigned char *)strchr(
                   (char *)p + 1 + sizeof svp->x, 0
@@ -1041,7 +1106,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             /* else fall through */
 
         case T_SYMBOL | T_MOD_SWAPPED:
-            if (!garbage_collection_in_progress)
+            if (!gc_status)
                 free_string(svp->u.string);
             p = (unsigned char *)strchr((char *)p + 1 + sizeof svp->x, 0) + 1;
             break;
@@ -1049,7 +1114,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         case T_QUOTED_ARRAY | T_MOD_SWAPPED:
             p += sizeof svp->x;
             /* FALLTHROUGH */
-            
+
         case T_POINTER | T_MOD_SWAPPED:
             p += 1 + sizeof(size_t) + sizeof(wiz_list_t *);
             p =
@@ -1160,7 +1225,7 @@ swap_variables (object_t *ob)
     if (ob == simul_efun_object)
         return MY_TRUE;
 
-    if (garbage_collection_in_progress)
+    if (gc_status)
     {
         /* Complete the previous swap operation */
         num_variables = ob->prog->num_variables;
@@ -1189,6 +1254,8 @@ swap_variables (object_t *ob)
         xfree(ob->variables);
         ob->variables = (svalue_t *)(last_variable_swap_num | 1);
         ob->flags |= O_SWAPPED;
+
+        tot_alloc_object_size -= num_variables * sizeof (svalue_t);
         return MY_TRUE;
     }
 
@@ -1253,11 +1320,12 @@ swap_variables (object_t *ob)
       ob->variables, num_variables
       , (unsigned char *)block->start + sizeof total_size
     );
-    
+
     num_vb_swapped++;
     total_vb_bytes_swapped += total_size - sizeof total_size;
     xfree(block->start);
     xfree(ob->variables);
+    tot_alloc_object_size -= num_variables * sizeof (svalue_t);
 
     /* Mark the variables as swapped */
     ob->variables = (svalue_t *)(swap_num | 1);
@@ -1317,13 +1385,13 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
  *
  * Return the next byte to read, or NULL when out of memory.
  */
- 
+
 {
     /* For all values yadda yadda... */
     for (;--num >= 0; svp++)
     {
         svp->type = *p & ~T_MOD_SWAPPED; /* get the original type */
-        
+
         switch(*p++)
         {
         case T_STRING | T_MOD_SWAPPED:
@@ -1333,7 +1401,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
 
             memcpy(&svp->x, p, sizeof svp->x);
             p += sizeof svp->x;
-            if (garbage_collection_in_progress)
+            if (gc_status)
             {
                 svp->type = T_NUMBER;
             }
@@ -1391,8 +1459,11 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
                 return NULL;
             }
 #ifdef GC_SUPPORT
-            if (garbage_collection_in_progress == 3)
+            if (gc_status == gcCountRefs)
             {
+                /* Pretend that this memory block already existing
+                 * in the clear phase.
+                 */
                 clear_memory_reference(v);
                 v->ref = 0;
             }
@@ -1413,7 +1484,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             p += sizeof num_keys;
             memcpy(&user, p, sizeof user);
             p += sizeof user;
-            if (garbage_collection_in_progress)
+            if (gc_status)
             {
                 /* The garbage collector is not prepared to handle hash
                  * mappings. On the other hand, the order of keys does
@@ -1451,8 +1522,11 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
                     p = read_unswapped_svalues(data, num_values, p);
                 }
 #ifdef GC_SUPPORT
-                if (garbage_collection_in_progress == 3)
+                if (gc_status == gcCountRefs)
                 {
+                    /* Pretend that this memory block already existing
+                     * in the clear phase.
+                     */
                     clear_memory_reference(m);
                     clear_memory_reference(
                       (char *)CM_MISC(cm) -
@@ -1520,7 +1594,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             fatal("bad type %d in read_unswapped_svalues()\n", svp->type);
         }
     } /* for() */
-    
+
     return p;
 } /* read_unswapped_svalues() */
 
@@ -1567,7 +1641,7 @@ load_ob_from_swap (object_t *ob)
     if (swap_num & 1)
     {
         /* Swap in the program */
-        
+
         program_t tmp_prog, *prog;
 
         swap_num &= ~1;
@@ -1592,7 +1666,6 @@ load_ob_from_swap (object_t *ob)
             fatal("Couldn't read the swap file.\n");
         }
         tmp_prog.swap_num = swap_num;
-        tmp_prog.total_size = tmp_prog.line_numbers - (bytecode_p)0;
 
         /* Allocate the memory for the program, except for the
          * line numbers.
@@ -1613,6 +1686,7 @@ load_ob_from_swap (object_t *ob)
 
         ob->prog = prog;
         locate_in (prog); /* relocate the internal pointers */
+        prog->line_numbers = NULL;
 
         /* The reference count will already be 1 ! */
 
@@ -1627,7 +1701,7 @@ load_ob_from_swap (object_t *ob)
     if (swap_num & 1)
     {
         /* Swap in the variables */
-        
+
         p_int total_size;
         unsigned char *block;
         mp_int size;
@@ -1682,7 +1756,9 @@ load_ob_from_swap (object_t *ob)
         {
             ob->variables = variables;
             result |= 2;
-            if (garbage_collection_in_progress)
+            tot_alloc_object_size += ob->prog->num_variables * sizeof (svalue_t);
+
+            if (gc_status)
             {
                 /* Called from within the GC - free later.
                  * Also keep the swap-block
@@ -1714,11 +1790,6 @@ load_ob_from_swap (object_t *ob)
 
     /* Update the object flags */
     ob->flags &= ~O_SWAPPED;
-    if (!(ob->flags & (O_DESTRUCTED|O_WILL_CLEAN_UP))
-     && function_exists("clean_up",ob))
-    {
-        ob->flags |= O_WILL_CLEAN_UP;
-    }
 
     return result;
 } /* load_ob_from_swap() */
@@ -1732,51 +1803,55 @@ load_line_numbers_from_swap (program_t *prog)
  */
 
 {
-    program_t tmp_prog;
-    char *lines;
-    p_int swap_num, size;
+    linenumbers_t tmp_numbers;
+    linenumbers_t *lines;
+    p_int swap_num;
 
-    swap_num = prog->swap_num;
+    swap_num = prog->swap_num + prog->total_size;
 
     if (swapfile_size <= swap_num)
         fatal("Attempt to swap in from beyond the end of the swapfile.\n");
     if (fseek(swap_file, swap_num, 0) == -1)
         fatal("Couldn't seek the swap file, errno %d, offset %ld.\n",
               errno, swap_num);
-    if (fread((char *)&tmp_prog, sizeof tmp_prog, 1, swap_file) != 1) {
+    if (fread((char *)&tmp_numbers, sizeof tmp_numbers, 1, swap_file) != 1) {
         fatal("Couldn't read the swap file.\n");
     }
 
-    swap_num += tmp_prog.line_numbers - (bytecode_p)0;
-
-    if (fseek(swap_file, swap_num, 0) == -1)
-        fatal("Couldn't seek the swap file, errno %d, offset %ld.\n",
-              errno, swap_num);
-
-    size = tmp_prog.total_size - prog->total_size;
-    if ( !(lines = xalloc(size)) )
+    if ( !(lines = xalloc(tmp_numbers.size)) )
         return MY_FALSE;
 
-    fread(lines, size, 1, swap_file);
+    *lines = tmp_numbers;
 
-    prog->total_size = tmp_prog.total_size + sizeof(p_int);
-    prog->line_numbers = (unsigned char *)lines;
-    total_prog_block_size += size + sizeof(p_int);
+    if (tmp_numbers.size > sizeof(tmp_numbers))
+    {
+        fread(lines+1, tmp_numbers.size - sizeof(tmp_numbers)
+             , 1, swap_file);
+    }
+
+    prog->line_numbers = lines;
+    total_prog_block_size += lines->size;
+    total_bytes_unswapped += lines->size;
+
     return MY_TRUE;
 } /* load_line_numbers_from_swap() */
 
 /*-------------------------------------------------------------------------*/
 void
-remove_swap_file (program_t *prog)
+remove_prog_swap (program_t *prog, Bool load_line_numbers)
 
-/* Program <prog> is going to be deleted - remove its swapfile entry.
+/* Program <prog> is going to be deleted or has been changed - remove its
+ * swapfile entry if it has one. If <load_line_numbers> is true, load
+ * the line number information back into memory before removing the swap entry.
  */
 
 {
     p_int swap_num;
-    program_t tmp_prog;
 
     swap_num = prog->swap_num;
+
+    if (swap_num == -1) /* then program not swapped */
+        return;
 
     /* This test is good not only for debugging, but also when the
      * processor is on fire, to stop subsequent damage.
@@ -1784,23 +1859,42 @@ remove_swap_file (program_t *prog)
     if (swapfile_size <= swap_num)
         fatal("Attempt to remove swap entry beyond the end of the swapfile.\n");
 
-    /* The linenumber information has probably not been unswapped, thus
-     * prog->total_size is just the current size in memory.
-     */
-    if (fseek(swap_file, swap_num, 0 ) == -1)
-        fatal("Couldn't seek the swap file, errno %d, offset %ld.\n",
-              errno, swap_num);
-    if (fread(&tmp_prog, sizeof tmp_prog, 1, swap_file) != 1)
+    if (!prog->line_numbers && load_line_numbers)
     {
-        fatal("Couldn't read the swap file.\n");
+        if (!load_line_numbers_from_swap(prog))
+            fatal("Can't unswap the line numbers.\n");
     }
+
+    if (!prog->line_numbers)
+    {
+        /* The linenumber information has not been unswapped, thus
+         * we need to read the linenumber size directly from the
+         * swapfile.
+         */
+        linenumbers_t tmp_lines;
+
+        if (fseek(swap_file, swap_num + prog->total_size, 0 ) == -1)
+            fatal("Couldn't seek the swap file, errno %d, offset %ld.\n",
+                  errno, swap_num);
+        if (fread(&tmp_lines, sizeof tmp_lines, 1, swap_file) != 1)
+        {
+            fatal("Couldn't read the swap file.\n");
+        }
+        total_bytes_swapped -= tmp_lines.size;
+    }
+    else
+    {
+        total_bytes_unswapped -= prog->line_numbers->size;
+        total_bytes_swapped -= prog->line_numbers->size;
+    }
+
     swap_free(prog->swap_num);
     total_bytes_unswapped -= prog->total_size;
-    total_bytes_swapped -= tmp_prog.total_size;
+    total_bytes_swapped -= prog->total_size;
     num_unswapped--;
     num_swapped--;
     prog->swap_num = -1;
-} /* remove_swap_file() */
+} /* remove_prog_swap() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1808,9 +1902,9 @@ name_swap_file (const char *name)
 
 /* Set the swap file name to a copy of <name>.
  */
- 
+
 {
-    strncpy(file_name, name, sizeof file_name);
+    xstrncpy(file_name, name, sizeof file_name);
     file_name[sizeof file_name - 1] = '\0';
 } /* name_swap_file()*/
 
@@ -1883,29 +1977,37 @@ swap_status (strbuf_t *sbuf)
 
 /*-------------------------------------------------------------------------*/
 void
-swap_dinfo_data (svalue_t *svp)
+swap_dinfo_data (svalue_t *svp, int value)
 
 /* Fill in the data for debug_info(DINFO_DATA, DID_SWAP)
  * into the svalue block <svp>.
+ * If <value> is -1, <svp> points indeed to a value block; other it is
+ * the index of the desired value and <svp> points to a single svalue.
  */
- 
+
 {
-    svp[DID_SW_PROGS].u.number        = num_swapped - num_unswapped;
-    svp[DID_SW_PROG_SIZE].u.number    = total_bytes_swapped - total_bytes_unswapped;
-    svp[DID_SW_PROG_UNSWAPPED].u.number = num_unswapped;
-    svp[DID_SW_PROG_U_SIZE].u.number  = total_bytes_unswapped;
-    svp[DID_SW_VARS].u.number         = num_vb_swapped;
-    svp[DID_SW_VAR_SIZE].u.number     = total_vb_bytes_swapped;
-    svp[DID_SW_FREE].u.number         = num_swapfree;
-    svp[DID_SW_FREE_SIZE].u.number    = total_bytes_swapfree;
-    svp[DID_SW_FILE_SIZE].u.number    = swapfile_size;
-    svp[DID_SW_REUSED].u.number       = total_swap_reused;
-    svp[DID_SW_SEARCHES].u.number     = swap_num_searches;
-    svp[DID_SW_SEARCH_LEN].u.number   = swap_total_searchlength;
-    svp[DID_SW_F_SEARCHES].u.number   = swap_free_searches;
-    svp[DID_SW_F_SEARCH_LEN].u.number = swap_free_searchlength;
-    svp[DID_SW_COMPACT].u.number      = swap_compact_mode;
-    svp[DID_SW_RECYCLE_FREE].u.number = recycle_free_space;
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code
+
+    ST_NUMBER(DID_SW_PROGS, num_swapped - num_unswapped);
+    ST_NUMBER(DID_SW_PROG_SIZE, total_bytes_swapped - total_bytes_unswapped);
+    ST_NUMBER(DID_SW_PROG_UNSWAPPED, num_unswapped);
+    ST_NUMBER(DID_SW_PROG_U_SIZE, total_bytes_unswapped);
+    ST_NUMBER(DID_SW_VARS, num_vb_swapped);
+    ST_NUMBER(DID_SW_VAR_SIZE, total_vb_bytes_swapped);
+    ST_NUMBER(DID_SW_FREE, num_swapfree);
+    ST_NUMBER(DID_SW_FREE_SIZE, total_bytes_swapfree);
+    ST_NUMBER(DID_SW_FILE_SIZE, swapfile_size);
+    ST_NUMBER(DID_SW_REUSED, total_swap_reused);
+    ST_NUMBER(DID_SW_SEARCHES, swap_num_searches);
+    ST_NUMBER(DID_SW_SEARCH_LEN, swap_total_searchlength);
+    ST_NUMBER(DID_SW_F_SEARCHES, swap_free_searches);
+    ST_NUMBER(DID_SW_F_SEARCH_LEN, swap_free_searchlength);
+    ST_NUMBER(DID_SW_COMPACT, swap_compact_mode);
+    ST_NUMBER(DID_SW_RECYCLE_FREE, recycle_free_space);
+
+#undef ST_NUMBER
 } /* swap_dinfo_data() */
 
 /***************************************************************************/

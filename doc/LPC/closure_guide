@@ -2,22 +2,22 @@ Closure Guide for LPC
 
 Table of Contents
 
-	1 Indroduction, Overview and Efun-Closures
+        1 Indroduction, Overview and Efun-Closures
 
-	2 Lfun-, Inline and Lambda-Closures
-	2.1 Lfun-Closures
+        2 Lfun-, Inline and Lambda-Closures
+        2.1 Lfun-Closures
         2.2 Inline-Closures
-	2.3 Lambda-Closures
+        2.3 Lambda-Closures
         2.3.1 Advantages of Lambda-Closures
-	2.3.2 Free Variables in Lambda-Closure Constructs
-	2.3.3 Special Efun-Closures and Operator-Closures for Lambdas
-	2.4 Closures with Strange Names
-	2.5 Operator-Closures
-	2.6 Variable-Closures
+        2.3.2 Free Variables in Lambda-Closure Constructs
+        2.3.3 Special Efun-Closures and Operator-Closures for Lambdas
+        2.4 Closures with Strange Names
+        2.5 Operator-Closures
+        2.6 Variable-Closures
 
-	3 Examples
-	3.1 Lfun-Closure
-	3.2 Lambda-Closure
+        3 Examples
+        3.1 Lfun-Closure
+        3.2 Lambda-Closure
 
 1 Introduction, Overview and Efun-Closures
 
@@ -320,12 +320,12 @@ Table of Contents
           the end there is a single argument, it is used as the else-case
           if no condition returned true.
 
-          lambda(({ 'x }),({ (#'?),            // if
-                             ({ (#'>),'x,5 }), //    (x > 5)
-                             ({ (#'*),'x,2 }), //       result is x * 2;
-                             ({ (#'<),'x,-5 }) // else if (x < -5)
-                             ({ (#'/),'x,2 }), //    result is x/2;
-                             'x                // else result is x;
+          lambda(({ 'x }),({ (#'?),             // if
+                             ({ (#'>),'x,5 }),  //    (x > 5)
+                             ({ (#'*),'x,2 }),  //       result is x * 2;
+                             ({ (#'<),'x,-5 }), // else if (x < -5)
+                             ({ (#'/),'x,2 }),  //    result is x/2;
+                             'x                 // else result is x;
                           }))
 
       #'?! is like the #'? but it negates all conditions after evaluation
@@ -406,11 +406,11 @@ Table of Contents
            for each assignment.
 
            lambda(0, ({#'foreach, 'o, ({#'users})
-                                    , ({'#call_other, 'o, "die" })
+                                    , ({#'call_other, 'o, "die" })
                      }));
 
            lambda(0, ({#'foreach, ({'k, 'v}), ({ ...mapping...})
-                                    , ({'#printf, "%O:%O\n", 'k, 'v })
+                                    , ({#'printf, "%O:%O\n", 'k, 'v })
                      }));
 
       #'return gets one argument and acts like the "return" statement in LPC
@@ -507,6 +507,12 @@ Table of Contents
            ates to true (not 0) and returns it. If all evaluate to 0 it
            returns 0.
 
+      #'catch executes the closure given as argument, but catches any
+           runtime error (see catch(E)). Optionally the symbol 'nolog
+           may be given as third argument to suppress the log of any
+           caught error.
+
+
 2.4 Closures with Strange Names
 
     #'negate is the unary minus that returns -x for the argument x.
@@ -566,7 +572,7 @@ Table of Contents
 
                This returns ([ "x": 1;2;3,
                                "y": 4;5;6 ]).
-               
+
                However, the elements of the arrays are evaluated as lambda
                expressions, so if you want to create a mapping from values
                evaluated at call time, write them as lambda closures:

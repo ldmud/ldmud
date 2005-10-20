@@ -1,8 +1,13 @@
 Short: '...' syntax element
 From: Lars, Daniel Schild, Stefan
 Type: Feature
-State: Acknowledged
+State: Rejected - Implemented in 3.3.37 .
 
+The implementation in 3.3 takes advantage of that drivers regular efun
+structure, which doesn't exist in 3.2. For that reason, this feature
+won't be implemented in this branch.
+
+---------------------------------------------------------------------------
 Alternative varargs declaration: foo(a,b, c...) ?
 
 New function call syntax: foo(a,b,c...): if c is an array, it is flattened

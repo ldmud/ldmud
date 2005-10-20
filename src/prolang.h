@@ -15,6 +15,7 @@ extern short hook_type_map[];
 extern char *inherit_file;
 extern int num_parse_error;
 extern program_t *compiled_prog;
+extern fulltype_t exact_types;
 
 #ifndef INITIALIZATION_BY___INIT
 extern svalue_t *prog_variable_values;
@@ -29,9 +30,10 @@ extern void yywarn(char *str);
 extern void free_all_local_names(void);
 extern void store_line_number_info(void);
 extern void store_line_number_backward(int offset);
-extern void store_include_info(char *name);
-extern void store_include_end(void);
-extern void compile_file(void);
+extern mp_uint store_include_info(char *name, char *file, char delim, int inc_depth);
+extern void store_include_end(mp_uint inc_offset);
+extern void compile_file(int fd);
+extern short find_inherited (char *super_name, char *real_name);
 
 #if defined( DEBUG ) && defined ( TRACE_CODE )
 extern void set_code_window(void);

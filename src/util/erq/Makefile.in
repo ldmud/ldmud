@@ -30,18 +30,12 @@ WARN= # no warning options - will work with all compilers :-)
 # adding a -fomit-frame-pointer on the NeXT (gcc version 1.93 (68k, MIT syntax))
 # will corrupt the driver.
 OPTIMIZE = @OCFLAGS@ # high optimization
-#OPTIMIZE= @MCFLAGS@ # for better debugging
+#OPTIMIZE= @MCFLAGS@ # medium optimization
+#OPTIMIZE= @LCFLAGS@ # minimal optimization
 #OPTIMIZE= @DCFLAGS@ # no optimization; for frequent recompilations.
 #
-# debugging options: [-DDEBUG] [-DYYDEBUG|-DYYDEBUG=1] [-DTRACE_CODE]
-# -DDEBUG: Enable run time debugging. It will use more time and space.
-# When the flag is changed, be sure to recompile everything.
-# Simply comment out this line if not wanted.
-# If you change anything in the source, you are strongly encouraged to have
-# DEBUG defined.
-# If you will not change anything, you are still encouraged to have
-# it defined, if you want to locate any game driver bugs.
-#DEBUG=-DDEBUG -DTRACE_CODE
+# The main debugging level is define in config.h
+# Add additional options here.
 DEBUG=
 #
 MPATH=-DMUD_LIB='"$(MUD_LIB)"' -DBINDIR='"$(BINDIR)"' -DERQ_DIR='"$(ERQ_DIR)"'
@@ -50,23 +44,23 @@ TOPINC=-I@top_srcdir@
 #
 CFLAGS= @EXTRA_CFLAGS@ $(OPTIMIZE) $(DEBUG) $(WARN) $(MPATH) $(PROFIL) $(TOPINC)
 #
-LIBS=@LIBS@
+LIBS=@ERQ_LIBS@
 #
 LDFLAGS=@LDFLAGS@
 
 
 
-all:	erq
+all:	erq@EXEEXT@
 
 FORCE: install
 
-erq:	erq.c
+erq@EXEEXT@:	erq.c
 #	$(CC) erq.c -lresolv -o erq
-	$(CC) $(CFLAGS) $(LDFLAGS) erq.c -o erq $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) erq.c -o erq@EXEEXT@ $(LIBS)
 
-install: erq
+install: erq@EXEEXT@
 	$(mkinstalldirs) $(BINDIR)
-	$(INSTALL) erq $(BINDIR)/erq
+	$(INSTALL) erq@EXEEXT@ $(BINDIR)/erq@EXEEXT@
 
 clean:
-	-rm -f *.o erq *~
+	-rm -f *.o erq@EXEEXT@ *~

@@ -48,7 +48,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/debug_info.h"
- 
+
 /*-------------------------------------------------------------------------*/
 
   /* The description of one callout.
@@ -79,6 +79,10 @@ static struct call *call_list_free = NULL;
 
 static long num_call = 0;
   /* Number of allocated callouts.
+   */
+
+static long num_callouts = 0;
+  /* Number of active callouts.
    */
 
 static object_t call_out_nil_object;
@@ -195,7 +199,13 @@ new_call_out (svalue_t *sp, short num_arg)
         /* call structure is still in the free list, and the
          * callback structure was invalidated automatically.
          */
-        bad_efun_vararg(error_index, arg - 1);
+        bad_efun_vararg(error_index+2, arg - 1);
+        /* NOTREACHED */
+    }
+
+    if (max_callouts && max_callouts <= num_callouts)
+    {
+        error("Too many callouts at once (max. %ld).\n", (long)max_callouts);
         /* NOTREACHED */
     }
 
@@ -203,6 +213,7 @@ new_call_out (svalue_t *sp, short num_arg)
      * store the missing data.
      */
 
+    num_callouts++;
     call_list_free = cop->next;
     cop->command_giver = command_giver; /* save current player context */
     if (command_giver)
@@ -296,7 +307,7 @@ call_out (void)
         wiz_list_t *user;
 
         clear_state();
-        debug_message("%s: Error in call out.\n", time_stamp());
+        debug_message("%s Error in call out.\n", time_stamp());
         cop = current_call_out;
         ob = called_object;
         if (ob)
@@ -325,6 +336,7 @@ call_out (void)
         cop = call_list;
         call_list = cop->next;
         current_call_out = cop;
+        num_callouts--;
 
         /* A special case:
          * If a lot of time has passed, so that current call out was missed,
@@ -508,6 +520,7 @@ found:
                         cop->next->delta += cop->delta;
                     *copp = cop->next;
                     free_call(cop);
+                    num_callouts--;
                 }
                 /* It is possible to have delay < 0 if we are
                  * called from inside call_out() .
@@ -549,6 +562,7 @@ found:
                     cop->next->delta += cop->delta;
                 *copp = cop->next;
                 free_call(cop);
+                num_callouts--;
             }
             if (delay < 0)
                 delay = 0;
@@ -562,30 +576,26 @@ found:
 
 /*-------------------------------------------------------------------------*/
 size_t
-print_call_out_usage (strbuf_t *sbuf, Bool verbose)
+call_out_status (strbuf_t *sbuf, Bool verbose)
 
 /* Compute and return the amount of memory used by callouts.
  * If <verbose> is true, write detailed statistics to the current user.
  */
 
 {
-    long i;
-    struct call *cop;
-
-    for (i=0, cop = call_list; cop; cop = cop->next)
-        i++;
+    remove_stale_call_outs();
     if (verbose)
     {
         strbuf_add(sbuf, "\nCall out information:\n");
         strbuf_add(sbuf,"---------------------\n");
         strbuf_addf(sbuf, "Number of allocated call outs: %8ld, %8ld bytes\n",
                     num_call, num_call * sizeof (struct call));
-        strbuf_addf(sbuf, "Current length: %ld\n", i);
+        strbuf_addf(sbuf, "Current length: %ld\n", num_callouts);
     }
     else
     {
-        strbuf_addf(sbuf, "call out:\t\t\t%8ld %8ld (current length %ld)\n"
-                   , num_call, num_call * sizeof (struct call), i);
+        strbuf_addf(sbuf, "call out:\t\t\t%8ld %9ld (current length %ld)\n"
+                   , num_call, num_call * sizeof (struct call), num_callouts);
     }
 
     return num_call * sizeof (struct call);
@@ -593,23 +603,26 @@ print_call_out_usage (strbuf_t *sbuf, Bool verbose)
 
 /*-------------------------------------------------------------------------*/
 void
-callout_dinfo_status (svalue_t *svp)
+callout_dinfo_status (svalue_t *svp, int value)
 
 /* Return the callout information for debug_info(DINFO_DATA, DID_STATUS).
  * <svp> points to the svalue block for the result, this function fills in
  * the spots for the object table.
+ * If <value> is -1, <svp> points indeed to a value block; other it is
+ * the index of the desired value and <svp> points to a single svalue.
  */
 
 {
-    long i;
-    struct call *cop;
-    
-    for (i=0, cop = call_list; cop; cop = cop->next)
-        i++;
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code
 
-    svp[DID_ST_CALLOUTS].u.number      = i;
-    svp[DID_ST_CALLOUT_SLOTS].u.number = num_call;
-    svp[DID_ST_CALLOUT_SIZE].u.number  = num_call * sizeof(struct call);
+    remove_stale_call_outs();
+    ST_NUMBER(DID_ST_CALLOUTS, num_callouts);
+    ST_NUMBER(DID_ST_CALLOUT_SLOTS, num_call);
+    ST_NUMBER(DID_ST_CALLOUT_SIZE, num_call * sizeof(struct call));
+
+#undef ST_NUMBER
 } /* callout_dinfo_status() */
 
 /*-------------------------------------------------------------------------*/
@@ -638,7 +651,8 @@ count_extra_ref_from_call_outs (void)
 void
 remove_stale_call_outs (void)
 
-/* GC Support: Remove all callouts referencing destructed objects.
+/* GC and statistics support: Remove all callouts referencing destructed
+ * objects.
  */
 
 {
@@ -651,6 +665,7 @@ remove_stale_call_outs (void)
         ob = callback_object(&(cop->fun));
         if (!ob)
         {
+            num_callouts--;
             if (cop->next)
                 cop->next->delta += cop->delta;
             *copp = cop->next;
@@ -680,11 +695,8 @@ clear_ref_from_call_outs (void)
 
         clear_ref_in_callback(&(cop->fun));
 
-        if (NULL != (ob = cop->command_giver) && ob->flags & O_DESTRUCTED)
-        {
-            ob->ref = 0;
-            clear_inherit_ref(ob->prog);
-        }
+        if (NULL != (ob = cop->command_giver))
+            clear_object_ref(ob);
     }
 } /* clear_ref_from_call_outs() */
 
@@ -759,15 +771,20 @@ get_all_call_outs (void)
         ob = callback_object(&(cop->fun));
         if (!ob)
             continue;
-            
+
         /* Get the subarray */
 
         vv = allocate_array(3 + cop->fun.num_arg);
 
         if (cop->fun.is_lambda)
         {
+            if (cop->fun.function.lambda.x.closure_type == CLOSURE_ALIEN_LFUN)
+                put_ref_object( vv->item
+                              , cop->fun.function.lambda.u.lambda->function.alien.ob
+                              , "get_all_call_outs");
+            else
+                put_ref_object(vv->item, ob, "get_all_call_outs");
             assign_svalue_no_free(&vv->item[1], &cop->fun.function.lambda);
-            /* assuming that item[0] was inited to 0 */
         }
         else
         {
@@ -798,7 +815,7 @@ get_all_call_outs (void)
     }
 
     return v;
-}
+} /* get_all_call_outs() */
 
 /***************************************************************************/
 

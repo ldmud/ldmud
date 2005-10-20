@@ -1,8 +1,8 @@
 CONCEPT
-	mappings
+        mappings
 
 LAST UPDATE
-	Mon, 15 Mar 1999
+        Mon, 15 Mar 1999
 
 DESCRIPTION
 
@@ -88,7 +88,7 @@ DESCRIPTION
   or:
       map = mkmapping(({}), ({}));
 
-    Or  by  using the efun   allocate_mapping().  This efun gets  as  first
+    Or  by  using the efun   m_allocate().  This efun gets  as  first
   argument the  amount  of keys which will  be  added soon and  an optional
   second argument specifying the width of the mapping:
 
@@ -105,6 +105,18 @@ DESCRIPTION
   afterwards.    The <width> just specifies how   many  values per key this
   mapping is   going to have. If  no  width is given, 1  will  be  taken as
   default.
+
+  An empty mapping created with '([])' will always have a width of 1. To
+  create empty mappings with other widths, write it as
+
+      map = ([:width ]);
+
+  <width> can be any expression returning an integer value (including
+  function calls), and in fact this notation is just a fancy way of
+  writing
+
+      map = m_allocate(0, width);
+
 
 
   4. How can I modify the data of a mapping?
@@ -420,12 +432,15 @@ DESCRIPTION
   applications which use mappings.
 
   And Hyps further comment on this:
-	The function mapping_to_alist() is also not that
-	clever because insert_alist() allways creates a new
-	alist.  A second (optional) argument to m_values() to
-	specify the value column would be better. Besides
-	this, the conversion of a mapping into an alist could
-	be done by to_array().
+        The function mapping_to_alist() is also not that
+        clever because insert_alist() allways creates a new
+        alist.  A second (optional) argument to m_values() to
+        specify the value column would be better. Besides
+        this, the conversion of a mapping into an alist could
+        be done by to_array().
+
+HISTORY
+        The ([:width ]) notation was added in LDMud 3.2.9 .
 
 SEE ALSO
-	alists(LPC), closures(LPC), mkmapping(E), walk_mapping(E)
+        alists(LPC), closures(LPC), mkmapping(E), walk_mapping(E)

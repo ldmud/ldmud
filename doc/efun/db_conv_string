@@ -1,3 +1,4 @@
+OPTIONAL
 SYNOPSIS
         string db_conv_string(string str)
 
@@ -6,6 +7,13 @@ DESCRIPTION
         for usage as a string in db_exec(), e.g. ' is replaced with \' and so
         on.
 
+        The function is available only if the driver is compiled with
+        mySQL support. In that case, __MYSQL__ is defined.
+
+HISTORY
+        Added in 3.2.9 .
+
 SEE ALSO
-        db_affected_rows(E), db_close(E), db_connect(E),
-        db_exec(E), db_fetch(E), db_handles(E)
+        db_affected_rows(E), db_close(E), db_coldefs(E), db_connect(E),
+        db_exec(E), db_error(E), db_fetch(E), db_handles(E), db_insert_id(E),
+        mysql(C)

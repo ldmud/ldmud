@@ -1,5 +1,5 @@
 CONCEPT
-	uids (userids)
+        uids (userids)
 
 DESCRIPTION
         Every object in the mud is attributed with a user-id 'uid': a string
@@ -46,8 +46,8 @@ DESCRIPTION
         Userids are assigned at the time of the creation of an object
         by calling the driverhooks H_LOAD_UIDS and H_CLONE_UIDS:
 
-	    mixed <load_uids closure> (string objectname)
-	    mixed <clone_uids closure>(object blueprint, string objectname)
+            mixed <load_uids closure> (string objectname)
+            mixed <clone_uids closure>(object blueprint, string objectname)
 
         When an object is newly loaded, the H_LOAD_UIDS hook is
         called with the object name as argument.
@@ -76,7 +76,7 @@ DESCRIPTION
         The masters (e)uid is determined by a call to
         master->get_master_uid():
 
-             "<uid"> -> uid = "<uid>", euid = "<euid>"
+             "<uid"> -> uid = "<uid>", euid = "<uid>"
 
         In non-strict-euids mode, more results are possible:
 
@@ -92,5 +92,5 @@ DESCRIPTION
         the appropriate driver hooks.
 
 SEE ALSO
-	native(C), get_bb_uid(M), valid_seteuid(M),
-	objects(C), clone_object(E), geteuid(E), getuid(E), seteuid(E)
+        native(C), get_bb_uid(M), valid_seteuid(M),
+        objects(C), clone_object(E), geteuid(E), getuid(E), seteuid(E)

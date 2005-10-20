@@ -28,4 +28,4 @@ enable_compat_mode=no
 enable_strict_euids=yes
 enable_supply_parse_command=no
 
-with_catch_udp_port=8000
+with_udp_port=8000

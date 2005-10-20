@@ -30,6 +30,11 @@
 /* Define as the return type of signal handlers (int or void).  */
 #define RETSIGTYPE void
 
+/* Set in response to the signal handler return type, since not all
+ * compilers understand direct definition comparisons
+ */
+#define RETSIGTYPE_VOID 1
+
 /* Define to `unsigned' if <sys/types.h> doesn't define.  */
 /* #undef size_t */
 
@@ -77,9 +82,6 @@
 
 /* the atari strtol() used to consider characters '9' < c < 'A' to be numeric */
 /* #undef STRTOL_BROKEN */
-
-/* does the libc consider it normal to free a null pointer? */
-#define FREE_NULL_POINTER 1
 
 /* needs the first argument of strtol be declared as const ? */
 #ifndef __MWERKS__
@@ -135,6 +137,15 @@
 
 /* Does the machine offer IPv6? */
 /* #undef HAS_IPV6 */
+
+/* Does the machine offer mySQL? */
+/* #undef HAS_MYSQL */
+
+/* Does the machine offer pthread library? */
+/* #undef HAS_PTHREADS */
+
+/* Does the machine offer pcre library? */
+/* #undef HAS_PCRE */
 
 /* define the erq include file. */
 #define ERQ_INCLUDE "util/erq/erq.h"

@@ -1,16 +1,16 @@
 SYNOPSIS
-	void throw(mixed arg)
+        void throw(mixed arg)
 
 DESCRIPTION
-	Abort execution. If the current program execution was
-	initiated by catch(), that catch expression will
-	return arg as error code.
-	Calling throw() without previous catch() does not make sense
-	and will result in an ``throw without catch'' error.
+        Abort execution. If the current program execution was
+        initiated by catch(), that catch expression will
+        return arg as error code.
+        Calling throw() without previous catch() does not make sense
+        and will result in an ``throw without catch'' error.
 
 EXAMPLE
-	catch(throw("aborting execution"));
-	This will just print the string "aborting execution".
-	
+        catch(throw("aborting execution"));
+        This will just print the string "aborting execution".
+
 SEE ALSO
-	catch(E), raise_error(E)
+        catch(E), raise_error(E)

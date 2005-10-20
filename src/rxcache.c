@@ -18,18 +18,19 @@
  * If RXCACHE_TABLE is not defined, the whole caching is disabled.
  *
  * The include rxcache.h file offers some macros for transparent use:
- *   REGCOMP() wrap up the calls to regcomp().
+ *   REGCOMP() wrap up the calls to hs_regcomp().
  *   RX_DUP() and REGFREE() handle the refcounting necessary.
  * The macros map to the standard uncached, non-refcounted calls
  * if the rxcache is disabled.
  *
- * Beware! regexec() stores result data in the regexp structure (the
+ * Beware! hs_regexec() stores result data in the regexp structure (the
  * startp[] and end[] arrays), so the same pattern must not be used
- * in two concurrent regcomp_cache/regexec pairs.
+ * in two concurrent regcomp_cache/hs_regexec pairs.
  *
  * TODO: Using shared strings as cache-indices can speed things up,
  * TODO:: especially when knowing where to find the hashvalue from
  * TODO:: the strtable.
+ * TODO: Use in-table chaining to handle collisions.
  *------------------------------------------------------------------
  */
 
@@ -70,11 +71,12 @@
 /* One expression hashtable entry */
 
 typedef struct RxHashEntry {
-    char   * pString;  /* Generator string, a shared string
-                        * NULL if unused */
+    unsigned char * pString;  /* Generator string, a shared string
+                               * NULL if unused */
     p_uint   hString;  /* Hash of pString */
     Bool     from_ed;  /* The from_ed value */
-    regexp * pRegexp;  /* The generated regular expression from regcomp() */
+    Bool     excompat; /* The excompat value */
+    regexp * pRegexp;  /* The generated regular expression from hs_regcomp() */
 } RxHashEntry;
 
 
@@ -85,6 +87,8 @@ static RxHashEntry xtable[RXCACHE_TABLE];  /* The Expression Hashtable */
 static uint32 iNumXRequests   = 0;  /* Number of calls to regcomp() */
 static uint32 iNumXFound      = 0;  /* Number of calls satisfied from table */
 static uint32 iNumXCollisions = 0;  /* Number of hashcollisions */
+static uint32 iNumXEntries    = 0;  /* Number of used cache entries */
+static uint32 iXSizeAlloc     = 0;  /* Dynamic memory held in regexp structs */
 
 /*--------------------------------------------------------------------*/
 void rxcache_init(void)
@@ -97,7 +101,7 @@ void rxcache_init(void)
 
 /*--------------------------------------------------------------------*/
 regexp *
-regcomp_cache(char * expr, Bool excompat, Bool from_ed)
+regcomp_cache(unsigned char * expr, Bool excompat, Bool from_ed)
 
 /* Compile a regexp structure from the expression <expr>, more or
  * less ex compatible.
@@ -116,14 +120,15 @@ regcomp_cache(char * expr, Bool excompat, Bool from_ed)
 
     iNumXRequests++;
 
-    hExpr = whashstr(expr, 50);
+    hExpr = whashstr((char *)expr, 50);
     pHash = xtable+RxStrHash(hExpr);
 
     /* Look for a ready-compiled regexp */
     if (pHash->pString != NULL
      && pHash->hString == hExpr
      && pHash->from_ed == from_ed
-     && !strcmp(pHash->pString, expr)
+     && pHash->excompat == excompat
+     && !strcmp((char *)pHash->pString, (char *)expr)
        )
     {
         iNumXFound++;
@@ -133,21 +138,29 @@ regcomp_cache(char * expr, Bool excompat, Bool from_ed)
     /* Regexp not found: compile a new one and enter it
      * into the table.
      */
-    pRegexp = regcomp(expr, excompat, from_ed);
+    pRegexp = hs_regcomp(expr, excompat, from_ed);
     if (NULL == pRegexp)
         return NULL;
 
-    expr = make_shared_string(expr);
+    expr = (unsigned char *)make_shared_string((char *)expr);
 
     if (NULL != pHash->pString)
     {
         iNumXCollisions++;
-        free_string(pHash->pString);
+        iNumXEntries--;
+        iXSizeAlloc -= pHash->pRegexp->regalloc;
+
+        free_string((char *)pHash->pString);
         rx_free(pHash->pRegexp);
     }
     pHash->pString = expr; /* refs are transferred */
     pHash->hString = hExpr;
     pHash->pRegexp = pRegexp;
+    pHash->from_ed = from_ed;
+    pHash->excompat = excompat;
+
+    iNumXEntries++;
+    iXSizeAlloc += pRegexp->regalloc;
 
     return rx_dup(pRegexp);
 } /* regcomp_cache() */
@@ -161,25 +174,11 @@ rxcache_status (strbuf_t *sbuf, Bool verbose)
  */
 
 {
-    int    i;
-
-    uint32 iNumXEntries = 0;      /* Number of used cache entries */
-    uint32 iXSizeAlloc = 0;       /* Dynamic memory held in regexp structures */
-    uint32 iNumXReq;              /* Number of regcomp() requests, made non-zero */
+    uint32 iNumXReq;  /* Number of regcomp() requests, made non-zero */
 
 #if defined(__MWERKS__) && !defined(WARN_ALL)
 #    pragma warn_largeargs off
 #endif
-
-    /* Scan the whole tables, counting entries */
-    for (i = 0; i < RXCACHE_TABLE; i++)
-    {
-        if (NULL != xtable[i].pString)
-        {
-            iNumXEntries++;
-            iXSizeAlloc += xtable[i].pRegexp->regalloc;
-        }
-    }
 
     /* In verbose mode, print the statistics */
     if (verbose)
@@ -199,7 +198,7 @@ rxcache_status (strbuf_t *sbuf, Bool verbose)
     }
     else
     {
-        strbuf_addf(sbuf, "Regexp cache:\t\t\t%8ld %8lu\n", iNumXEntries, iXSizeAlloc);
+        strbuf_addf(sbuf, "Regexp cache:\t\t\t%8ld %9lu\n", iNumXEntries, iXSizeAlloc);
     }
 
     return iXSizeAlloc;
@@ -211,35 +210,28 @@ rxcache_status (strbuf_t *sbuf, Bool verbose)
 
 /*-------------------------------------------------------------------------*/
 void
-rxcache_dinfo_status (svalue_t *svp)
+rxcache_dinfo_status (svalue_t *svp, int value)
 
 /* Return the rxcache information for debug_info(DINFO_DATA, DID_STATUS).
  * <svp> points to the svalue block for the result, this function fills in
  * the spots for the object table.
+ * If <value> is -1, <svp> points indeed to a value block; other it is
+ * the index of the desired value and <svp> points to a single svalue.
  */
 
 {
-    int    i;
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code
 
-    uint32 iNumXEntries = 0;      /* Number of used cache entries */
-    uint32 iXSizeAlloc = 0;       /* Dynamic memory held in regexp structures */
+    ST_NUMBER(DID_ST_RX_CACHED, iNumXEntries);
+    ST_NUMBER(DID_ST_RX_TABLE, RXCACHE_TABLE);
+    ST_NUMBER(DID_ST_RX_TABLE_SIZE, iXSizeAlloc);
+    ST_NUMBER(DID_ST_RX_REQUESTS, iNumXRequests);
+    ST_NUMBER(DID_ST_RX_REQ_FOUND, iNumXFound);
+    ST_NUMBER(DID_ST_RX_REQ_COLL, iNumXCollisions);
 
-    /* Scan the whole tables, counting entries */
-    for (i = 0; i < RXCACHE_TABLE; i++)
-    {
-        if (NULL != xtable[i].pString)
-        {
-            iNumXEntries++;
-            iXSizeAlloc += xtable[i].pRegexp->regalloc;
-        }
-    }
-
-    svp[DID_ST_RX_CACHED].u.number     = iNumXEntries;
-    svp[DID_ST_RX_TABLE].u.number      = RXCACHE_TABLE;
-    svp[DID_ST_RX_TABLE_SIZE].u.number = iXSizeAlloc;
-    svp[DID_ST_RX_REQUESTS].u.number   = iNumXRequests;
-    svp[DID_ST_RX_REQ_FOUND].u.number  = iNumXFound;
-    svp[DID_ST_RX_REQ_COLL].u.number   = iNumXCollisions;
+#undef ST_NUMBER
 } /* rxcache_dinfo_status() */
 
 /*--------------------------------------------------------------------*/
@@ -301,7 +293,7 @@ count_rxcache_refs (void)
     {
         if (NULL != xtable[i].pString)
         {
-            count_ref_from_string(xtable[i].pString);
+            count_ref_from_string((char *)xtable[i].pString);
             count_rxcache_ref(xtable[i].pRegexp);
         }
     } /* for (i) */

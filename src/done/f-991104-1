@@ -2,7 +2,8 @@ Subject: Inline closures are not real closures.
 From: Lars
 Date: 991104
 Type: Feature
-State: Acknowledged.
+State: Done - implemented in 3.3.271
+See also: f-020528
 
 Inline closures still lack the ability to use the values of
 the local vars of their creating function.

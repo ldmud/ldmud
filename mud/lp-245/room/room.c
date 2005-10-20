@@ -23,6 +23,8 @@ string property;
 /* No castles are allowed to be dropped here */
 int no_castle_flag;
 
+convert_number();
+query_numbers();
 
 init() {
     int i;

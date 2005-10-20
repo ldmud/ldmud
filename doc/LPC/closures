@@ -308,25 +308,25 @@ DESCRIPTION
         ); which will set the property to a function that returns the
         function that is in the variable get_orc at the time you do
         the add_prop() call.
-        
+
         Back to fortress.c : Assume you have the function
         successfully queried and stored in the variable get_orc. Now
         you can compute your extra_reset() function by: get_orc =
         lambda( 0, ({#'funcall, get_orc, 8, 40}) ); which creates the
         usual 8 orcs with an a_chat chance of 40.
-        
+
         Here comes the orc_valley.c source:
-        
+
             ----------- cut here ------- cut here -------- cut here ---
-        
+
         #include "room.h"
         #include "/sys/stdproperties.h"
         #undef EXTRA_RESET
         #define EXTRA_RESET extra_reset();
-        
+
         extra_reset() {
             closure get_orc;
-        
+
             replace_program("room/room"); /* Must come first. */
             get_orc = lambda( ({'num_orcs, 'chat_chance}),
                ({#'?!, ({#'present, "orc", ({#'previous_object}) }),
@@ -388,7 +388,7 @@ DESCRIPTION
             add_prop(C_EXTRA_RESET, get_orc);
             funcall(get_orc);
         }
-        
+
         TWO_EXIT("room/slope", "east",
                 "room/fortress", "north",
                 "The orc valley",
@@ -396,9 +396,9 @@ DESCRIPTION
                 "by orcs.\n"
                 "There is a fortress to the north, with lot of signs
                 of orcs.\n", 1)
-        
+
             ----------- cut here ------- cut here -------- cut here ----
-        
+
 
         Procedural elements:
         ====================

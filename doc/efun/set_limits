@@ -8,16 +8,16 @@ SYNOPSIS
 
 DESCRIPTION
         Set the default runtime limits from the given arguments. The new
-        limits will be in effect as the initial 'max limits' with the 
+        limits will be in effect as the initial 'max limits' with the
         next execution thread.
- 
+
         The arguments can be given in two ways: as an array (like the one
         returned from query_limits(), or as a list of tagged values.
         The limit settings recognize two special values:
 
             LIMIT_UNLIMITED: the limit is deactivated
             LIMIT_KEEP:      the former setting is kept
- 
+
         The efun causes a privilege violation ("set_limits", current_object,
         first
 
@@ -25,7 +25,7 @@ EXAMPLES
         set_limits( ({ 200000 }) )
         set_limits( LIMIT_EVAL, 200000 )
           --> set new default eval_cost limit to 200000
-          
+
         set_limits( ({ LIMIT_UNLIMITED, LIMIT_KEEP, 5000 }) )
         set_limits( LIMIT_EVAL, LIMIT_UNLIMITED, LIMIT_ARRAY, LIMIT_KEEP,
                     LIMIT_MAPPING, 5000 )

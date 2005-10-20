@@ -48,3 +48,17 @@ Themis: IBM RS6000/?/?, AIX 3.4, xlc
   3.2.8-dev.164,                      -O4/-O:           384.6
   3.2.8-dev.164, -DDEBUG -DTRACE_CODE -O4/-O:            82.2
 
+New Themis: IBM RS6000/?/?, AIX 3.4, xlc
+
+  3.2.9-dev.263,                      -O2:             1260.5
+  3.2.9-dev.263, -DDEBUG -DTRACE_CODE -O2:              616.1
+  3.2.9-dev.263, -DDEBUG -DTRACE_CODE -DCHKSTRG -O2:    536.7
+  3.2.9-dev.263,                      -O4:             1322.1
+  3.2.9-dev.263, -DDEBUG -DTRACE_CODE -O4:              656.5
+  3.2.9-dev.263, -DDEBUG -DTRACE_CODE -DCHKSTRG -O4:    575.0
+
+  3.3.25,                             -O2:             1186.0
+  3.3.25,        -DDEBUG -DTRACE_CODE -O2:              645.2
+  3.3.25,                             -O4:             1260.6
+  3.3.25,        -DDEBUG -DTRACE_CODE -O4:              681.9
+

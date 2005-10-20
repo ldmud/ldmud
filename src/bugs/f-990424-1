@@ -14,3 +14,9 @@ could be emulated very easily.  Just a thought - it might not even be
 beneficial.
 
 This might even be used in parallel to the old search-by-name system.
+
+------------------------------------------------------------------
+From: Pulami
+Date:  2002-05-19
+
+Hi, Lars!Ich würde gerne unter all den laufenden Call-Outs einer Funktion/Closure dieeine löschen, die mit einem bestimmten Argument aufgerufen wird. Da ichmittels call_out_info() ein Feld mit allen Call-Outs einer Funktion/Closurebekommen kann, wäre die sinnvollste Lösung, dass ich den soundsovieltenCall-Out einer Funktion/Closure löschen kann, also:    int remove_call_out(string|closure fun [, int nummer])Hierbei wäre remove_call_out(fun) das selbe wie remove_call_out(fun, 0), 0stünde also für den als nächstes aufzurufenden Call-Out, 1 für den folgendenetc. pp.Eventuell wäre aus Geschwindigkeits-Gründen auch eine neue Efun    mixed *find_all_call_outs(string|closure fun)statt einer Sefun sinnvoll, die zur Funktion/Closure fun von this_object()ein entsprechendes Feld analog zu call_out_info() (ohne 1.) und 2.)) zurVerfügung stellt. Ich nehme mal an, dass call_out_info() entsprechend derAufruf-Reihenfolge sortiert ist, mit dem nächsten aufzurufenden Call-Out alserstem Element.Folgendes als Sefun ist wohl ausreichend schnell:mixed *find_all_call_outs(mixed fun){    return map(        filter(            call_out_info(),            (: $1[0]==$2 && $1[1]==$3 :),            // $1[0] ist das Objekt, $1[1] ist die Funktion/Closure.            previous_object(),            fun            ),        (: $1[2..] :)        );}

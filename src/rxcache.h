@@ -9,9 +9,9 @@
 #ifdef RXCACHE_TABLE
 
 extern void rxcache_init(void);
-extern regexp * regcomp_cache(char * expr, Bool excompat, Bool from_ed);
+extern regexp * regcomp_cache(unsigned char * expr, Bool excompat, Bool from_ed);
 extern size_t rxcache_status(strbuf_t *sbuf, Bool verbose);
-extern void   rxcache_dinfo_status(svalue_t *svp);
+extern void   rxcache_dinfo_status(svalue_t *svp, int value);
 extern regexp * rx_dup(regexp *);
 extern void rx_free(regexp *);
 
@@ -27,7 +27,7 @@ extern void count_rxcache_ref(regexp *);
 
 #else
 
-#define REGCOMP(x,y,z) regcomp(x,y,z)
+#define REGCOMP(x,y,z) hs_regcomp(x,y,z)
 #define RX_DUP(x)      (x)
 #define REGFREE(x)     xfree(x)
 

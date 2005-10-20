@@ -1,14 +1,14 @@
 NAME
-	for
+        for
 
 SYNTAX
-	for(init; expr2; expr3) statement;
+        for(init; expr2; expr3) statement;
 
 DESCRIPTION
-	Execute <init> once. Then, while <expr2> returns a non-zero
-	value, execute <statement>. Every time <statement> has been
-	executed, or a 'continue' statement has been executed, execute
-	<expr3> before next loop.
+        Execute <init> once. Then, while <expr2> returns a non-zero
+        value, execute <statement>. Every time <statement> has been
+        executed, or a 'continue' statement has been executed, execute
+        <expr3> before next loop.
 
         <init> is usually a series of one or more expressions (remember
         that assignments are expressions, too), separated by commas.
@@ -28,9 +28,9 @@ DESCRIPTION
            for (int i; ...      : no value assigned
            for (int i += 4; ... : only plain assignments allowed
 
-	A 'break' in the 'statement' will terminate the loop. A
-	'continue' will continue the execution from the beginning of
-	the loop.
+        A 'break' in the 'statement' will terminate the loop. A
+        'continue' will continue the execution from the beginning of
+        the loop.
 
 SEE ALSO
     foreach(LPC), if(LPC), do-while(LPC), while(LPC), switch(LPC)

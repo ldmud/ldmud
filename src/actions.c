@@ -97,6 +97,7 @@ struct command_context_s
     action_t * marker;       /* the marker sentence */
     char * cmd;              /* the full command, a stack buffer */
     char * verb;             /* the shared verb */
+    char * action_verb;      /* the tabled action verb */
     svalue_t errmsg;         /* the error message */
     object_t * errobj;       /* object which set the error message */
 };
@@ -114,7 +115,12 @@ object_t *command_giver;
 
 char *last_verb = NULL;
   /* During a command execution, this is the shared string with the
-   * command verb.
+   * given command verb.
+   */
+
+char *last_action_verb = NULL;
+  /* During a command execution, this is the tabled string with the
+   * command verb as specified in the action definition.
    */
 
 char *last_command = NULL;
@@ -175,6 +181,10 @@ free_action_temporaries (void)
         free_string(last_verb);
     last_verb = NULL;
 
+    if (last_action_verb)
+        free_string(last_action_verb);
+    last_action_verb = NULL;
+
 } /* free_action_temporaries() */
 
 /*-------------------------------------------------------------------------*/
@@ -199,6 +209,8 @@ new_action_sent(void)
     }
     p->verb = NULL;
     p->function = NULL;
+    p->ob = NULL;
+    p->shadow_ob = NULL;
     return p;
 } /* new_action_sent() */
 
@@ -238,7 +250,7 @@ purge_action_sent(void)
 
 {
     sentence_t *p;
-    
+
     for (;free_sent; free_sent = p) {
         p = free_sent->next;
         xfree(free_sent);
@@ -257,6 +269,7 @@ save_command_context (struct command_context_s * context)
 {
     context->rt.type = COMMAND_CONTEXT;
     context->verb = last_verb;
+    context->action_verb = last_action_verb;
     context->cmd = last_command;
     context->mark_player = marked_command_giver;
     if (marked_command_giver)
@@ -270,6 +283,7 @@ save_command_context (struct command_context_s * context)
 
     command_giver = NULL;
     last_verb = NULL;
+    last_action_verb = NULL;
     last_command = NULL;
     marked_command_giver = NULL;
     command_marker = NULL;
@@ -290,6 +304,9 @@ _restore_command_context (struct command_context_s * context)
     if (last_verb)
         free_string(last_verb);
 
+    if (last_action_verb)
+        free_string(last_action_verb);
+
     if (command_marker)
         free_action_sent(command_marker);
     else if (marked_command_giver && !(O_DESTRUCTED & marked_command_giver->flags))
@@ -297,6 +314,7 @@ _restore_command_context (struct command_context_s * context)
 
     /* Restore the previous context */
     last_verb = context->verb;
+    last_action_verb = context->action_verb;
     last_command = context->cmd;
     command_giver = check_object(context->this_player);
     if (context->this_player)
@@ -333,7 +351,7 @@ remove_action_sent (object_t *ob, object_t *player)
         action_t *tmp;
 
         tmp = (action_t *)*s;
-        
+
         if (tmp->ob == ob)
         {
 #ifdef DEBUG
@@ -348,7 +366,7 @@ remove_action_sent (object_t *ob, object_t *player)
                 else if (tmp->verb)
                     debug_message("%s --Unlinking sentence fun=0, verb='%s'\n"
                                  , time_stamp(), tmp->verb);
-                else 
+                else
                     debug_message("%s --Unlinking sentence fun=0, verb=0\n"
                                  , time_stamp());
             }
@@ -360,6 +378,50 @@ remove_action_sent (object_t *ob, object_t *player)
             s = &((*s)->next);
     }
 } /* remove_action_sent() */
+
+/*-------------------------------------------------------------------------*/
+void
+remove_shadow_action_sent (object_t *ob, object_t *player)
+
+/* Remove all actions defined by <ob> and attached to <player>.
+ */
+
+{
+    sentence_t **s;
+
+    /* A simple list walk */
+    for (s = &player->sent; *s;)
+    {
+        action_t *tmp;
+
+        tmp = (action_t *)*s;
+
+        if (tmp->shadow_ob == ob)
+        {
+#ifdef DEBUG
+            if (d_flag > 1)
+            {
+                if (tmp->function && tmp->verb)
+                    debug_message("%s --Unlinking sentence fun='%s', verb='%s'\n"
+                                 , time_stamp(), tmp->function, tmp->verb);
+                else if (tmp->function)
+                    debug_message("%s --Unlinking sentence fun='%s', verb=0\n"
+                                 , time_stamp(), tmp->function);
+                else if (tmp->verb)
+                    debug_message("%s --Unlinking sentence fun=0, verb='%s'\n"
+                                 , time_stamp(), tmp->verb);
+                else
+                    debug_message("%s --Unlinking sentence fun=0, verb=0\n"
+                                 , time_stamp());
+            }
+#endif
+            *s = tmp->sent.next;
+            free_action_sent(tmp);
+        }
+        else
+            s = &((*s)->next);
+    }
+} /* remove_shadow_action_sent() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -413,6 +475,35 @@ remove_environment_sent (object_t *player)
 } /* remove_environment_sent() */
 
 /*-------------------------------------------------------------------------*/
+void
+remove_shadow_actions (object_t *shadow, object_t *target)
+
+/* Remove all shadow actions defined by <shadow> and attached to <target> or
+ * an object in <target>'s vicinity.
+ */
+
+{
+    object_t *item;
+
+    remove_shadow_action_sent(shadow, target);
+    for (item = target->contains; item; item = item->next_inv)
+    {
+        if (shadow != item)
+            remove_shadow_action_sent(shadow, item);
+    }
+    if (target->super)
+    {
+        remove_shadow_action_sent(shadow, target->super);
+
+        for (item = target->super->contains; item; item = item->next_inv)
+        {
+            if (shadow != item && target != item)
+                remove_shadow_action_sent(shadow, item);
+        }
+    }
+} /* remove_shadow_actions() */
+
+/*-------------------------------------------------------------------------*/
 static Bool
 call_modify_command (char *buff)
 
@@ -440,10 +531,10 @@ call_modify_command (char *buff)
             ip->modify_command = 0;
             free_object(ob, "modify_command");
         }
-        else if (closure_hook[H_MODIFY_COMMAND_FNAME].type == T_STRING)
+        else if (driver_hook[H_MODIFY_COMMAND_FNAME].type == T_STRING)
         {
             push_volatile_string(buff);
-            svp = sapply(closure_hook[H_MODIFY_COMMAND_FNAME].u.string, ob, 1);
+            svp = sapply(driver_hook[H_MODIFY_COMMAND_FNAME].u.string, ob, 1);
             /* !command_giver means that the command_giver has been destructed. */
             if (!command_giver)
                 return MY_TRUE;
@@ -451,30 +542,30 @@ call_modify_command (char *buff)
     }
     else
     {
-        if (closure_hook[H_MODIFY_COMMAND].type == T_CLOSURE)
+        if (driver_hook[H_MODIFY_COMMAND].type == T_CLOSURE)
         {
             lambda_t *l;
 
-            l = closure_hook[H_MODIFY_COMMAND].u.lambda;
-            if (closure_hook[H_MODIFY_COMMAND].x.closure_type == CLOSURE_LAMBDA)
+            l = driver_hook[H_MODIFY_COMMAND].u.lambda;
+            if (driver_hook[H_MODIFY_COMMAND].x.closure_type == CLOSURE_LAMBDA)
                 l->ob = command_giver;
             push_volatile_string(buff);
             push_object(command_giver);
-            call_lambda(&closure_hook[H_MODIFY_COMMAND], 2);
+            call_lambda(&driver_hook[H_MODIFY_COMMAND], 2);
             transfer_svalue(svp = &apply_return_value, inter_sp--);
             if (!command_giver)
                 return MY_TRUE;
         }
-        else if (closure_hook[H_MODIFY_COMMAND].type == T_STRING
+        else if (driver_hook[H_MODIFY_COMMAND].type == T_STRING
             && !(O_DESTRUCTED & command_giver->flags))
         {
             push_volatile_string(buff);
             svp =
-              sapply(closure_hook[H_MODIFY_COMMAND].u.string, command_giver, 1);
+              sapply(driver_hook[H_MODIFY_COMMAND].u.string, command_giver, 1);
             if (!command_giver)
                 return MY_TRUE;
         }
-        else if (closure_hook[H_MODIFY_COMMAND].type == T_MAPPING)
+        else if (driver_hook[H_MODIFY_COMMAND].type == T_MAPPING)
         {
             svalue_t sv;
             char * str;
@@ -483,7 +574,7 @@ call_modify_command (char *buff)
             {
                 put_string(&sv, str);
                 svp =
-                  get_map_value(closure_hook[H_MODIFY_COMMAND].u.map, &sv);
+                  get_map_value(driver_hook[H_MODIFY_COMMAND].u.map, &sv);
                 if (svp->type == T_CLOSURE)
                 {
                     push_shared_string(sv.u.string);
@@ -502,7 +593,7 @@ call_modify_command (char *buff)
     if (svp)
     {
         if (svp->type == T_STRING) {
-            strncpy(buff, svp->u.string, COMMAND_FOR_OBJECT_BUFSIZE-1);
+            xstrncpy(buff, svp->u.string, COMMAND_FOR_OBJECT_BUFSIZE-1);
             buff[COMMAND_FOR_OBJECT_BUFSIZE-1] = '\0';
         } else if (svp->type == T_NUMBER && svp->u.number) {
             return MY_TRUE;
@@ -522,20 +613,20 @@ special_parse (char *buff)
  */
 
 {
-    if (strcmp(buff, "malloc") == 0)
-    {
-        strbuf_t sbuf;
-
-        status_parse(&sbuf, "malloc");
-        strbuf_send(&sbuf);
-        return 1;
-    }
-
 #ifdef O_IS_WIZARD
     if (!is_wizard_used || command_giver->flags & O_IS_WIZARD)
 #endif
     {
         Bool no_curobj = MY_FALSE;
+
+        if (strcmp(buff, "malloc") == 0)
+        {
+            strbuf_t sbuf;
+
+            status_parse(&sbuf, "malloc");
+            strbuf_send(&sbuf);
+            return 1;
+        }
 
         if (strcmp(buff, "dumpallobj") == 0) {
 
@@ -546,6 +637,7 @@ special_parse (char *buff)
             }
             add_message("Dumping to /OBJ_DUMP ... ");
             dumpstat("/OBJ_DUMP");
+            dumpstat_dest("/DEST_OBJ_DUMP");
             add_message("done\n");
             if (no_curobj)
             {
@@ -602,12 +694,20 @@ notify_no_command (char *command, object_t *save_command_giver)
 
 {
     svalue_t *svp;
+    Bool      useHook;
+
+    useHook = (   driver_hook[H_SEND_NOTIFY_FAIL].type == T_CLOSURE
+               || driver_hook[H_SEND_NOTIFY_FAIL].type == T_STRING
+              );
 
     svp = &error_msg;
 
     if (svp->type == T_STRING)
     {
-        tell_object(command_giver, svp->u.string);
+        if (!useHook)
+            tell_object(command_giver, svp->u.string);
+        else
+            push_svalue(svp);
     }
     else if (svp->type == T_CLOSURE)
     {
@@ -615,23 +715,85 @@ notify_no_command (char *command, object_t *save_command_giver)
         call_lambda(svp, 1);
         /* add_message might cause an error, thus, we free the closure first. */
         if (inter_sp->type == T_STRING)
-            tell_object(command_giver, inter_sp->u.string);
-        pop_stack();
+        {
+            if (!useHook)
+            {
+                tell_object(command_giver, inter_sp->u.string);
+                pop_stack();
+            }
+        }
+        else
+        {
+            pop_stack();
+            useHook = MY_FALSE;
+        }
     }
-    else if (closure_hook[H_NOTIFY_FAIL].type == T_STRING)
+    else if (driver_hook[H_NOTIFY_FAIL].type == T_STRING)
     {
-        tell_object(command_giver, closure_hook[H_NOTIFY_FAIL].u.string);
+        if (!useHook)
+            tell_object(command_giver, driver_hook[H_NOTIFY_FAIL].u.string);
+        else
+            push_svalue(&driver_hook[H_NOTIFY_FAIL]);
     }
-    else if (closure_hook[H_NOTIFY_FAIL].type == T_CLOSURE)
+    else if (driver_hook[H_NOTIFY_FAIL].type == T_CLOSURE)
     {
-        if (closure_hook[H_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
-            closure_hook[H_NOTIFY_FAIL].u.lambda->ob = command_giver;
+        if (driver_hook[H_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
+            driver_hook[H_NOTIFY_FAIL].u.lambda->ob = command_giver;
         push_volatile_string(command);
         push_valid_ob(save_command_giver);
-        call_lambda(&closure_hook[H_NOTIFY_FAIL], 2);
+        call_lambda(&driver_hook[H_NOTIFY_FAIL], 2);
         if (inter_sp->type == T_STRING)
-            tell_object(command_giver, inter_sp->u.string);
-        pop_stack();
+        {
+            if (!useHook)
+            {
+                tell_object(command_giver, inter_sp->u.string);
+                pop_stack();
+            }
+        }
+        else
+        {
+            pop_stack();
+            useHook = MY_FALSE;
+        }
+    }
+    else /* No H_NOTIFY_FAIL hook set, and no notify_fail() given */
+    {
+        free_svalue(svp); /* remember: this is &error_msg */
+        svp->type = T_INVALID;
+
+        if (error_obj)
+            free_object(error_obj, "notify_no_command");
+        error_obj = NULL;
+
+        error("Missing H_NOTIFY_FAIL hook, and no notify_fail() given.\n");
+        /* NOTREACHED */
+        useHook = MY_FALSE;
+    }
+
+    /* If the output has to go through a hook, push the remaining
+     * arguments and call the hook.
+     */
+    if (useHook)
+    {
+        if (error_obj != NULL)
+            push_valid_ob(error_obj);
+        else
+            push_number(0);
+        push_valid_ob(save_command_giver);
+
+        if (driver_hook[H_SEND_NOTIFY_FAIL].type == T_STRING)
+        {
+            (void)sapply_int( driver_hook[H_SEND_NOTIFY_FAIL].u.string
+                            , command_giver, 3, MY_TRUE
+                            );
+        }
+        else
+        {
+            if (driver_hook[H_SEND_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
+                driver_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob = command_giver;
+            call_lambda(&driver_hook[H_SEND_NOTIFY_FAIL], 3);
+            pop_stack();
+        }
     }
 
     free_svalue(svp); /* remember: this is &error_msg */
@@ -648,8 +810,8 @@ static Bool
 parse_command (char *buff, Bool from_efun)
 
 /* Take the command in <buff> and execute it.
- * The command_giver and marked_command_giver are set, last_verb
- * and last_command may be set (and will be overwritten).
+ * The command_giver and marked_command_giver are set, last_verb,
+ * last_action_verb and last_command may be set (and will be overwritten).
  *
  * The command will be searched in the list of marked_command_giver.
  *
@@ -772,7 +934,7 @@ parse_command (char *buff, Bool from_efun)
                     continue;
             }
         }
-        else if (type == SENT_NO_SPACE)
+        else if (type == SENT_OLD_NO_SPACE || type == SENT_NO_SPACE)
         {
             /* The arguments may follow the verb without space,
              * that means we just have to check if buff[] begins
@@ -790,7 +952,9 @@ parse_command (char *buff, Bool from_efun)
             if (sa->short_verb)
                 continue;
             sa->short_verb++;
-            error("An 'action' had an undefined verb.\n");
+            current_object = sa->ob; /* For a proper error handling */
+            error("The action defined by %s and bound to %s has an undefined "
+                  "verb.\n", sa->ob->name, command_giver->name);
         }
         else
         {
@@ -801,6 +965,10 @@ parse_command (char *buff, Bool from_efun)
         /*
          * Now we have found a special sentence!
          */
+
+        if (last_action_verb)
+            free_string(last_action_verb);
+        last_action_verb = ref_string(sa->verb);
 
 #ifdef DEBUG
         if (d_flag > 1)
@@ -863,17 +1031,40 @@ parse_command (char *buff, Bool from_efun)
         marker_sent->function = NULL;
 
         /* Push the argument and call the command function.
-         *
-         * For NO_SPACE commands it would be logical to cut off the
-         * actual verb part from the first word and add it to the arguments,
-         * but this would break all existing mudlibs.
          */
-        if (s->type == SENT_NO_SPACE)
+        if (s->type == SENT_OLD_NO_SPACE)
         {
             if (strlen(buff) > strlen(sa->verb))
             {
                 push_volatile_string(&buff[strlen(sa->verb)]);
                 ret = sapply(sa->function, sa->ob, 1);
+            }
+            else
+            {
+                ret = sapply(sa->function, sa->ob, 0);
+            }
+        }
+        else if (s->type == SENT_NO_SPACE)
+        {
+            if (strlen(buff) > strlen(sa->verb))
+            {
+                /* We need to cut off the verb right where the
+                 * arguments start. On the other hand, we can't modify
+                 * the last_verb permanently, as this sentence might
+                 * fail and other sentences want the full one.
+                 */
+                char ch;
+                size_t len = strlen(sa->verb);
+
+                push_referenced_shared_string(last_verb);
+                ch = buff[len];
+                buff[len] = '\0';
+                last_verb = make_shared_string(buff);
+                buff[len] = ch;
+                push_volatile_string(&buff[len]);
+                ret = sapply(sa->function, sa->ob, 1);
+                free_string(last_verb);
+                last_verb = inter_sp->u.string; inter_sp--;
             }
             else
             {
@@ -1012,24 +1203,24 @@ execute_command (char *str, object_t *ob)
     last_command = str;
 
     /* Execute the command */
-    if (closure_hook[H_COMMAND].type == T_STRING)
+    if (driver_hook[H_COMMAND].type == T_STRING)
     {
         svalue_t *svp;
 
         push_volatile_string(str);
-        svp = sapply_int(closure_hook[H_COMMAND].u.string, ob, 1, MY_TRUE);
+        svp = sapply_int(driver_hook[H_COMMAND].u.string, ob, 1, MY_TRUE);
         res = (svp->type != T_NUMBER) || (svp->u.number != 0);
     }
-    else if (closure_hook[H_COMMAND].type == T_CLOSURE)
+    else if (driver_hook[H_COMMAND].type == T_CLOSURE)
     {
         lambda_t *l;
 
-        l = closure_hook[H_COMMAND].u.lambda;
-        if (closure_hook[H_COMMAND].x.closure_type == CLOSURE_LAMBDA)
+        l = driver_hook[H_COMMAND].u.lambda;
+        if (driver_hook[H_COMMAND].x.closure_type == CLOSURE_LAMBDA)
             l->ob = ob;
         push_volatile_string(str);
         push_object(ob);
-        call_lambda(&closure_hook[H_COMMAND], 2);
+        call_lambda(&driver_hook[H_COMMAND], 2);
         res = (inter_sp->type != T_NUMBER) || (inter_sp->u.number != 0);
         free_svalue(inter_sp);
         inter_sp--;
@@ -1071,7 +1262,7 @@ e_command (char *str, object_t *ob)
 
     if (strlen(str) > sizeof(buff) - 1)
         error("Too long command.\n");
-    strncpy(buff, str, sizeof buff);
+    xstrncpy(buff, str, sizeof buff);
     buff[sizeof buff - 1] = '\0';
 
     if (O_SET_INTERACTIVE(ip, ob))
@@ -1104,7 +1295,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
  */
 {
     action_t *p;
-    object_t *ob;
+    object_t *ob, *shadow_ob;
     char *str;
     short string_type;
 
@@ -1112,11 +1303,13 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
     if (current_object->flags & O_DESTRUCTED)
         return MY_TRUE;
 
+    shadow_ob = NULL;
     ob = current_object;
 
     /* Check if the call comes from a shadow of the current object */
     if (ob->flags & O_SHADOW && O_GET_SHADOW(ob)->shadowing)
     {
+        shadow_ob = ob;
         str = findstring(func->u.string);
         do
         {
@@ -1138,7 +1331,8 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
     /* And the commandgiver must be in the vicinity */
     if (ob != command_giver
      && ob->super != command_giver
-     && ob->super != command_giver->super
+     && (ob->super == NULL || ob->super != command_giver->super)
+       /* above condition includes the check command_giver->super == NULL */
      && ob != command_giver->super)
         error("add_action from object '%s' that was not present to '%s'.\n"
              , ob->name, command_giver->name);
@@ -1152,21 +1346,23 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
     if (*func->u.string == ':')
         error("Illegal function name: %s\n", func->u.string);
 
-#ifdef COMPAT_MODE
-    str = func->u.string;
-    if (*str++=='e' && *str++=='x' && *str++=='i' && *str++=='t' && !*str)
+    if (compat_mode)
     {
-        error("Illegal to define a command to the exit() function.\n");
-        /* NOTREACHED */
-        return MY_TRUE;
+        str = func->u.string;
+        if (*str++=='e' && *str++=='x' && *str++=='i' && *str++=='t' && !*str)
+        {
+            error("Illegal to define a command to the exit() function.\n");
+            /* NOTREACHED */
+            return MY_TRUE;
+        }
     }
-#endif
 
     /* Allocate and initialise a new sentence */
     p = new_action_sent();
 
     /* Set str to the function, made shared */
     str = func->u.string;
+    func->type = T_NUMBER;
     if ((string_type = func->x.string_type) != STRING_SHARED)
     {
         char *str2;
@@ -1179,11 +1375,13 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
 
     p->function = str;
     p->ob = ob;
+    p->shadow_ob = shadow_ob;
 
     if (cmd)
     {
         /* Set str to the command verb, made shared */
         str = cmd->u.string;
+        cmd->type = T_NUMBER;
         if ((string_type = cmd->x.string_type) != STRING_SHARED)
         {
             char *str2;
@@ -1205,12 +1403,17 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
             }
             else if (flag == AA_NOSPACE)
             {
+                p->sent.type = SENT_OLD_NO_SPACE;
+            }
+            else if (flag == AA_IMM_ARGS)
+            {
                 p->sent.type = SENT_NO_SPACE;
             }
             else if (flag < AA_VERB)
             {
                 if (-flag >= strlen(p->verb))
                 {
+                    free_action_sent(p);
                     error("Bad arg 3 to add_action(): value %ld larger than verb '%s'.\n"
                          , (long)flag, p->verb);
                     /* NOTREACHED */
@@ -1224,6 +1427,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
             }
             else
             {
+                free_action_sent(p);
                 error("Bad arg 3 to add_action(): value %ld too big.\n"
                      , (long)flag);
                 /* NOTREACHED */
@@ -1412,12 +1616,12 @@ e_get_action (object_t *ob, char *verb)
     for (s = ob->sent; s; s = s->next)
     {
         action_t *sa;
-        
+
         if (SENT_IS_INTERNAL(s->type))
             continue;
-        
+
         sa = (action_t *)s;
-        
+
         if (verb != sa->verb)
             continue;
         /* verb will be 0 for SENT_MARKER */
@@ -1480,12 +1684,12 @@ e_get_all_actions (object_t *ob, int mask)
     for (s = ob->sent; s; s = s->next)
     {
         action_t * sa;
-        
+
         if (SENT_IS_INTERNAL(s->type))
             continue;
 
         sa = (action_t *)s;
-        
+
         if (mask & 1)
         {
             char * str;
@@ -1557,7 +1761,7 @@ e_get_object_actions (object_t *ob1, object_t *ob2)
             continue;
 
         sa = (action_t *)s;
-        
+
         if (sa->ob == ob2) {
             put_ref_string(p, sa->verb);
             p++;
@@ -1635,6 +1839,7 @@ f_notify_fail (svalue_t *sp)
 
     if (command_giver && !(command_giver->flags & O_DESTRUCTED))
     {
+#ifdef USE_FREE_CLOSURE_HOOK
         if (error_msg.type == T_CLOSURE)
             /* It might be the closure we're just executing, so
              * keep it around for now.
@@ -1645,10 +1850,15 @@ f_notify_fail (svalue_t *sp)
         else
             free_svalue(&error_msg);
         transfer_svalue_no_free(&error_msg, sp);
+#else
+        transfer_svalue(&error_msg, sp);
+#endif
         if (error_obj)
             free_object(error_obj, "notify_fail");
         error_obj = ref_object(current_object, "notify_fail");
     }
+    else
+        free_svalue(sp);
 
     put_number(sp, 0);
 
@@ -1673,7 +1883,7 @@ f_query_notify_fail (svalue_t *sp)
 
 {
     p_int flag;
-    
+
     if (sp->type != T_NUMBER)
         bad_xefun_arg(1, sp);
 
@@ -1931,7 +2141,7 @@ svalue_t *f_add_verb (svalue_t *sp)
 #ifdef F_ADD_XVERB
 svalue_t *f_add_xverb (svalue_t *sp)
 {
-    return add_verb(sp, SENT_NO_SPACE);
+    return add_verb(sp, SENT_OLD_NO_SPACE);
 }
 #endif
 

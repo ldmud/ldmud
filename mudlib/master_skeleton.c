@@ -86,13 +86,14 @@
 // void quota_demon (void)
 //   Handle quotas in times of memory shortage.
 //
-// void receive_imp (string host, string msg, int port)
-//   Handle a received IMP message.
+// void receive_udp (string host, string msg, int port)
+// void receive_imp (string host, string msg, int port) // deprecated
+//   Handle a received UDP message.
 //
 // void slow_shut_down (int minutes)
 //   Schedule a shutdown for the near future.
 //
-// void notify_shutdown ()
+// void notify_shutdown (void|string crash_reason)
 //   Notify the master about an immediate shutdown.
 //
 //---------------------------------------------------------------------------
@@ -120,7 +121,7 @@
 // int query_allow_shadow (object victim)
 //   Validate a shadowing.
 //
-// int valid_trace (string what)
+// int valid_trace (string what, int|string arg)
 //   Check if the player may use tracing.
 //
 // int valid_exec (string name, object ob, object obfrom)
@@ -137,7 +138,7 @@
 //     Userids and depending Security
 //
 // string get_bb_uid()
-//   Return the string to be used as backbone-uid.
+//   Return the string to be used as temporary euid by process_string().
 //
 // int valid_seteuid (object obj, string neweuid)
 //   Validate the change of an objects euid by efun seteuid().
@@ -253,7 +254,7 @@ void inaugurate_master (int arg)
 // mudwho or wizlist handling has to be initialized here.
 //
 // Besides that, do whatever you feel you need to do,
-// e.g. set_auto_include_string(), or give the master a decent euid.
+// e.g. set_auto_include(), or give the master a decent euid.
 
 
 //---------------------------------------------------------------------------
@@ -421,7 +422,12 @@ void disconnect (object obj)
 // This called by the gamedriver to handle the removal of an IP connection,
 // either because the connection is already lost ('netdeath') or due to
 // calls to exec() or remove_interactive().
-// The connection will be unbound upon return from this call.
+//
+// The connection will be unbound upon return from this call, so
+// for the time of this call, interactive(ob) will still return TRUE
+// even if the actual network connection has already been lost.
+//
+// This method is not called if the object has been destructed already.
 
 
 //---------------------------------------------------------------------------
@@ -493,7 +499,7 @@ mixed include_file (string file, string compiled_file, int sys_include)
 //   0:      use the normal include filename generation (""-includes are used
 //           as they are, <>-includes are handled according to H_INCLUDE_DIRS).
 //   <path>: the full absolute pathname of the file to include without
-//           parentdir parts ("/../"). Leading slashes ("/") are ignored.
+//           parentdir parts ("/../"). Leading slashes ("/") may be omitted.
 //   else:   The include directive is not legal.
 
 //---------------------------------------------------------------------------
@@ -561,12 +567,19 @@ mixed prepare_destruct (object obj)
 //
 // The gamedriver calls this function whenever an object shall be destructed.
 // It expects, that this function cleans the inventory of the object, or
-// the destruct will fail.
+// the destruct will fail. It is also recommended to clean up all
+// shadows on obj at this point.
+//
 // Furthermore, the function could notify the former inventory objects that
 // their holder is under destruction (useful to move players out of rooms which
 // are updated); and it could announce mudwide the destruction(quitting) of
 // players.
-
+//
+// Another use for this apply is to take care of any other 'cleanup'
+// work needed to be done, like adjusting weights, light levels, and
+// such. Alternatively and traditionally this is done by calling an
+// lfun 'remove()' in the object, which then calls the efun destruct()
+// after performing all the adjustments.
 
 //---------------------------------------------------------------------------
 void quota_demon (void)
@@ -584,16 +597,21 @@ void quota_demon (void)
 
 
 //---------------------------------------------------------------------------
-void receive_imp (string host, string msg, int port)
+void receive_udp (string host, string msg, int port)
+void receive_imp (string host, string msg, int port) // deprecated
 
-// Handle a received IMP message.
+// Handle a received UDP message.
 //
 // Arguments:
 //   host: Name of the host the message comes from.
 //   msg : The received message.
 //   port: the port number from which the message was sent.
 //
-// This function is called for every message received on the IMP port.
+// This function is called for every message received on the UDP port.
+//
+// The driver first calls receive_udp(). If that method doesn't exist
+// and if the driver is compiled with USE_DEPRECATED, it will then
+// call receive_imp().
 
 
 //---------------------------------------------------------------------------
@@ -636,17 +654,26 @@ void slow_shut_down (int minutes)
 //   fine, else the game is shut down by a call to this function.
 
 //---------------------------------------------------------------------------
-void notify_shutdown (void)
+varargs void notify_shutdown (string crash_reason)
 
-// Notify the master about an immediate shutdown.
+// Notify the master about an immediate shutdown. If <crash_reason> is 0,
+// it is a normal shutdown, otherwise it is a crash and <crash_reason>
+// gives a hint at the reason.
 //
-// If the gamedriver shuts down, this is the last function called before
-// the mud shuts down the udp connections and the accepting socket for new
-// players.
 // The function has the opportunity to perform any cleanup operation, like
 // informing the mudwho server that the mud is down. This can not be done
 // when remove_player() is called because the udp connectivity is already
 // gone then.
+//
+// If the gamedriver shuts down normally , this is the last function called
+// before the mud shuts down the udp connections and the accepting socket
+// for new players.
+//
+// If the gamedriver crashes, this is the last function called before the
+// mud attempts to dump core and exit. WARNING: Since the driver is in
+// an unstable state, this function may not be able to run to completion!
+// The following crash reasons are defined:
+//   "Fatal Error": an internal sanity check failed.
 
 
 //===========================================================================
@@ -659,16 +686,17 @@ void dangling_lfun_closure ()
 
 // Handle a dangling lfun-closure.
 //
-// This is called when the gamedriver executes a closure using a vanished lfun.
-// A proper handling is to raise a runtime error.
+// This is called when the gamedriver executes a closure using a vanished
+// lfun, with previous_object() showing the originating object. A proper
+// handling is to raise a runtime error.
 //
 // Technical:
 //   Upon replacing programs (see efun replace_program()), any existing
 //   lambda closures of the object are adjusted to the new environment.
 //   If a closure uses a lfun which vanished in the replacement process,
-//   the reference to this lfun is replaced by a reference to this function.
-//   The error will then occur when the execution of the adjusted lambda
-//   reaches the point of the lfun reference.
+//   the reference to the lfun is replaced by an alien-lfun closure
+//   referencing this function.  The error will then occur when the execution
+//   of the adjusted lambda reaches the point of the lfun reference.
 //   There are two reasons for the delayed handling. First is that the
 //   program replacement and with it the closure adjustment happens at
 //   the end of a backend cycle, outside of any execution thread: noone
@@ -725,7 +753,8 @@ mixed heart_beat_error (object culprit, string err,
 
 
 //---------------------------------------------------------------------------
-void runtime_error (string err, string prg, string curobj, int line)
+void runtime_error (string err, string prg, string curobj, int line
+                   , mixed culprit)
 
 // Announce a runtime error.
 //
@@ -734,15 +763,26 @@ void runtime_error (string err, string prg, string curobj, int line)
 //   prg    : The executed program.
 //   curobj : The object causing the error.
 //   line   : The line number where the error occured.
+//   culprit: -1 for runtime errors; the object holding the heart_beat()
+//            function for heartbeat errors.
 //
-// This function has to announce a runtime error to the active player.
-// If it is a wizard, it might give him the full error message together
-// with the source line; if it is a player, it should issue a decent
-// message ("Your sensitive mind notices a wrongness in the fabric of space")
-// and could also announce the error to the wizards online.
+// This function has to announce a runtime error to the active user,
+// resp. handle a runtime error which occured during the execution of
+// heart_beat() of <culprit>.
+//
+// For a normal runtime error, if the active user is a wizard, it might
+// give him the full error message together with the source line; if the
+// user is a is a player, it should issue a decent message ("Your sensitive
+// mind notices a wrongness in the fabric of space") and could also announce
+// the error to the wizards online.
+//
+// If the error is a heartbeat error, the heartbeat for the offending
+// <culprit> has been turned off. The function itself shouldn't do much, since
+// the lfun heart_beat_error() will be called right after this one.
 //
 // Note that <prg> denotes the program actually executed (which might be
-// inherited one) whereas <curobj> is just the offending object.
+// inherited) whereas <curobj> is just the offending object for which the
+// program was executed.
 
 
 //===========================================================================
@@ -785,9 +825,10 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //                       is shadowed by a 'nomask'-type simul_efun.
 //   rename_object     : The current object <who> renames object <arg>
 //                       to name <arg2>.
-//   send_imp          : Send UDP-data to host <arg>.
+//   send_imp          : Send UDP-data to host arg3 (deprecated).
+//   send_udp          : Send UDP-data to host <arg>.
 //   set_auto_include_string : Set the string automatically included by
-//                       the compiler.
+//                       the compiler (deprecated).
 //   get_extra_wizinfo : Get the additional wiz-list info for wizard <arg>.
 //   set_extra_wizinfo : Set the additional wiz-list info for wizard <arg>.
 //   set_extra_wizinfo_size : Set the size of the additional wizard info
@@ -796,7 +837,8 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   limited:          : Execute <arg> with reduced/changed limits.
 //   set_limits        : Set limits to <arg>.
 //   set_this_object   : Set this_object() to <arg>.
-//   shadow_add_action : Add an action to function <arg> from a shadow.
+//   shadow_add_action : Add an action to function <arg4> of object <arg3>
+//                       from the shadow <who> which is shadowing <arg3>.
 //   symbol_variable   : Attempt to create symbol of a hidden variable
 //                       of object <arg> with with index <arg2> in the
 //                       objects variable table.
@@ -809,7 +851,7 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 // wizlist field. While a toplevel array, if found, will be copied, this does
 // not apply to nested arrays or to any mappings. You might also have some
 // sensitive closures there.
-// send_imp() should be watched as it could be abused to mess up the IMP.
+// send_udp() should be watched as it could be abused to mess up the IMP.
 // The xxx_extra_wizinfo operations are necessary for a proper wizlist and
 // should therefore be restricted to admins.
 // All other operations are potential sources for direct security breaches -
@@ -833,19 +875,22 @@ int query_allow_shadow (object victim)
 
 
 //---------------------------------------------------------------------------
-int valid_trace (string what)
+int valid_trace (string what, int|string arg)
 
 // Check if the player is allowed to use tracing.
 //
 // Argument:
 //   what: The actual action (see below).
+//   arg:  The argument given to the traceing efun.
 //
 // Result:
 //   Return 0 to disallow, any other value to allow it.
 //
 // Actions asked for so far are:
 //   "trace":       Is the user allowed to use tracing?
+//                  <arg> is the tracelevel argument given.
 //   "traceprefix": Is the user allowed to set a traceprefix?
+//                  <arg> is the prefix given.
 
 //---------------------------------------------------------------------------
 int valid_exec (string name, object ob, object obfrom)
@@ -920,9 +965,13 @@ int valid_snoop (object snoopee, object snooper)
 //---------------------------------------------------------------------------
 string get_bb_uid()
 
-// Return the string (or 0) to be used as backbone-euid.
-// It is just used by process_string() only if no this_object() is present.
-// If strict-euids, the function must exist and return a string.
+// This method is called when efun process_string() is used without a
+// current object (e.g. from notify_fail method). The current object
+// will be set to the current command giver, and will receive the euid
+// returned from this function.
+//
+// If strict-euids, this function must exist and return a string.
+// Otherwise the function is optional and/or may return 0.
 
 //---------------------------------------------------------------------------
 int valid_seteuid (object obj, string neweuid)
@@ -979,10 +1028,11 @@ mixed valid_write (string path, string euid, string fun, object caller)
 //
 //
 // valid_write() is called for these operations:
-//   copy_file    (for the target file resp. directory name)
-//   ed_start     (when writing a file)
-//   rename_from  (for each the old name of a rename())
-//   rename_to    (for the new name of a rename())
+//   copy_file           (for the target file resp. directory name)
+//   ed_start            (when writing a file)
+//   garbage_collection  (for the log filename)
+//   rename_from         (for each the old name of a rename())
+//   rename_to           (for the new name of a rename())
 //   mkdir
 //   objdump
 //   opcdump

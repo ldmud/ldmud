@@ -1,7 +1,7 @@
 PRELIMINARY
 SYNOPSIS
-        object present_clone (string str, object env)
-        object present_clone (object obj, object env)
+        object present_clone (string str [, object env] )
+        object present_clone (object obj [, object env] )
 
 DESCRIPTION
         This efun searches the inventory of object <env> (default is the
@@ -14,6 +14,9 @@ DESCRIPTION
 
         For plain driver this name starts with a '/', for compat-mode
         drivers it doesn't.
+
+        Note that in contrast to present(), this efun never searches
+        in the environment of <env>.
 
 EXAMPLES
         Assume that object 'env' contains the objects /obj/money#8,

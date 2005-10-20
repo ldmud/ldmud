@@ -30,10 +30,10 @@
   /* prefix bytes for multi-byte codes are required to have fixed values
    * for simple bit manipulation to be applicable.
    */
-	dummy     /* = 0x01 */
-	escape    /* = 0x02 */
-	tefun     /* = 0x03 */
-	vefun     /* = 0x04 */
+        dummy     /* = 0x01 */
+        escape    /* = 0x02 */
+        tefun     /* = 0x03 */
+        vefun     /* = 0x04 */
 
   /* These are the predefined functions and statements that have a direct
    * counterpart in LPC.
@@ -41,30 +41,33 @@
    * The compiler needs to treat sscanf and parse_command specially because
    * these two 'efuns' take lvalues as part of their arguments.
    */
-	identifier
-	string
+        identifier
+        string
         cstring0
         cstring1
         cstring2
         cstring3
-	number
+        number
+        nnumber
         const0
         const1
+        nconst1
         clit
         nclit
-	float
-	closure
-	symbol
-	return
+        float
+        closure
+        symbol
+        return
         return0
-	break
-	switch
-	sscanf
+        break
+        switch
+        sscanf
 #ifdef SUPPLY_PARSE_COMMAND
-	parse_command
+        parse_command
 #endif
-	local
-	catch
+        local
+        catch
+        catch_no_log
 "++"    inc
 "--"    dec
 "x++"   post_inc
@@ -92,6 +95,7 @@
 "^"     xor
 "<<"    lsh
 ">>"    rsh
+">>>"   rshl
 "!"     not
 ".."    range
 "..<"   nr_range
@@ -110,6 +114,13 @@
 "^="    xor_eq
 "<<="   lsh_eq
 ">>="   rsh_eq
+">>>="  rshl_eq
+
+  /* These two operators don't exist as implemented machine instructions,
+   * but are required as operator-closure values for the closure compiler.
+   */
+"&&="   land_eq
+"||="   lor_eq
 
 /*---------------------------------------------------------------------------
 /* These values are used by the stack machine, and can not be directly
@@ -118,6 +129,8 @@
 
         pop_value
         dup
+        ldup
+        swap_values
         clear_locals
         lbranch
         lbranch_when_zero
@@ -182,7 +195,7 @@ int     pointerp(mixed);
 int     stringp(mixed);
 int     symbolp(mixed);
 
-string  ctime(int default: F_TIME);
+string  ctime(int*|int default: F_TIME);
 int     ed(void|string, void|string);
 mixed   negate(int|float);
   /* Mainly used by the compiler to implement the unary '-' */
@@ -190,6 +203,7 @@ void    printf(string, ...);
 int     random(int);
 void    throw(mixed);
 int     time();
+int*    utime();
 
         /* Strings */
 
@@ -201,7 +215,7 @@ string  lower_case(string);
 string *regexp(string *, string);
 string  sprintf(string, ...);
 int     strlen(string);
-string  terminal_colour(string, int|mapping, void|int, void|int );
+string  terminal_colour(string, int|mapping|closure, void|int, void|int );
 
 string  clear_bit(string, int);
 string  set_bit(string, int);
@@ -216,15 +230,17 @@ int     count_bits(string);
 
         /* Arrays and Mapings */
 
-mixed  *allocate(int);
-int     member_array(mixed, mixed *|string);
+mixed  *allocate(int|int*, void|mixed);
+#ifdef USE_DEPRECATED
+int     member_array(mixed, mixed *|string) "use member()";
+#endif /* USE_DEPRECATED */
 int     member(mixed *|string|mapping, mixed);
 mapping mkmapping(mixed *, ...);
+mapping m_add(mapping, mixed, ...);
 mapping m_delete(mapping, mixed);
 mixed  *m_indices(mapping);
-int     m_sizeof F_SIZEOF (mapping);
 mixed  *m_values(mapping, int default: F_CONST0);
-int     sizeof(mixed *|mapping);
+int     sizeof(string|mixed *|mapping);
 mixed  *unique_array(mixed *, string, mixed default: F_CONST0);
 mixed  *unmkmapping(mapping);
 int     widthof(mapping);
@@ -240,6 +256,7 @@ mixed   funcall (closure, ...);
    */
 closure lambda(mixed *, mixed);
 mixed   quote(mixed *|quoted_array|symbol|string);
+mixed   unquote(quoted_array|symbol);
 closure symbol_function(symbol|string, string|object default: F_CONST0);
 
 void    call_out(string|closure, int, void|mixed, ...);
@@ -258,11 +275,10 @@ object  find_object(string);
 string  function_exists(string, object default: F_THIS_OBJECT);
 int     input_to(string, void|int, ...);
 int     interactive(object default: F_THIS_OBJECT);
-string  load_name(string|object default: F_THIS_OBJECT);
+string  load_name(int|string|object default: F_THIS_OBJECT);
 object  load_object(string);
-string  object_name(object default: F_THIS_OBJECT);
-string  file_name F_OBJECT_NAME (object default: F_THIS_OBJECT);
-void    replace_program(string);
+string  object_name(int|object default: F_THIS_OBJECT);
+void    replace_program(void|string);
 int     set_next_reset(int);
 void    set_this_object(object);
 int     snoop(object, void|object);
@@ -311,7 +327,7 @@ void    disable_commands();
 void    enable_commands();
 int     living(object);
 mixed  *query_actions(object|string, int|object|string default: F_CONST1);
-string  query_verb();
+string  query_verb(int default: F_CONST0);
 string  query_command();
 object  this_player();
 
@@ -346,7 +362,9 @@ mixed  *order_alist(mixed *, void|mixed *, ...);
 
         /* Misc */
 
+#ifdef USE_SET_LIGHT
 int     set_light(int);
+#endif /* USE_SET_LIGHT */
 
         /* Backwards compatibility */
 
@@ -387,21 +405,21 @@ mixed  *slice_array F_RANGE (mixed *,int,int);
         /* Miscellaneous */
 
 mixed   abs(int|float);
-float   sin(float);
+float   sin(int|float);
 float   asin(float);
-float   cos(float);
+float   cos(int|float);
 float   acos(float);
-float   tan(float);
-float   atan(float);
-float   atan2(float,float);
-float   log(float);
-float   exp(float);
-float   sqrt(float);
-float   ceil(float);
-float   floor(float);
-float   pow(float,float);
+float   tan(int|float);
+float   atan(int|float);
+float   atan2(int|float,int|float);
+float   log(int|float);
+float   exp(int|float);
+float   sqrt(int|float);
+float   ceil(int|float);
+float   floor(int|float);
+float   pow(int|float,int|float);
 
-mixed   get_type_info(mixed, int default: F_THIS_OBJECT);
+mixed   get_type_info(mixed, mixed | int default: F_THIS_OBJECT);
 void    raise_error(string);
 int     referencep(mixed &);
 int     typeof(mixed|mixed &);
@@ -418,9 +436,7 @@ int     strstr(string, string, int default: F_CONST0);
         /* Arrays and Mappings */
 
 mapping m_allocate(int, int default: F_CONST1);
-mapping allocate_mapping F_M_ALLOCATE (int, int default: F_CONST1);
 int     m_contains(mixed & | mapping, mixed & | mixed, ...);
-int     mapping_contains F_M_CONTAINS (mixed & | mapping, mixed & | mixed, ...);
 
         /* Functions and Closures */
 
@@ -435,22 +451,20 @@ object  previous_object(int);
 
 int     object_time(object default: F_THIS_OBJECT);
 int     program_time(object default: F_THIS_OBJECT);
-string  program_name(object default: F_THIS_OBJECT);
+string  program_name(int|object default: F_THIS_OBJECT);
 int     query_once_interactive(object);
 
         /* Network IO */
 
-#ifdef CATCH_UDP_PORT
-int     query_imp_port();
-#endif
 object  query_input_pending(object);
 string  query_ip_name(object default: F_THIS_PLAYER);
 string  query_ip_number(object|mixed &  default: F_THIS_PLAYER);
 int     query_mud_port(int|object default: F_THIS_PLAYER);
+int     query_udp_port();
 
         /* Driver and System functions */
 
-void    garbage_collection();
+void    garbage_collection(void|string);
 
         /* Inventories */
 
@@ -461,11 +475,22 @@ object *all_environment(void|object);
  * Beware that some may be used in mudlib 2.4.5.
  */
 
-mapping copy_mapping(mapping);
 string  extract(string, int, int);
   /* If this is not defined, the xcode extract1 is not used either.
    */
 /* void swap(object); */ /* debugging only */
+
+
+        /* Obsolete and deprecated functions */
+
+#ifdef USE_DEPRECATED
+
+mapping allocate_mapping F_M_ALLOCATE (int, int default: F_CONST1) "use m_allocate()";
+mapping copy_mapping(mapping) "use copy()";
+int     mapping_contains F_M_CONTAINS (mixed & | mapping, mixed & | mixed, ...) "use m_contains()";
+int     query_imp_port F_QUERY_UDP_PORT () "use query_udp_port()";
+
+#endif /* USE_DEPRECTED */
 
 /*---------------------------------------------------------------------------
  * Machine instructions with 'tefun' prefixed codes.
@@ -483,9 +508,14 @@ string  extract(string, int, int);
 
 mixed   copy(mixed);
 mixed   deep_copy(mixed);
+mixed   max(mixed|mixed*, ...);
+mixed   min(mixed|mixed*, ...);
+int     sgn(int|float);
 string  save_value(mixed);
 mixed   restore_value(string);
 object  to_object(object|string|closure);
+mixed  *gmtime(int*|int default: F_TIME);
+mixed  *localtime(int*|int default: F_TIME);
 
 mixed   get_extra_wizinfo(object|string);
 void    set_extra_wizinfo(object|string, mixed);
@@ -494,23 +524,21 @@ mixed  *wizlist_info();
 
         /* Strings */
 
+string  copy_bits(string,string,void|int,void|int,void|int);
 string  make_shared_string(string);
+string  md5(string);
 string *regexplode(string, string);
-string  regreplace(string,string,string,int);
+string  regreplace(string,string,closure|string,int);
 string  trim(string, ...);
 string  upper_case(string);
 
         /* Arrays and Mappings */
 
 mixed   filter(mapping|mixed *, string|closure|mapping, ...);
-mixed  *filter_array(mixed *, string|closure|mapping, ...);
 mapping filter_indices(mapping, string|closure,  ...);
-mapping filter_mapping F_FILTER_INDICES (mapping, string|closure,  ...);
 mapping m_reallocate(mapping, int);
 mixed   map(mixed *|mapping, mapping|string|closure, ...);
-mixed  *map_array(mixed *, mapping|string|closure, ...);
 mapping map_indices(mapping, string|closure, ...);
-mapping map_mapping F_MAP_INDICES (mapping, string|closure, ...);
 mixed  *sort_array(mixed *,string|closure, ...);
 mixed  *transpose_array(mixed *);
 void    walk_mapping(mapping, string|closure, ...);
@@ -522,12 +550,14 @@ closure unbound_lambda(mixed *, mixed);
 
         /* Objects */
 
+object  blueprint(string|object default: F_THIS_OBJECT); /* PRELIMINARY */
 object *clones(void|int|string|object, void|int);
 mixed  *filter_objects(mixed *, string, ...);
 mixed  *functionlist(object|string, int default: F_CONST1);
-string *inherit_list(object default: F_THIS_OBJECT);
+string *include_list(void|object, void|int);
+string *inherit_list(void|object, void|int);
 mixed  *map_objects(mixed *, string, ...);
-mixed  *object_info(object, int);
+mixed  *object_info(object, int, void|int);
 object  present_clone(object|string, object default: F_THIS_OBJECT); /* PRELIMINARY */
 mixed   query_editing(object);
 int     query_idle(object);
@@ -543,21 +573,20 @@ void    unshadow();
         /* Network IO */
 
 int     binary_message(int *|string, int default: F_CONST0);
+int     find_input_to(object, object|string|closure, void|string);
+mixed * input_to_info(object);
+int     remove_input_to(object, void|object|string|closure, void|string);
 int     set_buffer_size(int);
 void    set_combine_charset(int *|string);
 void    set_connection_charset(int *|string, int default: F_CONST1);
-string  set_prompt(string|closure|int, object default: F_THIS_PLAYER);
+mixed   set_prompt(string|closure|int, object default: F_THIS_PLAYER);
 
 #ifdef ERQ_DEMON
 int     attach_erq_demon(object|string, int default: F_CONST0);
 int     send_erq(int, int*|string, closure default: F_CONST0);
 #endif
 
-#ifdef CATCH_UDP_PORT
-#ifdef UDP_SEND
-int     send_imp(string, int, string|int*);
-#endif
-#endif
+int     send_udp(string, int, string|int*);
 
         /* Files */
 
@@ -566,7 +595,7 @@ int     copy_file(string, string);
         /* Driver and System functions */
 
 mixed   debug_info(int, ...);
-void    debug_message(string);
+void    debug_message(string, int default: F_CONST0);
 string  expand_define(string, string default: F_CONST0);
 mixed  *get_error_file(string, int default: F_CONST1);
 mixed  *heart_beat_info();
@@ -575,7 +604,6 @@ mixed   limited(closure, ...);
 string *last_instructions(int, int default: F_CONST1);
 #endif
 mixed  *query_limits(int default: F_CONST0);
-void    set_auto_include_string(string);
 void    set_driver_hook(int, closure|int|string|mapping|string*);
 void    set_limits(int|int*, ...);
 void    shutdown();
@@ -585,7 +613,6 @@ string  traceprefix(string|int);
         /* Inventories */
 
 void    set_environment(object, object);
-void    efun308 F_SET_ENVIRONMENT (object, object);
 
         /* Verbs and Commands */
 
@@ -599,6 +626,24 @@ object  set_modify_command(object|string default: F_THIS_OBJECT);
 void    set_this_player(int|object);
 
 
+#ifdef USE_MYSQL
+
+        /* mySQL-Support */
+
+int     db_affected_rows(int);
+string *db_coldefs(int);
+string  db_conv_string(string);
+int     db_close(int);
+int     db_connect(string, ...);
+string  db_error(int);
+int     db_exec(int, string);
+mixed   db_fetch(int);
+int    *db_handles();
+int     db_insert_id(int);
+
+#endif /* USE_MYSQL */
+
+
         /* Functions only used in compatibility mode. */
 
 #ifdef COMPAT_MODE
@@ -609,11 +654,31 @@ int     transfer(object, object|string);
  * Beware that some may be used in mudlib 2.4.5.
  */
 
-void    add_verb(string);
-void    add_xverb(string);
-  /* TODO: Get rid of add_verb(), add_xverb()
-   */
+#ifdef USE_PROCESS_STRING
 string  process_string(string);
+#endif /* USE_PROCESS_STRING */
+
+#ifdef USE_SET_IS_WIZARD
 int     set_is_wizard(object, int default: F_CONST1);
+#endif /* USE_SET_IS_WIZARD */
+
+
+        /* Obsolete and deprecated functions */
+
+#ifdef USE_DEPRECATED
+
+void    add_verb(string) "use add_action()";
+void    add_xverb(string) "use add_action()";
+void    efun308 F_SET_ENVIRONMENT (object, object) "use set_environment()";
+string  file_name F_OBJECT_NAME (object default: F_THIS_OBJECT) "use object_name()";
+mixed  *map_array(mixed *, mapping|string|closure, ...) "use map()";
+mixed  *filter_array(mixed *, string|closure|mapping, ...) "use filter()";
+mapping filter_mapping F_FILTER_INDICES (mapping, string|closure,  ...) "use filter_indices()";
+mapping map_mapping F_MAP_INDICES (mapping, string|closure, ...) "use map_indices()";
+int     m_sizeof F_SIZEOF (mapping) "use sizeof()";
+int     send_imp F_SEND_UDP (string, int, string|int*) "use send_udp()";
+void    set_auto_include_string (string) "use set_driver_hook(H_AUTO_INCLUDE)";
+
+#endif /* USE_DEPRECATED */
 
 /***************************************************************************/

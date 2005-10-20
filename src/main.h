@@ -19,10 +19,13 @@ extern long time_to_swap_variables;
 extern svalue_t const0, const1;
 extern double consts[5];
 extern char *mud_lib;
+extern char *erq_file;
+extern char **erq_args;
 extern char master_name[];
 extern char *debug_file;
 extern object_t dummy_current_object_for_loads;
 extern int slow_shut_down_to_do;
+extern Bool reopen_debug_log;
 
 #ifdef DEBUG
 extern Bool check_a_lot_ref_counts_flag;
@@ -36,9 +39,9 @@ extern Bool check_string_table_flag;
 extern int port_numbers[];
 extern int numports;
 
-#ifdef CATCH_UDP_PORT
 extern int udp_port;
-#endif
+
+extern Bool compat_mode;
 
 /* --- Prototypes --- */
 
@@ -51,10 +54,12 @@ void reallocate_reserved_areas(void);
 
 extern void write_x(int d, p_uint i);
 extern void writed(int d, p_uint i);
+extern void writes(int d, const char *s);
 extern char *dprintf_first(int fd, char *s, p_int a);
 extern void dprintf1(int fd, char *s, p_int a);
 extern void dprintf2(int fd, char *s, p_int a, p_int b);
 extern void dprintf3(int fd, char *s, p_int a, p_int b, p_int c);
+extern void dprintf4(int fd, char *s, p_int a, p_int b, p_int c, p_int d);
 
 
 #endif /* MAIN_H__ */

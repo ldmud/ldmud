@@ -4,6 +4,11 @@
 
 @TOP@
 
+/* Set in response to the signal handler return type, since not all
+ * compilers understand direct definition comparisons
+ */
+#undef RETSIGTYPE_VOID
+
 /* does the compiler provide inline functions? */
 #undef HAS_INLINE
 
@@ -76,6 +81,15 @@
 
 /* Does the machine offer IPv6? */
 #undef HAS_IPV6
+
+/* Does the machine offer mySQL? */
+#undef HAS_MYSQL
+
+/* Does the machine offer pthread library? */
+#undef HAS_PTHREADS
+
+/* Does the machine offer pcre library? */
+#undef HAS_PCRE
 
 /* define the erq include file. */
 #undef ERQ_INCLUDE

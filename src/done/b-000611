@@ -2,7 +2,7 @@ Short: dev.20x crashes on Hyperborea
 Date: 11.Jun 2000
 From: Kees Leune <C.J.Leune@kub.nl>
 Type: Bug
-State: New
+State: Abandoned or fixed - no longer appears in 3.2.9-dev.390
 
 Analysis: Probably fixed 3.2-dev.213, together with b-000606
 

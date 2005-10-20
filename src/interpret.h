@@ -6,6 +6,7 @@
 #include "driver.h"
 #include "typedefs.h"
 #include "instrs.h"
+#include "svalue.h"
 
 /* --- Types --- */
 
@@ -24,6 +25,7 @@ struct control_stack {
     object_t *ob;          /* Current object */
     object_t *prev_ob;     /* Save previous object */
     program_t *prog;       /* Current program, NULL in the bottom entry */
+    svalue_t   lambda;     /* Current lambda, counted, or svalue-0 if none */
     bytecode_p pc;         /* Program counter, points to next bytecode */
     svalue_t *fp;          /* Frame pointer: first arg on stack */
     bytecode_p funstart;
@@ -46,13 +48,16 @@ struct control_stack {
        * stored in .pretend_to_be and this flag is or'ed with CS_PRETEND.
        */
 #   define CS_PRETEND 0x80
+    Bool  catch_call;
+      /* This is the 'faked' call context for the code inside a catch().
+       * Since the interpreter fakes a subroutine call for this, F_RETURN
+       * must be able to tell the contexts apart.
+       * (Right now the LPC compiler prohibits the use of 'return' inside
+       * of a catch, but providing it on this level already doesn't hurt).
+       */
     int   instruction;
       /* For EFUN_FUNSTART entries, this is the efun executed.
        */
-
-#if 0  /* TODO: Remove me fully if nobody complains */
-    short dummy; /* TODO: ??? */
-#endif
 
     bytecode_p *break_sp;
       /* Points to address to branch to at next F_BREAK, which is also
@@ -73,6 +78,11 @@ struct control_stack {
  */
 #define CLEAR_EVAL_COST (assigned_eval_cost = eval_cost = 0)
 
+/* Check if the current evaluation took too long
+ */
+#define EVALUATION_TOO_LONG() \
+    (max_eval_cost && (eval_cost >= max_eval_cost || eval_cost < 0))
+
 
 /* --- Variables --- */
 
@@ -82,7 +92,8 @@ extern int trace_level;
 #ifdef MALLOC_LPC_TRACE
 extern bytecode_p inter_pc;
 #endif
-extern svalue_t *inter_sp;
+extern struct control_stack *csp;
+extern svalue_t * inter_sp;
 extern int function_index_offset;
 extern svalue_t *current_variables;
 extern int32  eval_cost;
@@ -100,7 +111,15 @@ extern p_int apply_cache_miss;
 
 extern void assign_eval_cost(void);
 
+extern Bool eval_instruction(bytecode_p first_instruction, svalue_t *initial_sp);
 extern void free_string_svalue(svalue_t *v);
+extern void push_control_stack(svalue_t *sp, bytecode_p pc, svalue_t *fp);
+extern void pop_control_stack(void);
+extern struct longjump_s *push_error_context(svalue_t *sp, bytecode_t catch_inst);
+extern void pop_error_context (void);
+extern svalue_t *pull_error_context (svalue_t *sp);
+extern Bool destructed_object_ref (svalue_t *svp);
+extern object_t * get_object_ref (svalue_t *svp);
 extern void free_object_svalue(svalue_t *v);
 extern void zero_object_svalue(svalue_t *v);
 extern void free_svalue(svalue_t *v);
@@ -140,28 +159,28 @@ extern svalue_t *apply(char *fun, object_t *ob, int num_arg);
 extern char *function_exists(char *fun, object_t *ob);
 extern void call_function(program_t *progp, int fx);
 extern int get_line_number(bytecode_p p, program_t *progp, char **namep);
-extern char *dump_trace(Bool how);
+extern char *collect_trace(strbuf_t * sbuf, vector_t ** rvec);
+extern char *dump_trace(Bool how, vector_t **rvec);
 extern int get_line_number_if_any(char **name);
 extern void reset_machine(Bool first);
 extern svalue_t *secure_apply(char *fun, object_t *ob, int num_arg);
-extern svalue_t *apply_master_ob(char *fun, int num_arg);
+extern svalue_t *apply_master_ob(char *fun, int num_arg, Bool external);
+#define apply_master(fun, num_arg) apply_master_ob(fun, num_arg, MY_FALSE)
+#define callback_master(fun, num_arg) apply_master_ob(fun, num_arg, MY_TRUE)
+
 extern void assert_master_ob_loaded(void);
 extern svalue_t *secure_call_lambda(svalue_t *closure, int num_arg);
 extern void remove_object_from_stack(object_t *ob);
 extern void call_lambda(svalue_t *lsvp, int num_arg);
 extern void free_interpreter_temporaries(void);
 extern void invalidate_apply_low_cache(void);
-extern void add_eval_cost(int num);
 extern void push_referenced_mapping(mapping_t *m);
 extern void m_indices_filter (svalue_t *key, svalue_t *data, void *extra);
 extern int last_instructions(int length, Bool verbose, svalue_t **svpp);
 extern svalue_t *f_last_instructions(svalue_t *sp);
 extern svalue_t *f_trace(svalue_t *sp);
 extern svalue_t *f_traceprefix(svalue_t *sp);
-
-#ifndef COMPAT_MODE
 extern char *add_slash (char *str);
-#endif
 
 #ifdef OPCPROF
 extern Bool opcdump(char *fname);

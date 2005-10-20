@@ -61,11 +61,11 @@ RMF= $(RM)
 # If your compiler doesn't have own code for float maths, you must
 # define _NO_OWN_FLOATS so OS 1.3-versions will compile properly.
 #
-# interpret.c and lang.c need lots of RAM to compile, thus it might be wise
+# interpret.c and parser.c need lots of RAM to compile, thus it might be wise
 # to put the temporaries somewhere else than into T: in RAM:.
 # Use these macros to insert the needed compiler-options, including any
 # non-standard code-model options.
-#   LOPT: The options for lang.c
+#   LOPT: The options for parser.c
 #   IOPT: The options for interpret.c
 #
 # To compile the hosts/amiga/signal, your compiler must be able to
@@ -137,21 +137,15 @@ BINDIR = mudbin:
 
 ERQDIR = mudbin:erq
 
-# Profiling is mostly useless for us.
-#   PROFIL= -DOPCPROF -DVERBOSE_OPCPROF
-#     would enable the profiling of the virtual stackmachine.
+# Profiling is mostly useless for us, except for the options available
+# in config.h .
 
 PROFIL=
 
 # Debugging options:
-#   DEBUG: Enable run time debugging. It will use more time and space.
-#            Nevertheless you are strongly encouraged to keep it defined.
-#   YYDEBUG[=1]: Debug output for the LPC compiler.
-#   TRACE_CODE: Enable the LPC code tracing.
-#   CHECK_STRINGS: Enable the shared string checking.
-#   KEEP_STRINGS: Shared strings are never really freed.
-#   DEBUG_TELNET: Activates debug prints in the telnet machine
-DEBUG = DEBUG=symbolflush def=DEBUG def=TRACE_CODE def=CHECK_STRINGS # def=KEEP_STRINGS def=DEBUG_TELNET
+#   Debugging options should be set in config.h to guarantee a clean
+#   recompile.
+DEBUG = DEBUG=symbolflush
 
 # Extra object files and libraries.
 
@@ -168,7 +162,7 @@ LIBS= $(NETLIB) lib=lib:scmffpnb.lib
 MPATH=def=MUD_LIB="\"$(MUD_LIB)\"" def=BINDIR="\"$(BINDIR)\" def=ERQ_DIR="\"$(ERQDIR)\""
 LDFLAGS= afp Data=FAR Code=FAR link
 DEFINES= $(DEBUG) $(PROFIL) $(MPATH) $(NETDEF)
-CFLAGS= $(CCOPTS) $(DEFINES)
+CFLAGS= -Dlint $(CCOPTS) $(DEFINES)
 YFLAGS= -d
 
 SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\
@@ -177,20 +171,20 @@ SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\
     ptrtable.c heartbeat.c actions.c mempools.c \
     access_check.c parse_old.c parse.c prolang.y rxcache.c\
     simul_efun.c strfuns.c sprintf.c gcollect.c closure.c random.c \
-    efuns.c stdstrings.c $(XSRC)
-OBJ=lang.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
+    pkg-mysql.c efuns.c stdstrings.c md5.c $(XSRC)
+OBJ=parser.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
 comm.o ed.o regexp.o mapping.o wiz_list.o swap.o xalloc.o\
 call_out.o otable.o dumpstat.o stralloc.o hash.o port.o\
-ptrtable.o heartbeat.o actions.o mempools.o \
+ptrtable.o pkg-mysql.o heartbeat.o actions.o mempools.o md5.o\
 access_check.o parse_old.o parse.o simul_efun.o strfuns.o sprintf.o\
 rxcache.o efuns.o gcollect.o closure.o random.o stdstrings.o $(XOBJ)
 
-driver: $(OBJ)
+ldmud: $(OBJ)
 	$(CC) $(LDFLAGS) $(LIBS) $(OBJ) to=$@
 
 # Utils and auto installation are not supported
 # install: driver
-#	 install csrc=$? $(BINDIR)/parse
+#	 install csrc=$? $(BINDIR)/ldmud
 #
 # install.utils:
 #	 (cd util; $(MAKE) $(MFLAGS) install)
@@ -198,14 +192,10 @@ driver: $(OBJ)
 # utils:
 #	  (cd util; $(MAKE) $(MFLAGS))
 
-parse: driver
-	+-$(MV) parse parse.old
-	$(CP) driver parse
-
 clean:
 	-$(RMF) *.o *.a lang.c lang.h lang.y instrs.h efun_defs.c y.output
 	-$(RMF) stdstrings.c stdstrings.h
-	-$(RMF) make_func.c make_func driver PlayMud
+	-$(RMF) make_func.c make_func ldmud PlayMud
 
 tags: $(SRC)
 	ctags $(SRC)
@@ -217,6 +207,9 @@ make_func.c: make_func.y
 	$(YACC) $(YFLAGS) make_func.y
 	-$(RM) make_func.c
 	$(MV) $(YTAB).c make_func.c
+
+make_func.o : make_func_main.c make_func.c hash.h ixfile.h exec.h
+	$(CC) $(CFLAGS) make_func_main.o to=make_func.o
 
 make_func: make_func.o hash.o ixfile.o alloca.o exec.h
 	$(CC) $(LDFLAGS) alloca.o make_func.o hash.o ixfile.o to=make_func $(LIBS)
@@ -337,7 +330,7 @@ netclean:
 osclean:
 	-$(RM) $(XOBJ)
 	-$(RM) backend.o interpret.o object.o otable.o simulate.o stralloc.o
-	-$(RM) PlayMud driver
+	-$(RM) PlayMud ldmud
 
 amiga.o : hosts/amiga/amiga.c
 	$(CC) $(CFLAGS) idir=hosts/amiga csrc=$< to=$@

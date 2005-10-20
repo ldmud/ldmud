@@ -1,41 +1,41 @@
 SYNOPSIS
-	object present(mixed str)
-	object present(mixed str, object ob)
+        object present(mixed str)
+        object present(mixed str, object ob)
 
 DESCRIPTION
-	If an object that identifies (*) to the name ``str'' is present
-	in the inventory or environment of this_object (), then return
-	it. If "str" has the form "<id> <n>" the <n>-th object matching
-	<id> will be returned.
+        If an object that identifies (*) to the name ``str'' is present
+        in the inventory or environment of this_object(), then return
+        it. If "str" has the form "<id> <n>" the <n>-th object matching
+        <id> will be returned.
 
-	"str" can also be an object, in which case the test is much faster
-	and easier.
+        "str" can also be an object, in which case the test is much faster
+        and easier.
 
-	A second optional argument ob is the enviroment where the search
-	for str takes place. Normally this_player() is a good choice.
-	Only the inventory of ob is searched, not its environment.
+        A second optional argument ob is the enviroment where the search
+        for str takes place. Normally this_player() is a good choice.
+        Only the inventory of ob is searched, not its environment.
 
-	(*) id (str) { return str == <name>; }
-	i.e. the parser applies id(str) to all objects in the vicinity
-	until the matching one (if any) is found.
+        (*) id (str) { return str == <name>; }
+        i.e. the parser applies id(str) to all objects in the vicinity
+        until the matching one (if any) is found.
 
-	If you want an object to support the "<id> <n>" syntax in
-	conjunction with self-defined verbs (like "open chest 3") you
-	can do it like that:
+        If you want an object to support the "<id> <n>" syntax in
+        conjunction with self-defined verbs (like "open chest 3") you
+        can do it like that:
 
-	init () { add_action ("open_chest", "open"); }
+        init () { add_action ("open_chest", "open"); }
 
-	open_chest (str) {
-	  if (present (str) != this_object ())
-	      return 0; /* Not this chest */
-	  ...
-	}
+        open_chest (str) {
+          if (present (str) != this_object ())
+              return 0; /* Not this chest */
+          ...
+        }
 
-	Btw: if the n-th object matching "str" is searched in this_object()
-	and it's environment and the object is found in the environment
-	then it will be the n-th occurence of ``str'' in the environment
-	and not in both objects.
+        Btw: if the n-th object matching "str" is searched in this_object()
+        and it's environment and the object is found in the environment
+        then it will be the n-th occurence of ``str'' in the environment
+        and not in both objects.
 
 SEE ALSO
-	move_object(E), environment(E), this_object(E), present_clone(E)
-	id(A), init(A)
+        move_object(E), environment(E), this_object(E), present_clone(E)
+        id(A), init(A)

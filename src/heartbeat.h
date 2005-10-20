@@ -3,7 +3,7 @@
 
 #include "driver.h"
 
-#include "typedefs.h" 
+#include "typedefs.h"
 #include "strfuns.h"    /* strbuf_t */
 
 /* --- Variables --- */
@@ -19,7 +19,7 @@ extern mp_int num_hb_objs;
 extern void  call_heart_beat(void);
 extern int   set_heart_beat (object_t *ob, Bool to);
 extern int   heart_beat_status (strbuf_t *sbuf, Bool verbose);
-extern void  hbeat_dinfo_status(svalue_t *svp);
+extern void  hbeat_dinfo_status(svalue_t *svp, int value);
 extern svalue_t *f_heart_beat_info (svalue_t *sp);
 
 #ifdef GC_SUPPORT

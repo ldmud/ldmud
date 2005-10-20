@@ -12,26 +12,26 @@
 
 /* --- Macros --- */
 
-#define SHSTR_OVERHEAD  (sizeof(unsigned short) + sizeof(char *))
+#define SHSTR_OVERHEAD  (sizeof(StrRefCount) + sizeof(char *))
   /* Overhead of a shared string, used in interpret:apply_low()
    * for a heuristic.
    */
 
 #define SHSTR_NEXT(str) \
-  (*(char **)((char *) (str) - sizeof(unsigned short) - sizeof(char *)))
+  (*(char **)((char *) (str) - sizeof(StrRefCount) - sizeof(char *)))
 
   /* char* SHSTR_NEXT(char*): return the pointer to the next string
    * in the same hash chain.
    */
 
 #define SHSTR_REFS(str) \
-  (*(unsigned short *)((char *) (str) - sizeof(unsigned short)))
+  (*(StrRefCount *)((char *) (str) - sizeof(StrRefCount)))
 
   /* ushort SHSTR_REFS(char*): return the number of refs to this string.
    */
 
 #define SHSTR_BLOCK(str) \
-  ((char *)(str) - sizeof(unsigned short) - sizeof(char *))
+  ((char *)(str) - sizeof(StrRefCount) - sizeof(char *))
 
   /* char* SHSTR_BLOCK(char*): return a pointer to the first byte
    * of the memory area of this string.
@@ -40,14 +40,14 @@
 #ifdef MALLOC_smalloc
 
 #define shstr_malloced_length(str) ( *( \
-        (p_uint *)(str-sizeof(char*)-sizeof(unsigned short))\
+        (p_uint *)(str-sizeof(char*)-sizeof(StrRefCount))\
         - SMALLOC_OVERHEAD) - SMALLOC_OVERHEAD )
 #else
 
 #define malloc_size_mask() (~0)
 
 #define shstr_malloced_length(str) (\
-        (sizeof(char*) + sizeof(char *) + sizeof(short) +\
+        (sizeof(char*) + sizeof(char *) + sizeof(StrRefCount) +\
         strlen(str) + 1 + sizeof(char *) - 1) / sizeof(char *) - 1)
 
 #endif
@@ -55,12 +55,12 @@
 /* --- Prototypes --- */
 extern void init_shared_strings(void);
 
-extern char  *findstring(char *s);
-extern char  *make_shared_string(char *str);
+extern char  *findstring(const char *s);
+extern char  *make_shared_string(const char *str);
 extern void   deref_string(char *str);
 extern void   free_string(char *str);
 extern mp_int add_string_status(strbuf_t *sbuf, Bool verbose);
-extern void   string_dinfo_status(svalue_t *svp);
+extern void   string_dinfo_status(svalue_t *svp, int value);
 
 #ifdef GC_SUPPORT
 

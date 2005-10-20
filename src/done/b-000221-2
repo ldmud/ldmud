@@ -2,7 +2,7 @@ From:    Jones@Zeittunnel
 Short: foreach() and redeclarations
 Date:    Tue Feb 22 01:59:27 2000
 Type: Bug
-State: New
+State: Abandoned - not reproducible.
 
 Hi,
 

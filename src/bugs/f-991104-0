@@ -3,7 +3,7 @@ From: Lars
 Date: 991104
 Type: Feature
 State: Unclassified
-See also: f-981226-1
+See also: f-981226-1, p-020912, p-021021
 
 When writing data to the network, the driver drops messages when
 encountering an EWOULDBLOCK.

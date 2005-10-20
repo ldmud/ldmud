@@ -8,8 +8,12 @@
  * The implemented efuns, sorted by topic, are:
  *
  * Strings:
+ *    vefun: copy_bits()
  *    tefun: make_shared_string()
- *    tefun: process_string() (optional)
+ *    tefun: md5()
+#ifdef USE_PROCESS_STRING
+ *    tefun: process_string()
+#endif
  *    efun:  sscanf()
  *    efun:  terminal_colour()
  *    tefun: trim()
@@ -17,11 +21,14 @@
  *
  * Objects:
  *    xefun: all_environment()
+ *    tefun: blueprint()
  *    vefun: clones()
  *    tefun: object_info()
  *    tefun: present_clone() (preliminary)
  *    tefun: present()
- *    tefun: set_is_wizard() (optional)
+#ifdef USE_SET_IS_WIZARD
+ *    tefun: set_is_wizard()
+#endif
  *    tefun: set_modify_command()
  *    tefun: set_prompt()
  *    tefun: transfer() (optional)
@@ -33,9 +40,13 @@
  *    tefun: deep_copy()
  *    vefun: filter()
  *    vefun: map()
+ *    vefun: min()
+ *    vefun: max()
  *
  * Others:
  *    tefun: debug_info()
+ *    tefun: gmtime()
+ *    tefun: localtime()
  *    tefun: shutdown()
  *
  *---------------------------------------------------------------------------
@@ -49,6 +60,10 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#include <time.h>
 
 #define USES_SVALUE_STRLEN
 #include "efuns.h"
@@ -61,10 +76,11 @@
 #include "comm.h"
 #include "dumpstat.h"
 #include "heartbeat.h"
-#include "instrs.h"
+#include "instrs.h" /* F_TRANSFER, F_UNDEF */
 #include "interpret.h"
 #include "main.h"
 #include "mapping.h"
+#include "md5.h"
 #include "object.h"
 #include "otable.h"
 #include "ptrtable.h"
@@ -82,9 +98,10 @@
 #include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/objectinfo.h"
 #include "../mudlib/sys/strings.h"
+#include "../mudlib/sys/time.h"
 
 /* Forward declarations */
-static void copy_svalue (svalue_t *dest, svalue_t *, struct pointer_table *);
+static void copy_svalue (svalue_t *dest, svalue_t *, struct pointer_table *, int);
 
 /* Macros */
 
@@ -116,6 +133,14 @@ static void copy_svalue (svalue_t *dest, svalue_t *, struct pointer_table *);
   if ((arg1)->type != type1) \
       bad_xefun_vararg(3, sp);
 
+#define TYPE_TESTV4(arg1,type1) \
+  if ((arg1)->type != type1) \
+      bad_xefun_vararg(4, sp);
+
+#define TYPE_TESTV5(arg1,type1) \
+  if ((arg1)->type != type1) \
+      bad_xefun_vararg(5, sp);
+
 /* Typetests for efuns */
 
 #define E_TYPE_TESTV1(arg1,type1) \
@@ -128,7 +153,7 @@ static void copy_svalue (svalue_t *dest, svalue_t *, struct pointer_table *);
 
 /*-------------------------------------------------------------------------*/
 
-#ifdef F_SET_IS_WIZARD
+#ifdef USE_SET_IS_WIZARD
 Bool is_wizard_used = MY_FALSE;
   /* TODO: This flag can go when the special commands are gone. */
 #endif
@@ -136,6 +161,536 @@ Bool is_wizard_used = MY_FALSE;
 
 /*=========================================================================*/
 /*                              STRINGS                                    */
+
+/*-------------------------------------------------------------------------*/
+static INLINE p_int
+last_bit (const char *str)
+
+/* Return the number of the last set bit in bitstring <str>.
+ */
+
+{
+    mp_int   pos;
+    long     len;
+    int      c;
+
+    pos = -1;
+
+    /* Get the arguments */
+    len = (long)strlen(str);
+
+    /* First, find the last non-zero character */
+    c = 0;
+    while (len-- > 0 && (c = str[len]) == ' ') NOOP;
+
+    if (len >= 0)
+    {
+        int pattern;
+
+        /* Found a character, now determine the bit position */
+        c -= ' ';
+        pos = 6 * len + 5;
+        for ( pattern = 1 << 5
+            ; pattern && !(c & pattern)
+            ; pattern >>= 1, pos--)
+            NOOP;
+    }
+
+    return pos;
+} /* last_bit() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+copy_bits ( char * dest, p_int deststart
+          , char * src,  p_int srcstart
+          , p_int len
+          )
+
+/* Copy the bitrange <src>[<srcstart>..<srcstart>+<len>[ into the
+ * <dest> string starting at <deststart>.
+ * <dest> is supposed to be allocated big enough.
+ */
+
+{
+    char * pDest, * pSrc;
+
+    if (len < 1)
+        return;
+
+    pDest = dest + deststart / 6;
+    pSrc = src + srcstart / 6;
+
+    /* Special case: both source and target bit range start on the same bit.
+     */
+    if (deststart % 6 == srcstart % 6)
+    {
+        /* Copy the first few bits until the next byte boundary.
+         * Make sure not to overwrite preexisting bytes
+         */
+        if (deststart % 6 != 0)
+        {
+            int getmask, storemask;
+
+            storemask = (1 << deststart % 6) - 1;
+              /* storemask is now 00011111 through 00000001 */
+            getmask = ~storemask;
+              /* getmask   is now 11100000 through 11111110 */
+
+            if (len < 6 - deststart % 6)
+            {
+                /* A really small copy: we don't even need all bits from
+                 * the src byte.
+                 */
+                int len2 = 6 - deststart % 6 - len;
+                int lenmask;
+
+                lenmask = (1 << len2) - 1;
+                lenmask <<= 6 - len2;
+                  /* lenmask has now 1-bits for the bits we need not to copy */
+                storemask &= ~lenmask;
+            }
+
+            *pDest = ' ' + (  ((*pDest - ' ') & storemask)
+                            | ((*pSrc - ' ') & getmask)
+                           );
+
+            len -= 6 - deststart % 6; /* might become negative here */
+            pDest++;
+            pSrc++;
+        }
+
+        /* Do a fast byte copy */
+        if (len >= 6)
+        {
+            memcpy(pDest, pSrc, len / 6);
+        }
+
+        /* Copy the remaining bytes, if any */
+        if (len > 0 && len % 6 != 0)
+        {
+            int mask;
+
+            mask = (1 << (len % 6)) - 1;
+              /* mask is now 00011111 through 00000001 */
+            pDest[len / 6] = ((pSrc[len / 6] - ' ') & mask) + ' ';
+        }
+    }
+    else
+    {
+        /* Copy enough bits so that deststart points to a byte boundary */
+        if (deststart % 6 != 0)
+        {
+            /* Since these are going to be at max five bits, we copy
+             * them in a loop bit by bit.
+             */
+
+            int getmask, getbit;
+            int storemask, storebit;
+            char src_bits, dest_bits;
+
+            getbit = srcstart % 6;
+            getmask = 1 << getbit;
+            storebit = deststart % 6;
+            storemask = 1 << storebit;
+
+            src_bits = *pSrc - ' ';
+            dest_bits = *pDest - ' ';
+
+            while (len > 0 && storebit != 6)
+            {
+                if (0 != (src_bits & getmask))
+                    dest_bits = dest_bits | storemask;
+                else
+                    dest_bits = dest_bits & (~storemask);
+
+                srcstart++;
+                getbit++; getmask <<= 1;
+                if (getbit == 6)
+                {
+                    getbit = 0;
+                    getmask = 0x01;
+                    pSrc++;
+                    src_bits = *pSrc - ' ';
+                }
+
+                deststart++;
+                storebit++; storemask <<= 1;
+
+                len--;
+            }
+
+            *pDest = dest_bits + ' ';
+            pDest++;
+        } /* if need to align deststart */
+
+        /* deststart now points to byte boundary, that means we can
+         * now copy the bits by blockwise selection from the src string.
+         */
+        if (len >= 6)
+        {
+            int getmask1, getmask2, len2;
+            int getshift1, getshift2;
+
+            len2 = 6 - srcstart % 6; /* Number of bits in first byte */
+
+            getmask1 = (1 << len2) - 1;
+            getmask1 <<= 6 - len2;
+              /* getmask1 has now the mask for the high order bits of the
+               * first src byte
+               */
+            getshift1 = 6 - len2;
+            getshift2 = len2;
+
+            len2 = 6 - len2;  /* Number of bits in second byte */
+
+            getmask2 = (1 << len2) - 1;
+              /* getmask2 has now the mask for the low order bits of the
+               * second src byte
+               */
+
+            while (len >= 6)
+            {
+                *pDest = ' ' + ( ((pSrc[0]-' ') & getmask1) >> getshift1
+                                |((pSrc[1]-' ') & getmask2) << getshift2
+                               );
+                len -= 6;
+                pDest++;
+                pSrc++;
+                srcstart += 6;
+                deststart += 6;
+            }
+        } /* if >= 6 bits left */
+
+        /* deststart still points to byte boundary, but there are
+         * less than 6 bits left to copy.
+         */
+        if (len > 0)
+        {
+            /* Since these are going to be at max five bits, we copy
+             * them in a loop bit by bit.
+             */
+
+            int getmask, getbit;
+            int storemask, storebit;
+            char src_bits, dest_bits;
+
+            getbit = srcstart % 6;
+            getmask = 1 << getbit;
+            storebit = 0;
+            storemask = 0x01;
+
+            src_bits = *pSrc - ' ';
+            dest_bits = 0;
+
+            while (len > 0)
+            {
+                if (0 != (src_bits & getmask))
+                    dest_bits |= storemask;
+
+                srcstart++;
+                getbit++; getmask <<= 1;
+                if (getbit == 6)
+                {
+                    getbit = 0;
+                    getmask = 0x01;
+                    pSrc++;
+                    src_bits = *pSrc - ' ';
+                }
+
+                deststart++;
+                storebit++; storemask <<= 1;
+
+                len--;
+            }
+
+            *pDest = dest_bits + ' ';
+        } /* if (1..5 bits left) */
+    } /* case selection */
+} /* copy_bits() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_copy_bits (svalue_t *sp, int num_arg)
+
+/* EFUN copy_bits()
+ *
+ *     string copy_bits(string src, string dest
+ *                     [, int srcstart [, int deststart [, int copylen ]]]
+ *                      )
+ *
+ * Copy the bitrange [<srcstart>..<srcstart>+<copylen>[ from bitstring <src>
+ * and copy it into the bitstring <dest> starting at <deststart>, overwriting
+ * the original bits at those positions.
+ * The resulting combined string is returned, the input strings remain
+ * unaffected.
+ *
+ * If <srcstart> is not given, <src> is copied from the start.
+ *   If <srcstart> is negative, it is counted from one past the last set
+ *   bit in the string (ie. '-1' will index the last set bit).
+ * If <deststart> is not given, <dest> will be overwritten from the start.
+ *   If <deststart> is negative, it is counted from one past the last set
+ *   bit in the string (ie. '-1' will index the last set bit).
+ * If <copylen> is not given, it is assumed to be infinite, ie. the result
+ *   will consist of <dest> up to position <deststart>, followed by
+ *   the data copied from <src>.
+ *   If <copylen> is negative, the function will copy the abs(<copylen>)
+ *   bits _before_ <srcstart> in to the result.
+ *
+ * None of the range limits can become negative.
+ */
+
+{
+    p_int srcstart, deststart, copylen;
+    p_int srclen, destlen, resultlen;
+    Bool copyall;
+    char *src, *dest, *result;
+    int result_string_type;
+
+    /* Get the optional command arguments */
+    srcstart = deststart = copylen = 0;
+    copyall = MY_TRUE;
+
+    switch (num_arg)
+    {
+    case 5:
+        TYPE_TESTV5(sp, T_NUMBER);
+        copyall = MY_FALSE;
+        copylen = sp->u.number;
+        sp--;
+        num_arg--;
+        /* FALL THROUGH */
+
+    case 4:
+        TYPE_TESTV4(sp, T_NUMBER);
+        deststart = sp->u.number;
+        sp--;
+        num_arg--;
+        /* FALL THROUGH */
+
+    case 3:
+        TYPE_TESTV3(sp, T_NUMBER);
+        srcstart = sp->u.number;
+        sp--;
+        num_arg--;
+        /* FALL THROUGH */
+    }
+    inter_sp = sp;
+
+    /* Get the fixed command arguments and check for consistency */
+    TYPE_TESTV2(sp, T_STRING);
+    TYPE_TESTV1(sp-1, T_STRING);
+    dest = sp->u.string;
+    src = sp[-1].u.string;
+
+    sp++; /* We might need to save a precautionary reference to the result */
+
+    srclen = last_bit(src)+1;
+    destlen = last_bit(dest)+1;
+
+    if (srcstart < 0 && srcstart + srclen < 0)
+        error("Bad argument 3 to copy_bits(): Index %ld is out of range "
+              "(last bit: %ld).\n"
+             , (long)srcstart, (long)srclen);
+    if (srcstart < 0)
+        srcstart += srclen;
+
+    if (deststart < 0 && deststart + destlen < 0)
+        error("Bad argument 4 to copy_bits(): Index %ld is out of range "
+              "(last bit: %ld).\n"
+             , (long)deststart, (long)destlen);
+    if (deststart < 0)
+        deststart += destlen;
+
+    if (!copyall && copylen < 0)
+    {
+        if (srcstart + copylen < 0)
+            error("Bad argument 5 to copy_bits(): Length %ld out of range "
+                  "(start index: %ld).\n"
+                 , (long)copylen, (long)srcstart);
+
+        srcstart += copylen;
+        copylen = -copylen;
+    }
+
+    /* Test the input strings for sanity */
+    {
+        char *cp;
+        long len;
+
+        len = (long)svalue_strlen(sp-2);
+        cp = src;
+        for ( ; len > 0; len--, cp++)
+        {
+            int c = *cp - ' ';
+            if (c < 0 || c > 0x3f)
+                error("Bad argument 1 to copy_bits(): String contains "
+                      "illegal character %d\n", c + ' ');
+        }
+
+        len = (long)svalue_strlen(sp-1);
+        cp = dest;
+        for ( ; len > 0; len--, cp++)
+        {
+            int c = *cp - ' ';
+            if (c < 0 || c > 0x3f)
+                error("Bad argument 2 to copy_bits(): String contains "
+                      "illegal character %d\n", c + ' ');
+        }
+    }
+
+    /* Do the copying - some constellations are really simple */
+    if (copyall)
+    {
+        if (srcstart == 0 && deststart == 0)
+        {
+            if (sp[-2].x.string_type == STRING_SHARED)
+            {
+                result_string_type = STRING_SHARED;
+                result = ref_string(src);
+            }
+            else
+            {
+                result_string_type = STRING_MALLOC;
+                result = string_copy(src);
+            }
+        }
+        else
+        {
+            if (srclen > srcstart)
+                copylen = srclen - srcstart;
+            else
+                copylen = 0;
+
+            if (PINT_MAX - copylen < deststart)
+                error("copy_bits: result length exceeds numerical limit: "
+                      "%ld + %ld\n"
+                     , (long)deststart, (long)copylen
+                     );
+            resultlen = deststart + copylen;
+            if (resultlen > MAX_BITS || resultlen < 0)
+                error("copy_bits: Result too big: %lu bits\n"
+                     , (unsigned long)resultlen);
+
+            /* Get the result string and store the reference on the stack
+             * for error cleanups.
+             */
+            result_string_type = STRING_MALLOC;
+            result = xalloc((resultlen + 5) / 6 + 1);
+            if (result == NULL)
+            {
+                error("Out of memory.\n");
+                /* NOTREACHED */
+            }
+            memset(result, ' ', (resultlen + 5) / 6);
+            result[(resultlen + 5) / 6] = '\0';
+            inter_sp = sp; put_malloced_string(sp, result);
+
+            /* Copy the first part of dest into the result */
+            if (deststart > 0)
+            {
+                if (deststart > destlen)
+                    copy_bits(result, 0, dest, 0, destlen);
+                else
+                    copy_bits(result, 0, dest, 0, deststart);
+            }
+
+            /* Now append the src */
+            copy_bits(result, deststart, src, srcstart, copylen);
+        }
+    }
+    else if (copylen == 0)
+    {
+        if (sp[-1].x.string_type == STRING_SHARED)
+        {
+            result_string_type = STRING_SHARED;
+            result = ref_string(dest);
+        }
+        else
+        {
+            result_string_type = STRING_MALLOC;
+            result = string_copy(dest);
+        }
+    }
+    else if (srcstart == 0 && deststart == 0
+          && copylen >= destlen && copylen >= srclen)
+    {
+        if (sp[-2].x.string_type == STRING_SHARED)
+        {
+            result_string_type = STRING_SHARED;
+            result = ref_string(src);
+        }
+        else
+        {
+            result_string_type = STRING_MALLOC;
+            result = string_copy(src);
+        }
+    }
+    else
+    {
+        p_int destendlen;   /* Length of the end part of dest to copy */
+        p_int srccopylen;   /* Actual number of bits to copy from src */
+
+        /* Get the length to copy and the length of the result */
+        srccopylen = copylen;
+        if (srcstart >= srclen - copylen)
+            srccopylen = srclen - srcstart;
+
+        if (PINT_MAX - copylen < deststart)
+            error("copy_bits: result length exceeds numerical limit: %ld + %ld\n"
+                 , (long)deststart, (long)copylen
+                 );
+        resultlen = deststart + copylen;
+        if (resultlen < destlen)
+            resultlen = destlen;
+        if (resultlen > MAX_BITS || resultlen < 0)
+            error("copy_bits: Result too big: %lu bits\n"
+                 , (unsigned long)resultlen);
+
+        destendlen = destlen - (deststart + copylen);
+
+        /* Get the result string and store the reference on the stack
+         * for error cleanups.
+         */
+        result_string_type = STRING_MALLOC;
+        result = xalloc((resultlen + 5) / 6 + 1);
+        if (result == NULL)
+        {
+            error("Out of memory.\n");
+            /* NOTREACHED */
+        }
+        memset(result, ' ', (resultlen + 5) / 6);
+        result[(resultlen + 5) / 6] = '\0';
+        inter_sp = sp; put_malloced_string(sp, result);
+
+        /* Copy the first part of dest into the result */
+        if (deststart > 0)
+        {
+            if (deststart > destlen)
+                copy_bits(result, 0, dest, 0, destlen);
+            else
+                copy_bits(result, 0, dest, 0, deststart);
+        }
+
+        /* Copy the source part into the result */
+        copy_bits(result, deststart, src, srcstart, srccopylen);
+
+        /* Copy the remainder of dest into the result */
+        if (destendlen > 0)
+        {
+            copy_bits( result, deststart + copylen
+                     , dest, deststart + copylen
+                     , destendlen);
+        }
+    }
+
+    /* Clean up the stack and push the result */
+    sp--; /* The result reference for error cleanup */
+    free_svalue(sp--);
+    free_svalue(sp);
+
+    put_string(sp, result); sp->x.string_type = result_string_type;
+    return sp;
+} /* f_copy_bits() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -168,6 +723,42 @@ f_make_shared_string (svalue_t *sp)
 
     return sp;
 } /* f_make_shared_string() */
+
+/*--------------------------------------------------------------------*/
+svalue_t *
+f_md5(svalue_t *sp)
+
+/* TEFUN: md5()
+ *
+ *   string md5(string arg)
+ *
+ * Create and return a MD5 message digest from the string <arg>.
+ */
+
+{
+    MD5_CTX context;
+    unsigned char *digest, d[17];
+    int i;
+
+    TYPE_TEST1(sp, T_STRING);
+
+    xallocate(digest, 33, "md5 result");
+
+    MD5Init(&context);
+    MD5Update(&context, (unsigned char *)sp->u.string, svalue_strlen(sp));
+    MD5Final(&context, d);
+
+    d[16]='\0';
+
+    for (i = 0; i < 16; i++)
+        sprintf((char *)digest+2*i, "%02x", d[i]);
+
+    digest[32] = '\0';
+    free_string_svalue(sp);
+    put_malloced_string(sp, (char *)digest);
+
+    return sp;
+} /* f_md5() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -318,8 +909,8 @@ f_upper_case (svalue_t *sp)
             /* MALLOCed strings can be changed in-place */
             for ( ; '\0' != (c = *s); s++)
             {
-                if (islower((unsigned)c))
-                    *s = (char)toupper(c);
+                if (islower((unsigned char)c))
+                    *s = (char)toupper((unsigned char)c);
             }
         }
         else
@@ -335,8 +926,8 @@ f_upper_case (svalue_t *sp)
             /* Copy and change the rest */
             for (d = str + initial_len; '\0' != (c = *s++) ; )
             {
-                if (islower((unsigned)c))
-                    c = (char)toupper(c);
+                if (islower((unsigned char)c))
+                    c = (char)toupper((unsigned char)c);
                 *d++ = c;
             }
 
@@ -348,7 +939,7 @@ f_upper_case (svalue_t *sp)
 
     /* That's it */
     return sp;
-}
+} /* f_upper_case() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -375,22 +966,28 @@ at_end (int i, int imax, int z, int *lens)
 
 /*-------------------------------------------------------------------------*/
 char *
-e_terminal_colour ( char * text, mapping_t * map
+e_terminal_colour ( char * text, mapping_t * map, svalue_t *cl
                   , int indent, int wrap
                   )
 
 /* EFUN terminal_colour()
  *
- *   string terminal_colour (string text, mapping map
+ *   string terminal_colour (string text, mapping|closure map
  *                          , int wrap, int indent )
  *
  * Expands all colour-defines from the input-string and replaces them by the
  * apropriate values found for the color-key inside the given mapping. The
- * mapping has the format "KEY" : "value", non-string contents are ignored.
+ * mapping has the format "KEY" : "value", non-string contents are ignored
+ * with one exception: the entry (0 : value) is used for otherwise
+ * unrecognized tags, if existing; <value> may be a string or a closure (see
+ * below).
  *
  * If <map> is given as 0, no keyword detection or replacement will be
  * performed and the efun acts just as a text wrapper and indenter (assuming
  * that <wrap> and <indent> are given).
+ *
+ * If <map> is given as a closure, it is called for each KEY with the key
+ * as argument, and it has to return the replacement string.
  *
  * The parameters wrap and indent are both optional, if only wrap is given
  * then the str will be linewrapped at the column given with wrap.  If indent
@@ -407,6 +1004,8 @@ e_terminal_colour ( char * text, mapping_t * map
  * Result is a pointer to the final string. If no changes were necessary,
  * this is <text> again; otherwise it is a pointer to memory allocated
  * by the function.
+ * TODO: Instead of computing the wrapping twice, the first pass
+ * TODO:: should record what to break where.
  */
 
 {
@@ -447,6 +1046,15 @@ e_terminal_colour ( char * text, mapping_t * map
        * is necessary to determine which parts[] to exempt from the
        * wrapping calculation.
        */
+    svalue_t * mdata_save = NULL;
+      /* Pointer into an array on the stack, pointing to the next
+       * free entry.
+       * The array is used to keep copies of the replacement string
+       * svalues to make sure that the strings exist as long as we
+       * need them.
+       * By keeping the array itself on the stack, cleanup is automatic.
+       */
+    int num_tmp;           /* Number of temporary svalues on the stack */
     int k;                 /* Index within a string */
     int col;               /* Current print column */
     int j;                 /* Accumulated total length of result */
@@ -456,15 +1064,32 @@ e_terminal_colour ( char * text, mapping_t * map
     int i;
     Bool maybe_at_end;     /* TRUE if the next text might start a new line */
     Bool no_keys;          /* TRUE if no delimiter in the string */
+    Bool indent_overflows;
+      /* Used to catch this boundary condition:
+       *   t_c("\\/ "*32, 0, indent > MAX_STRING_LENGTH - 40, 40)
+       * In this case, the last indent is followed by no data, which the
+       * data copying part notices, but not the previous length calculation
+       * part.
+       * Set to TRUE in the length calculation when the possibility arises.
+       */
+
+    if (wrap && indent > wrap)
+    {
+        error("(terminal_colour) indent %ld > wrap %ld\n"
+             , (long)indent, (long)wrap);
+        /* NOTREACHED */
+        return NULL;
+    }
 
     instr = text;
+    num_tmp = 0;
 
     /* Find the first occurance of the magic character pair.
      * If found, duplicate the input string into instr and
      * let cp point into that copy at the delimiter.
-     * If not found, cp will be NULL.
+     * If not found (or no mapping/closure given), cp will be NULL.
      */
-    if (map != NULL)
+    if (map != NULL || cl != NULL)
     {
         cp = text;
         do {
@@ -476,6 +1101,20 @@ e_terminal_colour ( char * text, mapping_t * map
                     savestr = string_copy(text);
                     cp = savestr + (cp - text);
                     instr = savestr;
+
+                    /* Check for the special escape '%%^^'.
+                     * If found, modify it to '%^%^, and let cp
+                     * point to it.
+                     */
+                    if (cp > savestr
+                     && cp[-1] == TC_FIRST_CHAR
+                     && cp[2] == TC_SECOND_CHAR
+                       )
+                    {
+                        cp--;
+                        cp[1] = TC_SECOND_CHAR;
+                        cp[2] = TC_FIRST_CHAR;
+                    }
                     break;
                 }
                 cp++;
@@ -519,6 +1158,23 @@ e_terminal_colour ( char * text, mapping_t * map
          * a copy.
          */
 
+        /* If we got a mapping, do a one-time lookup for the default
+         * entry and store it in <cl>.
+         */
+        if (map != NULL)
+        {
+            cl = get_map_value(map, &const0);
+            if (cl->type == T_NUMBER && cl->u.number == 0)
+                cl = NULL; /* No default entry */
+
+            if (cl && cl->type != T_STRING && cl->type != T_CLOSURE)
+            {
+                error("(terminal_colour) Illegal type for default entry.\n");
+                /* NOTREACHED */
+                return text;
+            }
+        }
+
         /* cp here points to the first delimiter found */
 
         parts = CALLOCATE( NSTRSEGS, char * );
@@ -556,7 +1212,22 @@ e_terminal_colour ( char * text, mapping_t * map
                 cp = strchr(cp,TC_FIRST_CHAR);
                 if (cp) {
                     if (cp[1] == TC_SECOND_CHAR)
+                    {
+                        /* Check for the special escape '%%^^'.
+                         * If found, modify it to '%^%^, and let cp
+                         * point to it.
+                         */
+                        if (cp > savestr
+                         && cp[-1] == TC_FIRST_CHAR
+                         && cp[2] == TC_SECOND_CHAR
+                           )
+                        {
+                            cp--;
+                            cp[1] = TC_SECOND_CHAR;
+                            cp[2] = TC_FIRST_CHAR;
+                        }
                         break;
+                    }
                     cp++;
                 }
             } while (cp);
@@ -584,16 +1255,22 @@ e_terminal_colour ( char * text, mapping_t * map
     else
         lens = NULL;
 
+    /* If required, allocate the mdata save array on the stack */
+    if (!no_keys)
+    {
+        vector_t *vec;
+
+        vec = allocate_array_unlimited(num/2 + 1);
+          /* Slightly bigger than required */
+        mdata_save = vec->item;
+        inter_sp++; put_array(inter_sp, vec);
+        num_tmp++;
+    }
+
     /* Do the the keyword replacement and calculate the lengths.
      * The lengths are collected in the lens[] array to save the
      * need for repeated strlens().
      */
-    col = 0;
-    start = -1;
-    space = 0;
-    maybe_at_end = MY_FALSE;
-    j = 0; /* gathers the total length of the final string */
-    j_extra = 0; /* gathers the extra length needed during fmt'ing */
     for (i = 0; i < num; i++)
     {
         long len;
@@ -613,7 +1290,7 @@ e_terminal_colour ( char * text, mapping_t * map
                 str = NULL;
             else
                 str = findstring(parts[i]);
-            if (str != NULL)
+            if (str != NULL && map != NULL)
             {
                 svalue_t mkey;
 
@@ -626,6 +1303,37 @@ e_terminal_colour ( char * text, mapping_t * map
 
                 /* now look for mapping data */
                 mdata = get_map_value(map, &mkey);
+                if (mdata->type == T_NUMBER && mdata->u.number == 0)
+                    mdata = NULL; /* No entry */
+            }
+
+            /* If the map lookup didn't find anything, try the
+             * <cl>osure (which might be the default entry)
+             */
+            if (mdata == NULL && cl != NULL && parts[i][0] != '\0')
+            {
+                if (cl->type == T_STRING)
+                {
+                    mdata = cl;
+                }
+                else
+                {
+                    /* It's a closure.
+                     * We keep the result in the array on the stack
+                     * to make sure it lives until we are done processing it.
+                     */
+                    push_volatile_string(parts[i]);
+                    call_lambda(cl, 1);
+                    *mdata_save = *inter_sp;
+                    inter_sp--;
+                    mdata = mdata_save++;
+                    if (mdata->type != T_STRING)
+                    {
+                        error("(terminal_colour) Closure did not return a string.\n");
+                        /* NOTREACHED */
+                        return NULL;
+                    }
+                }
             }
         }
         else if (!(i % 2) && !no_keys
@@ -652,6 +1360,26 @@ e_terminal_colour ( char * text, mapping_t * map
             len = (long)strlen(parts[i]);
 
         lens[i] = len;
+    } /* for (i = 0..num) for length gathering */
+
+
+    /* Do the wrapping analysis.
+     * In order to do this, we need to have all lengths already
+     * available.
+     */
+    col = 0;
+    start = -1;
+    space = 0;
+    maybe_at_end = MY_FALSE;
+    indent_overflows =  MY_FALSE;
+    j = 0; /* gathers the total length of the final string */
+    j_extra = 0; /* gathers the extra length needed during fmt'ing */
+    for (i = 0; i < num; i++)
+    {
+        long len;
+
+        len = lens[i];
+
         if (len > 0)
         {
             /* This part must be considered for wrapping/indentation */
@@ -728,9 +1456,55 @@ e_terminal_colour ( char * text, mapping_t * map
 
                             if (space)
                             {
-                                /* Break the line at the last space */
-                                col -= space;
-                                space = 0;
+                                /* Break the line at the last space. */
+                                int next_word_len = 0;
+
+                                if (col - space > 2)
+                                {
+                                    /* Check if the current word is too
+                                     * long to be put on one line. If it
+                                     * is, don't bother breaking at the last
+                                     * space.
+                                     */
+                                    int test_z = z;
+                                    int test_i = i;
+                                    Bool done = MY_FALSE;
+
+                                    next_word_len = col - space;
+                                    for ( ; !done && test_i <  num; test_i++)
+                                    {
+                                        if (lens[test_i] < 0)
+                                            continue;
+                                        for ( ; !done && test_z < lens[test_i]
+                                              ; test_z++)
+                                        {
+                                            char testc = parts[test_i][test_z];
+                                            if (testc == ' ' || testc == '\n')
+                                            {
+                                                done = MY_TRUE;
+                                                break;
+                                            }
+                                            next_word_len++;
+                                        }
+                                        test_z = 0;
+                                    }
+                                }
+
+                                if (next_word_len+indent > wrap)
+                                {
+                                    /* Word is too long, just treat it
+                                     * as if there is no space within range.
+                                     */
+                                    space = 0;
+                                    j++;
+                                    col = 1;
+                                }
+                                else
+                                {
+                                    /* It makes sense to break properly */
+                                    col -= space;
+                                    space = 0;
+                                }
                             }
                             else
                             {
@@ -760,14 +1534,17 @@ e_terminal_colour ( char * text, mapping_t * map
                         col += indent;
                     }
                     else
+                    {
                         maybe_at_end = MY_TRUE;
+                    }
 
                     /* Guard against overflow */
                     if (j > MAX_STRING_LENGTH)
                     {
                         /* Reduce this part to fit; all the following
-                         * parts will be reduced to shreds^W0.
+                         * parts will be reduced to shreds.
                          */
+                        indent_overflows = MY_TRUE;
                         lens[i] -= (j - MAX_STRING_LENGTH);
                         j = MAX_STRING_LENGTH;
                         if (lens[i] < z)
@@ -783,6 +1560,7 @@ e_terminal_colour ( char * text, mapping_t * map
         else
         {
             /* This replacement does not need to be wrapped. */
+            indent_overflows = MY_FALSE;
             j += -len;
             if (j > MAX_STRING_LENGTH)
             {
@@ -794,7 +1572,7 @@ e_terminal_colour ( char * text, mapping_t * map
                 j = MAX_STRING_LENGTH;
             }
         } /* if (len > 0) */
-    } /* for (i = 0..num) */
+    } /* for (i = 0..num) for wrapping analysis */
 
 
     /* Now we have the final string in parts and length in j.
@@ -841,7 +1619,8 @@ e_terminal_colour ( char * text, mapping_t * map
 
             if (pt - tmpmem + ((l < 0) ? -l : l) >= tmpmem_size)
             {
-                error("Partial string too long (%ld+%ld >= %ld).\n"
+                error("Partial string '%s' too long (%ld+%ld >= %ld).\n"
+                     , p
                      , (long)(pt - tmpmem), (long)((l < 0) ? -l : l)
                      , (long)tmpmem_size);
                 /* NOTREACHED */
@@ -896,9 +1675,54 @@ e_terminal_colour ( char * text, mapping_t * map
                         if (space)
                         {
                             /* Break at last space */
-                            col -= space;
-                            space = 0;
-                            kind = 1;
+                            int next_word_len = 0;
+
+                            if (col - space > 2)
+                            {
+                                /* Check if the following word is too
+                                 * long to be put on one line. If it
+                                 * is, don't bother breaking at the last
+                                 * space.
+                                 */
+                                int test_k = k;
+                                int test_i = i;
+                                Bool done = MY_FALSE;
+
+                                next_word_len = col - space;
+                                for ( ; !done && test_i <  num; test_i++)
+                                {
+                                    if (lens[test_i] < 0)
+                                        continue;
+                                    for ( ; !done && test_k < lens[test_i]
+                                          ; test_k++)
+                                    {
+                                        char testc = parts[test_i][test_k];
+                                        if (testc == ' ' || testc == '\n')
+                                        {
+                                            done = MY_TRUE;
+                                            break;
+                                        }
+                                        next_word_len++;
+                                    }
+                                    test_k = 0;
+                                }
+                            }
+
+                            if (next_word_len + indent > wrap)
+                            {
+                                /* Word is too long: treat it as if there
+                                 * is no space within range.
+                                 */
+                                space = 0;
+                                col = 1;
+                                kind = 2;
+                            }
+                            else
+                            {
+                                col -= space;
+                                space = 0;
+                                kind = 1;
+                            }
                         }
                         else
                         {
@@ -915,7 +1739,7 @@ e_terminal_colour ( char * text, mapping_t * map
                     }
                     else
                         continue;
-                }
+                } /* if (type of c) */
 
                 /* If we get here, we ended a line, and kind tells us why:
                  *   kind == 0: hard line break
@@ -949,7 +1773,7 @@ e_terminal_colour ( char * text, mapping_t * map
 
                 /* If we are indenting, check if we have to add the
                  * indentation space.
-                 * Note: if kind == 2, it's the current character which 
+                 * Note: if kind == 2, it's the current character which
                  *   will go onto the next line, otherwise it's the next
                  *   character will. The difference is important in the
                  *   call to at_end().
@@ -966,7 +1790,10 @@ e_terminal_colour ( char * text, mapping_t * map
                     cp += indent;
                     col += indent;
                 }
-            }
+
+                /* Since we're in a new line, all the 'garbage' is gone. */
+                space_garbage = 0;
+            } /* for(k = 0.. lens[i] */
         } /* for(i = 0..num) */
 
         /* Append the last fragment from the tmpmem to the result */
@@ -995,16 +1822,26 @@ e_terminal_colour ( char * text, mapping_t * map
       xfree(parts);
     if (savestr)
       xfree(savestr);
+    while (num_tmp > 0)
+    {
+        free_svalue(inter_sp);
+        inter_sp--;
+        num_tmp--;
+    }
 
     /* now we have what we want */
 #ifdef DEBUG
-    if (cp - deststr != j) {
+    if (cp - deststr != j
+     && (!indent_overflows || cp - deststr != wrap)
+       ) {
       fatal("Length miscalculated in terminal_colour()\n"
-            "    Expected: %i Was: %ld\n"
+            "    Expected: %i (or %i) Was: %ld\n"
             "    In string: %s\n"
             "    Out string: %s\n"
-            "    Indent: %i Wrap: %i\n"
-           , j, (long)(cp - deststr), text, deststr, indent, wrap);
+            "    Indent: %i Wrap: %i, indent overflow: %s\n"
+           , j, wrap
+           , (long)(cp - deststr), text, deststr, indent, wrap
+           , indent_overflows ? "true" : "false");
     }
 #endif
     return deststr;
@@ -1016,7 +1853,7 @@ e_terminal_colour ( char * text, mapping_t * map
 #undef TC_SECOND_CHAR
 } /* e_terminal_colour() */
 
-#ifdef F_PROCESS_STRING
+#ifdef USE_PROCESS_STRING
 /*-------------------------------------------------------------------------*/
 static char *
 process_value (char *str)
@@ -1040,7 +1877,7 @@ process_value (char *str)
     object_t *ob;
 
     /* Simple check if the argument is valid */
-    if (strlen(str) < 1 || !isalpha((unsigned)(str[0])))
+    if (strlen(str) < 1 || !isalpha((unsigned char)(str[0])))
         return NULL;
 
     /* Copy the argument so that we can separate the various
@@ -1092,7 +1929,7 @@ process_value (char *str)
 
     /* We no longer need this */
     xfree(func);
-    
+
     /* Apply the function and see if adequate answer is returned.
      */
     ret = apply(func2, ob, numargs);
@@ -1129,7 +1966,20 @@ f_process_string(svalue_t *sp)
  * Both filename and args are optional.
  *
  * TODO: OSB has a bugfix for this function to handle spaces in
- * TODO:: arguments.
+ * TODO:: arguments. Basically using the new explode solves the problem.
+ * TODO:: public string process_string(string str)
+ * TODO:: {
+ * TODO::   int il;
+ * TODO::   string * parts;
+ * TODO::   string tmp;
+ * TODO::   parts = explode(str, "@@");
+ * TODO::   for ( il = 1; il < sizeof(parts); il += 2) {
+ * TODO::     tmp = process_value(parts[il]);
+ * TODO::     if (stringp(tmp))
+ * TODO::       parts[il] = tmp;
+ * TODO::   }
+ * TODO::   return implode(parts, "");
+ * TODO:: }
  */
 
 {
@@ -1146,7 +1996,7 @@ f_process_string(svalue_t *sp)
 
     TYPE_TEST1(sp, T_STRING);
     str = sp->u.string;
-    
+
     if (!str || !(p1 = strchr(str,'@')))
         return sp;  /* Nothing to do */
 
@@ -1163,7 +2013,7 @@ f_process_string(svalue_t *sp)
         svalue_t *ret;
 
         current_object = command_giver;
-        ret = apply_master_ob(STR_GET_BB_UID,0);
+        ret = apply_master(STR_GET_BB_UID,0);
         if (!ret)
             return sp;
 
@@ -1238,7 +2088,7 @@ f_process_string(svalue_t *sp)
             }
             xfree(buf);
         }
-        
+
         if (!p2)
         {
             /* No replacement by function call */
@@ -1293,9 +2143,9 @@ f_process_string(svalue_t *sp)
     }
 
     return sp;
-}
+} /* f_process_string() */
 
-#endif /* F_PROCESS_STRING */
+#endif /* USE_PROCESS_STRING */
 
 /*-------------------------------------------------------------------------*/
 /* Structures for sscanf() */
@@ -1630,10 +2480,24 @@ sscanf_search (char *str, char *fmt, struct sscanf_info *info)
     {
         if (b != '%')
         {
-            /* It's another %-spec: match it */
+            /* It's another %-spec: try to find its match within the
+             * <str> by attempting the match at one character after the
+             * other.
+             */
             for (fmt -= 2; *str; str++)
             {
                 sscanf_match(str, fmt, info);
+
+                /* If the sequence was '%s%d', the '%d' has to match
+                 * on the first try, otherwise all will be assigned to
+                 * the '%s'.
+                 */
+                if (b == 'd' && info->match_end == str)
+                    return str + strlen(str);
+
+                /* If we found a match at the current position of str,
+                 * the '%s' ends here and the next match starts.
+                 */
                 if (info->match_end)
                     return str;
             }
@@ -2232,6 +3096,64 @@ x_all_environment (svalue_t *sp, int numarg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_blueprint (svalue_t *sp)
+
+/* EFUN blueprint()
+ *
+ *   object blueprint ()
+ *   object blueprint (string|object ob)
+ *
+ * The efuns returns the blueprint for the given object <ob>, or for
+ * the current object if <ob> is not specified.
+ *
+ * If the blueprint is destructed, the efun returns 0.
+ * For objects with replaced programs, the efun returns the blueprint
+ * for the replacement program.
+ */
+
+{
+    object_t * obj, * blueprint;
+
+    if (sp->type == T_OBJECT)
+        obj = sp->u.ob;
+    else if (sp->type == T_STRING)
+    {
+        obj = get_object(sp->u.string);
+        if (!obj)
+        {
+            error("Object not found: %s\n", sp->u.string);
+            /* NOTREACHED */
+            return sp;
+        }
+    }
+    else
+    {
+        bad_xefun_arg(1, sp);
+        /* NOTREACHED */
+        return sp;
+    }
+
+    if ((obj->flags & O_SWAPPED) && load_ob_from_swap(obj) < 0)
+        error("Out of memory: unswap object '%s'.\n", obj->name);
+
+    blueprint = NULL;
+    if (obj->prog != NULL
+     && obj->prog->blueprint != NULL
+     && !(obj->prog->blueprint->flags & O_DESTRUCTED)
+       )
+        blueprint = ref_object(obj->prog->blueprint, "blueprint()");
+
+    free_svalue(sp);
+    if (blueprint != NULL)
+        put_object(sp, blueprint);
+    else
+        put_number(sp, 0);
+
+    return sp;
+} /* f_blueprint() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_clones (svalue_t *sp, int num_arg)
 
 /* VEFUN clones()
@@ -2252,8 +3174,11 @@ f_clones (svalue_t *sp, int num_arg)
  *   == 0: (default) return the clones of the current blueprint only.
  *   == 1: return the clones of the previous blueprints only.
  *   == 2: return all clones of the blueprint.
+ *
+ * If the driver is compiled with DYNAMIC_COSTS, the cost of this
+ * efun is proportional to the number of objects in the game.
  */
- 
+
 {
     char      *name;     /* The load-name to search */
     mp_int     mintime;  /* 0 or lowest load_time for an object to qualify */
@@ -2261,6 +3186,7 @@ f_clones (svalue_t *sp, int num_arg)
     mp_int     load_id;  /* The load_id of the reference */
     object_t **ores;     /* Table pointing to the found objects */
     size_t     found;    /* Number of objects found */
+    size_t     checked;  /* Number of objects checked */
     size_t     osize;    /* Size of ores[] */
     vector_t  *res;      /* Result vector */
     svalue_t  *svp;
@@ -2323,7 +3249,7 @@ f_clones (svalue_t *sp, int num_arg)
             }
 
             free_svalue(sp--); inter_sp = sp;
-            
+
             if (sp->type == T_OBJECT)
                 reference = sp->u.ob;
             else if (sp->type == T_STRING) {
@@ -2390,11 +3316,14 @@ f_clones (svalue_t *sp, int num_arg)
     /* Prepare the table with the object pointers */
     osize = 256;
     found = 0;
+    checked = 0;
     xallocate(ores, sizeof(*ores) * osize, "initial object table");
 
     /* Loop through the object list */
     for (ob = obj_list; ob; ob = ob->next_all)
     {
+        checked++;
+
         if ((ob->flags & (O_DESTRUCTED|O_CLONE)) == O_CLONE
          && ob->load_name == name
          && (!mintime || ob->load_time > mintime
@@ -2423,6 +3352,10 @@ f_clones (svalue_t *sp, int num_arg)
             ores[found++] = ob;
         }
     }
+
+#if defined(DYNAMIC_COSTS)
+    eval_cost += checked / 100 + found / 256;
+#endif /* DYNAMIC_COSTS */
 
     /* Create the result and put it onto the stack */
     if (max_array_size && found > max_array_size)
@@ -2455,7 +3388,7 @@ f_clones (svalue_t *sp, int num_arg)
     put_array(sp, res);
 
     xfree(ores);
-    
+
     return sp;
 } /* f_clones() */
 
@@ -2607,34 +3540,99 @@ e_object_present (svalue_t *v, object_t *ob)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_object_info (svalue_t *sp)
+f_object_info (svalue_t *sp, int num_args)
 
 /* TEFUN object_info()
  *
  *    mixed * object_info(object o, int type)
+ *    mixed * object_info(object o, int type, int which)
  *
  * Return an array with information about the object <o>. The
  * type of information returned is determined by <type>.
+ *
+ * If <which> is specified, the function does not return the full array, but
+ * just the single value from index <which>.
  */
 
 {
     vector_t *v;
-    object_t *o, *o2, *prev;
+    object_t *o, *o2;
     program_t *prog;
-    svalue_t *svp;
-    int flags, pos;
+    svalue_t *svp, *argp;
+    mp_int v0, v1, v2;
+    int flags, pos, value;
+    svalue_t result;
 
     /* Test and get the arguments from the stack */
-    TYPE_TEST1(sp-1, T_OBJECT)
-    TYPE_TEST2(sp, T_NUMBER)
+    argp = sp - num_args + 1;
+    TYPE_TESTV1(argp, T_OBJECT)
+    TYPE_TESTV2(argp+1, T_NUMBER)
+    if (num_args == 3)
+    {
+        TYPE_TESTV3(argp+2, T_NUMBER)
+        value = argp[2].u.number;
+        assign_svalue_no_free(&result, &const0);
+    }
+    else
+        value = -1;
 
-    o = sp[-1].u.ob;
+    o = argp->u.ob;
 
     /* Depending on the <type> argument, determine the
      * data to return.
      */
-    switch(sp->u.number)
+    switch(argp[1].u.number)
     {
+#define PREP(max) \
+    if (num_args == 2) { \
+        v = allocate_array(max); \
+        if (!v) \
+            error("Out of memory: array[%d] for result.\n" \
+                 , max); \
+        svp = v->item; \
+    } else { \
+        v = NULL; \
+        if (value < 0 || value >= max) \
+            error("Illegal index for object_info(): %d, " \
+                  "expected 0..%d\n", value, max-1); \
+        svp = &result; \
+    }
+
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code; \
+    else {}
+
+#define ST_DOUBLE(which,code) \
+    if (value == -1) { \
+        svp[which].type = T_FLOAT; \
+        STORE_DOUBLE(svp+which, code); \
+    } else if (value == which) { \
+        svp->type = T_FLOAT; \
+        STORE_DOUBLE(svp, code); \
+    } else {}
+
+#define ST_STRING(which,code) \
+    if (value == -1) { \
+        put_malloced_string(svp+which, code); \
+    } else if (value == which) { \
+        put_malloced_string(svp, code); \
+    } else {}
+
+#define ST_RSTRING(which,code) \
+    if (value == -1) { \
+        put_ref_string(svp+which, code); \
+    } else if (value == which) { \
+        put_ref_string(svp, code); \
+    } else {}
+
+#define ST_OBJECT(which,code,tag) \
+    if (value == -1) { \
+        put_ref_object(svp+which, code, tag); \
+    } else if (value == which) { \
+        put_ref_object(svp, code, tag); \
+    } else {}
+
     default:
         error("Illegal value %ld for object_info().\n", sp->u.number);
         /* NOTREACHED */
@@ -2642,132 +3640,137 @@ f_object_info (svalue_t *sp)
 
     /* --- The basic information from the object structure */
     case OINFO_BASIC:
-        v = allocate_array(OIB_MAX);
-        svp = v->item;
+        PREP(OIB_MAX);
 
         flags = o->flags;
 
-        svp[OIB_HEART_BEAT].u.number = (flags & O_HEART_BEAT) ? 1 : 0;
+        ST_NUMBER(OIB_HEART_BEAT,        (flags & O_HEART_BEAT) ? 1 : 0);
 #ifdef O_IS_WIZARD
-        svp[OIB_IS_WIZARD].u.number  = (flags & O_IS_WIZARD) ? 1 : 0;
+        ST_NUMBER(OIB_IS_WIZARD,         (flags & O_IS_WIZARD) ? 1 : 0);
 #else
-        svp[OIB_IS_WIZARD].u.number  = 0;
+        ST_NUMBER(OIB_IS_WIZARD,         0);
 #endif
-        svp[OIB_ENABLE_COMMANDS].u.number
-                                     = (flags & O_ENABLE_COMMANDS) ? 1 : 0;
-        svp[OIB_CLONE].u.number      = (flags & O_CLONE) ? 1 : 0;
-        svp[OIB_DESTRUCTED].u.number = (flags & O_DESTRUCTED) ? 1 : 0;
-        svp[OIB_SWAPPED].u.number    = (flags & O_SWAPPED) ? 1 : 0;
-        svp[OIB_ONCE_INTERACTIVE].u.number
-                                     = (flags & O_ONCE_INTERACTIVE) ? 1 : 0;
-        svp[OIB_RESET_STATE].u.number = (flags & O_RESET_STATE) ? 1 : 0;
-        svp[OIB_WILL_CLEAN_UP].u.number
-                                     = (flags & O_WILL_CLEAN_UP) ? 1 : 0;
-        svp[OIB_LAMBDA_REFERENCED].u.number
-                                     = (flags & O_LAMBDA_REFERENCED) ? 1 : 0;
-        svp[OIB_SHADOW].u.number     = (flags & O_SHADOW) ? 1 : 0;
-        svp[OIB_REPLACED].u.number   = (flags & O_REPLACED) ? 1 : 0;
-#ifdef F_SET_LIGHT
-        svp[OIB_TOTAL_LIGHT].u.number = o->total_light;
+        ST_NUMBER(OIB_ENABLE_COMMANDS,   (flags & O_ENABLE_COMMANDS) ? 1 : 0);
+        ST_NUMBER(OIB_CLONE,             (flags & O_CLONE) ? 1 : 0);
+        ST_NUMBER(OIB_DESTRUCTED,        (flags & O_DESTRUCTED) ? 1 : 0);
+        ST_NUMBER(OIB_SWAPPED,           (flags & O_SWAPPED) ? 1 : 0);
+        ST_NUMBER(OIB_ONCE_INTERACTIVE,  (flags & O_ONCE_INTERACTIVE) ? 1 : 0);
+        ST_NUMBER(OIB_RESET_STATE,       (flags & O_RESET_STATE) ? 1 : 0);
+        ST_NUMBER(OIB_WILL_CLEAN_UP,     (flags & O_WILL_CLEAN_UP) ? 1 : 0);
+        ST_NUMBER(OIB_LAMBDA_REFERENCED, (flags & O_LAMBDA_REFERENCED) ? 1 : 0);
+        ST_NUMBER(OIB_SHADOW,            (flags & O_SHADOW) ? 1 : 0);
+        ST_NUMBER(OIB_REPLACED,          (flags & O_REPLACED) ? 1 : 0);
+#ifdef USE_SET_LIGHT
+        ST_NUMBER(OIB_TOTAL_LIGHT,       o->total_light);
 #else
-        svp[OIB_TOTAL_LIGHT].u.number = 0;
+        ST_NUMBER(OIB_TOTAL_LIGHT,       0);
 #endif
-        svp[OIB_NEXT_RESET].u.number = o->time_reset;
-        svp[OIB_TIME_OF_REF].u.number = o->time_of_ref;
-        svp[OIB_REF].u.number         = o->ref;
-        svp[OIB_GIGATICKS].u.number   = (p_int)o->gigaticks;
-        svp[OIB_TICKS].u.number       = (p_int)o->ticks;
-        svp[OIB_SWAP_NUM].u.number    = O_SWAP_NUM(o);
-        svp[OIB_PROG_SWAPPED].u.number = O_PROG_SWAPPED(o) ? 1 : 0;
-        svp[OIB_VAR_SWAPPED].u.number = O_VAR_SWAPPED(o) ? 1 : 0;
+        ST_NUMBER(OIB_NEXT_RESET,        o->time_reset);
+        ST_NUMBER(OIB_TIME_OF_REF,       o->time_of_ref);
+        ST_NUMBER(OIB_REF,               o->ref);
+        ST_NUMBER(OIB_GIGATICKS,         (p_int)o->gigaticks);
+        ST_NUMBER(OIB_TICKS,             (p_int)o->ticks);
+        ST_NUMBER(OIB_SWAP_NUM,          O_SWAP_NUM(o));
+        ST_NUMBER(OIB_PROG_SWAPPED,      O_PROG_SWAPPED(o) ? 1 : 0);
+        ST_NUMBER(OIB_VAR_SWAPPED,       O_VAR_SWAPPED(o) ? 1 : 0);
 
-        put_malloced_string(svp+OIB_NAME, string_copy(o->name));
-        put_ref_string(svp+OIB_LOAD_NAME, o->load_name);
+        if (compat_mode)
+        {
+            ST_STRING(OIB_NAME, string_copy(o->name));
+        }
+        else
+        {
+            ST_STRING(OIB_NAME, add_slash(o->name));
+        }
+
+        ST_RSTRING(OIB_LOAD_NAME, o->load_name);
 
         o2 = o->next_all;
         if (o2)
         {
-            put_ref_object(svp+OIB_NEXT_ALL, o2, "object_info(0)");
+            ST_OBJECT(OIB_NEXT_ALL, o2, "object_info(0)");
         } /* else the element was already allocated as 0 */
 
         o2 = o->prev_all;
         if (o2)
         {
-            put_ref_object(svp+OIB_PREV_ALL, o2, "object_info(0)");
+            ST_OBJECT(OIB_PREV_ALL, o2, "object_info(0)");
         } /* else the element was already allocated as 0 */
 
         break;
 
     /* --- Position in the object list */
     case OINFO_POSITION:
-        v = allocate_array(OIP_MAX);
-        svp = v->item;
+        PREP(OIP_MAX);
 
         o2 = o->next_all;
         if (o2)
         {
-            put_ref_object(svp+OIP_NEXT, o2, "object_info(1) next");
+            ST_OBJECT(OIP_NEXT, o2, "object_info(1) next");
         } /* else the element was already allocated as 0 */
 
-        /* Find the non-destructed predecessor of the object */
-        if (obj_list == o)
+        o2 = o->prev_all;
+        if (o2)
         {
-            pos = 0;
-            prev = NULL;
-        }
-        else
-        for (prev = NULL, o2 = obj_list, pos = 0; o2; o2 = o2->next_all)
-        {
-            prev = o2;
-            pos++;
-            if (o2->next_all == o)
-                break;
-        }
+            ST_OBJECT(OIP_PREV, o2, "object_info(1) next");
+        } /* else the element was already allocated as 0 */
 
-        if (o2) /* Found it in the list */
+        if (value == -1 || value == OIP_POS)
         {
-            if (prev)
+            /* Find the non-destructed predecessor of the object */
+            if (obj_list == o)
             {
-                put_ref_object(svp+OIP_PREV, prev, "object_info(1) prev");
-            } /* else the element was already allocated as 0 */
-        }
-        else /* Not found (this shouldn't happen) */
-            pos = -1;
+                pos = 0;
+            }
+            else
+            for (o2 = obj_list, pos = 0; o2; o2 = o2->next_all)
+            {
+                pos++;
+                if (o2->next_all == o)
+                    break;
+            }
 
-        svp[OIP_POS].u.number = pos;
+            if (!o2) /* Not found in the list (this shouldn't happen) */
+                pos = -1;
+
+            ST_NUMBER(OIP_POS, pos);
+        }
 
         break;
 
-    /* --- Memory information */
+    /* --- Memory and program information */
     case OINFO_MEMORY:
-        v = allocate_array(OIM_MAX);
-        svp = v->item;
+        PREP(OIM_MAX);
 
         if ((o->flags & O_SWAPPED) && load_ob_from_swap(o) < 0)
             error("Out of memory: unswap object '%s'.\n", o->name);
 
         prog = o->prog;
 
-        svp[OIM_REF].u.number = prog->ref;
+        ST_NUMBER(OIM_REF, prog->ref);
 
-        put_malloced_string(svp+OIM_NAME, string_copy(prog->name));
+        ST_STRING(OIM_NAME, string_copy(prog->name));
 
-        svp[OIM_PROG_SIZE].u.number
-                               = (long)(PROGRAM_END(*prog) - prog->program);
+        ST_NUMBER(OIM_PROG_SIZE, (long)(PROGRAM_END(*prog) - prog->program));
           /* Program size */
-        svp[OIM_NUM_FUNCTIONS].u.number = prog->num_functions;
-        svp[OIM_SIZE_FUNCTIONS].u.number
-                           = (p_int)(prog->num_functions * sizeof(uint32)
-                             + prog->num_function_names * sizeof(short));
+        ST_NUMBER(OIM_NUM_FUNCTIONS, prog->num_functions);
+        ST_NUMBER(OIM_SIZE_FUNCTIONS
+                 , (p_int)(prog->num_functions * sizeof(uint32)
+                    + prog->num_function_names * sizeof(short)));
           /* Number of function names and the memory usage */
-        svp[OIM_NUM_VARIABLES].u.number = prog->num_variables;
-        svp[OIM_SIZE_VARIABLES].u.number
-                     = (p_int)(prog->num_variables * sizeof(variable_t));
+        ST_NUMBER(OIM_NUM_VARIABLES, prog->num_variables);
+        ST_NUMBER(OIM_SIZE_VARIABLES
+                 , (p_int)(prog->num_variables * sizeof(variable_t)));
           /* Number of variables and the memory usage */
-        svp[OIM_NUM_STRINGS].u.number = prog->num_strings;
-        svp[OIM_SIZE_STRINGS].u.number
-                                 = (p_int)(prog->num_strings * sizeof(char*));
+        v1 = program_string_size(prog, &v0, &v2);
+
+        ST_NUMBER(OIM_NUM_STRINGS, prog->num_strings);
+        ST_NUMBER(OIM_SIZE_STRINGS, (p_int)v0);
+        ST_NUMBER(OIM_SIZE_STRINGS_DATA, v1);
+        ST_NUMBER(OIM_SIZE_STRINGS_TOTAL, v2);
           /* Number of strings and the memory usage */
+
+        ST_NUMBER(OIM_NUM_INCLUDES, prog->num_includes);
         {
             int i = prog->num_inherited;
             int cnt = 0;
@@ -2775,26 +3778,52 @@ f_object_info (svalue_t *sp)
 
             for (inheritp = prog->inherit; i--; inheritp++)
             {
-                if (inheritp->inherit_type == INHERIT_TYPE_NORMAL)
+                if (inheritp->inherit_type == INHERIT_TYPE_NORMAL
+                 || inheritp->inherit_type == INHERIT_TYPE_VIRTUAL
+                   )
                     cnt++;
             }
-            svp[OIM_NUM_INHERITED].u.number = cnt;
+            ST_NUMBER(OIM_NUM_INHERITED, cnt);
         }
-        svp[OIM_SIZE_INHERITED].u.number
-                     = (p_int)(prog->num_inherited * sizeof(inherit_t));
+        ST_NUMBER(OIM_SIZE_INHERITED
+                 , (p_int)(prog->num_inherited * sizeof(inherit_t)));
           /* Number of inherites and the memory usage */
-        svp[OIM_TOTAL_SIZE].u.number = prog->total_size;
+        ST_NUMBER(OIM_TOTAL_SIZE, prog->total_size);
 
-        svp[OIM_DATA_SIZE].u.number = data_size(o);
+        {
+            mp_int totalsize;
+
+            ST_NUMBER(OIM_DATA_SIZE, data_size(o, &totalsize));
+            ST_NUMBER(OIM_TOTAL_DATA_SIZE, totalsize);
+        }
+
+        ST_NUMBER(OIM_NO_INHERIT, (prog->flags & P_NO_INHERIT) ? 1 : 0);
+        ST_NUMBER(OIM_NO_CLONE, (prog->flags & P_NO_CLONE) ? 1 : 0);
+        ST_NUMBER(OIM_NO_SHADOW, (prog->flags & P_NO_SHADOW) ? 1 : 0);
         break;
+
+#undef PREP
+#undef ST_NUMBER
+#undef ST_DOUBLE
+#undef ST_STRING
+#undef ST_RSTRING
+#undef ST_OBJECT
     }
 
     free_svalue(sp);
     sp--;
     free_svalue(sp);
+    if (num_args == 3)
+    {
+        sp--;
+        free_svalue(sp);
+    }
 
     /* Assign the result */
-    put_array(sp, v);
+    if (num_args == 2)
+        put_array(sp, v);
+    else
+        transfer_svalue_no_free(sp, &result);
 
     return sp;
 }
@@ -2864,11 +3893,8 @@ f_present_clone (svalue_t *sp)
         }
 
         /* Now make the name sane */
-#ifndef COMPAT_MODE
-        name = (char *)make_name_sane(name0, MY_TRUE);
-#else
-        name = (char *)make_name_sane(name0, MY_FALSE);
-#endif
+        name = (char *)make_name_sane(name0, !compat_mode);
+
         if (name)
             name = findstring(name);
         else
@@ -3025,7 +4051,7 @@ f_transfer (svalue_t *sp)
     }
     else
         bad_xefun_arg(2, sp);
-        
+
     from = ob->super;
     result = 0; /* Default: success result */
 
@@ -3071,7 +4097,8 @@ f_transfer (svalue_t *sp)
         if (from && from->super && !(from->flags & O_ENABLE_COMMANDS))
         {
             ret = sapply(STR_CANPUTGET, from, 0);
-            if (!ret || (ret->type != T_NUMBER && ret->u.number != 1)
+            if (!ret
+             || (ret->type == T_NUMBER && ret->u.number == 0)
              || (from->flags & O_DESTRUCTED))
             {
                 result = 3;
@@ -3092,8 +4119,10 @@ f_transfer (svalue_t *sp)
             }
 
             ret = sapply(STR_CANPUTGET, to, 0);
-            if (!ret || (ret->type != T_NUMBER && ret->type != 0)
-             || (to->flags & O_DESTRUCTED) || (ob->flags & O_DESTRUCTED))
+            if (!ret
+             || (ret->type == T_NUMBER && ret->u.number == 0)
+             || (to->flags & O_DESTRUCTED)
+             || (ob->flags & O_DESTRUCTED))
             {
                 result = 5;
                 break;
@@ -3105,48 +4134,49 @@ f_transfer (svalue_t *sp)
         if (to->flags & O_ENABLE_COMMANDS)
         {
             ret = sapply(STR_GET, ob, 0);
-            if (!ret || (ret->type == T_NUMBER && ret->u.number == 0)
+            if (!ret
+             || (ret->type == T_NUMBER && ret->u.number == 0)
              || (ob->flags & O_DESTRUCTED))
             {
                 result = 6;
                 break;
             }
+        }
 
-            /* If it is not a room, correct the total weight in
-             * the destination.
+        /* If it is not a room, correct the total weight in
+         * the destination.
+         */
+        if (to->super && weight)
+        {
+            /* Check if the destination can carry that much.
              */
-            if (to->super && weight)
+            push_number(weight);
+            ret = sapply(STR_ADD_WEIGHT, to, 1);
+            if (ret && ret->type == T_NUMBER && ret->u.number == 0)
             {
-                /* Check if the destination can carry that much.
-                 */
-                push_number(weight);
-                ret = sapply(STR_ADD_WEIGHT, to, 1);
-                if (ret && ret->type == T_NUMBER && ret->u.number == 0)
-                {
-                    result = 1;
-                    break;
-                }
-
-                if (to->flags & O_DESTRUCTED)
-                {
-                    result = 1;
-                    break;
-                }
+                result = 1;
+                break;
             }
 
-            /* If it is not a room, correct the weight in
-             * the 'from' object.
-             */
-            if (from && from->super && weight)
+            if (to->flags & O_DESTRUCTED)
             {
-                push_number(-weight);
-                (void)sapply(STR_ADD_WEIGHT, from, 1);
+                result = 1;
+                break;
             }
+        }
+
+        /* If it is not a room, correct the weight in
+         * the 'from' object.
+         */
+        if (from && from->super && weight)
+        {
+            push_number(-weight);
+            (void)sapply(STR_ADD_WEIGHT, from, 1);
         }
 
         /* When we come here, the move is ok */
     } /* pseudo-switch() */
-        
+
     if (result)
     {
         /* All the applys might have changed these */
@@ -3176,7 +4206,7 @@ e_say (svalue_t *v, vector_t *avoid)
  * If the first element of <avoid> is not an object, the function
  * will store its command_giver object into it.
  */
- 
+
 {
     static svalue_t ltmp = { T_POINTER };
     static svalue_t stmp = { T_OBJECT };
@@ -3313,7 +4343,7 @@ e_say (svalue_t *v, vector_t *avoid)
         break;
 
     case T_OBJECT:
-        strncpy(buff, v->u.ob->name, sizeof buff);
+        xstrncpy(buff, v->u.ob->name, sizeof buff);
         buff[sizeof buff - 1] = '\0';
         message = buff;
         break;
@@ -3325,7 +4355,7 @@ e_say (svalue_t *v, vector_t *avoid)
 
     case T_POINTER:
         /* say()'s evil twin: send <v> to all recipients' catch_msg() lfun */
-        
+
         for (curr_recipient = recipients; NULL != (ob = *curr_recipient++) ; )
         {
             if (ob->flags & O_DESTRUCTED)
@@ -3346,7 +4376,7 @@ e_say (svalue_t *v, vector_t *avoid)
     }
 
     /* Now send the message to all recipients */
-    
+
     for (curr_recipient = recipients; NULL != (ob = *curr_recipient++); )
     {
         interactive_t *ip;
@@ -3395,7 +4425,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     /* Like in say(), collect the possible recipients.
      * First count how many there are.
      */
-    
+
     for (ob = room->contains; ob; ob = ob->next_inv)
     {
         interactive_t *ip;
@@ -3411,7 +4441,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     if (num_recipients < 20)
         recipients = some_recipients;
     else
-        recipients = 
+        recipients =
           alloca( (num_recipients+1) * sizeof(object_t *) );
 
     /* Now fill the table */
@@ -3437,7 +4467,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
         break;
 
     case T_OBJECT:
-        strncpy(buff, v->u.ob->name, sizeof buff);
+        xstrncpy(buff, v->u.ob->name, sizeof buff);
         buff[sizeof buff - 1] = '\0';
         message = buff;
         break;
@@ -3476,7 +4506,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     }
 
     /* Now send the message to all recipients */
-    
+
     for (curr_recipient = recipients; NULL != (ob = *curr_recipient++); )
     {
         interactive_t *ip;
@@ -3497,7 +4527,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
 } /* e_tell_room() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef F_SET_IS_WIZARD
+#ifdef USE_SET_IS_WIZARD
 
 svalue_t *
 f_set_is_wizard (svalue_t *sp)
@@ -3536,7 +4566,7 @@ f_set_is_wizard (svalue_t *sp)
     return sp;
 } /* f_set_is_wizard() */
 
-#endif /* F_SET_IS_WIZARD */
+#endif /* USE_SET_IS_WIZARD */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -3627,89 +4657,6 @@ bad_arg_1:
     return sp;
 } /* f_set_modify_command() */
 
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_set_prompt (svalue_t *sp)
-
-/* TEFUN set_prompt()
- *
- *       string set_prompt(mixed prompt, object ob)
- *
- * Set the prompt given by the first argument for the interactive object
- * instead of the default ``> ''. If the second argument is omitted,
- * this_player() is used as default. The first arg can be a string or a
- * closure.
- *
- * The result returned is the old prompt.
- */
-
-{
-    svalue_t *prompt;
-    interactive_t *ip;
-
-    /* Make sure the object is interactive */
-    if (sp->type != T_OBJECT
-     || !(O_SET_INTERACTIVE(ip, sp->u.ob))
-     || ip->closing)
-    {
-        bad_xefun_arg(2, sp);
-    }
-
-    /* Get the address of the prompt svalue */
-    prompt = query_prompt(sp->u.ob);
-
-    free_object_svalue(sp);
-    sp--;
-
-    if (sp->type == T_STRING || sp->type == T_CLOSURE)
-    {
-        if (sp->type == T_STRING
-         && sp->x.string_type == STRING_VOLATILE)
-        {
-            char *str = make_shared_string(sp->u.string);
-
-            if (!str)
-            {
-                inter_sp = sp;
-                error("(set_prompt) Out of memory (%lu bytes) for prompt\n"
-                     , (unsigned long) strlen(sp->u.string));
-            }
-            else
-            {
-                sp->u.string = str;
-                sp->x.string_type = STRING_SHARED;
-            }
-        }
-
-        /* Three-way exchange to set the new prompt and put
-         * the old one onto the stack.
-         */
-        sp[1] = *prompt;
-        *prompt = *sp;
-        *sp = sp[1];
-        if (sp->type == T_CLOSURE)
-        {
-            /* In case the prompt is changed from within the prompt
-             * closure.
-             */
-            addref_closure(sp, "unset_prompt");
-            free_closure_hooks(sp, 1);
-        }
-    }
-    else if (sp->type == T_NUMBER
-          && (sp->u.number == 0 || sp->u.number == -1) )
-    {
-        assign_svalue(sp, prompt);
-    }
-    else
-    {
-        bad_xefun_arg(1, sp);
-        /* NOTREACHED */
-    }
-
-    return sp;
-} /* f_set_prompt() */
-
 /*=========================================================================*/
 /*                              VALUES                                     */
 
@@ -3743,6 +4690,7 @@ f_copy (svalue_t *sp)
         size = VEC_SIZE(old);
         if (old->ref != 1 && old != &null_vector)
         {
+            DYN_ARRAY_COST(size);
             new = allocate_uninit_array((int)size);
             if (!new)
                 error("(copy) Out of memory: array[%lu] for copy.\n"
@@ -3761,6 +4709,8 @@ f_copy (svalue_t *sp)
         old = sp->u.map;
         if (old->ref != 1)
         {
+            check_map_for_destr(old);
+            DYN_MAPPING_COST(MAP_SIZE(old));
             new = copy_mapping(old);
             if (!new)
                 error("(copy) Out of memory: mapping[%lu] for copy.\n"
@@ -3780,8 +4730,9 @@ f_copy (svalue_t *sp)
 /* Data packet passed to deep_copy_mapping() during a mapping walk.
  */
 struct csv_info {
+    int depth;                     /* Depth of the copy procedure */
     int width;                     /* width of the mapping */
-    mapping_t * dest;         /* the mapping to copy into */
+    mapping_t * dest;              /* the mapping to copy into */
     struct pointer_table *ptable;  /* the pointer table to use */
 };
 
@@ -3799,28 +4750,43 @@ deep_copy_mapping (svalue_t *key, svalue_t *val, void *extra)
     svalue_t *newdata;
     int i;
 
-    copy_svalue(&newkey, key, info->ptable);
+    copy_svalue(&newkey, key, info->ptable, info->depth);
     newdata = get_map_lvalue_unchecked(info->dest, &newkey);
+    if (!newdata)
+    {
+        error("Out of memory.\n");
+        /* NOTREACHED */
+        return;
+    }
     for (i = info->width; i-- > 0; newdata++, val++)
-        copy_svalue(newdata, val, info->ptable);
+        copy_svalue(newdata, val, info->ptable, info->depth);
 
     free_svalue(&newkey); /* no longer needed */
 }
 
 /*-------------------------------------------------------------------------*/
 static void
-copy_svalue (svalue_t *dest, svalue_t *src
-            , struct pointer_table *ptable)
+copy_svalue ( svalue_t *dest, svalue_t *src
+            , struct pointer_table *ptable
+            , int depth)
 
 /* Copy the svalue <src> into the yet uninitialised svalue <dest>.
  * If <src> is an array or mapping, recurse to achieve a deep copy, using
  * <ptable> to keep track of the arrays and mappings encountered.
+ * <depth> is the nesting depth of this value.
  *
  * The records in the pointer table store the svalue* of the created
  * copy for each registered array and mapping in the .data member.
  */
 
 {
+    assert_stack_gap();
+    if (EVALUATION_TOO_LONG())
+    {
+        put_number(dest, 0); /* Need to store something! */
+        return;
+    }
+
     switch (src->type)
     {
     default:
@@ -3849,6 +4815,10 @@ copy_svalue (svalue_t *dest, svalue_t *src
         if (rec->ref_count++ < 0) /* New array */
         {
             size = (mp_int)VEC_SIZE(old);
+            DYN_ARRAY_COST(size);
+#if defined(DYNAMIC_COSTS)
+            eval_cost += (depth+1) / 10;
+#endif
 
             /* Create a new array, assign it to dest, and store
              * it in the table, too.
@@ -3856,7 +4826,10 @@ copy_svalue (svalue_t *dest, svalue_t *src
             new = allocate_uninit_array(size);
             put_array(dest, new);
             if (src->type == T_QUOTED_ARRAY)
+            {
+                dest->type = T_QUOTED_ARRAY;
                 dest->x.quotes = src->x.quotes;
+            }
             rec->data = dest;
 
             /* Copy the values */
@@ -3864,8 +4837,11 @@ copy_svalue (svalue_t *dest, svalue_t *src
             {
                 svalue_t * svp = &old->item[i];
 
-                if (svp->type == T_MAPPING || svp->type == T_POINTER)
-                    copy_svalue(&new->item[i], svp, ptable);
+                if (svp->type == T_MAPPING
+                 || svp->type == T_POINTER
+                 || svp->type == T_QUOTED_ARRAY
+                   )
+                    copy_svalue(&new->item[i], svp, ptable, depth+1);
                 else
                     assign_svalue_no_free(&new->item[i], svp);
             }
@@ -3895,6 +4871,11 @@ copy_svalue (svalue_t *dest, svalue_t *src
              */
             check_map_for_destr(old);
             size = (mp_int)MAP_SIZE(old);
+            DYN_MAPPING_COST(size);
+#if defined(DYNAMIC_COSTS)
+            eval_cost += (depth+1) / 10;
+#endif
+            info.depth = depth+1;
             info.width = old->num_values;
             new = allocate_mapping(size, info.width);
             if (!new)
@@ -3946,6 +4927,7 @@ f_deep_copy (svalue_t *sp)
         NOOP
         break;
 
+    case T_QUOTED_ARRAY:
     case T_POINTER:
       {
         vector_t *old;
@@ -3958,7 +4940,9 @@ f_deep_copy (svalue_t *sp)
             ptable = new_pointer_table();
             if (!ptable)
                 error("(deep_copy) Out of memory for pointer table.\n");
-            copy_svalue(&new, sp, ptable);
+            copy_svalue(&new, sp, ptable, 0);
+            if (sp->type == T_QUOTED_ARRAY)
+                new.x.quotes = sp->x.quotes;
             transfer_svalue(sp, &new);
             free_pointer_table(ptable);
         }
@@ -3973,7 +4957,7 @@ f_deep_copy (svalue_t *sp)
         ptable = new_pointer_table();
         if (!ptable)
             error("(deep_copy) Out of memory for pointer table.\n");
-        copy_svalue(&new, sp, ptable);
+        copy_svalue(&new, sp, ptable, 0);
         transfer_svalue(sp, &new);
         free_pointer_table(ptable);
         break;
@@ -4009,7 +4993,7 @@ f_filter (svalue_t *sp, int num_arg)
     if (sp[-num_arg+1].type == T_MAPPING)
         return x_filter_mapping(sp, num_arg, MY_TRUE);
     else
-        return f_filter_array(sp, num_arg);
+        return x_filter_array(sp, num_arg);
 
 } /* f_filter() */
 
@@ -4037,9 +5021,220 @@ f_map (svalue_t *sp, int num_arg)
     if (sp[-num_arg+1].type == T_MAPPING)
         return x_map_mapping(sp, num_arg, MY_TRUE);
     else
-        return f_map_array(sp, num_arg);
+        return x_map_array(sp, num_arg);
 
 } /* f_map() */
+
+/*-------------------------------------------------------------------------*/
+static svalue_t *
+x_min_max (svalue_t *sp, int num_arg, Bool bMax)
+
+/* Implementation of VEFUNs max() and min().
+ * <bMax> is true if the maximum is to be returned, false for the minimum.
+ */
+
+{
+    char * fname = bMax ? "max" : "min";
+    svalue_t *argp = sp-num_arg+1;
+    svalue_t *valuep = argp;
+    int left = num_arg;
+    Bool gotArray = MY_FALSE;
+    svalue_t *result = NULL;
+
+
+    if (argp->type == T_POINTER)
+    {
+        if (num_arg > 1)
+        {
+           error("Bad arguments to %s: only one array accepted.\n", fname);
+           /* NOTREACHED */
+        }
+        valuep = argp->u.vec->item;
+        left = (int)VEC_SIZE(argp->u.vec);
+        gotArray = MY_TRUE;
+        if (left < 1)
+        {
+           error("Bad argument 1 to %s: array must not be empty.\n", fname);
+           /* NOTREACHED */
+        }
+    }
+
+    if (valuep->type == T_STRING)
+    {
+        result = valuep;
+
+        for (valuep++, left--; left > 0; valuep++, left--)
+        {
+            int cmp;
+
+            if (valuep->type != T_STRING)
+            {
+                if (gotArray)
+                    error("Bad argument to %s: array[%d] is not a string.\n"
+                         , fname, (int)VEC_SIZE(argp->u.vec) - left + 1);
+                else
+                    error("Bad argument %d to %s: not a string.\n"
+                         , num_arg - left + 1, fname);
+                /* TODO: Give type and value */
+                /* NOTREACHED */
+            }
+
+            cmp = strcmp(valuep->u.string, result->u.string);
+            if (bMax ? (cmp > 0) : (cmp < 0))
+                result = valuep;
+        }
+    }
+    else if (valuep->type == T_NUMBER || valuep->type == T_FLOAT)
+    {
+        result = valuep;
+
+        for (valuep++, left--; left > 0; valuep++, left--)
+        {
+            if (valuep->type != T_FLOAT && valuep->type != T_NUMBER)
+            {
+                if (gotArray)
+                    error("Bad argument to %s: array[%d] is not a number.\n"
+                         , fname, (int)VEC_SIZE(argp->u.vec) - left + 1);
+                else
+                    error("Bad argument %d to %s: not a number.\n"
+                         , num_arg - left + 1, fname);
+                /* TODO: Give type and value */
+                /* NOTREACHED */
+            }
+
+            if (valuep->type == T_NUMBER && result->type == T_NUMBER)
+            {
+                if (bMax ? (valuep->u.number > result->u.number)
+                         : (valuep->u.number < result->u.number))
+                    result = valuep;
+            }
+            else
+            {
+                double v, r;
+
+                if (valuep->type == T_FLOAT)
+                    v = READ_DOUBLE(valuep);
+                else
+                    v = (double)(valuep->u.number);
+
+                if (result->type == T_FLOAT)
+                    r = READ_DOUBLE(result);
+                else
+                    r = (double)(result->u.number);
+
+                if (bMax ? (v > r)
+                         : (v < r))
+                    result = valuep;
+            }
+        } /* for (values) */
+    }
+    else
+    {
+        if (gotArray)
+            error("Bad argument to %s: array[0] is not a string or number.\n"
+                 , fname);
+        else
+            error("Bad argument 1 to %s: not a string or number.\n"
+                 , fname);
+        /* TODO: Give type and value */
+        /* NOTREACHED */
+    }
+
+    /* Assign the result.
+     * We need to make a local copy, otherwise we might lose it in the pop.
+     */
+    {
+        svalue_t resvalue;
+
+        assign_svalue_no_free(&resvalue, result);
+        sp = pop_n_elems(num_arg, sp) + 1;
+        transfer_svalue_no_free(sp, &resvalue);
+    }
+
+    return sp;
+} /* x_min_max() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_max (svalue_t *sp, int num_arg)
+
+/* VEFUN max()
+ *
+ *   string    max (string arg, ...)
+ *   string    max (string * arg_array)
+ *
+ *   int|float max (int|float arg, ...)
+ *   int|float max (int|float * arg_array)
+ *
+ * Determine the maximum value of the <arg>uments and return it.
+ * If max() is called with an array (which must not be empty) as only
+ * argument, it returns the maximum value of the array contents.
+ */
+
+{
+    return x_min_max(sp, num_arg, MY_TRUE);
+} /* f_max() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_min (svalue_t *sp, int num_arg)
+
+/* VEFUN min()
+ *
+ *   string    min (string arg, ...)
+ *   string    min (string * arg_array)
+ *
+ *   int|float min (int|float arg, ...)
+ *   int|float min (int|float * arg_array)
+ *
+ * Determine the minimum value of the <arg>uments and return it.
+ * If min() is called with an array (which must not be empty) as only
+ * argument, it returns the minimum value of the array contents.
+ */
+
+{
+    return x_min_max(sp, num_arg, MY_FALSE);
+} /* f_min() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_sgn (svalue_t *sp)
+
+/* VEFUN sgn()
+ *
+ *   int sgn (int|float arg)
+ *
+ * Return the sign of the argument: -1 if it's < 0, +1 if it's > 0, and
+ * 0 if it is 0.
+ */
+
+{
+    if (sp->type == T_NUMBER)
+    {
+        if (sp->u.number > 0)
+            sp->u.number = 1;
+        else if (sp->u.number < 0)
+            sp->u.number = -1;
+        else
+            sp->u.number = 0;
+    }
+    else if (sp->type == T_FLOAT)
+    {
+        double d = READ_DOUBLE(sp);
+
+        sp->type = T_NUMBER;
+        if (d > 0.0)
+            sp->u.number = 1;
+        else if (d < 0.0)
+            sp->u.number = -1;
+        else
+            sp->u.number = 0;
+    }
+    else
+      error("Bad argument 1 to sgn(): not a number or float.\n");
+
+    return sp;
+} /* f_sgn() */
 
 /*=========================================================================*/
 /*                               OTHER                                     */
@@ -4050,7 +5245,10 @@ f_debug_info (svalue_t *sp, int num_arg)
 
 /* VEFUN debug_info()
  *
+ *   mixed debug_info(int flag)
  *   mixed debug_info(int flag, object obj)
+ *   mixed debug_info(int flag, int arg2)
+ *   mixed debug_info(int flag, int arg2, int arg3)
  *
  * Print out some driver internal debug information.
  *
@@ -4082,9 +5280,13 @@ f_debug_info (svalue_t *sp, int num_arg)
  *     it can write the files. The file in question is always written anew.
  *     Result is 1 on success, or 0 if an error occured.
  *
- *     <arg2> == "objects": dump information about all objects. Default
+ *     <arg2> == "objects": dump information about all live objects. Default
  *       filename is '/OBJ_DUMP', the valid_write() will read 'objdump' for
  *       the function.
+ *
+ *     <arg2> == "destructed": dump information about all destructed objects.
+ *       Default filename is '/DEST_OBJ_DUMP', the valid_write() will read
+ *       'objdump' for the function.
  *
  *     <arg2> == "opcodes": dump the usage statistics of the opcodes. Default
  *       filename is '/OPC_DUMP', the valid_write() will read 'opcdump' for
@@ -4094,7 +5296,9 @@ f_debug_info (svalue_t *sp, int num_arg)
  * DINFO_DATA (6): Return raw information about an aspect of
  *     the driver specified by <arg2>. The result of the function
  *     is an array with the information, or 0 for unsupported values
- *     of <arg2>.
+ *     of <arg2>. If <arg3> is given and in the range of array indices for
+ *     the given <arg2>, the result will be just the indexed array entry,
+ *     but not the full array.
  *
  *     Allowed values for <arg2> are: DID_STATUS, DID_SWAP, DID_MALLOC.
  *
@@ -4110,8 +5314,7 @@ f_debug_info (svalue_t *sp, int num_arg)
  *            Number and size of allocated shadows.
  *
  *        int DID_ST_OBJECTS
- *        int DID_ST_OBJECTS_SIZE
- *            Number and size of swapped-in objects.
+ *            Total number and size of objects.
  *
  *        int DID_ST_OBJECTS_SWAPPED
  *        int DID_ST_OBJECTS_SWAP_SIZE
@@ -4119,6 +5322,14 @@ f_debug_info (svalue_t *sp, int num_arg)
  *
  *        int DID_ST_OBJECTS_LIST
  *            Number of objects in the object list.
+ *
+ *        int DID_ST_OBJECTS_NEWLY_DEST
+ *            Number of newly destructed objects (ie. objects destructed
+ *            in this execution thread).
+ *
+ *        int DID_ST_OBJECTS_DESTRUCTED
+ *            Number of destructed but still referenced objects, not
+ *            counting the DID_ST_OBJECTS_NEWLY_DEST.
  *
  *        int DID_ST_OBJECTS_PROCESSED
  *            Number of listed objects processed in the last backend
@@ -4142,6 +5353,11 @@ f_debug_info (svalue_t *sp, int num_arg)
  *
  *        int DID_ST_HBEAT_CALLS
  *            Number of heart_beats executed so far.
+ *
+ *        int DID_ST_HBEAT_CALLS_TOTAL
+ *            Number of heart_beats calls so far. The difference to
+ *            ST_HBEAT_CALLS is that the latter only counts heart beat
+ *            calls during which at least one heart beat was actually executed.
  *
  *        int DID_ST_HBEAT_SLOTS
  *        int DID_ST_HBEAT_SIZE
@@ -4180,7 +5396,7 @@ f_debug_info (svalue_t *sp, int num_arg)
  *            Number and size of swapped-out programs.
  *
  *        int DID_ST_USER_RESERVE
- *        int DID_ST_MASTER_RESERVE     
+ *        int DID_ST_MASTER_RESERVE
  *        int DID_ST_SYSTEM_RESERVE
  *            Current sizes of the three memory reserves.
  *
@@ -4215,6 +5431,21 @@ f_debug_info (svalue_t *sp, int num_arg)
  *        int DID_ST_STR_SEARCH_LEN
  *            Number of searches in the string table, and the
  *            accumulated search length.
+ *
+ *        int DID_ST_STR_FOUND
+ *            Number successful searches.
+ *
+ *        int DID_ST_STR_ENTRIES
+ *            Number of entries (hash chains) in the string table.
+ *
+ *        int DID_ST_STR_ADDED
+ *            Number of strings added to the table so far.
+ *
+ *        int DID_ST_STR_DELETED
+ *            Number of strings delete from the table so far.
+ *
+ *        int DID_ST_STR_COLLISIONS
+ *            Number of strings added to an existing hash chain.
  *
  *        int DID_ST_RX_CACHED
  *            Number of regular expressions cached.
@@ -4281,7 +5512,7 @@ f_debug_info (svalue_t *sp, int num_arg)
  *            The name of the allocator: "sysmalloc" or "smalloc".
  *
  *        int DID_MEM_SBRK
- *        int DID_MEM_SBKR_SIZE
+ *        int DID_MEM_SBRK_SIZE
  *            Number and size of memory blocks requested from the
  *            operating system (smalloc only).
  *
@@ -4323,6 +5554,83 @@ f_debug_info (svalue_t *sp, int num_arg)
  *            Number of calls to malloc_increment(), the number
  *            of successes and the size of memory allocated this
  *            way (smalloc only).
+ *
+ *        int DID_MEM_PERM
+ *        int DID_MEM_PERM_SIZE
+ *            Number and size of permanent (non-GCable) allocations
+ *            (smalloc only).
+ *
+ *        int DID_MEM_CLIB
+ *        int DID_MEM_CLIB_SIZE
+ *            Number and size of allocations done through the
+ *            clib functions (smalloc only with SBRK_OK).
+ *
+ *        int DID_MEM_OVERHEAD
+ *            Overhead for every allocation (smalloc only).
+ *
+ *        int DID_MEM_ALLOCATED
+ *            The amount of memory currently allocated from the
+ *            allocator, including the overhead for the allocator
+ *            (smalloc only).
+ *
+ *        int DID_MEM_USED
+ *            The amount of memory currently used for driver data,
+ *            excluding the overhead from the allocator (smalloc only).
+ *
+ *        int DID_MEM_TOTAL_UNUSED
+ *            The amount of memory allocated from the system, but
+ *            not used by the driver.
+ *
+ * DINFO_TRACE (7): Return the call stack 'trace' information as specified
+ *     by <arg2>. The result of the function is either an array (format
+ *     explained below), or a printable string. Omitting <arg2> defaults
+ *     to DIT_CURRENT.
+ *
+ *     <arg2> == DIT_CURRENT (0): Current call trace
+ *            == DIT_ERROR   (1): Most recent error call trace (caught or
+ *                                uncaught)
+ *            == DIT_UNCAUGHT_ERROR (2): Most recent uncaught-error call trace
+ *        Return the information in array form.
+ *
+ *        The error traces are changed only when an appropriate error
+ *        occurs; in addition a GC deletes them. After an uncaught
+ *        error, both error traces point to the same array (so the '=='
+ *        operator holds true).
+ *
+ *        If the array has just one entry, the trace information is not
+ *        available and the one entry is string with the reason.
+ *
+ *        If the array has more than one entries, the first entry is 0 or the
+ *        name of the object with the heartbeat which started the current
+ *        thread; all following entries describe the call stack starting with
+ *        the topmost function called.
+ *
+ *        All call entries are arrays themselves with the following elements:
+ *
+ *        int[TRACE_TYPE]: The type of the call frame:
+ *            TRACE_TYPE_SYMBOL (0): a function symbol (shouldn't happen).
+ *            TRACE_TYPE_SEFUN  (1): a simul-efun.
+ *            TRACE_TYPE_EFUN   (2): an efun closure.
+ *            TRACE_TYPE_LAMBDA (3): a lambda closure.
+ *            TRACE_TYPE_LFUN   (4): a normal lfun.
+ *
+ *        mixed[TRACE_NAME]: The 'name' of the called frame:
+ *            _TYPE_EFUN:   either the name of the efun, or the code of
+ *                          the instruction for operator closures
+ *            _TYPE_LAMBDA: the numeric lambda identifier.
+ *            _TYPE_LFUN:   the name of the lfun.
+ *
+ *        string[TRACE_PROGRAM]: The (file)name of the program holding the
+ *            code.
+ *        string[TRACE_OBJECT]:  The name of the object for which the code
+ *                               was executed.
+ *        int[TRACE_LOC]:
+ *            _TYPE_LAMBDA: current program offset from the start of the
+ *                          closure code.
+ *            _TYPE_LFUN:   the line number.
+ *
+ *     <arg2> == DIT_STR_CURRENT (3): Return the information about the current
+ *        call trace as printable string.
  *
  * TODO: debug_info() and all associated routines are almost big enough
  * TODO:: to justify a file on their own.
@@ -4379,7 +5687,7 @@ f_debug_info (svalue_t *sp, int num_arg)
           flags&O_WILL_CLEAN_UP   ?"TRUE":"FALSE");
         add_message("O_REPLACED        : %s\n",
           flags&O_REPLACED        ?"TRUE":"FALSE");
-#ifdef F_SET_LIGHT
+#ifdef USE_SET_LIGHT
         add_message("total light : %d\n", ob->total_light);
 #endif
         add_message("time_reset  : %ld\n", (long)ob->time_reset);
@@ -4416,6 +5724,7 @@ f_debug_info (svalue_t *sp, int num_arg)
          */
 
         program_t *pg;
+        mp_int v0, v1, v2;
 
         if (num_arg != 2)
             error("bad number of arguments to debug_info\n");
@@ -4432,8 +5741,16 @@ f_debug_info (svalue_t *sp, int num_arg)
                   pg->num_function_names * sizeof(short)));
         add_message("num vars:    %3d (%4ld)\n", pg->num_variables
           , (long)(pg->num_variables * sizeof(variable_t)));
-        add_message("num strings: %3d (%4ld)\n", pg->num_strings
-          , (long)(pg->num_strings   * sizeof(char *)));
+
+        v1 = program_string_size(pg, &v0, &v2);
+        add_message("num strings: %3d (%4ld) : overhead %ld + data %ld (%ld)\n"
+                   , pg->num_strings
+                   , (long)(v0 + v1)
+                   , (long)v0
+                   , (long)v1
+                   , (long)v2
+                   );
+
         {
             int i = pg->num_inherited;
             int cnt = 0;
@@ -4441,7 +5758,9 @@ f_debug_info (svalue_t *sp, int num_arg)
 
             for (inheritp = pg->inherit; i--; inheritp++)
             {
-                if (inheritp->inherit_type == INHERIT_TYPE_NORMAL)
+                if (inheritp->inherit_type == INHERIT_TYPE_NORMAL
+                 || inheritp->inherit_type == INHERIT_TYPE_VIRTUAL
+                   )
                     cnt++;
             }
             add_message("num inherits %3d (%4ld)\n", cnt
@@ -4449,8 +5768,9 @@ f_debug_info (svalue_t *sp, int num_arg)
         }
         add_message("total size      %6ld\n"
           ,pg->total_size);
-        add_message("data size       %6ld\n"
-          ,data_size(sp->u.ob));
+
+        v1 = data_size(sp->u.ob, &v2);
+        add_message("data size       %6ld (%6ld)\n", v1, v2);
         break;
       }
 
@@ -4542,6 +5862,12 @@ f_debug_info (svalue_t *sp, int num_arg)
             break;
         }
 
+        if (!strcmp(arg[1].u.string, "destructed"))
+        {
+            res.u.number = dumpstat_dest(fname ? fname : "/DEST_OBJ_DUMP") ? 1 : 0;
+            break;
+        }
+
         if (!strcmp(arg[1].u.string, "opcodes"))
         {
 #ifdef OPCPROF
@@ -4562,52 +5888,135 @@ f_debug_info (svalue_t *sp, int num_arg)
          */
 
         vector_t *v;
+        svalue_t *dinfo_arg;
+        int       value = -1;
 
-        if (num_arg != 2)
+        if (num_arg != 2 && num_arg != 3)
             error("bad number of arguments to debug_info\n");
         TYPE_TESTV2(arg+1, T_NUMBER)
+        if (num_arg == 3)
+        {
+            TYPE_TESTV3(arg+2, T_NUMBER)
+            value = arg[2].u.number;
+        }
 
         switch(arg[1].u.number)
         {
-        case DID_STATUS:
-            v = allocate_array(DID_STATUS_MAX);
-            if (!v)
-                error("Out of memory: array[%d] for result.\n"
-                     , DID_STATUS_MAX);
+#define PREP(which) \
+            if (value == -1) { \
+                v = allocate_array(which); \
+                if (!v) \
+                    error("Out of memory: array[%d] for result.\n" \
+                         , which); \
+                dinfo_arg = v->item; \
+            } else { \
+                v = NULL; \
+                if (value < 0 || value >= which) \
+                    error("Illegal index for debug_info(): %d, " \
+                          "expected 0..%d\n", value, which-1); \
+                dinfo_arg = &res; \
+            }
 
-            dinfo_data_status(v->item);
-            otable_dinfo_status(v->item);
-            hbeat_dinfo_status(v->item);
-            callout_dinfo_status(v->item);
-            string_dinfo_status(v->item);
+        case DID_STATUS:
+            PREP(DID_STATUS_MAX)
+
+            dinfo_data_status(dinfo_arg, value);
+            otable_dinfo_status(dinfo_arg, value);
+            hbeat_dinfo_status(dinfo_arg, value);
+            callout_dinfo_status(dinfo_arg, value);
+            string_dinfo_status(dinfo_arg, value);
 #ifdef RXCACHE_TABLE
-            rxcache_dinfo_status(v->item);
+            rxcache_dinfo_status(dinfo_arg, value);
 #endif
-            put_array(&res, v);
+
+            if (value == -1)
+                put_array(&res, v);
             break;
 
         case DID_SWAP:
-            v = allocate_array(DID_SWAP_MAX);
-            if (!v)
-                error("Out of memory: array[%d] for result.\n", DID_SWAP_MAX);
-            swap_dinfo_data(v->item);
-            put_array(&res, v);
+            PREP(DID_SWAP_MAX)
+
+            swap_dinfo_data(dinfo_arg, value);
+            if (value == -1)
+                put_array(&res, v);
             break;
 
         case DID_MEMORY:
-            v = allocate_array(DID_MEMORY_MAX);
-            if (!v)
-                error("Out of memory: array[%d] for result.\n"
-                     , DID_MEMORY_MAX);
+            PREP(DID_MEMORY_MAX)
+
 #if defined(MALLOC_smalloc)
-            smalloc_dinfo_data(v->item);
+            smalloc_dinfo_data(dinfo_arg, value);
 #endif
 #if defined(MALLOC_sysmalloc)
-            put_volatile_string(v->item+DID_MEM_NAME, "system malloc");
+            if (value == -1)
+                put_volatile_string(v->item+DID_MEM_NAME, "system malloc");
+            else if (value == DID_MEM_NAME)
+                put_volatile_string(dinfo_arg, "system malloc");
 #endif
-            put_array(&res, v);
+            if (value == -1)
+                put_array(&res, v);
             break;
+
+#undef PREP
         }
+        break;
+      }
+
+    case DINFO_TRACE:  /* --- DINFO_TRACE --- */
+      {
+        /* Return the trace information */
+
+        if (num_arg != 1 && num_arg != 2)
+            error("bad number of arguments to debug_info\n");
+
+        if (num_arg == 2 && sp->type != T_NUMBER)
+            error("bad arg 2 to debug_info(): not a number.\n");
+
+        if (num_arg == 1 || sp->u.number == DIT_CURRENT)
+        {
+            vector_t * vec;
+
+            (void)collect_trace(NULL, &vec);
+            put_array(&res, vec);
+        }
+        else if (sp->u.number == DIT_ERROR)
+        {
+            if (current_error_trace)
+                put_ref_array(&res, current_error_trace);
+            else
+            {
+                vector_t *vec;
+
+                vec = allocate_uninit_array(1);
+                put_ref_string(vec->item, STR_NO_TRACE);
+                put_array(&res, vec);
+            }
+        }
+        else if (sp->u.number == DIT_UNCAUGHT_ERROR)
+        {
+            if (uncaught_error_trace)
+                put_ref_array(&res, uncaught_error_trace);
+            else
+            {
+                vector_t *vec;
+
+                vec = allocate_uninit_array(1);
+                put_ref_string(vec->item, STR_NO_TRACE);
+                put_array(&res, vec);
+            }
+        }
+        else if (sp->u.number == DIT_STR_CURRENT)
+        {
+            strbuf_t sbuf;
+
+            strbuf_zero(&sbuf);
+            (void)collect_trace(&sbuf, NULL);
+            put_malloced_string(&res, string_copy(sbuf.buf));
+            strbuf_free(&sbuf);
+        }
+        else
+            error("bad arg 2 to debug_info(): %ld, expected 0..2\n"
+                 , sp->u.number);
         break;
       }
 
@@ -4618,13 +6027,130 @@ f_debug_info (svalue_t *sp, int num_arg)
     }
 
     /* Clean up the stack and return the result */
-    
+
     sp = pop_n_elems(num_arg, sp);
 
     sp++;
     *sp = res;
     return sp;
 } /* f_debug_info() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+x_gm_localtime (svalue_t *sp, Bool localTime)
+
+/* Implementation of the efuns gmtime() and localtime()
+ * localTime = TRUE: return localtime(), otherwise gmtime()
+ */
+
+{
+    time_t      clk;
+    struct tm * pTm;
+    vector_t  * v;
+
+    if (sp->type != T_NUMBER)
+    {
+        TYPE_TEST1(sp, T_POINTER)
+        if (VEC_SIZE(sp->u.vec) != 2)
+            error("Invalid array size for argument 1: %ld, expected 2\n"
+                 , (long)VEC_SIZE(sp->u.vec));
+        if (sp->u.vec->item[0].type != T_NUMBER
+         || sp->u.vec->item[1].type != T_NUMBER)
+            error("Invalid array for argument 1\n");
+        clk = sp->u.vec->item[0].u.number;
+    }
+    else
+    {
+        clk = sp->u.number;
+    }
+
+    pTm = (localTime ? localtime : gmtime)(&clk);
+
+    v = allocate_array(TM_MAX);
+    if (!v)
+        error("Out of memory: array[%d] for result.\n", TM_MAX);
+
+    v->item[TM_SEC].u.number = pTm->tm_sec;
+    v->item[TM_MIN].u.number = pTm->tm_min;
+    v->item[TM_HOUR].u.number = pTm->tm_hour;
+    v->item[TM_MDAY].u.number = pTm->tm_mday;
+    v->item[TM_MON].u.number = pTm->tm_mon;
+    v->item[TM_YEAR].u.number = pTm->tm_year + 1900;
+    v->item[TM_WDAY].u.number = pTm->tm_wday;
+    v->item[TM_YDAY].u.number = pTm->tm_yday;
+    v->item[TM_ISDST].u.number = pTm->tm_isdst ? 1 : 0;
+
+    free_svalue(sp);
+    put_array(sp, v); /* Adopt the ref */
+
+    return sp;
+} /* x_gm_localtime() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_gmtime (svalue_t *sp)
+
+/* TEFUN gmtime()
+ *
+ *   int * gmtime(int clock = time())
+ *   int * gmtime(int* uclock)
+ *
+ * Interpret the argument clock as number of seconds since Jan,
+ * 1st, 1970, 0:00, and return the time in UTC in a nice structure.
+ *
+ * Alternatively, accept an array of two ints: the first is <clock>
+ * value as in the first form, the second int is the number of
+ * microseconds elapsed in the current second.
+ *
+ * The result is an array of integers:
+ *
+ *   int TM_SEC   (0) : Seconds (0..59)
+ *   int TM_MIN   (1) : Minutes (0..59)
+ *   int TM_HOUR  (2) : Hours (0..23)
+ *   int TM_MDAY  (3) : Day of the month (1..31)
+ *   int TM_MON   (4) : Month of the year (0..11)
+ *   int TM_YEAR  (5) : Year (e.g.  2001)
+ *   int TM_WDAY  (6) : Day of the week (Sunday = 0)
+ *   int TM_YDAY  (7) : Day of the year (0..365)
+ *   int TM_ISDST (8) : TRUE: Daylight saving time
+ */
+
+{
+    return x_gm_localtime(sp, MY_FALSE);
+} /* f_gmtime() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_localtime (svalue_t *sp)
+
+/* TEFUN localtime()
+ *
+ *   int * localtime(int clock = time())
+ *   int * localtime(int* uclock)
+ *
+ * Interpret the argument clock as number of seconds since Jan,
+ * 1st, 1970, 0:00, and return the time in local time in a nice structure.
+ *
+ * Alternatively, accept an array of two ints: the first is <clock>
+ * value as in the first form, the second int is the number of
+ * microseconds elapsed in the current second.
+ *
+ * The result is an array of integers:
+ *
+ *   int TM_SEC   (0) : Seconds (0..59)
+ *   int TM_MIN   (1) : Minutes (0..59)
+ *   int TM_HOUR  (2) : Hours (0..23)
+ *   int TM_MDAY  (3) : Day of the month (1..31)
+ *   int TM_MON   (4) : Month of the year (0..11)
+ *   int TM_YEAR  (5) : Year (e.g.  2001)
+ *   int TM_WDAY  (6) : Day of the week (Sunday = 0)
+ *   int TM_YDAY  (7) : Day of the year (0..365)
+ *   int TM_ISDST (8) : TRUE: Daylight saving time
+ */
+
+{
+    return x_gm_localtime(sp, MY_TRUE);
+} /* f_localtime() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

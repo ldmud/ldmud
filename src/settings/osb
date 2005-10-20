@@ -4,22 +4,27 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/users/phil/osb --libexec=/users/phil/osb/erq --libdir=/users/phil/osb/mudlib --with-setting=osb $*
+exec ./configure --prefix=/usr/home/osb --libexec=/usr/home/osb/erq --libdir=/usr/home/osb/mudlib --with-setting=osb $*
 exit 1
 
 # --- The actual settings ---
 
-with_max_local=20
+with_max_local=50
 with_max_cost=1000000
 
 with_apply_cache_bits=14
+with_rxcache_table=4096
 
 enable_compat_mode=no
 enable_strict_euids=no
 
-enable_supply_parse_command=yes
-enable_initialization_by___init=no
+enable_supply_parse_command=no
+enable_initialization_by___init=yes
 enable_use_system_crypt=no
+enable_malloc_trace=yes
+enable_malloc_lpc_trace=yes
+
+enable_use_mysql=/usr/local/lib/mysql
 
 enable_erq=xerq
 

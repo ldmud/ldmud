@@ -1,5 +1,5 @@
-#ifndef _WIZLIST_H_
-#define _WIZLIST_H_ 1
+#ifndef LPC_WIZLIST_H_
+#define LPC_WIZLIST_H_ 1
 
 /* Indices returned by wizlist_info()
  */
@@ -14,4 +14,4 @@
 
 #define WL_SIZE         7  /* Number of entries */
 
-#endif /* _WIZLIST_H_ */
+#endif /* LPC_WIZLIST_H_ */

@@ -1,5 +1,5 @@
 LDMud, a LPmud gamedriver.
-Copyright 1997-1999 by Lars Duening.
+Copyright 1997-2001 by Lars Duening.
 
 LDMud is based on LPmud, which is
 Copyright 1989-1991 by Lars Pensj|, and, starting with version 3.1.2,
@@ -48,3 +48,9 @@ itself was written by Shawn J. Cokus.
 The xerq demon is Copyright (C) 1995 by Brian Gerst. Use of the source
 code is subject to the restriction that it must not be used for monetary
 gain.
+
+The MD5 message digest algorithm is Copyright (C) 1991-2, RSA Data Security,
+Inc.
+
+The lpc-mode.el for EMACS is Copyright (C) 2002 Vivek Dasmohapatra
+<vivek@etla.org>, and distributed under the GPL.

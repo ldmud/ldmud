@@ -1,6 +1,7 @@
 /*---------------------------------------------------------------------------
  * XErq - Main module.
  * (C) Copyright 1995 by Brian Gerst.
+ * (C) Copyright 2001 by Brian Gerst, Frank Kirschner, Lars Duening.
  *---------------------------------------------------------------------------
  * This module implements the main() function with the central loop, plus
  * a bunch of utility functions.
@@ -28,14 +29,24 @@ void (*erq_table[])(char *, int)
     , erq_listen
     , erq_accept
     , erq_lookup
+#ifdef USE_IPV6
+    , erq_rlookupv6
+#endif
 };
   /* Dispatchtable for the ERQ request functions.
    * Arguments are (message, msg_len).
    */
 
-#define ERQ_REQUEST_MAX ERQ_LOOKUP
+#ifndef USE_IPV6
+#    define ERQ_REQUEST_MAX ERQ_LOOKUP
+#else
+#    define ERQ_REQUEST_MAX ERQ_RLOOKUPV6
+#endif
 
 /*-------------------------------------------------------------------------*/
+const char * erq_dir = ERQ_DIR;
+  /* The filename of the directory with the ERQ executables. */
+
 child_t *childs;
   /* List of active children. The main loop will remove _EXITED children.
    */
@@ -68,6 +79,36 @@ int seq_interval;
    * an odd random number.
    */
 
+pid_t master_pid;
+  /* The pid of the 'master' erq process.
+   */
+
+/* When spawning a short-running child process, it used to happen that the
+ * process finishes before the parent even manages to put the pid into
+ * the child control structure; causing sig_child() not to find the child
+ * structure when it gets the signal.
+ * To avoid this, the spawning code employs a synchronisation scheme to
+ * make sure that the child doesn't execute before the parent completed
+ * initialisation.
+ *
+ * For ERQ_FORKed children (which are not synchronized), and as a fallback
+ * solution in case the synchronisation fails and the child terminates
+ * prematurely, sig_child() stores the relevant data in these globals for
+ * the main process to evaluate. The calling pattern (one ERQ
+ * command per select() round) guarantees that there can be only one such
+ * 'unfinished' child control structure at a time.
+ */
+
+volatile int pending_sig;
+  /* Set to true if these variables hold data of for an unaccounted SIG_CLD.
+   */
+
+volatile wait_status_t pending_status;
+volatile pid_t pending_pid;
+  /* The status and pid for the pending SIG_CLD, valid only while pending_sig
+   * is TRUE.
+   */
+
 /*-------------------------------------------------------------------------*/
 char *
 time_stamp (void)
@@ -82,12 +123,20 @@ time_stamp (void)
 
 {
     time_t t;
-    static char result[27];
+    static char result[27+20];
     struct tm *tm;
+    int pid;
 
     t = time(NULL);
     tm = localtime(&t);
-    strftime(result, sizeof(result), "%Y.%m.%d %H:%M:%S [xerq]", tm);
+    pid = getpid();
+    if (pid == master_pid)
+        strftime(result, sizeof(result), "%Y.%m.%d %H:%M:%S [xerq]", tm);
+    else
+    {
+        strftime(result, sizeof(result), "%Y.%m.%d %H:%M:%S [xerq:", tm);
+        sprintf(result+26, "%d]", pid);
+    }
     return result;
 } /* time_stamp() */
 
@@ -101,21 +150,61 @@ main(int argc, char *argv[])
 {
     int num;
 
-    /* Only "--forked" use is supported. */
-    if (argc > 1 && !strcmp(argv[1], "--forked"))
+    master_pid = getpid();
+
+    /* Print information about this daemon to help debugging */
     {
-        write(1, "1", 1);
+        fprintf(stderr, "%s XERQ %s: Path '%s', debuglevel %d\n"
+                      , time_stamp(), __DATE__, argv[0], ERQ_DEBUG
+               );
     }
-    else
+
+    /* Quick and dirty commandline parser */
     {
-        fprintf(stderr, "%s dynamic attatchment unimplemented\n"
-                      , time_stamp());
-        die();
+        int is_forked = 0;
+        int i;
+
+        for (i = 1; i < argc; i++)
+        {
+            if (!strcmp(argv[i], "--forked"))
+                is_forked = 1;
+            else if (!strcmp(argv[i], "--execdir"))
+            {
+                if (i+1 >= argc)
+                {
+                    fprintf(stderr, "%s Missing value for --execdir.\n"
+                                  , time_stamp());
+                    die();
+                }
+                erq_dir = argv[i+1];
+                i++;
+            }
+            else
+            {
+                fprintf(stderr, "%s Unknown argument '%s'.\n"
+                              , time_stamp(), argv[i]);
+                die();
+            }
+        }
+        /* Check if we have been forked off the driver */
+        if (is_forked)
+        {
+            write(1, "1", 1); /* indicate sucessful fork/execl */
+            fprintf(stderr, "%s Demon started\n", time_stamp() );
+        }
+        else
+        {
+            fprintf(stderr, "%s Dynamic attachement unimplemented\n"
+                          , time_stamp());
+            die();
+        }
     }
 
     /* Initialize */
-    
+
     in_select = 0;
+    pending_sig = 0;
+
     signal(SIGCLD, sig_child);
     signal(SIGPIPE, SIG_IGN);
 
@@ -123,7 +212,7 @@ main(int argc, char *argv[])
     childs = NULL;
     retries = NULL;
     stdout_queue = NULL;
-    
+
     randomize(time(0));
     seq_number = get_ticket();
     seq_interval = get_ticket() | 1; /* make sure it is odd */
@@ -138,15 +227,43 @@ main(int argc, char *argv[])
 #endif
 
     /* The main loop */
-    
+
     while(1)
     {
         fd_set read_fds, write_fds;
         int num_fds;
-        child_t *chp, **chpp;
+        child_t *chp;
         retry_t *rtp, **rtpp;
         socket_t *sp;
         struct timeval timeout;
+
+        /* Clean up the list of children (may close some sockets) */
+
+        for (chp = childs; chp;)
+        {
+            child_t *this = chp;
+
+            chp = chp->next;
+
+            /* If there is a pending SIG_CLD for this child, handle it.
+             * This is to be expected for CHILD_FORK children.
+             */
+            if (pending_sig && this->pid == pending_pid)
+            {
+                if (this->type != CHILD_FORK)
+                    fprintf(stderr, "%s Pending SIG_CLD for pid %d delivered.\n"
+                                  , time_stamp(), pending_pid);
+                this->status = pending_status;
+                this->pid = pending_pid;
+                pending_sig = 0;
+            }
+
+            if (this->status == CHILD_EXITED)
+            {
+                XPRINTF((stderr, "%s Child %p exited.\n", time_stamp(), this));
+                remove_child(this); /* will also unlink it from the list */
+            }
+        }
 
         /* look for sockets to select on */
 
@@ -186,22 +303,6 @@ main(int argc, char *argv[])
                 FD_SET(sp->fd, &write_fds);
         } /* for (sockets) */
 
-        /* Clean up the list of children */
-        
-        for (chpp = &childs; *chpp;)
-        {
-            chp = *chpp;
-            if (chp->status==CHILD_EXITED)
-            {
-                *chpp = chp->next;
-                remove_child(chp);
-            }
-            else
-            {
-                chpp = &chp->next;
-            }
-        }
-
         /* Scan the list of pending retries for the soonest one.
          * Put the time till then into timeout.
          * (If the list is empty, select() will receive NULL for timeout).
@@ -218,24 +319,37 @@ main(int argc, char *argv[])
             }
             timeout.tv_sec = t - time(NULL);
             timeout.tv_usec = 0;
+            XPRINTF((stderr, "%s Soonest retry_t: in %ld seconds.\n"
+                           , time_stamp(), (long)timeout.tv_sec));
         }
 
-#ifdef DEBUG
-        fprintf(stderr, "%s Starting select...\n", time_stamp());
+#if ERQ_DEBUG > 1
+        fprintf(stderr, "%s select()\n", time_stamp());
 #endif
         in_select = 1; /* so sig_child() can write reply directly */
         num = select(num_fds, &read_fds, &write_fds, 0, retries ? &timeout : 0);
         in_select = 0; /* don't want sig_child() writing now */
 
-#ifdef DEBUG
-        fprintf(stderr, "%s Select returns %d\n", time_stamp(), num);
+#if ERQ_DEBUG > 1
+        fprintf(stderr, "%s select() returns %d, time() %ld\n"
+                      , time_stamp(), num, (long)time(NULL));
+#endif
+#if ERQ_DEBUG > 0
         if (num < 0)
-            fprintf(stderr, "%s  errno=%d.\n", time_stamp(), errno);
+        {
+            int myerrno = errno;
+            fprintf(stderr, "%s select() errno = %d", time_stamp(), errno);
+            errno = myerrno;
+            perror(" ");
+        }
 #endif
 
         /* Is stdout ready to write? Then flush the queue. */
         if (FD_ISSET(1, &write_fds))
-            flush_queue(&stdout_queue, 1);
+        {
+            XPRINTF((stderr, "%s stdout_queue ready for flush.\n", time_stamp()));
+            flush_queue(&stdout_queue, 1, 0);
+        }
 
         /* Check for retries */
         for (rtpp = &retries; *rtpp; )
@@ -243,6 +357,8 @@ main(int argc, char *argv[])
             rtp = *rtpp;
             if (rtp->time <= time(NULL))
             {
+                XPRINTF((stderr, "%s Call retry %p (time %ld)\n"
+                               , time_stamp(), rtp, (long)rtp->time));
                 (*(rtp->func))(rtp->mesg, read_32(rtp->mesg));
                 *rtpp = rtp->next;
                 free(rtp);
@@ -255,19 +371,42 @@ main(int argc, char *argv[])
 
         /* check for input from driver */
         if (FD_ISSET(0, &read_fds))
-            erq_cmd();
-
-        /* Handle the ready sockets */
-
-        for (sp = sockets; sp; sp = sp->next)
         {
-            if (FD_ISSET(sp->fd, &read_fds))  read_socket(sp, 0);
-            if (FD_ISSET(sp->fd, &write_fds)) read_socket(sp, 1);
+            XPRINTF((stderr, "%s New command from driver.\n", time_stamp()));
+            erq_cmd();
+        }
+
+        /* Handle the ready sockets.
+         * Remember that read_socket() may close the socket.
+         */
+
+        for (sp = sockets; sp; )
+        {
+            socket_t *this = sp;
+            int rc;
+
+            sp = sp->next;
+
+            rc = 0;
+
+            if (FD_ISSET(this->fd, &read_fds))
+            {
+                XPRINTF((stderr, "%s Socket %p ready for reading.\n"
+                               , time_stamp(), this));
+                rc = read_socket(this, 0);
+            }
+
+            if (!rc && FD_ISSET(this->fd, &write_fds))
+            {
+                XPRINTF((stderr, "%s Socket %p ready for writing.\n"
+                               , time_stamp(), this));
+                (void)read_socket(this, 1);
+            }
         }
     } /* while(1) */
 
     /* NOTREACHED */
-    
+
     return 0;
 } /* main() */
 
@@ -291,15 +430,20 @@ erq_cmd (void)
     int len, mesg_len;
     char request;
 
+    /* Clear the buffer so that errors can be detected more easily */
+    memset(buf, 0, sizeof(buf));
+
     /* Read the message header */
     if (pos < 9)
     {
         len = read(0, buf+pos, 9-pos);
         if (len <= 0)
         {
-            perror("read");
+            perror("[xerq] read");
             die();
         }
+        XPRINTF((stderr, "%s Read %d of the missing %d header bytes.\n"
+                       , time_stamp(), len, 9-pos));
         pos += len;
         if (pos < 9)
             return;
@@ -310,7 +454,7 @@ erq_cmd (void)
     {
         /* This doesn't happen in a functioning system */
         fprintf(stderr
-               , "%s: Received too long packet: %d bytes.\n"
+               , "%s Received too long packet: %d bytes.\n"
                , time_stamp(), mesg_len);
         die();
     }
@@ -325,21 +469,24 @@ erq_cmd (void)
             perror("read");
             die();
         }
+        XPRINTF((stderr, "%s Read %d of the missing %d message bytes.\n"
+                       , time_stamp(), len, mesg_len-pos));
         pos += len;
         if (pos < mesg_len)
             return;
     }
 
+    XPRINTF((stderr, "%s Message complete.\n", time_stamp()));
     pos = 0; /* Message complete */
 
     /* Branch on the request */
     request = buf[8];
     if (request <= ERQ_REQUEST_MAX)
     {
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
         char *mesg, *mesgs[]={
-            "rlookup","fork","auth","execute","spawn","send","kill",
-            "open_udp","open_tcp","listen","accept","lookup"};
+            "rlookup","execute","fork","auth","spawn","send","kill",
+            "open_udp","open_tcp","listen","accept","lookup","rlookupv6"};
         mesg=mesgs[(int)request];
         fprintf(stderr, "%s command: %s\n", time_stamp(), mesg);
 #endif
@@ -380,8 +527,8 @@ sig_child(int sig)
 
     pid = wait(&status);
 
-#ifdef DEBUG
-    fprintf(stderr, "%s sigchild called, pid=%d status=%d\n"
+#if ERQ_DEBUG > 0
+    fprintf(stderr, "%s [sigchild] pid=%d status=%d\n"
                   , time_stamp(), pid, status);
 #endif
 
@@ -390,8 +537,13 @@ sig_child(int sig)
     {
         if (chp->pid != pid)
             continue;
+
         chp->status = CHILD_EXITED;
         chp->return_code = status;
+#if ERQ_DEBUG > 0
+        fprintf(stderr, "%s [sigchild] Caught SIGCLD for pid %d, child %p.\n"
+                      , time_stamp(), pid, chp);
+#endif
         if (in_select)
             remove_child(chp); /* safe to do it from here */
         /*  if we're in select, we know we're not going to be messing up
@@ -400,8 +552,26 @@ sig_child(int sig)
     }
 
     if (!chp)
-        fprintf(stderr, "%s Caught SIGCLD for pid %d, not in child list.\n"
+    {
+        /* There is no valid child. Maybe we caught the signal before
+         * the child structure was complete (this can happen especially
+         * with short-lived CHILD_FORK sub processes).
+         */
+        if (pending_sig)
+        {
+            fprintf(stderr, "%s [sigchild] SIGCLD for pid %d not delivered.\n"
+                          , time_stamp(), pending_pid);
+        }
+
+#if ERQ_DEBUG > 0
+        fprintf(stderr, "%s [sigchild] SIGCLD for unknown pid %d received.\n"
                       , time_stamp(), pid);
+#endif
+
+        pending_status = status;
+        pending_pid = pid;
+        pending_sig = 1;
+    }
 
     /* Restore the signal handler */
     signal(SIGCLD, sig_child);
@@ -419,6 +589,8 @@ add_retry (void (*func)(char *, int), char *mesg, int len, int t)
     struct retry_s *retry;
 
     retry = malloc(sizeof(struct retry_s)+len);
+    XPRINTF((stderr, "%s New retry %p: %d seconds, func %p, data %p:%d\n"
+                   , time_stamp(), retry, t, func, mesg, len));
     retry->time = time(NULL)+t;
     retry->func = func;
     memcpy(&retry->mesg, mesg, len);
@@ -503,18 +675,31 @@ replyn (int32 handle, int keep, int num, ...)
 
     /* Catenate the data arguments */
     va_start(va, num);
-    while (num--)
+    while (num-- > 0 && total < ERQ_MAX_REPLY)
     {
         char *data;
         int len;
 
         data = va_arg(va, char *);
         len = va_arg(va, int);
+        if (total + len > ERQ_MAX_REPLY)
+        {
+            fprintf(stderr, "%s Too much data in replyn(): %d bytes omitted.\n"
+                          , time_stamp(), total + len - ERQ_MAX_REPLY);
+            len = ERQ_MAX_REPLY - total;
+        }
         memcpy(p, data, len);
         p += len;
         total += len;
     }
     va_end(va);
+
+    if (num > 0)
+    {
+        fprintf(stderr, "%s Too much data in replyn(): Remaining %d "
+                        "data blocks omitted.\n"
+                      , time_stamp(), num);
+    }
 
     /* Create the header */
     write_32(reply, total);
@@ -576,12 +761,15 @@ writen (int fd, char *mesg, int len, struct equeue_s **qpp)
 {
     int l = 0;
 
+    XPRINTF((stderr, "%s writen(%d, %p:%d, %p (-> %p) ))\n"
+                   , time_stamp(), fd, mesg, len, qpp, *qpp));
     if (!(*qpp))
     {
         /* Send as much of the message as possible */
         do
             l = write(fd, mesg, len);
         while (l == -1 && errno == EINTR);
+        XPRINTF((stderr, "%s   Wrote %d bytes.\n", time_stamp(), l));
         if (l < 0 || l == len)
             return l;
         mesg += l;
@@ -591,7 +779,8 @@ writen (int fd, char *mesg, int len, struct equeue_s **qpp)
     if (!len)
         return 0;
 
-    add_to_queue(qpp, mesg, len);
+    XPRINTF((stderr, "%s   Queuing data %p:%d\n", time_stamp(), mesg, len));
+    add_to_queue(qpp, mesg, len, 0);
     return l;
 } /* writen() */
 
@@ -608,11 +797,14 @@ write1 (void *mesg, int len)
     l = writen(1, mesg, len, &stdout_queue);
     if (l < 0)
     {
-        fprintf(stderr, "%s Error occurred on driver socket, errno=%d.\n",
+        int myerrno = errno;
+        fprintf(stderr, "%s Error occurred on driver socket, errno=%d",
                 time_stamp(), errno);
+        errno = myerrno;
+        perror(" ");
         die();
     }
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
     if (l != len)
         fprintf( stderr
                , "%s Driver-erq socket blocked, queueing %d bytes\n"

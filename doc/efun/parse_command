@@ -1,3 +1,4 @@
+DEPRECATED
 SYNOPSIS
         int parse_command (string cmd, object  env, string fmt, mixed &var, ...)
         int parse_command (string cmd, object* arr, string fmt, mixed &var, ...)
@@ -105,7 +106,7 @@ DESCRIPTION -- non-compat mode
 
         In addition the master object may offer the same functions to provide
         reasonable defaults (like 'thing' as generic singular name):
- 
+
              string *parse_command_id_list()
                - Would normally return: ({ "one", "thing" })
 
@@ -126,7 +127,7 @@ DESCRIPTION -- non-compat mode
                - Would normally return: "all"
 
 
-	int parse_command(string, object|object*, string, destargs...)
+        int parse_command(string, object|object*, string, destargs...)
 
 DESCRIPTION -- compat mode
 

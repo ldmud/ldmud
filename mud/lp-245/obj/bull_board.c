@@ -2,6 +2,8 @@ string messages, new_hd, new_body;
 int num_messages;
 object who;
 
+headers();
+
 id(str) {
     return str == "bulletin board" || str == "board" || str == "bulletinboard";
 }

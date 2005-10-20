@@ -142,6 +142,16 @@ struct ident_s
 #define I_TYPE_RESWORD    4  /* reserved word */
 #define I_TYPE_DEFINE     5
 
+/* ident_t.global magic values */
+
+#define I_GLOBAL_FUNCTION_VAR    (-1)
+#define I_GLOBAL_FUNCTION_EFUN   (-2)
+#define I_GLOBAL_VARIABLE_OTHER  (-1)
+#define I_GLOBAL_VARIABLE_FUN    (-2)
+#define I_GLOBAL_EFUN_OTHER      (-1)
+#define I_GLOBAL_SEFUN_OTHER     (-1)
+
+
 #define lookup_predef(p) (p->type == I_TYPE_GLOBAL ? p->u.global.efun : -1)
 
 
@@ -174,14 +184,16 @@ extern Bool pragma_no_clone;
 extern Bool pragma_no_inherit;
 extern Bool pragma_no_shadow;
 extern Bool pragma_pedantic;
+extern Bool pragma_warn_deprecated;
 extern char *last_lex_string;
 extern ident_t *all_efuns;
 extern struct inline_fun * first_inline_fun;
 extern Bool insert_inline_fun_now;
-extern int next_inline_fun;
+extern unsigned int next_inline_fun;
 
 /* Values of pragma_strict_types */
 
+#define PRAGMA_KEEP_TYPES    (-1) /* Only used in struct incstate */
 #define PRAGMA_WEAK_TYPES    0
 #define PRAGMA_STRONG_TYPES  1
 #define PRAGMA_STRICT_TYPES  2
@@ -190,7 +202,10 @@ extern int next_inline_fun;
 /* --- Prototypes --- */
 
 extern void init_lexer(void);
-extern ident_t *make_shared_identifier(char *, int, int);
+extern ident_t *lookfor_shared_identifier(char *, int, int, Bool);
+#define make_shared_identifier(s,n,d) lookfor_shared_identifier(s,n,d, MY_TRUE)
+#define find_shared_identifier(s,n,d) lookfor_shared_identifier(s,n,d, MY_FALSE)
+extern ident_t *make_global_identifier(char *, int);
 extern void free_shared_identifier(ident_t*);
 extern int yylex(void);
 extern void end_new_file(void);
@@ -200,8 +215,6 @@ extern char *get_f_name(int n);
 extern void free_defines(void);
 extern size_t show_lexer_status (strbuf_t * sbuf, Bool verbose);
 extern void set_inc_list(vector_t *v);
-extern void clear_auto_include_string(void);
-extern svalue_t *f_set_auto_include_string(svalue_t *sp);
 extern void remove_unknown_identifier(void);
 extern char *lex_error_context(void);
 extern svalue_t *f_expand_define(svalue_t *sp);

@@ -12,4 +12,8 @@ oder etwas in der art ({#'+,"text1",'x,"text2"}) klappen wuerde
 Note: With a better LPC compiler this could be extended to normal LPC.
 Statements like a+"x"+b+"y" could be made more efficient because the
 result string could be allocated to the right size in the first place.
+
 Maybe an instruction F_ADD_MULTI <numarg>?
+
+The '+' operator could compile to a different VM instruction than the #'+
+closure (right now its the same).

@@ -35,6 +35,7 @@ extern simul_efun_table_t simul_efun_table[];
 
 /* --- Prototypes --- */
 
+extern void invalidate_simul_efuns (void);
 extern object_t *get_simul_efun_object(void);
 extern char *query_simul_efun_file_name(void);
 

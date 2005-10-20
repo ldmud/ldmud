@@ -6,6 +6,9 @@
 
 int is_debug;
 
+id();
+short();
+
 /*
 generic debug support for any object
 

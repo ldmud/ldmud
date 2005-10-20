@@ -16,15 +16,13 @@
 void
 erq_rlookup(char *mesg, int msglen)
 
-/* ERQ_RLOOKUP: look up an address by a hostname.
+/* ERQ_RLOOKUP: look up a hostname by an address.
  */
 
 {
     struct hostent *hp;
     int len;
     char addr[4];
-
-    memcpy(addr, mesg+9, 4);
 
     if (msglen != 13)
     {
@@ -33,18 +31,30 @@ erq_rlookup(char *mesg, int msglen)
         return;
     }
 
+    memcpy(addr, mesg+9, 4);
+
+    XPRINTF((stderr, "%s rlookup %02x.%02x.%02x.%02x\n"
+                   , time_stamp(), addr[0], addr[1], addr[2], addr[3]));
+
     hp = gethostbyaddr(addr, 4, AF_INET);
     if (!hp && mesg[8] == ERQ_RLOOKUP)
     {
         mesg[8]++; /* No second retry */
+        XPRINTF((stderr, "%s   Retry in 5 seconds.\n", time_stamp()));
         add_retry(erq_rlookup, mesg, 13, 5);
         return;
     }
 
     if (hp)
+    {
+        XPRINTF((stderr, "%s   rlookup found '%s'\n", time_stamp(), hp->h_name));
         len = strlen(hp->h_name)+1;
+    }
     else
+    {
+        XPRINTF((stderr, "%s   rlookup failed.\n", time_stamp()));
         len = 0;
+    }
 
     if (hp)
         replyn(get_handle(mesg), 0, 2,
@@ -58,23 +68,36 @@ erq_rlookup(char *mesg, int msglen)
 void
 erq_lookup(char *mesg, int len)
 
-/* ERQ_LOOKUP: look up a hostname by an address.
+/* ERQ_LOOKUP: look up an address by a hostname.
  */
 
 {
     struct hostent *hp;
+    char * msg;
 
+    msg = mesg;
     if (mesg[len-1] != 0)
     {
-        mesg[len] = 0;
+        msg = malloc(len+1);
+        if (!msg)
+        {
+            XPRINTF((stderr, "%s Out of memory.\n", time_stamp()));
+            die();
+        }
+        memcpy(msg, mesg, len);
+        msg[len] = 0;
         len++;
     }
 
-    hp = gethostbyname(mesg+9);
-    if (!hp && mesg[8] == ERQ_LOOKUP)
+    XPRINTF((stderr, "%s lookup '%s'\n", time_stamp(), msg+9));
+    hp = gethostbyname(msg+9);
+    if (!hp && msg[8] == ERQ_LOOKUP)
     {
+        XPRINTF((stderr, "%s   Retry in 5 seconds.\n", time_stamp()));
         mesg[8]++; /* No second retry */
-        add_retry(erq_lookup, mesg, len, 5);
+        add_retry(erq_lookup, msg, len, 5);
+        if (msg != mesg)
+            free(msg);
         return;
     }
 
@@ -83,11 +106,20 @@ erq_lookup(char *mesg, int len)
         char r_notfound[] = { ERQ_E_NOTFOUND };
         char r_noaddr[] = { 0, 0, 0, 0 };
 
+        if (hp)
+            XPRINTF((stderr, "%s   lookup found %02x.%02x.%02x.%02x\n"
+                           , time_stamp(), hp->h_addr[0], hp->h_addr[1]
+                           , hp->h_addr[2], hp->h_addr[3]));
+        else
+            XPRINTF((stderr, "%s   lookup failed.\n", time_stamp()));
         replyn(get_handle(mesg), 0, 3,
             hp ? r_ok : r_notfound, 1,
             hp ? (char *) hp->h_addr : r_noaddr, 4,
-            mesg+9, len-9);
+            msg+9, len-9);
     }
+
+    if (msg != mesg)
+        free(msg);
 } /* erq_lookup() */
 
 /*-------------------------------------------------------------------------*/
@@ -142,7 +174,6 @@ erq_rlookupv6(char *mesg, int msglen)
         strcat(mbuff, ai2->ai_canonname);
         reply1(get_handle(mesg), mbuff, strlen(mbuff)+1);
         free(mbuff);
-        free(buf);
     }
     else
         reply1(get_handle(mesg), msg_invalid, strlen(msg_invalid)+1);

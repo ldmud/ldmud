@@ -1,8 +1,11 @@
 Short: New efun 'call_trace()' or so
 Date: Sun, 16 Jul 2000 01:12:33 +0200
 From: Freaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
+State: Done - implemented in 3.2.9-dev.242
 See also: f-990203-28
 
+
+--- Or maybe put this functionality into debug_info().
 
 Hi,
 

@@ -2,7 +2,7 @@ Date: Mon, 7 Feb 2000 21:18:03 +0200 (EET)
 From: =?ISO-8859-1?Q?Manu_M=E4ki?= <mtmaki@students.turkuai.fi>
 Short: query_notify_fail() fails
 Type: Bug
-State: New
+State: Abandoned - not reproducible
 
 Hi, I had a chat you a while ago and you asked me to mail you these two
 probelsm I'm facing when using H_COMMAND hook. The hook looks like this:

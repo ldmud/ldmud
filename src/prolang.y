@@ -28,12 +28,10 @@
  * keywords %if, %elif, %else and %endif; mainly to activate the proper
  * parsing rules for INITIALIZATION_BY___INIT.
  *---------------------------------------------------------------------------
- * A compile file, open it to yield a filedescriptor 'fd', then call the
- * functions
+ * A compile file, set its filename into <current_file>, open it to yield a
+ * filedescriptor 'fd', then call
  *
- *     start_new_file(fd); : lex.c
- *     compile_file();     : prolang.y
- *     end_new_file();     : lex.c
+ *     compile_file(fd);
  *
  * then close the file again. The compiled program is 'returned' in
  * the global compiled_prog - on error, this variable is returned as NULL.
@@ -77,6 +75,8 @@
  *---------------------------------------------------------------------------
  */
 
+#undef lint  /* undef so that precompiled headers can be used */
+
 #include "driver.h"
 #include "typedefs.h"
 
@@ -109,6 +109,8 @@
 
 #include "../mudlib/sys/driver_hook.h"
 
+#define lint  /* redef again to prevent spurious warnings */
+
 #define YYMAXDEPTH        600
 
 /*-------------------------------------------------------------------------*/
@@ -132,7 +134,7 @@ int num_virtual_variables;
    * are offset by this value, in effect collecting the virtual
    * variables at the start of the variable indices.
    */
-   
+
 program_t *compiled_prog;
   /* After yyparse(), the finished program.
    */
@@ -161,7 +163,7 @@ svalue_t *prog_variable_values;
 
 #define SH(x) - -(1 << (x))
 
-short hook_type_map[NUM_CLOSURE_HOOKS] =
+short hook_type_map[NUM_DRIVER_HOOKS] =
 %hookmap \
     H_MOVE_OBJECT0: 0, \
     H_MOVE_OBJECT1: 0, \
@@ -181,6 +183,8 @@ short hook_type_map[NUM_CLOSURE_HOOKS] =
     H_ERQ_STOP:       SH(T_CLOSURE), \
     H_MODIFY_COMMAND_FNAME: SH(T_STRING), \
     H_COMMAND:        SH(T_CLOSURE) SH(T_STRING), \
+    H_SEND_NOTIFY_FAIL: SH(T_CLOSURE) SH(T_STRING), \
+    H_AUTO_INCLUDE:   SH(T_CLOSURE) SH(T_STRING), \
 
 #undef SH
 
@@ -193,7 +197,7 @@ short hook_type_map[NUM_CLOSURE_HOOKS] =
  * a list of these structures is used to collect the information about
  * the array content.
  */
- 
+
 struct const_list_s
 {
     const_list_t *next;
@@ -209,18 +213,18 @@ struct const_list_s
  * The .head svalue_t is a T_ERROR_HANDLER pointing to a deallocation
  * function for the list.
  */
- 
+
 struct const_list_svalue_s
 {
     svalue_t     head;  /* the error handler */
     const_list_t list;  /* First element of the list */
 };
 
-/* --- struct efun_shadow_t: Store info about masked efuns ---
+/* --- struct efun_shadow_s: Store info about masked efuns ---
  *
  * This structure is used when global identifiers shadow efun names.
  */
- 
+
 struct efun_shadow_s
 {
     efun_shadow_t *next;    /* Linkpointer for the list of shadows */
@@ -287,29 +291,31 @@ struct efun_shadow_s
     * INDEX_START_NONE is used for functions with no type information.
     */
 
-#define NUMPAREAS                  8  /* Number of saved areas */
+#define A_INCLUDES                 8
+   /* (include_t) Tabled descriptors of all included files, in the order
+    * of appearance.
+    */
 
-#define A_FUNCTIONS                8
+#define NUMPAREAS                  9  /* Number of saved areas */
+
+#define A_FUNCTIONS                9
    /* (function_t): Function definitions
     */
 
 %ifndef INITIALIZATION_BY___INIT
-#    define A_VARIABLE_VALUES      9
+#    define A_VARIABLE_VALUES     10
        /* (svalue_t) Initializers for non-virtual variables.
         */
-#    define A_VIRTUAL_VAR_VALUES  10
+#    define A_VIRTUAL_VAR_VALUES  11
        /* (svalue_t) Initializers for virtual variables.
         */
 %endif
 
-#define A_STRING_NEXT             11
+#define A_STRING_NEXT             12
    /* (int) During compilation, the strings in A_STRINGS are organized
     * in a hash table (prog_string_indizes/_tags). The hash chains are
     * linked together using the indizes in this area. The end of
     * a chain is marked by a negative next-index.
-    */
-#define A_INCLUDE_NAMES           12
-   /* (char*) Names of include files in the order of appearance.
     */
 
 #define NUMAREAS                  13  /* Total number of areas */
@@ -418,6 +424,10 @@ static mem_block_t mem_block[NUMAREAS];
   /* Index the chain-index for program string <n>.
    */
 
+#define INCLUDE_COUNT  (mem_block[A_INCLUDES].current_size / sizeof(include_t))
+  /* Return the total number of include files encountered so far.
+   */
+
 /*-------------------------------------------------------------------------*/
 /* Information describing nested local blocks (scopes).
  */
@@ -464,7 +474,7 @@ static p_int comp_stack[COMPILER_STACK_SIZE];
   /* A stack of addresses (offsets) in the generated program code for
    * later backpatching.
    */
-   
+
 static size_t comp_stackp;
   /* Index of the next unused entry in <comp_stack>.
    */
@@ -507,7 +517,7 @@ static vartype_t type_of_locals[MAX_LOCAL];
   /* The short type (ie: just the type, no visibility information) of
    * the local variables.
    */
-   
+
 static fulltype_t full_type_of_locals[MAX_LOCAL];
   /* The full types of the local variables.
    */
@@ -527,9 +537,16 @@ static ident_t *all_locals = NULL;
    * nested block scopes.
    */
 
-static fulltype_t exact_types;
+       fulltype_t exact_types;
   /* If 0, don't check nor require argument and function types.
-   * Otherwise it's the return type of the function.
+   * Otherwise it's the full return type of the function, including
+   * visibility. The lexer reads this variable when scanning an
+   * inline closure.
+   */
+
+static fulltype_t default_varmod;
+static fulltype_t default_funmod;
+  /* Default visibility modifiers for variables resp. function.
    */
 
 static int heart_beat;
@@ -639,7 +656,7 @@ static int current_break_stack_need = 0;
   /* Current depth of the required switch/break stack at this point
    * in a function.
    */
-   
+
 static int max_break_stack_need = 0;
   /* Total depth of the required switch/break stack for this function.
    * This information is required when computing the 'num_locals'
@@ -668,9 +685,15 @@ static p_uint last_include_start;
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
+struct lvalue_s; /* Defined within YYSTYPE aka %union */
+static Bool add_lvalue_code ( struct lvalue_s * lv, int instruction);
 static void insert_pop_value(void);
 static void arrange_protected_lvalue(p_int, int, p_int, int);
 static int insert_inherited(char *,char *, program_t **, function_t *, int, bytecode_p);
+  /* Returnvalues from insert_inherited(): */
+#  define INHERITED_NOT_FOUND            (-1)
+#  define INHERITED_WILDCARDED_ARGS      (-2)
+#  define INHERITED_WILDCARDED_NOT_FOUND (-3)
 static void store_line_number_relocation(int relocated_from);
 int yyparse(void);
 %ifdef INITIALIZATION_BY___INIT
@@ -700,8 +723,12 @@ yyerror (char *str)
     if (num_parse_error > 5)
         return;
     context = lex_error_context();
-    fprintf(stderr, "%s %s: %s line %d %s\n"
-                  , time_stamp(), current_file, str, current_line, context);
+    fprintf(stderr, "%s %s line %d: %s%s.\n"
+                  , time_stamp(), current_file, current_line, str, context);
+    /* TODO: lex should implement a function get_include_stack() which
+     * TODO:: returns an svalue-array with the current include stack.
+     * TODO:: This could be printed, and also passed to parse_error().
+     */
     fflush(stderr);
     parse_error(MY_FALSE, current_file, current_line, str, context);
     if (num_parse_error == 0)
@@ -718,10 +745,10 @@ yyerrorf (char *format, ...)
 
 {
     va_list va;
-    char buff[512];
-    char fixed_fmt[200];
+    char buff[5120];
+    char fixed_fmt[1000];
 
-    format = limit_error_format(fixed_fmt, format);
+    format = limit_error_format(fixed_fmt, sizeof(fixed_fmt), format);
     va_start(va, format);
     vsprintf(buff, format, va);
     va_end(va);
@@ -740,8 +767,12 @@ yywarn (char *str)
     char *context;
 
     context = lex_error_context();
-    fprintf(stderr, "%s %s: Warning: %s line %d %s\n"
-                  , time_stamp(), current_file, str, current_line, context);
+    fprintf(stderr, "%s %s line %d: Warning: %s%s\n"
+                  , time_stamp(), current_file, current_line, str, context);
+    /* TODO: lex should implement a function get_include_stack() which
+     * TODO:: returns an svalue-array with the current include stack.
+     * TODO:: This could be printed, and also passed to parse_error().
+     */
     fflush(stderr);
     parse_error(MY_TRUE, current_file, current_line, str, context);
     if (num_parse_error == 0)
@@ -757,10 +788,10 @@ yywarnf (char *format, ...)
 
 {
     va_list va;
-    char buff[512];
-    char fixed_fmt[200];
+    char buff[5120];
+    char fixed_fmt[1000];
 
-    format = limit_error_format(fixed_fmt, format);
+    format = limit_error_format(fixed_fmt, sizeof(fixed_fmt), format);
     va_start(va, format);
     vsprintf(buff, format, va);
     va_end(va);
@@ -784,7 +815,10 @@ yalloc (size_t size)
 
     p = xalloc(size+sizeof(char*));
     if (!p)
+    {
+        fatal("Out of memory in compiler.\n");
         return NULL;
+    }
     *p++ = last_yalloced;
     last_yalloced = (char *)p;
     return p;
@@ -859,14 +893,14 @@ realloc_mem_block (mem_block_t *mbp, mp_int size)
  */
 
 {
-    mp_int max_size;
+    mp_uint max_size;
     char *p;
 
     max_size = mbp->max_size;
     do {
         max_size *= 2;
     } while (size > max_size);
-    
+
     p = rexalloc(mbp->block, max_size);
     if (!p)
     {
@@ -940,6 +974,50 @@ add_to_mem_block (int n, void *data, size_t size)
    * are pointer types and one of them is a *ANY.
    */
 
+#define REDEFINED_TYPE(e,t) \
+    (   BASIC_TYPE( (e), (t) ) \
+     || ( (t) == (TYPE_MOD_POINTER|TYPE_ANY) ) \
+     || ( (e) == (TYPE_MOD_POINTER|TYPE_ANY) ) \
+    )
+
+  /* Return TRUE if type <t> is a proper redefinition of <e>.
+   * This is the case if <e> and <t> are compatible base types,
+   * or if one of them is *ANY.
+   */
+
+/*-------------------------------------------------------------------------*/
+static char *
+get_visibility (fulltype_t type)
+
+/* Return (in a static buffer) a textual representation of the visibility
+ * portion of <type>.
+ */
+
+{
+    static char buff[100];
+    size_t len;
+
+    buff[0] = '\0';
+    if (type & TYPE_MOD_STATIC)
+        strcat(buff, "static ");
+    if (type & TYPE_MOD_NO_MASK)
+        strcat(buff, "nomask ");
+    if (type & TYPE_MOD_PRIVATE)
+        strcat(buff, "private ");
+    if (type & TYPE_MOD_PROTECTED)
+        strcat(buff, "protected ");
+    if (type & TYPE_MOD_PUBLIC)
+        strcat(buff, "public ");
+    if (type & TYPE_MOD_VARARGS)
+        strcat(buff, "varargs ");
+
+    len = strlen(buff);
+    if (len)
+        buff[len-1] = '\0';
+
+    return buff;
+} /* get_visibility() */
+
 /*-------------------------------------------------------------------------*/
 static char *
 get_type_name (fulltype_t type)
@@ -981,9 +1059,9 @@ get_type_name (fulltype_t type)
         reference = MY_TRUE;
         type &= ~TYPE_MOD_REFERENCE;
     }
-    
+
     if (type >= sizeof type_name / sizeof type_name[0])
-        fatal("Bad type\n");
+        fatal("Bad type %ld\n", (long)type);
 
     strcat(buff, type_name[type]);
     strcat(buff," ");
@@ -1142,13 +1220,22 @@ check_aggregate_types (int n)
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
-realloc_a_program (void)
+realloc_a_program (size_t size)
 
-/* Double the allocated size of the A_PROGRAM area.
+/* If necessary, increase the allocated size of the A_PROGRAM area so that at
+ * least <size> more bytes can be stored in it.
+ *
+ * Return NULL when out of memory, or a pointer to the (possibly newly
+ * allocated) memory area (ie. mem_block[A_PROGRAM].block).
  */
 
 {
-    return realloc_mem_block(&mem_block[A_PROGRAM], 0);
+    mem_block_t * mbp = &mem_block[A_PROGRAM];
+    mp_uint new_size = mbp->current_size + size;
+
+    if (new_size <= mbp->max_size)
+        return mbp->block;
+    return realloc_mem_block(mbp, new_size);
 } /* realloc_a_program() */
 
 /*-------------------------------------------------------------------------*/
@@ -1165,8 +1252,12 @@ ins_byte (unsigned char b)
 
 {
     if (mem_block[A_PROGRAM].current_size == mem_block[A_PROGRAM].max_size ) {
-        if (!realloc_a_program())
+        if (!realloc_a_program(1))
+        {
+            yyerrorf("Out of memory: program size %lu\n"
+                    , mem_block[A_PROGRAM].current_size + 1);
             return;
+        }
     }
     mem_block[A_PROGRAM].block[mem_block[A_PROGRAM].current_size++] = b;
 } /* ins_byte() */
@@ -1195,16 +1286,20 @@ ins_short (short l)
  */
 
 {
-    mp_uint current_size;
-    char *dest;
-
-    current_size = CURRENT_PROGRAM_SIZE;
-    CURRENT_PROGRAM_SIZE = current_size + 2;
-    if (current_size +1 < mem_block[A_PROGRAM].max_size
-     || realloc_a_program())
+    if (realloc_a_program(2))
     {
+        mp_uint current_size;
+        char *dest;
+
+        current_size = CURRENT_PROGRAM_SIZE;
+        CURRENT_PROGRAM_SIZE = current_size + 2;
         dest = mem_block[A_PROGRAM].block + current_size;
         PUT_SHORT(dest, l);
+    }
+    else
+    {
+        yyerrorf("Out of memory: program size %lu\n"
+                , mem_block[A_PROGRAM].current_size + 2);
     }
 } /* ins_short() */
 
@@ -1239,6 +1334,25 @@ read_short (mp_uint offset)
     return l;
 } /* read_short() */
 
+%ifdef INITIALIZATION_BY___INIT
+/*-------------------------------------------------------------------------*/
+static void
+upd_offset (mp_uint offset, long l)
+
+/* Store the 3-byte number <l> at <offset> in the A_PROGRAM are in
+ * a fixed byteorder.
+ */
+
+{
+    char *dest;
+
+    dest = mem_block[A_PROGRAM].block + offset;
+    STORE_UINT8(dest, l>>16);
+    PUT_SHORT(dest, l & 0xffff);
+} /* upd_offset() */
+
+%endif /* INITIALIZATION_BY___INIT */
+
 /*-------------------------------------------------------------------------*/
 static void
 ins_long (int32 l)
@@ -1247,19 +1361,21 @@ ins_long (int32 l)
  */
 
 {
-    mp_uint current_size;
-    char *dest;
-
-    current_size = CURRENT_PROGRAM_SIZE;
-    CURRENT_PROGRAM_SIZE = current_size + 4;
-    if (current_size +3 >= mem_block[A_PROGRAM].max_size
-     && !realloc_a_program())
+    if (realloc_a_program(4))
     {
-        return;
-    }
+        mp_uint current_size;
+        char *dest;
 
-    dest = mem_block[A_PROGRAM].block + current_size;
-    PUT_INT32(dest, l);
+        current_size = CURRENT_PROGRAM_SIZE;
+        CURRENT_PROGRAM_SIZE = current_size + 4;
+        dest = mem_block[A_PROGRAM].block + current_size;
+        PUT_INT32(dest, l);
+    }
+    else
+    {
+        yyerrorf("Out of memory: program size %lu\n"
+                , mem_block[A_PROGRAM].current_size + 4);
+    }
 } /* ins_long() */
 
 /*-------------------------------------------------------------------------*/
@@ -1278,13 +1394,7 @@ ins_long (int32 l)
 
 #define PREPARE_INSERT(n) \
     bytecode_p __PREPARE_INSERT__p = (\
-      (\
-        CURRENT_PROGRAM_SIZE+(n) > mem_block[A_PROGRAM].max_size ?\
-          realloc_a_program()\
-        :\
-          0\
-      ),\
-      PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE);
+      realloc_a_program(n) ? (PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE) : NULL);
 
 #define add_byte(b)   (void) STORE_INT8(__PREPARE_INSERT__p, (b))
 
@@ -1296,7 +1406,7 @@ push_address (void)
 
 /* Push the current program size as address onto the compiler stack.
  */
- 
+
 {
     if (comp_stackp >= COMPILER_STACK_SIZE)
     {
@@ -1357,6 +1467,8 @@ fix_branch (int ltoken, p_int dest, p_int loc)
  * into its long-branch variant <ltoken>.
  *
  * Return TRUE if the long branch had to be used, FALSE otherwise.
+ * TODO: This really confuses the line number detection code, as suddenly
+ * TODO:: the recorded offset are no longer accurate.
  */
 
 {
@@ -1371,6 +1483,8 @@ fix_branch (int ltoken, p_int dest, p_int loc)
          */
         p_int i, j;
         bytecode_p p;
+
+        mem_block[A_PROGRAM].block[loc] = 0; /* Init it */
 
         /* Update the break address */
         if ( current_break_address > loc
@@ -1396,14 +1510,16 @@ fix_branch (int ltoken, p_int dest, p_int loc)
             }
             current_continue_address++;
         }
-        
+
         ins_byte(0); /* Just to make sure the memory is there */
 
         /* Move the code */
         p = PROGRAM_BLOCK + mem_block[A_PROGRAM].current_size-1;
         i = mem_block[A_PROGRAM].current_size - loc;
         for( ; --i >= 0; --p )
+        {
             PUT_CODE(p, GET_CODE(p-1));
+        }
 
         /* Store the new branch instruction */
         PUT_CODE(p, ltoken);
@@ -1431,10 +1547,14 @@ yyget_space (p_int size)
  */
 
 {
-    while (CURRENT_PROGRAM_SIZE + size > mem_block[A_PROGRAM].max_size)
-        realloc_a_program();
-    CURRENT_PROGRAM_SIZE += size;
-    return PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE - size;
+    if (realloc_a_program(size))
+    {
+        CURRENT_PROGRAM_SIZE += size;
+        return PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE - size;
+    }
+    yyerrorf("Out of memory: program size %lu\n"
+            , mem_block[A_PROGRAM].current_size + size);
+    return NULL;
 } /* yyget_space() */
 
 /*-------------------------------------------------------------------------*/
@@ -1449,27 +1569,34 @@ yymove_switch_instructions (int len, p_int blocklen)
 {
     mp_int i, j;
 
-    if ( (CURRENT_PROGRAM_SIZE += len) > mem_block[A_PROGRAM].max_size )
-        realloc_a_program();
-
-    /* Adjust the continue address, if any */
-    if ( (current_continue_address & CONTINUE_ADDRESS_MASK) > switch_pc
-     && !(current_continue_address & CONTINUE_DELIMITER ) )
+    if (realloc_a_program(len))
     {
-        for(i = current_continue_address & CONTINUE_ADDRESS_MASK;
-          (j=read_short(i)) > switch_pc; )
+        CURRENT_PROGRAM_SIZE += len;
+
+        /* Adjust the continue address, if any */
+        if ( (current_continue_address & CONTINUE_ADDRESS_MASK) > switch_pc
+         && !(current_continue_address & CONTINUE_DELIMITER ) )
         {
-                upd_short(i, j+len);
-                i = j;
+            for(i = current_continue_address & CONTINUE_ADDRESS_MASK;
+              (j=read_short(i)) > switch_pc; )
+            {
+                    upd_short(i, j+len);
+                    i = j;
+            }
+            current_continue_address += len;
         }
-        current_continue_address += len;
+
+        move_memory(
+          mem_block[A_PROGRAM].block + switch_pc + len,
+          mem_block[A_PROGRAM].block + switch_pc,
+          blocklen
+        );
     }
-    
-    move_memory(
-      mem_block[A_PROGRAM].block + switch_pc + len,
-      mem_block[A_PROGRAM].block + switch_pc,
-      blocklen
-    );
+    else
+    {
+        yyerrorf("Out of memory: program size %lu\n"
+                , mem_block[A_PROGRAM].current_size + len);
+    }
 } /* yymove_switch_instructions() */
 
 /*-------------------------------------------------------------------------*/
@@ -1489,6 +1616,61 @@ yycerrorl (char *s1, char *s2, int line1, int line2)
     yyerrorf(s1, buff);
 } /* yycerrorl() */
 
+/*-------------------------------------------------------------------------*/
+static void
+update_lop_branch ( p_uint address, int instruction )
+
+/* <address> points to the branch offset value of an LAND/LOR operation,
+ * currently set to 0. Update that offset to branch to the current end
+ * of the program.
+ *
+ * If that branch is too long, the code is rewritten:
+ *
+ *     Original:             Rewritten:
+ *
+ *      <expr1>                <expr1>
+ *      LOR/LAND l             DUP
+ *      <expr2>                LBRANCH_<instruction>
+ *   l:                        POP_VALUE
+ *                             <expr2>
+ *                          l:
+ *
+ * The extra DUP compensates the svalue the LBRANCH eats.
+ * The LBRANCH_<instruction> needs to be passed suiting the logical
+ * operator: LBRANCH_WHEN_ZERO for LAND, LBRANCH_WHEN_NON_ZERO for LOR.
+ */
+
+{
+    p_int offset;
+
+    last_expression = -1;
+
+    offset = mem_block[A_PROGRAM].current_size - ( address + 1);
+    if (offset > 0xff)
+    {
+        /* A long branch is needed */
+
+        int i;
+        bytecode_p p;
+
+        ins_short(0);
+        ins_byte(0);
+        p = PROGRAM_BLOCK + mem_block[A_PROGRAM].current_size-1;
+        for (i = offset; --i >= 0; --p )
+            *p = p[-3];
+        p[-4] = F_DUP;
+        p[-3] = instruction;
+        upd_short(address+1, offset+3);
+        if (offset > 0x7ffc)
+            yyerror("offset overflow");
+        p[0]  = F_POP_VALUE;
+    }
+    else
+    {
+        mem_block[A_PROGRAM].block[address] = offset;
+    }
+} /* update_lop_branch() */
+
 /* ========================   LOCALS and SCOPES   ======================== */
 
 /*-------------------------------------------------------------------------*/
@@ -1500,7 +1682,7 @@ free_all_local_names (void)
 
 {
     ident_t *p,*q;
-    
+
     for (q = all_locals; NULL != (p = q);)
     {
         q = p->next_all;
@@ -1559,6 +1741,12 @@ add_local_name (ident_t *ident, fulltype_t type, int depth)
  */
 
 {
+    if ((type & PRIMARY_TYPE_MASK) == TYPE_VOID)
+    {
+        yyerrorf( "Illegal to define variable '%s' as type 'void'"
+                , ident->name);
+    }
+
     if (current_number_of_locals >= MAX_LOCAL
      || current_number_of_locals >= 256)
         yyerror("Too many local variables");
@@ -1592,7 +1780,7 @@ add_local_name (ident_t *ident, fulltype_t type, int depth)
             max_number_of_locals = current_number_of_locals;
         block_scope[depth-1].num_locals++;
     }
-    
+
     return ident;
 } /* add_local_name() */
 
@@ -1642,6 +1830,35 @@ leave_block_scope (void)
         block_depth--;
     }
 } /* leave_block_scope() */
+
+/*-------------------------------------------------------------------------*/
+static ident_t *
+lookup_local (int num)
+
+/* Lookup the ident_t structure for local variable <num>.
+ */
+
+{
+    ident_t *p, *q;
+
+    /* First, find the declaration of this local */
+    q = NULL;
+    for (p = all_locals; p != NULL; p = p->next_all)
+    {
+        if (p->u.local.num == num)
+        {
+            q = p;
+            break;
+        }
+    }
+
+    /* q should be set here and point to the previous declaration.
+     */
+    if (!q)
+        fatal("Local identifier %ld not found in list.\n", (long)num);
+
+    return q;
+} /* lookup_local() */
 
 /*-------------------------------------------------------------------------*/
 static ident_t *
@@ -1768,9 +1985,22 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
     unsigned short argument_start_index;
 
     flags |= type & ~TYPE_MOD_MASK; /* Move the visibility-info into flags */
-    
-    if (p->type == I_TYPE_GLOBAL && (num = p->u.global.function) >= 0)
-    {
+
+    do {
+        function_t *funp;
+        Bool args_differ, compare_args;
+
+        if (p->type != I_TYPE_GLOBAL) break;
+        if ((num = p->u.global.function) < 0) break;
+
+        funp = FUNCTION(num);
+
+        if ((funp->flags & (NAME_INHERITED|TYPE_MOD_PRIVATE))
+         == (NAME_INHERITED|TYPE_MOD_PRIVATE))
+        {
+            break;
+        }
+
         /* The function was already defined. It may be one of several reasons:
          *
          *   1. There has been a prototype.
@@ -1780,21 +2010,19 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
          *   5. A "late" prototype has been encountered.
          */
 
-        function_t *funp;
-        Bool args_differ, compare_args;
-
-        funp = FUNCTION(num);
         args_differ = MY_FALSE;
         compare_args = MY_FALSE;
-        
+
         /* The following checks are useful only when done before
          * a functionbody appears, otherwise the warning/error message
          * line numbers will be misleading.
          */
         if (!complete)
         {
-            if (funp->flags & TYPE_MOD_NO_MASK
-             && !((funp->flags|flags) & (NAME_PROTOTYPE|NAME_UNDEFINED)) )
+            if ((funp->flags & TYPE_MOD_NO_MASK)
+             && !(funp->flags & (NAME_PROTOTYPE|NAME_UNDEFINED))
+             && ((flags & (NAME_PROTOTYPE|NAME_UNDEFINED)) == (NAME_PROTOTYPE|NAME_UNDEFINED))
+               )
                 yyerrorf("Illegal to redefine 'nomask' function \"%s\"", p->name);
 
             if (!(funp->flags & (NAME_UNDEFINED|NAME_PROTOTYPE|NAME_INHERITED) ) )
@@ -1819,12 +2047,12 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
             {
                 fulltype_t t1, t2;
 
-                if (funp->num_arg != num_arg && !(funp->flags & TYPE_MOD_VARARGS))
-                    yyerror("Incorrect number of arguments in redefinition.");
+                if (funp->num_arg > num_arg && !(funp->flags & TYPE_MOD_VARARGS))
+                    yyerrorf("Incorrect number of arguments in redefinition of '%s'.", p->name);
                 else if (funp->num_arg == num_arg
                       && ((funp->flags ^ flags) & TYPE_MOD_XVARARGS)
                       && !(funp->flags & TYPE_MOD_VARARGS))
-                    yyerror("Incorrect number of arguments in redefinition.");
+                    yyerrorf("Incorrect number of arguments in redefinition of '%s'.", p->name);
                 else
                 {
                     unsigned short first_arg;
@@ -1833,9 +2061,10 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                     if (first_arg == INDEX_START_NONE)
                     {
                         if (num_arg && !(funp->flags & NAME_TYPES_LOST) )
-                            yyerror(
-                              "Redefined function not compiled with type testing."
-                            );
+                            yyerrorf(
+                              "Redefined function '%s' not compiled with type testing."
+                                    , p->name
+                                    );
                     }
                     else
                     {
@@ -1844,6 +2073,34 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                     }
                 } /* cases (number of arguments) */
 
+                /* If it's a prototype->function redefinition, check if the
+                 * visibility is conserved.
+                 */
+                {
+#                   define TYPE_MOD_VIS \
+                           ( TYPE_MOD_NO_MASK \
+                           | TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC \
+                           | TYPE_MOD_PROTECTED)
+                    fulltype_t f1 = funp->flags;
+                    fulltype_t f2 = flags;
+
+                    /* Smooth out irrelevant differences */
+                    if (f1 & TYPE_MOD_STATIC) f1 |= TYPE_MOD_PROTECTED;
+                    if (f2 & TYPE_MOD_STATIC) f2 |= TYPE_MOD_PROTECTED;
+
+                    if (!(f1 & (NAME_INHERITED|NAME_TYPES_LOST))
+                     && ((f1 ^ f2) & TYPE_MOD_VIS)
+                       )
+                    {
+                        char buff[100];
+
+                        strcpy(buff, get_visibility(funp->flags));
+                        yywarnf("Inconsistent declaration of '%s': Visibility changed from '%s' to '%s'"
+                               , p->name, buff, get_visibility(flags));
+                    }
+#                   undef TYPE_MOD_VIS
+                }
+
                 /* Check if the 'varargs' attribute is conserved */
 
                 t1 = type & TYPE_MOD_MASK;
@@ -1851,9 +2108,9 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                 if (!MASKED_TYPE(t1, t2))
                 {
                     if (pragma_pedantic)
-                        yyerrorf("Return type mismatch %s", get_two_types(t2, t1));
+                        yyerrorf("Inconsistent declaration of '%s': Return type mismatch %s", p->name, get_two_types(t2, t1));
                     else
-                        yywarnf("Return type mismatch %s", get_two_types(t2, t1));
+                        yywarnf("Inconsistent declaration of '%s': Return type mismatch %s", p->name, get_two_types(t2, t1));
                 }
 
                 if (pragma_pedantic
@@ -1861,7 +2118,8 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                  &&  funp->flags & TYPE_MOD_VARARGS
                    )
                 {
-                    yywarn("Redefinition loses 'varargs' modifier.");
+                    yywarnf("Redefinition of '%s' loses 'varargs' modifier."
+                           , p->name);
                 }
 
                 /* Check that the two argument lists are compatible */
@@ -1894,13 +2152,13 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                             args_differ = MY_TRUE;
                             if (pragma_pedantic)
                                 yyerrorf("Argument type mismatch in "
-                                         "redefinition: arg %d %s"
-                                        , i+1, get_two_types(t1, t2)
+                                         "redefinition of '%s': arg %d %s"
+                                        , p->name, i+1, get_two_types(t1, t2)
                                         );
                             else
                                 yywarnf("Argument type mismatch in "
-                                         "redefinition: arg %d %s"
-                                        , i+1, get_two_types(t1, t2)
+                                         "redefinition of '%s': arg %d %s"
+                                        , p->name, i+1, get_two_types(t1, t2)
                                         );
                         }
                     } /* for (all args) */
@@ -1910,7 +2168,10 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
             } /* if (exact_types && already defined) */
 
          } /* if (!complete) */
-        
+
+        if (strcmp(p->name, "heart_beat") == 0)
+            heart_beat = num;
+
         /* If it was yet another prototype, then simply return. */
         if (flags & NAME_PROTOTYPE)
         {
@@ -1944,7 +2205,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
             }
 
         }
-        
+
         funp->num_local = num_local;
         funp->flags = flags;
         funp->offset.pc = offset;
@@ -1953,10 +2214,10 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         /* That's it */
         return num;
 
-    } /* if (function already defined) */
+    } while(0); /* Test and handle for already defined functions */
 
     /* It's a new function! */
-    
+
     if (strcmp(p->name, "heart_beat") == 0)
         heart_beat = FUNCTION_COUNT;
 
@@ -1975,7 +2236,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         /* This is the first _GLOBAL use of this identifier:
          * make an appropriate entry in the identifier table.
          */
-        
+
         if (p->type != I_TYPE_UNKNOWN)
         {
             /* The ident has been used before otherwise, so
@@ -1986,14 +2247,14 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         /* should be I_TYPE_UNKNOWN now. */
 
         p->type = I_TYPE_GLOBAL;
-        p->u.global.variable = -1;
-        p->u.global.efun     = -1;
-        p->u.global.sim_efun = -1;
+        p->u.global.variable = I_GLOBAL_VARIABLE_OTHER;
+        p->u.global.efun     = I_GLOBAL_EFUN_OTHER;
+        p->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
 
         p->next_all = all_globals;
         all_globals = p;
     }
-    else if (p->u.global.variable == -2)
+    else if (p->u.global.variable == I_GLOBAL_VARIABLE_FUN)
     {
         /* The previous _GLOBAL use is the permanent efun definition:
          * mark the efun as shadowed.
@@ -2005,6 +2266,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         q->next = all_efun_shadows;
         all_efun_shadows = q;
     }
+    /* else: Other cases don't need special treatment */
 
     p->u.global.function = num;
 
@@ -2043,12 +2305,18 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
     variable_t dummy;
     int n;
 
+    if ((flags & PRIMARY_TYPE_MASK) == TYPE_VOID)
+    {
+        yyerrorf( "Illegal to define variable '%s' as type 'void'"
+                , name->name);
+    }
+
     if (name->type != I_TYPE_GLOBAL)
     {
         /* This is the first _GLOBAL use of this identifier:
          * make an appropriate entry in the identifier table.
          */
-        
+
         if (name->type != I_TYPE_UNKNOWN)
         {
             /* The ident has been used before otherwise, so
@@ -2058,15 +2326,15 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
         }
 
         name->type = I_TYPE_GLOBAL;
-        name->u.global.function = -1;
-        name->u.global.variable = -1; /* mark it as 'yet undef' for now */
-        name->u.global.efun     = -1;
-        name->u.global.sim_efun = -1;
+        name->u.global.function = I_GLOBAL_FUNCTION_VAR;
+        name->u.global.variable = I_GLOBAL_VARIABLE_OTHER; /* mark it as 'yet undef' for now */
+        name->u.global.efun     = I_GLOBAL_EFUN_OTHER;
+        name->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
 
         name->next_all = all_globals;
         all_globals = name;
     }
-    else if (name->u.global.function == -2)
+    else if (name->u.global.function == I_GLOBAL_FUNCTION_EFUN)
     {
         /* The previous _GLOBAL use is the permanent efun definition:
          * mark the efun as shadowed.
@@ -2082,9 +2350,40 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
     /* If the variable already exists, make sure that we can redefine it */
     if ( (n = name->u.global.variable) >= 0)
     {
+        /* Visible nomask variables can't be redefined */
         if ( VARIABLE(n)->flags & TYPE_MOD_NO_MASK && !(flags & NAME_HIDDEN))
             yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
                     , name->name);
+
+        /* We can redefine inherited variables if they are private or hidden,
+         * or if one of them is static.
+         */
+        if (  (   !(VARIABLE(n)->flags & NAME_INHERITED)
+               || (   !(VARIABLE(n)->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+                   && !((flags ^ VARIABLE(n)->flags) & TYPE_MOD_STATIC)
+                  )
+              )
+            && !(flags & NAME_INHERITED)
+           )
+        {
+            if (VARIABLE(n)->flags & NAME_INHERITED)
+                yyerrorf("Illegal to redefine inherited variable '%s'", name->name);
+            else
+                yyerrorf("Illegal to redefine global variable '%s'", name->name);
+        }
+
+        if (((flags ^ VARIABLE(n)->flags) & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE))
+            == TYPE_MOD_STATIC
+         && !(flags & NAME_INHERITED)
+           )
+        {
+            yywarnf("Redefining inherited %s variable '%s' with a %s variable"
+                   , (VARIABLE(n)->flags & TYPE_MOD_STATIC)
+                     ? "nosave" : "non-nosave"
+                   , name->name
+                   , (flags & TYPE_MOD_STATIC) ? "nosave" : "non-nosave"
+                   );
+        }
 
         /* Make sure that at least one of the two definitions is 'static'.
          * The variable which has not been inherited gets first pick.
@@ -2148,15 +2447,15 @@ redeclare_variable (ident_t *name, fulltype_t flags, int n)
 
         /* I_TYPE_UNKNOWN */
         name->type = I_TYPE_GLOBAL;
-        name->u.global.function = -1;
-        name->u.global.variable = -1; /* default: it's hidden */
-        name->u.global.efun     = -1;
-        name->u.global.sim_efun = -1;
-        
+        name->u.global.function = I_GLOBAL_FUNCTION_VAR;
+        name->u.global.variable = I_GLOBAL_VARIABLE_OTHER; /* default: it's hidden */
+        name->u.global.efun     = I_GLOBAL_EFUN_OTHER;
+        name->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
+
         name->next_all = all_globals;
         all_globals = name;
     }
-    else if (name->u.global.function == -2)
+    else if (name->u.global.function == I_GLOBAL_FUNCTION_EFUN)
     {
         /* The previous _GLOBAL use is the permanent efun definition:
          * mark the efun as shadowed.
@@ -2165,7 +2464,7 @@ redeclare_variable (ident_t *name, fulltype_t flags, int n)
 
         q = xalloc(sizeof(efun_shadow_t));
         q->shadow = name;
-        
+
         q->next = all_efun_shadows;
         all_efun_shadows = q;
     }
@@ -2176,7 +2475,7 @@ redeclare_variable (ident_t *name, fulltype_t flags, int n)
     /* The variable is hidden, do nothing else */
     if (flags & NAME_HIDDEN)
         return;
-        
+
     if (name->u.global.variable >= 0 && name->u.global.variable != n)
     {
         if (VARIABLE(name->u.global.variable)->flags & TYPE_MOD_NO_MASK )
@@ -2189,7 +2488,7 @@ redeclare_variable (ident_t *name, fulltype_t flags, int n)
     {
         yyerrorf("Illegal to redefine 'nomask' variable \"%s\"", name->name);
     }
-    
+
     if (flags & TYPE_MOD_NOSAVE)
     {
         /* 'nosave' is internally saved as 'static' (historical reason) */
@@ -2218,7 +2517,7 @@ verify_declared (ident_t *p)
         yyerrorf("Variable %s not declared !", p->name);
         return -1;
     }
-    
+
     return r;
 } /* verify_declared() */
 
@@ -2282,7 +2581,7 @@ store_prog_string (char *str)
     }
 
     /* Add a totally new string */
-    
+
     str_size = mem_block[A_STRINGS].current_size;
     next_size = mem_block[A_STRING_NEXT].current_size;
 
@@ -2311,7 +2610,7 @@ store_prog_string (char *str)
 
     /* Store the string index as new prog_string_index[] */
     *indexp = str_size / sizeof str;
-    
+
     last_string_is_new = MY_TRUE;
     return *indexp;
 } /* store_prog_string() */
@@ -2426,7 +2725,7 @@ copy_svalue (svalue_t *svp)
     default:
         return &const0;
     }
-    
+
     return svp;
 } /* copy_svalue() */
 
@@ -2529,14 +2828,14 @@ free_const_list_svalue (svalue_t *svp)
 %token L_INC
 %token L_INHERIT
 %token L_INLINE_FUN
-%token L_INT   
+%token L_INT
 %token L_LAND
 %token L_LE
 %token L_LOCAL
 %token L_LOR
 %token L_LSH
-%token L_MAPPING     
-%token L_MIXED       
+%token L_MAPPING
+%token L_MIXED
 %token L_NE
 %token L_NO_MASK
 %token L_NOSAVE
@@ -2553,6 +2852,7 @@ free_const_list_svalue (svalue_t *svp)
 %token L_RANGE
 %token L_RETURN
 %token L_RSH
+%token L_RSHL
 %token L_SSCANF
 %token L_STATIC
 %token L_STATUS
@@ -2560,10 +2860,10 @@ free_const_list_svalue (svalue_t *svp)
 %token L_STRING_DECL
 %token L_SWITCH
 %token L_SYMBOL
-%token L_SYMBOL_DECL 
+%token L_SYMBOL_DECL
 %token L_VARARGS
 %token L_VIRTUAL
-%token L_VOID        
+%token L_VOID
 %token L_WHILE
 
 /* Textbook solution to the 'dangling else' shift/reduce conflict.
@@ -2584,7 +2884,7 @@ free_const_list_svalue (svalue_t *svp)
 
     double float_number;
       /* Literal floats */
-      
+
     struct {
         p_int number;
     } closure;
@@ -2615,7 +2915,7 @@ free_const_list_svalue (svalue_t *svp)
       /* Inheritance: [0]: code inheritance qualifiers
        *              [1]: variable inheritance qualifiers
        */
-       
+
     svalue_t *initialized;
       /* Position where to store the variable initializer.
        */
@@ -2645,7 +2945,8 @@ free_const_list_svalue (svalue_t *svp)
     }
     lrvalue;
       /* Used for expressions which may return a rvalue or lvalues.
-       * .type is always used, the others only for indexed lvalues.
+       * It is also used by the index range generation to move around
+       * the index expressions.
        * Lvalue generation in places where either a r- or an lvalue
        * is acceptible first generates the rvalue code, but stores
        * the necessary information to patch the code to produce
@@ -2679,7 +2980,7 @@ free_const_list_svalue (svalue_t *svp)
        * index values.
        */
 
-    struct {
+    struct lvalue_s {
         union {
             bytecode_p p;
             bytecode_t simple[2];
@@ -2805,6 +3106,10 @@ free_const_list_svalue (svalue_t *svp)
   /* Number of variables given to foreach
    */
 
+%type <number> opt_catch_mods
+  /* Bitflags for catch() modes: 1: nolog
+   */
+
 /* Special uses of <numbers> */
 
 %type <numbers> condStart
@@ -2835,7 +3140,7 @@ free_const_list_svalue (svalue_t *svp)
 %left     '&'
 %left     L_EQ    L_NE
 %left     '<'     L_LE  '>' L_GE
-%left     L_LSH   L_RSH
+%left     L_LSH   L_RSH L_RSHL
 %left     '+'     '-'
 %left     '*'     '/'   '%'
 %right    '~'     L_NOT
@@ -2845,7 +3150,7 @@ free_const_list_svalue (svalue_t *svp)
 
 /*-------------------------------------------------------------------------*/
 
-all: program;
+all: program ;
 
 program:
       program def possible_semi_colon
@@ -2853,9 +3158,10 @@ program:
 
 possible_semi_colon:
       /* empty */
-    | ';' { yywarn("Extra ';'. Ignored."); };
+    | ';' { yywarn("Extra ';'. Ignored."); }
+    ;
 
-note_start: { $$.start = CURRENT_PROGRAM_SIZE; }
+note_start: { $$.start = CURRENT_PROGRAM_SIZE; } ;
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -2863,6 +3169,7 @@ note_start: { $$.start = CURRENT_PROGRAM_SIZE; }
  * Function definitions
  * Variable definitions
  * Inheritance
+ * Default visibility
  */
 
 def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
@@ -2871,6 +3178,12 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
           use_local_scopes = pragma_use_local_scopes;
           block_depth = 1;
           init_scope(block_depth);
+
+          if (!($1 & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                     | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC)))
+          {
+              $1 |= default_funmod;
+          }
 
           $2 |= $1; /* $2 is now the complete type */
 
@@ -2897,20 +3210,20 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
               /* prevent freeing by exotic name clashes */
               ident_t *p = $3;
               p->type = I_TYPE_GLOBAL;
-              p->u.global.variable = -1;
-              p->u.global.efun     = -1;
-              p->u.global.sim_efun = -1;
-              p->u.global.function = -1;
+              p->u.global.variable = I_GLOBAL_VARIABLE_OTHER;
+              p->u.global.efun     = I_GLOBAL_EFUN_OTHER;
+              p->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
+              p->u.global.function = I_GLOBAL_FUNCTION_VAR;
               p->next_all = all_globals;
               all_globals = p;
           }
       }
-      
+
       '(' argument ')'
-      
+
       {
           /* We got the complete prototype: define it */
-          
+
           if ( current_number_of_locals
            && (full_type_of_locals[current_number_of_locals-1]
                & TYPE_MOD_VARARGS)
@@ -2949,25 +3262,29 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
 
       {
           /* The function is complete */
-          
+
           p_int start;
           bytecode_p p;
 %line
           if ( (start = $9) < 0)
           {
               /* function_body was a ';' -> prototype
-               * Just norm the visibility flags.
+               * Just norm the visibility flags unless it is a prototype
+               * for an already inherited function.
                */
 
               funflag_t *flagp;
 
               flagp = (funflag_t *)(&FUNCTION($3->u.global.function)->flags);
-              *flagp |= $1 & (*flagp & TYPE_MOD_PUBLIC
-                              ? (TYPE_MOD_NO_MASK)
-                              : (TYPE_MOD_NO_MASK|TYPE_MOD_PRIVATE
-                                |TYPE_MOD_STATIC|TYPE_MOD_PROTECTED
-                                |TYPE_MOD_PUBLIC)
-                              );
+              if (!(*flagp & NAME_INHERITED))
+              {
+                  *flagp |= $1 & (*flagp & TYPE_MOD_PUBLIC
+                                  ? (TYPE_MOD_NO_MASK)
+                                  : (TYPE_MOD_NO_MASK|TYPE_MOD_PRIVATE
+                                    |TYPE_MOD_STATIC|TYPE_MOD_PROTECTED
+                                    |TYPE_MOD_PUBLIC)
+                                  );
+              }
           }
           else
           {
@@ -3003,7 +3320,7 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
 
           /* Clean up */
           free_all_local_names();
-          
+
           if (first_inline_fun)
               insert_inline_fun_now = MY_TRUE;
 
@@ -3018,7 +3335,8 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
               insert_inline_fun_now = MY_TRUE;
       }
 
-    | inheritance 
+    | inheritance
+    | default_visibility
 ; /* def */
 
 
@@ -3033,10 +3351,15 @@ function_body:
           CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
 #endif
           $<number>$ = CURRENT_PROGRAM_SIZE;
-          if ( (CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE)
-                > mem_block[A_PROGRAM].max_size )
+          if (realloc_a_program(FUNCTION_HDR_SIZE))
           {
-              realloc_a_program();
+              CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE;
+          }
+          else
+          {
+              yyerrorf("Out of memory: program size %lu\n"
+                      , mem_block[A_PROGRAM].current_size + FUNCTION_HDR_SIZE);
+              YYACCEPT;
           }
       }
 
@@ -3109,32 +3432,35 @@ inheritance:
            * Since simulate::load_object() makes sure that the master has been
            * loaded, this test can only fail when the master is compiled.
            */
-          if (master_ob && !(master_ob->flags & O_DESTRUCTED))
+          if (master_ob && !(master_ob->flags & O_DESTRUCTED)
+           && (!max_eval_cost || eval_cost < max_eval_cost)
+             )
           {
               svalue_t *res;
-#ifndef COMPAT_MODE
-              char * filename;
-#endif
 
               push_string_shared(last_string_constant);
-#ifndef COMPAT_MODE
-              filename = alloca(strlen(current_file)+2);
-              *filename = '/';
-              strcpy(filename+1, current_file);
-              push_volatile_string(filename);
-#else
-              push_volatile_string(current_file);
-#endif
-              res = apply_master_ob(STR_INHERIT_FILE, 2);
+
+              if (!compat_mode)
+              {
+                  char * filename;
+                  filename = alloca(strlen(current_file)+2);
+                  *filename = '/';
+                  strcpy(filename+1, current_file);
+                  push_volatile_string(filename);
+              }
+              else
+                  push_volatile_string(current_file);
+
+              res = apply_master(STR_INHERIT_FILE, 2);
 
               if (res && !(res->type == T_NUMBER && !res->u.number))
               {
                   /* We got a result - either a new name or a "reject it"
                    * value.
                    */
-                   
+
                   char * cp;
-            
+
                   if (res->type != T_STRING)
                   {
                       yyerrorf("Illegal to inherit file '%s'.", last_string_constant);
@@ -3142,7 +3468,7 @@ inheritance:
                   }
 
                   for (cp = res->u.string; *cp == '/'; cp++) NOOP;
-            
+
                   if (!legal_path(cp))
                   {
                       yyerrorf("Illegal path '%s'.", res->u.string);
@@ -3156,6 +3482,13 @@ inheritance:
                   last_string_constant = make_shared_string(cp);
               }
               /* else: no result - use the string as it is */
+          }
+          else if (max_eval_cost && eval_cost >= max_eval_cost)
+          {
+              yyerrorf("Can't call master::%s for "
+                       "'%s': eval cost too big"
+                      , STR_INHERIT_FILE, last_string_constant);
+              /* use the string as it is */
           }
 
 
@@ -3183,7 +3516,7 @@ inheritance:
           if (ob->prog->flags & P_NO_INHERIT)
           {
               yyerror("Illegal to inherit an object which sets "
-                      "'#pragma no_inherit'.\n");
+                      "'#pragma no_inherit'");
               YYACCEPT;
           }
 
@@ -3192,30 +3525,61 @@ inheritance:
 
           /* Set up the inherit structure */
           inherit.prog = ob->prog;
-          inherit.inherit_type = INHERIT_TYPE_NORMAL;
+          if ($1[1] & TYPE_MOD_VIRTUAL)
+              inherit.inherit_type = INHERIT_TYPE_VIRTUAL;
+          else
+              inherit.inherit_type = INHERIT_TYPE_NORMAL;
           inherit.function_index_offset = FUNCTION_COUNT;
           inherit.inherit_depth = 1;
 
           /* If it's a virtual inherit, check if it has been
            * inherited virtually before. If yes, don't bother to insert it
            * again.
+           * For all types of inherits, check if the same program has already
+           * been inherited at the toplevel.
            */
-          if ($1[1] & TYPE_MOD_VIRTUAL)
+
           {
               inherit_t *inheritp;
               int j;
+              Bool duplicate_toplevel = MY_FALSE;
 
               inheritp = (inherit_t *)(mem_block[A_INHERITS].block);
               j = mem_block[A_INHERITS].current_size;
               for (; (j -= sizeof(inherit_t)) >= 0; inheritp++)
               {
-                  if (inheritp->prog == ob->prog
-                   && !(inheritp->variable_index_offset & NON_VIRTUAL_OFFSET_TAG) )
+                  if (inheritp->prog == ob->prog)
                   {
-                      inherit.inherit_type |= INHERIT_TYPE_DUPLICATE;
-                      inheritp->inherit_depth = 1;
-                      break;
+                      /* Check for duplicate toplevel inherit.
+                       * Since the check for duplicate virtual inherits
+                       * may change the inherit_depth, this test must
+                       * come first
+                       */
+                      if (inheritp->inherit_depth == 1)
+                          duplicate_toplevel = MY_TRUE;
+
+                      /* Check for duplicate virtual inherit */
+                      if (($1[1] & TYPE_MOD_VIRTUAL)
+                       && !(inheritp->variable_index_offset & NON_VIRTUAL_OFFSET_TAG)
+                       && !(inherit.inherit_type & INHERIT_TYPE_DUPLICATE)
+                         )
+                      {
+                          inherit.inherit_type |= INHERIT_TYPE_DUPLICATE;
+                          inheritp->inherit_depth = 1;
+                      }
                   }
+              }
+              if  (duplicate_toplevel)
+              {
+                  if (pragma_pedantic)
+                  {
+                      yyerrorf("Program '%s' already inherited"
+                              , inherit.prog->name);
+                      YYACCEPT;
+                  }
+                  else
+                      yywarnf("Program '%s' already inherited"
+                             , inherit.prog->name);
               }
           }
 
@@ -3228,11 +3592,11 @@ inheritance:
 %ifdef INITIALIZATION_BY___INIT
               initializer = copy_functions(ob->prog, $1[0]);
               copy_variables(ob->prog, $1[1]);
-          
+
               if (initializer > -1)
               {
                   /* We inherited a __INIT() function: create a call */
-              
+
                   transfer_init_control();
                   ins_byte(F_CALL_EXPLICIT_INHERITED);
                   ins_short(INHERIT_COUNT);
@@ -3249,7 +3613,16 @@ inheritance:
               /* Fix up the inherit indices */
               fix_function_inherit_indices(ob->prog);
 
-              /* Update and store the inherit structure */
+              /* Update and store the inherit structure.
+               *
+               * If the program was inherited non-virtual, the v_i_offset
+               * may become negative here if the program itself inherits
+               * other programs with variables virtually. That is ok
+               * because in the final program the sub-inherited virtual
+               * variables no longer are immediately before the programs
+               * non-virtual variables, but the program's code doesn't know
+               * that and continues to 'offset over' them.
+               */
               inherit.variable_index_offset
                 = $1[1] & TYPE_MOD_VIRTUAL
                   ? V_VARIABLE_COUNT - ob->prog->num_variables
@@ -3365,6 +3738,41 @@ inheritance_qualifier:
 ; /* inheritance_qualifier */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+/* Default visibility.
+ *
+ * We use the inheritance modifier notation to specify the default
+ * visibility of functions and variables.
+ */
+
+default_visibility:
+    L_DEFAULT inheritance_qualifiers ';'
+      {
+          if ($2[0] & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                       | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC)
+             )
+          {
+              yyerror("Default visibility specification for functions "
+                      "accepts only 'private', 'protected', 'public' or "
+                      "'static'");
+              YYACCEPT;
+          }
+
+          if ($2[1] & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                       | TYPE_MOD_PROTECTED)
+             )
+          {
+              yyerror("Default visibility specification for variables "
+                      "accepts only 'private', 'protected' or 'public'"
+                      );
+              YYACCEPT;
+          }
+
+          default_funmod = $2[0];
+          default_varmod = $2[1];
+      }
+; /* default_visibility */
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* Type specifications and casts
  *
  * The type rules are used to parse variable and function types, casts,
@@ -3401,7 +3809,7 @@ type_modifier:
     | L_PRIVATE    { $$ = TYPE_MOD_PRIVATE; }
     | L_PUBLIC     { $$ = TYPE_MOD_PUBLIC; }
     | L_VARARGS    { $$ = TYPE_MOD_VARARGS; }
-    | L_PROTECTED  { $$ = TYPE_MOD_PROTECTED; } 
+    | L_PROTECTED  { $$ = TYPE_MOD_PROTECTED; }
     | L_NOSAVE     { $$ = TYPE_MOD_NOSAVE; }
 ;
 
@@ -3423,8 +3831,8 @@ basic_non_void_type:
     | L_OBJECT       { $$ = TYPE_OBJECT;  current_type = $$; }
     | L_CLOSURE_DECL { $$ = TYPE_CLOSURE; current_type = $$; }
     | L_SYMBOL_DECL  { $$ = TYPE_SYMBOL;  current_type = $$; }
-    | L_FLOAT_DECL   { $$ = TYPE_FLOAT;   current_type = $$; };
-    | L_MAPPING      { $$ = TYPE_MAPPING; current_type = $$; };
+    | L_FLOAT_DECL   { $$ = TYPE_FLOAT;   current_type = $$; }
+    | L_MAPPING      { $$ = TYPE_MAPPING; current_type = $$; }
     | L_MIXED        { $$ = TYPE_ANY;     current_type = $$; }
 ; /* basic_type */
 
@@ -3502,15 +3910,23 @@ new_name:
       optional_star L_IDENTIFIER
       {
 %line
-          if (current_type & TYPE_MOD_VARARGS)
+          fulltype_t actual_type = current_type;
+
+          if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                              | TYPE_MOD_PROTECTED)))
+          {
+              actual_type |= default_varmod;
+          }
+
+          if (actual_type & TYPE_MOD_VARARGS)
           {
               yyerror("can't declare a variable as varargs");
-              current_type &= ~TYPE_MOD_VARARGS;
+              actual_type &= ~TYPE_MOD_VARARGS;
           }
 %ifdef INITIALIZATION_BY___INIT
-            define_variable($2, current_type | $1);
+            define_variable($2, actual_type | $1);
 %else /* then !INITIALIZATION_BY___INIT */
-            define_variable($2, current_type | $1, &const0);
+            define_variable($2, actual_type | $1, &const0);
 %endif
       }
 
@@ -3520,7 +3936,15 @@ new_name:
 
     | optional_star L_IDENTIFIER
       {
-          define_variable($2, current_type | $1);
+          fulltype_t actual_type = current_type;
+
+          if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                              | TYPE_MOD_PROTECTED)))
+          {
+              actual_type |= default_varmod;
+          }
+
+          define_variable($2, actual_type | $1);
           $<number>$ = verify_declared($2); /* Is the var declared? */
           transfer_init_control();          /* Prepare INIT code */
       }
@@ -3530,6 +3954,14 @@ new_name:
       {
           int i = $<number>3;
           PREPARE_INSERT(4)
+
+          fulltype_t actual_type = current_type;
+
+          if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                              | TYPE_MOD_PROTECTED)))
+          {
+              actual_type |= default_varmod;
+          }
 
 #ifdef DEBUG
           if (i & VIRTUAL_VAR_TAG)
@@ -3563,10 +3995,10 @@ new_name:
               yyerror("Illegal initialization");
 
           /* Do the types match? */
-          if (!compatible_types((current_type | $1) & TYPE_MOD_MASK, $5.type))
+          if (!compatible_types((actual_type | $1) & TYPE_MOD_MASK, $5.type))
           {
               yyerrorf("Type mismatch %s when initializing %s",
-                      get_two_types(current_type | $1, $5.type), $2->name);
+                      get_two_types(actual_type | $1, $5.type), $2->name);
           }
 
           /* Ok, assign */
@@ -3583,9 +4015,17 @@ new_name:
           /* svalue_constant can contain identifiers, so define the variable
            * now, lest the identifier could get freed by a name clash.
            */
-          int n;
 %line
-          define_variable($2, current_type | $1 | NAME_INITIALIZED, &const0);
+          int n;
+          fulltype_t actual_type = current_type;
+
+          if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                              | TYPE_MOD_PROTECTED)))
+          {
+              actual_type |= default_varmod;
+          }
+
+          define_variable($2, actual_type | $1 | NAME_INITIALIZED, &const0);
           n = $2->u.global.variable;
           $<initialized>$ = currently_initialized
             = n & VIRTUAL_VAR_TAG ? V_VAR_VALUE(n) : NV_VAR_VALUE(n);
@@ -3599,12 +4039,20 @@ new_name:
            * to the currently_initialized buffer set above, so
            * we just have to check the validity.
            */
-           
+
+          fulltype_t actual_type = current_type;
+
+          if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                              | TYPE_MOD_PROTECTED)))
+          {
+              actual_type |= default_varmod;
+          }
+
           if ($4 != F_ASSIGN)
               yyerror("Illegal initialization");
 
           if (exact_types)
-              if (!TYPE( current_type | $1 , type_rtoc($<initialized>3)) )
+              if (!TYPE( actual_type | $1 , type_rtoc($<initialized>3)) )
               {
                   yyerror("Bad initializer type");
               }
@@ -3623,7 +4071,7 @@ block:
 
       { enter_block_scope(); }
 
-      local_declarations
+      statements
 
       {
           /* If this is a local block, the declarations inserted
@@ -3643,15 +4091,17 @@ block:
           }
       }
 
-      statements '}'
+      '}'
 
       { leave_block_scope(); }
 ; /* block */
 
 
-local_declarations:
+statements:
       /* empty */
-    | local_declarations basic_type local_name_list ';' ;
+    | statements basic_type local_name_list ';'
+    | statements statement
+;
 
 
 local_name_list:
@@ -3702,13 +4152,12 @@ new_local :
 
               source = $1.u.simple;
               current_size = CURRENT_PROGRAM_SIZE;
-              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
-              if (current_size + 3 > mem_block[A_PROGRAM].max_size
-               && !realloc_a_program())
+              if (!realloc_a_program(3))
               {
                   yyerrorf("Out of memory: program size %lu", current_size+3);
                   YYACCEPT;
               }
+              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
               dest = PROGRAM_BLOCK + current_size;
               *dest++ = *source++;
               *dest++ = *source;
@@ -3737,13 +4186,13 @@ new_local_name:
               ins_byte(scope->first_local);
               ins_byte(0);
           }
-          
+
           $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE;
           $$.u.simple[1] = q->u.local.num;
           $$.length = 0;
           $$.type = current_type | $1;
       }
-      
+
     | optional_star L_LOCAL
       {
           /* A local name is redeclared. If this happens on a deeper
@@ -3774,11 +4223,6 @@ new_local_name:
 ; /* new_local_name */
 
 
-statements:
-      /* empty */
-    | statements statement
-
-
 statement:
       comma_expr ';'
       {
@@ -3801,10 +4245,10 @@ statement:
     | L_BREAK ';'
       {
           /* Compile the break statement */
-          
+
           if (current_break_address == 0)
               yyerror("break statement outside loop");
-              
+
           if (current_break_address & BREAK_ON_STACK)
           {
               /* We break from a switch() */
@@ -3814,7 +4258,7 @@ statement:
           else
           {
               /* A normal loop break: add the LBRANCH to the list */
-              
+
               ins_byte(F_LBRANCH);
               ins_short(current_break_address);
               current_break_address = CURRENT_PROGRAM_SIZE - 2;
@@ -3885,11 +4329,18 @@ return:
 %line
           if (exact_types)
           {
-              if (!MASKED_TYPE($2.type, exact_types & TYPE_MOD_MASK))
-                  type_error("Return type not matching", exact_types);
-              /* if (exact_types & ~TYPE_MOD_POINTER) == TYPE_ANY ,
-               * a reference in $2.type remains undetected.
+              fulltype_t rtype = exact_types & TYPE_MOD_MASK;
+
+              /* More checks, ie. mixed vs non-mixed, would be nice,
+               * but the general type tracking is too lacking for it.
                */
+              if (!MASKED_TYPE($2.type, rtype))
+              {
+                  char tmp[100];
+                  strcpy(tmp, get_type_name($2.type));
+                  yyerrorf("Return type not matching: got %s, expected %s"
+                         , tmp, get_type_name(rtype));
+              }
           }
 
           if ($2.type & TYPE_MOD_REFERENCE)
@@ -3925,7 +4376,7 @@ return:
 while:
       {
           /* Save the previous environment */
-         
+
           $<numbers>$[0] = current_continue_address;
           $<numbers>$[1] = current_break_address;
 
@@ -3989,7 +4440,7 @@ while:
           /* The body compiled ok. Now patch up the breaks and continues
            * and insert the condition checking.
            */
-           
+
           p_int offset;
           p_int next_addr;
           p_int addr = pop_address();
@@ -4019,7 +4470,7 @@ while:
           if (offset < -0xff)
           {
               /* We need a LBRANCH instead of the BBRANCH */
-              
+
               bytecode_p codep;
 
               if (offset < -0x8000)
@@ -4072,7 +4523,7 @@ do:
           /* Save the previous environment */
           $<numbers>$[0] = current_continue_address;
           $<numbers>$[1] = current_break_address;
-          
+
           current_break_address = BREAK_DELIMITER;
           current_continue_address = CONTINUE_DELIMITER;
 
@@ -4085,7 +4536,7 @@ do:
           /* The body is complete - we can already patch up
            * the continue statements.
            */
-           
+
           p_int next_addr;
           p_int current;
 %line
@@ -4106,7 +4557,7 @@ do:
           /* The loop is complete - we just need the final branch
            * instruction and to patch up the breaks.
            */
-           
+
           p_int offset;
           p_int next_addr;
           p_int addr = pop_address();
@@ -4114,8 +4565,11 @@ do:
           bytecode_p dest;
 
           current = CURRENT_PROGRAM_SIZE;
-          if (current + 3 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+          if (!realloc_a_program(3))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+3);
+              YYACCEPT;
+          }
 
           /* Add the branch statement */
           dest = PROGRAM_BLOCK + current;
@@ -4189,7 +4643,7 @@ do:
  * c: <cond>
  *    BBRANCH_WHEN_NON_ZERO l
  */
- 
+
 for:
       L_FOR '('
 
@@ -4211,7 +4665,7 @@ for:
           insert_pop_value();
 
           /* From here, the <body> will be placed eventually */
-          
+
           current_continue_address = CONTINUE_DELIMITER;
           $<number>$ = CURRENT_PROGRAM_SIZE;
       }
@@ -4224,7 +4678,7 @@ for:
            * in an 'expression' on the compiler stack for later
            * re-insertion.
            */
-           
+
           p_int start, length;
           bytecode_p expression;
 
@@ -4267,7 +4721,7 @@ for:
            * for later re-insertion and start the compilation
            * of the loop body.
            */
-           
+
           p_int length;
 
           /* Save the code block */
@@ -4310,7 +4764,7 @@ for:
            * code save on the compiler stack and patch up
            * the break and continues.
            */
-           
+
           p_int offset;
           p_int next_addr;
 
@@ -4322,7 +4776,7 @@ for:
               upd_short(current_continue_address,
                   CURRENT_PROGRAM_SIZE - current_continue_address);
           }
-          
+
           if ( $<expression>9.line != current_line
            || (    $<expression>12.line != current_line
                 && $<expression>12.length)
@@ -4457,17 +4911,57 @@ expr_decl:
 
               source = $1.u.simple;
               current_size = CURRENT_PROGRAM_SIZE;
-              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
-              if (current_size + 3 > mem_block[A_PROGRAM].max_size
-               && !realloc_a_program())
+              if (!realloc_a_program(3))
               {
                   yyerrorf("Out of memory: program size %lu", current_size+3);
                   YYACCEPT;
               }
+              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
               dest = PROGRAM_BLOCK + current_size;
               *dest++ = *source++;
               *dest++ = *source;
               *dest = $2;
+          }
+      }
+    | local_name_lvalue
+      {
+          /* We got a "int <name>" type expression. Compile it as if
+           * it has been "int <name> = 0".
+           */
+
+          p_int length;
+%line
+          /* Add the bytecode for pushing the number 0 onto the stack */
+          ins_f_code(F_CONST0);
+
+          /* Add the bytecode to create the lvalue and do the
+           * assignment.
+           */
+          length = $1.length;
+          if (length)
+          {
+              add_to_mem_block(A_PROGRAM, $1.u.p, length+1);
+              yfree($1.u.p);
+              last_expression = CURRENT_PROGRAM_SIZE-1;
+              mem_block[A_PROGRAM].block[last_expression] = F_ASSIGN;
+          }
+          else
+          {
+              bytecode_p source, dest;
+              mp_uint current_size;
+
+              source = $1.u.simple;
+              current_size = CURRENT_PROGRAM_SIZE;
+              if (!realloc_a_program(3))
+              {
+                  yyerrorf("Out of memory: program size %lu", current_size+3);
+                  YYACCEPT;
+              }
+              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
+              dest = PROGRAM_BLOCK + current_size;
+              *dest++ = *source++;
+              *dest++ = *source;
+              *dest = F_ASSIGN;
           }
       }
 ; /* expr_decl */
@@ -4502,13 +4996,13 @@ for_expr:
 
 foreach:
 
-      L_FOREACH '(' 
+      L_FOREACH '('
 
       {
           /* Save the previous environment */
           $<numbers>$[0] = current_continue_address;
           $<numbers>$[1] = current_break_address;
-          
+
           current_break_address = BREAK_DELIMITER;
           current_continue_address = CONTINUE_DELIMITER;
 
@@ -4525,7 +5019,7 @@ foreach:
           /* Remember the starting address of the expression */
           $<address>$ = CURRENT_PROGRAM_SIZE;
       }
-      
+
       expr0 ')'
 
       {
@@ -4572,7 +5066,7 @@ foreach:
           /* The body is complete - patch up the continue and
            * break statements and generate the remaining statements.
            */
-           
+
           p_int next_addr;
           p_int addr;
           mp_uint current;
@@ -4610,26 +5104,26 @@ foreach:
           else /* Create the full statement */
           {
               /* First patch up the continue statements */
-          
+
               for(; current_continue_address > 0
                   ; current_continue_address = next_addr)
-              { 
+              {
                   next_addr = read_short(current_continue_address);
                   upd_short(current_continue_address,
                       current - current_continue_address);
               }
-  
+
               /* Create the FOREACH_NEXT instruction and update
                * the branch of the earlier F_FOREACH.
                */
 
               upd_short(addr - 2, current - addr);
- 
+
               ins_f_code(F_FOREACH_NEXT);
               ins_short(current + 3 - addr);
 
               current += 3;
-          
+
               /* Finish up the breaks.
                */
               for (; current_break_address > 0
@@ -4644,7 +5138,7 @@ foreach:
                */
               ins_f_code(F_FOREACH_END);
           }
-              
+
           /* Restore the previous environment */
           current_continue_address = $<numbers>3[0];
           current_break_address    = $<numbers>3[1];
@@ -4688,13 +5182,12 @@ foreach_var_decl:  /* Generate the code for one lvalue */
 
               source = $1.u.simple;
               current_size = CURRENT_PROGRAM_SIZE;
-              CURRENT_PROGRAM_SIZE = current_size + 2;
-              if (current_size + 2 > mem_block[A_PROGRAM].max_size
-               && !realloc_a_program())
+              if (!realloc_a_program(2))
               {
                   yyerrorf("Out of memory: program size %lu", current_size+2);
                   YYACCEPT;
               }
+              CURRENT_PROGRAM_SIZE = current_size + 2;
               dest = PROGRAM_BLOCK + current_size;
               *dest++ = *source++;
               *dest++ = *source;
@@ -4727,7 +5220,7 @@ foreach_in:
           if ($1->type == I_TYPE_UNKNOWN)
               free_shared_identifier($1);
       }
-      
+
     | L_LOCAL
 
       {
@@ -4737,7 +5230,7 @@ foreach_in:
           for (id = all_locals; id; id = id->next_all)
               if (id->u.local.num == $1)
                   break;
-          
+
           if (id && strcmp(id->name, "in"))
               yyerror("Expected keyword 'in' in foreach()");
       }
@@ -4773,7 +5266,7 @@ switch:
         /* We start a new switch(), which might be nested into
          * an outer switch().
          */
-         
+
         case_state_t *statep;
 %line
         current_break_stack_need++;
@@ -5007,18 +5500,21 @@ condStart:
           /* When we enter a condition, we must not allow case labels
            * anymore.
            */
-             
+
           mp_uint current;
           bytecode_p current_code;
 
           /* Turn off the case labels */
-            
+
           $$[0] = current_break_address;
           current_break_address &= ~CASE_LABELS_ENABLED;
 
           current = CURRENT_PROGRAM_SIZE;
-          if (current + 2 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+          if (!realloc_a_program(2))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+3);
+              YYACCEPT;
+          }
           current_code = PROGRAM_BLOCK + current;
 
           /* Add the branch instruction, with the usual optimization */
@@ -5114,7 +5610,8 @@ constant:
     | constant '<'   constant { $$ = $1 <  $3; }
     | constant L_LE  constant { $$ = $1 <= $3; }
     | constant L_LSH constant { $$ = (p_uint)$3 > MAX_SHIFT ? 0 : $1 << $3; }
-    | constant L_RSH constant { $$ = $1 >> ((p_uint)$3 > MAX_SHIFT ? MAX_SHIFT : $3); }
+    | constant L_RSH constant { $$ = (p_uint)$3 > MAX_SHIFT ? ($1 >= 0 ? 0 : -1) : ($1 >> $3); }
+    | constant L_RSHL constant { $$ = (p_uint)$3 > MAX_SHIFT ? 0 : ((p_uint)$1 >> $3); }
     | constant '+'   constant { $$ = $1 +  $3; }
     | constant '-'   constant { $$ = $1 -  $3; }
     | constant '*'   constant { $$ = $1 *  $3; }
@@ -5139,10 +5636,10 @@ constant:
               $$ = 0;
           }
       }
-    | '(' constant ')' { $$ = $2; } ;
+    | '(' constant ')' { $$ = $2; }
     | '-'   constant %prec '~' { $$ = -$2; }
     | L_NOT constant { $$ = !$2; }
-    | '~'   constant { $$ = ~$2; } ;
+    | '~'   constant { $$ = ~$2; }
     | L_NUMBER
 ; /* constant */
 
@@ -5204,63 +5701,189 @@ comma_expr:
 
 expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-      lvalue L_ASSIGN expr0 %prec L_ASSIGN
+
+      /* Normal assign:               ||= (&&= analog):
+       *
+       *  <expr0>               <lvalue>         <lvalue>
+       *  <lvalue>              LDUP             LDUP
+       *  ASSIGN-operator       LOR l            DUP
+       *                        <expr0>          LBRANCH_WHEN_NON_ZERO l
+       *                    l:  SWAP_VALUES      POP_VALUE
+       *                        ASSIGN           <expr0>
+       *                                      l: SWAP_VALUES
+       *                                          ASSIGN
+       */
+
+      lvalue L_ASSIGN
+
       {
-          p_int length;
-          vartype_t type2;
+          if ($2 == F_LAND_EQ || $2 == F_LOR_EQ)
+          {
+              if (!add_lvalue_code(&$1, 0))
+                  YYACCEPT;
+
+              /* Add the operator specific code */
+
+              if ($2 == F_LAND_EQ)
+              {
+                  /* Insert the LDUP, LAND and remember the position */
+
+                  ins_f_code(F_LDUP);
+                  ins_f_code(F_LAND);
+                  $<address>$ = CURRENT_PROGRAM_SIZE;
+                  ins_byte(0);
+              }
+              else if ($2 == F_LOR_EQ)
+              {
+                  /* Insert the LDUP, LOR and remember the position */
+
+                  ins_f_code(F_LDUP);
+                  ins_f_code(F_LOR);
+                  $<address>$ = CURRENT_PROGRAM_SIZE;
+                  ins_byte(0);
+              }
+          }
+      }
+
+      expr0 %prec L_ASSIGN
+
+      {
+          vartype_t type1, type2, restype;
 %line
-          type2 = $3.type;
+          $$ = $4;
+
+          type1 = $1.type;
+          type2 = $4.type;
+          restype = type2; /* Assume normal assignment */
 
           /* Check the validity of the assignment */
           if (exact_types
            && !compatible_types($1.type, type2)
-           && !(   $1.type == TYPE_STRING
-                && (type2 == TYPE_NUMBER || type2 == TYPE_FLOAT)
-                && $2 == F_ADD_EQ))
+             )
           {
-              yyerrorf("Bad assignment %s", get_two_types($1.type, $3.type));
+              Bool ok = MY_FALSE;
+
+              switch($2)
+              {
+              case F_LAND_EQ:
+              case F_LOR_EQ:
+                  ok = MY_TRUE;
+                  break;
+
+              case F_ADD_EQ:
+                  switch(type1)
+                  {
+                  case TYPE_STRING:
+                      if (type2 == TYPE_NUMBER || type2 == TYPE_FLOAT)
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
+                  case TYPE_FLOAT:
+                      if (type2 == TYPE_NUMBER)
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
+                  }
+                  break;
+
+              case F_SUB_EQ:
+                  switch(type1)
+                  {
+                  case TYPE_FLOAT:
+                      if (type2 == TYPE_NUMBER)
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
+                  }
+                  break;
+
+              case F_MULT_EQ:
+                  switch(type1)
+                  {
+                  case TYPE_STRING:
+                      if (type2 == TYPE_NUMBER)
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
+                  case TYPE_FLOAT:
+                      if (type2 == TYPE_NUMBER)
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
+                  default:
+                      if ((type1 & TYPE_MOD_POINTER) && type2 == TYPE_NUMBER)
+                      {
+                          ok = MY_TRUE;
+                      }
+                  }
+                  break;
+
+              case F_DIV_EQ:
+                  switch(type1)
+                  {
+                  case TYPE_FLOAT:
+                      if (type2 == TYPE_NUMBER)
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
+                  }
+                  break;
+
+              } /* switch(assign op) */
+
+              if (!ok)
+              {
+                  yyerrorf("Bad assignment %s", get_two_types(type1, type2));
+              }
+
+              /* Operator assignment: result type is determined by assigned-to
+               * type.
+               */
+              restype = type1;
           }
 
           if (type2 & TYPE_MOD_REFERENCE)
               yyerror("Can't trace reference assignments.");
 
-          /* Create the code to push the lvalue */
-          length = $1.length;
-          if (length)
+          if ($2 == F_LAND_EQ || $2 == F_LOR_EQ)
           {
-              add_to_mem_block(A_PROGRAM, $1.u.p, length+1);
-              yfree($1.u.p);
-              last_expression = CURRENT_PROGRAM_SIZE-1;
-              mem_block[A_PROGRAM].block[last_expression] = $2;
+              /* Update the offset the earlier LAND/LOR instruction */
+
+              if ($2 == F_LAND_EQ)
+              {
+                  update_lop_branch($<address>3, F_LBRANCH_WHEN_ZERO);
+              }
+              else if ($2 == F_LOR_EQ)
+              {
+                  update_lop_branch($<address>3, F_LBRANCH_WHEN_NON_ZERO);
+              }
+
+              /* Insert the SWAP and the ASSIGN */
+
+              ins_f_code(F_SWAP_VALUES);
+              ins_f_code(F_ASSIGN);
           }
           else
           {
-              bytecode_p source, dest;
-              mp_uint current_size;
-
-              source = $1.u.simple;
-              current_size = CURRENT_PROGRAM_SIZE;
-              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
-              if (current_size + 3 > mem_block[A_PROGRAM].max_size
-               && !realloc_a_program())
-              {
-                  yyerrorf("Out of memory: program size %lu", current_size+3);
+              if (!add_lvalue_code(&$1, $2))
                   YYACCEPT;
-              }
-              dest = PROGRAM_BLOCK + current_size;
-              *dest++ = *source++;
-              *dest++ = *source;
-              *dest = $2;
           }
-          $$.type = type2;
+          $$.end = CURRENT_PROGRAM_SIZE;
+          $$.type = restype;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | error L_ASSIGN expr0  %prec L_ASSIGN
-      {   yyerror("Illegal LHS"); $$.type = TYPE_ANY; };
+      {   yyerror("Illegal LHS"); $$ = $3; $$.type = TYPE_ANY; }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr0 '?' %prec '?'
+    | expr0 '?'
       {
           /* Insert the branch to the :-part and remember this address */
           ins_byte(F_BRANCH_WHEN_ZERO);
@@ -5291,7 +5914,7 @@ expr0:
               /* We have to make it a long branch and move the code
                * generated so far.
                */
-               
+
               int i;
               bytecode_p p;
 
@@ -5354,20 +5977,22 @@ expr0:
               mem_block[A_PROGRAM].block[address] = offset;
           }
 
+          $$ = $1;
+          $$.end = CURRENT_PROGRAM_SIZE;
+
           /* Check the types and determine the result type */
           type1 = $4.type;
           type2 = $7.type;
 
-          if (exact_types
-           && !compatible_types(type1, type2)
-           && instrs[F_CALL_OTHER].ret_type != TYPE_ANY)
+          if (!compatible_types(type1, type2))
           {
-
-              type_error("Different types in ?: expr", type1);
-              type_error("                      and ", type2);
+              $$.type = TYPE_ANY;
+              if ((type1 & TYPE_MOD_POINTER) != 0
+               && (type2 & TYPE_MOD_POINTER) != 0)
+                  $$.type |= TYPE_MOD_POINTER;
+              /* TODO: yyinfof("Different types to ?: */
           }
-
-          if (type1 == TYPE_ANY)
+          else if (type1 == TYPE_ANY)
               $$.type = type2;
           else if (type2 == TYPE_ANY)
               $$.type = type1;
@@ -5383,7 +6008,7 @@ expr0:
     | expr0 L_LOR %prec L_LOR
       {
           /* Insert the LOR and remember the position */
-          
+
           ins_byte(F_LOR);
           $<address>$ = CURRENT_PROGRAM_SIZE;
           ins_byte(0);
@@ -5393,51 +6018,11 @@ expr0:
 
       {
           /* Update the offset the earlier LOR instruction */
-          
-          p_int address, offset;
 
-          last_expression = -1;
-          address = $<address>3;
-          offset = mem_block[A_PROGRAM].current_size - ( address + 1);
-          if (offset > 0xff)
-          {
-              /* A long branch is needed:
-               *
-               *    <expr1>
-               *    LOR l
-               *    <expr2>
-               * l:
-               *
-               * is converted to
-               *
-               *    <expr1>
-               *    DUP
-               *    LBRANCH_WHEN_NON_ZERO l
-               *    <expr2>
-               * l:
-               *
-               * The extra DUP compensates the svalue the LBRANCH eats.
-               */
-               
-              int i;
-              bytecode_p p;
+          update_lop_branch($<address>3, F_LBRANCH_WHEN_NON_ZERO);
 
-              ins_short(0);
-              ins_byte(0);
-              p = PROGRAM_BLOCK + mem_block[A_PROGRAM].current_size-1;
-              for (i = offset; --i >= 0; --p )
-                  *p = p[-3];
-              p[-4] = F_DUP;
-              p[-3] = F_LBRANCH_WHEN_NON_ZERO;
-              upd_short(address+1, offset+3);
-              if (offset > 0x7ffc)
-                  yyerror("offset overflow");
-              p[0]  = F_POP_VALUE;
-          }
-          else
-          {
-              mem_block[A_PROGRAM].block[address] = offset;
-          }
+          $$ = $1;
+          $$.end = CURRENT_PROGRAM_SIZE;
 
           /* Determine the result type */
           if ($1.type == $4.type)
@@ -5460,52 +6045,11 @@ expr0:
 
       {
           /* Update the offset the earlier LAND instruction */
-          
-          p_int address, offset;
 
-          last_expression = -1;
+          update_lop_branch($<address>3, F_LBRANCH_WHEN_ZERO);
 
-          address = $<address>3;
-          offset = mem_block[A_PROGRAM].current_size - ( address + 1);
-          if (offset > 0xff)
-          {
-              /* A long branch is needed:
-               *
-               *    <expr1>
-               *    LAND l
-               *    <expr2>
-               * l:
-               *
-               * is converted to
-               *
-               *    <expr1>
-               *    DUP
-               *    LBRANCH_WHEN_ZERO l
-               *    <expr2>
-               * l:
-               *
-               * The extra DUP compensates the svalue the LBRANCH eats.
-               */
-               
-              int i;
-              bytecode_p p;
-
-              ins_short(0);
-              ins_byte(0);
-              p = PROGRAM_BLOCK + mem_block[A_PROGRAM].current_size-1;
-              for (i = offset; --i >= 0; --p )
-                  *p = p[-3];
-              p[-4] = F_DUP;
-              p[-3] = F_LBRANCH_WHEN_ZERO;
-              upd_short(address+1, offset+3);
-              if (offset > 0x7ffc)
-                  yyerror("offset overflow");
-              p[0]  = F_POP_VALUE;
-          }
-          else
-          {
-              mem_block[A_PROGRAM].block[address] = offset;
-          }
+          $$ = $1;
+          $$.end = CURRENT_PROGRAM_SIZE;
 
           /* Determine the return type */
           if ($1.type == $4.type)
@@ -5521,8 +6065,10 @@ expr0:
               type_error("Bad argument 1 to |", $1.type);
           if (exact_types && !BASIC_TYPE($3.type,TYPE_NUMBER))
               type_error("Bad argument 2 to |", $3.type);
+          $$ = $1;
           $$.type = TYPE_NUMBER;
           ins_byte(F_OR);
+          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -5532,15 +6078,19 @@ expr0:
               type_error("Bad argument 1 to ^", $1.type);
           if (exact_types && !BASIC_TYPE($3.type,TYPE_NUMBER))
               type_error("Bad argument 2 to ^", $3.type);
+          $$ = $1;
           $$.type = TYPE_NUMBER;
           ins_byte(F_XOR);
+          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '&' expr0
       {
+          $$ = $1;
           ins_byte(F_AND);
           $$.type = TYPE_ANY;
+          $$.end = CURRENT_PROGRAM_SIZE;
 
           /* Check the types */
           if (exact_types)
@@ -5591,8 +6141,12 @@ expr0:
                   if ( !BASIC_TYPE(second_type,TYPE_NUMBER)
                    &&  !BASIC_TYPE(second_type ,TYPE_STRING) )
                       type_error("Bad argument 2 to &", second_type);
-                  $$.type =   BASIC_TYPE(first_type ,TYPE_NUMBER)
-                            ? TYPE_NUMBER : TYPE_STRING;
+                  if ( first_type == TYPE_ANY )
+                      $$.type =   BASIC_TYPE(second_type ,TYPE_NUMBER)
+                                ? TYPE_NUMBER : TYPE_STRING;
+                  else
+                      $$.type =   BASIC_TYPE(first_type ,TYPE_NUMBER)
+                                ? TYPE_NUMBER : TYPE_STRING;
               }
           } /* end of exact_types code */
       } /* end of '&' code */
@@ -5601,41 +6155,79 @@ expr0:
     | expr0 L_EQ expr0
       {
           vartype_t t1 = $1.type, t2 = $3.type;
+
+          $$ = $1;
           if (exact_types
-           && t1 != t2 && t1 != TYPE_ANY && t2 != TYPE_ANY)
+           && t1 != t2 && t1 != TYPE_ANY && t2 != TYPE_ANY
+           && !(t1 == TYPE_NUMBER && t2 == TYPE_FLOAT)
+           && !(t1 == TYPE_FLOAT && t2 == TYPE_NUMBER)
+             )
           {
               yyerrorf("== always false because of different types %s"
                       , get_two_types($1.type, $3.type));
           }
           ins_byte(F_EQ);
           $$.type = TYPE_NUMBER;
+          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_NE expr0
       {
           vartype_t t1 = $1.type, t2 = $3.type;
+
+          $$ = $1;
           if (exact_types
-           && t1 != t2 && t1 != TYPE_ANY && t2 != TYPE_ANY)
+           && t1 != t2 && t1 != TYPE_ANY && t2 != TYPE_ANY
+           && !(t1 == TYPE_NUMBER && t2 == TYPE_FLOAT)
+           && !(t1 == TYPE_FLOAT && t2 == TYPE_NUMBER)
+             )
            {
               yyerrorf("!= always true because of different types %s"
                       , get_two_types($1.type, $3.type));
           }
           ins_byte(F_NE);
           $$.type = TYPE_NUMBER;
+          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr0 '>'  expr0  { $$.type = TYPE_NUMBER; ins_byte(F_GT); }
-    | expr0 L_GE expr0  { $$.type = TYPE_NUMBER; ins_byte(F_GE); }
-    | expr0 '<'  expr0  { $$.type = TYPE_NUMBER; ins_byte(F_LT); }
-    | expr0 L_LE expr0  { $$.type = TYPE_NUMBER; ins_byte(F_LE); }
+    | expr0 '>'  expr0
+      {
+          $$ = $1;
+          $$.type = TYPE_NUMBER;
+          ins_f_code(F_GT);
+          $$.end = CURRENT_PROGRAM_SIZE;
+      }
+    | expr0 L_GE  expr0
+      {
+          $$ = $1;
+          $$.type = TYPE_NUMBER;
+          ins_f_code(F_GE);
+          $$.end = CURRENT_PROGRAM_SIZE;
+      }
+    | expr0 '<'  expr0
+      {
+          $$ = $1;
+          $$.type = TYPE_NUMBER;
+          ins_f_code(F_LT);
+          $$.end = CURRENT_PROGRAM_SIZE;
+      }
+    | expr0 L_LE  expr0
+      {
+          $$ = $1;
+          $$.type = TYPE_NUMBER;
+          ins_f_code(F_LE);
+          $$.end = CURRENT_PROGRAM_SIZE;
+      }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_LSH expr0
       {
+          $$ = $1;
           ins_byte(F_LSH);
           $$.type = TYPE_NUMBER;
+          $$.end = CURRENT_PROGRAM_SIZE;
           if (exact_types)
           {
               if (!BASIC_TYPE($1.type, TYPE_NUMBER))
@@ -5648,14 +6240,32 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_RSH expr0
       {
+          $$ = $1;
           ins_byte(F_RSH);
           $$.type = TYPE_NUMBER;
+          $$.end = CURRENT_PROGRAM_SIZE;
           if (exact_types)
           {
               if (!BASIC_TYPE($1.type, TYPE_NUMBER))
                   type_error("Bad argument number 1 to '>>'", $1.type);
               if (!BASIC_TYPE($3.type, TYPE_NUMBER))
                   type_error("Bad argument number 2 to '>>'", $3.type);
+          }
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | expr0 L_RSHL expr0
+      {
+          $$ = $1;
+          ins_byte(F_RSHL);
+          $$.type = TYPE_NUMBER;
+          $$.end = CURRENT_PROGRAM_SIZE;
+          if (exact_types)
+          {
+              if (!BASIC_TYPE($1.type, TYPE_NUMBER))
+                  type_error("Bad argument number 1 to '>>>'", $1.type);
+              if (!BASIC_TYPE($3.type, TYPE_NUMBER))
+                  type_error("Bad argument number 2 to '>>>'", $3.type);
           }
       }
 
@@ -5676,6 +6286,8 @@ expr0:
           mp_uint current_size;
           bytecode_p p;
 %line
+          $$ = $1;
+
           current_size = CURRENT_PROGRAM_SIZE;
           p = &(PROGRAM_BLOCK[current_size]);
 
@@ -5746,17 +6358,21 @@ expr0:
               else if (($1.type == TYPE_NUMBER || $1.type == TYPE_FLOAT)
                      && $4.type == TYPE_STRING)
                   $$.type = TYPE_STRING;
-              else if ($1.type == TYPE_FLOAT && $4.type == TYPE_NUMBER)
+              else if ($1.type == TYPE_FLOAT
+                    && ($4.type == TYPE_NUMBER || $4.type == TYPE_ANY))
                   $$.type = TYPE_FLOAT;
-              else if ($1.type == TYPE_NUMBER && $4.type == TYPE_FLOAT)
+              else if (($1.type == TYPE_NUMBER || $1.type == TYPE_ANY)
+                    && $4.type == TYPE_FLOAT)
                   $$.type = TYPE_FLOAT;
           }
+          $$.end = CURRENT_PROGRAM_SIZE;
       } /* '+' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '-' expr0
       {
 %line
+          $$ = $1;
           $$.type = TYPE_ANY;
 
           if (exact_types)
@@ -5876,12 +6492,15 @@ expr0:
           } /* if (exact_types) */
 
           ins_byte(F_SUBTRACT);
+          $$.end = CURRENT_PROGRAM_SIZE;
       } /* '-' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '*' expr0
       {
           vartype_t type1, type2;
+
+          $$ = $1;
 
           type1 = $1.type;
           type2 = $3.type;
@@ -5903,6 +6522,7 @@ expr0:
           }
 
           ins_byte(F_MULTIPLY);
+          $$.end = CURRENT_PROGRAM_SIZE;
 
           if (type1 == TYPE_FLOAT || type2 == TYPE_FLOAT )
           {
@@ -5919,6 +6539,10 @@ expr0:
           else if (type2 & TYPE_MOD_POINTER)
           {
               $$.type = type2;
+          }
+          else if (type1 == TYPE_ANY || type2 == TYPE_ANY)
+          {
+              $$.type = TYPE_ANY;
           }
           else
           {
@@ -5937,13 +6561,17 @@ expr0:
                   type_error("Bad argument number 2 to '%'", $3.type);
           }
 
+          $$ = $1;
           ins_byte(F_MOD);
+          $$.end = CURRENT_PROGRAM_SIZE;
           $$.type = TYPE_NUMBER;
       }
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '/' expr0
       {
           vartype_t type1, type2;
+
+          $$ = $1;
 
           type1 = $1.type;
           type2 = $3.type;
@@ -5957,6 +6585,7 @@ expr0:
           }
 
           ins_byte(F_DIVIDE);
+          $$.end = CURRENT_PROGRAM_SIZE;
 
           if (type1 == TYPE_FLOAT || type2 == TYPE_FLOAT )
           {
@@ -5988,12 +6617,17 @@ expr0:
           $$.type = $1;
           if ($2.type != TYPE_ANY
            && $2.type != TYPE_UNKNOWN
-           && $1 != TYPE_VOID)
+           && $1 != TYPE_VOID
+           && $1 != $2.type
+             )
           {
               switch($1)
               {
               default:
                   type_error("Illegal cast", $1);
+                  break;
+              case TYPE_ANY:
+                  /* Do nothing, just adapt the type information */
                   break;
               case TYPE_NUMBER:
                   ins_f_code(F_TO_INT);
@@ -6012,6 +6646,7 @@ expr0:
                   break;
               }
           }
+          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -6025,6 +6660,8 @@ expr0:
           int i;
           PREPARE_INSERT(4)
 %line
+          $$.start = $1.start;
+
           i = verify_declared($2);
 
           if (i != -1)
@@ -6051,21 +6688,28 @@ expr0:
                   i = NV_VARIABLE(i)->flags & TYPE_MOD_MASK;
               }
 
-              if (exact_types && !BASIC_TYPE(i, TYPE_NUMBER))
+              if (exact_types
+               && !BASIC_TYPE(i, TYPE_NUMBER)
+               && !BASIC_TYPE(i, TYPE_FLOAT))
               {
                   argument_type_error($1.code, i);
               }
 
               CURRENT_PROGRAM_SIZE += 2;
           }
-          /* TODO: else: variable not declared - try to recover */
+          else
+          {
+              /* Variable not declared - try to recover */
+              YYACCEPT;
+          }
 
           last_expression = CURRENT_PROGRAM_SIZE;
 
           CURRENT_PROGRAM_SIZE += 1;
 
           add_byte($1.code);
-          $$.type = TYPE_NUMBER;
+          $$.end = CURRENT_PROGRAM_SIZE;
+          $$.type = i;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -6074,17 +6718,22 @@ expr0:
           int i;
           PREPARE_INSERT(3)
 %line
+          $$.start = $1.start;
+
           add_byte(F_PUSH_LOCAL_VARIABLE_LVALUE);
           add_byte($2);
           CURRENT_PROGRAM_SIZE =
             (last_expression = CURRENT_PROGRAM_SIZE + 2) + 1;
           add_byte($1.code);
           i = type_of_locals[$2];
-          if (exact_types && !BASIC_TYPE(i, TYPE_NUMBER))
+          if (exact_types
+           && !BASIC_TYPE(i, TYPE_NUMBER)
+           && !BASIC_TYPE(i, TYPE_FLOAT))
           {
               argument_type_error($1.code, i);
           }
-          $$.type = TYPE_NUMBER;
+          $$.type = i;
+          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -6092,10 +6741,14 @@ expr0:
       {
           mp_uint current;
           bytecode_p p;
-          int start;
+          int start, restype;
 %line
           if ($3.type1 & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
+
+          $$.start = $1.start;
+
+          restype = TYPE_ANY;
 
           /* Check the types */
           if (exact_types)
@@ -6124,6 +6777,7 @@ expr0:
               case TYPE_STRING:
                   if (!BASIC_TYPE($3.type1, TYPE_NUMBER))
                       type_error("Bad type of index", $3.type1);
+                  restype = TYPE_NUMBER;
                   break;
               }
           } /* if (exact_types) */
@@ -6141,8 +6795,12 @@ expr0:
                   bytecode_p q;
 
                   length = $2.end - start + 1;
-                  if (current+length > mem_block[A_PROGRAM].max_size)
-                      realloc_a_program();
+                  if (!realloc_a_program(length))
+                  {
+                      yyerrorf("Out of memory: program size %lu\n"
+                              , current+length);
+                      YYACCEPT;
+                  }
                   p = PROGRAM_BLOCK;
                   memcpy(p + current, p + start, length);
                   p += start;
@@ -6162,8 +6820,11 @@ expr0:
                   int i;
                   int length;
 
-                  if (current + 2 > mem_block[A_PROGRAM].max_size)
-                      realloc_a_program();
+                  if (!realloc_a_program(2))
+                  {
+                      yyerrorf("Out of memory: program size %lu\n", current+2);
+                      YYACCEPT;
+                  }
                   p = PROGRAM_BLOCK + start;
                   i = p[1];
                   length = current - start - 2;
@@ -6177,8 +6838,11 @@ expr0:
           }
           else
           {
-              if (current + 2 > mem_block[A_PROGRAM].max_size)
-                  realloc_a_program();
+              if (!realloc_a_program(2))
+              {
+                  yyerrorf("Out of memory: program size %lu\n", current+2);
+                  YYACCEPT;
+              }
               p = PROGRAM_BLOCK + start;
               *p++ = ($3.inst == F_INDEX) ? F_PUSH_INDEXED_LVALUE
                                           : F_PUSH_RINDEXED_LVALUE;
@@ -6188,7 +6852,8 @@ expr0:
           *p = $1.code;
           last_expression = current + 1;
           CURRENT_PROGRAM_SIZE = current + 2;
-          $$.type = TYPE_NUMBER;
+          $$.end = CURRENT_PROGRAM_SIZE;
+          $$.type = restype;
       } /* pre_inc_dec expr4 [index_expr] */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -6200,6 +6865,8 @@ expr0:
           if ($4.type & TYPE_MOD_REFERENCE
            || $6.type & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
+
+          $$.start = $1.start;
 
           /* Check the types */
           if (exact_types)
@@ -6222,8 +6889,11 @@ expr0:
            * produced by <expr4> and add our PUSH_INDEXED_MAP_LVALUE
            */
           current = CURRENT_PROGRAM_SIZE;
-          if (current + 2 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+          if (!realloc_a_program(2))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+2);
+              YYACCEPT;
+          }
           p = PROGRAM_BLOCK + current;
           *p++ = F_PUSH_INDEXED_MAP_LVALUE;
 
@@ -6231,7 +6901,8 @@ expr0:
           *p = $1.code;
           last_expression = current + 1;
           CURRENT_PROGRAM_SIZE = current + 2;
-          $$.type = TYPE_NUMBER;
+          $$.type = TYPE_ANY;
+          $$.end = CURRENT_PROGRAM_SIZE;
       } /* pre_inc_dec expr4 [expr0 ',' expr0] */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -6241,6 +6912,7 @@ expr0:
           last_expression = CURRENT_PROGRAM_SIZE;
           ins_byte(F_NOT);        /* Any type is valid here. */
           $$.type = TYPE_NUMBER;
+          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -6252,6 +6924,7 @@ expr0:
           if (exact_types && !BASIC_TYPE($2.type, TYPE_NUMBER))
               type_error("Bad argument to ~", $2.type);
           $$.type = TYPE_NUMBER;
+          $$.end = CURRENT_PROGRAM_SIZE;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -6268,22 +6941,39 @@ expr0:
               mem_block[A_PROGRAM].block[last_expression] =
                 F_NCLIT;
           }
+          else if (CURRENT_PROGRAM_SIZE - last_expression == 1
+           && mem_block[A_PROGRAM].block[last_expression] ==
+                F_CONST1 )
+          {
+              mem_block[A_PROGRAM].block[last_expression] =
+                F_NCONST1;
+          }
+          else if (CURRENT_PROGRAM_SIZE - last_expression == 1 + sizeof(p_int)
+           && mem_block[A_PROGRAM].block[last_expression] ==
+                F_NUMBER )
+          {
+              mem_block[A_PROGRAM].block[last_expression] =
+                F_NNUMBER;
+          }
           else
           {
               ins_byte(F_NEGATE);
           }
-          type = $2.type;
+          $$.end = CURRENT_PROGRAM_SIZE;
 
+          type = $2.type;
           if (exact_types
            && !BASIC_TYPE(type, TYPE_NUMBER)
            && type != TYPE_FLOAT )
-              type_error("Bad argument to unary '-'", $2.type);
+              type_error("Bad argument to unary '-'", type);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | lvalue L_INC %prec L_INC
       {
 %line
+          $$.start = CURRENT_PROGRAM_SIZE;
+
           /* Create the code to push the lvalue plus POST_INC */
           if ($1.length)
           {
@@ -6306,16 +6996,22 @@ expr0:
           }
 
           /* Check the types */
-          if (exact_types && !BASIC_TYPE($1.type, TYPE_NUMBER))
+          if (exact_types
+           && !BASIC_TYPE($1.type, TYPE_NUMBER)
+           && !BASIC_TYPE($1.type, TYPE_FLOAT)
+             )
               type_error("Bad argument to ++", $1.type);
 
-          $$.type = TYPE_NUMBER;
+          $$.end = CURRENT_PROGRAM_SIZE;
+          $$.type = $1.type;
       } /* post-inc */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | lvalue L_DEC %prec L_DEC
       {
 %line
+          $$.start = CURRENT_PROGRAM_SIZE;
+
           /* Create the code to push the lvalue plus POST_DEC */
           if ($1.length)
           {
@@ -6339,14 +7035,18 @@ expr0:
           }
 
           /* Check the types */
-          if (exact_types && !BASIC_TYPE($1.type, TYPE_NUMBER))
+          if (exact_types
+           && !BASIC_TYPE($1.type, TYPE_NUMBER)
+           && !BASIC_TYPE($1.type, TYPE_FLOAT)
+             )
               type_error("Bad argument to --", $1.type);
 
-          $$.type = TYPE_NUMBER;
+          $$.end = CURRENT_PROGRAM_SIZE;
+          $$.type = $1.type;
       } /* post-dec */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4
+    | expr4 { $$ = $1; }
 
 ; /* expr0 */
 
@@ -6370,7 +7070,7 @@ expr4:
     | L_STRING
       {
           /* Push a constant string */
-          
+
           int string_number;
           PREPARE_INSERT(3)
           char *p;
@@ -6415,7 +7115,7 @@ expr4:
     | L_NUMBER
       {
           /* Store a number */
-          
+
           p_int current;
           p_int number;
           PREPARE_INSERT(1 + sizeof (p_int))
@@ -6428,6 +7128,7 @@ expr4:
               current++;
               add_byte(F_CONST0);
               $$.type = TYPE_ANY;
+              /* TODO: TYPE_NULL would be better */
           }
           else if ( number == 1 )
           {
@@ -6497,7 +7198,7 @@ expr4:
     | L_FLOAT
       {
           /* Generate a float literal */
-          
+
           int exponent;
 
           $$.start = CURRENT_PROGRAM_SIZE;
@@ -6512,7 +7213,7 @@ expr4:
     | '(' note_start comma_expr ')'        %prec '~'
       {
           /* A nested expression */
-          
+
           $$.type = $3.type;
           $$.start = $2.start;
           $$.code = -1;
@@ -6522,7 +7223,7 @@ expr4:
     | '(' '{' note_start expr_list '}' ')' %prec '~'
       {
           /* Generate an array */
-          
+
           check_aggregate_types($4);
             /* We don't care about these types,
              * unless a reference appears
@@ -6544,7 +7245,7 @@ expr4:
            * array first and then applying QUOTE as often
            * as possible.
            */
-           
+
           int quotes;
 
           check_aggregate_types($3);
@@ -6566,17 +7267,36 @@ expr4:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '(' '[' ':' note_start
+
+          /* Generate an empty mapping of given width */
+
+      {
+          ins_byte(F_CONST0);
+      }
+
+      expr0 ']' ')'
+
+      {
+          ins_f_code(F_M_ALLOCATE);
+
+          $$.type = TYPE_MAPPING;
+          $$.start = $4.start;
+          $$.code = -1;
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '(' '[' note_start m_expr_list ']' ')'
       {
           /* Generate a mapping */
-          
+
           mp_int num_keys;
 
           check_aggregate_types($4[0]);
           num_keys = $4[0] / ($4[1]+1);
 
           if ((num_keys|$4[1]) & ~0xffff)
-              yyerror("cannot handle more than 65525 keys/values "
+              yyerror("cannot handle more than 65535 keys/values "
                       "in mapping aggregate");
 
           if ( (num_keys | $4[1]) &~0xff)
@@ -6602,7 +7322,7 @@ expr4:
       {
 %line
           /* Generate a range expression */
-          
+
           $$.start = $1.start;
           $$.code = -1;
 
@@ -6650,8 +7370,11 @@ expr4:
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.code = -1;
 
-          if (current + 3 > mem_block[A_PROGRAM].max_size)
-                realloc_a_program();
+          if (!realloc_a_program(3))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+3);
+              YYACCEPT;
+          }
           p = PROGRAM_BLOCK + current;
 
           if (i & VIRTUAL_VAR_TAG)
@@ -6694,8 +7417,11 @@ expr4:
 %line
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.code = -1;
-          if (current + 2 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+          if (!realloc_a_program(2))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+2);
+              YYACCEPT;
+          }
           p = PROGRAM_BLOCK + current;
           *p++ = F_PUSH_LOCAL_VARIABLE_LVALUE;
           *p = $2;
@@ -6859,14 +7585,17 @@ expr4:
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.end = 0;
 
-          if (current + 3 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+          if (!realloc_a_program(3))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+3);
+              YYACCEPT;
+          }
           p = PROGRAM_BLOCK + current;
 
           if (i & VIRTUAL_VAR_TAG)
           {
               /* Access a virtual variable */
-              
+
               $$.code = F_PUSH_VIRTUAL_VARIABLE_LVALUE;
               *p++ = F_VIRTUAL_VARIABLE;
               *p = i;
@@ -6875,7 +7604,7 @@ expr4:
           else
           {
               /* Access a non-virtual variable */
-              
+
               if ((i + num_virtual_variables) & ~0xff)
               {
                   $$.code = F_PUSH_IDENTIFIER16_LVALUE;
@@ -6908,8 +7637,11 @@ expr4:
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.code = F_PUSH_LOCAL_VARIABLE_LVALUE;
           $$.end = 0;
-          if (current + 2 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+          if (!realloc_a_program(2))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+2);
+              YYACCEPT;
+          }
           p = PROGRAM_BLOCK + current;
           *p++ = F_LOCAL;
           *p = $1;
@@ -7014,7 +7746,7 @@ lvalue:
     | expr4 index_expr %prec '['
       {
           /* Generate/add an (R)INDEX_LVALUE */
-          
+
           bytecode_p p, q;
           p_int start, current;
 %line
@@ -7123,7 +7855,7 @@ lvalue:
     | expr4 '[' expr0 ',' expr0 ']' %prec '['
       {
           /* Generate/add an PUSH_INDEXED_MAP_LVALUE */
-          
+
           bytecode_p p, q;
           p_int start, current;
 %line
@@ -7357,15 +8089,18 @@ index_range :
           /* Simulate an expression yielding 0 for the lower bound.
            * We pretend that it's part of the upper bound expr.
            */
-          
+
           p_int current;
           p_int length;
           bytecode_p mark, p;
 
           current = CURRENT_PROGRAM_SIZE;
-              
-          while (current + 1 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+
+          if (!realloc_a_program(1))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+1);
+              YYACCEPT;
+          }
 
           mark = PROGRAM_BLOCK + $3.start;
           p = PROGRAM_BLOCK + current;
@@ -7391,15 +8126,18 @@ index_range :
           /* Simulate an expression yielding 0 for the lower bound.
            * We pretend that it's part of the upper bound expr.
            */
-          
+
           p_int current;
           p_int length;
           bytecode_p mark, p;
 
           current = CURRENT_PROGRAM_SIZE;
-              
-          while (current + 1 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+
+          if (!realloc_a_program(1))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+1);
+              YYACCEPT;
+          }
 
           mark = PROGRAM_BLOCK + $4.start;
           p = PROGRAM_BLOCK + current;
@@ -7474,7 +8212,7 @@ index_range :
           /* Simulate an expression yielding <1 for the upper bound.
            * We pretend that it's part of the lower bound expr.
            */
-          
+
           $$.inst  = F_RX_RANGE;
           $$.start = $3.start;
           $$.end   = $3.end;
@@ -7533,10 +8271,12 @@ m_expr_list2:
           $$[1] = $1[1];
           add_arg_type($3.type);
       }
+; /* m_expr_list2 */
 
 m_expr_values:
       ':' expr0                { $$ = 1;      add_arg_type($2.type); }
     | m_expr_values ';' expr0  { $$ = $1 + 1; add_arg_type($3.type); }
+; /* m_expr_values */
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -7576,10 +8316,10 @@ function_call:
               /* prevent freeing by exotic name clashes */
               /* also makes life easier below */
               real_name->type = I_TYPE_GLOBAL;
-              real_name->u.global.function = -1;
-              real_name->u.global.variable = -1;
-              real_name->u.global.efun     = -1;
-              real_name->u.global.sim_efun = -1;
+              real_name->u.global.function = I_GLOBAL_FUNCTION_VAR;
+              real_name->u.global.variable = I_GLOBAL_VARIABLE_OTHER;
+              real_name->u.global.efun     = I_GLOBAL_EFUN_OTHER;
+              real_name->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
               real_name->next_all = all_globals;
               all_globals = real_name;
           }
@@ -7682,13 +8422,17 @@ function_call:
                       i = funp->num_arg - $4;
                       if (funp->flags & TYPE_MOD_XVARARGS)
                           i--; /* Last argument may be omitted */
-                          
-                      if (i > 4
-                       && CURRENT_PROGRAM_SIZE + i + 2 >
-                                  mem_block[A_PROGRAM].max_size)
+
+                      if (i > 4)
                       {
-                          realloc_a_program();
-                          __PREPARE_INSERT__p = PROGRAM_BLOCK 
+                          if (!realloc_a_program(i+2))
+                          {
+                              yyerrorf("Out of memory: program size %lu\n"
+                                      , mem_block[A_PROGRAM].current_size + i+2);
+                              YYACCEPT;
+                          }
+
+                          __PREPARE_INSERT__p = PROGRAM_BLOCK
                                                 + CURRENT_PROGRAM_SIZE;
                       }
                       CURRENT_PROGRAM_SIZE += i;
@@ -7707,7 +8451,9 @@ function_call:
                       CURRENT_PROGRAM_SIZE += 3;
                   }
                   else
+                  {
                       CURRENT_PROGRAM_SIZE += 2;
+                  }
               }
               $$.type = funp->type & TYPE_MOD_MASK;
           } /* if (simul-efun) */
@@ -7739,7 +8485,23 @@ function_call:
 
                   if (ix < 0)
                   {
-                      yyerror("function not defined by inheritance as specified");
+                      switch(ix) {
+                      case INHERITED_NOT_FOUND:
+                          yyerror("function not defined by inheritance as specified");
+                          break;
+                      case INHERITED_WILDCARDED_ARGS:
+                          yyerror("wildcarded call to inherited function can't pass arguments");
+                          break;
+                      case INHERITED_WILDCARDED_NOT_FOUND:
+                          /* Not an error, but we can't do argument
+                           * checks either.
+                           */
+                          break;
+                      default:
+                          fatal("Unknown return code %d from insert_inherited()\n", ix);
+                          break;
+                      }
+
                       $$.type = TYPE_ANY;
                       if ($1.super)
                           yfree($1.super);
@@ -7757,7 +8519,7 @@ function_call:
                   {
                       first_arg = INDEX_START_NONE;
                   }
-                  
+
                   funp = &inherited_function;
               }
               else
@@ -7816,6 +8578,8 @@ function_call:
                   {
                       /* There are arguments to check */
 
+                      int argno; /* Argument number for error message */
+
                       if (funp->flags & TYPE_MOD_XVARARGS)
                           num_arg--; /* last argument is checked separately */
 
@@ -7825,16 +8589,16 @@ function_call:
                       arg_types += first_arg;
                       argp = get_argument_types_start(anum_arg);
 
-                      for (i = num_arg; --i >= 0; )
+                      for (argno = 1, i = num_arg; --i >= 0; argno++)
                       {
                           fulltype_t tmp1, tmp2;
 
                           tmp1 = *argp++ & TYPE_MOD_RMASK;
                           tmp2 = *arg_types++ & TYPE_MOD_MASK;
-                          if (!MASKED_TYPE(tmp1, tmp2))
+                          if (!REDEFINED_TYPE(tmp1, tmp2))
                           {
                               yyerrorf("Bad type for argument %d of %s %s",
-                                anum_arg - i,
+                                argno,
                                 funp->name,
                                 get_two_types(tmp2, tmp1));
                           }
@@ -7878,6 +8642,11 @@ function_call:
               $$.type = instrs[f].ret_type;
               argp = &efun_arg_types[instrs[f].arg_index];
 
+              /* Warn if the efun is deprecated */
+              if (pragma_warn_deprecated && instrs[f].deprecated != NULL)
+                  yywarnf("%s() is deprecated: %s"
+                         , instrs[f].name, instrs[f].deprecated);
+
               num_arg = $4;
 
               /* Check and/or complete number of arguments */
@@ -7900,6 +8669,8 @@ function_call:
               else if (num_arg > max && max != -1)
               {
                   yyerrorf("Too many arguments to %s", instrs[f].name);
+                  pop_arg_stack (num_arg - max);
+                  $4 -= num_arg - max; /* Don't forget this for the final pop */
                   num_arg = max;
               }
 
@@ -8013,7 +8784,7 @@ function_call:
                * epilog() will take care of it.
                */
               function_t *funp;
-  
+
               f = define_new_function(MY_FALSE,
                   $1.real, 0, 0, 0, NAME_UNDEFINED, TYPE_UNKNOWN
               );
@@ -8024,7 +8795,11 @@ function_call:
               funp = FUNCTION(f);
               if (exact_types)
               {
-                  yyerrorf("Undefined function %.50s", $1.real->name);
+                  yyerrorf("Undefined function '%.50s'", $1.real->name);
+              }
+              else if (pragma_pedantic)
+              {
+                  yywarnf("Undefined function '%.50s'", $1.real->name);
               }
               $$.type = TYPE_ANY;  /* Just a guess */
           }
@@ -8035,7 +8810,7 @@ function_call:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr4 L_ARROW 
+    | expr4 L_ARROW
       {
 %line
           /* If call_other() has been replaced by a sefun, and
@@ -8044,7 +8819,7 @@ function_call:
            * Putting this block before the <expr4> yields a
            * faulty grammar.
            */
-           
+
           if (call_other_sefun >= 0
            && call_other_sefun & ~0xff)
           {
@@ -8059,8 +8834,10 @@ function_call:
               q = p + 6;
               for (left = CURRENT_PROGRAM_SIZE - $1.start
                   ; left > 0
-                  ; left--, p++, q++)
-                  *q = *p;
+                  ; left--)
+              {
+                  *--q = *--p;
+              }
 
               /* p now points to program[$1.start].
                * Store the first two call-other args there.
@@ -8129,7 +8906,7 @@ function_call:
           if (call_other_sefun >= 0)
           {
               /* SIMUL EFUN */
-              
+
               PREPARE_INSERT(6)
               function_t *funp;
               int num_arg;
@@ -8162,13 +8939,17 @@ function_call:
                       i = funp->num_arg - num_arg;
                       if (funp->flags & TYPE_MOD_XVARARGS)
                           i--; /* Last argument may be omitted */
-                          
-                      if (i > 4
-                       && CURRENT_PROGRAM_SIZE + i + 2 >
-                                  mem_block[A_PROGRAM].max_size)
+
+                      if (i > 4)
                       {
-                          realloc_a_program();
-                          __PREPARE_INSERT__p = PROGRAM_BLOCK 
+                          if (!realloc_a_program(i+2))
+                          {
+                              yyerrorf("Out of memory: program size %lu\n"
+                                      , mem_block[A_PROGRAM].current_size + i+2);
+                              YYACCEPT;
+                          }
+
+                          __PREPARE_INSERT__p = PROGRAM_BLOCK
                                                 + CURRENT_PROGRAM_SIZE;
                       }
                       CURRENT_PROGRAM_SIZE += i;
@@ -8258,7 +9039,7 @@ call_other_name:
            && $2.type != TYPE_ANY)
               type_error("Illegal type for lfun name", (p_int)$2.type);
       }
-      
+
 ; /* call_other_name */
 
 
@@ -8269,12 +9050,98 @@ function_name:
           $$.real  = $1;
       }
 
+    | L_LOCAL
+      {
+          ident_t *lvar = lookup_local($1);
+          ident_t *fun = find_shared_identifier(lvar->name, I_TYPE_UNKNOWN, 0);
+
+          /* Search the inferior list for this identifier for a global
+           * (function) definition.
+           */
+
+          while (fun && fun->type > I_TYPE_GLOBAL)
+              fun = fun->inferior;
+
+          if (!fun || fun->type != I_TYPE_GLOBAL)
+          {
+              yyerrorf("Undefined function '%.50s'\n", lvar->name);
+              YYACCEPT;
+          }
+
+          $$.super = NULL;
+          $$.real  = fun;
+      }
+
     | L_COLON_COLON L_IDENTIFIER
       {
           *($$.super = yalloc(1)) = '\0';
           $$.real  = $2;
       }
 
+    | L_COLON_COLON L_LOCAL
+      {
+          ident_t *lvar = lookup_local($2);
+
+          *($$.super = yalloc(1)) = '\0';
+          $$.real  = lvar;
+      }
+
+    | anchestor L_COLON_COLON L_LOCAL
+      {
+%line
+          ident_t *lvar = lookup_local($3);
+
+          /* Attempt to call an efun directly even though there
+           * is a nomask simul-efun for it?
+           */
+          if ( !strcmp($1, "efun")
+           && lvar->type == I_TYPE_GLOBAL
+           && lvar->u.global.sim_efun >= 0
+           && simul_efunp[lvar->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
+           && master_ob
+           && (!max_eval_cost || eval_cost < max_eval_cost)
+             )
+          {
+              /* Yup, check it with a privilege violation.
+               * If it's denied, ignore the "efun::" qualifier.
+               */
+
+              svalue_t *res;
+
+              push_volatile_string("nomask simul_efun");
+              push_volatile_string(current_file);
+              push_volatile_string(lvar->name);
+              res = apply_master(STR_PRIVILEGE, 3);
+              if (!res || res->type != T_NUMBER || res->u.number < 0)
+              {
+                  yyerrorf("Privilege violation: nomask simul_efun %s"
+                          , lvar->name);
+                  yfree($1);
+                  $$.super = NULL;
+              }
+              else if (!res->u.number)
+              {
+                  yfree($1);
+                  $$.super = NULL;
+              }
+              else
+              {
+                  $$.super = $1;
+              }
+          }
+          else if (max_eval_cost && eval_cost >= max_eval_cost)
+          {
+              yyerrorf("Can't call master::%s for "
+                       "'nomask simul_efun %s': eval cost too big"
+                      , STR_PRIVILEGE, lvar->name);
+              yfree($1);
+              $$.super = NULL;
+          }
+          else /* the qualifier is ok */
+              $$.super = $1;
+
+          $$.real = lvar; /* and don't forget the function ident */
+      }
     | anchestor L_COLON_COLON L_IDENTIFIER
       {
 %line
@@ -8286,6 +9153,7 @@ function_name:
            && $3->u.global.sim_efun >= 0
            && simul_efunp[$3->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
            && master_ob
+           && (!max_eval_cost || eval_cost < max_eval_cost)
              )
           {
               /* Yup, check it with a privilege violation.
@@ -8297,7 +9165,7 @@ function_name:
               push_volatile_string("nomask simul_efun");
               push_volatile_string(current_file);
               push_volatile_string($3->name);
-              res = apply_master_ob(STR_PRIVILEGE, 3);
+              res = apply_master(STR_PRIVILEGE, 3);
               if (!res || res->type != T_NUMBER || res->u.number < 0)
               {
                   yyerrorf("Privilege violation: nomask simul_efun %s"
@@ -8314,6 +9182,14 @@ function_name:
               {
                   $$.super = $1;
               }
+          }
+          else if (max_eval_cost && eval_cost >= max_eval_cost)
+          {
+              yyerrorf("Can't call master::%s for "
+                       "'nomask simul_efun %s': eval cost too big"
+                      , STR_PRIVILEGE, $3->name);
+              yfree($1);
+              $$.super = NULL;
           }
           else /* the qualifier is ok */
               $$.super = $1;
@@ -8435,7 +9311,7 @@ catch:
           ins_byte(0);
       }
 
-      '(' comma_expr ')'
+      '(' comma_expr opt_catch_mods ')'
 
       {
 %line
@@ -8443,8 +9319,18 @@ catch:
 
           ins_f_code(F_END_CATCH);
 
-          /* Update the offset field of the CATCH instruction */
+          /* Get the address of the CATCH instruction */
           start = $<address>2;
+
+          /* Modify the instruction if necessary */
+          if ($5)
+          {
+              bytecode_p p;
+              p = PROGRAM_BLOCK + start;
+              *p = F_CATCH_NO_LOG;
+          }
+
+          /* Update the offset field of the CATCH instruction */
           offset = CURRENT_PROGRAM_SIZE - (start + 2);
           if (offset >= 0x100)
           {
@@ -8466,8 +9352,12 @@ catch:
               int i;
               bytecode_p p;
 
-              if (CURRENT_PROGRAM_SIZE + 5 > mem_block[A_PROGRAM].max_size)
-                  realloc_a_program();
+              if (!realloc_a_program(5))
+              {
+                  yyerrorf("Out of memory: program size %lu\n"
+                          , CURRENT_PROGRAM_SIZE + 5);
+                  YYACCEPT;
+              }
               CURRENT_PROGRAM_SIZE += 5;
               p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE - 1;
               for( i = offset; --i >= 0; --p ) *p = p[-5];
@@ -8489,6 +9379,41 @@ catch:
           $$.code = -1;
       }
 ; /* catch */
+
+
+opt_catch_mods :
+      ';' L_IDENTIFIER
+
+      {
+          if (strcmp($2->name, "nolog"))
+              yyerror("Expected keyword 'nolog' in catch()");
+          if ($2->type == I_TYPE_UNKNOWN)
+              free_shared_identifier($2);
+          $$ = 1;
+      }
+
+    | ';' L_LOCAL
+
+      {
+          ident_t *id;
+
+          /* Find the ident structure for this local */
+          for (id = all_locals; id; id = id->next_all)
+              if (id->u.local.num == $2)
+                  break;
+
+          if (id && strcmp(id->name, "nolog"))
+              yyerror("Expected keyword 'nolog' in catch()");
+
+          $$ = 1;
+      }
+
+    | /* empty */
+
+      {
+         $$  = 0;
+      }
+; /* opt_catch_mods */
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -8772,15 +9697,26 @@ svalue_constant:
               svp->u.lambda = l;
               svp->x.closure_type = CLOSURE_PRELIMINARY;
           }
+          else if (ix >= CLOSURE_SIMUL_EFUN_OFFS)
+          {
+              /* Sefun closure */
+              svp->x.closure_type = (short)ix;
+              svp->u.ob = ref_object(current_object, "closure");
+          }
           else
           {
-              /* Efun, sefun or operator closure */
+              /* Efun or operator closure */
+              if (pragma_warn_deprecated
+               && instrs[ix - CLOSURE_EFUN_OFFS].deprecated != NULL)
+                  yywarnf("%s() is deprecated: %s"
+                         , instrs[ix - CLOSURE_EFUN_OFFS].name
+                         , instrs[ix - CLOSURE_EFUN_OFFS].deprecated
+                         );
+
               svp->x.closure_type
-                = ix >= CLOSURE_SIMUL_EFUN_OFFS
-                  ? ix
-                  : (  instrs[ix - CLOSURE_EFUN_OFFS].Default == -1
-                     ? ix + CLOSURE_OPERATOR-CLOSURE_EFUN
-                     : ix);
+                = (short)(  instrs[ix - CLOSURE_EFUN_OFFS].Default == -1
+                          ? ix + CLOSURE_OPERATOR-CLOSURE_EFUN
+                          : ix);
               svp->u.ob = ref_object(current_object, "closure");
           }
       }
@@ -8839,7 +9775,7 @@ float_constant:
 
 
 const_expr_list:
-      /* empty */           { $$.length = 0; };
+      /* empty */           { $$.length = 0; }
     | const_expr_list2      { $$ = $1; }
     | const_expr_list2 ','  { $$ = $1; }  /* Allow a trailing comma */
 ;
@@ -9008,6 +9944,52 @@ const_expr_list3:
 /*=========================================================================*/
 
 /*-------------------------------------------------------------------------*/
+static Bool
+add_lvalue_code ( struct lvalue_s * lv, int instruction)
+
+/* Add the lvalue code held in * <lv> to the end of the program.
+ * If <instruction> is not zero, it is the code for an instruction
+ * to be added after the lvalue code.
+ * Return TRUE on success, and FALSE on failure.
+ */
+
+{
+    p_int length;
+
+    /* Create the code to push the lvalue */
+    length = lv->length;
+    if (length)
+    {
+        add_to_mem_block(A_PROGRAM, lv->u.p, length);
+        yfree(lv->u.p);
+        last_expression = CURRENT_PROGRAM_SIZE;
+    }
+    else
+    {
+        bytecode_p source, dest;
+        mp_uint current_size;
+
+        source = lv->u.simple;
+        current_size = CURRENT_PROGRAM_SIZE;
+        if (!realloc_a_program(2))
+        {
+            yyerrorf("Out of memory: program size %lu"
+                    , current_size+2);
+            return MY_FALSE;
+        }
+        CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2);
+        dest = PROGRAM_BLOCK + current_size;
+        *dest++ = *source++;
+        *dest++ = *source;
+    }
+
+    if (instruction != 0)
+       ins_f_code(instruction);
+
+    return MY_TRUE;
+} /* add_lvalue_code() */
+
+/*-------------------------------------------------------------------------*/
 static void
 insert_pop_value (void)
 
@@ -9044,6 +10026,7 @@ insert_pop_value (void)
             break;
         case F_CONST0:
         case F_CONST1:
+        case F_NCONST1:
             mem_block[A_PROGRAM].current_size = last_expression;
             break;
         default: ins_byte(F_POP_VALUE);
@@ -9140,15 +10123,19 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
         if (end)
         {
             /* Variant 1: cycle a codeblock and modify instructions */
-            
+
             p_int length;
             bytecode_p q;
 
             length = end - start + 1;
 
             /* Get enough memory */
-            while (current + length > mem_block[A_PROGRAM].max_size)
-                realloc_a_program();
+            if (!realloc_a_program(length))
+            {
+                yyerrorf("Out of memory: program size %lu\n"
+                        , CURRENT_PROGRAM_SIZE + length);
+                return;
+            }
 
             /* Cycle the indexing code to the end, where it belongs */
             p = PROGRAM_BLOCK;
@@ -9188,12 +10175,16 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
         else
         {
             /* Variant 2: Overwrite the old <code> and insert <newcode> */
-            
+
             int i;
             p_int length;
 
-            while (current + 2 > mem_block[A_PROGRAM].max_size)
-                realloc_a_program();
+            if (!realloc_a_program(2))
+            {
+                yyerrorf("Out of memory: program size %lu\n"
+                        , CURRENT_PROGRAM_SIZE + 2);
+                return;
+            }
 
             p = PROGRAM_BLOCK + start;
             i = p[1];
@@ -9208,7 +10199,7 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
     else
     {
         /* Variant 3: Just add a modified <newcode> */
-        
+
         switch(newcode)
         {
         case F_PROTECTED_INDEX_LVALUE:
@@ -9220,10 +10211,14 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
         default:
             yyerror("Need lvalue for range lvalue.");
         }
-        
-        while (current + 2 > mem_block[A_PROGRAM].max_size)
-            realloc_a_program();
-            
+
+        if (!realloc_a_program(2))
+        {
+            yyerrorf("Out of memory: program size %lu\n"
+                    , CURRENT_PROGRAM_SIZE + 2);
+            return;
+        }
+
         p = PROGRAM_BLOCK + current;
         STORE_CODE(p, newcode >> F_ESCAPE_BITS);
         PUT_CODE(p, newcode);
@@ -9289,7 +10284,7 @@ transfer_init_control (void)
         /* First call: we have to generate the __INIT function
          * header.
          */
-         
+
 #ifdef ALIGN_FUNCTIONS
         CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
         /* Must happen before PREPARE_INSERT()! */
@@ -9308,19 +10303,19 @@ transfer_init_control (void)
               (CURRENT_PROGRAM_SIZE += sizeof name + 3) - 2;
         }
     }
-    else if ((p_int)(CURRENT_PROGRAM_SIZE - 2) == last_initializer_end)
+    else if ((p_int)(CURRENT_PROGRAM_SIZE - 3) == last_initializer_end)
     {
         /* The news INIT fragment directly follows the old one, so
          * just overwrite the JUMP instruction of the last.
          */
-        mem_block[A_PROGRAM].current_size -= 3;
+        mem_block[A_PROGRAM].current_size -= 4;
     }
     else
     {
         /* Change the address of the last jump after the last
          * initializer to this point.
          */
-        upd_short(last_initializer_end, mem_block[A_PROGRAM].current_size);
+        upd_offset(last_initializer_end, mem_block[A_PROGRAM].current_size);
     }
 } /* transfer_init_control() */
 
@@ -9335,34 +10330,27 @@ add_new_init_jump (void)
 {
     ins_byte(F_JUMP);
     last_initializer_end = (p_int)mem_block[A_PROGRAM].current_size;
+    ins_byte(0);
     ins_short(0);
 } /* add_new_init_jump() */
 
 %endif /* INITIALIZATION_BY___INIT */
 
 /*-------------------------------------------------------------------------*/
-static int
-insert_inherited (char *super_name, char *real_name
-                 , program_t **super_p, function_t *fun_p
-                 , int num_arg, bytecode_p __prepare_insert__p
-                 )
+static short
+lookup_inherited (char *super_name, char *real_name
+                 , inherit_t **pIP, funflag_t *pFlags)
 
-/* The compiler encountered a <super_name>::<real_name>() call with
- * <num_arg> arguments; the codepointer is <__prepare_insert__p>.
+/* Lookup an inherited function <super_name>::<real_name> and return
+ * it's function index, setting *pIP to the inherit_t pointer and
+ * *pFlags to the function flags.
+ * Return -1 if not found, *pIP set to NULL, and *pFlags set to 0.
  *
- * Look up the function information and set *<super_p> and *<fun_p>
- * the program pointer and the function_t information. Also compile
- * the function call(s).
+ * This function is called by the lexer to resolve #'<inherited_fun> closures,
+ * so both strings are not shared.
  *
- * Result is -1 if the function wasn't found, otherwise the
- * function index.
- *
- * <super_name> can be an empty string, the (partial) name of one
- * of the inherits, or a wildcarded name (and no args). In the latter
- * case, the function is called in all inherits matching the pattern.
- * The results from such a wildcarded call are returned in an array,
- * <super_p>, <fun_p> and the returned function index are those of
- * the first function found.
+ * <super_name> can be an empty string or the (partial) name of one
+ * of the inherits. <real_name> must be shared string.
  */
 
 {
@@ -9370,13 +10358,17 @@ insert_inherited (char *super_name, char *real_name
     int num_inherits, super_length;
     short found_ix;
 
+    found_ix = -1;
+    *pIP = NULL;
+    *pFlags = 0;
+
     /* Strip leading '/' */
     while (*super_name == '/')
         super_name++;
     super_length = strlen(super_name);
-    num_inherits = INHERIT_COUNT;
 
-    real_name = findstring(real_name); /* TODO: Isn't this a shared string anyway? */
+    num_inherits = INHERIT_COUNT;
+    real_name = findstring(real_name);
 
     /* Search the function in all inherits.
      * For normal inherits its sufficient to search the inherits
@@ -9384,9 +10376,7 @@ insert_inherited (char *super_name, char *real_name
      * with virtual inherits the order gets messed up.
      */
     ip = (inherit_t *)mem_block[A_INHERITS].block;
-    for ( foundp = NULL, found_ix = -1
-        ; num_inherits > 0
-        ; ip++, num_inherits--)
+    for ( foundp = NULL ; num_inherits > 0 ; ip++, num_inherits--)
     {
         short i;
 
@@ -9395,10 +10385,10 @@ insert_inherited (char *super_name, char *real_name
             continue;
 
         /* Test if super_name matches the end of the name of the inherit. */
-        if (*super_name)
+        if (super_length > 0)
         {
             /* ip->prog->name includes .c */
-            int l = strlen(ip->prog->name + 2);
+            int l = strlen(ip->prog->name) - 2;
 
             if (l < super_length)
                 continue;
@@ -9424,24 +10414,23 @@ insert_inherited (char *super_name, char *real_name
             if (foundp->inherit_depth < 2) /* toplevel inherit */
                 break;
         }
-    } /* for (all includes) */
+    } /* for (all inherits) */
 
     if (foundp != NULL)
     {
         funflag_t flags;
-        bytecode_p __PREPARE_INSERT__p = __prepare_insert__p;
 
         /* Found it! */
         ip = foundp;
 
-        flags = ip->prog->functions[found_ix];
+        *pFlags = flags = ip->prog->functions[found_ix];
 
         if (flags & NAME_INHERITED)
         {
             /* The parent inherits the function itself: we have to
              * check if it's a virtual inheritance.
              */
-            
+
             inherit_t *ip2;
             program_t *prog1, *prog2;
             int numvar2;
@@ -9463,6 +10452,82 @@ insert_inherited (char *super_name, char *real_name
                 found_ix -= ip2->function_index_offset;
             }
         }
+
+        *pIP = ip;
+    } /* if (foundp) */
+
+    return found_ix;
+} /* lookup_inherited() */
+
+/*-------------------------------------------------------------------------*/
+short
+find_inherited (char *super_name, char *real_name)
+
+/* Lookup an inherited function <super_name>::<real_name> and return
+ * it's function index. Return -1 if not found.
+ * This function is called by the lexer to resolve #'<inherited_fun> closures,
+ * so both strings are not shared.
+ *
+ * <super_name> can be an empty string or the (partial) name of one
+ * of the inherits.
+ */
+
+{
+    inherit_t *ip;
+    funflag_t flags;
+    short     ix;
+
+    real_name = findstring(real_name);
+
+    ix =  real_name ? lookup_inherited(super_name, real_name, &ip, &flags) : -1;
+    if (ix >= 0) /* Correct the index for the toplevel program */
+        ix += ip->function_index_offset;
+    return ix;
+} /* find_inherited() */
+
+/*-------------------------------------------------------------------------*/
+static int
+insert_inherited (char *super_name, char *real_name
+                 , program_t **super_p, function_t *fun_p
+                 , int num_arg, bytecode_p __prepare_insert__p
+                 )
+
+/* The compiler encountered a <super_name>::<real_name>() call with
+ * <num_arg> arguments; the codepointer is <__prepare_insert__p>.
+ *
+ * Look up the function information and set *<super_p> and *<fun_p>
+ * the program pointer and the function_t information. Also compile
+ * the function call(s).
+ *
+ * Result is the function index, or one of the negative error codes:
+ * INHERITED_NOT_FOUND (-1): the function wasn't found.
+ * INHERITED_WILDCARDED_ARGS (-2): it was a wildcarded supercall with
+ *   arguments
+ * INHERITED_WILDCARDED_NOT_FOUND (-3): it was a wildcarded supercall,
+ *   but not a single function was found.
+ *
+ * <real_name> must be a shared string (this function doesn't change
+ * the reference count).
+ *
+ * <super_name> can be an empty string, the (partial) name of one
+ * of the inherits, or a wildcarded name (and no args). In the latter
+ * case, the function is called in all inherits matching the pattern.
+ * The results from such a wildcarded call are returned in an array,
+ * <super_p>, <fun_p> and the returned function index are those of
+ * the first function found.
+ */
+
+{
+    inherit_t *ip;
+    funflag_t flags;
+    short found_ix;
+
+    found_ix = lookup_inherited(super_name, real_name, &ip, &flags);
+
+    if (ip != NULL)
+    {
+        /* Found it! */
+        bytecode_p __PREPARE_INSERT__p = __prepare_insert__p;
 
         /* Generate the function call */
         add_byte(F_CALL_EXPLICIT_INHERITED);
@@ -9494,11 +10559,12 @@ insert_inherited (char *super_name, char *real_name
         }
         CURRENT_PROGRAM_SIZE += 6;
         return found_ix;
-    } /* if (foundp) */
+    } /* if (ip) */
 
     /* Inherit not found, maybe it's a wildcarded call */
-    if (strpbrk(super_name, "*?") && !num_arg)
+    if (strpbrk(super_name, "*?"))
     {
+        int num_inherits;
         Bool *was_called;  /* Flags which inh. fun has been called already */
         inherit_t *ip0;
         int calls = 0;
@@ -9506,21 +10572,25 @@ insert_inherited (char *super_name, char *real_name
         int first_index;
         short i;
 
+        /* Wildcarded supercalls only work without arguments */
+        if (num_arg)
+            return INHERITED_WILDCARDED_ARGS;
+
         *super_p = NULL;
         num_inherits = INHERIT_COUNT;
 
         was_called = alloca(sizeof(*was_called)*num_inherits);
         for (i = 0; i < num_inherits; i++)
             was_called[i] = MY_FALSE;
-          
+
         /* Test every inherit if the name matches and if
          * it does, generate the function call.
          */
         ip0 = (inherit_t *)mem_block[A_INHERITS].block;
-        first_index = -1;
+        first_index = num_inherits > 0 ? INHERITED_WILDCARDED_NOT_FOUND
+                                       : INHERITED_NOT_FOUND;
         for (; num_inherits > 0; ip0++, num_inherits--)
         {
-            funflag_t flags;
             PREPARE_INSERT(6)
 
             /* ip->prog->name includes .c */
@@ -9530,6 +10600,12 @@ insert_inherited (char *super_name, char *real_name
 
             if (ip->inherit_type & INHERIT_TYPE_DUPLICATE)
                 /* duplicate inherit */
+                continue;
+
+            if (ip->inherit_depth > 1)
+                /* Only consider direct inherits, otherwise we would even
+                 * call functions in sub-inherits which have been redefined.
+                 */
                 continue;
 
             if ( !match_string(super_name, ip->prog->name, l) )
@@ -9546,7 +10622,7 @@ insert_inherited (char *super_name, char *real_name
                 /* The parent inherits the function itself: we have to
                  * check if it's a virtual inheritance.
                  */
-            
+
                 inherit_t *ip2;
                 program_t *prog1, *prog2;
                 int numvar2;
@@ -9570,8 +10646,6 @@ insert_inherited (char *super_name, char *real_name
             } /* if (inherited) */
 
             ip_index = ip - (inherit_t *)mem_block[A_INHERITS].block;
-            if (!calls) /* First function found */
-                first_index = i;
 
             /* The (new) ip might be duplicate inherit, or point to
              * a virtually inherited function we called already.
@@ -9580,6 +10654,9 @@ insert_inherited (char *super_name, char *real_name
              || was_called[ip_index])
                 /* duplicate inherit */
                 continue;
+
+            if (!calls) /* First function found */
+                first_index = i;
 
             /* Generate the function call */
             add_byte(F_CALL_EXPLICIT_INHERITED);
@@ -9617,7 +10694,7 @@ insert_inherited (char *super_name, char *real_name
         } /* for() */
 
         /* The calls above left their results on the stack.
-         * Combine them into a single array.
+         * Combine them into a single array (which might be empty).
          */
         {
             PREPARE_INSERT(3)
@@ -9629,7 +10706,7 @@ insert_inherited (char *super_name, char *real_name
     }
 
     /* No such function */
-    return -1;
+    return INHERITED_NOT_FOUND;
 } /* insert_inherited() */
 
 /*-------------------------------------------------------------------------*/
@@ -9638,13 +10715,12 @@ cross_define (function_t *from, function_t *to, int32 offset)
 
 /* The function <to> is a cross-definition from real function <from>,
  * separated by <offset>.
- * Set the flags and offset of <to> accordingly, and synchronize
- * the NO_MASK flag of both.
+ * Set the flags and offset of <to> accordingly to point to <from>, and
+ * synchronize the NO_MASK flag of both.
  */
 
 {
     short nomask;
-
     to->flags = (to->flags & ~NAME_UNDEFINED)
               | (from->flags & (NAME_UNDEFINED|NAME_PROTOTYPE))
               | NAME_CROSS_DEFINED | NAME_HIDDEN | NAME_INHERITED;
@@ -9675,7 +10751,7 @@ get_function_id (program_t *progp, int fx)
         flags = progp->functions[fx];
     }
 
-    /* Walk the inherit chain */    
+    /* Walk the inherit chain */
     while(flags & NAME_INHERITED)
     {
         inherit_t *inheritp;
@@ -9756,7 +10832,7 @@ copy_functions (program_t *from, fulltype_t type)
         inherit_t *ip;
         fun_hdr_p  funstart;
         funflag_t  flags;
-        int i2;
+        int i2; /* The index of the real function */
 
         flags = from->functions[i];
         fun_p->offset.inherit = NEW_INHERITED_INDEX;
@@ -9767,6 +10843,8 @@ copy_functions (program_t *from, fulltype_t type)
             /* The inherit-index has to be recomputed */
             fun_p->flags =
                 (flags & ~INHERIT_MASK) | NAME_INHERITED | NAME_HIDDEN;
+
+            /* If cross-defined, get the real function index */
             if (flags & NAME_CROSS_DEFINED)
             {
                 fun_p->offset.func = flags & INHERIT_MASK;
@@ -9802,7 +10880,7 @@ copy_functions (program_t *from, fulltype_t type)
             fun_p->flags |= NAME_UNDEFINED;
         }
 
-    } /* for (inherited functions) */
+    } /* for (inherited functions) pass 1 */
 
     /* Point back to the begin of the copied function data */
     fun_p = (function_t *)
@@ -9843,47 +10921,34 @@ copy_functions (program_t *from, fulltype_t type)
          * and definitiability. The switch() allows us to abort
          * easily without using gotos.
          */
-        switch (0) { default:
-            /* Test if the function is visible at all */
-            if ( (fun.flags & (NAME_HIDDEN|TYPE_MOD_NO_MASK|NAME_UNDEFINED) ) ==
-                 (NAME_HIDDEN|TYPE_MOD_NO_MASK) )
-                break;
+        switch (0) {
+        default:
+            /* Test if the function is visible at all.
+             * For this test, 'private nomask' degenerates to 'private'
+             * if we didn't do that, the driver would crash on a second
+             * level inherit (possible on a multiple second-level inherit).
+             * TODO: Find out why it crashes.
+             */
+            {
+                fulltype_t fflags = fun.flags;
+
+                if ((fflags & (TYPE_MOD_PRIVATE|TYPE_MOD_NO_MASK))
+                 == (TYPE_MOD_PRIVATE|TYPE_MOD_NO_MASK)
+                   )
+                    fflags &= ~(TYPE_MOD_NO_MASK);
+
+                if ( (fflags & (NAME_HIDDEN|TYPE_MOD_NO_MASK|NAME_UNDEFINED) ) ==
+
+                     (NAME_HIDDEN|TYPE_MOD_NO_MASK) )
+                {
+                    break;
+                }
+            }
 
             /* Visible: create a new identifier for it */
-            p = make_shared_identifier(fun.name, I_TYPE_GLOBAL, 0);
-            if (!p) {
-                yyerrorf("Out of memory: identifier '%s'", fun.name);
+            p = make_global_identifier(fun.name, I_TYPE_GLOBAL);
+            if (!p)
                 break;
-            }
-
-            if (p->type > I_TYPE_GLOBAL)
-            {
-                /* Somebody created a #define for this name.
-                 * Now fake the ident-table entry.
-                 */
-                ident_t *q;
-
-                do {
-                    q = p;
-                    p = p->inferior;
-                }
-                while (p && p->type > I_TYPE_GLOBAL);
-
-                if (!p)
-                {
-                    p = xalloc(sizeof(ident_t));
-                    if (!p) {
-                        yyerrorf("Out of memory: identifier (%lu bytes)"
-                                , (unsigned long) sizeof(ident_t));
-                        break;
-                    }
-                    p->name = q->name;
-                    p->type = I_TYPE_UNKNOWN;
-                    p->inferior = NULL;
-                    p->hash = q->hash;
-                    q->inferior = p;
-                }
-            }
 
             if (p->type != I_TYPE_UNKNOWN)
             {
@@ -9904,7 +10969,6 @@ copy_functions (program_t *from, fulltype_t type)
                      * to the non-standard preference would be very hard to
                      * reconstruct.
                      */
-
                     if ((uint32)n < first_func_index)
                     {
                         /* We already have a function definition/prototype
@@ -9949,27 +11013,52 @@ copy_functions (program_t *from, fulltype_t type)
                                         , n - current_func_index );
                         }
                         else if ( (fun.flags & OldFunction->flags & TYPE_MOD_NO_MASK)
-                             &&  !( (fun.flags|OldFunction->flags) & NAME_UNDEFINED ) )
+                             &&  !( (fun.flags|OldFunction->flags) & (TYPE_MOD_PRIVATE|NAME_UNDEFINED) ) )
                         {
                             yyerrorf(
                               "Illegal to inherit 'nomask' function '%s' twice",
                               fun.name);
                         }
                         else if ((   fun.flags & TYPE_MOD_NO_MASK
-                                  || OldFunction->flags & (NAME_HIDDEN|NAME_UNDEFINED))
+                                  || OldFunction->flags & (NAME_HIDDEN|NAME_UNDEFINED|TYPE_MOD_PRIVATE))
                               && !(fun.flags & (NAME_HIDDEN|NAME_UNDEFINED))
                                 )
                         {
-                            /* This function is nomask, but the previous entry
-                             * is hidden or undefined: prefer the inherited one.
+                            /* This function is visible and existing, but the
+                             * inherited one is not, or this one is also nomask:
+                             * prefer the inherited one.
                              */
                             cross_define( &fun, OldFunction
                                         , current_func_index - n );
                             p->u.global.function = current_func_index;
                         }
-                        else
+                        else if ((   fun.flags & TYPE_MOD_NO_MASK
+                                  || OldFunction->flags & (NAME_HIDDEN|NAME_UNDEFINED|TYPE_MOD_PROTECTED))
+                              && !(fun.flags & (NAME_HIDDEN|NAME_UNDEFINED))
+                                )
                         {
-                            /* prefer the first one */
+                            /* This function is visible and existing, but the
+                             * inherited one is not, or this one is also nomask:
+                             * prefer the inherited one.
+                             */
+                            cross_define( &fun, OldFunction
+                                        , current_func_index - n );
+                            p->u.global.function = current_func_index;
+                        }
+                        else if ( (fun.flags & TYPE_MOD_PRIVATE) == 0
+                              ||  (OldFunction->flags & TYPE_MOD_PRIVATE) == 0
+                              ||  ((OldFunction->flags|fun.flags)
+                                   & TYPE_MOD_VIRTUAL) != 0
+                                )
+                        {
+                            /* At least one of the functions is visible
+                             * or redefinable: prefer the first one.
+                             * TODO: The whole if-condition is more a kludge,
+                             * TODO:: developed iteratively from .367
+                             * TODO:: through .370. It should be reconsidered,
+                             * TODO:: which of course implies a deeper
+                             * TODO:: analysis of the going ons here.
+                             */
                             cross_define( OldFunction, &fun
                                         , n - current_func_index );
                         }
@@ -9980,16 +11069,23 @@ copy_functions (program_t *from, fulltype_t type)
                          * inherit this one.
                          */
 #ifdef DEBUG
-                        /* The definition we picked before should be cross-defined
-                         * to the definition we have now.
+                        /* The definition we picked before should be
+                         * cross-defined to the definition we have now; or
+                         * it should be nominally invisible so we can redefine
+                         * it.
                          */
-                        if ( !(FUNCTION(n)->flags & NAME_CROSS_DEFINED)
-                         ||   FUNCTION(n)->offset.func
-                           != MAKE_CROSSDEF_OFFSET(((int32)current_func_index) - n)
+                        if ((   !(FUNCTION(n)->flags & NAME_CROSS_DEFINED)
+                             ||   FUNCTION(n)->offset.func
+                                != MAKE_CROSSDEF_OFFSET(((int32)current_func_index) - n)
+                            )
+                         && ((FUNCTION(n)->flags & TYPE_MOD_PRIVATE) == 0
+                            )
                            )
                         {
                             fatal(
-                              "inconsistent function definition within superclass\n"
+                              "Inconsistent definition of %s() within "
+                              "superclass '%s'.\n"
+                            , fun.name, from->name
                             );
                         }
 #endif
@@ -9998,35 +11094,52 @@ copy_functions (program_t *from, fulltype_t type)
                 }
                 else /* n < 0: not an lfun */
                 {
-                    if (n == -2)
+                    if (n != I_GLOBAL_FUNCTION_EFUN
+                     || (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
+                     || (fun.flags & (NAME_UNDEFINED)) != 0
+                       )
                     {
-                        /* This inherited function shadows an efun */
+                        if (n == I_GLOBAL_FUNCTION_EFUN)
+                        {
+                            /* This inherited function shadows
+                             * an (simul-)efun.
+                             */
 
-                        efun_shadow_t *q;
+                            efun_shadow_t *q;
 
-                        q = xalloc(sizeof(efun_shadow_t));
-                        if (!q) {
-                            yyerrorf("Out of memory: efun shadow (%lu bytes)"
-                                    , (unsigned long) sizeof(efun_shadow_t));
-                            break;
+                            q = xalloc(sizeof(efun_shadow_t));
+                            if (!q) {
+                                yyerrorf("Out of memory: efun shadow (%lu bytes)"
+                                        , (unsigned long) sizeof(efun_shadow_t));
+                                break;
+                            }
+                            q->shadow = p;
+                            q->next = all_efun_shadows;
+                            all_efun_shadows = q;
                         }
-                        q->shadow = p;
-                        q->next = all_efun_shadows;
-                        all_efun_shadows = q;
+
+                        /* Update the symbol table entry to point
+                         * to the newly read function.
+                         */
+                        p->u.global.function = current_func_index;
                     }
-                    p->u.global.function = current_func_index;
+                    /* else: inherited private defined function must not hide
+                     * the (simul-)efun and is thusly not added to
+                     * the symbol-table.
+                     */
                 }
-            }
-            else /* p is I_TYPE_UNKNOWN */
+            } /* if (p != I_TYPE_UNKNOWN) */
+
+            if (p->type == I_TYPE_UNKNOWN)
             {
                 /* First time this function-ident was ever encountered.
                  * Just make a new global.
                  */
-                
+
                 p->type = I_TYPE_GLOBAL;
-                p->u.global.variable = -1;
-                p->u.global.efun     = -1;
-                p->u.global.sim_efun = -1;
+                p->u.global.variable = I_GLOBAL_VARIABLE_OTHER;
+                p->u.global.efun     = I_GLOBAL_EFUN_OTHER;
+                p->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
                 p->u.global.function = current_func_index;
                 p->next_all = all_globals;
                 all_globals = p;
@@ -10046,8 +11159,12 @@ copy_functions (program_t *from, fulltype_t type)
              */
             if ((heart_beat == -1)
              && fun.name[0] == 'h'
-             && (strcmp(fun.name, "heart_beat") == 0))
+             && (strcmp(fun.name, "heart_beat") == 0)
+             && !(fun.flags & (NAME_HIDDEN|NAME_UNDEFINED))
+               )
+            {
                 heart_beat = current_func_index;
+            }
 
 %ifdef INITIALIZATION_BY___INIT
             /* Recognize the initializer function */
@@ -10091,7 +11208,7 @@ copy_functions (program_t *from, fulltype_t type)
 
         /* Finally update the entry in the A_FUNCTIONS area */
         fun_p[i] = fun;
-    }
+    } /* for (inherited functions), pass 2 */
 
 %ifdef INITIALIZATION_BY___INIT
     return initializer;
@@ -10185,7 +11302,7 @@ copy_variables (program_t *from, fulltype_t type
                 inherit_t inherit, *inheritp2;
                 int k, inherit_index;
                 funflag_t *flagp;
-                function_t *funp;
+                function_t *funp, *funp2;
 
 #ifdef INITIALIZATION_BY___INIT
                 if (variables_initialized)
@@ -10220,6 +11337,7 @@ copy_variables (program_t *from, fulltype_t type
                     /* First occurence of these virtual variables, we're
                      * going to copy them into our variables.
                      */
+                    inheritp2 = &inherit;
                     variable_index_offset += new_bound - last_bound;
                     inherit.variable_index_offset =
                       variable_index_offset - progp->num_variables;
@@ -10245,9 +11363,16 @@ copy_variables (program_t *from, fulltype_t type
                 flagp = from->functions + inheritp->function_index_offset;
                 funp = (function_t *)mem_block[A_FUNCTIONS].block +
                     inherit.function_index_offset;
-                for (k = inherit.prog->num_functions; --k >= 0; funp++)
+                funp2 = (function_t *)mem_block[A_FUNCTIONS].block +
+                    inheritp2->function_index_offset;
+                    /* Usually funp2 == funp, but if the program is inherited
+                     * virtually several times with differing visibilities,
+                     * the two pointers differ.
+                     */
+                for (k = inherit.prog->num_functions; --k >= 0; funp++, funp2++)
                 {
                     if ( !(funp->flags & NAME_CROSS_DEFINED)
+                     &&  !(funp2->flags & NAME_CROSS_DEFINED)
                      && (*flagp & (NAME_INHERITED|NAME_CROSS_DEFINED)) ==
                            NAME_INHERITED
                      && (*flagp & INHERIT_MASK) == inheritc )
@@ -10300,42 +11425,10 @@ copy_variables (program_t *from, fulltype_t type
             ident_t *p;
             fulltype_t new_type;
 
-            p = make_shared_identifier(from->variable_names[j].name,
-                I_TYPE_GLOBAL, 0);
-            if (!p) {
-                yyerrorf("Out of memory: identifier '%s'"
-                        , from->variable_names[j].name);
+            p = make_global_identifier(from->variable_names[j].name
+                                      , I_TYPE_GLOBAL);
+            if (!p)
                 return;
-            }
-
-            if (p->type > I_TYPE_GLOBAL)
-            {
-                /* There is a #define for this name - fake
-                 * a proper entry in the ident table.
-                 */
-
-                ident_t *q;
-
-                do {
-                    q = p;
-                    p = p->inferior;
-                } while (p && p->type > I_TYPE_GLOBAL);
-
-                if (!p)
-                {
-                    p = xalloc(sizeof(ident_t));
-                    if (!p) {
-                        yyerrorf("Out of memory: identifier (%lu bytes)"
-                                , (unsigned long) sizeof(ident_t));
-                        return;
-                    }
-                    p->name = q->name;
-                    p->type = I_TYPE_UNKNOWN;
-                    p->inferior = NULL;
-                    p->hash = q->hash;
-                    q->inferior = p;
-                }
-            }
 
             new_type = type;
 
@@ -10539,57 +11632,130 @@ store_line_number_backward (int offset)
 } /* store_line_number_backward() */
 
 /*-------------------------------------------------------------------------*/
-void
-store_include_info (char *name)
+mp_uint
+store_include_info (char *name, char * filename, char delim, int depth)
 
-/* The lexer is going to include file <name>.
+/* The lexer is going to include <name>, which can be the filename given
+ * in an #include directive, or a descriptive name for a different source.
+ * The full (file)name of the source as seen by the lexer is <filename>.
+ * This will be include depth <depth>.
+ * <delim> is either '"' or '>' if this include is from a file, or ')'
+ * if it's a different source.
+ *
+ * Result is the offset of the include information in the mem_block.
+ * It is to be considered a handle and has to be passed to
+ * store_include_end().
  */
 
 {
-    if (last_include_start == mem_block[A_LINENUMBERS].current_size)
+    mp_uint rc;
+
+    /* Generate and store the plain include information */
     {
-        simple_includes++;
+        include_t inc;
+        char * tmp;
+        size_t len;
+
+        /* Make sure that the filename starts with a leading slash,
+         * then make it a tabled string and store it.
+         */
+        if (*filename != '/')
+        {
+            tmp = alloca(strlen(filename)+2);
+            if (tmp == NULL)
+            {
+                yyerror("Out of stack memory: copy of filename");
+            }
+            else
+            {
+                *tmp = '/';
+                strcpy(tmp+1, filename);
+                filename = tmp;
+            }
+        }
+
+        inc.filename = make_shared_string(filename);
+        if (inc.filename == NULL)
+        {
+            inc.filename = ref_string(STR_DEFAULT);
+            yyerror("Out of memory: sharing include filename");
+        }
+
+        /* Surround the <name> with the delimiters, then
+         * make it a tabled string and store it.
+         */
+        len = strlen(name);
+        tmp = alloca(len+3);
+        if (tmp == NULL)
+        {
+            yyerror("Out of stack memory: copy of name");
+        }
+        else
+        {
+            *tmp = delim == '"' ? delim
+                                : (delim == '>' ? '<' : '(');
+            strcpy(tmp+1, name);
+            tmp[len+1] = delim;
+            tmp[len+2] = '\0';
+
+            inc.name = make_shared_string(tmp);
+            if (inc.name == NULL)
+            {
+                inc.name = ref_string(STR_DEFAULT);
+                yyerror("Out of memory: sharing include name");
+            }
+        }
+
+        /* Complete the structure and store it */
+        inc.depth = depth;
+        rc = mem_block[A_INCLUDES].current_size;
+        add_to_mem_block(A_INCLUDES, &inc, sizeof inc);
     }
-    else
+
+    /* Store the information for the linenumber tracing */
+
     {
-        simple_includes = 0;
+        if (last_include_start == mem_block[A_LINENUMBERS].current_size)
+        {
+            simple_includes++;
+        }
+        else
+        {
+            simple_includes = 0;
+        }
+
+        stored_lines++;  /* don't count the #include line */
+
+        /* Use up the amounts of lines collected */
+        while (stored_lines < current_line)
+        {
+            int lines;
+
+            lines = current_line - stored_lines;
+            if (lines > LI_MAXEMPTY) lines = LI_MAXEMPTY;
+            stored_lines += lines;
+            byte_to_mem_block(A_LINENUMBERS, 256 - lines);
+        }
+
+        /* Store the bytecode and mark the position */
+        byte_to_mem_block(A_LINENUMBERS, LI_INCLUDE);
+        last_include_start = mem_block[A_LINENUMBERS].current_size;
+
+        /* Restart linecount */
+        stored_lines = 0;
     }
 
-    stored_lines++;  /* don't count the #include line */
-
-    /* Use up the amounts of lines collected */
-    while (stored_lines < current_line)
-    {
-        int lines;
-
-        lines = current_line - stored_lines;
-        if (lines > LI_MAXEMPTY) lines = LI_MAXEMPTY;
-        stored_lines += lines;
-        byte_to_mem_block(A_LINENUMBERS, 256 - lines);
-    }
-
-    /* Store the bytecode and mark the position */
-    byte_to_mem_block(A_LINENUMBERS, LI_INCLUDE);
-    last_include_start = mem_block[A_LINENUMBERS].current_size;
-
-    /* Remember the included filename in A_INCLUDE_NAMES */
-    name = make_shared_string(name);
-    if (!name)
-    {
-        name = ref_string(STR_DEFAULT);
-        yyerror("Out of memory: sharing string");
-    }
-    add_to_mem_block(A_INCLUDE_NAMES, &name, sizeof name);
-
-    /* Restart linecount */
-    stored_lines = 0;
+    return rc;
 } /* store_include_info() */
 
 /*-------------------------------------------------------------------------*/
 void
-store_include_end (void)
+store_include_end (mp_uint inc_offset)
 
-/* The current include ended.
+/* The current include ended. <inc_offset> has to be the offset returned by
+ * store_include_info() for this include file.
+ * <current_line> is already supposed to be the restored value from the
+ * including file.
  */
 
 {
@@ -10598,8 +11764,11 @@ store_include_end (void)
     stored_lines = current_line-1;
     if (last_include_start == mem_block[A_LINENUMBERS].current_size)
     {
+        include_t * inc = (include_t *)(mem_block[A_INCLUDES].block + inc_offset);
         /* No code was generated in this include - remove the
          * information stored by store_include_info().
+         * line number information stored by store_include_info()
+         * and tag the include information in A_INCLUDES.
          */
 
         last_include_start = mem_block[A_LINENUMBERS].current_size - 1;
@@ -10617,40 +11786,20 @@ store_include_end (void)
         {
             last_include_start--;
         }
-        free_string( *(char **)
-          (mem_block[A_INCLUDE_NAMES].block +
-           (mem_block[A_INCLUDE_NAMES].current_size -= sizeof(char *)))
-        );
 
-        /* If we return to the auto_include_string, current_line has been
-         * negative, and hence stored_lines became negative.  However,
-         * actually, the line number information has been unwinded to 0.  */
-        if (stored_lines < 0)
-            stored_lines = 0;
-
+        inc->depth = -inc->depth;
     }
     else
     {
         /* Store the include end and correct the linenumber */
-        
+
         byte_to_mem_block(A_LINENUMBERS, LI_INCLUDE_END);
-        /* Since LI_INCLUDE advances the line number by one, this is even more
-         * tricky to accomodate correctly in the auto_include string.
-         * By using a fake line number relocation, we decrease the line number
-         * by two, then we advance it by one empty line.
-         */
-        if (stored_lines < 1)
-        {
-            stored_lines = 0;
-            byte_to_mem_block(A_LINENUMBERS, LI_RELOCATED + 1);
-            byte_to_mem_block(A_LINENUMBERS, 256 - 1);
-        }
     }
 } /* store_include_end() */
 
 /*-------------------------------------------------------------------------*/
 static void
-prolog(void)
+prolog (void)
 
 /* Initialize the compiler environment prior to a compile.
  */
@@ -10677,6 +11826,8 @@ prolog(void)
     num_parse_error  = 0;
     block_depth      = 0;
     use_local_scopes = MY_TRUE;
+    default_varmod = 0;
+    default_funmod = 0;
 
     free_all_local_names();   /* In case of earlier error */
 
@@ -10698,7 +11849,7 @@ prolog(void)
     case_state.free_block = NULL;
     case_state.next_free = NULL;
 %ifdef INITIALIZATION_BY___INIT
-    last_initializer_end = -3;
+    last_initializer_end = -4; /* To pass the test in transfer_init_control() */
     variables_initialized = 0;
 %endif
 
@@ -10804,40 +11955,10 @@ epilog (void)
     {
         ident_t *ip;
 
-        ip = make_shared_identifier("__INIT", I_TYPE_UNKNOWN, 0);
-        switch (0) { default:
-            if (!ip)
-            {
-                yyerror("Out of memory: identifer '__INIT'");
-                break;
-            }
-
-            if (ip->type > I_TYPE_GLOBAL)
-            {
-                /* Somebody created a #define with this name.
-                 * Fake an ident-table entry.
-                 */
-                do {
-                    q = ip;
-                    ip = ip->inferior;
-                } while (ip && ip->type > I_TYPE_GLOBAL);
-                if (!ip)
-                {
-                    ip = xalloc(sizeof(ident_t));
-                    if (!ip) {
-                        yyerrorf("Out of memory: identifer (%lu bytes)"
-                                , (unsigned long) sizeof(ident_t));
-                        break;
-                    }
-                    ip->name = q->name;
-                    ip->type = I_TYPE_UNKNOWN;
-                    ip->inferior = NULL;
-                    ip->hash = q->hash;
-                    q->inferior = ip;
-                }
-            }
+        ip = make_global_identifier("__INIT", I_TYPE_UNKNOWN);
+        if (ip)
             define_new_function(MY_FALSE, ip, 0, 0, first_initializer_start, TYPE_MOD_PROTECTED, 0);
-        }
+
         /* ref count for ip->name was incremented by transfer_init_control() */
 
         /* Change the last jump after the last initializer into a
@@ -10856,19 +11977,6 @@ epilog (void)
      */
     if (mem_block[A_STRINGS].current_size > 0x10000 * sizeof (char *))
         yyerror("Too many strings");
-
-    /* Add the names of the include files in reversed order
-     * the program strings.
-     */
-    while (mem_block[A_INCLUDE_NAMES].current_size)
-    {
-        add_to_mem_block(
-          A_STRINGS,
-          mem_block[A_INCLUDE_NAMES].block +
-            (mem_block[A_INCLUDE_NAMES].current_size -= sizeof(char *)),
-          sizeof(char*)
-        );
-    }
 
     /* Get and check the numbers of functions, strings, and variables */
     num_functions = FUNCTION_COUNT;
@@ -10900,8 +12008,9 @@ epilog (void)
         {
             funflag_t flags;
 
-            /* If the function was cross-defined, resolve f->offset.func
-             * to use the proper offset to point to the actual definition.
+            /* If the function was cross-defined, the targeted function might
+             * be a cross-definition itself. Unravel such a cross-definition
+             * chain and let f->offset.func point to the actual definition.
              */
             if ( f->flags & NAME_CROSS_DEFINED )
             {
@@ -10924,39 +12033,42 @@ epilog (void)
 #ifdef ALIGN_FUNCTIONS
                 CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
 #endif
-                if (CURRENT_PROGRAM_SIZE + FUNCTION_HDR_SIZE + 2 >
-                    mem_block[A_PROGRAM].max_size)
+                if (!realloc_a_program(FUNCTION_HDR_SIZE + 2))
                 {
-                    realloc_a_program();
+                    yyerrorf("Out of memory: program size %lu\n"
+                            , CURRENT_PROGRAM_SIZE + FUNCTION_HDR_SIZE + 2);
                 }
-                ref_string(f->name);
-                f->offset.pc = CURRENT_PROGRAM_SIZE + sizeof f->name + 1;
-                p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE;
-                memcpy(p, (char *)&f->name, sizeof f->name);
-                p += sizeof f->name;
-                *p++ = f->type;
-                *p++ = f->num_arg;
-                *p++ = f->num_local;
-%ifdef INITIALIZATION_BY___INIT
-                /* If __INIT() is undefined (i.e. there was a prototype, but
-                 * no explicit function nor the automagic initialization code,
-                 * then a dummy function is generated. This prevents crashes
-                 * when this program is inherited later.
-                 */
-                if (f->name[0] == '_' && !strcmp(f->name, "__INIT")
-                 && !f->num_arg)
+                else
                 {
-                    f->flags &= ~NAME_UNDEFINED;
-                    *p++ = F_CONST1;
-                    *p   = F_RETURN;
-                } else {
-%endif
-                    *p++ = F_ESCAPE;
-                    *p   = F_UNDEF-0x100;
+                    ref_string(f->name);
+                    f->offset.pc = CURRENT_PROGRAM_SIZE + sizeof f->name + 1;
+                    p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE;
+                    memcpy(p, (char *)&f->name, sizeof f->name);
+                    p += sizeof f->name;
+                    *p++ = f->type;
+                    *p++ = f->num_arg;
+                    *p++ = f->num_local;
 %ifdef INITIALIZATION_BY___INIT
-                }
+                    /* If __INIT() is undefined (i.e. there was a prototype, but
+                     * no explicit function nor the automagic initialization code,
+                     * then a dummy function is generated. This prevents crashes
+                     * when this program is inherited later.
+                     */
+                    if (f->name[0] == '_' && !strcmp(f->name, "__INIT")
+                     && !f->num_arg)
+                    {
+                        f->flags &= ~NAME_UNDEFINED;
+                        *p++ = F_CONST1;
+                        *p   = F_RETURN;
+                    } else {
 %endif
-                CURRENT_PROGRAM_SIZE += sizeof f->name + 5;
+                        *p++ = F_ESCAPE;
+                        *p   = F_UNDEF-0x100;
+%ifdef INITIALIZATION_BY___INIT
+                    }
+%endif
+                    CURRENT_PROGRAM_SIZE += sizeof f->name + 5;
+                }
             }
 
             /* Set the function address resp. inherit index in
@@ -10966,7 +12078,6 @@ epilog (void)
             f->flags = flags & NAME_INHERITED ?
               (flags & ~INHERIT_MASK)  | (f->offset.inherit & INHERIT_MASK) :
               (flags & ~FUNSTART_MASK) | (f->offset.pc & FUNSTART_MASK);
-
             /* If the function is visible, add it to the list of names
              * to be sorted.
              */
@@ -11154,8 +12265,8 @@ epilog (void)
 
         for (t = all_efun_shadows; NULL != (s = t); )
         {
-            s->shadow->u.global.function = -2;
-            s->shadow->u.global.variable = -2;
+            s->shadow->u.global.function = I_GLOBAL_FUNCTION_EFUN;
+            s->shadow->u.global.variable = I_GLOBAL_VARIABLE_FUN;
             t = s->next;
             xfree(s);
         }
@@ -11183,8 +12294,11 @@ epilog (void)
             mem_block[A_ARGUMENT_INDEX].current_size = 0;
         }
         for (i=0; i<NUMPAREAS; i++)
-            size += align(mem_block[i].current_size);
-            
+        {
+            if (i != A_LINENUMBERS)
+                size += align(mem_block[i].current_size);
+        }
+
         size += align(num_function_names * sizeof *prog->function_names);
         size += align(num_functions * sizeof *prog->functions);
 
@@ -11205,6 +12319,7 @@ epilog (void)
             yyerrorf("Out of memory: filename '%s'", current_file);
             break;
         }
+        prog->blueprint = NULL;
         prog->total_size = size;
         prog->ref = 0;
         prog->heart_beat = heart_beat;
@@ -11296,6 +12411,18 @@ epilog (void)
         }
         p += align(mem_block[A_INHERITS].current_size);
 
+        /* Add the include file information */
+        prog->num_includes = INCLUDE_COUNT;
+        if (prog->num_includes)
+        {
+            memcpy(p, mem_block[A_INCLUDES].block
+                    , mem_block[A_INCLUDES].current_size);
+            prog->includes = (include_t *)p;
+        }
+        else
+            prog->includes = NULL;
+        p += align(mem_block[A_INCLUDES].current_size);
+
         /* Add the argument type information
          */
         if (pragma_save_types)
@@ -11319,11 +12446,29 @@ epilog (void)
 
         /* Add the linenumber information.
          */
-        prog->line_numbers = p;
-        if (mem_block[A_LINENUMBERS].current_size)
-            memcpy(p, mem_block[A_LINENUMBERS].block,
-                   mem_block[A_LINENUMBERS].current_size);
-        p += align(mem_block[A_LINENUMBERS].current_size);
+        {
+            size_t linenumber_size;
+
+            linenumber_size = mem_block[A_LINENUMBERS].current_size
+                              + sizeof(linenumbers_t);
+
+            if ( !(prog->line_numbers = xalloc(linenumber_size)) )
+            {
+                total_prog_block_size -= prog->total_size + strlen(prog->name)+1;
+                total_num_prog_blocks -= 1;
+                xfree(prog);
+                yyerrorf("Out of memory: linenumber structure (%lu bytes)"
+                        , (unsigned long)linenumber_size);
+                break;
+            }
+            total_prog_block_size += linenumber_size;
+            prog->line_numbers->size = linenumber_size;
+            if (mem_block[A_LINENUMBERS].current_size)
+                memcpy( prog->line_numbers->line_numbers
+                      , mem_block[A_LINENUMBERS].block
+                      , mem_block[A_LINENUMBERS].current_size);
+        }
+
 
         /* Correct the variable index offsets */
         fix_variable_index_offsets(prog);
@@ -11383,7 +12528,10 @@ epilog (void)
         do_free_sub_strings( num_strings
                            , (char **)mem_block[A_STRINGS].block
                            , num_variables
-                           , (variable_t *)mem_block[A_VIRTUAL_VAR].block );
+                           , (variable_t *)mem_block[A_VIRTUAL_VAR].block
+                           , INCLUDE_COUNT
+                           , (include_t *)mem_block[A_INCLUDES].block
+                           );
 
         compiled_prog = NULL;
 
@@ -11398,19 +12546,21 @@ epilog (void)
 
 /*-------------------------------------------------------------------------*/
 void
-compile_file(void)
+compile_file (int fd)
 
 /* Compile an LPC file. See the head comment for instructions.
  */
 
 {
     prolog();
+    start_new_file(fd);
     yyparse();
     /* If the parse failed, either num_parse_error != 0
      * or inherit_file != NULL here.
      */
     epilog();
-}
+    end_new_file();
+} /* compile_file() */
 
 /*-------------------------------------------------------------------------*/
 #if defined( DEBUG ) && defined ( TRACE_CODE )

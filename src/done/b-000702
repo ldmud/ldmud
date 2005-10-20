@@ -2,7 +2,7 @@ Short: dev.200 in UNItopia cores on fast connects
 Date: Sat, 1 Jul 2000 09:20:58 +0200
 From: Freaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
 Type: Bug
-State: Probably fixed
+State: Done - fixed
 
 Analysis: This is most likely the telnet negotiation bug fixed in 
 209 and 213.

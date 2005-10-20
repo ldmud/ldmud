@@ -59,6 +59,10 @@ init() {
     add_action("wield", "wield");
 }
 
+id(str) {
+    return str == name_of_weapon || str == alt_name || str == alias_name;
+}
+
 wield(str) {
     if (!id(str))
 	return 0;
@@ -88,10 +92,6 @@ short() {
 
 weapon_class() {
     return class_of_weapon;
-}
-
-id(str) {
-    return str == name_of_weapon || str == alt_name || str == alias_name;
 }
 
 drop(silently) {

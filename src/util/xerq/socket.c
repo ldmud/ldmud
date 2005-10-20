@@ -1,6 +1,7 @@
 /*---------------------------------------------------------------------------
  * XErq - Socket functions.
  * (C) Copyright 1995 by Brian Gerst.
+ * (C) Copyright 2001 by Brian Gerst, Frank Kirschner, Lars Duening.
  *---------------------------------------------------------------------------
  * This module implements the communication requests, and also contains
  * the functions handling socket_t structures.
@@ -9,7 +10,13 @@
 
 #include "defs.h"
 
-static void send_auth (auth_t *ap);
+#ifdef _AIX
+typedef unsigned long length_t;  /* *sigh* */
+#else
+typedef int length_t;
+#endif
+
+static int send_auth (auth_t *ap);
 
 /*-------------------------------------------------------------------------*/
 socket_t *
@@ -24,6 +31,7 @@ new_socket(int fd, char type)
     socket_t *sp;
 
     sp = malloc(sizeof(struct socket_s));
+    XPRINTF((stderr, "%s New socket %p: fd %d\n", time_stamp(), sp, fd));
     sp->next = sockets;
     sp->fd = fd;
     sp->type = type;
@@ -47,11 +55,13 @@ free_socket (socket_t *sp)
     socket_t **spp;
     equeue_t *qp, *qnext;
 
+    XPRINTF((stderr, "%s Freeing socket %p\n", time_stamp(), sp));
     /* Remove the socket from the socket */
     for (spp = &sockets; *spp; spp = &(*spp)->next)
     {
         if (*spp != sp)
             continue;
+        XPRINTF((stderr, "%s   Unlinking socket %p\n", time_stamp(), sp));
         *spp = sp->next;
         break;
     }
@@ -59,17 +69,18 @@ free_socket (socket_t *sp)
     /* Free all pending queued data */
     for (qp = sp->queue; qp;)
     {
+        XPRINTF((stderr, "%s   Freeing queue %p\n", time_stamp(), qp));
         qnext = qp->next;
         free(qp);
         qp = qnext;
     }
-    
+
     free(sp);
 } /* free_socket() */
 
 /*-------------------------------------------------------------------------*/
 void
-add_to_queue (equeue_t **qpp, char *data, int len)
+add_to_queue (equeue_t **qpp, char *data, int len, int32 hand)
 
 /* Add the message <data> of <len> bytes to the end of queue <qpp>.
  */
@@ -78,9 +89,12 @@ add_to_queue (equeue_t **qpp, char *data, int len)
     equeue_t *new;
 
     new = malloc(sizeof(struct equeue_s)+len);
+    XPRINTF((stderr, "%s New queue %p: data %p:%d, queue head %p (-> %p)\n"
+                   , time_stamp(), new, data, len, qpp, *qpp));
     new->len = len;
     new->pos = 0;
     new->next = 0;
+    new->handle = hand;
     memcpy(&new->buf, data, len);
     while (*qpp)
         qpp = &(*qpp)->next;
@@ -89,7 +103,7 @@ add_to_queue (equeue_t **qpp, char *data, int len)
 
 /*-------------------------------------------------------------------------*/
 int
-flush_queue (equeue_t **qpp, int fd)
+flush_queue (equeue_t **qpp, int fd, int reply_handle)
 
 /* Try to write all pending data from queue <qpp> to socket <fd>.
  * Return -1 if an error occured, and 0 if the queue could be emptied.
@@ -97,13 +111,18 @@ flush_queue (equeue_t **qpp, int fd)
  */
 
 {
-   int l;
-   equeue_t *qp = *qpp, *next;
+    int l;
+    equeue_t *qp = *qpp, *next;
 
-   do {
+    XPRINTF((stderr, "%s Flush queue %p (-> %p) to %d\n"
+                   , time_stamp(), qpp, *qpp, fd));
+    do {
+        XPRINTF((stderr, "%s   Flush queue entry %p, data %p:%d:%d\n"
+                       , time_stamp(), qp, qp->buf, qp->pos, qp->len));
         do
             l = write(fd, qp->buf+qp->pos, qp->len);
         while (l==-1 && errno==EINTR);
+        XPRINTF((stderr, "%s   Wrote %d of %d bytes.\n", time_stamp(), l, qp->len));
         if (l < 0)
             return l;
         if (l < qp->len)
@@ -112,12 +131,19 @@ flush_queue (equeue_t **qpp, int fd)
             qp->len -= l;
             break;
         }
+        XPRINTF((stderr, "%s   Freeing queue entry %p.\n", time_stamp(), qp));
+        if (reply_handle) {
+            char r_ok[] = { ERQ_OK, 0 };
+            reply1(qp->handle, r_ok, sizeof(r_ok));
+        }
         next = qp->next;
         free(qp);
         qp = next;
-   } while(next);
-   *qpp = qp;
-   return 0;
+    } while(next);
+
+    XPRINTF((stderr, "%s   Re-setting queue to entry %p.\n", time_stamp(), qp));
+    *qpp = qp;
+    return 0;
 } /* flush_queue() */
 
 /*-------------------------------------------------------------------------*/
@@ -133,19 +159,24 @@ close_socket (socket_t *sp)
 
 {
     child_t *chp;
-    socket_t **spp;
+    socket_t *stmp;
     int found = 0;
 
+    XPRINTF((stderr, "%s Closing socket %p\n", time_stamp(), sp));
+
     /* Check if the socket is still active */
-    for (spp = &sockets; *spp; spp = &(*spp)->next)
-        if (*spp == sp)
+    for (stmp = sockets; stmp; stmp = stmp->next)
+        if (stmp == sp)
         {
             found = 1;
             break;
         }
 
     if (!found) /* socket already closed */
+    {
+        XPRINTF((stderr, "%s   Socket %p already closed.\n", time_stamp(), sp));
         return;
+    }
 
     /* Depending on the socket type, handle the fluff
      * depending on the socket.
@@ -155,9 +186,14 @@ close_socket (socket_t *sp)
     case SOCKET_STDOUT:
       {
         for (chp = childs; chp; chp=chp->next)
-            if (chp->fd == sp) break;
+            if (chp->fd == sp)
+                break;
         if (chp)
+        {
+            XPRINTF((stderr, "%s   Remove 'fd' link from child %p.\n"
+                           , time_stamp(), chp));
             chp->fd = NULL;
+        }
         break;
       }
 
@@ -167,7 +203,11 @@ close_socket (socket_t *sp)
             if (chp->err == sp)
                 break;
         if (chp)
+        {
+            XPRINTF((stderr, "%s   Remove 'err' link from child %p.\n"
+                           , time_stamp(), chp));
             chp->err = NULL;
+        }
         break;
       }
 
@@ -175,6 +215,8 @@ close_socket (socket_t *sp)
     case SOCKET_AUTH:
       {
         auth_t *ap = (auth_t *)sp;
+        XPRINTF((stderr, "%s   Write auth info %p:%d\n"
+                       , time_stamp(), ap->buf, ap->pos));
         write_32(ap->buf, ap->pos);
         write_32((ap->buf)+4, ap->s.handle);
         write1(ap->buf, ap->pos);
@@ -193,7 +235,7 @@ close_socket (socket_t *sp)
 } /* close_socket() */
 
 /*-------------------------------------------------------------------------*/
-void
+int
 read_socket (socket_t *sp, int rw)
 
 /* The socket <sp> was flagged by select() as ready for reading (<rw> == 0)
@@ -201,6 +243,8 @@ read_socket (socket_t *sp, int rw)
  * appropriate action.
  *
  * If there is data pending on the socket, try to write it in any case.
+ *
+ * Return 0 on success, 1 if an error occured and the socket has been closed.
  */
 
 {
@@ -208,9 +252,12 @@ read_socket (socket_t *sp, int rw)
     int num;
 
     num = 0;
-    
+
+    XPRINTF((stderr, "%s Read socket %p (type %d) , rw %d\n"
+                   , time_stamp(), sp, sp->type, rw));
+
     if (sp->queue)
-        flush_queue(&sp->queue, sp->fd);
+        flush_queue(&sp->queue, sp->fd, 1);
 
     switch(sp->type)
     {
@@ -221,18 +268,18 @@ read_socket (socket_t *sp, int rw)
 
         reply1keep(sp->handle, r, sizeof(r));
         sp->type = SOCKET_WAIT_ACCEPT;
-        return;
+        return 0;
       }
 
     case SOCKET_WAIT_ACCEPT:
-        return;
+        return 0;
 
     case SOCKET_UDP:
       {
         /* Read the data message and pass it on */
-        
+
         struct sockaddr_in addr;
-        size_t len;
+        length_t len;
 
         do {
             char r[] = { ERQ_STDOUT };
@@ -242,9 +289,14 @@ read_socket (socket_t *sp, int rw)
                            (struct sockaddr *)&addr, &len);
             if (num < 0 && errno==EINTR)
                   continue;
+            { int myerrno = errno;
+              XPRINTF((stderr, "%s   Received UDP: %d bytes of %d.\n"
+                             , time_stamp(), num, len));
+              errno = myerrno;
+            }
             if (num <= 0)
                 break;
-            replyn(sp->handle, 1, 4, 
+            replyn(sp->handle, 1, 4,
                 r, sizeof(r),
                 (char *) &addr.sin_addr.s_addr, 4,
                 (char *) &addr.sin_port, 2,
@@ -260,12 +312,12 @@ read_socket (socket_t *sp, int rw)
             /* Our opened TCP socket finally connected */
 
             char r[] = { ERQ_OK };
-            
+
             sp->type = SOCKET_CONNECTED;
             replyn(sp->handle, 1, 2,
                 r, sizeof(r),
                 (char *) &sp->ticket, TICKET_SIZE);
-            return;
+            return 0;
         }
         /* FALLTHROUGH */
       }
@@ -275,7 +327,7 @@ read_socket (socket_t *sp, int rw)
     case SOCKET_CONNECTED:
       {
         /* Read data from the stream and pass it on */
-        
+
         char r_err[] = { ERQ_STDERR };
         char r_out[] = { ERQ_STDOUT };
 
@@ -283,10 +335,15 @@ read_socket (socket_t *sp, int rw)
             num = read(sp->fd, buf, ERQ_MAX_REPLY-14);
             if (num < 0 && errno == EINTR)
                 continue;
+            { int myerrno = errno;
+              XPRINTF((stderr, "%s   Received stream: %d bytes.\n"
+                             , time_stamp(), num));
+              errno = myerrno;
+            }
             if (num <= 0)
                 break;
             replyn(sp->handle, 1, 2,
-              (sp->type==SOCKET_LISTEN) ? r_err : r_out, 1, 
+              (sp->type==SOCKET_STDERR) ? r_err : r_out, 1,
               buf, num);
         } while(1);
         break;
@@ -299,8 +356,7 @@ read_socket (socket_t *sp, int rw)
             /* Our authd connection is finally there */
 
             sp->type = SOCKET_AUTH;
-            send_auth((auth_t *)sp);
-            return;
+            return send_auth((auth_t *)sp);
         }
         /* FALLTHROUGH */
       }
@@ -314,10 +370,15 @@ read_socket (socket_t *sp, int rw)
             num = read(ap->s.fd, &ap->buf[ap->pos], sizeof(ap->buf)-ap->pos);
             if (num < 0 && errno == EINTR)
                 continue;
+            { int myerrno = errno;
+              XPRINTF((stderr, "%s   Received auth: %d bytes.\n"
+                             , time_stamp(), num));
+              errno = myerrno;
+            }
             if (num <= 0)
             {
                 close_socket(sp);
-                return;
+                return 1;
             }
             ap->pos += num;
         } while(1);
@@ -328,9 +389,10 @@ read_socket (socket_t *sp, int rw)
     {
         /* We got EOF when reading data - the socket is no longer needed.
          */
-         
+
+        XPRINTF((stderr, "%s   EOF when reading data.\n", time_stamp()));
         close_socket(sp);
-        return;
+        return 1;
     }
 
     if (errno != EWOULDBLOCK
@@ -339,9 +401,15 @@ read_socket (socket_t *sp, int rw)
 #endif
         )
     {
+        int myerrno = errno;
+        XPRINTF((stderr, "%s   Error %d when reading data.\n", time_stamp(), errno));
+        errno = myerrno;
         reply_errno(sp->handle);
         close_socket(sp);
+        return 1;
     }
+
+    return 0;
 } /* read_socket() */
 
 /*-------------------------------------------------------------------------*/
@@ -358,7 +426,7 @@ erq_send (char *mesg, int msglen)
     char *data;
 
     /* Find the socket identified in the message */
-    
+
     if (msglen < 9+TICKET_SIZE)
     {
         char r_arglen[] = { ERQ_E_ARGLENGTH };
@@ -381,6 +449,9 @@ erq_send (char *mesg, int msglen)
         return;
     }
 
+    XPRINTF((stderr, "%s Send %d bytes to socket %p, type %d\n"
+                   , time_stamp(), msglen, sp, sp->type));
+
     /* Act according to the type of the socket */
     switch(sp->type)
     {
@@ -388,10 +459,15 @@ erq_send (char *mesg, int msglen)
     case SOCKET_CONNECTED:
       {
         /* Send the data to the stream */
-        
+
         do
             num = write(sp->fd, data, msglen);
         while (num == -1 && errno == EINTR);
+        { int myerrno = errno;
+          XPRINTF((stderr, "%s   Stream: Wrote %d bytes of %d.\n"
+                         , time_stamp(), num, msglen));
+          errno = myerrno;
+        }
         break;
       }
 
@@ -410,6 +486,11 @@ erq_send (char *mesg, int msglen)
             num = sendto(sp->fd, data, msglen, 0, (struct sockaddr *)&addr,
                 sizeof(addr));
         while(num == -1 && errno == EINTR);
+        { int myerrno = errno;
+          XPRINTF((stderr, "%s   UDP: Wrote %d bytes of %d.\n"
+                         , time_stamp(), num, msglen));
+          errno = myerrno;
+        }
         break;
       }
 
@@ -429,7 +510,7 @@ erq_send (char *mesg, int msglen)
     } /* switch(socket->type) */
 
     /* Return the success of the action */
-    
+
     if (num == msglen)
     {
         char r_ok[] = { ERQ_OK, 0 };
@@ -438,22 +519,27 @@ erq_send (char *mesg, int msglen)
     }
     else if (num >= 0)
     {
-        add_to_queue(&sp->queue, mesg+num, msglen-num);
-/*
+        XPRINTF((stderr, "%s   Queue remaining data: %p:%d\n"
+                       , time_stamp(), mesg+num, msglen-num));
+        add_to_queue(&sp->queue, mesg+num, msglen-num, get_handle(mesg));
         num=htonl(num);
-        replyn(get_handle(mesg), 0, 2,
+        replyn(get_handle(mesg), 1, 2,
             (char[]) { ERQ_E_INCOMPLETE }, 1,
             (char *)&num, 4);
-*/
         return;
     }
 
-    reply_errno(sp->handle);
-    if (errno != EWOULDBLOCK
+    reply_errno(get_handle(mesg));
+    if (   errno != EWOULDBLOCK
 #if EWOULDBLOCK!=EAGAIN
         && errno != EAGAIN
 #endif
-        ) close_socket(sp);
+        )
+    {
+        XPRINTF((stderr, "%s   Error %d when writing data.\n"
+                       , time_stamp(), errno));
+        close_socket(sp);
+    }
 } /* erq_send() */
 
 /*-------------------------------------------------------------------------*/
@@ -534,7 +620,7 @@ erq_open_udp (char *mesg, int msglen)
     memcpy(&addr.sin_port, mesg + 9, 2);
 
     /* Open and initialise the socket */
-    
+
     if ((fd=socket(AF_INET, SOCK_DGRAM, 0)) < 0
      || fcntl(fd, F_SETFD, 1) < 0
      ||        fcntl(fd, F_SETFL, O_NONBLOCK) < 0
@@ -645,7 +731,7 @@ erq_accept (char *mesg, int msglen)
     struct sockaddr_in addr;
     socket_t *sp;
     int fd;
-    size_t tmp;
+    length_t tmp;
 
     if (msglen != 9+TICKET_SIZE)
     {
@@ -689,7 +775,7 @@ erq_accept (char *mesg, int msglen)
     {
         char r_ok[] = { ERQ_OK };
         replyn(sp->handle = get_handle(mesg), 1, 4,
-            r_ok, sizeof(r_ok), 
+            r_ok, sizeof(r_ok),
             (char *) &addr.sin_addr.s_addr, 4,
             (char *) &addr.sin_port, 2,
             (char *) &sp->ticket, TICKET_SIZE);
@@ -697,10 +783,11 @@ erq_accept (char *mesg, int msglen)
 } /* erq_accept() */
 
 /*-------------------------------------------------------------------------*/
-static void
+static int
 send_auth (auth_t *ap)
 
 /* We got connection to the authd - send our request.
+ * Return 0 on success, 1 if an error occured and the socket has been closed.
  */
 
 {
@@ -712,7 +799,12 @@ send_auth (auth_t *ap)
         num = write(ap->s.fd, req, strlen(req));
     while(num == -1 && errno == EINTR);
     if (num <= 0)
+    {
         close_socket((socket_t *)ap);
+        return 1;
+    }
+
+    return 0;
 } /* send_auth() */
 
 /*-------------------------------------------------------------------------*/
@@ -723,7 +815,7 @@ erq_auth (char *mesg, int msglen)
  * If the connection can't be completed immediately (EINPROGRESS), the
  * socket is set to SOCKET_WAIT_AUTH.
  */
- 
+
 {
     struct sockaddr_in addr;
     auth_t *ap;
@@ -737,7 +829,7 @@ erq_auth (char *mesg, int msglen)
 
         memcpy(&sh, mesg+13, sizeof(sh)); remote_port = ntohs(sh);
         memcpy(&sh, mesg+15, sizeof(sh)); local_port = ntohs(sh);
-        
+
         memcpy(&addr.sin_addr.s_addr, mesg+9, 4);
         addr.sin_family = AF_INET;
         addr.sin_port = htons(AUTH_PORT);

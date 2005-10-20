@@ -15,7 +15,7 @@
 #    define getrusage(a, b)  syscall(SYS_GETRUSAGE, a, b)
 #endif
 
-#if defined(AMIGA) && !defined(__SASC)
+#if defined(AMIGA) && !defined(__SASC) && !defined(__GNUC__)
 #    include <sys/resource.h>
 #endif
 

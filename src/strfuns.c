@@ -101,7 +101,7 @@ strbuf_grow (strbuf_t *buf, size_t len)
     if (!buf->buf)
     {
         buf->buf = xalloc(new_len);
-        buf->alloc_len = (ushort)new_len;
+        buf->alloc_len = (u_long)new_len;
         buf->length = 0;
         *(buf->buf) = '\0';
         return len;
@@ -118,20 +118,20 @@ strbuf_grow (strbuf_t *buf, size_t len)
     new_buf = malloc_increment_size(buf->buf, new_len - buf->alloc_len);
     if (new_buf)
     {
-        buf->alloc_len = (ushort)new_len;
+        buf->alloc_len = (u_long)new_len;
         return len;
     }
 #endif
      */
 
     buf->buf = rexalloc(buf->buf, new_len);
-    buf->alloc_len = (ushort)new_len;
+    buf->alloc_len = (u_long)new_len;
     return len;
 } /* strbuf_grow() */
 
 /*--------------------------------------------------------------------*/
 void
-strbuf_add (strbuf_t *buf, char * text)
+strbuf_add (strbuf_t *buf, const char * text)
 
 /* Add the <text> to string buffer <buf>.
  */
@@ -155,7 +155,7 @@ strbuf_add (strbuf_t *buf, char * text)
 
 /*--------------------------------------------------------------------*/
 void
-strbuf_addn (strbuf_t *buf, char * text, size_t len)
+strbuf_addn (strbuf_t *buf, const char * text, size_t len)
 
 /* Add the <len> characters starting at <text> to string buffer <buf>.
  */
@@ -199,7 +199,7 @@ strbuf_addc (strbuf_t *buf, char ch)
 
 /*--------------------------------------------------------------------*/
 void
-strbuf_addf (strbuf_t *buf, char * format, ...)
+strbuf_addf (strbuf_t *buf, const char * format, ...)
 
 /* Create a string from <format> and the following arguments using
  * sprintf() rules, and add the result to the string buffer <buf>.
@@ -277,7 +277,7 @@ strbuf_store (strbuf_t *buf, svalue_t *svp)
 
 /*--------------------------------------------------------------------*/
 static char *
-sort_string (char * in, size_t len, long ** pos)
+sort_string (const char * in, size_t len, long ** pos)
 
 /* Sort the characters of string <in> (with length <len>) by their numeric
  * values and return a newly allocated memory block with the sorted string.
@@ -295,7 +295,7 @@ sort_string (char * in, size_t len, long ** pos)
     long   * tmppos;  /* Temporary position array */
     size_t   step;
     size_t   i, j;
-    
+
     out = xalloc(len+1);
     tmp = xalloc(len+1);
     if (!out || !tmp)
@@ -358,7 +358,7 @@ sort_string (char * in, size_t len, long ** pos)
     for (step = 2; step < len; step *= 2)
     {
         size_t start, dest, left;
-        
+
         /* Exchange out and tmp */
         {
             char *tmp2;
@@ -417,7 +417,7 @@ sort_string (char * in, size_t len, long ** pos)
             } /* for (sort run) */
         } /* for (start) */
     } /* for(step) */
-    
+
     /* Free the temporary data */
     if (tmppos)
         xfree(tmppos);
@@ -442,6 +442,8 @@ intersect_strings (char * left, char * right, Bool bSubtract)
  *   <left> but not in <right>.
  * The order of the characters returned is their order of appearance
  * in <left>.
+ *
+ * Both <left> and <right> are deallocated.
  */
 
 {
@@ -449,7 +451,8 @@ intersect_strings (char * left, char * right, Bool bSubtract)
     size_t   ix_left, ix_right;
     long   * pos;
     CBool  * matches;
-    char   * left_in, *result;
+    char   * left_in;
+    char   * result;
 
     left_in = left;            /* Needed to create the result */
     len_left = strlen(left);
@@ -508,6 +511,25 @@ intersect_strings (char * left, char * right, Bool bSubtract)
 
     return result;
 } /* intersect_strings() */
+
+/*--------------------------------------------------------------------*/
+char *
+xstrncpy (char * dest, const char * src, size_t num)
+
+/* Copy string <src> at address <dest> up to and including the terminating
+ * 0 or up to size <num>, whichever comes first. Result is <dest>.
+ *
+ * In contrast to strncpy(), the copying terminates if a terminating 0
+ * is found (and copied) in <src> - strncpy() would add additional 0s
+ * until a total of <num> characters has been written to <dest>.
+ */
+
+{
+    char * p = dest;
+
+    while (num-- != 0 && (*p++ = *src++) != '\0') NOOP;
+    return dest;
+} /* xstrncpy() */
 
 /*====================================================================*/
 

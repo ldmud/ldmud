@@ -1,5 +1,5 @@
-#ifndef _DRIVER_HOOK_H_
-#define _DRIVER_HOOK_H_ 1
+#ifndef LPC_DRIVER_HOOK_H_
+#define LPC_DRIVER_HOOK_H_ 1
 
 /* --- Driver Hooks ---
  */
@@ -22,8 +22,10 @@
 #define H_ERQ_STOP              15
 #define H_MODIFY_COMMAND_FNAME  16
 #define H_COMMAND               17
+#define H_SEND_NOTIFY_FAIL      18
+#define H_AUTO_INCLUDE          19
 
-#define NUM_CLOSURE_HOOKS       18  /* Number of hooks */
+#define NUM_DRIVER_HOOKS        20  /* Number of hooks */
 
-#endif /* _DRIVER_HOOK_ */
+#endif /* LPC_DRIVER_HOOK_ */
 

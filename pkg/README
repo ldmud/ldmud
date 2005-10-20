@@ -9,6 +9,3 @@ for the one or other reason didn't make it into the driver proper (yet).
 
   misc
     Various efuns, partly for older drivers.
-
-  mysql (for 3.2.8-dev.207) by Karm
-    Efuns for a mySQL database running on localhost.

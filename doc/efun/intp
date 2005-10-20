@@ -1,10 +1,9 @@
 SYNOPSIS
-	int intp(mixed arg)
+        int intp(mixed arg)
 
 DESCRIPTION
-	Return 1 if arg is an integer number.
+        Return 1 if arg is an integer number.
 
 SEE ALSO
-
-	closurep(E), floatp(E), mappingp(E), objectp(E), pointerp(E),
-	referencep(E), stringp(E), symbolp(E)
+        closurep(E), floatp(E), mappingp(E), objectp(E), pointerp(E),
+        referencep(E), stringp(E), symbolp(E), clonep(E)

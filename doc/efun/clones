@@ -20,11 +20,14 @@ DESCRIPTION
 
         Note: this efun is computationally expensive.
 
+        If the driver is compiled with DYNAMIC_COSTS, the cost of this
+        efun is proportional to the number of objects in the game.
+
 EXAMPLE
-	object o, p;
-	o = clone_object("/std/thing"); /* or "std/thing" in COMPAT_MODE */
+        object o, p;
+        o = clone_object("/std/thing"); /* or "std/thing" in COMPAT_MODE */
         destruct(find_object("/std/thing"));
-	p = clone_object("/std/thing");
+        p = clone_object("/std/thing");
 
         clones("/std/thing")    --> returns ({ p })
         clones("/std/thing", 0) --> returns ({ p })
@@ -32,8 +35,8 @@ EXAMPLE
         clones("/std/thing", 2) --> returns ({ o, p })
 
 HISTORY
-	Introduced in LDMud 3.2.8.
+        Introduced in LDMud 3.2.8.
+        LDMud 3.2.9 added the dynamic cost.
 
 SEE ALSO
-	clone_object(E), clonep(E)
-
+        blueprint(E), clone_object(E), clonep(E)

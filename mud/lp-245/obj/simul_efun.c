@@ -36,9 +36,9 @@ void start_simul_efun()
     if ( !(info = get_extra_wizinfo(0)) )
 	set_extra_wizinfo(0, info = allocate(BACKBONE_WIZINFO_SIZE));
     if (!(living_name_m = info[LIVING_NAME]))
-	living_name_m = info[LIVING_NAME] = allocate_mapping(0, 1);
+	living_name_m = info[LIVING_NAME] = m_allocate(0, 1);
     if (!(name_living_m = info[NAME_LIVING]))
-	name_living_m = info[NAME_LIVING] = allocate_mapping(0, 1);
+	name_living_m = info[NAME_LIVING] = m_allocate(0, 1);
     if (find_call_out("clean_simul_efun") < 0)
 	call_out("clean_simul_efun", 1800);
 }
@@ -273,9 +273,9 @@ varargs void add_worth(int value, object ob)
 {
     mixed old;
 #ifdef __COMPAT_MODE__
-    switch (explode(file_name(previous_object()), "/")[0]) {
+    switch (explode(object_name(previous_object()), "/")[0]) {
 #else
-    switch (explode(file_name(previous_object()), "/")[1]) {
+    switch (explode(object_name(previous_object()), "/")[1]) {
 #endif
       default:
 	raise_error("Illegal call of add_worth.\n");
@@ -302,7 +302,10 @@ varargs void wizlist(string name)
     if (!name) {
         name = this_player()->query_real_name();
         if (!name)
+        {
+            write("Need to provide a name or 'ALL' to the wizlist function.\n");
             return;
+        }
     }
     a = transpose_array(wizlist_info());
     cmds = a[WL_COMMANDS];
@@ -313,7 +316,10 @@ varargs void wizlist(string name)
     a[0] = a[WL_COMMANDS];
     a[WL_COMMANDS] = cmds;
     if ((pos = member(a[WL_NAME], name)) < 0 && name != "ALL")
+    {
+        write("No wizlist info for '"+name+"' found.\n");
         return;
+    }
     b = allocate(sizeof(cmds));
     for (i = sizeof(cmds); i;) {
         b[<i] = i;
@@ -346,7 +352,7 @@ varargs void wizlist(string name)
 //---------------------------------------------------------------------------
 void shout(string s)
 {
-    filter_array(users(), lambda(({'u}),({#'&&,
+    filter(users(), lambda(({'u}),({#'&&,
       ({#'environment, 'u}),
       ({#'!=, 'u, ({#'this_player})}),
       ({#'tell_object, 'u, to_string(s)})
@@ -615,6 +621,8 @@ int transfer(object item, object dest)
     int weight;
     object from;
 
+    efun::set_this_object(previous_object());
+
     weight = item->query_weight();
     if (!item)
         return 3;
@@ -637,7 +645,7 @@ int transfer(object item, object dest)
          */
         else if (environment(from))
         {
-            if (from->can_put_and_get() || !from)
+            if (!from->can_put_and_get() || !from)
                 return 3;
         }
     }
@@ -656,7 +664,7 @@ int transfer(object item, object dest)
 
     if (living(dest))
     {
-        if (item->get() || !item)
+        if (!item->get() || !item)
             return 6;
     }
 
@@ -736,3 +744,4 @@ mixed extract (mixed data, varargs mixed*from_to)
 #endif /* !efun_defined(extract) */
 
 /*************************************************************************/
+

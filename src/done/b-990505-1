@@ -2,7 +2,8 @@ Short: Memory leak in prolang.y
 Date: Sat, 8 May 1999 01:09:09 +0200
 From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
 Type: Bug
-State: Unclassified
+State: Done - Fixed in 3.2.9-dev.390
+See also: b-020205-2
 
 Hier ist noch ein Memory-Leak:
 large block 0x0e88488c prolang.y 5721 size 0x000003a9
