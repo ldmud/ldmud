@@ -21,8 +21,7 @@ A: This seems to be some bug in the linux networking. You can circumvent it
 
 Q: Where can I get further documentation?
 
-A: ftp://ftp.ibr.cs.tu-bs.de/pub/games/lpmud/driver-docs-3.2*@*.tar.gz
-   ftp://heute.cs.tu-berlin.de 7681 driver*.ps.gz
+A: ftp://heute.cs.tu-berlin.de 7681 driver*.ps.gz
    http://UNItopia.uni-stuttgart.de/doc/
 
 Q: mudlibs?
@@ -45,5 +44,3 @@ A: ftp://heute.cs.tu-berlin.de 7681 intermud*.tar.gz
    ftp://ftp.tu-bs.de/pub/games/lpmud/intermud-0.7beta.tar.gz
    ftp://heute.cs.tu-berlin.de 7681 ftpd*.tar.gz
    ftp://ftp.tu-bs.de/pub/games/lpmud/naserftpd-1.6.tar.gz
-   ftp://ftp.tu-bs.de/pub/games/lpmud/tw-erq-1.3.tar.gz
-    alternate erq demon

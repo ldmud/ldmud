@@ -1,9 +1,38 @@
+/*---------------------------------------------------------------------------
+ * Object Table
+ *
+ *---------------------------------------------------------------------------
+ * The OTable:
+ *
+ *   This table is a lookup-by-name table of all (non destructed)
+ *   objects in the game. Similar to the shared string table, this one
+ *   is even simpler because object names are unique by name and address.
+ *
+ *   Note: if you change an object name, you must remove it and reenter it.
+ *
+ *   The hash index is computed from the object name, and if the object
+ *   is found in the index chain, it is moved to the head of the chain
+ *   to speed up further lookups.
+ *
+ *   The size of the hash table is given by OTABLE_SIZE in config.h. It does
+ *   not need to be prime, and should probably be set to 1/4 of the number
+ *   of objects in the game.
+ *
+ *   The table links are not counted in the object's refcount.
+ *
+ *   TODO: Maybe make the object table size dynamic (start with 128 and double
+ *   TODO:: as required). This also requires to store the hashvalue in
+ *   TODO:: the object.
+ *---------------------------------------------------------------------------
+ */
+
 #include "driver.h"
 
 #include <stdio.h>
 
 #include "otable.h"
 
+#include "backend.h"
 #include "comm.h"
 #include "gcollect.h"
 #include "hash.h"
@@ -11,184 +40,225 @@
 #include "object.h"
 #include "simulate.h"
 
-/*
- * Object name hash table.  Object names are unique, so no special
- * problems - like stralloc.c.  For non-unique hashed names, we need
- * a better package (if we want to be able to get at them all) - we
- * cant move them to the head of the hash chain, for example.
- *
- * Note: if you change an object name, you must remove it and reenter it.
- */
 
-/*
- * hash table - list of pointers to heads of object chains.
- * Each object in chain has a pointer, next_hash, to the next object.
- * OTABLE_SIZE is in config.h, need not be a prime, probably between
- * 100 and 1000.  You can have a quite small table and still get very good
- * performance!  Our database is 8Meg; we use about 500.
- */
+/*=========================================================================*/
+/*                           OBJECT TABLE                                  */
+/*-------------------------------------------------------------------------*/
 
-static struct object ** obj_table = 0;
-
-void init_otable()
-{
-	int x;
-	obj_table = (struct object **)
-			xalloc(sizeof(struct object *) * OTABLE_SIZE);
-
-	for (x=0; x<OTABLE_SIZE; x++)
-		obj_table[x] = 0;
-}
-
-#ifdef MALLOC_smalloc
-void note_otable_ref() {
-    note_malloced_block_ref((char *)obj_table);
-}
-#endif
-
-/*
- * Object hash function, ripped off from stralloc.c.
- */
-
-/* some compilers can't grasp #if BITNUM(OTABLE_SIZE) == 1 */
-/* some compilers can't even grasp #if BITNUM_IS_1(OTABLE_SIZE) *sigh* */
 #if !( (OTABLE_SIZE) & (OTABLE_SIZE)-1 )
-#define ObjHash(s) (whashstr((s), 100) & ((OTABLE_SIZE)-1) )
+#    define ObjHash(s) (whashstr((s), 100) & ((OTABLE_SIZE)-1) )
 #else
-#define ObjHash(s) (whashstr((s), 100) % OTABLE_SIZE)
+#    define ObjHash(s) (whashstr((s), 100) % OTABLE_SIZE)
 #endif
-
-/*
- * Looks for obj in table, moves it to head.
+/* Hash the string <s> and compute the appropriate table index
  */
 
-static int obj_searches = 0, obj_probes = 0, objs_found = 0;
+static struct object ** obj_table = NULL;
+  /* Pointer to the (allocated) hashtable.
+   */
 
-static struct object * find_obj_n(s)
-char * s;
-{
-	struct object * curr, *prev;
+static long objs_in_table = 0;
+  /* Number of objects in the table.
+   */
 
-	int h = ObjHash(s);
+static long obj_searches = 0;
+static long obj_probes = 0;
+static long objs_found = 0;
+  /* Total number of object lookups, of visited objects, and
+   * the number of successfull lookups.
+   */
 
-	curr = obj_table[h];
-	prev = 0;
+static long user_obj_lookups = 0;
+static long user_obj_found = 0;
+  /* Number of externally requested lookups, and how many succeeded.
+   */
 
-	obj_searches++;
+/*-------------------------------------------------------------------------*/
+static struct object *
+find_obj_n (char *s)
 
-	while (curr) {
-	    obj_probes++;
-	    if (!strcmp(curr->name, s)) { /* found it */
-		if (prev) { /* not at head of list */
-		    prev->next_hash = curr->next_hash;
-		    curr->next_hash = obj_table[h];
-		    obj_table[h] = curr;
-		    }
-		objs_found++;
-		return(curr);	/* pointer to object */
-		}
-	    prev = curr;
-	    curr = curr->next_hash;
-	    }
-	
-	return(0); /* not found */
-}
-
-/*
- * Add an object to the table - can't have duplicate names.
+/* Lookup the object with name <s> in the table and return the pointer
+ * to its structure. If it is not in the table, return NULL.
+ *
+ * The call updates the statistics and also moves the found object
+ * to the head of its hash chain.
  */
 
-static int objs_in_table = 0;
+{
+    struct object * curr, *prev;
 
-void enter_object_hash(ob)
-struct object * ob;
+    int h = ObjHash(s);
+
+    curr = obj_table[h];
+    prev = NULL;
+
+    obj_searches++;
+
+    while (curr)
+    {
+        obj_probes++;
+        if (!strcmp(curr->name, s)) /* found it */
+        {
+            if (prev) /* not at head of list */
+            {
+                prev->next_hash = curr->next_hash;
+                curr->next_hash = obj_table[h];
+                obj_table[h] = curr;
+            }
+            objs_found++;
+            return curr;
+        }
+        prev = curr;
+        curr = curr->next_hash;
+    }
+
+    /* Not found */
+    return NULL;
+
+} /* find_obj_n() */
+
+/*-------------------------------------------------------------------------*/
+void
+enter_object_hash (struct object *ob)
+
+/* Add the object <ob> to the table. There must not be an object
+ * with the same name in the table already (not even <ob> itself).
+ */
+
 {
 #ifdef DEBUG
-	struct object * s;
+    struct object * s;
 #endif
-	int h = ObjHash(ob->name);
+    int h = ObjHash(ob->name);
 
 #ifdef DEBUG
-	s = find_obj_n(ob->name);
-	if (s) {
-	    if (s != ob)
-		fatal("Duplicate object \"%s\" in object hash table",
-				ob->name);
-	    else
-		fatal("Entering object \"%s\" twice in object table",
-				ob->name);
-	}
-        if (ob->next_hash)
-	    fatal("Object \"%s\" not found in object table but next link not null",
-			ob->name);
+    s = find_obj_n(ob->name);
+    if (s)
+    {
+        if (s != ob)
+            fatal("Duplicate object \"%s\" in object hash table"
+                 , ob->name);
+        else
+            fatal( "Entering object \"%s\" twice in object table"
+                 , ob->name);
+    }
+    if (ob->next_hash)
+        fatal( "Object \"%s\" not found in object table but next link not null"
+             , ob->name);
 #endif
-	ob->next_hash = obj_table[h];
-	obj_table[h] = ob;
-	objs_in_table++;
-	return;
+
+    ob->next_hash = obj_table[h];
+    obj_table[h] = ob;
+    objs_in_table++;
 }
 
-/* Remove an object from the table */
+/*-------------------------------------------------------------------------*/
+void
+remove_object_hash (struct object *ob)
 
-void remove_object_hash(ob)
-struct object *ob;
+/* Remove object <ob> from the table, where it must be in.
+ */
+
 {
-	struct object * s;
-	int h = ObjHash(ob->name);
+    struct object * s;
+    int h = ObjHash(ob->name);
 
-	s = find_obj_n(ob->name);
+    s = find_obj_n(ob->name);
 
-	if (s != ob)
-		fatal("Remove object \"%s\": found a different object!",
-			ob->name);
-	
-	obj_table[h] = ob->next_hash;
-	ob->next_hash = 0;
-	objs_in_table--;
-	return;
+    if (s != ob)
+        fatal( "Remove object \"%s\": found a different object!"
+             , ob->name);
+
+    obj_table[h] = ob->next_hash;
+    ob->next_hash = NULL;
+    objs_in_table--;
 }
 
+/*-------------------------------------------------------------------------*/
 /*
  * Lookup an object in the hash table; if it isn't there, return null.
  * This is only different to find_object_n in that it collects different
  * stats; more finds are actually done than the user ever asks for.
  */
 
-static int user_obj_lookups = 0, user_obj_found = 0;
+struct object *
+lookup_object_hash (char *s)
 
-struct object * lookup_object_hash(s)
-char * s;
-{
-	struct object * ob = find_obj_n(s);
-	user_obj_lookups++;
-	if (ob) user_obj_found++;
-	return(ob);
-}
-
-/*
- * Print stats, returns the total size of the object table.  All objects
- * are in table, so their size is included as well.
+/* Lookup an object by name <s>. If found, return its pointer, if not,
+ * return NULL.
  */
 
-static char sbuf[100];
-
-int show_otable_status(verbose)
-    int verbose;
 {
-    if (verbose) {
-	add_message("\nObject name hash table status:\n");
-	add_message("------------------------------\n");
-	sprintf(sbuf, "%.2f", (float) objs_in_table / (float) OTABLE_SIZE);
-	add_message("Average hash chain length	           %s\n", sbuf);
-	sprintf(sbuf, "%.2f", (float) obj_probes / (float) obj_searches);
-	add_message("Searches/average search length       %d (%s)\n",
-		    obj_searches, sbuf);
-	add_message("External lookups succeeded (succeed) %d (%d)\n",
-		    user_obj_lookups, user_obj_found);
+    struct object * ob = find_obj_n(s);
+    user_obj_lookups++;
+    if (ob)
+        user_obj_found++;
+    return ob;
+}
+
+/*-------------------------------------------------------------------------*/
+size_t
+show_otable_status (/* TODO: BOOL */ short verbose)
+
+/* Return the amount of memory used by the object table.
+ * If <verbose> is TRUE, also print the statistics to the current user.
+ */
+
+{
+    if (verbose)
+    {
+        char sbuf[100];
+
+        add_message("\nObject name hash table status:\n");
+        add_message("------------------------------\n");
+        sprintf(sbuf, "%.2f", (float) objs_in_table / (float) OTABLE_SIZE);
+        add_message("Average hash chain length                   %s\n", sbuf);
+        sprintf(sbuf, "%.2f", (float) obj_probes / (float) obj_searches);
+        add_message("Searches/average search length       %ld (%s)\n",
+                    obj_searches, sbuf);
+        add_message("External lookups succeeded (succeed) %ld (%ld)\n",
+                    (long)user_obj_lookups, (long)user_obj_found);
     }
     /* objs_in_table * sizeof(struct object) is already accounted for
        in tot_alloc_object_size.  */
-    add_message("hash table overhead\t\t\t %8d\n",
-		OTABLE_SIZE * sizeof(struct object *));
+    add_message("hash table overhead\t\t\t %8ld\n",
+                (long)(OTABLE_SIZE * sizeof(struct object *)));
     return OTABLE_SIZE * sizeof(struct object *);
 }
+
+
+/*=========================================================================*/
+/*                           GENERAL ROUTINES                              */
+
+/*-------------------------------------------------------------------------*/
+void
+init_otable (void)
+
+/* Allocate and initialise the hash table
+ */
+
+{
+    int x;
+    obj_table = xalloc(sizeof(struct object *) * OTABLE_SIZE);
+
+    for (x = 0; x < OTABLE_SIZE; x++)
+        obj_table[x] = NULL;
+}
+
+/*-------------------------------------------------------------------------*/
+#ifdef MALLOC_smalloc
+void
+note_otable_ref (void)
+
+/* GC support: mark the memory used by the hashtable as used.
+ */
+
+{
+    note_malloced_block_ref((char *)obj_table);
+}
+
+#endif /* MALLOC_smalloc */
+
+
+/***************************************************************************/
+

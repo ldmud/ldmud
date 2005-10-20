@@ -7,8 +7,8 @@
 #include "/sys/functionlist.h"
 #include "/sys/erq.h"
 
-#if !defined(COMPAT_FLAG) && !defined(NO_NATIVE_MODE) && \
-    !__EFUN_DEFINED__(creator) && __EFUN_DEFINED__(geteuid)
+#if !defined(__COMPAT_MODE__) && !defined(NO_NATIVE_MODE) && \
+    !__EFUN_DEFINED__(creator) && defined(__EUIDS__)
 #define NATIVE_MODE
 #endif
 
@@ -93,7 +93,7 @@ static void wiz_decay() {
     call_out("wiz_decay", 3600);
 }
 
-mixed creator_file(string object_name);
+mixed creator_file(string obj_name);
 string *define_include_dirs();
 
 void inaugurate_master(int arg)
@@ -142,7 +142,7 @@ void inaugurate_master(int arg)
 	  ({#'call_other, ({#'environment, 'item}), "exit", 'item}),
 	}) }),
 #endif
-	({#'efun::efun308, 'item, 'dest}),
+	({#'efun::set_environment, 'item, 'dest}),
 	({#'?, ({#'living, 'item}), ({#',,
 	  ({#'efun::set_this_player, 'item}),
 	  ({#'call_other, 'dest, "init"}),
@@ -174,10 +174,10 @@ void inaugurate_master(int arg)
 #ifdef COMPAT_FLAG
     set_driver_hook(
       H_LOAD_UIDS,
-      unbound_lambda( ({'object_name}),
+      unbound_lambda( ({'obj_name}),
 	({#'?,
 	  ({#'==,
-	    ({#'sscanf, 'object_name, "players/%s", 'wiz_name}),
+	    ({#'sscanf, 'obj_name, "players/%s", 'wiz_name}),
 	    1,
 	  }),
 	  ({#'?,
@@ -189,8 +189,8 @@ void inaugurate_master(int arg)
 	    'wiz_name
 	  }),
 	  ({#'&&,
-	    ({#'!=, ({#'[..], 'object_name, 0, 3}), "ftp/"}),
-	    ({#'!=, ({#'[..], 'object_name, 0, 4}), "open/"}),
+	    ({#'!=, ({#'[..], 'obj_name, 0, 3}), "ftp/"}),
+	    ({#'!=, ({#'[..], 'obj_name, 0, 4}), "open/"}),
 	  })
 	})
       )
@@ -217,10 +217,10 @@ void inaugurate_master(int arg)
      */
     set_driver_hook(
       H_LOAD_UIDS,
-      unbound_lambda( ({'object_name}), ({
+      unbound_lambda( ({'obj_name}), ({
 	#'?,
 	({#'==,
-	  ({#'=, 'creator_name, ({#'creator_file, 'object_name})}),
+	  ({#'=, 'creator_name, ({#'creator_file, 'obj_name})}),
 	  ({#'getuid, ({#'previous_object})}),
 	}),
 	 ({#'geteuid, ({#'previous_object})}),
@@ -447,7 +447,7 @@ object connect() {
     mudwho_info[ob] =
       sprintf("A\t%.20s\t%.20s\t%.20s\t%.20s\t%:010d\t0\tlogin",
         MUDWHO_NAME, MUDWHO_PASSWORD, MUDWHO_NAME,
-        explode(file_name(ob), "#")[<1] + "@" MUDWHO_NAME, time()
+        explode(object_name(ob), "#")[<1] + "@" MUDWHO_NAME, time()
       )
     ;
 #endif /* MUDWHO */
@@ -467,8 +467,8 @@ int xx(int arg)
 int verify_create_wizard(object ob) {
     int dummy;
 
-    if (sscanf(file_name(ob), "room/port_castle#%d", dummy) == 1
-      || sscanf(file_name(ob), "global/port_castle#%d", dummy) == 1)
+    if (sscanf(object_name(ob), "room/port_castle#%d", dummy) == 1
+      || sscanf(object_name(ob), "global/port_castle#%d", dummy) == 1)
 	return 1;
     return 0;
 }
@@ -650,7 +650,7 @@ string master_create_wizard(string owner, string domain, object caller) {
 		    wizard + "\n");
 	mkdir(wizard);
     }
-    dest = file_name(environment(player));
+    dest = object_name(environment(player));
     def_castle = "#define NAME \"" + owner + "\"\n#define DEST \"" +
 	dest + "\"\n" + read_file("/room/def_castle.c");
     if (file_size(castle) > 0) {
@@ -749,7 +749,7 @@ string parse_command_all_word()
 /*
  * Give a file name for edit preferences to be saved in.
  */
-string get_ed_buffer_save_file_name(string file) {
+string get_ed_buffer_save_object_name(string file) {
     string *file_ar;
     string path;
 
@@ -826,7 +826,7 @@ int query_player_level(string what) {
  * Function name:   valid_exec
  * Description:     Checks if a certain 'program' has the right to use exec()
  * Arguments:       name: Name of the 'program' that attempts to use exec()
- *                        Note that this is different from file_name(),
+ *                        Note that this is different from object_name(),
  *                        Programname is what 'function_exists' returns.
  *                  NOTE, the absence of a leading slash in the name.
  * Returns:         True if exec() is allowed.
@@ -863,7 +863,7 @@ mixed valid_write(string path, string eff_user, string call_fun, object caller)
 		     sscanf(path, ".%s", user) == 0)
 			return path;
 	    } else {
-		user = file_name(previous_object());
+		user = object_name(previous_object());
 		if ( user[0..3] == "obj/"  ||
 		     user[0..4] == "room/" ||
 		     user[0..3] == "std/"  )
@@ -886,8 +886,8 @@ mixed valid_write(string path, string eff_user, string call_fun, object caller)
 		path = "/"+path;
 	    break;
 	case "do_rename":
-	    if((file_name(caller) == SIMUL_EFUN_FILE ||
-		file_name(caller) == SPARE_SIMUL_EFUN_FILE) &&
+	    if((object_name(caller) == SIMUL_EFUN_FILE ||
+		object_name(caller) == SPARE_SIMUL_EFUN_FILE) &&
 	     path[0..4] == "/log/" && !(
 	      sizeof(regexp(({path[5..34]}), "/")) ||
 	      path[5] == '.' ||
@@ -975,17 +975,17 @@ mixed make_path_absolute(string path) {
     return valid_read(path,0,"make_path_absolute", this_player());
 }
 
-mixed creator_file(string object_name)
+mixed creator_file(string obj_name)
 {
     string wiz_name;
     string start, trailer;
 
-    if ( sscanf(object_name, "players/%s", wiz_name) == 1 ) {
+    if ( sscanf(obj_name, "players/%s", wiz_name) == 1 ) {
         if ( sscanf(wiz_name, "%s/%s", start, trailer) == 2 )
 	    /* file names with // are illegal -> return 0 */
             return strlen(start) && start;
         return wiz_name;
-    } else if (object_name[0..3] != "ftp/" && object_name[0..4] != "open/") {
+    } else if (obj_name[0..3] != "ftp/" && obj_name[0..4] != "open/") {
         /* no creator, but legal. */
         return 1;
     }
@@ -1005,7 +1005,7 @@ void move_or_destruct(object what, object to)
 #else /* !COMPAT_FLAG */
     if ( !catch( what->move(to, 1) ) ) return;
 #endif /*COMPAT_FLAG */
-    
+
     /*
      * Failed to move the object. Then, it is destroyed.
      */
@@ -1017,7 +1017,7 @@ int valid_snoop(object snooper, object snoopee) {
     if (!geteuid(previous_object()))
 	return 0;
 #endif
-    if (file_name(previous_object()) == get_simul_efun())
+    if (object_name(previous_object()) == get_simul_efun())
         return 1;
 }
 
@@ -1100,7 +1100,7 @@ mixed prepare_destruct(object ob) {
 /* privilege_violation is called when objects try to do illegal things,
  * or files being compiled request a privileged efun.
  *
- * return values: 
+ * return values:
  *   1: The caller/file is allowed to use the privilege.
  *   0: The caller was probably misleaded; try to fix the error.
  *  -1: A real privilege violation. Handle it as error.
@@ -1130,6 +1130,11 @@ int privilege_violation(string what, mixed who, mixed where, mixed how) {
 	  case ERQ_SPAWN:
 	  case ERQ_SEND:
 	  case ERQ_KILL:
+          case ERQ_OPEN_UDP:
+          case ERQ_OPEN_TCP:
+          case ERQ_LISTEN:
+          case ERQ_ACCEPT:
+          case ERQ_LOOKUP:
 	  default:
 	    return -1;
 	}

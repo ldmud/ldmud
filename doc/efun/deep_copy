@@ -1,0 +1,24 @@
+SYNOPSIS
+        mixed deep_copy (mixed arg)
+
+DESCRIPTION
+        Create a deep copy of <arg> and return it. For arrays and mappings
+        this means that a new array or mapping is created with copies of the
+        original content. Embedded arrays and mappings are truly copied, too.
+
+        For other values this function is a no-op.
+
+EXAMPLE
+        mixed *a, *b;
+
+        a = ({ 1, ({ 21, 22 }) });
+        b = copy(a);
+        a[0] = -1; a[1][0] = -21;
+         --> a is now   ({ -1, ({ -21, 22 }) })
+             b is still ({  1, ({  21, 22 }) })
+
+HISTORY
+        Introduced in LDMud 3.2.6.
+
+SEE ALSO
+        copy(E)

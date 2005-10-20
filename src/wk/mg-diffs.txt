@@ -1,3 +1,0 @@
-Morgengrauen uses a new efun 
-  int absolute_hb_count()
-which returns the number of HB cycles since bootup.

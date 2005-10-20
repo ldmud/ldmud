@@ -13,7 +13,7 @@ enum bar { a = 1, b = 2 };
 Make the -nss option cause
   while (foo)
     ;
-This is the real alternative to 
+This is the real alternative to
   while (foo) ;
 
 Look at all the undocumented options, and determine which of them are

@@ -3,7 +3,7 @@
 #define MACHINE_H
 
 /* Define if using alloca.c.  */
-#define C_ALLOCA 1
+/* #undef C_ALLOCA */
 
 /* Define to one of _getb67, GETB67, getb67 for Cray-2 and Cray-YMP systems.
    This function is required for alloca.c support on those systems.  */
@@ -22,13 +22,13 @@
 /* #undef NDIR */
 
 /* Define to `int' if <sys/types.h> doesn't define.  */
-#define pid_t int
+/* #undef pid_t */
 
 /* Define as the return type of signal handlers (int or void).  */
 #define RETSIGTYPE void
 
 /* Define to `unsigned' if <sys/types.h> doesn't define.  */
-/* #define size_t unsigned */
+/* #undef size_t */
 
 /* If using the C implementation of alloca, define if you know the
    direction of stack growth for your system; otherwise it will be
@@ -40,7 +40,7 @@
 /* #undef STACK_DIRECTION */
 
 /* Define if you have the ANSI C header files.  */
-/* #undef STDC_HEADERS */
+#define STDC_HEADERS 1
 
 /* Define if you don't have dirent.h, but have sys/dir.h.  */
 /* #undef SYSDIR */
@@ -49,7 +49,7 @@
 /* #undef SYSNDIR */
 
 /* Define if the closedir function returns void instead of int.  */
-#define VOID_CLOSEDIR 1
+/* #undef VOID_CLOSEDIR */
 
 /* Is the library function inet_ntoa() compatible with the compiler ? */
 #define INET_NTOA_OK 1
@@ -60,18 +60,20 @@
 #define SIZEOF_LONG 4
 
 /* A mask that allows to extract an unsigned char from a signed */
-#define CHARBIT_MASK CHARBITS
+#define CHARBIT_MASK 0xff
 
-/* #undef RENAME_HANDLES_DIRECTORIES */
+#define RENAME_HANDLES_DIRECTORIES 1
 
 /* Does the system have a getrusage call?  */
-/* #define HAVE_GETRUSAGE */
+/* #undef HAVE_GETRUSAGE */
 /* If so, is it restricted to user and system time? */
 /* #undef GETRUSAGE_RESTRICTED */
 /* Is it available as a subfunction of syscall() ? */
 /* #undef GETRUSAGE_VIA_SYSCALL */
 /* Can ru_utime / ru_stime be accessed as a timeval with tv_sec and tv_usec ? */
+#ifndef __INTEL__
 #define RUSAGE_USEC 1
+#endif
 
 /* the atari strtol() used to consider characters '9' < c < 'A' to be numeric */
 /* #undef STRTOL_BROKEN */
@@ -80,12 +82,20 @@
 /* #undef FREE_NULL_POINTER */
 
 /* needs the first argument of strtol be declared as const ? */
-/* #undef STRTOL_CONST_CHARP */
+#ifdef __INTEL__
+#define STRTOL_CONST_CHARP 1
+#endif
 
 /* Define if you have bcopy, and it handles overlapping ranges correctly. */
-/* #undef OVERLAPPING_BCOPY */
+#ifdef __INTEL__
+#define OVERLAPPING_BCOPY 1
+#endif
 
+#ifdef __INTEL__
+#define MALLOC_ALIGN 4
+#else
 #define MALLOC_ALIGN 8
+#endif
 
 /* does the compiler know of a 'long long' type? */
 #define HAVE_LONG_LONG 1
@@ -132,11 +142,8 @@
 /* Define if you have getcwd.  */
 #define HAVE_GETCWD 1
 
-/* Define if you have getdomainname.  */
-/* #undef HAVE_GETDOMAINNAME */
-
 /* Define if you have getrusage.  */
-/* #define HAVE_GETRUSAGE */
+/* #undef HAVE_GETRUSAGE */
 
 /* Define if you have gettimeofday.  */
 #define HAVE_GETTIMEOFDAY 1
@@ -166,7 +173,7 @@
 #define HAVE_SYSCONF 1
 
 /* Define if you have wait3.  */
-#define HAVE_WAIT3 1
+/* #undef HAVE_WAIT3 */
 
 /* Define if you have waitpid.  */
 #define HAVE_WAITPID 1
@@ -192,11 +199,14 @@
 /* Define if you have the <string.h> header file.  */
 #define HAVE_STRING_H 1
 
+/* Define if you have the <sys/param.h> header file. */
+#define HAVE_SYS_PARAM_H 1
+
 /* Define if you have the <sys/rusage.h> header file.  */
-#define HAVE_SYS_RUSAGE_H 1
+/* #undef HAVE_SYS_RUSAGE_H */
 
 /* Define if you have the <sys/termios.h> header file.  */
-#define HAVE_SYS_TERMIOS_H 1
+/* #undef HAVE_SYS_TERMIOS_H */
 
 /* Define if you have the <sys/time.h> header file.  */
 #define HAVE_SYS_TIME_H 1
@@ -205,7 +215,9 @@
 #define HAVE_UNISTD_H 1
 
 /* Define if you have the <values.h> header file.  */
-/* #undef HAVE_VALUES_H */
+#ifdef __INTEL__
+#define HAVE_VALUES_H 1
+#endif
 
 /* Define if you have the crypt library (-lcrypt).  */
 /* #undef HAVE_LIBCRYPT */

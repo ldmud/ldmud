@@ -82,7 +82,7 @@ long time_to_swap_variables = TIME_TO_SWAP_VARIABLES;
 #ifndef MAXNUMPORTS
 int port_number = PORTNO;
 #else
-int port_numbers[MAXNUMPORTS] = { PORTNO };  
+int port_numbers[MAXNUMPORTS] = { PORTNO };
   /* The login port numbers.
    * Negative numbers are not ports, but the numbers of inherited
    * socket file descriptors.
@@ -119,34 +119,18 @@ mp_int max_small_malloced = MAX_SMALL_MALLOCED;
 #endif
 
 /* -- Other Global Variables -- */
-struct svalue const0, const1;  
+struct svalue const0, const1;
   /* The values 0 and 1 as svalues, mem-copied when needed */
 
 double consts[5];  /* Weight constants used to compute average figures */
 
 char *debug_file;  /* Name of the debug log file. */
 
-/* Dummy object for functions, which need a current_object though
- * there is none. This is usually the case when (re)loading the
- * master object.
- */
-struct object dummy_current_object_for_loads = {
-  0, /* flags */
-  0, /* light */
-  0, /* next_reset */
-  0, /* time of ref */
-  1, /* ref */
-#ifdef DEBUG
-  0, /* extra ref */
-#endif
-  0, /*  struct program *prog; */
-  0, /*  char *name; */
-  0,0,0, /* struct object *next_all, *next_inv, *next_hash; */
-  0, /*  struct object *contains; */
-  0, /*  struct object *super;            * Which object surround us ? */
-  0, /*  struct sentence *sent;		  */
-  &default_wizlist_entry, /*  user        * What wizard defined this object */
-};
+struct object dummy_current_object_for_loads;
+  /* Dummy object for functions, which need a current_object though
+   * there is none. This is usually the case when (re)loading the
+   * master object.
+   */
 
 int slow_shut_down_to_do = 0;
   /* If non-zero, the game should perform a graceful shutdown.
@@ -177,9 +161,6 @@ main (int argc, char **argv)
 #ifdef RXCACHE_TABLE
     rxcache_init();
 #endif
-#ifdef FILE_STAT
-    init_filestat();
-#endif
 
     const0.type = T_NUMBER; const0.u.number = 0;
     const1.type = T_NUMBER; const1.u.number = 1;
@@ -189,14 +170,25 @@ main (int argc, char **argv)
     current_time = get_current_time();
     seed_random(current_time);
 
+    dummy_current_object_for_loads = NULL_object;
+#ifdef DEBUG
+    if (dummy_current_object_for_loads.user)
+    {
+        fprintf(stderr, "Assigning NULL_object does not clear the target.\n");
+        exit(1);
+    }
+#endif
+    dummy_current_object_for_loads.ref = 1;
+    dummy_current_object_for_loads.user = &default_wizlist_entry;
+
     /*
      * Check that the definition of EXTRACT_UCHAR() is correct.
      */
     p = (char *)&i;
     *p = -10;
     if (EXTRACT_UCHAR(p) != 0x100 - 10) {
-	fprintf(stderr, "Bad definition of EXTRACT_UCHAR() in config.h.\n");
-	exit(1);
+        fprintf(stderr, "Bad definition of EXTRACT_UCHAR() in config.h.\n");
+        exit(1);
     }
 
 #ifdef HOST_DEPENDENT_INIT
@@ -209,6 +201,16 @@ main (int argc, char **argv)
     if (getargs(argc, argv, firstscan))
       exit(1);
 
+    /* Make sure the name of the master object is sensible.
+     * This is important for modules like the lexer which
+     * use it directly.
+     */
+    {
+        const char *pName = make_name_sane(master_name);
+        if (pName)
+            strcpy(master_name, pName);
+    }
+
 #ifdef MAXNUMPORTS
     if (numports < 1) /* then use the default port */
         numports = 1;
@@ -219,44 +221,41 @@ main (int argc, char **argv)
 #endif
 #ifdef MALLOC_smalloc
     if (reserved_system_size > 0)
-	reserved_system_area = xalloc(reserved_system_size);
+        reserved_system_area = xalloc(reserved_system_size);
     if (reserved_master_size > 0)
-	reserved_master_area = xalloc(reserved_master_size);
+        reserved_master_area = xalloc(reserved_master_size);
 #endif
     if (reserved_user_size > 0)
-	reserved_user_area = xalloc(reserved_user_size);
+        reserved_user_area = xalloc(reserved_user_size);
     init_shared_strings();
-    walk_mapping_string_svalue.x.string_type = STRING_SHARED;
     init_otable();
     for (i = 0; i < (int)(sizeof consts / sizeof consts[0]); i++)
-	consts[i] = exp(- i / 900.0);
-    init_num_args();
+        consts[i] = exp(- i / 900.0);
+    init_lexer();
     reset_machine(1);
     CLEAR_EVAL_COST;
     if (!new_mudlib && chdir(MUD_LIB) == -1) {
         fprintf(stderr, "Bad mudlib directory: %s\n", MUD_LIB);
-	exit(1);
+        exit(1);
     }
     {
-#ifdef MAXPATHLEN
         char path[MAXPATHLEN];
-#else
-        char path[2048];
-#endif
 #ifdef HAVE_GETCWD
         if (!getcwd(path, sizeof(path) ))
 #else
         if (!getwd(path))
 #endif
-	{
-	    perror("get(c)wd failed");
-	    fatal("must be able to obtain current directory name\n");
-	}
+        {
+            perror("get(c)wd failed");
+            fatal("must be able to obtain current directory name\n");
+        }
         mud_lib = string_copy(path);
     }
 
+#ifdef ERQ_DEMON
     if (!no_erq_demon)
-	start_erq_demon("");
+        start_erq_demon("");
+#endif
     initialize_host_ip_number();
 
     /* if we get low on file descriptors, the descriptor for debug_message
@@ -266,18 +265,18 @@ main (int argc, char **argv)
     (void)signal(SIGFPE, SIG_IGN);
     current_object = &dummy_current_object_for_loads;
     if (setjmp(toplevel_error_recovery_info.con.text)) {
-	clear_state();
-	add_message("Anomaly in the fabric of world space.\n");
+        clear_state();
+        add_message("Anomaly in the fabric of world space.\n");
     } else {
-	toplevel_error_recovery_info.type = ERROR_RECOVERY_BACKEND;
+        toplevel_error_recovery_info.type = ERROR_RECOVERY_BACKEND;
 
-	master_ob = load_object(master_name, 0, 60);
+        master_ob = get_object(master_name);
     }
     current_object = master_ob;
     toplevel_error_recovery_info.type = ERROR_RECOVERY_NONE;
-    if (master_ob == 0) {
-	fprintf(stderr, "The file %s must be loadable.\n", master_name);
-	exit(1);
+    if (master_ob == NULL) {
+        fprintf(stderr, "The file %s must be loadable.\n", master_name);
+        exit(1);
     }
     /*
      * Make sure master_ob is never made a dangling pointer.
@@ -289,7 +288,7 @@ main (int argc, char **argv)
     apply_master_ob(STR_INAUGURATE, 1);
     setup_print_block_dispatcher();
 
-    /* Second scan of the arguments, now we're looking just for 
+    /* Second scan of the arguments, now we're looking just for
      * the 'f' flag.
      */
     if (getargs(argc, argv, secondscan))
@@ -297,12 +296,12 @@ main (int argc, char **argv)
 
 #ifdef DEBUG
     if (d_flag > 1 && time_to_swap_variables <= 0)
-	check_a_lot_ref_counts_flag = MY_TRUE;
+        check_a_lot_ref_counts_flag = MY_TRUE;
 #endif
 
     get_simul_efun_object();
     if (game_is_being_shut_down)
-	exit(1);
+        exit(1);
 
     load_wiz_file();
     preload_objects(e_flag);
@@ -329,21 +328,21 @@ void initialize_master_uid (void)
     ret = apply_master_ob(STR_GET_M_UID, 0);
 #ifndef NATIVE_MODE
     if (ret && ret->type == T_NUMBER && ret->u.number) {
-	master_ob->user = &default_wizlist_entry;
+        master_ob->user = &default_wizlist_entry;
 #ifdef EUIDS
-	master_ob->eff_user = 0;
+        master_ob->eff_user = 0;
 #endif
     } else
 #endif
     if (ret == 0 || ret->type != T_STRING) {
-	fprintf(stderr, "get_master_uid() in %s does not work\n", master_name);
+        fprintf(stderr, "get_master_uid() in %s does not work\n", master_name);
 #ifdef NATIVE_MODE
-	exit(1);
+        exit(1);
 #endif
     } else {
-	master_ob->user = add_name(ret->u.string);
+        master_ob->user = add_name(ret->u.string);
 #ifdef EUIDS
-	master_ob->eff_user = master_ob->user;
+        master_ob->eff_user = master_ob->user;
 #endif
     }
 }
@@ -364,7 +363,7 @@ char *_string_copy(str, file, line)
 
     p = smalloc(strlen(str)+1, file, line);
     if (p) {
-	(void)strcpy(p, str);
+        (void)strcpy(p, str);
     }
     return p;
 }
@@ -376,7 +375,7 @@ char *string_copy(str)
 
     p = xalloc(strlen(str)+1);
     if (p) {
-	(void)strcpy(p, str);
+        (void)strcpy(p, str);
     }
     return p;
 }
@@ -397,23 +396,19 @@ debug_message(char *a, ...)
 
     va_start(va, a);
     if (fp == NULL) {
-	if ( !(file = debug_file) ) {
-#ifndef MSDOS
-	    sprintf(deb,"%s.debug.log", query_host_name());
-#else
-	    strcpy(deb,"debug.log");
-#endif
-	    file = deb;
-	}
+        if ( !(file = debug_file) ) {
+            sprintf(deb,"%s.debug.log", query_host_name());
+            file = deb;
+        }
 #ifndef AMIGA
-	fp = fopen(file, "w");
+        fp = fopen(file, "w");
 #else
-	fp = fopen(file, "a");
+        fp = fopen(file, "a");
 #endif
-	if (fp == NULL) {
-	    perror(file);
-	    abort();
-	}
+        if (fp == NULL) {
+            perror(file);
+            abort();
+        }
     }
     (void)vfprintf(fp, a, va);
     va_end(va);
@@ -425,7 +420,7 @@ debug_message(char *a, ...)
 POINTER
 xalloc (size_t size)
 
-/* Allocate <size> bytes of memory like malloc() does. 
+/* Allocate <size> bytes of memory like malloc() does.
  * This function catches out of memory situations and tries to recover
  * from them by using the reserved memory areas. If it totally runs
  * out of memory, the program exit()s with code 3.
@@ -436,39 +431,39 @@ xalloc (size_t size)
     static int going_to_exit;
 
     if (going_to_exit)
-	exit(3);
+        exit(3);
     if (size == 0)
-	fatal("Tried to allocate 0 bytes.\n");
+        fatal("Tried to allocate 0 bytes.\n");
 #ifdef MAX_MALLOCED
     {
-	static mp_int total_malloced = 0;
+        static mp_int total_malloced = 0;
 
-	if ((total_malloced += size + sizeof(p_int)) > max_malloced) {
-	    total_malloced -= size + sizeof(p_int);
-	    p = 0;
-	} else {
-	    p = malloc(size);
-	}
+        if ((total_malloced += size + sizeof(p_int)) > max_malloced) {
+            total_malloced -= size + sizeof(p_int);
+            p = 0;
+        } else {
+            p = malloc(size);
+        }
     }
 #else
     p = malloc(size);
 #endif
     if (p == 0) {
-	if (reserved_user_area) {
-	    free(reserved_user_area);
-	    p = "Temporary out of MEMORY. Freeing reserve.\n";
-	    write(1, p, strlen(p));
-	    reserved_user_area = 0;
-	    garbage_collect_to_do = MY_TRUE;
-	    extra_jobs_to_do = MY_TRUE;
-	    return xalloc(size);	/* Try again */
-	}
-	/* We can hardly survive out of memory without the garbage collector */
-	going_to_exit = 1;
-	p = "Totally out of MEMORY.\n";
-	write(1, p, strlen(p));
-	(void)dump_trace(0);
-	exit(2);
+        if (reserved_user_area) {
+            free(reserved_user_area);
+            p = "Temporary out of MEMORY. Freeing reserve.\n";
+            write(1, p, strlen(p));
+            reserved_user_area = 0;
+            garbage_collect_to_do = MY_TRUE;
+            extra_jobs_to_do = MY_TRUE;
+            return xalloc(size);        /* Try again */
+        }
+        /* We can hardly survive out of memory without the garbage collector */
+        going_to_exit = 1;
+        p = "Totally out of MEMORY.\n";
+        write(1, p, strlen(p));
+        (void)dump_trace(0);
+        exit(2);
     }
     return p;
 }
@@ -487,35 +482,35 @@ reallocate_reserved_areas (void)
     malloc_privilege = MALLOC_USER;
 #ifdef MALLOC_smalloc
     if (reserved_system_size && !reserved_system_area) {
-	if ( !(reserved_system_area = xalloc(reserved_system_size)) ) {
-	    slow_shut_down_to_do = 1;
-	    return;
-	}
-	else {
-	    p = "Reallocated System reserve.\n";
-	    write(1, p, strlen(p));
-	}
+        if ( !(reserved_system_area = xalloc(reserved_system_size)) ) {
+            slow_shut_down_to_do = 1;
+            return;
+        }
+        else {
+            p = "Reallocated System reserve.\n";
+            write(1, p, strlen(p));
+        }
     }
     if (reserved_master_size && !reserved_master_area) {
-	if ( !(reserved_master_area = xalloc(reserved_master_size)) ) {
-	    slow_shut_down_to_do = 1;
-	    return;
-	}
-	else {
-	    p = "Reallocated Master reserve.\n";
-	    write(1, p, strlen(p));
-	}
+        if ( !(reserved_master_area = xalloc(reserved_master_size)) ) {
+            slow_shut_down_to_do = 1;
+            return;
+        }
+        else {
+            p = "Reallocated Master reserve.\n";
+            write(1, p, strlen(p));
+        }
     }
 #endif /* MALLOC_smalloc */
     if (reserved_user_size && !reserved_user_area) {
-	if ( !(reserved_user_area = xalloc(reserved_user_size)) ) {
-	    slow_shut_down_to_do = 6;
-	    return;
+        if ( !(reserved_user_area = xalloc(reserved_user_size)) ) {
+            slow_shut_down_to_do = 6;
+            return;
         }
-	else {
-	    p = "Reallocated User reserve.\n";
-	    write(1, p, strlen(p));
-	}
+        else {
+            p = "Reallocated User reserve.\n";
+            write(1, p, strlen(p));
+        }
     }
     slow_shut_down_to_do = 0;
 }
@@ -531,10 +526,10 @@ writex (int d, p_uint i)
     char c;
 
     for (j = 2 * sizeof i; --j >= 0; i <<= 4) {
-	c = (i >> (8 * sizeof i - 4) ) + '0';
-	if (c >= '9' + 1)
-	    c += 'a' - ('9' + 1);
-	write(d, &c, 1);
+        c = (i >> (8 * sizeof i - 4) ) + '0';
+        if (c >= '9' + 1)
+            c += 'a' - ('9' + 1);
+        write(d, &c, 1);
     }
 }
 
@@ -548,12 +543,12 @@ writed (int d, p_uint i)
     p_uint j;
     char c;
 
-    for (j = 1000000000; j > i; j /= 10);
+    for (j = 1000000000; j > i; j /= 10) NOOP;
     if (!j) j = 1;
     do {
-	c = (i / j) % 10 + '0';
-	write(d, &c, 1);
-	j /= 10;
+        c = (i / j) % 10 + '0';
+        write(d, &c, 1);
+        j /= 10;
     } while (j > 0);
 }
 
@@ -731,9 +726,9 @@ static LongOpt aLongOpts[]
     , { "no-erq",             cNoERQ,         MY_FALSE }
     , { "no-heart",           cNoHeart,       MY_FALSE }
     , { "no-preload",         cNoPreload,     MY_FALSE }
-    , { "reserved-user",      cReserveUser,   MY_TRUE }
-    , { "reserved-master",    cReserveMaster, MY_TRUE }
-    , { "reserved-system",    cReserveSystem, MY_TRUE }
+    , { "reserve-user",       cReserveUser,   MY_TRUE }
+    , { "reserve-master",     cReserveMaster, MY_TRUE }
+    , { "reserve-system",     cReserveSystem, MY_TRUE }
 #if TIME_TO_SWAP > 0
     , { "swap-time",          cSwapTime,      MY_TRUE }
     , { "swap-variables",     cSwapVars,      MY_TRUE }
@@ -768,11 +763,17 @@ version (void)
 
 /* Print the version of the gamedriver.
  */
- 
+
 {
-  fputs("LDMud " GAME_VERSION PATCH_LEVEL LOCAL_LEVEL 
-        " - an LPMud Game Driver.\n"
-        "\nReleased: " RELEASE_DATE 
+  fputs("LDMud ", stdout);
+
+  if (IS_RELEASE())
+      fputs(GAME_VERSION, stdout);
+  else
+      fputs(LONG_VERSION, stdout);
+
+  fputs(LOCAL_LEVEL " - a LPMud Game Driver.\n"
+        "\nRelease:  " PROJ_VERSION ", " RELEASE_DATE
         "\nCompiled: " __DATE__
 #ifdef __TIME__
         " " __TIME__
@@ -787,7 +788,7 @@ options (void)
 
 /* Print the version of the gamedriver and the compile time options.
  */
- 
+
 {
   version();
   fputs("\n           Mode: "
@@ -827,12 +828,13 @@ options (void)
   printf("            UDP: recv only, default port is: %d.\n", CATCH_UDP_PORT);
 #    endif
 #else
-  fputs("            UDP: disabled.\n");
+  fputs("            UDP: disabled.\n", stdout);
 #endif
 
 #ifdef ERQ_DEMON
-  printf("            ERQ: max reply length: %d bytes, directory: %s.\n"
-        , ERQ_MAX_REPLY, ERQ_DIR);
+  printf("            ERQ: max data length: send %d / recv %d bytes.\n"
+         "                 directory: %s.\n"
+        , ERQ_MAX_SEND, ERQ_MAX_REPLY, ERQ_DIR);
 #else
   fputs("            ERQ: disabled.\n", stdout);
 #endif
@@ -850,36 +852,13 @@ options (void)
 #endif
 
   fputs("       Language: "
-#ifdef OLD_PREVIOUS_OBJECT_BEHAVIOUR
-                         "old previous_object()\n"
-#else
-                         "new previous_object()\n"
-#endif
-#ifdef OLD_EXPLODE_BEHAVIOUR
-        "                 old explode()\n"
-#else
-        "                 new explode()\n"
-#endif
 #ifdef SUPPLY_PARSE_COMMAND
-        "                 parse_command() enabled\n"
+                         "parse_command() enabled\n"
 #endif
 #ifdef INITIALIZATION_BY___INIT
         "                 initialization by __INIT()\n"
 #else
         "                 static initialization\n"
-#endif
-#ifdef MAPPINGS
-        "                 mappings enabled\n"
-#endif
-#ifdef FLOATS
-#    ifdef TRANSCENDENT_FUNCTIONS
-        "                 floats and transcendent functions enabled\n"
-#    else
-        "                 floats enabled\n"
-#    endif
-#endif
-#ifndef NO_XVARARGS
-        "                 varargs enabled\n"
 #endif
        , stdout);
 
@@ -913,18 +892,31 @@ options (void)
 #endif
         );
 
+#ifndef OLD_RESET
+  printf("         Timing: reset:                 %7d s\n"
+         "                 clean up:              %7d s\n"
+        , TIME_TO_RESET, TIME_TO_CLEAN_UP
+        );
+#else
   printf("         Timing: reset:                 %7d s (granularity %d s)\n"
          "                 clean up:              %7d s\n"
         , TIME_TO_RESET, RESET_GRANULARITY, TIME_TO_CLEAN_UP
         );
+#endif
 
 #if TIME_TO_SWAP > 0
   printf("       Swapping: objects             after %4d s\n"
          "                 variables           after %4d s\n"
-         "                 file: <mudlib>/%s.<host>\n"
         , TIME_TO_SWAP, TIME_TO_SWAP_VARIABLES
-        , SWAP_FILE
         );
+  if (SWAP_FILE[0] == '/')
+      printf("                 file: %s.<host>\n"
+            , SWAP_FILE
+            );
+  else
+      printf("                 file: <mudlib>/%s.<host>\n"
+            , SWAP_FILE
+            );
 #else
   fputs("Swapping disabled.\n", stdout);
 #endif
@@ -1003,8 +995,14 @@ options (void)
 #       if defined(YYDEBUG)
                               , "YYDEBUG"
 #       endif
+#       if defined(MSDOS_FS)
+                              , "MSDOS_FS"
+#       endif
 #       if defined(TRACECODE)
                               , "TRACECODE"
+#       endif
+#       if defined(OLD_RESET)
+                              , "OLD_RESET"
 #       endif
 #       if defined(COMM_STAT)
                               , "COMM_STAT"
@@ -1012,8 +1010,11 @@ options (void)
 #       if defined(APPLY_CACHE_STAT)
                               , "APPLY_CACHE_STAT"
 #       endif
-#       if defined(FILE_STAT)
-                              , "FILE_STAT"
+#       if defined(OPCPROF)
+                              , "OPC_PROF"
+#           if defined(OPCPROF_VERBOSE)
+                              , "OPCPROF_VERBOSE"
+#           endif
 #       endif
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
@@ -1031,7 +1032,7 @@ options (void)
                 curlen += strlen(optstrings[i]) + 2;
                 if (curlen > 78)
                 {
-                    printf("\n%*s", iInitial, " ");
+                    printf("\n%*s", (int)iInitial, " ");
                     curlen = iInitial;
                 }
                 fputs(optstrings[i], stdout);
@@ -1104,7 +1105,7 @@ shortusage (void)
 "  --longhelp\n"
 "  -h|-?|--help\n"
        , stdout);
-       
+
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1230,7 +1231,7 @@ usage (void)
 "  -h|-?|--help\n"
 "    Display the short help text and exit.\n"
        , stdout);
-       
+
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1248,15 +1249,15 @@ firstscan (int eOption, const char * pValue)
     {
     case cArgument:
 #ifndef MAXNUMPORTS
-	if (atoi(pValue))
-	    port_number = atoi(pValue);
+        if (atoi(pValue))
+            port_number = atoi(pValue);
         else
             fprintf(stderr, "Illegal portnumber '%s' ignored.\n", pValue);
 #else
         if (numports >= MAXNUMPORTS)
             fprintf(stderr, "Portnumber '%s' ignored.\n", pValue);
         else if (atoi(pValue))
-  	    port_numbers[numports++] = atoi(pValue);
+              port_numbers[numports++] = atoi(pValue);
         else
             fprintf(stderr, "Illegal portnumber '%s' ignored.\n", pValue);
 #endif
@@ -1267,7 +1268,7 @@ firstscan (int eOption, const char * pValue)
         if (numports >= MAXNUMPORTS)
             fprintf(stderr, "fd '%s' ignored.\n", pValue);
         else if (atoi(pValue))
-  	    port_numbers[numports++] = -atoi(pValue);
+              port_numbers[numports++] = -atoi(pValue);
         else
             fprintf(stderr, "Illegal fd '%s' ignored.\n", pValue);
         break;
@@ -1301,7 +1302,7 @@ firstscan (int eOption, const char * pValue)
         break;
 
     case cNoPreload:
-	e_flag++;
+        e_flag++;
         break;
 
     case cNoERQ:
@@ -1311,15 +1312,15 @@ firstscan (int eOption, const char * pValue)
     case cDebug:
         d_flag++;
         break;
-        
+
     case cTrace:
-	comp_flag = MY_TRUE;
+        comp_flag = MY_TRUE;
         break;
-        
+
     case cNoHeart:
-	t_flag = MY_TRUE;
+        t_flag = MY_TRUE;
         break;
-        
+
 #if TIME_TO_SWAP > 0
     case cSwap:
         /* Compatibility vs. one-char-only options *sigh* */
@@ -1371,7 +1372,7 @@ firstscan (int eOption, const char * pValue)
 #ifdef MAX_MALLOCED
     case cMaxMalloc:
         max_malloced = strtol(pValue, (char **)0, 0);
-	if (!max_malloced)
+        if (!max_malloced)
         {
             fprintf(stderr, "Illegal value '%s' for --max-malloc\n", pValue);
             return 1;
@@ -1380,7 +1381,7 @@ firstscan (int eOption, const char * pValue)
 
     case cMaxSmall:
         max_small_malloced = strtol(pValue, (char **)0, 0);
-	if (!max_small_malloced)
+        if (!max_small_malloced)
         {
             fprintf(stderr, "Illegal value '%s' for --max-small-malloc\n", pValue);
             return 1;
@@ -1415,7 +1416,7 @@ firstscan (int eOption, const char * pValue)
                  * to original Amylaar and the one-char-only short options.
                  */
 
-                switch(*pValue++) 
+                switch(*pValue++)
                 {
                 default:  pValue--; /* FALLTHROUGH */
                 case 'u': sizep = &reserved_user_size; break;
@@ -1423,7 +1424,7 @@ firstscan (int eOption, const char * pValue)
                 case 's': sizep = &reserved_system_size; break;
                 }
             }
-            else 
+            else
             switch (eOption)
             {
             case cReserveUser:   sizep = &reserved_user_size; break;
@@ -1439,10 +1440,10 @@ firstscan (int eOption, const char * pValue)
     case cGcollectFD:
         if (isdigit((unsigned char)*pValue)) {
             gcollect_outfd = strtol(pValue, (char **)0, 0);
-	} else {
-      	    gcollect_outfd = ixopen3(pValue, O_CREAT|O_TRUNC|O_WRONLY, 0640);
-	}
-	break;
+        } else {
+                  gcollect_outfd = ixopen3(pValue, O_CREAT|O_TRUNC|O_WRONLY, 0640);
+        }
+        break;
 #endif
 
     case cOptions:
@@ -1528,7 +1529,7 @@ secondscan (int eOption, const char * pValue)
 static int
 getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
 
-/* Get the arguments from the commandline and pass them 
+/* Get the arguments from the commandline and pass them
  * as (number, optional value) to the opt_eval callback.
  * If opt_eval() returns non-zero, argument scanning is terminated.
  * In that case, or if getargs() detects an error itself, getargs() returns
@@ -1540,11 +1541,12 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
   int         i;        /* all purpose */
   int         iArg;     /* Number of argument under inspection */
   OptNumber   eOption;  /* The current recognized option */
+  int         iOption;  /* The index of the recognized option */
   short       bCont;    /* True: find another option in the same argument */
   short       bDone;    /* True: all options parsed, only args left */
   short       bShort;   /* True: current argument is a short option */
   char      * pArg;     /* Next argument character to consider */
-  
+
   /* Make the compiler happy */
   bShort = MY_FALSE;
   pArg = NULL;
@@ -1620,15 +1622,16 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
     {
       if (bShort) /* search the short option */
       {
-        for (i = 0; i < sizeof(aShortOpts) / sizeof(aShortOpts[0]); i++)
-          if (*pArg == aShortOpts[i].cOption)
+        for (iOption = 0; iOption < sizeof(aShortOpts) / sizeof(aShortOpts[0]); iOption++)
+        {
+          if (*pArg == aShortOpts[iOption].cOption)
           {
-            eOption = aShortOpts[i].eNumber;
-            bTakesValue = aShortOpts[i].bValue;
+            eOption = (OptNumber)aShortOpts[iOption].eNumber;
+            bTakesValue = aShortOpts[iOption].bValue;
             pArg++; iArglen--;  /* Consume this character */
             break;
           }
-
+        }
         /* Consume a following '=' if appropriate */
         if (cUnknown != eOption && bTakesValue && iArglen > 0 && '=' == *pArg)
         {
@@ -1646,12 +1649,13 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
         }
       }
       else  /* search the long option */
-      { 
-        for (i = 0; i < sizeof(aLongOpts) / sizeof(aLongOpts[0]); i++)
-          if (!strncasecmp(pArg, aLongOpts[i].pOption, iArglen))
+      {
+        for (iOption = 0; iOption < sizeof(aLongOpts) / sizeof(aLongOpts[0]); iOption++)
+          if (iArglen == strlen(aLongOpts[iOption].pOption)
+           && !strncasecmp(pArg, aLongOpts[iOption].pOption, iArglen))
           {
-            eOption = aLongOpts[i].eNumber;
-            bTakesValue = aLongOpts[i].bValue;
+            eOption = (OptNumber)aLongOpts[iOption].eNumber;
+            bTakesValue = aLongOpts[iOption].bValue;
             break;
           }
       }
@@ -1666,7 +1670,7 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
         fputs("'.\n", stderr);
         return 1;
       }
-      
+
       /* If at this point bTakesValue is true, but pValue is still NULL,
        * then the value is in the next argument. Get it if it's there.
        */
@@ -1681,9 +1685,9 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
       {
         fputs("driver: Option '", stderr);
         if (bShort)
-          putc(aShortOpts[eOption].cOption, stderr);
+          putc(aShortOpts[iOption].cOption, stderr);
         else
-          fputs(aLongOpts[eOption].pOption, stderr);
+          fputs(aLongOpts[iOption].pOption, stderr);
         fputs("' expects a value.\n", stderr);
         return 1;
       }

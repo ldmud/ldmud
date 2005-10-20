@@ -5,7 +5,7 @@
 
 #include "object.h"     /* struct object */
 
-extern mp_int data_size PROT((struct object *ob));
-extern void dumpstat PROT((void));
+extern mp_int data_size(struct object *ob);
+extern void dumpstat(void);
 
 #endif

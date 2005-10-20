@@ -61,7 +61,7 @@ enum codes {code_eof = 0,  /* end of file */
 	      sp_nparen, ifstmt, whilestmt,
 	      forstmt, stmt, stmtl, elselit, dolit, dohead, ifhead,
 	      elsehead, period };
-	      
+	
 #define false 0
 #define true  1
 
@@ -321,7 +321,7 @@ struct parser_state {
 
     /* Pointer to the top of stack of the p_stack, il and cstk arrays. */
     int         tos;
-    
+
     int         box_com;	/* set to true when we are in a "boxed"
 				 * comment. In that case, the first non-blank
 				 * char should be lined up with the / in /* */

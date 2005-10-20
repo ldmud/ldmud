@@ -1,12 +1,14 @@
 #ifndef __FILESTAT_H__
 #define __FILESTAT_H__ 1
 
-#include "config.h"
+#include "driver.h"
 
 #if defined(FILE_STAT)
 
-#include "driver.h"
+#error "FILE_STAT must not be defined at the moment."
+Thats it.
 
+#if 0
 #define FSTAT_READ  0
 #define FSTAT_WRITE 1
 #define FSTAT_DEL   2
@@ -32,13 +34,15 @@ extern void count_fstat_refs (void);
 #define FCOUNT_SAVE(name)  fstat_count((name), FSTAT_SAVE)
 #define FCOUNT_REST(name)  fstat_count((name), FSTAT_REST)
 
+#endif
+
 #else
 
-#define FCOUNT_READ(name) 
+#define FCOUNT_READ(name)
 #define FCOUNT_WRITE(name)
-#define FCOUNT_DEL(name)  
-#define FCOUNT_COMP(name) 
-#define FCOUNT_INCL(name) 
+#define FCOUNT_DEL(name)
+#define FCOUNT_COMP(name)
+#define FCOUNT_INCL(name)
 #define FCOUNT_SAVE(name)
 #define FCOUNT_REST(name)
 

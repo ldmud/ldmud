@@ -13,8 +13,8 @@
 
 #else
 
-#define MASK	   0x0fffffff
-#define M_REF	   0x20000000
+#define MASK           0x0fffffff
+#define M_REF           0x20000000
 
 #ifdef HAS_INLINE
 #define SMALLOC_H_INLINE inline
@@ -50,45 +50,45 @@ register struct svalue *v;
     register int i;
 
     if (type == STRING_MALLOC) {
-	i = (
-		(((p_uint*)(p))[-SMALLOC_OVERHEAD] & MASK) -
-		 (SMALLOC_OVERHEAD + 1)
-	    ) * SIZEOF_P_INT;
-	if (*(p+=i))
-	    if (*++p)
-		if (!*++p) return i+2;
+        i = (
+                (((p_uint*)(p))[-SMALLOC_OVERHEAD] & MASK) -
+                 (SMALLOC_OVERHEAD + 1)
+            ) * SIZEOF_P_INT;
+        if (*(p+=i))
+            if (*++p)
+                if (!*++p) return i+2;
 #if SIZEOF_P_INT == 4
-		else return i+3;
+                else return i+3;
 #else
-		else return i+3+strlen(p+1);
+                else return i+3+strlen(p+1);
 #endif
-	    else return i+1;
-	return i;
+            else return i+1;
+        return i;
     } else if (type == STRING_SHARED) {
-    	if ( (i =
-	       (*(p_uint*)
-		 (p - sizeof(short) - (SMALLOC_OVERHEAD+1) * SIZEOF_P_INT) &
-		MASK) * SIZEOF_P_INT -
-	       sizeof(short) -
-	       (SMALLOC_OVERHEAD+2) * SIZEOF_P_INT
-	     ) >= 0)
+            if ( (i =
+               (*(p_uint*)
+                 (p - sizeof(short) - (SMALLOC_OVERHEAD+1) * SIZEOF_P_INT) &
+                MASK) * SIZEOF_P_INT -
+               sizeof(short) -
+               (SMALLOC_OVERHEAD+2) * SIZEOF_P_INT
+             ) >= 0)
 #if SIZEOF_P_INT == 4
-	{
-    	    if (*(p+=i))
-    		if (*++p)
-	    	    if (!*++p) return i+2;
-		    else return i+3;
-	    	else return i+1;
-	    return i;
-    	}
-	if (!*p) return 0;
-	return 1;
+        {
+                if (*(p+=i))
+                    if (*++p)
+                        if (!*++p) return i+2;
+                    else return i+3;
+                    else return i+1;
+            return i;
+            }
+        if (!*p) return 0;
+        return 1;
 #else
-	    return i + strlen(p+i);
-	return strlen(p);
+            return i + strlen(p+i);
+        return strlen(p);
 #endif
     } else {
-	return strlen(p);
+        return strlen(p);
     }
 }
 
@@ -100,8 +100,8 @@ static int svalue_strlen(v) struct svalue *v; { return _svalue_strlen(v); }
 #endif /* USES_SVALUE_STRLEN */
 
 #define malloced_strlen(s) ( ( \
-	(*(p_uint *)((s)-sizeof(p_int)*SMALLOC_OVERHEAD) & MASK) \
-	- SMALLOC_OVERHEAD) * SIZEOF_P_INT)
+        (*(p_uint *)((s)-sizeof(p_int)*SMALLOC_OVERHEAD) & MASK) \
+        - SMALLOC_OVERHEAD) * SIZEOF_P_INT)
 
 /* --- Variables --- */
 extern int debugmalloc;
@@ -114,7 +114,7 @@ extern POINTER smalloc PROT((size_t size, char *file, int line));
 extern POINTER smalloc PROT((size_t size));
 #endif
 
-extern void xfree PROT((POINTER ptr));  
+extern void xfree PROT((POINTER ptr));
 /* smalloc.c source says sfree(), but redef's it as xfree() */
 
 extern POINTER amalloc PROT((size_t size));
@@ -125,7 +125,7 @@ extern PFREE_RETURN_TYPE pfree PROT((POINTER p));
 
 #if MALLOC_ALIGN > SINT || defined(FREE_NULL_POINTER)
 extern FREE_RETURN_TYPE afree PROT((POINTER p));
-#endif 
+#endif
 
 extern POINTER rexalloc PROT((POINTER p, size_t size));
 

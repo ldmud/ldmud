@@ -315,7 +315,7 @@ set_defaults()
 	    *p->p_obj = p->p_default;
 }
 
-/* Process an option ARG (e.g. "-l60").  
+/* Process an option ARG (e.g. "-l60").
    EXPLICIT should be nonzero iff the argument is being explicitly
    specified (as opposed to being taken from a PRO_SETTINGS group of
    settings).  */
@@ -343,7 +343,7 @@ found:
 	  *(p->p_explicit) = 1;
 	
 	switch (p->p_type) {
-	  
+	
         case PRO_PRSTRING:
 	  puts ((char *)p->p_obj);
 	  exit (0);
@@ -351,7 +351,7 @@ found:
 	case PRO_SETTINGS:
 	  {
 	    char *t;  /* current position */
-	    
+	
 	    t = (char *)p->p_obj;
 	    do
 	      {
@@ -361,10 +361,10 @@ found:
 	      }
 	    while (*t);
 	  }
-	  
+	
 	case PRO_IGN:
 	  break;
-	  
+	
 	case PRO_STDIN:
 	  if (in_name == 0)
 	    {
@@ -375,7 +375,7 @@ found:
 	  if (output == 0)
 	    output = stdout;
 	  break;
-	  
+	
 	case PRO_KEY:
 	  if (*param_start == 0)
 	    goto need_param;
@@ -385,7 +385,7 @@ found:
 	    addkey(str, 4);
 	  }
 	  break;
-	  
+	
 	case PRO_BOOL:
 	  if (p->p_special == OFF)
 	    *p->p_obj = false;
@@ -402,11 +402,11 @@ found:
 	  }
 	  *p->p_obj = atoi(param_start);
 	  break;
-	  
+	
 	case PRO_FONT:
 	  parsefont((struct fstate *) p->p_obj, param_start);
 	  break;
-	  
+	
 	default:
 	  fprintf(stderr, "indent: set_option: internal error: p_type %d\n",
 		  p->p_type);

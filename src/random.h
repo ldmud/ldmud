@@ -3,7 +3,7 @@
 
 #include "driver.h"
 
-extern mp_uint random_number(mp_uint n);
-extern void seed_random(int seed);
+extern uint32 random_number(uint32 n);
+extern void seed_random(uint32 seed);
 
 #endif  /* __RANDOM_H__ */

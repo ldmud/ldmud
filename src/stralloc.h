@@ -9,24 +9,24 @@
 #define STRALLOC_INLINE
 #endif
 
-#define SHSTR_NEXT(str)	(*(char **)((char *) (str) - sizeof(unsigned short)\
-						   - sizeof(char *)))
-#define SHSTR_REFS(str)	(*(unsigned short *)((char *) (str)\
-						   - sizeof(unsigned short)))
+#define SHSTR_NEXT(str)        (*(char **)((char *) (str) - sizeof(unsigned short)\
+                                                   - sizeof(char *)))
+#define SHSTR_REFS(str)        (*(unsigned short *)((char *) (str)\
+                                                   - sizeof(unsigned short)))
 #define SHSTR_BLOCK(str) ((char *)(str) - sizeof(unsigned short)\
-					- sizeof(char *))
+                                        - sizeof(char *))
 
 #ifdef MALLOC_smalloc
 #include "smalloc.h"
 extern int malloc_size_mask PROT((void));
 #define shstr_malloced_size(str) ( *( \
-	(p_uint *)(str-sizeof(char*)-sizeof(unsigned short))\
-	- SMALLOC_OVERHEAD) )
+        (p_uint *)(str-sizeof(char*)-sizeof(unsigned short))\
+        - SMALLOC_OVERHEAD) )
 #else
 #define malloc_size_mask() (~0)
 #define shstr_malloced_size(str) (\
-	(sizeof(char*) + sizeof(char *) + sizeof(short) +\
-	strlen(str) + 1 + sizeof(char *) - 1) / sizeof(char *))
+        (sizeof(char*) + sizeof(char *) + sizeof(short) +\
+        strlen(str) + 1 + sizeof(char *) - 1) / sizeof(char *))
 #endif
 
 extern mp_int stralloc_allocd_strings;
@@ -95,10 +95,10 @@ enum StandardStrings {
   , SHX_INAUGURATE      /* "inaugurate_master" */
   , SHX_LOG_ERROR       /* "log_error" */
   , SHX_LOGON           /* "logon" */
-  , SHX_OBJ_NAME        /* "object_name" */
   , SHX_PLAYER_LEVEL    /* "query_player_level" */
   , SHX_PRELOAD         /* "preload" */
   , SHX_PREP_DEST       /* "prepare_destruct" */
+  , SHX_PRINTF_OBJ_NAME /* "printf_obj_name" */
   , SHX_PRIVILEGE       /* "privilege_violation" */
   , SHX_QUERY_SHADOW    /* "query_allow_shadow" */
   , SHX_QUOTA_DEMON     /* "quota_demon" */
@@ -142,44 +142,44 @@ extern char *shstring[SHSTR_NOSTRINGS];
 #define STR_VARINIT     shstring[SHX_VARINIT]
 
     /* Master lfuns */
-#define STR_ABS_PATH       shstring[SHX_ABS_PATH]
-#define STR_COMP_OBJ       shstring[SHX_COMP_OBJ]
-#define STR_CONNECT        shstring[SHX_CONNECT]
-#define STR_DISCONNECT     shstring[SHX_DISCONNECT]
-#define STR_EPILOG         shstring[SHX_EPILOG]
-#define STR_EXT_RELOAD     shstring[SHX_EXT_RELOAD]
-#define STR_FLAG           shstring[SHX_FLAG]
-#define STR_GET_BB_UID     shstring[SHX_GET_BB_UID]
-#define STR_GET_ED_FNAME   shstring[SHX_GET_ED_FNAME]
-#define STR_GET_M_UID      shstring[SHX_GET_M_UID]
-#define STR_GET_SEFUN      shstring[SHX_GET_SEFUN]
-#define STR_GET_WNAME      shstring[SHX_GET_WNAME]
-#define STR_HEART_ERROR    shstring[SHX_HEART_ERROR]
-#define STR_INAUGURATE     shstring[SHX_INAUGURATE]
-#define STR_LOG_ERROR      shstring[SHX_LOG_ERROR]
-#define STR_LOGON          shstring[SHX_LOGON]
-#define STR_OBJ_NAME       shstring[SHX_OBJ_NAME]
-#define STR_PLAYER_LEVEL   shstring[SHX_PLAYER_LEVEL]
-#define STR_PRELOAD        shstring[SHX_PRELOAD]
-#define STR_PREP_DEST      shstring[SHX_PREP_DEST]
-#define STR_PRIVILEGE      shstring[SHX_PRIVILEGE]
-#define STR_QUERY_SHADOW   shstring[SHX_QUERY_SHADOW]
-#define STR_QUOTA_DEMON    shstring[SHX_QUOTA_DEMON]
-#define STR_RETR_ED        shstring[SHX_RETR_ED]
-#define STR_REACTIVATE     shstring[SHX_REACTIVATE]
-#define STR_RECEIVE_IMP    shstring[SHX_RECEIVE_IMP]
-#define STR_REMOVE_PL      shstring[SHX_REMOVE_PL]
-#define STR_RUNTIME        shstring[SHX_RUNTIME]
-#define STR_SAVE_ED        shstring[SHX_SAVE_ED]
-#define STR_SHUTDOWN       shstring[SHX_SHUTDOWN]
-#define STR_SLOW_SHUT      shstring[SHX_SLOW_SHUT]
-#define STR_STALE_ERQ      shstring[SHX_STALE_ERQ]
-#define STR_VALID_EXEC     shstring[SHX_VALID_EXEC]
-#define STR_VALID_QSNOOP   shstring[SHX_VALID_QSNOOP]
-#define STR_VALID_READ     shstring[SHX_VALID_READ]
-#define STR_VALID_SETEUID  shstring[SHX_VALID_SETEUID]
-#define STR_VALID_SNOOP    shstring[SHX_VALID_SNOOP]
-#define STR_VALID_WRITE    shstring[SHX_VALID_WRITE]
+#define STR_ABS_PATH         shstring[SHX_ABS_PATH]
+#define STR_COMP_OBJ         shstring[SHX_COMP_OBJ]
+#define STR_CONNECT          shstring[SHX_CONNECT]
+#define STR_DISCONNECT       shstring[SHX_DISCONNECT]
+#define STR_EPILOG           shstring[SHX_EPILOG]
+#define STR_EXT_RELOAD       shstring[SHX_EXT_RELOAD]
+#define STR_FLAG             shstring[SHX_FLAG]
+#define STR_GET_BB_UID       shstring[SHX_GET_BB_UID]
+#define STR_GET_ED_FNAME     shstring[SHX_GET_ED_FNAME]
+#define STR_GET_M_UID        shstring[SHX_GET_M_UID]
+#define STR_GET_SEFUN        shstring[SHX_GET_SEFUN]
+#define STR_GET_WNAME        shstring[SHX_GET_WNAME]
+#define STR_HEART_ERROR      shstring[SHX_HEART_ERROR]
+#define STR_INAUGURATE       shstring[SHX_INAUGURATE]
+#define STR_LOG_ERROR        shstring[SHX_LOG_ERROR]
+#define STR_LOGON            shstring[SHX_LOGON]
+#define STR_PLAYER_LEVEL     shstring[SHX_PLAYER_LEVEL]
+#define STR_PRELOAD          shstring[SHX_PRELOAD]
+#define STR_PREP_DEST        shstring[SHX_PREP_DEST]
+#define STR_PRINTF_OBJ_NAME  shstring[SHX_PRINTF_OBJ_NAME]
+#define STR_PRIVILEGE        shstring[SHX_PRIVILEGE]
+#define STR_QUERY_SHADOW     shstring[SHX_QUERY_SHADOW]
+#define STR_QUOTA_DEMON      shstring[SHX_QUOTA_DEMON]
+#define STR_RETR_ED          shstring[SHX_RETR_ED]
+#define STR_REACTIVATE       shstring[SHX_REACTIVATE]
+#define STR_RECEIVE_IMP      shstring[SHX_RECEIVE_IMP]
+#define STR_REMOVE_PL        shstring[SHX_REMOVE_PL]
+#define STR_RUNTIME          shstring[SHX_RUNTIME]
+#define STR_SAVE_ED          shstring[SHX_SAVE_ED]
+#define STR_SHUTDOWN         shstring[SHX_SHUTDOWN]
+#define STR_SLOW_SHUT        shstring[SHX_SLOW_SHUT]
+#define STR_STALE_ERQ        shstring[SHX_STALE_ERQ]
+#define STR_VALID_EXEC       shstring[SHX_VALID_EXEC]
+#define STR_VALID_QSNOOP     shstring[SHX_VALID_QSNOOP]
+#define STR_VALID_READ       shstring[SHX_VALID_READ]
+#define STR_VALID_SETEUID    shstring[SHX_VALID_SETEUID]
+#define STR_VALID_SNOOP      shstring[SHX_VALID_SNOOP]
+#define STR_VALID_WRITE      shstring[SHX_VALID_WRITE]
 
     /* Compat mode lfuns */
 #define STR_ADD_WEIGHT      shstring[SHX_ADD_WEIGHT]

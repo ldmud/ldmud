@@ -26,7 +26,7 @@
 
 /*-------------------------------------------------------------------------*/
 mp_int
-get_current_time (void) 
+get_current_time (void)
 
 /* The function time() can't really be trusted to return an integer.
  * But this game uses the 'current_time', which is an integer number
@@ -50,17 +50,21 @@ get_current_time (void)
 
     mp_int offset;
     mp_int now;
+    mp_int total_alarms_now = total_alarms;
 
-    offset = (total_alarms - noted_alarms) >> 1;
-    /* allow one alarm to happen without force-incrementing the time, so
-     * that no time anomaly due to race conditions occurs.
+    offset = (total_alarms_now - noted_alarms) >> 1;
+    noted_alarms = total_alarms_now;
+    /* The division by two forces last_time to run at about 1/4 real time
+     * so that the computer clock can catch up eventually. Furthermore it
+     * allows to miss one single alarm to race conditions (total_alarms is
+     * incremented in time, but after we read it) without causing a time
+     * anomaly.
      */
-    noted_alarms += offset;
     last_time += offset;
-    now = (mp_int)time((time_t *)NULL);	/* Just use the old time() for now */
+    now = (mp_int)time((time_t *)NULL);        /* Just use the old time() for now */
     if (now >= last_time) {
-	last_time = now;
-	return now;
+        last_time = now;
+        return now;
     }
     debug_message("Time anomaly, %ld seconds.\n", (long)(last_time - now));
     return last_time;
@@ -79,9 +83,9 @@ time_string (int t)
 /*-------------------------------------------------------------------------*/
 #ifdef STRTOL_BROKEN
 
-#define DIGIT(x)	(isdigit(x) ? (x) - '0' : \
-			islower(x) ? (x) + 10 - 'a' : (x) + 10 - 'A')
-#define MBASE	('z' - 'a' + 1 + 10)
+#define DIGIT(x)        (isdigit(x) ? (x) - '0' : \
+                        islower(x) ? (x) + 10 - 'a' : (x) + 10 - 'A')
+#define MBASE        ('z' - 'a' + 1 + 10)
 
 #ifdef STRTOL_CONST_CHARP
 long
@@ -96,49 +100,49 @@ strtol(register char *str, char **ptr, register int base)
     int xx, neg = 0;
 
     if (ptr != (char **)0)
-	*ptr = (char*)str; /* in case no number is formed */
+        *ptr = (char*)str; /* in case no number is formed */
     if (base < 0 || base > MBASE)
-	return (0); /* base is invalid -- should be a fatal error */
+        return (0); /* base is invalid -- should be a fatal error */
     if (!isalnum(c = *str)) {
-	while (isspace(c))
-		c = *++str;
-	switch (c) {
-	  case '-':
-	    neg++;
-	  case '+': /* fall-through */
-	    c = *++str;
-	}
+        while (isspace(c))
+                c = *++str;
+        switch (c) {
+          case '-':
+            neg++;
+          case '+': /* fall-through */
+            c = *++str;
+        }
     }
     if (base == 0)
-	if (c != '0')
-	    base = 10;
-	else if (str[1] == 'x' || str[1] == 'X')
-	    base = 16;
-	else
-	    base = 8;
+        if (c != '0')
+            base = 10;
+        else if (str[1] == 'x' || str[1] == 'X')
+            base = 16;
+        else
+            base = 8;
     /*
      * for any base > 10, the digits incrementally following
-     *	9 are assumed to be "abc...z" or "ABC...Z"
+     *        9 are assumed to be "abc...z" or "ABC...Z"
      */
     if (!isalnum(c) || (xx = DIGIT(c)) >= base)
-	return (0); /* no number formed */
+        return (0); /* no number formed */
     if (base == 10) {
-	/* accumulate neg avoids surprises near MAXLONG */
-	for (val = '0'-c; isdigit(c = *++str); )
-	    /* multiplication with a constant can be optimized */
-	    val = 10 * val +'0'-c;
+        /* accumulate neg avoids surprises near MAXLONG */
+        for (val = '0'-c; isdigit(c = *++str); )
+            /* multiplication with a constant can be optimized */
+            val = 10 * val +'0'-c;
     } else if (base == 16) {
-	/* str[1] might be '0', thus we must not access str[2] without check. */
-	if (c == '0' && (str[1] == 'x' || str[1] == 'X') && isxdigit(str[2]))
-	    c = *(str += 2); /* skip over leading "0x" or "0X" */
-	for (val = -DIGIT(c); isalnum(c = *++str) && (xx = DIGIT(c)) < 16; )
-	    val = (val << 4) - xx;
+        /* str[1] might be '0', thus we must not access str[2] without check. */
+        if (c == '0' && (str[1] == 'x' || str[1] == 'X') && isxdigit(str[2]))
+            c = *(str += 2); /* skip over leading "0x" or "0X" */
+        for (val = -DIGIT(c); isalnum(c = *++str) && (xx = DIGIT(c)) < 16; )
+            val = (val << 4) - xx;
     } else {
-	for (val = -DIGIT(c); isalnum(c = *++str) && (xx = DIGIT(c)) < base; )
-	    val = base * val - xx;
+        for (val = -DIGIT(c); isalnum(c = *++str) && (xx = DIGIT(c)) < base; )
+            val = base * val - xx;
     }
     if (ptr != (char **)0)
-	*ptr = (char *)str;
+        *ptr = (char *)str;
     return (neg ? val : -val);
 }
 #endif /* STRTOL_BROKEN */
@@ -150,20 +154,20 @@ size_t
 strcspn(char *s, char *set)
 {
     register char *t, *s, c, d;
-	
+
     s = start;
     while (c = *s)
     {
-	t = set;
-	while (d = *t++) {
-	    if (c == d)
-		return s - start;
-	}
-	s++;
+        t = set;
+        while (d = *t++) {
+            if (c == d)
+                return s - start;
+        }
+        s++;
     }
 }
 #endif /* !HAVE_STRCSPN */
-    
+
 /*-------------------------------------------------------------------------*/
 #ifndef HAVE_MEMSET
 
@@ -172,11 +176,11 @@ memset (char *s, int c, size_t n)
 {
 #ifdef HAVE_BZERO
     if(c == 0)
-	bzero(s, n);
+        bzero(s, n);
 #endif
     else {
-	while(--n >= 0)
-	    *s++ = c;
+        while(--n >= 0)
+            *s++ = c;
     }
 }
 
@@ -195,9 +199,9 @@ memmem (char *needle, size_t needlelen, char *haystack, size_t haystacklen)
 
     i = haystacklen - needlelen;
     if (i >= 0) do {
-	if ( !strncmp(needle, haystack, needlelen) )
-	    return haystack;
-	haystack++;
+        if ( !strncmp(needle, haystack, needlelen) )
+            return haystack;
+        haystack++;
     } while (--i >= 0);
     return 0;
 }
@@ -211,17 +215,17 @@ void
 move_memory (char *dest, char *src, size_t n)
 {
     if (!n)
-	return;
+        return;
     if (dest > src) {
-	dest += n;
-	src  += n;
-	do
-	    *--dest = *--src;
-	while (--n);
+        dest += n;
+        src  += n;
+        do
+            *--dest = *--src;
+        while (--n);
     } else {
-	do
-	    *dest++ = *src++;
-	while (--n);
+        do
+            *dest++ = *src++;
+        while (--n);
     }
 }
 #endif /* !HAVE_MEMMOVE */
@@ -264,7 +268,7 @@ exp (double a) /* can't compute anything but exp(-n/900) */
 #endif /* atarist */
 
 /*-------------------------------------------------------------------------*/
-#if !defined(HAVE_GETRUSAGE) && !defined(MSDOS)
+#if !defined(HAVE_GETRUSAGE)
 
 #include <sys/times.h>
 int
@@ -274,12 +278,12 @@ getrusage (int who, struct rusage *rusage)
 
     if (who != RUSAGE_SELF) {
 
-	errno = EINVAL;
-	return -1;
+        errno = EINVAL;
+        return -1;
     }
     if (times(&buffer)==-1) {
-	/* pass errno */
-	return -1;
+        /* pass errno */
+        return -1;
     }
     rusage->ru_utime = buffer.tms_utime;
     rusage->ru_stime = buffer.tms_stime;
@@ -333,36 +337,6 @@ getrusage (int who, struct rusage *rusage) {
 }
 
 #endif /* AMIGA */
-
-/*-----------------------------------------------------------------------*/
-#if defined(MSDOS) && !defined(HAVE_GETRUSAGE)
-
-static long rusage_timer = 0L;
-static long rusage_milliseconds = 0;
-
-void
-init_rusage () {
-    (void)milliseconds(&rusage_timer);
-}
-
-int
-getrusage (int who, struct rusage *rusage)
-{
-    unsigned long offset;
-
-    if (who != RUSAGE_SELF) {
-	errno = EINVAL;
-	return -1;
-    }
-    offset = milliseconds(&rusage_timer);
-    rusage_milliseconds += offset;
-    memset (rusage, 0, sizeof (struct rusage));
-    rusage->ru_utime = rusage_milliseconds;
-    return 0;
-}
-
-#endif /* MSDOS */
-
 
 /***************************************************************************/
 

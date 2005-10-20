@@ -1,9 +1,14 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-/* Should code for the external request demon be included?  */
+/* Should code for the external request demon be included?
+ */
 #define ERQ_DEMON
-#define ERQ_MAX_REPLY 256
+
+/* Maximum sizes for an erq send or reply.
+ */
+#define ERQ_MAX_REPLY 1024
+#define ERQ_MAX_SEND  1024
 
 /* Only executables that are safe no matter what arguments/options
  * are supplied should be placed in ERQ_DIR. If you want something
@@ -59,7 +64,6 @@
  * >100 castles :  10000   (almost 3 hours).
  */
 #define TIME_TO_RESET           1800    /* 30 minutes */
-#define RESET_GRANULARITY        150    /*  2.5 minutes */
 
 /*
  * Define the maximum stack size of the stack machine. This stack will also
@@ -84,8 +88,10 @@
 /*
  * Maximum number of bits in a bit field. They are stored in printable
  * strings, 6 bits per byte.
+ * The limit is more based on considerations of speed than memory
+ * consumption.
  */
-#define MAX_BITS                1200    /* 200 bytes */
+#define MAX_BITS		6144	/* 1 KByte */
 
 /*
  * Define what port number the game is to use.
@@ -202,16 +208,6 @@
 #undef NATIVE_MODE
 #define EUIDS
 
-/* Define OLD_PREVIOUS_OBJECT_BEHAVIOUR if the new behaviour gives problems
- * in your security system.
- */
-#undef OLD_PREVIOUS_OBJECT_BEHAVIOUR
-
-/* Define OLD_EXPLODE_BEHAVIOUR when you want to have explode geared towards a
- * subroutine of parse_command
- */
-#undef OLD_EXPLODE_BEHAVIOUR
-
 /* Define SUPPLY_PARSE_COMMAND if you want the efun parse_command.
  * If you don't need it, better #undef it, lest some new wiz can inadvertly
  * crash your mud or make it leak memory.
@@ -238,19 +234,6 @@
 
 #define MAX_BYTE_TRANSFER       50000
 
-/* Define FLOATS if you want code for the floating-point type
- */
-
-#define FLOATS
-#define TRANSCENDENT_FUNCTIONS
-
-/* Define NO_XVARARGS if you don't want variadic function support */
-/* #define NO_XVARARGS */
-
-/* Define MAPPINGS if you want a mappings */
-
-#define MAPPINGS
-
 /*
  * CATCH_UDP_PORT
  *
@@ -266,21 +249,39 @@
  */
 #define SET_BUFFER_SIZE_MAX    65536
 
+/* Define this macro to get the old reset implementation.
+ * TODO: Get rid of all OLD_RESET code.
+ */
+/* #define OLD_RESET */
+
+#ifdef OLD_RESET
+/* Object reset times are not exact, but instead rounded up to the
+ * next multiple of RESET_GRANULARITY. This should be between 10
+ * and 60 seconds (see otable.c for a more detailed discussion).
+ */
+#define RESET_GRANULARITY          300   /* five minutes */
+#endif
+
 /* Profiling:
  * Define COMM_STAT to gather statistics about the network-io.
  * Define APPLY_CACHE_STAT to gather statistics about the hit/miss-rate
  *  of the apply cache.
- * Define FILE_STAT to gather statistics about the file usage.
  */
 #define COMM_STAT
 #define APPLY_CACHE_STAT
-#define FILE_STAT
 
-/* When smalloc is used without SBRK_OK, MIN_MALLOCED will lower large block
- * fragmentation. The value should be a multiple of the large chunk size.
+/* When smalloc is used without SBRK_OK and MIN_MALLOCED is defined,
+ * the gamedriver will reserve this amount of memory on startup for
+ * large blocks, thus reducing the large block fragmentation. The value
+ * therefore should be a significantly large multiple of the large
+ * chunk size.
  */
+/* #define MIN_MALLOCED	   0x0100000 */
 
-/* #undef  MIN_MALLOCED       0x0100000 */
+/* When smalloc is used, these two values give the upper limits for
+ * large and small block allocation (useful for systems with no
+ * functioning process limit).
+ */
 #define MAX_MALLOCED       0x4000000
 #define MAX_SMALL_MALLOCED 0x1000000
 

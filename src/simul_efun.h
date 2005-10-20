@@ -6,6 +6,7 @@
 #include "exec.h"       /* struct program, struct function */
 #include "interpret.h"  /* struct vector */
 #include "object.h"     /* struct object */
+#include "ptrtable.h"
 
 extern struct function *simul_efunp;
 extern struct object *simul_efun_object;
@@ -21,7 +22,7 @@ extern void count_simul_efun_refs PROT((void));
 #endif /* MALLOC_smalloc */
 
 #ifdef DEBUG
-extern void count_simul_efun_extra_refs PROT((void));
+extern void count_simul_efun_extra_refs PROT((struct pointer_table *ptable));
 #endif
 
 #endif  /* __SIMUL_EFUN_H__ */

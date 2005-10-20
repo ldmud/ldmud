@@ -1,13 +1,17 @@
-SUBDIRS = indent make_docs
+SUBDIRS = indent make_docs xerq
 SED = sed
 #CFLAGS = -O
 CFLAGS = -g
 BINDIR=/user/mud/bin
 
-all:	$(SUBDIRS) fundesc
+all:	subs erq fundesc
 
-$(SUBDIRS): FORCE
-	cd $@; $(MAKE)
+subs:
+	for i in $(SUBDIRS) ;\
+	do \
+	(cd $$i ; echo "Making $$i." ;\
+	$(MAKE) );\
+	done
 
 FORCE: install
 
@@ -27,11 +31,11 @@ install: erq fundesc
 	for i in $(SUBDIRS) ;\
 	do \
 	(cd $$i ; echo "Installing in $$i." ;\
-	$(MAKE) $(MFLAGS) install);\
+	$(MAKE) $(MFLAGS) BINDIR=$(BINDIR) install);\
 	done
 
 clean:
-	-rm -f *.o fundesc erq
+	-rm -f *.o fundesc erq *~
 	for i in $(SUBDIRS) ;\
 	do \
 	(cd $$i ; echo "Cleaning in $$i." ;\

@@ -76,9 +76,9 @@ diff -cp --recursive gcc-2.7.0/ChangeLog gcc-2.7.0-x/ChangeLog
 + Sat Jul  8 10:33:59 1995  J"orn Rennecke  (amylaar@meolyon.hanse.de)
 + 	* New optimization option -fomit-default-branch . Most of it
 + 	is in expand_end_case(). Doc in gcc.1
-+ 
++
   Fri Jun 16 06:54:03 1995  Richard Kenner  (kenner@vlsi1.ultra.nyu.edu)
-  
+
   	* alpha.c (alpha_builtin_saveregs): Use ptr_mode and conversions
 diff -cp --recursive gcc-2.7.0/expr.c gcc-2.7.0-x/expr.c
 *** gcc-2.7.0/expr.c	Sat Jul  8 01:56:19 1995
@@ -86,17 +86,17 @@ diff -cp --recursive gcc-2.7.0/expr.c gcc-2.7.0-x/expr.c
 *************** do_store_flag (exp, target, mode, only_c
 *** 9888,9896 ****
      index value is out of range.  */
-  
+
   void
 ! do_tablejump (index, mode, range, table_label, default_label)
        rtx index, range, table_label, default_label;
        enum machine_mode mode;
   {
     register rtx temp, vector;
-  
+
 --- 9888,9897 ----
      index value is out of range.  */
-  
+
   void
 ! do_tablejump (index, mode, range, table_label, default_label, default_dropped)
        rtx index, range, table_label, default_label;
@@ -104,36 +104,36 @@ diff -cp --recursive gcc-2.7.0/expr.c gcc-2.7.0-x/expr.c
 +      int default_dropped;
   {
     register rtx temp, vector;
-  
+
 *************** do_tablejump (index, mode, range, table_
 *** 9902,9909 ****
        or equal to the minimum value of the range and less than or equal to
        the maximum value of the range.  */
-  
+
 !   emit_cmp_insn (index, range, GTU, NULL_RTX, mode, 1, 0);
 !   emit_jump_insn (gen_bgtu (default_label));
-  
+
     /* If index is in range, it must fit in Pmode.
        Convert to Pmode so we can index with it.  */
 --- 9903,9913 ----
        or equal to the minimum value of the range and less than or equal to
        the maximum value of the range.  */
-  
+
 !   if (!default_dropped)
 !     {
 !       emit_cmp_insn (index, range, GTU, NULL_RTX, mode, 1, 0);
 !       emit_jump_insn (gen_bgtu (default_label));
 !     }
-  
+
     /* If index is in range, it must fit in Pmode.
        Convert to Pmode so we can index with it.  */
 diff -cp --recursive gcc-2.7.0/expr.h gcc-2.7.0-x/expr.h
 *** gcc-2.7.0/expr.h	Sat Jul  8 01:56:20 1995
 --- gcc-2.7.0-x/expr.h	Sat Jul  8 06:09:43 1995
-*************** extern rtx compare_from_rtx PROTO((rtx, 
+*************** extern rtx compare_from_rtx PROTO((rtx,
 *** 712,718 ****
   				   enum machine_mode, rtx, int));
-  
+
   /* Generate a tablejump instruction (used for switch statements).  */
 ! extern void do_tablejump PROTO((rtx, enum machine_mode, rtx, rtx, rtx));
   
@@ -141,7 +141,7 @@ diff -cp --recursive gcc-2.7.0/expr.h gcc-2.7.0-x/expr.h
   /* rtl.h and tree.h were included.  */
 --- 712,718 ----
   				   enum machine_mode, rtx, int));
-  
+
   /* Generate a tablejump instruction (used for switch statements).  */
 ! extern void do_tablejump PROTO((rtx, enum machine_mode, rtx, rtx, rtx, int));
   
@@ -153,16 +153,16 @@ diff -cp --recursive gcc-2.7.0/flags.h gcc-2.7.0-x/flags.h
 *************** extern int flag_delayed_branch;
 *** 299,304 ****
 --- 299,311 ----
-  
+
   extern int flag_short_temps;
-  
+
 + /* Nonzero means that the type passed to a switch should be used for
 +    optimization.  This makes switching on an uninitialized variable or
 +    on an out-of-range enum value have undefined effects, but it saves
 +    a comparison and a branch when it comes into effect.			  */
-+ 
++
 + extern int flag_drop_default_branch;
-+ 
++
   /* Nonzero means pretend it is OK to examine bits of target floats,
      even if that isn't true.  The resulting code will have incorrect constants,
      but the same series of instructions that the native compiler would make.  */
@@ -218,7 +218,7 @@ diff -cp --recursive gcc-2.7.0/stmt.c gcc-2.7.0-x/stmt.c
   	{
   	  int win = 0;
 + 	  int default_dropped = 0;
-+ 
++
 + 	  if (flag_drop_default_branch)
 + 	    {
 + 	      /* If the range of case labels is larger than the range of the
@@ -231,9 +231,9 @@ diff -cp --recursive gcc-2.7.0/stmt.c gcc-2.7.0-x/stmt.c
 + 		 If the former range is smaller than the latter, we can't
 + 		 optimize the branch out. Alas, we may grow the range of
 + 		 case labels slightly to make it fit.			    */
-+ 
++
 + 	      tree orig_type, type_min, type_max, missing, nocheck_range;
-+ 
++
 + 	      orig_type = TREE_TYPE(orig_index);
 + 	      type_min = TYPE_MIN_VALUE(orig_type);
 + 	      type_max = TYPE_MAX_VALUE(orig_type);
@@ -287,7 +287,7 @@ diff -cp --recursive gcc-2.7.0/stmt.c gcc-2.7.0-x/stmt.c
   		}
 *************** expand_end_case (orig_index)
 *** 4960,4966 ****
-  
+
   	      do_tablejump (index, TYPE_MODE (index_type),
   			    expand_expr (range, NULL_RTX, VOIDmode, 0),
 ! 			    table_label, default_label);
@@ -295,7 +295,7 @@ diff -cp --recursive gcc-2.7.0/stmt.c gcc-2.7.0-x/stmt.c
   	    }
   #endif
 --- 5006,5012 ----
-  
+
   	      do_tablejump (index, TYPE_MODE (index_type),
   			    expand_expr (range, NULL_RTX, VOIDmode, 0),
 ! 			    table_label, default_label, default_dropped);
@@ -308,11 +308,11 @@ diff -cp --recursive gcc-2.7.0/toplev.c gcc-2.7.0-x/toplev.c
 *************** int flag_delayed_branch;
 *** 462,467 ****
 --- 462,469 ----
-  
+
   int flag_short_temps;
-  
+
 + int flag_drop_default_branch;
-+ 
++
   /* Nonzero if we are compiling pure (sharable) code.
      Value is 1 if we are doing reasonable (i.e. simple
      offset into offset table) pic.  Value is 2 if we can

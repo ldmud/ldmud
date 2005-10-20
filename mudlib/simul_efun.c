@@ -450,7 +450,7 @@ void cindent(string name)
  * Arguments:     arr: The array
  *		  from: Index from which to delete elements
  *		  to: Last index to be deleted.
- * Returns:       
+ * Returns:
  */
 public mixed *
 exclude_array(mixed *arr, int from, int to)
@@ -480,7 +480,7 @@ public mixed * exclude_element (mixed *arr, int index) {
  * Function name: all_environment
  * Description:   Gives an array of all containers which an object is in, i.e.
  *		  match in matchbox in bigbox in chest in room, would for the
- *		  match give: matchbox, bigbox, chest, room 
+ *		  match give: matchbox, bigbox, chest, room
  * Arguments:     ob: The object
  * Returns:       The array of containers.
  */
@@ -488,7 +488,7 @@ public object *
 all_environment(object ob)
 {
   object *r;
-  
+
   if (!ob || !environment(ob)) return 0;
   if (!environment(environment(ob)))
       return ({ environment(ob) });
@@ -528,8 +528,8 @@ break_string(string str, int width, int indent)
 	indstr = "";
     gCol = indent;
     brkarg = ({ width, indstr });
-  
-    return indstr + 
+
+    return indstr +
 	implode(map_array(explode(str+" "," "),"brk",this_object(),brkarg)," ");
 }
 
@@ -548,7 +548,7 @@ static string brk(string word, mixed *width_indstr)
 	gCol += strlen(word) + 1;
 	return word;
     }
-}    
+}
 
 /*
  * Function name:   update_actions
@@ -587,7 +587,7 @@ static void dump_elem(mixed sak, string tab);
  * Description:   Dumps a variable with write() for debugging purposes.
  * Arguments:     a: Anything including an array
  */
-public varargs void 
+public varargs void
 dump_array(mixed *a, string tab)
 {
   int n,m;

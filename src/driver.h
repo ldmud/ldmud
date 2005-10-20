@@ -19,8 +19,8 @@
 #define MASTER_NAME "obj/master"
 #else
 #define MASTER_NAME "secure/master"
-#endif  
-#endif  
+#endif
+#endif
 
 #if defined(NATIVE_MODE) && !defined(EUIDS)
 #define EUIDS
@@ -30,18 +30,22 @@
 #undef MAXNUMPORTS
 #endif
 
+#if !defined(CATCH_UDP_PORT)
+#undef UDP_SEND
+#endif
+
 #include "machine.h"
 #include "port.h"
 
 /* TODO: this ctype-stuff might go into lex.h (impl in efun_defs.c) */
 #define _MCTe 0x01 /* escaped character in save/restore object. */
-#define _MCTd 0x02 /* numeric digit		*/
+#define _MCTd 0x02 /* numeric digit                */
 
 
-#define _MCTs 0x10 /* whitespace EXCLUDING '\n'	*/
+#define _MCTs 0x10 /* whitespace EXCLUDING '\n'        */
 
-#define _MCTx 0x40 /* hexadecimal		*/
-#define _MCTa 0x80 /* alphanumeric or '_' 	*/
+#define _MCTx 0x40 /* hexadecimal                */
+#define _MCTa 0x80 /* alphanumeric or '_'         */
 extern unsigned char _my_ctype[];
 #define isescaped(c) (_my_ctype[(unsigned char)(c)]&_MCTe)
 #define isalunum( c) (_my_ctype[(unsigned char)(c)]&_MCTa)
@@ -65,46 +69,46 @@ extern unsigned char _my_ctype[];
 #    endif
 #    undef calloc
 #    ifdef SBRK_OK
-#        define amalloc         malloc
-#        define afree           free
+#        define amalloc  malloc
+#        define afree    free
 #    else  /* SBRK_OK */
-         POINTER amalloc PROT((size_t));
-         POINTER smalloc_calloc PROT((size_t, size_t));
-         FREE_RETURN_TYPE afree PROT((POINTER));
+         POINTER amalloc(size_t);
+         POINTER smalloc_calloc(size_t, size_t);
+         FREE_RETURN_TYPE afree(POINTER);
 #        ifndef SMALLOC
-#          define malloc  amalloc
+#            define malloc  amalloc
 #        endif
 #        define calloc  smalloc_calloc
 #        define free    afree
 #    endif /* SBRK_OK */
-     void xfree PROT((POINTER));
-     POINTER rexalloc PROT((POINTER, size_t));
+     void xfree(POINTER);
+     POINTER rexalloc(POINTER, size_t);
 #    if MALLOC_ALIGN > SIZEOF_P_INT || FREE_NULL_POINTER
 #        define PFREE_RETURN_TYPE void
 #        define PFREE_RETURN return;
-         PFREE_RETURN_TYPE pfree PROT((POINTER));
+         PFREE_RETURN_TYPE pfree(POINTER);
 #    else  /* MALLOC_ALIGN */
 #        define PFREE_RETURN_TYPE FREE_RETURN_TYPE
 #        define PFREE_RETURN FREE_RETURN
 #        define pfree  afree
 #    endif /* MALLOC_ALIGN */
-     POINTER permanent_xalloc PROT((size_t));
-     PFREE_RETURN_TYPE pfree PROT((POINTER));
+     POINTER permanent_xalloc(size_t);
+     PFREE_RETURN_TYPE pfree(POINTER);
 #else  /* MALLOC_smalloc && !MAKE_FUNC */
-#    define xfree free
-#    define rexalloc realloc
-#    define amalloc         xalloc
+#    define xfree            free
+#    define rexalloc         realloc
+#    define amalloc          xalloc
 #    define permanent_xalloc xalloc
-#    define afree           free
-#    define pfree		free
+#    define afree            free
+#    define pfree            free
 #endif /* MALLOC_smalloc && !MAKE_FUNC */
 
 #if defined(MALLOC_smalloc) && defined(SMALLOC_TRACE)
 #    define xalloc(size) (smalloc((size), __FILE__, __LINE__))
-     POINTER smalloc PROT((size_t, char *, int));
+     POINTER smalloc(size_t, char *, int);
 #endif /* SMALLOC_TRACE */
 #ifndef xalloc
-     POINTER xalloc PROT((size_t));
+     POINTER xalloc(size_t);
 #endif
 
 /* TODO: MALLOC_* -> malloc.h */

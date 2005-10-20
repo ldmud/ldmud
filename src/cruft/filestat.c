@@ -1,9 +1,8 @@
 /*---------------------------------------------------------------------------
  * File Statistics
  *
- * Copyright (C) 1998 by Lars Duening.
  *---------------------------------------------------------------------------
- * This module counts the usage of files by the mud, separated into normal 
+ * This module counts the usage of files by the mud, separated into normal
  * reading and writing, compiling and inheriting, and save/restore objects.
  * Also counted are the total number of usages ('total'), the number of first
  * uses within the current heart beat interval ('tick'), and the number of
@@ -24,6 +23,8 @@
 #if defined(FILE_STAT)
 
 #include <stdio.h>
+
+#define NO_INCREMENT_STRING_REF
 
 #include "filestat.h"
 
@@ -164,7 +165,7 @@ fstat_status (void)
     sprintf(buf, "Table uses %lu bytes of memory.\n", iNumFiles * sizeof(filestat));
     add_message(buf);
     add_message("\nAppending detailed statistics to /FILESTAT...\n");
-    
+
     fputs("File Usage statistic:\n", f);
     fputs("---------------------\n", f);
     fprintf(f, "%lu files used %lu times in %lu commands/%ld backend loops.\n"

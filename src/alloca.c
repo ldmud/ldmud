@@ -6,7 +6,7 @@
  *---------------------------------------------------------------------------
  * This implementation of the PWB library alloca() function,
  * which is used to allocate space off the run-time stack so
- * that it is automatically reclaimed upon procedure exit, 
+ * that it is automatically reclaimed upon procedure exit,
  * was inspired by discussions with J. Q. Johnson of Cornell.
  *
  * It should work under any C implementation that uses an
@@ -14,6 +14,14 @@
  * frames).  There are some preprocessor constants that can
  * be defined when compiling for your specific system, for
  * improved efficiency; however, the defaults should be okay.
+ *
+ * CAVEAT: Modern C compilers often recognize uses of alloca() and
+ *   generate special code instead of a normal function call. To
+ *   turn off this feature (and thus make use of this alloca()
+ *   implementation), you can try doing the following things:
+ *     - define C_ALLOCA when compiling your program
+ *     - make sure the compiler sees the prototype for alloca()
+ *     - don't include <alloca.h>
  *
  * The general concept of this implementation is to keep
  * track of all alloca()-allocated blocks, and reclaim any
@@ -29,6 +37,8 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+
+extern void * alloca(size_t size);
 
 typedef void *pointer;  /* generic pointer type */
 
@@ -54,12 +64,12 @@ typedef void *pointer;  /* generic pointer type */
 
 #    define STACK_DIR  STACK_DIRECTION  /* known at compile-time */
 
-#else	/* STACK_DIRECTION == 0; need run-time code */
+#else /* STACK_DIRECTION == 0; need run-time code */
 
 static int stack_dir;                   /* 1 or -1 once known */
 #    define STACK_DIR stack_dir
 
-#endif	/* STACK_DIRECTION == 0 */
+#endif /* STACK_DIRECTION == 0 */
 
 /*-------------------------------------------------------------------------*/
 
@@ -71,18 +81,18 @@ static int stack_dir;                   /* 1 or -1 once known */
  * alignment chunk size.  The following default should work okay.
  */
 
-#ifndef	ALIGN_SIZE
+#ifndef ALIGN_SIZE
 #  define  ALIGN_SIZE  sizeof(double)  /* it's a guess */
 #endif
 
 typedef union hdr
 {
-  char	align[ALIGN_SIZE];	/* to force sizeof(header) */
+  char   align[ALIGN_SIZE];      /* to force sizeof(header) */
   struct
-    {
-      union hdr *next;		/* for chaining headers */
-      char *deep;		/* for stack depth measure */
-    } h;
+  {
+      union hdr *next;           /* for chaining headers */
+      char *deep;                /* for stack depth measure */
+  } h;
 } header;
 
 static header *last_alloca_header = NULL; /* -> last alloca header */
@@ -98,24 +108,24 @@ find_stack_direction (void)
  */
 
 {
-  static char	*addr = NULL;	/* address of first
-				   `dummy', once known */
-  auto char	dummy;		/* to get stack address */
+    static char *addr = NULL;  /* address of first `dummy', once known */
+    auto char    dummy;        /* to get stack address */
 
-  if (addr == NULL)
-    {				/* initial entry */
-      addr = &dummy;
 
-      find_stack_direction ();	/* recurse once */
+    if (addr == NULL) /* initial entry */
+    {
+        addr = &dummy;
+
+        find_stack_direction ();        /* recurse once */
     }
-  else				/* second entry */
+    else              /* second entry */
     if (&dummy > addr)
-      stack_dir = 1;		/* stack grew upward */
+        stack_dir = 1;                  /* stack grew upward */
     else
-      stack_dir = -1;		/* stack grew downward */
+        stack_dir = -1;                 /* stack grew downward */
 }
 
-#endif	/* STACK_DIRECTION == 0 */
+#endif /* STACK_DIRECTION == 0 */
 
 /*-------------------------------------------------------------------------*/
 pointer
@@ -137,55 +147,57 @@ alloca (size_t size)
  */
 
 {
-  auto char	probe;		/* probes stack depth: */
-  register char	*depth = &probe;
+    auto char        probe;                /* probes stack depth: */
+    register char   *depth = &probe;
 
 #if STACK_DIRECTION == 0
-  if (STACK_DIR == 0)		/* unknown growth direction */
-    find_stack_direction ();
+    if (STACK_DIR == 0)  /* unknown growth direction */
+        find_stack_direction ();
 #endif
 
-  /* Reclaim garbage, defined as all alloca()ed storage that
-     was allocated from deeper in the stack than currently. */
+    /* Reclaim garbage, defined as all alloca()ed storage that
+     * was allocated from deeper in the stack than currently.
+     */
 
-  {
-    register header	*hp;	/* traverses linked list */
+    {
+        register header *hp;   /* traverses linked list */
 
-    for (hp = last_alloca_header; hp != NULL;)
-      if (STACK_DIR > 0 && hp->h.deep > depth
-	  || STACK_DIR < 0 && hp->h.deep < depth)
-	{
-	  register header	*np = hp->h.next;
+        for (hp = last_alloca_header; hp != NULL;)
+            if (STACK_DIR > 0 && hp->h.deep > depth
+             || STACK_DIR < 0 && hp->h.deep < depth)
+            {
+                register header        *np = hp->h.next;
 
-	  free ((pointer) hp);	/* collect garbage */
+                free ((pointer) hp);  /* collect garbage */
+                hp = np;              /* -> next header */
+            }
+            else
+                break;               /* rest are not deeper */
 
-	  hp = np;		/* -> next header */
-	}
-      else
-	break;			/* rest are not deeper */
+        last_alloca_header = hp;  /* -> last valid storage */
+    }
 
-    last_alloca_header = hp;	/* -> last valid storage */
-  }
+    if (size == 0)
+    {
+        return NULL;  /* no allocation required */
+    }
 
-  if (size == 0)
-    return NULL;		/* no allocation required */
+    /* Allocate combined header + user data storage. */
 
-  /* Allocate combined header + user data storage. */
+    {
+        register pointer new = malloc (sizeof (header) + size);
+        /* address of header */
+        if (!new) { fprintf(stderr,"alloca: failed!"); return NULL; }
 
-  {
-    register pointer	new = malloc (sizeof (header) + size);
-    /* address of header */
-    if (!new) { fprintf(stderr,"alloca: failed!"); return NULL; }
+        ((header *)new)->h.next = last_alloca_header;
+        ((header *)new)->h.deep = depth;
 
-    ((header *)new)->h.next = last_alloca_header;
-    ((header *)new)->h.deep = depth;
+        last_alloca_header = (header *)new;
 
-    last_alloca_header = (header *)new;
+        /* User storage begins just after header. */
 
-    /* User storage begins just after header. */
-
-    return (pointer)((char *)new + sizeof(header));
-  }
+        return (pointer)((char *)new + sizeof(header));
+    }
 }
 
 /***************************************************************************/

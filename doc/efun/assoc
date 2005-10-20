@@ -1,29 +1,41 @@
-mixed assoc(mixed key, mixed *keys, mixed *|void data_or_fail, mixed|void fail);
+SYNOPSIS
+	int   assoc (mixed key, mixed *keys)
+	mixed assoc (mixed key, mixed *alist [, mixed fail] )
+	mixed assoc (mixed key, mixed *keys, mixed *data [, mixed fail] )
 
-Searches a key in an alist.
+DESCRIPTION
+	All invocation forms search for a <key> in an <alist> (an array
+        of two equal-sized arrays) or in an ordered array <keys>.
+	An attempt to search in any other structure will yield an
+	unpredictable result.
 
-Three modes of calling:
-   i ) With exactly two arguments, the second being an array which's first
-       element is no array.
-       In this case the entire array is searched for the key; -1 is returned
-	 if not found, else the index ( like member_array, but faster ).
+	Complexity: O( lg(n) ) , where n is the number of keys.
 
-   ii) With two or three arguments, the second being an array which's first
-       element is an array.
-       The array has to have a second element of the same size;
-       the key is searched in the first and the associated element of the
-       second array that is element of second argument is returned if succesful;
-       if not, 0 is returned, or the third argument, if given.
 
-   iii) With three or four arguments, the second being an array of keys
-	( first element no array ) and the second is a matching data array.
-	returns 0 or fourth argument ( if given ) for failure,
-	or the matching entry in the array given as third argument for success.
+	1. Form: Key Search
 
-Complexity : O( lg(n) ) , where n is the number of keys.
+	  <key> is searched in the array <keys>, result is the index at
+	  which <key> was found. If it isn't found, -1 is returned.
 
-Return value is undefined if another list is given in place of a presorted
-key list.
 
-See also: LPC/alists order_alist insert_alist
+	2. Form: Alist Lookup
+
+	  <key> is searched in the <alist>, result is the data associated
+	  with <key> if it is found. If it isn't found, the result
+	  will be 0, or <fail> if specified.
+
+
+	3. Form: Ordered List Lookup
+
+	  <key> is searched in the array <keys>, the index at which it
+	  is found is as index into <data> to get the return value.
+	  If <key> is not found, the reuslt will be 0, or <fail> if
+	  specified.
+
+	  For this to be useful, <data> has to be ordered so that
+	  it matches <key>. This form of lookup is therefore used
+	  primarily with multidimensional alists.
+
+SEE ALSO
+	alists(LPC), insert_alist(E), order_alist(E)
 

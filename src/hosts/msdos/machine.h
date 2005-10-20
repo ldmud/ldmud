@@ -164,6 +164,9 @@
 /* Define if you have the <string.h> header file.  */
 #define HAVE_STRING_H 1
 
+/* Define if you have the <sys/param.h> header file. */
+/* #undef HAVE_SYS_PARAM_H */
+
 /* Define if you have the <sys/rusage.h> header file.  */
 /* #undef HAVE_SYS_RUSAGE_H */
 

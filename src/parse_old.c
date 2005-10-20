@@ -42,7 +42,7 @@
 
   Left to do 910723:
 
-  Fix so alternatives possible after %s in a pattern 
+  Fix so alternatives possible after %s in a pattern
 
 */
 /*
@@ -50,53 +50,53 @@
 
 int parse_command(string,ob/arr,string,destargs...)
 
-	parse		Returns 1 if pattern matches
+        parse                Returns 1 if pattern matches
 
-	string		Given command
-	ob/arr		if arr 
-				array holding the accessible objects
-			if ob
-				object from which to recurse and create
-				the list of accessible objects, normally
-				ob = environment(this_player())
-	string		Parsepattern as list of words and formats:
-			Example string = " 'get' / 'take' %i "
-			Syntax:
-				'word' 		obligatory text
-				[word]		optional text
-				/		Alternative marker
-				%o		Single item, object
-				%l		Single living object
-				%s		Any text
-				%w              Any word
-				%p		Preposition
-				%i		Any items
-				%d              Number 0- or tx(0-99)
+        string                Given command
+        ob/arr                if arr
+                                array holding the accessible objects
+                        if ob
+                                object from which to recurse and create
+                                the list of accessible objects, normally
+                                ob = environment(this_player())
+        string                Parsepattern as list of words and formats:
+                        Example string = " 'get' / 'take' %i "
+                        Syntax:
+                                'word'                 obligatory text
+                                [word]                optional text
+                                /                Alternative marker
+                                %o                Single item, object
+                                %l                Single living object
+                                %s                Any text
+                                %w              Any word
+                                %p                Preposition
+                                %i                Any items
+                                %d              Number 0- or tx(0-99)
 
-	destargs	This is the list of result variables as in sscanf
-			One variable is needed for each %_
-			The return types of different %_ is:
-			%o	Returns an object
-			%l	Returns an object
-			%s	Returns a string of words
-			%w      Returns a string of one word
-			%p	Can on entry hold a list of word in array
-				or an empty variable
-				Returns:
-				   if empty variable: a string
-				   if array: array[0]=matched word
-			%i	Returns a special array on the form:
-				[0] = (int) +(wanted) -(order) 0(all)
-				[1..n] (object) Objectpointers
-			%d      Returns a number
-			
+        destargs        This is the list of result variables as in sscanf
+                        One variable is needed for each %_
+                        The return types of different %_ is:
+                        %o        Returns an object
+                        %l        Returns an object
+                        %s        Returns a string of words
+                        %w      Returns a string of one word
+                        %p        Can on entry hold a list of word in array
+                                or an empty variable
+                                Returns:
+                                   if empty variable: a string
+                                   if array: array[0]=matched word
+                        %i        Returns a special array on the form:
+                                [0] = (int) +(wanted) -(order) 0(all)
+                                [1..n] (object) Objectpointers
+                        %d      Returns a number
+
 Example:
 
  parse_command("take apple",environment(this_player()),
  " 'get' / 'take' %i ",items);
 
 
-*/ 
+*/
 
 /* Hardcoded function names to call in LPC objects
 */
@@ -224,7 +224,7 @@ static int makeobjlist (alist, src)
 /* Return number of objects in the list
 */
 static int itnumalt()
-{ 
+{
   int ant;
   struct altern_objects *ao;
 
@@ -237,10 +237,10 @@ static int itnumalt()
 }
 
 /* Return a pointer to the numbered element of the list
-*/ 
+*/
 static OBJECT *italt (a)
     int a;
-{ 
+{
   int ant;
   struct altern_objects *ao;
 
@@ -267,7 +267,7 @@ static void italt_new ()
   while (ao) {
     ao=ao->next;
     free_object(ao2->ao_obj,"parse->italt_new()");
-    xfree((char *)ao2); 
+    xfree((char *)ao2);
     ao2=ao;
   }
 }
@@ -293,7 +293,7 @@ static void italt_put (obj)
     old=ao; ao=ao->next;
   }
   ao=(struct altern_objects *) xalloc(sizeof(struct altern_objects));
-  if (old) old->next=ao; 
+  if (old) old->next=ao;
   else gPobjects=ao;
   ao->ao_obj=obj; ao->next=0;
   add_ref(obj,"parse->italt_put()");
@@ -310,7 +310,7 @@ static char *getfirst (cmd)
   char ch,*st;
 
   st= *cmd; strcpy(gFword,""); if (st[0]==0) return gFword;
-  ch=' '; pos=0; inqoute=0; 
+  ch=' '; pos=0; inqoute=0;
   while ((st[0]<=' ') && (st[0])) st++; /* Skip leading spaces */
   if ((st[0]=='\'') || (st[0]=='[')) {
     inqoute=1; ch=st[0]; gFword[0]=st[0]; pos=1; st++;
@@ -335,7 +335,7 @@ static char *lookfirst (cmd)
     char *cmd;
 {
   return getfirst(&cmd);
-}     
+}
 
 /* Call object function in LPC
 */
@@ -345,7 +345,7 @@ static int call_obj (fnamn, on, apa)
     char *apa;
 {
   struct svalue *ret;
-  
+
   if (gDebug) fprintf(stderr,"Calling %s in %s with %s\n",fnamn,on->name,apa);
   push_volatile_string(apa);
   ret = apply(fnamn,on,1);
@@ -384,7 +384,7 @@ static char *singfix (str)
   if (EQ(str,"sheep")) return "sheep";
   return str;
 }
-    
+
 /* Checks with obj in gOblist to see if it accepts all gAdjectives in adjs
    Used when name of object not known, i.e cmds like: 'get all the red ones'
    if func QADJFUNC doesn't exist in obj last word of QSHORTFUNC is used
@@ -405,11 +405,11 @@ static int matchadjective (adjs)
     sp=adjs;
     while ((on) && (sp) && (*sp)) {
       while (*sp==' ') sp++;
-      sp2=strchr(sp,' ');  
+      sp2=strchr(sp,' ');
       if (sp2) {
-	*sp2=0;
-	strcpy(ad,sp); *sp2=' '; sp=sp2;
-	if (!call_obj(QADJFUNC,on,ad)) on=0; /* Not ok */
+        *sp2=0;
+        strcpy(ad,sp); *sp2=' '; sp=sp2;
+        if (!call_obj(QADJFUNC,on,ad)) on=0; /* Not ok */
       }
       sp=sp2;
     }
@@ -418,10 +418,10 @@ static int matchadjective (adjs)
       on=ao->ao_obj;
       ret = apply(QSHORTFUNC,on,0);
       if (ret && ret->type==T_STRING) {
-	sp=ret->u.string; sp2=backstrchr(sp,' ');
-	if (sp2) sp=sp2;
-	sprintf(tot,"%s%s",adjs,sp); lowercase(tot);
-	if (!call_obj(QIDFUNC,on,tot)) on=0;
+        sp=ret->u.string; sp2=backstrchr(sp,' ');
+        if (sp2) sp=sp2;
+        sprintf(tot,"%s%s",adjs,sp); lowercase(tot);
+        if (!call_obj(QIDFUNC,on,tot)) on=0;
       }
       else on=0;
     }
@@ -441,14 +441,14 @@ static int check_for_general (onam, plur)
   static char* plurpron[] = {"those","them","these","ones","$"};
   static char* singpron[] = {"this","one","it","$"};
   int ilop;
-  
+
   if (EMPTY(onam)) return 0;
   if (plur) {
-    ilop=0; 
+    ilop=0;
     while (!EQ(plurpron[ilop],"$")) if (EQ(plurpron[ilop++],onam)) return 1;
   }
   else {
-    ilop=0; 
+    ilop=0;
     while (!EQ(singpron[ilop],"$")) if (EQ(singpron[ilop++],onam)) return 1;
   }
   return 0;
@@ -459,13 +459,13 @@ static int order_num (wd)
 { /* Only positive numbers and zero */
 
   static char *onums[] = {"first","second","third","fourth","fifth","sixth",
-		  "seventh","eighth","nineth","tenth",
-		  "eleventh","twelfth","thirteenth","fourteenth","fifteenth","sixteenth",
-		  "seventeenth","eighteenth","nineteenth","dummy"};
+                  "seventh","eighth","nineth","tenth",
+                  "eleventh","twelfth","thirteenth","fourteenth","fifteenth","sixteenth",
+                  "seventeenth","eighteenth","nineteenth","dummy"};
   static char *onumt[] = {"twenty","thirty","forty","fifty","sixty","seventy",
-		  "eighty","ninety"};
+                  "eighty","ninety"};
   static char *onumta[] = {"twentieth","thirtieth","fortieth","fiftieth","sixtieth","seventieth",
-		  "eightieth","ninetieth"};
+                  "eightieth","ninetieth"};
 
   char ns[KLUDGELEN];
 
@@ -477,10 +477,10 @@ static int order_num (wd)
   }
   for (nm=0;nm<8;nm++) for (ilop=0;ilop<9;ilop++) {
     if (ilop>0) {
-	sprintf(ns,"%s%s",onumt[nm],onums[ilop-1]);
-	if (EQ(ns,wd)) return 20+nm*10+(ilop);
+        sprintf(ns,"%s%s",onumt[nm],onums[ilop-1]);
+        if (EQ(ns,wd)) return 20+nm*10+(ilop);
     } else
-	if (EQ(onumta[nm],wd)) return 20+nm*10+(ilop);
+        if (EQ(onumta[nm],wd)) return 20+nm*10+(ilop);
   }
   return -1;
 }
@@ -490,11 +490,11 @@ static int numeric (wd)
 { /* Only positive numbers and zero */
 
   static char *nums[] = {"one","two","three","four","five","six",
-		  "seven","eight","nine","ten",
-		  "eleven","twelve","thirteen","fourteen","fifteen","sixteen",
-		  "seventeen","eighteen","nineteen"};
+                  "seven","eight","nine","ten",
+                  "eleven","twelve","thirteen","fourteen","fifteen","sixteen",
+                  "seventeen","eighteen","nineteen"};
   static char *numt[] = {"twenty","thirty","forty","fifty","sixty","seventy",
-		  "eighty","ninety"};
+                  "eighty","ninety"};
 
   char ns[KLUDGELEN];
 
@@ -506,11 +506,11 @@ static int numeric (wd)
   for (ilop=1;ilop<20;ilop++) if (EQ(nums[ilop-1],wd)) return ilop;
   for (nm=0;nm<8;nm++) for (ilop=0;ilop<9;ilop++) {
     if (ilop>0) {
-	sprintf(ns,"%s%s",numt[nm],nums[ilop-1]);
-	if (EQ(ns,wd)) return 20+nm*10+(ilop);
+        sprintf(ns,"%s%s",numt[nm],nums[ilop-1]);
+        if (EQ(ns,wd)) return 20+nm*10+(ilop);
     }
     else
-	if (EQ(numt[nm],wd)) return 20+nm*10+(ilop);
+        if (EQ(numt[nm],wd)) return 20+nm*10+(ilop);
   }
   return -1;
 }
@@ -521,25 +521,25 @@ static int numeric (wd)
 static OBJECT *matchobject2 (cmd, plur)
     char **cmd;
     int plur;
-{ 
+{
   OBJECT *on;
   struct altern_objects *ao;
   char *st,*ocmd,totname[2*KLUDGELEN],tot2[2*KLUDGELEN];
 
   ocmd= *cmd; strcpy(gAdjective,"");
-  st=lowercase(getfirst(cmd)); 
+  st=lowercase(getfirst(cmd));
   while (st[0]) {
     if (check_for_general(st,plur)) {
       if (matchadjective(gAdjective)) return italt(1);
     }
     sprintf(totname,"%s%s",gAdjective,st);
     if (plur) sprintf(tot2,"%s%s",gAdjective,singfix(st));
-    ao=gOblist; 
+    ao=gOblist;
     while (ao) {
       on=0;
       if (plur) {
-	if (call_obj(QPLURIDFUNC,ao->ao_obj,totname)) on=ao->ao_obj;
-	else if (call_obj(QIDFUNC,ao->ao_obj,tot2)) on=ao->ao_obj;
+        if (call_obj(QPLURIDFUNC,ao->ao_obj,totname)) on=ao->ao_obj;
+        else if (call_obj(QIDFUNC,ao->ao_obj,tot2)) on=ao->ao_obj;
       }
       else if (call_obj(QIDFUNC,ao->ao_obj,totname)) on=ao->ao_obj;
       if (on) italt_put(on);
@@ -547,7 +547,7 @@ static OBJECT *matchobject2 (cmd, plur)
     }
     if (!itnumalt()) {
       strcat(gAdjective,st); strcat(gAdjective," ");
-      st=lowercase(getfirst(cmd)); 
+      st=lowercase(getfirst(cmd));
     }
     else st[0]=0;
   }
@@ -560,11 +560,11 @@ static OBJECT *matchobject2 (cmd, plur)
 static OBJECT *finditem (cmd, plur)
     char **cmd;
     int plur;
-{ 
+{
   int nm;
   OBJECT *pn;
   char *ocmd,w1[KLUDGELEN];
-  
+
   ocmd= *cmd; strcpy(w1,lowercase(getfirst(cmd)));
   if (gDebug) fprintf(stderr,"FO (plur=%d): %s\n",plur,ocmd);
   italt_new(); /* Clear alternate list */
@@ -578,11 +578,11 @@ static OBJECT *finditem (cmd, plur)
    */
   if (EQ("the",w1)) {
     if (gDebug) fprintf(stderr,"Skip 'the'\n");
-    *cmd=ocmd; getfirst(cmd); 
-    if ((pn=finditem(cmd,plur))) return pn;
+    *cmd=ocmd; getfirst(cmd);
+    if (NULL != (pn=finditem(cmd,plur))) return pn;
     else { *cmd=ocmd; return 0; }
   }
-  
+
   /* Check things like: some <objname>
    */
   else if ((EQ("some",w1)) && (plur==0)) {
@@ -592,12 +592,12 @@ static OBJECT *finditem (cmd, plur)
 
     nm = random_number(6) + 2; /* some objects are random:2-7 */
     if (gDebug) fprintf(stderr,"some rnd = %d\n",nm);
-    if ((pn=finditem(cmd,1))) { 
-      gWantnum=nm; 
-      return pn; 
+    if (NULL != (pn=finditem(cmd,1))) {
+      gWantnum=nm;
+      return pn;
     }
   }
-  
+
   /* Check things like: three <objname>
    */
   else if ( (plur==0) && ((nm=numeric(w1))>0) ) {
@@ -605,11 +605,11 @@ static OBJECT *finditem (cmd, plur)
     *cmd=ocmd; getfirst(cmd);
     /* Skip of in : two of the bottles */
     if (EQ(lowercase(lookfirst(*cmd)),"of")) getfirst(cmd);
-    if ((pn=finditem(cmd,nm-1))) {
+    if (NULL != (pn=finditem(cmd,nm-1))) {
       gWantnum=nm; return pn;
     }
   }
-  
+
   /* Check things like: third <objname>
    */
   else if ( (plur==0) && ((nm=order_num(w1))>0) ) {
@@ -618,18 +618,18 @@ static OBJECT *finditem (cmd, plur)
     /* Skip of in : second of the bottles */
     if (EQ(lowercase(lookfirst(*cmd)),"of")) {
       getfirst(cmd);
-      if ((pn=finditem(cmd,1))) { /* Fix second of the bottles */
-	gWantnum= -nm; return pn;
+      if (NULL != (pn=finditem(cmd,1))) { /* Fix second of the bottles */
+        gWantnum= -nm; return pn;
       }
     }
     else {
-      if ((pn=finditem(cmd,0))) { /* Fix second bottle */
-	gWantnum = -nm; return pn;
+      if (NULL != (pn=finditem(cmd,0))) { /* Fix second bottle */
+        gWantnum = -nm; return pn;
       }
     }
   }
-  
-  
+
+
   /* Check things like: all <objname>
    */
   else if ((EQ("all",w1)) && (plur==0)) {
@@ -637,31 +637,31 @@ static OBJECT *finditem (cmd, plur)
     *cmd=ocmd; getfirst(cmd);
     /* Skip of in : all of the bottles */
     if (EQ(lowercase(lookfirst(*cmd)),"of")) { getfirst(cmd); }
-    if ((pn=finditem(cmd,1))) { /* Handle: get all apples */
+    if (NULL != (pn=finditem(cmd,1))) { /* Handle: get all apples */
       gWantnum=0; /* Antal objekt som anvandaren vill ta 0 == all */
       return pn;
     }
     else { /* Handle: get all */
-      italt_loadall(); pn=(OBJECT *) italt(1); 
+      italt_loadall(); pn=(OBJECT *) italt(1);
       gWantnum=0; /* Antal objekt som anvandaren vill ta 0 == all */
     }
   }
-  
+
   /* Search for: adj1 adj2 ... adjN objectname
    */
   else {
     *cmd=ocmd; if (gDebug) fprintf(stderr,"Objtry: %s\n",ocmd);
     if (plur) pn=matchobject2(cmd,plur);
     else { /* Standard singular */
-      pn=matchobject2(cmd,0); 
+      pn=matchobject2(cmd,0);
       if (!pn) { /* Handle things of type: get apples */
-	pn=matchobject2(cmd,1); 
-	if (pn) gWantnum = 0; /* Default this to all */
+        pn=matchobject2(cmd,1);
+        if (pn) gWantnum = 0; /* Default this to all */
       }
     }
     if (gDebug) fprintf(stderr,"Done matchobject in finditem.\n");
   }
-  
+
   if (pn == 0) *cmd=ocmd;
   if (gDebug) fprintf(stderr,"Done finditem.\n");
   return pn;
@@ -674,7 +674,7 @@ static int findobject (cmd)
 {
   int nm,s;
   OBJECT *ob;
-  
+
   if (finditem(cmd,0)) {
     if (gCarg) {
       VECTOR *p;
@@ -688,10 +688,10 @@ static int findobject (cmd)
          makeobjlist() has reversed the order on entry
       */
       for (s=1;s<=nm;s++) {
-	p->item[s].type = T_OBJECT;
-	p->item[s].u.ob = ob = italt(nm+1-s);
-	if (!ob) if (gDebug) fprintf(stderr,"No object from italt %d\n",s);
-	if (ob) add_ref(ob,"parse_command");
+        p->item[s].type = T_OBJECT;
+        p->item[s].u.ob = ob = italt(nm+1-s);
+        if (!ob) if (gDebug) fprintf(stderr,"No object from italt %d\n",s);
+        if (ob) add_ref(ob,"parse_command");
       }
       sv_tmp.type = T_POINTER;
       sv_tmp.u.vec = p;
@@ -711,18 +711,18 @@ static int findobject (cmd)
 */
 static OBJECT *findplay (cmd)
     char **cmd;
-{ 
+{
   OBJECT *pn;
   char w1[KLUDGELEN];
 
   strcpy(w1,lowercase(lookfirst(*cmd)));
-  /* can be fixed later with call to LPC command_giver->query_real_name() 
+  /* can be fixed later with call to LPC command_giver->query_real_name()
   if (EQ(w1,"me")) strcpy(w1,getmyname_jp());
   if (EQ(w1,"myself")) strcpy(w1,getmyname_jp());
   */
   pn=(OBJECT *) find_living_object(w1, 1);  /* Find player by name */
   if (pn) {
-    getfirst(cmd); 
+    getfirst(cmd);
     if (gCarg) {
       sv_tmp.type = T_OBJECT;
       sv_tmp.u.ob = pn;
@@ -749,7 +749,7 @@ static int findword (cmd, v)
   while (cnt<m) {
     if (p->item[cnt].type == T_STRING) {
       if (strcmp(p->item[cnt].u.string,w)==0) {
-	f=cnt; cnt=m;
+        f=cnt; cnt=m;
       }
     }
     cnt+=1;
@@ -786,11 +786,11 @@ static int findprepos (cmd)
     if (strcmp(w,hard_prep[cnt])==0) {
       getfirst(cmd); /* Skip this word */
       if (gCarg) {
-	sv_tmp.type = T_STRING;
-	sv_tmp.x.string_type = STRING_MALLOC;
-	sv_tmp.u.string = string_copy(w);
-	transfer_svalue(gCarg->u.lvalue, &sv_tmp);
-	return 1;
+        sv_tmp.type = T_STRING;
+        sv_tmp.x.string_type = STRING_MALLOC;
+        sv_tmp.u.string = string_copy(w);
+        transfer_svalue(gCarg->u.lvalue, &sv_tmp);
+        return 1;
       }
     }
     cnt++;
@@ -861,7 +861,7 @@ static void addword (d, s)
     char *s;
 {
   if ((strlen(d)+strlen(s))<(KLUDGELEN-2)) {
-    if (!EMPTY(d)) strcat(d," "); 
+    if (!EMPTY(d)) strcat(d," ");
     strcat(d,s);
   }
   if (gTxarg) {
@@ -882,22 +882,22 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
   /* Arguments:
      string      Command
      ob/arr      List of accessible objects or recurse start object
-     ps		 parsepattern
-     destargs	 lvalues.
-     num_arg	 Number of lvalues.
+     ps                 parsepattern
+     destargs         lvalues.
+     num_arg         Number of lvalues.
      */
-  
+
   int altflag,         /* =1 (true) i altkedja, match har intr{ffat */
   txflag,              /* = 1 om vi adderar text till str{ng */
   ptyp;                /* Parsetype %o %i %l %p %s 'word' [word] / %w */
-  
+
   char *parsep;            /* Parsepattern */
   char *cmd;               /* Command to be parsed */
   char *ops,*ocs;          /* Temporary parse and command */
   char tx_jp[KLUDGELEN];   /* Fill up string for %s */
   char *tx_save_parsep = NULL; /* Where to continue parsing when a word was added
-			        * to a string
-			        */
+                                * to a string
+                                */
   char *tx_end_first_pattern = NULL;
   LVALUE *l;               /* Argument pointer in dest_args */
 
@@ -916,7 +916,7 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
         error("Unsupported @ construct.\n");
 
   ocs = cmd = (char *) string_copy(cs);
-  
+
   /* Get the accessible objects
    */
   if (ob_or_array->type == T_OBJECT) makeobjlist(&gOblist,ob_or_array->u.ob);
@@ -931,7 +931,7 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
     }
     gOblist=gPobjects; gPobjects=0;
   }
-  
+
   ops = parsep = (char *) string_copy(ps);
   gPobjects=gOblist;
   if (gDebug) fprintf(stderr,"Has made list of Acsobjects. %d \n",itnumalt());
@@ -951,26 +951,26 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
     switch(ptyp) { /* See which pattern type to search for */
 
     case EP: break;
-      
+
     case SI: if (findsingle(&cmd)) altflag=1; /* %o */ break;
     case IT: if (findobject(&cmd)) altflag=1; /* %i */ break;
     case US: if (findplay(&cmd)) altflag=1;   /* %l */ break;
     case PP: if (findprepos(&cmd)) altflag=1; /* %p */ break;
 
     case TX: /* %s */
-      txflag=1; strcpy(tx_jp,""); gTxarg=gCarg; altflag=1; 
+      txflag=1; strcpy(tx_jp,""); gTxarg=gCarg; altflag=1;
       tx_save_parsep = parsep;
       break;
-      
+
     case DTX: /* 'word' */
       if (EQ(lowercase(gMword),lowercase(lookfirst(cmd)))) {
-	getfirst(&cmd); altflag=1;
+        getfirst(&cmd); altflag=1;
       }
       break;
 
     case OTX: /* [word] */
       if (EQ(lowercase(gMword),lowercase(lookfirst(cmd)))) {
-	getfirst(&cmd); 
+        getfirst(&cmd);
       }
       altflag=1; /* Always take next parsepattern type [word] is opt */
       break;
@@ -985,12 +985,12 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
 
     case NUM: /* %d */
       if ((altflag=numeric(lookfirst(cmd)))>0) {
-	if (gCarg) {
-	  sv_tmp.type = T_NUMBER;
-	  sv_tmp.u.number = altflag;
-	  transfer_svalue(gCarg->u.lvalue, &sv_tmp);
-	}
-	altflag=1; getfirst(&cmd);
+        if (gCarg) {
+          sv_tmp.type = T_NUMBER;
+          sv_tmp.u.number = altflag;
+          transfer_svalue(gCarg->u.lvalue, &sv_tmp);
+        }
+        altflag=1; getfirst(&cmd);
       }
       break;
     }
@@ -1006,8 +1006,8 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
         txflag = -1; /* End string input if not just started */
       }
       while (ptyp == ALT) { /* Skip left over alternatives */
-	ptyp=get1ps(&parsep,&l,1); /* Skip this pattern */
-	ptyp=get1ps(&parsep,&l,0); /* Next real pattern or ALT */
+        ptyp=get1ps(&parsep,&l,1); /* Skip this pattern */
+        ptyp=get1ps(&parsep,&l,0); /* Next real pattern or ALT */
       }
     }
     else { /* Pattern did not match */
@@ -1016,25 +1016,25 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
       int tmp;
       a=parsep; try=l;
       tmp=get1ps(&a,&try,0);
-      if (tmp == ALT) { 
-	parsep = a;		   /* Skip ALT */
-	ptyp=get1ps(&parsep,&l,0); /* Next real pattern or ALT */
+      if (tmp == ALT) {
+        parsep = a;                   /* Skip ALT */
+        ptyp=get1ps(&parsep,&l,0); /* Next real pattern or ALT */
       }
       else {
-	if (txflag>=0 && *getfirst(&cmd)) {
-	  /* %s is defined, add word and try pattern again */
-	  addword(tx_jp, gFword);
-	  if (parsep != tx_end_first_pattern) {
-	    parsep = tx_save_parsep;
-	    ptyp = get1ps(&parsep,&l,0);
-	  }
-	}
-	else break; /* Impossible to match pattern, exit */
+        if (txflag>=0 && *getfirst(&cmd)) {
+          /* %s is defined, add word and try pattern again */
+          addword(tx_jp, gFword);
+          if (parsep != tx_end_first_pattern) {
+            parsep = tx_save_parsep;
+            ptyp = get1ps(&parsep,&l,0);
+          }
+        }
+        else break; /* Impossible to match pattern, exit */
       }
     }
-    
+
     if (gDebug) fprintf(stderr,"Pattern, after: %d cmd: '%s'\n",ptyp, cmd);
-  } 
+  }
 
   /* End of pattern reached, what have got? What is left?
   */

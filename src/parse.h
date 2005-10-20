@@ -14,13 +14,8 @@ extern int parse PROT((char *cmd, struct svalue *ob_or_array, char *pattern, str
 
 #endif /* SUPPLY_PARSE_COMMAND */
 
-#ifdef F_DESCRIBE
-/* TODO: Delete me (F_DESCRIBE) or implement me */
-extern char *describe_items PROT((struct svalue *arr, char *func, int live));
-#endif
-
 #ifdef F_PROCESS_STRING
 extern char * process_string PROT((char *str));
 #endif /* F_PROCESS_STRING */
-  
+
 #endif  /* __PARSE_H__ */

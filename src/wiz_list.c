@@ -29,10 +29,10 @@ static struct wiz_list *find_wiz(name)
     struct wiz_list *wl;
 
     if ( !( name = findstring(name) ) )
-	return 0;
+        return 0;
     for (wl = all_wiz; wl; wl = wl->next)
         if (wl->name == name)
-	    return wl;
+            return wl;
     return 0;
 }
 
@@ -63,10 +63,10 @@ struct wiz_list *add_name(str)
     wl->file_name = 0;
     wl->error_message = 0;
     if (wiz_info_extra_size >= 0) {
-	wl->extra.type  = T_POINTER;
-	wl->extra.u.vec = allocate_array(wiz_info_extra_size);
+        wl->extra.type  = T_POINTER;
+        wl->extra.u.vec = allocate_array(wiz_info_extra_size);
     } else {
-	wl->extra = const0;
+        wl->extra = const0;
     }
     wl->last_call_out = 0;
     all_wiz = wl;
@@ -99,12 +99,12 @@ void wiz_decay() {
 
     /* Perform this once every hour. */
     if (next_time > current_time)
-	return;
+        return;
     next_time = current_time + 60 * 60;
     for (wl = all_wiz; wl; wl = wl->next) {
         wl->score = wl->score * 99 / 100;
-	wl->cost = wl->cost * .9;  /* integer is prone to overflow */
-	wl->heart_beats = wl->heart_beats * 9 / 10;
+        wl->cost = wl->cost * .9;  /* integer is prone to overflow */
+        wl->heart_beats = wl->heart_beats * 9 / 10;
     }
 }
 
@@ -113,7 +113,7 @@ void wiz_decay() {
  */
 void load_wiz_file()
 {
-    char buff[1000];		/* I hate not knowing how much I need. */
+    char buff[1000];                /* I hate not knowing how much I need. */
     FILE *f;
 
     f = fopen("WIZLIST", "r");
@@ -121,23 +121,23 @@ void load_wiz_file()
         return;
     while(fgets(buff, sizeof buff, f) != NULL) {
         char *p;
-	int score;
+        int score;
 
-	p = strchr(buff, ' ');
-	if (p == 0) {
-	    fprintf(stderr, "Bad WIZLIST file.\n");
-	    break;
-	}
-	*p = '\0';
-	p++;
-	if (*p == '\0') {
-	    fprintf(stderr, "Bad WIZLIST file.\n");
-	    break;
-	}
-	score = atoi(p);
-	if (score > 0) {
-	    add_name(buff)->score += score;
-	}
+        p = strchr(buff, ' ');
+        if (p == 0) {
+            fprintf(stderr, "Bad WIZLIST file.\n");
+            break;
+        }
+        *p = '\0';
+        p++;
+        if (*p == '\0') {
+            fprintf(stderr, "Bad WIZLIST file.\n");
+            break;
+        }
+        score = atoi(p);
+        if (score > 0) {
+            add_name(buff)->score += score;
+        }
     }
     fclose(f);
 }
@@ -150,38 +150,38 @@ struct svalue *f_wizlist_info(sp)
     struct wiz_list *w;
 
     if (_privilege_violation("wizlist_info", &const0, sp) <= 0) {
-	all = allocate_array(0);
+        all = allocate_array(0);
     } else {
-	all = allocate_array(number_of_wiz);
-	wsvp = all->item;
-	for (w = all_wiz; w; w = w->next) {
-	    entry = allocate_array(7);
+        all = allocate_array(number_of_wiz);
+        wsvp = all->item;
+        for (w = all_wiz; w; w = w->next) {
+            entry = allocate_array(7);
             wsvp->type = T_POINTER;
             wsvp->u.vec = entry;
             wsvp++;
             svp = entry->item;
-	    svp->type          = T_STRING;
-	    svp->x.string_type = STRING_SHARED;
-	    svp->u.string      = w->name;
-	    increment_string_ref(w->name);
-	    svp++;
-	    svp->u.number      = w->score;
-	    svp++;
-	    svp->u.number      = w->cost;
-	    svp++;
-	    svp->u.number      = w->heart_beats;
-	    svp++;
-	    /* reserved for call_out */
-	    svp++;
-	    svp->u.number      = w->size_array;
-	    svp++;
-	    if (w->extra.type == T_POINTER) {
-		struct vector *v = w->extra.u.vec;
-		svp->type  = T_POINTER;
-		svp->u.vec = slice_array(v, 0, VEC_SIZE(v) - 1);
-	    } else
-		assign_svalue_no_free(svp, &w->extra);
-	} /* end for */
+            svp->type          = T_STRING;
+            svp->x.string_type = STRING_SHARED;
+            svp->u.string      = w->name;
+            increment_string_ref(w->name);
+            svp++;
+            svp->u.number      = w->score;
+            svp++;
+            svp->u.number      = w->cost;
+            svp++;
+            svp->u.number      = w->heart_beats;
+            svp++;
+            /* reserved for call_out */
+            svp++;
+            svp->u.number      = w->size_array;
+            svp++;
+            if (w->extra.type == T_POINTER) {
+                struct vector *v = w->extra.u.vec;
+                svp->type  = T_POINTER;
+                svp->u.vec = slice_array(v, 0, VEC_SIZE(v) - 1);
+            } else
+                assign_svalue_no_free(svp, &w->extra);
+        } /* end for */
     } /* end if */
     sp++;
     sp->type = T_POINTER;
@@ -215,7 +215,7 @@ void clear_ref_from_wiz_list()
     struct wiz_list *w;
 
     for (w = all_wiz; w; w = w->next) {
-	clear_ref_in_vector(&w->extra, 1);
+        clear_ref_in_vector(&w->extra, 1);
     }
     clear_ref_in_vector(&default_wizlist_entry.extra, 1);
 }
@@ -225,13 +225,13 @@ void count_ref_from_wiz_list()
     struct wiz_list *w;
 
     for (w = all_wiz; w; w = w->next) {
-	count_ref_from_string(w->name);
-	count_ref_in_vector(&w->extra, 1);
-	if(w->file_name)
-	    note_malloced_block_ref(w->file_name);
-	if (w->error_message)
-	    note_malloced_block_ref(w->error_message);
-	note_malloced_block_ref((char *)w);
+        count_ref_from_string(w->name);
+        count_ref_in_vector(&w->extra, 1);
+        if(w->file_name)
+            note_malloced_block_ref(w->file_name);
+        if (w->error_message)
+            note_malloced_block_ref(w->error_message);
+        note_malloced_block_ref((char *)w);
     }
     count_ref_in_vector(&default_wizlist_entry.extra, 1);
 }
@@ -243,7 +243,7 @@ void count_extra_ref_from_wiz_list()
     struct wiz_list *w;
 
     for (w = all_wiz; w; w = w->next) {
-	count_extra_ref_in_vector(&w->extra, 1);
+        count_extra_ref_in_vector(&w->extra, 1);
     }
     count_extra_ref_in_vector(&default_wizlist_entry.extra, 1);
 }
@@ -256,18 +256,18 @@ struct svalue *f_set_extra_wizinfo(sp)
     short type;
 
     if ((type = sp[-1].type) == T_OBJECT) {
-	user = sp[-1].u.ob->user;
+        user = sp[-1].u.ob->user;
     } else if (type != T_STRING || !(user = find_wiz(sp[-1].u.string)))
     {
-	if (type == T_NUMBER && sp[-1].u.number == 0)
-	    user = 0;
-	else
-	    bad_xefun_arg(1, sp);
+        if (type == T_NUMBER && sp[-1].u.number == 0)
+            user = 0;
+        else
+            bad_xefun_arg(1, sp);
     }
     if (_privilege_violation("set_extra_wizinfo", sp-1, sp) <= 0) {
-	free_svalue(sp);
+        free_svalue(sp);
     } else {
-	transfer_svalue(user ? &user->extra : &default_wizlist_entry.extra, sp);
+        transfer_svalue(user ? &user->extra : &default_wizlist_entry.extra, sp);
     }
     free_svalue(sp-1);
     return sp - 2;
@@ -280,15 +280,15 @@ struct svalue *f_get_extra_wizinfo(sp)
     short type;
 
     if ((type = sp->type) == T_OBJECT) {
-	user = sp->u.ob->user;
+        user = sp->u.ob->user;
     } else if (type != T_STRING || !(user = find_wiz(sp->u.string))) {
-	if (type == T_NUMBER && sp->u.number == 0)
-	    user = 0;
-	else
-	    bad_xefun_arg(1, sp);
+        if (type == T_NUMBER && sp->u.number == 0)
+            user = 0;
+        else
+            bad_xefun_arg(1, sp);
     }
     if (_privilege_violation("get_extra_wizinfo", sp, sp) <= 0)
-	bad_xefun_arg(1, sp);
+        bad_xefun_arg(1, sp);
     assign_svalue(sp, user ? &user->extra : &default_wizlist_entry.extra);
     return sp;
 }
@@ -297,9 +297,9 @@ void remove_wiz_list() {
     struct wiz_list *wl, *w;
 
     for (w = all_wiz; w; w = wl) {
-	free_string(w->name);
-	wl = w->next;
-	xfree((char *)w);
+        free_string(w->name);
+        wl = w->next;
+        xfree((char *)w);
     }
 }
 
@@ -315,11 +315,11 @@ void save_error(msg, file, line)
 
     p = get_wiz_name(file);
     if(!p)
-	return;
+        return;
     strcpy(name, p);
     wl = add_name(name);
     if (wl->file_name)
-	xfree(wl->file_name);
+        xfree(wl->file_name);
     len = strlen(file);
     copy = xalloc(len + 4); /* May add .c plus the null byte, and / */
     *copy = '/';
@@ -328,15 +328,15 @@ void save_error(msg, file, line)
      * If it is a cloned object, we have to find out what the file
      * name is, and add '.c'.
      */
-    if ( (p = strrchr(copy, '#')) ||
+    if ( NULL != (p = strrchr(copy, '#')) ||
         ((p = copy+len), *p++ != 'c') || p[-2] != '.' ) {
-	p[0] = '.';
-	p[1] = 'c';
-	p[2] = '\0';
+        p[0] = '.';
+        p[1] = 'c';
+        p[2] = '\0';
     }
     wl->file_name = copy;
     if (wl->error_message)
-	xfree(wl->error_message);
+        xfree(wl->error_message);
     wl->error_message = string_copy(msg);
     wl->line_number = line;
 }
@@ -351,9 +351,9 @@ struct svalue *f_get_error_file(sp)
     struct svalue *v;
 
     if (sp[-1].type != T_STRING)
-	bad_xefun_arg(1, sp);
+        bad_xefun_arg(1, sp);
     if (sp->type != T_NUMBER)
-	bad_xefun_arg(2, sp);
+        bad_xefun_arg(2, sp);
     name = sp[-1].u.string;
     forget = sp->u.number;
     wl = find_wiz(name);
@@ -363,9 +363,9 @@ struct svalue *f_get_error_file(sp)
      * The error_message is used as a flag if there has been any error.
      */
     if (!wl || !wl->error_message) {
-	sp->type = T_NUMBER;
-	sp->u.number = 0;
-	return sp;
+        sp->type = T_NUMBER;
+        sp->u.number = 0;
+        return sp;
     }
     vec = allocate_array(4);
     v = vec->item;
@@ -378,7 +378,7 @@ struct svalue *f_get_error_file(sp)
     v[2].u.string = string_copy(wl->error_message);
     v[3].u.number = (wl->line_number & 0x40000000) != 0;
     if (forget)
-	wl->line_number |= 0x40000000;
+        wl->line_number |= 0x40000000;
     sp->type = T_POINTER;
     sp->u.vec = vec;
     return sp;
@@ -397,7 +397,7 @@ char *get_wiz_name(file)
     push_volatile_string(file);
     ret = apply_master_ob(STR_GET_WNAME, 1);
     if (ret == 0 || ret->type != T_STRING)
-	return 0;
+        return 0;
     strncpy(buff, ret->u.string, sizeof buff - 1);
     return buff;
 }

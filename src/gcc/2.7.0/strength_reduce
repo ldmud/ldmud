@@ -24,19 +24,19 @@ craigs@iii.net (Craig Shrimpton) writes:
 
 >Greetings,
 
->I have been informed of a possible serious compile bug when using -O2 
->optimization.  The program will produce two different results depending 
->on how the -O2 optimization is invoked. 
+>I have been informed of a possible serious compile bug when using -O2
+>optimization.  The program will produce two different results depending
+>on how the -O2 optimization is invoked.
 
->Compile first as so: gcc -O2 -o test test.c 
+>Compile first as so: gcc -O2 -o test test.c
 >and then as:  gcc -O2 -fno-strength-reduce -o test test.c
 
->The first compile does not produce the expected result.  I have tried 
->this with -O and it compiles correctly.  The bug seems to be related to 
->-O2 without -fno-strength-reduce.  The errors this could produce for 
+>The first compile does not produce the expected result.  I have tried
+>this with -O and it compiles correctly.  The bug seems to be related to
+>-O2 without -fno-strength-reduce.  The errors this could produce for
 >engineering, math, statistic and financial applications is mind-boggling.
 
->If this is already known, please let me know if a patch exists.  I'm 
+>If this is already known, please let me know if a patch exists.  I'm
 >running gcc 2.7.0 and libc-5.0.9
 
 >Cheers,
@@ -96,10 +96,10 @@ and conditional branch taken frequencies.
 + 		 are incorrect unless it can be verified that
 + 		 overflow behaviour stays the same for all possible
 + 		 values of the loop bound, for all iterations. */
-+ 
++
   	      /* Look for giv with constant positive mult_val and nonconst
   		 add_val. Insert insns to compute new compare value.  */
-  
+
 *************** maybe_eliminate_biv_1 (x, insn, bl, elim
 *** 6156,6161 ****
 --- 6161,6167 ----
@@ -108,7 +108,7 @@ and conditional branch taken frequencies.
   		  }
 + #endif
   	    }
-  
+
   	  /* This code has problems.  Basically, you can't know when
 
 

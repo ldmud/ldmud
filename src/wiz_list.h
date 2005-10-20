@@ -12,7 +12,7 @@ struct wiz_list {
     int score;
     int cost;
     int heart_beats;
-    mp_int size_array;		/* Total size of this wizards arrays. */
+    mp_int size_array;                /* Total size of this wizards arrays. */
     mp_int mapping_total;
     struct svalue extra;
     mp_int quota_allowance;

@@ -148,7 +148,7 @@ shadows to one object.
 Objects must inherit std/object.c if they want to be moved, or moved into.
 The -o flag will as usuall remove this requirement.
 
-Fixed a bug in restore_object and save_object, so that the 'static' 
+Fixed a bug in restore_object and save_object, so that the 'static'
 information is used.
 
 Merged from Marion's version:
@@ -244,7 +244,7 @@ Fixed a better test of type equality.
 
 3.0.19
 
-Fixed load_object() to take an extra parameter for not resetting object 
+Fixed load_object() to take an extra parameter for not resetting object
 after load. This is used in mudlib 3.0 for inherited objects. Only when the
 ENTIRE object is loaded (all inherited objects loaded) is its reset() called.
 
@@ -657,7 +657,7 @@ return types and types of arguments for all efuns. A program, make_func, will
 automatically generate a file efun_defs.c that is included into lex.c.
 The base for compile time type checking is also done this way.
 
-JnA: get_log_file() added to get the filename of where to log errors for a 
+JnA: get_log_file() added to get the filename of where to log errors for a
 JnA: given file. This is a function in wiz_list.c called from smart_log. It
 JnA: calls the corresponding function in /secure/master. It is not used
 in -o mode.
@@ -829,7 +829,7 @@ JnA: Fixed small bug in new_call_out which dumped the GD if command_giver == 0
 
 JnA: Fixed a bug with fclose() in restore_object(), dumped the GD
 
-RW: snoop: Added a backwards compatible patch to set_snoop. There is 
+RW: snoop: Added a backwards compatible patch to set_snoop. There is
     now a new function in comm1.c (new_set_snoop) that defines the
     mudlib 3.0 version of set_snoop. The difference is that the efun
     in !o_flag mode takes two arguments, snooper and snopee and checks
@@ -1120,10 +1120,10 @@ that matched 'pattern'.
 Sorry, some NULL:s had been used again in array.c.
 
 New efun: object *deep_inventory(object *ob);
-  This function returns the recursive inventory of an object. The returned 
-  array of objects is flat, ie there is no structure reflecting the 
+  This function returns the recursive inventory of an object. The returned
+  array of objects is flat, ie there is no structure reflecting the
   internal containment relations.
- 
+
 When the user gives a 'e file' command from inside the editor session, then
 the file name has to be transformed to correct path if not given with a
 leading slash. This is only needed in native mode. A function
@@ -1177,7 +1177,7 @@ JnA: dump the driver. Multi word id's is now possible. 'word word' is not.
 RW: Fixed a lot of #else XXX and #endif XXX that ought to have the XXX
     within comments. Apparently a lot of compilers complain mightily.
 
-RW: Applied fix to apply_low() in interpret.c . References to functions in 
+RW: Applied fix to apply_low() in interpret.c . References to functions in
     swapped objects were kept and made the game dump. Fix supplied by
     Dworkin.
 
@@ -1238,14 +1238,14 @@ This is a short summary of how special types are handled:
     'private' variables and functions: Can not be accessed by a sub class
     inheriting their definitions. Functions can not be called through
     call_other(). 'private' inheritance will make all variables and functions
-    'private'. 
+    'private'.
 
     'nomask' functions and variables can not be redefined by a sub class.
     'nomask' inheritance will make all inherited definitions 'nomask'.
 
     'public' variables and functions can be redefined by a sub class, even if
     they have been inherited 'private'ly. 'public' inheritance will make all
-    inherited definitions 'public'. 
+    inherited definitions 'public'.
 
     The type 'protected' is reserved, but does not mean anything currently.
 
@@ -1667,7 +1667,7 @@ argument to deep_inventory() defaults to this_object() .
 inherit takes string constants, not only string literals.
 new efuns: raise_error(), get_eval_cost(), functionlist(), allocate_mapping(),
   copy_mapping(), rename_object(), walk_mapping(), regexplode(), typeof(),
-  symbol_function(), lambda(), unbound_lambda(), bind_lambda(), quote(), 
+  symbol_function(), lambda(), unbound_lambda(), bind_lambda(), quote(),
   apply(), funcall(), symbolp(), closurep(), garbage_collection(),
   extern_call()
 Fixed error recovery memory leaks in tell_room(), say(), filter_mapping(),

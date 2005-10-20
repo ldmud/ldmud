@@ -1,8 +1,9 @@
-Amylaar-LPMud 3.2.1 for Be   (10th July 1998)
---------------------------
+LDMud 3.2 for Be
+----------------
 
-This is a rehost of Amylaar's LPMud gamedriver to the
-Be Operating System (PR3) using the Metrowerks Compiler.
+This is the Be version of the 'LDMud' gamedriver, ported for
+the BeOS R4.
+
 Rehosting the program involved mostly workarounds for the
 quirks in Be's networking code and limited stack space,
 else it was a simple recompilation.
@@ -10,11 +11,6 @@ else it was a simple recompilation.
 The rehost is complete except for one thing: ERQs must be started
 manually and then connect to the gamedriver, the driver can't
 start them on his own.
-
-Everything is still very unixish, and not tested very much.
-As I'm more interested in other things at the moment, my work
-on the gamedriver is on a at-need basis only.
-So if anybody wishes to take over from here: be my guest.
 
 Recompilation
 -------------
@@ -35,21 +31,6 @@ Known Bugs
     endless mapping or array loops), the driver might crash due to
     exhausted stack space before the internal safeguard of sprintf()
     can stop him.
-  - When started in the background, the driver somehow can't set the
-    first opened socket to 'nonblocking' (fcntl(FNDELAY)). I hacked
-    around this by explicitely ignoring the error for the first
-    socket. Ugh.
-    
-History
--------
- 13.08.1998: Made sure that the erq is not started automatically,
-             even if the option in config.h is set.
- 10.07.1998: Updated the Be port with changes from the OSB driver.
-             Added hack for fcntl(FNDELAY).
- 05.07.1998: Added dual-compilation facilities for PPC and x86.
-             Got rid of the 'duplicate' link warnings.
- 17.05.1998: Updated the Be port with changes from the OSB driver.
-  8.03.1998: First Be port of the gamedriver.
 
 
 Share and enjoy!

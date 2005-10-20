@@ -131,9 +131,6 @@
 /* Define if you have getcwd.  */
 #undef HAVE_GETCWD
 
-/* Define if you have getdomainname.  */
-#undef HAVE_GETDOMAINNAME
-
 /* Define if you have getrusage.  */
 #undef HAVE_GETRUSAGE
 
@@ -190,6 +187,9 @@
 
 /* Define if you have the <string.h> header file.  */
 #undef HAVE_STRING_H
+
+/* Define if you have the <sys/param.h> header file. */
+#undef HAVE_SYS_PARAM_H
 
 /* Define if you have the <sys/rusage.h> header file.  */
 #undef HAVE_SYS_RUSAGE_H

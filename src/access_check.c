@@ -58,13 +58,13 @@
  * this, add an appropriate 'allow-all' rule *.*.*.* at the very end.
  *
  * An example rulefile:
- * 
+ *
  *   # SPARC cluster has access denied. Class 1
  *   129.132.122.*:1:0:0:0:LPMUD access denied for your cluster.
  *
  *   # CALL-1A0 has access limited to some maximum, for now 5 logins. Class 2
  *   129.132.106.*:2:5:8:20:Sorry, LPMUD is currently full.
- * 
+ *
  *   # CALL-1A0 at all other times, its a 10 limit.
  *   #   Due to the rule order, this is effectively limited to times
  *   #   outside 8-20.
@@ -88,6 +88,9 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
 #include <time.h>
 
 #include "access_check.h"
@@ -144,31 +147,31 @@ find_access_class (struct sockaddr_in *full_addr)
     for (aap = all_access_addresses; aap; aap = aap->next) {
 #if DEBUG_ACCESS_CHECK
         fprintf(stderr, "'%s', %ld %ld\n",
-	        inet_ntoa(*(struct in_addr*)&aap->addr),
-	        (long)aap->class->max_usage, (long)aap->class->usage);
+                inet_ntoa(*(struct in_addr*)&aap->addr),
+                (long)aap->class->max_usage, (long)aap->class->usage);
 #endif
-	if ((aap->addr ^ addr) & aap->mask)
-	    continue;
-	if (aap->wday_mask >= 0) {
-	    if (!tm_p) {
-		time(&seconds);
-		tm_p = localtime(&seconds);
+        if ((aap->addr ^ addr) & aap->mask)
+            continue;
+        if (aap->wday_mask >= 0) {
+            if (!tm_p) {
+                time(&seconds);
+                tm_p = localtime(&seconds);
 #if DEBUG_ACCESS_CHECK
-		fprintf(stderr, "h:%d w:%d\n", tm_p->tm_hour, tm_p->tm_wday);
+                fprintf(stderr, "h:%d w:%d\n", tm_p->tm_hour, tm_p->tm_wday);
 #endif
-	    }
-	    if ( !((1 << tm_p->tm_hour) & aap->hour_mask) )
-		continue;
-	    if ( !((1 << tm_p->tm_wday) & aap->wday_mask) )
-		continue;
-	}
-	return aap->class;
+            }
+            if ( !((1 << tm_p->tm_hour) & aap->hour_mask) )
+                continue;
+            if ( !((1 << tm_p->tm_wday) & aap->wday_mask) )
+                continue;
+        }
+        return aap->class;
     }
     return NULL;
 }
 
 /*-------------------------------------------------------------------------*/
-static void 
+static void
 add_access_entry (struct sockaddr_in *full_addr, long *idp)
 
 /* Find the class structure for <full_addr> and increments its count
@@ -184,14 +187,14 @@ add_access_entry (struct sockaddr_in *full_addr, long *idp)
 
     acp = find_access_class(full_addr);
     if (acp) {
-	acp->usage++;
-	*idp = acp->id;
+        acp->usage++;
+        *idp = acp->id;
     }
 }
 
 /*-------------------------------------------------------------------------*/
 static void
-read_access_file (void) 
+read_access_file (void)
 
 /* Read and parse the ACCESS_FILE, (re)creating all the datastructures.
  * After the file has been read, the usage counts will be updated by
@@ -209,16 +212,18 @@ read_access_file (void)
 
     /* Free the old datastructures */
     for (aap = all_access_addresses; aap; aap = next_aap) {
-	next_aap = aap->next;
-	free((char *)aap);
+        next_aap = aap->next;
+        free((char *)aap);
     }
     for (acp = all_access_classes; acp; acp = next_acp) {
-	next_acp = acp->next;
-	free((char *)acp);
+        next_acp = acp->next;
+        free((char *)acp);
     }
     all_access_classes = NULL;
 
     infp = fopen(ACCESS_FILE, "r");
+    if (!infp)
+        perror("driver: Can't read access file '" ACCESS_FILE "'");
     FCOUNT_READ(ACCESS_FILE);
     last = &all_access_addresses;
       /* *last will be set to NULL at the end, so no dangling pointer
@@ -233,147 +238,147 @@ read_access_file (void)
      * nonsense, but no error message.
      */
     if (infp) for(addr = mask = 0;;) {
-	long max_usage, class_id;
-	int first_hour, last_hour;
+        long max_usage, class_id;
+        int first_hour, last_hour;
 
         /* Parse the next IP address byte, i.e. everything up to the
          * next . or : .
          */
-	addr <<= 8;
-	mask <<= 8;
-	if (fscanf(infp, "%9[^.:\n]%[.:]", message, message+12) != 2 ||
-	    *message == '#')
-	{
-	    do {
-		i = fgetc(infp);
-		if (i == EOF)
-		    goto file_end;
-	    } while(i != '\n');
-	    addr = mask = 0;
-	    continue;
-	}
-	if (*message != '*') {
-	    int j;
-	    j = atoi(message);
-	    if ((unsigned)j > 0xff)
-		break;
-	    addr += j;
-	    mask += 0xff;
-	}
-	if (message[12] == '.') /* Then another byte follows */
-	    continue;
+        addr <<= 8;
+        mask <<= 8;
+        if (fscanf(infp, "%9[^.:\n]%[.:]", message, message+12) != 2 ||
+            *message == '#')
+        {
+            do {
+                i = fgetc(infp);
+                if (i == EOF)
+                    goto file_end;
+            } while(i != '\n');
+            addr = mask = 0;
+            continue;
+        }
+        if (*message != '*') {
+            int j;
+            j = atoi(message);
+            if ((unsigned)j > 0xff)
+                break;
+            addr += j;
+            mask += 0xff;
+        }
+        if (message[12] == '.') /* Then another byte follows */
+            continue;
 
         /* Parse the time specs next. Start by trying the first (old)
          * format.
          */
-	max_usage = 0;
-	message[0] = '\0';
+        max_usage = 0;
+        message[0] = '\0';
 
-	i = fscanf(infp, "%ld:%ld:%d:%d:",
-	  &class_id, &max_usage, &first_hour, &last_hour);
-	if (!i)
-	    break;
+        i = fscanf(infp, "%ld:%ld:%d:%d:",
+          &class_id, &max_usage, &first_hour, &last_hour);
+        if (!i)
+            break;
 
-	aap = malloc(sizeof *aap);
-	if (!aap)
-	    break;
-	*last = aap;
-	aap->addr = htonl(addr);
-	aap->mask = htonl(mask);
-	aap->wday_mask = -1; /* Default: valid on every day */
+        aap = malloc(sizeof *aap);
+        if (!aap)
+            break;
+        *last = aap;
+        aap->addr = htonl(addr);
+        aap->mask = htonl(mask);
+        aap->wday_mask = -1; /* Default: valid on every day */
 
-	if (i == 4) {            /* Old format */
-	    if (first_hour || last_hour) {
-		aap->wday_mask = 0x7f;
-		if (first_hour <= last_hour) {
-		    aap->hour_mask = (2 << last_hour) - (1 << first_hour);
-		} else {
-		    aap->hour_mask = -(1 << first_hour) + (2 << last_hour) - 1;
-		}
-	    }
-	} else if (i == 2) {     /* New format */
-	    char c, c2[2];
+        if (i == 4) {            /* Old format */
+            if (first_hour || last_hour) {
+                aap->wday_mask = 0x7f;
+                if (first_hour <= last_hour) {
+                    aap->hour_mask = (2 << last_hour) - (1 << first_hour);
+                } else {
+                    aap->hour_mask = -(1 << first_hour) + (2 << last_hour) - 1;
+                }
+            }
+        } else if (i == 2) {     /* New format */
+            char c, c2[2];
 
-	    for (;;) {
-		c = 'm';
-		fscanf(infp, "%c %1[=]", &c, c2);
-		switch(c) {
-		  case 'w':
-		  {
-		    int32 *maskp;
+            for (;;) {
+                c = 'm';
+                fscanf(infp, "%c %1[=]", &c, c2);
+                switch(c) {
+                  case 'w':
+                  {
+                    int32 *maskp;
 
-		    maskp = &aap->wday_mask;
-		    goto get_mask;
-		  case 'h':
-		    maskp = &aap->hour_mask;
-		  get_mask:
-		    mask = 0;
-		    do {
-			int j, k;
+                    maskp = &aap->wday_mask;
+                    goto get_mask;
+                  case 'h':
+                    maskp = &aap->hour_mask;
+                  get_mask:
+                    mask = 0;
+                    do {
+                        int j, k;
 
-			*c2 = '\0';
-			if (!fscanf(infp, "%d %1[-,:] ", &j, c2))
-			    break;
-			if (*c2 == '-') {
-			    k = 24;
-			    fscanf(infp, "%d %1[,:] ", &k, c2);
-			    if (j <= k) {
-				mask |= (2 << k) - (1 << j);
-			    } else {
-				mask |= -(1 << j) + (2 << k) - 1;
-			    }
-			} else {
-			    mask |= 1 << j;
-			}
-		    } while (*c2 == ',');
-		    *maskp = mask;
-		    aap->wday_mask &= 0x7f; /* make sure it's not negative */
-		    continue;
-		  }
-		  default:
-		    ungetc(c, infp);
+                        *c2 = '\0';
+                        if (!fscanf(infp, "%d %1[-,:] ", &j, c2))
+                            break;
+                        if (*c2 == '-') {
+                            k = 24;
+                            fscanf(infp, "%d %1[,:] ", &k, c2);
+                            if (j <= k) {
+                                mask |= (2 << k) - (1 << j);
+                            } else {
+                                mask |= -(1 << j) + (2 << k) - 1;
+                            }
+                        } else {
+                            mask |= 1 << j;
+                        }
+                    } while (*c2 == ',');
+                    *maskp = mask;
+                    aap->wday_mask &= 0x7f; /* make sure it's not negative */
+                    continue;
+                  }
+                  default:
+                    ungetc(c, infp);
                     /* FALLTHROUGH */
-		  case 'm':
-		    break;
-		} /* switch */
+                  case 'm':
+                    break;
+                } /* switch */
 
-		break;
-	    } /* for */
-	} /* if (i) */
+                break;
+            } /* for */
+        } /* if (i) */
 
         /* The rest of the line is the message to print.
          * TODO: A malign ACCESS_FILE can cause a buffer overflow here.
          */
-	fgets(message, sizeof message, infp);
+        fgets(message, sizeof message, infp);
 
         /* Check if this rule creates a new class. If yes, allocate
          * a new structure and assign message text and usage to it.
          */
-	for (acp = all_access_classes; acp; acp = acp->next) {
-	    if (acp->id == class_id)
-		break;
-	}
-	if (!acp) {
-	    i = strlen(message);
-	    if (message[i-1] == '\n')
-	        message[--i] = '\0';
-	    acp = malloc(sizeof *acp - sizeof acp->message + 1 + i);
-	    if (!acp) {
-		free((char *)aap);
-		break;
-	    }
-	    acp->id = class_id;
-	    acp->max_usage = max_usage == -1 ? MAXINT : max_usage;
-	    acp->usage = 0;
-	    strcpy(acp->message, message);
-	    acp->next = all_access_classes;
-	    all_access_classes = acp;
-	}
+        for (acp = all_access_classes; acp; acp = acp->next) {
+            if (acp->id == class_id)
+                break;
+        }
+        if (!acp) {
+            i = strlen(message);
+            if (message[i-1] == '\n')
+                message[--i] = '\0';
+            acp = malloc(sizeof *acp - sizeof acp->message + 1 + i);
+            if (!acp) {
+                free((char *)aap);
+                break;
+            }
+            acp->id = class_id;
+            acp->max_usage = max_usage == -1 ? MAXINT : max_usage;
+            acp->usage = 0;
+            strcpy(acp->message, message);
+            acp->next = all_access_classes;
+            all_access_classes = acp;
+        }
 
         /* Finishing touches. */
-	aap->class = acp;
-	last = &aap->next;
-	addr = mask = 0;
+        aap->class = acp;
+        last = &aap->next;
+        addr = mask = 0;
     }
 file_end: /* emergency exit from the loop */
 
@@ -401,17 +406,20 @@ allow_host_access (struct sockaddr_in *full_addr, long *idp)
     struct stat statbuf;
     struct access_class *acp;
 
-    if (!ixstat(ACCESS_FILE, &statbuf) && statbuf.st_mtime > last_read_time) {
-	last_read_time = statbuf.st_mtime;
-	read_access_file();
+    if (ixstat(ACCESS_FILE, &statbuf))
+        perror("driver: Can't stat access file '" ACCESS_FILE "'");
+    else if (statbuf.st_mtime > last_read_time) {
+        last_read_time = statbuf.st_mtime;
+        read_access_file();
     }
+
     acp = find_access_class(full_addr);
     if (acp) {
-	if (acp->usage >= acp->max_usage)
-	    return acp->message;
-	acp->usage++;
-	*idp = acp->id;
-	return NULL;
+        if (acp->usage >= acp->max_usage)
+            return acp->message;
+        acp->usage++;
+        *idp = acp->id;
+        return NULL;
     }
     return "No matching entry";
 }
@@ -431,10 +439,10 @@ release_host_access (long num)
     fprintf(stderr, "release_host_access %ld called.\n", num);
 #endif
     for (acp = all_access_classes; acp; acp = acp->next) {
-	if (acp->id != num)
-	    continue;
-	acp->usage--;
-	break;
+        if (acp->id != num)
+            continue;
+        acp->usage--;
+        break;
     }
 }
 

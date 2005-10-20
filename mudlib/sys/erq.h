@@ -14,6 +14,8 @@
 #define ERQ_OPEN_UDP 7
 #define ERQ_OPEN_TCP 8
 #define ERQ_LISTEN   9
+#define ERQ_ACCEPT  10
+#define ERQ_LOOKUP  11
 
 /* answers from ERQ_EXECUTE / ERQ_FORK */
 

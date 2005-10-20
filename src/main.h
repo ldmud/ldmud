@@ -39,11 +39,6 @@ extern mp_int max_small_malloced;
 extern /* TODO: BOOL */ int check_a_lot_ref_counts_flag;
 #endif
 
-#ifdef D_FLAG
-/* TODO: D_flag is obsolete */
-extern /* TODO: BOOL */ int D_flag;	/* Log specific trace messages to /log/D_TRACE */
-#endif
-
 #ifndef MAXNUMPORTS
 extern int port_number;
 #else

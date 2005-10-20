@@ -8,7 +8,7 @@
  *------------------------------------------------------------------
  */
 
-#if defined(SunOS4) || defined (ultrix)
+#if defined(SunOS4) || defined (ultrix) || defined(solaris)
 extern void bzero(char *, int);
 #endif
 
@@ -20,7 +20,7 @@ extern char *_crypt(char *, char *);
 extern int ioctl(int, ...); /* should be in <ioctl.h> */
 #endif
 
-#if defined(SunOS4) || defined(ultrix) || defined(__CYGWIN32__)
+#if defined(SunOS4) || defined(ultrix) || defined(__CYGWIN__)
 extern int gethostname(char *, int);
 extern char *getdomainname(char *, int);
 #endif
@@ -31,11 +31,11 @@ extern void perror(const char *);
 extern long int strtol(const char *, char **, int);
 #endif
 
-#if defined(__CYGWIN32__) || defined(sun)
+#if defined(__CYGWIN__) || defined(sun)
 extern time_t time(time_t *tloc);
 #endif
 
-#if 0 && defined(__CYGWIN32__)
+#if 0 && defined(__CYGWIN__)
 extern char * ctime(time_t *tloc);
 #endif
 

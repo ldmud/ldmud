@@ -38,10 +38,10 @@ inc_pstack ()
 	xrealloc (parser_state_tos->p_stack,
 		 parser_state_tos->p_stack_size * sizeof (enum codes));
       parser_state_tos->il = (int *)
-	xrealloc (parser_state_tos->il, 
+	xrealloc (parser_state_tos->il,
 		  parser_state_tos->p_stack_size * sizeof (int));
       parser_state_tos->cstk = (int *)
-	xrealloc (parser_state_tos->cstk, 
+	xrealloc (parser_state_tos->cstk,
 		  parser_state_tos->p_stack_size * sizeof (int));
     }
   return parser_state_tos->tos;
@@ -115,7 +115,7 @@ parse(tk)
 		/*
 		 * only do this if there is nothing on the line
 		 */
-	      
+	
 		parser_state_tos->ind_level -= ind_size;
 		/*
 		 * it is a group as part of a while, for, etc.
@@ -182,7 +182,7 @@ parse(tk)
 						 * be same as for if */
 	    /* everything following should be in 1 level */
 	    parser_state_tos->i_l_follow = parser_state_tos->ind_level + ind_size;
-	    
+	
 	    parser_state_tos->p_stack[parser_state_tos->tos] = elsehead;
 	    /* remember if with else */
 	    parser_state_tos->search_brace = btype_2 | else_if;
@@ -242,37 +242,37 @@ parse(tk)
 
 /*
  * Copyright (C) 1976 by the Board of Trustees of the University of Illinois
- * 
+ *
  * All rights reserved
- * 
- * 
+ *
+ *
  * NAME: reduce
- * 
+ *
  * FUNCTION: Implements the reduce part of the parsing algorithm
- * 
+ *
  * ALGORITHM: The following reductions are done.  Reductions are repeated until
  * no more are possible.
- * 
+ *
  * Old TOS		New TOS <stmt> <stmt>	<stmtl> <stmtl> <stmt>	<stmtl> do
  * <stmt>	"dostmt" if <stmt>	"ifstmt" switch <stmt>	<stmt> decl
  * <stmt>	<stmt> "ifelse" <stmt>	<stmt> for <stmt>	<stmt> while
  * <stmt>	<stmt> "dostmt" while	<stmt>
- * 
+ *
  * On each reduction, parser_state_tos->i_l_follow (the indentation for the following line) is
  * set to the indentation level associated with the old TOS.
- * 
+ *
  * PARAMETERS: None
- * 
+ *
  * RETURNS: Nothing
- * 
+ *
  * GLOBALS: parser_state_tos->cstk parser_state_tos->i_l_follow = parser_state_tos->il parser_state_tos->p_stack = parser_state_tos->tos =
- * 
+ *
  * CALLS: None
- * 
+ *
  * CALLED BY: parse 
- * 
+ *
  * HISTORY: initial coding 	November 1976	D A Willcox of CAC
- * 
+ *
  */
 /*----------------------------------------------*\
 |   REDUCTION PHASE				    |

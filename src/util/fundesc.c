@@ -6,7 +6,7 @@
 /*
   Process stdin, dir to write doc files in argv[1]
   argv[2] (optional) is the name of the processed file.
-  
+
 */
 
 char buf[2000];
@@ -35,7 +35,7 @@ void
 make_desc(fdesc)
      char *fdesc;
 
-{  
+{
   char *tmp, *tmp2, *tmp3, *tmp4, fname[100];
   int n,il;
   FILE *f;
@@ -58,7 +58,7 @@ make_desc(fdesc)
       tmp3 = tmp4;
   *tmp2 = 0; strcpy(fname,&tmp3[1]);  *tmp2='(';
 
-  if (f=fopen(fname,"a")) 
+  if (f=fopen(fname,"a"))
       if (dfile)
 	  fprintf(f,"%s\n/*\n * Source: %s\n * Line: %d\n *\n * Description:%s\n\n",
 	      tmp,dfile,line_count-1,fdesc);
@@ -76,7 +76,7 @@ main(argc, argv)
 {
     int pflag, ch;
     char *tmp, *bpek;
-    
+
     if (argc<2) {
 	perror("To few args");
 	exit(1);
@@ -87,13 +87,13 @@ main(argc, argv)
 	exit(1);
     }
 
-    if (argc > 2) 
+    if (argc > 2)
 	dfile = argv[2];
     else
 	dfile = 0;
-    
+
     pflag = 0; tmp = start; bpek = buf; line_count = 1;
-    
+
     while ((ch=getchar()) != EOF) {
 
 	if (ch == '\n')
@@ -122,4 +122,4 @@ main(argc, argv)
 	else tmp = start;
     }
 }
- 
+

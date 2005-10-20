@@ -50,8 +50,6 @@
  */
 #define TIME_TO_RESET	3600	/* one hour */
 
-#define RESET_GRANULARITY 900	/* 15 minutes */
-
 /*
  * Define the maximum stack size of the stack machine. This stack will also
  * contain all local variables and arguments.
@@ -75,8 +73,10 @@
 /*
  * Maximum number of bits in a bit field. They are stored in printable
  * strings, 6 bits per byte.
+ * The limit is more based on considerations of speed than memory
+ * consumption.
  */
-#define MAX_BITS		1200	/* 200 bytes */
+#define MAX_BITS		6144	/* 1 KByte */
 
 /*
  * There is a hash table for living objects, used by find_living().
@@ -191,16 +191,6 @@
 #define COMPAT_MODE
 #undef NATIVE_MODE
 
-/* Define OLD_PREVIOUS_OBJECT_BEHAVIOUR if the new behaviour gives problems
- * in your security system.
- */
-#undef OLD_PREVIOUS_OBJECT_BEHAVIOUR
-
-/* Define OLD_EXPLODE_BEHAVIOUR when you want to have explode geared towards a
- * subroutine of parse_command
- */
-#undef OLD_EXPLODE_BEHAVIOUR
-
 /* Define INITIALIZATION_BY___INIT if you want all initializations of variables
  * to be suspended till the object is created ( as supposed to initialization
  * at compile time; the latter is more memory efficient for loading and faster
@@ -216,16 +206,6 @@
 
 #define MAX_BYTE_TRANSFER 50000
 
-/* Define FLOATS if you want code for the floating-point type
- */
-
-#define FLOATS
-#define TRANSCENDENT_FUNCTIONS
-
-/* Define MAPPINGS if you want a mappings */
-
-#define MAPPINGS
-   
 /*
  * CATCH_UDP_PORT
  *
@@ -237,14 +217,34 @@
 #undef CATCH_UDP_PORT	4246
 #undef UDP_SEND
 
+/* Define this macro to get the old reset implementation.
+ * TODO: Get rid of all OLD_RESET code.
+ */
+/* #define OLD_RESET */
+
+#ifdef OLD_RESET
+/* Object reset times are not exact, but instead rounded up to the
+ * next multiple of RESET_GRANULARITY. This should be between 10
+ * and 60 seconds (see otable.c for a more detailed discussion).
+ */
+#define RESET_GRANULARITY          300   /* five minutes */
+#endif
+
 #define COMM_STAT
 #define APPLY_CACHE_STAT
-#define FILE_STAT
 
-/* When smalloc is used without SBRK_OK, MIN_MALLOCED will lower large block
- * fragmentation. The value should be a multiple of the large chunk size.
+/* When smalloc is used without SBRK_OK and MIN_MALLOCED is defined,
+ * the gamedriver will reserve this amount of memory on startup for
+ * large blocks, thus reducing the large block fragmentation. The value
+ * therefore should be a significantly large multiple of the large
+ * chunk size.
  */
 /* #define MIN_MALLOCED	   0x1000000 */
+
+/* When smalloc is used, these two values give the upper limits for
+ * large and small block allocation (useful for systems with no
+ * functioning process limit).
+ */
 #define MAX_MALLOCED	   0x4000000
 #define MAX_SMALL_MALLOCED 0x1000000
 

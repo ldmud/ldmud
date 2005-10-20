@@ -301,7 +301,7 @@ EOF
 err=`eval "($CPP conftest.c >${DEV_NULL}) 2>&1"`
 if test -z "$err"; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining ${trhdr}"
@@ -320,7 +320,7 @@ done
 
 #At least my Atari has no tr .
 capfunc='echo HAVE_$func|sed y~abcdefghijklmnopqrstuvwxyz./~ABCDEFGHIJKLMNOPQRSTUVWXYZ__~'
-for func in values.h string.h bstring.h netdb.h crypt.h sys/termios.h
+for func in values.h string.h bstring.h netdb.h crypt.h sys/param.h sys/termios.h
 do
 trhdr=`eval ${capfunc}`
 echo checking for ${func}
@@ -331,7 +331,7 @@ EOF
 err=`eval "($CPP conftest.c >${DEV_NULL}) 2>&1"`
 if test -z "$err"; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining ${trhdr}"
@@ -380,7 +380,7 @@ EOF
 eval $compile
 #beware: bash 1.05.1 sends exit signals to the main shell from subshells
 if test -s conftest && (trap '' 0; ./conftest; exit) 2>${DEV_NULL}; then
-  
+
 {
 test -n "$verbose" && \
 echo "	defining STDC_HEADERS"
@@ -416,7 +416,7 @@ int t() { DIR *dirp = 0; }
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining DIRENT"
@@ -443,7 +443,7 @@ int t() { DIR *dirp = 0; }
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining SYSNDIR"
@@ -470,7 +470,7 @@ int t() { DIR *dirp = 0; }
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining SYSDIR"
@@ -497,7 +497,7 @@ int t() { DIR *dirp = 0; }
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining NDIR"
@@ -526,7 +526,7 @@ eval $compile
 if test -s conftest && (trap '' 0; ./conftest; exit) 2>${DEV_NULL}; then
   :
 else
-  
+
 {
 test -n "$verbose" && \
 echo "	defining VOID_CLOSEDIR"
@@ -561,7 +561,7 @@ if eval $compile; then
   :
 else
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" SIZEOF_P_INT to be 8
@@ -580,7 +580,7 @@ rm -f conftest*
 
 else
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" SIZEOF_P_INT to be 4
@@ -604,7 +604,7 @@ int t() {  }
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" SIZEOF_INT to be 4
@@ -615,11 +615,11 @@ SEDDEFS="${SEDDEFS}\${SEDdA}SIZEOF_INT\${SEDdB}SIZEOF_INT\${SEDdC}4\${SEDdD}
 \${SEDeA}SIZEOF_INT\${SEDeB}SIZEOF_INT\${SEDeC}4\${SEDeD}
 "
 }
- 
+
 
 else
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" SIZEOF_INT to be 2
@@ -643,7 +643,7 @@ int t() {  }
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" SIZEOF_LONG to be 4
@@ -658,7 +658,7 @@ SEDDEFS="${SEDDEFS}\${SEDdA}SIZEOF_LONG\${SEDdB}SIZEOF_LONG\${SEDdC}4\${SEDdD}
 
 else
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" SIZEOF_LONG to be 8
@@ -684,7 +684,7 @@ int t() {  }
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" MALLOC_ALIGN to be 8
@@ -699,7 +699,7 @@ SEDDEFS="${SEDDEFS}\${SEDdA}MALLOC_ALIGN\${SEDdB}MALLOC_ALIGN\${SEDdC}8\${SEDdD}
 
 else
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" MALLOC_ALIGN to be 4
@@ -723,7 +723,7 @@ int t() {  }
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining HAVE_LONG_LONG"
@@ -751,7 +751,7 @@ if eval $compile; then
   :
 else
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" inline to be __inline
@@ -776,7 +776,7 @@ if egrep "size_t" conftest.out >${DEV_NULL} 2>&1; then
   :
 else
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" size_t to be unsigned
@@ -799,7 +799,7 @@ if egrep "pid_t" conftest.out >${DEV_NULL} 2>&1; then
   :
 else
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" pid_t to be int
@@ -828,7 +828,7 @@ int t() { int i; }
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" RETSIGTYPE to be void
@@ -843,7 +843,7 @@ SEDDEFS="${SEDDEFS}\${SEDdA}RETSIGTYPE\${SEDdB}RETSIGTYPE\${SEDdC}void\${SEDdD}
 
 else
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" RETSIGTYPE to be int
@@ -877,7 +877,7 @@ fi
 rm -f conftest*
 LIBS="${LIBS_save}"
 if test -n "${have_lib}"; then
-   
+
 {
 test -n "$verbose" && \
 echo "	defining HAVE_LIBM"
@@ -910,7 +910,7 @@ fi
 rm -f conftest*
 LIBS="${LIBS_save}"
 if test -n "${have_lib}"; then
-   
+
 {
 test -n "$verbose" && \
 echo "	defining HAVE_LIBSOCKET"
@@ -945,7 +945,7 @@ LIBS="${LIBS_save}"
 if test -n "${have_lib}"; then
    :; LIBS="$LIBS -lc -lucb"
 else
-   :; 
+   :;
 fi
 
 LIBS_save="${LIBS}"
@@ -968,7 +968,7 @@ LIBS="${LIBS_save}"
 if test -n "${have_lib}"; then
    :; LIBS="$LIBS -lcrypt"
 else
-   :; 
+   :;
 fi
 
 case "$DEFS" in
@@ -991,7 +991,7 @@ fi
 rm -f conftest*
 LIBS="${LIBS_save}"
 if test -n "${have_lib}"; then
-   
+
 {
 test -n "$verbose" && \
 echo "	defining HAVE_LIBNSL"
@@ -1018,7 +1018,7 @@ int t() { char *p = alloca(2 * sizeof(int)); }
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining HAVE_ALLOCA_H"
@@ -1078,7 +1078,7 @@ ${CAT} > conftest.c <<EOF
 #include "confdefs.h"
 #include <ctype.h>
 int main() { exit(0); }
-int t() { 
+int t() {
 /* The GNU C library defines this for functions which it implements
     to always fail with ENOSYS.  Some functions are actually named
     something starting with __ and the normal name is an alias.  */
@@ -1111,7 +1111,7 @@ ${CAT} > conftest.c <<EOF
 #include "confdefs.h"
 #include <ctype.h>
 int main() { exit(0); }
-int t() { 
+int t() {
 /* The GNU C library defines this for functions which it implements
     to always fail with ENOSYS.  Some functions are actually named
     something starting with __ and the normal name is an alias.  */
@@ -1144,7 +1144,7 @@ ${CAT} > conftest.c <<EOF
 #include "confdefs.h"
 #include <ctype.h>
 int main() { exit(0); }
-int t() { 
+int t() {
 /* The GNU C library defines this for functions which it implements
     to always fail with ENOSYS.  Some functions are actually named
     something starting with __ and the normal name is an alias.  */
@@ -1193,7 +1193,7 @@ if test -n "$alloca_missing"; then
   # contain a buggy version.  If you still want to use their alloca,
   # use ar to extract alloca.o from them instead of compiling alloca.c.
   ALLOCA=alloca.o
-  
+
 {
 test -n "$verbose" && \
 echo "	defining C_ALLOCA"
@@ -1224,7 +1224,7 @@ rm -fr conftest*
 
 if test -n "$cross_compiling"
 then
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" STACK_DIRECTION to be 0
@@ -1259,7 +1259,7 @@ EOF
 eval $compile
 #beware: bash 1.05.1 sends exit signals to the main shell from subshells
 if test -s conftest && (trap '' 0; ./conftest; exit) 2>${DEV_NULL}; then
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" STACK_DIRECTION to be 1
@@ -1273,7 +1273,7 @@ SEDDEFS="${SEDDEFS}\${SEDdA}STACK_DIRECTION\${SEDdB}STACK_DIRECTION\${SEDdC}1\${
 
 
 else
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" STACK_DIRECTION to be -1
@@ -1300,7 +1300,7 @@ ${CAT} > conftest.c <<EOF
 #include "confdefs.h"
 #include <ctype.h>
 int main() { exit(0); }
-int t() { 
+int t() {
 /* The GNU C library defines this for functions which it implements
     to always fail with ENOSYS.  Some functions are actually named
     something starting with __ and the normal name is an alias.  */
@@ -1346,14 +1346,14 @@ ${CAT} > conftest.c <<EOF
 #endif
 
 int main() { exit(0); }
-int t() { 
+int t() {
 struct rusage rus;
 syscall(SYS_GETRUSAGE, RUSAGE_SELF, rus);
  }
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining GETRUSAGE_VIA_SYSCALL"
@@ -1364,7 +1364,7 @@ SEDDEFS="${SEDDEFS}\${SEDdA}GETRUSAGE_VIA_SYSCALL\${SEDdB}GETRUSAGE_VIA_SYSCALL\
 \${SEDeA}GETRUSAGE_VIA_SYSCALL\${SEDeB}GETRUSAGE_VIA_SYSCALL\${SEDeC}1\${SEDeD}
 "
 }
- 
+
 {
 test -n "$verbose" && \
 echo "	defining HAVE_GETRUSAGE"
@@ -1392,7 +1392,7 @@ ${CAT} > conftest.c <<EOF
 #include "confdefs.h"
 #include <ctype.h>
 int main() { exit(0); }
-int t() { 
+int t() {
 /* The GNU C library defines this for functions which it implements
     to always fail with ENOSYS.  Some functions are actually named
     something starting with __ and the normal name is an alias.  */
@@ -1424,7 +1424,7 @@ done
 
 #At least my Atari has no tr .
 capfunc='echo HAVE_$func|sed y~abcdefghijklmnopqrstuvwxyz./~ABCDEFGHIJKLMNOPQRSTUVWXYZ__~'
-for func in fcntl getdomainname
+for func in fcntl
 do
 trfunc=`eval ${capfunc}`
 echo checking for ${func}
@@ -1432,7 +1432,7 @@ ${CAT} > conftest.c <<EOF
 #include "confdefs.h"
 #include <ctype.h>
 int main() { exit(0); }
-int t() { 
+int t() {
 /* The GNU C library defines this for functions which it implements
     to always fail with ENOSYS.  Some functions are actually named
     something starting with __ and the normal name is an alias.  */
@@ -1487,7 +1487,7 @@ int t() {  }
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining INET_NTOA_OK"
@@ -1533,7 +1533,7 @@ EOF
 eval $compile
 #beware: bash 1.05.1 sends exit signals to the main shell from subshells
 if test -s conftest && (trap '' 0; ./conftest; exit) 2>${DEV_NULL}; then
-  
+
 {
 test -n "$verbose" && \
 echo "	defining INET_NTOA_OK"
@@ -1551,7 +1551,7 @@ fi
 rm -fr conftest*
 if test -n "$cross_compiling"
 then
-  
+
 {
 test -n "$verbose" && \
 echo "	defining RENAME_HANDLES_DIRECTORIES"
@@ -1576,7 +1576,7 @@ EOF
 eval $compile
 #beware: bash 1.05.1 sends exit signals to the main shell from subshells
 if test -s conftest && (trap '' 0; ./conftest; exit) 2>${DEV_NULL}; then
-  
+
 {
 test -n "$verbose" && \
 echo "	defining RENAME_HANDLES_DIRECTORIES"
@@ -1613,7 +1613,7 @@ ${CAT} > conftest.c <<EOF
 #endif
 
 int main() { exit(0); }
-int t() { 
+int t() {
     struct rusage rus;
     long *v = (long *)main;
     getrusage(RUSAGE_SELF, &rus);
@@ -1637,7 +1637,7 @@ if eval $compile; then
   :
 else
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining GETRUSAGE_RESTRICTED"
@@ -1671,7 +1671,7 @@ ${CAT} > conftest.c <<EOF
 #endif
 
 int main() { exit(0); }
-int t() { 
+int t() {
     struct rusage rus;
     long *v = (long *)main;
     getrusage(RUSAGE_SELF, &rus);
@@ -1681,7 +1681,7 @@ int t() {
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining RUSAGE_USEC"
@@ -1718,7 +1718,7 @@ int t() {  }
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining FREE_RETURNS_VOID"
@@ -1766,7 +1766,7 @@ int t() {  }
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" POINTER to be void\ *
@@ -1781,7 +1781,7 @@ SEDDEFS="${SEDDEFS}\${SEDdA}POINTER\${SEDdB}POINTER\${SEDdC}void *\${SEDdD}
 
 else
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" POINTER to be char\ *
@@ -1813,7 +1813,7 @@ int t() {  }
 EOF
 if eval $compile; then
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" CHARBIT_MASK to be CHARBITS
@@ -1828,7 +1828,7 @@ SEDDEFS="${SEDDEFS}\${SEDdA}CHARBIT_MASK\${SEDdB}CHARBIT_MASK\${SEDdC}CHARBITS\$
 
 else
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" CHARBIT_MASK to be 0xff
@@ -1865,7 +1865,7 @@ eval $compile
 if test -s conftest && (trap '' 0; ./conftest; exit) 2>${DEV_NULL}; then
   :
 else
-  
+
 {
 test -n "$verbose" && \
 echo "	defining STRTOL_BROKEN"
@@ -1920,7 +1920,7 @@ main() {
             if (errno == EADDRINUSE) {
                 close(s);
 		continue;
-            } 
+            }
             exit(1);
         }
 	if (listen(s, 5) == -1) exit(1);
@@ -1956,7 +1956,7 @@ EOF
 eval $compile
 #beware: bash 1.05.1 sends exit signals to the main shell from subshells
 if test -s conftest && (trap '' 0; ./conftest; exit) 2>${DEV_NULL}; then
-  
+
 {
 test -n "$verbose" && \
 echo "	defining USE_IOCTL_FIONBIO"
@@ -2008,7 +2008,7 @@ main() {
             if (errno == EADDRINUSE) {
                 close(s);
 		continue;
-            } 
+            }
             exit(1);
         }
 	if (listen(s, 5) == -1) exit(1);
@@ -2029,7 +2029,7 @@ EOF
 eval $compile
 #beware: bash 1.05.1 sends exit signals to the main shell from subshells
 if test -s conftest && (trap '' 0; ./conftest; exit) 2>${DEV_NULL}; then
-  
+
 {
 test -n "$verbose" && \
 echo "	defining USE_FCNTL_O_NDELAY"
@@ -2080,7 +2080,7 @@ main() {
             if (errno == EADDRINUSE) {
                 close(s);
 		continue;
-            } 
+            }
             exit(1);
         }
 	if (listen(s, 5) == -1) exit(1);
@@ -2101,7 +2101,7 @@ EOF
 eval $compile
 #beware: bash 1.05.1 sends exit signals to the main shell from subshells
 if test -s conftest && (trap '' 0; ./conftest; exit) 2>${DEV_NULL}; then
-  
+
 {
 test -n "$verbose" && \
 echo "	defining USE_FCNTL_FNDELAY"
@@ -2136,7 +2136,7 @@ EOF
 eval $compile
 #beware: bash 1.05.1 sends exit signals to the main shell from subshells
 if test -s conftest && (trap '' 0; ./conftest; exit) 2>${DEV_NULL}; then
-  
+
 {
 test -n "$verbose" && \
 echo "	defining OVERLAPPING_BCOPY"
@@ -2166,7 +2166,7 @@ if eval $compile; then
   :
 else
   rm -rf conftest*
-  
+
 {
 test -n "$verbose" && \
 echo "	defining STRTOL_CONST_CHARP"
@@ -2189,7 +2189,7 @@ ${CAT} > conftest.c <<EOF
 double d = 4.5;
 main() { printf("hello world\n"); }
 EOF
-for TESTFLAG in -O4 -O3 -xO2 -O2 -O; do 
+for TESTFLAG in -O4 -O3 -xO2 -O2 -O; do
   if eval $tcomp; then
     if echo `eval $tcomp2` | egrep '[uU]nrecognized [oO]ption' >${DEV_NULL}; then
       :
@@ -2252,7 +2252,7 @@ EOF
 eval "$CPP conftest.c > conftest.out 2>&1"
 if egrep "yes" conftest.out >${DEV_NULL} 2>&1; then
   rm -rf conftest*
-   EXTRA_CFLAGS='-Dsolaris' 
+   EXTRA_CFLAGS='-Dsolaris'
 
 fi
 rm -f conftest*
@@ -2437,7 +2437,7 @@ fi
 rm -fr conftest*
 if test -n "${SBRK_OK}"; then
   if test -z "${TESTFLAG}" ; then
-    
+
 {
 test -n "$verbose" && \
 echo "	defining SBRK_OK"
@@ -2497,7 +2497,7 @@ EOF
 eval $compile
 #beware: bash 1.05.1 sends exit signals to the main shell from subshells
 if test -s conftest && (trap '' 0; ./conftest; exit) 2>${DEV_NULL}; then
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" FREE_NULL_POINTER to be 1
@@ -2536,7 +2536,7 @@ if test -z "${CONFIG_SHELL}"; then
 fi
 if test "${OSTYPE}" = 'win32'; then
   EXEEXT='.exe'
-  
+
 {
 test -n "$verbose" && \
 echo "	defining" HOST_INCLUDE to be \"hosts/GnuWin32/GnuWin32.h\"

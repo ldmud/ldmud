@@ -30,28 +30,28 @@
      )
 #    define INIT_VEC_TYPE p_uint s[SMALLOC_OVERHEAD]; struct vector v
 #    define VEC_INIT(size, ref, type) \
-	{ ( size * sizeof(struct svalue) + \
-	    sizeof(struct vector) - \
-	    sizeof(struct svalue) \
-	  ) / SIZEOF_P_INT + SMALLOC_OVERHEAD }, \
-	{ ref, VEC_DEBUGREF(ref) (struct wiz_list *)NULL, { { type } } }
+        { ( size * sizeof(struct svalue) + \
+            sizeof(struct vector) - \
+            sizeof(struct svalue) \
+          ) / SIZEOF_P_INT + SMALLOC_OVERHEAD }, \
+        { ref, VEC_DEBUGREF(ref) (struct wiz_list *)NULL, { { type } } }
 
 #else /* !MALLOC_smalloc */
 
 #    define VEC_SIZE(v) ((v)->size)
 #    define INIT_VEC_TYPE struct vector v
 #    define VEC_INIT(size, ref, type) \
-	{ size, ref, VEC_DEBUGREF(ref) (struct wiz_list *)NULL, { { type } } }
+        { size, ref, VEC_DEBUGREF(ref) (struct wiz_list *)NULL, { { type } } }
 #endif
 
 #if !defined(MALLOC_smalloc) || !defined(SMALLOC_TRACE)
 #    define ALLOC_VECTOR(nelem, file, line) \
         (struct vector *)xalloc(sizeof (struct vector) + \
-			        sizeof(struct svalue) * (nelem - 1))
+                                sizeof(struct svalue) * (nelem - 1))
 #else
 #    define ALLOC_VECTOR(nelem, file, line) \
         (struct vector *)smalloc(sizeof (struct vector) + \
-			        sizeof(struct svalue) * (nelem - 1), file, line)
+                                sizeof(struct svalue) * (nelem - 1), file, line)
 #endif /* SMALLOC_TRACE */
 
 
@@ -68,8 +68,6 @@ struct null_vector_aggregate_struct { INIT_VEC_TYPE; };
 
 extern struct null_vector_aggregate_struct null_vector_aggregate;
 #define null_vector null_vector_aggregate.v
-
-extern struct vector *subtract_array_tmp_vec;
 
 extern int num_arrays;
 extern char *last_insert_alist_shared_string;
@@ -100,7 +98,6 @@ extern char *implode_string(struct vector *, char *);
 extern void free_vector(struct vector *p);
 extern void free_empty_vector(struct vector *p);
 extern struct vector *explode_string(char *str, char *del);
-extern struct vector *new_explode_string(char *str, char *del);
 extern struct vector *slice_array(struct vector *p, int from, int to);
 extern struct vector *make_unique(struct vector *arr, char *func, struct svalue *skipnum);
 extern struct vector *add_array(struct vector *p, struct vector *q);

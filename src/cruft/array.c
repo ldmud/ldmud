@@ -34,8 +34,8 @@ static int num_elems(arr)
 
     cnt = arr->size;
 
-    for (il=0;il<arr->size;il++) 
-	if (arr->item[il].type == T_POINTER) 
+    for (il=0;il<arr->size;il++)
+	if (arr->item[il].type == T_POINTER)
 	    cnt += num_elems(arr->item[il].u.vec) - 1;
     return cnt;
 }
@@ -45,8 +45,8 @@ struct vector *flatten_array(arr)
 {
     int max, cnt, il, il2;
     struct vector *res, *dres;
-    
-    if (arr->size < 1) 
+
+    if (arr->size < 1)
 	return allocate_array(0);
 
     max = num_elems(arr);
@@ -57,10 +57,10 @@ struct vector *flatten_array(arr)
     if (max == 0) 	    /* In the case arr is an array of empty arrays */
 	return allocate_array(0);
 
-    res = allocate_array(max); 
+    res = allocate_array(max);
 
     for (cnt = 0 , il = 0; il < arr->size; il++)
-	if (arr->item[il].type != T_POINTER) 
+	if (arr->item[il].type != T_POINTER)
 	    assign_svalue(&res->item[cnt++],&arr->item[il]);
 	else {
 	    dres = flatten_array(arr->item[il].u.vec);
@@ -68,7 +68,7 @@ struct vector *flatten_array(arr)
 		assign_svalue(&res->item[cnt++],&dres->item[il2]);
 	    free_vector(dres);
 	}
-    
+
     return res;
 }
 #endif

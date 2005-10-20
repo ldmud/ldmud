@@ -6,4 +6,5 @@ clean:
 	-rm -f *.o make_docs
 
 install: make_docs
-	$(INSTALL) -c -s $? $(BINDIR)
+	cp $? $(BINDIR)
+#	$(INSTALL) -c -s $? $(BINDIR)

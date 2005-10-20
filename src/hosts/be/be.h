@@ -10,9 +10,14 @@
     }
 
 
+#ifdef __MWERKS__
 #define isascii(c) !((unsigned long)c & 0xFFFFFF80)
 #define EMSGSIZE 40
+#endif
+
 #define FNDELAY O_NONBLOCK
-#define CHARBITS (0xFF)
+#ifndef CHARBITS
+#  define CHARBITS (0xFF)
+#endif
 
 #endif

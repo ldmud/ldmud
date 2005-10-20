@@ -32,7 +32,7 @@ dnl bison -y is incompatible in functionality & Copyright
 AC_PROGRAMS_CHECK(YACC, byacc, yacc)
 AC_PROG_CPP
 AC_HAVE_HEADERS(sys/rusage.h sys/time.h unistd.h stdlib.h libc.h memory.h)
-AC_HAVE_HEADERS(values.h string.h bstring.h netdb.h crypt.h sys/termios.h)
+AC_HAVE_HEADERS(values.h string.h bstring.h netdb.h crypt.h sys/param.h sys/termios.h)
 AC_STDC_HEADERS
 AC_DIR_HEADER
 AC_COMPILE_CHECK(["sizeof(char *) == 4"],
@@ -69,7 +69,7 @@ esac
 AC_ALLOCA
 AC_HAVE_FUNCS(fchmod getrusage bzero memset memcpy memmem strcspn crypt _crypt)
 AC_HAVE_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
-AC_HAVE_FUNCS(fcntl getdomainname)
+AC_HAVE_FUNCS(fcntl)
 AC_TEST_PROGRAM([
 #include <sys/types.h> /* needed for netinet/in.h */
 #include <netinet/in.h>
@@ -272,7 +272,7 @@ main() {
             if (errno == EADDRINUSE) {
                 close(s);
 		continue;
-            } 
+            }
             exit(1);
         }
 	if (listen(s, 5) == -1) exit(1);
@@ -339,7 +339,7 @@ main() {
             if (errno == EADDRINUSE) {
                 close(s);
 		continue;
-            } 
+            }
             exit(1);
         }
 	if (listen(s, 5) == -1) exit(1);
@@ -390,7 +390,7 @@ main() {
             if (errno == EADDRINUSE) {
                 close(s);
 		continue;
-            } 
+            }
             exit(1);
         }
 	if (listen(s, 5) == -1) exit(1);
@@ -441,7 +441,7 @@ double d = 4.5;
 main() { printf("hello world\n"); }
 EOF
 changequote(,)dnl
-for TESTFLAG in -O4 -O3 -xO2 -O2 -O; do 
+for TESTFLAG in -O4 -O3 -xO2 -O2 -O; do
   if eval $tcomp; then
     if echo `eval $tcomp2` | egrep '[uU]nrecognized [oO]ption' >${DEV_NULL}; then
       :

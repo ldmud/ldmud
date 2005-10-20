@@ -1,42 +1,50 @@
-#include <stdio.h>
-/* Copyright 1990,1991 Eric Young. All Rights Reserved.
+/*------------------------------------------------------------------
+ * Portable crypt() Implementation.
+ *
+ * Copyright 1990,1991 Eric Young. All Rights Reserved.
  * This version of crypt has been developed from my MIT compatable
  * DES library.
  * The library is available at pub/DES at ftp.psy.uq.oz.au
  * eay@psych.psy.uq.oz.au
+ *------------------------------------------------------------------
  */
 
+#include <stdio.h>
+
+/*--------------------------------------------------------------------*/
+
 typedef unsigned char des_cblock[8];
+
 typedef struct des_ks_struct
-	{
-	des_cblock _;
-	} des_key_schedule[16];
+{
+    des_cblock _;
+} des_key_schedule[16];
 
-#define DES_KEY_SZ 	(sizeof(des_cblock))
-#define DES_ENCRYPT	1
-#define DES_DECRYPT	0
+#define DES_KEY_SZ     (sizeof(des_cblock))
+#define DES_ENCRYPT    1
+#define DES_DECRYPT    0
 
-/* Amylaar: prepend crypt_ to avoid name clashes */
-typedef unsigned char crypt_uchar;
-typedef unsigned short crypt_ushort;
-typedef unsigned int crypt_uint;
-typedef unsigned long crypt_ulong;
+typedef unsigned char   crypt_uchar;
+typedef unsigned short  crypt_ushort;
+typedef unsigned int    crypt_uint;
+typedef unsigned long   crypt_ulong;
 
-static int body PROT((crypt_ulong *out0, crypt_ulong *out1, des_key_schedule *ks, crypt_ulong Eswap0, crypt_ulong Eswap1));
+static void body(crypt_ulong *out0, crypt_ulong *out1, des_key_schedule *ks, crypt_ulong Eswap0, crypt_ulong Eswap1);
 
 #define ITERATIONS 16
 #define HALF_ITERATIONS 8
 
-#define c2l(c,l)	(l =((crypt_ulong)(*((c)++)))    , \
-			 l|=((crypt_ulong)(*((c)++)))<< 8, \
-			 l|=((crypt_ulong)(*((c)++)))<<16, \
-			 l|=((crypt_ulong)(*((c)++)))<<24)
+#define c2l(c,l) (l =((crypt_ulong)(*((c)++)))    , \
+                  l|=((crypt_ulong)(*((c)++)))<< 8, \
+                  l|=((crypt_ulong)(*((c)++)))<<16, \
+                  l|=((crypt_ulong)(*((c)++)))<<24)
 
-#define l2c(l,c)	(*((c)++)=(crypt_uchar)(((l)    )&0xff), \
-			 *((c)++)=(crypt_uchar)(((l)>> 8)&0xff), \
-			 *((c)++)=(crypt_uchar)(((l)>>16)&0xff), \
-			 *((c)++)=(crypt_uchar)(((l)>>24)&0xff))
+#define l2c(l,c) (*((c)++)=(crypt_uchar)(((l)    )&0xff), \
+                  *((c)++)=(crypt_uchar)(((l)>> 8)&0xff), \
+                  *((c)++)=(crypt_uchar)(((l)>>16)&0xff), \
+                  *((c)++)=(crypt_uchar)(((l)>>24)&0xff))
 
+/*--------------------------------------------------------------------*/
 static unsigned long SPtrans[8][64]={
 {
 /* nibble 0 */
@@ -336,97 +344,113 @@ static crypt_ulong skb[8][64]={
 0x00002822,0x04002822,0x00042822,0x04042822,
 }};
 
-/* See ecb_encrypt.c for a pseudo description of these macros. */
+/*--------------------------------------------------------------------*/
+
+/* See ecb_encrypt.c for a pseudo description of these macros.
+ */
+
 #define PERM_OP(a,b,t,n,m) ((t)=((((a)>>(n))^(b))&(m)),\
-	(b)^=(t),\
-	(a)^=((t)<<(n)))
+        (b)^=(t),\
+        (a)^=((t)<<(n)))
 
 #define HPERM_OP(a,t,n,m) ((t)=((((a)<<(16-(n)))^(a))&(m)),\
-	(a)=(a)^(t)^(t>>(16-(n))))\
+        (a)=(a)^(t)^(t>>(16-(n))))\
 
 static char shifts2[16]={0,0,1,1,1,1,1,1,0,1,1,1,1,1,1,0};
 
-static int des_set_key(des_cblock *key, des_key_schedule schedule)
-	{
-	register unsigned long c,d,t,s;
-	register unsigned char *in;
-	unsigned long *k;
-	register int i;
+/*--------------------------------------------------------------------*/
+static void
+des_set_key (des_cblock *key, des_key_schedule schedule)
 
-	k=(unsigned long *)schedule;
-	in=(crypt_uchar *)key;
+{
+    register unsigned long c, d, t, s;
+    register unsigned char *in;
+    unsigned long *k;
+    register int i;
 
-	c2l(in,c);
-	c2l(in,d);
+    k = (unsigned long *)schedule;
+    in = (crypt_uchar *)key;
 
-	/* do PC1 in 60 simple operations */ 
-	PERM_OP(d,c,t,4,0x0f0f0f0f);
-	HPERM_OP(c,t,-2, 0xcccc0000);
-	HPERM_OP(c,t,-1, 0xaaaa0000);
-	HPERM_OP(c,t, 8, 0x00ff0000);
-	HPERM_OP(c,t,-1, 0xaaaa0000);
-	HPERM_OP(d,t,-8, 0xff000000);
-	HPERM_OP(d,t, 8, 0x00ff0000);
-	HPERM_OP(d,t, 2, 0x33330000);
-	d=((d&0x00aa00aa)<<7)|((d&0x55005500)>>7)|(d&0xaa55aa55);
-	d=(d>>8)|((c&0xf0000000)>>4);
-	c&=0x0fffffff;
+    c2l(in,c);
+    c2l(in,d);
 
-	for (i=0; i<ITERATIONS; i++)
-		{
-		if (shifts2[i])
-			{ c=((c>>2)|(c<<26)); d=((d>>2)|(d<<26)); }
-		else
-			{ c=((c>>1)|(c<<27)); d=((d>>1)|(d<<27)); }
-		c&=0x0fffffff;
-		d&=0x0fffffff;
-		/* could be a few less shifts but I am to lazy at this
-		 * point in time to investigate */
-		s=	skb[0][ (c    )&0x3f                ]|
-			skb[1][((c>> 6)&0x03)|((c>> 7)&0x3c)]|
-			skb[2][((c>>13)&0x0f)|((c>>14)&0x30)]|
-			skb[3][((c>>20)&0x01)|((c>>21)&0x06) |
-			                      ((c>>22)&0x38)];
-		t=	skb[4][ (d    )&0x3f                ]|
-			skb[5][((d>> 7)&0x03)|((d>> 8)&0x3c)]|
-			skb[6][ (d>>15)&0x3f                ]|
-			skb[7][((d>>21)&0x0f)|((d>>22)&0x30)];
+    /* do PC1 in 60 simple operations */ 
+    PERM_OP(d,c,t,4,0x0f0f0f0f);
+    HPERM_OP(c,t,-2, 0xcccc0000);
+    HPERM_OP(c,t,-1, 0xaaaa0000);
+    HPERM_OP(c,t, 8, 0x00ff0000);
+    HPERM_OP(c,t,-1, 0xaaaa0000);
+    HPERM_OP(d,t,-8, 0xff000000);
+    HPERM_OP(d,t, 8, 0x00ff0000);
+    HPERM_OP(d,t, 2, 0x33330000);
+    d = ((d&0x00aa00aa)<<7)|((d&0x55005500)>>7)|(d&0xaa55aa55);
+    d = (d>>8)|((c&0xf0000000)>>4);
+    c &= 0x0fffffff;
 
-		/* table contained 0213 4657 */
-		*(k++)=((t<<16)|(s&0x0000ffff));
-		s=     ((s>>16)|(t&0xffff0000));
-		
-		s=(s<<4)|(s>>28);
-		*(k++)=s;
-		}
-	return(0);
-	}
+    for (i = 0; i < ITERATIONS; i++)
+    {
+        if (shifts2[i])
+        {
+            c = ((c>>2)|(c<<26));
+            d = ((d>>2)|(d<<26));
+        }
+        else
+        {
+            c = ((c>>1)|(c<<27));
+            d = ((d>>1)|(d<<27));
+        }
+        c &= 0x0fffffff;
+        d &= 0x0fffffff;
 
+        /* could be a few less shifts but I am to lazy at this
+         * point in time to investigate
+         */
+        s = skb[0][ (c    )&0x3f                ]|
+            skb[1][((c>> 6)&0x03)|((c>> 7)&0x3c)]|
+            skb[2][((c>>13)&0x0f)|((c>>14)&0x30)]|
+            skb[3][((c>>20)&0x01)|((c>>21)&0x06) |
+                                              ((c>>22)&0x38)];
+        t = skb[4][ (d    )&0x3f                ]|
+            skb[5][((d>> 7)&0x03)|((d>> 8)&0x3c)]|
+            skb[6][ (d>>15)&0x3f                ]|
+            skb[7][((d>>21)&0x0f)|((d>>22)&0x30)];
+
+        /* table contained 0213 4657 */
+        *(k++) = ((t<<16)|(s&0x0000ffff));
+        s      = ((s>>16)|(t&0xffff0000));
+                
+        s = (s<<4)|(s>>28);
+        *(k++) = s;
+    }
+}
+
+/*--------------------------------------------------------------------*/
 /******************************************************************
  * modified stuff for crypt.
  ******************************************************************/
 
-#define D_ENCRYPT(L,R,S)	\
-	t=(R<<1)|(R>>31); \
-	v=(t^(t>>16)); \
-	u=(v&E0); \
-	v=(v&E1); \
-	u=(u^(u<<16))^t^s[S  ]; \
-	t=(v^(v<<16))^t^s[S+1]; \
-	t=(t>>4)|(t<<28); \
-	L^=	SPtrans[1][(t    )&0x3f]| \
-		SPtrans[3][(t>> 8)&0x3f]| \
-		SPtrans[5][(t>>16)&0x3f]| \
-		SPtrans[7][(t>>24)&0x3f]| \
-		SPtrans[0][(u    )&0x3f]| \
-		SPtrans[2][(u>> 8)&0x3f]| \
-		SPtrans[4][(u>>16)&0x3f]| \
-		SPtrans[6][(u>>24)&0x3f];
+#define D_ENCRYPT(L,R,S)        \
+        t=(R<<1)|(R>>31); \
+        v=(t^(t>>16)); \
+        u=(v&E0); \
+        v=(v&E1); \
+        u=(u^(u<<16))^t^s[S  ]; \
+        t=(v^(v<<16))^t^s[S+1]; \
+        t=(t>>4)|(t<<28); \
+        L^=        SPtrans[1][(t    )&0x3f]| \
+                SPtrans[3][(t>> 8)&0x3f]| \
+                SPtrans[5][(t>>16)&0x3f]| \
+                SPtrans[7][(t>>24)&0x3f]| \
+                SPtrans[0][(u    )&0x3f]| \
+                SPtrans[2][(u>> 8)&0x3f]| \
+                SPtrans[4][(u>>16)&0x3f]| \
+                SPtrans[6][(u>>24)&0x3f];
 
 #define PERM_OP(a,b,t,n,m) ((t)=((((a)>>(n))^(b))&(m)),\
-	(b)^=(t),\
-	(a)^=((t)<<(n)))
+        (b)^=(t),\
+        (a)^=((t)<<(n)))
 
+/*--------------------------------------------------------------------*/
 static crypt_uchar con_salt[128]={
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -457,94 +481,120 @@ static crypt_uchar cov_2char[64]={
 0x73,0x74,0x75,0x76,0x77,0x78,0x79,0x7A
 };
 
-char *crypt(const char *buf, const char *salt)
-	{
-	unsigned int i,j,x,y;
-	crypt_ulong Eswap0=0,Eswap1=0;
-	crypt_ulong out[2],ll;
-	des_cblock key;
-	des_key_schedule ks;
-	static crypt_uchar buff[20];
-	crypt_uchar bb[9];
-	crypt_uchar *b=bb;
-	crypt_uchar c,u;
+/*--------------------------------------------------------------------*/
+char *
+crypt (const char *buf, const char *salt)
 
-	x=buff[0]=salt[0];
-	Eswap0=con_salt[x];
-	x=buff[1]=salt[1];
-	Eswap1=con_salt[x]<<4;
+/* Encrypt string <buf> using the first two characters of <salt> as
+ * seed for the algorithm. The result is the encrypted string, stored
+ * in a static buffer, whose first two characters are copies of <salt>.
+ */
 
-	for (i=0; i<8; i++)
-		{
-		c= *(buf++);
-		if (!c) break;
-		key[i]=(c<<1);
-		}
-	for (; i<8; i++)
-		key[i]=0;
+{
+    static crypt_uchar buff[20];
 
-	des_set_key((des_cblock *)(key),ks);
-	body(&out[0],&out[1],&ks,Eswap0,Eswap1);
+    unsigned int i, j, x, y;
+    crypt_ulong Eswap0 = 0;
+    crypt_ulong Eswap1 = 0;
+    crypt_ulong out[2], ll;
+    des_cblock key;
+    des_key_schedule ks;
+    crypt_uchar bb[9];
+    crypt_uchar *b = bb;
+    crypt_uchar c, u;
 
-	ll=out[0]; l2c(ll,b);
-	ll=out[1]; l2c(ll,b);
-	y=0;
-	u=0x80;
-	bb[8]=0;
-	for (i=2; i<13; i++)
-		{
-		c=0;
-		for (j=0; j<6; j++)
-			{
-			c<<=1;
-			if (bb[y] & u) c|=1;
-			u>>=1;
-			if (!u)
-				{
-				y++;
-				u=0x80;
-				}
-			}
-		buff[i]=cov_2char[c];
-		}
-	return((char *)buff);
-	}
+    x = buff[0] = salt[0];
+    Eswap0 = con_salt[x];
+    x = buff[1] = salt[1];
+    Eswap1 = con_salt[x] << 4;
 
-static int body(crypt_ulong *out0, crypt_ulong *out1, des_key_schedule *ks, crypt_ulong Eswap0, crypt_ulong Eswap1)
-	{
-	register unsigned long l,r,t,u,v;
-	register unsigned long *s;
-	register int i,j;
-	register unsigned long E0,E1;
+    for (i = 0; i < 8; i++)
+    {
+        c = *(buf++);
+       if (!c)
+           break;
+       key[i] = (c << 1);
+    }
 
-	l=0;
-	r=0;
+    for (; i < 8; i++)
+        key[i] = 0;
 
-	s=(crypt_ulong *)ks;
-	E0=Eswap0;
-	E1=Eswap1;
+    des_set_key((des_cblock *)(key), ks);
+    body(&out[0], &out[1], &ks, Eswap0, Eswap1);
 
-	for (j=0; j<25; j++)
-		{
-		for (i=0; i<(ITERATIONS*2); i+=4)
-			{
-			D_ENCRYPT(l,r,  i);	/*  1 */
-			D_ENCRYPT(r,l,  i+2);	/*  2 */
-			}
-		t=l;
-		l=r;
-		r=t;
-		}
-	t=l;
-	l=r;
-	r=t;
-	PERM_OP(r,l,t, 1,0x55555555);
-	PERM_OP(l,r,t, 8,0x00ff00ff);
-	PERM_OP(r,l,t, 2,0x33333333);
-	PERM_OP(l,r,t,16,0x0000ffff);
-	PERM_OP(r,l,t, 4,0x0f0f0f0f);
+    ll = out[0]; l2c(ll,b);
+    ll = out[1]; l2c(ll,b);
 
-	*out0=l;
-	*out1=r;
-	return(0);
-	}
+    y = 0;
+    u = 0x80;
+    bb[8] = 0;
+    for (i = 2; i < 13; i++)
+    {
+        c = 0;
+        for (j = 0; j < 6; j++)
+        {
+            c <<= 1;
+            if (bb[y] & u)
+                c |= 1;
+            u >>= 1;
+            if (!u)
+            {
+                y++;
+                u = 0x80;
+            }
+        }
+        buff[i] = cov_2char[c];
+    }
+
+    return((char *)buff);
+}
+
+/*--------------------------------------------------------------------*/
+static void
+body (crypt_ulong *out0
+     , crypt_ulong *out1
+     , des_key_schedule *ks
+     , crypt_ulong Eswap0
+     , crypt_ulong Eswap1)
+
+{
+    register unsigned long l, r, t, u, v;
+    register unsigned long *s;
+    register int i, j;
+    register unsigned long E0, E1;
+
+    l = 0;
+    r = 0;
+
+    s = (crypt_ulong *)ks;
+    E0 = Eswap0;
+    E1 = Eswap1;
+
+    for (j = 0; j < 25; j++)
+    {
+        for (i = 0; i < (ITERATIONS*2); i += 4)
+        {
+            D_ENCRYPT(l,r, i  );  /* 1 */
+            D_ENCRYPT(r,l, i+2);  /* 2 */
+        }
+        t = l;
+        l = r;
+        r = t;
+    }
+
+    t = l;
+    l = r;
+    r = t;
+
+    PERM_OP(r,l,t, 1,0x55555555);
+    PERM_OP(l,r,t, 8,0x00ff00ff);
+    PERM_OP(r,l,t, 2,0x33333333);
+    PERM_OP(l,r,t,16,0x0000ffff);
+    PERM_OP(r,l,t, 4,0x0f0f0f0f);
+
+    *out0 = l;
+    *out1 = r;
+}
+
+/***************************************************************************/
+

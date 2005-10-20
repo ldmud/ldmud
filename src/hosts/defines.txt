@@ -31,5 +31,5 @@ Intel (gcc)             i386, __i386__
 compilers:
 ---------
 gcc:			__GNUC__
-Cygnus gcc for Win32    __CYGWIN32__
+Cygnus gcc for Win32    __CYGWIN32__ resp. __CYGWIN__
 Metrowerks (Be)         __MWERKS__

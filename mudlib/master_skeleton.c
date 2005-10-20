@@ -508,7 +508,7 @@ string get_wiz_name (string file)
 
 
 //---------------------------------------------------------------------------
-string object_name (object obj)
+string printf_obj_name (object obj)
 
 // Return a printable name for an object.
 //
@@ -519,9 +519,9 @@ string object_name (object obj)
 //   A string with the objects name, or 0.
 //
 // This function is called by sprintf() to print a meaningful name
-// in addition to the normal file_name().
+// in addition to the normal object_name().
 // If this functions returns a string, the object will be printed
-// as "<filename> (<obj_name>)".
+// as "<obj_name> (<printf_obj_name>)".
 
 
 //---------------------------------------------------------------------------

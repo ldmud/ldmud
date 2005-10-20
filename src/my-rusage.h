@@ -19,8 +19,8 @@
 #    include <sys/resource.h>
 #endif
 
-#ifdef HAVE_GETRUSAGE
-#    if defined(RUSAGE_USEC)
+#if defined(HAVE_GETRUSAGE)
+#    if defined(RUSAGE_USEC) || defined(__hpux__)
 #        define RUSAGE_TIME(t) ( (t).tv_sec * 1000 + (t).tv_usec / 1000 )
 #    else
 #        if defined(solaris)
@@ -30,6 +30,10 @@
 #            define RUSAGE_TIME(t) ( (t).tv_sec * 1000 + (t).tv_nsec / 1000000 )
 #        endif /* ! solaris */
 #    endif /* RUSAGE_USEC */
+
+#    ifdef HAVE_SYS_TIME_H
+#        include <sys/time.h> /* Needed on some systems for sys/resource.h */
+#    endif
 
 #    ifdef HAVE_SYS_RUSAGE_H  /* solaris */
 #        include <sys/rusage.h>
@@ -48,41 +52,36 @@
 #    define GETRUSAGE_RESTRICTED
 #    define RUSAGE_SELF     0
 
-#    ifndef MSDOS
+#    if defined(POSIX) && (HAVE_SYSCONF)
+     /* there is actually a system that pretends to be POSIX, prototypes sysconf,
+      * but does not have it.
+      */
+#        define TIMES_FREQ sysconf(_SC_CLK_TCK)
 
-#        if defined(POSIX) && (HAVE_SYSCONF)
-         /* there is actually a system that pretends to be POSIX, prototypes sysconf,
-          * but does not have it.
-          */
-#            define TIMES_FREQ sysconf(_SC_CLK_TCK)
+#    else /* !POSIX */
 
-#        else /* !POSIX */
+#        include <sys/time.h>
+#        include <sys/times.h>
+#        include <time.h>
 
-#            include <sys/time.h>
-#            include <sys/times.h>
-#            include <time.h>
+#        define TIMES_FREQ CLK_TCK
+#        ifndef CLK_TCK
+#            define CLK_TCK CLOCKS_PER_SEC
+#            ifndef CLOCKS_PER_SEC
+#                define CLOCKS_PER_SEC 60
+#            endif /* !CLOCKS_PER_SEC */
+#        endif /* !CLK_TCK */
 
-#            define TIMES_FREQ CLK_TCK
-#            ifndef CLK_TCK
-#                define CLK_TCK CLOCKS_PER_SEC
-#                ifndef CLOCKS_PER_SEC
-#                    define CLOCKS_PER_SEC 60
-#                endif /* !CLOCKS_PER_SEC */
-#            endif /* !CLK_TCK */
+#    endif /* !POSIX */
 
-#        endif /* !POSIX */
-
-#        define RUSAGE_TIME(t) ( (t) * 1000 / TIMES_FREQ )
-
-#    else /* MSDOS */
-
-#        define RUSAGE_TIME(t) (t)
-
-#    endif /* MSDOS */
+#    define RUSAGE_TIME(t) ( (t) * 1000 / TIMES_FREQ )
 
 struct rusage {
     long ru_utime, ru_stime;
 };
+
+extern int getrusage(int, struct rusage*);
+  /* Implemented in port.c */
 
 #endif /* HAVE_GETRUSAGE */
 

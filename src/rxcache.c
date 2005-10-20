@@ -196,7 +196,7 @@ rxcache_status (int /* TODO: bool */ verbose)
 }
 
 /*--------------------------------------------------------------------*/
-regexp * 
+regexp *
 rx_dup (regexp * expr)
 
 /* Increase the reference count of <expr> and return it.

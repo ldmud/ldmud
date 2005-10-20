@@ -5,7 +5,8 @@
 
 #include "driver.h"
 #include "datatypes.h"
-
+#include "instrs.h"
+#include "ptrtable.h"
 
 /* Some functions are inlined in interpret.c, and called normally
  * from everywhere else.
@@ -26,17 +27,17 @@
  * The pointer, csp, will point to the values that will be used at return.
  */
 struct control_stack {
-    struct object *ob;		/* Current object */
-    struct object *prev_ob;	/* Save previous object */
-    struct program *prog;	/* Current program */
+    struct object *ob;                /* Current object */
+    struct object *prev_ob;        /* Save previous object */
+    struct program *prog;        /* Current program */
     char *pc;
     struct svalue *fp;
     char *funstart;
-    int num_local_variables;	/* Local + arguments */
-    int function_index_offset;	/* Used when executing functions in inherited
-				   programs */
-    struct svalue *current_variables;	/* Same */
-    short extern_call;		/* Flag if evaluator should return */
+    int num_local_variables;        /* Local + arguments */
+    int function_index_offset;        /* Used when executing functions in inherited
+                                   programs */
+    struct svalue *current_variables;        /* Same */
+    short extern_call;                /* Flag if evaluator should return */
     short dummy;
     char **break_sp;
     struct object *pretend_to_be;
@@ -50,20 +51,20 @@ extern struct error_recovery_info {
     struct con_struct con;
 } *error_recovery_pointer;
 
-#define ERROR_RECOVERY_NONE	0
-#define ERROR_RECOVERY_BACKEND	1
-#define ERROR_RECOVERY_APPLY	2
-#define ERROR_RECOVERY_CATCH	3
+#define ERROR_RECOVERY_NONE        0
+#define ERROR_RECOVERY_BACKEND        1
+#define ERROR_RECOVERY_APPLY        2
+#define ERROR_RECOVERY_CATCH        3
 
-#define LI_MAXOFFSET	0x3c
-#define LI_INCLUDE	0x3d
-#define LI_INCLUDE_END	0x3e
-#define LI_L_RELOCATED	0x3f
+#define LI_MAXOFFSET        0x3c
+#define LI_INCLUDE        0x3d
+#define LI_INCLUDE_END        0x3e
+#define LI_L_RELOCATED        0x3f
 
-#define LI_RELOCATED	0xc0
-#define LI_SMALL_REL	0x20
+#define LI_RELOCATED        0xc0
+#define LI_SMALL_REL        0x20
 
-#define LI_MAXEMPTY	0x20
+#define LI_MAXEMPTY        0x20
 
 #define MAX_SHIFT ((sizeof(p_int) << 3) - 1)
 
@@ -94,6 +95,7 @@ extern int apply_cache_hit, apply_cache_miss;
 extern void init_interpret PROT((void));
 extern void assign_eval_cost PROT((void));
 extern void push_object PROT((struct object *ob));
+extern void push_valid_ob PROT((struct object *ob));
 extern void push_number PROT((p_int n));
 extern void push_shared_string PROT((char *p));
 extern void push_referenced_shared_string PROT((char *p));
@@ -123,7 +125,8 @@ extern int privilege_violation4 PROT((char *what, struct object *whom, char *how
 extern void check_for_destr PROT((struct vector *v));
 extern void push_apply_value PROT((void));
 extern void pop_apply_value  PROT((void));
-extern struct svalue *sapply PROT((char *fun, struct object *ob, int num_arg));
+extern struct svalue *sapply_int(char *fun, struct object *ob, int num_arg, short /* TODO: BOOL */ b_ign_prot);
+#define sapply(f,o,n) sapply_int(f,o,n, MY_FALSE)
 extern struct svalue *apply PROT((char *fun, struct object *ob, int num_arg));
 extern char *function_exists PROT((char *fun, struct object *ob));
 extern void call_function PROT((struct program *progp, int fx));
@@ -140,10 +143,20 @@ extern void call_lambda PROT((struct svalue *lsvp, int num_arg));
 extern void free_interpreter_temporaries PROT((void));
 extern void invalidate_apply_low_cache PROT((void));
 extern void add_eval_cost PROT((int num));
-
-#ifdef MAPPINGS
 extern void push_referenced_mapping PROT((struct mapping *m));
-extern void m_indices_filter PROT((struct svalue *key, struct svalue *data, char *extra));
+extern void m_indices_filter (struct svalue* key, struct svalue* data, void *extra);
+int last_instructions PROT((int length, int verbose, struct svalue **svpp));
+struct svalue *f_last_instructions PROT((struct svalue *sp));
+struct svalue *f_set_modify_command PROT((struct svalue *sp));
+struct svalue *f_set_prompt PROT((struct svalue *sp));
+struct svalue *f_extract_lvalue PROT((struct svalue *sp));
+struct svalue *f_transpose_array PROT((struct svalue *sp));
+struct svalue *f_trace PROT((struct svalue *sp));
+struct svalue *f_traceprefix PROT((struct svalue *sp));
+struct svalue *f_set_is_wizard PROT((struct svalue *sp));
+struct svalue *f_to_object PROT((struct svalue *sp));
+#ifdef F_DEBUG_INFO
+struct svalue *f_debug_info PROT((struct svalue *sp, int num_arg));
 #endif
 
 #ifdef OPCPROF

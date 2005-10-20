@@ -13,7 +13,7 @@
 #define socket_close  closesocket
 #define socketpair(a,b,c,d) (-1)
 
-#ifdef __INTEL__
+#if defined(NEED_SWAP16) && defined(__INTEL__)
 /* This function is missing from libroot.so.LIB :-( */
 INLINE static uint16 _imp____swap_int16(uint16 uarg)
 {

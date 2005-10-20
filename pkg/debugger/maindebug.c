@@ -38,7 +38,7 @@ if ((strcmp(buf,"s") == 0) || (strcmp(buf,"status") == 0))
   add_message("                  Name : "); add_message((char *) (*( (char **) (&csp->funstart[-5]) ))); add_message("\n");
   sprintf(buf," Anz. der lokalen Vars : %d\n",(csp->num_local_variables - csp->funstart[0])); ABM;
   sprintf(buf,"    Anz. der Parameter : %d\n",(csp->funstart[0])); ABM;
- } else 
+ } else
 if ((strcmp(buf,"lv") == 0) || (strcmp(buf,"list vars") == 0))
  {
   CLRSCR;
@@ -57,7 +57,7 @@ if ((strcmp(buf,"lv") == 0) || (strcmp(buf,"list vars") == 0))
 	   { add_message(" "); }
 	} else { add_message("\n"); }
       }
-     if ((lauf1 % 2) != 0) 
+     if ((lauf1 % 2) != 0)
       { add_message("\n"); }
      add_message("\n");
 //     add_message("Funktionslokale Variablen : \n");
@@ -77,10 +77,10 @@ if ((strcmp(buf,"lv") == 0) || (strcmp(buf,"list vars") == 0))
            for (lauf3 = lauf2; lauf3 < (NUMLINES / 2); lauf3++)
 	     { add_message(" "); }
 	  } else { add_message("\n"); }
-	} 	 
+	} 	
        while (tempfunktion->variable_names[lauf1].flags != 0xff);
       }
-    
+
     }
  } else
 if ((strcmp(buf,"lf") == 0) || (strcmp(buf,"list fun") == 0))
@@ -93,13 +93,13 @@ if ((strcmp(buf,"lf") == 0) || (strcmp(buf,"list fun") == 0))
    {
     printflags(buf2,current_object->prog->funktionsdaten[lauf1].flags);
     sprintf(buf,"%s %s%n",buf2,current_object->prog->funktionsdaten[lauf1].name,&lauf2);
-    
+
     add_message(buf);
     if (!((lauf1 % 2) != 0))
      { // *** Da es meist viele Objektglobale Variablen gibt, diese zweispaltig darstellen.
       for (lauf3 = lauf2; lauf3 < (NUMLINES / 2); lauf3++)
        { add_message(" "); }
-     } else { add_message("\n"); }    
+     } else { add_message("\n"); }
    }
  } else
 if ((sscanf(buf,"i %s",buf2) == 1) || (sscanf(buf,"inspect %s",buf2) == 1))
@@ -131,8 +131,8 @@ if ((sscanf(buf,"i %s",buf2) == 1) || (sscanf(buf,"inspect %s",buf2) == 1))
   add_message("\n");
  } else
 if ((strcmp(buf,"lb") == 0) || (strcmp(buf,"list break") == 0))
- { // *** Da moechte jemand schaun, welche Breakpoints er schon definiert 
-   // *** hat. 
+ { // *** Da moechte jemand schaun, welche Breakpoints er schon definiert
+   // *** hat.
   CLRSCR;
   add_message("Anzeige der aktuell definierten Breakpoints\n");
   add_message("-------------------------------------------------------------\n");
@@ -142,24 +142,24 @@ if ((strcmp(buf,"lb") == 0) || (strcmp(buf,"list break") == 0))
    } else
    {
     temp_breakpoint = first_breakpoint;
-    while (temp_breakpoint != 0) 
+    while (temp_breakpoint != 0)
      {
       add_message("Nr. %d : Datei %s, Zeile %d\n",temp_breakpoint->number,temp_breakpoint->in_file,temp_breakpoint->line);
       temp_breakpoint = temp_breakpoint->next;	
      }
    }
   add_message("\n");
- } else 
+ } else
 if ((sscanf(buf,"b %s %d",buf2,&lauf1) == 2) || (sscanf(buf,"break %s %d",buf2,&lauf1) == 2))
- { 
+ {
   num_breakpoints++;
   sprintf(buf,"Breakpoint Nr. %d wird in der Datei %s, Zeile %d hinzugefuegt.\n",num_breakpoints,buf2,lauf1);
   add_message(buf);
   add_message("\n");
-    
-  if (first_breakpoint == 0) // *** Bisher keine Breakpoints definiert. 
+
+  if (first_breakpoint == 0) // *** Bisher keine Breakpoints definiert.
    {
-    temp_breakpoint = malloc(sizeof( struct breakpoint )); 
+    temp_breakpoint = malloc(sizeof( struct breakpoint ));
     first_breakpoint = temp_breakpoint;
    } else
    {
@@ -176,7 +176,7 @@ if ((sscanf(buf,"b %s %d",buf2,&lauf1) == 2) || (sscanf(buf,"break %s %d",buf2,&
   temp_breakpoint->line = lauf1;
   temp_breakpoint->in_file = malloc(strlen(buf2)+1);
   strcpy(temp_breakpoint->in_file,buf2);
-  temp_breakpoint->number = num_breakpoints;  
+  temp_breakpoint->number = num_breakpoints;
  } else
 if ((strcmp(buf,"c") == 0) || (strcmp(buf,"continue") == 0))
  {

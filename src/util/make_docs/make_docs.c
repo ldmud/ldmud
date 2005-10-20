@@ -1,8 +1,11 @@
+#include "../../machine.h"
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef SYSDIR
 #include <sys/dir.h>
+#endif
 #include <stdio.h>
-#ifdef M_UNIX
+#if defined(M_UNIX) || defined(solaris) || defined(linux)
 #include <dirent.h>
 #endif
 
@@ -56,7 +59,7 @@ void load_files(path2, f)
     FILE *f;
 {
     DIR *dirp;
-#if defined(_AIX) || defined(M_UNIX)
+#if defined(_AIX) || defined(M_UNIX) || defined(solaris) || defined(linux)
     struct dirent *de;
 #else
     struct direct *de;
@@ -87,7 +90,7 @@ int main(argc, argv)
     struct stat st;
     char *efun, *lfun, *docpath;
     FILE *f;
-    
+
     if (argc != 2) {
 	fprintf(stderr, "Usage: %s out_file\n", argv[0]);
 	exit(1);

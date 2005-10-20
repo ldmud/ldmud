@@ -1,9 +1,12 @@
-mapping
-m_delete(mapping map, mixed index)
+SYNOPSIS
+	mapping m_delete(mapping map, mixed key)
 
-Remove the entry with index 'index' from mapping 'map', and return the
-changed mapping. If the mapping does not have an entry with index 'index',
-the first argument is returned.
+DESCRIPTION
+	Remove the entry with index 'key' from mapping 'map'. The
+	changed mapping 'map' is also returned as result.
+	If the mapping does not have an	entry with index 'key',
+	nothing is changed.
 
-See also:
-    mappingp, mkmapping, m_indices, m_values, m_sizeof
+SEE ALSO
+	mappingp(E), mkmapping(E), m_indices(E), m_values(E),
+	sizeof(E), widthof(E)

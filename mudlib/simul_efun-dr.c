@@ -252,7 +252,7 @@ int command(string str, object ob) {
     /* Don't call this locally, unless you add code to set this_object() back */
     int result;
     object me;
-    
+
     if (!ob) {
 	set_this_object(previous_object());
 	return efun::command(str);

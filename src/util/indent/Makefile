@@ -45,5 +45,6 @@ clean:
 	rm -f ${OBJS} core indent
 
 install:	indent
-	$(INSTALL) -c -s indent $(BINDIR)
+	cp $? $(BINDIR)
+#	$(INSTALL) -c -s $? $(BINDIR)
 

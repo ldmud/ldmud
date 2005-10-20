@@ -179,16 +179,18 @@ CFLAGS= $(CCOPTS) $(DEFINES)
 YFLAGS= -d
 
 SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\
-    comm1.c ed.c regexp.c mapping.c wiz_list.c swap.c $(MALLOC).c\
+    comm.c ed.c regexp.c mapping.c wiz_list.c swap.c $(MALLOC).c\
     call_out.c otable.c dumpstat.c stralloc.c hash.c port.c\
+    ptrtable.c heartbeat.c \
     access_check.c parse_old.c parse.c prolang.y rxcache.c\
     simul_efun.c sprintf.c gcollect.c closure.c random.c \
-    filestat.c $(XSRC)
+    efuns.c $(XSRC)
 OBJ=lang.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
-comm1.o ed.o regexp.o mapping.o wiz_list.o swap.o $(MALLOC).o\
+comm.o ed.o regexp.o mapping.o wiz_list.o swap.o $(MALLOC).o\
 call_out.o otable.o dumpstat.o stralloc.o hash.o port.o\
+ptrtable.o heartbeat.o \
 access_check.o parse_old.o parse.o simul_efun.o sprintf.o\
-rxcache.o gcollect.o closure.o random.o filestat.o $(XOBJ)
+rxcache.o efuns.o gcollect.o closure.o random.o $(XOBJ)
 
 driver: $(OBJ)
 	$(CC) $(LDFLAGS) $(LIBS) $(OBJ) to=$@
@@ -239,7 +241,7 @@ lang.c lang.h: func_spec make_func prolang.y config.h
 	-$(RMF) efun_defs.c
 	-$(RMF) lang.y
 	-$(RMF) instrs.h
-	make_func > efun_defs.c
+	make_func 
 	$(YACC) $(YFLAGS) -v lang.y
 	-$(RMF) lang.c
 	-$(RMF) lang.h
@@ -291,7 +293,7 @@ PlayMud: hosts/amiga/PlayMud.c
 	$(CC) $< to=$@
 
 netclean:
-	-$(RM) access_check.o comm1.o main.o swap.o socket.o amiga.o
+	-$(RM) access_check.o comm.o main.o swap.o socket.o amiga.o
 
 osclean:
 	-$(RM) $(XOBJ)

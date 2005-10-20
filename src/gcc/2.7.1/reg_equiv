@@ -7,7 +7,7 @@ Tue Oct 17 23:33:19 1995  J"orn Rennecke (amylaar@meolyon.hanse.de)
 	 record_memref_equivalence_conflicts_between,
 	 remove_all_conflicting_equivalences,
 	 remove_conflicting_equivalences): new functions.
-	(validate_equiv_mem, validate_equiv_mem_from_store): 
+	(validate_equiv_mem, validate_equiv_mem_from_store):
 	record any equivalence conflicts seen.
 	(update_equiv_regs): Initialize new variables. For each equivalence
 	made to a memory location, record the location in
@@ -27,19 +27,19 @@ diff -c -r1.1.1.2 local-alloc.c
 --- 77,85 ----
   #define CLASS_LIKELY_SPILLED_P(CLASS) (reg_class_size[(int) (CLASS)] == 1)
   #endif
-  
+
 + /* Clear a vector of pointers.  */
 + #define pzero(pnt, n) bzero((char *)(pnt), sizeof *(pnt) * (n))
-+ 
++
   /* Next quantity number available for allocation.  */
-  
+
   static int next_qty;
 ***************
 *** 242,247 ****
 --- 245,277 ----
   static int this_insn_number;
   static rtx this_insn;
-  
+
 + /* Vectors used to detect conflicts between exploiting equivalences.
 +    When doing a write earlier, this can conflict with doing a read later,
 +    and vice versa. However, there can be no read later <-> read later nor
@@ -54,19 +54,19 @@ diff -c -r1.1.1.2 local-alloc.c
 +    been recorded so far.
 +    Likewise, reg_equiv_memory_wloc is for writes that might be done
 +    earlier.  */
-+ 
++
 + static rtx *reg_equiv_memory_rloc, *reg_equiv_memory_wloc;
-+ 
++
 + /* The insn that is tagged with the REG_EQUIV note. Used to delete the
 +    note in case of conflicts.  */
-+ 
++
 + static rtx *reg_equiv_note_insn;
-+ 
++
 + /* Element N is an expression list listing all pseudo regs that need
 +    have reg_equiv_memory_loc removed if pseudo reg N is substituted by
 +    reg_equiv_memory_loc[N] .  This is a symmetric relation.  */
 + static rtx *reg_equiv_memory_loc_conflicts;
-+ 
++
   static void alloc_qty		PROTO((int, enum machine_mode, int, int));
   static void alloc_qty_for_scratch PROTO((rtx, int, rtx, int, int));
   static void validate_equiv_mem_from_store PROTO((rtx, rtx));
@@ -89,32 +89,32 @@ diff -c -r1.1.1.2 local-alloc.c
 *** 526,537 ****
   /* Depth of loops we are in while in update_equiv_regs.  */
   static int loop_depth;
-  
+
 ! /* Used for communication between the following two functions: contains
 !    a MEM that we wish to ensure remains unchanged.  */
 ! static rtx equiv_mem;
-! 
+!
 ! /* Set nonzero if EQUIV_MEM is modified.  */
 ! static int equiv_mem_modified;
-  
+
   /* If EQUIV_MEM is modified by modifying DEST, indicate that it is modified.
      Called via note_stores.  */
 --- 562,578 ----
   /* Depth of loops we are in while in update_equiv_regs.  */
   static int loop_depth;
-  
+
 ! /* Used for communication between the following two functions:  */
 ! static struct {
 !   /* contains a MEM that we wish to ensure remains unchanged.  */
 !   rtx mem;
-! 
+!
 !   /* Set nonzero if EQUIV_MEM is modified.  */
 !   int modified;
-! 
+!
 !   /* The register the MEM is equivalent to */
 !   rtx reg;
 ! } equiv_mem_internals;
-  
+
   /* If EQUIV_MEM is modified by modifying DEST, indicate that it is modified.
      Called via note_stores.  */
 ***************
@@ -127,7 +127,7 @@ diff -c -r1.1.1.2 local-alloc.c
 ! 	  && true_dependence (dest, equiv_mem)))
 !     equiv_mem_modified = 1;
   }
-  
+
   /* Verify that no store between START and the death of REG invalidates
 --- 583,596 ----
        rtx set;
@@ -142,21 +142,21 @@ diff -c -r1.1.1.2 local-alloc.c
 ! 			 equiv_mem_internals.mem))
 !     equivalence_conflict (equiv_mem_internals.reg, dest);
   }
-  
+
   /* Verify that no store between START and the death of REG invalidates
 ***************
 *** 564,578 ****
     rtx insn;
     rtx note;
-  
+
 -   equiv_mem = memref;
 -   equiv_mem_modified = 0;
-- 
+-
     /* If the memory reference has side effects or is volatile, it isn't a
        valid equivalence.  */
     if (side_effects_p (memref))
       return 0;
-  
+
 !   for (insn = start; insn && ! equiv_mem_modified; insn = NEXT_INSN (insn))
       {
         if (GET_RTX_CLASS (GET_CODE (insn)) != 'i')
@@ -164,16 +164,16 @@ diff -c -r1.1.1.2 local-alloc.c
 --- 609,625 ----
     rtx insn;
     rtx note;
-  
+
     /* If the memory reference has side effects or is volatile, it isn't a
        valid equivalence.  */
     if (side_effects_p (memref))
       return 0;
-  
+
 !   equiv_mem_internals.mem = memref;
 !   equiv_mem_internals.modified = 0;
 !   equiv_mem_internals.reg = reg;
-! 
+!
 !   for (insn = start; insn && ! equiv_mem_internals.modified;
 !        insn = NEXT_INSN (insn))
       {
@@ -182,14 +182,14 @@ diff -c -r1.1.1.2 local-alloc.c
 ***************
 *** 684,689 ****
 --- 731,816 ----
-  
+
     return 0;
   }
-+ 
++
 + /* If X references a pseudo register that could later be turned into an
 +    equivalent memory location, that would be affected by a store to MEMREF,
 +    record this as a conflict with equiv_reg.  */
-+ 
++
 + static void
 + record_memref_equivalence_conflict (memref, x, equiv_reg)
 +      rtx x;
@@ -198,7 +198,7 @@ diff -c -r1.1.1.2 local-alloc.c
 +   int i, j;
 +   char *fmt;
 +   enum rtx_code code = GET_CODE (x);
-+ 
++
 +   switch (code)
 +     {
 +     case REG:
@@ -215,9 +215,9 @@ diff -c -r1.1.1.2 local-alloc.c
 +     case HIGH:
 +     case LO_SUM:
 +       return;
-+ 
++
 +     }
-+ 
++
 +   fmt = GET_RTX_FORMAT (code);
 +   for (i = GET_RTX_LENGTH (code) - 1; i >= 0; i--)
 +     switch (fmt[i])
@@ -231,13 +231,13 @@ diff -c -r1.1.1.2 local-alloc.c
 + 					      equiv_reg);
 + 	break;
 +       }
-+ 
++
 +   return;
 + }
-+ 
++
 + /* Call record_memref_equivalence_conflict for all patterns
 +    of insns in the range (START, END] .  */
-+ 
++
 + static void
 + record_memref_equivalence_conflicts_between (memref, equiv_reg, start, end)
 +      rtx memref, equiv_reg;
@@ -245,15 +245,15 @@ diff -c -r1.1.1.2 local-alloc.c
 +      rtx end;
 + {
 +   rtx insn;
-+ 
++
 +   for (insn = NEXT_INSN (start); insn != NEXT_INSN (end);
 +        insn = NEXT_INSN (insn))
 +     if (GET_RTX_CLASS (GET_CODE (insn)) == 'i')
 +       record_memref_equivalence_conflict (memref, PATTERN (insn), equiv_reg);
 + }
-+ 
++
 + /* Record an equivalence conflict.  */
-+ 
++
 + static void
 + equivalence_conflict (reg0, reg1)
 +   rtx reg0, reg1;
@@ -272,32 +272,32 @@ diff -c -r1.1.1.2 local-alloc.c
 *** 943,957 ****
      into the using insn.  If it succeeds, we can eliminate the register
      completely.  */
-  
+
   static void
   update_equiv_regs ()
   {
 !   rtx *reg_equiv_init_insn = (rtx *) alloca (max_regno * sizeof (rtx *));
 !   rtx *reg_equiv_replacement = (rtx *) alloca (max_regno * sizeof (rtx *));
     rtx insn;
-  
+
 !   bzero ((char *) reg_equiv_init_insn, max_regno * sizeof (rtx *));
 !   bzero ((char *) reg_equiv_replacement, max_regno * sizeof (rtx *));
-  
+
     init_alias_analysis ();
-  
+
 --- 1070,1098 ----
      into the using insn.  If it succeeds, we can eliminate the register
      completely.  */
-  
+
 + static rtx *reg_equiv_replacement;
 + static int *reg_live_length_doubled;
-+ 
++
   static void
   update_equiv_regs ()
   {
 !   rtx *reg_equiv_init_insn = (rtx *) alloca (max_regno * sizeof (rtx));
     rtx insn;
-  
+
 !   reg_equiv_replacement = (rtx *) alloca (max_regno * sizeof (rtx));
 !   reg_equiv_memory_rloc = (rtx *) alloca (max_regno * sizeof (rtx));
 !   reg_equiv_memory_wloc = (rtx *) alloca (max_regno * sizeof (rtx));
@@ -309,12 +309,12 @@ diff -c -r1.1.1.2 local-alloc.c
 !   pzero (reg_equiv_memory_wloc, max_regno);
 !   pzero (reg_equiv_note_insn, max_regno);
 !   bzero ((char *) reg_live_length_doubled, max_regno * sizeof (int));
-! 
+!
 !   reg_equiv_memory_loc_conflicts = (rtx *) oballoc (max_regno * sizeof (rtx));
 !   pzero (reg_equiv_memory_loc_conflicts, max_regno);
-  
+
     init_alias_analysis ();
-  
+
 ***************
 *** 991,1003 ****
   	  && (regno = REGNO (SET_SRC (set))) >= FIRST_PSEUDO_REGISTER
@@ -327,7 +327,7 @@ diff -c -r1.1.1.2 local-alloc.c
 ! 	REG_NOTES (reg_equiv_init_insn[regno])
 ! 	  = gen_rtx (EXPR_LIST, REG_EQUIV, dest,
 ! 		     REG_NOTES (reg_equiv_init_insn[regno]));
-  
+
         /* If this is a register-register copy where SRC is not dead, see if we
   	 can optimize it.  */
 --- 1132,1151 ----
@@ -348,7 +348,7 @@ diff -c -r1.1.1.2 local-alloc.c
 ! 	  record_memref_equivalence_conflicts_between (
 ! 		dest, SET_SRC (set), reg_equiv_init_insn[regno], insn);
 ! 	}
-  
+
         /* If this is a register-register copy where SRC is not dead, see if we
   	 can optimize it.  */
 ***************
@@ -357,7 +357,7 @@ diff -c -r1.1.1.2 local-alloc.c
   	 it is always equivalent to the constant.  */
         if (note && CONSTANT_P (XEXP (note, 0)))
 ! 	PUT_MODE (note, (enum machine_mode) REG_EQUIV);
-  
+
         /* If this insn introduces a "constant" register, decrease the priority
   	 of that register.  Record this insn if the register is only used once
 --- 1177,1186 ----
@@ -368,7 +368,7 @@ diff -c -r1.1.1.2 local-alloc.c
 ! 	  reg_equiv_note_insn[regno] = insn;
 ! 	  PUT_MODE (note, (enum machine_mode) REG_EQUIV);
 ! 	}
-  
+
         /* If this insn introduces a "constant" register, decrease the priority
   	 of that register.  Record this insn if the register is only used once
 ***************
@@ -378,7 +378,7 @@ diff -c -r1.1.1.2 local-alloc.c
   	  && validate_equiv_mem (insn, dest, SET_SRC (set)))
 ! 	REG_NOTES (insn) = note = gen_rtx (EXPR_LIST, REG_EQUIV, SET_SRC (set),
 ! 					   REG_NOTES (insn));
-  
+
         /* Don't mess with things live during setjmp.  */
         if (note && reg_live_length[regno] >= 0)
 --- 1202,1213 ----
@@ -391,18 +391,18 @@ diff -c -r1.1.1.2 local-alloc.c
 ! 	  REG_NOTES (insn) = note
 ! 	  = gen_rtx (EXPR_LIST, REG_EQUIV, SET_SRC (set), REG_NOTES (insn));
 ! 	}
-  
+
         /* Don't mess with things live during setjmp.  */
         if (note && reg_live_length[regno] >= 0)
 ***************
 *** 1061,1066 ****
 --- 1216,1222 ----
-  
+
   	  /* Note that the statement below does not affect the priority
   	     in local-alloc!  */
 + 	  reg_live_length_doubled[regno] = 1;
   	  reg_live_length[regno] *= 2;
-  
+
   	  /* If the register is referenced exactly twice, meaning it is set
 ***************
 *** 1111,1118 ****
@@ -416,30 +416,30 @@ diff -c -r1.1.1.2 local-alloc.c
 +     }
 +     remove_all_conflicting_equivalences();
 + }
-+ 
++
 + /* ??? This could sort registers according to some metric of desirability
 +    and cost to have an equivalence.
 +    ??? The call might also be moved to a later point if the intermediate
 +    steps can work meaningful with mutual exclusive equivalences.  */
-+ 
++
 + static void
 + remove_all_conflicting_equivalences()
 + {
 +   int i;
-+ 
++
 +   for (i = FIRST_PSEUDO_REGISTER; i < max_regno; i++)
 +     remove_conflicting_equivalences (i);
 + }
-+ 
++
 + /* Remove all memory equivalences that become invalid by exploiting the
 +    equivalence of pseudo register REGNO with a memory location.  */
-+ 
++
 + static void
 + remove_conflicting_equivalences (regno)
 +   int regno;
 + {
 +   rtx c;
-+ 
++
 +   for (c = reg_equiv_memory_loc_conflicts[regno]; c; c = XEXP (c, 1))
 +     {
 +       int was_equiv = REGNO (XEXP (c, 0));
@@ -472,4 +472,4 @@ diff -c -r1.1.1.3 toplev.c
 + 		 remove_early_reg_dead_notes ();
   	       });
       }
-  
+

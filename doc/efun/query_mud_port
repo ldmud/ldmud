@@ -11,20 +11,16 @@ DESCRIPTION
 	returned. If this_player() is not existing or not interactive,
 	the first port number open for connections is returned.
 
+	The second and third form of invocation are available only
+        if the driver was compiled with MAXNUMPORTS defined.
+
 	If an user object is given, the port used for its connection
 	is returned.
-
 	If a positive number is given, the <num>th port number the
 	parser uses for connections is returned (given that there are
 	that many ports).
-
 	If -1 is given, the number of ports open for connections is
 	returned.
-
-HISTORY
-	The second and third form of invocation are available only
-	with Deepthought's multi-port driver patch that is used in
-	Nightfall and the LDMud driver line.
 
 SEE ALSO
 	query_host_name(E), query_imp_port(E)
