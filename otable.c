@@ -1,9 +1,15 @@
+#include "driver.h"
+
 #include <stdio.h>
 
-#include "lint.h"
-#include "config.h"
+#include "otable.h"
+
+#include "comm.h"
+#include "gcollect.h"
+#include "hash.h"
 #include "interpret.h"
 #include "object.h"
+#include "simulate.h"
 
 /*
  * Object name hash table.  Object names are unique, so no special

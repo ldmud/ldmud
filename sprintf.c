@@ -48,22 +48,35 @@
  *  "x"   the integer arg is printed in hex.
  *  "X"   the integer arg is printed in hex (in capitals).
  * e,E,f,F,g,G like in c.
+ *
+ * TODO: Improve the printing of endless loops in arrays/mappings, maybe
+ * TODO:: in a way similar to save_object(). For example:
+ * TODO::   ({ / * <1> * / 1, -1, ({ / * <2> * / 3, <1> }) })
+ * TODO:: (the space between *s and /s keeps the compiler from misparsing
+ * TODO::  the example).
  */
 
-#include "config.h"
+#include "driver.h"
 
 #include <stdio.h>
 #include <setjmp.h>
 #include <sys/types.h>
 
-#include "lint.h"
-#include "interpret.h"
-#include "lang.h"
-#include "instrs.h"
+#define NO_INCREMENT_STRING_REF
+#include "sprintf.h"
+
+#include "array.h"
 #include "exec.h"
-#include "stdio.h"
+#include "interpret.h"
+#include "instrs.h"
+#include "main.h"
 #include "object.h"
+#include "prolang.h"
 #include "sent.h"
+#include "simulate.h"
+#include "simul_efun.h"
+#include "stralloc.h"
+#include "swap.h"
 
 /*
  * If this #define is defined then error messages are returned,
@@ -72,10 +85,6 @@
 #define RETURN_ERROR_MESSAGES
 
 #if defined(F_SPRINTF) || defined(F_PRINTF)
-
-extern void free_svalue PROT((struct svalue *));
-
-extern struct object *current_object;
 
 typedef unsigned int format_info;
 /*
@@ -229,9 +238,9 @@ struct sprintf_buffer {
 };
 
 static char buff[BUFF_SIZE];	/* buffer for returned string */
-unsigned int bpos;		/* position in buff */
-unsigned int line_start;
-jmp_buf error_jmp;		/* for error longjmp()s */
+static unsigned int bpos;		/* position in buff */
+static unsigned int line_start;
+static jmp_buf error_jmp;		/* for error longjmp()s */
 
 static struct sprintf_buffer *realloc_sprintf_buffer(b)
     struct sprintf_buffer *b;
@@ -314,7 +323,7 @@ static void numadd(buffer, num)
  * This is a function purely because stradd() is, to keep same param
  * passing...
  */
-void add_indent(buffer, indent)
+static void add_indent(buffer, indent)
     struct sprintf_buffer **buffer;
     int indent;
 {
@@ -343,7 +352,7 @@ struct stsf_locals {
     int num_values;
 };
 
-void svalue_to_string_filter(key, data, extra)
+static void svalue_to_string_filter(key, data, extra)
     struct svalue *key;
     struct svalue *data;
     char *extra;
@@ -467,7 +476,7 @@ static struct sprintf_buffer *svalue_to_string(obj, str, indent, trailing)
       }
       stradd(&str, obj->u.ob->name);
       push_object(obj->u.ob);
-      temp = apply_master_ob("object_name", 1);
+      temp = apply_master_ob(STR_OBJ_NAME, 1);
       if (temp && (temp->type == T_STRING)) {
         stradd(&str, " (\"");
         stradd(&str, temp->u.string);
@@ -627,8 +636,6 @@ static struct sprintf_buffer *svalue_to_string(obj, str, indent, trailing)
 		break;
 	      case CLOSURE_SIMUL_EFUN:
 	      {
-		extern struct function *simul_efunp;
-
 		stradd(&str, "#'");
 		stradd(&str, simul_efunp[type - CLOSURE_SIMUL_EFUN].name);
 		break;
@@ -663,7 +670,7 @@ static struct sprintf_buffer *svalue_to_string(obj, str, indent, trailing)
  * "str" is unmodified.  trailing is, of course, ignored in the case
  * of right justification.
  */
-void add_justified(str, len, pad, fs, finfo, trailing)
+static void add_justified(str, len, pad, fs, finfo, trailing)
   char *str, *pad;
   int len;
   int fs;
@@ -699,7 +706,7 @@ void add_justified(str, len, pad, fs, finfo, trailing)
  * Returns 1 if column completed.
  * Returns 2 if column completed has a \n at the end.
  */
-int add_column(column, trailing)
+static int add_column(column, trailing)
   cst **column;
   short int trailing;
 {
@@ -752,7 +759,7 @@ int add_column(column, trailing)
  * Returns 0 if table not completed.
  * Returns 1 if table completed.
  */
-int add_table(table, trailing)
+static int add_table(table, trailing)
   cst **table;
   short int trailing;
 {
@@ -763,7 +770,7 @@ int add_table(table, trailing)
   for (i=0; i < TAB->nocols && TAB_D; i++) {
     for (done=0;(TAB_D[done])&&(TAB_D[done] != '\n');done++);
     add_justified(TAB_D, done, TAB->pad, TAB->size, TAB->info, 
-                  (trailing || (i < TAB->nocols-1) || (TAB->next)));
+                  (trailing || ((unsigned short int)i < TAB->nocols-1) || (TAB->next)));
     TAB_D += done; /* inc'ed next line ... */
     if (!(*TAB_D) || !(*(++TAB_D))) TAB_D = 0;
   }
@@ -799,16 +806,16 @@ char *string_print_formatted(format_str, argc, argv)
   struct svalue *argv;
 {
   format_info finfo;
-  char format_char;
+  char format_char = 0;
   savechars *saves = 0;	/* chars to restore */
   cst *csts;		/* list of columns/tables to be done */
   /* It is important that the address of csts is taken at least once, so
    * that it will have the correct value at error recovery.
    */
   struct svalue *carg;	/* current arg */
-  unsigned int nelemno;	/* next offset into array */
+  unsigned int nelemno = 0;	/* next offset into array */
   unsigned int fpos;	/* position in format_str */
-  unsigned int arg;	/* current arg number */
+  int arg;	/* current arg number */
   unsigned int fs;	/* field size */
   int pres;		/* precision */
   unsigned int err_num;
@@ -819,7 +826,6 @@ char *string_print_formatted(format_str, argc, argv)
 
   clean.u.string = 0;
   if ((err_num = setjmp(error_jmp))) { /* error handling */
-    extern struct svalue const1;
     static char error_prefix[] = "ERROR: (s)printf(): ";
     char *err;
     cst *tcst;
@@ -1186,7 +1192,7 @@ char *string_print_formatted(format_str, argc, argv)
                 (*temp)->size = fs/pres;
               }
               len = n/pres; /* length of average column */
-              if (n < pres) pres = n;
+              if ((int)n < pres) pres = n;
               if (len*pres < n) len++;
               if (len > 1 && n%pres) pres -= (pres - n%pres)/len;
               (*temp)->d.tab = (char **)xalloc(pres*sizeof(char *));
@@ -1203,7 +1209,7 @@ char *string_print_formatted(format_str, argc, argv)
                     SAVE_CHAR(((TABLE)+fs));
                     TABLE[fs] = '\0';
                     (*temp)->d.tab[i++] = TABLE+fs+1;
-                    if (i >= pres) goto add_table_now;
+                    if ((int)i >= pres) goto add_table_now;
                     n = 0;
                   }
                 }
@@ -1217,7 +1223,7 @@ add_table_now:
             if (pres && pres<slen) {
               slen = pres;
             }
-            if (fs && fs>slen) {
+            if (fs && (int)fs>slen) {
               add_justified(carg->u.string, slen, pad, fs, finfo,
           (((format_str[fpos] != '\n') && (format_str[fpos] != '\0'))
           || ((finfo & INFO_ARRAY) && (nelemno < VEC_SIZE((argv+arg)->u.vec))))
@@ -1232,7 +1238,7 @@ add_table_now:
 	 case INFO_T_FLOAT:
 	 {
 	    char cheat[6];
-	    char temp[100];
+	    char temp[1024];
 	    int tmpl;
 	    p_uint i = 1;
   
@@ -1249,7 +1255,7 @@ add_table_now:
 	      cheat[i++] = '*';
 	      cheat[i++] = format_char;
 	      cheat[i] = '\0';
-	      if (pres > sizeof(temp) - 12) {
+	      if (pres > (int)(sizeof(temp) - 12)) {
 		pres = sizeof(temp) - 12;
 	      }
 	      sprintf(temp, cheat, pres, READ_DOUBLE(carg));
@@ -1262,9 +1268,11 @@ add_table_now:
 	      cheat[i] = '\0';
 	      sprintf(temp, cheat, carg->u.number);
 	      tmpl = strlen(temp);
+              if (tmpl >= (int)sizeof(temp))
+                fatal("Local buffer overflow in sprintf() for float.\n");
 	      if (pres && tmpl > pres) tmpl = pres; /* well.... */
 	    }
-	    if (tmpl < fs)
+	    if (tmpl < (int)fs)
 	      add_justified(temp, tmpl, pad, fs, finfo,
 		(((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||
 		 ((finfo & INFO_ARRAY) &&

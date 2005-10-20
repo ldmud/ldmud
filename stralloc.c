@@ -1,7 +1,14 @@
+#define STRALLOC
+#include "driver.h"
+
 #include <stdio.h>
 
-#define STRALLOC
 #include "stralloc.h"
+
+#include "comm.h"
+#include "gcollect.h"
+#include "hash.h"
+#include "simulate.h"
 
 #ifndef DEBUG
 #define BUG_FREE
@@ -25,6 +32,10 @@
  *	generally allocates blocks which are a power of 2 (should write my
  *	own best-fit malloc specialised to strings); then again, GNU malloc
  *	is bug free...
+ * Actually, the above is not true in 3.2.1: the overhead is 6 bytes
+ * (next poniter and one short for refs), upon which the heuristic in
+ * interpret.c::apply_low() builds. The string length can be deduced from
+ * the size of the allocated memory block when using smalloc.c .
  */
 
 /*
@@ -40,7 +51,7 @@
 #define	WORD_ALIGN_BIT	0x3	/* these are 0 for aligned ptrs */
 
 static mp_int num_distinct_strings = 0;
-mp_int bytes_distinct_strings = 0;
+static mp_int bytes_distinct_strings = 0;
 mp_int stralloc_allocd_strings = 0;
 mp_int stralloc_allocd_bytes = 0;
 static int search_len = 0;
@@ -64,10 +75,8 @@ static int num_str_searches = 0;
  * 1000 and 5000.
  */
 
-static char ** base_table = 0;
-char *out_of_memory_string;
-char *empty_shared_string;
-extern struct ident *ident_table[ITABLE_SIZE];
+static char ** base_table = 0;    /* The hash table */
+char *shstring[SHSTR_NOSTRINGS];  /* the table of common strings */
 
 void init_shared_strings()
 {
@@ -78,10 +87,66 @@ void init_shared_strings()
 	fatal("Out of memory\n");
     for (x=0; x<HTABLE_SIZE; x++)
 	base_table[x] = 0;
-    out_of_memory_string = make_shared_string(
+    
+    /* Generic game strings */
+    shstring[SHX_DEFAULT] = make_shared_string(
 "This string is used as a substitute if allocating another one failed."
     );
-    empty_shared_string = make_shared_string("");
+    shstring[SHX_EMPTY]   = make_shared_string("");
+
+    /* Object lfuns */
+    shstring[SHX_CATCH_TELL] = make_shared_string("catch_tell");
+    shstring[SHX_CATCH_MSG]  = make_shared_string("catch_msg");
+    shstring[SHX_ID]         = make_shared_string("id");
+    shstring[SHX_VARINIT]    = make_shared_string("__INIT");
+
+    /* Master lfuns */
+    shstring[SHX_ABS_PATH]   = make_shared_string("make_path_absolute");
+    shstring[SHX_COMP_OBJ]   = make_shared_string("compile_object");
+    shstring[SHX_CONNECT]    = make_shared_string("connect");
+    shstring[SHX_DISCONNECT] = make_shared_string("disconnect");
+    shstring[SHX_EPILOG]     = make_shared_string("epilog");
+    shstring[SHX_EXT_RELOAD] = make_shared_string("external_master_reload");
+    shstring[SHX_FLAG]       = make_shared_string("flag");
+    shstring[SHX_GET_BB_UID] = make_shared_string("get_bb_uid");
+    shstring[SHX_GET_ED_FNAME] = make_shared_string("get_ed_buffer_save_file_name");
+    shstring[SHX_GET_M_UID]  = make_shared_string("get_master_uid");
+    shstring[SHX_GET_SEFUN]  = make_shared_string("get_simul_efun");
+    shstring[SHX_GET_WNAME]  = make_shared_string("get_wiz_name");
+    shstring[SHX_HEART_ERROR] = make_shared_string("heart_beat_error");
+    shstring[SHX_INAUGURATE] = make_shared_string("inaugurate_master");
+    shstring[SHX_LOG_ERROR]  = make_shared_string("log_error");
+    shstring[SHX_LOGON]      = make_shared_string("logon");
+    shstring[SHX_OBJ_NAME]   = make_shared_string("object_name");
+    shstring[SHX_PLAYER_LEVEL] = make_shared_string("query_player_level");
+    shstring[SHX_PRELOAD]    = make_shared_string("preload");
+    shstring[SHX_PREP_DEST]  = make_shared_string("prepare_destruct");
+    shstring[SHX_PRIVILEGE]  = make_shared_string("privilege_violation");
+    shstring[SHX_QUERY_SHADOW] = make_shared_string("query_allow_shadow");
+    shstring[SHX_QUOTA_DEMON] = make_shared_string("quota_demon");
+    shstring[SHX_RETR_ED]    = make_shared_string("retrieve_ed_setup");
+    shstring[SHX_REACTIVATE] = make_shared_string("reactivate_destructed_master");
+    shstring[SHX_RECEIVE_IMP] = make_shared_string("receive_imp");
+    shstring[SHX_REMOVE_PL]  = make_shared_string("remove_player");
+    shstring[SHX_RUNTIME]    = make_shared_string("runtime_error");
+    shstring[SHX_SAVE_ED]    = make_shared_string("save_ed_setup");
+    shstring[SHX_SHUTDOWN]   = make_shared_string("notify_shutdown");
+    shstring[SHX_SLOW_SHUT]  = make_shared_string("slow_shut_down");
+    shstring[SHX_STALE_ERQ]  = make_shared_string("stale_erq");
+    shstring[SHX_VALID_EXEC] = make_shared_string("valid_exec");
+    shstring[SHX_VALID_QSNOOP] = make_shared_string("valid_query_snoop");
+    shstring[SHX_VALID_READ] = make_shared_string("valid_read");
+    shstring[SHX_VALID_SETEUID] = make_shared_string("valid_seteuid");
+    shstring[SHX_VALID_SNOOP] = make_shared_string("valid_snoop");
+    shstring[SHX_VALID_WRITE] = make_shared_string("valid_write");
+
+    /* Compat mode lfuns */
+    shstring[SHX_ADD_WEIGHT] = make_shared_string("add_weight");
+    shstring[SHX_CANPUTGET]  = make_shared_string("can_put_and_get");
+    shstring[SHX_DROP]       = make_shared_string("drop");
+    shstring[SHX_GET]        = make_shared_string("get");
+    shstring[SHX_QUERY_WEIGHT] = make_shared_string("query_weight");
+    shstring[SHX_PREVENT_INSERT] = make_shared_string("prevent_insert");
 }
 
 void clear_shared_string_refs()
@@ -96,9 +161,11 @@ void clear_shared_string_refs()
 
 #ifdef MALLOC_smalloc
 void note_shared_string_table_ref() {
+    int i;
+
     note_malloced_block_ref((char *)base_table);
-    count_ref_from_string(out_of_memory_string);
-    count_ref_from_string(empty_shared_string);
+    for (i = 0; i < SHSTR_NOSTRINGS; i++)
+      count_ref_from_string(shstring[i]);
 }
 
 void walk_shared_strings(func)

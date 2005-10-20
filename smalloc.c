@@ -9,27 +9,37 @@
 /* support for atari st/tt and FAST_FIT by amylaar @cs.tu-berlin.de */
 #define FIT_STYLE_FAST_FIT
 #define SMALLOC
-#include "lint.h"
+#include "driver.h"
+
+#include "smalloc.h"
+
+#include "comm.h"
+#include "backend.h"
+#include "gcollect.h"
+#include "main.h"
+#include "simulate.h"
+
+#ifdef SMALLOC_LPC_TRACE
+#include "exec.h"
+#include "object.h"
+#endif
 
 typedef p_uint u;
 
-void dprintf1 PROT((int, char *, p_int));
-void dprintf2 PROT((int, char *, p_int, p_int));
-void dprintf3 PROT((int, char *, p_int, p_int, p_int));
+void dprintf1 (int, char *, p_int);
+void dprintf2 (int, char *, p_int, p_int);
+void dprintf3 (int, char *, p_int, p_int, p_int);
+
+
 static char *esbrk PROT((u));
 
 #define lARGE_TRACE /* case is used to switch on/off */
-#define fake(s)
+#define fake(s) (void)0
 #ifndef fake
 #define fake(s) dprintf1(2, "%s\n",(p_int)(s)),debug_message(s)
 #endif
 
 #ifdef SMALLOC_LPC_TRACE
-#include "exec.h"
-#include "object.h"
-extern struct object *current_object;
-extern struct program *current_prog;
-extern char *inter_pc;
 #define M_OBJ 1
 #define M_PROG 2
 #define M_PC 3
@@ -81,7 +91,6 @@ extern char *inter_pc;
 #define THIS_BLOCK	0x40000000
 #define M_REF		0x20000000 /* check this in smalloc.h */
 #define M_GC_FREE	0x10000000 /* check this in smalloc.h */
-#define MASK		0x0FFFFFFF
 
 #define MAGIC		0x17952932
 
@@ -94,7 +103,7 @@ static u *next_unused=0;
 static u unused_size=0;			/* until we need a new chunk */
 
 #ifdef SMALLOC_TRACE
-u sfmagic[SMALL_BLOCK_MAX] =  {
+static u sfmagic[SMALL_BLOCK_MAX] =  {
 	0xde8f7d2d,
 	0xbd89a4b6,
 	0xb667bbec,
@@ -105,7 +114,7 @@ u sfmagic[SMALL_BLOCK_MAX] =  {
 	0x16dd36e2,
 };
 
-u samagic[SMALL_BLOCK_MAX] = {
+static u samagic[SMALL_BLOCK_MAX] = {
 	0x34706efd,
 	0xfc2a5830,
 	0x4e62041a,
@@ -133,7 +142,6 @@ static u *heap_end=0;
 static int overlap;
 #endif
 
-extern int gcollect_outfd;
 #define gout gcollect_outfd
 
 /* STATISTICS */
@@ -150,7 +158,7 @@ typedef struct { unsigned counter, size; } t_stat;
 #define count_add(a,b)   { a.size+=(b); }
 #define count_back(a,b) { a.size-=(b); --a.counter; }
 
-t_stat sbrk_stat;
+static t_stat sbrk_stat;
 
 int debugmalloc=0;	/* Only used when debuging malloc() */
 
@@ -169,9 +177,9 @@ static void large_free PROT((char *));
 #define s_size_ptr(p)	(p)
 #define s_next_ptr(p)	((u **) (p+OVERHEAD))
 
-t_stat small_alloc_stat={0,0};
-t_stat small_free_stat={0,0};
-t_stat small_chunk_stat={0,0};
+static t_stat small_alloc_stat={0,0};
+static t_stat small_free_stat={0,0};
+static t_stat small_chunk_stat={0,0};
 
 #ifdef SMALLOC_TRACE
 POINTER smalloc(size, file, line)
@@ -205,7 +213,7 @@ POINTER smalloc(size)
   if (SIZE_INDEX(small_count, size) > SIZE_INDEX(small_max, size))
     SIZE_INDEX(small_max, size) = SIZE_INDEX(small_count, size);
 
-  if (temp = SIZE_PNT_INDEX(sfltable, size)) 
+  if ( (temp = SIZE_PNT_INDEX(sfltable, size)) ) 
     {					/* allocate from the free list */
       count_back(small_free_stat, size);
 #ifdef SMALLOC_LPC_TRACE
@@ -244,13 +252,11 @@ fake("From free list.");
       }
       next_unused = (u *) large_malloc(SMALL_CHUNK_SIZE + sizeof(u*), 1);
       if (next_unused == 0) {
-	extern int malloc_privilege;
-
 	unused_size = 0;
 	if (malloc_privilege < MALLOC_SYSTEM)
 	    return 0;
 	SIZE_INDEX(sys_small_missing, size) ++;
-	if (temp = SIZE_PNT_INDEX(sys_sfltable, size)) {
+	if ( (temp = SIZE_PNT_INDEX(sys_sfltable, size)) ) {
 #ifdef SMALLOC_LPC_TRACE
 	    temp[M_OBJ]  = (u)current_object;
 	    temp[M_PROG] = current_prog ? current_prog->id_number : 0;
@@ -298,7 +304,7 @@ fake("allocation from chunk successful\n");
 }
 
 #ifdef DEBUG
-char *debug_free_ptr;
+static char *debug_free_ptr;
 #endif /* DEBUG */
 
 void sfree(ptr)
@@ -345,7 +351,7 @@ fake("Freed");
 #define fit_style BEST_FIT
 /* if this is a constant, evaluate at compile-time.... */
 #ifndef fit_style
-int fit_style =BEST_FIT;
+static int fit_style =BEST_FIT;
 #endif
 
 #define l_size_ptr(p)		(p)
@@ -367,7 +373,7 @@ u *ptr;
 
 #ifdef FIT_STYLE_FAST_FIT
 
-#if defined(atarist) || defined (sun) || defined(AMIGA) || defined(__linux__)
+#if defined(atarist) || defined (sun) || defined(AMIGA) || defined(__linux__) || defined(__BEOS__)
 /* there is a type signed char */
     typedef /*signed*/ char balance_t;
 #   define BALANCE_T_BITS 8
@@ -390,7 +396,7 @@ struct free_block {
 /* prepare two nodes for the free tree that will never be removed,
    so that we can always assume that the tree is and remains non-empty. */
 /* some compilers don't understand forward declarations of static vars. */
-extern struct free_block dummy2;
+extern struct free_block dummy2;  /* forward */
 static struct free_block dummy =
 	{ /*size*/0, /*parent*/&dummy2, /*left*/0, /*right*/0, /*balance*/0 };
        struct free_block dummy2 =
@@ -417,7 +423,7 @@ struct free_block *p;
     _check_next(p->right);
 }
 
-void check_next() {
+static void check_next() {
     _check_next(free_tree);
 }
 
@@ -457,7 +463,7 @@ struct free_block *parent, *p;
 }
 
 /* this function returns a value so that it can be used in ,-expressions. */
-int do_check_avl() {
+static int do_check_avl() {
     check_avl(0, free_tree);
     if (inconsistency) {
         fflush(stderr);
@@ -473,7 +479,7 @@ static int contains(p, q)
     return p == q || (p && (contains(p->left, q) || contains(p->right, q)));
 }
 
-int check_free_block(m)
+static int check_free_block(m)
     char *m;
 {
     u *p;
@@ -491,8 +497,8 @@ int check_free_block(m)
 #define do_check_avl() 0
 #endif /* DEBUG_AVL */
 
-t_stat large_free_stat;     
-void remove_from_free_list(ptr)
+static t_stat large_free_stat;     
+static void remove_from_free_list(ptr)
 u *ptr;
 {
     struct free_block *p, *q, *r, *s, *t;
@@ -509,14 +515,14 @@ u *ptr;
     dprintf1(2, "size:%d\n",p->size);
 #endif
     if (p->left) {
-        if (q = p->right) {
+        if ( (q = p->right) ) {
 	    fake("two childs");
 	    s = q;
 	    for ( ; r = q, q = r->left; );
 	    if (r == s) {
 		r->left = s = p->left;
 		s->parent = r;
-		if (r->parent = s = p->parent) {
+		if ( (r->parent = s = p->parent) ) {
 		    if (p == s->left) {
 			s->left  = r;
 		    } else {
@@ -530,7 +536,7 @@ u *ptr;
 		goto balance_right;
 	    } else {
 		t = r->parent;
-		if (t->left = s = r->right) {
+		if ( (t->left = s = r->right) ) {
 		    s->parent  = t;
 		}
 		r->balance = p->balance;
@@ -538,7 +544,7 @@ u *ptr;
 		s->parent = r;
 		r->right = s = p->right;
 		s->parent = r;
-		if (r->parent = s = p->parent) {
+		if ( (r->parent = s = p->parent) ) {
 		    if (p == s->left) {
 			s->left  = r;
 		    } else {
@@ -573,7 +579,7 @@ u *ptr;
 	fake("no left child");
 	s = p;
 	p = s->parent;
-        if(q = r = s->right) {
+        if ( (q = r = s->right) ) {
             r->parent = p;
         }
 	if (s == p->left) {
@@ -593,7 +599,7 @@ balance_right:
         b = p->balance;
         if (b > 0) {
             p->balance = 0;
-            if (q = p->parent) goto balance_q;
+            if ((q = p->parent)) goto balance_q;
             return;
         } else if (b < 0) {
 	    r = p->left;
@@ -604,7 +610,7 @@ balance_right:
 		fake("R-Rotation.");
 		dprintf1(2, "r->balance: %d\n", r->balance);
 #endif
-		if (p->left = s = r->right) {
+		if ( (p->left = s = r->right) ) {
 		    s->parent = p;
 		}
 		r->right = p;
@@ -621,8 +627,8 @@ balance_right:
 		dprintf1(2, "p->balance: %d\n", p->balance);
 		dprintf1(2, "r-height: %d\n", check_avl(r->parent, r));
 #endif
-		if (r->parent = s) {
-		    if (p->balance = b) {
+		if ( (r->parent = s) ) {
+		    if ( (p->balance = b) ) {
 		        if (p == s->left) {
 			    s->left  = r;
 			    return;
@@ -651,10 +657,10 @@ balance_right:
 	        fake("LR-Rotation.");
 	        t = r->right;
 	        b = t->balance;
-	        if (p->left  = s = t->right) {
+	        if ( (p->left  = s = t->right) ) {
 	            s->parent = p;
 	        }
-	        if (r->right = s = t->left ) {
+	        if ( (r->right = s = t->left) ) {
 	            s->parent = r;
 	        }
 	        t->left  = r;
@@ -678,7 +684,7 @@ balance_right:
 #ifdef DEBUG_AVL
 	        dprintf1(2, "t-height: %d\n", check_avl(t->parent, t));
 #endif
-	        if (t->parent = s) {
+	        if ( (t->parent = s) ) {
 	            if (p == s->left) {
 	                p = s;
 	                s->left  = t;
@@ -707,7 +713,7 @@ balance_left:
         b = p->balance;
         if (b < 0) {
             p->balance = 0;
-            if (q = p->parent) goto balance_q;
+            if ( (q = p->parent) ) goto balance_q;
             return;
         } else if (b > 0) {
 	    r = p->right;
@@ -718,7 +724,7 @@ balance_left:
 		fake("L-Rotation.");
 		dprintf1(2, "r->balance: %d\n", r->balance);
 #endif
-		if (p->right = s = r->left) {
+		if ( (p->right = s = r->left) ) {
 		    s->parent = p;
 		}
 		fake("subtree relocated");
@@ -737,8 +743,8 @@ balance_left:
 		dprintf1(2, "p->balance: %d\n", p->balance);
 		dprintf1(2, "r-height: %d\n", check_avl(r->parent, r));
 #endif
-		if (r->parent = s) {
-		    if (p->balance = b) {
+		if ( (r->parent = s) ) {
+		    if ( (p->balance = b) ) {
 		        if (p == s->left) {
 			    s->left  = r;
 			    return;
@@ -767,10 +773,10 @@ balance_left:
 	        fake("RL-Rotation.");
 	        t = r->left;
 	        b = t->balance;
-	        if (p->right = s = t->left ) {
+	        if ( (p->right = s = t->left) ) {
 	            s->parent = p;
 	        }
-	        if (r->left  = s = t->right) {
+	        if ( (r->left  = s = t->right) ) {
 	            s->parent = r;
 	        }
 	        t->right = r;
@@ -791,7 +797,7 @@ balance_left:
 	        p->balance = b2;
 #endif
 	        t->balance = 0;
-	        if (t->parent = s) {
+	        if ( (t->parent = s) ) {
 	            if (p == s->left) {
 	                p = s;
 	                s->left  = t;
@@ -812,7 +818,7 @@ balance_left:
     }
 }
 
-void add_to_free_list(ptr)
+static void add_to_free_list(ptr)
 u *ptr;
 {
     u size;
@@ -841,14 +847,14 @@ u *ptr;
         dprintf1(2, "checked node size %d\n",p->size);
 #endif
         if (size < p->size) {
-            if (q = p->left) {
+            if ( (q = p->left) ) {
                 continue;
             }
             fake("add left");
             p->left = r;
             break;
         } else /* >= */ {
-            if (q = p->right) {
+            if ( (q = p->right) ) {
                 continue;
             }
             fake("add right");
@@ -887,7 +893,7 @@ u *ptr;
                 if (r->balance < 0) {
                     /* R-Rotation */
                     fake("R-Rotation");
-                    if (p->left = s = r->right) {
+                    if ( (p->left = s = r->right) ) {
                         s->parent = p;
                     }
                     r->right = p;
@@ -895,7 +901,7 @@ u *ptr;
                     r->balance = 0;
                     s = p->parent;
                     p->parent = r;
-                    if (r->parent = s) {
+                    if ( (r->parent = s) ) {
 			if ( s->left == p) {
 			    s->left  = r;
 			} else {
@@ -914,12 +920,12 @@ u *ptr;
                     dprintf1(2, "t = %x\n",(p_uint)t);
                     dprintf1(2, "r->balance:%d\n",r->balance);
 #endif
-                    if (p->left  = s = t->right) {
+                    if ( (p->left  = s = t->right) ) {
                         s->parent = p;
                     }
                     fake("relocated right subtree");
                     t->right = p;
-                    if (r->right = s = t->left ) {
+                    if ( (r->right = s = t->left) ) {
                         s->parent = r;
                     }
                     fake("relocated left subtree");
@@ -942,7 +948,7 @@ u *ptr;
                     s = p->parent;
                     p->parent = t;
                     r->parent = t;
-                    if (t->parent = s) {
+                    if ( (t->parent = s) ) {
 			if ( s->left == p) {
 			    s->left  = t;
 			} else {
@@ -974,7 +980,7 @@ u *ptr;
                 if (r->balance > 0) {
                     /* L-Rotation */
                     fake("L-Rotation");
-                    if (p->right = s = r->left) {
+                    if ( (p->right = s = r->left) ) {
                         s->parent = p;
                     }
                     r->left  = p;
@@ -982,7 +988,7 @@ u *ptr;
                     r->balance = 0;
                     s = p->parent;
                     p->parent = r;
-                    if (r->parent = s) {
+                    if ( (r->parent = s) ) {
 			if ( s->left == p) {
 			    s->left  = r;
 			} else {
@@ -1001,12 +1007,12 @@ u *ptr;
                     dprintf1(2, "t = %x\n",(p_uint)t);
                     dprintf1(2, "r->balance:%d\n",r->balance);
 #endif
-                    if (p->right = s = t->left ) {
+                    if ( (p->right = s = t->left) ) {
                         s->parent = p;
                     }
                     fake("relocated left subtree");
                     t->left  = p;
-                    if (r->left  = s = t->right) {
+                    if ( (r->left  = s = t->right) ) {
                         s->parent = r;
                     }
                     fake("relocated right subtree");
@@ -1028,7 +1034,7 @@ u *ptr;
                     s = p->parent;
                     p->parent = t;
                     r->parent = t;
-                    if (t->parent = s) {
+                    if ( (t->parent = s) ) {
 			if ( s->left == p) {
 			    s->left  = t;
 			} else {
@@ -1053,7 +1059,7 @@ u *ptr;
         }
         r = p;
         p = p->parent;
-    } while (q = p);
+    } while ( (q = p) );
     fake((do_check_avl(),"add_to_free_list successful"));
 }
 
@@ -1073,7 +1079,7 @@ void show_free_list()
 #endif
 
 t_stat large_free_stat;     
-void remove_from_free_list(ptr)
+static void remove_from_free_list(ptr)
 u *ptr;
 {
 #ifdef SMALLOC_TRACE
@@ -1091,10 +1097,9 @@ u *ptr;
      l_prev_ptr(l_next_ptr(ptr)) = l_prev_ptr(ptr);
 }
 
-void add_to_free_list(ptr)
+static void add_to_free_list(ptr)
 u *ptr;
 {
-  extern int puts();
   count_up(large_free_stat, *ptr & MASK);
 
 #ifdef DEBUG
@@ -1110,7 +1115,7 @@ u *ptr;
 }
 #endif /* FIT_STYLE_FAST_FIT */
 
-void build_block(ptr, size)	/* build a properly annotated unalloc block */
+static void build_block(ptr, size)	/* build a properly annotated unalloc block */
 u *ptr;
 u size;
 {
@@ -1129,7 +1134,7 @@ u *ptr;
   *ptr |= THIS_BLOCK | M_GC_FREE | M_REF;
 }
 
-t_stat large_alloc_stat;
+static t_stat large_alloc_stat;
 #ifdef SMALLOC_TRACE
 static char *_large_malloc(size, force_more, file, line)
     u size;
@@ -1171,13 +1176,13 @@ retry:
 	    tempsize = p->size;
 	    if (minsplit < tempsize) {
 		ptr = (u*)p; /* remember this fit */
-		if (q = p->left) {
+		if ( (q = p->left) ) {
 		    continue;
 		}
 		/* We don't need that much, but that's the best fit we have */
 		break;
 	    } else if (size > tempsize) {
-		if (q = p->right) {
+		if ( (q = p->right) ) {
 		    continue;
 		}
 		break;
@@ -1187,7 +1192,7 @@ retry:
 		    break;
 		}
 		/* size < tempsize */
-		if (q = p->left) {
+		if ( (q = p->left) ) {
 		    r = p;
 		    /* if r is used in the following loop instead of p,
 		     * gcc will handle q very inefficient throughout the
@@ -1197,12 +1202,12 @@ retry:
 			p = q;
 			tempsize = p->size;
 			if (size < tempsize) {
-			    if (q = p->left) {
+			    if ( (q = p->left) ) {
 				continue;
 			    }
 			    break;
 			} else if (size > tempsize ) {
-			    if (q = p->right) {
+			    if ( (q = p->right) ) {
 			        continue;
 			    }
 			    break;
@@ -1215,18 +1220,18 @@ retry:
 		}
 		tempsize = p->size;
 		if (minsplit > tempsize) {
-		    if (q = p->right) {
+		    if ( (q = p->right) ) {
 			for (;;) {
 			    p = q;
 			    tempsize = p->size;
 			    if (minsplit <= tempsize) {
 				ptr = (u*)p; /* remember this fit */
-				if (q = p->left) {
+				if ( (q = p->left) ) {
 				    continue;
 				}
 				break;
 			    } else /* minsplit > tempsize */ {
-				if (q = p->right) {
+				if ( (q = p->right) ) {
 				    continue;
 				}
 				break;
@@ -1312,9 +1317,7 @@ dprintf1(2, "search length %d\n",search_length);
 
       {
 #ifdef MAX_MALLOCED
-	extern mp_int max_malloced;
-
-	if (sbrk_stat.size + chunk_size > max_malloced &&
+	if ((mp_int)(sbrk_stat.size + chunk_size) > max_malloced &&
 	    (chunk_size = max_malloced - sbrk_stat.size - (heap_start?0:SINT) )
 	    < block_size)
 	{
@@ -1327,14 +1330,6 @@ dprintf1(2, "search length %d\n",search_length);
 	}
       }
       if (ptr == 0) {
-	extern int out_of_memory;
-	extern char *reserved_user_area, *reserved_master_area,
-	            *reserved_system_area;
-	extern mp_int max_small_malloced;
-	extern int malloc_privilege;
-	extern int garbage_collect_to_do;
-	extern int extra_jobs_to_do;
-
 	static int going_to_exit=0;
 	static char mess1[] =
 	  "Temporary out of MEMORY. Freeing user reserve.\n";
@@ -1347,7 +1342,7 @@ dprintf1(2, "search length %d\n",search_length);
 
 	if (going_to_exit)
 	  exit(3);
-	if (force_more && small_chunk_stat.size < max_small_malloced) {
+	if (force_more && (mp_int)small_chunk_stat.size < max_small_malloced) {
 	    /* Now that out of memory is a possible error, we don't want
 	     * to have all large blocks fragmented to smithereens.
 	     * Set max_small_malloced accordingly.
@@ -1355,8 +1350,8 @@ dprintf1(2, "search length %d\n",search_length);
 	    force_more = 0;
 	    goto retry;
 	} else {
-	    garbage_collect_to_do = 1;
-	    extra_jobs_to_do = 1;
+	    garbage_collect_to_do = MY_TRUE;
+	    extra_jobs_to_do = MY_TRUE;
 	    if (reserved_user_area) {
 		sfree(reserved_user_area);
 		reserved_user_area = 0;
@@ -1479,8 +1474,6 @@ size_t size;
 
     temp = (u*)xalloc(size+(MALLOC_ALIGN-SINT));
     if (!temp) {
-	extern int malloc_privilege;
-
 	int save_privilege = malloc_privilege;
 	malloc_privilege = MALLOC_SYSTEM;
 	temp = (u*)xalloc(size+(MALLOC_ALIGN-SINT));
@@ -1530,7 +1523,7 @@ POINTER p; /* could be void *, thus needs casting */
 #endif /* MALLOC_ALIGN */
 
 #ifdef SBRK_OK
-POINTER srealloc(p, size)
+static POINTER srealloc(p, size)
 POINTER p; size_t size;
 {
    u *q, old_size;
@@ -1634,7 +1627,7 @@ u size;
 	p[1] &= ~PREV_BLOCK;
 	overlap = SINT;
       } else {
-	*p = THIS_BLOCK | heap_start - p; /* no M_GC_FREE */
+	*p = THIS_BLOCK | (heap_start - p); /* no M_GC_FREE */
 	overlap = 0;
       }
       heap_start = (u*)block;
@@ -1646,7 +1639,7 @@ u size;
 	overlap = SINT;
       } else {
 	p = (u*)heap_end - 1;
-	*p = *p & (PREV_BLOCK|THIS_BLOCK|M_GC_FREE) | (u*)block - p;
+	*p = (*p & (PREV_BLOCK|THIS_BLOCK|M_GC_FREE)) | ((u*)block - p);
 	heap_end = (u*)(block + size);
 	*(u*)block = PREV_BLOCK;
 	overlap = 0;
@@ -1665,14 +1658,14 @@ u size;
 	block -= SINT;
 	overlap += SINT;
       } else {
-	*prev = *prev & (PREV_BLOCK|THIS_BLOCK|M_GC_FREE) | (u*)block - prev;
+	*prev = (*prev & (PREV_BLOCK|THIS_BLOCK|M_GC_FREE)) | ((u*)block - prev);
 	*(u*)block = PREV_BLOCK;
       }
       if (next - p == 1) {
 	*next &= ~PREV_BLOCK;
 	overlap += SINT;
       } else {
-	*p = THIS_BLOCK | next - p; /* no M_GC_FREE */
+	*p = THIS_BLOCK | (next - p); /* no M_GC_FREE */
       }
     }
   }
@@ -1681,102 +1674,13 @@ u size;
 #endif /* !SBRK_OK */
 }
 
-void writex(d, i)
-    int d;
-    p_uint i;
-{
-    int j;
-    char c;
-
-    for (j = 2 * sizeof i; --j >= 0; i <<= 4) {
-	c = (i >> 8 * sizeof i - 4) + '0';
-	if (c >= '9' + 1)
-	    c += 'a' - ('9' + 1);
-	write(d, &c, 1);
-    }
-}
-
-void writed(d, i)
-    int d;
-    p_uint i;
-{
-    p_uint j;
-    char c;
-
-    for (j = 1000000000; j > i; j /= 10);
-    if (!j) j = 1;
-    do {
-	c = (i / j) % 10 + '0';
-	write(d, &c, 1);
-	j /= 10;
-    } while (j > 0);
-}
-
-char *dprintf_first(fd, s, a)
-    int fd;
-    char *s;
-    p_int a;
-{
-    char *p;
-
-    do {
-	if ( !(p = strchr(s, '%')) ) {
-	    WRITES(fd, s);
-	    return "";
-	}
-	write(fd, s, p - s);
-	switch(p[1]) {
-	  case '%':
-	    write(fd, p+1, 1);
-	    continue;
-	  case 's':
-	    WRITES(fd, (char *)a);
-	    break;
-	  case 'd':
-	    writed(fd, a);
-	    break;
-	  case 'x':
-	    writex(fd, a);
-	    break;
-	}
-	return p+2;
-    } while (1);
-}
-
-void dprintf1(fd, s, a)
-    int fd;
-    char *s;
-    p_int a;
-{
-    s = dprintf_first(fd, s, a);
-    WRITES(fd, s);
-}
-
-void dprintf2(fd, s, a, b)
-    int fd;
-    char *s;
-    p_int a, b;
-{
-    s = dprintf_first(fd, s, a);
-    dprintf1(fd, s, b);
-}
-
-void dprintf3(fd, s, a, b, c)
-    int fd;
-    char *s;
-    p_int a, b, c;
-{
-    s = dprintf_first(fd, s, a);
-    dprintf2(fd, s, b, c);
-}
-
 int resort_free_list() { return 0; }
 
 int malloc_size_mask() { return MASK; }
 
-long malloc_increment_size_calls = 0;
-long malloc_increment_size_success = 0;
-long malloc_increment_size_total = 0;
+static long malloc_increment_size_calls = 0;
+static long malloc_increment_size_success = 0;
+static long malloc_increment_size_total = 0;
 
 #define dump_stat(str,stat) add_message(str,stat.counter,stat.size)
 #define dump_stat2(str,stat) add_message (str,stat.counter,stat.size * SINT)
@@ -1878,26 +1782,24 @@ int is_freed(p, minsize) /* might return false for joined blocks */
 }
 #endif /* SMALLOC_TRACE */
 #ifdef SMALLOC_LPC_TRACE
-void write_lpc_trace(d, p)
+static void write_lpc_trace(d, p)
     int d;
     u *p;
 {
-    extern struct object *obj_list;
-
     struct object *obj, *o;
     char *pc;
     struct program *prog;
     int line;
     int32 id;
 
-    if (obj = (struct object *)p[M_OBJ]) {
+    if ( (obj = (struct object *)p[M_OBJ]) ) {
 	WRITES(d, "Object: ");
 	for(o = obj_list; o && o != obj; o = o->next_all);
 	if (o && !(o->flags & O_DESTRUCTED)) WRITES(d, o->name);
 	else WRITES(d, "Doesn't exist anymore.");
     }
     WRITES(d, "\n");
-    if (id = p[M_PROG]) {
+    if ( (id = p[M_PROG]) ) {
 	WRITES(d, "Program: ");
 	for (o = obj_list;
 	  o && !(o->flags & O_DESTRUCTED) &&
@@ -1911,13 +1813,10 @@ void write_lpc_trace(d, p)
 		o = 0;
 	}
 	if (o) {
-	    extern int get_line_number
-				PROT((char *, struct program *, char **));
-
 	    char *file;
 
 	    line = get_line_number(pc, prog, &file);
-	    dprintf2(d, "%s line:%d\n", file, line);
+	    dprintf2(d, "%s line:%d\n", (p_int)file, line);
 	} else {
 	    WRITES(d, "Not found on old address.\n");
 	}
@@ -1925,7 +1824,7 @@ void write_lpc_trace(d, p)
 }
 #endif
 
-void print_block(d, block)
+static void print_block(d, block)
     int d;
     u *block;
 {
@@ -1952,7 +1851,6 @@ void print_block(d, block)
 }
 
 void clear_M_REF_flags() {
-    extern int first_showsmallnewmalloced_call;
     u *p, *q, *last;
     int i;
 
@@ -2119,7 +2017,7 @@ char *malloc_increment_size(p, size)
     if (next & THIS_BLOCK)
 	return 0;
     next &= MASK;
-    if (next == size) {
+    if (next == (p_uint)size) {
 	remove_from_free_list(start2);
 	start2[next] |= PREV_BLOCK;
 	start[0] += size;
@@ -2128,11 +2026,11 @@ char *malloc_increment_size(p, size)
 	count_add(large_alloc_stat, size);
 	return (char*)start2;
     }
-    if (next >= size + SMALL_BLOCK_MAX + OVERHEAD) {
+    if (next >= (p_uint)size + SMALL_BLOCK_MAX + OVERHEAD) {
 	remove_from_free_list(start2);
 	start2[next-1] -= size;
 	start3 = start2 + size;
-	start3[0] = next-size | PREV_BLOCK;
+	start3[0] = (next-size) | PREV_BLOCK;
 	add_to_free_list(start3);
 	start[0] += size;
 	malloc_increment_size_success++;
@@ -2193,7 +2091,6 @@ int debugmalloc;
 verify_sfltable() {
     u *p;
     int i, j;
-    extern int end;
 
     if (!debugmalloc)
 	return;
@@ -2266,3 +2163,67 @@ test_malloc(p)
 }
 
 #endif /* 0 (never) */
+
+/*-------------------------------------------------------------------------*/
+char *dprintf_first(fd, s, a)
+    int fd;
+    char *s;
+    p_int a;
+{
+    char *p;
+
+    do {
+	if ( !(p = strchr(s, '%')) ) {
+	    WRITES(fd, s);
+	    return "";
+	}
+	write(fd, s, p - s);
+	switch(p[1]) {
+	  case '%':
+	    write(fd, p+1, 1);
+	    continue;
+	  case 's':
+	    WRITES(fd, (char *)a);
+	    break;
+	  case 'd':
+	    writed(fd, a);
+	    break;
+	  case 'x':
+	    writex(fd, a);
+	    break;
+	}
+	return p+2;
+    } while (1);
+}
+
+/*-------------------------------------------------------------------------*/
+void dprintf1(fd, s, a)
+    int fd;
+    char *s;
+    p_int a;
+{
+    s = dprintf_first(fd, s, a);
+    WRITES(fd, s);
+}
+
+/*-------------------------------------------------------------------------*/
+void dprintf2(fd, s, a, b)
+    int fd;
+    char *s;
+    p_int a, b;
+{
+    s = dprintf_first(fd, s, a);
+    dprintf1(fd, s, b);
+}
+
+/*-------------------------------------------------------------------------*/
+void dprintf3(fd, s, a, b, c)
+    int fd;
+    char *s;
+    p_int a, b, c;
+{
+    s = dprintf_first(fd, s, a);
+    dprintf2(fd, s, b, c);
+}
+
+

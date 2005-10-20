@@ -81,7 +81,7 @@ void init_rusage(void); /* in port.c */
 #endif
 
 static char ver[] =
-  "\0$VER: Amylaar-LPMud " GAME_VERSION PATCH_LEVEL " (" __DATE__ ") OS " OSVERSION NETVERSION " #950205";
+  "\0$VER: Amylaar-LPMud " GAME_VERSION PATCH_LEVEL LOCAL_LEVEL " (" __DATE__ ") OS " OSVERSION NETVERSION " #950205";
 static APTR oldException = NULL;
 static ULONG oldExceptSig = 0L;
 
@@ -133,7 +133,7 @@ void amiga_init (void) {
   LONG stackSize;
   char *vp = ver;  /* so the version string won't be optimized away */
 
-  printf ("dr %s%s (Amiga, OS %s%s)\n", GAME_VERSION, PATCH_LEVEL, OSVERSION, NETSTRING);
+  printf ("dr %s%s (Amiga, OS %s%s)\n", GAME_VERSION, PATCH_LEVEL LOCAL_LEVEL, OSVERSION, NETSTRING);
 #ifdef INCLUDE_VERSION
   if (SysBase->lib_Version < 36) {
     printf ("Fatal: Need OS 2.0 to run.\n");

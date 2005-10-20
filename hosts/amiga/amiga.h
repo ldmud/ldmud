@@ -12,7 +12,11 @@
 
 #include "hosts/amiga/ixfile.h"
 
-#define NO_IP_DEMON
+#if defined(AMIGA) && defined(__SASC)
+#  if __VERSION__ * 1000 + __REVISION__ < 6055
+#    error Need SAS/C 6.55 or better to compile.
+#  endif
+#endif
 
 #if !defined(AMIGA_TCP)
   #undef CATCH_UDP_PORT

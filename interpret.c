@@ -1,6 +1,12 @@
-#include "config.h"
+#include "driver.h"
 
+#include "my-alloca.h"
+#include "my-rusage.h"
+#ifndef __STDC__
 #include <varargs.h>
+#else
+#include <stdarg.h>
+#endif
 #include <stdio.h>
 #include <setjmp.h>
 #include <ctype.h>
@@ -11,6 +17,14 @@
 #include <prof.h>
 #endif
 
+#ifdef HAVE_CRYPT_H
+     /* solaris defines crypt() here */
+#    include <crypt.h>
+#endif
+#if !defined(HAVE_CRYPT) && defined(HAVE__CRYPT)
+#    define crypt(pass, salt) _crypt(pass, salt)
+#endif
+
 #ifdef MARK
 #define CASE(x) case (x)-F_OFFSET: MARK(x);
 #else
@@ -19,89 +33,42 @@
 
 #define INTERPRET
 #define USES_SVALUE_STRLEN
-#include "lint.h"
 #include "interpret.h"
-#include "smalloc.h"
-
-#include "lang.h"
-#include "exec.h"
-#include "object.h"
-#include "wiz_list.h"
-#include "instrs.h"
+#include "array.h"
+#include "backend.h"
+#include "call_out.h"
+#include "closure.h"
 #include "comm.h"
+#include "ed.h"
+#include "exec.h"
+#include "gcollect.h"
+#include "instrs.h"
+#include "lex.h"
+#include "main.h"
+#include "mapping.h"
+#include "object.h"
+#include "otable.h"
+#include "parse.h"
+#include "prolang.h"
+#include "random.h"
 #include "sent.h"
-#include "switch.h"
+#include "simulate.h"
+#include "simul_efun.h"
 #include "stralloc.h"
+#include "smalloc.h"
+#include "sprintf.h"
+#include "swap.h"
+#include "switch.h"
+#include "wiz_list.h"
 
-#ifdef HAVE_CRYPT_H
-/* solaris defines crypt() here */
-#include <crypt.h>
-#endif
 
-#ifdef GETRUSAGE_VIA_SYSCALL
-/* hpux */
-#include <sys/syscall.h>
-#define getrusage(a, b)  syscall(SYS_GETRUSAGE, a, b)
-#endif
 
-#ifdef HAVE_GETRUSAGE			/* Defined in machine.h */
-#ifdef HAVE_SYS_RUSAGE_H
-/* solaris */
-#include <sys/rusage.h>
-#endif /* HAVE_SYS_RUSAGE */
-#include <sys/resource.h>
-#ifdef sun
-extern int getpagesize();
-#endif
-#ifndef RUSAGE_SELF
-#define RUSAGE_SELF	0
-#endif
-#if defined(sun) || defined(ultrix)
-extern int getrusage PROT((int, struct rusage *));
-#endif
-#endif /* HAVE_GETRUSAGE */
-
-#if defined(__GNUC__) && !defined(lint) && !defined(DEBUG)
-#define INLINE inline
-#else
-#define INLINE
-#endif
-
-#ifdef MAPPINGS
-/* mapping prototypes */
-
-struct mapping *allocate_mapping PROT((int, int));
-void free_mapping PROT((struct mapping*));
-void free_protector_mapping PROT((struct mapping*));
-struct svalue *get_map_lvalue PROT((struct mapping*, struct svalue*, int));
-struct mapping *copy_mapping PROT((struct mapping *));
-void remove_mapping PROT((struct mapping *, struct svalue *));
-struct mapping *add_mapping PROT((struct mapping*, struct mapping*));
-void add_to_mapping PROT((struct mapping*, struct mapping*));
-void sub_from_mapping_filter PROT((struct svalue *, struct svalue *, char *));
-struct mapping *subtract_mapping PROT((struct mapping *, struct mapping *));
-struct svalue *filter_mapping PROT(( struct svalue*, int));
-struct svalue *map_mapping PROT((struct svalue*, int));
-void check_map_for_destr PROT((struct mapping *));
-void walk_mapping PROT((
-	struct mapping *,
-	void (*)(struct svalue *, struct svalue *, char *),
-	char *
-));
-void m_values_filter  PROT((struct svalue *, struct svalue *, char *));
-struct vector *m_indices PROT((struct mapping *));
-#endif /* MAPPINGS */
-
-extern struct object *master_ob;
-extern int do_rename PROT((char *, char *));     
-
-extern void print_svalue PROT((struct svalue *));
 static void free_protector_svalue PROT((struct svalue *));
 struct svalue *sapply PROT((char *, struct object *, int));
 static void do_trace PROT((char *, char *, char *));
 static int apply_low PROT((char *, struct object *, int));
 static int inter_sscanf PROT((int, struct svalue *));
-struct vector *inter_add_array PROT((struct vector *, struct vector**));
+static struct vector *inter_add_array PROT((struct vector *, struct vector**));
 static int strpref PROT((char *, char *));
 static void transfer_pointer_range PROT((struct svalue *source));
 static void transfer_protected_pointer_range
@@ -110,18 +77,8 @@ static void assign_string_range PROT((struct svalue *source, int do_free));
 static void assign_protected_string_range
   PROT((struct protected_range_lvalue *dest,struct svalue *source, int do_free));
 static void call_simul_efun PROT((int code, struct object *ob, int num_arg));
-#if defined(F_SPRINTF) || defined(F_PRINTF)
-extern char *string_print_formatted PROT((char *, int, struct svalue *));
-#endif /* defined(F_SPRINTF) || defined(F_PRINTF) */
 
-extern struct object *previous_ob;
-extern char *last_verb;
-extern struct svalue const0, const1;
 struct program *current_prog;
-extern int current_time;
-extern struct object *current_heart_beat, *current_interactive;
-extern int out_of_memory;
-extern char *out_of_memory_string;
 
 /* A function call can cause an eval_cost overflow linear to the number of
  * shadows. Well, adding more than a million is likely to cause memory
@@ -132,8 +89,8 @@ extern char *out_of_memory_string;
 #define MAX_TRACE_COST ((int32)(0x80000000 - MIN_TRACE_COST))
 int tracedepth;
 int trace_level;
-int traceing_recursion = -1;
-int trace_test PROT((int));
+static int traceing_recursion = -1;
+static int trace_test PROT((int));
 #define TRACE_CALL 1
 #define TRACE_CALL_OTHER 2
 #define TRACE_RETURN 4
@@ -168,11 +125,6 @@ int trace_test PROT((int));
  * If Y isn't loaded when it is needed, X will be discarded, and Y will be
  * loaded separetly. X will then be reloaded again.
  */
-extern int d_flag;
-
-extern int port_number;
-
-extern int32 current_line, initial_eval_cost, eval_cost, assigned_eval_cost;
 
 /*
  * These are the registers used at runtime.
@@ -205,6 +157,27 @@ static struct control_stack *csp;	/* Points to last element pushed */
 #define ERRORF(s) {inter_pc = pc; inter_sp = sp; error s ;}
 #define ERROR(s) ERRORF((s))
 #define STACK_OVERFLOW(sp, fp, pc) stack_overflow(sp, fp, pc)
+
+/* defines and a helpfun for F_TERMINAL_COLOUR */
+
+#define CALLOCATE(num, type) ((type *)xalloc(sizeof(type[1]) * (num) ))
+#define RESIZE(ptr, num, type) ((type *)rexalloc((void *)ptr, sizeof(type) * (num)))
+
+#define NSTRSEGS 32
+#define TC_FIRST_CHAR '%'
+#define TC_SECOND_CHAR '^'
+
+static int at_end(int i, int imax, int z, int *lens) {
+    if (z + 1 != lens[i])
+        return 0;
+    for (i++; i < imax; i++) {
+        if (lens[i] > 0)
+            return 0;
+    }
+    return 1;
+}
+
+/* end of F_TERMINAL_COLOUR addons */
 
 #define pop_n_elems(n) (sp = _pop_n_elems((n), sp))
 INLINE static struct svalue *_pop_n_elems PROT((int, struct svalue *));
@@ -381,7 +354,7 @@ static INLINE struct svalue *find_virtual_value(num)
     return &current_object->variables[num];
 }
 
-INLINE void free_string_svalue(v)
+LOCAL_INLINE void free_string_svalue(v)
     struct svalue *v;
 {
     switch(v->x.string_type) {
@@ -607,7 +580,7 @@ static struct {
     int index1, index2, size;
 } special_lvalue;
 
-INLINE void assign_svalue_no_free(to, from)
+LOCAL_INLINE void assign_svalue_no_free(to, from)
     struct svalue *to;
     struct svalue *from;
 {
@@ -662,7 +635,7 @@ INLINE void assign_svalue_no_free(to, from)
     }
 }
 
-INLINE void assign_lrvalue_no_free(to, from)
+static INLINE void assign_lrvalue_no_free(to, from)
     struct svalue *to;
     struct svalue *from;
 {
@@ -809,7 +782,7 @@ void assign_svalue(dest, v)
     return;
 }
 
-INLINE void transfer_svalue_no_free(dest, v)
+LOCAL_INLINE void transfer_svalue_no_free(dest, v)
     struct svalue *dest;
     struct svalue *v;
 {
@@ -1178,7 +1151,9 @@ void push_svalue(v)
     assign_svalue_no_free(++inter_sp, v);
 }
 
-void push_lrvalue(v)
+static void push_lrvalue PROT((struct svalue *v)) UNUSED;
+
+static void push_lrvalue(v)
     struct svalue *v;
 {
     assign_lrvalue_no_free(++inter_sp, v);
@@ -1305,7 +1280,7 @@ assign_from_lvalue:
 	    if ( !(to->u.string = make_shared_string(from->u.string)) ) {
 		to->type = T_STRING;
 		to->x.string_type = STRING_SHARED;
-		increment_string_ref(to->u.string = out_of_memory_string);
+		increment_string_ref(to->u.string = STR_DEFAULT);
 		inter_sp = sp;
 		inter_pc = pc;
 		error("Out of memory\n");
@@ -1361,7 +1336,7 @@ assign_from_lvalue:
  * Don't do this if it is a value that will be used afterwards, as the
  * data may be sent to xfree(), and destroyed.
  */
-INLINE void pop_stack() {
+LOCAL_INLINE void pop_stack() {
 #ifdef DEBUG
     if (inter_sp < start_of_stack)
 	fatal("Stack underflow.\n");
@@ -1394,7 +1369,7 @@ static INLINE struct svalue *push_indexed_lvalue(sp, pc)
 	    return sp;
 	}
 	sp = vec;
-	if (ind >= VEC_SIZE(vec->u.vec)) ERROR ("Index out of bounds\n")
+	if ((size_t)ind >= VEC_SIZE(vec->u.vec)) ERROR ("Index out of bounds\n")
 	item = &vec->u.vec->item[ind];
 	if (vec->u.vec->ref == 1) {
 	    /* marion says: but this is crude too */
@@ -1477,7 +1452,7 @@ static INLINE struct svalue *push_rindexed_lvalue(sp, pc)
 {					\
     struct hash_mapping *hm;		\
 					\
-    if (hm = (m)->hash) {		\
+    if ( (hm = (m)->hash) ) {		\
 	if (!hm->ref++) 		\
 	    hm->deleted = 0;		\
 	dest.type = T_PROTECTOR_MAPPING;\
@@ -1503,7 +1478,7 @@ static INLINE struct svalue *push_protected_indexed_lvalue(sp, pc)
 	    return sp;
 	}
 	sp = vec;
-	if (ind >= VEC_SIZE(vec->u.vec)) ERROR ("Index out of bounds\n")
+	if ((size_t)ind >= VEC_SIZE(vec->u.vec)) ERROR ("Index out of bounds\n")
 	item = &vec->u.vec->item[ind];
 	lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
 	lvalue->v.type = T_PROTECTED_LVALUE;
@@ -1588,7 +1563,8 @@ static INLINE struct svalue *push_protected_indexed_map_lvalue(sp, pc)
 	struct mapping *m;
 
 	m = vec->u.map;
-	if ( (p_uint)sp->u.number >= m->num_values) {
+	if ((p_uint)sp->u.number >= (p_uint)m->num_values) {
+            /* using uints automagically checks for negative indices */
 	    ERROR("Illegal index\n")
 	    return sp;
 	}
@@ -1634,7 +1610,7 @@ static INLINE struct svalue *index_lvalue(sp, pc)
 		return sp;
 	    }
 	    sp = i;
-	    if (ind >= VEC_SIZE(v)) {
+	    if ((size_t)ind >= VEC_SIZE(v)) {
 		ERROR ("Index out of bounds\n")
 		return sp;
 	    }
@@ -1780,7 +1756,7 @@ static INLINE struct svalue *protected_index_lvalue(sp, pc)
 		return sp;
 	    }
 	    sp = i;
-	    if (ind >= VEC_SIZE(v)) {
+	    if ((size_t)ind >= VEC_SIZE(v)) {
 		ERROR ("Index out of bounds\n")
 		return sp;
 	    }
@@ -2316,7 +2292,7 @@ static INLINE struct svalue *push_indexed_value(sp, pc)
 	if (i->type != T_NUMBER || (ind = i->u.number) < 0)
 	    { ERROR("Illegal index\n") return sp; }
 	sp = vec;
-	if (ind >= VEC_SIZE(vec->u.vec)) ERROR ("Index out of bounds\n")
+	if ((size_t)ind >= VEC_SIZE(vec->u.vec)) ERROR ("Index out of bounds\n")
 	if (!--vec->u.vec->ref) {
 	    struct svalue *p, tmp;
 
@@ -2499,8 +2475,6 @@ static void push_control_stack(sp, pc, fp)
     struct svalue *fp;
 {
     if (csp >= &control_stack[MAX_USER_TRACE-1]) {
-	extern int num_error;
-
 	if (!num_error || csp == &control_stack[MAX_TRACE-1]) {
 	    ERROR("Too deep recursion.\n")
 	}
@@ -2525,7 +2499,7 @@ static void pop_control_stack() {
     if (csp == control_stack - 1)
 	fatal("Popped out of the control stack");
 #endif
-    if (current_prog = csp->prog) /* is 0 when we reach the bottom */
+    if ( (current_prog = csp->prog) ) /* is 0 when we reach the bottom */
 	current_strings = current_prog->strings;
     inter_pc = csp->pc;
     inter_fp = csp->fp;
@@ -2595,7 +2569,8 @@ void push_referenced_mapping(m)
 )
 
 void m_indices_filter(key, data, extra)
-    struct svalue *key, *data;
+    struct svalue *key;
+    struct svalue *data UNUSED;
     char *extra;
 {
     struct svalue **svpp = (struct svalue **)extra;
@@ -2603,8 +2578,9 @@ void m_indices_filter(key, data, extra)
     assign_svalue_no_free( (*svpp)++, key );
 }
 
-void m_values_filter(key, data, extra)
-    struct svalue *key, *data;
+static void m_values_filter(key, data, extra)
+    struct svalue *key UNUSED;
+    struct svalue *data;
     char *extra;
 {
     struct svalue **svpp = (struct svalue **)extra;
@@ -2691,7 +2667,7 @@ INLINE static struct svalue *_push_malloced_string(p, sp)
 }
 
 
-INLINE void push_malloced_string(p)
+LOCAL_INLINE void push_malloced_string(p)
     char *p;
 {
     inter_sp++;
@@ -2712,7 +2688,7 @@ static INLINE void put_malloced_string(p, sp)
 /*
  * Push a string on the stack that is constant in the current stack frame.
  */
-INLINE
+static INLINE
 struct svalue *_push_volatile_string(p, sp)
     char *p;
     struct svalue *sp;
@@ -2756,7 +2732,6 @@ struct svalue *where;
 struct svalue *sp;
 {
     struct svalue *svp;
-    extern struct object *simul_efun_object;
 
     if (current_object == master_ob) return 1;
     if (current_object == simul_efun_object) return 1;
@@ -2765,7 +2740,7 @@ struct svalue *sp;
     sp++;
     assign_svalue_no_free(sp, where);
     inter_sp = sp;
-    svp = apply_master_ob("privilege_violation", 3);
+    svp = apply_master_ob(STR_PRIVILEGE, 3);
     if (!svp || svp->type != T_NUMBER || svp->u.number < 0) {
 	inter_sp = sp-3;
         error("privilege violation : %s\n", what);
@@ -2781,7 +2756,6 @@ int privilege_violation4(what, whom, how_str, how_num, sp)
     struct svalue *sp;
 {
     struct svalue *svp;
-    extern struct object *simul_efun_object;
 
     if (current_object == master_ob) return 1;
     if (current_object == simul_efun_object) return 1;
@@ -2798,7 +2772,7 @@ int privilege_violation4(what, whom, how_str, how_num, sp)
 	    push_number(how_num);
     }
     inter_sp = sp;
-    svp = apply_master_ob("privilege_violation", 4);
+    svp = apply_master_ob(STR_PRIVILEGE, 4);
     if (!svp || svp->type != T_NUMBER || svp->u.number < 0) {
 	inter_sp = sp-4;
         error("privilege violation : %s\n", what);
@@ -2934,7 +2908,7 @@ static INLINE struct svalue *setup_new_frame2(funstart, sp)
 	    ERROR("Varargs argument passed by reference.\n");
         }
 	/* Clear the local variables */
-	if (i = funstart[1])
+	if ( (i = funstart[1]) )
 	{
 	  csp->num_local_variables += i;
 	  do {
@@ -2949,7 +2923,7 @@ static INLINE struct svalue *setup_new_frame2(funstart, sp)
             free_svalue(sp--);
             csp->num_local_variables--;
         } while(--i);
-        if (i = funstart[1])
+        if ( (i = funstart[1]) )
         {
           csp->num_local_variables += i;
           do { 
@@ -2961,11 +2935,11 @@ static INLINE struct svalue *setup_new_frame2(funstart, sp)
     else
     {
         /* Correct number of arguments and local variables */
-        if (i = funstart[1] - i) { 
+        if ( (i = funstart[1] - i) ) { 
 #if defined(__GNUC__) && __GNUC__ >= 2 
             /* there seems to be a problem with gcc 1.36 */
             /* local structs are handled more efficiently. */
-            struct svalue const_0 = {T_NUMBER, 0, 0};
+            struct svalue const_0 = {T_NUMBER, { 0 }, { 0 } };
 #else
 #define const_0 const0
 #endif
@@ -2987,9 +2961,8 @@ static INLINE struct svalue *setup_new_frame2(funstart, sp)
     return sp;
 }
 
-static uint32 setup_new_frame(fx, pc)
+static uint32 setup_new_frame(fx)
     int fx;
-    char *pc;
 {
     uint32 flags;
 
@@ -3053,8 +3026,7 @@ static INLINE struct con_struct *push_error_context (sp)
 	return &p->recovery_info.con;
 }
 
-static INLINE void pop_error_context (sp)
-    struct svalue *sp;
+static INLINE void pop_error_context ()
 {
     struct catch_context *p;
 
@@ -3077,7 +3049,7 @@ static INLINE void pop_error_context (sp)
     xfree ((char *)p);
 }
 
-struct svalue *pull_error_context (sp)
+static struct svalue *pull_error_context (sp)
     struct svalue *sp;
 {
     /* They did a throw() or error. That means that the control
@@ -3105,7 +3077,7 @@ struct svalue *pull_error_context (sp)
     return sp;
 }
 
-struct program *search_inherited(str, prg, offpnt)
+static struct program *search_inherited(str, prg, offpnt)
     char *str;
     struct program *prg;
     int *offpnt;
@@ -3135,8 +3107,7 @@ struct program *search_inherited(str, prg, offpnt)
 	    offpnt[0] = prg->inherit[i].variable_index_offset;
 	    offpnt[1] = prg->inherit[i].function_index_offset;
 	    return prg->inherit[i].prog;
-	} else if ( tmp = search_inherited(str, prg->inherit[i].prog,
-	  offpnt) )
+	} else if ( (tmp = search_inherited(str, prg->inherit[i].prog,offpnt)) )
 	{
 #ifdef DEBUG
 	    if (d_flag)
@@ -3205,6 +3176,7 @@ void check_for_destr(v)
 #define TYPE_TEST1(arg, t) if ( (arg)->type != t ) goto bad_arg_1;
 #define TYPE_TEST2(arg, t) if ( (arg)->type != t ) goto bad_arg_2;
 #define TYPE_TEST3(arg, t) if ( (arg)->type != t ) goto bad_arg_3;
+#define TYPE_TEST4(arg, t) if ( (arg)->type != t ) goto bad_arg_4;
 
 /*
  * Evaluate instructions at address 'p'. All program offsets are
@@ -3224,17 +3196,19 @@ void check_for_destr(v)
 
 #ifdef TRACE_CODE
 /* keep some more information in the core than we show... */
-int previous_instruction[TOTAL_TRACE_LENGTH];
-int stack_size[TOTAL_TRACE_LENGTH];
-char *previous_pc[TOTAL_TRACE_LENGTH];
-struct program *previous_programs[TOTAL_TRACE_LENGTH];
-struct object *previous_objects[TOTAL_TRACE_LENGTH];
+static int previous_instruction[TOTAL_TRACE_LENGTH];
+static int stack_size[TOTAL_TRACE_LENGTH];
+static char *previous_pc[TOTAL_TRACE_LENGTH];
+static struct program *previous_programs[TOTAL_TRACE_LENGTH];
+static struct object *previous_objects[TOTAL_TRACE_LENGTH];
 static int last = TOTAL_TRACE_LENGTH - 1;
 #endif
 static void eval_instruction(first_instruction, sp)
     char *first_instruction;
     register struct svalue *sp;
-    /* gcc feels better about setjmp() when variables are declared register */
+    /* gcc feels better about setjmp() when variables are declared register.
+     * Still we might get 'variable foo might be clobbered' warnings, but
+     * declaring them as volatile would degrade optimization, so we don't. */
 {
     register char *pc;
     register struct svalue *fp;
@@ -3256,7 +3230,7 @@ again:
     if (++last == TOTAL_TRACE_LENGTH)
 	last = 0;
 #else
-    last = last+1 & TOTAL_TRACE_LENGTH-1;
+    last = (last+1) & (TOTAL_TRACE_LENGTH-1);
 #endif
     previous_instruction[last] = instruction;
     previous_pc[last] = pc;
@@ -3290,7 +3264,7 @@ again:
 		eval_cost -= MAX_TRACE_COST;
 		assigned_eval_cost -= MAX_TRACE_COST;
 	    }
-	    printf("eval_cost too big %d\n", eval_cost - initial_eval_cost);
+	    printf("eval_cost too big %ld\n", eval_cost - initial_eval_cost);
 	    assign_eval_cost();
 	    if (error_recovery_pointer->type <= ERROR_RECOVERY_BACKEND) {
 		CLEAR_EVAL_COST;
@@ -3338,6 +3312,7 @@ again:
 bad_arg_1: bad_arg_pc(1, instruction, sp, pc);
 bad_arg_2: bad_arg_pc(2, instruction, sp, pc);
 bad_arg_3: bad_arg_pc(3, instruction, sp, pc);
+bad_arg_4: bad_arg_pc(4, instruction, sp, pc);
 bad_left:  ERRORF(("Bad left type to %s.\n",  get_f_name(instruction)))
 bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 	/*NOTREACHED*/
@@ -3693,7 +3668,6 @@ case 255:
     /* fall through */
     CASE(F_RETURN);
     {
-	int i;
 	struct svalue *svp;
 
 	svp = sp;
@@ -3707,7 +3681,7 @@ case 255:
         while (sp != fp)
             free_svalue(--sp);
 	*sp = *svp;	/* This way, the same ref counts are maintained */
-	if (current_prog = csp->prog) /* is 0 when we reach the bottom */
+	if ( (current_prog = csp->prog) ) /* is 0 when we reach the bottom */
 	    current_strings = current_prog->strings;
 	function_index_offset = csp->function_index_offset;
 	current_variables     = csp->current_variables;
@@ -3876,7 +3850,7 @@ case 255:
 	for (i = -num_arg; ++i <= 0; ) {
 	    if ( sp[i].type != T_POINTER )
 		bad_arg_pc(i+num_arg, instruction, sp, pc);
-	    if (length > VEC_SIZE(sp[i].u.vec))
+	    if (length > (int)VEC_SIZE(sp[i].u.vec))
 		length = VEC_SIZE(sp[i].u.vec);
 	}
 	num_values = num_arg - 1;
@@ -3986,7 +3960,7 @@ case 255:
 	/* NOT current_prog, which can be an inherited object. */
 	flags = current_object->prog->functions[func_offset];
 	if (flags & NAME_CROSS_DEFINED) {
-	    func_offset += (flags & INHERIT_MASK) - (INHERIT_MASK + 1 >> 1);
+	    func_offset += (flags & INHERIT_MASK) - ( (INHERIT_MASK + 1) >> 1);
 	}
 	/* Save all important global stack machine registers */
 	push_control_stack(sp, pc+1, fp);
@@ -4080,6 +4054,311 @@ case 255:
 	    put_number(0);
 	break;
     }
+#ifdef F_TERMINAL_COLOUR
+    CASE(F_TERMINAL_COLOUR);
+    {
+      char *instr, *cp, *savestr = NULL, *deststr, **parts;
+      int num, i, j, k, col, start, space, *lens, maybe_at_end;
+      int space_garbage = 0;
+      int wrap = 0;
+      int indent = 0;
+      int max_string_length = 200000; /* TODO: Make this a define */
+      struct svalue * mdata;
+      struct svalue mkey;
+
+      GET_NUM_ARG;
+      if ( num_arg >= 3 ) {
+	if ( num_arg == 4 ) {
+	  TYPE_TEST4(sp, T_NUMBER );
+	  indent = (sp--)->u.number;
+	}
+	TYPE_TEST3(sp,T_NUMBER);
+	wrap = (sp--)->u.number;
+      }
+
+      TYPE_TEST2(sp-1, T_STRING);
+      TYPE_TEST1(sp, T_MAPPING);
+	
+      /* now tested for all types, stored wrap and indent and have the
+       * string to process and the color data mapping at sp and sp-1
+       */
+
+      cp = instr = (sp-1)->u.string;
+      do {
+        cp = strchr(cp, TC_FIRST_CHAR);
+        if (cp) {
+	  if (cp[1] == TC_SECOND_CHAR) {
+	    savestr = string_copy( instr );
+	    cp = savestr + ( cp - instr );
+	    instr = savestr;
+	    break;
+	  }
+	  cp++;
+	}
+      } while (cp);
+
+      if (cp == NULL) {
+        if (wrap) {
+	  num = 1;
+	  parts = CALLOCATE(1, char *);
+	  parts[0] = instr;
+	  savestr = NULL;
+        } else {
+	  pop_stack(); /* no delimiter in string, so return the original */
+	  break;
+        }
+      } else {
+        /* here we have something to parse */
+	
+        parts = CALLOCATE( NSTRSEGS, char * );
+        if (cp - instr) {       /* starting seg, if not delimiter */
+	  num = 1;
+	  parts[0] = instr;
+	  *cp = 0;
+        } else
+	  num = 0;
+        while (cp) {
+	  cp += 2;
+	  instr = cp;
+	  do {
+	    cp = strchr(cp,TC_FIRST_CHAR);
+	    if (cp) {
+	      if (cp[1] == TC_SECOND_CHAR)
+		break;
+	      cp++;
+	    }
+	  } while (cp);
+	  if (cp) {
+	    *cp = 0;
+	    if (cp > instr) {
+	      parts[num] = instr;
+	      num++;
+	      if (num % NSTRSEGS == 0)
+		parts = RESIZE(parts, num + NSTRSEGS, char * );
+	    }
+	  }
+        }
+        if (*instr)     /* trailing seg, if not delimiter */
+	  parts[num++] = instr;
+      }
+
+      /* Could keep track of the lens as we create parts, removing the need
+       for a strlen() below */
+      if ( num )
+        lens = CALLOCATE(num, int);
+      else
+        lens = NULL;
+
+      /* Do the the pointer replacement and calculate the lengths */
+      col = 0;
+      start = -1;
+      space = 0;
+      maybe_at_end = 0;
+      for (j = i = 0; i < num; i++) {
+        int len;
+	
+	/* dirty hack to make an svalue from parts[i] */
+	mkey.type = T_STRING;
+	mkey.x.string_type = STRING_MALLOC;
+	mkey.u.string = string_copy( parts[i] );
+
+	/* now look for mapping data */
+	mdata = get_map_lvalue( sp->u.map, & mkey, 0 );
+
+	/* if it is a string, use it as part, if not, go on with the old */
+	if ( mdata && mdata->type == T_STRING ) {
+	  parts[i] = mdata->u.string;
+	  len = svalue_strlen( mdata );
+	  if (wrap) len = -len;
+	}
+	else
+	  len = strlen( parts[i] );
+
+        lens[i] = len;
+        if (len > 0) {
+	  if (maybe_at_end) {
+	    if (j + indent > max_string_length) {
+	      /* this string no longer counts, so we are still in
+		 a maybe_at_end condition.  This means we will end
+		 up truncating the rest of the fragments too, since
+		 the indent will never fit. */
+	      lens[i] = 0;
+	      len = 0;
+	    } else {
+	      j += indent;
+	      col += indent;
+	      maybe_at_end = 0;
+	    }
+	  }
+	  j += len;
+	  if (j > max_string_length) {
+	    lens[i] -= j - max_string_length;
+	    j = max_string_length;
+	  }
+	  if (wrap) {
+	    int z;
+	    char *p = parts[i];
+	    for (z = 0; z < lens[i]; z++) {
+	      char c = p[z];
+	      if (c == '\n') {
+		col = 0;
+		start = -1;
+	      } else {
+		if (col > start || c != ' ')
+		  col++;
+		else
+		  j--;
+		
+		if (c == ' ')
+		  space = col;
+		if (col == wrap+1) {
+		  if (space) {
+		    col -= space;
+		    space = 0;
+		  } else {
+		    j++;
+		    col = 1;
+		  }
+		  start = indent;
+		} else
+		  continue;
+	      }
+	      /* If we get here, we ended a line */
+	      if (z + 1 != lens[i]) {
+		j += indent;
+		col += indent;
+	      } else
+		maybe_at_end = 1;
+	      
+	      if (j > max_string_length) {
+		lens[i] -= (j - max_string_length);
+		j = max_string_length;
+		if (lens[i] < z) {
+		  /* must have been ok
+		     or we wouldn't be here */
+		  lens[i] = z;
+		  break;
+		}
+	      }
+	    }
+	  }
+        } else {
+	  j += -len;
+	  if (j > max_string_length) {
+	    lens[i] = -(-(lens[i]) - (j - max_string_length));
+	    j = max_string_length;
+	  }
+        }
+      }
+      
+      /* now we have the final string in parts and length in j.
+	 let's compose it, wrapping if necessary */
+      cp = deststr = xalloc(j+1);
+      if (wrap) {
+	/* TODO: Fixed buffer size *ugh* */
+        char *tmpmem = xalloc(8192);
+        char *pt = tmpmem;
+	
+        col = 0;
+        start = -1;
+        space = 0;
+        for (i = 0; i < num; i++) {
+	  int kind;
+	  int len;
+	  int l = lens[i];
+	  char *p = parts[i];
+	  if (l < 0) {
+	    memcpy(pt, p, -l);
+	    pt += -l;
+	    space_garbage += -l; /* Number of chars due to ignored junk
+				    since last space */
+	    continue;
+	  }
+	  for (k = 0; k < lens[i]; k++) {
+	    int n;
+	    char c = p[k];
+	    *pt++ = c;
+	    if (c == '\n') {
+	      col = 0;
+	      kind = 0;
+	      start = -1;
+	    } else {
+	      if (col > start || c != ' ')
+		col++;
+	      else
+		pt--;
+	      
+	      if (c == ' ') {
+		space = col;
+		space_garbage = 0;
+	      }
+	      if (col == wrap+1) {
+		if (space) {
+		  col -= space;
+		  space = 0;
+		  kind = 1;
+		} else {
+		  col = 1;
+		  kind = 2;
+		}
+		start = indent;
+	      } else
+		continue;
+	    }
+	    /* If we get here, we ended a line */
+	    len = (kind == 1 ? col + space_garbage : col);
+	    n = (pt - tmpmem) - len;
+	    memcpy(cp, tmpmem, n);
+	    cp += n;
+	    if (kind == 1) {
+	      /* replace the space */
+	      cp[-1] = '\n';
+	    }
+	    if (kind == 2) {
+	      /* need to insert a newline */
+	      *cp++ = '\n';
+	    }
+	    memmove(tmpmem, tmpmem + n, len);
+	    pt = tmpmem + len;
+	    if (!at_end(i, num, k, lens)) {
+	      memset(cp, ' ', indent);
+	      cp += indent;
+	      col += indent;
+	    }
+	  }
+        }
+        memcpy(cp, tmpmem, pt - tmpmem);
+        cp += pt - tmpmem;
+        xfree(tmpmem);
+      } else {
+	for (i = 0; i < num; i++) {
+	  memcpy(cp, parts[i], lens[i]);
+	  cp += lens[i];
+	}
+      }
+      *cp = 0;
+
+      if ( lens )
+        xfree(lens);
+      if ( parts )
+        xfree(parts);
+      if (savestr)
+        xfree(savestr);
+
+      /* now we have what we want */
+      pop_stack();
+#ifdef DEBUG
+      if (cp - deststr != j) {
+        fatal("Length miscalculated in terminal_colour()\n"
+              "    Expected: %i Was: %i\n"
+              "    String: %s\n    Indent: %i Wrap: %i\n"
+             , j, cp - deststr, sp->u.string, indent, wrap);
+      }
+#endif
+      put_malloced_string(deststr, sp);
+      break;
+    }
+#endif
     CASE(F_WRITE_FILE);
     {
 	int i;
@@ -4333,7 +4612,7 @@ case 255:
 	inter_sp = _push_volatile_string(argp->u.string,
 	    _push_object(current_object, sp) );
 	inter_pc = pc;
-	ret = apply_master_ob("valid_seteuid", 2);
+	ret = apply_master_ob(STR_VALID_SETEUID, 2);
 	if (ret == 0 || ret->type != T_NUMBER || ret->u.number != 1) {
 	    if (out_of_memory) {
 		error("Out of memory\n");
@@ -4370,7 +4649,7 @@ case 255:
 	TYPE_TEST1(sp, T_OBJECT)
 	ob = sp->u.ob;
 	decr_object_ref(ob, "getuid");
-	if (name = ob->user->name) {
+	if ( (name = ob->user->name) ) {
 	    sp->type = T_STRING;
 	    sp->x.string_type = STRING_SHARED;
 	    increment_string_ref(sp->u.string = name);
@@ -4402,7 +4681,7 @@ case 255:
     {
 	GET_NUM_ARG
 	inter_pc = pc;
-	sp = filter(sp, num_arg);
+	sp = f_filter_array(sp, num_arg);
 	break;
     }
     CASE(F_SET_BIT);
@@ -4437,7 +4716,7 @@ case 255:
 	}
 	if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
 	    ERRORF(("Illegal bit pattern in set_bit character %d\n", ind))
-	str[ind] = (str[ind] - ' ' | 1 << bitnum % 6) + ' ';
+	str[ind] = ((str[ind] - ' ') | 1 << (bitnum % 6) ) + ' ';
 	sp = strp;
 	break;
     }
@@ -4470,7 +4749,7 @@ case 255:
 	}
 	if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
 	    ERRORF(("Illegal bit pattern in clear_bit character %d\n", ind))
-	str[ind] = (str[ind] - ' ' & ~(1 << bitnum % 6)) + ' ';
+	str[ind] = ((str[ind] - ' ') & ~(1 << (bitnum % 6))) + ' ';
 	break;
     }
     CASE(F_TEST_BIT);
@@ -4486,7 +4765,7 @@ case 255:
 	    put_number(0);
 	    break;
 	}
-	if ((sp-1)->u.string[sp->u.number/6] - ' ' & 1 << sp->u.number % 6) {
+	if ( ((sp-1)->u.string[sp->u.number/6] - ' ') & 1 << (sp->u.number % 6) ) {
 	    sp--;
 	    free_string_svalue(sp);
 	    put_number(1);
@@ -4687,10 +4966,7 @@ case 255:
     }
     CASE(F_THIS_OBJECT);
 	if (current_object->flags & O_DESTRUCTED) {
-	    debug_message(
-	      "current_object %s destructed\n",
-	      current_object->name
-	    );
+            /* No diagnostic of this case anymore */
 	    push_number(0);
 	    break;
 	}
@@ -4705,10 +4981,6 @@ case 255:
 #ifdef F_QUERY_ACTIONS
     CASE(F_QUERY_ACTIONS);
     {
-	extern struct vector
-	  *get_action PROT((struct object *, char *)),
-	  *get_all_actions PROT((struct object *, int)),
-	  *get_object_actions PROT((struct object *, struct object *));
 	struct vector *v;
 	struct svalue *arg;
 	struct object *ob;
@@ -4993,8 +5265,6 @@ case 255:
 	}
 #endif /* FLOATS */
 	else if ((sp-1)->type == T_POINTER && sp->type == T_POINTER) {
-	    extern struct vector *subtract_array_tmp_vec, *subtract_array
-	      PROT((struct vector *,struct vector*));
 	    struct vector *v;
 
 	    v = sp->u.vec;
@@ -5031,8 +5301,6 @@ case 255:
 	int i;
 
 	if (sp->type == T_POINTER && (sp-1)->type == T_POINTER) {
-	    extern struct vector *intersect_array
-	      PROT((struct vector *, struct vector *));
 	    inter_sp = sp - 2;
 	    (sp-1)->u.vec = intersect_array(sp->u.vec, (sp-1)->u.vec);
 	    sp--;
@@ -5083,7 +5351,7 @@ case 255:
 	    goto bad_arg_2;
 	i = sp->u.number;
 	sp--;
-	sp->u.number = i > MAX_SHIFT ? 0 : sp->u.number << i;
+	sp->u.number = (uint)i > MAX_SHIFT ? 0 : sp->u.number << i;
 	break;
     }
     CASE(F_RSH);
@@ -5096,7 +5364,7 @@ case 255:
 	    goto bad_arg_2;
 	i = sp->u.number;
 	sp--;
-	sp->u.number >>= i > MAX_SHIFT ? MAX_SHIFT : i;
+	sp->u.number >>= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
 	break;
     }
     CASE(F_MULTIPLY);
@@ -5702,8 +5970,6 @@ case 255:
     }
     CASE(F_SIMUL_EFUN);
     {
-	extern struct object *simul_efun_object;
-	extern struct function *simul_efunp;
 	int code;
 	struct simul_efun_table_s *entry;
 	unsigned char *funstart;
@@ -5733,7 +5999,7 @@ case 255:
 	    }
 	}
 	entry = &simul_efun_table[code];
-	if (funstart = entry->funstart) {
+	if ( (funstart = entry->funstart) ) {
 	    struct program *prog;
 	    struct svalue *new_sp;
 
@@ -6547,8 +6813,6 @@ case 255:
 #endif /* F_SHOUT */
     CASE(F_SWITCH);
     {
-	extern char* findstring PROT((char*));
-	extern void align_switch PROT((unsigned char *));
 	mp_int offset, o0, o1, def_offs;
 	int i, len, tablen, type;
 	mp_int d,s,r;
@@ -6598,7 +6862,7 @@ case 255:
 	} else {
 	    p1 = (unsigned char *)(p0 + tablen + tablen / sizeof(p_int) );
 	}
-	b = (p_int)p0-1 & sizeof abuf.b;
+	b = (p_int)(p0-1) & sizeof abuf.b;
 	memcpy((char *)abuf.b, p0, sizeof abuf.b);
 	a = sizeof abuf.b - b;
 	memcpy((char *)(abuf.b + a), (char *)(p1 + a), b);
@@ -6641,7 +6905,7 @@ case 255:
 	for(;;) {
 	    r = *(p_int*)l;
 	    if (s < r)
-		if (d < sizeof(p_int)) {
+		if (d < (mp_int)sizeof(p_int)) {
 		    if (!d) {
 			p2 =
 			  tabstart + tablen +
@@ -6694,7 +6958,7 @@ case 255:
 		    d >>= 1;
 		}
 	    else if (s > r) {
-		if (d < sizeof(p_int)) {
+		if (d < (mp_int)sizeof(p_int)) {
 		    if (!d) {
 			p2 =
 			  tabstart + tablen +
@@ -6739,7 +7003,7 @@ case 255:
 		    l += d;
 		    while (l >= end_tab) {
 			d >>= 1;
-			if (d <= sizeof(p_int)/2) {
+			if (d <= (mp_int)sizeof(p_int)/2) {
 			    l -= sizeof(p_int);
 			    d = 0;
 			    break;
@@ -6863,8 +7127,8 @@ case 255:
 
 	TYPE_TEST1(sp, T_STRING)
 	str = xalloc(svalue_strlen(sp)+1);
-	for(s = sp->u.string, d = str; c = *s++; ) {
-	    if (isupper(c))
+	for(s = sp->u.string, d = str; (c = *s++) ; ) {
+	    if (isupper((unsigned char)c))
 		c += 'a' - 'A';
 	    *d++ = c;
 	}
@@ -6884,7 +7148,7 @@ case 255:
     }
     CASE(F_CAPITALIZE);
 	TYPE_TEST1(sp, T_STRING)
-	if (islower(sp->u.string[0])) {
+	if (islower((unsigned char)(sp->u.string[0]))) {
 	    char *str;
 
 	    str = string_copy(sp->u.string);
@@ -6896,9 +7160,6 @@ case 255:
 #ifdef F_PROCESS_STRING
     CASE(F_PROCESS_STRING);
     {
-	extern char
-	    *process_string PROT((char *));
-
 	char *str;
 
 	assign_eval_cost();
@@ -7010,7 +7271,7 @@ case 255:
 	TYPE_TEST1(sp, T_STRING)
 	path = check_valid_path(sp->u.string, current_object, "mkdir", 1);
 	/* pop_stack(); see comment above... */
-	i = !(path == 0 || mkdir(path, 0770) == -1);
+	i = !(path == 0 || mkdir(path, 0775) == -1);
 	free_svalue(sp);
 	put_number(i);
 	break;
@@ -7541,8 +7802,6 @@ case 255:
 	    break;
 	  case T_POINTER:
 	  {
-	    extern struct vector *subtract_array_tmp_vec, *subtract_array
-	      PROT((struct vector *,struct vector*));
 	    struct vector *v, *v_old;
 
 	    if (type2 != T_POINTER)
@@ -7667,9 +7926,6 @@ case 255:
 	    if (argp->type == T_LVALUE || argp->type == T_PROTECTED_LVALUE)
 		continue;
 	    if (argp->type == T_POINTER && sp[-1].type == T_POINTER) {
-		extern struct vector *intersect_array
-		  PROT((struct vector *, struct vector *));
-
 		struct vector *vec1, *vec2;
 
 		inter_sp = sp - 2;
@@ -7747,7 +8003,7 @@ case 255:
 		    goto bad_right;
 		i = sp->u.number;
 		sp->u.number =
-		  i > MAX_SHIFT ? (argp->u.number = 0) : (argp->u.number <<= i);
+		  (uint)i > MAX_SHIFT ? (argp->u.number = 0) : (argp->u.number <<= i);
 		break;
 	    }
 	    if (argp->type == T_LVALUE || argp->type == T_PROTECTED_LVALUE)
@@ -7770,7 +8026,7 @@ case 255:
 		if (sp->type != T_NUMBER)
 		    goto bad_right;
 		i = sp->u.number;
-		sp->u.number = argp->u.number >>= i > MAX_SHIFT ? MAX_SHIFT : i;
+		sp->u.number = argp->u.number >>= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
 		break;
 	    }
 	    if (argp->type == T_LVALUE || argp->type == T_PROTECTED_LVALUE)
@@ -7951,9 +8207,6 @@ case 255:
     }
 #endif /* F_DESCRIBE */
     CASE(F_UNIQUE_ARRAY); {
-	extern struct vector
-	    *make_unique PROT((struct vector *arr,char *func,
-	    struct svalue *skipnum));
 	struct vector *res;
 
 	assign_eval_cost();
@@ -8041,8 +8294,6 @@ case 255:
     }
     CASE(F_SORT_ARRAY);
     {
-	extern struct vector *sort_array
-	  PROT((struct vector*,char *,struct object *));
 	struct vector *res;
 	struct svalue *arg;
 	struct object *ob;
@@ -8091,8 +8342,9 @@ case 255:
 	int i;
 	struct svalue *args;
 	struct vector *list;
-	int listsize,keynum;
+	int listsize;
 	int reuse;
+        size_t keynum;
 
 	GET_NUM_ARG
 	args = sp-num_arg+1;
@@ -8127,12 +8379,10 @@ case 255:
 	   it is better not to free them till the next reordering by
 	   order_alist to retain the alist property.
 	 */
-	extern struct svalue *insert_alist
-	  PROT((struct svalue *key,struct svalue *key_data,
-	    struct vector *list));
 	int i;
 	struct vector *list;
-	int listsize,keynum;
+	int listsize;
+        size_t keynum;
 	struct svalue *key,*key_data,*ret;
 	static struct { INIT_VEC_TYPE; } tempvec =
 	  { VEC_INIT(1, 1, T_NUMBER) };
@@ -8160,7 +8410,7 @@ case 255:
 		key_data = (struct svalue*)NULL;
 		key = sp-1;
 	    } else {
-		if (VEC_SIZE(sp[-1].u.vec) != listsize)
+		if (VEC_SIZE(sp[-1].u.vec) != (size_t)listsize)
 		    goto bad_arg_1;
 		key_data = key = sp[-1].u.vec->item;
 	    }
@@ -8176,7 +8426,7 @@ case 255:
 	*sp = *ret;
 	break;
     }
-#endif F_INSERT_ALIST
+#endif /* F_INSERT_ALIST */
 #ifdef F_ASSOC
     CASE(F_ASSOC);
     {
@@ -8184,7 +8434,6 @@ case 255:
 	   it is better not to free them till the next reordering by
 	   order_alist to retain the alist property.
 	 */
-	int assoc PROT((struct svalue *key, struct vector *keys));
 	struct svalue *args;
 	struct vector *keys,*data;
 	struct svalue *fail_val;
@@ -8246,8 +8495,6 @@ case 255:
 #ifdef F_INTERSECT_ALIST
     CASE(F_INTERSECT_ALIST);
     {
-	extern struct vector *intersect_alist
-	  PROT((struct vector *, struct vector *));
 	struct vector *tmp;
 
 	TYPE_TEST1(sp-1, T_POINTER)
@@ -8261,8 +8508,6 @@ case 255:
 #endif /* F_INTERSECT_ALIST */
     CASE(F_REPLACE_PROGRAM);
     {
-	extern struct object *simul_efun_object;
-
 	struct replace_ob *tmp;
 	int name_len;
 	char *name;
@@ -8320,8 +8565,6 @@ program to replace the current one with has to be inherited\n")
     }
     CASE(F_SET_THIS_OBJECT);
     {
-	extern struct object *simul_efun_object;
-
 	TYPE_TEST1(sp, T_OBJECT)
 	if (current_variables == master_ob->variables ||
 	    current_variables == simul_efun_object->variables ||
@@ -8346,8 +8589,8 @@ program to replace the current one with has to be inherited\n")
 	TYPE_TEST1(sp-2, T_MAPPING)
 	TYPE_TEST3(sp, T_NUMBER)
 	m = sp[-2].u.map;
-	n = (p_uint)sp->u.number;
-	if (n >= m->num_values) {
+	n = (mp_uint)sp->u.number;
+	if (n >= (mp_uint)m->num_values) { /* again also checks for n < 0 */
 	    ERROR("Illegal index\n")
 	}
 	sp--;
@@ -8370,8 +8613,8 @@ program to replace the current one with has to be inherited\n")
 	TYPE_TEST1(sp-2, T_MAPPING)
 	TYPE_TEST3(sp, T_NUMBER)
 	m = sp[-2].u.map;
-	n = (p_uint)sp->u.number;
-	if (n >= m->num_values) {
+	n = (mp_uint)sp->u.number;
+	if (n >= (mp_uint)m->num_values) { /* again also checks for n < 0 */
 	    ERROR("Illegal index\n")
 	}
 	sp--;
@@ -8433,8 +8676,6 @@ program to replace the current one with has to be inherited\n")
     }
     CASE(F_CLOSURE);
     {
-	extern void closure_literal PROT((struct svalue *, int));
-
 	unsigned short tmp_ushort[2];
 	int ix;
 
@@ -8476,8 +8717,6 @@ program to replace the current one with has to be inherited\n")
 	    } else goto bad_arg_1;
 	if (sp->type != T_OBJECT) {
 	    if (sp->type == T_NUMBER && sp->u.number == 0) {
-		extern void symbol_efun PROT((struct svalue *));
-
 		sp--;
 		inter_pc = pc;
 		symbol_efun(sp);
@@ -8511,10 +8750,6 @@ program to replace the current one with has to be inherited\n")
 	{
 	    struct lambda *l;
 	    ph_int closure_type;
-
-	    extern int lambda_ref_replace_program
-		PROT((struct lambda *, int, p_int,
-			struct vector *, struct svalue *));
 
 	    if (ob == current_object) {
 		l = (struct lambda *)
@@ -8763,7 +8998,6 @@ program to replace the current one with has to be inherited\n")
     }
     CASE(F_TEFUN)
     {
-	extern struct svalue *(*efun_table[]) PROT((struct svalue *));
 	int code = EXTRACT_UCHAR(pc);
 	pc++;
 #ifdef TRACE_CODE
@@ -8778,7 +9012,6 @@ program to replace the current one with has to be inherited\n")
     }
     CASE(F_VEFUN)
     {
-	extern struct svalue *(*vefun_table[]) PROT((struct svalue *, int));
 	int code = EXTRACT_UCHAR(pc);
 	int numarg = EXTRACT_UCHAR(pc+1);
 	pc += 2;
@@ -8821,7 +9054,7 @@ program to replace the current one with has to be inherited\n")
 	    pop_control_stack();
 	    pc = inter_pc;
 	    fp = inter_fp;
-	    pop_error_context (sp);
+	    pop_error_context();
 	    push_number(0);
 	    eval_cost -= CATCH_RESERVED_COST;
 	    break;
@@ -8843,16 +9076,12 @@ program to replace the current one with has to be inherited\n")
 	  }
 	  XCASE(F_QUERY_IP_NUMBER);
 	  {
-	    extern struct svalue *query_ip_name PROT((struct svalue *, int));
-
 	    inter_pc = pc;
 	    sp = query_ip_name(sp, 0);
 	    break;
 	  }
 	  XCASE(F_QUERY_IP_NAME);
 	  {
-	    extern struct svalue *query_ip_name PROT((struct svalue *, int));
-
 	    inter_pc = pc;
 	    sp = query_ip_name(sp, 1);
 	    break;
@@ -9061,7 +9290,7 @@ program to replace the current one with has to be inherited\n")
 	    if (sp[-1].type != T_STRING) goto xbad_arg_2;
 	    if (sp[ 0].type != T_NUMBER) goto xbad_arg_3;
 	    p1 = sp[-2].u.string;
-	    if (offs = sp->u.number) {
+	    if ( (offs = sp->u.number) ) {
 		if (offs < 0) {
 		    offs += svalue_strlen(sp-2);
 		}
@@ -9326,8 +9555,6 @@ program to replace the current one with has to be inherited\n")
 	  }
 	  XCASE(F_SET_EXTRA_WIZINFO_SIZE);
 	  {
-	    extern int wiz_info_extra_size;
-
 	    if (sp->type != T_NUMBER) goto xbad_arg_1;
             if (privilege_violation("set_extra_wizinfo_size", sp) > 0)
 	        wiz_info_extra_size = sp->u.number;
@@ -9336,13 +9563,17 @@ program to replace the current one with has to be inherited\n")
 	  }
           XCASE(F_QUERY_MUD_PORT);  /* mud_port,        21  */
           {
+#ifndef MAXNUMPORTS
             push_number(port_number);
+#else
+	    inter_pc = pc;
+	    sp = query_ip_port(sp);
+#endif
             break;
           }
 #ifdef CATCH_UDP_PORT
           XCASE(F_QUERY_IMP_PORT); /* udp_port,        22  */
           {
-            extern int udp_port;
             push_number(udp_port);
             break;
           }
@@ -9618,9 +9849,8 @@ program to replace the current one with has to be inherited\n")
 	  }
 	  XCASE(F_GARBAGE_COLLECTION);
 	  {
-	    extern int extra_jobs_to_do, garbage_collect_to_do;
-
-	    extra_jobs_to_do = garbage_collect_to_do = 1;
+	    extra_jobs_to_do = garbage_collect_to_do = MY_TRUE;
+	    time_last_gc = 0;
 	    break;
 	  }
 	  XCASE(F_TYPEOF);
@@ -9804,54 +10034,28 @@ Instruction %d, num arg %d\n",
  * manually !
  */
 
-char debug_apply_fun[30]; /* For debugging */
+static char debug_apply_fun[30]; /* For debugging */
 
 #ifdef APPLY_CACHE_STAT
 int apply_cache_hit = 0, apply_cache_miss = 0;
 #endif
 
-#define REPEAT20(x) x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x
-#define REPEAT64(x) REPEAT20(x),REPEAT20(x),REPEAT20(x),x,x,x,x
-#if APPLY_CACHE_BITS == 6
-#define CACHE_SIZE 0x40
-#define CACHE_INITIALIZER(x) {REPEAT64(x)}
-#endif
-#if APPLY_CACHE_BITS == 7
-#define CACHE_SIZE 0x80
-#define CACHE_INITIALIZER(x) {REPEAT64(x),REPEAT64(x)}
-#endif
-#if APPLY_CACHE_BITS == 8
-#define CACHE_SIZE 0x100
-#define CACHE_INITIALIZER(x) {REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x)}
-#endif
-#if APPLY_CACHE_BITS == 9
-#define CACHE_SIZE 0x200
-#define CACHE_INITIALIZER(x) {REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x)}
-#endif
-#if APPLY_CACHE_BITS == 10
-#define CACHE_SIZE 0x400
-#define CACHE_INITIALIZER(x) {REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x)}
-#endif
-#if APPLY_CACHE_BITS == 11
-#define CACHE_SIZE 0x800
-#define CACHE_INITIALIZER(x) {\
-REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),\
-REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x)}
-#endif
-#if APPLY_CACHE_BITS == 12
-#define CACHE_SIZE 0x1000
-#define CACHE_INITIALIZER(x) {\
-REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),\
-REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),\
-REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),\
-REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x),REPEAT64(x)}
+#if APPLY_CACHE_BITS < 1
+#error APPLY_CACHE_BITS must be at least 1.
+#else
+#define CACHE_SIZE (1 << APPLY_CACHE_BITS)
 #endif
 
     static char *cache_name[CACHE_SIZE];
-    static struct program *cache_progp[CACHE_SIZE] =
-	CACHE_INITIALIZER((struct program *)sizeof(double));
-    static int cache_id[CACHE_SIZE] = CACHE_INITIALIZER(0);
-
+      /* The name of the cached function, shared for existing functions,
+       * allocated if the object does not have the function.
+       */
+    static struct program *cache_progp[CACHE_SIZE];
+      /* The pointer to the program code of the function, or NULL if the
+       * object does not implement the function.
+       */
+    static int cache_id[CACHE_SIZE];
+      /* The id-number of the object. */
 
 static int apply_low(fun, ob, num_arg)
     char *fun;
@@ -9879,7 +10083,6 @@ static int apply_low(fun, ob, num_arg)
 #endif
 #ifdef DEBUG
     {
-	extern int num_error;
 	if (num_error > 2) {
 	    fatal("apply_low with too many errors.\n");
 	    goto failure;
@@ -9909,28 +10112,39 @@ retry_for_shadow:
 	fatal("apply() on destructed object\n");
 #endif
     if ( !((p_int)fun & 2) ) {
-	/* Heuristic to find out if fun is no shared string */
+	/* Heuristic to find out if fun is an unshared string,
+         * building on the six-byte-overhead of shared strings.
+         * This means that every shared string has a set bit 1,
+         * whereas other strings have no overhead and thus bit 1
+         * cleared. Function names are always shared, so if there
+         * is no shared string twin for fun, the called function does
+         * not exist anywhere. As a side effect, we get the shared
+         * string for fun which makes the cache-lookup much faster.
+         */
 	fun = findstring(fun);
 	if (!fun)
 	    goto failure2;
     }
+    /* *fun is now (more or less) guaranteed to be a shared string */
     ix =
       ( progp->id_number ^ (p_int)fun ^ ( (p_int)fun >> APPLY_CACHE_BITS ) ) &
         (CACHE_SIZE-1);
-    if (cache_id[ix] == progp->id_number && !strcmp(cache_name[ix], fun) ) {
-	/* We have found a matching entry in the cache. The pointer to
-	   the function name has to match, not only the contents.
-	   This is because hashing the string in order to get a cache index
-	   would be much more costly than hashing it's pointer.
-	   If cache access would be costly, the cache would be useless.
-	 */
+    if (cache_id[ix] == progp->id_number 
+     && (cache_name[ix] == fun || !strcmp(cache_name[ix], fun)) 
+       ) {
+	/* We have found a matching entry in the cache. The contents have
+         * to match, not only the pointers, because cache entries for
+         * functions not existant in _this_ object <ob> are stored as
+         * separately allocated copy, not as another ref to the shared
+         * string. Yet they shall be found here.
+         */
 #ifdef APPLY_CACHE_STAT
 	apply_cache_hit++;
 #endif
 	if (cache_progp[ix]
 	  /* Static functions may not be called from outside. */
 	  && ( !cache_flags[ix] ||
-	       !(cache_flags[ix] & TYPE_MOD_PROTECTED) && current_object == ob))
+	       (!(cache_flags[ix] & TYPE_MOD_PROTECTED) && current_object == ob)) )
 	{
 	    /* the cache will tell us in wich program the function is, and
 	     * where
@@ -9971,12 +10185,15 @@ retry_for_shadow:
     } else {
 	/* we have to search the function */
 	char *shared_name;
-	extern char *findstring PROT((char *));
 
 #ifdef APPLY_CACHE_STAT
 	apply_cache_miss++;
 #endif
-	if (shared_name = findstring(fun)) {
+        /* This call to findstring() is not really necessary, but serves
+         * as safeguard should a non-shared string escape the attention
+         * of the 'heuristic' filter before.
+         */
+	if ( (shared_name = ((cache_name[ix] == fun) ? fun : findstring(fun))) ) {
 	    int fx;
 
 	    eval_cost++;
@@ -10048,8 +10265,8 @@ retry_for_shadow:
 		 */
 		return 1;
 	    } /* end for */
-	} /* end if */
-	/* We have to mark a function not to be in the object */
+	} /* end if(shared_name) */
+	/* We have to mark a function not to be in the object. */
 	if (!cache_progp[ix]) {
 	    /* The old cache entry was for an undefined function, so the
 	       name had to be malloced */
@@ -10150,7 +10367,6 @@ char *function_exists(fun, ob)
     struct object *ob;
 {
     char *shared_name;
-    extern char *findstring PROT((char *));
     unsigned char *funstart;
     struct program *progp;
     int ix;
@@ -10210,7 +10426,7 @@ void call_function(progp, fx)
 #endif
     csp->num_local_variables = 0;
     current_prog = progp;
-    flags = setup_new_frame(fx, inter_pc);
+    flags = setup_new_frame(fx);
     funstart = current_prog->program + (flags & FUNSTART_MASK);
     csp->funstart = funstart;
     previous_ob = current_object;
@@ -10238,7 +10454,7 @@ int get_line_number(p, progp, namep)
     int i;
     char **include_names;
     struct incinfo *inctop = 0;
-    int relocated_from, relocated_to = -1;
+    int relocated_from = 0, relocated_to = -1;
     p_int old_total;
 
     if (progp == 0)
@@ -10246,8 +10462,6 @@ int get_line_number(p, progp, namep)
     old_total = 0;
     if (!progp->line_numbers)
 	if (!load_line_numbers_from_swap(progp)) {
-	    extern int malloc_privilege;
-
 	    int save_privilege;
 
 	    old_total = progp->total_size;
@@ -10351,9 +10565,6 @@ int get_line_number(p, progp, namep)
 	*namep = progp->name;
     }
     if (old_total) {
-	extern mp_int total_prog_block_size;
-	extern void reallocate_reserved_areas();
-
 	xfree(progp->line_numbers);
 	total_prog_block_size -= progp->total_size - old_total;
 	progp->total_size = old_total;
@@ -10374,13 +10585,11 @@ char *dump_trace(how)
     struct control_stack *p;
     char *ret = 0;
     char *pc = inter_pc;
-    int line;
+    int line = 0;
     char *name;
     char *file;
-    struct object *ob;
-#ifdef TRACE_CODE
-    int last_instructions PROT((int, int, struct svalue **));
-#endif
+    struct object *ob = NULL;
+    unsigned char *last_catch = NULL;
 
     if (current_prog == 0)
 	return 0;
@@ -10404,7 +10613,6 @@ char *dump_trace(how)
     do {
 	char *dump_pc;
 	struct program *prog;
-	unsigned char *last_catch;
 	if (p->extern_call) {
 	    struct control_stack *q = p;
 	    for (;;) {
@@ -10417,7 +10625,7 @@ char *dump_trace(how)
 		    break;
 		}
 	    }
-	    last_catch = 0;
+	    last_catch = NULL;
 	}
 	if (p == csp) {
 	    dump_pc = pc;
@@ -10429,32 +10637,32 @@ char *dump_trace(how)
 	/* Use some heuristics first to see if it could possibly be a CATCH */
 	if (p > &control_stack[0] && p->funstart == p[-1].funstart)
 	{
-	    unsigned char *pc = p->pc;
-	    if (*pc == F_LBRANCH - F_OFFSET) {
+	    unsigned char *pc2 = p->pc;
+	    if (*pc2 == F_LBRANCH - F_OFFSET) {
 		union {
 		    char bytes[2];
 		    short offset;
 		} ou;
-		pc++;
-		ou.bytes[0] = pc[0];
-		ou.bytes[1] = pc[0];
+		pc2++;
+		ou.bytes[0] = pc2[0];
+		ou.bytes[1] = pc2[0]; /* TODO: not pc2[1] ??? */
 		if (ou.offset <= 0)
 		    goto not_catch;
-		pc += ou.offset;
+		pc2 += ou.offset;
 	    }
 #ifdef F_XLBRANCH
 code needs fixing
 #endif
-	    if ( (pc - (unsigned char *)p->funstart) < 4)
+	    if ( (pc2 - (unsigned char *)p->funstart) < 4)
 		goto not_catch;
-	    if (pc[-2] != F_ESCAPE-F_OFFSET ||
-		pc[-1] != F_END_CATCH-F_OFFSET-0x100)
+	    if (pc2[-2] != F_ESCAPE-F_OFFSET ||
+		pc2[-1] != F_END_CATCH-F_OFFSET-0x100)
 	    {
 		goto not_catch;
 	    }
-	    if (last_catch == pc)
+	    if (last_catch == pc2)
 		goto not_catch;
-	    last_catch = pc;
+	    last_catch = pc2;
 	    name = "CATCH";
 	    goto name_computed;
         }
@@ -10617,7 +10825,7 @@ INLINE static char *sscanf_match_percent(str, fmt, info)
 	    *(nump = &info->min) = 0;
 	    continue;
 	  case 'd':
-	    while(isspace(*str))
+	    while(isspace((unsigned char)*str))
 		str++;
 	  case 'D':
 	    if (*str == '-') {
@@ -10658,7 +10866,7 @@ INLINE static char *sscanf_match_percent(str, fmt, info)
 	
 	    info->field -= (i = info->min);
 	    while (--i >= 0) {
-		if (!isspace(*str)) {
+		if (!isspace((unsigned char)*str)) {
 		    info->match_end = 0;
 		    return 0;
 		}
@@ -10666,7 +10874,7 @@ INLINE static char *sscanf_match_percent(str, fmt, info)
 	    }
 	    i = info->field;
 	    while (--i >= 0) {
-		if (!isspace(*str))
+		if (!isspace((unsigned char)*str))
 		    break;
 		str++;
 	    }
@@ -10718,7 +10926,7 @@ static void sscanf_match(str, fmt, info)
 }
 
 /* find start of match in str. return 0 for no match. */
-char *sscanf_search(str, fmt, info)
+static char *sscanf_search(str, fmt, info)
     char *str, *fmt;
     struct sscanf_info *info;
 {
@@ -11007,7 +11215,7 @@ match_skipped:
 	    flags = info.flags;
 	    num = info.string_min;
 	    if (num > 0) {
-		if (num > strlen(in_string))
+		if (num > (mp_int)strlen(in_string))
 		    break;
 		match = in_string + num;
 	    } else {
@@ -11021,7 +11229,7 @@ match_skipped:
 		break;
 	    }
 	    if ((match = sscanf_search(match, fmt, &info)) &&
-		(num = match - in_string) <= max)
+		(mp_uint)(num = match - in_string) <= max)
 	    {
 		if (flags.do_assign) {
 		    match = xalloc(num+1);
@@ -11151,7 +11359,7 @@ static void last_instr_output(str, svpp)
     }
 }
 
-int program_referenced(prog, prog2)
+static int program_referenced(prog, prog2)
     struct program *prog, *prog2;
 {
     struct inherit *inh;
@@ -11166,7 +11374,7 @@ int program_referenced(prog, prog2)
     return 0;
 }
 
-int program_exists(prog, guess)
+static int program_exists(prog, guess)
     struct program *prog;
     struct object *guess;
 {
@@ -11188,7 +11396,7 @@ int last_instructions(length, verbose, svpp)
     int i;
     struct object *old_obj;
     char old_file[160], buf[400];
-    int old_line, line;
+    int old_line, line = 0;
 
     old_obj = 0;
     *old_file = old_file[sizeof old_file - 1] = 0;
@@ -11281,8 +11489,6 @@ static struct program *check_a_lot_ref_counts_search_prog;
 void count_inherits(progp)
     struct program *progp;
 {
-    extern int register_pointer PROT((char *));
-
     int i;
     struct program *progp2;
 
@@ -11300,7 +11506,6 @@ void count_inherits(progp)
     }
 }
 
-       void count_extra_ref_in_vector PROT((struct svalue *svp, mp_int num));
 static void check_extra_ref_in_vector PROT((struct svalue *svp, mp_int num));
 
 static void count_extra_ref_in_mapping_filter(key, data, extra)
@@ -11322,8 +11527,6 @@ static void check_extra_ref_in_mapping_filter(key, data, extra)
 void count_extra_ref_in_object(ob)
     struct object *ob;
 {
-    extern int register_pointer PROT((char *));
-
     ob->extra_ref++;
     if ( register_pointer( (char *)(ob) ) )
 	return;
@@ -11352,7 +11555,7 @@ void count_extra_ref_in_object(ob)
     if (ob->flags & O_SHADOW) {
 	struct ed_buffer *buf;
 
-	if (buf = O_GET_SHADOW(ob)->ed_buffer)
+	if ( (buf = O_GET_SHADOW(ob)->ed_buffer) )
             count_ed_buffer_extra_refs(buf);
     }
 }
@@ -11361,8 +11564,6 @@ static void count_extra_ref_in_closure(l, type)
     struct lambda *l;
     ph_int type;
 {
-    extern int register_pointer PROT((char *));
-
     if (CLOSURE_HAS_CODE(type)) {
 	mp_int num_values;
 	struct svalue *svp;
@@ -11394,8 +11595,6 @@ void count_extra_ref_in_vector(svp, num)
     struct svalue *p;
 
     for (p = svp; p < svp+num; p++) {
-	extern int register_pointer PROT((char *));
-
 	switch(p->type) {
 	  case T_CLOSURE:
 	    if (CLOSURE_MALLOCED(p->x.closure_type)) {
@@ -11442,8 +11641,6 @@ static void check_extra_ref_in_vector(svp, num)
 
     for (p = svp; p < svp+num; p++) {
 	switch(p->type) {
-	extern int register_pointer PROT((char *));
-
 	  case T_QUOTED_ARRAY:
 	  case T_POINTER:
 	    if ( register_pointer( (char *)(p->u.vec) ) ) continue;
@@ -11472,13 +11669,6 @@ static void check_extra_ref_in_vector(svp, num)
 void check_a_lot_ref_counts(search_prog)
     struct program *search_prog;
 {
-    extern int register_pointer PROT((char *));
-
-    extern struct object *master_ob;
-    struct pointer_record;
-    extern void init_pointer_table PROT((struct pointer_record **));
-    extern void free_pointer_table PROT((void));
-    extern void count_extra_ref_from_call_outs PROT((void));
     struct object *ob;
     struct pointer_record *pointer_table_space[256];
     int i;
@@ -11526,7 +11716,7 @@ void check_a_lot_ref_counts(search_prog)
     int j;
 
     for (j = TOTAL_TRACE_LENGTH; --j >= 0; ) {
-	if (ob = previous_objects[j])
+	if ( (ob = previous_objects[j]) )
 	    count_extra_ref_in_object(ob);
     }
 }
@@ -11567,8 +11757,6 @@ void check_a_lot_ref_counts(search_prog)
 		  ob->ref, ob->extra_ref);
 	if ( !(ob->flags & O_SWAPPED) ) {
 	    if (ob->prog->ref != ob->prog->extra_ref) {
-		extern long time_to_swap;
-
 		/* an inheriting file might be swapped */
 		if (TIME_TO_SWAP > 0 && time_to_swap + 1 > 0 &&
 		    ob->prog->ref > ob->prog->extra_ref)
@@ -11606,20 +11794,14 @@ char *msg, *fname, *post;
     sprintf(buf, "*** %d %*s %s %s %s%s", tracedepth, tracedepth, "", msg, objname, fname, post);
     add_message(buf);
 #ifdef DEBUG
-    add_message(MESSAGE_FLUSH);
+    add_message(message_flush);
 #endif
 }
 
-void secure_apply_error(save_sp, save_csp)
+static void secure_apply_error(save_sp, save_csp)
     struct svalue *save_sp;
     struct control_stack *save_csp;
 {
-    extern int out_of_memory;
-    extern int num_error;
-    extern char *current_error, *current_error_object_name,
-		*current_error_file;
-    extern mp_int current_error_line_number;
-
     if (csp != save_csp) { /* could be error before push */
 	csp = save_csp+1;	
 	previous_ob = csp->prev_ob;
@@ -11647,7 +11829,7 @@ void secure_apply_error(save_sp, save_csp)
 	    a += 3;
 	}
 	save_cmd = command_giver;
-	apply_master_ob("runtime_error", a);
+	apply_master_ob(STR_RUNTIME, a);
 	command_giver = save_cmd;
     }
     num_error--;
@@ -11684,8 +11866,6 @@ struct svalue *apply_master_ob(fun, num_arg)
     char *fun;
     int num_arg;
 {
-    extern struct object *master_ob;
-
     static int eval_cost_reserve = MASTER_RESERVED_COST;
 
     int reserve_used = 0;
@@ -11728,10 +11908,6 @@ struct svalue *apply_master_ob(fun, num_arg)
 
 void assert_master_ob_loaded()
 {
-    extern void clear_auto_include_string PROT((void));
-    extern struct object *master_ob;
-    extern char master_name[];
-    extern void initialize_master_uid();
     static int inside = 0;
     static struct object *destructed_master_ob = 0;
 
@@ -11754,14 +11930,13 @@ void assert_master_ob_loaded()
 	 * inherits itself. Partial working self-inheritance is possible if
 	 * the H_INCLUDE_DIRS hook does something strange.
 	 */
-	extern struct object dummy_current_object_for_loads;
 	if (inside || !master_ob) {
 	    if (destructed_master_ob) {
 		struct object *ob, **pp;
 		int i;
 		int removed = 0;
 
-		if (ob = find_object2(master_name)) {
+		if ( (ob = find_object2(master_name)) ) {
 		    emergency_destruct(ob);
 		}
 		ob = destructed_master_ob;
@@ -11778,8 +11953,6 @@ void assert_master_ob_loaded()
 		ob->flags &= ~O_DESTRUCTED;
 		enter_object_hash(ob);
 		if (!removed && ob->prog->num_variables) {
-		    extern int malloc_privilege;
-
 		    int save_privilege = malloc_privilege;
 		    struct svalue *v;
 
@@ -11800,9 +11973,9 @@ void assert_master_ob_loaded()
 		if (current_object == &dummy_current_object_for_loads)
 		    current_object = master_ob;
 		push_number(removed);
-		sapply("reactivate_destructed_master", ob, 1);
+		sapply(STR_REACTIVATE, ob, 1);
 		push_number(2 - removed);
-		sapply("inaugurate_master", ob, 1);
+		sapply(STR_INAUGURATE, ob, 1);
 		fprintf(stderr, "Old master reactivated.\n");
 		inside = 0;
 		return;
@@ -11846,7 +12019,7 @@ void assert_master_ob_loaded()
 	}
 	initialize_master_uid();
 	push_number(3);
-	apply_master_ob("inaugurate_master", 1);
+	apply_master_ob(STR_INAUGURATE, 1);
 	assert_master_ob_loaded();
 	inside = 0;
 	add_ref(master_ob, "assert_master_ob_loaded");
@@ -11902,7 +12075,7 @@ void remove_object_from_stack(ob)
     }
 }
 
-int trace_test(b)
+static int trace_test(b)
     int b;
 {
     struct interactive *ip;
@@ -11925,7 +12098,7 @@ char *p, *s;
 
 /* Concatenation of two arrays into one, freeing the summands.
  */
-struct vector *inter_add_array(q, vpp)
+static struct vector *inter_add_array(q, vpp)
     struct vector *q, **vpp;
 {
     struct vector *p = *vpp;
@@ -11956,9 +12129,7 @@ struct vector *inter_add_array(q, vpp)
 	/* this is provisoric, i need some stats from several days uptime
 	 * to judge if it actually pays to do the test.
 	 */
-	extern char *malloc_increment_size PROT((char *, p_int));
-
-	if (d = (struct svalue *)malloc_increment_size((char *)p, q_size<<1)) {
+	if ( (d = (struct svalue *)malloc_increment_size((char *)p, q_size<<1)) ) {
 	    (r = p)->ref = 1;
 	    r->user->size_array -= p_size;
 	    (r->user = current_object->user)->size_array += p_size + q_size;
@@ -12028,8 +12199,6 @@ struct vector *inter_add_array(q, vpp)
 struct svalue *f_set_is_wizard(sp)
     struct svalue *sp;
 {
-    extern int is_wizard_used;
-
     int i;
     unsigned short *flagp;
 
@@ -12118,7 +12287,6 @@ struct svalue *f_set_prompt(sp)
 	if (sp->type == T_STRING &&
 	    sp->x.string_type == STRING_VOLATILE)
 	{
-	    extern struct svalue *inter_sp;
 	    char *str = make_shared_string(sp->u.string);
 
 	    if (!str) {
@@ -12179,7 +12347,7 @@ struct svalue *f_transpose_array(sp)
 	if (y->type != T_POINTER)
 	    break;
 	z = y->u.vec->item;
-	if (VEC_SIZE(y->u.vec) < b)
+	if (VEC_SIZE(y->u.vec) < (size_t)b)
 	    if ( !(b = VEC_SIZE(y->u.vec)) )
 		break;
 	if (y->u.vec->ref == no_copy) {
@@ -12227,7 +12395,7 @@ struct svalue *f_trace(sp)
 	struct svalue *arg;
 	assign_eval_cost();
 	inter_sp = _push_constant_string("trace", sp);
-	arg = apply_master_ob("query_player_level", 1);
+	arg = apply_master_ob(STR_PLAYER_LEVEL, 1);
 	if (!arg) {
 	    if (out_of_memory)
 		error("Out of memory\n");
@@ -12260,7 +12428,7 @@ struct svalue *f_traceprefix(sp)
 	struct svalue *arg;
 	inter_sp = _push_constant_string("trace", sp);
 	assign_eval_cost();
-	arg = apply_master_ob("query_player_level",1);
+	arg = apply_master_ob(STR_PLAYER_LEVEL,1);
 	if (!arg) {
 	    if (out_of_memory)
 		error("Out of memory\n");
@@ -12347,8 +12515,9 @@ struct svalue *f_debug_info(sp, num_arg)
 	add_message("name        : '%s'\n", ob->name);
 	for (obj2 = ob->next_all; obj2 && obj2->flags & O_DESTRUCTED; )
 	    obj2 = obj2->next_all;
-	add_message("next_all    : OBJ(%s)\n",
-	  obj2->next_all?obj2->name:"NULL");
+	if (obj2)
+	    add_message("next_all    : OBJ(%s)\n",
+	      obj2->next_all?obj2->name:"NULL");
 	for (prev=0,obj2=obj_list,i=0; obj2; obj2=obj2->next_all) {
 	    if ( !(obj2->flags & O_DESTRUCTED) )
 		prev = obj2, i++;
@@ -12421,8 +12590,6 @@ struct svalue *f_debug_info(sp, num_arg)
       case 3:
       {
 #if defined(MALLOC_smalloc) || defined(MALLOC_malloc)
-	extern void dump_malloc_data();
-
 	if (num_arg != 1)
     	    ERROR("bad number of arguments to debug_info\n")
 	dump_malloc_data();
@@ -12431,8 +12598,6 @@ struct svalue *f_debug_info(sp, num_arg)
       }
       case 4:
       {
-	extern int status_parse PROT((char *));
-
 	if (num_arg != 2)
     	    ERROR("bad number of arguments to debug_info\n")
 	if (sp->type == T_NUMBER && sp->u.number == 0) {
@@ -12492,7 +12657,7 @@ void call_lambda(lsvp, num_arg)
 	}
 	current_prog = current_object->prog;
 	/* inter_sp == sp */
-	flags = setup_new_frame(l->function.index, inter_pc);
+	flags = setup_new_frame(l->function.index);
 	funstart = current_prog->program + (flags & FUNSTART_MASK);
 	csp->funstart = funstart;
 	eval_instruction(funstart + 2, inter_sp);
@@ -12512,10 +12677,10 @@ void call_lambda(lsvp, num_arg)
 	    if ((d =
 		 (current_object->flags|l->function.alien.ob->flags) &
 		  O_DESTRUCTED) ||
-		current_object->flags & O_SWAPPED &&
-		load_ob_from_swap(current_object) < 0 ||
-		l->function.alien.ob->flags & O_SWAPPED &&
-		load_ob_from_swap(l->function.alien.ob) < 0)
+		(current_object->flags & O_SWAPPED &&
+		load_ob_from_swap(current_object) < 0) ||
+		(l->function.alien.ob->flags & O_SWAPPED &&
+		load_ob_from_swap(l->function.alien.ob) < 0) )
 	    {
 		/* inter_sp == sp */
 		previous_ob = csp->prev_ob;
@@ -12536,7 +12701,7 @@ void call_lambda(lsvp, num_arg)
 	current_object = l->function.alien.ob;
 	current_prog = current_object->prog;
 	/* inter_sp == sp */
-	flags = setup_new_frame(l->function.alien.index, inter_pc);
+	flags = setup_new_frame(l->function.alien.index);
 	funstart = current_prog->program + (flags & FUNSTART_MASK);
 	csp->funstart = funstart;
 	eval_instruction(funstart + 2, inter_sp);
@@ -12628,8 +12793,6 @@ void call_lambda(lsvp, num_arg)
 		max = instrs[i].max_arg;
 		p = code;
 		if (num_arg < min) {
-		    extern int proxy_efun PROT((int, int));
-	
 		    int f;
 	
 		    if (num_arg == min-1 &&
@@ -12671,8 +12834,6 @@ void call_lambda(lsvp, num_arg)
 	    }
 	} else {
 	    /* simul_efun */
-	    extern struct object *simul_efun_object;
-
 	    struct object *ob;
 
 	    inter_pc = csp->funstart = SIMUL_EFUN_FUNSTART;
@@ -12708,9 +12869,6 @@ static void call_simul_efun(code, ob, num_arg)
     struct object *ob;
     int num_arg;
 {
-    extern struct function *simul_efunp;
-    extern struct vector *simul_efun_vector;
-
     char *function_name;
 
     /*
@@ -12757,7 +12915,6 @@ void free_interpreter_temporaries() {
 void clear_interpreter_refs() {
 #ifdef TRACE_CODE
 {
-    extern clear_inherit_ref PROT((struct program *));
     int i;
 
     for (i = TOTAL_TRACE_LENGTH; --i >= 0; ) {
@@ -12785,7 +12942,7 @@ void count_interpreter_refs() {
     for (i = TOTAL_TRACE_LENGTH; --i >= 0; ) {
 	struct object *ob;
 
-	if (ob = previous_objects[i]) {
+	if ( (ob = previous_objects[i]) ) {
 	    if (ob->flags & O_DESTRUCTED) {
 		previous_objects[i] = 0;
 		previous_instruction[i] = 0;
@@ -12863,4 +13020,20 @@ struct svalue *f_to_object(sp)
     else
 	put_number(0);
     return sp;
+}
+
+/*---------------------------------------------------------------------------*/
+void
+init_interpret (void)
+
+/* Initialize the interpreter data structures, especially the apply cache.
+ */
+
+{
+  /* The cache is inited to hold entries for 'functions' in a non-existing
+   * program (id 0). The first real apply calls will thus see a (virtual)
+   * collision with 'older' cache entries.
+   */
+  memset(cache_id, 0, sizeof cache_id);
+  memset(cache_progp, 1, sizeof cache_progp);
 }

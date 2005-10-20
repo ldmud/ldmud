@@ -1330,6 +1330,58 @@ fi
 rm -f conftest*
 done
 
+case $DEFS in
+  *HAVE_GETRUSAGE*)
+    ;;
+  *)
+echo checking for "getrusage() via syscall()"
+${CAT} > conftest.c <<EOF
+#include "confdefs.h"
+
+#include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
+#include <sys/syscall.h>
+#include <sys/resource.h>
+#ifndef RUSAGE_SELF
+#define RUSAGE_SELF     0
+#endif
+
+int main() { exit(0); }
+int t() { 
+struct rusage rus;
+syscall(SYS_GETRUSAGE, RUSAGE_SELF, rus);
+ }
+EOF
+if eval $compile; then
+  rm -rf conftest*
+  
+{
+test -n "$verbose" && \
+echo "	defining GETRUSAGE_VIA_SYSCALL"
+echo "#define" GETRUSAGE_VIA_SYSCALL 1 >> confdefs.h
+DEFS="$DEFS -DGETRUSAGE_VIA_SYSCALL=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}GETRUSAGE_VIA_SYSCALL\${SEDdB}GETRUSAGE_VIA_SYSCALL\${SEDdC}1\${SEDdD}
+\${SEDuA}GETRUSAGE_VIA_SYSCALL\${SEDuB}GETRUSAGE_VIA_SYSCALL\${SEDuC}1\${SEDuD}
+\${SEDeA}GETRUSAGE_VIA_SYSCALL\${SEDeB}GETRUSAGE_VIA_SYSCALL\${SEDeC}1\${SEDeD}
+"
+}
+ 
+{
+test -n "$verbose" && \
+echo "	defining HAVE_GETRUSAGE"
+echo "#define" HAVE_GETRUSAGE 1 >> confdefs.h
+DEFS="$DEFS -DHAVE_GETRUSAGE=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_GETRUSAGE\${SEDdB}HAVE_GETRUSAGE\${SEDdC}1\${SEDdD}
+\${SEDuA}HAVE_GETRUSAGE\${SEDuB}HAVE_GETRUSAGE\${SEDuC}1\${SEDuD}
+\${SEDeA}HAVE_GETRUSAGE\${SEDeB}HAVE_GETRUSAGE\${SEDeC}1\${SEDeD}
+"
+}
+
+
+fi
+rm -f conftest*
+ ;;
+esac
+
 #At least my Atari has no tr .
 capfunc='echo HAVE_$func|sed y~abcdefghijklmnopqrstuvwxyz./~ABCDEFGHIJKLMNOPQRSTUVWXYZ__~'
 for func in strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid
@@ -1548,6 +1600,10 @@ ${CAT} > conftest.c <<EOF
 
 #include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
 #include <sys/time.h>
+#ifdef GETRUSAGE_VIA_SYSCALL
+#include <sys/syscall.h>
+#define getrusage(a, b)  syscall(SYS_GETRUSAGE, a, b)
+#endif
 #ifdef HAVE_SYS_RUSAGE_H
 #include <sys/rusage.h>
 #endif
@@ -1602,6 +1658,10 @@ ${CAT} > conftest.c <<EOF
 
 #include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
 #include <sys/time.h>
+#ifdef GETRUSAGE_VIA_SYSCALL
+#include <sys/syscall.h>
+#define getrusage(a, b)  syscall(SYS_GETRUSAGE, a, b)
+#endif
 #ifdef HAVE_SYS_RUSAGE_H
 #include <sys/rusage.h>
 #endif
@@ -1630,53 +1690,6 @@ DEFS="$DEFS -DRUSAGE_USEC=1"
 SEDDEFS="${SEDDEFS}\${SEDdA}RUSAGE_USEC\${SEDdB}RUSAGE_USEC\${SEDdC}1\${SEDdD}
 \${SEDuA}RUSAGE_USEC\${SEDuB}RUSAGE_USEC\${SEDuC}1\${SEDuD}
 \${SEDeA}RUSAGE_USEC\${SEDeB}RUSAGE_USEC\${SEDeC}1\${SEDeD}
-"
-}
-
-
-fi
-rm -f conftest*
- ;;
-  *)
-echo checking for "getrusage() via syscall()"
-${CAT} > conftest.c <<EOF
-#include "confdefs.h"
-
-#include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
-#include <sys/syscall.h>
-#include <sys/resource.h>
-#ifndef RUSAGE_SELF
-#define RUSAGE_SELF     0
-#endif
-
-int main() { exit(0); }
-int t() { 
-struct rusage rus;
-syscall(SYS_GETRUSAGE, RUSAGE_SELF, rus);
- }
-EOF
-if eval $compile; then
-  rm -rf conftest*
-  
-{
-test -n "$verbose" && \
-echo "	defining GETRUSAGE_VIA_SYSCALL"
-echo "#define" GETRUSAGE_VIA_SYSCALL 1 >> confdefs.h
-DEFS="$DEFS -DGETRUSAGE_VIA_SYSCALL=1"
-SEDDEFS="${SEDDEFS}\${SEDdA}GETRUSAGE_VIA_SYSCALL\${SEDdB}GETRUSAGE_VIA_SYSCALL\${SEDdC}1\${SEDdD}
-\${SEDuA}GETRUSAGE_VIA_SYSCALL\${SEDuB}GETRUSAGE_VIA_SYSCALL\${SEDuC}1\${SEDuD}
-\${SEDeA}GETRUSAGE_VIA_SYSCALL\${SEDeB}GETRUSAGE_VIA_SYSCALL\${SEDeC}1\${SEDeD}
-"
-}
- 
-{
-test -n "$verbose" && \
-echo "	defining HAVE_GETRUSAGE"
-echo "#define" HAVE_GETRUSAGE 1 >> confdefs.h
-DEFS="$DEFS -DHAVE_GETRUSAGE=1"
-SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_GETRUSAGE\${SEDdB}HAVE_GETRUSAGE\${SEDdC}1\${SEDdD}
-\${SEDuA}HAVE_GETRUSAGE\${SEDuB}HAVE_GETRUSAGE\${SEDuC}1\${SEDuD}
-\${SEDeA}HAVE_GETRUSAGE\${SEDeB}HAVE_GETRUSAGE\${SEDeC}1\${SEDeD}
 "
 }
 

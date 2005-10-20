@@ -1,13 +1,19 @@
+#include "driver.h"
+
 #include <stdio.h>
 
 #define USES_SVALUE_STRLEN
-#include "lint.h"
-#include "interpret.h"
-#include "smalloc.h"
-#include "object.h"
+#include "dumpstat.h"
+#include "array.h"
+#include "comm.h"
 #include "exec.h"
-#include "lang.h"
+#include "interpret.h"
 #include "instrs.h"
+#include "mapping.h"
+#include "object.h"
+#include "prolang.h"
+#include "simulate.h"
+#include "smalloc.h"
 
 /*
  * Write statistics about objects on file.
@@ -20,7 +26,7 @@ struct svalue_size_locals {
     int num_values;
 };
 
-void svalue_size_map_filter(key, values, extra)
+static void svalue_size_map_filter(key, values, extra)
     struct svalue *key;
     struct svalue *values;
     char *extra;
@@ -35,8 +41,6 @@ void svalue_size_map_filter(key, values, extra)
     }
 }
 #endif
-
-extern struct object *obj_list;
 
 static int svalue_size(v)
     struct svalue *v;
@@ -53,22 +57,15 @@ static int svalue_size(v)
     case T_STRING:
 	/* Include some malloc overhead. */
 	if (v->x.string_type == STRING_SHARED)
-	    return strlen(v->u.string) + sizeof(short) + 3*sizeof(char*) &
-	      ~(sizeof(char *) - 1);
-	return svalue_strlen(v) + 2*sizeof(char *) & ~(sizeof(char *) - 1);
+	    return (strlen(v->u.string) + sizeof(short) + 3*sizeof(char*)) &
+	      (~(sizeof(char *) - 1));
+	return (svalue_strlen(v) + 2*sizeof(char *)) & (~(sizeof(char *) - 1));
     case T_SYMBOL:
-	return strlen(v->u.string) + sizeof(short) + 3*sizeof(char*) &
-	  ~(sizeof(char *) - 1);
+	return (strlen(v->u.string) + sizeof(short) + 3*sizeof(char*)) &
+	  (~(sizeof(char *) - 1));
 #ifdef MAPPINGS
     case T_MAPPING:
     {
-	extern int register_pointer PROT((char *));
-	extern void walk_mapping PROT((
-		struct mapping *,
-		void (*)(struct svalue *, struct svalue *, char *),
-		char *
-	));
-
 	struct svalue_size_locals locals;
 	struct condensed_mapping *cm;
 
@@ -90,8 +87,6 @@ static int svalue_size(v)
     case T_POINTER:
     case T_QUOTED_ARRAY:
     {
-	extern int register_pointer PROT((char *));
-
 	if (v->u.vec == &null_vector) return 0;
 	if (register_pointer( (char *)(v->u.vec) ) ) return 0;
 #ifdef MALLOC_smalloc
@@ -100,14 +95,13 @@ static int svalue_size(v)
 	total = sizeof *v->u.vec - sizeof v->u.vec->item +
 	  sizeof(struct svalue) * v->u.vec->size + sizeof(char *);
 #endif
-	for (i=0; i < VEC_SIZE(v->u.vec); i++) {
+	for (i=0; i < (mp_int)VEC_SIZE(v->u.vec); i++) {
 	    total += svalue_size(&v->u.vec->item[i]);
 	}
 	return total;
     }
     case T_CLOSURE:
     {
-	extern int register_pointer PROT((char *));
 	int num_values;
 	struct svalue *svp;
 	struct lambda *l;
@@ -168,10 +162,6 @@ static int svalue_size(v)
 mp_int data_size(ob)
     struct object *ob;
 {
-    struct pointer_record;
-    extern void init_pointer_table PROT((struct pointer_record **));
-    extern void free_pointer_table PROT((void));
-
     mp_int total = sizeof(p_int); /* smalloc overhead */
     int i;
     struct pointer_record *pointer_table_space[256];

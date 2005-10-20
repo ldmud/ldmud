@@ -1,5 +1,6 @@
-#include "config.h"
-#include "stralloc.h"
+#include "driver.h"
+
+#include "my-alloca.h"
 
 #include <sys/time.h>
 #ifdef __STDC__
@@ -25,6 +26,8 @@
 #include <ctype.h>
 #ifndef AMIGA
 #include <signal.h>
+#else
+#include "hosts/amiga/nsignal.h"
 #endif
 #ifndef SIGCLD
 #define SIGCLD SIGCHLD
@@ -32,58 +35,87 @@
 #ifdef _AIX
 #include <sys/select.h>
 #endif
-#include "lint.h"
 #ifdef HAVE_FCNTL
 #include <fcntl.h>
-#endif
-#include "interpret.h"
-#include "comm.h"
-#include "object.h"
-#include "sent.h"
-#include "wiz_list.h"
-#include "exec.h"
-#include "util/erq.h"
-
-#ifdef AMIGA
-#include "hosts/amiga/nsignal.h"
 #endif
 
 #ifdef SOCKET_INC
 #include SOCKET_INC
 #endif
 
+#include "comm.h"
+#include "access_check.h"
+#include "array.h"
+#include "backend.h"
+#include "ed.h"
+#include "exec.h"
+#include "gcollect.h"
+#include "interpret.h"
+#include "main.h"
+#include "object.h"
+#include "sent.h"
+#include "simulate.h"
+#include "stralloc.h"
+#include "wiz_list.h"
+#include "util/erq.h"
+
+#if !defined (SOCKET_LIB) && !defined(SOCKET_INC)
+#define socket_number(s) (s)
+#define socket_ioctl  ioctl
+#define socket_select select
+#define socket_read   read
+#define socket_write  write
+#define socket_close  close
+#endif /* SOCKET_LIB */
+
+#if defined(SunOS4) || defined(atarist)
+SOCKET_T socket PROT((int, int, int));
+int getpeername PROT((SOCKET_T, struct sockaddr *, int *));
+void  shutdown PROT((SOCKET_T, int));
+int setsockopt PROT((SOCKET_T, int, int, char *, int));
+int bind PROT((SOCKET_T, struct sockaddr *, int));
+int listen PROT((SOCKET_T, int));
+SOCKET_T accept PROT((SOCKET_T, struct sockaddr *, int *));
+struct timeval;
+int select PROT((int, fd_set *, fd_set *, fd_set *, struct timeval *));
+#endif /* SunOS4 */
+
+#if defined(__CYGWIN32__)
+extern int socketpair PROT((int, int, int, int[2]));
+#endif
+
 #ifndef EPROTO
 #define EPROTO EINTR
 #endif
 
-void telnet_neg PROT((struct interactive *));
-
-extern int d_flag;
-extern int current_time;
-extern int trace_level;
-extern int32 initial_eval_cost, eval_cost, assigned_eval_cost;
-void remove_flush_entry PROT((struct interactive *ip));
-
-void remove_interactive();
-
-struct interactive *all_players[MAX_PLAYERS];
-
-void new_player();
-
-void flush_all_player_mess();
-
+static void telnet_neg PROT((struct interactive *));
 static void send_will PROT((int));
 static void send_wont PROT((int));
 static void send_do PROT((int));
 static void send_dont PROT((int));
+static void remove_flush_entry PROT((struct interactive *ip));
+static void new_player PROT((SOCKET_T new_socket, struct sockaddr_in *addr, int len));
+static void add_ip_entry PROT((long addr, char *name));
 
-int num_player = 0, max_player = -1;
+struct interactive *all_players[MAX_PLAYERS];
+int num_player = 0;
+static int max_player = -1;
+
+/* Special flush message for add_message().
+ * It is a variable instead of a define to keep gcc from complaining about
+ * a 'null format string'.
+ */
+char *message_flush = NULL;
+
+/* TODO: Add a public char message_flush[] so that gcc stops complaining
+ * TODO:: about a null format string
+ */
 
 #ifdef ERQ_DEMON
 
 #define MAX_PENDING_ERQ 32
 
-SOCKET_T erq_demon = -2, erq_proto_demon = -1;
+static SOCKET_T erq_demon = -2, erq_proto_demon = -1;
 static char buf_from_erq[ERQ_MAX_REPLY], *input_from_erq = &buf_from_erq[0];
 
 static long read_32 PROT((char *));
@@ -94,11 +126,6 @@ static void stop_erq_demon PROT((int));
 static struct svalue pending_erq[MAX_PENDING_ERQ+1], *free_erq;
 
 #endif /* ERQ_DEMON */
-
-#ifdef ACCESS_RESTRICTED
-extern char *allow_host_access (); 
-extern void release_host_access ();
-#endif
 
 static char sending_telnet_command = 0;
 #define SEND_TELNET_COMMAND(TEXT) {\
@@ -113,10 +140,7 @@ static struct object *first_player_for_flush=(struct object *)NULL;
  * Interprocess communication interface to the backend.
  */
 
-extern int port_number;
-
 #ifdef CATCH_UDP_PORT
-extern int udp_port;
 static SOCKET_T udp_s = -1;
 #else
 #define udp_port 0
@@ -127,10 +151,16 @@ int add_message_calls=0;
 int inet_packets=0;
 int inet_volume=0;
 #endif
+#ifndef MAXNUMPORTS
 static SOCKET_T s;
+#define MUDSOCKET s
+#else
+static SOCKET_T sos[MAXNUMPORTS];
+#define MUDSOCKET sos[i]
+#endif
 
 #ifndef MSDOS
-void set_socket_nonblocking(new_socket)
+static void set_socket_nonblocking(new_socket)
     SOCKET_T new_socket;
 {
     int tmp;
@@ -147,13 +177,22 @@ void set_socket_nonblocking(new_socket)
 #else
     if (fcntl(new_socket, F_SETFL, FNDELAY) == -1) {
 #endif
+#ifndef __BEOS__
 	perror("fcntl socket FNDELAY");
 	abort();
+#else
+        if (new_socket)
+        {
+            perror("fcntl socket FNDELAY");
+            abort();
+        }
+        perror("ignored error: fcntl socket FNDELAY");
+#endif
     }
 #endif /* !USE_IOCTL_FIONBIO */
 }
 
-void set_close_on_exec(new_socket)
+static void set_close_on_exec(new_socket)
     SOCKET_T new_socket;
 {
 #ifdef HAVE_FCNTL
@@ -162,7 +201,7 @@ void set_close_on_exec(new_socket)
 }
 #endif /* MSDOS */
 
-set_socket_own(new_socket)
+static void set_socket_own(new_socket)
     SOCKET_T new_socket;
 {
 #ifdef F_SETOWN
@@ -261,13 +300,15 @@ void initialize_host_ip_number() {
 static volatile int urgent_data = 0;
 static volatile long urgent_data_time;
 
-void urgent_data_handler()
+static void urgent_data_handler()
 {
     if (d_flag)
 	write(2, "received urgent data\n", 21);
     urgent_data = 1;
     urgent_data_time = current_time;
+#if defined(SIGURG)
     signal(SIGURG, (RETSIGTYPE(*)PROT((int)))urgent_data_handler);
+#endif
 }
 
 static void (*telopts_do  [NTELOPTS]) PROT((int));
@@ -277,43 +318,69 @@ static void (*telopts_wont[NTELOPTS]) PROT((int));
 
 void prepare_ipc() {
     int tmp;
+#ifdef MAXNUMPORTS
+    int i;
+#endif
 
     /* Don't undo the effect of mudlib_telopts.  */
     if (!telopts_do[0])
-	init_telopts();
-    host_ip_addr.sin_port = htons((u_short)port_number);
-    host_ip_addr.sin_addr.s_addr = INADDR_ANY;
-    s = socket(host_ip_addr.sin_family, SOCK_STREAM, 0);
-    if ((int)s == -1) {
-	perror("socket");
-	abort();
-    }
-    tmp = 1;
-    if (setsockopt (s, SOL_SOCKET, SO_REUSEADDR,
-		    (char *) &tmp, sizeof (tmp)) < 0) {
-	perror ("setsockopt");
-	exit (1);
-    }
-    if (bind(s, (struct sockaddr *)&host_ip_addr, sizeof host_ip_addr) == -1) {
-	if (errno == EADDRINUSE) {
-	    fprintf(stderr, "Socket already bound!\n");
-	    debug_message("Socket already bound!\n");
-	    exit(errno);
-	} else {
-	    perror("bind");
+      init_telopts();
+
+#ifndef MAXNUMPORTS
+#define PNUMBER port_number
+#else
+#define PNUMBER port_numbers[i]
+#endif
+
+#ifdef MAXNUMPORTS
+    for (i = 0; i < numports; i++) {
+#endif
+    if (PNUMBER > 0) {
+	host_ip_addr.sin_port = htons((u_short)PNUMBER);
+	host_ip_addr.sin_addr.s_addr = INADDR_ANY;
+	MUDSOCKET = socket(host_ip_addr.sin_family, SOCK_STREAM, 0);
+	if ((int)MUDSOCKET == -1) {
+	    perror("socket");
 	    abort();
 	}
+	tmp = 1;
+	if (setsockopt (MUDSOCKET, SOL_SOCKET, SO_REUSEADDR,
+			(char *) &tmp, sizeof (tmp)) < 0) {
+	    perror ("setsockopt");
+	    exit (1);
+	}
+	if (bind(MUDSOCKET, (struct sockaddr *)&host_ip_addr, sizeof host_ip_addr) == -1) {
+	    if (errno == EADDRINUSE) {
+		fprintf(stderr, "Socket already bound!\n");
+		debug_message("Socket already bound!\n");
+		exit(errno);
+	    } else {
+		perror("bind");
+		abort();
+	    }
+	}
     }
-    if (listen(s, 5) == -1) {
+    else {
+	MUDSOCKET = -PNUMBER;
+	tmp = sizeof(host_ip_addr);
+	if (!getsockname(MUDSOCKET, (struct sockaddr *)&host_ip_addr, &tmp))
+	    PNUMBER = ntohs(host_ip_addr.sin_port);
+    }
+    if (listen(MUDSOCKET, 5) == -1) {
 	perror("listen");
 	abort();
     }
-    set_socket_nonblocking(s);
-    set_close_on_exec(s);
-    if (socket_number(s) >= min_nfds)
-	min_nfds = socket_number(s)+1;
+    set_socket_nonblocking(MUDSOCKET);
+    set_close_on_exec(MUDSOCKET);
+    if (socket_number(MUDSOCKET) >= min_nfds)
+	min_nfds = socket_number(MUDSOCKET)+1;
+#ifdef MAXNUMPORTS
+  } /* for */
+#endif
     signal(SIGPIPE, SIG_IGN);
+#if defined(SIGURG)
     signal(SIGURG, (RETSIGTYPE(*)PROT((int)))urgent_data_handler);
+#endif
 }
 
 #else /* MSDOS */
@@ -332,9 +399,15 @@ void prepare_ipc() {
  * This one is called when shutting down the MUD.
  */
 void ipc_remove() {
+#ifdef MAXNUMPORTS
+    int i;
+#endif
     (void)printf("Shutting down ipc...\n");
 #ifndef MSDOS
-    socket_close(s);
+#ifdef MAXNUMPORTS
+    for (i = 0; i < numports; i++)
+#endif
+    socket_close(MUDSOCKET);
 #ifdef CATCH_UDP_PORT
     if (udp_s >= 0)
 	socket_close(udp_s);
@@ -349,7 +422,11 @@ void ipc_remove() {
  * It has to be initialized as array of char, because a string could be made
  * shared.
  */
-char destruct_add_message_format[] = { '%', 's', '\0' };
+static char destruct_add_message_format[] = { '%', 's', '\0' };
+
+/* TODO: Add a public char message_flush[] so that gcc stops complaining
+ * TODO:: about a null format string
+ */
 
 /*
  * Send a message to a player. If that player is shadowed, special
@@ -384,12 +461,12 @@ void add_message(fmt, a1, a2, a3, a4, a5, a6, a7, a8, a9)
     min_length = MAX_SOCKET_PACKET_SIZE;
     if (command_giver == 0 ||
         ( command_giver->flags & O_DESTRUCTED &&
-          fmt != destruct_add_message_format && fmt != MESSAGE_FLUSH ) ||
+          fmt != destruct_add_message_format && fmt != message_flush ) ||
 	 !(ip = O_GET_INTERACTIVE(command_giver)) ||
 	 ip->sent.type != SENT_INTERACTIVE ||
-	(ip->do_close && fmt != MESSAGE_FLUSH) ) {
+	(ip->do_close && fmt != message_flush) ) {
 	putchar(']');
-	if ( fmt != MESSAGE_FLUSH ) {
+	if ( fmt != message_flush ) {
 #ifdef __STDC__
 	    vprintf(fmt, va);
 #else
@@ -403,7 +480,7 @@ void add_message(fmt, a1, a2, a3, a4, a5, a6, a7, a8, a9)
 	return;
     }
     old_message_length = ip->message_length;
-    if ( fmt == MESSAGE_FLUSH ) {
+    if ( fmt == message_flush ) {
 	min_length = 1;
 	source = "";
     } else {
@@ -439,7 +516,7 @@ void add_message(fmt, a1, a2, a3, a4, a5, a6, a7, a8, a9)
 	if (!sending_telnet_command) {
 	    if (shadow_catch_message(command_giver, source))
 		return;
-	    if (snooper = ip->snoop_by) {
+	    if ( (snooper = ip->snoop_by) ) {
 		buff[0] = '%';
 		if (O_GET_INTERACTIVE(snooper) &&
 		    O_GET_INTERACTIVE(snooper)->sent.type == SENT_INTERACTIVE)
@@ -580,7 +657,7 @@ void add_message(fmt, a1, a2, a3, a4, a5, a6, a7, a8, a9)
     } while (*source);
     ip->message_length = length = dest - ip->message_buf;
     if ( length && !old_message_length ) { /* buffer became 'dirty' */
-	if ( ip->next_player_for_flush = first_player_for_flush ) {
+	if ( (ip->next_player_for_flush = first_player_for_flush) ) {
 	    O_GET_INTERACTIVE(first_player_for_flush)->
 	      previous_player_for_flush =
 		command_giver;
@@ -593,7 +670,7 @@ void add_message(fmt, a1, a2, a3, a4, a5, a6, a7, a8, a9)
     }
 }
 
-void remove_flush_entry(ip)
+static void remove_flush_entry(ip)
     struct interactive *ip;
 {
 
@@ -618,7 +695,7 @@ void flush_all_player_mess() {
         np = O_GET_INTERACTIVE(p)->next_player_for_flush;
 	/* beware of side-effects when calling add_message the first time! */
 	command_giver = p;
-	add_message(MESSAGE_FLUSH);
+	add_message(message_flush);
     }
     command_giver=save;
 }
@@ -650,18 +727,18 @@ void flush_all_player_mess() {
 #define	StartCmdGiver	(max_player)
 #define IncCmdGiver	NextCmdGiver--
 
-extern int time_to_call_heart_beat, comm_time_to_call_heart_beat;
 static fd_set exceptfds;
 
-int get_message(buff, size)
+int get_message(buff)
     char *buff;
-    int size;
 {
     int i;
     struct interactive * ip = 0;
     static fd_set readfds;
     static int NextCmdGiver = -1;
     static int CmdsGiven = 0;
+
+    FD_ZERO(&readfds);
 
     /*
      * Stay in this loop until we have a message from a player.
@@ -679,9 +756,15 @@ int get_message(buff, size)
 	    int retries;
 
 	    flush_all_player_mess();
-	    twait = !comm_time_to_call_heart_beat;
+	    twait = comm_time_to_call_heart_beat ? 0 : 1;
 	    FD_ZERO(&readfds);
-	    FD_SET(s, &readfds);
+#ifdef MAXNUMPORTS
+	  for (i = 0; i < numports; i++) {
+#endif
+	    FD_SET(MUDSOCKET, &readfds);
+#ifdef MAXNUMPORTS
+	  } /* for */
+#endif
 	    nfds = min_nfds;
 	    for (i = max_player + 1; --i >= 0;) {
 		ip = all_players[i];
@@ -723,7 +806,8 @@ int get_message(buff, size)
 		timeout.tv_usec = 0;
 		res = socket_select(nfds, &readfds, 0, 0, &timeout);
 		if (res == -1) {
-		    if (errno == EINTR) {
+		    /* BeOS PR2 returns errno -1 instead of EINTR :-( */
+		    if (errno == EINTR || errno == -1) {
 			/* We got an alarm, probably need heart_beat.
 			 * But finish the select call since we already have
 			 * prepared readfds.
@@ -746,7 +830,7 @@ int get_message(buff, size)
 		urgent_data = 0;
 		timeout.tv_sec = 0;
 		timeout.tv_usec = 0;
-		memset((char *)&exceptfds, 255, nfds + 7 >> 3);
+		memset((char *)&exceptfds, 255, (nfds + 7) >> 3);
 		if (socket_select(nfds, 0, 0, &exceptfds, &timeout) > 0) {
 		    for (i = max_player + 1; --i >= 0;) {
 			ip = all_players[i];
@@ -773,8 +857,6 @@ int get_message(buff, size)
 	    NextCmdGiver = StartCmdGiver;
 #ifdef ERQ_DEMON
 	    if (erq_demon >= 0 && FD_ISSET(erq_demon, &readfds)) {
-		static void add_ip_entry PROT((long, char *));
-
 		mp_int l, msglen, rest;
 		int32 handle;
 		char *rp;
@@ -846,7 +928,6 @@ int get_message(buff, size)
 			    (rest = msglen - 8) <= MAX_ARRAY_SIZE &&
 			    pending_erq[handle].type != T_INVALID)
 			{
-			    extern struct object *current_interactive;
 			    struct svalue *erqp = &pending_erq[handle];
 			    char *cp;
 			    struct vector *v;
@@ -893,11 +974,14 @@ int get_message(buff, size)
 	    }
 #endif /* ERQ_DEMON */
 	    /* First, try to get a new player... */
-	    if (FD_ISSET(s, &readfds)) {
+#ifdef MAXNUMPORTS
+	    for (i = 0; i < numports; i++) {
+#endif
+	    if (FD_ISSET(MUDSOCKET, &readfds)) {
 		SOCKET_T new_socket;
 
 		length = sizeof addr;
-		new_socket = accept(s, (struct sockaddr *)&addr, &length);
+		new_socket = accept(MUDSOCKET, (struct sockaddr *)&addr, &length);
 		if ((int)new_socket != -1)
 		    new_player(new_socket, &addr, length);
 		else if ((int)new_socket == -1 &&
@@ -910,9 +994,12 @@ int get_message(buff, size)
 		    abort();
 		}
 	    }
+#ifdef MAXNUMPORTS
+            } /* for */
+#endif
 	    /* check heart beat */
 	    if (comm_time_to_call_heart_beat) {
-		time_to_call_heart_beat = 1;
+		time_to_call_heart_beat = MY_TRUE;
 		return 0;
 	    }
 	}
@@ -921,11 +1008,15 @@ int get_message(buff, size)
 	/* we don't test readfds so that we can accept udp messages with
 	 * short latency. But for the same reason, it was necessary to
 	 * include the descriptor number in the set to be selected on.
+         * Note for BeOS PR2: in PR2, reading a non-ready UDP socket
+         *   can cause the thread to freeze :-(
 	 */
+#ifndef __BEOS__
 	if (udp_s >= 0)
+#else
+	if (udp_s >= 0 && FD_ISSET(udp_s,&readfds))
+#endif
 	{
-	    extern struct object *current_interactive;
-
 	    char udp_buf[1024+1], *st;
 	    int cnt;
 
@@ -944,7 +1035,7 @@ int get_message(buff, size)
 		push_string_malloced((st));
 		push_string_malloced((udp_buf));
 		push_number(ntohs(addr.sin_port));
-		apply_master_ob("receive_imp", 3);
+		apply_master_ob(STR_RECEIVE_IMP, 3);
 	    }
 	}
 #endif
@@ -1114,8 +1205,6 @@ int get_message(buff, size)
 void remove_interactive(ob)
     struct object *ob;
 {
-    extern int malloc_privilege;
-
     struct object *save = command_giver;
     int i;
     struct interactive *interactive;
@@ -1131,13 +1220,11 @@ void remove_interactive(ob)
 	current_object = ob;
 	save_privilege = malloc_privilege;
 	if ( !(ob->flags & O_DESTRUCTED) ) {
-	    extern struct object *current_interactive;
-
 	    command_giver = 0;
 	    current_interactive = 0;
 	    push_object(ob);
 	    malloc_privilege = MALLOC_MASTER;
-	    apply_master_ob("disconnect", 1);
+	    apply_master_ob(STR_DISCONNECT, 1);
 	    /* master might have used exec() */
 	    ob = interactive->ob;
 	}
@@ -1164,7 +1251,7 @@ void remove_interactive(ob)
 	{
 	    static char erq_welcome[] = { IAC, TELOPT_BINARY };
 
-	    add_message(MESSAGE_FLUSH);
+	    add_message(message_flush);
 	    erq_demon = interactive->socket;
 	    erq_proto_demon = -1;
 	    socket_write(erq_demon, erq_welcome, sizeof erq_welcome);
@@ -1173,11 +1260,11 @@ void remove_interactive(ob)
 	{
 	    trace_level |= interactive->trace_level;
 	    add_message(destruct_add_message_format, "Closing down.\n");
-	    add_message(MESSAGE_FLUSH);
+	    add_message(message_flush);
 	    (void)shutdown(interactive->socket, 2);
 	    socket_close(interactive->socket);
 	}
-#if defined(ACCESS_CONTROL) && defined(ACCESS_RESTRICTED)
+#if defined(ACCESS_CONTROL)
         release_host_access(interactive->access_class);
 #endif
 	num_player--;
@@ -1218,110 +1305,16 @@ void remove_interactive(ob)
 }
 
 #ifdef ACCESS_CONTROL
-#ifndef ACCESS_RESTRICTED
 
-char *allow_host_access(apa, idp)
-    struct sockaddr_in apa;
-    long *idp;
-{
-    int len = sizeof apa;
-    char * ipname;
-    static int read_access_list = 0;
-    static struct access_list {
-	int addr_len;
-	char * addr, *name, *comment;
-	struct access_list * next;
-    } * access_list;
-    register struct access_list * ap;
+/*-------------------------------------------------------------------------*/
+void
+refresh_access_data(void (*add_entry)(struct sockaddr_in *, long*) )
 
-    if(!read_access_list) {
-	FILE * f = fopen("ACCESS.DENY", "r");
-	char buf[1024], ipn[50], hname[100], comment[1024], *p1, *p2;
-	struct access_list * na;
-	struct hostent * hent;
+/* Called from access_check after the ACCESS_FILE has been (re)read, this
+ * function has to call the passed callback function add_entry for every
+ * user currently logged in.
+ */
 
-	read_access_list = 1;
-	if(f) {
-	    while(fgets(buf, sizeof buf - 1, f)) {
-		if(*buf != '#') {
-		    ipn[0] = hname[0] = comment[0] = 0;
-		    if(p1 = strchr(buf, ':')) *p1 = 0;
-		    if(buf[0] && buf[0] != '\n')
-			strncpy(ipn, buf, sizeof ipn - 1);
-		    if((p2 = p1) && *++p2) {
-			if(p1 = strchr(p2, ':')) *p1 = 0;
-			if(p2[0] && p2[0] != '\n')
-			    strcpy(hname, p2);
-			if(p1 && p1[1] && p1[1] != '\n')
-			    strcpy(comment, p1+1);
-		    }
-			
-		    if(!(na =
-			  (struct access_list *)permanent_xalloc(sizeof na[0])))
-		    {
-			fatal("Out of mem.\n");
-		    }
-		    na->addr = na->name = na->comment = 0;
-		    na->next = 0;
-		    if (*ipn) {
-			if ( !(na->addr = permanent_xalloc(strlen(ipn) + 1) ))
-			    fatal("Out of mem.\n");
-			strcpy(na->addr, ipn);
-		    }
-		    if (*hname) {
-			if ( !(na->name = permanent_xalloc(strlen(hname)+1)) )
-			    fatal("Out of mem.\n");
-			strcpy(na->name, hname);
-		    }
-		    if (*comment) {
-			if (!(na->comment=permanent_xalloc(strlen(comment)+1)))
-			    fatal("Out of mem.\n");
-			strcpy(na->comment, comment);
-		    }
-
-		    if((!(int)*ipn)
-			&&
-			((!*hname)
-			  || (!(hent = gethostbyname(hname))) ||
-				 (!(na->addr =
-				   permanent_xalloc(hent->h_length+1)))||
-				 !strcpy(na->addr,
-					inet_ntoa(*(struct in_addr *)hent->h_addr)))) {
-			if(na->name) pfree(na->name);
-			if(na->comment) pfree(na->comment);
-			pfree((char *)na);
-			continue;
-		    }
-		    if(!(na->addr_len = strlen(na->addr)))
-			continue;
-
-		    /* printf("disabling: %s:%s:%s\n", na->addr,
-			   na->name?na->name:"no name",
-			   na->comment?na->comment:"no comment");  */
-
-		    na->next = access_list;
-		    access_list = na;
-		}
-	    }
-	    fclose(f);
-	}
-    }
-    
-    if (!access_list)
-	return 0;
-	
-    ipname = inet_ntoa(apa.sin_addr);
-    
-    for(ap = access_list; ap; ap = ap->next)
-	if(!strncmp(ipname, ap->addr, ap->addr_len)){
-	    printf("Stopping: %s:%s\n", ap->addr, ap->name?ap->name:"no name");
-	    return ap->comment ? ap->comment : "";
-	}
-    return 0;
-}
-#else /* !ACCESS_RESTRICTED */
-void refresh_access_data(add_entry)
-    void (*add_entry)PROT((struct sockaddr_in *, long*));
 {
     struct interactive **user;
     int n;
@@ -1332,7 +1325,7 @@ void refresh_access_data(add_entry)
 	    (*add_entry)(&(*user)->addr, &(*user)->access_class);
     }
 }
-#endif /* ACCESS_RESTRICTED */
+
 #endif /* ACCESS_CONTROL */
 
 struct vector *users() {
@@ -1362,7 +1355,7 @@ struct vector *users() {
     return ret;
 }
 
-void new_player(new_socket, addr, len)
+static void new_player(new_socket, addr, len)
     SOCKET_T new_socket;
     struct sockaddr_in *addr;
     int len;
@@ -1404,8 +1397,6 @@ void new_player(new_socket, addr, len)
     if (d_flag > 1)
 	debug_message("New player at socket %d.\n", new_socket);
     for (i=0; i<MAX_PLAYERS; i++) {
-	extern struct object *master_ob;
-
 	struct object *ob;
 	struct svalue *ret;
 	struct interactive *new_interactive;
@@ -1481,7 +1472,7 @@ void new_player(new_socket, addr, len)
 	if (i > max_player)
 	    max_player = i;
 	memcpy((char *)&all_players[i]->addr, (char *)addr, len);
-#if defined(ACCESS_CONTROL) && defined(ACCESS_RESTRICTED)
+#if defined(ACCESS_CONTROL)
 	all_players[i]->access_class = class;
 #endif
 	num_player++;
@@ -1490,7 +1481,7 @@ void new_player(new_socket, addr, len)
 	 * It is asserted that the master_ob is loaded.
 	 */
 	add_ref(master_ob, "new_player");
-	ret = apply_master_ob("connect", 0);
+	ret = apply_master_ob(STR_CONNECT, 0);
 	if (new_interactive != O_GET_INTERACTIVE(master_ob))
 	    return;
 	if (ret == 0 || ret->type != T_OBJECT ||
@@ -1501,7 +1492,7 @@ void new_player(new_socket, addr, len)
 	    return;
 	}
 	command_giver = master_ob;
-	add_message(MESSAGE_FLUSH);
+	add_message(message_flush);
 	/*
 	 * There was an object returned from connect(). Use this as the
 	 * player object.
@@ -1671,9 +1662,7 @@ int call_function_interactive(i, str)
     }
     free_object(ob, "call_function_interactive");
     push_volatile_string(str);
-    if (extra = i->input_to->num_arg) {
-	extern struct svalue *inter_sp;
-
+    if ( (extra = i->input_to->num_arg) ) {
 	memcpy(
 	  (char *)(inter_sp + 1),
 	  (char *)i->input_to->arg,
@@ -1748,7 +1737,7 @@ void remove_all_players()
 	trace_level |= all_players[i]->trace_level;
 	CLEAR_EVAL_COST;
 	push_object(all_players[i]->ob);
-	(void)apply_master_ob("remove_player", 1);
+	(void)apply_master_ob(STR_REMOVE_PL, 1);
 	if ( !(all_players[i]->ob->flags & O_DESTRUCTED) ) {
 	    emergency_destruct(all_players[i]->ob);
 	}
@@ -1798,8 +1787,6 @@ void print_prompt()
 	fatal("print_prompt() of non-interactive object\n");
 #endif
     if (ip->input_to == 0) {
-	extern struct svalue *inter_sp;
-
 	struct svalue *prompt;
 
 	prompt = &ip->prompt;
@@ -1913,14 +1900,14 @@ int new_set_snoop(me, you)
 	push_number(0);
     else
 	push_object(you);
-    ret = apply_master_ob("valid_snoop", 2);
+    ret = apply_master_ob(STR_VALID_SNOOP, 2);
 
     if (!ret || ret->type != T_NUMBER || ret->u.number == 0)
 	return 0;
 
     if (me->flags & O_DESTRUCTED)
 	return 0;
-    if (by = O_GET_INTERACTIVE(me)) {
+    if ( (by = O_GET_INTERACTIVE(me)) ) {
 	if (by->sent.type != SENT_INTERACTIVE)
 	    by = 0;
 	else if (by->closing)
@@ -2011,7 +1998,7 @@ static void send_wont(option)
     SEND_TELNET_COMMAND(
       add_message("%c", IAC);
       add_message("%c%c", WONT, option);
-      add_message(MESSAGE_FLUSH);
+      add_message(message_flush);
     )
 }
 
@@ -2021,7 +2008,7 @@ static void send_dont(option)
     SEND_TELNET_COMMAND(
       add_message("%c", IAC);
       add_message("%c%c", DONT, option);
-      add_message(MESSAGE_FLUSH);
+      add_message(message_flush);
     )
 }
 
@@ -2031,7 +2018,7 @@ static void send_will(option)
     SEND_TELNET_COMMAND(
       add_message("%c", IAC);
       add_message("%c%c", WILL, option);
-      add_message(MESSAGE_FLUSH);
+      add_message(message_flush);
     )
 }
 
@@ -2041,12 +2028,12 @@ static void send_do(option)
     SEND_TELNET_COMMAND(
       add_message("%c", IAC);
       add_message("%c%c", DO, option);
-      add_message(MESSAGE_FLUSH);
+      add_message(message_flush);
     )
 }
 
 static void reply_nil(option)
-    int option;
+    int option UNUSED;
 {
 }
 
@@ -2136,7 +2123,7 @@ static void reply_to_wont_sga(option)
     }
 }
 
-struct svalue *h_telnet_neg(n)
+static struct svalue *h_telnet_neg(n)
     int n;
 {
     struct svalue *svp;
@@ -2159,7 +2146,7 @@ static void reply_h_telnet_neg(option)
     int option;
 {
     struct interactive *ip = O_GET_INTERACTIVE(command_giver);
-    int i;
+    int i = 0;
 
     switch(ip->tn_state) {
       case TS_DO:
@@ -2246,7 +2233,7 @@ void mudlib_telopts()
 
 
 
-void telnet_neg(ip)
+static void telnet_neg(ip)
     struct interactive *ip;
 {
     char *to, *from;
@@ -2337,7 +2324,7 @@ void telnet_neg(ip)
 		     * next character to make our decisions.
 		     */
 		    if ( !(ip->noecho & CHARMODE_REQ) ||
-			 ip->text[0] == '!' && ! (ip->noecho & IGNORE_BANG) )
+			 (ip->text[0] == '!' && ! (ip->noecho & IGNORE_BANG)) )
 		    {
 			ip->gobble_char = '\n';
 			goto full_newline;
@@ -2368,7 +2355,7 @@ void telnet_neg(ip)
 	      }
 	      case '\n':
 		if ( !(ip->noecho & CHARMODE_REQ) ||
-		     ip->text[0] == '!' && ! (ip->noecho & IGNORE_BANG) )
+		     (ip->text[0] == '!' && ! (ip->noecho & IGNORE_BANG)) )
 		{
 		    ip->gobble_char = '\r';
 		}
@@ -2527,7 +2514,7 @@ void telnet_neg(ip)
 
 #define IPSIZE 200
 static struct ipentry {
-    long addr;
+    long addr;  /* TODO: make this an struct in_addr */
     char *name;
 } iptable[IPSIZE] = { {0, 0}, };
 
@@ -2535,8 +2522,6 @@ struct svalue *query_ip_name(sp, lookup)
     struct svalue *sp;
     int lookup;
 {
-    extern struct svalue *inter_sp;
-
     struct object *ob;
     int i;
     struct interactive *ip;
@@ -2565,8 +2550,6 @@ struct svalue *query_ip_name(sp, lookup)
 	return sp;
     }
     if (sp->type == T_LVALUE) {
-	extern struct svalue const0;
-
 	struct svalue array, *svp;
 	struct vector *v;
 	char *cp;
@@ -2589,7 +2572,7 @@ struct svalue *query_ip_name(sp, lookup)
     }
     if (lookup) {
 	for(i = 0; i < IPSIZE; i++) {
-	    if (iptable[i].addr == ip->addr.sin_addr.s_addr && iptable[i].name)
+	    if (iptable[i].addr == (long)(ip->addr.sin_addr.s_addr) && iptable[i].name)
 	    {
 		sp->type = T_STRING;
 		sp->x.string_type = STRING_SHARED;
@@ -2671,8 +2654,6 @@ static int erq_pending_len = 0;
 static void stop_erq_demon(notify)
     int notify;
 {
-    extern struct svalue *inter_sp;
-
     struct svalue *erqp;
     int i;
 
@@ -2691,7 +2672,7 @@ static void stop_erq_demon(notify)
 	    erqp->u.lvalue = free_erq;
 	    free_erq = erqp;
 	     CLEAR_EVAL_COST;
-	    apply_master_ob("stale_erq", 1);
+	    apply_master_ob(STR_STALE_ERQ, 1);
 	}
 	erqp++;
     } while (--i);
@@ -2792,7 +2773,7 @@ int send_erq(handle, request, arg, arglen)
 	if (erq_pending_len)
 	    return 0;
     }
-    if (arglen + 9 > sizeof buf)
+    if (arglen + 9 > (int) sizeof buf)
 	return 0;
     *(int32*)buf = htonl(erq_pending_len = arglen + 9);
     *(int32*)(buf+4) = htonl(handle);
@@ -2898,7 +2879,7 @@ void clear_comm_refs() {
     clear_ref_in_vector(
       pending_erq, sizeof pending_erq / sizeof (struct svalue)
     );
-#endif ERQ_DEMON
+#endif /* ERQ_DEMON */
 }
 
 void count_comm_refs() {
@@ -2960,12 +2941,6 @@ char *get_host_ip_number() {
 struct svalue *f_query_snoop(sp)
     struct svalue *sp;
 {
-    extern struct svalue *inter_sp;
-    extern int out_of_memory;
-    extern struct object *master_ob;
-
-    extern void zero_object_svalue PROT((struct svalue *));
-
     struct svalue *arg1;
     struct object *ob;
 
@@ -2984,7 +2959,7 @@ struct svalue *f_query_snoop(sp)
 	assert_master_ob_loaded();
 	if (current_object != master_ob) {
 	    assign_eval_cost();
-	    arg1 = apply_master_ob("valid_query_snoop", 1);
+	    arg1 = apply_master_ob(STR_VALID_QSNOOP, 1);
 	    if (arg1 == 0 || arg1->type != T_NUMBER || !arg1->u.number) {
 		if (out_of_memory) {
 		    error("Out of memory\n");
@@ -3011,8 +2986,6 @@ struct svalue *f_query_snoop(sp)
 struct svalue *f_query_idle(sp)
     struct svalue *sp;
 {
-    extern struct svalue *inter_sp;
-
     int i;
     struct object *ob;
 
@@ -3048,9 +3021,9 @@ struct svalue *f_remove_interactive(sp)
     {
 	if (victim->message_length) {
 	    command_giver = victim->ob;
-	    add_message(MESSAGE_FLUSH);
+	    add_message(message_flush);
 
-	    /* MESSAGE_FLUSH takes always directly effect on the
+	    /* message_flush takes always directly effect on the
 	     * socket. No apply() is involved.
 	     */
 	}
@@ -3063,8 +3036,6 @@ struct svalue *f_remove_interactive(sp)
 void notify_no_command(command)
     char *command;
 {
-    extern struct svalue *inter_sp;
-
     struct svalue *svp;
     struct interactive *ip;
 
@@ -3153,9 +3124,6 @@ int replace_interactive(ob, obfrom, /*IGN*/name)
      *      Otherwise I can write my own player object without any security
      *      at all!
      */
-    extern void prompt_from_ed_buffer PROT((struct interactive *));
-    extern void prompt_to_ed_buffer PROT((struct interactive *));
-
     struct svalue *v;
     struct interactive *stale_interactive, *ip;
     struct object *save_command;
@@ -3164,14 +3132,13 @@ int replace_interactive(ob, obfrom, /*IGN*/name)
     push_constant_string(name);
     push_object(ob);
     push_object(obfrom);
-    v = apply_master_ob("valid_exec", 3);
+    v = apply_master_ob(STR_VALID_EXEC, 3);
     if (!v || v->type != T_NUMBER || v->u.number == 0)
 	return 0;
 /*
     if (strcmp(name, "secure/login.c") != 0)
 	return 0;
 */
-    /* fprintf(stderr,"DEBUG: %s,%s\n",ob->name,obfrom->name); */
     if ((stale_interactive = O_GET_INTERACTIVE(ob)) &&
 	stale_interactive->sent.type != SENT_INTERACTIVE)
     {
@@ -3188,13 +3155,13 @@ int replace_interactive(ob, obfrom, /*IGN*/name)
 	prompt_from_ed_buffer(stale_interactive);
 	if (stale_interactive->message_length) {
             command_giver = ob;
-            add_message(MESSAGE_FLUSH);
+            add_message(message_flush);
 	}
     }
     prompt_from_ed_buffer(ip);
     if (ip->message_length) {
         command_giver = obfrom;
-        add_message(MESSAGE_FLUSH);
+        add_message(message_flush);
     }
     command_giver = save_command;
     if (ip->snoop_on) {
@@ -3276,7 +3243,7 @@ void count_comm_extra_refs() {
 	if (all_players[i] == 0)
 	    continue;
 	all_players[i]->ob->extra_ref++;
-	if (ob = all_players[i]->snoop_by) {
+	if ( (ob = all_players[i]->snoop_by) ) {
 	    struct interactive *ip;
 
 	    if (!(ip = O_GET_INTERACTIVE(current_object)) ||
@@ -3287,11 +3254,11 @@ void count_comm_extra_refs() {
 	    }
 	} /* end of snoop-processing */
 
-	if (it = all_players[i]->input_to) {
+	if ( (it = all_players[i]->input_to) ) {
 	    it->ob->extra_ref++;
 	    count_extra_ref_in_vector(it->arg, it->num_arg);
 	}
-	if (ob = all_players[i]->modify_command)
+	if ( (ob = all_players[i]->modify_command) )
 	    count_extra_ref_in_object(ob);
         count_extra_ref_in_vector(&all_players[i]->prompt, 1);
         count_extra_ref_in_vector(&all_players[i]->default_err_message, 1);
@@ -3405,7 +3372,7 @@ struct svalue *f_binary_message(sp)
     struct svalue *sp;
 {
     char *message, *p;
-    mp_int size, wrote, i;
+    mp_int size, wrote = 0, i;
     struct svalue *svp;
     struct interactive *ip;
     struct object *save_command_giver;
@@ -3446,12 +3413,12 @@ struct svalue *f_binary_message(sp)
 		    message += wrote;
 		} else {
 		    if (ip->message_length >= MAX_SOCKET_PACKET_SIZE) {
-			add_message(MESSAGE_FLUSH);
+			add_message(message_flush);
 			if (ip->do_close)
 			    break;
 		    }
 		    if (!ip->message_length ) {
-			if (ip->next_player_for_flush = first_player_for_flush)
+			if ( (ip->next_player_for_flush = first_player_for_flush) )
 			{
 			    O_GET_INTERACTIVE(first_player_for_flush)->
 			      previous_player_for_flush =
@@ -3466,10 +3433,10 @@ struct svalue *f_binary_message(sp)
 	    }
 	    sending_telnet_command = 0;
 	    if (sp->u.number & 2)
-		add_message(MESSAGE_FLUSH);
+		add_message(message_flush);
 	    wrote = 0;
 	} else {
-	    add_message(MESSAGE_FLUSH);
+	    add_message(message_flush);
 	    for (i = 6;;) {
 		wrote = socket_write(ip->socket, message, size);
 		if (wrote != -1)
@@ -3527,7 +3494,7 @@ struct svalue *f_set_connection_charset(sp)
 	bzero(p, &ip->charset[sizeof ip->charset] - p);
 	ip->charset['\n'/8] &= ~(1 << '\n' % 8);
 	ip->charset['\0'/8] &= ~(1 << '\0' % 8);
-	if (ip->quote_iac = sp->u.number) {
+	if ( (ip->quote_iac = sp->u.number) ) {
 	    if (ip->charset[IAC/8] & (1 << IAC % 8))
 		ip->charset[IAC/8] &= ~(1 << IAC % 8);
 	    else
@@ -3539,3 +3506,36 @@ struct svalue *f_set_connection_charset(sp)
     sp--;
     return sp;
 }
+
+#ifdef MAXNUMPORTS
+struct svalue *query_ip_port(sp)
+    struct svalue *sp;
+{
+    struct object *ob;
+    struct interactive *ip;
+    struct sockaddr_in addr;
+    int length;
+
+    length = sizeof(addr);
+
+    if (sp->type != T_OBJECT) {
+	if (   sp->type != T_NUMBER 
+            || sp->u.number < -1 || sp->u.number >= numports
+           )
+	  bad_xefun_arg(1, sp);
+        sp->u.number = sp->u.number < 0 ? numports : port_numbers[sp->u.number];
+	return sp;
+    }
+    ob = sp->u.ob;
+    decr_object_ref(ob, "query_ip_port");
+    if ( !(ip = O_GET_INTERACTIVE(ob)) || ip->sent.type != SENT_INTERACTIVE) {
+	sp->type = T_NUMBER;
+	sp->u.number = port_numbers[0];
+	return sp;
+    }
+    getsockname(ip->socket, (struct sockaddr *)&addr, &length);
+    sp->type = T_NUMBER;
+    sp->u.number = ntohs(addr.sin_port);
+    return sp;
+}
+#endif

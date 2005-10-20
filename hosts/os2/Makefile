@@ -27,9 +27,6 @@ MALLOC=smalloc
 # must not #define SBRK_OK without static linking on __RS6000__
 # How can static linking be done?
 #
-# Gnu malloc, fastest but uses most memory.
-#MALLOC=gmalloc
-#
 # Use the standard malloc on your system:
 #MALLOC=sysmalloc
 #
@@ -138,10 +135,18 @@ parse: driver
 #	$(YACC) make_func.y
 #	$(MV) $(YACCTAB)c make_func.c
 	
+make_func.o : make_func.c 
+	$(CC) $(CFLAGS) -DYACC='"$(YACC)"' -c make_func.c
 
 make_func: make_func.o hash.o
 	$(CC) $(OPTIMIZE) $(LDFLAGS) make_func.o hash.o -o make_func
 	fixstk 96k make_func
+
+interpret.s : interpret.c
+	$(CC) $(CFLAGS) -S interpret.c
+
+interpret.o : interpret.s
+	$(CC) $(CFLAGS) -c interpret.s
 
 #lang.y efun_defs.c instrs.h: func_spec make_func prolang.y config.h
 #	$(RM) efun_defs.c
@@ -154,90 +159,185 @@ lang.c lang.h: lang.y
 	
 	$(MV) $(YACCTAB)h lang.h
 
-$(MALLOC).o : $(MALLOC).c lint.h config.h machine.h
+$(MALLOC).o : $(MALLOC).c driver.h config.h machine.h port.h
 	$(RM) smalloc.o
-	$(RM) gmalloc.o
 	$(RM) sysmalloc.o
-	$(RM) malloc.o
 	$(CC) $(CFLAGS) -c $(MALLOC).c
 
-access_check.o : access_check.c lint.h config.h machine.h comm.h interpret.h
+#--------------------------------------------------------
+# Dependencies, manual and automatic.
 
-alloca.o : alloca.c
+array.o : instrs.h lang.h
 
-array.o : array.c config.h machine.h lint.h interpret.h object.h wiz_list.h \
-  regexp.h exec.h lang.h instrs.h stralloc.h
+closure.o : instrs.h lang.h
 
-backend.o : backend.c lint.h config.h machine.h interpret.h object.h \
-  wiz_list.h exec.h comm.h
+dumpstat.o : instrs.h lang.h
 
-call_out.o : call_out.c lint.h config.h machine.h interpret.h object.h comm.h \
-  stralloc.h exec.h wiz_list.h
+gcollect.o : instrs.h lang.h
 
-closure.o : closure.c lint.h config.h machine.h lex.h exec.h interpret.h \
-  object.h lang.h instrs.h
+interpret.o : instrs.h lang.h
 
-comm1.o : comm1.c config.h machine.h lint.h interpret.h comm.h object.h \
-  sent.h patchlevel.h wiz_list.h
+lang.o : driver.h config.h machine.h lex.h interpret.h object.h \
+    instrs.h port.h switch.h stralloc.h
 
-dumpstat.o : dumpstat.c lint.h config.h machine.h interpret.h object.h exec.h \
-  smalloc.h lang.h instrs.h
+lex.o : instrs.h lang.h efun_defs.c
 
-ed.o : ed.c lint.h config.h machine.h regexp.h interpret.h object.h comm.h
+simul_efun.o : instrs.h lang.h
 
-gcollect.o : gcollect.c lint.h config.h machine.h interpret.h object.h exec.h \
-  sent.h comm.h smalloc.h instrs.h lang.h wiz_list.h stralloc.h
+simulate.o : instrs.h
 
-hash.o : hash.c
+sprintf.o : instrs.h
 
-interpret.s : interpret.c lint.h config.h machine.h interpret.h lang.h exec.h \
-  object.h wiz_list.h instrs.h comm.h sent.h switch.h smalloc.h stralloc.h
-	$(CC) $(CFLAGS) -S interpret.c
+# --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS FOLLOW ---
+access_check.o : comm.h access_check.h driver.h sent.h object.h interpret.h \
+    config.h port.h machine.h exec.h datatypes.h hosts/amiga/patchfloat.h
 
-interpret.o : interpret.s
-	$(CC) $(CFLAGS) -c interpret.s
+alloca.o :
 
-lang.o : lang.c lint.h config.h machine.h lex.h interpret.h object.h exec.h \
-  instrs.h incralloc.h switch.h stralloc.h
+array.o : wiz_list.h swap.h stralloc.h simulate.h rxcache.h regexp.h \
+    prolang.h object.h mapping.h main.h interpret.h instrs.h exec.h \
+    datatypes.h backend.h array.h my-alloca.h driver.h smalloc.h sent.h \
+    lang.h port.h machine.h config.h hosts/amiga/patchfloat.h
 
-lex.o : lex.c lint.h config.h machine.h interpret.h lang.h exec.h lex.h \
-  instrs.h patchlevel.h stralloc.h efun_defs.c
+backend.o : wiz_list.h swap.h stralloc.h smalloc.h simulate.h rxcache.h \
+    regexp.h object.h mapping.h main.h lex.h interpret.h gcollect.h exec.h \
+    ed.h comm.h call_out.h array.h backend.h hosts/amiga/nsignal.h driver.h \
+    datatypes.h sent.h instrs.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
 
-main.o : main.c lint.h config.h machine.h interpret.h object.h lex.h \
-  patchlevel.h
+call_out.o : wiz_list.h stralloc.h simulate.h object.h main.h interpret.h \
+    gcollect.h exec.h comm.h closure.h backend.h array.h call_out.h \
+    driver.h smalloc.h sent.h instrs.h datatypes.h port.h machine.h \
+    config.h hosts/amiga/patchfloat.h
 
-make_func.o : make_func.c lint.h config.h machine.h
-	$(CC) $(CFLAGS) -DYACC='"$(YACC)"' -c make_func.c
+closure.o : switch.h simul_efun.h simulate.h stralloc.h prolang.h object.h \
+    main.h lex.h instrs.h interpret.h exec.h array.h closure.h my-alloca.h \
+    driver.h sent.h smalloc.h lang.h datatypes.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
 
-mapping.o : mapping.c config.h machine.h lint.h interpret.h lang.h instrs.h \
-  object.h wiz_list.h regexp.h stralloc.h smalloc.h
+comm1.o : util/erq.h wiz_list.h stralloc.h simulate.h sent.h object.h \
+    main.h interpret.h gcollect.h exec.h ed.h backend.h array.h \
+    access_check.h comm.h hosts/amiga/nsignal.h telnet.h my-alloca.h \
+    driver.h smalloc.h instrs.h datatypes.h config.h port.h machine.h \
+    hosts/amiga/patchfloat.h
 
-object.o : object.c lint.h config.h machine.h comm.h interpret.h object.h \
-  sent.h wiz_list.h exec.h
+dumpstat.o : smalloc.h simulate.h prolang.h object.h mapping.h instrs.h \
+    interpret.h exec.h comm.h array.h dumpstat.h driver.h datatypes.h \
+    sent.h lang.h port.h machine.h config.h hosts/amiga/patchfloat.h
 
-otable.o : otable.c lint.h config.h machine.h interpret.h object.h
+ed.o : stralloc.h simulate.h rxcache.h regexp.h object.h main.h interpret.h \
+    gcollect.h comm.h closure.h ed.h driver.h smalloc.h sent.h instrs.h \
+    exec.h datatypes.h port.h machine.h config.h hosts/amiga/patchfloat.h
 
-parse.o : parse.c lint.h config.h machine.h interpret.h object.h wiz_list.h
+gcollect.o : wiz_list.h swap.h stralloc.h smalloc.h simul_efun.h simulate.h \
+    sent.h rxcache.h prolang.h otable.h object.h mapping.h main.h lex.h \
+    instrs.h interpret.h exec.h ed.h comm.h closure.h call_out.h backend.h \
+    array.h gcollect.h driver.h datatypes.h regexp.h lang.h port.h \
+    machine.h config.h hosts/amiga/patchfloat.h
 
-parse_old.o : parse_old.c lint.h config.h machine.h interpret.h object.h \
-  wiz_list.h
+hash.o : hash.h
 
-port.o : port.c lint.h config.h machine.h
+interpret.o : wiz_list.h switch.h swap.h sprintf.h smalloc.h stralloc.h \
+    simul_efun.h simulate.h sent.h random.h prolang.h parse.h otable.h \
+    object.h mapping.h main.h lex.h instrs.h gcollect.h exec.h ed.h comm.h \
+    closure.h call_out.h backend.h array.h interpret.h my-rusage.h \
+    my-alloca.h driver.h datatypes.h lang.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
 
-regexp.o : regexp.c regexp.h lint.h config.h machine.h
+lang.o : wiz_list.h switch.h swap.h stralloc.h simul_efun.h simulate.h \
+    object.h mapping.h main.h lex.h instrs.h interpret.h gcollect.h exec.h \
+    closure.h backend.h array.h prolang.h my-alloca.h driver.h smalloc.h \
+    sent.h datatypes.h lang.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
 
-simul_efun.o : simul_efun.c lint.h config.h machine.h interpret.h object.h \
-  exec.h lex.h lang.h instrs.h stralloc.h
+lex.o : efun_defs.c hosts/amiga/socket.h stralloc.h simul_efun.h simulate.h \
+    prolang.h patchlevel.h main.h instrs.h hash.h gcollect.h exec.h comm.h \
+    closure.h array.h lex.h my-alloca.h driver.h hosts/amiga/socket_sim.h \
+    hosts/amiga/socket_tcp.h smalloc.h object.h interpret.h sent.h lang.h \
+    datatypes.h port.h machine.h config.h hosts/amiga/socket_sim_protos.h \
+    hosts/amiga/patchfloat.h
 
-simulate.o : simulate.c lint.h config.h machine.h interpret.h instrs.h lang.h \
-  object.h sent.h wiz_list.h exec.h comm.h stralloc.h
+main.o : wiz_list.h swap.h stralloc.h simul_efun.h simulate.h rxcache.h \
+    random.h patchlevel.h otable.h object.h mapping.h lex.h interpret.h \
+    gcollect.h comm.h array.h backend.h main.h hosts/amiga/socket.h \
+    my-alloca.h driver.h exec.h smalloc.h sent.h instrs.h regexp.h \
+    datatypes.h hosts/amiga/socket_sim.h hosts/amiga/socket_tcp.h port.h \
+    machine.h config.h hosts/amiga/socket_sim_protos.h \
+    hosts/amiga/patchfloat.h
 
-sprintf.o : sprintf.c config.h machine.h lint.h interpret.h lang.h instrs.h \
-  exec.h object.h sent.h
+make_func.o : interpret.h hash.h exec.h my-alloca.h driver.h datatypes.h \
+    port.h machine.h config.h hosts/amiga/patchfloat.h
 
-stralloc.o : stralloc.c stralloc.h config.h machine.h lint.h
+mapping.o : wiz_list.h stralloc.h smalloc.h simulate.h regexp.h object.h \
+    main.h interpret.h gcollect.h backend.h array.h mapping.h my-alloca.h \
+    driver.h datatypes.h sent.h instrs.h exec.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
 
-swap.o : swap.c lint.h config.h machine.h interpret.h object.h exec.h
+object.o : wiz_list.h swap.h stralloc.h simulate.h sent.h random.h otable.h \
+    mapping.h main.h interpret.h exec.h comm.h closure.h backend.h array.h \
+    object.h my-alloca.h driver.h smalloc.h instrs.h datatypes.h port.h \
+    machine.h config.h hosts/amiga/patchfloat.h
 
-wiz_list.o : wiz_list.c config.h machine.h lint.h interpret.h object.h \
-  wiz_list.h stralloc.h lang.h instrs.h
+otable.o : simulate.h object.h interpret.h hash.h gcollect.h comm.h \
+    otable.h driver.h sent.h instrs.h exec.h datatypes.h port.h machine.h \
+    config.h hosts/amiga/patchfloat.h
+
+parse.o : wiz_list.h stralloc.h simulate.h object.h main.h instrs.h \
+    interpret.h closure.h array.h parse.h driver.h smalloc.h sent.h exec.h \
+    datatypes.h port.h machine.h config.h hosts/amiga/patchfloat.h
+
+parse_old.o : wiz_list.h simulate.h random.h object.h main.h interpret.h \
+    array.h parse.h driver.h sent.h instrs.h exec.h datatypes.h smalloc.h \
+    port.h machine.h config.h hosts/amiga/patchfloat.h
+
+port.o : hosts/crypt.c main.h backend.h my-rusage.h driver.h interpret.h \
+    object.h port.h machine.h config.h datatypes.h exec.h \
+    hosts/amiga/patchfloat.h
+
+random.o : random.h driver.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
+
+regexp.o : regexp.h driver.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
+
+rxcache.o : stralloc.h smalloc.h regexp.h hash.h gcollect.h comm.h \
+    rxcache.h driver.h datatypes.h object.h interpret.h exec.h sent.h \
+    port.h machine.h config.h hosts/amiga/patchfloat.h
+
+simul_efun.o : swap.h stralloc.h simulate.h prolang.h parse.h object.h \
+    lex.h instrs.h interpret.h gcollect.h exec.h array.h simul_efun.h \
+    my-alloca.h driver.h smalloc.h sent.h lang.h datatypes.h port.h \
+    machine.h config.h hosts/amiga/patchfloat.h
+
+simulate.o : wiz_list.h swap.h stralloc.h simul_efun.h sent.h rxcache.h \
+    prolang.h otable.h object.h mapping.h main.h lex.h instrs.h interpret.h \
+    exec.h ed.h dumpstat.h comm.h closure.h call_out.h backend.h array.h \
+    simulate.h hosts/amiga/nsignal.h my-alloca.h driver.h smalloc.h \
+    regexp.h lang.h datatypes.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
+
+smalloc.o : object.h exec.h simulate.h main.h gcollect.h backend.h comm.h \
+    smalloc.h driver.h interpret.h sent.h instrs.h datatypes.h port.h \
+    machine.h config.h hosts/amiga/patchfloat.h
+
+sprintf.o : swap.h stralloc.h simul_efun.h simulate.h sent.h prolang.h \
+    object.h main.h instrs.h interpret.h exec.h array.h sprintf.h driver.h \
+    smalloc.h lang.h datatypes.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
+
+stralloc.o : simulate.h hash.h gcollect.h comm.h stralloc.h driver.h sent.h \
+    object.h instrs.h interpret.h exec.h smalloc.h port.h machine.h \
+    config.h datatypes.h hosts/amiga/patchfloat.h
+
+swap.o : hosts/amiga/socket.h wiz_list.h stralloc.h simul_efun.h simulate.h \
+    prolang.h object.h mapping.h main.h interpret.h gcollect.h exec.h \
+    comm.h array.h swap.h driver.h hosts/amiga/socket_sim.h \
+    hosts/amiga/socket_tcp.h smalloc.h sent.h instrs.h lang.h datatypes.h \
+    port.h machine.h config.h hosts/amiga/socket_sim_protos.h \
+    hosts/amiga/patchfloat.h
+
+wiz_list.o : stralloc.h object.h main.h interpret.h gcollect.h backend.h \
+    array.h wiz_list.h driver.h smalloc.h exec.h datatypes.h instrs.h \
+    port.h machine.h config.h hosts/amiga/patchfloat.h
+
+# --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS PRECEDE ---

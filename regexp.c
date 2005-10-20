@@ -1,6 +1,6 @@
 /* $Source: regexp.c $
  *
- * $Revision: 1.2 $
+ * $Revision: 1.8 $
  *
  * regexp.c - regular expression matching
  *
@@ -57,6 +57,17 @@
  * Sponsored by The USENIX Association for public distribution. 
  *
  * $Log: regexp.c,v $
+ * Revision 1.6c  1998/08/10 16:00:00  lduning
+ * Removed some compiler warnings.
+ *
+ * $Log: regexp.c,v $
+ * Revision 1.6b  1998/05/11 13:00:00  lduning
+ * Added some more support for rxcache.
+ *
+ * Revision 1.6a  1998/04/22 13:00:00  lduning
+ * OPEN/CLOSE definitions follow whatever value NSUBEXP is set to.
+ * OSB uses an NSUBEXP of 50.
+ *
  * Revision 1.6  1997/10/25 14:01:19  amylaar
  * Disable interactive regsub error messages for regreplace.
  *
@@ -144,14 +155,16 @@
 
 /* Headers */
 
+#include "driver.h" /* for <string.h>, <values.h> and free() */
+
 #include <stdio.h>
-#include "string.h"
+#include <string.h>
 #include <ctype.h>
+
 #include "regexp.h"
-#include "lint.h" /* for <string.h>, <values.h> and free() */
 
 #ifndef lint
-static char    *Ident = "$Id: regexp.c 1.2 Mon, 02 Nov 1998 15:49:18 -0700 baron $";
+static char    *Ident UNUSED = "$Id: regexp.c 1.8 Mon, 02 Nov 1998 16:21:55 -0700 baron $";
 #endif
 
 
@@ -212,7 +225,7 @@ static char    *Ident = "$Id: regexp.c 1.2 Mon, 02 Nov 1998 15:49:18 -0700 baron
 #define	OPEN	20		/* no	Mark this point in input as start of
 				 * #n. */
  /* OPEN+1 is number 1, etc. */
-#define	CLOSE	30		/* no	Analogous to OPEN. */
+#define	CLOSE (OPEN+NSUBEXP)	/* no	Analogous to OPEN. */
 
 /*
  * Opcode notes:
@@ -415,6 +428,8 @@ int		excompat;	/* \( \) operators like in unix ex */
 	xfree((char *)expr2);
 	FAIL("out of space");
     }
+    r->regalloc = sizeof(regexp)+regsize;
+    r->refs = 1;
 
     /* Second pass: emit code. */
     regparse = expr2;
@@ -454,7 +469,7 @@ int		excompat;	/* \( \) operators like in unix ex */
 	    longest = NULL;
 	    len = 0;
 	    for (; scan != NULL; scan = regnext(scan))
-		if (OP(scan) == EXACTLY && strlen(OPERAND(scan)) >= len) {
+		if (OP(scan) == EXACTLY && (int)strlen(OPERAND(scan)) >= len) {
 		    longest = OPERAND(scan);
 		    len = strlen(OPERAND(scan));
 		}
@@ -482,7 +497,7 @@ int            *flagp;
     register char  *ret;
     register char  *br;
     register char  *ender;
-    register int    parno;
+    register int    parno = 0;
     int             flags;
 
     *flagp = HASWIDTH;		/* Tentatively. */
@@ -873,7 +888,7 @@ STATIC char    *regprop();
 /*
  - regexec - match a regexp against a string
  */
-int regexec(prog, string, start)
+/* TODO: bool */ int regexec(prog, string, start)
 register regexp *prog;
 register char  *string;
 char *start;
@@ -1068,60 +1083,6 @@ char           *prog;
 	    break;
 	case BACK:
 	    break;
-	case OPEN + 1:
-	case OPEN + 2:
-	case OPEN + 3:
-	case OPEN + 4:
-	case OPEN + 5:
-	case OPEN + 6:
-	case OPEN + 7:
-	case OPEN + 8:
-	case OPEN + 9:{
-		register int    no;
-		register char  *save;
-
-		no = OP(scan) - OPEN;
-		save = reginput;
-
-		if (regmatch(nxt)) {
-		    /*
-		     * Don't set startp if some later invocation of the same
-		     * parentheses already has. 
-		     */
-		    if (regstartp[no] == (char *)NULL)
-			regstartp[no] = save;
-		    return (1);
-		} else
-		    return (0);
-	    }
-	    break;
-	case CLOSE + 1:
-	case CLOSE + 2:
-	case CLOSE + 3:
-	case CLOSE + 4:
-	case CLOSE + 5:
-	case CLOSE + 6:
-	case CLOSE + 7:
-	case CLOSE + 8:
-	case CLOSE + 9:{
-		register int    no;
-		register char  *save;
-
-		no = OP(scan) - CLOSE;
-		save = reginput;
-
-		if (regmatch(nxt)) {
-		    /*
-		     * Don't set endp if some later invocation of the same
-		     * parentheses already has. 
-		     */
-		    if (regendp[no] == (char *)NULL)
-			regendp[no] = save;
-		    return (1);
-		} else
-		    return (0);
-	    }
-	    break;
 	case BRANCH:{
 		register char  *save;
 
@@ -1172,8 +1133,49 @@ char           *prog;
 	    return (1);		/* Success! */
 	    break;
 	default:
-	    regerror("memory corruption");
-	    return (0);
+            if (OP(scan) > OPEN && OP(scan) < OPEN+NSUBEXP)
+            {
+		register int    no;
+		register char  *save;
+
+		no = OP(scan) - OPEN;
+		save = reginput;
+
+		if (regmatch(nxt)) {
+		    /*
+		     * Don't set startp if some later invocation of the same
+		     * parentheses already has. 
+		     */
+		    if (regstartp[no] == (char *)NULL)
+			regstartp[no] = save;
+		    return (1);
+		} else
+		    return (0);
+	    }
+            else if (OP(scan) > CLOSE && OP(scan) < CLOSE+NSUBEXP)
+            {
+		register int    no;
+		register char  *save;
+
+		no = OP(scan) - CLOSE;
+		save = reginput;
+
+		if (regmatch(nxt)) {
+		    /*
+		     * Don't set endp if some later invocation of the same
+		     * parentheses already has. 
+		     */
+		    if (regendp[no] == (char *)NULL)
+			regendp[no] = save;
+		    return (1);
+		} else
+		    return (0);
+	    }
+            else
+            {
+	        regerror("memory corruption");
+	        return (0);
+            }
 	    break;
 	}
 
@@ -1338,7 +1340,7 @@ char           *op;
 
 #endif
 {
-    register char  *p;
+    register char  *p = NULL;
     static char     buf[50];
 
     strcpy(buf, ":");
@@ -1374,30 +1376,6 @@ char           *op;
     case END:
 	p = "END";
 	break;
-    case OPEN + 1:
-    case OPEN + 2:
-    case OPEN + 3:
-    case OPEN + 4:
-    case OPEN + 5:
-    case OPEN + 6:
-    case OPEN + 7:
-    case OPEN + 8:
-    case OPEN + 9:
-	sprintf(buf + strlen(buf), "OPEN%d", OP(op) - OPEN);
-	p = (char *)NULL;
-	break;
-    case CLOSE + 1:
-    case CLOSE + 2:
-    case CLOSE + 3:
-    case CLOSE + 4:
-    case CLOSE + 5:
-    case CLOSE + 6:
-    case CLOSE + 7:
-    case CLOSE + 8:
-    case CLOSE + 9:
-	sprintf(buf + strlen(buf), "CLOSE%d", OP(op) - CLOSE);
-	p = (char *)NULL;
-	break;
     case STAR:
 	p = "STAR";
 	break;
@@ -1411,7 +1389,18 @@ char           *op;
 	p = "NOTEDGE";
 	break;
     default:
-	regerror("corrupted opcode");
+        if (OP(op) > OPEN && OP(op) < OPEN+NSUBEXP)
+        {
+	    sprintf(buf + strlen(buf), "OPEN%d", OP(op) - OPEN);
+	    p = (char *)NULL;
+        }
+        else if (OP(op) > CLOSE && OP(op) < CLOSE+NSUBEXP)
+        {
+	    sprintf(buf + strlen(buf), "CLOSE%d", OP(op) - CLOSE);
+	    p = (char *)NULL;
+        }
+        else
+	    regerror("corrupted opcode");
 	break;
     }
     if (p != (char *)NULL)

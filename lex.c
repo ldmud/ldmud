@@ -1,24 +1,31 @@
+#include "driver.h"
+
+#include "my-alloca.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <ctype.h>
-
-#include "lint.h"
-
+#include <string.h>
 #ifdef OS2
 #include <io.h>
 #endif
 
-#include "interpret.h" /* we have to place it before lang.h
-			  to define struct svalue */
-#include "lang.h"
-#include "string.h"
-#include "config.h"
-#include "exec.h"
 #include "lex.h"
+
+#include "array.h"
+#include "closure.h"
+#include "comm.h"
+#include "exec.h"
+#include "gcollect.h"
+#include "hash.h"
 #include "instrs.h"
+#include "main.h"
 #include "patchlevel.h"
+#include "prolang.h"
+#include "simulate.h"
+#include "simul_efun.h"
 #include "stralloc.h"
 
+/* TODO: Use get_host_name() instead of gethostname() */
 #ifdef AMIGA
 #include "hosts/amiga/socket.h"
 #endif
@@ -29,6 +36,16 @@
 #else
 #define CHAR_EOF ((char)EOF)
 #endif
+
+#define MLEN 4096
+#define NSIZE 256
+
+#define NELEM(a) (sizeof (a) / sizeof (a)[0])
+
+struct s_reswords {
+    char *name;
+    int code;
+};
 
 int current_line;
 int total_lines;	/* Used to compute average compiled lines/s */
@@ -58,7 +75,6 @@ static int exgetc();
 static char *get_current_file(), *get_current_line(), *get_version(),
 	*get_hostname(), *get_domainname();
 static void efun_defined PROT((char **));
-extern char *get_host_ip_number();
 static int yyin_des;
 static char *linebufstart;
 static char *linebufend;
@@ -73,10 +89,6 @@ static int auto_include_start;
 
 #define EXPANDMAX 25000
 static int nexpands;
-
-#ifndef tolower
-extern int tolower PROT((int));
-#endif
 
 static void lexerror PROT((char *));
 
@@ -153,7 +165,7 @@ static struct s_reswords reswords[] = {
 { "while",		F_WHILE, },
 };
 
-struct ident *ident_table[ITABLE_SIZE];
+static struct ident *ident_table[ITABLE_SIZE];
 #if ITABLE_SIZE == 256
 #define identhash(s) chashstr((s), 12)
 #else
@@ -209,7 +221,7 @@ int n;
 #if defined(LEXDEBUG)
     		printf("shifting down inferior.\n");
 #endif
-    		if (curr = (struct ident*)xalloc(sizeof *curr)) {
+    		if ( (curr = (struct ident*)xalloc(sizeof *curr)) ) {
 		    curr->name = inferior->name;
     		    curr->next = inferior->next;
     		    curr->type = I_TYPE_UNKNOWN;
@@ -303,7 +315,7 @@ fflush(stdout);
 #endif
 }
 
-void merge(name, namelen, deststart)
+static void merge(name, namelen, deststart)
     char *name, *deststart;
     mp_int namelen;
 {
@@ -420,9 +432,7 @@ mygetc()
 #endif
 #if defined(LEXDEBUG)
     putc(*outp, stderr);
-#if 1
-    fflush(stdout);
-#endif
+    fflush(stderr);
 #endif
     return *outp++;
 }
@@ -589,7 +599,6 @@ inc_open(buf, name, namelen, delim)
 #endif
 	}
     } else if (closure_hook[H_INCLUDE_DIRS].type == T_CLOSURE) {
-	extern struct object *current_object;
 	struct svalue *svp;
 
 	push_string_malloced(name);
@@ -618,13 +627,18 @@ inc_open(buf, name, namelen, delim)
 static void realloc_defbuf() {
     char * old_defbuf = defbuf;
     long old_defbuf_len = defbuf_len;
+    char * old_outp = outp;
 
+    if (MAX_TOTAL_BUF <= defbuf_len)
+      return;
     outp -= &defbuf[defbuf_len] - (char*)0;
     if (defbuf_len > (MAX_TOTAL_BUF >> 1) ) {
 	defbuf_len = MAX_TOTAL_BUF;
     } else {
 	defbuf_len <<= 1;
     }
+    fprintf(stderr, "reallocating defbuf from %ld (%ud left) to %ld.\n"
+           , old_defbuf_len, old_outp-defbuf, defbuf_len);
     defbuf = xalloc(defbuf_len);
     memcpy(defbuf+defbuf_len-old_defbuf_len, old_defbuf, old_defbuf_len);
     xfree(old_defbuf);
@@ -750,7 +764,6 @@ char *name;
     linebufoffset = linebufstart - &defbuf[defbuf_len];
     if (outp - defbuf < 3*MAXLINE) {
 	realloc_defbuf();
-	fprintf(stderr, "reallocating defbuf.\n");
 	if (outp - defbuf < 2*MAXLINE) {
 	    lexerror("Maximum total buffer size exceeded");
 	    return;
@@ -880,7 +893,7 @@ char *sp;
     if (!*p) {
 	lexerror("Illegal # command");
     } else {
-	while(*p && !isspace(*p))
+	while(*p && !isspace((unsigned char)*p))
 	    p++;
 	*p = 0;
     }
@@ -916,12 +929,8 @@ static void handle_pragma(str)
 	pragma_verbose_errors = 1;
 #if defined( DEBUG ) && defined ( TRACE_CODE )
     } else if (strcmp(str, "set_code_window") == 0) {
-	extern void set_code_window();
-
 	set_code_window();
     } else if (strcmp(str, "show_code_window") == 0) {
-	extern void show_code_window();
-
 	show_code_window();
 #endif
     }
@@ -1216,9 +1225,6 @@ yylex1()
 	goto badlex;
     case '#':
 	if (*yyp == '\'') {
-	    extern struct function *simul_efunp;
-	    extern struct object *master_ob;
-
 	    struct ident *p;
 	    char *wordstart = ++yyp;
 	    int efun_override;
@@ -1228,7 +1234,6 @@ yylex1()
 	    c = *--yyp;
 	    /* the assignment is good for the data flow analysis :-} */
 	    if (yyp == wordstart) {
-		extern int symbol_operator PROT((char *, char **));
 		int i;
 
 		if ((i = symbol_operator(yyp, &outp)) < 0)
@@ -1321,7 +1326,7 @@ yylex1()
 		push_constant_string("nomask simul_efun");
 		push_volatile_string(current_file);
 		push_shared_string(p->name);
-		res = apply_master_ob("privilege_violation", 3);
+		res = apply_master_ob(STR_PRIVILEGE, 3);
 		if (!res || res->type != T_NUMBER || res->u.number < 0)
 		{
 		    yyerrorf(
@@ -1368,8 +1373,6 @@ yylex1()
 		    break;
 		}
 		if (p->u.global.variable >= 0) {
-		    extern int num_virtual_variables;
-
 		    if (p->u.global.variable & VIRTUAL_VAR_TAG) {
 			/* Handling this would require an extra coding of
 			 * this closure type, and special treatment in
@@ -1500,7 +1503,7 @@ yylex1()
     fprintf(stderr, "#undef '%s'\n", sp);
 #endif
     		h = identhash(sp);
-		for(q = &ident_table[h]; p=*q; q=&p->next) {
+		for(q = &ident_table[h]; ( p= *q); q=&p->next) {
 		    if (strcmp(sp, p->name)) continue;
 		    if (p->type != I_TYPE_DEFINE) break; /* failure */
 		    if (!p->u.define.permanent) {
@@ -1577,8 +1580,8 @@ yylex1()
 		yyerror("Illegal character constant");
 	    }
 	} else if (*yyp++ != '\'' ||
-		   c == '\'' &&
-			(*yyp == '(' || isalunum(*yyp) || *yyp == '\'') )
+		   (c == '\'' &&
+			(*yyp == '(' || isalunum(*yyp) || *yyp == '\'')) )
 	{
 	    char *wordstart;
 	    int quotes = 1;
@@ -1589,7 +1592,7 @@ yylex1()
 		yyp++;
 	    }
 	    wordstart = yyp;
-	    if (!isalpha(*yyp)) {
+	    if (!isalpha((unsigned char)*yyp)) {
 		if (*yyp == '(' && yyp[1] == '{') {
 		    outp = yyp + 2;
 		    yylval.number = quotes;
@@ -1796,8 +1799,6 @@ yylex()
     return r;
 }
 
-extern YYSTYPE yylval;
-
 void end_new_file()
 {
     while (inctop) {
@@ -1817,10 +1818,12 @@ void end_new_file()
 	iftop = p->next;
 	xfree((char *)p);
     }
+
     if (defbuf_len > DEFBUF_1STLEN) {
 	xfree(defbuf);
 	defbuf_len = 0;
     }
+
     if (last_lex_string) {
 	free_string(last_lex_string);
 	last_lex_string = 0;
@@ -1875,8 +1878,7 @@ struct ident *all_efuns = 0;
 
 void init_num_args()
 {
-    extern char master_name[];
-    int i, n;
+    size_t i, n;
     struct lpc_predef_s *tmpf;
     char mtext[MLEN];
     static short binary_operators[] = {
@@ -2081,7 +2083,7 @@ int quote;
     if (*p == '(') {		/* if "function macro" */
 	int arg;
 	int inid;
-	char *ids;
+	char *ids = NULL;
 	p++;			/* skip '(' */
 	SKIPWHITE;
 	if (*p == ')') {
@@ -2287,7 +2289,7 @@ free_defines()
 	q = p->next;
 	p->next = 0;
 	prev = &ident_table[p->hash];
-	while (curr = *prev) {
+	while ( (curr = *prev) ) {
 	    if (curr->name == p->name) { /* found it */
 		p->next = curr->next;
 		free_string(p->name);
@@ -2363,11 +2365,18 @@ static int
 _expand_define(p)
     struct defn *p;
 {
-    char expbuf[DEFMAX];
+    char *expbuf;
     char *args[NARGS];
-    char buf[DEFMAX];
+    char *buf;
     char *q, *e, *b;
 	char *r;
+
+    expbuf = alloca(DEFMAX * sizeof(char));
+    buf = alloca(DEFMAX * sizeof(char));
+    if (!expbuf || !buf) {
+	lexerror("Stack overflow");
+	return 0;
+    }
 
     if (nexpands++ > EXPANDMAX) {
 	lexerror("Too many macro expansions");
@@ -2423,8 +2432,6 @@ _expand_define(p)
 				++r;
 			    } while (isalunum(c = *r));
 			} else {
-			    extern int symbol_operator PROT((char *, char **));
-
 			    char *end;
 
 			    if (symbol_operator(r, &end) < 0) {
@@ -2578,7 +2585,8 @@ _expand_define(p)
 #define SKPW 	do c = mygetc(); while(lexwhite(c)); myungetc(c)
 
 static int exgetc() {
-    register char c,*yyp;
+    register unsigned char c;
+    register char *yyp;
 
     c=mygetc();
     for (;;) {
@@ -2718,7 +2726,8 @@ static int cond_get_exp(priority, svp)
     struct svalue *svp;
 {
     int c;
-    int value,value2,x;
+    int value = 0;
+    int value2,x;
     struct svalue sv2;
 
     svp->type = T_INVALID;
@@ -2855,9 +2864,9 @@ static int cond_get_exp(priority, svp)
 			  else value %= value2; 	break;
 	      case BPLUS  : value += value2;		break;
 	      case BMINUS : value -= value2;		break;
-	      case LSHIFT : if (value2 > MAX_SHIFT) value = 0;
+	      case LSHIFT : if ((uint)value2 > MAX_SHIFT) value = 0;
 			    else value <<= value2; break;
-	      case RSHIFT : value >>= value2 > MAX_SHIFT ? MAX_SHIFT : value2;
+	      case RSHIFT : value >>= (uint)value2 > MAX_SHIFT ? MAX_SHIFT : value2;
 		break;
 	      case LESS   : value = value <  value2;	break;
 	      case LEQ    : value = value <= value2;	break;
@@ -2930,7 +2939,7 @@ static int cond_get_exp(priority, svp)
 void set_inc_list(v)
     struct vector *v;
 {
-    int i;
+    size_t i;
     char *p;
     struct svalue *svp;
     mp_int len, max;
@@ -3022,10 +3031,15 @@ static char *get_current_line() {
 
 static char *get_version() {
     char *buf;
+    size_t len;
 
-    buf = xalloc(8 + strlen(PATCH_LEVEL));
+    len = strlen(GAME_VERSION PATCH_LEVEL LOCAL_LEVEL);
+    buf = xalloc(3 + len);
     if (!buf) return 0;
-    sprintf(buf, "\"%5.5s%s\"", GAME_VERSION, PATCH_LEVEL);
+    buf[0] = '"';
+    strcpy(buf+1, GAME_VERSION PATCH_LEVEL LOCAL_LEVEL);
+    buf[len+1] = '"';
+    buf[len+2] = '\0';
     return buf;
 }
 
@@ -3116,8 +3130,6 @@ void count_lex_refs() {
 #endif /* MALLOC_smalloc */
 
 char *lex_error_context() {
-    extern int yychar;
-
     static char buf[20];
     char *end;
     mp_int len;
@@ -3130,7 +3142,7 @@ char *lex_error_context() {
     } else {
 	strncpy(buf + len, outp, sizeof buf - 1 - len);
 	buf[sizeof buf - 1] = '\0';
-	if (end = strchr(buf, '\n'))
+	if ( (end = strchr(buf, '\n')) )
 	    *end = 0;
     }
     return buf;

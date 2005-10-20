@@ -3,16 +3,9 @@
 
 #include "hosts/os2/os2config.h"
 
-/* Define NO_IP_DEMON if the hostname resolving demon is inappropriate.
+/* #define ACCESS_CONTROL if you want the driver to do any access control.
  */
-#define NO_IP_DEMON
-
-/*
- * Define this if you want to use the improved access restriction system.
- * Look at the file ACCESS.ALLOW for information. It replaces the old
- * ACCESS.DENY.
- */
-#define ACCESS_RESTRICTED
+#define ACCESS_CONTROL
 
 /* Some configurations for this system. Needn't be changed if you don't use
  * the new access restriction system.
@@ -35,11 +28,6 @@
  * Max size of a file allowed to be read by 'read_file()'.
  */
 #define READ_FILE_MAX_SIZE	50000
-
-/* Version of the game in the form xx.xx.xx (leading zeroes) gc.
- * A dot and two digits may be appended, that is the patch level.
- */
-#define GAME_VERSION "03.02"
 
 /*
  * If an object is left alone for a certain time, then the
@@ -269,53 +257,24 @@
 #define APPLY_CACHE_STAT
 
 /* When smalloc is used without SBRK_OK, MIN_MALLOCED will lower large block
-   fragmentation.
+ * fragmentation. The value should be a multiple of the large chunk size.
  */
 /* #define MIN_MALLOCED	   0x1000000 */
 #define MAX_MALLOCED	   0x4000000
 #define MAX_SMALL_MALLOCED 0x1000000
 
-#undef SMALLOC_TRACE /* do 'make clean' after changing this... */
-#undef SMALLOC_LPC_TRACE /* do 'make clean' after changing this... */
+/* Define this to annotate all allocations with file:line of the driver
+ * source responsible for it.
+ */
+#undef SMALLOC_TRACE
+
+/* Define this to annotate all allocations with file:line of the lpc program
+ * responsible for it.
+ */
+#undef SMALLOC_LPC_TRACE
 
 /* If using TRACE_CODE , how many instructions should be kept? */
 #define TOTAL_TRACE_LENGTH 0x1000
 
-/************************************************************************/
-/*	END OF CONFIG -- DO NOT ALTER ANYTHING BELOW THIS LINE		*/
-/************************************************************************/
-
-/*
- * some generic large primes used by various hash functions in different files
- * You can alter these if you know of a better set of numbers!  Be sure
- * they are primes...
- */
-
-#define	P1		701	/* 3 large, different primes */
-#define	P2		14009	/* There's a file of them here somewhere :-) */
-#define	P3		54001
-
-#define BITNUM(n) ( \
-	 ((n)&010101010101)+\
-	(((n)&020202020202)>>1)+\
-	(((n)&000404040404)>>2)+\
-	(((n)&001010101010)>>3)+\
-	(((n)&002020202020)>>4)+\
-	(((n)&004040404040)>>5)\
-) %63
-
-#define BITNUM_IS_1(n) ( !( (n) & (n)-1 ) )
-
-#define CLEAR_EVAL_COST (assigned_eval_cost = eval_cost = initial_eval_cost)
-
-#ifndef MASTER_NAME
-#ifdef COMPAT_MODE
-#define MASTER_NAME "obj/master"
-#else
-#define MASTER_NAME "secure/master"
-#endif  
-#endif  
- 
-#include "port.h"
 
 #endif /* CONFIG_H */

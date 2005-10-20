@@ -1248,7 +1248,7 @@ short int *st_name;
     scroll ? "SCROLLED" : "",
     MSDOS_VERSION,
     GAME_VERSION,
-    PATCH_LEVEL,
+    PATCH_LEVEL LOCAL_LEVEL,
 
     /* if X-Comp was written as X-Compat the below would cause
         something to malfunction.

@@ -1,214 +1,23 @@
 #ifndef INTERPRET_H
 #define INTERPRET_H
 
-#include "port.h"
-#include "config.h"
+#include <setjmp.h>
 
-union u {
-    char *string;
-    p_int number;
-    struct object *ob;
-    struct vector *vec;
-    struct mapping *map;
-    struct lambda *lambda;
-    p_int mantissa;
-    struct svalue *lvalue;
-    struct protected_lvalue *protected_lvalue;
-    struct protected_char_lvalue *protected_char_lvalue;
-    struct protected_range_lvalue *protected_range_lvalue;
-    void (*error_handler) PROT((struct svalue *));
-    struct const_list_svalue *const_list;
-};
+#include "driver.h"
+#include "datatypes.h"
 
-/*
- * The value stack element.
- * If it is a string, then the way that the string has been allocated differ,
- * wich will affect how it should be freed.
+
+/* Some functions are inlined in interpret.c, and called normally
+ * from everywhere else.
  */
-struct svalue {
-    ph_int type;
-    union {
-        ph_int string_type;
-        ph_int exponent;
-	ph_int closure_type;
-	ph_int quotes;
-	ph_int num_arg; /* for call_out.c */
-	ph_int generic;
-    } x;
-    union u u;
-};
-
-#define SVALUE_FULLTYPE(svp) ((p_int *)(svp))
-
-#define T_INVALID	0x0
-#define T_LVALUE	0x1
-#define T_NUMBER	0x2
-#define T_STRING	0x3
-#define T_POINTER	0x4
-#define T_OBJECT	0x5
-#define T_MAPPING	0x6
-#define T_FLOAT 	0x7
-#define T_CLOSURE	0x8
-#define T_SYMBOL	0x9
-#define T_QUOTED_ARRAY	0xa
-
-#define T_CHAR_LVALUE   	0xb
-#define T_STRING_RANGE_LVALUE	0xc
-#define T_POINTER_RANGE_LVALUE	0xd
-#define T_PROTECTED_CHAR_LVALUE 	 0x0e
-#define T_PROTECTED_STRING_RANGE_LVALUE	 0x0f
-#define T_PROTECTED_POINTER_RANGE_LVALUE 0x10
-
-#define T_PROTECTED_LVALUE	0x11
-#define T_PROTECTOR_MAPPING	0x12
-
-#define T_ERROR_HANDLER 	0x13
-
-#define T_MOD_SWAPPED		0x80
-
-#define STRING_MALLOC	0	/* Allocated by malloc() */
-#define STRING_VOLATILE 1	/* Do not has to be freed at all */
-#define STRING_CONSTANT	1	/* Old, but misleading name */
-#define STRING_SHARED	2	/* Allocated by the shared string library */
-
-#define CLOSURE_OPERATOR	(-0x1800)
-#define CLOSURE_EFUN		(-0x1000)
-#define CLOSURE_SIMUL_EFUN	(-0x0800)
-#define CLOSURE_MALLOCED(c) ((c) >= 0)
-#define CLOSURE_LFUN		0
-#define CLOSURE_ALIEN_LFUN	1
-#define CLOSURE_IS_LFUN(c)	(((c)&~1) == 0)
-#define CLOSURE_IDENTIFIER	2
-#define CLOSURE_PRELIMINARY	3
-#define CLOSURE_REFERENCES_CODE(c) ((c) > 3)
-#define CLOSURE_BOUND_LAMBDA	4
-#define CLOSURE_HAS_CODE(c) ((c) > 4)
-#define CLOSURE_LAMBDA		5
-#define CLOSURE_UNBOUND_LAMBDA	6
-#define CLOSURE_CALLABLE(c) ((c) >= CLOSURE_EFUN && (c) <= CLOSURE_LAMBDA)
-
-#define CLOSURE_IDENTIFIER_OFFS 0xe800
-#define CLOSURE_OPERATOR_OFFS	(CLOSURE_OPERATOR & 0xffff)
-#define CLOSURE_EFUN_OFFS	(CLOSURE_EFUN & 0xffff)
-#define CLOSURE_SIMUL_EFUN_OFFS	(CLOSURE_SIMUL_EFUN & 0xffff)
-
-#ifdef MALLOC_smalloc
-#include "smalloc.h"
-#endif
-
-struct vector {
-#ifndef MALLOC_smalloc
-    p_int size;
-#endif
-    p_int ref;
-#ifdef DEBUG
-    p_int extra_ref;
-#endif
-    struct wiz_list *user;	/* Save who made the vector */
-    struct svalue item[1];
-};
-
-#define null_vector null_vector_aggregate.v
-
-extern struct null_vector_aggregate_struct  {
-#ifdef MALLOC_smalloc
-    p_int s[SMALLOC_OVERHEAD];
-#endif
-    struct vector v;
-} null_vector_aggregate;
-
-#ifdef DEBUG
-#define VEC_DEBUGREF(ref) ref,
+#if defined(HAS_INLINE) && defined(INTERPRET)
+#define INTER_INLINE LOCAL_INLINE
 #else
-#define VEC_DEBUGREF(ref)
+#define INTER_INLINE extern
 #endif
 
-#ifdef MALLOC_smalloc
-#define VEC_SIZE(v) (\
-  ( malloced_size(v) - \
-    ( SMALLOC_OVERHEAD + \
-      ( sizeof(struct vector) - sizeof(struct svalue) ) / SIZEOF_P_INT \
-    ) \
-  ) / (sizeof(struct svalue)/SIZEOF_P_INT) \
-)
-#define INIT_VEC_TYPE p_uint s[SMALLOC_OVERHEAD]; struct vector v
-#define VEC_INIT(size, ref, type) \
-	{ ( size * sizeof(struct svalue) + \
-	    sizeof(struct vector) - \
-	    sizeof(struct svalue) \
-	  ) / SIZEOF_P_INT + SMALLOC_OVERHEAD }, \
-	{ ref, VEC_DEBUGREF(ref) (struct wiz_list *)NULL, { { type } } }
-#else /* !MALLOC_smalloc */
-#define VEC_SIZE(v) ((v)->size)
-#define INIT_VEC_TYPE struct vector v
-#define VEC_INIT(size, ref, type) \
-	{ size, ref, VEC_DEBUGREF(ref) (struct wiz_list *)NULL, { { type } } }
-#endif
+/* --- Types --- */
 
-struct mapping {
-    p_int ref;
-    struct hash_mapping *hash;
-    struct condensed_mapping *condensed;
-    struct wiz_list *user;
-    int num_values; /* number of values per key */
-};
-
-struct hash_mapping {
-    p_int mask;
-    p_int used;
-    p_int condensed_deleted;
-    p_int ref;
-    struct map_chain *deleted;
-    struct mapping *next_dirty;
-    struct map_chain *chains[1];
-};
-
-struct condensed_mapping {
-    /* values for misc keys go above */
-#define CM_MISC(m) ((struct svalue *)(m))
-    /* struct svalue misc[0]; */
-    p_int misc_size;
-    p_int string_size;
-#define CM_STRING(m) ((char **)((m)+1))
-    /* char *string[0]; */
-    /* values for string keys go below */
-};
-
-struct lambda {
-    p_int ref;
-    struct object *ob;
-    union {
-	unsigned short index;	/* lfun closures */
-	char code[1];	/* lambda closures */
-	struct lambda *lambda;
-	struct {
-	    struct object *ob;
-	    unsigned short index;
-	} alien;	/* alien_lfun closures */
-    } function;
-};
-
-struct map_chain {
-    struct map_chain *next;
-    struct svalue key;
-    struct svalue data[1]; /* data == &key+1 is used in some places */
-};
-
-#define MAP_CHAIN_SIZE(n) (\
-	(sizeof(struct map_chain) - sizeof(struct svalue) ) +\
-		sizeof(struct svalue)*(n) )
-
-#if !defined(MALLOC_smalloc) || !defined(SMALLOC_TRACE) || !defined(__STDC__)
-#define ALLOC_VECTOR(nelem, file, line) \
-    (struct vector *)xalloc(sizeof (struct vector) + \
-			    sizeof(struct svalue) * (nelem - 1))
-#else
-#define ALLOC_VECTOR(nelem, file, line) \
-    (struct vector *)smalloc(sizeof (struct vector) + \
-			    sizeof(struct svalue) * (nelem - 1), file, line)
-#endif /* SMALLOC_TRACE */
-
-void free_vector PROT((struct vector *)), free_all_values();
 
 /*
  * Control stack element.
@@ -232,8 +41,6 @@ struct control_stack {
     char **break_sp;
     struct object *pretend_to_be;
 };
-
-#include <setjmp.h>
 
 struct con_struct { jmp_buf text; };
 
@@ -260,61 +67,107 @@ extern struct error_recovery_info {
 
 #define MAX_SHIFT ((sizeof(p_int) << 3) - 1)
 
-#if defined(atarist) || (defined(AMIGA) && defined(_DCC))
-/* Faster routines, using inline and knowlegde about double format.
- * the exponent isn't actually in 'exponent', but that doesn't really matter
- * as long as the accesses are consistent.
- * the DICE compiler for the amiga lacks the ldexp() and frexp() functions,
- * therefore these functions here are more than a speedup there...
- */
-#define FLOAT_FORMAT_1
-/* STORE_DOUBLE doesn't do any rounding, but truncates off the least
- * significant bits of the mantissa that won't fit together with the exponent
- * into 48 bits. To compensate for this, we initialise the unknown bits of
- * the mantissa with 0x7fff in READ_DOUBLE . This keeps the maximum precision
- * loss of a store/read pair to the same value as rounding, while being faster
- * and being more stable.
- */
-static
-#ifdef atarist
-inline
-#endif
-double READ_DOUBLE(struct svalue *svalue_pnt)
-{	double tmp;
-	(*(long*)&tmp) = svalue_pnt->u.mantissa;
-	((short*)&tmp)[2] = svalue_pnt->x.exponent;
-	((short*)&tmp)[3] = 0x7fff;
-	return tmp;
-}
 
-#define SPLIT_DOUBLE(double_value, int_pnt) (\
-(*(int_pnt) = ((short*)&double_value)[2]),\
-*((long*)&double_value)\
-)
+/* --- Variables --- */
 
-#define STORE_DOUBLE_USED
-#define STORE_DOUBLE(dest, double_value) (\
-(dest)->u.mantissa = *((long*)&double_value),\
-(dest)->x.exponent = ((short*)&double_value)[2]\
-)
+extern struct program *current_prog;
+extern struct error_recovery_info *error_recovery_pointer;
+extern int tracedepth;
+extern int trace_level;
+extern struct svalue *inter_sp;
+extern int function_index_offset;
+extern struct svalue *current_variables;
+extern struct svalue apply_return_value;
+extern struct svalue catch_value;
+extern struct svalue last_indexing_protector;
+
+#ifdef SMALLOC_LPC_TRACE
+extern char *inter_pc;
 #endif
 
-#ifndef STORE_DOUBLE
-#define FLOAT_FORMAT_0
-#define READ_DOUBLE(svalue_pnt) ( ldexp( (double)((svalue_pnt)->u.mantissa) , \
-		(svalue_pnt)->x.exponent-31 ) )
-
-/* if your machine doesn't use the exponent to designate powers of two,
-   the use of ldexp in SPLIT_DOUBLE won't work; you'll have to mulitply
-   with 32768. in this case */
-#define SPLIT_DOUBLE(double_value, int_pnt) \
-( (long)ldexp( frexp( (double_value), (int_pnt) ), 31) )
-
-#define STORE_DOUBLE_USED int __store_double_int_;
-#define STORE_DOUBLE(dest, double_value) (\
-((dest)->u.mantissa = SPLIT_DOUBLE((double_value), &__store_double_int_)),\
- (dest)->x.exponent = __store_double_int_\
-)
+#ifdef APPLY_CACHE_STAT
+extern int apply_cache_hit, apply_cache_miss;
 #endif
+
+/* --- Prototypes --- */
+
+extern void init_interpret PROT((void));
+extern void assign_eval_cost PROT((void));
+extern void push_object PROT((struct object *ob));
+extern void push_number PROT((p_int n));
+extern void push_shared_string PROT((char *p));
+extern void push_referenced_shared_string PROT((char *p));
+INTER_INLINE void free_string_svalue PROT((struct svalue *v));
+extern void free_object_svalue PROT((struct svalue *v));
+extern void zero_object_svalue PROT((struct svalue *v));
+extern void free_svalue PROT((struct svalue *v));
+INTER_INLINE void assign_svalue_no_free PROT((struct svalue *to, struct svalue *from));
+extern void assign_svalue PROT((struct svalue *dest, struct svalue *v));
+INTER_INLINE void transfer_svalue_no_free PROT((struct svalue *dest, struct svalue *v));
+extern void transfer_svalue PROT((struct svalue *dest, struct svalue *v));
+extern void push_svalue PROT((struct svalue *v));
+extern void push_svalue_block PROT((int num, struct svalue *v));
+INTER_INLINE void pop_stack PROT((void));
+extern void drop_stack PROT((void));
+extern void bad_efun_arg PROT((int arg, int instr, struct svalue *sp)) NORETURN;
+extern void bad_xefun_arg PROT((int arg, struct svalue *sp)) NORETURN;
+extern void bad_xefun_vararg PROT((int arg, struct svalue *sp)) NORETURN;
+extern void push_vector PROT((struct vector *v));
+extern void push_referenced_vector PROT((struct vector *v));
+extern void push_string_malloced PROT((char *p));
+extern void push_string_shared PROT((char *p));
+INTER_INLINE void push_malloced_string PROT((char *p));
+extern void push_volatile_string PROT((char *p));
+extern int _privilege_violation PROT((char *what, struct svalue *where, struct svalue *sp));
+extern int privilege_violation4 PROT((char *what, struct object *whom, char *how_str, int how_num, struct svalue *sp));
+extern void check_for_destr PROT((struct vector *v));
+extern void push_apply_value PROT((void));
+extern void pop_apply_value  PROT((void));
+extern struct svalue *sapply PROT((char *fun, struct object *ob, int num_arg));
+extern struct svalue *apply PROT((char *fun, struct object *ob, int num_arg));
+extern char *function_exists PROT((char *fun, struct object *ob));
+extern void call_function PROT((struct program *progp, int fx));
+extern int get_line_number PROT((char *p, struct program *progp, char **namep));
+extern char *dump_trace PROT((int how));
+extern int get_line_number_if_any PROT((char **name));
+extern void reset_machine PROT((int first));
+extern struct svalue *secure_apply PROT((char *fun, struct object *ob, int num_arg));
+extern struct svalue *apply_master_ob PROT((char *fun, int num_arg));
+extern void assert_master_ob_loaded PROT((void));
+extern struct svalue *secure_call_lambda PROT((struct svalue *closure, int num_arg));
+extern void remove_object_from_stack PROT((struct object *ob));
+extern void call_lambda PROT((struct svalue *lsvp, int num_arg));
+extern void free_interpreter_temporaries PROT((void));
+extern void invalidate_apply_low_cache PROT((void));
+extern void add_eval_cost PROT((int num));
+
+#ifdef MAPPINGS
+extern void push_referenced_mapping PROT((struct mapping *m));
+extern void m_indices_filter PROT((struct svalue *key, struct svalue *data, char *extra));
+#endif
+
+#ifdef OPCPROF
+extern void opcdump PROT((void));
+#endif
+
+#ifdef TRACE_CODE
+extern int last_instructions PROT((int length, int verbose, struct svalue **svpp));
+#endif
+
+#ifdef DEBUG
+extern int check_state PROT((void));
+extern void count_inherits PROT((struct program *progp));
+extern void count_extra_ref_in_object PROT((struct object *ob));
+extern void count_extra_ref_in_vector PROT((struct svalue *svp, mp_int num));
+extern void check_a_lot_ref_counts PROT((struct program *search_prog));
+#endif
+
+#ifdef MALLOC_smalloc
+extern void clear_interpreter_refs PROT((void));
+extern void count_interpreter_refs PROT((void));
+#endif
+
+#define bad_efun_vararg bad_xefun_arg
+#define push_constant_string(str) push_volatile_string(str)
 
 #endif /* INTERPRET_H */

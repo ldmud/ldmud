@@ -34,7 +34,6 @@
 #endif /* not (DIRENT or _POSIX_VERSION) */
 
 #include "lint.h"
-#include "stdio.h"
 #include "interpret.h"
 #include "instrs.h"
 #include "object.h"
@@ -43,6 +42,7 @@
 #include "exec.h"
 #include "comm.h"
 #include "stralloc.h"
+#include "rxcache.h"
 
 #ifdef atarist
 #define CONST const
@@ -352,7 +352,7 @@ struct object *load_object(lname, dont_reset, depth)
 	struct svalue *svp;
 
 	push_volatile_string(name);
-	svp = apply_master_ob("compile_object", 1);
+	svp = apply_master_ob(STR_COMP_OBJ, 1);
 	if (svp && svp->type == T_OBJECT) {
 	    name[name_length] = '\0';
 	    if (ob = lookup_object_hash(name)) {
@@ -787,7 +787,7 @@ struct object *object_present(v, ob)
 	return 0;
     if (ob->super) {
 	push_volatile_string(v->u.string);
-	ret = sapply("id", ob->super, 1);
+	ret = sapply(STR_ID, ob->super, 1);
 	if (ob->super->flags & O_DESTRUCTED)
 	    return 0;
 	if (ret && !(ret->type == T_NUMBER && ret->u.number == 0))
@@ -826,7 +826,7 @@ static struct object *object_present2(str, ob)
     }
     for (; ob; ob = ob->next_inv) {
 	push_volatile_string(item);
-	ret = sapply("id", ob, 1);
+	ret = sapply(STR_ID, ob, 1);
 	if (ob->flags & O_DESTRUCTED) {
 	    xfree(item);
 	    inter_sp--;
@@ -872,7 +872,7 @@ void destruct_object(v)
 	debug_message("Destruct object %s (ref %ld)\n", ob->name, ob->ref);
 
     push_object(ob);
-    result = apply_master_ob("prepare_destruct", 1);
+    result = apply_master_ob(STR_PREP_DEST, 1);
     if (!result) error("No prepare_destruct\n");
     if (result->type == T_STRING) error(result->u.string);
     if (result->type != T_NUMBER || result->u.number != 0) return;
@@ -1203,7 +1203,7 @@ void say(v, avoid)
 	    if (assoc(&stmp, avoid) >= 0) continue;
 	    push_vector(v->u.vec);
 	    push_object(origin);
-	    sapply("catch_msg", ob, 2);
+	    sapply(STR_CATCH_MSG, ob, 2);
 	}
 	pop_stack(); /* free avoid alist */
 	command_giver = check_object(save_command_giver);
@@ -1304,7 +1304,7 @@ void tell_room(room, v, avoid)
 	    if (assoc(&stmp, avoid) >= 0) continue;
 	    push_vector(v->u.vec);
 	    push_object(origin);
-	    sapply("catch_msg", ob, 2);
+	    sapply(STR_CATCH_MSG, ob, 2);
 	}
 	return;
       }
@@ -2785,8 +2785,8 @@ int status_parse(buff)
 #endif
 #ifdef APPLY_CACHE_STAT
 	    sprintf(print_buff,
-	      "Calls to apply_low: %d Cache hits: %.2f%%\n\n",
-	      apply_cache_hit+apply_cache_miss,
+	      "Calls to apply_low: %d Cache hits: %d (%.2f%%)\n\n",
+	      apply_cache_hit+apply_cache_miss, apply_cache_hit,
 	      100.*(float)apply_cache_hit/
 		(float)(apply_cache_hit+apply_cache_miss) );
 	    add_message("%s", print_buff);
@@ -2802,6 +2802,9 @@ int status_parse(buff)
 	tot += print_call_out_usage(verbose);
 #ifdef MAPPINGS
 	tot += total_mapping_size();
+#endif
+#ifdef RXCACHE_TABLE
+        tot += rxcache_status(verbose);
 #endif
 	tot += res;
 
@@ -2907,7 +2910,7 @@ int special_parse(buff)
 #if !defined(DEBUG) || defined(SHOWSMALLNEWMALLOCED_RESTRICTED)
 	    struct svalue *arg;
 	    push_constant_string("inspect memory");
-	    arg = apply_master_ob("query_player_level", 1);
+	    arg = apply_master_ob(STR_PLAYER_LEVEL, 1);
 	    if (arg && (arg->type != T_NUMBER || arg->u.number != 0))
 #endif
 	    {
@@ -3179,7 +3182,7 @@ void fatal(fmt, a, b, c, d, e, f, g, h)
 #ifdef __STDC__
     va_end(va);
 #endif
-#if !defined(AMIGA)
+#if !defined(AMIGA) && !defined(__BEOS__)
     /* we want a core dump, and abort() seems to fail for linux and sun */
     (void)signal(SIGFPE, SIG_DFL);
     *((char*)0) = 0/0;
@@ -3412,7 +3415,7 @@ void error(fmt, a, b, c, d, e, f, g, h)
 	    a += 3;
 	}
 	save_cmd = command_giver;
-	apply_master_ob("runtime_error", a);
+	apply_master_ob(STR_RUNTIME, a);
 	command_giver = save_cmd;
 	if (current_heart_beat) {
 	    struct object *culprit;
@@ -3431,8 +3434,7 @@ void error(fmt, a, b, c, d, e, f, g, h)
 		push_number(line_number);
 		a += 3;
 	    }
-	    svp = apply_master_ob("heart_beat_error", a);
-	    command_giver = save_cmd;
+	    svp = apply_master_ob(STR_HEART_ERROR, a);
 	    if (svp && (svp->type != T_NUMBER || svp->u.number) ) {
 		set_heart_beat(culprit, 1);
 	    }
@@ -3502,7 +3504,7 @@ void smart_log(error_file, line, what, context)
     if (master_ob && !(master_ob->flags & O_DESTRUCTED) ) {
 	push_volatile_string(error_file);
 	push_volatile_string(buff);
-	apply_master_ob("log_error", 2);
+	apply_master_ob(STR_LOG_ERROR, 2);
     }
 }
 
@@ -3553,9 +3555,9 @@ char *check_valid_path(path, caller, call_fun, writeflg)
     push_constant_string(call_fun);
     push_object(caller);
     if (writeflg)
-	v = apply_master_ob("valid_write", 4);
+	v = apply_master_ob(STR_VALID_WRITE, 4);
     else
-	v = apply_master_ob("valid_read", 4);
+	v = apply_master_ob(STR_VALID_READ, 4);
     if (!v || (v->type == T_NUMBER && v->u.number == 0))
 	return 0;
     if (v->type != T_STRING) {
@@ -3609,7 +3611,7 @@ void startmasterupdate() {
  * in an interrupt.
  */
 void shutdowngame() {
-    apply_master_ob("notify_shutdown", 0);
+    apply_master_ob(STR_SHUTDOWN, 0);
     ipc_remove();
     remove_all_players();
     remove_destructed_objects(); /*Will perform the remove_interactive calls*/
@@ -3661,7 +3663,7 @@ int transfer_object(svp)
      * Get the weight of the object
      */
     weight = 0;
-    v_weight = sapply("query_weight", ob, 0);
+    v_weight = sapply(STR_QUERY_WEIGHT, ob, 0);
     if (v_weight && v_weight->type == T_NUMBER)
 	weight = v_weight->u.number;
     if (ob->flags & O_DESTRUCTED)
@@ -3671,7 +3673,7 @@ int transfer_object(svp)
      * then we must call drop() to check that the object can be dropped.
      */
     if (from && (from->flags & O_ENABLE_COMMANDS)) {
-	ret = sapply("drop", ob, 0);
+	ret = sapply(STR_DROP, ob, 0);
 	if (ret && (ret->type != T_NUMBER || ret->u.number != 0))
 	    return 2;
 	/* This should not happen, but we can not trust LPC hackers. :-) */
@@ -3683,7 +3685,7 @@ int transfer_object(svp)
      * remove things out of it.
      */
     if (from && from->super && !(from->flags & O_ENABLE_COMMANDS)) {
-	ret = sapply("can_put_and_get", from, 0);
+	ret = sapply(STR_CANPUTGET, from, 0);
 	if (!ret || (ret->type != T_NUMBER && ret->u.number != 1) ||
 	  (from->flags & O_DESTRUCTED))
 	    return 3;
@@ -3693,10 +3695,10 @@ int transfer_object(svp)
      * Then we must test 'prevent_insert', and 'can_put_and_get'.
      */
     if (to->super && !(to->flags & O_ENABLE_COMMANDS)) {
-	ret = sapply("prevent_insert", ob, 0);
+	ret = sapply(STR_PREVENT_INSERT, ob, 0);
 	if (ret && (ret->type != T_NUMBER || ret->u.number != 0))
 	    return 4;
-	ret = sapply("can_put_and_get", to, 0);
+	ret = sapply(STR_CANPUTGET, to, 0);
 	if (!ret || (ret->type != T_NUMBER && ret->type != 0) ||
 	  (to->flags & O_DESTRUCTED) || (ob->flags & O_DESTRUCTED))
 	    return 5;
@@ -3705,7 +3707,7 @@ int transfer_object(svp)
      * If the destination is a player, check that he can pick it up.
      */
     if (to->flags & O_ENABLE_COMMANDS) {
-	ret = sapply("get", ob, 0);
+	ret = sapply(STR_GET, ob, 0);
 	if (!ret || (ret->type == T_NUMBER && ret->u.number == 0) ||
 	  (ob->flags & O_DESTRUCTED))
 	    return 6;
@@ -3718,7 +3720,7 @@ int transfer_object(svp)
 	 * Check if the destination can carry that much.
 	 */
 	push_number(weight);
-	ret = sapply("add_weight", to, 1);
+	ret = sapply(STR_ADD_WEIGHT, to, 1);
 	if (ret && ret->type == T_NUMBER && ret->u.number == 0)
 	    return 1;
 	if (to->flags & O_DESTRUCTED)
@@ -3729,7 +3731,7 @@ int transfer_object(svp)
      */
     if (from && from->super && weight) {
 	push_number(-weight);
-	(void)sapply("add_weight", from, 1);
+	(void)sapply(STR_ADD_WEIGHT, from, 1);
     }
     move_object();
     return 0;
@@ -3743,8 +3745,11 @@ int transfer_object(svp)
 void slow_shut_down(minutes)
     int minutes;
 {
+    char buf[90];
+    sprintf(buf, "slow_shut_down(%d)\n", minutes);
+    write(1, buf, strlen(buf));
     push_number(minutes);
-    apply_master_ob("slow_shut_down", 1);
+    apply_master_ob(STR_SLOW_SHUT, 1);
 }
 
 int match_string(match, str, len)
@@ -4246,7 +4251,7 @@ static int validate_shadowing(ob)
 	}
     }
     push_object(ob);
-    ret = apply_master_ob("query_allow_shadow", 1);
+    ret = apply_master_ob(STR_QUERY_SHADOW, 1);
     if (out_of_memory)
 	error("Out of memory\n");
     if (!((ob->flags|cob->flags) & O_DESTRUCTED) &&

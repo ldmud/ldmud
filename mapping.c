@@ -1,27 +1,29 @@
+#include "driver.h"
+
+#include "my-alloca.h"
 #include <stdio.h>
-#include "config.h"
-#include "lint.h"
+
+#include "mapping.h"
+
+#include "array.h"
+#include "backend.h"
+#include "gcollect.h"
 #include "interpret.h"
+#include "main.h"
 #include "object.h"
-#include "wiz_list.h"
 #include "regexp.h"
-#include "stralloc.h"
+#include "simulate.h"
 #include "smalloc.h"
+#include "stralloc.h"
+#include "wiz_list.h"
 
 #define MIN_P_INT ( (p_int)-1 << (sizeof(p_int) * 8 - 1) )
 #define MIN_PH_INT ( (ph_int)-1 << (sizeof(ph_int) * 8 - 1) )
 
 #define EMPTY_MAPPING_THRESHOLD 2000
 
-extern struct svalue const0;
-extern int extra_jobs_to_do;
-extern struct wiz_list default_wizlist_entry;
-extern void push_referenced_mapping PROT((struct mapping *));
-
-extern void m_indices_filter PROT((struct svalue *, struct svalue *, char *));
-
-struct hash_mapping dirty_mapping_head_hash;
-struct mapping dirty_mapping_head = {
+static struct hash_mapping dirty_mapping_head_hash;
+static struct mapping dirty_mapping_head = {
     /* ref        */ 1,
     /* hash       */ &dirty_mapping_head_hash,
     /* condensed  */ 0,
@@ -31,14 +33,13 @@ struct mapping dirty_mapping_head = {
 
 mp_int num_mappings = 0;
 
-struct mapping *last_dirty_mapping = &dirty_mapping_head;
+static struct mapping *last_dirty_mapping = &dirty_mapping_head;
 mp_int num_dirty_mappings = 0;
 
 static mp_int empty_mapping_load = 2*-EMPTY_MAPPING_THRESHOLD;
 static mp_int empty_mapping_base = 0;
 
 struct mapping *stale_mappings; /* for garbage_collection */
-extern struct lambda *stale_misc_closures;
 
 struct mapping *allocate_mapping(size, num_values)
 mp_int size, num_values;
@@ -66,7 +67,7 @@ mp_int size, num_values;
 	    size |= size >> 16;
 	}
 	size >>= 1; /* This is now actually the mask, which is one lower */
-	if (size > ((MAXINT - sizeof *hm - 0x100000) / sizeof *mcp) ||
+	if (size > (mp_int)((MAXINT - sizeof *hm - 0x100000) / sizeof *mcp) ||
 	    !(hm = (struct hash_mapping *)
 		xalloc(sizeof *hm + sizeof *mcp * size) ) )
 	{
@@ -83,7 +84,7 @@ mp_int size, num_values;
 	hm->deleted = 0;
 #endif
 	num_dirty_mappings++;
-	extra_jobs_to_do = 1;
+	extra_jobs_to_do = MY_TRUE;
 	mcp = hm->chains;
 	do *mcp++ = 0; while (--size >= 0);
     }
@@ -141,7 +142,7 @@ struct mapping *m;
           (1 + num_values) -
 	cm->string_size * (sizeof *svp/sizeof *str - 1);
     xfree( (char *)svp); /* free the condensed mapping part */
-    if (hm = m->hash) {
+    if ( (hm = m->hash) ) {
 	struct map_chain **mcp, *mc, *next;
 	struct mapping *next_dirty;
 
@@ -152,7 +153,7 @@ struct mapping *m;
 	mcp = hm->chains;
 	i = hm->mask + 1;
 	do {
-	    for (next = *mcp++; mc = next; ) {
+	    for (next = *mcp++; (mc = next); ) {
 		svp = &mc->key;
 		j = num_values;
 		do {
@@ -199,7 +200,7 @@ struct mapping *m;
 	cm->string_size * (sizeof(struct svalue)/sizeof(char*) - 1);
     xfree( (char *)CM_MISC(cm) - cm->misc_size * (num_values + 1) );
 					/* free the condensed mapping part */
-    if (hm = m->hash) {
+    if ( (hm = m->hash) ) {
 	struct map_chain **mcp, *mc, *next;
 	struct mapping *next_dirty;
 	mp_int i;
@@ -211,7 +212,7 @@ struct mapping *m;
 	mcp = hm->chains;
 	i = hm->mask + 1;
 	do {
-	    for (next = *mcp++; mc = next; ) {
+	    for (next = *mcp++; (mc = next); ) {
 		next = mc->next;
 		xfree( (char *)mc );
 	    }
@@ -279,7 +280,7 @@ static void remove_empty_mappings() {
     } while (m);
     last_dirty_mapping = last;
     num_dirty_mappings -=
-      empty_mapping_load + 2*EMPTY_MAPPING_THRESHOLD + empty_mapping_base >> 1;
+      (empty_mapping_load + 2*EMPTY_MAPPING_THRESHOLD + empty_mapping_base) >> 1;
     empty_mapping_load = 2*-EMPTY_MAPPING_THRESHOLD - empty_mapping_base;
 #ifdef DEBUG
     check_dirty_mapping_list();
@@ -302,8 +303,6 @@ void free_protector_mapping(m)
 		m->hash ? "reference" : "part");
 #ifdef TRACE_CODE
 	{
-	    extern int last_instructions PROT((int, int, struct svalue **));
-
 	    last_instructions(TOTAL_TRACE_LENGTH, 1, 0);
 	}
 #endif
@@ -380,11 +379,11 @@ struct svalue *get_map_lvalue(m, map_index, need_lvalue)
 		offset |= offset >> 8;
 		offset |= offset >> 16;
 	    }
-	    if ( (offset = offset+1 >> 1) >= sizeof str) 
+	    if ( (offset = (offset+1) >> 1) >= (p_int)sizeof str) 
 		do {
 		    if (key + offset >= keyend) continue;
 		    if ( str >= *(char **)(key+offset) ) key += offset;
-		} while ( (offset >>= 1) >= sizeof str);
+		} while ( (offset >>= 1) >= (p_int)sizeof str);
 	    if ( str == *(char **)key ) {
 		/* found it */
 #ifndef FAST_MULTIPLICATION
@@ -429,9 +428,9 @@ struct svalue *get_map_lvalue(m, map_index, need_lvalue)
 	    offset |= offset >> 8;
 	    offset |= offset >> 16;
 	}
-	offset = offset+1 >> 1;
+	offset = (offset+1) >> 1;
 	key = keyend - offset;
-	while ( (offset >>= 1) >= (sizeof svp)/2) {
+	while ( (offset >>= 1) >= (p_int)(sizeof svp)/2) {
 	    if ( !(u_d = (((struct svalue *)key)->u.number >> 1) -
 			 (index_u >> 1)) ) {
 	      if ( !(u_d = ((struct svalue *)key)->x.generic - index_x) )
@@ -452,7 +451,7 @@ struct svalue *get_map_lvalue(m, map_index, need_lvalue)
 		/* u_d < 0 */
 		key -= offset;
 		while (key < keystart) {
-		    if ( (offset >>= 1) < (sizeof svp) )
+		    if ( (offset >>= 1) < (p_int)(sizeof svp) )
 			break;
 		    key += offset;
 		}
@@ -481,7 +480,7 @@ struct svalue *get_map_lvalue(m, map_index, need_lvalue)
 	hm->deleted = 0;
 #endif
 	num_dirty_mappings++;
-	extra_jobs_to_do = 1;
+	extra_jobs_to_do = MY_TRUE;
 	m->hash = hm;
 	mc = (struct map_chain *)xalloc(MAP_CHAIN_SIZE(num_values));
 	hm->chains[0] = mc;
@@ -582,10 +581,9 @@ void check_map_for_destr(m)
     for (svp = CM_MISC(cm),i = cm->misc_size; (i -= sizeof *svp) >= 0; ) {
 	--svp;
 	if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED) {
-	    struct svalue *data;
-	    extern void free_object_svalue PROT((struct svalue *));
+	    struct svalue *data = NULL;
 
-	    if (j = num_values) {
+	    if ( (j = num_values) ) {
 		data = (struct svalue *)((char *)svp - i -
 		  num_values * ((char *)CM_MISC(cm) - (char *)svp));
 		do {
@@ -621,7 +619,7 @@ void check_map_for_destr(m)
 		hm->deleted = 0;
 #endif
 		num_dirty_mappings++;
-		extra_jobs_to_do = 1;
+		extra_jobs_to_do = MY_TRUE;
 	    }
 	    hm->condensed_deleted++;
 	}
@@ -638,11 +636,11 @@ void check_map_for_destr(m)
 	    assign_svalue(svp, &const0);
 	}
     }
-    if (hm = m->hash) {
+    if ( (hm = m->hash) ) {
 	struct map_chain **mcp, **mcp2, *mc;
 
 	for (mcp = hm->chains, i = hm->mask + 1; --i >= 0;) {
-	    for(mcp2 = mcp++; mc = *mcp2; ) {
+	    for (mcp2 = mcp++; (mc = *mcp2); ) {
 		if (mc->key.type == T_OBJECT &&
 		  mc->key.u.ob->flags & O_DESTRUCTED)
 		{
@@ -722,11 +720,11 @@ void remove_mapping(m, map_index)
 		offset |= offset >> 8;
 		offset |= offset >> 16;
 	    }
-	    if ( (offset = offset+1 >> 1) >= sizeof str) 
+	    if ( (offset = (offset+1) >> 1) >= (p_int)sizeof str) 
 		do {
 		    if (key + offset >= keyend) continue;
 		    if ( str >= *(char **)(key+offset) ) key += offset;
-		} while ( (offset >>= 1) >= sizeof str);
+		} while ( (offset >>= 1) >= (p_int)sizeof str);
 	    if ( str == *(char **)key ) {
 		/* found it */
 
@@ -754,7 +752,7 @@ void remove_mapping(m, map_index)
 		    hm->deleted = 0;
 #endif
 		    num_dirty_mappings++;
-		    extra_jobs_to_do = 1;
+		    extra_jobs_to_do = MY_TRUE;
 		}
 		hm->condensed_deleted++;
 		return;
@@ -790,9 +788,9 @@ void remove_mapping(m, map_index)
 	    offset |= offset >> 8;
 	    offset |= offset >> 16;
 	}
-	offset = offset+1 >> 1;
+	offset = (offset+1) >> 1;
 	key = keyend - offset;
-	while ( (offset >>= 1) >= (sizeof svp)/2) {
+	while ( (offset >>= 1) >= (p_int)(sizeof svp)/2) {
 	    if ( !(u_d = (((struct svalue *)key)->u.number >> 1) -
 			 (index_u >> 1)) ) {
 	      if ( !(u_d = ((struct svalue *)key)->x.generic - index_x) )
@@ -840,7 +838,7 @@ void remove_mapping(m, map_index)
 #endif
 			hm->ref = 0;
 			num_dirty_mappings++;
-			extra_jobs_to_do = 1;
+			extra_jobs_to_do = MY_TRUE;
 		    }
 		    hm->condensed_deleted++;
 		    return;
@@ -852,7 +850,7 @@ void remove_mapping(m, map_index)
 		/* u_d < 0 */
 		key -= offset;
 		while (key < keystart) {
-		    if ( (offset >>= 1) < (sizeof svp) )
+		    if ( (offset >>= 1) < (p_int)(sizeof svp) )
 			break;
 		    key += offset;
 		}
@@ -862,7 +860,7 @@ void remove_mapping(m, map_index)
 	break;
       }
     }
-    if (hm = m->hash) {
+    if ( (hm = m->hash) ) {
 	struct map_chain **mcp, *mc;
 	p_int index_type = *SVALUE_FULLTYPE(map_index);
 	p_int index_u = map_index->u.number;
@@ -872,7 +870,7 @@ void remove_mapping(m, map_index)
 	i = i ^ i >> 16;
 	i = i ^ i >> 8;
 	i &= hm->mask;
-	for(mcp = &hm->chains[i]; mc = *mcp; ) {
+	for(mcp = &hm->chains[i]; (mc = *mcp); ) {
 	    if (mc->key.u.number == index_u &&
 		*SVALUE_FULLTYPE(&mc->key) == index_type)
 	    {
@@ -910,7 +908,7 @@ struct mapping *copy_mapping(m)
     char **str, **str2;
     struct svalue *svp, *svp2;
 
-    if (hm = m->hash) {
+    if ( (hm = m->hash) ) {
 	struct map_chain **mcp, **mcp2;
 	mp_int linksize;
 
@@ -979,7 +977,7 @@ struct mapping *copy_mapping(m)
     while ( (i -= sizeof *svp) >= 0)
 	assign_svalue_no_free(--svp2, --svp);
     m2 = (struct mapping *)xalloc(sizeof *m2);
-    if (m2->hash = hm2) {
+    if ( (m2->hash = hm2) ) {
 	last_dirty_mapping->hash->next_dirty = m2;
 	last_dirty_mapping = m2;
     }
@@ -1143,7 +1141,7 @@ struct mapping *add_mapping(m1, m2)
        *  sizeof *m3 + sizeof(char*) + size + sizeof(char*);
        */
 
-    if (hm = m1->hash) {
+    if ( (hm = m1->hash) ) {
 	struct map_chain **mcp;
 
 	size = hm->mask + 1;
@@ -1161,7 +1159,7 @@ struct mapping *add_mapping(m1, m2)
 	    }
 	} while (--size);
     }
-    if (hm = m2->hash) {
+    if ( (hm = m2->hash) ) {
 	struct map_chain **mcp;
 
 	size = hm->mask + 1;
@@ -1210,16 +1208,16 @@ void walk_mapping(m, func, extra)
 	if ( (--svp)->type != T_INVALID )
 	    (*func)(svp, data, extra);
     }
-    if (hm = m->hash) {
+    if ( (hm = m->hash) ) {
 	struct map_chain **mcp, *mc;
 
 	mcp = hm->chains;
 	size = hm->mask;
 	do {
-	    if (mc = *mcp++) {
+	    if ( (mc = *mcp++) ) {
 		do {
 		    (*func)(&mc->key, mc->data, extra);
-		} while (mc = mc->next);
+		} while ( (mc = mc->next) );
 	    }
 	} while (--size >= 0);
     }
@@ -1288,7 +1286,7 @@ struct svalue *walk_mapping_prologue(m, sp)
 
     i = m->condensed->string_size/sizeof(char *) +
         m->condensed->misc_size/sizeof(struct svalue);
-    if (hm = m->hash) {
+    if ( (hm = m->hash) ) {
 	i += hm->used - hm->condensed_deleted;
 	if (!m->num_values) {
 	    hm = 0;
@@ -1314,9 +1312,7 @@ struct svalue *f_walk_mapping(sp, num_arg)
     struct svalue *sp;
     int num_arg;
 {
-    extern struct svalue *inter_sp;
-
-    struct svalue *arg, *extra;
+    struct svalue *arg, *extra = NULL;
     int extra_num;
     struct mapping *m;
     struct object *ob;
@@ -1420,7 +1416,8 @@ static void add_to_mapping_filter(key, data, extra)
 }
 
 void sub_from_mapping_filter(key, data, extra)
-    struct svalue *key, *data;
+    struct svalue *key;
+    struct svalue *data UNUSED;
     char *extra;
 {
     remove_mapping((struct mapping *)extra, key);
@@ -1464,13 +1461,11 @@ struct svalue *filter_mapping (sp, num_arg)
     struct svalue *sp;
     int num_arg;
 {
-    extern struct svalue *inter_sp;
-
     struct svalue *arg;
     struct mapping *m;
     char *func;
     struct object *ob;
-    struct svalue *extra;
+    struct svalue *extra = NULL;
     int num_values;
     struct svalue *v;
     int extra_num;
@@ -1526,7 +1521,7 @@ struct svalue *filter_mapping (sp, num_arg)
 	    assign_svalue_no_free((inter_sp = sp + 1), read_pointer);
 	    push_svalue_block( extra_num, extra);
 	    v = apply( func, ob, 1 + extra_num);
-	    if (!v || v->type == T_NUMBER && !v->u.number)
+	    if (!v || (v->type == T_NUMBER && !v->u.number) )
 		continue;
 	} else {
 	    assign_svalue_no_free((inter_sp = sp + 1), read_pointer);
@@ -1559,13 +1554,11 @@ struct svalue *map_mapping (sp, num_arg)
     struct svalue *sp;
     int num_arg;
 {
-    extern struct svalue *inter_sp;
-
     struct svalue *arg;
     struct mapping *m;
     char *func;
     struct object *ob;
-    struct svalue *extra;
+    struct svalue *extra = NULL;
     struct vector *vec;
     int num_values;
     int extra_num;
@@ -1654,9 +1647,6 @@ struct svalue *map_mapping (sp, num_arg)
 void compact_mappings(num)
     mp_int num;
 {
-    extern struct svalue last_indexing_protector;
-    extern int malloc_privilege;
-
     struct mapping *m;
 
     malloc_privilege = MALLOC_SYSTEM;
@@ -1671,7 +1661,7 @@ void compact_mappings(num)
 	num = num_dirty_mappings;
 	last_dirty_mapping = &dirty_mapping_head;
     } else {
-	extra_jobs_to_do = 1;
+	extra_jobs_to_do = MY_TRUE;
     }
     num_dirty_mappings -= num;
     m = dirty_mapping_head_hash.next_dirty;
@@ -1707,8 +1697,6 @@ void compact_mappings(num)
 	    printf("compact_mappings(): remaining ref count %ld!\n", hm->ref);
 #ifdef TRACE_CODE
 	    {
-		extern int last_instructions PROT((int, int, struct svalue **));
-
 		last_instructions(TOTAL_TRACE_LENGTH, 1, 0);
 	    }
 #endif
@@ -1814,7 +1802,7 @@ void compact_mappings(num)
 	for (runlength = 2; runlength < string_used; runlength <<= 1) {
 	    struct map_chain *out_hook1, *out_hook2, **out1, **out2;
 
-	    count1 = string_used & runlength-1;
+	    count1 = string_used & (runlength-1);
 	    count2 = string_used & runlength;
 	    if (!count1) {
 		out2 = &out_hook1;
@@ -1887,7 +1875,7 @@ void compact_mappings(num)
 	for (runlength = 2; runlength < misc_used; runlength <<= 1) {
 	    struct map_chain *out_hook1, *out_hook2, **out1, **out2;
 
-	    count1 = misc_used & runlength-1;
+	    count1 = misc_used & (runlength-1);
 	    count2 = misc_used & runlength;
 	    if (!count1) {
 		out2 = &out_hook1;
@@ -2223,8 +2211,6 @@ void compact_mappings(num)
 }
 
 mp_int total_mapping_size() {
-    extern struct wiz_list *all_wiz;
-
     struct wiz_list *wl;
     mp_int total;
 
@@ -2268,7 +2254,7 @@ struct set_mapping_user_locals {
     struct svalue *hairy; /* changing keys */
 };
 
-void set_mapping_user_filter(key, data, extra)
+static void set_mapping_user_filter(key, data, extra)
     struct svalue *key, *data;
     char *extra;
 {
@@ -2336,8 +2322,6 @@ void set_mapping_user(m, owner)
 void count_ref_in_mapping(m)
     struct mapping *m;
 {
-    extern struct object *gc_obj_list_destructed;
-
     char **str;
     struct svalue *svp, *data;
     mp_int size;
@@ -2359,7 +2343,7 @@ void count_ref_in_mapping(m)
     size = m->condensed->misc_size;
     while ( (size -= sizeof(struct svalue)) >= 0) {
 	--svp;
-	if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED ||
+	if ( (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED) ||
 	    ( svp->type == T_CLOSURE &&
 	      ( CLOSURE_MALLOCED(svp->x.closure_type) ?
 		  ( svp->x.closure_type != CLOSURE_UNBOUND_LAMBDA &&

@@ -16,6 +16,7 @@
 #define TYPE_MOD_PUBLIC         0x08000000 /* Force inherit through private  */
 #define TYPE_MOD_VARARGS        0x04000000 /* Used for type checking         */
 #define TYPE_MOD_PROTECTED      0x01000000 /* cannot be called externally    */
+#define NAME_CROSS_DEFINED	0x00080000 /* function defined from other program */
 #define NAME_HIDDEN             0x00000800 /* Not visible for inheritance    */
 #define NAME_UNDEFINED          0x00000200 /* Not defined yet                */
 

@@ -40,10 +40,8 @@ struct input_to {
     struct svalue arg[1];
 };
 
-void remove_sent PROT((struct object *, struct object *)),
-    free_sentence PROT((struct sentence *)),
-    free_shadow_sent PROT((struct shadow_sentence *)),
-    free_input_to PROT((struct input_to *));
+extern void free_shadow_sent PROT((struct shadow_sentence *));
+extern void free_input_to PROT((struct input_to *));
 struct sentence *alloc_sentence PROT((void));
 
 

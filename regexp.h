@@ -1,3 +1,8 @@
+#ifndef _REGEXP_H_
+#define _REGEXP_H_
+
+#include "driver.h"
+
 /*
  * Definitions etc. for regexp(3) routines.
  *
@@ -5,7 +10,8 @@
  * not the System V one.
  */
 
-#define NSUBEXP  10
+#define NSUBEXP  50		/* Number of allowed () expressions */
+
 typedef struct regexp {
 	char *startp[NSUBEXP];
 	char *endp[NSUBEXP];
@@ -13,6 +19,8 @@ typedef struct regexp {
 	char reganch;		/* Internal use only. */
 	char *regmust;		/* Internal use only. */
 	int regmlen;		/* Internal use only. */
+	long regalloc;		/* Allocated total length, used by rxcache */
+        p_uint refs;            /* Number of refs, used+maintained by rxcache */
 	char program[1];	/* Unwarranted chumminess with compiler. */
 } regexp;
 
@@ -23,7 +31,9 @@ typedef struct regexp {
  */
 #define	MAGIC	0234
 
-extern regexp *regcomp();
-extern int regexec();
-extern char *regsub();
-extern void regerror();
+extern regexp *regcomp PROT((char *expr, int excompat));
+extern int regexec PROT((regexp *prog, char *string, char *start));
+extern char *regsub PROT((regexp *prog, char *source, char *dest, int n, int quiet));
+extern void regerror PROT((char *));  /* defined in ed.c! */
+
+#endif /* _REGEXP_H_ */

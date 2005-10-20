@@ -33,7 +33,7 @@
 
 #define ED_VERSION 5	/* used only in the "set" function, for i.d. */
 
-#include "config.h"
+#include "driver.h"
 
 #include <stdio.h>
 #include <sys/types.h>  /* need for netinet */
@@ -43,11 +43,19 @@
  * a pointer to the \0 after the destination string, and this program refers
  * to the "private" reganch field in the struct regexp.
  */
-#include "lint.h"
-#include "regexp.h"
-#include "interpret.h"
-#include "object.h"
+
+#define NO_INCREMENT_STRING_REF
+#include "ed.h"
+#include "closure.h"
 #include "comm.h"
+#include "gcollect.h"
+#include "interpret.h"
+#include "main.h"
+#include "object.h"
+#include "regexp.h"
+#include "rxcache.h"
+#include "simulate.h"
+#include "stralloc.h"
 
 /*
  *	#defines for non-printing ASCII characters
@@ -104,7 +112,7 @@
 #define TRUE	1
 #define FALSE	0
 #define ERR		-2
-#undef  FATAL		(ERR-1)
+#undef  FATAL		/* (ERR-1) */
 #define CHANGED		(ERR-2)
 #define SET_FAIL	(ERR-3)
 #define SUB_FAIL	(ERR-4)
@@ -130,12 +138,6 @@ struct	line {
 	char		l_buff[1];
 };
 typedef struct line	LINE;
-
-extern struct object *command_giver;
-
-#ifndef toupper
-extern int toupper PROT((int));
-#endif
 
 static int doprnt PROT((int, int));
 static int ins PROT((char *));
@@ -258,9 +260,6 @@ static struct tbl {
 /*-------------------------------------------------------------------------*/
 
 static  LINE	*getptr();
-extern	char	*gettxt();
-extern	char	*gettxtl();
-extern	char	*catsub();
 static  void	prntln(), putcntl();
 static regexp	*optpat();
 
@@ -360,7 +359,7 @@ void prompt_from_ed_buffer(ip)
 {
     struct ed_buffer *ed_buffer;
 
-    if (ed_buffer = ip->sent.ed_buffer) {
+    if ( (ed_buffer = ip->sent.ed_buffer) ) {
 	transfer_svalue(&ip->prompt, &ed_buffer->old_prompt);
 	ed_buffer->old_prompt.type = T_INVALID;
     }
@@ -371,7 +370,7 @@ void prompt_to_ed_buffer(ip)
 {
     struct ed_buffer *ed_buffer;
 
-    if (ed_buffer = ip->sent.ed_buffer) {
+    if ( (ed_buffer = ip->sent.ed_buffer) ) {
 	transfer_svalue(&ed_buffer->old_prompt, &ip->prompt);
 	ip->prompt.type = T_STRING;
 	ip->prompt.x.string_type = STRING_CONSTANT;
@@ -814,8 +813,6 @@ static
 char *getfn(writeflg)
 int writeflg;
 {
-    extern int out_of_memory;
-
     static char	file[MAXFNAME];
     char	*cp;
     char *file2;
@@ -841,7 +838,7 @@ int writeflg;
     }
     if (file[0] != '/') {
 	push_string_malloced(file);
-	ret = apply_master_ob("make_path_absolute", 1);
+	ret = apply_master_ob(STR_ABS_PATH, 1);
 	if (!ret || (ret->type == T_NUMBER && ret->u.number == 0)) {
 	    if (out_of_memory)
 		error("Out of memory\n");
@@ -1265,8 +1262,8 @@ regexp *optpat()
 	if(*str == EOS)
 		return(P_OLDPAT);
 	if(P_OLDPAT)
-		xfree((char *)P_OLDPAT);
-	return P_OLDPAT = regcomp(str,P_EXCOMPAT);
+		REGFREE(P_OLDPAT);
+	return P_OLDPAT = REGCOMP(str,P_EXCOMPAT);
 }
 
 /* regerror.c */
@@ -1315,7 +1312,7 @@ int set()
 	word[i] = EOS;
 	for(t = tbl; t->t_str; t++) {
 		if(strcmp(word,t->t_str) == 0) {
-			P_FLAGS = P_FLAGS & t->t_and_mask | t->t_or_mask;
+			P_FLAGS = (P_FLAGS & t->t_and_mask) | t->t_or_mask;
 			return(0);
 		}
 	}
@@ -1323,13 +1320,13 @@ int set()
 		struct svalue *ret;
 		push_object(command_giver);
 		push_number( P_SHIFTWIDTH | P_FLAGS );
-		ret = apply_master_ob("save_ed_setup",2);
+		ret = apply_master_ob(STR_SAVE_ED,2);
 		if ( ret && ret->type==T_NUMBER && ret->u.number > 0 )
 			return 0;
 	}
 	if ( !strcmp(word,"shiftwidth") ) {
 		Skip_White_Space;
-		if ( isdigit(*inptr) ) {
+		if ( isdigit((unsigned char)*inptr) ) {
 			P_SHIFTWIDTH = *inptr-'0';
 			return 0;
 		}
@@ -1338,7 +1335,7 @@ int set()
 }
 
 #ifndef relink
-void relink(a, x, y, b)
+static void relink(a, x, y, b)
 LINE	*a, *x, *y, *b;
 {
 	x->l_prev = a;
@@ -1548,7 +1545,7 @@ char *buf;
     /* process status vars */
     if (quote != '\0') {
 	shi = 0;	/* in case a comment starts on this line */
-    } else if (in_ppcontrol || *p == '#' && p[1] != '\'') {
+    } else if (in_ppcontrol || (*p == '#' && p[1] != '\'') ) {
 	while (*p != '\0') {
 	    if (*p == '\\' && *++p == '\0') {
 		in_ppcontrol = TRUE;
@@ -1731,8 +1728,6 @@ char *buf;
 		    if (isalunum(*p)) {
 			do ++p; while (isalunum(*p));
 		    } else {
-			extern int symbol_operator PROT((char *, char **));
-
 			char *end;
 
 			if (symbol_operator(p, &end) < 0) {
@@ -1744,14 +1739,14 @@ char *buf;
 		    break;
 		}
 	    default:
-		if (isalpha(*--p) || *p == '_') {
+		if (isalpha((unsigned char)*--p) || *p == '_') {
 		    register char *q;
 
 		    /* Identifier. See if it's a keyword. */
 		    q = ident;
 		    do {
 			*q++ = *p++;
-		    } while (isalnum(*p) || *p == '_');
+		    } while (isalnum((unsigned char)*p) || *p == '_');
 		    *q = '\0';
 
 		    if      (strcmp(ident, "if"   ) == 0)	token = IF;
@@ -2281,7 +2276,6 @@ void ed_start(file_arg, exit_fn, exit_ob)
 	char *exit_fn;
 	struct object *exit_ob;
 {
-	extern void push_apply_value(), pop_apply_value();
 	char *new_path;
 	struct svalue *setup, *prompt;
 	struct ed_buffer *old_ed_buffer;
@@ -2333,7 +2327,7 @@ void ed_start(file_arg, exit_fn, exit_ob)
 	set_ed_buf();
 	push_apply_value();
 	push_object(command_giver);
-	setup = apply_master_ob("retrieve_ed_setup",1);
+	setup = apply_master_ob(STR_RETR_ED,1);
 	if ( setup && setup->type==T_NUMBER && setup->u.number ) {
 		ED_BUFFER->flags      = setup->u.number & ALL_FLAGS_MASK;
 		ED_BUFFER->shiftwidth = setup->u.number & SHIFTWIDTH_MASK;
@@ -2366,7 +2360,7 @@ void clear_ed_buffer_refs(b)
     struct object *ob;
 
     if (b->exit_fn) {
-	if (ob = b->exit_ob) {
+	if ( (ob = b->exit_ob) ) {
 	    if (ob->flags & O_DESTRUCTED) {
 		reference_destructed_object(ob);
 		b->exit_ob = 0;
@@ -2375,6 +2369,11 @@ void clear_ed_buffer_refs(b)
 	    }
 	}
     }
+
+    /* For rxcache */
+    if (b->oldpat)
+        b->oldpat->refs = 0;
+
     clear_ref_in_vector(&b->old_prompt, 1);
 }
 
@@ -2393,7 +2392,7 @@ void count_ed_buffer_refs(b)
     }
     if (b->exit_fn) {
 	note_malloced_block_ref(b->exit_fn);
-	if (ob = b->exit_ob) {
+	if ( (ob = b->exit_ob) ) {
 	    if (ob->flags & O_DESTRUCTED) {
 		reference_destructed_object(ob);
 		b->exit_ob = 0;
@@ -2402,8 +2401,13 @@ void count_ed_buffer_refs(b)
 	    }
 	}
     }
+#ifdef RXCACHE_TABLE
     if (b->oldpat)
-	note_malloced_block_ref((char *)b->oldpat);
+        count_rxcache_ref(b->oldpat);
+#else
+    if (b->oldpat)
+        note_malloced_block_ref(b->oldpat);
+#endif
     count_ref_in_vector(&b->old_prompt, 1);
 }
 #endif /* MALLOC_smalloc */
@@ -2414,7 +2418,7 @@ void count_ed_buffer_extra_refs(b)
 {
     struct object *ob;
 
-    if (ob = b->exit_ob)
+    if ( (ob = b->exit_ob) )
 	ob->extra_ref++;
 }
 #endif
@@ -2439,7 +2443,10 @@ void free_ed_buffer() {
 	free_svalue(&ED_BUFFER->old_prompt);
     }
     if(P_OLDPAT)
-	xfree((char *)P_OLDPAT);
+    {
+	REGFREE(P_OLDPAT);
+        P_OLDPAT=NULL;
+    }
     xfree((char *)ED_BUFFER);
     EXTERN_ED_BUFFER = 0;
     if (name) {
@@ -2547,7 +2554,7 @@ void save_ed_buffer()
 
     ED_BUFFER = EXTERN_ED_BUFFER;
     push_string_shared(P_FNAME);
-    stmp = apply_master_ob("get_ed_buffer_save_file_name",1);
+    stmp = apply_master_ob(STR_GET_ED_FNAME,1);
     if (save->sent.type == SENT_INTERACTIVE) {
 	save->catch_tell_activ = 0;
 	command_giver = save->ob;
@@ -2573,7 +2580,7 @@ struct svalue *f_query_editing(sp)
     ob = sp->u.ob;
     decr_object_ref(ob, "query_editing");
     if (ob->flags & O_SHADOW && (sent = O_GET_SHADOW(ob)) && sent->ed_buffer) {
-	if (ob = sent->ed_buffer->exit_ob) {
+	if ( (ob = sent->ed_buffer->exit_ob) ) {
 	    sp->u.ob = ob;
 	    add_ref(ob, "query_editing");
 	    return sp;

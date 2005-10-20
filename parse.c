@@ -9,25 +9,27 @@
 
 */
 
+#include "driver.h"
+
 #include <stdio.h>
 #include <ctype.h>
 #include <time.h>
-#include "lint.h"
+
+#define NO_INCREMENT_STRING_REF
+#include "parse.h"
+
+#include "array.h"
+#include "closure.h"
 #include "interpret.h"
-#include "config.h"
-#include "object.h"
-#include "wiz_list.h"
 #include "instrs.h"
-
-extern char *string_copy PROT((char *));
-extern int d_flag; /* for debugging purposes */
-extern struct object *previous_ob;
-
-#ifndef tolower			/* On some systems this is a function */
-extern int tolower PROT((int));
-#endif
+#include "main.h"
+#include "object.h"
+#include "simulate.h"
+#include "stralloc.h"
+#include "wiz_list.h"
 
 #if defined(SUPPLY_PARSE_COMMAND)
+
 
 struct svalue find_living_closures[2] = { { T_INVALID }, { T_INVALID } };
 
@@ -35,10 +37,6 @@ struct object *find_living_object (name, player)
     char *name;
     int player;
 {
-    extern void symbol_efun PROT((struct svalue *));
-
-    extern struct svalue *inter_sp;
-
     static char *function_names[2] = { "find_living", "find_player"};
 
     struct svalue *sp, *svp;
@@ -333,6 +331,23 @@ static struct vector	*gAdjid_list_d	= 0;  /* From master */
 static struct vector	*gPrepos_list	= 0;  /* From master */
 static char 		*gAllword       = 0;  /* From master */
 
+/* Forward function declarations */
+static char *parse_one_plural PROT((char *str));
+static char *parse_to_plural PROT((char *str));
+static int check_adjectiv PROT((int obix, struct vector *wvec, int from, int to));
+static int member_string PROT((char *str, struct vector *svec));
+static int find_string PROT((char *str, struct vector *wvec, int *cix_in));
+static int match_object PROT((int  obix, struct vector *wvec, int *cix_in, int *plur));
+static struct svalue *prepos_parse PROT((struct vector *wvec, int *cix_in, int *fail, struct svalue *prepos));
+static struct svalue *one_parse PROT((struct vector *obvec, char *pat, struct vector *wvec, int *cix_in, int *fail, struct svalue*prep_param));
+static struct svalue *number_parse PROT((struct vector *obvec, struct vector *wvec, int *cix_in, int *fail));
+static struct svalue *item_parse PROT((struct vector *obvec, struct vector *wvec, int *cix_in, int *fail));
+static struct svalue *living_parse PROT((struct vector *obvec, struct vector *wvec, int *cix_in, int *fail));
+static struct svalue *single_parse PROT((struct vector *obvec, struct vector *wvec, int *cix_in, int *fail));
+static struct svalue *sub_parse PROT((struct vector *obvec, struct vector *patvec, int *pix_in, struct vector *wvec, int *cix_in, int *fail, struct svalue *sp));
+static struct svalue *slice_words PROT((struct vector *wvec, int from, int to));
+static void stack_put PROT((struct svalue *pval, struct svalue *sp, int pos, int max));
+
 /*
  * Function name: 	load_lpc_info
  * Description:		Loads relevant information from a given object.
@@ -343,7 +358,7 @@ static char 		*gAllword       = 0;  /* From master */
  * Arguments:		ix: Index in the array
  *			ob: The object to call for information.
  */
-void load_lpc_info(ix, ob)
+static void load_lpc_info(ix, ob)
     int	ix;
     struct object *ob;
 {
@@ -351,14 +366,13 @@ void load_lpc_info(ix, ob)
     struct svalue sval, *ret;
     int il, make_plural = 0;
     char *str;
-    char *parse_to_plural();
 
     /* Amylaar: any apply() can result in a self-destruct. */
     if (!ob|| ob->flags & O_DESTRUCTED)
 	return;
 
     if (gPluid_list && 
-	VEC_SIZE(gPluid_list) > ix && 
+	VEC_SIZE(gPluid_list) > (size_t)ix && 
 	gPluid_list->item[ix].type == T_NUMBER &&
 	gPluid_list->item[ix].u.number == 0)
     {
@@ -373,7 +387,7 @@ void load_lpc_info(ix, ob)
     }
 
     if (gId_list && 
-	VEC_SIZE(gId_list) > ix && 
+	VEC_SIZE(gId_list) > (size_t)ix && 
 	gId_list->item[ix].type == T_NUMBER &&
 	gId_list->item[ix].u.number == 0 &&
 	!(ob->flags & O_DESTRUCTED) )
@@ -386,7 +400,7 @@ void load_lpc_info(ix, ob)
 	    {
 		tmp = allocate_array(VEC_SIZE(ret->u.vec));
 		sing = ret->u.vec;
-		for (il = 0; il < VEC_SIZE(tmp); il++)
+		for (il = 0; (size_t)il < VEC_SIZE(tmp); il++)
 		{
 		    if (sing->item[il].type == T_STRING)
 		    {
@@ -409,7 +423,7 @@ void load_lpc_info(ix, ob)
     }
 
     if (gAdjid_list && 
-	VEC_SIZE(gAdjid_list) > ix && 	
+	VEC_SIZE(gAdjid_list) > (size_t)ix && 	
 	gAdjid_list->item[ix].type == T_NUMBER &&
 	gAdjid_list->item[ix].u.number == 0 &&
 	!(ob->flags & O_DESTRUCTED) )
@@ -443,8 +457,8 @@ struct parse_context {
 
 static struct parse_context *gPrevious_context;
 
-void parse_error_handler(arg)
-    struct svalue *arg;
+static void parse_error_handler(arg)
+    struct svalue *arg UNUSED;
 {
     struct parse_context *old;
 
@@ -526,18 +540,12 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
     struct svalue 	*stack_args;	/* Pointer to lvalue args on stack */
     int 		num_arg;	/* Number of args on stack */
 {
-    extern struct svalue *inter_sp;
-
     static struct svalue error_handler_addr = { T_ERROR_HANDLER };
 
-    struct vector	*obvec, *patvec, *wvec;
+    struct vector	*obvec = NULL, *patvec, *wvec;
     struct parse_context *old;
     int			pix, cix, six, fail, fword, ocix, fpix;
     struct svalue	*pval;
-    void		check_for_destr();    /* In interpret.c */
-    struct svalue	*sub_parse();
-    struct svalue	*slice_words();
-    void		stack_put();
 
     /*
      * Pattern and commands can not be empty
@@ -647,13 +655,13 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
 
     /* Loop through the pattern. Handle %s but not '/'
     */
-    for (six=0,cix=0,fail=0,pix=0; pix < VEC_SIZE(patvec); pix++)
+    for (six=0,cix=0,fail=0,pix=0; (size_t)pix < VEC_SIZE(patvec); pix++)
     {
 	pval = 0; 
 	fail = 0; 
 
 	if (EQ(patvec->item[pix].u.string,"%s")) {
-	    if (pix == (VEC_SIZE(patvec)-1))
+	    if ((size_t)pix == (VEC_SIZE(patvec)-1))
 	    {
 		pval = slice_words(wvec,cix,VEC_SIZE(wvec)-1);
 		cix = VEC_SIZE(wvec);
@@ -668,7 +676,7 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
 			cix = ++ocix;
 			pix = fpix;
 		    }
-		} while ((fail) && (cix<VEC_SIZE(wvec)));
+		} while ((fail) && ((size_t)cix < VEC_SIZE(wvec)));
 
 		if (!fail) {
 		    stack_put(pval,stack_args,six+1,num_arg);
@@ -693,7 +701,7 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
     
     /* Also fail when there is words left to parse and pattern exhausted
     */
-    if (cix < VEC_SIZE(wvec))
+    if ((size_t)cix < VEC_SIZE(wvec))
 	fail = 1;
 
     pop_stack();
@@ -709,7 +717,7 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
  *			pos: Position on stack to put value
  *			max: The number of args on the stack
  */
-void stack_put(pval, sp, pos, max)
+static void stack_put(pval, sp, pos, max)
     struct svalue	*pval;
     struct svalue	*sp;
     int			pos, max;
@@ -729,7 +737,7 @@ void stack_put(pval, sp, pos, max)
  *			to:   Last word to use
  * Returns:		A pointer to a static svalue now containing string.
  */
-struct svalue *slice_words(wvec, from, to)
+static struct svalue *slice_words(wvec, from, to)
     struct vector	*wvec;
     int			from, to;
 {
@@ -766,7 +774,7 @@ struct svalue *slice_words(wvec, from, to)
  *			updates pointers in pattern and word vectors. It
  *			handles alternate patterns but not "%s"
  */
-struct svalue *sub_parse(obvec, patvec, pix_in, wvec, cix_in, fail, sp)
+static struct svalue *sub_parse(obvec, patvec, pix_in, wvec, cix_in, fail, sp)
     struct vector	*obvec;
     struct vector	*patvec;
     int			*pix_in;
@@ -777,9 +785,8 @@ struct svalue *sub_parse(obvec, patvec, pix_in, wvec, cix_in, fail, sp)
 {
     int		cix, pix, subfail;
     struct svalue	*pval;
-    struct svalue	*one_parse();
 
-    if (*cix_in == VEC_SIZE(wvec)) {
+    if (*cix_in == (int)VEC_SIZE(wvec)) {
 	*fail = 1;
 	return 0;
     }
@@ -794,13 +801,13 @@ struct svalue *sub_parse(obvec, patvec, pix_in, wvec, cix_in, fail, sp)
 	pix++;
 	cix = *cix_in;
 
-	while ((pix < VEC_SIZE(patvec)) && (EQ(patvec->item[pix].u.string,"/")))
+	while (((size_t)pix < VEC_SIZE(patvec)) && (EQ(patvec->item[pix].u.string,"/")))
 	{
 	    subfail = 0;
 	    pix++;
 	}
 
-	if ((!subfail) && (pix<VEC_SIZE(patvec)))
+	if ((!subfail) && ((size_t)pix < VEC_SIZE(patvec)))
 	    pval = one_parse(obvec, patvec->item[pix].u.string, wvec, &cix, 
 			     &subfail, sp);
 	else
@@ -812,13 +819,13 @@ struct svalue *sub_parse(obvec, patvec, pix_in, wvec, cix_in, fail, sp)
 
     /* If there is alternatives skip them
     */
-    if ((pix+1 < VEC_SIZE(patvec)) && (EQ(patvec->item[pix+1].u.string,"/"))) {
-	while ((pix+1 <VEC_SIZE(patvec)) &&
+    if (((size_t)pix+1 < VEC_SIZE(patvec)) && (EQ(patvec->item[pix+1].u.string,"/"))) {
+	while (((size_t)pix+1 < VEC_SIZE(patvec)) &&
 	       (EQ(patvec->item[pix+1].u.string,"/"))) {
 	       pix += 2;
 	}
 	pix++; /* Skip last alternate after last '/' */
-	if (pix>=VEC_SIZE(patvec))
+	if ((size_t)pix >= VEC_SIZE(patvec))
 	    pix = VEC_SIZE(patvec)-1;
     }
 
@@ -841,7 +848,7 @@ struct svalue *sub_parse(obvec, patvec, pix_in, wvec, cix_in, fail, sp)
  *			prep_param: Only used on %p (see prepos_parse)
  * Returns:		svalue holding result of parse.
  */
-struct svalue *one_parse(obvec, pat, wvec, cix_in, fail, prep_param)
+static struct svalue *one_parse(obvec, pat, wvec, cix_in, fail, prep_param)
     struct vector	*obvec;
     char		*pat;
     struct vector	*wvec;
@@ -853,20 +860,15 @@ struct svalue *one_parse(obvec, pat, wvec, cix_in, fail, prep_param)
     struct svalue	*pval;
     static struct svalue stmp;
     char		*str1, *str2;
-    struct svalue	*item_parse();
-    struct svalue	*living_parse();
-    struct svalue	*single_parse();
-    struct svalue	*prepos_parse();
-    struct svalue	*number_parse();
 
-    if (*cix_in == VEC_SIZE(wvec)) {
+    if (*cix_in == (int)VEC_SIZE(wvec)) {
 	*fail = 1;
 	return 0;
     }
 
     ch=pat[0]; 
     if (ch=='%') {
-	ch=((isupper(pat[1]))?tolower(pat[1]):pat[1]);
+	ch=((isupper((unsigned char)pat[1]))?tolower(pat[1]):pat[1]);
     }
 
     pval = 0;
@@ -970,8 +972,8 @@ struct svalue *one_parse(obvec, pat, wvec, cix_in, fail, prep_param)
  *			fail: Fail flag if parse did not match
  * Returns:		svalue holding result of parse.
  */
-struct svalue *number_parse(obvec, wvec, cix_in, fail)
-    struct vector 	*obvec;
+static struct svalue *number_parse(obvec, wvec, cix_in, fail)
+    struct vector 	*obvec UNUSED;
     struct vector 	*wvec;
     int			*cix_in;
     int			*fail;
@@ -1044,7 +1046,7 @@ struct svalue *number_parse(obvec, wvec, cix_in, fail)
  *			fail: Fail flag if parse did not match
  * Returns:		svalue holding result of parse.
  */
-struct svalue *item_parse(obvec, wvec, cix_in, fail)
+static struct svalue *item_parse(obvec, wvec, cix_in, fail)
     struct vector 	*obvec;
     struct vector 	*wvec;
     int			*cix_in;
@@ -1054,11 +1056,10 @@ struct svalue *item_parse(obvec, wvec, cix_in, fail)
     struct svalue	*pval;
     static struct svalue stmp;
     int			cix, tix, obix, plur_flag, max_cix, match_all;
-    int			match_object();
 
 
     tmp = allocate_array(VEC_SIZE(obvec) + 1);
-    if (pval = number_parse(obvec, wvec, cix_in, fail))
+    if ( (pval = number_parse(obvec, wvec, cix_in, fail)) )
 	assign_svalue_no_free(&tmp->item[0],pval);
 
     if ((pval) && (pval->u.number>1))
@@ -1077,11 +1078,11 @@ struct svalue *item_parse(obvec, wvec, cix_in, fail)
 	match_all = 0;
     }
 
-    for (max_cix = *cix_in, tix=1, obix=0; obix < VEC_SIZE(obvec); obix++) {
+    for (max_cix = *cix_in, tix=1, obix=0; (size_t)obix < VEC_SIZE(obvec); obix++) {
 	*fail = 0; cix = *cix_in;
 	if (obvec->item[obix].type != T_OBJECT)
 	    continue;
-	if (cix == VEC_SIZE(wvec) && match_all)
+	if (cix == (int)VEC_SIZE(wvec) && match_all)
 	{
 	    assign_svalue_no_free(&tmp->item[tix++],&obvec->item[obix]);
 	    continue;
@@ -1103,7 +1104,7 @@ struct svalue *item_parse(obvec, wvec, cix_in, fail)
     }
     else
     {
-	if (*cix_in < VEC_SIZE(wvec))
+	if ((size_t)*cix_in < VEC_SIZE(wvec))
 	    *cix_in = max_cix + 1;
 	ret = slice_array(tmp,0,tix-1);
 	if (!pval) {
@@ -1139,7 +1140,7 @@ struct svalue *item_parse(obvec, wvec, cix_in, fail)
  *			fail: Fail flag if parse did not match
  * Returns:		svalue holding result of parse.
  */
-struct svalue *living_parse(obvec, wvec, cix_in, fail)
+static struct svalue *living_parse(obvec, wvec, cix_in, fail)
     struct vector 	*obvec;
     struct vector 	*wvec;
     int			*cix_in;
@@ -1153,7 +1154,7 @@ struct svalue *living_parse(obvec, wvec, cix_in, fail)
 
     live = allocate_array(VEC_SIZE(obvec)); tix = 0; *fail = 0;
 
-    for (obix=0;obix<VEC_SIZE(obvec);obix++)  {
+    for (obix=0; (size_t)obix < VEC_SIZE(obvec);obix++)  {
 	if (obvec->item[obix].type != T_OBJECT)
 	    continue;
 	if (obvec->item[obix].u.ob->flags & O_ENABLE_COMMANDS)
@@ -1197,21 +1198,20 @@ struct svalue *living_parse(obvec, wvec, cix_in, fail)
  *			fail: Fail flag if parse did not match
  * Returns:		svalue holding result of parse.
  */
-struct svalue *single_parse(obvec, wvec, cix_in, fail)
+static struct svalue *single_parse(obvec, wvec, cix_in, fail)
     struct vector 	*obvec;
     struct vector 	*wvec;
     int			*cix_in;
     int			*fail;
 {
     int			cix, obix, plur_flag;
-    int			match_object();
     struct svalue *osvp;
 
     plur_flag = 0; /* Amylaar: I don't know if it's the right value,
 		    * but it is at least better than no initialization.
 		    */
     osvp = obvec->item;
-    for (obix=0;obix<VEC_SIZE(obvec);obix++,osvp++)
+    for (obix=0; (size_t)obix < VEC_SIZE(obvec);obix++,osvp++)
     {
 	if (osvp->type != T_OBJECT) continue;
 	*fail = 0; cix = *cix_in;
@@ -1244,7 +1244,7 @@ struct svalue *single_parse(obvec, wvec, cix_in, fail)
  *			fail: Fail flag if parse did not match
  * Returns:		svalue holding result of parse.
  */
-struct svalue *prepos_parse(wvec, cix_in, fail, prepos)
+static struct svalue *prepos_parse(wvec, cix_in, fail, prepos)
     struct vector 	*wvec;
     int			*cix_in;
     int			*fail;
@@ -1264,7 +1264,7 @@ struct svalue *prepos_parse(wvec, cix_in, fail, prepos)
       pvec = prepos->u.vec;
   }
 
-  for (pix = 0; pix < VEC_SIZE(pvec); pix++)
+  for (pix = 0; (size_t)pix < VEC_SIZE(pvec); pix++)
   {
       if (pvec->item[pix].type != T_STRING)
 	  continue;
@@ -1280,13 +1280,13 @@ struct svalue *prepos_parse(wvec, cix_in, fail, prepos)
       }
       else {
 	  tvec = explode_string(tmp, " ");
-	  for (tix=0;tix<VEC_SIZE(tvec);tix++)
+	  for (tix=0; (size_t)tix < VEC_SIZE(tvec);tix++)
 	  {
-	      if ((*cix_in+tix >= VEC_SIZE(wvec)) ||
+	      if (((size_t)*cix_in+tix >= VEC_SIZE(wvec)) ||
 		  (!EQ(wvec->item[*cix_in+tix].u.string,tvec->item[tix].u.string)))
 		  break;
 	  }
-	  if (tix = (tix == VEC_SIZE(tvec))?1:0)
+	  if ( (tix = (tix == (int)VEC_SIZE(tvec))?1:0) )
 	      (*cix_in)+=VEC_SIZE(tvec);
 	  free_vector(tvec);
 	  if (tix)
@@ -1294,7 +1294,7 @@ struct svalue *prepos_parse(wvec, cix_in, fail, prepos)
       }
   }
 
-  if (pix == VEC_SIZE(pvec))
+  if (pix == (int)VEC_SIZE(pvec))
   {
       *fail = 1;
   }
@@ -1333,7 +1333,7 @@ struct svalue *prepos_parse(wvec, cix_in, fail, prepos)
  *                            MUST be initialized by caller!
  * Returns:		True if object matches.
  */
-int match_object(obix, wvec, cix_in, plur)
+static int match_object(obix, wvec, cix_in, plur)
     int		 	obix;
     struct vector 	*wvec;
     int			*cix_in;
@@ -1342,8 +1342,6 @@ int match_object(obix, wvec, cix_in, plur)
     struct vector	*ids;
     int 		il, pos, cplur, old_cix;
     char		*str;
-    int			find_string();
-    int			check_adjectiv();
 
     for (cplur = (*plur * 2); cplur<4; cplur++)
     {
@@ -1357,7 +1355,7 @@ int match_object(obix, wvec, cix_in, plur)
 
 	case 1:
 	    if (!gId_list || 
-		VEC_SIZE(gId_list) <= obix || 
+		VEC_SIZE(gId_list) <= (size_t)obix || 
 		gId_list->item[obix].type != T_POINTER)
 		continue;
 	    ids = gId_list->item[obix].u.vec;
@@ -1371,7 +1369,7 @@ int match_object(obix, wvec, cix_in, plur)
 
 	case 3:
 	    if (!gPluid_list || 
-		VEC_SIZE(gPluid_list) <= obix || 
+		VEC_SIZE(gPluid_list) <= (size_t)obix || 
 		gPluid_list->item[obix].type != T_POINTER)
 		continue;
 	    ids = gPluid_list->item[obix].u.vec;
@@ -1385,7 +1383,7 @@ int match_object(obix, wvec, cix_in, plur)
 	if (!ids)
 	    fatal("match_object(): internal error\n");
 
-	for (il = 0; il < VEC_SIZE(ids); il++)
+	for (il = 0; (size_t)il < VEC_SIZE(ids); il++)
 	{
 	    if (ids->item[il].type == T_STRING)
 	    {
@@ -1423,7 +1421,7 @@ int match_object(obix, wvec, cix_in, plur)
  *			cix_in: Startpos in word array
  * Returns:		Pos in array if string found or -1
  */
-int find_string(str, wvec, cix_in)
+static int find_string(str, wvec, cix_in)
     char		*str;
     struct vector	*wvec;
     int			*cix_in;
@@ -1432,7 +1430,7 @@ int find_string(str, wvec, cix_in)
     char *p1, *p2;
     struct vector *split;
 
-    for (; *cix_in < VEC_SIZE(wvec); (*cix_in)++)
+    for (; (size_t)*cix_in < VEC_SIZE(wvec); (*cix_in)++)
     {
 	p1 = wvec->item[*cix_in].u.string;
 	if (p1[0] != str[0])
@@ -1446,7 +1444,7 @@ int find_string(str, wvec, cix_in)
 
 	/* If str was multi word we need to make som special checks
         */
-	if (*cix_in == (VEC_SIZE(wvec) -1))
+	if (*cix_in == ((int)VEC_SIZE(wvec) -1))
 	    continue;
 
 	split = explode_string(str," ");
@@ -1463,13 +1461,13 @@ int find_string(str, wvec, cix_in)
 	}
 	
 	fpos = *cix_in;
-	for (; (*cix_in-fpos) < VEC_SIZE(split); (*cix_in)++)
+	for (; (size_t)(*cix_in-fpos) < VEC_SIZE(split); (*cix_in)++)
 	{
 	    if (strcmp(split->item[*cix_in-fpos].u.string, 
 		       wvec->item[*cix_in].u.string))
 		break;
 	}
-	if ((*cix_in - fpos) == VEC_SIZE(split))
+	if ((size_t)(*cix_in - fpos) == VEC_SIZE(split))
 	    return fpos;
 
 	*cix_in = fpos;
@@ -1488,7 +1486,7 @@ int find_string(str, wvec, cix_in)
  *			to:   last cmdword to test
  * Returns:		True if a match is made.
  */
-int check_adjectiv(obix, wvec, from, to)
+static int check_adjectiv(obix, wvec, from, to)
     int			obix;
     struct vector	*wvec;
     int			from;
@@ -1497,7 +1495,6 @@ int check_adjectiv(obix, wvec, from, to)
     int il, back, sum, fail;
     char *adstr;
     struct vector *ids;
-    int member_string();
 
     if (gAdjid_list->item[obix].type == T_POINTER)
 	ids = gAdjid_list->item[obix].u.vec;
@@ -1557,7 +1554,7 @@ int check_adjectiv(obix, wvec, from, to)
  *			svec: vector of strings
  * Returns:		Pos if found else -1.
  */
-int member_string(str, svec)
+static int member_string(str, svec)
     char		*str;
     struct vector	*svec;
 {
@@ -1566,7 +1563,7 @@ int member_string(str, svec)
     if (!svec)
 	return -1;
 
-    for (il = 0; il < VEC_SIZE(svec); il++)
+    for (il = 0; (size_t)il < VEC_SIZE(svec); il++)
     {
 	if (svec->item[il].type != T_STRING)
 	    continue;
@@ -1585,23 +1582,22 @@ int member_string(str, svec)
  * Arguments:		str: The sentence to change
  * Returns:		Sentence in plural form.
  */
-char *parse_to_plural(str)
+static char *parse_to_plural(str)
     char *str;
 {
     struct vector	*words;
     struct svalue	stmp;
     char *sp;
     int il, changed;
-    char		*parse_one_plural();
 
     if (!(strchr(str,' ')))
 	return parse_one_plural(str);
 
     words = explode_string(str, " ");
     
-    for (changed = 0, il = 1; il < VEC_SIZE(words); il++) {
+    for (changed = 0, il = 1; (size_t)il < VEC_SIZE(words); il++) {
 	if ((EQ(words->item[il].u.string,"of")) ||
-	    (il+1 == VEC_SIZE(words)))  {
+	    (il+1 == (int)VEC_SIZE(words)))  {
 	    sp = parse_one_plural(words->item[il-1].u.string);
 	    if (sp != words->item[il-1].u.string) {
 		stmp.type = T_STRING;
@@ -1629,7 +1625,7 @@ char *parse_to_plural(str)
  * Arguments:		str: The sentence to change
  * Returns:		Word in plural form.
  */
-char *parse_one_plural(str)
+static char *parse_one_plural(str)
     char	*str;
 {
     char 	ch, ch2;
@@ -1696,6 +1692,8 @@ char *describe_items (arr, func, live)
 #endif
 
 #ifdef F_PROCESS_STRING
+static char *process_part PROT((char *str));
+
 /* process_string
  *
  * Description:   Checks a string for the below occurences and replaces:
@@ -1720,13 +1718,10 @@ char *
 process_string(str)
     char *str;
 {
-    extern struct svalue *inter_sp;
-
     struct vector *vec;
     struct object *old_cur = current_object;
     int pr_start, il, changed, ch_last;
     char *p0, *p1, *p2, *p3, *buf;
-    char *process_part();
     struct wiz_list *old_eff_user;
 
     if ((!str) || (!(p1=strchr(str,'@'))))
@@ -1745,7 +1740,7 @@ process_string(str)
 	struct svalue *ret;
 
 	current_object = command_giver;
-	ret = apply_master_ob("get_bb_uid",0);
+	ret = apply_master_ob(STR_GET_BB_UID,0);
 	if (!ret || ret->type != T_STRING)
 	    return str;
 	if (current_object->eff_user)
@@ -1763,7 +1758,7 @@ process_string(str)
 
     pr_start = ((str[0]=='@') && (str[1]=='@'))?0:1;
 
-    for (ch_last = 0, changed = 0, il = pr_start; il < VEC_SIZE(vec); il++) {
+    for (ch_last = 0, changed = 0, il = pr_start; (size_t)il < VEC_SIZE(vec); il++) {
 	p0 = vec->item[il].u.string;
 	p1 = strchr(p0, ' ');
 	if (!p1) {
@@ -1829,7 +1824,7 @@ process_string(str)
 /*
  * Process a string holding exactly one 'value by function call'
  */
-char *process_part(str)
+static char *process_part(str)
     char	*str;
 {
     struct svalue *ret;
@@ -1902,7 +1897,7 @@ struct svalue *process_value(str)
     
     /* Apply the function and see if adequate answer is returned
     */
-    if ( func2 = findstring(func) ) {
+    if ( (func2 = findstring(func)) ) {
 	xfree(func);
 	ret = apply(func2, ob, numargs);
     } else {
@@ -1917,7 +1912,8 @@ struct svalue *process_value(str)
     return &rval;
 }
 #endif /* F_PROCESS_STRING */
-  
+
+#if 0  
 /*
  * Function name: break_string
  * Description:   Breaks a continous string without newlines into a string
@@ -1929,7 +1925,7 @@ struct svalue *process_value(str)
  *		  indent: (optional) How many spaces to indent with.
  * Returns:       A string with newline separated strings
  */
-char *
+static char *
 break_string(str, width, indent)
     char 	*str;
     int		width;
@@ -1970,7 +1966,7 @@ break_string(str, width, indent)
 
     xfree(fstr);
 
-    for (nchar = 0, il = 0; il < VEC_SIZE(lines); il++)
+    for (nchar = 0, il = 0; (size_t)il < VEC_SIZE(lines); il++)
 	nchar += indent + strlen(lines->item[il].u.string) + 1;
     
     fstr = xalloc(nchar + 1);
@@ -1980,7 +1976,7 @@ break_string(str, width, indent)
     for (il = 0; il < indent; il++) 
 	istr[il] = ' ';
     
-    for (nchar = 0, il = 0; il < VEC_SIZE(lines); il++)
+    for (nchar = 0, il = 0; (size_t)il < VEC_SIZE(lines); il++)
     {
 	strcat(fstr, istr); 
 	strcat(fstr, lines->item[il].u.string);
@@ -1993,7 +1989,7 @@ break_string(str, width, indent)
     return fstr;
 
 }
-
+#endif
 
 #if 0  
 

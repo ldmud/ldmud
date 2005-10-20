@@ -110,14 +110,6 @@
 
 /* #undef inline */
 
-/* Define what random number generator to use.
- * If no one is specified, a guaranteed bad one will be used.
- * possible choices: RANDOM DRAND48 RAND
- */
-/* #undef RANDOM */
-/* #undef DRAND48 */
-#define RAND 1
-
 /* Define if you have _crypt.  */
 /* #undef HAVE__CRYPT */
 

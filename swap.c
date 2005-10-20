@@ -1,4 +1,4 @@
-#include "config.h"
+#include "driver.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -7,16 +7,33 @@
 #include <values.h>
 #endif
 
-#include "lint.h"
-#include "interpret.h"
-#include "object.h"
+#define NO_INCREMENT_STRING_REF
+#include "swap.h"
+
+#include "array.h"
+#include "comm.h"
 #include "exec.h"
+#include "gcollect.h"
+#include "interpret.h"
+#include "main.h"
+#include "mapping.h"
+#include "object.h"
+#include "prolang.h"
+#include "simulate.h"
+#include "simul_efun.h"
+#include "stralloc.h"
 #include "wiz_list.h"
 
+/* TODO: Use get_host_name() instead of gethostname() */
 #ifdef AMIGA
 #include "hosts/amiga/socket.h"
 #endif
 
+/* TODO: The Watermark usage should be done via commandline option,
+ * TODO:: as it potentially reduces swapfile fragmentation at the
+ * TODO:: expense of swapfile size.
+ */
+/* #define USE_WATERMARKS */
 #define LOW_WATER_MARK  (swapfile_size >> 2)
 #define HIGH_WATER_MARK (swapfile_size >> 1)
 
@@ -33,25 +50,20 @@ mp_int total_bytes_swapfree = 0;
 mp_int swapfile_size = 0;
 /* Number of bytes that have been reused from freed swap prog blocks */
 mp_int total_swap_reused = 0;
-int recycle_free_space = 0; /* should free space be reused right now ? */
 long swap_num_searches, swap_total_searchlength;
 long swap_free_searches, swap_free_searchlength;
 
-char file_name[100] = "";
+#ifdef USE_WATERMARKS
+static int /* TODO: bool */ recycle_free_space = MY_FALSE; 
+  /* True when freespace should be re-used, false if not
+   */
+#endif
 
-FILE *swap_file = (FILE *) 0;	/* The swap file is opened once */
+static char file_name[100] = "";
+
+static FILE *swap_file = (FILE *) 0;	/* The swap file is opened once */
 
 mp_int total_num_prog_blocks, total_prog_block_size;
-
-extern int d_flag;
-
-extern void free_mapping PROT((struct mapping *)),
-	free_empty_mapping PROT((struct mapping *));
-extern struct mapping *allocate_mapping PROT((int, int));
-extern struct svalue *get_map_lvalue
-	PROT((struct mapping*, struct svalue*, int));
-
-
 
 /*
  * Free space is kept in a simple linked list. The size field is < 0
@@ -66,9 +78,9 @@ struct swap_block
   mp_int size;
 };
 
-struct swap_block swap_list;
-struct swap_block *swap_rover = 0; /* pointer to the current swap_block */
-struct swap_block *swap_previous = &swap_list; /* one prior to swap_rover */
+static struct swap_block swap_list;
+static struct swap_block *swap_rover = 0; /* pointer to the current swap_block */
+static struct swap_block *swap_previous = &swap_list; /* one prior to swap_rover */
 static mp_int current_offset; /* file offset corresponding to swap_rover */
 
 #if 0
@@ -102,7 +114,7 @@ check() {
  *   argument_types
  *   type_start
  */
-int
+static int
 locate_out (prog) struct program *prog; {
     char *p = 0; /* keep cc happy */
 
@@ -148,9 +160,8 @@ locate_out (prog) struct program *prog; {
  *   argument_types
  *   type_start
  */
-int
+static int
 locate_in (prog) struct program *prog; {
-    extern int32 current_id_number;
     char *p = (char *)prog;
 
     if (!prog) return 0;
@@ -191,25 +202,26 @@ locate_in (prog) struct program *prog; {
  * it. If there is none, add one at the end of the file. Return the
  * offset from the beginning of the file.
  */
-int swap_alloc(size)
+static int swap_alloc(size)
   mp_int size;
 {
   struct swap_block *mark,*last;
-  extern int malloc_privilege;
   int save_privilege;
 
   save_privilege = malloc_privilege;
   malloc_privilege = MALLOC_SYSTEM;
+#ifdef USE_WATERMARKS
   if (!recycle_free_space) {
-    if (total_bytes_swapfree < HIGH_WATER_MARK)
-      goto alloc_new_space;
-    recycle_free_space = 1;
+      if (total_bytes_swapfree < HIGH_WATER_MARK)
+          goto alloc_new_space;
+      recycle_free_space = 1;
   } else {
-    if (total_bytes_swapfree < LOW_WATER_MARK) {
-      recycle_free_space = 0;
-      goto alloc_new_space;
-    }
+      if (total_bytes_swapfree < LOW_WATER_MARK) {
+          recycle_free_space = 0;
+          goto alloc_new_space;
+      }
   }
+#endif
   swap_num_searches++;
   mark = swap_rover;
   for (;;)
@@ -248,9 +260,11 @@ int swap_alloc(size)
     swap_rover = swap_rover->next;
     if (swap_rover == mark) /* Once around the list without success */
     {
+#ifdef USE_WATERMARKS
 alloc_new_space:
+#endif
       last = swap_previous;
-      while (mark = last->next)
+      while ( (mark = last->next) )
         last = mark;
       mark = (struct swap_block *) permanent_xalloc(sizeof(struct swap_block));
       mark->next = 0;
@@ -265,7 +279,7 @@ alloc_new_space:
   }
 }
 
-int swap_free(offset, size)
+static int swap_free(offset, size)
   mp_int offset, size;
 {
   if (offset < current_offset)
@@ -314,7 +328,7 @@ int swap_free(offset, size)
   return 0; /* success */
 }
 
-p_int store_swap_block(buffer, size)
+static p_int store_swap_block(buffer, size)
     char *buffer;
     mp_int size;
 {
@@ -345,12 +359,6 @@ p_int store_swap_block(buffer, size)
 	return -1;
     }
     return offset;
-}
-
-void set_swapbuf(buf)
-    char *buf;
-{
-  /* This space intentionally left blank */
 }
 
 /*
@@ -407,7 +415,7 @@ struct varblock {
 };
 
 #define CHECK_SPACE(count) \
-    if (rest < count) { \
+    if (rest < (mp_int)(count)) { \
 	struct varblock *CStmp; \
 	if ( !(CStmp = reallocate_block(p, rest, count)) ) {\
 	    CStmp = (struct varblock *)(p + rest); \
@@ -519,7 +527,6 @@ static struct varblock *swap_svalues(svp, num, block)
 	  }
 	  case T_POINTER:
 	  {
-	    extern int is_alist PROT((struct vector *));
 	    int32 size;
 
 	    size = VEC_SIZE(svp->u.vec);
@@ -631,9 +638,7 @@ swap_opaque:
 /* When garbage collection is done, restoring strings would give nothing
  * but trouble, thus, a dummy number is inserted instead.
  */
-#ifdef MALLOC_smalloc
-extern int garbage_collection_in_progress;
-#else
+#ifndef MALLOC_smalloc
 #define garbage_collection_in_progress 0
 #endif
 static unsigned char *last_variable_block;
@@ -744,8 +749,6 @@ static unsigned char *free_swapped_svalues(svp, num, p)
 int swap_variables(ob)
     struct object *ob;
 {
-    extern struct object *simul_efun_object;
-
     char *start;
     p_int total_size;
     struct varblock *block;
@@ -816,8 +819,8 @@ int swap_variables(ob)
 	return 0;
     }
     *(p_int*)block->start = total_size =
-      ((char *)block->current - block->start) + (sizeof(p_int) - 1) &
-	~((sizeof(p_int)) - 1);
+      (((char *)block->current - block->start) + (sizeof(p_int) - 1)) &
+	(~(sizeof(p_int) - 1));
     swap_num = store_swap_block(block->start, total_size);
     if (swap_num  == -1) {
 	xfree(block->start);
@@ -921,8 +924,6 @@ static unsigned char *read_unswapped_svalues(svp, num, p)
 	    }
 #ifdef MALLOC_smalloc
 	    if (garbage_collection_in_progress == 3) {
-		extern void clear_memory_reference PROT((char *));
-
 		clear_memory_reference((char *)v);
 		v->ref = 0;
 	    }
@@ -931,8 +932,6 @@ static unsigned char *read_unswapped_svalues(svp, num, p)
 	  }
 	  case T_MAPPING | T_MOD_SWAPPED:
 	  {
-	    extern mp_int num_mappings;
-
 	    struct mapping *m;
 	    p_int num_values;
 	    struct wiz_list *user;
@@ -982,8 +981,6 @@ static unsigned char *read_unswapped_svalues(svp, num, p)
 		}
 #ifdef MALLOC_smalloc
 		if (garbage_collection_in_progress == 3) {
-		    extern void clear_memory_reference PROT((char *));
-
 		    clear_memory_reference((char *)m);
 		    clear_memory_reference(
 		      (char *)CM_MISC(cm) -
@@ -1047,7 +1044,7 @@ static unsigned char *read_unswapped_svalues(svp, num, p)
     return p;
 }
 
-static void dummy_handler() {}
+static void dummy_handler(char * fmt, ...) {}
 
 #ifdef DEBUG
 static p_int debug_var_swap_num, debug_prog_swap_num;
@@ -1062,7 +1059,6 @@ int load_ob_from_swap(ob)
     result = 0;
     swap_num = (p_int)ob->prog;
     if (swap_num & 1) {
-	extern int errno;
 	struct program tmp_prog, *prog;
 
 #ifdef DEBUG
@@ -1126,8 +1122,7 @@ int load_ob_from_swap(ob)
 	mp_int size;
 	struct svalue *variables;
 	struct object dummy, *save_current = current_object;
-	extern void (*allocate_array_error_handler)();
-	void (*save_handler)();
+	void (*save_handler)(char *, ...);
 
 #ifdef DEBUG
 	debug_var_swap_num = swap_num;
@@ -1258,8 +1253,7 @@ int remove_swap_file(prog)
     return 1;
 }
 
-void name_swap_file(name)
-    char *name;
+void name_swap_file(const char *name)
 {
     strncpy(file_name, name, sizeof file_name);
     file_name[sizeof file_name - 1] = '\0';

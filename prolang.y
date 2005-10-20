@@ -9,28 +9,34 @@
  * the generated token list. The reason of this is that there is no
  * #include-statment that yacc recognizes.
  */
+#define LANG
+#include "driver.h"
+
+#include "my-alloca.h"
 #include <stdio.h>
 #ifdef __STDC__
 #include <stdarg.h>
 #endif
 
-#define LANG
-#include "lint.h"
-#include "lex.h"
-#include "interpret.h"
-#include "object.h"
-#include "exec.h"
-#include "config.h"
-#include "instrs.h"
-#include "incralloc.h"
-#include "switch.h"
-#include "stralloc.h"
+#include "prolang.h"
 
-#if defined(__GNUC__) && !defined(lint) && !defined(DEBUG)
-#define INLINE inline
-#else
-#define INLINE
-#endif
+#include "array.h"
+#include "backend.h"
+#include "closure.h"
+#include "exec.h"
+#include "gcollect.h"
+#include "interpret.h"
+#include "instrs.h"
+#include "lex.h"
+#include "main.h"
+#include "mapping.h"
+#include "object.h"
+#include "simulate.h"
+#include "simul_efun.h"
+#include "stralloc.h"
+#include "swap.h"
+#include "switch.h"
+#include "wiz_list.h"
 
 #define YYMAXDEPTH	600
 
@@ -72,6 +78,25 @@ struct const_list_svalue {
     struct const_list list;
 };
 
+struct efun_shadow {
+    struct ident *shadow;
+    struct efun_shadow *next;
+};
+
+/*
+ * Information for allocating a block that can grow dynamically
+ * using realloc. That means that no pointers should be kept into such
+ * an area, as it might be moved.
+ */
+
+struct mem_block {
+    char *block;
+    mp_uint current_size;
+    mp_uint max_size;
+};
+
+#define START_BLOCK_SIZE	2048
+
 static struct mem_block mem_block[NUMAREAS];
 
 /*
@@ -105,39 +130,28 @@ static struct mem_block mem_block[NUMAREAS];
  * checked and required.
  */
 static int exact_types;
-extern int pragma_strict_types;		/* Maintained by lex.c */
-extern int pragma_save_types;		/* Also maintained by lex.c */
-extern int pragma_combine_strings;	/* Also maintained by lex.c */
 int approved_object;		/* How I hate all these global variables */
+int num_virtual_variables;
 
-extern mp_int total_num_prog_blocks, total_prog_block_size;
-
-extern int num_parse_error;
-extern int d_flag;
 static int heart_beat;		/* Number of the heart beat function */
 
 static p_int stored_bytes;	/* used by store_line_number_info to */
 static p_int stored_lines;	/* keep track of the stored info     */
-static p_int last_include_start;
-int num_virtual_variables;
+static p_uint last_include_start;
 static p_int switch_pc; /* to ease relative addressing */
 static p_int current_break_address;
 static p_int current_continue_address;
-extern struct s_case_state case_state;
-extern struct case_list_entry *case_blocks;
 static int current_type;
 
-static p_int last_expression;
+static p_uint last_expression;
 
 static char *last_string_constant = 0;
 
 static struct program NULL_program; /* marion - clean neat empty struct */
 
+int yyparse PROT((void));
 static char *get_two_types PROT((int type1, int type2));
-void add_local_name PROT((struct ident *, int)),
-	smart_log PROT((char *, int, char *, char *));
-extern int yylex();
-extern char *last_lex_string;
+static void add_local_name PROT((struct ident *, int));
 static int verify_declared PROT((struct ident *));
 %ifdef INITIALIZATION_BY___INIT
 static void copy_variables PROT((struct program *, int));
@@ -146,26 +160,18 @@ static int copy_functions PROT((struct program *, int type));
 static void copy_variables PROT((struct program *, int, struct svalue *));
 static void copy_functions PROT((struct program *, int type));
 %endif
-void fix_function_inherit_indices PROT((struct program *));
-void fix_variable_index_offsets PROT((struct program *));
+static void fix_function_inherit_indices PROT((struct program *));
+static void fix_variable_index_offsets PROT((struct program *));
 static void type_error PROT((char *, int));
 static void argument_type_error PROT((int, int));
-
-extern int current_line;
-/*
- * 'inherit_file' is used as a flag. If it is set to a string
- * after yyparse(), this string should be loaded as an object,
- * and the original object must be loaded again.
- */
-extern char *current_file, *inherit_file;
 
 /*
  * The names and types of arguments and auto variables.
  */
-unsigned short type_of_locals[MAX_LOCAL];
-unsigned long full_type_of_locals[MAX_LOCAL];
-int current_number_of_locals = 0;
-int current_break_stack_need = 0  ,max_break_stack_need = 0;
+static unsigned short type_of_locals[MAX_LOCAL];
+static unsigned long full_type_of_locals[MAX_LOCAL];
+static int current_number_of_locals = 0;
+static int current_break_stack_need = 0  ,max_break_stack_need = 0;
 
 /*
  * The types of arguments when calling functions must be saved,
@@ -236,8 +242,8 @@ static int compatible_types(t1, t2)
 /*
  * Add another argument type to the argument type stack
  */
-INLINE
-static void add_arg_type(type)
+static INLINE void
+add_arg_type(type)
     unsigned short type;
 {
     struct mem_block *mbp = &type_of_arguments;
@@ -252,8 +258,8 @@ static void add_arg_type(type)
 /*
  * Pop the argument type stack 'n' elements.
  */
-INLINE
-static void pop_arg_stack(n)
+static INLINE void
+pop_arg_stack(n)
     int n;
 {
     type_of_arguments.current_size -= sizeof (unsigned short) * n;
@@ -265,8 +271,8 @@ static void pop_arg_stack(n)
  * 0 is the first argument.
  */
 #if 0 /* not used */
-INLINE
-static int get_argument_type(arg, n)
+static INLINE int
+get_argument_type(arg, n)
     int arg, n;
 {
     return
@@ -275,8 +281,8 @@ static int get_argument_type(arg, n)
 }
 #endif
 
-INLINE
-static unsigned short *get_argument_types_start(n)
+static INLINE unsigned short *
+get_argument_types_start(n)
     int n;
 {
     return
@@ -284,8 +290,8 @@ static unsigned short *get_argument_types_start(n)
 	 (type_of_arguments.block + type_of_arguments.current_size))[ - n];
 }
 
-INLINE
-static void check_aggregate_types(n)
+static INLINE void
+check_aggregate_types(n)
     int n;
 {
     unsigned short *argp, mask;
@@ -313,8 +319,6 @@ static char *realloc_mem_block(mbp, size)
     } while (size > max_size);
     p = rexalloc((char *)mbp->block, max_size);
     if (!p) {
-	extern void lex_close PROT((char *));
-
 	lex_close("Out of memory");
 	return 0;
     }
@@ -326,8 +330,8 @@ static char *realloc_mem_block(mbp, size)
 /* add_to_mem_block must not be called with length zero, because the length
  * is passed to memcpy .
  */
-INLINE
-static void add_to_mem_block(n, data, size)
+static INLINE void
+add_to_mem_block(n, data, size)
     int n, size;
     char *data;
 {
@@ -371,7 +375,7 @@ static void ins_byte(b)
 static void ins_short(l)
     short l;
 {
-    int current_size;
+    mp_uint current_size;
     char *dest;
 
     current_size = CURRENT_PROGRAM_SIZE;
@@ -416,7 +420,7 @@ static short read_short(offset)
 static void ins_long(l)
     int32 l;
 {
-    int current_size;
+    mp_uint current_size;
     char *dest;
 
     current_size = CURRENT_PROGRAM_SIZE;
@@ -608,7 +612,7 @@ static void transfer_init_control() {
 	    char *name;
 	    PREPARE_INSERT(sizeof name + 3);
 
-	    name = make_shared_string("__INIT");
+	    name = make_shared_string(STR_VARINIT);
 	    memcpy(__PREPARE_INSERT__p , (char *)&name, sizeof name);
 	    __PREPARE_INSERT__p += sizeof(name);
 	    add_byte(TYPE_ANY);
@@ -617,7 +621,7 @@ static void transfer_init_control() {
             first_initializer_start =
 	      (CURRENT_PROGRAM_SIZE += sizeof name + 3) - 2;
 	}
-    } else if (CURRENT_PROGRAM_SIZE - 2 == last_initializer_end) {
+    } else if ((int)(CURRENT_PROGRAM_SIZE - 2) == last_initializer_end) {
 	mem_block[A_PROGRAM].current_size -= 3;
     } else {
 	/*
@@ -629,7 +633,7 @@ static void transfer_init_control() {
     }
 }
 
-void add_new_init_jump();
+static void add_new_init_jump();
 
 %endif /* INITIALIZATION_BY___INIT */
 
@@ -959,7 +963,7 @@ static int last_string_is_new;
 
 static int prog_string_indizes[0x100];
 
-short store_prog_string(str)
+static short store_prog_string(str)
     char *str;
 {
     int size;
@@ -1010,7 +1014,7 @@ short store_prog_string(str)
     return *indexp = size / sizeof str;
 }
 
-void delete_prog_string()
+static void delete_prog_string()
 {
     char *str;
     int size;
@@ -1060,8 +1064,6 @@ INLINE static
 struct svalue *copy_svalue(svp)
     struct svalue *svp;
 {
-    extern struct svalue const0;
-
     switch (svp->type) {
       case T_NUMBER:
       case T_FLOAT:
@@ -1097,7 +1099,7 @@ static void insert_pop_value();
 #define FIX_BRANCH(lfcode, destination, location) fix_branch(\
   (lfcode)-F_OFFSET, destination, location)
 
-int fix_branch(ltoken, dest, loc)
+static int fix_branch(ltoken, dest, loc)
     int ltoken, dest, loc;
 {
     int offset;
@@ -1173,7 +1175,7 @@ static void add_string_constant() {
     last_lex_string = 0;
 }
 
-char *yyget_space(size)
+static char *yyget_space(size)
     p_int size;
 {
     while (CURRENT_PROGRAM_SIZE + size > mem_block[A_PROGRAM].max_size)
@@ -1182,7 +1184,7 @@ char *yyget_space(size)
     return mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE - size;
 }
 
-void yymove_switch_instructions(len, blocklen)
+static void yymove_switch_instructions(len, blocklen)
     int len;
     p_int blocklen;
 {
@@ -1208,7 +1210,7 @@ void yymove_switch_instructions(len, blocklen)
     );
 }
 
-void yycerrorl(s1, s2, line1, line2)
+static void yycerrorl(s1, s2, line1, line2)
     char *s1, *s2;
     int line1, line2;
 {
@@ -1241,7 +1243,7 @@ static struct vector *list_to_vector(length, initialized)
 	    *svp++ = list->val;
 	    list = list->next;
 	    xfree(block);
-	} while (block = (char *)list);
+	} while ( (block = (char *)list) );
     }
     initialized->type = T_POINTER;
     initialized->u.vec = vec;
@@ -1260,11 +1262,11 @@ static void free_const_list_svalue(svp)
 	    free_svalue(&list->val);
 	    list = list->next;
 	    xfree(block);
-	} while (block = (char *)list);
+	} while ( (block = (char *)list) );
 }
 %endif
 
-INLINE int proxy_efun PROT((int, int));
+LOCAL_INLINE int proxy_efun PROT((int, int));
 
 static void arrange_protected_lvalue PROT((int, int, int, int));
 
@@ -1277,7 +1279,9 @@ struct s_lrvalue {
 
 static struct s_lrvalue indexing_argument, indexing_index1, indexing_index2;
 static int indexing_code;
+#ifndef INITIALIZATION_BY___INIT
 static struct svalue *currently_initialized;
+#endif
 
 %}
 
@@ -1476,9 +1480,9 @@ inheritance: inheritance_qualifiers F_INHERIT string_constant ';'
 			mem_block[A_VIRTUAL_VAR].current_size /
 			  sizeof(struct variable) - ob->prog->num_variables
 		      :
-			mem_block[A_VARIABLES].current_size /
-			  sizeof(struct variable) - ob->prog->num_variables |
-			NON_VIRTUAL_OFFSET_TAG;
+			(mem_block[A_VARIABLES].current_size /
+			  sizeof(struct variable) - ob->prog->num_variables) 
+                        | NON_VIRTUAL_OFFSET_TAG;
 		    add_to_mem_block(
 		      A_INHERITS,
 		      (char *)&inherit,
@@ -1718,7 +1722,6 @@ name_list: new_name
 
 new_name: optional_star F_IDENTIFIER
 	{
-	    extern struct svalue const0;
 %line
 	    if (current_type & TYPE_MOD_VARARGS) {
 		yyerror("can't declare a variable as varargs");
@@ -1774,7 +1777,6 @@ new_name: optional_star F_IDENTIFIER
 	    /* svalue_constant can contain identifiers, so define the variable
 	     * now, lest the identifier could get freed by a name clash.
 	     */
-	    extern struct svalue const0;
 	    int n;
 %line
 	    define_variable($2, current_type | $1 | NAME_INITIALIZED, &const0);
@@ -1843,7 +1845,7 @@ statement: comma_expr ';'
 %line
 		    if (current_continue_address == 0)
 			yyerror("continue statement outside loop");
-		    if (depth = (current_continue_address & SWITCH_DEPTH_MASK))
+		    if ( (depth = (current_continue_address & SWITCH_DEPTH_MASK)) )
 		    {
 			while(depth > SWITCH_DEPTH_UNIT*256) {
 			    ins_f_code(F_BREAKN_CONTINUE);
@@ -1967,7 +1969,7 @@ do: {
 	int offset;
 	int next_addr;
 	int addr = pop_address();
-	int current;
+	mp_uint current;
 	char *dest;
 	char tmp_short[2];
 
@@ -2248,7 +2250,7 @@ case: F_CASE case_label ':'
 case_label: constant
         {
 %line
-	    if ( $$.key = $1 ) {
+	    if ( ($$.key = $1) ) {
 		if ( !(case_state.no_string_labels) )
 		    yyerror("Mixed case label list not allowed");
 		case_state.some_numeric_labels = 1;
@@ -2278,8 +2280,8 @@ constant:
       | constant F_GE	constant { $$ = $1 >= $3; }
       | constant '<'	constant { $$ = $1 <  $3; }
       | constant F_LE	constant { $$ = $1 <= $3; }
-      | constant F_LSH	constant { $$ = $3 > MAX_SHIFT ? 0 : $1 << $3; }
-      | constant F_RSH	constant { $$ = $1 >> ($3 > MAX_SHIFT ? MAX_SHIFT : $3); }
+      | constant F_LSH	constant { $$ = (p_uint)$3 > MAX_SHIFT ? 0 : $1 << $3; }
+      | constant F_RSH	constant { $$ = $1 >> ((p_uint)$3 > MAX_SHIFT ? MAX_SHIFT : $3); }
       | constant '+'	constant { $$ = $1 +  $3; }
       | constant '-'	constant { $$ = $1 -  $3; }
       | constant '*'	constant { $$ = $1 *  $3; }
@@ -2356,7 +2358,7 @@ expr0:
 		] = $2;
 	    } else {
 		char *source, *dest;
-		int current_size;
+		mp_uint current_size;
 
 		source = $1.u.simple;
 		current_size = CURRENT_PROGRAM_SIZE;
@@ -2660,12 +2662,12 @@ expr0:
 	expr0
 	{
 	    /* Type checks of this case are complicated */
-	    int current_size;
+	    mp_uint current_size;
 	    unsigned char *p;
 %line
 	    if (pragma_combine_strings &&
 		last_expression + 2 == (current_size = CURRENT_PROGRAM_SIZE) &&
-		$<numbers>3[0] + 4 == current_size &&
+		$<numbers>3[0] + 4 == (mp_int)current_size &&
 		(((p = &mem_block[A_PROGRAM].block[current_size])[-2] -
 		  (F_CSTRING0 - F_OFFSET)) & ~3) == 0 &&
 		((p[-4] - (F_CSTRING0 - F_OFFSET)) & ~3) == 0
@@ -2732,8 +2734,8 @@ expr0:
 
 		    if ( (type2 | TYPE_MOD_POINTER) ==
 			 (TYPE_MOD_POINTER|TYPE_ANY)   ||
-			 type2 & TYPE_MOD_POINTER &&
-			 type1 == (TYPE_MOD_POINTER|TYPE_ANY)
+			 (type2 & TYPE_MOD_POINTER &&
+			 type1 == (TYPE_MOD_POINTER|TYPE_ANY))
 		       )
 		    {
 			$$.type = type1;
@@ -2891,7 +2893,7 @@ expr0:
 		    add_byte(i);
 		    i = V_VARIABLE(i)->flags & TYPE_MOD_MASK;
 		} else {
-		    if (i + num_virtual_variables & ~0xff) {
+		    if ((i + num_virtual_variables) & ~0xff) {
 			add_f_byte(F_PUSH_IDENTIFIER16_LVALUE);
 			add_short(i + num_virtual_variables);
 		    } else {
@@ -2930,7 +2932,7 @@ expr0:
 	    /* the ',' operator is reserved for indexing on multi-valued
 	     * mappings and other multi-dimensional data
 	     */
-	    int current;
+	    mp_uint current;
 	    char *p;
 	    int start;
 %line
@@ -3015,7 +3017,7 @@ expr0:
 	    /* the ',' operator is reserved for indexing on multi-valued
 	     * mappings and other multi-dimensional data
 	     */
-	    int current;
+	    mp_uint current;
 	    char *p;
 	    int start;
 %line
@@ -3227,8 +3229,6 @@ expr4: function_call %prec '~'
 		current += 2;
 		$$.type = TYPE_NUMBER;
 	    } else {
-		char * source = (char*)&$1;
-
 		add_f_byte(F_NUMBER);
 		memcpy(__PREPARE_INSERT__p, (char*)&$1, sizeof $1);
 		current += 1 + sizeof (p_int);
@@ -3504,7 +3504,7 @@ expr4: function_call %prec '~'
      | '&' F_IDENTIFIER			%prec '~'
 	{
 	    int i;
-	    int current;
+	    mp_uint current;
 	    char *p;
 %line
 	    i = verify_declared($2);
@@ -3517,7 +3517,7 @@ expr4: function_call %prec '~'
 		*p++ = F_PUSH_VIRTUAL_VARIABLE_LVALUE - F_OFFSET;
 		*p = i;
 	    } else {
-		if (i + num_virtual_variables & ~0xff) {
+		if ((i + num_virtual_variables) & ~0xff) {
 		    *p = F_PUSH_IDENTIFIER16_LVALUE - F_OFFSET;
 		    upd_short(++current, i + num_virtual_variables);
 		} else {
@@ -3534,7 +3534,7 @@ expr4: function_call %prec '~'
 	};
      | '&' F_LOCAL			%prec '~'
 	{
-	    int current;
+	    mp_uint current;
 	    char *p;
 %line
 	    $$.start = current = CURRENT_PROGRAM_SIZE;
@@ -3756,7 +3756,7 @@ expr4: function_call %prec '~'
      | F_IDENTIFIER
 	{
 	    int i;
-	    int current;
+	    mp_uint current;
 	    char *p;
 %line
 	    i = verify_declared($1);
@@ -3771,7 +3771,7 @@ expr4: function_call %prec '~'
 		*p = i;
 		$$.type = V_VARIABLE(i)->flags & TYPE_MOD_MASK;
 	    } else {
-		if (i + num_virtual_variables & ~0xff) {
+		if ((i + num_virtual_variables) & ~0xff) {
 		    $$.code = F_PUSH_IDENTIFIER16_LVALUE - F_OFFSET;
 		    *p = F_IDENTIFIER16 - F_OFFSET;
 		    upd_short(++current, i + num_virtual_variables);
@@ -3789,7 +3789,7 @@ expr4: function_call %prec '~'
 	}
      | F_LOCAL
 	{
-	    int current;
+	    mp_uint current;
 	    char *p;
 %line
 	    $$.start = current = CURRENT_PROGRAM_SIZE;
@@ -4077,7 +4077,6 @@ svalue_constant: constant
 %ifdef MAPPINGS
 	| '(' '[' ']' ')'
 	{
-	    extern struct mapping *allocate_mapping PROT((int, int));
 	    struct svalue *svp = currently_initialized;
 %line
 	    svp->type = T_MAPPING;
@@ -4085,7 +4084,6 @@ svalue_constant: constant
 	}
 	| '(' '[' ':' constant ']' ')'
 	{
-	    extern struct mapping *allocate_mapping PROT((int, int));
 	    struct svalue *svp = currently_initialized;
 %line
 	    svp->type = T_MAPPING;
@@ -4139,8 +4137,6 @@ constant_function_call: F_IDENTIFIER
 	}
 	'(' const_expr_list3 ')'
 	{
-	    extern struct svalue const0;
-
 	    struct svalue *svp;
 	    struct const_list_svalue *list;
 %line
@@ -4149,7 +4145,7 @@ constant_function_call: F_IDENTIFIER
 	    switch($<const_call_head>2.function) {
 	      case F_ORDER_ALIST-F_OFFSET:
 	      {
-		int i, listsize;
+		size_t i, listsize;
 		struct vector *vec;
 
 		if ($4.length == 1 &&
@@ -4164,7 +4160,7 @@ constant_function_call: F_IDENTIFIER
 		if ((listsize = VEC_SIZE(vec)) &&
 		    vec->item[0].type == T_POINTER)
 		{
-		    int keynum = VEC_SIZE(vec->item[0].u.vec);
+		    size_t keynum = VEC_SIZE(vec->item[0].u.vec);
 		    for (i = 0; i < VEC_SIZE(vec); i++) {
 			if (vec->item[i].type != T_POINTER ||
 			    VEC_SIZE(vec->item[i].u.vec) != keynum)
@@ -4271,7 +4267,7 @@ lvalue_list: /* empty */ { $$ = 0; }
 		ins_f_byte(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
 		ins_byte(i);
 	    } else {
-		if (i + num_virtual_variables & ~0xff) {
+		if ((i + num_virtual_variables) & ~0xff) {
 		    ins_f_byte(F_PUSH_IDENTIFIER16_LVALUE);
 		    ins_short(i + num_virtual_variables);
 		} else {
@@ -4494,7 +4490,7 @@ lvalue: F_IDENTIFIER
 		if (i == -1)
 		    $$.type = TYPE_ANY;
 	    } else {
-		if (i + num_virtual_variables & ~0xff) {
+		if ((i + num_virtual_variables) & ~0xff) {
 		    char *q;
 		    short var_index[2];
 
@@ -4534,7 +4530,7 @@ lvalue: F_IDENTIFIER
 	    if ($1.code >= 0) {
 		int end, start2;
 
-		if (end = $1.end) {
+		if ( (end = $1.end) ) {
 		    start2 = end+1;
 		    if ($1.code == F_PUSH_IDENTIFIER16_LVALUE - F_OFFSET)
 			p[start] = $1.code;
@@ -4602,7 +4598,7 @@ lvalue: F_IDENTIFIER
 	    if ($1.code >= 0) {
 		int end, start2;
 
-		if (end = $1.end) {
+		if ( (end = $1.end) ) {
 		    start2 = end+1;
 		    if ($1.code == F_PUSH_IDENTIFIER16_LVALUE - F_OFFSET)
 			p[start] = $1.code;
@@ -4732,7 +4728,7 @@ range_lvalue_indexing:
 	    } else {
 		int end, start2;
 
-		if (end = indexing_argument.end) {
+		if ( (end = indexing_argument.end) ) {
 		    start2 = end+1;
 		    if (indexing_argument.code ==
 			F_PUSH_IDENTIFIER16_LVALUE - F_OFFSET)
@@ -4869,8 +4865,8 @@ function_call: function_name
     { 
 %line
 	PREPARE_S_INSERT(6)
-	int f;
-	unsigned short *arg_types;
+	int f = 0;
+	unsigned short *arg_types = NULL;
 	int first_arg;
 	int efun_override = $1.super && strcmp($1.super, "efun") == 0;
 	int simul_efun;
@@ -4878,7 +4874,6 @@ function_call: function_name
 	$$.start = $<function_call_head>2.start;
 	$$.code = -1;
 	if ( (simul_efun = $<function_call_head>2.simul_efun) >= 0) {
-	    extern struct function *simul_efunp;
 	    struct function *funp;
 
 	    funp = &simul_efunp[simul_efun];
@@ -4984,7 +4979,7 @@ function_call: function_name
 		unsigned short *argp;
 		int num_arg, anum_arg;
 		
-		if (num_arg = funp->num_arg) {
+		if ( (num_arg = funp->num_arg) ) {
 		    if (funp->flags & TYPE_MOD_XVARARGS)
 		      num_arg--; /* last argument is checked separately */
 		    if (num_arg > (anum_arg = $4) )
@@ -5024,8 +5019,6 @@ function_call: function_name
 	    }
 	} else if ( (f = lookup_predef($1.real)) != -1 ) {
 	    int min, max, def, *argp, num_arg;
-	    extern int efun_arg_types[];
-
 	    {
 		int f2;
 
@@ -5215,8 +5208,6 @@ function_name: F_IDENTIFIER
 		}
 	      | anchestor F_COLON_COLON F_IDENTIFIER
 		{
-		    extern struct function *simul_efunp;
-		    extern struct object *master_ob;
 %line
 		    if ( !strcmp($1, "efun") &&
 		      $3->type == I_TYPE_GLOBAL &&
@@ -5231,7 +5222,7 @@ function_name: F_IDENTIFIER
 			push_constant_string("nomask simul_efun");
 			push_volatile_string(current_file);
 			push_volatile_string($3->name);
-			res = apply_master_ob("privilege_violation", 3);
+			res = apply_master_ob(STR_PRIVILEGE, 3);
 			if (!res || res->type != T_NUMBER || res->u.number < 0)
 			{
 			    yyerrorf(
@@ -5252,7 +5243,7 @@ function_name: F_IDENTIFIER
 
 condStart: F_IF '(' comma_expr ')'
 	{
-	    int current;
+	    mp_uint current;
 	    char *current_code;
 
 	    $$[0] = current_break_address;
@@ -5319,7 +5310,7 @@ optional_else: /* empty */
 /* 
  * Add a trailing jump after the last initialization code. 
  */ 
-void add_new_init_jump() { 
+static void add_new_init_jump() { 
     /* 
      * Add a new jump. 
      */ 
@@ -5332,7 +5323,7 @@ void add_new_init_jump() {
 static void arrange_protected_lvalue(start, code, end, newcode)
     int start, code, end, newcode;
 {
-    int current;
+    mp_uint current;
     char *p;
 
     current = CURRENT_PROGRAM_SIZE;
@@ -5410,9 +5401,7 @@ static void arrange_protected_lvalue(start, code, end, newcode)
     CURRENT_PROGRAM_SIZE = current + 2;
 }
 
-void epilog() {
-    extern int current_time;
-
+static void epilog() {
     int size, i;
     mp_int num_functions, num_strings, num_variables;
     char *p;
@@ -5538,11 +5527,11 @@ void epilog() {
 	    if ( f->flags & NAME_CROSS_DEFINED ) {
 		int32 offset;
 
-		offset = f->offset.func - (INHERIT_MASK + 1 >> 1);
+		offset = f->offset.func - ( (INHERIT_MASK + 1) >> 1);
 		while (f[offset].flags & NAME_CROSS_DEFINED) {
 		    offset =
 		      (f->offset.func = offset + f[offset].offset.func) -
-		      (INHERIT_MASK + 1 >> 1);
+		      ( (INHERIT_MASK + 1) >> 1);
 		}
 	    }
 	    if ((f->flags & (NAME_UNDEFINED|NAME_INHERITED)) == NAME_UNDEFINED)
@@ -5560,8 +5549,25 @@ void epilog() {
 		*p++ = f->type;
 		*p++ = f->num_arg;
 		*p++ = f->num_local;
-		*p++ = F_ESCAPE-F_OFFSET;
-		*p   = F_UNDEF-F_OFFSET-0x100;
+%ifdef INITIALIZATION_BY___INIT
+                /* If __INIT() is undefined (i.e. there was a prototype, but
+                 * no explicit function nor the automagic initialization code,
+                 * then a dummy function is generated. This prevents crashes
+                 * when this program is inherited later.
+                 */
+                if (f->name[0] == '_' && !strcmp(f->name, "__INIT")
+                 && !f->num_arg)
+                {
+                    f->flags &= ~NAME_UNDEFINED;
+                    *p++ = F_CONST1 - F_OFFSET;
+                    *p   = F_RETURN - F_OFFSET;
+                } else {
+%endif
+		    *p++ = F_ESCAPE-F_OFFSET;
+		    *p   = F_UNDEF-F_OFFSET-0x100;
+%ifdef INITIALIZATION_BY___INIT
+                }
+%endif
 		CURRENT_PROGRAM_SIZE += sizeof f->name + 5;
 	    }
 	    flags = f->flags;
@@ -5591,7 +5597,7 @@ void epilog() {
 	    struct function *out_start1, *out_start2, **out1, **out2;
 	    int count1, count2;
     
-	    count1 = num_function_names & runlength-1;
+	    count1 = num_function_names & (runlength-1);
 	    count2 = num_function_names & runlength;
 	    if (!count1) {
 		out2 = &out_start1;
@@ -5676,6 +5682,7 @@ void epilog() {
 	    struct function *functions;
 
 	    yyerror("Program too large");
+	    functions = (struct function *)mem_block[A_FUNCTIONS].block;
 	    for (i = num_functions; --i >= 0; functions++) {
 		if ( !(functions->flags & (NAME_UNDEFINED|NAME_INHERITED)) ==
 	              NAME_UNDEFINED)
@@ -5690,7 +5697,7 @@ void epilog() {
       (struct svalue *)mem_block[A_VIRTUAL_VAR_VALUES].block;
 %endif /* INITIALIZATION_BY___INIT */
     free_all_local_names();
-    for (q=all_globals; g=q; ) {
+    for (q=all_globals; (g = q); ) {
          q=g->next_all;
          free_shared_identifier(g);
     }
@@ -5700,7 +5707,7 @@ void epilog() {
 #endif
     if (all_efun_shadows) {
         struct efun_shadow *s, *t;
-    	for (t=all_efun_shadows; s=t; ) {
+    	for (t=all_efun_shadows; (s = t); ) {
 #if 0
     fprintf(stderr,"freeing efun shadow '%s'\n",s->shadow->name);
 #endif
@@ -5761,7 +5768,7 @@ void epilog() {
 		do {
 		    *namep++ =
 		      f - (struct function *)mem_block[A_FUNCTIONS].block;
-		} while (f = f->offset.next);
+		} while ( (f = f->offset.next) );
 	    }
 	}
 	p += align(num_function_names * sizeof *prog->function_names);
@@ -5843,9 +5850,6 @@ void epilog() {
 	return;
     }
     {
-	extern void do_free_sub_strings
-			PROT((int, char **, int, struct variable *));
-
 	struct function *functions;
 
 %ifndef INITIALIZATION_BY___INIT
@@ -5873,7 +5877,7 @@ void epilog() {
     }
 }
 
-INLINE int proxy_efun(function, num_arg)
+LOCAL_INLINE int proxy_efun(function, num_arg)
 int function, num_arg;
 {
     if (function == F_EXTRACT-F_OFFSET) {
@@ -5922,7 +5926,6 @@ insert_inherited(super_name, real_name,
     int num_arg;
     char *__prepare_insert__p;
 {
-    extern char *findstring PROT((char *));
     struct inherit *ip;
     int num_inherits, super_length;
 
@@ -6047,10 +6050,10 @@ insert_inherited(super_name, real_name,
 		char *funstart;
 
 		while ( (flags = ip2->prog->functions[i2]) & NAME_INHERITED) {
-		    ip2 = &ip->prog->inherit[flags & INHERIT_MASK];
-		    i2 -= ip->function_index_offset;
+		    ip2 = &ip2->prog->inherit[flags & INHERIT_MASK];
+		    i2 -= ip2->function_index_offset;
 		}
-		funstart = &ip->prog->program[flags & FUNSTART_MASK];
+		funstart = &ip2->prog->program[flags & FUNSTART_MASK];
 		fun_p->type = funstart[-1];
 		fun_p->num_arg = funstart[0];
 	    }
@@ -6071,8 +6074,6 @@ insert_inherited(super_name, real_name,
 void yyerror(str)
 char *str;
 {
-    extern int num_parse_error;
-
     char *context;
 
     if (num_parse_error > 5)
@@ -6122,7 +6123,7 @@ static int verify_declared(p)
 void free_all_local_names()
 {
     struct ident *p,*q;
-    for (q=all_locals; p=q;) {
+    for (q=all_locals; ( p = q);) {
         q = p->next_all;
         free_shared_identifier(p);
     }
@@ -6132,7 +6133,7 @@ void free_all_local_names()
     max_break_stack_need = 0;
 }
 
-void add_local_name(ident, type)
+static void add_local_name(ident, type)
     struct ident *ident;
     int type;
 {
@@ -6160,7 +6161,7 @@ int32 offset;
     to->flags = (to->flags & ~NAME_UNDEFINED) |
                (from->flags & (NAME_UNDEFINED|NAME_PROTOTYPE)) |
                NAME_CROSS_DEFINED | NAME_HIDDEN | NAME_INHERITED;
-    to->offset.func = offset + (INHERIT_MASK + 1 >> 1);
+    to->offset.func = offset + ( (INHERIT_MASK + 1) >> 1);
     nomask = (from->flags|to->flags) & TYPE_MOD_NO_MASK;
     from->flags |= nomask;
     to  ->flags |= nomask;
@@ -6174,7 +6175,7 @@ static uint32 *get_function_id(progp, fx)
 
     flags = progp->functions[fx];
     if (flags & NAME_CROSS_DEFINED) {
-	fx += (flags & INHERIT_MASK) - (INHERIT_MASK + 1 >> 1);
+	fx += (flags & INHERIT_MASK) - ( (INHERIT_MASK + 1) >> 1);
 	flags = progp->functions[fx];
     }
     while(flags & NAME_INHERITED) {
@@ -6251,7 +6252,7 @@ static void copy_functions(from, type)
 	    if (flags & NAME_CROSS_DEFINED) {
 		i2 +=
 		  (fun_p->offset.func = (flags & INHERIT_MASK)) -
-		  (INHERIT_MASK + 1 >> 1);
+		  ( (INHERIT_MASK + 1) >> 1);
 	    }
 	} else {
 	    fun_p->flags =
@@ -6351,7 +6352,7 @@ static void copy_functions(from, type)
 		   * to the non-standard preference would be very hard to
 		   * reconstruct.
 		   */
-		  if (n < first_func_index) {
+		  if ((uint32)n < first_func_index) {
 		    struct function *OldFunction = FUNCTION(n);
 
 		    if ( !(OldFunction->flags & NAME_INHERITED) ) {
@@ -6413,7 +6414,7 @@ static void copy_functions(from, type)
 		     */
 		    if ( !(FUNCTION(n)->flags & NAME_CROSS_DEFINED) ||
 			 FUNCTION(n)->offset.func !=
-			   current_func_index - n + (INHERIT_MASK + 1 >> 1) )
+			   ((int32)current_func_index) - n + ( (INHERIT_MASK + 1) >> 1) )
 		    {
 			fatal(
 			  "inconsistent function definition in superclass\n"
@@ -6505,7 +6506,7 @@ static void copy_functions(from, type)
 %endif
 }
 
-void fix_function_inherit_indices(from)
+static void fix_function_inherit_indices(from)
     struct program *from;
 {
     int i, inherit_index;
@@ -6526,7 +6527,7 @@ void fix_function_inherit_indices(from)
     }
 }
 
-void fix_variable_index_offsets(new_prog)
+static void fix_variable_index_offsets(new_prog)
     struct program *new_prog;
 {
     int i;
@@ -6559,8 +6560,8 @@ static void copy_variables(from, type)
 {
     int i, j;
     int new_bound, last_bound;
-    int variable_index_offset, function_index_offset;
-    int inheritc;
+    int variable_index_offset, fun_index_offset;
+    uint inheritc;
     struct inherit *inheritp;
     int from_variable_index_offset = -1;
     int previous_variable_index_offset;
@@ -6585,7 +6586,7 @@ static void copy_variables(from, type)
 	    );
 #endif
     }
-    function_index_offset =
+    fun_index_offset =
       mem_block[A_FUNCTIONS].current_size / sizeof(struct function) -
       from->num_functions;
     variable_index_offset =
@@ -6637,7 +6638,7 @@ static void copy_variables(from, type)
 		}
 		inherit_index = (mem_block[A_INHERITS].current_size - j) /
 		   sizeof(struct inherit) - 1;
-		inherit.function_index_offset += function_index_offset;
+		inherit.function_index_offset += fun_index_offset;
 		add_to_mem_block(A_INHERITS, (char *)&inherit, sizeof inherit);
 		/* If a function is directly inherited from a program that
 		 * introduces a virtual variable, the code therein is not
@@ -6678,7 +6679,6 @@ static void copy_variables(from, type)
 		break;
 	}
 	for (j = last_bound; j < new_bound; j++) {
-	    extern struct svalue const0;
 	    struct ident *p;
 	    int new_type;
     
@@ -6776,7 +6776,7 @@ void store_line_number_info()
     byte_to_mem_block(A_LINENUMBERS, offset);
 }
 
-void store_line_number_relocation(relocated_from)
+static void store_line_number_relocation(relocated_from)
     int relocated_from;
 {
     int save_current, offset;
@@ -6803,8 +6803,6 @@ static int simple_includes;
 void store_include_info(name)
     char *name;
 {
-    extern char *out_of_memory_string;
-
     if (last_include_start == mem_block[A_LINENUMBERS].current_size) {
 	simple_includes++;
     } else {
@@ -6823,7 +6821,7 @@ void store_include_info(name)
     last_include_start = mem_block[A_LINENUMBERS].current_size;
     name = make_shared_string(name);
     if (!name) {
-	increment_string_ref(name = out_of_memory_string);
+	increment_string_ref(name = STR_DEFAULT);
 	yyerror("Out of memory");
     }
     add_to_mem_block(A_INCLUDE_NAMES, (char *)&name, sizeof name);
@@ -6902,7 +6900,7 @@ static char *get_type_name(type)
 	reference = 1;
 	type &= ~TYPE_MOD_REFERENCE;
     }
-    if (type >= sizeof type_name / sizeof type_name[0])
+    if ((size_t)type >= sizeof type_name / sizeof type_name[0])
 	fatal("Bad type\n");
     strcat(buff, type_name[type]);
     strcat(buff," ");
@@ -6936,8 +6934,6 @@ static void argument_type_error(i, type)
  * Compile an LPC file.
  */
 void compile_file() {
-    int yyparse();
-
     prolog();
     yyparse();
     epilog();
@@ -7011,7 +7007,7 @@ H_MODIFY_COMMAND_FNAME: SH(T_STRING), \
 
 #if defined( DEBUG ) && defined ( TRACE_CODE )
 
-int code_window_offset = -1;
+static int code_window_offset = -1;
 
 void set_code_window() {
     code_window_offset = CURRENT_PROGRAM_SIZE;

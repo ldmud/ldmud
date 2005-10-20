@@ -248,13 +248,13 @@ YFLAGS += -d
 SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\
     comm1.c ed.c regexp.c mapping.c wiz_list.c swap.c $(MALLOC).c\
     call_out.c otable.c dumpstat.c stralloc.c hash.c port.c\
-    access_check.c parse_old.c parse.c prolang.y\
+    access_check.c parse_old.c parse.c prolang.y rxcache.c\
     simul_efun.c sprintf.c gcollect.c closure.c random.c $(XSRC)
 OBJ=lang.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
     comm1.o ed.o regexp.o mapping.o wiz_list.o swap.o $(MALLOC).o\
     call_out.o otable.o dumpstat.o stralloc.o hash.o port.o\
     access_check.o parse_old.o parse.o simul_efun.o sprintf.o\
-    gcollect.o closure.o random.o $(XOBJ)
+    gcollect.o closure.o random.o rxcache.o $(XOBJ)
 
 driver: $(OBJ)
 	$(CC) $(LDFLAGS) $(OBJ) -o $@ $(LIBS)
@@ -308,49 +308,51 @@ lang.c lang.h: lang.y
 	$(MV) $(YTAB).c lang.c
 	$(MV) $(YTAB).h lang.h
 
-$(MALLOC).o: $(MALLOC).c lint.h config.h machine.h
+$(MALLOC).o: $(MALLOC).c driver.h config.h machine.h port.h
 	-$(RMF) smalloc.o
 	-$(RMF) gmalloc.o
 	-$(RMF) sysmalloc.o
 	-$(RMF) malloc.o
 	$(CC) $(CFLAGS) -c $(MALLOC).c
 
-access_check.o : access_check.c lint.h config.h machine.h comm.h interpret.h
+#--------------------------------------------------------
+# Dependencies, manual and automatic.
 
-alloca.o : alloca.c
+array.o : instrs.h lang.h
 
-array.o: array.c config.h machine.h lint.h interpret.h object.h wiz_list.h \
-  regexp.h exec.h lang.h instrs.h stralloc.h
+closure.o : instrs.h lang.h
 
-backend.o: backend.c lint.h config.h machine.h interpret.h object.h \
-  wiz_list.h exec.h comm.h hosts/amiga/patchfloat.h
+dumpstat.o : instrs.h lang.h
 
-call_out.o: call_out.c lint.h config.h machine.h interpret.h object.h comm.h \
-  stralloc.h exec.h wiz_list.h
+gcollect.o : instrs.h lang.h
 
-closure.o: closure.c lint.h config.h machine.h lex.h exec.h interpret.h \
-  object.h lang.h instrs.h
+$(PREC) hash.o : hash.c
 
-comm1.o: comm1.c config.h machine.h lint.h interpret.h comm.h object.h \
-  sent.h wiz_list.h
+interpret.o : instrs.h lang.h
 
-dumpstat.o: dumpstat.c lint.h config.h machine.h interpret.h object.h exec.h \
-  smalloc.h lang.h instrs.h
+lang.o : driver.h config.h machine.h lex.h interpret.h object.h \
+    instrs.h port.h switch.h stralloc.h
 
-ed.o: ed.c lint.h config.h machine.h regexp.h interpret.h object.h comm.h
+lex.o : instrs.h lang.h efun_defs.c
 
-gcollect.o : gcollect.c lint.h config.h machine.h interpret.h object.h exec.h \
-  sent.h comm.h smalloc.h instrs.h lang.h wiz_list.h stralloc.h
+$(PREC) make_func.o : make_func.c
 
-$(PREC) hash.o: hash.c
+simul_efun.o : instrs.h lang.h
+
+simulate.o : instrs.h
+
+sprintf.o : instrs.h
 
 .IF $(DICE2)
 # I prefer compiling interpret.c in two steps, in case the three iterations
 # over the assembler source aren't enough.
 
-$(PREC) interpret.a: interpret.c lint.h config.h machine.h interpret.h lang.h exec.h \
-  object.h wiz_list.h instrs.h comm.h sent.h switch.h smalloc.h stralloc.h \
-  astrip hosts/amiga/patchfloat.h
+$(PREC) interpret.a : interpret.c closure.h swap.h sprintf.h lex.h gcollect.h \
+    parse.h call_out.h simul_efun.h simulate.h mapping.h array.h main.h \
+    backend.h stralloc.h switch.h sent.h comm.h instrs.h wiz_list.h \
+    object.h exec.h prolang.h smalloc.h interpret.h lint.h config.h \
+    machine.h lang.h port.h hosts/amiga/patchfloat.h \
+    astrip
 	$(CC) $(IOPT2) $(CFLAGS) -a interpret.c -o $(DTMP)interpret.x
 	astrip $(DTMP)interpret.x interpret.a
 	$(RM) $(DTMP)interpret.x
@@ -367,9 +369,11 @@ interpret.o: interpret.a dstol
 	-$(AS) $(DTMP)interpret.f -o interpret.o $(AOPT2)
 	$(RM) $(DTMP)interpret.e $(DTMP)interpret.f
 .ELSE
-interpret.o: interpret.c lint.h config.h machine.h interpret.h lang.h exec.h \
-  object.h wiz_list.h instrs.h comm.h sent.h switch.h smalloc.h stralloc.h \
-  hosts/amiga/patchfloat.h
+interpret.o : interpret.c closure.h swap.h sprintf.h lex.h gcollect.h \
+    parse.h call_out.h simul_efun.h simulate.h mapping.h array.h main.h \
+    backend.h stralloc.h switch.h sent.h comm.h instrs.h wiz_list.h \
+    object.h exec.h prolang.h smalloc.h interpret.h lint.h config.h \
+    machine.h lang.h port.h hosts/amiga/patchfloat.h
 	$(CC) $(IOPT) $(CFLAGS) -c interpret.c -o interpret.o $(LIBS)
 .END
 
@@ -377,9 +381,11 @@ interpret.o: interpret.c lint.h config.h machine.h interpret.h lang.h exec.h \
 # I prefer compiling lang.c in two steps, in case the three iterations
 # over the assembler source aren't enough.
 
-$(PREC) lang.a: lang.c lint.h config.h machine.h lex.h interpret.h object.h exec.h \
-  instrs.h incralloc.h switch.h stralloc.h \
-  astrip
+$(PREC) lang.a : lang.c simul_efun.h mapping.h swap.h backend.h array.h \
+    closure.h main.h simulate.h stralloc.h switch.h instrs.h config.h \
+    exec.h object.h interpret.h lex.h prolang.h lint.h sent.h smalloc.h \
+    port.h machine.h lang.h hosts/amiga/patchfloat.h \
+    astrip
 	$(CC) $(LOPT2) $(CFLAGS) -a lang.c -o $(DTMP)lang.x
 	astrip $(DTMP)lang.x lang.a
 	$(RM) $(DTMP)lang.x
@@ -399,68 +405,17 @@ lang.o: lang.a dstol
 	-$(AS) $(DTMP)lang.g -o lang.o $(AOPT2)
 	$(RM) $(DTMP)lang.f $(DTMP)lang.g
 .ELSE
-$(PREC) lang.o: lang.c lint.h config.h machine.h lex.h interpret.h object.h exec.h \
-  instrs.h incralloc.h switch.h stralloc.h
+$(PREC) lang.o : lang.c simul_efun.h mapping.h swap.h backend.h array.h \
+    closure.h main.h simulate.h stralloc.h switch.h instrs.h config.h \
+    exec.h object.h interpret.h lex.h prolang.h lint.h sent.h smalloc.h \
+    port.h machine.h lang.h hosts/amiga/patchfloat.h
 	$(CC) $(LOPT) $(CFLAGS) -c lang.c -o $@
 .END
-
-lex.o : lex.c lint.h config.h machine.h interpret.h lang.h exec.h lex.h \
-  instrs.h patchlevel.h stralloc.h efun_defs.c
-
-main.o : main.c lint.h config.h machine.h interpret.h object.h lex.h \
-  patchlevel.h
-
-$(PREC) make_func.o : make_func.c lint.h config.h machine.h
-	$(CC) $(CFLAGS) -DYACC="$(YACC)" -c make_func.c
-
-mapping.o : mapping.c config.h machine.h lint.h interpret.h \
-  object.h wiz_list.h regexp.h stralloc.h smalloc.h
-
-object.o : object.c lint.h config.h machine.h comm.h interpret.h object.h \
-  sent.h wiz_list.h exec.h hosts/amiga/patchfloat.h
-
-otable.o : otable.c lint.h config.h machine.h interpret.h object.h \
-  hosts/amiga/patchfloat.h
-
-parse.o : parse.c lint.h config.h machine.h interpret.h object.h wiz_list.h
-
-parse_old.o : parse_old.c lint.h config.h machine.h interpret.h object.h \
-  wiz_list.h
-
-port.o : port.c lint.h config.h machine.h
-
-regexp.o : regexp.c regexp.h lint.h config.h machine.h #/usr/include/string.h
-
-simul_efun.o : simul_efun.c lint.h config.h machine.h interpret.h object.h \
-  exec.h lex.h lang.h instrs.h stralloc.h
-
-simulate.o : simulate.c lint.h config.h machine.h interpret.h instrs.h \
-  object.h sent.h wiz_list.h exec.h comm.h stralloc.h hosts/amiga/patchfloat.h
-
-sprintf.o : sprintf.c config.h machine.h lint.h interpret.h lang.h instrs.h \
-  exec.h object.h sent.h
-
-stralloc.o : stralloc.c stralloc.h config.h machine.h lint.h \
-  hosts/amiga/patchfloat.h
-
-swap.o : swap.c lint.h config.h machine.h interpret.h object.h exec.h
-
-wiz_list.o : wiz_list.c config.h machine.h lint.h interpret.h object.h \
-  wiz_list.h stralloc.h
-
-# It's not that easy under AmigaOS...
-#
-# timestamp:
-#	  echo '#define RELEASE_DATE "'`date`'"' > tmp
-#	  tail +1 patchlevel.h >> tmp
-#	  $(MV) tmp patchlevel.h
 
 #-----------------------------------------------------------------------------
 #			    Extra Rules
 #-----------------------------------------------------------------------------
 
-#   crypt.o  : BSD-implementation of crypt()
-#   fcrypt.o : Crack-implementation of crypt() (just in case)
 #   PlayMud  : a simple client to access the running mud.
 #   netclean : removes all object files containing communication-specific code.
 #   osclean  : removes all object files which contain OS-specific code.
@@ -473,12 +428,6 @@ wiz_list.o : wiz_list.c config.h machine.h lint.h interpret.h object.h \
 # DICE 2.xx also needs:
 #   astrip: to strip comments from intermediate assembler files
 #   dstol : to patch assembler files with large switch()es
-
-fcrypt.o :
-	$(CC) $(CFLAGS) -Dfcrypt=crypt -Ihosts/fcrypt -c hosts/fcrypt/crack-fcrypt.c -o fcrypt.o
-
-crypt.o :
-	$(CC) $(CFLAGS) -c hosts/crypt.c -o crypt.o
 
 playmud: PlayMud
 
@@ -497,23 +446,18 @@ osclean:
 	-$(RM) interpret.a astrip dstol
 .END
 
-amiga.o : patchlevel.h config.h hosts/amiga/nsignal.h
 amiga.o : hosts/amiga/amiga.c
 	$(CC) $(CFLAGS) -Ihosts/amiga -c $< -o $@
 
 ixfile.o : hosts/amiga/ixfile.c
 	$(CC) $(CFLAGS) -Ihosts/amiga -c $< -o $@
 
-signal.o : hosts/amiga/nsignal.h
 signal.o : hosts/amiga/signal.c
 	$(CC) $(CFLAGS) -Ihosts/amiga -c $< -o $@
 
-signal_rr.o : hosts/amiga/nsignal.h
 signal_rr.o : hosts/amiga/signal_rr.c
 	$(CC) $(CFLAGS) $(ROPT) -Ihosts/amiga -c $< -o $@
 
-socket.o : hosts/amiga/nsignal.h hosts/amiga/socket_sim.c hosts/amiga/socket_tcp.c\
-	   hosts/amiga/mudmsgs.h
 socket.o : hosts/amiga/socket.c
 	$(CC) $(CFLAGS) -Ihosts/amiga -c $< -o $@
 
@@ -522,3 +466,174 @@ astrip: hosts/amiga/astrip.c
 
 dstol: hosts/amiga/dstol.c
 	$(CC) $? -o $@
+
+# --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS FOLLOW ---
+access_check.o : access_check.c comm.h access_check.h driver.h sent.h \
+    object.h interpret.h config.h port.h machine.h exec.h datatypes.h \
+    hosts/amiga/patchfloat.h
+
+alloca.o : alloca.c
+
+array.o : array.c wiz_list.h swap.h stralloc.h simulate.h rxcache.h \
+    regexp.h prolang.h object.h mapping.h main.h interpret.h instrs.h \
+    exec.h datatypes.h backend.h array.h my-alloca.h driver.h smalloc.h \
+    sent.h lang.h port.h machine.h config.h hosts/amiga/patchfloat.h
+
+backend.o : backend.c wiz_list.h swap.h stralloc.h smalloc.h simulate.h \
+    rxcache.h regexp.h object.h mapping.h main.h lex.h interpret.h \
+    gcollect.h exec.h ed.h comm.h call_out.h array.h backend.h \
+    hosts/amiga/nsignal.h driver.h datatypes.h sent.h instrs.h port.h \
+    machine.h config.h hosts/amiga/patchfloat.h
+
+call_out.o : call_out.c wiz_list.h stralloc.h simulate.h object.h main.h \
+    interpret.h gcollect.h exec.h comm.h closure.h backend.h array.h \
+    call_out.h driver.h smalloc.h sent.h instrs.h datatypes.h port.h \
+    machine.h config.h hosts/amiga/patchfloat.h
+
+closure.o : closure.c switch.h simul_efun.h simulate.h stralloc.h prolang.h \
+    object.h main.h lex.h instrs.h interpret.h exec.h array.h closure.h \
+    my-alloca.h driver.h sent.h smalloc.h lang.h datatypes.h port.h \
+    machine.h config.h hosts/amiga/patchfloat.h
+
+comm1.o : comm1.c util/erq.h wiz_list.h stralloc.h simulate.h sent.h \
+    object.h main.h interpret.h gcollect.h exec.h ed.h backend.h array.h \
+    access_check.h comm.h hosts/amiga/nsignal.h telnet.h my-alloca.h \
+    driver.h smalloc.h instrs.h datatypes.h config.h port.h machine.h \
+    hosts/amiga/patchfloat.h
+
+dumpstat.o : dumpstat.c smalloc.h simulate.h prolang.h object.h mapping.h \
+    instrs.h interpret.h exec.h comm.h array.h dumpstat.h driver.h \
+    datatypes.h sent.h lang.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
+
+ed.o : ed.c stralloc.h simulate.h rxcache.h regexp.h object.h main.h \
+    interpret.h gcollect.h comm.h closure.h ed.h driver.h smalloc.h sent.h \
+    instrs.h exec.h datatypes.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
+
+gcollect.o : gcollect.c wiz_list.h swap.h stralloc.h smalloc.h simul_efun.h \
+    simulate.h sent.h rxcache.h prolang.h otable.h object.h mapping.h \
+    main.h lex.h instrs.h interpret.h exec.h ed.h comm.h closure.h \
+    call_out.h backend.h array.h gcollect.h driver.h datatypes.h regexp.h \
+    lang.h port.h machine.h config.h hosts/amiga/patchfloat.h
+
+hash.o : hash.c hash.h
+
+amiga.o : hosts/amiga/amiga.c hosts/amiga/nsignal.h patchlevel.h config.h
+
+ixfile.o : hosts/amiga/ixfile.c
+
+signal.o : hosts/amiga/signal.c hosts/amiga/nsignal.h
+
+signal_rr.o : hosts/amiga/signal_rr.c hosts/amiga/nsignal.h
+
+socket.o : hosts/amiga/socket.c hosts/amiga/socket_sim.c \
+    hosts/amiga/socket_tcp.c hosts/amiga/nsignal.h hosts/amiga/mudmsgs.h \
+    telnet.h hosts/amiga/socket_sim_protos.h hosts/amiga/socket.h \
+    hosts/amiga/socket_sim.h hosts/amiga/socket_tcp.h \
+    hosts/amiga/socket_sim_protos.h
+
+interpret.o : interpret.c wiz_list.h switch.h swap.h sprintf.h smalloc.h \
+    stralloc.h simul_efun.h simulate.h sent.h random.h prolang.h parse.h \
+    otable.h object.h mapping.h main.h lex.h instrs.h gcollect.h exec.h \
+    ed.h comm.h closure.h call_out.h backend.h array.h interpret.h \
+    my-rusage.h my-alloca.h driver.h datatypes.h lang.h port.h machine.h \
+    config.h hosts/amiga/patchfloat.h
+
+lang.o : lang.c wiz_list.h switch.h swap.h stralloc.h simul_efun.h \
+    simulate.h object.h mapping.h main.h lex.h instrs.h interpret.h \
+    gcollect.h exec.h closure.h backend.h array.h prolang.h my-alloca.h \
+    driver.h smalloc.h sent.h datatypes.h lang.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
+
+lex.o : lex.c efun_defs.c hosts/amiga/socket.h stralloc.h simul_efun.h \
+    simulate.h prolang.h patchlevel.h main.h instrs.h hash.h gcollect.h \
+    exec.h comm.h closure.h array.h lex.h my-alloca.h driver.h \
+    hosts/amiga/socket_sim.h hosts/amiga/socket_tcp.h smalloc.h object.h \
+    interpret.h sent.h lang.h datatypes.h port.h machine.h config.h \
+    hosts/amiga/socket_sim_protos.h hosts/amiga/patchfloat.h
+
+main.o : main.c wiz_list.h swap.h stralloc.h simul_efun.h simulate.h \
+    rxcache.h random.h patchlevel.h otable.h object.h mapping.h lex.h \
+    interpret.h gcollect.h comm.h array.h backend.h main.h \
+    hosts/amiga/socket.h my-alloca.h driver.h exec.h smalloc.h sent.h \
+    instrs.h regexp.h datatypes.h hosts/amiga/socket_sim.h \
+    hosts/amiga/socket_tcp.h port.h machine.h config.h \
+    hosts/amiga/socket_sim_protos.h hosts/amiga/patchfloat.h
+
+make_func.o : make_func.c interpret.h hash.h exec.h my-alloca.h driver.h \
+    datatypes.h port.h machine.h config.h hosts/amiga/patchfloat.h
+
+mapping.o : mapping.c wiz_list.h stralloc.h smalloc.h simulate.h regexp.h \
+    object.h main.h interpret.h gcollect.h backend.h array.h mapping.h \
+    my-alloca.h driver.h datatypes.h sent.h instrs.h exec.h port.h \
+    machine.h config.h hosts/amiga/patchfloat.h
+
+object.o : object.c wiz_list.h swap.h stralloc.h simulate.h sent.h random.h \
+    otable.h mapping.h main.h interpret.h exec.h comm.h closure.h backend.h \
+    array.h object.h my-alloca.h driver.h smalloc.h instrs.h datatypes.h \
+    port.h machine.h config.h hosts/amiga/patchfloat.h
+
+otable.o : otable.c simulate.h object.h interpret.h hash.h gcollect.h \
+    comm.h otable.h driver.h sent.h instrs.h exec.h datatypes.h port.h \
+    machine.h config.h hosts/amiga/patchfloat.h
+
+parse.o : parse.c wiz_list.h stralloc.h simulate.h object.h main.h instrs.h \
+    interpret.h closure.h array.h parse.h driver.h smalloc.h sent.h exec.h \
+    datatypes.h port.h machine.h config.h hosts/amiga/patchfloat.h
+
+parse_old.o : parse_old.c wiz_list.h simulate.h random.h object.h main.h \
+    interpret.h array.h parse.h driver.h sent.h instrs.h exec.h datatypes.h \
+    smalloc.h port.h machine.h config.h hosts/amiga/patchfloat.h
+
+port.o : port.c hosts/crypt.c main.h backend.h my-rusage.h driver.h \
+    interpret.h object.h port.h machine.h config.h datatypes.h exec.h \
+    hosts/amiga/patchfloat.h
+
+random.o : random.c random.h driver.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
+
+regexp.o : regexp.c regexp.h driver.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
+
+rxcache.o : rxcache.c stralloc.h smalloc.h regexp.h hash.h gcollect.h \
+    comm.h rxcache.h driver.h datatypes.h object.h interpret.h exec.h \
+    sent.h port.h machine.h config.h hosts/amiga/patchfloat.h
+
+simul_efun.o : simul_efun.c swap.h stralloc.h simulate.h prolang.h parse.h \
+    object.h lex.h instrs.h interpret.h gcollect.h exec.h array.h \
+    simul_efun.h my-alloca.h driver.h smalloc.h sent.h lang.h datatypes.h \
+    port.h machine.h config.h hosts/amiga/patchfloat.h
+
+simulate.o : simulate.c wiz_list.h swap.h stralloc.h simul_efun.h sent.h \
+    rxcache.h prolang.h otable.h object.h mapping.h main.h lex.h instrs.h \
+    interpret.h exec.h ed.h dumpstat.h comm.h closure.h call_out.h \
+    backend.h array.h simulate.h hosts/amiga/nsignal.h my-alloca.h driver.h \
+    smalloc.h regexp.h lang.h datatypes.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
+
+smalloc.o : smalloc.c object.h exec.h simulate.h main.h gcollect.h \
+    backend.h comm.h smalloc.h driver.h interpret.h sent.h instrs.h \
+    datatypes.h port.h machine.h config.h hosts/amiga/patchfloat.h
+
+sprintf.o : sprintf.c swap.h stralloc.h simul_efun.h simulate.h sent.h \
+    prolang.h object.h main.h instrs.h interpret.h exec.h array.h sprintf.h \
+    driver.h smalloc.h lang.h datatypes.h port.h machine.h config.h \
+    hosts/amiga/patchfloat.h
+
+stralloc.o : stralloc.c simulate.h hash.h gcollect.h comm.h stralloc.h \
+    driver.h sent.h object.h instrs.h interpret.h exec.h smalloc.h port.h \
+    machine.h config.h datatypes.h hosts/amiga/patchfloat.h
+
+swap.o : swap.c hosts/amiga/socket.h wiz_list.h stralloc.h simul_efun.h \
+    simulate.h prolang.h object.h mapping.h main.h interpret.h gcollect.h \
+    exec.h comm.h array.h swap.h driver.h hosts/amiga/socket_sim.h \
+    hosts/amiga/socket_tcp.h smalloc.h sent.h instrs.h lang.h datatypes.h \
+    port.h machine.h config.h hosts/amiga/socket_sim_protos.h \
+    hosts/amiga/patchfloat.h
+
+wiz_list.o : wiz_list.c stralloc.h object.h main.h interpret.h gcollect.h \
+    backend.h array.h wiz_list.h driver.h smalloc.h exec.h datatypes.h \
+    instrs.h port.h machine.h config.h hosts/amiga/patchfloat.h
+
+# --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS PRECEDE ---

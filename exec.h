@@ -27,7 +27,11 @@
  * 6. List of inherited objects.
  */
 
-#include "machine.h"
+#include "interpret.h" /* struct svalue */
+
+/* TODO: The 'flags' should maybe be implemented using bitfields, especially
+ * TODO:: since some flagvalues actually contain offsets
+ */
 
 /*
  * When an new object inherits from another, all function definitions
@@ -204,8 +208,6 @@ extern struct program *current_prog;
 #define H_ERQ_STOP	  15
 #define H_MODIFY_COMMAND_FNAME 16
 #define NUM_CLOSURE_HOOKS 17
-
-#include "interpret.h" /* net a real dependency */
 
 extern struct svalue closure_hook[NUM_CLOSURE_HOOKS];
 

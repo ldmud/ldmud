@@ -1,28 +1,38 @@
+#include "driver.h"
+
+#include "my-alloca.h"
 #include <stdio.h>
 
-#include "lint.h"
-#include "interpret.h"
-#include "object.h"
+#include "simul_efun.h"
+
+#include "array.h"
 #include "exec.h"
-#include "lex.h"
-#include "lang.h"
+#include "gcollect.h"
+#include "interpret.h"
 #include "instrs.h"
+#include "lex.h"
+#include "object.h"
+#include "parse.h"
+#include "prolang.h"
+#include "simulate.h"
 #include "stralloc.h"
+#include "swap.h"
 
 struct function *simul_efunp = 0;
 static int num_simul_efun    = 0;
 static int total_simul_efun  = 0;
 
-/* Don't release this pointer ever. It is used elsewhere. */
+/* Don't export this pointer ever. It is used elsewhere. */
 static char *simul_efun_file_name = 0;
+
 struct object *simul_efun_object  = 0;
-struct program *simul_efun_program= 0;
+static struct program *simul_efun_program= 0;
 struct vector *simul_efun_vector  = 0;
 
 struct simul_efun_table_s simul_efun_table[256];
 
 static struct ident *all_simul_efuns = 0;
-short all_discarded_simul_efun = -1;
+static short all_discarded_simul_efun = -1;
 
 /*
  * If there is a simul_efun file, then take care of it and extract all
@@ -30,10 +40,7 @@ short all_discarded_simul_efun = -1;
  */
 struct object *get_simul_efun_object()
 {
-    extern struct ident *all_efuns;
-
     struct svalue *svp;
-    extern void free_defines();
     struct object *ob;
     struct program *progp;
     char *name;
@@ -61,7 +68,7 @@ struct object *get_simul_efun_object()
 	free_vector(simul_efun_vector);
 	simul_efun_vector = 0;
     }
-    svp = apply_master_ob("get_simul_efun", 0);
+    svp = apply_master_ob(STR_GET_SEFUN, 0);
     if (svp == 0) {
 	fprintf(stderr, "No simul_efun\n");
 	return 0;
@@ -205,7 +212,7 @@ struct object *get_simul_efun_object()
 	    simul_efunp[j].flags   = flags;
 	    simul_efunp[j].type    = type;
 
-	    if (j < sizeof simul_efun_table / sizeof simul_efun_table[0]) {
+	    if (j < (int)(sizeof simul_efun_table / sizeof simul_efun_table[0])) {
 		simul_efun_table[j].funstart = funstart;
 		simul_efun_table[j].program = inherit_progp;
 		simul_efun_table[j].function_index_offset = fun_ix_offs;
@@ -245,10 +252,6 @@ char *query_simul_efun_file_name() {
 
 #ifdef MALLOC_smalloc
 
-#ifdef SUPPLY_PARSE_COMMAND
-extern struct svalue find_living_closures[2];
-#endif
-
 void clear_simul_efun_refs() {
     if (simul_efun_vector && simul_efun_vector->ref) {
 	simul_efun_vector->ref = 0;
@@ -268,8 +271,6 @@ void clear_simul_efun_refs() {
 }
 
 void count_simul_efun_refs() {
-    extern void mark_program_ref PROT((struct program *));
-
     if (simul_efun_file_name)
 	count_ref_from_string(simul_efun_file_name);
     if (simul_efunp) {
@@ -300,8 +301,6 @@ void count_simul_efun_refs() {
 
 #ifdef DEBUG
 void count_simul_efun_extra_refs() {
-    extern int register_pointer PROT((char *));
-
     if (simul_efun_vector) {
 	simul_efun_vector->extra_ref++;
         if ( !register_pointer( (char *)(simul_efun_vector) ) )

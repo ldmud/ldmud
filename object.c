@@ -1,36 +1,37 @@
-#include "config.h"
+#include "driver.h"
 
+#include "my-alloca.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <fcntl.h>
 
-#include "lint.h"
-#include "comm.h"
-#include "interpret.h"
+#define NO_INCREMENT_STRING_REF
 #include "object.h"
-#include "sent.h"
-#include "wiz_list.h"
-#include "exec.h"
 
-extern int d_flag;
-#ifdef D_FLAG
-extern int D_flag;
-#endif
-extern mp_int total_num_prog_blocks, total_prog_block_size;
+#include "array.h"
+#include "backend.h"
+#include "closure.h"
+#include "comm.h"
+#include "exec.h"
+#include "interpret.h"
+#include "main.h"
+#include "mapping.h"
+#include "otable.h"
+#include "random.h"
+#include "sent.h"
+#include "simulate.h"
+#include "stralloc.h"
+#include "swap.h"
+#include "wiz_list.h"
 
 extern pid_t getpid();
 
-void remove_swap_file PROT((struct program *));
-
 struct object *previous_ob;
-extern struct svalue const0;
-extern int trace_level;
 
 int tot_alloc_object, tot_alloc_object_size;
 
-#if defined(MSDOS) || ( defined(atarist) && !defined(MINIX) )
-#define MSDOS_FS
+#if defined(MSDOS_FS)
 static int old_format;
 #endif
 
@@ -186,7 +187,7 @@ static int recall_pointer(pointer)
 	source = number_buffer;
 	(void)sprintf(source, "%ld", id);
 	c = *source++;
-	do L_PUTC(c) while (c = *source++);
+	do L_PUTC(c) while ( (c = *source++) );
 	L_PUTC('>')
 	if (old_id) {
 		/* has been written before */
@@ -210,7 +211,7 @@ register char *src;
     L_PUTC_PROLOG
 
     L_PUTC('\"')
-    while (c = *src++) {
+    while ( (c = *src++) ) {
 	if (isescaped(c)) {
 	    switch(c) {
 		case '\007': c = 'a'; break;
@@ -238,14 +239,6 @@ int register_pointer PROT((char *));
 static void register_array PROT((struct vector *));
 
 #ifdef MAPPINGS
-
-extern void free_mapping PROT((struct mapping*));
-void check_map_for_destr PROT((struct mapping *));
-extern void walk_mapping PROT((
-        struct mapping *,
-        void (*)(struct svalue *, struct svalue *, char *),
-        char *
-));
 
 static void save_mapping_filter(key, data, extra)
     struct svalue *key, *data;
@@ -281,7 +274,7 @@ static void save_mapping(m)
 	source = number_buffer;
 	(void)sprintf(source, "%d", m->num_values);
 	c = *source++;
-	do MY_PUTC(c) while (c = *source++);
+	do MY_PUTC(c) while ( (c = *source++) );
     }
     MY_PUTC(']')
     MY_PUTC(')')
@@ -417,9 +410,6 @@ INLINE static int restore_mapping(svp, str)
     struct svalue *svp;
     char **str;
 {
-    extern struct mapping *allocate_mapping PROT((int, int));
-    struct svalue *get_map_lvalue PROT((struct mapping*, struct svalue*, int));
-
     struct mapping *z;
     struct svalue key, *data;
     int i;
@@ -505,7 +495,7 @@ static void save_svalue(v, delimiter)
 	    source = number_buffer;
 	    (void)sprintf(source, "%ld", v->u.number);
 	    c = *source++;
-	    do L_PUTC(c) while (c = *source++);
+	    do L_PUTC(c) while ( (c = *source++) );
 	    L_PUTC(delimiter);
 	    L_PUTC_EPILOG
 	    return;
@@ -521,7 +511,7 @@ static void save_svalue(v, delimiter)
 		v->x.exponent & 0xffff,
 		v->u.mantissa);
 	    c = *source++;
-	    do L_PUTC(c) while (c = *source++);
+	    do L_PUTC(c) while ( (c = *source++) );
 	    L_PUTC(delimiter);
 	    L_PUTC_EPILOG
 	    return;
@@ -530,7 +520,7 @@ static void save_svalue(v, delimiter)
 	case T_MAPPING:
 	    save_mapping(v->u.map);
 	    break;
-#endif MAPPINGS
+#endif /* MAPPINGS */
 	default:
 	{
 	    L_PUTC_PROLOG
@@ -587,7 +577,6 @@ static void register_array(vec)
     }
 }
 
-long current_pointer_id;
 static struct svalue *shared_restored_values;
 static long max_shared_restored, current_shared_restored;
 
@@ -627,7 +616,7 @@ char *pointer;
 		    old->ref_count++;
 		    return 1;
 		}
-	    } while (old = old->next);
+	    } while ( (old = old->next) );
 	    old = *insert;
 	    /* insert at top of sub hash chain */
 	    break;
@@ -754,7 +743,7 @@ void save_object(ob, file)
 	    c = *var_name++;
 	    do {
 		L_PUTC(c)
-	    } while (c = *var_name++);
+	    } while ( (c = *var_name++) );
 	    L_PUTC(' ')
 	    L_PUTC_EPILOG
 	}
@@ -774,7 +763,7 @@ void save_object(ob, file)
 	return;
     }
     (void)unlink(name);
-#if !defined(MSDOS_FS) && !defined(AMIGA) && !defined(OS2)
+#if !defined(MSDOS_FS) && !defined(AMIGA) && !defined(OS2) && !defined(__BEOS__)
     if (link(tmp_name, name) == -1)
 #else /* MSDOS_FS */
     (void) close(f);
@@ -785,7 +774,7 @@ void save_object(ob, file)
 	printf("Failed to link %s to %s\n", tmp_name, name);
 	add_message("Failed to save object !\n");
     }
-#if !defined(MSDOS_FS) && !defined(AMIGA) && !defined(OS2)
+#if !defined(MSDOS_FS) && !defined(AMIGA) && !defined(OS2) && !defined(__BEOS__)
     (void)close(f);
     unlink(tmp_name);
 #endif
@@ -1068,7 +1057,7 @@ static int old_restore_string(v, str)
     char *cp, c;
 
     cp = ++str;
-    if (c = *cp++) {
+    if ( (c = *cp++) ) {
 	do {
 #ifndef MSDOS_FS
 	    if (c == '\r')
@@ -1076,7 +1065,7 @@ static int old_restore_string(v, str)
 	    if (c == 30)
 #endif
 		cp[-1] = '\n';
-	} while (c = *cp++);
+	} while ( (c = *cp++) );
 	if (cp[-2] == '\n' && cp[-3] == '\"') {
 	    cp[-3] = '\0';
 	    v->type = T_STRING;
@@ -1097,8 +1086,7 @@ int restore_object(ob, file)
     int len;
     FILE *f;
     struct stat st;
-    struct variable *rover;
-    /* rover is used uninitialised, but var_rest is initialised instead. */
+    struct variable *rover = NULL;
     int var_rest, num_var;
 #ifndef MSDOS_FS
     int old_format;
@@ -1133,7 +1121,11 @@ int restore_object(ob, file)
 	(void)fclose(f);
 	return 0;
     }
-    buff = alloca(st.st_size + 1);
+    buff = xalloc(st.st_size + 1);
+    if (!buff) {
+        error("Out of memory.\n");
+        return 0; /* flow control hint */
+    }
     shared_restored_values = (struct svalue *)
       xalloc(sizeof(struct svalue)*256);
     max_shared_restored = 256;
@@ -1156,20 +1148,21 @@ int restore_object(ob, file)
 		int restored_version;
 
 		i = sscanf(buff+1, "%d:%d", &restored_version, &restored_host);
-		if (i <= 0 || i == 2 && restored_version <= CURRENT_VERSION) {
+		if (i <= 0 || (i == 2 && restored_version <= CURRENT_VERSION) ) {
 		    old_format = 0;
 		    continue;
 		}
 	    }
 	    (void)fclose(f);
-	    if (dp) do free_svalue(&dp->v); while (dp=dp->next);
+	    if (dp) do free_svalue(&dp->v); while ( (dp=dp->next) );
 	    xfree((char*)shared_restored_values);
+	    xfree(buff);
 	    error("Illegal format when restoring %s.\n", name);
 	    return 0; /* flow control hint */
 	}
 	*space = 0;
 	do {
-	    if ( var = findstring(buff) ) {
+	    if ( (var = findstring(buff)) ) {
 		do
 		    rover++;
 		while (--var_rest > 0 &&
@@ -1203,17 +1196,19 @@ int restore_object(ob, file)
 	     !restore_svalue(v, &pt, '\n')	)
 	{
 	    (void)fclose(f);
-	    if (dp) do free_svalue(&dp->v); while (dp=dp->next);
+	    if (dp) do free_svalue(&dp->v); while ( (dp=dp->next) );
 	    xfree((char*)shared_restored_values);
+	    xfree(buff);
 	    error("Illegal format when restoring %s.\n", name);
 	    return 0;
 	}
     }
-    if (dp) do free_svalue(&dp->v); while (dp=dp->next);
+    if (dp) do free_svalue(&dp->v); while ( (dp=dp->next) );
     if (d_flag > 1)
 	debug_message("Object %s restored from %s.\n", ob->name, name);
     (void)fclose(f);
     xfree((char*)shared_restored_values);
+    xfree(buff);
     return 1;
 }
 
@@ -1222,7 +1217,7 @@ void tell_npc(ob, str)
     char *str;
 {
     push_volatile_string(str);
-    (void)sapply("catch_tell", ob, 1);
+    (void)sapply(STR_CATCH_TELL, ob, 1);
 }
 
 /*
@@ -1328,7 +1323,7 @@ void add_ref(ob, from)
 #ifdef INITIALIZATION_BY___INIT
 struct object *get_empty_object(num_var, variables)
     int num_var;
-    struct variable *variables;
+    struct variable *variables UNUSED;
 #else
 struct object *get_empty_object(num_var, variables, initializers)
     int num_var;
@@ -1508,15 +1503,12 @@ void reset_object(ob, arg)
     struct object *ob;
     int arg;
 {
-    extern int current_time;
-    extern struct svalue *inter_sp;
-
     /* Be sure to update time first ! */
     ob->next_reset = current_time + TIME_TO_RESET/2 +
 	random_number(TIME_TO_RESET/2);
 #ifdef INITIALIZATION_BY___INIT
     if (arg != H_RESET) {
-	sapply("__INIT", ob, 0);
+	sapply(STR_VARINIT, ob, 0);
 	if (ob->flags & O_DESTRUCTED)
 	    return;
     }
@@ -1549,9 +1541,6 @@ void reset_object(ob, arg)
 struct replace_ob *obj_list_replace = (struct replace_ob *)0;
 
 void replace_programs() {
-    extern void replace_program_lambda_adjust
-	PROT((struct replace_ob *r_ob, struct program *));
-
     struct replace_ob *r_ob, *r_next;
     int i,j;
     struct svalue *svp;
@@ -1623,7 +1612,7 @@ void replace_programs() {
 	r_next = r_ob->next;
 	if (r_ob->lambda_rpp) {
 	    obj_list_replace = r_next;
-	    replace_program_lambda_adjust(r_ob, old_prog);
+	    replace_program_lambda_adjust(r_ob);
 	}
 	free_prog(old_prog, 1);
 #ifdef DEBUG
@@ -1682,7 +1671,7 @@ int shadow_catch_message(ob, str)
 	return 0;
     trace_level |= ip->trace_level;
     push_volatile_string(str);
-    if (sapply("catch_tell", ob, 1))
+    if (sapply(STR_CATCH_TELL, ob, 1))
 	return 1;
     /* The call failed, thus, current_object wasn't changed
      * (e.g. destructed and set to 0 ) .
@@ -1710,7 +1699,7 @@ int shadow_catch_message(ob, str)
 	if (function_exists("catch_tell", ob))
 	{
 	    push_volatile_string(str);
-	    if (apply("catch_tell", ob, 1)) /* this will work, since we know the */
+	    if (apply(STR_CATCH_TELL, ob, 1)) /* this will work, since we know the */
 		/* function is defined */
 		return 1;
 	}

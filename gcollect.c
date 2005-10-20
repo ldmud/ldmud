@@ -1,35 +1,37 @@
-#include "lint.h"
-#include "config.h"
-#include "interpret.h"
-#include "object.h"
-#include "exec.h"
-#include "sent.h"
-#include "comm.h"
-#include "smalloc.h"
-#include "instrs.h"
-#include "lang.h"
-#include "wiz_list.h"
+#include "driver.h"
+
+#include <sys/types.h>
+#include <sys/time.h>
+
 #define NO_INCREMENT_STRING_REF
+#include "gcollect.h"
+#include "array.h"
+#include "backend.h"
+#include "call_out.h"
+#include "closure.h"
+#include "comm.h"
+#include "ed.h"
+#include "exec.h"
+#include "interpret.h"
+#include "instrs.h"
+#include "lex.h"
+#include "main.h"
+#include "mapping.h"
+#include "object.h"
+#include "otable.h"
+#include "prolang.h"
+#include "rxcache.h"
+#include "sent.h"
+#include "simulate.h"
+#include "simul_efun.h"
+#include "smalloc.h"
 #include "stralloc.h"
-extern void dprintf1 PROT((int, char *, p_int));
+#include "swap.h"
+#include "wiz_list.h"
 
 /* The referencing code for dynamic data should mirror the destructor code,
  * thus, memory leaks can show up as soon as the memory has allocated.
  */
-
-
-#ifdef MAPPINGS
-void walk_mapping PROT((
-        struct mapping *,
-        void (*)(struct svalue *, struct svalue *, char *),
-        char *
-));
-extern mp_int num_dirty_mappings;
-extern void compact_mappings PROT((mp_int));
-#endif
-
-extern void free_all_sent();
-extern void remove_destructed_objects();
 
 #if defined(MALLOC_smalloc)
 
@@ -43,17 +45,16 @@ extern void remove_destructed_objects();
     ))\
 )
 
-extern int d_flag;
 int gcollect_outfd = 2;
 #define gout gcollect_outfd
+
+/* Time of last gc, used by the backend in times of memory shortage */
+time_t time_last_gc = 0;
 
 /* Are the ref counts unusable, i.e. is phase 2 or two 3 in progress ? */
 int garbage_collection_in_progress = 0;
 
 #ifdef SMALLOC_TRACE
-extern void writex PROT((int, int));
-extern void writed PROT((int, int));
-extern int is_freed PROT((char *, p_uint));
 #define WRITES(d, s) write((d), (s), strlen(s))
 #define WRITE_SMALLOC_TRACE(p)	(WRITES(gout, ((char **)(p))[-3]), \
 	WRITES(gout, " "), \
@@ -70,8 +71,6 @@ extern int is_freed PROT((char *, p_uint));
 #define TEST_REF(p) ( !( ((p_uint *)(p))[-SMALLOC_OVERHEAD] & M_REF ) )
 
 #define CHECK_REF(p) ( TEST_REF(p) && ( MARK_REF(p),MY_TRUE ) )
-
-extern long time_to_swap_variables;
 
 #ifdef __GNUC__
 /* typecast would strip NORETURN */
@@ -94,7 +93,7 @@ void clear_memory_reference(p)
     CLEAR_REF(p);
 }
 
-void remove_unreferenced_string(start, string)
+static void remove_unreferenced_string(start, string)
     char *start, *string;
 {
     if (TEST_REF(start)) {
@@ -110,8 +109,8 @@ void remove_unreferenced_string(start, string)
 }
 
 struct object *gc_obj_list_destructed;
-struct lambda *stale_lambda_closures, *stale_misc_closures;
-extern struct mapping *stale_mappings;
+static struct lambda *stale_lambda_closures;
+struct lambda *stale_misc_closures;
 
 void clear_inherit_ref(p)
     struct program *p;
@@ -185,10 +184,10 @@ struct sentence *p;
 	if (p->function) MARK_STRING_REF(p->function);
 	if (p->verb) MARK_STRING_REF(p->verb);
 	NOTE_REF(p);
-    } while (p = p->next);
+    } while ( (p = p->next) );
 }
 
-void clear_map_ref_filter PROT((struct svalue *, struct svalue *, char *));
+static void clear_map_ref_filter PROT((struct svalue *, struct svalue *, char *));
 
 void reference_destructed_object(ob)
     struct object *ob;
@@ -220,8 +219,6 @@ void note_malloced_block_ref(p)
 static void count_ref_in_closure(csvp)
     struct svalue *csvp;
 {
-    extern struct object *master_ob;
-
     struct lambda *l = csvp->u.lambda;
     ph_int type = csvp->x.closure_type;
 
@@ -381,8 +378,6 @@ void count_ref_in_vector(svp, num)
 #ifdef MAPPINGS
 	  case T_MAPPING:
 	    if (CHECK_REF(p->u.map)) {
-		extern void count_ref_in_mapping PROT((struct mapping *));
-
 		struct mapping *m;
 		struct condensed_mapping *cm;
 		int num_values;
@@ -413,8 +408,6 @@ void count_ref_in_vector(svp, num)
 		    count_ref_in_closure(p);
 		}
 	    } else {
-		extern struct object *master_ob;
-
 		struct object *ob;
 
 		ob = p->u.ob;
@@ -435,7 +428,7 @@ void count_ref_in_vector(svp, num)
     }
 }
 
-void clear_map_ref_filter(key, data, extra)
+static void clear_map_ref_filter(key, data, extra)
     struct svalue *key, *data;
     char *extra;
 {
@@ -503,6 +496,11 @@ void clear_ref_in_vector(svp, num)
     }
 }
 
+static void remove_uids(smart)
+    int smart UNUSED;
+{
+}
+
 /*
  * Loop through every object and variable in the game and check
  * all reference counts. This will surely take some time, and should
@@ -510,21 +508,6 @@ void clear_ref_in_vector(svp, num)
  */
 void garbage_collection()
 {
-    extern struct object *master_ob;
-    extern void clear_M_REF_flags();
-    extern void clear_shared_string_refs();
-    extern void walk_shared_strings PROT(( void (*)(char *, char *) ));
-    extern void reallocate_reserved_areas();
-
-    extern struct interactive *all_players[MAX_PLAYERS];
-    extern char *last_insert_alist_shared_string;
-    extern int malloc_privilege;
-    extern int32 initial_eval_cost, eval_cost, assigned_eval_cost;
-    extern int out_of_memory;
-    extern char *reserved_user_area, *reserved_master_area,
-	        *reserved_system_area;
-    extern char *mud_lib;
-
     struct object *ob, *next_ob;
     struct lambda *l, *next_l;
     int i;
@@ -585,7 +568,7 @@ void garbage_collection()
 	if (ob->flags & O_SHADOW) {
 	    struct ed_buffer *buf;
 
-	    if (buf = O_GET_SHADOW(ob)->ed_buffer) {
+	    if ( (buf = O_GET_SHADOW(ob)->ed_buffer) ) {
 		clear_ed_buffer_refs(buf);
 	    } /* end of ed-buffer processing */
 	}
@@ -601,7 +584,7 @@ void garbage_collection()
 
 	if (all_players[i] == 0)
 	    continue;
-	if (it = all_players[i]->input_to) {
+	if ( (it = all_players[i]->input_to) ) {
 	    clear_ref_in_vector(it->arg, it->num_arg);
 	    if (it->ob->flags & O_DESTRUCTED && it->ob->ref) {
 		it->ob->ref = 0;
@@ -611,7 +594,7 @@ void garbage_collection()
 	}
 	clear_ref_in_vector(&all_players[i]->default_err_message, 1);
 	clear_ref_in_vector(&all_players[i]->prompt, 1);
-	if (ob = all_players[i]->snoop_by) {
+	if ( (ob = all_players[i]->snoop_by) ) {
 	    if (!O_GET_INTERACTIVE(ob) ||
 		O_GET_INTERACTIVE(ob)->sent.type != SENT_INTERACTIVE)
 	    {
@@ -623,7 +606,7 @@ void garbage_collection()
 	        }
 	    }
 	} /* end of snoop-processing */
-	if (ob = all_players[i]->modify_command) {
+	if ( (ob = all_players[i]->modify_command) ) {
 	    if (ob->flags & O_DESTRUCTED && ob->ref) {
 		ob->ref = 0;
 		ob->prog->ref = 0;
@@ -654,6 +637,9 @@ void garbage_collection()
     clear_simul_efun_refs();
     clear_interpreter_refs();
     clear_comm_refs();
+#ifdef RXCACHE_TABLE
+    clear_rxcache_refs();
+#endif
 
     null_vector.ref = 0;
 
@@ -694,7 +680,7 @@ void garbage_collection()
 	    sent = ob->sent;
 	    if (ob->flags & O_SHADOW) {
 		NOTE_REF(sent);
-		if (buf = ((struct shadow_sentence *)sent)->ed_buffer) {
+		if ( (buf = ((struct shadow_sentence *)sent)->ed_buffer) ) {
 		    NOTE_REF(buf);
 		    count_ed_buffer_refs(buf);
 		} /* end of ed-buffer processing */
@@ -722,7 +708,7 @@ void garbage_collection()
 	NOTE_REF(all_players[i]);
 	/* There are no destructed interactives */
 	all_players[i]->ob->ref++;
-	if (ob = all_players[i]->snoop_by) {
+	if ( (ob = all_players[i]->snoop_by) ) {
 	    if (!O_GET_INTERACTIVE(ob) ||
 		O_GET_INTERACTIVE(ob)->sent.type != SENT_INTERACTIVE)
 	    {
@@ -735,7 +721,7 @@ void garbage_collection()
 	        }
 	    }
 	} /* end of snoop-processing */
-	if (it = all_players[i]->input_to) {
+	if ( (it = all_players[i]->input_to) ) {
 	    /* To avoid calling too high-level functions, we want the
 	     * struct input_to not to be freed by now.
 	     * Thus, we reference the object even if it is destructed.
@@ -752,7 +738,7 @@ void garbage_collection()
 	    MARK_STRING_REF(it->function);
 	    count_ref_in_vector(it->arg, it->num_arg);
 	} /* end of input_to processing */
-	if (ob = all_players[i]->modify_command) {
+	if ( (ob = all_players[i]->modify_command) ) {
 	    if (ob->flags & O_DESTRUCTED) {
 		all_players[i]->modify_command = 0;
 		reference_destructed_object(ob);
@@ -788,6 +774,9 @@ void garbage_collection()
     count_comm_refs();
     count_interpreter_refs();
     count_heart_beat_refs();
+#ifdef RXCACHE_TABLE
+    count_rxcache_refs();
+#endif
     if (reserved_user_area)
 	NOTE_REF(reserved_user_area);
     if (reserved_master_area)
@@ -844,22 +833,16 @@ void garbage_collection()
     free_unreferenced_memory();
     reallocate_reserved_areas();
     if (!reserved_user_area) {
-	void remove_uids PROT((int));
-
 	struct svalue *res = 0;
 	if (reserved_system_area) {
 	    CLEAR_EVAL_COST;
 	    malloc_privilege = MALLOC_MASTER;
-	    res = apply_master_ob("quota_demon", 0);
+	    res = apply_master_ob(STR_QUOTA_DEMON, 0);
 	}
 	remove_uids(res && (res->type != T_NUMBER || res->u.number) );
     }
     reallocate_reserved_areas();
-}
-
-void remove_uids(smart)
-    int smart;
-{
+    time_last_gc = time(NULL);
 }
 
 #else /* not MALLOC_smalloc :-( */
@@ -895,8 +878,6 @@ static void clear_program_id(p)
 static void renumber_program(p)
     struct program *p;
 {
-    extern int32 current_id_number;
-
     int i;
 
     if (p->id_number)
@@ -908,9 +889,6 @@ static void renumber_program(p)
 }
 
 int32 renumber_programs() {
-    extern int32 current_id_number;
-    extern void invalidate_apply_low_cache();
-
     struct object *ob;
 
     current_id_number = 0;
@@ -998,8 +976,6 @@ static void show_array(d, block, depth)
     a = (struct vector *)block;
     a_size = VEC_SIZE(a);
     if (depth && a != &null_vector) {
-	extern struct wiz_list *all_wiz;
-
 	int freed;
 	struct wiz_list *wl;
 
@@ -1011,7 +987,7 @@ static void show_array(d, block, depth)
 		for ( ; wl && wl != user; wl = wl->next);
 	}
 	if (freed || !wl || a_size <= 0 || a_size > MAX_ARRAY_SIZE ||
-	    malloced_size((char *)a) - SMALLOC_OVERHEAD << 2 !=
+	    (malloced_size((char *)a) - SMALLOC_OVERHEAD) << 2 !=
 	      sizeof(struct vector) + sizeof(struct svalue) * (a_size - 1) )
 	{
 	    WRITES(d, "Array in freed block 0x");
@@ -1081,12 +1057,6 @@ void setup_print_block_dispatcher()
  * gcollect.c is already notorious for including almost every header file.
  */
 {
-    extern struct object *master_ob;
-    extern struct svalue *inter_sp;
-
-    extern void store_print_block_dispatch_info
-				PROT((char *, void (*)(int, char *, int)));
-
     struct svalue tmp_closure;
     struct vector *a, *b;
 

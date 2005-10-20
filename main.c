@@ -1,3 +1,31 @@
+/*---------------------------------------------------------------------------
+ * LPMud Driver main module.
+ *
+ *---------------------------------------------------------------------------
+ * Here is the main() function which parses the commandline arguments,
+ * initializes everything and starts the backend loop. A documentation
+ * of the available commandline arguments is in the file
+ * doc/driver/invocation; the argument '--help' causes the driver to
+ * print a short help to all available arguments.
+ *
+ * The commandline arguments are actually parsed twice, since some
+ * arguments expect a functional master object (like the 'f' argument).
+ *
+ * The argument parser is an adaption of a generic parser. All the associated
+ * code and comments is kept in the lower half of this source for better
+ * readability.
+ *
+ * This file also contains several global functions and variables, some of
+ * which should probably go into a dedicated 'global' module or somewhere else
+ * appropriate.
+ * TODO: Move out all those variables and functions which are illfitting here.
+ * TODO: Put the argument parsing into a separate file?
+ *---------------------------------------------------------------------------
+ */
+
+#include "driver.h"
+
+#include "my-alloca.h"
 #include <stdio.h>
 #include <math.h>
 #include <setjmp.h>
@@ -5,79 +33,102 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <ctype.h>
-#ifdef __STDC__
 #include <stdarg.h>
-#endif
 #ifdef NeXT
 #include <sys/param.h>
 #endif
-#include "lint.h"
-#include "interpret.h"
-#include "object.h"
-#include "config.h"
-#include "lex.h"
-#include "patchlevel.h"
-#include "wiz_list.h"   /* this is not a real dependency */
-
 #ifdef AMIGA
 #include "hosts/amiga/socket.h"
 #endif
 
-extern char *prog;
+#define NO_INCREMENT_STRING_REF
+#include "main.h"
 
-extern int current_line;
+#include "backend.h"
+#include "array.h"
+#include "comm.h"
+#include "gcollect.h"
+#include "interpret.h"
+#include "lex.h"
+#include "mapping.h"
+#include "object.h"
+#include "otable.h"
+#include "patchlevel.h"
+#include "random.h"
+#include "rxcache.h"
+#include "simulate.h"
+#include "simul_efun.h"
+#include "stralloc.h"
+#include "swap.h"
+#include "wiz_list.h"
 
-int d_flag = 0;	/* Run with debug */
-int t_flag = 0;	/* Disable heart beat and reset */
-int e_flag = 0;	/* Load empty, without castles. */
-int comp_flag = 0; /* Trace compilations */
+/*-------------------------------------------------------------------------*/
+
+/* -- Pure commandline arguments -- */
+
+int d_flag    = 0;  /* Debuglevel */
+/* TODO: BOOL */ int t_flag    = MY_FALSE;  /* True: Disable heart beat and reset */
+int e_flag    = MY_FALSE;  /* Passed to preload(), usually disables it */
+/* TODO: BOOL */ int comp_flag = MY_FALSE;  /* Trace compilations */
 #ifdef DEBUG
-int check_a_lot_ref_counts_flag = 0;
+/* TODO: BOOL */ int check_a_lot_ref_counts_flag = MY_FALSE;  /* The name says it. */
 #endif
-long time_to_swap = TIME_TO_SWAP; /* marion - invocation parameter */
+
+long time_to_swap           = TIME_TO_SWAP;
 long time_to_swap_variables = TIME_TO_SWAP_VARIABLES;
-#ifdef D_FLAG
-int D_flag;	/* Log specific trace messages to /log/D_TRACE */
-#endif
+  /* A value <= 0 disables the swapping. */
 
-#ifdef YYDEBUG
-extern int yydebug;
-#endif
-
+#ifndef MAXNUMPORTS
 int port_number = PORTNO;
-#ifdef CATCH_UDP_PORT
-int udp_port = CATCH_UDP_PORT;
+#else
+int port_numbers[MAXNUMPORTS] = { PORTNO };  
+  /* The login port numbers.
+   * Negative numbers are not ports, but the numbers of inherited
+   * socket file descriptors.
+   */
+int numports = 0;  /* Number of specified ports */
 #endif
 
-int out_of_memory = 0;
-int malloc_privilege = MALLOC_USER;
-char *reserved_user_area = 0, *reserved_master_area = 0,
-     *reserved_system_area = 0; /* reserved for malloc()  */
-mp_int reserved_user_size = RESERVED_USER_SIZE; /* for statistical purposes */
+#ifdef CATCH_UDP_PORT
+int udp_port = CATCH_UDP_PORT;  /* Port number for UDP */
+#endif
+
+char *mud_lib;                        /* Path to the mudlib */
+char master_name[100] = MASTER_NAME;  /* Name of the master object */
+
+static int new_mudlib = 0;    /* True: mudlib directory was specified */
+static int no_erq_demon = 0;  /* True: don't start the erq */
+
+/* -- Global Variables/Arguments dealing with memory -- */
+
+/* TODO: BOOL */ int out_of_memory = MY_FALSE;              /* True: we are out of memory */
+int malloc_privilege = MALLOC_USER; /* Priviledge for next allocation */
+
+char *reserved_user_area   = NULL;  /* Reserved memory areas */
+char *reserved_master_area = NULL;
+char *reserved_system_area = NULL;
+
+mp_int reserved_user_size   = RESERVED_USER_SIZE;   /* The reserved sizes */
 mp_int reserved_master_size = RESERVED_MASTER_SIZE;
 mp_int reserved_system_size = RESERVED_SYSTEM_SIZE;
+
 #ifdef MAX_MALLOCED
-mp_int max_malloced = MAX_MALLOCED;
+mp_int max_malloced       = MAX_MALLOCED;           /* Allocation limits */
 mp_int max_small_malloced = MAX_SMALL_MALLOCED;
 #endif
 
-struct svalue const0, const1;
-extern struct svalue assoc_shared_string_key;
+/* -- Other Global Variables -- */
+struct svalue const0, const1;  
+  /* The values 0 and 1 as svalues, mem-copied when needed */
 
-double consts[5];
+double consts[5];  /* Weight constants used to compute average figures */
 
-extern struct error_recovery_info toplevel_error_recovery_info;
+char *debug_file;  /* Name of the debug log file. */
 
-extern struct object *master_ob;
-
-char *mud_lib; /* store the path so that it can be restored later quickly */
-
-char master_name[100] = MASTER_NAME;
-
-char *debug_file;
-
-extern struct wiz_list default_wizlist_entry;
-
+/* Dummy object for functions, which need a current_object though
+ * there is none. This is usually the case when (re)loading the
+ * master object.
+ */
 struct object dummy_current_object_for_loads = {
   0, /* flags */
   0, /* light */
@@ -95,37 +146,44 @@ struct object dummy_current_object_for_loads = {
   0, /*  struct sentence *sent;		  */
   &default_wizlist_entry, /*  user        * What wizard defined this object */
 };
-	/* To have an object to assign array usage to */
 
-int main(argc, argv)
-    int argc;
-    char **argv;
+int slow_shut_down_to_do = 0;
+  /* If non-zero, the game should perform a graceful shutdown.
+   * The value is the number of minutes to still last before shutting down.
+   */
+
+/*-------------------------------------------------------------------------*/
+
+/* Forward declarations for the argument parser in the lower half */
+
+static int getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) );
+static int firstscan (int, const char *);
+static int secondscan (int, const char *);
+
+/*-------------------------------------------------------------------------*/
+int
+main (int argc, char **argv)
+
+/* The main function. Nuff said. */
+
 {
-    extern void init_shared_strings();
-    extern void init_otable();
-    extern void init_closure_hooks();
-    extern void start_erq_demon();
-    extern void initialize_host_ip_number();
-    void initialize_master_uid();
-    extern int game_is_being_shut_down;
-    extern int current_time;
-    extern int32 initial_eval_cost, eval_cost, assigned_eval_cost;
-    extern struct svalue walk_mapping_string_svalue;
-
-    int i, new_mudlib = 0;
-    int no_erq_demon = 0;
+    int i;
     char *p;
-#ifdef MALLOC_gc
-    extern void gc_init();
-#endif
 
-#ifdef MALLOC_gc
-    gc_init();
+    /* Initialisations */
+
+    init_interpret();
+#ifdef RXCACHE_TABLE
+    rxcache_init();
 #endif
     const0.type = T_NUMBER; const0.u.number = 0;
     const1.type = T_NUMBER; const1.u.number = 1;
     assoc_shared_string_key.type = T_STRING;
     assoc_shared_string_key.x.string_type = STRING_SHARED;
+
+    current_time = get_current_time();
+    seed_random(current_time);
+
     /*
      * Check that the definition of EXTRACT_UCHAR() is correct.
      */
@@ -135,174 +193,21 @@ int main(argc, argv)
 	fprintf(stderr, "Bad definition of EXTRACT_UCHAR() in config.h.\n");
 	exit(1);
     }
-#ifdef DRAND48
-    srand48(get_current_time());
-#else
-#ifdef RANDOM
-    srandom(get_current_time());
-#else
-#ifdef RAND
-    srand(get_current_time());
-#else
-    seed_random(get_current_time());
-#endif /* RAND */
-#endif /* RANDOM */
-#endif /* DRAND48 */
-    current_time = get_current_time();
 
+#ifdef HOST_DEPENDENT_INIT
     HOST_DEPENDENT_INIT
+#endif
 
-    /*
-     * The flags are parsed twice !
-     * The first time, we search for the -m flag, which specifies
-     * another mudlib, -Dmacro flags & port specification, so that they
-     * will be available when compiling master.c , -N, -rsize and the -o flag.
+    /* First scan of the arguments.
+     * This evaluates everything but the 'f' arguments.
      */
-    for (i=1; i < argc; i++) {
-	if (atoi(argv[i]))
-	    port_number = atoi(argv[i]);
-	if (argv[i][0] != '-')
-	    continue;
-	switch(argv[i][1]) {
-	  case 'D':
-	    if (argv[i][2]) { /* Amylaar : allow flags to be passed down to
-					   the LPC preprocessor */
-		struct lpc_predef_s *tmp;
+    if (getargs(argc, argv, firstscan))
+      exit(1);
 
-		tmp = (struct lpc_predef_s *)
-		alloca(sizeof(struct lpc_predef_s));
-		if (!tmp) fatal("alloca failed\n");
-		tmp->flag = argv[i]+2;
-		tmp->next = lpc_predefs;
-		lpc_predefs = tmp;
-		continue;
-	    }
-	    break;
-	  case 'o':
-	    fprintf(stderr, "-o is an obsolete flag. Use COMPAT_MODE in config.h.\n");
-	    exit(0);
-	    break;
-#ifdef CATCH_UDP_PORT
-	  case 'u':
-	    udp_port = atoi(&argv[i][2]);
-	    continue;
+#ifdef MAXNUMPORTS
+    if (numports < 1) /* then use the default port */
+        numports = 1;
 #endif
-	  case 'N':
-	    no_erq_demon++; continue;
-	  case 'M':
-	    p = argv[i] + 2;
-	    if (!*p && ++i < argc)
-		p = argv[i];
-	    if (strlen(p) >= sizeof(master_name)) {
-	    /* master_name needs to have space for \0 */
-	        fprintf(stderr, "Too long master name '%s'\n", p);
-		exit(1);
-	    }
-	    strcpy(master_name, p);
-	    continue;
-	  case 'm':
-	    p = argv[i] + 2;
-	    if (!*p && ++i < argc)
-		p = argv[i];
-	    if (chdir(p) == -1) {
-	        fprintf(stderr, "Bad mudlib directory: %s\n", p);
-		exit(1);
-	    }
-	    new_mudlib = 1;
-	    break;
-	  case 'r':
-	  {
-	    mp_int *sizep;
-
-	    p = argv[i] + 2;
-	    switch(*p++) {
-	      default:
-		p--;
-	      case 'u': sizep = &reserved_user_size; break;
-	      case 'm': sizep = &reserved_master_size; break;
-	      case 's': sizep = &reserved_system_size; break;
-	    }
-	    *sizep = strtol(p, (char**)0, 0);
-	    break;
-	  }
-	  case 'E':
-	    initial_eval_cost = -atoi(&argv[i][2]);
-	    break;
-	  case '-':
-	    p = argv[i] + 2;
-#ifdef MAX_MALLOCED
-	    if ( !strncmp(p, "max_malloced", 12) ) {
-		if ( !*(p+=12) ) {
-		    i++;
-		    p = argv[i];
-		}
-		max_malloced = strtol(p, (char **)0, 0);
-		if (!max_malloced)
-		    fatal("0 max_malloced\n");
-		break;
-	    }
-	    if ( !strncmp(p, "max_small_malloced", 18) ) {
-		if ( !*(p+=18) && ++i < argc) {
-		    p = argv[i];
-		}
-		max_small_malloced = strtol(p, (char **)0, 0);
-		break;
-	    }
-#endif
-#ifdef DEBUG
-	    if ( !strcmp(p, "check_a_lot_ref_counts") ) {
-		check_a_lot_ref_counts_flag = 1;
-		break;
-	    }
-	    if ( !strncmp(p, "gobble_descriptors", 18) ) {
-		int n;
-
-		if ( !*(p+=18) && ++i < argc) {
-		    p = argv[i];
-		}
-		n = strtol(p, (char **)0, 0);
-		while(--n >= 0) {
-		    (void)dup(2);
-		}
-		break;
-	    }
-#endif
-	    if ( !strcmp(p, "version") ) {
-		printf("Version %5.5s%s\nRelease date: %s\ncompiled %s\n",
-		   GAME_VERSION, PATCH_LEVEL,
-		   RELEASE_DATE,
-#ifdef __STDC__
-		   __DATE__
-#else  /* !__STDC__ */
-		   "no __DATE__ available"
-#endif /* !__STDC__ */
-		);
-		exit(0);
-	    }
-#ifdef MALLOC_smalloc
-	    if ( !strncmp(p, "gcollect_outfd", 14) ) {
-		extern int gcollect_outfd;
-		if ( !*(p+=14) ) {
-		    i++;
-		    p = argv[i];
-		}
-		if (isdigit(*p)) {
-		    gcollect_outfd = strtol(p, (char **)0, 0);
-		} else {
-		    gcollect_outfd = ixopen3(p, O_CREAT|O_TRUNC|O_WRONLY, 0640);
-		}
-		break;
-	    }
-#endif
-	    if ( !strcmp(p, "debug_file") ) {
-		i++;
-		debug_file = argv[i];
-		break;
-	    }
-	    fprintf(stderr, "Unknown flag: %s\n", argv[i]);
-	    exit(1);
-	}
-    }
     init_closure_hooks();
 #ifdef MIN_MALLOCED
     xfree(xalloc(MIN_MALLOCED));
@@ -318,7 +223,7 @@ int main(argc, argv)
     init_shared_strings();
     walk_mapping_string_svalue.x.string_type = STRING_SHARED;
     init_otable();
-    for (i=0; i < sizeof consts / sizeof consts[0]; i++)
+    for (i = 0; i < (int)(sizeof consts / sizeof consts[0]); i++)
 	consts[i] = exp(- i / 900.0);
     init_num_args();
     reset_machine(1);
@@ -376,117 +281,47 @@ int main(argc, argv)
     add_ref(master_ob, "main");
     initialize_master_uid();
     push_number(0);
-    apply_master_ob("inaugurate_master", 1);
+    apply_master_ob(STR_INAUGURATE, 1);
     setup_print_block_dispatcher();
-    for (i=1; i < argc; i++) {
-	if (atoi(argv[i]))
-	    ;
-	else if (argv[i][0] != '-') {
-	    fprintf(stderr, "Bad argument %s\n", argv[i]);
-	    exit(1);
-	} else {
-	    /*
-	     * Look at flags. -m and -o have already been tested.
-	     */
-	    switch(argv[i][1]) {
-	    case 'f':
-		push_constant_string(argv[i]+2);
-		(void)apply_master_ob("flag", 1);
-		if (game_is_being_shut_down) {
-		    fprintf(stderr, "Shutdown by master object.\n");
-		    exit(0);
-		}
-		continue;
-	    case 'D':
-		if (argv[i][2]) { /* Amylaar : allow flags to be passed down to
-					       the LPC preprocessor */
-		    continue;
-		}
-#ifdef D_FLAG
-		D_flag++; continue;
-#else
-		fprintf(stderr, "'-D' is not supported\n");
-		exit(1);
-#endif
-	    case 'e':
-		e_flag++; continue;
-	    case '-':
-	    {
-		p = argv[i] + 2;
-		if (p[-1] == '-') {
-		    if (!strcmp(p, "max_malloced") ||
-			!strcmp(p, "max_small_malloced") ||
-			!strcmp(p, "gobble_descriptors") ||
-			!strcmp(p, "gcollect_outfd") ||
-			!strcmp(p, "debug_file") )
-		    {
-			i++;
-		    }
-		}
-		break;
-	    }
-	    case 'M':
-	    case 'm':
-		if (!argv[i][2])
-		    i++;
-		/* fall through */
-	    case 'o':
-	    case 'u':
-	    case 'N':
-	    case 'r':
-	    case 'E':
-		continue; /* these flags have been recognized above */
-	    case 'd':
-		d_flag++; continue;
-	    case 'c':
-		comp_flag++; continue;
-	    case 't':
-		t_flag++; continue;
-#if TIME_TO_SWAP > 0
-	    case 's':
-		if (argv[i][2] == 'v') {
-		    time_to_swap_variables = atoi (&argv[i][3]);
-		    if (time_to_swap_variables < 0)
-			time_to_swap_variables = (unsigned)-1>>1;
-		} else if (argv[i][2] == 'f') {
-		    extern void name_swap_file PROT((char*));
 
-		    name_swap_file(&argv[i][3]);
-		} else {
-		    time_to_swap = atoi (&argv[i][2]);
-		    if (time_to_swap < 0)
-			time_to_swap = (unsigned)-1>>1;
-		}
-		continue;
-#endif
-#ifdef YYDEBUG
-	    case 'y':
-		yydebug = 1; continue;
-#endif
-	    default:
-		fprintf(stderr, "Unknown flag: %s\n", argv[i]);
-		exit(1);
-	    }
-	}
-    }
+    /* Second scan of the arguments, now we're looking just for 
+     * the 'f' flag.
+     */
+    if (getargs(argc, argv, secondscan))
+        exit(1);
+
 #ifdef DEBUG
-    if (d_flag > 1 && time_to_swap_variables + 1 == 0)
-	check_a_lot_ref_counts_flag = 1;
+    if (d_flag > 1 && time_to_swap_variables <= 0)
+	check_a_lot_ref_counts_flag = MY_TRUE;
 #endif
+
     get_simul_efun_object();
     if (game_is_being_shut_down)
 	exit(1);
+
     load_wiz_file();
     preload_objects(e_flag);
+
+    /* Start the backend loop. This won't return before
+     * the game shuts down.
+     */
     backend();
+
     return 0;
 }
 
 
-void initialize_master_uid() {
+/*-------------------------------------------------------------------------*/
+void initialize_master_uid (void)
+
+/* After loading the master object, determine its (e)uid by calling the
+ * lfun get_master_uid() in it. For details, better read the code.
+ */
+
+{
     struct svalue *ret;
 
-    ret = apply_master_ob("get_master_uid", 0);
+    ret = apply_master_ob(STR_GET_M_UID, 0);
 #ifndef NATIVE_MODE
     if (ret && ret->type == T_NUMBER && ret->u.number) {
 	master_ob->user = &default_wizlist_entry;
@@ -508,6 +343,12 @@ void initialize_master_uid() {
     }
 }
 
+
+/*-------------------------------------------------------------------------*/
+
+/* string_copy() acts like strdup() with the additional bonus that it can
+ * trace file/line of the calling place if SMALLOC_TRACE is defined.
+ */
 
 #ifdef string_copy
 char *_string_copy(str, file, line)
@@ -536,25 +377,20 @@ char *string_copy(str)
 }
 #endif
 
-#ifdef __STDC__
-void debug_message(char *a, ...)
-#else
-/*VARARGS1*/
-void debug_message(a, b, c, d, e, f, g, h, i, j)
-    char *a;
-    int b, c, d, e, f, g, h, i, j;
-#endif
+/*-------------------------------------------------------------------------*/
+void
+debug_message(char *a, ...)
+
+/* Print a message into the debug logfile, printf() style.
+ */
+
 {
     static FILE *fp = NULL;
     char deb[100];
     char *file;
-#ifdef __STDC__
     va_list va;
-#endif
 
-#ifdef __STDC__
     va_start(va, a);
-#endif
     if (fp == NULL) {
 	if ( !(file = debug_file) ) {
 #ifndef MSDOS
@@ -574,49 +410,22 @@ void debug_message(a, b, c, d, e, f, g, h, i, j)
 	    abort();
 	}
     }
-#ifdef __STDC__
     (void)vfprintf(fp, a, va);
     va_end(va);
-#else
-    (void)fprintf(fp, a, b, c, d, e, f, g, h, i, j);
-#endif
     (void)fflush(fp);
 }
 
-#if 0
-void debug_message_svalue(v)
-    struct svalue *v;
-{
-    if (v == 0) {
-	debug_message("<NULL>");
-	return;
-    }
-    switch(v->type) {
-    case T_NUMBER:
-	debug_message("%ld", v->u.number);
-	return;
-    case T_STRING:
-	debug_message("\"%s\"", v->u.string);
-	return;
-    case T_OBJECT:
-	debug_message("OBJ(%s)", v->u.ob->name);
-	return;
-    case T_LVALUE:
-	debug_message("Pointer to ");
-	debug_message_svalue(v->u.lvalue);
-	return;
-    default:
-	debug_message("<INVALID>\n");
-	return;
-    }
-}
-#endif
-
-int slow_shut_down_to_do = 0;
-
+/*-------------------------------------------------------------------------*/
 #ifndef MALLOC_smalloc
-POINTER xalloc(size)
-    size_t size;
+POINTER
+xalloc (size_t size)
+
+/* Allocate <size> bytes of memory like malloc() does. 
+ * This function catches out of memory situations and tries to recover
+ * from them by using the reserved memory areas. If it totally runs
+ * out of memory, the program exit()s with code 3.
+ */
+
 {
     char *p;
     static int going_to_exit;
@@ -641,15 +450,12 @@ POINTER xalloc(size)
 #endif
     if (p == 0) {
 	if (reserved_user_area) {
-	    extern int garbage_collect_to_do;
-	    extern int extra_jobs_to_do;
-
 	    free(reserved_user_area);
 	    p = "Temporary out of MEMORY. Freeing reserve.\n";
 	    write(1, p, strlen(p));
 	    reserved_user_area = 0;
-	    garbage_collect_to_do = 1;
-	    extra_jobs_to_do = 1;
+	    garbage_collect_to_do = MY_TRUE;
+	    extra_jobs_to_do = MY_TRUE;
 	    return xalloc(size);	/* Try again */
 	}
 	/* We can hardly survive out of memory without the garbage collector */
@@ -663,7 +469,16 @@ POINTER xalloc(size)
 }
 #endif /* MALLOC_smalloc */
 
-void reallocate_reserved_areas() {
+/*-------------------------------------------------------------------------*/
+void
+reallocate_reserved_areas (void)
+
+/* Try to reallocate the reserved memory areas. If this is possible,
+ * a pending slow-shutdown is canceled.
+ */
+
+{
+    char *p;
     malloc_privilege = MALLOC_USER;
 #ifdef MALLOC_smalloc
     if (reserved_system_size && !reserved_system_area) {
@@ -671,18 +486,1198 @@ void reallocate_reserved_areas() {
 	    slow_shut_down_to_do = 1;
 	    return;
 	}
+	else {
+	    p = "Reallocated System reserve.\n";
+	    write(1, p, strlen(p));
+	}
     }
     if (reserved_master_size && !reserved_master_area) {
 	if ( !(reserved_master_area = xalloc(reserved_master_size)) ) {
 	    slow_shut_down_to_do = 1;
 	    return;
 	}
+	else {
+	    p = "Reallocated Master reserve.\n";
+	    write(1, p, strlen(p));
+	}
     }
 #endif /* MALLOC_smalloc */
     if (reserved_user_size && !reserved_user_area) {
-	if ( !(reserved_user_area = xalloc(reserved_user_size)) )
+	if ( !(reserved_user_area = xalloc(reserved_user_size)) ) {
 	    slow_shut_down_to_do = 6;
 	    return;
+        }
+	else {
+	    p = "Reallocated User reserve.\n";
+	    write(1, p, strlen(p));
+	}
     }
     slow_shut_down_to_do = 0;
 }
+
+/*-------------------------------------------------------------------------*/
+void
+writex (int d, p_uint i)
+
+/* Memory safe function to write hexvalue <i> to fd <d>. */
+
+{
+    int j;
+    char c;
+
+    for (j = 2 * sizeof i; --j >= 0; i <<= 4) {
+	c = (i >> (8 * sizeof i - 4) ) + '0';
+	if (c >= '9' + 1)
+	    c += 'a' - ('9' + 1);
+	write(d, &c, 1);
+    }
+}
+
+/*-------------------------------------------------------------------------*/
+void
+writed (int d, p_uint i)
+
+/* Memory safe function to write integer value <i> to fd <d>. */
+
+{
+    p_uint j;
+    char c;
+
+    for (j = 1000000000; j > i; j /= 10);
+    if (!j) j = 1;
+    do {
+	c = (i / j) % 10 + '0';
+	write(d, &c, 1);
+	j /= 10;
+    } while (j > 0);
+}
+
+/*=========================================================================*/
+/*                        The argument parser                              */
+/*=========================================================================*/
+/* This code parses the arguments passed to the program in the count <argc>
+ * and the array of strings <argv>. The parser distinguishes options, which
+ * start with a '-', from normal arguments; options are further distinguished
+ * by their name and may take an additional value. The parser neither
+ * imposes nor expects any order of options and arguments.
+ *
+ * Options are recognized in two forms. In the short form the option must
+ * be given as a single '-' followed by a single letter. In the long form,
+ * options start with '--' followed by a string of arbitrary length.
+ * Short options are case sensitive, long options aren't.
+ * Examples are: '-r' and '--recursive'.
+ *
+ * If an option takes a value, it must follow the option immediately after
+ * a separating space or '='. Additionally, the value for a short option
+ * may follow the option without separator. Examples are: '-fMakefile',
+ * '-f Makefile', '--file=Makefile' and '--file Makefile'.
+ *
+ * Short options may be collated into one argument, e.g. '-rtl', but
+ * of these only the last may take a value.
+ *
+ * The option '--' marks the end of options. All following command arguments
+ * are considered proper arguments even if they start with a '-' or '--'.
+ *-------------------------------------------------------------------------
+ * Internally every option recognized by the program is associated with
+ * an id number, defined as the enum OptNumber. The parser itself uses the
+ * two id numbers 'cUnknown' for unrecognized options, and 'cArgument' for
+ * proper command arguments.
+ *
+ * Id numbers are associated with their option strings/letters by the
+ * statically initialized arrays aShortOpts and aLongOpts. Every element
+ * of these two arrays is a structure defining the option's name (string
+ * or letter), the associated id number, and whether or not the option
+ * takes a value. The order of the elements does not matter.
+ *
+ * The parsing is done by calling the function
+ *
+ *   int getargs(int argc, char ** argv, int (*)handler(int, const char *))
+ *
+ * The function is passed the argument count <argc> and vector <argv> as
+ * they were received from the main() function, and a callback function
+ * <handler>. getargs() returns 0 if the parsing completed successfully,
+ * and non-zero else.
+ *
+ * The handler function is called for every successfully recognized option
+ * and argument. Its prototype is
+ *
+ *   int handler(int eOption, const char *pValue)
+ *
+ * Parameter <eOption> denotes the recognized option, and pValue points
+ * to the beginning of the value string if the option takes a value.
+ * Proper arguments are parsed with eOption==cArgument and pValue
+ * pointing to the argument string. The handler has to return 0 if the
+ * option/argument was processed correctly, and non-zero else.
+ *-------------------------------------------------------------------------
+ */
+/* Desription of short ('-') options */
+
+typedef struct ShortOpt {
+  char      cOption;  /* The option character */
+  int       eNumber;  /* The associated option number */
+  short     bValue;   /* True: takes a value */
+} ShortOpt;
+
+/* Desription of long ('--') options */
+
+typedef struct LongOpt {
+  char      * pOption;  /* The option string */
+  int         eNumber;  /* The associated option number */
+  short       bValue;   /* True: takes a value */
+} LongOpt;
+
+/* Every recognized option has a ordinal number */
+
+typedef enum OptNumber {
+   cUnknown = 0   /* unknown option                     */
+ , cArgument      /* normal argument (for us: filename) */
+ , cInherited     /* --inherit            */
+#ifdef CATCH_UDP_PORT
+ , cUdpPort       /* --udp                */
+#endif
+ , cTrace         /* --list-compiles      */
+ , cDebug         /* --debug              */
+ , cDefine        /* --define             */
+ , cEvalcost      /* --eval-cost          */
+ , cFuncall       /* --funcall            */
+ , cMaster        /* --master             */
+ , cMudlib        /* --mudlib             */
+ , cDebugFile     /* --debug-file         */
+#ifdef MAX_MALLOCED
+ , cMaxMalloc     /* --max-malloc         */
+ , cMaxSmall      /* --max-small-malloc   */
+#endif
+ , cNoERQ         /* --no-erq             */
+ , cNoHeart       /* --no-heart           */
+ , cNoPreload     /* --no-preload         */
+ , cReserved      /* -r                   */
+ , cReserveUser   /* --reserve-user       */
+ , cReserveMaster /* --reserve-master     */
+ , cReserveSystem /* --reserve-system     */
+#if TIME_TO_SWAP > 0
+ , cSwap          /* -s                   */
+ , cSwapTime      /* --swap-time          */
+ , cSwapVars      /* --swap-variables     */
+ , cSwapFile      /* --swap-file          */
+#endif
+#ifdef MALLOC_smalloc
+ , cGcollectFD    /* --gcollect-outfd     */
+#endif
+#ifdef DEBUG
+ , cCheckRefs     /* --check-refcounts    */
+ , cGobbleFDs     /* --gobble-descriptors */
+#endif
+#ifdef YYDEBUG
+ , cYYDebug       /* --yydebug            */
+#endif
+ , cOptions       /* --options            */
+ , cVersion       /* --version            */
+ , cLongHelp      /* --longhelp           */
+ , cHelp          /* --help               */
+} OptNumber;
+
+/* Comprehensive lists of recognized options */
+
+static ShortOpt aShortOpts[]
+  = { { 'c', cTrace,     MY_FALSE }
+    , { 'D', cDefine,    MY_TRUE }
+    , { 'd', cDebug,     MY_FALSE }
+    , { 'E', cEvalcost,  MY_TRUE }
+    , { 'e', cNoPreload, MY_FALSE }
+    , { 'f', cFuncall,   MY_TRUE }
+    , { 'M', cMaster,    MY_TRUE }
+    , { 'm', cMudlib,    MY_TRUE }
+    , { 'N', cNoERQ,     MY_FALSE }
+    , { 'P', cInherited, MY_TRUE }
+    , { 'r', cReserved,  MY_TRUE }
+#if TIME_TO_SWAP > 0
+    , { 's', cSwap,      MY_TRUE }
+#endif
+    , { 't', cNoHeart,   MY_FALSE }
+#ifdef CATCH_UDP_PORT
+    , { 'u', cUdpPort,   MY_TRUE }
+#endif
+#ifdef YYDEBUG
+    , { 'y', cYYDebug,   MY_FALSE }
+#endif
+    , { 'V', cVersion,   MY_FALSE }
+    , { 'h', cHelp,      MY_FALSE }
+    , { '?', cHelp,      MY_FALSE }
+    };
+
+static LongOpt aLongOpts[]
+  = { { "debug",              cDebug,         MY_FALSE }
+    , { "define",             cDefine,        MY_TRUE }
+    , { "debug-file",         cDebugFile,     MY_TRUE }
+    , { "debuf_file",         cDebugFile,     MY_TRUE } /* TODO: COMPAT */
+    , { "eval-cost",          cEvalcost,      MY_TRUE }
+    , { "funcall",            cFuncall,       MY_TRUE }
+    , { "list-compiles",      cTrace,         MY_FALSE }
+    , { "master",             cMaster,        MY_TRUE }
+    , { "mudlib",             cMudlib,        MY_TRUE }
+#ifdef MAX_MALLOCED
+    , { "max-malloc",         cMaxMalloc,     MY_TRUE }
+    , { "max-small-malloc",   cMaxSmall,      MY_TRUE }
+    , { "max_malloced",       cMaxMalloc,     MY_TRUE } /* TODO: COMPAT */
+    , { "max_small_malloced", cMaxSmall,      MY_TRUE } /* TODO: COMPAT */
+#endif
+    , { "inherit",            cInherited,     MY_TRUE }
+    , { "no-erq",             cNoERQ,         MY_FALSE }
+    , { "no-heart",           cNoHeart,       MY_FALSE }
+    , { "no-preload",         cNoPreload,     MY_FALSE }
+    , { "reserved-user",      cReserveUser,   MY_TRUE }
+    , { "reserved-master",    cReserveMaster, MY_TRUE }
+    , { "reserved-system",    cReserveSystem, MY_TRUE }
+#if TIME_TO_SWAP > 0
+    , { "swap-time",          cSwapTime,      MY_TRUE }
+    , { "swap-variables",     cSwapVars,      MY_TRUE }
+    , { "swap-file",          cSwapFile,      MY_TRUE }
+#endif
+#ifdef MALLOC_smalloc
+    , { "gcollect-outfd",     cGcollectFD,    MY_TRUE }
+    , { "gcollect_outfd",     cGcollectFD,    MY_TRUE } /* TODO: COMPAT */
+#endif
+#ifdef CATCH_UDP_PORT
+    , { "udp",                cUdpPort,       MY_TRUE }
+#endif
+#ifdef DEBUG
+    , { "check-refcounts",    cCheckRefs,     MY_TRUE }
+    , { "gobble-descriptors", cGobbleFDs,     MY_TRUE }
+    , { "check_a_lot_of_ref_counts", cCheckRefs, MY_TRUE } /* TODO: COMPAT */
+    , { "gobble_descriptors", cGobbleFDs,     MY_TRUE }    /* TODO: COMPAT */
+#endif
+#ifdef YYDEBUG
+    , { "yydebug",            cYYDebug,       MY_FALSE }
+#endif
+    , { "options",            cOptions,       MY_FALSE }
+    , { "version",            cVersion,       MY_FALSE }
+    , { "longhelp",           cLongHelp,      MY_FALSE }
+    , { "help",               cHelp,          MY_FALSE }
+    };
+
+/*-------------------------------------------------------------------------*/
+static void
+version (void)
+
+/* Print the version of the gamedriver.
+ */
+ 
+{
+  fputs("LDMud " GAME_VERSION PATCH_LEVEL LOCAL_LEVEL 
+        " - an LPMud Game Driver.\n"
+        "Released: " RELEASE_DATE ", compiled: " __DATE__
+#ifdef __TIME__
+        " " __TIME__
+#endif
+        "\n"
+       , stdout);
+}
+
+/*-------------------------------------------------------------------------*/
+static void
+options (void)
+
+/* Print the version of the gamedriver and the compile time options.
+ */
+ 
+{
+  version();
+  fputs("\nMode: "
+#ifdef COMPAT_MODE
+#    ifdef NATIVE_MODE
+        "Compat+Native"
+#    else
+        "Compat"
+#    endif
+#elif defined(NATIVE_MODE)
+        "Native"
+#else
+        "Plain (aka cross-compat)"
+#endif
+#ifdef EUIDS
+        " with euids.\n"
+#else
+        ", no euids.\n"
+#endif
+       , stdout);
+
+  fputs("Mudlib path: " MUD_LIB "\n"
+        "Binary path: " BINDIR "\n"
+        "Master object: <mudlib>/" MASTER_NAME "\n"
+       , stdout);
+
+#ifdef MAXNUMPORTS
+  printf("Multiple ports: %d ports max, default is %d.\n", MAXNUMPORTS, PORTNO);
+#else
+  printf("Single port: default is %d\n", PORTNO);
+#endif
+
+#ifdef CATCH_UDP_PORT
+#    ifdef UDP_SEND
+  printf("UDP enabled, default port is %d.\n", CATCH_UDP_PORT);
+#    else
+  printf("UDP enabled (recv only), default port is: %d.\n", CATCH_UDP_PORT);
+#    endif
+#else
+  fputs("UDP disabled.\n");
+#endif
+
+#ifdef ERQ_DEMON
+  printf("ERQ enabled: max reply length: %d bytes, directory: %s.\n"
+        , ERQ_MAX_REPLY, ERQ_DIR);
+#else
+  fputs("ERQ disabled.\n", stdout);
+#endif
+
+#ifdef ACCESS_CONTROL
+  fputs("Access control enabled, using <mudlib>/" ACCESS_FILE
+#    ifdef ACCESS_LOG
+        ", logs into <mudlib>/" ACCESS_LOG "\n"
+#    else
+        ", no logs.\n"
+#    endif
+        , stdout);
+#endif
+
+  fputs("Language: "
+#ifdef OLD_PREVIOUS_OBJECT_BEHAVIOUR
+                  "old previous_object()\n"
+#else
+                  "new previous_object()\n"
+#endif
+#ifdef OLD_EXPLODE_BEHAVIOUR
+        "          old explode()\n"
+#else
+        "          new explode()\n"
+#endif
+#ifdef SUPPLY_PARSE_COMMAND
+        "          parse_command() enabled\n"
+#endif
+#ifdef INITIALIZATION_BY___INIT
+        "          initialization by __INIT()\n"
+#else
+        "          static initialization\n"
+#endif
+#ifdef MAPPINGS
+        "          mappings enabled\n"
+#endif
+#ifdef FLOATS
+#    ifdef TRANSCENDENT_FUNCTIONS
+        "          floats and transcendent functions enabled\n"
+#    else
+        "          floats enabled\n"
+#    endif
+#endif
+#ifndef NO_XVARARGS
+        "          varargs enabled\n"
+#endif
+       , stdout);
+
+  printf("Runtime limits: max log size:        %7d\n"
+         "                max read file size:  %7d\n"
+         "                max byte read/write: %7d\n"
+         "                max socket buf size: %7d\n"
+         "                max eval cost:       %7d\n"
+         "                catch eval cost:     %7d\n"
+         "                master eval cost:    %7d\n"
+         "                eval stack:          %7d\n"
+         "                user call depth:     %7d\n"
+         "                max call depth:      %7d\n"
+         "                max bitfield length: %7d\n"
+         "                max array size:      %7d\n"
+         "                max number players:  %7d\n"
+         "                ed cmd/cmd ratio:    %7d:1\n"
+#if defined(TRACE_CODE)
+         "                max trace length:    %7d\n"
+#endif
+        , MAX_LOG_SIZE, READ_FILE_MAX_SIZE, MAX_BYTE_TRANSFER
+        , SET_BUFFER_SIZE_MAX
+        , MAX_COST, CATCH_RESERVED_COST, MASTER_RESERVED_COST
+        , EVALUATOR_STACK_SIZE
+        , MAX_USER_TRACE, MAX_TRACE
+        , MAX_BITS, MAX_ARRAY_SIZE
+        , MAX_PLAYERS
+        , ALLOWED_ED_CMDS /* MAX_CMDS_PER_BEAT is not implemented */
+#ifdef TRACE_CODE
+        , TOTAL_TRACE_LENGTH
+#endif
+        );
+
+  printf("Timing: reset: %d s (granularity %d s), clean up: %d s.\n"
+        , TIME_TO_RESET, RESET_GRANULARITY, TIME_TO_CLEAN_UP
+        );
+
+#if TIME_TO_SWAP > 0
+  printf("Swapping: objects after %d s, variables after %d s.\n"
+         "          file: <mudlib>/%s.<host>\n"
+        , TIME_TO_SWAP, TIME_TO_SWAP_VARIABLES
+        , SWAP_FILE
+        );
+#else
+  fputs("Swapping disabled.\n", stdout);
+#endif
+
+  printf("Compiler: max stack size:      %6d\n"
+         "          max local variables: %6d\n"
+         "          max define length:   %6d\n"
+#ifdef ALIGN_FUNCTIONS
+         "          functions are aligned.\n"
+#endif
+        , COMPILER_STACK_SIZE
+        , MAX_LOCAL
+        , DEFMAX
+        );
+
+  printf("Memory: using %s\n"
+         "        reserved user size:   %8d\n"
+         "        reserved master size: %8d\n"
+         "        reserved system size: %8d\n"
+#ifdef MIN_MALLOCED
+         "        initial allocation:   %8d\n"
+#endif
+#if defined(MALLOC_smalloc) && defined(MAX_MALLOCED)
+         "        max allocation:       %8d\n"
+         "        max small allocation: %8d\n"
+#endif
+#ifdef MALLOC_sysmalloc
+        , "system malloc"
+#elif defined(MALLOC_smalloc)
+        , "smalloc"
+#    if defined(SMALLOC_TRACE)
+#        if defined(SMALLOC_LPC_TRACE)
+                  " (trace enabled, lpc-trace enabled)"
+#        else
+                  " (trace enabled)"
+#        endif
+#    elif defined(SMALLOC_LPC_TRACE)
+                  " (lpc-trace enabled)"
+#    endif
+#else
+        , "unknown malloc"
+#endif
+        , RESERVED_USER_SIZE
+        , RESERVED_MASTER_SIZE
+        , RESERVED_SYSTEM_SIZE
+#ifdef MIN_MALLOCED
+        , MIN_MALLOCED
+#endif
+#if defined(MALLOC_smalloc) && defined(MAX_MALLOCED)
+        , MAX_MALLOCED, MAX_SMALL_MALLOCED
+#endif
+        );
+
+  printf("Internal tables: shared string hash: %6d entries\n"
+         "                 object hash:        %6d entries\n"
+         "                 reserved name hash: %6d entries\n"
+         "                 apply cache:        %6d entries\n"
+#ifdef RXCACHE_TABLE
+         "                 regexp cache:       %6d entries\n"
+#endif
+        , HTABLE_SIZE
+        , OTABLE_SIZE
+        , ITABLE_SIZE
+        , 1<<APPLY_CACHE_BITS
+#ifdef RXCACHE_TABLE
+        , RXCACHE_TABLE
+#endif
+        );
+
+#if defined(DEBUG) || defined(YYDEBUG) || defined(TRACE_CODE) \
+    || defined(COMM_STAT) || defined(APPLY_CACHE_STAT)
+#    undef ATLEASTONE
+  fputs("Other options: "
+#    ifdef DEBUG
+         "DEBUG"
+#        undef ATLEASTONE
+#        define ATLEASTONE
+#    endif
+#    ifdef YYDEBUG
+#        ifdef ATLEASTONE
+        ", "
+#        endif
+        "YYDEBUG"
+#        undef ATLEASTONE
+#        define ATLEASTONE
+#    endif
+#    ifdef TRACE_CODE
+#        ifdef ATLEASTONE
+        ", "
+#        endif
+        "TRACE_CODE"
+#        undef ATLEASTONE
+#        define ATLEASTONE
+#    endif
+#    ifdef COMM_STAT 
+#        ifdef ATLEASTONE
+        ", "
+#        endif
+        "COMM_STAT"
+#        undef ATLEASTONE
+#        define ATLEASTONE
+#    endif
+#    ifdef APPLY_CACHE_STAT
+#        ifdef ATLEASTONE 
+        ", "
+#        endif
+        "APPLY_CACHE_STAT"
+#        undef ATLEASTONE
+#        define ATLEASTONE
+#    endif
+        ".\n", stdout);
+#endif
+}
+
+/*-------------------------------------------------------------------------*/
+static void
+shortusage (void)
+
+/* Print the short help information to stdout. */
+
+{
+  version();
+  fputs("\n"
+#ifdef MAXNUMPORTS
+"Usage: driver [options] [<portnumber>...]\n"
+#else
+"Usage: driver [options] [<portnumber>]\n"
+#endif
+"\nOptions are:\n"
+"\n"
+#ifdef MAXNUMPORTS
+"  -P|--inherit <fd-number>\n"
+#endif
+#ifdef CATCH_UDP_PORT
+"  -u|--udp <portnumber>\n"
+#endif
+"  -D|--define <macro>[=<text>]\n"
+"  -E|--eval-cost <ticks>\n"
+"  -M|--master <filename>\n"
+"  -m|--mudlib <pathname>\n"
+"  --debug-file <filename>\n"
+"  -d|--debug\n"
+"  -c|--list-compiles\n"
+"  -e|--no-preload\n"
+"  -N|--no-erq\n"
+"  -t|--no-heart\n"
+"  -f|--funcall <word>\n"
+#if TIME_TO_SWAP > 0
+"  -s <time>  | --swap-time <time>\n"
+"  -s v<time> | --swap-variables <time>\n"
+"  -s f<name> | --swap-file <name>\n"
+#endif
+#ifdef MAX_MALLOCED
+"  --max-malloc <size>\n"
+"  --max-small-malloc <size>\n"
+#endif
+"  -r u<size> | --reserve-user <size>\n"
+"  -r m<size> | --reserve-master <size>\n"
+"  -r s<size> | --reserve-system <size>\n"
+#ifdef MALLOC_smalloc
+"  --gcollect-outfd <filename>|<num>\n"
+#endif
+#ifdef YYDEBUG
+"  --y|--yydebug\n"
+#endif
+#ifdef DEBUG
+"  --check-refcounts\n"
+"  --gobble-descriptors <num>\n"
+#endif
+"  -V|--version\n"
+"  --options\n"
+"  --longhelp\n"
+"  -h|-?|--help\n"
+       , stdout);
+       
+}
+
+/*-------------------------------------------------------------------------*/
+static void
+usage (void)
+
+/* Print the help information to stdout. */
+
+{
+  version();
+  fputs("\n"
+#ifdef MAXNUMPORTS
+"Usage: driver [options] [<portnumber>...]\n"
+#else
+"Usage: driver [options] [<portnumber>]\n"
+#endif
+"\nOptions are:\n"
+"\n"
+#ifdef MAXNUMPORTS
+"  -P|--inherit <fd-number>\n"
+"    Inherit filedescriptor <fd-number> from the parent process\n"
+"    as socket to listen for connections.\n"
+"\n"
+#endif
+#ifdef CATCH_UDP_PORT
+"  -u|--udp <portnumber>\n"
+"    Specify the <portnumber> for the UDP port, overriding the compiled-in\n"
+"    default.\n"
+"\n"
+#endif
+"  -D|--define <macro>[=<text>]\n"
+"    Add <macro> (optionally to be expanded to <text>) to the list of\n"
+"    predefined macros known by the LPC compiler.\n"
+"\n"
+"  -E|--eval-cost <ticks>\n"
+"    Set the number of <ticks> available for one evaluation thread.\n"
+"\n"
+"  -M|--master <filename>\n"
+"    Use <filename> for the master object.\n"
+"\n"
+"  -m|--mudlib <pathname>\n"
+"    Use <pathname> as the top directory of the mudlib.\n"
+"\n"
+"  --debug-file <filename>\n"
+"    Log all debug output in <filename> instead of <host>.debug.log .\n"
+"\n"
+"  -d|--debug\n"
+"    Generate debug output; repeat the argument for even more output.\n"
+"\n"
+"  -c|--list-compiles\n"
+"    List the name of every compiled file on stderr.\n"
+"\n"
+"  -e|--no-preload\n"
+"    Pass a non-zero argument (the number of occurences of this option)\n"
+"    to master->preload(), which usually inhibits all preloads of castles\n"
+"    and other objects.\n"
+"\n"
+"  -N|--no-erq\n"
+"    Don't start the erq demon (if it would be started at all).\n"
+"\n"
+"  -t|--no-heart\n"
+"    Disable heartbeats and call_outs.\n"
+"\n"
+"  -f|--funcall <word>\n"
+"    The lfun master->flag() is called with <word> as argument before the\n"
+"    gamedriver accepts netword connections.\n"
+"\n"
+#if TIME_TO_SWAP > 0
+"  -s <time>  | --swap-time <time>\n"
+"  -s v<time> | --swap-variables <time>\n"
+"    Time in seconds before an object (or its variables) are swapped out.\n"
+"    A time less or equal 0 disables swapping.\n"
+"\n"
+"  -s f<name> | --swap-file <name>\n"
+"    Swap into file <name> instead of LP_SWAP.<host> .\n"
+"\n"
+#endif
+#ifdef MAX_MALLOCED
+"  --max-malloc <size>\n"
+"    Restrict total memory allocations to <size> bytes.\n"
+"\n"
+"  --max-small-malloc <size>\n"
+"    Restrict total small block allocations to <size> bytes.\n"
+"\n"
+#endif
+"  -r u<size> | --reserve-user <size>\n"
+"  -r m<size> | --reserve-master <size>\n"
+"  -r s<size> | --reserve-system <size>\n"
+"    Reserve <size> amount of memory for user/master/system allocations to\n"
+"    be held until main memory runs out.\n"
+"\n"
+#ifdef MALLOC_smalloc
+"  --gcollect-outfd <filename>|<num>\n"
+"    Garbage collector output (like a log of all reclaimed memory blocks)\n"
+"    is sent to <filename> (or inherited fd <num>) instead of stderr.\n"
+"\n"
+#endif
+#ifdef YYDEBUG
+"  --y|--yydebug\n"
+"    Enable debugging of the LPC compiler.\n"
+"\n"
+#endif
+#ifdef DEBUG
+"  --check-refcounts\n"
+"    Every backend cycle, all refcounts in the system are checked.\n"
+"    SLOW!\n"
+"\n"
+"  --gobble-descriptors <num>\n"
+"    <num> (more) filedescriptors are used up. You'll know when you need it.\n"
+"\n"
+#endif
+"  -V|--version\n"
+"    Print the version of the driver, then exit.\n"
+"\n"
+"  --options\n"
+"    Print the version and compilation options of the driver, then exit.\n"
+"\n"
+"  --longhelp\n"
+"    Display this help and exit.\n"
+"  -h|-?|--help\n"
+"    Display the short help text and exit.\n"
+       , stdout);
+       
+}
+
+/*-------------------------------------------------------------------------*/
+static int
+firstscan (int eOption, const char * pValue)
+
+/* Callback from getargs() for the first scan of the commandline
+ * arguments. <eOption> is the option recognized, <pValue> a value
+ * or NULL.
+ * Return 0 on success, non-zero on a failure.
+ */
+
+{
+    switch (eOption)
+    {
+    case cArgument:
+#ifndef MAXNUMPORTS
+	if (atoi(pValue))
+	    port_number = atoi(pValue);
+        else
+            fprintf(stderr, "Illegal portnumber '%s' ignored.\n", pValue);
+#else
+        if (numports >= MAXNUMPORTS)
+            fprintf(stderr, "Portnumber '%s' ignored.\n", pValue);
+        else if (atoi(pValue))
+  	    port_numbers[numports++] = atoi(pValue);
+        else
+            fprintf(stderr, "Illegal portnumber '%s' ignored.\n", pValue);
+#endif
+        break;
+
+#ifdef MAXNUMPORTS
+    case cInherited:
+        if (numports >= MAXNUMPORTS)
+            fprintf(stderr, "fd '%s' ignored.\n", pValue);
+        else if (atoi(pValue))
+  	    port_numbers[numports++] = -atoi(pValue);
+        else
+            fprintf(stderr, "Illegal fd '%s' ignored.\n", pValue);
+        break;
+#endif
+
+#ifdef CATCH_UDP_PORT
+    case cUdpPort:
+        if (atoi(pValue))
+            udp_port = atoi(pValue);
+        else
+            fprintf(stderr, "Illegal portnumber '%s' ignored.\n", pValue);
+        break;
+#endif
+
+    case cDefine:
+        {
+            struct lpc_predef_s *tmp;
+
+            tmp = (struct lpc_predef_s *) xalloc(sizeof(struct lpc_predef_s));
+            tmp->flag = strdup(pValue);
+            tmp->next = lpc_predefs;
+            lpc_predefs = tmp;
+        }
+        break;
+
+    case cEvalcost:
+        if (atoi(pValue))
+            initial_eval_cost = -atoi(pValue);
+        else
+            fprintf(stderr, "Illegal eval-cost '%s' ignored.\n", pValue);
+        break;
+
+    case cNoPreload:
+	e_flag++;
+        break;
+
+    case cNoERQ:
+        no_erq_demon++;
+        break;
+
+    case cDebug:
+        d_flag++;
+        break;
+        
+    case cTrace:
+	comp_flag = MY_TRUE;
+        break;
+        
+    case cNoHeart:
+	t_flag = MY_TRUE;
+        break;
+        
+#if TIME_TO_SWAP > 0
+    case cSwap:
+        /* Compatibility vs. one-char-only options *sigh* */
+        switch (*pValue) {
+        case 'v': eOption = cSwapVars; pValue++; break;
+        case 'f': eOption = cSwapFile; pValue++; break;
+        default:  eOption = cSwapTime; break;
+        }
+        /* FALLTHROUGH */
+
+    case cSwapVars:
+    case cSwapFile:
+    case cSwapTime:
+        if (cSwapTime == eOption)
+        {
+            time_to_swap = atoi(pValue);
+            if (time_to_swap < 0)
+                time_to_swap = 0;
+        }
+        else if (cSwapVars == eOption)
+        {
+            time_to_swap_variables = atoi(pValue);
+            if (time_to_swap_variables < 0)
+                time_to_swap_variables = 0;
+        }
+        else
+            name_swap_file(pValue);
+        break;
+#endif
+
+#ifdef YYDEBUG
+    case cYYDebug:
+        yydebug = MY_TRUE;
+        break;
+#endif
+
+    case cMaster:
+        if (strlen(pValue) >= sizeof(master_name)) {
+            fprintf(stderr, "Too long master name '%s'\n", pValue);
+            return 1;
+        }
+        strcpy(master_name, pValue);
+        break;
+
+#ifdef MAX_MALLOCED
+    case cMaxMalloc:
+        max_malloced = strtol(pValue, (char **)0, 0);
+	if (!max_malloced)
+        {
+            fprintf(stderr, "Illegal value '%s' for --max-malloc\n", pValue);
+            return 1;
+        }
+        break;
+
+    case cMaxSmall:
+        max_small_malloced = strtol(pValue, (char **)0, 0);
+	if (!max_small_malloced)
+        {
+            fprintf(stderr, "Illegal value '%s' for --max-small-malloc\n", pValue);
+            return 1;
+        }
+        break;
+#endif
+
+    case cMudlib:
+        if (chdir(pValue) == -1) {
+            fprintf(stderr, "Bad mudlib directory: %s\n", pValue);
+            return 1;
+        }
+        new_mudlib = 1;
+        break;
+
+    case cDebugFile:
+        if (debug_file != NULL)
+            free(debug_file);
+        debug_file = strdup(pValue);
+        break;
+
+    case cReserved:
+    case cReserveUser:
+    case cReserveMaster:
+    case cReserveSystem:
+        {
+            mp_int *sizep = &reserved_user_size;
+
+            if (cReserved == eOption)
+            {
+                /* This is a rather nasty compromise between being compatible
+                 * to original Amylaar and the one-char-only short options.
+                 */
+
+                switch(*pValue++) 
+                {
+                default:  pValue--; /* FALLTHROUGH */
+                case 'u': sizep = &reserved_user_size; break;
+                case 'm': sizep = &reserved_master_size; break;
+                case 's': sizep = &reserved_system_size; break;
+                }
+            }
+            else 
+            switch (eOption)
+            {
+            case cReserveUser:   sizep = &reserved_user_size; break;
+            case cReserveMaster: sizep = &reserved_master_size; break;
+            case cReserveSystem: sizep = &reserved_system_size; break;
+            }
+
+            *sizep = strtol(pValue, (char**)0, 0);
+            break;
+        }
+
+#ifdef MALLOC_smalloc
+    case cGcollectFD:
+        if (isdigit((unsigned char)*pValue)) {
+            gcollect_outfd = strtol(pValue, (char **)0, 0);
+	} else {
+      	    gcollect_outfd = ixopen3(pValue, O_CREAT|O_TRUNC|O_WRONLY, 0640);
+	}
+	break;
+#endif
+
+    case cOptions:
+        options();
+        exit(0);
+        break;
+
+    case cVersion:
+        version();
+        exit(0);
+        break;
+
+    case cHelp:
+        shortusage();
+        return 1;
+
+    case cLongHelp:
+        usage();
+        return 1;
+
+#ifdef DEBUG
+    case cCheckRefs:
+        check_a_lot_ref_counts_flag = MY_TRUE;
+        break;
+
+    case cGobbleFDs:
+        {
+            int n;
+
+            n = strtol(pValue, (char **)0, 0);
+            while(--n >= 0) {
+                (void)dup(2);
+            }
+            break;
+        }
+#endif
+
+    case cFuncall:
+        /* ignored */
+        break;
+
+    default:
+        /* This shouldn't happen. */
+        fprintf(stderr, "driver: (firstscan) Internal error, eOption is %d\n", eOption);
+        return 1;
+    } /* switch */
+
+  return 0;
+}
+
+/*-------------------------------------------------------------------------*/
+static int
+secondscan (int eOption, const char * pValue)
+
+/* Callback from getargs() for the second scan of the commandline
+ * arguments. <eOption> is the option recognized, <pValue> a value
+ * or NULL.
+ * Return 0 on success, non-zero on a failure.
+ */
+
+{
+    switch (eOption)
+    {
+    case cFuncall:
+        push_constant_string((char *)pValue);
+        (void)apply_master_ob(STR_FLAG, 1);
+        if (game_is_being_shut_down) {
+            fprintf(stderr, "Shutdown by master object.\n");
+            exit(0);
+        }
+        /* ignored */
+        break;
+
+    default:
+        /* ignored */
+        break;
+    } /* switch */
+
+  return 0;
+}
+
+/*-------------------------------------------------------------------------*/
+static int
+getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
+
+/* Get the arguments from the commandline and pass them 
+ * as (number, optional value) to the opt_eval callback.
+ * If opt_eval() returns non-zero, argument scanning is terminated.
+ * In that case, or if getargs() detects an error itself, getargs() returns
+ * non-zero.
+ * A zero return means 'success' in both cases.
+ */
+
+{
+  int         i;        /* all purpose */
+  int         iArg;     /* Number of argument under inspection */
+  OptNumber   eOption;  /* The current recognized option */
+  short       bCont;    /* True: find another option in the same argument */
+  short       bDone;    /* True: all options parsed, only args left */
+  short       bShort;   /* True: current argument is a short option */
+  char      * pArg;     /* Next argument character to consider */
+  
+  /* Make the compiler happy */
+  bShort = MY_FALSE;
+  pArg = NULL;
+
+  /* Scan all arguments */
+  bCont = MY_FALSE;
+  bDone = MY_FALSE;
+  for (iArg = 1; iArg < argc; !bCont ? iArg++ : iArg)
+  {
+    size_t   iArglen;      /* Length of remaining argument */
+    char   * pValue;       /* First character of an option value, or NULL */
+    int      bTakesValue;  /* This option takes a value */
+
+    /* Make the compiler happy */
+    iArglen = 0;
+    pValue = NULL;
+    bTakesValue = MY_FALSE;
+
+    if (bDone)
+      eOption = cArgument;
+    else
+    /* If this is not a continuation, reinitialise the inspection vars.
+     * For --opt=val arguments, pValue is set to the first character of val.
+     */
+    if (!bCont)
+    {
+      pArg = argv[iArg];
+      if ('-' == pArg[0] && '-' == pArg[1]) /* Long option? */
+      {
+        eOption = cUnknown;
+        bShort = MY_FALSE;
+        pArg += 2;
+        /* Special case: if the argument is just '--', it marks the
+         * end of all options.
+         * We set a flag and continue with the next argument.
+         */
+        if ('\0' == *pArg)
+        {
+          bDone = MY_TRUE;
+          continue;
+        }
+        pValue = strchr(pArg, '=');
+        if (pValue != NULL)
+        {
+          iArglen = pValue - pArg;
+          pValue++;
+        }
+        else
+          iArglen = strlen(pArg);
+      }
+      else if ('-' == pArg[0]) /* Short option? */
+      {
+        eOption = cUnknown;
+        bShort = MY_TRUE;
+        pArg++;
+        iArglen = strlen(pArg);
+        pValue = NULL;
+      }
+      else /* No option */
+      {
+        eOption = cArgument;
+        pValue = pArg;
+        iArglen = 0;
+      }
+    }
+    else
+      eOption = cUnknown;
+
+    /* If the option is not determined yet, do it.
+     * Set pValue to the first character of the value if any.
+     */
+    if (cUnknown == eOption)
+    {
+      if (bShort) /* search the short option */
+      {
+        for (i = 0; i < sizeof(aShortOpts) / sizeof(aShortOpts[0]); i++)
+          if (*pArg == aShortOpts[i].cOption)
+          {
+            eOption = aShortOpts[i].eNumber;
+            bTakesValue = aShortOpts[i].bValue;
+            pArg++; iArglen--;  /* Consume this character */
+            break;
+          }
+
+        /* Consume a following '=' if appropriate */
+        if (cUnknown != eOption && bTakesValue && iArglen > 0 && '=' == *pArg)
+        {
+          pArg++; iArglen--;
+        }
+
+        /* If there is a value following in the same argument, set pValue to
+         * it and mark the remaining characters as 'consumed'
+         */
+        if (cUnknown != eOption && bTakesValue && iArglen > 0)
+        {
+          pValue = pArg;
+          pArg += iArglen;
+          iArglen = 0;
+        }
+      }
+      else  /* search the long option */
+      { 
+        for (i = 0; i < sizeof(aLongOpts) / sizeof(aLongOpts[0]); i++)
+          if (!strncasecmp(pArg, aLongOpts[i].pOption, iArglen))
+          {
+            eOption = aLongOpts[i].eNumber;
+            bTakesValue = aLongOpts[i].bValue;
+            break;
+          }
+      }
+
+      if (cUnknown == eOption)
+      {
+        fputs("driver: Unknown option '", stderr);
+        if (bShort)
+          fprintf(stderr, "-%c", *pArg);
+        else
+          fprintf(stderr, "--%*.*s", (int)iArglen, (int)iArglen, pArg);
+        fputs("'.\n", stderr);
+        return 1;
+      }
+      
+      /* If at this point bTakesValue is true, but pValue is still NULL,
+       * then the value is in the next argument. Get it if it's there.
+       */
+      if (bTakesValue && pValue == NULL && iArg + 1 < argc)
+      {
+        iArg++;
+        pValue = argv[iArg];
+      }
+
+      /* Signal an error if pValue is still NULL or if it's empty. */
+      if (bTakesValue && (pValue == NULL || !strlen(pValue)))
+      {
+        fputs("driver: Option '", stderr);
+        if (bShort)
+          putc(aShortOpts[eOption].cOption, stderr);
+        else
+          fputs(aLongOpts[eOption].pOption, stderr);
+        fputs("' expects a value.\n", stderr);
+        return 1;
+      }
+
+    } /* if (unknown option) */
+
+    /* Before evaluation of the parsed option, determine 'bCont' */
+    bCont = bShort && (iArglen > 0) && !bTakesValue;
+
+    /* --- The option evaluation --- */
+
+    i = (*opt_eval)(eOption, pValue);
+    if (i)
+      return i;
+
+  } /* for (iArg) */
+
+  return 0;
+} /* getargs() */
+
+/***************************************************************************/

@@ -11,21 +11,9 @@
  */
 #define ERQ_DIR "mudbin:erq"
 
-/* #define ACCESS_CONTROL if you want the driver to do any access control,
- * either using the old style ACCESS.DENY or the new ACCESS.ALLOW .
+/* #define ACCESS_CONTROL if you want the driver to do any access control.
  */
 #define ACCESS_CONTROL
-
-/*
- * Define this if you want to use the improved access restriction system.
- * Look at the file ACCESS.ALLOW for information. It replaces the old
- * ACCESS.DENY.
- */
-#define ACCESS_RESTRICTED
-
-/* Some configurations for this system. Needn't be changed if you don't use
- * the new access restriction system.
- */
 
 /* file for access permissions data */
 #define ACCESS_FILE "ACCESS.ALLOW"
@@ -44,11 +32,6 @@
  * Max size of a file allowed to be read by 'read_file()'.
  */
 #define READ_FILE_MAX_SIZE      50000
-
-/* Version of the game in the form xx.xx.xx (leading zeroes) gc.
- * A dot and two digits may be appended, that is the patch level.
- */
-#define GAME_VERSION            "03.02"
 
 /*
  * If an object is left alone for a certain time, then the
@@ -194,7 +177,14 @@
 #define DEFMAX                  12000
 
 /* the number of apply_low cache entries will be 2^APPLY_CACHE_BITS */
-#define APPLY_CACHE_BITS 10
+#define APPLY_CACHE_BITS 12
+
+/* The parameters of the regular expression/result cache.
+ * The expression cache uses a hashtable of RXCACHE_TABLE entries.
+ * Undefine RXCACHE_TABLE to disable the all regexp caching.
+ */
+
+#define RXCACHE_TABLE 16384  /* Length of the expression hash table */
 
 /*
  * Should newly defined LPC functions be aligned in memory? this costs 1.5
@@ -283,7 +273,7 @@
 #define APPLY_CACHE_STAT
 
 /* When smalloc is used without SBRK_OK, MIN_MALLOCED will lower large block
- * fragmentation.
+ * fragmentation. The value should be a multiple of the large chunk size.
  */
 
 /* #undef  MIN_MALLOCED       0x0100000 */
@@ -296,71 +286,5 @@
 /* If using TRACE_CODE , how many instructions should be kept?
  */
 #define TOTAL_TRACE_LENGTH 0x1000
-
-/************************************************************************/
-/*      END OF CONFIG -- DO NOT ALTER ANYTHING BELOW THIS LINE          */
-/************************************************************************/
-
-/*
- * some generic large primes used by various hash functions in different files
- * You can alter these if you know of a better set of numbers!  Be sure
- * they are primes...
- */
-
-#define P1              701     /* 3 large, different primes */
-#define P2              14009   /* There's a file of them here somewhere :-) */
-#define P3              54001
-
-#define BITNUM(n) ( \
-         ((n)&010101010101)+\
-        (((n)&020202020202)>>1)+\
-        (((n)&000404040404)>>2)+\
-        (((n)&001010101010)>>3)+\
-        (((n)&002020202020)>>4)+\
-        (((n)&004040404040)>>5)\
-) %63
-
-#define BITNUM_IS_1(n) ( !( (n) & (n)-1 ) )
-
-#define CLEAR_EVAL_COST (assigned_eval_cost = eval_cost = initial_eval_cost)
-
-#ifndef MASTER_NAME
-#ifdef COMPAT_MODE
-#define MASTER_NAME "obj/master"
-#else
-#define MASTER_NAME "secure/master"
-#endif
-#endif
-
-#if defined(NATIVE_MODE) && !defined(EUIDS)
-#define EUIDS
-#endif
-
-#ifdef MSDOS
-#undef ACCESS_CONTROL
-#endif
-
-/* SAS' preprocessor has its limits, too */
-
-#if defined(AMIGA) && defined(__SASC)
-#  if __VERSION__ * 1000 + __REVISION__ < 6055
-#    error Need SAS/C 6.55 or better to compile.
-#  endif
-#  if APPLY_CACHE_BITS > 9
-#    undef APPLY_CACHE_BITS
-#    define APPLY_CACHE_BITS 9
-#  endif
-#endif
-
-#ifndef ACCESS_CONTROL
-#undef ACCESS_RESTRICTED
-#endif
-
-#if !defined(AMIGA_TCP)
-  #undef CATCH_UDP_PORT
-  #undef UDP_SEND
-#endif
-
-#include "port.h"
 
 #endif /* CONFIG_H */

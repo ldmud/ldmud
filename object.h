@@ -1,3 +1,15 @@
+#ifndef __OBJECT_H__
+#define __OBJECT_H__ 1
+
+#include "driver.h"
+
+#include "exec.h"       /* struct program */
+#include "interpret.h"  /* struct svalue, struct variable */
+
+/* --- Types --- */
+
+struct pointer_record;
+
 /*
  * Definition of an object.
  * If the object is inherited, then it must not be destructed !
@@ -9,7 +21,6 @@
  *		for a number of reset periods.
  */
 
-#include "interpret.h" /* for struct svalue variables[1] */
 
 #define O_HEART_BEAT		0x01  /* Does it have an heart beat ? */
 #define O_IS_WIZARD		0x02  /* Is it a wizard player.c ? */
@@ -28,8 +39,6 @@
 #define O_VAR_SWAPPED(ob) ((p_int)(ob)->variables & 1)
 #define O_SWAP_NUM(ob) \
 	(O_PROG_SWAPPED(ob) ? (p_int)(ob)->prog  & ~1 : (ob)->prog->swap_num)
-
-#define SCAN_SWAP_BUFSIZE 0x2000
 
 struct object {
     unsigned short flags;	/* Bits or'ed together from above */
@@ -67,34 +76,57 @@ struct replace_ob {
 };
 
 
-extern struct object *load_object PROT((char *, int, int)),
-        *find_object PROT((char *));
-extern struct object *get_empty_object(), *find_object PROT((char *)),
-	*find_object2 PROT((char *));
-extern struct object *current_object, *command_giver;
-extern struct replace_ob *obj_list_replace;
-#define check_object(o) ((o)&&(o)->flags&O_DESTRUCTED?0:(o))
+/* --- Variables --- */
 
 extern struct object *obj_list;
 extern p_int new_destructed;
+extern struct object *current_object;
+extern struct object *command_giver;
+extern struct replace_ob *obj_list_replace;
+extern struct object *previous_ob;
+extern int tot_alloc_object, tot_alloc_object_size;
 
-struct value;
-void remove_destructed_objects(), save_object PROT((struct object *, char *)),
-    move_object PROT(()),
-    tell_object PROT((struct object *, char *)),
-    tell_npc PROT((struct object *, char *)),
-    reference_prog PROT((struct program *, char *));
+
+/* --- Prototypes --- */
+extern struct object *load_object PROT((char *, int, int));
+extern struct object *find_object PROT((char *));
+extern struct object *find_object2 PROT((char *));
+extern int restore_object PROT((struct object *, char *));
+extern void remove_destructed_objects PROT((void));
+extern void save_object PROT((struct object *, char *));
+extern void move_object PROT((void));
+extern void tell_object PROT((struct object *, char *));
+extern void tell_npc PROT((struct object *, char *));
+extern void reference_prog PROT((struct program *, char *));
+extern int register_pointer PROT((char *));
+extern void init_pointer_table PROT((struct pointer_record **space));
+extern void free_pointer_table PROT((void));
+extern void remove_all_objects PROT((void));
+extern void do_free_sub_strings PROT((int num_strings, char ** strings, int num_variables, struct variable *variable_names));
+extern void free_prog PROT((struct program *progp, int free_sub_strings));
+extern void reset_object PROT((struct object *ob, int arg));
+extern void replace_programs PROT((void));
+extern int shadow_catch_message PROT((struct object *ob, char *str));
+
+#ifdef INITIALIZATION_BY___INIT
+extern struct object *get_empty_object PROT((int num_var, struct variable * variables));
+#else
+extern struct object *get_empty_object PROT((int num_var, struct variable * variables, struct svalue *initialisers));
+#endif
+
 #ifdef DEBUG
-void add_ref PROT((struct object *, char *));
-void _free_object PROT((struct object *, char *));
+extern void add_ref PROT((struct object *, char *));
+extern void _free_object PROT((struct object *, char *));
 #define free_object(object, from) _free_object(object, from)
 #define decr_object_ref(object, from) free_object(object, from)
 #else
 #define add_ref(object, from) ((object)->ref++)
-int _free_object PROT((struct object *));
+extern int _free_object PROT((struct object *));
 #define free_object(object, from) \
 	((void)(--(object)->ref || _free_object(object)))
 #define decr_object_ref(object, from) (--(object)->ref)
 #endif
 
-int restore_object PROT((struct object *, char *));
+#define check_object(o) ((o)&&(o)->flags&O_DESTRUCTED?0:(o))
+
+#endif /* __OBJECT_H__ */

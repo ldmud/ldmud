@@ -1,16 +1,20 @@
+#include "driver.h"
+
 #include <stdio.h>
-#include "config.h"
-#include "lint.h"
-#include "interpret.h"
-#include "object.h"
+
 #include "wiz_list.h"
+
+#include "array.h"
+#include "backend.h"
+#include "gcollect.h"
+#include "interpret.h"
+#include "main.h"
+#include "object.h"
 #include "stralloc.h"
 
 /*
  * Maintain the wizards high score list about most popular castle.
  */
-
-extern char *string_copy PROT((char *));
 
 struct wiz_list *all_wiz = 0;
 static int number_of_wiz = 0;
@@ -62,8 +66,6 @@ struct wiz_list *add_name(str)
 	wl->extra.type  = T_POINTER;
 	wl->extra.u.vec = allocate_array(wiz_info_extra_size);
     } else {
-	extern struct svalue const0;
-
 	wl->extra = const0;
     }
     wl->last_call_out = 0;
@@ -94,7 +96,6 @@ void add_score(name, score)
 void wiz_decay() {
     struct wiz_list *wl;
     static int next_time;
-    extern int current_time;
 
     /* Perform this once every hour. */
     if (next_time > current_time)
@@ -147,7 +148,6 @@ struct svalue *f_wizlist_info(sp)
     struct vector *all, *entry;
     struct svalue *wsvp, *svp;
     struct wiz_list *w;
-    extern struct svalue const0;
 
     if (_privilege_violation("wizlist_info", &const0, sp) <= 0) {
 	all = allocate_array(0);
@@ -395,7 +395,7 @@ char *get_wiz_name(file)
     static char buff[50];
 
     push_volatile_string(file);
-    ret = apply_master_ob("get_wiz_name", 1);
+    ret = apply_master_ob(STR_GET_WNAME, 1);
     if (ret == 0 || ret->type != T_STRING)
 	return 0;
     strncpy(buff, ret->u.string, sizeof buff - 1);

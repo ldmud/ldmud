@@ -1,9 +1,13 @@
-#ifndef COMM_H
-#define COMM_H
+#ifndef __COMM_H__
+#define __COMM_H__ 1
 
+#include "driver.h"
 #include <sys/types.h>
 
-#include "sent.h"
+#include "interpret.h"  /* struct svalue, struct vector */
+#include "object.h"     /* struct object */
+#include "sent.h"       /* struct shadow_sentence */
+
 
 #ifdef SOCKET_HEADER
 #include SOCKET_HEADER
@@ -16,31 +20,8 @@
 #endif
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#endif /* SOCKET_LIB */
-
-#include "interpret.h"
-
-#if !defined (SOCKET_LIB) && !defined(SOCKET_INC)
 #define SOCKET_T int
-#define socket_number(s) (s)
-#define socket_ioctl  ioctl
-#define socket_select select
-#define socket_read   read
-#define socket_write  write
-#define socket_close  close
 #endif /* SOCKET_LIB */
-
-#if defined(SunOS4) || defined(atarist)
-SOCKET_T socket PROT((int, int, int));
-int getpeername PROT((SOCKET_T, struct sockaddr *, int *));
-void  shutdown PROT((SOCKET_T, int));
-int setsockopt PROT((SOCKET_T, int, int, char *, int));
-int bind PROT((SOCKET_T, struct sockaddr *, int));
-int listen PROT((SOCKET_T, int));
-SOCKET_T accept PROT((SOCKET_T, struct sockaddr *, int *));
-struct timeval;
-int select PROT((int, fd_set *, fd_set *, fd_set *, struct timeval *));
-#endif /* SunOS4 */
 
 #define MAX_TEXT	2048
 
@@ -55,8 +36,7 @@ int select PROT((int, fd_set *, fd_set *, fd_set *, struct timeval *));
 #endif /* irix */
 #endif /* MAX_SOCKET_PACKET_SIXE */
 
-#define MESSAGE_FLUSH ((char*)NULL)
-
+/* --- Types --- */
 struct interactive {
     struct shadow_sentence sent;
     SOCKET_T socket;
@@ -105,9 +85,7 @@ struct interactive {
     int portal_socket;		/* All messages should go through this socket, if open */
     int out_portal;		/* True if going out through a portal. */
 #endif /* PORTALS */
-#ifdef ACCESS_RESTRICTED
     long access_class;		/* represents a "cluster" where this player comes from */
-#endif
     char charset[32];
     char quote_iac;
     char catch_tell_activ;
@@ -120,8 +98,83 @@ struct interactive {
     char message_buf[MAX_SOCKET_PACKET_SIZE];
 };
 
-void set_prompt PROT((char *));
-struct svalue *query_prompt PROT((struct object *));
-void set_noecho PROT((struct interactive *, char));
+/* --- Variables --- */
+extern struct interactive *all_players[MAX_PLAYERS];
+extern int num_player;
+extern char *message_flush;
 
-#endif /* COMM_H */
+#ifdef COMM_STAT
+extern int add_message_calls;
+extern int inet_packets;
+extern int inet_volume;
+#endif
+
+/* --- Prototypes --- */
+extern void  initialize_host_ip_number PROT((void));
+extern void  prepare_ipc PROT((void));
+extern void  ipc_remove PROT((void));
+extern void  add_message VARPROT((char *, ...), printf, 1, 2);
+extern void  flush_all_player_mess PROT((void));
+extern int   get_message PROT((char *buff));
+extern void  remove_interactive PROT((struct object *ob));
+extern struct vector *users PROT((void));
+extern void  set_noecho PROT((struct interactive *i, char noecho));
+extern int   call_function_interactive PROT((struct interactive *i, char *str));
+extern int   set_call PROT((struct object *ob, struct input_to *it, int noecho));
+extern void  remove_all_players PROT((void));
+extern void  set_prompt PROT((char *str));
+extern struct svalue *query_prompt PROT((struct object *ob));
+extern void  print_prompt PROT((void));
+extern int   new_set_snoop PROT((struct object *me, struct object *you));
+extern void  init_telopts PROT((void));
+extern void  mudlib_telopts PROT((void));
+extern struct svalue *query_ip_name PROT((struct svalue *sp, int lookup));
+
+#ifdef ERQ_DEMON
+extern void  start_erq_demon PROT((char *suffix));
+extern struct svalue *f_attach_erq_demon PROT((struct svalue *sp));
+extern struct svalue *f_send_erq PROT((struct svalue *sp));
+#endif
+
+#ifdef MALLOC_smalloc
+extern void  clear_comm_refs PROT((void));
+extern void  count_comm_refs PROT((void));
+#endif /* MALLOC_smalloc */
+
+
+#ifndef INET_NTOA_OK
+extern char *inet_ntoa PROT((struct in_addr ad));
+#endif /* INET_NTOA_OK */
+
+extern char *query_host_name PROT((void));
+extern char *get_host_ip_number PROT((void));
+extern struct svalue *f_query_snoop PROT((struct svalue *sp));
+extern struct svalue *f_query_idle PROT((struct svalue *sp));
+extern struct svalue *f_remove_interactive PROT((struct svalue *sp));
+extern void  notify_no_command PROT((char *command));
+extern void  clear_notify PROT((void));
+extern void  set_notify_fail_message PROT((struct svalue *svp));
+extern void  free_notifys PROT((void));
+extern int   replace_interactive PROT((struct object *ob, struct object *obfrom, /*IGN*/ char *name));
+
+#ifdef DEBUG
+extern void  count_comm_extra_refs PROT((void));
+#endif /* DEBUG */
+
+#ifdef UDP_SEND
+extern struct svalue *f_send_imp PROT((struct svalue *sp));
+#endif /* UDP_SEND */
+
+extern struct svalue *f_set_buffer_size PROT((struct svalue *sp));
+extern struct svalue *f_binary_message PROT((struct svalue *sp));
+extern struct svalue *f_set_connection_charset PROT((struct svalue *sp));
+
+#ifdef MAXNUMPORTS
+extern struct svalue *query_ip_port PROT((struct svalue *sp));
+#endif
+
+#if defined(ACCESS_CONTROL)
+extern void refresh_access_data(void (*add_entry)(struct sockaddr_in *, long*) );
+#endif
+
+#endif /* __COMM_H__ */

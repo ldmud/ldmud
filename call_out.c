@@ -1,12 +1,18 @@
-#include "lint.h"
-#include "interpret.h"
-#include "object.h"
-#include "comm.h"
-#include "stralloc.h"
-#include "exec.h"
-#include "wiz_list.h"
+#include "driver.h"
 
-extern int trace_level;
+#include "call_out.h"
+#include "array.h"
+#include "backend.h"
+#include "closure.h"
+#include "comm.h"
+#include "exec.h"
+#include "gcollect.h"
+#include "interpret.h"
+#include "main.h"
+#include "object.h"
+#include "simulate.h"
+#include "stralloc.h"
+#include "wiz_list.h"
 
 /*
  * This file implements delayed calls of functions.
@@ -175,7 +181,7 @@ struct svalue *new_call_out(sp, num_arg)
     delay = arg[1].u.number;
     if (delay < 1)
 	delay = 1;
-    for (copp = &call_list; cop2 = *copp; copp = &cop2->next) {
+    for (copp = &call_list; (cop2 = *copp); copp = &cop2->next) {
 	int delta;
 	if ((delta = cop2->delta) >= delay) {
 	    cop2->delta -= delay;
@@ -198,13 +204,6 @@ struct svalue *new_call_out(sp, num_arg)
  * be living objects.
  */
 void call_out() {
-    extern struct object *command_giver;
-    extern struct object *current_interactive;
-    extern int current_time;
-    extern int tracedepth;
-    extern struct svalue *inter_sp;
-    extern int32 initial_eval_cost, eval_cost, assigned_eval_cost;
-
     static int last_time;
 
     static struct call *current_call_out; /* don't set back with longjmp() */
@@ -224,8 +223,6 @@ void call_out() {
     error_recovery_info.type = ERROR_RECOVERY_BACKEND;
     error_recovery_pointer = &error_recovery_info;
     if (setjmp(error_recovery_info.con.text)) {
-	extern void clear_state();
-
 	struct call *cop;
 	struct object *ob;
 	struct wiz_list *user;
@@ -436,7 +433,7 @@ void find_call_out(ob, fun, do_free_call)
 	    if (!CLOSURE_MALLOCED(type = fun->x.closure_type) &&
 		type >= CLOSURE_EFUN)
 	    {
-		for (copp = &call_list; cop = *copp; copp = &cop->next) {
+		for (copp = &call_list; (cop = *copp); copp = &cop->next) {
 		    delay += cop->delta;
 		    if (cop->is_lambda &&
 			cop->function.lambda.x.closure_type == type &&
@@ -452,14 +449,14 @@ void find_call_out(ob, fun, do_free_call)
 		l = fun->u.lambda;
 		if (type != CLOSURE_LFUN)
 		type = CLOSURE_UNBOUND_LAMBDA;
-		for (copp = &call_list; cop = *copp; copp = &cop->next) {
+		for (copp = &call_list; (cop = *copp); copp = &cop->next) {
 		    delay += cop->delta;
 		    if (cop->is_lambda && (
 			  cop->function.lambda.u.lambda == l ||
-			    cop->function.lambda.x.closure_type == type &&
+			    (cop->function.lambda.x.closure_type == type &&
 			    cop->function.lambda.u.lambda->ob == l->ob &&
 			    cop->function.lambda.u.lambda->function.index ==
-			    l->function.index))
+			    l->function.index)) )
 		    {
 			goto found;
 		    }
@@ -497,7 +494,7 @@ found:
 	    xfree(fun->u.string);
     }
     fun->type = T_NUMBER;
-    for (copp = &call_list; cop = *copp; copp = &cop->next) {
+    for (copp = &call_list; (cop = *copp); copp = &cop->next) {
 	delay += cop->delta;
 	if (cop->function.named.ob == ob &&
 	    cop->function.named.name == fun_name &&
@@ -569,7 +566,7 @@ void count_extra_ref_from_call_outs()
 void remove_stale_call_outs() {
     struct call **copp, *cop;
 
-    for (copp = &call_list; cop = *copp; ) {
+    for (copp = &call_list; (cop = *copp); ) {
 	if ( (cop->is_lambda ?
 		(CLOSURE_MALLOCED(cop->function.lambda.x.closure_type) ?
 		  cop->function.lambda.u.lambda->ob :
@@ -638,7 +635,7 @@ void count_ref_from_call_outs()
 	    cop->function.named.ob->ref++;
 	    count_ref_from_string(cop->function.named.name);
 	}
-	if (ob = cop->command_giver) {
+	if ( (ob = cop->command_giver) ) {
 	    if (ob->flags & O_DESTRUCTED) {
 		reference_destructed_object(ob);
 		cop->command_giver = 0;

@@ -1,9 +1,17 @@
-/*
-** A simple and fast generic string hasher based on Peter K. Pearson's
-** article in CACM 33-6, pp. 677.
-*/
+/*---------------------------------------------------------------------------
+ * String Hashing Functions
+ *
+ *---------------------------------------------------------------------------
+ * A simple and fast generic string hasher based on Peter K. Pearson's
+ * article in Communications of the ACM 33-6, pp. 677.
+ *---------------------------------------------------------------------------
+ */
 
-static unsigned char T[] = {
+#include "hash.h"
+
+/*-------------------------------------------------------------------------*/
+static unsigned char T[] 
+ = {
 	1, 87, 49, 12, 176, 178, 102, 166, 121, 193, 6, 84, 249, 230, 44, 163,
 	14, 197, 213, 181, 161, 85, 218, 80, 64, 239, 24, 226, 236, 142, 38, 200,
 	110, 177, 104, 103, 141, 253, 255, 50, 77, 101, 81, 18, 45, 96, 31, 222,
@@ -20,18 +28,22 @@ static unsigned char T[] = {
 	233, 40, 186, 147, 198, 192, 155, 33, 164, 191, 98, 204, 165, 180, 117, 76,
 	140, 36, 210, 172, 41, 54, 159, 8, 185, 232, 113, 196, 231, 47, 146, 120,
 	51, 65, 28, 144, 254, 221, 93, 189, 194, 139, 112, 43, 71, 109, 184, 209,
-    };
+ };
 
-int
-whashstr(s, maxn)
-char *s;			/* string to hash */
-int maxn;			/* maximum number of chars to consider */
+/*-------------------------------------------------------------------------*/
+unsigned short
+whashstr (char *s, int maxn)
+
+/* Hash the first <maxn> characters of string <s> into a short integer and
+ * return this hashed value.
+ */
+
 {
     register unsigned char c, hi, lo;
     register unsigned char *p = s;
     register int i = maxn;
 
-    if (c = *p++) {
+    if ( (c = *p++) ) {
 	for (hi = T[c], lo = c + 1; --i && (c = *p++); ) {
 	    hi = T[hi ^ c];
 	    lo = T[lo ^ c];
@@ -41,10 +53,15 @@ int maxn;			/* maximum number of chars to consider */
     return 0;
 }
 
-int
-chashstr(s, maxn)
-char *s;
-int maxn;
+/*-------------------------------------------------------------------------*/
+unsigned char
+chashstr (char *s, int maxn)
+
+/* Hash the first <maxn> characters of string <s> into a char-sized integer
+ * and return this hashed value.
+ * This function is less precise, but also faster than whashstr().
+ */
+
 {
     register unsigned char h;
     register unsigned char *p;
@@ -53,3 +70,6 @@ int maxn;
 	h = T[h ^ *p];
     return h;
 }
+
+/***************************************************************************/
+

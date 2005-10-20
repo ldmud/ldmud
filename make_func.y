@@ -1,12 +1,15 @@
 %{
+#define MAKE_FUNC
+#include "driver.h"
+
+#include "my-alloca.h"
 #include <stdio.h>
 #include <ctype.h>
 #include <fcntl.h>
-#define MAKE_FUNC
-#include "lint.h"
-#include "config.h"
-#include "interpret.h"
+
 #include "exec.h"
+#include "hash.h"
+#include "interpret.h"
 
 #define FUNC_SPEC 	"func_spec"
 #define FUNC_TOKENS 	"efun_tokens.y"
@@ -34,10 +37,10 @@
 #define isascii(c) ((c) >= 0 && (c) <= 255)
 #endif
 #undef isalunum
-#define isalunum(c) (isascii(c) && (isalnum(c) || (c) == '_' ))
-#define lexwhite(c) (isascii(c) && isspace(c) && (c) != '\n')
+#define isalunum(c) (isascii((unsigned char)c) && (isalnum((unsigned char)c) || (c) == '_' ))
+#define lexwhite(c) (isascii((unsigned char)c) && isspace((unsigned char)c) && (c) != '\n')
 #undef lexdigit
-#define lexdigit(c) (isascii(c) && isdigit(c))
+#define lexdigit(c) (isascii((unsigned char)c) && isdigit((unsigned char)c))
 
 #define MF_TYPE_MOD_POINTER   0x10000
 #define MF_TYPE_MOD_REFERENCE 0x20000
@@ -86,6 +89,7 @@ char *type_str PROT((int)), *etype PROT((int)), *etype1 PROT((int)),
 #ifndef toupper
 int toupper PROT((int));
 #endif
+int fatal PROT((char *str));
 
 int current_code_class;
 
@@ -99,26 +103,27 @@ char *str;
     return copy;
 }
 
-void fatal(str)
+int fatal(str)
     char *str;
 {
     fprintf(stderr, "%s", str);
     fflush(stdout);
     exit(1);
+    return 0;
 }
 
 char *make_f_name(str)
     char *str;
 {
     char f_name[500];
-    int i, len;
+    size_t i, len;
 
     if (strlen(str) + 1 + 2 > sizeof f_name)
 	fatal("A local buffer was too small!(1)\n");
     sprintf(f_name, "F_%s", str);
     len = strlen(f_name);
     for (i=0; i < len; i++) {
-	if (islower(f_name[i]))
+	if (islower((unsigned char)f_name[i]))
 	    f_name[i] = toupper(f_name[i]);
     }
     return mystrdup(f_name);
@@ -310,7 +315,6 @@ int current_line;
 char *current_file;
 int last_line;
 
-extern int whashstr PROT((char *,int));
 #define MAKE_FUNC_DEFHASH 101
 #define defhash(str) (whashstr((str), 12) % MAKE_FUNC_DEFHASH)
 
@@ -556,7 +560,7 @@ static void handle_endif()
 static int name_to_type(name)
     char *name;
 {
-    while (isspace(*name))
+    while (isspace((unsigned char)*name))
 	name++;
     if ( strncmp(name, "TYPE_", 5) )
 	return -1;
@@ -579,7 +583,7 @@ static int name_to_type(name)
 static int name_to_hook(name)
     char *name;
 {
-    while (isspace(*name))
+    while (isspace((unsigned char)*name))
 	name++;
     if ( strncmp(name, "H_", 2) )
 	return -1;
@@ -637,7 +641,7 @@ static void handle_map(str, size, name_to_index)
 	map[i] = deflt;
     }
     do {
-	while (isspace(*str))
+	while (isspace((unsigned char)*str))
 	    str++;
 	if (*str == '\\') {
 	    str = alloca(MAKE_FUNC_MAXLINE + 1);
@@ -683,9 +687,9 @@ static void handle_map(str, size, name_to_index)
 }
 
 static int exgetc() {
-    register char c;
+    register unsigned char c;
 
-    c=mygetc();
+    c= (unsigned char) mygetc();
     while ( isalpha(c) || c=='_' ) {
 	char word[512], *p;
 	int space_left;
@@ -919,15 +923,15 @@ static int efuncmp(i,j)
 {
     int result;
 
-    if (result = code_class[i] - code_class[j])
+    if ( (result = code_class[i] - code_class[j]) )
 	return result;
     if (C_IS_CODE(code_class[i])) return 0;
     return strcmp(key[i], key[j]);
 }
 
-int main(argc, argv)
-    int argc;
-    char **argv;
+int main (argc, argv)
+    int argc UNUSED;
+    char ** argv UNUSED;
 {
     int i, j, k;
     int match_tmp;
@@ -978,7 +982,7 @@ all: { $<p>$ = 0; } 'a'\n\
     current_line = 0;
     current_file = CONFIG;
 
-#define MATCH(str) (isspace(line_buffer[1+(match_tmp=strlen(str))]) &&\
+#define MATCH(str) (isspace((unsigned char)line_buffer[1+(match_tmp=strlen(str))]) &&\
 			strncmp(str, line_buffer+1, match_tmp) == 0)
 
     while (fgets(line_buffer, MAKE_FUNC_MAXLINE, fpr)) {
@@ -1025,16 +1029,16 @@ all: { $<p>$ = 0; } 'a'\n\
 	    int num_arg;
 
 	    cp = line_buffer+8;
-	    while( isspace(*cp)) cp++;
+	    while( isspace((unsigned char)*cp)) cp++;
 	    name = cp;
-	    while(isalunum(*cp)) cp++;
+	    while(isalunum((unsigned char)*cp)) cp++;
 	    num_arg = *cp == '(' ? 0 : -1;
 	    if (*cp == '\n') {
 		exps = cp;
 		*cp = '\0';
 	    } else {
 		*cp++ = '\0';
-		while( isspace(*cp)) cp++;
+		while( isspace((unsigned char)*cp)) cp++;
 		exps = cp;
 		while(*cp != '\n') cp++;
 		*cp = '\0';
@@ -1061,10 +1065,10 @@ Tabled codes: %d Tabled varargs codes: %d\n",
 	num_instr[C_TCODE] + num_instr[C_TEFUN],
 	num_instr[C_VCODE] + num_instr[C_VEFUN]
     );
-    if ( num_instr[C_CODE] + num_instr[C_EFUN] & ~0xff ||
-         ( num_instr[C_XCODE]+ num_instr[C_XEFUN] |
-           num_instr[C_TCODE]+ num_instr[C_TEFUN] |
-           num_instr[C_VCODE]+ num_instr[C_VEFUN] ) & ~0x7f)
+    if ( (num_instr[C_CODE] + num_instr[C_EFUN]) & ~0xff ||
+         ( (num_instr[C_XCODE]+ num_instr[C_XEFUN]) |
+           (num_instr[C_TCODE]+ num_instr[C_TEFUN]) |
+           (num_instr[C_VCODE]+ num_instr[C_VEFUN]) ) & ~0x7f)
     {
 	fatal("Codes exhausted!");
     }
@@ -1139,9 +1143,9 @@ Tabled codes: %d Tabled varargs codes: %d\n",
     j = i + num_instr[C_VCODE] + num_instr[C_VEFUN];
     k = i;
     while(k < j) {
-	printf("struct svalue *f_%s PROT((struct svalue *));\n", key[k++]);
+	printf("struct svalue *f_%s PROT((struct svalue *, int));\n", key[k++]);
     }
-    printf("\nstruct svalue *(*vefun_table[]) PROT((struct svalue *)) = {\n");
+    printf("\nstruct svalue *(*vefun_table[]) PROT((struct svalue *, int)) = {\n");
     while(i < j) {
 	printf(" f_%s,\n", key[i++]);
     }
@@ -1274,7 +1278,7 @@ Tabled codes: %d Tabled varargs codes: %d\n",
         fputs(line_buffer, fpw);
     }
     fclose(fpr), fclose(fpw);
-    return 0;
+    exit(0);
 }
 
 #undef MATCH
@@ -1290,7 +1294,7 @@ int ident(c)
     int c;
 {
     char buff[100];
-    int len, i;
+    size_t len, i;
 
     for (len=0; isalunum(c); c = getc(fpr)) {
 	if (len == sizeof buff - 1) {
@@ -1319,7 +1323,8 @@ int ident(c)
 char *type_str(n)
     int n;
 {
-    int i, type = n & 0xffff;
+    int type = n & 0xffff;
+    size_t i;
 
     for (i=0; i < NELEMS(types); i++) {
 	if (types[i].num == type) {
@@ -1377,7 +1382,7 @@ int yylex1() {
     
     for(;;) {
 	int match_tmp;
-#define MATCH(str) (isspace(line_buffer[match_tmp=strlen(str)]) &&\
+#define MATCH(str) (isspace((unsigned char)line_buffer[match_tmp=strlen(str)]) &&\
 			strncmp(str, line_buffer, match_tmp) == 0)
 
 	char line_buffer[MAKE_FUNC_MAXLINE+1];
@@ -1528,7 +1533,7 @@ char *etype(n)
     int n;
 {
     int i;
-    int local_size = 100;
+    size_t local_size = 100;
     char *buff = malloc(local_size);
 
     for (i=0; i < curr_arg_type_size; i++) {

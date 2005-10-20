@@ -208,6 +208,7 @@ string query_verb();
 int random(int);
 string read_bytes(string, void|int, void|int);
 string read_file(string, void|int, void|int);
+string terminal_colour(string, mapping, void|int, void|int );
 int remove_call_out(string|closure);
 int rename(string, string);
 void replace_program(string);
@@ -348,7 +349,11 @@ void  set_extra_wizinfo_size(int);
 int caller_stack_depth();
 
 /* A few interesting comm functions for the internet mud protocol */
+#ifdef MAXNUMPORTS
+int query_mud_port(object default: F_THIS_PLAYER);
+#else
 int query_mud_port();
+#endif
 #ifdef CATCH_UDP_PORT
 int query_imp_port();
 #endif

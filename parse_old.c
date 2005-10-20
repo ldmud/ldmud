@@ -11,13 +11,20 @@
 
 */
 
+#include "driver.h"
+
 #include <stdio.h>
 #include <ctype.h>
 #include <time.h>
-#include "lint.h"
+
+#include "parse.h"
+
+#include "array.h"
 #include "interpret.h"
-#include "config.h"
+#include "main.h"
 #include "object.h"
+#include "random.h"
+#include "simulate.h"
 #include "wiz_list.h"
 
 #define VALUE struct svalue
@@ -26,13 +33,6 @@
 #define SVALUE struct svalue
 #define LVALUE struct svalue
 
-extern char *string_copy PROT((char *));
-extern int o_flag, d_flag; /* for debugging purposes */
-extern SVALUE const0, const1;
-
-#ifndef tolower			/* On some systems this is a function */
-extern int tolower PROT((int));
-#endif
 
 #if defined(COMPAT_MODE) && defined(SUPPLY_PARSE_COMMAND)
 /*****************************************************
@@ -117,18 +117,18 @@ struct altern_objects {
   struct altern_objects *next;
 };
 
-int gDebug=0;
-char gMword[KLUDGELEN];            /* Text inside '' or [] */
-char gFword[KLUDGELEN];            /* Temp word gotten by getfirst() */
-struct altern_objects *gOblist;    /* List of accessible objects */
-char gAdjective[4*KLUDGELEN];      /* all adjectives before objname */
-LVALUE *gCarg;                     /* Current argument to %_ */
-int gWantnum;                      /* Number of wanted items 0 = all */
-struct altern_objects *gPobjects;  /* List of parsed objects */
-LVALUE *gTxarg;                    /* Argument of LPCvariable to store %s  */
-LVALUE *gForprepos;                /* Save arg* here for findprepos */
-LVALUE *gTopStack;                 /* arg* to arg after my last */
-struct svalue sv_tmp;
+static int gDebug=0;
+static char gMword[KLUDGELEN];            /* Text inside '' or [] */
+static char gFword[KLUDGELEN];            /* Temp word gotten by getfirst() */
+static struct altern_objects *gOblist;    /* List of accessible objects */
+static char gAdjective[4*KLUDGELEN];      /* all adjectives before objname */
+static LVALUE *gCarg;                     /* Current argument to %_ */
+static int gWantnum;                      /* Number of wanted items 0 = all */
+static struct altern_objects *gPobjects;  /* List of parsed objects */
+static LVALUE *gTxarg;                    /* Argument of LPCvariable to store %s  */
+static LVALUE *gForprepos;                /* Save arg* here for findprepos */
+static LVALUE *gTopStack;                 /* arg* to arg after my last */
+static struct svalue sv_tmp;
 
 #define EP 0          /* End Parse marker */
 #define SI 1          /* %o single item */
@@ -144,7 +144,7 @@ struct svalue sv_tmp;
 
 /* Search string in reverse order, I should replace it with strrchr I know :)
 */
-char *backstrchr (apa, ch)
+static char *backstrchr (apa, ch)
     char *apa;
     char ch;
 {
@@ -160,7 +160,7 @@ char *backstrchr (apa, ch)
 
 /* Convert string to lowercase
 */
-char *lowercase (apa)
+static char *lowercase (apa)
     char *apa;
 {
   char *bepa;
@@ -176,7 +176,7 @@ char *lowercase (apa)
 /* Add all objects in the inventory of 'first' and itself to the list 'parent'
    antal holds the number of elements in the 'parent' list.
 */
-void fixlist (first, parent, antal)
+static void fixlist (first, parent, antal)
     OBJECT *first;
     struct altern_objects **parent;
     int *antal;
@@ -199,7 +199,7 @@ void fixlist (first, parent, antal)
 
 /* Create a list of the theoretically accessible objects from 'src'
 */
-int makeobjlist (alist, src)
+static int makeobjlist (alist, src)
     struct altern_objects **alist;
     OBJECT *src;
 {
@@ -223,7 +223,7 @@ int makeobjlist (alist, src)
 
 /* Return number of objects in the list
 */
-int itnumalt()
+static int itnumalt()
 { 
   int ant;
   struct altern_objects *ao;
@@ -238,7 +238,7 @@ int itnumalt()
 
 /* Return a pointer to the numbered element of the list
 */ 
-OBJECT *italt (a)
+static OBJECT *italt (a)
     int a;
 { 
   int ant;
@@ -255,7 +255,7 @@ OBJECT *italt (a)
 
 /* Free the list, parameter bas is obsolete
 */
-void italt_new ()
+static void italt_new ()
 {
 
   /* Free p} altern_objects listan */
@@ -274,7 +274,7 @@ void italt_new ()
 
 /* Create the list as all the theoretically accessible objects
 */
-void italt_loadall()
+static void italt_loadall()
 {
   if (gPobjects) italt_new();
   makeobjlist(&gPobjects,0);
@@ -282,7 +282,7 @@ void italt_loadall()
 
 /* Put an object at the end of the list
 */
-void italt_put (obj)
+static void italt_put (obj)
     OBJECT *obj;
 {
   struct altern_objects *ao,*old;
@@ -303,7 +303,7 @@ void italt_put (obj)
 
 /* Put first word of cmd in gFword and point to next word
 */
-char *getfirst (cmd)
+static char *getfirst (cmd)
     char **cmd;
 {
   int pos,inqoute;
@@ -331,7 +331,7 @@ char *getfirst (cmd)
 /* Put first word of cmd in gFword
    without incrementing the callers pointer in the command string
 */
-char *lookfirst (cmd)
+static char *lookfirst (cmd)
     char *cmd;
 {
   return getfirst(&cmd);
@@ -339,7 +339,7 @@ char *lookfirst (cmd)
 
 /* Call object function in LPC
 */
-int call_obj (fnamn, on, apa)
+static int call_obj (fnamn, on, apa)
     char *fnamn;
     OBJECT *on;
     char *apa;
@@ -356,7 +356,7 @@ int call_obj (fnamn, on, apa)
 
 /* Change a noun in pluralform to a noun in singularform
 */
-char *singfix (str)
+static char *singfix (str)
     char *str;
 {
   static char sing[KLUDGELEN];
@@ -390,7 +390,7 @@ char *singfix (str)
    if func QADJFUNC doesn't exist in obj last word of QSHORTFUNC is used
    as object name and set as suffix to the adjective in call to id()
 */
-int matchadjective (adjs)
+static int matchadjective (adjs)
     char *adjs;
 {
 
@@ -433,7 +433,7 @@ int matchadjective (adjs)
 
 /* Decide if a word is a general word of type: those, ones
 */
-int check_for_general (onam, plur)
+static int check_for_general (onam, plur)
     char *onam;
     int plur;
 {
@@ -454,7 +454,7 @@ int check_for_general (onam, plur)
   return 0;
 }
 
-int order_num (wd)
+static int order_num (wd)
     char *wd;
 { /* Only positive numbers and zero */
 
@@ -485,7 +485,7 @@ int order_num (wd)
   return -1;
 }
 
-int numeric (wd)
+static int numeric (wd)
     char *wd;
 { /* Only positive numbers and zero */
 
@@ -518,7 +518,7 @@ int numeric (wd)
 /* Searches commandstring for "adj1 adj2 ... adjN objectname"
    Stores words before name in string: gAdjective, as "adj1 adj2 adj3 "
 */
-OBJECT *matchobject2 (cmd, plur)
+static OBJECT *matchobject2 (cmd, plur)
     char **cmd;
     int plur;
 { 
@@ -557,7 +557,7 @@ OBJECT *matchobject2 (cmd, plur)
 
 /* Search the command for valid object description
 */
-OBJECT *finditem (cmd, plur)
+static OBJECT *finditem (cmd, plur)
     char **cmd;
     int plur;
 { 
@@ -669,7 +669,7 @@ OBJECT *finditem (cmd, plur)
 
 /* Find match to a %i in pattern
 */
-int findobject (cmd)
+static int findobject (cmd)
     char **cmd;
 {
   int nm,s;
@@ -709,11 +709,9 @@ int findobject (cmd)
 
 /* Find match to a %l in pattern
 */
-OBJECT *findplay (cmd)
+static OBJECT *findplay (cmd)
     char **cmd;
 { 
-  extern struct object *find_living_object PROT((char *, int));
-
   OBJECT *pn;
   char w1[KLUDGELEN];
 
@@ -737,7 +735,7 @@ OBJECT *findplay (cmd)
 
 /* Find match to %p in pattern when a list of words has been supplied
 */
-int findword (cmd, v)
+static int findword (cmd, v)
     char **cmd;
     VALUE *v;
 {
@@ -768,7 +766,7 @@ int findword (cmd, v)
 
 /* Find match to %p in pattern
 */
-int findprepos (cmd)
+static int findprepos (cmd)
     char **cmd;
 {
   char *w;
@@ -802,7 +800,7 @@ int findprepos (cmd)
 
 /* Find match to %o in pattern
 */
-int findsingle (cmd)
+static int findsingle (cmd)
     char **cmd;
 {
   if (finditem(cmd,0)) {
@@ -818,7 +816,7 @@ int findsingle (cmd)
 
 /* Get the first parsetype of the pattern
 */
-int get1ps (parsep, lin, skip)
+static int get1ps (parsep, lin, skip)
     char **parsep;
     LVALUE **lin;
     int skip;
@@ -858,7 +856,7 @@ int get1ps (parsep, lin, skip)
 
 /* Add word to the string that matches the latest %s
 */
-void addword (d, s)
+static void addword (d, s)
     char *d;
     char *s;
 {
@@ -897,12 +895,11 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
   char *cmd;               /* Command to be parsed */
   char *ops,*ocs;          /* Temporary parse and command */
   char tx_jp[KLUDGELEN];   /* Fill up string for %s */
-  char *tx_save_parsep;    /* Where to continue parsing when a word was added
-			    * to a string
-			    */
-  char *tx_end_first_pattern;
+  char *tx_save_parsep = NULL; /* Where to continue parsing when a word was added
+			        * to a string
+			        */
+  char *tx_end_first_pattern = NULL;
   LVALUE *l;               /* Argument pointer in dest_args */
-  int new_routines();
 
   if (ob_or_array->type == T_OBJECT &&
       (ob_or_array->u.ob->flags & O_DESTRUCTED))
@@ -928,7 +925,7 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
     SVALUE *vv;
     int cnt;
     v=ob_or_array->u.vec; italt_new();
-    for (cnt=0;cnt<VEC_SIZE(v);cnt++) {
+    for (cnt=0;cnt<(int)VEC_SIZE(v);cnt++) {
       vv = &(v->item[VEC_SIZE(v)-1-cnt]);
       if (vv->type==T_OBJECT) italt_put(vv->u.ob);
     }

@@ -1,13 +1,24 @@
+#include "driver.h"
+
+#include "my-alloca.h"
 #ifdef __STDC__
 #include <stdarg.h>
 #endif
-#include "lint.h"
-#include "lex.h"
+#include <stdio.h>
+
+#define NO_INCREMENT_STRING_REF
+#include "closure.h"
+#include "array.h"
 #include "exec.h"
 #include "interpret.h"
-#include "object.h"
-#include "lang.h"
 #include "instrs.h"
+#include "lex.h"
+#include "main.h"
+#include "object.h"
+#include "prolang.h"
+#include "stralloc.h"
+#include "simulate.h"
+#include "simul_efun.h"
 #include "switch.h"
 
 /* maximum recursion depth for compile_value */
@@ -104,8 +115,6 @@ static int switch_initialized;
 static struct case_list_entry *save_case_free_block, *save_case_next_free,
 		*save_case_list0, *save_case_list1;
 
-extern char *current_file; /* used to detect when the compiler is running */
-
 static struct work_area {
     struct symbol **symbols;
     mp_int symbol_max, symbol_mask, symbols_left;
@@ -196,7 +205,7 @@ void set_closure_user(svp, owner)
 	} else {
 	    flags = prog->functions[ix];
 	    if (flags & NAME_CROSS_DEFINED) {
-		ix += (flags & INHERIT_MASK) - (INHERIT_MASK + 1 >> 1);
+		ix += (flags & INHERIT_MASK) - ((INHERIT_MASK + 1) >> 1);
 	    }
 	    svp->x.closure_type = CLOSURE_LFUN;
 	}
@@ -207,12 +216,9 @@ void set_closure_user(svp, owner)
     add_ref(owner, "set_closure_user");
 }
 
-void replace_program_lambda_adjust(r_ob, old_prog)
+void replace_program_lambda_adjust(r_ob)
     struct replace_ob *r_ob;
-    struct program *old_prog;
 {
-    extern struct object *master_ob;
-
     static struct lambda_replace_program_protector *current_lrpp;
 
     struct lambda_replace_program_protector *lrpp, *next_lrpp;
@@ -272,7 +278,7 @@ void replace_program_lambda_adjust(r_ob, old_prog)
 		}
 	    }
 	}
-    } while (lrpp = lrpp->next);
+    } while ( (lrpp = lrpp->next) );
     lrpp = r_ob->lambda_rpp;
     error_recovery_info.last = error_recovery_pointer;
     error_recovery_info.type = ERROR_RECOVERY_BACKEND;
@@ -325,7 +331,7 @@ void replace_program_lambda_adjust(r_ob, old_prog)
 	free_closure(&lrpp->l);
 	next_lrpp = lrpp->next;
 	xfree((char*)lrpp);
-    } while (lrpp = next_lrpp);
+    } while ( (lrpp = next_lrpp) );
     error_recovery_pointer = error_recovery_info.last;
 }
 
@@ -333,8 +339,6 @@ void closure_literal(dest, ix)
     struct svalue *dest;
     int ix;
 {
-    extern int function_index_offset;
-
     struct lambda *l;
     int32 flags;
     struct program *prog;
@@ -352,8 +356,6 @@ void closure_literal(dest, ix)
 	current_object->flags |= O_LAMBDA_REFERENCED;
     }
     if (ix >= CLOSURE_IDENTIFIER_OFFS) {
-	extern struct svalue *current_variables;
-
 	ix +=
 	  -CLOSURE_IDENTIFIER_OFFS +
 	  (current_variables - current_object->variables);
@@ -362,7 +364,7 @@ void closure_literal(dest, ix)
 	ix += function_index_offset;
 	flags = prog->functions[ix];
 	if (flags & NAME_CROSS_DEFINED) {
-	    ix += (flags & INHERIT_MASK) - (INHERIT_MASK + 1 >> 1);
+	    ix += (flags & INHERIT_MASK) - ((INHERIT_MASK + 1) >> 1);
 	}
 	dest->x.closure_type = CLOSURE_LFUN;
     }
@@ -384,7 +386,7 @@ struct symbol {
 static void lambda_error
 	VARPROT((char *error_str, ...), printf, 1, 2) NORETURN;
 
-void realloc_values() {
+static void realloc_values() {
     mp_int new_max;
     struct svalue *new_values;
 
@@ -403,7 +405,7 @@ void realloc_values() {
     current.value_max = new_max;
 }
 
-void realloc_code() {
+static void realloc_code() {
     mp_int new_max;
     unsigned char *new_code;
 
@@ -453,20 +455,21 @@ static void lambda_error(error_str, a1)
 #endif
 }
 
-void lambda_cerror(s)
+static void lambda_cerror(s)
     char *s;
 {
     lambda_error("%s\n", s);
 }
 
-void lambda_cerrorl(s1, s2, line1, line2)
-    char *s1, *s2;
-    int line1, line2;
+static void lambda_cerrorl(s1, s2, line1, line2)
+    char *s1;
+    char *s2 UNUSED;
+    int line1 UNUSED, line2 UNUSED;
 {
     lambda_error(s1, "\n");
 }
 
-char *lambda_get_space(size)
+static char *lambda_get_space(size)
     p_int size;
 {
     while (current.code_left < size)
@@ -476,7 +479,7 @@ char *lambda_get_space(size)
     return (char*)current.codep - size;
 }
 
-void lambda_move_switch_instructions(len, blocklen)
+static void lambda_move_switch_instructions(len, blocklen)
     int len;
     p_int blocklen;
 {
@@ -523,7 +526,7 @@ static void free_symbols()
     }
 }
 
-struct symbol *make_symbol(name)
+static struct symbol *make_symbol(name)
     char *name;
 {
     p_int h;
@@ -591,14 +594,12 @@ struct symbol *make_symbol(name)
 /* compile_lvalue does not only supply an lvalue, but also 1 byte space to
  * store the assignment code
  */
-void compile_lvalue PROT((struct svalue *, int));
+static void compile_lvalue PROT((struct svalue *, int));
 
-int compile_value(value, opt_flags)
+static int compile_value(value, opt_flags)
     struct svalue *value;
     int opt_flags;
 {
-    extern struct svalue const0, const1;
-
     if (!--current.levels_left)
 	lambda_error("Too deep recursion inside lambda()\n");
     switch(value->type) {
@@ -734,7 +735,7 @@ int compile_value(value, opt_flags)
 		  case F_BRANCH_WHEN_NON_ZERO-F_OFFSET:
 		  {
 		    mp_int *branchp;
-		    mp_int i, start, end, void_dest, non_void_dest;
+		    mp_int i, start, end, void_dest, non_void_dest = 0;
 		    int code = type - CLOSURE_OPERATOR;
 		    int opt_used, all_void;
 		    mp_int last_branch;
@@ -957,7 +958,7 @@ int compile_value(value, opt_flags)
 			    mp_int j;
 			    unsigned char *p, *q;
 
-			    growth = i+1 >> 1;
+			    growth = (i+1) >> 1;
 			    if (current.code_left < growth)
 				realloc_code();
 			    current.code_left -= growth;
@@ -1544,7 +1545,7 @@ int compile_value(value, opt_flags)
 				*--current.valuep = stmp;
 				l->key = (p_int)stmp.u.string;
 			    } else if (labels->type == T_NUMBER) {
-				if (l->key = labels->u.number) {
+				if ( (l->key = labels->u.number) ) {
 				    if (!no_string)
 					lambda_error(
 "mixed case label lists not supported\n"
@@ -1635,8 +1636,6 @@ int compile_value(value, opt_flags)
 		max = instrs[f].max_arg;
 		p = current.codep;
 		if (num_arg < min) {
-		    extern int proxy_efun PROT((int, int));
-	
 		    int g;
 	
 		    if (num_arg == min-1 && (def = instrs[f].Default)) {
@@ -1684,7 +1683,6 @@ int compile_value(value, opt_flags)
 	  default:
 	  {
 	    /* simul_efun */
-	    extern struct function *simul_efunp;
 	    int simul_efun;
 	    int num_arg;
 	    int i;
@@ -1892,7 +1890,7 @@ int compile_value(value, opt_flags)
     return opt_flags;
 }
 
-int is_lvalue(argp, index_lvalue)
+static int is_lvalue(argp, index_lvalue)
     struct svalue *argp;
     int index_lvalue;
 {
@@ -1927,7 +1925,7 @@ int is_lvalue(argp, index_lvalue)
     return 0;
 }
 
-void compile_lvalue(argp, flags)
+static void compile_lvalue(argp, flags)
     struct svalue *argp;
     int flags;
 {
@@ -2510,15 +2508,11 @@ char *symbol, **endp;
 void symbol_efun(sp)
     struct svalue *sp;
 {
-    extern struct svalue *inter_sp;
-
     int efun_override = 0;
     char *str;
 
     str = sp->u.string;
     if (isalunum(*str)) {
-	extern struct function *simul_efunp;
-
 	struct ident *p;
 
 	if ( !strncmp(str, "efun::", 6) ) {
@@ -2535,7 +2529,7 @@ void symbol_efun(sp)
 	
 		switch(code = p->u.code) {
 		  default:
-		    if (p = p->inferior)
+		    if ( (p = p->inferior) )
 			continue;
 		    goto undefined_function;
 		  case F_IF:
@@ -2573,8 +2567,8 @@ void symbol_efun(sp)
 		break;
 	}
 	if (!p || p->type < I_TYPE_GLOBAL ||
-	    ( efun_override || p->u.global.sim_efun < 0 ) &&
-	      p->u.global.efun < 0 )
+	    (( efun_override || p->u.global.sim_efun < 0 ) &&
+	      p->u.global.efun < 0) )
 	{
 	    if (p && p->type == I_TYPE_UNKNOWN)
 		free_shared_identifier(p);
@@ -2598,7 +2592,7 @@ undefined_function:
 	    push_constant_string("nomask simul_efun");
 	    push_object(current_object);
 	    push_shared_string(p->name);
-	    res = apply_master_ob("privilege_violation", 3);
+	    res = apply_master_ob(STR_PRIVILEGE, 3);
 	    if (!res || res->type != T_NUMBER || res->u.number < 0)
 	    {
 		error(
@@ -2659,8 +2653,6 @@ undefined_function:
 struct svalue *f_unbound_lambda(sp)
     struct svalue *sp;
 {
-    extern struct svalue *inter_sp;
-
     struct lambda *l;
     struct vector *args;
 
@@ -2685,8 +2677,6 @@ struct svalue *f_unbound_lambda(sp)
 struct svalue *f_symbol_variable(sp)
     struct svalue *sp;
 {
-    extern struct svalue *current_variables;
-
     char *str;
     struct object *ob;
     int n;
@@ -2752,8 +2742,6 @@ struct svalue *f_symbol_variable(sp)
     l = (struct lambda *)
         xalloc(sizeof *l - sizeof l->function + sizeof l->function.index);
     if (!l) {
-	extern struct svalue *inter_sp;
-
 	inter_sp = sp - 1;
 	error("Out of memory\n");
     }
@@ -2809,7 +2797,7 @@ void store_case_labels(
     mp_int runlength, key_num;
     int len, i,o;
     p_int maxspan;
-    mp_int current_key,last_key;
+    mp_int current_key,last_key = 0;
     mp_int current_addr,last_addr;
     char tmp_short[2];
     unsigned char *p;
@@ -2880,12 +2868,14 @@ void store_case_labels(
     /* list0 now contains all entries, sorted. Scan the list for ranges. */
     key_num = 0;
     if (numeric) {
-	struct case_list_entry *table_start, *max_gain_end;
+	struct case_list_entry *table_start, *max_gain_end = NULL;
+	struct case_list_entry *previous = NULL;
+	struct case_list_entry *range_start = NULL;
+	int last_line = 0;
 	p_int keys, max_gain, cutoff;
 
 	for(last_addr=0xffffff, list1=list0; list1; list1 = list1->next) {
-	    int curr_line,last_line;
-	    struct case_list_entry *range_start;
+	    int curr_line;
 
 	    key_num++;
 	    current_key = list1->key ;
@@ -2935,14 +2925,14 @@ void store_case_labels(
 	    last_line = curr_line;
 	    last_addr = current_addr;
 	}
-	if (	!( total_length + key_num*(sizeof(p_int)+1)     & ~0xff) ) {
+	if (	!( (total_length + key_num*(sizeof(p_int)+1))     & ~0xff) ) {
 	    len = 1;
 	    maxspan = MAXINT/len;
-	} else if ( !( total_length + key_num*(sizeof(p_int)+2) + 1 & ~0xffff) )
+	} else if ( !( (total_length + key_num*(sizeof(p_int)+2) + 1) & ~0xffff) )
 	{
 	    len = 2;
 	    maxspan = MAXINT/len;
-	} else if ( !( total_length + key_num*(sizeof(p_int)+3) + 2 & ~0xffffff) )
+	} else if ( !( (total_length + key_num*(sizeof(p_int)+3) + 2) & ~0xffffff) )
 	{
 	    len = 3;
 	    maxspan = MAXINT/len;
@@ -2961,7 +2951,6 @@ void store_case_labels(
 	for (max_gain = keys = 0; list1; list1 = list1->next) {
 	    p_int span, gain;
 
-	    struct case_list_entry *previous;
 	    keys++;
 	    if (list1->addr == 1) {
 		previous = list1;
@@ -2969,7 +2958,7 @@ void store_case_labels(
 	    }
 	    list1->addr += len-1;
 	    span = list1->key - table_start->key + 1;
-	    if ((p_uint)span >= maxspan)
+	    if ((p_uint)span >= (p_uint)maxspan) /* p_uint to catch span<0, too */
 		gain = -1;
 	    else
 		gain = keys * sizeof(p_int) - (span - keys)* len;
@@ -3033,12 +3022,14 @@ void store_case_labels(
 	    }
 	}
     } else {
+	int last_line = 0;
+
 	/* string case: neither ordinary nor lookup table ranges are viable.
 	 * Thus, don't spend unnecesarily time with calculating them.
 	 * Also, a more accurate calculation of len is possible.
 	 */
 	for (list1 = list0; list1; list1 = list1->next) {
-	    int curr_line,last_line;
+	    int curr_line;
 
 	    key_num++;
 	    current_key = list1->key ;
@@ -3050,11 +3041,11 @@ void store_case_labels(
 	    last_key = current_key;
 	    last_line = curr_line;
 	}
-	if (        !( (total_length   | key_num*sizeof(p_int)) & ~0xff) ) {
+	if (        !( ( total_length   | key_num*sizeof(p_int)) & ~0xff) ) {
 	    len = 1;
-	} else if ( !( (total_length+1 | key_num*sizeof(p_int)) & ~0xffff) ) {
+	} else if ( !( ((total_length+1) | key_num*sizeof(p_int)) & ~0xffff) ) {
 	    len = 2;
-	} else if ( !( (total_length+2 | key_num*sizeof(p_int)) & ~0xffffff) ) {
+	} else if ( !( ((total_length+2) | key_num*sizeof(p_int)) & ~0xffffff) ) {
 	    len = 3;
 	} else {
 	    (*cerror)("offset overflow");

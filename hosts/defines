@@ -6,6 +6,7 @@ Silicon Graphics:	sgi
 Atari ST/TT MiNT:	atarist
 Amiga, DICE:		AMIGA _DCC
 Amiga, SAS/C:		AMIGA __SASC
+BeOS                    __BEOS__
 Linux:			linux
 NeXT:			NeXT
 Sequent:		_SEQUENT_
@@ -15,6 +16,7 @@ HP-UX			hpux
 OS/2			OS2 (not always set by the compiler???)
 ???			M_UNIX
 Apple Unix		AUX		/* add -D_POSIX_SOURCE to CFLAGS */
+Windows NT/95/98        _WIN32, WINNT, _WINNT
 
 Program Loaders:
 ---------------
@@ -23,7 +25,11 @@ msdos:			MSDOS
 Processor Hardware:
 ------------------
 Sparc			sparc
+Intel (MWerks/Be)       __INTEL__
+Intel (gcc)             i386, __i386__
 
 compilers:
 ---------
 gcc:			__GNUC__
+Cygnus gcc for Win32    __CYGWIN32__
+Metrowerks (Be)         __MWERKS__

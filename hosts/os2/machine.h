@@ -97,12 +97,6 @@
 
 /* #undef inline */
 
-/* Define what random number generator to use.
- * If no one is specified, a guaranteed bad one will be used.
- * possible choices: RANDOM DRAND48 RAND
- */
-#define RAND RANDOM
-
 /* Define if you have _crypt.  */
 /* #undef HAVE__CRYPT */
 

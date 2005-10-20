@@ -1,85 +1,57 @@
-#include "config.h"
+/*---------------------------------------------------------------------------
+ * Portability code.
+ *
+ *---------------------------------------------------------------------------
+ * Implementation of missing system functions, as well as wrappers to
+ * system functions with known bugs.
+ *
+ * The functions in here should be host-independent, though at the moment
+ * some aren't.
+ *---------------------------------------------------------------------------
+ */
 
-#include "machine.h"
-#include <stdio.h>
+#include "driver.h"
+
 #include <ctype.h>
+#include "my-rusage.h"
+#include <stdio.h>
 #include <sys/types.h>
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
-#else
+#endif
 #include <time.h>
-#endif
-#if defined(AMIGA) && !defined(__SASC)
-#include <sys/resource.h>
-#endif
-#ifndef RUSAGE_SELF
-#define RUSAGE_SELF 0
-#endif
 
-#include "lint.h"
+#include "backend.h"
+#include "main.h"
 
-#ifdef sun
-time_t time PROT((time_t *));
-#endif
+/*-------------------------------------------------------------------------*/
+mp_int
+get_current_time (void) 
 
-
-/*
- * This file defines things that may have to be changed when porting
- * LPmud to new environments. Hopefully, there are #ifdef's that will take
- * care of everything.
- */
-
-#if defined(RAND) || defined(DRAND48) || defined(RANDOM)
-
-/*
- * Return a random number in the range 0 .. n-1
- */
-mp_uint random_number(n)
-    mp_uint n;
-{
-#ifdef RANDOM
-    return random() % n;
-#else /* RANDOM */
-#ifdef DRAND48
-    return (int)(drand48() * n);
-#else /* DRAND48 */
-#ifdef RAND
-    return rand() % n;
-#endif /* RAND */
-#endif /* DRAND48 */
-#endif /* RANDOM */
-}
-
-#endif
-
-/*
- * The function time() can't really be trusted to return an integer.
+/* The function time() can't really be trusted to return an integer.
  * But this game uses the 'current_time', which is an integer number
  * of seconds. To make this more portable, the following functions
  * should be defined in such a way as to return the number of seconds since
  * some chosen year. The old behaviour of time(), is to return the number
  * of seconds since 1970.
- */
-/* On a SUN Sparc I, a negative time offset of 22 seconds between two
+ * On a SUN Sparc I, a negative time offset of 22 seconds between two
  * sucessive calls to time() has been observed. Negative time offsets
  * can mess up the call_out tables. Since they also could mess up the
  * mudlib, completely hide them by forcing the visible time to continue
  * to run in positive direction.
  */
 
-mp_int get_current_time() {
+{
     /* Don't write ever to total_alarms outside the interrupt, to avoid
      * race conditions.
      */
-    extern volatile mp_int total_alarms;
-
     static mp_int last_time = 0;
     static mp_int noted_alarms = 0;
 
     mp_int offset;
     mp_int now;
 
-    offset = total_alarms - noted_alarms >> 1;
+    offset = (total_alarms - noted_alarms) >> 1;
     /* allow one alarm to happen without force-incrementing the time, so
      * that no time anomaly due to race conditions occurs.
      */
@@ -94,32 +66,30 @@ mp_int get_current_time() {
     return last_time;
 }
 
-char *time_string(t)
-    int t;
+/*-------------------------------------------------------------------------*/
+char *
+time_string (int t)
+
+/* Return a textual representation of the time <t>. */
+
 {
     return ctime((time_t *)&t);
 }
 
-
-
-/*
- * The functions below fix up some deficiencies of various platforms
- */
-
-
+/*-------------------------------------------------------------------------*/
 #ifdef STRTOL_BROKEN
+
 #define DIGIT(x)	(isdigit(x) ? (x) - '0' : \
 			islower(x) ? (x) + 10 - 'a' : (x) + 10 - 'A')
 #define MBASE	('z' - 'a' + 1 + 10)
 
-long
-strtol(str, ptr, base)
 #ifdef STRTOL_CONST_CHARP
-const
+long
+strtol(register const char *str, char **ptr, register int base)
+#else
+long
+strtol(register char *str, char **ptr, register int base)
 #endif
-register char *str;
-char **ptr;
-register int base;
 {
     register long val;
     register int c;
@@ -173,10 +143,11 @@ register int base;
 }
 #endif /* STRTOL_BROKEN */
 
+/*-------------------------------------------------------------------------*/
 #ifndef HAVE_STRCSPN
-strcspn(s, set)
-    char *start;
-    char *set;
+
+size_t
+strcspn(char *s, char *set)
 {
     register char *t, *s, c, d;
 	
@@ -192,12 +163,12 @@ strcspn(s, set)
     }
 }
 #endif /* !HAVE_STRCSPN */
-
     
+/*-------------------------------------------------------------------------*/
 #ifndef HAVE_MEMSET
-char *memset (s, c, n)
-    char *s;
-    int c, n;
+
+char *
+memset (char *s, int c, size_t n)
 {
 #ifdef HAVE_BZERO
     if(c == 0)
@@ -208,34 +179,71 @@ char *memset (s, c, n)
 	    *s++ = c;
     }
 }
+
 #endif /* !HAVE_MEMSET */
 
-#if 0 /* it's 'implemented' with a define, but without usable return value */
-char *memcpy(b,a,s)
-    char *b, *a;
-    int s;
-{
-    bcopy(a,b,s);
-    return b;
-}
-#endif
+/*-------------------------------------------------------------------------*/
+#ifndef HAVE_MEMMEM
 
+/* This implementation is not very efficient, but still better than the old
+ * match_string() .
+ */
+char *
+memmem (char *needle, size_t needlelen, char *haystack, size_t haystacklen)
+{
+    mp_int i;
+
+    i = haystacklen - needlelen;
+    if (i >= 0) do {
+	if ( !strncmp(needle, haystack, needlelen) )
+	    return haystack;
+	haystack++;
+    } while (--i >= 0);
+    return 0;
+}
+
+#endif /* !HAVE_MEMMEM */
+
+/*-------------------------------------------------------------------------*/
+#if !defined(HAVE_MEMMOVE) && !defined(OVERLAPPING_BCOPY)
+
+void
+move_memory (char *dest, char *src, size_t n)
+{
+    if (!n)
+	return;
+    if (dest > src) {
+	dest += n;
+	src  += n;
+	do
+	    *--dest = *--src;
+	while (--n);
+    } else {
+	do
+	    *dest++ = *src++;
+	while (--n);
+    }
+}
+#endif /* !HAVE_MEMMOVE */
+
+/*-------------------------------------------------------------------------*/
 #if !defined(HAVE_CRYPT) && !defined(HAVE__CRYPT)
 #include "hosts/crypt.c"
 #endif
 
 #if 0 /* If you can't get crypt to compile,  you can use this dummy */
-char * crypt(pass,salt)
-    char *pass, *salt;
+char * crypt(char *pass, char *salt)
 {
     return pass;
 }
 #endif
 
+/*-------------------------------------------------------------------------*/
 #ifdef atarist
+
 #ifndef ATARI_TT /* exp is in <math-688.h>, which is included by lint.h */
-double exp(a) /* can't compute anything but exp(-n/900) */
-    double a;
+double
+exp (double a) /* can't compute anything but exp(-n/900) */
 {
     float r = 1.;
     int i;
@@ -252,14 +260,15 @@ double exp(a) /* can't compute anything but exp(-n/900) */
     return (double)r;
 }
 #endif /* ATARI_TT */
+
 #endif /* atarist */
 
-
+/*-------------------------------------------------------------------------*/
 #if !defined(HAVE_GETRUSAGE) && !defined(MSDOS)
+
 #include <sys/times.h>
-int getrusage (who, rusage)
-    int who;
-    struct rusage *rusage;
+int
+getrusage (int who, struct rusage *rusage)
 {
     struct tms buffer;
 
@@ -305,11 +314,13 @@ struct rusage {
 
 static clock_t first_clock;
 
-void init_rusage (void) {
+void
+init_rusage (void) {
   first_clock = clock();
 }
 
-int getrusage (int who, struct rusage *rusage) {
+int
+getrusage (int who, struct rusage *rusage) {
   if (who != RUSAGE_SELF) {
     errno = EINVAL;
     return -1;
@@ -324,20 +335,18 @@ int getrusage (int who, struct rusage *rusage) {
 #endif /* AMIGA */
 
 /*-----------------------------------------------------------------------*/
-
-
 #if defined(MSDOS) && !defined(HAVE_GETRUSAGE)
 
 static long rusage_timer = 0L;
 static long rusage_milliseconds = 0;
 
-void init_rusage () {
+void
+init_rusage () {
     (void)milliseconds(&rusage_timer);
 }
 
-int getrusage (who, rusage)
-    int who;
-    struct rusage *rusage;
+int
+getrusage (int who, struct rusage *rusage)
 {
     unsigned long offset;
 
@@ -355,52 +364,5 @@ int getrusage (who, rusage)
 #endif /* MSDOS */
 
 
-#if 0 /* 'implemented' with a define if missing */
-void bzero(str, i)
-    char *str;
-    int i;
-{
-    memset(str, 0, i);
-}
-#endif
+/***************************************************************************/
 
-#ifndef HAVE_MEMMEM
-/* This implementation is not very efficient, but still better than the old
- * match_string() .
- */
-char *memmem(needle, needlelen, haystack, haystacklen)
-    char *needle, *haystack;
-    size_t needlelen, haystacklen;
-{
-    mp_int i;
-
-    i = haystacklen - needlelen;
-    if (i >= 0) do {
-	if ( !strncmp(needle, haystack, needlelen) )
-	    return haystack;
-	haystack++;
-    } while (--i >= 0);
-    return 0;
-}
-#endif /* !HAVE_MEMMEM */
-
-#if !defined(HAVE_MEMMOVE) && !defined(OVERLAPPING_BCOPY)
-void move_memory(dest, src, n)
-    char *dest, *src;
-    size_t n; /* might be unsigned */
-{
-    if (!n)
-	return;
-    if (dest > src) {
-	dest += n;
-	src  += n;
-	do
-	    *--dest = *--src;
-	while (--n);
-    } else {
-	do
-	    *dest++ = *src++;
-	while (--n);
-    }
-}
-#endif /* !HAVE_MEMMOVE */
