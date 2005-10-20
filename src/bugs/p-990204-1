@@ -213,107 +213,6 @@ diff -cr ldmud-3.2.5/comm.c ldmud-3.2.5sp1/comm.c
       add_message(message_flush);
 
       /* There was an object returned from connect(). Use this as the
-***************
-*** 4297,4308 ****
-      struct svalue *svp;
-      struct interactive *ip;
-
-      if (!(ip = O_GET_INTERACTIVE(command_giver))
-       || ip->sent.type != SENT_INTERACTIVE)
-      {
-          return;
-!     }
-
-      svp = &ip->default_err_message;
-      if (svp->type == T_STRING)
-      {
---- 4299,4319 ----
-      struct svalue *svp;
-      struct interactive *ip;
-
-+     /*  Patch for SiliconDream:
-+        If no command is found, eval the notify-fail-Hook regardless wether
-+        the ob is interactive or not. I believe this is a better handling
-+        than the original one (only for interactive obs). The new handling
-+        could be used to e.g. control monsters (We need it for the
-+        command-handling between different shells.
-      if (!(ip = O_GET_INTERACTIVE(command_giver))
-       || ip->sent.type != SENT_INTERACTIVE)
-      {
-          return;
-!     } */
-
-+     /*  Special Patch for SiliconDream - notify_fail is handled in softcode.
-+      $FIXME$ : Make a #define in config.h to take notifyfails completly out
-+                of the driver.
-      svp = &ip->default_err_message;
-      if (svp->type == T_STRING)
-      {
-***************
-*** 4313,4326 ****
-      else if (svp->type == T_CLOSURE)
-      {
-          call_lambda(svp, 0);
--         /* add_message might cause an error, thus, we free the closure first. */
-          free_svalue(svp);
-          svp->type = T_INVALID;
-          if (inter_sp->type == T_STRING)
-              add_message("%s", inter_sp->u.string);
-          pop_stack();
-      }
-!     else if (closure_hook[H_NOTIFY_FAIL].type == T_STRING)
-      {
-          add_message("%s", closure_hook[H_NOTIFY_FAIL].u.string);
-      }
---- 4324,4337 ----
-      else if (svp->type == T_CLOSURE)
-      {
-          call_lambda(svp, 0);
-          free_svalue(svp);
-          svp->type = T_INVALID;
-          if (inter_sp->type == T_STRING)
-              add_message("%s", inter_sp->u.string);
-          pop_stack();
-      }
-!     else */
-!     if (closure_hook[H_NOTIFY_FAIL].type == T_STRING)
-      {
-          add_message("%s", closure_hook[H_NOTIFY_FAIL].u.string);
-      }
-***************
-*** 4335,4340 ****
---- 4346,4374 ----
-          pop_stack();
-      }
-  }
-+
-+ /* Modified for Silicondream:
-+   If a command is successfully completed the NOTIFY_SUCC-Hook will be
-+   evaluated. We use this for the handling of the notify-fails in
-+   combination with our shell-handling
-+   */
-+ void notify_succ_command( char *command )
-+ {
-+     extern struct svalue *inter_sp;
-+
-+  if (closure_hook[H_NOTIFY_SUCC].type == T_STRING) {
-+ 	add_message("%s", closure_hook[H_NOTIFY_SUCC].u.string);
-+     } else if (closure_hook[H_NOTIFY_SUCC].type == T_CLOSURE) {
-+ 	if (closure_hook[H_NOTIFY_SUCC].x.closure_type == CLOSURE_LAMBDA)
-+ 	    closure_hook[H_NOTIFY_SUCC].u.lambda->ob = command_giver;
-+ 	push_volatile_string(command);
-+ 	call_lambda(&closure_hook[H_NOTIFY_SUCC], 1);
-+ 	if (inter_sp->type == T_STRING)
-+ 	    add_message("%s", inter_sp->u.string);
-+ 	pop_stack();
-+     }
-+ }
-+
-
-  /*-------------------------------------------------------------------------*/
-  void
-Only in ldmud-3.2.5sp1: comm.c~
-Only in ldmud-3.2.5sp1: comm.o
 diff -cr ldmud-3.2.5/config.h ldmud-3.2.5sp1/config.h
 *** ldmud-3.2.5/config.h	Thu Dec 10 03:37:36 1998
 --- ldmud-3.2.5sp1/config.h	Mon Jan 25 16:05:03 1999
@@ -424,33 +323,14 @@ diff -cr ldmud-3.2.5/exec.h ldmud-3.2.5sp1/exec.h
 ! #define H_PRE_REMOVE_DEEP_HOOK                  19
 ! #define H_POST_REMOVE_DEEP_HOOK                 20
 !
-! #define H_NOTIFY_SUCC                           21
-! #define NUM_CLOSURE_HOOKS 22
+! #define NUM_CLOSURE_HOOKS 21
 !
 
   extern struct svalue closure_hook[NUM_CLOSURE_HOOKS];
 
-Only in ldmud-3.2.5sp1: exec.h~
-Only in ldmud-3.2.5sp1: filestat.o
 diff -cr ldmud-3.2.5/func_spec ldmud-3.2.5sp1/func_spec
 *** ldmud-3.2.5/func_spec	Thu Dec 10 03:37:36 1998
 --- ldmud-3.2.5sp1/func_spec	Mon Jan 25 15:12:54 1999
-***************
-*** 214,219 ****
---- 214,226 ----
-  mixed negate(int|float);
-  void notify_fail(string|closure);
-  int objectp(mixed);
-+
-+ /*
-+  * new efuns for SiliconDream
-+  * by sunblade
-+  */
-+ int clonep(mixed);
-+
-  mixed *order_alist(mixed *, void|mixed *, ...);
-  int pointerp(mixed);
-  object present(object|string, void|object);
 ***************
 *** 299,305 ****
   mapping mkmapping(mixed *, ...);
@@ -603,42 +483,6 @@ diff -cr ldmud-3.2.5/interpret.c ldmud-3.2.5sp1/interpret.c
       {
           struct svalue *arg;
 ***************
-*** 6066,6071 ****
---- 6102,6116 ----
-          put_number(i);
-          break;
-      }
-+   CASE(F_CLONEP); {
-+       int i;
-+       i = sp->type == T_OBJECT;
-+       if (i) i = ((sp->u.ob->flags & O_CLONE) != 0);
-+       free_svalue(sp);
-+       put_number(i);
-+       break;
-+      }
-+
-  #ifdef F_FLOATP
-      CASE(F_FLOATP);
-      {
-***************
-*** 6228,6234 ****
-          TYPE_TEST2(sp,   T_OBJECT)
-          inter_sp = sp;
-          inter_pc = pc;
-!         i = replace_interactive((sp-1)->u.ob, sp->u.ob, current_prog->name);
-          pop_stack();
-          free_svalue(sp); /* object might have been destructed */
-          put_number(i);
---- 6273,6280 ----
-          TYPE_TEST2(sp,   T_OBJECT)
-          inter_sp = sp;
-          inter_pc = pc;
-!         i = replace_interactive((sp-1)->u.ob, sp->u.ob,
-!                                 current_object->prog->name);
-          pop_stack();
-          free_svalue(sp); /* object might have been destructed */
-          put_number(i);
-***************
 *** 9862,9868 ****
 --- 9908,9925 ----
             {
@@ -770,8 +614,6 @@ diff -cr ldmud-3.2.5/make_func.y ldmud-3.2.5sp1/make_func.y
 +        return H_PRE_REMOVE_DEEP_HOOK;
 +     if (!strcmp(name,"POST_REMOVE_DEEP_HOOK"))
 +        return H_POST_REMOVE_DEEP_HOOK;
-+     if ( !strcmp(name, "NOTIFY_SUCC") )
-+        return H_NOTIFY_SUCC;
       return -1;
   }
 
@@ -817,16 +659,6 @@ diff -cr ldmud-3.2.5/prolang.y ldmud-3.2.5sp1/prolang.y
 *** ldmud-3.2.5/prolang.y	Thu Dec 10 03:37:36 1998
 --- ldmud-3.2.5sp1/prolang.y	Mon Jan 25 15:25:55 1999
 ***************
-*** 4894,4899 ****
---- 4894,4900 ----
-                                  mem_block[A_PROGRAM].max_size)
-                      {
-                          realloc_a_program();
-+      __PREPARE_INSERT__p = mem_block[A_PROGRAM].block+CURRENT_PROGRAM_SIZE;
-                      }
-                      CURRENT_PROGRAM_SIZE += i;
-                      while ( --i >= 0 ) {
-***************
 *** 7006,7011 ****
 --- 7007,7019 ----
   H_NOECHO:         SH(T_CLOSURE) SH(T_STRING), \
@@ -837,7 +669,6 @@ diff -cr ldmud-3.2.5/prolang.y ldmud-3.2.5sp1/prolang.y
 + H_POST_CREATE_DEEP_HOOK:        SH(T_STRING), \
 + H_PRE_REMOVE_DEEP_HOOK:         SH(T_STRING), \
 + H_POST_REMOVE_DEEP_HOOK:        SH(T_STRING), \
-+ H_NOTIFY_SUCC:    SH(T_CLOSURE) SH(T_STRING), \
 +
 
   #if defined( DEBUG ) && defined ( TRACE_CODE )
@@ -985,24 +816,6 @@ diff -cr ldmud-3.2.5/simulate.c ldmud-3.2.5sp1/simulate.c
       clear_notify();
       if (special_parse(buff))
           return 1;
-***************
-*** 2426,2432 ****
-          notify_no_command(buff);
-          return 0;
-      }
-!     return 1;
-  }
-
-  /*
---- 2443,2450 ----
-          notify_no_command(buff);
-          return 0;
-      }
-!   notify_succ_command(buff);
-!   return 1;
-  }
-
-  /*
 ***************
 *** 3204,3209 ****
 --- 3222,3454 ----

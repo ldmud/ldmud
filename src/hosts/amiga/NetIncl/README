@@ -1,12 +1,5 @@
-The files in this directory hold collections of option settings, used
-when configuring the driver for compilation. To use the setting <foo>,
-start the configure script with argument --with-<foo>
-
-The provided settings:
-
-  default:  an example file, documenting all available options
-  compat:   settings used for a generic compat-mode driver
-  native:   settings used for a generic native-mode driver
-  osb:      settings used for the mud OSB
-  unitopia: settings used for the mud UNItopia
+This directory contains the includes needed to compile any program using
+BSD-style sockets for Internetworking.
+Install them into your compiler's include-path to use them.
+But take care that you don't overwrite includes already existing!
 

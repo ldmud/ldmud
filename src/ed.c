@@ -47,8 +47,9 @@
 #include <stdio.h>
 #include <ctype.h>
 
-#define NO_INCREMENT_STRING_REF
+#define NO_REF_STRING
 #include "ed.h"
+#include "actions.h"
 #include "closure.h"
 #include "comm.h"
 #include "filestat.h"
@@ -173,14 +174,14 @@ typedef struct line LINE;
 
 struct ed_buffer
 {
-    /* TODO: BOOL */ int     diag;              /* True: diagnostic-output?*/
-    /* TODO: BOOL */ int     truncflg;          /* True: truncate long line flag
+    Bool    diag;              /* True: diagnostic-output?*/
+    Bool    truncflg;          /* True: truncate long line flag
                                 * Note: not used anywhere */
     int     nonascii;          /* count of non-ascii chars read */
     int     nullchar;          /* count of null chars read */
     int     truncated;         /* count of lines truncated */
     char    fname[MAXFNAME];   /* name of the file */
-    /* TODO: BOOL */ int     fchanged;          /* True: file-changed */
+    Bool    fchanged;          /* True: file-changed */
     int     nofname;
     int     mark['z'-'a'+1];
     regexp *oldpat;
@@ -192,7 +193,7 @@ struct ed_buffer
     int     Line2;             /* command linerange: last line */
     int     nlines;
     int     flags;             /* flags */
-    /* TODO: BOOL */ int     appending;
+    Bool    appending;
     int     moring;            /* used for the wait line of help */
     int     shiftwidth;        /* shiftwidth, in the range 0..15 */
     int     leading_blanks;    /* Current number of leading blanks when
@@ -370,7 +371,7 @@ regerror (char *s)
 
 /*-------------------------------------------------------------------------*/
 static int
-append (int line, /* TODO: BOOL */ int glob)
+append (int line, Bool glob)
 
 /* Start appending (or inserting) after <line>: set the current line
  * and print/set the prompt.
@@ -427,7 +428,7 @@ more_append (char *str)
         }
         for (i = 0; i < P_LEADBLANKS; )
             inlin[i++]=' ';
-        strncpy(inlin+P_LEADBLANKS, str, MAXLINE-P_LEADBLANKS);
+        strncpy(inlin+P_LEADBLANKS, str, (size_t)(MAXLINE-P_LEADBLANKS));
         inlin[MAXLINE-1] = '\0';
         _count_blanks(inlin, 0);
         add_message("%*s", P_LEADBLANKS, "");
@@ -471,9 +472,7 @@ prompt_to_ed_buffer (struct interactive *ip)
 
     if ( NULL != (ed_buffer = ip->sent.ed_buffer) ) {
         transfer_svalue(&ed_buffer->old_prompt, &ip->prompt);
-        ip->prompt.type = T_STRING;
-        ip->prompt.x.string_type = STRING_CONSTANT;
-        ip->prompt.u.string = ed_buffer->appending ? "*\b" : ":";
+        put_volatile_string(&ip->prompt, ed_buffer->appending ? "*\b" : ":");
     }
 }
 
@@ -709,7 +708,7 @@ doprnt (int from, int to)
 
 /*-------------------------------------------------------------------------*/
 static void
-prntln (char *str, /* TODO: BOOL */ int vflg, int lin)
+prntln (char *str, Bool vflg, int lin)
 
 /* Print the line <str>, optionally prepended by the number <lin> (if not 0).
  * If <vflg> is true, tab characters are printed symbolically and line end
@@ -750,7 +749,7 @@ prntln (char *str, /* TODO: BOOL */ int vflg, int lin)
             start = str;
             do str++; while(*str >= ' ' && *str < 0x7f);
             if (*str)
-                add_message("%.*s", str - start, start);
+                add_message("%.*s", (int)(str - start), start);
             else
                 add_message("%s", start);
         }
@@ -810,7 +809,7 @@ egets (char *str, int size, FILE * stream)
                     c = c&127;   /* strip eigth bit */
                 P_NONASCII++;    /* count it */
             }
-            *cp++ = c;    /* not null, keep it */
+            *cp++ = (char)c;    /* not null, keep it */
             count++;
         }
     } while (size > count);
@@ -883,7 +882,7 @@ doread (int lin, char *fname)
 
 /*-------------------------------------------------------------------------*/
 static int
-dowrite (int from, int to, char *fname, /* TODO: BOOL */ int apflg)
+dowrite (int from, int to, char *fname, Bool apflg)
 
 /* Write the lines <from> to <to> into the file <fname>. If the <apflg>
  * is true, the file is opened for appending, else it is written
@@ -933,7 +932,7 @@ dowrite (int from, int to, char *fname, /* TODO: BOOL */ int apflg)
 
 /*-------------------------------------------------------------------------*/
 static INLINE int /* only used once */
-find (regexp *pat, /* TODO: BOOL */ int dir)
+find (regexp *pat, Bool dir)
 
 /* Find the <pat>tern in the text, starting 'after' the current line.
  * If <dir> is false, the search is carried out forward, else backwards.
@@ -970,7 +969,7 @@ find (regexp *pat, /* TODO: BOOL */ int dir)
 #if 0 /* unused */
 
 static int
-findg (regexp *pat, /* TODO: BOOL */ int dir)
+findg (regexp *pat, Bool dir)
 
 /* Find the <pat>tern in the text, starting 'after' the current line
  * and print matching lines (like a grep).
@@ -1009,7 +1008,7 @@ findg (regexp *pat, /* TODO: BOOL */ int dir)
 
 /*-------------------------------------------------------------------------*/
 static char *
-getfn (/* TODO: BOOL */ int writeflg)
+getfn (Bool writeflg)
 
 /* Get a filename from the input buffer, store it in a static array and
  * return a pointer to it. Relative filenames are made absolute by
@@ -1348,7 +1347,7 @@ getrhs (char *sub)
                 do {
                     if (*++inptr<'0' || *inptr >'7')
                         break;
-                    *sub = (*sub<<3) | (*inptr-'0');
+                    *sub = (char)((*sub<<3) | (*inptr-'0'));
                 } while (--i!=0);
                 sub++;
                 } break;
@@ -1402,12 +1401,12 @@ ins (char *str)
 {
     char    *cp;
     LINE    *new, *nxt;
-    int    len;
+    size_t   len;
 
     do
     {
         for ( cp = str; *cp && *cp != NL; cp++ ) NOOP;
-        len = cp - str;
+        len = (size_t)(cp - str);
         /* cp now points to end of first or only line */
 
         if ((new = (LINE *)xalloc(sizeof(LINE)+len)) == NULL)
@@ -1722,7 +1721,7 @@ set_ed_buf (void)
 
 /*-------------------------------------------------------------------------*/
 static INLINE int /* only used once */
-subst (regexp *pat, char *sub, /* TODO: BOOL */ int gflg, /* TODO: BOOL */ int pflag)
+subst (regexp *pat, char *sub, Bool gflg, Bool pflag)
 
 /* Scan the range P_LINE1 to P_LINE2 and replace in every line matching <pat>
  * the matched pattern by <sub>. If <gflg> is true, all matching patterns
@@ -1732,9 +1731,9 @@ subst (regexp *pat, char *sub, /* TODO: BOOL */ int gflg, /* TODO: BOOL */ int p
 
 {
     int    nchngd = 0;
-    char    *new, *old, buf[MAXLINE];
-    /* TODO: BOOL */ int    still_running = TRUE;
-    LINE    *lastline = getptr( P_LINE2 );
+    char  *new, *old, buf[MAXLINE];
+    Bool   still_running = TRUE;
+    LINE  *lastline = getptr( P_LINE2 );
 
     if(P_LINE1 <= 0)
         return SUB_FAIL;
@@ -1758,7 +1757,7 @@ subst (regexp *pat, char *sub, /* TODO: BOOL */ int gflg, /* TODO: BOOL */ int p
             do
             {
                 /* Copy leading text */
-                int diff = pat->startp[0] - current;
+                size_t diff = (size_t)(pat->startp[0] - current);
                 if ( (space -= diff) < 0)
                     return SUB_FAIL;
                 strncpy( new, current, diff );
@@ -1804,7 +1803,6 @@ subst (regexp *pat, char *sub, /* TODO: BOOL */ int gflg, /* TODO: BOOL */ int p
  */
 
 # define error(s)        { add_message(s, lineno); errs++; return; }
-# define bool char /* TODO: BOOL */
 
 static int lineno, errs;
 static int shi;        /* the current shift (negative for left shift) */
@@ -1832,7 +1830,7 @@ static int full_shift, small_shift;
 static char *stack, *stackbot;    /* token stack */
 static int *ind, *indbot;    /* indent stack */
 static char quote;        /* ' or " */
-static bool in_ppcontrol, in_comment, after_keyword;    /* status */
+static Bool in_ppcontrol, in_comment, after_keyword;    /* status */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1915,7 +1913,7 @@ indent (char *buf)
     register long indent_index;
     register int top, token;
     char *start;
-    bool do_indent;
+    Bool do_indent;
 
     /*
      * Problem: in this editor memory for deleted lines is reclaimed. So
@@ -2281,7 +2279,7 @@ indent (char *buf)
                     break;
                 }
 
-                *--sp = token;
+                *--sp = (char)token;
                 *--ip = i;
                 break;
             }
@@ -2341,7 +2339,6 @@ indent_code (int from, int to)
     return ED_OK;
 }
 
-# undef bool
 # undef error
 
 /* End of indent code */
@@ -2349,7 +2346,7 @@ indent_code (int from, int to)
 
 /*-------------------------------------------------------------------------*/
 static int
-docmd (/* TODO: BOOL */ int glob)
+docmd (Bool glob)
 
 /* Read the command letter from the input buffer and execute the command.
  * All other command parameters are expected to be set up by now.
@@ -2439,7 +2436,7 @@ docmd (/* TODO: BOOL */ int glob)
         if (*inptr != ' ' && *inptr != HT && *inptr != NL)
             return ERR;
 
-        if ((fptr = getfn(0)) == NULL)
+        if ((fptr = getfn(MY_FALSE)) == NULL)
             return ERR;
 
         clrbuf();
@@ -2456,7 +2453,7 @@ docmd (/* TODO: BOOL */ int glob)
         if (*inptr != ' ' && *inptr != HT && *inptr != NL)
             return ERR;
 
-        fptr = getfn(0);
+        fptr = getfn(MY_FALSE);
 
         if (P_NOFNAME)
             add_message("%s\n", P_FNAME);
@@ -2578,7 +2575,7 @@ docmd (/* TODO: BOOL */ int glob)
         if (*inptr != ' ' && *inptr != HT && *inptr != NL)
             return ERR;
 
-        if ((fptr = getfn(0)) == NULL)
+        if ((fptr = getfn(MY_FALSE)) == NULL)
             return ERR;
 
         if ((err = doread(P_LINE2, fptr)) < 0)
@@ -2626,7 +2623,7 @@ docmd (/* TODO: BOOL */ int glob)
         if (*inptr != ' ' && *inptr != HT && *inptr != NL)
             return ERR;
 
-        if ((fptr = getfn(1)) == NULL)
+        if ((fptr = getfn(MY_TRUE)) == NULL)
             return ERR;
 
         if (deflt(1, P_LASTLN) < 0)
@@ -2639,7 +2636,7 @@ docmd (/* TODO: BOOL */ int glob)
     case 'x':
         if (*inptr == NL && P_NLINES == 0 && !glob)
         {
-            if ((fptr = getfn(1)) == NULL)
+            if ((fptr = getfn(MY_TRUE)) == NULL)
                 return ERR;
             if (dowrite(1, P_LASTLN, fptr, 0) >= 0
              && command_giver && command_giver->flags & O_SHADOW)
@@ -2769,7 +2766,7 @@ ed_start (char *file_arg, char *exit_fn, struct object *exit_ob)
     /* Check for read on startup, since the buffer is read in. But don't
      * check for write, since we may want to change the file name.
      */
-    new_path = check_valid_path(file_arg, command_giver, "ed_start", 0);
+    new_path = check_valid_path(file_arg, command_giver, "ed_start", MY_FALSE);
     if (!file_arg && !new_path)
         return;
 
@@ -2796,14 +2793,12 @@ ed_start (char *file_arg, char *exit_fn, struct object *exit_ob)
     ED_BUFFER->shiftwidth= 4;
     prompt = query_prompt(command_giver);
     ED_BUFFER->old_prompt = *prompt;
-    prompt->type = T_STRING;
-    prompt->x.string_type = STRING_CONSTANT;
-    prompt->u.string = ":";
+    put_volatile_string(prompt, ":");
     ED_BUFFER->CurPtr = &ED_BUFFER->Line0;
     if (exit_fn)
     {
         ED_BUFFER->exit_fn = string_copy(exit_fn);
-        add_ref(exit_ob, "ed_start");
+        ref_object(exit_ob, "ed_start");
     }
     else
     {
@@ -3176,24 +3171,22 @@ f_query_editing (struct svalue *sp)
     }
 
     ob = sp->u.ob;
-    decr_object_ref(ob, "query_editing");
+    deref_object(ob, "query_editing");
     if (ob->flags & O_SHADOW
      && NULL != (sent = O_GET_SHADOW(ob))
      && sent->ed_buffer)
     {
         if ( NULL != (ob = sent->ed_buffer->exit_ob) )
         {
-            sp->u.ob = ob;
-            add_ref(ob, "query_editing");
+            sp->u.ob = ref_object(ob, "query_editing");
             return sp;
         }
-        sp->u.number = 1;
+        put_number(sp, 1);
     }
     else
     {
-        sp->u.number = 0;
+        put_number(sp, 0);
     }
-    sp->type = T_NUMBER;
     return sp;
 }
 

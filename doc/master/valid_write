@@ -14,10 +14,12 @@ DESCRIPTION
 
 	Func denotes the efun call or other operation that caused
 	valid_write() to be called:
-	cindent,
+
 	do_rename (efun rename(), for the old and then for the new name),
 	ed_start (whenever the builtin ed tries to write to a file),
 	mkdir,
+        objdump
+        opcdump
 	remove_file (efun rm()),
 	rmdir,
 	save_object,

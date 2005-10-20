@@ -63,10 +63,11 @@
 #include <setjmp.h>
 #include <sys/types.h>
 
-#define NO_INCREMENT_STRING_REF
+#define NO_REF_STRING
 #include "sprintf.h"
 
 #include "array.h"
+#include "closure.h"
 #include "exec.h"
 #include "interpret.h"
 #include "instrs.h"
@@ -83,6 +84,7 @@
 /*
  * If this #define is defined then error messages are returned,
  * otherwise error() is called (ie: A "wrongness in the fabric...")
+ * TODO: Always generate an error.
  */
 #define RETURN_ERROR_MESSAGES
 
@@ -474,15 +476,17 @@ static struct sprintf_buffer *svalue_to_string(obj, str, indent, trailing)
        * These flags aren't that useful...
        *
       if (obj->u.ob->flags & O_HEART_BEAT)        stradd(&str, " (hb)");
+#ifdef O_IS_WIZARD
       if (obj->u.ob->flags & O_IS_WIZARD)        stradd(&str, " (wiz)");
+#endif
       if (obj->u.ob->flags & O_ENABLE_COMMANDS)        stradd(&str, " (enabled)");
       if (obj->u.ob->flags & O_CLONE)                stradd(&str, " (clone)");
       if (obj->u.ob->flags & O_DESTRUCTED)        stradd(&str, " (destructed)");
       if (obj->u.ob->flags & O_SWAPPED)                stradd(&str, " (swapped)");
       if (obj->u.ob->flags & O_ONCE_INTERACTIVE) stradd(&str, " (x-activ)");
-      if (obj->u.ob->flags & O_APPROVED)        stradd(&str, " (ok)");
       if (obj->u.ob->flags & O_RESET_STATE)        stradd(&str, " (reset)");
       if (obj->u.ob->flags & O_WILL_CLEAN_UP)        stradd(&str, " (clean up)");
+      if (obj->u.ob->flags & O_REPLACED)            stradd(&str, " (replaced)");
        */
       break;
     }
@@ -548,6 +552,10 @@ static struct sprintf_buffer *svalue_to_string(obj, str, indent, trailing)
           struct lambda *l;
 
           l = obj->u.lambda;
+          if (((short)l->function.index) < 0) {
+            stradd(&str, "<local variable from replaced program>");
+            break;
+          }
           if (l->ob->flags & O_DESTRUCTED) {
             stradd(&str, "<local variable in destructed object>");
             break;
@@ -814,7 +822,6 @@ char *string_print_formatted(format_str, argc, argv)
 
   clean.u.string = 0;
   if (0 != (err_num = setjmp(error_jmp))) { /* error handling */
-    static char error_prefix[] = "ERROR: (s)printf(): ";
     char *err;
     cst *tcst;
 
@@ -885,22 +892,22 @@ char *string_print_formatted(format_str, argc, argv)
         err = "Out of memory.";
         break;
     }
-    strcpy(buff, error_prefix);
-    sprintf(buff + sizeof(error_prefix) - 1, err,
-      EXTRACT_ERR_ARGUMENT(err_num) );
-    strcat(buff, "\n");
-#ifdef RETURN_ERROR_MESSAGES
-    if ((err_num & ERR_ID_NUMBER) != ERR_NOMEM) {
+    buff[0]='\0';
+    if ((err_num & ERR_ID_NUMBER) != ERR_NOMEM)
+    {
         int line;
         char *file;
 
         line = get_line_number_if_any(&file);
-        fprintf(stderr, "%s:%d: %s", file,
-                                 line, buff);
-        return buff;
-    } else
+        sprintf(buff, "%s:%d: ", file, line);
+    }
+    strcat(buff, "(s)printf() error: ");
+    sprintf(buff + strlen(buff), err, EXTRACT_ERR_ARGUMENT(err_num));
+    strcat(buff, "\n");
+#ifdef RETURN_ERROR_MESSAGES
+    return buff;
 #endif /* RETURN_ERROR_MESSAGES */
-        error(buff);
+    error(buff);
   }
   arg = -1;
   bpos = 0;
@@ -1088,9 +1095,7 @@ char *string_print_formatted(format_str, argc, argv)
 
             if (clean.u.string)
               xfree(clean.u.string);
-            clean.type = T_STRING;
-            clean.x.string_type = STRING_MALLOC;
-            clean.u.string = (char *)xalloc(CLEANSIZ);
+            put_malloced_string(&clean, xalloc(CLEANSIZ));
             if (!clean.u.string)
                 ERROR(ERR_NOMEM);
             clean.u.string[0] = '\0';

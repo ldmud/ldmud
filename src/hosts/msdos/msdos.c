@@ -95,7 +95,7 @@ double x;
     return x <= -1.0 ? 1.0e-10 : 1.0+x;
 }
 
-    
+
 /*
  * Very weak replacement for crypt().
  */

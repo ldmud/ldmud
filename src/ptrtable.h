@@ -26,7 +26,7 @@ struct pointer_record
 
 extern struct pointer_table * new_pointer_table(void);
 extern void free_pointer_table(struct pointer_table *ptable);
-extern struct pointer_record * find_add_pointer(struct pointer_table *ptable, void *pointer, /* TODO: BOOL */ int bAdd);
+extern struct pointer_record * find_add_pointer(struct pointer_table *ptable, void *pointer, Bool bAdd);
 extern struct pointer_record * register_pointer(struct pointer_table *ptable, void *pointer);
 
 #define lookup_pointer(ptable, p) find_add_pointer(ptable, p, MY_FALSE)

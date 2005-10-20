@@ -12,12 +12,11 @@
 
 #ifdef __MWERKS__
 #define isascii(c) !((unsigned long)c & 0xFFFFFF80)
-#define EMSGSIZE 40
+#    ifndef EMSGSIZE
+#        define EMSGSIZE 42
+#    endif
 #endif
 
 #define FNDELAY O_NONBLOCK
-#ifndef CHARBITS
-#  define CHARBITS (0xFF)
-#endif
 
 #endif

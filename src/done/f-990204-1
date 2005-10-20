@@ -2,7 +2,7 @@ Short: New hook: notify_success
 From: Daniel von Dincklage <vondincklage@usa.net>
 Date: Fri, 19 Jun 1998 13:17:34 +0200
 Type: Feature
-State: Unclassified
+State: Done - obsoleted by H_COMMAND in 3.2.7-dev.127
 See also: p-990204-1
 
 - A "notify_success"-Hook

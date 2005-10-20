@@ -1,3 +1,10 @@
+gcc 2.8.1 on Solaris 5.7; egcs 2.91.16 on SunOS 4.1.3_U1, and probably
+others:
+  Compiling with optimization causes the compiler (not the assembler!) to
+  fall into catatonia for the configuration test for a float/branch
+  incompatibility. Workaround is to make sure that configure compiles this
+  test without optimization.
+
 gcc 2.9-beos-980929 on BeOS/x86:
   Compiling without optimization causes the compiler to crash on simulate.c
 

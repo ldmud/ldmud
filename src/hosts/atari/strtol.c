@@ -1,7 +1,7 @@
 /* original from norbert schelenkar's stdio */
 /* eff hacks	++jrb */
 /* conversion to ansi spec -- mj */
-/* 
+/*
  * Base can be anything between 2 and 36 or 0.
  * If not NULL then resulting *endptr points to the first
  * non-accepted character.
@@ -17,7 +17,7 @@
 #define _BASEMUL(B, SH, X) \
     ((0 != SH) ? \
        ((10 == (B)) ? ((((X) << (SH)) + (X)) << 1) : ((X) << (SH))) : \
-       ((X) * (B))) 
+       ((X) * (B)))
 
 long int strtol(nptr, endptr, base)
 register const char *nptr;
@@ -74,7 +74,7 @@ int base;
       case 2: shift++;
       default:;
   }
-  
+
   nptr--;				/* convert the number */
   while (c = *++nptr) {
 #if 0 /* Amylaar: non-numeric characters should not be accepted. */
@@ -104,7 +104,7 @@ int base;
 		overflow = 1;
 		
 	    }
-	    else 
+	    else
 		result -= digit;
 	}
   }
@@ -116,7 +116,7 @@ int base;
       }
       result = 0L - result;
   }
-  
+
   if (overflow > 0) {
 	errno = ERANGE;
   }

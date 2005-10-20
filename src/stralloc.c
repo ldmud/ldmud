@@ -5,10 +5,10 @@
 
 #include "stralloc.h"
 
-#include "comm.h"
 #include "gcollect.h"
 #include "hash.h"
 #include "simulate.h"
+#include "strfuns.h"
 
 #ifndef DEBUG
 #define BUG_FREE
@@ -117,7 +117,6 @@ void init_shared_strings()
     shstring[SHX_INAUGURATE] = make_shared_string("inaugurate_master");
     shstring[SHX_LOG_ERROR]  = make_shared_string("log_error");
     shstring[SHX_LOGON]      = make_shared_string("logon");
-    shstring[SHX_PLAYER_LEVEL] = make_shared_string("query_player_level");
     shstring[SHX_PRELOAD]    = make_shared_string("preload");
     shstring[SHX_PREP_DEST]  = make_shared_string("prepare_destruct");
     shstring[SHX_PRINTF_OBJ_NAME] = make_shared_string("printf_obj_name");
@@ -138,6 +137,7 @@ void init_shared_strings()
     shstring[SHX_VALID_READ] = make_shared_string("valid_read");
     shstring[SHX_VALID_SETEUID] = make_shared_string("valid_seteuid");
     shstring[SHX_VALID_SNOOP] = make_shared_string("valid_snoop");
+    shstring[SHX_VALID_TRACE] = make_shared_string("valid_trace");
     shstring[SHX_VALID_WRITE] = make_shared_string("valid_write");
 
     /* Compat mode lfuns */
@@ -296,8 +296,8 @@ char * str;
         return(s);
 }
 
-LOCAL_INLINE
-void decrement_string_ref(str)
+static INLINE
+void _decrement_string_ref(str)
 char *str;
 {
         stralloc_allocd_strings--;
@@ -306,6 +306,9 @@ char *str;
             REFS(str)--;
 }
 
+void decrement_string_ref(char *str) { _decrement_string_ref(str); }
+
+#define decrement_string_ref(str) _decrement_string_ref(str)
 
 /*
  * free_string - reduce the ref count on a string.  Various sanity
@@ -394,35 +397,32 @@ char * str;
  * GNU malloc overhead!  tee hee!
  */
 
-int add_string_status(verbose)
-    int verbose;
+int add_string_status(strbuf_t *sbuf, Bool verbose)
 {
     mp_int net_bytes_distinct_strings, net_allocd_bytes;
 
     if (verbose) {
-        add_message("\nShared string hash table:\n");
-        add_message("-------------------------\t Strings    Bytes\n");
+        strbuf_add(sbuf, "\nShared string hash table:\n");
+        strbuf_add(sbuf, "-------------------------\t Strings    Bytes\n");
     }
     net_bytes_distinct_strings = (bytes_distinct_strings &
         (malloc_size_mask() * sizeof (char *))) -
       num_distinct_strings * (sizeof(char*) + sizeof(short));
-    add_message("Strings malloced\t\t%8ld %8ld + %ld overhead\n",
+    strbuf_addf(sbuf, "Strings malloced\t\t%8ld %8ld + %ld overhead\n",
                 num_distinct_strings, net_bytes_distinct_strings, overhead_bytes());
     if (verbose) {
-        char print_buff[20];
 
         stralloc_allocd_bytes &= malloc_size_mask();
         net_allocd_bytes = (stralloc_allocd_bytes * sizeof(char*)) -
           stralloc_allocd_strings * (sizeof(char*) + sizeof(short));
-        add_message("Total asked for\t\t\t%8ld %8ld\n",
+        strbuf_addf(sbuf, "Total asked for\t\t\t%8ld %8ld\n",
                     stralloc_allocd_strings, net_allocd_bytes );
-        add_message("Space actually required/total string bytes %ld%%\n",
+        strbuf_addf(sbuf, "Space actually required/total string bytes %ld%%\n",
                     (net_bytes_distinct_strings + overhead_bytes())*100L /
                             net_allocd_bytes );
-        sprintf(print_buff, " %7.3f\n",
-                    (float)search_len / (float)num_str_searches);
-        add_message("Searches: %d    Average search length:%s\n",
-                    num_str_searches, print_buff);
+        strbuf_addf(sbuf, "Searches: %d    Average search length:%7.3f\n",
+                    num_str_searches
+                    , (float)search_len / (float)num_str_searches);
     }
     return net_bytes_distinct_strings + overhead_bytes();
 }

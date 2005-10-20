@@ -41,7 +41,7 @@
 #include "hosts/amiga/socket.h"
 #endif
 
-#define NO_INCREMENT_STRING_REF
+#define NO_REF_STRING
 #include "main.h"
 
 #include "backend.h"
@@ -68,27 +68,30 @@
 /* -- Pure commandline arguments -- */
 
 int d_flag    = 0;  /* Debuglevel */
-/* TODO: BOOL */ int t_flag    = MY_FALSE;  /* True: Disable heart beat and reset */
-int e_flag    = MY_FALSE;  /* Passed to preload(), usually disables it */
-/* TODO: BOOL */ int comp_flag = MY_FALSE;  /* Trace compilations */
+/* TODO: Make this bitflags, one for 'trace refcounts' etc */
+Bool t_flag    = MY_FALSE;  /* True: Disable heart beat and reset */
+static int e_flag = MY_FALSE;  /* Passed to preload(), usually disables it */
+Bool comp_flag = MY_FALSE;  /* Trace compilations */
 #ifdef DEBUG
-/* TODO: BOOL */ int check_a_lot_ref_counts_flag = MY_FALSE;  /* The name says it. */
+Bool check_a_lot_ref_counts_flag = MY_FALSE;  /* The name says it. */
 #endif
+
+Bool strict_euids = MY_FALSE;  /* Enforce use of the euids */
+
+long time_to_reset          = TIME_TO_RESET;
+long time_to_cleanup        = TIME_TO_CLEAN_UP;
+  /* A value <= 0 disables the reset/cleanup */
 
 long time_to_swap           = TIME_TO_SWAP;
 long time_to_swap_variables = TIME_TO_SWAP_VARIABLES;
   /* A value <= 0 disables the swapping. */
 
-#ifndef MAXNUMPORTS
-int port_number = PORTNO;
-#else
 int port_numbers[MAXNUMPORTS] = { PORTNO };
   /* The login port numbers.
    * Negative numbers are not ports, but the numbers of inherited
    * socket file descriptors.
    */
 int numports = 0;  /* Number of specified ports */
-#endif
 
 #ifdef CATCH_UDP_PORT
 int udp_port = CATCH_UDP_PORT;  /* Port number for UDP */
@@ -102,7 +105,7 @@ static int no_erq_demon = 0;  /* True: don't start the erq */
 
 /* -- Global Variables/Arguments dealing with memory -- */
 
-/* TODO: BOOL */ int out_of_memory = MY_FALSE;              /* True: we are out of memory */
+Bool out_of_memory = MY_FALSE;              /* True: we are out of memory */
 int malloc_privilege = MALLOC_USER; /* Priviledge for next allocation */
 
 char *reserved_user_area   = NULL;  /* Reserved memory areas */
@@ -162,13 +165,13 @@ main (int argc, char **argv)
     rxcache_init();
 #endif
 
-    const0.type = T_NUMBER; const0.u.number = 0;
-    const1.type = T_NUMBER; const1.u.number = 1;
+    put_number(&const0, 0);
+    put_number(&const1, 1);
     assoc_shared_string_key.type = T_STRING;
     assoc_shared_string_key.x.string_type = STRING_SHARED;
 
     current_time = get_current_time();
-    seed_random(current_time);
+    seed_random((unsigned)current_time);
 
     dummy_current_object_for_loads = NULL_object;
 #ifdef DEBUG
@@ -180,6 +183,10 @@ main (int argc, char **argv)
 #endif
     dummy_current_object_for_loads.ref = 1;
     dummy_current_object_for_loads.user = &default_wizlist_entry;
+
+#ifdef STRICT_EUIDS
+    strict_euids = MY_TRUE;
+#endif
 
     /*
      * Check that the definition of EXTRACT_UCHAR() is correct.
@@ -206,33 +213,33 @@ main (int argc, char **argv)
      * use it directly.
      */
     {
-        const char *pName = make_name_sane(master_name);
+        const char *pName = make_name_sane(master_name, MY_FALSE);
         if (pName)
             strcpy(master_name, pName);
     }
 
-#ifdef MAXNUMPORTS
     if (numports < 1) /* then use the default port */
         numports = 1;
-#endif
+
     init_closure_hooks();
 #ifdef MIN_MALLOCED
     xfree(xalloc(MIN_MALLOCED));
 #endif
 #ifdef MALLOC_smalloc
     if (reserved_system_size > 0)
-        reserved_system_area = xalloc(reserved_system_size);
+        reserved_system_area = xalloc((unsigned)reserved_system_size);
     if (reserved_master_size > 0)
-        reserved_master_area = xalloc(reserved_master_size);
+        reserved_master_area = xalloc((unsigned)reserved_master_size);
 #endif
     if (reserved_user_size > 0)
-        reserved_user_area = xalloc(reserved_user_size);
+        reserved_user_area = xalloc((unsigned)reserved_user_size);
     init_shared_strings();
     init_otable();
     for (i = 0; i < (int)(sizeof consts / sizeof consts[0]); i++)
         consts[i] = exp(- i / 900.0);
     init_lexer();
-    reset_machine(1);
+    reset_machine(MY_TRUE); /* Cold reset the machine */
+    RESET_LIMITS;
     CLEAR_EVAL_COST;
     if (!new_mudlib && chdir(MUD_LIB) == -1) {
         fprintf(stderr, "Bad mudlib directory: %s\n", MUD_LIB);
@@ -264,16 +271,16 @@ main (int argc, char **argv)
     debug_message((char *)(long)"");
     (void)signal(SIGFPE, SIG_IGN);
     current_object = &dummy_current_object_for_loads;
-    if (setjmp(toplevel_error_recovery_info.con.text)) {
+    if (setjmp(toplevel_context.con.text)) {
         clear_state();
         add_message("Anomaly in the fabric of world space.\n");
     } else {
-        toplevel_error_recovery_info.type = ERROR_RECOVERY_BACKEND;
+        toplevel_context.rt.type = ERROR_RECOVERY_BACKEND;
 
         master_ob = get_object(master_name);
     }
     current_object = master_ob;
-    toplevel_error_recovery_info.type = ERROR_RECOVERY_NONE;
+    toplevel_context.rt.type = ERROR_RECOVERY_NONE;
     if (master_ob == NULL) {
         fprintf(stderr, "The file %s must be loadable.\n", master_name);
         exit(1);
@@ -282,7 +289,7 @@ main (int argc, char **argv)
      * Make sure master_ob is never made a dangling pointer.
      * Look at apply_master_ob() for more details.
      */
-    add_ref(master_ob, "main");
+    ref_object(master_ob, "main");
     initialize_master_uid();
     push_number(0);
     apply_master_ob(STR_INAUGURATE, 1);
@@ -326,26 +333,24 @@ void initialize_master_uid (void)
     struct svalue *ret;
 
     ret = apply_master_ob(STR_GET_M_UID, 0);
-#ifndef NATIVE_MODE
-    if (ret && ret->type == T_NUMBER && ret->u.number) {
+    if (ret && ret->type == T_NUMBER && ret->u.number)
+    {
         master_ob->user = &default_wizlist_entry;
-#ifdef EUIDS
         master_ob->eff_user = 0;
-#endif
-    } else
-#endif
-    if (ret == 0 || ret->type != T_STRING) {
-        fprintf(stderr, "get_master_uid() in %s does not work\n", master_name);
-#ifdef NATIVE_MODE
-        exit(1);
-#endif
-    } else {
-        master_ob->user = add_name(ret->u.string);
-#ifdef EUIDS
-        master_ob->eff_user = master_ob->user;
-#endif
     }
-}
+    else if (ret == 0 || ret->type != T_STRING)
+    {
+        fprintf(stderr, "%s: get_master_uid() in %s does not work\n"
+               , strict_euids ? "Fatal" : "Warning:", master_name);
+        if (strict_euids)
+            exit(1);
+    }
+    else
+    {
+        master_ob->user = add_name(ret->u.string);
+        master_ob->eff_user = master_ob->user;
+    }
+} /* initialize_master_uid() */
 
 
 /*-------------------------------------------------------------------------*/
@@ -355,9 +360,8 @@ void initialize_master_uid (void)
  */
 
 #ifdef string_copy
-char *_string_copy(str, file, line)
-    char *str, *file;
-    int line;
+char *
+_string_copy (const char *str, const char *file, int line)
 {
     char *p;
 
@@ -368,8 +372,8 @@ char *_string_copy(str, file, line)
     return p;
 }
 #else
-char *string_copy(str)
-    char *str;
+char *
+string_copy (const char *str)
 {
     char *p;
 
@@ -462,7 +466,7 @@ xalloc (size_t size)
         going_to_exit = 1;
         p = "Totally out of MEMORY.\n";
         write(1, p, strlen(p));
-        (void)dump_trace(0);
+        (void)dump_trace(MY_FALSE);
         exit(2);
     }
     return p;
@@ -482,7 +486,7 @@ reallocate_reserved_areas (void)
     malloc_privilege = MALLOC_USER;
 #ifdef MALLOC_smalloc
     if (reserved_system_size && !reserved_system_area) {
-        if ( !(reserved_system_area = xalloc(reserved_system_size)) ) {
+        if ( !(reserved_system_area = xalloc((unsigned)reserved_system_size)) ) {
             slow_shut_down_to_do = 1;
             return;
         }
@@ -492,7 +496,7 @@ reallocate_reserved_areas (void)
         }
     }
     if (reserved_master_size && !reserved_master_area) {
-        if ( !(reserved_master_area = xalloc(reserved_master_size)) ) {
+        if ( !(reserved_master_area = xalloc((unsigned)reserved_master_size)) ) {
             slow_shut_down_to_do = 1;
             return;
         }
@@ -503,7 +507,7 @@ reallocate_reserved_areas (void)
     }
 #endif /* MALLOC_smalloc */
     if (reserved_user_size && !reserved_user_area) {
-        if ( !(reserved_user_area = xalloc(reserved_user_size)) ) {
+        if ( !(reserved_user_area = xalloc((unsigned)reserved_user_size)) ) {
             slow_shut_down_to_do = 6;
             return;
         }
@@ -526,9 +530,9 @@ writex (int d, p_uint i)
     char c;
 
     for (j = 2 * sizeof i; --j >= 0; i <<= 4) {
-        c = (i >> (8 * sizeof i - 4) ) + '0';
+        c = (char)((i >> (8 * sizeof i - 4) ) + '0');
         if (c >= '9' + 1)
-            c += 'a' - ('9' + 1);
+            c += (char)('a' - ('9' + 1));
         write(d, &c, 1);
     }
 }
@@ -546,7 +550,7 @@ writed (int d, p_uint i)
     for (j = 1000000000; j > i; j /= 10) NOOP;
     if (!j) j = 1;
     do {
-        c = (i / j) % 10 + '0';
+        c = (char)((i / j) % 10 + '0');
         write(d, &c, 1);
         j /= 10;
     } while (j > 0);
@@ -636,6 +640,7 @@ typedef enum OptNumber {
  , cUdpPort       /* --udp                */
 #endif
  , cTrace         /* --list-compiles      */
+ , cCleanupTime   /* --cleanup-time       */
  , cDebug         /* --debug              */
  , cDefine        /* --define             */
  , cEvalcost      /* --eval-cost          */
@@ -647,13 +652,20 @@ typedef enum OptNumber {
  , cMaxMalloc     /* --max-malloc         */
  , cMaxSmall      /* --max-small-malloc   */
 #endif
+ , cMaxArray      /* --max-array          */
+ , cMaxBytes      /* --max-bytes          */
+ , cMaxFile       /* --max-file           */
+ , cMaxMapping    /* --max-mapping        */
  , cNoERQ         /* --no-erq             */
  , cNoHeart       /* --no-heart           */
  , cNoPreload     /* --no-preload         */
+ , cResetTime     /* --reset-time         */
  , cReserved      /* -r                   */
  , cReserveUser   /* --reserve-user       */
  , cReserveMaster /* --reserve-master     */
  , cReserveSystem /* --reserve-system     */
+ , cStrictEuids   /* --strict-euids       */
+ , cNoStrictEuids /* --no-strict-euids    */
 #if TIME_TO_SWAP > 0
  , cSwap          /* -s                   */
  , cSwapTime      /* --swap-time          */
@@ -707,10 +719,11 @@ static ShortOpt aShortOpts[]
     };
 
 static LongOpt aLongOpts[]
-  = { { "debug",              cDebug,         MY_FALSE }
+  = { { "cleanup-time",       cCleanupTime,   MY_TRUE }
+    , { "debug",              cDebug,         MY_FALSE }
     , { "define",             cDefine,        MY_TRUE }
     , { "debug-file",         cDebugFile,     MY_TRUE }
-    , { "debuf_file",         cDebugFile,     MY_TRUE } /* TODO: COMPAT */
+    , { "debug_file",         cDebugFile,     MY_TRUE } /* TODO: COMPAT */
     , { "eval-cost",          cEvalcost,      MY_TRUE }
     , { "funcall",            cFuncall,       MY_TRUE }
     , { "list-compiles",      cTrace,         MY_FALSE }
@@ -722,13 +735,20 @@ static LongOpt aLongOpts[]
     , { "max_malloced",       cMaxMalloc,     MY_TRUE } /* TODO: COMPAT */
     , { "max_small_malloced", cMaxSmall,      MY_TRUE } /* TODO: COMPAT */
 #endif
+    , { "max-array",          cMaxArray,      MY_TRUE }
+    , { "max-bytes",          cMaxBytes,      MY_TRUE }
+    , { "max-file",           cMaxFile,       MY_TRUE }
+    , { "max-mapping",        cMaxMapping,    MY_TRUE }
     , { "inherit",            cInherited,     MY_TRUE }
     , { "no-erq",             cNoERQ,         MY_FALSE }
     , { "no-heart",           cNoHeart,       MY_FALSE }
     , { "no-preload",         cNoPreload,     MY_FALSE }
+    , { "reset-time",         cResetTime,     MY_TRUE }
     , { "reserve-user",       cReserveUser,   MY_TRUE }
     , { "reserve-master",     cReserveMaster, MY_TRUE }
     , { "reserve-system",     cReserveSystem, MY_TRUE }
+    , { "strict-euids",       cStrictEuids,   MY_FALSE }
+    , { "no-strict-euids",    cNoStrictEuids, MY_FALSE }
 #if TIME_TO_SWAP > 0
     , { "swap-time",          cSwapTime,      MY_TRUE }
     , { "swap-variables",     cSwapVars,      MY_TRUE }
@@ -793,20 +813,14 @@ options (void)
   version();
   fputs("\n           Mode: "
 #ifdef COMPAT_MODE
-#    ifdef NATIVE_MODE
-        "Compat+Native"
-#    else
         "Compat"
-#    endif
-#elif defined(NATIVE_MODE)
-        "Native"
 #else
         "Plain (aka cross-compat)"
 #endif
-#ifdef EUIDS
-        " with euids.\n"
+#ifdef STRICT_EUIDS
+        " with strict euids.\n"
 #else
-        ", no euids.\n"
+        "\n"
 #endif
        , stdout);
 
@@ -815,11 +829,7 @@ options (void)
         "  Master object: <mudlib>/" MASTER_NAME "\n"
        , stdout);
 
-#ifdef MAXNUMPORTS
   printf(" Multiple ports: %d ports max, default is %d.\n", MAXNUMPORTS, PORTNO);
-#else
-  printf("    Single port: default is %d\n", PORTNO);
-#endif
 
 #ifdef CATCH_UDP_PORT
 #    ifdef UDP_SEND
@@ -862,11 +872,10 @@ options (void)
 #endif
        , stdout);
 
-  printf(" Runtime limits: max log size:          %7d\n"
-         "                 max read file size:    %7d\n"
+  printf(" Runtime limits: max read file size:    %7d\n"
          "                 max byte read/write:   %7d\n"
          "                 max socket buf size:   %7d\n"
-         "                 max eval cost:         %7d\n"
+         "                 max eval cost:         %7d %s\n"
          "                 catch eval cost:       %7d\n"
          "                 master eval cost:      %7d\n"
          "                 eval stack:            %7d\n"
@@ -874,17 +883,24 @@ options (void)
          "                 max call depth:        %7d\n"
          "                 max bitfield length:   %7d\n"
          "                 max array size:        %7d\n"
+         "                 max mapping size:      %7d\n"
          "                 max number players:    %7d\n"
          "                 ed cmd/cmd ratio:      %7d:1\n"
 #if defined(TRACE_CODE)
          "                 max trace length:      %7d\n"
 #endif
-        , MAX_LOG_SIZE, READ_FILE_MAX_SIZE, MAX_BYTE_TRANSFER
+        , READ_FILE_MAX_SIZE, MAX_BYTE_TRANSFER
         , SET_BUFFER_SIZE_MAX
-        , MAX_COST, CATCH_RESERVED_COST, MASTER_RESERVED_COST
+        , MAX_COST
+#if defined(DYNAMIC_COSTS)
+        , "(dynamic)"
+#else
+        , ""
+#endif
+        , CATCH_RESERVED_COST, MASTER_RESERVED_COST
         , EVALUATOR_STACK_SIZE
         , MAX_USER_TRACE, MAX_TRACE
-        , MAX_BITS, MAX_ARRAY_SIZE
+        , MAX_BITS, MAX_ARRAY_SIZE, MAX_MAPPING_SIZE
         , MAX_PLAYERS
         , ALLOWED_ED_CMDS /* MAX_CMDS_PER_BEAT is not implemented */
 #ifdef TRACE_CODE
@@ -892,17 +908,10 @@ options (void)
 #endif
         );
 
-#ifndef OLD_RESET
   printf("         Timing: reset:                 %7d s\n"
          "                 clean up:              %7d s\n"
         , TIME_TO_RESET, TIME_TO_CLEAN_UP
         );
-#else
-  printf("         Timing: reset:                 %7d s (granularity %d s)\n"
-         "                 clean up:              %7d s\n"
-        , TIME_TO_RESET, RESET_GRANULARITY, TIME_TO_CLEAN_UP
-        );
-#endif
 
 #if TIME_TO_SWAP > 0
   printf("       Swapping: objects             after %4d s\n"
@@ -1001,9 +1010,6 @@ options (void)
 #       if defined(TRACECODE)
                               , "TRACECODE"
 #       endif
-#       if defined(OLD_RESET)
-                              , "OLD_RESET"
-#       endif
 #       if defined(COMM_STAT)
                               , "COMM_STAT"
 #       endif
@@ -1053,16 +1059,10 @@ shortusage (void)
 {
   version();
   fputs("\n"
-#ifdef MAXNUMPORTS
 "Usage: driver [options] [<portnumber>...]\n"
-#else
-"Usage: driver [options] [<portnumber>]\n"
-#endif
 "\nOptions are:\n"
 "\n"
-#ifdef MAXNUMPORTS
 "  -P|--inherit <fd-number>\n"
-#endif
 #ifdef CATCH_UDP_PORT
 "  -u|--udp <portnumber>\n"
 #endif
@@ -1077,6 +1077,14 @@ shortusage (void)
 "  -N|--no-erq\n"
 "  -t|--no-heart\n"
 "  -f|--funcall <word>\n"
+"  --strict-euids\n"
+"  --no-strict-euids\n"
+"  --cleanup-time\n"
+"  --reset-time\n"
+"  --max-array\n"
+"  --max-mapping\n"
+"  --max-bytes\n"
+"  --max-file\n"
 #if TIME_TO_SWAP > 0
 "  -s <time>  | --swap-time <time>\n"
 "  -s v<time> | --swap-variables <time>\n"
@@ -1117,19 +1125,13 @@ usage (void)
 {
   version();
   fputs("\n"
-#ifdef MAXNUMPORTS
 "Usage: driver [options] [<portnumber>...]\n"
-#else
-"Usage: driver [options] [<portnumber>]\n"
-#endif
 "\nOptions are:\n"
 "\n"
-#ifdef MAXNUMPORTS
 "  -P|--inherit <fd-number>\n"
 "    Inherit filedescriptor <fd-number> from the parent process\n"
 "    as socket to listen for connections.\n"
 "\n"
-#endif
 #ifdef CATCH_UDP_PORT
 "  -u|--udp <portnumber>\n"
 "    Specify the <portnumber> for the UDP port, overriding the compiled-in\n"
@@ -1173,6 +1175,33 @@ usage (void)
 "    The lfun master->flag() is called with <word> as argument before the\n"
 "    gamedriver accepts netword connections.\n"
 "\n"
+"  --cleanup-time <time>\n"
+"    The idle time in seconds for an object before the driver tries to\n"
+"    clean it up. This time should be substantially higher than the\n"
+"    reset time. A time <= 0 disables the cleanup mechanism.\n"
+"\n"
+"  --reset-time <time>\n"
+"    The time in seconds for an object before it is reset.\n"
+"    A time <= 0 disables the reset mechanism.\n"
+"\n"
+"  --max-array <size>\n"
+"    The maximum number of elements an array can hold.\n"
+"    Set to 0, arrays of any size are allowed.\n"
+"\n"
+"  --max-mapping <size>\n"
+"    The maximum number of elements a mapping can hold.\n"
+"    Set to 0, mappings of any size are allowed.\n"
+"\n"
+"  --max-bytes <size>\n"
+"    The maximum number of bytes one read_bytes()/write_bytes() call\n"
+"    can handle.\n"
+"    Set to 0, arrays of any size are allowed.\n"
+"\n"
+"  --max-file <size>\n"
+"    The maximum number of bytes one read_file()/write_file() call\n"
+"    can handle.\n"
+"    Set to 0, arrays of any size are allowed.\n"
+"\n"
 #if TIME_TO_SWAP > 0
 "  -s <time>  | --swap-time <time>\n"
 "  -s v<time> | --swap-variables <time>\n"
@@ -1199,6 +1228,10 @@ usage (void)
 "  -r s<size> | --reserve-system <size>\n"
 "    Reserve <size> amount of memory for user/master/system allocations to\n"
 "    be held until main memory runs out.\n"
+"\n"
+"  --strict-euids\n"
+"  --no-strict-euids\n"
+"    Enforce/don't enforce the proper use of euids.\n"
 "\n"
 #ifdef MALLOC_smalloc
 "  --gcollect-outfd <filename>|<num>\n"
@@ -1248,22 +1281,14 @@ firstscan (int eOption, const char * pValue)
     switch (eOption)
     {
     case cArgument:
-#ifndef MAXNUMPORTS
-        if (atoi(pValue))
-            port_number = atoi(pValue);
-        else
-            fprintf(stderr, "Illegal portnumber '%s' ignored.\n", pValue);
-#else
         if (numports >= MAXNUMPORTS)
             fprintf(stderr, "Portnumber '%s' ignored.\n", pValue);
         else if (atoi(pValue))
               port_numbers[numports++] = atoi(pValue);
         else
             fprintf(stderr, "Illegal portnumber '%s' ignored.\n", pValue);
-#endif
         break;
 
-#ifdef MAXNUMPORTS
     case cInherited:
         if (numports >= MAXNUMPORTS)
             fprintf(stderr, "fd '%s' ignored.\n", pValue);
@@ -1272,7 +1297,6 @@ firstscan (int eOption, const char * pValue)
         else
             fprintf(stderr, "Illegal fd '%s' ignored.\n", pValue);
         break;
-#endif
 
 #ifdef CATCH_UDP_PORT
     case cUdpPort:
@@ -1288,18 +1312,23 @@ firstscan (int eOption, const char * pValue)
             struct lpc_predef_s *tmp;
 
             tmp = (struct lpc_predef_s *) xalloc(sizeof(struct lpc_predef_s));
-            tmp->flag = strdup(pValue);
+            tmp->flag = string_copy(pValue);
             tmp->next = lpc_predefs;
             lpc_predefs = tmp;
         }
         break;
 
     case cEvalcost:
-        if (atoi(pValue))
-            initial_eval_cost = -atoi(pValue);
+      {
+        long val;
+
+        val = atoi(pValue);
+        if (val >= 0)
+            def_eval_cost = val;
         else
             fprintf(stderr, "Illegal eval-cost '%s' ignored.\n", pValue);
         break;
+      }
 
     case cNoPreload:
         e_flag++;
@@ -1320,6 +1349,50 @@ firstscan (int eOption, const char * pValue)
     case cNoHeart:
         t_flag = MY_TRUE;
         break;
+
+    case cCleanupTime:
+        if (atoi(pValue))
+        {
+            time_to_cleanup = atoi(pValue);
+            if (time_to_cleanup < 0)
+                time_to_cleanup = 0;
+        }
+        else
+            fprintf(stderr, "Illegal cleanup-time '%s' ignored.\n", pValue);
+        break;
+
+    case cResetTime:
+        if (atoi(pValue))
+        {
+            time_to_reset = atoi(pValue);
+            if (time_to_reset < 0)
+                time_to_reset = 0;
+        }
+        else
+            fprintf(stderr, "Illegal cleanup-time '%s' ignored.\n", pValue);
+        break;
+
+    case cMaxArray:
+    case cMaxBytes:
+    case cMaxFile:
+    case cMaxMapping:
+      {
+        long val = atoi(pValue);
+
+        if (val >= 0)
+        {
+            switch(eOption)
+            {
+            case cMaxArray:   def_array_size = (size_t)val;   break;
+            case cMaxBytes:   def_byte_xfer = val;            break;
+            case cMaxFile:    def_file_xfer = val;            break;
+            case cMaxMapping: def_mapping_size = (size_t)val; break;
+            }
+        }
+        else
+            fprintf(stderr, "Illegal limit '%s' ignored.\n", pValue);
+        break;
+      }
 
 #if TIME_TO_SWAP > 0
     case cSwap:
@@ -1436,6 +1509,14 @@ firstscan (int eOption, const char * pValue)
             break;
         }
 
+    case cStrictEuids:
+        strict_euids = MY_TRUE;
+        break;
+
+    case cNoStrictEuids:
+        strict_euids = MY_FALSE;
+        break;
+
 #ifdef MALLOC_smalloc
     case cGcollectFD:
         if (isdigit((unsigned char)*pValue)) {
@@ -1508,7 +1589,7 @@ secondscan (int eOption, const char * pValue)
     switch (eOption)
     {
     case cFuncall:
-        push_constant_string((char *)pValue);
+        push_volatile_string((char *)pValue);
         (void)apply_master_ob(STR_FLAG, 1);
         if (game_is_being_shut_down) {
             fprintf(stderr, "Shutdown by master object.\n");
@@ -1591,7 +1672,7 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
         pValue = strchr(pArg, '=');
         if (pValue != NULL)
         {
-          iArglen = pValue - pArg;
+          iArglen = (unsigned)(pValue - pArg);
           pValue++;
         }
         else
@@ -1685,7 +1766,7 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
       {
         fputs("driver: Option '", stderr);
         if (bShort)
-          putc(aShortOpts[iOption].cOption, stderr);
+          putc((unsigned char)(aShortOpts[iOption].cOption), stderr);
         else
           fputs(aLongOpts[iOption].pOption, stderr);
         fputs("' expects a value.\n", stderr);

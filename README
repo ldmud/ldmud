@@ -20,6 +20,10 @@ The files in this directory are:
   src/    : the driver source
   pkg/    : additional packages (unsupported and supported) for the driver.
   mudlib/ : standard files to copy into your mudlib.
+  mudlib/sys/:
+            include files to copy into your mudlib. Some of these are
+            also used by the src/ files. 
+  mud/    : the lp-245 mudlib, and support files for other mudlibs.
 
 Oh, and 'LDMud' is still just a working title (I am too lazy for 'ld-lpmud'
 or similar constructs).

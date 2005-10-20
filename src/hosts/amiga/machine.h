@@ -58,9 +58,6 @@
 /* Define if the closedir function returns void instead of int.  */
 /* #undef VOID_CLOSEDIR */
 
-/* Is the library function inet_ntoa() compatible with the compiler ? */
-#define INET_NTOA_OK 1
-
 /* The following values must be evaluable by the preprocessor */
 #define SIZEOF_P_INT 4
 #define SIZEOF_INT 4
@@ -231,7 +228,5 @@
 
 /* Define if you have the ucb library (-lucb).  */
 /* #undef HAVE_LIBUCB */
-
-#define HOST_INCLUDE "hosts/amiga/amiga.h"
 
 #endif /* MACHINE_H */

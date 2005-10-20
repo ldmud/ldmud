@@ -4,6 +4,7 @@
 #include "driver.h"
 
 #include "datatypes.h"  /* struct svalue */
+#include "strfuns.h"    /* strbuf_t */
 
 #ifndef MALLOC_smalloc /* sigh */
 
@@ -15,12 +16,6 @@
 
 #define MASK           0x0fffffff
 #define M_REF           0x20000000
-
-#ifdef HAS_INLINE
-#define SMALLOC_H_INLINE inline
-#else
-#define SMALLOC_H_INLINE
-#endif
 
 #ifdef SMALLOC_LPC_TRACE
 #ifdef SMALLOC_TRACE
@@ -42,49 +37,49 @@
  * This would also make the include of datatypes.h unnecessary.
  */
 #ifdef USES_SVALUE_STRLEN
-static SMALLOC_H_INLINE int _svalue_strlen(v)
+static INLINE size_t _svalue_strlen(v)
 register struct svalue *v;
 {
     register short type = v->x.string_type;
     register char *p = v->u.string;
-    register int i;
+    register long i;
 
     if (type == STRING_MALLOC) {
-        i = (
+        i = (signed)(
                 (((p_uint*)(p))[-SMALLOC_OVERHEAD] & MASK) -
                  (SMALLOC_OVERHEAD + 1)
-            ) * SIZEOF_P_INT;
+            ) * SIZEOF_CHAR_P;
         if (*(p+=i))
             if (*++p)
-                if (!*++p) return i+2;
-#if SIZEOF_P_INT == 4
-                else return i+3;
+                if (!*++p) return (size_t)(i+2);
+#if SIZEOF_CHAR_P == 4
+                else return (size_t)(i+3);
 #else
-                else return i+3+strlen(p+1);
+                else return (size_t)(i+3)+strlen(p+1);
 #endif
-            else return i+1;
-        return i;
+            else return (size_t)(i+1);
+        return (size_t)i;
     } else if (type == STRING_SHARED) {
-            if ( (i =
-               (*(p_uint*)
-                 (p - sizeof(short) - (SMALLOC_OVERHEAD+1) * SIZEOF_P_INT) &
-                MASK) * SIZEOF_P_INT -
+            if ( (i = (signed)
+               ((*(p_uint*)
+                 (p - sizeof(short) - (SMALLOC_OVERHEAD+1) * SIZEOF_CHAR_P) &
+                MASK) * SIZEOF_CHAR_P -
                sizeof(short) -
-               (SMALLOC_OVERHEAD+2) * SIZEOF_P_INT
+               (SMALLOC_OVERHEAD+2) * SIZEOF_CHAR_P)
              ) >= 0)
-#if SIZEOF_P_INT == 4
+#if SIZEOF_CHAR_P == 4
         {
                 if (*(p+=i))
                     if (*++p)
-                        if (!*++p) return i+2;
-                    else return i+3;
-                    else return i+1;
-            return i;
+                        if (!*++p) return (size_t)(i+2);
+                    else return (size_t)(i+3);
+                    else return (size_t)(i+1);
+            return (size_t)i;
             }
         if (!*p) return 0;
         return 1;
 #else
-            return i + strlen(p+i);
+            return (size_t)i + strlen(p+i);
         return strlen(p);
 #endif
     } else {
@@ -92,24 +87,24 @@ register struct svalue *v;
     }
 }
 
-#ifdef SMALLOC_H_INLINE
-static int svalue_strlen(v) struct svalue *v; { return _svalue_strlen(v); }
-#else
 #define svalue_strlen(v) (_svalue_strlen((v)))
-#endif
 #endif /* USES_SVALUE_STRLEN */
 
 #define malloced_strlen(s) ( ( \
         (*(p_uint *)((s)-sizeof(p_int)*SMALLOC_OVERHEAD) & MASK) \
-        - SMALLOC_OVERHEAD) * SIZEOF_P_INT)
+        - SMALLOC_OVERHEAD) * SIZEOF_CHAR_P)
 
 /* --- Variables --- */
 extern int debugmalloc;
 
 /* --- Prototypes --- */
 
+/* TODO: It would be nice to have a 'safe xalloc' which would either return
+ * TODO:: a pointer or throw an Out-of-memory error. Alas, with all the
+ * TODO:: local copies of inter_sp/inter_pc this is not so easy.
+ */
 #ifdef SMALLOC_TRACE
-extern POINTER smalloc PROT((size_t size, char *file, int line));
+extern POINTER smalloc PROT((size_t size, const char *file, int line));
 #else
 extern POINTER smalloc PROT((size_t size));
 #endif
@@ -136,11 +131,11 @@ extern void dprintf3 PROT((int fd, char *s, p_int a, p_int b, p_int c));
 
 extern int resort_free_list PROT((void)); /* TODO: Delete me? */
 extern int malloc_size_mask PROT((void));
-extern void dump_malloc_data PROT((void));
+extern void dump_malloc_data PROT((strbuf_t *sbuf));
 extern POINTER calloc PROT((size_t nelem, size_t sizel));
 extern void clear_M_REF_flags PROT((void));
 extern void free_unreferenced_memory PROT((void));
-extern char *malloc_increment_size PROT((char *p, p_int size));
+extern void *malloc_increment_size PROT((void *p, size_t size));
 extern void walk_new_small_malloced PROT(( void (*func)(POINTER, long) ));
 
 #ifdef SMALLOC_TRACE

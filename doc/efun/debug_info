@@ -1,30 +1,56 @@
 SYNOPSIS
-	mixed debug_info(int flag, object obj)
+        #include <sys/debug_info.h>
+
+        mixed debug_info(int flag)
+        mixed debug_info(int flag, mixed arg)
+        mixed debug_info(int flag, mixed arg2, mixed arg3)
 
 DESCRIPTION
-	Print out some driver internal debug information.
+        Gather some driver internal debug information according
+        to the setting of flag:
 
-	If flag is 0, information like heart_beat, enable_commands
-	etc. of the specified object will be printed, and 0 returned.
+        DINFO_OBJECT (0): Information like heart_beat, enable_commands
+        etc. of the specified object will be printed, and 0 returned.
 
-	If flag is 1, memory usage information like how many strings,
-	variables, inherited files, object size etc. will be printed
-	about the specified object, and 0 returned.
+        DINFO_MEMORY (1): Memory usage information like how many strings,
+        variables, inherited files, object size etc. will be printed
+        about the specified object, and 0 returned.
 
-	If flag is 2, objects from the global object list are
-	returned.  If the optional second arg is omitted, the first
-	element (numbered 0) is returned. If the second arg is a
-	number n, the n'th element of the object list returned. If the
-	second arg is an object, it's successor in the object list is
-	returned.
+        DINFO_OBJLIST (2): Objects from the global object list are
+        returned.  If the optional second arg is omitted, the first
+        element (numbered 0) is returned. If the second arg is a
+        number n, the n'th element of the object list returned. If the
+        second arg is an object, it's successor in the object list is
+        returned.
 
-	Flag == 3 is equivalent to typing ``malloc'' at the command
-	line. No second arg must be given. Returns 0.
+        DINFO_MALLOC (3): Equivalent to typing ``malloc'' at the command
+        line. No second arg must be given. Returns 0.
 
-	If flag is 4, the required second arg can be 0, "tables" or
-	"swap" and has the same effect as ``status'', ``status
-	tables'' resp. ``status swap'' on the command line. Returns 1
-	if a valid argument was given, 0 otherwise.
+        DINFO_STATUS (4): Collect the status information of the driver.
+        The optional second arg can be 0, "tables", "swap", "malloc" or any
+        other argument accepted by the actual driver.
+        The result is a printable string with the status information,
+        or 0 if an invalid argument was given.
+
+        DINFO_DUMP (5): Dump the information specified by <arg2> into the
+        filename specified by <arg3>. If <arg3> is omitted, a default file
+        name is used. The function calls master->valid_write() to check that
+        it can write the files. The file in question is always written
+        anew.
+
+        Result is 1 on success, or 0 if an error occured.
+
+        <arg2> == "objects": dump information about all objects. Default
+          filename is '/OBJ_DUMP', the valid_write() will read 'objdump' for
+          the function.
+        <arg2> == "opcodes": dump usage information about the opcodes. Default
+          filename is '/OPC_DUMP', the valid_write() will read 'opcdump' for
+          the function.
+
+HISTORY
+        Since 3.2.7, DINFO_STATUS returns the status information instead
+        of printing it.
+        DINFO_DUMP introduced with 3.2.7.
 
 SEE ALSO
-	trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)
+        trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)

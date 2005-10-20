@@ -4,6 +4,9 @@ Date: 990204
 Type: Patch
 State: Unclassified
 
+Deleted is all text pertaining to already implemented features.
+-------------------------------------------------------------------------
+
 ich hab mal in einem Anflug von Wahnsinn versucht, die Aenderungen, die
 DanS@FF an den Sourcen bis zur 3.2.1@141 gemacht hat, auf die 3.2.5 zu
 uebertragen. Ich hatte das Changelog vom FF-Driver bei Dir im wk-Verzeichnis
@@ -18,6 +21,243 @@ Das Define dafuer heisst uebrigens __CYGWIN__, nicht mehr __CYGWIN32__.
 
 Tschau sagt Stefan (Peng@FinalFrontier)
 
+
+Subject: Changelog LPmud driver FF
+From: Daniel Schild <schild@tsa.de>
+Date: Wed, 11 Nov 1998 13:56:53 +0100
+Organization: Teleport Sachsen-Anhalt GmbH / RegioCom GmbH
+X-Mailer: Mozilla 4.06 [en] (X11; I; Linux 2.0.35 i686)
+
+This is a multi-part message in MIME format.
+--------------0D6CD2B6E5EB4A8EE4326A26
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+viel spass beim lesen. weiss selber kaum noch, was da drin steht. wenn
+irgendwer den mist gebrauchen kann sach bescheid
+
+--
+Daniel Schild
+Dienst- und Applikationsentwicklung
+Teleport Sachsen-Anhalt GmbH | RegioCom GmbH
+Tel:    ++49 39203 8 2030    | ++49 39203 8 3300
+Fax:    ++49 39203 8 2031    | ++49 39203 8 3399
+E-Mail: schild@tsa.de        | schild@regiocom.net
+S-Mail: Steinfeldstr. 3, 39179 Barleben, Germany
+--------------0D6CD2B6E5EB4A8EE4326A26
+Content-Type: text/plain; charset=us-ascii; name="Changelog%"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline; filename="Changelog%"
+
+Sat Jul  6 16:35:44 MET DST 1996 (schild@hppool.cs.uni-magdeburg.de (DanS))
+	* version 3.2.1@129%1
+	* introduced:
+	  . ANSI and K&R prototypes
+	  . ANSI and K&R function definitions
+	  . added defines - undefining EFuns or other functionality
+	    now causes not only the removal of the functionality itself,
+	    it will remove some unused lines of code too
+	  . HP-UX special fixes and optimizations
+	* features:
+	  . the driver now handles the most recent signals and fatals
+	    by calling a function in the master object (default "crash")
+	    default signal for offline-reload of the master object: SIGUSR1
+	    definitions in: signal_handler.h; signal_handler.h and config.h
+	  . introduced EFun 'reload_object'. This function resets the specified
+	    object without reloading it from the source.
+	    definitions in: object.c config.h
+	    The idea and some lines of source are taken from the MudOS
+	    development project
+	  . introduced EFun int set_eval_cost(int a).
+	    return types and actions:
+	       a == 0 - reset the maximum number of evaluation nodes per loop
+	       a < 0  - return the maximum number of evaluation nodes per loop
+	       a > 0  - set the maximum number of evaluation nodes per loop to a
+	    The idea and most lines of source are taken from the MudOS
+	    development project.
+	  . introduced EFun int get_eval_time(). This EFun returns the number of
+	    miliseconds since the start of the current evaluation loop.
+	  . The driver process now dumps its process ID into a file called
+	    'driver_pid' inside the directory where the driver is installed
+	  . extended EFun mixed debug_info (int flag, object obj):
+	       flag == 5 - returns the size of obj in memory
+	       flag == 6 - returns the time obj was last referenced
+	       flag == 7 - returns obj's reference count
+	       flag == 8 - returns true if obj is swapped
+	* changed init_telopts() in comm1.c to execute only one loop and
+	  to include telnet_neg.h for default negotiation settings
+	* disabled EFun slice_array() and combine_free_list() in func_spez
+	* disabled buildin-command 'malloc' for interactives without
+	  O_IS_WIZARD set
+
+Mon Jul  8 12:24:01 MET DST 1996 (schild@hppool.cs.uni-magdeburg.de (DanS))
+	* version 3.2.1@130%2
+	* fixed bug in new varargs handling so that calls to local funtions
+	  work as expected.
+	* strict type checking for arguments to funtions is now disabled if you
+	  use either the varargs '...' operator or the array expand operator.
+	  The user has to check the type himself. (This is, because we don't
+	  know the array contents during compile time a.s.o.)
+
+Sat Jul 13 13:42:10 MET DST 1996 (schild@hppool.cs.uni-magdeburg.de (DanS))
+	* version 3.2.1@130%3
+	* added instrs.h to 'clean' rule in Makefile.in
+	  (thanks to Freaky@UNItopia aka freaky@rus.uni-stuttgart.de)
+	* fixed some minor things
+	  (thanks to Freaky@UNItopia aka freaky@rus.uni-stuttgart.de)
+	* checked the differnces between version 3.2.1@130 and this version
+	* removed some useless changes
+	* enhanced the signal handling package to use the closure hook H_CRASH
+	  which maybe either a string with the name of the function to call
+	  in the master object or a closure with up to 3 arguments:
+	    H_CRASH == T_STRING:
+	      call the function named by H_CRASH with 3 arguments:
+	        1. argument: a string containing the reason why the driver
+		   goes down
+		2. argument: type object; will contain the command giver
+		   for the current execution or 0 if none
+		3. argument: type object; will contain the current object
+		   or 0 if none
+	    H_CRASH == T_CLOSURE:
+	      call the closure with up to 3 arguments. Arguments and types are
+	      as specified above. If the number of arguments is less than 3
+	      the list will be truncated.
+	  default type for the hook is T_STRING; default value is "crash"
+	* introduced a new behaviour to call "reset" in objects
+	  (reset as in native mode):
+	  This is activated by the #define RESET_IF_SWAPPED inside config.h
+	  default value for RESET_IF_SWAPPED is 0
+	  If RESET_IF_SWAPPED equals:
+	    0 : this is the old behaviour;
+	        the driver will not reset objects swapped out
+	    1 : the driver will reset objects even if they are swapped out
+	    -1: the driver will only reset swapped objects if they have
+	        the O_RESET_IF_SWAPPED bit set. This bit will be set during
+		the creation phase of the object using the driver hook
+		H_RESET_IF_SWAPPED which maybe either a closure or a string.
+		if the type of H_RESET_IF_SWAPPED equals:
+		  T_STRING
+		    the driver will call the function namend by the hook inside
+		    the object. Remember - this is done once during creation time
+		  T_CLOSURE
+		    the driver will call the closure
+		If the hook returns 0 no reset will be called if the object is
+		swapped. A value other than 0 will result in calling reset
+		for this object even if it is swapped out.
+	  default type for the hook is T_STRING; default value is
+	  "reset_if_swapped"
+	  (thanks to Freaky@UNItopia aka freaky@rus.uni-stuttgart.de for a
+	  little :) discussion about that)
+	* added code for for EFun get_num_args() wich returns the number of
+	  arguments which the current function got. This only works if you
+	  assign the return value of get_num_args() to a local variable.
+	  (thanks to Freaky@UNItopia aka freaky@rus.uni-stuttgart.de for
+	  the idea)
+	* removed some useless changes
+	* changed 'configure' to look for full availibility of 'struct rusage'
+	  and if the system/user members of 'struct rusage' have a tv_usec member
+	  even if getrusage is simulated via syscall
+
+Sat Jul 13 15:45:48 MET DST 1996 (schild@hppool.cs.uni-magdeburg.de (DanS))
+	* version 3.2.1@130%4
+	* introduced flag O_WILL_RESET. This flag will be set during the
+	  creation phase of the object to determine, if there is a function
+	  defined by H_RESET. If H_RESET is a closure every object will get
+	  O_WILL_RESET. H_RESET will be called only in objects with O_WILL_RESET
+	  set.
+	* enhanced the swapping mechanism to do lazy swapping. This is activated
+	  by defining LAZY_SWAP in config.h.
+	  If lazy swapping is enabled, the look_for_objects_to_swap function
+	  in backend.c just fills a FIFO. That FIFO is then emptied during
+	  the next loops, prozessing LAZY_SWAP objects each loop.
+	* merged in the Multiport package GDMulti-130 with minor changes.
+	  See README.Multiport for details.
+	* added permanent defines TRUE_VARARGS, EXPAND_ARRAY, XTENDED_DEBUG_INFO
+	  and RESET_IF_SWAPPED (has the same value as defined in config.h; if
+	  RESET_IF_SWAPPED in config.h equals 0 RESET_IF_SWAPPED is not defined)
+	
+Sat Nov 16 17:17:33 MET 1996 (schild@hppool.cs.uni-magdeburg.de (DanS))
+	* version 3.2.1@134%4
+	* merged in the changes in the official driver distribution
+	  (
+	  diff3.2.1@130-131; release date: Sat Aug 10 19:16:25 MET DST 1996
+	    New email addresses.
+	    Fixed code that wouldn't compile with old K&R compiler.
+	    Removed remains of combine_free_list().
+	    store_case_labels(): avoid overflow when calculating gain from a
+	    table with large span.
+	  diff3.2.1@131-132; release date: Sat Sep 21 21:48:41 MET DST 1996
+	    Variadic function suport.
+	    Fixed bug in find_living_object() .
+	  diff3.2.1@132-133; release date: Sat Sep 28 00:12:52 MET DST 1996
+	    get_message(), erq.c:main(), start_subserver(): check for interrupted
+	    select.
+	    prolang.y, function_call: set return type to TYPE_ANY for
+	    unknown efun.
+	  diff3.2.1@133-134; release date: Sat Oct 19 23:25:05 MET 1996
+	    regreplace fixes from Marcus.
+	    sprintf.c: check for out of memory conditions.
+	    Fixes for sizeof(char *) != sizeof(int)
+	    Latest amiga diffs.
+	  )
+	* removed the selfmade varargs handling (still alpha code) due to
+	  the variadic function support introduced in 3.2.1@132
+
+Sat Nov 30 21:31:28 MET 1996 (schild@hppool.cs.uni-magdeburg.de (DanS))
+	* version 3.2.1@135%5
+	* merged in the changes in the official driver distribution
+	  (
+	  diff3.2.1@134-135; release date: Sat Nov 30 04:24:48 MET 1996
+	    Fixes to compile on BSDI 2.0.1 / 2.1 .
+	    Another regreplace bugfix.
+	    regcomp(): fixed memory leak (patch by Marcus)
+            port.h: use __STDC__, not __STDC .
+            svalue_size(), case T_CLOSURE, ! MALLOC_smalloc: fixed infinite loop.
+            64 bit fixes.
+            setup_new_frame2(): when there it an error, pass funstart as pc.
+          )
+	* added startup functionality for super user privileges:
+		- the driver may set the systems hard limit for the maximum
+		  number of open files.
+		- the driver may lock its text segment and its data segment into
+		  memory to avoid being paged or swapped out.
+	     	- after completion the driver process irreversibly falls back
+		  to a non privileged user and group ID
+
+Wed Apr  9 19:57:30 MET DST 1997 (schild@tsa.de (DanS))
+	* version 3.2.1@136%5
+	* merged in the changes in the official driver distribution
+	  (
+	  diff3.2.1@135-136; release date: Sat Nov 30 04:24:48 MET 1996
+	    store_include_end(): when returning to the auto include string,
+	    adjust stored_lines.
+	    patches for GnuWin32 host.
+	    64 bit fixes.
+	  )
+
+Thu Apr 10 03:30:10 MET DST 1997 (schild@tsa.de (DanS))
+	* version 3.2.1@137%5
+	* merged in the changes in the official driver distribution
+	  (
+	  AIX fixes.
+	  README.3.2: amylaar-users list and driver archive have moved.
+	  show_otable_status(): don't add objs_in_table * sizeof(struct object)
+	  to result.
+	  simulate.c: gcc >= 2.7 defines lstat prototype even on SunOS 4
+	  status_parse(): add sentences to total;
+	  define evaluation order of function calls.
+	  Reduced MAX_LAMBDA_LEVELS to 32k.
+	  !-escapes in charmode: Allow the same CR/LF combinations like for
+	  ordinary
+	  input. Echo immediately.
+	  )
+	
+Wed Apr 23 19:44:28 MET DST 1997 (schild@tsa.de (DanS))
+	* version 3.2.1@137%6a
+	* enhanced the swapping mechanism to always swap the line number
+	  information of all programm blocks directly after compilation
+
+--------------0D6CD2B6E5EB4A8EE4326A26--
 
 Index: Makefile.in
 ===================================================================
@@ -334,82 +574,6 @@ diff -c -2 -r3.2.5.1 -r3.2.5.2
 ! #endif /* TIME_TO_SWAP > 0 || TIME_TO_SWAP_VARIABLES > 0 */
       }
       error_recovery_pointer = error_recovery_info.last;
-Index: comm.c
-===================================================================
-RCS file: /usr/src/cvs/ldmud/comm.c,v
-retrieving revision 3.2.5.1
-retrieving revision 3.2.5.2.1.1
-diff -c -2 -r3.2.5.1 -r3.2.5.2.1.1
-*** comm.c	1998/12/30 20:17:24	3.2.5.1
---- comm.c	1998/12/31 17:12:02	3.2.5.2.1.1
-***************
-*** 140,147 ****
-  #endif /* SunOS4 */
-
-- #if defined(__CYGWIN32__)
-- extern int socketpair(int, int, int, int[2]);
-- #endif
--
-  #ifndef EPROTO
-  #    define EPROTO EINTR
---- 140,143 ----
-***************
-*** 231,234 ****
---- 227,232 ----
-    /* The first free entry in the freelist in pending_erq[] */
-
-+ #endif /* ERQ_DEMON */            // was ten lines wrong, we need IPSIZE even if we have ERQ_DEMON not defined
-+
-  #define IPSIZE 200
-  static struct ipentry {
-***************
-*** 240,245 ****
-     */
-
-- #endif /* ERQ_DEMON */
--
-  /*-------------------------------------------------------------------------*/
-
---- 238,241 ----
-***************
-*** 1601,1606 ****
-           *   tricky, we check if the socket is actually ready, to prevent
-           *   freezing.
-           */
-! #ifndef __BEOS__
-          if (udp_s >= 0)
-  #else
---- 1597,1603 ----
-           *   tricky, we check if the socket is actually ready, to prevent
-           *   freezing.
-+          * Same for CYGWIN, it aktually freezes the driver without FD_ISSET (Stef)
-           */
-! #if !defined(__BEOS__) && !defined(__CYGWIN__)
-          if (udp_s >= 0)
-  #else
-***************
-*** 1681,1684 ****
---- 1678,1687 ----
-                          continue;
-                      }
-+                     if (errno == ESHUTDOWN) {
-+                         debug_message("Connection to socket %d is lost.\n",
-+                                       ip->socket);
-+                         remove_interactive(ip->ob);
-+                         continue;
-+                     }
-                      perror("read");
-                      debug_message("Unknown errno %d\n", errno);
-***************
-*** 2110,2114 ****
---- 2113,2119 ----
-      set_socket_nonblocking(new_socket);
-      set_close_on_exec(new_socket);
-+ #ifndef __CYGWIN__
-      set_socket_own(new_socket);
-+ #endif /* __CYGWIN__ */
-
-  #ifdef ACCESS_CONTROL
 Index: config.h
 ===================================================================
 RCS file: /usr/src/cvs/ldmud/config.h,v
@@ -450,12 +614,6 @@ diff -c -2 -r3.2.5.1 -r3.2.5.2
 +    development project*/
 + #define RELOAD_OBJECT
 +
-+ /* Include code for some additional math EFuns:
-+    float ceil  (float f)          - returns the smallest int not < f
-+    float floor (float f)          - returns the largest int not > f
-+    float pow   (float x, float y) - returns x^y */
-+ #define ADDITIONAL_MATH
-+
 + /* Include code for EFun int set_eval_cost(int a).
 +    return types and actions:
 +    a == 0 - reset the maximum number of evaluation nodes per loop
@@ -479,20 +637,6 @@ diff -c -2 -r3.2.5.1 -r3.2.5.2
 +    'driver_pid' inside the directory where the driver is installed
 +    (BIN_DIR in Makefile) */
 + #define WRITE_PID
-+
-+ /* Include code for a new functionality of the '...' operator:
-+    it now expands function arguments:
-+      void test (int x, int y, int z) {}
-+    the call
-+      a = ({ 1, 2, 3 });
-+      test(a...);
-+    results in:
-+      x = 1;
-+      y = 2
-+      z = 3;
-+    (idea taken from the MudOS development project)
-+    */
-+ #define EXPAND_ARRAY
 +
 + /* If you define this the EFun mixed debug_info (int flag, object obj)
 +    gets some additional features
@@ -627,16 +771,6 @@ diff -c -2 -r3.2.5.1 -r3.2.5.2
 *** func_spec	1998/12/30 20:17:25	3.2.5.1
 --- func_spec	1998/12/31 11:39:43	3.2.5.2
 ***************
-*** 91,94 ****
---- 91,97 ----
-  "!"     not
-  ".."    range
-+ #ifdef EXPAND_ARRAY
-+ "..."	expand
-+ #endif /* EXPAND_ARRAY */
-
-    /* These values are used by the stack machine, and can not be directly
-***************
 *** 181,184 ****
 --- 184,190 ----
   string clear_bit(string, int);
@@ -651,11 +785,6 @@ diff -c -2 -r3.2.5.1 -r3.2.5.2
 --- 395,403 ----
   float exp(float);
   float sqrt(float);
-+ #ifdef ADDITIONAL_MATH
-+ float ceil(float);
-+ float floor(float);
-+ float pow(float, float);
-+ #endif /* ADDITIONAL_MATH */
   #endif /* TRANSCENDENT_FUNCTIONS */
 
 ***************
@@ -690,27 +819,12 @@ diff -c -2 -r3.2.5.1 -r3.2.5.2
 --- 159,170 ----
   #define STACK_OVERFLOW(sp, fp, pc) stack_overflow(sp, fp, pc)
 
-+ #ifdef EXPAND_ARRAY
-+ static int f_expand = 0;
-+ #endif /* EXPAND_ARRAY */
-+
 + #ifdef F_GET_NUM_ARGS
 + static unsigned short num_args_for_function;
 + #endif /* F_GET_NUM_ARGS */
 +
   /* defines and a helpfun for F_TERMINAL_COLOUR */
 
-***************
-*** 2872,2875 ****
---- 2880,2887 ----
-      int num_arg;
-
-+ #ifdef EXPAND_ARRAY
-+     f_expand = 0;
-+ #endif
-+
-      inter_fp = sp - csp->num_local_variables + 1;
-      num_arg = EXTRACT_SCHAR(&funstart[0]);
 ***************
 *** 3741,3744 ****
 --- 3753,3768 ----
@@ -730,78 +844,6 @@ diff -c -2 -r3.2.5.1 -r3.2.5.2
 + #endif /* F_RELOAD_OBJECT */
       CASE(F_AGGREGATE);
       {
-***************
-*** 3981,3984 ****
---- 4005,4011 ----
-           */
-          csp->num_local_variables = EXTRACT_UCHAR(pc);
-+ #ifdef EXPAND_ARRAY
-+       	csp->num_local_variables += f_expand;
-+ #endif /* EXPAND_ARRAY */
-          flags = setup_new_frame1(func_offset, 0, 0);
-          funstart = current_prog->program + (flags & FUNSTART_MASK);
-***************
-*** 6017,6020 ****
---- 6044,6050 ----
-              csp->funstart = funstart;
-              csp->num_local_variables = num_arg;
-+ #ifdef EXPAND_ARRAY
-+       	    csp->num_local_variables += f_expand;
-+ #endif /* EXPAND_ARRAY */
-              current_prog = prog = entry->program;
-              function_index_offset = entry->function_index_offset;
-***************
-*** 9720,9723 ****
---- 9750,9798 ----
-            }
-  #endif
-+ #ifdef ADDITIONAL_MATH
-+ #ifdef F_CEIL
-+ 	  XCASE(F_CEIL);
-+ 	  {
-+ 	    STORE_DOUBLE_USED
-+ 	    double d;
-+
-+ 	    if (sp->type != T_FLOAT) goto xbad_arg_1;
-+ 	    d = ceil(READ_DOUBLE(sp));
-+ 	    STORE_DOUBLE(sp, d);
-+ 	    break;
-+ 	  }
-+ #endif /* F_CEIL */
-+ #ifdef F_FLOOR
-+ 	  XCASE(F_FLOOR);
-+ 	  {
-+ 	    STORE_DOUBLE_USED
-+ 	    double d;
-+
-+ 	    if (sp->type != T_FLOAT) goto xbad_arg_1;
-+ 	    d = floor(READ_DOUBLE(sp));
-+ 	    STORE_DOUBLE(sp, d);
-+ 	    break;
-+ 	  }
-+ #endif /* F_FLOOR */
-+ #ifdef F_POW
-+ 	  XCASE(F_POW);
-+ 	  {
-+ 	    STORE_DOUBLE_USED
-+ 	    double x, y, d;
-+ 	
-+ 	    if ((sp-1)->type != T_FLOAT) goto xbad_arg_1;
-+ 	    x = READ_DOUBLE((sp - 1));
-+ 	    if (sp->type != T_FLOAT) goto xbad_arg_2;
-+ 	    y = READ_DOUBLE(sp);
-+ 	    if (((x == 0.) && (y < 0.)) ||
-+ 		((x < 0.) && (y != (double)((int)y))) )
-+ 	      goto xbad_arg_2;
-+ 	    d = pow (x, y);
-+ 	    pop_stack();
-+ 	    STORE_DOUBLE(sp, d);
-+ 	    break;
-+ 	  }
-+ #endif /* F_POW */
-+ #endif /* ADDITIONAL_MATH */
-            XCASE(F_CALL_RESOLVED);
-            {
 ***************
 *** 9864,9867 ****
 --- 9939,9958 ----
@@ -864,26 +906,6 @@ diff -c -2 -r3.2.5.1 -r3.2.5.2
 + 	  }
             XCASE(F_GARBAGE_COLLECTION);
             {
-***************
-*** 10182,10185 ****
---- 10305,10311 ----
-              csp->prev_ob = previous_ob;
-              csp->num_local_variables = num_arg;
-+ #ifdef EXPAND_ARRAY
-+       	    csp->num_local_variables += f_expand;
-+ #endif /* EXPAND_ARRAY */
-              csp->funstart = funstart = cache_funstart[ix];
-              current_prog = cache_progp[ix];
-***************
-*** 10245,10248 ****
---- 10371,10377 ----
-                  cache_name[ix] = shared_name;
-                  csp->num_local_variables = num_arg;
-+ #ifdef EXPAND_ARRAY
-+           	    csp->num_local_variables += f_expand;
-+ #endif /* EXPAND_ARRAY */
-                  current_prog = progp;
-                  flags = setup_new_frame1(fx, 0, 0);
 ***************
 *** 12534,12538 ****
             flags&O_DESTRUCTED      ?"TRUE":"FALSE");
@@ -965,26 +987,6 @@ diff -c -2 -r3.2.5.1 -r3.2.5.2
 + #endif /* XTENDED_DEBUG_INFO */
         default: bad_xefun_vararg(1, sp);
       }
-***************
-*** 12677,12680 ****
---- 12860,12866 ----
-      csp->prev_ob = previous_ob;
-      csp->num_local_variables = num_arg;
-+ #ifdef EXPAND_ARRAY
-+     csp->num_local_variables += f_expand;
-+ #endif /* EXPAND_ARRAY */
-      previous_ob = current_object;
-
-***************
-*** 12746,12749 ****
---- 12932,12938 ----
-          csp->prev_ob = previous_ob;
-          csp->num_local_variables = num_arg;
-+ #ifdef EXPAND_ARRAY
-+    	    csp->num_local_variables += f_expand;
-+ #endif /* EXPAND_ARRAY */
-          previous_ob = current_object;
-          current_object = l->function.alien.ob;
 Index: lex.c
 ===================================================================
 RCS file: /usr/src/cvs/ldmud/lex.c,v
@@ -998,9 +1000,6 @@ diff -c -2 -r3.2.5.1 -r3.2.5.2
 --- 643,656 ----
           add_permanent_define("__EUIDS__", -1, string_copy(""), MY_FALSE);
   #endif
-+ #ifdef EXPAND_ARRAY
-+ 	      add_permanent_define("EXPAND_ARRAY", -1, string_copy(""), 0);
-+ #endif
 + #if defined(RESET_IF_SWAPPED) && RESET_IF_SWAPPED
 + 	      sprintf(mtext, "%d", RESET_IF_SWAPPED);
 + 	      add_permanent_define("RESET_IF_SWAPPED", -1, string_copy(mtext), 0);
@@ -1139,92 +1138,6 @@ diff -c -2 -r3.2.5.1 -r3.2.5.2
 + #endif /* F_RELOAD_OBJECT */
 
   #endif /* __OBJECT_H__ */
-Index: prolang.y
-===================================================================
-RCS file: /usr/src/cvs/ldmud/prolang.y,v
-retrieving revision 3.2.5.1
-retrieving revision 3.2.5.2
-diff -c -2 -r3.2.5.1 -r3.2.5.2
-*** prolang.y	1998/12/30 20:17:25	3.2.5.1
---- prolang.y	1998/12/31 11:39:44	3.2.5.2
-***************
-*** 192,195 ****
---- 192,199 ----
-  static struct efun_shadow *all_efun_shadows = 0;
-
-+ %ifdef EXPAND_ARRAY
-+ static char f_expand;
-+ %endif
-+
-  #ifdef __STDC__
-  void yyerrorf(char *format, ...)
-***************
-*** 684,687 ****
---- 688,694 ----
-      variables_initialized = 0;
-  %endif
-+ %ifdef EXPAND_ARRAY
-+     f_expand = 0;
-+ %endif
-  }
-
-***************
-*** 1400,1403 ****
---- 1407,1413 ----
-  %right '~' F_NOT
-  %nonassoc F_INC F_DEC
-+ %ifdef EXPAND_ARRAY
-+ %left F_EXPAND
-+ %endif /* EXPAND_ARRAY */
-  %left F_ARROW '['
-  %%
-***************
-*** 3940,3944 ****
-  expr_list3: /* empty */                { $$ = 0; }
-           | expr0                { $$ = 1; add_arg_type($1.type); }
-!          | expr_list2 ',' expr0        { $$ = $1 + 1; add_arg_type($3.type); } ;
-
-  %ifdef MAPPINGS
---- 3950,3971 ----
-  expr_list3: /* empty */                { $$ = 0; }
-           | expr0                { $$ = 1; add_arg_type($1.type); }
-!          | expr_list2 ',' expr0        { $$ = $1 + 1; add_arg_type($3.type); }
-! %ifdef EXPAND_ARRAY
-!          | expr0 F_EXPAND
-! 	{
-! 	    $$ = 1;
-! 	    add_arg_type($1.type);
-!  	    ins_f_byte (F_EXPAND);
-! 	    f_expand = 1;
-!   	}
-!        	 | expr_list2 ',' expr0 F_EXPAND
-!         {
-! 	    $$ = $1 + 1;
-! 	    add_arg_type($3.type);
-! 	    ins_f_byte (F_EXPAND);
-! 	    f_expand = 1;
-!         }
-! %endif /* EXPAND_ARRAY */
-! ;
-
-  %ifdef MAPPINGS
-***************
-*** 4976,4980 ****
-               * Check the argument types.
-               */
-!             if (exact_types && first_arg != INDEX_START_NONE)
-              {
-                  int i;
---- 5003,5011 ----
-               * Check the argument types.
-               */
-!             if (exact_types && first_arg != INDEX_START_NONE
-! %ifdef EXPAND_ARRAY
-!         	       && !f_expand
-! %endif
-!             )
-              {
-                  int i;
 Index: simulate.c
 ===================================================================
 RCS file: /usr/src/cvs/ldmud/simulate.c,v

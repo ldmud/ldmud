@@ -8,9 +8,6 @@ DESCRIPTION
 	If called from inside the heart_beat() of a not living object
 	0 will be returned.
 
-	this_player() does not any more take an argument, use
-	this_interactive() instead of this_player(1).
-
 EXAMPLE
 	if (this_player() != this_interactive())
 	   write("Hey, somebody must have forced us to do a

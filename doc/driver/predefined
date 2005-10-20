@@ -7,10 +7,10 @@ DESCRIPTION
     options and parser invocation options:
 
       LPC3            : always defined.
+      __EUIDS__       : always (for compatibility).
       COMPAT_FLAG     : defined if the driver runs in compat mode.
       __COMPAT_MODE__ : ditto
-      __NATIVE_MODE__ : defined if the driver runs in native mode.
-      __EUIDS__       : defined if the driver uses euids.
+      __STRICT_EUIDS__: defined if strict euid usage is enforced.
 
       __MASTER_OBJECT__ : the name of the master object (in compat mode
                           without leading '/').
@@ -40,6 +40,7 @@ HISTORY
     3.2.5 added __COMPAT_MODE__, __NATIVE_MODE__, __EUIDS__,
         __ERQ_MAX_SEND__ and __ERQ_MAX_REPLY__.
     3.2.6 added __MAX_EVAL_COST__.
+    3.2.7 added __STRICT_EUIDS__ and make __EUIDS__ standard.
 
 SEE ALSO
     query_host_name(E), version(E), pragma(LPC), preprocessor(LPC)

@@ -1,0 +1,14 @@
+Short: Error handling within a catch.
+From: Michael Sporn
+Date: 990629
+Type: Feature
+State: Unclassified
+
+Immediate error handling should be independent from a catch(), as too
+many people forget to handle errors returned by a catch.
+
+Maybe a modification to runtime/heartbeat/log_error, giving an extra
+parameter 'is_caught', and if is_caught is true, the return value decides
+if the driver prints a traceback or not before doing the actual catch.
+
+In general, the error and diagnostic handling is much too confused.

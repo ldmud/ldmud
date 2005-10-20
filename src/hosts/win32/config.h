@@ -26,7 +26,7 @@
  * Look at the file ACCESS.ALLOW for information. It replaces the old
  * ACCESS.DENY.
  */
-#define ACCESS_RESTRICTEDX
+#define ACCESS_RESTRICTED
 
 /* Some configurations for this system. Needn't be changed if you don't use
  * the new access restriction system.
@@ -40,11 +40,6 @@
  */
 /* #define ACCESS_LOG "access.allow.log" */
 
-
-/*
- * Define the maximum size of log files (in bytes).
- */
-#define MAX_LOG_SIZE		50000
 /*
  * Max size of a file allowed to be read by 'read_file()'.
  */
@@ -208,14 +203,17 @@
  */
 #define ALIGN_FUNCTIONS
 
-/*
- * Define COMPAT_MODE if you are using mudlib 2.4.6 or older. This
- * replaces the old command line option -o.
+/* Define COMPAT_MODE if you are using the 2.4.5 mudlib or one of its
+ * derivatives.
+ * TODO: Make this a runtime option.
  */
+#undef COMPAT_MODE
 
-#define COMPAT_MODE
-#undef NATIVE_MODE
-#undef EUIDS
+/* Define STRICT_EUIDS if the driver is to enforce the use of euids,
+ * ie. load_object() and clone_object() require the current object to
+ * have a non-zero euid.
+ */
+#undef STRICT_EUIDS
 
 /* Define SUPPLY_PARSE_COMMAND if you want the efun parse_command.
  * If you don't need it, better #undef it, lest some new wiz can inadvertly
@@ -255,19 +253,6 @@
 #define UDP_SEND
 
 #define SET_BUFFER_SIZE_MAX 65536
-
-/* Define this macro to get the old reset implementation.
- * TODO: Get rid of all OLD_RESET code.
- */
-/* #define OLD_RESET */
-
-#ifdef OLD_RESET
-/* Object reset times are not exact, but instead rounded up to the
- * next multiple of RESET_GRANULARITY. This should be between 10
- * and 60 seconds (see otable.c for a more detailed discussion).
- */
-#define RESET_GRANULARITY          300   /* five minutes */
-#endif
 
 #define COMM_STAT
 #define APPLY_CACHE_STAT

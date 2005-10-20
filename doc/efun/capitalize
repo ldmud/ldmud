@@ -9,4 +9,4 @@ EXAMPLES
         capitalize("heya!") -> "Heya!"
 
 SEE ALSO
-	lower_case(E), swap_case(SEFUN), upper_case(SEFUN)
+	lower_case(E), upper_case(E)

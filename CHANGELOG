@@ -1,6 +1,687 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Aug-1999 (Lars Duening) -- Release 3.2.7
+    - Froze 3.2.7-pre.3 for release.
+
+14-Aug-1999 (Lars Duening)  (3.2.7-pre.3)
+    - (settings/avalon) Updated.
+    - (my-alloca.h) Removed a declaration-conflict on BeOS/PPC.
+    - (comm.c) Removed a compilation warning.
+    - (prolang.y) Redeclaration of local scopes inside of for() statements
+        did not recover gracefully.
+
+13-Aug-1999 (Lars Duening)  (3.2.7-pre.2)
+    - (lpmud.prj, patchlevel.h) Cosmetics (the version number was incorrect).
+
+11-Aug-1999 (Lars Duening)  (3.2.7-dev.135 == 3.2.7-pre.1)
+    - (lpmud.prj, patchlevel.h, hosts/be/Makefile) Introduced new source
+        branch '<v>-<r>-<p>.*' to hold the pre-releases during the shakedown
+        period before the 'official' release. Features and such in these
+        pre's are fixed, only fixes for final bugs take place.
+
+09-Aug-1999 (Lars Duening)
+    - (mapping.c) Efun m_reallocate() returned the old (freed) mapping,
+        not the new one.
+    - (interpret.c) Before every bytecode evaluation, inter_sp and inter_cp
+        are updated.
+    - (pkg/ip6-aix) AIX/IPv6 package added.
+
+04-Aug-1999 (Lars Duening)  (3.2.7-dev.134)
+    - (util/xerq/) Corrected a couple of typos (I hate not being able
+        to compile this!) (thanks, Freaky!).
+    - (simulate.c) Cosmetic for 'status tables': the apply-cache stat
+        lacked a divider.
+
+31-Jul-1999 (Lars Duening)  (3.2.7-dev.133)
+    - (interpret.c) '*', '*=': inter_sp wasn't set properly before error()
+        was called. (thanks, Michael!)
+    - (array, swap.c) Swapping in an array ignores the current size limit.
+        (thanks, Michael!)
+    - (efuns.c) Efun terminal_colour(): the temporary buffer for the current
+        line is now potentially unlimited.
+    - (util/xerq/) Integrated patches from UNItopia, which remove a couple
+        of warnings and works around the repeated closing of sockets.
+        (thanks, Freaky!)
+
+30-Jul-1999 (Lars Duening)
+    - (efuns.c) Efun trim(): forgot a check for the string end when trimming
+        left. This caused trim("") to core. (thanks, Freaky!)
+
+30-Jul-1999 (Lars Duening)  (3.2.7-dev.132)
+    - (gcollect.c) Oops, forgot to change two calls to free_vector() into
+        free_array(). (thanks, Freaky!)
+    - (interpret.c) Efun mkmapping() could have problem with oversized
+        arrays.
+
+29-Jul-1999 (Lars Duening)  (3.2.7-dev.131)
+    - (simulate.c) I am surprised nobody complained about this one: when
+        an error occured, the runtime stack was unrolled too early and
+        left the runtime_error() apply with no valid commandgiver.
+    - (func_spec, simulate) New efuns set_limits(), query_limits() and
+        limited() to handle runtime limits. (f-981229-11)
+    - (backend, main, simulate): array, mapping, and file transfer limits
+        are all settable from commandline and through the limit efuns.
+    - (interpret.c, efuns.c) Code for efuns like object_info()
+        now use the mudlib/sys/ includes to generated their results.
+    - (interpret.c, prolang.y) The '*' and '*=' operators now allow
+        to multiply strings/arrays with numbers.
+
+28-Jul-1999 (Lars Duening)
+    - (lots of files) Removed trailing spaces.
+    - (main, backend, lex, interpret, simulate) eval_costs are now counting
+        up from 0 and are tested against a positive limit. The limit can
+        be 0, in which case the eval costs are still counted, but can grow
+        without limit. This is just a preparation for the oncoming code,
+        and might even work.
+
+27-Jul-1999 (Lars Duening)  (3.2.7-dev.130)
+    - (efuns.c) Efun trim() also accepts a string of characters to trim.
+    - (array.h, datatypes.h, closure.h, mapping.h) Moved the definitions
+        of non-svalues back into their associated module header files.
+    - (datatypes.h, stralloc.h) Wrapped setting of svalues into nice
+        put_<type>() macros. For once, the sources shrank a few lines
+        instead of growing :-)
+
+26-Jul-1999 (Lars Duening)  (3.2.7-dev.129)
+    - (array.h, mapping.h, object.h, and dependees) Streamline the refcount
+        handling in macros ref_<type>(), deref_<type>() and free_<type>().
+        Not necessary in terms of typesafety, they make the source a bit
+        more readable, and less likely that a ref++ is forgotten.
+
+23-Jul-1999 (Lars Duening)  (3.2.7-dev.128)
+    - (lex.c, prolang.y) The inline function variables weren't initialized
+        properly nor checked, leading to interesting crashes when the driver
+        tried to freed non-existing memory.
+    - (lex.c, strfuns) Rewrote the inline closure scanner to cope with
+        linefills.
+
+22-Jul-1999 (Lars Duening)
+    - (access_check.c) A null-message could cause a random memory
+        write.
+    - (strfuns.c) Corrected a write beyond boundary.
+    - (lex.c) Inline function scanning: newlines didn't trigger a
+        buffer refill in time.
+
+22-Jul-1999 (Lars Duening)  (3.2.7-dev.127)
+    - (actions, func_spec) New efun 'execute_command()' implements
+        a low-level access to the command parser.
+    - (prolang.y, exec.h) New optional driver hook H_COMMAND, which
+        replaces the driver based command handling with its own.
+        (obsoletes f-990204-1 and f-990203-09)
+    - (make_func.y) Lookup failures yield an error message, not just
+        an exit(1).
+    - (func_spec, efuns) New efun 'trim()' to trim characters from
+        a string. (f-981229-24)
+    - (settings/) Small corrections to 'default', added 'wunderland'.
+    - (pkg/ip6/) Added the experimental IPv6 patch from Uwe (thanks!).
+
+21-Jul-1999 (Lars Duening)  (3.2.7-dev.126)
+    - (settings/) Updated the tubmud settings file, added the sticklib
+        file. All scripts now use 'exec' to start the configure script,
+        allowing more meaningful exit codes.
+    - (simulate.c) Caught errors now produce a tracedump on stdout/stderr
+        (thanks, Sunblood!).
+    - (mud/sticklib/) Added the StickLib changes (thanks, Doomdark!)
+    - (lex.c) 'check last char before :)' stumbled over Newline characters.
+    - (prolang.y) Inline closures: removed an interaction between typed
+        inline closures in untyped functions.
+    - (actions.c, comm) Notify-fail handling is now in actions.c, this
+        also means that notify-fail messages are saved over nested
+        commands.
+    - (actions.c) notify_fail is available for NPCs, too: the text
+        will be told to the NPC. (f-990204-5)
+    - (func_spec, actions) New efun 'query_notify_fail()' returns the
+        current notify-fail setting. (f-990217-2)
+    - (func_spec, actions) New efuns 'command_stack()' and
+      'command_stack_depth()' to query the command stack.
+
+20-Jul-1999 (Lars Duening)  (3.2.7-dev.125)
+    - (simulate, interpret.c, backend.c) Player command execution is now
+        stacked, meaning that after a command() the previous command giver,
+        verb, etc are restored. This does not yet extend to notify-fails
+        though.
+    - (actions.ch) New source files holds the functions related to
+        command parsing and action management.
+
+19-Jul-1999 (Lars Duening)  (3.2.7-dev.124)
+    - (prolang.y) Removed a spurious debug printf().
+    - (backend, call_out.c, closure.c, interpret.c, simulate.c, main.c)
+        Generalized the error_recovery_info stack into a runtime context stack.
+
+18-Jul-1999 (Lars Duening)  (3.2.7-dev.123)
+    - (settings) Updated the tubmud settings file.
+    - (autoconf/configure.in, configure) Unfortunately it's not just
+        gcc 2.8.1 on Solaris which stumble over the float/branch test.
+    - (prolang.y) Removed a nasty interaction between disabled local
+        scopes and for() statements (which unfortunately didn't manifest
+        itself in earlier tests). Also, the local_scopes pragmas are
+        check only when entering a function.
+    - (otable.c) The table status threatened to print some stack garbage.
+    - (main, config.h.in, interpret.c, array.c, mapping.c, object.c,
+       simulate.c) Array and mapping size limits are now commandline
+         options; and a setting of 0 disables the limit checks.
+
+16-Jul-1999 (Lars Duening)
+    - (autoconf/configure.in, configure) Oops, a typo in configure.in
+        really messed up the script.
+    - (backend.c) Following a notice from Stefan Lichtenhagen, I removed
+        the safety factor '*2' from f_regreplace() - the error it avoided
+        was fixed in dev.28. However, if this efun should cause crashes
+        again, this factor is one thing to try out.
+    - (simulate.c) Stupid bug, the second: clone_object() checked the
+        P_NO_CLONE flag before swapping in the program. (thanks, Manu!)
+    - (lex, prolang.y) New pragma 'no_local_scopes' turns off local
+        scoping to cater for legacy code; the second pragma 'local_scopes'
+        turns it back on.
+    - (settings/) Added settings file for Avalon (thanks, Thorsten!)
+
+16-Jul-1999 (Lars Duening)  (3.2.7-dev.122)
+    - (lex, prolang.y) Added inline closures ("functionals") using the
+        '(: <code/expression> :)' syntax MudOS invented. As a sideeffect,
+        the lexer now knows the '#line <num>' directive, and identifier
+        names may start with '$'. (thanks, Righ!) (p-990326)
+    - (func_spec, interpret.c, simulate) New efun query_command() returns
+        the full command given by the player (thanks, Ugh!).
+
+15-Jul-1999 (Lars Duening)  (3.2.7-dev.121)
+    - (prolang.y) The first expression in a for() may define local variables
+        which scope is the whole for() statement.
+    - (func_spec, interpret.c) More new bitstring efuns: count_bits(),
+        invert_bits().
+
+14-Jul-1999 (Lars Duening)  (3.2.7-dev.120)
+    - (func_spec, interpret.c) New bitstring efuns last_bit() and next_bit().
+        (thanks, Matthew!) (f-990203-14)
+    - (access_allow, comm, mudlib/ACCESS.ALLOW) Access rules can take
+        portnumbers into account. (idea from Gokhan, f-981211)
+
+13-Jul-1999 (Lars Duening)
+    - (bugs/) Cleaned up the directory a big; created summary files b-summary
+        and f-summary.
+    - (func_spec, interpret, object, doc/efun/) New efun object_time()
+        returns the creation time of the object. (idea from Daniel,
+        f-990324-2)
+    - (lex, prolang.y, simulate.c, exec.h) New pragmes 'no_clone' to disallow
+        clones of an object, and 'no_inherit' to disallow inheriting a
+        program. (thanks, Daniel!) (f-990324-0, p-990417-0)
+    - (comm.c) Error ESHUTDOWN on read yields a proper message and removes
+        the interactive player.
+    - (func_spec, interpret.c) New bitstring efuns and_bits(), or_bits(),
+        xor_bits(). (idea from Matthew, f-990203-14)
+
+12-Jul-1999 (Lars Duening)
+    - (func_spec, interpret.c) New efuns pow(), floor(), ceil() and atan2().
+    - (config.h.in, configure, interpret.c) If configuration option
+        DYNAMIC_COSTS is enabled (default is off), string additions are more
+        expensive for long strings (this is handy against the killer-loop
+        for (s=""; s += "a"; ) ).
+
+12-Jul-1999 (Lars Duening)  (3.2.7-dev.118, 119)
+    - (autoconf/configure.in, configure) gcc/cc1 2.8.1 on SunOS 5.7 falls into
+        catatonia when compiling the float/branch-incompatibility test.
+        Inserted a workaround.
+    - (prolang.y, lex, func_spec) Scope of variables in nested local blocks
+        ends with the defining block as it should. The space of such variables
+        is reused for other local blocks. (f-990203-05)
+    - dev.119: Small correction: function local variables (depth 2) can't
+        hide function arguments (depth 1);
+
+11-Jul-1999 (Lars Duening)  (3.2.7-dev.117)
+    - (machine.h.in) Oops, forgot to update this.
+    - (Makefile.in, port.h) Compile-time define NO_INLINES turns off inlining.
+    - (interpret, stralloc, strfuns.c, smalloc) Straightened out the
+        INLINE uses.
+
+10-Jul-1999 (Lars Duening)  (3.2.7-dev.116)
+    - (closure.c) Removed an erroneous errormessage when creating sefun
+        closures with large indices (thanks, Daniel!).
+    - (configuration, several files) Mappings have now an upper size limit
+        of MAX_MAPPING_SIZE keys (defaults to 5000). (f-990708-1)
+
+09-Jul-1999 (Lars Duening)  (3.2.7-dev.115)
+    - (config.h.in, autoconf/configure.in, settings/default) All of
+        of config.h is now configurable (and is it just me, or was
+        the original value parsing really broken?).
+    - (settings/) Added files for all Muds I had a config.h of. Oh, and
+        the files are now scripts in themselves :-)
+
+08-Jul-1999 (Lars Duening)  (3.2.7-dev.114)
+    - (machine.h.in, port.h) port.h now knows about the supported
+        (working) architectures and how to find the host-specific include
+        files. HOST_INCLUDE is still recognized, but optional.
+    - (machine.h.in, array.h, driver.h, port.h, interpret, simulate, random):
+        Use SIZEOF_CHAR_P instead of SIZEOF_P_INT.
+    - (Makefile.in) Target 'distclean' also deletes the
+        config.cache/status/log files.
+    - (other files) Added some documentation to the new autoconfig system.
+
+08-Jul-1999 (Lars Duening)  (3.2.7-dev.113)
+  Checked in the changes provided by Reinhard (thanks!):
+    - (machine.h.in, config.h.in, configure, autoconf/) Autoconfiguration
+        is now based on autoconf 2. The old configuration code is in the
+        subdirectory config-old/ held as backup. Special features are:
+          - rxcache and UDP port can be enabled/disabled explicitely.
+          - Enabling ERQ defines a symbol ERQ_INCLUDE pointing to the
+            correct include file (util/erq/erq.h resp util/xerq/erq.h).
+          - All config.h options can be set using parameters to configure.
+            configure --help will print the (long) list of available options.
+    - (func_spec) Fixed a rare case of an erroneus inclusion of send_imp()
+        UDP is disabled and thus the function f_send_imp() won't be compiled.
+    - (comm.c) erq.h is included only when the driver is compiled for
+        using the erq demon.
+
+07-Jul-1999 (Lars Duening)  (3.2.7-dev.112)
+    - (strfuns.c) Corrected off-by-one mistakes, and the length of the
+        final string.
+    - (datatypes.h, other files) Straightened the use of STRING_VOLATILE
+        (purely cosmetic).
+
+07-Jul-1999 (Lars Duening)  (3.2.7-dev.111)
+    - (strfuns, efuns, simulate): Modified efun debug_info() to return
+        the status information instead of printing it. Added "malloc" as
+        additional second argument to the DINFO_STATUS command.
+    - (interpret) Efun get_type_info() returns whether a string is shared
+        or not.
+    - (simulate, smalloc): Deactivated 'debugmalloc' and
+        'showsmallnewmalloced' and the associated code.
+    - (simulate, efuns, dumpstat, interpret): Added option DINFO_DUMP to
+        debug_info() to implement the 'dumpallobj' and 'opcprof' command.
+    - (interpret.c) Efuns trace() and traceprefix() are now validated
+        with the master-lfun 'valid_trace()'; the master-lfun
+        'query_player_level()' is thus no longer needed.
+    - (efuns, simulate, object): Efun set_is_wizard() is now optional,
+        and with it the object flag O_WIZARD.
+    - (object, simulate, prolang, efun): Object flag O_APPROVED is gone.
+
+06-Jul-1999 (Lars Duening)
+    - (comm, simulate.c)  Undid the last change. Now it is legal again for
+        the modify_command-hook to change the command_giver; this change
+        stays active for the execution of the command, and the original
+        commandgiver is passed to the NOTIFY_FAIL hook.
+    - (simulate.c) The MODIFY_COMMAND hook is now called first, even
+        before special commands like 'status' are parsed. This allows
+        the hook to filter out uses of these commands.
+    - (strfuns) New file holding string functions (for now).
+    - (simulate, otable, rxcache, stralloc, efuns, call_out, heartbeat):
+        Rewrote the status functions to use strbufs, in anticipation to
+        make these special commands into real efuns.
+
+05-Jul-1999 (Lars Duening)  (3.2.7-dev.110)
+    - (comm.c) include of <stddef.h> was missing.
+    - (simulate.c) After the modify-command hook was called, the commandgiver
+        and current object are restored their previous setting in case the
+        hook changed them. (thanks, Daniel!)
+
+04-Jul-1999 (Lars Duening)
+    - (closure.c) Corrected a nasty mistyping in compile_lvalue(). (thanks,
+        Freaky!).
+    - (lex.c, interpret.c) Removed two warnings.
+    - (doc/efun) Removed the manpage for the long-gone efun query_host_name.
+
+03-Jul-1999 (Lars Duening)  (3.2.7-dev.109)
+    - The driver compiles again with egcs.
+    - (efuns.c) Bugfix for efun terminal_colour(): terminal_colour("bla", ([
+        "bla":"blu"]), 1) returned "blu" instead of "bla". (thanks, Michael!)
+    - (efuns.c) The efun sscanf() used the wrong function to report argument
+        errors. (thanks, Freaky!)
+
+02-Jul-1999 (Lars Duening)
+    - (hosts/be/be.h, .../Makefile, .../machine.h, other files): Adapted for
+        BeOS 4.5. This involved adding numerous casts to make the now pickier
+        compiler happy. But now egcs starts crashing...
+    - (efuns.c) Found another shortcoming of present_clone() (and the reason
+        why I didn't see errors before *blush*).
+
+01-Jul-1999 (Lars Duening)
+    - (efuns.c) Fixed two nasty bugs in efun present_clone(): make_name_sane()
+        could return NULL, and the comparison was done against the wrong name.
+    - (interpret.h) To be safe, macro put_number() takes the sp as argument.
+    - (call_out.c) When setting current_prog for efun closures, the code
+        now makes sure that the program is swapped in.
+
+30-Jun-1999 (Lars Duening)  (3.2.7-dev.108)
+    - (mud/lp-245/obj/simul_efun.c) Duh, had a complete brainfart yesterday
+        when adapting present_clone() to compat mode.
+
+29-Jun-1999 (Lars Duening)  (3.2.7-dev.107)
+    - (doc/efun) Removed the files for the long-gone efuns find_living(),
+        find_player(), set_living_name(), add_worth() and wizlist().
+    - (doc/efun/all_environment) Corrected a typo.
+    - (efuns.c) Corrected a misformed condition in efun terminal_colour().
+    - (gcollect.c) If a swap-in fails, the GC raises a fatal error (instead
+        of just crashing).
+    - (mud/lp-245/) Added the old LP-245 mudlib, of course adapted to
+        this driver.
+    - (func_spec, efuns) New efun present_clone() to find objects with
+        a specific blueprint (suggested by Coogan).
+
+29-Jun-1999 (Lars Duening)  (3.2.7-dev.106)
+    - (exec.h, interpret.c, call_out.c) Efun-closures are now properly
+        identified, and call_outs to efun-closures set current_prog to the
+        prog of the bound object. This sources still hold some DEBUG-printfs.
+
+28-Jun-1999 (Lars Duening)  (3.2.7-dev.105)
+    - (interpret.c) Added some argument checks to efun terminal_colour().
+    - (func_spec, doc/efun/environment) Documented that efun environment()
+        can also take a string as argument.
+    - (interpret.c) 'Indexing on illegal type' no longer dumps trace (what
+        for did that do that any way?).
+    - (main, backend.c, object.c) TIME_TO_RESET and TIME_TO_CLEAN_UP are now
+        defaults for the runtime options '--reset-time' and '--cleanup-time'.
+    - (interpret.c) Reactivating a destructed didn't update the number
+        of listed objects.
+
+26-Jun-1999 (Lars Duening)
+    - (main.c, interpret.c, smalloc.c) Cosmetics.
+
+25-Jun-1999 (Lars Duening)  (3.2.7-dev.104)
+    - (lotsa files) NATIVE_MODE is gone - the only real difference it made
+        was the restriction of command() to the current object only, and
+        that can be handled by a simul-efun.
+    - (interpret.c) Oops, privilege_violation() slightly misinterpreted
+        the result from the master apply.
+
+25-Jun-1999 (Lars Duening)  (3.2.7-dev.103)
+    - (lotsa files) EUIDS mode is now automatic since most of the code
+        was there in any case.
+
+        New runtime option '--[no-]strict-euids'
+        which enables/disables the enforcement of euids known from the native
+        mode. When enabled, the LPC macro "__STRICT_EUIDS__" is defined.
+        The default setting is defined in config.h by STRICT_EUIDS; use
+        of an old config.h with NATIVE_MODE defined has (for now) the
+        same effect.
+
+24-Jun-1999 (Lars Duening)  (3.2.7-dev.102)
+    - (backend, efuns.c, heartbeat, interpret.c, object, simulate,
+        all config.h) OLD_RESET is gone.
+
+24-Jun-1999 (Lars Duening)  (3.2.7-dev.101)
+    - (mudlib/sys/{trace.h,input_to.h,files.h,debug_info.h}: Added these
+        includes with definitions for the efuns trace(), input_to(),
+        file_size(), get_dir(), and debug_info().
+    - (interpret, efuns, func_spec, exec.h) Finished commenting the
+        interpreter.
+
+20-Jun-1999 (Lars Duening)  (3.2.7-dev.100)
+    - (interpret) to_string(object) in compat mode added a leading
+        slash. program_time() freed its argument before querying it.
+        And recombine_free_lists() is gone for good.
+    - (interpret, func_spec,  exec.h) After a long day: more comments
+        added (17155 lines done, 3150 to go). In particular,
+        eval_instruction() is commented *phew* (but it's still big
+        and ugly).
+
+18-Jun-1999 (Lars Duening)  (3.2.7-dev.99)
+    - (interpret, func_spec, exec.h)  Something new: more comments.
+        (12558 lines done, 5800 to go).
+
+16-Jun-1999 (Lars Duening)
+    - (interpret.c) The operators +=, -=, *=, /= now accept a float left
+        and an int right.
+    - (interpret, efuns) Efun terminal_colour() moved out from the interpreter
+        into efuns.c. And it received comments during this move.
+
+15-Jun-1999 (Lars Duening)
+    - (interpret.c) Binding an unbound lambda to two objects and destructing
+        the originating object freed the lambda. (thanks, Kirnan & Michael)
+
+14-Jun-1999 (Lars Duening)
+    - (driver.h, port.h, all files commented so far) New type 'Bool' and its
+        smaller sibling 'CBool' introduced.
+    - (autoconf/configure.in, configure, port.h, regexp, ptrtable) Replaced
+        CHARBITS by CHAR_BIT, adapted the generation of CHARBIT_MASK.
+    - (datatypes.h, func_spec, exec.h, interpret) Something new: more
+        comments (8700 lines done, 9000 to go). Actually I started wrapping
+        the bytecode interpretation into its own types and macros, which
+        may increase portability, and at least make the critical places
+        easier to find.
+
+13-Jun-1999 (Lars Duening)
+    - (array.c) Efun inherit_list() just copies the program names, but
+        doesn't make them shared. Since they aren't shared anyway, this
+        makes the function much faster. (thanks, Michael!)
+    - (object.c) If the H_RESET hook is a closure, a result < 0 will disable
+        reset for this object. (thanks, Michael!)
+
+12-Jun-1999 (Lars Duening)
+    - (interpret.c, mapping.c) Both m_indices() and map()/map_mapping()
+        called check_map_for_destr() twice, wasting time. (thanks, Michael!)
+
+12-Jun-1999 (Lars Duening)  (3.2.7-dev.98)
+    - (datatypes.h, func_spec, exec.h, interpret) Oh boy: more comments
+        (6700 lines done, 10000 to go).
+
+10-Jun-1999 (Lars Duening)
+    - (call_out.c) Adding callouts from within a callout resulted
+        in the new callouts inserted in the wrong place when the active
+        callout had an odd delay (and thus a negative 'time left' entry).
+        If the new call_out had a MAX_INT delay, the current callout list
+        was effectively disabled. (b-990214-0)
+    - (backend.c) Added Michaels improvement to the swapping algorithm
+        (thanks!).
+
+05-Jun-1999 (Lars Duening)
+    - (smalloc.c) As I feared: trying to print more information about
+        gc'ed objects may crash the driver *sigh*.
+
+   Patches provided by Michael (thanks!):
+    - (backend, interpret, simulate) Improved the handling of closure hooks:
+        now setting a driver hook from within the hook works well, too.
+    - (closure.c) symbol_variable() properly recognizes objects with
+        pending program replacement.
+    - (interpret.c) dump_trace() recognizes alien lfuns properly.
+    - (interpret.c) Calls to alien lfun closures didn't set extern_call.
+    - (interpret.c) Calls to F_UNDEF closures (closures whose object
+        was destructed) generate a proper error message.
+    - (swap.c) If a closure variable was changed to F_UNDEF by the garbage
+        collector, the swapper now duly writes this new info into the swap file.
+    - (mapping.c) During a GC, mappings didn't check for changed alien lfuns.
+  Some more suggestions by Michael:
+    - (interpret.c) to_object() on F_UNDEF closures returns 0.
+    - (object.c) free_object() miscounted the amount of memory used by
+        objects.
+    - (simulate.c) Memory display in 'status' for objects and programs
+        now both display '<total> (<swapped>)' (before, only the objects
+        status displayed that, programs displayed '<resident> (<swapped>)' ).
+    - (swap.c) If variables could not be unswapped, the swapper didn't clear
+        them properly.
+
+24-May-1999 (Lars Duening)  (3.2.7-dev.97)
+    - (interpret, exec.h, heartbeat.c, comm.c, make_func.y) More comments,
+        really.
+
+22-May-1999 (Lars Duening)  (3.2.7-dev.96)
+    - (config.h, interpret.c, closure.c) Corrected some typos.
+
+22-May-1999 (Lars Duening)  (3.2.7-dev.95)
+    - (interpret.c) Guess what: more comments.
+    - (interpret.c, sprintf.c) to_string() and sprintf() stumbled over
+        variable closures left dangling after a replace_program(). (thanks,
+        Michael!)
+    - (prolang.y) insert_inherited: the loop for the case '*::f' tended to
+        clobber its own control variable 'ip', causing the omission of
+        function calls. (thanks, Michael!)
+
+18-May-1999 (Lars Duening)  (3.2.7-dev.94)
+    - (config.h, hosts/be/config.h) Increased the default for MAX_LOCAL
+        to 50.
+    - (interpret.c) Even more comments.
+
+17-May-1999 (Lars Duening)  (3.2.7-dev.93)
+    - (doc/efun/filter_{mapping,indices}) Corrected a wrong phrase.
+        (thanks, Zwirch!)
+    - (interpret.c) Some more comments.
+
+16-May-1999 (Lars Duening)  (3.2.7-dev.92)
+    - (object, backend.c, dumpstat.c, efuns.c, interpret.c, simulate.c,
+       sprintf.c, ../mudlib/sys/objectinfo.h, doc/efun/object_info):
+        New object flag O_REPLACED for objects with replaced programs,
+        so that clonep() stops flagging such blueprints as clones.
+        (suggested by Michael)
+    - (datatypes.h, interpret) More comments.
+    - (simulate.c) Streamlined the namehandling in clone_object().
+
+14-May-1999 (Lars Duening)  (3.2.7-dev.91)
+    - (backend.c) Removed one 'var might be clobbered' warning.
+    - (datatypes.h, interpret) More comments.
+    - (object.c) When restoring a mapping of form '([:<width>])', the <width>
+        is made sure to be positive. (thanks, Michael!)
+
+13-May-1999 (Lars Duening)  (3.2.7-dev.90)
+    - (datatypes.h, interpret) More comments.
+
+12-May-1999 (Lars Duening)  (3.2.7-dev.89)
+    - (interpret.c, doc/efun/...) Efun symbol_function() won't create
+        closures from protected lfuns of other objects. (thanks, Michael!)
+    - (func_spec, comm, interpret.c, config.h, driver.h, main)
+        query_mud_port() did not accept int arguments as documented; also,
+        the multiport feature is no longer optional.
+    - (smalloc.c) write_lpc_trace() tries to write as much information about
+        an object as possible, not just 'Doesn't exist anymore'.
+    - (interpret.c) destruct() now accepts destructed objects as arguments.
+        (thanks, Largo!).
+
+11-May-1999 (Lars Duening)  (3.2.7-dev.88)
+    - (object.c) Fixed some memory leaks on errors during a restore. (thanks,
+        Michael!)
+    - (interpret.c) Some more comments.
+
+10-May-1999 (Lars Duening)  (3.2.7-dev.87)
+    - (interpret.c) Removed a crasher in call_lambda() on closures of
+        not-inherited variables. (thanks, Michael!)
+    - (closure.c) Creating a symbol_variable() now protects it against
+        replace_program()s. (thanks, Michael!)
+    - (array.c, efuns.c, exec.h, interpret.c, prolang.y) Duplicate virtual
+        inherits are no longer listed in the result of inheritlist() and
+        the various statistical functions. (thanks, Michael!)
+
+09-May-1999 (Lars Duening)  (3.2.7-dev.86)
+    More patches from Michael:
+    - (backend.c, interpret, gcollect.c) interpret:call_lambda() no longer
+        protects closure with an extra refcount; instead old, replaced driver
+        hooks are stored in an array and freed by the backend (or the
+        garbage collector).
+    - (backend.c) When computing a 'real soon' swapping time for objects
+        with no reset, the new swap time became negative, effectively
+        disabling swapping for this object.
+    - (interpret.c) Improvement of efun terminal_colour(), reducing the number
+        of created shared strings.
+    - (simulate.c) If the loading of objects fails, the name of the object
+        is printed with the error message.
+    - (swap.c) If an object WILL_CLEAN_UP on swap in, the swapper doesn't
+        bother to check for the function 'clean_up'.
+    - (interpret.c, prolang.y) Added a couple of missing updates of
+        time_of_ref.
+    - (interpret.c) Fixed a crasher when using to_string() on an lfun
+        closure for a swapped program.
+    - (simulate.c) lookfor_object() no longer swaps in the object, instead
+        the caller does it when needed. As this is rather rare, the effect
+        should be reduced disk activity.
+    - (ed.c, heartbeat.c) Removed two compilation warnings for printf()
+        args.
+
+04-May-1999 (Lars Duening)
+    - (smalloc.c) _large_malloc() didn't compile in SMALLOC_LPC_TRACE due to
+        a missing 'const' specifier. (thanks, Freaky!)
+
+02-May-1999 (Lars Duening)  (3.2.7-dev.85)
+    - (backend.c) time_of_ref is fudged only after a reset of a swapped
+        object, not after a cleanup. Also, if the cleanup hook is a closure,
+        the time_of_ref is updated manually to make sure that the cleanup
+        won't occur in every backend loop.
+    - (simulate.c) lookfor_object() sets the time_of_ref of an object if
+        it had to swap it in. This is useful for blueprints for inheritance
+        and cloning, which would thrash otherwise. (thanks, Michael!)
+    - (lex.c) The test against recursive calls in _expand_define() crashed
+        the driver if an error occured during the macro expansion and the
+        error handling itself called macro expansion (e.g. through the
+        _expand_define_() efun). For now, non-reentrant recursive calls
+        are allowed again.
+
+30-Apr-1999 (Lars Duening)  (3.2.7-dev.84)
+    - (backend.c) If reset or cleanup cause an object to be swapped in,
+        the time_of_ref is fudged so that the object will swap out again
+        pretty soon, but not immediately.
+    - (hosts/be/Makefile) Re-introduced cross-compiling support for x86
+        on PowerPC.
+
+29-Apr-1999 (Lars Duening)
+    - (doc/efun/caller_stack_depth, HISTORY) Corrected two typos (thanks,
+        Zora!).
+
+28-Apr-1999 (Lars Duening)  (3.2.7-dev.83)
+    - (backend.h, closure.c, interpret.h, efuns.c) Move error_recover_info
+        definition into backend.h, adapting the other files, and added
+        a missing include to efuns.c
+    - (interpret, exec.h, datatypes.h) Began commenting.
+
+27-Apr-1999 (Lars Duening)  (3.2.7-dev.82)
+    - (heartbeat.c) 'status tables' could cause a division by 0.
+    Integrated a patch from Michael:
+    - (backend.c) process_objects() now checks if a swap was successful
+        before setting did_swap (since some objects won't swap).
+    - (interpret.c) Added some ASSIGN_EVAL_COST in critical efuns.
+    - (interpret.c) call_lambda() did not update time_of_ref/O_RESET_STATE
+        on calls. Furthermore, objects bound to (s)efun closures were not
+        swapped in, which caused segfaults in dump_trace().
+
+25-Apr-1999 (Lars Duening)  (3.2.7-dev.81)
+    - (backend.c, swap.c) Swapped-out objects are again swapped in for
+        reset. Skipping the call and just setting a due-time in the
+        swapper resulted in too few calls to reset(), especially with
+        small swap times. (thanks, Michael!)
+    - (backend.c) Removed the RESET_DEBUG code sequences.
+    - (interpret.c) Calls to tefuns and vefuns assign the eval costs
+        first.
+    - (sprintf.c) If possible, file:line of an offending sprintf() statement
+        are appended to all error messages, not just to the one printed
+        on stderr.
+    - (etc/icon-*.ppm) The Icon for the Gamedriver.
+    - (hosts/be/{Makefile, icon-*.raw, driver.r, driver.rscr) Added the
+        icon to the compiled resources.
+    - (heartbeat.c) Fixed a crasher which occured when a heart_beat()
+        function managed to remove all remaining objects from the hb list.
+
+19-Apr-1999 (Lars Duening)
+    - (mapping.c) When adding mappings, the second summand was freed before
+        the actual addition (thanks, Daniel!).
+    - (doc/LPC/modifiers) added from TubMud (thanks, Fiona!).
+
+17-Apr-1999 (Lars Duening)  (3.2.7-dev.80)
+    - (doc/) Small changes, improved the docs to switch, references
+        and alists (thanks, Freaky!).
+    - (lex.c) Bugfix from Daniel: Variables in closure may start with '_'.
+    - (closure.c) Bugfix from Daniel: #'[<] indexing corrected.
+    - (interpret.c) unmkmapping() also accepts key-only mappings (thanks,
+        Holger!).
+    - (func_spec) Efun caller_stack() was defined to return 'int' instead
+        of the correct 'object *'. (thanks, Robb!).
+    - (driver.h, smalloc, main) Added some 'const' to 'char *' where
+        useful.
+    - (main.c, lex.c) The list of predefs copied from the commandline is
+        now deallocated after the defines have been entered into the
+        table. This removes a spurious 'small block freed' warning on
+        garbage collections.
+
+04-Apr-1999 (Lars Duening)  (3.2.7-dev.78-79)
+    - Small changes, just cosmetics.
+
+01-Apr-1999 (Lars Duening)  (3.2.7-dev.77)
+    - Manually copied all changes since dev.76 into the Re-Release of 3.2.6.
+    - (call_out.c) Undid the change that callout can call protected
+        functions: this inability was intentional for security reasons.
+    - (backend.c) The consistency check of the object list was still
+        active. Now the code is still there, but deactivated.
+    - (doc/LPC/functions, doc/efun/call_out, doc/efun/call_other) Added
+        a bit documentation regarding protected functions (thanks, Macbeth!).
+    - (interpret.c, doc/LPC/operators) Subtraction allows any width of
+        the subtrahend.
+
+31-Mar-1999 (Lars Duening)
+    - (HISTORY, hosts/be/Makefile) Small corrections.
+
 31-Mar-1999 (Lars Duening) -- Release 3.2.6
     - Froze 3.2.6-dev.76 for release.
 
@@ -447,7 +1128,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
         to be static; the earlier solution of setting current_object
         messed up the previous_object() relation (*doh*!), causing
         security systems to malfunction. sapply() itself is now a mere
-        #define for sapply_int().
+        #define for sapply_int(). (b-981110-0)
 
 15-Feb-1999 (Lars Duening)  (3.2.6-dev.36)
     - (INSTALL) A few small changes (thanks, Patrick!).

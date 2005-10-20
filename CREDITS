@@ -89,7 +89,7 @@ Lars Duening thanks:
      I had to look up that 'l'-word first).
  - the citizens of One Step Beyond, PK-Mud and UNItopia for enduring my
      driver experiments.
- - Malcom Tester (mtester@cambric.com) for providing me with access to
+ - Malc (mehbisdokutie@geocities.com) for providing me with access to
      a Solaris system for testing.
  - Stefan Petri and contributors for the extensive documentation of the
      Amylaar driver (see also doc/README).
@@ -98,24 +98,36 @@ Lars Duening thanks:
  - Martin Brenner: initial multi-port implementation, inetd compatibility
      code.
  - Brian Gerst (bgerst@quark.vpplus.com) for the xerq daemon.
+ - Reinhard Pfau (Reinhard.Pfau@unix-ag.org, Mubo@SiliconDream) brought
+     the autoconf mechanism up to date.
+ - Ron Koerner (ron.koerner@gmx.de, Righ@FinalFrontier) provided the
+     initial implementation of functionals modelled after MudOS' syntax.
+ - Uwe (mai94cch@studserv.uni-leipzig.de) did the first IPv6 changes.
  - for bug reports, critics, fixes, patches and other support from:
      Alex@TubMud (at16@st-andrews.ac.uk)
      Alexander Fetke (alfebtcd@cs.tu-berlin.de, Alfe@Tubmud)
      Andreas Grammlich (andreas.grammlich@prepress.de, Gum@Wunderland)
+     Andreas Weller (aw6@informatik.uni-ulm.de, Zwirch@Carledon)
      Andres Cvitkovich (ac@twig.mond.at, Woody@Silberland)
+     Andrew Weisz (elarke01@snet.net)
      Blackcat@PK-Mud (amuelle1@htwm.de)
-     Cendor@Winterkill (mtmaki@pultti.ttaol.fi)
+     Brandon (pothole@darkspyre.quad.net)
      Christian Kirschbaum (chrissy@cs.tu-berlin.de, Chameloid@Tubmud)
      Christian Mudra (c_mudra@informatik.uni-kl.de, Coogan@Tubmud)
+     Dale Perkins (dale-perkins@home.net)
      Daniel von Dincklage (daniel@ozet.de, Sunblade@SiliconDream),
      Daniel Sloan (sloand@alphalink.com.au)
+     Fiona@Wunderland (ujastrow@mail.desy.de)
      Frank Kirschner (freaky@unitopia.uni-stuttgart.de)
      Frank Stolze (fstolze@iName.com)
-     Fiona@Wunderland
      Heiko Kopp (hkopp@informatik.uni-rostock.de, Bardioc@Evermore)
      Holger Kremss (jur94ewp@studserv.uni-leipzig.de, Holger@Wunderland)
      Joern Rennecke (amylaar@cygnus.co.uk)
+     Juergen Weickert (Sissi@UNItopia)
+     Kirnan@Avalon
+     Largo@Wunderland
      Logic (logic@logic.net)
+     Manu Mäki (mtmaki@pultti.turkuai.fi, Cendor@Winterkill)
      Matthew Julius (julius.2@wright.edu)
      Michael Sporn (sporn@mathematik.hu-berlin.de, sunblood@tubmud)
      Nepomuck@UNItopia
@@ -124,11 +136,15 @@ Lars Duening thanks:
      Ralph (ralphi@vkr.k-net.dk)
      Reimer Behrends (Macbeth@Tubmud)
      Reinhard Pfau (reinhard@netlab1.hrz.uni-siegen.de, mubo@SiliconDream),
+     Robb Townsend (meecham@infonline.net)
      Robert Reither (e8925573@student.tuwien.ac.at, Nathan@Unholy.Lands)
-     Juergen Weickert (Sissi@UNItopia)
+     Stephan Lichtenhagen (lichti@amethyst.chemie.uni-dortmund.de,
+       Tiamak@Morgengrauen)
      Sieni (sampsa@netsonic.fi)
      Stefan Riemer (stefan.riemer@bauing.uni-weimar.de, Peng@FinalFrontier)
+     Tatu P. Saloranta (doomdark@cc.hut.fi)
      Thomas Feldmeier (tfeldmei@student.informatik.uni-ulm.de, Zora@Carledon)
+     Thorsten Klose (Thorsten.Klose@infineon.com, Avatar@avalon)
      Tmm@UNItopia? (Tmm@gmx.de)
      Tucita@UNItopia
 

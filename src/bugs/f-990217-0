@@ -5,3 +5,4 @@ Type: Feature
 State: Unclassified
 
 deep_present() works like present(), but searches the whole inventory.
+Similar deep_present_clone().

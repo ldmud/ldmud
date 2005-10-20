@@ -12,6 +12,10 @@ DESCRIPTION
 	possible to use say() or write() which rely on a current
 	user to be something useful.
 
+        call_out() can only call functions which are publicly accessible,
+        i.e. "public" and "static" functions. "private" and "protected"
+        functions can't be called.
+
 	The execution of the call_out()s implies a simple (not
 	exhaustive) measure against rabbits: the evaluation costs of
 	those call_outs() executing at the same time are summed up on

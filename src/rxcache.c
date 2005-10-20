@@ -26,6 +26,10 @@
  * Beware! regexec() stores result data in the regexp structure (the
  * startp[] and end[] arrays), so the same pattern must not be used
  * in two concurrent regcomp_cache/regexec pairs.
+ *
+ * TODO: Using shared strings as cache-indices can speed things up,
+ * TODO:: especially when knowing where to find the hashvalue from
+ * TODO:: the strtable.
  *------------------------------------------------------------------
  */
 
@@ -36,15 +40,15 @@
 #include <stdio.h>
 #include <string.h>
 
-#define NO_INCREMENT_STRING_REF
+#define NO_REF_STRING
 #include "rxcache.h"
 
-#include "comm.h"
 #include "gcollect.h"
 #include "hash.h"
 #include "regexp.h"
 #include "smalloc.h"
 #include "stralloc.h"
+#include "strfuns.h"
 
 #ifdef RXCACHE_TABLE
 
@@ -143,20 +147,23 @@ regcomp_cache(char * expr, int /* TODO: bool */ excompat)
 }
 
 /*--------------------------------------------------------------------*/
-int
-rxcache_status (int /* TODO: bool */ verbose)
+size_t
+rxcache_status (strbuf_t *sbuf, Bool verbose)
 
 /* Gather (and optionally print) the statistics from the rxcache.
  * Return the amount of memory used.
  */
 
 {
-  char buf[250];
   int    i;
 
   uint32 iNumXEntries = 0;      /* Number of used cache entries */
   uint32 iXSizeAlloc = 0;       /* Dynamic memory held in regexp structures */
   uint32 iNumXReq;              /* Number of regcomp() requests, made non-zero */
+
+#if defined(__MWERKS__) && !defined(WARN_ALL)
+#    pragma warn_largeargs off
+#endif
 
   /* Scan the whole tables, counting entries */
   for (i = 0; i < RXCACHE_TABLE; i++)
@@ -171,28 +178,29 @@ rxcache_status (int /* TODO: bool */ verbose)
   /* In verbose mode, print the statistics */
   if (verbose)
   {
-    add_message("\nRegexp cache status:\n");
-    add_message(  "--------------------\n");
-    sprintf(buf, "Expressions in cache:  %lu (%.1f%%)\n"
+    strbuf_add(sbuf, "\nRegexp cache status:\n");
+    strbuf_add(sbuf,   "--------------------\n");
+    strbuf_addf(sbuf, "Expressions in cache:  %lu (%.1f%%)\n"
                , iNumXEntries, 100.0 * (float)iNumXEntries / RXCACHE_TABLE);
-    add_message("%s", buf);
-    sprintf(buf, "Memory allocated:      %lu\n", iXSizeAlloc);
-    add_message("%s", buf);
+    strbuf_addf(sbuf, "Memory allocated:      %lu\n", iXSizeAlloc);
     iNumXReq = iNumXRequests ? iNumXRequests : 1;
-    sprintf(buf, "Requests: %lu - Found: %lu (%.1f%%) - Coll: %lu (%.1f%% req/%.1f%% entries)\n"
+    strbuf_addf(sbuf
+               , "Requests: %lu - Found: %lu (%.1f%%) - Coll: %lu (%.1f%% req/%.1f%% entries)\n"
                , iNumXRequests, iNumXFound, 100.0 * (float)iNumXFound/(float)iNumXReq
                , iNumXCollisions, 100.0 * (float)iNumXCollisions/(float)iNumXReq
                , 100.0 * (float)iNumXCollisions/(iNumXEntries ? iNumXEntries : 1)
            );
-    add_message("%s", buf);
   }
   else
   {
-    sprintf(buf, "Regexp cache:\t\t\t%8ld %8lu\n", iNumXEntries, iXSizeAlloc);
-    add_message("%s", buf);
+    strbuf_addf(sbuf, "Regexp cache:\t\t\t%8ld %8lu\n", iNumXEntries, iXSizeAlloc);
   }
 
   return iXSizeAlloc;
+
+#if defined(__MWERKS__)
+#    pragma warn_largeargs reset
+#endif
 }
 
 /*--------------------------------------------------------------------*/

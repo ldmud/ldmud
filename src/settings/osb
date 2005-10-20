@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Settings for the OSB mudlib.
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/users/phil/osb --libexec=/users/phil/osb/erq --libdir=/users/phil/osb/mudlib --with-setting=osb $*
+exit 1
+
+# --- The actual settings ---
+
+with_max_local=20
+with_max_cost=1000000
+
+with_apply_cache_bits=14
+
+enable_compat_mode=no
+enable_strict_euids=no
+
+enable_supply_parse_command=yes
+enable_initialization_by___init=no

@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Settings for the Silberland mudlib.
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/mud --libexec=/mud/erq --with-setting=silberland $*
+exit 1
+
+# --- The actual settings ---
+
+enable_access_control=no
+
+with_time_to_clean_up=21600
+with_time_to_swap=5400
+with_time_to_swap_variables=10800
+with_time_to_reset=3600
+
+with_max_bits=1200
+
+with_portno=4711
+with_maxnumports=3
+
+with_max_local=25
+
+with_swap_file=/mud/swapfiles/SwapFile
+
+with_max_array_size=5000
+with_max_players=100
+
+with_htable_size=16384
+
+enable_compat_mode=no
+enable_strict_euids=yes
+
+enable_supply_parse_command=no
+enable_initialization_by___init=yes
+
+enable_max_malloced=yes
+with_max_malloced=0x5000000
+with_max_small_malloced=0x2000000

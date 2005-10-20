@@ -1,0 +1,149 @@
+Reminder: this file does not list all f- and p- files, only those which are
+          easily summarized
+
+
+Efuns
+--------------------------------------------------------------------------
+p-981027-1: substitute_string(string txt, string *key, string *repl, int, int)
+              Replace all occurances of <key> words in <txt> by associated
+              <repl> word.
+p-990330-0: subst() efun, see substitute_string()
+f-981229-22: strsubst(), see substitute_string()
+f-990708-0: map_replace(): similar to substitute_string()
+p-990417-1: replace_string() == implode(explode(X, Y), Z)
+p-990330-0: regexp() and regexplode() may filter
+f-981229-20: regexp(): flags to make the result more usable
+f-981229-23: regexplode(): flags to modify the result
+f-990203-23: strmatch(): simple patternmatcher
+f-981229-14: stringp() returns address of string
+f-990203-11: sprintf(): new flag %b for binaries.
+f-990303-1: sprintf(): on non-efun symbols misbehaves
+f-990309-1: csprintf(): merged from sprintf() and terminal_colour()
+f-990714-3: mprintf(): generalized sprintf()
+f-990217-4: strcount(): counts occurances of pattern in text
+f-990714-0: quote_string(), unquote_string()
+f-990203-13: explode(): behaviour of explode("", whatever)
+p-990204-1: walk_array(): equivalent to walk_mapping()
+f-990203-15: invert_array(): inverts the order of an array
+f-990714-7: turn_array(): reverse an array or string.
+f-990716:   Lots of array efuns, with simul-efun code.
+f-990714-1: invert_mapping(): reverse mapping
+f-990203-22: member_values(): inverse mapping lookup
+f-990310-1: m_add(): like m + ([]), but faster.
+f-990310-2: m_flat(): to flatten a mapping (like '...' on arrays)
+f-990714-2: factorize(): like unique_array() on mappings
+f-981202-0: Operators like #'+ in lambda should take lots of arguments
+f-990203-16: fold_left(), fold_right(): efuns to fold an array
+f-990714-4: merge_array(): merge subarrays
+f-990714-5: split_array(): split into subarrays
+f-990714-6: flatten_array(): flatten a nested array
+f-99-714-8: shuffle_array(): randomize an array.
+p-990204-0: set_eval_cost(): set/query the max eval cost
+p-990204-0: get_eval_time(): return the time in [ms] for this execution
+f-981229-13: query_micros() or some other kind of precise time measurement
+p-990204-0: get_num_args(): returns number of arguments
+p-990204-1: gmctime(): return GMC time
+p-990204-1: reset_eval_cost(): reset the eval cost counter
+p-990204-1: deep_call_other(): calls a function in all inherited objects
+f-990203-17: explains p-990204-1:deep_call_other() a bit.
+p-990204-1: raise_caller_error(): as it says
+f-990203-28: explains p-990204-1:raise_caller_error()
+p-990423-0: previous_program(): returns the previous programs
+f-990324-1: explains p-990423-0:previous_program()
+f-981209:   OBJ_DUMP needs reformatting
+f-981226-1: TCP efuns.
+f-981229-25: receive(): other comm efuns are put into the mudlib
+f-990204-2: reset_object(), set_next_reset() on another object.
+p-990204-0: reload_object(): re-initializes an object as if just loaded
+f-981229-09: additional arguments to allocate(), clone(), load()
+f-990203-24: objects(): return objects from the list of objects
+f-981229-26: find_objects(): find object by name pattern
+f-990203-00: children(): finds children of objects
+f-990203-26: clones(): similar to children() (f-990203-00)
+f-990217-0: deep_present(), deep_present_clone()
+f-981229-10: truncate_file(), copy_file()
+f-981208:   read_bytes()/write_bytes() should handle int*, too.
+f-981229-06: explains f-981208 a bit
+f-990203-19: get_dir(): extended functionality
+f-981229-15: set_environment(): third arg specifying where in the list
+f-981229-19: save_value(), restore_value()
+f-990203-25: save_object(), restore_object(): changed meaning
+f-981229-21: input_to() should accept closures
+f-990203-10: shutdown(), garbage_collection() should be privileged
+f-990211:   top(): statistics efun
+f-990217-2: query_notify_fail_object()
+f-990424-1: call_out(): uses handles in parallel to names.
+
+
+Language
+--------------------------------------------------------------------------
+p-990204-0: '...' operator for varargs passing and expanding
+f-981229-17: anonymous function syntax
+f-990203-02: dito
+p-990710-0: Handles (objects associated with a string)
+f-981229-05: struct foo {} type
+f-990203-31: re: f-981229-05: better saving method for small arrays?
+f-981229-18: foreach()
+f-981229-27: m[x;y], m[x][y] as alternatives to m[x,y]
+f-990419:  Implement [..x] as shortcut of [0..x].
+f-981229-29: MudOS 'ref's instead of Amylaars '&'s.
+f-990303-2: New syntax for ref parameters, see also f-981229-29
+f-990203-01: Various operators should work on mixed*.
+f-990203-1: Explains f-990203-01 a bit.
+f-990213:   Extended value range for ints.
+f-990323-0: inherits use relative paths.
+f-990605:  Use '<expr>->(<expr>)()' for computed call_others.
+f-990727:  Enums.
+
+
+Compiler
+--------------------------------------------------------------------------
+f-990203-07: Pragma to reserve (s)efun names
+f-981027-1: Spaces after \ should give a better error message.
+f-981110-1: static evalstack sizecheck for functions and closures
+f-981229-30: Preprocessor lacks: #, ##, and two bugs
+f-990203-04: \octal and \hex codes in strings
+f-990203-08: Add __DIR__ and __PATH__ to __FILE__
+f-990228:  Replace __INIT by a nameless function with special callpattern
+f-990510:  Is 'string name; ob->name()' possible?
+
+
+Runtime
+--------------------------------------------------------------------------
+p-990204-0: master object handles most recent signals and fatal()s
+p-990204-0: comm: init_telopts() executes just one loop each
+p-990204-0: reset distinguishes between swapped and unswapped objects
+p-990204-0: lazy swapping (not necessary with current backend)
+p-990204-0: special super-user startup
+p-990204-0: line numbers are swapped immediately
+f-990317-0: H_MODIFY_OUTPUT: hook for output, see also receive() (f-981229-25)
+p-990204-1: Lots of hooks for pre/post create and remove handling.
+f-990204-0: explains p-990204-1:create hooks
+f-981114-0: Query compilation and runtime options at runtime
+f-981208:   f-98114-0 again
+f-981222:   'Apply on destructed object' should be a runtime error, not a fatal
+f-981229-00: Get rid of hardcoded modes.
+f-981229-02: Get rid of hardcoded commands.
+f-990203-32: Make all extras (parsing, inventories, light) optional.
+f-981229-28: Information about MudOS compatibility
+f-990302-03: Better runtime error messages.
+f-990203-06: ed ranges can extend past the end of the file
+f-990203-06: ed: hitting return on last line yields better message
+f-990203-12: More ed ideas.
+f-990203-29: Sort of 'idle' detection.
+f-990204-3: Commandline socket specification
+f-990204-6: Persistant object names
+f-990313:  Better handling of ASSIGN_EVAL_COST.
+f-990316-1: set_auto_include_string() should accept closure. Make it a hook?
+f-990319-0: Can catch_msg() be removed?
+f-990417-0: Can the driver find private functions in the master?
+f-990424-0: Precompiled binaries.
+f-990629-0: Immediate error handling independant from catch().
+f-990721-0: Stacked input_to()s.
+
+
+Installation
+--------------------------------------------------------------------------
+f-981226-2: Check for and use <arpa/telnet.h>
+f-990708-3: Improved options selection process.
+

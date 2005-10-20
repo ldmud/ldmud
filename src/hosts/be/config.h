@@ -10,13 +10,8 @@
 #define ERQ_MAX_REPLY 1024
 #define ERQ_MAX_SEND  1024
 
-/* Only executables that are safe no matter what arguments/options
- * are supplied should be placed in ERQ_DIR. If you want something
- * different, consider writing a wrapper program or shell script.
- */
-#define ERQ_DIR "/boot/home/mud/erq"
-
 /* #define ACCESS_CONTROL if you want the driver to do any access control.
+ * TODO: ACCESS_CONTROL should be a runtime option
  */
 #define ACCESS_CONTROL
 
@@ -28,10 +23,6 @@
  */
 /* #define ACCESS_LOG "access.allow.log" */
 
-/*
- * Define the maximum size of log files (in bytes).
- */
-#define MAX_LOG_SIZE                50000
 /*
  * Max size of a file allowed to be read by 'read_file()'.
  */
@@ -98,15 +89,13 @@
 #define PORTNO                    4242
 
 /* Maximum numbers of ports the GD accepts connections to.
- * If this is not defined, the original one-port-code takes effect.
- * Compiling the GD with ENFORCE_ONE_PORT defined overrides this definition.
  */
 #define MAXNUMPORTS                 20
 
 /*
  * Max number of local variables in a function.
  */
-#define MAX_LOCAL                   20
+#define MAX_LOCAL                   50
 
 /* Maximum number of evaluated nodes/loop.
  * If this is exceeded, the current function is halted.
@@ -114,12 +103,22 @@
  */
 #define MAX_COST               1000000
 
-/* to catch an eval_cost too big error in an object that called recursive
+/* CATCH_RESERVED_COST is added to the eval cost for the time executing code
+ * guarded by a catch() statement, so that an eval_cost-too-big error can
+ * still be caught and handled.
+ *
+ * To catch an eval_cost too big error in an object that called recursive
  * master functions, CATCH_RESERVED_COST should be greater than
  * MASTER_RESERVED_COST * 2.
+ * TODO: Check that at runtime.
  */
 #define CATCH_RESERVED_COST       2000
+
+/* MASTER_RESERVED_COST is the total reserve available for master applies.
+ * It is halved for every recursion into another master apply.
+ */
 #define MASTER_RESERVED_COST     0x200 /* must be power of 2 */
+/* TODO: Check that at runtime */
 
 /*
  * Where to swap out objects. This file is not used if TIME_TO_SWAP is 0.
@@ -129,10 +128,22 @@
  */
 #define SWAP_FILE           "LP_SWAP.3"
 
-/*
- * This is the maximum array size allowed for one single array.
+/* This is the maximum array size allowed for one single array.
+ * If 0, any size is allowed.
  */
 #define MAX_ARRAY_SIZE            3000
+
+/* This is the maximum array size allowed for one single mapping.
+ * If 0, any size is allowed.
+ */
+#define MAX_MAPPING_SIZE            5000
+
+/*
+ * If this is defined, expensive operations like string additions
+ * receive additional evalcosts depending on the amount of data handled.
+ */
+
+#define DYNAMIC_COSTS
 
 /*
  * Maximum number of players in the game.
@@ -207,14 +218,17 @@
  */
 #define ALIGN_FUNCTIONS
 
-/*
- * Define COMPAT_MODE if you are using mudlib 2.4.6 or older. This
- * replaces the old command line option -o.
+/* Define COMPAT_MODE if you are using the 2.4.5 mudlib or one of its
+ * derivatives.
+ * TODO: Make this a runtime option.
  */
-
 #undef COMPAT_MODE
-#undef NATIVE_MODE
-#define EUIDS
+
+/* Define STRICT_EUIDS if the driver is to enforce the use of euids,
+ * ie. load_object() and clone_object() require the current object to
+ * have a non-zero euid.
+ */
+#undef STRICT_EUIDS
 
 /* Define SUPPLY_PARSE_COMMAND if you want the efun parse_command.
  * If you don't need it, better #undef it, lest some new wiz can inadvertly
@@ -257,19 +271,6 @@
  */
 #define SET_BUFFER_SIZE_MAX      65536
 
-/* Define this macro to get the old reset implementation.
- * TODO: Get rid of all OLD_RESET code.
- */
-/* #define OLD_RESET */
-
-#ifdef OLD_RESET
-/* Object reset times are not exact, but instead rounded up to the
- * next multiple of RESET_GRANULARITY. This should be between 10
- * and 60 seconds (see otable.c for a more detailed discussion).
- */
-#define RESET_GRANULARITY          300   /* five minutes */
-#endif
-
 /* Runtime statistics:
  *  COMM_STAT: count number and size of outgoing packets.
  *  APPLY_CACHE_STAT: count number of hits and misses in the apply cache.
@@ -295,12 +296,12 @@
 /* Define this to annotate all allocations with file:line of the driver
  * source responsible for it.
  */
-#undef SMALLOC_TRACE
+#define SMALLOC_TRACE
 
 /* Define this to annotate all allocations with file:line of the lpc program
  * responsible for it.
  */
-#undef SMALLOC_LPC_TRACE
+#define SMALLOC_LPC_TRACE
 
 /* If using TRACE_CODE , how many instructions should be kept? */
 #define TOTAL_TRACE_LENGTH      0x1000

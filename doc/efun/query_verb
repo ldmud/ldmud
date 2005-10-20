@@ -22,4 +22,4 @@ EXAMPLE
 	When ever you type "sing ..." you get "Your command was: sing ...".
 
 SEE ALSO
-	add_action(E)
+	add_action(E), query_command(E)

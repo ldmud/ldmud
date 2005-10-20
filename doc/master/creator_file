@@ -1,3 +1,4 @@
+OBSOLETE
 SYNOPSIS
 	string creator_file(mixed ob)
 
@@ -13,13 +14,14 @@ DESCRIPTION
 	backbone-id will then get the uid of the currently active user
 	as their userid instead.
 
-	Under compat mode this function is called as well.
+	Under compat mode this function is called as well and provides
+        the information returned by the creator() efun.
 
 	If this function is not provided by the master object, no
 	other object can be loaded.
 
 HISTORY
-	Dropped in 3.2.1
+	Dropped in 3.2.1, replaced by the _UID driver hooks.
 
 SEE ALSO
-	uids(C), creator(E)
+	uids(C), creator(E), getuid(E)

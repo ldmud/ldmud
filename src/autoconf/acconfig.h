@@ -1,10 +1,16 @@
-/* Is the library function inet_ntoa() compatible with the compiler ? */
-#undef INET_NTOA_OK
 
-/* The following values must be evaluable by the preprocessor */
-#define SIZEOF_P_INT 4
-#define SIZEOF_INT 4
-#define SIZEOF_LONG 4
+#ifndef MACHINE_H
+#define MACHINE_H
+
+@TOP@
+
+/* does the compiler provide inline functions? */
+#undef HAS_INLINE
+
+/* Is the library function inet_ntoa() compatible with the compiler ?
+ * Is there any platform where this is not the case?
+ */
+#undef INET_NTOA_OK
 
 /* A mask that allows to extract an unsigned char from a signed */
 #define CHARBIT_MASK 0xff
@@ -37,6 +43,9 @@
 /* does the compiler know of a 'long long' type? */
 #undef HAVE_LONG_LONG
 
+/* does the compiler know of a 'bool' type? */
+#undef HAVE_BOOL
+
 /* what kind of pointer is used by malloc() et al */
 #define POINTER *
 #undef FREE_RETURNS_VOID
@@ -56,8 +65,6 @@
 #undef USE_FCNTL_O_NDELAY
 #undef USE_FCNTL_FNDELAY
 
-#undef inline
-
 /* Define what random number generator to use.
  * If no one is specified, a probably good one will be used.
  * possible choices: RANDOM DRAND48 RAND
@@ -66,5 +73,10 @@
 #undef DRAND48
 #undef RAND
 
-/* A host specific include file.  */
-#define HOST_INCLUDE "hosts/unix.h"
+/* define the erq include file. */
+#undef ERQ_INCLUDE
+
+
+@BOTTOM@
+
+#endif

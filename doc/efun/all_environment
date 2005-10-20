@@ -11,7 +11,7 @@ DESCRIPTION
 EXAMPLE
 	If o is a match in a matchbox which is in a box in a chest,
 	in a room, all_environment(o) will return
-        ({ matchbox, chest, room }).
+        ({ matchbox, box, chest, room }).
 
 HISTORY
 	Introduced in LDMud 3.2.6, suggested by TubMud.

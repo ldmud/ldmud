@@ -14,3 +14,4 @@ void raise_caller_error(string msg, object caller = previous_object())
 
 Maybe make this an extension of raise_error() itself.
 
+Note: can be done in an efun using caller_stack() and set_this_object().

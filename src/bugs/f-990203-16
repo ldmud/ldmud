@@ -1,4 +1,4 @@
-Short: modify efun implode()
+Short: New efuns: fold_left(), fold_right()
 From: Matthew Julius <julius.2@wright.edu>
 Date: Fri, 08 Jan 1999 16:29:08 -0500
 Type: Feature
@@ -33,4 +33,77 @@ However, the ability to implode in either direction is nice...
 Note that right or left doesn't matter with MudOS functionals, for example,
 (: $1 - $2 :) and (: $2 - $1 :) do not differ at all really.  However, #'-
 and lambda(({ 'a, 'b }), ({ #'-, 'b, 'a })) are two very different things.
+
+SYNOPSIS
+        varargs mixed fold_left(closure c,mixed *a,mixed d);
+        varargs mixed fold_right(closure c,mixed *a,mixed d);
+
+          or
+
+        varargs mixed fold_left(closure c,string s,mixed d);
+        varargs mixed fold_right(closure c,string s,mixed d);
+
+DESCRIPTION
+        fold_left() and fold_right() receive an array as input and return
+        a value that is computed by combining a start value (which can be
+        given as third element or defaults to 0 otherwise) with an element
+        of the array, computing an intermediate value which is combined
+        with the next element (computing another intermediate value) and
+        so on. When all elements are used, the last computed value is the
+        result. The examples may make this clearer :-)
+
+        The closure given as first argument will describe how each two
+        values are combined, of course. (That means that this closure must
+        expect exactly two values and return the next value.)
+
+        With fold_left() and fold_right() the sum of a list of integers can
+        easily be computed, for example.
+
+        fold_left() takes the elements from the leftmost (the first) to
+        the rightmost (list last) element of the array, and fold_right()
+        uses the opposite order.
+
+NOTE
+        If the given array is empty, the start value given as third argument
+        (or 0 if none was given) is returned as result.
+
+EXAMPLES
+        return fold_left(#'+,({ 1,2,3,4,5,6 }));
+        /* return (((((0+1)+2)+3)+4)+5)+6;
+         * This will return 21. The 0 added to the 1 in the innermost
+         * parantheses results from the omitted third parameter to
+         * fold_left().
+         */
+
+        return fold_right(#'+,({ "Hel","lo, ","wo","rld!" }),"");
+        /* return "Hel"+("lo, "+("wo"+("rld!"+"")));
+         * This will return "Hello, world!" of course.
+         * To use implode(({ "Hel","lo, ","wo","rld!" }),"") instead is
+         * cheaper though.
+         */
+
+        return fold_left(#'+,"<w`","");
+        /* return '<' +  ('w' + ('`' + ""));
+         * Because characters in LPC are ints, in the innermost paranthesis
+         * an int is added to an empty string. The ascii-value of the back-
+         * tick (`) is 96, so the result of the innermost parantheses will
+         * be the string "96" (if an int is added to a string, the int is
+         * converted to a string which will contain its decimal representa-
+         * tion). Then 119 ('w') will be prepended to this string and final-
+         * ly 60 ('<'). The result will be "6011996" which is my phone num-
+         * ber ;-)
+         */
+
+        mixed max(mixed a,mixed b) { return a>b? a : b; }
+        return fold_left(#'max,({ 7,2,5 }),4);
+        /* return max(max(max(4,7),2),5);
+         * This will return the maximum of the array but at least 4.
+         * The simul_efun find_extreme() would fit better for this task
+         * though.
+         */
+
+SEE ALSO
+        implode(), find_extreme(), arrays, strings
+
+==> Cute
 

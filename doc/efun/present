@@ -37,5 +37,5 @@ DESCRIPTION
 	and not in both objects.
 
 SEE ALSO
-	move_object(E), environment(E), this_object(E),
+	move_object(E), environment(E), this_object(E), present_clone(E)
 	id(A), init(A)

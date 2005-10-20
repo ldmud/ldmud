@@ -3,7 +3,7 @@ SYNOPSIS
 
 DESCRIPTION
 	Return the string to be used as root-uid.
-	Under !native, the function is expendable.
+	Under !strict_euids, the function is expendable.
 
 HISTORY
 	Introduced in 3.2.1@40 replacing get_root_uid().

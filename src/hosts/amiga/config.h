@@ -10,12 +10,6 @@
 #define ERQ_MAX_REPLY 1024
 #define ERQ_MAX_SEND  1024
 
-/* Only executables that are safe no matter what arguments/options
- * are supplied should be placed in ERQ_DIR. If you want something
- * different, consider writing a wrapper program or shell script.
- */
-#define ERQ_DIR "mudbin:erq"
-
 /* #define ACCESS_CONTROL if you want the driver to do any access control.
  */
 #define ACCESS_CONTROL
@@ -27,11 +21,6 @@
  * simply not define this for NO logs
  */
 /* #define ACCESS_LOG "access.allow.log" */
-
-/*
- * Define the maximum size of log files (in bytes).
- */
-#define MAX_LOG_SIZE            50000
 
 /*
  * Max size of a file allowed to be read by 'read_file()'.
@@ -199,14 +188,17 @@
  */
 #define ALIGN_FUNCTIONS
 
-/*
- * Define COMPAT_MODE if you are using mudlib 2.4.6 or older. This
- * replaces the old command line option -o.
+/* Define COMPAT_MODE if you are using the 2.4.5 mudlib or one of its
+ * derivatives.
+ * TODO: Make this a runtime option.
  */
-
 #undef COMPAT_MODE
-#undef NATIVE_MODE
-#define EUIDS
+
+/* Define STRICT_EUIDS if the driver is to enforce the use of euids,
+ * ie. load_object() and clone_object() require the current object to
+ * have a non-zero euid.
+ */
+#undef STRICT_EUIDS
 
 /* Define SUPPLY_PARSE_COMMAND if you want the efun parse_command.
  * If you don't need it, better #undef it, lest some new wiz can inadvertly
@@ -248,19 +240,6 @@
 /* Maximum size of a socket send buffer.
  */
 #define SET_BUFFER_SIZE_MAX    65536
-
-/* Define this macro to get the old reset implementation.
- * TODO: Get rid of all OLD_RESET code.
- */
-/* #define OLD_RESET */
-
-#ifdef OLD_RESET
-/* Object reset times are not exact, but instead rounded up to the
- * next multiple of RESET_GRANULARITY. This should be between 10
- * and 60 seconds (see otable.c for a more detailed discussion).
- */
-#define RESET_GRANULARITY          300   /* five minutes */
-#endif
 
 /* Profiling:
  * Define COMM_STAT to gather statistics about the network-io.

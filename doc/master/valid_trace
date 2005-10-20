@@ -1,0 +1,14 @@
+SYNOPSIS
+	int valid_trace(string what)
+
+DESCRIPTION
+	Check if the interactive user is allowed to use tracing.
+
+	The argument <what> denotes the action for which permission is to be
+	checked:
+
+	"trace"		Is the user allowed to use tracing?
+	"traceprefix"   Is the user allowed to set a traceprefix?
+
+SEE ALSO
+	trace(E), showsmallnewmalloced(D), malloc(D), status(D), memory(C)

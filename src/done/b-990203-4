@@ -2,7 +2,7 @@ Short: Installation error of install.utils
 From:    Tiresius@OSB
 Date:    Thu Jan 21 02:51:59 1999
 Type: Bug
-State: Unclassified
+State: Done - 3.2.7 uses a new configuration system.
 
 Hello Mateese, I hear you are the one to contact for LD driver problems.
 

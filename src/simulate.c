@@ -15,29 +15,30 @@
 #else
 #include <signal.h>
 #endif
-#if defined(DIRENT) || defined(_POSIX_VERSION)
+#if defined(HAVE_DIRENT_H) || defined(_POSIX_VERSION)
 #include <dirent.h>
 #define generic_dirent dirent
 #define DIRENT_NLENGTH(dirent) (strlen((dirent)->d_name))
 #else /* not (DIRENT or _POSIX_VERSION) */
 #define generic_dirent direct
 #define DIRENT_NLENGTH(dirent) ((dirent)->d_namlen)
-#ifdef SYSNDIR
+#ifdef HAVE_SYS_NDIR_H
 #include <sys/ndir.h>
 #endif /* SYSNDIR */
-#ifdef SYSDIR
+#ifdef HAVE_SYS_DIR_H
 #include <sys/dir.h>
 #endif /* SYSDIR */
-#ifdef NDIR
+#ifdef HAVE_NDIR_H
 #include <ndir.h>
 #endif /* NDIR */
-#endif /* not (DIRENT or _POSIX_VERSION) */
+#endif /* not (HAVE_DIRENT_H or _POSIX_VERSION) */
 #if defined(__CYGWIN__)
 extern int lstat PROT((const char *, struct stat *));
 #endif
 
 #include "simulate.h"
 
+#include "actions.h"
 #include "array.h"
 #include "backend.h"
 #include "call_out.h"
@@ -60,8 +61,11 @@ extern int lstat PROT((const char *, struct stat *));
 #include "sent.h"
 #include "simul_efun.h"
 #include "stralloc.h"
+#include "strfuns.h"
 #include "swap.h"
 #include "wiz_list.h"
+
+#include "../mudlib/sys/rtlimits.h"
 
 #ifdef atarist
 #define CONST const
@@ -88,32 +92,79 @@ extern int fchmod PROT((int, int));
 #define lstat stat
 #endif
 
-#define COMMAND_FOR_OBJECT_BUFSIZE 1000
+/* --- Runtime limits --- */
 
-static void free_sentence PROT((struct sentence *p)); /* forward */
-static void remove_sent PROT((struct object *ob, struct object *player));
-static void remove_environment_sent PROT((struct object *));
-static int special_parse PROT((char *buff));
+/* Each of these limits comes as pair: one def_... value which holds the
+ * limit set at startup or with the set_limits() efun, and the max_... 
+ * value which holds the limit currently in effect. Before every execution,
+ * max_... are initialised from def_... with the RESET_LIMITS macro.
+ * 
+ * A limit of 0 usually means 'no limit'.
+ */
 
+size_t def_array_size = MAX_ARRAY_SIZE;
+size_t max_array_size = MAX_ARRAY_SIZE;
+  /* If != 0: the max. number of elements in an array.
+   */
 
-char *last_verb = 0;
+size_t def_mapping_size = MAX_MAPPING_SIZE;
+size_t max_mapping_size = MAX_MAPPING_SIZE;
+  /* If != 0: the max. number of elements in a mapping.
+   */
+
+int32 def_eval_cost = MAX_COST;
+int32 max_eval_cost = MAX_COST;
+  /* The max eval cost available for one execution thread. Stored as negative
+   * value for easier initialisation (see eval_cost).
+   * CLEAR_EVAL_COST uses this value to re-initialize (assigned_)eval_cost.
+   */
+
+int32 def_byte_xfer = MAX_BYTE_TRANSFER;
+int32 max_byte_xfer = MAX_BYTE_TRANSFER;
+  /* Maximum number of bytes to read/write in one read/write_bytes() call.
+   * If 0, it is unlimited.
+   */
+
+int32 def_file_xfer = READ_FILE_MAX_SIZE;
+int32 max_file_xfer = READ_FILE_MAX_SIZE;
+  /* Maximum number of bytes to read/write in one read/write_file() call.
+   */
+
+/* --- struct limits_context_s: last runtime limits context ---
+ *
+ * This structure saves the runtime limits on the runtime context stack.
+ * It is also used as a temporary when parsing limit specifications.
+ */
+
+struct limits_context_s
+{
+    rt_context_t rt;     /* the rt_context superclass */
+    size_t max_array;    /* max array size */
+    size_t max_mapping;  /* max mapping size */
+    int32  max_eval;     /* max eval cost */
+    int32  max_byte;     /* max byte xfer */
+    int32  max_file;     /* max file xfer */
+    int32  eval_cost;    /* the then-current eval costs used */
+};
+
 char *inherit_file;
 /*
  * 'inherit_file' is used as a flag. If it is set to a string
  * after yyparse(), this string should be loaded as an object,
  * and the original object must be loaded again.
  */
+#ifdef F_SET_IS_WIZARD
 int is_wizard_used = 0;
+  /* TODO: This flag can go when the special commands are gone. */
+#endif
 
 struct object *obj_list = NULL;
   /* Head of the list of all objects
    */
-#ifndef OLD_RESET
 struct object *obj_list_end = NULL;
   /* Last object in obj_list. This object also has its .next_all member
    * cleared.
    */
-#endif
 
 struct object *destructed_objs = NULL;
   /* List holding objects destructed in this execution thread.
@@ -124,7 +175,6 @@ struct object *master_ob = 0;
 p_int new_destructed = 0;  /* Number of destructed objects in object list */
 
 struct object *current_object;      /* The object interpreting a function. */
-struct object *command_giver;       /* Where the current command came from. */
 struct object *current_interactive; /* The user who caused this execution */
 struct object *previous_ob;
 
@@ -132,25 +182,82 @@ int num_parse_error;                /* Number of errors in the parser. */
 
 struct svalue closure_hook[NUM_CLOSURE_HOOKS];
 
-#if 0
-struct variable *find_status(str, must_find)
-    char *str;
-    int must_find;
+/*-------------------------------------------------------------------------*/
+static INLINE void
+save_limits_context (struct limits_context_s * context)
+
+/* Save the current limits context into <context> (but don't put it
+ * onto the context stack).
+ */
+
 {
-    int i;
+    context->rt.type = LIMITS_CONTEXT;
+    context->max_array = max_array_size;
+    context->max_mapping = max_mapping_size;
+    context->max_eval = max_eval_cost;
+    context->eval_cost = eval_cost;
+    context->max_byte = max_byte_xfer;
+    context->max_file = max_file_xfer;
+} /* save_limits_context() */
 
-    for (i=0; i < current_object->prog->num_variables; i++) {
-        if (strcmp(current_object->prog->variable_names[i].name, str) == 0)
-            return &current_object->prog->variable_names[i];
+/*-------------------------------------------------------------------------*/
+static INLINE void
+restore_limits_context (struct limits_context_s * context)
+
+/* Restore the last runtime limits from <context>.
+ *
+ * Restoring max_eval_cost is a bit tricky since eval_cost
+ * itself might be a bit too high for the restored limit, but
+ * avoiding a 'eval-cost too high' was the point of the exercise
+ * in the first place. Therefore, if we ran under a less limited
+ * eval-cost limit, we fake an effective cost of 10 ticks.
+ */
+
+{
+    assign_eval_cost();
+    if (!max_eval_cost || max_eval_cost > context->max_eval)
+    {
+        assigned_eval_cost = eval_cost = context->eval_cost+10;
     }
-    if (!must_find)
-        return 0;
-    error("--Status %s not found in prog for %s\n", str,
-           current_object->name);
-    return 0;
-}
-#endif
+    max_array_size = context->max_array;
+    max_mapping_size = context->max_mapping;
+    max_eval_cost = context->max_eval;
+    max_byte_xfer = context->max_byte;
+    max_file_xfer = context->max_file;
+} /* restore_limits_context() */
 
+/*-------------------------------------------------------------------------*/
+static void
+unroll_context_stack (void)
+
+/* Remove entries from the rt_context stack until the last entry
+ * is an ERROR_RECOVERY context.
+ */
+
+{
+    while (!ERROR_RECOVERY_CONTEXT(rt_context->type))
+    {
+        rt_context_t * context = rt_context;
+
+        rt_context = rt_context->last;
+        switch(context->type)
+        {
+        case COMMAND_CONTEXT:
+            restore_command_context(context);
+            break;
+
+        case LIMITS_CONTEXT:
+            restore_limits_context((struct limits_context_s *)context);
+            break;
+
+        default:
+            fatal("Unimplemented context type %d.\n", context->type);
+            /* NOTREACHED */
+        }
+    }
+} /* unroll_context_stack() */
+
+/*-------------------------------------------------------------------------*/
 struct give_uid_error_context {
     struct svalue head;
     struct object *new_object;
@@ -209,18 +316,13 @@ static int give_uid_to_object(ob, x, n)
         xfree((char *)ret[-1].u.lvalue); /* free error context */
         if (ret->type == T_STRING) {
             ob->user = add_name(ret->u.string);
-#ifdef EUIDS
             ob->eff_user = ob->user;
-#endif
             pop_stack();        /* deallocate result */
             inter_sp--;         /* skip error context */
             return 1;
-#ifdef EUIDS
         } else if (ret->type == T_POINTER && VEC_SIZE(ret->u.vec) == 2 &&
                    ( ret->u.vec->item[0].type == T_STRING
-#ifndef NATIVE_MODE
-                     || ret->u.vec->item[0].u.number
-#endif
+                     || (!strict_euids && ret->u.vec->item[0].u.number)
 
         ) ) {
             ret = ret->u.vec->item;
@@ -233,17 +335,12 @@ static int give_uid_to_object(ob, x, n)
             pop_stack();
             inter_sp--;
             return 1;
-#endif /* EUIDS */
-#ifndef NATIVE_MODE
-        } else if (ret->type == T_NUMBER && ret->u.number) {
+        } else if (!strict_euids && ret->type == T_NUMBER && ret->u.number) {
             ob->user = &default_wizlist_entry;
-#ifdef EUIDS
-            ob->eff_user = 0;
-#endif
+            ob->eff_user = NULL;
             pop_stack();
             inter_sp--;
             return 1;
-#endif
         } else {
             pop_stack();        /* deallocate result */
             err = "Illegal object to load.\n";
@@ -257,17 +354,12 @@ static int give_uid_to_object(ob, x, n)
     if (master_ob == 0) {
         /* Only for the master object. */
         ob->user = add_name("NONAME");
-#ifdef EUIDS
-        ob->eff_user = 0;
-#endif
+        ob->eff_user = NULL;
         return 1;
     }
     ob->user = add_name("NONAME");
-#ifdef EUIDS
     ob->eff_user = ob->user;
-#endif
-    arg.type = T_OBJECT;
-    arg.u.ob = ob;
+    put_object(&arg, ob);
     destruct_object(&arg);
     error(err);
     /* NOTREACHED */
@@ -276,7 +368,8 @@ static int give_uid_to_object(ob, x, n)
 
 /* Make a given object name sane.
  *
- * The function removes leading '/', a trailing '.c', and folds consecutive
+ * The function removes leading '/' (if addSlash is true, all but one leading
+ * '/' are removed), a trailing '.c', and folds consecutive
  * '/' into just one '/'. The '.c' removal does not work when given
  * clone object names (i.e. names ending in '#<number>').
  *
@@ -285,7 +378,7 @@ static int give_uid_to_object(ob, x, n)
  */
 
 const char *
-make_name_sane (const char *pName)
+make_name_sane (const char *pName, Bool addSlash)
 {
 #   define BUFLEN 500
     static char buf[BUFLEN];
@@ -293,16 +386,35 @@ make_name_sane (const char *pName)
     char *to;
     short bDiffers = MY_FALSE;
 
+    to = buf;
+
     /* Skip leading '/' */
-    while(*from == '/') {
-        bDiffers = MY_TRUE;
-        from++;
+    if (!addSlash)
+    {
+        while (*from == '/') {
+            bDiffers = MY_TRUE;
+            from++;
+        }
     }
+    else
+    {
+        *to++ = '/';
+        if (*from != '/')
+            bDiffers = MY_TRUE;
+        else
+        {
+            from++;
+            while (*from == '/') {
+                bDiffers = MY_TRUE;
+                from++;
+            }
+        }
+    }
+    /* addSlash or not: from now points to the first non-'/' */
 
     /* Copy the name into buf, doing the other operations */
-    for (to = buf
-        ; '\0' != *from && (to - buf) < BUFLEN
-        ; from++, to++)
+    for (; '\0' != *from && (to - buf) < BUFLEN
+         ; from++, to++)
     {
         if ('/' == *from)
         {
@@ -383,11 +495,9 @@ load_object (const char *lname, int dont_reset, int depth)
     strcpy(name, lname);
     strcpy(fname, lname);
 
-#ifdef NATIVE_MODE
-    if (current_object && current_object->eff_user == 0
+    if (strict_euids && current_object && current_object->eff_user == 0
         && current_object->name)
         error("Can't load objects when no effective user.\n");
-#endif
 
     if (master_ob && master_ob->flags & O_DESTRUCTED) {
         /* The master has been destructed, and it has not been noticed yet.
@@ -520,7 +630,7 @@ load_object (const char *lname, int dont_reset, int depth)
             char * pInherited;
             const char * tmp;
 
-            tmp = make_name_sane(inherit_file);
+            tmp = make_name_sane(inherit_file, MY_FALSE);
             if (!tmp)
             {
                 pInherited = inherit_file;
@@ -534,7 +644,7 @@ load_object (const char *lname, int dont_reset, int depth)
             push_referenced_shared_string(inherit_file);
             inherit_file = NULL;
             if (num_parse_error > 0) {
-                error("Error in loading object\n");
+                error("Error in loading object '%s'\n", name);
             }
             if (strcmp(pInherited, name) == 0) {
                 error("Illegal to inherit self.\n");
@@ -548,13 +658,14 @@ load_object (const char *lname, int dont_reset, int depth)
             inter_sp--;
             if (!ob || ob->flags & O_DESTRUCTED)
             {
-                error("Inheritance failed\n");
+                error("Error in loading object '%s' "
+                      "(inheritance failed)\n", name);
             }
         } /* handling of inherit_file */
     } /* while() - compilation loop */
 
     if (num_parse_error > 0) {
-        error("Error in loading object\n");
+        error("Error in loading object '%s'\n", name);
     }
 
     prog = compiled_prog;
@@ -563,18 +674,15 @@ load_object (const char *lname, int dont_reset, int depth)
 #else
     ob = get_empty_object( prog->num_variables, prog->variable_names
                          , prog_variable_values);
+    /* TODO: The initializers should be stored in the program.
+     * TODO:: See clone_object() for the reason.
+     */
     for (i = prog->num_variables; --i >= 0; )
         free_svalue(&prog_variable_values[i]);
     xfree((char *)prog_variable_values);
 #endif
     if (!ob)
         error("Out of memory\n");
-    /*
-     * Can we approve of this object ?
-     * TODO: Does anybody use this anyway?
-     */
-    if (approved_object || strcmp(prog->name, "std/object.c") == 0)
-        ob->flags |= O_APPROVED;
     ob->name = string_copy(name);        /* Shared string is no good here */
 #ifndef COMPAT_MODE
     name--;  /* Make the leading '/' visible again */
@@ -587,11 +695,9 @@ load_object (const char *lname, int dont_reset, int depth)
     if (obj_list)
         obj_list->prev_all = ob;
     obj_list = ob;
-#ifndef OLD_RESET
     if (!obj_list_end)
         obj_list_end = ob;
     num_listed_objs++;
-#endif
     enter_object_hash(ob);        /* add name to fast object lookup table */
 
     push_give_uid_error_context(ob);
@@ -660,6 +766,9 @@ static char *make_new_name(str)
     int l;
     char buff[12];
 
+    if ('/' == *str)
+        str++;
+
     for (;;) {
         (void)sprintf(buff, "#%ld", i);
         l = strlen(str);
@@ -685,11 +794,10 @@ struct object *clone_object(str1)
 {
     struct object *ob, *new_ob;
     struct object *save_command_giver = command_giver;
+    char *name;
 
-#ifdef NATIVE_MODE
-    if (current_object && current_object->eff_user == 0)
+    if (strict_euids && current_object && current_object->eff_user == 0)
         error("Illegal to call clone_object() with effective user 0\n");
-#endif
     ob = get_object(str1);
 
     /*
@@ -697,43 +805,82 @@ struct object *clone_object(str1)
      */
     if (ob == 0)
         return 0;
+
+    /* If ob is a clone, try finding the blueprint via the load_name */
+    if (ob->flags & O_CLONE)
+    {
+        struct object *bp;
+
+        bp = get_object(ob->load_name);
+        if (bp)
+            ob = bp;
+    }
+
     if (ob->super)
-        error("Cloning a bad object !\n");
-    if (ob->flags & O_CLONE) {
+        error("Cloning a bad object: '%s' is contained in '%s'.\n"
+             , ob->name, ob->super->name);
+
+    name = ob->name;
+
+    /* If the ob is a clone, we have to test if its name is something
+     * illegal like 'foobar#34'. In that case, we have to use the
+     * load_name as template.
+     */
+    if (ob->flags & O_CLONE)
+    {
         char c;
         char *p;
         mp_int name_length, i;
 
-        name_length = strlen(ob->name);
+        name_length = strlen(name);
         i = name_length;
         p = ob->name+name_length;
         while (--i > 0) {
             /* isdigit would need to check isascii first... */
-            if ( (c = *--p) < '0' || c > '9' ) {
-                if (c == '#' && name_length - i > 1) {
-                    /* would need to use program name to allow it */
-                    error("Cloning a bad object !\n");
+            if ( (c = *--p) < '0' || c > '9' )
+            {
+                if (c == '#' && name_length - i > 1)
+                {
+                    /* Well, unusable name format - use the load_name */
+                    name = ob->load_name;
                 }
                 break;
             }
         }
     }
 
+    if ((ob->flags & O_SWAPPED) && load_ob_from_swap(ob) < 0)
+        error("Out of memory\n");
+    /* TODO: Good question: if both blueprint and clone are swapped out,
+     * TODO:: and the clone is swapped back in - what happens to the entries
+     * TODO:: of the blueprint? Answer: cloned programs are never swapped?
+     */
+
+    if (ob->prog->flags & P_NO_CLONE)
+        error("Cloning a bad object: '%s' sets '#pragma no_clone'.\n"
+             , ob->name);
+
+    ob->time_of_ref = current_time;
+
     /* We do not want the heart beat to be running for unused copied objects */
 
-    if (ob->flags & O_HEART_BEAT)
-        (void)set_heart_beat(ob, 0);
+    if (!(ob->flags & O_CLONE) && ob->flags & O_HEART_BEAT)
+        set_heart_beat(ob, 0);
     new_ob = get_empty_object(ob->prog->num_variables
 #ifndef INITIALIZATION_BY___INIT
                              , ob->prog->variable_names
                              , ob->variables
 #endif
     );
+    /* TODO: Yeech: the new objects variables are initialised from the
+     * TODO:: template object variables. These values should be stored
+     * TODO:: in the program.
+     */
     if (!new_ob)
         error("Out of memory\n");
-    new_ob->name = make_new_name(ob->name);
-    increment_string_ref(new_ob->load_name = ob->load_name);
-    new_ob->flags |= O_CLONE | (ob->flags & ( O_APPROVED | O_WILL_CLEAN_UP )) ;
+    new_ob->name = make_new_name(name);
+    new_ob->load_name = ref_string(ob->load_name);
+    new_ob->flags |= O_CLONE | (ob->flags & O_WILL_CLEAN_UP ) ;
     new_ob->prog = ob->prog;
     reference_prog (ob->prog, "clone_object");
     new_ob->ticks = new_ob->gigaticks = 0;
@@ -746,11 +893,9 @@ struct object *clone_object(str1)
     if (obj_list)
         obj_list->prev_all = new_ob;
     obj_list = new_ob;
-#ifndef OLD_RESET
     if (!obj_list_end)
         obj_list_end = new_ob;
     num_listed_objs++;
-#endif
     enter_object_hash(new_ob);        /* Add name to fast object lookup table */
     push_give_uid_error_context(new_ob);
     push_object(ob);
@@ -843,38 +988,6 @@ struct object *environment(arg)
     return ob->super;
 }
 
-/*
- * Execute a command for an object. Copy the command into a
- * new buffer, because 'parse_command()' can modify the command.
- * If the object is not current object, static functions will not
- * be executed. This will prevent forcing players to do illegal things.
- *
- * Return cost of the command executed if success (> 0).
- * When failure, return 0.
- */
-int command_for_object(str, ob)
-    char *str;
-    struct object *ob;
-{
-    char buff[COMMAND_FOR_OBJECT_BUFSIZE];
-    int save_eval_cost = eval_cost - 1000;
-    struct interactive *ip;
-
-    if (strlen(str) > sizeof(buff) - 1)
-        error("Too long command.\n");
-    if (ob == 0)
-        ob = current_object;
-    if (current_object->flags & O_DESTRUCTED || ob->flags & O_DESTRUCTED)
-        return 0;
-    strncpy(buff, str, sizeof buff);
-    buff[sizeof buff - 1] = '\0';
-    if (NULL != (ip = O_GET_INTERACTIVE(ob)) && ip->sent.type == SENT_INTERACTIVE)
-        trace_level |= ip->trace_level;
-    if (parse_command(buff, ob))
-        return eval_cost - save_eval_cost;
-    else
-        return 0;
-}
 
 /*
  * To find if an object is present, we have to look in two inventory
@@ -884,6 +997,8 @@ int command_for_object(str, ob)
  * Also test the environment.
  * If the second argument 'ob' is non zero, only search in the
  * inventory of 'ob'. The argument 'ob' will be mandatory, later.
+ * TODO: Make this a nice efuns.c-Efun and also implement
+ * TODO:: deep_present() and present_clone() (see bugs/f-something)
  */
 
 static struct object *object_present2 PROT((char *, struct object *));
@@ -1043,9 +1158,7 @@ void emergency_destruct(ob)
     if (ob->flags & O_DESTRUCTED)
         return;
 
-#ifndef OLD_RESET
     ob->time_reset = 0;
-#endif
 
     if (ob->flags & O_SWAPPED) {
         int save_privilege;
@@ -1127,7 +1240,9 @@ void emergency_destruct(ob)
     if (ob->super) {
         if (ob->super->sent)
             remove_sent(ob, ob->super);
-        add_light(ob->super, - ob->total_light);
+#       ifdef F_SET_LIGHT
+            add_light(ob->super, - ob->total_light);
+#       endif
         for (pp = &ob->super->contains; *pp;) {
             if ((*pp)->sent)
                 remove_sent(ob, *pp);
@@ -1149,16 +1264,14 @@ void emergency_destruct(ob)
         ob->next_all->prev_all = ob->prev_all;
     if (ob == obj_list)
         obj_list = ob->next_all;
-#ifndef OLD_RESET
     if (ob == obj_list_end)
         obj_list_end = ob->prev_all;
     num_listed_objs--;
-#endif
     ob->super = 0;
     ob->next_inv = 0;
     ob->contains = 0;
     ob->flags &= ~O_ENABLE_COMMANDS;
-    ob->flags |= O_DESTRUCTED;
+    ob->flags |= O_DESTRUCTED;  /* should come last! */
     new_destructed++;
     if (command_giver == ob) command_giver = 0;
 
@@ -1201,8 +1314,7 @@ void destruct2(ob)
         int i;
         for (i=0; i<ob->prog->num_variables; i++) {
             free_svalue(&ob->variables[i]);
-            ob->variables[i].type = T_NUMBER;
-            ob->variables[i].u.number = 0;
+            put_number(ob->variables+i, 0);
         }
         xfree((char *)ob->variables);
     }
@@ -1218,7 +1330,7 @@ void destruct2(ob)
             next = sent->next;
             free_sentence(sent);
         } while ( NULL != (sent = next) );
-        ob->sent = 0;
+        ob->sent = NULL;
     }
 
     free_object(ob, "destruct_object");
@@ -1308,9 +1420,7 @@ void say(v, avoid)
         }
         origin = command_giver;
         if (avoid->item[0].type == T_NUMBER) {
-            avoid->item[0].type = T_OBJECT;
-            avoid->item[0].u.ob = command_giver;
-            add_ref(command_giver, "ass to var");
+            put_ref_object(avoid->item, command_giver, "say");
         }
     } else
         origin = current_object;
@@ -1526,38 +1636,6 @@ struct object *first_inventory(arg)
     return ob->contains;
 }
 
-/*
- * This will enable an object to use commands normally only
- * accessible by interactive players.
- * Also check if the player is a wizard. Wizards must not affect the
- * value of the wizlist ranking.
- */
-
-void enable_commands(num)
-    int num;
-{
-    if (current_object->flags & O_DESTRUCTED)
-        return;
-    if (d_flag > 1) {
-        debug_message("Enable commands %s (ref %ld)\n",
-            current_object->name, current_object->ref);
-    }
-    if (num) {
-        struct interactive *ip;
-
-        current_object->flags |= O_ENABLE_COMMANDS;
-        command_giver = current_object;
-        if (NULL != (ip = O_GET_INTERACTIVE(command_giver)) &&
-            ip->sent.type == SENT_INTERACTIVE)
-        {
-            trace_level |= ip->trace_level;
-        }
-    } else {
-        current_object->flags &= ~O_ENABLE_COMMANDS;
-        command_giver = 0;
-    }
-}
-
 #define MAX_LINES 50
 
 /*
@@ -1723,7 +1801,7 @@ static void get_dir_error_handler(arg)
     ecp = (struct get_dir_error_context *)arg;
     xclosedir(ecp->dirp);
     if (ecp->v)
-        free_vector(ecp->v);
+        free_array(ecp->v);
 }
 
 /*
@@ -1740,6 +1818,8 @@ static void get_dir_error_handler(arg)
  *
  *   - file_list("/");, file_list("."); and file_list("/."); return contents
  *     of directory "/"
+ *
+ * The mask flag values have to match mudlib/sys/files.h.
  */
 struct vector *get_dir(path, mask)
     char *path;
@@ -1760,7 +1840,7 @@ struct vector *get_dir(path, mask)
     if (!path)
         return 0;
 
-    path = check_valid_path(path, current_object, "get_dir", 0);
+    path = check_valid_path(path, current_object, "get_dir", MY_FALSE);
 
     if (path == 0)
         return 0;
@@ -1808,19 +1888,15 @@ struct vector *get_dir(path, mask)
         v = allocate_array(nqueries);
         stmp = v->item;
         if (mask&1) {
-            stmp->type = T_STRING;
-            stmp->x.string_type = STRING_MALLOC;
-            stmp->u.string = string_copy(p);
+            put_malloced_string(stmp, string_copy(p));
             stmp++;
         }
         if (mask&2) {
-            stmp->type = T_NUMBER;
-            stmp->u.number =  (S_IFDIR & st.st_mode) ? -2 : st.st_size;
+            put_number(stmp, (S_IFDIR & st.st_mode) ? -2 : st.st_size);
             stmp++;
         }
         if (mask&4) {
-            stmp->type = T_NUMBER;
-            stmp->u.number = st.st_mtime;
+            put_number(stmp, st.st_mtime);
             stmp++;
         }
         return v;
@@ -1857,7 +1933,7 @@ struct vector *get_dir(path, mask)
                 continue;
         }
         count += nqueries;
-        if ( count >= MAX_ARRAY_SIZE)
+        if (max_array_size && count >= max_array_size)
             break;
     }
     if (nqueries)
@@ -1894,8 +1970,8 @@ struct vector *get_dir(path, mask)
             count++;
             tmp = allocate_array(nqueries);
             new = add_array(v, tmp);
-            free_vector(v);
-            free_vector(tmp);
+            free_array(v);
+            free_array(tmp);
             ec.v = v = new;
             w = v;
         }
@@ -1908,19 +1984,15 @@ struct vector *get_dir(path, mask)
             if (namelen)
                 memcpy(name, de->d_name, namelen);
             name[namelen] = '\0';
-            w->item[j].type = T_STRING;
-            w->item[j].x.string_type = STRING_MALLOC;
-            w->item[j].u.string = name;
+            put_malloced_string(w->item+j, name);
             j++;
         }
         if (mask & 2) {
-            w->item[j].type = T_NUMBER;
-            w->item[j].u.number = de->size;
+            put_number(w->item + j, de->size);
             j++;
         }
         if (mask & 4) {
-            w->item[j].type = T_NUMBER;
-            w->item[j].u.number = de->time;
+            put_number(w->item + j, de->time);
             j++;
         }
         i++;
@@ -1942,7 +2014,7 @@ int tail(path)
     struct stat st;
     int offset;
 
-    path = check_valid_path(path, current_object, "tail", 0);
+    path = check_valid_path(path, current_object, "tail", MY_FALSE);
 
     if (path == 0)
         return 0;
@@ -1982,7 +2054,7 @@ int print_file(path, start, len)
     if (len < 0)
         return 0;
 
-    path = check_valid_path(path, current_object, "print_file", 0);
+    path = check_valid_path(path, current_object, "print_file", MY_FALSE);
 
     if (path == 0)
         return 0;
@@ -2016,7 +2088,7 @@ int print_file(path, start, len)
 int remove_file(path)
     char *path;
 {
-    path = check_valid_path(path, current_object, "remove_file", 1);
+    path = check_valid_path(path, current_object, "remove_file", MY_TRUE);
 
     if (path == 0)
         return 0;
@@ -2085,19 +2157,24 @@ void do_write(arg)
  */
 
 struct object *
-lookfor_object(char * str, /* TODO: BOOL */ int bLoad)
+lookfor_object(char * str, Bool bLoad)
 
 /* Look for a named object <str>, optionally loading it (<bLoad> is true).
  * Return a pointer to the object structure, or NULL.
  *
  * If <bLoad> is true, the function tries to load the object if it is
- * not already loaded, or alternatively makes sure it is swapped in.
- * If <bLoad> is false, the function just checks if the object is loaded,
- * but makes to attempt to swap it in (which may cause out-of-memory
- * conditions) or to load it.
+ * not already loaded.
+ * If <bLoad> is false, the function just checks if the object is loaded.
+ *
+ * The object is not swapped in.
  *
  * For easier usage, the macros find_object() and get_object() expand
  * to the no-load- resp. load-call of this function.
+ *
+ * TODO: It would be nice if all loading uses of lookfor would go through
+ * TODO:: the efun load_object() or a driver hook so that the mudlib
+ * TODO:: has a chance to interfere with it. Dito for clone_object(), so
+ * TODO:: that the euid-check can be done there?
  */
 {
     struct object *ob;
@@ -2107,7 +2184,7 @@ lookfor_object(char * str, /* TODO: BOOL */ int bLoad)
      * TODO:: and move the make_name_sane() into those where it can
      * TODO:: be dirty.
      */
-    pName = make_name_sane(str);
+    pName = make_name_sane(str, MY_FALSE);
     if (!pName)
         pName = str;
 
@@ -2119,11 +2196,6 @@ lookfor_object(char * str, /* TODO: BOOL */ int bLoad)
         ob = load_object(pName, 0, 60);
     if (!ob || ob->flags & O_DESTRUCTED)
         return NULL;
-    if (ob->flags & O_SWAPPED)
-    {
-        if (load_ob_from_swap(ob) < 0)
-            error("Out of memory\n");
-    }
     return ob;
 }
 
@@ -2151,6 +2223,8 @@ void apply_command(com)
 
 
 void move_object()
+/* Expects inter_sp[-1] being item and inter_sp[0] being dest
+ */
 {
     struct lambda *l;
     struct object *save_command = command_giver;
@@ -2195,7 +2269,9 @@ struct svalue *f_set_environment(sp)
             if (ob == item)
                 error("Can't move object inside itself.\n");
 
-        add_light(dest, item->total_light);
+#       ifdef F_SET_LIGHT
+            add_light(dest, item->total_light);
+#       endif
         dest->flags &= ~O_RESET_STATE;
     }
     item->flags &= ~O_RESET_STATE;
@@ -2207,7 +2283,9 @@ struct svalue *f_set_environment(sp)
         }
         if (item->super->sent)
             remove_sent(item, item->super);
-        add_light(item->super, - item->total_light);
+#       ifdef F_SET_LIGHT
+            add_light(item->super, - item->total_light);
+#       endif
         for (pp = &item->super->contains; *pp;) {
             if (*pp != item) {
                 if ((*pp)->sent)
@@ -2236,34 +2314,7 @@ struct svalue *f_set_environment(sp)
     return sp - 1;
 }
 
-struct svalue *f_set_this_player(sp)
-    struct svalue *sp;
-{
-    struct object *ob;
-    struct interactive *ip;
-
-    /* Special case, can happen if a function tries to restore
-     * an old this_player() setting which happens to be 0.
-     */
-    if (sp->type == T_NUMBER && !sp->u.number)
-    {
-        command_giver = NULL;
-        return sp - 1;
-    }
-
-    if (sp->type != T_OBJECT)
-        bad_xefun_arg(1, sp);
-    ob = sp->u.ob;
-    command_giver = ob;
-    if (NULL != (ip = O_GET_INTERACTIVE(ob)) &&
-        ip->sent.type == SENT_INTERACTIVE)
-    {
-        trace_level |= ip->trace_level;
-    }
-    free_object(ob, "set_this_player");
-    return sp - 1;
-}
-
+#ifdef F_SET_LIGHT
 /*
  * Every object as a count of number of light sources it contains.
  * Update this.
@@ -2279,6 +2330,7 @@ void add_light(p, n)
         p->total_light += n;
     } while ( NULL != (p = p->super) );
 }
+#endif
 
 static struct sentence *sent_free = 0;
 static long tot_alloc_sentence;
@@ -2295,7 +2347,8 @@ struct sentence *alloc_sentence() {
         p = sent_free;
         sent_free = sent_free->next;
     }
-    p->verb = 0;
+    p->verb = NULL;
+    p->function = NULL;
     return p;
 }
 
@@ -2308,10 +2361,11 @@ void free_all_sent() {
     }
 }
 
-static void free_sentence(p)
+void free_sentence(p)
     struct sentence *p;
 {
-    free_string(p->function);
+    if (p->function)
+        free_string(p->function);
     if (p->verb)
         free_string(p->verb);
     p->next = sent_free;
@@ -2325,505 +2379,13 @@ void free_shadow_sent(p)
     sent_free = (struct sentence *)p;
 }
 
-static struct marked_command_giver {
-
-    struct object *object;
-    struct error_recovery_info *erp;
-    struct sentence *marker;           /* when at the end of the sentence
-                                        * chain, the marker is referenced here.
-                                        */
-    struct marked_command_giver *next;
-} *last_marked = 0;
-
-static void pop_marked_command_giver()
+Bool status_parse(strbuf_t * sbuf, char * buff)
 {
-    struct marked_command_giver *tmp;
-
-    tmp = last_marked;
-    last_marked = tmp->next;
-    xfree( (char *)tmp);
-}
-
-/*
- * Find the sentence for a command from the player.
- * Return success status.
- */
-int player_parser(buff)
-    char *buff;
-{
-    struct sentence *s;
-    char *p;
-    int length;
-    struct object *save_current_object = current_object;
-    struct object *save_command_giver  = command_giver;
-    char *shared_verb;
-    struct sentence *mark_sentence;
-
-#ifdef DEBUG
-    if (d_flag > 1)
-        debug_message("cmd [%s]: %s\n", command_giver->name, buff);
-#endif
-    /* strip trailing spaces. */
-    for (p = buff + strlen(buff) - 1; p >= buff; p--) {
-        if (*p != ' ')
-            break;
-        *p = '\0';
-    }
-    if (buff[0] == '\0')
-        return 0;
-    clear_notify();
-    if (special_parse(buff))
-        return 1;
-    mark_sentence = alloc_sentence();
-    length = (int)(p_int)p;
-    p = strchr(buff, ' ');
-    if (p == 0) {
-        length += 1 - (int)(p_int)buff;
-        shared_verb = make_shared_string(buff);
-    } else {
-        *p = '\0';
-        shared_verb = make_shared_string(buff);
-        *p = ' ';
-        length = p - buff;
-    }
+    if (sbuf) strbuf_zero(sbuf);
+    if (!buff || *buff == 0 || strcmp(buff, "tables") == 0)
     {
-        /* mark the command_giver as having a sentence of type SENT_MARKER
-         * in the current error recovery context.
-         */
-
-        struct marked_command_giver *new_marked;
-
-        new_marked = (struct marked_command_giver *)xalloc(sizeof *new_marked);
-        new_marked->object = command_giver;
-        new_marked->erp = error_recovery_pointer;
-        new_marked->marker = 0;
-        new_marked->next = last_marked;
-        last_marked = new_marked;
-    }
-    for (s = command_giver->sent; s; s = s->next) {
-        struct svalue *ret;
-        struct object *command_object;
-        unsigned char type;
-        struct sentence *next; /* used only as flag */
-
-        if ((type = s->type) == SENT_PLAIN) {
-            if (s->verb != shared_verb)
-                continue;
-        } else if (type == SENT_SHORT_VERB) {
-            int len;
-            len = strlen(s->verb);
-            if (strncmp(s->verb, buff, len) != 0)
-                continue;
-        } else if (type == SENT_NO_SPACE) {
-            int len;
-            len = strlen(s->verb);
-            if(strncmp(buff, s->verb,len) != 0)
-                continue;
-        } else if (type == SENT_NO_VERB) {
-            /* Give an error only the first time we scan this sentence */
-            if (s->short_verb)
-                continue;
-            s->short_verb++;
-            error("An 'action' had an undefined verb.\n");
-        } else {
-            /* SENT_MARKER ... due to recursion. Or another SENT_IS_INTERNAL */
-            continue;
-        }
-        /*
-         * Now we have found a special sentence !
-         */
-#ifdef DEBUG
-        if (d_flag > 1)
-            debug_message("Local command %s on %s\n", s->function, s->ob->name);
-#endif
-        last_verb = shared_verb;
-        /*
-         * If the function is static and not defined by current object,
-         * then it will fail. If this is called directly from player input,
-         * then we set current_object so that static functions are allowed.
-         * current_object is reset just after the call to apply().
-         */
-        if (current_object == 0)
-            current_object = s->ob;
-        /*
-         * Remember the object, to update score.
-         */
-        command_object = s->ob;
-
-        /* if we get an error, we want the verb to be freed */
-        mark_sentence->function = shared_verb;
-        mark_sentence->verb = 0;
-        if ( !(next = s->next) ) {
-            mark_sentence->next = 0;
-            last_marked->marker = mark_sentence;
-            /* Since new commands are always added at the start, the end
-             * will remain the end. So there's no need to clear
-             * last_marked->marker again.
-             */
-        } else {
-            /* Place the marker, so we can continue the search, no matter what
-             * the object does. But beware, if the command_giver is destructed,
-             * the marker will be freed.
-             * Take care not to alter marker addresses.
-             */
-            if (next->type == SENT_MARKER) {
-                struct sentence *insert;
-
-                do {
-                    insert = next;
-                    next = next->next;
-                    if (!next) {
-                        last_marked->marker = mark_sentence;
-                        break;
-                    }
-                } while (next->type == SENT_MARKER);
-                if (next)
-                    insert->next = mark_sentence;
-            } else {
-                s->next = mark_sentence;
-            }
-            mark_sentence->ob = (struct object *)error_recovery_pointer;
-            mark_sentence->next = next;
-            mark_sentence->type = SENT_MARKER;
-        }
-
-        if(s->type == SENT_NO_SPACE) {
-            push_volatile_string(&buff[strlen(s->verb)]);
-            ret = sapply(s->function, s->ob, 1);
-        } else if (buff[length] == ' ') {
-            push_volatile_string(&buff[length+1]);
-            ret = sapply(s->function, s->ob, 1);
-        } else {
-            ret = sapply(s->function, s->ob, 0);
-        }
-        if (ret == 0) {
-            error("function %s not found.\n", s->function);
-        }
-        current_object = save_current_object;
-        command_giver  = save_command_giver;
-        /* s might be a dangling pointer right now. */
-        if (command_giver->flags & O_DESTRUCTED) {
-            /* the marker has been freed by destruct_object unless... */
-            if (!next) {
-                free_sentence(mark_sentence);
-            }
-            pop_marked_command_giver();
-            command_giver = 0;
-            last_verb = 0;
-            return 1;
-        }
-
-        /* remove the marker from the sentence chain, and make s->next valid */
-        if ( NULL != (s = mark_sentence->next) && s->type != SENT_MARKER) {
-            *mark_sentence = *s;
-            s->next = mark_sentence;
-            mark_sentence = s;
-        } else {
-            if (next) {
-                /* !s : there have been trailing sentences before, but all
-                 * have been removed.
-                 * s->type == SENT_MARKER : There was a delimiter sentence
-                 * between the two markers, which has been removed.
-                 */
-                struct sentence **pp;
-
-                for (pp = &command_giver->sent; (s = *pp) != mark_sentence; )
-                    pp = &s->next;
-                *pp = s->next;
-            }
-            s = mark_sentence;
-        }
-        /* If we get fail from the call, it was wrong second argument. */
-        if (ret->type == T_NUMBER && ret->u.number == 0) {
-            continue;
-        }
-        if (O_GET_INTERACTIVE(command_giver) &&
-            O_GET_INTERACTIVE(command_giver)->sent.type == SENT_INTERACTIVE &&
-            !(command_giver->flags & O_IS_WIZARD))
-        {
-            command_object->user->score++;
-        }
-        break;
-    }
-    last_verb = 0;
-    /* free marker and verb */
-    mark_sentence->verb = 0;
-    mark_sentence->function = shared_verb;
-    free_sentence(mark_sentence);
-    pop_marked_command_giver();
-    if (s == 0) {
-        notify_no_command(buff);
-        return 0;
-    }
-    return 1;
-}
-
-/*
- * Associate a command with function in this object.
- * The optional second argument is the command name. If the command name
- * is not given here, it should be given with add_verb().
- *
- * The optinal third argument is a flag that will state that the verb should
- * only match against leading characters.
- *
- * The object must be near the command giver, so that we ensure that the
- * sentence is removed when the command giver leaves.
- *
- * If the call is from a shadow, make it look like it is really from
- * the shadowed object.
- */
-int add_action(func, cmd, flag)
-    struct svalue *func, *cmd;
-    int flag;
-{
-    struct sentence *p;
-    struct object *ob;
-    char *str;
-    short string_type;
-
-    if (current_object->flags & O_DESTRUCTED)
-        return -1;
-    ob = current_object;
-    if (ob->flags & O_SHADOW && O_GET_SHADOW(ob)->shadowing) {
-        str = findstring(func->u.string);
-        do {
-            ob = O_GET_SHADOW(ob)->shadowing;
-            if (find_function(str, ob->prog) >= 0) {
-                if ( !privilege_violation4(
-                    "shadow_add_action", ob, str, 0, inter_sp)
-                )
-                    return -1;
-            }
-        } while(O_GET_SHADOW(ob)->shadowing);
-    }
-    if (command_giver == 0 || (command_giver->flags & O_DESTRUCTED))
-        return -1;
-    if (ob != command_giver && ob->super != command_giver &&
-        ob->super != command_giver->super && ob != command_giver->super)
-      error("add_action from object that was not present.\n");
-#ifdef DEBUG
-    if (d_flag > 1)
-        debug_message("--Add action %s\n", func->u.string);
-#endif
-    if (*func->u.string == ':')
-        error("Illegal function name: %s\n", func->u.string);
-#ifdef COMPAT_MODE
-    str = func->u.string;
-    if (*str++=='e' && *str++=='x' && *str++=='i' && *str++=='t' && !*str)
-        error("Illegal to define a command to the exit() function.\n");
-#endif
-    p = alloc_sentence();
-    str = func->u.string;
-    if ((string_type = func->x.string_type) != STRING_SHARED) {
-        char *str2;
-        str = make_shared_string(str2 = str);
-        if (string_type == STRING_MALLOC) {
-            xfree(str2);
-        }
-    }
-    p->function = str;
-    p->ob = ob;
-    if (cmd) {
-        str = cmd->u.string;
-        if ((string_type = cmd->x.string_type) != STRING_SHARED) {
-            char *str2;
-            str = make_shared_string(str2 = str);
-            if (string_type == STRING_MALLOC) {
-                xfree(str2);
-            }
-        }
-        p->verb = str;
-        p->type = SENT_PLAIN;
-        if (flag) {
-            p->type = SENT_SHORT_VERB;
-            p->short_verb = flag;
-            if (flag == 2)
-                p->type = SENT_NO_SPACE;
-        }
-    } else {
-        p->short_verb = 0;
-        p->verb = 0;
-        p->type = SENT_NO_VERB;
-    }
-    if (command_giver->flags & O_SHADOW) {
-        struct sentence *previous = command_giver->sent;
-
-        p->next = previous->next;
-        previous->next = p;
-    } else {
-        p->next = command_giver->sent;
-        command_giver->sent = p;
-    }
-    return 0;
-}
-
-static struct svalue *add_verb(sp, type)
-    struct svalue *sp;
-    int type;
-{
-    if (sp->type != T_STRING)
-        bad_xefun_arg(1, sp);
-    if (command_giver  && !(command_giver->flags & O_DESTRUCTED)) {
-        struct sentence *sent;
-
-        sent = command_giver->sent;
-        if (command_giver->flags & O_SHADOW)
-            sent = sent->next;
-        if (!sent)
-            error("No add_action().\n");
-        if (sent->verb != 0)
-            error("Tried to set verb again.\n");
-        sent->verb = make_shared_string(sp->u.string);
-        sent->type = type;
-        if (d_flag > 1)
-            debug_message("--Adding verb %s to action %s\n", sp->u.string,
-                command_giver->sent->function);
-    }
-    free_svalue(sp--);
-    return sp;
-}
-
-struct svalue *f_add_verb(sp)
-    struct svalue *sp;
-{
-    return add_verb(sp, SENT_PLAIN);
-}
-
-struct svalue *f_add_xverb(sp)
-    struct svalue *sp;
-{
-    return add_verb(sp, SENT_NO_SPACE);
-}
-
-struct svalue *f_remove_action(sp)
-    struct svalue *sp;
-{
-    struct object *ob;
-    char *verb;
-    struct sentence **sentp, *s;
-
-    if (sp[-1].type != T_STRING)
-        bad_xefun_arg(1, sp);
-    if (sp->type != T_OBJECT)
-        bad_xefun_arg(2, sp);
-    ob = sp->u.ob;
-    verb = sp[-1].u.string;
-    if (sp[-1].x.string_type != STRING_SHARED)
-        if ( !(verb = findstring(verb)) )
-            verb = (char *)f_remove_action; /* won't be found */
-    sentp = &ob->sent;
-    ob = current_object;
-    while ( NULL != (s = *sentp) ) {
-        if (s->ob == ob && s->verb == verb) {
-            *sentp = s->next;
-            free_sentence(s);
-            break;
-        }
-        sentp = &s->next;
-    }
-    free_object_svalue(sp);
-    sp--;
-    free_string_svalue(sp);
-    sp->type = T_NUMBER;
-    sp->u.number = s != 0;
-    return sp;
-}
-
-/*
- * Remove all commands (sentences) defined by object 'ob' in object
- * 'player'
- */
-static void remove_sent(ob, player)
-    struct object *ob, *player;
-{
-    struct sentence **s;
-
-    for (s= &player->sent; *s;) {
-        struct sentence *tmp;
-        if ((*s)->ob == ob) {
-#ifdef DEBUG
-            if (d_flag > 1)
-                debug_message("--Unlinking sentence %s\n", (*s)->function);
-#endif
-            tmp = *s;
-            *s = tmp->next;
-            free_sentence(tmp);
-        } else
-            s = &((*s)->next);
-    }
-}
-
-/*
- * Remove all commands (sentences) defined by objects that have the same
- * environment as object 'player' in object 'player'
- */
-static void remove_environment_sent(player)
-    struct object *player;
-{
-    struct sentence **p, *s;
-    struct object *super, *ob;
-
-    super = player->super;
-    p= &player->sent;
-    if ( NULL != (s = *p) ) for(;;) {
-        ob = s->ob;
-        if (!SENT_IS_INTERNAL(s->type) &&
-            ((ob->super == super && ob != player) || ob == super ) )
-        {
-            do {
-                struct sentence *tmp;
-
-#ifdef DEBUG
-                if (d_flag > 1)
-                    debug_message("--Unlinking sentence %s\n", s->function);
-#endif
-                tmp = s;
-                s = s->next;
-                free_sentence(tmp);
-                if (!s) {
-                    *p = 0;
-                    return;
-                }
-            } while (s->ob == ob);
-            *p = s;
-        } else {
-            do {
-                p = &s->next;
-                if (!(s = *p)) return;
-            } while (s->ob == ob);
-        }
-    }
-}
-
-static void no_op(p, size)
-    char *p UNUSED;
-    long size UNUSED;
-{
-#ifdef __MWERKS__
-#    pragma unused(p,size)
-#endif
-}
-
-static void show_memory_block(p, size)
-    char *p;
-    long size;
-{
-    add_message(
-      "adress: 0x%lx size: 0x%lx '%.*s'\n", (long)p, size, (int)size, p
-    );
-}
-
-int status_parse(buff)
-    char *buff;
-{
-    if (*buff == 0 || strcmp(buff, "tables") == 0) {
-        int tot, res;
-        int /* TODO: BOOL */ verbose = MY_FALSE;
-#if defined( COMM_STAT ) || defined( APPLY_CACHE_STAT )
-        /* passing floats/doubles to add_message is not portable */
-
-        char print_buff[90];
-#endif
+        size_t tot, res;
+        Bool verbose = MY_FALSE;
 
         if (strcmp(buff, "tables") == 0)
             verbose = MY_TRUE;
@@ -2834,53 +2396,60 @@ int status_parse(buff)
             res += reserved_master_size;
         if (reserved_system_area)
             res += reserved_system_size;
-        if (!verbose) {
-            add_message("Sentences:\t\t\t%8ld %8ld\n", tot_alloc_sentence,
-                        tot_alloc_sentence * sizeof (struct sentence));
-            add_message("Objects:\t\t\t%8d %8d (%ld swapped, %ld Kbytes)\n",
-                        tot_alloc_object, tot_alloc_object_size,
-                        num_vb_swapped, total_vb_bytes_swapped / 1024);
-            add_message("Arrays:\t\t\t\t%8ld %8ld\n", (long)num_arrays,
-                        total_array_size() );
-            add_message("Mappings:\t\t\t%8ld %8ld\n", num_mappings,
-                        total_mapping_size() );
-            add_message("Prog blocks:\t\t\t%8ld %8ld (%ld swapped, %ld Kbytes)\n",
-                        total_num_prog_blocks, total_prog_block_size,
-                        num_swapped - num_unswapped,
-                        (total_bytes_swapped - total_bytes_unswapped) / 1024);
-            add_message("Memory reserved:\t\t\t %8d\n", res);
+        if (!verbose)
+        {
+            strbuf_addf(sbuf, "Sentences:\t\t\t%8ld %8ld\n"
+                            , tot_alloc_sentence
+                            , tot_alloc_sentence * sizeof (struct sentence));
+            strbuf_addf(sbuf, "Objects:\t\t\t%8d %8d (%ld swapped, %ld Kbytes)\n"
+                            , tot_alloc_object, tot_alloc_object_size
+                            , num_vb_swapped, total_vb_bytes_swapped / 1024);
+            strbuf_addf(sbuf, "Arrays:\t\t\t\t%8ld %8ld\n"
+                            , (long)num_arrays, total_array_size() );
+            strbuf_addf(sbuf, "Mappings:\t\t\t%8ld %8ld\n"
+                             , num_mappings, total_mapping_size() );
+            strbuf_addf(sbuf, "Prog blocks:\t\t\t%8ld %8ld (%ld swapped, %ld Kbytes)\n"
+                            , total_num_prog_blocks + num_swapped - num_unswapped
+                            , total_prog_block_size + total_bytes_swapped
+                                                    - total_bytes_unswapped
+                            , num_swapped - num_unswapped
+                            , (total_bytes_swapped - total_bytes_unswapped) / 1024);
+            strbuf_addf(sbuf, "Memory reserved:\t\t\t %8d\n", res);
         }
         if (verbose) {
 #ifdef COMM_STAT
-            sprintf(print_buff,
-              "Calls to add_message: %d   Packets: %d   Average packet size: %.2f\n\n",
-              add_message_calls,
-              inet_packets,
-              inet_packets ? (float)inet_volume/(float)inet_packets : 0.0
+            strbuf_addf(sbuf
+                       , "Calls to add_message: %d   Packets: %d   "
+                         "Average packet size: %.2f\n\n"
+                       , add_message_calls
+                       , inet_packets
+                       , inet_packets ? (float)inet_volume/(float)inet_packets : 0.0
             );
-            add_message(print_buff);
 #endif
 #ifdef APPLY_CACHE_STAT
-            sprintf(print_buff,
-              "Calls to apply_low: %d Cache hits: %d (%.2f%%)\n\n",
-              apply_cache_hit+apply_cache_miss, apply_cache_hit,
-              100.*(float)apply_cache_hit/
-                (float)(apply_cache_hit+apply_cache_miss) );
-            add_message("%s", print_buff);
+            strbuf_addf(sbuf
+                       , "Calls to apply_low: %ld    "
+                         "Cache hits: %ld (%.2f%%)\n\n"
+                       , (long)(apply_cache_hit+apply_cache_miss)
+                       , (long)apply_cache_hit
+                       , 100.*(float)apply_cache_hit/
+                         (float)(apply_cache_hit+apply_cache_miss) );
 #endif
         }
         tot =  tot_alloc_sentence * sizeof (struct sentence);
         tot += total_prog_block_size;
         tot += total_array_size();
         tot += tot_alloc_object_size;
-#ifndef OLD_RESET
         if (verbose)
         {
-            add_message("\nObject status:\n");
-            add_message("--------------\n");
-            add_message("Objects total:\t\t\t %8ld\n", (long)tot_alloc_object);
-            add_message("Objects in list:\t\t %8ld\n", (long)num_listed_objs);
-            add_message("Objects processed in last cycle: %8ld (%5.1f%% - avg. %5.1f%%)\n"
+            strbuf_add(sbuf, "\nObject status:\n");
+            strbuf_add(sbuf, "--------------\n");
+            strbuf_addf(sbuf, "Objects total:\t\t\t %8ld\n"
+                             , (long)tot_alloc_object);
+            strbuf_addf(sbuf, "Objects in list:\t\t %8ld\n"
+                             , (long)num_listed_objs);
+            strbuf_addf(sbuf, "Objects processed in last cycle: "
+                               "%8ld (%5.1f%% - avg. %5.1f%%)\n"
                        , (long)num_last_processed
                        , (float)num_last_processed / (float)num_listed_objs * 100.0
                        , (avg_in_list || avg_last_processed > avg_in_list)
@@ -2888,327 +2457,64 @@ int status_parse(buff)
                          : 100.0 * (float)avg_last_processed / avg_in_list
                        );
         }
-#endif
-        tot += show_otable_status(verbose);
-        tot += heart_beat_status(verbose);
-        tot += add_string_status(verbose);
-        tot += print_call_out_usage(verbose);
+        tot += show_otable_status(sbuf, verbose);
+        tot += heart_beat_status(sbuf, verbose);
+        tot += add_string_status(sbuf, verbose);
+        tot += print_call_out_usage(sbuf, verbose);
         tot += total_mapping_size();
 #ifdef RXCACHE_TABLE
-        tot += rxcache_status(verbose);
+        tot += rxcache_status(sbuf, verbose);
 #endif
         tot += res;
 
         if (!verbose) {
-            add_message("\t\t\t\t\t --------\n");
-            add_message("Total:\t\t\t\t\t %8d\n", tot);
+            strbuf_add(sbuf, "\t\t\t\t\t --------\n");
+            strbuf_addf(sbuf, "Total:\t\t\t\t\t %8d\n", tot);
         }
-        return 1;
+        return MY_TRUE;
     }
+
     if (strcmp(buff, "swap") == 0) {
-        char print_buff[128];
 
         /* maximum seen so far: 10664 var blocks swapped,    5246112 bytes */
-        add_message("\
-%6ld prog blocks swapped,%10ld bytes\n\
-%6ld prog blocks unswapped,%8ld bytes\n\
-%6ld var blocks swapped,%11ld bytes\n\
-%6ld free blocks in swap,%10ld bytes\n\
-Swapfile size:%23ld bytes\n",
-          num_swapped - num_unswapped,
-          total_bytes_swapped - total_bytes_unswapped,
-          num_unswapped, total_bytes_unswapped,
-          num_vb_swapped, total_vb_bytes_swapped,
-          num_swapfree, total_bytes_swapfree,
-          swapfile_size
+        strbuf_addf(sbuf, "%6ld prog blocks swapped,%10ld bytes\n"
+                          "%6ld prog blocks unswapped,%8ld bytes\n"
+                          "%6ld var blocks swapped,%11ld bytes\n"
+                          "%6ld free blocks in swap,%10ld bytes\n"
+                          "Swapfile size:%23ld bytes\n"
+                    , num_swapped - num_unswapped
+                    , total_bytes_swapped - total_bytes_unswapped
+                    , num_unswapped, total_bytes_unswapped
+                    , num_vb_swapped, total_vb_bytes_swapped
+                    , num_swapfree, total_bytes_swapfree
+                    , swapfile_size
         );
-        sprintf(print_buff, "\
-Swap: searches: %5ld average search length: %3.1f\n\
-Free: searches: %5ld average search length: %3.1f\n",
-          swap_num_searches,
-            (double)swap_total_searchlength /
-              ( swap_num_searches ? swap_num_searches : 1 ),
-          swap_free_searches,
-            (double)swap_free_searchlength /
-              ( swap_free_searches ? swap_free_searches : 1 )
+        strbuf_addf(sbuf, "Total reused space:%18ld bytes\n\n"
+                        , total_swap_reused);
+        strbuf_addf(sbuf
+                   , "Swap: searches: %5ld average search length: %3.1f\n"
+                     "Free: searches: %5ld average search length: %3.1f\n"
+                   , swap_num_searches
+                   , (double)swap_total_searchlength /
+                     ( swap_num_searches ? swap_num_searches : 1 )
+                   , swap_free_searches
+                   , (double)swap_free_searchlength /
+                     ( swap_free_searches ? swap_free_searches : 1 )
         );
-        add_message("\
-Total reused space:%18ld bytes\n\
-\n%s",
-          total_swap_reused, print_buff
-        );
-        return 1;
+        return MY_TRUE;
     }
-    return 0;
-}
 
-/*
- * Hard coded commands, that will be available to all players. They can not
- * be redefined, so the command name should be something obscure, not likely
- * to be used in the game.
- */
-
-#ifdef DEBUG
-static char debug_parse_buff[50]; /* Used for debugging */
-#endif
-
-int first_showsmallnewmalloced_call = 1;
-
-static int special_parse(buff)
-    char *buff;
-{
-    struct interactive *ip;
-    struct svalue *svp;
-
-#ifdef DEBUG
-    strncpy(debug_parse_buff, buff, sizeof debug_parse_buff);
-    debug_parse_buff[sizeof debug_parse_buff - 1] = '\0';
-#endif
     if (strcmp(buff, "malloc") == 0) {
 #if defined(MALLOC_malloc) || defined(MALLOC_smalloc)
-        dump_malloc_data();
-#endif
-#ifdef MALLOC_gmalloc
-        add_message("Using Gnu malloc.\n");
+        dump_malloc_data(sbuf);
 #endif
 #ifdef MALLOC_sysmalloc
-        add_message("Using system standard malloc.\n");
+        strbuf_add(sbuf, "Using system standard malloc.\n");
 #endif
-        return 1;
-    }
-    if (!is_wizard_used || command_giver->flags & O_IS_WIZARD) {
-        if (strcmp(buff, "dumpallobj") == 0) {
-            dumpstat();
-            return 1;
-        }
-#ifdef OPCPROF /* amylaar */
-        if (strcmp(buff,  "opcdump") == 0) {
-            opcdump();
-            return 1;
-        }
-#endif
-#if defined(MALLOC_malloc) || defined(MALLOC_smalloc)
-        if (strcmp(buff,  "showsmallnewmalloced") == 0) {
-
-#if !defined(DEBUG) || defined(SHOWSMALLNEWMALLOCED_RESTRICTED)
-            struct svalue *arg;
-            push_constant_string("inspect memory");
-            arg = apply_master_ob(STR_PLAYER_LEVEL, 1);
-            if (arg && (arg->type != T_NUMBER || arg->u.number != 0))
-#endif
-            {
-                if (first_showsmallnewmalloced_call) {
-                    add_message("No previous call. please redo.\n");
-                    walk_new_small_malloced(no_op);
-                    first_showsmallnewmalloced_call = 0;
-                } else {
-                    walk_new_small_malloced(show_memory_block);
-                }
-            }
-            return 1;
-        }
-        if (strcmp(buff, "debugmalloc") == 0) {
-            debugmalloc = !debugmalloc;
-            if (debugmalloc)
-                add_message("On.\n");
-            else
-                add_message("Off.\n");
-            return 1;
-        }
-#endif /* MALLOC_(s)malloc */
-        if (strncmp(buff, "status", 6) == 0)
-            return status_parse(buff+6+(buff[6]==' '));
-    } /* end of wizard-only special parse commands */
-    if (NULL != (ip = O_GET_INTERACTIVE(command_giver)) &&
-        ip->sent.type == SENT_INTERACTIVE &&
-        ip->modify_command )
-    {
-        struct object *ob = ip->modify_command;
-
-        if (ob->flags & O_DESTRUCTED) {
-            ip->modify_command = 0;
-            free_object(ob, "modify_command");
-            return 0;
-        }
-        if (closure_hook[H_MODIFY_COMMAND_FNAME].type != T_STRING)
-            return 0;
-        push_volatile_string(buff);
-        svp = sapply(closure_hook[H_MODIFY_COMMAND_FNAME].u.string, ob, 1);
-        /* !command_giver means that the command_giver has been destructed. */
-        if (!svp) return 0;
-        if (!command_giver) return 1;
-    } else {
-        if (closure_hook[H_MODIFY_COMMAND].type == T_CLOSURE) {
-            struct lambda *l;
-
-            l = closure_hook[H_MODIFY_COMMAND].u.lambda;
-            if (closure_hook[H_MODIFY_COMMAND].x.closure_type == CLOSURE_LAMBDA)
-                l->ob = command_giver;
-            push_volatile_string(buff);
-            push_object(command_giver);
-            call_lambda(&closure_hook[H_MODIFY_COMMAND], 2);
-            transfer_svalue(svp = &apply_return_value, inter_sp--);
-            if (!command_giver) return 1;
-        } else if (closure_hook[H_MODIFY_COMMAND].type == T_STRING) {
-            if (command_giver->flags & O_DESTRUCTED)  /* just in case... */
-                return 0;
-            push_volatile_string(buff);
-            svp =
-              sapply(closure_hook[H_MODIFY_COMMAND].u.string, command_giver, 1);
-            if (!svp) return 0;
-            if (!command_giver) return 1;
-        } else if (closure_hook[H_MODIFY_COMMAND].type == T_MAPPING) {
-            struct svalue sv;
-
-            if ( NULL != (sv.u.string = findstring(buff)) ) {
-                sv.type = T_STRING;
-                sv.x.string_type = STRING_SHARED;
-                svp =
-                  get_map_lvalue(closure_hook[H_MODIFY_COMMAND].u.map, &sv, 0);
-                if (svp->type == T_CLOSURE) {
-                    push_shared_string(sv.u.string);
-                    push_object(command_giver);
-                    call_lambda(svp, 2);
-                    transfer_svalue(svp = &apply_return_value, inter_sp--);
-                    if (!command_giver) return 1;
-                }
-            } else {
-                return 0;
-            }
-        } else {
-            return 0;
-        }
-    }
-    if (svp->type == T_STRING) {
-        strncpy(buff, svp->u.string, COMMAND_FOR_OBJECT_BUFSIZE-1);
-        buff[COMMAND_FOR_OBJECT_BUFSIZE-1] = '\0';
-    } else if (svp->type == T_NUMBER) {
-        return svp->u.number;
-    }
-    return 0;
-}
-
-struct vector *get_action(ob, verb)
-    struct object *ob;
-    char *verb;
-{
-    struct vector *v;
-    struct sentence *s;
-    struct svalue *p;
-
-    if ( !(verb = findstring(verb)) ) return NULL;
-    for (s = ob->sent; s; s = s->next) {
-        if (verb != s->verb) continue;
-        /* verb will be 0 for SENT_MARKER */
-
-        v = allocate_array(4);
-        p = v->item;
-
-        p->u.number = s->type;
-        p++;
-        p->u.number = s->type != SENT_PLAIN ? s->short_verb : 0;
-        p++;
-        p->type = T_OBJECT;
-        add_ref((p->u.ob = s->ob), "get_action");
-        p++;
-        p->type = T_STRING;
-        p->x.string_type = STRING_SHARED;
-        increment_string_ref(p->u.string = s->function);
-
-        return v;
-    }
-    /* not found */
-    return NULL;
-}
-
-struct vector *get_all_actions(ob, mask)
-    struct object *ob;
-    int mask;
-{
-    struct vector *v;
-    struct sentence *s;
-    int num;
-    struct svalue *p;
-    int nqueries;
-
-    nqueries = ((mask>>1) & 0x55) + (mask & 0x55);
-    nqueries = ((nqueries>>2) & 0x33) + (nqueries & 0x33);
-    nqueries = ((nqueries>>4) & 0x0f) + (nqueries & 0x0f);
-    num = 0;
-    for (s = ob->sent; s; s = s->next) {
-        if (SENT_IS_INTERNAL(s->type))
-            continue;
-        num += nqueries;
+        return MY_TRUE;
     }
 
-    v = allocate_array(num);
-    p = v->item;
-    for (s = ob->sent; s; s = s->next)
-    {
-        if (SENT_IS_INTERNAL(s->type))
-            continue;
-        if (mask & 1) {
-            if ( NULL != (p->u.string = s->verb) ) {
-                increment_string_ref(p->u.string);
-                p->type = T_STRING;
-                p->x.string_type = STRING_SHARED;
-            }
-            p++;
-        }
-        if (mask & 2) {
-            p->u.number = s->type;
-            p++;
-        }
-        if (mask & 4) {
-            p->u.number = s->short_verb;
-            p++;
-        }
-        if (mask & 8) {
-            p->type = T_OBJECT;
-            add_ref((p->u.ob = s->ob), "get_action");
-            p++;
-        }
-        if (mask & 16) {
-            p->type = T_STRING;
-            p->x.string_type = STRING_SHARED;
-            increment_string_ref(p->u.string = s->function);
-            p++;
-        }
-    }
-
-    return v;
-}
-
-struct vector *get_object_actions(ob1, ob2)
-    struct object *ob1;
-    struct object *ob2;
-{
-    struct vector *v;
-    struct sentence *s;
-    int num;
-    struct svalue *p;
-
-    num = 0;
-    for (s = ob1->sent; s; s = s->next)
-        if (s->ob == ob2) num += 2;
-
-    v = allocate_array(num);
-    p = v->item;
-    for (s = ob1->sent; s; s = s->next)
-    {
-        if (s->ob == ob2) {
-            increment_string_ref(p->u.string = s->verb);
-            p->type = T_STRING;
-            p->x.string_type = STRING_SHARED;
-            p++;
-
-            p->type = T_STRING;
-            p->x.string_type = STRING_SHARED;
-            increment_string_ref(p->u.string = s->function);
-            p++;
-        }
-    }
-    return v;
+    return MY_FALSE;
 }
 
 #ifdef __STDC__
@@ -3249,7 +2555,7 @@ void fatal(fmt, a, b, c, d, e, f, g, h)
     if (current_object)
         debug_message("Current object was %s\n", current_object->name);
     debug_message("Dump of variables:\n");
-    (void)dump_trace(1);
+    (void)dump_trace(MY_TRUE);
     fflush(stdout);
 #if !defined(AMIGA) || !defined(__SASC)
     sleep(1); /* let stdout settle down... abort can ignore the buffer... */
@@ -3272,43 +2578,14 @@ char *current_error, *current_error_file, *current_error_object_name;
 mp_int current_error_line_number;
 
 /*
- * Error() has been "fixed" so that users can catch and throw them.
- * To catch them nicely, we really have to provide decent error information.
- * Hence, all errors that are to be caught
- * (error_recovery_pointer->type == ERROR_RECOVERY_CATCH)
- * construct a string containing the error message, which is returned as the
- * thrown value.  Users can throw their own error values however they choose.
- */
-
-static void remove_command_giver_markers()
-{
-    struct marked_command_giver *m;
-
-    while ( NULL != (m = last_marked) && m->erp == error_recovery_pointer) {
-        if (m->marker) {
-            free_sentence(m->marker);
-        } else {
-            remove_sent( (struct object *)error_recovery_pointer, m->object);
-        }
-        last_marked = m->next;
-        xfree( (char *)m);
-        /* We have freed the shared string pointed to by last_verb above,
-         * thus it is invalid. Besides, this function is called when we
-         * longjmp out of player_parser(), thus last_verb should be cleared.
-         */
-        last_verb = 0;
-    }
-}
-
-/*
  * This is here because throw constructs its own return value; we dont
  * want to replace it with the system's error string.
  */
 
 void throw_error() {
-    if (error_recovery_pointer->type >= ERROR_RECOVERY_CATCH) {
-        remove_command_giver_markers();
-        longjmp(error_recovery_pointer->con.text, 1);
+    unroll_context_stack();
+    if (rt_context->type >= ERROR_RECOVERY_CATCH) {
+        longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
         fatal("Throw_error failed!");
     }
     free_svalue(&catch_value);
@@ -3344,7 +2621,7 @@ static char emsg_buf[2000];
 #ifdef __STDC__
 void error(char *fmt, ...)
 #else
-#if SIZEOF_P_INT != 4
+#if SIZEOF_CHAR_P != 4
 You need an Ansi C compiler to get this right.
 #endif
 /*VARARGS1*/
@@ -3360,10 +2637,19 @@ void error(fmt, a, b, c, d, e, f, g, h)
     char *file, *malloced_error, *malloced_file = 0, *malloced_name = 0;
     char fixed_fmt[200];
     mp_int line_number = 0;
+    rt_context_t *rt;
 #ifdef __STDC__
     int a;
     va_list va;
 #endif
+
+    /* Find the last error recovery context, but do not yet unroll
+     * the stack: the current command context might be needed
+     * in the runtime error apply.
+     */
+    for ( rt = rt_context
+        ; !ERROR_RECOVERY_CONTEXT(rt->type)
+        ; rt = rt->last) NOOP;
 
     fmt = limit_error_format(fixed_fmt, fmt);
 #ifdef __STDC__
@@ -3371,8 +2657,7 @@ void error(fmt, a, b, c, d, e, f, g, h)
 #endif
     if (current_object)
         assign_eval_cost();
-    remove_command_giver_markers();
-    if (num_error && error_recovery_pointer->type <= ERROR_RECOVERY_APPLY) {
+    if (num_error && rt->type <= ERROR_RECOVERY_APPLY) {
         static char *times_word[] = {
           "",
           "Double",
@@ -3392,12 +2677,18 @@ void error(fmt, a, b, c, d, e, f, g, h)
     sprintf(emsg_buf+1, fmt, a, b, c, d, e, f, g, h);
 #endif
     emsg_buf[0] = '*';  /* all system errors get a * at the start */
-    if (error_recovery_pointer->type >= ERROR_RECOVERY_CATCH) {
+    if (rt->type >= ERROR_RECOVERY_CATCH) {
         /* user catches this error */
-        catch_value.type = T_STRING;
-        catch_value.x.string_type = STRING_MALLOC;        /* Always reallocate */
-        catch_value.u.string = string_copy(emsg_buf);
-        longjmp(error_recovery_pointer->con.text, 1);
+        put_malloced_string(&catch_value, string_copy(emsg_buf));
+          /* always reallocate */
+        debug_message("Caught error: %s", emsg_buf + 1);
+        printf("Caught error: %s", emsg_buf + 1);
+        dump_trace(MY_FALSE);
+        debug_message("... execution continues.\n");
+        printf("... execution continues.\n");
+
+        unroll_context_stack();
+        longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
         fatal("Catch() longjump failed");
     }
     num_error++;
@@ -3426,7 +2717,7 @@ void error(fmt, a, b, c, d, e, f, g, h)
     }
     object_name = dump_trace(num_error == 3);
     fflush(stdout);
-    if (error_recovery_pointer->type == ERROR_RECOVERY_APPLY) {
+    if (rt->type == ERROR_RECOVERY_APPLY) {
         printf("error in function call: %s", emsg_buf+1);
         if (current_object) {
             printf("program: %s, object: %s line %ld\n",
@@ -3447,7 +2738,8 @@ void error(fmt, a, b, c, d, e, f, g, h)
             if (malloced_name)
                 xfree(malloced_name);
         }
-        longjmp(error_recovery_pointer->con.text, 1);
+        unroll_context_stack();
+        longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
     }
     /*
      * The stack must be brought in a usable state. After the
@@ -3455,7 +2747,7 @@ void error(fmt, a, b, c, d, e, f, g, h)
      * and may not be used any more. The reason is that some strings
      * may have been on the stack machine stack, and have been deallocated.
      */
-    reset_machine (0);
+    reset_machine(MY_FALSE);
     if (do_save_error) {
         save_error(emsg_buf, file, line_number);
     }
@@ -3473,7 +2765,8 @@ void error(fmt, a, b, c, d, e, f, g, h)
     if (num_error == 3) {
         debug_message("Master failure: %s", emsg_buf+1);
     } else if (!out_of_memory) {
-        assigned_eval_cost = eval_cost -= MASTER_RESERVED_COST;
+        CLEAR_EVAL_COST;
+        RESET_LIMITS;
         push_volatile_string(malloced_error);
         a = 1;
         if (current_object) {
@@ -3525,15 +2818,16 @@ void error(fmt, a, b, c, d, e, f, g, h)
             set_noecho(i, 0);
         }
     }
-    if (error_recovery_pointer->type != ERROR_RECOVERY_NONE)
-        longjmp(error_recovery_pointer->con.text, 1);
+    unroll_context_stack();
+    if (rt_context->type != ERROR_RECOVERY_NONE)
+        longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
     abort();
 }
 
 /* Check that there are not '/../' in the path.
  * TODO: This should go into a 'files' module.
  */
-/* TODO: BOOL */ int check_no_parentdirs (char *path)
+Bool check_no_parentdirs (char *path)
 {
     char *p;
 
@@ -3652,7 +2946,7 @@ char *check_valid_path(path, caller, call_fun, writeflg)
     char *path;
     struct object *caller;
     char *call_fun;
-    int writeflg;
+    Bool writeflg;
 {
     struct svalue *v;
 
@@ -3661,15 +2955,13 @@ char *check_valid_path(path, caller, call_fun, writeflg)
     else
         push_number(0);
     {
-#ifdef EUIDS
     struct wiz_list *eff_user;
     if ( NULL != (eff_user = caller->eff_user) )
         push_shared_string(eff_user->name);
     else
-#endif
         push_number(0);
     }
-    push_constant_string(call_fun);
+    push_volatile_string(call_fun);
     push_valid_ob(caller);
     if (writeflg)
         v = apply_master_ob(STR_VALID_WRITE, 4);
@@ -3714,7 +3006,7 @@ struct svalue *f_shutdown(sp)
 void startmasterupdate() {
     extra_jobs_to_do = MY_TRUE;
     master_will_be_updated = 1;
-    add_eval_cost(-initial_eval_cost >> 3);
+    eval_cost += max_eval_cost >> 3;
     (void)signal(SIGUSR1, (RETSIGTYPE(*)PROT((int)))startmasterupdate);
 }
 
@@ -3737,9 +3029,6 @@ void shutdowngame() {
     dump_malloc_data();
 #endif
     find_alloced_data();
-#endif
-#ifdef OPCPROF
-    opcdump();
 #endif
 #if defined(AMIGA)
     amiga_end();
@@ -4156,11 +3445,11 @@ do_rename(fr, t)
     char *from, *to;
     int i;
 
-    from = check_valid_path(fr, current_object, "do_rename", 1);
+    from = check_valid_path(fr, current_object, "do_rename", MY_TRUE);
     if(!from)
         return 1;
     push_apply_value();
-    to = check_valid_path(t, current_object, "do_rename", 1);
+    to = check_valid_path(t, current_object, "do_rename", MY_TRUE);
     if(!to) {
         pop_apply_value();
         return 1;
@@ -4205,7 +3494,7 @@ struct svalue *f_set_driver_hook(sp)
     {
         bad_xefun_arg(1, sp);
     }
-    if (_privilege_violation("set_driver_hook", sp-1, sp) <= 0) {
+    if (!_privilege_violation("set_driver_hook", sp-1, sp)) {
         free_svalue(sp);
         return sp - 2;
     }
@@ -4214,8 +3503,7 @@ struct svalue *f_set_driver_hook(sp)
       case T_NUMBER:
         if (sp->u.number != 0)
             goto bad_arg_2;
-        closure_hook[n].type = T_NUMBER;
-        closure_hook[n].u.lambda = 0;
+        put_number(closure_hook + n, 0);
         break;
       case T_STRING:
       {
@@ -4224,9 +3512,7 @@ struct svalue *f_set_driver_hook(sp)
         if ( !((1 << T_STRING) & hook_type_map[n]) )
             goto bad_arg_2;
         if ( NULL != (str = make_shared_string(sp->u.string)) ) {
-            closure_hook[n].u.string = str;
-            closure_hook[n].type = T_STRING;
-            closure_hook[n].x.string_type = STRING_SHARED;
+            put_string(closure_hook + n, str);
             if (n == H_NOECHO)
                 mudlib_telopts();
         } else {
@@ -4246,7 +3532,7 @@ struct svalue *f_set_driver_hook(sp)
         struct vector *v = sp->u.vec;
 
         if (v->ref > 1) {
-            v->ref--;
+            deref_array(v);
             sp->u.vec = v = slice_array(v, 0, VEC_SIZE(v)-1);
         }
         if (n == H_INCLUDE_DIRS) {
@@ -4279,9 +3565,8 @@ bad_arg_2:
         closure_hook[n] = *sp;
         break;
     }
-    if (old.type == T_CLOSURE && old.x.closure_type == CLOSURE_LAMBDA)
-        old.x.closure_type = CLOSURE_UNBOUND_LAMBDA;
-    free_svalue(&old);
+    if (old.type != T_NUMBER)
+        free_closure_hooks(&old, 1);
     return sp - 2;
 }
 
@@ -4289,8 +3574,7 @@ void init_closure_hooks() {
     int i;
 
     for (i = NUM_CLOSURE_HOOKS; --i >= 0; ) {
-        closure_hook[i].type = T_NUMBER;
-        closure_hook[i].u.lambda = 0;
+        put_number(closure_hook + i, 0);
     }
 }
 
@@ -4379,15 +3663,13 @@ struct svalue *f_shadow(sp)
         bad_xefun_arg(2, sp);
     sp--;
     ob = sp->u.ob;
-    decr_object_ref(ob, "shadow");
+    deref_object(ob, "shadow");
     if (sp[1].u.number == 0) {
         ob = ob->flags & O_SHADOW ? O_GET_SHADOW(ob)->shadowed_by : 0;
         if (ob) {
-            add_ref(ob, "shadow");
-            sp->u.ob = ob;
+            sp->u.ob = ref_object(ob, "shadow");
         } else {
-            sp->type = T_NUMBER;
-            sp->u.number = 0;
+            put_number(sp, 0);
         }
         return sp;
     }
@@ -4432,12 +3714,10 @@ struct svalue *f_shadow(sp)
         }
         co_shadow_sent->shadowing = ob;
         shadow_sent->shadowed_by = current_object;
-        sp->type = T_OBJECT;
-        sp->u.ob = ob;
-        add_ref(ob, "shadow");
+        put_ref_object(sp, ob, "shadow");
         return sp;
     }
-    sp->u.number = 0;
+    put_number(sp, 0);
     return sp;
 }
 
@@ -4449,14 +3729,12 @@ struct svalue *f_query_shadowing(sp)
     if (sp->type != T_OBJECT)
         bad_xefun_arg(1, sp);
     ob = sp->u.ob;
-    decr_object_ref(ob, "shadow");
+    deref_object(ob, "shadow");
     ob = ob->flags & O_SHADOW ? O_GET_SHADOW(ob)->shadowing : 0;
     if (ob) {
-        add_ref(ob, "shadow");
-        sp->u.ob = ob;
+        sp->u.ob = ref_object(ob, "shadow");
     } else {
-        sp->type = T_NUMBER;
-        sp->u.number = 0;
+        put_number(sp, 0);
     }
     return sp;
 }
@@ -4493,3 +3771,342 @@ struct svalue *f_unshadow(sp)
     }
     return sp;
 }
+
+/*-------------------------------------------------------------------------*/
+static void
+extract_limits ( struct limits_context_s * result
+               , struct svalue *svp
+               , int  num
+               , Bool tagged
+               )
+
+/* Extract the user-given runtime limits from <svp>...
+ * and store them into <result>. If <tagged> is FALSE, <svp> points to an array
+ * with the <num> values stored at the proper indices, otherwise <svp> points
+ * to a series of <num>/2 (tag, value) pairs.
+ *
+ * If the function encounters illegal limit tags or values, it throws
+ * an error.
+ */
+
+{
+    char * limitnames[] = { "LIMIT_EVAL", "LIMIT_ARRAY", "LIMIT_MAPPING"
+                          , "LIMIT_BYTE", "LIMIT_FILE" };
+
+    /* Set the defaults (unchanged) limits */
+    result->max_eval = max_eval_cost;
+    result->max_array = max_array_size;
+    result->max_mapping = max_mapping_size;
+    result->max_byte = max_byte_xfer;
+    result->max_file = max_file_xfer;
+
+    if (!tagged)
+    {
+        p_int val;
+        int limit;
+
+        for (limit = 0; limit < LIMIT_MAX && limit < num; limit++)
+        {
+        
+            if (svp[limit].type != T_NUMBER)
+                error("Illegal %s value: not a number\n", limitnames[limit]);
+                /* TODO: Give type and value */
+            val = svp[limit].u.number;
+            if (val >= 0)
+            {
+                switch(limit)
+                {
+                case LIMIT_EVAL:    result->max_eval = val;    break;
+                case LIMIT_ARRAY:   result->max_array = val;   break;
+                case LIMIT_MAPPING: result->max_mapping = val; break;
+                case LIMIT_BYTE:    result->max_byte = val;    break;
+                case LIMIT_FILE:    result->max_file = val;    break;
+                default: fatal("Unimplemented limit #%d\n", limit);
+                }
+            }
+            else if (val == LIMIT_DEFAULT)
+            {
+                switch(limit)
+                {
+                case LIMIT_EVAL:    result->max_eval = def_eval_cost;
+                                    break;
+                case LIMIT_ARRAY:   result->max_array = def_array_size;
+                                    break;
+                case LIMIT_MAPPING: result->max_mapping = def_mapping_size;
+                                    break;
+                case LIMIT_BYTE:    result->max_byte = def_byte_xfer;
+                                    break;
+                case LIMIT_FILE:    result->max_file = def_file_xfer;
+                                    break;
+                default: fatal("Unimplemented limit #%d\n", limit);
+                }
+            }
+            else if (val != LIMIT_KEEP)
+                error("Illegal %s value: %ld\n", limitnames[limit], val);
+        }
+    }
+    else
+    {
+        int i;
+
+        for (i = 0; i < num - 1; i += 2)
+        {
+            p_int val;
+            int limit;
+
+            if (svp[i].type != T_NUMBER)
+                error("Illegal limit tag: not a number.\n");
+                /* TODO: Give type and value */
+            limit = (int)svp[i].u.number;
+            if (limit < 0 || limit >= LIMIT_MAX)
+                error("Illegal limit tag: %ld\n", (long)limit);
+
+            if (svp[i+1].type != T_NUMBER)
+                error("Illegal %s value: not a number\n", limitnames[limit]);
+                /* TODO: Give type and value */
+            val = svp[i+1].u.number;
+            if (val >= 0)
+            {
+                switch(limit)
+                {
+                case LIMIT_EVAL:    result->max_eval = val;    break;
+                case LIMIT_ARRAY:   result->max_array = val;   break;
+                case LIMIT_MAPPING: result->max_mapping = val; break;
+                case LIMIT_BYTE:    result->max_byte = val;    break;
+                case LIMIT_FILE:    result->max_file = val;    break;
+                default: fatal("Unimplemented limit #%d\n", limit);
+                }
+            }
+            else if (val == LIMIT_DEFAULT)
+            {
+                switch(limit)
+                {
+                case LIMIT_EVAL:    result->max_eval = def_eval_cost;
+                                    break;
+                case LIMIT_ARRAY:   result->max_array = def_array_size;
+                                    break;
+                case LIMIT_MAPPING: result->max_mapping = def_mapping_size;
+                                    break;
+                case LIMIT_BYTE:    result->max_byte = def_byte_xfer;
+                                    break;
+                case LIMIT_FILE:    result->max_file = def_file_xfer;
+                                    break;
+                default: fatal("Unimplemented limit #%d\n", limit);
+                }
+            }
+            else if (val != LIMIT_KEEP)
+                error("Illegal %s value: %ld\n", limitnames[limit], val);
+        }
+    }
+} /* extract_limits() */
+
+/*-------------------------------------------------------------------------*/
+struct svalue *
+f_limited (struct svalue * sp, int num_arg)
+
+/* VEFUN limited()
+ *
+ *   mixed limited(closure fun)
+ *   mixed limited(closure fun, int tag, int value, ...)
+ *   mixed limited(closure fun, int * limits [, mixed args...] )
+ *
+ * Call the function <fun> and execute it with the given runtime limits.
+ * After the function exits, the currently active limits are restored.
+ * Result of the efun is the result of the closure call.
+ *
+ * The arguments can be given in two ways: as an array (like the one
+ * returned from query_limits(), or as a list of tagged values.
+ * If the efun is used without any limit specification, all limits
+ * are supposed to be 'unlimited'.
+ *
+ * The limit settings recognize two special values:
+ *     LIMIT_UNLIMITED: the limit is deactivated
+ *     LIMIT_KEEP:      the former setting is kept
+ *     LIMIT_DEFAULT:   the 'global' default setting is used.
+ *
+ * The efun causes a privilege violation ("limited", current_object, closure).
+ */
+
+{
+    struct svalue *argp;
+    struct limits_context_s limits;
+    int cl_args;
+
+    if (!num_arg)
+        error("No arguments given.\n");
+
+    argp = sp - num_arg + 1;
+    cl_args = 0;
+
+    if (argp->type != T_CLOSURE)
+        bad_xefun_vararg(1, sp);
+    
+    /* Get the limits */
+    if (num_arg == 1)
+    {
+        limits.max_eval = 0;
+        limits.max_array = 0;
+        limits.max_mapping = 0;
+        limits.max_byte = 0;
+        limits.max_file = 0;
+    }
+    else if (argp[1].type == T_POINTER)
+    {
+        extract_limits(&limits, argp[1].u.vec->item
+                      , (int)VEC_SIZE(argp[1].u.vec)
+                      , MY_FALSE);
+        cl_args = num_arg - 2;
+    }
+    else if (num_arg % 2 == 1)
+    {
+        extract_limits(&limits, argp+1, num_arg-1, MY_TRUE);
+        cl_args = 0;
+    }
+    else
+        bad_xefun_vararg(num_arg, sp);
+
+    /* If this object is destructed, no extern calls may be done */
+    if (current_object->flags & O_DESTRUCTED
+     || !_privilege_violation("limited", argp, sp)
+        )
+    {
+        sp = pop_n_elems(num_arg, sp);
+        sp++;
+        put_number(sp, 0);
+    }
+    else
+    {
+        struct limits_context_s context;
+        
+        /* Save the current runtime limits and set the new ones */
+        save_limits_context(&context);
+        context.rt.last = rt_context;
+        rt_context = (rt_context_t *)&context;
+
+        max_eval_cost = limits.max_eval;
+        max_array_size = limits.max_array;
+        max_mapping_size = limits.max_mapping;
+        max_byte_xfer = limits.max_byte;
+        max_file_xfer = limits.max_file;
+
+        assign_eval_cost();
+        inter_sp = sp;
+        call_lambda(argp, cl_args);
+        sp = inter_sp;
+        
+        /* Over write the closure with the result */
+        free_closure(argp);
+        *argp = *sp;
+        sp--;
+
+        /* Free the remaining arguments from the efun call */
+        sp = pop_n_elems(num_arg - cl_args - 1, sp);
+
+        /* Restore the old limits */
+        rt_context = context.rt.last;
+        restore_limits_context(&context);
+    }
+
+    /* Stack is clean and sp points to the result */
+    return sp;
+} /* f_limited() */
+
+/*-------------------------------------------------------------------------*/
+struct svalue *
+f_set_limits (struct svalue * sp, int num_arg)
+
+/* VEFUN set_limits()
+ *
+ *   void set_limits(int tag, int value, ...)
+ *   void set_limits(int * limits)
+ *
+ * Set the default runtime limits from the given arguments. The new limits
+ * will be in effect for the next execution thread.
+ *
+ * The arguments can be given in two ways: as an array (like the one
+ * returned from query_limits(), or as a list of tagged values.
+ * The limit settings recognize two special values:
+ *     LIMIT_UNLIMITED: the limit is deactivated
+ *     LIMIT_KEEP:      the former setting is kept
+ *
+ * The efun causes a privilege violation ("set_limits", current_object, first
+ * arg).
+ */
+
+{
+    struct svalue *argp;
+    struct limits_context_s limits;
+
+    if (!num_arg)
+        error("No arguments given.\n");
+
+    argp = sp - num_arg + 1;
+
+    if (num_arg == 1 && argp->type == T_POINTER)
+        extract_limits(&limits, argp->u.vec->item, (int)VEC_SIZE(argp->u.vec)
+                      , MY_FALSE);
+    else if (num_arg % 2 == 0)
+        extract_limits(&limits, argp, num_arg, MY_TRUE);
+    else
+        bad_xefun_vararg(num_arg, sp);
+
+    if (_privilege_violation("set_limits", argp, sp))
+    {
+        /* Now store the parsed limits into the variables */
+        def_eval_cost = limits.max_eval;
+        def_array_size = limits.max_array;
+        def_mapping_size = limits.max_mapping;
+        def_byte_xfer = limits.max_byte;
+        def_file_xfer = limits.max_file;
+    }
+
+    sp = pop_n_elems(num_arg, sp);
+    return sp;
+} /* f_set_limits() */
+
+/*-------------------------------------------------------------------------*/
+struct svalue *
+f_query_limits (struct svalue * sp)
+
+/* TEFUN query_limits()
+ *
+ *   int * query_limits(int defaults)
+ *
+ * Return an array with the current runtime limits, resp. if defaults
+ * is true, the default runtime limits. The entries in the returned
+ * array are:
+ *
+ *   int[LIMIT_EVAL]:    the max number of eval costs
+ *   int[LIMIT_ARRAY]:   the max number of array entries
+ *   int[LIMIT_MAPPING]: the max number of mapping entries
+ *   int[LIMIT_BYTE]:    the max number of bytes for one read/write_bytes()
+ *   int[LIMIT_FILE]:    the max number of bytes for one read/write_file()
+ *
+ * A limit of '0' means 'no limit'.
+ */
+
+{
+    struct vector *vec;
+    Bool def;
+    
+    if (sp->type != T_NUMBER)
+        bad_xefun_arg(1, sp);
+    def = sp->u.number != 0;
+    
+    vec = allocate_uninit_array(LIMIT_MAX);
+    if (!vec)
+        error("Out of memory.\n");
+    
+    put_number(vec->item+LIMIT_EVAL,    def ? def_eval_cost : max_eval_cost);
+    put_number(vec->item+LIMIT_ARRAY,   def ? def_array_size : max_array_size);
+    put_number(vec->item+LIMIT_MAPPING, def ? def_mapping_size : max_mapping_size);
+    put_number(vec->item+LIMIT_BYTE,    def ? def_byte_xfer : max_byte_xfer);
+    put_number(vec->item+LIMIT_FILE,    def ? def_file_xfer : max_file_xfer);
+
+    /* No free_svalue: sp is a number */
+    put_array(sp, vec);
+    return sp;
+} /* f_query_limits() */
+
+/***************************************************************************/
+

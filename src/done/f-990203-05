@@ -2,7 +2,7 @@ Short: Scope of variables
 Date: 990203
 From: Lars
 Type: Feature
-State: Unclassified
+State: Done - implemented in 3-2-dev.118
 
 The scope of variables should respect the block limits
 set by {...}.

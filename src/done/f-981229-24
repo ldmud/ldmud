@@ -2,7 +2,7 @@ Short: new efun strtrim()
 From: Dave Setty <garpoz@locallink.net>
 Date: Thu, 10 Dec 1998 02:03:04 -0500
 Type: Feature
-State: Acknowledged
+State: Done - implemented in 3.2.7-dev.127
 
 3) strtrim(), which cuts a specified character (usually spaces) off
 
@@ -35,4 +35,9 @@ Ever since the first day we compiled the GD with it and it crashed the GD.
 We also had a sefun/efun regsubst() which was more robust than regreplace()
 at the time, but it never materialized and now we have neither.  I still
 harbor a dislike of regreplace() for some reason though.
+
+Lars comments:
+
+Trimming spaces happens often enough to justify a specialized (aka faster)
+efun.
 

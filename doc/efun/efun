@@ -2,12 +2,28 @@ NAME
 	efun
 
 DESCRIPTION
-	This directory contains descriptions for the efuns of
-	Amylaar's version of the LPC parser.
+	This directory contains descriptions for the efuns of the driver.
 
-	These are functions that are supplied by the parser and can be
+	These are functions that are supplied by the driver and can be
 	called by any LPC object (somewhat similar to system calls in the
 	C library).
+
+        There a few kinds of efuns:
+
+         - 'optional'
+
+           A mud's maintainer is free to deactivate these efun(s) when
+           compiling the driver.
+
+         - 'preliminary'
+
+           The behaviour of these efuns is not fixed yet, and may change
+           with further releases.
+
+         - 'deprecated' or 'obsolete'
+
+           This efun should no longer be used, it is merely provided
+           for backwards compatibility.
 
 SEE ALSO
 	efuns(LPC), applied(A), master(M), lpc(LPC), concepts(C), driver(D)

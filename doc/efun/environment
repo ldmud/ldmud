@@ -1,10 +1,12 @@
 SYNOPSIS
 	object environment(void)
 	object environment(object obj)
+	object environment(string obj)
 
 DESCRIPTION
-	Returns the surrounding object of obj. If no argument are
-	given, it returns the surrounding of the current object.
+	Returns the surrounding object of obj, which may be given by name.
+        If no argument is given, it returns the surrounding of the current
+        object.
 	
 	Destructed objects do not have an environment.
 

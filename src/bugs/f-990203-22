@@ -3,6 +3,7 @@ From: Matthew Julius <julius.2@wright.edu>
 Date: Fri, 08 Jan 1999 16:29:08 -0500
 Type: Feature
 State: Unclassified
+See also: f-990714-1
 
 mixed *member_values(mapping, closure|mixed, int, mixed...)
   Return the indices of a mapping that have a specific value.

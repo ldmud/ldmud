@@ -12,7 +12,7 @@ EXAMPLE
         mixed *a, *b;
 
         a = ({ 1, ({ 21, 22 }) });
-        b = copy(a);
+        b = deep_copy(a);
         a[0] = -1; a[1][0] = -21;
          --> a is now   ({ -1, ({ -21, 22 }) })
              b is still ({  1, ({  21, 22 }) })

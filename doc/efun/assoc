@@ -1,3 +1,4 @@
+OPTIONAL
 SYNOPSIS
 	int   assoc (mixed key, mixed *keys)
 	mixed assoc (mixed key, mixed *alist [, mixed fail] )

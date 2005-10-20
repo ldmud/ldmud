@@ -53,14 +53,14 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stralloc.h"
+#include "strfuns.h"
 
 /* TODO: Use get_host_name() instead of gethostname()
  * TODO: Implement the # and ## operators.
- * TODO: New predefs' __DRIVER_VERSION__, _REVISION__, _PATCHLEVEL__.
+ * TODO: New predefs' __DRIVER_VERSION__, _REVISION__, _PATCHLEVEL__, __PATH__
+ * TODO:: and __BASENAME__.
  * TODO: #define macro(a,b,...) -> ... is assigned to __VA_ARGS__ (see oncoming
  * TODO:: C standard).
- * TODO: More a compiler error: identifiers in sub-blocks are not deleted
- * TODO:: on block exit: fun() { { string s; } { string s; } } -> error.
  * TODO: Does Standard-C allow recursive macro expansion? If not, we
  * TODO:: should disallow it, too.
  */
@@ -136,17 +136,29 @@ char *current_file;
   /* Name of the file currently compiled.
    */
 
-int pragma_strict_types;
+Bool pragma_use_local_scopes;
+  /* True: treat all local scopes as one.
+   */
+
+Bool pragma_strict_types;
   /* True: enforce usage of strict types.
    */
-/* TODO: BOOL */ int pragma_save_types;
+Bool pragma_save_types;
   /* True: save argument types after compilation.
    */
-/* TODO: BOOL */ int pragma_combine_strings;
+Bool pragma_combine_strings;
   /* True: perform '+'-addition of constant strings at compile time.
    */
-/* TODO: BOOL */ int pragma_verbose_errors;
+Bool pragma_verbose_errors;
   /* True: give info on the context of an error.
+   */
+
+Bool pragma_no_clone;
+  /* True: prevent the object from being clone.
+   */
+
+Bool pragma_no_inherit;
+  /* True: prevent the program from being inherited.
    */
 
 char *last_lex_string;
@@ -193,6 +205,15 @@ struct lpc_predef_s *lpc_predefs = NULL;
  * copied right before outp (which at that time points at the character
  * after the macro use), then outp is set back to point at the beginning
  * of the added text, lexing the just expanded text next.
+ *
+ * Functionals (inline functions) are somewhat similar to macros. When a
+ * definition '(: ... :)' is encountered, a copy of text between the
+ * delimiters is stored verbatim in the list of inline functions, starting at
+ * first_inline_fun. To the compiler the lexer returns F_INLINE_FUN with the
+ * synthetic identifier of the function. Whenever such functions are pending
+ * and the compiler is at a safe place to accept a function definition
+ * (signalled in insert_inline_fun_now), the text of the pending functions is
+ * inserted into the input stream like a macro.
  */
 
 static int yyin_des;
@@ -227,7 +248,7 @@ static char saved_char;
 
 /*-------------------------------------------------------------------------*/
 
-static /* TODO: BOOL */ int lex_fatal;
+static Bool lex_fatal;
   /* True: lexer encountered fatal error.
    */
 
@@ -237,7 +258,7 @@ static struct svalue *inc_list;
    * array.
    */
 
-static int inc_list_size;
+static size_t inc_list_size;
   /* The number of names in <inc_list>.
    */
 
@@ -313,6 +334,23 @@ static struct ident *undefined_permanent_defines = NULL;
   /* 'Parking list' for permanent defines which have been #undef'ined.
    * After the compilation is complete, they will be put back into
    * the ident_table.
+   */
+
+/*-------------------------------------------------------------------------*/
+
+struct inline_fun * first_inline_fun = NULL;
+  /* Linked list of the saved function text for inline functions.
+   */
+
+Bool insert_inline_fun_now = MY_FALSE;
+  /* This is TRUE when we are at a suitable point to insert the
+   * saved inline functions. Usually this is at the end of a function,
+   * or after a global variable definition.
+   */
+
+int next_inline_fun = 0;
+  /* The running count of inline functions, used to 'name' the next
+   * function to generate.
    */
 
 /*-------------------------------------------------------------------------*/
@@ -484,7 +522,7 @@ static char optab2[]
    */
 #define SAVEC \
     if (yyp < yytext+MAXLINE-5)\
-       *yyp++ = c;\
+       *yyp++ = (char)c;\
     else {\
        lexerror("Line too long");\
        break;\
@@ -501,13 +539,13 @@ static char optab2[]
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
-static INLINE int number(int);
+static INLINE int number(long);
 static INLINE int string(char *);
-static void handle_define(char *, /* TODO: BOOL */ int);
-static void add_define(char *, int, char *);
-static void add_permanent_define(char *, int, void *, /* TODO: BOOL */ char);
-static /* TODO: BOOL */ int expand_define(void);
-static /* TODO: BOOL */ int _expand_define(struct defn*);
+static void handle_define(char *, Bool);
+static void add_define(char *, short, char *);
+static void add_permanent_define(char *, short, void *, Bool);
+static Bool expand_define(void);
+static Bool _expand_define(struct defn*);
 static INLINE void myungetc(char);
 static int cond_get_exp(int, struct svalue *);
 static int exgetc(void);
@@ -548,11 +586,11 @@ init_lexer(void)
 
 /* Initialize the various lexer tables, including the predefined macros
  * from the commandline given in lpc_predefs.
+ * The lpc_predefs list is deallocated by this call.
  */
 
 {
     size_t i, n;
-    struct lpc_predef_s *tmpf;
     char mtext[MLEN];
     static short binary_operators[]
       = { F_ADD, F_SUBTRACT, F_MULTIPLY, F_DIVIDE, F_MOD
@@ -577,11 +615,11 @@ init_lexer(void)
         if (instrs[n].Default == -1)
             continue;
 
-        p = make_shared_identifier(instrs[n].name, I_TYPE_GLOBAL);
+        p = make_shared_identifier(instrs[n].name, I_TYPE_GLOBAL, 0);
         if (!p)
             fatal("Out of memory\n");
         p->type = I_TYPE_GLOBAL;
-        p->u.global.efun     =  n;
+        p->u.global.efun     =  (short)n;
         p->u.global.sim_efun = -1;
         p->u.global.function = -2;
         p->u.global.variable = -2;
@@ -594,7 +632,7 @@ init_lexer(void)
     {
         struct ident *p;
 
-        p = make_shared_identifier(reswords[i].name, I_TYPE_RESWORD);
+        p = make_shared_identifier(reswords[i].name, I_TYPE_RESWORD, 0);
         if (!p)
             fatal("Out of memory\n");
         p->type = I_TYPE_RESWORD;
@@ -606,14 +644,14 @@ init_lexer(void)
      */
     for (i = 0; i < NELEM(binary_operators); i++)
     {
-        n = binary_operators[i] - F_OFFSET;
+        n = (unsigned)binary_operators[i] - F_OFFSET;
         instrs[n].min_arg = instrs[n].max_arg = 2;
         instrs[n].Default = 0;
         instrs[n].ret_type = TYPE_ANY;
     }
     for (i=0; i<NELEM(ternary_operators); i++)
     {
-        n = ternary_operators[i] - F_OFFSET;
+        n = (unsigned)ternary_operators[i] - F_OFFSET;
         instrs[n].min_arg = instrs[n].max_arg = 3;
         instrs[n].Default = 0;
         instrs[n].ret_type = TYPE_ANY;
@@ -637,12 +675,10 @@ init_lexer(void)
         add_permanent_define("COMPAT_FLAG", -1, string_copy(""), MY_FALSE);
         add_permanent_define("__COMPAT_MODE__", -1, string_copy(""), MY_FALSE);
 #endif
-#ifdef NATIVE_MODE
-        add_permanent_define("__NATIVE_MODE__", -1, string_copy(""), MY_FALSE);
-#endif
-#ifdef EUIDS
-        add_permanent_define("__EUIDS__", -1, string_copy(""), MY_FALSE);
-#endif
+    add_permanent_define("__EUIDS__", -1, string_copy(""), MY_FALSE);
+    if (strict_euids)
+        add_permanent_define("__STRICT_EUIDS__", -1, string_copy(""), MY_FALSE);
+
 #ifdef COMPAT_MODE
     mtext[0] = '"';
     strcpy(mtext+1, master_name);
@@ -670,14 +706,18 @@ init_lexer(void)
     sprintf(mtext, "%d", ERQ_MAX_REPLY);
     add_permanent_define("__ERQ_MAX_REPLY__", -1, string_copy(mtext), MY_FALSE);
 #endif
-    sprintf(mtext, "%ld", -initial_eval_cost);
+    sprintf(mtext, "%ld", def_eval_cost);
     add_permanent_define("__MAX_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
 
     /* Add the permanent macro definitions given on the commandline */
 
-    for (tmpf = lpc_predefs; tmpf; tmpf = tmpf->next)
+    while (NULL != lpc_predefs)
     {
         char namebuf[NSIZE];
+        struct lpc_predef_s *tmpf;
+
+        tmpf = lpc_predefs;
+        lpc_predefs = lpc_predefs->next;
 
         *mtext = '\0';
         sscanf(tmpf->flag, "%[^=]=%[ -~=]", namebuf, mtext);
@@ -686,21 +726,27 @@ init_lexer(void)
         if ( strlen(mtext) >= MLEN )
             fatal("-D%s: macrotext too long (>%d)\n", tmpf->flag, MLEN);
         add_permanent_define(namebuf, -1, string_copy(mtext), MY_FALSE);
+
+        xfree(tmpf->flag);
+        xfree(tmpf);
     }
 } /* init_lexer() */
 
 /*-------------------------------------------------------------------------*/
 struct ident *
-make_shared_identifier (char *s, int n)
+make_shared_identifier (char *s, int n, int depth)
 
 /* Find and/or add identifier <s> of type <n> to the ident_table, and
  * return a pointer to the found/generated struct ident. New generated
  * entries have their type set to I_TYPE_UNKNOWN regardless of <n>.
+ * Local identifiers (<n> == I_TYPE_LOCAL) are additionally distinguished by
+ * their definition <depth>.
  *
  * If an identifier with the same name but a lower type exists in the table,
  * it is shifted down: a new entry for this name created and put into the
  * table, the original entry is referenced by the .inferior pointer in the
- * new entry.
+ * new entry. The same happens when a new LOCAL of greater depth is
+ * added to an existing LOCAL of smaller depth.
  *
  * Return NULL when out of memory.
  */
@@ -739,7 +785,10 @@ make_shared_identifier (char *s, int n)
             }
 
             /* If the found entry is of inferior type, shift it down */
-            if (n > curr->type)
+            if (n > curr->type
+             || (   I_TYPE_LOCAL == curr->type && I_TYPE_LOCAL == n
+                 && depth > curr->u.local.depth)
+               )
             {
                 struct ident *inferior = curr;
 
@@ -753,7 +802,7 @@ make_shared_identifier (char *s, int n)
                     curr->next = inferior->next;
                     curr->type = I_TYPE_UNKNOWN;
                     curr->inferior = inferior;
-                    curr->hash = h;
+                    curr->hash = (short)h;
                     ident_table[h] = curr;
                 }
             }
@@ -782,7 +831,7 @@ make_shared_identifier (char *s, int n)
     curr->next = ident_table[h];
     curr->type = I_TYPE_UNKNOWN;
     curr->inferior = NULL;
-    curr->hash = h;
+    curr->hash = (short)h;
     ident_table[h] = curr;
 
     return curr;
@@ -880,7 +929,7 @@ realloc_defbuf (void)
 
 {
     char * old_defbuf = defbuf;
-    long old_defbuf_len = defbuf_len;
+    size_t old_defbuf_len = defbuf_len;
     char * old_outp = outp;
     ptrdiff_t outp_off;
 
@@ -898,7 +947,7 @@ realloc_defbuf (void)
     }
     if (comp_flag)
         fprintf(stderr, "(reallocating defbuf from %ld (%ld left) to %ld) "
-               , old_defbuf_len, (long)(old_outp-defbuf), defbuf_len);
+               , (long)old_defbuf_len, (long)(old_outp-defbuf), defbuf_len);
     defbuf = xalloc(defbuf_len);
     memcpy(defbuf+defbuf_len-old_defbuf_len, old_defbuf, old_defbuf_len);
     xfree(old_defbuf);
@@ -938,7 +987,7 @@ _myfilbuf (void)
      * and reset outp.
      */
     if (linebufend - outp)
-        memcpy(outp-MAXLINE, outp, linebufend  - outp);
+        memcpy(outp-MAXLINE, outp, (size_t)(linebufend - outp));
     outp -= MAXLINE;
 
     *(outp-1) = '\n'; /* so an ungetc() gives a sensible result */
@@ -988,20 +1037,19 @@ add_input (char *p)
  * Main use is by the macro expansion routines.
  */
 {
-    int l = strlen(p);
+    size_t l = strlen(p);
 
 #if defined(LEXDEBUG)
     if (l > 0)
         fprintf(stderr, "add '%s'\n", p);
 #endif
-    outp -= l;
-    if (outp < &defbuf[10])
+    if ((ptrdiff_t)l > outp - &defbuf[10])
     {
-        outp += l;
         lexerror("Macro expansion buffer overflow");
         return;
     }
 
+    outp -= l;
     strncpy(outp, p, l);
 }
 
@@ -1036,7 +1084,7 @@ myungetc (char c)
 }
 
 /*-------------------------------------------------------------------------*/
-static INLINE /* TODO: BOOL */ int
+static INLINE Bool
 gobble (char c)
 
 /* Skip the next character in the input buffer if it is <c> and return true.
@@ -1065,7 +1113,7 @@ lexerror (char *s)
 }
 
 /*-------------------------------------------------------------------------*/
-static /* TODO: BOOL */ int
+static Bool
 skip_to (char *token, char *atoken)
 
 /* Skip the file linewise until one of the following preprocessor statements
@@ -1196,7 +1244,7 @@ skip_to (char *token, char *atoken)
 
 /*-------------------------------------------------------------------------*/
 static void
-handle_cond (/* TODO: BOOL */ int c)
+handle_cond (Bool c)
 
 /* Evaluate the boolean condition <c> of a preprocessor #if statement.
  * If necessary, skip to the condition branch to read next, and/or
@@ -1473,7 +1521,7 @@ handle_include (char *name)
     int   fd;        /* fd of new include file */
     char  delim;     /* Filename end-delimiter ('"' or '>'). */
     char *old_outp;  /* Save the original outp */
-    /* TODO: BOOL */ int in_buffer = MY_FALSE; /* True if macro was expanded */
+    Bool  in_buffer = MY_FALSE; /* True if macro was expanded */
     ptrdiff_t linebufoffset;  /* Position of current linebufstart */
     char  buf[INC_OPEN_BUFSIZE];
 
@@ -1527,7 +1575,7 @@ handle_include (char *name)
     }
 
     /* Store the delimiter and set p to the closing delimiter */
-    delim = *name++ == '"' ? '"' : '>';
+    delim = (char)((*name++ == '"') ? '"' : '>');
     for(p = name; *p && *p != delim; p++) NOOP;
 
     if (!*p) {
@@ -1874,8 +1922,24 @@ handle_pragma (char *str)
     else if (strcmp(str, "verbose_errors") == 0)
     {
         pragma_verbose_errors = MY_TRUE;
-#if defined( DEBUG ) && defined ( TRACE_CODE )
     }
+    else if (strcmp(str, "no_clone") == 0)
+    {
+        pragma_no_clone = MY_TRUE;
+    }
+    else if (strcmp(str, "no_inherit") == 0)
+    {
+        pragma_no_inherit = MY_TRUE;
+    }
+    else if (strcmp(str, "no_local_scopes") == 0)
+    {
+        pragma_use_local_scopes = MY_FALSE;
+    }
+    else if (strcmp(str, "local_scopes") == 0)
+    {
+        pragma_use_local_scopes = MY_TRUE;
+    }
+#if defined( DEBUG ) && defined ( TRACE_CODE )
     else if (strcmp(str, "set_code_window") == 0)
     {
         set_code_window();
@@ -1883,13 +1947,13 @@ handle_pragma (char *str)
     else if (strcmp(str, "show_code_window") == 0)
     {
         show_code_window();
-#endif
     }
+#endif
 } /* handle_pragma() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE int
-number (int i)
+number (long i)
 
 /* Return a number to yacc: set yylval.number to <i> and return F_NUMBER.
  */
@@ -1911,7 +1975,7 @@ add_lex_string (char *str)
  */
 
 {
-    mp_int len1, len3;
+    size_t len1, len3;
     char *tmp;
 
     len1 = strlen(last_lex_string);
@@ -1964,6 +2028,9 @@ yylex1 (void)
  * Illegal characters are returned as spaces.
  * If the lexer runs into a fatal error or the end of file, -1 is returned.
  *
+ * <depth> is the current nesting depth for local scopes, needed for
+ * correct lookup of local identifiers.
+ *
  * Some elements return additional information:
  *   F_ASSIGN:  yylval.number is the type of assignment operation
  *              e.g. F_ADD_EQ-F_OFFSET for '+='.
@@ -1983,6 +2050,33 @@ yylex1 (void)
     register char c;
 
 #define TRY(c, t) if (*yyp == (c)) {yyp++; outp = yyp; return t;}
+
+    /* If we are at a point suitable for inline function insertion,
+     * do it.
+     * Note: It is not strictly necessary to insert all of them
+     * at once, since the compiler will set insert_inline_fun_now
+     * again as soon as it is finished with this one.
+     */
+    if (insert_inline_fun_now)
+    {
+        struct inline_fun * fun;
+        char buf[80];
+
+        sprintf(buf, "#line %d\n", current_line);
+        insert_inline_fun_now = MY_FALSE;
+        while (first_inline_fun)
+        {
+            fun = first_inline_fun->next;
+            if (first_inline_fun->buf.length)
+            {
+                strbuf_add(&(first_inline_fun->buf), buf);
+                add_input(first_inline_fun->buf.buf);
+                strbuf_free(&(first_inline_fun->buf));
+            }
+            xfree(first_inline_fun);
+            first_inline_fun = fun;
+        }
+    }
 
     yyp = outp;
 
@@ -2276,10 +2370,268 @@ yylex1 (void)
             return ':';
 
 
+        /* --- Inline Function --- */
+
+        case '(':
+            /* Check for '(:' but ignore '(::' which can occur e.g.
+             * in 'if (::remove())'. However, accept '(:::' e.g. from
+             * '(:::remove()', and '(::)'.
+             */
+
+            if (*yyp == ':'
+             && (yyp[1] != ':' || yyp[2] == ':' || yyp[2] == ')'))
+            {
+                struct inline_fun * fun;
+                strbuf_t * textbuf;
+                size_t pos_return;  /* position of the 'return' */
+                char name[256+MAXPATHLEN];
+                int level;
+                int first_line;  /* For error messages */
+                char *start;
+
+                first_line = current_line;
+
+                /* Allocate new function list element */
+                if (!first_inline_fun)
+                {
+                    /* Create the list */
+                    first_inline_fun = xalloc(sizeof *first_inline_fun);
+                    if (!first_inline_fun)
+                        yyerror("Out of memory.");
+                    fun = first_inline_fun;
+                }
+                else
+                {
+                    /* Append the element at the end of the list */
+                    fun = first_inline_fun;
+                    while (fun->next)
+                        fun = fun->next;
+                    fun->next = xalloc(sizeof *fun);
+                    if (!fun->next)
+                        yyerror("Out of memory.");
+                    fun = fun->next;
+                }
+
+                textbuf = &(fun->buf);
+                strbuf_zero(textbuf);
+                fun->next = NULL; /* Terminate the list properly */
+
+                /* Create the name of the new inline function */
+                sprintf(name, "__inline_%s_%d_%04x", current_file
+                             , current_line, next_inline_fun++);
+
+                /* Convert all non-alnums to '_' */
+                for (start = name; *start != '\0'; start++)
+                {
+                    if (!isalnum(*start))
+                        *start = '_';
+                }
+
+                /* Create the function header in the string buffer.
+                 * For now we insert a 'return' which we might 'space out'
+                 * later.
+                 */
+                strbuf_addf(textbuf
+                           , "\n#line %d\n"
+                             "varargs mixed %s (mixed $1, mixed $2, mixed $3,"
+                             " mixed $4, mixed $5, mixed $6, mixed $7,"
+                             " mixed $8, mixed $9) { return "
+                           , current_line, name);
+                pos_return = (unsigned)textbuf->length-7;
+
+                /* Set yyp to the end of (: ... :), and also check
+                 * for the highest parameter used.
+                 */
+                yyp++;
+                level = 1;
+                start = yyp;
+                while (level)
+                {
+                    switch (*yyp++)
+                    {
+                    case CHAR_EOF:
+                        current_line = first_line;
+                        yyerror("Unexpected end of file in (: .. :)");
+                        return -1;
+
+                    case '\0':
+                        lexerror("Lexer failed to refill the line buffer");
+                        return -1;
+
+                    case '(':
+                        if (yyp[0] == ':'
+                         && (yyp[1] != ':' || yyp[2] == ':' || yyp[2] == ')')
+                           )
+                            level++, yyp++;
+                        break;
+
+                    case ':':
+                        if (yyp[0] == ')')
+                            level--, yyp++;
+                        break;
+
+                    case '#':
+                        if (*yyp == '\'')
+                            yyp++;
+                        break;
+
+                    case '/':
+                        c = *yyp;
+                        if (c == '*')
+                        {
+                            int this_line;
+
+                            this_line = current_line;
+                            strbuf_addn(textbuf, start, (unsigned)(yyp-start-1));
+                            outp = yyp;
+                            skip_comment();
+                            yyp = outp;
+                            if (lex_fatal)
+                                return -1;
+
+                            start = yyp;
+                            while (this_line++ < current_line)
+                                strbuf_addc(textbuf, '\n');
+
+                            continue;
+                        }
+
+                        if (c == '/')
+                        {
+                            int this_line;
+
+                            this_line = current_line;
+                            strbuf_addn(textbuf, start, (unsigned)(yyp-start-1));
+                            yyp = skip_pp_comment(yyp);
+
+                            start = yyp;
+                            while (this_line++ < current_line)
+                                strbuf_addc(textbuf, '\n');
+
+                            continue;
+                        }
+                        break;
+
+                    case '\n':
+                        store_line_number_info();
+                        nexpands = 0;
+                        current_line++;
+                        total_lines++;
+                        if (!*yyp)
+                        {
+                            strbuf_addn(textbuf, start, (unsigned)(yyp-start));
+                            outp = yyp;
+                            yyp = _myfilbuf();
+                            start = yyp;
+                        }
+                        break;
+
+                    case '\"':
+                    case '\'':
+                      {
+                        char delimiter = yyp[-1];
+
+                        while ((c = *yyp++) != delimiter)
+                        {
+                            if (c == '\\')
+                            {
+                                if (*yyp++ == '\n')
+                                {
+                                    store_line_number_info();
+                                    nexpands = 0;
+                                    current_line++;
+                                    total_lines++;
+                                    if (!*yyp)
+                                    {
+                                        strbuf_addn(textbuf
+                                            , start
+                                            , (unsigned)(yyp-start));
+                                        outp = yyp;
+                                        yyp = _myfilbuf();
+                                        start = yyp;
+                                    }
+                                }
+                            }
+                            else if (c == '\n')
+                            {
+                                store_line_number_info();
+                                nexpands = 0;
+                                current_line++;
+                                total_lines++;
+                                if (!*yyp)
+                                {
+                                    strbuf_addn(textbuf
+                                        , start
+                                        , (unsigned)(yyp-start));
+                                    outp = yyp;
+                                    yyp = _myfilbuf();
+                                    start = yyp;
+                                }
+                            }
+                        }
+                        break;
+                      } /* string-case */
+
+                    } /* switch(yyp[0]) */
+
+                } /* while(level) */
+
+                /* yyp now points to the character after the ':)'.
+                 * This is where the next call to lex has to continue.
+                 * Also copy the remaining (or the only) part of the
+                 * closure into the text buffer.
+                 */
+
+                strbuf_addn(textbuf, start, (unsigned)(yyp-start-2));
+                outp = yyp;
+
+                /* The closure must not be too long (there is a hard limit in
+                 * the strbuf_t datastructure.
+                 */
+                if (textbuf->length > MAX_STRBUF_LEN-100)
+                    yyerror("Inline closure too long");
+
+                /* Check if the last character before the ':)' is
+                 * a ';' or '}'. For convenience we re-use yyp to
+                 * point into our buffer (we will exit from here
+                 * anyway).
+                 */
+
+                yyp = textbuf->buf + textbuf->length-1;
+                while (lexwhite(*yyp) || '\n' == *yyp || '\r' == *yyp)
+                    yyp--;
+
+                if (*yyp == ';' || *yyp == '}')
+                {
+                    /* Functional contains statements: remove the 'return'
+                     * added in the beginnin.
+                     */
+                    int i;
+
+                    for (i = 0; i < 6; i++)
+                        textbuf->buf[pos_return+i] = ' ';
+
+                    /* Finish up the function text */
+                    strbuf_add(textbuf, "}\n");
+                }
+                else
+                {
+                    /* Finish up the function text */
+                    strbuf_add(textbuf, ";}\n");
+                }
+
+
+                /* Return the ID of the name of the new inline function */
+
+                yylval.ident = make_shared_identifier(name, I_TYPE_UNKNOWN, 0);
+                return F_INLINE_FUN;
+            }
+
+            /* FALL THROUGH */
         /* --- Single-char Operators and Punctuation --- */
 
+        /* case '(' is a fall through from above */
         case ';':
-        case '(':
         case ')':
         case ',':
         case '{':
@@ -2301,7 +2653,7 @@ yylex1 (void)
 
                 struct ident *p;
                 char *wordstart = ++yyp;
-                /* TODO: BOOL */ int efun_override;
+                Bool efun_override;
                     /* True if 'efun::' is specified. */
 
                 /* Set yyp to the last character of the functionname
@@ -2342,7 +2694,7 @@ yylex1 (void)
 
                 /* Lookup the name parsed from the text */
                 *yyp = '\0'; /* c holds the char at this place */
-                p = make_shared_identifier(wordstart, I_TYPE_GLOBAL);
+                p = make_shared_identifier(wordstart, I_TYPE_GLOBAL, 0);
                 *yyp = c;
                 if (!p) {
                     lexerror("Out of memory");
@@ -2435,7 +2787,7 @@ yylex1 (void)
                 {
                     struct svalue *res;
 
-                    push_constant_string("nomask simul_efun");
+                    push_volatile_string("nomask simul_efun");
                     push_volatile_string(current_file);
                     push_shared_string(p->name);
                     res = apply_master_ob(STR_PRIVILEGE, 3);
@@ -2540,7 +2892,7 @@ yylex1 (void)
                 /* --- <newline>#: Preprocessor statement --- */
 
                 char *sp = NULL; /* Begin of second word */
-                /* TODO: BOOL */ int quote; /* In "" string? */
+                Bool quote; /* In "" string? */
                 char last;
                   /* Character last read, used to implement \-sequences */
 
@@ -2753,7 +3105,7 @@ yylex1 (void)
                             {
                                 p->inferior->next = p->next;
                                 *q = p->inferior;
-                                increment_string_ref(p->name);
+                                ref_string(p->name);
                             }
                             else
                             {
@@ -2774,6 +3126,17 @@ yylex1 (void)
                 {
                     deltrail(sp);
                     handle_pragma(sp);
+                }
+                else if (strcmp("line", yytext) == 0)
+                {
+                    char * end;
+                    long new_line;
+
+                    deltrail(sp);
+                    new_line = strtol(sp, &end, 0);
+                    if (end == sp || *end != '\0')
+                        yyerror("Unrecognised #line directive");
+                    current_line = new_line - 1;
                 }
                 else
                 {
@@ -2860,7 +3223,7 @@ yylex1 (void)
                 /* If the first non-quote is not an alnum, it must
                  * be a quoted aggregrate or an error.
                  */
-                if (!isalpha((unsigned char)*yyp))
+                if (!isalpha((unsigned char)*yyp) && *yyp != '_')
                 {
                     if (*yyp == '(' && yyp[1] == '{')
                     {
@@ -3000,12 +3363,12 @@ yylex1 (void)
                 while(leXdigit(c = *++yyp))
                 {
                     if (c > '9')
-                        c = (c & 0xf) + ( '9' + 1 - ('a' & 0xf) );
+                        c = (char)((c & 0xf) + ( '9' + 1 - ('a' & 0xf) ));
                     l <<= 4;
                     l += c - '0';
                 }
                 outp = yyp;
-                return number(l);
+                return number((signed)l);
             }
 
             /* If one '.' follows, it's the start of a float.
@@ -3059,13 +3422,14 @@ yylex1 (void)
 
         /* --- Identifier --- */
 
-        case 'A':case 'B':case 'C':case 'D':case 'E':case 'F':case 'G':case 'H':
-        case 'I':case 'J':case 'K':case 'L':case 'M':case 'N':case 'O':case 'P':
-        case 'Q':case 'R':case 'S':case 'T':case 'U':case 'V':case 'W':case 'X':
-        case 'Y':case 'Z':case 'a':case 'b':case 'c':case 'd':case 'e':case 'f':
-        case 'g':case 'h':case 'i':case 'j':case 'k':case 'l':case 'm':case 'n':
-        case 'o':case 'p':case 'q':case 'r':case 's':case 't':case 'u':case 'v':
-        case 'w':case 'x':case 'y':case 'z':case '_':
+        case 'A':case 'B':case 'C':case 'D':case 'E':case 'F':case 'G':
+        case 'H':case 'I':case 'J':case 'K':case 'L':case 'M':case 'N':
+        case 'O':case 'P':case 'Q':case 'R':case 'S':case 'T':case 'U':
+        case 'V':case 'W':case 'X':case 'Y':case 'Z':case 'a':case 'b':
+        case 'c':case 'd':case 'e':case 'f':case 'g':case 'h':case 'i':
+        case 'j':case 'k':case 'l':case 'm':case 'n':case 'o':case 'p':
+        case 'q':case 'r':case 's':case 't':case 'u':case 'v':case 'w':
+        case 'x':case 'y':case 'z':case '_':case '$':
         {
             struct ident *p;
             char *wordstart = yyp-1;
@@ -3080,7 +3444,7 @@ yylex1 (void)
             /* Lookup/enter the identifier in the ident_table, then restore
              * the original text
              */
-            p = make_shared_identifier(wordstart, I_TYPE_UNKNOWN);
+            p = make_shared_identifier(wordstart, I_TYPE_UNKNOWN, 0);
             *yyp = c;
             if (!p)
             {
@@ -3111,7 +3475,7 @@ yylex1 (void)
                 return p->u.code;
 
             case I_TYPE_LOCAL:
-                yylval.number = p->u.local;
+                yylval.number = p->u.local.num;
                 outp = yyp;
                 return F_LOCAL;
 
@@ -3160,6 +3524,8 @@ yylex (void)
 /* The lex function called by the parser. The actual lexing is done
  * in yylex1(), this function just does any necessary pre- and post-
  * processing.
+ * <depth> is the current nesting depth for local scopes, needed for
+ * correct lookup of local identifiers.
  */
 
 {
@@ -3207,12 +3573,18 @@ start_new_file (int fd)
         current_line = auto_include_start;
     }
 
-    pragma_strict_types = PRAGMA_WEAK_TYPES; /* I would prefer !o_flag /Lars */
+    pragma_strict_types = PRAGMA_WEAK_TYPES;
     instrs[F_CALL_OTHER-F_OFFSET].ret_type = TYPE_ANY;
+    pragma_use_local_scopes = MY_TRUE;
     pragma_save_types = MY_FALSE;
     pragma_verbose_errors = MY_FALSE;
+    pragma_no_clone = MY_FALSE;
+    pragma_no_inherit = MY_FALSE;
 
     nexpands = 0;
+
+    next_inline_fun = 0;
+    insert_inline_fun_now = MY_FALSE;
 } /* start_new_file() */
 
 /*-------------------------------------------------------------------------*/
@@ -3256,6 +3628,16 @@ end_new_file (void)
         free_string(last_lex_string);
         last_lex_string = NULL;
     }
+
+    while (first_inline_fun)
+    {
+        struct inline_fun * fun = first_inline_fun;
+
+        first_inline_fun = first_inline_fun->next;
+        strbuf_free(&(fun->buf));
+        xfree(fun);
+    }
+
 } /* end_new_file() */
 
 /*-------------------------------------------------------------------------*/
@@ -3347,8 +3729,8 @@ cmygetc (void)
 } /* cmygetc() */
 
 /*-------------------------------------------------------------------------*/
-static /* TODO: BOOL */ int
-refill (/* TODO: BOOL */ int quote)
+static Bool
+refill (Bool quote)
 
 /* Read the next line from the input buffer into yytext[], skipping
  * comments, reading the final \n as space.
@@ -3390,10 +3772,10 @@ refill (/* TODO: BOOL */ int quote)
         else if (c == '"')
             quote = !quote;
         else
-            last = c;
+            last = (char)c;
 
         if (p < yytext+MAXLINE-5)
-            *p++ = c;
+            *p++ = (char)c;
         else
         {
             lexerror("Line too long");
@@ -3417,7 +3799,7 @@ refill (/* TODO: BOOL */ int quote)
 
 /*-------------------------------------------------------------------------*/
 static void
-handle_define (char *yyt, /* TODO: BOOL */ int quote)
+handle_define (char *yyt, Bool quote)
 
 /* This function is called from yylex1() to handle '#define' statements.
  * The text of the line with the statement is in yytext[], <yyt> points
@@ -3466,8 +3848,8 @@ handle_define (char *yyt, /* TODO: BOOL */ int quote)
     {
         /* --- Function Macro --- */
 
-        int arg;           /* Number of macro arguments */
-        /* TODO: BOOL */ int inid;  /* true: parsing an identifier */
+        short arg;         /* Number of macro arguments */
+        Bool inid;         /* true: parsing an identifier */
         char *ids = NULL;  /* Start of current identifier */
 
         p++;        /* skip '(' and following whitespace */
@@ -3544,7 +3926,8 @@ handle_define (char *yyt, /* TODO: BOOL */ int quote)
                 if (inid)
                 {
                     int idlen = p - ids;
-                    int n, l;
+                    size_t l;
+                    int n;
 
                     /* Check if the identifier matches one of the
                      * function arguments. If yes, replace it in mtext[]
@@ -3556,8 +3939,8 @@ handle_define (char *yyt, /* TODO: BOOL */ int quote)
                         if (l == idlen && strncmp(args[n], ids, l) == 0)
                         {
                             q -= idlen;
-                            *q++ = MARKS;
-                            *q++ = n+MARKS+1;
+                            *q++ = (char)MARKS;
+                            *q++ = (char)(n+MARKS+1);
                             break;
                         }
                     }
@@ -3653,7 +4036,7 @@ handle_define (char *yyt, /* TODO: BOOL */ int quote)
 
 /*-------------------------------------------------------------------------*/
 static void
-add_define (char *name, int nargs, char *exps)
+add_define (char *name, short nargs, char *exps)
 
 /* Add a new macro definition for macro <name> with <nargs> arguments
  * and the replacement text <exps>. The positions where the arguments
@@ -3670,7 +4053,7 @@ add_define (char *name, int nargs, char *exps)
     struct ident *p;
 
     /* Lookup/create a new identifier entry */
-    p = make_shared_identifier(name, I_TYPE_DEFINE);
+    p = make_shared_identifier(name, I_TYPE_DEFINE, 0);
     if (!p)
     {
         lexerror("Out of memory");
@@ -3718,7 +4101,7 @@ add_define (char *name, int nargs, char *exps)
 
 /*-------------------------------------------------------------------------*/
 static void
-add_permanent_define (char *name, int nargs, void *exps, /* TODO: BOOL */ char special)
+add_permanent_define (char *name, short nargs, void *exps, Bool special)
 
 /* Add a new permanent macro definition for macro <name>
  * with <nargs> arguments and the replacement text <exps>.
@@ -3741,7 +4124,7 @@ add_permanent_define (char *name, int nargs, void *exps, /* TODO: BOOL */ char s
     struct ident *p;
 
     /* Lookup/create a new identifier entry */
-    p = make_shared_identifier(name, I_TYPE_DEFINE);
+    p = make_shared_identifier(name, I_TYPE_DEFINE, 0);
     if (!p)
     {
         error("Out of memory\n");
@@ -3768,7 +4151,7 @@ add_permanent_define (char *name, int nargs, void *exps, /* TODO: BOOL */ char s
     p->type = I_TYPE_DEFINE;
     p->u.define.nargs = nargs;
     p->u.define.permanent = MY_TRUE;
-    p->u.define.special = special;
+    p->u.define.special = (short)special;
     if (!special)
         p->u.define.exps.str = (char *)exps;
     else
@@ -3875,7 +4258,7 @@ lookup_define (char *s)
 
 
 /*-------------------------------------------------------------------------*/
-static /* TODO: BOOL */ int
+static Bool
 expand_define (void)
 
 /* Check if yytext[] holds a macro and expand it if it is.
@@ -3893,7 +4276,7 @@ expand_define (void)
 }
 
 /*-------------------------------------------------------------------------*/
-static /* TODO: BOOL */ int
+static Bool
 _expand_define (struct defn *p)
 
 /* Expand the macro <p> and add_input() the expanded text.
@@ -3931,11 +4314,19 @@ _expand_define (struct defn *p)
        * function and reused thereafter. Putting them on the
        * stack would make _expand_define() reentrant, but
        * very slow on systems without proper alloca().
+       * Right now the only possibility for a recursive call
+       * is an error during the expansing, with error handling requesting
+       * another expansion. In this case, reentrancy is not an issue
+       * because after returning from the error, the function itself
+       * returns immediately.
+       *
+       * But should the need ever arise, the old fragments may be
+       * changed to implement a stack of buffers.
        */
 
-#ifdef DEBUG
+#if 0
     static int mutex = 0;
-      /* The mutex is used as guard against recursive calls.
+      /* TODO: The mutex may be used to implement a stack of buffers if needed.
        */
 #endif
 
@@ -3948,9 +4339,11 @@ _expand_define (struct defn *p)
     char *b;  /* Pointer into buf[] when expanding */
     char *r;  /* Next character to read from input buffer */
 
-#ifdef DEBUG
-    /* TODO: Remove this test if no problems are reported.
-     * I see no way this is called recursively anyway.
+#if 0
+    /* TODO: This was a test for recursive calls. If a stack of buffers is
+     * TODO:: needed, this code fragments allow an easy implementation,
+     * TODO:: especially because the DEMUTEX macros are already where
+     * TODO:: they have to be.
      */
     if (mutex++)
     {
@@ -4010,8 +4403,8 @@ _expand_define (struct defn *p)
 
         int c;
         int parcnt = 0;  /* Number of pending open' (' */
-        /* TODO: BOOL */ int dquote = MY_FALSE; /* true: in "" */
-        /* TODO: BOOL */ int squote = MY_FALSE; /* true: in '' */
+        Bool dquote = MY_FALSE; /* true: in "" */
+        Bool squote = MY_FALSE; /* true: in '' */
         int n;           /* Number of parsed macro arguments */
 
         /* Look for the argument list */
@@ -4035,7 +4428,7 @@ _expand_define (struct defn *p)
         {
             /* Setup */
             r = outp;
-            *--r = c;
+            *--r = (char)c;
             q = expbuf;
             args[0] = q;
 
@@ -4054,13 +4447,13 @@ _expand_define (struct defn *p)
                     /* Begin of string literal, or '"' constant */
                     if (!squote)
                         dquote = !dquote;
-                    *q++ = c;
+                    *q++ = (char)c;
                     continue;
 
                   case '#':
                     /* Outside of strings it must be a #'symbol.
                      */
-                    *q++ = c;
+                    *q++ = (char)c;
                     if (!squote && !dquote && *r == '\'')
                     {
                         r++;
@@ -4068,7 +4461,7 @@ _expand_define (struct defn *p)
                         if (isalunum(c = *r))
                         {
                             do {
-                                *q++ = c;
+                                *q++ = (char)c;
                                 ++r;
                             } while (isalunum(c = *r));
                         }
@@ -4080,7 +4473,7 @@ _expand_define (struct defn *p)
                             {
                                 yyerror("Missing function name after #'");
                             }
-                            strncpy(q, r, end - r);
+                            strncpy(q, r, (size_t)(end - r));
                             q += end - r;
                             r = end;
                         }
@@ -4096,7 +4489,7 @@ _expand_define (struct defn *p)
                     {
                         squote = !squote;
                     }
-                    *q++ = c;
+                    *q++ = (char)c;
                     continue;
 
                   case '(' :
@@ -4104,7 +4497,7 @@ _expand_define (struct defn *p)
                      */
                     if (!squote && !dquote)
                         parcnt++;
-                    *q++ = c;
+                    *q++ = (char)c;
                     continue;
 
                   case ')' :
@@ -4121,13 +4514,13 @@ _expand_define (struct defn *p)
                             break;
                         }
                     }
-                    *q++ = c;
+                    *q++ = (char)c;
                     continue;
 
                   case '\\':
                     /* In strings, escaped sequence.
                      */
-                    *q++ = c;
+                    *q++ = (char)c;
                     if (squote || dquote)
                     {
                         c = *r++;
@@ -4151,7 +4544,7 @@ _expand_define (struct defn *p)
                             r--;
                             continue;
                         }
-                        *q++ = c;
+                        *q++ = (char)c;
                     }
                     continue;
 
@@ -4188,7 +4581,7 @@ _expand_define (struct defn *p)
                         }
                         continue;
                     }
-                    *q++ = c;
+                    *q++ = (char)c;
                     continue;
 
                   case CHAR_EOF:
@@ -4218,7 +4611,7 @@ _expand_define (struct defn *p)
                     }
 
                   default:
-                    *q++ = c;
+                    *q++ = (char)c;
                     continue;
                 } /* end switch */
 
@@ -4310,7 +4703,7 @@ exgetc (void)
  */
 
 {
-#define SKPW         do c = mygetc(); while(lexwhite(c)); myungetc(c)
+#define SKPW         do c = (unsigned char)mygetc(); while(lexwhite(c)); myungetc((char)c)
   /* Skip the whitespace in the input buffer until the first non-blank.
    * End with the input pointing to this non-blank.
    */
@@ -4318,7 +4711,7 @@ exgetc (void)
     register unsigned char c;
     register char *yyp;
 
-    c = mygetc();
+    c = (unsigned char)mygetc();
     for (;;)
     {
         if ( isalpha(c) || c=='_' )
@@ -4331,29 +4724,29 @@ exgetc (void)
             yyp = yytext;
             do {
                 SAVEC;
-                c=mygetc();
+                c=(unsigned char)mygetc();
             } while ( isalunum(c) );
-            myungetc(c);
+            myungetc((char)c);
 
             *yyp='\0';
             if (strcmp(yytext, "defined") == 0)
             {
                 /* handle the 'defined' predicate */
-                do c = mygetc(); while(lexwhite(c));
+                do c = (unsigned char)mygetc(); while(lexwhite(c));
                 if (c != '(')
                 {
                     yyerror("Missing ( in defined");
                     continue;
                 }
-                do c = mygetc(); while(lexwhite(c));
+                do c = (unsigned char)mygetc(); while(lexwhite(c));
                 yyp=yytext;
                 while ( isalunum(c) )
                 {
                     SAVEC;
-                    c=mygetc();
+                    c=(unsigned char)mygetc();
                 }
                 *yyp='\0';
-                while(lexwhite(c)) c = mygetc();
+                while(lexwhite(c)) c = (unsigned char)mygetc();
                 if (c != ')') {
                     yyerror("Missing ) in defined");
                     continue;
@@ -4370,7 +4763,7 @@ exgetc (void)
                 if (!expand_define())
                     add_input(" 0 ");
             }
-            c = mygetc();
+            c = (unsigned char)mygetc();
         }
         else if (c == '\\' && *outp == '\n')
         {
@@ -4379,13 +4772,13 @@ exgetc (void)
              * for reparsing.
              */
 
-            /* TODO: BOOL */ int quote;
+            Bool quote;
 
             outp++;
             yyp = yytext;
             for(quote = MY_FALSE;;)
             {
-                c = mygetc();
+                c = (unsigned char)mygetc();
                 if (c == '"')
                     quote = !quote;
                 while(!quote && c == '/') { /* handle comments cpp-like */
@@ -4393,7 +4786,7 @@ exgetc (void)
 
                     if ( (c2 = mygetc()) == '*') {
                         skip_comment();
-                        c=mygetc();
+                        c=(unsigned char)mygetc();
                     } else if (c2 == '/') {
                         outp = skip_pp_comment(outp);
                         current_line--;
@@ -4413,7 +4806,7 @@ exgetc (void)
             total_lines++;
             add_input(yytext);
             nexpands = 0;
-            c = mygetc();
+            c = (unsigned char)mygetc();
         }
         else
         {
@@ -4476,8 +4869,6 @@ cond_get_exp (int priority, struct svalue *svp)
 
             char *p, *q;
 
-            svp->type = T_STRING;
-            svp->x.string_type = STRING_MALLOC;
             q = p = outp;
             for (;;)
             {
@@ -4489,7 +4880,7 @@ cond_get_exp (int priority, struct svalue *svp)
                 if (c == '\n')
                 {
                     yyerror("unexpected end of string in #if");
-                    svp->u.string = string_copy("");
+                    put_malloced_string(svp, string_copy(""));
                     return 0;
                 }
                 if (c == '\\')
@@ -4502,10 +4893,10 @@ cond_get_exp (int priority, struct svalue *svp)
                         break;
                     }
                 }
-                *q++ = c;
+                *q++ = (char)c;
             }
             *q = '\0';
-            svp->u.string = string_copy(outp);
+            put_malloced_string(svp, string_copy(outp));
             outp = p;
         }
         else
@@ -4593,9 +4984,8 @@ cond_get_exp (int priority, struct svalue *svp)
             value = value * base + x;
             c = mygetc();
         }
-        myungetc(c);
-        svp->type = T_NUMBER;
-        svp->u.number = value;
+        myungetc((char)c);
+        put_number(svp, value);
     }
 
 
@@ -4628,7 +5018,7 @@ cond_get_exp (int priority, struct svalue *svp)
         {
             if (!optab2[x])
             {
-                myungetc(value2);
+                myungetc((char)value2);
                 if (!optab2[x+1])
                 {
                     yyerror("illegal operator use in #if");
@@ -4646,7 +5036,7 @@ cond_get_exp (int priority, struct svalue *svp)
         if (priority >= optab2[x+2])
         {
             if (optab2[x])
-                myungetc(value2);
+                myungetc((char)value2);
             break;
         }
 
@@ -4688,7 +5078,7 @@ cond_get_exp (int priority, struct svalue *svp)
                   if (c != ':')
                   {
                       yyerror("'?' without ':' in #if");
-                      myungetc(c);
+                      myungetc((char)c);
                       return 0;
                   }
                   if (value)
@@ -4735,7 +5125,7 @@ cond_get_exp (int priority, struct svalue *svp)
                     yyerror("illegal operator use in #if");
                     return 0;
                 }
-                svp->u.number = value;
+                put_number(svp, value);
             }
         }
         else
@@ -4747,7 +5137,7 @@ cond_get_exp (int priority, struct svalue *svp)
             return 0;
         }
     }
-    myungetc(c);
+    myungetc((char)c);
     return value;
 } /* cond_get_expr() */
 
@@ -4802,7 +5192,7 @@ set_inc_list (struct vector *v)
         if (*p == '.' && !p[1])
             error("H_INCLUDE_DIRS path is a single prefix dot\n");
 
-        len = strlen(p);
+        len = (signed)strlen(p);
         if (max < len)
             max = len;
         if (len >= 2 && p[len -1] == '.' && p[len - 2] == '/')
@@ -4951,7 +5341,7 @@ efun_defined (char **args)
 {
     struct ident *p;
 
-    p = make_shared_identifier(args[0], I_TYPE_GLOBAL);
+    p = make_shared_identifier(args[0], I_TYPE_GLOBAL, 0);
     if (!p)
     {
         lexerror("Out of memory");
@@ -5181,8 +5571,7 @@ f_expand_define (struct svalue *sp)
     /* Return the result */
     if (!res)
     {
-        sp->type = T_NUMBER;
-        sp->u.number = 0;
+        put_number(sp, 0);
     }
     else
     {

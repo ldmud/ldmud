@@ -43,23 +43,33 @@
 
 #include "driver.h"
 
-#define SENT_PLAIN          0
-#define SENT_SHORT_VERB     1
-#define SENT_NO_SPACE       2
-#define SENT_NO_VERB        3
+#define SENT_PLAIN          0  /* Normal action */
+#define SENT_SHORT_VERB     1  /* Action with embedded verb */
+#define SENT_NO_SPACE       2  /* Added with add_action() + add_xverb() */
+#define SENT_NO_VERB        3  /* Action with no verb given */
 #define SENT_IS_INTERNAL(x) ((x) >= SENT_MARKER)
-#define SENT_MARKER         4
-#define SENT_SHADOW         5
-#define SENT_INTERACTIVE    6
+#define SENT_MARKER         4  /* Internal: marker for a command search */
+#define SENT_SHADOW         5  /* Internal: shadow data */
+#define SENT_INTERACTIVE    6  /* Internal: interactive data */
 
 /* TODO: Document the struct sentence members */
-struct sentence {
+struct sentence
+{
     char *verb;
+      /* Shared string: the defined verb.
+       * For SENT_PLAIN, this is the whole verb.
+       * For SENT_SHORT_VERB and SENT_NO_SPACE, only the first letters of
+       *   the command have to match this verb.
+       */
     struct object *ob;
-    char *function;
-    struct sentence *next;
-    unsigned short short_verb; /* Only leading characters count */
-    unsigned char type;
+      /* Object defining this sentence. This value is used for comparisons
+       * only, and in case of SENT_MARKER is in fact a *rt_context_t.
+       */
+    char *function;             /* the name of the action function */
+    struct sentence *next;      /* Next sentence in the list */
+    unsigned short short_verb;
+      /* SENT_NO_VERB: number of times this sentence was encountered. */
+    unsigned char type;         /* Type of the sentence */
 };
 
 /* TODO: Document the struct shadow_sentence members */

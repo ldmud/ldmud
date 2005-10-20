@@ -2,7 +2,7 @@ Short: Get rid of the light handling
 From: Daniel von Dincklage <vondincklage@usa.net>
 Date: Mon, 22 Jun 1998 00:53:36 +0200
 Type: Feature
-State: Unclassified
+State: Done - optional in 3.2.7
 
 > - Get rid of the light-handling in the driver
 

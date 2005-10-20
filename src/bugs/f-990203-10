@@ -6,3 +6,4 @@ State: Unclassified
 
 Make shutdown() and garbage_collection() call master::privilege_violation().
 
+Note: Most muds solve that with nomask simul-efuns.

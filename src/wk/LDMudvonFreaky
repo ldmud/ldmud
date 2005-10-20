@@ -3,31 +3,6 @@ From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
 Date: Mon, 23 Nov 1998 02:18:23 +0100
 X-Mailer: Mutt 0.94.15i
 
-Hi,
-
-Ich wollte nur mal fragen, wie es mit dem Final Release von LDMud 3.2.5
-aussieht :) Auf welchem FTP-Server liegt dann alles?
-
-Dann haette ich noch ein paar Vorschlaege fuer Erweiterungen:
-
-Die Driver-Befehle 'dumpallobj' 'malloc' 'status' und 'status <parameter>'
-sollten alle (wie auch schon showsmallnewmalloced) im Master abgefragt
-werden, ob derjenige, der das eingibt, das ueberhaupt darf.
-Dazu gibt es ja schon 'master::query_player_level(string what, object ob)'
-Momentan kann man nicht verhindern, dass jemand ein 'dumpallobj' ausfuehrt.
-
-Die Master-Funktion ist meiner Meinung nach allerdings etwas ungluecklich
-gewaehlt. Man koennte das auch ueber die privilege_violation regeln, wo die
-ganze Sache besser aufgehoben waere.
-
-Dann waere auch das 'set_is_wizard()' ueberfluessig und man koennte sich
-diese Efun sparen. Ich wuesste nicht, wo die sonst noch gebraucht wird, da
-man den Wert eh' nicht gut auslesen kann und sowas in der Mudlib besser
-aufgehoben ist.
-
-Dann waere es endlich mal an der Zeit die 'efun308' nach 'set_environment'
-umzubenennen ;)
-
 Das naechste waere ein Style-Guide fuer den Driver-Code.
 Ich habe an deinen Diffs z.B. gesehen, dass du die Tabs durch Spaces
 ersetzt. Da sollte man sich mal auf eines einigen, damit alle Debugger sich

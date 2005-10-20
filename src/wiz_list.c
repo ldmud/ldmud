@@ -63,8 +63,7 @@ struct wiz_list *add_name(str)
     wl->file_name = 0;
     wl->error_message = 0;
     if (wiz_info_extra_size >= 0) {
-        wl->extra.type  = T_POINTER;
-        wl->extra.u.vec = allocate_array(wiz_info_extra_size);
+        put_array(&(wl->extra), allocate_array(wiz_info_extra_size));
     } else {
         wl->extra = const0;
     }
@@ -149,21 +148,17 @@ struct svalue *f_wizlist_info(sp)
     struct svalue *wsvp, *svp;
     struct wiz_list *w;
 
-    if (_privilege_violation("wizlist_info", &const0, sp) <= 0) {
+    if (!_privilege_violation("wizlist_info", &const0, sp)) {
         all = allocate_array(0);
     } else {
         all = allocate_array(number_of_wiz);
         wsvp = all->item;
         for (w = all_wiz; w; w = w->next) {
             entry = allocate_array(7);
-            wsvp->type = T_POINTER;
-            wsvp->u.vec = entry;
+            put_array(wsvp, entry);
             wsvp++;
             svp = entry->item;
-            svp->type          = T_STRING;
-            svp->x.string_type = STRING_SHARED;
-            svp->u.string      = w->name;
-            increment_string_ref(w->name);
+            put_ref_string(svp, w->name);
             svp++;
             svp->u.number      = w->score;
             svp++;
@@ -177,15 +172,13 @@ struct svalue *f_wizlist_info(sp)
             svp++;
             if (w->extra.type == T_POINTER) {
                 struct vector *v = w->extra.u.vec;
-                svp->type  = T_POINTER;
-                svp->u.vec = slice_array(v, 0, VEC_SIZE(v) - 1);
+                put_array(svp, slice_array(v, 0, VEC_SIZE(v) - 1));
             } else
                 assign_svalue_no_free(svp, &w->extra);
         } /* end for */
     } /* end if */
     sp++;
-    sp->type = T_POINTER;
-    sp->u.vec = all;
+    put_array(sp, all);
     return sp;
 }
 
@@ -264,7 +257,7 @@ struct svalue *f_set_extra_wizinfo(sp)
         else
             bad_xefun_arg(1, sp);
     }
-    if (_privilege_violation("set_extra_wizinfo", sp-1, sp) <= 0) {
+    if (!_privilege_violation("set_extra_wizinfo", sp-1, sp)) {
         free_svalue(sp);
     } else {
         transfer_svalue(user ? &user->extra : &default_wizlist_entry.extra, sp);
@@ -287,7 +280,7 @@ struct svalue *f_get_extra_wizinfo(sp)
         else
             bad_xefun_arg(1, sp);
     }
-    if (_privilege_violation("get_extra_wizinfo", sp, sp) <= 0)
+    if (!_privilege_violation("get_extra_wizinfo", sp, sp))
         bad_xefun_arg(1, sp);
     assign_svalue(sp, user ? &user->extra : &default_wizlist_entry.extra);
     return sp;
@@ -363,24 +356,18 @@ struct svalue *f_get_error_file(sp)
      * The error_message is used as a flag if there has been any error.
      */
     if (!wl || !wl->error_message) {
-        sp->type = T_NUMBER;
-        sp->u.number = 0;
+        put_number(sp, 0);
         return sp;
     }
     vec = allocate_array(4);
     v = vec->item;
-    v[0].type = T_STRING;
-    v[0].x.string_type = STRING_MALLOC;
-    v[0].u.string = string_copy(wl->file_name);
+    put_malloced_string(v, string_copy(wl->file_name));
     v[1].u.number = wl->line_number & ~0x40000000;
-    v[2].type = T_STRING;
-    v[2].x.string_type = STRING_MALLOC;
-    v[2].u.string = string_copy(wl->error_message);
+    put_malloced_string(v+2, string_copy(wl->error_message));
     v[3].u.number = (wl->line_number & 0x40000000) != 0;
     if (forget)
         wl->line_number |= 0x40000000;
-    sp->type = T_POINTER;
-    sp->u.vec = vec;
+    put_array(sp, vec);
     return sp;
 }
 

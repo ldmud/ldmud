@@ -19,18 +19,20 @@ DESCRIPTION
           int [OIB_HEART_BEAT]:       1 if <ob> has a heart_beat, 0 else.
           int [OIB_IS_WIZARD]:        1 if <ob> has the wizard flag set,
                                         0 else.
+            This entry is always 0 when set_is_wizard() is not available.
           int [OIB_ENABLE_COMMANDS]:  1 if <ob> can give commands, 0 else.
           int [OIB_CLONE]:            1 if <ob> is a clone, 0 else.
           int [OIB_DESTRUCTED]:       1 if <ob> is destructed, 0 else.
           int [OIB_SWAPPED]:          1 if <ob> is swapped, 0 else.
           int [OIB_ONCE_INTERACTIVE]: 1 if <ob> was once interactive, 0 else.
-          int [OIB_APPROVED]:         1 if <ob> descends from /std/object,
-                                        0 else.
           int [OIB_RESET_STATE]:      1 if <ob> is (still) reset, 0 else.
           int [OIB_WILL_CLEAN_UP]:    1 if <ob> will call clean_up(), 0 else.
           int [OIB_LAMBDA_REFERENCED]: 1 if <ob> has lambdas, 0 else.
           int [OIB_SHADOW]:           1 if <ob> is shadowed, 0 else.
+          int [OIB_REPLACED]:         1 if the program for <ob> was replaced,
+                                      0 else.
           int [OIB_TOTAL_LIGHT]:  the amount of light <ob> is emitting.
+            This entry is always 0 when set_light() is not available.
           int [OIB_NEXT_RESET]:   time of the next reset.
           int [OIB_TIME_OF_REF]:  time of the last call to <ob>
           int [OIB_REF]:          number of references to <ob>
@@ -82,6 +84,11 @@ DESCRIPTION
 
 HISTORY
         Introduced in LDMud 3.2.6.
+        Changes in LDMud 3.2.7:
+          - new basic result OIB_REPLACED.
+          - basic result OIB_IS_WIZARD is always 0 if set_is_wizard()
+              is not available.
+          - basic result OIB_APPROVED is gone.
 
 SEE ALSO
         debug_info(E)

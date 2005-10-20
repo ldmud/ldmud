@@ -1,0 +1,14 @@
+PRELIMINARY
+SYNOPSIS
+	mixed query_notify_fail()
+
+DESCRIPTION
+        Return the string or closure which was last set as error message for
+        this command (with notify_fail()). If nothing was set yet, return 0.
+
+HISTORY
+        Introduces in LDMud 3.2.7.
+
+SEE ALSO
+        add_action(E), query_verb(E), query_command(E), notify_fail(E),
+        hooks(C)

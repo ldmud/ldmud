@@ -2,7 +2,7 @@ Short: New efun pow()
 From: Matthew Julius <julius.2@wright.edu>
 Date: Fri, 08 Jan 1999 16:29:08 -0500
 Type: Feature
-State: Unclassified
+State: Done - implemented in 3.2-dev.120
 
 int|float pow(int|float, int|float)
   The ability to return an integer when possible is highly desirable.

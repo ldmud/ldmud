@@ -1,4 +1,3 @@
-PRELIMINARY
 SYNOPSIS
 	mixed * map(mixed *arg, string func, object ob, mixed extra...)
 	mixed * map(mixed *arg, closure cl, mixed extra...)

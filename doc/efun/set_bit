@@ -16,8 +16,8 @@ EXAMPLES
 	string s;
 	s=set_bit("?",5);
 	
-	Because "?" has a valueof 31 the variable s will now contain
-	the charcter "_" wich is equal to 63 (31+2^5=63).
+	Because "?" has a value of 31 the variable s will now contain
+	the character "_" wich is equal to 63 (31+2^5=63).
 	
 	string s;
 	s=set_bit("78",3);
@@ -26,4 +26,5 @@ EXAMPLES
 	s will now contain the string "?<".
 	
 SEE ALSO
-	clear_bit(E), test_bit(E)
+        clear_bit(E), last_bit(E), next_bit(E), test_bit(E), count_bits(E),
+        and_bits(E), or_bits(E), xor_bits(E), invert_bits(E)

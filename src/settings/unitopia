@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Settings for the UNItopia mudlib.
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/UNItopia/mudadm/magyra --libexecdir=/UNItopia/mudadm/magyra/erq --with-setting=unitopia $*
+exit 1
+
+# --- The actual settings ---
+
+with_time_to_clean_up=5400
+with_time_to_swap=1800
+with_time_to_swap_variables=3600
+with_time_to_reset=2400
+
+with_portno=3333
+
+with_max_cost=300000
+with_catch_reserved_cost=10000
+with_master_reserved_cost=0x800
+
+with_max_players=200
+
+with_reserved_user_size=1500000
+
+with_htable_size=32768
+with_otable_size=8192
+
+with_catch_udp_port=3335
+
+with_max_malloced=0xC000000
+
+enable_compat_mode=no
+enable_strict_euids=yes
+
+enable_supply_parse_command=no
+enable_initialization_by___init=yes
+
+enable_smalloc_trace=yes
+enable_smalloc_lpc_trace=yes

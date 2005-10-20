@@ -4,10 +4,12 @@ SYNOPSIS
 DESCRIPTION
 	Evaluates the closure. The extra args will be passed as args
 	to the closure.	If cl is not a closure, it will simply be
-	returned (in 3.2 only if no extra args are passed).
+	returned.
 
 HISTORY
-	Introduced in 3.2@70
+	Introduced in 3.2@70.
+        Returning a non-closure as it is even when args are given was
+        introduced with 3.2.1
 
 SEE ALSO
 	apply(E), quote(E)

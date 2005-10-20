@@ -143,6 +143,11 @@ MUD_LIB = mudlib:
 
 BINDIR = mudbin:
 
+#
+# Set ERQDIR to where executables are stored which ERQ may start.
+
+ERQDIR = mudbin:erq
+
 # Profiling is mostly useless for us.
 #   PROFIL= -DOPCPROF -DVERBOSE_OPCPROF
 #     would enable the profiling of the virtual stackmachine.
@@ -172,7 +177,7 @@ LIBS= $(NETLIB) lib=lib:scmffpnb.lib
 
 # ----------------------- The Rules -------------------------------------
 
-MPATH=def=MUD_LIB="\"$(MUD_LIB)\"" def=BINDIR="\"$(BINDIR)\""
+MPATH=def=MUD_LIB="\"$(MUD_LIB)\"" def=BINDIR="\"$(BINDIR)\" def=ERQ_DIR="\"$(ERQDIR)\""
 LDFLAGS= afp Data=FAR Code=FAR link
 DEFINES= $(DEBUG) $(PROFIL) def=MALLOC_$(MALLOC) $(MPATH) $(NETDEF)
 CFLAGS= $(CCOPTS) $(DEFINES)
@@ -181,15 +186,15 @@ YFLAGS= -d
 SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\
     comm.c ed.c regexp.c mapping.c wiz_list.c swap.c $(MALLOC).c\
     call_out.c otable.c dumpstat.c stralloc.c hash.c port.c\
-    ptrtable.c heartbeat.c \
+    ptrtable.c heartbeat.c actions.c \
     access_check.c parse_old.c parse.c prolang.y rxcache.c\
-    simul_efun.c sprintf.c gcollect.c closure.c random.c \
+    simul_efun.c strfuns.c sprintf.c gcollect.c closure.c random.c \
     efuns.c $(XSRC)
 OBJ=lang.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
 comm.o ed.o regexp.o mapping.o wiz_list.o swap.o $(MALLOC).o\
 call_out.o otable.o dumpstat.o stralloc.o hash.o port.o\
-ptrtable.o heartbeat.o \
-access_check.o parse_old.o parse.o simul_efun.o sprintf.o\
+ptrtable.o heartbeat.o actions.o \
+access_check.o parse_old.o parse.o simul_efun.o strfuns.o sprintf.o\
 rxcache.o efuns.o gcollect.o closure.o random.o $(XOBJ)
 
 driver: $(OBJ)
@@ -231,9 +236,9 @@ make_func: make_func.o hash.o ixfile.o alloca.o exec.h
 # Byacc will warn a 'shift/reduce' conflict.
 # This is a known wart in the C-grammar.
 #
-# lang.y efun_defs.c instrs.h: 
+# lang.y efun_defs.c instrs.h:
 #  Separate rule deleted to avoid double compiling with SAS/C
-#  Always after an Compiler-Error smake starts right here and 
+#  Always after an Compiler-Error smake starts right here and
 #  so compiles lang.c, interpret.c and lex.c :-(, so I changed it.
 #  inserted right here (and so changed the dependencies !)
 
@@ -241,7 +246,7 @@ lang.c lang.h: func_spec make_func prolang.y config.h
 	-$(RMF) efun_defs.c
 	-$(RMF) lang.y
 	-$(RMF) instrs.h
-	make_func 
+	make_func
 	$(YACC) $(YFLAGS) -v lang.y
 	-$(RMF) lang.c
 	-$(RMF) lang.h

@@ -66,7 +66,7 @@ struct timeval *timeout;
   SOCKET_T cc;
   unsigned long rfds, mask, rrfds;
   int count = 0;
-  
+
   DosEnterCritSec ();
 
   rfds = *readfds;
@@ -88,19 +88,19 @@ struct timeval *timeout;
     else
       ulTimeout = timeout -> tv_sec * 1000 +
 	          timeout -> tv_usec / 1000;
-  
+
     DosWaitEventSem (select_event, ulTimeout);
 
     DosEnterCritSec ();
   }
-  
+
   rrfds = 0;
   count = 0;
-  
+
   for (cc = all_sockets; cc; cc = cc -> next)
   {
     mask = 1 << cc -> fd;
-    
+
     if (mask & rfds)
     {
       if (cc -> incoming != IN_EMPTY ||
@@ -118,11 +118,11 @@ struct timeval *timeout;
   }
   if (count)
     *readfds = rrfds;
-  
+
   DosResetEventSem (select_event, &q);
-  
+
   DosExitCritSec ();
-  
+
   return count;
 }
 
@@ -214,18 +214,18 @@ int i;
 
   if (++num_sockets >= MAX_NP_SOCKETS)
     return (SOCKET_T) -1;
-  
+
   nc = (SOCKET_T) malloc (sizeof (struct sock_buff));
-  
+
   if (nc == NULL)
     return (SOCKET_T) -1;
-  
+
   bzero (nc, sizeof (struct sock_buff));
   nc -> type = SOCKET_T_ACCEPT;
   nc -> incoming = IN_EMPTY;
   nc -> next = NULL;
   nc->fd = ACCEPT_FD;
-  
+
   return nc;
 }
 
@@ -248,7 +248,7 @@ connection_thread (ULONG ulThreadArg)
 #ifdef DBUG
       printf ("Disconnect (local).\n");
 #endif
-      remove_socket (s);    
+      remove_socket (s);
       _endthread ();
     }
     if (DosRead (s -> fd, s -> in,
@@ -264,7 +264,7 @@ connection_thread (ULONG ulThreadArg)
       s -> thread_id = 0;
       if (s -> fd) s -> fd = 0;
       DosExitCritSec ();
-#if 0 
+#if 0
       DosExit (EXIT_THREAD, 0);
 #endif
       _endthread ();
@@ -366,7 +366,7 @@ struct sockaddr *addr;
 int addr_size;
 {
   char pipename[64];
-  
+
   sprintf (pipename, REQUEST_PIPE, addr -> a.sin_port);
 
   if (DosCreateNPipe (pipename, &sock -> fd,
@@ -490,7 +490,7 @@ gethostname (char *name, int length)
       s = "OS2";
 
   n = strlen (s) + 1;
-  length = n < length ? n : length;   
+  length = n < length ? n : length;
 
   strncpy (name, s, n);
   return name;

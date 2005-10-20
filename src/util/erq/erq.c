@@ -15,7 +15,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 
-#include "../machine.h"
+#include "machine.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -65,7 +65,7 @@
 #define AUTH_PORT 113 /* according to RFC 931 */
 
 #include "erq.h"
-#include "../config.h"
+#include "config.h"
 
 #define DETACH
 #define MAX_CHILDS 36

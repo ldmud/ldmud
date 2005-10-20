@@ -6,16 +6,22 @@ DESCRIPTION
 	Clone a new object from definition <name>, or alternatively from
 	the object <template>. In both cases, the new object is given
 	an unique name and returned.
-	
+
 	The original, called blueprint, used for cloning, should not be
-	used in the system, only be used for cloning. The cloned objects
+	used in the system, just for cloning. The cloned objects
 	contain only the data but the blueprint also the function code.
 	The blueprint is the one without a unique number at the end of
 	the object's name. The clone_object() function never
 	returns a blue print.
+
+        If the blueprint exists and has a heart_beat(), clone_object()
+        turns it off.
 	
 	Note that the pathname must be complete, which means there are no
 	relative paths allowed.
+
+        If strict euids are enforced, the cloning object must have
+        a non-zero euid.
 
 EXAMPLE
 	// Clone a torch (filename in non-compat format)
@@ -26,6 +32,13 @@ EXAMPLE
 	object key1, key2;
 	key1 = clone_object(load_object("obj/key"));
 	key2 = clone_object(key1);
+
+BUGS
+        If variable initialization is not done with __INIT(), the initializers
+        are copied from the _current_ variables of the blueprint. This is in
+        line with the meaning of 'blueprint', but can lead to hard-to-find
+        errors. Variables without initializer are unaffected and always
+        initialized to 0.
 
 HISTORY
 	Modified in LDMud 3.2.6 to take an object as argument.

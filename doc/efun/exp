@@ -3,3 +3,6 @@ SYNOPSIS
 
 DESCRIPTION
 	The exponential function.
+
+SEE ALSO
+        log(E), pow(E)

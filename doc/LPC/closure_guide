@@ -1,18 +1,19 @@
-                                      written by Alfe for TubMud 96-Apr-11
 Closure Guide for LPC
 
 Table of Contents
 
 	1 Indroduction, Overview and Efun-Closures
 
-	2 Lfun- and Lambda-Closures
+	2 Lfun-, Inline and Lambda-Closures
 	2.1 Lfun-Closures
-	2.2 Lambda-Closures
-	2.2.1 Free Variables in Lambda-Closure Constructs
-	2.2.2 Special Efun-Closures and Operator-Closures for Lambdas
-	2.3 Closures with Strange Names
-	2.4 Operator-Closures
-	2.5 Variable-Closures
+        2.2 Inline-Closures
+	2.3 Lambda-Closures
+        2.3.1 Advantages of Lambda-Closures
+	2.3.2 Free Variables in Lambda-Closure Constructs
+	2.3.3 Special Efun-Closures and Operator-Closures for Lambdas
+	2.4 Closures with Strange Names
+	2.5 Operator-Closures
+	2.6 Variable-Closures
 
 	3 Examples
 	3.1 Lfun-Closure
@@ -120,8 +121,8 @@ Table of Contents
 2 Lfun- and Lambda-Closures
 
   Very often the possibilities closures to efuns offer are not sufficient
-  for the purpose one has. In nearly all cases two possibilities exist in
-  such cases: either use an lfun-closure or a lambda-closure.
+  for the purpose one has. In nearly all cases three possibilities exist in
+  such cases: use an lfun- or inline-closure, or a lambda-closure.
 
 2.1 Lfun-Closures
 
@@ -141,21 +142,58 @@ Table of Contents
     Thus, #'foo is used like there was an efun of this name and doing the
     job that is done in foo().
 
-2.2 Lambda-Closures
+2.2 Inline Closure
 
-    Very often the use of an lfun-closure seems a bit unpractical since
-    then another lfun exists and if it is as small as the function foo()
-    in the example at the chapter above it was nice to have a possibility
-    to notate the things foo() does in short at the point where it is used
-    (in the parentheses of filter_array()).
+    Inline closures are a variant of lfun closures, the difference being
+    that the function text is written right where the closure is used,
+    enclosed in a pair of '(:' and ':)'. The compiler will then take care
+    of creating a proper lfun and lfun-closure. The arguments passed to
+    such an inline closure are accessible by position: $1 would be the
+    first argument, $2 the second, and so on. With this, the
+    above example would read:
 
-    One large field for lambda-closures is this. The efun lambda() creates
-    a function temporarily and returns a closure pointing to this func-
-    tion. lambda() therefor gets two arrays as arguments, the first is a
-    list of all arguments the function shall expect and the second array
-    is the code of the function (in a more or less complicated form; at
-    least not in C- or LPC-syntax). The closure #'foo from the example
-    could be notated as lambda-closure:
+      int * bar() {
+        return filter_array(({ 10,50,30,70 }), (: ($1 * 2) > 42 :));
+      }
+
+    or alternatively:
+
+      int * bar() {
+        return filter_array(({ 10,50,30,70 }), (: return ($1 * 2) > 42; :));
+      }
+
+    The difference between the two versions is that in the first form the text
+    of the inline closure must be an expression only, whereas in the second
+    form any legal statement is allowed. The compiler distinguishes the two
+    forms by the last character before the ':)': if it's a ';' or '}', the
+    compiler treats the closure as statement(s), otherwise as expression.
+
+    Inline closures may also nested, so that the following (not very useful)
+    example is legal, too:
+
+      return filter_array( ({ 10, 50, 30, 70 })
+                         , (: string *s;
+                              s = map_array(users(), (: $1->query_name() :));
+                              return s[random(sizeof(s))] + ($1 * 2);
+                            :));
+
+    The notation of inline closures is modelled after the MudOS functionals,
+    but there are a few important differences in behaviour.
+
+
+2.3 Lambda-Closures
+
+    Lambda-Closures take the idea of 'define it where you use it' one step
+    further. On first glance they may look like inline closures with an uglier
+    notation, but they offer a few increased possibilities. But first things
+    first.
+
+    The efun lambda() creates a function temporarily and returns a closure
+    pointing to this function. lambda() therefor gets two arrays as
+    arguments, the first is a list of all arguments the function shall expect
+    and the second array is the code of the function (in a more or less
+    complicated form; at least not in C- or LPC-syntax). The closure #'foo
+    from the example above could be notated as lambda-closure:
 
       lambda(({ 'x }),({ (#'>),
                          ({ (#'*),'x,2 }),
@@ -196,8 +234,8 @@ Table of Contents
 
     Lambda-closure constructs can become quite large and hard to read. The
     larger they become the harder the code is to read and you should avoid
-    extreme cases. Very often the possibility to use an lfun instead of a
-    large lambda shortens the code dramatically. Example:
+    extreme cases. Very often the possibility to use an lfun or an inline
+    instead of a large lambda shortens the code dramatically. Example:
 
       status foo(object o) {
         return environment(o)->query_level()>WL_APPRENTICE;
@@ -220,10 +258,45 @@ Table of Contents
     used, #'-> does not exist. You have to use #'call_other for this and
     give the name of the lfun to be called as a string.)
 
-    This example is not really extreme but I think it signifies the disad-
-    vantage of lambda constructs.
+    This example also demonstrates the two disadvantages of lambda closures.
+    First, they are very difficult to read, even for a simple example like
+    this. Second, the lambda closure is re-created everytime the
+    filter_array() is executed, even though the created code is always the
+    same.
 
-2.2.1 Free Variables in Lambda-Closure Constructs
+    'Why lambdas at all then?' you may ask now. Well, read on.
+
+
+2.3.1 Advantages of Lambda Closures
+
+    The advantages of lambdas stem from the fact that they are created
+    at runtime from normal arrays.
+
+    This means that the behaviour of a lambda can be made dependant on data
+    available only at runtime. For example:
+
+      closure c;
+      c = lambda(0, ({#'-, ({ #'time }), time() }) );
+
+    Whenever you now call this closure ('funcall(c)') it will return the
+    elapsed time since the closure was created.
+
+    The second advantage of lambdas is that the arrays from which they
+    are compiled can be constructed at runtime. Imagine a customizable prompt
+    which can be configured to display the time, the environment, or both:
+
+      mixed code;
+
+      code = ({ "> " });
+      if (user_wants_time)
+        code = ({ #'+, ({ #'ctime }), code });
+      if (user_wants_environment)
+        code = ({ #'+, ({#'to_string, ({#'environment, ({#'this_player }) }) })
+                     , code });
+      set_prompt(lambda(0, code));
+
+
+2.3.2 Free Variables in Lambda-Closure Constructs
 
       You can use local variables in lambda constructs without declaring
       them, just use them. The only limitation is that you at first have
@@ -234,7 +307,7 @@ Table of Contents
       The closure #'= is used to assign a value to something (like the
       LPC-operator = is).
 
-2.2.2 Special Efun-Closures and Operator-Closures for Lambdas
+2.3.3 Special Efun-Closures and Operator-Closures for Lambdas
 
       There are some special closures that are supposed to be used only
       within a lambda construct. With them you can create nearly all code
@@ -412,7 +485,7 @@ Table of Contents
            ates to true (not 0) and returns it. If all evaluate to 0 it
            returns 0.
 
-2.3 Closures with Strange Names
+2.4 Closures with Strange Names
 
     #'negate is the unary minus that returns -x for the argument x.
 
@@ -493,7 +566,7 @@ Table of Contents
                      This is a strange thing and I deem it a bug, so it
                      might change in the future.
 
-2.4 Operator-Closures
+2.5 Operator-Closures
 
     Most of the closures that are used for things which are done by opera-
     tors are in fact not operator-closures but efun-closures. But there are
@@ -535,7 +608,7 @@ Table of Contents
 
     I also deem the fact that CL_R_RANGE is an operator closure a bug.
 
-2.5 Variable-Closures
+2.6 Variable-Closures
 
     All object-global variables might be "closured" by prepending a #' to
     them to allow access and/or manipulation of them. So if your object has

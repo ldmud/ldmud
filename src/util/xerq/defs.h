@@ -1,6 +1,7 @@
 #include "erq.h"
 #include "erq-config.h"
 #include "driver.h"
+#include "random.h"
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -15,6 +16,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <ctype.h>
 
 #ifdef _AIX
 #include <sys/select.h>
@@ -125,6 +127,7 @@ void write1(char *, int);
 void add_to_queue(struct queue_s **, char *, int);
 int flush_queue(struct queue_s **, int);
 void send_auth(struct auth_s *);
+void add_retry(void (*func)(char *, int), char *mesg, int len, int t);
 
 void erq_rlookup(char *, int);
 void erq_execute(char *, int);
@@ -138,6 +141,8 @@ void erq_open_tcp(char *, int);
 void erq_listen(char *, int);
 void erq_accept(char *, int);
 void erq_lookup(char *, int);
+
+void close_socket(struct socket_s *);
 
 extern struct child_s *childs;
 extern struct socket_s *sockets;

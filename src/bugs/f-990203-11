@@ -11,6 +11,7 @@ specifiers, '-' and ':' would still be valid.  I would use this a lot myself.
 It's so much easier for me to read a bitfield in binary than in octal, hex
 or decimal representation.
 
+Solved in 3.2.6:
 funcall(<swapped variable>) crashes the GD.  Specifically, with various
 uses of symbol_variable().  I'm not sure if this extends to
 funcall(<swapped function>)

@@ -7,3 +7,6 @@ moved over to the directory ../done.
 <yymmdd> is the date when the original issue was raised.
 <x> is an arbitrary number to distinguish requests raised on the same day
     and may be omitted.
+
+f-summary summarizes most(!) of the feature and patch submissions.
+b-summary summarizes all bug reports.

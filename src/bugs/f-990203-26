@@ -19,3 +19,4 @@ a program_name()-efun that returns the name of the program of a
 object. (ob->prog->name) That would make it possible to detect renamed
 objects, too.
 
+Note: program_name() is implemented in 3.2.6

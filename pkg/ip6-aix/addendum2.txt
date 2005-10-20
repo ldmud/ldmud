@@ -1,0 +1,46 @@
+Return-Path: <mai94cch@studserv.uni-leipzig.de>
+Delivered-To: duening@softhome.net
+Received: (qmail 28531 invoked by uid 417); 9 Aug 1999 14:35:28 -0000
+Received: from studserv.uni-leipzig.de (139.18.1.15)
+  by mx0.softhome.net with SMTP; 9 Aug 1999 14:35:28 -0000
+Received: from localhost (mai94cch@localhost)
+	by studserv.uni-leipzig.de (8.8.7/8.8.7) with SMTP id QAA52250
+	for <duening@softhome.net>; Mon, 9 Aug 1999 16:10:25 +0200
+Date: Mon, 9 Aug 1999 16:10:24 +0200 (MESZ)
+From: <mai94cch@studserv.uni-leipzig.de>
+To: Lars Duening <duening@softhome.net>
+Subject: Re: AIX
+In-Reply-To: <0003519784c3d522_mailit@smtp.softhome.net>
+Message-ID: <Pine.A41.3.96.990809160712.66470A-100000@studserv.uni-leipzig.de>
+MIME-Version: 1.0
+Content-Type: TEXT/PLAIN; charset=US-ASCII
+
+On Sun, 8 Aug 1999, Lars Duening wrote:
+
+> >On Thu, 5 Aug 1999, Lars Duening wrote:
+> 
+> >> Ich vergass: gibt es ein eindeutiges C-Macro, dass deine AIX und den 
+> >Compiler 
+> >> kennzeichnet, so wie __BEOS__ fuer BeOS, oder __GNUC__ fuer den GNU-
+> >Compiler?
+> >> 
+> >> Ich brauche das, damit ich deine Aenderungen gezielt aktivieren kann.
+> 
+> >Ich habe noch nix gefunden, um den compiler eindeutig zu indentifizieren;
+> >es ist der compiler, der mit AIX (4.3) zusammen ausgeliefert wird.
+> 
+> Steht auch nichts in der Manpage?
+> 
+> -- 
+> Lars Duening; duening@softhome.net
+> 'lars@bearnip.com' is temporarily unavailable.
+> 
+
+Hallo,
+
+ich habe was gefunden. Der Compiler hat per default _AIX definiert.
+
+MfG
+Uwe
+
+

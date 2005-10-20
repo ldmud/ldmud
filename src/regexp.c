@@ -1,6 +1,6 @@
 /* $Source: src/regexp.c $
  *
- * $Revision: 1.13 $
+ * $Revision: 1.14 $
  *
  * regexp.c - regular expression matching
  *
@@ -42,7 +42,7 @@
  * maximum number of bytes that can be written to the memory region
  * pointed to by dest
  * Some prototypes removed and version variable renamed; take into account
- * that linux defines CHARBITS to 8 .
+ * that linux defines CHAR_BIT to 8 .
  * Free temporaries in case of error.
  *
  *         Beware that some of this code is subtly aware of the way operator
@@ -82,7 +82,7 @@
  *  use in ^ and \< searches
  *
  * Revision 1.2  1994/07/23  21:23:13  amylaar
- * Generalized handling of CHARBITS == 8 .
+ * Generalized handling of CHAR_BIT == 8 .
  *
  * Revision 1.1.1.2  1994/07/06  22:58:44  amylaar
  * Enter 3.2.1@22 into separate 3.2.1 depository.
@@ -164,7 +164,7 @@
 #include "regexp.h"
 
 #ifndef lint
-static char    *Ident UNUSED = "$Id: regexp.c 1.13 Fri, 26 Mar 1999 20:27:43 -0700 baron $";
+static char    *Ident UNUSED = "$Id: regexp.c 1.14 Thu, 17 Jun 1999 17:26:32 -0700 lars $";
 #endif
 
 
@@ -283,7 +283,7 @@ static char    *Ident UNUSED = "$Id: regexp.c 1.13 Fri, 26 Mar 1999 20:27:43 -07
 #define        FAIL(m)        { regerror(m); return(NULL); }
 #define        ISMULT(c)        ((c) == ASTERIX)
 #define        META        "^$.[()|*\\"
-#ifndef CHARBITS
+#ifndef CHAR_BIT
 #define        UCHARAT(p)        ((int)*(unsigned char *)(p))
 #else
 #define        UCHARAT(p)        ((int)*(p)&CHARBIT_MASK)

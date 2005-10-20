@@ -2,10 +2,10 @@ SYNOPSIS
 	closure bind_lambda(closure, object ob)
 
 DESCRIPTION
-	Binds an unbound closure to an object.
-	If the optional argument ob is not this_object(), a privilege
-	violation occurs. If ob is omitted, this_object() is used as
-	default. The newly bound closure is returned.
+	Binds an unbound closure to an object and return it.
+
+        If the optional argument ob is not this_object(), the privilege
+        violation ("bind_lambda", this_object(), ob) occurs.
 
 HISTORY
 	Introduced in 3.2@82.

@@ -11,7 +11,8 @@ DESCRIPTION
 	The master is the gateway between the interpreter and the
 	mudlib to perform actions with mudlib specific effects. Calls
 	to the master by the interpreter have an automatic catch() in
-	effect.
+	effect. Functions to be called by the driver can be public
+        or static, but not private.
 
 	Note that the master is loaded first of all objects. Thus you
 	shouldn't inherit an other object, nor is the compiler able to

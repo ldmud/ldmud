@@ -22,4 +22,5 @@ about possible useful new additions anyway. So, here's my list:
   include code here, but it's a trivial addition and I can mail the
   changes necessary if need be.
 
+Note: Problem is the add_action()-Handling.
 

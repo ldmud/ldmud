@@ -80,11 +80,17 @@ DESCRIPTION
 
 	expr1 - expr2	Subtract 'expr2' from 'expr1'. Valid for
 			numbers, strings, arrays, mappings.
-			For arrays and mappings, all occurences of the
+			For arrays, all occurences of the
 			elements in 'expr2' are removed from 'expr1',
 			and the result is returned.
+                        For mapping, all occurances of elemens in 'expr1'
+                        which have a matching key in 'expr2' are removed, and
+                        the result is returned.
 
 	expr1 * expr2	Multiply 'expr1' with 'expr2'.
+                        If strings or arrays are multiplied with a number
+                        (zero or positive), the result is a repetition of the
+                        original string or array.
 
 	expr1 % expr2	The modulo operator of numeric arguments.
 
@@ -112,9 +118,9 @@ DESCRIPTION
 			indexed by 'expr2'.
 
 	expr1[expr2..expr3] The symbolic form of extract(). Extracts a
-			piece from an array or string. expr2 or expr3
-			may be omitted, default is start resp. end of
-			expr1. Negative numbers for expr2 or expr3
+			piece from an array or string. expr3 may be omitted,
+                        default is the end of expr1. Negative numbers for
+                        expr2 or expr3
 			mean ``count from before the beginning'', i.e.
 			foo[-2..-1] is an empty array or string.
 			foo[<2..<1] gives the 2nd and last element of

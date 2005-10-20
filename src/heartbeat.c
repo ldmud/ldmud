@@ -31,16 +31,15 @@
 
 #include "driver.h"
 
-#ifndef OLD_RESET
-
 #include <stddef.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <math.h>
 
-#define NO_INCREMENT_STRING_REF
+#define NO_REF_STRING
 #include "heartbeat.h"
 
+#include "actions.h"
 #include "array.h"
 #include "backend.h"
 #include "comm.h"
@@ -49,6 +48,7 @@
 #include "object.h"
 #include "sent.h"
 #include "simulate.h"
+#include "strfuns.h"
 #include "wiz_list.h"
 
 /*-------------------------------------------------------------------------*/
@@ -59,6 +59,7 @@
 struct hb_info {
     struct hb_info * next;  /* next node in list */
     struct hb_info * prev;  /* previous node in list */
+    mp_int           tlast; /* time of last heart_beat */
     struct object  * obj;   /* the object itself */
 };
 
@@ -75,7 +76,9 @@ struct hb_block {
 
 /*-------------------------------------------------------------------------*/
 struct object *current_heart_beat = NULL;
-  /* The object whose heart_beat() is currently executed.
+  /* The object whose heart_beat() is currently executed. It is NULL outside
+   * of heartbeat executions.
+   *
    * interpret.c needs to know this for the heart-beat tracing, and
    * simulate.c test this in the error() function to react properly.
    */
@@ -101,7 +104,7 @@ static mp_int num_blocks = 0;
   /* Number of allocated node blocks.
    */
 
-#if !defined(OLD_RESET) && defined(DEBUG)
+#if defined(DEBUG)
 mp_int num_hb_objs = 0;
 #else
 static mp_int num_hb_objs = 0;
@@ -141,7 +144,7 @@ call_heart_beat (void)
 
 {
     struct hb_info *this;
-    mp_int num_hb_to_do;
+    mp_int num_hb_to_do;  /* For statistics only */
 
     /* Housekeeping */
 
@@ -156,12 +159,12 @@ call_heart_beat (void)
         return;
     }
 
-    num_hb_calls++;
     num_hb_to_do = num_hb_objs;
+    num_hb_calls++;
 
     this = next_hb;
 
-    while (hb_num_done < num_hb_to_do && !comm_time_to_call_heart_beat)
+    while (num_hb_objs && !comm_time_to_call_heart_beat)
     {
         struct object * obj;
 
@@ -169,7 +172,21 @@ call_heart_beat (void)
          * list and have to wrap around.
          */
         if (!this)
+        {
+#ifdef DEBUG
+            if (!hb_list)
+                fatal("hb_list is NULL, but num_hb_objs is %ld\n", (long)num_hb_objs);
+#endif
             this = hb_list;
+        }
+
+        /* Check the time of the last heartbeat to see, if we
+         * processed all objects.
+         */
+        if (current_time == this->tlast)
+            break;
+
+        this->tlast = current_time;
 
         obj = this->obj;
         next_hb = this->next;
@@ -178,9 +195,13 @@ call_heart_beat (void)
 
 #ifdef DEBUG
         if (!(obj->flags & O_HEART_BEAT))
-            fatal("Heart beat not set in object on heart beat list!");
+            fatal("Heart beat not set in object '%s' on heart beat list!\n"
+                 , obj->name
+                 );
         if (obj->flags & O_SWAPPED)
-            fatal("Heart beat in swapped object.\n");
+            fatal("Heart beat in swapped object '%s'.\n", obj->name);
+        if (obj->flags & O_DESTRUCTED)
+            fatal("Heart beat in destruct object '%s'.\n", obj->name);
 #endif
 
         if (obj->prog->heart_beat == -1)
@@ -246,10 +267,12 @@ call_heart_beat (void)
 
             obj->user->heart_beats++;
             CLEAR_EVAL_COST;
+            RESET_LIMITS;
             call_function(obj->prog, obj->prog->heart_beat);
 
         } /* if (object has heartbeat) */
 
+        /* Step to next object with heart beat */
         this = next_hb;
     } /* while (not done) */
 
@@ -262,7 +285,7 @@ call_heart_beat (void)
 
 /*-------------------------------------------------------------------------*/
 int
-set_heart_beat (struct object *ob, /* TODO: BOOL */ int to)
+set_heart_beat (struct object *ob, Bool to)
 
 /* EFUN set_heart_beat() and internal use.
  *
@@ -311,6 +334,7 @@ set_heart_beat (struct object *ob, /* TODO: BOOL */ int to)
         new = free_list;
         free_list = free_list->next;
 
+        new->tlast = 0;
         new->obj = ob;
 
         /* Insert the new node at the proper place in the list */
@@ -390,7 +414,7 @@ count_heart_beat_refs (void)
 
 /*-------------------------------------------------------------------------*/
 int
-heart_beat_status (int /* TODO: BOOL */ verbose)
+heart_beat_status (strbuf_t * sbuf, Bool verbose)
 
 /* If <verbose> is true, print the heart beat status information directly
  * to the current interactive user. In any case, return the amount of
@@ -398,26 +422,31 @@ heart_beat_status (int /* TODO: BOOL */ verbose)
  */
 
 {
-    char buf[20];
-
     if (verbose) {
-        add_message("\nHeart beat information:\n");
-        add_message("-----------------------\n");
-        add_message("Number of objects with heart beat: %ld, beats: %ld, reserved: %ld\n"
+        strbuf_add(sbuf, "\nHeart beat information:\n");
+        strbuf_add(sbuf, "-----------------------\n");
+        strbuf_addf(sbuf, "Number of objects with heart beat: %ld, "
+                          "beats: %ld, reserved: %ld\n"
                    , (long)num_hb_objs, (long)num_hb_calls
                    , (long)num_blocks * NUM_NODES);
-        add_message("HB calls completed in last cycle:  %ld (%.2f%%)\n"
+#if defined(__MWERKS__) && !defined(WARN_ALL)
+#    pragma warn_largeargs off
+#endif
+        strbuf_addf(sbuf, "HB calls completed in last cycle:  %ld (%.2f%%)\n"
                    , (long)hb_num_done
-                   , num_hb_objs || hb_num_done > num_hb_objs
+                   , num_hb_objs && hb_num_done <= num_hb_objs
                      ? 100.0 * (float)hb_num_done / (float)num_hb_objs
                      : 100.0
                    );
-        sprintf(buf, "%.2f",
-          avg_num_hb_objs ?
-            100 * (double) avg_num_hb_done / avg_num_hb_objs :
-            100.0
-        );
-        add_message("Average of HB calls completed:     %s%%\n", buf);
+        strbuf_addf(sbuf
+                   , "Average of HB calls completed:     %.2f%%\n"
+                   , avg_num_hb_objs ?
+                     100 * (double) avg_num_hb_done / avg_num_hb_objs :
+                     100.0
+                   );
+#if defined(__MWERKS__)
+#    pragma warn_largeargs reset
+#endif
     }
     return 0;
 }
@@ -455,403 +484,14 @@ f_heart_beat_info (struct svalue *sp)
         if (this->obj->flags & O_DESTRUCTED)  /* TODO: Can't happen. */
             continue;
 #endif
-        v->type = T_OBJECT;
-        v->u.ob = this->obj;
+        put_ref_object(v, this->obj, "heart_beat_info");
         v++;
         i--;
-        add_ref(this->obj, "heart_beat_info");
     }
     sp++;
-    sp->type = T_POINTER;
-    sp->u.vec = vec;
+    put_array(sp, vec);
     return sp;
 }
 
 /***************************************************************************/
-
-#else /* ******************************************************************/
-
-#include <stddef.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#ifdef AMIGA
-#include "hosts/amiga/nsignal.h"
-#else
-#include <signal.h>
-#include <sys/times.h>
-#endif
-#include <math.h>
-
-#define NO_INCREMENT_STRING_REF
-#include "heartbeat.h"
-
-#include "array.h"
-#include "backend.h"
-#include "datatypes.h"
-#include "comm.h"
-#include "gcollect.h"
-#include "object.h"
-#include "simulate.h"
-#include "wiz_list.h"
-
-/*-------------------------------------------------------------------------*/
-
-#define ALARM_TIME  2  /* The granularity of alarm() calls */
-
-/*-------------------------------------------------------------------------*/
-
-struct object *current_heart_beat = NULL;
-  /* The object whose heart_beat() is currently executed.
-   * interpret.c needs to know this for the heart-beat tracing, and
-   * simulate.c test this in the error() function to react properly.
-   */
-
-/*-------------------------------------------------------------------------*/
-
-/* The 'ring list' of objects with heart beats.
- *
- * Actually it is an array of <hb_max> (struct object *), pointing to the
- * objects. hb_list points to the beginning of the array, hb_tail to the
- * currently last used entry.
- *
- * hb_last_called and hb_last_to_call determine which objects' heart_beat()
- * needs to be called next. Depending on the context, hb_last_called ==
- * hb_last_to_call can mean 'all objects called' or 'no objects called'.
- *
- * In every round as many objects are called as possible, and the latter
- * two pointers are adjusted accordingly. This way, the next round can take
- * off where the first one left off.
- */
-
-static struct object **hb_list = NULL; /* head of the array */
-static struct object **hb_tail = NULL; /* for sane wrap around */
-
-static struct object **hb_last_called, **hb_last_to_call;
-
-static mp_int num_hb_objs = 0; /* current number of objects in list */
-static mp_int num_hb_to_do;    /* number of objects to do this round */
-static mp_int hb_num_done;     /* number of objects done this round */
-static mp_int hb_max = 0;      /* max size of the allocated array */
-
-static long num_hb_calls = 0; /* stats */
-static long avg_num_hb_objs = 0, avg_num_hb_done = 0; /* decaying average */
-
-/*-------------------------------------------------------------------------*/
-void
-call_heart_beat (void)
-
-/* Call the heart_beat() lfun in all registered heart beat objects; or at
- * at least call as many as possible until the next alarm() timeout
- * occurs.
- *
- * If the object in question (or one of its shadows) is living, command_giver
- * is set to the object, else it is set to NULL. If there are no players
- * in the game, no heart_beat() will be called (but the call outs will!).
- */
-
-{
-    struct object *ob;
-
-    /* Housekeeping */
-
-    time_to_call_heart_beat = MY_FALSE; /* interrupt loop if we take too long */
-    comm_time_to_call_heart_beat = MY_FALSE;
-    alarm(ALARM_TIME);
-
-    current_interactive = NULL;
-
-    /* Set this new round through the hb list */
-    hb_last_to_call = hb_last_called;
-    hb_num_done = 0;
-    if (num_player > 0 && 0 != (num_hb_to_do = num_hb_objs))
-    {
-        num_hb_calls++;
-        while (!comm_time_to_call_heart_beat)
-        {
-            /* Step to the next object to call, wrapping
-             * around the end of the list if necessary.
-             * Objects without hb lfun are skipped.
-             */
-            hb_num_done++;
-            if (++hb_last_called == hb_tail)
-                hb_last_called = hb_list;
-            ob = *hb_last_called;
-
-#ifdef DEBUG
-            if (!(ob->flags & O_HEART_BEAT))
-                fatal("Heart beat not set in object on heart beat list!");
-            if (ob->flags & O_SWAPPED)
-                fatal("Heart beat in swapped object.\n");
-#endif
-
-            if (ob->prog->heart_beat == -1) {
-                /* Swapped? No heart_beat()-lfun? TODO: Dunno */
-                if (hb_num_done == num_hb_to_do)
-                    break;
-                continue;
-            }
-
-            /* Prepare to call <ob>->heart_beat().
-             */
-            current_prog = ob->prog;
-            current_object = ob;
-            current_heart_beat = ob;
-
-            command_giver = ob;
-            if (command_giver->flags & O_SHADOW) {
-                struct shadow_sentence *shadow_sent;
-
-                while(shadow_sent = O_GET_SHADOW(command_giver),
-                      shadow_sent->shadowing)
-                {
-                    command_giver = shadow_sent->shadowing;
-                }
-                if (!(command_giver->flags & O_ENABLE_COMMANDS)) {
-                    command_giver = 0;
-                    trace_level = 0;
-                } else {
-                    trace_level =
-                      shadow_sent->type == SENT_INTERACTIVE ?
-                        ((struct interactive *)shadow_sent)->trace_level : 0;
-                }
-            } else {
-                if (!(command_giver->flags & O_ENABLE_COMMANDS))
-                    command_giver = 0;
-                trace_level = 0;
-            }
-
-            ob->user->heart_beats++;
-            CLEAR_EVAL_COST;
-            call_function(ob->prog, ob->prog->heart_beat);
-
-            /* (hb_last_called == hb_last_to_call) is not a sufficient
-             * condition, since the first object with heart beat might
-             * call set_heart_beat(0) in the heart beat, causing
-             * hb_last_to_call to move.
-             */
-            if (hb_num_done == num_hb_to_do)
-                break;
-        } /* while (no timeout) */
-
-        /* Update stats */
-        avg_num_hb_objs += num_hb_to_do - (avg_num_hb_objs >> 10);
-        avg_num_hb_done += hb_num_done  - (avg_num_hb_done >> 10);
-    }
-    current_heart_beat = 0;
-}
-
-/*-------------------------------------------------------------------------*/
-int
-set_heart_beat (struct object *ob, /* TODO: BOOL */ int to)
-
-/* EFUN set_heart_beat() and internal use.
- *
- * Add (<to> != 0) or remove (<to> == 0) object <ob> to/from the list
- * of heartbeat objects, thus activating/deactivating its heart beat.
- * Return 0 on failure (including calls for destructed objects or if
- * the object is already in the desired state) and 1 on success.
- *
- * The function is aware that it might be called from within a heart_beat()
- * and adjusts the correct pointers if that is so.
- */
-
-{
-    /* Safety checks */
-    if (ob->flags & O_DESTRUCTED)
-        return 0;
-    if (to)
-        to = O_HEART_BEAT; /* ...so that the following comparison works */
-    if (to == (ob->flags & O_HEART_BEAT))
-        return 0;
-
-    if (to)
-    {
-
-        /*
-         * --- Add <ob> to the list of heartbeat objects ---
-         *
-         * The new object will be added right after hb_last_called,
-         * and hb_last_called will then be set to point at it.
-         */
-
-        struct object **new_op;
-
-        if (++num_hb_objs > hb_max) {
-
-            /* We need to (re)allocate more memory for the array. */
-
-            if (!hb_max) {
-
-                /* First allocation */
-
-                hb_max = 16;
-                hb_list =
-                  (struct object **)xalloc(hb_max * sizeof(struct object **));
-                if (!hb_list) {
-                    hb_max = 0;
-                    return 0;
-                }
-                hb_last_called = hb_last_to_call = (hb_tail = hb_list) - 1;
-
-            } else {
-
-                /* Double the size of the current allocation */
-
-                struct object **new;
-                ptrdiff_t tail_diff, called_diff, to_call_diff;
-
-                tail_diff    = hb_tail         - hb_list;
-                called_diff  = hb_last_called  - hb_list;
-                to_call_diff = hb_last_to_call - hb_list;
-
-                hb_max <<= 1;
-                new = (struct object **)
-                  rexalloc((char *)hb_list, hb_max * sizeof(struct object **));
-                if (!new) {
-                    hb_max >>= 1;
-                    return 0;
-                }
-
-                /* Adjust the hb_* ptr to point into the new memory block. */
-                hb_list = new;
-                hb_tail         = new + tail_diff;
-                hb_last_called  = new + called_diff;
-                hb_last_to_call = new + to_call_diff;
-            }
-        }
-
-        ob->flags |= O_HEART_BEAT;
-        new_op = ++hb_last_called;
-        move_memory(
-          (char *)(new_op+1),
-          (char *)new_op,
-          (char *)hb_tail++ - (char *)new_op
-        );
-        *new_op = ob;
-        if (hb_last_to_call >= new_op)
-            hb_last_to_call++;
-    }
-    else {
-
-        /*
-         * --- Remove <ob> from the list of heartbeat objects ---
-         */
-
-        struct object **op;
-        int active;
-
-        ob->flags &= ~O_HEART_BEAT;
-
-        /* Search the object in the list and remove it. */
-        for (op = hb_list; *op != ob; op++) NOOP;
-        move_memory(
-          (char *)op,
-          (char *)(op+1),
-          (char *)hb_tail-- - (char *)(op+1)
-        );
-
-        /* Check which pointers need to be adjusted */
-        active = hb_last_called >= hb_last_to_call;
-        if (hb_last_called >= op) {
-            hb_last_called--;
-            active ^= 1;
-        }
-        if (hb_last_to_call >= op) {
-            hb_last_to_call--;
-            active ^= 1;
-        }
-        /* hb_last_called == hb_last_to_call can mean either all called or
-         * all to be called - if the first object did a set_heart_beat(0) .
-         * If we decremented num_hb_to_do anyways, the statistics would
-         * be wrong.
-         */
-        if (num_hb_to_do > hb_num_done)
-            num_hb_to_do -= active;
-
-        num_hb_objs--;
-    }
-
-    /* That's it */
-    return 1;
-}
-
-/*-------------------------------------------------------------------------*/
-#ifdef MALLOC_smalloc
-
-void
-count_heart_beat_refs (void)
-
-/* Count the reference to the hb_list array in a garbage collection.
- */
-
-{
-    if (hb_list)
-        note_malloced_block_ref((char *)hb_list);
-}
-#endif
-
-/*-------------------------------------------------------------------------*/
-int
-heart_beat_status (int /* TODO: BOOL */ verbose)
-
-/* If <verbose> is true, print the heart beat status information directly
- * to the current interactive user. In any case, return the amount of
- * memory used by the heart beat functions.
- */
-
-{
-    char buf[20];
-
-    if (verbose) {
-        add_message("\nHeart beat information:\n");
-        add_message("-----------------------\n");
-        add_message("Number of objects with heart beat: %ld, starts: %ld, reserved %ld\n",
-                    (long)num_hb_objs, (long)num_hb_calls, (long)hb_max);
-        sprintf(buf, "%.2f",
-          avg_num_hb_objs ?
-            100 * (double) avg_num_hb_done / avg_num_hb_objs :
-            100.0
-        );
-        add_message("Average of HB calls completed:     %s%%\n", buf);
-    }
-    return 0;
-}
-
-/*=========================================================================*/
-
-/*                               EFUNS                                     */
-
-/*-------------------------------------------------------------------------*/
-struct svalue *
-f_heart_beat_info (struct svalue *sp)
-
-/* EFUN heart_beat_info()
- *
- * Create a vector of all objects with a heart beat and push it
- * onto the stack. The resulting vector may be empty.
- *
- * This efun is expensive!
- */
-
-{
-    int i;
-    struct object *ob, **op;
-    struct vector *vec;
-    struct svalue *v;
-
-    vec = allocate_array(i = num_hb_objs);
-    for (v = vec->item, op = hb_list; --i >= 0; v++) {
-        v->type = T_OBJECT;
-        v->u.ob = ob = *op++;
-        add_ref(ob, "heart_beat_info");
-    }
-    sp++;
-    sp->type = T_POINTER;
-    sp->u.vec = vec;
-    return sp;
-}
-
-/***************************************************************************/
-#endif /* OLD_RESET */
 

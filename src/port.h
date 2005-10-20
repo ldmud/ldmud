@@ -9,11 +9,19 @@
  *
  * This include provides various macros for system dependent
  * features, includes the most common system includes and, more
- * important, the HOST_INCLUDE (defined in machine.h). If no
- * HOST_INCLUDE is defined, hosts/unix.h is used as default.
+ * important, the host specific includes. port.h knows about the
+ * architectures the driver has been ported to and includes
+ * their files automatically. This process can be bypassed by
+ * defining an include file in the macro HOST_INCLUDE.
  *
  * Not everything system dependent is defined here, some stuff
  * are kept in separate my-foo.h files.
+ *
+ * TODO: Make a NOTREACHED(code) macro, which allows the insertion
+ * TODO:: of <code> for compilers without reachability-detection to
+ * TODO:: aid the optimizer.
+ * TODO: Make CHARBITMASK a define in here depending on CHAR_BIT
+ * TODO:: so it can vanish from configure.
  *------------------------------------------------------------------
  */
 
@@ -23,7 +31,7 @@ Thats it.
 #endif
 
 #if !defined(__STDC__)
-/* TODO: Add a ANSI-check to configure and let it fail, too. */
+/* On useful systems, the configure script catches this, too. */
 #error You need a Standard-C compiler.
 Thats it.
 #endif
@@ -57,6 +65,7 @@ Thats it.
  * Standard system headers.
  */
 
+#include <limits.h>
 #include <errno.h>
 #ifdef __SASC
 #    include <sys/errno.h>
@@ -113,25 +122,24 @@ extern int errno;
 
 /*------------------------------------------------------------------
  * Define some macros:
- *   CHARBITS     number of bits in a char, if not defined already.
+ *   CHAR_BIT     number of bits in a char, if not defined already.
+ *   TODO: Lookup what ISO-C says about this.
  *   MAXPATHLEN   max length of a pathname, if not defined already.
  *   PROT(x)      for portable prototype definitions.
  *   NORETURN     attribute for non-returning functions.
  *   UNUSED       attribute for unused functions and variables.
  *   FORMATDEBUG  attribute for printf-style prototypes.
  *   VARPROT      for portable printf-style prototype definitions.
- *   HAS_INLINE   if 'inline' is available
- *   INLINE       attribute for inline functions.
- *   LOCAL_INLINE attribute for inline functions which shall be
- *                available to other files, too.
+ *   INLINE       attribute for inline functions, depending on
+ *                HAS_INLINE (autoconf) and NO_INLINES (Makefile).
  *   EXTRACT_UCHAR(), EXTRACT_SCHAR():
  *                extract a character from a memory location.
  *   MSDOS_FS     if the filesystem uses MS-DOS semantics
  *                (i.e. backslashes as directory separators)
  */
 
-#ifndef CHARBITS
-#    define CHARBITS 8
+#ifndef CHAR_BIT
+#    define CHAR_BIT 8
 #endif
 
 #ifndef MAXPATHLEN
@@ -173,23 +181,14 @@ extern int errno;
 #    define VARPROT(proto, like,form,var) ()
 #endif
 
-/* TODO: Give machine.h a 'HAS_INLINE' define */
-/* TODO: Rethink this as soon as configure/autoconf has a proper inline
- * TODO:: detection - one that just checks for 'inline' vs. '__inline'.
- */
-
-#if (defined(__GNUC__) || defined(__MWERKS__) || defined(inline)) && !defined(DEBUG)
-#    define HAS_INLINE 1
+#if defined(HAS_INLINE) && !defined(NO_INLINES)
 #    define INLINE inline
-#    if defined(__MWERKS__)
-#        define LOCAL_INLINE
-#    else
-#        define LOCAL_INLINE INLINE
-#    endif
+     /* configure made sure that 'inline' expands to the proper attribute */
 #else
-#    undef HAS_INLINE
 #    define INLINE
-#    define LOCAL_INLINE
+#    undef NO_INLINES
+#    define NO_INLINES
+     /* just so we can recognize if we have inlines or not */
 #endif
 
 #define EXTRACT_UCHAR(p) (*(unsigned char *)(p))
@@ -201,36 +200,39 @@ extern int errno;
 
 /*------------------------------------------------------------------
  * Integral types:
+ *   Bool, SBool, CBool: boolean type, sized as int/short/char.
  *   p_int  : an integer that has the same size as a pointer
  *   ph_int : an integer that has half the size of a pointer
  *   mp_int : an integer that has at least the size of a pointer
  *   int32  : an integer with 32 bits
  *   PTRTYPE: a type to use with constant pointer arithmetic.
  * The unsigned versions use 'uint' instead of 'int'.
- * TODO: Add a type 'uchar'.
+ * TODO: Add a type 'uchar', '(u)int8' and '(u)int16'., unless not already
+ * TODO:: defined by STDC.
+ * TODO: inttypes.h and stdint.h have many interesting types...
  */
 
 /* p_int : an integer that has the same size as a pointer */
-#if SIZEOF_LONG == SIZEOF_P_INT
+#if SIZEOF_LONG == SIZEOF_CHAR_P
 typedef long                p_int;
 typedef unsigned long       p_uint;
-#else
-#    if SIZEOF_INT == SIZEOF_P_INT
+#elif SIZEOF_INT == SIZEOF_CHAR_P
 typedef int                 p_int;
 typedef unsigned int        p_uint;
-#    endif
-#    if SIZEOF_LONG < SIZEOF_P_INT
+#elif defined(HAVE_LONG_LONG) && SIZEOF_LONG_LONG == SIZEOF_CHAR_P
 typedef long long           p_int;
 typedef unsigned long long  p_uint;
-#    endif
+#else
+#error cannot find an integer type with same size as a pointer
+Thats it.
 #endif
 
 /* ph_int : an integer that has half the size of a pointer */
-#if SIZEOF_P_INT == SIZEOF_INT * 2
+#if SIZEOF_CHAR_P == SIZEOF_INT * 2
 typedef int                 ph_int;
 typedef unsigned int        ph_uint;
 #else
-#    if SIZEOF_P_INT == 4
+#    if SIZEOF_CHAR_P == 4
 /* short is assumed to be always 2 bytes. */
 /* TODO: This is a dangerous assumption. */
 typedef short               ph_int;
@@ -254,6 +256,15 @@ typedef unsigned int        uint32;
 #        endif
 #    endif
 #endif /* __BEOS__ */
+
+/* Boolean datatype and values */
+
+typedef int    Bool;  /* naming it 'bool' clashes on some machines... */
+typedef short SBool;
+typedef char  CBool;
+
+#define MY_TRUE  (1)
+#define MY_FALSE (0)
 
 /* TODO: This should go into my-malloc.h? */
 #ifdef FREE_RETURNS_VOID
@@ -335,11 +346,17 @@ typedef unsigned int        uint32;
 #define ALARM_HANDLER_FIRST_CALL(name)  name(0)
 
 /*------------------------------------------------------------------
- * The host specific include, as defined in machine.h
+ * The host specific includes
  */
 
-#ifdef HOST_INCLUDE
-#  include HOST_INCLUDE
+#if defined(HOST_INCLUDE)
+#    include HOST_INCLUDE
+#elif defined(AMIGA)
+#    include "hosts/amiga/amiga.h"
+#elif defined(__BEOS__)
+#    include "hosts/be/be.h"
+#else
+#    include "hosts/unix.h"
 #endif
 
 /*------------------------------------------------------------------

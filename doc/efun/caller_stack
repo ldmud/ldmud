@@ -8,7 +8,8 @@ DESCRIPTION
 	previous_object(i) equals caller_stack()[i].
 	
 	If you pass the optional argument <add_interactive> (as true value)
-	this_interactive() (or 0 if not existing) is appended to the array.
+	this_interactive() is appended to the array, or 0 if there is no
+        current interactive.
 
 EXAMPLE
 	interactive object A enters a command which causes

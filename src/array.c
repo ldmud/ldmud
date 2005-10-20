@@ -2,6 +2,10 @@
  * Array handling functions.
  *
  *---------------------------------------------------------------------------
+ * TODO: Rewrite the low-level functions (like allocate_array()) to return
+ * TODO:: failure codes (errno like) instead of throwing errors. In addition,
+ * TODO:: provide wrapper functions which do throw error()s, so that every
+ * TODO:: caller can handle the errors himself (like the swapper).
  * The structure of an array ("vector") is defined in datatypes.h as this:
  *
  *   struct vector {
@@ -23,7 +27,6 @@
  *
  * .extra_ref exists when the driver is compiled for DEBUGging, and
  * is used to countercheck the the .ref count.
- * TODO: How _is_ .extra_ref checked?
  *
  * .user records which wizard's object created the vector, and is used
  * to keep the wizlist statistics (array usage) up to date.
@@ -103,6 +106,10 @@
  *   - removing one or more keys does not break the order of the
  *     other keys.
  *   - all strings used as key values are made shared strings.
+ *
+ * TODO: order_alist() should be generalized into a sort_array() function
+ * TODO:: since it is used for more than just alists (similar assoc() into
+ * TODO:: a lookup function). Alists themselves are pretty outdated by now.
  *---------------------------------------------------------------------------
  */
 
@@ -147,7 +154,7 @@ void (*allocate_array_error_handler) (char *, ...)
    * swapping in an object.
    */
 
-char *last_insert_alist_shared_string = 0; /* TODO: Remove me */
+char *last_insert_alist_shared_string = NULL; /* TODO: Remove me */
   /* The last key string inserted into an alist.
    * gcollect needs to know this.
    * At the moment this value is not used and could as well be
@@ -176,6 +183,67 @@ _allocate_array(mp_int n, char * file, int line)
 
 #endif
 
+/* Allocate an array for <n> elements (but not more than the current
+ * maximum) and return the pointer.
+ * The elements are initialised to the svalue 0.
+ *
+ * If the allocations fails (and error() does return), a 0 pointer
+ * may be returned. This is usually only possible when arrays
+ * are allocated from the swapper.
+ *
+ * Allocating an array of size 0 will return a reference to the
+ * globally shared empty array.
+ *
+ * MALLOC_smalloc: annotate the allocations with <file> and <line>
+ */
+
+{
+    mp_int i;
+    struct vector *p;
+    struct svalue *svp;
+
+    if (n < 0 || (max_array_size && (size_t)n > max_array_size))
+        error("Illegal array size: %ld.\n", n);
+
+    if (n == 0) {
+        p = ref_array(&null_vector);
+        return p;
+    }
+
+    num_arrays++;
+
+    p = ALLOC_VECTOR(n, file, line);
+    if (!p) {
+        (*allocate_array_error_handler)("Out of memory\n");
+        return 0;
+    }
+
+    p->ref = 1;
+#ifndef MALLOC_smalloc
+    p->size = n;
+#endif
+    (p->user = current_object->user)->size_array += n;
+
+    svp = p->item;
+    for (i = n; --i >= 0; )
+        *svp++ = const0;
+
+    return p;
+}
+
+/*-------------------------------------------------------------------------*/
+#ifndef allocate_array_unlimited
+
+struct vector *
+allocate_array_unlimited (mp_int n)
+
+#else
+
+struct vector *
+_allocate_array_unlimited(mp_int n, char * file, int line)
+
+#endif
+
 /* Allocate an array for <n> elements and return the pointer.
  * The elements are initialised to the svalue 0.
  *
@@ -194,12 +262,11 @@ _allocate_array(mp_int n, char * file, int line)
     struct vector *p;
     struct svalue *svp;
 
-    if (n < 0 || n > MAX_ARRAY_SIZE)
+    if (n < 0)
         error("Illegal array size: %ld.\n", n);
 
     if (n == 0) {
-        p = &null_vector;
-        p->ref++;
+        p = ref_array(&null_vector);
         return p;
     }
 
@@ -237,7 +304,8 @@ _allocate_uninit_array (mp_int n, char *file, int line)
 
 #endif
 
-/* Allocate an array for <n> elements and return the pointer.
+/* Allocate an array for <n> elements (but no more than the current
+ * maximum) and return the pointer.
  * The elements are not initialised.
  * If the allocations fails (and error() does return), a 0 pointer
  * may be returned.
@@ -251,12 +319,11 @@ _allocate_uninit_array (mp_int n, char *file, int line)
 {
     struct vector *p;
 
-    if (n < 0 || n > MAX_ARRAY_SIZE)
+    if (n < 0 || (max_array_size && (size_t)n > max_array_size))
         error("Illegal array size: %ld.\n", n);
 
     if (n == 0) {
-        p = &null_vector;
-        p->ref++;
+        p = ref_array(&null_vector);
         return p;
     }
 
@@ -279,22 +346,19 @@ _allocate_uninit_array (mp_int n, char *file, int line)
 
 /*-------------------------------------------------------------------------*/
 void
-free_vector (struct vector *p)
+_free_vector (struct vector *p)
 
-/* Decrement the ref-count of vector <p> and deallocate the vector
- * if possible (the contained elements are properly freed in this
- * case).
+/* Deallocate the vector <p>, properly freeing the contained elements.
+ * The refcount is supposed to be zero at the time of call.
  */
 
 {
-    mp_int i;
+    mp_uint i;
     struct svalue *svp;
 
-    p->ref--;
-    if (p->ref > 0)
-        return;
-
 #ifdef DEBUG
+    if (p->ref > 0)
+        fatal("Vector with %ld refs passed to _free_vector()\n", p->ref);
     if (p == &null_vector)
         fatal("Tried to free the zero-size shared vector.\n");
 #endif
@@ -309,8 +373,8 @@ free_vector (struct vector *p)
         free_svalue(svp++);
     } while (--i);
 
-    xfree((char *)p);
-}
+    xfree(p);
+} /* _free_vector() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -321,7 +385,7 @@ free_empty_vector (struct vector *p)
  */
 
 {
-    mp_int i;
+    mp_uint i;
 
     i = VEC_SIZE(p);
     p->user->size_array -= i;
@@ -331,7 +395,7 @@ free_empty_vector (struct vector *p)
 
 /*-------------------------------------------------------------------------*/
 static struct vector *
-shrink_array (struct vector *p, int n)
+shrink_array (struct vector *p, mp_int n)
 
 /* Create and return a new array containing just the first <n> elements
  * of <p>. <p> itself is freed (and thus possibly deallocated).
@@ -346,8 +410,15 @@ shrink_array (struct vector *p, int n)
          * the shortcut
          */
 
-    res = slice_array(p, 0, n-1);
-    free_vector(p);
+    if (n)
+    {
+        res = slice_array(p, 0, n-1);
+    }
+    else
+    {
+        res = ref_array(&null_vector);
+    }
+    free_array(p);
     return res;
 }
 
@@ -363,7 +434,7 @@ set_vector_user (struct vector *p, struct object *owner)
     struct svalue *svp;
     mp_int i;
 
-    i = VEC_SIZE(p);
+    i = (mp_int)VEC_SIZE(p);
     if (p->user)
         p->user->size_array -= i;
     if ( NULL != (p->user = owner->user) )
@@ -415,12 +486,12 @@ explode_string (char *str, char *del)
 
 {
     char *p, *beg;
-    size_t num;
-    int len;
+    long num;
+    long len;
     struct vector *ret;
     char *buff;
 
-    len = strlen(del);
+    len = (long)strlen(del);
 
     /* --- Special case: Delimiter is an empty or one-char string --- */
     if (len <= 1) {
@@ -431,19 +502,17 @@ explode_string (char *str, char *del)
         if (len < 1) {
             struct svalue *svp;
 
-            len = strlen(str);
+            len = (long)strlen(str);
             ret = allocate_array(len);
             for( svp = ret->item; --len >= 0; svp++, str++ ) {
                 buff = xalloc(2);
                 if (!buff) {
-                    free_vector(ret);
+                    free_array(ret);
                     error("Out of memory\n");
                 }
                 buff[0] = *str;
                 buff[1] = '\0';
-                svp->type = T_STRING;
-                svp->x.string_type = STRING_MALLOC;
-                svp->u.string = buff;
+                put_malloced_string(svp, buff);
             }
             return ret;
 
@@ -464,25 +533,22 @@ explode_string (char *str, char *del)
             ret = allocate_array(num);
             for (svp = ret->item; NULL != (p = strchr(str, c)); str = p + 1, svp++) {
                 len = p - str;
-                buff = xalloc(len + 1);
+                buff = xalloc((size_t)(len + 1));
                 if (!buff) {
-                    free_vector(ret);
+                    free_array(ret);
                     error("Out of memory\n");
                 }
-                memcpy(buff, str, len);
+                memcpy(buff, str, (size_t)len);
                 buff[len] = '\0';
-                svp->type = T_STRING;
-                svp->x.string_type = STRING_MALLOC;
-                svp->u.string = buff;
+                put_malloced_string(svp, buff);
             }
 
             /* str now points to the (possibly empty) remains after
              * the last delimiter.
              */
-            svp->type = T_STRING;
-            svp->x.string_type = STRING_MALLOC;
-            if ( !(svp->u.string = string_copy(str)) ) {
-                free_vector(ret);
+            put_malloced_string(svp, string_copy(str));
+            if ( !svp->u.string ) {
+                free_array(ret);
                 error("Out of memory\n");
             }
 
@@ -503,7 +569,7 @@ explode_string (char *str, char *del)
      *   do the comparisons again.
      */
     for (p=str, num=1; *p;) {
-        if (strncmp(p, del, len) == 0) {
+        if (strncmp(p, del, (size_t)len) == 0) {
             p += len;
             num++;
         } else
@@ -516,21 +582,19 @@ explode_string (char *str, char *del)
      *   <buff> serves as temporary buffer for the copying.
      */
     for (p=str, beg = str, num=0; *p; ) {
-        if (strncmp(p, del, len) == 0) {
-            int bufflen;
+        if (strncmp(p, del, (size_t)len) == 0) {
+            long bufflen;
 
             bufflen = p - beg;
-            buff = xalloc(bufflen + 1);
+            buff = xalloc((size_t)bufflen + 1);
             if (!buff) {
-                free_vector(ret);
+                free_array(ret);
                 error("Out of memory\n");
             }
-            memcpy(buff, beg, bufflen);
+            memcpy(buff, beg, (size_t)bufflen);
             buff[bufflen] = '\0';
 
-            ret->item[num].type = T_STRING;
-            ret->item[num].x.string_type = STRING_MALLOC;
-            ret->item[num].u.string = buff;
+            put_malloced_string(ret->item+num, buff);
 
             num++;
             beg = p + len;
@@ -542,12 +606,11 @@ explode_string (char *str, char *del)
     }
 
     /* Copy the last occurence (may be empty). */
-    if ( !(ret->item[num].u.string = string_copy(beg)) ) {
-        free_vector(ret);
+    put_malloced_string(ret->item + num, string_copy(beg));
+    if ( !ret->item[num].u.string) {
+        free_array(ret);
         error("Out of memory\n");
     }
-    ret->item[num].type = T_STRING;
-    ret->item[num].x.string_type = STRING_MALLOC;
 
     return ret;
 }
@@ -579,16 +642,17 @@ _implode_string (struct vector *arr, char *del, char *file, int line)
  */
 
 {
-    mp_int size, i, del_len, arr_size;
+    mp_int size, i, arr_size;
+    mp_int del_len;
     char *p, *q;
     struct svalue *svp;
 
-    del_len = strlen(del);
+    del_len = (mp_int)strlen(del);
 
     /* Compute the <size> of the final string
      */
     size = -del_len;
-    for (i = (arr_size = VEC_SIZE(arr)), svp = arr->item; --i >= 0; svp++)
+    for (i = (arr_size = (mp_int)VEC_SIZE(arr)), svp = arr->item; --i >= 0; svp++)
     {
         if (svp->type == T_STRING) {
             size += del_len + strlen(svp->u.string);
@@ -602,11 +666,11 @@ _implode_string (struct vector *arr, char *del, char *file, int line)
 #ifndef implode_string
     if (size <= 0)
         return string_copy("");
-    p = xalloc(size + 1);
+    p = xalloc((size_t)size + 1);
 #else
     if (size <= 0)
         return _string_copy("", file, line);
-    p = smalloc(size + 1, file, line);
+    p = smalloc((size_t)size + 1, file, line);
 #endif
     if (!p) {
         /* caller raises the error() */
@@ -648,7 +712,7 @@ _implode_string (struct vector *arr, char *del, char *file, int line)
 
 /*-------------------------------------------------------------------------*/
 struct vector *
-slice_array (struct vector *p, int from, int to)
+slice_array (struct vector *p, mp_int from, mp_int to)
 
 /* Create a vector slice from vector <p>, range <from> to <to> inclusive,
  * and return it.
@@ -688,7 +752,7 @@ add_array (struct vector *p, struct vector *q)
     mp_int q_size;
 
     s = p->item;
-    p = allocate_array((cnt = VEC_SIZE(p)) + (q_size = VEC_SIZE(q)));
+    p = allocate_array((cnt = (mp_int)VEC_SIZE(p)) + (q_size = (mp_int)VEC_SIZE(q)));
     d = p->item;
     for ( ; --cnt >= 0; ) {
         assign_svalue_no_free (d++, s++);
@@ -766,8 +830,8 @@ static struct svalue ltmp = { T_POINTER };
     struct svalue *source, *dest; /* Pointers into minuend
                                      and difference vector */
     mp_int i;
-    mp_int minuend_size    = VEC_SIZE(minuend);
-    mp_int subtrahend_size = VEC_SIZE(subtrahend);
+    mp_int minuend_size    = (mp_int)VEC_SIZE(minuend);
+    mp_int subtrahend_size = (mp_int)VEC_SIZE(subtrahend);
 
     int (*assoc_function)(struct svalue *, struct vector *);
       /* Function to find an svalue in a sorted vector.
@@ -779,12 +843,12 @@ static struct svalue ltmp = { T_POINTER };
 
     if (minuend_size == 0)
     {
-        free_vector(subtrahend);
+        free_array(subtrahend);
         return minuend;
     }
     if (subtrahend_size == 0)
     {
-        free_vector(subtrahend);
+        free_array(subtrahend);
         return shrink_array(minuend, minuend_size);
     }
 
@@ -803,7 +867,7 @@ static struct svalue ltmp = { T_POINTER };
     {
         ltmp.u.vec = subtrahend;
         vtmpp = order_alist(&ltmp, 1, 1);
-        free_vector(ltmp.u.vec);
+        free_array(ltmp.u.vec);
         assoc_function = &assoc;
         subtrahend = vtmpp->item[0].u.vec;
     }
@@ -828,7 +892,7 @@ static struct svalue ltmp = { T_POINTER };
             if ( (*assoc_function)(source, subtrahend) < 0 )
                 assign_svalue(dest++, source);
         }
-        free_vector(vtmpp);
+        free_array(vtmpp);
         return shrink_array(minuend, dest - minuend->item);
     }
 
@@ -844,8 +908,8 @@ static struct svalue ltmp = { T_POINTER };
             assign_svalue_no_free(dest++, source);
     }
 
-    free_vector(vtmpp);
-    free_vector(minuend);
+    free_array(vtmpp);
+    free_array(minuend);
 
     /* Shrink the difference vector to the needed size and return it. */
     return shrink_array(difference, dest-difference->item);
@@ -880,8 +944,7 @@ all_inventory (struct object *ob)
     cur=ob->contains;
     for (res=0; res < cnt; res++) {
         d->item[res].type=T_OBJECT;
-        d->item[res].u.ob = cur;
-        add_ref(cur,"all_inventory");
+        d->item[res].u.ob = ref_object(cur, "all_inventory");
         cur=cur->next_inv;
     }
 
@@ -913,7 +976,7 @@ map_array ( struct vector *arr
     struct svalue *v, *w, *x;
     mp_int cnt;
 
-    r = allocate_array(cnt = VEC_SIZE(arr));
+    r = allocate_array(cnt = (mp_int)VEC_SIZE(arr));
     if (!r)
         error("Out of memory\n");
     push_referenced_vector(r);
@@ -1020,11 +1083,11 @@ sort_array (struct vector *data, char *func, struct object *ob)
  */
 
 {
-  int step, halfstep, size;
+  mp_int step, halfstep, size;
   int i, j, index1, index2, end1, end2;
   struct svalue *source, *dest, *temp;
 
-  size = VEC_SIZE(data);
+  size = (mp_int)VEC_SIZE(data);
   temp = data->item;
 
   /* Squash all destructed objects in data. */
@@ -1108,7 +1171,7 @@ sort_array (struct vector *data, char *func, struct object *ob)
   temp = data->item;
   for (i=size; --i >= 0; )
     temp[i]=source[i];
-  drop_stack();
+  inter_sp--;
   return data;
 }
 
@@ -1158,8 +1221,7 @@ write_deep_inventory (struct object *first, struct svalue *svp)
 
     ob = first;
     do {
-        svp->type = T_OBJECT;
-        add_ref( (svp->u.ob = ob), "deep_inventory");
+        put_ref_object(svp, ob, "deep_inventory");
         svp++;
     } while ( NULL != (ob = ob->next_inv) );
 
@@ -1174,7 +1236,7 @@ write_deep_inventory (struct object *first, struct svalue *svp)
 
 /*-------------------------------------------------------------------------*/
 struct vector *
-deep_inventory (struct object *ob, int /* TODO: bool */ take_top)
+deep_inventory (struct object *ob, Bool take_top)
 
 /* Return a vector with the full inventory of <ob>, i.e. all objects contained
  * by <ob> and all deep inventories of those objects, too. The resulting
@@ -1203,8 +1265,7 @@ deep_inventory (struct object *ob, int /* TODO: bool */ take_top)
 
     /* Fill in <ob> if desired */
     if (take_top) {
-        svp->type = T_OBJECT;
-        add_ref( (svp->u.ob = ob), "deep_inventory");
+        put_ref_object(svp, ob, "deep_inventory");
         svp++;
     }
 
@@ -1257,7 +1318,7 @@ alist_cmp (struct svalue *p1, struct svalue *p2)
 
 /*-------------------------------------------------------------------------*/
 struct vector *
-order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
+order_alist (struct svalue *inlists, int listnum, Bool reuse)
 
 /* Order the alist <inlists> and return a new vector with it. The sorting
  * order is the internal order defined by alist_cmp().
@@ -1298,10 +1359,10 @@ order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
        */
     struct svalue **root2;   /* Aux pointer into *root. */
     struct svalue *inpnt;    /* Pointer to the value to copy into the result */
-    int keynum;              /* Number of keys */
+    mp_int keynum;           /* Number of keys */
     int i, j;
 
-    keynum = VEC_SIZE(inlists[0].u.vec);
+    keynum = (mp_int)VEC_SIZE(inlists[0].u.vec);
 
     /* Allocate the auxiliary array. */
     root = (struct svalue **)alloca(keynum * sizeof(struct svalue *[2])
@@ -1321,6 +1382,10 @@ order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
 
     /*
      * Heapsort inlists[0].vec into *root.
+     * TODO: For small arrays a simpler sort like linear insertion or
+     * TODO:: even bubblesort might be faster (less overhead). Best solution
+     * TODO:: would be to offer both algorithms and determine the threshhold
+     * TODO:: at startup.
      */
 
     /* Heapify the keys into the first half of root */
@@ -1341,8 +1406,7 @@ order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
         } else if (inpnt->type == T_OBJECT) {
             if (inpnt->u.ob->flags & O_DESTRUCTED) {
                 free_object_svalue(inpnt);
-                inpnt->type = T_NUMBER;
-                inpnt->u.number = 0;
+                put_number(inpnt, 0);
             }
         }
         /* propagate the new element up in the heap as much as necessary */
@@ -1421,8 +1485,7 @@ order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
         /* Set the new array v as the next 'out' vector, and init outpnt
          * and offs.
          */
-        outlists[i].type  = T_POINTER;
-        outlists[i].u.vec = v;
+        put_array(outlists + i, v);
         outpnt = v->item;
 
         v = inlists[i].u.vec; /* Next vector to fill if reusable */
@@ -1443,8 +1506,7 @@ order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
                     inpnt->u.ob->flags & O_DESTRUCTED)
                 {
                     free_object_svalue(inpnt);
-                    outpnt->type = T_NUMBER;
-                    outpnt->u.number = 0;
+                    put_number(outpnt, 0);
                     outpnt++;
                 } else {
                     *outpnt++ = *inpnt;
@@ -1462,8 +1524,7 @@ order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
                 if (inpnt->type == T_OBJECT &&
                     inpnt->u.ob->flags & O_DESTRUCTED)
                 {
-                    outpnt->type = T_NUMBER;
-                    outpnt->u.number = 0;
+                    put_number(outpnt, 0);
                     outpnt++;
                 } else {
                     assign_svalue_no_free(outpnt++, inpnt);
@@ -1476,7 +1537,7 @@ order_alist (struct svalue *inlists, int listnum, int /* TODO: bool */ reuse)
 }
 
 /*-------------------------------------------------------------------------*/
-int /* TODO: bool */
+Bool
 is_alist (struct vector *v)
 
 /* Determine if <v> satisfies the conditions for being an alist key vector.
@@ -1497,7 +1558,7 @@ is_alist (struct vector *v)
     struct svalue *svp;
     mp_int i;
 
-    for (svp = v->item, i = VEC_SIZE(v); --i > 0; svp++) {
+    for (svp = v->item, i = (mp_int)VEC_SIZE(v); --i > 0; svp++) {
         if (svp->type == T_STRING && svp->x.string_type != STRING_SHARED)
             return 0;
         if (alist_cmp(svp, svp+1) > 0)
@@ -1517,7 +1578,7 @@ is_alist (struct vector *v)
 struct svalue *
 f_filter_array (struct svalue *sp, int num_arg)
 
-/* EFUN: filter_array()
+/* VEFUN: filter_array()
  *
  *   mixed *filter_array(mixed *arr, string fun)
  *   mixed *filter_array(mixed *arr, string fun, string|object obj, mixed extra, ...)
@@ -1569,9 +1630,9 @@ f_filter_array (struct svalue *sp, int num_arg)
         bad_efun_vararg(1, sp);
 
     p = arg->u.vec;
-    p_size = VEC_SIZE(p);
+    p_size = (mp_int)VEC_SIZE(p);
 
-    flags = alloca(p_size+1);
+    flags = alloca((size_t)p_size+1);
     if (!flags)
     {
         error("Stack overflow in filter_array()");
@@ -1601,7 +1662,7 @@ f_filter_array (struct svalue *sp, int num_arg)
         for (w = p->item, cnt = p_size; --cnt >= 0; ) {
             if (w->type == T_OBJECT && w->u.ob->flags & O_DESTRUCTED)
                 zero_object_svalue(w);
-            if (get_map_lvalue(m, w++, MY_FALSE) == &const0) {
+            if (get_map_value(m, w++) == &const0) {
                 flags[cnt] = 0;
                 continue;
             }
@@ -1694,7 +1755,7 @@ f_filter_array (struct svalue *sp, int num_arg)
     }
 
     /* Cleanup */
-    free_vector(p);
+    free_array(p);
     arg->u.vec = vec;
     while(--num_arg)
         free_svalue(sp--);
@@ -1706,7 +1767,7 @@ f_filter_array (struct svalue *sp, int num_arg)
 struct svalue *
 f_filter_objects (struct svalue *sp, int num_arg)
 
-/* EFUN filter_objects()
+/* VEFUN filter_objects()
  *
  *   object *filter_objects (object *arr, string fun, mixed extra, ...)
  *
@@ -1727,7 +1788,7 @@ f_filter_objects (struct svalue *sp, int num_arg)
     char *func;                /* The <fun> argument */
     struct svalue *arguments;  /* Beginning of 'extra' arguments on vm stack */
     struct vector *w;          /* Result vector */
-    /* TODO: bool */ char *flags = NULL;        /* Flag array, one flag for each element of <p> */
+    CBool *flags = NULL;     /* Flag array, one flag for each element of <p> */
     int res;                   /* Count of objects to return */
     struct object *ob;         /* Object to call */
     mp_int p_size;             /* Size of <p> */
@@ -1748,7 +1809,7 @@ f_filter_objects (struct svalue *sp, int num_arg)
     func = arguments[-1].u.string;
     num_arg -= 2;
 
-    p_size = VEC_SIZE(p);
+    p_size = (mp_int)VEC_SIZE(p);
 
     /* Call <func> in every object, recording the result in flags.
      *
@@ -1775,7 +1836,7 @@ f_filter_objects (struct svalue *sp, int num_arg)
 
       case STRING_SHARED:
 
-        flags = alloca(p_size+1);
+        flags = alloca((p_size+1)*sizeof(*flags));
         if (!flags)
         {
             error("Stack overflow in filter_objects()");
@@ -1784,7 +1845,7 @@ f_filter_objects (struct svalue *sp, int num_arg)
         }
 
         for (cnt = 0; cnt < p_size; cnt++) {
-            flags[cnt]=0;
+            flags[cnt] = MY_FALSE;
             v = &p->item[cnt];
 
             /* Coerce <v> into a (non-destructed) object ob (if necessary
@@ -1814,7 +1875,7 @@ f_filter_objects (struct svalue *sp, int num_arg)
             push_svalue_block(num_arg, arguments);
             v = sapply (func, ob, num_arg);
             if ((v) && (v->type!=T_NUMBER || v->u.number) ) {
-                flags[cnt]=1;
+                flags[cnt] = MY_TRUE;
                 res++;
             }
         } /* for() */
@@ -1846,14 +1907,14 @@ f_filter_objects (struct svalue *sp, int num_arg)
                     if (sv.x.string_type == STRING_MALLOC) {
                         if ( !(v->u.string = string_copy(sv.u.string)) ) {
                             v->type = T_INVALID;
-                            free_vector(w);
+                            free_array(w);
                             error("Out of memory\n");
                         }
                     } else {
-                        increment_string_ref(sv.u.string);
+                        ref_string(sv.u.string);
                     }
                 } else {
-                    add_ref(sv.u.ob, "filter");
+                    (void)ref_object(sv.u.ob, "filter");
                 }
 
                 /* Loop termination check moved in here to save cycles */
@@ -1864,7 +1925,7 @@ f_filter_objects (struct svalue *sp, int num_arg)
     } /* if (res) */
 
     /* Cleanup and return */
-    free_vector(p);
+    free_array(p);
 
     do {
         free_svalue(sp--);
@@ -1881,7 +1942,7 @@ f_filter_objects (struct svalue *sp, int num_arg)
 struct svalue *
 f_map_objects (struct svalue *sp, int num_arg)
 
-/* EFUN map_objects()
+/* VEFUN map_objects()
  *
  *   mixed *map_objects (object *arr, string fun, mixed extra, ...)
  *
@@ -1902,7 +1963,7 @@ f_map_objects (struct svalue *sp, int num_arg)
     struct svalue *arguments;  /* Beginning of 'extra' arguments on vm stack */
     struct vector *r;          /* Result vector */
     struct object *ob;         /* Object to call */
-    int size;                  /* Size of <p> */
+    mp_int size;               /* Size of <p> */
     int cnt;
     struct svalue *w, *v, *x;
 
@@ -1919,7 +1980,7 @@ f_map_objects (struct svalue *sp, int num_arg)
     func = arguments[-1].u.string;
     num_arg -= 2;
 
-    r = allocate_array(size = VEC_SIZE(p));
+    r = allocate_array(size = (mp_int)VEC_SIZE(p));
     arguments[-2].u.vec = r;
 
     push_referenced_vector(p); /* Ref it from the stack in case of errors */
@@ -1979,7 +2040,7 @@ f_map_objects (struct svalue *sp, int num_arg)
     do {
         free_svalue(sp--);
     } while(--num_arg >= 0);
-    free_vector(p);
+    free_array(p);
 
     return sp;
 }
@@ -2002,7 +2063,7 @@ search_alist (struct svalue *key, struct vector *keylist)
 {
     mp_int i, o, d, keynum;
 
-    if ( !(keynum = VEC_SIZE(keylist)) )
+    if ( !(keynum = (mp_int)VEC_SIZE(keylist)) )
         return 0;
 
     /* Simple binary search */
@@ -2036,6 +2097,8 @@ search_alist (struct svalue *key, struct vector *keylist)
 
 
 /*-------------------------------------------------------------------------*/
+#ifdef F_INSERT_ALIST
+
 struct svalue *
 insert_alist (struct svalue *key, struct svalue * /* TODO: bool */ key_data, struct vector *list)
 
@@ -2078,13 +2141,11 @@ insert_alist (struct svalue *key, struct svalue * /* TODO: bool */ key_data, str
         tmpstr = make_shared_string(key->u.string);
         if (key->x.string_type == STRING_MALLOC)
             xfree(key->u.string);
-        key->x.string_type = STRING_SHARED;
-        key->u.string = tmpstr;
-        increment_string_ref(tmpstr);
+        put_ref_string(key, tmpstr);
         last_insert_alist_shared_string = tmpstr;
     }
 
-    keynum = VEC_SIZE(list->item[0].u.vec);
+    keynum = (mp_int)VEC_SIZE(list->item[0].u.vec);
 
     /* Locate the key */
     ix = search_alist(key, list->item[0].u.vec);
@@ -2092,14 +2153,12 @@ insert_alist (struct svalue *key, struct svalue * /* TODO: bool */ key_data, str
     /* If its just a lookup: return the result.
      */
     if (key_data == 0) {
-         stmp.type = T_NUMBER;
-         stmp.u.number = ix;
+         put_number(&stmp, ix);
          return &stmp;
     }
 
     /* Prepare the result alist vector */
-    stmp.type = T_POINTER;
-    stmp.u.vec = allocate_array(list_size = VEC_SIZE(list));
+    put_array(&stmp, allocate_array(list_size = (mp_int)VEC_SIZE(list)));
 
     new_member = ix == keynum || alist_cmp(key, &list->item[0].u.vec->item[ix]);
 
@@ -2139,6 +2198,7 @@ insert_alist (struct svalue *key, struct svalue * /* TODO: bool */ key_data, str
     return &stmp;
 }
 
+#endif
 
 /*-------------------------------------------------------------------------*/
 int
@@ -2187,10 +2247,10 @@ intersect_alist (struct vector *a1, struct vector *a2)
 
 {
     struct vector *a3;
-    int d, l, i1, i2, a1s, a2s;
+    mp_int d, l, i1, i2, a1s, a2s;
 
-    a1s = VEC_SIZE(a1);
-    a2s = VEC_SIZE(a2);
+    a1s = (mp_int)VEC_SIZE(a1);
+    a2s = (mp_int)VEC_SIZE(a2);
     a3 = allocate_array( a1s < a2s ? a1s : a2s);
     for (i1=i2=l=0; i1 < a1s && i2 < a2s; ) {
         d = alist_cmp(&a1->item[i1], &a2->item[i2]);
@@ -2228,16 +2288,16 @@ intersect_array (struct vector *a1, struct vector *a2)
 
     ltmp.u.vec = a1;
     vtmpp1 = order_alist(&ltmp, 1, 1);
-    free_vector(ltmp.u.vec);
+    free_array(ltmp.u.vec);
 
     ltmp.u.vec = a2;
     vtmpp2 = order_alist(&ltmp, 1, 1);
-    free_vector(ltmp.u.vec);
+    free_array(ltmp.u.vec);
 
     vtmpp3 = intersect_alist(vtmpp1->item[0].u.vec, vtmpp2->item[0].u.vec);
 
-    free_vector(vtmpp1);
-    free_vector(vtmpp2);
+    free_array(vtmpp1);
+    free_array(vtmpp2);
 
     return vtmpp3;
 }
@@ -2255,13 +2315,13 @@ match_regexp (struct vector *v, char *pattern)
 
 {
     struct regexp *reg;        /* compiled regexp */
-    /* TODO: bool */ char *res;           /* res[i] true -> v[i] matches */
+    CBool *res;                /* res[i] true -> v[i] matches */
     mp_int num_match, v_size;  /* Number of matches, size of <v> */
     struct vector *ret;        /* The result vector */
     mp_int i;
 
     /* Simple case: empty input yields empty output */
-    if ((v_size = VEC_SIZE(v)) == 0)
+    if ((v_size = (mp_int)VEC_SIZE(v)) == 0)
         return allocate_array(0);
 
     /* Compile the regexp (or take it from the cache) */
@@ -2272,7 +2332,7 @@ match_regexp (struct vector *v, char *pattern)
     /* Check every string in <v> if it matches and set res[]
      * accordingly.
      */
-    res = (char *)alloca(v_size);
+    res = alloca(v_size * sizeof(*res));
     if (!res)
     {
         error("Stack overflow in regexp()");
@@ -2283,7 +2343,7 @@ match_regexp (struct vector *v, char *pattern)
     for (num_match = i = 0; i < v_size; i++) {
         char *line;
 
-        res[i] = 0;
+        res[i] = MY_FALSE;
 
         if (v->item[i].type != T_STRING)
             continue;
@@ -2293,14 +2353,14 @@ match_regexp (struct vector *v, char *pattern)
         if (regexec(reg, line, line) == 0)
             continue;
 
-        res[i] = 1;
+        res[i] = MY_TRUE;
         num_match++;
     }
 
     /* Create the result vector and copy the matching lines */
     ret = allocate_array(num_match);
     for (num_match=i=0; i < v_size; i++) {
-        if (res[i] == 0)
+        if (!res[i])
             continue;
         assign_svalue_no_free(&ret->item[num_match], &v->item[i]);
         num_match++;
@@ -2313,9 +2373,121 @@ match_regexp (struct vector *v, char *pattern)
 
 /*-------------------------------------------------------------------------*/
 struct svalue *
+f_transpose_array (struct svalue *sp)
+
+/* TEFUN transpose_array()
+ *
+ *   mixed *transpose_array (mixed *arr);
+ *
+ * transpose_array ( ({ ({1,2,3}), ({a,b,c}) }) )
+ * 		  => ({ ({1,a}), ({2,b)}, ({3,c}) })
+ *
+ * transpose_array() applied to an alist results in an array of
+ * ({ key, data }) pairs, useful if you want to use sort_array()
+ * or filter_array() on the alist.
+ *
+ * TODO: There should be something like this for mappings.
+ */
+
+{
+    struct vector *v;  /* Input vector */
+    struct vector *w;  /* Result vector */
+    mp_int a;          /* size of <v> */
+    mp_int b;          /* size of <v>[ix] for all ix */
+    mp_int i, j;
+    int no_copy;
+      /* 1 if <v> has only one ref, else 0. Not just a boolean, it
+       * is compared with the ref counts of the subvectors of v.
+       */
+    struct svalue *x, *y, *z;
+    int o;
+
+    /* Get and test the arguments */
+    if (sp->type != T_POINTER)
+        bad_xefun_arg(1, sp);
+
+    v = sp->u.vec;
+
+    if ( !(a = (mp_int)VEC_SIZE(v)) )
+        return sp;
+
+    if (v->item->type != T_POINTER)
+        bad_xefun_arg(1, sp);
+
+    if ( !(b = (mp_int)VEC_SIZE(v->item->u.vec)) )
+    {
+        sp->u.vec = ref_array(v->item->u.vec);
+        free_array(v);
+        return sp;
+    }
+
+    no_copy = (v->ref == 1) ? 1 : 0;
+
+    /* Allocate and initialize the result vector */
+    w = allocate_uninit_array(b);
+    for (j = b, x = w->item; --j >= 0; x++)
+    {
+        put_array(x, allocate_array(a));
+    }
+
+    o = offsetof(struct vector, item);
+
+    for (i = a, y = v->item; --i >= 0; o += sizeof(struct svalue), y++)
+    {
+        x = w->item;
+        if (y->type != T_POINTER)
+            break;
+
+        z = y->u.vec->item;
+
+        if (VEC_SIZE(y->u.vec) < (size_t)b
+         && !(b = (mp_int)VEC_SIZE(y->u.vec)) )
+                break;
+
+        if (y->u.vec->ref == no_copy)
+        {
+            /* Move the values to the result vector */
+
+            j = b;
+            do {
+                transfer_svalue_no_free(
+                  (struct svalue *)((char*)x->u.vec+o),
+                  z
+                );
+                x++;
+                z++;
+            } while (--j > 0);
+            free_empty_vector(y->u.vec);
+            y->type = T_INVALID;
+        }
+        else
+        {
+            /* Assign the values to the result vector */
+
+            j = b;
+            do {
+                assign_svalue_no_free(
+                  (struct svalue *)((char*)x->u.vec+o),
+                  z
+                );
+                x++;
+                z++;
+            } while (--j > 0);
+        }
+    }
+
+    /* Clean up and return the result */
+
+    free_array(sp->u.vec);
+    sp->u.vec = w;
+    return sp;
+} /* f_transpose_array() */
+
+/*-------------------------------------------------------------------------*/
+struct svalue *
 f_regexplode (struct svalue *sp)
 
-/* EFUN regexplode()
+/* TEFUN regexplode()
  *
  *   string *regexplode (string text, string pattern)
  *
@@ -2388,7 +2560,7 @@ f_regexplode (struct svalue *sp)
     *matchp = 0; /* Terminate list properly */
 
     /* Prepare the result vector */
-    if (num_match > ((MAX_ARRAY_SIZE-1) >> 1) ) {
+    if (max_array_size && num_match > ((max_array_size-1) >> 1) ) {
         REGFREE(reg);
         inter_sp = sp;
         error("Illegal array size");
@@ -2407,43 +2579,37 @@ f_regexplode (struct svalue *sp)
 
         /* Copy the text leading up to the current delimiter match. */
         len = match->start - text;
-        str = xalloc(len + 1);
+        str = xalloc((size_t)len + 1);
         if (!str)
         {
             error("Out of memory.\n");
             /* NOTREACHED */
             return NULL;
         }
-        strncpy(str, text, len);
+        strncpy(str, text, (size_t)len);
         str[len] = 0;
         text += len;
-        svp->type = T_STRING;
-        svp->x.string_type = STRING_MALLOC;
-        svp->u.string = str;
+        put_malloced_string(svp, str);
         svp++;
 
         /* Copy the matched delimiter */
         len = match->end - text;
-        str = xalloc(len + 1);
+        str = xalloc((size_t)len + 1);
         if (!str)
         {
             error("Out of memory.\n");
             /* NOTREACHED */
             return NULL;
         }
-        strncpy(str, text, len);
+        strncpy(str, text, (size_t)len);
         str[len] = 0;
         text += len;
-        svp->type = T_STRING;
-        svp->x.string_type = STRING_MALLOC;
-        svp->u.string = str;
+        put_malloced_string(svp, str);
         svp++;
     }
 
     /* Copy the remaining text (maybe the empty string) */
-    svp->type = T_STRING;
-    svp->x.string_type = STRING_MALLOC;
-    svp->u.string = string_copy(text);
+    put_malloced_string(svp, string_copy(text));
 
     /* Cleanup */
     REGFREE(reg);
@@ -2452,18 +2618,15 @@ f_regexplode (struct svalue *sp)
     free_string_svalue(sp);
 
     /* Return the result */
-    sp->type = T_POINTER;
-    sp->u.vec = ret;
+    put_array(sp, ret);
     return sp;
 }
 
 /*-------------------------------------------------------------------------*/
-#ifdef F_INHERIT_LIST
-
 struct svalue *
 f_inherit_list (struct svalue *sp)
 
-/* EFUN inherit_list()
+/* TEFUN inherit_list()
  *
  *   string* inherit_list (object ob = this_object())
  *
@@ -2511,6 +2674,7 @@ f_inherit_list (struct svalue *sp)
     for (cur = 0; cur < next; cur++)
     {
         int cnt;
+        struct inherit *inheritp;
 
         pr = plist[cur];
         cnt = pr->num_inherited;
@@ -2518,51 +2682,46 @@ f_inherit_list (struct svalue *sp)
             break;
 
         /* Store the inherited programs in the list.
-         *
-         * This is an optimized version of:
-         *   for (i = 0; i < cnt; i++) plist[next++] = pr->inherit[i].prog;
          */
-        prp = &pr->inherit[0].prog;
-        while(--cnt >= 0) {
-            plist[next++] = *prp;
-            prp = (struct program **)((char *)prp + sizeof(struct inherit));
+        for (inheritp = &pr->inherit[0]; cnt--; inheritp++)
+        {
+            if (!inheritp->is_extra)
+                plist[next++] = inheritp->prog;
         }
     }
 
-    /* next is also the number of files found :-) */
+    /* next is also the actual number of files found :-) */
     vec = allocate_array(next);
 
-    /* Take the filenames of the programs, make them shared and
-     * put them into the result vector.
+    /* Take the filenames of the program and copy them into
+     * the result vector.
      * TODO: What? The filenames are not shared a priori?
      */
     for (svp = vec->item, prp = plist; --next >= 0; svp++) {
         char *str;
 
         pr = *prp++;
-        if ( !(str = make_shared_string(pr->name)) ) {
-            free_vector(vec);
+        str = xalloc(strlen(pr->name)+1);
+        if (!str)
+        {
+            free_array(vec);
             error("Out of memory\n");
         }
-        svp->type = T_STRING;
-        svp->x.string_type = STRING_SHARED;
-        svp->u.string = str;
+        strcpy(str, pr->name);
+        put_malloced_string(svp, str);
     }
 
     free_object_svalue(sp);
 
-    sp->type = T_POINTER;
-    sp->u.vec = vec;
+    put_array(sp, vec);
     return sp;
 }
-
-#endif /* F_INHERIT_LIST */
 
 /*-------------------------------------------------------------------------*/
 struct svalue *
 f_functionlist (struct svalue *sp)
 
-/* EFUN functionlist()
+/* TEFUN functionlist()
  *
  *   mixed *functionlist (object ob, int flags = RETURN_FUNCTION_NAME)
  *
@@ -2614,13 +2773,15 @@ f_functionlist (struct svalue *sp)
  * TODO: All these defs are in mudlib/sys/functionlist.h and mudlib/sys/lpctypes.h
  * TODO:: as well as in exec.h and this file. This should be centralized.
  * TODO:: Maybe write the files on mud startup?
+ * TODO:: Include mudlib/sys/functionlist.h doesn't help because then
+ * TODO:: mkdepend stumbles over the embedded include <sys/lpctypes.h>.
  */
 
 {
-#define RETURN_FUNCTION_NAME        0x01
-#define RETURN_FUNCTION_FLAGS        0x02
-#define RETURN_FUNCTION_TYPE        0x04
-#define RETURN_FUNCTION_NUMARG        0x08
+#define RETURN_FUNCTION_NAME    0x01
+#define RETURN_FUNCTION_FLAGS   0x02
+#define RETURN_FUNCTION_TYPE    0x04
+#define RETURN_FUNCTION_NUMARG  0x08
 
 #define RETURN_FUNCTION_MASK    0x0f  /* union of all RETURN_FUNCTION_ defs */
 
@@ -2629,7 +2790,7 @@ f_functionlist (struct svalue *sp)
     struct object *ob;        /* <ob> argument to list */
     mp_int mode_flags;        /* <flags> argument */
     struct program *prog;     /* <ob>'s program */
-    mp_int num_functions;     /* Number of functions to list */
+    unsigned short num_functions;  /* Number of functions to list */
     char *vis_tags;
       /* Bitflag array describing the visibility of every function in prog
        * in relation to the passed <flags>: */
@@ -2644,7 +2805,7 @@ f_functionlist (struct svalue *sp)
     struct program *defprog;  /* Program which actually defines *fun */
     uint32 flags;
     unsigned short *ixp;
-    int i, j;
+    long i, j;
 
     inter_sp = sp; /* In case of errors leave a clean stack */
 
@@ -2739,7 +2900,7 @@ f_functionlist (struct svalue *sp)
      */
 
     for(i = prog->num_functions, fun += i; --i >= 0; ) {
-        unsigned char *funstart; /* Pointer to function in the executable */
+        fun_hdr_p funstart; /* Pointer to function in the executable */
 
         fun--;
 
@@ -2758,7 +2919,7 @@ f_functionlist (struct svalue *sp)
          */
         if ( !~(flags | ~(NAME_INHERITED|NAME_CROSS_DEFINED) ) ) {
             active_flags |= NAME_CROSS_DEFINED;
-            j = (flags & INHERIT_MASK) - ((INHERIT_MASK + 1) >> 1);
+            j = (long)((flags & INHERIT_MASK) - ((INHERIT_MASK + 1) >> 1));
             flags = fun[j];
             j += i;
         } else {
@@ -2786,12 +2947,12 @@ f_functionlist (struct svalue *sp)
 
         if (mode_flags & RETURN_FUNCTION_NUMARG) {
             svp--;
-            svp->u.number = (funstart[0] & 0x7f); /* number of arguments */
+            svp->u.number = FUNCTION_NUM_ARGS(funstart) & 0x7f;
         }
 
         if (mode_flags & RETURN_FUNCTION_TYPE) {
             svp--;
-            svp->u.number = funstart[-1]; /* return type */
+            svp->u.number = FUNCTION_TYPE(funstart); /* return type */
         }
 
         if (mode_flags & RETURN_FUNCTION_FLAGS) {
@@ -2799,25 +2960,18 @@ f_functionlist (struct svalue *sp)
             /* If the function starts with the bytecodes F_ESCAPE F_UNDEF,
              * it referenced but undefined. But you know that.
              */
-            if (funstart[2] == F_ESCAPE-F_OFFSET &&
-                funstart[3] == F_UNDEF-F_OFFSET-0x100)
+            if (FUNCTION_CODE(funstart)[0] == F_ESCAPE-F_OFFSET &&
+                FUNCTION_CODE(funstart)[1] == F_UNDEF-F_OFFSET-0x100)
             {
                 active_flags |= NAME_UNDEFINED;
             }
             svp--;
-            svp->u.number = active_flags;
+            svp->u.number = (p_int)active_flags;
         }
 
         if (mode_flags & RETURN_FUNCTION_NAME) {
             svp--;
-            svp->type = T_STRING;
-            svp->x.string_type = STRING_SHARED;
-            memcpy(
-              (char *)&svp->u.string,
-              funstart - 1 - sizeof svp->u.string,
-              sizeof svp->u.string
-            );
-            increment_string_ref(svp->u.string);
+            put_ref_string(svp, FUNCTION_NAME(funstart));
         }
     } /* for() */
 
@@ -2826,8 +2980,7 @@ f_functionlist (struct svalue *sp)
     sp--;
     free_svalue(sp);
 
-    sp->type = T_POINTER;
-    sp->u.vec = list;
+    put_array(sp, list);
     return sp;
 
 #undef VISTAG_INVIS
@@ -2944,7 +3097,7 @@ put_in (struct unique **ulist, struct svalue *marker, struct svalue *elem)
 {
     struct unique *llink, *slink, *tlink;
     int cnt;                      /* Number of distinct markers */
-    int /* TODO: bool */ fixed;   /* True: <elem> was inserted */
+    Bool fixed;                   /* True: <elem> was inserted */
 
     llink = *ulist;
     cnt = 0;
@@ -3034,9 +3187,9 @@ make_unique (struct vector *arr, char *func, struct svalue *skipnum)
 
     head = NULL;
 
-    arr->ref++;  /* TODO: Really necessary? Looks more like a memleak
-                  * in case of errors to me. */
-    arr_size = VEC_SIZE(arr);
+    ref_array(arr);  /* Prevent apply from freeing this */
+
+    arr_size = (mp_int)VEC_SIZE(arr);
 
     /* Build the comb structure.
      */
@@ -3048,7 +3201,7 @@ make_unique (struct vector *arr, char *func, struct svalue *skipnum)
                 ant = put_in(&head, v, &(arr->item[cnt]));
         }
 
-    arr->ref--;
+    deref_array(arr);
 
     ret = allocate_array(ant);
 
@@ -3059,8 +3212,8 @@ make_unique (struct vector *arr, char *func, struct svalue *skipnum)
      */
 
     for (cnt = ant-1; cnt >= 0; cnt--) {
-        ret->item[cnt].type = T_POINTER;
-        ret->item[cnt].u.vec = res = allocate_array(head->count);
+        res = allocate_array(head->count);
+        put_array(ret->item+cnt, res);
 
         nxt2 = head;
         head = head->next;

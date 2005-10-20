@@ -3,3 +3,6 @@ SYNOPSIS
 
 DESCRIPTION
 	Returns the argument's arcus tangent.
+
+SEE ALSO
+        atan2(E), sin(E), cos(E), tan(E), asin(E), acos(E)

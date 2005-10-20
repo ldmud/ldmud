@@ -1,9 +1,8 @@
 Short: static master functions aren't called.
 Date: 981110
 Type: Bug
-State: Unclassified
+State: Done: fixed in 3.2.6-dev.36
 Author: Lars
-Long:
 
 Subject: inaugurate_master()
 From: Lars Duning <lduning@mdisystems.com>

@@ -27,12 +27,12 @@ free some disk space.
 READ THIS FILE TO THE END before doing anything. You should also
 read the file README. It could be useful to verify your system's
 and its setup's compatibility by installing and test running the
-binary distribution first. 
+binary distribution first.
 There are several support files you need to build LPmud. These
 are the dependencies:
 
   Target    File(s)                     Required parts(s)
-  --------  ------------------------   ---------------------- 
+  --------  ------------------------   ----------------------
   ZIP       pkz204g.exe                 PKUNZIP.EXE
   GCC       \DJGPP                      Directory
   YACC      BYACC19.ZIP                 Directory
@@ -87,7 +87,7 @@ BYACC
 =====
 
 BYACC is a parser generator for C.  byacc19.zip is available at
-simtel-20 in the directory ./msdos/pgmutil 
+simtel-20 in the directory ./msdos/pgmutil
 
 Installing BYACC
      pkunzip -d byacc19

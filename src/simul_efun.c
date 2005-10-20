@@ -1,3 +1,6 @@
+/* TODO: After this is commented, go back and finish the documentation
+ * TODO:: of eval_instruction()::F_SIMUL_EFUN.
+ */
 #include "driver.h"
 
 #include "my-alloca.h"
@@ -65,7 +68,7 @@ struct object *get_simul_efun_object()
         simul_efun_program = 0;
     }
     if (simul_efun_vector) {
-        free_vector(simul_efun_vector);
+        free_array(simul_efun_vector);
         simul_efun_vector = 0;
     }
     svp = apply_master_ob(STR_GET_SEFUN, 0);
@@ -165,7 +168,7 @@ struct object *get_simul_efun_object()
             type = funstart[-1];
             num_arg = (funstart[0] & 0x7f);
             num_locals = funstart[1];
-            p = make_shared_identifier(function_name, I_TYPE_GLOBAL);
+            p = make_shared_identifier(function_name, I_TYPE_GLOBAL, 0);
             if (p->type == I_TYPE_UNKNOWN) {
                 p->type = I_TYPE_GLOBAL;
                 p->u.global.function = -2;
@@ -175,7 +178,7 @@ struct object *get_simul_efun_object()
                 p->next_all = all_simul_efuns;
                 all_simul_efuns = p;
             }
-            if (flags & TYPE_MOD_VARARGS) num_arg = -1;
+            if (flags & TYPE_MOD_VARARGS) num_arg = SIMUL_EFUN_VARARGS;
             switch(0) { default:
                 if ((j=p->u.global.sim_efun) != -1) {
                     j &= ~-0x8000;
@@ -196,7 +199,7 @@ struct object *get_simul_efun_object()
                         if (j >= 0) break; /* switch */
                     } else break;          /* switch */
                 }
-                increment_string_ref(function_name);
+                ref_string(function_name);
                 j = num_simul_efun++;
                 if (num_simul_efun > num_fun) {
                     num_fun = num_simul_efun + 12;

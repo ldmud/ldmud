@@ -11,7 +11,7 @@
 #include <values.h>
 #endif
 
-#define NO_INCREMENT_STRING_REF
+#define NO_REF_STRING
 #include "swap.h"
 
 #include "array.h"
@@ -117,7 +117,7 @@ check() {
  */
 static int
 locate_out (prog) struct program *prog; {
-    char *p = 0; /* keep cc happy */
+    char *p = NULL; /* keep cc happy */
 
     if (!prog) return 0;
     if (d_flag > 1) {
@@ -127,7 +127,7 @@ locate_out (prog) struct program *prog; {
             (long)prog->variable_names, (long)prog->inherit,
             (long)prog->argument_types, (long)prog->type_start);
     }
-    prog->program        = &p[prog->program - (char *)prog];
+    prog->program        = &p[prog->program - (bytecode_p)prog];
     prog->line_numbers        = (char *)
         &p[(char *)prog->line_numbers - (char *)prog];
     prog->functions        = (uint32 *)
@@ -168,7 +168,7 @@ locate_in (prog) struct program *prog; {
     if (!prog) return 0;
     prog->id_number        =
         ++current_id_number ? current_id_number : renumber_programs();
-    prog->program        = &p[prog->program - (char *)0];
+    prog->program        = &p[prog->program - (bytecode_p)0];
     prog->line_numbers        = (char *)0;
     prog->functions        = (uint32 *)
         &p[(char *)prog->functions - (char *)0];
@@ -281,8 +281,7 @@ alloc_new_space:
   }
 }
 
-static int swap_free(offset, size)
-  mp_int offset, size;
+static int swap_free(mp_int offset, mp_int size UNUSED)
 {
   if (offset < current_offset)
   {
@@ -634,7 +633,7 @@ swap_opaque:
 #endif
 static unsigned char *last_variable_block;
 static mp_int last_variable_swap_num;
-static char *last_zeroed_swapped_object;
+static char *last_changed_swapped_svalue;
 
 struct free_swapped_mapping_locals {
     p_int num_values;
@@ -715,8 +714,27 @@ static unsigned char *free_swapped_svalues(svp, num, p)
                 p += sizeof svp->x;
                 memcpy(p, (char *)&svp->u, sizeof svp->u);
                 p += sizeof svp->u;
-                last_zeroed_swapped_object = (char*)p;
+                last_changed_swapped_svalue = (char*)p;
                 break;
+            }
+            goto advance;
+          case T_CLOSURE:
+            /* the garbage collector replaces closures bound to destructed
+             * objects by F_UNDEF
+             */
+            if (svp->x.closure_type == CLOSURE_EFUN + F_UNDEF - F_OFFSET)
+            {
+              if (memcmp(p+1, &svp->x, sizeof svp->x)
+                || memcmp(p+1+sizeof svp->x, &svp->u, sizeof svp->u))
+              {
+                  p++;
+                  memcpy(p, (char *)&svp->x, sizeof svp->x);
+                  p += sizeof svp->x;
+                  memcpy(p, (char *)&svp->u, sizeof svp->u);
+                  p += sizeof svp->u;
+                  last_changed_swapped_svalue = (char*)p;
+                  break;
+              }
             }
           case T_STRING:
           case T_SYMBOL:
@@ -725,7 +743,7 @@ static unsigned char *free_swapped_svalues(svp, num, p)
           case T_MAPPING:
           case T_NUMBER:
           case T_FLOAT:
-          case T_CLOSURE:
+advance:
             p += 1 + sizeof svp->x + sizeof svp->u;
             break;
           default:
@@ -752,11 +770,11 @@ int swap_variables(ob)
         return 1;
     if (garbage_collection_in_progress) {
         num_variables = ob->prog->num_variables;
-        last_zeroed_swapped_object = 0;
+        last_changed_swapped_svalue = 0;
         (void)free_swapped_svalues(
           ob->variables, num_variables, last_variable_block
         );
-        if (last_zeroed_swapped_object) {
+        if (last_changed_swapped_svalue) {
             if (fseek(swap_file, last_variable_swap_num + sizeof(p_int), 0) ==
                                                                             -1)
             {
@@ -765,7 +783,7 @@ int swap_variables(ob)
             }
             if (fwrite(
                   last_variable_block,
-                  last_zeroed_swapped_object - (char *)last_variable_block,
+                  last_changed_swapped_svalue - (char *)last_variable_block,
                   1, swap_file) != 1)
             {
                 fatal("I/O error in swap.\n");
@@ -849,7 +867,7 @@ static void clear_svalues(svp, num)
     mp_int num;
 {
     for (; --num >= 0;) {
-        svp->type = T_NUMBER;
+        *svp++ = const0;
     }
 }
 
@@ -902,7 +920,7 @@ static unsigned char *read_unswapped_svalues(svp, num, p)
             memcpy((char *)&user, p, sizeof user);
             p += sizeof user;
             current_object->user = user;
-            v = allocate_array(size);
+            v = allocate_array_unlimited(size);
             svp->u.vec = v;
             if (!v) {
                 clear_svalues(svp, num + 1);
@@ -999,7 +1017,7 @@ static unsigned char *read_unswapped_svalues(svp, num, p)
                     p = read_unswapped_svalues(&sv, 1, p); /* adds 1 ref */
                     if (!p)
                         break;
-                    data = get_map_lvalue(m, &sv, MY_TRUE); /* adds another ref */
+                    data = get_map_lvalue_unchecked(m, &sv); /* adds another ref */
                     free_svalue(&sv);
                     if (!data)
                         break;
@@ -1053,19 +1071,6 @@ int load_ob_from_swap(ob)
     int result;
 
     result = 0;
-    /* If the old reset time has passed, schedule a new one for the near
-     * future. Do not give the player a safe haven for the first
-     * TIME_TO_RESET/2 seconds as the canonical formula would do.
-     */
-#ifndef OLD_RESET
-    if (ob->time_reset && ob->time_reset <= current_time)
-    {
-        ob->time_reset = current_time + random_number(TIME_TO_RESET);
-    }
-#else
-    if (ob->next_reset <= current_time)
-        ob->next_reset = current_time + random_number(TIME_TO_RESET);
-#endif
     swap_num = (p_int)ob->prog;
     if (swap_num & 1) {
         struct program tmp_prog, *prog;
@@ -1092,7 +1097,7 @@ int load_ob_from_swap(ob)
             fatal("Couldn't read the swap file.\n");
         }
         tmp_prog.swap_num = swap_num;
-        tmp_prog.total_size = tmp_prog.line_numbers - (char *)0;
+        tmp_prog.total_size = tmp_prog.line_numbers - (bytecode_p)0;
         if ( !(prog = (struct program *)xalloc(tmp_prog.total_size)) )
             return -0x80;
         memcpy((char *)prog, (char *)&tmp_prog, sizeof tmp_prog);
@@ -1190,10 +1195,12 @@ int load_ob_from_swap(ob)
     }
 #ifndef BUG_FREE
     if (!result)
-        fatal("Loading not swapped object.\n");
+        fatal("Loading unswapped object from swap.\n");
 #endif
     ob->flags &= ~O_SWAPPED;
-    if (!(ob->flags & O_DESTRUCTED) && function_exists("clean_up",ob)) {
+    if (!(ob->flags & (O_DESTRUCTED|O_WILL_CLEAN_UP))
+     && function_exists("clean_up",ob))
+    {
         ob->flags |= O_WILL_CLEAN_UP;
     }
     return result;
@@ -1215,7 +1222,7 @@ int load_line_numbers_from_swap(prog)
     if (fread((char *)&tmp_prog, sizeof tmp_prog, 1, swap_file) != 1) {
         fatal("Couldn't read the swap file.\n");
     }
-    swap_num += tmp_prog.line_numbers - (char *)0;
+    swap_num += tmp_prog.line_numbers - (bytecode_p)0;
     if (fseek(swap_file, swap_num, 0) == -1)
         fatal("Couldn't seek the swap file, errno %d, offset %ld.\n",
               errno, swap_num);

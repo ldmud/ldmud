@@ -5,7 +5,7 @@ DESCRIPTION
 	Return the file name of the object that defines the function
 	str in object ob. The returned value can be other than
 	file_name(ob) if the function is defined in an inherited
-	object. In native mode, the returned name always begins with a
+	object. In !compat mode, the returned name always begins with a
 	'/' (absolute path). 0 is returned if the function was not
 	defined, or was defined as static.
 

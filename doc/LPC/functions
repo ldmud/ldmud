@@ -51,7 +51,10 @@ NOTE
 
 		private variables static functions inherit "/foo/bar";
 
-	The type modfifier 'protected' is currently unused.
+	Functions declared as 'protected' can only be used explicitely
+        (function()) or via closures (#'function). They can't be called
+        with call_other(), call_out(), filter() or map(), to allow security
+        against computed calls.
 
 	Functions that are declared as ``nomask'' cannot be overloaded
 	by a inheriting program.
@@ -61,4 +64,4 @@ NOTE
 
 SEE ALSO
 	types(LPC), modifiers(LPC), varargs(LPC), call_other(E),
-	simul_efun(C)
+	simul_efun(C), call_out(E)

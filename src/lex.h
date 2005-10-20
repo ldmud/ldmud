@@ -3,6 +3,7 @@
 
 #include "driver.h"
 #include "interpret.h"  /* struct vector, struct svalue */
+#include "strfuns.h"
 
 /* --- Types --- */
 
@@ -72,9 +73,9 @@ struct defn
         char *str;     /*   given as xalloced literal (.special is false) */
         defn_fun fun;  /*   return by fun() (.special is true) */
     } exps;
-    short nargs;  /* Number of arguments, 0 for non-function macros */
-    /* TODO: BOOL */ char permanent;  /* true: permanent define */
-    /* TODO: BOOL */ char special;    /* true: <fun> returns the replacement text */
+    short nargs;       /* Number of arguments, 0 for non-function macros */
+    SBool permanent;   /* true: permanent define */
+    SBool special;     /* true: <fun> returns the replacement text */
 };
 
 
@@ -115,7 +116,10 @@ struct ident
             short sim_efun;
               /* simul-efun: Index in simul_efun[], negative else */
         } global;
-        int local;
+        struct {             /*   Local identifier: */
+            int num;         /*     TODO: index? */
+            int depth;       /*     Definition depth */
+        } local;
     } u;
     struct ident *next_all;  /* 'all_...' list link */
 };
@@ -131,6 +135,20 @@ struct ident
 #define lookup_predef(p) (p->type == I_TYPE_GLOBAL ? p->u.global.efun : -1)
 
 
+/* --- struct inline_fun: linked list element of saved function texts ---
+ *
+ * The functions inlined by (: ... :) have their code (plus the function
+ * header and trailer) saved for later parsing in a list of these
+ * structures.
+ */
+
+struct inline_fun
+{
+    strbuf_t buf;              /* the complete function text */
+    struct inline_fun * next;  /* next list element */
+};
+
+
 /* --- Variables --- */
 
 extern struct lpc_predef_s * lpc_predefs;
@@ -138,11 +156,17 @@ extern int current_line;
 extern int total_lines;
 extern char *current_file;
 extern int pragma_strict_types;
-extern /* TODO: BOOL */ int pragma_save_types;
-extern /* TODO: BOOL */ int pragma_combine_strings;
-extern /* TODO: BOOL */ int pragma_verbose_errors;
+extern Bool pragma_use_local_scopes;
+extern Bool pragma_save_types;
+extern Bool pragma_combine_strings;
+extern Bool pragma_verbose_errors;
+extern Bool pragma_no_clone;
+extern Bool pragma_no_inherit;
 extern char *last_lex_string;
 extern struct ident *all_efuns;
+extern struct inline_fun * first_inline_fun;
+extern Bool insert_inline_fun_now;
+extern int next_inline_fun;
 
 /* Values of pragma_strict_types */
 
@@ -154,7 +178,7 @@ extern struct ident *all_efuns;
 /* --- Prototypes --- */
 
 extern void init_lexer(void);
-extern struct ident *make_shared_identifier(char *, int);
+extern struct ident *make_shared_identifier(char *, int, int);
 extern void free_shared_identifier(struct ident*);
 extern int yylex(void);
 extern void end_new_file(void);

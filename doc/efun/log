@@ -3,3 +3,6 @@ SYNOPSIS
 
 DESCRIPTION
 	Returns the natural logarithm of its argument.
+
+SEE ALSO
+        exp(E), pow(E)

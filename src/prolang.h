@@ -5,15 +5,6 @@
 
 #include "interpret.h"
 
-/* Some functions are inlined in lang.c, and called normally
- * from everywhere else.
- */
-#if defined(HAS_INLINE) && defined(LANG)
-#define LANG_INLINE LOCAL_INLINE
-#else
-#define LANG_INLINE extern
-#endif
-
 #ifndef LANG
 
 /* Needed in lang.h, but lang.c itself must not include
@@ -45,7 +36,7 @@ extern struct svalue *(*vefun_table[]) PROT((struct svalue *, int));
 
 /* --- Prototypes --- */
 extern void yyerrorf VARPROT((char *format, ...), printf, 1, 2);
-LANG_INLINE int proxy_efun PROT((int, int));
+extern int proxy_efun PROT((int, int));
 extern void yyerror PROT((char *str));
 extern void free_all_local_names PROT((void));
 extern void store_line_number_info PROT((void));

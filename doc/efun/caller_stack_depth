@@ -2,7 +2,7 @@ SYNOPSIS
 	int caller_stack_depth(void)
 
 DESCRIPTION
-	Returns the number of previous objects on the stack +1. This
+	Returns the number of previous objects on the stack. This
 	can be used for security checks.
 
 SEE ALSO

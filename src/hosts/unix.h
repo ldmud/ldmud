@@ -3,7 +3,7 @@
 
 /*------------------------------------------------------------------
  * Definitions and includes for Unixish hosts.
- * 
+ *
  * This file is included by port.h via the HOST_INCLUDE define.
  *------------------------------------------------------------------
  */

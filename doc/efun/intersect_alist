@@ -1,3 +1,4 @@
+OPTIONAL
 SYNOPSIS
 	mixed * intersect_alist (mixed * list1, mixed * list2)
 

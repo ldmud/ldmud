@@ -1,0 +1,16 @@
+SYNOPSIS
+	float ceil (float arg)
+
+DESCRIPTION
+        Round the <arg>ument upwards the nearest whole number, returning
+        that value.
+
+EXAMPLES
+        ceil(4.5)  - return 5
+        ceil(-4.5) - return -4
+
+HISTORY
+	Introduced in LDMud 3.2.7.
+
+SEE ALSO
+        abs(E), floor(E)

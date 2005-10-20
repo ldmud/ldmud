@@ -6,3 +6,4 @@ State: Unclassified
 
 - A reset_object() efun that updates the last-reset.
 
+Note: add object argument to set_next_reset(), but make that priviledged.

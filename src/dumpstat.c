@@ -14,6 +14,7 @@
 #define USES_SVALUE_STRLEN
 #include "dumpstat.h"
 #include "array.h"
+#include "closure.h"
 #include "comm.h"
 #include "exec.h"
 #include "filestat.h"
@@ -28,14 +29,14 @@
 
 /*-------------------------------------------------------------------------*/
 
-static mp_int svalue_size(struct svalue *); /* forward */
+static size_t svalue_size(struct svalue *); /* forward */
 
 /* Auxiliary structure for counting a mapping */
 
 struct svalue_size_locals
 {
-    mp_int total;       /* Return: total memory usage of all elements */
-    int    num_values;  /* Passed: width of the mapping */
+    mp_uint total;       /* Return: total memory usage of all elements */
+    int     num_values;  /* Passed: width of the mapping */
 };
 
 /*-------------------------------------------------------------------------*/
@@ -65,7 +66,7 @@ svalue_size_map_filter (struct svalue *key, struct svalue *values, void *extra)
 }
 
 /*-------------------------------------------------------------------------*/
-static mp_int
+static size_t
 svalue_size (struct svalue *v)
 
 /* Compute the memory usage of *<v>, calling svalue_size() recursively
@@ -73,7 +74,7 @@ svalue_size (struct svalue *v)
  */
 
 {
-    mp_int i, total;
+    mp_uint i, total;
 
     switch(v->type)
     {
@@ -101,7 +102,7 @@ svalue_size (struct svalue *v)
         if (NULL == register_pointer(ptable, v->u.map) ) return 0;
 
         cm = v->u.map->condensed;
-        locals.total = cm->string_size + cm->misc_size;
+        locals.total = (mp_uint)(cm->string_size + cm->misc_size);
         locals.num_values = v->u.map->num_values;
         walk_mapping(v->u.map, svalue_size_map_filter, &locals);
         if (v->u.map->hash)
@@ -214,11 +215,12 @@ data_size (struct object *ob)
 }
 
 /*-------------------------------------------------------------------------*/
-void
-dumpstat(void)
+Bool
+dumpstat(char *fname)
 
 /* Called by the command parser, this function dumps statistics about
- * all objects into the file $MUDLIB/OBJ_DUMP.
+ * all objects into the file $MUDLIB/<fname>.
+ * Return TRUE on success, FALSE if <fname> can't be written.
  */
 
 {
@@ -227,11 +229,15 @@ dumpstat(void)
 
     static char *swapstrings[] =
         {"", "PROG SWAPPED", "VAR SWAPPED", "SWAPPED", };
-    f = fopen("OBJ_DUMP", "w");
-    if (f == 0)
-        return;
-    FCOUNT_WRITE("OBJ_DUMP");
-    add_message("Dumping to OBJ_DUMP ...");
+
+    fname = check_valid_path(fname, current_object, "objdump", MY_TRUE);
+    if (!fname)
+        return MY_FALSE;
+    f = fopen(fname, "w");
+    if (!f)
+        return MY_FALSE;
+    FCOUNT_WRITE(fname);
+
     for (ob = obj_list; ob; ob = ob->next_all)
     {
         mp_int tmp;
@@ -240,7 +246,7 @@ dumpstat(void)
             continue;
 #endif
         if (!O_PROG_SWAPPED(ob)
-         && (ob->prog->ref == 1 || !(ob->flags & O_CLONE)))
+         && (ob->prog->ref == 1 || !(ob->flags & (O_CLONE|O_REPLACED))))
         {
             tmp = ob->prog->total_size;
         }
@@ -263,8 +269,8 @@ dumpstat(void)
                 swapstrings[(O_PROG_SWAPPED(ob)?1:0) | (O_VAR_SWAPPED(ob)?2:0)]
         );
     }
-    add_message("done.\n");
     fclose(f);
+    return MY_TRUE;
 }
 
 /***************************************************************************/

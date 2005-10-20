@@ -12,32 +12,11 @@
 **   '// !compat' means: only when not running in compat mode.
 **   '// native'  means: only when running in native mode.
 ** and similar for every other combination.
-** Euids (effective userids) are available only in euids mode - no need to
-** put this obvious comment everywhere.
 **
-** Note that the master is loaded first of all objects. Thus you shouldn't
-** inherit an other object, nor is the compiler able to search include files
+** Note that the master is loaded first of all objects. Thus it is possible,
+** you shouldn't inherit an other object (as most files expect the master
+** to exist), nor is the compiler able to search include files
 ** (read: they must be specified with full path).
-**
-** Amylaar: actually, you can inherit, but the file will be loaded then before
-** the master, which isn't good for most files.
-**
-**   31-Aug-93  [Mateese]  Written for LPMud 3.2.
-**    5-Sep-93  [Amylaar]  Fixed some obvious bugs.
-**    6-Sep-93  [Mateese]  Nicened Amylaars additions.
-**    9-Sep-93  [Amylaar]  A clarification on compat valid_read()/valid_write()
-**   20-Sep-93  [Mateese]  Added quota_demon().
-**   18-Nov-93  [Mateese]  Added fourth argument to privilege_violation().
-**   16-Feb-94  [Mateese]  notify_shutdown() added.
-**                         argument to inauguarate_master() added.
-**   27-Feb-94  [Amylaar]  Corrections to the above.
-**   02-Sep-94  [Mateese]  Added case 'set_driver_hook' to privilege_violation().
-**                         New handling of epilog().
-**   21-Sep-94  [Mateese]  Adapted for LPMud 3.2.1.
-**   22-Sep-94  [Amylaar]  Adapted to 3.2.1@57, and some small fixes.
-**   17-Oct-94  [Mateese]  Small fixes.
-**   05-Feb-95  [Mateese]  Added case 'erq' to privilege_violation().
-**   10-Mar-95  [Mateese]  Added case 'input_to' to privilege_violation().
 */
 
 
@@ -135,8 +114,8 @@
 // int query_allow_shadow (object victim)
 //   Validate a shadowing.
 //
-// int query_player_level (string what)
-//   Check if the player is of high enough level for several things.
+// int valid_trace (string what)
+//   Check if the player may use tracing.
 //
 // int valid_exec (string name, object ob, object obfrom)
 //   Validate the rebinding of an IP connection by usage of efun exec().
@@ -151,10 +130,10 @@
 //---------------------------------------------------------------------------
 //     Userids and depending Security
 //
-// string get_bb_uid()  // euids
+// string get_bb_uid()
 //   Return the string to be used as backbone-uid.
 //
-// int valid_seteuid (object obj, string neweuid)  // euids
+// int valid_seteuid (object obj, string neweuid)
 //   Validate the change of an objects euid by efun seteuid().
 //
 // int|string valid_read  (string path, string euid, string fun, object caller)
@@ -346,7 +325,7 @@ void preload (string file)
 //
 // It is task of the epilog()/preload() pair to ensure the validity of
 // the given strings (e.g. filtering out comments and blank lines).
-// For preload itself a 'call_other(file, "???")' is sufficient, but it
+// For preload itself a 'load_object(file)' is sufficient, but it
 // should be guarded by a catch() to avoid premature blockings.
 // Also it is wise to change the master's euid from master_uid to something
 // less privileged for the time of the preload.
@@ -755,6 +734,7 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   call_out_info     : Return an array with all call_out informations.
 //   erq               : A the request <arg4> is to be send to the
 //                       erq-demon by the object <who>.
+//   execute_command   : Execute command string <arg2> for the object <arg>.
 //   input_to          : Object <who> issues an 'ignore-bang'-input_to() for
 //                       commandgiver <arg3>; the exakt flags are <arg4>.
 //   nomask simul_efun : Attempt to get an efun <arg> via efun:: when it
@@ -769,6 +749,8 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   set_extra_wizinfo_size : Set the size of the additional wizard info
 //                       in the wiz-list to <arg>.
 //   set_driver_hook   : Set hook <arg> to <arg2>.
+//   limited:          : Execute <arg> with reduced/changed limits.
+//   set_limits        : Set limits to <arg>.
 //   set_this_object   : Set this_object() to <arg>.
 //   shadow_add_action : Add an action to function <arg> from a shadow.
 //   symbol_variable   : Attempt to create symbol of a hidden variable
@@ -807,21 +789,19 @@ int query_allow_shadow (object victim)
 
 
 //---------------------------------------------------------------------------
-int query_player_level (string what)
+int valid_trace (string what)
 
-// Check if the player is of high enough level for several things.
+// Check if the player is allowed to use tracing.
 //
 // Argument:
-//   what: The 'thing' type (see below).
+//   what: The actual action (see below).
 //
 // Result:
 //   Return 0 to disallow, any other value to allow it.
 //
-// Types asked for so far are:
-//   "trace"         : Is the player is allowed to use tracing?
-//   "inspect memory": Is the player allowed to issue the special
-//                     command 'showsmallnewmalloced' ?
-
+// Actions asked for so far are:
+//   "trace":       Is the user allowed to use tracing?
+//   "traceprefix": Is the user allowed to set a traceprefix?
 
 //---------------------------------------------------------------------------
 int valid_exec (string name, object ob, object obfrom)
@@ -882,26 +862,26 @@ int valid_snoop (object snoopee, object snooper)
 // theoretical permissions (uid) and its current permissions (euid) (some
 // experts think that this attempt has failed (Heya Macbeth!)).
 //
-// Userids are always available, effective userids only if the driver was
-// compiled to run in euids mode (note that native mode without euids is not
-// possible).
-// The driver just implements the setting/querying of the (e)uids -- it is
+// The driver mainly implements the setting/querying of the (e)uids -- it is
 // task of the mudlib to give out the right (e)uid to the right object, and
 // to check them where necessary.
+//
+// If the driver is set to use 'strict euids', the loading and cloning
+// of objects requires the initiating object to have a non-zero euid.
 //
 // The main use for (e)uids is for determination of file access rights, but
 // you can of course use the (e)uids for other identification purposes as well.
 //===========================================================================
 
 //---------------------------------------------------------------------------
-string get_bb_uid()  // euids
+string get_bb_uid()
 
-// Return the string to be used as backbone-uid.
+// Return the string (or 0) to be used as backbone-euid.
 // It is just used by process_string() only if no this_object() is present.
-
+// If strict-euids, the function must exist and return a string.
 
 //---------------------------------------------------------------------------
-int valid_seteuid (object obj, string neweuid)  // euids
+int valid_seteuid (object obj, string neweuid)
 
 // Validate the change of an objects euid by efun seteuid().
 //
@@ -921,8 +901,7 @@ mixed valid_write (string path, string euid, string fun, object caller)
 //
 // Arguments:
 //   path   : The (possibly partial) filename given to the operation.
-//   euid   : !euids: 0;
-//             euids: the euid of the caller (might be 0).
+//   euid   : the euid of the caller (might be 0).
 //   fun    : The name of the operation requested (see below).
 //   caller : The calling object.
 //
@@ -951,10 +930,11 @@ mixed valid_write (string path, string euid, string fun, object caller)
 //   tail
 //
 // valid_write() is called for these operations:
-//   cindent
 //   ed_start     (when writing a file)
 //   do_rename    (twice for each the old and new name)
 //   mkdir
+//   objdump
+//   opcdump
 //   save_object
 //   remove_file
 //   rmdir

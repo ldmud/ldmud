@@ -2,7 +2,7 @@ Short: new efun limited()
 From: alfebtcd <alfebtcd@cs.tu-berlin.de>
 Date: Wed, 16 Dec 1998 21:11:51 +0100 (MET)
 Type: Feature
-State: Acknowledged
+State: Done - implemented in 3.2.7-dev.131
 
 speaking of limitation: how about a privileged efun with which you can
 execute code with some limitations switched off?  at least the corelib

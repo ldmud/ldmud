@@ -1,0 +1,22 @@
+The files in this directory hold collections of option settings, used
+when configuring the driver for compilation. To use the setting <foo>,
+start the configure script with argument --with-setting=<foo> or
+the settings file directly with './settings/<foo>'.
+
+The provided settings:
+
+  default:  an example file, documenting all available options
+
+  compat:   settings used for a generic compat-mode driver
+  native:   settings used for a generic native-mode driver
+
+  avalon:     settings for Avalon
+  carledon:   settings for Carledon
+  osb:        settings for OSB
+  pkmud:      settings for PkMud
+  silberland: settings for SilberLand
+  sticklib:   settings for StickLib
+  tubmud:     settings for TubMud
+  unitopia:   settings for UNItopia
+  wunderland: settings for WunderLand
+

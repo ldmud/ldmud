@@ -181,6 +181,4 @@
 /* needs the first argument of strtol be declared as const ? */
 #define STRTOL_CONST_CHARP 1
 
-#define HOST_INCLUDE "hosts/os2/os2.h"
-
 #endif /* MACHINE_H */

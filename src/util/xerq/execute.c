@@ -1,6 +1,6 @@
 #include "defs.h"
 
-int execute(char *buf, int buflen, char *status, int *sockets)
+int execute(char *buf, int buflen, char *status, int *esockets)
 {
     char path[256], argbuf[1024], *p, *args[96], **argp, c;
     pid_t pid;
@@ -46,17 +46,17 @@ int execute(char *buf, int buflen, char *status, int *sockets)
 	return 0;
     }
     sprintf(path, "%s/%s", ERQ_DIR, p);
-    if (sockets) {
-	if(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) < 0) {
+    if (esockets) {
+	if(socketpair(AF_UNIX, SOCK_STREAM, 0, esockets) < 0) {
 	    perror("socketpair");
 	    status[0] = ERQ_E_FORKFAIL;
 	    status[1] = errno;
 	    return 0;
 	}
-	if(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets + 2) < 0) {
+	if(socketpair(AF_UNIX, SOCK_STREAM, 0, esockets + 2) < 0) {
 	    perror("socketpair");
-	    close(sockets[0]);
-	    close(sockets[1]);
+	    close(esockets[0]);
+	    close(esockets[1]);
 	    status[0] = ERQ_E_FORKFAIL;
 	    status[1] = errno;
 	    return 0;
@@ -66,26 +66,26 @@ int execute(char *buf, int buflen, char *status, int *sockets)
     if (!pid) {
 	close(0);
 	close(1);
-	if (sockets) {
-	    dup2(sockets[0], 0);
-	    dup2(sockets[0], 1);
-	    dup2(sockets[2], 2);
-	    close(sockets[0]);
-	    close(sockets[1]);
-	    close(sockets[2]);
-	    close(sockets[3]);
+	if (esockets) {
+	    dup2(esockets[0], 0);
+	    dup2(esockets[0], 1);
+	    dup2(esockets[2], 2);
+	    close(esockets[0]);
+	    close(esockets[1]);
+	    close(esockets[2]);
+	    close(esockets[3]);
 	}
 	execv(path, args);
 	_exit(1);
     }
-    if (sockets) {
-	close(sockets[0]);
-	close(sockets[2]);
+    if (esockets) {
+	close(esockets[0]);
+	close(esockets[2]);
     }
     if (pid < 0) {
-	if (sockets) {
-	    close(sockets[1]);
-	    close(sockets[3]);
+	if (esockets) {
+	    close(esockets[1]);
+	    close(esockets[3]);
 	}
 	status[0] = ERQ_E_FORKFAIL;
 	status[1] = errno;
@@ -120,7 +120,19 @@ void free_child(struct child_s *chp)
 void remove_child(struct child_s *chp)
 {
     char mesg[2];
+    int found=0;
+    struct child_s **chpp;
 
+    for (chpp = &childs; *chpp; chpp = &(*chpp)->next)
+        if (*chpp == chp)
+        {
+            found = 1;
+            break;
+        }
+
+    if (!found)  /* child was removed already */
+        return;
+    
     switch(chp->type) {
       case CHILD_EXECUTE: {
 	mesg[0]=ERQ_OK;
@@ -174,25 +186,24 @@ void erq_execute(char *mesg, int msglen)
 
 void erq_spawn(char *mesg, int msglen)
 {
-    int sockets[4];
+    int esockets[4];
     char status[2];
     pid_t pid;
-    struct ticket_s ticket;
 
-    if ((pid=execute(&mesg[9], msglen-9, status, sockets))) {
+    if ((pid=execute(&mesg[9], msglen-9, status, esockets))) {
 	struct child_s *chp;
 	chp=new_child();
 	chp->pid=pid;
 	chp->type=CHILD_SPAWN;
 	chp->status=CHILD_RUNNING;
 	chp->handle=get_handle(mesg);
-	chp->fd=new_socket(sockets[1], SOCKET_STDOUT);
+	chp->fd=new_socket(esockets[1], SOCKET_STDOUT);
 	memcpy(&chp->fd->ticket, &chp->ticket, TICKET_SIZE);
-	fcntl(sockets[1], F_SETFD, 1);
-	fcntl(sockets[1], F_SETFL, O_NONBLOCK);
-	chp->err=new_socket(sockets[3], SOCKET_STDERR);
-	fcntl(sockets[3], F_SETFD, 1);
-	fcntl(sockets[3], F_SETFL, O_NONBLOCK);
+	fcntl(esockets[1], F_SETFD, 1);
+	fcntl(esockets[1], F_SETFL, O_NONBLOCK);
+	chp->err=new_socket(esockets[3], SOCKET_STDERR);
+	fcntl(esockets[3], F_SETFD, 1);
+	fcntl(esockets[3], F_SETFL, O_NONBLOCK);
 	chp->fd->handle=chp->handle;
 	status[0]=ERQ_OK;
 	replyn(chp->handle, 1, 2,

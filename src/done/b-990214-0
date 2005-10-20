@@ -2,7 +2,7 @@ Short: Problems with negative times in call-outs
 From: Freaky <Freaky@UNItopia.rus.uni-stuttgart.de>
 Date: Thu, 4 Feb 1999 17:30:00 +0100
 Type: Bug
-State: Unclassified.
+State: Done - fixed in 3.2.7-dev.98.
 
 Note: I have no idea how this can happen. If this effect shows up again,
 putting a sanity check into new_call_out() might give us a clue.

@@ -44,11 +44,13 @@ whashstr (char *s, int maxn)
     register int i = maxn;
 
     if ( '\0' != (c = *p++) ) {
-        for (hi = T[c], lo = c + 1; --i && '\0' != (c = *p++); ) {
+        for (hi = T[c], lo = (unsigned char)(c + 1)
+            ; --i && '\0' != (c = *p++); )
+        {
             hi = T[hi ^ c];
             lo = T[lo ^ c];
         }
-        return (hi << 8) + lo;
+        return (unsigned short)((hi << 8) + lo);
     }
     return 0;
 }

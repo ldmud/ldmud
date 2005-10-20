@@ -6,6 +6,6 @@
 #include "object.h"     /* struct object */
 
 extern mp_int data_size(struct object *ob);
-extern void dumpstat(void);
+extern Bool dumpstat(char *name);
 
 #endif

@@ -10,4 +10,4 @@ DESCRIPTION
           swaps it back in.
 
 SEE ALSO
-        program_name(E)
+        object_time(E), program_name(E)

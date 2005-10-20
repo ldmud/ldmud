@@ -65,7 +65,7 @@
 #define CHARBIT_MASK 0xff
 
 /* #undef RENAME_HANDLES_DIRECTORIES */
-		       
+		
 /* Does the system have a getrusage call?  */
 #define HAVE_GETRUSAGE 1
 

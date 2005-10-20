@@ -7,3 +7,4 @@ State: Unclassified
 Make all the extras (command parsing, inventories, light) optional
 so that mudlibs can replace them.
 
+Note: light is optional in 3.2.7.

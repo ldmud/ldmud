@@ -1,0 +1,35 @@
+PRELIMINARY
+SYNOPSIS
+
+        #include <rtlimits.h>
+
+        int * query_limits()
+        int * query_limits(int default)
+
+DESCRIPTION
+        Return an array with the current runtime limits, resp. if <defaults>
+        is true, the default runtime limits. The entries in the returned
+        array are:
+ 
+          int[LIMIT_EVAL]:    the max number of eval costs
+          int[LIMIT_ARRAY]:   the max number of array entries
+          int[LIMIT_MAPPING]: the max number of mapping entries
+          int[LIMIT_BYTE]:    the max number of bytes handled with
+                                one read_bytes()/write_bytes() call.
+          int[LIMIT_FILE]:    the max number of bytes handled with
+                                one read_file()/write_file() call.
+       
+        A limit of '0' aka LIMIT_UNLIMITED means 'no limit'.
+
+EXAMPLES
+        query_limits()
+          --> returns the current runtime limits
+
+        query_limits(1)
+          --> returns the default runtime limits
+
+HISTORY
+        Introduced in LDMud 3.2.7.
+
+SEE ALSO
+        limited(E), set_limits(E)

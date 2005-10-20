@@ -11,7 +11,8 @@ DESCRIPTION
 	The master is the gateway between the interpreter and the
 	mudlib to perform actions with mudlib specific effects. Calls
 	to the master by the interpreter have an automatic catch() in
-	effect.
+	effect. Functions to be called by the driver can be public
+        or static, but not private.
 
 	Note that the master is loaded first of all objects. Thus you
 	shouldn't inherit an other object, nor is the compiler able to
@@ -34,6 +35,7 @@ DESCRIPTION
 	  - The master is loaded, but since the driverhooks are not set yet,
 	    no standard initialisation lfun is called.
 	  - get_master_uid() is called. If the result is valid, it becomes the
+            masters uid.
 	  - inaugurate_master() is called.
 	  - flag() is called for each given '-f' commandline option.
 	  - get_simul_efun() is called.
@@ -185,10 +187,10 @@ DESCRIPTION
 	------------------------------------------------------------------
 	    Userids and depending Security
 
-	string get_bb_uid()  // euids
+	string get_bb_uid()
 	  Return the string to be used as root-uid.
 
-	int valid_seteuid (object obj, string neweuid)	// euids
+	int valid_seteuid (object obj, string neweuid)
 	  Validate the change of an objects euid by efun seteuid().
 
 	int|string valid_read (string path, string euid, string fun, object caller)

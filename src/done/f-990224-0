@@ -2,7 +2,7 @@ Subject: Uninformtive error message.
 From: Lars Duning <lduning@peopledoc.com>
 Date: Thu, 18 Feb 1999 12:10:59 +0000
 Type: Feature
-State: Unclassified
+State: Done
 
  - 'object the closure was bound to has been destructed'
    Which object?

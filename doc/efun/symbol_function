@@ -6,9 +6,12 @@ SYNOPSIS
 DESCRIPTION
 	Constructs a lfun closure, efun closure or operator closure
 	from the first arg (string or symbol). For lfuns, the second
-	arg is the object that the lfun belongs to. (Ob can also be
-	specified as file_name of the object). Lfuns can be static,
-	but must not be private.
+	arg is the object that the lfun belongs to, specified by
+        the object itself or by its name (the object will be loaded
+        in the second case)
+
+        Private lfuns can never be accessed this way, static and
+        protected lfuns only if <ob> is the current object.
 
 EXAMPLES
 	symbol_function("efun::users")		-> #'users

@@ -172,9 +172,10 @@ random_number (uint32 n)
         rc = (y ^ (y >> 18));
     }
 
-#if defined(HAVE_LONG_LONG) && SIZEOF_P_INT == 4
-    return (unsigned long long)rc * (unsigned long long)n
-                                    >> sizeof(uint32) * 8;
+#if defined(HAVE_LONG_LONG) && SIZEOF_CHAR_P == 4
+    return (uint32)
+           ((unsigned long long)rc * (unsigned long long)n
+                                    >> sizeof(uint32) * 8);
 #else
     return rc % n;
 #endif

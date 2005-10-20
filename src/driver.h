@@ -10,6 +10,8 @@
  *------------------------------------------------------------------
  */
 
+#define __DRIVER_SOURCE__
+
 #include "config.h"
 
 /* Verify some of the definitions in config.h */
@@ -22,19 +24,18 @@
 #endif
 #endif
 
-#if defined(NATIVE_MODE) && !defined(EUIDS)
-#define EUIDS
-#endif
-
-#if defined(ENFORCE_ONE_PORT)
-#undef MAXNUMPORTS
+/* This one is for backwards compatibility with old config.hs */
+#if defined(NATIVE_MODE) && !defined(STRICT_EUIDS)
+#define STRICT_EUIDS
+#elif defined(COMPAT_MODE)
+#undef STRICT_EUIDS
 #endif
 
 #if !defined(CATCH_UDP_PORT)
 #undef UDP_SEND
 #endif
 
-#include "machine.h"
+/* Include the portability headers */
 #include "port.h"
 
 /* TODO: this ctype-stuff might go into lex.h (impl in efun_defs.c) */
@@ -55,12 +56,11 @@ extern unsigned char _my_ctype[];
 #    define MAXINT (0x7fffffff)
 #endif
 
-/* Boolean values */
-#define MY_TRUE  (1)
-#define MY_FALSE (0)
-
 /* A define to point out empty loop bodies. */
 #define NOOP
+
+/* A macro to wrap statements */
+#define MACRO(x) do { x ; } while(0)
 
 /* TODO: -> mallocator */
 #if defined(MALLOC_smalloc) && !defined(MAKE_FUNC)
@@ -83,7 +83,7 @@ extern unsigned char _my_ctype[];
 #    endif /* SBRK_OK */
      void xfree(POINTER);
      POINTER rexalloc(POINTER, size_t);
-#    if MALLOC_ALIGN > SIZEOF_P_INT || FREE_NULL_POINTER
+#    if MALLOC_ALIGN > SIZEOF_CHAR_P || FREE_NULL_POINTER
 #        define PFREE_RETURN_TYPE void
 #        define PFREE_RETURN return;
          PFREE_RETURN_TYPE pfree(POINTER);
@@ -105,7 +105,7 @@ extern unsigned char _my_ctype[];
 
 #if defined(MALLOC_smalloc) && defined(SMALLOC_TRACE)
 #    define xalloc(size) (smalloc((size), __FILE__, __LINE__))
-     POINTER smalloc(size_t, char *, int);
+     POINTER smalloc(size_t, const char *, int);
 #endif /* SMALLOC_TRACE */
 #ifndef xalloc
      POINTER xalloc(size_t);

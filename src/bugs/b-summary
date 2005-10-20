@@ -1,0 +1,45 @@
+Crasher
+--------------------------------------------------------------------------
+b-981028:  3.2.4 crashes on Solaris 2.6
+b-990305-01: 3.2-dev.38 and 3.2.1@139 crash in find_string()
+b-990430: Crash on too much input/output in combination with charmode
+
+
+Efuns
+--------------------------------------------------------------------------
+b-981202-3: Array-indexing malfunctions on rare occasions.
+b-981208: inherit_list() stumbles over multiple virtual inherits (solved?)
+b-990217-3: random() is not random enough
+b-990523: regexp() must not print error messages.
+
+
+Language
+--------------------------------------------------------------------------
+
+
+Compiler
+--------------------------------------------------------------------------
+b-990113-0: 'varargs' attribute on simul_efuns
+b-990204-1: '++' operator on wide mappings.
+b-990217-0: '*::' with virtual inherits (solved?)
+b-990217-1: virtual inherits need cleaner implementation.
+b-990320-0: in make_funcs, varargs tefuns are not always recognized
+b-990505-1: #include messes up line numbers
+
+
+Runtime
+--------------------------------------------------------------------------
+b-981209-0: slow_shut_down() not used.
+b-981212: xerq-1.4 crashes often
+b-990217-4: erq-replies for destructed objects 'bug'.
+b-990429: Memory leaks
+b-990505-0: Memory leak in call_lambda()/send_erq()?
+b-990505-1: Memory leak in load_object()?
+b-990605: In a lot of error places, inter_sp/inter_pc are wrong.
+b-990713-0: Too fast call_outs/heart_beats?
+b-990713-1: shadow on destructed object with heartbeat
+
+
+Installation
+--------------------------------------------------------------------------
+

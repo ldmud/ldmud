@@ -18,22 +18,28 @@
 #if !defined(C_ALLOCA) || defined(MAKE_FUNC)
 
 #ifdef HAVE_ALLOCA_H
-#include <alloca.h>
+#    include <alloca.h>
 #else /* !HAVE_ALLOCA_H */
-#ifdef __GNUC__
-#ifndef alloca
-#define alloca(size) __builtin_alloca(size)
-#endif
-#else /* !__GNUC__ */
-#ifdef _AIX
- #pragma alloca
-#endif /* _AIX */
-#endif /* !__GNUC__ */
+#    ifdef __GNUC__
+#        ifndef alloca
+#            define alloca(size) __builtin_alloca(size)
+#        endif
+#    else /* !__GNUC__ */
+#        ifdef _AIX
+#            pragma alloca
+#        endif /* _AIX */
+#    endif /* !__GNUC__ */
 #endif /* !HAVE_ALLOCA_H */
 
 #define GC_ALLOCA NOOP
 
 #else
+
+#include <sys/types.h>
+
+#ifdef alloca
+#    undef alloca
+#endif
 
 extern void * alloca(size_t);
 

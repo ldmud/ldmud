@@ -84,13 +84,13 @@ struct interactive {
     struct svalue prompt;       /* The prompt to print. */
     struct sockaddr_in addr;    /* Address of connected user */
 
-    /* TODO: BOOL */ char closing;                /* True when closing this socket. */
+    CBool closing;              /* True when closing this socket. */
     char do_close;              /* Bitflags: Close this down; Proto-ERQ. */
     char noecho;                /* Input mode bitflags */
 
     char tn_state;              /* current state of telnet machine */
     char save_tn_state;         /* saved state of telnet machine */
-    /* TODO: BOOL */ char supress_go_ahead;
+    CBool supress_go_ahead;
 
     short text_end;             /* first free char in buffer */
     short command_start;        /* used for charmode */
@@ -100,12 +100,10 @@ struct interactive {
     int32 chars_ready;          /* 32 bits so that it won't underflow twice */
     struct interactive *snoop_on; /* whom we're snooping */
     struct object      *snoop_by; /* by whom we're snooped */
-    struct svalue default_err_message;
-                                /* This or "What?" is printed when error */
     mp_int last_time;           /* Time of last command executed */
     int trace_level;            /* Trace flags. 0 means no tracing */
-    char *trace_prefix;         /* Trace only object which has this string
-                                   as name prefix */
+    char *trace_prefix;         /* Trace only objects which have this string
+                                   as name prefix. NULL traces everything. */
     int message_length;         /* Current length of message in message_buf[] */
 
     struct object *next_player_for_flush;
@@ -122,8 +120,8 @@ struct interactive {
        * character to be sent. Characters whose flag is 0 are excluded
        * from the sent data.
        */
-    /* TODO: BOOL */ char quote_iac;
-    /* TODO: BOOL */ char catch_tell_activ;
+    CBool quote_iac;
+    CBool catch_tell_activ;
     char gobble_char;           /* Char to ignore at the next telnet_neg() */
     char ts_data;               /* Telnet suboption? */
 
@@ -143,6 +141,9 @@ struct interactive {
  * input modes: echo/noecho, linemode/charmode, and ignore '!' escape.
  * Echo and Charmode additionally distinguish between 'required'
  * and 'granted'.
+ *
+ * The values of NOECHO_REQ, CHARMODE_REQ and IGNORE_BANG have to match
+ * those in mudlib/sys/input_to.h.
  *
  * TODO: I admit that I'm not completely sure what the xxx_REQ, xxx and
  * xxx_ACK really mean - but I'm too tired to find out. Until it
@@ -212,11 +213,11 @@ extern void  prepare_ipc(void);
 extern void  ipc_remove(void);
 extern void  add_message VARPROT((char *, ...), printf, 1, 2);
 extern void  flush_all_player_mess(void);
-extern /* TODO: BOOL */ int   get_message(char *buff);
+extern Bool get_message(char *buff);
 extern void  remove_interactive(struct object *ob);
 extern struct vector *users(void);
 extern void  set_noecho(struct interactive *i, char noecho);
-extern /* TODO: BOOL */ int   call_function_interactive(struct interactive *i, char *str);
+extern Bool call_function_interactive(struct interactive *i, char *str);
 extern void  remove_all_players(void);
 extern void  set_prompt(char *str);
 extern struct svalue *query_prompt(struct object *ob);
@@ -224,7 +225,7 @@ extern void  print_prompt(void);
 extern int   set_snoop(struct object *me, struct object *you);
 extern void  init_telopts(void);
 extern void  mudlib_telopts(void);
-extern struct svalue *query_ip_name(struct svalue *sp, /* TODO: BOOL */ int lookup);
+extern struct svalue *query_ip_name(struct svalue *sp, Bool lookup);
 extern struct svalue *input_to (struct svalue *sp, int num_arg);
 
 #ifdef ERQ_DEMON
@@ -243,10 +244,6 @@ extern char *get_host_ip_number(void);
 extern struct svalue *f_query_snoop(struct svalue *sp);
 extern struct svalue *f_query_idle(struct svalue *sp);
 extern struct svalue *f_remove_interactive(struct svalue *sp);
-extern void  notify_no_command(char *command);
-extern void  clear_notify(void);
-extern void  set_notify_fail_message(struct svalue *svp);
-extern void  free_notifys(void);
 extern int   replace_interactive(struct object *ob, struct object *obfrom, char *name);
 
 #ifdef DEBUG
@@ -260,17 +257,10 @@ extern struct svalue *f_send_imp(struct svalue *sp);
 extern struct svalue *f_set_buffer_size(struct svalue *sp);
 extern struct svalue *f_binary_message(struct svalue *sp);
 extern struct svalue *f_set_connection_charset(struct svalue *sp);
-
-#ifdef MAXNUMPORTS
 extern struct svalue *query_ip_port(struct svalue *sp);
-#endif /* MAXNUMPORTS */
 
 #if defined(ACCESS_CONTROL)
-extern void refresh_access_data(void (*add_entry)(struct sockaddr_in *, long*) );
+extern void refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) );
 #endif /* ACCESS_CONTROL */
-
-#if !defined(INET_NTOA_OK)
-extern char * inet_ntoa (struct in_addr ad);
-#endif
 
 #endif /* __COMM_H__ */

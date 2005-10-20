@@ -33,11 +33,11 @@
 #include "otable.h"
 
 #include "backend.h"
-#include "comm.h"
 #include "gcollect.h"
 #include "hash.h"
 #include "interpret.h"
 #include "object.h"
+#include "strfuns.h"
 #include "simulate.h"
 
 
@@ -198,7 +198,7 @@ lookup_object_hash (char *s)
 
 /*-------------------------------------------------------------------------*/
 size_t
-show_otable_status (/* TODO: BOOL */ short verbose)
+show_otable_status (strbuf_t * sbuf, Bool verbose)
 
 /* Return the amount of memory used by the object table.
  * If <verbose> is TRUE, also print the statistics to the current user.
@@ -207,21 +207,27 @@ show_otable_status (/* TODO: BOOL */ short verbose)
 {
     if (verbose)
     {
-        char sbuf[100];
-
-        add_message("\nObject name hash table status:\n");
-        add_message("------------------------------\n");
-        sprintf(sbuf, "%.2f", (float) objs_in_table / (float) OTABLE_SIZE);
-        add_message("Average hash chain length                   %s\n", sbuf);
-        sprintf(sbuf, "%.2f", (float) obj_probes / (float) obj_searches);
-        add_message("Searches/average search length       %ld (%s)\n",
-                    obj_searches, sbuf);
-        add_message("External lookups succeeded (succeed) %ld (%ld)\n",
-                    (long)user_obj_lookups, (long)user_obj_found);
+#if defined(__MWERKS__) && !defined(WARN_ALL)
+#    pragma warn_largeargs off
+#endif
+        strbuf_add(sbuf, "\nObject name hash table status:\n");
+        strbuf_add(sbuf, "------------------------------\n");
+        strbuf_addf(sbuf
+                   , "Average hash chain length                   %.2f\n"
+                   , (float) objs_in_table / (float) OTABLE_SIZE);
+        strbuf_addf(sbuf
+                   , "Searches/average search length       %ld (%.2f)\n"
+                   , obj_searches
+                   , (float) obj_probes / (float) obj_searches);
+        strbuf_addf(sbuf, "External lookups succeeded (succeed) %ld (%ld)\n"
+                   , (long)user_obj_lookups, (long)user_obj_found);
+#if defined(__MWERKS__)
+#    pragma warn_largeargs reset
+#endif
     }
     /* objs_in_table * sizeof(struct object) is already accounted for
        in tot_alloc_object_size.  */
-    add_message("hash table overhead\t\t\t %8ld\n",
+    strbuf_addf(sbuf, "hash table overhead\t\t\t %8ld\n",
                 (long)(OTABLE_SIZE * sizeof(struct object *)));
     return OTABLE_SIZE * sizeof(struct object *);
 }

@@ -10,6 +10,8 @@ DESCRIPTION
 	The backbone id is also temporary given to objects while being
 	called via process_string().
 
+        If strict-euids, this function must exist and return a string.
+
 HISTORY
 	Since 3.2.1, get_bb_uid() is needed just for process_string()
 	if no this_object() is present.

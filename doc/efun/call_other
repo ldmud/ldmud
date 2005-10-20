@@ -15,7 +15,10 @@ DESCRIPTION
 
 	If ob does not define a publicly accessible function of the
 	specified name, call_other() will return 0, which is
-	indistinguishable from a function returning 0.
+	indistinguishable from a function returning 0. "publicly
+        accessible" means "public" when calling other objects, and
+        "public" or "static" when calling this_object(). "private"
+        and "protected" function can never be called with call_other().
 
 	The return type of call_other() is 'any' be default. However,
 	if your LPC code uses #pragma strict_types, the return type is
@@ -39,5 +42,5 @@ EXAMPLES
 
 SEE ALSO
 	function_exists(E), call_resolved(E), create(E), pragma(LPC),
-	extern_call(E)
+	extern_call(E), functions(LPC)
 

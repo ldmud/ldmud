@@ -4,5 +4,5 @@ Date: Mon, 15 Mar 1999 16:58:36 +0000
 Type: Feature
 State: Unclassified
 
-Rename map_mapping to map_keys()?
+Done in 3.2.6: Rename map_mapping to map_keys()?
 Add a map_flat() to pass the values flat on the stack?

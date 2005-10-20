@@ -1,0 +1,15 @@
+Changes between the old autoconfig and Mubo's revised Version:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- uses autoconf V2.x instead of V1.x
+- replaced obsolete macros with newer versions
+- replaced 'echo' calls with appropriate message macros
+- replaced checks of ${DEFS} (they are no longer supported by autoconf V2.x)
+- use result caching
+  (will be usefull if packages would be added to the driver distributions
+   since they can share the cache file)
+- added messages for some checks wich were 'quiet'
+- replaced type size check with AC_CHECK_SIZEOF() macro
+- added size check for 'short'
+- added type check for 'bool' (defines HAVE_BOOL if supported)
+- added size check for 'long long' if supported
+- added test for ANSI-C compliant compiler (mainly for LDMUD project)

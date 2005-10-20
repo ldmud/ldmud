@@ -1,0 +1,15 @@
+SYNOPSIS
+	float pow (float base, float exp)
+
+DESCRIPTION
+        The function returns the value of <base> raised to the power of <exp>.
+
+EXAMPLES
+        pow(-2, 3)   - returns -8
+        pow(8, 1/3)  - returns 2
+
+HISTORY
+	Introduced in LDMud 3.2.7.
+
+SEE ALSO
+        exp(E), log(E)

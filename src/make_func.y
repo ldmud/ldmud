@@ -25,7 +25,11 @@
  * byte, but there are more than 256 codes and functions. This is solved
  * by the use of multi-byte instructions, where the first byte is
  * one of a set of prefix bytes, followed by the instructions code
- * byte within the range for this prefix.
+ * byte within the range for this prefix. The code ranges are:
+ *    normal instructions:   0..255 (0x000..0x0ff)
+ *          xcodes+xefuns: 256..383 (0x100..0x17f)
+ *          tcodes+tefuns: 384..511 (0x180..0x1ff)
+ *          vcodes+vefuns: 512..639 (0x200..0x27f)
  *
  * When make_func is run, it first reads the file 'config.h' to determine
  * which defines are used in the compilation of the driver. For this
@@ -314,7 +318,7 @@ static int min_arg = -1;
    * are optional arguments, or -1 if all arguments are needed.
    */
 
-static /* BOOL */ int limit_max = MY_FALSE;
+static Bool limit_max = MY_FALSE;
   /* True when the last argument for a function is the '...'
    */
 
@@ -401,14 +405,15 @@ make_f_name (char *str)
     len = strlen(f_name);
     for (i = 0; i < len; i++)
     {
-        if (islower((unsigned char)f_name[i]))
-            f_name[i] = toupper(f_name[i]);
+        if (islower(f_name[i]))
+            f_name[i] = (char)toupper(f_name[i]);
     }
     return mystrdup(f_name);
 }
 
-#ifdef __MWERKS__
+#if defined(__MWERKS__) && !defined(WARN_ALL)
 #    pragma warn_possunwant off
+#    pragma warn_implicitconv off
 #endif
 %}
 
@@ -645,6 +650,7 @@ typel: arg_type              { $$ = ($1 == VOID && min_arg == -1); }
 
 #ifdef __MWERKS__
 #    pragma warn_possunwant reset
+#    pragma warn_implicitconv reset
 #endif
 
 /*=========================================================================*/
@@ -811,7 +817,7 @@ add_input (char *p)
  */
 
 {
-    int l;
+    size_t l;
 
     l = strlen(p);
     outp -= l;
@@ -926,7 +932,7 @@ nextword (char *str)
 }
 
 /*-------------------------------------------------------------------------*/
-static /* TODO: BOOL */ int
+static Bool
 skip_to (char mark, char *token, char *atoken)
 
 /* Skip the file fpr linewise until one of the following control statements
@@ -961,7 +967,7 @@ skip_to (char mark, char *token, char *atoken)
             for (p = b; c != '\n' && c != EOF; )
             {
                 if (p < b+sizeof b-1)
-                    *p++ = c;
+                    *p++ = (char)c;
                 c = fgetc(fp);
             }
             *p++ = '\0';
@@ -1193,6 +1199,8 @@ name_to_hook(char *name)
         return H_ERQ_STOP;
     if ( !strcmp(name, "MODIFY_COMMAND_FNAME") )
         return H_MODIFY_COMMAND_FNAME;
+    if ( !strcmp(name, "COMMAND") )
+        return H_COMMAND;
     return -1;
 }
 
@@ -1286,7 +1294,10 @@ handle_map (char *str, int size, int (* name_to_index)(char *) )
         {
             i = (*name_to_index)(str);
             if (i < 0)
+            {
+                fprintf(stderr, "Can't translate '%s' into an index.\n", str);
                 exit(-1);
+            }
             map[i] = val;
         }
         str = del+1;
@@ -1316,9 +1327,9 @@ exgetc(void)
  */
 
 {
-    register unsigned char c;
+    char c;
 
-    c = (unsigned char) mygetc();
+    c = mygetc();
     while (isalpha(c) || c == '_' )
     {
         char word[512], *p;
@@ -1486,7 +1497,7 @@ cond_get_exp (int priority)
             value = value * base + x;
             c = mygetc();
         }
-        myungetc(c);
+        myungetc((char)c);
     }
 
     /* Now evaluate the following <binop> <expr> pairs (if any) */
@@ -1511,7 +1522,7 @@ cond_get_exp (int priority)
         {
             if (!optab2[x])
             {
-                myungetc(value2);
+                myungetc((char)value2);
                 if ( !optab2[x+1] )
                 {
                     yyerror("illegal operator use in #if");
@@ -1529,7 +1540,7 @@ cond_get_exp (int priority)
         if (priority >= optab2[x+2])
         {
             if (optab2[x])
-                myungetc(value2);
+                myungetc((char)value2);
             break;
         }
 
@@ -1561,7 +1572,7 @@ cond_get_exp (int priority)
             if ( c!=':' )
             {
                 yyerror("'?' without ':' in #if");
-                myungetc(c);
+                myungetc((char)c);
                 return 0;
             }
             if ( value )
@@ -1575,12 +1586,12 @@ cond_get_exp (int priority)
         } /* switch() */
   } /* for() */
 
-  myungetc(c);
+  myungetc((char)c);
   return value;
 } /* cond_get_expr() */
 
 /*-------------------------------------------------------------------------*/
-static /* TODO: BOOL */ int
+static Bool
 make_func_isescaped (char c)
 
 /* Return true if <c> is one of the escapable characters (e.g. \r or \"),
@@ -1618,12 +1629,12 @@ ident (char c)
     char buff[100];
     size_t len, i;
 
-    for (len = 0; isalunum(c); c = getc(fpr))
+    for (len = 0; isalunum(c); c = (char)getc(fpr))
     {
         if (len == sizeof buff - 1)
         {
             yyerror("Too long indentifier");
-            do c = getc(fpr); while (isalunum(c));
+            do c = (char)getc(fpr); while (isalunum(c));
             break;
         }
         buff[len++] = c;
@@ -1737,7 +1748,7 @@ yylex1 (void)
 
     for(;;)
     {
-        int match_tmp;
+        size_t match_tmp;
 #define MATCH(str) (isspace((unsigned char)line_buffer[match_tmp=strlen(str)]) &&\
                         strncmp(str, line_buffer, match_tmp) == 0)
 
@@ -1828,7 +1839,7 @@ yylex1 (void)
                     (void)ungetc(c, fpr);
                     break;
                 }
-                buff[len++] = c;
+                buff[len++] = (char)c;
             }
             buff[len] = '\0';
             yylval.string = mystrdup(buff);
@@ -1852,7 +1863,7 @@ yylex1 (void)
             }
           default:
             if (isalpha(c))
-                return ident(c);
+                return ident((char)c);
             return c;
         }
     } /* for() */
@@ -2054,11 +2065,11 @@ main (int argc UNUSED, char ** argv UNUSED)
 #endif
 
     int i, j, k;
-    int match_tmp;
-    unsigned char c;
+    size_t match_tmp;
+    char c;
     char line_buffer[MAKE_FUNC_MAXLINE + 1];
     char defbuf[MAKE_FUNC_MAXLINE + 1];
-    /* TODO: BOOL */ int bPrintedNotice;
+    Bool bPrintedNotice;
 
     /* Some predefined macros */
 
@@ -2582,8 +2593,9 @@ all: { $<p>$ = 0; } 'a'\n\
 
 } /* main() */
 
-#ifdef __MWERKS__
+#if defined(__MWERKS__) && !defined(WARN_ALL)
 #    pragma warn_possunwant off
+#    pragma warn_implicitconv off
 #endif
 
 /***************************************************************************/

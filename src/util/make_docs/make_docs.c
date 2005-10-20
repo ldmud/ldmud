@@ -1,11 +1,11 @@
 #include "../../machine.h"
 #include <sys/types.h>
 #include <sys/stat.h>
-#ifdef SYSDIR
+#ifdef HAVE_SYS_DIR_H
 #include <sys/dir.h>
 #endif
 #include <stdio.h>
-#if defined(M_UNIX) || defined(solaris) || defined(linux)
+#ifdef HAVE_DIRENT_H
 #include <dirent.h>
 #endif
 
@@ -59,7 +59,7 @@ void load_files(path2, f)
     FILE *f;
 {
     DIR *dirp;
-#if defined(_AIX) || defined(M_UNIX) || defined(solaris) || defined(linux)
+#ifdef HAVE_DIRENT_H
     struct dirent *de;
 #else
     struct direct *de;

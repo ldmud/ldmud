@@ -4,12 +4,13 @@
 #include "driver.h"
 
 #include "regexp.h"
+#include "strfuns.h"
 
 #ifdef RXCACHE_TABLE
 
 extern void rxcache_init PROT((void));
 extern regexp * regcomp_cache PROT((char * expr, int excompat));
-extern int rxcache_status PROT((int verbose));
+extern size_t rxcache_status PROT((strbuf_t *sbuf, Bool verbose));
 extern regexp * rx_dup PROT((regexp *));
 extern void rx_free PROT((regexp *));
 

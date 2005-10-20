@@ -10,7 +10,27 @@
 
 /* --- Macros --- */
 
-/* See array.c for a description of what the macros do. */
+/* struct vector *ref_array(struct vector *a)
+ *   Add another ref to array <a> and return the vector <a>.
+ */
+
+#define ref_array(a) ((a)->ref++, (a))
+
+/* void free_array(struct vector *a)
+ *   Subtract one ref from array <a>, and free the array fully if
+ *   the refcount reaches zero.
+ */
+
+#define free_array(a) MACRO( if (--((a)->ref) <= 0) _free_vector(a); )
+
+/* p_int deref_array(struct vector *a)
+ *   Subtract one ref from array <a>, but don't check if it needs to
+ *   be freed. Result is the number of refs left.
+ */
+
+#define deref_array(a) (--(a)->ref)
+
+/* See array.c for a description of what the following macros do. */
 
 /* Helper for VEC_INIT() */
 #ifdef DEBUG
@@ -24,16 +44,16 @@
 #    define VEC_SIZE(v) (\
       ( malloced_size(v) - \
         ( SMALLOC_OVERHEAD + \
-          ( sizeof(struct vector) - sizeof(struct svalue) ) / SIZEOF_P_INT \
+          ( sizeof(struct vector) - sizeof(struct svalue) ) / SIZEOF_CHAR_P \
         ) \
-      ) / (sizeof(struct svalue)/SIZEOF_P_INT) \
+      ) / (sizeof(struct svalue)/SIZEOF_CHAR_P) \
      )
 #    define INIT_VEC_TYPE p_uint s[SMALLOC_OVERHEAD]; struct vector v
 #    define VEC_INIT(size, ref, type) \
         { ( size * sizeof(struct svalue) + \
             sizeof(struct vector) - \
             sizeof(struct svalue) \
-          ) / SIZEOF_P_INT + SMALLOC_OVERHEAD }, \
+          ) / SIZEOF_CHAR_P + SMALLOC_OVERHEAD }, \
         { ref, VEC_DEBUGREF(ref) (struct wiz_list *)NULL, { { type } } }
 
 #else /* !MALLOC_smalloc */
@@ -56,6 +76,25 @@
 
 
 /* --- Types --- */
+
+/* --- struct vector: the array datatype ---
+ *
+ * When smalloc is used, the number of elements can be deduced from
+ * the memory block size, so the .size entry is not needed.
+ */
+
+struct vector {
+#ifndef MALLOC_smalloc
+    p_int size;       /* Number of contained elements */
+#endif
+    p_int ref;        /* Number of references */
+#ifdef DEBUG
+    p_int extra_ref;  /* Second refcount, used to check .ref. */
+#endif
+    struct wiz_list *user;    /* Save who made the vector */
+    struct svalue item[1];
+};
+
 
 /* The global null vector is allocated statically and thus needs
  * its own type.
@@ -80,34 +119,36 @@ extern struct svalue assoc_shared_string_key;
 #if defined(MALLOC_smalloc) && defined(SMALLOC_TRACE)
 
 #define allocate_array(n) (_allocate_array(n, __FILE__ "::allocate_array", __LINE__))
+#define allocate_array_unlimited(n) (_allocate_array_unlimited(n, __FILE__ "::allocate_array", __LINE__))
 #define allocate_uninit_array(n) (_allocate_array(n, __FILE__ "::allocate_uninit_array", __LINE__))
 #define implode_string(a,d) (_implode_string(a,d, __FILE__ "::implode_string", __LINE__))
 
 extern struct vector *_allocate_array(mp_int, char *, int);
+extern struct vector *_allocate_array_unlimited(mp_int, char *, int);
 extern struct vector *_allocate_uninit_array(mp_int, char *, int);
 extern char *_implode_string(struct vector *, char *, char *, int);
 
 #else
 
 extern struct vector *allocate_array(mp_int);
+extern struct vector *allocate_array_unlimited(mp_int);
 extern struct vector *allocate_uninit_array(mp_int);
 extern char *implode_string(struct vector *, char *);
 
 #endif /* SMALLOC && SMALLOC_TRACE */
 
-extern void free_vector(struct vector *p);
+extern void _free_vector(struct vector *p);
 extern void free_empty_vector(struct vector *p);
 extern struct vector *explode_string(char *str, char *del);
-extern struct vector *slice_array(struct vector *p, int from, int to);
+extern struct vector *slice_array(struct vector *p, mp_int from, mp_int to);
 extern struct vector *make_unique(struct vector *arr, char *func, struct svalue *skipnum);
 extern struct vector *add_array(struct vector *p, struct vector *q);
 extern struct vector *subtract_array(struct vector *minuend, struct vector *subtrahend);
 extern struct vector *all_inventory(struct object *ob);
 extern void map_array(struct vector *arr, char *func, struct object *ob, int num_extra, struct svalue *extra);
 extern struct vector *sort_array(struct vector *data, char *func, struct object *ob);
-extern struct vector *deep_inventory(struct object *ob, int take_top);
-extern struct vector *order_alist(struct svalue *inlists, int listnum, int reuse);
-extern struct svalue *insert_alist(struct svalue *key, struct svalue *key_data, struct vector *list);
+extern struct vector *deep_inventory(struct object *ob, Bool take_top);
+extern struct vector *order_alist(struct svalue *inlists, int listnum, Bool reuse);
 extern int assoc(struct svalue *key, struct vector *list);
 extern struct vector *intersect_alist(struct vector *a1, struct vector *a2);
 extern int is_alist(struct vector *v);
@@ -115,12 +156,14 @@ extern struct vector *intersect_array(struct vector *a1, struct vector *a2);
 extern struct vector *match_regexp(struct vector *v, char *pattern);
 
 extern struct svalue *f_filter_array(struct svalue *sp, int num_arg);
+extern struct svalue *f_transpose_array(struct svalue *sp);
 extern struct svalue *f_regexplode(struct svalue *sp);
 
-#ifdef F_INHERIT_LIST
-extern struct svalue *f_inherit_list(struct svalue *sp);
-#endif /* F_INHERIT_LIST */
+#ifdef F_INSERT_ALIST
+extern struct svalue *insert_alist(struct svalue *key, struct svalue *key_data, struct vector *list);
+#endif
 
+extern struct svalue *f_inherit_list(struct svalue *sp);
 extern struct svalue *f_filter_objects(struct svalue *sp, int num_arg);
 extern struct svalue *f_map_objects(struct svalue *sp, int num_arg);
 extern struct svalue *f_functionlist(struct svalue *sp);

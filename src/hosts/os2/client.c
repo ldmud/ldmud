@@ -49,7 +49,7 @@ main (int argc, char *argv[])
   for (;;)
     if (gets (in_buffer, BUF_SIZE - 2) != NULL)
     {
-      len = strlen (in_buffer); 
+      len = strlen (in_buffer);
       in_buffer[len++] = '\n';
       in_buffer[len++] = '\0';
       write(fd, in_buffer, len);

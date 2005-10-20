@@ -95,7 +95,7 @@ install: driver
 install.utils:
 	(cd util; $(MAKE) $(MFLAGS) install)
 
-utils: 
+utils:
 	(cd util; $(MAKE) $(MFLAGS))
 
 parse: driver
@@ -139,7 +139,7 @@ make_func: make_func.o hash.o
 lang.y efun_defs.c instrs.h: func_spec make_func prolang.y config.h
 	$(RM) efun_defs.c
 	$(RM) lang.y
-	./make_func 
+	./make_func
 
 lang.c lang.h: lang.y
 	$(YACC) -d -v lang.y

@@ -1,6 +1,5 @@
 SYNOPSIS
 	int query_mud_port(void)
-
 	int query_mud_port(object user)
 	int query_mud_port(int num)
 
@@ -10,9 +9,6 @@ DESCRIPTION
 	If no argument is given, the port for this_player() is
 	returned. If this_player() is not existing or not interactive,
 	the first port number open for connections is returned.
-
-	The second and third form of invocation are available only
-        if the driver was compiled with MAXNUMPORTS defined.
 
 	If an user object is given, the port used for its connection
 	is returned.

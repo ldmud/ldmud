@@ -22,11 +22,11 @@
 #define OIB_DESTRUCTED          4
 #define OIB_SWAPPED             5
 #define OIB_ONCE_INTERACTIVE    6
-#define OIB_APPROVED            7
-#define OIB_RESET_STATE         8
-#define OIB_WILL_CLEAN_UP       9
-#define OIB_LAMBDA_REFERENCED  10
-#define OIB_SHADOW             11
+#define OIB_RESET_STATE         7
+#define OIB_WILL_CLEAN_UP       8
+#define OIB_LAMBDA_REFERENCED   9
+#define OIB_SHADOW             10
+#define OIB_REPLACED           11
 #define OIB_TOTAL_LIGHT        12
 #define OIB_NEXT_RESET         13
 #define OIB_TIME_OF_REF        14
@@ -41,12 +41,15 @@
 #define OIB_NEXT_ALL           23
 #define OIB_PREV_ALL           24
 
+#define OIB_MAX 25
 
 /* Indices in the array resulting from OINFO_POSITION
  */
 #define OIP_NEXT  0
 #define OIP_PREV  1
 #define OIP_POS   2
+
+#define OIP_MAX 3
 
 
 /* Indices in the array resulting from OINFO_MEMORY
@@ -64,5 +67,6 @@
 #define OIM_SIZE_INHERITED  10
 #define OIM_TOTAL_SIZE      11
 
+#define OIM_MAX 12
 
 #endif /* _OBJECTINFO_H_ */

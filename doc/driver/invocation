@@ -8,9 +8,9 @@ PURPOSE
     the related documentation.
 
 DESCRIPTION
-    The driver is invoked from the commandline as other normal programs. Neither
-    the current directory nor the directory the executable is in need to be
-    in any special relation the directory of the mudlib. Once the driver
+    The driver is invoked from the commandline as other normal programs.
+    Neither the current directory nor the directory the executable is in need
+    to be in any special relation the directory of the mudlib. Once the driver
     is running, it emits two streams of outputs:
 
       - driver-related messages on stderr; this unfortunately includes
@@ -48,6 +48,7 @@ DESCRIPTION
 
       -E|--eval-cost <ticks>
         Set the number of <ticks> available for one evaluation thread.
+        If 0, execution is unlimited.
 
       -M|--master <filename>
         Use <filename> for the master object.
@@ -86,6 +87,33 @@ DESCRIPTION
         The lfun master->flag() is called with <word> as argument before the
         gamedriver accepts netword connections.
 
+      --max-array <size>
+        The maximum number of elements an array can hold.
+        Set to 0, arrays of any size are allowed.
+
+      --max-mapping <size>
+        The maximum number of elements a mapping can hold.
+        Set to 0, mappings of any size are allowed.
+
+      --max-bytes <size>
+        The maximum number of bytes one read_bytes()/write_bytes() call
+        can handle.
+        Set to 0, arrays of any size are allowed.
+
+      --max-file <size>
+        The maximum number of bytes one read_file()/write_file() call
+        can handle.
+        Set to 0, arrays of any size are allowed.
+
+      --cleanup-time <time>
+        The idle time in seconds for an object before the driver tries to
+        clean it up. It should be substantially longer than the reset time.
+        A time <= 0 disables the cleanup mechanism.
+
+      --reset-time <time>
+        The time in seconds before an object is reset. A time <= 0 disables
+        the reset mechanism.
+
       -s <time>  | --swap-time <time>
       -s v<time> | --swap-variables <time>
         Time in seconds before an object (or its variables) are swapped out.
@@ -101,7 +129,6 @@ DESCRIPTION
         Giving this option results in smaller, but also more fragmented
         swapfiles, and the swap performance may degrade.
 
-
       --max-malloc <size>
         Restrict total memory allocations to <size> bytes.
         Only available if compiled with MAX_MALLOCED.
@@ -115,6 +142,10 @@ DESCRIPTION
       -r s<size> | --reserve-system <size>
         Reserve <size> amount of memory for user/master/system allocations to
         be held until main memory runs out.
+
+      --strict-euids
+      --no-strict-euids
+        Enable/disable the enforced use of euids.
 
       --gcollect-outfd <filename>|<num>
         Garbage collector output (like a log of all reclaimed memory blocks)

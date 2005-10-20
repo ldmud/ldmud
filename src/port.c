@@ -197,7 +197,7 @@ memmem (char *needle, size_t needlelen, char *haystack, size_t haystacklen)
 {
     mp_int i;
 
-    i = haystacklen - needlelen;
+    i = (signed)(haystacklen - needlelen);
     if (i >= 0) do {
         if ( !strncmp(needle, haystack, needlelen) )
             return haystack;

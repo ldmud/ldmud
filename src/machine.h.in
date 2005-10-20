@@ -1,5 +1,8 @@
+/* machine.h.in.  Generated automatically from configure.in by autoheader.  */
+
 #ifndef MACHINE_H
 #define MACHINE_H
+
 
 /* Define if using alloca.c.  */
 #undef C_ALLOCA
@@ -8,17 +11,14 @@
    This function is required for alloca.c support on those systems.  */
 #undef CRAY_STACKSEG_END
 
-/* Define if you have dirent.h.  */
-#undef DIRENT
+/* Define if you have alloca, as a function or macro.  */
+#undef HAVE_ALLOCA
 
-/* Define if you have alloca.h and it should be used (not Ultrix).  */
+/* Define if you have <alloca.h> and it should be used (not on Ultrix).  */
 #undef HAVE_ALLOCA_H
 
 /* Define as __inline if that's what the C compiler calls it.  */
 #undef inline
-
-/* Define if you don't have dirent.h, but have ndir.h.  */
-#undef NDIR
 
 /* Define to `int' if <sys/types.h> doesn't define.  */
 #undef pid_t
@@ -32,31 +32,22 @@
 /* If using the C implementation of alloca, define if you know the
    direction of stack growth for your system; otherwise it will be
    automatically deduced at run-time.
-	STACK_DIRECTION > 0 => grows toward higher addresses
-	STACK_DIRECTION < 0 => grows toward lower addresses
-	STACK_DIRECTION = 0 => direction of growth unknown
+ STACK_DIRECTION > 0 => grows toward higher addresses
+ STACK_DIRECTION < 0 => grows toward lower addresses
+ STACK_DIRECTION = 0 => direction of growth unknown
  */
 #undef STACK_DIRECTION
 
 /* Define if you have the ANSI C header files.  */
 #undef STDC_HEADERS
 
-/* Define if you don't have dirent.h, but have sys/dir.h.  */
-#undef SYSDIR
+/* does the compiler provide inline functions? */
+#undef HAS_INLINE
 
-/* Define if you don't have dirent.h, but have sys/ndir.h.  */
-#undef SYSNDIR
-
-/* Define if the closedir function returns void instead of int.  */
-#undef VOID_CLOSEDIR
-
-/* Is the library function inet_ntoa() compatible with the compiler ? */
+/* Is the library function inet_ntoa() compatible with the compiler?
+ * TODO: Is there any platform where this is not the case?
+ */
 #undef INET_NTOA_OK
-
-/* The following values must be evaluable by the preprocessor */
-#define SIZEOF_P_INT 4
-#define SIZEOF_INT 4
-#define SIZEOF_LONG 4
 
 /* A mask that allows to extract an unsigned char from a signed */
 #define CHARBIT_MASK 0xff
@@ -89,6 +80,9 @@
 /* does the compiler know of a 'long long' type? */
 #undef HAVE_LONG_LONG
 
+/* does the compiler know of a 'bool' type? */
+#undef HAVE_BOOL
+
 /* what kind of pointer is used by malloc() et al */
 #define POINTER *
 #undef FREE_RETURNS_VOID
@@ -108,63 +102,79 @@
 #undef USE_FCNTL_O_NDELAY
 #undef USE_FCNTL_FNDELAY
 
-#undef inline
+/* define the erq include file. */
+#undef ERQ_INCLUDE
 
-/* A host specific include file.  */
-#define HOST_INCLUDE "hosts/unix.h"
+/* The number of bytes in a char *.  */
+#undef SIZEOF_CHAR_P
 
-/* Define if you have _crypt.  */
+/* The number of bytes in a int.  */
+#undef SIZEOF_INT
+
+/* The number of bytes in a long.  */
+#undef SIZEOF_LONG
+
+/* The number of bytes in a long long.  */
+#undef SIZEOF_LONG_LONG
+
+/* The number of bytes in a short.  */
+#undef SIZEOF_SHORT
+
+/* Define if you have the _crypt function.  */
 #undef HAVE__CRYPT
 
-/* Define if you have bzero.  */
+/* Define if you have the bzero function.  */
 #undef HAVE_BZERO
 
-/* Define if you have crypt.  */
+/* Define if you have the crypt function.  */
 #undef HAVE_CRYPT
 
-/* Define if you have fchmod.  */
+/* Define if you have the fchmod function.  */
 #undef HAVE_FCHMOD
 
-/* Define if you have fcntl.  */
+/* Define if you have the fcntl function.  */
 #undef HAVE_FCNTL
 
-/* Define if you have getcwd.  */
+/* Define if you have the getcwd function.  */
 #undef HAVE_GETCWD
 
-/* Define if you have getrusage.  */
+/* Define if you have the getdomainname function.  */
+#undef HAVE_GETDOMAINNAME
+
+/* Define if you have the getrusage function.  */
 #undef HAVE_GETRUSAGE
 
-/* Define if you have gettimeofday.  */
+/* Define if you have the gettimeofday function.  */
 #undef HAVE_GETTIMEOFDAY
 
-/* Define if you have memcpy.  */
+/* Define if you have the memcpy function.  */
 #undef HAVE_MEMCPY
 
-/* Define if you have memmem.  */
+/* Define if you have the memmem function.  */
 #undef HAVE_MEMMEM
 
-/* Define if you have memmove.  */
+/* Define if you have the memmove function.  */
 #undef HAVE_MEMMOVE
 
-/* Define if you have memset.  */
+/* Define if you have the memset function.  */
 #undef HAVE_MEMSET
 
-/* Define if you have strchr.  */
+/* Define if you have the strchr function.  */
 #undef HAVE_STRCHR
 
-/* Define if you have strcspn.  */
+/* Define if you have the strcspn function.  */
 #undef HAVE_STRCSPN
 
-/* Define if you have strrchr.  */
+/* Define if you have the strrchr function.  */
 #undef HAVE_STRRCHR
 
-/* Define if you have sysconf.  */
+/* Define if you have the sysconf function.  */
 #undef HAVE_SYSCONF
 
-/* Define if you have wait3.  */
+/* Define if you have the wait3 function.  */
 #undef HAVE_WAIT3
 
-/* Define if you have waitpid.  */
+/* Define if you have the waitpid function.  */
 #undef HAVE_WAITPID
 
 /* Define if you have the <bstring.h> header file.  */
@@ -173,11 +183,20 @@
 /* Define if you have the <crypt.h> header file.  */
 #undef HAVE_CRYPT_H
 
+/* Define if you have the <dirent.h> header file.  */
+#undef HAVE_DIRENT_H
+
 /* Define if you have the <libc.h> header file.  */
 #undef HAVE_LIBC_H
 
+/* Define if you have the <limits.h> header file.  */
+#undef HAVE_LIMITS_H
+
 /* Define if you have the <memory.h> header file.  */
 #undef HAVE_MEMORY_H
+
+/* Define if you have the <ndir.h> header file.  */
+#undef HAVE_NDIR_H
 
 /* Define if you have the <netdb.h> header file.  */
 #undef HAVE_NETDB_H
@@ -188,7 +207,13 @@
 /* Define if you have the <string.h> header file.  */
 #undef HAVE_STRING_H
 
-/* Define if you have the <sys/param.h> header file. */
+/* Define if you have the <sys/dir.h> header file.  */
+#undef HAVE_SYS_DIR_H
+
+/* Define if you have the <sys/ndir.h> header file.  */
+#undef HAVE_SYS_NDIR_H
+
+/* Define if you have the <sys/param.h> header file.  */
 #undef HAVE_SYS_PARAM_H
 
 /* Define if you have the <sys/rusage.h> header file.  */
@@ -206,9 +231,6 @@
 /* Define if you have the <values.h> header file.  */
 #undef HAVE_VALUES_H
 
-/* Define if you have the crypt library (-lcrypt).  */
-#undef HAVE_LIBCRYPT
-
 /* Define if you have the m library (-lm).  */
 #undef HAVE_LIBM
 
@@ -218,7 +240,4 @@
 /* Define if you have the socket library (-lsocket).  */
 #undef HAVE_LIBSOCKET
 
-/* Define if you have the ucb library (-lucb).  */
-#undef HAVE_LIBUCB
-
-#endif /* MACHINE_H */
+#endif

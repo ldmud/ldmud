@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Settings for the TubMud mudlib.
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/home/tubmud --bindir=/home/tubmud/mudbin --libdir=/home/tubmud/mudlib --libexec=/home/tubmud/mudbin/erqdir --with-setting=tubmud $*
+exit 1
+
+# --- The actual settings ---
+
+with_master_name=kernel/master
+
+with_catch_udp_port=7683
+
+with_time_to_clean_up=10800
+with_time_to_swap=900
+with_time_to_swap_variables=2000
+with_time_to_reset=2700
+
+with_max_user_trace=90
+with_max_trace=100
+
+with_portno=7680
+
+with_max_players=70
+
+with_reserved_user_size=800000
+
+catch_reserved_cost=20000
+master_reserved_cost=0x2000
+
+max_array_size=4000
+max_mapping_size=0
+htable_size=16384
+
+enable_compat_mode=yes
+enable_strict_euids=no
+
+enable_supply_parse_command=yes
+enable_initialization_by___init=no

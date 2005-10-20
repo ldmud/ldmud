@@ -26,8 +26,8 @@ extern void mark_program_ref(struct program *p);
 extern void reference_destructed_object(struct object *ob);
 extern void note_malloced_block_ref(char *p);
 extern void count_ref_from_string(char *p);
-extern void count_ref_in_vector(struct svalue *svp, int num);
-extern void clear_ref_in_vector(struct svalue *svp, int num);
+extern void count_ref_in_vector(struct svalue *svp, size_t num);
+extern void clear_ref_in_vector(struct svalue *svp, size_t num);
 
 #endif /* MALLOC_smalloc */
 

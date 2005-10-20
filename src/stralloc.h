@@ -2,12 +2,7 @@
 #define _STRALLOC_H_ 1
 
 #include "driver.h"
-
-#if defined(HAS_INLINE) && defined(STRALLOC)
-#define STRALLOC_INLINE LOCAL_INLINE
-#else
-#define STRALLOC_INLINE
-#endif
+#include "strfuns.h"
 
 #define SHSTR_NEXT(str)        (*(char **)((char *) (str) - sizeof(unsigned short)\
                                                    - sizeof(char *)))
@@ -15,6 +10,10 @@
                                                    - sizeof(unsigned short)))
 #define SHSTR_BLOCK(str) ((char *)(str) - sizeof(unsigned short)\
                                         - sizeof(char *))
+
+/* TODO: Introduce ref_string(), deref_string() etc instead of
+ * TODO:: the void-returning increment_string_ref().
+ */
 
 #ifdef MALLOC_smalloc
 #include "smalloc.h"
@@ -32,17 +31,17 @@ extern int malloc_size_mask PROT((void));
 extern mp_int stralloc_allocd_strings;
 extern mp_int stralloc_allocd_bytes;
 
-#if !defined(NO_INCREMENT_STRING_REF) && !defined(STRALLOC)
-static INLINE void increment_string_ref PROT((char * str)) /* TODO: UNUSED */;
+#if !defined(NO_REF_STRING) && !defined(STRALLOC)
+static INLINE char *ref_string(char * str) /* TODO: UNUSED */;
 
-static INLINE
-void increment_string_ref(str)
-char *str;
+static INLINE char *
+ref_string(char *str)
 {
         stralloc_allocd_strings++;
         stralloc_allocd_bytes += shstr_malloced_size(str);
         if (SHSTR_REFS(str))
             SHSTR_REFS(str)++;
+        return str;
 }
 #endif
 
@@ -52,9 +51,9 @@ extern void clear_shared_string_refs PROT((void));
 
 extern char * findstring PROT((char *s));
 extern char * make_shared_string PROT((char *str));
-STRALLOC_INLINE void decrement_string_ref PROT((char *str));
+extern void decrement_string_ref PROT((char *str));
 extern void free_string PROT((char *str));
-extern int add_string_status PROT((int verbose));
+extern int add_string_status PROT((strbuf_t *sbuf, Bool verbose));
 
 #ifdef MALLOC_smalloc
 extern void note_shared_string_table_ref PROT((void));
@@ -95,7 +94,6 @@ enum StandardStrings {
   , SHX_INAUGURATE      /* "inaugurate_master" */
   , SHX_LOG_ERROR       /* "log_error" */
   , SHX_LOGON           /* "logon" */
-  , SHX_PLAYER_LEVEL    /* "query_player_level" */
   , SHX_PRELOAD         /* "preload" */
   , SHX_PREP_DEST       /* "prepare_destruct" */
   , SHX_PRINTF_OBJ_NAME /* "printf_obj_name" */
@@ -116,6 +114,7 @@ enum StandardStrings {
   , SHX_VALID_READ      /* "valid_read" */
   , SHX_VALID_SETEUID   /* "valid_seteuid" */
   , SHX_VALID_SNOOP     /* "valid_snoop" */
+  , SHX_VALID_TRACE     /* "valid_trace" */
   , SHX_VALID_WRITE     /* "valid_write" */
 
     /* Compat mode lfuns */
@@ -158,7 +157,6 @@ extern char *shstring[SHSTR_NOSTRINGS];
 #define STR_INAUGURATE       shstring[SHX_INAUGURATE]
 #define STR_LOG_ERROR        shstring[SHX_LOG_ERROR]
 #define STR_LOGON            shstring[SHX_LOGON]
-#define STR_PLAYER_LEVEL     shstring[SHX_PLAYER_LEVEL]
 #define STR_PRELOAD          shstring[SHX_PRELOAD]
 #define STR_PREP_DEST        shstring[SHX_PREP_DEST]
 #define STR_PRINTF_OBJ_NAME  shstring[SHX_PRINTF_OBJ_NAME]
@@ -179,6 +177,7 @@ extern char *shstring[SHSTR_NOSTRINGS];
 #define STR_VALID_READ       shstring[SHX_VALID_READ]
 #define STR_VALID_SETEUID    shstring[SHX_VALID_SETEUID]
 #define STR_VALID_SNOOP      shstring[SHX_VALID_SNOOP]
+#define STR_VALID_TRACE      shstring[SHX_VALID_TRACE]
 #define STR_VALID_WRITE      shstring[SHX_VALID_WRITE]
 
     /* Compat mode lfuns */

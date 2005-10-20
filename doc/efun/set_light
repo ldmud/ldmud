@@ -1,3 +1,4 @@
+OPTIONAL
 SYNOPSIS
 	int set_light(int n)
 

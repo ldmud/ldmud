@@ -8,8 +8,6 @@ DESCRIPTION
         The <obj> can be given as the object itself, or by its name.
         If <obj> is omitted, the current object is tested.
 
-	Objects with a replaced program count as clones.
-
 EXAMPLE
 	object o;
 	o = clone_object("/std/thing");
@@ -17,7 +15,8 @@ EXAMPLE
         write(clonep("/std/thing"))                 --> writes "0"
 
 HISTORY
-	Introduced in LDMud 3.2.6.
+	Introduced in LDMud 3.2.6, changed in 3.2.7 so that objects
+        with replaced programs no longer count as clones.
 
 SEE ALSO
 	load_name(E), clone_object(E)

@@ -40,6 +40,8 @@
 
 #define YYMAXDEPTH        600
 
+static void free_local_names(int depth);
+
 /* NUMPAREAS areas are saved with the program code after compilation.
  */
 #define A_PROGRAM                0
@@ -58,9 +60,7 @@
 %endif /* INITIALIZATION_BY___INIT */
 #define A_STRING_NEXT               11
 #define A_INCLUDE_NAMES        12
-#define A_INHERIT_FLAG         13
-  /* TRUE if corresponding inherit is a duplicate due to virtual inheritance */
-#define NUMAREAS               14
+#define NUMAREAS               13
 
 #define CURRENT_PROGRAM_SIZE (mem_block[A_PROGRAM].current_size)
 
@@ -101,6 +101,35 @@ struct mem_block {
 
 static struct mem_block mem_block[NUMAREAS];
 
+/* Information describing nested local blocks (scopes).
+ */
+struct block_scope_s {
+    int first_local;  /* Number of first local defined in this scope */
+    int num_locals;   /* Number of locals defined in this scope */
+    mp_uint addr;
+      /* Address of CLEAR_LOCALS instruction, needed for backpatching */
+};
+
+static struct block_scope_s block_scope[COMPILER_STACK_SIZE];
+  /* A static stack of block scopes, indexed by <block_depth>-1.
+   * TODO: This should be dynamic.
+   */
+
+static int block_depth;
+  /* The nesting depth of blocks ( '{ ... }' ), used to distinguish
+   * local variable definitions.
+   * block_depth = 0: not used, would mean 'global'
+   *             = 1: function arguments
+   *             = 2: function local variables
+   *             > 2: vars of nested blocks within the function
+   */
+
+static Bool use_local_scopes;
+  /* Copy of pragma_use_local_scopes, updated at every entry into
+   * a function. Reason is that the pragma must not change inside
+   * a function.
+   */
+
 /*
  * Some good macros to have.
  */
@@ -132,7 +161,6 @@ static struct mem_block mem_block[NUMAREAS];
  * checked and required.
  */
 static int exact_types;
-int approved_object;                /* How I hate all these global variables */
 int num_virtual_variables;
 
 static int heart_beat;                /* Number of the heart beat function */
@@ -153,7 +181,7 @@ static struct program NULL_program; /* marion - clean neat empty struct */
 
 int yyparse PROT((void));
 static char *get_two_types PROT((int type1, int type2));
-static void add_local_name PROT((struct ident *, int));
+static struct ident * add_local_name PROT((struct ident *, int, int));
 static int verify_declared PROT((struct ident *));
 %ifdef INITIALIZATION_BY___INIT
 static void copy_variables PROT((struct program *, int));
@@ -173,6 +201,7 @@ static void argument_type_error PROT((int, int));
 static unsigned short type_of_locals[MAX_LOCAL];
 static unsigned long full_type_of_locals[MAX_LOCAL];
 static int current_number_of_locals = 0;
+static int max_number_of_locals = 0;
 static int current_break_stack_need = 0  ,max_break_stack_need = 0;
 
 /*
@@ -190,7 +219,11 @@ struct svalue *prog_variable_values; /* this one too */
 %endif /* INITIALIZATION_BY___INIT */
 
 static struct ident *all_globals = 0;
-static struct ident *all_locals = 0;
+static struct ident *all_locals = NULL;
+  /* List of defined local variables, listed in reverse order of definition.
+   * This also means that the variables are listed in reverse order of
+   * nested block scopes.
+   */
 static struct efun_shadow *all_efun_shadows = 0;
 
 #ifdef __STDC__
@@ -357,8 +390,8 @@ static char *realloc_a_program() {
 
 #define ins_byte(b) byte_to_mem_block(A_PROGRAM, b)
 #ifndef ins_byte
-INLINE
-static void ins_byte(b)
+static INLINE
+void ins_byte(b)
     char b;
 {
     if (mem_block[A_PROGRAM].current_size == mem_block[A_PROGRAM].max_size ) {
@@ -581,6 +614,87 @@ static int pop_address() {
     return comp_stack[--comp_stackp];
 }
 
+/* Some functions to handle the block scopes */
+
+static void init_scope(int depth)
+{
+    block_scope[depth-1].num_locals = 0;
+    block_scope[depth-1].first_local = current_number_of_locals;
+    block_scope[depth-1].addr = 0;
+}
+
+static void enter_block_scope(void)
+{
+    if (block_depth == COMPILER_STACK_SIZE)
+        yyerror("Too deep nesting of local blocks.\n");
+    if (use_local_scopes)
+    {
+        block_depth++;
+        init_scope(block_depth);
+    }
+}
+
+static void leave_block_scope(void)
+{
+    if (use_local_scopes)
+    {
+        free_local_names(block_depth);
+        block_depth--;
+    }
+}
+
+static struct ident * redeclare_local (int num, struct ident ** ppPrev)
+{
+    /* A local name is redeclared. If this happens on a deeper
+     * level, it is legal - return the ident of the earlier variable.
+     * If it is illegal, print an error message and return NULL.
+     * If <ppPrev> is not NULL, *ppPrev is set to the ident of the
+     * earlier variable in either case (this is needed for error
+     * recovery in some places).
+     */
+    struct ident *p, *q;
+
+    if (all_locals && all_locals->u.local.depth > block_depth)
+    {
+        fatal("List of locals clobbered: list depth %d, "
+              "block depth %d\n"
+              , all_locals->u.local.depth, block_depth);
+    }
+
+    /* First, find the previous declaration of this local */
+    q = NULL;
+    for (p = all_locals; p != NULL; p = p->next_all)
+    {
+        if (p->u.local.num == num)
+        {
+            /* We found the identifier, and due to the list properties
+             * it is also the one with deepest depth.
+             */
+            q = p;
+            break;
+        }
+    }
+
+    /* q should be set here and point to the previous declaration.
+     * If it is of lower depth, it may be shadowed. However, it
+     * is not possible to shadow an argument (depth 1) with
+     * a function-local variable (depth 2).
+     */
+    if (!q)
+        fatal("Local identifier %ld not found in list.\n", (long)num);
+    if (ppPrev)
+        *ppPrev = q;
+    if (q->u.local.depth >= block_depth
+     || (q->u.local.depth == 1 && block_depth == 2)
+       )
+    {
+        yyerrorf("Illegal to redeclare local name '%s'", q->name);
+        return NULL;
+    }
+
+    return q;
+}
+
 %ifdef INITIALIZATION_BY___INIT
 /*
  * If there is any initialization of a global variable, a function which will
@@ -653,7 +767,6 @@ static void prolog() {
         type_of_arguments.block = xalloc(type_of_arguments.max_size);
     }
     type_of_arguments.current_size = 0;
-    approved_object = 0;
     last_expression = -1;
     compiled_prog = 0;                /* 0 means fail to load. */
     heart_beat = -1;
@@ -661,6 +774,8 @@ static void prolog() {
     current_continue_address = 0;
     current_break_address = 0;
     num_parse_error = 0;
+    block_depth = 0;
+    use_local_scopes = MY_TRUE;
     free_all_local_names();        /* In case of earlier error */
     /* Initialize memory blocks where the result of the compilation
      * will be stored.
@@ -806,7 +921,7 @@ static int define_new_function(p, num_arg, num_local, offset, flags, type)
     num = mem_block[A_FUNCTIONS].current_size / sizeof fun;
     if (p->type != I_TYPE_GLOBAL) {
         if (p->type != I_TYPE_UNKNOWN) {
-            p = make_shared_identifier(p->name, I_TYPE_GLOBAL);
+            p = make_shared_identifier(p->name, I_TYPE_GLOBAL, 0);
         }
         /* should be I_TYPE_UNKNOWN now. */
         p->type = I_TYPE_GLOBAL;
@@ -874,7 +989,7 @@ static void define_variable(name, flags, svp)
 
     if (name->type != I_TYPE_GLOBAL) {
         if (name->type != I_TYPE_UNKNOWN) {
-            name = make_shared_identifier(name->name, I_TYPE_GLOBAL);
+            name = make_shared_identifier(name->name, I_TYPE_GLOBAL, 0);
         }
         name->type = I_TYPE_GLOBAL;
         name->u.global.function = -1;
@@ -901,8 +1016,7 @@ static void define_variable(name, flags, svp)
             VARIABLE(n)->flags |=   ~flags & TYPE_MOD_STATIC;
         }
     }
-    dummy.name = name->name;
-    increment_string_ref(dummy.name);
+    dummy.name = ref_string(name->name);
     dummy.flags = flags;
     if (flags & TYPE_MOD_VIRTUAL) {
         if (!(flags & NAME_HIDDEN))
@@ -1042,7 +1156,7 @@ static void delete_prog_string()
 
 %ifndef INITIALIZATION_BY___INIT
 /* convert an svalue how mt is used at run-time to it's compile-time type */
-INLINE static
+static INLINE
 int type_rtoc(svp)
     struct svalue *svp;
 {
@@ -1062,7 +1176,7 @@ int type_rtoc(svp)
     }
 }
 
-INLINE static
+static INLINE
 struct svalue *copy_svalue(svp)
     struct svalue *svp;
 {
@@ -1074,7 +1188,7 @@ struct svalue *copy_svalue(svp)
         if (svp->x.string_type != STRING_SHARED)
             return &const0;
       case T_SYMBOL:
-        increment_string_ref(svp->u.string);
+        ref_string(svp->u.string);
         break;
       case T_POINTER:
       case T_QUOTED_ARRAY:
@@ -1087,7 +1201,7 @@ struct svalue *copy_svalue(svp)
         if (CLOSURE_MALLOCED(svp->x.closure_type))
             svp->u.lambda->ref++;
         else
-            add_ref(svp->u.ob, "ass to var");
+            (void)ref_object(svp->u.ob, "ass to var");
         break;
       default:
         return &const0;
@@ -1247,8 +1361,7 @@ static struct vector *list_to_vector(length, initialized)
             xfree(block);
         } while ( NULL != (block = (char *)list) );
     }
-    initialized->type = T_POINTER;
-    initialized->u.vec = vec;
+    put_array(initialized, vec);
     return vec;
 }
 
@@ -1268,8 +1381,6 @@ static void free_const_list_svalue(svp)
 }
 %endif
 
-LOCAL_INLINE int proxy_efun PROT((int, int));
-
 static void arrange_protected_lvalue PROT((int, int, int, int));
 
 struct s_lrvalue {
@@ -1285,8 +1396,9 @@ static int indexing_code;
 static struct svalue *currently_initialized;
 #endif
 
-#ifdef __MWERKS__
+#if defined(__MWERKS__) && !defined(WARN_ALL)
 #    pragma warn_possunwant off
+#    pragma warn_implicitconv off
 #endif
 %}
 
@@ -1368,7 +1480,7 @@ static struct svalue *currently_initialized;
 %type <number> m_expr_values
 
 %type <numbers> condStart
-%type <ident> F_IDENTIFIER
+%type <ident> F_IDENTIFIER F_INLINE_FUN
 %type <function_name> function_name
 %type <string> anchestor
 
@@ -1377,14 +1489,15 @@ static struct svalue *currently_initialized;
 /* The following symbols return type information */
 
 %type <type> decl_cast cast
-%type <lvalue> lvalue
+%type <lvalue> lvalue local_name_lvalue
 %type <lrvalue> function_call expr4
 %type <lrvalue> catch sscanf
 %ifdef SUPPLY_PARSE_COMMAND
 %type <lrvalue> parse_command
 %endif
 
-%type <lrvalue> expr0 comma_expr
+%type <lrvalue> expr0 expr_decl comma_expr comma_expr_decl
+%type <lrvalue> inline_fun
 
 %type <lrvalue> note_start
 
@@ -1444,6 +1557,7 @@ inheritance: inheritance_qualifiers F_INHERIT string_constant ';'
                         /* Return back to load_object() */
                         YYACCEPT;
                     }
+                    ob->time_of_ref = current_time;
                     /* We want to refer to the program;
                        variables are needed too if they are initialized. */
                     if (ob->flags & O_SWAPPED && load_ob_from_swap(ob) < 0) {
@@ -1452,11 +1566,16 @@ inheritance: inheritance_qualifiers F_INHERIT string_constant ';'
                         yyerror("Out of memory");
                         YYACCEPT;
                     }
+                    if (ob->prog->flags & P_NO_INHERIT)
+                    {
+                        yyerror("Illegal to inherit an object which sets "
+                                "'#pragma no_inherit'.\n");
+                        YYACCEPT; /* TODO: Is this ok? Should be. */
+                    }
                     free_string(last_string_constant);
                     last_string_constant = 0;
-                    if (ob->flags & O_APPROVED)
-                        approved_object = 1;
                     inherit.prog = ob->prog;
+                    inherit.is_extra = MY_FALSE;
                     inherit.function_index_offset =
                         mem_block[A_FUNCTIONS].current_size /
                           sizeof(struct function);
@@ -1491,7 +1610,6 @@ inheritance: inheritance_qualifiers F_INHERIT string_constant ';'
                       (char *)&inherit,
                       sizeof inherit
                     );
-                    byte_to_mem_block(A_INHERIT_FLAG, 0);
                     num_virtual_variables =
                       mem_block[A_VIRTUAL_VAR].current_size /
                         sizeof (struct variable);
@@ -1521,6 +1639,9 @@ function_body:
 
 def: type optional_star F_IDENTIFIER
         {
+            use_local_scopes = pragma_use_local_scopes;
+            block_depth = 1;
+            init_scope(block_depth);
             $2 |= $1;
 
             if ($1 & TYPE_MOD_MASK) {
@@ -1594,29 +1715,108 @@ def: type optional_star F_IDENTIFIER
                   *p++ = $6 | ~0x7f;
                 else
                   *p++ = $6;
-                *p   = current_number_of_locals - $6+ max_break_stack_need;
-                define_new_function($3, $6, current_number_of_locals - $6+
+                *p   = max_number_of_locals - $6+ max_break_stack_need;
+                define_new_function($3, $6, max_number_of_locals - $6+
                         max_break_stack_need,
                         start + sizeof $3->name + 1, 0, $2);
-                increment_string_ref($3->name);
+                ref_string($3->name);
                 ins_f_byte(F_RETURN0);
             }
             free_all_local_names();
+            if (first_inline_fun)
+                insert_inline_fun_now = MY_TRUE;
+            block_depth = 0;
         }
-   | type name_list ';' { if ($1 == 0) yyerror("Missing type"); }
+   | type name_list ';'
+       {
+         if ($1 == 0)
+             yyerror("Missing type");
+         if (first_inline_fun)
+             insert_inline_fun_now = MY_TRUE;
+       }
    | inheritance ;
+
+inline_fun: F_INLINE_FUN
+       {
+         /* Synthesize the prototype of the inline function
+          * Since we have to declare the function arguments for that,
+          * first save the existing locals.
+          */
+
+         struct ident * save_all_locals;
+         int save_current_number_of_locals;
+         int save_max_number_of_locals;
+         int save_tol[10], save_ftol[10];
+         char name[3];
+         int num, i;
+
+         /* Save the old locals information */
+         save_all_locals = all_locals;
+         save_current_number_of_locals = current_number_of_locals;
+         save_max_number_of_locals = max_number_of_locals;
+
+         /* Simulate 'no locals' */
+         all_locals = NULL;
+         current_number_of_locals = 0;
+         max_number_of_locals = 0;
+         block_depth++;
+
+         /* Declare the 9 parameters (saving the types of the old ones) */
+         name[0] = '$'; name[2] = '\0';
+
+         for (i = 0; i < 9; i++)
+         {
+             save_tol[i] = type_of_locals[i];
+             save_ftol[i] = full_type_of_locals[i];
+             name[1] = (char)('1' + i);
+             add_local_name(make_shared_identifier( name, I_TYPE_UNKNOWN
+                                                  , block_depth)
+                           , TYPE_ANY, block_depth);
+         }
+
+         /* Declare the function */
+         num = define_new_function(/* id */ $1, 9, 0, 0
+                                  , NAME_UNDEFINED|NAME_PROTOTYPE
+                                  , TYPE_UNKNOWN|TYPE_MOD_VARARGS|TYPE_MOD_PRIVATE
+                                  );
+
+         /* Restore the old locals information */
+         free_all_local_names();
+         block_depth--;
+         all_locals = save_all_locals;
+         current_number_of_locals = save_current_number_of_locals;
+         max_number_of_locals = save_max_number_of_locals;
+
+         for (i = 0; i < 9; i++)
+         {
+             type_of_locals[i] = save_tol[i];
+             full_type_of_locals[i] = save_ftol[i];
+         }
+
+         /* Insert the call to the lfun closure */
+
+         $$.start = CURRENT_PROGRAM_SIZE;
+         $$.code = -1;
+         ins_f_byte(F_CLOSURE);
+         ins_short(num);
+         $$.type = TYPE_CLOSURE;
+
+       } ; /* inline_fun */
 
 new_arg_name: type optional_star F_IDENTIFIER
         {
             if (exact_types && $1 == 0) {
                 yyerror("Missing type for argument");
-                add_local_name($3, TYPE_ANY);        /* Supress more errors */
+                add_local_name($3, TYPE_ANY, block_depth);        /* Supress more errors */
             } else {
-                add_local_name($3, $1 | $2);
+                add_local_name($3, $1 | $2, block_depth);
             }
         }
         | type optional_star F_LOCAL
         {
+            /* A local name is redeclared. Since this is the argument
+             * list, it can't be legal.
+             */
             yyerror("Illegal to redeclare local name");
         } ;
 
@@ -1795,19 +1995,48 @@ new_name: optional_star F_IDENTIFIER
         };
 %endif /* INITIALIZATION_BY___INIT */
 
-block: '{' local_declarations statements '}';
+block: '{'
+            { enter_block_scope(); }
+        local_declarations
+            {
+                /* If this is a local block, we need to insert code to
+                 * zero out the locals - previous blocks may have left
+                 * values in them.
+                 */
+                if (block_depth > 2)
+                {
+                    if (block_scope[block_depth-1].num_locals)
+                    {
+                        ins_f_code(F_CLEAR_LOCALS);
+                        ins_byte(block_scope[block_depth-1].first_local);
+                        ins_byte(block_scope[block_depth-1].num_locals);
+                    }
+                }
+            }
+        statements '}'
+            { leave_block_scope(); }
+        ;
 
 local_declarations: /* empty */
                   | local_declarations basic_type local_name_list ';' ;
 
 new_local_name: optional_star F_IDENTIFIER
         {
-            add_local_name($2, current_type | $1);
+            add_local_name($2, current_type | $1, block_depth);
         }
         | optional_star F_LOCAL
         {
-            /* TODO: This should really look at the scope */
-            yyerror("Illegal to redeclare local name");
+            /* A local name is redeclared. If this happens on a deeper
+             * level, it is legal.
+             */
+            struct ident *q;
+
+            q = redeclare_local($2, NULL);
+            if (q)
+            {
+                /* TODO: Add warning for variable shadow */
+                add_local_name(q, current_type | $1, block_depth);
+            }
         } ;
 
 local_name_list: new_local_name
@@ -2022,9 +2251,12 @@ do: {
         current_break_address    = $<numbers>1[1];
     }
 
-for: F_FOR '('          { $<numbers>$[0] = current_continue_address;
-                    $<numbers>$[1] = current_break_address; }
-     for_expr ';'
+for: F_FOR '('
+        {   $<numbers>$[0] = current_continue_address;
+            $<numbers>$[1] = current_break_address;
+            enter_block_scope();
+        }
+     for_init_expr ';'
         {   insert_pop_value();
             current_continue_address = CONTINUE_DELIMITER;
             $<number>$ = CURRENT_PROGRAM_SIZE;
@@ -2072,6 +2304,18 @@ for: F_FOR '('          { $<numbers>$[0] = current_continue_address;
             ins_f_byte(F_BRANCH); /* to expression */
             ins_byte(0);
             current_break_address = BREAK_DELIMITER;
+
+            {
+                struct block_scope_s *scope = block_scope + block_depth - 1;
+
+                if (use_local_scopes && scope->num_locals)
+                {
+                    /* Fix the number of locals to clear, now that we know it
+                     */
+                    mem_block[A_PROGRAM].block[scope->addr+2]
+                      = (char)scope->num_locals;
+                }
+            }
         }
      statement
         {
@@ -2122,9 +2366,133 @@ for: F_FOR '('          { $<numbers>$[0] = current_continue_address;
               upd_short(current_break_address,
                   CURRENT_PROGRAM_SIZE - current_break_address);
           }
-       current_continue_address = $<numbers>3[0];
-       current_break_address        = $<numbers>3[1];
-   }
+          current_continue_address = $<numbers>3[0];
+          current_break_address        = $<numbers>3[1];
+
+          leave_block_scope();
+        }
+
+/* Special rules for 'int <name> = <expr>' declarations in the first
+ * for() expression. Crude, but functional.
+ */
+for_init_expr: /* EMPTY */
+        {
+            last_expression = mem_block[A_PROGRAM].current_size;
+            ins_f_byte(F_CONST1);
+        }
+        | comma_expr_decl;
+
+comma_expr_decl: expr_decl
+        | comma_expr_decl
+        {
+            insert_pop_value();
+        }
+        ',' expr_decl
+        { $$.type = $4.type; } ;
+
+expr_decl: expr0
+        | basic_type local_name_lvalue F_ASSIGN expr0
+          {
+              int length;
+              int type2;
+%line
+              type2 = $4.type;
+              if (exact_types && !compatible_types($2.type, type2))
+              {
+                  type_error("Bad assignment. Rhs", $4.type);
+              }
+              if ($3 != F_ASSIGN - F_OFFSET)
+              {
+                  yyerror("Only plain assignments allowed here.");
+              }
+              if (type2 & TYPE_MOD_REFERENCE)
+                  yyerror("Can't trace reference assignments.");
+              length = $2.length;
+              if (length) {
+                  add_to_mem_block
+                    (A_PROGRAM, $2.u.p, length+1);
+                  yfree($2.u.p);
+                  mem_block[A_PROGRAM].block[
+                    last_expression = CURRENT_PROGRAM_SIZE-1
+                  ] = $3;
+              } else {
+                  char *source, *dest;
+                  mp_uint current_size;
+
+                  source = $2.u.simple;
+                  current_size = CURRENT_PROGRAM_SIZE;
+                  CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
+                  if (current_size + 3 > mem_block[A_PROGRAM].max_size )
+                      if (!realloc_a_program()) {
+                          yyerror("Out of memory");
+                          YYACCEPT;
+                      }
+                  dest = mem_block[A_PROGRAM].block + current_size;
+                  *dest++ = *source++;
+                  *dest++ = *source;
+                  *dest = $3;
+              }
+              $$.type = type2;
+          }
+        ; /* expr_decl */
+
+local_name_lvalue: optional_star F_IDENTIFIER
+          {
+              struct block_scope_s *scope = block_scope + block_depth - 1;
+
+              add_local_name($2, current_type | $1, block_depth);
+
+              if (use_local_scopes && scope->num_locals == 1)
+              {
+                  /* First definition of a local, so insert the
+                   * clear_locals bytecode and remember its position
+                   */
+                  scope->addr = mem_block[A_PROGRAM].current_size;
+                  ins_f_code(F_CLEAR_LOCALS);
+                  ins_byte(scope->first_local);
+                  ins_byte(0);
+              }
+
+              $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE - F_OFFSET;
+              $$.u.simple[1] = $2->u.local.num;
+              $$.length = 0;
+              $$.type = current_type | $1;
+          }
+       | optional_star F_LOCAL
+          {
+              struct ident *q, *prev;
+              struct block_scope_s *scope = block_scope + block_depth - 1;
+
+              q = redeclare_local($2, &prev);
+              if (q)
+              {
+                  q = add_local_name(q, current_type | $1, block_depth);
+              }
+              else
+              {
+                  /* redeclare_local() called yyerror(), now use the
+                   * found ident to recover from it.
+                   */
+                  q = prev;
+              }
+
+              if (use_local_scopes && scope->num_locals == 1)
+              {
+                  /* First definition of a local, so insert the
+                   * clear_locals bytecode and remember its position
+                   */
+                  scope->addr = mem_block[A_PROGRAM].current_size;
+                  ins_f_code(F_CLEAR_LOCALS);
+                  ins_byte(scope->first_local);
+                  ins_byte(0);
+              }
+
+              $$.u.simple[0] = F_PUSH_LOCAL_VARIABLE_LVALUE - F_OFFSET;
+              $$.u.simple[1] = q->u.local.num;
+              $$.length = 0;
+              $$.type = current_type | $1;
+          }
+        ; /* local_name_lvalue */
 
 for_expr: /* EMPTY */
         {
@@ -2804,15 +3172,32 @@ expr0:
             type1 = $1.type;
             type2 = $3.type;
             if (exact_types) {
-                if ( !BASIC_TYPE(type1, TYPE_NUMBER) && type1 != TYPE_FLOAT)
+                if (!BASIC_TYPE(type1, TYPE_NUMBER)
+                 && type1 != TYPE_FLOAT
+                 && type1 != TYPE_STRING
+                 && !(type1 & TYPE_MOD_POINTER)
+                   )
                     type_error("Bad argument number 1 to '*'", type1);
-                if ( !BASIC_TYPE(type2, TYPE_NUMBER) && type2 != TYPE_FLOAT)
+                if (!BASIC_TYPE(type2, TYPE_NUMBER)
+                 && type2 != TYPE_FLOAT
+                 && type2 != TYPE_STRING
+                 && !(type2 & TYPE_MOD_POINTER)
+                   )
                     type_error("Bad argument number 2 to '*'", type2);
             }
             ins_f_byte(F_MULTIPLY);
             if (type1 == TYPE_FLOAT || type2 == TYPE_FLOAT )
             {
                 $$.type = TYPE_FLOAT;
+            } else if (type1 == T_STRING || type2 == T_STRING)
+            {
+                $$.type = TYPE_STRING;
+            } else if (type1 & TYPE_MOD_POINTER)
+            {
+                $$.type = type1;
+            } else if (type2 & TYPE_MOD_POINTER)
+            {
+                $$.type = type2;
             } else {
                 $$.type = TYPE_NUMBER;
             }
@@ -3177,6 +3562,7 @@ note_start: { $$.start = CURRENT_PROGRAM_SIZE; }
 expr4: function_call %prec '~'
 %//  | F_STRING F_STRING
 %//        { fatal("presence of rule should prevent its reduction"); }
+     | inline_fun
      | F_STRING
         {
             int string_number;
@@ -3297,7 +3683,7 @@ expr4: function_call %prec '~'
                                          * unless a reference appears */
             ins_f_byte(F_AGGREGATE);
             ins_short($4);
-            if ($4 > MAX_ARRAY_SIZE)
+            if (max_array_size && $4 > max_array_size)
                 yyerror("Illegal array size");
             $$.type = TYPE_MOD_POINTER | TYPE_ANY;
             $$.start = $3.start;
@@ -3311,7 +3697,7 @@ expr4: function_call %prec '~'
                                          * unless a reference appears */
             ins_f_byte(F_AGGREGATE);
             ins_short($3);
-            if ($3 > MAX_ARRAY_SIZE)
+            if (max_array_size && $3 > max_array_size)
                 yyerror("Illegal array size");
             $$.type = TYPE_QUOTED_ARRAY;
             $$.start = $2.start;
@@ -4002,16 +4388,13 @@ svalue_constant: constant
         {
             struct svalue *svp = currently_initialized;
 %line
-            svp->type = T_NUMBER;
-            svp->u.number = $1;
+            put_number(svp, $1);
         }
         | string_constant
         {
             struct svalue *svp = currently_initialized;
 %line
-            svp->type = T_STRING;
-            svp->x.string_type = STRING_SHARED;
-            svp->u.string = last_string_constant;
+            put_string(svp, last_string_constant);
             last_string_constant = 0;
         }
         | F_SYMBOL
@@ -4052,7 +4435,7 @@ svalue_constant: constant
                    sizeof *l - sizeof l->function + sizeof l->function.index
                 );
                 l->ref = 1;
-                l->ob = current_object;
+                l->ob = ref_object(current_object, "closure");
                 l->function.index = ix;
                 svp->u.lambda = l;
                 svp->x.closure_type = CLOSURE_PRELIMINARY;
@@ -4061,23 +4444,20 @@ svalue_constant: constant
                   (instrs[ix - CLOSURE_EFUN_OFFS].Default == -1 ?
                     ix + CLOSURE_OPERATOR-CLOSURE_EFUN :
                     ix);
-                svp->u.ob = current_object;
+                svp->u.ob = ref_object(current_object, "closure");
             }
-            add_ref(current_object, "closure");
         }
         | '(' '[' ']' ')'
         {
             struct svalue *svp = currently_initialized;
 %line
-            svp->type = T_MAPPING;
-            svp->u.map = allocate_mapping(0, 1);
+            put_mapping(svp, allocate_mapping(0, 1));
         }
         | '(' '[' ':' constant ']' ')'
         {
             struct svalue *svp = currently_initialized;
 %line
-            svp->type = T_MAPPING;
-            svp->u.map = allocate_mapping(0, $4);
+            put_mapping(svp, allocate_mapping(0, $4));
         }
         ;
 
@@ -4154,8 +4534,8 @@ constant_function_call: F_IDENTIFIER
                         if (vec->item[i].type != T_POINTER ||
                             VEC_SIZE(vec->item[i].u.vec) != keynum)
                         {
-                            yyerrorf("bad data array %d for alist", i);
-                            free_vector(vec);
+                            yyerrorf("bad data array %ld for alist", (long)i);
+                            free_array(vec);
                             *svp = const0;
                             break;
                         }
@@ -4164,12 +4544,11 @@ constant_function_call: F_IDENTIFIER
                     yyerror("missing argument for order_alist");
                 }
                 if (listsize) {
-                    svp->type = T_POINTER;
-                    svp->u.vec = order_alist(vec->item, listsize, 1);
+                    put_array(svp, order_alist(vec->item, listsize, 1));
                 } else {
                     *svp = const0;
                 }
-                free_vector(vec);
+                free_array(vec);
                 break;
               }
               default:
@@ -4831,8 +5210,8 @@ function_call: function_name
                                 real_name->u.global.sim_efun) & ~0xff)
             {
                 PREPARE_S_INSERT(6)
-                char *p = real_name->name;
-                increment_string_ref(p);
+                char *p;
+                p = ref_string(real_name->name);
                 add_f_byte(F_STRING);
                 add_short(store_prog_string(
                   make_shared_string(query_simul_efun_file_name())));
@@ -5127,9 +5506,14 @@ function_call: function_name
 | expr4 F_ARROW function_name %prec F_ARROW
     {
 %line
+        /* TODO: Factor out the name-lookup from the function calls
+         * TODO:: above, so that we can make a->b() just another
+         * TODO:: notation of call_other().
+         * TODO: Introduce the a->(<expr>)() notation.
+         */
         int string_number;
-        char *p = $3.real->name;
-        increment_string_ref(p);
+        char *p;
+        p = ref_string($3.real->name);
         if ($3.real->type == I_TYPE_UNKNOWN)
             free_shared_identifier($3.real);
         if ($3.super) {
@@ -5202,7 +5586,7 @@ function_name: F_IDENTIFIER
                     {
                         struct svalue *res;
 
-                        push_constant_string("nomask simul_efun");
+                        push_volatile_string("nomask simul_efun");
                         push_volatile_string(current_file);
                         push_volatile_string($3->name);
                         res = apply_master_ob(STR_PRIVILEGE, 3);
@@ -5291,6 +5675,7 @@ optional_else: /* empty */
 
 #ifdef __MWERKS__
 #    pragma warn_possunwant reset
+#    pragma warn_implicitconv reset
 #endif
 
 %ifdef INITIALIZATION_BY___INIT
@@ -5388,7 +5773,8 @@ static void arrange_protected_lvalue(start, code, end, newcode)
     CURRENT_PROGRAM_SIZE = current + 2;
 }
 
-static void epilog() {
+static void epilog()
+{
     int size, i;
     mp_int num_functions, num_strings, num_variables;
     char *p;
@@ -5406,6 +5792,7 @@ static void epilog() {
         free_string(last_string_constant);
         last_string_constant = 0;
     }
+
     while (case_blocks) {
         struct case_list_entry *tmp;
 
@@ -5439,7 +5826,7 @@ static void epilog() {
     if (last_initializer_end > 0) {
         struct ident *ip;
 
-        ip = make_shared_identifier("__INIT", I_TYPE_UNKNOWN);
+        ip = make_shared_identifier("__INIT", I_TYPE_UNKNOWN, 0);
         switch (0) { default:
             if (!ip) {
                 yyerror("Out of memory");
@@ -5528,7 +5915,7 @@ static void epilog() {
                 {
                     realloc_a_program();
                 }
-                increment_string_ref(f->name);
+                ref_string(f->name);
                 f->offset.pc = CURRENT_PROGRAM_SIZE + sizeof f->name + 1;
                 p = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE;
                 memcpy(p, (char *)&f->name, sizeof f->name);
@@ -5734,6 +6121,8 @@ static void epilog() {
         prog->heart_beat = heart_beat;
         prog->id_number =
           ++current_id_number ? current_id_number : renumber_programs();
+        prog->flags = (pragma_no_clone ? P_NO_CLONE : 0)
+                    | (pragma_no_inherit ? P_NO_INHERIT : 0);
         prog->load_time = current_time;
         total_prog_block_size += prog->total_size;
         total_num_prog_blocks += 1;
@@ -5864,9 +6253,12 @@ static void epilog() {
     }
 }
 
-LOCAL_INLINE int proxy_efun(function, num_arg)
-int function, num_arg;
+int proxy_efun(int function, int num_arg UNUSED)
 {
+#if defined(__MWERKS__) && !defined(F_EXTRACT)
+#    pragma unused(num_arg)
+#endif
+#ifdef F_EXTRACT
     if (function == F_EXTRACT-F_OFFSET) {
         if (num_arg == 2) {
             return F_EXTRACT2-F_OFFSET;
@@ -5875,6 +6267,7 @@ int function, num_arg;
             return F_EXTRACT1-F_OFFSET;
         }
     }
+#endif
     if (function == F_PREVIOUS_OBJECT-F_OFFSET) {
         /* num_arg == 0 */
         return F_PREVIOUS_OBJECT0-F_OFFSET;
@@ -5915,7 +6308,6 @@ insert_inherited(super_name, real_name,
 {
     struct inherit *ip;
     int num_inherits, super_length;
-    int ix;
 
     while(*super_name == '/')
         super_name++;
@@ -5924,13 +6316,13 @@ insert_inherited(super_name, real_name,
         sizeof (struct inherit);
     real_name = findstring(real_name);
     ip = (struct inherit *)mem_block[A_INHERITS].block;
-    for (ix = 0; num_inherits > 0; ip++, ix++, num_inherits--) {
+    for (; num_inherits > 0; ip++, num_inherits--) {
         short i;
         uint32 flags;
         char *__PREPARE_INSERT__p = __prepare_insert__p;
         short __ADD_SHORT__s[2];
 
-        if (mem_block[A_INHERIT_FLAG].block[ix] != 0)
+        if (ip->is_extra)
             /* this is a duplicate inherit */
             continue;
 
@@ -5992,22 +6384,24 @@ insert_inherited(super_name, real_name,
         return i;
     }
     if (strpbrk(super_name, "*?") && !num_arg) {
+        struct inherit *ip0;
         int calls = 0;
         short i = -1;
-        int ix2;
 
         *super_p = 0;
         num_inherits = mem_block[A_INHERITS].current_size /
             sizeof (struct inherit);
-        ip = (struct inherit *)mem_block[A_INHERITS].block;
-        for (ix2 = 0; num_inherits > 0; ip++, ix2++, num_inherits--) {
+        ip0 = (struct inherit *)mem_block[A_INHERITS].block;
+        for (; num_inherits > 0; ip0++, num_inherits--) {
             uint32 flags;
             PREPARE_S_INSERT(6)
 
             /* ip->prog->name includes .c */
-            int l = strlen(ip->prog->name + 2);
+            int l = strlen(ip0->prog->name + 2);
 
-            if (mem_block[A_INHERIT_FLAG].block[ix2] != 0)
+            ip = ip0; /* ip will be changed in the body */
+
+            if (ip->is_extra)
                 /* duplicate inherit */
                 continue;
             if ( !match_string(super_name, ip->prog->name, l) )
@@ -6141,27 +6535,64 @@ void free_all_local_names()
     }
     all_locals = 0;
     current_number_of_locals = 0;
+    max_number_of_locals = 0;
     current_break_stack_need = 0;
     max_break_stack_need = 0;
 }
 
-static void add_local_name(ident, type)
-    struct ident *ident;
-    int type;
+static void free_local_names(int depth)
 {
-    if (current_number_of_locals == MAX_LOCAL)
+    struct ident *q;
+
+    if (!depth)
+    {
+        free_all_local_names();
+        return;
+    }
+
+    /* Are the locals of the given depth? */
+    if (!all_locals || all_locals->u.local.depth < depth)
+        return;
+
+    if (all_locals->u.local.depth > depth)
+        fatal("List of locals clobbered: depth %d, block_depth %d\n"
+             , all_locals->u.local.depth, depth);
+
+    while (all_locals != NULL && all_locals->u.local.depth >= depth)
+    {
+        q = all_locals;
+        all_locals = q->next_all;
+        free_shared_identifier(q);
+        current_number_of_locals--;
+    }
+}
+
+static struct ident * add_local_name(ident, type, depth)
+    struct ident *ident;
+    int type, depth;
+{
+    if (current_number_of_locals >= MAX_LOCAL
+     || current_number_of_locals >= 256)
         yyerror("Too many local variables");
     else {
         if (ident->type != I_TYPE_UNKNOWN) {
-            ident = make_shared_identifier(ident->name, I_TYPE_LOCAL);
+            ident = make_shared_identifier(ident->name, I_TYPE_LOCAL, depth);
         }
         ident->type = I_TYPE_LOCAL;
-        ident->u.local = current_number_of_locals;
+        ident->u.local.num = current_number_of_locals;
+        ident->u.local.depth = depth;
+        if (all_locals && all_locals->u.local.depth > depth)
+            fatal("List of locals clobbered: depth %d, adding depth %d\n"
+                 , all_locals->u.local.depth, depth);
         ident->next_all = all_locals;
         all_locals = ident;
         type_of_locals[current_number_of_locals] = type;
         full_type_of_locals[current_number_of_locals++] = type;
+        if (current_number_of_locals > max_number_of_locals)
+            max_number_of_locals = current_number_of_locals;
+        block_scope[depth-1].num_locals++;
     }
+    return ident;
 }
 
 static void cross_define(from, to, offset)
@@ -6322,7 +6753,7 @@ static void copy_functions(from, type)
                  (NAME_HIDDEN|TYPE_MOD_NO_MASK) )
                 break;
             /* this function is either visible or subject to redefinition */
-            p = make_shared_identifier(fun.name, I_TYPE_GLOBAL);
+            p = make_shared_identifier(fun.name, I_TYPE_GLOBAL, 0);
             if (!p) {
                 yyerror("Out of memory");
                 break;
@@ -6651,8 +7082,8 @@ static void copy_variables(from, type)
                 inherit_index = (mem_block[A_INHERITS].current_size - j) /
                    sizeof(struct inherit) - 1;
                 inherit.function_index_offset += fun_index_offset;
+                inherit.is_extra = MY_TRUE;
                 add_to_mem_block(A_INHERITS, (char *)&inherit, sizeof inherit);
-                byte_to_mem_block(A_INHERIT_FLAG, 1);
                 /* If a function is directly inherited from a program that
                  * introduces a virtual variable, the code therein is not
                  * aware of virtual inheritance. For this reason, there are
@@ -6696,7 +7127,7 @@ static void copy_variables(from, type)
             int new_type;
 
             p = make_shared_identifier(from->variable_names[j].name,
-                I_TYPE_GLOBAL);
+                I_TYPE_GLOBAL, 0);
             if (!p) {
                 yyerror("Out of memory");
                 return;
@@ -6834,7 +7265,7 @@ void store_include_info(name)
     last_include_start = mem_block[A_LINENUMBERS].current_size;
     name = make_shared_string(name);
     if (!name) {
-        increment_string_ref(name = STR_DEFAULT);
+        name = ref_string(STR_DEFAULT);
         yyerror("Out of memory");
     }
     add_to_mem_block(A_INCLUDE_NAMES, (char *)&name, sizeof name);
@@ -7017,6 +7448,7 @@ H_TELNET_NEG:     SH(T_CLOSURE) SH(T_STRING), \
 H_NOECHO:         SH(T_CLOSURE) SH(T_STRING), \
 H_ERQ_STOP:       SH(T_CLOSURE), \
 H_MODIFY_COMMAND_FNAME: SH(T_STRING), \
+H_COMMAND:        SH(T_CLOSURE) SH(T_STRING), \
 
 #if defined( DEBUG ) && defined ( TRACE_CODE )
 
@@ -7049,7 +7481,8 @@ void count_compiler_refs() {
 }
 #endif
 
-#ifdef __MWERKS__
+#if defined(__MWERKS__) && !defined(WARN_ALL)
 #    pragma warn_possunwant off
+#    pragma warn_implicitconv off
 #endif
 

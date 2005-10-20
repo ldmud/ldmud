@@ -45,10 +45,10 @@
  *     void count_ref_from_string(char *p);
  *         Count the reference to shared string <p>.
  *
- *     void clear_ref_in_vector(struct svalue *svp, int num);
+ *     void clear_ref_in_vector(struct svalue *svp, size_t num);
  *         Clear the refs of the <num> elements of vector <svp>.
  *
- *     void count_ref_in_vector(struct svalue *svp, int num)
+ *     void count_ref_in_vector(struct svalue *svp, size_t num)
  *         Count the references the <num> elements of vector <p>.
  *
  * The referencing code for dynamic data should mirror the destructor code,
@@ -64,7 +64,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 
-#define NO_INCREMENT_STRING_REF
+#define NO_REF_STRING
 #include "gcollect.h"
 #include "array.h"
 #include "backend.h"
@@ -161,7 +161,7 @@ static struct lambda *stale_lambda_closures;
 #    define WRITES(d, s) write((d), (s), strlen(s))
 #    define WRITE_SMALLOC_TRACE(p)  (WRITES(gout, ((char **)(p))[-3]), \
             WRITES(gout, " "), \
-            ((p_uint (*)(int, int))writed)(gout, ((p_uint *)(p))[-2]), \
+            ((p_uint (*)(int, int))writed)(gout, (int)((p_uint *)(p))[-2]), \
             WRITES(gout, "\n") ),
 #else
 #    define WRITE_SMALLOC_TRACE(p)
@@ -397,12 +397,12 @@ clear_map_ref_filter (struct svalue *key, struct svalue *data, void *extra)
  */
 {
     clear_ref_in_vector(key, 1);
-    clear_ref_in_vector(data, (p_int)extra);
+    clear_ref_in_vector(data, (size_t)extra);
 }
 
 /*-------------------------------------------------------------------------*/
 void
-clear_ref_in_vector (struct svalue *svp, int num)
+clear_ref_in_vector (struct svalue *svp, size_t num)
 
 /* Clear the refs of the <num> elements of vector <svp>.
  */
@@ -473,7 +473,7 @@ clear_ref_in_vector (struct svalue *svp, int num)
 
 /*-------------------------------------------------------------------------*/
 void
-count_ref_in_vector (struct svalue *svp, int num)
+count_ref_in_vector (struct svalue *svp, size_t num)
 
 /* Count the references the <num> elements of vector <p>.
  */
@@ -491,8 +491,7 @@ count_ref_in_vector (struct svalue *svp, int num)
             ob = p->u.ob;
             if (ob->flags & O_DESTRUCTED)
             {
-                p->type = T_NUMBER;
-                p->u.number = 0;
+                put_number(p, 0);
                 reference_destructed_object(ob);
             }
             else
@@ -714,7 +713,7 @@ count_ref_in_closure (struct svalue *csvp)
             num_values = svp[-0xff].u.number;
         svp -= num_values;
         NOTE_REF(svp);
-        count_ref_in_vector(svp, num_values);
+        count_ref_in_vector(svp, (size_t)num_values);
     }
     else
     {
@@ -752,7 +751,7 @@ clear_ref_in_closure (struct lambda *l, ph_int type)
         if ( (num_values = EXTRACT_UCHAR(l->function.code)) == 0xff)
             num_values = svp[-0xff].u.number;
         svp -= num_values;
-        clear_ref_in_vector(svp, num_values);
+        clear_ref_in_vector(svp, (size_t)num_values);
     }
     else if (type == CLOSURE_BOUND_LAMBDA)
     {
@@ -817,6 +816,7 @@ garbage_collection(void)
      */
 
     malloc_privilege = MALLOC_MASTER;
+    RESET_LIMITS;
     CLEAR_EVAL_COST;
     out_of_memory = MY_FALSE;
     assert_master_ob_loaded();
@@ -831,7 +831,7 @@ garbage_collection(void)
     free_defines();
     free_all_local_names();
     remove_unknown_identifier();
-    free_notifys();
+    free_old_driver_hooks();
 
     /* --- Pass 1: clear the M_REF flag in all malloced blocks ---
      */
@@ -868,6 +868,10 @@ garbage_collection(void)
              */
             ob->prog->ref = 0;
         }
+        if (was_swapped < 0)
+            fatal("Totally out of MEMORY in GC: (swapping in '%s')\n"
+                 , ob->name);
+
         clear_inherit_ref(ob->prog);
         ob->ref = 0;
         clear_ref_in_vector(ob->variables, ob->prog->num_variables);
@@ -899,7 +903,7 @@ garbage_collection(void)
 
         if ( NULL != (it = all_players[i]->input_to) )
         {
-            clear_ref_in_vector(it->arg, it->num_arg);
+            clear_ref_in_vector(it->arg, (size_t)it->num_arg);
             if (it->ob->flags & O_DESTRUCTED && it->ob->ref)
             {
                 it->ob->ref = 0;
@@ -907,7 +911,6 @@ garbage_collection(void)
                 clear_inherit_ref(it->ob->prog);
             }
         }
-        clear_ref_in_vector(&all_players[i]->default_err_message, 1);
         clear_ref_in_vector(&all_players[i]->prompt, 1);
 
         if ( NULL != (ob = all_players[i]->snoop_by) )
@@ -1074,7 +1077,7 @@ garbage_collection(void)
             }
             ob->ref++;
             MARK_STRING_REF(it->function);
-            count_ref_in_vector(it->arg, it->num_arg);
+            count_ref_in_vector(it->arg, (size_t)it->num_arg);
         } /* end of input_to processing */
 
         if ( NULL != (ob = all_players[i]->modify_command) )
@@ -1090,7 +1093,6 @@ garbage_collection(void)
             }
         }
 
-        count_ref_in_vector(&all_players[i]->default_err_message, 1);
         count_ref_in_vector(&all_players[i]->prompt, 1);
 
         if (all_players[i]->trace_prefix)
@@ -1199,6 +1201,7 @@ garbage_collection(void)
         struct svalue *res = NULL;
         if (reserved_system_area)
         {
+            RESET_LIMITS;
             CLEAR_EVAL_COST;
             malloc_privilege = MALLOC_MASTER;
             res = apply_master_ob(STR_QUOTA_DEMON, 0);
@@ -1221,13 +1224,16 @@ garbage_collection(void)
 
 /*-------------------------------------------------------------------------*/
 static void
-show_string (int d, char *block, int depth)
+show_string (int d, char *block, int depth UNUSED)
 
 /* Print the string from memory <block> on filedescriptor <d>.
  */
 
 {
-    mp_int len;
+#ifdef __MWERKS__
+#    pragma unused(depth)
+#endif
+    size_t len;
 
     WRITES(d, "\"");
     if ((len = strlen(block)) < 70)
@@ -1244,13 +1250,16 @@ show_string (int d, char *block, int depth)
 
 /*-------------------------------------------------------------------------*/
 static void
-show_added_string (int d, char *block, int depth)
+show_added_string (int d, char *block, int depth UNUSED)
 
 /* Print the string from memory <block> on filedescriptor <d>, prefixed
  * by 'Added string: '.
  */
 
 {
+#ifdef __MWERKS__
+#    pragma unused(depth)
+#endif
     WRITES(d, "Added string: ");
     show_string(d, block, 0);
     WRITES(d, "\n");
@@ -1270,7 +1279,7 @@ show_object (int d, char *block, int depth)
     if (depth) {
         struct object *o;
 
-        for (o = obj_list; o && o != ob; o = o->next_all);
+        for (o = obj_list; o && o != ob; o = o->next_all) NOOP;
         if (!o || o->flags & O_DESTRUCTED) {
             WRITES(d, "Destructed object in block 0x");
             writex(d, (unsigned)((unsigned *)block - SMALLOC_OVERHEAD));
@@ -1301,7 +1310,7 @@ show_array(int d, char *block, int depth)
     mp_int a_size;
 
     a = (struct vector *)block;
-    a_size = VEC_SIZE(a);
+    a_size = (signed)VEC_SIZE(a);
     if (depth && a != &null_vector)
     {
         int freed;
@@ -1313,7 +1322,7 @@ show_array(int d, char *block, int depth)
             user = a->user;
             wl = all_wiz;
             if (user)
-                for ( ; wl && wl != user; wl = wl->next);
+                for ( ; wl && wl != user; wl = wl->next) NOOP;
         }
         if (freed || !wl || a_size <= 0 || a_size > MAX_ARRAY_SIZE
          || (malloced_size((char *)a) - SMALLOC_OVERHEAD) << 2 !=
@@ -1330,7 +1339,7 @@ show_array(int d, char *block, int depth)
         user = a->user;
     }
 
-    WRITES(d, "Array size ");writed(d, a_size);
+    WRITES(d, "Array size ");writed(d, (unsigned)a_size);
     WRITES(d, ", uid: ");show_string(d, user ? user->name : "0", 0);
     WRITES(d, "\n");
     if (depth > 2)
@@ -1350,7 +1359,7 @@ show_array(int d, char *block, int depth)
             break;
 
         case T_NUMBER:
-            writed(d, svp->u.number);
+            writed(d, (unsigned)svp->u.number);
             WRITES(d, "\n");
             break;
 
@@ -1412,8 +1421,8 @@ setup_print_block_dispatcher (void)
     tmp_closure.type = T_CLOSURE;
     tmp_closure.x.closure_type = CLOSURE_EFUN + F_ADD - F_OFFSET;
     tmp_closure.u.ob = master_ob;
-    push_constant_string("");
-    push_constant_string("");
+    push_volatile_string("");
+    push_volatile_string("");
     call_lambda(&tmp_closure, 2);
     store_print_block_dispatch_info(inter_sp->u.string, show_added_string);
     free_svalue(inter_sp--);
@@ -1421,8 +1430,8 @@ setup_print_block_dispatcher (void)
     store_print_block_dispatch_info((char *)a, show_array);
     b = slice_array(a, 0, 0);
     store_print_block_dispatch_info((char *)b, show_array);
-    free_vector(a);
-    free_vector(b);
+    free_array(a);
+    free_array(b);
     store_print_block_dispatch_info((char *)master_ob, show_object);
 }
 #endif /* SMALLOC_TRACE */

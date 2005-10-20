@@ -8,6 +8,9 @@ DESCRIPTION
 	This efun can be used only to load blueprints - for clones, use
 	the efun clone_object().
 
+        If strict euids are enforced, the cloning object must have
+        a non-zero euid.
+
 EXAMPLE
 	// Update and reload the standard player object
 	destruct(find_object("/std/player"));

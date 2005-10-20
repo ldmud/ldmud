@@ -9,16 +9,19 @@ DESCRIPTION
 	If a closure is given, it is executed to return the error
 	message string, but not before all attempts to execute the
 	commandline failed (read: not at the time of the call to
-	notify_fail()).
+	notify_fail()). The closure receives as argument the original
+        commandgiver; usually it is identical to this_player(), unless
+        the modify_cmd hook changed that.
 	
-	If notify_fail() is called more than once, only the last call
-	will be used.
+        If notify_fail() is called more than once for this command, only the
+        last call will be used. However, calls to notify_fail() in nested
+        commands have no effect on this command.
 	
 	The idea of this function is to give better error messages
 	instead of simply 'What ?'.
 	
 	It is also better to use
-		notify_fail(message); return 0;
+		return notify_fail(message);
 	instead of
 		write(message); return 1;
 	
@@ -26,6 +29,10 @@ DESCRIPTION
 
 HISTORY
         Returntype changed in LDMud 3.2.6 from void to int.
+        Since LDMud 3.2.7, notify-fail settings are saved over nested
+        commands, and NPCs can see their notify-fail messages.
+
 
 SEE ALSO
-	add_action(E), query_verb(E)
+        add_action(E), query_verb(E), query_command(E), query_notify_fail(E),
+        hooks(C)

@@ -28,4 +28,4 @@ HISTORY
 
 SEE ALSO
 	clone_object(E), clonep(E), object_name(E), load_object(E),
-        replace_program(E), program_name(E)
+        replace_program(E), program_name(E), present_clone(E)

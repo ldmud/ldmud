@@ -7,6 +7,9 @@ for the one or other reason didn't make it into the driver proper (yet).
   diff by Ugh and Alfe
     A function to compute the distance between two strings.
 
+  ip6 (for 3.2.6) by Uwe
+    A first adaption of the driver for IPv6/Linux.
+
   misc
     Various efuns, partly for older drivers.
 

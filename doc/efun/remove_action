@@ -5,6 +5,8 @@ DESCRIPTION
 	Removes the action for the optional object, default is for
 	this_player().
 
+        Result is 0 if there was no action to remove, and non-0 otherwise.
+
 HISTORY
 	Introduced in 3.2.1
 

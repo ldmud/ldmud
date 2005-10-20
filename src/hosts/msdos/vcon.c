@@ -217,8 +217,8 @@ static int prev_history();
 
 static void walk_history()
 {
-  CHAR *ptr; 
-  
+  CHAR *ptr;
+
   ptr = history_buffer + HISTORY_SHIFT;
   while(*ptr++);
   current_ptr -= ptr - history_buffer;
@@ -233,16 +233,16 @@ static void walk_history()
 
 static int next_history()
 {
-  CHAR *ptr; 
-  
+  CHAR *ptr;
+
   for(ptr = history_ptr;ptr < history_buffer + HISTORY_BUFFER && *ptr++;);
   if(ptr != history_buffer + HISTORY_BUFFER && *ptr) {
     history_ptr = ptr;
     return 1;
   }
   return 0;
-}  
- 
+}
+
 static int prev_history()
 {
   CHAR *ptr;
@@ -254,13 +254,13 @@ static int prev_history()
     }
     while(flag--);
     if(ptr != history_end) ptr++;
-    if(*ptr) { 
+    if(*ptr) {
       history_ptr = ptr;
       return 1;
     }
   }
   return 0;
-}  
+}
 
 static void show_history()
 {
@@ -292,7 +292,7 @@ static void clean_history()
   while(ptr < cmd) {
     while(*ptr++ == *cmd++) {
       if(!*ptr && !*cmd) {
-        ptr2 = ptr; 
+        ptr2 = ptr;
         while(ptr > history_buffer && *--ptr);
         while(ptr > history_buffer) *--ptr2 = *--ptr;
         history_end = ptr2;
@@ -309,7 +309,7 @@ static void clean_history()
 
 static void insert_history()
 {
-  CHAR *ptr, ch; 
+  CHAR *ptr, ch;
 
   ptr = history_ptr;
   reset_page();
@@ -317,21 +317,21 @@ static void insert_history()
     beep();
   }
   else {
-    for(;(ch = *ptr & 0xff) && ch != CTRL_J; ptr++) { 
+    for(;(ch = *ptr & 0xff) && ch != CTRL_J; ptr++) {
       *queue_end++ = ch;
-      if(queue_end - kbd_queue == KBD_QUEUE) { 
+      if(queue_end - kbd_queue == KBD_QUEUE) {
         beep(); beep();
         break;
       }
     }
   }
-}  
+}
 
 static void append_history(key)
 int key;
 {
   if(current_ptr == history_buffer + HISTORY_BUFFER - 1) walk_history();
-  
+
   if(IS_PRINT(key) || key == TAB)
     key |= FG_G | FG_R | FG_B | FG_I;
   else if(current_ptr == history_buffer || *(current_ptr-1) == 0)
@@ -346,7 +346,7 @@ int key;
   }
 }
 
-    
+
 static void bs_history()
 {
   if(current_ptr == history_buffer) return;
@@ -398,7 +398,7 @@ static void scan_kbd()
                 case Home: case End:
                     page(key);
                     break;
-                case CrsrRt: 
+                case CrsrRt:
                     if (!next_history())
                         beep();
                     show_history();
@@ -552,7 +552,7 @@ static int vc_write2(int vcon, char *msg, int len)
 static int vc_write(int vcon, char ch)
 {
     switch (ch) {
-        case '\n': 
+        case '\n':
             dsp_crlf(vcon);
             break;
         case '\t':
@@ -604,7 +604,7 @@ static int vc_read(int vcon, char *data, int length)
                 case  BS:
                     strcpy(tmp, "\b \b");
                     break;
-                default: 
+                default:
                     if (!IS_PRINT(key) && key != ESC && key != CTRL_G) {
                         sprintf(tmp, "<%d>", key);
                     }
@@ -754,7 +754,7 @@ char *color;
       case 'g':
        attrib |= FG_G;
       break;
-      
+
       case 'b':
        attrib |= FG_B;
       break;
@@ -766,12 +766,12 @@ char *color;
       case 'G':
        attrib |= BG_G;
       break;
-      
+
       case 'B':
        attrib |= BG_B;
       break;
 
-      case 'i': 
+      case 'i':
        attrib |= FG_I;
       break;
 
@@ -791,7 +791,7 @@ char *color;
 static void init_display(int vcon)
 {
     char mono[] = "mono";
-  
+
     if (getenv("MUD_MODE") != NULL && strcmp(getenv("MUD_MODE"), mono) == 0) {
         video_address = 0xb0000UL;
         console[vcon].color = 0x0700;
@@ -823,7 +823,7 @@ static void init_buffers()
         console[con].connected = console[con].ready = console[con].x = 0;
         console[con].top = console[con].screen = console[con].buffer;
         console[con].end = console[con].buffer + PAGE1;
-        init_display(con);  
+        init_display(con);
         for (i = 0; i < BUFFER; i++) {
             console[con].buffer[i] = (SPACE | console[con].color);
         }
@@ -835,7 +835,7 @@ static void init_buffers()
 }
 
 
-static void shift_buffer(int vcon) 
+static void shift_buffer(int vcon)
 {
   int i;
 
@@ -843,7 +843,7 @@ static void shift_buffer(int vcon)
     for (i = 0; i + SHIFT < BUFFER && console[vcon].buffer[i+SHIFT]; i++) {
       console[vcon].buffer[i] = console[vcon].buffer[i+SHIFT];
     }
-    while(i < BUFFER) 
+    while(i < BUFFER)
       console[vcon].buffer[i++] = ((SPACE & 0xff) | console[vcon].color);
     console[vcon].end -= SHIFT;
     console[vcon].top = console[vcon].end - PAGE2;
@@ -878,7 +878,7 @@ static int scrolling() {
 
 static void dsp_crlf(int vcon)
 {
-  if (!console[vcon].line_buffer[0]) { 
+  if (!console[vcon].line_buffer[0]) {
     console[vcon].line_buffer[0] = (SPACE | console[vcon].color);
   }
   append_buffer(vcon, console[vcon].line_buffer);
@@ -887,13 +887,13 @@ static void dsp_crlf(int vcon)
     if (!scrolling())
       display_screen(vcon);
   }
-} 
+}
 
 
 static void dsp_bs(con)
 int con;
 {
-  if (!console[con].x) { 
+  if (!console[con].x) {
     beep();
     return;
   }
@@ -923,7 +923,7 @@ int con;
 {
     int i;
     CHAR buf[LINE_BUFFER];
-    
+
     for (i = 0; i < LINE_BUFFER && console[con].line_buffer[i]; i++) {
         buf[i] = console[con].line_buffer[i];
     }
@@ -945,8 +945,8 @@ int con;
   status(con,((console[con].connected) ? "CONNECTED" : "AVAILABLE"),0);
 }
 
-   
-static void clear_line_buffer(con) 
+
+static void clear_line_buffer(con)
 int con;
 {
   int i = LINE_BUFFER;
@@ -1070,9 +1070,9 @@ CHAR *ptr;
     }
   }
 }
-   
 
-static void ansi_color(con,attrib) 
+
+static void ansi_color(con,attrib)
 int con;
 CHAR attrib;
 {
@@ -1091,7 +1091,7 @@ CHAR attrib;
        console[con].color |= FG_I;
      }
       break;
-      
+
       /* FAINT */
       case 2:
      console[con].color &= ~FG_I;
@@ -1118,7 +1118,7 @@ CHAR attrib;
      console[con].color = ~console[con].color;
      console[con].color &= ~BLINK;
       break;
-     
+
       /* foreground *
       case 30: /* black */
      console[con].color &= ~FG_R & ~FG_G & ~FG_B;
@@ -1214,7 +1214,7 @@ CHAR color;
         buf[i] = SPACE | color;
     dosmemput(buf, PAGE1*2, video_address);
 }
-  
+
 
 /* display buffer */
 
@@ -1266,7 +1266,7 @@ short int *st_name;
   for (walk = 0; msg[walk]; walk++) {
       ScreenPutChar(msg[walk],bar_attrib,walk,STATUS_LINE);
   }
-  while(walk < WIDTH) { 
+  while(walk < WIDTH) {
     ScreenPutChar(SPACE,bar_attrib,walk++,STATUS_LINE);
   }
 }
@@ -1275,7 +1275,7 @@ short int *st_name;
 /**************************************************************************/
 /* help */
 
-static void show_help() 
+static void show_help()
 {
   int attrib, i, x_pos, y_pos;
   char help[] = \
@@ -1335,13 +1335,13 @@ CHAR key;
                 ptr -= PAGE1;
             break;
 
-        case CrsrUp: 
+        case CrsrUp:
             if (ptr - WIDTH < console[current].buffer)
                 ptr = console[current].buffer;
             else
                 ptr -= WIDTH;
             break;
-    
+
         case PgDn:
             if (ptr + PAGE1 > console[current].top)
                 ptr = console[current].top;
@@ -1349,7 +1349,7 @@ CHAR key;
                 ptr += PAGE1;
             break;
 
-        case CrsrDn: 
+        case CrsrDn:
             if (ptr + WIDTH > console[current].top)
                 ptr = console[current].top;
             else
@@ -1410,17 +1410,17 @@ void toggle_video_mode()
     mode_to_set = mode;
 
     if (mode == C4350)
-        /* 
-         * just set mode 3 and load 8x8 font, idea taken 
+        /*
+         * just set mode 3 and load 8x8 font, idea taken
          * (and code translated from Assembler to C)
          * form Csaba Biegels stdvga.asm
          */
-      mode_to_set = 0x03;  
+      mode_to_set = 0x03;
     regs.h.ah = 0x00; /* set mode */
     regs.h.al = mode_to_set;
     int86(0x10, &regs, &regs);
 
-   /* 
+   /*
     * enable cursor size emulation, see Ralf Browns
     * interrupt list
     */
@@ -1428,12 +1428,12 @@ void toggle_video_mode()
     regs.h.bl = 0x34;
     regs.h.al = 0x00; /* 0: enable (1: disable) */
     int86(0x10, &regs, &regs);
-    if (mode == C4350) 
+    if (mode == C4350)
     {
       /* load 8x8 font */
-      regs.x.ax = 0x1112;         
+      regs.x.ax = 0x1112;
       regs.x.bx = 0;
       int86(0x10, &regs, &regs);
     }
     display_screen(current);
-}    
+}

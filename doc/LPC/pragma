@@ -27,6 +27,13 @@ DESCRIPTION
 	verbose_errors: upon a compilation error, the driver displays
 		the actual context of the errorenous text. This is
 		helpful with errors within long expressions.
+        no_local_scopes, local_scopes: when local scoping is turned
+                off, local variables are visible even outside
+                their defining blocks. The setting of this pragma is
+                considered upon entry into a function only. By default,
+                local scoping is on.
+        local_scopes: local variables are visible only inside their
+                defining blocks.
 	
 	When an object is compiled with type testing (#pragma
 	strict_types), all types are saved of the arguments for that

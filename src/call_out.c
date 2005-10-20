@@ -19,12 +19,16 @@
  * overhead.
  *
  * TODO: The CHUNKed allocation would be nice to have as generic module.
+ * TODO: It would be nice if the callout would store from where the
+ * TODO:: callout originated and fake a control-stack entry for a proper
+ * TODO:: traceback. However, this has to take swapping into account.
  *---------------------------------------------------------------------------
  */
 
 #include "driver.h"
 
 #include "call_out.h"
+#include "actions.h"
 #include "array.h"
 #include "backend.h"
 #include "closure.h"
@@ -36,6 +40,8 @@
 #include "object.h"
 #include "simulate.h"
 #include "stralloc.h"
+#include "strfuns.h"
+#include "swap.h"
 #include "wiz_list.h"
 
 /*-------------------------------------------------------------------------*/
@@ -46,7 +52,7 @@
    */
 
 struct call {
-    int delta;           /* Delay in relation to the previous structure */
+    /* TODO: p_int or mp_int */ int delta;           /* Delay in relation to the previous structure */
     union {              /* The function to call */
         struct {
             char          *name;  /* a shared string */
@@ -54,7 +60,7 @@ struct call {
         } named;
         struct svalue lambda;
     } function;
-    /* TODO: BOOL */ int is_lambda; /* Closure or named function? */
+    Bool is_lambda; /* Closure or named function? */
     struct svalue v;
       /* The argument value to pass to the function.
        * To pass several arguments, v is of type LVALUE,
@@ -160,7 +166,7 @@ free_used_call (struct call *cop)
 
 /*-------------------------------------------------------------------------*/
 struct svalue *
-new_call_out (struct svalue *sp, int num_arg)
+new_call_out (struct svalue *sp, short num_arg)
 
 /* EFUN: call_out()
  *
@@ -216,8 +222,7 @@ new_call_out (struct svalue *sp, int num_arg)
             arg[0].u.string = cop->function.named.name;
             arg[0].x.string_type = STRING_SHARED;
         }
-        cop->function.named.ob = ob = current_object;
-        add_ref(ob, "call_out");
+        cop->function.named.ob = ob = ref_object(current_object, "call_out");
         cop->is_lambda = MY_FALSE;
     }
     else if(arg[0].type == T_CLOSURE && CLOSURE_CALLABLE(arg->x.closure_type))
@@ -248,7 +253,7 @@ new_call_out (struct svalue *sp, int num_arg)
         if (!cop->is_lambda)
         {
             /* ref count was incremented above */
-            current_object->ref--;
+            deref_object(current_object, "new_call_out");
         }
         do
         {
@@ -266,7 +271,7 @@ new_call_out (struct svalue *sp, int num_arg)
     call_list_free = cop->next;
     cop->command_giver = command_giver; /* save current player context */
     if (command_giver)
-        add_ref(command_giver, "new_call_out");  /* Bump its ref */
+        ref_object(command_giver, "new_call_out");  /* Bump its ref */
 
     if (num_arg > 1)
     {
@@ -288,8 +293,7 @@ new_call_out (struct svalue *sp, int num_arg)
             if (w->type == T_LVALUE)
             {
                 free_svalue(w);
-                w->type = T_NUMBER;
-                w->u.number = 0;
+                put_number(w, 0);
             }
             transfer_svalue_no_free(v++, w++);
         } while (--num_arg);
@@ -305,16 +309,14 @@ new_call_out (struct svalue *sp, int num_arg)
         else
         {
             free_svalue(&arg[2]);
-            cop->v.type = T_NUMBER;
-            cop->v.u.number = 0;
+            put_number(&(cop->v), 0);
         }
     }
     else
     {
         /* Use the 'no argument' argument */
 
-        cop->v.type = T_OBJECT;
-        cop->v.u.ob = &call_out_nil_object;
+        put_object(&(cop->v), &call_out_nil_object);
     }
 
     /* Adjust the stack and get the delay */
@@ -336,7 +338,10 @@ new_call_out (struct svalue *sp, int num_arg)
             *copp = cop;
             return sp;
         }
-        delay -= delta;
+        delay -= (delta >= 0 ? delta : 0);
+          /* Especially when called from within a call_out, delta may be
+           * negative.
+           */
     }
     *copp = cop;
     cop->delta = delay;
@@ -387,9 +392,9 @@ call_out (void)
 
     /* Activate the local error recovery context */
 
-    error_recovery_info.last = error_recovery_pointer;
-    error_recovery_info.type = ERROR_RECOVERY_BACKEND;
-    error_recovery_pointer = &error_recovery_info;
+    error_recovery_info.rt.last = rt_context;
+    error_recovery_info.rt.type = ERROR_RECOVERY_BACKEND;
+    rt_context = (rt_context_t *)&error_recovery_info;
 
     if (setjmp(error_recovery_info.con.text))
     {
@@ -545,8 +550,7 @@ call_out (void)
                 {
                     sp++;
                     free_object(ob, "call_out");
-                    sp->type = T_NUMBER;
-                    sp->u.number = 0;
+                    put_number(sp, 0);
                     v++;
                 }
                 else
@@ -579,15 +583,11 @@ call_out (void)
                     else
                     {
                         free_object(ob, "call_out");
-                        sp->type = T_NUMBER;
-                        sp->u.number = 0;
+                        put_number(sp, 0);
                     }
                 }
                 else
-                {
-                    sp->type = T_OBJECT;
-                    sp->u.ob = ob;
-                }
+                    put_object(sp, ob);
             }
             else
             {
@@ -613,6 +613,8 @@ call_out (void)
             }
             else
             {
+                Bool dontcall = MY_FALSE;
+
                 current_object = ob;
                 user = ob->user;
                 if (user->last_call_out != current_time)
@@ -626,14 +628,29 @@ call_out (void)
                 }
                 if (cop->function.lambda.x.closure_type < CLOSURE_SIMUL_EFUN
                  && cop->function.lambda.x.closure_type >= CLOSURE_EFUN)
-                    current_prog = NULL;
-                    /* Setting current_prog to NULL is OK in this case since
-                     * there is no higher-level program from which this
-                     * closure is called.
+                {
+                    /* efun, operator or sefun closure: we need the program
+                     * for a proper traceback
                      */
-                call_lambda(&cop->function.lambda, num_arg);
-                user->call_out_cost = eval_cost;
-                free_svalue(sp);
+                    if (O_PROG_SWAPPED(ob)
+                     && load_ob_from_swap(ob) < 0)
+                    {
+                        debug_message("Error in call_out: out of memory.\n");
+                        dontcall = MY_TRUE;
+                    }
+                    current_prog = ob->prog;
+                }
+
+                if (!dontcall)
+                {
+                    RESET_LIMITS;
+                    call_lambda(&cop->function.lambda, num_arg);
+                    user->call_out_cost = eval_cost;
+                    free_svalue(sp);
+                }
+                else
+                    while (--num_arg >= 0)
+                        pop_stack();
             }
             free_closure(&cop->function.lambda);
         }
@@ -661,7 +678,8 @@ call_out (void)
                 {
                     assigned_eval_cost = eval_cost = user->call_out_cost;
                 }
-                sapply_int(cop->function.named.name, ob, num_arg, MY_TRUE);
+                RESET_LIMITS;
+                sapply(cop->function.named.name, ob, num_arg);
                 user->call_out_cost = eval_cost;
             }
             free_string(cop->function.named.name);
@@ -675,13 +693,13 @@ call_out (void)
     } /* while (callouts pending) */
 
     inter_sp = sp - 1;
-    error_recovery_pointer = error_recovery_info.last;
+    rt_context = error_recovery_info.rt.last;
 
 }
 
 /*-------------------------------------------------------------------------*/
 void
-find_call_out (struct object *ob, struct svalue *fun, /* TODO: BOOL */ int do_free_call)
+find_call_out (struct object *ob, struct svalue *fun, Bool do_free_call)
 
 /* Find the (first) callout for <ob>/<fun> (or <fun> if it is a closure).
  * If <do_free_call> is true, the found callout is removed.
@@ -743,12 +761,10 @@ find_call_out (struct object *ob, struct svalue *fun, /* TODO: BOOL */ int do_fr
                 /* FALLTHROUGH*/
 not_found:
                 free_svalue(fun);
-                fun->type = T_NUMBER;
-                fun->u.number = -1;
+                put_number(fun, -1);
                 return;
 found:
                 free_svalue(fun);
-                fun->type = T_NUMBER;
                 if (do_free_call)
                 {
                     if (cop->next)
@@ -761,7 +777,7 @@ found:
                  */
                 if (delay < 0)
                     delay = 0;
-                fun->u.number = delay;
+                put_number(fun, delay);
                 return;
             }
         }
@@ -782,7 +798,6 @@ found:
             xfree(fun->u.string);
     }
 
-    fun->type = T_NUMBER;
     for (copp = &call_list; NULL != (cop = *copp); copp = &cop->next)
     {
         delay += cop->delta;
@@ -800,17 +815,17 @@ found:
             }
             if (delay < 0)
                 delay = 0;
-            fun->u.number = delay;
+            put_number(fun, delay);
             return;
         }
     }
     free_string(fun_name);
-    fun->u.number = -1;
+    put_number(fun, -1);
 }
 
 /*-------------------------------------------------------------------------*/
-int
-print_call_out_usage (/* TODO: BOOL */ int verbose)
+size_t
+print_call_out_usage (strbuf_t *sbuf, Bool verbose)
 
 /* Compute and return the amount of memory used by callouts.
  * If <verbose> is true, write detailed statistics to the current user.
@@ -824,16 +839,16 @@ print_call_out_usage (/* TODO: BOOL */ int verbose)
         i++;
     if (verbose)
     {
-        add_message("\nCall out information:\n");
-        add_message("---------------------\n");
-        add_message("Number of allocated call outs: %8ld, %8ld bytes\n",
+        strbuf_add(sbuf, "\nCall out information:\n");
+        strbuf_add(sbuf,"---------------------\n");
+        strbuf_addf(sbuf, "Number of allocated call outs: %8ld, %8ld bytes\n",
                     num_call, num_call * sizeof (struct call));
-        add_message("Current length: %ld\n", i);
+        strbuf_addf(sbuf, "Current length: %ld\n", i);
     }
     else
     {
-        add_message("call out:\t\t\t%8ld %8ld (current length %ld)\n", num_call,
-                    num_call * sizeof (struct call), i);
+        strbuf_addf(sbuf, "call out:\t\t\t%8ld %8ld (current length %ld)\n"
+                   , num_call, num_call * sizeof (struct call), i);
     }
 
     return num_call * sizeof (struct call);
@@ -1014,7 +1029,6 @@ get_all_call_outs (void)
     for (i=0, cop = call_list; cop; cop = cop->next)
     {
         struct vector *vv;
-        char *function_name;
 
         next_time += cop->delta;
 
@@ -1039,17 +1053,11 @@ get_all_call_outs (void)
             ob = cop->function.named.ob;
             if (ob->flags & O_DESTRUCTED)
             {
-                free_vector(vv);
+                free_array(vv);
                 continue;
             }
-            vv->item[0].type = T_OBJECT;
-            vv->item[0].u.ob = ob;
-            add_ref(ob, "get_all_call_outs");
-            vv->item[1].type = T_STRING;
-            vv->item[1].x.string_type = STRING_SHARED;
-            function_name = cop->function.named.name;
-            increment_string_ref(function_name);
-            vv->item[1].u.string = function_name;
+            put_ref_object(vv->item, ob, "get_all_call_outs");
+            put_ref_string(vv->item + 1, cop->function.named.name);
         }
 
         vv->item[2].u.number = next_time;
@@ -1072,8 +1080,7 @@ get_all_call_outs (void)
             assign_svalue_no_free(&vv->item[3], &cop->v);
         }
 
-        v->item[i].type = T_POINTER;
-        v->item[i].u.vec = vv;        /* Ref count is already 1 */
+        put_array(v->item + i, vv);
         i++;
     }
 

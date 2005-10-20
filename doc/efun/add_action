@@ -58,4 +58,4 @@ HISTORY
 	The flag==2 argument is supported since 3.2@127
 
 SEE ALSO
-	query_verb(E), add_verb(E), add_xverb(E), init(A)
+	query_verb(E), query_command(E), add_verb(E), add_xverb(E), init(A)

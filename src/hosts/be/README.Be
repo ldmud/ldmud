@@ -12,6 +12,11 @@ The rehost is complete except for one thing: ERQs must be started
 manually and then connect to the gamedriver, the driver can't
 start them on his own.
 
+To run the driver, your machine must have a hostname, even if it is not
+connected to any network. To give your machine a hostname, open the Network
+preferences and enter one. After a reboot this name is active, you can check
+it by entering the command 'echo $HOSTNAME' in the Terminal.
+
 Recompilation
 -------------
   To recompile the gamedriver, copy the files machine.h, config.h
@@ -31,8 +36,9 @@ Known Bugs
     endless mapping or array loops), the driver might crash due to
     exhausted stack space before the internal safeguard of sprintf()
     can stop him.
+  - Dito when using deeply nested function calls between objects.
 
 
 Share and enjoy!
 
-  Lars Duening (lars@cableinet.co.uk)
+  Lars Duening (lars@bearnip.com)

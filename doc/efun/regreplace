@@ -37,7 +37,7 @@ AUTHOR
 	Marcus@TAPPMud contributed the efun and the man page
 	
 SEE ALSO
-	regexp(E), regexplode(E), sscanf(E)
+	regexp(E), regexplode(E), sscanf(E), trim(E)
 
 
 

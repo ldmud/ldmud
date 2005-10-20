@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
 #endif
     while(1) {
         fd_set read_fds, write_fds;
-        int num_fds, fd;
+        int num_fds;
         struct child_s *chp, **chpp;
         struct retry_s *rtp, **rtpp;
         struct socket_s *sp;
@@ -182,10 +182,10 @@ void erq_cmd()
         char *mesg, *mesgs[]={
             "rlookup","fork","auth","execute","spawn","send","kill",
             "open_udp","open_tcp","listen","accept","lookup"};
-        mesg=mesgs[request];
+        mesg=mesgs[(int)request];
         fprintf(stderr, "command: %s\n", mesg);
 #endif
-        (*erq_table[request])(buf, mesg_len);
+        (*erq_table[(int)request])(buf, mesg_len);
     } else bad_request(buf);
 }
 
@@ -319,6 +319,23 @@ void reply_errno(int32 handle)
     return;
 }
 
+int writen(int fd, char *mesg, int len, struct queue_s **qpp)
+{
+    int l=0;
+    if (!(*qpp)) {
+        do
+          l=write(fd, mesg, len);
+        while (l==-1 && errno==EINTR);
+        if (l<0 || l==len) return l;
+        mesg+=l;
+        len-=l;
+    }
+    if (!len)
+        return 0;
+    add_to_queue(qpp, mesg, len);
+    return l;
+}
+
 void write1(char *mesg, int len)
 {
     int l;
@@ -332,20 +349,4 @@ void write1(char *mesg, int len)
     if (l!=len) fprintf(stderr,
         "Driver-erq socket blocked, queueing %d bytes\n", len);
 #endif
-}
-
-int writen(int fd, char *mesg, int len, struct queue_s **qpp)
-{
-    int l=0;
-    if (!(*qpp)) {
-        do
-          l=write(fd, mesg, len);
-        while (l==-1 && errno==EINTR);
-        if (l<0 || l==len) return l;
-        mesg+=l;
-        len-=l;
-    }
-    if (!len) return;
-    add_to_queue(qpp, mesg, len);
-    return l;
 }

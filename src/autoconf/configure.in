@@ -1,7 +1,297 @@
+dnl ##define([AC_CACHE_LOAD], )dnl
+dnl---------------------------------------------------------------------------
+dnl configure-script template
+dnl
+dnl---------------------------------------------------------------------------
+dnl TODO: allow the use of hosts/<foo>/machine.h.in resp Makefile.in
+dnl TODO:: when existing instead of the normal ones.
+
+dnl
+dnl some helper macros
+dnl
+
+AC_DEFUN(AC_UPDATE_VAR,
+if test "x$[$1]" = "x" && test "x$DEFAULT[$1]" != "x"; then
+  [$1]=$DEFAULT[$1]
+fi
+)
+
+AC_DEFUN(AC_CDEF_FROM_ENABLE,
+AC_UPDATE_VAR(enable_[$1])
+if test "x$enable_[$1]" = "xyes"; then
+  cdef_[$1]="#define"
+else
+  cdef_[$1]="#undef"
+fi
+)
+
+AC_DEFUN(AC_INT_VAL_FROM_WITH,
+[if test "x$with_[$1]" != "x"; then
+  with_[$1]=`echo $with_[$1]|
+changequote(, )dnl
+             sed -e 's/^\(-\?\(0x[0-9a-fA-F]\+\)\?[0-9]*\)[^0-9]\?.*$/\1/'`
+changequote([, ])dnl
+fi
+AC_UPDATE_VAR(with_[$1])
+val_[$1]=$with_[$1]]
+)
+
+AC_DEFUN(AC_STRING_VAL_FROM_WITH,
+[if test "x$with_[$1]" != "x"; then
+  with_[$1]=`echo $with_[$1]|
+changequote(, )dnl
+             sed -e 's/^\([^"]*\)\?.*$/\1/'`
+changequote([, ])dnl
+fi
+AC_UPDATE_VAR(with_[$1])
+val_[$1]="\"$with_[$1]\""]
+)
+
+AC_DEFUN(AC_FORM_HELP,[  --$1[]dnl
+ifelse([$2],,,dnl
+builtin(format,%[]builtin(eval,(len([$1])<32)*(32-len([$1])))s,)  [default=$2])[]dnl
+ifelse([$3],,,[
+]patsubst([$3],[^],[        ]))[]dnl
+])
+
+
+AC_DEFUN(AC_MY_ARG_ENABLE,
+[DEFAULTenable_[]translit([$1],[-],[_])=ifelse($2,,no,[$2])
+AC_ARG_ENABLE([$1],AC_FORM_HELP([enable-$1]ifelse($3,,,[=($3)]),
+ifelse([$2],,[disabled],[$2],no,[disabled],[$2],yes,[enabled],[enabled($2)]),
+[$4]),[$5],[$6])
+])
+
+AC_DEFUN(AC_MY_ARG_WITH,
+[DEFAULTwith_[]translit([$1],[-],[_])=ifelse($2,,no,[$2])
+AC_ARG_WITH([$1],AC_FORM_HELP([with-$1]ifelse($3,,[=VALUE],[=$3]),
+[$2],
+[$4]),[$5],[$6])
+])
+
+dnl
+dnl let's start
 AC_INIT(prolang.y)
+
+dnl set the default prefix
+AC_PREFIX_DEFAULT(/usr/local/mud)
+
+dnl
+dnl define default values for package arguments
+dnl and declare the package arguments
+dnl
+
+AC_MY_ARG_ENABLE(erq,erq,[no/erq/xerq],[Enables and or selects ERQ demon])
+AC_MY_ARG_ENABLE(access-control,yes,,)
+AC_MY_ARG_ENABLE(access-log,no,,)
+AC_MY_ARG_ENABLE(align-functions,yes,,)
+AC_MY_ARG_ENABLE(compat-mode,no,,)
+AC_MY_ARG_ENABLE(strict-euids,no,,)
+AC_MY_ARG_ENABLE(supply-parse-command,yes,,)
+AC_MY_ARG_ENABLE(initialization-by-__init,yes,,)
+AC_MY_ARG_ENABLE(udp-send,yes,,)
+AC_MY_ARG_ENABLE(comm-stat,yes,,)
+AC_MY_ARG_ENABLE(apply-cache_stat,yes,,)
+AC_MY_ARG_ENABLE(smalloc-trace,no,,)
+AC_MY_ARG_ENABLE(smalloc-lpc-trace,no,,)
+AC_MY_ARG_ENABLE(max-malloced,yes,,)
+AC_MY_ARG_ENABLE(min-malloced,no,,)
+AC_MY_ARG_ENABLE(dynamic-costs,no,,)
+
+AC_MY_ARG_ENABLE(catch-udp-port,yes,,)
+AC_MY_ARG_ENABLE(rxcache_table,yes,,)
+
+AC_MY_ARG_WITH(access-file,ACCESS.ALLOW,,[access permissions file])
+AC_MY_ARG_WITH(access-log,access.allow.log,,[access log file])
+
+AC_MY_ARG_WITH(erq-max-reply,1024,,)
+AC_MY_ARG_WITH(erq-max-send,1024,,)
+
+AC_MY_ARG_WITH(max-log-size,50000,[BYTES],[maximum size of log files])
+AC_MY_ARG_WITH(read-file-max-size,50000,[BYTES],
+  [maximum size of a file allowed to be read by 'read_file()'])
+
+AC_MY_ARG_WITH(master-name,secure/master,,[name of the master object])
+AC_MY_ARG_WITH(time-to-clean_up,3600,[SECONDS],)
+AC_MY_ARG_WITH(time-to-swap,900,[SECONDS],)
+AC_MY_ARG_WITH(time-to-swap-variables,1800,[SECONDS],)
+AC_MY_ARG_WITH(time-to-reset,1800,[SECONDS],)
+AC_MY_ARG_WITH(evaluator-stack-size,2000,,)
+AC_MY_ARG_WITH(max-user-trace,60,,)
+AC_MY_ARG_WITH(max-trace,65,,)
+AC_MY_ARG_WITH(compiler-stack-size,400,,)
+AC_MY_ARG_WITH(max-bits,6144,,)
+AC_MY_ARG_WITH(portno,4242,,)
+AC_MY_ARG_WITH(maxnumports,20,,)
+AC_MY_ARG_WITH(max-cost,1000000,,)
+AC_MY_ARG_WITH(catch-reserved-cost,2000,,)
+AC_MY_ARG_WITH(master-reserved-cost,0x200,,)
+AC_MY_ARG_WITH(swap-file,LP_SWAP.3,,[name of the swap file])
+AC_MY_ARG_WITH(max-array-size,3000,,)
+AC_MY_ARG_WITH(max-mapping-size,5000,,)
+AC_MY_ARG_WITH(max-players,50,,)
+AC_MY_ARG_WITH(max-local,50,,)
+AC_MY_ARG_WITH(allowed-ed-cmds,20,,[number of ed commands per backend cycle])
+AC_MY_ARG_WITH(reserved-user-size,700000,,)
+AC_MY_ARG_WITH(reserved-master-size,100000,,)
+AC_MY_ARG_WITH(reserved-system-size,200000,,)
+AC_MY_ARG_WITH(htable-size,4096,,)
+AC_MY_ARG_WITH(itable-size,256,,)
+AC_MY_ARG_WITH(otable-size,1024,,)
+AC_MY_ARG_WITH(defmax,65000,,)
+AC_MY_ARG_WITH(apply-cache-bits,12,,)
+AC_MY_ARG_WITH(rxcache-table,16384,,)
+AC_MY_ARG_WITH(max-byte-transfer,50000,,)
+AC_MY_ARG_WITH(catch-udp-port,4246,,)
+AC_MY_ARG_WITH(set-buffer-size-max,65536,,)
+AC_MY_ARG_WITH(min-malloced,0x1000000,,)
+AC_MY_ARG_WITH(max-malloced,0x4000000,,)
+AC_MY_ARG_WITH(max-small-malloced,0x1000000,,)
+AC_MY_ARG_WITH(total-trace-length,0x1000,,)
+
+AC_ARG_WITH(setting,[  --with-setting=SETTING  include a predefined setting],[
+if test -f "settings/$withval" ; then
+cat >conftest.sed <<\EOF
+/^#.*/ d
+/^[[ \t]]*$/ d
+s/disable_\([[^= \t]]*\)/enable_\1=no/
+/^enable_/ s/^/DEFAULT/p
+/^with_/ s/^/DEFAULT/p
+[]
+EOF
+eval `sed -n -f conftest.sed <settings/$withval`
+rm conftest.sed
+else
+AC_MSG_ERROR(Setting \"$withval\" not available)
+fi
+])
+
+dnl
+dnl process package arguments
+dnl (here the variable names are used; with a "_" instead of a dash "-" !)
+dnl
+
+AC_UPDATE_VAR(enable_erq)
+if test "x$enable_erq" = "xerq" || test "x$enable_erq" = "xyes"; then
+  cdef_erq_demon="#define"
+  erq_sub=erq
+  AC_DEFINE(ERQ_INCLUDE,"util/erq/erq.h")
+elif test "x$enable_erq" = "xxerq"; then
+  cdef_erq_demon="#define"
+  erq_sub=xerq
+  AC_DEFINE(ERQ_INCLUDE,"util/xerq/erq.h")
+else
+  cdef_erq_demon="#undef"
+  erq_sub=
+fi
+
+AC_CDEF_FROM_ENABLE(access_control)
+AC_CDEF_FROM_ENABLE(access_log)
+AC_CDEF_FROM_ENABLE(align_functions)
+AC_CDEF_FROM_ENABLE(compat_mode)
+AC_CDEF_FROM_ENABLE(strict_euids)
+AC_CDEF_FROM_ENABLE(supply_parse_command)
+AC_CDEF_FROM_ENABLE(initialization_by___init)
+AC_CDEF_FROM_ENABLE(udp_send)
+AC_CDEF_FROM_ENABLE(comm_stat)
+AC_CDEF_FROM_ENABLE(apply_cache_stat)
+AC_CDEF_FROM_ENABLE(smalloc_trace)
+AC_CDEF_FROM_ENABLE(smalloc_lpc_trace)
+AC_CDEF_FROM_ENABLE(max_malloced)
+AC_CDEF_FROM_ENABLE(min_malloced)
+AC_CDEF_FROM_ENABLE(dynamic_costs)
+
+AC_CDEF_FROM_ENABLE(catch_udp_port)
+AC_CDEF_FROM_ENABLE(rxcache_table)
+
+AC_STRING_VAL_FROM_WITH(access_file)
+AC_STRING_VAL_FROM_WITH(access_log)
+AC_STRING_VAL_FROM_WITH(swap_file)
+AC_STRING_VAL_FROM_WITH(master_name)
+
+AC_INT_VAL_FROM_WITH(erq_max_reply)
+AC_INT_VAL_FROM_WITH(erq_max_send)
+AC_INT_VAL_FROM_WITH(max_log_size)
+AC_INT_VAL_FROM_WITH(read_file_max_size)
+AC_INT_VAL_FROM_WITH(time_to_clean_up)
+AC_INT_VAL_FROM_WITH(time_to_swap)
+AC_INT_VAL_FROM_WITH(time_to_swap_variables)
+AC_INT_VAL_FROM_WITH(time_to_reset)
+AC_INT_VAL_FROM_WITH(evaluator_stack_size)
+AC_INT_VAL_FROM_WITH(max_user_trace)
+AC_INT_VAL_FROM_WITH(max_trace)
+AC_INT_VAL_FROM_WITH(compiler_stack_size)
+AC_INT_VAL_FROM_WITH(max_bits)
+AC_INT_VAL_FROM_WITH(portno)
+AC_INT_VAL_FROM_WITH(maxnumports)
+AC_INT_VAL_FROM_WITH(max_cost)
+AC_INT_VAL_FROM_WITH(catch_reserved_cost)
+AC_INT_VAL_FROM_WITH(master_reserved_cost)
+AC_INT_VAL_FROM_WITH(max_array_size)
+AC_INT_VAL_FROM_WITH(max_mapping_size)
+AC_INT_VAL_FROM_WITH(max_players)
+AC_INT_VAL_FROM_WITH(max_local)
+AC_INT_VAL_FROM_WITH(allowed_ed_cmds)
+AC_INT_VAL_FROM_WITH(reserved_user_size)
+AC_INT_VAL_FROM_WITH(reserved_master_size)
+AC_INT_VAL_FROM_WITH(reserved_system_size)
+AC_INT_VAL_FROM_WITH(htable_size)
+AC_INT_VAL_FROM_WITH(itable_size)
+AC_INT_VAL_FROM_WITH(otable_size)
+AC_INT_VAL_FROM_WITH(defmax)
+AC_INT_VAL_FROM_WITH(apply_cache_bits)
+AC_INT_VAL_FROM_WITH(rxcache_table)
+AC_INT_VAL_FROM_WITH(max_byte_transfer)
+AC_INT_VAL_FROM_WITH(catch_udp_port)
+AC_INT_VAL_FROM_WITH(set_buffer_size_max)
+AC_INT_VAL_FROM_WITH(min_malloced)
+AC_INT_VAL_FROM_WITH(max_malloced)
+AC_INT_VAL_FROM_WITH(max_small_malloced)
+AC_INT_VAL_FROM_WITH(total_trace_length)
+
+if test "x$cdef_access_control" = "x#undef"; then
+  cdef_access_log="#undef"
+  val_access_log=
+fi
+
+if test "x$cdef_access_log" = "x#undef"; then
+  val_access_log=
+fi
+
+if test "x$cdef_catch_udp_port" = "x#undef"; then
+  val_catch_udp_port=
+fi
+
+if test "x$cdef_min_malloced" = "x#undef"; then
+  val_min_malloced=
+fi
+
+if test "x$cdef_max_malloced" = "x#undef"; then
+  val_max_malloced=
+  val_max_small_malloced=
+fi
+
+if test "x$cdef_rxcache_table" = "x#undef"; then
+  val_rxcache_table=
+fi
+
+
+dnl
+dnl select a C-Compiler
+dnl
 AC_PROG_CC
-AC_COMPILE_CHECK(["gcc/assembler float/branch incompatibility, e.g. on AIX"],
-[int foo(), bar(), foobar();
+
+# The newer versions of gcc/egcs running on SunOS fall into catatonia when
+# asked to compile this test with any optimisation. To be able to run
+# configure at all, we fudge the CFLAGS a bit.
+
+save_cflags=$CFLAGS
+echo "For this test, I use '-g' instead of '$CFLAGS' as compiler flags."
+CFLAGS="-g"
+
+AC_CACHE_CHECK([gcc/assembler float/branch incompatibility, e.g. on AIX],
+lp_cv_sys_float_branch_incompatible,
+AC_TRY_LINK([int foo(), bar(), foobar();
 #define x1 foobar();
 #define x4 x1 x1 x1 x1
 #define x10 x4 x4 x4 x4
@@ -21,62 +311,106 @@ int foo(){ return 0; }
 int bar(){ return 0; }
 int foobar(){ return 0; }
 double d = 4.5;],
-[double e = 1.3; e/= 0.2;],,
-echo "falling back to cc"
-CC="cc"
-GCC=""
+[double e = 1.3; e/= 0.2;],
+lp_cv_sys_float_branch_incompatible=no,
+lp_cv_sys_float_branch_incompatible=yes
+))
+if test $lp_cv_sys_float_branch_incompatible = yes ; then
+  CC="cc"
+  GCC=""
+  AC_MSG_WARN(falling back to cc)
+fi
+
+# Restore the CFLAGS
+CFLAGS=$save_cflags
+
+dnl check for ANSI-C  (for compiling LDMUD project)
+dnl TODO: check for 'c89' if CC="cc" and 'cc' not ANSI-C
+dnl
+AC_TRY_COMPILE([
+#ifndef __STDC__
+#error need STDC
+guarantee an compiling error here...
+#endif
+],,
+:,
+AC_MSG_ERROR(You need an ANSI-C compiler! sorry..)
 )
+
+
+dnl Checking for programs and headers
+
 AC_PROG_INSTALL
 AC_CONFIG_HEADER(machine.h)
 dnl bison -y is incompatible in functionality & Copyright
-AC_PROGRAMS_CHECK(YACC, byacc, yacc)
+dnl (Mubo: copyright changed, this should no longer be a problem, but...)
+AC_CHECK_PROGS(YACC, byacc, yacc)
 AC_PROG_CPP
-AC_HAVE_HEADERS(sys/rusage.h sys/time.h unistd.h stdlib.h libc.h memory.h)
-AC_HAVE_HEADERS(values.h string.h bstring.h netdb.h crypt.h sys/param.h sys/termios.h)
-AC_STDC_HEADERS
-AC_DIR_HEADER
-AC_COMPILE_CHECK(["sizeof(char *) == 4"],
-[int i = 8/(sizeof(char *) - 4);],,
-  AC_COMPILE_CHECK(["sizeof(char *) == 8"],
-  [int i = 8/(sizeof(char *) - 8);],,
-  ,AC_DEFINE(SIZEOF_P_INT, 8))
-,AC_DEFINE(SIZEOF_P_INT, 4))
-AC_COMPILE_CHECK(["sizeof(int) == 2"],
-[int i = 8/(sizeof(int) - 2);],
-, AC_DEFINE(SIZEOF_INT, 4) ,AC_DEFINE(SIZEOF_INT, 2))
-AC_COMPILE_CHECK(["sizeof(long) == 8"],
-[int i = 8/(sizeof(long) - 8);],
-, AC_DEFINE(SIZEOF_LONG, 4),AC_DEFINE(SIZEOF_LONG, 8))
-AC_COMPILE_CHECK(["needed malloc() alignment"],
-[struct ts {double d; char *p; double e;};
+AC_CHECK_HEADERS(sys/rusage.h sys/time.h unistd.h stdlib.h libc.h memory.h)
+AC_CHECK_HEADERS(values.h string.h bstring.h netdb.h crypt.h sys/param.h sys/termios.h)
+AC_HEADER_STDC
+dnl extra check for <limits.h>; must be there!
+AC_CHECK_HEADERS(limits.h)
+AC_HEADER_DIRENT
+
+AC_CHECK_SIZEOF(char *)
+AC_CHECK_SIZEOF(int)
+AC_CHECK_SIZEOF(short)
+AC_CHECK_SIZEOF(long)
+
+AC_CACHE_CHECK(for needed malloc() alignment,lp_cv_sys_malloc_align,
+AC_TRY_COMPILE([struct ts {double d; char *p; double e;};
 int i = 96/(sizeof(struct ts)-20);
-],, AC_DEFINE(MALLOC_ALIGN, 8), AC_DEFINE(MALLOC_ALIGN, 4))
-AC_COMPILE_CHECK(["long long"],
-[long long i;],
-, AC_DEFINE(HAVE_LONG_LONG),)
-AC_INLINE
-AC_SIZE_T
-AC_PID_T
-AC_RETSIGTYPE
-AC_HAVE_LIBRARY(m)
-AC_HAVE_LIBRARY(socket)
-AC_HAVE_LIBRARY(ucb, LIBS="$LIBS -lc -lucb")
-AC_HAVE_LIBRARY(crypt, LIBS="$LIBS -lcrypt")
-case "$DEFS" in
-  *HAVE_LIBSOCKET* | *HAVE_LIBUCB*)
-      AC_HAVE_LIBRARY(nsl) ;;
-esac
-AC_ALLOCA
-AC_HAVE_FUNCS(fchmod getrusage bzero memset memcpy memmem strcspn crypt _crypt)
-AC_HAVE_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
-AC_HAVE_FUNCS(fcntl)
-AC_TEST_PROGRAM([
+],,
+lp_cv_sys_malloc_align=8,
+lp_cv_sys_malloc_align=4))
+AC_DEFINE_UNQUOTED(MALLOC_ALIGN,$lp_cv_sys_malloc_align)
+
+AC_CACHE_CHECK(for long long,lp_cv_type_long_long,
+AC_TRY_COMPILE([long long i;],,
+lp_cv_type_long_long=yes,
+lp_cv_type_long_long=no))
+if test $lp_cv_type_long_long = yes; then
+  AC_DEFINE(HAVE_LONG_LONG)
+  AC_CHECK_SIZEOF(long long)
+fi
+
+AC_CACHE_CHECK(for bool,lp_cv_type_bool,
+AC_TRY_COMPILE([bool b;],,
+lp_cv_type_bool=yes,
+lp_cv_type_bool=no))
+if test $lp_cv_type_bool = yes; then
+  AC_DEFINE(HAVE_BOOL)
+fi
+
+AC_C_INLINE
+if test "x$ac_cv_c_inline" != "xno"; then
+  AC_DEFINE(HAS_INLINE)
+fi
+
+AC_TYPE_SIZE_T
+AC_TYPE_PID_T
+AC_TYPE_SIGNAL
+AC_CHECK_LIB(m,main)
+AC_CHECK_LIB(socket,main)
+AC_CHECK_LIB(ucb,main, LIBS="$LIBS -lc -lucb")
+AC_CHECK_LIB(crypt,main, LIBS="$LIBS -lcrypt")
+if test $ac_cv_lib_socket_main = "yes" || test $ac_cv_lib_ucb_main = "yes"; then
+      AC_CHECK_LIB(nsl,main)
+fi
+AC_FUNC_ALLOCA
+AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strcspn crypt _crypt)
+AC_CHECK_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
+AC_CHECK_FUNCS(fcntl getdomainname)
+
+AC_CACHE_CHECK(if inet_ntoa() ok,lp_cv_func_inet_ntoa_ok,
+AC_TRY_RUN([
 #include <sys/types.h> /* needed for netinet/in.h */
 #include <netinet/in.h>
 #include <arpa/inet.h>
 main() {
-    char addr1[] = "176.88.1.16";
-    char addr2[] = "88.176.128.2";
+    char addr1[[]] = "176.88.1.16";
+    char addr2[[]] = "88.176.128.2";
     struct in_addr tmp;
 
 #if SIZEOF_INT == 4
@@ -92,7 +426,9 @@ main() {
         exit(1);
     exit(0);
 }
-], AC_DEFINE(INET_NTOA_OK),,AC_COMPILE_CHECK("inet_ntoa()",[
+],lp_cv_func_inet_ntoa_ok=yes,
+lp_cv_func_inet_ntoa_ok=no,
+AC_TRY_COMPILE([
 #if defined(sun) && !defined(__svr4__)
 #include <sys/types.h> /* needed for netinet/in.h */
 #include <netinet/in.h>
@@ -100,23 +436,37 @@ main() {
 char *inet_ntoa(ad)
     struct in_addr ad;
 {
-    static char addr[20];
+    static char addr[[[20]]];
     return addr;
 }
 #else
 use inet_ntoa() from the library.
 #endif
-],, AC_DEFINE(INET_NTOA_OK)))
-AC_TEST_PROGRAM([
+],lp_cv_func_inet_ntoa_ok=no,
+lp_cv_func_inet_ntoa_ok=yes
+)))
+if test $lp_cv_func_inet_ntoa_ok = yes ; then
+  AC_DEFINE(INET_NTOA_OK)
+fi
+
+AC_CACHE_CHECK(if rename handles directories,
+lp_cv_sys_rename_handles_directories,
+AC_TRY_RUN([
 main() {
     mkdir("conftestdirfrom", 0770);
     exit(rename("conftestdirfrom", "conftestdirto"));
 }
-], AC_DEFINE(RENAME_HANDLES_DIRECTORIES) [(echo "rename ok")],
-, AC_DEFINE(RENAME_HANDLES_DIRECTORIES))
-case "$DEFS" in
-  *HAVE_GETRUSAGE*)
-AC_COMPILE_CHECK("full availability of struct rusage members", [
+],
+lp_cv_sys_rename_handles_directories=yes,
+lp_cv_sys_rename_handles_directories=no))
+if test $lp_cv_sys_rename_handles_directories = yes; then
+  AC_DEFINE(RENAME_HANDLES_DIRECTORIES)
+fi
+
+if test $ac_cv_func_getrusage = "yes" ; then
+AC_CACHE_CHECK(full availability of struct rusage members,
+lp_cv_struct_rusage_full,
+AC_TRY_COMPILE([
 #include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
 #include <sys/time.h>
 #ifdef HAVE_SYS_RUSAGE_H
@@ -144,8 +494,13 @@ AC_COMPILE_CHECK("full availability of struct rusage members", [
     *v++ = rus.ru_nsignals;
     *v++ = rus.ru_nvcsw;
     *v++ = rus.ru_nivcsw;
-],, AC_DEFINE(GETRUSAGE_RESTRICTED))
-AC_COMPILE_CHECK("struct rusage timeval members with tv_usec", [
+],lp_cv_struct_rusage_full=yes,lp_cv_struct_rusage_full=no))
+if test $lp_cv_struct_rusage_full = no; then
+  AC_DEFINE(GETRUSAGE_RESTRICTED)
+fi
+AC_CACHE_CHECK(struct rusage timeval members with tv_usec,
+lp_cv_struct_rusage_usec,
+AC_TRY_COMPILE([
 #include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
 #include <sys/time.h>
 #ifdef HAVE_SYS_RUSAGE_H
@@ -161,9 +516,14 @@ AC_COMPILE_CHECK("struct rusage timeval members with tv_usec", [
     getrusage(RUSAGE_SELF, &rus);
     *v++ = rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
     *v++ = rus.ru_stime.tv_sec * 1000 + rus.ru_stime.tv_usec / 1000;
-], AC_DEFINE(RUSAGE_USEC),) ;;
-  *)
-AC_COMPILE_CHECK("getrusage() via syscall()", [
+], lp_cv_struct_rusage_usec=yes, lp_cv_struct_rusage_usec=no))
+if test $lp_cv_struct_rusage_usec = yes; then
+  AC_DEFINE(RUSAGE_USEC)
+fi
+else
+AC_CACHE_CHECK(for getrusage() via syscall(),
+lp_cv_func_getrusage_via_syscall,
+AC_TRY_COMPILE([
 #include <sys/types.h> /* BSDI 2.0.1 / 2.1 needs this for resource.h */
 #include <sys/syscall.h>
 #include <sys/resource.h>
@@ -173,10 +533,16 @@ AC_COMPILE_CHECK("getrusage() via syscall()", [
 ],[
 struct rusage rus;
 syscall(SYS_GETRUSAGE, RUSAGE_SELF, rus);
-], AC_DEFINE(GETRUSAGE_VIA_SYSCALL) AC_DEFINE(HAVE_GETRUSAGE)) ;;
-esac
+], lp_cv_func_getrusage_via_syscall=yes, lp_cv_func_getrusage_via_syscall=no))
+if test $lp_cv_func_getrusage_via_syscall=yes; then
+  AC_DEFINE(GETRUSAGE_VIA_SYSCALL) AC_DEFINE(HAVE_GETRUSAGE)
+fi
+fi
+
 dnl I have seen malloc() being declared in <memory.h> on some machines.
-AC_COMPILE_CHECK("return type of free", [
+AC_CACHE_CHECK(if return type of free is void,
+lp_cv_prop_free_returns_void,
+AC_TRY_COMPILE([
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
@@ -187,8 +553,14 @@ AC_COMPILE_CHECK("return type of free", [
 #include <memory.h>
 #endif
 void free();
-],, AC_DEFINE(FREE_RETURNS_VOID))
-AC_COMPILE_CHECK([void* or char* from malloc],[
+],, lp_cv_prop_free_returns_void=yes, lp_cv_prop_free_returns_void=no))
+if test $lp_cv_prop_free_returns_void = yes; then
+  AC_DEFINE(FREE_RETURNS_VOID)
+fi
+
+AC_CACHE_CHECK(if void* or char* from malloc,
+lp_cv_prop_malloc_return_type,
+AC_TRY_COMPILE([
 #include <sys/types.h>
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
@@ -211,17 +583,34 @@ void free PROT((POINTER));
 #else
 int free PROT((POINTER));
 #endif
-],,AC_DEFINE(POINTER, void *), AC_DEFINE(POINTER, char *))
-AC_COMPILE_CHECK([CHARBITS == 8 or undef],[
+],,lp_cv_prop_malloc_return_type='void *',
+lp_cv_prop_malloc_return_type='char *'))
+AC_DEFINE_UNQUOTED(POINTER,$lp_cv_prop_malloc_return_type)
+
+AC_CACHE_CHECK(if CHAR_BIT == 8 or undef,
+lp_cv_prop_charbits_eq_8,
+AC_TRY_COMPILE([
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <limits.h>
 #ifdef HAVE_VALUES_H
 #include <values.h>
 #endif
-int i[1/(CHARBITS-8)];
-],,AC_DEFINE(CHARBIT_MASK, CHARBITS), AC_DEFINE(CHARBIT_MASK, 0xff))
-AC_TEST_PROGRAM([
+int i[1/(CHAR_BIT-8)];
+],,lp_cv_prop_charbits_eq_8=no, lp_cv_prop_charbits_eq_8=yes))
+if test $lp_cv_prop_charbits_eq_8 = yes; then
+  AC_DEFINE(CHARBIT_MASK, 0xff)
+else
+dnl this is something I don't really understand... am I too stupid?
+dnl bitmask set to number of bits ?????? *shudder* [Mubo]
+  AC_DEFINE(CHARBIT_MASK, CHAR_BIT)
+fi
+
+AC_CACHE_CHECK(if strtol broken, lp_cv_prop_strtol_broken,
+dnl the quoting hell wants two start quotes here, but only one end quote...
+dnl M4 can be wonderful... :-(  [Mubo]
+AC_TRY_RUN([[
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
@@ -229,15 +618,20 @@ AC_TEST_PROGRAM([
 #include <unistd.h>
 #endif
 int main() {
-]changequote(,)]
     if (strtol("1]", (char **)0, 10) != 1) exit(1);
-[changequote([,])[
     exit(0);
 }
-],, AC_DEFINE(STRTOL_BROKEN))
+], lp_cv_prop_strtol_broken=no,
+lp_cv_prop_strtol_broken=yes))
+if test $lp_cv_prop_strtol_broken = yes; then
+  AC_DEFINE(STRTOL_BROKEN)
+fi
+
 dnl the following three tests would better be nested, but it seems to overflow
 dnl internal buffers of m4
-AC_TEST_PROGRAM([
+AC_CACHE_CHECK(nonblocking using ioctl with FIONBIO,
+lp_cv_prop_use_ioctl_fionbio,
+AC_TRY_RUN([
 #include <sys/types.h> /* needed for netinet/in.h */
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -285,12 +679,12 @@ main() {
 		errno == EAGAIN)
 	    {
 		/* hpux has special problems with sockets from pipe() */
-		int sockets[2];
+		int sockets[[2]];
 		FILE *fp_read;
 
 		if(pipe(sockets) < 0)
 		    exit(1);
-		fp_read = fdopen(sockets[0], "r");
+		fp_read = fdopen(sockets[[0]], "r");
 		if (fp_read == NULL)
 		    exit(1);
 		if (ioctl(fileno(fp_read) , FIONBIO, &tmp) == -1)
@@ -303,9 +697,19 @@ main() {
     }
     exit(1);
 }
-], AC_DEFINE(USE_IOCTL_FIONBIO),,
-echo "You have to supply the correct way to set sockets non-blocking by hand.")
-AC_TEST_PROGRAM([
+],
+lp_cv_prop_use_ioctl_fionbio=yes,
+lp_cv_prop_use_ioctl_fionbio=no,
+lp_cv_prop_use_ioctl_fionbio=unknown
+AC_MSG_WARN(You have to supply the correct way to set sockets non-blocking by hand.)
+))
+if test $lp_cv_prop_use_ioctl_fionbio = yes; then
+  AC_DEFINE(USE_IOCTL_FIONBIO)
+fi
+
+AC_CACHE_CHECK(nonblocking using fcntl with O_NDELAY,
+lp_cv_prop_use_fnctl_o_ndelay,
+AC_TRY_RUN([
 #include <sys/types.h> /* needed for netinet/in.h */
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -355,8 +759,16 @@ main() {
     }
     exit(1);
 }
-], AC_DEFINE(USE_FCNTL_O_NDELAY))
-AC_TEST_PROGRAM([
+], lp_cv_prop_use_fnctl_o_ndelay=yes,
+lp_cv_prop_use_fnctl_o_ndelay=no,
+lp_cv_prop_use_fnctl_o_ndelay=unknown))
+if test $lp_cv_prop_use_fnctl_o_ndelay = yes; then
+  AC_DEFINE(USE_FCNTL_O_NDELAY)
+fi
+
+AC_CACHE_CHECK(nonblocking wusing fcntl with FNDELAY,
+lp_cv_prop_use_fcntl_fndelay,
+AC_TRY_RUN([
 #include <sys/types.h> /* needed for netinet/in.h */
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -406,12 +818,19 @@ main() {
     }
     exit(1);
 }
-], AC_DEFINE(USE_FCNTL_FNDELAY))
-AC_TEST_PROGRAM([
+],lp_cv_prop_use_fcntl_fndelay=yes,
+lp_cv_prop_use_fcntl_fndelay=no,
+lp_cv_prop_use_fcntl_fndelay=unknown))
+if test $lp_cv_prop_use_fcntl_fndelay = yes; then
+  AC_DEFINE(USE_FCNTL_FNDELAY)
+fi
+
+
+AC_CACHE_CHECK(for overlapping bcopy,
+lp_cv_prop_overlapping_bcopy,
+AC_TRY_RUN([
 main(){
-]changequote(,)
-    char str[99] = "hello world";
-changequote([,])[
+    char str[[99]] = "hello world";
     bcopy(str, str+2, 12);
     if(strcmp("hehello world", str))
 	exit(1);
@@ -420,30 +839,46 @@ changequote([,])[
 	exit(1);
     exit(0);
 }
-], AC_DEFINE(OVERLAPPING_BCOPY))
+], lp_cv_prop_overlapping_bcopy=yes,
+lp_cv_prop_overlapping_bcopy=no,
+lp_cv_prop_overlapping_bcopy=yes))
+if test $lp_cv_prop_overlapping_bcopy = yes; then
+  AC_DEFINE(OVERLAPPING_BCOPY)
+fi
+
 dnl AC_COMPILE_CHECK([random],[long random();],[return random() % 7;]
 dnl , AC_DEFINE(RANDOM),
 dnl AC_COMPILE_CHECK([rand],[],[return rand() % 7;]
 dnl , AC_DEFINE(RAND),
 dnl AC_COMPILE_CHECK([drand48],[double drand48();],
 dnl [return (int)(drand48() * 7);], AC_DEFINE(DRAND48))))
-AC_COMPILE_CHECK([strtol prototype],[#ifdef HAVE_STDLIB_H
+
+AC_CACHE_CHECK(if strtol needs const char*,
+lp_cv_prop_strtol_const_charp,
+AC_TRY_COMPILE([#ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
 long strtol(str, ptr, base) char *str; char **ptr; int base; { return 0; }
-],,,AC_DEFINE(STRTOL_CONST_CHARP))
-tcomp='${CC-cc} ${CFLAGS} ${TESTFLAG} -o conftest conftest.c >${DEV_NULL} 2>&1'
+],,lp_cv_prop_strtol_const_charp=no,
+lp_cv_prop_strtol_const_charp=yes))
+if test $lp_cv_prop_strtol_const_charp = yes; then
+  AC_DEFINE(STRTOL_CONST_CHARP)
+fi
+
+
+tcomp='${CC-cc} ${CFLAGS} ${TESTFLAG} -o conftest conftest.c >/dev/null 2>&1'
 tcomp2='${CC-cc} ${CFLAGS} ${TESTFLAG} -o conftest conftest.c 2>&1'
-tcomp3='${CC-cc} ${CFLAGS} ${TESTFLAG} -c conftest.c >${DEV_NULL} 2>&1'
-${CAT} > conftest.c <<EOF
+tcomp3='${CC-cc} ${CFLAGS} ${TESTFLAG} -c conftest.c >/dev/null 2>&1'
+cat > conftest.c <<EOF
 #include <stdio.h>
 double d = 4.5;
 main() { printf("hello world\n"); }
 EOF
+AC_MSG_CHECKING(medium optimization CFLAGS)
 changequote(,)dnl
 for TESTFLAG in -O4 -O3 -xO2 -O2 -O; do
   if eval $tcomp; then
-    if echo `eval $tcomp2` | egrep '[uU]nrecognized [oO]ption' >${DEV_NULL}; then
+    if echo `eval $tcomp2` | egrep '[uU]nrecognized [oO]ption' >/dev/null; then
       :
       #the [e]grep option -v will not give a failure exit status on the atari
     else
@@ -465,7 +900,7 @@ done
 # -print-libgcc-filename to test for gcc.
 TESTFLAG='-print-libgcc-filename -O3 -fno-inline-functions'
 if eval $tcomp; then
-  if echo `eval $tcomp2` | egrep '[uU]nrecognized [oO]ption' >${DEV_NULL}; then
+  if echo `eval $tcomp2` | egrep '[uU]nrecognized [oO]ption' >/dev/null; then
     :
   else
     if eval $tcomp; then
@@ -474,14 +909,16 @@ if eval $tcomp; then
   fi
 fi
 MCFLAGS=$CFLAGS
-echo medium optimization CFLAGS: $MCFLAGS
+AC_MSG_RESULT($MCFLAGS)
+
+AC_MSG_CHECKING(highest optimization CFLAGS)
 for TESTFLAG in -fomit-frame-pointer; do
   if eval $tcomp; then
     CFLAGS="$CFLAGS $TESTFLAG"
   fi
 done
 OCFLAGS=$CFLAGS
-echo highest optimization CFLAGS: $OCFLAGS
+AC_MSG_RESULT($OCFLAGS)
 if ${CC-cc} -g -c conftest.c ; then
   DCFLAGS='-g'
 else
@@ -492,18 +929,20 @@ if ${CC-cc} $OFLAGS -o conftest conftest.c ; then
   OPTIMIZE_LINKING='$(OPTIMIZE)'
 fi
 rm -f conftest.c
-case "$DEFS" in
-  *HAVE_LIBSOCKET*)
-AC_PROGRAM_EGREP(yes,[
+
+if test $ac_cv_lib_socket_main = "yes"; then
+AC_EGREP_CPP(yes,[
 #if defined(sun)
 yes
 #endif
 ],
-[ EXTRA_CFLAGS='-Dsolaris' ]) ;;
-esac
-AC_WITH(target, EXTRA_CFLAGS="-D${withval}")
-echo "checking if ${YACC} includes bogus malloc prototypes"
-${CAT} > conftest.y <<EOF
+[ EXTRA_CFLAGS='-Dsolaris' ])
+fi
+
+AC_ARG_WITH(target,[  --with-target    ??], EXTRA_CFLAGS="-D${withval}")
+
+AC_MSG_CHECKING(if ${YACC} includes bogus malloc prototypes)
+cat > conftest.y <<EOF
 %{
 #include "confdefs.h"
 #ifdef HAVE_UNISTD_H
@@ -525,7 +964,7 @@ int yylex(){ return 0; }
 EOF
 rm -f y.tab.c y_tab.c
 ${YACC} conftest.y
-if mv y.tab.c conftest.c > ${DEV_NULL} 2>&1; then
+if mv y.tab.c conftest.c > /dev/null 2>&1; then
   YACCTAB=y.tab.
 else
   mv y_tab.c conftest.c
@@ -534,13 +973,16 @@ fi
 if eval $compile; then
   MOVE_YACC_TAB='$(MV) $(YACCTAB)c'
   CLEAN_YACC_TAB=''
+  AC_MSG_RESULT(no)
 else
   MOVE_YACC_TAB='tail +2 $(YACCTAB)c >'
   CLEAN_YACC_TAB='$(RM) $(YACCTAB)c'
+  AC_MSG_RESULT(yes)
 fi
 rm -f conftest*
-echo "checking for ${YACC} / <malloc.h> / -DSGI_SOURCE / afree name clash"
-${CAT} > conftest.y <<EOF
+
+AC_MSG_CHECKING(for ${YACC} / <malloc.h> / -DSGI_SOURCE / afree name clash)
+cat > conftest.y <<EOF
 %{
 #include "confdefs.h"
 #define afree free
@@ -554,28 +996,31 @@ int yylex(){ return 0; }
 EOF
 rm -f y.tab.c y_tab.c
 ${YACC} conftest.y
-if mv y.tab.c conftest.c > ${DEV_NULL} 2>&1; then
+if mv y.tab.c conftest.c > /dev/null 2>&1; then
   YACCTAB=y.tab.
 else
   mv y_tab.c conftest.c
   YACCTAB=y_tab.
 fi
 if eval $compile; then
-  :
+  AC_MSG_RESULT(no)
 else
   EXTRA_CFLAGS="${EXTRA_CFLAGS} -U_SGI_SOURCE"
+  AC_MSG_RESULT(yes)
 fi
 rm -f conftest*
+
+
 SAVE_LIBS="${LIBS}"
 SAVE_CFLAGS="${CFLAGS}"
 CFLAGS=''
 for TESTFLAG in '' -static -Bstatic -n; do
-echo "checking malloc redefinition with linking flag ${TESTFLAG}"
+AC_MSG_CHECKING(malloc redefinition with linking flag ${TESTFLAG})
 LIBS="${SAVE_LIBS} ${TESTFLAG}"
-${CAT} > conftest.data <<EOF
+cat > conftest.data <<EOF
 42
 EOF
-AC_TEST_PROGRAM([
+AC_TRY_RUN([
 #include <sys/types.h>
 #include <stdio.h>
 #ifdef HAVE_UNISTD_H
@@ -671,21 +1116,24 @@ if test -n "${SBRK_OK}"; then
     EXTRA_CFLAGS="${EXTRA_CFLAGS} -DSBRK_OK"
   fi
   break
+  AC_MSG_RESULT(ok)
+else
+  AC_MSG_RESULT(failed)
 fi
 done
+
 LIBS="${SAVE_LIBS}"
 CFLAGS="${SAVE_CFLAGS}"
 case "$EXTRA_CFLAGS" in
  *-Dsolaris*)
-  case "$DEFS" in
-    *HAVE_LIBUCB*)
+  if test $ac_cv_lib_ucb_main = "yes"; then
       LIBS="${LDFLAGS} -lm -lgcc -lc -lnsl -lgcc -lc -ldl_stubs\
         -lnswnis -lnswnisplus -lnswfiles -lnswcompat -lstraddr -lswitch\
         -ltcpip -lsocket -lnsl -lgcc -lc /usr/ucblib/libucb.a"
-      LDFLAGS= "-u dgettext -lintl" ;;
-  esac ;;
+      LDFLAGS= "-u dgettext -lintl"
+  fi ;;
 esac
-AC_TEST_PROGRAM([
+AC_TRY_RUN([
 #include <sys/types.h>
 #include <stdio.h>
 #ifdef HAVE_UNISTD_H
@@ -708,14 +1156,18 @@ int main(){
     return 0;
 }
 ],AC_DEFINE(FREE_NULL_POINTER,1))
-echo "checking malloc overhead"
-${CAT} > conftest.c <<EOF
+
+AC_CACHE_CHECK(malloc overhead,lp_cv_sys_malloc_overhead,
+cat > conftest.c <<EOF
 #include "confdefs.h"
-#include "util/overhead.c"
+#include "${srcdir}/util/overhead.c"
 EOF
 ${CC-cc} -o conftest conftest.c
-AC_DEFINE_UNQUOTED(EXTERN_MALLOC_OVERHEAD,`./conftest --terse`)
+lp_cv_sys_malloc_overhead=`./conftest --terse`
 rm -f conftest*
+)
+AC_DEFINE_UNQUOTED(EXTERN_MALLOC_OVERHEAD,$lp_cv_sys_malloc_overhead)
+
 if test -z "${CONFIG_SHELL}"; then
   CONFIG_SHELL='/bin/sh'
 fi
@@ -723,6 +1175,10 @@ if test "${OSTYPE}" = 'win32'; then
   EXEEXT='.exe'
   AC_DEFINE(HOST_INCLUDE,"hosts/GnuWin32/GnuWin32.h")
 fi
+
+
+dnl
+
 AC_SUBST(OCFLAGS)
 AC_SUBST(MCFLAGS)
 AC_SUBST(DCFLAGS)
@@ -734,4 +1190,86 @@ AC_SUBST(CLEAN_YACC_TAB)
 AC_SUBST(YACCTAB)
 AC_SUBST(CONFIG_SHELL)
 AC_SUBST(EXEEXT)
-AC_OUTPUT(Makefile)
+
+dnl
+dnl additional replacements:
+dnl
+
+dnl first: the conditional defines:
+dnl
+AC_SUBST(cdef_erq_demon)
+AC_SUBST(cdef_access_control)
+AC_SUBST(cdef_access_log)
+AC_SUBST(cdef_align_functions)
+AC_SUBST(cdef_compat_mode)
+AC_SUBST(cdef_strict_euids)
+AC_SUBST(cdef_supply_parse_command)
+AC_SUBST(cdef_initialization_by___init)
+AC_SUBST(cdef_udp_send)
+AC_SUBST(cdef_comm_stat)
+AC_SUBST(cdef_apply_cache_stat)
+AC_SUBST(cdef_smalloc_trace)
+AC_SUBST(cdef_smalloc_lpc_trace)
+AC_SUBST(cdef_dynamic_costs)
+
+AC_SUBST(cdef_min_malloced)
+AC_SUBST(cdef_max_malloced)
+AC_SUBST(cdef_catch_udp_port)
+AC_SUBST(cdef_rxcache_table)
+
+dnl second: valued defines
+dnl
+AC_SUBST(val_access_file)
+AC_SUBST(val_access_log)
+AC_SUBST(val_erq_max_reply)
+AC_SUBST(val_erq_max_send)
+AC_SUBST(val_max_log_size)
+AC_SUBST(val_read_file_max_size)
+AC_SUBST(val_time_to_clean_up)
+AC_SUBST(val_time_to_swap)
+AC_SUBST(val_time_to_swap_variables)
+AC_SUBST(val_time_to_reset)
+AC_SUBST(val_evaluator_stack_size)
+AC_SUBST(val_max_user_trace)
+AC_SUBST(val_max_trace)
+AC_SUBST(val_compiler_stack_size)
+AC_SUBST(val_max_bits)
+AC_SUBST(val_portno)
+AC_SUBST(val_maxnumports)
+AC_SUBST(val_max_cost)
+AC_SUBST(val_max_local)
+AC_SUBST(val_catch_reserved_cost)
+AC_SUBST(val_master_reserved_cost)
+AC_SUBST(val_swap_file)
+AC_SUBST(val_max_array_size)
+AC_SUBST(val_max_mapping_size)
+AC_SUBST(val_max_players)
+AC_SUBST(val_allowed_ed_cmds)
+AC_SUBST(val_reserved_user_size)
+AC_SUBST(val_reserved_master_size)
+AC_SUBST(val_reserved_system_size)
+AC_SUBST(val_htable_size)
+AC_SUBST(val_itable_size)
+AC_SUBST(val_otable_size)
+AC_SUBST(val_defmax)
+AC_SUBST(val_apply_cache_bits)
+AC_SUBST(val_rxcache_table)
+AC_SUBST(val_master_name)
+AC_SUBST(val_max_byte_transfer)
+AC_SUBST(val_catch_udp_port)
+AC_SUBST(val_set_buffer_size_max)
+AC_SUBST(val_min_malloced)
+AC_SUBST(val_max_malloced)
+AC_SUBST(val_max_small_malloced)
+AC_SUBST(val_total_trace_length)
+
+dnl finally: some remaining stuff
+dnl
+AC_SUBST(erq_sub)
+
+dnl
+dnl Ok. now lets make the Makefiles; also these in subdirs! [Mubo]
+dnl make config.h, too. [Mubo]
+dnl
+AC_OUTPUT(Makefile config.h util/Makefile util/xerq/Makefile
+util/erq/Makefile)

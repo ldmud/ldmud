@@ -2,7 +2,7 @@ Short: Driver hook for add_action()
 From: Matthew Julius <julius.2@wright.edu>
 Date: Fri, 08 Jan 1999 16:29:08 -0500
 Type: Feature
-State: Unclassified
+State: Done - obsoleted by H_COMMAND in 3.2.7-dev.127
 
 Driver hook to store the name of the function to call in an interactive
 object after modify_command() has been called.  This function actually
@@ -13,3 +13,4 @@ those that choose not to use add_action().
 The function name could also be an unbound lambda closure I suppose, but
 I would not use this myself.
 
+Note: can't this be done as part of the MODIFY_CMD processing?

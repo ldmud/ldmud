@@ -4,7 +4,26 @@ NAME
 DESCRIPTION
 	A block is a special statment, that begins with '{', contains
 	a list of statements, and ends with '}'. The block may also
-	define local variables.
+	define local variables which are initialised to 0 everytime
+        the block is entered.
 
-        For now, local variables are visible until the end of the
-        function.
+        Local variables defined in a block are visible only until the
+        end of the block. Definitions in an inner block hide definitions in
+        outer blocks.
+
+HISTORY
+        Up to 3.2.7, local variables were visible (from their point of
+        definition) in the whole function. That is, code like
+
+            do {
+                int res;
+
+                res = ...
+            } while (res == 5);
+            write(res);
+
+        was perfectly legal. It is no longer, as 'res' ceases to exist
+        with the closing '}' of the while().
+
+        You can get this old behaviour back with the #pragma no_local_scopes.
+        To turn it off again, use #pragma local_scopes.

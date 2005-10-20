@@ -1,9 +1,6 @@
 CONCEPT
 	closures example
 
-LAST UPDATE
-	Mateese, 10-Dec-1994, 23:30 MET
-
 DESCRIPTION
 	These are a small discussed examples of the usage of
 	(lambda-)closures. For technical details see the closures(LPC)
@@ -40,6 +37,13 @@ DESCRIPTION
 	  }
 	    ...
 	  AddDetail("runes", #'_detail_runes);
+
+        or with an inline closure:
+
+          AddDetail("runes"
+                   , (: sprintf("Hello %s!\n", this_player()->QueryName()) :)
+                   );
+
 
 	Simple? Here is the same code, this time as lambda-closure:
 
@@ -81,6 +85,15 @@ DESCRIPTION
 
 	  map_array( filter_array(all_inventory(room), #'living)
 	           , #'_reduce_hp)
+
+        or as an inline closure:
+
+          map_array( filter_array(all_inventory(room), #'living)
+                   , (: int hp;
+                        hp = liv->QueryHP();
+                        if (hp > 10)
+                          liv->SetHP(hp - 10);
+                      :) );
 
 	Both filter_array() and map_array() pass the actual array item
 	being filtered/mapped as first argument to the closure.
@@ -167,11 +180,11 @@ DESCRIPTION -- When to use which closure?
 	longer than the object defining it. Reason: when the defining
 	object gets destructed, the closure will vanish, too.
 	
-	Efun- and lfun-closures should be used where useful, as they
-	mostly do the job and are easy to read. The disadvantage of
-	lfun-closures is that they make a replace_program() impossible
-	- but since such objects tend to not being replaceable at all,
-	this is no real loss.
+        Efun-, lfun- and inline closures should be used where useful, as they
+        mostly do the job and are easy to read. The disadvantage of lfun- and
+        inline closures is that they make a replace_program() impossible
+        - but since such objects tend to not being replaceable at all, this is
+        no real loss.
 
 	Lambda closures are needed if the actions of the closure are
 	heavily depending on some data available only at runtime, like
@@ -186,4 +199,4 @@ DESCRIPTION -- When to use which closure?
 
 
 SEE ALSO
-	closures(LPC)
+	closures(LPC), closure_guide(LPC), closures-abstract(LPC)

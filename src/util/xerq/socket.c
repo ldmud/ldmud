@@ -62,12 +62,25 @@ int flush_queue(struct queue_s **qpp, int fd)
 	free(qp);
    } while(next);
    *qpp=qp;
-   return;
+   return 0;
 }	
 
 void close_socket(struct socket_s *sp)
 {
     struct child_s *chp;
+    int found = 0;
+    struct socket_s **spp;
+
+    for (spp = &sockets; *spp; spp = &(*spp)->next)
+        if (*spp == sp)
+        {
+            found = 1;
+            break;
+        }
+
+    if (!found) /* socket already closed */
+        return;
+            
     switch(sp->type) {
       case SOCKET_STDOUT: {
 	for (chp=childs; chp; chp=chp->next)
@@ -100,7 +113,7 @@ void close_socket(struct socket_s *sp)
 void read_socket(struct socket_s *sp, int rw)
 {
     char buf[ERQ_MAX_REPLY];
-    int num, len;
+    int num;
 
     if (sp->queue) flush_queue(&sp->queue, sp->fd);
     switch(sp->type) {
@@ -163,7 +176,6 @@ void read_socket(struct socket_s *sp, int rw)
       }
       case SOCKET_AUTH: {
         struct auth_s *ap=(struct auth_s *)sp;
-	int pos;
 	do {
 	  num=read(ap->s.fd, &ap->buf[ap->pos], sizeof(ap->buf)-ap->pos);
 	  if (num<0 && errno==EINTR) continue;
@@ -194,7 +206,7 @@ void erq_send(char *mesg, int msglen)
 {
     struct ticket_s *ticket;
     struct socket_s *sp;
-    int num, type;
+    int num;
     char *data;
 
     if (msglen < 9+TICKET_SIZE) {
@@ -265,7 +277,6 @@ void erq_send(char *mesg, int msglen)
 
 void erq_listen(char *mesg, int msglen)
 {
-    struct ticket_s ticket;
     struct sockaddr_in addr;
     struct socket_s *sp;
     int fd, tmp;
@@ -311,7 +322,6 @@ void erq_listen(char *mesg, int msglen)
 
 void erq_open_udp(char *mesg, int msglen)
 {
-    struct ticket_s ticket;
     struct sockaddr_in addr;
     struct socket_s *sp;
     int fd, tmp;
@@ -346,7 +356,6 @@ void erq_open_udp(char *mesg, int msglen)
 
 void erq_open_tcp(char *mesg, int msglen)
 {
-    struct ticket_s ticket;
     struct sockaddr_in addr;
     struct socket_s *sp;
     int fd, tmp, status;
@@ -391,10 +400,9 @@ void erq_open_tcp(char *mesg, int msglen)
 
 void erq_accept(char *mesg, int msglen)
 {
-    struct ticket_s ticket;
     struct sockaddr_in addr;
     struct socket_s *sp;
-    int fd, tmp, status;
+    int fd, tmp;
 
     if (msglen != 9+TICKET_SIZE) {
 	reply1(get_handle(mesg), (char[]) { ERQ_E_ARGLENGTH, 0 }, 2);
@@ -432,9 +440,7 @@ void erq_accept(char *mesg, int msglen)
 void erq_auth(char *mesg, int msglen)
 {
     struct sockaddr_in addr;
-    struct socket_s *sp;
     struct auth_s *ap;
-    int32 host;
     int fd, tmp, status, local_port, remote_port;
 
     switch(msglen) {

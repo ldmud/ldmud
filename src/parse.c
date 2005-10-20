@@ -15,9 +15,10 @@
 #include <ctype.h>
 #include <time.h>
 
-#define NO_INCREMENT_STRING_REF
+#define NO_REF_STRING
 #include "parse.h"
 
+#include "actions.h"
 #include "array.h"
 #include "closure.h"
 #include "interpret.h"
@@ -61,9 +62,7 @@ old_explode_string (char *str, char *del)
      */
     if (len == 0) {
         ret = allocate_array(1);
-        ret->item[0].type = T_STRING;
-        ret->item[0].x.string_type = STRING_MALLOC;
-        ret->item[0].u.string = string_copy(str);
+        put_malloced_string(ret->item, string_copy(str));
         return ret;
     }
 
@@ -102,7 +101,7 @@ old_explode_string (char *str, char *del)
     buff = xalloc(strlen(str) + 1);
     if (!buff)
     {
-        free_vector(ret);
+        free_array(ret);
         error("Out of memory.\n");
         /* NOTREACHED */
         return NULL;
@@ -112,9 +111,7 @@ old_explode_string (char *str, char *del)
         if (strncmp(p, del, len) == 0) {
             strncpy(buff, beg, p - beg);
             buff[p-beg] = '\0';
-            ret->item[num].type = T_STRING;
-            ret->item[num].x.string_type = STRING_MALLOC;
-            ret->item[num].u.string = string_copy(buff);
+            put_malloced_string(ret->item + num, string_copy(buff));
             /* TODO: implement a string_copy_n(beg, n) */
             num++;
             beg = p + len;
@@ -131,9 +128,7 @@ old_explode_string (char *str, char *del)
         if (num >= VEC_SIZE(ret))
             fatal("Index out of bounds in old explode(): estimated %ld, got %ld.\n", (long)num, VEC_SIZE(ret));
 #endif
-        ret->item[num].type = T_STRING;
-        ret->item[num].x.string_type = STRING_MALLOC;
-        ret->item[num].u.string = string_copy(beg);
+        put_malloced_string(ret->item + num, string_copy(beg));
     }
 
     xfree(buff);
@@ -166,6 +161,10 @@ static struct svalue *process_value PROT((char *str));
  * Arguments:     str: A string containing text and function descriptions as
  *                  as described above.
  * Returns:           String containing the result of all replacements.
+ *
+ * TODO: OSB has a bugfix for this function.
+ * TODO: Move process_string() into a different file and make it use
+ * TODO:: the new explode.
  */
 char *
 process_string(str)
@@ -187,22 +186,28 @@ process_string(str)
 
     old_eff_user = 0;
 
-#ifdef EUIDS
     if (!current_object)
     {
         struct svalue *ret;
 
         current_object = command_giver;
         ret = apply_master_ob(STR_GET_BB_UID,0);
-        if (!ret || ret->type != T_STRING)
+        if (!ret)
             return str;
+
+        if (ret->type != T_STRING
+         && (strict_euids || ret->type != T_NUMBER || ret->u.number))
+            return str;
+
         if (current_object->eff_user)
         {
             old_eff_user = current_object->eff_user;
-            current_object->eff_user = add_name(ret->u.string);
+            if (ret->type == T_STRING)
+                current_object->eff_user = add_name(ret->u.string);
+            else
+                current_object->eff_user = NULL;
         }
     }
-#endif
 
     vec = old_explode_string(str,"@@");
     if (!vec)
@@ -261,13 +266,11 @@ process_string(str)
         buf = 0;
 
     inter_sp--;
-    free_vector(vec);
+    free_array(vec);
 
-#ifdef EUIDS
     if (old_eff_user) {
         current_object->eff_user = old_eff_user;
     }
-#endif
 
     current_object = old_cur;
 
@@ -310,8 +313,7 @@ static struct svalue *process_value(str)
     int numargs;
     struct object *ob;
 
-    rval.type = T_NUMBER;
-    rval.u.number = 0;
+    put_number(&rval, 0);
 
     if ((strlen(str)<1) || (str[0]<'A') || (str[0]>'z'))
         return &rval;
@@ -383,18 +385,17 @@ struct object *find_living_object (name, player)
     sp++;
     svp = &find_living_closures[player];
     if (svp->type == T_INVALID) {
-        sp->type = T_STRING;
-        sp->x.string_type = STRING_SHARED;
-        if ( !(sp->u.string = make_shared_string(function_names[player])) )
+        put_string(sp, make_shared_string(function_names[player]));
+        if (!sp->u.string)
             error("Out of memory\n");
         inter_sp = sp;
         symbol_efun(sp);
         *svp = *sp;
         inter_sp = sp - 1;
     }
-    sp->type = T_STRING;
-    sp->x.string_type = STRING_SHARED;
-    if ( !(sp->u.string = make_shared_string(name)) )
+
+    put_string(sp, make_shared_string(name));
+    if ( !sp->u.string)
         error("Out of memory\n");
     inter_sp = sp;
     call_lambda(svp, 1);
@@ -743,14 +744,11 @@ static void load_lpc_info(ix, ob)
                     if (sing->item[il].type == T_STRING)
                     {
                         str = parse_to_plural(sing->item[il].u.string);
-                        sval.type = T_STRING;
-                        sval.x.string_type = STRING_MALLOC;
-                        sval.u.string = str;
+                        put_malloced_string(&sval, str);
                         transfer_svalue_no_free(&tmp->item[il],&sval);
                     }
                 }
-                sval.type = T_POINTER;
-                sval.u.vec = tmp;
+                put_array(&sval, tmp);
                 transfer_svalue_no_free(&gPluid_list->item[ix], &sval);
             }
         }
@@ -809,31 +807,31 @@ static void parse_error_handler(arg)
     */
     if (gId_list)
     {
-        free_vector(gId_list);
+        free_array(gId_list);
     }
     if (gPluid_list)
     {
-        free_vector(gPluid_list);
+        free_array(gPluid_list);
     }
     if (gAdjid_list)
     {
-        free_vector(gAdjid_list);
+        free_array(gAdjid_list);
     }
     if (gId_list_d)
     {
-        free_vector(gId_list_d);
+        free_array(gId_list_d);
     }
     if (gPluid_list_d)
     {
-        free_vector(gPluid_list_d);
+        free_array(gPluid_list_d);
     }
     if (gAdjid_list_d)
     {
-        free_vector(gAdjid_list_d);
+        free_array(gAdjid_list_d);
     }
     if (gPrepos_list)
     {
-        free_vector(gPrepos_list);
+        free_array(gPrepos_list);
     }
     if (gAllword)
         xfree(gAllword);
@@ -847,9 +845,9 @@ static void parse_error_handler(arg)
     gAdjid_list         = old->adjid;
     gAllword                 = old->allword;
 
-    free_vector(old->wvec);
-    free_vector(old->patvec);
-    free_vector(old->obvec);
+    free_array(old->wvec);
+    free_array(old->patvec);
+    free_array(old->obvec);
 
     gPrevious_context = old->previous_context;
     xfree((char *)old);
@@ -918,8 +916,8 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
     } else if (ob_or_array->type == T_OBJECT) {
         obvec = deep_inventory(ob_or_array->u.ob, 1); /* 1 == ob + deepinv */
     } else {
-        free_vector(wvec);
-        free_vector(patvec);
+        free_array(wvec);
+        free_array(patvec);
         xfree((char *)old);
         error("Bad second argument to parse_command()\n");
     }
@@ -955,8 +953,7 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
     pval = apply_master_ob(QGET_ID,0);
     if (pval && pval->type == T_POINTER)
     {
-        gId_list_d = pval->u.vec;
-        pval->u.vec->ref++;
+        gId_list_d = ref_array(pval->u.vec);
     }
     else
         gId_list_d = 0;
@@ -964,8 +961,7 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
     pval = apply_master_ob(QGET_PLURID,0);
     if (pval && pval->type == T_POINTER)
     {
-        gPluid_list_d = pval->u.vec;
-        pval->u.vec->ref++;
+        gPluid_list_d = ref_array(pval->u.vec);
     }
     else
         gPluid_list_d = 0;
@@ -973,8 +969,7 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
     pval = apply_master_ob(QGET_ADJID,0);
     if (pval && pval->type == T_POINTER)
     {
-        gAdjid_list_d = pval->u.vec;
-        pval->u.vec->ref++;
+        gAdjid_list_d = ref_array(pval->u.vec);
     }
     else
         gAdjid_list_d = 0;
@@ -982,8 +977,7 @@ int parse (cmd, ob_or_array, pattern, stack_args, num_arg)
     pval = apply_master_ob(QGET_PREPOS,0);
     if (pval && pval->type == T_POINTER)
     {
-        gPrepos_list = pval->u.vec;
-        pval->u.vec->ref++;
+        gPrepos_list = ref_array(pval->u.vec);
     }
     else
         gPrepos_list = allocate_array(0);
@@ -1096,11 +1090,9 @@ static struct svalue *slice_words(wvec, from, to)
     else
         tx = 0;
 
-    free_vector(slice);
+    free_array(slice);
     if (tx) {
-        stmp.type = T_STRING;
-        stmp.x.string_type = STRING_SHARED;
-        stmp.u.string = make_shared_string(tx);
+        put_string(&stmp, make_shared_string(tx));
         xfree(tx);
         return &stmp;
     }
@@ -1228,9 +1220,7 @@ static struct svalue *one_parse(obvec, pat, wvec, cix_in, fail, prep_param)
         break;
 
     case 'w':
-        stmp.type = T_STRING;
-        stmp.x.string_type = STRING_SHARED;
-        stmp.u.string = make_shared_string(wvec->item[*cix_in].u.string);
+        put_string(&stmp, make_shared_string(wvec->item[*cix_in].u.string));
         pval = &stmp;
         (*cix_in)++;
         *fail = 0;
@@ -1331,8 +1321,7 @@ static struct svalue *number_parse(obvec, wvec, cix_in, fail)
     if (sscanf(wvec->item[cix].u.string,"%d",&num)) {
         if (num>=0) {
             (*cix_in)++;
-            stmp.type = T_NUMBER;
-            stmp.u.number = num;
+            put_number(&stmp, num);
             return &stmp;
         }
         *fail = 1;
@@ -1342,8 +1331,7 @@ static struct svalue *number_parse(obvec, wvec, cix_in, fail)
     if (gAllword && (strcmp(wvec->item[cix].u.string,gAllword) == 0))
     {
         (*cix_in)++;
-        stmp.type = T_NUMBER;
-        stmp.u.number = 0;
+        put_number(&stmp, 0);
         return &stmp;
     }
 
@@ -1351,8 +1339,7 @@ static struct svalue *number_parse(obvec, wvec, cix_in, fail)
         sprintf(buf,"%s%s", num10[ten], (ten>1)?num1[ones]:num1[ten*10+ones]);
         if (EQ(buf,wvec->item[cix].u.string)) {
             (*cix_in)++;
-            stmp.type = T_NUMBER;
-            stmp.u.number = ten*10+ones;
+            put_number(&stmp, ten*10+ones);
             return &stmp;
         }
     }
@@ -1362,8 +1349,7 @@ static struct svalue *number_parse(obvec, wvec, cix_in, fail)
                 (ten>1)?ord1[ones]:ord1[ten*10+ones]);
         if (EQ(buf,wvec->item[cix].u.string)) {
             (*cix_in)++;
-            stmp.type = T_NUMBER;
-            stmp.u.number = -(ten*10+ones);
+            put_number(&stmp, -(ten*10+ones));
             return &stmp;
         }
     }
@@ -1442,7 +1428,7 @@ static struct svalue *item_parse(obvec, wvec, cix_in, fail)
 
     if (tix<2) {
         *fail = 1;
-        free_vector(tmp);
+        free_array(tmp);
         if (pval) (*cix_in)--;
         return 0;
     }
@@ -1452,14 +1438,12 @@ static struct svalue *item_parse(obvec, wvec, cix_in, fail)
             *cix_in = max_cix + 1;
         ret = slice_array(tmp,0,tix-1);
         if (!pval) {
-            ret->item[0].type = T_NUMBER;
-            ret->item[0].u.number = plur_flag?0:1;
+            put_number(ret->item, plur_flag?0:1);
         }
-        free_vector(tmp);
+        free_array(tmp);
     }
 
-    stmp.type = T_POINTER;
-    stmp.u.vec = ret;
+    put_array(&stmp, ret);
     return &stmp;
 }
 
@@ -1508,12 +1492,12 @@ static struct svalue *living_parse(obvec, wvec, cix_in, fail)
     if (tix) {
         pval = item_parse(live, wvec, cix_in, fail);
         if (pval) {
-            free_vector(live);
+            free_array(live);
             return pval;
         }
     }
 
-    free_vector(live);
+    free_array(live);
 
     /* find_player */
     ob = find_living_object(wvec->item[*cix_in].u.string, 1);
@@ -1522,9 +1506,7 @@ static struct svalue *living_parse(obvec, wvec, cix_in, fail)
         ob = find_living_object(wvec->item[*cix_in].u.string, 0);
 
     if (ob) {
-        stmp.type = T_OBJECT;
-        stmp.u.ob = ob;
-        add_ref(ob, "living_parse");
+        put_ref_object(&stmp, ob, "living_parse");
         (*cix_in)++;
         return &stmp;
     }
@@ -1565,7 +1547,7 @@ static struct svalue *single_parse(obvec, wvec, cix_in, fail)
         if (match_object(obix, wvec, &cix, &plur_flag))
         {
             *cix_in = cix+1;
-            add_ref(osvp->u.ob, "single_parse");
+            (void)ref_object(osvp->u.ob, "single_parse");
             return osvp;
         }
         plur_flag = 0;
@@ -1632,7 +1614,7 @@ static struct svalue *prepos_parse(wvec, cix_in, fail, prepos)
           }
           if ( 0 != (tix = (tix == (int)VEC_SIZE(tvec))?1:0) )
               (*cix_in)+=VEC_SIZE(tvec);
-          free_vector(tvec);
+          free_array(tvec);
           if (tix)
               break;
       }
@@ -1800,7 +1782,7 @@ static int find_string(str, wvec, cix_in)
         if (!split || (VEC_SIZE(split) > (VEC_SIZE(wvec) - *cix_in)))
         {
             if (split)
-                free_vector(split);
+                free_array(split);
             continue;
         }
 
@@ -1944,20 +1926,18 @@ static char *parse_to_plural(str)
             (il+1 == (int)VEC_SIZE(words)))  {
             sp = parse_one_plural(words->item[il-1].u.string);
             if (sp != words->item[il-1].u.string) {
-                stmp.type = T_STRING;
-                stmp.x.string_type = STRING_MALLOC;
-                stmp.u.string = string_copy(sp);
+                put_malloced_string(&stmp, string_copy(sp));
                 transfer_svalue(&words->item[il-1],&stmp);
                 changed = 1;
             }
         }
     }
     if (!changed) {
-        free_vector(words);
+        free_array(words);
         return string_copy(str);
     }
     sp = implode_string(words, " ");
-    free_vector(words);
+    free_array(words);
     return sp;
 }
 
@@ -2092,7 +2072,7 @@ break_string(str, width, indent)
     }
 
     xfree(istr);
-    free_vector(lines);
+    free_array(lines);
 
     return fstr;
 

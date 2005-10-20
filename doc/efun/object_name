@@ -29,4 +29,4 @@ EXAMPLES
 	
 SEE ALSO
 	clone_object(E), load_name(E), load_object(E), find_object(E),
-        program_name(E), rename_object(E)
+        object_time(E), program_name(E), rename_object(E)

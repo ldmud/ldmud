@@ -5,7 +5,7 @@ SYNOPSIS
 DESCRIPTION
 	Returns an object pointer to the object that did a
 	call_other() to the current object, if any. There are two
-	exceptions for previous_object().  When the object calls a own
+	exceptions for previous_object().  When the object calls an own
 	function with a call_other() the previous_object() will be
 	unchanged and when a destructed object calls a function of the
 	current object previous_object() will return 0.

@@ -33,9 +33,8 @@ DESCRIPTION
 
 	H_LOAD_UIDS
 	H_CLONE_UIDS
-	  Mandatory hooks to determine the uid and euid (if the driver
-	  has been compiled for EUIDS) of loaded or cloned objects.
-	  Hook settings can be any closure:
+          Mandatory hooks to determine the uid and euid of loaded or cloned
+          objects.  Hook settings can be any closure:
 
 	    mixed <load_uids closure> (string objectname)
 	    mixed <clone_uids closure>(object blueprint, string objectname)
@@ -47,18 +46,19 @@ DESCRIPTION
 	  name as second argument.
 	  In both cases the new object already exists, but has 0 uids.
 
-	  The result of the call may be a string, or (if compiled for
-	  EUIDS) a two-element array with a string as first element.
-	  If the result of the call is a simple string, it is set as
-	  both the uid and euid, else uid and euid are set from the
-	  two elements of the array. If the second element is not a
-	  string, the euid is set to 0.
+          For the result, the following possibilities exist (<num> is
+          a non-zero number, <no-string> is anything but a string):
 
-	  If the driver is compiled for non-NATIVE_MODE, the second
-	  element of the returned array may be something else than a
-	  string, as long it is not zero, to set the uid to 0 as well.
-	  Also, returning a non-zero number from the call will set
-	  both uids to 0.
+             "<uid>"                    -> uid = "<uid>", euid = "<uid>"
+             ({ "<uid>", "<euid>" })    -> uid = "<uid>", euid = "<euid>"
+             ({ "<uid>", <no-string> }) -> uid = "<uid>", euid = 0
+
+          If strict-euids is not active, the following results are
+          possible, too:
+
+             <num>                      -> uid = 0, euid = 0
+             ({ <num>, "<euid>" })      -> uid = 0, euid = "<euid>"
+             ({ <num>, <no-string> })   -> uid = 0, euid = 0
 
 
 	H_CREATE_SUPER
@@ -109,9 +109,12 @@ DESCRIPTION
 
 	    void|int <closure> ( void )
 
-	  If the result of the call is a non-zero number, it is used
-	  as the interval to wait before the next reset(), else the default
-	  interval computed from TIME_TO_RESET is used.
+	  If the result of the call is a positive number, it is used
+	  as the interval to wait before the next reset().
+          If the result is 0, the default interval computed from
+          TIME_TO_RESET is used.
+          If the result is a negative number, the object will not be
+          reset again, unless directed otherwise by set_next_reset().
 
 	  If the hook is defined as the name of an lfun in the object,
 	  it is called in the object as
@@ -162,9 +165,37 @@ DESCRIPTION
 	  clean up this object will be done.
 
 
+        H_COMMAND
+          Optional hook to parse and execute commands. If this hook is used,
+          it bypasses the normal command parsing done by the driver (including
+          the MODIFY_COMMAND and NOTIFY_FAIL hooks).
+
+          The hook is called with two parameters: the command received
+          from the living (interactive user or NPC), and the living object
+          (the 'command giver') itself. The hook has to return non-0 if the
+          command was found and executed, and 0 otherwise.
+
+          At the time the hook is called, query_command() returns the command
+          string and this_player() returns the living object. query_verb() and
+          query_notify_fail() return 0.
+
+          If the hook is a string, it is the name of an lfun in the command
+          giver:
+
+              int <name>(string command, object command_giver)
+
+          If the hook is a closure, it is called as:
+
+              int <closure>(string command, object command_giver)
+
+          Lambda-closures are additionally bound to the command_giver.
+
+
 	H_MODIFY_COMMAND
 	  Optional hook to modify commands (both entered or given by a
-	  call to command()) before the parser sees them.
+	  call to command()) before the parser sees them (this includes
+          special commands like 'status').
+
 	  Hook setting can be any closure, the name of the function
 	  to call in the object, or a mapping.
 
@@ -203,16 +234,27 @@ DESCRIPTION
 	  If the result is 0, the originally given command is to be
 	  used (not available for closure settings).
 
+          It is possible for the hook to change the command giver
+          (this_player()) for the execution of the command. This means that
+          even though the commands are execute for the original commandgiver,
+          this_player() will return the changed commandgiver.
+
 
 	H_MODIFY_COMMAND_FNAME
 	  Mandatory hook specifying the name of the 'modify_command'
 	  function to call for newly entered commands as result of a
 	  set_modify_command().
+
 	  Hook setting must be a string.
 
 	  If set_modify_command() is used for an interactive user, all
 	  newly entered commands are first passed to the function
 	  named by this hook.
+
+          It is possible for the hook to change the command giver
+          (this_player()) for the execution of the command. This means that
+          even though the commands are execute for the original commandgiver,
+          this_player() will return the changed commandgiver.
 
 
 	H_NOTIFY_FAIL
@@ -225,10 +267,14 @@ DESCRIPTION
 	  player.
 	  If set to a closure, it is called as
 
-	    string <closure>(string entered_command)
+	    string <closure>(string entered_command, object cmd_giver)
 
 	  and the result is used as failure message. Lambda closures
 	  are bound to this_player() prior to execution.
+
+          <cmd_giver> is the object which received the command in
+          the first place. It is usually identical with this_player(),
+          unless the H_MODIFY_COMMAND hook changed it.
 
 
 	H_NO_IPC_SLOT
@@ -335,6 +381,7 @@ DESCRIPTION
 
 
 HISTORY
+        H_NOTIFY_FAIL recevied the new 'command_giver' argument in 3.2.7.
 	The hooks concept was introduced in 3.2.1
 	The hook for moving was introduced in 3.2.1@1
 	The hook for clean up was introduced in 3.2.1@34
@@ -347,10 +394,7 @@ HISTORY
 	The hook for telnet negotiation was introduced in 3.2.1@60.
 	The hooks for no-echo negotiation and erq-lossage notification
 	    were introduced in 3.2.1@85.
-
-AUTHOR
-	Mateese
-	minor corrections by Pepel
+        H_COMMAND was introducedin 3.2.7.
 
 SEE ALSO
-	native(C), set_driver_hook(E), set_modify_command(E)
+	native(C), set_driver_hook(E)

@@ -71,7 +71,7 @@ static char *esbrk PROT((u));
 #define sfree   xfree
 #define srealloc realloc
 
-#define SINT (SIZEOF_P_INT)
+#define SINT (SIZEOF_CHAR_P)
 
 #define SMALL_BLOCK_MAX (8)
 
@@ -169,7 +169,7 @@ int debugmalloc=0;        /* Only used when debuging malloc() */
 /********************************************************/
 
 #ifdef SMALLOC_TRACE
-static char *_large_malloc PROT((u, int, char *, int));
+static char *_large_malloc PROT((u, int, const char *, int));
 #define large_malloc(size, force_m) _large_malloc(size, force_m, file, line)
 #else
 static char *large_malloc();
@@ -186,7 +186,7 @@ static t_stat small_chunk_stat={0,0};
 #ifdef SMALLOC_TRACE
 POINTER smalloc(size, file, line)
   size_t size;
-  char *file; int line;
+  const char *file; int line;
 #else
 POINTER smalloc(size)
   size_t size;
@@ -1141,7 +1141,7 @@ static t_stat large_alloc_stat;
 static char *_large_malloc(size, force_more, file, line)
     u size;
     int force_more;
-    char *file; int line;
+    const char *file; int line;
 #else
 static char *large_malloc(size, force_more)
     u size;
@@ -1380,7 +1380,7 @@ dprintf1(2, "search length %d\n",search_length);
         }
         going_to_exit = 1;
         write(2, mess4, sizeof(mess4)-1);
-        (void)dump_trace(0);
+        (void)dump_trace(MY_FALSE);
 #ifdef DEBUG
         fatal("Out of memory\n");
 #else
@@ -1684,30 +1684,26 @@ static long malloc_increment_size_calls = 0;
 static long malloc_increment_size_success = 0;
 static long malloc_increment_size_total = 0;
 
-#define dump_stat(str,stat) add_message(str,stat.counter,stat.size)
-#define dump_stat2(str,stat) add_message (str,stat.counter,stat.size * SINT)
-void dump_malloc_data()
+#define dump_stat(str,stat) strbuf_addf(sbuf, str,stat.counter,stat.size)
+#define dump_stat2(str,stat) strbuf_addf(sbuf, str,stat.counter,stat.size * SINT)
+void dump_malloc_data(strbuf_t *sbuf)
 {
-  add_message("Type                   Count      Space (bytes)\n");
+  strbuf_add(sbuf, "Type                   Count      Space (bytes)\n");
   dump_stat("sbrk requests:     %8d        %10d (a)\n",sbrk_stat);
   dump_stat2("large blocks:      %8d        %10d (b)\n",large_alloc_stat);
   dump_stat2("large free blocks: %8d        %10d (c)\n\n",large_free_stat);
   dump_stat("small chunks:      %8d        %10d (d)\n",small_chunk_stat);
   dump_stat("small blocks:      %8d        %10d (e)\n",small_alloc_stat);
   dump_stat("small free blocks: %8d        %10d (f)\n",small_free_stat);
-  add_message(
+  strbuf_addf(sbuf,
 "unused from current chunk          %10ld (g)\n\n",unused_size);
-  add_message(
-"    Small blocks are stored in small chunks, which are allocated as\n");
-  add_message(
-"large blocks.  Therefore, the total large blocks allocated (b) plus\n");
-  add_message(
-"the large free blocks (c) should equal total storage from sbrk (a).\n");
-  add_message(
-"Similarly, (e) + (f) + (g) equals (d).  The total amount of storage\n");
-  add_message(
+  strbuf_add(sbuf,
+"    Small blocks are stored in small chunks, which are allocated as\n"
+"large blocks.  Therefore, the total large blocks allocated (b) plus\n"
+"the large free blocks (c) should equal total storage from sbrk (a).\n"
+"Similarly, (e) + (f) + (g) equals (d).  The total amount of storage\n"
 "wasted is (c) + (f) + (g); the amount allocated is (b) - (f) - (g).\n");
-  add_message(
+  strbuf_addf(sbuf,
     "malloc_increment_size: calls %ld success %ld total %ld\n",
     malloc_increment_size_calls,
     malloc_increment_size_success,
@@ -1789,19 +1785,23 @@ static void write_lpc_trace(d, p)
     u *p;
 {
     struct object *obj, *o;
-    char *pc;
+    bytecode_p pc;
     struct program *prog;
     int line;
     int32 id;
 
-    if ( (obj = (struct object *)p[M_OBJ]) ) {
+    if ( NULL != (obj = (struct object *)p[M_OBJ]) ) {
         WRITES(d, "Object: ");
-        for(o = obj_list; o && o != obj; o = o->next_all);
-        if (o && !(o->flags & O_DESTRUCTED)) WRITES(d, o->name);
-        else WRITES(d, "Doesn't exist anymore."); /* TODO: Can't happen */
+        if (obj->flags & O_DESTRUCTED)
+            WRITES(d, "(destructed) ");
+        for(o = obj_list; o && o != obj; o = o->next_all) NOOP;
+        if (!o)
+            WRITES(d, "(not in list) ");
+        else if (o->name)
+            WRITES(d, o->name); /* TODO: If this cores, it has to go again */
     }
     WRITES(d, "\n");
-    if ( (id = p[M_PROG]) ) {
+    if ( 0 != (id = p[M_PROG]) ) {
         WRITES(d, "Program: ");
         for (o = obj_list;
           o && !(o->flags & O_DESTRUCTED) &&
@@ -1809,7 +1809,7 @@ static void write_lpc_trace(d, p)
             o = o->next_all;
         /* Unlikely, but possible: ids might have been renumbered. */
         if (o) {
-            pc = (char *)p[M_PC];
+            pc = (bytecode_p)p[M_PC];
             prog = o->prog;
             if (prog->program > pc || pc > PROGRAM_END(*prog))
                 o = 0;
@@ -1904,7 +1904,10 @@ void clear_M_REF_flags() {
             *p |= M_REF;
         }
     }
+#if 0
+    /* TODO: DEBUG_SMALLOC code */
     first_showsmallnewmalloced_call = 1;
+#endif
 }
 
 #if 0
@@ -2003,10 +2006,9 @@ void free_unreferenced_memory() {
         dprintf1(gout, "%d small blocks freed\n", success);
     }
 }
-char *malloc_increment_size(p, size)
-    char *p;
-    p_int size;
+void *malloc_increment_size(void *vp, size_t size)
 {
+    char *p = vp;
     p_uint *start, *start2, *start3, old_size, next;
 
     malloc_increment_size_calls++;
@@ -2026,7 +2028,7 @@ char *malloc_increment_size(p, size)
         malloc_increment_size_success++;
         malloc_increment_size_total += (start2 - start) - OVERHEAD;
         count_add(large_alloc_stat, size);
-        return (char*)start2;
+        return (void*)start2;
     }
     if (next >= (p_uint)size + SMALL_BLOCK_MAX + OVERHEAD) {
         remove_from_free_list(start2);
@@ -2038,12 +2040,13 @@ char *malloc_increment_size(p, size)
         malloc_increment_size_success++;
         malloc_increment_size_total += (start2 - start) - OVERHEAD;
         count_add(large_alloc_stat, size);
-        return (char*)start2;
+        return (void*)start2;
     }
     return 0;
 }
 
 
+#if 0
 /*
  * Functions below can be used to debug malloc.
  */
@@ -2083,7 +2086,6 @@ void walk_new_small_malloced(func)
     }
 }
 
-#if 0
 
 int debugmalloc;
 /*

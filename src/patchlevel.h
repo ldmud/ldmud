@@ -2,16 +2,16 @@
 #define __PATCHLEVEL_H__ 1
 
 /* $Format: "#define RELEASE_DATE \"$ProjectDate$\""$ */
-#define RELEASE_DATE "Wed, 31 Mar 1999 03:48:20 +0100"
+#define RELEASE_DATE "Thu, 19 Aug 1999 15:36:37 -0700"
 
 /* $Format: "#define PROJ_VERSION \"$ProjectVersion$\""$ */
-#define PROJ_VERSION "3-2-rel.6"
+#define PROJ_VERSION "3-2-rel.7"
 
 /* $Format: "#define GAME_VERSION \"$ReleaseVersion$\""$ */
-#define GAME_VERSION "3.2.6"
+#define GAME_VERSION "3.2.7"
 
 /* $Format: "#define LONG_VERSION \"$ReleaseVersion$-$ReleaseType$.$ProjectMinorVersion$\""$ */
-#define LONG_VERSION "3.2.6-rel.6"
+#define LONG_VERSION "3.2.7-rel.7"
 
 /* $Format: "#define LOCAL_LEVEL \"\""$ */
 #define LOCAL_LEVEL ""

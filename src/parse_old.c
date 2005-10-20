@@ -19,6 +19,7 @@
 
 #include "parse.h"
 
+#include "actions.h"
 #include "array.h"
 #include "interpret.h"
 #include "main.h"
@@ -189,8 +190,8 @@ static void fixlist (first, parent, antal)
     if (cur->contains) fixlist(cur->contains,&this,antal);
     taill=this;
     this=(struct altern_objects *) xalloc(sizeof(struct altern_objects));
-    this->ao_obj=cur; (*antal)++;
-    add_ref(cur,"parse->fixlist");
+    this->ao_obj=ref_object(cur, "parse->fixlist");
+    (*antal)++;
     if (gDebug) fprintf(stderr," Obj:%s ,",cur->name);
     this->next=taill; cur=cur->next_inv;
   }
@@ -295,8 +296,8 @@ static void italt_put (obj)
   ao=(struct altern_objects *) xalloc(sizeof(struct altern_objects));
   if (old) old->next=ao;
   else gPobjects=ao;
-  ao->ao_obj=obj; ao->next=0;
-  add_ref(obj,"parse->italt_put()");
+  ao->ao_obj=ref_object(obj, "parse->italt_put()");
+  ao->next=0;
   if (gDebug) fprintf(stderr,"..done\n");
 }
 
@@ -681,20 +682,18 @@ static int findobject (cmd)
       if (gDebug) fprintf(stderr,"Assign array\n");
       nm=itnumalt();
       p=(VECTOR *)allocate_array(nm+1);
-      p->item[0].type = T_NUMBER;
-      p->item[0].u.number = gWantnum;
+      put_number(p->item, gWantnum);
 
       /* Make array in reverse order from italt() because
          makeobjlist() has reversed the order on entry
       */
       for (s=1;s<=nm;s++) {
-        p->item[s].type = T_OBJECT;
-        p->item[s].u.ob = ob = italt(nm+1-s);
+        ob = italt(nm+1-s);
+        put_object(p->item+s, ob);
         if (!ob) if (gDebug) fprintf(stderr,"No object from italt %d\n",s);
-        if (ob) add_ref(ob,"parse_command");
+        if (ob) ref_object(ob,"parse_command");
       }
-      sv_tmp.type = T_POINTER;
-      sv_tmp.u.vec = p;
+      put_array(&sv_tmp, p);
       transfer_svalue(gCarg->u.lvalue, &sv_tmp);
 #if 0 /* amylaar: the ref count is already set by allocate_array */
       gCarg->u.lvalue->u.vec->ref++;
@@ -724,9 +723,7 @@ static OBJECT *findplay (cmd)
   if (pn) {
     getfirst(cmd);
     if (gCarg) {
-      sv_tmp.type = T_OBJECT;
-      sv_tmp.u.ob = pn;
-      add_ref(pn, "parse_command(%l)");
+      put_ref_object(&sv_tmp, pn, "parse_command(%l)");
       transfer_svalue(gCarg->u.lvalue, &sv_tmp);
     }
   }
@@ -786,9 +783,7 @@ static int findprepos (cmd)
     if (strcmp(w,hard_prep[cnt])==0) {
       getfirst(cmd); /* Skip this word */
       if (gCarg) {
-        sv_tmp.type = T_STRING;
-        sv_tmp.x.string_type = STRING_MALLOC;
-        sv_tmp.u.string = string_copy(w);
+        put_malloced_string(&sv_tmp, string_copy(w));
         transfer_svalue(gCarg->u.lvalue, &sv_tmp);
         return 1;
       }
@@ -805,8 +800,7 @@ static int findsingle (cmd)
 {
   if (finditem(cmd,0)) {
     if ((itnumalt()==1) && (gCarg)) {
-      sv_tmp.type = T_OBJECT;
-      add_ref( sv_tmp.u.ob=italt(1), "parse_command(%o)" );
+      put_ref_object(&sv_tmp, italt(1), "parse_command(%o)" );
       transfer_svalue(gCarg->u.lvalue, &sv_tmp);
     }
     return 1;
@@ -865,9 +859,7 @@ static void addword (d, s)
     strcat(d,s);
   }
   if (gTxarg) {
-    sv_tmp.type = T_STRING;
-    sv_tmp.x.string_type = STRING_MALLOC;
-    sv_tmp.u.string = string_copy(d);
+    put_malloced_string(&sv_tmp, string_copy(d));
     transfer_svalue(gTxarg->u.lvalue, &sv_tmp);
   }
 }
@@ -986,8 +978,7 @@ int parse (cs, ob_or_array, ps, dest_args, num_arg)
     case NUM: /* %d */
       if ((altflag=numeric(lookfirst(cmd)))>0) {
         if (gCarg) {
-          sv_tmp.type = T_NUMBER;
-          sv_tmp.u.number = altflag;
+          put_number(&sv_tmp, altflag);
           transfer_svalue(gCarg->u.lvalue, &sv_tmp);
         }
         altflag=1; getfirst(&cmd);

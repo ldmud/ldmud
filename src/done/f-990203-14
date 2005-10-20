@@ -2,7 +2,7 @@ Short: New efuns for bitstrings
 From: Matthew Julius <julius.2@wright.edu>
 Date: Fri, 08 Jan 1999 16:29:08 -0500
 Type: Feature
-State: Unclassified
+State: Done - implemented in 3.2.7-dev.120
 
 string or_bits(string, string)
 string xor_bits(string, string)
@@ -16,4 +16,4 @@ int next_bit(string|int, int)
 
 > well, then also a way to find the next 0 bit, please.
 
-
+int last_bit(string, int)

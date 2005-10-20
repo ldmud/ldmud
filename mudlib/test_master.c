@@ -19,7 +19,7 @@
 void inaugurate_master (int arg)
 
 // Initialise the master object.
-// We have to set the uid hooks, else we can't clone a login object.
+// We have to set the uid hooks, otherwise we can't clone a login object.
 
 {
   set_driver_hook(2, unbound_lambda(({}), "uid"));
@@ -73,8 +73,8 @@ static nomask mixed logon ()
 
 {
   debug_message(sprintf("%O: logon()\n", this_object()));
-  write("\nAmylaar LPMud " __VERSION__ "\n\n----------\n");
-  debug_info(4,0);
+  write("\nLDMud " __VERSION__ "\n\n----------\n");
+  write(debug_info(4,0));
   write("----------\n\n> ");
   enable_commands();
   add_action("f_help", "help");

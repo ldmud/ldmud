@@ -29,7 +29,6 @@
 
 #include <sys/types.h>
 
-#define NO_INCREMENT_STRING_REF
 #include "ptrtable.h"
 
 #include "simulate.h"
@@ -50,7 +49,7 @@ struct sub_table
 {
     struct pointer_record *records[PTABLE_SIZE];
       /* The table of hash chains */
-    char used[PTABLE_SIZE / CHARBITS];
+    char used[PTABLE_SIZE / CHAR_BIT];
       /* Bitvector denoting which record[] entries are valid */
     struct sub_table *next_all;  /* Next subtable in global list */
 };
@@ -64,7 +63,7 @@ struct pointer_table
       /* The top-level hashtable.
        */
 
-    char hash_usage[ PTABLE_SIZE * 2 / CHARBITS ];
+    char hash_usage[ PTABLE_SIZE * 2 / CHAR_BIT ];
      /* Bit vector describing the state of every entry in table[],
       * two bits each.
       *
@@ -132,7 +131,7 @@ free_pointer_table (struct pointer_table *ptable)
 
 /*-------------------------------------------------------------------------*/
 struct pointer_record *
-find_add_pointer (struct pointer_table *ptable, void *pointer, /* TODO: BOOL */ int bAdd)
+find_add_pointer (struct pointer_table *ptable, void *pointer, Bool bAdd)
 
 /* Lookup the <pointer> in the <ptable> and return the pointer to its
  * pointer_record. If the <pointer> is not registered yet and <bAdd> is
@@ -159,8 +158,8 @@ find_add_pointer (struct pointer_table *ptable, void *pointer, /* TODO: BOOL */ 
     hash = key ^ key >> 16;
     hash ^= hash >> 8;
     hash &= (PTABLE_SIZE-1);
-    mask = 1 << (hash & (CHARBITS-1));
-    /* TODO: this statement assumes CHARBITS == 8 */
+    mask = 1 << (hash & (CHAR_BIT-1));
+    /* TODO: this statement assumes CHAR_BIT == 8 */
     usage_p = ptable->hash_usage + (hash >> 2 & ~1);
 
     insert = &(ptable->table[hash]);
@@ -186,8 +185,8 @@ find_add_pointer (struct pointer_table *ptable, void *pointer, /* TODO: BOOL */ 
             table = *(struct sub_table**)insert;
 
             hash = (key ^ key >> 16) & (PTABLE_SIZE-1);
-            mask = 1 << (hash & (CHARBITS-1));
-            /* TODO: this statement assumes CHARBITS == 8 */
+            mask = 1 << (hash & (CHAR_BIT-1));
+            /* TODO: this statement assumes CHAR_BIT == 8 */
             usage_p = &table->used[hash >> 3];
 
             insert = &table->records[hash];
@@ -238,7 +237,7 @@ find_add_pointer (struct pointer_table *ptable, void *pointer, /* TODO: BOOL */ 
 
             /* TODO: This code yaddayadda... */
             old_hash = (old->key ^ old->key >> 16) & (PTABLE_SIZE-1);
-            table->used[old_hash >> 3] |= 1 << (old_hash & (CHARBITS-1));
+            table->used[old_hash >> 3] |= 1 << (old_hash & (CHAR_BIT-1));
             table->records[old_hash] = old;
 
             /* Compute the position for the new entry */
@@ -249,7 +248,7 @@ find_add_pointer (struct pointer_table *ptable, void *pointer, /* TODO: BOOL */ 
                 old = NULL;
             }
             insert = &table->records[hash];
-            mask = 1 << (hash & (CHARBITS-1));
+            mask = 1 << (hash & (CHAR_BIT-1));
             usage_p = &table->used[hash >> 3];
         }
     }

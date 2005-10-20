@@ -33,4 +33,5 @@ EXAMPLES
 	contains "78".
 
 SEE ALSO
-	set_bit(E), test_bit(E)
+        set_bit(E), next_bit(E), last_bit(E), test_bit(E), count_bits(E),
+        and_bits(E), or_bits(E), xor_bits(E), invert_bits(E)

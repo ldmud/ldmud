@@ -1,0 +1,94 @@
+
+# These lines are needed on some machines.
+MAKE=make
+SHELL=@CONFIG_SHELL@
+INSTALL=@INSTALL@
+mkinstalldirs=$(SHELL) @top_srcdir@/mkinstalldirs
+#
+CC=@CC@
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+
+SUBDIRS = indent make_docs @erq_sub@
+SED = sed
+
+BINDIR=@bindir@
+MUD_LIB=@libdir@
+
+#PROFIL= -DOPCPROF -DVERBOSE_OPCPROF
+#PROFIL=-p -DMARK
+#PROFIL=-pg
+PROFIL=
+#Enable warnings from the compiler, if wanted.
+WARN= # no warning options - will work with all compilers :-)
+#WARN= -Wall -Wshadow -Dlint
+#WARN= -Wall -Wshadow -Wno-parentheses # gcc settings
+#
+# Optimization and source level debugging options.
+# adding a -fomit-frame-pointer on the NeXT (gcc version 1.93 (68k, MIT syntax))
+# will corrupt the driver.
+OPTIMIZE = @OCFLAGS@ # high optimization
+#OPTIMIZE= @MCFLAGS@ # for better debugging
+#OPTIMIZE= @DCFLAGS@ # no optimization; for frequent recompilations.
+#
+# debugging options: [-DDEBUG] [-DYYDEBUG|-DYYDEBUG=1] [-DTRACE_CODE]
+# -DDEBUG: Enable run time debugging. It will use more time and space.
+# When the flag is changed, be sure to recompile everything.
+# Simply comment out this line if not wanted.
+# If you change anything in the source, you are strongly encouraged to have
+# DEBUG defined.
+# If you will not change anything, you are still encouraged to have
+# it defined, if you want to locate any game driver bugs.
+#DEBUG=-DDEBUG -DTRACE_CODE
+DEBUG=
+#
+MPATH=-DMUD_LIB='"$(MUD_LIB)"' -DBINDIR='"$(BINDIR)"'
+#
+CFLAGS= @EXTRA_CFLAGS@ $(OPTIMIZE) $(DEBUG) $(WARN) $(MPATH) $(PROFIL)
+#
+LIBS=@LIBS@
+#
+LDFLAGS=@LDFLAGS@
+
+
+
+all:	subs fundesc
+
+subs:
+	for i in $(SUBDIRS) ;\
+	do \
+	(cd $$i ; echo "Making $$i." ;\
+	$(MAKE) );\
+	done
+
+FORCE: install
+
+fundesc:
+	$(CC) fundesc.c -o fundesc
+
+install-fundesc: fundesc
+	$(mkinstalldirs) $(BINDIR)
+	$(INSTALL) fundesc $(BINDIR)/fundesc
+
+install-subs:
+	for i in $(SUBDIRS) ;\
+	do \
+	(cd $$i ; echo "Installing in $$i." ;\
+	$(MAKE) $(MFLAGS) BINDIR=$(BINDIR) install);\
+	done
+
+# erq is installed with the subs (if needed). [Mubo]
+#
+install: install-fundesc install-subs
+#	$(SED) -e "s;MUD_LIB;$(MUD_LIB);" \
+#	-e "s;BINDIR;$(BINDIR);" restart_mud > $(BINDIR)/restart_mud
+#	-chmod 775 $(BINDIR)/restart_mud
+
+clean:
+	-rm -f *.o fundesc *~
+	for i in $(SUBDIRS) ;\
+	do \
+	(cd $$i ; echo "Cleaning in $$i." ;\
+	$(MAKE) clean);\
+	done

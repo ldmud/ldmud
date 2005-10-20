@@ -70,36 +70,3 @@ will reflect the object doing bind_lambda(), and all object / uid based
 security will also refer to this object.
 
 
-The following is mostly vapourware.
-
-Well, another application would be that some things in the driver can be,
-sort of, microprogrammed.
-The master object could set some hooks in inaugurate_master(), like creating
-the code for move_object(), using a primitive low_move_object() or
-__move_object() or such. All calls of init(), exit(), etc. can thus be
-controlled on mudlib level.
-The driver would do an implicit bind_lambda() to the victim when the closure
-is used.
-
-e.g.
-({#'?, ({#'=, 'ob, ({#'first_inventory, 'destination}) }),
-    ({#'do,
-	({#'call_other, 'ob, "init"}),
-    ({#'=, 'ob, ({#'next_inventory, 'ob}) }), 0 })
-})
-
-or
-
-({#'filter_objects, ({#'all_inventory, 'destination}), "init"})
-/* Won't show init failures due to move/destruct */
-
-is equivalent to
-
-if (ob = first_inventory(destination) ) {
-    do {
-	ob->init();
-    } while(ob = next_inventory(ob) );
-}
-
-and it's speed is mainly determined by the call_other. Thus, it shouldn't be
-noticably slower than the current C code in move_object().

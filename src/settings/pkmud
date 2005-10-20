@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# Settings for the PkMud mudlib.
+#
+# configure will strip this part from the script.
+
+exec ./configure --prefix=/u/mud --libexec=/u/mud/erq --with-setting=pkmud $*
+exit 1
+
+# --- The actual settings ---
+
+enable_access_control=no
+
+with_time_to_clean_up=21600
+with_time_to_swap=5400
+with_time_to_swap_variables=10800
+with_time_to_reset=2700
+
+with_portno=4711
+with_maxnumports=1
+
+with_max_local=20
+
+with_swap_file=/u/mud/swap/swapfile.325
+
+with_max_array_size=5000
+with_max_players=100
+
+with_reserved_user_size=800000
+with_reserved_master_size=50000
+with_reserved_system_size=100000
+
+with_htable_size=16384
+with_otable_size=4096
+
+with_defmax=48000
+with_apply_cache_bits=10
+
+enable_compat_mode=no
+enable_strict_euids=yes
+
+enable_supply_parse_command=no
+enable_initialization_by___init=yes
+
+enable_min_malloced=yes
+with_min_malloced=0x80000
+enable_max_malloced=yes
+with_max_malloced=0x5000000
+with_max_small_malloced=0x2000000

@@ -1,7 +1,7 @@
 Short: ACCESS.ALLOW should take ports into account
 Date: 981211
 Type: Feature
-State: Acknowledged
+State: Done - implemented in 3.2.7-dev.120
 From: Gokhan Moral <gm@Bilkent.EDU.TR>
 
 I noticed that the multiport support is already there, this is fine.

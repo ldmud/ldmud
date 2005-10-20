@@ -1,4 +1,3 @@
-PRELIMINARY
 SYNOPSIS
 	mixed * filter (mixed *arg, string fun, object ob, mixed extra...)
 	mixed * filter (mixed *arg, closure cl, mixed extra...)

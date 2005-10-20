@@ -1,23 +1,58 @@
-This is a brief description of how to install LPmud 3.2 on a unix host:
+TODO: This file needs a serious rewrite.
 
-After you unpacked, you will have a directory 'ldmud-xxx' containing the
-subdirectories 'doc' and 'src' (at least). Add two more subdirectories
-'bin' and 'lib'.
 
-cd to src. execute ./configure . This will check for a number of site
-specific settings, and can take about a minute or two.
-For NeXT-Step 2.1, supply --with-target=NeXT .
+Unix or Unix-like system
+------------------------
 
-Edit the Makefile, defining where the lib and bin is. Check definitions
-in config.h, most are probably good as they are. The ones that are
-important wrt. which mudlibs can be run are COMPAT_MODE NATIVE_MODE
-OLD_PREVIOUS_OBJECT_BEHAVIOUR OLD_EXPLODE_BEHAVIOUR INITIALIZATION_BY___INIT
-You get the most 2.4.5 compatibility if you define all of these but
-NATIVE_MODE . Likewise, you get the most 3.0 compatibility when you define
-all but COMPAT_MODE. The most interesting configuration is probably not
-to set any of these.
+  The driver uses a standard autoconfiguration system. To prepare the
+  compilation, execute the 'configure' script from within the src/ directory.
 
-Do 'make install' and 'make install.utils'.
+  configure checks for a number of site specific settings and uses this
+  information to create the files machine.h (from machine.h.in), Makefile
+  (from Makefile.in) and config.h (from config.h.in). We'll come back to
+  config.h below.
+
+  configure takes a lot of arguments (--help will tell you everything),
+  but the most important are these:
+
+    --prefix=PREFIX:  the base directory for the mud installation,
+                        defaults to /usr/local/mud .
+    --bindir=DIR:     the directory to install the executables in,
+                        defaults to ${PREFIX}/bin .
+    --libdir=DIR:     the directory where the mudlib is found,
+                        defaults to ${PREFIX}/lib .
+    --libexecdir=DIR: the directory where the programs for the ERQ are found,
+                        defaults to ${PREFIX}/libexec .
+
+  These settings are written into the Makefile and compiled into the driver,
+  just the mudlib directory setting can be changed with a commandline
+  argument.
+
+  A lot of the drivers parameters can be tweaked for better performance; these
+  parameters are defined in config.h . This file too is created by configure,
+  which provides sensible defaults for all parameters for which no explicite
+  setting is provided. To tweak a setting yourself, pass the argument
+  '--enable-<option>=yes|no' resp. '--with-<option>=<value>' to configure on
+  the commandline.
+
+  Alternatively, the indivial specifications can be collected in a settings
+  file, which is stored in the directory src/settings/. To use the
+  setting file <osb>, give '--with-<osb>' as argument to configure. The
+  file src/settings/default documents the available settings. The setting
+  files are self-executing: './settings/<foo> [<extra-configure-args>]' will
+  start configure with the proper commandline arguments.
+
+
+  After configuration is finished, you may want to modify the Makefile
+  to fine tune those parameters which are not covered by the configuration.
+
+  The compilation is done using make. Following targets are implemented:
+
+    <none>:        compile the driver
+    install:       compile the driver and install it in ${bindir}
+    utils:         compile the utilities, especially the ERQ demon
+    install-utils: compile and install the utilities in ${bindir}
+
 
 Get a mudlib. One way to do this is to get the source to 2.4.5, which includes
 a mudlib in the directory 'mudlib'. Copy all those files into your 'lib'
@@ -36,3 +71,61 @@ Test the game with 'driver &'.
 If you see the message 'Setting up ipc', then you are up and running.
 Test with 'telnet localhost 4242' ; that is, when you change the port
 number in config.h , the changed number does apply.
+
+
+BeOS
+----
+  Under BeOS, the driver can be configured and compiled in two ways:
+
+  1. Using the provided configuration files.
+
+    Copy the files machine.h, config.h and Makefile from src/hosts/be/
+    to src/. You may have to edit config.h and Makefile if you have
+    to use a specific mudlib with exotic settings.
+
+    Advantage of this method is that the Makefile allows cross-compilation
+    and covers Be specifics like file icon, type and version.
+
+  2. Use the Unix configure mechanism.
+
+    In general just follow the instructions given for Unix systems, but
+    be aware of the follwing:
+
+     - start the configure script with
+
+       CC="$BE_C_COMPILER" EXTRA_CFLAGS="$BE_DEFAULT_C_FLAGS" ./configure
+
+       or if the script stumbles over the compiler, even try
+
+       CC=cc EXTRA_CFLAGS="$BE_DEFAULT_C_FLAGS" ./configure
+
+     - on BeOS/PPC, add '-relax_pointers' to the EXTRA_CFLAGS
+     - the created executable will have neither icon nor type.
+     - cross compilation is not supported.
+     - the Makefile defaults to best optimization which needs a lot
+       of memory during compilation.
+
+
+Windows 95/98/NT
+----------------
+
+  To compile the gamedriver for Windows, you need the 'Cygwin' package,
+  which is a port of gcc, bash, and other GNU/Unix programs. Once it
+  is installed and running, the procedure is the same as under Unix.
+
+  CygWin is available from <URL:http://sourceware.cygnus.com/cygwin/>,
+  and the homepage is <URL:http://www.cygnus.com/>.
+
+  One common pitfall is that the installation does not create the '/bin'
+  directory in which the CygWin executables are expected. A typical
+  error message would be 'make: /bin/sh not found'.
+
+  Solution 1: Create a directory 'bin' in your search path (e.g. c:\bin)
+    and copy all required executables (in this case 'sh.exe') into
+    that directory.
+
+  Solution 2 (this can be done in a script): cd into the directory
+    where the executables are stored, e.g.
+    /compiler/Cygnus/B19/H-i386-cygwin32/bin . In this directory, give
+    the command 'mount $PWD /bin'.
+

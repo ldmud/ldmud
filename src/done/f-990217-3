@@ -2,6 +2,6 @@ Short: new efun all_previous_object()
 From: Holger@Wunderland
 Date: 990217
 Type: Feature
-State: Unclassified
+State: Done - implemented in 3.2.6 as caller_stack().
 
 Returns the current callstack.

@@ -16,4 +16,4 @@ HISTORY
 
 SEE ALSO
 	sin(E), asin(E), cos(E), acos(E), tan(E), atan(E), log(E),
-	exp(E), sqrt(E)
+	exp(E), sqrt(E), floor(E), ceil(E), pow(E)

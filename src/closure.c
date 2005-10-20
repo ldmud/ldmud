@@ -6,9 +6,10 @@
 #endif
 #include <stdio.h>
 
-#define NO_INCREMENT_STRING_REF
+#define NO_REF_STRING
 #include "closure.h"
 #include "array.h"
+#include "backend.h"
 #include "exec.h"
 #include "interpret.h"
 #include "instrs.h"
@@ -21,12 +22,14 @@
 #include "simul_efun.h"
 #include "switch.h"
 
-/* maximum recursion depth for compile_value */
 #define MAX_LAMBDA_LEVELS 0x8000;
+  /* Maximum recursion depth for compile_value.
+   */
 
 #define SYMTAB_START_SIZE 16
 #define CODE_BUFFER_START_SIZE 1024
 #define VALUE_START_MAX 0x20
+  /* TODO: ??? */
 
 #define ZERO_ACCEPTED        0x01 /* a return value of zero need not be coded */
 #define VOID_ACCEPTED        0x02 /* any return value can be left out */
@@ -43,14 +46,18 @@
 #define UNIMPLEMENTED \
         lambda_error("Unimplemented - contact amylaar@mail.cs.tu-berlin.de\n");
 
-static void insert_value_push PROT((struct svalue *));
+/*-------------------------------------------------------------------------*/
+/* Forward declarations */
 
+static void insert_value_push(struct svalue *);
+
+/*-------------------------------------------------------------------------*/
 static INLINE int function_cmp(name, prog, ix)
     char *name;
     struct program *prog;
     int ix;
 {
-    int32 flags;
+    uint32 flags;
 
     ix = prog->function_names[ix];
     flags = prog->functions[ix];
@@ -139,12 +146,7 @@ struct lambda_replace_program_protector {
     struct svalue block;
 };
 
-int lambda_ref_replace_program(l, type, size, args, block)
-    struct lambda *l;
-    int type;
-    p_int size;
-    struct vector *args;
-    struct svalue *block;
+int lambda_ref_replace_program(struct lambda *l, int type, p_int size, struct vector *args, struct svalue *block)
 {
     struct replace_ob *r_ob;
 
@@ -156,13 +158,12 @@ int lambda_ref_replace_program(l, type, size, args, block)
             lrpp = (struct lambda_replace_program_protector *)
                 xalloc(sizeof *lrpp);
             lrpp->l.u.lambda = l;
-            lrpp->l.x.closure_type = type;
+            lrpp->l.x.closure_type = (short)type;
             lrpp->next = r_ob->lambda_rpp;
             r_ob->lambda_rpp = lrpp;
             if (size) {
                 lrpp->size = size;
-                args->ref++;
-                lrpp->args = args;
+                lrpp->args = ref_array(args);
                 assign_svalue_no_free(&lrpp->block, block);
             }
             return 1;
@@ -179,11 +180,11 @@ void set_closure_user(svp, owner)
 
     if ( !CLOSURE_MALLOCED(type = svp->x.closure_type) ) {
         free_object(svp->u.ob, "set_closure_user");
-        svp->u.ob = owner;
+        svp->u.ob = ref_object(owner, "set_closure_user");
     } else if (type == CLOSURE_PRELIMINARY) {
         int ix;
         struct lambda *l;
-        int32 flags;
+        uint32 flags;
         struct program *prog;
 
         prog = owner->prog;
@@ -210,10 +211,9 @@ void set_closure_user(svp, owner)
             svp->x.closure_type = CLOSURE_LFUN;
         }
         free_object(l->ob, "closure");
-        l->function.index = ix;
-        l->ob = owner;
+        l->function.index = (unsigned short)ix;
+        l->ob = ref_object(owner, "set_closure_user");
     }
-    add_ref(owner, "set_closure_user");
 }
 
 void replace_program_lambda_adjust(r_ob)
@@ -237,13 +237,12 @@ void replace_program_lambda_adjust(r_ob)
                 if (i < 0 || i >= r_ob->new_prog->num_functions) {
                     assert_master_ob_loaded();
                     free_object(l->ob, "replace_program_lambda_adjust");
-                    add_ref(
-                      l->ob = master_ob, "replace_program_lambda_adjust");
+                    l->ob = ref_object(master_ob, "replace_program_lambda_adjust");
                     i = find_function(
                         findstring("dangling_lfun_closure"),
                         master_ob->prog
                     );
-                    l->function.index = i < 0 ? 0 : i;
+                    l->function.index = (unsigned short)(i < 0 ? 0 : i);
                 }
             } else if (lrpp->l.x.closure_type == CLOSURE_ALIEN_LFUN) {
                 struct lambda *l;
@@ -257,15 +256,14 @@ void replace_program_lambda_adjust(r_ob)
                       l->function.alien.ob,
                       "replace_program_lambda_adjust"
                     );
-                    add_ref(
-                      l->function.alien.ob = master_ob,
+                      l->function.alien.ob = ref_object(master_ob,
                       "replace_program_lambda_adjust"
                     );
                     i = find_function(
                         findstring("dangling_lfun_closure"),
                         master_ob->prog
                     );
-                    l->function.index = i < 0 ? 0 : i;
+                    l->function.index =  (unsigned short)(i < 0 ? 0 :i);
                 }
             } else /* CLOSURE_IDENTIFIER */ {
                 struct lambda *l;
@@ -274,15 +272,19 @@ void replace_program_lambda_adjust(r_ob)
                 l = lrpp->l.u.lambda;
                 i = l->function.index -= r_ob->var_offset;
                 if (i >= r_ob->new_prog->num_variables) {
-                    l->function.index = -1;
+                    l->function.index = (unsigned short)-1;
+                    /* TODO: This value should be properly publicized and
+                     * TODO:: tested - especially in F_TO_STRING and
+                     * TODO:: sprintf().
+                     */
                 }
             }
         }
     } while ( NULL != (lrpp = lrpp->next) );
     lrpp = r_ob->lambda_rpp;
-    error_recovery_info.last = error_recovery_pointer;
-    error_recovery_info.type = ERROR_RECOVERY_BACKEND;
-    error_recovery_pointer = &error_recovery_info;
+    error_recovery_info.rt.last = rt_context;
+    error_recovery_info.rt.type = ERROR_RECOVERY_BACKEND;
+    rt_context = (rt_context_t *)&error_recovery_info;
     if (setjmp(error_recovery_info.con.text)) {
         unsigned char *p;
 
@@ -290,7 +292,7 @@ void replace_program_lambda_adjust(r_ob)
         p = (unsigned char *)lrpp->l.u.lambda->function.code;
         p[3] = F_ESCAPE - F_OFFSET;
         p[4] = F_UNDEF - F_OFFSET - 0x100;
-        free_vector(lrpp->args);
+        free_array(lrpp->args);
         free_svalue(&lrpp->block);
         free_closure(&lrpp->l);
         next_lrpp = lrpp->next;
@@ -323,16 +325,16 @@ void replace_program_lambda_adjust(r_ob)
             }
             while (--num_values >= 0)
                 transfer_svalue(--svp, --svp2);
-            memcpy(l->function.code, l2->function.code, code_size2);
+            memcpy(l->function.code, l2->function.code, (size_t)code_size2);
             xfree((char *)svp2);
-            free_vector(lrpp->args);
+            free_array(lrpp->args);
             free_svalue(&lrpp->block);
         }
         free_closure(&lrpp->l);
         next_lrpp = lrpp->next;
         xfree((char*)lrpp);
     } while ( NULL != (lrpp = next_lrpp) );
-    error_recovery_pointer = error_recovery_info.last;
+    rt_context = error_recovery_info.rt.last;
 }
 
 void closure_literal(dest, ix)
@@ -340,11 +342,12 @@ void closure_literal(dest, ix)
     int ix;
 {
     struct lambda *l;
-    int32 flags;
+    uint32 flags;
     struct program *prog;
 
     l = (struct lambda *)
         xalloc(sizeof *l - sizeof l->function + sizeof l->function.index);
+    /* TODO: if (!l) return dest set to number 0 */
     l->ref = 1;
     prog = current_object->prog;
     if ( !(prog->flags & P_REPLACE_ACTIVE) ||
@@ -368,9 +371,8 @@ void closure_literal(dest, ix)
         }
         dest->x.closure_type = CLOSURE_LFUN;
     }
-    l->ob = current_object;
-    l->function.index = ix;
-    add_ref(current_object, "closure");
+    l->ob = ref_object(current_object, "closure");
+    l->function.index = (unsigned short)ix;
     dest->type = T_CLOSURE;
     dest->u.lambda = l;
 }
@@ -410,7 +412,7 @@ static void realloc_code() {
     unsigned char *new_code;
 
     new_max = current.code_max << 1;
-    new_code = rexalloc(current.code, new_max);
+    new_code = rexalloc(current.code, (size_t)new_max);
     if (!new_code)
         lambda_error("Out of memory\n");
     current.code_left += current.code_max;
@@ -493,7 +495,7 @@ static void lambda_move_switch_instructions(len, blocklen)
     move_memory(
       current.codep - blocklen,
       current.codep - blocklen - len,
-      blocklen
+      (size_t)blocklen
     );
 }
 
@@ -559,17 +561,17 @@ static struct symbol *make_symbol(name)
         sym2 = sym;
         current.symbols_left = current.symbol_max;
         current.symbol_max <<= 1;
-        symp = newtab = (struct symbol **)xalloc(current.symbol_max);
+        symp = newtab = (struct symbol **)xalloc((size_t)current.symbol_max);
         if (!symp) {
             current.symbol_max >>= 1;
             xfree((char*)sym);
             lambda_error("Out of memory\n");
         }
-        current.symbol_mask = i = current.symbol_max - sizeof sym;
+        current.symbol_mask = i = current.symbol_max - (long)sizeof sym;
         do {
             *symp++ = 0;
         } while ((i -= sizeof sym) >= 0);
-        i = current.symbols_left - sizeof sym;
+        i = current.symbols_left - (long)sizeof sym;
         do {
             struct symbol *next;
 
@@ -622,7 +624,7 @@ static int compile_value(value, opt_flags)
                 /* operator */
                 mp_int block_size;
 
-                block_size = VEC_SIZE(block);
+                block_size = (mp_int)VEC_SIZE(block);
                 switch(type - CLOSURE_OPERATOR) {
                   default:
                     lambda_error("Unimplemented operator %s for lambda()\n",
@@ -650,7 +652,7 @@ static int compile_value(value, opt_flags)
                             realloc_code();
                         *branchp++ = current.code_max - current.code_left;
                         current.code_left -= 2;
-                        *current.codep = code;
+                        *current.codep = (bytecode_t)code;
                         current.codep += 2;
                     }
                     void_given = compile_value(
@@ -674,13 +676,13 @@ static int compile_value(value, opt_flags)
                         start = *--branchp;
                         offset = end - start - 2;
                         if (offset <= 0xff) {
-                            current.code[start+1] = offset;
+                            current.code[start+1] = (bytecode_t)offset;
                             continue;
                         } else {
                             mp_int growth;
                             int growth_factor;
                             mp_int j;
-                            char *p, *q;
+                            bytecode_p p, q;
 
                             if (opt_flags & VOID_ACCEPTED) {
                                 growth = i;
@@ -705,26 +707,26 @@ static int compile_value(value, opt_flags)
                                 end--;
                             branchp++;
                             do {
-                                char tmp_short[2];
+                                bytecode_t tmp_short[2];
                                 start = *--branchp;
                                 offset = end - start;
                                 end += growth_factor;
                                 if (offset > 0x7fff)
                                     UNIMPLEMENTED
-                                *(short *)tmp_short = offset;
-                                j = p - (char *)&current.code[start+2];
+                                *(short *)tmp_short = (short)offset;
+                                j = p - (bytecode_p)&current.code[start+2];
                                 do {
                                     *--q = *--p;
                                 } while (--j);
                                 if (opt_flags & VOID_ACCEPTED) {
                                     *--q = tmp_short[1];
                                     *--q = tmp_short[0];
-                                    *--q = code;
+                                    *--q = (bytecode_t)code;
                                 } else {
                                     *--q = F_POP_VALUE - F_OFFSET;
                                     *--q = tmp_short[1];
                                     *--q = tmp_short[0];
-                                    *--q = code;
+                                    *--q = (bytecode_t)code;
                                     *--q = F_DUP - F_OFFSET;
                                 }
                                 p -= 2;
@@ -766,11 +768,11 @@ static int compile_value(value, opt_flags)
                             realloc_code();
                         last_branch = current.code_max - current.code_left;
                         current.code_left -= 2;
-                        *current.codep = opt_used & NEGATE_GIVEN ?
+                        *current.codep = (bytecode_t)(opt_used & NEGATE_GIVEN ?
                             (code == F_BRANCH_WHEN_NON_ZERO-F_OFFSET ?
                                 F_BRANCH_WHEN_ZERO-F_OFFSET :
                                 F_BRANCH_WHEN_NON_ZERO-F_OFFSET) :
-                            code;
+                            code);
                         current.codep += 2;
                         ++argp;
                         opt_used =
@@ -790,7 +792,8 @@ static int compile_value(value, opt_flags)
                          * by one afterwards.
                          */
                         if (offset > 0xfe) {
-                            char *p, tmp_short[2];
+                            char *p;
+                            bytecode_t tmp_short[2];
                             mp_int j;
 
                             p = (char*)current.codep++;
@@ -802,19 +805,19 @@ static int compile_value(value, opt_flags)
                                 p[1] = *p;
                             } while (--j);
                             current.code_left--;
-                            *((short *)tmp_short) = offset + 2;
+                            *((short *)tmp_short) = (short)(offset + 2);
                             current.code[last_branch] +=
                               F_LBRANCH_WHEN_ZERO - F_BRANCH_WHEN_ZERO;
                             current.code[last_branch+1] = tmp_short[0];
                             current.code[last_branch+2] = tmp_short[1];
                         } else {
-                            current.code[last_branch+1] = offset;
+                            current.code[last_branch+1] = (bytecode_t)offset;
                         }
                         *branchp++ = current.code_max - current.code_left;
                         *branchp++ = last_branch;
                         current.code_left -= 2;
                         *current.codep++ = F_BRANCH-F_OFFSET;
-                        *current.codep++ = opt_used;
+                        *current.codep++ = (bytecode_t)opt_used;
                     }
                     if ( i /* no default */ &&
                          ( opt_flags & VOID_ACCEPTED ||
@@ -844,7 +847,7 @@ static int compile_value(value, opt_flags)
                         if (code == F_LBRANCH_WHEN_ZERO-F_OFFSET ||
                             code == F_LBRANCH_WHEN_NON_ZERO-F_OFFSET)
                         {
-                            char tmp_short[2];
+                            bytecode_t tmp_short[2];
 
                             tmp_short[0] = current.code[start+1];
                             tmp_short[1] = current.code[start+2];
@@ -909,7 +912,7 @@ static int compile_value(value, opt_flags)
                                 move_memory(
                                   &current.code[start+1],
                                   &current.code[start],
-                                  non_void_dest - start
+                                  (size_t)(non_void_dest - start)
                                 );
                                 current.codep++;
                                 current.code[start] = F_CONST0-F_OFFSET;
@@ -954,7 +957,7 @@ static int compile_value(value, opt_flags)
                             void_dest - start - 2:
                             non_void_dest - start - 2;
                         if (offset <= 0xff) {
-                            current.code[start+1] = offset;
+                            current.code[start+1] = (bytecode_t)offset;
                             continue;
                         } else {
                             mp_int growth;
@@ -970,7 +973,7 @@ static int compile_value(value, opt_flags)
                             q = p + growth;
                             branchp +=2;
                             do {
-                                char tmp_short[2];
+                                bytecode_t tmp_short[2];
 
                                 start = *--branchp;
                                 code = current.code[start];
@@ -1006,15 +1009,15 @@ fprintf(stderr, "DEBUG: closure:   read branch %p -> %p (offset %lx), q-p %ld, i
                                  * fprintf()s stay in here to warn of
                                  * possible problems.
                                  */
-                                *(short *)tmp_short = offset + (q-p);
+                                *(short *)tmp_short = (short)(offset + (q-p));
                                 j = (p - (current.code + start)) - 2;
                                 do {
                                     *--q = *--p;
                                 } while (--j);
                                 *--q = tmp_short[1];
                                 *--q = tmp_short[0];
-                                *--q = *(p-=2) +
-                                    (F_LBRANCH_WHEN_ZERO - F_BRANCH_WHEN_ZERO);
+                                *--q = (bytecode_t)(*(p-=2) +
+                                    F_LBRANCH_WHEN_ZERO - F_BRANCH_WHEN_ZERO);
 fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
               , q, *q, q[1], q[2]);
                             } while ( (i -= 2) > 0);
@@ -1115,7 +1118,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                     compile_value(argp+2, REF_REJECTED);
                   generic_modify:
                     compile_lvalue(argp+1, USE_INDEX_LVALUE);
-                    *current.codep++ = type;
+                    *current.codep++ = (bytecode_t)type;
                     break;
                   case F_POST_INC-F_OFFSET:
                   case F_POST_DEC-F_OFFSET:
@@ -1151,23 +1154,23 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                     if (current.code_left < 3)
                         realloc_code();
                     if (offset > 0xff) {
-                        char tmp_short[2];
+                        bytecode_t tmp_short[2];
 
                         if (offset > 0x8000)
                             UNIMPLEMENTED
                         current.code_left -= 3;
-                        *((short *)tmp_short) = -offset;
+                        *((short *)tmp_short) = (short)-offset;
                         *current.codep++ = void_given & NEGATE_GIVEN ?
-                            F_LBRANCH_WHEN_ZERO - F_OFFSET                 :
-                            F_LBRANCH_WHEN_NON_ZERO - F_OFFSET;
+                            (bytecode_t)(F_LBRANCH_WHEN_ZERO - F_OFFSET):
+                            (bytecode_t)(F_LBRANCH_WHEN_NON_ZERO - F_OFFSET);
                         *current.codep++ = tmp_short[0];
                         *current.codep++ = tmp_short[1];
                     } else {
                         current.code_left -= 2;
                         *current.codep++ = void_given & NEGATE_GIVEN ?
-                            F_BBRANCH_WHEN_ZERO - F_OFFSET                 :
-                            F_BBRANCH_WHEN_NON_ZERO - F_OFFSET;
-                        *current.codep++ = offset;
+                            (bytecode_t)(F_BBRANCH_WHEN_ZERO - F_OFFSET):
+                            (bytecode_t)(F_BBRANCH_WHEN_NON_ZERO - F_OFFSET);
+                        *current.codep++ = (bytecode_t)offset;
                     }
                     opt_flags = compile_value(++argp, opt_flags);
                     break;
@@ -1202,26 +1205,27 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                     offset =
                       current.code_max - current.code_left - start_branch;
                     if (offset > 0xff) {
-                        char *p, tmp_short[2];
+                        bytecode_t tmp_short[2];
+                        bytecode_p p;
 
                         if (offset > 0x7ffd)
                             UNIMPLEMENTED
                         if (current.code_left < 1)
                             realloc_code();
                         current.code_left--;
-                        p = (char*)current.codep++;
+                        p = (bytecode_p)current.codep++;
                         i = offset;
                         do {
                             p--;
                             p[1] = *p;
                         } while (--i);
-                        *((short *)tmp_short) = offset + 2;
+                        *((short *)tmp_short) = (short)(offset + 2);
                         current.code[start_branch-2] = F_LBRANCH - F_OFFSET;
                         current.code[start_branch-1] = tmp_short[0];
                         current.code[start_branch-0] = tmp_short[1];
                         start_branch++;
                     } else {
-                        current.code[start_branch-1] = offset;
+                        current.code[start_branch-1] = (bytecode_t)offset;
                     }
                     argp = block->item;
                     void_given =
@@ -1231,23 +1235,25 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                     offset =
                       current.code_max - current.code_left - start_branch + 1;
                     if (offset > 0xff) {
-                        char tmp_short[2];
+                        bytecode_t tmp_short[2];
 
                         if (offset > 0x8000)
                             UNIMPLEMENTED
                         current.code_left -= 3;
-                        *((short *)tmp_short) = -offset;
-                        *current.codep++ = void_given & NEGATE_GIVEN ?
+                        *((short *)tmp_short) = (short)-offset;
+                        *current.codep++ = (bytecode_t)
+                                           (void_given & NEGATE_GIVEN ?
                             F_LBRANCH_WHEN_ZERO - F_OFFSET                 :
-                            F_LBRANCH_WHEN_NON_ZERO - F_OFFSET;
+                            F_LBRANCH_WHEN_NON_ZERO - F_OFFSET);
                         *current.codep++ = tmp_short[0];
                         *current.codep++ = tmp_short[1];
                     } else {
                         current.code_left -= 2;
-                        *current.codep++ = void_given & NEGATE_GIVEN ?
+                        *current.codep++ = (bytecode_t)
+                                           (void_given & NEGATE_GIVEN ?
                             F_BBRANCH_WHEN_ZERO - F_OFFSET                 :
-                            F_BBRANCH_WHEN_NON_ZERO - F_OFFSET;
-                        *current.codep++ = offset;
+                            F_BBRANCH_WHEN_NON_ZERO - F_OFFSET);
+                        *current.codep++ = (bytecode_t)offset;
                     }
                     opt_flags = compile_value(++argp, opt_flags);
                     break;
@@ -1275,7 +1281,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                     if (offset > 0xff) {
                         UNIMPLEMENTED
                     }
-                    current.code[start-1] = offset;
+                    current.code[start-1] = (bytecode_t)offset;
                     break;
                   }
                   case F_NOT-F_OFFSET:
@@ -1336,16 +1342,16 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                         realloc_code();
                     current.code_left -= 2;
                     *current.codep++ = F_SSCANF - F_OFFSET;
-                    *current.codep++ = block_size - 1;
+                    *current.codep++ = (bytecode_t)(block_size - 1);
                     break;
                   }
                   case F_AGGREGATE-F_OFFSET:
                   {
                     int i;
-                    char size[2];
+                    bytecode_t size[2];
 
                     i = block_size - 1;
-                    *(short *)size = i;
+                    *(short *)size = (short)i;
                     while (--i >= 0) {
                         compile_value(++argp, REF_REJECTED);
                     }
@@ -1359,7 +1365,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                   }
                   case F_M_CAGGREGATE-F_OFFSET:
                   {
-                    int i, j, num_keys, num_values;
+                    mp_int i, j, num_keys, num_values;
 
                     num_values = 1;
                     i = block_size;
@@ -1370,7 +1376,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                         if ( (++argp)->type != T_POINTER )
                             lambda_error("Bad argument to #'([\n");
                         element = argp->u.vec->item;
-                        j = VEC_SIZE(argp->u.vec);
+                        j = (mp_int)VEC_SIZE(argp->u.vec);
                         if (j != num_values) {
                             if (!j)
                                 lambda_error("#'([ : Missing key.\n");
@@ -1387,21 +1393,21 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                         realloc_code();
                     num_values--; /* one item of each subarray is the key */
                     if ( (num_keys | num_values) & ~0xff) {
-                        char size[2];
+                        bytecode_t size[2];
 
                         current.code_left -= 5;
                         *current.codep++ = F_M_AGGREGATE-F_OFFSET;
-                        *(short *)size = num_keys;
+                        *(short *)size = (short)num_keys;
                         *current.codep++ = size[0];
                         *current.codep++ = size[1];
-                        *(short *)size = num_values;
+                        *(short *)size = (short)num_values;
                         *current.codep++ = size[0];
                         *current.codep++ = size[1];
                     } else {
                         current.code_left -= 3;
                         *current.codep++ = F_M_CAGGREGATE-F_OFFSET;
-                        *current.codep++ = num_keys;
-                        *current.codep++ = num_values;
+                        *current.codep++ = (bytecode_t)num_keys;
+                        *current.codep++ = (bytecode_t)num_values;
                     }
                     break;
                   }
@@ -1418,10 +1424,10 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                     if (current.code_left < 1)
                         realloc_code();
                     current.code_left--;
-                    *current.codep++ =
+                    *current.codep++ = (bytecode_t)(
                       opt_flags & VOID_GIVEN ?
                         F_RETURN0 - F_OFFSET :
-                        F_RETURN - F_OFFSET;
+                        F_RETURN - F_OFFSET);
                     break;
                   }
                   case F_EXTRACT_LVALUE-F_OFFSET:
@@ -1498,7 +1504,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                         ++argp;
                         if (argp->type == T_POINTER) {
                             labels = argp->u.vec->item;
-                            j = VEC_SIZE(argp->u.vec);
+                            j = (mp_int)VEC_SIZE(argp->u.vec);
                         } else {
                             labels = argp;
                             j = 1;
@@ -1562,10 +1568,8 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                                 if (--current.values_left < 0)
                                     realloc_values();
                                 no_string = 0;
-                                stmp.type = T_STRING;
-                                stmp.x.string_type = STRING_SHARED;
-                                stmp.u.string =
-                                  make_shared_string(labels->u.string);
+                                put_string(&stmp
+                                          , make_shared_string(labels->u.string));
                                 if (!stmp.u.string)
                                     lambda_error("Out of memory\n");
                                 *--current.valuep = stmp;
@@ -1620,7 +1624,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                             if (current.code_left < 1)
                                 realloc_code();
                             current.code_left--;
-                            *current.codep++ = argp->x.closure_type;
+                            *current.codep++ = (bytecode_t) argp->x.closure_type;
                         }
                     }
                     if (!default_addr) {
@@ -1650,11 +1654,11 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
             } else {
                 /* efun */
                 mp_int i;
-                char *p;
+                bytecode_p p;
                 int f;
-                int num_arg, min, max, def;
+                mp_int num_arg, min, max, def;
 
-                num_arg = VEC_SIZE(block) - 1;
+                num_arg = (mp_int)VEC_SIZE(block) - 1;
                 for (i = num_arg; --i >= 0; ) {
                     compile_value(++argp, 0);
                 }
@@ -1669,7 +1673,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                     int g;
 
                     if (num_arg == min-1 && 0 != (def = instrs[f].Default)) {
-                        *p++ = def - F_OFFSET;
+                        *p++ = (bytecode_t)(def - F_OFFSET);
                         current.code_left--;
                         max--;
                         min--;
@@ -1687,13 +1691,13 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                     }
                 }
                 if (f > 0xff) {
-                    *p++ = f >> F_ESCAPE_BITS;
+                    *p++ = (bytecode_t)(f >> F_ESCAPE_BITS);
                     current.code_left--;
                 }
-                *p++ = f;
+                *p++ = (bytecode_t)f;
                 current.code_left--;
                 if (min != max) {
-                    *p++ = num_arg;
+                    *p++ = (bytecode_t)num_arg;
                     if (num_arg > 0xff)
                         lambda_error("Too many arguments to efun closure\n");
                     current.code_left--;
@@ -1714,7 +1718,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
           {
             /* simul_efun */
             int simul_efun;
-            int num_arg;
+            mp_int num_arg;
             int i;
 
             simul_efun = type - CLOSURE_SIMUL_EFUN;
@@ -1728,7 +1732,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                   simul_efunp[simul_efun].name;
                 compile_value(&string_sv, 0);
             }
-            num_arg = VEC_SIZE(block) - 1;
+            num_arg = (mp_int)VEC_SIZE(block) - 1;
             for (i = num_arg; --i >= 0; ) {
                 compile_value(++argp, 0);
             }
@@ -1737,9 +1741,10 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
             if (simul_efun > 0xff) {
                 current.code_left -= 2;
                 *current.codep++ = F_CALL_OTHER - F_OFFSET;
-                *current.codep++ = num_arg + 2;
+                *current.codep++ = (bytecode_t)(num_arg + 2);
                 if (num_arg + 2 > 0xff)
                     lambda_error("Argument number overflow\n");
+                /* TODO: And this works? */
             } else {
                 struct function *funp;
 
@@ -1759,14 +1764,14 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                     }
                 }
                 *current.codep++ = F_SIMUL_EFUN - F_OFFSET;
-                *current.codep++ = simul_efun;
+                *current.codep++ = (bytecode_t)simul_efun;
                 if (funp->num_arg == 0xff) {
-                    *current.codep++ = num_arg;
+                    *current.codep++ = (bytecode_t)num_arg;
                     current.code_left -= 3;
                 } else
                     current.code_left -= 2;
-                break;
             }
+            break;
           }
           case CLOSURE_UNBOUND_LAMBDA:
           case CLOSURE_BOUND_LAMBDA:
@@ -1779,7 +1784,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
             struct lambda *l;
             mp_int block_size;
 
-            block_size = VEC_SIZE(block);
+            block_size = (mp_int)VEC_SIZE(block);
             l = argp->u.lambda;
             insert_value_push(argp);
             for (i = block_size; --i; ) {
@@ -1789,7 +1794,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
             realloc_code();
             current.code_left -= 2;
             *current.codep++ = F_FUNCALL - F_OFFSET;
-            *current.codep++ = block_size;
+            *current.codep++ = (bytecode_t)block_size;
             break;
           }
           case CLOSURE_LFUN:
@@ -1798,7 +1803,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
             struct lambda *l;
             mp_int block_size;
 
-            block_size = VEC_SIZE(block);
+            block_size = (mp_int)VEC_SIZE(block);
             l = argp->u.lambda;
             if (l->ob != current.lambda_origin) {
                 insert_value_push(argp);
@@ -1809,7 +1814,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                     realloc_code();
                 current.code_left -= 2;
                 *current.codep++ = F_FUNCALL - F_OFFSET;
-                *current.codep++ = block_size;
+                *current.codep++ = (bytecode_t)block_size;
             } else {
                 for (i = block_size; --i; ) {
                     compile_value(++argp, 0);
@@ -1818,9 +1823,9 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                     realloc_code();
                 current.code_left -= 4;
                 *current.codep++ = F_CALL_FUNCTION_BY_ADDRESS - F_OFFSET;
-                *current.codep++ = ((char *)&l->function.index)[0];
-                *current.codep++ = ((char *)&l->function.index)[1];
-                *current.codep++ = block_size - 1;
+                *current.codep++ = ((bytecode_p)&l->function.index)[0];
+                *current.codep++ = ((bytecode_p)&l->function.index)[1];
+                *current.codep++ = (bytecode_t)(block_size - 1);
                 if (block_size > 0x100)
                     lambda_error("Too many arguments to lfun closure\n");
             }
@@ -1847,7 +1852,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                 if ((short)l->function.index < 0)
                     lambda_error("Variable not inherited\n");
                 *current.codep++ = F_IDENTIFIER - F_OFFSET;
-                *current.codep++ = l->function.index;
+                *current.codep++ = (bytecode_t)l->function.index;
             }
             break;
           }
@@ -1872,7 +1877,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
             if (current.code_left < 2)
                 realloc_code();
             *current.codep++ = F_LOCAL - F_OFFSET;
-            *current.codep++ = sym->index;
+            *current.codep++ = (bytecode_t)sym->index;
             current.code_left -= 2;
         }
         break;
@@ -1898,7 +1903,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
                     break;
                 }
                 *current.codep++ = F_CLIT - F_OFFSET;
-                *current.codep++ = i;
+                *current.codep++ = (bytecode_t)i;
                 current.code_left -= 2;
                 break;
             }
@@ -1906,7 +1911,7 @@ fprintf(stderr, "DEBUG: closure:   new code %p: %02x %02x %02x\n"
             if (current.code_left < 2)
                 realloc_code();
             *current.codep++ = F_NCLIT - F_OFFSET;
-            *current.codep++ = -i;
+            *current.codep++ = (bytecode_t)-i;
             current.code_left -= 2;
             break;
         }
@@ -1977,7 +1982,7 @@ static void compile_lvalue(argp, flags)
             realloc_code();
         current.code_left -= 3;
         *current.codep++ = F_PUSH_LOCAL_VARIABLE_LVALUE - F_OFFSET;
-        *current.codep++ = sym->index;
+        *current.codep++ = (bytecode_t)sym->index;
         return;
       }
       case T_POINTER:
@@ -1999,16 +2004,16 @@ static void compile_lvalue(argp, flags)
                         if (flags & PROTECT_LVALUE) {
                             current.code_left -= 2;
                             *current.codep++ = F_ESCAPE - F_OFFSET;
-                            *current.codep++ =
-                              argp->x.closure_type == F_RINDEX-F_OFFSET ?
+                            *current.codep++ = (bytecode_t)(
+                              argp->x.closure_type == F_RINDEX-F_OFFSET +CLOSURE_EFUN ?
                                 F_PROTECTED_RINDEX_LVALUE - F_OFFSET - 0x100 :
-                                F_PROTECTED_INDEX_LVALUE  - F_OFFSET - 0x100;
+                                F_PROTECTED_INDEX_LVALUE  - F_OFFSET - 0x100);
                         } else {
                             current.code_left--;
-                            *current.codep++ =
-                              argp->x.closure_type == F_RINDEX-F_OFFSET ?
+                            *current.codep++ = (bytecode_t)(
+                              argp->x.closure_type == F_RINDEX-F_OFFSET + CLOSURE_EFUN ?
                                 F_RINDEX_LVALUE - F_OFFSET :
-                                F_INDEX_LVALUE - F_OFFSET;
+                                F_INDEX_LVALUE - F_OFFSET);
                         }
                         return;
                     }
@@ -2019,16 +2024,18 @@ static void compile_lvalue(argp, flags)
                     if (flags & PROTECT_LVALUE) {
                         current.code_left -= 3;
                         *current.codep++ = F_ESCAPE - F_OFFSET;
-                        *current.codep++ =
+                        /* TODO: Here the '+CLOSURE_EFUN' before the '?' as
+                         * TODO:: well? */
+                        *current.codep++ = (bytecode_t)(
                           argp->x.closure_type == F_RINDEX-F_OFFSET ?
                             F_PUSH_PROTECTED_RINDEXED_LVALUE - F_OFFSET - 0x100 :
-                            F_PUSH_PROTECTED_INDEXED_LVALUE  - F_OFFSET - 0x100;
+                            F_PUSH_PROTECTED_INDEXED_LVALUE  - F_OFFSET - 0x100);
                     } else {
                         current.code_left -= 2;
-                        *current.codep++ =
+                        *current.codep++ = (bytecode_t)(
                           argp->x.closure_type == F_RINDEX-F_OFFSET ?
                             F_PUSH_RINDEXED_LVALUE - F_OFFSET :
-                            F_PUSH_INDEXED_LVALUE - F_OFFSET;
+                            F_PUSH_INDEXED_LVALUE - F_OFFSET);
                     }
                     return;
                 }
@@ -2084,11 +2091,11 @@ static void compile_lvalue(argp, flags)
                 current.code_left -= 2;
                 *current.codep++ = F_ESCAPE - F_OFFSET;
                 if (flags & PROTECT_LVALUE) {
-                    *current.codep++ = argp->x.closure_type - CLOSURE_EFUN -
-                                F_NR_RANGE +  F_PROTECTED_NR_RANGE_LVALUE;
+                    *current.codep++ = (bytecode_t)(argp->x.closure_type - CLOSURE_EFUN -
+                                F_NR_RANGE +  F_PROTECTED_NR_RANGE_LVALUE);
                 } else {
-                    *current.codep++ = argp->x.closure_type - CLOSURE_EFUN -
-                                        F_NR_RANGE +  F_NR_RANGE_LVALUE;
+                    *current.codep++ = (bytecode_t)(argp->x.closure_type - CLOSURE_EFUN -
+                                        F_NR_RANGE +  F_NR_RANGE_LVALUE);
                 }
                 return;
               case F_MAP_INDEX -F_OFFSET+CLOSURE_EFUN:
@@ -2124,7 +2131,7 @@ static void compile_lvalue(argp, flags)
                 if ((short)l->function.index < 0)
                     lambda_error("Variable not inherited\n");
                 *current.codep++ = F_PUSH_IDENTIFIER_LVALUE - F_OFFSET;
-                *current.codep++ = l->function.index;
+                *current.codep++ = (bytecode_t)l->function.index;
                 return;
               }
             }
@@ -2147,7 +2154,7 @@ static void compile_lvalue(argp, flags)
             if ((short)l->function.index < 0)
                 lambda_error("Variable not inherited\n");
             *current.codep++ = F_PUSH_IDENTIFIER_LVALUE - F_OFFSET;
-            *current.codep++ = l->function.index;
+            *current.codep++ = (bytecode_t)(l->function.index);
             return;
           }
         }
@@ -2171,18 +2178,18 @@ struct lambda *lambda(args, block, origin)
 
     current.symbols_left = current.symbol_max =
         sizeof current.symbols[0] * SYMTAB_START_SIZE;
-    current.symbol_mask = current.symbol_max- sizeof(struct symbol *);
+    current.symbol_mask = (long)(current.symbol_max- sizeof(struct symbol *));
     current.last = 0;
     current.code = 0;
     current.values = 0;
-    current.symbols = (struct symbol **)xalloc(current.symbol_max);
+    current.symbols = (struct symbol **)xalloc((size_t)current.symbol_max);
     i = SYMTAB_START_SIZE - 1;
     do {
         current.symbols[i] = 0;
     } while (--i >= 0);
     switch_initialized = 0;
     argp = args->item;
-    j = VEC_SIZE(args);
+    j = (mp_int)VEC_SIZE(args);
     for (i = 0; i < j; i++, argp++) {
         struct symbol *sym;
 
@@ -2199,10 +2206,10 @@ struct lambda *lambda(args, block, origin)
     current.code_max = CODE_BUFFER_START_SIZE;
     current.code_left = CODE_BUFFER_START_SIZE-3;
     current.levels_left = MAX_LAMBDA_LEVELS;
-    if ( !(current.code = current.codep = xalloc(current.code_max)) )
+    if ( !(current.code = current.codep = xalloc((size_t)current.code_max)) )
         lambda_error("Out of memory\n");
     *current.codep++ = 0;                   /* dummy for num values */
-    *current.codep++ = current.num_locals; /* num arguments */
+    *current.codep++ = (bytecode_t)current.num_locals; /* num arguments */
     *current.codep++ = 0;                   /* dummy for num variables */
     current.value_max = current.values_left = VALUE_START_MAX;
     if ( !(current.values =
@@ -2218,26 +2225,26 @@ struct lambda *lambda(args, block, origin)
     if (current.code_left < 1)
         realloc_code();
     current.code_left -= 1;
-    *current.codep++ =
-      void_given & VOID_GIVEN ? F_RETURN0 - F_OFFSET : F_RETURN - F_OFFSET;
+    *current.codep++ = (bytecode_t)(
+      void_given & VOID_GIVEN ? F_RETURN0 - F_OFFSET : F_RETURN - F_OFFSET);
     num_values = current.value_max - current.values_left;
-    values_size = num_values * sizeof (struct svalue);
+    values_size = (long)(num_values * sizeof (struct svalue));
     code_size = current.code_max - current.code_left;
     l0 = xalloc(values_size + sizeof *l - sizeof l->function + code_size);
-    memcpy(l0, (char *)current.valuep, values_size);
+    memcpy(l0, (char *)current.valuep, (size_t)values_size);
     l0 += values_size;
     l = (struct lambda *)l0;
     l->ref = 1;
-    memcpy(l->function.code, current.code, code_size);
+    memcpy(l->function.code, current.code, (size_t)code_size);
     /* fix number of constant values */
     if (num_values > 0xff) {
         ((struct svalue *)l->function.code)[-0xff].u.number = num_values;
         l->function.code[0] = 0xff;
     } else {
-        l->function.code[0] = num_values;
+        l->function.code[0] = (bytecode_t)num_values;
     }
     /* fix number of variables */
-    l->function.code[2] = current.num_locals + current.max_break_stack;
+    l->function.code[2] = (bytecode_t)(current.num_locals + current.max_break_stack);
     free_symbols();
     xfree(current.code);
     xfree(current.values);
@@ -2261,7 +2268,7 @@ static void insert_value_push(value)
     if (offset < 0xff) {
         current.code_left -= 2;
         *current.codep++ = F_LAMBDA_CCONSTANT - F_OFFSET;
-        *current.codep++ = offset;
+        *current.codep++ = (bytecode_t)offset;
     } else {
         if (offset == 0xff) {
             current.values_left--;
@@ -2270,8 +2277,8 @@ static void insert_value_push(value)
         }
         current.code_left -= 3;
         *current.codep++ = F_LAMBDA_CONSTANT - F_OFFSET;
-        *current.codep++ = offset >> 8;
-        *current.codep++ = offset;
+        *current.codep++ = (bytecode_t)(offset >> 8);
+        *current.codep++ = (bytecode_t)(offset & 0xff);
     }
     if (--current.values_left < 0)
         realloc_values();
@@ -2553,7 +2560,7 @@ void symbol_efun(sp)
             str += 6;
             efun_override = 1;
         }
-        if ( !(p = make_shared_identifier(str, I_TYPE_GLOBAL)) ) {
+        if ( !(p = make_shared_identifier(str, I_TYPE_GLOBAL, 0)) ) {
             inter_sp = sp;
             error("Out of memory\n");
         }
@@ -2593,8 +2600,8 @@ void symbol_efun(sp)
                 }
                 free_string_svalue(sp);
                 sp->type = T_CLOSURE;
-                sp->x.closure_type = code + CLOSURE_OPERATOR;
-                add_ref(sp->u.ob = current_object, "symbol_efun");
+                sp->x.closure_type = (short)(code + CLOSURE_OPERATOR);
+                sp->u.ob = ref_object(current_object, "symbol_efun");
                 return;
             }
             if ( !(p = p->inferior) )
@@ -2612,8 +2619,7 @@ undefined_function:
             error("Undefined function: %s\n", str);
 #else
             free_string_svalue(sp);
-            sp->type = T_NUMBER;
-            sp->u.number = 0;
+            put_number(sp, 0);
             return;
 #endif
         }
@@ -2623,7 +2629,7 @@ undefined_function:
             struct svalue *res;
 
             inter_sp = sp;
-            push_constant_string("nomask simul_efun");
+            push_volatile_string("nomask simul_efun");
             push_valid_ob(current_object);
             push_shared_string(p->name);
             res = apply_master_ob(STR_PRIVILEGE, 3);
@@ -2640,17 +2646,17 @@ undefined_function:
         free_string_svalue(sp);
         sp->type = T_CLOSURE;
         if (!efun_override && p->u.global.sim_efun >= 0) {
-            sp->x.closure_type = p->u.global.sim_efun + CLOSURE_SIMUL_EFUN;
-            add_ref(sp->u.ob = current_object, "symbol_efun");
+            sp->x.closure_type = (short)(p->u.global.sim_efun + CLOSURE_SIMUL_EFUN);
+            sp->u.ob = ref_object(current_object, "symbol_efun");
             return;
         }
         /* p->u.global.efun >= 0 */
-        sp->x.closure_type = p->u.global.efun + CLOSURE_EFUN;
+        sp->x.closure_type = (short)(p->u.global.efun + CLOSURE_EFUN);
         if (sp->x.closure_type > LAST_INSTRUCTION_CODE + CLOSURE_EFUN)
-            sp->x.closure_type = CLOSURE_EFUN +
+            sp->x.closure_type = (short)(CLOSURE_EFUN +
               efun_aliases[
-                sp->x.closure_type - CLOSURE_EFUN - LAST_INSTRUCTION_CODE - 1];
-        add_ref(sp->u.ob = current_object, "symbol_efun");
+                sp->x.closure_type - CLOSURE_EFUN - LAST_INSTRUCTION_CODE - 1]);
+        sp->u.ob = ref_object(current_object, "symbol_efun");
     } else {
         int i;
         char *end;
@@ -2669,18 +2675,17 @@ undefined_function:
 #else
         free_string_svalue(sp);
         if (*end || i < 0) {
-            sp->type = T_NUMBER;
-            sp->u.number = 0;
+            put_number(sp, 0);
             return;
         }
 #endif
         sp->type = T_CLOSURE;
         if (instrs[i].Default == -1) {
-            sp->x.closure_type = i + CLOSURE_OPERATOR;
+            sp->x.closure_type = (short)(i + CLOSURE_OPERATOR);
         } else {
-            sp->x.closure_type = i + CLOSURE_EFUN;
+            sp->x.closure_type = (short)(i + CLOSURE_EFUN);
         }
-        add_ref(sp->u.ob = current_object, "symbol_efun");
+        sp->u.ob = ref_object(current_object, "symbol_efun");
     }
 }
 
@@ -2693,7 +2698,7 @@ struct svalue *f_unbound_lambda(sp)
     if (sp[-1].type != T_POINTER) {
         if (sp[-1].type != T_NUMBER || sp[-1].u.number)
             bad_xefun_arg(1, sp);
-        (args = &null_vector)->ref++;
+        args = ref_array(&null_vector);
     } else {
         args = sp[-1].u.vec;
     }
@@ -2701,7 +2706,7 @@ struct svalue *f_unbound_lambda(sp)
     l = lambda(args, sp, 0);
     l->ob = 0;
     free_svalue(sp--);
-    free_vector(args);
+    free_array(args);
     sp->type = T_CLOSURE;
     sp->x.closure_type = CLOSURE_UNBOUND_LAMBDA;
     sp->u.lambda = l;
@@ -2721,7 +2726,7 @@ struct svalue *f_symbol_variable(sp)
     if (current_variables < ob->variables ||
         current_variables >= ob->variables + ob->prog->num_variables)
     {
-        /* efun closures are called without setting current_prog nor
+        /* efun closures are called without changing current_prog nor
          * current_variables. This keeps the program scope for variables
          * for calls inside this_object(), but would give trouble with
          * calling from other ones if it were not for this test.
@@ -2739,7 +2744,7 @@ struct svalue *f_symbol_variable(sp)
             return sp;
         }
         if (current_prog->variable_names[n].flags & NAME_HIDDEN) {
-            if (_privilege_violation("symbol_variable", sp, sp) <= 0) {
+            if (!_privilege_violation("symbol_variable", sp, sp)) {
                 sp->u.number = 0;
                 return sp;
             }
@@ -2766,8 +2771,7 @@ struct svalue *f_symbol_variable(sp)
         }
         free_string(str);
         if (n < 0) {
-            sp->type = T_NUMBER;
-            sp->u.number = 0;
+            put_number(sp, 0);
             return sp;
         }
         n = num_var - n - 1;
@@ -2779,12 +2783,17 @@ struct svalue *f_symbol_variable(sp)
         inter_sp = sp - 1;
         error("Out of memory\n");
     }
-    add_ref(l->ob = current_object, "symbol_variable");
+    l->ob = ref_object(current_object, "symbol_variable");
     l->ref = 1;
-    l->function.index = n + (current_variables - current_object->variables);
+    l->function.index = (unsigned short)(n + (current_variables - current_object->variables));
     sp->type = T_CLOSURE;
     sp->x.closure_type = CLOSURE_IDENTIFIER;
     sp->u.lambda = l;
+    if ( !(current_object->prog->flags & P_REPLACE_ACTIVE) ||
+         !lambda_ref_replace_program(l, sp->x.closure_type, 0, 0, 0) )
+    {
+        current_object->flags |= O_LAMBDA_REFERENCED;
+    }
     return sp;
 }
 
@@ -2833,8 +2842,8 @@ void store_case_labels(
     p_int maxspan;
     mp_int current_key,last_key = 0;
     mp_int current_addr,last_addr;
-    char tmp_short[2];
-    unsigned char *p;
+    bytecode_t tmp_short[2];
+    bytecode_p p;
     mp_int tablen;
     int i0;
 
@@ -2979,7 +2988,7 @@ void store_case_labels(
             total_length += len-1;
             default_addr += len-1;
         }
-        cutoff = sizeof(p_int)*2 + len*2;
+        cutoff =(long)(sizeof(p_int)*2 + len*2);
         list1 = list0;
         table_start = list1;
         for (max_gain = keys = 0; list1; list1 = list1->next) {
@@ -2995,16 +3004,16 @@ void store_case_labels(
             if ((p_uint)span >= (p_uint)maxspan) /* p_uint to catch span<0, too */
                 gain = -1;
             else
-                gain = keys * sizeof(p_int) - (span - keys)* len;
+                gain = (long)(keys * sizeof(p_int) - (span - keys)* len);
             if (max_gain - gain > cutoff && max_gain >= cutoff) {
                 struct case_list_entry *tmp;
                 p_int key, addr, size;
-                unsigned char *p0;
+                bytecode_p p0;
 
                 /* write table from table_start to  max_gain_end */
                 span = max_gain_end->key - table_start->key + 1;
                 size = span * len;
-                p0 = (unsigned char*)(*get_space)(size);
+                p0 = (bytecode_p)(*get_space)(size);
                 tmp = table_start;
                 key = tmp->key;
                 if (tmp->addr == 1) {
@@ -3024,11 +3033,11 @@ void store_case_labels(
                     if (key == tmp->key  || !tmp->line)
                         addr = tmp->addr;
                     p0 += len;
-                    p0[-1] = addr;
+                    p0[-1] = (bytecode_t)addr;
                     if (len >= 2) {
-                        p0[-2] = addr >> 8;
+                        p0[-2] = (bytecode_t)(addr >> 8);
                         if (len > 2) {
-                            p0[-3] = addr >> 16;
+                            p0[-3] = (bytecode_t)(addr >> 16);
                         }
                     }
                 } while (++key <= max_gain_end->key);
@@ -3099,25 +3108,25 @@ void store_case_labels(
         i++,o<<=1;
     /* and store it */
     type |= i | len << 6;
-    tablen = key_num * sizeof(p_int);
-    p = (unsigned char *)get_space(
-        tablen + key_num * len + 2 + len + sizeof(p_int) - 4);
-    p[-total_length] = tablen;
-    p[-total_length+1] = type;
+    tablen = (long)(key_num * sizeof(p_int));
+    p = (bytecode_p)get_space((long)
+        (tablen + key_num * len + 2 + len + sizeof(p_int) - 4));
+    p[-total_length] = (bytecode_t)tablen;
+    p[-total_length+1] = (bytecode_t)type;
     i0 = p[-total_length+1+len];
-    p[-total_length+2] = total_length;
+    p[-total_length+2] = (bytecode_t)total_length;
     if (len >= 2) {
-        *p++ = tablen >> 8;
-        p[-total_length+2] = total_length >> 8;
+        *p++ = (bytecode_t)(tablen >> 8);
+        p[-total_length+2] = (bytecode_t)(total_length >> 8);
         if (len > 2) {
-            *p++ = tablen >> 16;
-            p[-total_length+2] = total_length >> 16;
+            *p++ = (bytecode_t)(tablen >> 16);
+            p[-total_length+2] = (bytecode_t)(total_length >> 16);
         }
     }
-    *(short*)tmp_short = default_addr;
+    *(short*)tmp_short = (short)default_addr;
     *p++ = tmp_short[0];
     *p++ = tmp_short[1];
-    *p++ = i0;
+    *p++ = (bytecode_t)i0;
     p += sizeof(p_int) - 4;
     for (list1 = list0; list1; list1 = list1->next) {
         memcpy(p, &list1->key, sizeof(list1->key));
@@ -3125,16 +3134,16 @@ void store_case_labels(
     }
     for (list1 = list0; list1; list1 = list1->next) {
         p += len;
-        p[-1] = list1->addr;
+        p[-1] = (bytecode_t)list1->addr;
         if (len >= 2) {
-            p[-2] = list1->addr >> 8;
+            p[-2] = (bytecode_t)(list1->addr >> 8);
             if (len > 2) {
-                p[-3] = list1->addr >> 16;
+                p[-3] = (bytecode_t)(list1->addr >> 16);
             }
         }
     }
     if (len > 2)
-        *(*get_space)(1) = default_addr >> 16;
+        *(*get_space)(1) = (char)(bytecode_t)(default_addr >> 16);
 }
 
 void align_switch(pc)
@@ -3148,7 +3157,7 @@ void align_switch(pc)
     a2 = pc[1];
     len = a2 >> 6;
     pc[0] |= len;
-    pc[1] = offset = pc[2];
+    offset = pc[1] = pc[2];
     if (len >=2) {
         offset += (pc[2] = pc[3]) << 8;
         if (len > 2) {
@@ -3166,7 +3175,10 @@ void align_switch(pc)
     pc[offset+len+1] = abuf[2] = a2;
     startu = pc+offset+len+2 + sizeof(p_int) - 4;
     starta = (unsigned char *)((p_int)startu & ~(sizeof(char *)-1));
-    size = tablen + tablen / sizeof(char*) * len;
-    move_memory(starta, startu, size);
-    move_memory(starta+size, abuf + sizeof abuf - (startu-starta), startu-starta);
+    size = (long)(tablen + tablen / sizeof(char*) * len);
+    move_memory(starta, startu, (size_t)size);
+    move_memory(starta+size, abuf + sizeof abuf - (startu-starta), (size_t)(startu-starta));
 }
+
+/*=========================================================================*/
+/***************************************************************************/
