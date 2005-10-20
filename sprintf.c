@@ -846,7 +846,7 @@ char *string_print_formatted(format_str, argc, argv)
     }
     if (clean.u.string)
       xfree(clean.u.string);
-    while (tcst = csts) {
+    while ( (tcst = csts) ) {
 	csts = tcst->next;
 	if (tcst->info & INFO_TABLE && tcst->d.tab)
 	    xfree((char *)tcst->d.tab);
@@ -1166,9 +1166,9 @@ char *string_print_formatted(format_str, argc, argv)
               max = len = 0;
               n = 1;
 	      s = TABLE;
-	      if (c = *(start = s)) for (;;) {
+	      if ( (c = *(start = s)) ) for (;;) {
 		if (c != '\n') {
-		  if (c = *++s)
+		  if ( (c = *++s) )
 		    continue;
 		  else
 		    break;
@@ -1176,7 +1176,7 @@ char *string_print_formatted(format_str, argc, argv)
 		len = s - start;
                 if (len > max) max = len;
 		n++;
-		if (c = *(start = ++s)) {
+		if ( (c = *(start = ++s)) ) {
 		  continue;
 		}
 		n--;
@@ -1192,7 +1192,7 @@ char *string_print_formatted(format_str, argc, argv)
                 (*temp)->size = fs/pres;
               }
               len = n/pres; /* length of average column */
-              if ((int)n < pres) pres = n;
+              if (n < (unsigned int)pres) pres = n;
               if (len*pres < n) len++;
               if (len > 1 && n%pres) pres -= (pres - n%pres)/len;
               (*temp)->d.tab = (char **)xalloc(pres*sizeof(char *));
@@ -1209,7 +1209,7 @@ char *string_print_formatted(format_str, argc, argv)
                     SAVE_CHAR(((TABLE)+fs));
                     TABLE[fs] = '\0';
                     (*temp)->d.tab[i++] = TABLE+fs+1;
-                    if ((int)i >= pres) goto add_table_now;
+                    if (i >= (unsigned int)pres) goto add_table_now;
                     n = 0;
                   }
                 }
@@ -1223,7 +1223,7 @@ add_table_now:
             if (pres && pres<slen) {
               slen = pres;
             }
-            if (fs && (int)fs>slen) {
+            if (fs && fs > (unsigned int)slen) {
               add_justified(carg->u.string, slen, pad, fs, finfo,
           (((format_str[fpos] != '\n') && (format_str[fpos] != '\0'))
           || ((finfo & INFO_ARRAY) && (nelemno < VEC_SIZE((argv+arg)->u.vec))))
@@ -1255,7 +1255,7 @@ add_table_now:
 	      cheat[i++] = '*';
 	      cheat[i++] = format_char;
 	      cheat[i] = '\0';
-	      if (pres > (int)(sizeof(temp) - 12)) {
+	      if ((size_t)pres > (sizeof(temp) - 12)) {
 		pres = sizeof(temp) - 12;
 	      }
 	      sprintf(temp, cheat, pres, READ_DOUBLE(carg));
@@ -1268,11 +1268,11 @@ add_table_now:
 	      cheat[i] = '\0';
 	      sprintf(temp, cheat, carg->u.number);
 	      tmpl = strlen(temp);
-              if (tmpl >= (int)sizeof(temp))
+              if ((size_t)tmpl >= sizeof(temp))
                 fatal("Local buffer overflow in sprintf() for float.\n");
 	      if (pres && tmpl > pres) tmpl = pres; /* well.... */
 	    }
-	    if (tmpl < (int)fs)
+	    if ((unsigned int)tmpl < fs)
 	      add_justified(temp, tmpl, pad, fs, finfo,
 		(((format_str[fpos] != '\n') && (format_str[fpos] != '\0')) ||
 		 ((finfo & INFO_ARRAY) &&

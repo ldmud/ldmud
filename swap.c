@@ -1,3 +1,7 @@
+/* TODO: 'status swap' should also list the mode, if freespace is recycled
+ * TODO:: and the swaps/s.
+ * TODO: Background defragmentation of the swapfile
+ */
 #include "driver.h"
 
 #include <sys/types.h>

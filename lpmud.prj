@@ -6,11 +6,11 @@
 ;;    <v>-<r>-dev.*: The development branch for version <v>.<r>
 ;;    <v>-<r>-rel.*: The release branch for version <v>.<r>
 ;;    <v>-<r>-<p>-pre.*; The pre-releases for beta testing (unused yet).
-(Project-Version lpmud 3-2-rel 3)
-(Parent-Version lpmud 3-2-rel 2)
-(Version-Log "Release 3.2.3 (21. Sep 1998")
+(Project-Version lpmud 3-2-rel 4)
+(Parent-Version lpmud 3-2-rel 3)
+(Version-Log "Release 3.2.4 (23. Sep 1998)")
 (New-Version-Log "")
-(Checkin-Time "Mon, 02 Nov 1998 23:35:29 +0000")
+(Checkin-Time "Mon, 02 Nov 1998 23:41:14 +0000")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -20,7 +20,7 @@
                   "^lang.y$" "^make_func.c$" "make_func$" "\\..*\\.swp$"))
 (Project-Keywords (ReleaseMajor 3)
                   (ReleaseMinor 2)
-                  (ReleaseMicro 3)
+                  (ReleaseMicro 4)
                   (ReleaseType "rel") ; "dev", "pre" or "rel"
                  (ReleaseVersion "$ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$")
 )
@@ -53,22 +53,22 @@
   (telnet.h (lpmud/22_telnet.h 1.2 644))
   (sysmalloc.c (lpmud/23_sysmalloc. 1.1 644))
   (switch.h (lpmud/24_switch.h 1.3 644))
-  (swap.c (lpmud/25_swap.c 1.4.1.1 644))
-  (stralloc.h (lpmud/26_stralloc.h 1.4 644))
-  (stralloc.c (lpmud/27_stralloc.c 1.4 644))
-  (sprintf.c (lpmud/28_sprintf.c 1.5 644))
-  (smalloc.h (lpmud/29_smalloc.h 1.3 644))
+  (swap.c (lpmud/25_swap.c 1.4.1.2 644))
+  (stralloc.h (lpmud/26_stralloc.h 1.4.1.1 644))
+  (stralloc.c (lpmud/27_stralloc.c 1.4.1.1 644))
+  (sprintf.c (lpmud/28_sprintf.c 1.5.1.1 644))
+  (smalloc.h (lpmud/29_smalloc.h 1.3.1.1 644))
   (smalloc.c (lpmud/30_smalloc.c 1.4 644))
-  (simulate.c (lpmud/31_simulate.c 1.7.1.1 644))
-  (simul_efun.c (lpmud/32_simul_efun 1.4 644))
+  (simulate.c (lpmud/31_simulate.c 1.7.1.2 644))
+  (simul_efun.c (lpmud/32_simul_efun 1.4.1.1 644))
   (sent.h (lpmud/33_sent.h 1.3 644))
   (rmcr (lpmud/34_rmcr 1.2 644))
   (regexp.h (lpmud/35_regexp.h 1.6 644))
-  (regexp.c (lpmud/36_regexp.c 1.8 644))
+  (regexp.c (lpmud/36_regexp.c 1.8.1.1 644))
   (prolang.y (lpmud/37_prolang.y 1.5 644))
   (port.h (lpmud/38_port.h 1.5 644))
   (port.c (lpmud/39_port.c 1.3 644))
-  (patchlevel.h (lpmud/40_patchlevel 1.10.1.1 644))
+  (patchlevel.h (lpmud/40_patchlevel 1.10.1.2 644))
   (parse_old.c (lpmud/41_parse_old. 1.3 644))
   (parse.c (lpmud/42_parse.c 1.4 644))
   (otable.c (lpmud/43_otable.c 1.3 644))
@@ -206,7 +206,7 @@
   (DONE (lpmud/d/19_DONE 1.2 644))
   (Copyright (lpmud/d/20_Copyright 1.3 644))
   (C_COMPILER_BUGS (lpmud/d/21_C_COMPILER 1.2 644))
-  (CREDITS (lpmud/d/22_CREDITS 1.3.1.1 644))
+  (CREDITS (lpmud/d/22_CREDITS 1.3.1.2 644))
   (COMPAT (lpmud/d/23_COMPAT 1.2 644))
   (BUGS (lpmud/d/24_BUGS 1.2 644))
 
@@ -290,7 +290,7 @@
   (hosts/be/be.h (lpmud/e/35_be.h 1.2 644))
   (hosts/be/README.Be (lpmud/e/36_README.Be 1.3 644))
   (hosts/be/Makefile (lpmud/e/37_Makefile 1.3.1.1 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.3.1.1 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.3.1.2 644))
 
 ;; Files added by populate at Mon, 02 Nov 1998 23:17:14 +0000,
 ;; to version 3-2-dev.6(w), by lars:
@@ -361,7 +361,7 @@
   (backend.h (lpmud/f/46_backend.h 1.1.1.1 644))
   (array.h (lpmud/f/47_array.h 1.1 644))
   (access_check.h (lpmud/f/48_access_che 1.1 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.1.1.1 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.1.1.2 644))
 
 ;; Files deleted by populate at Mon, 02 Nov 1998 23:20:26 +0000,
 ;; from version 3-2-dev.7(w), by lars:
@@ -382,8 +382,16 @@
 ;; to version 3-2-rel.2(w), by lars:
 
   (wk/config.h-OSB (lpmud/g/1_config.h-O 1.1 644))
-  (filestat.h (lpmud/g/2_filestat.h 1.1 644))
-  (filestat.c (lpmud/g/3_filestat.c 1.1 644))
+  (filestat.h (lpmud/g/2_filestat.h 1.2 644))
+  (filestat.c (lpmud/g/3_filestat.c 1.2 644))
+
+;; Files added by populate at Mon, 02 Nov 1998 23:41:08 +0000,
+;; to version 3-2-rel.3(w), by lars:
+
+  (wk/config.h-Carledon (lpmud/g/8_config.h-C 1.1 644))
+  (wk/Driverbug3 (lpmud/g/9_Driverbug3 1.1 644))
+  (doc/efun/terminal_colour (lpmud/g/10_terminal_c 1.1 644))
+  (doc/efun/query_mud_port (lpmud/g/11_query_mud_ 1.1 644))
 )
 (Merge-Parents)
 (New-Merge-Parents)

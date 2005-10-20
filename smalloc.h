@@ -144,7 +144,7 @@ extern char *malloc_increment_size PROT((char *p, p_int size));
 extern void walk_new_small_malloced PROT(( void (*func)(POINTER, long) ));
 
 #ifdef SMALLOC_TRACE
-extern void store_print_block_dispatch_info PROT((char *block, void (*func)(POINTER, long) ));
+extern void store_print_block_dispatch_info PROT((char *block, void (*func)(int, char *, int) ));
 extern int is_freed PROT((char *p, p_uint minsize));
 #endif /* SMALLOC_TRACE */
 

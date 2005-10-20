@@ -175,7 +175,7 @@ void walk_shared_strings(func)
     char *p, *n;
 
     for (x=0; x<HTABLE_SIZE; x++)
-	for (n = base_table[x]; p = n; ) {
+	for (n = base_table[x]; (p = n); ) {
 	    n = NEXT(p); /* p may be freed by (*func)() . */
 	    (*func)(p-sizeof(short)-sizeof(char *), p);
 	}
@@ -265,14 +265,14 @@ char * string;
 	NEXT(s) = base_table[h];
 	base_table[h] = s;
 	num_distinct_strings++;
-	bytes_distinct_strings +=
+	bytes_distinct_strings += (
 #ifdef MALLOC_smalloc
 	  SMALLOC_OVERHEAD * sizeof(char *) +
 #else
 	  sizeof(char *) +
 #endif
 	    (sizeof(char *) + sizeof(short) +
-	    length + 1 + (sizeof(char *)-1)) & ~(sizeof(char *)-1);
+	    length + 1 + (sizeof(char *)-1))) & (~(sizeof(char *)-1));
 	REFS(s) = 1;
 	stralloc_allocd_strings++;
 	stralloc_allocd_bytes += shstr_malloced_size(s);
@@ -296,7 +296,7 @@ char * str;
 	return(s);
 }
 
-INLINE
+LOCAL_INLINE
 void decrement_string_ref(str)
 char *str;
 {

@@ -1,6 +1,6 @@
 /* $Source: regexp.c $
  *
- * $Revision: 1.8 $
+ * $Revision: 1.8.1.1 $
  *
  * regexp.c - regular expression matching
  *
@@ -164,7 +164,7 @@
 #include "regexp.h"
 
 #ifndef lint
-static char    *Ident UNUSED = "$Id: regexp.c 1.8 Mon, 02 Nov 1998 16:21:55 -0700 baron $";
+static char    *Ident UNUSED = "$Id: regexp.c 1.8.1.1 Mon, 02 Nov 1998 16:41:14 -0700 baron $";
 #endif
 
 
@@ -361,7 +361,7 @@ int		excompat;	/* \( \) operators like in unix ex */
     /* This might be slightly more than needed */
     if (expr2 == (short *)NULL)
 	FAIL("out of space");
-    for ( scan=expr,dest=expr2; c= *scan++; ) {
+    for ( scan=expr,dest=expr2; (c= *scan++); ) {
 	switch (c) {
 	    case '(':
 	    case ')':

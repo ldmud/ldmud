@@ -212,7 +212,7 @@ struct object *get_simul_efun_object()
 	    simul_efunp[j].flags   = flags;
 	    simul_efunp[j].type    = type;
 
-	    if (j < (int)(sizeof simul_efun_table / sizeof simul_efun_table[0])) {
+	    if ((size_t)j < (sizeof simul_efun_table / sizeof simul_efun_table[0])) {
 		simul_efun_table[j].funstart = funstart;
 		simul_efun_table[j].program = inherit_progp;
 		simul_efun_table[j].function_index_offset = fun_ix_offs;

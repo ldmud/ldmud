@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Sep-1998 (Lars Duening) -- Release 3.2.4
+    - (simulate.c) load_object() The code cleaning up the filename did
+        not check if an object with the 'sane' filename already exists.
+        This lead to duplicate entries in the object table and thus
+        fatal driver aborts. Furthermore, the code carelessly modified
+        the string passed, causing disruptions in the shared string
+        table.
+    - (doc/efun/terminal_colour, doc/efun/query_mud_port) added.
+
+22-Sep-1998 (Lars Duening)
+    - (filestat.*) Oops, the one statistic necessary to detect multiple
+        uses of a file in one command was missing. Corrected that.
+
 21-Sep-1998 (Lars Duening) -- Release 3.2.3
     - (array.c) Changed order_alist() to use Standard conformant pointer
         arithmetics.

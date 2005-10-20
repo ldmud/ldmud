@@ -15,7 +15,9 @@
 #define FSTAT_SAVE  5
 #define FSTAT_REST  6
 #define FSTAT_TOTAL 7
-#define FSTAT_MAX   8
+#define FSTAT_TUSES 8
+#define FSTAT_LUSES 9
+#define FSTAT_MAX   10
 
 extern void init_filestat (void);
 extern void fstat_count (char * filename, int type);

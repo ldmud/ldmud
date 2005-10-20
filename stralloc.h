@@ -4,7 +4,7 @@
 #include "driver.h"
 
 #if defined(HAS_INLINE) && defined(STRALLOC)
-#define STRALLOC_INLINE inline
+#define STRALLOC_INLINE LOCAL_INLINE
 #else
 #define STRALLOC_INLINE
 #endif

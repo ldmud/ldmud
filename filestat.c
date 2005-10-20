@@ -5,6 +5,11 @@
  *---------------------------------------------------------------------------
  * This module counts the usage of files by the mud, separated into normal 
  * reading and writing, compiling and inheriting, and save/restore objects.
+ * Also counted are the total number of usages ('total'), the number of first
+ * uses within the current heart beat interval ('tick'), and the number of
+ * first uses in the current player command/heart beat execution thread
+ * ('cmd'). Differences between the 'total' and the 'tick' resp. 'cmd' figure
+ * denote multiple usages of a file in one interval/execution.
  *
  * The current statistics can be appended to the file /FILESTAT from within
  * the mud using the special command 'status files'.
@@ -36,6 +41,8 @@
 typedef struct filestat {
   struct filestat * next;               /* Next structure in hashchain */
   char            * name;               /* The filename as shared string */
+  int               tstamp;             /* current_time of last update */
+  uint32            lstamp;             /* Backend loopcount of last update */
   uint32            stats[FSTAT_MAX];   /* The statistics */
 } filestat;
 
@@ -76,6 +83,7 @@ fstat_count (char * filename, int type)
     char     * fname;
     filestat * fstat = NULL;
     int        hash;
+    uint32     clstamp = total_alarms + total_player_commands;
 
 
     hash = StrHash(filename);
@@ -117,6 +125,16 @@ fstat_count (char * filename, int type)
     iNumUsage++;
     fstat->stats[type]++;
     fstat->stats[FSTAT_TOTAL]++;
+    if (clstamp != fstat->lstamp)
+    {
+        fstat->lstamp = clstamp;
+        fstat->stats[FSTAT_LUSES]++;
+    }
+    if (current_time != fstat->tstamp)
+    {
+        fstat->tstamp = current_time;
+        fstat->stats[FSTAT_TUSES]++;
+    }
 }
 
 /*-------------------------------------------------------------------------*/
@@ -143,16 +161,19 @@ fstat_status (void)
     sprintf(buf, "%lu files used %lu times in %lu commands/%ld backend loops.\n"
                , iNumFiles, iNumUsage, total_player_commands, total_alarms);
     add_message(buf);
+    sprintf(buf, "Table uses %lu bytes of memory.\n", iNumFiles * sizeof(filestat));
+    add_message(buf);
     add_message("\nAppending detailed statistics to /FILESTAT...\n");
     
     fputs("File Usage statistic:\n", f);
     fputs("---------------------\n", f);
     fprintf(f, "%lu files used %lu times in %lu commands/%ld backend loops.\n"
              , iNumFiles, iNumUsage, total_player_commands, total_alarms);
-    fprintf(f, "\n%30s : %8s : %8s %8s %8s %8s %8s %8s %8s\n"
-             , "  Name", "  Total", "  Read", "  Write", "  Del", "  Comp"
+    fprintf(f, "Table uses %lu bytes of memory.\n", iNumFiles * sizeof(filestat));
+    fprintf(f, "\n%30s : %8s (%8s, %8s) : %8s %8s %8s %8s %8s %8s %8s\n"
+             , "  Name", "  Total", "  Tick", "  Cmd", "  Read", "  Write", "  Del", "  Comp"
              , "  Incl", "  Save", "  Rest");
-    for (i = 0; i < 30 + 8*9 + 2 + 2; i++)
+    for (i = 0; i < 30 + 10*9 + 2 + 2; i++)
         buf[i] = '-';
     buf[i] = '\n';
     buf[i+1] = '\0';
@@ -161,9 +182,11 @@ fstat_status (void)
     {
         for (fstat = table[i]; fstat != NULL; fstat = fstat->next)
         {
-            fprintf(f, "%30s: %8lu : %8lu %8lu %8lu %8lu %8lu %8lu %8lu\n"
+            fprintf(f, "%30s: %8lu (%8lu, %8lu) : %8lu %8lu %8lu %8lu %8lu %8lu %8lu\n"
                      , fstat->name
                      , fstat->stats[FSTAT_TOTAL]
+                     , fstat->stats[FSTAT_TUSES]
+                     , fstat->stats[FSTAT_LUSES]
                      , fstat->stats[FSTAT_READ]
                      , fstat->stats[FSTAT_WRITE]
                      , fstat->stats[FSTAT_DEL]

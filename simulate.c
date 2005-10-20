@@ -279,17 +279,10 @@ struct object *load_object(lname, dont_reset, depth)
     char name[200];
     struct program *prog;
 
-#ifdef NATIVE_MODE
-    if (current_object && current_object->eff_user == 0
-	&& current_object->name)
-	error("Can't load objects when no effective user.\n");
-#endif
     /* Massage the filename a bit to bring it into a sane format:
      *  - Remove leading '/'
      *  - Remove a trailing '.c'
      *  - Collapse multiple '/' into just one.
-     * There will be a legality check later on, so don't care about
-     * that now.
      */
 
     while(lname[0] == '/')
@@ -298,7 +291,9 @@ struct object *load_object(lname, dont_reset, depth)
     {
         char *from, *to;
 
-        for (from = to = lname; '\0' != *from; from++, to++)
+        for (from = lname, to = name
+            ; '\0' != *from && (to - name) < sizeof(name) - 4
+            ; from++, to++)
         {
             if ('/' == *from)
             {
@@ -308,17 +303,31 @@ struct object *load_object(lname, dont_reset, depth)
             }
             else if ('.' == *from && 'c' == *(from+1) && '\0' == *(from+2))
                 break;
-            else if (from != to)
+            else
               *to = *from;
         }
         *to = '\0';
-        name_length = to - lname;
+        name_length = to - name;
     }
 
+    /* It could be that the sane filename is one of an already loaded
+     * object. In that case, simply return that object.
+     */
+    ob = lookup_object_hash(name);
+    if (ob)
+        return ob;
+
+#ifdef NATIVE_MODE
+    if (current_object && current_object->eff_user == 0
+	&& current_object->name)
+	error("Can't load objects when no effective user.\n");
+#endif
+
+#ifdef DEBUG
     if ((size_t)name_length > sizeof name - 4)
 	name_length = sizeof name - 4;
-    if (name_length)
-	memcpy(name, lname, name_length);
+#endif
+
     if (master_ob && master_ob->flags & O_DESTRUCTED) {
 	/* The master has been destructed, and it has not been noticed yet.
 	 * Reload it, because it can't be done inside of yyparse.
@@ -1975,18 +1984,13 @@ struct object *find_object(str)
     while(str[0] == '/')
 	str++;
     ob = find_object2(str);
-    if (ob) {
-	if (ob->flags & O_SWAPPED)
-	    if (load_ob_from_swap(ob) < 0)
-		error("Out of memory\n");
-	return ob;
-    }
-    ob = load_object(str, 0, 60);
-    if (ob->flags & O_DESTRUCTED)		/* *sigh* */
-	return 0;
-    if (ob && ob->flags & O_SWAPPED)
-	if (load_ob_from_swap(ob) < 0)
-	    error("Out of memory\n");
+    if (!ob)
+        ob = load_object(str, 0, 60);
+    if (!ob || ob->flags & O_DESTRUCTED)
+        return NULL;
+    if (ob->flags & O_SWAPPED)
+        if (load_ob_from_swap(ob) < 0)
+            error("Out of memory\n");
     return ob;
 }
 

@@ -1,10 +1,13 @@
 This file lists all changes to the game driver which have a visible
 impact on its behaviour; both towards the mudlib as well as towards
-the host system. This means new features as well as bug fixes.
+the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-21-Sep-1998 (Lars Duening)
+24-Sep-1998 (Lars Duening) -- Release 3.2.4
+    - Bugfix for the collapsing of '/' in object names.
+
+21-Sep-1998 (Lars Duening) -- Release 3.2.3
     - Bugfix: mapping_contains() no longer returns destructed objects.
         (found by Zora).
     - New special command 'status files' to append file usage statistics
@@ -18,9 +21,10 @@ For a detailed list of all changes see the file CHANGELOG.
     - Version number pattern changed from 03.02.1@<patchlevel>
       to 3.2.<patchlevel>. This affects all uses of the __VERSION__
       lpc predefine.
-    - Objects may be loaded with filenames containing two or
+    - Objects may be loaded/inherited with filenames containing two or
       more consecutive '/'es, these are collapsed into just one.
-      (suggested by Zora).
+      However, it is not possible to find objects using the wrong
+      names. (suggested by Zora)
     - The dreaded __INIT() bug is fixed (provided by mubo).
     - New commandline options:
         --options : prints all options used in compiling the driver
@@ -29,8 +33,10 @@ For a detailed list of all changes see the file CHANGELOG.
         --longhelp: prints an elaborate description of the commandline
                     options
     - The commandline option handling was renovated, most options now
-      exist in a short and long form. See doc/driver/invocation for
-      further information.
+      exist in a short and long form. This caused slight changes in
+      name and syntax for well-known options (.e.g '--gcollect_out_fd<file>'
+      is now '--gcollect-out-fd <file>'). Please see doc/driver/invocation
+      for further information. 
 
 10-Jul-1998 (Lars Duening) -- Release 3.2.1@141-osb.16
     - Bugfix for the "*":: problem (provided by Daniel von Dincklage).
