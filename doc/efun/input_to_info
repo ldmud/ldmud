@@ -1,5 +1,5 @@
 SYNOPSIS
-        mixed * find_input_to (object player)
+        mixed * input_to_info (object player)
 
 DESCRIPTION
         Construct an array of all input_to's pending for this interactive

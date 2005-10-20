@@ -35,8 +35,8 @@ Reading symbols from /usr/libexec/ld-elf.so.1...done.
 #1  0x804d85f in vec_size (vec=0x845e070) at array.c:200
 200	        fatal("Size %ld of vector %p doesn't match memsize %ld\n"
 (gdb) list
-195	                   ( sizeof(vector_t) - sizeof(svalue_t) ) / SIZEOF_CHAR_P 
-196	                 ) 
+195	                   ( sizeof(vector_t) - sizeof(svalue_t) ) / SIZEOF_CHAR_P
+196	                 )
 197	
 198	              ) / (sizeof(svalue_t)/SIZEOF_CHAR_P);
 199	    if (vec->size != memsize)
@@ -90,13 +90,13 @@ $3 = 1817
 (gdb) p *(object*)0x844f220
 No symbol "object" in current context.
 (gdb) p *(object_t*)0x844f220
-$4 = {flags = 512, ref = 15, total_light = 0, time_reset = 1019811627, 
-  time_of_ref = 1019811350, load_time = 1019637777, load_id = 57, 
-  extra_ref = 13, prog = 0x83ea1a0, name = 0x844937c "p/daemons/inetd", 
-  load_name = 0x834fdc0 "/p/daemons/inetd", next_all = 0x844ebb8, 
-  prev_all = 0x8475244, next_hash = 0x0, next_inv = 0x0, contains = 0x0, 
-  super = 0x0, sent = 0x0, user = 0x8433ab0, eff_user = 0x8433ab0, 
-  extra_num_variables = 6, variables = 0x844ed04, ticks = 4484171, 
+$4 = {flags = 512, ref = 15, total_light = 0, time_reset = 1019811627,
+  time_of_ref = 1019811350, load_time = 1019637777, load_id = 57,
+  extra_ref = 13, prog = 0x83ea1a0, name = 0x844937c "p/daemons/inetd",
+  load_name = 0x834fdc0 "/p/daemons/inetd", next_all = 0x844ebb8,
+  prev_all = 0x8475244, next_hash = 0x0, next_inv = 0x0, contains = 0x0,
+  super = 0x0, sent = 0x0, user = 0x8433ab0, eff_user = 0x8433ab0,
+  extra_num_variables = 6, variables = 0x844ed04, ticks = 4484171,
   gigaticks = 0}
 (gdb) p *(programn_5t    _t) *)0x                 x/128xb 0x0x845e048
 Invalid number "0x0x845e048".
@@ -387,9 +387,9 @@ at swap.c:864
 #5  0x08051cce in backend () at backend.c:637
 #6  0x0809aa08 in main (argc=4, argv=0xbffffae4) at main.c:428
 #7  0x400e3306 in __libc_start_main (main=0x809a3c4 <main>, argc=4,
-ubp_av=0xbffffae4, 
+ubp_av=0xbffffae4,
     init=0x8049c7c <_init>, fini=0x80c90b0 <_fini>, rtld_fini=0x4000d2dc
-<_dl_fini>, 
+<_dl_fini>,
     stack_end=0xbffffadc) at ../sysdeps/generic/libc-start.c:129
 (gdb)
 

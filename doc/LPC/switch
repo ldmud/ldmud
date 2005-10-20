@@ -2,7 +2,7 @@ NAME
         switch
 
 SYNTAX
-        switch (expr) statement;
+        switch (expr) block;
 
 DESCRIPTION
         Branch to the case label in statement that matches expr.
@@ -59,10 +59,32 @@ EXAMPLE
           case 99 : write("It tastes good.\n";
         }
 
+BUGS
+        In C, the grammar for switch() is
+
+            switch (expr) block
+
+        allowing constructs like
+
+            switch (expr)
+              while (expr2)
+              {
+              case 1: ...
+              case 2: ...
+              }
+
+        The LPC compiler currently can't handle neither statements as switch
+        body, nor case labels embedded in inner loops.
+
 HISTORY
         LDMud 3.2.9/3.3 allowed to pass values of the wrong type to switch(),
           the driver would in that case use the default case. Before, values
           of the wrong type caused a runtime error.
+
+        LDMud 3.2.10 constrained the grammar to require a block for the
+          switch() body, not just a statement. This differs from the C
+          syntax, but was necessary as the compiler didn't handle
+          the statement case correctly.
 
 SEE ALSO
         for(LPC), foreach(LPC), do-while(LPC), if(LPC), while(LPC)

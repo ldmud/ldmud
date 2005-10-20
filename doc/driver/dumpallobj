@@ -30,6 +30,7 @@ DESCRIPTION
              'PROG SWAPPED' if only the program is swapped
              'VAR SWAPPED' if only the variabes are swapped
              'SWAPPED' if both program and variables are swapped
+          - the time the object was created
 
         For every destructed object, a line is written into the file with the
         following information in the given order:
@@ -41,6 +42,7 @@ DESCRIPTION
 
 HISTORY
         LDMud 3.2.9 added the DEST_OBJ_DUMP.
+        LDMud 3.2.10 added the object creation time to OBJ_DUMP.
 
 SEE ALSO
         malloc(D), status(D), memory(C), objects(C), debug_info(E),

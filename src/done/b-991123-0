@@ -90,13 +90,13 @@ $10 = 0x8a763f2 "cost"
 0xa171504:	0x73	0x68	0x61	0x6e	0x67	0x65	0x6c	0x61
 0xa17150c:	0x00	0x00	0x00	0x00
 (gdb) p *(object_t *)0x09b38ee0
-$12 = {flags = 4608, ref = 2, total_light = 1, time_reset = 0, 
-  time_of_ref = 943372134, load_time = 943334225, load_id = 0, extra_ref = 0, 
-  prog = 0x865cc30, name = 0xc627ae4 "d/Kokosinsel/Knossos/Strasse/main3", 
-  load_name = 0x869e5b2 "/d/Kokosinsel/Knossos/Strasse/main3", 
-  next_all = 0xc7e753c, prev_all = 0xcb12358, next_hash = 0x9457298, 
-  next_inv = 0x0, contains = 0x0, super = 0x0, sent = 0x0, user = 0x8b20998, 
-  eff_user = 0x8b20998, extra_num_variables = 48, variables = 0x8e552cc, 
+$12 = {flags = 4608, ref = 2, total_light = 1, time_reset = 0,
+  time_of_ref = 943372134, load_time = 943334225, load_id = 0, extra_ref = 0,
+  prog = 0x865cc30, name = 0xc627ae4 "d/Kokosinsel/Knossos/Strasse/main3",
+  load_name = 0x869e5b2 "/d/Kokosinsel/Knossos/Strasse/main3",
+  next_all = 0xc7e753c, prev_all = 0xcb12358, next_hash = 0x9457298,
+  next_inv = 0x0, contains = 0x0, super = 0x0, sent = 0x0, user = 0x8b20998,
+  eff_user = 0x8b20998, extra_num_variables = 48, variables = 0x8e552cc,
   ticks = 158380, gigaticks = 0}
 (gdb) p *(  (char *)080e21ee
 Invalid number "080e21ee".
@@ -105,19 +105,19 @@ $13 = 0x80e21ee "interpret.c"
 (gdb) p 0x4b1
 $14 = 1201
 (gdb) p (program        *(program_t) *)0x865cc30
-$15 = {ref = 1548, total_size = 7140, extra_ref = 0, 
-  program = 0x865cc80 "\206±\034\b\a", name = 0x89d18bc "i/room.c", 
-  id_number = 133, load_time = 943276671, 
+$15 = {ref = 1548, total_size = 7140, extra_ref = 0,
+  program = 0x865cc80 "\206±\034\b\a", name = 0x89d18bc "i/room.c",
+  id_number = 133, load_time = 943276671,
   line_numbers = 0x865e58c "ààî\021ö\nS\004E\006\004\004\005\002ÿ\t\f\t\f\006þ\0
 17ÿ\n\b\016ÿ\r\017\r\017\r\017\r\025@\001\001\001\001\001\001\aA\f\006\006\006\n
 \004\t\001\001ÿ\n\bnS\aEFF\006\006\r\013Á\013I\006\r\013Á\013B\001ì\a\t\001ñ\n\t
 \001ð\n\t\001î\nL\r\004\013\n\n\t\001ï\t[\001C\004\006ú\037\005\n\f\t¾\beÿ\020\0
 01Cÿ#\005\n\f\t¾\b]\001M\001ð\nþ\rÿ\023\023\023@ñ\tE\nÀ\013@è\bMTÿ\n\t\bN\t\004þ
 \rG\bAG\b\b@ð\n]\eÀ\013@ï\aÿ\f\013\001ï\bÿ\f\013\001ààì\bL\006\fÀ\013ÿ\023\a\016
-\002\t"..., function_names = 0x865dcd0, functions = 0x865dde0, 
-  strings = 0x865e01c, variable_names = 0x865e130, inherit = 0x865e2b0, 
-  flags = 0, heart_beat = -1, argument_types = 0x865e31c, 
-  type_start = 0x865e46c, swap_num = -1, num_function_names = 135, 
+\002\t"..., function_names = 0x865dcd0, functions = 0x865dde0,
+  strings = 0x865e01c, variable_names = 0x865e130, inherit = 0x865e2b0,
+  flags = 0, heart_beat = -1, argument_types = 0x865e31c,
+  type_start = 0x865e46c, swap_num = -1, num_function_names = 135,
   num_functions = 143, num_strings = 69, num_variables = 48, num_inherited = 9}
 (gdb) p 0x85
 $16 = 133
@@ -144,12 +144,12 @@ $18 = (char **) 0x837d3a4
 0xa171530:	0x2f	0x6d	0x2d	0x32	0x35	0x39	0x5f	0x32
 0xa171538:	0x37	0x31	0x00	0x00	0x0a	0x00	0x00	0x30
 (gdb) p *(object_t*)0x0a5f8cd8
-$19 = {flags = 512, ref = 1, total_light = 1, time_reset = 0, 
-  time_of_ref = 943371255, load_time = 943353344, load_id = 0, extra_ref = 0, 
-  prog = 0x9e07054, name = 0xc5db8c4 "map/m-260_271", 
-  load_name = 0xc11ae7a "/map/m-260_271", next_all = 0x9ab87b4, 
-  prev_all = 0xbf0b728, next_hash = 0x0, next_inv = 0x0, contains = 0x0, 
-  super = 0x0, sent = 0x0, user = 0x9fd7e14, eff_user = 0x9fd7e14, 
+$19 = {flags = 512, ref = 1, total_light = 1, time_reset = 0,
+  time_of_ref = 943371255, load_time = 943353344, load_id = 0, extra_ref = 0,
+  prog = 0x9e07054, name = 0xc5db8c4 "map/m-260_271",
+  load_name = 0xc11ae7a "/map/m-260_271", next_all = 0x9ab87b4,
+  prev_all = 0xbf0b728, next_hash = 0x0, next_inv = 0x0, contains = 0x0,
+  super = 0x0, sent = 0x0, user = 0x9fd7e14, eff_user = 0x9fd7e14,
   extra_num_variables = 62, variables = 0xc96ec34, ticks = 6111, gigaticks = 0}
 (gdb) p (char *)0x080e21ee
 $20 = 0x80e21ee "interpret.c"
@@ -179,19 +179,19 @@ $30 = 0xab104ae "spritz_robbie"
 #2  0x809afd2 in free_prog (progp=0xbed8d3c, free_sub_strings=1)
     at object.c:519
 #3  0x809abff in _free_object (ob=0x9b78b9c) at object.c:255
-#4  0x806a28a in eval_instruction (first_instruction=0x8449feb "\030", 
+#4  0x806a28a in eval_instruction (first_instruction=0x8449feb "\030",
     initial_sp=0x810f2cc) at interpret.c:5829
-#5  0x8076cc1 in eval_instruction (first_instruction=0x8620f93 "\030", 
+#5  0x8076cc1 in eval_instruction (first_instruction=0x8620f93 "\030",
     initial_sp=0x810f27c) at interpret.c:10452
-#6  0x808d1af in apply_low (fun=0x89b5556 "say_command", ob=0xdc5f594, 
+#6  0x808d1af in apply_low (fun=0x89b5556 "say_command", ob=0xdc5f594,
     num_arg=1, b_ign_prot=0) at interpret.c:18847
-#7  0x808d752 in sapply_int (fun=0x89b5556 "say_command", ob=0xdc5f594, 
+#7  0x808d752 in sapply_int (fun=0x89b5556 "say_command", ob=0xdc5f594,
     num_arg=1, b_find_static=0) at interpret.c:19061
 #8  0x80dab53 in parse_command (
-    buff=0xbfffef0c "'aber vorher mustt du die platte defragmentieren", 
+    buff=0xbfffef0c "'aber vorher mustt du die platte defragmentieren",
     from_efun=0) at actions.c:809
 #9  0x80dae5f in execute_command (
-    str=0xbfffef0c "'aber vorher mustt du die platte defragmentieren", 
+    str=0xbfffef0c "'aber vorher mustt du die platte defragmentieren",
     ob=0xdc5f594) at actions.c:967
 #10 0x809ef4a in backend () at backend.c:486
 #11 0x806593c in main (argc=50, argv=0xbffffb48) at main.c:323
@@ -210,7 +210,7 @@ $32 = (char **) 0x83820f0
 
 ~/orbit/3.2.7/ldmud-dev.104/src > gdb ../../../../magyra/bin/dri
 ver-3.2.7.U07ia ~/orbit/3.2.7/ldmud-dev.104/src > gdb
-ver-3.2.7.U07 ../../../dri   core.driver.991122-14\:17 
+ver-3.2.7.U07 ../../../dri   core.driver.991122-14\:17
 GNU gdb 4.17
 Copyright 1998 Free Software Foundation, Inc.
 GDB is free software, covered by the GNU General Public License, and you are

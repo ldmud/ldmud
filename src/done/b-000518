@@ -6,7 +6,7 @@ State: Done - fixed in 3.2.8-dev.213
 
 
 in Evermore schmiert mir der Driver ab, wenn ich
-mit #include "../xxx.h"  ein file include, das nicht existiert. 
+mit #include "../xxx.h"  ein file include, das nicht existiert.
 Plattform: Solaris2.7, Compat driver, die Settings hast du ja da.
 < > -includes zeigen dieses Problem nicht.
 
@@ -45,7 +45,7 @@ string get_include_dir(string included, string includer) {
 
 
 Der Fehler tritt zum Beispiel auf, wenn ich unter
-/players/fangorn/work/bla.c ein #include "../blubber.h" mache, wenn das 
+/players/fangorn/work/bla.c ein #include "../blubber.h" mache, wenn das
 blubber.h dort nicht existiert. Dann dumped der driver.
 
 -- Analysis --

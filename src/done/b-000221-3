@@ -5,12 +5,12 @@ Type: Bug
 State: Done - fixed in 3.2.8-dev.176
 
 foreach(<typ> xxx:yyy) ...
-bugt falls xxx auch der name einer globalen funktion oder variablen 
+bugt falls xxx auch der name einer globalen funktion oder variablen
 ist
-(zumindest ist innerhalb der foreach-schleife der zugriff auf xxx 
+(zumindest ist innerhalb der foreach-schleife der zugriff auf xxx
 falsch.
 auch kommen teilweise andere variablenzugriffe durcheinander)
-ach ja, testen kannst du es z.B.:  int x; test() { foreach(int 
+ach ja, testen kannst du es z.B.:  int x; test() { foreach(int
 x:({1,2,3}))
 write(x+"\n"); }
 dann gibt test() 3 0-en aus

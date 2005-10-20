@@ -1,7 +1,7 @@
 Short: Addition of unequal mappings should not fail silently.
 Date: Tue, 10 Oct 2000 11:28:13 +0200 (MEST)
 From: Erzmagier des Wunderlandes <mud@hurrikap.rz.uni-leipzig.de>
-Type: Bug 
+Type: Bug
 State: Done - fixed in 3.2.9-dev.325
 
 Hi Mateese.

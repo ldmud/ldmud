@@ -8,10 +8,10 @@ The rooms used incorrect pathnames.
 
 Description:
 
-You wrote a 'maze' here using the mazemaster I believe, 
+You wrote a 'maze' here using the mazemaster I believe,
 compile_object() etc
 /p/school/examples/lpc/xmace0.c
-for some reason the small area seems to work ok with dev156 but not 
+for some reason the small area seems to work ok with dev156 but not
 with dev164
 it looks like it doesn't compile the virtual rooms as it should
 either way I get errors about destination object being 0

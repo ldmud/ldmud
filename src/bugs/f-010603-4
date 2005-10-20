@@ -6,11 +6,11 @@ State: New
 
 Acius wrote on Sunday, May 20 2001, 00:46:08:
 
->I hope that my explanation was not too garbled, it's late. And While 
->we're talking about adding efun's, how about an update_object(string 
+>I hope that my explanation was not too garbled, it's late. And While
+>we're talking about adding efun's, how about an update_object(string
 >path) efun that:
 >* Compiles the .c file at "path"
->* If path has an error, report the error and *do nothing to the existing 
+>* If path has an error, report the error and *do nothing to the existing
 >object associated with that path*.
 >* If path does not have an error, destruct the existing blueprint object
 > for path and then load in the new one.
@@ -19,7 +19,7 @@ You can have the efun take a parameter: recompile-and-load, or just recompile
 to check the syntax.
 
 Be careful with inherits, though.
--- 
+--
 Lars Duening; lars@bearnip.com
 PGP Key: http://www.bearnip.com/lars/pgp-lars.asc
 

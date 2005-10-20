@@ -2,7 +2,7 @@ SYNOPSIS
         void printf(string format, ...)
 
 DESCRIPTION
-        A cross between sprintf() and write(). Returns void and printd
+        A cross between sprintf() and write(). Returns void and prints
         the result string to the user.
 
 SEE ALSO

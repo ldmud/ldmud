@@ -8,7 +8,7 @@ See also: f-010223, f-011015-1, f-000905-1
 New format specifier  '%S' to format colour-coded strings, '%s' normal strings
 as usual.
 
-Optionally introduce an efun 
+Optionally introduce an efun
 
   csprintf(mapping cntl, string format, mixed args...)
 

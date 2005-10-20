@@ -15,10 +15,6 @@
  * delay this callout is to be scheduled after its predecessor in
  * the list.
  *
- * A second list holds freed call structures to reduce memory management
- * overhead.
- *
- * TODO: The CHUNKed allocation would be nice to have as generic module.
  * TODO: It would be nice if the callout would store from where the
  * TODO:: callout originated and fake a control-stack entry for a proper
  * TODO:: traceback. However, this has to take swapping into account.
@@ -64,30 +60,12 @@ struct call {
 };
 
 
-#define CHUNK_SIZE 20
-  /* Structures are allocated in chunks of this size, to reduce the
-   * malloc overhead.
-   */
-
 static struct call *call_list = NULL;
   /* The list of pending call_outs, sorted in ascending order of delay.
    */
 
-static struct call *call_list_free = NULL;
-  /* The list of unused call structures.
-   */
-
-static long num_call = 0;
-  /* Number of allocated callouts.
-   */
-
 static long num_callouts = 0;
   /* Number of active callouts.
-   */
-
-static object_t call_out_nil_object;
-  /* Callouts with no argument let call.v use this variable as
-   * placeholder.
    */
 
 /*-------------------------------------------------------------------------*/
@@ -104,8 +82,7 @@ free_call (struct call *cop)
     if (cop->command_giver)
         free_object(cop->command_giver, "free_call");
 
-    cop->next = call_list_free;
-    call_list_free = cop;
+    pfree(cop);
 } /* free_call() */
 
 /*-------------------------------------------------------------------------*/
@@ -133,24 +110,6 @@ new_call_out (svalue_t *sp, short num_arg)
 
     arg = sp - num_arg + 1;
 
-    /* First, find a new call structure.
-     * If possible from the free list, else allocate a new chunk of them.
-     * Note that we don't yet remove the structure from the freelist - in
-     * case errors happen.
-     */
-
-    if ( !(cop = call_list_free) )
-    {
-        int i;
-
-        cop = call_list_free = pxalloc(CHUNK_SIZE * sizeof (struct call));
-        for ( i = 0; i < CHUNK_SIZE - 1; i++)
-            call_list_free[i].next = &call_list_free[i+1];
-        call_list_free[CHUNK_SIZE-1].next = NULL;
-        call_out_nil_object.flags |= O_DESTRUCTED;
-        num_call += CHUNK_SIZE;
-    }
-
     /* Test if the expected arguments are on the stack */
 
     if (arg[0].type != T_STRING && arg[0].type != T_CLOSURE)
@@ -177,6 +136,20 @@ new_call_out (svalue_t *sp, short num_arg)
         return sp;
     }
 
+    if (max_callouts && max_callouts <= num_callouts)
+    {
+        error("Too many callouts at once (max. %ld).\n", (long)max_callouts);
+        /* NOTREACHED */
+    }
+
+    /* Get a new call structure.
+     * Note: it is not useful to pool these allocations, as muds tend
+     * to have spikes of high callout usage, but a low longterm average
+     * usage. Any overhead savings by a pool are more than made up
+     * by the unused structures sitting around.
+     */
+    cop = pxalloc(sizeof (struct call));
+
     /* Get the function designation from the stack */
 
     if (arg[0].type == T_STRING)
@@ -196,25 +169,15 @@ new_call_out (svalue_t *sp, short num_arg)
 
     if (error_index >= 0)
     {
-        /* call structure is still in the free list, and the
-         * callback structure was invalidated automatically.
-         */
+        pfree(cop); /* The callback structure was invalidated automatically. */
         bad_efun_vararg(error_index+2, arg - 1);
         /* NOTREACHED */
     }
 
-    if (max_callouts && max_callouts <= num_callouts)
-    {
-        error("Too many callouts at once (max. %ld).\n", (long)max_callouts);
-        /* NOTREACHED */
-    }
-
-    /* We can do the callout, so lets remove it from the freelist and
-     * store the missing data.
+    /* We can do the callout.
      */
 
     num_callouts++;
-    call_list_free = cop->next;
     cop->command_giver = command_giver; /* save current player context */
     if (command_giver)
         ref_object(command_giver, "new_call_out");  /* Bump its ref */
@@ -507,7 +470,10 @@ find_call_out (object_t *ob, svalue_t *fun, Bool do_free_call)
                         goto found;
                     }
                 }
-                /* FALLTHROUGH*/
+                goto not_found;
+            }
+            else if (type == CLOSURE_UNBOUND_LAMBDA)
+            {
 not_found:
                 free_svalue(fun);
                 put_number(fun, -1);
@@ -572,7 +538,7 @@ found:
     }
     free_string(fun_name);
     put_number(fun, -1);
-}
+} /* find_call_out() */
 
 /*-------------------------------------------------------------------------*/
 size_t
@@ -588,18 +554,17 @@ call_out_status (strbuf_t *sbuf, Bool verbose)
     {
         strbuf_add(sbuf, "\nCall out information:\n");
         strbuf_add(sbuf,"---------------------\n");
-        strbuf_addf(sbuf, "Number of allocated call outs: %8ld, %8ld bytes\n",
-                    num_call, num_call * sizeof (struct call));
-        strbuf_addf(sbuf, "Current length: %ld\n", num_callouts);
+        strbuf_addf(sbuf, "Number of call outs: %8ld, %8ld bytes\n",
+                    num_callouts, num_callouts * sizeof (struct call));
     }
     else
     {
-        strbuf_addf(sbuf, "call out:\t\t\t%8ld %9ld (current length %ld)\n"
-                   , num_call, num_call * sizeof (struct call), num_callouts);
+        strbuf_addf(sbuf, "call out:\t\t\t%8ld %9ld\n"
+                   , num_callouts, num_callouts * sizeof (struct call));
     }
 
-    return num_call * sizeof (struct call);
-}
+    return num_callouts * sizeof (struct call);
+} /* call_out_status() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -619,8 +584,7 @@ callout_dinfo_status (svalue_t *svp, int value)
 
     remove_stale_call_outs();
     ST_NUMBER(DID_ST_CALLOUTS, num_callouts);
-    ST_NUMBER(DID_ST_CALLOUT_SLOTS, num_call);
-    ST_NUMBER(DID_ST_CALLOUT_SIZE, num_call * sizeof(struct call));
+    ST_NUMBER(DID_ST_CALLOUT_SIZE, num_callouts * sizeof(struct call));
 
 #undef ST_NUMBER
 } /* callout_dinfo_status() */

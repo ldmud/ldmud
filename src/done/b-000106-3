@@ -14,7 +14,7 @@ die Alist. (Driver: 3.2.1-dev164)
 mixed *high;
 
 void test()
-{   
+{
     int i;
     string *ii;
 

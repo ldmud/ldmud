@@ -4,17 +4,17 @@ Date: Sat, 09 Mar 2002 22:40:26 -0700
 Type: Feature
 State: New
 
-Add a new configuration parameter MAX_STACK_SIZE/--max-stack (default: 0 = 
+Add a new configuration parameter MAX_STACK_SIZE/--max-stack (default: 0 =
 infinite), which is used by assert_stack_gap() to limit recursions.
 
-On systems which provide limits on stack/heap (BSD: getrlimit(), BeOS: 
+On systems which provide limits on stack/heap (BSD: getrlimit(), BeOS:
 Hardcoded system constants?), use these values to override the max-stack/max-
 malloc.
 
 
 AIX uses the ulimit() efun.
-  
-                                   
+
+
 -------------------------------------------------------------------------------
       Base Operating System and Extensions Technical Reference, Volume 2
 -------------------------------------------------------------------------------

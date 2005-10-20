@@ -67,7 +67,6 @@
 #endif
         local
         catch
-        catch_no_log
 "++"    inc
 "--"    dec
 "x++"   post_inc
@@ -132,6 +131,7 @@
         ldup
         swap_values
         clear_locals
+        fbranch
         lbranch
         lbranch_when_zero
         lbranch_when_non_zero
@@ -235,6 +235,7 @@ mixed  *allocate(int|int*, void|mixed);
 int     member_array(mixed, mixed *|string) "use member()";
 #endif /* USE_DEPRECATED */
 int     member(mixed *|string|mapping, mixed);
+int     rmember(mixed *|string, mixed);
 mapping mkmapping(mixed *, ...);
 mapping m_add(mapping, mixed, ...);
 mapping m_delete(mapping, mixed);
@@ -272,11 +273,11 @@ object  clone_object(string|object);
 void    destruct(object);
 int     exec(object, object);
 object  find_object(string);
-string  function_exists(string, object default: F_THIS_OBJECT);
 int     input_to(string, void|int, ...);
 int     interactive(object default: F_THIS_OBJECT);
 string  load_name(int|string|object default: F_THIS_OBJECT);
 object  load_object(string);
+object  master(int default: F_CONST0);
 string  object_name(int|object default: F_THIS_OBJECT);
 void    replace_program(void|string);
 int     set_next_reset(int);
@@ -432,6 +433,7 @@ int    *to_array(string);
         /* Strings */
 
 int     strstr(string, string, int default: F_CONST0);
+int     strrstr(string, string, int default: F_NCONST1);
 
         /* Arrays and Mappings */
 
@@ -478,7 +480,9 @@ object *all_environment(void|object);
 string  extract(string, int, int);
   /* If this is not defined, the xcode extract1 is not used either.
    */
-/* void swap(object); */ /* debugging only */
+#if 0
+void swap(object); /* debugging only */
+#endif
 
 
         /* Obsolete and deprecated functions */
@@ -490,7 +494,7 @@ mapping copy_mapping(mapping) "use copy()";
 int     mapping_contains F_M_CONTAINS (mixed & | mapping, mixed & | mixed, ...) "use m_contains()";
 int     query_imp_port F_QUERY_UDP_PORT () "use query_udp_port()";
 
-#endif /* USE_DEPRECTED */
+#endif /* USE_DEPRECATED */
 
 /*---------------------------------------------------------------------------
  * Machine instructions with 'tefun' prefixed codes.
@@ -511,7 +515,7 @@ mixed   deep_copy(mixed);
 mixed   max(mixed|mixed*, ...);
 mixed   min(mixed|mixed*, ...);
 int     sgn(int|float);
-string  save_value(mixed);
+string  save_value(mixed, void|int);
 mixed   restore_value(string);
 object  to_object(object|string|closure);
 mixed  *gmtime(int*|int default: F_TIME);
@@ -537,6 +541,7 @@ string  upper_case(string);
 mixed   filter(mapping|mixed *, string|closure|mapping, ...);
 mapping filter_indices(mapping, string|closure,  ...);
 mapping m_reallocate(mapping, int);
+mixed  *m_entry(mapping, mixed);
 mixed   map(mixed *|mapping, mapping|string|closure, ...);
 mapping map_indices(mapping, string|closure, ...);
 mixed  *sort_array(mixed *,string|closure, ...);
@@ -553,6 +558,7 @@ closure unbound_lambda(mixed *, mixed);
 object  blueprint(string|object default: F_THIS_OBJECT); /* PRELIMINARY */
 object *clones(void|int|string|object, void|int);
 mixed  *filter_objects(mixed *, string, ...);
+mixed   function_exists(string, void|int|object, void|int);
 mixed  *functionlist(object|string, int default: F_CONST1);
 string *include_list(void|object, void|int);
 string *inherit_list(void|object, void|int);
@@ -563,12 +569,14 @@ mixed   query_editing(object);
 int     query_idle(object);
 object  query_shadowing(object);
 object  query_snoop(object);
-mixed   save_object(void|string);
+mixed   save_object(void|string|int, void|int);
 void    remove_interactive(object);
 void    rename_object(object, string);
 int     restore_object(string);
 object  shadow(object, int);
 void    unshadow();
+string  variable_exists(string, void|int|object, void|int);
+mixed  *variable_list(object|string, int default: F_CONST1);
 
         /* Network IO */
 
@@ -576,10 +584,16 @@ int     binary_message(int *|string, int default: F_CONST0);
 int     find_input_to(object, object|string|closure, void|string);
 mixed * input_to_info(object);
 int     remove_input_to(object, void|object|string|closure, void|string);
+int     enable_telnet(int, object default: F_THIS_INTERACTIVE);
+int     net_connect(string, int default: F_QUERY_UDP_PORT);
 int     set_buffer_size(int);
-void    set_combine_charset(int *|string);
-void    set_connection_charset(int *|string, int default: F_CONST1);
+mixed   get_combine_charset(int);
+void    set_combine_charset(int *|string|int);
+mixed   get_connection_charset(int);
+void    set_connection_charset(int *|string|int, int default: F_CONST1);
 mixed   set_prompt(string|closure|int, object default: F_THIS_PLAYER);
+int     get_max_commands(object default: F_THIS_INTERACTIVE);
+void    set_max_commands(int, object default: F_THIS_INTERACTIVE);
 
 #ifdef ERQ_DEMON
 int     attach_erq_demon(object|string, int default: F_CONST0);
@@ -621,10 +635,19 @@ int     command_stack_depth();
 int     execute_command(string, object, object);
 int     notify_fail(string|closure);
 mixed   query_notify_fail(int default: F_CONST0);
-int     remove_action(string, object default: F_THIS_PLAYER);
+int     remove_action(int|string, object default: F_THIS_PLAYER);
 object  set_modify_command(object|string default: F_THIS_OBJECT);
 void    set_this_player(int|object);
 
+
+#ifdef USE_MCCP
+
+mixed   query_mccp(object default: F_THIS_PLAYER);
+int    *query_mccp_stats(object default: F_THIS_PLAYER);
+int     start_mccp_compress(int);
+int     end_mccp_compress();
+
+#endif /* USE_MCCP */
 
 #ifdef USE_MYSQL
 

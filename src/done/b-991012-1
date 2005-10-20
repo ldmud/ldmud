@@ -7,7 +7,7 @@ State: Done - corrected in 3.2.8-dev.151
 
 > Ich muesste wissen, was genau in m, width und indent drinsteht.
 
-str = "The smell of horses is very strong in here. You see many closed 
+str = "The smell of horses is very strong in here. You see many closed
 boxes from which you hear the neigh and stomping of several horses.  If you want to rent a horse, call for the groom. A sign is nailed to  the door of one of the boxes.
 There is one obvious exit: north.
 "

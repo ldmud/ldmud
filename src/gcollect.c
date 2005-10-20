@@ -89,6 +89,7 @@
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
+#include "mempools.h"
 #include "object.h"
 #include "otable.h"
 #include "parse.h"
@@ -637,6 +638,12 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
                 mapping_t *m;
                 p_int num_values;
 
+                if (p->u.map->hash != NULL)
+                {
+                    dump_malloc_trace(1, p->u.map);
+                    dump_malloc_trace(1, p->u.map->hash);
+                    fatal("Mapping %p still has a hash part.\n", p->u.map);
+                }
                 m = p->u.map;
                 m->ref = 0;
                 num_values = m->num_values;
@@ -1069,6 +1076,11 @@ garbage_collection(void)
     out_of_memory = MY_FALSE;
     assert_master_ob_loaded();
     malloc_privilege = MALLOC_SYSTEM;
+
+    /* Recover as much memory from temporaries as possible.
+     * However, don't call mb_release() yet as the swap buffer
+     * is still needed.
+     */
     if (obj_list_replace)
         replace_programs();
     handle_newly_destructed_objects();
@@ -1085,7 +1097,7 @@ garbage_collection(void)
     purge_action_sent();
     purge_shadow_sent();
     check_wizlist_for_destr();
-    compact_mappings(num_dirty_mappings);
+    compact_mappings(num_dirty_mappings, MY_TRUE);
     if (current_error_trace)
     {
         free_array(current_error_trace);
@@ -1236,6 +1248,10 @@ garbage_collection(void)
 #ifdef RXCACHE_TABLE
     clear_rxcache_refs();
 #endif
+    mb_clear_refs();
+      /* As this call also covers the swap buffer, it MUST come after
+       * processing (and potentially swapping) the objects.
+       */
 
     null_vector.ref = 0;
 
@@ -1373,6 +1389,13 @@ garbage_collection(void)
         }
 #endif
 
+#ifdef USE_MCCP
+        if (all_players[i]->out_compress != NULL)
+            note_ref(all_players[i]->out_compress);
+        if (all_players[i]->out_compress_buf != NULL)
+            note_ref(all_players[i]->out_compress_buf);
+#endif /* USE_MCCP */
+
         /* There are no destructed interactives, or interactives
          * referencing destructed objects.
          */
@@ -1436,6 +1459,7 @@ garbage_collection(void)
 #ifdef RXCACHE_TABLE
     count_rxcache_refs();
 #endif
+    mb_note_refs();
 
 
     if (reserved_user_area)
@@ -1523,8 +1547,8 @@ garbage_collection(void)
         remove_uids(res && (res->type != T_NUMBER || res->u.number) );
     }
 
-    /* Reconsolidate the free lists */
-    consolidate_freelists();
+    /* Allow the memory manager to do some consolidation */
+    mem_consolidate(MY_TRUE);
 
     /* Finally, try to reclaim the reserved areas */
 
@@ -1606,7 +1630,7 @@ show_added_string (int d, char *block, int depth UNUSED)
     WRITES(d, "Added string: ");
     show_string(d, block, 0);
     WRITES(d, "\n");
-}
+} /* show_added_string() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1637,7 +1661,8 @@ show_object (int d, char *block, int depth)
     WRITES(d, " from ");
     show_string(d, ob->load_name, 0);
     WRITES(d, ", uid: ");
-    show_string(d, ob->user->name ? ob->user->name : "0", 0);
+    show_string(d, ob->user ? (ob->user->name ? ob->user->name : "<null>")
+                            :"0", 0);
     WRITES(d, "\n");
 } /* show_object() */
 
@@ -1735,10 +1760,17 @@ show_array(int d, char *block, int depth)
         user = a->user;
     }
 
+    /* Release the memory from the buffers. Eventually it will be
+     * allocated again, but for now the point is to reduce the amount
+     * of allocated memory.
+     */
+    mb_release();
+
     WRITES(d, "Array ");
     write_x(d, (p_int)a);
     WRITES(d, " size ");writed(d, (p_uint)a_size);
-    WRITES(d, ", uid: ");show_string(d, user ? user->name : "0", 0);
+    WRITES(d, ", uid: ");
+    show_string(d, user ? (user->name ? user->name : "<null>") :"0", 0);
     WRITES(d, "\n");
     if (depth > 2)
         return;
@@ -1891,13 +1923,14 @@ garbage_collection (void)
     free_action_temporaries();
     remove_stale_player_data();
     remove_stale_call_outs();
+    mb_release();
     free_defines();
     free_all_local_names();
     remove_unknown_identifier();
     purge_action_sent();
     purge_shadow_sent();
     check_wizlist_for_destr();
-    compact_mappings(num_dirty_mappings);
+    compact_mappings(num_dirty_mappings, MY_TRUE);
     if (current_error_trace)
     {
         free_array(current_error_trace);

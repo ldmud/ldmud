@@ -4,12 +4,12 @@ Short: Fw: Verhalten von F_M_CAGGREGATE (#'([)
 Type: Bug
 State: Not a bug.
 
-Das Verhalten von #'([ ist seltsam, weil es als Argumente nicht 
+Das Verhalten von #'([ ist seltsam, weil es als Argumente nicht
 gequotete
 Arrays will anstatt gequoteter wie allgemein ueblich:
 funcall(lambda(0,({#'([,'({1,2}),'({3,4})}))) funktioniert nicht (Bad
 argument to #'([), aber
-funcall(lambda(0,({#'([,({1,2}),({3,4})}))) klappt (ergebnis 
+funcall(lambda(0,({#'([,({1,2}),({3,4})}))) klappt (ergebnis
 ([1:2,3:4]))
 Es ist also nicht moeglich, ein Mapping aus Funktionsergebnissen
 zusammenzusetzen.

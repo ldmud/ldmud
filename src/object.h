@@ -243,8 +243,12 @@ extern object_t *get_empty_object(int num_var);
 extern object_t *get_empty_object(int num_var, variable_t * variables, svalue_t *initialisers);
 #endif
 
+extern svalue_t *f_function_exists (svalue_t *sp, int num_arg);
+extern svalue_t *f_variable_exists (svalue_t *sp, int num_arg);
+extern svalue_t *f_variable_list (svalue_t *sp);
+
 extern svalue_t *f_save_object(svalue_t *sp, int numarg);
-extern svalue_t *f_save_value(svalue_t *sp);
+extern svalue_t *f_save_value(svalue_t *sp, int numarg);
 extern svalue_t *f_restore_object(svalue_t *sp);
 extern svalue_t *f_restore_value(svalue_t *sp);
 

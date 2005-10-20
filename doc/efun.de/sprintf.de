@@ -32,8 +32,10 @@ BESCHREIBUNG
         folgenden Zeichen (Argumenttyp-Kennzeichner):
         Zeichen    Argumenttyp    Bemerkung
         's'        string
+        'c'        integer        als ASCII-Zeichen
         'd' 'i'    integer        Dezimalschreibweise
         'o'        integer        Oktalschreibweise
+        'b' 'B'    integer        Binaerschreibweise
         'x' 'X'    integer        Hexadezimalschreibweise
         'e' 'E'    float          Exponentialschreibweise
         'f' 'F'    float          Gleitkommadarstellung
@@ -72,8 +74,11 @@ BESCHREIBUNG
                      die sinnvollste sein.
         |            Der Wert wird zentriert in das Feld eingefuegt.
                      (Siehe Modifikator n, Feldbreite)
+        $            Blocksatz. Benoetigt eine Feldbreite, funktioniert nur
+                     bei Strings (auch im Spaltenmodus).
         =            Spaltenmodus (siehe unten).
-        #            Tabellenmodus (siehe unten).
+        #            Fuer Strings: Tabellenmodus (siehe unten).
+                     Fuer '%O'/'%Q': kompakte Ausgabe.
         @            Arraymodus (siehe unten).
         *            Ein Stern kann immer dort eingesetzt werden, wo
                      hier weiter oben ein n fuer eine Ganzzahl steht.

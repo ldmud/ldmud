@@ -52,6 +52,7 @@ DESCRIPTION
 
         expr1 & expr2        The result is the bitwise and of 'expr1' and
                         'expr2'.
+
                         For arrays and strings, the intersection set
                         (all elements resp. characters from expr1 which
                         which are also in the expr2) is computed.
@@ -59,6 +60,12 @@ DESCRIPTION
                          but  ({ 'a','a','b' }) & ({ 'a' }) -> ({ 'a' })
                         Eventually the array behaviour will be changed
                         to match the string behaviour.
+
+                        Mappings can be intersected with another mapping
+                        or an array. The resulting mapping holds all
+                        those entries from the first array, which are
+                        also mentioned in the second mapping (as index)
+                        resp. in the array.
 
         expr1 == expr2        Compare values. Valid for strings, numbers,
                               objects and closures.
@@ -132,8 +139,8 @@ DESCRIPTION
                         or 'int*'. <var> must be of a specific type
                         for a conversion to take place; if <var> is 'mixed'
                         or unknown, the cast is purely declarative.
-                        Also, if the type of <var> is that of <type>, the
-                        value is not changed.
+                        Also, if the declared type of <var> is that of <type>,
+                        the value is not changed.
 
                         NB. The literal number 0 is of unknown type, as
                         it doubles as 'not initialized' for strings, objects,
@@ -189,6 +196,7 @@ NOTE
 
 HISTORY
         LDMud 3.2.9 added '>>>', '>>>=', '&&=' and '||='.
+        LDMud 3.2.10 extended '&' to mappings.
 
 SEE ALSO
         arrays(LPC), alists(LPC), mappings(LPC), closures(LPC)

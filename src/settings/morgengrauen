@@ -23,12 +23,12 @@ if test "x$DEBUG" = "x"; then
     with_time_to_clean_up=36000
     with_time_to_swap=14000
     with_time_to_swap_variables=22000
-    with_time_to_reset=3600 
+    with_time_to_reset=3600
 else
     with_time_to_clean_up=540
     with_time_to_swap=90
     with_time_to_swap_variables=180
-    with_time_to_reset=360 
+    with_time_to_reset=360
 fi
 
 with_portno=23

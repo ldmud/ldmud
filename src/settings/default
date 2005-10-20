@@ -37,6 +37,20 @@ exit 1
 # These options provide default settings for those options which can
 # also be set on the commandline.
 
+# The name of the master object.
+
+with_master_name=secure/master
+
+# Enable this if you are using a 2.4.5 mudlib or one of its derivates.
+
+enable_compat_mode=no
+
+# Define ALLOW_FILENAME_SPACES if the driver should accept space characters
+# in filenames. If it is not defined, a hardcoded test for space characters
+# is activated.
+
+enable_filename_spaces=no
+
 
 # --- Runtime limits ---
 
@@ -116,7 +130,7 @@ with_reserved_system_size=200000
 # This value gives the upper limits for the total allocated memory.
 # A value of 0 means 'unlimited'.
 
-with_max_malloced=0x4000000 
+with_max_malloced=0x4000000
 
 # If these values are >0, the driver will reserve this amount of memory
 # on startup for large resp. small blocks, reducing the block fragmentation.
@@ -171,20 +185,17 @@ enable_erq=erq
 # Max size of a packet received from/send to the ERQ.
 # TODO: Do the current erqs compile this in?
 
-with_erq_max_reply=1024 
-with_erq_max_send=1024 
+with_erq_max_reply=1024
+with_erq_max_send=1024
 
 #----------- Compilation Options ----------
 # To change these options, the config.h must be recreated and the
 # driver recompiled.
 
-# Enable this if you are using a 2.4.5 mudlib or one of its derivates.
+# The optimization level in the generated Makefile
+# Settings: no, low, med, high
 
-enable_compat_mode=no
-
-# The name of the master object.
-
-with_master_name=secure/master
+with_optimize=med
 
 # Enable this to annotate all allocations with 'file:line' of the
 # driver source allocating it.
@@ -198,10 +209,17 @@ enable_malloc_trace=no
 
 enable_malloc_lpc_trace=no
 
+# Define this to log all calls to esbrk() (the system memory allocator).
+# Works best if MALLOC_TRACE, or also MALLOC_LPC_TRACE, are defined.
+# This define is useful if your mud keeps growing in total memory size
+# instead of re-using the memory already allocated.
+# Supported by: MALLOC_smalloc
+enable_malloc_sbrk_trace=no
+
 # If TRACE_CODE is enable, the driver keeps a log of TOTAL_TRACE_LENGTH
 # most recently execute bytecode instructions.
 
-enable_trace_code=yes
+enable_trace_code=no
 with_total_trace_length=4096
 
 # Enable these for runtime statistics:
@@ -276,6 +294,10 @@ enable_initialization_by___init=yes
 
 enable_use_system_crypt=yes
 
+# Enable call_other()s on arrays of objects.
+
+enable_lpc_array_calls=yes
+
 # Define USE_LPC_NOSAVE if you want to use the keyword 'nosave' to
 # specify variables not be save by save_object(). The old keyword 'static'
 # works in either case.
@@ -288,7 +310,7 @@ enable_lpc_nosave=yes
 #  'yes' : mySQL support is compiled in, the libmysqlclient is expected
 #          in the normal library search path.
 #  <path>: mySQL support is compiled in, <path> is added to the link paths
-#          and should be the path to libmysqlclient, 
+#          and should be the path to libmysqlclient,
 #          e.g. enable_use_mysql=/usr/local/lib/mysql .
 #          The include files are searched in /usr/local/include, <path>,
 #          and <path>/include.
@@ -296,6 +318,10 @@ enable_lpc_nosave=yes
 #          <path>/lib and <path>, in this order.
 
 enable_use_mysql=no
+
+# Enable support for MCCP (Mud Control Compression Protocol).
+
+enable_use_mccp=no
 
 # Enable obsolete and deprecated efuns.
 
@@ -322,7 +348,7 @@ enable_use_process_string=yes
 
 # Maximum size of a socket send buffer.
 
-with_set_buffer_size_max=65536 
+with_set_buffer_size_max=65536
 
 # CATCH_RESERVED_COST is added to the eval cost for the time executing
 # code guarded by a catch() statement, so that an eval_cost-too-big error
@@ -353,7 +379,7 @@ with_evaluator_stack_size=2000
 with_max_user_trace=60
 
 # Maximum function call depth during error handling.
-# It must be bigger than MAX_USER_TRACE (TODO: Check this at runtime)
+# It must be bigger than MAX_USER_TRACE (check at compile time).
 
 with_max_trace=65
 
@@ -415,7 +441,7 @@ with_itable_size=256
 # Size of the apply cache, expressed in the bitsize of its indices.
 # The number of entries is 2**cache_bits.
 
-with_apply_cache_bits=12 
+with_apply_cache_bits=12
 
 # Select whether compiled regular expressions shall be cached, and
 # how big the cache shall be (max: 65536).
@@ -477,10 +503,6 @@ with_erq_debug=0
 # No penalty for using.  Requires MALLOC_TRACE to work. Incompatible with
 # DUMP_GC_REFS.
 enable_check_object_gc_ref=yes
-
-# Activate total smalloc size consistency check code. This will produce
-# a lot of output in the GC log.
-enable_check_smalloc_total=no
 
 # Sometimes the GC stumbles over invalid references to memory blocks (namely
 # 'Program referenced as something else'). Define this macro to get a detailed

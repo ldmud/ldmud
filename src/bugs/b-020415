@@ -24,9 +24,9 @@ gefixt ist, daher maile ich Dir einfach mal ...
 pected dfaff2ee, found f460146e
 2002.04.15 16:56:49 Current object was domains/mordor/dol_guldur/level2/secret
 2002.04.15 16:56:49 Dump of the call chain:
-'      build_way' in 'domains/mordor/lib/way.c' ('domains/mordor/lib/way') line 
+'      build_way' in 'domains/mordor/lib/way.c' ('domains/mordor/lib/way') line
 210
-'        add_way' in 'domains/mordor/lib/way.c' ('domains/mordor/lib/way') line 
+'        add_way' in 'domains/mordor/lib/way.c' ('domains/mordor/lib/way') line
 45
 ...
 '       populate' in 'domains/mordor/dol_guldur/level2/secret.c' ('domains/mordo
@@ -51,64 +51,64 @@ hier der backtrace:
 #8  0x9d430 in load_object (lname=0x18 "", create_super=0, depth=0, chain=0x0)
     at simulate.c:1693
 #9  0x9dce0 in lookfor_object (str=0x0, bLoad=1) at simulate.c:2097
-#10 0x63a18 in eval_instruction (first_instruction=0xefff7352 "\025", 
+#10 0x63a18 in eval_instruction (first_instruction=0xefff7352 "\025",
     initial_sp=0x170800) at interpret.c:14872
 #11 0x6fe4c in call_lambda (lsvp=0x7e, num_arg=3) at interpret.c:21897
-#12 0x634b0 in eval_instruction (first_instruction=0x1b8369 "\025o\032", 
+#12 0x634b0 in eval_instruction (first_instruction=0x1b8369 "\025o\032",
     initial_sp=0x5084bf) at interpret.c:14663
-#13 0x6dbb4 in apply_low (fun=0xfe824 "", ob=0x2ab6cac, num_arg=3, 
+#13 0x6dbb4 in apply_low (fun=0xfe824 "", ob=0x2ab6cac, num_arg=3,
     b_ign_prot=0) at interpret.c:20697
-#14 0x63ae8 in eval_instruction (first_instruction=0x174f2ee "ákÖL\026\a", 
+#14 0x63ae8 in eval_instruction (first_instruction=0x174f2ee "ákÖL\026\a",
     initial_sp=0x3) at interpret.c:14891
 #15 0x6e17c in apply_low (fun=0xfe7bc "", ob=0xdffdf4, num_arg=0, b_ign_prot=0)
     at interpret.c:20807
 ---Type <return> to continue, or q <return> to quit---
-#16 0x63ae8 in eval_instruction (first_instruction=0xefff8a52 "\025", 
+#16 0x63ae8 in eval_instruction (first_instruction=0xefff8a52 "\025",
     initial_sp=0x1) at interpret.c:14891
 #17 0x6fe4c in call_lambda (lsvp=0x7e, num_arg=2) at interpret.c:21897
-#18 0x634b0 in eval_instruction (first_instruction=0x1b8369 "\025o\032", 
+#18 0x634b0 in eval_instruction (first_instruction=0x1b8369 "\025o\032",
     initial_sp=0x507e13) at interpret.c:14663
-#19 0x6dbb4 in apply_low (fun=0xfe79c "", ob=0x2ab6cac, num_arg=2, 
+#19 0x6dbb4 in apply_low (fun=0xfe79c "", ob=0x2ab6cac, num_arg=2,
     b_ign_prot=0) at interpret.c:20697
-#20 0x63ae8 in eval_instruction (first_instruction=0x1332a78 "\025", 
+#20 0x63ae8 in eval_instruction (first_instruction=0x1332a78 "\025",
     initial_sp=0x3) at interpret.c:14891
 #21 0x6fb90 in call_lambda (lsvp=0xfe764, num_arg=1057792) at interpret.c:21759
 #22 0x84f54 in reset_object (ob=0xdffdf4, arg=5) at object.c:643
-#23 0x9d7cc in load_object (lname=0xf47840 "ð", create_super=0, depth=-1, 
+#23 0x9d7cc in load_object (lname=0xf47840 "ð", create_super=0, depth=-1,
     chain=0xdc800) at simulate.c:1861
 #24 0x9dce0 in lookfor_object (str=0x0, bLoad=1) at simulate.c:2097
 #25 0x65908 in eval_instruction (
-    first_instruction=0x340f42 "^\001&\032\001\025\026¥\004\003", 
+    first_instruction=0x340f42 "^\001&\032\001\025\026¥\004\003",
     initial_sp=0x170800) at interpret.c:15868
 #26 0x6dbb4 in apply_low (fun=0xfe74c "", ob=0x4f3734, num_arg=1, b_ign_prot=0)
     at interpret.c:20697
-#27 0x63ae8 in eval_instruction (first_instruction=0xefffab42 "\025\025", 
+#27 0x63ae8 in eval_instruction (first_instruction=0xefffab42 "\025\025",
     initial_sp=0x1) at interpret.c:14891
 #28 0x6fe4c in call_lambda (lsvp=0x7e, num_arg=3) at interpret.c:21897
-#29 0x634b0 in eval_instruction (first_instruction=0x1b8369 "\025o\032", 
+#29 0x634b0 in eval_instruction (first_instruction=0x1b8369 "\025o\032",
     initial_sp=0x507e00) at interpret.c:14663
 ---Type <return> to continue, or q <return> to quit---
-#30 0x5cda8 in eval_instruction (first_instruction=0x4bb0bb "\025\026", 
+#30 0x5cda8 in eval_instruction (first_instruction=0x4bb0bb "\025\026",
     initial_sp=0x170bd8) at interpret.c:11709
 #31 0x6f010 in call_lambda (lsvp=0xfe6fc, num_arg=0) at interpret.c:21562
 #32 0x64b44 in eval_instruction (
     first_instruction=0x481bee "^\001&\032\001¸S\006\032\001·\025R\024\032\001×S\017\032\001\a\003\223\a\001l", initial_sp=0x163e) at interpret.c:15063
-#33 0x6e17c in apply_low (fun=0xfe6e4 "", ob=0x2e8b924, num_arg=0, 
+#33 0x6e17c in apply_low (fun=0xfe6e4 "", ob=0x2e8b924, num_arg=0,
     b_ign_prot=0) at interpret.c:20807
 #34 0x63ae8 in eval_instruction (
     first_instruction=0xefffc982 "\025 \002\036ùÀ\002\036ùÀe", initial_sp=0x1)
     at interpret.c:14891
 #35 0x6fe4c in call_lambda (lsvp=0x7e, num_arg=2) at interpret.c:21897
-#36 0x634b0 in eval_instruction (first_instruction=0x1b8369 "\025o\032", 
+#36 0x634b0 in eval_instruction (first_instruction=0x1b8369 "\025o\032",
     initial_sp=0x507ded) at interpret.c:14663
-#37 0x6dbb4 in apply_low (fun=0xfe6a4 "", ob=0x2ab6cac, num_arg=2, 
+#37 0x6dbb4 in apply_low (fun=0xfe6a4 "", ob=0x2ab6cac, num_arg=2,
     b_ign_prot=0) at interpret.c:20697
 #38 0x63ae8 in eval_instruction (
     first_instruction=0x127c003 "^\002%\002\001^\004%S%\006", initial_sp=0x3)
     at interpret.c:14891
-#39 0x9bb9c in catch_instruction (catch_inst=27 '\e', offset=17, 
+#39 0x9bb9c in catch_instruction (catch_inst=27 '\e', offset=17,
     i_sp=0x170d54, i_pc=0x127bff7 "\006", i_fp=0xfe64c) at simulate.c:474
-#40 0x4e62c in eval_instruction (first_instruction=0x127bff7 "\006", 
+#40 0x4e62c in eval_instruction (first_instruction=0x127bff7 "\006",
     initial_sp=0x127bff7) at interpret.c:7423
 #41 0x6f010 in call_lambda (lsvp=0xefffe178, num_arg=1) at interpret.c:21562
 ---Type <return> to continue, or q <return> to quit---
@@ -116,7 +116,7 @@ hier der backtrace:
     at simulate.c:3603
 #43 0x1e968 in x_filter_array (sp=0x170800, num_arg=892012) at array.c:1723
 #44 0x3f05c in f_filter (sp=0xfe644, num_arg=2) at efuns.c:4966
-#45 0x4cd08 in eval_instruction (first_instruction=0x127c30c "L\032", 
+#45 0x4cd08 in eval_instruction (first_instruction=0x127c30c "L\032",
     initial_sp=0x3f038) at interpret.c:6361
 #46 0x6f010 in call_lambda (lsvp=0x5b21cc, num_arg=1) at interpret.c:21562
 #47 0x9fea0 in execute_callback (cb=0x5b21cc, nargs=0, keep=0, toplevel=1)
@@ -124,7 +124,7 @@ hier der backtrace:
 #48 0x23db8 in call_out () at call_out.c:436
 #49 0x21c5c in backend () at backend.c:631
 #50 0x7c300 in main (argc=-268438416, argv=0xeffff8fc) at main.c:429
-(gdb) 
+(gdb)
 
 ----------------------------------------------------------------------------
 
@@ -167,13 +167,13 @@ No symbol "block" in current context.
 0x84597f4:      0x6c    0xbf    0x0c    0x08    0x9a    0x02    0x00    0x00
 0x84597fc:      0xfd    0x6e    0x70    0x34    0x2a    0x00    0x00    0x00
 (gdb) p *(object_t*)0x86340b0
-$12 = {flags = 1536, ref = 2461, total_light = 0, time_reset = 1019510723, 
-  time_of_ref = 1019509692, load_time = 1019506653, load_id = 0, 
-  extra_ref = 0, prog = 0x85bdea4, name = 0x862c290 "secure/master", 
-  load_name = 0x8354db4 "/secure/master", next_all = 0x8631a50, 
-  prev_all = 0x83ba4fc, next_hash = 0x0, next_inv = 0x0, contains = 0x0, 
-  super = 0x0, sent = 0x0, user = 0x8354e6c, eff_user = 0x8354e6c, 
-  extra_num_variables = 30, variables = 0x823178c, ticks = 84307, 
+$12 = {flags = 1536, ref = 2461, total_light = 0, time_reset = 1019510723,
+  time_of_ref = 1019509692, load_time = 1019506653, load_id = 0,
+  extra_ref = 0, prog = 0x85bdea4, name = 0x862c290 "secure/master",
+  load_name = 0x8354db4 "/secure/master", next_all = 0x8631a50,
+  prev_all = 0x83ba4fc, next_hash = 0x0, next_inv = 0x0, contains = 0x0,
+  super = 0x0, sent = 0x0, user = 0x8354e6c, eff_user = 0x8354e6c,
+  extra_num_variables = 30, variables = 0x823178c, ticks = 84307,
   gigaticks = 0}
 (gdb) p (char *)0x80cbee4
 $13 = 0x80cbee4 "array.c"
@@ -190,22 +190,22 @@ $14 = 652
     at array.c:1145
 #7  0x8078b5f in eval_instruction (
     first_instruction=0x85bfddb "N\004\004\032\001T\001\026\032\002\030\025X\032", initial_sp=0x8111b20) at interpret.c:8445
-#8  0x8092d24 in apply_low (fun=0x81c56b4 "valid_write", ob=0x86340b0, 
+#8  0x8092d24 in apply_low (fun=0x81c56b4 "valid_write", ob=0x86340b0,
     num_arg=4, b_ign_prot=1) at interpret.c:20775
-#9  0x8093350 in sapply_int (fun=0x81c56b4 "valid_write", ob=0x86340b0, 
+#9  0x8093350 in sapply_int (fun=0x81c56b4 "valid_write", ob=0x86340b0,
     num_arg=4, b_find_static=1) at interpret.c:20997
 #10 0x809382d in apply_master_ob (fun=0x81c56b4 "valid_write", num_arg=4)
     at interpret.c:21260
 #11 0x80bcdbc in check_valid_path (
-    path=0x85325c8 "/save/daemons/man/concepts", caller=0x860dfdc, 
+    path=0x85325c8 "/save/daemons/man/concepts", caller=0x860dfdc,
     call_fun=0x80e1358 "save_object", writeflg=1) at simulate.c:3147
 #12 0x80a73d3 in f_save_object (sp=0x8111ad8, numarg=1) at object.c:1701
 ---Type <return> to continue, or q <return> to quit---
-#13 0x8074dfd in eval_instruction (first_instruction=0x833f32b "\a\bW\001", 
+#13 0x8074dfd in eval_instruction (first_instruction=0x833f32b "\a\bW\001",
     initial_sp=0x8111ac8) at interpret.c:6361
-#14 0x80931a0 in apply_low (fun=0x834c69c "clean_up", ob=0x860dfdc, num_arg=1, 
+#14 0x80931a0 in apply_low (fun=0x834c69c "clean_up", ob=0x860dfdc, num_arg=1,
     b_ign_prot=0) at interpret.c:20885
-#15 0x8093350 in sapply_int (fun=0x834c69c "clean_up", ob=0x860dfdc, 
+#15 0x8093350 in sapply_int (fun=0x834c69c "clean_up", ob=0x860dfdc,
     num_arg=1, b_find_static=0) at interpret.c:20997
 #16 0x80933f3 in apply (fun=0x834c69c "clean_up", ob=0x860dfdc, num_arg=1)
     at interpret.c:21035

@@ -6,11 +6,11 @@ State: New
 
 Hallo Lars!
 
-Hier mal al anhang der aktuelle stand des Logsystems. 
+Hier mal al anhang der aktuelle stand des Logsystems.
 Es ist jetzt soweit: man kann endlich damit loggen :)
 Allerdings unterstützt es noch keine shared libs...
 
--- 
+--
  Bye, Gawain (ICQ: 81736439)
 
             					  ###
@@ -33,12 +33,12 @@ diff -Naur 3-2-dev.orig/mudlib/sys/driver_hook.h 3-2-dev/mudlib/sys/driver_hook.
  #define H_SEND_NOTIFY_FAIL      18
  #define H_AUTO_INCLUDE          19
 +#define H_MODIFY_SYSLOG         20
- 
+
 -#define NUM_DRIVER_HOOKS        20  /* Number of hooks */
 +#define NUM_DRIVER_HOOKS        21  /* Number of hooks */
- 
+
  #endif /* LPC_DRIVER_HOOK_ */
- 
+
 diff -Naur 3-2-dev.orig/mudlib/sys/syslog.h 3-2-dev/mudlib/sys/syslog.h
 --- 3-2-dev.orig/mudlib/sys/syslog.h	Thu Jan  1 01:00:00 1970
 +++ 3-2-dev/mudlib/sys/syslog.h	Mon Jan 28 11:12:14 2002
@@ -138,7 +138,7 @@ diff -Naur 3-2-dev.orig/src/Makefile.in 3-2-dev/src/Makefile.in
        random.o regexp.o rxcache.o simulate.o simul_efun.o stdstrings.o \
 -      stralloc.o strfuns.o sprintf.o swap.o wiz_list.o xalloc.o @ALLOCA@
 +      stralloc.o strfuns.o sprintf.o swap.o syslog.o wiz_list.o xalloc.o @ALLOCA@
- 
+
  driver: $(OBJ)
  	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) $(OBJ) -o $@ $(LIBS)
 @@ -417,6 +417,9 @@
@@ -148,7 +148,7 @@ diff -Naur 3-2-dev.orig/src/Makefile.in 3-2-dev/src/Makefile.in
 +
 +syslog.o : svalue.h machine.h syslog.h mapping.h array.h ../mudlib/sys/syslog.h \
 +    ../mudlib/sys/driver_hook.h config.h
- 
+
  wiz_list.o : xalloc.h svalue.h stralloc.h stdstrings.h object.h mapping.h \
      main.h interpret.h gcollect.h backend.h array.h ../mudlib/sys/wizlist.h \
 diff -Naur 3-2-dev.orig/src/func_spec 3-2-dev/src/func_spec
@@ -156,16 +156,16 @@ diff -Naur 3-2-dev.orig/src/func_spec 3-2-dev/src/func_spec
 +++ 3-2-dev/src/func_spec	Mon Jan 28 11:12:14 2002
 @@ -491,7 +491,6 @@
  %tefuns
- 
+
          /* Miscellaneous */
 -
  mixed   copy(mixed);
  mixed   deep_copy(mixed);
  mixed   max(mixed|mixed*, ...);
 @@ -576,6 +575,10 @@
- 
+
          /* Driver and System functions */
- 
+
 +int     syslog(int,int,string);
 +mixed   setlogmask(mapping|void);
 +mixed   getlogmask(void);
@@ -181,25 +181,25 @@ diff -Naur 3-2-dev.orig/src/lex.c 3-2-dev/src/lex.c
  #include "wiz_list.h" /* wizlist_name[] */
  #include "xalloc.h"
 +#include "syslog.h"
- 
+
  #include "../mudlib/sys/driver_hook.h"
- 
+
 diff -Naur 3-2-dev.orig/src/main.c 3-2-dev/src/main.c
 --- 3-2-dev.orig/src/main.c	Wed Jan  2 07:49:08 2002
 +++ 3-2-dev/src/main.c	Mon Jan 28 11:12:14 2002
 @@ -121,6 +121,8 @@
  char *mud_lib;                /* Path to the mudlib */
  char master_name[100] = "";   /* Name of the master object */
- 
+
 +char *syslog_config = NULL;
 +
  static int new_mudlib = 0;    /* True: mudlib directory was specified */
  static int no_erq_demon = 0;  /* True: don't start the erq */
- 
+
 @@ -251,6 +253,7 @@
      if (getargs(argc, argv, eval_arg))
        exit(1);
- 
+
 +
      /* Change to the mudlib dir early so that the debug.log file
       * is opened in the right place.
@@ -207,7 +207,7 @@ diff -Naur 3-2-dev.orig/src/main.c 3-2-dev/src/main.c
 @@ -324,6 +327,11 @@
          mud_lib = string_copy(path);
      }
- 
+
 +    if (!ldopenlog()) {
 +        fprintf(stderr, "Could not open %s as syslog config file\nor failure during init of syslog system.\n", syslog_config);
 +        exit(2);
@@ -215,13 +215,13 @@ diff -Naur 3-2-dev.orig/src/main.c 3-2-dev/src/main.c
 +
  #ifdef ERQ_DEMON
      /* Make sure that erq_file contains a complete absolute pathname. */
- 
+
 @@ -451,6 +459,7 @@
  #if defined(AMIGA) && !defined(__GNUC__)
      amiga_end();
  #endif
 +    ldcloselog();
-     
+
      return 0; /* TODO: There are constants for this */
  } /* main() */
 @@ -853,6 +862,7 @@
@@ -268,7 +268,7 @@ diff -Naur 3-2-dev.orig/src/main.c 3-2-dev/src/main.c
 +	    free(syslog_config);
 +	syslog_config = strdup(pValue);
 +	break;
- 
+
      case cRandomSeed:
          random_seed = strtoul(pValue, (char **)0, 0);
 diff -Naur 3-2-dev.orig/src/syslog.c 3-2-dev/src/syslog.c
@@ -280,9 +280,9 @@ diff -Naur 3-2-dev.orig/src/syslog.c 3-2-dev/src/syslog.c
 + *            texts into files or other datasinks.                            *
 + * written by gawain@camlann.de (gawain@Regenbogen)                           *
 + ******************************************************************************/
-+ 
++
 +/* Concept:
-+ * 
++ *
 + * the ldmud driver logs all its messages with the private function ldsyslog().
 + * this private ldsyslog() then does the real logging with the help of buildin
 + * printf()s/puts() or with external shared-libs. ldsyslog() also calls a mudlib
@@ -293,11 +293,11 @@ diff -Naur 3-2-dev.orig/src/syslog.c 3-2-dev/src/syslog.c
 + * else it is not.
 + * the function ldsyslog_memsafe() is a wrapper for ldsyslog and parses its printf
 + * style parameters on its own. so it is garanteed that no more memory than OUTPUT_MAXLEN
-+ * will be used. this is important in low memory situations. a amount of OUTPUT_MAXLEN 
++ * will be used. this is important in low memory situations. a amount of OUTPUT_MAXLEN
 + * bytes is allocated during driver startup (its hold until shutdown).
 + * there are two auxiliary functions: ldopenlog() and ldcloselog()
 + * ldopenlog() is used to init the logging system (eg. loding the external libs)
-+ * and ldcloselog() is used to shut it down (eg. unload external libs) 
++ * and ldcloselog() is used to shut it down (eg. unload external libs)
 + * the two efuns f_syslog() and f_setlogmask() serve as interface from the mudlib
 + * to the loggingsystem. f_getlogmask() returns a copy of the currently installed logmask
 + * mapping. f_getlogfiles() returns a copy of the currently installed logfiles mapping.
@@ -368,7 +368,7 @@ diff -Naur 3-2-dev.orig/src/syslog.c 3-2-dev/src/syslog.c
 +/* convert a facility or level string to its int value */
 +/* what .. 0=facility, 1=level */
 +/* negative return value indicates invalid string */
-+static 
++static
 +int ldstr2int(char *str, int what) {
 +    int value = -1, i;
 +    char *t;
@@ -391,7 +391,7 @@ diff -Naur 3-2-dev.orig/src/syslog.c 3-2-dev/src/syslog.c
 +}
 +
 +/* (re)read config file */
-+static 
++static
 +int ldreadconfig(char *file) {
 +    FILE *c;
 +    char section[100], item[100], value[100], fac[100], lev[100], mem[100];
@@ -486,7 +486,7 @@ diff -Naur 3-2-dev.orig/src/syslog.c 3-2-dev/src/syslog.c
 +		    push_string_malloced(out);
 +		    call_lambda(&driver_hook[H_MODIFY_SYSLOG], 3);
 +		    ok = inter_sp->u.number; // 0 to suppress output to file
-+		    free_svalue(inter_sp); 
++		    free_svalue(inter_sp);
 +		    inter_sp--;
 +		}
 +	    } // result[level]...
@@ -530,15 +530,15 @@ diff -Naur 3-2-dev.orig/src/syslog.c 3-2-dev/src/syslog.c
 +    while(*tmp && out<output+OUTPUT_MAXLEN-1) {
 +	if(*tmp=='%')
 +	    switch(*(++tmp)) {
-+		default : *out++ = '%'; 
-+			  *out++ = *tmp; 
++		default : *out++ = '%';
++			  *out++ = *tmp;
 +			  break;
-+		case 's': t = va_arg(ap, char *); 
-+			  while(out<output+OUTPUT_MAXLEN-1 && (*out = *t++)) 
-+			      out++; 
++		case 's': t = va_arg(ap, char *);
++			  while(out<output+OUTPUT_MAXLEN-1 && (*out = *t++))
++			      out++;
 +			  break;
 +		case 'x': d = va_arg(ap, int);
-+			  *out++ = '0'; *out++ = 'x'; 
++			  *out++ = '0'; *out++ = 'x';
 +			  for (x= j= 2 * sizeof d; --j >= 0; d >>= 4) {
 +			      *(out+j) = hex[d & 0xF];
 +			  }
@@ -703,7 +703,7 @@ Am Mittwoch, 28. November 2001 04:08 schrieben Sie:
 Also hier schonmal so eine art von skelett fuer das system...
 das include sollte man nach driver-defines und mudlib defines splitten,
 wobei dann der driversrc auch das .h aus der mudlib einbinden muss...
-(fuer die werte der defines). ausserdem muessen noch sinnvolle defines 
+(fuer die werte der defines). ausserdem muessen noch sinnvolle defines
 gefunden und definiert werden :)
 ansonsten hoffe ich, dass es einen einblick in meine vorstellung gibt :)
 

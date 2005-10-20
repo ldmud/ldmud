@@ -2666,8 +2666,7 @@ create_efun_defs (void)
                     ? _MCTs : 0 )
                 | ( (isascii(c) && isxdigit((unsigned char)c))  ? _MCTx : 0 )
                 | ( ((isascii(c) && (isalnum ((unsigned char)c) || c == '_'))
-                   || (((unsigned char)c) >= 0xC0 && ((unsigned char)c) <= 0xFF))
-                    ? _MCTa : 0 )
+                   || ((unsigned char)c) >= 0xC0) ? _MCTa : 0 )
                );
         c++;
     } while (c != '\0');
@@ -3015,7 +3014,6 @@ main (int argc, char ** argv)
 
 {
     enum { NONE = 0, MakeInstrs, MakeLang, MakeStrings } action = NONE;
-    char line_buffer[MAKE_FUNC_MAXLINE + 1];
 
     /* --- Check what we have to do --- */
     if (argc == 2)
@@ -3041,40 +3039,6 @@ main (int argc, char ** argv)
              , stderr);
         return 1; /* TODO: There are constants for this */
     }
-
-    if (action == MakeLang)
-    {
-        /* --- Test YACC for default and anonymous rules ---
-         *
-         * This test uses THE_LANG as temporary file.
-         */
-        if ((fpw = fopen(THE_LANG, "w")) == 0) {
-            perror(THE_LANG);
-            exit(1);
-        }
-        fprintf(fpw, "%s", "\
-%union{ int i; char *p; }\n\
-%type <p> all\n\
-%%\n\
-all: { $<p>$ = 0; } 'a' ; \n\
-%%\n\
-");
-        fclose(fpw);
-        sprintf(line_buffer, "%s %s", YACC, THE_LANG);
-
-        fprintf(stderr, "checking default & anonymous rules in %s\n", YACC);
-        if (system(line_buffer))
-        {
-            fprintf(
-              stderr,
-"...it seems to have trouble with this combination, I'll avoid the latter.\n"
-            );
-            add_define("YACC_CANNOT_MIX_ANONYMOUS_WITH_DEFAULT", -1, "");
-        }
-        else
-            fprintf(stderr, "...good, it can handle them.\n");
-    }
-
 
     /* --- Read the config files --- */
     read_config();

@@ -1,7 +1,7 @@
 PRELIMINARY
 SYNOPSIS
 
-        #include <rtlimits.h>
+        #include <sys/rtlimits.h>
 
         mixed limited(closure fun)
         mixed limited(closure fun, int tag, int value, ...)

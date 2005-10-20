@@ -5,36 +5,36 @@ Type: Bug
 State: Done - fixed in 3.2.8-dev.174
 
 [Knarf@Zeittunnel:d-code] Was hab ich falsch gemacht: zlpc return
-   restore_value("#0:0\n([\"name\":\"test\",])\n"); bringt nen 
+   restore_value("#0:0\n([\"name\":\"test\",])\n"); bringt nen
 Segmentation
    fault - beim Treiber! ... laesst also das Mud abstuerzen!
 
 Zeittunnel uses @159 on Linux
 
 Knarf@Zeittunnel tells you: sonderbarerweise geht
-   restore_object(save_object((["name":"test"]))), wenn ich aber den 
+   restore_object(save_object((["name":"test"]))), wenn ich aber den
    string,
-      den save_object liefert explizit einsetze (direkt und auch als 
+      den save_object liefert explizit einsetze (direkt und auch als
       variable),
          kommt es zum crash
 
 > Knarf@Zeittunnel tells you: statt object natuerlich immer value ...
 Knarf@Zeittunnel tells you: sogar zlpc {string
-   s;s=save_value((["name":"test"]));return restore_value(s);} geht. 
+   s;s=save_value((["name":"test"]));return restore_value(s);} geht.
    wirklich
       komisch =8-/
 
-> Knarf@Zeittunnel tells you: zlpc return 
+> Knarf@Zeittunnel tells you: zlpc return
 save_value((["name":"test"])); liefert
-   "#0:0\n([\"name\":\"test\",])\n" - setz ich das direkt ein, ist 
+   "#0:0\n([\"name\":\"test\",])\n" - setz ich das direkt ein, ist
    das mud tot
-Knarf@Zeittunnel tells you: der driver sagt uebrigens: Free string: 
+Knarf@Zeittunnel tells you: der driver sagt uebrigens: Free string:
    not found
-      in string table! ("#0:0|([name")|2000.02.12 19:07:28 Free string: 
+      in string table! ("#0:0|([name")|2000.02.12 19:07:28 Free string:
       not found
          in string table!2000.02.12 19:07:28 Current object was
             w/knread: EOF|Read 0, should be 9! usw...  (| hab ich
-               eingefuegt 
+               eingefuegt
 
 Analysis:
 

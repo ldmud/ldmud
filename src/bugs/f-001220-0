@@ -4,6 +4,6 @@ Date: 2000-12-20
 Type: Feature
 State: New
 
-Let debug_info(this_interactive()) return information about the 
+Let debug_info(this_interactive()) return information about the
 interactive structure, especially about the charmode/noecho settings.
 

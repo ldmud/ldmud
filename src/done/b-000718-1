@@ -8,7 +8,7 @@ State: Abandoned - not reproducible.
 
 Hullow, I have a couple of problems with you LDMud-driver... First of all
 I can't download it from ftp.bearnip.com, so I can't get version 3.2.8. I
-did however manage to download the last release version from ftp.mud.de. 
+did however manage to download the last release version from ftp.mud.de.
 
 Now, at first configure wouldn't make the files (config.h, machine.h and
 makefile), but I used config.status for that. This might have been a
@@ -22,7 +22,7 @@ message:
 gcc -04 -g -fstrength-reduce -fno-force-mem -fno-force-addr
 -fno-inline-functions -fomit-frame-pointer -DDEBUG -DTRACE_CODE
 -DMALLOC_smalloc  -DMUD_LIB='"/usr/local/mud/lib"'
--DBINDIR='"/usr/local/mud/bin"' -DERQ_DIR='"/usr/local/mud/libexec"' 
+-DBINDIR='"/usr/local/mud/bin"' -DERQ_DIR='"/usr/local/mud/libexec"'
 -DYACC='"byacc"' -c make_func.c
 In file included from driver.h:39,
                  from make_func.y:149:

@@ -78,6 +78,9 @@ erq_lookup(char *mesg, int len)
     msg = mesg;
     if (mesg[len-1] != 0)
     {
+        /* Create a local copy of the message in which the string
+         * has a proper termination.
+         */
         msg = malloc(len+1);
         if (!msg)
         {
@@ -91,7 +94,7 @@ erq_lookup(char *mesg, int len)
 
     XPRINTF((stderr, "%s lookup '%s'\n", time_stamp(), msg+9));
     hp = gethostbyname(msg+9);
-    if (!hp && msg[8] == ERQ_LOOKUP)
+    if (!hp && msg[8] == ERQ_LOOKUP && h_errno == TRY_AGAIN)
     {
         XPRINTF((stderr, "%s   Retry in 5 seconds.\n", time_stamp()));
         mesg[8]++; /* No second retry */

@@ -445,10 +445,12 @@ typedef signed long ssize_t;
  * At last, the functions provided in port.c
  */
 
+extern char current_time_stamp[];
 extern mp_int get_current_time(void);
 extern char * time_string(mp_int);
 extern char * utime_string (mp_int, mp_int);
 extern char * time_stamp(void);
+extern char *xmemmem(const char *, size_t, const char *, size_t);
 
 #ifndef HAVE_STRCSPN
 extern size_t strcspn(char *s, char *set);
@@ -456,10 +458,6 @@ extern size_t strcspn(char *s, char *set);
 
 #ifndef HAVE_STRDUP
 extern char *strdup(const char *);
-#endif
-
-#ifndef HAVE_MEMMEM
-extern char *memmem(char *, size_t, char *, size_t);
 #endif
 
 #if !defined(HAVE_MEMMOVE) && !defined(OVERLAPPING_BCOPY)

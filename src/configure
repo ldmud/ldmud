@@ -306,7 +306,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA YACC CPP EGREP ALLOCA WCFLAGS OCFLAGS LCFLAGS MCFLAGS DCFLAGS EXTRA_CFLAGS OPTIMIZE_LINKING MOVE_YACC_TAB CLEAN_YACC_TAB YACCTAB CONFIG_SHELL cdef_erq_demon cdef_access_control cdef_access_log cdef_align_functions cdef_compat_mode cdef_strict_euids cdef_supply_parse_command cdef_initialization_by___init cdef_use_system_crypt cdef_use_ipv6 cdef_use_mysql cdef_use_pthreads cdef_use_pcre cdef_use_set_light cdef_use_set_is_wizard cdef_use_process_string cdef_lpc_nosave cdef_use_deprecated cdef_comm_stat cdef_trace_code cdef_apply_cache_stat cdef_malloc_trace cdef_malloc_lpc_trace cdef_dynamic_costs cdef_rxcache_table cdef_wizlist_file cdef_opcprof cdef_verbose_opcprof cdef_debug cdef_yydebug cdef_no_inlines cdef_check_strings cdef_keep_strings cdef_debug_telnet cdef_debug_smalloc_allocs cdef_check_object_gc_ref cdef_check_smalloc_total cdef_dump_gc_refs val_access_file val_access_log val_erq_max_reply val_erq_max_send val_erq_debug val_pthreads_write_max_size val_read_file_max_size val_time_to_clean_up val_time_to_swap val_time_to_swap_variables val_time_to_reset val_evaluator_stack_size val_max_user_trace val_max_trace val_compiler_stack_size val_max_bits val_portno val_maxnumports val_max_cost val_max_local val_catch_reserved_cost val_master_reserved_cost val_swap_file val_max_array_size val_max_mapping_size val_max_callouts val_max_players val_allowed_ed_cmds val_reserved_user_size val_reserved_master_size val_reserved_system_size val_htable_size val_itable_size val_otable_size val_defmax val_apply_cache_bits val_rxcache_table val_master_name val_max_byte_transfer val_udp_port val_set_buffer_size_max val_malloc val_min_malloced val_min_small_malloced val_max_malloced val_total_trace_length val_wizlist_file erq_sub ERQ_LIBS PKGLIBS LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA YACC CPP EGREP ALLOCA val_optimize WCFLAGS OCFLAGS LCFLAGS MCFLAGS DCFLAGS EXTRA_CFLAGS OPTIMIZE_LINKING MOVE_YACC_TAB CLEAN_YACC_TAB YACCTAB CONFIG_SHELL cdef_erq_demon cdef_access_control cdef_access_log cdef_align_functions cdef_compat_mode cdef_filename_spaces cdef_strict_euids cdef_supply_parse_command cdef_initialization_by___init cdef_use_system_crypt cdef_use_ipv6 cdef_use_mccp cdef_use_mysql cdef_use_pthreads cdef_use_pcre cdef_use_set_light cdef_use_set_is_wizard cdef_use_process_string cdef_lpc_array_calls cdef_lpc_nosave cdef_use_deprecated cdef_comm_stat cdef_trace_code cdef_apply_cache_stat cdef_malloc_trace cdef_malloc_lpc_trace cdef_malloc_sbrk_trace cdef_dynamic_costs cdef_rxcache_table cdef_wizlist_file cdef_opcprof cdef_verbose_opcprof cdef_debug cdef_yydebug cdef_no_inlines cdef_check_strings cdef_keep_strings cdef_debug_telnet cdef_debug_smalloc_allocs cdef_check_object_gc_ref cdef_dump_gc_refs val_access_file val_access_log val_erq_max_reply val_erq_max_send val_erq_debug val_pthreads_write_max_size val_read_file_max_size val_time_to_clean_up val_time_to_swap val_time_to_swap_variables val_time_to_reset val_evaluator_stack_size val_max_user_trace val_max_trace val_compiler_stack_size val_max_bits val_portno val_maxnumports val_max_cost val_max_local val_catch_reserved_cost val_master_reserved_cost val_swap_file val_max_array_size val_max_mapping_size val_max_callouts val_max_players val_allowed_ed_cmds val_reserved_user_size val_reserved_master_size val_reserved_system_size val_htable_size val_itable_size val_otable_size val_defmax val_apply_cache_bits val_rxcache_table val_master_name val_max_byte_transfer val_udp_port val_set_buffer_size_max val_malloc val_min_malloced val_min_small_malloced val_max_malloced val_total_trace_length val_wizlist_file erq_sub ERQ_LIBS PKGLIBS LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -843,15 +843,21 @@ Optional Features:
   --enable-access-log                 default=disabled
   --enable-align-functions            default=enabled
   --enable-compat-mode                default=disabled
+  --enable-filename-spaces            default=disabled
+        Allow space characters in filenames
   --enable-strict-euids               default=disabled
   --enable-supply-parse-command       default=enabled
   --enable-initialization-by-__init   default=enabled
   --enable-use-system-crypt           default=enabled
   --enable-udp-send                   default=enabled
   --enable-use-ipv6                   default=disabled
+  --enable-use-mccp                   default=disabled
+        Enables MCCP support
   --enable-use-mysql                  default=disabled
   --enable-use-pthreads               default=disabled
-        enable using of threads for socket writes - HIGHLY ALPHA!
+        enable using of threads for socket writes - FRAGILE!
+  --enable-lpc-array-calls            default=enabled
+        Enables call_others on arrays of objects
   --enable-use-pcre                   default=disabled
         enable using of perl compatible regexp (requires Fiona's pcre-patch)
   --enable-lpc-nosave                 default=enabled
@@ -868,8 +874,10 @@ Optional Features:
   --enable-apply-cache_stat           default=enabled
   --enable-malloc-trace               default=disabled
   --enable-malloc-lpc-trace           default=disabled
+  --enable-malloc-sbrk-trace          default=disabled
+        Log all esbrk() calls (smalloc only)
   --enable-dynamic-costs              default=disabled
-  --enable-trace-code                 default=enabled
+  --enable-trace-code                 default=disabled
         trace the most recently executed bytecode
   --enable-rxcache_table              default=enabled
   --enable-opcprof                    default=disabled
@@ -892,14 +900,14 @@ Optional Features:
         enable small block diagnostics
   --enable-check-object-gc-ref        default=enabled
         check object references in GC
-  --enable-check-smalloc-total        default=disabled
-        trace smalloc statistics
   --enable-dump-gc-refs               default=disabled
         trace GC references
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
+  --with-optimize=VALUE               default=med
+        Optimization level: no/low/med/high
   --with-access-file=VALUE            default=ACCESS.ALLOW
         access permissions file
   --with-access-log=VALUE             default=access.allow.log
@@ -924,7 +932,7 @@ Optional Packages:
   --with-compiler-stack-size=VALUE    default=400
   --with-max-bits=VALUE               default=6144
   --with-portno=VALUE                 default=4242
-  --with-udp_port=VALUE               default=4246
+  --with-udp-port=VALUE               default=4246
   --with-maxnumports=VALUE            default=20
   --with-max-cost=VALUE               default=1000000
   --with-catch-reserved-cost=VALUE    default=2000
@@ -1388,6 +1396,13 @@ if test "${enable_compat_mode+set}" = set; then
 
 fi;
 
+DEFAULTenable_filename_spaces=no
+# Check whether --enable-filename-spaces or --disable-filename-spaces was given.
+if test "${enable_filename_spaces+set}" = set; then
+  enableval="$enable_filename_spaces"
+
+fi;
+
 DEFAULTenable_strict_euids=no
 # Check whether --enable-strict-euids or --disable-strict-euids was given.
 if test "${enable_strict_euids+set}" = set; then
@@ -1430,6 +1445,13 @@ if test "${enable_use_ipv6+set}" = set; then
 
 fi;
 
+DEFAULTenable_use_mccp=no
+# Check whether --enable-use-mccp or --disable-use-mccp was given.
+if test "${enable_use_mccp+set}" = set; then
+  enableval="$enable_use_mccp"
+
+fi;
+
 DEFAULTenable_use_mysql=no
 # Check whether --enable-use-mysql or --disable-use-mysql was given.
 if test "${enable_use_mysql+set}" = set; then
@@ -1441,6 +1463,13 @@ DEFAULTenable_use_pthreads=no
 # Check whether --enable-use-pthreads or --disable-use-pthreads was given.
 if test "${enable_use_pthreads+set}" = set; then
   enableval="$enable_use_pthreads"
+
+fi;
+
+DEFAULTenable_lpc_array_calls=yes
+# Check whether --enable-lpc-array-calls or --disable-lpc-array-calls was given.
+if test "${enable_lpc_array_calls+set}" = set; then
+  enableval="$enable_lpc_array_calls"
 
 fi;
 
@@ -1514,6 +1543,13 @@ if test "${enable_malloc_lpc_trace+set}" = set; then
 
 fi;
 
+DEFAULTenable_malloc_sbrk_trace=no
+# Check whether --enable-malloc-sbrk-trace or --disable-malloc-sbrk-trace was given.
+if test "${enable_malloc_sbrk_trace+set}" = set; then
+  enableval="$enable_malloc_sbrk_trace"
+
+fi;
+
 DEFAULTenable_dynamic_costs=no
 # Check whether --enable-dynamic-costs or --disable-dynamic-costs was given.
 if test "${enable_dynamic_costs+set}" = set; then
@@ -1521,7 +1557,7 @@ if test "${enable_dynamic_costs+set}" = set; then
 
 fi;
 
-DEFAULTenable_trace_code=yes
+DEFAULTenable_trace_code=no
 # Check whether --enable-trace-code or --disable-trace-code was given.
 if test "${enable_trace_code+set}" = set; then
   enableval="$enable_trace_code"
@@ -1608,17 +1644,19 @@ if test "${enable_check_object_gc_ref+set}" = set; then
 
 fi;
 
-DEFAULTenable_check_smalloc_total=no
-# Check whether --enable-check-smalloc-total or --disable-check-smalloc-total was given.
-if test "${enable_check_smalloc_total+set}" = set; then
-  enableval="$enable_check_smalloc_total"
-
-fi;
-
 DEFAULTenable_dump_gc_refs=no
 # Check whether --enable-dump-gc-refs or --disable-dump-gc-refs was given.
 if test "${enable_dump_gc_refs+set}" = set; then
   enableval="$enable_dump_gc_refs"
+
+fi;
+
+
+DEFAULTwith_optimize=med
+
+# Check whether --with-optimize or --without-optimize was given.
+if test "${with_optimize+set}" = set; then
+  withval="$with_optimize"
 
 fi;
 
@@ -1773,7 +1811,7 @@ fi;
 
 DEFAULTwith_udp_port=4246
 
-# Check whether --with-udp_port or --without-udp_port was given.
+# Check whether --with-udp-port or --without-udp-port was given.
 if test "${with_udp_port+set}" = set; then
   withval="$with_udp_port"
 
@@ -2118,6 +2156,16 @@ else
   cdef_compat_mode="#undef"
 fi
 
+if test "x$enable_filename_spaces" = "x" && test "x$DEFAULTenable_filename_spaces" != "x"; then
+  enable_filename_spaces=$DEFAULTenable_filename_spaces
+fi
+
+if test "x$enable_filename_spaces" = "xyes"; then
+  cdef_filename_spaces="#define"
+else
+  cdef_filename_spaces="#undef"
+fi
+
 if test "x$enable_strict_euids" = "x" && test "x$DEFAULTenable_strict_euids" != "x"; then
   enable_strict_euids=$DEFAULTenable_strict_euids
 fi
@@ -2178,6 +2226,16 @@ else
   cdef_use_pthreads="#undef"
 fi
 
+if test "x$enable_use_mccp" = "x" && test "x$DEFAULTenable_use_mccp" != "x"; then
+  enable_use_mccp=$DEFAULTenable_use_mccp
+fi
+
+if test "x$enable_use_mccp" = "xyes"; then
+  cdef_use_mccp="#define"
+else
+  cdef_use_mccp="#undef"
+fi
+
 if test "x$enable_use_pcre" = "x" && test "x$DEFAULTenable_use_pcre" != "x"; then
   enable_use_pcre=$DEFAULTenable_use_pcre
 fi
@@ -2186,6 +2244,16 @@ if test "x$enable_use_pcre" = "xyes"; then
   cdef_use_pcre="#define"
 else
   cdef_use_pcre="#undef"
+fi
+
+if test "x$enable_lpc_array_calls" = "x" && test "x$DEFAULTenable_lpc_array_calls" != "x"; then
+  enable_lpc_array_calls=$DEFAULTenable_lpc_array_calls
+fi
+
+if test "x$enable_lpc_array_calls" = "xyes"; then
+  cdef_lpc_array_calls="#define"
+else
+  cdef_lpc_array_calls="#undef"
 fi
 
 if test "x$enable_lpc_nosave" = "x" && test "x$DEFAULTenable_lpc_nosave" != "x"; then
@@ -2276,6 +2344,16 @@ if test "x$enable_malloc_lpc_trace" = "xyes"; then
   cdef_malloc_lpc_trace="#define"
 else
   cdef_malloc_lpc_trace="#undef"
+fi
+
+if test "x$enable_malloc_sbrk_trace" = "x" && test "x$DEFAULTenable_malloc_sbrk_trace" != "x"; then
+  enable_malloc_sbrk_trace=$DEFAULTenable_malloc_sbrk_trace
+fi
+
+if test "x$enable_malloc_sbrk_trace" = "xyes"; then
+  cdef_malloc_sbrk_trace="#define"
+else
+  cdef_malloc_sbrk_trace="#undef"
 fi
 
 if test "x$enable_dynamic_costs" = "x" && test "x$DEFAULTenable_dynamic_costs" != "x"; then
@@ -2411,16 +2489,6 @@ else
   cdef_check_object_gc_ref="#undef"
 fi
 
-if test "x$enable_check_smalloc_total" = "x" && test "x$DEFAULTenable_check_smalloc_total" != "x"; then
-  enable_check_smalloc_total=$DEFAULTenable_check_smalloc_total
-fi
-
-if test "x$enable_check_smalloc_total" = "xyes"; then
-  cdef_check_smalloc_total="#define"
-else
-  cdef_check_smalloc_total="#undef"
-fi
-
 if test "x$enable_dump_gc_refs" = "x" && test "x$DEFAULTenable_dump_gc_refs" != "x"; then
   enable_dump_gc_refs=$DEFAULTenable_dump_gc_refs
 fi
@@ -2430,6 +2498,17 @@ if test "x$enable_dump_gc_refs" = "xyes"; then
 else
   cdef_dump_gc_refs="#undef"
 fi
+
+
+if test "x$with_optimize" != "x"; then
+  with_optimize=`echo $with_optimize|
+             sed -e 's/^\([^"]*\)\?.*$/\1/'`
+fi
+if test "x$with_optimize" = "x" && test "x$DEFAULTwith_optimize" != "x"; then
+  with_optimize=$DEFAULTwith_optimize
+fi
+
+val_optimize="$with_optimize"
 
 
 if test "x$with_access_file" != "x"; then
@@ -2934,6 +3013,7 @@ if test "x$cdef_opcprof" = "x#undef"; then
   cdef_verbose_opcprof="#undef"
 fi
 
+val_optimize=`echo ${val_optimize} | tr 'a-z' 'A-Z'`
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -3754,8 +3834,8 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 # configure at all, we fudge the CFLAGS a bit.
 
 save_cflags=$CFLAGS
-echo "For this test, I use '-g' instead of '$CFLAGS' as compiler flags."
 CFLAGS="-g"
+echo "For this test, '$CFLAGS' instead of '$save_cflags' is used as compiler flags."
 
 echo "$as_me:$LINENO: checking gcc/assembler float/branch incompatibility, e.g. on AIX" >&5
 echo $ECHO_N "checking gcc/assembler float/branch incompatibility, e.g. on AIX... $ECHO_C" >&6
@@ -7292,6 +7372,59 @@ _ACEOF
 fi
 
 
+echo "$as_me:$LINENO: checking for main in -lnsl" >&5
+echo $ECHO_N "checking for main in -lnsl... $ECHO_C" >&6
+if test "${ac_cv_lib_nsl_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lnsl  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_nsl_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_nsl_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_nsl_main" >&5
+echo "${ECHO_T}$ac_cv_lib_nsl_main" >&6
+if test $ac_cv_lib_nsl_main = yes; then
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBNSL 1
+_ACEOF
+
+  LIBS="-lnsl $LIBS"
+
+fi
+
+
 ERQ_LIBS="$LIBS"
 
 echo "$as_me:$LINENO: checking for main in -lucb" >&5
@@ -8172,7 +8305,8 @@ done
 
 
 
-for ac_func in fcntl getdomainname
+
+for ac_func in fcntl getdomainname strtoul
 do
 as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
 echo "$as_me:$LINENO: checking for $ac_func" >&5
@@ -8819,10 +8953,10 @@ echo $ECHO_N "checking for mySQL... $ECHO_C" >&6
 if test "${lp_cv_has_mysql+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
-  for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/include" "/usr/include" "/usr/lib/mysql"; do
+  for TESTPATH in "" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include" "/usr/lib/mysql"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
-        CFLAGS="$CFLAGS -I$TESTPATH"
+        CFLAGS="-I$TESTPATH $CFLAGS"
     fi
 cat >conftest.$ac_ext <<_ACEOF
 #line $LINENO "configure"
@@ -8888,8 +9022,12 @@ _ACEOF
 
 
   if test $enable_use_mysql = yes; then
+    tmp=""
+
     if test "x$mysql_path" = "x"; then
-        echo "$as_me:$LINENO: checking for main in -lmysqlclient" >&5
+        if test -d "/usr/local/mysql/lib/mysql"; then
+            CFLAGS="$saveflags -L/usr/local/mysql/lib/mysql"
+            echo "$as_me:$LINENO: checking for main in -lmysqlclient" >&5
 echo $ECHO_N "checking for main in -lmysqlclient... $ECHO_C" >&6
 if test "${ac_cv_lib_mysqlclient_main+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -8933,12 +9071,157 @@ fi
 echo "$as_me:$LINENO: result: $ac_cv_lib_mysqlclient_main" >&5
 echo "${ECHO_T}$ac_cv_lib_mysqlclient_main" >&6
 if test $ac_cv_lib_mysqlclient_main = yes; then
-  PKGLIBS="$PKGLIBS -lmysqlclient"
+  tmp="$PKGLIBS -L/usr/local/mysql/lib/mysql -lmysqlclient"
 fi
 
-    else
-        tmp=""
+        elif test -d "/usr/local/mysql/lib"; then
+            CFLAGS="$saveflags -L/usr/local/mysql/lib"
+            echo "$as_me:$LINENO: checking for main in -lmysqlclient" >&5
+echo $ECHO_N "checking for main in -lmysqlclient... $ECHO_C" >&6
+if test "${ac_cv_lib_mysqlclient_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lmysqlclient  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
 
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_mysqlclient_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_mysqlclient_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_mysqlclient_main" >&5
+echo "${ECHO_T}$ac_cv_lib_mysqlclient_main" >&6
+if test $ac_cv_lib_mysqlclient_main = yes; then
+  tmp="$PKGLIBS -L/usr/local/mysql/lib -lmysqlclient"
+fi
+
+        elif test -d "/usr/local/lib"; then
+            CFLAGS="$saveflags -L/usr/local/lib"
+            echo "$as_me:$LINENO: checking for main in -lmysqlclient" >&5
+echo $ECHO_N "checking for main in -lmysqlclient... $ECHO_C" >&6
+if test "${ac_cv_lib_mysqlclient_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lmysqlclient  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_mysqlclient_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_mysqlclient_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_mysqlclient_main" >&5
+echo "${ECHO_T}$ac_cv_lib_mysqlclient_main" >&6
+if test $ac_cv_lib_mysqlclient_main = yes; then
+  tmp="$PKGLIBS -L/usr/local/lib -lmysqlclient"
+fi
+
+        else
+            echo "$as_me:$LINENO: checking for main in -lmysqlclient" >&5
+echo $ECHO_N "checking for main in -lmysqlclient... $ECHO_C" >&6
+if test "${ac_cv_lib_mysqlclient_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lmysqlclient  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_mysqlclient_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_mysqlclient_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_mysqlclient_main" >&5
+echo "${ECHO_T}$ac_cv_lib_mysqlclient_main" >&6
+if test $ac_cv_lib_mysqlclient_main = yes; then
+  tmp="$PKGLIBS -lmysqlclient"
+fi
+
+        fi
+    else
         if test -d "${mysql_path}/lib/mysql"; then
             CFLAGS="$saveflags -L${mysql_path}/lib/mysql"
             echo "$as_me:$LINENO: checking for main in -lmysqlclient" >&5
@@ -9088,20 +9371,21 @@ fi
 
         fi
 
-        if test "x$tmp" = "x"; then
-            echo "mysqlclient library not found - disabling mySQL support"
-            if test "x$not_available" = "x"; then
+    fi
+
+    if test "x$tmp" = "x"; then
+        echo "mysqlclient library not found - disabling mySQL support"
+        if test "x$not_available" = "x"; then
     not_available="use-mysql"
 else
     not_available="$not_available, use-mysql"
 fi
-            cdef_use_mysql="#undef"
-            enable_use_mysql="no"
-            mysql_path=
-            lp_cv_has_mysql="no"
-        else
-            PKGLIBS="$tmp"
-        fi
+        cdef_use_mysql="#undef"
+        enable_use_mysql="no"
+        mysql_path=
+        lp_cv_has_mysql="no"
+    else
+        PKGLIBS="$tmp"
     fi
   fi
 
@@ -9326,6 +9610,72 @@ else
     not_available="$not_available, use-mysql"
 fi
   fi
+fi
+
+# --- Check if we need zlib libraries for mccp ---
+
+if test "x$enable_use_mccp" = "x" || test "x$enable_use_mccp" = "xyes"; then
+    if test "$lp_cv_need_lib_z" != "yes"; then
+        echo "$as_me:$LINENO: checking for main in -lz" >&5
+echo $ECHO_N "checking for main in -lz... $ECHO_C" >&6
+if test "${ac_cv_lib_z_main+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lz  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+#include "confdefs.h"
+
+
+int
+main ()
+{
+main ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_lib_z_main=yes
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+ac_cv_lib_z_main=no
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+echo "$as_me:$LINENO: result: $ac_cv_lib_z_main" >&5
+echo "${ECHO_T}$ac_cv_lib_z_main" >&6
+if test $ac_cv_lib_z_main = yes; then
+  PKGLIBS="$PKGLIBS -lz"
+                     lp_cv_need_lib_z="yes"
+
+fi
+
+    fi
+    if test "$lp_cv_need_lib_z" != "yes"; then
+        echo "libz library not found - disabling MCCP support"
+        if test "x$not_available" = "x"; then
+    not_available="use-mccp"
+else
+    not_available="$not_available, use-mccp"
+fi
+        cdef_use_mccp="#undef"
+        enable_use_mccp="no"
+    fi
 fi
 
 # ---
@@ -10996,6 +11346,10 @@ fi
 
 
 
+
+
+
+
                                                             ac_config_files="$ac_config_files Makefile config.h util/Makefile util/indent/Makefile util/xerq/Makefile util/erq/Makefile"
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -11603,6 +11957,7 @@ s,@YACC@,$YACC,;t t
 s,@CPP@,$CPP,;t t
 s,@EGREP@,$EGREP,;t t
 s,@ALLOCA@,$ALLOCA,;t t
+s,@val_optimize@,$val_optimize,;t t
 s,@WCFLAGS@,$WCFLAGS,;t t
 s,@OCFLAGS@,$OCFLAGS,;t t
 s,@LCFLAGS@,$LCFLAGS,;t t
@@ -11619,17 +11974,20 @@ s,@cdef_access_control@,$cdef_access_control,;t t
 s,@cdef_access_log@,$cdef_access_log,;t t
 s,@cdef_align_functions@,$cdef_align_functions,;t t
 s,@cdef_compat_mode@,$cdef_compat_mode,;t t
+s,@cdef_filename_spaces@,$cdef_filename_spaces,;t t
 s,@cdef_strict_euids@,$cdef_strict_euids,;t t
 s,@cdef_supply_parse_command@,$cdef_supply_parse_command,;t t
 s,@cdef_initialization_by___init@,$cdef_initialization_by___init,;t t
 s,@cdef_use_system_crypt@,$cdef_use_system_crypt,;t t
 s,@cdef_use_ipv6@,$cdef_use_ipv6,;t t
+s,@cdef_use_mccp@,$cdef_use_mccp,;t t
 s,@cdef_use_mysql@,$cdef_use_mysql,;t t
 s,@cdef_use_pthreads@,$cdef_use_pthreads,;t t
 s,@cdef_use_pcre@,$cdef_use_pcre,;t t
 s,@cdef_use_set_light@,$cdef_use_set_light,;t t
 s,@cdef_use_set_is_wizard@,$cdef_use_set_is_wizard,;t t
 s,@cdef_use_process_string@,$cdef_use_process_string,;t t
+s,@cdef_lpc_array_calls@,$cdef_lpc_array_calls,;t t
 s,@cdef_lpc_nosave@,$cdef_lpc_nosave,;t t
 s,@cdef_use_deprecated@,$cdef_use_deprecated,;t t
 s,@cdef_comm_stat@,$cdef_comm_stat,;t t
@@ -11637,6 +11995,7 @@ s,@cdef_trace_code@,$cdef_trace_code,;t t
 s,@cdef_apply_cache_stat@,$cdef_apply_cache_stat,;t t
 s,@cdef_malloc_trace@,$cdef_malloc_trace,;t t
 s,@cdef_malloc_lpc_trace@,$cdef_malloc_lpc_trace,;t t
+s,@cdef_malloc_sbrk_trace@,$cdef_malloc_sbrk_trace,;t t
 s,@cdef_dynamic_costs@,$cdef_dynamic_costs,;t t
 s,@cdef_rxcache_table@,$cdef_rxcache_table,;t t
 s,@cdef_wizlist_file@,$cdef_wizlist_file,;t t
@@ -11650,7 +12009,6 @@ s,@cdef_keep_strings@,$cdef_keep_strings,;t t
 s,@cdef_debug_telnet@,$cdef_debug_telnet,;t t
 s,@cdef_debug_smalloc_allocs@,$cdef_debug_smalloc_allocs,;t t
 s,@cdef_check_object_gc_ref@,$cdef_check_object_gc_ref,;t t
-s,@cdef_check_smalloc_total@,$cdef_check_smalloc_total,;t t
 s,@cdef_dump_gc_refs@,$cdef_dump_gc_refs,;t t
 s,@val_access_file@,$val_access_file,;t t
 s,@val_access_log@,$val_access_log,;t t

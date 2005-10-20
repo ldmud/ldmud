@@ -42,7 +42,7 @@ with_min_small_malloced=0x4000000
 with_max_cost=1000000
 with_max_trace=85
 with_max_user_trace=80
- 
+
 # --- Communication ---
 with_portno=7600
 with_udp_port=7610

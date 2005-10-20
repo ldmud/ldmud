@@ -7,7 +7,9 @@
  *
  * Objects with active heartbeats are referenced from a list which
  * is sorted in ascending order of the object pointers. However, these
- * object pointers do not count as 'refs'.
+ * object pointers do not count as 'refs'. The sorting prevents that
+ * objects with a rapid change of the heartbeat status are called more
+ * often than others.
  *
  * The backend will call call_heart_beat() in every cycle right after
  * starting a new alarm(). The function evaluates as many heartbeats
@@ -22,7 +24,7 @@
  * TODO: Make the list a skiplist or similar.
  * TODO: Add an object flag O_IN_HB_LIST so that several toggles of the
  * TODO:: heart beat status only toggle O_HEARTBEAT, but leave the object
- * TODO:: in the list until call_+heart_beat() can remove it. This would
+ * TODO:: in the list until call_heart_beat() can remove it. This would
  * TODO:: also remove the need for a double-linked or skiplist, but
  * TODO:: require the object-pointer to count as ref and it could let
  * TODO:: keep destructed objects in the list for a while.
@@ -59,27 +61,19 @@
 /*-------------------------------------------------------------------------*/
 
 /* Listnode for one object with a heartbeat
+ * It is no use pooling the nodes to reduce allocation overhead, as
+ * the average heartbeat use is usually much lower than the peak usage.
  */
 
 struct hb_info {
     struct hb_info * next;  /* next node in list */
     struct hb_info * prev;  /* previous node in list */
     mp_int           tlast; /* time of last heart_beat */
-    object_t  * obj;   /* the object itself */
-};
-
-/* Allocation block for a bunch of listnodes.
- * They are kept in a list themselves for the garbage collector.
- */
-
-#define NUM_NODES 32
-
-struct hb_block {
-    struct hb_block * next;           /* next allocated block */
-    struct hb_info entry[NUM_NODES];  /* the heartbeat nodes */
+    object_t       * obj;   /* the object itself */
 };
 
 /*-------------------------------------------------------------------------*/
+
 object_t *current_heart_beat = NULL;
   /* The object whose heart_beat() is currently executed. It is NULL outside
    * of heartbeat executions.
@@ -95,18 +89,6 @@ static struct hb_info * hb_list = NULL;
 static struct hb_info * next_hb = NULL;
   /* Next hb_info whose objects' heartbeat must be executed.
    * If NULL, the first info in the list is meant.
-   */
-
-static struct hb_info * free_list = NULL;
-  /* List of unused nodes
-   */
-
-static struct hb_block * block_list = NULL;
-  /* List of heartbeat node blocks.
-   */
-
-static mp_int num_blocks = 0;
-  /* Number of allocated node blocks.
    */
 
 #if defined(DEBUG)
@@ -153,7 +135,12 @@ call_heart_beat (void)
 
 {
     struct hb_info *this;
-    mp_int num_hb_to_do;  /* For statistics only */
+      /* Current list pointer, static so that longjmp() won't clobber it */
+
+    static mp_int num_hb_to_do;
+      /* For statistics only */
+
+    struct error_recovery_info error_recovery_info;
 
     /* Housekeeping */
 
@@ -172,6 +159,24 @@ call_heart_beat (void)
     num_hb_to_do = num_hb_objs;
     num_hb_calls++;
 
+    /* Activate the local error recovery context */
+
+    error_recovery_info.rt.last = rt_context;
+    error_recovery_info.rt.type = ERROR_RECOVERY_BACKEND;
+    rt_context = (rt_context_t *)&error_recovery_info;
+
+    if (setjmp(error_recovery_info.con.text))
+    {
+        /* An error occured: recover. The guilt heartbeat has already
+         * been removed by simulate::error().
+         */
+        clear_state();
+        debug_message("%s Error in heartbeat.\n", time_stamp());
+    }
+
+    /* Set this to the next hb to be execute.
+     * This is the loop invariant.
+     */
     this = next_hb;
 
     while (num_hb_objs && !comm_time_to_call_heart_beat)
@@ -227,12 +232,8 @@ call_heart_beat (void)
                 this->next->prev = this->prev;
             if (this == hb_list)
                 hb_list = this->next;
-            this->next = free_list;
-            free_list = this;
-#ifdef DEBUG
-            this->prev = NULL;
-            this->obj = NULL;
-#endif
+
+            xfree(this);
         }
         else
         {
@@ -287,11 +288,14 @@ call_heart_beat (void)
         this = next_hb;
     } /* while (not done) */
 
+    rt_context = error_recovery_info.rt.last;
+
     /* Update stats */
     avg_num_hb_objs += num_hb_to_do - (avg_num_hb_objs >> 10);
     avg_num_hb_done += hb_num_done  - (avg_num_hb_done >> 10);
 
     current_heart_beat = NULL;
+
 } /* call_heart_beat() */
 
 /*-------------------------------------------------------------------------*/
@@ -323,32 +327,13 @@ set_heart_beat (object_t *ob, Bool to)
         struct hb_info *new;
 
         /* Get a new node */
-        if (!free_list)
-        {
-            struct hb_block * new_block;
-            int i;
-
-            /* We need a whole new block */
-            new_block = xalloc(sizeof(*new_block));
-            if (!new_block)
-                return 0;
-            new_block->next = block_list;
-            block_list = new_block;
-            num_blocks++;
-
-            /* Put the new nodes into the freelist */
-            for (i = 0; i < NUM_NODES-1; i++)
-                new_block->entry[i].next = &new_block->entry[i+1];
-            new_block->entry[NUM_NODES-1].next = free_list;
-            free_list = &new_block->entry[0];
-        }
-        new = free_list;
-        free_list = free_list->next;
+        new = xalloc(sizeof(*new));
 
         new->tlast = 0;
         new->obj = ob;
 
-        /* Insert the new node at the proper place in the list */
+        /* Insert the new node at the proper place in the list. */
+
         if (!hb_list || ob < hb_list->obj)
         {
             new->next = hb_list;
@@ -394,9 +379,7 @@ set_heart_beat (object_t *ob, Bool to)
         if (this == next_hb)
             next_hb = this->next;
 
-        /* ... and put it into the freelist */
-        this->next = free_list;
-        free_list = this;
+        xfree(this);
 
         num_hb_objs--;
         ob->flags &= ~O_HEART_BEAT;
@@ -404,7 +387,7 @@ set_heart_beat (object_t *ob, Bool to)
 
     /* That's it */
     return 1;
-}
+} /* set_heart_beat() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef GC_SUPPORT
@@ -416,10 +399,10 @@ count_heart_beat_refs (void)
  */
 
 {
-    struct hb_block *block;
+    struct hb_info * this;
 
-    for (block = block_list; block; block = block->next)
-        note_malloced_block_ref((char *)block);
+    for (this = hb_list; this != NULL; this = this->next)
+        note_malloced_block_ref(this);
 }
 #endif
 
@@ -437,9 +420,8 @@ heart_beat_status (strbuf_t * sbuf, Bool verbose)
         strbuf_add(sbuf, "\nHeart beat information:\n");
         strbuf_add(sbuf, "-----------------------\n");
         strbuf_addf(sbuf, "Number of objects with heart beat: %ld, "
-                          "beats: %ld, reserved: %ld\n"
-                   , (long)num_hb_objs, (long)num_hb_calls
-                   , (long)num_blocks * NUM_NODES);
+                          "beats: %ld\n"
+                   , (long)num_hb_objs, (long)num_hb_calls);
 #if defined(__MWERKS__) && !defined(WARN_ALL)
 #    pragma warn_largeargs off
 #endif
@@ -459,7 +441,7 @@ heart_beat_status (strbuf_t * sbuf, Bool verbose)
 #    pragma warn_largeargs reset
 #endif
     }
-    return num_blocks * sizeof(struct hb_block);
+    return num_hb_objs * sizeof(struct hb_info);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -492,8 +474,8 @@ hbeat_dinfo_status (svalue_t *svp, int value)
     ST_NUMBER(DID_ST_HBEAT_OBJS, num_hb_objs);
     ST_NUMBER(DID_ST_HBEAT_CALLS, num_hb_calls);
     ST_NUMBER(DID_ST_HBEAT_CALLS_TOTAL, total_hb_calls);
-    ST_NUMBER(DID_ST_HBEAT_SLOTS, num_blocks * NUM_NODES);
-    ST_NUMBER(DID_ST_HBEAT_SIZE, num_blocks * sizeof(struct hb_block));
+    ST_NUMBER(DID_ST_HBEAT_SLOTS, num_hb_objs);
+    ST_NUMBER(DID_ST_HBEAT_SIZE, num_hb_objs * sizeof(struct hb_info));
     ST_NUMBER(DID_ST_HBEAT_PROCESSED, hb_num_done);
     ST_DOUBLE(DID_ST_HBEAT_AVG_PROC
              , avg_num_hb_objs

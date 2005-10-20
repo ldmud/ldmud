@@ -4,6 +4,140 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+30-May-2004 (Lars Duening) -- Release 3.2.10
+
+    - Changed efuns:
+       + debug_info(): Removed the DID_MEM_UNUSED value from the DINFO_DATA:
+           DID_MEMORY result.
+       + debug_info(): Added the DID_ST_MB_ values to the DINFO_DATA:
+           DID_STATUS result.
+       + debug_info(): The DINFO_DATA:"objects" dump also lists the object
+           creation times.
+       + debug_info(): Added DID_ST_BOOT_TIME to the DINFO_DATA:DID_STATUS
+           result.
+       + debug_info(): Added a third argument to DINFO_OBJLIST to return
+           multiple objects.
+       + remove_action(): It is now possible to remove all actions
+           an object defines.
+       + save_object(), save_value(): The format of the saved data can
+           be specified with an function argument.
+       + set_connection_charset(), set_combine_charset(): Passing 0 as
+           argument re-establishes the default charset.
+       + sprintf(), printf(): Modifier '#' for '%O'/'%Q' prints the values
+           in a compact format.
+       + sprintf(), printf(): Format specifier '%b' prints a number
+           in binary notation.
+       + wizlist_info(): The evalcost statistic is now split into 'ticks'
+           and 'gigaticks', and a second non-decaying evalcost statistic
+           has been added.
+
+    - Corrected efuns:
+       + find_call_out(): No longer throws an error when passed an unbound
+           lambda to look for.
+       + m_add(): Fixed a memory leak when existing entries were overwritten.
+       + remove_input_to(): The proper noecho state is restored after
+           removing a pending input handler.
+       + restore_object(): The function leaked memory when restoring from
+           a MALLOCed string.
+       + to_array(): When converting a string, the characters are treated
+           as unsigned.
+
+    - New efuns:
+       + enable_telnet(): Enable or disable telnet for an interactive
+           object.
+       + get_combine_charset(), get_connection_charset(): Query the
+           combine resp. connection charset.
+       + get_max_commands(): Query the allowed command rate of an
+           interactive object.
+       + master(): Return the current master object.
+       + m_entry(): Return all values for mapping entry at once.
+       + net_connect(): Open a TCP connection.
+       + rmember(): Search arrays and strings from the end.
+       + set_max_commands(): Set the allowed command rate of an
+           interactive object.
+       + strrstr(): Search a string within a string backwards.
+       + variable_exists(): Check the existance of a named variable.
+       + variable_list(): Return all variable names of an object.
+
+    - Master Object:
+
+    - Fixed Crashers:
+       + Using 'break' or 'continue' in large programs caused bytecode
+           corruption.
+       + Function calls by address and global variable accesses are no
+           longer possible after set_this_object().
+       + Overflowing the value stack during a secure_apply() could
+           crash the driver in the error recovery.
+       + walk_mapping(): If the callback object was destructed
+           before the first call, the efun crashed in the error handling.
+       + Swapping of volatile strings could crash the driver.
+       + H_COMMAND specifying an lfun by name which doesn't exist
+           in the interactive object.
+       + Using function_exists() or variable_exists() on a destructed
+           object.
+       + Editor: 'Z' given at the end of a file followed by two 'd'
+           corrupted the internal text storage, which sometimes
+           caused crashes.
+
+    - Language:
+       + catch(; nolog) is now an official feature.
+       + New modifier catch(; publish).
+       + Constrained the switch() grammar so that only blocks are
+           suitable as bodies.
+       + Operator '&' can intersect mappings with other mappings and arrays.
+       + Macro __MAX_MALLOC__ is defined to the internal upper limit for
+           total memory usage.
+       + Macro __MSDOS_FS__ is defined on systems using the MS-DOS
+           filesystem conventions.
+       + Preprocessor symbol __FILENAME_SPACES__ is defined if the driver is
+           instructed to allow spaces in filenames.
+       + A cast of a value to its own type, or a cast not resulting in a
+           conversion operation generates a warning. The pragma
+           no_warn_empty_casts can turn this warning off.
+       + The strong_types/strict_types pragmas now persist beyond the
+           end of an include file (as does every other pragma).
+       + call_other()s on arrays of objects is now configurable; if enabled,
+           the macro __LPC_ARRAY_CALLS__ is defined.
+       + <mapping> &= <mapping>, <mapping> &= <vector> implemented.
+       + Bugfix: Characters with the 8th bit set are now treated as positive
+           when entered as literal character constants.
+       + Bugfix: Illegal case ranges like '100..50' now generate
+           an error message.
+
+    - Runtime:
+       + Mapping are now compacted (apart from a GC) only, if a certain
+           amount of time has elapsed since the last addition/removal
+           of a key, and if either more than half of the condensed entries
+           have been deleted, or if the number of hashed entries exceeds
+           the number of (non-deleted) condensed entries.
+       + A heart-beat error now longer aborts the heartbeat cycle.
+       + The operators -=, *= and /= can now operate on <int> x <float>,
+           yielding a <float> result.
+       + Allowed longer program names in backtraces.
+       + If the H_RESET/H_CREATE_* hooks are defined by name, static
+           functions are found as well.
+       + Bugfix: Subtracting arrays of closures from each other now actually
+           identifies identical closures.
+       + Bugfix: The smalloc allocator now re-uses free 'large' memory for
+           small block chunks instead of always allocating them from the
+           system.
+
+    - Other Changes:
+       + Editor: Consecutive 'z' or 'Z' commands no longer repeat
+          the previous current line.
+       + Editor: Faulty commands 'quit'/'Quit' are caught before
+          the text buffer is cleared.
+       + Configuration option '--enable-malloc-sbrk-trace' to enable
+          a log of all system memory requests including the stats of
+          the memory allocation request causing it. The intention is
+          to help debugging muds with high system memory usage.
+       + Configuration option '--with-optimize' to set the optimization
+          level in the generated Makefiles.
+       + New commandline option '--filename-spaces'/'--no-filename-spaces'
+           to allow or disallow space characters in filenames (default is to
+           disallow them).
+
+
 02-Feb-2003 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
@@ -41,7 +175,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + get_dir(): New flag GETDIR_PATH to return the full pathnames.
        + get_type_info(): now returns the bound object for efun,
             simul-efun and operator closures as well.
-       + inherit_list(): the inherited objects can be returned in a 
+       + inherit_list(): the inherited objects can be returned in a
            tree reflecting the inheritance structure. Virtual inherits
            can be returned tagged as such.
        + input_to(): New option INPUT_PROMPT to specify a prompt for this
@@ -128,7 +262,7 @@ For a detailed list of all changes see the file CHANGELOG.
            iteration.
        + functionlist(): The filter flags didn't really work.
        + input_to(): The option IGNORE_BANG didn't work. In charmode, !-escapes
-           after the first received data are now recognized. 
+           after the first received data are now recognized.
        + map() and other efuns taking callbacks arguments: The pattern
            'function, object, extra' was parsed such that 'object' became
            part of the 'extra' arguments.

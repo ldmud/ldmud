@@ -384,8 +384,10 @@ string|string * get_simul_efun ()
 // simul_efun objects to call simul_efuns that are not present in the
 // main simul_efun object. This allows to remove simul_efuns at runtime
 // without getting errors from old compiled programs that still use the
-// obsolete simul_efuns. A side use of this mechanism is to provide
-// a 'spare' simul_efun object in case the normal one fails to load.
+// obsolete simul_efuns.
+//
+// The additional simul-efun objects can not serve as backups for
+// the primary one!
 //
 // If the game depends on the simul_efun object, and none could be loaded,
 // an immediate shutdown should occur.
@@ -405,7 +407,8 @@ object connect ()
 // Result:
 //   An login object the requested connection should be bound to.
 //
-// Note that the connection is not bound yet!
+// Note that the connection is at this time bound to the master object,
+// and will be re-bound to the returned object.
 //
 // The gamedriver will call the lfun 'logon()' in the login object after
 // binding the connection to it. That lfun has to return !=0 to succeed.
@@ -816,16 +819,19 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   attach_erq_demon  : Attach the erq demon to object <arg> with flag <arg2>.
 //   bind_lambda       : Bind a lambda-closure to object <arg>.
 //   call_out_info     : Return an array with all call_out informations.
-//   erq               : A the request <arg4> is to be send to the
+//   erq               : A the request <arg2> is to be send to the
 //                       erq-demon by the object <who>.
+//   enable_telnet     : Enable/disable telnet (<arg2>) for object <arg>.
 //   execute_command   : Execute command string <arg2> for the object <arg>.
 //   input_to          : Object <who> issues an 'ignore-bang'-input_to() for
-//                       commandgiver <arg3>; the exakt flags are <arg4>.
+//                       commandgiver <arg2>; the exact flags are <arg2>.
+//   net_connect       : Attempt to open a connection to host <arg>,
+//                        port <arg2>.
 //   nomask simul_efun : Attempt to get an efun <arg> via efun:: when it
 //                       is shadowed by a 'nomask'-type simul_efun.
 //   rename_object     : The current object <who> renames object <arg>
 //                       to name <arg2>.
-//   send_imp          : Send UDP-data to host arg3 (deprecated).
+//   send_imp          : Send UDP-data to host <arg> (deprecated).
 //   send_udp          : Send UDP-data to host <arg>.
 //   set_auto_include_string : Set the string automatically included by
 //                       the compiler (deprecated).
@@ -834,14 +840,18 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   set_extra_wizinfo_size : Set the size of the additional wizard info
 //                       in the wiz-list to <arg>.
 //   set_driver_hook   : Set hook <arg> to <arg2>.
+//   set_max_commands  : Set the max. number of commands interactive
+//                       object <arg> can issue per second to <arg2>.
 //   limited:          : Execute <arg> with reduced/changed limits.
 //   set_limits        : Set limits to <arg>.
 //   set_this_object   : Set this_object() to <arg>.
-//   shadow_add_action : Add an action to function <arg4> of object <arg3>
-//                       from the shadow <who> which is shadowing <arg3>.
+//   shadow_add_action : Add an action to function <arg2> of object <arg>
+//                       from the shadow <who> which is shadowing <arg>.
 //   symbol_variable   : Attempt to create symbol of a hidden variable
 //                       of object <arg> with with index <arg2> in the
 //                       objects variable table.
+//   variable_list     : An attempt to return the variable values of object
+//                        <arg> is made from a different object <who>.
 //   wizlist_info      : Return an array with all wiz-list information.
 //
 // call_out_info can return the arguments to functions and lambda closures
@@ -1003,7 +1013,10 @@ mixed valid_write (string path, string euid, string fun, object caller)
 //   allowed.
 //   You can also return 1 to indicate that the path can be used unchanged.
 //
-// The path finally to be used must not contain spaces or '..'s .
+// The returned pathname must not contain ``..'', a leading / will be stripped
+// by the interpreter. By default, the returned path must also not contain
+// space characters; if the driver is instructed to allow them, the
+// preprocessor macro __FILENAME_SPACES__ is defined.
 //
 // These are the central functions establishing the various file access
 // rights.

@@ -26,9 +26,9 @@ rekursiven REs die kollidieren oder so *denk*
 
 ------------
 
-> Mhm, ich kenne die Perl REs zwar nicht so gut (willst du nur die 
-> Funktionalitaet in efuns verpackt, oder auch Sprachaenderungen); aber gerade 
-> gestern habe ich die PCRE ("Perl Compatible Regular Expressions") Library 
+> Mhm, ich kenne die Perl REs zwar nicht so gut (willst du nur die
+> Funktionalitaet in efuns verpackt, oder auch Sprachaenderungen); aber gerade
+> gestern habe ich die PCRE ("Perl Compatible Regular Expressions") Library
 > gefunden, was eine zukuenftige Implementierung erheblich vereinfacht.
 
 Aehm, ich wollte nur dass man bei den vorhandenen efuns auch
@@ -318,7 +318,7 @@ wuerde das sehr 'elegant' loesen. Zur Zeit ist unser Konstrukt dort
 eher unuebersichtlich:
 
 mix = regexplode(mix, "[^ -~]");
-for (i = sizeof(mix)-2; i>0; i-=2) 
+for (i = sizeof(mix)-2; i>0; i-=2)
   mix[i] = sprintf("\\%03d", mix[i][0]);
 mix = implode(mix, "");
 
@@ -427,7 +427,7 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 *** 2614,2620 ****
 --- 2614,2626 ----
    */
-  
+
   {
 + #ifndef USE_PCRE
       struct regexp *reg;        /* compiled regexp */
@@ -443,7 +443,7 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 *** 2625,2633 ****
 --- 2631,2643 ----
           return allocate_array(0);
-  
+
       /* Compile the regexp (or take it from the cache) */
 + #ifndef USE_PCRE
       reg = REGCOMP((unsigned char *)pattern, 0, MY_FALSE);
@@ -452,7 +452,7 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 + #else
 +     reg = pcregex_cache(pattern, 0);
 + #endif
-  
+
       /* Check every string in <v> if it matches and set res[]
        * accordingly.
 ***************
@@ -472,7 +472,7 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 ***************
 *** 2651,2658 ****
 --- 2665,2685 ----
-  
+
           eval_cost++;
           line = v->item[i].u.string;
 + #ifndef USE_PCRE
@@ -481,7 +481,7 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 + #else
 +         found = pcre_exec(reg->pProg, reg->pHints, line, strlen(line),
 +             0, 0, ergs, OVEC_LEN);
-+ 
++
 +         if (found == PCRE_ERROR_NOMATCH) continue;
 +         if (found <= 0) {
 +             pcregex_free(reg);
@@ -490,7 +490,7 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 +             return NULL;
 +         }
 + #endif
-  
+
           res[i] = MY_TRUE;
           num_match++;
 ***************
@@ -498,19 +498,19 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 --- 2694,2704 ----
           num_match++;
       }
-  
+
 + #ifndef USE_PCRE
       REGFREE(reg);
 + #else
 +     pcregex_free(reg);
 + #endif
-  
+
       return ret;
   }
 ***************
 *** 2823,2829 ****
 --- 2854,2867 ----
-  
+
       char *text;                        /* Input text from the vm stack */
       char *pattern;                     /* Delimiter pattern from the vm stack */
 + #ifndef USE_PCRE
@@ -528,7 +528,7 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 *** 2841,2853 ****
       text = sp[-1].u.string;
       pattern = sp->u.string;
-  
+
       reg = REGCOMP((unsigned char *)pattern, 0, MY_FALSE);
 !     if (reg == 0) {
           inter_sp = sp;
@@ -536,13 +536,13 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
           /* NOTREACHED */
           return NULL;
       }
-  
+
       /* Loop over <text>, repeatedly matching it against the pattern,
        * until all matches have been found and recorded.
 --- 2879,2895 ----
       text = sp[-1].u.string;
       pattern = sp->u.string;
-  
+
 + #ifndef USE_PCRE
       reg = REGCOMP((unsigned char *)pattern, 0, MY_FALSE);
 !     if (reg == NULL) {
@@ -554,7 +554,7 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 + #else
 +     reg = pcregex_cache(pattern, 0);
 + #endif
-  
+
       /* Loop over <text>, repeatedly matching it against the pattern,
        * until all matches have been found and recorded.
 ***************
@@ -604,7 +604,7 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 ***************
 *** 2876,2882 ****
 --- 2942,2952 ----
-  
+
       /* Prepare the result vector */
       if (max_array_size && num_match > ((max_array_size-1) >> 1) ) {
 + #ifndef USE_PCRE
@@ -619,7 +619,7 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 *** 2915,2921 ****
 --- 2985,2995 ----
       put_malloced_string(svp, string_copy(text));
-  
+
       /* Cleanup */
 + #ifndef USE_PCRE
       REGFREE(reg);
@@ -635,13 +635,13 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
       put_array(sp, ret);
       return sp;
   }
-+ 
++
 + /*-------------------------------------------------------------------------*/
-+ 
++
 + #ifdef USE_PCRE
 + svalue_t *
 + f_regmatch (svalue_t *sp)
-+ 
++
 + /* TEFUN regmatch()
 +  *
 +  *   mixed* regmatch (string text, string pattern, int opt)
@@ -657,39 +657,39 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 +  *
 +  * TODO: eval costs?!
 +  */
-+ 
++
 + {
-+ 
++
 +     char* text;
 +     char* pattern;
 +     int opt;
-+ 
++
 +     pcregex* regex;
 +     int ergs[OVEC_LEN];
 +     int found;
-+ 
++
 +     vector_t* matches;
 +     svalue_t* svp;
 +     int i, len;
 +     const char* match;
-+ 
++
 +     /* Get the efun arguments */
 +     if (sp[-2].type != T_STRING) bad_xefun_arg(1, sp);
 +     if (sp[-1].type != T_STRING) bad_xefun_arg(2, sp);
 +     if (sp[ 0].type != T_NUMBER) bad_xefun_arg(3, sp);
-+ 
++
 +     text    = sp[-2].u.string;
 +     pattern = sp[-1].u.string;
 +     opt     = sp[ 0].u.number;
-+ 
++
 +     /* compile the regex */
 +     regex = pcregex_cache(pattern, opt);
-+ 
++
 +     /* use the regex */
 +     /* TODO: support for pcre-options? */
 +     found = pcre_exec(regex->pProg, regex->pHints, text, strlen(text),
 +                                   0, 0, ergs, OVEC_LEN);
-+ 
++
 +     /* no match */
 +     if (found == PCRE_ERROR_NOMATCH) {
 +         pcregex_free(regex);
@@ -699,7 +699,7 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 +         put_number(sp, 0);
 +         return sp;
 +     }
-+ 
++
 +     /* error occured */
 +     if (found <= 0) {
 +         inter_sp = sp;
@@ -708,7 +708,7 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 +         /* NOTREACHED */
 +         return NULL;
 +     }
-+ 
++
 +     /* create result array */
 +     if (max_array_size && found > (max_array_size-1)) {
 +         pcregex_free(regex);
@@ -719,10 +719,10 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 +     }
 +     matches = allocate_array(found);
 +     svp = matches->item;
-+ 
++
 +     /* put resulting strings in that array */
 +     for (i = 0; i < found; i++) {
-+ 
++
 +         if (ergs[(2*i)+1] == -1) {
 +             /* no match stored in this subpattern */
 +             put_number(svp, 0);
@@ -738,25 +738,25 @@ diff -c /mud/src/driver/3-2-dev/src/array.c ./array.c
 +                 /* NOTREACHED */
 +                 return NULL;
 +             }
-+ 
++
 +             /* memory of match was allocated via pcre_malloc == xalloc
 +              * should it be string_copy()ed?                             */
 +             put_malloced_string(svp, (char*)match);
 +         }
-+ 
++
 +         svp++;
 +     }
-+ 
++
 +     pcregex_free(regex);
 +     free_svalue(sp--);
 +     free_string_svalue(sp--);
 +     free_string_svalue(sp);
-+ 
++
 +     put_array(sp, matches);
 +     return sp;
 + }
 + #endif /* USE_PCRE */
-  
+
   /*-------------------------------------------------------------------------*/
   svalue_t *
 diff -c /mud/src/driver/3-2-dev/src/func_spec ./func_spec
@@ -771,7 +771,7 @@ diff -c /mud/src/driver/3-2-dev/src/func_spec ./func_spec
 + mixed  *regmatch(string, string, int);
   string  trim(string, ...);
   string  upper_case(string);
-  
+
 diff -c /mud/src/driver/3-2-dev/src/lex.c ./lex.c
 *** /mud/src/driver/3-2-dev/src/lex.c	Sat Jul 14 05:49:25 2001
 --- ./lex.c	Thu Jul 26 19:02:32 2001
@@ -799,7 +799,7 @@ diff -c /mud/src/driver/3-2-dev/src/main.c ./main.c
 + #ifdef USE_PCRE
 +     pcre_init();
 + #endif
-  
+
       put_number(&const0, 0);
       put_number(&const1, 1);
 diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
@@ -808,17 +808,17 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
 ***************
 *** 54,59 ****
 --- 54,113 ----
-  
+
   #include "../mudlib/sys/debug_info.h"
-  
+
 + #ifdef USE_PCRE
 + /*--------------------------------------------------------------------
 +  * Wrapper functions for the pcre module following below:
 +  */
-+ 
++
 + static uint32 pcre_malloc_size;
 + static const char* pcre_malloc_err;
-+ 
++
 + /* malloc wrapper for pcre package
 +  */
 + void* pcre_wrapper_malloc(size_t size)  {
@@ -828,16 +828,16 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
 +     pcre_malloc_size += size;
 +     return x;
 + }
-+ 
++
 + void  pcre_wrapper_free(void *ptr)      { return xfree(ptr); }
-+ 
++
 + /* Initialise the pcre memory management */
 + void pcre_init(void)
 + {
 +     pcre_malloc = pcre_wrapper_malloc;
 +     pcre_free   = pcre_wrapper_free;
 + }
-+ 
++
 + /* generate apropriate error message for pcre_exec() calls */
 + const char* pcre_error_message(int found)
 + {
@@ -861,21 +861,21 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
 +     }
 +     return text;
 + }
-+ 
++
 + #endif /* USE_PCRE */
 + /*--------------------------------------------------------------------*/
-+ 
++
   #ifdef RXCACHE_TABLE
-  
+
   /*--------------------------------------------------------------------*/
 ***************
 *** 66,84 ****
   #define RxStrHash(s) ((s) % RXCACHE_TABLE)
   #endif
-  
-- 
+
+-
 - /* One expression hashtable entry */
-- 
+-
 - typedef struct RxHashEntry {
 -     unsigned char * pString;  /* Generator string, a shared string
 -                                * NULL if unused */
@@ -884,18 +884,18 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
 -     Bool     excompat; /* The excompat value */
 -     regexp * pRegexp;  /* The generated regular expression from regcomp() */
 - } RxHashEntry;
-- 
-- 
+-
+-
   /* Variables */
   static RxHashEntry xtable[RXCACHE_TABLE];  /* The Expression Hashtable */
-  
+
 --- 120,125 ----
 ***************
 *** 98,103 ****
 --- 139,260 ----
       memset(xtable, 0, sizeof(xtable));
   }
-  
+
 + #ifdef USE_PCRE
 + pcregex* pcregex_cache(const char* expr, int opt)
 + {
@@ -904,12 +904,12 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
 +     RxHashEntry *pHash;
 +     const char* pErrmsg;
 +     int erridx;
-+ 
++
 +     iNumXRequests++;
-+ 
++
 +     hExpr = whashstr((char *)expr, 50);
 +     pHash = xtable+RxStrHash(hExpr);
-+ 
++
 +     /* Look for a ready-compiled regexp */
 +     if (pHash->pString  != NULL
 +      && pHash->hString  == hExpr
@@ -920,44 +920,44 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
 +         iNumXFound++;
 +         return pcregex_dup(pHash->pRegex.pc_re);
 +     }
-+ 
++
 +     /* Regexp not found: compile a new one and enter it
 +      * into the table.
 +      */
-+ 
++
 +     xallocate(pRegexp, sizeof(pcregex), "rxcache entry");
-+ 
++
 +     pcre_malloc_size = 0;
 +     pcre_malloc_err  = "compiling regex";
 +     pRegexp->pProg  = pcre_compile(expr, opt, &pErrmsg, &erridx, NULL);
-+ 
++
 +     if (NULL == pRegexp->pProg) {
 +         xfree(pRegexp);
 +         error("pcre: %s at offset %d\n", pErrmsg, erridx);
 +         /* NOTREACHED */
 +         return NULL;
 +     }
-+ 
++
 +     pcre_malloc_err  = "studying regex";
 +     pRegexp->pHints = pcre_study(pRegexp->pProg, 0, &pErrmsg);
-+ 
++
 +     if (pErrmsg) {
 +         xfree(pRegexp);
 +         error("pcre: %s\n", pErrmsg);
 +         /* NOTREACHED */
 +         return NULL;
 +     }
-+ 
++
 +     pRegexp->regalloc = pcre_malloc_size + sizeof(pRegexp);
 +     pRegexp->refs     = 1;
-+ 
++
 +     expr = (unsigned char *)make_shared_string((char *)expr);
-+ 
++
 +     if (NULL != pHash->pString)
 +     {
 +         iNumXCollisions++;
 +         free_string((char *)pHash->pString);
-+ 
++
 +         if (pHash->pc) pcregex_free(pHash->pRegex.pc_re);
 +         else           rx_free(pHash->pRegex.ed_re);
 +     }
@@ -967,58 +967,58 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
 +     pHash->from_ed      = 0; /* not used */
 +     pHash->excompat     = 0; /* not used */
 +     pHash->pc           = 1;
-+ 
++
 +     iNumXEntries++;
 +     iXSizeAlloc += pRegexp->regalloc;
-+ 
++
 +     return pcregex_dup(pRegexp);
 + } /* pcregex_cache */
-+ 
++
 + /*--------------------------------------------------------------------*/
-+ 
++
 + pcregex *
 + pcregex_dup (pcregex * expr)
-+ 
++
 + /* Increase the reference count of <expr> and return it.
 +  */
-+ 
++
 + {
 +     expr->refs++;
 +     return expr;
 + }
-+ 
++
 + /*--------------------------------------------------------------------*/
-+ 
++
 + void
 + pcregex_free (pcregex * expr)
-+ 
++
 + /* Decrease the reference count of <expr>. If it reaches 0, the
 +  * structure and all associated data is deallocated.
 +  */
-+ 
++
 + {
 +     expr->refs--;
 +     if (expr->refs) return;
-+ 
++
 +     iNumXEntries--;
 +     iXSizeAlloc -= expr->regalloc;
 +     if (expr->pHints) xfree(expr->pHints);
 +     xfree(expr->pProg);
 +     xfree(expr);
 + }
-+ 
++
 + /*--------------------------------------------------------------------*/
-+ 
-+ 
++
++
 + #endif /* USE_PCRE */
-+ 
++
   /*--------------------------------------------------------------------*/
   regexp *
   regcomp_cache(unsigned char * expr, Bool excompat, Bool from_ed)
 ***************
 *** 123,137 ****
       pHash = xtable+RxStrHash(hExpr);
-  
+
       /* Look for a ready-compiled regexp */
 !     if (pHash->pString != NULL
 !      && pHash->hString == hExpr
@@ -1030,11 +1030,11 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
           iNumXFound++;
 !         return rx_dup(pHash->pRegexp);
       }
-  
+
       /* Regexp not found: compile a new one and enter it
 --- 280,295 ----
       pHash = xtable+RxStrHash(hExpr);
-  
+
       /* Look for a ready-compiled regexp */
 !     if (pHash->pString  != NULL
 !      && pHash->hString  == hExpr
@@ -1047,7 +1047,7 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
           iNumXFound++;
 !         return rx_dup(pHash->pRegex.ed_re);
       }
-  
+
       /* Regexp not found: compile a new one and enter it
 ***************
 *** 147,162 ****
@@ -1055,7 +1055,7 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
           iNumXCollisions++;
           iNumXEntries--;
 -         iXSizeAlloc -= pHash->pRegexp->regalloc;
-  
+
           free_string((char *)pHash->pString);
 !         rx_free(pHash->pRegexp);
       }
@@ -1064,14 +1064,14 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
 !     pHash->pRegexp = pRegexp;
 !     pHash->from_ed = from_ed;
 !     pHash->excompat = excompat;
-  
+
       iNumXEntries++;
       iXSizeAlloc += pRegexp->regalloc;
 --- 305,321 ----
       {
           iNumXCollisions++;
           iNumXEntries--;
-  
+
           free_string((char *)pHash->pString);
 !         if (pHash->pc) pcregex_free(pHash->pRegex.pc_re);
 !         else           rx_free(pHash->pRegex.ed_re);
@@ -1082,42 +1082,42 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
 !     pHash->from_ed      = from_ed;
 !     pHash->excompat     = excompat;
 !     pHash->pc           = 0;
-  
+
       iNumXEntries++;
       iXSizeAlloc += pRegexp->regalloc;
 ***************
 *** 255,262 ****
-  
+
   {
       expr->refs--;
 !     if (!expr->refs)
 !         xfree(expr);
   }
-  
+
   /*--------------------------------------------------------------------*/
 --- 414,424 ----
-  
+
   {
       expr->refs--;
 !     if (expr->refs) return;
-! 
+!
 !     iNumXEntries--;
 !     iXSizeAlloc -= expr->regalloc;
 !     xfree(expr);
   }
-  
+
   /*--------------------------------------------------------------------*/
 ***************
 *** 276,282 ****
-  
+
       for (i = 0; i < RXCACHE_TABLE; i++)
           if (NULL != xtable[i].pString)
 !             xtable[i].pRegexp->refs = 0;
   } /* clear_rxcache_refs() */
-  
+
   /*--------------------------------------------------------------------*/
 --- 438,447 ----
-  
+
       for (i = 0; i < RXCACHE_TABLE; i++)
           if (NULL != xtable[i].pString)
 !         {
@@ -1125,7 +1125,7 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
 !             else              xtable[i].pRegex.pc_re->refs = 0;
 !         }
   } /* clear_rxcache_refs() */
-  
+
   /*--------------------------------------------------------------------*/
 ***************
 *** 293,299 ****
@@ -1135,7 +1135,7 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
 !             count_rxcache_ref(xtable[i].pRegexp);
           }
       } /* for (i) */
-  
+
 --- 458,475 ----
           if (NULL != xtable[i].pString)
           {
@@ -1154,101 +1154,101 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.c ./rxcache.c
 !             }
           }
       } /* for (i) */
-  
+
 ***************
 *** 305,311 ****
-  
+
   /* Mark all memory associated with one regexp structure and count
    * the refs.
 !  * This function is called both from rxcache as well as from ed.
    */
-  
+
   {
 --- 481,487 ----
-  
+
   /* Mark all memory associated with one regexp structure and count
    * the refs.
 !  * This function is called from ed.
    */
-  
+
   {
 ***************
 *** 313,321 ****
       pRegexp->refs++;
   } /* count_rxcache_ref() */
-  
+
   #endif /* if GC_SUPPORT */
-  
+
 ! #endif /* if RXCACHE_TABLE */
-  
+
   /*====================================================================*/
-  
+
 --- 489,555 ----
       pRegexp->refs++;
   } /* count_rxcache_ref() */
-  
+
 + /*--------------------------------------------------------------------*/
   #endif /* if GC_SUPPORT */
-  
+
 ! #else /* RXCACHE_TABLE undef'd*/
-! 
+!
 ! /*--------------------------------------------------------------------*/
 ! /* Wrapper to use PCRE without cache */
-! 
+!
 ! #ifdef USE_PCRE
 ! pcregex* pcregex_cache(const char* expr, int opt)
 ! {
 !     pcregex *pRegexp;
 !     const char* pErrmsg;
 !     int erridx;
-! 
+!
 !     xallocate(pRegexp, sizeof(pcregex), "rxcache entry");
-! 
+!
 !     pcre_malloc_size = 0;
 !     pcre_malloc_err  = "compiling regex";
 !     pRegexp->pProg  = pcre_compile(expr, opt, &pErrmsg, &erridx, NULL);
-! 
+!
 !     if (NULL == pRegexp->pProg) {
 !         xfree(pRegexp);
 !         error("pcre: %s at offset %d\n", pErrmsg, erridx);
 !         /* NOTREACHED */
 !         return NULL;
 !     }
-! 
+!
 !     pcre_malloc_err  = "studying regex";
 !     pRegexp->pHints = pcre_study(pRegexp->pProg, 0, &pErrmsg);
-! 
+!
 !     if (pErrmsg) {
 !         xfree(pRegexp);
 !         error("pcre: %s\n", pErrmsg);
 !         /* NOTREACHED */
 !         return NULL;
 !     }
-! 
+!
 !     pRegexp->regalloc = pcre_malloc_size + sizeof(pRegexp);
 !     pRegexp->refs     = 1;
-! 
+!
 !     expr = (unsigned char *)make_shared_string((char *)expr);
-! 
+!
 !     return pRegexp;
 ! }
-! 
+!
 ! /*--------------------------------------------------------------------*/
-! 
+!
 ! void
 ! pcregex_free (pcregex * expr)
-! 
+!
 ! /* Deallocate structure and all associated data
 !  */
-! 
+!
 ! {
 !     if (expr->pHints) xfree(expr->pHints);
 !     xfree(expr->pProg);
 !     xfree(expr);
 ! }
-  
+
   /*====================================================================*/
-  
+
 + #endif /* USE_PCRE */
 + #endif /* RXCACHE_TABLE undef'd */
 diff -c /mud/src/driver/3-2-dev/src/rxcache.h ./rxcache.h
@@ -1257,29 +1257,29 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.h ./rxcache.h
 ***************
 *** 5,10 ****
 --- 5,50 ----
-  
+
   #include "regexp.h"
   #include "strfuns.h"
 + #include "pcre-3.4/pcre.h"
-+ 
++
 + /* --- struct pcregex: regular expression basis ---
 +  *
 +  * This structure is used to hold a compiled regular expression as well
 +  * as caching and refcounting data analog struct regexp
 +  */
-+ 
++
 + typedef struct pcregex {
 +     pcre*         pProg;     /* The generated regular expression */
 +     pcre_extra*   pHints;    /* Study data */
 +     long          regalloc;  /* Allocated total length, used by rxcache */
 +     p_uint        refs;      /* Number of refs, used+maintained by rxcache */
 + } pcregex;
-+ 
++
 + /* --- struct RxHashEntry: One expression hashtable entry ---
 +  *
 +  * The rxcache table consists of this entries
 +  */
-+ 
++
 + typedef struct RxHashEntry {
 +     unsigned char * pString;    /* Generator string, a shared string
 +                                  * NULL if unused */
@@ -1292,7 +1292,7 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.h ./rxcache.h
 +         pcregex*    pc_re;      /* perl style regex program */
 +     } pRegex;
 + } RxHashEntry;
-+ 
++
 + #ifdef USE_PCRE
 + #define OVEC_LEN 300            /* is maximum, means 99 parentheses */
 + extern void pcregex_free (pcregex *);
@@ -1300,8 +1300,8 @@ diff -c /mud/src/driver/3-2-dev/src/rxcache.h ./rxcache.h
 + pcregex* pcregex_cache(const char* expr, int opt);
 + const char* pcre_error_message(int);
 + #endif USE_PCRE
-  
+
   #ifdef RXCACHE_TABLE
-  
+
 --311121419-828061240-996183711=:22388--
 

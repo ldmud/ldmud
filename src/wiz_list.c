@@ -27,6 +27,9 @@
  *      size_t length;
  *      int32  score;
  *      int32  cost;
+ *      int32  gigacost;
+ *      int32  total_cost;
+ *      int32  total_gigacost;
  *      int32  heart_beats;
  *      mp_int size_array;
  *      mp_int mapping_total;
@@ -42,12 +45,14 @@
  * length of the string. .next is the pointer to the next entry in
  * the wizlist.
  *
- * .score, .cost, .heart_beats, .size_array and .mapping_total collect
- * statistics about the objects for this uid/wizard. .score is the
- * number of action functions executed, .cost the eval ticks spent,
- * .heart_beats the number of heart_beat() calls. .size_array and
- * .mapping_total give the number of values held in arrays and mappings
- * for this wizard.
+ * .score, .(total_)cost+.(total_)gigacost, .heart_beats, .size_array and
+ * .mapping_total collect statistics about the objects for this uid/wizard.
+ * .score is the number of action functions executed (weighted over time),
+ * .cost+.gigacost the eval ticks spent (weighted over time),
+ * .total_cost+.total_gigacost the eval ticks spent (total), .heart_beats the
+ * number of heart_beat() calls (weighted over time).  .size_array and
+ * .mapping_total give the number of values held in arrays and mappings for
+ * this wizard.
  *
  * .extra offer space for one svalue which can be used by the mudlib
  * for its own purposes. The driver can be instructed to fill the .extra
@@ -115,6 +120,9 @@ wiz_list_t default_wizlist_entry
     , 0             /* length */
     , 0             /* score */
     , 0             /* cost */
+    , 0             /* gigacost */
+    , 0             /* total_cost */
+    , 0             /* total_gigacost */
     , 0             /* heart_beats */
     , 0             /* size_array */
     , 0             /* mapping_total */
@@ -216,14 +224,17 @@ add_name (char * str)
 
     str = make_shared_string(str);
 
-    wl->next          = NULL;
-    wl->name          = str;
-    wl->length        = strlen(str);
-    wl->score         = 0;
-    wl->cost          = 0;
-    wl->heart_beats   = 0;
-    wl->size_array    = 0;
-    wl->mapping_total = 0;
+    wl->next           = NULL;
+    wl->name           = str;
+    wl->length         = strlen(str);
+    wl->score          = 0;
+    wl->cost           = 0;
+    wl->gigacost       = 0;
+    wl->total_cost     = 0;
+    wl->total_gigacost = 0;
+    wl->heart_beats    = 0;
+    wl->size_array     = 0;
+    wl->mapping_total  = 0;
 #if 0
     wl->quota_allowance = 0;
     wl->quota_usage   = 0;
@@ -279,7 +290,8 @@ wiz_decay (void)
     for (wl = all_wiz; wl; wl = wl->next)
     {
         wl->score = wl->score * 99 / 100;
-        wl->cost = wl->cost * .9;  /* integer is prone to overflow */
+        wl->cost = wl->cost * .9;
+        wl->gigacost = wl->gigacost * .9;
         wl->heart_beats = wl->heart_beats * 9 / 10;
     }
 
@@ -460,10 +472,12 @@ f_wizlist_info (svalue_t *sp)
  * Every entry is an array itself:
  *
  *   string w[WL_NAME]        = Name of the wizard.
- *   int    w[WL_COMMANDS]    = Number of commands execute by objects
+ *   int    w[WL_COMMANDS]    = Weighted number of commands execute by objects
  *                              of this wizard.
- *   int    w[WL_EVAL_COST]   = Total sum of eval_costs.
- *   int    w[WL_HEART_BEATS] = Total count of heart_beats.
+ *   int    w[WL_COST] and  w[WL_GIGACOST] = Weighted sum of eval_costs.
+ *   int    w[WL_TOTAL_COST] and  w[WL_TOTAL_GIGACOST] = Total sum of
+ *                              eval_costs.
+ *   int    w[WL_HEART_BEATS] = Weighted count of heart_beats.
  *   int    w[WL_CALL_OUT]    = Reserved for call_out() (unused yet).
  *   int    w[WL_ARRAY_TOTAL] = Total size of arrays in elements.
  *   mixed  w[WL_EXTRA]       = Extra wizlist-info if set.
@@ -474,7 +488,7 @@ f_wizlist_info (svalue_t *sp)
     svalue_t *wsvp, *svp;
     wiz_list_t *w;
 
-    if (!_privilege_violation("wizlist_info", &const0, sp))
+    if (!privilege_violation3("wizlist_info", &const0, sp))
     {
         all = allocate_array(0);
     }
@@ -490,7 +504,10 @@ f_wizlist_info (svalue_t *sp)
             svp = entry->item;
             put_ref_string(&(svp[WL_NAME]), w->name);
             put_number(&(svp[WL_COMMANDS]), w->score);
-            put_number(&(svp[WL_EVAL_COST]), w->cost);
+            put_number(&(svp[WL_COST]), w->cost);
+            put_number(&(svp[WL_GIGACOST]), w->gigacost);
+            put_number(&(svp[WL_TOTAL_COST]), w->total_cost);
+            put_number(&(svp[WL_TOTAL_GIGACOST]), w->total_gigacost);
             put_number(&(svp[WL_HEART_BEATS]), w->heart_beats);
             put_number(&(svp[WL_CALL_OUT]), 0); /* TODO: Implement me */
             put_number(&(svp[WL_ARRAY_TOTAL]), w->size_array);
@@ -550,7 +567,7 @@ f_set_extra_wizinfo (svalue_t *sp)
             bad_xefun_arg(1, sp);
     }
 
-    if (!_privilege_violation("set_extra_wizinfo", sp-1, sp))
+    if (!privilege_violation3("set_extra_wizinfo", sp-1, sp))
         free_svalue(sp);
     else
         transfer_svalue(user ? &user->extra : &default_wizlist_entry.extra, sp);
@@ -599,7 +616,7 @@ f_get_extra_wizinfo (svalue_t *sp)
             bad_xefun_arg(1, sp);
     }
 
-    if (!_privilege_violation("get_extra_wizinfo", sp, sp))
+    if (!privilege_violation3("get_extra_wizinfo", sp, sp))
         bad_xefun_arg(1, sp);
 
     assign_svalue(sp, user ? &user->extra : &default_wizlist_entry.extra);
@@ -634,7 +651,7 @@ f_set_extra_wizinfo_size (svalue_t *sp)
     if (sp->type != T_NUMBER)
         bad_xefun_arg(1, sp);
 
-    if (!_privilege_violation("set_extra_wizinfo_size", &const0, sp))
+    if (!privilege_violation3("set_extra_wizinfo_size", &const0, sp))
         wiz_info_extra_size = sp->u.number;
 
     sp--;

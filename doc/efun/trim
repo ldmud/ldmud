@@ -1,6 +1,5 @@
 SYNOPSIS
-
-        #include <strings.h>
+        #include <sys/strings.h>
 
         string trim (string s)
         string trim (string s, int where)

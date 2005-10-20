@@ -91,6 +91,7 @@
 #include "interpret.h"
 #include "main.h"
 #include "mapping.h"
+#include "mempools.h"
 #include "object.h"
 #include "otable.h"
 #include "prolang.h"
@@ -301,6 +302,7 @@ mp_int total_prog_block_size;
 
 static varblock_t *swap_svalues(svalue_t *, mp_int, varblock_t *);
 static unsigned char *free_swapped_svalues(svalue_t *, mp_int, unsigned char *);
+static unsigned char * dump_swapped_values (mp_int num, unsigned char * p, int indent);
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -790,10 +792,8 @@ reallocate_block (unsigned char *p, mp_int rest, mp_int count)
 
     /* Allocate the new memory area and copy the data stored so far.
      */
-    if ( !(start2 = xalloc(size2 + sizeof(varblock_t))) )
+    if ( !(start2 = mb_realloc(mbSwap, size2 + sizeof(varblock_t))) )
         return NULL;
-    memcpy(start2, start1, size2 - rest);
-    xfree(start1);
 
     /* Set up the new varblock */
     tmp = (varblock_t *)(start2 + size2);
@@ -841,20 +841,24 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
  *    swtype, (ph_int)svp->x, string, \0
  *
  * POINTER:
- *    swtype, (size_t)size, (wiz_list_t*) user, values...
+ *    swtype, (size_t) swapsize, (size_t)size, (wiz_list_t*) user, values...
  *
  * QUOTED_ARRAY:
- *    swtype, (ph_int)quotes, (size_t)size, (wiz_list_t*) user, values...
+ *    swtype, (ph_int)quotes, (size_t) swapsize, (size_t)size, (wiz_list_t*) user, values...
  *
  * MAPPING:
- *    swtype, (p_int)width, (p_int)size, (wiz_list_t*) user, entries...
+ *    swtype, (size_t) swapsize, (p_int)width, (p_int)size, (wiz_list_t*) user, entries...
  *
  * Opaque, NUMBER, FLOAT, OBJECT, CLOSURE
  *    svp->type, svp->x, svp->u
  *
  * Opaque are: contents of alists, empty arrays, arrays or mappings with
  * more than one ref (this also protects against recursive data structures),
- * mappings with closure or object keys.
+ * and mappings with closure or object keys (see the comment in the T_MAPPING
+ * case for the reason).
+ *
+ * The 'swapsize' is the size of the data block starting from the first
+ * byte of the 'swapsize' value. This value is used for sanity checks.
  */
 
 {
@@ -862,6 +866,8 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
 
     unsigned char *p;
     mp_int rest;
+    size_t swapsize;  /* the swapsize value */
+    mp_int ss_loc;    /* the location of the swapsize entry */
 
 #   define CHECK_SPACE(count) \
         if (rest < (mp_int)(count)) { \
@@ -891,6 +897,23 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
         } \
         rest = tmp->rest; \
     }
+
+#    define INIT_SWAPSIZE() \
+        { \
+            varblock_t *ustmp; \
+            ustmp = (varblock_t *)(p + rest); \
+            ss_loc = p - (unsigned char *)ustmp->start; \
+        } \
+        swapsize = 0; \
+        ADD_TO_BLOCK(swapsize);
+
+#    define UPDATE_SWAPSIZE() \
+        { \
+            varblock_t *ustmp; \
+            ustmp = (varblock_t *)(p + rest); \
+            swapsize = (p - (unsigned char *)ustmp->start) - ss_loc; \
+        } \
+        memcpy(p - swapsize, &swapsize, sizeof(swapsize));
 
     p = block->current;
     rest = block->rest;
@@ -933,12 +956,14 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
             if (size > 1 && is_alist(svp->u.vec))
                 swapping_alist = MY_TRUE;
 
-            CHECK_SPACE(1 + sizeof(size) + sizeof(wiz_list_t *))
+            CHECK_SPACE(1 + sizeof(swapsize) + sizeof(size) + sizeof(wiz_list_t *))
             *p++ = T_POINTER | T_MOD_SWAPPED;
             rest--;
+            INIT_SWAPSIZE();
             ADD_TO_BLOCK(size)
             ADD_TO_BLOCK(svp->u.vec->user)
             SWAP_SVALUES(svp->u.vec->item, size)
+            UPDATE_SWAPSIZE();
             swapping_alist = MY_FALSE;
             break;
           }
@@ -952,16 +977,19 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
                 goto swap_opaque;
 
             CHECK_SPACE(
-              1 + sizeof svp->x.quotes +
+              1 + sizeof(swapsize) + sizeof svp->x.quotes +
               sizeof size + sizeof(wiz_list_t *)
             )
 
             *p++ = T_QUOTED_ARRAY | T_MOD_SWAPPED;
             rest--;
             ADD_TO_BLOCK(svp->x.quotes)
+            INIT_SWAPSIZE();
+              /* The odd order of swapsize makes the swap-in code simpler */
             ADD_TO_BLOCK(size)
             ADD_TO_BLOCK(svp->u.vec->user)
             SWAP_SVALUES(svp->u.vec->item, size)
+            UPDATE_SWAPSIZE();
             break;
           }
 
@@ -970,31 +998,29 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
             mapping_t *m = svp->u.map;
             p_int size, num_values, save;
             varblock_t *tmp;
-            svalue_t *svp2;
 
             if (m->ref > 1 || swapping_alist)
                 goto swap_opaque;
 
-            /* mappings with object or closure keys can get stale, which
-             * necessiates special treatment in garbage_collection(),
-             * which in turn is not prepared to face swapping.
+            /* Mappings with object or closure keys can get stale, which
+             * necessiates special treatment in garbage_collection().
+             * The GC however requires all such mappings to be resident,
+             * so they can't be swapped.
+             * This alleviates the swapper from the need to check the
+             * mapping for destructed object keys.
              */
-            svp2 = CM_MISC(m->condensed);
-            size = m->condensed->misc_size;
-            while ( (size -= sizeof(svalue_t)) >= 0)
-            {
-                if ((--svp2)->type == T_OBJECT || svp2->type == T_CLOSURE)
-                    goto swap_opaque;
-            }
+            if (mapping_references_objects(m))
+                goto swap_opaque;
 
             CHECK_SPACE(
-              1 + sizeof num_values + sizeof size + sizeof m->user
+              1 + sizeof(swapsize) + sizeof num_values + sizeof size + sizeof m->user
             )
 
             *p++ = T_MAPPING | T_MOD_SWAPPED;
             rest--;
-            /* num_values might be wider than m->num_values. */
+            INIT_SWAPSIZE();
             num_values = m->num_values;
+              /* The type of num_values might be wider than m->num_values. */
             ADD_TO_BLOCK(num_values);
             size = MAP_SIZE(m);
             ADD_TO_BLOCK(size);
@@ -1012,6 +1038,7 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
                 return tmp;
             }
             rest = tmp->rest;
+            UPDATE_SWAPSIZE();
             break;
           }
 
@@ -1031,7 +1058,7 @@ swap_opaque:
         default:
            fatal("bad type %d in swap_svalues()\n", svp->type);
         }
-    }
+    } /* for() */
 
     /* All saved - construct the varblock to return */
     {
@@ -1046,8 +1073,271 @@ swap_opaque:
 #   undef SWAP_SVALUES
 #   undef ADD_TO_BLOCK
 #   undef CHECK_SPACE
+#   undef INIT_SWAPSIZE
+#   undef UPDATE_SWAPSIZE
 
 } /* swap_svalues() */
+
+/*-------------------------------------------------------------------------*/
+#if 0
+static unsigned char *
+check_swapped_values (mp_int num, unsigned char * p)
+
+/* Check the content of the swap buffer starting at <p>, supposedly holding
+ * <num> svalues.
+ * Result is a pointer to the first byte after the data block, or NULL
+ * on an error.
+ */
+
+{
+    size_t          swapsize;
+    unsigned char * start;  /* Start value of <p> for swapsize checks */
+
+#   define GET_SWAPSIZE() \
+        start = p; \
+        memcpy(&swapsize, p, sizeof(swapsize)); \
+        p += sizeof(swapsize);
+
+#   define CHECK_SWAPSIZE() \
+        if (start + swapsize != p) \
+        { \
+            fprintf(stderr \
+                 , "--- Incorrect swapsize on check: expected %lu bytes, " \
+                   "read %lu (%p .. %p)\n" \
+                 , (unsigned long)swapsize \
+                 , (unsigned long)(p - start), start, p \
+                ); \
+            return NULL; \
+        }
+
+    /* For all values yadda yadda... */
+    while (--num >= 0)
+    {
+        svalue_t sv;
+
+        sv.type = *p & ~T_MOD_SWAPPED; /* get the original type */
+
+        switch(*p++)
+        {
+        case T_STRING | T_MOD_SWAPPED:
+        case T_SYMBOL | T_MOD_SWAPPED:
+          {
+            mp_int    len;
+
+            memcpy(&sv.x, p, sizeof sv.x);
+            p += sizeof sv.x;
+            memcpy(&len, p, sizeof len);
+            p += sizeof len;
+            p += len;
+            break;
+          }
+
+        case T_QUOTED_ARRAY | T_MOD_SWAPPED:
+            memcpy(&sv.x, p, sizeof sv.x);
+            p += sizeof sv.x;
+            /* FALLTHROUGH */
+
+        case T_POINTER | T_MOD_SWAPPED:
+          {
+            size_t size;
+            wiz_list_t *user;
+
+            GET_SWAPSIZE();
+            memcpy(&size, p, sizeof size);
+            p += sizeof size;
+            memcpy(&user, p, sizeof user);
+            p += sizeof user;
+            p = check_swapped_values(size, p);
+            if (!p)
+                return NULL;
+            CHECK_SWAPSIZE();
+            break;
+          }
+
+        case T_MAPPING | T_MOD_SWAPPED:
+          {
+            p_int num_values;
+            wiz_list_t *user;
+            p_int num_keys;
+
+            GET_SWAPSIZE();
+            memcpy(&num_values, p, sizeof num_values);
+            p += sizeof num_values;
+            memcpy(&num_keys, p, sizeof num_keys);
+            p += sizeof num_keys;
+            memcpy(&user, p, sizeof user);
+            p += sizeof user;
+            p = check_swapped_values(num_keys*(1+num_values), p);
+            if (!p)
+                return NULL;
+            CHECK_SWAPSIZE();
+            break;
+          }
+
+        case T_STRING:
+        case T_SYMBOL:
+        case T_POINTER:
+        case T_QUOTED_ARRAY:
+        case T_MAPPING:
+        case T_NUMBER:
+        case T_FLOAT:
+        case T_OBJECT:
+        case T_CLOSURE:
+            p += sizeof sv.x;
+            p += sizeof sv.u;
+            break;
+
+        default:
+            return NULL;
+        }
+    } /* for() */
+
+    return p;
+
+#   undef GET_SWAPSIZE
+#   undef CHECK_SWAPSIZE
+} /* check_swapped_values() */
+
+#endif
+
+/*-------------------------------------------------------------------------*/
+static unsigned char *
+dump_swapped_values (mp_int num, unsigned char * p, int indent)
+
+/* Dump the content of the swap buffer starting at <p>, supposedly holding
+ * <num> svalues, to stderr.
+ * Result is a pointer to the first byte after the data block, or NULL
+ * on an irrecoverable error.
+ *
+ * This function is called when free_swapped_values() or
+ * read_unswapped_values() detect an inconsistency.
+ */
+
+{
+    mp_int          max_num = num;
+    unsigned char * block = p;
+
+    size_t          swapsize;
+    unsigned char * start;  /* Start value of <p> for swapsize checks */
+
+#   define GET_SWAPSIZE() \
+        start = p; \
+        memcpy(&swapsize, p, sizeof(swapsize)); \
+        p += sizeof(swapsize);
+
+#   define CHECK_SWAPSIZE() \
+        if (start + swapsize != p) \
+        { \
+            fprintf(stderr \
+                 , "%.*s--- Incorrect swapsize: expected %lu bytes, " \
+                   "read %lu (%p .. %p)\n" \
+                 , indent, "               " \
+                 , (unsigned long)swapsize \
+                 , (unsigned long)(p - start), start, p \
+                ); \
+        }
+
+    /* For all values yadda yadda... */
+    while (--num >= 0)
+    {
+        svalue_t sv;
+
+        sv.type = *p & ~T_MOD_SWAPPED; /* get the original type */
+
+        fprintf(stderr, "%.*s%08lx (%6ld) [%3ld]: type %d"
+                      , indent, "                "
+                      , (unsigned long)p, (unsigned long)(p - block)
+                      , max_num  - num - 1
+                      , sv.type
+               );
+        switch(*p++)
+        {
+        case T_STRING | T_MOD_SWAPPED:
+        case T_SYMBOL | T_MOD_SWAPPED:
+          {
+            mp_int    len;
+
+            memcpy(&sv.x, p, sizeof sv.x);
+            p += sizeof sv.x;
+            memcpy(&len, p, sizeof len);
+            p += sizeof len;
+            fprintf(stderr, " string (%d) : '%.*s'\n"
+                          , (int)sv.x.generic, (int)len, p
+                   );
+            p += len;
+            break;
+          }
+
+        case T_QUOTED_ARRAY | T_MOD_SWAPPED:
+            memcpy(&sv.x, p, sizeof sv.x);
+            p += sizeof sv.x;
+            /* FALLTHROUGH */
+
+        case T_POINTER | T_MOD_SWAPPED:
+          {
+            size_t size;
+            wiz_list_t *user;
+
+            GET_SWAPSIZE();
+            memcpy(&size, p, sizeof size);
+            p += sizeof size;
+            memcpy(&user, p, sizeof user);
+            p += sizeof user;
+            fprintf(stderr, " array: %ld values\n", (long)size);
+            p = dump_swapped_values(size, p, indent+2);
+            if (!p)
+                return NULL;
+            CHECK_SWAPSIZE();
+            break;
+          }
+
+        case T_MAPPING | T_MOD_SWAPPED:
+          {
+            p_int num_values;
+            wiz_list_t *user;
+            p_int num_keys;
+
+            GET_SWAPSIZE();
+            memcpy(&num_values, p, sizeof num_values);
+            p += sizeof num_values;
+            memcpy(&num_keys, p, sizeof num_keys);
+            p += sizeof num_keys;
+            memcpy(&user, p, sizeof user);
+            p += sizeof user;
+            fprintf(stderr, " mapping: %ld keys, %ld values\n"
+                          , (long)num_keys, (long)num_values);
+            p = dump_swapped_values(num_keys*(1+num_values), p, indent+2);
+            if (!p)
+                return NULL;
+            CHECK_SWAPSIZE();
+            break;
+          }
+
+        case T_STRING:
+        case T_SYMBOL:
+        case T_POINTER:
+        case T_QUOTED_ARRAY:
+        case T_MAPPING:
+        case T_NUMBER:
+        case T_FLOAT:
+        case T_OBJECT:
+        case T_CLOSURE:
+            p += sizeof sv.x;
+            p += sizeof sv.u;
+            fprintf(stderr, " opaque\n");
+            break;
+
+        default:
+            fprintf(stderr, " bad type\n");
+            return NULL;
+        }
+    } /* for() */
+
+    return p;
+
+#   undef GET_SWAPSIZE
+#   undef CHECK_SWAPSIZE
+} /* dump_swapped_values() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1089,14 +1379,35 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
  */
 
 {
+    mp_int          max_num = num;
+    unsigned char * block = p;
+
+    size_t          swapsize;
+    unsigned char * start;
+
+#   define GET_SWAPSIZE() \
+        start = p; \
+        memcpy(&swapsize, p, sizeof(swapsize)); \
+        p += sizeof(swapsize);
+
+#   define CHECK_SWAPSIZE() \
+        if (start + swapsize != p) \
+        { \
+            dump_swapped_values(max_num, block, 0); \
+            fatal("svalue type %d: expected %lu bytes, read %lu (%p .. %p)\n" \
+                 , (int)svp->type, (unsigned long)swapsize \
+                 , (unsigned long)(p - start), start, p \
+                ); \
+        }
+
     for (; --num >= 0; svp++)
     {
         switch(*p)
         {
         case T_STRING | T_MOD_SWAPPED:
-            if (svp->x.string_type == STRING_MALLOC)
+            if (svp->x.string_type != STRING_SHARED)
             {
-                if (!gc_status)
+                if (!gc_status && svp->x.string_type == STRING_MALLOC)
                     xfree(svp->u.string);
                 p = (unsigned char *)strchr(
                   (char *)p + 1 + sizeof svp->x, 0
@@ -1116,10 +1427,13 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             /* FALLTHROUGH */
 
         case T_POINTER | T_MOD_SWAPPED:
-            p += 1 + sizeof(size_t) + sizeof(wiz_list_t *);
+            p += 1;
+            GET_SWAPSIZE();
+            p += sizeof(size_t) + sizeof(wiz_list_t *);
             p =
               free_swapped_svalues(svp->u.vec->item, VEC_SIZE(svp->u.vec), p);
             free_empty_vector(svp->u.vec);
+            CHECK_SWAPSIZE();
             break;
 
         case T_MAPPING | T_MOD_SWAPPED:
@@ -1130,16 +1444,17 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
              */
             free_swapped_mapping_locals_t l;
 
-            p +=
-              1 +
-              sizeof(p_int) +
-              sizeof(p_int) +
-              sizeof(wiz_list_t *);
+            p += 1;
+            GET_SWAPSIZE();
+            p += sizeof(p_int) +
+                 sizeof(p_int) +
+                 sizeof(wiz_list_t *);
             l.num_values = svp->u.map->num_values;
             l.p = p;
             walk_mapping(svp->u.map, free_swapped_mapping_filter, &l);
             p = l.p;
             free_empty_mapping(svp->u.map);
+            CHECK_SWAPSIZE();
             break;
           }
 
@@ -1189,11 +1504,15 @@ advance:
             break;
 
         default:
+            dump_swapped_values(max_num, block, 0);
             fatal("bad type %d in free_swapped_svalues()\n", *p);
         }
     }
 
     return p;
+
+#   undef GET_SWAPSIZE
+#   undef CHECK_SWAPSIZE
 } /* free_swapped_svalues() */
 
 /*-------------------------------------------------------------------------*/
@@ -1250,7 +1569,7 @@ swap_variables (object_t *ob)
                 fatal("I/O error in swap.\n");
             }
         }
-        xfree(last_variable_block);
+        mb_free(mbSwap);
         xfree(ob->variables);
         ob->variables = (svalue_t *)(last_variable_swap_num | 1);
         ob->flags |= O_SWAPPED;
@@ -1285,7 +1604,7 @@ swap_variables (object_t *ob)
 
     /* Allocate the initial varblock and initialize it
      */
-    start = xalloc(VARBLOCK_STARTSIZE + sizeof(varblock_t));
+    start = mb_alloc(mbSwap, VARBLOCK_STARTSIZE + sizeof(varblock_t));
     if (!start)
         return MY_FALSE;
     block = (varblock_t *)(start + VARBLOCK_STARTSIZE);
@@ -1298,7 +1617,7 @@ swap_variables (object_t *ob)
     if (!block->current)
     {
         /* Oops */
-        xfree(block->start);
+        mb_free(mbSwap);
         return MY_FALSE;
     }
 
@@ -1311,7 +1630,7 @@ swap_variables (object_t *ob)
     swap_num = store_swap_block(block->start, total_size);
     if (swap_num  == -1)
     {
-        xfree(block->start);
+        mb_free(mbSwap);
         return MY_FALSE;
     }
 
@@ -1323,7 +1642,7 @@ swap_variables (object_t *ob)
 
     num_vb_swapped++;
     total_vb_bytes_swapped += total_size - sizeof total_size;
-    xfree(block->start);
+    mb_free(mbSwap);
     xfree(ob->variables);
     tot_alloc_object_size -= num_variables * sizeof (svalue_t);
 
@@ -1387,6 +1706,27 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
  */
 
 {
+    mp_int          max_num = num;
+    unsigned char * block = p;
+
+    size_t          swapsize;
+    unsigned char * start;  /* Start value of <p> for swapsize checks */
+
+#   define GET_SWAPSIZE() \
+        start = p; \
+        memcpy(&swapsize, p, sizeof(swapsize)); \
+        p += sizeof(swapsize);
+
+#   define CHECK_SWAPSIZE() \
+        if (start + swapsize != p) \
+        { \
+            dump_swapped_values(max_num, block, 0); \
+            fatal("svalue type %d: expected %lu bytes, read %lu (%p .. %p)\n" \
+                 , (int)svp->type, (unsigned long)swapsize \
+                 , (unsigned long)(p - start), start, p \
+                ); \
+        }
+
     /* For all values yadda yadda... */
     for (;--num >= 0; svp++)
     {
@@ -1408,9 +1748,11 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             else
             {
                 if (svp->type == T_STRING
-                 && svp->x.string_type == STRING_MALLOC)
+                 && svp->x.string_type != STRING_SHARED)
                 {
                     s = string_copy((char *)p);
+                    svp->x.string_type = STRING_MALLOC;
+                      /* Might have been STRING_VOLATILE */
                 }
                 else
                 {
@@ -1440,6 +1782,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             wiz_list_t *user;
             vector_t *v;
 
+            GET_SWAPSIZE();
             memcpy(&size, p, sizeof size);
             p += sizeof size;
             memcpy(&user, p, sizeof user);
@@ -1458,6 +1801,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
                 clear_svalues(svp + 1, num);
                 return NULL;
             }
+            CHECK_SWAPSIZE();
 #ifdef GC_SUPPORT
             if (gc_status == gcCountRefs)
             {
@@ -1478,6 +1822,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             wiz_list_t *user;
             p_int num_keys;
 
+            GET_SWAPSIZE();
             memcpy(&num_values, p, sizeof num_values);
             p += sizeof num_values;
             memcpy(&num_keys, p, sizeof num_keys);
@@ -1536,7 +1881,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
                 }
 #endif
             }
-            else
+            else /* !gcStatus */
             {
                 mp_int i;
                 wiz_list_t *save;
@@ -1565,13 +1910,14 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
                     p = read_unswapped_svalues(data, num_values, p);
                     if (!p)
                         break;
-                }
+                } /* for() */
                 if (!p)
                 {
                     clear_svalues(svp + 1, num);
                     return NULL;
                 }
             }
+            CHECK_SWAPSIZE();
             break;
           }
 
@@ -1591,11 +1937,15 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             break;
 
         default:
+            dump_swapped_values(max_num, block, 0);
             fatal("bad type %d in read_unswapped_svalues()\n", svp->type);
         }
     } /* for() */
 
     return p;
+
+#   undef GET_SWAPSIZE
+#   undef CHECK_SWAPSIZE
 } /* read_unswapped_svalues() */
 
 /*-------------------------------------------------------------------------*/
@@ -1730,7 +2080,8 @@ load_ob_from_swap (object_t *ob)
         size = total_size - sizeof total_size;
 
         /* Allocate the memory buffer */
-        if ( !(block = (unsigned char *)xalloc(size)) )
+        block = (unsigned char *) mb_alloc(mbSwap, size);
+        if ( !block)
             return result | -0x80;
 
         /* Allocate the variable space */
@@ -1738,7 +2089,7 @@ load_ob_from_swap (object_t *ob)
                 sizeof(svalue_t) * ob->prog->num_variables
         )) )
         {
-            xfree(block);
+            mb_free(mbSwap);
             return result | -0x80;
         }
 
@@ -1768,7 +2119,7 @@ load_ob_from_swap (object_t *ob)
             }
             else
             {
-                xfree(block);
+                mb_free(mbSwap);
                 swap_free(swap_num);
                 num_vb_swapped--;
                 total_vb_bytes_swapped -= total_size - sizeof total_size;
@@ -1777,7 +2128,7 @@ load_ob_from_swap (object_t *ob)
         else
         {
             /* Out of memory */
-            xfree(block);
+            mb_free(mbSwap);
             result |= -0x80;
         }
 

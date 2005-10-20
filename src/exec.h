@@ -320,6 +320,17 @@ struct instr_s
  *     Load the (unsigned) int16 'd' stored at <p>, the LOAD_ variant
  *     then increments <p>.
  *
+ *   void GET_LONG ([unsigned] long d, bytecode_p p)
+ *   void LOAD_LONG([unsigned] long d, bytecode_p p)
+ *     Load the (unsigned) long 'd' stored at <p>, the LOAD_ variant
+ *     then increments <p>.
+ *
+ *   void PUT_LONG (bytecode_p p, [unsigned] long d)
+ *   void STORE_LONG(bytecode_p p, [unsigned] long d)
+ *   void RSTORE_LONG(bytecode_p p, [unsigned] long d)
+ *     Store the (unsigned) long <d> into <p>, the STORE_ variant
+ *     then increments <p>. The RSTORE_ variant pre-decrements <p>.
+ *
  *   void LOAD_INT32([unsigned] int32 d, bytecode_p p)
  *     Load the (unsigned) in32 'd' stored at <p>, then increment <p>.
  */
@@ -414,7 +425,17 @@ typedef bytecode_t    * bytecode_p;
                                STORE_2BYTE(p,_us);)
 #define RSTORE_SHORT(p,d) MACRO(unsigned short _us = (unsigned short)d; \
                                RSTORE_2BYTE(p,_us);)
-  /* TODO: This assumes sizeof(short) == 2. */
+  /* TODO: The above assumes sizeof(short) == 2. */
+
+#define GET_LONG(d,p)    GET_4BYTE(d,p)
+#define LOAD_LONG(d,p)   LOAD_4BYTE(d,p)
+#define PUT_LONG(p,d)    MACRO(unsigned long _us = (unsigned long)d; \
+                                PUT_4BYTE(p,_us);)
+#define STORE_LONG(p,d)  MACRO(unsigned long _us = (unsigned long)d; \
+                               STORE_4BYTE(p,_us);)
+#define RSTORE_LONG(p,d) MACRO(unsigned long _us = (unsigned long)d; \
+                               RSTORE_4BYTE(p,_us);)
+  /* TODO: The above assumes sizeof(long) == 4. */
 
 #define LOAD_INT16(d,p) LOAD_2BYTE(d,p)
 #define LOAD_INT32(d,p) LOAD_2BYTE(d,p)

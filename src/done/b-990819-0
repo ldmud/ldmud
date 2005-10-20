@@ -43,7 +43,7 @@ b_ign_prot=0)
 #3  0x441a4 in sapply_int (fun=0x310e1a "Functions", ob=0x130400, num_arg=1,
 
     b_find_static=0) at interpret.c:18562
-#4  0x80168 in parse_command (buff=0xefffeef0 "Functions /obj/player tell", 
+#4  0x80168 in parse_command (buff=0xefffeef0 "Functions /obj/player tell",
     from_efun=0) at actions.c:796
 #5  0x804f8 in execute_command (str=0xefffeef0 "Functions /obj/player tell",
 

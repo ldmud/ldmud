@@ -36,19 +36,19 @@ if [ $((${version_minor} % 2)) -eq 0 ]; then
         #  --- Stable version ---
           setverflags="${setverflags} f"
           vstring="${version_major}.${version_minor}.${version_micro}"
-    fi 
+    fi
 
     if [ "${release_type}" = "pre" ]; then
         #  --- Pre-release version ---
           setverflags="${setverflags} d ${version_patch}"
           vstring="${version_major}.${version_minor}.${version_micro}-pre.${version_patch}"
-    fi 
+    fi
 
     if [ "${release_type}" = "dev" ]; then
         #  --- Current version ---
           setverflags="${setverflags} d ${version_patch}"
           vstring="${version_major}.${version_minor}.${version_micro}-dev.${version_patch}"
-    fi 
+    fi
 
 else
 

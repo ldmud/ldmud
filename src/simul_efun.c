@@ -172,10 +172,14 @@ invalidate_simul_efuns (void)
 
 /*-------------------------------------------------------------------------*/
 object_t *
-get_simul_efun_object (void)
+get_simul_efun_object (Bool require)
 
 /* (Re)load the simul_efun object and extract all information we need.
  * Result is a copy of the simul_efun_object pointer, or NULL on failure.
+ *
+ * If <require> is TRUE and the master lfun get_simul_efun() returns
+ * the name of an object, but this object doesn't exist, then the function
+ * terminates the driver.
  *
  * At the time of call, simul_efun_object must be NULL.
  */
@@ -230,7 +234,9 @@ get_simul_efun_object (void)
                , time_stamp(), simul_efun_file_name);
         fprintf(stderr, "%s The function get_simul_efun() in the master must load it.\n"
                , time_stamp());
-        exit(1); /* TODO: Use the proper constant here */
+        if (require)
+            exit(1);
+        return NULL;
     }
     if (O_PROG_SWAPPED(ob) && load_ob_from_swap(ob) < 0)
     {

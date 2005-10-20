@@ -36,14 +36,14 @@ small chunks:          2597          42570024 (d)
 small blocks:       1501736          41771632 (e)
 small free blocks:    33337            760520 (f)
 unused from current chunk                7172 (g)
-[Mateese:d-code] Hmm. Wenn ihr bei auch auf den Status schaut, habt 
+[Mateese:d-code] Hmm. Wenn ihr bei auch auf den Status schaut, habt
 ihr auch
    so irre hohe Werte unter 'Actions'?
    [Coogan@TubMud:d-code] nein ... Actions:           7433   178392
    [Freaky@UNItopia:d-code] Actions: 257878  6189072 (Gesamt: 86092935)
    [Mateese:d-code] Uptime?
    [Freaky@UNItopia:d-code] 10 Tage
-   [Mateese:d-code] Hmm, wenn es ein schleichendes Leck ist, faellt es 
+   [Mateese:d-code] Hmm, wenn es ein schleichendes Leck ist, faellt es
    nach nur
       10 Tagen wahrscheinlich noch nicht auf.
 

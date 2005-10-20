@@ -51,6 +51,9 @@ struct hash_mapping {
        * a lvalue.
        */
     mapping_t        *next_dirty;  /* Next dirty mapping in the list */
+    mp_int            last_used;
+      /* Time of the last change (add or delete) to the mapping.
+       */
     struct map_chain *chains[ 1 /* +.mask */ ];
       /* The hash chain heads ('hash buckets')
        */
@@ -131,6 +134,16 @@ struct condensed_mapping {
   /* Size of a map_chain structure for <n> values
    */
 
+#define MAP_CONDENSED_SIZE(m) (\
+        (m)->condensed \
+        ? ( (m)->condensed->string_size / sizeof(char *) \
+          + (m)->condensed->misc_size   / sizeof(svalue_t) ) \
+        : 0 \
+                              )
+  /* Size of the condensed portion of a given mapping <m>, including
+   * deleted entries.
+   */
+
 #define MAP_SIZE(m) (\
         (m)->condensed->string_size / sizeof(char *) + \
         (m)->condensed->misc_size   / sizeof(svalue_t) + \
@@ -174,13 +187,14 @@ extern svalue_t *_get_map_lvalue(mapping_t *m, svalue_t *map_index, Bool need_lv
 #define get_map_value(m,x) _get_map_lvalue(m,x,MY_FALSE, MY_TRUE)
 #define get_map_lvalue(m,x) _get_map_lvalue(m,x,MY_TRUE, MY_TRUE)
 #define get_map_lvalue_unchecked(m,x) _get_map_lvalue(m,x,MY_TRUE, MY_FALSE)
+extern Bool mapping_references_objects (mapping_t *m);
 extern void check_map_for_destr(mapping_t *m);
 extern void remove_mapping(mapping_t *m, svalue_t *map_index);
 extern mapping_t *copy_mapping(mapping_t *m);
 extern mapping_t *resize_mapping(mapping_t *m, mp_int new_width);
 extern mapping_t *add_mapping(mapping_t *m1, mapping_t *m2);
 extern void walk_mapping(mapping_t *m, void (*func)(svalue_t *key, svalue_t *val, void *extra), void *extra);
-extern void compact_mappings(mp_int num);
+extern void compact_mappings(mp_int num, Bool force);
 extern mp_int total_mapping_size(void);
 extern void set_mapping_user(mapping_t *m, object_t *owner);
 
@@ -188,12 +202,14 @@ extern vector_t *m_indices(mapping_t *m);
 extern void sub_from_mapping_filter(svalue_t *key, svalue_t *data, void *extra);
 extern void add_to_mapping(mapping_t *m1, mapping_t *m2);
 extern mapping_t *subtract_mapping(mapping_t *minuend, mapping_t *subtrahend);
+extern mapping_t *map_intersect(mapping_t *m, svalue_t * val);
 extern svalue_t *x_filter_mapping(svalue_t *sp, int num_arg, Bool bFull);
 extern svalue_t *f_filter_indices (svalue_t *sp, int num_arg);
 extern svalue_t *x_map_mapping(svalue_t *sp, int num_arg, Bool bFull);
 extern svalue_t *f_map_indices (svalue_t *sp, int num_arg);
 extern svalue_t *f_walk_mapping(svalue_t *sp, int num_arg);
 extern svalue_t *f_m_reallocate (svalue_t *sp);
+extern svalue_t * f_m_entry (svalue_t *sp);
 
 #ifdef DEBUG
 extern void check_dirty_mapping_list(void);

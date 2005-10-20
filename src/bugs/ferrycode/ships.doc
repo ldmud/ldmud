@@ -1,4 +1,4 @@
- 
+
 Ships:
 - Ship Inheritable
   - 3d Hull array, where things can go, cannot go, and are.
@@ -21,7 +21,7 @@ Ships:
     - Ship Mode - Full Sail / Battle Stations
     - # of Crew - Keep track of crew
 - Rooms:
-  - Cargo Hold 
+  - Cargo Hold
     - Storage area
     - Lockable room
     - Limit total # of items in hold
@@ -34,13 +34,13 @@ Ships:
   - Bridge
     - Control room
     - Signal to all on ship
-  - Crew Quarters 
+  - Crew Quarters
     - Check crew status (happy/mad/etc)
-    - Order around crew 
+    - Order around crew
   - Captain's Cabin
-    - Player emotes 
+    - Player emotes
     - Change Long Desc Capability
-  - Ship's Stores 
+  - Ship's Stores
     - Handle ship status
     - Correspond to crew quarters
 - Crew inheritable
@@ -50,7 +50,7 @@ Ships:
   - The method that controls a player's ownership of vehicles.
 - Ship Daemon:  (Hayden)
   - Controls the setup of ships as they are created.
-- Ship Docks:  
+- Ship Docks:
   - The stores where players will come to buy their ships and set them up.
   - This may include 'remodeling' of the interior, and repair to the ships.
 - Ship Inheritable:  (Hayden & Malachai)
@@ -61,4 +61,4 @@ Ships:
 - Documentaion:
   - Completely document the entire ship system, as its done.
   - So anyone can understand the code.
- 
+

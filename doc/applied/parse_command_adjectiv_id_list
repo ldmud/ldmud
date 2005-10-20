@@ -4,5 +4,10 @@ SYNOPSIS
 DESCRIPTION
         Used by parse_command().
 
+EXAMPLE
+        string * parse_command_adjectiv_id_list() {
+            return ({ "iffish" });
+        }
+
 SEE ALSO
         parse_command(E)

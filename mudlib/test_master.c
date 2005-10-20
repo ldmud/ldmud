@@ -36,29 +36,48 @@ int old_flag;
 
 void set_noecho(int flag)
 {
-  if (flag & ~old_flag & 1) {
-    write("sending IAC WILL ECHO\n");
-    binary_message(({ 0xff, 0xfb, 0x01 })); // IAC WILL ECHO
-  } else if (old_flag & ~flag & 1) {
-    write("sending IAC WONT ECHO\n");
-    binary_message(({ 0xff, 0xfc, 0x01 })); // IAC WONT ECHO
-  }
-  if (flag & ~old_flag & 2) {
-    write("sending IAC WILL+DO SGA\n");
-    binary_message(({ 0xff, 0xfb, 0x03 })); // IAC WILL SGA
-    binary_message(({ 0xff, 0xfd, 0x03 })); // IAC DO SGA
-  } else if (old_flag & ~flag & 2) {
-    write("sending IAC WONT+DONT SGA\n");
-    binary_message(({ 0xff, 0xfc, 0x03 })); // IAC WONT SGA
-    binary_message(({ 0xff, 0xfe, 0x03 })); // IAC DONT SGA
-  }
-  old_flag = flag;
-}
+    if (flag & ~old_flag & 1)
+    {
+        write("sending IAC WILL ECHO\n");
+        binary_message(({ 0xff, 0xfb, 0x01 })); // IAC WILL ECHO
+    }
+    else if (old_flag & ~flag & 1)
+    {
+        write("sending IAC WONT ECHO\n");
+        binary_message(({ 0xff, 0xfc, 0x01 })); // IAC WONT ECHO
+    }
+    if (flag & ~old_flag & 2)
+    {
+        write("sending IAC WILL+DO SGA\n");
+        binary_message(({ 0xff, 0xfb, 0x03 })); // IAC WILL SGA
+        binary_message(({ 0xff, 0xfd, 0x03 })); // IAC DO SGA
+    }
+    else if (old_flag & ~flag & 2)
+    {
+        write("sending IAC WONT+DONT SGA\n");
+        binary_message(({ 0xff, 0xfc, 0x03 })); // IAC WONT SGA
+        binary_message(({ 0xff, 0xfe, 0x03 })); // IAC DONT SGA
+    }
+    old_flag = flag;
+} /* set_noecho() */
 
 void telnetneg(int a, int b, int* c)
 {
-  // just ignore, should work with linux telnet
-  printf("got %d %d %O\n", a,b,c);
+    // just ignore, should work with linux telnet
+    printf("got %d %d %O\n", a,b,c);
+}
+
+//---------------------------------------------------------------------------
+string get_simul_efun ()
+
+// Load the simul-efun object "/sefun" if existing and return its pathname.
+
+{
+    object sefun;
+
+    if (!catch(sefun = load_object("/sefun")))
+        return object_name(sefun);
+    return 0;
 }
 
 //---------------------------------------------------------------------------

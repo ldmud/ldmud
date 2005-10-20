@@ -115,7 +115,7 @@ extern Bool eval_instruction(bytecode_p first_instruction, svalue_t *initial_sp)
 extern void free_string_svalue(svalue_t *v);
 extern void push_control_stack(svalue_t *sp, bytecode_p pc, svalue_t *fp);
 extern void pop_control_stack(void);
-extern struct longjump_s *push_error_context(svalue_t *sp, bytecode_t catch_inst);
+extern struct longjump_s *push_error_context(svalue_t *sp, int catch_flags);
 extern void pop_error_context (void);
 extern svalue_t *pull_error_context (svalue_t *sp);
 extern Bool destructed_object_ref (svalue_t *svp);
@@ -149,14 +149,13 @@ extern void bad_efun_arg(int arg, int instr, svalue_t *sp) NORETURN;
 extern void bad_xefun_arg(int arg, svalue_t *sp) NORETURN;
 extern void bad_xefun_vararg(int arg, svalue_t *sp) NORETURN;
 #define bad_efun_vararg   bad_xefun_arg
-extern Bool _privilege_violation(char *what, svalue_t *where, svalue_t *sp);
+extern Bool privilege_violation3(char *what, svalue_t *where, svalue_t *sp);
 extern Bool privilege_violation4(char *what, object_t *whom, char *how_str, int how_num, svalue_t *sp);
 extern void push_apply_value(void);
 extern void pop_apply_value (void);
 extern svalue_t *sapply_int(char *fun, object_t *ob, int num_arg, Bool b_ign_prot);
 #define sapply(f,o,n) sapply_int(f,o,n, MY_FALSE)
 extern svalue_t *apply(char *fun, object_t *ob, int num_arg);
-extern char *function_exists(char *fun, object_t *ob);
 extern void call_function(program_t *progp, int fx);
 extern int get_line_number(bytecode_p p, program_t *progp, char **namep);
 extern char *collect_trace(strbuf_t * sbuf, vector_t ** rvec);

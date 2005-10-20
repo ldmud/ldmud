@@ -1,18 +1,25 @@
 /*---------------------------------------------------------------------------
- * Gamedriver Mempools: Specialised Memory Allocators.
+ * Specialised Memory Allocators.
  *
  *---------------------------------------------------------------------------
- * Purpose of the memory pools is to provide fast allocation methods for
+ * Memory buffers provide memory for functions which repeatedly allocated
+ * large chunks of temporary memory (restore_object() for example). Instead
+ * of deallocating the memory after its use, the memory buffer keeps it
+ * around for the next time. This way any interim fragmentation of the free
+ * large memory pool won't affect the next use.
+ *
+ * The driver implements a buffer each for dedicated purposes. Each of
+ * these buffers is identified by a number from membuffer_e.
+ *---------------------------------------------------------------------------
+ * Purpose of memory pools is to provide fast allocation methods for
  * certain allocation patterns. They are most useful for scratchpad
  * purposes.
  *
  * Mempools: allocation of objects with identical time of death.
  *           Attempts to deallocate single objects have no effect.
  *
- * Fifopools: allocation/deallocation of objects follows (more than less)
- *            a fifo pattern.
- *
- * Note: the GC will deallocate all memory pools.
+ * Lifopools: allocation/deallocation of objects follows (more than less)
+ *            a lifo pattern.
  *---------------------------------------------------------------------------
  * Memory pools can be made dependant from other pools. This means that
  * whenever the 'superior' pool is reset or deleted, all pools depending
@@ -36,6 +43,12 @@
  * the pool, in which case the the mempool behaves like a malloc() with
  * (semi)automatic free().
  *
+ * The size_xxxpool() utility functions calculate a somewhat optimum
+ * pool allocation size based on the element size. The function tries to
+ * keep the allocation size under a certain limit in order to avoid running
+ * into large block fragmentation (because if that happens, we would be
+ * better off not using a memory pool at all).
+ *
  * The memory allocated from a mempool is aligned to the size of union align
  * (which is assumed to be a power of 2).
  *---------------------------------------------------------------------------
@@ -49,7 +62,235 @@
 
 #include "mempools.h"
 #include "gcollect.h"
+#ifdef DEBUG
+#include "simulate.h"
+#endif
+#include "strfuns.h"
+#include "svalue.h"
 #include "xalloc.h"
+
+#include "../mudlib/sys/debug_info.h"
+
+/*=========================================================================*/
+/*                         M E M B U F F E R S                             */
+
+/*-------------------------------------------------------------------------*/
+
+/* -- struct membuffer_s: one memory buffer -- */
+
+typedef struct membuffer_s {
+    void * mem;  /* The allocated memory */
+    size_t size;  /* Size of the allocated memory */
+} membuffer_t;
+
+static membuffer_t membuffers[mbMax];
+  /* The memory buffers.
+   */
+
+/*-------------------------------------------------------------------------*/
+void
+mb_init (void)
+
+/* Initialize the memory buffers.
+ */
+
+{
+    int i;
+
+    for (i = 0; i < mbMax; i++)
+    {
+        membuffers[i].mem = NULL;
+        membuffers[i].size = 0;
+    }
+} /* mb_init() */
+
+/*-------------------------------------------------------------------------*/
+void
+mb_release (void)
+
+/* Free all memory buffers.
+ */
+
+{
+    int i;
+
+    for (i = 0; i < mbMax; i++)
+    {
+        if (membuffers[i].mem != NULL)
+            xfree(membuffers[i].mem);
+        membuffers[i].mem = NULL;
+        membuffers[i].size = 0;
+    }
+} /* mb_release() */
+
+/*-------------------------------------------------------------------------*/
+void *
+mb_alloc (membuffer_e buf, size_t size)
+
+/* Allocate 'size' bytes of memory for buffer <buf>.
+ * Returns NULL when out of memory.
+ */
+
+{
+#ifdef DEBUG
+    if (buf < 0 || buf >= mbMax)
+        fatal("mb_alloc: Illegal buf# %d\n", buf);
+#endif
+
+    if (membuffers[buf].size >= size)
+        return membuffers[buf].mem;
+
+    if (membuffers[buf].mem != NULL)
+        xfree(membuffers[buf].mem);
+
+    membuffers[buf].mem = xalloc(size);
+
+    if (membuffers[buf].mem != NULL)
+        membuffers[buf].size = size;
+    else
+        membuffers[buf].size = 0;
+
+    return membuffers[buf].mem;
+} /* mb_alloc() */
+
+/*-------------------------------------------------------------------------*/
+void *
+mb_realloc (membuffer_e buf, size_t size)
+
+/* Realloate the memory of buffer <buf> to hold <size> bytes, without
+ * losing the current content, and return the new pointer.
+ * Returns NULL when out of memory (the old memory block will be unaffected
+ * then).
+ */
+
+{
+    void * mem;
+
+#ifdef DEBUG
+    if (buf < 0 || buf >= mbMax)
+        fatal("mb_alloc: Illegal buf# %d\n", buf);
+#endif
+
+    if (membuffers[buf].size >= size)
+        return membuffers[buf].mem;
+
+    if (membuffers[buf].mem != NULL)
+        mem = rexalloc(membuffers[buf].mem, size);
+    else
+        mem = xalloc(size);
+
+    if (mem != NULL)
+    {
+        membuffers[buf].mem = mem;
+        membuffers[buf].size = size;
+    }
+
+    return mem;
+} /* mb_realloc() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef GC_SUPPORT
+
+void
+mb_clear_refs (void)
+
+/* GC Support: Clear the refs of all memory associated with the
+ * memory buffers.
+ */
+
+{
+    int i;
+
+    for (i = 0; i < mbMax; i++)
+    {
+        if (membuffers[i].mem != NULL)
+            clear_memory_reference(membuffers[i].mem);
+    }
+} /* mb_clear_refs() */
+
+void
+mb_note_refs (void)
+
+/* GC Support: Note the refs of all memory associated with the
+ * memory buffers.
+ */
+
+{
+    int i;
+
+    for (i = 0; i < mbMax; i++)
+    {
+        if (membuffers[i].mem != NULL)
+            note_malloced_block_ref(membuffers[i].mem);
+    }
+} /* mb_note_refs() */
+
+#endif /* GC_SUPPORT */
+
+/*-------------------------------------------------------------------------*/
+size_t
+mb_status (strbuf_t * sbuf, Bool verbose)
+
+/* Gather (and optionally print) the statistics from the membuffers.
+ * Return the amount of memory used.
+ */
+
+{
+    size_t res;
+    int i;
+
+    for (i = 0, res = 0; i < mbMax; i++)
+        res += membuffers[i].size;
+
+#if defined(__MWERKS__) && !defined(WARN_ALL)
+#    pragma warn_largeargs off
+#endif
+
+    /* In verbose mode, print the statistics */
+    if (verbose)
+    {
+        strbuf_add(sbuf, "\nMemory Buffers:\n");
+        strbuf_add(sbuf,   "---------------\n");
+        strbuf_addf(sbuf, "File data:    %8lu\n", membuffers[mbFile].size);
+        strbuf_addf(sbuf, "Swap buffer:  %8lu\n", membuffers[mbSwap].size);
+    }
+    else
+    {
+        strbuf_addf(sbuf, "Memory buffers:\t\t\t\t %9lu\n", res);
+    }
+
+    return res;
+
+#if defined(__MWERKS__)
+#    pragma warn_largeargs reset
+#endif
+
+} /* mb_status() */
+
+/*-------------------------------------------------------------------------*/
+void
+mb_dinfo_status (svalue_t *svp, int value)
+
+/* Return the rxcache information for debug_info(DINFO_DATA, DID_STATUS).
+ * <svp> points to the svalue block for the result, this function fills in
+ * the spots for the object table.
+ * If <value> is -1, <svp> points indeed to a value block; other it is
+ * the index of the desired value and <svp> points to a single svalue.
+ */
+
+{
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code
+
+    ST_NUMBER(DID_ST_MB_FILE, membuffers[mbFile].size);
+    ST_NUMBER(DID_ST_MB_SWAP, membuffers[mbSwap].size);
+
+#undef ST_NUMBER
+} /* mb_dinfo_status() */
+
+/*=========================================================================*/
+/*                           M E M P O O L S                               */
 
 /*-------------------------------------------------------------------------*/
 
@@ -81,10 +322,10 @@ typedef union align align_t;
  * the (low) unused and (high) used memory, pointing to the first used
  * byte.
  *
- * Fifopools are like Mempools, with the addition that every used
- * block is prepended by a fifo_t structure (allocated to a multiple
+ * Lifopools are like Mempools, with the addition that every used
+ * block is prepended by a lifo_t structure (allocated to a multiple
  * of the align_t type). pMark points therefore at this structure of the
- * first used block. If a fifo-allocation is freed, it is just marked
+ * first used block. If a lifo-allocation is freed, it is just marked
  * as free (negative length) unless it is the block pMark points to.
  * In that case, pMark is moved up until it points to a used block,
  * retrieving previously freed blocks as well. When a memblock is
@@ -105,23 +346,29 @@ struct memblock_s {
     } u;
 };
 
-/* --- struct fifo_s: headblock for a fifo-type allocation ---
+#define MEMBLOCK_LIMIT (256)
+  /* Maximum size for the userspace of a memory block.
+   * Using blocks larger than this is likely to run into fragmentation
+   * of the large block heap.
+   */
+
+/* --- struct lifo_s: headblock for a lifo-type allocation ---
  *
  * One of these structures, allocated to a multiple of align_t, is
- * prepended to every fifopool allocation. Additionally, the end
+ * prepended to every lifopool allocation. Additionally, the end
  * of every memory block is marked with a 'used' structure as sentinel.
  */
 
-typedef struct fifo_s fifo_t;
+typedef struct lifo_s lifo_t;
 
-struct fifo_s {
+struct lifo_s {
     ssize_t length;    /* Size of this block, including this structure.
                         * Positive for allocated blocks, negative for free ones.
                         */
     Memblock pBlock;   /* Backpointer to the memoryblock holding this block */
 };
 
-#define SIZEOF_FIFO_T ROUND(sizeof(fifo_t))
+#define SIZEOF_LIFO_T ROUND(sizeof(lifo_t))
 
 /*=========================================================================*/
 
@@ -131,7 +378,7 @@ struct fifo_s {
 
 enum pooltype_u {
     MEMPOOL = 0,
-    FIFOPOOL
+    LIFOPOOL
 };
 
 typedef enum pooltype_u pooltype_t;
@@ -146,23 +393,59 @@ struct mempool_s {
     Memblock   pBlocks;     /* List of memory blocks
                              * It is guaranteed that at least one memory block
                              * exists. */
-    Memblock   pFree;       /* Fifopools: List of unused memory blocks */
+    Memblock   pFree;       /* Lifopools: List of unused memory blocks */
     Mempool    pSuper;      /* The pool this one depends on */
     Mempool    pSubPools;   /* List of depending pools */
     Mempool    pNextSub;    /* Next pool in the dependee list */
 };
 
 /*-------------------------------------------------------------------------*/
-size_t
-fifopool_size (size_t elemsize, unsigned int num)
+static INLINE size_t
+size_pool (size_t elemsize, size_t o_size)
 
-/* Return the size for a fifopool suitable to hold <num> object of size
- * <elemsize>, taking into account all the overhead.
+/* Return the userspace size for a memblock suitable to hold objects of
+ * size <elemsize>, taking into account an per-element overhead of <o_size>
+ * and the maximum memblock size.
+ * The result can be passed as 'size' parameter to new_pool() functions.
  */
 
 {
-    return num * (ROUND(elemsize) + SIZEOF_FIFO_T);
-}
+    size_t esize = (ROUND(elemsize) + o_size);
+    unsigned int num;
+
+    num = MEMBLOCK_LIMIT / esize;
+    if (num < 1)
+        num = 1;
+    return num * esize;
+} /* size_pool() */
+
+/*-------------------------------------------------------------------------*/
+size_t
+size_mempool (size_t elemsize)
+
+/* Return the userspace size for a mempool suitable to hold objects of
+ * size <elemsize>, taking into account an per-element overhead of <o_size>
+ * and the maximum memblock size.
+ * The result can be passed as 'size' parameter to new_mempool().
+ */
+
+{
+    return size_pool(elemsize, 0);
+} /* size_mempool() */
+
+/*-------------------------------------------------------------------------*/
+size_t
+size_lifopool (size_t elemsize)
+
+/* Return the userspace size for a lifopool suitable to hold objects of
+ * size <elemsize>, taking into account an per-element overhead of <o_size>
+ * and the maximum memblock size.
+ * The result can be passed as 'size' parameter to new_lifopool().
+ */
+
+{
+    return size_pool(elemsize, SIZEOF_LIFO_T);
+} /* size_lifopool() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE Mempool
@@ -183,7 +466,7 @@ new_pool (size_t iSize, pooltype_t type)
       /* If this assert fails, sizeof(union align) is not a power of 2 */
 
     /* Round iSize up to the next integral of sizeof(union align) */
-    iSize = ROUND(iSize + (type == FIFOPOOL ? SIZEOF_FIFO_T : 0));
+    iSize = ROUND(iSize + (type == LIFOPOOL ? SIZEOF_LIFO_T : 0));
 
     pPool = xalloc(sizeof(*pPool));
     if (!pPool)
@@ -200,12 +483,12 @@ new_pool (size_t iSize, pooltype_t type)
     pBlock->length = sizeof(*pBlock) - sizeof(pBlock->u) + iSize;
     pBlock->pMark = pBlock->u.data + iSize;
 
-    /* For fifopools, add a sentinel (pseudo-used block) at the end
+    /* For lifopools, add a sentinel (pseudo-used block) at the end
      * of the arena.
      */
-    if (FIFOPOOL == type)
+    if (LIFOPOOL == type)
     {
-        fifo_t *p = (fifo_t *)(pBlock->pMark - SIZEOF_FIFO_T);
+        lifo_t *p = (lifo_t *)(pBlock->pMark - SIZEOF_LIFO_T);
 
         p->length = 1;
         p->pBlock = pBlock;
@@ -240,16 +523,16 @@ new_mempool (size_t iSize)
 
 /*-------------------------------------------------------------------------*/
 Mempool
-new_fifopool (size_t iSize)
+new_lifopool (size_t iSize)
 
-/* Create a new Fifopool for a typical allocation size of <iSize>
+/* Create a new Lifopool for a typical allocation size of <iSize>
  * bytes per memory block and prepare
  * Result is the pointer to the mempool structure, or NULL if an error
  * occurs.
  */
 
 {
-    return new_pool(iSize, FIFOPOOL);
+    return new_pool(iSize, LIFOPOOL);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -336,9 +619,9 @@ alloc_from_pool (Mempool pPool, size_t iSize)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void *
-alloc_from_fifo (Mempool pPool, size_t iSize)
+alloc_from_lifo (Mempool pPool, size_t iSize)
 
-/* Allocate <iSize> bytes of memory from the fifopool <pPool>.
+/* Allocate <iSize> bytes of memory from the lifopool <pPool>.
  * Return a pointer to the allocated memory (it is at least aligned to
  * the size of a ALIGNTYPE), or NULL on failure.
  *
@@ -348,10 +631,10 @@ alloc_from_fifo (Mempool pPool, size_t iSize)
 
 {
     Memblock pBlock;
-    fifo_t *pFifo;
+    lifo_t *pLifo;
 
     /* Round iSize up to the next integral of sizeof(ALIGNTYPE) */
-    iSize = ROUND(iSize + SIZEOF_FIFO_T);
+    iSize = ROUND(iSize + SIZEOF_LIFO_T);
     /* If it is a big block, allocate it directly and insert
      * it directly _after_ the current 'normal sized' memblock.
      */
@@ -361,27 +644,27 @@ alloc_from_fifo (Mempool pPool, size_t iSize)
         assert(pPool->pBlocks != NULL); /* just in case */
 
         pBlock = xalloc(sizeof(*pBlock)-sizeof(pBlock->u)
-                        +iSize+SIZEOF_FIFO_T);
+                        +iSize+SIZEOF_LIFO_T);
         if (pBlock == NULL)
             return NULL;
         pBlock->length = sizeof(*pBlock)-sizeof(pBlock->u)
-                         +iSize+SIZEOF_FIFO_T;
+                         +iSize+SIZEOF_LIFO_T;
         pBlock->pMark = pBlock->u.data;
         pBlock->pNext = pPool->pBlocks->pNext;
         pPool->pBlocks->pNext = pBlock;
 
-        /* Write the fifo_t for the allocated block */
-        pFifo = (fifo_t *)pBlock->pMark;
-        pFifo->length = (ssize_t)iSize;
-        pFifo->pBlock = pBlock;
+        /* Write the lifo_t for the allocated block */
+        pLifo = (lifo_t *)pBlock->pMark;
+        pLifo->length = (ssize_t)iSize;
+        pLifo->pBlock = pBlock;
 
         /* Write the sentinel */
-        pFifo = (fifo_t *)(pBlock->pMark+iSize);
-        pFifo->length = 1;
-        pFifo->pBlock = pBlock;
+        pLifo = (lifo_t *)(pBlock->pMark+iSize);
+        pLifo->length = 1;
+        pLifo->pBlock = pBlock;
 
         /* Return the address */
-        return (void *)(pBlock->u.data+SIZEOF_FIFO_T);
+        return (void *)(pBlock->u.data+SIZEOF_LIFO_T);
     }
 
     /* Normal iSizes are always allocated from the first memblock
@@ -409,16 +692,16 @@ alloc_from_fifo (Mempool pPool, size_t iSize)
                              + pPool->iAllocSize;
             pBlock->pMark = pBlock->u.data + pPool->iAllocSize;
 
-            /* For fifopools, add a sentinel (pseudo-used block) at the end
+            /* For lifopools, add a sentinel (pseudo-used block) at the end
              * of the arena.
              */
-            pFifo = (fifo_t *)(pBlock->pMark-SIZEOF_FIFO_T);
+            pLifo = (lifo_t *)(pBlock->pMark-SIZEOF_LIFO_T);
 
-            pFifo->length = 1;
-            pFifo->pBlock = pBlock;
+            pLifo->length = 1;
+            pLifo->pBlock = pBlock;
 
             /* Update the pMark pointer */
-            pBlock->pMark = (char *)pFifo;
+            pBlock->pMark = (char *)pLifo;
         }
 
         /* Link the block into the list of used blocks */
@@ -431,17 +714,17 @@ alloc_from_fifo (Mempool pPool, size_t iSize)
      */
     pBlock->pMark -= iSize;
 
-    /* Put in the fifo_t structure and
+    /* Put in the lifo_t structure and
      * return the address after the structure.
      */
-    pFifo = (fifo_t *)pBlock->pMark;
+    pLifo = (lifo_t *)pBlock->pMark;
 
-    pFifo->length = (ssize_t)iSize;
-    pFifo->pBlock = pBlock;
+    pLifo->length = (ssize_t)iSize;
+    pLifo->pBlock = pBlock;
 
-    return (void *)(pBlock->pMark + SIZEOF_FIFO_T);
+    return (void *)(pBlock->pMark + SIZEOF_LIFO_T);
 
-} /* alloc_from_fifo() */
+} /* alloc_from_lifo() */
 
 /*-------------------------------------------------------------------------*/
 void *
@@ -459,8 +742,8 @@ mempool_alloc (Mempool pPool, size_t iSize)
     assert(pPool != NULL);
     assert(iSize < LONG_MAX);
 
-    if (pPool->type == FIFOPOOL)
-        return alloc_from_fifo(pPool, iSize);
+    if (pPool->type == LIFOPOOL)
+        return alloc_from_lifo(pPool, iSize);
 
     return alloc_from_pool(pPool, iSize);
 } /* mempool_alloc() */
@@ -470,40 +753,40 @@ void
 mempool_free (Mempool pPool, void * adr)
 
 /* Return the block allocated at <adr> to the pool <pPool>.
- * This is a noop for mempools, but (lazily) returns memory to a fifopool.
+ * This is a noop for mempools, but (lazily) returns memory to a lifopool.
  */
 
 {
     Memblock pBlock;
-    fifo_t * pFifo;
+    lifo_t * pLifo;
     ssize_t length;
 
     assert(pPool != NULL);
     assert(adr != NULL);
 
-    if (FIFOPOOL != pPool->type)
+    if (LIFOPOOL != pPool->type)
         return;
 
-    /* Get the fifo_t structure and its data */
-    pFifo = (fifo_t *)((char *)adr - SIZEOF_FIFO_T);
-    assert(pFifo->length > 1);
-    pBlock = pFifo->pBlock;
-    length = pFifo->length;
+    /* Get the lifo_t structure and its data */
+    pLifo = (lifo_t *)((char *)adr - SIZEOF_LIFO_T);
+    assert(pLifo->length > 1);
+    pBlock = pLifo->pBlock;
+    length = pLifo->length;
 
     /* Mark the block as unused */
-    pFifo->length = -length;
+    pLifo->length = -length;
 
     /* If this newly freed block happens to be the first free block in the
      * memblock, return it and all following free blocks to the free
      * arena of the memblock.
      */
-    if ((char *)pFifo == pBlock->pMark)
+    if ((char *)pLifo == pBlock->pMark)
     {
-        /* Loop invariant: pMark == pFifo */
-        while (pFifo->length < 0)
+        /* Loop invariant: pMark == pLifo */
+        while (pLifo->length < 0)
         {
-            pBlock->pMark = pBlock->pMark - pFifo->length;
-            pFifo = (fifo_t *)pBlock->pMark;
+            pBlock->pMark = pBlock->pMark - pLifo->length;
+            pLifo = (lifo_t *)pBlock->pMark;
         }
     }
 
@@ -514,7 +797,7 @@ mempool_free (Mempool pPool, void * adr)
     {
         while (pBlock->pNext != NULL
             &&    pBlock->pMark - (char*)&(pBlock->u)
-               >= pPool->iAllocSize - SIZEOF_FIFO_T)
+               >= pPool->iAllocSize - SIZEOF_LIFO_T)
         {
             pPool->pBlocks = pBlock->pNext;
             pBlock->pNext = pPool->pFree;
@@ -567,7 +850,7 @@ mempool_reset (Mempool pPool)
 
     pBlock = pPool->pBlocks;
     pBlock->pMark = pBlock->u.data + pPool->iAllocSize
-                    - (FIFOPOOL == pPool->type ? SIZEOF_FIFO_T : 0);
+                    - (LIFOPOOL == pPool->type ? SIZEOF_LIFO_T : 0);
     pBlock->pNext = NULL;
 
     /* Reset all depending pools */

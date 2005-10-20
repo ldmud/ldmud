@@ -6,7 +6,7 @@ State: New
 
 ({ closure/fun, arg1, arg2, ... })
 
-This is returned from find_call_out() etc, and can be passed to 
+This is returned from find_call_out() etc, and can be passed to
 call_out() instead of the usual flat notation.
--- 
+--
 Lars Duening; lars.duening@wcom.com

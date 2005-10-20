@@ -50,7 +50,7 @@ Thanks!
 dev.206 with TELNET_DEBUG: lp-245 with AIX telnet:
 
 
-2000.06.02 09:54:02 obj/living.c: Warning: Missing arguments to simul_efun add_worth line 755 
+2000.06.02 09:54:02 obj/living.c: Warning: Missing arguments to simul_efun add_worth line 755
 2000.06.02 09:54:02 LDMud 3.2.8-dev.206 (3-2-dev.206)
 Loading init file /room/init_file
 Preloading file: obj/quicktyper.c 0.02
@@ -62,9 +62,9 @@ Preloading file: obj/weapon 0.00
 Preloading file: obj/armour 0.01
 Preloading file: room/death/death_mark 0.00
 2000.06.02 09:54:02 Setting up ipc.
-2000.06.02 09:54:05 obj/player.c: Warning: Missing arguments to simul_efun add_worth line 1728 
-2000.06.02 09:54:05 obj/player.c: Warning: Missing arguments to simul_efun snoop line 2261 
-2000.06.02 09:54:05 obj/player.c: Warning: Missing arguments to simul_efun wizlist line 2383 
+2000.06.02 09:54:05 obj/player.c: Warning: Missing arguments to simul_efun add_worth line 1728
+2000.06.02 09:54:05 obj/player.c: Warning: Missing arguments to simul_efun snoop line 2261
+2000.06.02 09:54:05 obj/player.c: Warning: Missing arguments to simul_efun wizlist line 2383
 2000.06.02 09:54:07 TDEBUG: 'obj/player#2' telnet_neg: state 0
 2000.06.02 09:54:07 TDEBUG: 'obj/player#2' telnet machine ready
 2000.06.02 09:54:07 TDEBUG: 'obj/player#2' telnet_neg: state 0
@@ -74,7 +74,7 @@ Preloading file: room/death/death_mark 0.00
 2000.06.02 09:54:07 TDEBUG: send IAC WILL 01
 2000.06.02 09:54:07 TDEBUG: 'obj/player#2' Sending telnet (1 bytes):  ff
 2000.06.02 09:54:07 TDEBUG: 'obj/player#2' Sending telnet (2 bytes):  fb 01
-2000.06.02 09:54:07 TDEBUG: 'obj/player#2' Sending telnet (0 bytes): 
+2000.06.02 09:54:07 TDEBUG: 'obj/player#2' Sending telnet (0 bytes):
 2000.06.02 09:54:07 TDEBUG: 'obj/player#2' telnet_neg: state 0
 2000.06.02 09:54:07 TDEBUG: 'obj/player#2' t_n: new state 1
 2000.06.02 09:54:07 TDEBUG: 'obj/player#2' t_n: state IAC
@@ -98,12 +98,12 @@ Preloading file: room/death/death_mark 0.00
 2000.06.02 09:54:11 TDEBUG: send IAC WONT 01
 2000.06.02 09:54:11 TDEBUG: 'obj/player#2' Sending telnet (1 bytes):  ff
 2000.06.02 09:54:11 TDEBUG: 'obj/player#2' Sending telnet (2 bytes):  fc 01
-2000.06.02 09:54:11 TDEBUG: 'obj/player#2' Sending telnet (0 bytes): 
+2000.06.02 09:54:11 TDEBUG: 'obj/player#2' Sending telnet (0 bytes):
 2000.06.02 09:54:11 TDEBUG: 'obj/player#2' set_noecho():   WONT TELOPT_SGA
 2000.06.02 09:54:11 TDEBUG: send IAC WONT 03
 2000.06.02 09:54:11 TDEBUG: 'obj/player#2' Sending telnet (1 bytes):  ff
 2000.06.02 09:54:11 TDEBUG: 'obj/player#2' Sending telnet (2 bytes):  fc 03
-2000.06.02 09:54:11 TDEBUG: 'obj/player#2' Sending telnet (0 bytes): 
+2000.06.02 09:54:11 TDEBUG: 'obj/player#2' Sending telnet (0 bytes):
 2000.06.02 09:54:11 TDEBUG: 'obj/player#2' telnet_neg: state 0
 2000.06.02 09:54:11 TDEBUG: 'obj/player#2' t_n: new state 1
 2000.06.02 09:54:11 TDEBUG: 'obj/player#2' t_n: state IAC
@@ -124,7 +124,7 @@ Preloading file: room/death/death_mark 0.00
 2000.06.02 09:55:04 TDEBUG: send IAC WILL 01
 2000.06.02 09:55:04 TDEBUG: 'obj/player#4' Sending telnet (1 bytes):  ff
 2000.06.02 09:55:04 TDEBUG: 'obj/player#4' Sending telnet (2 bytes):  fb 01
-2000.06.02 09:55:04 TDEBUG: 'obj/player#4' Sending telnet (0 bytes): 
+2000.06.02 09:55:04 TDEBUG: 'obj/player#4' Sending telnet (0 bytes):
 2000.06.02 09:55:04 TDEBUG: 'obj/player#4' telnet_neg: state 0
 2000.06.02 09:55:04 TDEBUG: 'obj/player#4' t_n: new state 1
 2000.06.02 09:55:04 TDEBUG: 'obj/player#4' t_n: state IAC
@@ -143,7 +143,7 @@ Preloading file: room/death/death_mark 0.00
 2000.06.02 09:55:06 TDEBUG: send IAC WONT 01
 2000.06.02 09:55:06 TDEBUG: 'obj/player#4' Sending telnet (1 bytes):  ff
 2000.06.02 09:55:06 TDEBUG: 'obj/player#4' Sending telnet (2 bytes):  fc 01
-2000.06.02 09:55:06 TDEBUG: 'obj/player#4' Sending telnet (0 bytes): 
+2000.06.02 09:55:06 TDEBUG: 'obj/player#4' Sending telnet (0 bytes):
 2000.06.02 09:55:06 TDEBUG: 'obj/player#4' telnet_neg: state 0
 2000.06.02 09:55:06 TDEBUG: 'obj/player#4' t_n: new state 1
 2000.06.02 09:55:06 TDEBUG: 'obj/player#4' t_n: state IAC
@@ -187,7 +187,7 @@ Preloading std/room                                :   355 ms, 43736 ticks
 2000.06.12 21:22:12 TDEBUG: send IAC WILL 01
 2000.06.12 21:22:12 TDEBUG: 'secure/login#3' Sending telnet (1 bytes):  ffffffff
 2000.06.12 21:22:12 TDEBUG: 'secure/login#3' Sending telnet (2 bytes):  fffffffb 01
-2000.06.12 21:22:12 TDEBUG: 'secure/login#3' Sending telnet (0 bytes): 
+2000.06.12 21:22:12 TDEBUG: 'secure/login#3' Sending telnet (0 bytes):
 2000.06.12 21:22:12 TDEBUG: 'secure/login#3' telnet_neg: state 0
 2000.06.12 21:22:12 TDEBUG: 'secure/login#3' t_n: new state 1
 2000.06.12 21:22:12 TDEBUG: 'secure/login#3' t_n: state IAC
@@ -213,12 +213,12 @@ Preloading std/room                                :   355 ms, 43736 ticks
 2000.06.12 21:22:16 TDEBUG: send IAC WONT 01
 2000.06.12 21:22:16 TDEBUG: 'Mateese' Sending telnet (1 bytes):  ffffffff
 2000.06.12 21:22:16 TDEBUG: 'Mateese' Sending telnet (2 bytes):  fffffffc 01
-2000.06.12 21:22:16 TDEBUG: 'Mateese' Sending telnet (0 bytes): 
+2000.06.12 21:22:16 TDEBUG: 'Mateese' Sending telnet (0 bytes):
 2000.06.12 21:22:16 TDEBUG: 'Mateese' set_noecho():   WONT TELOPT_SGA
 2000.06.12 21:22:16 TDEBUG: send IAC WONT 03
 2000.06.12 21:22:16 TDEBUG: 'Mateese' Sending telnet (1 bytes):  ffffffff
 2000.06.12 21:22:16 TDEBUG: 'Mateese' Sending telnet (2 bytes):  fffffffc 03
-2000.06.12 21:22:16 TDEBUG: 'Mateese' Sending telnet (0 bytes): 
+2000.06.12 21:22:16 TDEBUG: 'Mateese' Sending telnet (0 bytes):
 2000.06.12 21:22:17 TDEBUG: 'Mateese' telnet_neg: state 0
 2000.06.12 21:22:17 TDEBUG: 'Mateese' t_n: new state 1
 2000.06.12 21:22:17 TDEBUG: 'Mateese' t_n: state IAC
@@ -275,7 +275,7 @@ dev.206 with TELNET_DEBUG: lp-245 with EWAN:
 
 Noticeable are the multitude of NAWS requests...
 
-2000.06.02 09:55:15 obj/living.c: Warning: Missing arguments to simul_efun add_worth line 755 
+2000.06.02 09:55:15 obj/living.c: Warning: Missing arguments to simul_efun add_worth line 755
 2000.06.02 09:55:15 LDMud 3.2.8-dev.206 (3-2-dev.206)
 Loading init file /room/init_file
 Preloading file: obj/quicktyper.c 0.02
@@ -287,9 +287,9 @@ Preloading file: obj/weapon 0.01
 Preloading file: obj/armour 0.00
 Preloading file: room/death/death_mark 0.00
 2000.06.02 09:55:15 Setting up ipc.
-2000.06.02 09:55:20 obj/player.c: Warning: Missing arguments to simul_efun add_worth line 1728 
-2000.06.02 09:55:20 obj/player.c: Warning: Missing arguments to simul_efun snoop line 2261 
-2000.06.02 09:55:20 obj/player.c: Warning: Missing arguments to simul_efun wizlist line 2383 
+2000.06.02 09:55:20 obj/player.c: Warning: Missing arguments to simul_efun add_worth line 1728
+2000.06.02 09:55:20 obj/player.c: Warning: Missing arguments to simul_efun snoop line 2261
+2000.06.02 09:55:20 obj/player.c: Warning: Missing arguments to simul_efun wizlist line 2383
 
 2000.06.02 09:55:21 TDEBUG: 'obj/player#2' telnet_neg: state 0
 2000.06.02 09:55:21 TDEBUG: 'obj/player#2' t_n: new state 1
@@ -303,7 +303,7 @@ Preloading file: room/death/death_mark 0.00
 2000.06.02 09:55:21 TDEBUG: send IAC DONT 1f
 2000.06.02 09:55:21 TDEBUG: 'obj/player#2' Sending telnet (1 bytes):  ff
 2000.06.02 09:55:21 TDEBUG: 'obj/player#2' Sending telnet (2 bytes):  fe 1f
-2000.06.02 09:55:21 TDEBUG: 'obj/player#2' Sending telnet (0 bytes): 
+2000.06.02 09:55:21 TDEBUG: 'obj/player#2' Sending telnet (0 bytes):
 [...repeat 3 times...]
 
 2000.06.02 09:55:21 TDEBUG: 'obj/player#2' t_n: new state 0
@@ -330,7 +330,7 @@ Preloading file: room/death/death_mark 0.00
 2000.06.02 09:55:22 TDEBUG: send IAC WILL 01
 2000.06.02 09:55:22 TDEBUG: 'obj/player#2' Sending telnet (1 bytes):  ff
 2000.06.02 09:55:22 TDEBUG: 'obj/player#2' Sending telnet (2 bytes):  fb 01
-2000.06.02 09:55:22 TDEBUG: 'obj/player#2' Sending telnet (0 bytes): 
+2000.06.02 09:55:22 TDEBUG: 'obj/player#2' Sending telnet (0 bytes):
 2000.06.02 09:55:22 TDEBUG: 'obj/player#2' telnet_neg: state 0
 2000.06.02 09:55:22 TDEBUG: 'obj/player#2' t_n: new state 1
 2000.06.02 09:55:22 TDEBUG: 'obj/player#2' t_n: state IAC
@@ -355,12 +355,12 @@ Preloading file: room/death/death_mark 0.00
 2000.06.02 09:55:25 TDEBUG: send IAC WONT 01
 2000.06.02 09:55:25 TDEBUG: 'obj/player#2' Sending telnet (1 bytes):  ff
 2000.06.02 09:55:25 TDEBUG: 'obj/player#2' Sending telnet (2 bytes):  fc 01
-2000.06.02 09:55:25 TDEBUG: 'obj/player#2' Sending telnet (0 bytes): 
+2000.06.02 09:55:25 TDEBUG: 'obj/player#2' Sending telnet (0 bytes):
 2000.06.02 09:55:25 TDEBUG: 'obj/player#2' set_noecho():   WONT TELOPT_SGA
 2000.06.02 09:55:25 TDEBUG: send IAC WONT 03
 2000.06.02 09:55:25 TDEBUG: 'obj/player#2' Sending telnet (1 bytes):  ff
 2000.06.02 09:55:25 TDEBUG: 'obj/player#2' Sending telnet (2 bytes):  fc 03
-2000.06.02 09:55:25 TDEBUG: 'obj/player#2' Sending telnet (0 bytes): 
+2000.06.02 09:55:25 TDEBUG: 'obj/player#2' Sending telnet (0 bytes):
 2000.06.02 09:55:25 TDEBUG: 'obj/player#2' telnet_neg: state 0
 2000.06.02 09:55:25 TDEBUG: 'obj/player#2' t_n: new state 1
 2000.06.02 09:55:25 TDEBUG: 'obj/player#2' t_n: state IAC
@@ -394,7 +394,7 @@ Preloading file: room/death/death_mark 0.00
 2000.06.02 09:55:32 TDEBUG: send IAC DONT 1f
 2000.06.02 09:55:32 TDEBUG: 'obj/player#2' Sending telnet (1 bytes):  ff
 2000.06.02 09:55:32 TDEBUG: 'obj/player#2' Sending telnet (2 bytes):  fe 1f
-2000.06.02 09:55:32 TDEBUG: 'obj/player#2' Sending telnet (0 bytes): 
+2000.06.02 09:55:32 TDEBUG: 'obj/player#2' Sending telnet (0 bytes):
 [...lots more of the WILL NAWS/WONT NAWS negotiation attempts...]
 
 -----------------------------------------------------------------------
@@ -422,7 +422,7 @@ Preloading std/room                                :   321 ms, 43736 ticks
 2000.06.04 22:27:49 TDEBUG: send IAC WILL 01
 2000.06.04 22:27:49 TDEBUG: 'secure/login#1' Sending telnet (1 bytes):  ffffffff
 2000.06.04 22:27:49 TDEBUG: 'secure/login#1' Sending telnet (2 bytes):  fffffffb 01
-2000.06.04 22:27:49 TDEBUG: 'secure/login#1' Sending telnet (0 bytes): 
+2000.06.04 22:27:49 TDEBUG: 'secure/login#1' Sending telnet (0 bytes):
 2000.06.04 22:27:49 TDEBUG: 'secure/login#1' telnet_neg: state 0
 2000.06.04 22:27:49 TDEBUG: 'secure/login#1' t_n: new state 1
 2000.06.04 22:27:49 TDEBUG: 'secure/login#1' t_n: state IAC
@@ -448,7 +448,7 @@ Preloading std/room                                :   321 ms, 43736 ticks
 2000.06.04 22:27:54 TDEBUG: send IAC WONT 01
 2000.06.04 22:27:54 TDEBUG: 'Mateese' Sending telnet (1 bytes):  ffffffff
 2000.06.04 22:27:54 TDEBUG: 'Mateese' Sending telnet (2 bytes):  fffffffc 01
-2000.06.04 22:27:54 TDEBUG: 'Mateese' Sending telnet (0 bytes): 
+2000.06.04 22:27:54 TDEBUG: 'Mateese' Sending telnet (0 bytes):
 2000.06.04 22:27:54 TDEBUG: 'Mateese' telnet_neg: state 0
 2000.06.04 22:27:54 TDEBUG: 'Mateese' t_n: new state 1
 2000.06.04 22:27:54 TDEBUG: 'Mateese' t_n: state IAC

@@ -89,7 +89,7 @@ new_pointer_table (void)
     Mempool pool;
     struct pointer_table *ptable;
 
-    pool = new_mempool(1024);
+    pool = new_mempool(size_mempool(sizeof(struct pointer_record)));
     if (!pool)
         return NULL;
     ptable = mempool_alloc(pool, sizeof(*ptable));

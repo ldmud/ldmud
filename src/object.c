@@ -159,10 +159,10 @@
 #include "my-alloca.h"
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <string.h>
 #include <stdio.h>
 #include <fcntl.h>
 
-#define NO_REF_STRING
 #define USES_SVALUE_STRLEN
 #include "object.h"
 
@@ -178,6 +178,7 @@
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
+#include "mempools.h"
 #include "otable.h"
 #include "prolang.h"
 #include "ptrtable.h"
@@ -194,6 +195,7 @@
 #include "wiz_list.h"
 #include "xalloc.h"
 
+#include "../mudlib/sys/functionlist.h"
 #include "../mudlib/sys/driver_hook.h"
 
 /*-------------------------------------------------------------------------*/
@@ -636,8 +638,8 @@ reset_object (object_t *ob, int arg)
             call_lambda(&driver_hook[arg], 0);
         }
 
-        /* If the call returned a number, use it as the current
-         * reset interval
+        /* If the call returned a non-zero number, use it as the current
+         * reset interval, overwriting the default set above.
          */
         if (inter_sp->type == T_NUMBER && inter_sp->u.number)
             ob->time_reset = (inter_sp->u.number > 0)
@@ -652,7 +654,8 @@ reset_object (object_t *ob, int arg)
             previous_ob = current_object = ob;
 
         push_number(arg == H_RESET);
-        if (!sapply(driver_hook[arg].u.string, ob, 1) && arg == H_RESET)
+        if (!sapply_int(driver_hook[arg].u.string, ob, 1, MY_TRUE)
+          && arg == H_RESET)
             ob->time_reset = 0;
     }
 
@@ -1019,6 +1022,842 @@ renumber_programs (void)
     return ++current_id_number;
 }
 
+/*-------------------------------------------------------------------------*/
+static char *
+function_exists ( char *fun, object_t *ob, Bool show_hidden
+                , char ** prog_name, uint32 * prog_line
+                )
+
+/* Search for the function <fun> in the object <ob>. If existing, return
+ * the name of the program (without added reference), if not return NULL.
+ *
+ * If <prog_name> and <prog_line> are both non-NULL, they are set to
+ * the name of the program _file_ and the line where the function is found.
+ * The program file name will have one reference added.
+ *
+ * Visibility rules apply: static and protected functions can't be
+ * found from the outside unless <show_hidden> is true.
+ */
+
+{
+    char *shared_name;
+    fun_hdr_p funstart;
+    program_t *progp;
+    int ix;
+    funflag_t flags;
+
+#ifdef DEBUG
+    if (ob->flags & O_DESTRUCTED)
+        fatal("function_exists() on destructed object\n");
+#endif
+
+    if (prog_name)
+        *prog_name = NULL;
+
+    /* Make the program resident */
+    if (O_PROG_SWAPPED(ob))
+    {
+        ob->time_of_ref = current_time;
+        if (load_ob_from_swap(ob) < 0)
+            error("Out of memory\n");
+    }
+
+    shared_name = findstring(fun);
+    progp = ob->prog;
+
+    /* Check if the function exists at all */
+    if ( (ix = find_function(shared_name, progp)) < 0)
+        return NULL;
+
+    /* Is it visible for the caller? */
+    flags = progp->functions[ix];
+
+    if (!show_hidden
+     && (   flags & TYPE_MOD_PRIVATE
+         || (flags & TYPE_MOD_STATIC && current_object != ob))
+       )
+        return NULL;
+
+    /* Resolve inheritance */
+    while (flags & NAME_INHERITED)
+    {
+        inherit_t *inheritp;
+
+        inheritp = &progp->inherit[flags & INHERIT_MASK];
+        ix -= inheritp->function_index_offset;
+        progp = inheritp->prog;
+        flags = progp->functions[ix];
+    }
+
+    funstart = progp->program  + (flags & FUNSTART_MASK);
+
+    /* And after all this, the function may be undefined */
+    if (FUNCTION_CODE(funstart)[0] == F_ESCAPE
+     && FUNCTION_CODE(funstart)[1] == F_UNDEF  - 0x100)
+    {
+        return NULL;
+    }
+
+    if (prog_line && prog_name)
+        *prog_line = get_line_number(funstart, progp, prog_name);
+
+    /* We got it. */
+    return progp->name;
+} /* function_exists() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_function_exists (svalue_t *sp, int num_arg)
+
+/* EXEC function_exists()
+ *
+ *   mixed function_exists (string str [, int flags])
+ *   mixed function_exists (string str , object ob, [, int flags])
+ *
+ * Look up a function <str> in the current object, respectively
+ * in the object <ob>. Depending on the value of <flags>, one
+ * of the following informations is returned:
+ *
+ * <flags> == FEXISTS_PROGNAME (0, default):
+ *   Return the name of the program the function is defined in.
+ *   This can be either object_name(ob), or the name of an inherited
+ *   program. If !compat mode, the returned name always begins
+ *   with a '/'.
+ *
+ * <flags> == FEXISTS_FILENAME (1):
+ *   Return the name of the file the function is defined in (this
+ *   may be an include file). If !compat mode, the returned name
+ *   always begins with a '/'.
+ *
+ * <flags> == FEXISTS_LINENO (2):
+ *   Return the line number within the source file.
+ *
+ * <flags> == FEXISTS_ALL (3):
+ *   Return an array with all the above information. The above
+ *   flag values are the indices into that array.
+ *
+ * The <flags> value can be or-ed to NAME_HIDDEN to return
+ * information about static and protected functions in other objects.
+ * It is not possible to return information about private functions.
+ *
+ * If the function cannot be found (because it doesn't exist or
+ * it is not visible to the caller), the result is 0.
+ */
+
+{
+    char *str, *prog_name;
+    uint32 prog_line;
+    svalue_t *argp;
+    object_t *ob;
+    p_int mode_flags;
+
+    /* Evaluate arguments */
+    argp = sp - num_arg + 1;
+
+    ob = NULL;
+    mode_flags = 0;
+
+    inter_sp = sp;
+
+    if (argp[0].type != T_STRING)
+        bad_xefun_vararg(1, sp);
+
+    if (num_arg < 2)
+    {
+        ob = current_object;
+        mode_flags = 0;
+    }
+
+    if (num_arg >= 2)
+    {
+        if (argp[1].type == T_NUMBER)
+        {
+            ob = current_object;
+            mode_flags = argp[1].u.number;
+
+            if ((mode_flags & ~NAME_HIDDEN) < 0
+             || (mode_flags & ~NAME_HIDDEN) > FEXISTS_ALL
+               )
+            if (mode_flags != 0 && mode_flags != NAME_HIDDEN)
+            {
+                error("Bad argument 2 to variable_exists(): "
+                      "value %ld (%ld sans NAME_HIDDEN) out of range %d..%d.\n"
+                     , (long)mode_flags, (long)(mode_flags & ~NAME_HIDDEN)
+                     , FEXISTS_ALL, FEXISTS_LINENO
+                    );
+                /* NOTREACHED */
+                return sp;
+            }
+        }
+        else if (argp[1].type == T_OBJECT)
+        {
+            ob = argp[1].u.ob;
+            mode_flags = 0;
+        }
+        else
+            bad_xefun_vararg(2, sp);
+    }
+
+    if (num_arg >= 3)
+    {
+        /* The last argument must be a number. On the other
+         * side, we can't have two numbers at once.
+         */
+        if (argp[1].type != T_OBJECT)
+            bad_xefun_vararg(2, sp);
+
+        if (argp[2].type != T_NUMBER)
+            bad_xefun_vararg(3, sp);
+
+        mode_flags = argp[2].u.number;
+
+        if ((mode_flags & ~NAME_HIDDEN) < 0
+         || (mode_flags & ~NAME_HIDDEN) > FEXISTS_ALL
+           )
+        if (mode_flags != 0 && mode_flags != NAME_HIDDEN)
+        {
+            error("Bad argument 3 to function_exists(): "
+                  "value %ld (%ld sans NAME_HIDDEN) out of range %d..%d.\n"
+                 , (long)mode_flags, (long)(mode_flags & ~NAME_HIDDEN)
+                 , FEXISTS_ALL, FEXISTS_LINENO
+                );
+            /* NOTREACHED */
+            return sp;
+        }
+    }
+
+    if (ob->flags & O_DESTRUCTED)
+    {
+        error("Bad argument to function_exists(): Object is destructed.\n");
+        /* NOTREACHED */
+        return sp;
+    }
+
+    /* Get the information */
+    prog_name = NULL;
+    str = function_exists( argp->u.string, ob, (mode_flags & NAME_HIDDEN)
+                         , &prog_name, &prog_line);
+    sp = pop_n_elems(num_arg, sp);
+
+    if (str)
+    {
+        switch (mode_flags & ~NAME_HIDDEN)
+        {
+        case FEXISTS_ALL:
+          {
+            char *res;
+            char * p;
+            vector_t *vec;
+
+            /* Make a copy of the string so that we can remove
+             * a the trailing '.c'. In non-compat mode, we also
+             * have to add the leading '/'.
+             */
+            p = strrchr (str, '.');
+
+            if (p)
+                *p = '\0';  /* temporarily mask out the '.c' */
+
+            if (compat_mode)
+                res = string_copy (str);
+            else
+                res = add_slash(str);
+
+            if (p)
+                *p = '.';  /* undo the change above */
+
+            if (!res)
+            {
+                error("Out of memory\n");
+            }
+            vec = allocate_uninit_array(FEXISTS_LINENO+1);
+            put_malloced_string(vec->item+FEXISTS_PROGNAME, res);
+            if (prog_name)
+            {
+                if (compat_mode)
+                    res = string_copy (prog_name);
+                else
+                    res = add_slash(prog_name);
+                if (!res)
+                {
+                    error("Out of memory\n");
+                }
+                put_malloced_string(vec->item+FEXISTS_FILENAME, res);
+            }
+            else
+            {
+                vec->item[FEXISTS_FILENAME].type = T_NUMBER;
+                vec->item[FEXISTS_FILENAME].u.number = 0;
+            }
+            put_number(vec->item+FEXISTS_LINENO, prog_line);
+
+            sp++;
+            put_array(sp, vec);
+            break;
+          }
+        case FEXISTS_PROGNAME:
+          {
+            char * p, * res;
+
+            /* Make a copy of the string so that we can remove
+             * a the trailing '.c'. In non-compat mode, we also
+             * have to add the leading '/'.
+             */
+            p = strrchr (str, '.');
+
+            if (p)
+                *p = '\0';  /* temporarily mask out the '.c' */
+
+            if (compat_mode)
+                res = string_copy(str);
+            else
+                res = add_slash(str);
+
+            if (p)
+                *p = '.';  /* undo the change above */
+
+            if (!res)
+            {
+                error("Out of memory\n");
+            }
+            sp++;
+            put_malloced_string(sp, res);
+            break;
+          }
+
+        case FEXISTS_FILENAME:
+            if (prog_name)
+            {
+                char *res;
+
+                if (compat_mode)
+                    res = string_copy(prog_name);
+                else
+                    res = add_slash(prog_name);
+                if (!res)
+                {
+                    error("Out of memory\n");
+                }
+                sp++;
+                put_malloced_string(sp, res);
+            }
+            else
+            {
+                sp++;
+                sp->type = T_NUMBER;
+                sp->u.number = 0;
+            }
+            break;
+
+        case FEXISTS_LINENO:
+            sp++;
+            sp->type = T_NUMBER;
+            sp->u.number = prog_line;
+            break;
+
+        default:
+            fatal("function_exists(): flags value %ld (from %ld) not implemented.\n"
+                 , mode_flags & ~NAME_HIDDEN, mode_flags);
+            /* NOTREACHED */
+        }
+    }
+    else
+    {
+        sp++;
+        sp->type = T_NUMBER;
+        sp->u.number = 0;
+    }
+
+    /* str and prog_name have no ref on their own */
+
+    return sp;
+} /* f_function_exists() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_variable_exists (svalue_t *sp, int num_arg)
+
+/* EXEC variable_exists()
+ *
+ *   string variable_exists (string str [, int flags])
+ *   string variable_exists (string str , object ob, [, int flags])
+ *
+ * Look up a variable <str> in the current object, respectively
+ * in the object <ob>.
+ *
+ * The result is the name of the program the variable is defined in. This can
+ * be either object_name(ob), or the name of an inherited program. If !compat
+ * mode, the returned name always begins with a '/'.
+ *
+ * If <flags> can be passed as NAME_HIDDEN to return information about static
+ * and protected variables in other objects. It is not possible to return
+ * information about private variables.
+ *
+ * If the variable cannot be found (because it doesn't exist or
+ * it is not visible to the caller), the result is 0.
+ */
+
+{
+    char *str;
+    svalue_t *argp;
+    object_t *ob;
+    p_int mode_flags;
+
+    /* Evaluate arguments */
+    argp = sp - num_arg + 1;
+
+    ob = NULL;
+    mode_flags = 0;
+
+    inter_sp = sp;
+
+    if (argp[0].type != T_STRING)
+        bad_xefun_vararg(1, sp);
+
+    if (num_arg < 2)
+    {
+        ob = current_object;
+        mode_flags = 0;
+    }
+
+    if (num_arg >= 2)
+    {
+        if (argp[1].type == T_NUMBER)
+        {
+            ob = current_object;
+            mode_flags = argp[1].u.number;
+
+            if (mode_flags != 0 && mode_flags != NAME_HIDDEN)
+            {
+                error("Bad argument 2 to variable_exists(): "
+                      "value %ld, expected 0 or %d (NAME_HIDDEN).\n"
+                     , (long)mode_flags, NAME_HIDDEN
+                    );
+                /* NOTREACHED */
+                return sp;
+            }
+        }
+        else if (argp[1].type == T_OBJECT)
+        {
+            ob = argp[1].u.ob;
+            mode_flags = 0;
+        }
+        else
+            bad_xefun_vararg(2, sp);
+    }
+
+    if (num_arg >= 3)
+    {
+        /* The last argument must be a number. On the other
+         * side, we can't have two numbers at once.
+         */
+        if (argp[1].type != T_OBJECT)
+            bad_xefun_vararg(2, sp);
+
+        if (argp[2].type != T_NUMBER)
+            bad_xefun_vararg(3, sp);
+
+        mode_flags = argp[2].u.number;
+
+        if (mode_flags != 0 && mode_flags != NAME_HIDDEN)
+        {
+            error("Bad argument 3 to variable_exists(): "
+                  "value %ld, expected 0 or %d (NAME_HIDDEN).\n"
+                 , (long)mode_flags, NAME_HIDDEN
+                );
+            /* NOTREACHED */
+            return sp;
+        }
+    }
+
+    if (ob->flags & O_DESTRUCTED)
+    {
+        error("Bad argument to variable_exists(): Object is destructed.\n");
+        /* NOTREACHED */
+        return sp;
+    }
+
+    /* Make the program resident */
+    if (O_PROG_SWAPPED(ob))
+    {
+        ob->time_of_ref = current_time;
+        if (load_ob_from_swap(ob) < 0)
+            error("Out of memory: unswap object '%s'\n", ob->name);
+    }
+
+    /* Get the information */
+    str = NULL;
+
+    do
+    {
+        char *shared_name;
+        program_t *progp;
+        int ix;
+        fulltype_t flags;
+
+        shared_name = findstring(argp->u.string);
+        if (!shared_name)
+            break;
+
+        progp = ob->prog;
+
+        /* Check if the function exists at all */
+        for (ix = 0; ix < progp->num_variables; ix++)
+        {
+            if (shared_name == progp->variable_names[ix].name)
+                break;
+        }
+
+        if (ix >= progp->num_variables)
+            break;
+
+        /* Is it visible for the caller? */
+        flags = progp->variable_names[ix].flags;
+
+        if (!(mode_flags & NAME_HIDDEN)
+         && (   (flags & TYPE_MOD_PRIVATE)
+             || ((flags & TYPE_MOD_PROTECTED) && current_object != ob))
+           )
+            break;
+
+        /* Resolve inheritance */
+        while (flags & NAME_INHERITED)
+        {
+            int ic;
+
+            for (ic = 0; ic < progp->num_inherited; ic++)
+            {
+                inherit_t *ip = &progp->inherit[ic];
+
+                if (ix >= ip->variable_index_offset + ip->prog->num_variables
+                 || ix < ip->variable_index_offset
+                   )
+                    continue;
+                ix -= ip->variable_index_offset;
+                progp = ip->prog;
+                flags = progp->variable_names[ix].flags;
+            }
+        }
+
+        /* progp now points to the program which really defines
+         * the variable var.
+         */
+
+        /* We got it. */
+        str = progp->name;
+    } while(0);
+
+    /* Put the result onto the stack */
+    sp = pop_n_elems(num_arg, sp);
+    inter_sp = sp;
+
+    if (str)
+    {
+        /* Make a copy of the string so that we can remove
+         * a the trailing '.c'. In non-compat mode, we also
+         * have to add the leading '/'.
+         */
+        char * p, * res;
+        p = strrchr (str, '.');
+
+        if (p)
+            *p = '\0';  /* temporarily mask out the '.c' */
+
+        if (compat_mode)
+            res = string_copy (str);
+        else
+            res = add_slash(str);
+
+        if (p)
+            *p = '.';  /* undo the change above */
+
+        if (!res)
+        {
+            error("Out of memory\n");
+        }
+        sp++;
+        put_malloced_string(sp, res);
+    }
+    else
+    {
+        sp++;
+        put_number(sp, 0);
+    }
+
+    /* str had no ref on its own */
+
+    return sp;
+} /* f_variable_exists() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_variable_list (svalue_t *sp)
+
+/* EFUN variable_list()
+ *
+ *   mixed *variable_list (object ob, int flags = RETURN_FUNCTION_NAME)
+ *
+ * Return an array with information about <ob>s variables. For every
+ * variable, 1 to 4 values (depending on <flags>) are stored in
+ * the result array conveying in this order:
+ *   - the name of the variable
+ *   - the variable flags (see below)
+ *   - the return type (listed in mudlib/sys/lpctypes.h)
+ *   - the value of the variable
+ *
+ * <ob> may be given as true object or as a filename. In the latter
+ * case, the efun does not try to load the object before proceeding.
+ *
+ * If <ob> is not the current object and the value of the variable is
+ * requested, a privilege_violation ("variable_list", <ob>) occurs.
+ *
+ * <flags> determines both which information is returned for every
+ * variable, and which variables should be considered at all.
+ * Its value is created by bin-or'ing together following flags from
+ * mudlib/sys/functionlist.h:
+ *
+ *   Control of returned information:
+ *     RETURN_FUNCTION_NAME    include the variable name
+ *     RETURN_FUNCTION_FLAGS   include the variable flags
+ *     RETURN_FUNCTION_TYPE    include the return type
+ *     RETURN_VARIABLE_VALUE   include the variable value
+ *
+ *   Control of listed variables:
+ *     NAME_INHERITED      don't list if defined by inheritance
+ *     TYPE_MOD_NOSAVE ==
+ *     TYPE_MOD_STATIC     don't list if nosave ('static') variable
+ *     TYPE_MOD_PRIVATE    don't list if private
+ *     TYPE_MOD_PROTECTED  don't list if protected
+ *     NAME_HIDDEN         don't list if not visible through inheritance
+ *
+ * The 'flags' information consists of the bin-or of the list control
+ * flags given above, plus the following:
+ *
+ *     TYPE_MOD_VIRTUAL    variable is inherited virtually
+ *     TYPE_MOD_NO_MASK    variable is nomask
+ *     TYPE_MOD_PUBLIC     variable is public
+ *
+ * All these flags are defined in mudlib/sys/functionlist.h, which
+ * should be copied into an accessible place in the mudlib. The
+ * return types are defined in mudlib/sys/lpctypes.h which also
+ * should be copied into the mudlib.
+ *
+ * TODO: All these defs are in mudlib/sys/functionlist.h and mudlib/sys/lpctypes.h
+ * TODO:: as well as in exec.h and this file. This should be centralized.
+ * TODO:: Maybe write the files on mud startup?
+ * TODO:: Include mudlib/sys/functionlist.h doesn't help because then
+ * TODO:: mkdepend stumbles over the embedded include <sys/lpctypes.h>.
+ */
+
+{
+    object_t *ob;         /* <ob> argument to list */
+    mp_int mode_flags;    /* <flags> argument */
+    program_t *prog;      /* <ob>'s program */
+    unsigned short num_variables;  /* Number of variables to list */
+    char *vis_tags;
+      /* Bitflag array describing the visibility of every variable in prog
+       * in relation to the passed <flags>: */
+#define VISTAG_INVIS '\0'  /* Variable should not be listed */
+#define VISTAG_VIS   '\1'  /* Variable matches the <flags> list criterium */
+#define VISTAG_ALL   '\2'  /* Variable should be listed, no list restrictions */
+#define VISTAG_NAMED '\4'  /* Variable is neither hidden nor private */
+
+#define FILTERFLAGS (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|NAME_INHERITED)
+
+    vector_t *list;       /* Result vector */
+    svalue_t *svp;        /* Last element in list which was filled in. */
+    variable_t *var;      /* Current variable under examination */
+    uint32 flags;
+    long i, j;
+
+    inter_sp = sp; /* In case of errors leave a clean stack */
+
+    /* Extract the arguments from the vm stack.
+     */
+    if (sp[-1].type != T_OBJECT)
+    {
+        if (sp[-1].type != T_STRING)
+            bad_xefun_arg(1, sp);
+        if (!(ob = find_object(sp[-1].u.string)))
+            error("Object '%s' not found.\n", sp[-1].u.string);
+    }
+    else
+        ob = sp[-1].u.ob;
+
+    if (sp[0].type != T_NUMBER)
+        bad_xefun_arg(2, sp);
+
+    mode_flags = sp->u.number;
+
+    if (ob != current_object && (mode_flags & RETURN_VARIABLE_VALUE))
+    {
+        assert_master_ob_loaded();
+        if (privilege_violation3("variable_list", sp-1, sp) <= 0)
+        {
+            free_svalue(sp);
+            sp--;
+            free_svalue(sp);
+            sp->type = T_NUMBER;
+            sp->u.number = 0;
+            return sp;
+        }
+    }
+
+    if (O_PROG_SWAPPED(ob))
+        if (load_ob_from_swap(ob) < 0)
+        {
+            error("Out of memory: unswap object '%s'\n", ob->name);
+            /* NOTREACHED */
+            return NULL;
+        }
+
+    prog = ob->prog;
+
+    /* Initialize the vistag[] flag array.
+     */
+    num_variables = prog->num_variables;
+    vis_tags = alloca(num_variables);
+    if (!vis_tags)
+    {
+        error("Stack overflow in variable_list()");
+        /* NOTREACHED */
+        return NULL;
+    }
+
+    /* Preset the visibility. By default, if there is any listing
+     * modifier, the variables are not visible. If there is none, the
+     * variables are visible.
+     */
+    memset( vis_tags, (mode_flags & FILTERFLAGS) ?  VISTAG_INVIS : VISTAG_ALL
+          , num_variables);
+
+    /* Count how many named variables need to be listed in the result.
+     * Flag every variable to list in vistag[].
+     */
+    num_variables = 0;
+
+    /* First, check all variables for which we have a name */
+    flags = mode_flags & (FILTERFLAGS ^ NAME_HIDDEN);
+    var = prog->variable_names;
+    i = prog->num_variables;
+    while ( --i >= 0 )
+    {
+        if (!(var[i].flags & flags) )
+        {
+            vis_tags[i] = VISTAG_NAMED|VISTAG_VIS;
+            num_variables++;
+        }
+        else
+        {
+            vis_tags[i] |= VISTAG_NAMED;
+        }
+    }
+
+
+    /* If the user wants to see the hidden or private variables, we loop
+     * through the full variable table and check all variables not yet
+     * touched by the previous 'named' scan.
+     * TODO: Due to the dedicated 'find hidden name' loop, this shouldn't
+     * TODO:: be necessary, nor the VISTAG_ALL at all.
+     */
+    if ((mode_flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0)
+    {
+        var = prog->variable_names;
+        for (i = prog->num_variables; --i >= 0; )
+        {
+            if (!(vis_tags[i] & VISTAG_NAMED)
+             && !(var[i].flags & flags)
+               )
+            {
+                vis_tags[i] = VISTAG_VIS;
+                num_variables++;
+            }
+        }
+    }
+
+    /* If <flags> accepts all variables, use the total number of variables
+     * instead of the count computed above.
+     */
+    if ( !(mode_flags & FILTERFLAGS))
+    {
+        num_variables = prog->num_variables;
+    }
+
+    /* Compute the size of the result vector to
+     *  2**(number of RETURN_FUNCTION_ bits set)
+     */
+    for (i = (mode_flags & RETURN_VARIABLE_MASK), j = 0; i; i >>= 1) {
+        if (i & 1)
+            j += num_variables;
+    }
+
+    /* Allocate the result vector and set svp to its end
+     */
+    list = allocate_array(j);
+    svp = list->item + j;
+
+    /* Loop backwards through all variables, check their flags if
+     * they are to be listed and store the requested data in
+     * the result vector.
+     */
+
+    for (i = prog->num_variables, var = prog->variable_names + i; --i >= 0; )
+    {
+        uint32 active_flags;  /* A variable's definition status flags */
+        var--;
+
+        if ((vis_tags[i] & (VISTAG_ALL|VISTAG_VIS)) == VISTAG_INVIS)
+            continue; /* Don't list this one */
+
+        flags = var->flags;
+
+        active_flags = (flags & ~INHERIT_MASK);
+        if (!(vis_tags[i] & VISTAG_NAMED))
+            active_flags |= NAME_HIDDEN;
+
+        /* Add the data to the result vector as <flags> determines.
+         */
+
+        if (mode_flags & RETURN_VARIABLE_VALUE)
+        {
+            svp--;
+            assign_svalue_no_free(svp, &ob->variables[i]);
+        }
+
+        if (mode_flags & RETURN_FUNCTION_TYPE)
+        {
+            svp--;
+            svp->u.number = var->flags & TYPE_MOD_MASK;
+        }
+
+        if (mode_flags & RETURN_FUNCTION_FLAGS)
+        {
+            svp--;
+            svp->u.number = (p_int)active_flags;
+        }
+
+        if (mode_flags & RETURN_FUNCTION_NAME) {
+            svp--;
+            put_ref_string(svp, var->name);
+        }
+    } /* for() */
+
+    /* Cleanup and return */
+    free_svalue(sp);
+    sp--;
+    free_svalue(sp);
+
+    put_array(sp, list);
+    return sp;
+
+#undef FILTERFLAGS
+
+#undef VISTAG_INVIS
+#undef VISTAG_VIS
+#undef VISTAG_ALL
+#undef VISTAG_NAMED
+} /* f_variable_list() */
+
 /*=========================================================================*/
 /*                        Save/Restore an Object                           */
 
@@ -1071,6 +1910,10 @@ static void register_svalue(svalue_t *);
 
 #define SAVE_OBJECT_BUFSIZE 4096
   /* Size of the read/write buffer.
+   */
+
+static int save_version = -1;
+  /* The version of the savefile to write.
    */
 
 static const char save_file_suffix[] = ".o";
@@ -1506,232 +2349,243 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
       {
         int type;
 
-        switch(type = v->x.closure_type)
+        if (save_version > 0)
         {
-        case CLOSURE_LFUN:
-          {
-            L_PUTC_PROLOG
-
-            if (recall_pointer(v->u.lambda))
-                break;
-
-            if (v->u.lambda->ob == current_object)
+            switch(type = v->x.closure_type)
             {
-                lambda_t  *l;
-                program_t *prog;
-                int        ix;
-                funflag_t  flags;
-                char      *function_name, c;
-                object_t  *ob;
+            case CLOSURE_LFUN:
+              {
+                if (recall_pointer(v->u.lambda))
+                    break;
 
-                l = v->u.lambda;
-                ob = l->ob;
-                ix = l->function.index;
-
-                prog = ob->prog;
-                flags = prog->functions[ix];
-                while (flags & NAME_INHERITED)
                 {
-                    inherit_t *inheritp;
+                    L_PUTC_PROLOG
 
-                    inheritp = &prog->inherit[flags & INHERIT_MASK];
-                    ix -= inheritp->function_index_offset;
-                    prog = inheritp->prog;
-                    flags = prog->functions[ix];
-                }
-
-                memcpy(&function_name
-                      , FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK))
-                      , sizeof function_name
-                      );
-
-                L_PUTC('#');
-                L_PUTC('l');
-                L_PUTC(':');
-                c = *function_name++;
-                do L_PUTC(c) while ( '\0' != (c = *function_name++) );
-                /* TODO: Once we have inherit-conscious lfun closures,
-                 * TODO:: save them as #'l:<inherit>-<name>
-                 */
-            }
-            else
-            {
-                L_PUTC('0');
-            }
-
-            L_PUTC_EPILOG
-            break;
-          }
-
-        case CLOSURE_IDENTIFIER:
-          {
-            L_PUTC_PROLOG
-            lambda_t *l;
-            char * source, c;
-
-            if (recall_pointer(v->u.lambda))
-                break;
-
-            l = v->u.lambda;
-            if (l->function.index == VANISHED_VARCLOSURE_INDEX)
-            {
-                rc = MY_FALSE;
-                break;
-            }
-            if (l->ob->flags & O_DESTRUCTED
-             || l->ob != current_object
-               )
-            {
-                rc = MY_FALSE;
-                break;
-            }
-
-            source = l->ob->prog->variable_names[l->function.index].name;
-
-            L_PUTC('#');
-            L_PUTC('v');
-            L_PUTC(':');
-            c = *source++;
-            do L_PUTC(c) while ( '\0' != (c = *source++) );
-
-            L_PUTC_EPILOG
-            break;
-          }
-
-        default:
-            if (type < 0)
-            {
-                switch(type & -0x0800)
-                {
-                case CLOSURE_OPERATOR:
-                  {
-                    char *s = NULL;
-                    switch(type - CLOSURE_OPERATOR)
+                    if (v->u.lambda->ob == current_object)
                     {
-                    case F_POP_VALUE:
-                        s = ",";
-                        break;
+                        lambda_t  *l;
+                        program_t *prog;
+                        int        ix;
+                        funflag_t  flags;
+                        char      *function_name, c;
+                        object_t  *ob;
 
-                    case F_BBRANCH_WHEN_NON_ZERO:
-                        s = "do";
-                        break;
+                        l = v->u.lambda;
+                        ob = l->ob;
+                        ix = l->function.index;
 
-                    case F_BBRANCH_WHEN_ZERO:
-                        s = "while";
-                        break;
+                        prog = ob->prog;
+                        flags = prog->functions[ix];
+                        while (flags & NAME_INHERITED)
+                        {
+                            inherit_t *inheritp;
 
-                    case F_BRANCH:
-                        s = "continue";
-                        break;
+                            inheritp = &prog->inherit[flags & INHERIT_MASK];
+                            ix -= inheritp->function_index_offset;
+                            prog = inheritp->prog;
+                            flags = prog->functions[ix];
+                        }
 
-                    case F_CSTRING0:
-                        s = "default";
-                        break;
+                        memcpy(&function_name
+                              , FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK))
+                              , sizeof function_name
+                              );
 
-                    case F_BRANCH_WHEN_ZERO:
-                        s = "?";
-                        break;
-
-                    case F_BRANCH_WHEN_NON_ZERO:
-                        s = "?!";
-                        break;
-
-                    case F_RANGE:
-                        s = "[..]";
-                        break;
-
-                    case F_NR_RANGE:
-                        s = "[..<]";
-                        break;
-
-                    case F_RR_RANGE:
-                        s = "[<..<]";
-                        break;
-
-                    case F_RN_RANGE:
-                        s = "[<..]";
-                        break;
-
-                    case F_MAP_INDEX:
-                        s = "[,]";
-                        break;
-
-                    case F_NX_RANGE:
-                        s = "[..";
-                        break;
-
-                    case F_RX_RANGE:
-                        s = "[<..";
-                        break;
-
+                        L_PUTC('#');
+                        L_PUTC('l');
+                        L_PUTC(':');
+                        c = *function_name++;
+                        do L_PUTC(c) while ( '\0' != (c = *function_name++) );
+                        /* TODO: Once we have inherit-conscious lfun closures,
+                         * TODO:: save them as #'l:<inherit>-<name>
+                         */
+                    }
+                    else
+                    {
+                        L_PUTC('0');
                     }
 
-                    if (s)
+                    L_PUTC_EPILOG
+                }
+                break;
+              }
+
+            case CLOSURE_IDENTIFIER:
+              {
+                lambda_t *l;
+                char * source, c;
+
+                if (recall_pointer(v->u.lambda))
+                    break;
+
+                l = v->u.lambda;
+                if (l->function.index == VANISHED_VARCLOSURE_INDEX)
+                {
+                    rc = MY_FALSE;
+                    break;
+                }
+                if (l->ob->flags & O_DESTRUCTED
+                 || l->ob != current_object
+                   )
+                {
+                    rc = MY_FALSE;
+                    break;
+                }
+
+                source = l->ob->prog->variable_names[l->function.index].name;
+
+                {
+                    L_PUTC_PROLOG
+
+                    L_PUTC('#');
+                    L_PUTC('v');
+                    L_PUTC(':');
+                    c = *source++;
+                    do L_PUTC(c) while ( '\0' != (c = *source++) );
+
+                    L_PUTC_EPILOG
+                }
+                break;
+              }
+
+            default:
+                if (type < 0)
+                {
+                    switch(type & -0x0800)
                     {
+                    case CLOSURE_OPERATOR:
+                      {
+                        char *s = NULL;
+                        switch(type - CLOSURE_OPERATOR)
+                        {
+                        case F_POP_VALUE:
+                            s = ",";
+                            break;
+
+                        case F_BBRANCH_WHEN_NON_ZERO:
+                            s = "do";
+                            break;
+
+                        case F_BBRANCH_WHEN_ZERO:
+                            s = "while";
+                            break;
+
+                        case F_BRANCH:
+                            s = "continue";
+                            break;
+
+                        case F_CSTRING0:
+                            s = "default";
+                            break;
+
+                        case F_BRANCH_WHEN_ZERO:
+                            s = "?";
+                            break;
+
+                        case F_BRANCH_WHEN_NON_ZERO:
+                            s = "?!";
+                            break;
+
+                        case F_RANGE:
+                            s = "[..]";
+                            break;
+
+                        case F_NR_RANGE:
+                            s = "[..<]";
+                            break;
+
+                        case F_RR_RANGE:
+                            s = "[<..<]";
+                            break;
+
+                        case F_RN_RANGE:
+                            s = "[<..]";
+                            break;
+
+                        case F_MAP_INDEX:
+                            s = "[,]";
+                            break;
+
+                        case F_NX_RANGE:
+                            s = "[..";
+                            break;
+
+                        case F_RX_RANGE:
+                            s = "[<..";
+                            break;
+
+                        }
+
+                        if (s)
+                        {
+                            L_PUTC_PROLOG
+                            char c;
+
+                            L_PUTC('#');
+                            L_PUTC('e');
+                            L_PUTC(':');
+
+                            c = *s++;
+                            do L_PUTC(c) while ( '\0' != (c = *s++) );
+
+                            L_PUTC_EPILOG
+                            break;
+                        }
+                        type += CLOSURE_EFUN - CLOSURE_OPERATOR;
+                      }
+                    /* default action for operators: FALLTHROUGH */
+
+                    case CLOSURE_EFUN:
+                      {
                         L_PUTC_PROLOG
-                        char c;
+                        char * source, c;
+
+                        source = instrs[type - CLOSURE_EFUN].name;
 
                         L_PUTC('#');
                         L_PUTC('e');
                         L_PUTC(':');
 
-                        c = *s++;
-                        do L_PUTC(c) while ( '\0' != (c = *s++) );
+                        c = *source++;
+                        do L_PUTC(c) while ( '\0' != (c = *source++) );
 
                         L_PUTC_EPILOG
                         break;
+                      }
+
+                    case CLOSURE_SIMUL_EFUN:
+                      {
+                        L_PUTC_PROLOG
+                        char * source, c;
+
+                        source = simul_efunp[type - CLOSURE_SIMUL_EFUN].name;
+
+                        L_PUTC('#');
+                        L_PUTC('s');
+                        L_PUTC(':');
+
+                        c = *source++;
+                        do L_PUTC(c) while ( '\0' != (c = *source++) );
+
+                        L_PUTC_EPILOG
+                        break;
+                      }
                     }
-                    type += CLOSURE_EFUN - CLOSURE_OPERATOR;
-                  }
-                /* default action for operators: FALLTHROUGH */
-
-                case CLOSURE_EFUN:
-                  {
-                    L_PUTC_PROLOG
-                    char * source, c;
-
-                    source = instrs[type - CLOSURE_EFUN].name;
-
-                    L_PUTC('#');
-                    L_PUTC('e');
-                    L_PUTC(':');
-
-                    c = *source++;
-                    do L_PUTC(c) while ( '\0' != (c = *source++) );
-
-                    L_PUTC_EPILOG
                     break;
-                  }
-
-                case CLOSURE_SIMUL_EFUN:
-                  {
-                    L_PUTC_PROLOG
-                    char * source, c;
-
-                    source = simul_efunp[type - CLOSURE_SIMUL_EFUN].name;
-
-                    L_PUTC('#');
-                    L_PUTC('s');
-                    L_PUTC(':');
-
-                    c = *source++;
-                    do L_PUTC(c) while ( '\0' != (c = *source++) );
-
-                    L_PUTC_EPILOG
-                    break;
-                  }
+                }
+                else /* type >= 0: one of the lambda closures */
+                {
+                    rc = MY_FALSE;
                 }
                 break;
-            }
-            else /* type >= 0: one of the lambda closures */
-            {
-                rc = MY_FALSE;
-            }
-            break;
 
-        } /* switch(closure type) */
+            } /* switch(closure type) */
+        }
+        else
+        {
+            rc = 0;
+        }
 
-        /* We come here, we could write the closure */
         /* 'rc' at this point signifies whether the closure could be written.
          * If it couldn't, maybe write a default '0', and also adjust rc
          * to serve as function result.
@@ -1892,8 +2746,8 @@ f_save_object (svalue_t *sp, int numarg)
 
 /* VEFUN save_object()
  *
- *   int    save_object (string file)
- *   string save_object ()
+ *   int    save_object (string file, [int version])
+ *   string save_object ([int version])
  *
  * Save the variables of the current object to the file <file> (the suffix
  * ".o" will be appended. Returns 0 if the save file could be created,
@@ -1908,6 +2762,11 @@ f_save_object (svalue_t *sp, int numarg)
  * In the second form, the a string with all variables and values is
  * returned directly, or 0 if an error occurs. This string can be used
  * with restore_object() to restore the variable values.
+ *
+ * In both forms, the optional argument <version> determines the format
+ * of the save file. A value of '-1' creates the format native to the
+ * driver. Currently the formats 0 and 1 are supported.
+ *
  * TODO: "save_object()" looks nice, but maybe call that "save_variables()"?
  */
 
@@ -1945,20 +2804,75 @@ f_save_object (svalue_t *sp, int numarg)
     file = NULL;
     name = NULL;
     tmp_name = NULL;
+    save_version = CURRENT_VERSION;
 
-    /* Test the arguments */
-    if (!numarg)
+    switch (numarg)
     {
+    case 0:
         strbuf_zero(&save_string_buffer);
-    }
-    else if (sp->type != T_STRING)
-    {
-        bad_xefun_arg(1, sp);
-        /* NOTREACHED */
-        return sp;
-    }
-    else
-      file = sp->u.string;
+        break;
+
+    case 1:
+        if (sp->type == T_STRING)
+        {
+           file = sp->u.string;
+        }
+        else if (sp->type == T_NUMBER)
+        {
+            if (sp->u.number < -1 || sp->u.number > CURRENT_VERSION)
+            {
+                error("Illegal value for arg 1 to save_object(): %ld, "
+                      "expected -1..%d\n"
+                     , (long)sp->u.number, CURRENT_VERSION
+                     );
+                /* NOTREACHED */
+                return sp;
+            }
+
+            strbuf_zero(&save_string_buffer);
+            save_version = sp->u.number >= 0 ? sp->u.number
+                                             : CURRENT_VERSION;
+        }
+        else
+        {
+            bad_xefun_arg(1, sp);
+            /* NOTREACHED */
+            return sp;
+        }
+        break;
+
+    case 2:
+        if (sp[-1].type != T_STRING)
+            bad_xefun_arg(1, sp);
+        if (sp->type != T_NUMBER)
+            bad_xefun_arg(2, sp);
+
+        file = sp[-1].u.string;
+
+        if (sp->u.number < -1 || sp->u.number > CURRENT_VERSION)
+        {
+            error("Illegal value for arg 1 to save_object(): %ld, "
+                  "expected -1..%d\n"
+                 , (long)sp->u.number, CURRENT_VERSION
+                 );
+            /* NOTREACHED */
+            return sp;
+        }
+
+        save_version = sp->u.number >= 0 ? sp->u.number
+                                         : CURRENT_VERSION;
+
+        /* The main code wants sp == filename */
+        sp--;
+        numarg--;
+        break;
+
+    default:
+        fatal("Too many arguments to save_object(): %d, expected 0..2\n"
+             , numarg);
+    } /* switch(numarg) */
+
+    save_object_header[1] = '0' + save_version;
 
     /* No need in saving destructed objects */
 
@@ -1966,14 +2880,14 @@ f_save_object (svalue_t *sp, int numarg)
     if (ob->flags & O_DESTRUCTED)
     {
         if (numarg)
-            free_string_svalue(sp);
-        else
-            sp++;
+            sp = pop_n_elems(numarg, sp);
+        sp++;
         put_number(sp, 0);
         return sp;
     }
 
     /* If saving to a file, get the proper name and open it
+     * The code assumes that sp is the filename argument.
      */
     if (file)
     {
@@ -2141,9 +3055,8 @@ f_save_object (svalue_t *sp, int numarg)
             unlink(tmp_name);
             add_message("Failed to save to file '%s'. Disk could be full.\n", file);
             if (numarg)
-                free_string_svalue(sp);
-            else
-                sp++;
+                sp = pop_n_elems(numarg, sp);
+            sp++;
             put_number(sp, 1);
             return sp;
         }
@@ -2174,7 +3087,8 @@ f_save_object (svalue_t *sp, int numarg)
 #endif
 
         if (numarg)
-            free_string_svalue(sp);
+            sp = pop_n_elems(numarg, sp);
+        sp++;
         put_number(sp, i);
     }
     else
@@ -2183,7 +3097,9 @@ f_save_object (svalue_t *sp, int numarg)
          * data pending in the save_buffer.
          */
 
-        sp++; /* We're returning a result. */
+        if (numarg)
+            sp = pop_n_elems(numarg, sp);
+        sp++;
 
         if (failed)
             put_number(sp, 0); /* Shouldn't happen */
@@ -2228,11 +3144,11 @@ f_save_object (svalue_t *sp, int numarg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_save_value (svalue_t *sp)
+f_save_value (svalue_t *sp, int numarg)
 
 /* TEFUN save_value()
  *
- *   string save_value(mixed value)
+ *   string save_value(mixed value, [int version])
  *
  * Encode the <value> into a string suitable for restoration with
  * restore_value() and return it.
@@ -2241,6 +3157,10 @@ f_save_value (svalue_t *sp)
  * character: the first line describes the format used to save the value in
  * the '#x:y' notation; the second line is the representation of the value
  * itself.
+ *
+ * The optional argument <version> determines the format
+ * of the save file. A value of '-1' creates the format native to the
+ * driver. Currently the formats 0 and 1 are supported.
  */
 
 {
@@ -2269,6 +3189,47 @@ f_save_value (svalue_t *sp)
 
     strbuf_zero(&save_string_buffer);
     save_object_descriptor = -1;
+    save_version = CURRENT_VERSION;
+
+    /* Evaluate the arguments */
+    switch (numarg)
+    {
+    case 1:
+        /* Ok */
+        break;
+
+    case 2:
+        if (sp->type == T_NUMBER)
+        {
+            if (sp->u.number < -1 || sp->u.number > CURRENT_VERSION)
+            {
+                error("Illegal value for arg 1 to save_object(): %ld, "
+                      "expected -1..%d\n"
+                     , (long)sp->u.number, CURRENT_VERSION
+                     );
+                /* NOTREACHED */
+                return sp;
+            }
+
+            save_version = sp->u.number >= 0 ? sp->u.number
+                                                    : CURRENT_VERSION;
+
+            sp--;
+        }
+        else
+        {
+            bad_xefun_arg(2, sp);
+            /* NOTREACHED */
+            return sp;
+        }
+        break;
+
+    default:
+        fatal("Illegal number of arguments to save_value(): %d, expected 1..2\n"
+             , numarg);
+    } /* switch(numarg) */
+
+    save_value_header[1] = '0' + save_version;
 
     /* First look at the value for arrays and mappings
      */
@@ -2744,7 +3705,12 @@ restore_size (char **str)
             pt2 = strchr(pt, ':');
             if (!pt2)
                 return -1;
-            pt = &pt2[1];
+            pt = &pt2[2];
+              /* 'pt = &pt2[1]' is the logical statement, but
+               * would run afoul the '#e:,' operator closure.
+               * Because every closure has at least one character
+               * following the ':', this solution is safe.
+               */
             break;
 
         default:
@@ -2872,7 +3838,12 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                     return MY_FALSE;
                 }
 
-                if (c == delimiter) break;
+                /* Break at the delimiter, but make sure that it's not
+                 * part of an operator closure ('#e:,' for example).
+                 */
+                if (c == delimiter
+                 && !(cp[-4] == '#' && cp[-3] == 'e' && cp[-2] == ':')
+                   ) break;
             }
             cp[-1] = '\0'; /* Overwrites the delimiter */
             *pt = cp;
@@ -2891,7 +3862,11 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                 if ((code = symbol_operator(name, &end)) >= 0)
                 {
                     svp->type = T_CLOSURE;
-                    svp->x.closure_type = code + CLOSURE_EFUN_OFFS;
+                    code += CLOSURE_EFUN_OFFS;
+                    svp->x.closure_type
+                      = (short)(  instrs[code - CLOSURE_EFUN_OFFS].Default == -1
+                                ? code + CLOSURE_OPERATOR-CLOSURE_EFUN
+                                : code);
                     svp->u.ob = ref_object(current_object, "restore_svalue");
                     break;
                 }
@@ -3508,6 +4483,8 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
     } /* switch()*/
 
     cp = *pt;
+    if (delimiter == '\n' && *cp == '\r')
+        cp++;
     if (*cp++ != delimiter)
         return MY_FALSE;
     *pt = cp;
@@ -3587,6 +4564,7 @@ f_restore_object (svalue_t *sp)
  */
 
 {
+static int nesting = 0;  /* Used to detect recursive calls */
     int restored_version; /* Formatversion of the saved data */
     char *name;      /* Full name of the file to read */
     char *file;      /* Filename passed, NULL if restoring from a string */
@@ -3594,6 +4572,7 @@ f_restore_object (svalue_t *sp)
     char *buff;      /* Current line read from the savefile
                       * resp. a copy of the string passed.
                       */
+    Bool adopted_arg; /* TRUE if buff adopted the memory of sp->u.string */
     char *cur;       /* Current position in the string passed */
     char *space;
     object_t *ob;    /* Local copy of current_object */
@@ -3615,16 +4594,49 @@ f_restore_object (svalue_t *sp)
     } * dp = NULL;
       /* List of values for which the variables no longer exist. */
 
+#define FREE_BUFF() MACRO( \
+          if (nesting < 2) mb_free(mbFile); \
+          if (adopted_arg || nesting > 1) xfree(buff); \
+        )
+      /* Free buff correctly. Note that adopted_arg and 'nesting < 2'
+       * can be true at the same time.
+       */
+
+    /* Keep track of recursive calls */
+    nesting++;
 
     /* Test the arguments */
     if (sp->type != T_STRING)
     {
+        nesting--;
         bad_xefun_arg(1, sp);
+        return sp;
+    }
+
+    /* No use in restoring a destructed object, or an object
+     * with no variables. Do this check before analysing the
+     * arguments, as freeing buff is complicated.
+     */
+    ob = current_object;
+    if (ob->flags & O_DESTRUCTED)
+    {
+        free_svalue(sp);
+        put_number(sp, 0);
+        nesting--;
+        return sp;
+    }
+
+    if (ob->prog->num_variables == 0)
+    {
+        free_svalue(sp);
+        put_number(sp, 1);
+        nesting--;
         return sp;
     }
 
     /* Check if got a filename or the value string itself */
     buff = NULL;
+    adopted_arg = MY_FALSE;
     name = NULL;
     file = NULL;
     f = NULL;
@@ -3636,7 +4648,12 @@ f_restore_object (svalue_t *sp)
         if (sp->x.string_type != STRING_MALLOC)
         {
             len = svalue_strlen(sp);
-            xallocate(buff, len+1, "copy of value string");
+            buff = (nesting > 1) ? xalloc(len+1) : mb_alloc(mbFile, len+1);
+            if (buff == NULL)
+            {
+                nesting--;
+                outofmem(len+1, "copy of value string");
+            }
             memcpy(buff, sp->u.string, len);
             buff[len] = '\0';
         }
@@ -3645,29 +4662,12 @@ f_restore_object (svalue_t *sp)
             /* We can adopt the string */
             buff = sp->u.string;
             put_number(sp, 0);
+            adopted_arg = MY_TRUE;
         }
     }
     else
         file = sp->u.string;
 
-
-    /* No use in restoring a destructed object, or an object
-     * with no variables.
-     */
-    ob = current_object;
-    if (ob->flags & O_DESTRUCTED)
-    {
-        free_svalue(sp);
-        put_number(sp, 0);
-        return sp;
-    }
-
-    if (ob->prog->num_variables == 0)
-    {
-        free_svalue(sp);
-        put_number(sp, 1);
-        return sp;
-    }
 
     /* If restoring from a file, set it up */
 
@@ -3678,6 +4678,7 @@ f_restore_object (svalue_t *sp)
         file = check_valid_path(file, ob, "restore_object", MY_FALSE);
         if (file == NULL)
         {
+            nesting--;
             error("Illegal use of restore_object()\n");
             /* NOTREACHED */
             return sp;
@@ -3691,6 +4692,7 @@ f_restore_object (svalue_t *sp)
 
         if (!name)
         {
+            nesting--;
             error("Stack overflow in restore_object()\n");
             /* NOTREACHED */
             return sp;
@@ -3710,6 +4712,7 @@ f_restore_object (svalue_t *sp)
                 fclose(f);
             free_svalue(sp);
             put_number(sp, 0);
+            nesting--;
             return sp;
         }
         if (st.st_size == 0)
@@ -3717,6 +4720,7 @@ f_restore_object (svalue_t *sp)
             fclose(f);
             free_svalue(sp);
             put_number(sp, 0);
+            nesting--;
             return sp;
         }
         FCOUNT_REST(name);
@@ -3725,10 +4729,12 @@ f_restore_object (svalue_t *sp)
          * can be one single line.
          */
 
-        buff = xalloc((size_t)(st.st_size + 1));
+        buff = (nesting > 1) ? xalloc((size_t)(st.st_size + 1))
+                             : mb_alloc(mbFile, (size_t)(st.st_size+1));
         if (!buff)
         {
             fclose(f);
+            nesting--;
             error("(restore) Out of memory (%lu bytes) for linebuffer.\n"
                  , (unsigned long) st.st_size+1);
             /* NOTREACHED */
@@ -3738,7 +4744,7 @@ f_restore_object (svalue_t *sp)
 
     /* Initialise the variables */
 
-    max_shared_restored = 256;
+    max_shared_restored = 64;
     current_shared_restored = 0;
 
     if (shared_restored_values)
@@ -3752,7 +4758,8 @@ f_restore_object (svalue_t *sp)
     {
         if (f)
             fclose(f);
-        xfree(buff);
+        FREE_BUFF();
+        nesting--;
         error("(restore) Out of memory (%lu bytes) for shared values.\n"
              , sizeof(svalue_t)*max_shared_restored);
         /* NOTREACHED */
@@ -3782,7 +4789,13 @@ f_restore_object (svalue_t *sp)
         else if (cur[0] == '\0')
             break;
 
-        /* Remember that we have a newline at end of buff! */
+        /* Remember that we have a newline, and maybe even a CRLF at end of
+         * buff!
+         */
+        pt = strchr(cur, '\r');
+        if (pt && pt[1] == '\n') /* Convert a CRLF into a LF */
+            *pt = '\n';
+        pt = NULL;
 
         space = strchr(cur, ' ');
         if (!file)
@@ -3820,7 +4833,8 @@ f_restore_object (svalue_t *sp)
                 while ( NULL != (dp=dp->next) );
 
             free_shared_restored_values();
-            xfree(buff);
+            FREE_BUFF();
+            nesting--;
             error("Illegal format (version line) when restoring %s.\n"
                   , file ? name : current_object->name);
             /* NOTREACHED */
@@ -3890,7 +4904,7 @@ f_restore_object (svalue_t *sp)
                 if (!dp)
                 {
                     free_shared_restored_values();
-                    xfree(buff);
+                    FREE_BUFF();
                     if (f)
                         fclose(f);
                     if (tmp)
@@ -3899,6 +4913,7 @@ f_restore_object (svalue_t *sp)
                             free_svalue(&tmp->v);
                         while (NULL != (tmp = tmp->next));
                     }
+                    nesting--;
                     error("Stack overflow in restore_object()\n");
                     /* NOTREACHED */
                     return sp;
@@ -3937,7 +4952,8 @@ f_restore_object (svalue_t *sp)
                 while ( NULL != (dp=dp->next) );
             }
             free_shared_restored_values();
-            xfree(buff);
+            FREE_BUFF();
+            nesting--;
             error("Illegal format (value string) when restoring %s.\n"
                  , file ? name : current_object->name);
             /* NOTREACHED */
@@ -3961,11 +4977,15 @@ f_restore_object (svalue_t *sp)
     if (f)
         fclose(f);
     free_shared_restored_values();
-    xfree(buff);
+    FREE_BUFF();
+
+    nesting--;
 
     free_svalue(sp);
     put_number(sp, 1);
     return sp;
+
+#undef FREE_BUFF
 } /* f_restore_object() */
 
 /*-------------------------------------------------------------------------*/
@@ -4036,7 +5056,7 @@ f_restore_value (svalue_t *sp)
 
     /* Initialise the shared value table */
 
-    max_shared_restored = 256;
+    max_shared_restored = 64;
 
     if (shared_restored_values)
     {
@@ -4073,9 +5093,18 @@ f_restore_value (svalue_t *sp)
         return sp; /* flow control hint */
     }
 
+    free_shared_restored_values();
+
+    if (*p != '\0')
+    {
+        error("Illegal format when restoring a value: extraneous characters "
+              "at the end.\n");
+        /* NOTREACHED */
+        return sp; /* flow control hint */
+    }
+
     /* Restore complete - now clean up and return the result */
 
-    free_shared_restored_values();
     inter_sp = --sp;
     free_string_svalue(sp);
     *sp = sp[1];
@@ -4084,4 +5113,3 @@ f_restore_value (svalue_t *sp)
 } /* f_restore_value() */
 
 /***************************************************************************/
-

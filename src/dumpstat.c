@@ -11,6 +11,10 @@
 #include "typedefs.h"
 
 #include <stdio.h>
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#include <time.h>
 
 #define USES_SVALUE_STRLEN
 #include "dumpstat.h"
@@ -321,6 +325,8 @@ dumpstat(char *fname)
 
     for (ob = obj_list; ob; ob = ob->next_all)
     {
+        char timest[21];
+        struct tm *tm;
         mp_int compsize, totalsize, overhead;
 #ifdef DEBUG
         if (ob->flags & O_DESTRUCTED) /* TODO: Can't happen */
@@ -351,9 +357,12 @@ dumpstat(char *fname)
             fprintf(f, " (%lu%09lu)", ob->gigaticks, ob->ticks);
         else
             fprintf(f, " (%lu)", ob->ticks);
-        fprintf(f, " %s\n",
+        fprintf(f, " %s",
                 swapstrings[(O_PROG_SWAPPED(ob)?1:0) | (O_VAR_SWAPPED(ob)?2:0)]
         );
+        tm = localtime((time_t *)&ob->load_time);
+        strftime(timest, sizeof(timest)-1, "%Y.%m.%d-%H:%M:%S", tm);
+        fprintf(f, " %s\n", timest);
     }
     fclose(f);
     return MY_TRUE;

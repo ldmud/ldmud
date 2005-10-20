@@ -1209,7 +1209,15 @@ execute_command (char *str, object_t *ob)
 
         push_volatile_string(str);
         svp = sapply_int(driver_hook[H_COMMAND].u.string, ob, 1, MY_TRUE);
-        res = (svp->type != T_NUMBER) || (svp->u.number != 0);
+        if (!svp)
+        {
+            error("Can't find H_COMMAND lfun '%s' in object '%s'.\n"
+                 , driver_hook[H_COMMAND].u.string, ob->name
+                 );
+            res = 0;
+        }
+        else
+            res = (svp->type != T_NUMBER) || (svp->u.number != 0);
     }
     else if (driver_hook[H_COMMAND].type == T_CLOSURE)
     {
@@ -1543,50 +1551,74 @@ f_remove_action (svalue_t *sp)
  *
  *   int remove_action(string verb, object ob)
  *
- * Removes the action for the optional object, default is for
- * this_player().
+ * Remove the first action defined by the current object with command verb
+ * <verb> from <ob> (default is this_player()).
  * Return 1 if the action was found and removed, and 0 else.
+ *
+ *   int remove_action(int flag, object ob)
+ *
+ * if <flag> is non-0, remove all actionsdefined by the current object from
+ * <ob> (default is this_player()).
+ * Return the number of actions removed.
  */
 
 {
-    object_t *ob;
-    char *verb;
+    object_t    *ob;
+    char        *verb;
     sentence_t **sentp;
-    action_t *s;
+    action_t    *s;
+    int          rc;
 
     /* Get and test the arguments */
-    if (sp[-1].type != T_STRING)
+    if (sp[-1].type != T_STRING && sp[-1].type != T_NUMBER)
         bad_xefun_arg(1, sp);
     if (sp->type != T_OBJECT)
         bad_xefun_arg(2, sp);
 
     ob = sp->u.ob;
-    verb = sp[-1].u.string;
 
-    if (sp[-1].x.string_type != STRING_SHARED)
-        if ( !(verb = findstring(verb)) )
+    verb = NULL;
+    if (sp[-1].type == T_STRING)
+    {
+        verb = sp[-1].u.string;
+        if (sp[-1].x.string_type != STRING_SHARED)
+            if ( !(verb = findstring(verb)) )
+                verb = (char *)f_remove_action; /* won't be found */
+    }
+    else if (sp[-1].type == T_NUMBER)
+    {
+        if (sp[-1].u.number != 0)
+            verb = NULL; /* finds all */
+        else
             verb = (char *)f_remove_action; /* won't be found */
+    }
 
     /* Now search and remove the sentence */
+    rc = 0;
     sentp = &ob->sent;
     ob = current_object;
     while ( NULL != (s = (action_t *)*sentp) )
     {
-        if (s->ob == ob && s->verb == verb)
+        if (s->ob == ob && (!verb || s->verb == verb))
         {
             *sentp = s->sent.next;
             free_action_sent(s);
-            break;
+            rc++;
+            if (verb != NULL)
+                break;
         }
-        sentp = &s->sent.next;
+        else
+        {
+            sentp = &s->sent.next;
+        }
     }
 
     /* Clean up the stack and push the result */
     free_object_svalue(sp);
     sp--;
-    free_string_svalue(sp);
+    free_svalue(sp);
 
-    put_number(sp, s != 0);
+    put_number(sp, rc);
 
     return sp;
 } /* f_remove_action() */
@@ -1690,7 +1722,7 @@ e_get_all_actions (object_t *ob, int mask)
 
         sa = (action_t *)s;
 
-        if (mask & 1)
+        if (mask & QA_VERB)
         {
             char * str;
             if ( NULL != (str = sa->verb) ) {
@@ -1698,22 +1730,22 @@ e_get_all_actions (object_t *ob, int mask)
             }
             p++;
         }
-        if (mask & 2)
+        if (mask & QA_TYPE)
         {
             p->u.number = s->type;
             p++;
         }
-        if (mask & 4)
+        if (mask & QA_SHORT_VERB)
         {
             p->u.number = sa->short_verb;
             p++;
         }
-        if (mask & 8)
+        if (mask & QA_OBJECT)
         {
             put_ref_object(p, sa->ob, "get_action");
             p++;
         }
-        if (mask & 16)
+        if (mask & QA_FUNCTION)
         {
             put_ref_string(p, sa->function);
             p++;

@@ -5,11 +5,11 @@ Type: Bug
 State: Done - fixed in 3.2.8-dev.175.
 
 Dafire@FinalFrontier tells you: qlpc return
-   terminal_colour("test123REPtest123",(["REP":"REPLACED"]),4,3); 
+   terminal_colour("test123REPtest123",(["REP":"REPLACED"]),4,3);
 crasht den
-   driver.. der sagt dann noch: 2000.02.17 17:24:23 Length 
+   driver.. der sagt dann noch: 2000.02.17 17:24:23 Length
 miscalculated in
-   terminal_colour(); Expected: 62 Was: 59;  String: 
+   terminal_colour(); Expected: 62 Was: 59;  String:
 test123REPtest123;
    Indent: 3 Wrap: 4
 

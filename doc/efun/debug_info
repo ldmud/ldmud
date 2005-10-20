@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <debug_info.h>
+        #include <sys/debug_info.h>
 
         mixed debug_info(int flag)
         mixed debug_info(int flag, mixed arg)
@@ -17,11 +17,17 @@ DESCRIPTION
             about the specified object, and 0 returned.
 
         DINFO_OBJLIST (2): Objects from the global object list are
-            returned.  If the optional second arg is omitted, the first
-            element (numbered 0) is returned. If the second arg is a
-            number n, the n'th element of the object list returned. If the
-            second arg is an object, it's successor in the object list is
+            returned.  If the optional <arg2> is omitted, the first
+            element(s) (numbered 0) is returned. If the <arg2> is a
+            number n, the n'th element(s) of the object list returned. If the
+            <arg2> is an object, it's successor(s) in the object list is
             returned.
+            The optional <arg3> specifies the maximum number of objects
+            returned. If it's 0, a single object is returned. If it is
+            a positive number m, an array with at max 'm' objects is
+            returned. This way, by passing __INT_MAX__ as <arg3> it is
+            possible to create an array of all objects in the game
+            (given a suitable maximum array size).
 
         DINFO_MALLOC (3): Equivalent to typing ``malloc'' at the command
             line. No second arg must be given. Returns 0.
@@ -60,6 +66,7 @@ DESCRIPTION
                    'PROG SWAPPED' if only the program is swapped
                    'VAR SWAPPED' if only the variabes are swapped
                    'SWAPPED' if both program and variables are swapped
+                - the time the object was created
 
              <arg2> == "destructed": dump information about all destructed
                objects.  Default filename is '/DEST_OBJ_DUMP', the
@@ -91,6 +98,9 @@ DESCRIPTION
 
             <arg2> == DID_STATUS (0): Returns the "status" and "status tables"
             information. Following indices are defined:
+
+              int DID_ST_BOOT_TIME
+                  The time() when the mud was started.
 
               int DID_ST_ACTIONS
               int DID_ST_ACTIONS_SIZE
@@ -140,13 +150,12 @@ DESCRIPTION
                   Number of objects with a heartbeat.
 
               int DID_ST_HBEAT_CALLS
-                  Number of heart_beats executed so far.
+                  Number of active heart_beat cycles executed so far
+                  (ie. cycles in which at least one heart_beat() function
+                  was called).
 
               int DID_ST_HBEAT_CALLS_TOTAL
-                  Number of heart_beats calls so far. The difference to
-                  ST_HBEAT_CALLS is that the latter only counts heart beat
-                  calls during which at least one heart beat was actually
-                  executed.
+                  Total number of heart_beats cycles so far.
 
               int DID_ST_HBEAT_SLOTS
               int DID_ST_HBEAT_SIZE
@@ -161,12 +170,7 @@ DESCRIPTION
                   as fraction (0..1.0).
 
               int DID_ST_CALLOUTS
-                  Number of pending call_outs.
-
-              int DID_ST_CALLOUT_SLOTS
-              int DID_ST_CALLOUT_SIZE
-                  Number of allocated entries in the call_out table
-                  and its size.
+                  Number and total size of pending call_outs.
 
               int DID_ST_ARRAYS
               int DID_ST_ARRAYS_SIZE
@@ -254,6 +258,13 @@ DESCRIPTION
                   Number of requested new regexps which collided with
                   a cached one.
 
+              int DID_ST_MB_FILE
+                  The size of the 'File' memory buffer.
+
+              int DID_ST_MB_SWAP
+                  The size of the 'Swap' memory buffer.
+
+
             <arg2> == DID_SWAP (1): Returns the "status swap" information:
 
                int DID_SW_PROGS
@@ -319,10 +330,6 @@ DESCRIPTION
                int DID_MEM_CHUNK
                int DID_MEM_CHUNK_SIZE
                    Number and size of small chunk blocks (smalloc only).
-
-               int DID_MEM_UNUSED
-                   Unused space in the current small chunk block
-                   (smalloc only).
 
                int DID_MEM_SMALL
                int DID_MEM_SMALL_SIZE
@@ -432,6 +439,13 @@ HISTORY
           DID_MEM_ALLOCATED, DID_MEM_USED, DID_MEM_TOTAL_UNUSED,
           DID_ST_HBEAT_CALLS_TOTAL and the found/added/deleted/collisions
           string stats.
+        LDMud 3.2.10 added the object creation time to DINFO_DUMP:"objects",
+          removed DID_MEM_UNUSED from DINFO_DATA:DID_MEMORY; added
+          DID_ST_BOOT_TIME, DID_ST_MB_FILE and DID_ST_MB_SWAP to
+          DINFO_DATA:DID_STATUS; removed DID_ST_CALLOUT_SLOTS and from
+          DINFO_DATA:DID_STATUS; added the third argument to
+          DINFO_OBJLIST, and changed the meaning of
+          DID_ST_CALLOUT_SIZE and DID_ST_HBEAT_SIZE/_SLOTS.
 
 SEE ALSO
         trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)

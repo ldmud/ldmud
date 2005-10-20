@@ -24,7 +24,7 @@ But if i use a clinet (tinyfugue), which forces a \n to accept the input
 i got strange results.
 With 3.2.7 i got the key i typed, but with 3.2.8 i got back a strange string
 containing -3 (hex $FC) and at the second call a +3 (hex $03) if i type
-just return. 
+just return.
 The result is the same, if i entered another key before i type return.
 
 I'm confused with the output, all i want is a code which detects just the
@@ -167,7 +167,7 @@ the input_to("func",2);
 2000.08.22 22:54:37 TDEBUG: 'sys/impl#12' t_n: state IAC
 2000.08.22 22:54:37 TDEBUG: 'sys/impl#12' t_n: got WONT
 2000.08.22 22:54:37 TDEBUG: 'sys/impl#12' t_n: new state 3
-2000.08.22 22:54:37 TDEBUG: 'sys/impl#12' t_n: state WONT got SUPPRESS GO AHEAD (03)  
+2000.08.22 22:54:37 TDEBUG: 'sys/impl#12' t_n: state WONT got SUPPRESS GO AHEAD (03)
 2000.08.22 22:54:37 TDEBUG: 'sys/impl#12' reply to WONT SGA
 2000.08.22 22:54:37 TDEBUG: 'sys/impl#12'   we already said DONT
 2000.08.22 22:54:37 TDEBUG: 'sys/impl#12' t_n: new state 0
@@ -193,7 +193,7 @@ the input_to("func",2);
 2000.08.22 22:54:37 TDEBUG: 'sys/impl#12' t_n: state WONT got SUPPRESS GO AHEAD (03)
 2000.08.22 22:54:37 TDEBUG: 'sys/impl#12' reply to WONT SGA
 2000.08.22 22:54:37 TDEBUG: 'sys/impl#12'   we already said DONT
-2000.08.22 22:54:37 TDEBUG: 'sys/impl#12' t_n: new state 0 
+2000.08.22 22:54:37 TDEBUG: 'sys/impl#12' t_n: new state 0
 2000.08.22 22:54:37 TDEBUG: 'sys/impl#12' t_n: new state 1
 2000.08.22 22:54:37 TDEBUG: 'sys/impl#12' t_n: state IAC
 2000.08.22 22:54:37 TDEBUG: 'sys/impl#12' t_n: got DONT
@@ -236,7 +236,7 @@ Here the output if i use ordinary telnet :
 2000.08.22 23:04:04 TDEBUG: 'sys/impl#12' telnet_neg: state 0
 2000.08.22 23:04:04 TDEBUG: 'sys/impl#12' t_n: new state 1
 2000.08.22 23:04:04 TDEBUG: 'sys/impl#12' t_n: state IAC
-2000.08.22 23:04:04 TDEBUG: 'sys/impl#12' t_n: got WILL  
+2000.08.22 23:04:04 TDEBUG: 'sys/impl#12' t_n: got WILL
 2000.08.22 23:04:04 TDEBUG: 'sys/impl#12' t_n: new state 2
 2000.08.22 23:04:04 TDEBUG: 'sys/impl#12' t_n: state WILL got SUPPRESS GO AHEAD (03)
 2000.08.22 23:04:04 TDEBUG: 'sys/impl#12' reply to WILL SGA
@@ -263,7 +263,7 @@ Here the output if i use ordinary telnet :
 2000.08.22 23:04:07 TDEBUG: 'sys/impl#12'   Unescaped input
 2000.08.22 23:04:07 TDEBUG: 'sys/impl#12'     incomplete negotiation: length 0
 2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' CHARMODE_REQ
-2000.08.22 23:04:08 TDEBUG: 'sys/impl#12'   Unescaped input  
+2000.08.22 23:04:08 TDEBUG: 'sys/impl#12'   Unescaped input
 2000.08.22 23:04:08 TDEBUG: 'sys/impl#12'     incomplete negotiation: length 0
 2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' telnet_neg: state 0
 2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' CHARMODE_REQ
@@ -285,7 +285,7 @@ Here the output if i use ordinary telnet :
 2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' Sending telnet (1 bytes):  ffffffff
 2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' Sending telnet (2 bytes):  fffffffe 03
 2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' Sending telnet (0 bytes):
-2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' set_noecho():     cmd_start 1, tn_start 1, tn_end 1     
+2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' set_noecho():     cmd_start 1, tn_start 1, tn_end 1
 2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' telnet_neg: state 0
 2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' t_n: new state 1
 2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' t_n: state IAC
@@ -300,7 +300,7 @@ Here the output if i use ordinary telnet :
 2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' t_n: new state 3
 2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' t_n: state WONT got SUPPRESS GO AHEAD (03)
 2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' reply to WONT SGA
-2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' t_n: new state 0     
+2000.08.22 23:04:08 TDEBUG: 'sys/impl#12' t_n: new state 0
 
 
 

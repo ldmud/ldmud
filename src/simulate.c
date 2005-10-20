@@ -100,6 +100,7 @@ extern int fchmod PROT((int, int));
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
+#include "mempools.h"
 #include "object.h"
 #include "otable.h"
 #include "prolang.h"
@@ -360,11 +361,11 @@ static void free_shadow_sent (shadow_t *p);
 
 /*-------------------------------------------------------------------------*/
 Bool
-catch_instruction (bytecode_t catch_inst, uint offset
+catch_instruction ( int flags, uint offset
                   , volatile svalue_t ** volatile i_sp
                   , bytecode_p i_pc, svalue_t * i_fp)
 
-/* Implement the F_CATCH/F_CATCH_NO_LOG instruction.
+/* Implement the F_CATCH instruction.
  *
  * At the time of call, all important locals from eval_instruction() are
  * have been stored in their global locations.
@@ -423,7 +424,7 @@ catch_instruction (bytecode_t catch_inst, uint offset
     /* Save some globals on the error stack that must be restored
      * separately after a longjmp, then set the jump.
      */
-    if ( setjmp( push_error_context(INTER_SP, catch_inst)->text ) )
+    if ( setjmp( push_error_context(INTER_SP, flags)->text ) )
     {
         /* A throw() or error occured. We have to restore the
          * control and error stack manually here.
@@ -709,9 +710,12 @@ error (char *fmt, ...)
 
 {
     rt_context_t *rt;
-    char     *object_name;
+    char     *object_name = NULL;
     char     *ts;
     svalue_t *svp;
+    Bool      published_catch;
+      /* TRUE: this is a catch which wants runtime_error to be called
+       */
     Bool      do_save_error;
     char     *file;                  /* program name */
     char     *malloced_error;        /* copy of emsg_buf+1 */
@@ -771,14 +775,20 @@ error (char *fmt, ...)
 
     emsg_buf[0] = '*';  /* all system errors get a * at the start */
 
+    published_catch = MY_FALSE;
+
     if (rt->type >= ERROR_RECOVERY_CATCH)
     {
         /* User catches this error */
 
+        struct error_recovery_info * eri = (struct error_recovery_info *)rt;
+
         put_malloced_string(&catch_value, string_copy(emsg_buf));
           /* always reallocate */
 
-        if (rt->type != ERROR_RECOVERY_CATCH_NOLOG)
+        published_catch = (eri->flags & CATCH_FLAG_PUBLISH);
+
+        if (!(eri->flags & CATCH_FLAG_NOLOG))
         {
             /* Even though caught, dump the backtrace - it makes mudlib
              * debugging much easier.
@@ -786,18 +796,39 @@ error (char *fmt, ...)
             debug_message("%s Caught error: %s", ts, emsg_buf + 1);
             printf("%s Caught error: %s", ts, emsg_buf + 1);
             if (current_error_trace)
+            {
                 free_array(current_error_trace);
-            dump_trace(MY_FALSE, &current_error_trace);
+                current_error_trace = NULL;
+            }
+            object_name = dump_trace(MY_FALSE, &current_error_trace);
             debug_message("%s ... execution continues.\n", ts);
             printf("%s ... execution continues.\n", ts);
         }
+        else
+        {
+            /* No dump of the backtrace into the log, but we want it
+             * available for debug_info().
+             */
+            if (current_error_trace)
+            {
+                free_array(current_error_trace);
+                current_error_trace = NULL;
+            }
+            object_name = collect_trace(NULL, &current_error_trace);
+        }
 
-        unroll_context_stack();
-        longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
-        fatal("Catch() longjump failed");
+
+        if (!published_catch)
+        {
+            unroll_context_stack();
+            longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
+            fatal("Catch() longjump failed");
+        }
     }
 
-    /* Error not caught by the program */
+    /* Error not caught by the program, or catch() requests the
+     * runtime_error() is to be called.
+     */
 
     num_error++;
     if (num_error > 3)
@@ -853,15 +884,25 @@ error (char *fmt, ...)
         }
     }
 
-    /* Dump the backtrace */
-    if (uncaught_error_trace)
-        free_array(uncaught_error_trace);
-    if (current_error_trace)
-        free_array(current_error_trace);
+    /* Dump the backtrace (unless already done) */
+    if (!published_catch)
+    {
+        if (uncaught_error_trace)
+        {
+            free_array(uncaught_error_trace);
+            uncaught_error_trace = NULL;
+        }
+        if (current_error_trace)
+        {
+            free_array(current_error_trace);
+            current_error_trace = NULL;
+        }
 
-    object_name = dump_trace(num_error == 3, &current_error_trace);
-    uncaught_error_trace = ref_array(current_error_trace);
-    fflush(stdout);
+        object_name = dump_trace(num_error == 3, &current_error_trace);
+        if (!published_catch)
+            uncaught_error_trace = ref_array(current_error_trace);
+        fflush(stdout);
+    }
 
     if (rt->type == ERROR_RECOVERY_APPLY)
     {
@@ -875,11 +916,20 @@ error (char *fmt, ...)
         if (out_of_memory)
         {
             if (malloced_error)
+            {
                 xfree(malloced_error);
+                malloced_error = NULL;
+            }
             if (malloced_file)
+            {
                 xfree(malloced_file);
+                malloced_file = NULL;
+            }
             if (malloced_name)
+            {
                 xfree(malloced_name);
+                malloced_name = NULL;
+            }
             if (current_error_trace)
             {
                 free_array(current_error_trace);
@@ -895,15 +945,15 @@ error (char *fmt, ...)
         longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
     }
 
-    /* Error is not caught at all.
-     *
-     * The stack must be brought in a usable state. After the
-     * call to reset_machine(), all arguments to error() are invalid,
-     * and may not be used any more. The reason is that some strings
-     * may have been on the stack machine stack, and have been deallocated.
+    /* If the error is not caught at all, the stack must be brought in a
+     * usable state. After the call to reset_machine(), all arguments to
+     * error() are invalid, and may not be used any more. The reason is that
+     * some strings may have been on the stack machine stack, and have been
+     * deallocated.
      */
 
-    reset_machine(MY_FALSE);
+    if (!published_catch)
+        reset_machine(MY_FALSE);
 
     if (do_save_error)
     {
@@ -943,8 +993,11 @@ error (char *fmt, ...)
         object_t *culprit = NULL;
 
 
-        CLEAR_EVAL_COST;
-        RESET_LIMITS;
+        if (!published_catch)
+        {
+            CLEAR_EVAL_COST;
+            RESET_LIMITS;
+        }
         push_volatile_string(malloced_error);
         a = 1;
         if (curobj)
@@ -1019,16 +1072,26 @@ error (char *fmt, ...)
         }
 
         /* Handling errors is expensive! */
-        assigned_eval_cost = eval_cost += MASTER_RESERVED_COST;
+        if (!published_catch)
+            assigned_eval_cost = eval_cost += MASTER_RESERVED_COST;
     }
 
     /* Clean up */
     if (malloced_error)
+    {
         xfree(malloced_error);
+        malloced_error = NULL;
+    }
     if (malloced_file)
+    {
         xfree(malloced_file);
+        malloced_file = NULL;
+    }
     if (malloced_name)
+    {
         xfree(malloced_name);
+        malloced_name = NULL;
+    }
 
     num_error--;
 
@@ -1044,6 +1107,14 @@ error (char *fmt, ...)
     }
 
     /* Unroll the context stack and find the recovery context to jump to. */
+
+    if (published_catch)
+    {
+        unroll_context_stack();
+        longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
+        fatal("Catch() longjump failed");
+    }
+
     unroll_context_stack();
     if (rt_context->type != ERROR_RECOVERY_NONE)
         longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
@@ -1452,7 +1523,9 @@ legal_path (char *path)
  * TODO: This should go into a 'files' module.
  */
 {
-    if (path == NULL || strchr(path, ' ') || path[0] == '/')
+    if (path == NULL
+     || (!allow_filename_spaces && strchr(path, ' '))
+     || path[0] == '/')
         return MY_FALSE;
 
 #ifdef MSDOS_FS
@@ -1460,7 +1533,7 @@ legal_path (char *path)
         char *name;
 
         if (strchr(path,'\\'))
-            return MY_FALSE; /* better save than sorry ... */
+            return MY_FALSE; /* better safe than sorry ... */
         if (strchr(path,':'))
             return MY_FALSE; /* \B: is okay for DOS .. *sigh* */
         name = strrchr(path,'/');
@@ -2784,8 +2857,10 @@ status_parse (strbuf_t * sbuf, char * buff)
                             , num_vb_swapped, total_vb_bytes_swapped / 1024);
             strbuf_addf(sbuf, "Arrays:\t\t\t\t%8ld %9ld\n"
                             , (long)num_arrays, total_array_size() );
-            strbuf_addf(sbuf, "Mappings:\t\t\t%8ld %9ld\n"
-                             , num_mappings, total_mapping_size() );
+            strbuf_addf(sbuf, "Mappings:\t\t\t%8ld %9ld (%ld dirty)\n"
+                            , num_mappings, total_mapping_size()
+                            , num_dirty_mappings
+                            );
             strbuf_addf(sbuf, "Prog blocks:\t\t\t%8ld %9ld (%ld swapped, %ld Kbytes)\n"
                             , total_num_prog_blocks + num_swapped - num_unswapped
                             , total_prog_block_size + total_bytes_swapped
@@ -2914,6 +2989,7 @@ status_parse (strbuf_t * sbuf, char * buff)
             strbuf_addf(sbuf, "Other structures\t\t\t %9lu\n", other);
             tot += other;
         }
+        tot += mb_status(sbuf, verbose);
         tot += res;
 
         if (!verbose) {
@@ -3055,7 +3131,7 @@ check_valid_path (char *path, object_t *caller, char* call_fun, Bool writeflg)
     else
         push_number(0);
 
-    if ( NULL != (eff_user = caller->eff_user) )
+    if ( NULL != (eff_user = caller->eff_user) && NULL != eff_user->name)
         push_shared_string(eff_user->name);
     else
         push_number(0);
@@ -3093,7 +3169,7 @@ check_valid_path (char *path, object_t *caller, char* call_fun, Bool writeflg)
     if (legal_path(path))
         return path;
 
-    error("Illegal path %s for %s() by %s\n", path, call_fun, caller->name);
+    error("Illegal path '%s' for %s() by %s\n", path, call_fun, caller->name);
     return NULL;
 } /* check_valid_path() */
 
@@ -3810,7 +3886,7 @@ match_string (char * match, char * str, mp_int len)
             /* matchlen >= 1 */
             if ((len -= matchlen) >= 0) do
             {
-                if ( !(str2 = memmem(match, matchlen, str, len + matchlen)) )
+                if ( !(str2 = xmemmem(str, len + matchlen, match, matchlen)) )
                     return MY_FALSE;
                 len -= str2 - str;
                 if (match_string(match + matchlen, str2 + matchlen, len))
@@ -4203,7 +4279,7 @@ f_set_driver_hook (svalue_t *sp)
     }
 
     /* Legal call? */
-    if (!_privilege_violation("set_driver_hook", sp-1, sp))
+    if (!privilege_violation3("set_driver_hook", sp-1, sp))
     {
         free_svalue(sp);
         return sp - 2;
@@ -4346,7 +4422,7 @@ f_set_auto_include_string (svalue_t *sp)
     if (sp->type != T_STRING)
         bad_xefun_arg(1, sp);
 
-    if (_privilege_violation("set_auto_include_string", sp, sp) > 0)
+    if (privilege_violation3("set_auto_include_string", sp, sp) > 0)
     {
         char *str;
         svalue_t old;
@@ -4722,7 +4798,7 @@ f_limited (svalue_t * sp, int num_arg)
 
     /* If this object is destructed, no extern calls may be done */
     if (current_object->flags & O_DESTRUCTED
-     || !_privilege_violation("limited", argp, sp)
+     || !privilege_violation3("limited", argp, sp)
         )
     {
         sp = pop_n_elems(num_arg, sp);
@@ -4814,7 +4890,7 @@ f_set_limits (svalue_t * sp, int num_arg)
     else
         bad_xefun_vararg(num_arg, sp);
 
-    if (_privilege_violation("set_limits", argp, sp))
+    if (privilege_violation3("set_limits", argp, sp))
     {
         /* Now store the parsed limits into the variables */
         def_eval_cost = limits.max_eval;

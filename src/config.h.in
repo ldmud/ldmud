@@ -13,6 +13,22 @@
  */
 
 
+/* Define COMPAT_MODE if you are using the 2.4.5 mudlib or one of its
+ * derivatives.
+ */
+@cdef_compat_mode@ COMPAT_MODE
+
+/* The name of the master object.
+ */
+#define MASTER_NAME              @val_master_name@
+
+/* Define ALLOW_FILENAME_SPACES if the driver should accept space characters
+ * in filenames. If it is not defined, a hardcoded test for space characters
+ * is activated.
+ */
+@cdef_filename_spaces@ ALLOW_FILENAME_SPACES
+
+
 /* --- Runtime limits --- */
 
 /* This is the maximum array size allowed for one single array.
@@ -171,16 +187,6 @@
  * driver recompiled.
  */
 
-/* Define COMPAT_MODE if you are using the 2.4.5 mudlib or one of its
- * derivatives.
- * TODO: Make this a runtime option.
- */
-@cdef_compat_mode@ COMPAT_MODE
-
-/* The name of the master object.
- */
-#define MASTER_NAME              @val_master_name@
-
 /* Define this to annotate all allocations with file:line of the driver
  * source responsible for it.
  * Supported by: MALLOC_smalloc
@@ -192,6 +198,14 @@
  * Supported by: MALLOC_smalloc
  */
 @cdef_malloc_lpc_trace@ MALLOC_LPC_TRACE
+
+/* Define this to log all calls to esbrk() (the system memory allocator).
+ * Works best if MALLOC_TRACE, or also MALLOC_LPC_TRACE, are defined.
+ * This define is useful if your mud keeps growing in total memory size
+ * instead of re-using the memory already allocated.
+ * Supported by: MALLOC_smalloc
+ */
+@cdef_malloc_sbrk_trace@ MALLOC_SBRK_TRACE
 
 /* Trace the most recently executed bytecode instructions?
  */
@@ -243,6 +257,10 @@
 
 /* --- Language --- */
 
+/* Define this if you want to allow call_other()s on arrays of objects.
+ */
+@cdef_lpc_array_calls@ USE_ARRAY_CALLS
+
 /* Define SUPPLY_PARSE_COMMAND if you want the efun parse_command.
  * If you don't need it, better #undef it, lest some new wiz can inadvertly
  * crash your mud or make it leak memory.
@@ -269,6 +287,10 @@
 /* Define this if you want the 'nosave' keyword.
  */
 @cdef_lpc_nosave@ USE_LPC_NOSAVE
+
+/* Define this if you want MCCP (Mud Control Compression Protocol).
+ */
+@cdef_use_mccp@ USE_MCCP
 
 /* Define this if you want mySQL support (assuming that your host
  * actually offers this.
@@ -335,6 +357,8 @@
 /* Define the maximum call depth for functions.
  * MAX_USER_TRACE is used for for normal program execution, the full
  * MAX_TRACE is only available in error handling.
+ *
+ * MAX_TRACE must be larger than MAX_USER_TRACE (check at compile time).
  */
 #define MAX_USER_TRACE              @val_max_user_trace@
 #define MAX_TRACE                   @val_max_trace@
@@ -352,9 +376,7 @@
 
 /* When uploading files, we want fast response; however, normal players
  * shouldn't be able to hog the system in this way.  Define ALLOWED_ED_CMDS
- * to be the ratio of the no of ed cmds executed per player cmd, and
- * MAX_CMDS_PER_BEAT to be the max no of buffered player commands the
- * system will accept in each heartbeat interval.
+ * to be the ratio of the no of ed cmds executed per player cmd.
  */
 #define ALLOWED_ED_CMDS           @val_allowed_ed_cmds@
 /* TODO: ALLOWED_ED_CMDS: make this a runtime option */
@@ -489,11 +511,6 @@
 #ifdef MALLOC_TRACE
 @cdef_check_object_gc_ref@ CHECK_OBJECT_GC_REF
 #endif
-
-/* Activate total smalloc size consistency check code. This will produce
- * a lot of output in the GC log.
- */
-@cdef_check_smalloc_total@ CHECK_SMALLOC_TOTAL
 
 /* Sometimes the GC stumbles over invalid references to memory
  * blocks (namely 'Program referenced as something else'). Define

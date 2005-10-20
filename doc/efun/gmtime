@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <time.h>
+        #include <sys/time.h>
 
         int * gmtime(int clock)
         int * gmtime(int* uclock)

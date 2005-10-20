@@ -4,8 +4,8 @@ Date: Tue, 22 May 2001 23:46:39 -0600
 Type: Feature
 State: New
 
-Following up to all the resolve_path mails - I'll write something on the 
-catch_output and reload_object tomorrow (and apologies to Dale who now gets 
+Following up to all the resolve_path mails - I'll write something on the
+catch_output and reload_object tomorrow (and apologies to Dale who now gets
 to read this all again):
 
 Dale Perkins wrote on Saturday, May 19 2001, 14:08:04:
@@ -17,10 +17,10 @@ Dale Perkins wrote on Saturday, May 19 2001, 14:08:04:
 >>      string resolve_path ( string pathname
 >>                          , string|object anchor = this_object())
 >
->How about calling query_path() in the object passed to the efun, if that 
+>How about calling query_path() in the object passed to the efun, if that
 >fails then you use the objects base directory.
 
-Hmm, I don't really like adding hard coded lfun names to the driver - but 
+Hmm, I don't really like adding hard coded lfun names to the driver - but
 there might be a different way of getting the same result:
 
    string resolve_path ( string pathname
@@ -28,7 +28,7 @@ there might be a different way of getting the same result:
 
 If the anchor is a string, it is the anchor path.
 If the anchor is an object, it's object_name is the anchor path.
-If the anchor is a closure, it is called and the resulting string is the 
+If the anchor is a closure, it is called and the resulting string is the
 anchor path.
 
 Your idea could then be implemented with the call
@@ -43,7 +43,7 @@ or easier
 >        return "/" + implode(explode(file_name(ob), "/")[0..<2], "/");
 >    }
 
-This would be a equivalent to the dirname and basename unix commands. Are 
+This would be a equivalent to the dirname and basename unix commands. Are
 they needed often?
 
 >> - The ~ notation for home directories needs to be understood, and in
@@ -52,17 +52,17 @@ they needed often?
 >>   a new master apply which is called for any path which begins with
 >>   a special character other than '/' and '.'.
 
-I thought about this, and I think that a resolve_path() efun does not need to 
-expand the shortcuts - it just needs to recognize them. The actual expansion 
+I thought about this, and I think that a resolve_path() efun does not need to
+expand the shortcuts - it just needs to recognize them. The actual expansion
 can be done in valid_read()/valid_write(), where it happens nowadays anyway.
 
 Acius wrote:
 
->I have written a fair amount of MS-DOS, Windows, and Linux code, and 
->they all have very similar systems for handling relative paths. Namely, 
->each object/process has its own "current directory" and paths in all 
->file commands are evaluated relative to it. If embedding this in the 
->lib, I would actually change the handling of relative paths in all 
+>I have written a fair amount of MS-DOS, Windows, and Linux code, and
+>they all have very similar systems for handling relative paths. Namely,
+>each object/process has its own "current directory" and paths in all
+>file commands are evaluated relative to it. If embedding this in the
+>lib, I would actually change the handling of relative paths in all
 >file-access commands. That would let me do things like:
 >
 >read_bytes("mydata", 100);
@@ -71,21 +71,21 @@ Acius wrote:
 >
 >save_object("myself");
 
-I think the problem here is that there is no widely accepted notion of what 
-the 'current directory' for an object is, so we'd end up with a boondoggle of 
-hooks. In other words: this kind of functionality belongs into simul_efuns 
+I think the problem here is that there is no widely accepted notion of what
+the 'current directory' for an object is, so we'd end up with a boondoggle of
+hooks. In other words: this kind of functionality belongs into simul_efuns
 and/or valid_read() and valid_write().
 
-> Admittedly, the system I've described above doesn't need a new efun at 
-> all, just a few extra calls to master.c. And in fact, this entire system 
-> could be implemented with existing MUDlib code using valid_read and 
-> valid_write mechanisms... (although I think the point was making it 
+> Admittedly, the system I've described above doesn't need a new efun at
+> all, just a few extra calls to master.c. And in fact, this entire system
+> could be implemented with existing MUDlib code using valid_read and
+> valid_write mechanisms... (although I think the point was making it
 > consistent, not just making it possible)
 
-The original point was to make one of the central pieces of path resolution 
+The original point was to make one of the central pieces of path resolution
 more efficient :-)
 
--- 
+--
 Lars Duening; lars@bearnip.com
 PGP Key: http://www.bearnip.com/lars/pgp-lars.asc
 ------------------------------------------------------------------------------
@@ -110,7 +110,7 @@ Lars Duening wrote:
 
 >    string resolve_path ( string pathname
 >                        , string|object|closure anchor)
-> 
+>
 > If the anchor is a string, it is the anchor path.
 > If the anchor is an object, it's object_name is the anchor path.
 > If the anchor is a closure, it is called and the resulting string is the
@@ -164,7 +164,7 @@ I just don't see how this functionality is all that useful as an efun.
 > >>   domains and & for projects). The solution I see here is to introduce
 > >>   a new master apply which is called for any path which begins with
 > >>   a special character other than '/' and '.'.
-> 
+>
 > I thought about this, and I think that a resolve_path() efun does not need to
 > expand the shortcuts - it just needs to recognize them. The actual expansion
 > can be done in valid_read()/valid_write(), where it happens nowadays anyway.
@@ -182,7 +182,7 @@ Hmm ...
 
 
 
--- 
+--
 Matthew Julius                    o_o
                                  ( _ )
 julius.2@wright.edu             ( | | )

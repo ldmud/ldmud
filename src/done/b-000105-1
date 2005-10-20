@@ -22,22 +22,22 @@ Ciao, Michael
 @@ -1742,7 +1742,7 @@
                      assign_svalue(d++, s++);
                  }
- 
+
 -                deref_array(sv);
 +                free_array(sv);
- 
+
                  /* The if() above effectively did the 'free_svalue(source)' */
              }
 @@ -1845,7 +1845,7 @@
                      assign_svalue(d++, s++);
                  }
- 
+
 -                deref_array(sv);
 +                free_array(sv);
                  /* The if() above effectively did the 'free_svalue(source)' */
              }
          }
 
--- 
+--
 Michael Sporn <sporn@mathematik.hu-berlin.de>
 

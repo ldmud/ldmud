@@ -2,7 +2,7 @@ NAME
         efun
 
 DESCRIPTION
-        This directory contains descriptions for the efuns of LDMud 3.2.9.
+        This directory contains descriptions for the efuns of LDMud 3.2.10.
 
         These are functions that are supplied by the driver and can be
         called by any LPC object (somewhat similar to system calls in the

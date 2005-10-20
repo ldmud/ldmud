@@ -2942,6 +2942,8 @@ compile_value (svalue_t *value, int opt_flags)
 
                 /* ({#'catch, <body> })
                  * ({#'catch, <body>, 'nolog })
+                 * ({#'catch, <body>, 'publish })
+                 * ({#'catch, <body>, 'nolog, 'publish })
                  */
                 case F_CATCH:
                   {
@@ -2953,22 +2955,33 @@ compile_value (svalue_t *value, int opt_flags)
                      */
 
                     mp_int start, offset;
+                    int flags, i;
                     int void_given;
 
-                    if (block_size != 2 && block_size != 3)
+                    if (block_size != 2 && block_size != 4)
                         lambda_error("Wrong number of arguments to #'catch\n");
 
-                    if (current.code_left < 2)
+                    if (current.code_left < 3)
                         realloc_code();
-                    current.code_left -= 2;
+                    current.code_left -= 3;
 
-                    if (block_size == 2)
-                        STORE_CODE(current.codep, F_CATCH);
-                    else if (argp[2].type != T_SYMBOL
-                     || strcmp(argp[2].u.string, "nolog"))
-                        lambda_error("Expected 'nolog as second argument.\n");
-                    else
-                        STORE_CODE(current.codep, F_CATCH_NO_LOG);
+                    STORE_CODE(current.codep, F_CATCH);
+
+                    flags = 0;
+                    for (i = 3; i <= block_size; i++)
+                    {
+                        if (argp[i-1].type == T_SYMBOL
+                         && !strcmp(argp[i-1].u.string, "nolog"))
+                            flags |= CATCH_FLAG_NOLOG;
+                        else if (argp[i-1].type == T_SYMBOL
+                         && !strcmp(argp[i-1].u.string, "publish"))
+                            flags |= CATCH_FLAG_PUBLISH;
+                        else
+                            lambda_error("Expected 'nolog or 'publish as "
+                                         "catch-modifier.\n");
+                    }
+
+                    STORE_UINT8(current.codep, flags);
 
                     STORE_UINT8(current.codep, 0);
                     start = current.code_max - current.code_left;
@@ -5286,15 +5299,18 @@ undefined_function:
         i = symbol_operator(str, &end);
         /* If there was a valid operator with trailing junk, *end, but i >= 0.
          * On the other hand, if we passed the empty string, i < 0, but !*end.
-         * Thus, we have to test for (*end || i < 0) .
+         * Thus, we have to test for (*end || i < 0) (not that end points
+         * into sp->u.str).
          */
 
-        free_svalue(sp);
         if (*end || i < 0)
         {
+            free_svalue(sp);
             put_number(sp, 0);
             return;
         }
+
+        free_svalue(sp);
         sp->type = T_CLOSURE;
         if (instrs[i].Default == -1) {
             sp->x.closure_type = (short)(i + CLOSURE_OPERATOR);
@@ -5424,7 +5440,7 @@ f_symbol_variable (svalue_t *sp)
 
         if (current_prog->variable_names[n].flags & NAME_HIDDEN)
         {
-            if (!_privilege_violation("symbol_variable", sp, sp))
+            if (!privilege_violation3("symbol_variable", sp, sp))
             {
                 sp->u.number = 0;
                 return sp;

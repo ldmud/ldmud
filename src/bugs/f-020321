@@ -10,6 +10,6 @@ Also:
 
 #pragma no_simul_efuns
 
-schaltet die Verwendung von allen simul-efuns ab. Automatisch definiert fuer 
-master und simul_efun haupt-object, sollte es auch in allen inheriteten 
+schaltet die Verwendung von allen simul-efuns ab. Automatisch definiert fuer
+master und simul_efun haupt-object, sollte es auch in allen inheriteten
 Modulen verwendet werden.

@@ -29,6 +29,10 @@
 #define RETURN_FUNCTION_NUMARG	0x08
 #define RETURN_FUNCTION_ARGTYPE 0x10 /* not implemented */
 
+/* Masks of the flag unions allowed for various efuns: */
+#define RETURN_FUNCTION_MASK    0x0f  /* functionlist() */
+#define RETURN_VARIABLE_MASK    0x07  /* variable_list() */
+
 /* Return value flag types for function_exists() */
 
 #define FEXISTS_PROGNAME  (0)

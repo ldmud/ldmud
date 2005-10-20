@@ -6,7 +6,7 @@ State: New
 
 Hi Lars,
 
-immer, wenn ich mich langweile, komme ich auf dumme Gedanken. So hat es sich 
+immer, wenn ich mich langweile, komme ich auf dumme Gedanken. So hat es sich
 auch gestern zugetragen, bei einer trödeligen Bahnfahrt *schnarch*.
 
 Wie wäre es, Fremdkörper in LPC integrierbar zu machen.
@@ -21,12 +21,12 @@ Mit "Fremdkörper" meine ich:
 
 Wie ich mir das ungefähr vorstelle:
 
-Jeder Fremdkörper ist im Grunde ein Modul, das zur Compile-Zeit in den Driver 
-eingebunden wird. (Meinetwegen auch dynamisch, aber das wäre wohl zu 
+Jeder Fremdkörper ist im Grunde ein Modul, das zur Compile-Zeit in den Driver
+eingebunden wird. (Meinetwegen auch dynamisch, aber das wäre wohl zu
 kompliziert).
 
-Jedes Modul besitzt einen Grundstock von Funktionen, die vom LPC-Objekt aus 
-direkt oder indirekt aufgerufen werden.  (Mehr dazu gleich). Im Moment fallen 
+Jedes Modul besitzt einen Grundstock von Funktionen, die vom LPC-Objekt aus
+direkt oder indirekt aufgerufen werden.  (Mehr dazu gleich). Im Moment fallen
 mir dazu nur zwei Funktionen ein:
 
 void modul_embedded(string text, varargs mixed * options) (Indirekter Aufruf)
@@ -40,12 +40,12 @@ Der Driver selbst muss den Modulen ausserdem Service-Funktionen anbieten:
   - Überprüfung & Modifikation des Eval-Verbrauchs etc.
 
 
-Desweiteren brauchts noch ein paar Hooks, bzw. Funktionen die im Master 
-aufgerufen werden, damit dort z.B. das Zugriffsrecht auf Fremdkörper geregelt 
+Desweiteren brauchts noch ein paar Hooks, bzw. Funktionen die im Master
+aufgerufen werden, damit dort z.B. das Zugriffsrecht auf Fremdkörper geregelt
 werden kann.
 
-Dann natürlich muss die generelle Verwendung von Modulen in LPC möglich 
-gemacht werden. Wie das aussehen könnte, k.A., ich mache mal ein Beispiel als 
+Dann natürlich muss die generelle Verwendung von Modulen in LPC möglich
+gemacht werden. Wie das aussehen könnte, k.A., ich mache mal ein Beispiel als
 Präprozessoranweisungen:
 
 #use modulname[, modulname2[, ..., modulnameN]
@@ -56,17 +56,17 @@ Präprozessoranweisungen:
 #endembed
 
 
-#use Gibt an, welche Module dieses Objekt verwenden möchte. Das Objekt 
-repräsentiert also ab diesem Zeitpunkt die Module. Bei den Modulen handelt es 
+#use Gibt an, welche Module dieses Objekt verwenden möchte. Das Objekt
+repräsentiert also ab diesem Zeitpunkt die Module. Bei den Modulen handelt es
 sich also um so etwas ähnliches wie Inherits.
-Mit der Einbindung der Module stehen dem Objekt die Grundfunktionen zur 
-Verfügung, also z.B. modulname_exec. (Oder wenn es einfacher ist, auch 
+Mit der Einbindung der Module stehen dem Objekt die Grundfunktionen zur
+Verfügung, also z.B. modulname_exec. (Oder wenn es einfacher ist, auch
 modul_exec(name, ...)).
 
-Zwischen #embed [modulname] und #endembed kann man Text einbinden, der nicht 
-von LPC / Präprozessor geparsed wird, sondern der Funktion modul_embedded 
-unmodifiziert übergeben wird. (Oder evtl. besser, vom Modul abgefragt werden 
-kann.) Dabei könnte es sich z.B. um Perl-Sourcecode handeln.  
+Zwischen #embed [modulname] und #endembed kann man Text einbinden, der nicht
+von LPC / Präprozessor geparsed wird, sondern der Funktion modul_embedded
+unmodifiziert übergeben wird. (Oder evtl. besser, vom Modul abgefragt werden
+kann.) Dabei könnte es sich z.B. um Perl-Sourcecode handeln.
 
 
 Der MUD-Wizard könnte dann solchen LPC-Code schreiben:
@@ -85,9 +85,9 @@ inherit "room";
 void create()
 {
     string str = modul_exec("perl", M_EMBEDDED_ARG);
-    // M_EMBEDDED_ARG ist einfach ein Flag, das dem Modul sagt, dass der 
+    // M_EMBEDDED_ARG ist einfach ein Flag, das dem Modul sagt, dass der
 embedded text verwendet werden soll
-    
+
 
     set_long(str);
 }
@@ -102,7 +102,7 @@ embedded text verwendet werden soll
 string diff(string file1, string file2, varargs mixed * options)
 {
     return apply(#'modul_exec, "diff", file1, file2, options);
-    // Leserechte etc. checkt das Modul selbst.     
+    // Leserechte etc. checkt das Modul selbst.
 }
 
 int patch(string file, string patch, varargs mixed * options)
@@ -118,32 +118,32 @@ int patch(string file, string patch, varargs mixed * options)
 
 string suche_pfad(mixed start, mixed ziel, mixed * real_big_room_info_matrix)
 {
-    return modul_exec("pfadfinder", start, ziel, real_big_room_info_matrix);  
+    return modul_exec("pfadfinder", start, ziel, real_big_room_info_matrix);
 }
 ---- Ende Beispeil 3 ----
 
 
-Natürlich gibts schon sowas wie ERQ. Im Gegensatz dazu wären solche Module 
-jedoch keine Schnittstellen im herkömmlichen Sinn (auch wenn z.B. ein 
-Perl-Modul eine Schnittstelle zu einem externen Perl-Interpreter darstellen 
+Natürlich gibts schon sowas wie ERQ. Im Gegensatz dazu wären solche Module
+jedoch keine Schnittstellen im herkömmlichen Sinn (auch wenn z.B. ein
+Perl-Modul eine Schnittstelle zu einem externen Perl-Interpreter darstellen
 könnte).
 
-Der Vorteil wäre, daß eben die Module teil des LPC-Objektes wären; die Module 
-werden also durch LPC-Objekte repräsentiert. Als Teil des Drivers kann man 
-den Modulen Daten übergeben, wie jeder anderen LPC-Funktion auch, in Form von 
+Der Vorteil wäre, daß eben die Module teil des LPC-Objektes wären; die Module
+werden also durch LPC-Objekte repräsentiert. Als Teil des Drivers kann man
+den Modulen Daten übergeben, wie jeder anderen LPC-Funktion auch, in Form von
 Referenzen, komplexen Datentypen etc, was über den ERQ nicht möglich wäre.
 
-Wenn Module andere EFuns aufrufen, sollte die EFun dabei denken, das Objekt 
-selbst hätte diese Funktion aufgerufen. Schreibrechte und sonstige 
+Wenn Module andere EFuns aufrufen, sollte die EFun dabei denken, das Objekt
+selbst hätte diese Funktion aufgerufen. Schreibrechte und sonstige
 MUD-Internas ließen sich so besser abhandeln als über die ERQ-Schnittstelle.
 
 Man kann damit eine Ecke verrücktere Sachen machen als mit ERQ.
 
-z.B. ein #use tinyfugue im Player. Immer wird darüber gewitzelt, TinyFugue in 
-LPC zu übersetzen und das den Telnet-Spielern als Client vorzusetzen. Als 
-Fremdkörpereinbindung wäre es relativ einfach zu lösen, indem man den Output 
-vom MUD an den Player dem TinyFugue-Modul als Input vorsetzt und den Output 
-vom TinyFugue wiederum an den Player schickt... 
+z.B. ein #use tinyfugue im Player. Immer wird darüber gewitzelt, TinyFugue in
+LPC zu übersetzen und das den Telnet-Spielern als Client vorzusetzen. Als
+Fremdkörpereinbindung wäre es relativ einfach zu lösen, indem man den Output
+vom MUD an den Player dem TinyFugue-Modul als Input vorsetzt und den Output
+vom TinyFugue wiederum an den Player schickt...
 
 Zumindest theoretisch.
 

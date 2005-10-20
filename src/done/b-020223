@@ -15,12 +15,12 @@ On Thursday 28 February 2002 01:28, you wrote:
 > crasht der 3.2.9 immer noch mit korruptem Speicher? Ich habe ihn hier
 > jetzt den Tag ueber laufen gelassen, aber kein Problem bekommen.
 
-Ich liess des neue Release eben auch einen Tag lang laufen, das Teil hat 
-meinen Rechner in die Knie gezwungen, was aber daran lag, dass nach 1,9 GB 
+Ich liess des neue Release eben auch einen Tag lang laufen, das Teil hat
+meinen Rechner in die Knie gezwungen, was aber daran lag, dass nach 1,9 GB
 Debug-Log kein Platz mehr auf der Platte war.
 
-Ich werde den Crasher noch einen Tag laufen lassen... wenn der Driver crashen 
-sollte, bekommst du Post von mir. Dass er aber bei mir und bei dir so lange 
+Ich werde den Crasher noch einen Tag laufen lassen... wenn der Driver crashen
+sollte, bekommst du Post von mir. Dass er aber bei mir und bei dir so lange
 durchhaelt, sieht schon mal gut aus.
 
 Gruss
@@ -36,8 +36,8 @@ Hi Lars,
 > #0  0x080e7807 in smalloc (size=104) at smalloc.c:664
 > 664           SIZE_PNT_INDEX(sfltable, size) = *(word_t**) temp;
 
-Dieser Crash ist bei mir nun auch mit dem dev406 aufgetreten. Dies war das 
-dritte Mal, und jedes mal war der vorherige Aufruf eine Simul-Efun der 
+Dieser Crash ist bei mir nun auch mit dem dev406 aufgetreten. Dies war das
+dritte Mal, und jedes mal war der vorherige Aufruf eine Simul-Efun der
 UNItopia-Grammatik.
 
 Diesmal war es:
@@ -48,36 +48,36 @@ apply( #'<sefun>seines, ({ /* #1, size: 3 */
   29292929
 }) )
 
-In etwa aehnliche Parameter hatten die Aufrufe der vorherigen Crashes auch; 
+In etwa aehnliche Parameter hatten die Aufrufe der vorherigen Crashes auch;
 ich kann es jedoch nicht reproduzieren, der Aufruf erzeugt einen RTE.
 
-Hier der Backtrace von dev406, der sich jedoch nicht sonderlich von den 
+Hier der Backtrace von dev406, der sich jedoch nicht sonderlich von den
 vorherigen unterscheidet:
 
 #0  0x080e7827 in smalloc (size=104) at smalloc.c:664
 664             SIZE_PNT_INDEX(sfltable, size) = *(word_t**) temp;
 #0  0x080e7827 in smalloc (size=104) at smalloc.c:664
         temp = (word_t *) 0x656a6253
-#1  0x08080605 in eval_instruction (first_instruction=0x84508a7 
+#1  0x08080605 in eval_instruction (first_instruction=0x84508a7
 "O\006\013X2", initial_sp=0x812f428) at interpret.c:8054
-        res = 0x83cba7c "RUNTIME-ERROR:\nWer:    
+        res = 0x83cba7c "RUNTIME-ERROR:\nWer:
 /w/menaures/public/apps/crasher (\"UID:w:menaures\")   Command: '"
         l = 86
         l2 = 10
-        pc = 0x845055e 
+        pc = 0x845055e
 "\e\001(\a\214(\e\002(\a\202(\e\003(\a\215(\e\004(\025\026fzut\2042\b\003\006\020O\006\020\005\003_\017'X2"
         fp = (svalue_t *) 0x812f458
         sp = (svalue_t *) 0x812f490
         num_arg = -1
         instruction = 40
         expected_stack = (svalue_t *) 0x0
-#2  0x08097bf5 in apply_low (fun=0x8326800 "do_log_error", ob=0x85bd5e0, 
+#2  0x08097bf5 in apply_low (fun=0x8326800 "do_log_error", ob=0x85bd5e0,
 num_arg=5, b_ign_prot=0) at interpret.c:20535
         funstart = 0x84508a5 "\006\013O\006\013X2"
         progp = (program_t *) 0x844eeb4
         save_csp = (struct control_stack *) 0x8137140
         ix = 930
-#3  0x0808e280 in eval_instruction (first_instruction=0x82f7d63 "\e", 
+#3  0x0808e280 in eval_instruction (first_instruction=0x82f7d63 "\e",
 initial_sp=0x812f2b8) at interpret.c:14795
         arg = (svalue_t *) 0x812f398
         ob = (object_t *) 0x85bd5e0
@@ -87,13 +87,13 @@ initial_sp=0x812f2b8) at interpret.c:14795
         num_arg = 7
         instruction = 128
         expected_stack = (svalue_t *) 0x812f398
-#4  0x08097bf5 in apply_low (fun=0x82dc7d4 "seines", ob=0x8334c78, num_arg=3, 
+#4  0x08097bf5 in apply_low (fun=0x82dc7d4 "seines", ob=0x8334c78, num_arg=3,
 b_ign_prot=0) at interpret.c:20535
         funstart = 0x82f7d61 "\003"
         progp = (program_t *) 0x82f8d6c
         save_csp = (struct control_stack *) 0x8137040
         ix = 1292
-#5  0x08099a73 in call_simul_efun (code=46, ob=0x8334c78, num_arg=3) at 
+#5  0x08099a73 in call_simul_efun (code=46, ob=0x8334c78, num_arg=3) at
 interpret.c:21786
         function_name = 0x82dc7d4 "seines"
 #6  0x0809991e in call_lambda (lsvp=0x812f2a0, num_arg=3) at interpret.c:21712
@@ -101,7 +101,7 @@ interpret.c:21786
         i = -2002
         sp = (svalue_t *) 0x812f2b8
         l = (lambda_t *) 0x85c5938
-#7  0x0808db26 in eval_instruction (first_instruction=0x8397e3b 
+#7  0x0808db26 in eval_instruction (first_instruction=0x8397e3b
 "\005\001\e\003\rdd\e\003\016d\023\013", initial_sp=0x812f298)
     at interpret.c:14567
         args = (svalue_t *) 0x812f2a0
@@ -111,13 +111,13 @@ interpret.c:21786
         num_arg = 4
         instruction = 125
         expected_stack = (svalue_t *) 0x812f2a0
-#8  0x080d3723 in catch_instruction (catch_inst=28 '\034', offset=21, 
-i_sp=0x81a19e4, i_pc=0x8397e3b "\005\001\e\003\rdd\e\003\016d\023\013", 
+#8  0x080d3723 in catch_instruction (catch_inst=28 '\034', offset=21,
+i_sp=0x81a19e4, i_pc=0x8397e3b "\005\001\e\003\rdd\e\003\016d\023\013",
     i_fp=0x812f280) at simulate.c:467
         catch_inst = 28 '\034'
         rc = 135459488
         new_pc = 0x8397e50 "M\020\002_\001A\e"
-#9  0x0807ef17 in eval_instruction (first_instruction=0x8397dcb 
+#9  0x0807ef17 in eval_instruction (first_instruction=0x8397dcb
 "O\001\003\e", initial_sp=0x812f298) at interpret.c:7350
         offset = 21
         pc = 0x8397e3b "\005\001\e\003\rdd\e\003\016d\023\013"
@@ -126,19 +126,19 @@ i_sp=0x81a19e4, i_pc=0x8397e3b "\005\001\e\003\rdd\e\003\016d\023\013",
         num_arg = -1
         instruction = 28
         expected_stack = (svalue_t *) 0x0
-#10 0x08097bf5 in apply_low (fun=0x84dbac4 "execute_file", ob=0x85c5938, 
+#10 0x08097bf5 in apply_low (fun=0x84dbac4 "execute_file", ob=0x85c5938,
 num_arg=1, b_ign_prot=0) at interpret.c:20535
         funstart = 0x8397dc9 "\001\003O\001\003\e"
         progp = (program_t *) 0x8397694
         save_csp = (struct control_stack *) 0x8136f80
         ix = 3633
-#11 0x08098212 in sapply_int (fun=0x84dbac4 "execute_file", ob=0x85c5938, 
+#11 0x08098212 in sapply_int (fun=0x84dbac4 "execute_file", ob=0x85c5938,
 num_arg=1, b_find_static=0) at interpret.c:20757
         expected_sp = (svalue_t *) 0x812f278
-#12 0x080982a7 in apply (fun=0x84dbac4 "execute_file", ob=0x85c5938, 
+#12 0x080982a7 in apply (fun=0x84dbac4 "execute_file", ob=0x85c5938,
 num_arg=1) at interpret.c:20795
 No locals.
-#13 0x080d7e6b in execute_callback (cb=0x82214d8, nargs=0, keep=0, 
+#13 0x080d7e6b in execute_callback (cb=0x82214d8, nargs=0, keep=0,
 toplevel=1) at simulate.c:3415
         ob = (object_t *) 0x85c5938
         num_arg = 1
@@ -149,28 +149,28 @@ toplevel=1) at simulate.c:3415
         last_time = 1014471575
         current_call_out = (struct call *) 0x82214d4
         called_object = (object_t *) 0x85c5938
-        error_recovery_info = {rt = {last = 0x8110fa0, type = 1}, con = {text 
-= {{__jmpbuf = {0, 135334752, 135928576, -1073749268, 
-          -1073749484, 134571612}, __mask_was_saved = 0, __saved_mask = 
-{__val = {0, 135294783, 135624067, 19, 135933312, 2, 0, 0, 3221217980, 
-            1074788879, 3221218024, 1, 1075287584, 1074788852, 1075270012, 
-135459448, 2392, 103332, 3221218152, 892547122, 3221218028, 
-            135070683, 0, 20, 135294766, 1075287584, 0, 1, 3221220300, 
+        error_recovery_info = {rt = {last = 0x8110fa0, type = 1}, con = {text
+= {{__jmpbuf = {0, 135334752, 135928576, -1073749268,
+          -1073749484, 134571612}, __mask_was_saved = 0, __saved_mask =
+{__val = {0, 135294783, 135624067, 19, 135933312, 2, 0, 0, 3221217980,
+            1074788879, 3221218024, 1, 1075287584, 1074788852, 1075270012,
+135459448, 2392, 103332, 3221218152, 892547122, 3221218028,
+            135070683, 0, 20, 135294766, 1075287584, 0, 1, 3221220300,
 134562415, 2, 135185491}}}}}}
 #15 0x08054277 in backend () at backend.c:631
         hide_current = (object_t *) 0x0
-        buff = "ls\000e 
-garb*\000r\000\000ollection()\000res/public/apps/test))\000() > 5000) m = 
-quote(m);\000\000rintf(\"%Q\\n\", 
-m);\000;\000quoted_array\",\"string\",\"string*\",\"symbol\",\"void\"\000rray(str, 
+        buff = "ls\000e
+garb*\000r\000\000ollection()\000res/public/apps/test))\000() > 5000) m =
+quote(m);\000\000rintf(\"%Q\\n\",
+m);\000;\000quoted_array\",\"string\",\"string*\",\"symbol\",\"void\"\000rray(str,
 #'>); write(implode(str, \"\\n\"));\000 implode(str,"...
 #16 0x080a9222 in main (argc=2, argv=0xbffffce4) at main.c:428
         i = 5
         p = 0xbffffc78 "\005"
         set = {__val = {8192, 0 <repeats 31 times>}}
-#17 0x400850ea in __libc_start_main (main=0x80a8a50 <main>, argc=2, 
-ubp_av=0xbffffce4, init=0x8049a84 <_init>, fini=0x80eb090 <_fini>, 
-    rtld_fini=0x4000da44 <_dl_fini>, stack_end=0xbffffcdc) at 
+#17 0x400850ea in __libc_start_main (main=0x80a8a50 <main>, argc=2,
+ubp_av=0xbffffce4, init=0x8049a84 <_init>, fini=0x80eb090 <_fini>,
+    rtld_fini=0x4000da44 <_dl_fini>, stack_end=0xbffffcdc) at
 ../sysdeps/generic/libc-start.c:129
         fini = (void (*)()) 0x40018364 <_dl_debug_impcalls>
         rtld_fini = (void (*)()) 0x2564f
@@ -191,8 +191,8 @@ On Monday 18 February 2002 19:32, you wrote:
 > Gruss
 > Menaures
 
-Soeben nochmals aufgetreten. Interessant dabei ist: Nicht reproduzierbar durch Aufruf, 
-aber auch diesmal beim Aufruf einer SEfun, sogar einer der Grammatikfunktionen, 
+Soeben nochmals aufgetreten. Interessant dabei ist: Nicht reproduzierbar durch Aufruf,
+aber auch diesmal beim Aufruf einer SEfun, sogar einer der Grammatikfunktionen,
 aufgetreten. Irgendwas geht da schief.
 
 apply( #'<sefun>query_deklin_ein_adjektiv, ({ /* #1, size: 2 */
@@ -356,7 +356,7 @@ Hier der Backtrace, ich hoffe du kannst was damit anfangen:
  num_arg = 1
  instruction = 125
  expected_stack = (svalue_t *) 0x812f3e0
-#8  0x080d3713 in catch_instruction (catch_inst=28 '\034', offset=21, i_sp=0x81a1b24, i_pc=0x85a9417 "\005\001\e\003\rdd\e\003\016d\023\013", 
+#8  0x080d3713 in catch_instruction (catch_inst=28 '\034', offset=21, i_sp=0x81a1b24, i_pc=0x85a9417 "\005\001\e\003\rdd\e\003\016d\023\013",
     i_fp=0x812f3c0) at simulate.c:467
  catch_inst = 28 '\034'
  rc = 135459808
@@ -388,9 +388,9 @@ No locals.
  last_time = 1014056483
  current_call_out = (struct call *) 0x830f4f0
  called_object = (object_t *) 0x85dc20c
- error_recovery_info = {rt = {last = 0x81110e0, type = 1}, con = {text = {{__jmpbuf = {0, 135335072, 135928896, -1073749700, 
-          -1073749916, 134571612}, __mask_was_saved = 0, __saved_mask = {__val = {0, 135295039, 135624387, 19, 135933632, 7, 0, 0, 3221217548, 
-            1074788879, 3221217592, 1, 1075287584, 1074788852, 1075270012, 135459768, 2252, 91746, 3221217720, 858927154, 3221217596, 
+ error_recovery_info = {rt = {last = 0x81110e0, type = 1}, con = {text = {{__jmpbuf = {0, 135335072, 135928896, -1073749700,
+          -1073749916, 134571612}, __mask_was_saved = 0, __saved_mask = {__val = {0, 135295039, 135624387, 19, 135933632, 7, 0, 0, 3221217548,
+            1074788879, 3221217592, 1, 1075287584, 1074788852, 1075270012, 135459768, 2252, 91746, 3221217720, 858927154, 3221217596,
             135070667, 0, 20, 135295022, 1075287584, 137656356, 1, 3221219868, 134562415, 2, 135185939}}}}}}
 #15 0x08054277 in backend () at backend.c:631
  hide_current = (object_t *) 0x0
@@ -399,7 +399,7 @@ No locals.
  i = 5
  p = 0xbffffac8 "\005"
  set = {__val = {8192, 0 <repeats 31 times>}}
-#17 0x400850ea in __libc_start_main (main=0x80a8a50 <main>, argc=2, ubp_av=0xbffffb34, init=0x8049a84 <_init>, fini=0x80eb260 <_fini>, 
+#17 0x400850ea in __libc_start_main (main=0x80a8a50 <main>, argc=2, ubp_av=0xbffffb34, init=0x8049a84 <_init>, fini=0x80eb260 <_fini>,
     rtld_fini=0x4000da44 <_dl_fini>, stack_end=0xbffffb2c) at ../sysdeps/generic/libc-start.c:129
  fini = (void (*)()) 0x40018364 <_dl_debug_impcalls>
  rtld_fini = (void (*)()) 0x1dbc4

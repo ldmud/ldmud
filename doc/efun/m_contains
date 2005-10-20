@@ -13,4 +13,4 @@ HISTORY
         Renamed from 'mapping_contains()' in LDMud 3.2.6.
 
 SEE ALSO
-        mappings(LPC), member(E)
+        m_entry(E), mappings(LPC), member(E)

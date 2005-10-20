@@ -8,8 +8,8 @@ PS: Achso noch was, auch unter CYGWIN erhaelt der Treiber ein SIGSEGV in
     backend() Zeile 525 (else if (ip->sh.ed_buffer))
 
 also, das auch bezog sich auf SunSolaris, dort ist der gleiche Fehler
-praesent, was uns, also Evermore davon abhaelt eine andere Version als 
-3.2.7 zu benutzen. 
+praesent, was uns, also Evermore davon abhaelt eine andere Version als
+3.2.7 zu benutzen.
 
 Der Fehler tritt auf, nachdem der Player sich mit Namen zu erkennen
 gegeben hat. Es sollte dann die passwordabfrage folgen, aber in dem
@@ -22,7 +22,7 @@ stuertzt das Mud mit dem besagten Fehler ab.
 
 Das ganze habe ich auf SunOS ( sun4x_55 ) und CYGWIN beobachtet.
 
-Vielleicht hilft dir das. Ich hatte dir das Thema schon mal einzeln 
+Vielleicht hilft dir das. Ich hatte dir das Thema schon mal einzeln
 gemailed, als ich es auf SunOS bemerkte, deswegen mag auch das 'auch'
 dort stehen.
 

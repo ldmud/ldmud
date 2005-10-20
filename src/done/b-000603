@@ -206,7 +206,7 @@ void reset(int arg)
 npc.c:
 
 /* Copyright TubMud 1997 */
-/* Many or some changes for Evermore 1997 */ 
+/* Many or some changes for Evermore 1997 */
 
 inherit "/basic/living/chatter";
 inherit "/std/monster";
@@ -232,8 +232,8 @@ refresh() {
 
 status
 query_busy() {
-  return 
-//    chatter::query_busy() || 
+  return
+//    chatter::query_busy() ||
     sequence::query_busy() ||
     monster::query_busy();
 }
@@ -244,8 +244,8 @@ query_busy() {
 
 status
 query_blocking() {
-  return 
-//    chatter::query_busy() || 
+  return
+//    chatter::query_busy() ||
     sequence::query_busy() ||
     monster::query_busy();
 }
@@ -367,7 +367,7 @@ varargs int raw_learn_skill(string skillid,int value,int what,
 
   if(value <= 0) return 0;
 
-    
+
 
   if(value+skills[skillid,0]+skills[skillid,1]+skills[skillid,2] > learn_limits[0])
     value = learn_limits[0]-(skills[skillid,0]+skills[skillid,1]+skills[skillid,2]);
@@ -384,7 +384,7 @@ varargs int raw_learn_skill(string skillid,int value,int what,
 
   if(what >= 0 && what < 3)
   {
-    if(value+skills[skillid,what] > learn_limits[what+1]) 
+    if(value+skills[skillid,what] > learn_limits[what+1])
       value = learn_limits[what+1] - skills[skillid,what];
 
     if (value < 0) return 0;
@@ -452,9 +452,9 @@ int *query_skill_percents(string skillid)
 {
   int *h,i;
   mixed test;
-  
+
   if(!(h = query_skill_values(skillid))) return 0;
-  return map(h, (: ($1 + 500 ) / 1000 :)); 
+  return map(h, (: ($1 + 500 ) / 1000 :));
 }
 
 int query_skill_percent(string skillid)
@@ -499,14 +499,14 @@ void receive_learn_event(mapping e)
   skillid = e[E_SKILLID];
   value = e[E_VALUE];
   how = e[E_HOW];
-  
+
   if(this_object() != e[E_AGENT]) {
     if(how == 2) return; // Can't see if someone did it by trainer
     value /=WATCHING_QUOTIENT;
     how = 0;
     if(random(5)) return;
   }
-  
+
   skilldata = SE_SKILL->query_skill_data(skillid);
   if(!skilldata) return;
 
@@ -533,7 +533,7 @@ void learn_skill(string skillid,int value,int how)
 }
 
 
-varargs string query_skill_tree(int displaywidth) 
+varargs string query_skill_tree(int displaywidth)
 {
    return "/global/commands/score"->query_skill_tree(displaywidth);
 }
@@ -546,7 +546,7 @@ int *query_slot_maxima() { return slot_maxima; }
 varargs void recalculate_slots(int *limits)
 {
   string prof;
-  
+
   if(!limits)
     limits = LIB_PROFESSION->query_slot_maxima(prof = query_profession());
 
@@ -570,7 +570,7 @@ varargs void recalculate_slots(int *limits)
       sizeof(SE_SKILL->query_leaves()) -
       sizeof(SE_SKILL->query_leaves("combat")) -
       sizeof(SE_SKILL->query_leaves("magic"));
-      
+
   slot_maxima = limits;
 }
 
@@ -589,7 +589,7 @@ int query_max_slots(int what)
   int race_bonus;
   int h;
 
-  if(what == SKC_ALL) 
+  if(what == SKC_ALL)
     return query_max_slots(SKC_COMBAT) +
            query_max_slots(SKC_MAGIC) +
            query_max_slots(SKC_OTHER);
@@ -600,7 +600,7 @@ int query_max_slots(int what)
             get_race_data(query_race(),"slot_boni")) || ({ 0,0,0 }))[what];
 
   low = (LIB_PROFESSION->query_slot_minima(query_profession()))[what];
-  // We need to calculate the maxima personalized to the player. 
+  // We need to calculate the maxima personalized to the player.
   high = (query_slot_maxima())[what];
   // Linear functions between two points, round down and up to avoid
   // getting the very last slots only on reaching Level 49
@@ -616,7 +616,7 @@ int query_free_slots(int what)
   return query_max_slots(what) - query_used_slots(what);
 }
 
-  
+
 /*
  * Maybe the heart of the skill system.
  * Gets a skill ID and a value from 0 (easy for everyone) to
@@ -626,13 +626,13 @@ int query_free_slots(int what)
  * and returns
  * -99 (complete failure) over 0 (almost worked) to 99 (wonderful)
  */
- 
+
 varargs int test_and_improve_skill(string skillid,int difficulty,int bandwidth)
 {
   int res;
   int learn_value;
   int age;
-  
+
   if(!skillid)
     raise_error("No Skill ID given.\n");
 

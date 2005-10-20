@@ -423,6 +423,9 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
 #define put_number(sp,num) \
     ( (sp)->type = T_NUMBER, (sp)->u.number = (num) )
 
+#define put_float(sp,fnum) \
+    do { STORE_DOUBLE_USED; (sp)->type = T_FLOAT; STORE_DOUBLE((sp), fnum); }while(0)
+
 #define put_ref_array(sp,arr) \
     ( (sp)->type = T_POINTER, (sp)->u.vec = ref_array(arr) )
 #define put_array(sp,arr) \

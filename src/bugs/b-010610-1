@@ -16,13 +16,13 @@ Elric wrote:
 > with the driver, perhaps some negotiation or its just expecting \r\n and
 > only gets \r so it gets confused.
 
-If CRT expects some additional negotiation, I don't know which one. I 
-compared CRT against normal unix telnet, and while they get exactly 
-the same control messages, CRT insists on sending the CR only after 
-you type a second key (the driver then receives the CR and the next 
-key in one go). 
+If CRT expects some additional negotiation, I don't know which one. I
+compared CRT against normal unix telnet, and while they get exactly
+the same control messages, CRT insists on sending the CR only after
+you type a second key (the driver then receives the CR and the next
+key in one go).
 
-I will have to read up on telnet linemode negotiation, but that'll 
+I will have to read up on telnet linemode negotiation, but that'll
 take time as the information is scattered over 10 RFCs.
 
 -----------------------------------------------------------------------

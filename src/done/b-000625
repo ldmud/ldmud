@@ -6,11 +6,11 @@ State: Done - fixed in 3.2.8-dev.213
 
 Hallo Lars,
 
-bei der Ausfuehrung unseres neuen Autoload System kommt es zu 
+bei der Ausfuehrung unseres neuen Autoload System kommt es zu
 einem reproduzierbaren Problem. Da die Treiberausgabe so
 gross ist, habe ich sie als Datei angehaengt.
 
-ich sende Dir hier als Attachment die EverLIB1.4N sowie das 
+ich sende Dir hier als Attachment die EverLIB1.4N sowie das
 configure script fuer Evermore (du brauchst ein neues fuer
 native).
 Die Lib solltest du dann wie folgt starten:
@@ -19,13 +19,13 @@ Standardport ist 23.
 
 Es ist ein Archwizard "lars" mit Password "lars" eingerichtet.
 Sowie Du Dich anmeldest, also nach dem Password enter drueckst,
-kommt diese ellenlange Ausgabe in der Shell. 
+kommt diese ellenlange Ausgabe in der Shell.
 
 Es ist NICHT wie ich vermutete das Autoload sondern generell
 beim einloggen reproduzierbar und passiert bei jedem Spieler
 der sich einloggt.
 
-Wenn Du fragen hast, einfach mailen. 
+Wenn Du fragen hast, einfach mailen.
 
 Gruesse
 
@@ -33,8 +33,8 @@ Heiko
 
 PS: Es kann passieren das der Treiber meckert weil bestimmte
 o-files nicht funktionieren. Dann musst du auf alle Dateien
-im save Verzeichnis und in den Unterverzeichnissen der Lib 
-ein dos2unix ausfuehren. Leider sind die o-files von wenn 
+im save Verzeichnis und in den Unterverzeichnissen der Lib
+ein dos2unix ausfuehren. Leider sind die o-files von wenn
 unter Windows gearbeitet wird nicht kompatibel :(
 
 

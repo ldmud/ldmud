@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <input_to.h>
+        #include <sys/input_to.h>
 
         void input_to(string|closure fun)
         void input_to(string|closure fun, int flag, ...)

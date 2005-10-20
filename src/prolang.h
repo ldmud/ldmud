@@ -31,7 +31,7 @@ extern void free_all_local_names(void);
 extern void store_line_number_info(void);
 extern void store_line_number_backward(int offset);
 extern mp_uint store_include_info(char *name, char *file, char delim, int inc_depth);
-extern void store_include_end(mp_uint inc_offset);
+extern void store_include_end(mp_uint inc_offset, int include_line);
 extern void compile_file(int fd);
 extern short find_inherited (char *super_name, char *real_name);
 

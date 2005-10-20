@@ -43,7 +43,7 @@ Program terminated with signal 11, Segmentation fault.
 803	        l->function.alien.ob->prog->ref = 0;
 804	        clear_inherit_ref(l->function.alien.ob->prog);
 (gdb) p *l
-$4 = {ref = 0, ob = 0x20003, function = {index = 28146, code = "ò", 
+$4 = {ref = 0, ob = 0x20003, function = {index = 28146, code = "ò",
     lambda = 0x8436df2, alien = {ob = 0x8436df2, index = 2}}}
 (gdb) p l->ob
 $5 = (object_t *) 0x20003
@@ -64,15 +64,15 @@ Cannot access memory at address 0x20003.
 484	            else if (p->u.ob->flags & O_DESTRUCTED && p->u.ob->ref)
 485	            {
 (gdb) p *svp
-$6 = {type = 8, x = {string_type = 5, exponent = 5, closure_type = 5, 
+$6 = {type = 8, x = {string_type = 5, exponent = 5, closure_type = 5,
     quotes = 5, num_arg = 5, extern_args = 5, generic = 5}, u = {
-    string = 0xa2bb238 "", number = 170635832, ob = 0xa2bb238, 
-    vec = 0xa2bb238, map = 0xa2bb238, lambda = 0xa2bb238, 
-    mantissa = 170635832, lvalue = 0xa2bb238, protected_lvalue = 0xa2bb238, 
-    protected_char_lvalue = 0xa2bb238, protected_range_lvalue = 0xa2bb238, 
+    string = 0xa2bb238 "", number = 170635832, ob = 0xa2bb238,
+    vec = 0xa2bb238, map = 0xa2bb238, lambda = 0xa2bb238,
+    mantissa = 170635832, lvalue = 0xa2bb238, protected_lvalue = 0xa2bb238,
+    protected_char_lvalue = 0xa2bb238, protected_range_lvalue = 0xa2bb238,
     error_handler = 0xa2bb238}}
 (gdb) up
-#2  0x807028e in clear_map_ref_filter (key=0x80f8874, data=0xa600d1c, 
+#2  0x807028e in clear_map_ref_filter (key=0x80f8874, data=0xa600d1c,
     extra=0x1) at gcollect.c:421
 421	    clear_ref_in_vector(data, (size_t)extra);
 (gdb) list
@@ -88,22 +88,22 @@ $6 = {type = 8, x = {string_type = 5, exponent = 5, closure_type = 5,
 ---*/
 425	void
 (gdb) p *key
-$7 = {type = 3, x = {string_type = 2, exponent = 2, closure_type = 2, 
+$7 = {type = 3, x = {string_type = 2, exponent = 2, closure_type = 2,
     quotes = 2, num_arg = 2, extern_args = 2, generic = 2}, u = {
-    string = 0x8a43e4a "look_msg", number = 144981578, ob = 0x8a43e4a, 
-    vec = 0x8a43e4a, map = 0x8a43e4a, lambda = 0x8a43e4a, 
-    mantissa = 144981578, lvalue = 0x8a43e4a, protected_lvalue = 0x8a43e4a, 
-    protected_char_lvalue = 0x8a43e4a, protected_range_lvalue = 0x8a43e4a, 
+    string = 0x8a43e4a "look_msg", number = 144981578, ob = 0x8a43e4a,
+    vec = 0x8a43e4a, map = 0x8a43e4a, lambda = 0x8a43e4a,
+    mantissa = 144981578, lvalue = 0x8a43e4a, protected_lvalue = 0x8a43e4a,
+    protected_char_lvalue = 0x8a43e4a, protected_range_lvalue = 0x8a43e4a,
     error_handler = 0x8a43e4a}}
 (gdb) p extra
 $8 = (void *) 0x1
 (gdb) p *data
-$9 = {type = 8, x = {string_type = 5, exponent = 5, closure_type = 5, 
+$9 = {type = 8, x = {string_type = 5, exponent = 5, closure_type = 5,
     quotes = 5, num_arg = 5, extern_args = 5, generic = 5}, u = {
-    string = 0xa2bb238 "", number = 170635832, ob = 0xa2bb238, 
-    vec = 0xa2bb238, map = 0xa2bb238, lambda = 0xa2bb238, 
-    mantissa = 170635832, lvalue = 0xa2bb238, protected_lvalue = 0xa2bb238, 
-    protected_char_lvalue = 0xa2bb238, protected_range_lvalue = 0xa2bb238, 
+    string = 0xa2bb238 "", number = 170635832, ob = 0xa2bb238,
+    vec = 0xa2bb238, map = 0xa2bb238, lambda = 0xa2bb238,
+    mantissa = 170635832, lvalue = 0xa2bb238, protected_lvalue = 0xa2bb238,
+    protected_char_lvalue = 0xa2bb238, protected_range_lvalue = 0xa2bb238,
     error_handler = 0xa2bb238}}
 (gdb) p data
 $11 = (svalue_t *) 0xa600d1c
@@ -117,7 +117,7 @@ $11 = (svalue_t *) 0xa600d1c
 (gdb) p key
 $12 = (svalue_t *) 0x80f8874
 (gdb) up
-#3  0x80c055a in walk_mapping (m=0xd57b2ec, 
+#3  0x80c055a in walk_mapping (m=0xd57b2ec,
     func=0x8070270 <clear_map_ref_filter>, extra=0x1) at mapping.c:2434
 2434	            (*func)(&walk_mapping_string_svalue, data, extra);
 (gdb) list
@@ -125,7 +125,7 @@ $12 = (svalue_t *) 0x80f8874
 2430	    data = (svalue_t *)((char *)str + size);
 2431	    while ( (size -= sizeof(char *)) >= 0)
 2432	    {
-2433	        if ( !( (p_int)(walk_mapping_string_svalue.u.string = *str++) & 
+2433	        if ( !( (p_int)(walk_mapping_string_svalue.u.string = *str++) &
 1 ) )
 2434	            (*func)(&walk_mapping_string_svalue, data, extra);
 2435	        data += num_values;
@@ -135,7 +135,7 @@ $12 = (svalue_t *) 0x80f8874
 (gdb) p m
 $14 = (mapping_t *) 0xd57b2ec
 (gdb) p *m
-$15 = {ref = 0, hash = 0x0, condensed = 0xa600cb4, user = 0xa205a68, 
+$15 = {ref = 0, hash = 0x0, condensed = 0xa600cb4, user = 0xa205a68,
   num_values = 1}
 (gdb) x/72xb 0xa600cf0
 0xa600cf0:	0x6e	0xc0	0xae	0x0c	0x16	0xc1	0xfc	0x0c
@@ -148,22 +148,22 @@ $15 = {ref = 0, hash = 0x0, condensed = 0xa600cb4, user = 0xa205a68,
 0xa600d28:	0x78	0x0c	0xc4	0x0b	0x02	0x00	0x02	0x00
 0xa600d30:	0x01	0x00	0x00	0x00	0x03	0x00	0x02	0x00
 (gdb) down
-#2  0x807028e in clear_map_ref_filter (key=0x80f8874, data=0xa600d1c, 
+#2  0x807028e in clear_map_ref_filter (key=0x80f8874, data=0xa600d1c,
     extra=0x1) at gcollect.c:421
 421	    clear_ref_in_vector(data, (size_t)extra);
 (gdb) down
 #1  0x807040d in clear_ref_in_vector (svp=0xa600d1c, num=1) at gcollect.c:481
 481	                    clear_ref_in_closure(l, p->x.closure_type);
 (gdb) p *l
-$16 = {ref = 0, ob = 0x20003, function = {index = 28146, code = "ò", 
+$16 = {ref = 0, ob = 0x20003, function = {index = 28146, code = "ò",
     lambda = 0x8436df2, alien = {ob = 0x8436df2, index = 2}}}
 (gdb) p *p
-$17 = {type = 8, x = {string_type = 5, exponent = 5, closure_type = 5, 
+$17 = {type = 8, x = {string_type = 5, exponent = 5, closure_type = 5,
     quotes = 5, num_arg = 5, extern_args = 5, generic = 5}, u = {
-    string = 0xa2bb238 "", number = 170635832, ob = 0xa2bb238, 
-    vec = 0xa2bb238, map = 0xa2bb238, lambda = 0xa2bb238, 
-    mantissa = 170635832, lvalue = 0xa2bb238, protected_lvalue = 0xa2bb238, 
-    protected_char_lvalue = 0xa2bb238, protected_range_lvalue = 0xa2bb238, 
+    string = 0xa2bb238 "", number = 170635832, ob = 0xa2bb238,
+    vec = 0xa2bb238, map = 0xa2bb238, lambda = 0xa2bb238,
+    mantissa = 170635832, lvalue = 0xa2bb238, protected_lvalue = 0xa2bb238,
+    protected_char_lvalue = 0xa2bb238, protected_range_lvalue = 0xa2bb238,
     error_handler = 0xa2bb238}}
 (gdb) p p
 $18 = (svalue_t *) 0xa600d1c
@@ -173,7 +173,7 @@ $19 = (lambda_t *) 0xa2bb238
 #0  0x8070ef0 in clear_ref_in_closure (l=0xa2bb238, type=5) at gcollect.c:790
 790	    if (type != CLOSURE_UNBOUND_LAMBDA && l->ob->flags & O_DESTRUCTED
 (gdb) p *l
-$20 = {ref = 0, ob = 0x20003, function = {index = 28146, code = "ò", 
+$20 = {ref = 0, ob = 0x20003, function = {index = 28146, code = "ò",
     lambda = 0x8436df2, alien = {ob = 0x8436df2, index = 2}}}
 (gdb) x/48xb 0xa2bb220
 0xa2bb220:	0xfb	0xef	0x7a	0x0e	0xd1	0xa7	0x0e	0x08
@@ -183,7 +183,7 @@ $20 = {ref = 0, ob = 0x20003, function = {index = 28146, code = "ò",
 0xa2bb240:	0xf2	0x6d	0x43	0x08	0x02	0x00	0x00	0x00
 0xa2bb248:	0xc0	0x00	0x00	0x00	0x0e	0x00	0x00	0x10
 (gdb) p *l
-$21 = {ref = 0, ob = 0x20003, function = {index = 28146, code = "ò", 
+$21 = {ref = 0, ob = 0x20003, function = {index = 28146, code = "ò",
     lambda = 0x8436df2, alien = {ob = 0x8436df2, index = 2}}}
 (gdb) p l
 $22 = (lambda_t *) 0xa2bb238
@@ -193,11 +193,11 @@ $22 = (lambda_t *) 0xa2bb238
 (gdb) p l
 $23 = (lambda_t *) 0xa2bb238
 (gdb) up
-#2  0x807028e in clear_map_ref_filter (key=0x80f8874, data=0xa600d1c, 
+#2  0x807028e in clear_map_ref_filter (key=0x80f8874, data=0xa600d1c,
     extra=0x1) at gcollect.c:421
 421	    clear_ref_in_vector(data, (size_t)extra);
 (gdb) up
-#3  0x80c055a in walk_mapping (m=0xd57b2ec, 
+#3  0x80c055a in walk_mapping (m=0xd57b2ec,
     func=0x8070270 <clear_map_ref_filter>, extra=0x1) at mapping.c:2434
 2434	            (*func)(&walk_mapping_string_svalue, data, extra);
 (gdb) x/48x 0xd57b2d0
@@ -214,20 +214,20 @@ $25 = 0x80ea12a "mapping.c"
 (gdb) p 0x1e11
 $26 = 7697
 (gdb) p *(object_t *)0xd567284
-$28 = {flags = 1792, ref = 0, total_light = 1, time_reset = 945055037, 
-  time_of_ref = 945052482, load_time = 944868947, load_id = 1, extra_ref = 0, 
-  prog = 0xd56c048, name = 0x8f548c0 "map/m-248_1222", 
-  load_name = 0x893170a "/map/m-248_1222", next_all = 0xd53c0e4, 
-  prev_all = 0xb2a4be8, next_hash = 0x0, next_inv = 0x0, contains = 0xd54869c, 
-  super = 0x0, sent = 0x0, user = 0xa205a68, eff_user = 0xa205a68, 
-  extra_num_variables = 59, variables = 0xd567300, ticks = 73848, 
+$28 = {flags = 1792, ref = 0, total_light = 1, time_reset = 945055037,
+  time_of_ref = 945052482, load_time = 944868947, load_id = 1, extra_ref = 0,
+  prog = 0xd56c048, name = 0x8f548c0 "map/m-248_1222",
+  load_name = 0x893170a "/map/m-248_1222", next_all = 0xd53c0e4,
+  prev_all = 0xb2a4be8, next_hash = 0x0, next_inv = 0x0, contains = 0xd54869c,
+  super = 0x0, sent = 0x0, user = 0xa205a68, eff_user = 0xa205a68,
+  extra_num_variables = 59, variables = 0xd567300, ticks = 73848,
   gigaticks = 0}
 (gdb) p ((object_t *)0xd567284)->prog
 $29 = (program_t *) 0xd56c048
 (gdb) p *(((object_t *)0xd567284)->prog)
-$30 = {ref = 0, total_size = 4712, extra_ref = 0, 
-  program = 0xd56c098 "òÄ\034\b\a", name = 0xd571bf8 "map/m-248_1222.c", 
-  id_number = 7697, load_time = 944868947, 
+$30 = {ref = 0, total_size = 4712, extra_ref = 0,
+  program = 0xd56c098 "òÄ\034\b\a", name = 0xd571bf8 "map/m-248_1222.c",
+  id_number = 7697, load_time = 944868947,
   line_numbers = 0xd56d144 "ñ\021ÿ\nN\a\aD\024\024\b@ÿ\t\f\001G\002\001G~N\aNF\t
 \f\002\a\t\t\bK\004\003\002A\013\003\t\004\004\bC\004\003\004\013\003\t\004\004\
 bC\004\003\003\002\002\bC\004\003\002Q\002A\002\002\002A\004\013\b\t\bC\004\003\
@@ -236,10 +236,10 @@ bC\004\003\003\002\002\bC\004\003\002Q\002A\002\002\002A\004\013\b\t\bC\004\003\
 002\t\bC\004\003\002A\004\003\002\002\002A\004\004\002\002\002\002\003\004\f\t\b
 C\004\003\002\002\b\a\004\bC\004\003\003\004\003\002A\002A\004\004\002\002\004\0
 02A\003\006\004\004\004\013\004\bC\004\003\002I\002I\t\t\bC\004\002Y\004\002\002
-"..., function_names = 0xd56c700, functions = 0xd56c888, strings = 0xd56cbc8, 
-  variable_names = 0xd56cf3c, inherit = 0xd56d114, flags = 0, heart_beat = -1, 
-  argument_types = 0x0, type_start = 0x0, swap_num = -1, 
-  num_function_names = 195, num_functions = 208, num_strings = 221, 
+"..., function_names = 0xd56c700, functions = 0xd56c888, strings = 0xd56cbc8,
+  variable_names = 0xd56cf3c, inherit = 0xd56d114, flags = 0, heart_beat = -1,
+  argument_types = 0x0, type_start = 0x0, swap_num = -1,
+  num_function_names = 195, num_functions = 208, num_strings = 221,
   num_variables = 59, num_inherited = 4}
 (gdb) quit
 
@@ -247,13 +247,13 @@ C\004\003\002\002\b\a\004\bC\004\003\003\004\003\002A\002A\004\004\002\002\004\0
 > Ich habe den Crash ein wenig eingegrenzt: es handelt sich um eine
 > defekte Lambdaclosure, die in einem Mapping unter dem Key "look_msg"
 > im Objekt /map/m-248_1222.c gespeichert ist.
-> 
+>
 > Klingt das vertraut?
 
 In dem Objekt sind nur look_msg's der Form "$Der() ..." definiert.
 Es gibt dort nichts ungewoehnliches.
 Mit dem Befehl 'zmap /map/m-248_1222.c' bekommst du den Original-Filenamen
-raus: 
+raus:
 
 zmap /map/m-248_1222.c
 -------------------------------------------------------------------------------
@@ -286,9 +286,9 @@ ich denke eigentlich nicht.
 (gdb) bt
 #0  0x8070ef0 in clear_ref_in_closure (l=0xa2bb238, type=5) at gcollect.c:790
 #1  0x807040d in clear_ref_in_vector (svp=0xa600d1c, num=1) at gcollect.c:481
-#2  0x807028e in clear_map_ref_filter (key=0x80f8874, data=0xa600d1c, 
+#2  0x807028e in clear_map_ref_filter (key=0x80f8874, data=0xa600d1c,
     extra=0x1) at gcollect.c:421
-#3  0x80c055a in walk_mapping (m=0xd57b2ec, 
+#3  0x80c055a in walk_mapping (m=0xd57b2ec,
     func=0x8070270 <clear_map_ref_filter>, extra=0x1) at mapping.c:2434
 #4  0x80703d0 in clear_ref_in_vector (svp=0xd54c920, num=24) at gcollect.c:468
 #5  0x8070390 in clear_ref_in_vector (svp=0xd567300, num=59) at gcollect.c:456
@@ -296,7 +296,7 @@ ich denke eigentlich nicht.
 #7  0x805213b in backend () at backend.c:388
 #8  0x80bc174 in main (argc=51, argv=0xbffff894) at main.c:333
 (gdb) p *l
-$1 = {ref = 0, ob = 0x20003, function = {index = 28146, code = "ò", 
+$1 = {ref = 0, ob = 0x20003, function = {index = 28146, code = "ò",
     lambda = 0x8436df2, alien = {ob = 0x8436df2, index = 2}}}
 (gdb) x/72xb 0xa2bb220
 0xa2bb220:	0xfb	0xef	0x7a	0x0e	0xd1	0xa7	0x0e	0x08
@@ -309,22 +309,22 @@ $1 = {ref = 0, ob = 0x20003, function = {index = 28146, code = "ò",
 0xa2bb258:	0x98	0x33	0xbf	0x09	0x08	0x32	0x0e	0x08
 0xa2bb260:	0x2a	0x29	0x00	0x00	0x08	0x3c	0x09	0x71
 (gdb) p *(svalue_t *)0xa22bb23C
-$2 = {type = 3, x = {string_type = 2, exponent = 2, closure_type = 2, 
+$2 = {type = 3, x = {string_type = 2, exponent = 2, closure_type = 2,
     quotes = 2, num_arg = 2, extern_args = 2, generic = 2}, u = {
-    string = 0x8436df2 "/z/Gilden/OrdenDerFinsternis/apps/gilden_ob", 
-    number = 138636786, ob = 0x8436df2, vec = 0x8436df2, map = 0x8436df2, 
-    lambda = 0x8436df2, mantissa = 138636786, lvalue = 0x8436df2, 
-    protected_lvalue = 0x8436df2, protected_char_lvalue = 0x8436df2, 
+    string = 0x8436df2 "/z/Gilden/OrdenDerFinsternis/apps/gilden_ob",
+    number = 138636786, ob = 0x8436df2, vec = 0x8436df2, map = 0x8436df2,
+    lambda = 0x8436df2, mantissa = 138636786, lvalue = 0x8436df2,
+    protected_lvalue = 0x8436df2, protected_char_lvalue = 0x8436df2,
     protected_range_lvalue = 0x8436df2, error_handler = 0x8436df2}}
 (gdb) p *(svalue_t *)0xa2bb244
-$3 = {type = 2, x = {string_type = 0, exponent = 0, closure_type = 0, 
+$3 = {type = 2, x = {string_type = 0, exponent = 0, closure_type = 0,
     quotes = 0, num_arg = 0, extern_args = 0, generic = 0}, u = {
-    string = 0xc0 <Address 0xc0 out of bounds>, number = 192, ob = 0xc0, 
-    vec = 0xc0, map = 0xc0, lambda = 0xc0, mantissa = 192, lvalue = 0xc0, 
-    protected_lvalue = 0xc0, protected_char_lvalue = 0xc0, 
+    string = 0xc0 <Address 0xc0 out of bounds>, number = 192, ob = 0xc0,
+    vec = 0xc0, map = 0xc0, lambda = 0xc0, mantissa = 192, lvalue = 0xc0,
+    protected_lvalue = 0xc0, protected_char_lvalue = 0xc0,
     protected_range_lvalue = 0xc0, error_handler = 0xc0}}
 (gdb) p *(svalue_t *)0xa2bb244
-$4 = {ref = 2, ob = 0xc0, function = {index = 14, code = "\016", 
+$4 = {ref = 2, ob = 0xc0, function = {index = 14, code = "\016",
     lambda = 0x1000000e, alien = {ob = 0x1000000e, index = 27456}}}
 (gdb) x/72xb 0xa2bb210
 0xa2bb210:	0x78	0xbf	0xe3	0x0b	0x0e	0x00	0x00	0x30
@@ -337,72 +337,72 @@ $4 = {ref = 2, ob = 0xc0, function = {index = 14, code = "\016",
 0xa2bb248:	0xc0	0x00	0x00	0x00	0x0e	0x00	0x00	0x10
 0xa2bb250:	0x40	0x6b	0x1f	0x0a	0x94	0x03	0x00	0x00
 (gdb) p *(svalue_t*)0xa2bb238
-$5 = {type = 0, x = {string_type = 0, exponent = 0, closure_type = 0, 
+$5 = {type = 0, x = {string_type = 0, exponent = 0, closure_type = 0,
     quotes = 0, num_arg = 0, extern_args = 0, generic = 0}, u = {
-    string = 0x20003 <Address 0x20003 out of bounds>, number = 131075, 
-    ob = 0x20003, vec = 0x20003, map = 0x20003, lambda = 0x20003, 
-    mantissa = 131075, lvalue = 0x20003, protected_lvalue = 0x20003, 
-    protected_char_lvalue = 0x20003, protected_range_lvalue = 0x20003, 
+    string = 0x20003 <Address 0x20003 out of bounds>, number = 131075,
+    ob = 0x20003, vec = 0x20003, map = 0x20003, lambda = 0x20003,
+    mantissa = 131075, lvalue = 0x20003, protected_lvalue = 0x20003,
+    protected_char_lvalue = 0x20003, protected_range_lvalue = 0x20003,
     error_handler = 0x20003}}
 (gdb) p *(svalue_t*)0xa2bb238
-$6 = {type = 192, x = {string_type = 0, exponent = 0, closure_type = 0, 
+$6 = {type = 192, x = {string_type = 0, exponent = 0, closure_type = 0,
     quotes = 0, num_arg = 0, extern_args = 0, generic = 0}, u = {
-    string = 0x1000000e <Address 0x1000000e out of bounds>, 
-    number = 268435470, ob = 0x1000000e, vec = 0x1000000e, map = 0x1000000e, 
-    lambda = 0x1000000e, mantissa = 268435470, lvalue = 0x1000000e, 
-    protected_lvalue = 0x1000000e, protected_char_lvalue = 0x1000000e, 
+    string = 0x1000000e <Address 0x1000000e out of bounds>,
+    number = 268435470, ob = 0x1000000e, vec = 0x1000000e, map = 0x1000000e,
+    lambda = 0x1000000e, mantissa = 268435470, lvalue = 0x1000000e,
+    protected_lvalue = 0x1000000e, protected_char_lvalue = 0x1000000e,
     protected_range_lvalue = 0x1000000e, error_handler = 0x1000000e}}
 (gdb) p *(svalue_t*)0xa2bb23c
-$7 = {type = 3, x = {string_type = 2, exponent = 2, closure_type = 2, 
+$7 = {type = 3, x = {string_type = 2, exponent = 2, closure_type = 2,
     quotes = 2, num_arg = 2, extern_args = 2, generic = 2}, u = {
-    string = 0x8436df2 "/z/Gilden/OrdenDerFinsternis/apps/gilden_ob", 
-    number = 138636786, ob = 0x8436df2, vec = 0x8436df2, map = 0x8436df2, 
-    lambda = 0x8436df2, mantissa = 138636786, lvalue = 0x8436df2, 
-    protected_lvalue = 0x8436df2, protected_char_lvalue = 0x8436df2, 
+    string = 0x8436df2 "/z/Gilden/OrdenDerFinsternis/apps/gilden_ob",
+    number = 138636786, ob = 0x8436df2, vec = 0x8436df2, map = 0x8436df2,
+    lambda = 0x8436df2, mantissa = 138636786, lvalue = 0x8436df2,
+    protected_lvalue = 0x8436df2, protected_char_lvalue = 0x8436df2,
     protected_range_lvalue = 0x8436df2, error_handler = 0x8436df2}}
 (gdb) p *(svalue_t*)0xa2bb244
-$8 = {type = 2, x = {string_type = 0, exponent = 0, closure_type = 0, 
+$8 = {type = 2, x = {string_type = 0, exponent = 0, closure_type = 0,
     quotes = 0, num_arg = 0, extern_args = 0, generic = 0}, u = {
-    string = 0xc0 <Address 0xc0 out of bounds>, number = 192, ob = 0xc0, 
-    vec = 0xc0, map = 0xc0, lambda = 0xc0, mantissa = 192, lvalue = 0xc0, 
-    protected_lvalue = 0xc0, protected_char_lvalue = 0xc0, 
+    string = 0xc0 <Address 0xc0 out of bounds>, number = 192, ob = 0xc0,
+    vec = 0xc0, map = 0xc0, lambda = 0xc0, mantissa = 192, lvalue = 0xc0,
+    protected_lvalue = 0xc0, protected_char_lvalue = 0xc0,
     protected_range_lvalue = 0xc0, error_handler = 0xc0}}
 (gdb) p *(svalue_t*)0xa2bb24c
-$9 = {type = 14, x = {string_type = 4096, exponent = 4096, 
-    closure_type = 4096, quotes = 4096, num_arg = 4096, extern_args = 4096, 
-    generic = 4096}, u = {string = 0xa1f6b40 "\b", number = 169831232, 
-    ob = 0xa1f6b40, vec = 0xa1f6b40, map = 0xa1f6b40, lambda = 0xa1f6b40, 
-    mantissa = 169831232, lvalue = 0xa1f6b40, protected_lvalue = 0xa1f6b40, 
-    protected_char_lvalue = 0xa1f6b40, protected_range_lvalue = 0xa1f6b40, 
+$9 = {type = 14, x = {string_type = 4096, exponent = 4096,
+    closure_type = 4096, quotes = 4096, num_arg = 4096, extern_args = 4096,
+    generic = 4096}, u = {string = 0xa1f6b40 "\b", number = 169831232,
+    ob = 0xa1f6b40, vec = 0xa1f6b40, map = 0xa1f6b40, lambda = 0xa1f6b40,
+    mantissa = 169831232, lvalue = 0xa1f6b40, protected_lvalue = 0xa1f6b40,
+    protected_char_lvalue = 0xa1f6b40, protected_range_lvalue = 0xa1f6b40,
     error_handler = 0xa1f6b40}}
 (gdb) p ((svalue_t*)0xa2bb24c)->u.protected_char_lvalue
 $11 = (struct protected_char_lvalue *) 0xa1f6b40
 (gdb) p *((svalue_t*)0xa2bb24c)->u.protected_char_lvalue
-$12 = {v = {type = 8, x = {string_type = 0, exponent = 0, closure_type = 0, 
+$12 = {v = {type = 8, x = {string_type = 0, exponent = 0, closure_type = 0,
       quotes = 0, num_arg = 0, extern_args = 0, generic = 0}, u = {
-      string = 0x0, number = 0, ob = 0x0, vec = 0x0, map = 0x0, lambda = 0x0, 
-      mantissa = 0, lvalue = 0x0, protected_lvalue = 0x0, 
-      protected_char_lvalue = 0x0, protected_range_lvalue = 0x0, 
-      error_handler = 0}}, protector = {type = 0, x = {string_type = 0, 
-      exponent = 0, closure_type = 0, quotes = 0, num_arg = 0, 
-      extern_args = 0, generic = 0}, u = {string = 0x0, number = 0, ob = 0x0, 
-      vec = 0x0, map = 0x0, lambda = 0x0, mantissa = 0, lvalue = 0x0, 
-      protected_lvalue = 0x0, protected_char_lvalue = 0x0, 
-      protected_range_lvalue = 0x0, error_handler = 0}}, lvalue = 0x38545db5, 
+      string = 0x0, number = 0, ob = 0x0, vec = 0x0, map = 0x0, lambda = 0x0,
+      mantissa = 0, lvalue = 0x0, protected_lvalue = 0x0,
+      protected_char_lvalue = 0x0, protected_range_lvalue = 0x0,
+      error_handler = 0}}, protector = {type = 0, x = {string_type = 0,
+      exponent = 0, closure_type = 0, quotes = 0, num_arg = 0,
+      extern_args = 0, generic = 0}, u = {string = 0x0, number = 0, ob = 0x0,
+      vec = 0x0, map = 0x0, lambda = 0x0, mantissa = 0, lvalue = 0x0,
+      protected_lvalue = 0x0, protected_char_lvalue = 0x0,
+      protected_range_lvalue = 0x0, error_handler = 0}}, lvalue = 0x38545db5,
   start = 0x38527639 <Address 0x38527639 out of bounds>}
 (gdb) p *(svalue_t*)0xa2bb34
-$13 = {type = 0, x = {string_type = 0, exponent = 0, closure_type = 0, 
-    quotes = 0, num_arg = 0, extern_args = 0, generic = 0}, u = {string = 0x0, 
-    number = 0, ob = 0x0, vec = 0x0, map = 0x0, lambda = 0x0, mantissa = 0, 
-    lvalue = 0x0, protected_lvalue = 0x0, protected_char_lvalue = 0x0, 
+$13 = {type = 0, x = {string_type = 0, exponent = 0, closure_type = 0,
+    quotes = 0, num_arg = 0, extern_args = 0, generic = 0}, u = {string = 0x0,
+    number = 0, ob = 0x0, vec = 0x0, map = 0x0, lambda = 0x0, mantissa = 0,
+    lvalue = 0x0, protected_lvalue = 0x0, protected_char_lvalue = 0x0,
     protected_range_lvalue = 0x0, error_handler = 0}}
 (gdb) p *(svalue_t*)0xa2bb22c
-$14 = {type = -27920, x = {string_type = 25162, exponent = 25162, 
-    closure_type = 25162, quotes = 25162, num_arg = 25162, 
-    extern_args = 25162, generic = 25162}, u = {string = 0xe94d76c "\016", 
-    number = 244635500, ob = 0xe94d76c, vec = 0xe94d76c, map = 0xe94d76c, 
-    lambda = 0xe94d76c, mantissa = 244635500, lvalue = 0xe94d76c, 
-    protected_lvalue = 0xe94d76c, protected_char_lvalue = 0xe94d76c, 
+$14 = {type = -27920, x = {string_type = 25162, exponent = 25162,
+    closure_type = 25162, quotes = 25162, num_arg = 25162,
+    extern_args = 25162, generic = 25162}, u = {string = 0xe94d76c "\016",
+    number = 244635500, ob = 0xe94d76c, vec = 0xe94d76c, map = 0xe94d76c,
+    lambda = 0xe94d76c, mantissa = 244635500, lvalue = 0xe94d76c,
+    protected_lvalue = 0xe94d76c, protected_char_lvalue = 0xe94d76c,
     protected_range_lvalue = 0xe94d76c, error_handler = 0xe94d76c}}
 (gdb) x/72xb 0xa2bb210
 0xa2bb210:	0x78	0xbf	0xe3	0x0b	0x0e	0x00	0x00	0x30

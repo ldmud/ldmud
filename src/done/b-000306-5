@@ -11,7 +11,7 @@ compiled over the years that are either feature-desires or
 bug-reports.  Here are a few bugs that we have verified are still
 around:
 
--   padding a %d in (s)printf() with left justification doesn't 
-    work if the type specifier isn't followed by anything.  
-    (ie. sprintf("%' '-9d", 1500) doesn't work, while 
+-   padding a %d in (s)printf() with left justification doesn't
+    work if the type specifier isn't followed by anything.
+    (ie. sprintf("%' '-9d", 1500) doesn't work, while
     sprintf("%' '-9dx", 1500) does).

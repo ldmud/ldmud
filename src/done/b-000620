@@ -10,7 +10,7 @@ uninitialized variable.
 Hallo Lars,
 
 ich habe mir mal einen Treiber mit DEBUG_TELNET definiert, kompiliert
-und wollte den nun testen. Dazu habe ich die auskommentierten 
+und wollte den nun testen. Dazu habe ich die auskommentierten
 Hooks im Master reaktiviert. Lib ist Evermore-1.4N, Driver runs on cygwin,
 client was zMud.
 

@@ -7,11 +7,11 @@ State: New
 
 On 29 Feb 00, at 11:21, Casey Zacek wrote:
 
-> 
+>
 > Regarding the command_stack() additions I suggested, one of my Arches
 > came up with this:
-> 
-> 
+>
+>
 > oh and I realized that if command_stack() returned the object
 > calling command(), that'd almost certainly solve our problems
 > cuz we can test that against the command_giver element of the
@@ -25,6 +25,6 @@ On 29 Feb 00, at 11:21, Casey Zacek wrote:
 
 How about the object name instead of the object itself?
 
--- 
+--
 Lars Duening; lars@bearnip.com
 

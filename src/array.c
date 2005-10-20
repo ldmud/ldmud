@@ -1017,7 +1017,7 @@ compare_single (svalue_t *svp, vector_t *v)
 
     if (svp->type == T_CLOSURE)
     {
-        return closure_cmp(svp, p2);
+        return closure_eq(svp, p2) ? 0 : -1;
     }
 
     if (svp->u.number != p2->u.number)
@@ -1035,7 +1035,7 @@ compare_single (svalue_t *svp, vector_t *v)
 
     /* NOTREACHED */
     return 0;
-}
+} /* compare_single() */
 
 /*-------------------------------------------------------------------------*/
 vector_t *
@@ -1323,7 +1323,7 @@ alist_cmp (svalue_t *p1, svalue_t *p2)
         break;
     }
     return 0;
-}
+} /* alist_cmp() */
 
 /*-------------------------------------------------------------------------*/
 vector_t *
@@ -3043,7 +3043,7 @@ f_include_list (svalue_t *sp, int num_arg)
         struct iinfo * next;    /* Next include to work */
 
         /* Get the memory pool */
-        pool = new_mempool(sizeof(*begin) * 64);
+        pool = new_mempool(size_mempool(sizeof(*begin)));
         if (NULL == pool)
         {
             error("Out of memory: memory pool\n");
@@ -3297,7 +3297,7 @@ f_inherit_list (svalue_t *sp, int num_arg)
         }
 
     /* Get the memory pool */
-    pool = new_mempool(sizeof(*begin) * 64);
+    pool = new_mempool(size_mempool(sizeof(*begin)));
     if (NULL == pool)
     {
         error("Out of memory: memory pool\n");
@@ -3571,14 +3571,7 @@ f_functionlist (svalue_t *sp)
  */
 
 {
-#define RETURN_FUNCTION_NAME    0x01
-#define RETURN_FUNCTION_FLAGS   0x02
-#define RETURN_FUNCTION_TYPE    0x04
-#define RETURN_FUNCTION_NUMARG  0x08
-
-#define RETURN_FUNCTION_MASK    0x0f  /* union of all RETURN_FUNCTION_ defs */
-
-#define RETURN_FUNCTION_ARGTYPE 0x10 /* not implemented */
+#define FILTERFLAGS  (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|NAME_INHERITED)
 
     object_t *ob;         /* <ob> argument to list */
     mp_int mode_flags;    /* <flags> argument */
@@ -3644,15 +3637,8 @@ f_functionlist (svalue_t *sp)
      * modifier, the functions are not visible. If there is none, the functions
      * are visible.
      */
-    memset(
-      vis_tags,
-      mode_flags &
-      (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|
-       NAME_INHERITED) ?
-        VISTAG_INVIS :
-        VISTAG_ALL  ,
-      num_functions
-    );
+    memset( vis_tags, (mode_flags & FILTERFLAGS) ?  VISTAG_INVIS : VISTAG_ALL
+          , num_functions);
 
     /* Count how many named functions need to be listed in the result.
      * Flag every function to list in vistag[].
@@ -3660,8 +3646,7 @@ f_functionlist (svalue_t *sp)
     num_functions = 0;
 
     /* First, check all functions for which we have a name */
-    flags = mode_flags &
-        (TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|NAME_INHERITED);
+    flags = mode_flags & (FILTERFLAGS ^ NAME_HIDDEN);
 
     fun = prog->functions;
     j = prog->num_function_names;
@@ -3702,9 +3687,7 @@ f_functionlist (svalue_t *sp)
      * TODO: Due to the dedicated 'find hidden name' loop, this shouldn't
      * TODO:: be necessary, nor the VISTAG_ALL at all.
      */
-    if ( !(mode_flags &
-           (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|
-            NAME_INHERITED) ) )
+    if ( !(mode_flags & FILTERFLAGS))
     {
         num_functions = prog->num_functions;
     }
@@ -3819,13 +3802,9 @@ f_functionlist (svalue_t *sp)
 #undef VISTAG_INVIS
 #undef VISTAG_VIS
 #undef VISTAG_ALL
+#undef VISTAG_NAMED
 
-#undef RETURN_FUNCTION_NAME
-#undef RETURN_FUNCTION_FLAGS
-#undef RETURN_FUNCTION_TYPE
-#undef RETURN_FUNCTION_NUMARG
-#undef RETURN_FUNCTION_ARGTYPE
-#undef RETURN_FUNCTION_MASK
+#undef FILTERFLAGS
 }
 
 /*=========================================================================*/
@@ -4034,10 +4013,10 @@ make_unique (vector_t *arr, char *func, svalue_t *skipnum)
      * TODO: Implement an automatic memory-cleanup in case of errors,
      * TODO:: e.g. by adding a dedicated structure on the runtime stack.
      */
-    pool = new_mempool(arr_size * sizeof(*head));
+    pool = new_mempool(size_mempool(sizeof(*head)));
     if (!pool)
         error("(unique_array) Out of memory: (%lu bytes) for mempool\n"
-             , arr_size * sizeof(*head));
+             , (unsigned long)size_mempool(sizeof(*head)));
 
     ref_array(arr);  /* Prevent apply from freeing this */
 

@@ -30,11 +30,13 @@ WARN= # no warning options - will work with all compilers :-)
 # Optimization and source level debugging options.
 # adding a -fomit-frame-pointer on the NeXT (gcc version 1.93 (68k, MIT syntax))
 # will corrupt the driver.
-OPTIMIZE = @OCFLAGS@ # high optimization
-#OPTIMIZE= @MCFLAGS@ # medium optimization
-#OPTIMIZE= @LCFLAGS@ # minimal optimization
-#OPTIMIZE= @DCFLAGS@ # no optimization; for frequent recompilations.
-#
+HIGH_OPTIMIZE = @OCFLAGS@ # high optimization
+MED_OPTIMIZE= @MCFLAGS@ # medium optimization
+LOW_OPTIMIZE = @LCFLAGS@ # minimal optimization
+NO_OPTIMIZE= @DCFLAGS@ # no optimization; for frequent recompilations.
+
+OPTIMIZE= $(@val_optimize@_OPTIMIZE)
+
 # The main debugging level is define in config.h
 # Add additional options here.
 DEBUG=

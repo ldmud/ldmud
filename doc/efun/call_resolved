@@ -7,13 +7,13 @@ DESCRIPTION
         ob->func(...). The result of that function call is stored in
         result, which must be passed by reference.
 
-        If the current object is already destructed, or the ob does
-        not exist, or ob does not define a public accessible function
-        named func, call_resolved() returns 0 as failure code, else 1
-        for success.
+        If the current object is already destructed, or ob does not
+        define a public accessible function named func,
+        call_resolved() returns 0 as failure code, else 1 for success.
 
-        ob can also be an object_name. If a string is passed for ob, and
-        no object with that name does exist, an error occurs.
+        ob can also be an object_name. If a string is passed for ob
+        and an object with that name can't be found or loaded, an
+        error occurs.
 
 SEE ALSO
         call_other(E), function_exists(E), find_object(E)

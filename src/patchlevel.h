@@ -8,16 +8,16 @@
  */
 
 /* $Format: "#define RELEASE_DATE \"$ProjectDate$\""$ */
-#define RELEASE_DATE "Sun, 02 Feb 2003 18:11:57 -0700"
+#define RELEASE_DATE "Sun, 30 May 2004 01:48:11 -0600"
 
 /* $Format: "#define PROJ_VERSION \"$ProjectVersion$\""$ */
-#define PROJ_VERSION "3-2-rel.9"
+#define PROJ_VERSION "3-2-rel.10"
 
 /* $Format: "#define GAME_VERSION \"$ReleaseVersion$\""$ */
-#define GAME_VERSION "3.2.9"
+#define GAME_VERSION "3.2.10"
 
 /* $Format: "#define LONG_VERSION \"$ReleaseVersion$-$ReleaseType$.$ProjectMinorVersion$\""$ */
-#define LONG_VERSION "3.2.9-rel.9"
+#define LONG_VERSION "3.2.10-rel.10"
 
 /* $Format: "#define VERSION_MAJOR \"$ReleaseMajor$\""$ */
 #define VERSION_MAJOR "3"
@@ -26,10 +26,10 @@
 #define VERSION_MINOR "2"
 
 /* $Format: "#define VERSION_MICRO \"$ReleaseMicro$\""$ */
-#define VERSION_MICRO "9"
+#define VERSION_MICRO "10"
 
 /* $Format: "#define VERSION_PATCH \"$ProjectMinorVersion$\""$ */
-#define VERSION_PATCH "9"
+#define VERSION_PATCH "10"
 
 /* $Format: "#define LOCAL_LEVEL \"\""$ */
 #define LOCAL_LEVEL ""

@@ -41,11 +41,11 @@ type = struct object_s {
 } *
 (gdb) p *ob
 $2 = {flags = 20992, ref = 512, total_light = 501, time_reset = 1092,
-time_of_ref = 30971, load_time = 1092, load_id = 30960, 
+time_of_ref = 30971, load_time = 1092, load_id = 30960,
   extra_ref = 1936875888, prog = 0x65, name = 0x0, load_name = 0x0,
-next_all = 0x61702f2e, prev_all = 0x20657372, next_hash = 0x0, 
+next_all = 0x61702f2e, prev_all = 0x20657372, next_hash = 0x0,
   next_inv = 0x0, contains = 0x0, super = 0x0, sent = 0x0, user = 0x0,
-eff_user = 0x0, extra_num_variables = 0, variables = 0x0, 
+eff_user = 0x0, extra_num_variables = 0, variables = 0x0,
   ticks = 0, gigaticks = 0}
 
 
@@ -67,7 +67,7 @@ The lambda closure that was used in H_COMMAND is the following...
          ({ #'=, 'eval_s,
            ({ #'get_eval_cost })
          }),
-         ({ #'=, 'res, 
+         ({ #'=, 'res,
            ({ #'execute_command, 'cmd, ({ #'this_object }), 'cmd_giver }),
          }),
          ({ #'=, 'eval_e,
@@ -103,7 +103,7 @@ The lambda closure that was used in H_COMMAND is the following...
          ({ #'catch,
            ({ #'call_other, "/players/cendor/rooms/cmdlagroom", "get_data", ({ #'this_object }), 'cmd, 'udif, 'edif })
          }),
-         ({ #'return, 'res }),  
+         ({ #'return, 'res }),
        })));
 
 This works all OK except random crashes. :-) The purpose of this hook is

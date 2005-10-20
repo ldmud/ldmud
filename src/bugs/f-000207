@@ -7,7 +7,7 @@ See also: b-000207
 
 
 
-unsere (devellop) ;)  efuns.c gezippt... 
+unsere (devellop) ;)  efuns.c gezippt...
 
 also nach dem standard-efun teil kommen mysql funktionen und danach der
 teil von righ ;)
@@ -1121,7 +1121,7 @@ process_value (char *str)
 
     /* We no longer need this */
     xfree(func);
-    
+
     /* Apply the function and see if adequate answer is returned.
      */
     ret = apply(func2, ob, numargs);
@@ -1174,7 +1174,7 @@ f_process_string(svalue_t *sp)
 
     TYPE_TEST1(sp, T_STRING);
     str = sp->u.string;
-    
+
     if (!str || !(p1 = strchr(str,'@')))
         return sp;  /* Nothing to do */
 
@@ -1266,7 +1266,7 @@ f_process_string(svalue_t *sp)
             }
             xfree(buf);
         }
-        
+
         if (!p2)
         {
             /* No replacement by function call */
@@ -2283,7 +2283,7 @@ f_clones (svalue_t *sp, int num_arg)
  *   == 1: return the clones of the previous blueprints only.
  *   == 2: return all clones of the blueprint.
  */
- 
+
 {
     char      *name;     /* The load-name to search */
     mp_int     mintime;  /* 0 or lowest load_time for an object to qualify */
@@ -2353,7 +2353,7 @@ f_clones (svalue_t *sp, int num_arg)
             }
 
             free_svalue(sp--); inter_sp = sp;
-            
+
             if (sp->type == T_OBJECT)
                 reference = sp->u.ob;
             else if (sp->type == T_STRING) {
@@ -2488,7 +2488,7 @@ f_clones (svalue_t *sp, int num_arg)
     put_array(sp, res);
 
     xfree(ores);
-    
+
     return sp;
 } /* f_clones() */
 
@@ -3060,7 +3060,7 @@ f_transfer (svalue_t *sp)
     }
     else
         bad_xefun_arg(2, sp);
-        
+
     from = ob->super;
     result = 0; /* Default: success result */
 
@@ -3181,7 +3181,7 @@ f_transfer (svalue_t *sp)
 
         /* When we come here, the move is ok */
     } /* pseudo-switch() */
-        
+
     if (result)
     {
         /* All the applys might have changed these */
@@ -3211,7 +3211,7 @@ e_say (svalue_t *v, vector_t *avoid)
  * If the first element of <avoid> is not an object, the function
  * will store its command_giver object into it.
  */
- 
+
 {
     static svalue_t ltmp = { T_POINTER };
     static svalue_t stmp = { T_OBJECT };
@@ -3360,7 +3360,7 @@ e_say (svalue_t *v, vector_t *avoid)
 
     case T_POINTER:
         /* say()'s evil twin: send <v> to all recipients' catch_msg() lfun */
-        
+
         for (curr_recipient = recipients; NULL != (ob = *curr_recipient++) ; )
         {
             if (ob->flags & O_DESTRUCTED)
@@ -3381,7 +3381,7 @@ e_say (svalue_t *v, vector_t *avoid)
     }
 
     /* Now send the message to all recipients */
-    
+
     for (curr_recipient = recipients; NULL != (ob = *curr_recipient++); )
     {
         interactive_t *ip;
@@ -3430,7 +3430,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     /* Like in say(), collect the possible recipients.
      * First count how many there are.
      */
-    
+
     for (ob = room->contains; ob; ob = ob->next_inv)
     {
         interactive_t *ip;
@@ -3446,7 +3446,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     if (num_recipients < 20)
         recipients = some_recipients;
     else
-        recipients = 
+        recipients =
           alloca( (num_recipients+1) * sizeof(object_t *) );
 
     /* Now fill the table */
@@ -3511,7 +3511,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     }
 
     /* Now send the message to all recipients */
-    
+
     for (curr_recipient = recipients; NULL != (ob = *curr_recipient++); )
     {
         interactive_t *ip;
@@ -4211,7 +4211,7 @@ f_debug_info (svalue_t *sp, int num_arg)
  *            Number and size of swapped-out programs.
  *
  *        int DID_ST_USER_RESERVE
- *        int DID_ST_MASTER_RESERVE     
+ *        int DID_ST_MASTER_RESERVE
  *        int DID_ST_SYSTEM_RESERVE
  *            Current sizes of the three memory reserves.
  *
@@ -4637,7 +4637,7 @@ f_debug_info (svalue_t *sp, int num_arg)
     }
 
     /* Clean up the stack and return the result */
-    
+
     sp = pop_n_elems(num_arg, sp);
 
     sp++;
@@ -4719,7 +4719,7 @@ allocate_new_dat(void)
     }
 
     /* The chained list exists */
-    
+
     tmp = my_dat->prev = xalloc(sizeof(db_dat_t));
     if ( !tmp )
     {
@@ -4856,9 +4856,9 @@ raise_db_error (db_dat_t *dat)
        error(	"An unknown error occured during the current database-"
 		"operation\n");
        /* NOTREACHED */
-    } else 
+    } else
     {
-       
+
        tmp = mysql_error(dat->mysql_dat);
        err_string = alloca(strlen(tmp) + 2);
        strcpy(err_string, tmp);
@@ -4970,14 +4970,14 @@ f_db_close (svalue_t *sp)
  * Close the server-connection with the handle <handle>
  * Return the handle-number on success.
  */
-     
+
 {
    p_int     handle;
    db_dat_t *dat;
-   
+
    TYPE_TEST1(sp, T_NUMBER)
       handle = sp->u.number;
-   
+
    if ( !(dat = find_dat_by_handle((unsigned int)handle)) )
    {
       error("Illegal handle for database.\n");
@@ -4988,7 +4988,7 @@ f_db_close (svalue_t *sp)
    free_svalue(sp); /* Well, it's just a number */
    put_number(sp, handle);
    return sp;
-   
+
 } /* db_close() */
 
 /*-------------------------------------------------------------------------*/
@@ -5010,12 +5010,12 @@ f_db_connect (svalue_t *sp)
    char     *user;
    p_int     sock;
    db_dat_t *tmp;
-   
+
    TYPE_TEST2(sp, T_STRING);
    TYPE_TEST1(sp-1, T_STRING);
    database = sp[-1].u.string;
    user = sp->u.string;
-   
+
    tmp = allocate_new_dat();
    if ( !tmp )
    {
@@ -5023,7 +5023,7 @@ f_db_connect (svalue_t *sp)
       /* NOTREACHED */
       return NULL;
    }
-   
+
    tmp->mysql_dat = mysql_init(0);
    if ( !tmp->mysql_dat )
    {
@@ -5032,14 +5032,14 @@ f_db_connect (svalue_t *sp)
       /* NOTREACHED */
       return NULL;
    }
-   
+
    /* Only connections to LOCALHOST are currently possible
        * I wouldn't dare to implement synchronous DB-access via
        * TCP (that's something for ERQ wizards :-).
        */
 
       /* DAFIRE@FF Datenbankanmeldung als user:mud pw:dum */
-      
+
    if ( !mysql_real_connect(tmp->mysql_dat, "localhost", user, "dum",
                             database, 0, 0, 0))
    {
@@ -5047,7 +5047,7 @@ f_db_connect (svalue_t *sp)
       /* NOTREACHED */
       return sp;
    }
-      
+
    free_string_svalue(sp);
    sp--;
    free_string_svalue(sp);
@@ -5087,12 +5087,12 @@ f_db_exec (svalue_t *sp)
        /* NOTREACHED */
        return sp;
     }
-       
+
     if ( mysql_query(dat->mysql_dat, s) )
     {
        /* either a REAL error occured or just an error in the SQL-statement
         */
-          
+
        err_no = mysql_errno(dat->mysql_dat);
        if (   (err_no == CR_COMMANDS_OUT_OF_SYNC)
               || (err_no == CR_SERVER_GONE_ERROR)
@@ -5103,7 +5103,7 @@ f_db_exec (svalue_t *sp)
           raise_db_error(dat);
           return sp;
        }
-          
+
        /* Just an error in the SQL-statement */
        free_string_svalue(sp);
        sp--;
@@ -5113,7 +5113,7 @@ f_db_exec (svalue_t *sp)
     }
 
     /* If we used a select-statement, how many columns are returned? */
-    
+
     if ( mysql_field_count(dat->mysql_dat) )
     {
         /* Try to initiate a row-by-row transfer */
@@ -5135,7 +5135,7 @@ f_db_exec (svalue_t *sp)
 /*-------------------------------------------------------------------------*/
 svalue_t *
 f_db_coldefs (svalue_t *sp)
- 
+
 /* TEFUN db_coldefs()  by dafire@ff
  *
  *   mixed db_coldefs(int handle)
@@ -5148,7 +5148,7 @@ f_db_coldefs (svalue_t *sp)
    int           num_fields, i;
    unsigned int  handle;
    MYSQL_FIELD  *fields;
-     
+
    TYPE_TEST1(sp, T_NUMBER)
       handle = (unsigned int)sp->u.number;
    if ( !(dat = find_dat_by_handle(handle)) )
@@ -5157,16 +5157,16 @@ f_db_coldefs (svalue_t *sp)
       /* NOTREACHED */
       return sp;
    }
-   if (!dat->mysql_result) 
+   if (!dat->mysql_result)
    {
       free_svalue(sp);
       put_number(sp, 0);
       return sp;
    }
- 
-    
+
+
    num_fields = mysql_num_fields(dat->mysql_result);
-     
+
    v = allocate_array(num_fields);
    if (!v)
    {
@@ -5174,14 +5174,14 @@ f_db_coldefs (svalue_t *sp)
       /* NOTREACHED */
       return sp;
    }
- 
+
    fields = mysql_fetch_fields(dat->mysql_result);
-     
+
    for (i = 0; i < num_fields; i++)
    {
       put_malloced_string(v->item+i, string_copy(fields[i].name));
    }
-  
+
    free_svalue(sp); /* It's a number */
    put_array(sp, v);
    return sp;
@@ -5215,13 +5215,13 @@ f_db_fetch (svalue_t *sp)
         return sp;
     }
 
-    if (!dat->mysql_result) 
+    if (!dat->mysql_result)
     {
        free_svalue(sp);
        put_number(sp, 0);
        return sp;
     }
-    if (!dat->mysql_result) 
+    if (!dat->mysql_result)
     {
        free_svalue(sp);
        put_number(sp, 0);
@@ -5239,9 +5239,9 @@ f_db_fetch (svalue_t *sp)
     }
 
     /* How many columns does every line contain? */
-   
+
     num_cols = mysql_num_fields(dat->mysql_result);
-    
+
     v = allocate_array(num_cols);
     if (!v)
     {
@@ -5249,7 +5249,7 @@ f_db_fetch (svalue_t *sp)
         /* NOTREACHED */
         return sp;
     }
-    
+
     for (i = 0; i < num_cols; i++)
        if (dat->mysql_row[i])
           put_malloced_string(v->item+i, string_copy(dat->mysql_row[i]));
@@ -5353,7 +5353,7 @@ longint_t* _to_longint(char *s)
    int len,sign,i,end,mult,j;
    unsigned int val;
    char *rs,c;
-   
+
    if (!s)
    {
       bn=(longint_t*)xalloc(sizeof(longint_t));
@@ -5362,7 +5362,7 @@ longint_t* _to_longint(char *s)
          error("Out of memory.\n");
          return;
       }
-      
+
       bn->len=0;
       bn->sign=1;
       bn->data[0]=0;
@@ -5371,7 +5371,7 @@ longint_t* _to_longint(char *s)
    rs=s;
 
    sign=1;
-   
+
    while(s[0]=='-')
    {
       sign=-sign;
@@ -5393,7 +5393,7 @@ longint_t* _to_longint(char *s)
       bn->data[0]=0;
       return bn;
    }
-   
+
    for(i=len;i--;)
       if (s[i]<'0'||s[i]>'9')
       {
@@ -5430,7 +5430,7 @@ longint_t* _to_longint(char *s)
       s[end]=0;
       mult=1;
       j=i;
-      while(j<end) 
+      while(j<end)
       {
          mult*=10;
          j++;
@@ -5466,7 +5466,7 @@ longint_t *_stradd_positive(longint_t *a, longint_t *b)
    int len=a->len+1;
    register int i;
    unsigned int v;
-   
+
    if (b->len>a->len)
    {
       longint_t *tmp;
@@ -5479,7 +5479,7 @@ longint_t *_stradd_positive(longint_t *a, longint_t *b)
 
    if (len-1<0) i=0;
    else i=len-1;
-   
+
    bn=(longint_t*)xalloc(sizeof(longint_t)+sizeof(unsigned short)*i);
    if (!bn)
    {
@@ -5511,7 +5511,7 @@ longint_t *_stradd_positive(longint_t *a, longint_t *b)
       i++;
    }
    bn->len=i-1;
-   
+
    return bn;
 }
 
@@ -5533,7 +5533,7 @@ longint_t* _strsub_positive(longint_t* a,longint_t* b,int sign)
       else doswap=0;
    }
    else doswap=0;
-   
+
    if (doswap || b->len>a->len)
    {
       longint_t *tmp;
@@ -5582,7 +5582,7 @@ longint_t* _strsub_positive(longint_t* a,longint_t* b,int sign)
 inline int _strcmp(longint_t *a, longint_t *b)
 {
    int i;
-   
+
    if (a->sign!=b->sign) return a->sign;
 
    if (a->len > b->len) return 1*a->sign;
@@ -5591,11 +5591,11 @@ inline int _strcmp(longint_t *a, longint_t *b)
    i=a->len;
    while(i>=0 && a->data[i]==b->data[i]) i--;
    if (i<0) return 0;
-   
+
    if (a->data[i]>b->data[i]) return 1*a->sign;
    else return -1*a->sign;
 }
-   
+
 
 /* prereq: a->len >= b->len+ofs+1 */
 /* returns abs(a)*sgn(a):=abs(a)+abs(b)*10^(9*ofs) */
@@ -5628,7 +5628,7 @@ inline void _strmul_int(longint_t *r, longint_t *a, int b)
 {
    int i;
    unsigned v;
-   
+
    if (!b)
    {
       r->data[0]=0;
@@ -5659,10 +5659,10 @@ longint_t *_strmul(longint_t *a, longint_t *b)
 {
    longint_t *r2, *r;
    int i;
-   
+
    /* quick check if a==0 or b==0 */
    if (a->len==0 && a->data[0]==0
-       || b->len==0 && b->data[0]==0) 
+       || b->len==0 && b->data[0]==0)
    {
       r=(longint_t*)xalloc(sizeof(longint_t));
       if (!r)
@@ -5683,7 +5683,7 @@ longint_t *_strmul(longint_t *a, longint_t *b)
       error("Out of memory.\n");
       return;
    }
-   
+
    if (b->len==0)
    {
       _strmul_int(r2,a,b->data[0]);
@@ -5701,7 +5701,7 @@ longint_t *_strmul(longint_t *a, longint_t *b)
       r->len=i;
       do r->data[i]=0;
       while(i--);
-      
+
       for(i=0;i<=b->len;i++)
       {
          register int j,carry,v;
@@ -5730,7 +5730,7 @@ longint_t *_strmul(longint_t *a, longint_t *b)
    r->sign=a->sign*b->sign;
    return r;
 }
-      
+
 
 longint_t *_strdiv_int(longint_t *a, int b, int *rem, int shift)
 {
@@ -5740,7 +5740,7 @@ longint_t *_strdiv_int(longint_t *a, int b, int *rem, int shift)
    int i,ofs;
 
    ofs=shift/16;
-   
+
    if (a->len<ofs)
    {
       *rem=0;
@@ -5755,7 +5755,7 @@ longint_t *_strdiv_int(longint_t *a, int b, int *rem, int shift)
       r->data[0]=0;
       return r;
    }
-      
+
    if (a->len==0)
    {
       d=div(a->data[0]>>shift,b);
@@ -5771,7 +5771,7 @@ longint_t *_strdiv_int(longint_t *a, int b, int *rem, int shift)
       r->data[0]=d.quot;
       return r;
    }
-   
+
    v=a->len-ofs-1;
    if (v<0) v=0;
    r=(longint_t*)xalloc(sizeof(longint_t)+sizeof(unsigned short)*v);
@@ -5809,7 +5809,7 @@ longint_t *_strdiv(longint_t *a, longint_t *b)
    longint_t *r, *r2, *s;
    int irem,e,i,vi,j;
    unsigned int b2,v;
-   
+
    if (a->len==0 && a->data[0]==0)
    {
       r=(longint_t*)xalloc(sizeof(longint_t));
@@ -5824,14 +5824,14 @@ longint_t *_strdiv(longint_t *a, longint_t *b)
       return r;
    }
 
-   if (b->len==0 && b->data[0]==0) 
+   if (b->len==0 && b->data[0]==0)
    {
       error("Division by zero!\n");
       return;
    }
 
    /* maybe copy a */
-   
+
    if (b->len==0)
    {
       r=_strdiv_int(a,b->data[0],&irem,0);
@@ -5858,7 +5858,7 @@ longint_t *_strdiv(longint_t *a, longint_t *b)
 
       i=a->len-1;
       if (i<0) i=0;
-      
+
       r=(longint_t*)xalloc(sizeof(longint_t)+sizeof(unsigned short)*i);
       if (!r)
       {
@@ -5869,7 +5869,7 @@ longint_t *_strdiv(longint_t *a, longint_t *b)
       r->len=i-1;
       r->sign=1;
       while(i--) r->data[i]=0;
-      
+
       if (b->len==0)
       {
          b2=b->data[0];
@@ -5885,7 +5885,7 @@ longint_t *_strdiv(longint_t *a, longint_t *b)
             e++;
          }
       }
-      
+
       do
       {
          r2=_strdiv_int(a,b2,&irem,e);
@@ -5912,7 +5912,7 @@ longint_t *_strdiv(longint_t *a, longint_t *b)
 
             /* s=b*r2; */
             s=_strmul(b,r2);
-            
+
             /* a-=s; */
             vi=0;
             j=0;
@@ -5935,7 +5935,7 @@ longint_t *_strdiv(longint_t *a, longint_t *b)
             free_longint(s);
          }
          free_longint(r2);
-         
+
          if (_strcmp(a,b)>=0)
          {
             /* a-=b; */
@@ -5980,7 +5980,7 @@ inline longint_t *sval_to_longint(svalue_t *sp, int argno)
 {
    longint_t *a;
    int x,sgn,hi;
-   
+
    switch(sp->type)
    {
     case T_NUMBER:
@@ -5997,7 +5997,7 @@ inline longint_t *sval_to_longint(svalue_t *sp, int argno)
          hi=x>>16;
          x&=0xffff;
       }
-      
+
       a=(longint_t*)xalloc(sizeof(longint_t)
                            +(hi?sizeof(unsigned short):0));
       if (!a)
@@ -6029,7 +6029,7 @@ char *longint_to_string(longint_t *r)
    char *buf, *s, c;
    int len,sgn;
    longint_t *a;
-      
+
    len=r->len*5+7+4;
    buf=(char*)xalloc(len);
    if (!buf)
@@ -6037,7 +6037,7 @@ char *longint_to_string(longint_t *r)
       error("Out of memory!\n");
       return;
    }
-   
+
    s=buf+len-1;
    s[0]=0;
 
@@ -6054,7 +6054,7 @@ char *longint_to_string(longint_t *r)
       s[4]=c;
    }
    free_longint(r);
-   
+
    if (s[0]==0)
    {
       s--;
@@ -6069,13 +6069,13 @@ char *longint_to_string(longint_t *r)
       s--;
       s[0]='-';
    }
-   
+
    s=string_copy(s);
    xfree(buf);
    return s;
 }
 
- 
+
 /* TEFUN stradd()
  *
  *   string stradd(string|int a, string|int b)
@@ -6161,11 +6161,11 @@ f_strdiv(svalue_t *sp)
 {
    longint_t *a, *b, *res;
    int sgn;
-   
+
    a=sval_to_longint(sp-1,1);
    b=sval_to_longint(sp,2);
    sgn=a->sign*b->sign;
-   
+
    res=_strdiv(a,b);
 
    if (res->len==0 && res->data[0]==0) res->sign=1;
@@ -6184,13 +6184,13 @@ f_strdivrem(svalue_t *sp)
 {
    longint_t *a, *b, *res;
    int sgn;
-   
+
    a=sval_to_longint(sp-2,1);
    b=sval_to_longint(sp-1,2);
    /* test sp for lvalue; not really necessary,
       but doesn't make sense, if there is no lvalue in sp */
    sgn=a->sign*b->sign;
-   
+
    res=_strdiv(a,b);
 
    if (res->len==0 && res->data[0]==0) res->sign=1;
@@ -6201,7 +6201,7 @@ f_strdivrem(svalue_t *sp)
    put_malloced_string(sp-1, longint_to_string(a));
    transfer_svalue(sp,sp-1);
    free_svalue(sp);
-   
+
    sp-=2;
    put_malloced_string(sp, longint_to_string(res));
    return sp;
@@ -6212,7 +6212,7 @@ f_strcmp(svalue_t *sp)
 {
    longint_t *a, *b;
    int res;
-   
+
    a=sval_to_longint(sp-1,1);
    b=sval_to_longint(sp,2);
 

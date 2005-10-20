@@ -10,19 +10,19 @@ State: New
     track the memory usage, and maybe store it on a uid/object basis (like
     the eval costs).
 
-Wäre es möglich, eine Speichergrenze einzuführen? Ich stelle mir das ähnlich 
-vor wie die Evalgrenze. Man darf während einer Ausführung nur eine bestimmte 
+Wäre es möglich, eine Speichergrenze einzuführen? Ich stelle mir das ähnlich
+vor wie die Evalgrenze. Man darf während einer Ausführung nur eine bestimmte
 Anzahl Bytes belegen.
 
 Hintergrund:
-Bisher ist es möglich, mit den simpelsten Einzeilern in kürzester Zeit den 
-gesamten MUD-Speicher vollzumüllen. Besonders ärgerlich wird das, wenn es aus 
-Versehen passiert, z.B. das Abbruchkriterium einer Schleife fehlt und man 
-addiert fröhlich strings solange, bis der Speicher voll ist (und hält dafür 
+Bisher ist es möglich, mit den simpelsten Einzeilern in kürzester Zeit den
+gesamten MUD-Speicher vollzumüllen. Besonders ärgerlich wird das, wenn es aus
+Versehen passiert, z.B. das Abbruchkriterium einer Schleife fehlt und man
+addiert fröhlich strings solange, bis der Speicher voll ist (und hält dafür
 nebenbei das MUD für 15 Minuten an, bis es sich danach verabschiedet).
 
-Mit einer Speichergrenze von bleistiftsweise 4 Megabytes (oder ähnlich hohe 
-Zahl, die nie jemand braucht), würde bei erreichen dieses Limits ein RTE 
+Mit einer Speichergrenze von bleistiftsweise 4 Megabytes (oder ähnlich hohe
+Zahl, die nie jemand braucht), würde bei erreichen dieses Limits ein RTE
 geworfen werden, ähnlich einer Too Long Evaluation.
 
 Damit könnten solche Fälle wenigstens nicht mehr 'aus Versehen' eintreten.

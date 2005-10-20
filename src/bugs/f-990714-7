@@ -1,8 +1,8 @@
 Short: New efun turn_array()
 From: Tubmud
 Type: Feature
-State: Unclassified
 See also: f-990203-15
+State: Done - Implemented in 3.3.529 .
 
         mixed *turn_array(mixed *arr);
           turns the contents of the array (changes it indeed!) and returns

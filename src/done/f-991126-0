@@ -10,7 +10,7 @@ beschraenken? Das waere praktisch.
 Oder den Charmode so erweitern, dass man sagen kann: Diese Zeichen als
 String uebergeben und die anderen direkt uebergeben.
 Beim Editor waeren das z.B. alle Zeichen ausser den Kontroll-Zeichen.
- 
+
 Lars> Da gefaellt mir der zweite Vorschlag schon besser - du denkst an ein
 Lars> Gegenstueck zum set_connection_charset()?
 

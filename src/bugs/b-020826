@@ -26,20 +26,20 @@ We're running Redhat 7.3
 
 And Craig Venz noticed it, too:
 
-We've noticed ever since we upgraded to dev450 that using save_object and 
-restore_object with mappings has become rather flaky - some kind of 
-strange string limit seems to be imposed on loading mappings, .o files 
-which used to work just fine now give Illegal Format errors - this would 
-happen more often than not on mappings of larger size, while smaller ones 
-have no problem loading. Also, we had an instance of a strange corruption 
-while saving a large object file containing a mapping - the mapping itself 
-saved about the first 3 entries, then ended, later on in the text of the 
+We've noticed ever since we upgraded to dev450 that using save_object and
+restore_object with mappings has become rather flaky - some kind of
+strange string limit seems to be imposed on loading mappings, .o files
+which used to work just fine now give Illegal Format errors - this would
+happen more often than not on mappings of larger size, while smaller ones
+have no problem loading. Also, we had an instance of a strange corruption
+while saving a large object file containing a mapping - the mapping itself
+saved about the first 3 entries, then ended, later on in the text of the
 file the rest of the mapping appeared during a string variable.
-My guess would be there's some kind of memory overwrite bug in the save 
-mapping code, but I havent dived into the driver code itself yet to check 
+My guess would be there's some kind of memory overwrite bug in the save
+mapping code, but I havent dived into the driver code itself yet to check
 it out and see if I could get any more specifics.
 
-If you'd like examples of said corruptions and such give me a yell and 
+If you'd like examples of said corruptions and such give me a yell and
 I'll mail appropriate files to you.
 
 Thanks again for the continued work and support.

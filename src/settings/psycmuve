@@ -1,9 +1,12 @@
 #!/bin/sh
 #
-# Settings for psycMUVE, the LPC server and client implementation of the
-#			 protocol for synchronous conferencing.
+# settings/psycmuve version 2
 #
-# Information and download on:	http://psyc.pages.tm
+# LDMUD compilation settings for psycMUVE, the LPC server and client
+# implementation of the protocol for synchronous conferencing.
+#
+# Documents and download on:	http://muve.pages.de
+# Information about PSYC:	http://psyc.pages.de
 #
 # the PSYC implementation and library is designed in a way that it should
 # easily co-host in a running LPMUD, it just needs a few patches to the
@@ -15,12 +18,12 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/ve --bindir=/ve/bin --libdir=/ve/world --libexec=/ve/erq --with-setting=psycmuve $*
+exec ./configure --prefix=/opt/psycmuve --bindir=/opt/psycmuve/bin --libdir=/opt/psycmuve/lib --libexec=/opt/psycmuve/run --with-setting=psycmuve $*
 exit 1
 
 #-- FILE PATHES
 
-with_master_name=obj/master
+with_master_name=drivers/ldmud/master/master
 with_swap_file=log/ldmud.swap
 
 #-- SYSTEM SPECIFIC
@@ -36,7 +39,7 @@ with_max_players=900
 # The maximum number of ports to listen for connections on.
 with_maxnumports=20
 
-# how can i set all the other port numbers? 
+# how can i set all the other port numbers?
 # still using the historic dirty command line hack?
 with_portno=4404
 
@@ -47,11 +50,12 @@ with_set_buffer_size_max=65536
 with_udp_port=4404
 
 #-- RUNTIME LIMITS
+# currently we consider a psycmuve a friendly environment
+# where no coders will abuse cpu time and other limits
+# you may want to change this if you have many room coders
 
-# in productive use this will only hurt
-# (like interrupting in the middle of a 1000 user conference)
-# during debugging i use a much lower value
-with_max_cost=900900900
+# you can lower this value for better debugging
+with_max_cost=9999999
 
 # disabled "mud" limits
 with_max_array_size=0
@@ -68,7 +72,6 @@ with_reserved_user_size=100000
 with_htable_size=16384
 with_otable_size=256
 
-# i think i have one or two regexps in the lib, literally
 enable_rxcache_table=yes
 with_rxcache_table=4096
 
@@ -92,7 +95,7 @@ enable_initialization_by___init=no
 #-- EXTRAS
 
 # cool tool that does external name server resolution and more
-enable_erq=xerq
+enable_erq=erq
 
 # the "sorry" message of the built-in ACL isn't flexible enough:
 # it cannot output a properly formatted HTTP or PSYC message
@@ -100,3 +103,4 @@ enable_erq=xerq
 enable_access_control=no
 
 enable_supply_parse_command=no
+

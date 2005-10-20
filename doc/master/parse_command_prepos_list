@@ -5,5 +5,10 @@ DESCRIPTION
         Used by parse_command(). Return an array of common
         prepositions in the installations native language.
 
+EXAMPLE
+        string *parse_command_prepos_list() {
+            return ({ "in", "on", "under", "behind", "beside" });
+        }
+
 SEE ALSO
         parse_command(E)

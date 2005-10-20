@@ -3,11 +3,11 @@ Date: Fri, 8 Jan 1999 01:48:27 -0500 (EST)
 From: ak853@cleveland.Freenet.Edu (Eric Blade)
 Type: Feature
 State: Done - implemented in 3.2.8-dev.150
-    
+
     > Is there anyway to get a list of all objects cloned?
     >
     >
-    
+
     MudOS has this functionality, object *children(string name) ...  prolly
     wouldn't be too hard to just take it right from MudOS. :-)
 

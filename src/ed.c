@@ -212,6 +212,7 @@ struct ed_buffer_s
     int     leading_blanks;    /* Current number of leading blanks when
                                   using autoindentation. */
     int     cur_autoindent;
+    int     lastcmd;           /* The last command */
     char    *exit_fn;          /* Function to be called when player exits */
     object_t *exit_ob;         /* Object holding <exit_fn> */
     svalue_t prompt;           /* Current ED prompt, a volatile string! */
@@ -250,7 +251,6 @@ struct ed_buffer_s
 #define P_MARK          (ED_BUFFER->mark)
 #define P_OLDPAT        (ED_BUFFER->oldpat)
 #define P_LINE0         (ED_BUFFER->Line0)
-#define P_LINE0         (ED_BUFFER->Line0)
 #define P_CURLN         (ED_BUFFER->CurLn)
 #define P_CURPTR        (ED_BUFFER->CurPtr)
 #define P_LASTLN        (ED_BUFFER->LastLn)
@@ -271,6 +271,7 @@ struct ed_buffer_s
 #define P_MORE          (ED_BUFFER->moring)
 #define P_LEADBLANKS    (ED_BUFFER->leading_blanks)
 #define P_CUR_AUTOIND   (ED_BUFFER->cur_autoindent)
+#define P_LASTCMD       (ED_BUFFER->lastcmd)
 #define P_PROMPT        (ED_BUFFER->prompt)
 
 
@@ -701,7 +702,7 @@ doprnt (int from, int to)
     from = (from < 1) ? 1 : from;
     to = (to > P_LASTLN) ? P_LASTLN : to;
 
-    if (to != 0)
+    if (to != 0 && from <= P_LASTLN)
     {
         _setCurLn( from );
         while( P_CURLN <= to )
@@ -2559,7 +2560,7 @@ docmd (Bool glob)
 {
     static char  rhs[MAXPAT];
     regexp      *subpat;
-    int          c, err, line3;
+    int          c, err, line3, lastcmd;
     int          apflg, pflag, gflag;
     int          nchng;
     char        *fptr;
@@ -2567,7 +2568,9 @@ docmd (Bool glob)
     pflag = FALSE;
     Skip_White_Space;
 
-    c = *inptr++;
+    lastcmd = P_LASTCMD;
+
+    P_LASTCMD = c = *inptr++;
     switch(c)
     {
     case NL:
@@ -2718,19 +2721,23 @@ docmd (Bool glob)
         break;
 
     case 'M':
+      {
         if (deflt(1, P_LASTLN) < 0)
             return ERR;
+
         if (*inptr != NL)
             return ERR;
 
-        nchng = subst(REGCOMP((unsigned char *)"\015$", P_EXCOMPAT, MY_TRUE), "", 0, 0);
+        nchng = subst(REGCOMP((unsigned char *)"\015$"
+                     , P_EXCOMPAT, MY_TRUE), "", MY_FALSE, MY_FALSE);
 
         if (nchng < 0)
             return ERR;
         P_FCHANGED = TRUE;
         break;
+      }
 
-      case 'n':
+    case 'n':
         if (P_NFLG)
             P_FLAGS &= ~( NFLG_MASK | LFLG_MASK );
         else
@@ -2740,7 +2747,7 @@ docmd (Bool glob)
                    , P_NFLG?"ON":"OFF", P_LFLG?"ON":"OFF");
         break;
 
-      case 'I':
+    case 'I':
         if (deflt(1, P_LASTLN) < 0)
             return ERR ;
         if (*inptr != NL)
@@ -2753,8 +2760,8 @@ docmd (Bool glob)
             add_message("Done indenting.\n");
         break;
 
-      case 'H':
-      case 'h':
+    case 'H':
+    case 'h':
         print_help(*(inptr++));
         break;
 
@@ -2773,10 +2780,12 @@ docmd (Bool glob)
             return CHANGED;
         /*FALL THROUGH*/
     case 'Q':
+        if (*inptr != NL || glob)
+            return ERR;
         clrbuf();
         if (*inptr == NL && P_NLINES == 0 && !glob)
             return EOF;
-        else
+        else /* Just in case clrbuf() fails */
             return ERR;
 
     case 'r':
@@ -2890,52 +2899,78 @@ docmd (Bool glob)
         return ERR;
 
     case 'z':
-        if (deflt(P_CURLN,P_CURLN) < 0)
-            return ERR;
+      {
+        int dfln;
 
         switch(*inptr)
         {
         case '-':
+            dfln = P_CURLN;
+            if (deflt(dfln,dfln) < 0)
+                return ERR;
             if (doprnt(P_LINE1-21,P_LINE1) < 0)
                 return ERR;
             break;
 
         case '.':
+            dfln = P_CURLN;
+            if (deflt(dfln,dfln) < 0)
+                return ERR;
             if (doprnt(P_LINE1-11,P_LINE1+10) < 0)
                 return ERR;
             break;
 
         case '+':
         case '\n':
+            if (lastcmd == 'z' || lastcmd == 'Z')
+                dfln = P_CURLN != 1 ? P_CURLN + 1 : 1;
+            else
+                dfln = P_CURLN;
+            if (deflt(dfln,dfln) < 0)
+                return ERR;
             if (doprnt(P_LINE1,P_LINE1+21) < 0)
                 return ERR;
             break;
         }
         break;
+      }
 
     case 'Z':
-        if (deflt(P_CURLN,P_CURLN) < 0)
-            return(ERR);
+      {
+        int dfln;
 
         switch(*inptr)
         {
         case '-':
+            dfln = P_CURLN;
+            if (deflt(dfln,dfln) < 0)
+                return ERR;
             if (doprnt(P_LINE1-41,P_LINE1) < 0)
                 return ERR;
             break;
 
         case '.':
+            dfln = P_CURLN;
+            if (deflt(dfln,dfln) < 0)
+                return ERR;
             if (doprnt(P_LINE1-21,P_LINE1+20) < 0)
                 return ERR;
             break;
 
         case '+':
         case '\n':
+            if (lastcmd == 'z' || lastcmd == 'Z')
+                dfln = P_CURLN != 1 ? P_CURLN + 1 : 1;
+            else
+                dfln = P_CURLN;
+            if (deflt(dfln,dfln) < 0)
+                return ERR;
             if (doprnt(P_LINE1,P_LINE1+41) < 0)
                 return ERR;
             break;
         }
         break;
+      }
 
     default:
         return ERR;
@@ -3292,7 +3327,7 @@ ed_cmd (char *str)
         }
         else
         {
-            if((status = docmd(0)) >= 0)
+            if((status = docmd(MY_FALSE)) >= 0)
             {
                 if(status == 1)
                     doprnt(P_CURLN, P_CURLN);

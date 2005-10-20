@@ -1,5 +1,5 @@
 LDMud, a LPmud gamedriver.
-Copyright 1997-2001 by Lars Duening.
+Copyright 1997-2003 by Lars Duening.
 
 LDMud is based on LPmud, which is
 Copyright 1989-1991 by Lars Pensj|, and, starting with version 3.1.2,
@@ -40,10 +40,11 @@ the original authors. Use for other purposes than LPmud drivers or under
 licenses significantly different from the original LPmud license needs
 explicite permission.
 
-The random() efun is implemented using the Mersenne Twister generator
-which is Copyright (C) 1997 Makoto Matsumoto and Takuji Nishimura and
-subject to the GNU Library General Public License. The implementation
-itself was written by Shawn J. Cokus.
+The random() efun is implemented using the Mersenne Twister generator which is
+Copyright (C) 1997 - 2002, Makoto Matsumoto and Takuji Nishimura, and subject
+to a BSD-style license. The implementation is the faster implementation based
+on Shawn Cokus and Matthew Belle's improvements.  See random.c for the full
+text of the license.
 
 The xerq demon is Copyright (C) 1995 by Brian Gerst. Use of the source
 code is subject to the restriction that it must not be used for monetary

@@ -25,7 +25,7 @@ apply().
      object_t *ob;
      int num_arg;
 +    svalue_t *ret_val;
- 
+
      ob = callback_object(cb);
      if (!ob
 @@ -3028,9 +3029,10 @@
@@ -37,15 +37,15 @@ apply().
      else
 -        apply(cb->function.named.name, ob, num_arg + nargs);
 +        ret_val = apply(cb->function.named.name, ob, num_arg + nargs);
- 
+
      if (!keep)
      {
 @@ -3039,7 +3041,7 @@
      }
- 
+
      /* Return the result */
 -    return &apply_return_value;
 +    return ret_val;
  } /* execute_callback() */
- 
+
  /*-------------------------------------------------------------------------*/

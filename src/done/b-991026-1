@@ -11,7 +11,7 @@ inherit "/std/thing"; /* or add to the test_master.c */
 
 void init()
 {
-  add_action("crash","crash"); // direkt im create() hats 
+  add_action("crash","crash"); // direkt im create() hats
                                // nicht gecrasht
 }
 
@@ -21,7 +21,7 @@ int crash(string arg)
 
  anwesende=users();  // ein Array muss beteiligt sein
 
- switch(arg)         // ausserdem ein switch 
+ switch(arg)         // ausserdem ein switch
  {
    case "XXX":
    default:
@@ -30,7 +30,7 @@ int crash(string arg)
  return 1;
 }
 ----------------
-crasht mit 
+crasht mit
 Program received signal SIGSEGV, Segmentation fault.
 0x8088709 in _free_vector (p=0x0) at array.c:369
 array.c:369: No such file or directory.
@@ -43,7 +43,7 @@ array.c:369: No such file or directory.
 -----------------------------------
 
 Der Crash trat auch mit dem test_master auf, allerdings
-auf etwas ungewoehnliche Art. 
+auf etwas ungewoehnliche Art.
 
 Ich hab als Attachments das Log vom gdb und das Log vom Telnet
 angehaengt.
@@ -51,7 +51,7 @@ angehaengt.
 Erst beim 3. Aufruf des Befehls 'crash' (add_action auf
 die bekannte Funktion) kommt es zum crash, das allerdings
 bei mehreren Versuchen regelmaessig.
-Aber schon beim 2.Versuch ist das Verhalten nicht mehr 
+Aber schon beim 2.Versuch ist das Verhalten nicht mehr
 korrekt, die Funktion crash() macht ein return 0 statt
 dem return 1 (last_instructions ab 819a6f1 im gdb_log).
 Scheinbar wird da der Code selbst ueberschrieben, was
@@ -65,7 +65,7 @@ Gruss, Andreas
 --------------BE7772D3F0A7F9A9A11BF515
 telnet.log:
 
-ws02:~> telnet pk.mud.de 4242    
+ws02:~> telnet pk.mud.de 4242
 Trying 141.55.225.26...
 Connected to uwhome.mpi.htwm.de.
 Escape character is '^]'.

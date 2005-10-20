@@ -41,6 +41,10 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#include <time.h>
 #ifdef NeXT
 #include <sys/param.h>
 #endif
@@ -59,6 +63,7 @@
 #include "interpret.h"
 #include "lex.h"
 #include "mapping.h"
+#include "mempools.h"
 #include "object.h"
 #include "otable.h"
 #include "patchlevel.h"
@@ -72,6 +77,8 @@
 #include "swap.h"
 #include "wiz_list.h"
 #include "xalloc.h"
+
+#include "pkg-mysql.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -97,6 +104,8 @@ Bool check_string_table_flag = MY_FALSE;
 #endif
 
 Bool strict_euids = MY_FALSE;  /* Enforce use of the euids */
+Bool allow_filename_spaces = MY_FALSE; /* Allow spaces in filenames */
+
 
 static uint32 random_seed = 0;  /* The seed for the pseudo-random generator. */
 
@@ -166,6 +175,10 @@ Bool reopen_debug_log = MY_FALSE;
    * the debug.log file.
    */
 
+mp_int boot_time = 0;
+  /* The time() the driver was started.
+   */
+
 /*-------------------------------------------------------------------------*/
 
 /* Forward declarations for the argument parser in the lower half */
@@ -207,8 +220,11 @@ main (int argc, char **argv)
 
     /* Initialisations */
 
+    boot_time = (mp_int)time(NULL);
+
     setlocale(LC_CTYPE, ""); /* Use the locale defined in the LANG env var */
     get_stack_direction();
+    mb_init();
     init_interpret();
 #ifdef RXCACHE_TABLE
     rxcache_init();
@@ -236,6 +252,9 @@ main (int argc, char **argv)
 
 #ifdef STRICT_EUIDS
     strict_euids = MY_TRUE;
+#endif
+#ifdef ALLOW_FILENAME_SPACES
+        allow_filename_spaces = MY_TRUE;
 #endif
 
     /*
@@ -323,6 +342,9 @@ main (int argc, char **argv)
           , time_stamp(), (unsigned long)random_seed);
     debug_message("%s Random seed: 0x%lx\n"
                  , time_stamp(), (unsigned long)random_seed);
+
+    if (!pkg_mysql_init())
+        exit(1);
 
     /* If the master_name hasn't been set, select a sensible default */
     if ('\0' == master_name[0])
@@ -467,7 +489,8 @@ main (int argc, char **argv)
         check_a_lot_ref_counts_flag = MY_TRUE;
 #endif
 
-    get_simul_efun_object();
+    get_simul_efun_object(MY_TRUE);
+
     if (game_is_being_shut_down)
         exit(1);
 
@@ -639,7 +662,7 @@ reallocate_reserved_areas (void)
 void
 write_x (int d, p_uint i)
 
-/* Memory safe function to write hexvalue <i> to fd <d>. */
+/* Memory safe function to write 4-byte hexvalue <i> to fd <d>. */
 
 {
     int j;
@@ -651,7 +674,25 @@ write_x (int d, p_uint i)
             c += (char)('a' - ('9' + 1));
         write(d, &c, 1);
     }
-}
+} /* write_x() */
+
+/*-------------------------------------------------------------------------*/
+void
+write_X (int d, unsigned char i)
+
+/* Memory safe function to write 1-byte hexvalue <i> to fd <d>. */
+
+{
+    int j;
+    char c;
+
+    for (j = 2 * sizeof i; --j >= 0; i <<= 4) {
+        c = (char)((i >> (8 * sizeof i - 4) ) + '0');
+        if (c >= '9' + 1)
+            c += (char)('a' - ('9' + 1));
+        write(d, &c, 1);
+    }
+} /* write_X() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -670,7 +711,7 @@ writed (int d, p_uint i)
         write(d, &c, 1);
         j /= 10;
     } while (j > 0);
-}
+} /* writed() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -680,14 +721,15 @@ writes (int d, const char *s)
 
 {
     write(d, s, strlen(s));
-}
+} /* writes() */
 
 /*-------------------------------------------------------------------------*/
 char *
 dprintf_first (int fd, char *s, p_int a)
 
 /* Write the string <s> up to the next "%"-style argument to <fd>, the
- * write <a> according to the %-formatter. Recognized are %s, %d, and %a.
+ * write <a> according to the %-formatter. Recognized are %s, %d, %c,
+ * %x (4-Byte hex) and %X (a 1-Byte hex).
  * If no %-formatter is present, the whole string is written.
  *
  * Result is a pointer to the remaining string.
@@ -712,11 +754,20 @@ dprintf_first (int fd, char *s, p_int a)
         case 's':
             write(fd, (char *)a, strlen((char*)a));
             break;
+        case 'c':
+          {
+            char c = (char)a;
+            write(fd, (char *)&c, 1);
+            break;
+          }
         case 'd':
             writed(fd, a);
             break;
         case 'x':
             write_x(fd, a);
+            break;
+        case 'X':
+            write_X(fd, (unsigned char)a);
             break;
         }
         return p+2;
@@ -918,6 +969,8 @@ typedef enum OptNumber {
  , cReserveSystem   /* --reserve-system     */
  , cStrictEuids     /* --strict-euids       */
  , cNoStrictEuids   /* --no-strict-euids    */
+ , cFilenameSpaces   /* --filename-spaces    */
+ , cNoFilenameSpaces /* --no-filename-spaces */
  , cSwap            /* -s                   */
  , cSwapTime        /* --swap-time          */
  , cSwapVars        /* --swap-variables     */
@@ -1007,6 +1060,8 @@ static LongOpt aLongOpts[]
     , { "reserve-user",       cReserveUser,    MY_TRUE }
     , { "reserve-master",     cReserveMaster,  MY_TRUE }
     , { "reserve-system",     cReserveSystem,  MY_TRUE }
+    , { "filename-spaces",    cFilenameSpaces,    MY_FALSE }
+    , { "no-filename-spaces", cNoFilenameSpaces,  MY_FALSE }
     , { "strict-euids",       cStrictEuids,    MY_FALSE }
     , { "no-strict-euids",    cNoStrictEuids,  MY_FALSE }
     , { "swap-time",          cSwapTime,       MY_TRUE }
@@ -1143,6 +1198,12 @@ options (void)
   fputs("           IPv6: supported.\n", stdout);
 #endif
 
+#ifndef USE_MCCP
+  fputs("           MCCP: not supported.\n", stdout);
+#else
+  fputs("           MCCP: supported.\n", stdout);
+#endif
+
 #ifndef USE_MYSQL
   fputs("          mySQL: not supported.\n", stdout);
 #else
@@ -1176,6 +1237,9 @@ options (void)
     /* Print the language options, nicely indented. */
     {
         char * optstrings[] = { "" /* have at least one string in here */
+#ifdef USE_ARRAY_CALLS
+                              , "call_other() on (object*) enabled\n"
+#endif
 #ifdef SUPPLY_PARSE_COMMAND
                               , "parse_command() enabled\n"
 #endif
@@ -1201,6 +1265,11 @@ options (void)
 #endif
 #ifdef NO_NEGATIVE_RANGES
                               , "assignments to negative ranges disabled\n"
+#endif
+#ifdef ALLOW_FILENAME_SPACES
+                              , "filenames may contain space characters\n"
+#else
+                              , "filenames may not contain space characters\n"
 #endif
                               };
         size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
@@ -1253,7 +1322,7 @@ options (void)
         , MAX_USER_TRACE, MAX_TRACE
         , MAX_BITS, MAX_ARRAY_SIZE, MAX_MAPPING_SIZE
         , MAX_CALLOUTS, MAX_PLAYERS
-        , ALLOWED_ED_CMDS /* MAX_CMDS_PER_BEAT is not implemented */
+        , ALLOWED_ED_CMDS
 #ifdef TRACE_CODE
         , TOTAL_TRACE_LENGTH
 #endif
@@ -1304,14 +1373,18 @@ options (void)
         , "system malloc"
 #elif defined(MALLOC_smalloc)
         , "smalloc"
-#    if defined(MALLOC_TRACE)
-#        if defined(MALLOC_LPC_TRACE)
-                  " (trace enabled, lpc-trace enabled)"
-#        else
-                  " (trace enabled)"
+#    if defined(MALLOC_TRACE) || defined(MALLOC_LPC_TRACE) || defined(MALLOC_SBRK_TRACE)
+              " ("
+#        if defined(MALLOC_TRACE)
+                " MALLOC_TRACE"
 #        endif
-#    elif defined(MALLOC_LPC_TRACE)
-                  " (lpc-trace enabled)"
+#        if defined(MALLOC_LPC_TRACE)
+                " MALLOC_LPC_TRACE"
+#        endif
+#        if defined(MALLOC_SBRK_TRACE)
+                " MALLOC_SBRK_TRACE"
+#        endif
+              " )"
 #    endif
 #else
         , "unknown malloc"
@@ -1409,9 +1482,6 @@ options (void)
 #       if defined(CHECK_OBJECT_GC_REF)
                               , "CHECK_OBJECT_GC_REF"
 #       endif
-#       if defined(CHECK_SMALLOC_TOTAL)
-                              , "CHECK_SMALLOC_TOTAL"
-#       endif
 #       if defined(DUMP_GC_REFS)
                               , "DUMP_GC_REFS"
 #       endif
@@ -1476,6 +1546,8 @@ shortusage (void)
 "  -f|--funcall <word>\n"
 "  --strict-euids\n"
 "  --no-strict-euids\n"
+"  --filename-spaces\n"
+"  --no-filename-spaces\n"
 "  --cleanup-time\n"
 "  --reset-time\n"
 "  --max-array\n"
@@ -1667,6 +1739,10 @@ usage (void)
 "  -r s<size> | --reserve-system <size>\n"
 "    Reserve <size> amount of memory for user/master/system allocations to\n"
 "    be held until main memory runs out.\n"
+"\n"
+"  --filename-spaces\n"
+"  --no-filename-spaces\n"
+"    Allow/disallow the use of spaces in filenames.\n"
 "\n"
 "  --strict-euids\n"
 "  --no-strict-euids\n"
@@ -2061,7 +2137,11 @@ eval_arg (int eOption, const char * pValue)
         break;
 
     case cRandomSeed:
+#ifdef HAVE_STRTOUL
         random_seed = strtoul(pValue, (char **)0, 0);
+#else
+        random_seed = (uint32)strtol(pValue, (char **)0, 0);
+#endif
         seed_random(random_seed);
         break;
 
@@ -2104,6 +2184,14 @@ eval_arg (int eOption, const char * pValue)
 
     case cNoStrictEuids:
         strict_euids = MY_FALSE;
+        break;
+
+    case cFilenameSpaces:
+        allow_filename_spaces = MY_TRUE;
+        break;
+
+    case cNoFilenameSpaces:
+        allow_filename_spaces = MY_FALSE;
         break;
 
 #ifdef GC_SUPPORT

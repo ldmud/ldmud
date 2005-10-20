@@ -23,6 +23,7 @@ DESCRIPTION
                                 behind line # dest
         <line>m<dest>        : move single line
         m<dest>                : move current line
+        M : remove Ctrl-M (CR) characters.
         p : print line
         P : print line
         Q : quit, discarding the buffer

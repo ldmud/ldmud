@@ -90,6 +90,6 @@ Then, the argument would be a constant struct which
 was compatible with the blah structure.
 
 --------------------------------------------------------------------------
-When doing structs, offer an 'embed' keyword for sub-structs and 
-arrays, to embed them in their full length. This would introduce 
+When doing structs, offer an 'embed' keyword for sub-structs and
+arrays, to embed them in their full length. This would introduce
 'fixed length' arrays.

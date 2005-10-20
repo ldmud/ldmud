@@ -86,8 +86,8 @@ DESCRIPTION
           as the interval to wait before the first reset(), else the default
           interval computed from TIME_TO_RESET is used.
 
-          If the hook is defined as the name of an lfun in the object,
-          it is called in the object as
+          If the hook is defined as the name of an lfun (static or public)
+          in the object, it is called in the object as
 
             void <name>(0)
 
@@ -116,8 +116,8 @@ DESCRIPTION
           If the result is a negative number, the object will not be
           reset again, unless directed otherwise by set_next_reset().
 
-          If the hook is defined as the name of an lfun in the object,
-          it is called in the object as
+          If the hook is defined as the name of an lfun (static or public)
+          in the object, it is called in the object as
 
             void <name>(1)
 
@@ -329,6 +329,9 @@ DESCRIPTION
           If not set, only ""-type includes may be used in LPC
           programs.
 
+          The hook is called only if a call to master::include_file()
+          does not return a usable filename.
+
           If the hook setting is a string array, it has to contain the
           path names of those directories where <>-type includes are
           to be searched. The directories are searched in the order
@@ -491,6 +494,8 @@ HISTORY
             were introduced in 3.2.1@85.
         H_COMMAND was introduced in 3.2.7.
         H_SEND_NOTIFY_FAIL and H_AUTO_INCLUDE were introduced in 3.2.9.
+        LDMud 3.2.10 allowed static functions to be specified by name
+            for H_RESET and H_CREATE_*
 
 SEE ALSO
         native(C), set_driver_hook(E)

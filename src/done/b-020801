@@ -4,13 +4,13 @@ Date: 2002-08-01
 Type: Bug
 State: Done - implemented in 3.2.9
 
-When a collegue of mine ran an nmap scan over our mud's box, it caused the 
-driver to crash. This behaviour can be reproduced on demand. We are running 
-LDMud 3.2.8 (with local modifications) on a Linux-i386 box. The 
-modifications we made relate to adding ANSI support to the driver at string 
+When a collegue of mine ran an nmap scan over our mud's box, it caused the
+driver to crash. This behaviour can be reproduced on demand. We are running
+LDMud 3.2.8 (with local modifications) on a Linux-i386 box. The
+modifications we made relate to adding ANSI support to the driver at string
 creation time.
 
-Is this a known problem? If so, are there any patches available? I was not 
+Is this a known problem? If so, are there any patches available? I was not
 able to find this on your LDMud site.
 
 Some info:

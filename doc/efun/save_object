@@ -1,6 +1,6 @@
 SYNOPSIS
-        int    save_object (string name)
-        string save_object ()             (PRELIMINARY)
+        int    save_object (string name [, int format])
+        string save_object ([int format])
 
 DESCRIPTION
         Encode the saveable variables of the current object into a string.
@@ -15,6 +15,14 @@ DESCRIPTION
         In the second form the string is returned directly. If the
         object is destructed, the result is 0.
 
+        In both forms, the optional <format> argument determines the
+        format of the savefile to be written:
+
+           -1: use the driver's native format (default).
+            0: original format, used by Amylaar LPMud and LDMud <= 3.2.8 .
+            1: LDMud >= 3.2.9: no-lambda closures, symbols, quoted arrays
+                 can be saved.
+
         A variable is considered 'saveable' if it is not declared
         as 'nosave' or 'static'.
 
@@ -22,10 +30,11 @@ DESCRIPTION
 
 HISTORY
         Since LDMud 3.2.8, save_object() returns a success value.
-        The direct encoding into a string was added in LDMud 3.2.8, but
-        may be moved into a different efun in future.
+          The direct encoding into a string was added in LDMud 3.2.8, but
+          may be moved into a different efun in future.
         LDMud 3.2.9 added the saving of non-lambda closures, symbols,
-        and quoted arrays, using a new savefile format version.
+          and quoted arrays, using a new savefile format version.
+        LDMud 3.2.10 added the <format> argument.
 
 SEE ALSO
         restore_object(E), save_value(E)

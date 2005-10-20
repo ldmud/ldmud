@@ -24,28 +24,28 @@ Ich hatte jetzt mehrere Driver-Crashes in der Art:
 2000.12.14 18:52:34 Dump of the call chain:
 No trace.
 
-> Gnomi hat mir dieses Problem auch schon genannt - ich vermute, es haengt mal 
-> wieder mit dem xeditor und dem CHARMODE telnet code zusammen. Gnomi versucht, 
+> Gnomi hat mir dieses Problem auch schon genannt - ich vermute, es haengt mal
+> wieder mit dem xeditor und dem CHARMODE telnet code zusammen. Gnomi versucht,
 > diesen Fehler reproduzierbar zu machen.
 > For the time being, such errors no longer abort the driver, but starting
 > with 3.2.9-dev.248 they just terminate the affected connection.
 
 --------------
 
-Das Problem mit dem 'comm length < 1'-Fehler habe ich noch nicht 
+Das Problem mit dem 'comm length < 1'-Fehler habe ich noch nicht
 reproduzieren koennen, aber zumindest folgendes herausgefunden:
 
-Windows Telnet (zumindest in der NT-4-Version) mag nicht in den 
-Charmode schalten. Drueckt man im xeditor nun einfach Enter,  wird 
-eine leere Zeile an das Mud geschickt - und der xeditor macht aus 
+Windows Telnet (zumindest in der NT-4-Version) mag nicht in den
+Charmode schalten. Drueckt man im xeditor nun einfach Enter,  wird
+eine leere Zeile an das Mud geschickt - und der xeditor macht aus
 einer leeren Zeile ein "!". Deswegen die Ausrufezeichen.
 
 ...bei genauerer Betrachtung scheint es sogar so zu sein, dass
-Windows Telnet sich bereits im Charmode befindet, dies dem Mud aber 
+Windows Telnet sich bereits im Charmode befindet, dies dem Mud aber
 nicht mitteilt. Muss ich nochmal genauer anschauen...
 
-Mit TeraTerm hatte ich kein Problem, ausser ich schalte die 
-gesendeten Zeilenenden von CR auf CR+LF um. Dann werden wieder leere 
+Mit TeraTerm hatte ich kein Problem, ausser ich schalte die
+gesendeten Zeilenenden von CR auf CR+LF um. Dann werden wieder leere
 Zeilen an den Editor gesendet.
 
 Hmpfh.
@@ -64,7 +64,7 @@ Date     :   Thu Dec 21 13:45:12 2000
 
 Hi,
 
-> Das Problem mit dem 'comm length < 1'-Fehler habe ich noch nicht 
+> Das Problem mit dem 'comm length < 1'-Fehler habe ich noch nicht
 > reproduzieren koennen, aber zumindest folgendes herausgefunden:
 
 Der genaue Grund fuer den Crash/comm_fatal:
@@ -94,21 +94,21 @@ Date     :   Thu Dec 21 03:27:34 2000
 Hallo,
 
 On Wed, Dec 20, 2000 at 02:56:56PM -0700, Lars Duening wrote:
-> Das Problem mit dem 'comm length < 1'-Fehler habe ich noch nicht 
+> Das Problem mit dem 'comm length < 1'-Fehler habe ich noch nicht
 > reproduzieren koennen, aber zumindest folgendes herausgefunden:
-> 
-> Windows Telnet (zumindest in der NT-4-Version) mag nicht in den 
-> Charmode schalten. Drueckt man im xeditor nun einfach Enter,  wird 
-> eine leere Zeile an das Mud geschickt - und der xeditor macht aus 
+>
+> Windows Telnet (zumindest in der NT-4-Version) mag nicht in den
+> Charmode schalten. Drueckt man im xeditor nun einfach Enter,  wird
+> eine leere Zeile an das Mud geschickt - und der xeditor macht aus
 > einer leeren Zeile ein "!". Deswegen die Ausrufezeichen.
 >
 > ...bei genauerer Betrachtung scheint es sogar so zu sein, dass
-> Windows Telnet sich bereits im Charmode befindet, dies dem Mud aber 
+> Windows Telnet sich bereits im Charmode befindet, dies dem Mud aber
 > nicht mitteilt. Muss ich nochmal genauer anschauen...
 Was hat eigentlich Go-Ahead (oder Supress-Go-Ahead) mit dem Charmode zu tun?
 
-> Mit TeraTerm hatte ich kein Problem, ausser ich schalte die 
-> gesendeten Zeilenenden von CR auf CR+LF um. Dann werden wieder leere 
+> Mit TeraTerm hatte ich kein Problem, ausser ich schalte die
+> gesendeten Zeilenenden von CR auf CR+LF um. Dann werden wieder leere
 > Zeilen an den Editor gesendet.
 
 telnet_neg() geht davon aus, dass sobald '\n' gesendet wurde, es sich nicht
@@ -174,7 +174,7 @@ Ich hoffe, diese Informationen helfen irgendwie...
 2000.12.19 12:54:26 comm: data length < 0: -1
 2000.12.19 12:54:26 Current object was obj/zauberstab#596
 obj/zauberstab#596 i/xeditor/xeditor.c (utils.inc) line 292
---- Dump of current interactive structure (0x9cad350..0xa6b5a34) --- 
+--- Dump of current interactive structure (0x9cad350..0xa6b5a34) ---
   .socket:            50
   .ob:                0xa52ac24 (obj/player#573)
   .input_to:          0xb521d3c
@@ -433,7 +433,7 @@ Some testlogs:
 2000.12.20 13:59:16 TDEBUG: send IAC WILL 01
 2000.12.20 13:59:16 TDEBUG: 'secure/obj/login#2' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:16 TDEBUG: 'secure/obj/login#2' Sending telnet (2 bytes):  fb 01
-2000.12.20 13:59:16 TDEBUG: 'secure/obj/login#2' Sending telnet (0 bytes): 
+2000.12.20 13:59:16 TDEBUG: 'secure/obj/login#2' Sending telnet (0 bytes):
 2000.12.20 13:59:16 TDEBUG: 'secure/obj/login#2' telnet_neg: state 0
 2000.12.20 13:59:16 TDEBUG: 'secure/obj/login#2' t_n: new state 1
 2000.12.20 13:59:16 TDEBUG: 'secure/obj/login#2' t_n: state IAC
@@ -459,7 +459,7 @@ Some testlogs:
 2000.12.20 13:59:18 TDEBUG: send IAC WONT 01
 2000.12.20 13:59:18 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:18 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fc 01
-2000.12.20 13:59:18 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:18 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:18 TDEBUG: 'obj/player#3' telnet_neg: state 0
 2000.12.20 13:59:18 TDEBUG: 'obj/player#3' t_n: new state 1
 2000.12.20 13:59:18 TDEBUG: 'obj/player#3' t_n: state IAC
@@ -485,17 +485,17 @@ Some testlogs:
 2000.12.20 13:59:20 TDEBUG: send IAC WILL 01
 2000.12.20 13:59:20 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:20 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fb 01
-2000.12.20 13:59:20 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:20 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:20 TDEBUG: 'obj/player#3' set_noecho():   turn on charmode
 2000.12.20 13:59:20 TDEBUG: 'obj/player#3' set_noecho():     DO+WILL TELOPT_SGA
 2000.12.20 13:59:20 TDEBUG: send IAC DO 03
 2000.12.20 13:59:20 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:20 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fd 03
-2000.12.20 13:59:20 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:20 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:20 TDEBUG: send IAC WILL 03
 2000.12.20 13:59:20 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:20 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fb 03
-2000.12.20 13:59:20 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:20 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:20 TDEBUG: 'obj/player#3' telnet_neg: state 0
 2000.12.20 13:59:20 TDEBUG: 'obj/player#3' t_n: new state 1
 2000.12.20 13:59:20 TDEBUG: 'obj/player#3' t_n: state IAC
@@ -525,17 +525,17 @@ Some testlogs:
 2000.12.20 13:59:21 TDEBUG: send IAC WILL 01
 2000.12.20 13:59:21 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:21 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fb 01
-2000.12.20 13:59:21 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:21 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:21 TDEBUG: 'obj/player#3' set_noecho():   turn on charmode
 2000.12.20 13:59:21 TDEBUG: 'obj/player#3' set_noecho():     DO+WILL TELOPT_SGA
 2000.12.20 13:59:21 TDEBUG: send IAC DO 03
 2000.12.20 13:59:21 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:21 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fd 03
-2000.12.20 13:59:21 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:21 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:21 TDEBUG: send IAC WILL 03
 2000.12.20 13:59:21 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:21 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fb 03
-2000.12.20 13:59:21 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:21 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:21 TDEBUG: 'obj/player#3' telnet_neg: state 0
 2000.12.20 13:59:21 TDEBUG: 'obj/player#3' t_n: new state 1
 2000.12.20 13:59:21 TDEBUG: 'obj/player#3' t_n: state IAC
@@ -556,17 +556,17 @@ Some testlogs:
 2000.12.20 13:59:22 TDEBUG: send IAC WILL 01
 2000.12.20 13:59:22 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:22 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fb 01
-2000.12.20 13:59:22 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:22 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:22 TDEBUG: 'obj/player#3' set_noecho():   turn on charmode
 2000.12.20 13:59:22 TDEBUG: 'obj/player#3' set_noecho():     DO+WILL TELOPT_SGA
 2000.12.20 13:59:22 TDEBUG: send IAC DO 03
 2000.12.20 13:59:22 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:22 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fd 03
-2000.12.20 13:59:22 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:22 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:22 TDEBUG: send IAC WILL 03
 2000.12.20 13:59:22 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:22 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fb 03
-2000.12.20 13:59:22 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:22 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:22 TDEBUG: 'obj/player#3' telnet_neg: state 0
 2000.12.20 13:59:22 TDEBUG: 'obj/player#3' t_n: new state 1
 2000.12.20 13:59:22 TDEBUG: 'obj/player#3' t_n: state IAC
@@ -588,17 +588,17 @@ Some testlogs:
 2000.12.20 13:59:30 TDEBUG: send IAC WILL 01
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fb 01
-2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' set_noecho():   turn on charmode
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' set_noecho():     DO+WILL TELOPT_SGA
 2000.12.20 13:59:30 TDEBUG: send IAC DO 03
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fd 03
-2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:30 TDEBUG: send IAC WILL 03
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fb 03
-2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' telnet_neg: state 0
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' CHARMODE_REQ
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3'   Unescaped input
@@ -613,18 +613,18 @@ Some testlogs:
 2000.12.20 13:59:30 TDEBUG: send IAC WONT 01
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fc 01
-2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' set_noecho():   WONT TELOPT_SGA
 2000.12.20 13:59:30 TDEBUG: send IAC WONT 03
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fc 03
-2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' set_noecho():   turn off charmode
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' set_noecho():     DONT TELOPT_SGA
 2000.12.20 13:59:30 TDEBUG: send IAC DONT 03
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fe 03
-2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 13:59:30 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' set_noecho():     cmd_start 1, tn_start 1, tn_end 1
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' telnet_neg: state 0
 2000.12.20 13:59:30 TDEBUG: 'obj/player#3' t_n: new state 1
@@ -685,7 +685,7 @@ Some testlogs:
 2000.12.20 14:03:29 TDEBUG: send IAC WILL 01
 2000.12.20 14:03:29 TDEBUG: 'secure/obj/login#2' Sending telnet (1 bytes):  ff
 2000.12.20 14:03:29 TDEBUG: 'secure/obj/login#2' Sending telnet (2 bytes):  fb 01
-2000.12.20 14:03:29 TDEBUG: 'secure/obj/login#2' Sending telnet (0 bytes): 
+2000.12.20 14:03:29 TDEBUG: 'secure/obj/login#2' Sending telnet (0 bytes):
 2000.12.20 14:03:29 TDEBUG: 'secure/obj/login#2' telnet_neg: state 0
 2000.12.20 14:03:29 TDEBUG: 'secure/obj/login#2' t_n: new state 1
 2000.12.20 14:03:29 TDEBUG: 'secure/obj/login#2' t_n: state IAC
@@ -705,7 +705,7 @@ Some testlogs:
 2000.12.20 14:03:31 TDEBUG: send IAC WONT 01
 2000.12.20 14:03:31 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 14:03:31 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fc 01
-2000.12.20 14:03:31 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 14:03:31 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 14:03:31 TDEBUG: 'obj/player#3' telnet_neg: state 0
 2000.12.20 14:03:31 TDEBUG: 'obj/player#3' t_n: new state 1
 2000.12.20 14:03:31 TDEBUG: 'obj/player#3' t_n: state IAC
@@ -724,17 +724,17 @@ Some testlogs:
 2000.12.20 14:03:33 TDEBUG: send IAC WILL 01
 2000.12.20 14:03:33 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 14:03:33 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fb 01
-2000.12.20 14:03:33 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 14:03:33 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 14:03:33 TDEBUG: 'obj/player#3' set_noecho():   turn on charmode
 2000.12.20 14:03:33 TDEBUG: 'obj/player#3' set_noecho():     DO+WILL TELOPT_SGA
 2000.12.20 14:03:33 TDEBUG: send IAC DO 03
 2000.12.20 14:03:33 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 14:03:33 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fd 03
-2000.12.20 14:03:33 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 14:03:33 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 14:03:33 TDEBUG: send IAC WILL 03
 2000.12.20 14:03:33 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 14:03:33 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fb 03
-2000.12.20 14:03:33 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 14:03:33 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 14:03:33 TDEBUG: 'obj/player#3' telnet_neg: state 0
 2000.12.20 14:03:33 TDEBUG: 'obj/player#3' t_n: new state 1
 2000.12.20 14:03:33 TDEBUG: 'obj/player#3' t_n: state IAC
@@ -791,17 +791,17 @@ Some testlogs:
 2000.12.20 14:03:34 TDEBUG: send IAC WILL 01
 2000.12.20 14:03:34 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 14:03:34 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fb 01
-2000.12.20 14:03:34 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 14:03:34 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 14:03:34 TDEBUG: 'obj/player#3' set_noecho():   turn on charmode
 2000.12.20 14:03:34 TDEBUG: 'obj/player#3' set_noecho():     DO+WILL TELOPT_SGA
 2000.12.20 14:03:34 TDEBUG: send IAC DO 03
 2000.12.20 14:03:34 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 14:03:34 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fd 03
-2000.12.20 14:03:34 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 14:03:34 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 14:03:34 TDEBUG: send IAC WILL 03
 2000.12.20 14:03:34 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 14:03:34 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fb 03
-2000.12.20 14:03:34 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 14:03:34 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 14:03:35 TDEBUG: 'obj/player#3' CHARMODE_REQ
 2000.12.20 14:03:35 TDEBUG: 'obj/player#3'   Unescaped input
 2000.12.20 14:03:35 TDEBUG: 'obj/player#3'     incomplete negotiation: length 0
@@ -822,17 +822,17 @@ Some testlogs:
 2000.12.20 14:03:36 TDEBUG: send IAC WILL 01
 2000.12.20 14:03:36 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 14:03:36 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fb 01
-2000.12.20 14:03:36 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 14:03:36 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 14:03:36 TDEBUG: 'obj/player#3' set_noecho():   turn on charmode
 2000.12.20 14:03:36 TDEBUG: 'obj/player#3' set_noecho():     DO+WILL TELOPT_SGA
 2000.12.20 14:03:36 TDEBUG: send IAC DO 03
 2000.12.20 14:03:36 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 14:03:36 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fd 03
-2000.12.20 14:03:36 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 14:03:36 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 14:03:36 TDEBUG: send IAC WILL 03
 2000.12.20 14:03:36 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 14:03:36 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fb 03
-2000.12.20 14:03:36 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 14:03:36 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 14:03:37 TDEBUG: 'obj/player#3' telnet_neg: state 0
 2000.12.20 14:03:37 TDEBUG: 'obj/player#3' CHARMODE_REQ
 2000.12.20 14:03:37 TDEBUG: 'obj/player#3'   Unescaped input
@@ -847,18 +847,18 @@ Some testlogs:
 2000.12.20 14:03:37 TDEBUG: send IAC WONT 01
 2000.12.20 14:03:37 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 14:03:37 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fc 01
-2000.12.20 14:03:37 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 14:03:37 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 14:03:37 TDEBUG: 'obj/player#3' set_noecho():   WONT TELOPT_SGA
 2000.12.20 14:03:37 TDEBUG: send IAC WONT 03
 2000.12.20 14:03:37 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 14:03:37 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fc 03
-2000.12.20 14:03:37 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 14:03:37 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 14:03:37 TDEBUG: 'obj/player#3' set_noecho():   turn off charmode
 2000.12.20 14:03:37 TDEBUG: 'obj/player#3' set_noecho():     DONT TELOPT_SGA
 2000.12.20 14:03:37 TDEBUG: send IAC DONT 03
 2000.12.20 14:03:37 TDEBUG: 'obj/player#3' Sending telnet (1 bytes):  ff
 2000.12.20 14:03:37 TDEBUG: 'obj/player#3' Sending telnet (2 bytes):  fe 03
-2000.12.20 14:03:37 TDEBUG: 'obj/player#3' Sending telnet (0 bytes): 
+2000.12.20 14:03:37 TDEBUG: 'obj/player#3' Sending telnet (0 bytes):
 2000.12.20 14:03:37 TDEBUG: 'obj/player#3' set_noecho():     cmd_start 1, tn_start 1, tn_end 1
 2000.12.20 14:03:37 TDEBUG: 'obj/player#3' telnet_neg: state 0
 2000.12.20 14:03:37 TDEBUG: 'obj/player#3' t_n: new state 1

@@ -29,7 +29,7 @@ nicht ankommt. Und zwar all die tell_object() die im Spieler erzeugt
 werden. Und das sind in unserer Lib sehr viele. Eine andere Moeglichkeit
 gibt es leider nicht. Und die gesamte Lib umschreiben, dass man mit
 catch_tell und so arbeiten kann, darauf hab ich ehrlich gesagt keine Lust
-*stoehn*. Waer doch bestimmt simpel so einen Hook (analog modiy_command) 
+*stoehn*. Waer doch bestimmt simpel so einen Hook (analog modiy_command)
 zu machen, oder? Und bestimmt auch nicht zu viel Aufwand...
 
 Leider hab ich die aktuellsten Driver-Sourcen nicht hier, aber ich denke
@@ -59,7 +59,7 @@ noch was einfallen lassen. ;-)
 Lange Rede kurzer Sinn: Neben dem output-Hook waer noch ein Input-Hook
 schoen. Also wo alles veraendert werden kann, was reinkommt. Nicht nur
 Commands (modify_command()) sondern auch all das, was an input_to() geht
-usw. Eben _alles_. 
+usw. Eben _alles_.
 
 Also meine Bitte nochmal zusammengefasst. 2 Hooks, einer fuers
 Input-Modifizieren und einer fuer Output-Modifizieren. :-) Wenn Du keine

@@ -4,7 +4,7 @@ From: Lars Duening <lars@bearnip.com>
 Type: Feature
 State: New
 
-At the moment, if limited() is used to (un)limit the runtime costs of the 
+At the moment, if limited() is used to (un)limit the runtime costs of the
 executed closure, it does one of two things:
 
  - if the given runtime cost is smaller than the maximum, it is counted
@@ -19,11 +19,11 @@ This basically merges two diametral uses of limited()
  - to give a trusted function as much execution time as it needs, regardless
    of any limit to the caller.
 
-As Gnomi pointed out, making this decision over the amount of the given cost 
-is not enough: in UNItopia they would like to give a function a guaranteed 
-20000 ticks to execute, but don't want that to count against the calling 
+As Gnomi pointed out, making this decision over the amount of the given cost
+is not enough: in UNItopia they would like to give a function a guaranteed
+20000 ticks to execute, but don't want that to count against the calling
 function.
 
-My idea is now to distinguish between these two use by a new parameter to 
-limited(): LIMIT_COST, which would determine how much the called function 
+My idea is now to distinguish between these two use by a new parameter to
+limited(): LIMIT_COST, which would determine how much the called function
 should cost. A value of 0 would be the current behavior.

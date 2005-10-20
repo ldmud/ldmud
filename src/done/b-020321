@@ -59,12 +59,12 @@ Program terminated with signal 10, Bus error.
 #8  0x7f65c in add_mapping (m1=0x1fb5c2c, m2=0xefffea2e) at mapping.c:3019
 #9  0xa88c0 in swap_svalues (svp=0x17cc068, num=22, block=0x1fb5c90)
     at swap.c:871
-#10 0xa8e28 in free_swapped_svalues (svp=0xca34c, num=24951648, 
+#10 0xa8e28 in free_swapped_svalues (svp=0xca34c, num=24951648,
     p=0x1170610 "\a$") at swap.c:1044
 #11 0x221d8 in process_objects () at backend.c:1027
 #12 0x21a48 in backend () at backend.c:637
 #13 0x7a890 in main (argc=-268438400, argv=0xeffff90c) at main.c:411
-(gdb) 
+(gdb)
 
 Koennte dieser bug durch das condense_mapping() bei dev390 gefixt sein?
 Falls nein, welche Werte willst Du noch wissen?

@@ -39,17 +39,17 @@ The critical line(s) seem to be:
 
 212:      contact_list[C_DATA_LIST] += ([c_nr:0;0;0;0;0;0]);
 213:      contact_list[C_DATA_LIST][c_nr,CONTACT_TYPE] = otab[c_obj,_TYPE];
-              
+
 ---------------------------------------------------------------------------
 
 das war das letze was ich vom mud gesehen hab:
 
 [Debug:Unbekannt] RUNTIME-ERROR:
                   Wer:    /0   Command: '0'
-                  File:   
+                  File:
 /d/Quornitum/imar/univers/raumschiff/sensor.c
                   Zeile: 213
-                  Objekt: 
+                  Objekt:
 /d/Quornitum/imar/univers/ships/cpic.shuttle0
                   Fehler: Illegal mapping size: 1073741829
                                               0x40000005
@@ -61,14 +61,14 @@ To:             	"Lars Duening" <lars@bearnip.com>
 Subject:        	crash.txt
 Date sent:      	Sat, 3 Jun 2000 01:10:30 +0200
 
-  
- hmm.. crash mit dem 206er 
+
+ hmm.. crash mit dem 206er
 
 also .. eine weile vor dem crash hatten wir :
 
 02.06.00 22:06:02 [Debug:Unbekannt] RUNTIME-ERROR:
                   Wer:    /0   Command: '0'
-                  File:   /d/Quornitum/imar/univers/raumschiff/sensor.c  
+                  File:   /d/Quornitum/imar/univers/raumschiff/sensor.c
                   Zeile: 223
                   Objekt: /d/Quornitum/imar/univers/ships/eshiala.shuttle0
                   Fehler: Illegal mapping size: 1073741826
@@ -571,7 +571,7 @@ strings =3D 120,
  * Final Frontier              - = = * = = -                 U N I V E R S   *
  *****************************************************************************
  * File:        raumschiff/sensor.c                                          *
- * Description: 
+ * Description:
  * Author:      Imar@FF                                                      *
  *****************************************************************************/
 
@@ -589,7 +589,7 @@ strings =3D 120,
 /*
  mapping contact = ([Object: ({X,Y,Z}); ({BEAR,ELEV}); DISTANCE;
  				ARCS; NAME; TYPE; NR])
- 
+
  Zugriff mittels:
  CONTACT_POS		0
  CONTACT_MOTION		1
@@ -602,7 +602,7 @@ strings =3D 120,
 */
 
 
-  
+
 private void do_lr_sensor(float range)
 {
   mapping otab;		// ObjTabelle des Sektors
@@ -618,8 +618,8 @@ private void do_lr_sensor(float range)
    * angesprochen wurden, werden als TRUE vermerkt, alle anderen
    * werden zum Ende rausgeschmissen
    */
-  int *ref_list; 
- 
+  int *ref_list;
+
   /* Aufbau der contact_list :
    *
    * contact_list = ({ ({obj1, obj2, ...}), ([ 0: pos, motion, speed, dist,
@@ -645,20 +645,20 @@ private void do_lr_sensor(float range)
   mixed *contact_list;
 
   DEBUG("senso");
- 
-  if(!environment() || 
+
+  if(!environment() ||
      !sizeof(otab=UNIVERSD->query_object_table(pos2sector(QueryProp(P_POSITION)))))
     return 0;
 
   /*righ*/
   DEBUG(V(otab));
   /*end*/
-  
+
   p = QueryProp(P_POSITION);
   contact_list = QueryProp(P_CONTACT_LIST);
   c_siz = sizeof(contact_list[C_OBJ_LIST]);
   ref_list = allocate(c_siz);
- 
+
   idx = m_indices(otab);
   for(i=sizeof(idx);i--;)
     {
@@ -667,18 +667,18 @@ private void do_lr_sensor(float range)
       float *c_motion;	        // Kontakt-Motion
       int c_arc;		// Kontakt-Arc
       object c_obj;		// Kontakt-Obj
-  
+
 #define _POS	0
 #define _MOTION  1
 #define _TYPE   2
- 
+
       c_obj = idx[i];
       if(c_obj==this_object()) continue;
- 
+
       c_nr = member(contact_list[C_OBJ_LIST],c_obj);
       if(c_nr != -1)
 	ref_list[c_nr] = TRUE;
-   
+
       ship_distance = distance( p , otab[c_obj, _POS] );
 
       /*
@@ -691,66 +691,66 @@ private void do_lr_sensor(float range)
       if(range && ship_distance > range )
 	{
 	  if(c_nr != -1)  // Kontakt verloren
-	    {  
+	    {
 	      work_around = TYPE_TEXT[otab[c_obj, _TYPE]];
 	      if(!stringp(work_around))
 		work_around = "???";
 
-  
+
 	      tell_console(P_NAV_CON,
 			   wrap_string("[Achtung]",
 				       sprintf("Kontakt (%d) verloren. "
 					       " Typ: %s.\n",
 					       c_nr+1,
 					       work_around)));
-  
+
 	      /* Kontakt verloren:
 	       * Ist die Position des c_nr im Array, so wird ein leerer Index
 	       * gesetzt, aber nicht das Array verkuerzt. So verschieben sich
 	       * die c_nr der Objekte nicht
 	       */
 	      contact_list[C_OBJ_LIST][c_nr] = 0;
-  
+
 	      /* Ist c_nr letztes ArrayElem gewesen ?, dann wird das Array von
 	       * hinten nach freien Plaetzen untersucht und um diese gekuerzt
 	       */
 	      if(c_nr == c_siz - 1)
-		{    
+		{
 		  for(j=c_siz;j--;)
 		    if(contact_list[C_OBJ_LIST][j] == 0)
 		      c_siz--;
-     
+
 		  contact_list[C_OBJ_LIST]=contact_list[C_OBJ_LIST][0..c_siz];
-		  ref_list = ref_list[0..c_siz]; 
+		  ref_list = ref_list[0..c_siz];
 		}
-  
+
 	      /* vielleicht rette ich die Werte in einer spaeteren Version */
 	      contact_list[C_DATA_LIST] -= ([c_nr]);
 
 	      /* moegliche Locks killen*/
 	      check_laser_lock(c_nr);
-   
+
 	    } /* Kontakt verloren */
 	}
       else  // Kontakt in Range oder neu
 	{
 	  /*
-	   * Hier muss noch eine Sortierung der Contact-List eingebaut werden 
+	   * Hier muss noch eine Sortierung der Contact-List eingebaut werden
 	   */
-    
+
 	  if(c_nr == -1)	// neuer Kontakt
-	    {    
+	    {
 	      float *sph;
-     
+
 	      sph = xyz2sph( ({ p[X]-otab[c_obj, _POS][X],
 				p[Y]-otab[c_obj, _POS][Y],
 				p[Z]-otab[c_obj, _POS][Z] }) );
-	      
+	
 	      /* Freien Platz in der Contact-List finden */
 	      for(c_nr=0;c_nr<c_siz;c_nr++)
 		if(contact_list[C_OBJ_LIST][c_nr] == 0)
 		  break;
-       
+
 	      work_around = TYPE_TEXT[otab[c_obj, _TYPE]];
 	      if(!stringp(work_around))
 		work_around = "???";
@@ -765,29 +765,29 @@ private void do_lr_sensor(float range)
 					       sph[ELEVATION],
 					       write_su2pc(ship_distance),
 					       work_around)));
-     
+
 	      if(c_nr < c_siz)
 		{
 		  contact_list[C_OBJ_LIST][c_nr] = c_obj;
 		  ref_list[c_nr] = TRUE;
 		}
-	      else   
+	      else
 		{
 		  contact_list[C_OBJ_LIST] += ({ c_obj });
 		  ref_list += ({ TRUE });
 		  c_siz++;
 		}
-     
+
 	      contact_list[C_DATA_LIST] += ([c_nr:0;0;0;0;0;0]);
 	      contact_list[C_DATA_LIST][c_nr,CONTACT_TYPE] = otab[c_obj,_TYPE];
 	      contact_list[C_DATA_LIST][c_nr,CONTACT_NAME] = c_obj->query_name();
-   
+
 	    } /* neuer Kontakt */
-   
+
 	  // Kontakt updaten
-   
+
 	  c_arc = arc(otab[c_obj,_POS], otab[c_obj, _MOTION], p);
-   
+
 	  contact_list[C_DATA_LIST][c_nr,CONTACT_POS]    = otab[c_obj,_POS];
 	  contact_list[C_DATA_LIST][c_nr,CONTACT_MOTION] = otab[c_obj,_MOTION];
 	  contact_list[C_DATA_LIST][c_nr,CONTACT_DIST]   = ship_distance;
@@ -798,7 +798,7 @@ private void do_lr_sensor(float range)
 #undef _MOTION
 #undef _POS
 
-  /* 
+  /*
    * jetzt muessen alle Kontakts rausgeschmissen, die nicht referenziert
    * wurden. Dabei nur noch bis zum aktuellen c_siz gehen!!
    */
@@ -812,10 +812,10 @@ private void do_lr_sensor(float range)
       {
 	contact_list[C_OBJ_LIST][i] = 0;
 	work_around = TYPE_TEXT[contact_list[C_DATA_LIST][i, CONTACT_TYPE]];
- 
+
 	if(!stringp(work_around))
 	  work_around = "???";
-	  
+	
 	tell_console(P_NAV_CON,
 		     wrap_string("[Achtung]",
 				 sprintf("Kontakt (%d) verloren. Typ: %s.\n",
@@ -824,13 +824,13 @@ private void do_lr_sensor(float range)
 					 )));
 
 	contact_list[C_DATA_LIST] -= ([ i ]);
-   
+
 	/* moegliche Locks killen */
 	check_laser_lock(i);
-   
+
 	/* Letzter Eintrag gewesen ? Dann wie oben verkuerzen */
 	if(i == c_siz - 1)
-	  {  
+	  {
 	    /*
 	      DEBUG(sprintf("Letzter Eintrag:\n c_siz %d\nref_list %s\nobj_list %s\n---",
 	      c_siz,array2str(ref_list),array2str(contact_list[C_OBJ_LIST])
@@ -839,21 +839,21 @@ private void do_lr_sensor(float range)
 	    for(j=c_siz;j--;)
 	      if(contact_list[C_OBJ_LIST][j] == 0)
 		i--;
-         
+
 	    contact_list[C_OBJ_LIST]=contact_list[C_OBJ_LIST][0..i];
-     
-	    /* 
+
+	    /*
 	       DEBUG(sprintf("Letzter EintragEnde:\n c_siz %d\ni %d\nref_list %s\nobj_list %s\n---",
 	       c_siz,i,array2str(ref_list),array2str(contact_list[C_OBJ_LIST])
 	       ));
 	       */
 	  }
       }
- 
+
   DEBUG(sprintf("c_siz %d\nref_list %s\nobj_list %s\n---",
 		c_siz,array2str(ref_list),array2str(contact_list[C_OBJ_LIST])
 		));
-  
+
   SetProp(P_CONTACT_LIST,contact_list);
 }
 
@@ -864,7 +864,7 @@ private void do_sr_sensor(int range)
 
 
 // Wird vom HeartBeat des raumschiff aufgerufen
-void do_sensor() 
+void do_sensor()
 {
   if(!environment() || !QueryProp(P_RAW_SENSOR))
     return 0;
@@ -885,11 +885,11 @@ private void display_sensor_info(int contact_nr)
   float *m_pos;
   float *m_motion;
   int i, size;
-  
+
   string c_arc;
   string out;
-  
-  mixed *contact_list;  
+
+  mixed *contact_list;
   out = "\n"+TRENNLINIE+center("Sensor - Report\n",S_WIDTH)+TRENNLINIE+
     "Nr. Typ    Peilung   Entf.   Arc  Peilung Geschw. Arc Name\n"+
     TRENNLINIE;
@@ -901,7 +901,7 @@ private void display_sensor_info(int contact_nr)
 		   DOER);
       return;
     }
-  
+
   m_pos    = QueryProp(P_POSITION);
   m_motion = QueryProp(P_MOTION);
   	
@@ -909,25 +909,25 @@ private void display_sensor_info(int contact_nr)
     {
       if(contact_list[C_OBJ_LIST][i] == 0)
 	continue;
-    
+
       if(contact_nr && contact_nr != (i+1))
 	continue;
-  
+
       c_pos = contact_list[C_DATA_LIST][i,CONTACT_POS];
-   
+
       /* calculate relative positions */
-      xyz = ({0.0 ,0.0 ,0.0}); 
+      xyz = ({0.0 ,0.0 ,0.0});
 DEBUG("X ist"+X+"\n");
 DEBUG("Y ist"+Y+"\n");
 DEBUG("Z ist"+Z+"\n");
       xyz[X] = c_pos[X] - m_pos[X];
       xyz[Y] = c_pos[Y] - m_pos[Y];
       xyz[Z] = c_pos[Z] - m_pos[Z];
-      
+
       sph = xyz2sph( xyz );
       c_motion = contact_list[C_DATA_LIST][i,CONTACT_MOTION];
       c_arc = arc_text(contact_list[C_DATA_LIST][i,CONTACT_ARCS]);
-   
+
       out += right((i+1),3)+" "+
 	left(TYPE_TEXT[contact_list[C_DATA_LIST][i,CONTACT_TYPE]],6)+" "+
 	left(sph[BEARING],4)+" "+
@@ -939,34 +939,34 @@ DEBUG("Z ist"+Z+"\n");
 	right(write_su2pc(c_motion[RANGE]),5)+" "+
 	right(c_arc,3)+" "+
 	left(contact_list[C_DATA_LIST][i,CONTACT_NAME],24)+"\n";
-  
+
       if(contact_nr)
    	break;
-    } 	  
-  
+    } 	
+
   out += TRENNLINIE;
-  
+
   tell_console(P_NAV_CON,out, DOER);
 }
 
 
 
 /*
- * Allen Objekten im Sector, die einen Kontakt auf uns haben str schicken 
+ * Allen Objekten im Sector, die einen Kontakt auf uns haben str schicken
  */
 void tell_contacts(string str)
-{ 
+{
   mapping otab;
   mixed *contact_list;
   int i;
   object *iobj;
- 
+
   if(!environment()) return;
- 
+
   otab=(mapping)UNIVERSD->query_object_table(pos2sector(QueryProp(P_POSITION)));
- 
+
   if(!otab) return;
- 
+
   iobj = m_indices(otab);
   for(i=sizeof(iobj);i--;)
     if(contact_list = iobj[i]->QueryProp(P_CONTACT_LIST))
@@ -978,8 +978,8 @@ int sensor_parse(string str)
 {
   string *exp;
   int c_nr;
- 
-  
+
+
   if(!QueryProp(P_SYSTEM_ACTIVATE))
     {
       tell_console(P_NAV_CON,"[Kein System ist aktiviert.]\n", DOER);
@@ -987,7 +987,7 @@ int sensor_parse(string str)
     }
 
   exp = explode(lower_case(str||"")," ")-({""});
- 
+
   if(sizeof(exp) > 0)
     {
       if(exp[0] == "status" || exp[0] == "report")
@@ -996,7 +996,7 @@ int sensor_parse(string str)
 	    c_nr = to_int(exp[1]);
 	  else
 	    c_nr = 0;
-    
+
 	  display_sensor_info(c_nr);
 	}
     }
@@ -1005,15 +1005,15 @@ int sensor_parse(string str)
       notify_fail("sensor <report|status> <kontakt-nr>\n");
       return 0;
     }
- 
+
   return 1;
 }
- 
+
 void create()
 {
   SetProp(P_CONTACT_LIST,({ ({}), ([]) }) );
 
-  Set(P_RAW_SENSOR,		SAVE, F_MODE); 
+  Set(P_RAW_SENSOR,		SAVE, F_MODE);
   Set(P_SENSOR_NAME,		SAVE, F_MODE);
   Set(P_SENSOR_GENDER,		SAVE, F_MODE);
   Set(P_SENSOR_LONG,		SAVE, F_MODE);
@@ -1028,10 +1028,10 @@ void create()
  * Final Frontier              - = = * = = -                 U N I V E R S   *
  *****************************************************************************
  * File:        raumschiff/raumschiff.c                                      *
- * Description: 
+ * Description:
  * Author:      Imar@FF                                                      *
  * Modified:	16.05.2001 Simulacron	Meldung, wenn jemand das Schiff	     *
- * 					betritt 
+ * 					betritt
  *****************************************************************************/
 
 #include <inherit.h>
@@ -1041,7 +1041,7 @@ void create()
 #include <move.h>
 #include <level.h>
 
-#define DEBUGGER "shaman" 
+#define DEBUGGER "shaman"
 #include <debug.h>
 
 LIB_INHERIT CONTAIN_I;
@@ -1122,12 +1122,12 @@ private int check_path(string path)
 {
   string *e;
   int i,siz;
-  
+
   e = explode(path,"/");
   for(i=0,siz=sizeof(e)-1;i<siz;i++)
     if(file_size(implode(e[0..i],"/")) == -1)
       return FALSE;
-   
+
   return TRUE;
 }
 
@@ -1138,14 +1138,14 @@ private int IO(int job)
   object *r;
 
   ship_path = explode(QueryProp(P_SHIP_PATH)||"",PATH_CUT);
- 
+
   DEBUG(sprintf("IO: Job %d (1=L,2=S) Shippath %s",
 		job,array2str(ship_path)));
- 
+
   if(sizeof(ship_path) == _SHIP_PATH_SIZE)
     {
       ship_name = SHIPS+implode(ship_path,"/");
-  
+
       switch(job)
 	{
 	case _LOAD_SHIP:
@@ -1156,7 +1156,7 @@ private int IO(int job)
              set_eigen(1);
              return 1;
           }
-          
+
 	  else
 	    raise_error("Load-Error : "+ship_name+"\n");
 	  break;
@@ -1166,16 +1166,16 @@ private int IO(int job)
 	    {
 	      // Jetzt werden alle geladenen Raeume abgespeichert
 	      map_objects(getLoadedShipRooms(),"Save");
-	      
+	
 	      save_object(ship_name);
 	      return 1;
 	    }
 	  else
 	    raise_error("Save-Error : "+ship_name+"\n");
-	  break; 
+	  break;
 	}
     }
-   
+
   DEBUG("IO: Fehler aufgetreten");
 }
 
@@ -1195,7 +1195,7 @@ void QueueSave()
   while(remove_call_out("Save") != -1);
   call_out("Save",10);
 }
-  
+
 #undef _SHIP_PATH_SIZE
 #undef _LOAD_SHIP
 #undef _SAVE_SHIP
@@ -1236,14 +1236,14 @@ varargs void tell_console(string console, string message, string doer)
 /*
  * Ueberprueft, ob ein Planet oder Jumper in der Naehe ist.
  */
- 
+
 private void check_near_objects()
 /* modified righ */
 {
   mixed *contact_list;
   int size,i;
   string orbit,chk;
-  
+
   if(!environment())
     return;
 
@@ -1251,22 +1251,22 @@ private void check_near_objects()
   size=sizeof(contact_list[C_OBJ_LIST]);
 
   orbit=QueryProp(P_IN_ORBIT);
-  
+
   for(i=0;i<size;i++)
     {
       float dist;
       string name;
-  
+
       if(!contact_list[C_OBJ_LIST][i])
 	continue;
-   
+
       dist = contact_list[C_DATA_LIST][i,CONTACT_DIST];
-  
+
       switch(contact_list[C_DATA_LIST][i,CONTACT_TYPE])
 	{
 	case T_JUMPER:
 	  if(dist < JUMPER_RADIUS)
-	    {        
+	    {
 	      if(QueryProp(P_IN_JUMPER) == FALSE)
 		{
 		  tell_console(P_NAV_CON,
@@ -1277,7 +1277,7 @@ private void check_near_objects()
 		}
 	    }
 	  else
-	    {             
+	    {
 	      name = contact_list[C_OBJ_LIST][i]->query_id();
 	      if(QueryProp(P_IN_JUMPER) == name)
 		{
@@ -1287,7 +1287,7 @@ private void check_near_objects()
 		  SetProp(P_IN_JUMPER,FALSE);
 		}
 	    }
-	  break;   
+	  break;
 
 	case T_PLANET:
           name = contact_list[C_OBJ_LIST][i]->query_name();
@@ -1317,7 +1317,7 @@ private void check_near_objects()
                       orbit=0;
 		    }
 		}
-	    }  
+	    }
 	  break;
 	}
     }
@@ -1334,51 +1334,51 @@ void crash_with(object ob, int first_call)
   // Kein Crash mit Objecten, wenn sich das Raumschiff im Orbit befindet
   if(QueryProp(P_IN_ORBIT))
     return;
-   
+
   if(ob->QueryProp(P_TYPE) == T_JUMPER)
     return;
 
  // ob->add_damage(QueryProp(P_SPEED),0,this_object());
 
-  if(ob) 
+  if(ob)
     atom::crash_with(ob,first_call);
 }
-  
- 
+
+
 /*
  * Im HeartBeat wird das Raumschiff bewegt. Desweitern wird ueberprueft,
  * ob das Raumschiff den Sektor verlassen hat.
  */
 void heart_beat()
-{ 
-  reactor::do_generate();  // Energy vom Generator  
+{
+  reactor::do_generate();  // Energy vom Generator
   sensor::do_sensor();     // Umgebung ueberpruefen
 
   check_near_objects();
 
-  shield::reload_shield();  
+  shield::reload_shield();
   weapon::reload_weapon();
   damage::do_repair();
   nav::autopilot();
   //script::do_scripting();
 
   atom::heart_beat();	     // Bewegung allgemein
-    
-  if(QueryProp(P_NAV_DEST_POS) 
-     && QueryProp(P_SPEED) 
+
+  if(QueryProp(P_NAV_DEST_POS)
+     && QueryProp(P_SPEED)
      && (++eta_count % QueryProp(P_NAV_ETA_COUNT)) == 0)
     {
       int eta;
       string eta_out;
-     
-      eta = to_int(distance(QueryProp(P_POSITION),QueryProp(P_NAV_DEST_POS)) 
+
+      eta = to_int(distance(QueryProp(P_POSITION),QueryProp(P_NAV_DEST_POS))
 		   / QueryProp(P_MOTION)[RANGE]);
-     
+
       switch(eta)
 	{
 	case 0..60:
 	  eta_out = eta+"s.]\n";
-      
+
 	  SetProp(P_NAV_ETA_COUNT,1);
 	  break;
       	
@@ -1386,45 +1386,45 @@ void heart_beat()
 	  eta_out = eta/60+"min.]\n";
 	  SetProp(P_NAV_ETA_COUNT,60);
 	  break;
-        
+
 	case 3601..86400:
 	  eta_out = eta/3600+"h.]\n";
 	  SetProp(P_NAV_ETA_COUNT,3600);
 	  break;
-          
+
 	default:
 	  eta_out = "vergiss es.]\n";
 	  SetProp(P_NAV_ETA_COUNT,86400);
 	  break;
 	}
-     
+
       switch(QueryProp(P_NAV_ETA))
 	{
-	default: 
+	default:
 	  break;
-       
+
 	case ETA_WARP:
-	  if(QueryProp(P_SPEED)[0] == SPEED_WARP) 
+	  if(QueryProp(P_SPEED)[0] == SPEED_WARP)
 	    tell_console(P_NAV_CON,"[Eta - "+QueryProp(P_SPEED)[1]+" Warp: "+
 			  eta_out);
 	  break;
-       
+
 	case ETA_IMPULSE:
 	  if(QueryProp(P_SPEED)[0] == SPEED_IMPULSE)
 	    tell_console(P_NAV_CON,"[Eta - "+QueryProp(P_SPEED)[1]*100+"% : "
-			 +eta_out); 
+			 +eta_out);
 	  break;
-       
+
 	case ETA_IMPULSE|ETA_WARP:
-	  if(QueryProp(P_SPEED)[0] == SPEED_WARP) 
+	  if(QueryProp(P_SPEED)[0] == SPEED_WARP)
 	    tell_console(P_NAV_CON,"[Eta - "+QueryProp(P_SPEED)[1]+" Warp: "+
 			  eta_out);
 	  else
 	    tell_console(P_NAV_CON,"[Eta - "+QueryProp(P_SPEED)[1]*100+"% : "
-			 +eta_out);  
+			 +eta_out);
 	}
-    }  
-   
+    }
+
 #if FLIGHT_DEBUG
   {
     int *p;
@@ -1448,19 +1448,19 @@ void open_entrance()
   object r;
   int i;
 
-  if(!environment())                        
+  if(!environment())
     return;
-  
-  if(!shppath = QueryProp(P_SHIP_PATH)) 	   
+
+  if(!shppath = QueryProp(P_SHIP_PATH)) 	
     return;
 
   ent = QueryProp(P_ENTRANCE);
   if(!pointerp(ent))
     ent = ({ ent });
-  
-  if((i = sizeof(ent)) == 0)          
+
+  if((i = sizeof(ent)) == 0)
     return;
- 
+
   for(;i--;)
     if(r = SHIPD->LoadObject(SHIPS+shppath + PATH_CUT + ent[i]))
       r->add_exit( file_name(environment()), "raus" );
@@ -1474,7 +1474,7 @@ void close_entrance()
   int i;
 
   if(!environment()) return;
- 
+
   if(!shppath = QueryProp(P_SHIP_PATH))
     return;
 
@@ -1488,12 +1488,12 @@ void close_entrance()
     if(r = SHIPD->LoadObject(SHIPS+shppath + PATH_CUT + ent[i]))
       r->forbid_exit( "raus" );
 }
-    
+
 void init()
-{ 
+{
   string *ent;
   string ship_path;
-  
+
   if(QueryProp(P_REMOVE)) return;
 
   // Der Spieler muss zuerst in das Schiff und dann in den Raum gemoved
@@ -1506,29 +1506,29 @@ void init()
       if(!pointerp(ent))
 	ent = ({ ent });
 
-      if((ship_path = QueryProp(P_SHIP_PATH)) 
+      if((ship_path = QueryProp(P_SHIP_PATH))
 	 && sizeof(ent))
 	{  		
 	  open_entrance();
 	  DEBUG("Player wird in Raum gemoved");
 	  this_player()->move(SHIPS+ship_path + PATH_CUT + ent[0],
-		MOVE_NORMAL, 
+		MOVE_NORMAL,
 		"verschwindet im Schiff",
 		"betritt "+den( this_object() ));
 	}
       else
 	SPACE_ERR(sprintf("Schiff hat keinen Eingangsraum %O\n",ship_path));
     }
-  else 
-  if( environment() 
+  else
+  if( environment()
       && ( environment()->QueryProp(P_TYPE) == T_LANDING_AREA
 	   || environment()->QueryProp(P_TYPE) == T_HOLO_ROOM ))
     {
-      SetProp(P_DOCKED, TRUE);  
+      SetProp(P_DOCKED, TRUE);
       // Dies ist nen Hack, da sonst Schiffe, die
       // aus dem All geholt wurden, nicht betretbar
       // sind
-      
+
       add_action("betrete_parse","betret",1);
       add_action("betrete_parse","betritt");
     }
@@ -1537,7 +1537,7 @@ void init()
 static int docked()
 {
   return 0;
- 
+
   if( QueryProp(P_DOCKED) == TRUE )
     {
       notify_fail("[Das Raumschiff muss erst noch gestartet werden.]\n");
@@ -1558,9 +1558,9 @@ int notaus_parse()
 int system_parse(string str)
 {
   string *exp;
- 
+
   exp = explode(lower_case(str||"")," ")-({""})+({"dummy"});
- 
+
   switch(exp[0])
     {
     case "aktiviere":
@@ -1583,7 +1583,7 @@ int system_parse(string str)
 	  tell_console(P_NAV_CON,"[System aktiviert]\n", DOER);
 	}
       break;
-  
+
     case "deaktiviere":
       SetProp(P_SYSTEM_ACTIVATE,FALSE);
       SetProp(P_REACTOR_ENERGY,0);
@@ -1594,12 +1594,12 @@ int system_parse(string str)
     case "status":
       tell_console(P_NAV_CON,"[Kein Status]\n", DOER);
       break;
-  
-    default:  
+
+    default:
       notify_fail("system <aktiviere>|<deaktiviere>|<status>\n");
       return 0;
     }
-  
+
   return 1;
 }
 
@@ -1609,7 +1609,7 @@ int betrete_parse(string str)
   if( me(str) )
     {
       if(this_player()->move(this_object(), MOVE_SECRET ) != MOVE_OK )
-	write("Du kannst "+den()+" nicht betreten.\n");    
+	write("Du kannst "+den()+" nicht betreten.\n");
       else if( environment() )
         environment()->rtell( Der( this_player() )+" betritt "+
 		den()+"." );
@@ -1628,7 +1628,7 @@ int pos_parse(string str)
   int x,y,z;
   mixed *contact_list;
   int c_siz;
-    
+
   if(sscanf(str||"","%d %d %d",x,y,z) == 3)
     {
       SetProp(P_POSITION,({x,y,z}));
@@ -1655,7 +1655,7 @@ int pos_parse(string str)
 			    "\n",
 			    c_siz));
 	    else
-	      { 
+	      {
 		x--;
 		if(!contact_list[C_OBJ_LIST][x])
 		  write(sprintf("[Kontakt (%d) unbekannt.]\n",(x+1)));
@@ -1685,7 +1685,7 @@ string* _set_ship_name(string s)
 
   set_name( s );          // Schiff benennen
   set_gender("weiblich"); // Sobald das Schiff einen Namen hat, ist es
-                          // weiblich 
+                          // weiblich
   set_short(0);      // Falls noch gesetzt; Ausgegeben wird 'Eine <s>'
   return query_id();
 }
@@ -1717,31 +1717,31 @@ void create()
   weapon::create();
   damage::create();
   equip::create();
-  cargo::create();       
+  cargo::create();
   rcargo::create();
-  
+
   set_name("raumschiff");
   set_long("Ein schoenes Raumschiff.\n");
   set_gender("saechlich");
   set_eigen(1);
   SetProp(P_TYPE,T_SHIP);
   SetProp(P_DOCKED,TRUE);
-   
+
   set_own_light(1);
 
   set_msg_in("$Der() landet gerade");
-  set_msg_out("$Der() startet gerade"); 
- 
+  set_msg_out("$Der() startet gerade");
+
   set_weight(10000000);
-  
+
   set_max_internal_encumbrance(0);
   set_max_internal_size(100000);
-      
+
   open_con();
-    
+
   Set(P_SHIP_NAME, #'_set_ship_name, F_SET_METHOD);
   SetProp(P_SHIP_NAME,"NoName");
-    
+
   SetProp(P_ENTRANCE,({"room1"}));
 
   Set(P_SHIP_NR,          	SAVE, F_MODE);
@@ -1776,32 +1776,32 @@ void create()
 -----------------------------------------------------------------------------
 
 2001.08.30 17:49:53 sensor.c: contact-list: ({({OBJ(/d/Quornitum/imar/univers/inherit/planet#1857),
-    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1858), 
-    OBJ(/d/Quornitum/imar/univers/ships/seppelp.shuttle0), 
-    OBJ(/d/Quornitum/imar/univers/inherit/planet#1485), 
-    OBJ(/d/Quornitum/imar/univers/inherit/planet#1484), 
-    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1486), 
-    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1487), 
-    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1488) }), 
-  ([3: 
-      ({131025, 532340, 252850 }); 
-      ({0, 0, 0 }); 7007.73; 41; 8; "Mond Ai~Hai", 
-    4: 
-      ({130500, 532500, 253000 }); 
-      ({0, 0, 0 }); 7174.58; 41; 8; "Ch~Rihan", 
-    5: 
-      ({128900, 535200, 250300 }); 
-      ({0, 0, 0 }); 11027.6; 41; 64; "Taladon -> Quornitum", 
-    6: 
-      ({126678, 531002, 243766 }); 
-      ({0, 0, 0 }); 16900.5; 41; 64; "Taladon -> Endymion", 
-    7: 
-      ({134242, 530815, 258888 }); 
-      ({0, 0, 0 }); 41.6951; 42; 64; "Taladon -> Sol", 
-    1: 
-      ({511777, 570604, 250664 }); 
-      ({0, 0, 0 }); 0; 22; 64; "Sol -> Taladon", 
-    0: ({515000,571400,254000});({0,0,0});4706.4;42;8;"Sol"])}) 
+    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1858),
+    OBJ(/d/Quornitum/imar/univers/ships/seppelp.shuttle0),
+    OBJ(/d/Quornitum/imar/univers/inherit/planet#1485),
+    OBJ(/d/Quornitum/imar/univers/inherit/planet#1484),
+    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1486),
+    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1487),
+    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1488) }),
+  ([3:
+      ({131025, 532340, 252850 });
+      ({0, 0, 0 }); 7007.73; 41; 8; "Mond Ai~Hai",
+    4:
+      ({130500, 532500, 253000 });
+      ({0, 0, 0 }); 7174.58; 41; 8; "Ch~Rihan",
+    5:
+      ({128900, 535200, 250300 });
+      ({0, 0, 0 }); 11027.6; 41; 64; "Taladon -> Quornitum",
+    6:
+      ({126678, 531002, 243766 });
+      ({0, 0, 0 }); 16900.5; 41; 64; "Taladon -> Endymion",
+    7:
+      ({134242, 530815, 258888 });
+      ({0, 0, 0 }); 41.6951; 42; 64; "Taladon -> Sol",
+    1:
+      ({511777, 570604, 250664 });
+      ({0, 0, 0 }); 0; 22; 64; "Sol -> Taladon",
+    0: ({515000,571400,254000});({0,0,0});4706.4;42;8;"Sol"])})
 
           c_nr: 2
 2001.08.30 17:49:55 DEBUG: Illegal original mapping size: 1073741826
@@ -1845,5 +1845,5 @@ d/Quornitum/imar/univers/ships/highwind.shuttle0
 8c659ac:  25       10 local                      (2: 20)
 8c659ae:  12          const0                     (3: 21)
 8c659af: 114          push_indexed_map_lvalue    (4: 22)        line 228
-8c659b0:  37  25   1  25  14  13 113  25                                    
+8c659b0:  37  25   1  25  14  13 113  25
 

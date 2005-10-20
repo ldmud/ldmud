@@ -244,6 +244,12 @@
  */
 #define COMPAT_MODE
 
+/* Define ALLOW_FILENAME_SPACES if the driver should accept space characters
+ * in filenames. If it is not defined, a hardcoded test for space characters
+ * is activated.
+ */
+#undef ALLOW_FILENAME_SPACES
+
 /* Define STRICT_EUIDS if the driver is to enforce the use of euids,
  * ie. load_object() and clone_object() require the current object to
  * have a non-zero euid.
@@ -297,10 +303,18 @@
  */
 #undef USE_IPV6
 
+/* Define this if you want MCCP (Mud Control Compression Protocol).
+ */
+#undef USE_MCCP
+
 /* Define this if you want mySQL support (assuming that your host
  * actually offers this.
  */
 #undef USE_MYSQL
+
+/* Define this if you want to allow call_other()s on arrays of objects.
+ */
+#define USE_ARRAY_CALLS
 
 /* Define this if you want the 'nosave' keyword.
  */
@@ -362,6 +376,12 @@
  * Supported by: MALLOC_smalloc
  */
 #undef MALLOC_LPC_TRACE
+
+/* Define this to log all calls to esbrk() (the system memory allocator).
+ * Works best if MALLOC_TRACE, or also MALLOC_LPC_TRACE, are defined.
+ * Supported by: MALLOC_smalloc
+ */
+#undef MALLOC_SBRK_TRACE
 
 /* Trace the most recently executed bytecode instructions?
  */

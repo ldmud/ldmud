@@ -1,14 +1,46 @@
 SYNOPSIS
-        string function_exists(string str, object ob)
+        #include <functionlist.h>
+
+        mixed function_exists (string str [, int flags])
+        mixed function_exists (string str , object ob, [, int flags])
 
 DESCRIPTION
-        Return the file name of the object that defines the function
-        str in object ob. The returned value can be other than
-        object_name(ob) if the function is defined in an inherited
-        object. In !compat mode, the returned name always begins with a
-        '/' (absolute path). 0 is returned if the function was not
-        defined, or was defined as static (protected function on the
-        other hand are found).
+        Look up a function <str> in the current object, respectively
+        in the object <ob>. Depending on the value of <flags>, one
+        of the following informations is returned:
+
+        <flags> == FEXISTS_PROGNAME (0, default):
+          Return the name of the program the function is defined in.
+          This can be either object_name(ob), or the name of an inherited
+          program. If !compat mode, the returned name always begins
+          with a '/'.
+
+        <flags> == FEXISTS_FILENAME (1):
+          Return the name of the file the function is defined in (this
+          may be an include file). If !compat mode, the returned name
+          always begins with a '/'.
+
+        <flags> == FEXISTS_LINENO (2):
+          Return the line number within the source file.
+
+        <flags> == FEXISTS_ALL (3):
+          Return an array with all the above information. The above
+          flag values are the indices into that array.
+
+        The <flags> value can be or-ed to NAME_HIDDEN to return
+        information about static and protected functions in other objects.
+        It is not possible to return information about private functions.
+
+        If the function cannot be found (because it doesn't exist or
+        it is not visible to the caller), the result is 0.
+
+EXAMPLES
+        function_exists("create")
+        function_exists("create", that_object, NAME_HIDDEN|FEXISTS_ALL);
+
+HISTORY
+        LDMud 3.2.10 broadened the range of returned values and introduced
+          the <flags> argument.
 
 SEE ALSO
-        call_other(E), call_resolved(E), functionlist(E)
+        call_other(E), call_resolved(E), functionlist(E), variable_exists(E)

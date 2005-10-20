@@ -19,7 +19,7 @@ bsp: string abc = "das ist; ein test: fuer bla";
 > Interessante Idee, auch wenn der [..] Operator dafuer nicht verwendbar ist
 > ([';'..<':'] ist ununterscheidbar von [59..<58]); man koennte aber [[..]]
 
-wenn man die zeigen in die '' einschliesst sollte man das doch erkennen 
+wenn man die zeigen in die '' einschliesst sollte man das doch erkennen
 koennen... aber du weisst das sicher besser :)
 
 > verwenden. Die Frage ist: was machst du, wenn eines oder beide Elemente

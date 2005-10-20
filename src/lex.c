@@ -188,6 +188,10 @@ Bool pragma_warn_deprecated;
   /* True: warn if deprecated efuns are used.
    */
 
+Bool pragma_warn_empty_casts;
+  /* True: warn if a type is casted to itself.
+   */
+
 char *last_lex_string;
   /* When lexing string literals, this is the (shared) string lexed
    * so far. It is used to pass string values to lang.c and may be
@@ -423,14 +427,7 @@ static struct incstate
     char      * file;           /* Filename */
     ptrdiff_t   linebufoffset;  /* Position of linebufstart */
     mp_uint     inc_offset;     /* Handle returned by store_include_info() */
-    int pragma_strict_types;    /* Saved pragma_strict_types.
-                                 * If set to PRAGMA_KEEP_TYPES, the pragma
-                                 * setting at the end of the include file
-                                 * will not be reset.
-                                 * TODO: Remove this altogether as it has
-                                 * TODO:: already been done in 3.3
-                                 */
-    char saved_char;
+    char        saved_char;
 } *inctop = NULL;
 
 /*-------------------------------------------------------------------------*/
@@ -661,8 +658,8 @@ init_lexer(void)
         };
 
     /* Allocate enough memory for 20 nested includes/ifs */
-    lexpool = new_fifopool(fifopool_size(sizeof(lpc_ifstate_t), 20)
-                           + fifopool_size(sizeof(struct incstate), 20));
+    lexpool = new_lifopool(size_lifopool( sizeof(lpc_ifstate_t)
+                                         +sizeof(struct incstate)));
     if (!lexpool)
         fatal("Out of memory.\n");
 
@@ -757,6 +754,10 @@ init_lexer(void)
         add_permanent_define("__COMPAT_MODE__", -1, string_copy(""), MY_FALSE);
     }
     add_permanent_define("__EUIDS__", -1, string_copy(""), MY_FALSE);
+
+    if (allow_filename_spaces)
+        add_permanent_define("__FILENAME_SPACES__", -1, string_copy(""), MY_FALSE);
+
     if (strict_euids)
         add_permanent_define("__STRICT_EUIDS__", -1, string_copy(""), MY_FALSE);
 
@@ -800,21 +801,32 @@ init_lexer(void)
     sprintf(mtext, "%d", ERQ_MAX_REPLY);
     add_permanent_define("__ERQ_MAX_REPLY__", -1, string_copy(mtext), MY_FALSE);
 #endif
+    sprintf(mtext, "%ld", (long)MAX_MALLOCED);
+    add_permanent_define("__MAX_MALLOC__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "%ld", (long)def_eval_cost);
     add_permanent_define("__MAX_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "%ld", (long)CATCH_RESERVED_COST);
     add_permanent_define("__CATCH_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "%ld", (long)MASTER_RESERVED_COST);
     add_permanent_define("__MASTER_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
-    sprintf(mtext, "%ld", (long)TIME_TO_RESET);
+    sprintf(mtext, "%ld", (long)time_to_reset);
     add_permanent_define("__RESET_TIME__", -1, string_copy(mtext), MY_FALSE);
-    sprintf(mtext, "%ld", (long)TIME_TO_CLEAN_UP);
+    sprintf(mtext, "%ld", (long)time_to_cleanup);
     add_permanent_define("__CLEANUP_TIME__", -1, string_copy(mtext), MY_FALSE);
+#ifdef MSDOS_FS
+    add_permanent_define("__MSDOS_FS__", -1, string_copy(""), MY_FALSE);
+#endif
 #ifdef USE_IPV6
     add_permanent_define("__IPV6__", -1, string_copy(""), MY_FALSE);
 #endif
+#ifdef USE_MCCP
+    add_permanent_define("__MCCP__", -1, string_copy("1"), MY_FALSE);
+#endif
 #ifdef USE_MYSQL
     add_permanent_define("__MYSQL__", -1, string_copy(""), MY_FALSE);
+#endif
+#ifdef USE_ARRAY_CALLS
+    add_permanent_define("__LPC_ARRAY_CALLS__", -1, string_copy("1"), MY_FALSE);
 #endif
 #ifdef USE_LPC_NOSAVE
     add_permanent_define("__LPC_NOSAVE__", -1, string_copy(""), MY_FALSE);
@@ -1568,7 +1580,7 @@ handle_cond (Bool c)
         iftop = p;
         p->state = c ? EXPECT_ELSE : EXPECT_ENDIF;
     }
-}
+} /* handle_cond() */
 
 
 /*-------------------------------------------------------------------------*/
@@ -1618,7 +1630,6 @@ start_new_include (int fd, char * buf, char * name, char * name_ext, char delim)
     is->linebufoffset = linebufoffset;
     is->saved_char = saved_char;
     is->next = inctop;
-    is->pragma_strict_types = pragma_strict_types;
 
     /* Copy the new filename into current_file */
 
@@ -1655,8 +1666,6 @@ start_new_include (int fd, char * buf, char * name, char * name_ext, char delim)
         inctop->inc_offset = store_include_info(name, current_file, delim, inc_depth);
 
     /* Initialise the rest of the lexer state */
-    pragma_strict_types = PRAGMA_WEAK_TYPES;
-    instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
     current_line = 0;
     linebufend   = outp - 1; /* allow trailing zero */
     linebufstart = linebufend - MAXLINE;
@@ -1720,7 +1729,6 @@ add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
         current_line++; /* Make sure to restore to line 1 */
         (void)start_new_include(-1, string_copy(auto_include_string)
                                , current_file, "auto include", ')');
-        inctop->pragma_strict_types = PRAGMA_KEEP_TYPES;
         current_line++; /* Make sure to start at line 1 */
     }
 } /* add_auto_include() */
@@ -2528,6 +2536,16 @@ handle_pragma (char *str)
             pragma_warn_deprecated = MY_FALSE;
             validPragma = MY_TRUE;
         }
+        else if (strncmp(base, "warn_empty_casts", namelen) == 0)
+        {
+            pragma_warn_empty_casts = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_warn_empty_casts", namelen) == 0)
+        {
+            pragma_warn_empty_casts = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
 #if defined( DEBUG ) && defined ( TRACE_CODE )
         else if (strncmp(base, "set_code_window", namelen) == 0)
         {
@@ -3021,12 +3039,6 @@ yylex1 (void)
                 /* It's the end of an included file: return the previous
                  * file
                  */
-
-                static char call_other_return_types[]
-                  = { /* PRAGMA_WEAK_TYPES:   */ TYPE_ANY
-                    , /* PRAGMA_STRONG_TYPES: */ TYPE_ANY
-                    , /* PRAGMA_STRICT_TYPES: */ TYPE_UNKNOWN };
-
                 struct incstate *p;
                 Bool was_string_source = (yyin.fd == -1);
 
@@ -3038,14 +3050,12 @@ yylex1 (void)
                 nexpands = 0;
 
                 /* Restore the previous state */
+                store_include_end(p->inc_offset, p->line);
                 current_file = p->file;
                 current_line = p->line;
-
                 if (!was_string_source)
                     current_line++;
-                store_include_end(p->inc_offset);
-
-                if (was_string_source)
+                else
                 {
                     /* 'string' includes are supposed to be inline
                      * so correct the line number information to take out
@@ -3058,12 +3068,6 @@ yylex1 (void)
                     store_line_number_backward(1);
                 }
 
-                if (p->pragma_strict_types != PRAGMA_KEEP_TYPES)
-                {
-                    pragma_strict_types = p->pragma_strict_types;
-                    instrs[F_CALL_OTHER].ret_type =
-                        call_other_return_types[pragma_strict_types];
-                }
                 yyin = p->yyin;
                 saved_char = p->saved_char;
                 inctop = p->next;
@@ -3427,10 +3431,10 @@ yylex1 (void)
                              "(mixed $1, mixed $2, mixed $3,"
                              " mixed $4, mixed $5, mixed $6, mixed $7,"
                              " mixed $8, mixed $9) {\n"
-                             "return "
+                             "return ("
                            , name
                            );
-                pos_return = (size_t)textbuf->length-7;
+                pos_return = (size_t)textbuf->length-8;
 
                 /* Set yyp to the end of (: ... :), and also check
                  * for the highest parameter used.
@@ -3695,12 +3699,12 @@ yylex1 (void)
 
                 if (*yyp == ';' || *yyp == '}')
                 {
-                    /* Functional contains statements: remove the 'return'
+                    /* Functional contains statements: remove the 'return ('
                      * added in the beginnin.
                      */
                     int i;
 
-                    for (i = 0; i < 6; i++)
+                    for (i = 0; i < 8; i++)
                         textbuf->buf[pos_return+i] = ' ';
 
                     /* Finish up the function text */
@@ -3709,7 +3713,7 @@ yylex1 (void)
                 else
                 {
                     /* Finish up the function text */
-                    strbuf_add(textbuf, ";\n}\n");
+                    strbuf_add(textbuf, ");\n}\n");
                 }
 
                 /* Return the ID of the name of the new inline function */
@@ -4436,8 +4440,11 @@ yylex1 (void)
                 return L_SYMBOL;
             }
 
-            /* It's a normal (or escaped) character constant. */
-            yylval.number = c;
+            /* It's a normal (or escaped) character constant.
+             * Make sure that characters with the MSB set appear
+             * as positive numbers.
+             */
+            yylval.number = (unsigned char)c;
             outp = yyp;
             return L_NUMBER;
 
@@ -4748,6 +4755,7 @@ start_new_file (int fd)
     pragma_no_shadow = MY_FALSE;
     pragma_pedantic = MY_FALSE;
     pragma_warn_deprecated = MY_FALSE;
+    pragma_warn_empty_casts = MY_TRUE;
     pragma_combine_strings = MY_TRUE;
 
     nexpands = 0;
@@ -4998,7 +5006,8 @@ handle_define (char *yyt, Bool quote)
 
     char namebuf[NSIZE];      /* temp buffer for read identifiers */
     char args[NARGS][NSIZE];  /* parsed argument names of function macros */
-#if defined(CYGWIN) && __GNUC__ >= 2
+#if defined(CYGWIN) && __GNUC__ >= 3 && __GNUC_MINOR__ >= 2
+#   define MTEXT_IS_POINTER
     char *mtext;
       /* replacement text, with arguments replaced by the MARKS characters.
        * Under Cygwin and high optimization, the compiler produces faulty
@@ -5008,18 +5017,18 @@ handle_define (char *yyt, Bool quote)
     char mtext[MLEN];
       /* replacement text, with arguments replaced by the MARKS characters
        */
-#endif
+#endif /* CYGWIN and gcc 3.2 or newer */
     char *p;                  /* current text pointer */
     char *q;                  /* destination for parsed text */
 
-#if defined(CYGWIN) && __GNUC__ >= 3 && __GNUC_MINOR__ >= 2
+#if defined(MTEXT_IS_POINTER)
     mtext = alloca(MLEN);
     if (!mtext)
     {
         lexerror("Out of stack memory");
         return;
     }
-#endif /* CYGWIN */
+#endif /* MTEXT_IS_POINTER */
 
     p = yyt;
     strcat(p, " "); /* Make sure GETALPHA terminates */

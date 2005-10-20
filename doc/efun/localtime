@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <time.h>
+        #include <sys/time.h>
 
         int * localtime(int clock)
         int * localtime(int* uclock)

@@ -19,7 +19,7 @@ enable_access_control=no
 with_max_cost=1000000
 with_catch_reserved_cost=10000
 with_master_reserved_cost=0x800
-enable_dynamic_costs=yes
+enable_dynamic_costs=no
 
 with_time_to_clean_up=5400
 with_time_to_swap=1800
@@ -34,6 +34,7 @@ enable_initialization_by___init=yes
 
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
+enable_malloc_sbrk_trace=yes
 enable_use_mysql=/usr/lib/mysql
 
 with_htable_size=65536
@@ -45,3 +46,5 @@ with_max_array_size=10000
 with_max_mapping_size=40000
 with_max_byte_transfer=100000
 with_read_file_max_size=100000
+
+with_optmize=high

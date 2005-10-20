@@ -12,6 +12,7 @@ extern int d_flag;
 extern Bool t_flag;
 extern Bool comp_flag;
 extern Bool strict_euids;
+extern Bool allow_filename_spaces;
 extern long time_to_reset;
 extern long time_to_cleanup;
 extern long time_to_swap;
@@ -26,6 +27,7 @@ extern char *debug_file;
 extern object_t dummy_current_object_for_loads;
 extern int slow_shut_down_to_do;
 extern Bool reopen_debug_log;
+extern mp_int boot_time;
 
 #ifdef DEBUG
 extern Bool check_a_lot_ref_counts_flag;
@@ -52,6 +54,7 @@ extern void vdebug_message(char *, va_list);
 
 void reallocate_reserved_areas(void);
 
+extern void write_X (int d, unsigned char i);
 extern void write_x(int d, p_uint i);
 extern void writed(int d, p_uint i);
 extern void writes(int d, const char *s);

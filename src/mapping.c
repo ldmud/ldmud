@@ -39,6 +39,24 @@
  * hashed entries into the condensed part, removing the hashed part by
  * this.
  *
+ * To be compacted, a mapping has to conform to a number of conditions:
+ * either
+ *  - it has to be at least 2*TIME_TO_COMPACT seconds (typical 20 minutes)
+ *    since the last addition or deletion of an entry
+ *
+ * or it has been at least TIME_TO_COMPACT seconds since the last change
+ * and either
+ *  - the number of condensed-deleted entries is at least half the capacity
+ *    of the condensed part
+ * or
+ *  - the number of hashed entries exceeds the number non-deleted condensed
+ *    entries.
+ *
+ * The idea is to minimize reallocations of the (potentially large) condensed
+ * block, as it easily runs into fragmentation of the large block heap.
+ *
+ * A garbage collection however compacts all mappings unconditionally.
+ *
  *
  * -- mapping_t --
  *
@@ -46,7 +64,7 @@
  *       p_int                     ref;
  *       struct hash_mapping      *hash;
  *       struct condensed_mapping *condensed;
- *       wiz_list_t          *user;
+ *       wiz_list_t               *user;
  *       int                       num_values;
  *   }
  *
@@ -130,7 +148,8 @@
  *       p_int condensed_deleted;
  *       p_int ref;
  *       struct map_chain *deleted;
- *       mapping_t   *next_dirty;
+ *       mapping_t        *next_dirty;
+ *       mp_int            last_used;
  *       struct map_chain *chains[ 1 +.mask ];
  *   }
  *
@@ -162,6 +181,10 @@
  *   is the list of entries deleted from the mapping while the
  *   protection is in effect. If the .ref falls back to 0, all
  *   the pending deletions of the .deleted entries are performed.
+ *
+ *   .last_used holds the time (seconds since the epoch) of the last addition
+ *   or removal of an entry. It is used by the compaction algorithm to
+ *   determine whether the mapping should be compacted or not.
  *
  * -- struct map_chain --
  *
@@ -216,6 +239,11 @@
   /* Smallest value a p_int/ph_int variable can hold.
    */
 
+#define TIME_TO_COMPACT (600) /* 10 Minutes */
+   /* TODO: Make this configurable.
+    * TODO:: When doing so, also implement the shrinking of the hashtable
+    */
+
 /*-------------------------------------------------------------------------*/
 
 #define EMPTY_MAPPING_THRESHOLD 2000
@@ -224,7 +252,15 @@
    * and still allow fast 'freeing' of unused mappings.
    */
 
-static struct hash_mapping dirty_mapping_head_hash;
+static struct hash_mapping dirty_mapping_head_hash
+  = {
+    /* mask              */ 0,
+    /* used              */ 0,
+    /* condensed_deleted */ 0,
+    /* ref               */ 0,
+    /* deleted           */ NULL,
+    /* next_dirty        */ NULL
+    };
   /* Auxiliary structure dirty_mapping_head can reference
    */
 
@@ -362,19 +398,15 @@ allocate_mapping (mp_int size, mp_int num_values)
 
         hm->mask = size;
         hm->used = hm->condensed_deleted = hm->ref = 0;
+        hm->last_used = current_time;
+        hm->next_dirty = NULL;
+        hm->deleted = NULL;
 
         /* With this hash_mapping structure, the mapping counts
          * as potentially dirty.
          */
         last_dirty_mapping->hash->next_dirty = m;
         last_dirty_mapping = m;
-#ifdef DEBUG
-        /* These members don't really need a default initialisation
-         * but it's here to catch bogies.
-         */
-        hm->next_dirty = NULL;
-        hm->deleted = NULL;
-#endif
         num_dirty_mappings++;
 
         /* Inform backend that there is a new mapping to condense */
@@ -521,6 +553,11 @@ _free_mapping (mapping_t *m)
         hm->mask = hm->used = hm->condensed_deleted = hm->ref = 0;
         hm->chains[0] = 0;
         hm->next_dirty = next_dirty;
+        hm->last_used = 0;
+          /* Not '= current_time' to make sure that the compaction
+           * will immediately pick it up - there won't be any new
+           * entries coming in.
+           */
 
         m->condensed = 0;
         m->hash = hm;
@@ -626,6 +663,7 @@ free_empty_mapping (mapping_t *m)
         hm->mask = hm->used = hm->condensed_deleted = hm->ref = 0;
         hm->chains[0] = 0;
         hm->next_dirty = next_dirty;
+        hm->last_used = 0;
 
         m->condensed = 0;
         m->hash = hm;
@@ -691,14 +729,9 @@ remove_empty_mappings (void)
         return;
 
 #ifdef DEBUG
-    /* We have stored all these superflous zeroes.
-     * Now check that there is one in the proper place.
-     */
-    if (last_dirty_mapping->hash->next_dirty != 0)
+    if (last_dirty_mapping->hash->next_dirty != NULL)
         fatal("Dirty mapping list not terminated\n");
 #endif
-
-    last_dirty_mapping->hash->next_dirty = 0;
 
     /* Walk the dirty mapping list, deallocating pending
      * empty mappings
@@ -1050,19 +1083,17 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
             return NULL; /* Oops */
 
         hm->mask = hm->condensed_deleted = 0;
+        hm->last_used = current_time;
         hm->ref = 0;
         hm->used = 1;
-        last_dirty_mapping->hash->next_dirty = m;
-        last_dirty_mapping = m;
-#ifdef DEBUG
-        /* These members don't really need a default initialisation
-         * but it's here to catch bogies.
-         */
         hm->next_dirty = NULL;
         hm->deleted = NULL;
-#endif
+
+        last_dirty_mapping->hash->next_dirty = m;
+        last_dirty_mapping = m;
         num_dirty_mappings++;
         extra_jobs_to_do = MY_TRUE;  /* there are mappings to condense! */
+
         m->hash = hm;
 
         /* Now create the hashing structure with one empty entry */
@@ -1191,6 +1222,7 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
         mc = (struct map_chain *)xalloc(MAP_CHAIN_SIZE(num_values));
         if (!mc)
             return NULL;
+        hm->last_used = current_time;
         hm->used++;
         mc->next = hm->chains[i];
         hm->chains[i] = mc;
@@ -1205,6 +1237,65 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
 
     /* NOTREACHED */
 } /* _get_map_lvalue() */
+
+/*-------------------------------------------------------------------------*/
+Bool
+mapping_references_objects (mapping_t *m)
+
+/* Check if the mapping <m> references objects (directly or through
+ * closures) as keys.
+ * Return TRUE if it does, FALSE if it doesn't.
+ *
+ * The swapper uses this function to determine whether or not to
+ * swap a mapping.
+ */
+
+{
+    struct condensed_mapping *cm;
+    struct hash_mapping *hm;
+
+    /* Scan the condensed part for object references used as keys.
+     */
+
+    if (NULL != (cm = m->condensed))
+    {
+        svalue_t *svp;
+        mp_int i;
+
+        for (svp = CM_MISC(cm),i = cm->misc_size; (i -= sizeof *svp) >= 0; )
+        {
+            --svp;
+            if (T_OBJECT == svp->type || T_CLOSURE == svp->type)
+                return MY_TRUE;
+        } /* for (all condensed keys) */
+    } /* if (m->cond) */
+
+    /* If it exists, scan the hash part for object references.
+     */
+
+    if ( NULL != (hm = m->hash) )
+    {
+        struct map_chain **mcp, *mc;
+        p_int i;
+
+        /* Walk all chains */
+
+        for (mcp = hm->chains, i = hm->mask + 1; --i >= 0;)
+        {
+            /* Walk this chain */
+
+            for (mc = *mcp++; NULL != mc; mc = mc->next)
+            {
+                svalue_t * entry = &(mc->data[0]);
+
+                if (T_OBJECT == entry->type || T_CLOSURE == entry->type)
+                    return MY_TRUE;
+            } /* walk this chain */
+        } /* walk all chains */
+    } /* if (hash part exists) */
+
+    return MY_FALSE;
+} /* mapping_references_objects() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1294,13 +1385,12 @@ check_map_for_destr (mapping_t *m)
                     }
                     m->hash = hm;
                     hm->mask = hm->used = hm->condensed_deleted = hm->ref = 0;
+                    hm->last_used = current_time;
                     hm->chains[0] = 0;
-                    last_dirty_mapping->hash->next_dirty = m;
-                    last_dirty_mapping = m;
-#ifdef DEBUG
                     hm->next_dirty = NULL;
                     hm->deleted = NULL;
-#endif
+                    last_dirty_mapping->hash->next_dirty = m;
+                    last_dirty_mapping = m;
                     num_dirty_mappings++;
                     extra_jobs_to_do = MY_TRUE;
                 }
@@ -1512,16 +1602,15 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
                     m->hash = hm;
                     hm->mask = hm->used = hm->condensed_deleted = hm->ref = 0;
                     hm->chains[0] = 0;
-                    last_dirty_mapping->hash->next_dirty = m;
-                    last_dirty_mapping = m;
-#ifdef DEBUG
                     hm->next_dirty = NULL;
                     hm->deleted = NULL;
-#endif
+                    last_dirty_mapping->hash->next_dirty = m;
+                    last_dirty_mapping = m;
                     num_dirty_mappings++;
                     extra_jobs_to_do = MY_TRUE;
                 }
 
+                hm->last_used = current_time;
                 hm->condensed_deleted++;
 
                 return;
@@ -1647,17 +1736,16 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
                         m->hash = hm;
                         hm->mask = hm->used = hm->condensed_deleted = 0;
                         hm->chains[0] = 0;
-                        last_dirty_mapping->hash->next_dirty = m;
-                        last_dirty_mapping = m;
-#ifdef DEBUG
                         hm->next_dirty = 0;
                         hm->deleted = 0;
-#endif
+                        last_dirty_mapping->hash->next_dirty = m;
+                        last_dirty_mapping = m;
                         hm->ref = 0;
                         num_dirty_mappings++;
                         extra_jobs_to_do = MY_TRUE;
                     }
 
+                    hm->last_used = current_time;
                     hm->condensed_deleted++;
                     return;
                 }
@@ -1726,6 +1814,7 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
                     } while (--j >= 0);
                     xfree( (char *)mc );
                 }
+                hm->last_used = current_time;
                 hm->used--;
                 return;
             }
@@ -1780,10 +1869,9 @@ copy_mapping (mapping_t *m)
         hm2->mask = hm->mask;
         hm2->used = hm->used;
         hm2->condensed_deleted = hm->condensed_deleted;
-#ifdef DEBUG
+        hm2->last_used = current_time;
         hm2->next_dirty = NULL;
         hm2->deleted = NULL;
-#endif
         hm2->ref = 0;
 
         /* Now copy the hash chains */
@@ -1981,10 +2069,9 @@ resize_mapping (mapping_t *m, mp_int new_width)
         hm2->mask = hm->mask;
         hm2->used = hm->used;
         hm2->condensed_deleted = hm->condensed_deleted;
-#ifdef DEBUG
+        hm2->last_used = current_time;
         hm2->next_dirty = NULL;
         hm2->deleted = NULL;
-#endif
         hm2->ref = 0;
 
         /* Now copy the hash chains */
@@ -2383,8 +2470,12 @@ add_mapping (mapping_t *m1, mapping_t *m2)
      * even if there are no entries in the hash parts.
      */
     size1 =
-      (m1->hash ? dirty += m1->hash->condensed_deleted, m1->hash->used : 0)
-    + (m2->hash ? dirty += m2->hash->condensed_deleted, m2->hash->used : 0) ;
+      (m1->hash ? dirty += m1->hash->condensed_deleted, m1->hash->used : 0) ;
+    size1 +=
+      (m2->hash ? dirty += m2->hash->condensed_deleted, m2->hash->used : 0) ;
+      /* Note: don't combine the two statements above, as it yields
+       * undefined behaviour for 'dirty'.
+       */
     size1 += !size1 && dirty;
 
     /* Use size1 to allocate the result mapping and (that's the real reason
@@ -2542,9 +2633,17 @@ walk_mapping ( mapping_t *m
 
 /*-------------------------------------------------------------------------*/
 void
-compact_mappings (mp_int num)
+compact_mappings (mp_int num, Bool force)
 
-/* Compact the first <num> mappings in the dirty-mapping list.
+/* Compact the first <num> mappings in the dirty-mapping list which may
+ * have to satisfy certain conditions.
+ *
+ * If <force> is TRUE, the first <num> mappings are compacted unconditionally.
+ * If <force> is FALSE, the mappings to be compacted have to
+ *   - have a .last_used time of 2*TIME_TO_COMPACT or more seconds earlier,
+ *   - or have to have at least half of their condensed entries deleted
+ *     and have a .last_used time of TIME_TO_COMPACT or more seconds earlier.
+ *
  * Compaction means: removal of all deleted entries from the condensed
  * part, merge of all hashed entries into the condensed part,
  * reduction of the memory held by the condensed part to the
@@ -2561,7 +2660,9 @@ compact_mappings (mp_int num)
  */
 
 {
-    mapping_t *m;  /* The current mapping to compact */
+    mapping_t *m;     /* The current mapping to compact */
+    mapping_t *prev;  /* The previous dirty mapping, or NULL */
+    mapping_t *this;  /* The next dirty mapping to work */
 
     malloc_privilege = MALLOC_SYSTEM;
       /* compact_mappings() is called in very low memory situations,
@@ -2582,17 +2683,15 @@ compact_mappings (mp_int num)
     if (num >= num_dirty_mappings)
     {
         num = num_dirty_mappings;
-        last_dirty_mapping = &dirty_mapping_head;
     }
     else
     {
         extra_jobs_to_do = MY_TRUE;
     }
 
-    num_dirty_mappings -= num;
-
-    m = dirty_mapping_head_hash.next_dirty;
-    while (--num >= 0)
+    prev = &dirty_mapping_head;
+    this = dirty_mapping_head_hash.next_dirty;
+    while (--num >= 0 && this != NULL)
     {
         struct hash_mapping *hm;
           /* The hash part of m (guaranteed to exist!) */
@@ -2621,6 +2720,8 @@ compact_mappings (mp_int num)
         struct map_chain *last_string, *last_misc;
           /* Auxiliaries */
 
+        m = this;
+
 #ifdef DEBUG
         if (!m->user)
             fatal("No wizlist pointer for mapping\n");
@@ -2628,8 +2729,6 @@ compact_mappings (mp_int num)
         m->ref++; /* prevent freeing while using in case of recursive
                    * mappings referenced by a deleted value
                    */
-
-        check_map_for_destr(m);
 
         cm = m->condensed;
         hm = m->hash;
@@ -2639,6 +2738,58 @@ compact_mappings (mp_int num)
             fatal("compact_mappings(): remaining ref count %ld!\n", hm->ref);
         }
 #endif /* DEBUG */
+
+        /* Test the compaction criterium.
+         * By testing it before check_map_for_destr(), the size related
+         * criterias might trigger later than desired, but the time criterium
+         * makes sure that we won't miss one.
+         */
+        if (!force
+         && !(   current_time - hm->last_used >= TIME_TO_COMPACT
+              && (   hm->condensed_deleted * 2 >= MAP_CONDENSED_SIZE(m)
+                  || hm->used >= MAP_CONDENSED_SIZE(m) - hm->condensed_deleted
+                  || current_time - hm->last_used >= 2*TIME_TO_COMPACT
+                 )
+             )
+           )
+        {
+            /* This mapping doesn't qualify for compaction,
+             * so move it to the end of the list (this way the next
+             * call to compact_mappings() will consider the other
+             * mappings first.
+             */
+            if (this != last_dirty_mapping)
+            {
+                /* Move 'this' mapping to the end of the list */
+                prev->hash->next_dirty = this->hash->next_dirty;
+                last_dirty_mapping->hash->next_dirty = this;
+                this->hash->next_dirty = NULL;
+                last_dirty_mapping = this;
+
+                /* Set 'this' to the next unconsidered mapping */
+                this = prev->hash->next_dirty;
+            }
+            else
+            {
+                prev = this;
+                this = this->hash->next_dirty;
+            }
+            extra_jobs_to_do = MY_TRUE;
+            m->ref--; /* undo the ref increment from above */
+            continue;
+        }
+
+        check_map_for_destr(m); /* The compaction algo requires this */
+
+        /* This mapping can be compacted: unlink it */
+        num_dirty_mappings--;
+        this = this->hash->next_dirty;
+        prev->hash->next_dirty = this;
+        if (this == NULL)
+            last_dirty_mapping = prev;
+
+        num_values = m->num_values;
+
 
         /* Test if there are any hashed values to merge or
          * deleted values to compact
@@ -2665,12 +2816,9 @@ compact_mappings (mp_int num)
             /* No hashed keys, condensed part is compact: just deallocate
              * the hash part.
              */
-            m = hm->next_dirty;
             xfree( (char *)hm );
             continue;
         }
-
-        num_values = m->num_values;
 
 
         /* --- Setup Mergesort ---
@@ -3364,16 +3512,8 @@ compact_mappings (mp_int num)
            * now.
            */
 
-        m = hm->next_dirty;
-
         xfree( (char *)hm );
     } /* while (num >= 0) */
-
-    /* m is now the first of the remaining uncompacted mappings, or
-     * the head itself if all dirty mappings have been processed.
-     */
-
-    dirty_mapping_head_hash.next_dirty = m;
 
 } /* compact_mappings() */
 
@@ -3921,7 +4061,7 @@ add_to_mapping (mapping_t *m1, mapping_t *m2)
         }
     }
     walk_mapping(m2, add_to_mapping_filter, m1);
-}
+} /* add_to_mapping() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -3938,7 +4078,7 @@ sub_from_mapping_filter ( svalue_t *key, svalue_t *data UNUSED
 #    pragma unused(data)
 #endif
     remove_mapping((mapping_t *)extra, key);
-}
+} /* sub_from_mapping_filter() */
 
 /*-------------------------------------------------------------------------*/
 mapping_t *
@@ -3960,7 +4100,131 @@ subtract_mapping (mapping_t *minuend, mapping_t *subtrahend)
     minuend = copy_mapping(minuend);
     walk_mapping(subtrahend, sub_from_mapping_filter, minuend);
     return minuend;
-}
+} /* subtract_mapping() */
+
+/*-------------------------------------------------------------------------*/
+struct map_intersect_s
+{
+    mapping_t * m;   /* Mapping to be intersected */
+    mapping_t * rc;  /* Result mapping */
+};
+
+
+static void
+map_intersect_filter (svalue_t *key, svalue_t *data UNUSED, void *extra)
+
+/* Auxiliary function to map_intersect():
+ * If <key> is in <extra>->m, add the data to <extra>->rc.
+ */
+
+{
+#ifdef __MWERKS__
+#    pragma unused(data)
+#endif
+    mapping_t * m  = ((struct map_intersect_s *)extra)->m;
+    mapping_t * rc = ((struct map_intersect_s *)extra)->rc;
+
+    svalue_t * src;
+
+    src = get_map_value(m, key);
+    if (src != &const0)
+    {
+        int num_values = m->num_values;
+        svalue_t * dest;
+        int j;
+
+        dest = get_map_lvalue(rc, key);
+        if (!dest)
+        {
+            outofmemory("result mapping entry");
+            /* NOTREACHED */
+        }
+        for (j = 0; j < num_values; j++)
+        {
+            assign_svalue(dest+j, src+j);
+        }
+    } /* if found element */
+} /* map_intersect_filter() */
+
+
+mapping_t *
+map_intersect (mapping_t *m, svalue_t * val)
+
+/* Intersect mapping <m> with vector/mapping <val>.
+ *
+ * The result is a new mapping with all those elements of <m> which index
+ * can be found in vector <val>->u.vector resp. as index in mapping
+ * <val>->u.map. Both <m> and <val> are freed.
+ *
+ * Called by interpret to implement F_AND.
+ */
+
+{
+    mapping_t *rc = NULL;
+
+    if (val->type == T_POINTER)
+    {
+        vector_t * vec = val->u.vec;
+        size_t     vecsize = VEC_SIZE(vec);
+        int        num_values = m->num_values;
+        size_t     i;
+
+        rc = allocate_mapping(vecsize, num_values);
+        if (!rc)
+        {
+            outofmemory("result mapping");
+            /* NOTREACHED */
+        }
+
+        for (i = 0; i < vecsize; i++)
+        {
+            svalue_t * src;
+
+            src = get_map_value(m, &vec->item[i]);
+            if (src != &const0)
+            {
+                svalue_t * dest;
+                int j;
+
+                dest = get_map_lvalue(rc, &vec->item[i]);
+                if (!dest)
+                {
+                    outofmemory("result mapping entry");
+                    /* NOTREACHED */
+                }
+                for (j = 0; j < num_values; j++)
+                {
+                    assign_svalue(dest+j, src+j);
+                }
+            } /* if found element */
+        } /* for (i) */
+    }
+    else if (val->type == T_MAPPING)
+    {
+        mapping_t              * map = val->u.map;
+        int                      num_values = m->num_values;
+        struct map_intersect_s   data;
+
+        rc = allocate_mapping(MAP_SIZE(map), num_values);
+        if (!rc)
+        {
+            outofmemory("result mapping");
+            /* NOTREACHED */
+        }
+
+        data.m = m;
+        data.rc = rc;
+        walk_mapping(map, map_intersect_filter, &data);
+    }
+    else
+        fatal("(map_intersect) Illegal type to arg2: %d, "
+              "expected array/mapping."
+             , val->type);
+
+    free_mapping(m);
+    free_svalue(val);
+    return rc;
+} /* map_intersect() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -4118,7 +4382,7 @@ walk_mapping_prologue (mapping_t *m, svalue_t *sp, callback_t *cb)
     read_pointer = write_pointer = pointers + 4;
     walk_mapping(m, f_walk_mapping_filter, &write_pointer);
     return read_pointer;
-}
+} /* walk_mapping_prologue */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -4174,7 +4438,7 @@ f_walk_mapping (svalue_t *sp, int num_arg)
 
     read_pointer = walk_mapping_prologue(m, sp, &cb);
     i = read_pointer[-2].u.number;
-    sp++; /* walk_mapping_prologue() pushed one value */
+    inter_sp = ++sp; /* walk_mapping_prologue() pushed one value */
 
     num_values = m->num_values;
 
@@ -4187,7 +4451,11 @@ f_walk_mapping (svalue_t *sp, int num_arg)
         svalue_t *sp2, *data;
 
         if (!callback_object(&cb))
-            error("Object used by walk_mapping destructed");
+        {
+            error("Object used by walk_mapping destructed.\n");
+            /* NOTREACHED */
+            return NULL;
+        }
 
         /* Push the key */
         assign_svalue_no_free( (sp2 = sp+1), read_pointer++ );
@@ -4251,7 +4519,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
     mapping_t *m;            /* Mapping to filter */
     int         error_index;
     callback_t  cb;
-    int num_values;               /* Width of the mapping */
+    int num_values;          /* Width of the mapping */
     vector_t *dvec;          /* Values of one key */
     svalue_t *dvec_sp;       /* Stackentry of dvec */
     svalue_t *read_pointer;  /* Prepared mapping values */
@@ -4726,6 +4994,59 @@ f_m_reallocate (svalue_t *sp)
 
     return sp;
 } /* f_m_reallocate() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_m_entry (svalue_t *sp)
+
+/* TEFUN m_entry()
+ *
+ *    mixed * m_entry (mapping m, mixed key)
+ *
+ * Query the mapping <m> for key <key> and return all values for this
+ * key as array.
+ * If the mapping does not contain an entry for <key>, svalue-0 is
+ * returned.
+ */
+
+{
+    svalue_t * data;
+    vector_t * rc;
+
+    /* Test and get arguments */
+    if (sp[-1].type != T_MAPPING)
+    {
+        bad_xefun_arg(1, sp);
+        /* NOTREACHED */
+        return sp;
+    }
+
+    data = get_map_value(sp[-1].u.map, sp);
+    if (&const0 != data)
+    {
+        int num_values = sp[-1].u.map->num_values;
+        int i;
+
+        rc = allocate_array(num_values);
+
+        for (i = 0; i < num_values; i++)
+        {
+            assign_svalue(rc->item+i, data+i);
+        }
+    }
+    else
+        rc = NULL;
+
+    free_svalue(sp); sp--;
+    free_svalue(sp);
+
+    if (rc)
+        put_array(sp, rc);
+    else
+        put_number(sp, 0);
+
+    return sp;
+} /* f_m_entry() */
 
 /***************************************************************************/
 

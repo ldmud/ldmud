@@ -28,13 +28,13 @@ void init()
 }
 
 int tes(string str)
-{   
+{
     printf("VERB:%O STR:%O\n",query_verb(),str);
     return 1;
 }
 
 Bisher:
-> Xabc   
+> Xabc
 VERB:"Xabc" STR:"abc"
 > AAAAAabc
 VERB:"AAAAAabc" STR:"abc"
@@ -131,7 +131,7 @@ Ich habe mal ein diff angehaengt, das das behebt.
              push_volatile_string(&buff[length+1]);
              ret = sapply(sa->function, sa->ob, 1);
 @@ -1158,10 +1172,16 @@
- 
+
          if (flag)
          {
 -            p->sent.type = SENT_NO_SPACE;
@@ -247,7 +247,7 @@ Schaue es dir mal an.
          p->verb = str;
          p->sent.type = SENT_PLAIN;
 +	p->short_verb = 0;
- 
+
          if (flag)
          {
 -            p->sent.type = SENT_NO_SPACE;

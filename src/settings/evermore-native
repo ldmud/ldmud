@@ -1,4 +1,4 @@
-#!/bin/sh    
+#!/bin/sh
 #
 # Settings for the Evermore mudlib greater v 1.4.0 (Native Mode)
 #
@@ -61,7 +61,7 @@ enable_supply_parse_command=no
 # its better as getting errors
 enable_dynamic_costs=yes
 
-# we want mysql 
+# we want mysql
 enable_use_mysql=yes
 
 # but we do not want old names for efuns

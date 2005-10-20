@@ -6,16 +6,16 @@ State: New
 
 Hi Lars,
 
-ich wuerde gerne einen bestimmten Bereich von Bits aus einem Bitstring an 
-eine bestimmte Stelle in einen anderen Bitstring einfuegen. Im Moment ist das 
-nicht effizient zu loesen, wenn die Bereiche nicht durch 6 teilbar sind, da 
+ich wuerde gerne einen bestimmten Bereich von Bits aus einem Bitstring an
+eine bestimmte Stelle in einen anderen Bitstring einfuegen. Im Moment ist das
+nicht effizient zu loesen, wenn die Bereiche nicht durch 6 teilbar sind, da
 es noch keine Moeglichkeit gibt, die Bits in den Bitstrings zu verschieben.
 
-Eventuell koennte man ja sowas wie copy_bits(string source, string dest, int 
-sourcestart, int sourcelen, int deststart) realisieren, und eventuell sogar 
+Eventuell koennte man ja sowas wie copy_bits(string source, string dest, int
+sourcestart, int sourcelen, int deststart) realisieren, und eventuell sogar
 bestehende bitshift-operatoren mit Bitstrings arbeiten lassen?
 
-Ich  habe versucht, das selbst zu implementieren, aber bin mal wieder an 
+Ich  habe versucht, das selbst zu implementieren, aber bin mal wieder an
 fehlendem Durchblick & mangelnder C-Kenntnis gescheitert :-(
 
 Gruss

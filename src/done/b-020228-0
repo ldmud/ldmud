@@ -448,7 +448,7 @@ Logfiles haengen wie ueblich an, Cores sind nicht brauchbar (bin
 mittlerweile schon bei nur mit -g compilieren angelangt - ich find nicht
 raus woran das liegt, ist evtl. wirklich das System)
 
--- 
+--
 Markus Peter - SPiN AG
 warp@spin.de
 
@@ -2142,11 +2142,11 @@ Subject: Crash in 3.2.9-400
 Date: Tue, 12 Feb 2002 17:51:07 +0100
 
 
-Hmm.. Wir hatten im final heute wieder einen crash im final.. 
+Hmm.. Wir hatten im final heute wieder einen crash im final..
 Ich hab aber beim compilieren alle optimierungen weggelassen und
 offenbar hat das auch dem core file gutgetan:
 
-> Was war nochmal die letzte Version, die ihr vor  .400 verwendet 
+> Was war nochmal die letzte Version, die ihr vor  .400 verwendet
 > hattet?
 
 Hmm.. Also davor haben wir den 389 benutzt... Aber der ist wohl auch
@@ -2346,7 +2346,7 @@ Subject: 410 backtrace
 In-Reply-To: <00039b7cd93c602e_mailit@localhost>
 
 
-Here's the trace from the 410 crash. 
+Here's the trace from the 410 crash.
 
 (gdb) backtrace full
 #0  0xff1b3304 in ?? ()
@@ -2384,7 +2384,7 @@ Subject: dev 404 driver
 Not sure if this will help in debugging dev 404, but here is the log file
 from a crash we had tonight.  This "init_room" is moving a cloud object
 around the mud that players can climb up on to (simple up add_action) to
-the cloud.  
+the cloud.
 
 - Ron (Caper@PixieMud)
 
@@ -3002,35 +3002,35 @@ dem crash. lpmud.log sichern wir nicht.
 Was tun?
 
 (gdb) print *ob
-$1 = {flags = 722, ref = 0, total_light = 0, time_reset = 927712, 
-  time_of_ref = 585882, load_time = 45375528, load_id = 524288, 
-  extra_ref = 33496952, prog = 0x90001, name = 0x33afb0 "a", 
-  load_name = 0x90001 "\002@\bÐ", next_all = 0x3526f8, prev_all = 0x90001, 
-  next_hash = 0x35274c, next_inv = 0x90001, contains = 0x3527a0, 
-  super = 0x90001, sent = 0x3527f4, user = 0x90001, eff_user = 0x346794, 
-  extra_num_variables = 589825, variables = 0x34868c, ticks = 589825, 
+$1 = {flags = 722, ref = 0, total_light = 0, time_reset = 927712,
+  time_of_ref = 585882, load_time = 45375528, load_id = 524288,
+  extra_ref = 33496952, prog = 0x90001, name = 0x33afb0 "a",
+  load_name = 0x90001 "\002@\bÐ", next_all = 0x3526f8, prev_all = 0x90001,
+  next_hash = 0x35274c, next_inv = 0x90001, contains = 0x3527a0,
+  super = 0x90001, sent = 0x3527f4, user = 0x90001, eff_user = 0x346794,
+  extra_num_variables = 589825, variables = 0x34868c, ticks = 589825,
   gigaticks = 3481464}
 
 (gdb) print *(ob->prev_all)
-$2 = {flags = 576, ref = 14681216, total_light = -24032, 
-  time_reset = -2145335529, time_of_ref = 299472, load_time = 48477394, 
-  load_id = 14682258, extra_ref = 37750996, prog = 0x8e00710, 
-  name = 0x8020c1d4 <Address 0x8020c1d4 out of bounds>, 
-  load_name = 0x2a600213 <Address 0x2a600213 out of bounds>, 
-  next_all = 0x498d0, prev_all = 0x2630480, next_hash = 0xa22000b6, 
-  next_inv = 0x10000935, contains = 0x49804, super = 0x8000142d, 
-  sent = 0x67019, user = 0x491a2, eff_user = 0x10001ba8, 
-  extra_num_variables = 383976614, variables = 0x1323b47f, ticks = 4293075408, 
+$2 = {flags = 576, ref = 14681216, total_light = -24032,
+  time_reset = -2145335529, time_of_ref = 299472, load_time = 48477394,
+  load_id = 14682258, extra_ref = 37750996, prog = 0x8e00710,
+  name = 0x8020c1d4 <Address 0x8020c1d4 out of bounds>,
+  load_name = 0x2a600213 <Address 0x2a600213 out of bounds>,
+  next_all = 0x498d0, prev_all = 0x2630480, next_hash = 0xa22000b6,
+  next_inv = 0x10000935, contains = 0x49804, super = 0x8000142d,
+  sent = 0x67019, user = 0x491a2, eff_user = 0x10001ba8,
+  extra_num_variables = 383976614, variables = 0x1323b47f, ticks = 4293075408,
   gigaticks = 73598162}
 
 (gdb) print *(ob->next_all)
-$3 = {flags = 25088, ref = 805306379, total_light = 52, time_reset = 5, 
-  time_of_ref = 1962105, load_time = 811336, load_id = 519, 
-  extra_ref = 655594590, prog = 0x17c51c8, name = 0x3526f8 "b", 
-  load_name = 0x1d "", next_all = 0x17c5cb0, prev_all = 0x3000000a, 
-  next_hash = 0x340efc, next_inv = 0x5, contains = 0x1df079, super = 0xc6148, 
-  sent = 0x1f3, user = 0x4e62041a, eff_user = 0x47e94c, 
-  extra_num_variables = 23, variables = 0x63000000, ticks = 805306379, 
+$3 = {flags = 25088, ref = 805306379, total_light = 52, time_reset = 5,
+  time_of_ref = 1962105, load_time = 811336, load_id = 519,
+  extra_ref = 655594590, prog = 0x17c51c8, name = 0x3526f8 "b",
+  load_name = 0x1d "", next_all = 0x17c5cb0, prev_all = 0x3000000a,
+  next_hash = 0x340efc, next_inv = 0x5, contains = 0x1df079, super = 0xc6148,
+  sent = 0x1f3, user = 0x4e62041a, eff_user = 0x47e94c,
+  extra_num_variables = 23, variables = 0x63000000, ticks = 805306379,
   gigaticks = 3411708}
 
 
@@ -3238,45 +3238,45 @@ DEBUG: (swap.c:669) free_prog(0x81ea878 'dom/admin/command/admin.c') ref 0
 DEBUG: (swap.c:669) free_prog(0x8338ac8 'daemon/genermsgd.c') ref 0
 DEBUG: (swap.c:669) free_prog(0x82bd650 'command/objects.c') ref 0
 ]Done.
-2002.03.27 00:48:19 daemon/intermud0/inetd.c: Illegal to redeclare local name line 88 
-2002.03.27 00:48:19 daemon/intermud0/inetd.c: Bad assignment ( string vs string *) line 90 
-2002.03.27 00:48:19 daemon/intermud0/inetd.c: Variable name not declared ! line 98 
-2002.03.27 00:48:19 daemon/intermud0/inetd.c: Bad arg 1 type to lower_case(): got int, expected string; line 98 
-2002.03.27 00:48:19 daemon/intermud0/inetd.c: Variable name not declared ! line 99 
-2002.03.27 00:48:19 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107 
+2002.03.27 00:48:19 daemon/intermud0/inetd.c: Illegal to redeclare local name line 88
+2002.03.27 00:48:19 daemon/intermud0/inetd.c: Bad assignment ( string vs string *) line 90
+2002.03.27 00:48:19 daemon/intermud0/inetd.c: Variable name not declared ! line 98
+2002.03.27 00:48:19 daemon/intermud0/inetd.c: Bad arg 1 type to lower_case(): got int, expected string; line 98
+2002.03.27 00:48:19 daemon/intermud0/inetd.c: Variable name not declared ! line 99
+2002.03.27 00:48:19 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107
 2002.03.27 00:48:19 Error in loading object: 'daemon/intermud0/inetd'.
-2002.03.27 00:48:47 daemon/intermud0/inetd.c: Illegal to redeclare local name line 88 
-2002.03.27 00:48:47 daemon/intermud0/inetd.c: Bad assignment ( string vs string *) line 90 
-2002.03.27 00:48:47 daemon/intermud0/inetd.c: Variable name not declared ! line 98 
-2002.03.27 00:48:47 daemon/intermud0/inetd.c: Bad arg 1 type to lower_case(): got int, expected string; line 98 
-2002.03.27 00:48:47 daemon/intermud0/inetd.c: Variable name not declared ! line 99 
-2002.03.27 00:48:47 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107 
+2002.03.27 00:48:47 daemon/intermud0/inetd.c: Illegal to redeclare local name line 88
+2002.03.27 00:48:47 daemon/intermud0/inetd.c: Bad assignment ( string vs string *) line 90
+2002.03.27 00:48:47 daemon/intermud0/inetd.c: Variable name not declared ! line 98
+2002.03.27 00:48:47 daemon/intermud0/inetd.c: Bad arg 1 type to lower_case(): got int, expected string; line 98
+2002.03.27 00:48:47 daemon/intermud0/inetd.c: Variable name not declared ! line 99
+2002.03.27 00:48:47 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107
 2002.03.27 00:48:47 Error in loading object: 'daemon/intermud0/inetd'.
-2002.03.27 00:48:48 daemon/intermud0/inetd.c: Illegal to redeclare local name line 88 
-2002.03.27 00:48:48 daemon/intermud0/inetd.c: Bad assignment ( string vs string *) line 90 
-2002.03.27 00:48:48 daemon/intermud0/inetd.c: Variable name not declared ! line 98 
-2002.03.27 00:48:48 daemon/intermud0/inetd.c: Bad arg 1 type to lower_case(): got int, expected string; line 98 
-2002.03.27 00:48:48 daemon/intermud0/inetd.c: Variable name not declared ! line 99 
-2002.03.27 00:48:48 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107 
+2002.03.27 00:48:48 daemon/intermud0/inetd.c: Illegal to redeclare local name line 88
+2002.03.27 00:48:48 daemon/intermud0/inetd.c: Bad assignment ( string vs string *) line 90
+2002.03.27 00:48:48 daemon/intermud0/inetd.c: Variable name not declared ! line 98
+2002.03.27 00:48:48 daemon/intermud0/inetd.c: Bad arg 1 type to lower_case(): got int, expected string; line 98
+2002.03.27 00:48:48 daemon/intermud0/inetd.c: Variable name not declared ! line 99
+2002.03.27 00:48:48 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107
 2002.03.27 00:48:48 Error in loading object: 'daemon/intermud0/inetd'.
-2002.03.27 00:49:12 daemon/intermud0/inetd.c: Bad assignment ( string vs string *) line 90 
-2002.03.27 00:49:12 daemon/intermud0/inetd.c: Variable name not declared ! line 98 
-2002.03.27 00:49:12 daemon/intermud0/inetd.c: Bad arg 1 type to lower_case(): got int, expected string; line 98 
-2002.03.27 00:49:12 daemon/intermud0/inetd.c: Variable name not declared ! line 99 
-2002.03.27 00:49:12 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107 
-2002.03.27 00:49:12 daemon/intermud0/inetd.c: Bad arg 1 type to explode(): got int, expected string; line 108 
+2002.03.27 00:49:12 daemon/intermud0/inetd.c: Bad assignment ( string vs string *) line 90
+2002.03.27 00:49:12 daemon/intermud0/inetd.c: Variable name not declared ! line 98
+2002.03.27 00:49:12 daemon/intermud0/inetd.c: Bad arg 1 type to lower_case(): got int, expected string; line 98
+2002.03.27 00:49:12 daemon/intermud0/inetd.c: Variable name not declared ! line 99
+2002.03.27 00:49:12 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107
+2002.03.27 00:49:12 daemon/intermud0/inetd.c: Bad arg 1 type to explode(): got int, expected string; line 108
 2002.03.27 00:49:12 Error in loading object: 'daemon/intermud0/inetd'.
-2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable name not declared ! line 98 
-2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable name not declared ! line 99 
-2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107 
-2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 109 
-2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 109 
-2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable name not declared ! line 117 
+2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable name not declared ! line 98
+2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable name not declared ! line 99
+2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107
+2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 109
+2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 109
+2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable name not declared ! line 117
 2002.03.27 00:49:32 Error in loading object: 'daemon/intermud0/inetd'.
-2002.03.27 00:49:44 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107 
-2002.03.27 00:49:44 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 109 
-2002.03.27 00:49:44 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 109 
-2002.03.27 00:49:44 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 121 
+2002.03.27 00:49:44 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107
+2002.03.27 00:49:44 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 109
+2002.03.27 00:49:44 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 109
+2002.03.27 00:49:44 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 121
 2002.03.27 00:49:44 Error in loading object: 'daemon/intermud0/inetd'.
 DEBUG: (swap.c:669) free_prog(0x81ea878 'daemon/mail.c') ref 0
 DEBUG: (swap.c:669) free_prog(0x81a9bf4 'kernel/player_dummy.c') ref 0

@@ -252,7 +252,7 @@ And here is what calls it:
 save_me() {
   if (mappingp(all_data))
   {
-    log_file("VGRID_CRASH", 
+    log_file("VGRID_CRASH",
       sprintf("all data map: %O\n",all_data) );
     walk_mapping(all_data, #'save_set);
   }
@@ -370,13 +370,13 @@ Lars Duening wrote:
 Hi again.  Right now, the mapping gets it's data via a restore_object().
 There is the possibility that the mapping could chage, but not in any
 of the tests I ran.  The data only changes when someone adds a new
-terrain type (or modifies one). 
- 
+terrain type (or modifies one).
+
 > If the data comes indeed from a restore, make a backup copy of the
 > savefile (just in case), comment out the restore_object() call and
 > replace it with a manual setup of the mapping with the exact same
 > data usually restored from the savefile.
-> 
+>
 > If this with walk_mapping() and save_object() in place causes the
 > crashes to vanish, the culprit is most likely restore_object() in
 > combination with the restored data and the data in all_data at the
@@ -394,18 +394,18 @@ an error).  I'll include those errors below.
 > >       get the same backtrace each time the driver dumps core and it
 > >       always happens immediately after the weirdness with terrain_d.c
 > >       cleanup.
-> 
+>
 > Do you already have a clue what exactly goes wrong during this
 > 'weirdness'?
 
 What I think is happening is that the object is being pulled out from
 under itself and dested before/during the walk_mapping and the driver
-can't deal with the closure/mapping once that's happened.  This virtual 
-grid implemention is a bit over convoluted with regard to handling 
+can't deal with the closure/mapping once that's happened.  This virtual
+grid implemention is a bit over convoluted with regard to handling
 clean_up()'s and I suspect something isn't quite right with this
-object (terrain_d).  Looking at the driver files called, backend 
+object (terrain_d).  Looking at the driver files called, backend
 is calling remove_destructed_objects() and so on up to where the
-mappings are supposed to be deallocated - only they can't. 
+mappings are supposed to be deallocated - only they can't.
 
 Just a few minutes ago, I switched terrain_d to inherit our "regular"
 /std/Object file and now it works fine with no errors (because it's no
@@ -413,7 +413,7 @@ longer doing clean_up() the vgrid way).  This isn't really a problem
 because terrain_d is a daemon that configures terrain types.  I don't
 see why it ever was inheriting the virtual rooms/container objects.
 
-Getting back to the crash, here are a few more logs.  
+Getting back to the crash, here are a few more logs.
 
 On the 3.2.7 driver, I get the following error messages for the
 the original terrain_d in the run-time log.  The driver doesn't
@@ -480,7 +480,7 @@ In the case of map(), the driver won't crash.
 
 As I said, I've found a way to fix the problem by staying away from the
 virtual
-grid inheritables for the terrain_d daemon.  
+grid inheritables for the terrain_d daemon.
 
 - Ron
 

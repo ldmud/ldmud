@@ -67,7 +67,7 @@ Memory allocated:      20302
 Requests: 26162 - Found: 26118 (99.8%) - Coll: 0 (0.0% req/0.0% entries)
 
 
-And 'status' command shows: 
+And 'status' command shows:
 
 Actions:                            2568    61632
 Shadows:                              11      264

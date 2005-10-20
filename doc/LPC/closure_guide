@@ -226,6 +226,13 @@ Table of Contents
                   quote(({ 10,50,30,70 }))
                }))
 
+    For array constants, you can also use a single quote to the same
+    effect:
+
+      lambda(0,({ (#'sizeof),
+                  '({ 10,50,30,70 })
+               }))
+
     This lambda-closure points to a function that will return 4 (it will
     call sizeof() for the array ({ 10,50,30,70 })). Another thing: if
     we want to create a function that expects no arguments, we can give
@@ -264,7 +271,7 @@ Table of Contents
     filter_array() is executed, even though the created code is always the
     same.
 
-    'Why lambdas at all then?' you may ask now. Well, read on.
+    'Why use lambdas at all then?' you may ask now. Well, read on.
 
 
 2.3.1 Advantages of Lambda Closures
@@ -508,10 +515,16 @@ Table of Contents
            returns 0.
 
       #'catch executes the closure given as argument, but catches any
-           runtime error (see catch(E)). Optionally the symbol 'nolog
-           may be given as third argument to suppress the log of any
-           caught error.
+           runtime error (see catch(E)). Optionally the symbols 'nolog
+           and 'publish may be given as additional arguments to modify
+           the behaviour of the catch.
 
+      #'sscanf acts similar to how a funcall would, but passes the third
+           and following arguments as lvalues, that is, values which can
+           be assigned to.
+
+      #'= and the #'<op>= variants are also special because the first
+           argument has to be an lvalue.
 
 2.4 Closures with Strange Names
 
@@ -627,23 +640,25 @@ Table of Contents
     #',
     #'?
     #'?!
+    #'=
+    #'<op>=
+    #'++
+    #'--
     #'break
+    #'catch
     #'continue
     #'default
     #'do
+    #'foreach
     #'return
+    #'sscanf
     #'switch
     #'while
     #'({
     #'([
-    #'[<..] (but not the other versions !)
-    #'!        (this really is an operator which could be a flaw, too;
-                thanx to Fiona@Wunderland for reporting this :-)
 
     #'.. is very likely to be an operator closure too, but since it is
     not implemented yet, I cannot say for sure.
-
-    I also deem the fact that #'([<.. is an operator closure a bug.
 
 2.6 Variable-Closures
 
@@ -662,6 +677,8 @@ Table of Contents
 
     Anybody who now calls object->foo() will get a closure which will, when
     evaluated, write the actual value of object's global variable x.
+
+    Variable closures do not accept arguments.
 
 3 Examples
 

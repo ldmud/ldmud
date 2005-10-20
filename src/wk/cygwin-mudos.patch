@@ -8,7 +8,7 @@ diff -p ../mudos/v22.2a25/GNUmakefile.in ./GNUmakefile.in
   	-rm -f func_spec.cpp applies.h applies_table.c files
 ! 	-rm -f grammar.y comptest* a.out
   	-rm -f packages/Makefile packages/GNUmakefile packages/packages
-  
+
   # remove everything except configuration
 --- 214,220 ----
   	-rm -f opcodes.h efunctions.h opc.h efun_protos.h
@@ -16,7 +16,7 @@ diff -p ../mudos/v22.2a25/GNUmakefile.in ./GNUmakefile.in
   	-rm -f func_spec.cpp applies.h applies_table.c files
 ! 	-rm -f grammar.y comptest* $(A_OUT)
   	-rm -f packages/Makefile packages/GNUmakefile packages/packages
-  
+
   # remove everything except configuration
 diff -p ../mudos/v22.2a25/arch.h ./arch.h
 *** ../mudos/v22.2a25/arch.h	Wed Mar 04 09:49:56 1998
@@ -26,7 +26,7 @@ diff -p ../mudos/v22.2a25/arch.h ./arch.h
 --- 7,27 ----
   #define ARCH "Sequent DYNIX"
   #endif
-  
+
 + /*
 +  * Note - Cygwin runs under windows and automatically
 +  * defines a number of windows related things. These
@@ -41,7 +41,7 @@ diff -p ../mudos/v22.2a25/arch.h ./arch.h
 + #undef WIN32
 + #define ARCH "Cygwin-32"
 + #endif
-+ 
++
   #ifdef WINNT
   #define ARCH "Microsoft Windows NT"
   #endif
@@ -51,9 +51,9 @@ diff -p ../mudos/v22.2a25/build.MudOS ./build.MudOS
 *************** INSTALL_DIR="../bin"
 *** 129,134 ****
 --- 129,146 ----
-  
+
   echo "Trying out some stuff to see what works; ignore errors ..."
-  
+
 + #
 + # Determine if running under Cygwin-32 and use a.exe instead
 + # of a.out if so
@@ -62,20 +62,20 @@ diff -p ../mudos/v22.2a25/build.MudOS ./build.MudOS
 +   A_OUT=a.exe
 +   echo Using a.exe for Cygwin GNU compiler default executable
 + else
-+   A_OUT=a.out 
++   A_OUT=a.out
 +   echo Using standard a.out for compiler default executable
 + fi
-+ 
-  # 
++
+  #
   # Figure out what make is, and how to invoke it
-  # 
+  #
 *************** int main() {
 *** 339,345 ****
   }
   END
   $CC $CFLAGS comptest.c
 ! ARCH=`./a.out`
-  
+
   case $ARCH in
       AIX)
 --- 351,357 ----
@@ -83,7 +83,7 @@ diff -p ../mudos/v22.2a25/build.MudOS ./build.MudOS
   END
   $CC $CFLAGS comptest.c
 ! ARCH=`./$A_OUT`
-  
+
   case $ARCH in
       AIX)
 *************** esac
@@ -101,7 +101,7 @@ diff -p ../mudos/v22.2a25/build.MudOS ./build.MudOS
 ! if test ! -f a.out; then
       STR="-Dstrchr=index -Dstrrchr=rindex"
   fi
-  
+
 ! rm a.out
   cat >comptest.c <<END
   int main() {
@@ -112,7 +112,7 @@ diff -p ../mudos/v22.2a25/build.MudOS ./build.MudOS
 ! if test ! -f a.out; then
       STRFUNCS=strfuncs.o
   fi
-  
+
 --- 369,393 ----
   #
   # check for some missing functions
@@ -127,7 +127,7 @@ diff -p ../mudos/v22.2a25/build.MudOS ./build.MudOS
 ! if test ! -f $A_OUT; then
       STR="-Dstrchr=index -Dstrrchr=rindex"
   fi
-  
+
 ! rm $A_OUT
   cat >comptest.c <<END
   int main() {
@@ -138,7 +138,7 @@ diff -p ../mudos/v22.2a25/build.MudOS ./build.MudOS
 ! if test ! -f $A_OUT; then
       STRFUNCS=strfuncs.o
   fi
-  
+
 *************** echo YACC=$YACC >>Makefile.tmp
 *** 397,402 ****
 --- 409,415 ----
@@ -146,7 +146,7 @@ diff -p ../mudos/v22.2a25/build.MudOS ./build.MudOS
   echo A=a >>Makefile.tmp
   echo O=o >>Makefile.tmp
 + echo A_OUT=$A_OUT >>Makefile.tmp
-  
+
   echo "***************** Configuration completed **************"
   echo "Installing MudOS on $ARCH"
 diff -p ../mudos/v22.2a25/efuns_port.c ./efuns_port.c
@@ -172,7 +172,7 @@ diff -p ../mudos/v22.2a25/efuns_port.c ./efuns_port.c
 diff -p ../mudos/v22.2a25/socket_ctrl.c ./socket_ctrl.c
 *** ../mudos/v22.2a25/socket_ctrl.c	Thu Nov 05 20:37:50 1998
 --- ./socket_ctrl.c	Thu Mar 04 12:14:44 1999
-*************** INLINE int set_socket_owner P2(int, fd, 
+*************** INLINE int set_socket_owner P2(int, fd,
 *** 21,27 ****
   #ifdef OLD_ULTRIX
       return fcntl(fd, F_SETOWN, which);

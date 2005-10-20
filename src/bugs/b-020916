@@ -48,9 +48,9 @@ Loaded symbols for /lib/libnss_files.so.2
 #5  0x080a746f in f_save_object (sp=0x810f528, numarg=1) at object.c:1845
 #6  0x080744ba in eval_instruction (
     first_instruction=0x83e3353 "\005:S\n\a\030\004\020\001L\rY:&\026#2\204+\203\t\001", initial_sp=0x810f520) at interpret.c:6384
-#7  0x080933ac in apply_low (fun=0x8c07664 "save", ob=0x99160ac, num_arg=0, 
+#7  0x080933ac in apply_low (fun=0x8c07664 "save", ob=0x99160ac, num_arg=0,
     b_ign_prot=0) at interpret.c:20827
-#8  0x080939e2 in sapply_int (fun=0x8c07664 "save", ob=0x99160ac, num_arg=0, 
+#8  0x080939e2 in sapply_int (fun=0x8c07664 "save", ob=0x99160ac, num_arg=0,
     b_find_static=0) at interpret.c:21049
 #9  0x08093a83 in apply (fun=0x8c07664 "save", ob=0x99160ac, num_arg=0)
     at interpret.c:21087
@@ -59,7 +59,7 @@ Loaded symbols for /lib/libnss_files.so.2
 #11 0x08053192 in call_out () at call_out.c:436
 #12 0x080514bd in backend () at backend.c:657
 #13 0x0809ebec in main (argc=58, argv=0xbffff684) at main.c:470
-(gdb) 
+(gdb)
 
 Er gab 4 Sekunden folgende Meldung aus:
 2002.09.16 00:22:33 Garbage collection (slow_shut to do: 0, time since last gc: 1032128553)
@@ -81,7 +81,7 @@ Hi,
 
 Lars Duening schrieb:
 > Gnomi wrote:
-> 
+>
 > >Hallo!
 > >
 > >Der LDMud 3.2.9 dev545 hat ein Core produziert:
@@ -105,7 +105,7 @@ Subject: Re: Segmentation fault
 
 Lars Duening schrieb:
 > Gnomi wrote:
-> 
+>
 > >Hallo!
 > >
 > >Der LDMud 3.2.9 dev545 hat ein Core produziert:
@@ -124,13 +124,13 @@ diesen Crash. Diesen Haertetest fuehre ich nicht in UNItopia selbst durch...
 > Hmm, ich kann keine Aenderungen seit 446 finden, die dieses Verhalten
 > erklaeren koennten. Andererseits gab es Meldungen, dass save_object() seit
 > .450 ueber mappings stolpert - wiederum unerklaerbar.
-> 
+>
 > Ist dieser Crash reproduzierbar?
 
 Urgs. Also wenn ich nur den letzten Teil des Testes (wo er auch gecrasht
-ist) durchfuehre, dann nicht. 
+ist) durchfuehre, dann nicht.
 
-> 
+>
 > >#0  build_block (ptr=0xc1d46a4, size=5908) at smalloc.c:1841
 > >1841       *(ptr+size-1) = size;        /* copy the size information */
 > >(gdb) bt
@@ -142,7 +142,7 @@ ist) durchfuehre, dann nicht.
 > >#3  0x080a5dad in mempool_delete (pPool=0xc059580) at mempools.c:603
 > >#4  0x080b6ac7 in free_pointer_table (ptable=0xbeb17c4) at ptrtable.c:116
 > >#5  0x080a746f in f_save_object (sp=0x810f528, numarg=1) at object.c:1845
-> 
+>
 > Was sind *sp und *current_object in diesem Frame?
 
 (gdb) print sp
@@ -150,23 +150,23 @@ $1 = (svalue_t *) 0x810f528
 (gdb) print current_object
 $2 = (object_t *) 0x99160ac
 (gdb) print *sp
-$3 = {type = 3, x = {string_type = 2, exponent = 2, closure_type = 2, 
+$3 = {type = 3, x = {string_type = 2, exponent = 2, closure_type = 2,
     quotes = 2, num_arg = 2, extern_args = 2, generic = 2}, u = {
-    string = 0x8c07140 "/p/Registry/registry", number = 146829632, 
-    ob = 0x8c07140, vec = 0x8c07140, map = 0x8c07140, lambda = 0x8c07140, 
-    mantissa = 146829632, cb = 0x8c07140, lvalue = 0x8c07140, 
-    protected_lvalue = 0x8c07140, protected_char_lvalue = 0x8c07140, 
+    string = 0x8c07140 "/p/Registry/registry", number = 146829632,
+    ob = 0x8c07140, vec = 0x8c07140, map = 0x8c07140, lambda = 0x8c07140,
+    mantissa = 146829632, cb = 0x8c07140, lvalue = 0x8c07140,
+    protected_lvalue = 0x8c07140, protected_char_lvalue = 0x8c07140,
     protected_range_lvalue = 0x8c07140, error_handler = 0x8c07140}}
 (gdb) print *current_object
-$4 = {flags = 1536, ref = 9, total_light = 0, time_reset = 1032128597, 
-  time_of_ref = 1032128557, load_time = 1032126832, load_id = 427, 
-  extra_ref = 0, prog = 0x83e3090, name = 0x983372c "p/Registry/registry", 
-  load_name = 0x8c07140 "/p/Registry/registry", next_all = 0x9915dbc, 
-  prev_all = 0x9982dd0, next_hash = 0x0, next_inv = 0x0, contains = 0x0, 
-  super = 0x0, sent = 0x0, user = 0x9916da4, eff_user = 0x9916da4, 
-  extra_num_variables = 59, variables = 0x83e468c, ticks = 547724, 
+$4 = {flags = 1536, ref = 9, total_light = 0, time_reset = 1032128597,
+  time_of_ref = 1032128557, load_time = 1032126832, load_id = 427,
+  extra_ref = 0, prog = 0x83e3090, name = 0x983372c "p/Registry/registry",
+  load_name = 0x8c07140 "/p/Registry/registry", next_all = 0x9915dbc,
+  prev_all = 0x9982dd0, next_hash = 0x0, next_inv = 0x0, contains = 0x0,
+  super = 0x0, sent = 0x0, user = 0x9916da4, eff_user = 0x9916da4,
+  extra_num_variables = 59, variables = 0x83e468c, ticks = 547724,
   gigaticks = 0}
-(gdb) 
+(gdb)
 
 Das  /p/Registry/registry hat ein Mapping der Form
    ([
@@ -191,16 +191,16 @@ Content-Transfer-Encoding: 7bit
 
 Lars Duening schrieb:
 > >(gdb) print *current_object
-> >$4 = {flags = 1536, ref = 9, total_light = 0, time_reset = 1032128597, 
-> >  time_of_ref = 1032128557, load_time = 1032126832, load_id = 427, 
-> >  extra_ref = 0, prog = 0x83e3090, name = 0x983372c "p/Registry/registry", 
-> >  load_name = 0x8c07140 "/p/Registry/registry", next_all = 0x9915dbc, 
-> >  prev_all = 0x9982dd0, next_hash = 0x0, next_inv = 0x0, contains = 0x0, 
-> >  super = 0x0, sent = 0x0, user = 0x9916da4, eff_user = 0x9916da4, 
-> >  extra_num_variables = 59, variables = 0x83e468c, ticks = 547724, 
+> >$4 = {flags = 1536, ref = 9, total_light = 0, time_reset = 1032128597,
+> >  time_of_ref = 1032128557, load_time = 1032126832, load_id = 427,
+> >  extra_ref = 0, prog = 0x83e3090, name = 0x983372c "p/Registry/registry",
+> >  load_name = 0x8c07140 "/p/Registry/registry", next_all = 0x9915dbc,
+> >  prev_all = 0x9982dd0, next_hash = 0x0, next_inv = 0x0, contains = 0x0,
+> >  super = 0x0, sent = 0x0, user = 0x9916da4, eff_user = 0x9916da4,
+> >  extra_num_variables = 59, variables = 0x83e468c, ticks = 547724,
 > >  gigaticks = 0}
-> >(gdb) 
-> 
+> >(gdb)
+>
 > Waere es moeglich, die fuer die Registry benoetigten LPC-Dateien und das
 > letzte Savefile zu haben?
 
@@ -229,7 +229,7 @@ Alexander Motzkau:
 > Lars Duening schrieb:
 > > Say, when you had your mapping/save_object() problems - was the driver by
 > > chance compiled with USE_PTHREADS?
-> 
+>
 > Hmm, ein Grep ueber die Driversourcen ergab kein solches Define.
 > Allerdings wurde inzwischen Patches zum 457 druebergejagt, daher die Frage
 > an Freaky: Wurde der dev454 mit USE_PTHREADS kompiliert?
@@ -240,7 +240,7 @@ Ich habe nur die normalen Patches applied.
 Ciao
 		Freaky
 
--- 
+--
 Frank 'Freaky' Kirschner
 UNItopia Admin                          http://UNItopia.uni-stuttgart.de/
 Freaky@UNItopia.Uni-Stuttgart.DE      telnet://UNItopia.uni-stuttgart.de/
@@ -255,14 +255,14 @@ It's possible that it was (to alleviate the socket errors that we were
 having).
 
 -----Original Message-----
-From: Lars Duening [mailto:lars@bearnip.com] 
+From: Lars Duening [mailto:lars@bearnip.com]
 Sent: Saturday, September 21, 2002 9:40 AM
 To: Bill Andrulonis
 Subject: Re: Segmentation fault
 
 Say, when you had your mapping/save_object() problems - was the driver by
 chance compiled with USE_PTHREADS?
--- 
+--
 Lars Duening; lars@bearnip.com
 PGP Key: http://www.bearnip.com/lars/pgp-lars.asc
 
@@ -280,10 +280,10 @@ Content-Transfer-Encoding: 7bit
 
 Lars Duening schrieb:
 > Gnomi wrote:
-> 
+>
 > >Lars Duening schrieb:
 > >> Gnomi wrote:
-> >> 
+> >>
 > >> >Hallo!
 > >> >
 > >> >Der LDMud 3.2.9 dev545 hat ein Core produziert:
@@ -300,12 +300,12 @@ Lars Duening schrieb:
 > es
 > >diesen Crash. Diesen Haertetest fuehre ich nicht in UNItopia selbst
 > durch...
-> 
+>
 > Hast du den Code/wasuauchimmer fuer den Haertetest verfuegbar? Ich wuerde
 > gern versuchen, ihn im kleinen hier nachzuvollziehen.
 
 Liegt anbei. Man startet es mit check_path(Pfad), wobei in der Datei
-Pfad+"/FILES" eine Liste aller zu ladenden Dateien im Format 
+Pfad+"/FILES" eine Liste aller zu ladenden Dateien im Format
 'Groesse<Tabulator>vollstaendiger Dateiname' enthaelt (wie es z.B. von 'du'
 geschrieben wird).
 

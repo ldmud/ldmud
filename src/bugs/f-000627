@@ -11,7 +11,7 @@ und einem break; oder einem geschickten Abbruchkriterium machen, was
 in der Regel langsamer ist als den Array zu filtern und das Ergebnis
 zu betrachten.
 
-> Das Problem mit einer solchen Funktion ist, sie brauchbar allgemein 
+> Das Problem mit einer solchen Funktion ist, sie brauchbar allgemein
 > zu formulieren. Ich werde es mir durch den Kopf gehen lassen.
 
 Um das mit dem Ergebnis eindeutig hinzubekommen, waers wohl sinnvoll

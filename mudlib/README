@@ -14,6 +14,7 @@ Other files are:
   dhrystone.c      : an implementation of Dhrystone, called by the
                      test_master.
   astar.c          : an implementation of the A* pathfinding algorithm.
+  dns_resolve.c    : a simul-efun for non-block DNS lookups
 
   uni-crasher/     : A stress test program, see the README in this dir.
 

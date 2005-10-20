@@ -16,7 +16,7 @@ ich als Minimalkonfiguration:
 ---- file.c ----
 blah() { this_object()->x() }
 
-blub() {  
+blub() {
   filter_indices(this_object()->nix(), "y");}
 }
 ----
@@ -32,7 +32,7 @@ Dann gibt es noch eine Abwandlung von dem Fehler, der zu einem Crash
 fuehrt. Dazu ist noch eine Zeile Code und eine Zusatzbedingung noetig:
 
 blah() { this_object()->x() }
- 
+
 blub() {
   query_once_interactive(find_object("/magier:fiona"));
   filter_indices(this_object()->nix(""), "y");}

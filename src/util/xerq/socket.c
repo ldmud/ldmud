@@ -521,7 +521,7 @@ erq_send (char *mesg, int msglen)
     {
         XPRINTF((stderr, "%s   Queue remaining data: %p:%d\n"
                        , time_stamp(), mesg+num, msglen-num));
-        add_to_queue(&sp->queue, mesg+num, msglen-num, get_handle(mesg));
+        add_to_queue(&sp->queue, data+num, msglen-num, get_handle(mesg));
         num=htonl(num);
         replyn(get_handle(mesg), 1, 2,
             (char[]) { ERQ_E_INCOMPLETE }, 1,

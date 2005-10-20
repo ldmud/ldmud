@@ -8,11 +8,11 @@ See also: f-990510
 > --------------------------------<9>---------------------------------------
 > The driver's parser seems to get confused when you use a variable with
 > the same name as a function which you use in a call other.
-> 
+>
 > For example, this code does not compile:
-> 
+>
 > string short;
-> 
+>
 >     return short=this_player()->short();
 
 The problem is that "short" is lexed as L_LOCAL instead of

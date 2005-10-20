@@ -26,12 +26,12 @@ gdb. Besides, most likely, the thing will dump core next time :(
 No, you did not :) I have not make any modifications to the
 driver. I am using a Pentium 90 with 32 Mb RAM on Linux installed
 from a fresh Slackware 7 Distribution. Detailed information
-enclosed below. 
+enclosed below.
 
 Personally, I have the feeling that there is something like a
 buffer overflow somewhere, but I can't find the exact spot.
 
--kees 
+-kees
 PS: by the way, we are at hyperborea.net 2000, in case you want
 to check us out :)
 
@@ -56,9 +56,9 @@ flags           : fpu vme de pse tsc msr mce cx8
 bogomips        : 35.84
 
 [hyper @ loki]:~/tmp> free
-             total       used       free     shared   
+             total       used       free     shared
 buffers     cached
-Mem:         30996      30180        816       4420      
+Mem:         30996      30180        816       4420
 2404      15248
 -/+ buffers/cache:      12528      18468
 Swap:        51368       5496      45872
@@ -75,20 +75,20 @@ on
 0.00
 34 processes: 33 sleeping, 1 running, 0 zombie, 0 stopped
 CPU states:  0.9% user,  0.4% system,  0.6% nice,  3.2% idle
-Mem:   30996K av,  30224K used,    772K free,   4896K shrd,  
+Mem:   30996K av,  30224K used,    772K free,   4896K shrd,
 2388K buff
-Swap:  51368K av,   5496K used,  45872K free                
+Swap:  51368K av,   5496K used,  45872K free
 15180K cached
 
-  PID USER     PRI  NI  SIZE  RSS SHARE STAT  LIB %CPU %MEM  
+  PID USER     PRI  NI  SIZE  RSS SHARE STAT  LIB %CPU %MEM
 TIME COMMAND
-11545 hyper     14   0  1028 1028   848 R       0  7.3  3.3  
+11545 hyper     14   0  1028 1028   848 R       0  7.3  3.3
 0:00 top
-11471 hyper     13   5  8504 8252  1012 S N     0  4.5 26.6  
+11471 hyper     13   5  8504 8252  1012 S N     0  4.5 26.6
 0:57 driver
 
 
--- 
+--
 Kees Leune
 Tilburg University, Infolab
 Satco Services Group European Server
@@ -184,7 +184,7 @@ Crash report:
 With regards,
 kees
 
--- 
+--
 Kees Leune
 Tilburg University, Infolab
 Satco Services Group European Server
@@ -224,7 +224,7 @@ Hi Lars,
 
 We crashed again, but this time there was a lot of potentially
 useful debugging output. I attached the debug output to this
-mail, so you can 
+mail, so you can
 look at it. Also, I did a backtrace with the core, which gives
 these results:
 
@@ -250,7 +250,7 @@ problem. Thanks for working on this!
 
 Kees
 
--- 
+--
 Kees Leune
 Tilburg University, Infolab
 Satco Services Group European Server
@@ -501,26 +501,26 @@ debug:
 2000.05.15 13:09:16 bad type 57 in read_unswapped_svalues()
 2000.05.15 13:09:16 Current object was obj/rboard#187
 2000.05.15 13:09:16 Dump of the call chain:
-' check_password' in '        obj/player.c' ('     
+' check_password' in '        obj/player.c' ('
 obj/player#323')line 2292
-'move_player_to_start' in '        obj/player.c' ('     
+'move_player_to_start' in '        obj/player.c' ('
 obj/player#323')line 2383
-'move_player_to_start2' in '        obj/player.c' ('     
+'move_player_to_start2' in '        obj/player.c' ('
 obj/player#323')line 2401
-'move_player_to_start3' in '        obj/player.c' ('     
+'move_player_to_start3' in '        obj/player.c' ('
 obj/player#323')line 2555
-'        binhook' in '        obj/living.c' ('     
+'        binhook' in '        obj/living.c' ('
 obj/player#323')line 632
 '           main' in 'bincmds/player/boards.c'
 ('bincmds/player/boards')line 14
 '     boardcheck' in 'bincmds/player/boards.c'
 ('bincmds/player/boards')line 52
-'    query_board' in 'obj/guilds/Standard/boardroom.c' ('     
+'    query_board' in 'obj/guilds/Standard/boardroom.c' ('
 obj/rboard#187')line 77
 
 
 stderr:
-> 
+>
 > 2000.05.15 10:18:04 comm: write EPIPE detected
 > 2000.05.15 13:09:16 bad type 57 in read_unswapped_svalues()
 > 2000.05.15 13:09:16 Current object was obj/rboard#187
@@ -600,24 +600,24 @@ obj/guilds/Standard/portal#188 obj/guilds/Standard/portal.c line
 86ddde8:  79          branch_when_zero          (1)
 86dddec:  20          return0                   (0)     line 16
 858eaae:  90   0  36  25   0  19  20 114
-' check_password' in '        obj/player.c' ('     
+' check_password' in '        obj/player.c' ('
 obj/player#323')line 2292
-'move_player_to_start' in '        obj/player.c' ('     
+'move_player_to_start' in '        obj/player.c' ('
 obj/player#323')line 2383
-'move_player_to_start2' in '        obj/player.c' ('     
+'move_player_to_start2' in '        obj/player.c' ('
 obj/player#323')line 2401
-'move_player_to_start3' in '        obj/player.c' ('     
+'move_player_to_start3' in '        obj/player.c' ('
 obj/player#323')line 2555
-'        binhook' in '        obj/living.c' ('     
+'        binhook' in '        obj/living.c' ('
 obj/player#323')line 632
 '           main' in 'bincmds/player/boards.c'
 ('bincmds/player/boards')line 14
 '     boardcheck' in 'bincmds/player/boards.c'
 ('bincmds/player/boards')line 52
-'    query_board' in 'obj/guilds/Standard/boardroom.c' ('     
+'    query_board' in 'obj/guilds/Standard/boardroom.c' ('
 obj/rboard#187')line 77
 
--- 
+--
 Kees Leune
 Tilburg University, Infolab
 +31 13 466 2688 (phone) / +31 13 466 3069 (fax)
@@ -656,7 +656,7 @@ debug:
 2000.05.15 13:31:52 Could not load descr for
 'players/imgar/weapon'
 2000.05.15 13:33:23 log/ZKPRMB0.c: Variable p not declared ! line
-17 
+17
 Free string: not found in string table! ("'re already so weakened
 with those spells.
 
@@ -691,10 +691,10 @@ players/moab/castle/room/trainee_rm13
 2000.05.15 14:56:12 Dump of the call chain:
 No trace.
 
-Hopefully we will be able to sort this out quickly! 
+Hopefully we will be able to sort this out quickly!
 
 -Kees
--- 
+--
 Kees Leune
 Tilburg University, Infolab
 +31 13 466 2688 (phone) / +31 13 466 3069 (fax)
@@ -732,9 +732,9 @@ debug.log
 2000.05.17 04:32:36 Dump of the call chain:
 '           move' in '         room/room.c'
 ('players/yodelrodel/workroom')line 249
-'    move_player' in '        obj/living.c' ('    
+'    move_player' in '        obj/living.c' ('
 obj/player#3811')line 715
-<lambda 0x81e9071> in '        obj/rboard.c' ('     
+<lambda 0x81e9071> in '        obj/rboard.c' ('
 obj/rboard#416')offset 102
 
 stderr.log
@@ -815,16 +815,16 @@ players/firedrake/public/sofa#417 players/firedrake/sofa.c line
 81e90d9:  72  25   1 164  79  12  25   1
 '           move' in '         room/room.c'
 ('players/yodelrodel/workroom')line 249
-'    move_player' in '        obj/living.c' ('    
+'    move_player' in '        obj/living.c' ('
 obj/player#3811')line 715
-<lambda 0x81e9071> in '        obj/rboard.c' ('     
+<lambda 0x81e9071> in '        obj/rboard.c' ('
 obj/rboard#416')offset 102
 
 
 With regards,
 Kees
 
--- 
+--
 Kees Leune
 Tilburg University, Infolab
 Satco Services Group European Server
@@ -856,7 +856,7 @@ Content-Transfer-Encoding: 7bit
 X-PMFLAGS: 34078848 0 1 P69880.CNM
 
 Hi Lars,
- 
+
 > First I have to apologize for not answering sooner, but things at
 > work have been (and still are :-( ) a bit hectic. By all means, yes,
 > if it's not an effort, send me a note whenever you crash, and if
@@ -871,7 +871,7 @@ excerpts in that case.
 
 > You can set the swap times to '-1' (TIME_TO_SWAP and
 > TIME_TO_SWAP_VARIABLES in the configs, or the related commandline
-> options) to disable swapping. 
+> options) to disable swapping.
 
 I'll do that then. If this solves the problem, at least we can be
 sure that the problem is in the swapper code.
@@ -885,7 +885,7 @@ Thanks!
 Kees
 
 
--- 
+--
 Kees Leune
 Tilburg University, Infolab
 +31 13 466 2688 (phone) / +31 13 466 3069 (fax)
@@ -976,7 +976,7 @@ Please let me know if that would be useful.
 With regards,
 Kees
 
--- 
+--
 Kees Leune
 Tilburg University, Infolab
 +31 13 466 2688 (phone) / +31 13 466 3069 (fax)

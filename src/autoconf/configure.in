@@ -47,6 +47,17 @@ AC_UPDATE_VAR(with_[$1])
 val_[$1]="\"$with_[$1]\""]
 )
 
+AC_DEFUN([AC_TEXT_VAL_FROM_WITH],
+[if test "x$with_[$1]" != "x"; then
+  with_[$1]=`echo $with_[$1]|
+changequote(, )dnl
+             sed -e 's/^\([^"]*\)\?.*$/\1/'`
+changequote([, ])dnl
+fi
+AC_UPDATE_VAR(with_[$1])
+val_[$1]="$with_[$1]"]
+)
+
 AC_DEFUN(AC_FORM_HELP,[  --$1[]dnl
 ifelse([$2],,,dnl
 builtin(format,%[]builtin(eval,(len([$1])<32)*(32-len([$1])))s,)  [default=$2])[]dnl
@@ -99,14 +110,17 @@ AC_MY_ARG_ENABLE(access-control,yes,,)
 AC_MY_ARG_ENABLE(access-log,no,,)
 AC_MY_ARG_ENABLE(align-functions,yes,,)
 AC_MY_ARG_ENABLE(compat-mode,no,,)
+AC_MY_ARG_ENABLE(filename-spaces,no,,[Allow space characters in filenames])
 AC_MY_ARG_ENABLE(strict-euids,no,,)
 AC_MY_ARG_ENABLE(supply-parse-command,yes,,)
 AC_MY_ARG_ENABLE(initialization-by-__init,yes,,)
 AC_MY_ARG_ENABLE(use-system-crypt,yes,,)
 AC_MY_ARG_ENABLE(udp-send,yes,,)
 AC_MY_ARG_ENABLE(use-ipv6,no,,)
+AC_MY_ARG_ENABLE(use-mccp,no,,[Enables MCCP support])
 AC_MY_ARG_ENABLE(use-mysql,no,,)
-AC_MY_ARG_ENABLE(use-pthreads,no,,[enable using of threads for socket writes - HIGHLY ALPHA!])
+AC_MY_ARG_ENABLE(use-pthreads,no,,[enable using of threads for socket writes - FRAGILE!])
+AC_MY_ARG_ENABLE(lpc-array-calls,yes,,[Enables call_others on arrays of objects])
 AC_MY_ARG_ENABLE(use-pcre,no,,[enable using of perl compatible regexp (requires Fiona's pcre-patch)])
 AC_MY_ARG_ENABLE(lpc-nosave,yes,,[Enables the 'nosave' keyword])
 AC_MY_ARG_ENABLE(use-set-light,yes,,[enable the efun set_light()])
@@ -117,8 +131,9 @@ AC_MY_ARG_ENABLE(comm-stat,yes,,)
 AC_MY_ARG_ENABLE(apply-cache_stat,yes,,)
 AC_MY_ARG_ENABLE(malloc-trace,no,,)
 AC_MY_ARG_ENABLE(malloc-lpc-trace,no,,)
+AC_MY_ARG_ENABLE(malloc-sbrk-trace,no,,[Log all esbrk() calls (smalloc only)])
 AC_MY_ARG_ENABLE(dynamic-costs,no,,)
-AC_MY_ARG_ENABLE(trace-code,yes,,[trace the most recently executed bytecode])
+AC_MY_ARG_ENABLE(trace-code,no,,[trace the most recently executed bytecode])
 
 AC_MY_ARG_ENABLE(rxcache_table,yes,,)
 
@@ -133,8 +148,9 @@ AC_MY_ARG_ENABLE(debug-telnet,no,,[enable telnet machine diagnostics])
 AC_MY_ARG_ENABLE(debug-smalloc-allocs,no,,[enable small block diagnostics])
 
 AC_MY_ARG_ENABLE(check-object-gc-ref,yes,,[check object references in GC])
-AC_MY_ARG_ENABLE(check-smalloc-total,no,,[trace smalloc statistics])
 AC_MY_ARG_ENABLE(dump-gc-refs,no,,[trace GC references])
+
+AC_MY_ARG_WITH(optimize,med,,[Optimization level: no/low/med/high])
 
 AC_MY_ARG_WITH(access-file,ACCESS.ALLOW,,[access permissions file])
 AC_MY_ARG_WITH(access-log,access.allow.log,,[access log file])
@@ -159,7 +175,7 @@ AC_MY_ARG_WITH(max-trace,65,,)
 AC_MY_ARG_WITH(compiler-stack-size,400,,)
 AC_MY_ARG_WITH(max-bits,6144,,)
 AC_MY_ARG_WITH(portno,4242,,)
-AC_MY_ARG_WITH(udp_port,4246,,)
+AC_MY_ARG_WITH(udp-port,4246,,)
 AC_MY_ARG_WITH(maxnumports,20,,)
 AC_MY_ARG_WITH(max-cost,1000000,,)
 AC_MY_ARG_WITH(catch-reserved-cost,2000,,)
@@ -245,13 +261,16 @@ AC_CDEF_FROM_ENABLE(access_control)
 AC_CDEF_FROM_ENABLE(access_log)
 AC_CDEF_FROM_ENABLE(align_functions)
 AC_CDEF_FROM_ENABLE(compat_mode)
+AC_CDEF_FROM_ENABLE(filename_spaces)
 AC_CDEF_FROM_ENABLE(strict_euids)
 AC_CDEF_FROM_ENABLE(supply_parse_command)
 AC_CDEF_FROM_ENABLE(initialization_by___init)
 AC_CDEF_FROM_ENABLE(use_system_crypt)
 AC_CDEF_FROM_ENABLE(use_ipv6)
 AC_CDEF_FROM_ENABLE(use_pthreads)
+AC_CDEF_FROM_ENABLE(use_mccp)
 AC_CDEF_FROM_ENABLE(use_pcre)
+AC_CDEF_FROM_ENABLE(lpc_array_calls)
 AC_CDEF_FROM_ENABLE(lpc_nosave)
 AC_CDEF_FROM_ENABLE(use_deprecated)
 AC_CDEF_FROM_ENABLE(use_set_light)
@@ -261,6 +280,7 @@ AC_CDEF_FROM_ENABLE(comm_stat)
 AC_CDEF_FROM_ENABLE(apply_cache_stat)
 AC_CDEF_FROM_ENABLE(malloc_trace)
 AC_CDEF_FROM_ENABLE(malloc_lpc_trace)
+AC_CDEF_FROM_ENABLE(malloc_sbrk_trace)
 AC_CDEF_FROM_ENABLE(dynamic_costs)
 AC_CDEF_FROM_ENABLE(trace_code)
 
@@ -277,8 +297,9 @@ AC_CDEF_FROM_ENABLE(debug_telnet)
 AC_CDEF_FROM_ENABLE(debug_smalloc_allocs)
 
 AC_CDEF_FROM_ENABLE(check_object_gc_ref)
-AC_CDEF_FROM_ENABLE(check_smalloc_total)
 AC_CDEF_FROM_ENABLE(dump_gc_refs)
+
+AC_TEXT_VAL_FROM_WITH(optimize)
 
 AC_STRING_VAL_FROM_WITH(access_file)
 AC_STRING_VAL_FROM_WITH(access_log)
@@ -359,6 +380,7 @@ if test "x$cdef_opcprof" = "x#undef"; then
   cdef_verbose_opcprof="#undef"
 fi
 
+val_optimize=`echo ${val_optimize} | tr '[a-z]' '[A-Z]'`
 
 dnl
 dnl select a C-Compiler
@@ -370,8 +392,8 @@ AC_PROG_CC
 # configure at all, we fudge the CFLAGS a bit.
 
 save_cflags=$CFLAGS
-echo "For this test, I use '-g' instead of '$CFLAGS' as compiler flags."
 CFLAGS="-g"
+echo "For this test, '$CFLAGS' instead of '$save_cflags' is used as compiler flags."
 
 AC_CACHE_CHECK([gcc/assembler float/branch incompatibility, e.g. on AIX],
 lp_cv_sys_float_branch_incompatible,
@@ -510,6 +532,7 @@ fi
 
 AC_CHECK_LIB(m,main)
 AC_CHECK_LIB(socket,main)
+AC_CHECK_LIB(nsl,main)
 
 ERQ_LIBS="$LIBS"
 
@@ -572,7 +595,7 @@ fi
 AC_FUNC_ALLOCA
 AC_CHECK_FUNCS(fchmod getrusage bzero memset memcpy memmem strdup strcspn)
 AC_CHECK_FUNCS(strchr strrchr getcwd memmove sysconf gettimeofday wait3 waitpid)
-AC_CHECK_FUNCS(fcntl getdomainname)
+AC_CHECK_FUNCS(fcntl getdomainname strtoul)
 
 AC_CACHE_CHECK(if inet_ntoa() ok,lp_cv_func_inet_ntoa_ok,
 AC_TRY_RUN([
@@ -749,10 +772,10 @@ fi
 # --- mySQL ---
 
 AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
-for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/include" "/usr/include" "/usr/lib/mysql"; do
+for TESTPATH in "" "${mysql_path}/include" "${mysql_path}" "/usr/local/mysql/include" "/usr/lib/mysql"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
-        CFLAGS="$CFLAGS -I$TESTPATH"
+        CFLAGS="-I$TESTPATH $CFLAGS"
     fi
 AC_TRY_COMPILE([
 #include <sys/types.h>
@@ -784,11 +807,22 @@ if test $lp_cv_has_mysql = yes; then
   AC_DEFINE(HAS_MYSQL)
 
   if test $enable_use_mysql = yes; then
-    if test "x$mysql_path" = "x"; then
-        AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -lmysqlclient")
-    else
-        tmp=""
+    tmp=""
 
+    if test "x$mysql_path" = "x"; then
+        if test -d "/usr/local/mysql/lib/mysql"; then
+            CFLAGS="$saveflags -L/usr/local/mysql/lib/mysql"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/mysql/lib/mysql -lmysqlclient")
+        elif test -d "/usr/local/mysql/lib"; then
+            CFLAGS="$saveflags -L/usr/local/mysql/lib"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/mysql/lib -lmysqlclient")
+        elif test -d "/usr/local/lib"; then
+            CFLAGS="$saveflags -L/usr/local/lib"
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L/usr/local/lib -lmysqlclient")
+        else
+            AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -lmysqlclient")
+        fi
+    else
         if test -d "${mysql_path}/lib/mysql"; then
             CFLAGS="$saveflags -L${mysql_path}/lib/mysql"
             AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L${mysql_path}/lib/mysql -lmysqlclient")
@@ -800,16 +834,17 @@ if test $lp_cv_has_mysql = yes; then
             AC_CHECK_LIB(mysqlclient,main, tmp="$PKGLIBS -L$mysql_path -lmysqlclient")
         fi
 
-        if test "x$tmp" = "x"; then
-            echo "mysqlclient library not found - disabling mySQL support"
-            AC_NOT_AVAILABLE(use-mysql)
-            cdef_use_mysql="#undef"
-            enable_use_mysql="no"
-            mysql_path=
-            lp_cv_has_mysql="no"
-        else
-            PKGLIBS="$tmp"
-        fi
+    fi
+
+    if test "x$tmp" = "x"; then
+        echo "mysqlclient library not found - disabling mySQL support"
+        AC_NOT_AVAILABLE(use-mysql)
+        cdef_use_mysql="#undef"
+        enable_use_mysql="no"
+        mysql_path=
+        lp_cv_has_mysql="no"
+    else
+        PKGLIBS="$tmp"
     fi
   fi
 
@@ -868,6 +903,23 @@ else
   if test $enable_use_mysql = yes; then
       AC_NOT_AVAILABLE(use-mysql)
   fi
+fi
+
+# --- Check if we need zlib libraries for mccp ---
+
+if test "x$enable_use_mccp" = "x" || test "x$enable_use_mccp" = "xyes"; then
+    if test "$lp_cv_need_lib_z" != "yes"; then
+        AC_CHECK_LIB(z,main,
+                     PKGLIBS="$PKGLIBS -lz"
+                     lp_cv_need_lib_z="yes"
+        )
+    fi
+    if test "$lp_cv_need_lib_z" != "yes"; then
+        echo "libz library not found - disabling MCCP support"
+        AC_NOT_AVAILABLE(use-mccp)
+        cdef_use_mccp="#undef"
+        enable_use_mccp="no"
+    fi
 fi
 
 # ---
@@ -1807,6 +1859,7 @@ fi
 
 dnl
 
+AC_SUBST(val_optimize)
 AC_SUBST(WCFLAGS)
 AC_SUBST(OCFLAGS)
 AC_SUBST(LCFLAGS)
@@ -1832,17 +1885,20 @@ AC_SUBST(cdef_access_control)
 AC_SUBST(cdef_access_log)
 AC_SUBST(cdef_align_functions)
 AC_SUBST(cdef_compat_mode)
+AC_SUBST(cdef_filename_spaces)
 AC_SUBST(cdef_strict_euids)
 AC_SUBST(cdef_supply_parse_command)
 AC_SUBST(cdef_initialization_by___init)
 AC_SUBST(cdef_use_system_crypt)
 AC_SUBST(cdef_use_ipv6)
+AC_SUBST(cdef_use_mccp)
 AC_SUBST(cdef_use_mysql)
 AC_SUBST(cdef_use_pthreads)
 AC_SUBST(cdef_use_pcre)
 AC_SUBST(cdef_use_set_light)
 AC_SUBST(cdef_use_set_is_wizard)
 AC_SUBST(cdef_use_process_string)
+AC_SUBST(cdef_lpc_array_calls)
 AC_SUBST(cdef_lpc_nosave)
 AC_SUBST(cdef_use_deprecated)
 AC_SUBST(cdef_comm_stat)
@@ -1850,6 +1906,7 @@ AC_SUBST(cdef_trace_code)
 AC_SUBST(cdef_apply_cache_stat)
 AC_SUBST(cdef_malloc_trace)
 AC_SUBST(cdef_malloc_lpc_trace)
+AC_SUBST(cdef_malloc_sbrk_trace)
 AC_SUBST(cdef_dynamic_costs)
 
 AC_SUBST(cdef_rxcache_table)
@@ -1866,7 +1923,6 @@ AC_SUBST(cdef_debug_telnet)
 AC_SUBST(cdef_debug_smalloc_allocs)
 
 AC_SUBST(cdef_check_object_gc_ref)
-AC_SUBST(cdef_check_smalloc_total)
 AC_SUBST(cdef_dump_gc_refs)
 
 dnl second: valued defines

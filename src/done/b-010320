@@ -15,7 +15,7 @@ los ist. Und die letzten Monate hatten wir weniger als 100 MB auf der Platte
 frei, so das ich das Debug ausgemacht hatte ;)
 
 (Beginn des Logfiles)
-2001.03.17 19:27:15 d/Sol/kawajoe/slums/npc/bulle.c: syntax error line 111 
+2001.03.17 19:27:15 d/Sol/kawajoe/slums/npc/bulle.c: syntax error line 111
 DEBUG: ref_string(): 089ba876 'find_player' refcount reaches max!
 DEBUG: ref_string(): 089ba876 'find_player' has 0 refs.
 .
@@ -68,7 +68,7 @@ Fuer 'tritt' trifft das leider nicht zu.. ich denke das stammt aus dem Kampfsyst
 
 
 Vielleicht auch interessant das der 'find_player' String bei beiden Starts
-die gleiche Speicheradresse hatte ? 
+die gleiche Speicheradresse hatte ?
 
 Ich hoffe du kannst damit was anfangen ;)
 

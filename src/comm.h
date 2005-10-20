@@ -7,6 +7,9 @@
 #ifdef USE_PTHREADS
 #include <pthread.h>
 #endif
+#ifdef USE_MCCP
+#    include <zlib.h>
+#endif
 
 #include "simulate.h"   /* callback_t for input_to_t */
 #include "svalue.h"
@@ -79,6 +82,30 @@
 #define MAX_TEXT  2048
 
 
+/* --- Telnet Handling --- */
+
+#define SEND_TELNET_COMMAND(TEXT) {\
+        sending_telnet_command = MY_TRUE;\
+        TEXT\
+        sending_telnet_command = MY_FALSE;\
+}
+  /* Use this macro to safely send telnet commands with TEXT
+   */
+
+#ifdef DEBUG_TELNET
+
+#define DT(x) printf("%s TDEBUG: ", time_stamp()); printf x
+#define DTN(x) printf("%s TDEBUG: '%s' ", time_stamp(), get_txt(ip->ob->name)); printf x
+#define DTF(x) printf x
+
+#else
+
+#define DT(x)
+#define DTN(x)
+#define DTF(x)
+
+#endif
+
 /* --- Types --- */
 
 /* --- struct write_buffer_s: async write datastructure
@@ -134,6 +161,7 @@ struct interactive_s {
     CBool msg_discarded;        /* True if an earlier msg had been discarded */
     CBool set_input_to;         /* True if input_to was set in this cycle */
     CBool closing;              /* True when closing this socket. */
+    CBool tn_enabled;           /* True: telnet machine enabled */
     char do_close;              /* Bitflags: Close this down; Proto-ERQ. */
     char noecho;                /* Input mode bitflags */
 
@@ -155,6 +183,12 @@ struct interactive_s {
     interactive_t *snoop_on;    /* whom we're snooping */
     object_t *snoop_by;         /* by whom we're snooped */
     mp_int last_time;           /* Time of last command executed */
+    long  numCmds;              /* Number of commands executed with the same
+                                 * .last_time */
+    long  maxNumCmds;           /* Maximum number of commands (char or line)
+                                 * to execute per second. A value < 0
+                                 * means 'unlimited'.
+                                 */
     int trace_level;            /* Trace flags. 0 means no tracing */
     char *trace_prefix;         /* Trace only objects which have this string
                                    as name prefix. NULL traces everything. */
@@ -195,6 +229,12 @@ struct interactive_s {
     char message_buf[MAX_SOCKET_PACKET_SIZE];
       /* The send buffer. */
 
+#ifdef USE_MCCP
+     unsigned char   compressing;
+     z_stream      * out_compress;
+     unsigned char * out_compress_buf;
+#endif
+
 #ifdef USE_PTHREADS
     /* The data exchange with the writer thread happens through two
      * lists: write_first/write_last hands of data to write to
@@ -204,6 +244,11 @@ struct interactive_s {
      * TODO: These two lists + one extra can be combined into
      * TODO:: one list, plus two roving pointers into it.
      */
+    Bool                   flush_on_cleanup;
+      /* If set to TRUE at the time the thread is cancelled, all remaining
+       * pending data is sent to the socket (which is made non-blocking for
+       * this) as part of the cleanup.
+       */
     pthread_mutex_t        write_mutex;
     pthread_cond_t         write_cond;
     pthread_t              write_thread;
@@ -299,6 +344,7 @@ struct interactive_s {
 
 /* --- Variables --- */
 
+extern Bool sending_telnet_command;
 extern interactive_t *all_players[MAX_PLAYERS];
 extern int num_player;
 extern char *message_flush;
@@ -376,9 +422,16 @@ extern svalue_t *f_input_to_info (svalue_t *sp);
 extern svalue_t *f_send_udp(svalue_t *sp);
 extern svalue_t *f_set_buffer_size(svalue_t *sp);
 extern svalue_t *f_binary_message(svalue_t *sp);
+extern svalue_t *f_get_combine_charset(svalue_t *sp);
 extern svalue_t *f_set_combine_charset(svalue_t *sp);
+extern svalue_t *f_get_connection_charset(svalue_t *sp);
 extern svalue_t *f_set_connection_charset(svalue_t *sp);
 extern svalue_t *query_ip_port(svalue_t *sp);
+extern svalue_t *f_get_max_commands (svalue_t *sp);
+extern svalue_t *f_set_max_commands (svalue_t *sp);
+extern svalue_t *f_enable_telnet (svalue_t *sp);
+extern void check_for_out_connections (void);
+extern svalue_t * f_net_connect (svalue_t *sp);
 
 #if defined(ACCESS_CONTROL)
 extern void refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) );

@@ -99,6 +99,10 @@
  */
 #undef USE_MYSQL
 
+/* Define this if you want to allow call_other()s on arrays of objects.
+ */
+#define USE_ARRAY_CALLS
+
 /* Define this if you want the 'nosave' keyword.
  */
 #define USE_LPC_NOSAVE
@@ -212,6 +216,12 @@
  * TODO: Make this a runtime option.
  */
 #undef COMPAT_MODE
+
+/* Define ALLOW_FILENAME_SPACES if the driver should accept space characters
+ * in filenames. If it is not defined, a hardcoded test for space characters
+ * is activated.
+ */
+#undef ALLOW_FILENAME_SPACES
 
 /* Define STRICT_EUIDS if the driver is to enforce the use of euids,
  * ie. load_object() and clone_object() require the current object to

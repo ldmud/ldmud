@@ -4,7 +4,7 @@ From: Freaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
 Type: Bug
 State: Done - fixed
 
-Analysis: This is most likely the telnet negotiation bug fixed in 
+Analysis: This is most likely the telnet negotiation bug fixed in
 209 and 213.
 
 Ich habe gerade den dev-200 mehrmals gecrashed, indem ich immer wieder
@@ -18,9 +18,9 @@ Der Driver cored nach ca. 200 bis 500 Connects direkt hintereinander.
 
 > > Ich habe gerade den dev-200 mehrmals gecrashed, indem ich immer wieder
 > > connected habe und dann sofort disconnected.
-> 
-> Wie sofort war der Disconnect: gleich wenn telnet mit 'Connected to' 
-> zuruckkommt, oder komplett eingeloggt und dann 'quit'? Oder 
+>
+> Wie sofort war der Disconnect: gleich wenn telnet mit 'Connected to'
+> zuruckkommt, oder komplett eingeloggt und dann 'quit'? Oder
 > verbindung abgebrochen?
 
 Einfach zweimal return gedrueckt beim Einloggen (Bei UNItopia bewirkt

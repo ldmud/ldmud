@@ -25,6 +25,14 @@
 #include "main.h"
 
 /*-------------------------------------------------------------------------*/
+
+char current_time_stamp[21] = { 0 };
+  /* Static buffer for the last timestamp computed by time_stamp().
+   * This is for use only by those functions which must avoid memory
+   * operations - all other functions should use time_stamp() itself.
+   */
+
+/*-------------------------------------------------------------------------*/
 mp_int
 get_current_time (void)
 
@@ -70,7 +78,7 @@ get_current_time (void)
     }
     debug_message("Time anomaly, %ld seconds.\n", (long)(last_time - now));
     return last_time;
-}
+} /* get_current_time() */
 
 /*-------------------------------------------------------------------------*/
 char *
@@ -90,7 +98,7 @@ time_string (mp_int t)
         strftime(result, sizeof(result)-1, "%a %b %d %H:%M:%S %Y", tm);
     }
     return result;
-}
+} /* time_string() */
 
 /*-------------------------------------------------------------------------*/
 char *
@@ -114,7 +122,7 @@ utime_string (mp_int t, mp_int ut)
         strftime(result+len+6, sizeof(result)-7-len, " %Y", tm);
     }
     return result;
-}
+} /* utime_string() */
 
 /*-------------------------------------------------------------------------*/
 char *
@@ -130,19 +138,50 @@ time_stamp (void)
 
 {
     mp_int t;
-    static char result[21];
     struct tm *tm;
-    mp_int last_time = -1;
+    static mp_int last_time = -1;
 
     t = get_current_time();
     if (t != last_time)
     {
         last_time = t;
         tm = localtime((time_t *)&t);
-        strftime(result, sizeof(result)-1, "%Y.%m.%d %H:%M:%S", tm);
+        strftime( current_time_stamp, sizeof(current_time_stamp)-1
+                , "%Y.%m.%d %H:%M:%S", tm);
     }
-    return result;
+    return current_time_stamp;
 } /* time_stamp() */
+
+/*-------------------------------------------------------------------------*/
+char *
+xmemmem ( const char *haystack, size_t haystacklen
+        , const char *needle, size_t needlelen
+        )
+
+/* Find the first occurance of <needle> (of length <needlelen>) in
+ * <haystack> (of <haystacklen> length) and return a pointer to it.
+ * A needle of length 0 is always found at <haystack>.
+ * If not found, return NULL.
+ *
+#ifndef HAVE_MEMMEM
+ * This function is a GNU/Linux extension, but up to and including
+ * glibc 2 it wasn't implemented correctly. Since it is also used
+ * only in the get_dir() implementation, we don't even bother to
+ * use the glibc implementation.
+#endif
+ */
+
+{
+    mp_int i;
+
+    i = (mp_int)(haystacklen - needlelen);
+    if (i >= 0) do {
+        if ( !memcmp(needle, haystack, needlelen) )
+            return (char *)haystack;
+        haystack++;
+    } while (--i >= 0);
+    return 0;
+} /* xmemmem() */
 
 /*-------------------------------------------------------------------------*/
 /* Some UNIX functions which are not supported on all platforms. */
@@ -279,25 +318,6 @@ memset (char *s, int c, size_t n)
 }
 
 #endif /* !HAVE_MEMSET */
-
-/*-------------------------------------------------------------------------*/
-#ifndef HAVE_MEMMEM
-
-char *
-memmem (char *needle, size_t needlelen, char *haystack, size_t haystacklen)
-{
-    mp_int i;
-
-    i = (mp_int)(haystacklen - needlelen);
-    if (i >= 0) do {
-        if ( !strncmp(needle, haystack, needlelen) )
-            return haystack;
-        haystack++;
-    } while (--i >= 0);
-    return 0;
-}
-
-#endif /* !HAVE_MEMMEM */
 
 /*-------------------------------------------------------------------------*/
 #if !defined(HAVE_MEMMOVE) && !defined(OVERLAPPING_BCOPY)

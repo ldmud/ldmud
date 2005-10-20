@@ -34,5 +34,5 @@ HISTORY
 
 
 SEE ALSO
-        add_action(E), query_verb(E), query_command(E), query_notify_fail(E),
-        hooks(C)
+        add_action(E), command(E), query_verb(E), query_command(E),
+        query_notify_fail(E), hooks(C)

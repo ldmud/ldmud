@@ -8,5 +8,5 @@ foreach (i : <int-expr>) : loops from i = 0 to i = <int-expr>-1
 foreach (i : <int1> .. <int2>) : loops from i = <int1> to i = <int2>,
   incrementing or decrementing i depending on range limits
 
-foreach (<expr>), foreach(<int1>..<int2>): loops as usual, but does 
+foreach (<expr>), foreach(<int1>..<int2>): loops as usual, but does
 not assign the loop values to any variable.

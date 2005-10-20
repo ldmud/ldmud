@@ -28,7 +28,7 @@ Block eingebettet ist.
 Ciao
 		Freaky
 
--- 
+--
 Frank 'Freaky' Kirschner
 UNItopia Admin                          http://UNItopia.uni-stuttgart.de/
 Freaky@UNItopia.Uni-Stuttgart.DE      telnet://UNItopia.uni-stuttgart.de/
@@ -625,16 +625,16 @@ freeing large block 0x08b735c0 prolang.y 11542 size 0x000002d2
   By object: d/Ebenen/apps/domain_master
   By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 
-  By object: (not in list) 
+  By object: (not in list)
   By program: z/Spiele/Abraeumen/d/Arktis/obj/abraeumen.c line:276
 
-  By object: (not in list) 
+  By object: (not in list)
   By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 
   By object: map/map
   By program: map/map.c line:398
 
-  By object: (destructed) (not in list) 
+  By object: (destructed) (not in list)
   By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 
   By object: p/mammi/kraut/obj/guert_sh#148549
@@ -702,32 +702,32 @@ freeing large block 0x08b735c0 prolang.y 11542 size 0x000002d2
 
 
 freeing small block 0x17e885d8 (user 0x17e885f4) object.c 321
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 Object: (destructed) "d/Gallien/arthax/wald/wald9k" from "/d/Gallien/arthax/wald/wald9k", uid: "Gallien:arthax"
 
 freeing small block 0x17af8048 (user 0x17af8064) object.c 321
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 Object: (destructed) "d/Gallien/arthax/wald/wald9k" from "/d/Gallien/arthax/wald/wald9k", uid: "Gallien:arthax"
 
 freeing small block 0x162a677c (user 0x162a6798) simulate.c::string_copy 1641
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 d/Gallien/arthax/wald/wald9k Ôb
 
 freeing small block 0x162a022c (user 0x162a0248) simulate.c::string_copy 1641
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 d/Gallien/arthax/wald/wald9k ãÇ
 
 freeing small block 0x15b07a98 (user 0x15b07ab4) object.c 321
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 Object: (destructed) "êV-llien/arthax/wald/wald9k" from "/d/Gallien/arthax/wald/wald9k", uid: "Gallien:arthax"
 
 freeing small block 0x11e62f2c (user 0x11e62f48) simulate.c::string_copy 1641
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 d/Gallien/arthax/wald/wald9k •
 
@@ -811,17 +811,17 @@ By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 Object: (destructed) "d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7" from "/d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7", uid: "Doerrland:Doerrstadt"
 
 freeing small block 0x17a67e2c (user 0x17a67e48) object.c 321
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 Object: (destructed) "d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7" from "/d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7", uid: "Doerrland:Doerrstadt"
 
 freeing small block 0x1737142c (user 0x17371448) simulate.c::string_copy 1641
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7  
 
 freeing small block 0x16f41e3c (user 0x16f41e58) object.c 321
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 Object: (destructed) "Ä:errland/Doerrstadt/Doerrgasse/d_gasse7" from "/d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7", uid: "Doerrland:Doerrstadt"
 
@@ -831,7 +831,7 @@ By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 Object: (destructed) "d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7" from "/d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7", uid: "Doerrland:Doerrstadt"
 
 freeing small block 0x168d1330 (user 0x168d134c) object.c 321
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 Object: (destructed) "d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7" from "/d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7", uid: "Doerrland:Doerrstadt"
 
@@ -846,7 +846,7 @@ By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7  
 
 freeing small block 0x15c91d80 (user 0x15c91d9c) object.c 321
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 Object: (destructed) "d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7" from "/d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7", uid: "Doerrland:Doerrstadt"
 
@@ -866,7 +866,7 @@ By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7  
 
 freeing small block 0x11b2d7dc (user 0x11b2d7f8) simulate.c::string_copy 1641
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7  
 
@@ -896,12 +896,12 @@ By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 Object: (destructed) "Ï™Ierrland/Doerrstadt/Doerrgasse/d_gasse7" from "/d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7", uid: "Doerrland:Doerrstadt"
 
 freeing small block 0x131344bc (user 0x131344d8) simulate.c::string_copy 1641
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7  
 
 freeing small block 0x131c23cc (user 0x131c23e8) simulate.c::string_copy 1641
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7  
 
@@ -916,9 +916,9 @@ By program: secure/simul_efun/simul_efun.c (map.inc) line:207
 d/Doerrland/Doerrstadt/Doerrgasse/d_gasse7  
 
   --
- 
+
 freeing small block 0x17dc2c08 (user 0x17dc2c24) prolang.y::string_copy 11552
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 p/nepomuck/i/tell_arround.c 
 
@@ -940,7 +940,7 @@ p/nepomuck/i/tell_arround.c 
  --
 
 freeing small block 0x17c06100 (user 0x17c0611c) object.c 321
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "d/Gallien/Westgallien/Wald/obj/room_bach" from "/d/Gallien/Westgallien/Wald/obj/room_bach", uid: "Gallien:Westgallien"
 
@@ -960,19 +960,19 @@ By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 d/Gallien/Westgallien/Wald/obj/room_bach .c 
 
 freeing small block 0x11cfd0bc (user 0x11cfd0d8) prolang.y::string_copy 11552
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 d/Gallien/Westgallien/Wald/i/room_bach.c  h 
 
 freeing small block 0x123e2528 (user 0x123e2544) simulate.c::string_copy 1641
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 d/Gallien/Westgallien/Wald/obj/room_bach .c 
 
   -- There is also the unreferenced string
 
 freeing small block 0x17b31a8c (user 0x17b31aa8) object.c 321
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
@@ -982,7 +982,7 @@ By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x178c2dd0 (user 0x178c2dec) simulate.c::string_copy 1641
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 p/Item/Moebel/Sessel/obj/bett -
 
@@ -992,12 +992,12 @@ By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x17727a84 (user 0x17727aa0) simulate.c::string_copy 1641
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 p/Item/Moebel/Sessel/obj/bett 4
 
 freeing small block 0x176bdcb4 (user 0x176bdcd0) object.c 321
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
@@ -1017,37 +1017,37 @@ By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x16f44000 (user 0x16f4401c) object.c 321
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x16cfd330 (user 0x16cfd34c) simulate.c::string_copy 1641
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 p/Item/Moebel/Sessel/obj/bett 6
 
 freeing small block 0x16bd84ac (user 0x16bd84c8) object.c 321
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x16b6e89c (user 0x16b6e8b8) object.c 321
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x1693ec34 (user 0x1693ec50) object.c 321
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x16811f60 (user 0x16811f7c) object.c 321
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x167873c0 (user 0x167873dc) object.c 321
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
@@ -1057,7 +1057,7 @@ By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x161c4790 (user 0x161c47ac) object.c 321
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
@@ -1067,37 +1067,37 @@ By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 p/Item/Moebel/Sessel/obj/bett 
 
 freeing small block 0x15f10e30 (user 0x15f10e4c) object.c 321
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x15ea9530 (user 0x15ea954c) simulate.c::string_copy 1641
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 p/Item/Moebel/Sessel/obj/bett 2
 
 freeing small block 0x15d24d14 (user 0x15d24d30) object.c 321
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x15d22e54 (user 0x15d22e70) simulate.c::string_copy 1641
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 p/Item/Moebel/Sessel/obj/bett “
 
 freeing small block 0x15ce93e0 (user 0x15ce93fc) object.c 321
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x15cbf4f4 (user 0x15cbf510) simulate.c::string_copy 1641
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 p/Item/Moebel/Sessel/obj/bett ˇ
 
 freeing small block 0x15c04274 (user 0x15c04290) object.c 321
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
@@ -1118,22 +1118,22 @@ Object: (destructed) "
 em/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x15a3b19c (user 0x15a3b1b8) object.c 321
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x15920cf8 (user 0x15920d14) object.c 321
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x157b2380 (user 0x157b239c) simulate.c::string_copy 1641
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 p/Item/Moebel/Sessel/obj/bett 
 
 freeing small block 0x1551a290 (user 0x1551a2ac) object.c 321
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
@@ -1143,12 +1143,12 @@ By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
 freeing small block 0x153f63a4 (user 0x153f63c0) simulate.c::string_copy 1641
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 p/Item/Moebel/Sessel/obj/bett 
 
 freeing small block 0x152b6410 (user 0x152b642c) object.c 321
-By object: (destructed) (not in list) 
+By object: (destructed) (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "p/Item/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
@@ -1158,11 +1158,11 @@ By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 p/Item/Moebel/Sessel/obj/bett È
 
 freeing small block 0x151b05d4 (user 0x151b05f0) object.c 321
-By object: (not in list) 
+By object: (not in list)
 By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
 Object: (destructed) "àø“em/Moebel/Sessel/obj/bett" from "/p/Item/Moebel/Sessel/obj/bett", uid: "p:Item"
 
-  -- 
+  --
 
 3421 small blocks freed
 2001.12.15 03:35:38 Consolidation merged 223805 blocks, freed 3 chunks holding 456 blocks.

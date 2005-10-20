@@ -35,6 +35,7 @@
 
 #include "array.h"
 #include "interpret.h"
+#include "main.h"
 #include "simulate.h"
 #include "svalue.h"
 #include "xalloc.h"
@@ -103,6 +104,46 @@ static int32 next_handle = 1;
    */
 
 static void raise_db_error (db_dat_t *dat) NORETURN;
+
+/*-------------------------------------------------------------------------*/
+Bool
+pkg_mysql_init (void)
+
+/* Initialize the mySQL package and return TRUE on success.
+ *
+ * All there really is to do is to check if the driver was linked against the
+ * correct mysqlclient library.
+ */
+
+{
+    const char * client_version = mysql_get_client_info();
+    const char * server_version = MYSQL_SERVER_VERSION
+#ifdef MYSQL_SERVER_SUFFIX
+                                  MYSQL_SERVER_SUFFIX
+#endif /* MYSQL_SERVER_SUFFIX */
+                          ;
+    long cl_version, s_version;
+
+    cl_version = strtol(client_version, NULL, 10);
+    s_version = strtol(server_version, NULL, 10);
+    if (cl_version != s_version)
+    {
+        printf("%s %s: mySQL: compiled for %s, linked with %s client.\n"
+              , time_stamp()
+              , cl_version > s_version ? "Fatal" : "Warning"
+              , server_version, client_version);
+        debug_message("%s %s: mySQL: compiled for %s, linked with %s "
+                      "client.\n"
+                     , time_stamp()
+                     , cl_version < s_version ? "Fatal" : "Warning"
+                     , server_version, client_version);
+        if (cl_version > s_version)
+            return MY_FALSE;
+    }
+    printf("%s mySQL %s\n", time_stamp(), client_version);
+    debug_message("%s mySQL %s\n", time_stamp(), client_version);
+    return MY_TRUE;
+} /* pkg_mysql_init() */
 
 /*-------------------------------------------------------------------------*/
 static db_dat_t *
@@ -273,7 +314,7 @@ raise_db_error (db_dat_t *dat)
  */
 
 {
-    char *tmp;
+    const char *tmp;
     char *err_string;
 
     if ( !dat )
@@ -500,7 +541,7 @@ f_db_error (svalue_t *sp)
 {
     db_dat_t     *dat;
     unsigned int  handle;
-    char         *errmsg;
+    const char   *errmsg;
 
     TYPE_TEST1(sp, T_NUMBER)
 
@@ -831,7 +872,7 @@ f_db_coldefs (svalue_t *sp)
 
     for (i = 0; i < num_fields; i++)
     {
-        put_malloced_string(v->item+i, string_copy(fields[i].name));
+        put_malloced_string(v->item+i, string_copy(fields[i].name) );
     }
 
     free_svalue(sp); /* It's a number */

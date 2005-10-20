@@ -31,7 +31,7 @@ perfekt.
 Wenn man die Variable aus a.c rausnimmt, funktioniert es auch perfekt.
 
 Mit Driver 327 funktionierte das ganze noch. Mit 328-164 kommen die
-angesprochenen Fehler. 
+angesprochenen Fehler.
 
 Wenn man nur c.c laedt, dann funktioniert es auch. Aber beim Laden
 von test.c geht es nicht. Nur zur Information, das test.c ist ein
@@ -40,7 +40,7 @@ stehen fuer thing und container. Daher kommen die Bugs schon beim
 hochfahren des MUDs, da alle moeglichen Variablen mangels create()
 der anderen Subklassen nicht initialisiert werden.
 
-Ich hoffe, das hilft Dir weiter. Die Files hab ich bis aufs 
+Ich hoffe, das hilft Dir weiter. Die Files hab ich bis aufs
 notwendigstes zusammengeschrumpft.
 
 Ciao!

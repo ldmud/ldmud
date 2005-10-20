@@ -19,19 +19,39 @@ DESCRIPTION
         call of set_this_object(), some LPC-constructs might behave in
         an odd manner, or even crash the system. In particular, using
         global variables or calling local functions (except by
-        call_other) is illegal.
-
-        With the current implementation, global variables can be
-        accessed, but this is not guaranteed to work in subsequent
-        versions.
+        call_other) is illegal and actively prevented.
 
         Allowed are call_other, map functions, access of local
         variables (which might hold array pointers to a global array),
         simple arithmetic and the assignment operators.
 
-BUG
-        After set_this_object(), references to global variables and
-        local function should be actively caught and rejected.
+BUGS
+        It is currently not possible to directly restore the original
+        current object. So instead of writing
+
+          object me = this_object();
+          set_this_object(that);
+          <some code>
+          set_this_object(me);
+          <more code>
+
+        one has to use a workaround:
+
+          private void doit (object that) {
+            set_this_object(that);
+            <some code>
+          }
+
+          funcall(#'doit, that);
+          <more code>
+
+        Some people would consider this a feature.
+
+
+HISTORY
+        LDMud 3.2.10 actively prevents references to global variables
+        and function calls by address while set_this_object() is in
+        effect.
 
 SEE ALSO
         this_object(E), set_this_player(E)

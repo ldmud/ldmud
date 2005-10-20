@@ -42,14 +42,17 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/time.h>
+
 #if defined(AMIGA) && !defined(__GNUC__)
 #include "hosts/amiga/nsignal.h"
 #else
 #include <signal.h>
 #include <sys/times.h>
 #endif
+
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <string.h>
 #include <time.h>
 #include <math.h>
 
@@ -69,6 +72,7 @@
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
+#include "mempools.h"
 #include "my-alloca.h"
 #include "object.h"
 #include "otable.h"
@@ -91,13 +95,14 @@
 #define ALARM_TIME  2  /* The granularity of alarm() calls */
 
 /*-------------------------------------------------------------------------*/
+
 mp_int current_time;
   /* The current time, updated every heart beat.
    * TODO: Should be time_t if it is given that time_t is always a skalar.
    */
 
 Bool time_to_call_heart_beat;
-  /* True: It's time to call the heart beat. Set by comm1.c when it recognizes
+  /* True: It's time to call the heart beat. Set by comm.c when it recognizes
    *   an alarm(). */
 
 volatile mp_int alarm_called = MY_FALSE;
@@ -250,7 +255,7 @@ logon (object_t *ob)
     current_object = ob;
     ret = apply(STR_LOGON, ob, 0);
     if (ret == 0) {
-        add_message("prog %s:\n", ob->name);
+        /* add_message("prog %s:\n", ob->name); */
         error("Could not find logon() on the player %s\n", ob->name);
     }
     current_object = save;
@@ -448,6 +453,8 @@ backend (void)
             check_string_table();
 #endif
 
+        check_for_out_connections();
+
         /*
          * Do the extra jobs, if any.
          */
@@ -541,7 +548,7 @@ backend (void)
             extra_jobs_to_do = MY_FALSE;
 
             if (num_dirty_mappings) {
-                compact_mappings((num_dirty_mappings+80) >> 5);
+                compact_mappings((num_dirty_mappings+80) >> 5, MY_FALSE);
                 malloc_privilege = MALLOC_USER;
             }
         } /* if (extra_jobs_to_do */
@@ -647,9 +654,6 @@ backend (void)
          */
         if (time_to_call_heart_beat)
         {
-            object_t *hide_current = current_object;
-              /* TODO: Is there any point to this? */
-
             current_time = get_current_time();
 
             current_object = NULL;
@@ -667,16 +671,18 @@ backend (void)
             do_state_check(2, "after call_out");
 
             /* Reset/cleanup/swap objects.
-             * TODO: Reset and cleanup/swap should be separated.
              */
             process_objects();
             do_state_check(2, "after swap/cleanup/reset");
 
+            /* Other periodic processing */
             command_giver = NULL;
             trace_level = 0;
-            current_object = hide_current;
+
             wiz_decay();
             comm_cleanup_interactives();
+
+            mem_consolidate(MY_FALSE);
         }
 
     } /* end of main loop */
@@ -1101,7 +1107,7 @@ no_clean_up:
 
     /* Restore the error recovery context */
     rt_context = error_recovery_info.rt.last;
-}
+} /* process_objects() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1448,7 +1454,8 @@ e_read_file (char *file, int start, int len)
     if (!len) len = size;
 
     /* Get the memory */
-    str = xalloc((size_t)size + 2); /* allow a trailing \0 and leading ' ' */
+    str = mb_alloc(mbFile, (size_t)size+2);
+      /* allow a trailing \0 and leading ' ' */
     if (!str) {
         fclose(f);
         error("(read_file) Out of memory (%ld bytes) for buffer\n", size+2);
@@ -1468,10 +1475,11 @@ e_read_file (char *file, int start, int len)
         if (size > st.st_size) /* Happens with the last block */
             size = (long)st.st_size;
 
-        if ((!size && start > 1) || fread(str, (size_t)size, 1, f) != 1) {
-                fclose(f);
-            xfree(str-1);
-                return NULL;
+        if ((!size && start > 1) || fread(str, (size_t)size, 1, f) != 1)
+        {
+            fclose(f);
+            mb_free(mbFile);
+            return NULL;
         }
         st.st_size -= size;
         end = str+size;
@@ -1519,10 +1527,11 @@ e_read_file (char *file, int start, int len)
         if (size > st.st_size)
             size = (long)st.st_size;
 
-        if (fread(p2, (size_t)size, 1, f) != 1) {
-                fclose(f);
-            xfree(str-1);
-                return NULL;
+        if (fread(p2, (size_t)size, 1, f) != 1)
+        {
+            fclose(f);
+            mb_free(mbFile);
+            return NULL;
         }
 
         st.st_size -= size;
@@ -1551,7 +1560,7 @@ e_read_file (char *file, int start, int len)
         if ( st.st_size && len > 0) {
             /* tried to read more than READ_MAX_FILE_SIZE */
             fclose(f);
-            xfree(str-1);
+            mb_free(mbFile);
             return NULL;
         }
     }
@@ -1563,7 +1572,7 @@ e_read_file (char *file, int start, int len)
      * get rid of the largish buffer itself.
      */
     p2 = string_copy(str); /* TODO: string_n_copy() */
-    xfree(str-1);
+    mb_free(mbFile);
     if (!p2)
         error("(read_file) Out of memory for result\n");
 
@@ -1627,7 +1636,7 @@ e_read_bytes (char *file, int start, int len)
         return NULL;
     }
 
-    str = xalloc((size_t)len + 1);
+    str = mb_alloc(mbFile, (size_t)len + 1);
     if (!str) {
         close(f);
         return NULL;
@@ -1638,7 +1647,7 @@ e_read_bytes (char *file, int start, int len)
     close(f);
 
     if (size <= 0) {
-        xfree(str);
+        mb_free(mbFile);
         return NULL;
     }
 
@@ -1651,7 +1660,7 @@ e_read_bytes (char *file, int start, int len)
      * of the largish buffer itself.
      */
     p = string_copy(str);
-    xfree(str);
+    mb_free(mbFile);
 
     return p;
 } /* e_read_bytes() */

@@ -41,7 +41,7 @@ Folgendes macht der Hook:
 Getestet hab ichs mit dem Hook als string und als unbound-lambda oder
 lfun-closure im Master.
 Ich hab auch mal Laufzeitfehler im Hook erzeugt bzw. vom Hook selber
-Textausgaben gemacht (ergibt too-deep-recursion). Beides hat 
+Textausgaben gemacht (ergibt too-deep-recursion). Beides hat
 zumindest mal
 nicht gecrasht.
                                                         Ciao, Zwirch
@@ -51,7 +51,7 @@ PS: ich schick die Diffs auch noch an lars@bearnip
 +++ ldmud-164-outputhook/src/comm.c	Tue Feb  8 12:42:57 2000
 @@ -823,6 +823,61 @@
  }
- 
+
  /*-------------------------------------------------------------------------*/
 +
 +char *
@@ -64,7 +64,7 @@ PS: ich schick die Diffs auch noch an lars@bearnip
 +{
 +    svalue_t *svp;
 +    char *output;
-+    
++
 +    svp = NULL;
 +    output=NULL;
 +
@@ -81,7 +81,7 @@ PS: ich schick die Diffs auch noch an lars@bearnip
 +        transfer_svalue(svp = &apply_return_value, inter_sp--);
 +        if (!command_giver)
 +            return NULL;
-+    }    
++    }
 +    else if (closure_hook[H_MODIFY_OUTPUT].type == T_STRING
 +        && !(O_DESTRUCTED & command_giver->flags))
 +    {
@@ -94,7 +94,7 @@ PS: ich schick die Diffs auch noch an lars@bearnip
 +
 +    /* If svp is not NULL, it contains the new, modified output.
 +     */
-+    if (svp && svp->type == T_STRING) 
++    if (svp && svp->type == T_STRING)
 +    {
 +        output=xalloc(svalue_strlen(svp)+1);
 +        if(!output)
@@ -104,13 +104,13 @@ PS: ich schick die Diffs auch noch an lars@bearnip
 +            return NULL;
 +        }
 +        strcpy(output, svp->u.string);
-+    } 
++    }
 +    return output;
-+} 
++}
 +
  void
  add_message (char *fmt, ...)
- 
+
 @@ -870,6 +925,7 @@
         * TODO: Actually, it is used just as a flag for flush/non-flush.
         */
@@ -122,13 +122,13 @@ PS: ich schick die Diffs auch noch an lars@bearnip
 @@ -878,6 +934,7 @@
      object_t      *snooper;  /* Snooper of <ip> */
      int   n;
- 
+
 +    tmp=NULL;
      va_start(va, fmt);
- 
+
      /* Test if the command_giver is a real, living, undestructed user,
 @@ -950,7 +1007,6 @@
- 
+
          if (!sending_telnet_command)
          {
 -
@@ -138,7 +138,7 @@ PS: ich schick die Diffs auch noch an lars@bearnip
 @@ -959,6 +1015,13 @@
              if (shadow_catch_message(command_giver, source))
                  return;
- 
+
 +            /* call the H_MODIFY_OUTPUT-hook
 +             * If the hook modified the output we continue with
 +             * the modified string
@@ -155,7 +155,7 @@ PS: ich schick die Diffs auch noch an lars@bearnip
                      remove_flush_entry(ip);
 +                if(tmp) xfree(tmp);
                  return;
- 
+
                case EWOULDBLOCK:
 @@ -1125,10 +1189,12 @@
                    "%s comm: write EWOULDBLOCK. Message discarded.\n", time_stamp());
@@ -163,12 +163,12 @@ PS: ich schick die Diffs auch noch an lars@bearnip
                      remove_flush_entry(ip);
 +                if(tmp) xfree(tmp);
                  return;
- 
+
                case EMSGSIZE:
                  fprintf(stderr, "%s comm: write EMSGSIZE.\n", time_stamp());
 +                if(tmp) xfree(tmp);
                  return;
- 
+
                case EINVAL:
 @@ -1158,6 +1224,7 @@
              if (old_message_length)
@@ -176,17 +176,17 @@ PS: ich schick die Diffs auch noch an lars@bearnip
              ip->do_close = FLAG_DO_CLOSE;
 +            if(tmp) xfree(tmp);
              return;
- 
+
          } /* for (retries) */
 @@ -1177,7 +1244,8 @@
      } while (*source);
- 
+
      /* --- Final touches --- */
 -
 +    if(tmp) xfree(tmp);
-+  
++
      ip->message_length = length = dest - ip->message_buf;
- 
+
      /* Update the ring of interactives with pending data */
 --- ldmud-164/src/make_func.y	Mon Dec  6 18:41:06 1999
 +++ ldmud-164-outputhook/src/make_func.y	Tue Feb  1 15:10:34 2000
@@ -198,7 +198,7 @@ PS: ich schick die Diffs auch noch an lars@bearnip
 +        return H_MODIFY_OUTPUT;
      return -1;
  }
- 
+
 --- ldmud-164/src/prolang.y	Fri Dec 17 02:05:54 1999
 +++ ldmud-164-outputhook/src/prolang.y	Tue Feb  1 14:40:42 2000
 @@ -180,7 +180,7 @@
@@ -208,7 +208,7 @@ PS: ich schick die Diffs auch noch an lars@bearnip
 -
 +    H_MODIFY_OUTPUT:  SH(T_CLOSURE) SH(T_STRING), \
  #undef SH
- 
+
  /*-------------------------------------------------------------------------*/
 --- ldmud-164/mudlib/sys/driver_hook.h	Tue Sep 28 23:11:40 1999
 +++ ldmud-164-outputhook/mudlib/sys/driver_hook.h	Tue Feb  1 14:39:25 2000
@@ -217,11 +217,11 @@ PS: ich schick die Diffs auch noch an lars@bearnip
  #define H_MODIFY_COMMAND_FNAME  16
  #define H_COMMAND               17
 +#define H_MODIFY_OUTPUT         18
- 
+
 -#define NUM_CLOSURE_HOOKS       18  /* Number of hooks */
 +#define NUM_CLOSURE_HOOKS       19  /* Number of hooks */
- 
+
  #endif /* _DRIVER_HOOK_ */
- 
+
 
 ---------------------------

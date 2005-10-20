@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <trace.h>
+        #include <sys/trace.h>
 
         int trace(int traceflags)
 

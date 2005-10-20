@@ -575,32 +575,35 @@ static p_int current_break_address;
    * variable points to the first offset-part of a series of LBRANCHes
    * which implement the break statement. Stored in every offset-part
    * is the address of the offset of the next LBRANCH in the series. The
-   * last LBRANCH is marked by having a negative offset value.
+   * last FBRANCH is marked by having a negative offset value.
    *
    * There are a few special values/flags for this variable:
    */
-#define BREAK_ON_STACK         0x04000000
+#define BREAK_ADDRESS_MASK   0x0003ffff
+  /* Mask for the offset-address part of the variable.
+   */
+#define BREAK_ON_STACK        (0x04000000)
   /* Bitflag: true when the break-address is stored on the break stack,
    * and therefore the BREAK instruction has to be used.
    */
-#define BREAK_FROM_SWITCH      0x08000000
+#define BREAK_FROM_SWITCH     (0x08000000)
   /* TODO: We are compiling a switch instruction.
    */
-#define CASE_LABELS_ENABLED    0x10000000
+#define CASE_LABELS_ENABLED   (0x10000000)
   /* The "case" and "default" statements are allowed since we're
    * compiling a switch(). This flag is turned off for loops or
    * conditions embedded in a switch().
    */
-#define BREAK_DELIMITER       -0x20000000
+#define BREAK_DELIMITER       (-0x20000000)
   /* Special value: no break encountered (yet).
    */
 
 static p_int current_continue_address;
   /* If != 0, the compiler is in a continue-able environment and this
-   * variable points to the first offset-part of a series of LBRANCHes
+   * variable points to the first offset-part of a series of  FBRANCHes
    * which implement the continue statement. Stored in every offset-part
-   * is the address of the offset of the next LBRANCH in the series. The
-   * last LBRANCH is marked by having a negative offset value.
+   * is the address of the offset of the next FBRANCH in the series. The
+   * last FBRANCH is marked by having a negative offset value.
    *
    * A special case are continues inside a switch, as for these the
    * switch()es have to be terminated too using the BREAK_CONTINUE
@@ -629,7 +632,7 @@ static fulltype_t current_type;
 static p_uint last_expression;
   /* If >= 0, the address of the last instruction which by itself left
    * a value on the stack. If there is no such instruction, the value
-   * is negative.
+   * is (unsigned)-1.
    */
 
 static Bool last_string_is_new;
@@ -1280,12 +1283,18 @@ ins_f_code (unsigned int b)
 
 /*-------------------------------------------------------------------------*/
 static void
-ins_short (short l)
+ins_short (long l)
 
 /* Add the 2-byte number <l> to the A_PROGRAM area in a fixed byteorder.
  */
 
 {
+    short s = (short)l;
+
+    if (l > (long)USHRT_MAX || l < SHRT_MIN)
+        yyerrorf("Compiler error: too large number %lx passed to ins_short()"
+                , l);
+
     if (realloc_a_program(2))
     {
         mp_uint current_size;
@@ -1294,7 +1303,7 @@ ins_short (short l)
         current_size = CURRENT_PROGRAM_SIZE;
         CURRENT_PROGRAM_SIZE = current_size + 2;
         dest = mem_block[A_PROGRAM].block + current_size;
-        PUT_SHORT(dest, l);
+        PUT_SHORT(dest, s);
     }
     else
     {
@@ -1305,7 +1314,7 @@ ins_short (short l)
 
 /*-------------------------------------------------------------------------*/
 static void
-upd_short (mp_uint offset, short l)
+upd_short (mp_uint offset, long l)
 
 /* Store the 2-byte number <l> at <offset> in the A_PROGRAM are in
  * a fixed byteorder.
@@ -1313,9 +1322,14 @@ upd_short (mp_uint offset, short l)
 
 {
     char *dest;
+    short s = (short)l;
+
+    if (l > (long)USHRT_MAX || l < SHRT_MIN)
+        yyerrorf("Compiler error: too large number %ld passed to upd_short()"
+                , l);
 
     dest = mem_block[A_PROGRAM].block + offset;
-    PUT_SHORT(dest, l);
+    PUT_SHORT(dest, s);
 } /* upd_short() */
 
 /*-------------------------------------------------------------------------*/
@@ -1333,25 +1347,6 @@ read_short (mp_uint offset)
     GET_SHORT(l, dest);
     return l;
 } /* read_short() */
-
-%ifdef INITIALIZATION_BY___INIT
-/*-------------------------------------------------------------------------*/
-static void
-upd_offset (mp_uint offset, long l)
-
-/* Store the 3-byte number <l> at <offset> in the A_PROGRAM are in
- * a fixed byteorder.
- */
-
-{
-    char *dest;
-
-    dest = mem_block[A_PROGRAM].block + offset;
-    STORE_UINT8(dest, l>>16);
-    PUT_SHORT(dest, l & 0xffff);
-} /* upd_offset() */
-
-%endif /* INITIALIZATION_BY___INIT */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1377,6 +1372,56 @@ ins_long (int32 l)
                 , mem_block[A_PROGRAM].current_size + 4);
     }
 } /* ins_long() */
+
+/*-------------------------------------------------------------------------*/
+static void
+upd_long (mp_uint offset, long l)
+
+/* Store the 4-byte number <l> at <offset> in the A_PROGRAM are in
+ * a fixed byteorder.
+ */
+
+{
+    char *dest;
+
+    dest = mem_block[A_PROGRAM].block + offset;
+    PUT_LONG(dest, l);
+} /* upd_long() */
+
+/*-------------------------------------------------------------------------*/
+static long
+read_long (mp_uint offset)
+
+/* Return the 4-byte number stored at <offset> in the A_PROGRAM area.
+ */
+
+{
+    long l;
+    char *dest;
+
+    dest = mem_block[A_PROGRAM].block + offset;
+    GET_LONG(l, dest);
+    return l;
+} /* read_long() */
+
+%ifdef INITIALIZATION_BY___INIT
+/*-------------------------------------------------------------------------*/
+static void
+upd_offset (mp_uint offset, long l)
+
+/* Store the 3-byte number <l> at <offset> in the A_PROGRAM are in
+ * a fixed byteorder.
+ */
+
+{
+    char *dest;
+
+    dest = mem_block[A_PROGRAM].block + offset;
+    STORE_UINT8(dest, l>>16);
+    PUT_SHORT(dest, l & 0xffff);
+} /* upd_offset() */
+
+%endif /* INITIALIZATION_BY___INIT */
 
 /*-------------------------------------------------------------------------*/
 /* The following macros are used for a speedy codegeneration within bigger
@@ -1490,9 +1535,10 @@ fix_branch (int ltoken, p_int dest, p_int loc)
         if ( current_break_address > loc
          && !(current_break_address & (BREAK_ON_STACK|BREAK_DELIMITER) ) )
         {
-            for (i = current_break_address; (j = read_short(i)) > loc; )
+            for (i = current_break_address & BREAK_ADDRESS_MASK
+                ; (j = read_long(i)) > loc; )
             {
-                upd_short(i, j+1);
+                upd_long(i, j+1);
                 i = j;
             }
             current_break_address++;
@@ -1503,9 +1549,9 @@ fix_branch (int ltoken, p_int dest, p_int loc)
          && !(current_continue_address & CONTINUE_DELIMITER ) )
         {
             for(i = current_continue_address & CONTINUE_ADDRESS_MASK;
-              (j=read_short(i)) > loc; )
+              (j=read_long(i)) > loc; )
             {
-                upd_short(i, j+1);
+                upd_long(i, j+1);
                 i = j;
             }
             current_continue_address++;
@@ -1526,7 +1572,8 @@ fix_branch (int ltoken, p_int dest, p_int loc)
         upd_short(loc, offset+2);
 
         if (offset > 0x7ffd)
-            yyerror("offset overflow");
+            yyerrorf("Compiler limit: Too much code to branch over: %ld bytes"
+                    , offset);
 
         return MY_TRUE;
     }
@@ -1578,9 +1625,9 @@ yymove_switch_instructions (int len, p_int blocklen)
          && !(current_continue_address & CONTINUE_DELIMITER ) )
         {
             for(i = current_continue_address & CONTINUE_ADDRESS_MASK;
-              (j=read_short(i)) > switch_pc; )
+              (j=read_long(i)) > switch_pc; )
             {
-                    upd_short(i, j+len);
+                    upd_long(i, j+len);
                     i = j;
             }
             current_continue_address += len;
@@ -1662,7 +1709,8 @@ update_lop_branch ( p_uint address, int instruction )
         p[-3] = instruction;
         upd_short(address+1, offset+3);
         if (offset > 0x7ffc)
-            yyerror("offset overflow");
+            yyerrorf("Compiler limit: Too much code to skip for ||/&&:"
+                     " %ld bytes" , offset);
         p[0]  = F_POP_VALUE;
     }
     else
@@ -3106,8 +3154,8 @@ free_const_list_svalue (svalue_t *svp)
   /* Number of variables given to foreach
    */
 
-%type <number> opt_catch_mods
-  /* Bitflags for catch() modes: 1: nolog
+%type <number> opt_catch_mods opt_catch_mod_list opt_catch_modifier
+  /* Bitflags for catch() modes: CATCH_FLAG_xxx from simulate.h
    */
 
 /* Special uses of <numbers> */
@@ -3195,7 +3243,9 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
           else
           {
               if (pragma_strict_types != PRAGMA_WEAK_TYPES)
-                  yyerror("\"#pragma strict_types\" requires type of function");
+                  yyerrorf("\"#pragma %s_types\" requires type of function"
+                          , pragma_strict_types == PRAGMA_STRICT_TYPES
+                            ? "strict" : "strong" );
               exact_types = 0;
           }
 
@@ -3365,9 +3415,7 @@ function_body:
 
       block
 
-%ifdef YACC_CANNOT_MIX_ANONYMOUS_WITH_DEFAULT
       { $$ = $<number>1; }
-%endif
 
     | ';' { $$ = -1; }
 ; /* function_body */
@@ -4257,11 +4305,14 @@ statement:
           }
           else
           {
-              /* A normal loop break: add the LBRANCH to the list */
+              /* A normal loop break: add the FBRANCH to the list */
 
-              ins_byte(F_LBRANCH);
-              ins_short(current_break_address);
-              current_break_address = CURRENT_PROGRAM_SIZE - 2;
+              ins_byte(F_FBRANCH);
+              ins_long(current_break_address & BREAK_ADDRESS_MASK);
+              current_break_address = CURRENT_PROGRAM_SIZE - 4;
+              if (current_break_address > BREAK_ADDRESS_MASK)
+                  yyerrorf("Compiler limit: (L_BREAK) value too large: %ld"
+                          , current_break_address);
           }
       }
 
@@ -4283,7 +4334,7 @@ statement:
               {
                   ins_f_code(F_BREAKN_CONTINUE);
                   ins_byte(255);
-                  ins_short(2);
+                  ins_long(4);
                   depth -= SWITCH_DEPTH_UNIT*256;
               }
 
@@ -4302,14 +4353,14 @@ statement:
           else
           {
               /* Normal continue */
-              ins_byte(F_LBRANCH);
+              ins_byte(F_FBRANCH);
           }
 
           /* In either case, handle the list of continues alike */
-          ins_short(current_continue_address);
+          ins_long(current_continue_address & CONTINUE_ADDRESS_MASK);
           current_continue_address =
                         ( current_continue_address & SWITCH_DEPTH_MASK ) |
-                        ( CURRENT_PROGRAM_SIZE - 2 );
+                        ( CURRENT_PROGRAM_SIZE - 4 );
       }
 ; /* statement */
 
@@ -4451,8 +4502,8 @@ while:
           for ( ; current_continue_address > 0
                 ; current_continue_address = next_addr)
           {
-              next_addr = read_short(current_continue_address);
-              upd_short(current_continue_address,
+              next_addr = read_long(current_continue_address);
+              upd_long(current_continue_address,
                   CURRENT_PROGRAM_SIZE - current_continue_address);
           }
 
@@ -4497,8 +4548,8 @@ while:
           for( ; current_break_address > 0
                ; current_break_address = next_addr)
           {
-              next_addr = read_short(current_break_address);
-              upd_short(current_break_address,
+              next_addr = read_long(current_break_address);
+              upd_long(current_break_address,
                   CURRENT_PROGRAM_SIZE - current_break_address);
           }
 
@@ -4544,8 +4595,8 @@ do:
           for(; current_continue_address > 0
               ; current_continue_address = next_addr)
           {
-              next_addr = read_short(current_continue_address);
-              upd_short(current_continue_address,
+              next_addr = read_long(current_continue_address);
+              upd_long(current_continue_address,
                   current - current_continue_address);
           }
       }
@@ -4617,8 +4668,8 @@ do:
           for (; current_break_address > 0
                ; current_break_address = next_addr)
           {
-              next_addr = read_short(current_break_address);
-              upd_short(current_break_address,
+              next_addr = read_long(current_break_address);
+              upd_long(current_break_address,
                   current - current_break_address);
           }
 
@@ -4648,6 +4699,7 @@ for:
       L_FOR '('
 
       {
+%line
           /* Save the previous environment */
           $<numbers>$[0] = current_continue_address;
           $<numbers>$[1] = current_break_address;
@@ -4661,6 +4713,7 @@ for:
       for_init_expr ';'
 
       {
+%line
           /* Get rid of whatever init_expr computed */
           insert_pop_value();
 
@@ -4772,8 +4825,8 @@ for:
           for (; current_continue_address > 0
                ; current_continue_address = next_addr)
           {
-              next_addr = read_short(current_continue_address);
-              upd_short(current_continue_address,
+              next_addr = read_long(current_continue_address);
+              upd_long(current_continue_address,
                   CURRENT_PROGRAM_SIZE - current_continue_address);
           }
 
@@ -4830,8 +4883,8 @@ for:
           for (; current_break_address > 0
                ; current_break_address = next_addr)
           {
-              next_addr = read_short(current_break_address);
-              upd_short(current_break_address,
+              next_addr = read_long(current_break_address);
+              upd_long(current_break_address,
                   CURRENT_PROGRAM_SIZE - current_break_address);
           }
 
@@ -5100,7 +5153,6 @@ foreach:
               ins_f_code(F_POP_VALUE);
               current++;
           }
-
           else /* Create the full statement */
           {
               /* First patch up the continue statements */
@@ -5108,8 +5160,8 @@ foreach:
               for(; current_continue_address > 0
                   ; current_continue_address = next_addr)
               {
-                  next_addr = read_short(current_continue_address);
-                  upd_short(current_continue_address,
+                  next_addr = read_long(current_continue_address);
+                  upd_long(current_continue_address,
                       current - current_continue_address);
               }
 
@@ -5129,8 +5181,8 @@ foreach:
               for (; current_break_address > 0
                    ; current_break_address = next_addr)
               {
-                  next_addr = read_short(current_break_address);
-                  upd_short(current_break_address,
+                  next_addr = read_long(current_break_address);
+                  upd_long(current_break_address,
                       current - current_break_address);
               }
 
@@ -5245,18 +5297,23 @@ foreach_in:
  *
  * Note that the actual switch rule is:
  *
- *   switch: L_SWITCH ( comma_expr ) statement
+ *   switch: L_SWITCH ( comma_expr ) block
  *
  * and that case and default are both just special kinds of statement
- * which mark addresses with in the statement code to which the
+ * which mark addresses within the statement code to which the
  * switch statement may jump.
  *
- * That also means that the code
+ * That also means that in contrast to C the code
  *
  *    switch(x);
  * or switch(x) write("Foo");
  *
- * is syntactically ok, even though it wouldn't do anything.
+ * is syntactically not ok.
+ *
+ * TODO: Since current_break_address is used to indicate an active switch(),
+ * TODO:: the compiler can't compile Duff's device: the inner while() hides
+ * TODO:: active switch(). If that is fixed, we can change the 'block'
+ * TODO:: back to 'statement' in the grammar rule.
  */
 
 switch:
@@ -5303,7 +5360,7 @@ switch:
             current_continue_address += SWITCH_DEPTH_UNIT;
       }
 
-      statement
+      block
 
       {
 %line
@@ -5400,7 +5457,11 @@ case: L_CASE case_label ':'
         if ($2.key >= $4.key)
         {
             if ($2.key > $4.key)
+            {
+                yyerrorf("Illegal case range: lower limit %ld > upper limit %ld"
+                        , (long)$2.key, (long)$4.key);
                 break;
+            }
             if ( !(temp = new_case_entry()) )
             {
                 yyerror("Out of memory: new case entry");
@@ -5623,7 +5684,7 @@ constant:
           }
           else
           {
-              yyerror("division by zero");
+              yyerror("modulus by zero");
               $$ = 0;
           }
       }
@@ -5828,6 +5889,18 @@ expr0:
                   {
                   case TYPE_FLOAT:
                       if (type2 == TYPE_NUMBER)
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
+                  }
+                  break;
+
+              case F_AND_EQ:
+                  switch(type1)
+                  {
+                  case TYPE_MAPPING:
+                      if (type2 & TYPE_MOD_POINTER)
                       {
                           ok = MY_TRUE;
                       }
@@ -6101,6 +6174,17 @@ expr0:
                &&  second_type == TYPE_ANY )
               {
                     /* $$ == TYPE_ANY is correct */
+              }
+              else if (first_type == TYPE_MAPPING)
+              {
+                  if (second_type != TYPE_MAPPING
+                   && !(second_type & TYPE_MOD_POINTER)
+                   && second_type != TYPE_ANY
+                     )
+                  {
+                      type_error("Bad argument 2 to &", second_type );
+                  }
+                  $$.type = TYPE_MAPPING;
               }
               else if ( (first_type | second_type) & TYPE_MOD_POINTER)
               {
@@ -6646,6 +6730,19 @@ expr0:
                   break;
               }
           }
+          else if (pragma_warn_empty_casts)
+          {
+              if ($2.type == $1)
+              {   if ($2.type != TYPE_ANY)
+                      yywarnf("casting a value to its own type: %s"
+                             , get_type_name($1));
+              }
+              else if ($2.type != TYPE_UNKNOWN && $2.type != TYPE_ANY)
+                  yywarnf("cast will not convert the value: %s"
+                         , get_two_types($1, $2.type)
+                      );
+          }
+
           $$.end = CURRENT_PROGRAM_SIZE;
       }
 
@@ -9308,7 +9405,8 @@ catch:
       {
           $<address>$ = CURRENT_PROGRAM_SIZE;
           ins_byte(F_CATCH);
-          ins_byte(0);
+          ins_byte(0); /* Placeholder for flags */
+          ins_byte(0); /* Placeholder for the jump offset */
       }
 
       '(' comma_expr opt_catch_mods ')'
@@ -9326,12 +9424,12 @@ catch:
           if ($5)
           {
               bytecode_p p;
-              p = PROGRAM_BLOCK + start;
-              *p = F_CATCH_NO_LOG;
+              p = PROGRAM_BLOCK + start + 1;
+              *p = $5 & 0xff;
           }
 
           /* Update the offset field of the CATCH instruction */
-          offset = CURRENT_PROGRAM_SIZE - (start + 2);
+          offset = CURRENT_PROGRAM_SIZE - (start + 3);
           if (offset >= 0x100)
           {
               /* Too big offset, change
@@ -9365,13 +9463,13 @@ catch:
               p[-4] = F_BRANCH ;
               p[-3] = 3;
               p[-2] = F_LBRANCH;
-              upd_short(start + 5, offset+2);
+              upd_short(start + 6, offset+2);
               if (offset > 0x7ffd)
                   yyerror("offset overflow");
           }
           else
           {
-              mem_block[A_PROGRAM].block[start+1] = offset;
+              mem_block[A_PROGRAM].block[start+2] = offset;
           }
 
           $$.start = start;
@@ -9382,18 +9480,47 @@ catch:
 
 
 opt_catch_mods :
-      ';' L_IDENTIFIER
-
+      ';' opt_catch_mod_list
       {
-          if (strcmp($2->name, "nolog"))
-              yyerror("Expected keyword 'nolog' in catch()");
-          if ($2->type == I_TYPE_UNKNOWN)
-              free_shared_identifier($2);
-          $$ = 1;
+          $$ = $2;
+      }
+
+    | /* empty */
+      {
+         $$  = 0;
+      }
+; /* opt_catch_mods */
+
+opt_catch_mod_list :
+      opt_catch_mod_list ',' opt_catch_modifier
+      {
+          $$ = $1 | $3;
+      }
+
+    | opt_catch_modifier
+      {
+          $$ = $1;
+      }
+; /* opt_catch_mod_list */
+
+
+opt_catch_modifier :
+      L_IDENTIFIER
+      {
+          $$ = 0;
+
+          if (!strcmp($1->name, "nolog"))
+              $$ = CATCH_FLAG_NOLOG;
+          else if (!strcmp($1->name, "publish"))
+              $$ = CATCH_FLAG_PUBLISH;
+          else
+              yyerror("Illegal modifier in catch() - "
+                      "expected 'nolog' or 'publish'");
+          if ($1->type == I_TYPE_UNKNOWN)
+              free_shared_identifier($1);
       }
 
     | ';' L_LOCAL
-
       {
           ident_t *id;
 
@@ -9402,18 +9529,15 @@ opt_catch_mods :
               if (id->u.local.num == $2)
                   break;
 
-          if (id && strcmp(id->name, "nolog"))
-              yyerror("Expected keyword 'nolog' in catch()");
-
-          $$ = 1;
+          if (id && !strcmp(id->name, "nolog"))
+              $$ = CATCH_FLAG_NOLOG;
+          else if (id && !strcmp(id->name, "publish"))
+              $$ = CATCH_FLAG_PUBLISH;
+          else
+              yyerror("Illegal modifier in catch() - "
+                      "expected 'nolog' or 'publish'");
       }
-
-    | /* empty */
-
-      {
-         $$  = 0;
-      }
-; /* opt_catch_mods */
+; /* opt_catch_modifier */
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -9808,9 +9932,7 @@ const_expr_list2:
       }
 
       svalue_constant
-%ifdef YACC_CANNOT_MIX_ANONYMOUS_WITH_DEFAULT
       { $$ = $<const_list>1; }
-%endif
 
     | const_expr_list2 ','
       {
@@ -11750,18 +11872,17 @@ store_include_info (char *name, char * filename, char delim, int depth)
 
 /*-------------------------------------------------------------------------*/
 void
-store_include_end (mp_uint inc_offset)
+store_include_end (mp_uint inc_offset, int include_line)
 
 /* The current include ended. <inc_offset> has to be the offset returned by
- * store_include_info() for this include file.
- * <current_line> is already supposed to be the restored value from the
- * including file.
+ * store_include_info() for this include file, <include_line> is the
+ * line number of the #include statement in the including file.
  */
 
 {
     unsigned char c;
 
-    stored_lines = current_line-1;
+    stored_lines = include_line;
     if (last_include_start == mem_block[A_LINENUMBERS].current_size)
     {
         include_t * inc = (include_t *)(mem_block[A_INCLUDES].block + inc_offset);

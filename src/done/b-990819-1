@@ -44,7 +44,7 @@ refuses to compile with that error.  Now for the really weird part.  The place
 I've been testing it is a test lib I use for development.  When I uploaded the
 file to the real mud, it compiled fine!  So then I started looking at the
 driver for errors.  Both muds are 3.2.6 (though it also occurs on later
-versions of the driver), both compiled using byacc (though I tried yacc too). 
+versions of the driver), both compiled using byacc (though I tried yacc too).
 The test mud, I used both gcc 2.8.1 and gcc 2.7.2.3.  The real mud was
 compiled
 with gcc 2.7.2.1.  The only other difference I see that could make a

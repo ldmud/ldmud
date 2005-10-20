@@ -17,7 +17,7 @@ inherit "testi2";
 void create()
 {
  set_heart_beat(1);
-} 
+}
 
 ---testi1.c-------
 private void heart_beat()

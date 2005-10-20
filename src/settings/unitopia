@@ -34,6 +34,7 @@ with_max_cost=450000
 # --- Communication ---
 with_portno=3333
 with_udp_port=3335
+enable_use_mccp=yes
 
 #----------- Compilation Options ----------
 enable_malloc_trace=yes
@@ -50,6 +51,7 @@ enable_access_control=no
 enable_supply_parse_command=no
 enable_use_mysql=no
 enable_use_deprecated=no
+enable_lpc_array_calls=yes
 
 # --- Runtime limits ---
 with_catch_reserved_cost=0x10000

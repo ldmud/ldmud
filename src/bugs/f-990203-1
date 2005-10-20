@@ -10,7 +10,7 @@ I know obs & users(), works already, but not the others.
 alfebtcd wrote:
 
 > &= also works already.
-> 
+>
 > i assume that | and |= are supposed to do an "or" of two arrays; did you
 > consider that adding the operands is normally enough?  i never was in
 > need of anything else.  doubled occurances never troubled me yet.

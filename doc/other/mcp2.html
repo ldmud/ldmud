@@ -1,7 +1,7 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
 <HTML>
 <HEAD>
-<LINK REV=MADE HREF="mailto:mcp-dev@research.att.com"> 
+<LINK REV=MADE HREF="mailto:mcp-dev@research.att.com">
 <TITLE>MCP 2.1</TITLE>
 </HEAD>
 <BODY>
@@ -109,8 +109,8 @@ A network service which implements the MUD's shared space.
 <DT> Connection Endpoint
 <DD> Since, for most part, MCP is peer-to-peer and has no built-in
 concept of "client" or "server",
-we use <EM>connection endpoint</EM> to refer to either a 
-client or a server.  
+we use <EM>connection endpoint</EM> to refer to either a
+client or a server.
 
 Likewise "implementations" should be taken to mean
 either client or server implementations of MCP.
@@ -172,8 +172,8 @@ All network lines beginning with the literal string
 <DD> An MCP <EM>message</EM> is a structured entity consisting of a
 <EM>message name</EM> identifying the class (kind) of the message
 (usually indicating an action to be taken),
-an <EM>authentication key</EM>, and 
-a keyword-to-value mapping that comprises the <EM>arguments</EM> 
+an <EM>authentication key</EM>, and
+a keyword-to-value mapping that comprises the <EM>arguments</EM>
 of the message.
 
 How a given MCP message is formatted as a sequence of out-of-band
@@ -349,7 +349,7 @@ of message names, keywords, or values.</P>
 &lt;keyvals&gt; ::= '' |  &lt;space&gt; &lt;keyval&gt; &lt;keyvals&gt;
 &lt;keyval&gt; ::= &lt;key&gt; ':' &lt;space&gt; &lt;value&gt;
 &lt;key&gt; ::= &lt;simple-key&gt; | &lt;multiline-key&gt;
-&lt;simple-key&gt; ::= &lt;ident&gt; 
+&lt;simple-key&gt; ::= &lt;ident&gt;
 &lt;multiline-key&gt; ::= &lt;ident&gt; '*'
 </PRE>
 <HR>
@@ -476,14 +476,14 @@ the literal string <SAMP>#$#:</SAMP> followed by the data tag.</P>
 <PRE>
     #$#spam 12345 from: Biff text*: "" _data-tag: 9b76
     #$#* 9b76 text: This is some sample text.
-    #$#* 9b76 text: 
+    #$#* 9b76 text:
     #$#* 9b76 text: Note that you don't need to quote strings
     #$#* 9b76 text: in multiline data.  Also, you can include "special"
     #$#* 9b76 text: characters like quotes.  Everything after the
     #$#* 9b76 text: space after the keyword and colon is considered
     #$#* 9b76 text: part of the value.
     #$#* 9b76 text:     This means that spaces can also be part of the value.
-    #$#: 9b76 
+    #$#: 9b76
 </PRE>
 
 <P>Multiline values lack authentication keys; the data tags are
@@ -754,7 +754,7 @@ describes version 2.0).</P>
 <P>The <SAMP>mcp-negotiate</SAMP> package consists of two messages:</P>
 <UL>
 <LI><SAMP>mcp-negotiate-can</SAMP>, which is used to inform the
-other side of a connection of the packages supported by an 
+other side of a connection of the packages supported by an
 implementation, and the range of versions supported.
 <LI><SAMP>mcp-negotiate-end</SAMP>, which indicates that an
 implementation has sent <SAMP>mcp-negotiate-can</SAMP> messages
@@ -813,7 +813,7 @@ the MCP version negotiation phase.  With the exception of the
 <SAMP>mcp-negotiate</SAMP> package, neither the client nor the
 server should assume that any package is available on the other until
 an <SAMP>mcp-negotiate-can</SAMP> message is received for that
-package.  
+package.
 </P>
 
 <P>The <SAMP>mcp-negotiate-end</SAMP> message indicates that
@@ -1073,7 +1073,7 @@ reply. However, due to potential race conditions, an
 <SAMP>mcp-cord-closed</SAMP> message <EM>may</EM> be received by an
 endpoint which has already sent a <SAMP>mcp-cord-closed</SAMP> message
 for the same cord.  As with any message on a closed cord, these
-messages should be ignored.</P> 
+messages should be ignored.</P>
 </DL>
 
 <H2>Authors</H2>
@@ -1112,7 +1112,7 @@ syntactically significant.
 &lt;keyvals&gt; ::= '' |  &lt;space&gt; &lt;keyval&gt; &lt;keyvals&gt;
 &lt;keyval&gt; ::= &lt;key&gt; ':' &lt;space&gt; &lt;value&gt;
 &lt;key&gt; ::= &lt;simple-key&gt; | &lt;multiline-key&gt;
-&lt;simple-key&gt; ::= &lt;ident&gt; 
+&lt;simple-key&gt; ::= &lt;ident&gt;
 &lt;multiline-key&gt; ::= &lt;ident&gt; '*'
 &lt;value&gt; ::= &lt;unquoted-string&gt; | &lt;quoted-string&gt;
 

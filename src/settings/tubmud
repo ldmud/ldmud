@@ -51,5 +51,4 @@ enable_use_alists=yes
 # --- Compilation Options ---
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
-
-
+enable_malloc_sbrk_trace=yes

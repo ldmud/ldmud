@@ -4,7 +4,7 @@ Date: 2002-05-07
 Type: Feature
 State: New
 
-mapping1 & 0-width-mapping: all elements from mapping1 whose key 
+mapping1 & 0-width-mapping: all elements from mapping1 whose key
 exists in 0-width-mapping
 
 mapping & array: all elements from mapping whose key is in array.

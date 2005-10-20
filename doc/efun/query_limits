@@ -1,7 +1,6 @@
 PRELIMINARY
 SYNOPSIS
-
-        #include <rtlimits.h>
+        #include <sys/rtlimits.h>
 
         int * query_limits()
         int * query_limits(int default)

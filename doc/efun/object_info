@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <objectinfo.h>
+        #include <sys/objectinfo.h>
         mixed * object_info (object ob, int what)
         mixed * object_info (object ob, int what, int index)
 

@@ -124,7 +124,7 @@ DEBUG: 2001.12.21 06:02:12 GC found 1686 malloced strings using 79191 bytes.
 ]SELFDESTRUCT ROOM: room/mine/tunnel4
 ]SELFDESTRUCT ROOM: room/mine/tunnel2
 ]==> 0
-] An expansive veldt. To the west is a stout tree stump. 
+] An expansive veldt. To the west is a stout tree stump.
 There are five obvious exits: church, snail, east, bored and west.
 2001.12.22 01:30:12 [erq] read: EOF
 2001.12.22 01:30:12 [erq] Read 0, should be 9!
@@ -214,15 +214,15 @@ $1 = (object_t *) 0x2
 2001.12.20 16:17:52 Connection reset by peer detected.
 
 ==> lplog.011220.175700 <==
-2001.12.20 12:44:12 players/dragonlady/yipe/trousers.c: Illegal character (hex 2e) '.' line 47 
-2001.12.20 12:44:12 players/dragonlady/yipe/trousers.c: Illegal character (hex 5c) '\' line 47 
-2001.12.20 12:44:12 players/dragonlady/yipe/trousers.c: Newline in string line 47 
-2001.12.20 12:44:12 players/dragonlady/yipe/trousers.c: syntax error line 51 
+2001.12.20 12:44:12 players/dragonlady/yipe/trousers.c: Illegal character (hex 2e) '.' line 47
+2001.12.20 12:44:12 players/dragonlady/yipe/trousers.c: Illegal character (hex 5c) '\' line 47
+2001.12.20 12:44:12 players/dragonlady/yipe/trousers.c: Newline in string line 47
+2001.12.20 12:44:12 players/dragonlady/yipe/trousers.c: syntax error line 51
 ]The plains stretch away to the north and east.  Some hilly country
 rises to the west, while the forest broods to the south.  The sky is
 totally hung with clouds and the sun can barely be seen through them
 on this cold winter day.
-There are seven obvious exits: north, northwest, northeast, west, 
+There are seven obvious exits: north, northwest, northeast, west,
     east, southwest and southeast.
 ]Mansion of Kantele is to the south.
 2001.12.20 13:56:59 Could not load descr for 'players/dragonlady/yipe/hpants'
@@ -238,7 +238,7 @@ There are seven obvious exits: north, northwest, northeast, west,
 illuminate a dome at the far end of the church. The tower of the
 church lies east of the entrance. The place in front of the church is
 bordered by a pit to the west and the main road, crossing the meadow
-to the south. A note is pinned to the signpost beside the portal. 
+to the south. A note is pinned to the signpost beside the portal.
 There are several clouds in the sky and the sun is shining upon you on
 this cold winter day.
 There are two obvious exits: southeast and north.
@@ -252,7 +252,7 @@ gerade im Wohnzimmer neben einem offenen Kamin, in dem ein angenehm
 wärmendes Feuer brennt.   Vor dem Kamin liegt ein Schaffell, das zum
 Niedersitzen und Anwärmen verführt.   An der Wand darüber hängt ein
 Bild.   Im anderen Teil des Zimmers steht ein gemütliches Sofa und ein
-kleiner Tisch für den Nachmittagstee.   
+kleiner Tisch für den Nachmittagstee.
 There are five obvious exits: church, door, north, west and pub.
 ]Rebel  (9.11.01).
 ]Phylax is coding again (Watch out!).
@@ -260,7 +260,7 @@ There are five obvious exits: church, door, north, west and pub.
 ]Bild.
 ]Sofa (unoccupied).
 ]SELFDESTRUCT ROOM: room/mine/tunnel4
-2001.12.20 17:21:37 players/zogaric/theater/booth_room.c: Warning: Redefinition of #define TP line 30 
+2001.12.20 17:21:37 players/zogaric/theater/booth_room.c: Warning: Redefinition of #define TP line 30
 2001.12.20 17:52:21 [erq] read: EOF
 2001.12.20 17:52:21 [erq] Read 0, should be 9!
 2001.12.20 17:52:21 [erq] Giving up.

@@ -34,6 +34,10 @@
 #    endif
 #endif /* MALLOC_LPC_TRACE */
 
+/* The minimum allocation size in words */
+
+#define SMALLOC_MIN_SIZE (2)
+
 #define malloced_size(ptr) ( ((p_uint *)(ptr))[-SMALLOC_OVERHEAD] & M_MASK )
 
 /* TODO: svalue_strlen() should go into a strings/datatypes module.
@@ -58,6 +62,8 @@ static INLINE size_t _svalue_strlen (svalue_t *v)
                      ( ((p_uint*)p)[-SMALLOC_OVERHEAD] & M_MASK)
                      - SMALLOC_OVERHEAD - 1
                     ) * SIZEOF_CHAR_P;
+        if (i <= SMALLOC_MIN_SIZE * sizeof(p_uint))
+            return strlen(p);
         if (*(p += i))
         {
             /* The string ends somewhere in this word */
@@ -85,6 +91,10 @@ static INLINE size_t _svalue_strlen (svalue_t *v)
         if (i >= 0)
 #if SIZEOF_CHAR_P == 4
         {
+#if SMALLOC_MIN_SIZE > 1
+            if (i <= SMALLOC_MIN_SIZE * sizeof(p_uint))
+                return strlen(p);
+#endif
             if (*(p+=i))
             {
                 if (*++p)
@@ -99,8 +109,11 @@ static INLINE size_t _svalue_strlen (svalue_t *v)
         if (!*p) return 0;
         return 1;
 #else
+#if SMALLOC_MIN_SIZE > 1
+        if (i <= SMALLOC_MIN_SIZE * sizeof(p_uint))
+            return strlen(p);
+#endif
         return (size_t)i + strlen(p+i);
-        return strlen(p);
 #endif
     }
     else /* volatile/constant string */
@@ -130,11 +143,12 @@ extern int debugmalloc;
  */
 #ifdef MALLOC_TRACE
 extern POINTER smalloc(size_t size, const char *file, int line) MALLOC;
+extern POINTER rexalloc_traced(POINTER ptr, size_t size, const char *file, int line);
 #else
 extern POINTER smalloc(size_t size) MALLOC;
+extern POINTER rexalloc_traced(POINTER ptr, size_t size);
 #endif
 
-extern POINTER rexalloc(POINTER ptr, size_t size);
 extern POINTER amalloc(size_t size) MALLOC;
 extern POINTER pxalloc(size_t size) MALLOC;
 extern void xfree(POINTER ptr);
@@ -147,8 +161,14 @@ extern void dump_malloc_data(strbuf_t *sbuf);
 extern void smalloc_dinfo_data(svalue_t *svp, int value);
 extern void clear_M_REF_flags(void);
 extern void free_unreferenced_memory(void);
-extern void consolidate_freelists (void);
-extern void *malloc_increment_size(void *p, size_t size);
+extern void mem_consolidate(Bool force);
+#ifdef MALLOC_TRACE
+extern void *mem_increment_size(void *p, size_t size, const char *file, int line);
+#define malloc_increment_size(p,size) mem_increment_size(p,size,__FILE__, __LINE__)
+#else
+extern void *mem_increment_size(void *p, size_t size);
+#define malloc_increment_size(p,size) mem_increment_size(p,size)
+#endif
 extern void walk_new_small_malloced( void (*func)(POINTER, long) );
 
 #ifdef MALLOC_TRACE

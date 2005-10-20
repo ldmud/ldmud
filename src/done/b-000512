@@ -44,7 +44,7 @@ das Evermore vom Netz muss.... *sigh deeply*
 >Client?
 
 Ich habe das Problem bis jetzt bei ZMud beobachtet, und selbst ein
-simples Telnet unter Windows aendert nichts. 
+simples Telnet unter Windows aendert nichts.
 Es gibt aber einige Dinge die ich berichten kann. Evermore ist zur
 Zeit auf dem Weg von COMPAT zu NATIVE. Daher existiert bereits eine
 simplere Architektur die komplett native ist. Der Player und viele
@@ -55,20 +55,20 @@ mehr Traffic erzeugen, als andere die auch Windows benutzen. So hatte
 ich heute einen Spieler der hat 5x mehr Traffic mit Win98 produziert
 als ich mit Win2000.
 
->Was schoen waere, waere eine Beschreibung wie man dieses 
->Fehlverhalten gezielt produziert, sowie ein Log der dabei gesendeten 
+>Was schoen waere, waere eine Beschreibung wie man dieses
+>Fehlverhalten gezielt produziert, sowie ein Log der dabei gesendeten
 >Daten speziell vom Anfang des Fehlverhaltens.
 
 Das ist mein Problem, ich hab keine Ahnung wie ich genau sehen, welche
-Daten gesendet werden. Ich habe bisher nur ein tcpdump gemacht. Gibt 
-es eine Moeglichkeit direkt die Daten einzusehen? 
+Daten gesendet werden. Ich habe bisher nur ein tcpdump gemacht. Gibt
+es eine Moeglichkeit direkt die Daten einzusehen?
 Moeglicherweise liegt es auch an Evermore wie das Beispiel mit der
 Native Version gezeigt hat, nur bin ich Ratlos WORAN es liegen koennte.
 Wir haben schon den ERQ abgeschaltet und den Player den Heart Beat geklaut,
-hilft alles nichts. 
+hilft alles nichts.
 
-> Damit ich das richtig verstehen:  wenn der Client auf Unix laeuft, 
-> sendet der Driver 'DONT TELOPT_ECHO 0' einmal, wenn der Client auf 
+> Damit ich das richtig verstehen:  wenn der Client auf Unix laeuft,
+> sendet der Driver 'DONT TELOPT_ECHO 0' einmal, wenn der Client auf
 > Unix laeuft, mehrere Tausend Mal?
 
 Bei einen _Windows_ Client empfaengt h_telnet_neg in der File, die
@@ -85,7 +85,7 @@ wir haben heute Stunden damit zugebracht, das Problem einzuschraenken.
 Dabei ist folgendes herausgekommen.
 Wir benutzen den H_TELNET_NEG und den H_NOECHO. Wenn wir beides aus
 kommentieren, dann funktioniert es wunderbar. Nur moechten unsere
-Spieler (und die Wizards auch) nicht auf die automatische 
+Spieler (und die Wizards auch) nicht auf die automatische
 Groessenanpassung verzichten. Da ich selbst in unserer h_telnet_neg
 file nicht durchsehe, haenge ich dir die Datei mal an. Wir konnten
 weiterhin ermitteln, das bei einem Windows Rechner die Sequenz
@@ -97,11 +97,11 @@ die gesendet wird ein
 Ich denke es liegt an unserer Art das zu managen, aber ich weiss nicht
 wie.
 Eine Moeglichkeit die wir schon ausgeschlossen haben war folgende:
-Wir haben den H_NOECHO komplett abgeschaltet. Zusaetzlich haben wir 
+Wir haben den H_NOECHO komplett abgeschaltet. Zusaetzlich haben wir
 in der Methode init_telnet_neg() die im Player zum Schluss seiner
 initialisierungsphase aufgerufen wird, das send_dont(TELOPT_NEW_ENVIRONMENT)
 herausgenommen.
-Dies hat bewirkt das mein Rechner (WindowsNT) auf einmal keine Probleme 
+Dies hat bewirkt das mein Rechner (WindowsNT) auf einmal keine Probleme
 mehr verursacht hat, bei den anderen Spielern blieb das Problem aber
 bestehen
 (auch WindowsNT).
@@ -110,7 +110,7 @@ Ich bin ehrlich gesagt total ratlos, und wenn wir nicht ne andere
 Moeglichkeit
 finden, wird es wohl darauf hinaus laufen, das wir die eigene
 Telnet-geschichte
-aufgeben muessen. 
+aufgeben muessen.
 
 Waehre nett, wenn du mal in die Files schaust.
 
@@ -222,7 +222,7 @@ private void send_dont(int option)
 void create()
 {
     create::create();
-    
+
     env_vars = ([]);
     telnet_flags_client = "";
     telnet_flags_server = "";
@@ -330,7 +330,7 @@ private void received_new_environment(int *parameter)
 varargs status h_telnet_neg(int what, int option, int *parameter)
 {
      debug_message(sprintf("player = %s - what = %O - option = %O - parameter = %O\n", (string) this_object() -> query_real_name(), what, option, parameter));
-   
+
     switch (what) {
     case SB:
         switch (option) {
@@ -348,7 +348,7 @@ varargs status h_telnet_neg(int what, int option, int *parameter)
         }
 
         break;
-    case WILL:           
+    case WILL:
         // do we know the option from the client?
         if (member(CLIENT_KNOWS, option) < 0) {
             // no, disallow
@@ -441,7 +441,7 @@ void h_noecho(int noecho, object user)
         send_wont(TELOPT_ECHO);
     }
 
-    if (noecho & ~old_noecho & IT_NOECHO) { 
+    if (noecho & ~old_noecho & IT_NOECHO) {
         telnet_flags_server = set_bit(telnet_flags_server, TELOPT_ECHO);
         send_will(TELOPT_ECHO);
     }
@@ -458,5 +458,5 @@ void h_noecho(int noecho, object user)
     }
 
     old_noecho = noecho;
-} 
-*/              
+}
+*/

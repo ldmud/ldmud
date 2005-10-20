@@ -14,7 +14,11 @@ struct wiz_list_s
                               * NULL for the default entry */
     size_t length;           /* strlen(.name) */
     int32  score;            /* Number of actions executed by t.w. objects */
-    int32  cost;             /* Evalticks spent on this wizards objects */
+    int32  cost;             /* Weighted evalticks spent on this wizards
+                              * objects */
+    int32  gigacost;
+    int32  total_cost;       /* Total Evalticks spent on this wizards objects */
+    int32  total_gigacost;
     int32  heart_beats;      /* Number of heart_beat() calls */
     mp_int size_array;       /* Total size of this wizards arrays. */
     mp_int mapping_total;    /* Total size of this wizards mappings */

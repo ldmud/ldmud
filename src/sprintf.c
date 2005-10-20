@@ -7,6 +7,24 @@
  * extensions (some parameters have slightly different meaning or
  * restrictions to "standard" (s)printf.)
  *
+ * The following are the possible type specifiers.
+ *  "%"   in which case no arguments are interpreted, and a "%" is inserted, and
+ *        all modifiers are ignored.
+ *  "O"   the argument is an LPC datatype.
+ *  "Q"   the argument is an LPC datatype, strings are printed in LPC notation.
+ *  "s"   the argument is a string.
+ *  "d"   the integer arg is printed in decimal.
+ *  "i"   as d.
+ *  "c"   the integer arg is to be printed as a character.
+ *  "b"   the integer arg is printed in binary.
+ *  "o"   the integer arg is printed in octal.
+ *  "x"   the integer arg is printed in hex.
+ *  "X"   the integer arg is printed in hex (in capitals).
+ * "e","E","f","F","g","G"
+ *        floating point formatting like in C.
+ *  "^"   prints "%^" for compatibility with terminal_colour() strings.
+ *        No modifiers are allowed.
+ *
  * This version supports the following as modifiers:
  *  " "   pad positive integers with a space.
  *  "+"   pad positive integers with a plus sign.
@@ -22,8 +40,10 @@
  *        are broken into the size of 'precision', and the last line is
  *        padded to have a length of 'fs'.
  *        columns are auto-magically word wrapped.
- *  "#"   table mode, print a list of '\n' separated 'words' in a
- *        compact table within the field size.  Only meaningful with strings.
+ *  "#"   with strings: table mode - print a list of '\n' separated 'words' in a
+ *          compact table within the field size.
+ *        with %O/%Q: compact mode - omit most whitespace and shorten
+ *          identifiers
  *   n    specifies the field size, a '*' specifies to use the corresponding
  *        arg as the field size.  If n is prepended with a zero, then the field
  *        is printed with leading zeros.
@@ -42,22 +62,6 @@
  *        To include "'" in the pad string, you must use "\\'" (as the
  *        backslash has to be escaped past the interpreter), similarly, to
  *        include "\" requires "\\\\".
- * The following are the possible type specifiers.
- *  "%"   in which case no arguments are interpreted, and a "%" is inserted, and
- *        all modifiers are ignored.
- *  "O"   the argument is an LPC datatype.
- *  "Q"   the argument is an LPC datatype, strings are printed in LPC notation.
- *  "s"   the argument is a string.
- *  "d"   the integer arg is printed in decimal.
- *  "i"   as d.
- *  "c"   the integer arg is to be printed as a character.
- *  "o"   the integer arg is printed in octal.
- *  "x"   the integer arg is printed in hex.
- *  "X"   the integer arg is printed in hex (in capitals).
- * "e","E","f","F","g","G"
- *        floating point formatting like in C.
- *  "^"   prints "%^" for compatibility with terminal_colour() strings.
- *        No modifiers are allowed.
  *---------------------------------------------------------------------------
  */
 
@@ -103,9 +107,10 @@
  *                                0001 : error type not found;
  *                                0010 : percent sign, null argument;
  *                                0011 : LPC datatype;
- *                                0100 : string;
- *                                0101 : integer;
- *                                0110 : float
+ *                                0100 : LPC datatype, quoted;
+ *                                0101 : string;
+ *                                0110 : integer
+ *                                0111 : float
  *   00000000 00xx0000 : aligment INFO_A:
  *                                00 : right;
  *                                01 : centre;
@@ -255,6 +260,7 @@ struct stsf_locals
     int indent;             /* Indentation */
     int num_values;         /* Mapping width */
     Bool quote;             /* TRUE: Quote strings */
+    Bool compact;           /* TRUE: Compact output */
     fmt_state_t      *st;   /* sprintf state */
 };
 
@@ -297,11 +303,22 @@ struct fmt_state
 };
 
 /*-------------------------------------------------------------------------*/
+
+static Bool static_fmt_used = MY_FALSE;
+static fmt_state_t static_fmt;
+  /* A reusable instance of fmt_state_t, to avoid repeated re-allocations
+   * (and subsequent large block fragmentation).
+   * Since sprintf() can be used recursively (through master::printf_obj_name)
+   * static_fmt_used acts as mutex. A recursive sprintf() call will then
+   * allocate a temporary fmt_state_t structure.
+   */
+
+/*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
 static sprintf_buffer_t *svalue_to_string(fmt_state_t *
                                          , svalue_t *, sprintf_buffer_t *
-                                         , int, Bool, Bool);
+                                         , int, Bool, Bool, Bool);
 
 /*-------------------------------------------------------------------------*/
 /* Macros */
@@ -528,11 +545,11 @@ svalue_to_string_filter(svalue_t *key, svalue_t *data, void *extra)
 
     i = locals->num_values;
     locals->spb =
-      svalue_to_string(locals->st, key, locals->spb, locals->indent, !i, locals->quote);
+      svalue_to_string(locals->st, key, locals->spb, locals->indent, !i, locals->quote, locals->compact);
     while (--i >= 0)
     {
         stradd(locals->st, &locals->spb, delimiter);
-        locals->spb = svalue_to_string(locals->st, data++, locals->spb, 1, !i, locals->quote);
+        locals->spb = svalue_to_string(locals->st, data++, locals->spb, 1, !i, locals->quote, locals->compact);
         delimiter = ";";
     }
 } /* svalue_to_string_filter() */
@@ -541,10 +558,13 @@ svalue_to_string_filter(svalue_t *key, svalue_t *data, void *extra)
 static sprintf_buffer_t *
 svalue_to_string ( fmt_state_t *st
                  , svalue_t *obj, sprintf_buffer_t *str
-                 , int indent, Bool trailing, Bool quoteStrings)
+                 , int indent, Bool trailing, Bool quoteStrings
+                 , Bool compact)
 
 /* Print the value <obj> into the buffer <str> with indentation <indent>.
  * If <trailing> is true, add ",\n" after the printed value.
+ * If <qoute> is true, special characters in strings are quoted LPC-style.
+ * If <compact> is true, a short output format is used.
  *
  * Result is the (updated) string buffer.
  * The function calls itself for recursive values.
@@ -553,7 +573,9 @@ svalue_to_string ( fmt_state_t *st
 {
     mp_int i;
 
-    add_indent(st, &str, indent);
+    if (!compact)
+        add_indent(st, &str, indent);
+
     switch (obj->type)
     {
     case T_INVALID:
@@ -561,8 +583,8 @@ svalue_to_string ( fmt_state_t *st
         break;
 
     case T_LVALUE:
-        stradd(st, &str, "lvalue: ");
-        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings);
+        stradd(st, &str, compact ? "l:" : "lvalue: ");
+        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings, compact);
         break;
 
     case T_NUMBER:
@@ -701,24 +723,36 @@ svalue_to_string ( fmt_state_t *st
                 /* New array */
                 prec->id_number = st->pointer_id++;
 
-                stradd(st, &str, "({ /* #");
-                numadd(st, &str, prec->id_number);
-                stradd(st, &str, ", size: ");
-                numadd(st, &str, size);
-                stradd(st, &str, " */\n");
+                if (compact)
+                {
+                    stradd(st, &str, "({#");
+                    numadd(st, &str, prec->id_number);
+                    stradd(st, &str, " ");
+                }
+                else
+                {
+                    stradd(st, &str, "({ /* #");
+                    numadd(st, &str, prec->id_number);
+                    stradd(st, &str, ", size: ");
+                    numadd(st, &str, size);
+                    stradd(st, &str, " */\n");
+                }
                 for (i = 0; i < size-1; i++)
-                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings);
-                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings);
-                stradd(st, &str, "\n");
-                add_indent(st, &str, indent);
+                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings, compact);
+                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings, compact);
+                if (!compact)
+                {
+                    stradd(st, &str, "\n");
+                    add_indent(st, &str, indent);
+                }
                 stradd(st, &str, "})");
             }
             else
             {
                 /* Recursion! */
-                stradd(st, &str, "({ #");
+                stradd(st, &str, compact ? "({#" : "({ #");
                 numadd(st, &str, prec->id_number);
-                stradd(st, &str, " })");
+                stradd(st, &str, compact ? "})" : " })");
             }
         }
         break;
@@ -735,26 +769,45 @@ svalue_to_string ( fmt_state_t *st
             /* New mapping */
             prec->id_number = st->pointer_id++;
 
-            stradd(st, &str, "([ /* #");
+            stradd(st, &str, compact ? "([#" : "([ /* #");
             numadd(st, &str, prec->id_number);
-            stradd(st, &str, " */\n");
+            stradd(st, &str, compact ? " " : " */\n");
+
             locals.spb = str;
             locals.indent = indent + 2;
             locals.num_values = obj->u.map->num_values;
             locals.st = st;
             locals.quote = quoteStrings;
+            locals.compact = compact;
             check_map_for_destr(obj->u.map);
             walk_mapping(obj->u.map, svalue_to_string_filter, &locals);
             str = locals.spb;
-            add_indent(st, &str, indent);
+            if (!compact)
+            {
+                /* Remove the ',' from the trailing ',\n', if any */
+                if (BUF_TEXT(str)[str->offset - 1] == '\n'
+                 && BUF_TEXT(str)[str->offset - 2] == ','
+                   )
+                {
+                    BUF_TEXT(str)[str->offset - 2] = '\n';
+                    str->offset--;
+                }
+                add_indent(st, &str, indent);
+            }
+            else
+            {
+                /* Remove the trailing, if any */
+                if (BUF_TEXT(str)[str->offset - 1] == ',')
+                    str->offset--;
+            }
             stradd(st, &str, "])");
         }
         else
         {
             /* Recursion! */
-            stradd(st, &str, "([ #");
+            stradd(st, &str, compact ? "([#" : "([ #");
             numadd(st, &str, prec->id_number);
-            stradd(st, &str, " ])");
+            stradd(st, &str, compact ? "])" : " ])");
         }
         break;
       }
@@ -772,12 +825,16 @@ svalue_to_string ( fmt_state_t *st
         if (!compat_mode)
             stradd(st, &str, "/");
         stradd(st, &str, obj->u.ob->name);
-        push_object(obj->u.ob);
-        temp = apply_master(STR_PRINTF_OBJ_NAME, 1);
-        if (temp && (temp->type == T_STRING)) {
-            stradd(st, &str, " (\"");
-            stradd(st, &str, temp->u.string);
-            stradd(st, &str, "\")");
+        if (!compact)
+        {
+            push_object(obj->u.ob);
+            temp = apply_master(STR_PRINTF_OBJ_NAME, 1);
+            if (temp && (temp->type == T_STRING))
+            {
+                stradd(st, &str, " (\"");
+                stradd(st, &str, temp->u.string);
+                stradd(st, &str, "\")");
+            }
         }
         break;
       }
@@ -821,13 +878,37 @@ svalue_to_string ( fmt_state_t *st
 
             if (ob->flags & O_DESTRUCTED)
             {
-                stradd(st, &str, "<local function in destructed object>");
+                stradd(st, &str, compact ? "<dest lfun>"
+                                 : "<local function in destructed object>");
                 break;
             }
             if (O_PROG_SWAPPED(ob))
                 load_ob_from_swap(ob);
+
             stradd(st, &str, "#'");
+
+            /* For alien lfun closures, prepend the object the closure
+             * is bound to.
+             */
+            if (type == CLOSURE_ALIEN_LFUN)
+            {
+                object_t *a_ob = l->ob;
+
+                if (a_ob->flags & O_DESTRUCTED)
+                {
+                    stradd(st, &str, compact ? "[<dest obj>]"
+                                             : "[<destructed object>]");
+                }
+                else
+                {
+                    stradd(st, &str, "[");
+                    stradd(st, &str, a_ob->name);
+                    stradd(st, &str, "]");
+                }
+            }
+
             stradd(st, &str, ob->name);
+
             prog = ob->prog;
             flags = prog->functions[ix];
             is_inherited = MY_FALSE;
@@ -865,12 +946,14 @@ svalue_to_string ( fmt_state_t *st
             l = obj->u.lambda;
             if (l->function.index == VANISHED_VARCLOSURE_INDEX)
             {
-                stradd(st, &str, "<local variable from replaced program>");
+                stradd(st, &str, compact ? "<repl lvar>"
+                                 : "<local variable from replaced program>");
                 break;
             }
             if (l->ob->flags & O_DESTRUCTED)
             {
-                stradd(st, &str, "<local variable in destructed object>");
+                stradd(st, &str, compact ? "<dest lvar>"
+                                 : "<local variable in destructed object>");
                 break;
             }
 
@@ -982,9 +1065,13 @@ svalue_to_string ( fmt_state_t *st
               char buf[80];
 
               if (type == CLOSURE_PRELIMINARY)
-                  sprintf(buf, "<prelim lambda 0x%p>", obj->u.lambda);
+                  sprintf(buf, compact ? "<prelim 0x%p>"
+                                       : "<prelim lambda 0x%p>"
+                             , obj->u.lambda);
               else
-                  sprintf(buf, "<free lambda 0x%p>", obj->u.lambda);
+                  sprintf(buf, compact ? "<free 0x%p>"
+                                       : "<free lambda 0x%p>"
+                             , obj->u.lambda);
               stradd(st, &str, buf);
               break;
           }
@@ -996,9 +1083,13 @@ svalue_to_string ( fmt_state_t *st
               object_t *ob;
 
               if (type == CLOSURE_BOUND_LAMBDA)
-                  sprintf(buf, "<bound lambda 0x%p:", obj->u.lambda);
+                  sprintf(buf, compact ? "<bound 0x%p:"
+                                       : "<bound lambda 0x%p:"
+                             , obj->u.lambda);
               else
-                  sprintf(buf, "<lambda 0x%p:", obj->u.lambda);
+                  sprintf(buf, compact ? "<0x%p:"
+                                       : "<lambda 0x%p:"
+                             , obj->u.lambda);
 
               stradd(st, &str, buf);
               ob = obj->u.lambda->ob;
@@ -1030,16 +1121,20 @@ svalue_to_string ( fmt_state_t *st
         buf[1] = '\0';
         stradd(st, &str, "'");
         stradd(st, &str, buf);
-        stradd(st, &str, "' (");
-        numadd(st, &str, buf[0] & 0xff);
-        stradd(st, &str, ")");
+        stradd(st, &str, "'");
+        if (!compact)
+        {
+            stradd(st, &str, " (");
+            numadd(st, &str, buf[0] & 0xff);
+            stradd(st, &str, ")");
+        }
         break;
     }
 
   case T_PROTECTED_CHAR_LVALUE:
     {
-        stradd(st, &str, "prot char: ");
-        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings);
+        stradd(st, &str, compact ? "p char:" : "prot char: ");
+        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings, compact);
         break;
     }
 
@@ -1047,7 +1142,7 @@ svalue_to_string ( fmt_state_t *st
   case T_PROTECTED_STRING_RANGE_LVALUE:
     {
         if (obj->type == T_PROTECTED_STRING_RANGE_LVALUE)
-            stradd(st, &str, "prot: ");
+            stradd(st, &str, compact ? "p:" : "prot: ");
         stradd(st, &str, "\"");
         stradd(st, &str, obj->u.string);
         stradd(st, &str, "\"");
@@ -1060,12 +1155,12 @@ svalue_to_string ( fmt_state_t *st
         size_t size;
 
         if (obj->type == T_PROTECTED_POINTER_RANGE_LVALUE)
-            stradd(st, &str, "prot: ");
+            stradd(st, &str, compact ? "p:" : "prot: ");
 
         size = VEC_SIZE(obj->u.vec);
         if (!size)
         {
-            stradd(st, &str, "({ })");
+            stradd(st, &str, compact ? "({})" : "({ })");
         }
         else
         {
@@ -1077,32 +1172,44 @@ svalue_to_string ( fmt_state_t *st
                 /* New array */
                 prec->id_number = st->pointer_id++;
 
-                stradd(st, &str, "({ /* #");
-                numadd(st, &str, prec->id_number);
-                stradd(st, &str, ", size: ");
-                numadd(st, &str, size);
-                stradd(st, &str, " */\n");
+                if (compact)
+                {
+                    stradd(st, &str, "({#");
+                    numadd(st, &str, prec->id_number);
+                    stradd(st, &str, " ");
+                }
+                else
+                {
+                    stradd(st, &str, "({ /* #");
+                    numadd(st, &str, prec->id_number);
+                    stradd(st, &str, ", size: ");
+                    numadd(st, &str, size);
+                    stradd(st, &str, " */\n");
+                }
                 for (i = 0; i < size-1; i++)
-                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings);
-                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings);
-                stradd(st, &str, "\n");
-                add_indent(st, &str, indent);
+                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings, compact);
+                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings, compact);
+                if (!compact)
+                {
+                    stradd(st, &str, "\n");
+                    add_indent(st, &str, indent);
+                }
                 stradd(st, &str, "})");
             }
             else
             {
                 /* Recursion! */
-                stradd(st, &str, "({ #");
+                stradd(st, &str, compact ? "({#" : "({ #");
                 numadd(st, &str, prec->id_number);
-                stradd(st, &str, " })");
+                stradd(st, &str, compact ? "})" : " })");
             }
         }
         break;
     }
 
   case T_PROTECTED_LVALUE:
-      stradd(st, &str, "prot lvalue: ");
-      str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings);
+      stradd(st, &str, compact ? "p l:" : "prot lvalue: ");
+      str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings, compact);
       break;
 
   default:
@@ -1112,7 +1219,7 @@ svalue_to_string ( fmt_state_t *st
   } /* end of switch (obj->type) */
 
   if (trailing)
-      stradd(st, &str, ",\n");
+      stradd(st, &str, compact ? "," : ",\n");
 
   return str;
 } /* end of svalue_to_string() */
@@ -1486,6 +1593,9 @@ string_print_formatted (char *format_str, int argc, svalue_t *argv)
 
 {
     fmt_state_t  *st;     /* The formatting state */
+    volatile fmt_state_t  *vst;    /* A copy of st, stored in a volatile var
+                                    * to survive a longjmp()
+                                    */
 static char buff[BUFF_SIZE]; /* The buffer to return the result */
 
     svalue_t     *carg;            /* current arg */
@@ -1516,18 +1626,28 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
         st->saves = new;\
     }
 
-    xallocate(st, sizeof *st, "sprintf() context");
+    if (!static_fmt_used)
+    {
+        st = &static_fmt;
+        static_fmt_used = MY_TRUE;
+    }
+    else
+        xallocate(st, sizeof *st, "sprintf() context");
 
     st->saves = NULL;
     st->clean.u.string = NULL;
     st->csts = NULL;
     st->ptable = NULL;
 
-    if (0 != (err_num = setjmp(st->error_jmp)))
+    vst = st;
+
+    if (0 != (err_num = setjmp(((fmt_state_t*)st)->error_jmp)))
     {
         /* error handling */
         char *err;
         cst  *tcst;
+
+        st = (fmt_state_t*)vst;
 
         if (st->ptable)
             free_pointer_table(st->ptable);
@@ -1636,13 +1756,18 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                , err, EXTRACT_ERR_ARGUMENT(err_num));
         strcat(st->buff, "\n");
         strcpy(buff, st->buff);
-        xfree(st);
+        if (st == &static_fmt)
+            static_fmt_used = MY_FALSE;
+        else
+            xfree(st);
 #ifndef RETURN_ERROR_MESSAGES
         error("%s", buff); /* buff may contain a '%' */
         /* NOTREACHED */
 #endif /* RETURN_ERROR_MESSAGES */
         return buff;
     }
+
+    st = (fmt_state_t*)vst;
 
     format_char = 0;
     nelemno = 0;
@@ -1853,6 +1978,8 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                 case 'd':
                 case 'c':
                 case 'o':
+                case 'b':
+                case 'B':
                 case 'x':
                 case 'X':
                     format_char = format_str[fpos];
@@ -1959,7 +2086,10 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                     b->size = CLEANSIZ;
                     b->start = &st->clean.u.string;
                     b = svalue_to_string(st, carg, b, 0, MY_FALSE
-                                        , (finfo & INFO_T) == INFO_T_QLPC);
+                                        , (finfo & INFO_T) == INFO_T_QLPC
+                                        , (finfo & INFO_TABLE)
+                                        );
+                    finfo &= ~INFO_TABLE; /* since we fall through */
                     carg = &st->clean; /* passed to INFO_T_STRING */
                     free_pointer_table(st->ptable);
                     st->ptable = NULL;
@@ -2183,10 +2313,49 @@ add_table_now:
 
                 case INFO_T_INT:
                 case INFO_T_FLOAT:
-                  {
                     /* We 'cheat' by using the systems sprintf() to format
-                     * the number.
+                     * the number in most of the formats.
                      */
+                  if ((finfo & INFO_T ) == INFO_T_INT
+                   && (format_char == 'b' || format_char == 'B')
+                     )
+                  {
+                    /* Dummy for finding most significant bit */
+                    p_int signi = 0;
+                    int isize = sizeof(carg->u.number) * CHAR_BIT;
+                    char temp[sizeof(carg->u.number) * CHAR_BIT + 1];
+                    p_int tmpl;
+
+                    memset(temp, '\0', sizeof(temp));
+
+                    if (carg->type != T_NUMBER)
+                    {
+                        ERROR1(ERR_INCORRECT_ARG, format_char);
+                    }
+                    /* Calculate binary representation (2's compliment) */
+                    while ( --isize > -1 )
+                    {
+                       if ( ( carg->u.number & ( 1 << isize ) ) != 0 )
+                       {
+                          signi = 1;
+                          strcat( temp, "1" );
+                       }
+                       else if ( signi )
+                          strcat( temp, "0" );
+                    }
+                    tmpl = strlen(temp);
+                    if ((size_t)tmpl >= sizeof(temp))
+                        fatal("Local buffer overflow in sprintf() for int.\n");
+                    if (pres && tmpl > pres)
+                        tmpl = pres; /* well.... */
+                    if ((unsigned int)tmpl < fs)
+                        add_aligned(st, temp, tmpl, pad, fs, finfo);
+                    else
+                        ADD_STRN(temp, tmpl)
+                    break;
+                  }
+                  else
+                  {
                     char cheat[6];  /* Synthesized format for sprintf() */
                     char temp[1024];
                       /* The buffer must be big enough to hold the biggest float
@@ -2313,7 +2482,11 @@ add_table_now:
 
     /* Copy over the result */
     strcpy(buff, st->buff);
-    xfree(st);
+
+    if (st == &static_fmt)
+        static_fmt_used = MY_FALSE;
+    else
+        xfree(st);
 
     /* Done */
     return buff;

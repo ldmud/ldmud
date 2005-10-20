@@ -20,13 +20,13 @@ void heart_beat()
 global_var wird nicht initiallisiert. heart_beat wird im create
 eines Inherits des Files gesetzt.
 
-Ich kann dir das komplette File samt Inherits schicken. 
-global_var++ gibt halt keinen Fehler. 
+Ich kann dir das komplette File samt Inherits schicken.
+global_var++ gibt halt keinen Fehler.
 
 
 Datei:
 /z/Gilden/Hexenvolk/obj/vertraut/vertraut.c
-bzw. 
+bzw.
 /z/Gilden/Hexenvolk/obj/vertraute/cat.c beispielsweise
 
 Nutzt aber auch noch einige includedateien...

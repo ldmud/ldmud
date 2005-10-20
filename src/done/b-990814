@@ -58,23 +58,23 @@ On Tue, 26 Oct 1999, Lars Duening wrote:
 > >#0  read_socket (sp=3D0x80573e0, rw=3D1) at socket.c:53
 > >#1  0x8049199 in main (argc=3D2, argv=3D0xbffffdc4) at erq.c:126
 > >#2  0x40030cb3 in __libc_start_main (main=3D0x8048d3c <main>, argc=3D2,
-> >argv=3D0xbffffdc4, init=3D0x8048860 <_init>, 
+> >argv=3D0xbffffdc4, init=3D0x8048860 <_init>,
 > >    fini=3D0x804b0dc <_fini>, rtld_fini=3D0x4000a350 <_dl_fini>,
 > >stack_end=3D0xbffffdbc) at ../sysdeps/generic/libc-start.c:78
 > >(gdb) p qp
 > >No symbol "qp" in current context.
-> 
+>
 > No symbol? Either something is really wrong, or you were using
 > a very aggressive optimizer. What if you use *qpp instead of every
 > qp, e.g. "p *(*qpp->buf)" instead of "p *(qp->buf)"?
-> 
+>
 > I must admit that I am running out of ideas :-(
-> 
-> -- 
+>
+> --
 > Lars Duening; lars@bearnip.com
 > Note: Currently I can check my mail only occasionally.
-> 
-> 
+>
+>
 
 Yeah, now I really got something out from gdb :) I hope this helps...
 
@@ -108,9 +108,9 @@ $6 =3D 0x2c "erq --forked "
 $7 =3D 101
 (gdb) p *qpp->buf+*qpp->pos
 $8 =3D 83907173
-(gdb) p qpp->buf+*qpp->pos 
+(gdb) p qpp->buf+*qpp->pos
 $9 =3D 0x500522c <Address 0x500522c out of bounds>
-(gdb) p qpp->buf+qpp->pos 
+(gdb) p qpp->buf+qpp->pos
 $10 =3D 0x2c "erq --forked "
 (gdb) p fd
 $11 =3D 6

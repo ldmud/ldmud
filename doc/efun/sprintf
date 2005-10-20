@@ -16,6 +16,8 @@ DESCRIPTION
           "d" : the argument is an integer to be included in decimal
                 representation.
           "i" : same as "d".
+          "b" : the argument is an integer to be included in binary
+                representation.
           "o" : the argument is an integer to be included in octal
                 representation.
           "x" : the argument is an integer to be included in hexadecimal
@@ -69,13 +71,15 @@ DESCRIPTION
                 not then the field size is. The field size specifies the width
                 of the column and has the effect that the last line of the
                 column is padded with spaces to achieve this length.
-          "#"   table mode.  Ignored unless the argument type specifier is s.
-                Field size must be specified, if precision is specified then
-                it specifies the number of columns in the table, otherwise the
-                number is "optimally" generated (the algorithm tries generate
-                as few columns as possible).  Table mode is passed a list
-                of backslash-n separated 'words' which are put in a format
-                similar to that of ls.
+          "#"   For strings: table mode.
+                  Field size must be specified, if precision is
+                  specified then it specifies the number of columns in
+                  the table, otherwise the number is "optimally"
+                  generated (as few lines and columns as possible).
+                  Table mode is passed a list of backslash-n separated
+                  'words' which are put in a format similar to that of
+                  ls.
+                For %O/%Q: compact output.
           "@"   the argument is an array.  the corresponding AFS (minus all
                 "@") is applied to each element of the array.
 
@@ -181,6 +185,7 @@ HISTORY
           leading 0s in the field size modifier, clarified the interaction
           between the padding and newlines, and added the '$' formatter for
           justified printing of strings.
+        LDMud 3.2.10 added modifier '#' for '%O'/'%Q' and the datatype '%b'.
 
 SEE ALSO
         printf(E), terminal_colour(E)

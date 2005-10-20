@@ -257,13 +257,13 @@ Crashed in fatal->vfprintf trying to print the check_string message
 (from the core file)
 
 
-> How reproducible is this crash - does it happen all the time during the 
+> How reproducible is this crash - does it happen all the time during the
 > login? And what was the first version of the driver this problem showed up?
 
 This happened after being up for about a day. The object with the string
 "mushroom carts" seems to be a room.
 
-We've been seing crashes every couple of days.. I think they have all 
+We've been seing crashes every couple of days.. I think they have all
 been the check_string variety.
 
 I've been noticing it since early 33x, but its possible it could have
@@ -285,11 +285,11 @@ The core file is pretty useless:
 Cannot access memory at address 0xa2fc
 
 We've been seeing these types of crashes since we switched from amylaar,
-but they are very random. We've had crashes after 30 minutes, but we've 
+but they are very random. We've had crashes after 30 minutes, but we've
 also had it run for two weeks without crashing.
 
-I wouldn't necessarily rule out bad memory or some other non-driver 
-problem like that, as we switched machines at the same time we switched 
+I wouldn't necessarily rule out bad memory or some other non-driver
+problem like that, as we switched machines at the same time we switched
 drivers =)
 
 
@@ -516,24 +516,24 @@ No program to trace.
 --------------060202060709030103040907--
 
 
-> Just a thing to try: start the driver with option --check-strings . This 
-> performs a sanity check of the strings table every backend cycle, which 
+> Just a thing to try: start the driver with option --check-strings . This
+> performs a sanity check of the strings table every backend cycle, which
 > should make the crashes more reproducable.
-> 
+>
 > Please let me know how it works out.
 
 
-We've been running with --check-strings for a while now. Doesn't seem to 
+We've been running with --check-strings for a while now. Doesn't seem to
 behave any differently (or crash any more or less often) =)
 
-We rebooted the machine after noticing a kernel OOPS in the log files 
+We rebooted the machine after noticing a kernel OOPS in the log files
 (as well as upgrading the kernel version)... Maybe it will help *shrug*
 
 I'll let you know if I narrow down the problem any.
 
 Btw, db_exec no longer returns a valid handle as of 367
 (I was using the return value of db_exec to find the new handle if the
-handle happened to change - which I guess shouldn't be needed anymore, 
+handle happened to change - which I guess shouldn't be needed anymore,
 but the return value is totally bogus now)
 
 Ben

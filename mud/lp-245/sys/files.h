@@ -17,6 +17,7 @@
 #define GETDIR_NAMES      1  /* return the filenames */
 #define GETDIR_SIZES      2  /* return the file sizes */
 #define GETDIR_DATES      4  /* return the dates of last modification */
+#define GETDIR_PATH      16  /* with _NAMES: add the path to the filenames */
 #define GETDIR_UNSORTED  32  /* return the results unsorted */
 
 #define GETDIR_ALL        7  /* return names, sizes and dates */

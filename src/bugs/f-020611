@@ -11,21 +11,21 @@ Message-ID: <Pine.LNX.4.44.0206111715170.467-100000@crystae.homeip.net>
 Organization: AT&T Broadband
 Date: Tue, 11 Jun 2002 22:33:41 GMT
 
-Hi, this is my first post here, but I've been a loyal user of the LP 
-driver (in its various forms) for 2 years now. Recently, I started a 
-project on my MUD to parse the player save-files, and create a text and 
+Hi, this is my first post here, but I've been a loyal user of the LP
+driver (in its various forms) for 2 years now. Recently, I started a
+project on my MUD to parse the player save-files, and create a text and
 HTML wizard list.
 
-It took me a long time, until I settled on parsing the .o files, creating 
-XML files, and then using XSLT and libxml to create the resulting output 
-files. The majority of this was a piece of cake, except for the parsing of 
-the .o files. It is a real bitch (pardon language) to parse a file in the 
+It took me a long time, until I settled on parsing the .o files, creating
+XML files, and then using XSLT and libxml to create the resulting output
+files. The majority of this was a piece of cake, except for the parsing of
+the .o files. It is a real bitch (pardon language) to parse a file in the
 .o format.
 
 I therefore, propose the following addition to the driver (at least LD):
 
-An option should be given to have save_object() save in an XML format, 
-in a standard format, and to have restore_object() restore data in such 
+An option should be given to have save_object() save in an XML format,
+in a standard format, and to have restore_object() restore data in such
 format. No, this doesn't mean that every .o file will look like this:
 
 <ldmud-save>
@@ -44,30 +44,30 @@ But rather:
 
 The advantages of this over the "old" format are:
 
-- It is more modern. XML is gaining a strong foothold in the technical 
+- It is more modern. XML is gaining a strong foothold in the technical
 world, and MUDs shouldn't be left behind.
 
-- Verification. Using DTDs or schemas, MUD admins could create their own 
-DTDs which would specify how their savefiles would be layed out for 
+- Verification. Using DTDs or schemas, MUD admins could create their own
+DTDs which would specify how their savefiles would be layed out for
 various objects, and then validate them.
 
-- Easier parsability. MUD admins could display the data shown here in any 
-number of ways: a list of all players, a list of the players with top 
+- Easier parsability. MUD admins could display the data shown here in any
+number of ways: a list of all players, a list of the players with top
 experience, wizards list, etc.
 
-- Standardization. MUD admins could collaborate, and create a standard for 
-player savefiles, bulletin board savefiles, etc. and could then share data 
-across MUDs. This is, probably, the most exciting part about using XML 
+- Standardization. MUD admins could collaborate, and create a standard for
+player savefiles, bulletin board savefiles, etc. and could then share data
+across MUDs. This is, probably, the most exciting part about using XML
 savefiles.
 
-Adding this to the driver shouldn't be *too* hard; it's only a matter of 
-modifying save/restore_object(). I haven't looked through at the source 
-for *_object() yet (D'oh!), but I imagine it can't be too difficult (at 
-least when one gets to writing/reading the file). In fact, I would 
+Adding this to the driver shouldn't be *too* hard; it's only a matter of
+modifying save/restore_object(). I haven't looked through at the source
+for *_object() yet (D'oh!), but I imagine it can't be too difficult (at
+least when one gets to writing/reading the file). In fact, I would
 volunteer to do it.
 
-If you have any questions, comments, or flames, pretty please with a 
-cherry on top [:)] post them rec.games.mud.lp, rather than emailing them 
+If you have any questions, comments, or flames, pretty please with a
+cherry on top [:)] post them rec.games.mud.lp, rather than emailing them
 to me, just for the sake of community and discussion!
 
 -- Tom Jakubowski (aka Camelot, aka Miro)
@@ -82,7 +82,7 @@ Date: Tue, 11 Jun 2002 22:35:58 GMT
 
 Oh, oops, about the standard:
 
-The standard determined by the LDmud coders would not determine the type 
+The standard determined by the LDmud coders would not determine the type
 of or what data is stored, but rather *how* it is stored.
 
 -- Tom Jakubowski
@@ -114,153 +114,153 @@ Xref: uni-berlin.de rec.games.mud.lp:36940
 
 Tom Jakubowski wrote:
 
-> Hi, this is my first post here, but I've been a loyal user of the LP 
-> driver (in its various forms) for 2 years now. Recently, I started a 
-> project on my MUD to parse the player save-files, and create a text and 
+> Hi, this is my first post here, but I've been a loyal user of the LP
+> driver (in its various forms) for 2 years now. Recently, I started a
+> project on my MUD to parse the player save-files, and create a text and
 > HTML wizard list.
-> 
-> It took me a long time, until I settled on parsing the .o files, creating 
-> XML files, and then using XSLT and libxml to create the resulting output 
-> files. The majority of this was a piece of cake, except for the parsing of 
-> the .o files. It is a real bitch (pardon language) to parse a file in the 
+>
+> It took me a long time, until I settled on parsing the .o files, creating
+> XML files, and then using XSLT and libxml to create the resulting output
+> files. The majority of this was a piece of cake, except for the parsing of
+> the .o files. It is a real bitch (pardon language) to parse a file in the
 > .o format.
 
 
-The only subtle trick in parsing .o files is handling arrays and 
-mappings properly; all the other variables are simply ints and strings 
-(and there's a small header, though I have yet to find any use for it). 
+The only subtle trick in parsing .o files is handling arrays and
+mappings properly; all the other variables are simply ints and strings
+(and there's a small header, though I have yet to find any use for it).
 The grammar for arrays and mappings is fairly simple, as such things go.
 
-One point: you *must* have a file-reading library that can differentiate 
-between tokens separated by a newline "\n" and a space; the newline is a 
-meaningful token in a .o file. If you're writing in C, you should be 
-using fgets. If you attempted to write a .o parser using fscanf, or by 
-streaming values off an input stream, then you were using the wrong 
+One point: you *must* have a file-reading library that can differentiate
+between tokens separated by a newline "\n" and a space; the newline is a
+meaningful token in a .o file. If you're writing in C, you should be
+using fgets. If you attempted to write a .o parser using fscanf, or by
+streaming values off an input stream, then you were using the wrong
 tools, and your parsing difficulties are quite understandable.
 
  > I therefore, propose the following addition to the driver (at least LD):
 
-> 
-> An option should be given to have save_object() save in an XML format, 
-> in a standard format, and to have restore_object() restore data in such 
+>
+> An option should be given to have save_object() save in an XML format,
+> in a standard format, and to have restore_object() restore data in such
 > format. No, this doesn't mean that every .o file will look like this:
-> 
+>
 > <ldmud-save>
 >   <name>miro</name>
 >   <level>30</level>
 >   ...
 > </ldmud-save>
-> 
+>
 > But rather:
-> 
+>
 > <ldmud-save>
 >   <data name="name" type="string">miro</data>
 >   <data name="level" type="int">30</data>
 >   ...
 > </ldmud-save>
-> 
+>
 > The advantages of this over the "old" format are:
-> 
-> - It is more modern. XML is gaining a strong foothold in the technical 
+>
+> - It is more modern. XML is gaining a strong foothold in the technical
 > world, and MUDs shouldn't be left behind.
 
 
-XML is gaining a strong foothold because it's a simple, portable method 
-for storing arbitrarily formatted hierarchical data. Perhaps the 
-portability could become useful if you find a need to transfer MUD data 
-to some other medium; perhaps for transferring it to a database. I 
-probably wouldn't rewrite save_object() for that though, I'd just load 
-.o file and export it to XML (this can be done quite easily in LPC). As 
-for storing data hierarchically, the LDMud data is not inherently 
+XML is gaining a strong foothold because it's a simple, portable method
+for storing arbitrarily formatted hierarchical data. Perhaps the
+portability could become useful if you find a need to transfer MUD data
+to some other medium; perhaps for transferring it to a database. I
+probably wouldn't rewrite save_object() for that though, I'd just load
+.o file and export it to XML (this can be done quite easily in LPC). As
+for storing data hierarchically, the LDMud data is not inherently
 hierarchical, so there isn't much of an advantage here.
 
-One disadvantage of XML is that the XML version of the file is likely to 
-occupy much more disk space than the relatively efficient .o version. 
-The "disk space is cheap" argument doesn't work, since a great many 
-LPMuds are running in environments with harsh quotas (commercial 
+One disadvantage of XML is that the XML version of the file is likely to
+occupy much more disk space than the relatively efficient .o version.
+The "disk space is cheap" argument doesn't work, since a great many
+LPMuds are running in environments with harsh quotas (commercial
 providers and universities are infamous for 10 MB file limits).
 
 
-> - Verification. Using DTDs or schemas, MUD admins could create their own 
-> DTDs which would specify how their savefiles would be layed out for 
+> - Verification. Using DTDs or schemas, MUD admins could create their own
+> DTDs which would specify how their savefiles would be layed out for
 > various objects, and then validate them.
 
 
-One of the most powerful advantages of .o files is that they can be 
-loaded by objects that are *not the same type* as the object that 
-created the file. If different object types are given different file 
+One of the most powerful advantages of .o files is that they can be
+loaded by objects that are *not the same type* as the object that
+created the file. If different object types are given different file
 layouts, you will break this extremely useful functionality.
 
 
-> - Easier parsability. MUD admins could display the data shown here in any 
-> number of ways: a list of all players, a list of the players with top 
+> - Easier parsability. MUD admins could display the data shown here in any
+> number of ways: a list of all players, a list of the players with top
 > experience, wizards list, etc.
 
 
-Parsing a .o file in LPC and getting all the variables in it is *stupid* 
-easy. There's a command on our MUD, 'stat', which works by parsing the 
-.o file and displaying all the internal variables. It took maybe an hour 
+Parsing a .o file in LPC and getting all the variables in it is *stupid*
+easy. There's a command on our MUD, 'stat', which works by parsing the
+.o file and displaying all the internal variables. It took maybe an hour
 or two to write.
 
 Here's one way (not our way, but an easy way):
 * Read every line in the .o file into an array, say string *vars.
-* Delete strings in vars that start with # (this should just be the 
+* Delete strings in vars that start with # (this should just be the
 first one)
-* For each string in vars, clip the string at the first space. "vars" is 
+* For each string in vars, clip the string at the first space. "vars" is
 now a list of all the variables stored in the .o file.
 * Create a new .c file. For each entry in vars, append this to the file:
 "mixed "+vars[i]+";\n\nquery_"+vars[i]+"() { return "+vars[i]+"; }\n\n"
 * At the very end, add a method like this:
 "void create() { restore_object(\"" + name_of_o_file + "\"); }\n\n"
 
-This will create a query-able object that holds all the variables in the 
-.o file. To use it, load the object you just created, and query each 
-variable's value (using the vars array to figure out what the variables 
-are). This would be one reasonable way to write an XML converter. 
-Perhaps it's not the fastest way, but it's easy to understand, and it 
-handles all the data types. BTW, if you're actually going to do this, 
-I've already written a function to convert LPC variables to strings. 
+This will create a query-able object that holds all the variables in the
+.o file. To use it, load the object you just created, and query each
+variable's value (using the vars array to figure out what the variables
+are). This would be one reasonable way to write an XML converter.
+Perhaps it's not the fastest way, but it's easy to understand, and it
+handles all the data types. BTW, if you're actually going to do this,
+I've already written a function to convert LPC variables to strings.
 Don't reinvent the wheel, use it:
 
 http://www.simud.org/doxygen/simul__efun_8c-source.html#l01923
 
-It handles funny escape characters, arbitrarily wide mappings, and 
-similar nagging problems. It doesn't handle a few minor things 
+It handles funny escape characters, arbitrarily wide mappings, and
+similar nagging problems. It doesn't handle a few minor things
 (recursive arrays and closures); these are non-trivial to fix.
 
 
-> - Standardization. MUD admins could collaborate, and create a standard for 
-> player savefiles, bulletin board savefiles, etc. and could then share data 
-> across MUDs. This is, probably, the most exciting part about using XML 
+> - Standardization. MUD admins could collaborate, and create a standard for
+> player savefiles, bulletin board savefiles, etc. and could then share data
+> across MUDs. This is, probably, the most exciting part about using XML
 > savefiles.
 
 
-But there is no reason that .o save files cannot already do the same 
-thing. Any .o file may be loaded by any object. Any mismatched 
+But there is no reason that .o save files cannot already do the same
+thing. Any .o file may be loaded by any object. Any mismatched
 variables, either in the file or in the object, are quitely ignored.
 
-Arguably you could use XML to communicate with non-LP Muds, but the real 
-problem is "agreeing on a standard", not figuring out how to get the 
-data across once a standard is found. Transferring the data is the easy 
-part. If all MUDs were similar to D&D, it would be easier ... 
+Arguably you could use XML to communicate with non-LP Muds, but the real
+problem is "agreeing on a standard", not figuring out how to get the
+data across once a standard is found. Transferring the data is the easy
+part. If all MUDs were similar to D&D, it would be easier ...
 mercifully, many MUDs are not.
 
 
-> Adding this to the driver shouldn't be *too* hard; it's only a matter of 
-> modifying save/restore_object(). I haven't looked through at the source 
-> for *_object() yet (D'oh!), but I imagine it can't be too difficult (at 
-> least when one gets to writing/reading the file). In fact, I would 
+> Adding this to the driver shouldn't be *too* hard; it's only a matter of
+> modifying save/restore_object(). I haven't looked through at the source
+> for *_object() yet (D'oh!), but I imagine it can't be too difficult (at
+> least when one gets to writing/reading the file). In fact, I would
 > volunteer to do it.
 
 
-The algorithm I sketched above would be a fairly simple way to read in a 
-.o file and output a .xml file. Doing the reverse would be quite a bit 
-harder, since there's no built-in XML support for LPC (you'd have to 
+The algorithm I sketched above would be a fairly simple way to read in a
+.o file and output a .xml file. Doing the reverse would be quite a bit
+harder, since there's no built-in XML support for LPC (you'd have to
 write your own parser).
 
 
-> If you have any questions, comments, or flames, pretty please with a 
-> cherry on top [:)] post them rec.games.mud.lp, rather than emailing them 
+> If you have any questions, comments, or flames, pretty please with a
+> cherry on top [:)] post them rec.games.mud.lp, rather than emailing them
 > to me, just for the sake of community and discussion!
 
 
@@ -297,61 +297,61 @@ Xref: uni-berlin.de rec.games.mud.lp:36941
 
 On Wed, 12 Jun 2002, Acius wrote:
 
-> XML is gaining a strong foothold because it's a simple, portable method 
-> for storing arbitrarily formatted hierarchical data. Perhaps the 
-> portability could become useful if you find a need to transfer MUD data 
-> to some other medium; perhaps for transferring it to a database. I 
-> probably wouldn't rewrite save_object() for that though, I'd just load 
-> .o file and export it to XML (this can be done quite easily in LPC). As 
-> for storing data hierarchically, the LDMud data is not inherently 
+> XML is gaining a strong foothold because it's a simple, portable method
+> for storing arbitrarily formatted hierarchical data. Perhaps the
+> portability could become useful if you find a need to transfer MUD data
+> to some other medium; perhaps for transferring it to a database. I
+> probably wouldn't rewrite save_object() for that though, I'd just load
+> .o file and export it to XML (this can be done quite easily in LPC). As
+> for storing data hierarchically, the LDMud data is not inherently
 > hierarchical, so there isn't much of an advantage here.
 Right, but exporting a .o file with LPC is relatively useless. Using a
 compiled language along with a scheduler like cron is much more
 reasonable alternative, as the instruction to reparse the data and create
 lists, topscore lists, etc. is automatic.
 
-> 
-> One disadvantage of XML is that the XML version of the file is likely to 
-> occupy much more disk space than the relatively efficient .o version. 
-> The "disk space is cheap" argument doesn't work, since a great many 
-> LPMuds are running in environments with harsh quotas (commercial 
+>
+> One disadvantage of XML is that the XML version of the file is likely to
+> occupy much more disk space than the relatively efficient .o version.
+> The "disk space is cheap" argument doesn't work, since a great many
+> LPMuds are running in environments with harsh quotas (commercial
 > providers and universities are infamous for 10 MB file limits).
 I realise that hard drive space is a big problem (and I'm one of the
 victims ;)), but this is exactly why it would be an optional choice,
 when the admin compiles the driver.
- 
-> > - Easier parsability. MUD admins could display the data shown here in any 
-> > number of ways: a list of all players, a list of the players with top 
+
+> > - Easier parsability. MUD admins could display the data shown here in any
+> > number of ways: a list of all players, a list of the players with top
 > > experience, wizards list, etc.
-> 
-> 
-> Parsing a .o file in LPC and getting all the variables in it is *stupid* 
-> easy. There's a command on our MUD, 'stat', which works by parsing the 
-> .o file and displaying all the internal variables. It took maybe an hour 
+>
+>
+> Parsing a .o file in LPC and getting all the variables in it is *stupid*
+> easy. There's a command on our MUD, 'stat', which works by parsing the
+> .o file and displaying all the internal variables. It took maybe an hour
 > or two to write.
-> 
+>
 [snip]
 Er, perhaps I didn't make myself clear. I meant that the parsability would
 be 200x easier for an admin writing a C/Perl/any-other-language-with-XML-
 libraries program, rather than LPC. *Everyone* knows how easy it is to
 parse a .o file from LPC, because of its great string functions.
 
-> 
-> > - Standardization. MUD admins could collaborate, and create a standard for 
-> > player savefiles, bulletin board savefiles, etc. and could then share data 
-> > across MUDs. This is, probably, the most exciting part about using XML 
+>
+> > - Standardization. MUD admins could collaborate, and create a standard for
+> > player savefiles, bulletin board savefiles, etc. and could then share data
+> > across MUDs. This is, probably, the most exciting part about using XML
 > > savefiles.
-> 
-> 
-> But there is no reason that .o save files cannot already do the same 
-> thing. Any .o file may be loaded by any object. Any mismatched 
+>
+>
+> But there is no reason that .o save files cannot already do the same
+> thing. Any .o file may be loaded by any object. Any mismatched
 > variables, either in the file or in the object, are quitely ignored.
-> 
+>
 I didn't list this, but the ability to load any .o file with any object
 is a slight security risk. I suppose this would be true for an
 XML-savefile as well.
 
-I guess this security risk could be solved by changing the permissions for 
+I guess this security risk could be solved by changing the permissions for
 restore_object() in the master object. But it might be useful for an
 individual wizard to specify, when calling save_object(), what objects
 can restore from the file. So the new .o file might look like:
@@ -363,23 +363,23 @@ secret_codeword "crystae"
 or, if any object can read it, it would look just like an old-style
 save-file.
 
-> Arguably you could use XML to communicate with non-LP Muds, but the real 
-> problem is "agreeing on a standard", not figuring out how to get the 
-> data across once a standard is found. Transferring the data is the easy 
-> part. If all MUDs were similar to D&D, it would be easier ... 
+> Arguably you could use XML to communicate with non-LP Muds, but the real
+> problem is "agreeing on a standard", not figuring out how to get the
+> data across once a standard is found. Transferring the data is the easy
+> part. If all MUDs were similar to D&D, it would be easier ...
 > mercifully, many MUDs are not.
-> 
+>
 Exactly... we could have a central organization, made up of MUD admins,
 who would create the standard and then approve MUDs as conforming to the
 standard. Sort of like the creation of ANSI C.
 
 > I'm not trying to flame you. I do think you should reconsider
-> 
+>
 > your dislike of .o files, however ;-).
-> 
+>
 I don't dislike .o files at all, I'm just supplying an alternative. :)
 
-> 
+>
 > -- Acius
 > Acius@Walraven
 
@@ -411,7 +411,7 @@ Tom Jakubowski <tom@crystae.homeip.net> wrote:
 > is a slight security risk. I suppose this would be true for an
 > XML-savefile as well.
 
-> I guess this security risk could be solved by changing the permissions for 
+> I guess this security risk could be solved by changing the permissions for
 > restore_object() in the master object. But it might be useful for an
 > individual wizard to specify, when calling save_object(), what objects
 > can restore from the file. So the new .o file might look like:
@@ -423,12 +423,12 @@ Tom Jakubowski <tom@crystae.homeip.net> wrote:
 > or, if any object can read it, it would look just like an old-style
 > save-file.
 
-Please try to read the source code of save_object() and restore_object()  
+Please try to read the source code of save_object() and restore_object()
 (in object.c in Amylaar and LDMud) before posting such questions. If you
 had done so, you would know that the #0:0 line is a version number. I'm
 assuming the original writers wanted to leave room for possibily
 incompatible future versions of save_object() and restore_object(), but
-this is just an assumption. 
+this is just an assumption.
 
 As for the security, you would also see a call to check_valid_path() in
 both, which calls valid_read() for restore or valid_write() for save in
@@ -461,14 +461,14 @@ Organization: AT&T Broadband
 Date: Thu, 13 Jun 2002 04:06:13 GMT
 Xref: uni-berlin.de rec.games.mud.lp:36945
 
-> Please try to read the source code of save_object() and restore_object()  
+> Please try to read the source code of save_object() and restore_object()
 > (in object.c in Amylaar and LDMud) before posting such questions. If you
 > had done so, you would know that the #0:0 line is a version number. I'm
 > assuming the original writers wanted to leave room for possibily
 > incompatible future versions of save_object() and restore_object(), but
-> this is just an assumption. 
-> 
-Thanks for the info - as a matter of fact I don't have a copy of the 
+> this is just an assumption.
+>
+Thanks for the info - as a matter of fact I don't have a copy of the
 driver source on hand at the moment.
 
 > As for the security, you would also see a call to check_valid_path() in
@@ -479,13 +479,13 @@ driver source on hand at the moment.
 > object to call a special routine which would enforce save/restore
 > restrictions. For example, my mud only allows the mail program to do
 > save_object() or restore_object() in the mail directory.
-> 
-Maybe if you backtrack a few steps you'd see that I already wrote that. 
-I simple suggested that, in addition, an individual coder could determine 
-which objects have the permission to restore (or save I guess) from/to the 
-.o file. Saying that the current system is ideal is like saying the 
-permission system in the LP-2.4.5 mudlib is ideal (where each person's 
-access is controlled by an access list in the player's savefile, rather 
+>
+Maybe if you backtrack a few steps you'd see that I already wrote that.
+I simple suggested that, in addition, an individual coder could determine
+which objects have the permission to restore (or save I guess) from/to the
+.o file. Saying that the current system is ideal is like saying the
+permission system in the LP-2.4.5 mudlib is ideal (where each person's
+access is controlled by an access list in the player's savefile, rather
 than determined by an access file/list in each directory).
 
 -- Tom Jakubowski (Miro@Crystae, Camelot@Aldebaran)
@@ -516,62 +516,62 @@ Xref: uni-berlin.de rec.games.mud.lp:36943
 
 Tom Jakubowski wrote:
 > On Wed, 12 Jun 2002, Acius wrote:
-> 
->>XML is gaining a strong foothold because it's a simple, portable method 
->>for storing arbitrarily formatted hierarchical data. Perhaps the 
->>portability could become useful if you find a need to transfer MUD data 
->>to some other medium; perhaps for transferring it to a database. I 
+>
+>>XML is gaining a strong foothold because it's a simple, portable method
+>>for storing arbitrarily formatted hierarchical data. Perhaps the
+>>portability could become useful if you find a need to transfer MUD data
+>>to some other medium; perhaps for transferring it to a database. I
 >>probably wouldn't rewrite save_object() for that though, I'd just load a
->>.o file and export it to XML (this can be done quite easily in LPC). As 
->>for storing data hierarchically, the LDMud data is not inherently 
+>>.o file and export it to XML (this can be done quite easily in LPC). As
+>>for storing data hierarchically, the LDMud data is not inherently
 >>hierarchical, so there isn't much of an advantage here.
-> 
+>
 > Right, but exporting a .o file with LPC is relatively useless. Using a
 > compiled language along with a scheduler like cron is much more
 > reasonable alternative, as the instruction to reparse the data and create
 > lists, topscore lists, etc. is automatic.
 
-I said exporting .o *to XML* with LPC. How can you say this is useless, 
-when this is the functionality you were asking for? Converting a .o to a 
-.xml is nearly identically difficult to saving straight to .xml, and can 
-be done in straight LPC. If you don't like the extra step of converting 
-.o to .xml, you'll need to write a driver version, but that's a lot more 
-work and doesn't gain you anything I can think of. If you call it 
-save_xml() (instead of replacing save_object()), then you get the added 
-bonus of not deprecating the millions of lines of existing MUD code, 
+I said exporting .o *to XML* with LPC. How can you say this is useless,
+when this is the functionality you were asking for? Converting a .o to a
+.xml is nearly identically difficult to saving straight to .xml, and can
+be done in straight LPC. If you don't like the extra step of converting
+.o to .xml, you'll need to write a driver version, but that's a lot more
+work and doesn't gain you anything I can think of. If you call it
+save_xml() (instead of replacing save_object()), then you get the added
+bonus of not deprecating the millions of lines of existing MUD code,
 while still allowing them to use save_xml() in extending their own libs.
 
->>One disadvantage of XML is that the XML version of the file is likely to 
->>occupy much more disk space than the relatively efficient .o version. 
->>The "disk space is cheap" argument doesn't work, since a great many 
->>LPMuds are running in environments with harsh quotas (commercial 
+>>One disadvantage of XML is that the XML version of the file is likely to
+>>occupy much more disk space than the relatively efficient .o version.
+>>The "disk space is cheap" argument doesn't work, since a great many
+>>LPMuds are running in environments with harsh quotas (commercial
 >>providers and universities are infamous for 10 MB file limits).
-> 
+>
 > I realise that hard drive space is a big problem (and I'm one of the
 > victims ;)), but this is exactly why it would be an optional choice,
 > when the admin compiles the driver.
->  
-> 
->>>- Easier parsability. MUD admins could display the data shown here in any 
->>>number of ways: a list of all players, a list of the players with top 
+>
+>
+>>>- Easier parsability. MUD admins could display the data shown here in any
+>>>number of ways: a list of all players, a list of the players with top
 >>>experience, wizards list, etc.
 >>
 >>
->>Parsing a .o file in LPC and getting all the variables in it is *stupid* 
->>easy. There's a command on our MUD, 'stat', which works by parsing the 
->>.o file and displaying all the internal variables. It took maybe an hour 
+>>Parsing a .o file in LPC and getting all the variables in it is *stupid*
+>>easy. There's a command on our MUD, 'stat', which works by parsing the
+>>.o file and displaying all the internal variables. It took maybe an hour
 >>or two to write.
 >>
-> 
+>
 > [snip]
 > Er, perhaps I didn't make myself clear. I meant that the parsability would
 > be 200x easier for an admin writing a C/Perl/any-other-language-with-XML-
 > libraries program, rather than LPC. *Everyone* knows how easy it is to
 > parse a .o file from LPC, because of its great string functions.
 
-True: Outside of LPC, it's easier to read XML because of the libraries 
-available for it. But see my earlier comment -- it's wiser to make a 
-save_xml() function (either as a simul_efun using a .o->.xml converter, 
+True: Outside of LPC, it's easier to read XML because of the libraries
+available for it. But see my earlier comment -- it's wiser to make a
+save_xml() function (either as a simul_efun using a .o->.xml converter,
 or as a driver function), because it won't break existing code.
 
 How would you handle arrays and mappings in XML?
@@ -602,18 +602,18 @@ Organization: AT&T Broadband
 Date: Thu, 13 Jun 2002 04:01:25 GMT
 Xref: uni-berlin.de rec.games.mud.lp:36944
 
-> I said exporting .o *to XML* with LPC. How can you say this is useless, 
-> when this is the functionality you were asking for? Converting a .o to a 
-> .xml is nearly identically difficult to saving straight to .xml, and can 
-> be done in straight LPC. If you don't like the extra step of converting 
-> .o to .xml, you'll need to write a driver version, but that's a lot more 
-> work and doesn't gain you anything I can think of. If you call it 
-> save_xml() (instead of replacing save_object()), then you get the added 
-> bonus of not deprecating the millions of lines of existing MUD code, 
+> I said exporting .o *to XML* with LPC. How can you say this is useless,
+> when this is the functionality you were asking for? Converting a .o to a
+> .xml is nearly identically difficult to saving straight to .xml, and can
+> be done in straight LPC. If you don't like the extra step of converting
+> .o to .xml, you'll need to write a driver version, but that's a lot more
+> work and doesn't gain you anything I can think of. If you call it
+> save_xml() (instead of replacing save_object()), then you get the added
+> bonus of not deprecating the millions of lines of existing MUD code,
 > while still allowing them to use save_xml() in extending their own libs.
-> 
-Ack, you're right. A simul-efun to convert .o to XML would be ideal. I 
-never thought until now that along with each save_object() call, I could 
+>
+Ack, you're right. A simul-efun to convert .o to XML would be ideal. I
+never thought until now that along with each save_object() call, I could
 do a save_xml(file) call. :/ Sorry.
 
 > How would you handle arrays and mappings in XML?
@@ -636,14 +636,14 @@ or maybe:
   </elements>
 </data>
 
-> 
+>
 > -- Acius
 > acius _at_ simud _dot_ org
-> 
-> 
+>
+>
 
-BTW, I take my proposal away, as Acius as made me realise that a 
-simul-efun (or perhaps a patch to my copy of the driver only, for the sake 
+BTW, I take my proposal away, as Acius as made me realise that a
+simul-efun (or perhaps a patch to my copy of the driver only, for the sake
 of efficiency) is a *much* better solution.
 
 -- Tom Jakubowski (Miro@Crystae, Camelot@Aldebaran)
@@ -677,10 +677,10 @@ Xref: uni-berlin.de rec.games.mud.lp:36947
 Tom Jakubowski wrote:
 
 >
-> Ack, you're right. A simul-efun to convert .o to XML would be ideal. I 
-> never thought until now that along with each save_object() call, I could 
+> Ack, you're right. A simul-efun to convert .o to XML would be ideal. I
+> never thought until now that along with each save_object() call, I could
 > do a save_xml(file) call. :/ Sorry.
-> 
+>
 
 
 Why on earth keep the outdated save_object at all if you want to use a
@@ -717,25 +717,25 @@ Date: Fri, 14 Jun 2002 07:19:39 GMT
 Xref: uni-berlin.de rec.games.mud.lp:36948
 
 Sten During wrote:
-> 
+>
 > Why on earth keep the outdated save_object at all if you want to use a
 > different format?
-> 
+>
 > write_file (or whatever your driverversion calls it) and read_file ought
 > to be enough. With todays processors the performance-hit actually
 > matters very little.
 
-Because save_object() is currently the only method for getting a 
-complete list of all the variables in an object. save_object() has 
-functionality that would be impossible without an equivalent function 
-(namely, assembling a list of all the variables in an object along with 
+Because save_object() is currently the only method for getting a
+complete list of all the variables in an object. save_object() has
+functionality that would be impossible without an equivalent function
+(namely, assembling a list of all the variables in an object along with
 their values).
 
-It's got very little to do with performance, and far more to do with 
-simply having the functionality at all. Replacing save_object() with a 
-function which returned a mapping of all the variables in the object 
-would be quite acceptable, and actually very nice -- you could implement 
-save_object() as a simul_efun then. I believe there's an experimental 
+It's got very little to do with performance, and far more to do with
+simply having the functionality at all. Replacing save_object() with a
+function which returned a mapping of all the variables in the object
+would be quite acceptable, and actually very nice -- you could implement
+save_object() as a simul_efun then. I believe there's an experimental
 feature to save_object() to a string, which is a step in this direction.
 
 -- Acius
@@ -769,7 +769,7 @@ Xref: uni-berlin.de rec.games.mud.lp:36949
 Acius wrote:
 
 > Sten During wrote:
-> 
+>
 >>
 >> Why on earth keep the outdated save_object at all if you want to use a
 >> different format?
@@ -777,23 +777,23 @@ Acius wrote:
 >> write_file (or whatever your driverversion calls it) and read_file ought
 >> to be enough. With todays processors the performance-hit actually
 >> matters very little.
-> 
-> 
-> Because save_object() is currently the only method for getting a 
-> complete list of all the variables in an object. save_object() has 
-> functionality that would be impossible without an equivalent function 
-> (namely, assembling a list of all the variables in an object along with 
+>
+>
+> Because save_object() is currently the only method for getting a
+> complete list of all the variables in an object. save_object() has
+> functionality that would be impossible without an equivalent function
+> (namely, assembling a list of all the variables in an object along with
 > their values).
-> 
-> It's got very little to do with performance, and far more to do with 
-> simply having the functionality at all. Replacing save_object() with a 
-> function which returned a mapping of all the variables in the object 
-> would be quite acceptable, and actually very nice -- you could implement 
-> save_object() as a simul_efun then. I believe there's an experimental 
+>
+> It's got very little to do with performance, and far more to do with
+> simply having the functionality at all. Replacing save_object() with a
+> function which returned a mapping of all the variables in the object
+> would be quite acceptable, and actually very nice -- you could implement
+> save_object() as a simul_efun then. I believe there's an experimental
 > feature to save_object() to a string, which is a step in this direction.
-> 
+>
 > -- Acius
-> 
+>
 
 You would want to do this anyway as there are times when you want to
 be able to force an object to dump its current status. Saving said
@@ -825,10 +825,10 @@ Xref: uni-berlin.de rec.games.mud.lp:36950
 On Fri, 14 Jun 2002 07:19:39 GMT, Acius <redsorcerer@hotmail.com>
 wrote:
 
->Because save_object() is currently the only method for getting a 
->complete list of all the variables in an object. save_object() has 
->functionality that would be impossible without an equivalent function 
->(namely, assembling a list of all the variables in an object along with 
+>Because save_object() is currently the only method for getting a
+>complete list of all the variables in an object. save_object() has
+>functionality that would be impossible without an equivalent function
+>(namely, assembling a list of all the variables in an object along with
 >their values).
 
 This is not entirely correct.

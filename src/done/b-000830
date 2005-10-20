@@ -125,7 +125,7 @@ Lars Duening:
 > >Differenz von 60 MB habe (140MB aus OBJ_DUMP und 200MB bei malloc)
 > >
 > >Wo koennen diese 60MB stecken?
-> 
+>
 > Die 200 MB, ist das der Brutto- oder der Nettospeicherverbrauch?
 
 Ja... malloc sagt:
