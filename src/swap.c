@@ -1878,29 +1878,37 @@ swap_status (strbuf_t *sbuf)
 
 /*-------------------------------------------------------------------------*/
 void
-swap_dinfo_data (svalue_t *svp)
+swap_dinfo_data (svalue_t *svp, int value)
 
 /* Fill in the data for debug_info(DINFO_DATA, DID_SWAP)
  * into the svalue block <svp>.
+ * If <value> is -1, <svp> points indeed to a value block; other it is
+ * the index of the desired value and <svp> points to a single svalue.
  */
  
 {
-    svp[DID_SW_PROGS].u.number        = num_swapped - num_unswapped;
-    svp[DID_SW_PROG_SIZE].u.number    = total_bytes_swapped - total_bytes_unswapped;
-    svp[DID_SW_PROG_UNSWAPPED].u.number = num_unswapped;
-    svp[DID_SW_PROG_U_SIZE].u.number  = total_bytes_unswapped;
-    svp[DID_SW_VARS].u.number         = num_vb_swapped;
-    svp[DID_SW_VAR_SIZE].u.number     = total_vb_bytes_swapped;
-    svp[DID_SW_FREE].u.number         = num_swapfree;
-    svp[DID_SW_FREE_SIZE].u.number    = total_bytes_swapfree;
-    svp[DID_SW_FILE_SIZE].u.number    = swapfile_size;
-    svp[DID_SW_REUSED].u.number       = total_swap_reused;
-    svp[DID_SW_SEARCHES].u.number     = swap_num_searches;
-    svp[DID_SW_SEARCH_LEN].u.number   = swap_total_searchlength;
-    svp[DID_SW_F_SEARCHES].u.number   = swap_free_searches;
-    svp[DID_SW_F_SEARCH_LEN].u.number = swap_free_searchlength;
-    svp[DID_SW_COMPACT].u.number      = swap_compact_mode;
-    svp[DID_SW_RECYCLE_FREE].u.number = recycle_free_space;
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code
+    
+    ST_NUMBER(DID_SW_PROGS, num_swapped - num_unswapped);
+    ST_NUMBER(DID_SW_PROG_SIZE, total_bytes_swapped - total_bytes_unswapped);
+    ST_NUMBER(DID_SW_PROG_UNSWAPPED, num_unswapped);
+    ST_NUMBER(DID_SW_PROG_U_SIZE, total_bytes_unswapped);
+    ST_NUMBER(DID_SW_VARS, num_vb_swapped);
+    ST_NUMBER(DID_SW_VAR_SIZE, total_vb_bytes_swapped);
+    ST_NUMBER(DID_SW_FREE, num_swapfree);
+    ST_NUMBER(DID_SW_FREE_SIZE, total_bytes_swapfree);
+    ST_NUMBER(DID_SW_FILE_SIZE, swapfile_size);
+    ST_NUMBER(DID_SW_REUSED, total_swap_reused);
+    ST_NUMBER(DID_SW_SEARCHES, swap_num_searches);
+    ST_NUMBER(DID_SW_SEARCH_LEN, swap_total_searchlength);
+    ST_NUMBER(DID_SW_F_SEARCHES, swap_free_searches);
+    ST_NUMBER(DID_SW_F_SEARCH_LEN, swap_free_searchlength);
+    ST_NUMBER(DID_SW_COMPACT, swap_compact_mode);
+    ST_NUMBER(DID_SW_RECYCLE_FREE, recycle_free_space);
+
+#undef ST_NUMBER
 } /* swap_dinfo_data() */
 
 /***************************************************************************/

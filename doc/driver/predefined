@@ -49,6 +49,7 @@ DESCRIPTION
       __IPV6__ :      support for IP v 6
       __MYSQL__ :     support for mySQL
       __LPC_NOSAVE__: support for the 'nosave' keyword
+      __DEPRECATED__: support for obsolete and deprecated efuns.
 
 
 HISTORY
@@ -59,8 +60,8 @@ HISTORY
     3.2.6 added __MAX_EVAL_COST__.
     3.2.7 added __STRICT_EUIDS__ and made __EUIDS__ standard.
     3.2.8 added __IPV6__, __LPC_NOSAVE__, __DIR__, __PATH__().
-    3.2.9 added __LDMUD__, __MYSQL__, __VERSION_MAJOR__, __VERSION_MINOR__, 
-        __VERSION_MICRO__ and __VERSION_PATCH__.
+    3.2.9 added __LDMUD__, __MYSQL__, __DEPRECATED__, __VERSION_MAJOR__,
+        __VERSION_MINOR__, __VERSION_MICRO__ and __VERSION_PATCH__.
 
 SEE ALSO
     query_host_name(E), version(E), pragma(LPC), preprocessor(LPC)

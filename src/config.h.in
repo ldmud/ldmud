@@ -273,13 +273,11 @@
 
 #define MAX_BYTE_TRANSFER        @val_max_byte_transfer@
 
-/* Define this if the mud are to catch incoming udp messages on a
- * specific port. If == -1 it will not be used unless the mud is started
- * with the -u### flag. Where ### is the portnumber for the udp port.
- * If undefined the -u flag will be ignored.
+/* Define this to the port on which the driver can receive UDP message.
+ * If set to -1, the port will not be opened unless the mud is given a valid
+ * port number on startup with the -u commandline option.
  */
-@cdef_catch_udp_port@ CATCH_UDP_PORT            @val_catch_udp_port@
-@cdef_udp_send@ UDP_SEND
+#define UDP_PORT            @val_udp_port@
 
 /* Define this if you want IPv6 support (assuming that your host
  * actually offers this.
@@ -294,6 +292,10 @@
 /* Define this if you want the 'nosave' keyword.
  */
 @cdef_lpc_nosave@ USE_LPC_NOSAVE
+
+/* Define this if you want the obsolete and deprecated efuns.
+ */
+@cdef_use_deprecated@ USE_DEPRECATED
 
 /* Maximum size of a socket send buffer.
  */
@@ -314,29 +316,29 @@
 
 #define MALLOC_@val_malloc@
 
-/* If MIN_MALLOCED is defined, the gamedriver will reserve this amount of
+/* If MIN_MALLOCED is > 0, the gamedriver will reserve this amount of
  * memory on startup for large blocks, thus reducing the large block
  * fragmentation. The value therefore should be a significantly large
  * multiple of the large chunk size.
  * As a rule of thumb, reserve enough memory to cover the first couple
  * of days of uptime.
  */
-@cdef_min_malloced@ MIN_MALLOCED  @val_min_malloced@
+#define MIN_MALLOCED  @val_min_malloced@
 
-/* If MIN_SMALL_MALLOCED is defined, the gamedriver will reserve this
+/* If MIN_SMALL_MALLOCED is > 0, the gamedriver will reserve this
  * amount of memory on startup for small blocks, thus reducing the small block
  * fragmentation. The value therefore should be a significantly large
  * multiple of the small chunk size.
  * As a rule of thumb, reserve enough memory to cover the first couple
  * of days of uptime.
  */
-@cdef_min_small_malloced@ MIN_MALLOCED  @val_min_small_malloced@
+#define MIN_SMALL_MALLOCED  @val_min_small_malloced@
 
-/* These two values give the upper limits for
- * large and small block allocation (useful for systems with no
- * functioning process limit).
+/* This value gives the upper limit for the total allocated memory
+ * (useful for systems with no functioning process limit).
+ * A value of 0 means 'unlimited'.
  */
-@cdef_max_malloced@ MAX_MALLOCED         @val_max_malloced@
+#define MAX_MALLOCED         @val_max_malloced@
 
 /* Define this to annotate all allocations with file:line of the driver
  * source responsible for it.

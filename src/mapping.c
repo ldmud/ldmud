@@ -750,7 +750,7 @@ free_protector_mapping (mapping_t *m)
             last_instructions(TOTAL_TRACE_LENGTH, MY_TRUE, NULL);
         }
 #endif
-        dump_trace(MY_FALSE);
+        dump_trace(MY_FALSE, NULL);
         printf("%s free_protector_mapping() : no hash %s\n"
               , time_stamp(), m->hash ? "reference" : "part");
         free_mapping(m);

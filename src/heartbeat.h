@@ -19,7 +19,7 @@ extern mp_int num_hb_objs;
 extern void  call_heart_beat(void);
 extern int   set_heart_beat (object_t *ob, Bool to);
 extern int   heart_beat_status (strbuf_t *sbuf, Bool verbose);
-extern void  hbeat_dinfo_status(svalue_t *svp);
+extern void  hbeat_dinfo_status(svalue_t *svp, int value);
 extern svalue_t *f_set_heart_beat (svalue_t *sp);
 extern svalue_t *f_heart_beat_info (svalue_t *sp);
 

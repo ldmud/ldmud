@@ -10,10 +10,8 @@ exit 1
 # --- The actual settings ---
 
 with_portno=7690
-enable_catch_udp_port=yes
-enable_udp_send=yes
 enable_erq=erq
-with_catch_udp_port=7691
+with_udp_port=7691
 with_max_players=200
 enable_access_control=no
 

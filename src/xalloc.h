@@ -72,9 +72,9 @@ extern char *reserved_system_area;
 extern mp_int reserved_user_size;
 extern mp_int reserved_master_size;
 extern mp_int reserved_system_size;
-#ifdef MAX_MALLOCED
+extern mp_int min_malloced;
+extern mp_int min_small_malloced;
 extern mp_int max_malloced;
-#endif
 
 
 /* --- SMalloc --- */
@@ -143,6 +143,8 @@ extern POINTER xalloc(size_t size);
 
 
 /* --- Associated functions --- */
+
+extern void reserve_memory (void);
 
 #ifndef string_copy
 

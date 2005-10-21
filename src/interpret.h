@@ -147,7 +147,7 @@ extern svalue_t *apply(string_t *fun, object_t *ob, int num_arg);
 extern void call_function(program_t *progp, int fx);
 extern int get_line_number(bytecode_p p, program_t *progp, string_t **namep);
 extern string_t *collect_trace(strbuf_t * sbuf, vector_t ** rvec);
-extern string_t *dump_trace(Bool how);
+extern string_t *dump_trace(Bool how, vector_t **rvec);
 extern int get_line_number_if_any(string_t **name);
 extern void reset_machine(Bool first);
 extern svalue_t *secure_apply(string_t *fun, object_t *ob, int num_arg);

@@ -61,7 +61,7 @@ with_reserved_user_size=800000
 with_htable_size=28672
 with_itable_size=1024
 with_otable_size=7168
-with_catch_udp_port=7610
+with_udp_port=7610
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
 

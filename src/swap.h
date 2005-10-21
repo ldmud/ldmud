@@ -26,6 +26,6 @@ extern void name_swap_file(const char *name);
 extern void unlink_swap_file(void);
 extern size_t swap_overhead (void);
 extern void swap_status(strbuf_t *sbuf);
-extern void swap_dinfo_data (svalue_t *svp);
+extern void swap_dinfo_data (svalue_t *svp, int value);
 
 #endif  /* SWAP_H__ */

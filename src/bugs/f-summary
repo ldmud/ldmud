@@ -174,6 +174,7 @@ f-000830: telnet-Timing extension (RFC 860)
 f-000905-0: Graceful charmode recovery.
 f-001116: Faster callouts
 f-001220-1: Possible implementation detail of the telnet machine
+f-010216: Possible implementation of T_ERROR
 
 
 Installation
@@ -182,7 +183,6 @@ f-981226-2: Check for and use <arpa/telnet.h>
 f-990708-3: Improved options selection process.
 f-000407: More options for setting files
 f-000814: configure-with_portno should take a string
-f-000918: Add a path spec to --use-mysql on configuration.
 
 Other
 --------------------------------------------------------------------------

@@ -527,9 +527,11 @@ static ident_t *all_locals = NULL;
    * nested block scopes.
    */
 
-static fulltype_t exact_types;
+       fulltype_t exact_types;
   /* If 0, don't check nor require argument and function types.
-   * Otherwise it's the return type of the function.
+   * Otherwise it's the full return type of the function, including
+   * visibility. The lexer reads this variable when scanning an
+   * inline closure.
    */
 
 static int heart_beat;
@@ -3025,7 +3027,7 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
               /* FUNCTION_NAME */
               memcpy(p, &$3->name, sizeof $3->name);
               p += sizeof $3->name;
-              ref_mstring($3->name);
+              (void)ref_mstring($3->name);
 
               /* FUNCTION_TYPE */
               *p++ = $2;

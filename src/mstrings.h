@@ -106,7 +106,7 @@ extern void mstring_walk_strings (void (*func)(string_t *));
 #endif /* GC_SUPPORT */
 
 extern mp_int add_string_status (strbuf_t *sbuf, Bool verbose);
-extern void string_dinfo_status (svalue_t *svp);
+extern void   string_dinfo_status(svalue_t *svp, int value);
 
 
 /* --- Inline functions and macros --- */

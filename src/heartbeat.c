@@ -130,6 +130,10 @@ static long num_hb_calls = 0;
   /* Number of calls to call_heart_beat() with active heartbeats.
    */
 
+static long total_hb_calls = 0;
+  /* Total number of calls to call_heart_beat().
+   */
+
 /*-------------------------------------------------------------------------*/
 void
 call_heart_beat (void)
@@ -154,6 +158,7 @@ call_heart_beat (void)
     /* Housekeeping */
 
     current_interactive = NULL;
+    total_hb_calls++;
 
     /* Set this new round through the hb list */
     hb_num_done = 0;
@@ -459,27 +464,45 @@ heart_beat_status (strbuf_t * sbuf, Bool verbose)
 
 /*-------------------------------------------------------------------------*/
 void
-hbeat_dinfo_status (svalue_t *svp)
+hbeat_dinfo_status (svalue_t *svp, int value)
 
 /* Return the heartbeat information for debug_info(DINFO_DATA, DID_STATUS).
  * <svp> points to the svalue block for the result, this function fills in
  * the spots for the object table.
+ * If <value> is -1, <svp> points indeed to a value block; other it is
+ * the index of the desired value and <svp> points to a single svalue.
  */
 
 {
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code
+    
+#define ST_DOUBLE(which,code) \
+    if (value == -1) { \
+        svp[which].type = T_FLOAT; \
+        STORE_DOUBLE(svp+which, code); \
+    } else if (value == which) { \
+        svp->type = T_FLOAT; \
+        STORE_DOUBLE(svp, code); \
+    }
+    
     STORE_DOUBLE_USED;
     
-    svp[DID_ST_HBEAT_OBJS].u.number      = num_hb_objs;
-    svp[DID_ST_HBEAT_CALLS].u.number     = num_hb_calls;
-    svp[DID_ST_HBEAT_SLOTS].u.number     = num_blocks * NUM_NODES;
-    svp[DID_ST_HBEAT_SIZE].u.number      = num_blocks * sizeof(struct hb_block);
-    svp[DID_ST_HBEAT_PROCESSED].u.number = hb_num_done;
-    svp[DID_ST_HBEAT_AVG_PROC].type = T_FLOAT;
-    STORE_DOUBLE(svp+DID_ST_HBEAT_AVG_PROC
-                , avg_num_hb_objs
-                  ? avg_num_hb_done / avg_num_hb_objs
-                  : 1.0
-                );
+    ST_NUMBER(DID_ST_HBEAT_OBJS, num_hb_objs);
+    ST_NUMBER(DID_ST_HBEAT_CALLS, num_hb_calls);
+    ST_NUMBER(DID_ST_HBEAT_CALLS_TOTAL, total_hb_calls);
+    ST_NUMBER(DID_ST_HBEAT_SLOTS, num_blocks * NUM_NODES);
+    ST_NUMBER(DID_ST_HBEAT_SIZE, num_blocks * sizeof(struct hb_block));
+    ST_NUMBER(DID_ST_HBEAT_PROCESSED, hb_num_done);
+    ST_DOUBLE(DID_ST_HBEAT_AVG_PROC
+             , avg_num_hb_objs
+               ? avg_num_hb_done / avg_num_hb_objs
+               : 1.0
+             );
+
+#undef ST_NUMBER
+#undef ST_DOUBLE
 } /* hbeat_dinfo_status() */
 
 /*=========================================================================*/

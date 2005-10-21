@@ -10,6 +10,8 @@ DESCRIPTION
 
 HISTORY
 	The 'hostport' argument was added in 3.2.1.
+        LDMud 3.2.9 renamed this method to receive_udp().
 
 SEE ALSO
-	send_imp(E), query_imp_port(E)
+	send_udp(E), query_udp_port(E)
+

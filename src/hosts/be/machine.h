@@ -78,9 +78,6 @@
 /* the atari strtol() used to consider characters '9' < c < 'A' to be numeric */
 /* #undef STRTOL_BROKEN */
 
-/* does the libc consider it normal to free a null pointer? */
-#define FREE_NULL_POINTER 1
-
 /* needs the first argument of strtol be declared as const ? */
 #ifndef __MWERKS__
 #    undef STRTOL_CONST_CHARP

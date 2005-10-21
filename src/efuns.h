@@ -58,10 +58,11 @@ extern svalue_t *f_map (svalue_t *sp, int num_arg);
 extern svalue_t *f_member (svalue_t *sp);
 extern svalue_t *f_min (svalue_t *sp, int num_arg);
 extern svalue_t *f_max (svalue_t *sp, int num_arg);
+extern svalue_t *f_sgn (svalue_t *sp);
 extern svalue_t *f_quote (svalue_t *sp);
 
 extern svalue_t *f_clones (svalue_t *sp, int num_args);
-extern svalue_t *f_object_info (svalue_t *sp);
+extern svalue_t *f_object_info (svalue_t *sp, int num_args);
 extern svalue_t *f_present_clone (svalue_t *sp);
 extern svalue_t *f_to_object(svalue_t *sp);
 extern svalue_t *f_set_is_wizard(svalue_t *sp);  /* optional */

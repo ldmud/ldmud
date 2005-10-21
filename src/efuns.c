@@ -57,6 +57,7 @@
  *    efun: member()
  *    efun: min()
  *    efun: max()
+ *    efun: sgn()
  *    efun: quote()
  *
  * Others:
@@ -609,7 +610,7 @@ f_regreplace (svalue_t *sp)
     if (pat && regexec(pat,curr,start)) {
         do {
             size_t diff = (size_t)(pat->startp[0]-curr);
-            space -= diff;
+            space -= diff; /* TODO: space -= diff+1 ? */
             while (space <= 0) {
                 XREALLOC;
             }
@@ -3024,33 +3025,96 @@ f_clones (svalue_t *sp, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_object_info (svalue_t *sp)
+f_object_info (svalue_t *sp, int num_args)
 
 /* EFUN object_info()
  *
  *    mixed * object_info(object o, int type)
+ *    mixed * object_info(object o, int type, int which)
  *
  * Return an array with information about the object <o>. The
  * type of information returned is determined by <type>.
+ *
+ * If <which> is specified, the function does not return the full array, but
+ * just the single value from index <which>.
  */
 
 {
     vector_t *v;
-    object_t *o, *o2, *prev;
+    object_t *o, *o2;
     program_t *prog;
-    svalue_t *svp;
+    svalue_t *svp, *argp;
     mp_int v0, v1, v2;
-    int flags, pos;
+    int flags, pos, value;
+    svalue_t result;
 
     /* Get the arguments from the stack */
-
-    o = sp[-1].u.ob;
+    argp = sp - num_args + 1;
+    if (num_args == 3)
+    {
+        value = argp[2].u.number;
+        transfer_svalue_no_free(&result, &const0);
+    }
+    else
+        value = -1;
+  
+    o = argp->u.ob;
 
     /* Depending on the <type> argument, determine the
      * data to return.
      */
-    switch(sp->u.number)
+    switch(argp[1].u.number)
     {
+#define PREP(max) \
+    if (num_args == 2) { \
+        v = allocate_array(max); \
+        if (!v) \
+            error("Out of memory: array[%d] for result.\n" \
+                 , max); \
+        svp = v->item; \
+    } else { \
+        v = NULL; \
+        if (value < 0 || value >= max) \
+            error("Illegal index for object_info(): %d, " \
+                  "expected 0..%d\n", value, max-1); \
+        svp = &result; \
+    }
+
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code; \
+    else {}
+    
+#define ST_DOUBLE(which,code) \
+    if (value == -1) { \
+        svp[which].type = T_FLOAT; \
+        STORE_DOUBLE(svp+which, code); \
+    } else if (value == which) { \
+        svp->type = T_FLOAT; \
+        STORE_DOUBLE(svp, code); \
+    } else {}
+            
+#define ST_STRING(which,code) \
+    if (value == -1) { \
+        put_ref_string(svp+which, code); \
+    } else if (value == which) { \
+        put_ref_string(svp, code); \
+    } else {}
+            
+#define ST_NOREF_STRING(which,code) \
+    if (value == -1) { \
+        put_string(svp+which, code); \
+    } else if (value == which) { \
+        put_string(svp, code); \
+    } else {}
+            
+#define ST_OBJECT(which,code,tag) \
+    if (value == -1) { \
+        put_ref_object(svp+which, code, tag); \
+    } else if (value == which) { \
+        put_ref_object(svp, code, tag); \
+    } else {}
+            
     default:
         error("Illegal value %ld for object_info().\n", sp->u.number);
         /* NOTREACHED */
@@ -3058,137 +3122,134 @@ f_object_info (svalue_t *sp)
 
     /* --- The basic information from the object structure */
     case OINFO_BASIC:
-        v = allocate_array(OIB_MAX);
-        svp = v->item;
+        PREP(OIB_MAX);
 
         flags = o->flags;
 
-        svp[OIB_HEART_BEAT].u.number = (flags & O_HEART_BEAT) ? 1 : 0;
+        ST_NUMBER(OIB_HEART_BEAT,        (flags & O_HEART_BEAT) ? 1 : 0);
 #ifdef O_IS_WIZARD
-        svp[OIB_IS_WIZARD].u.number  = (flags & O_IS_WIZARD) ? 1 : 0;
+        ST_NUMBER(OIB_IS_WIZARD,         (flags & O_IS_WIZARD) ? 1 : 0);
 #else
-        svp[OIB_IS_WIZARD].u.number  = 0;
+        ST_NUMBER(OIB_IS_WIZARD,         0);
 #endif
-        svp[OIB_ENABLE_COMMANDS].u.number
-                                     = (flags & O_ENABLE_COMMANDS) ? 1 : 0;
-        svp[OIB_CLONE].u.number      = (flags & O_CLONE) ? 1 : 0;
-        svp[OIB_DESTRUCTED].u.number = (flags & O_DESTRUCTED) ? 1 : 0;
-        svp[OIB_SWAPPED].u.number    = (flags & O_SWAPPED) ? 1 : 0;
-        svp[OIB_ONCE_INTERACTIVE].u.number
-                                     = (flags & O_ONCE_INTERACTIVE) ? 1 : 0;
-        svp[OIB_RESET_STATE].u.number = (flags & O_RESET_STATE) ? 1 : 0;
-        svp[OIB_WILL_CLEAN_UP].u.number
-                                     = (flags & O_WILL_CLEAN_UP) ? 1 : 0;
-        svp[OIB_LAMBDA_REFERENCED].u.number
-                                     = (flags & O_LAMBDA_REFERENCED) ? 1 : 0;
-        svp[OIB_SHADOW].u.number     = (flags & O_SHADOW) ? 1 : 0;
-        svp[OIB_REPLACED].u.number   = (flags & O_REPLACED) ? 1 : 0;
+        ST_NUMBER(OIB_ENABLE_COMMANDS,   (flags & O_ENABLE_COMMANDS) ? 1 : 0);
+        ST_NUMBER(OIB_CLONE,             (flags & O_CLONE) ? 1 : 0);
+        ST_NUMBER(OIB_DESTRUCTED,        (flags & O_DESTRUCTED) ? 1 : 0);
+        ST_NUMBER(OIB_SWAPPED,           (flags & O_SWAPPED) ? 1 : 0);
+        ST_NUMBER(OIB_ONCE_INTERACTIVE,  (flags & O_ONCE_INTERACTIVE) ? 1 : 0);
+        ST_NUMBER(OIB_RESET_STATE,       (flags & O_RESET_STATE) ? 1 : 0);
+        ST_NUMBER(OIB_WILL_CLEAN_UP,     (flags & O_WILL_CLEAN_UP) ? 1 : 0);
+        ST_NUMBER(OIB_LAMBDA_REFERENCED, (flags & O_LAMBDA_REFERENCED) ? 1 : 0);
+        ST_NUMBER(OIB_SHADOW,            (flags & O_SHADOW) ? 1 : 0);
+        ST_NUMBER(OIB_REPLACED,          (flags & O_REPLACED) ? 1 : 0);
 #ifdef F_SET_LIGHT
-        svp[OIB_TOTAL_LIGHT].u.number = o->total_light;
+        ST_NUMBER(OIB_TOTAL_LIGHT,       o->total_light);
 #else
-        svp[OIB_TOTAL_LIGHT].u.number = 0;
+        ST_NUMBER(OIB_TOTAL_LIGHT,       0);
 #endif
-        svp[OIB_NEXT_RESET].u.number = o->time_reset;
-        svp[OIB_TIME_OF_REF].u.number = o->time_of_ref;
-        svp[OIB_REF].u.number         = o->ref;
-        svp[OIB_GIGATICKS].u.number   = (p_int)o->gigaticks;
-        svp[OIB_TICKS].u.number       = (p_int)o->ticks;
-        svp[OIB_SWAP_NUM].u.number    = O_SWAP_NUM(o);
-        svp[OIB_PROG_SWAPPED].u.number = O_PROG_SWAPPED(o) ? 1 : 0;
-        svp[OIB_VAR_SWAPPED].u.number = O_VAR_SWAPPED(o) ? 1 : 0;
+        ST_NUMBER(OIB_NEXT_RESET,        o->time_reset);
+        ST_NUMBER(OIB_TIME_OF_REF,       o->time_of_ref);
+        ST_NUMBER(OIB_REF,               o->ref);
+        ST_NUMBER(OIB_GIGATICKS,         (p_int)o->gigaticks);
+        ST_NUMBER(OIB_TICKS,             (p_int)o->ticks);
+        ST_NUMBER(OIB_SWAP_NUM,          O_SWAP_NUM(o));
+        ST_NUMBER(OIB_PROG_SWAPPED,      O_PROG_SWAPPED(o) ? 1 : 0);
+        ST_NUMBER(OIB_VAR_SWAPPED,       O_VAR_SWAPPED(o) ? 1 : 0);
 
         if (compat_mode)
-            put_ref_string(svp+OIB_NAME, o->name);
+        {
+            ST_STRING(OIB_NAME, o->name);
+        }
         else
-            put_string(svp+OIB_NAME, add_slash(o->name));
-
-        put_ref_string(svp+OIB_LOAD_NAME, o->load_name);
+        {
+            ST_NOREF_STRING(OIB_NAME, add_slash(o->name));
+        }
+  
+        ST_STRING(OIB_LOAD_NAME, o->load_name);
 
         o2 = o->next_all;
         if (o2)
         {
-            put_ref_object(svp+OIB_NEXT_ALL, o2, "object_info(0)");
+            ST_OBJECT(OIB_NEXT_ALL, o2, "object_info(0)");
         } /* else the element was already allocated as 0 */
 
         o2 = o->prev_all;
         if (o2)
         {
-            put_ref_object(svp+OIB_PREV_ALL, o2, "object_info(0)");
+            ST_OBJECT(OIB_PREV_ALL, o2, "object_info(0)");
         } /* else the element was already allocated as 0 */
 
         break;
 
     /* --- Position in the object list */
     case OINFO_POSITION:
-        v = allocate_array(OIP_MAX);
-        svp = v->item;
+        PREP(OIP_MAX);
 
         o2 = o->next_all;
         if (o2)
         {
-            put_ref_object(svp+OIP_NEXT, o2, "object_info(1) next");
+            ST_OBJECT(OIP_NEXT, o2, "object_info(1) next");
         } /* else the element was already allocated as 0 */
 
-        /* Find the non-destructed predecessor of the object */
-        if (obj_list == o)
+        o2 = o->prev_all;
+        if (o2)
         {
-            pos = 0;
-            prev = NULL;
-        }
-        else
-        for (prev = NULL, o2 = obj_list, pos = 0; o2; o2 = o2->next_all)
+            ST_OBJECT(OIP_PREV, o2, "object_info(1) next");
+        } /* else the element was already allocated as 0 */
+  
+        if (value == -1 || value == OIP_POS)
         {
-            prev = o2;
-            pos++;
-            if (o2->next_all == o)
-                break;
-        }
-
-        if (o2) /* Found it in the list */
-        {
-            if (prev)
+            /* Find the non-destructed predecessor of the object */
+            if (obj_list == o)
             {
-                put_ref_object(svp+OIP_PREV, prev, "object_info(1) prev");
-            } /* else the element was already allocated as 0 */
-        }
-        else /* Not found (this shouldn't happen) */
-            pos = -1;
+                pos = 0;
+            }
+            else
+            for (o2 = obj_list, pos = 0; o2; o2 = o2->next_all)
+            {
+                pos++;
+                if (o2->next_all == o)
+                    break;
+            }
 
-        svp[OIP_POS].u.number = pos;
+            if (!o2) /* Not found in the list (this shouldn't happen) */
+                pos = -1;
+
+            ST_NUMBER(OIP_POS, pos);
+        }
 
         break;
 
     /* --- Memory and program information */
     case OINFO_MEMORY:
-        v = allocate_array(OIM_MAX);
-        svp = v->item;
+        PREP(OIM_MAX);
 
         if ((o->flags & O_SWAPPED) && load_ob_from_swap(o) < 0)
             error("Out of memory: unswap object '%s'.\n", get_txt(o->name));
 
         prog = o->prog;
 
-        svp[OIM_REF].u.number = prog->ref;
+        ST_NUMBER(OIM_REF, prog->ref);
+  
+        ST_STRING(OIM_NAME, prog->name);
+  
+        ST_NUMBER(OIM_PROG_SIZE, (long)(PROGRAM_END(*prog) - prog->program));
 
-        put_ref_string(svp+OIM_NAME, prog->name);
-
-        svp[OIM_PROG_SIZE].u.number
-                               = (long)(PROGRAM_END(*prog) - prog->program);
           /* Program size */
-        svp[OIM_NUM_FUNCTIONS].u.number = prog->num_functions;
-        svp[OIM_SIZE_FUNCTIONS].u.number
-                           = (p_int)(prog->num_functions * sizeof(uint32)
-                             + prog->num_function_names * sizeof(short));
+        ST_NUMBER(OIM_NUM_FUNCTIONS, prog->num_functions);
+        ST_NUMBER(OIM_SIZE_FUNCTIONS
+                 , (p_int)(prog->num_functions * sizeof(uint32)
+                    + prog->num_function_names * sizeof(short)));
           /* Number of function names and the memory usage */
-        svp[OIM_NUM_VARIABLES].u.number = prog->num_variables;
-        svp[OIM_SIZE_VARIABLES].u.number
-                     = (p_int)(prog->num_variables * sizeof(variable_t));
+        ST_NUMBER(OIM_NUM_VARIABLES, prog->num_variables);
+        ST_NUMBER(OIM_SIZE_VARIABLES
+                 , (p_int)(prog->num_variables * sizeof(variable_t)));
           /* Number of variables and the memory usage */
         v1 = program_string_size(prog, &v0, &v2);
-        svp[OIM_NUM_STRINGS].u.number = prog->num_strings;
-        svp[OIM_SIZE_STRINGS].u.number = (p_int)v0;
-        svp[OIM_SIZE_STRINGS_DATA].u.number = v1;
-        svp[OIM_SIZE_STRINGS_TOTAL].u.number = v2;
+        ST_NUMBER(OIM_NUM_STRINGS, prog->num_strings);
+        ST_NUMBER(OIM_SIZE_STRINGS, (p_int)v0);
+        ST_NUMBER(OIM_SIZE_STRINGS_DATA, v1);
+        ST_NUMBER(OIM_SIZE_STRINGS_TOTAL, v2);
           /* Number of strings and the memory usage */
         {
             int i = prog->num_inherited;
@@ -3200,32 +3261,47 @@ f_object_info (svalue_t *sp)
                 if (inheritp->inherit_type == INHERIT_TYPE_NORMAL)
                     cnt++;
             }
-            svp[OIM_NUM_INHERITED].u.number = cnt;
+            ST_NUMBER(OIM_NUM_INHERITED, cnt);
         }
-        svp[OIM_SIZE_INHERITED].u.number
-                     = (p_int)(prog->num_inherited * sizeof(inherit_t));
+        ST_NUMBER(OIM_SIZE_INHERITED
+                 , (p_int)(prog->num_inherited * sizeof(inherit_t)));
           /* Number of inherites and the memory usage */
-        svp[OIM_TOTAL_SIZE].u.number = prog->total_size;
+        ST_NUMBER(OIM_TOTAL_SIZE, prog->total_size);
 
         {
             mp_int totalsize;
 
-            svp[OIM_DATA_SIZE].u.number = data_size(o, &totalsize);
-            svp[OIM_TOTAL_DATA_SIZE].u.number = totalsize;
+            ST_NUMBER(OIM_DATA_SIZE, data_size(o, &totalsize));
+            ST_NUMBER(OIM_TOTAL_DATA_SIZE, totalsize);
         }
 
-        svp[OIM_NO_INHERIT].u.number = (prog->flags & P_NO_INHERIT) ? 1 : 0;
-        svp[OIM_NO_CLONE].u.number   = (prog->flags & P_NO_CLONE) ? 1 : 0;
-        svp[OIM_NO_SHADOW].u.number  = (prog->flags & P_NO_SHADOW) ? 1 : 0;
+        ST_NUMBER(OIM_NO_INHERIT, (prog->flags & P_NO_INHERIT) ? 1 : 0);
+        ST_NUMBER(OIM_NO_CLONE, (prog->flags & P_NO_CLONE) ? 1 : 0);
+        ST_NUMBER(OIM_NO_SHADOW, (prog->flags & P_NO_SHADOW) ? 1 : 0);
         break;
+
+#undef PREP
+#undef ST_NUMBER
+#undef ST_DOUBLE
+#undef ST_STRING
+#undef ST_RSTRING
+#undef ST_OBJECT
     }
 
     free_svalue(sp);
     sp--;
     free_svalue(sp);
+    if (num_args == 3)
+    {
+        sp--;
+        free_svalue(sp);
+    }
 
     /* Assign the result */
-    put_array(sp, v);
+    if (num_args == 2)
+        put_array(sp, v);
+    else
+        transfer_svalue_no_free(sp, &result);
 
     return sp;
 } /* f_object_info() */
@@ -5037,6 +5113,46 @@ f_quote (svalue_t *sp)
     return sp;
 } /* f_quote() */
 
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_sgn (svalue_t *sp)
+
+/* VEFUN sgn()
+ *
+ *   int sgn (int|float arg)
+ *
+ * Return the sign of the argument: -1 if it's < 0, +1 if it's > 0, and
+ * 0 if it is 0.
+ */
+
+{
+    if (sp->type == T_NUMBER)
+    {
+        if (sp->u.number > 0)
+            sp->u.number = 1;
+        else if (sp->u.number < 0)
+            sp->u.number = 1;
+        else
+            sp->u.number = 0;
+    }
+    else if (sp->type == T_FLOAT)
+    {
+        double d = READ_DOUBLE(sp);
+
+        sp->type = T_NUMBER;
+        if (d > 0.0)
+            sp->u.number = 1;
+        else if (d < 0.0)
+            sp->u.number = -1;
+        else
+            sp->u.number = 0;
+    }
+    else
+      error("Bad argument 1 to sgn(): not a number or float.\n");
+
+    return sp;
+} /* f_sgn() */
+
 /*=========================================================================*/
 /*                               OTHER                                     */
 
@@ -5046,7 +5162,10 @@ f_debug_info (svalue_t *sp, int num_arg)
 
 /* EFUN debug_info()
  *
- *   mixed debug_info(int flag, [ mixed arg2... ])
+ *   mixed debug_info(int flag)
+ *   mixed debug_info(int flag, object obj)
+ *   mixed debug_info(int flag, int arg2)
+ *   mixed debug_info(int flag, int arg2, int arg3)
  *
  * Print out some driver internal debug information.
  *
@@ -5090,7 +5209,9 @@ f_debug_info (svalue_t *sp, int num_arg)
  * DINFO_DATA (6): Return raw information about an aspect of
  *     the driver specified by <arg2>. The result of the function
  *     is an array with the information, or 0 for unsupported values
- *     of <arg2>.
+ *     of <arg2>. If <arg3> is given and in the range of array indices for
+ *     the given <arg2>, the result will be just the indexed array entry,
+ *     but not the full array.
  *
  *     Allowed values for <arg2> are: DID_STATUS, DID_SWAP, DID_MALLOC.
  *
@@ -5138,6 +5259,11 @@ f_debug_info (svalue_t *sp, int num_arg)
  *
  *        int DID_ST_HBEAT_CALLS
  *            Number of heart_beats executed so far.
+ *
+ *        int DID_ST_HBEAT_CALLS_TOTAL
+ *            Number of heart_beats calls so far. The difference to
+ *            ST_HBEAT_CALLS is that the latter only counts heart beat
+ *            calls during which at least one heart beat was actually executed.
  *
  *        int DID_ST_HBEAT_SLOTS
  *        int DID_ST_HBEAT_SIZE
@@ -5351,12 +5477,15 @@ f_debug_info (svalue_t *sp, int num_arg)
  *            clib functions (smalloc only with SBRK_OK).
  *
  *
- * DINFO_TRACE (7): Return the current call stack 'trace' information in the
- *     form specifiec by <arg2>. The result of the function is either
- *     an array (format explained below) if <arg2> is 0 or missing, or
- *     a printable string for any non-zero value of <arg2>.
+ * DINFO_TRACE (7): Return the call stack 'trace' information as specified
+ *     by <arg2>. The result of the function is either an array (format
+ *     explained below), or a printable string. Omitting <arg2> defaults
+ *     to DIT_CURRENT.
  *
- *     <arg2> == 0: Return the information in array form.
+ *     <arg2> == DIT_CURRENT (0) or == DIT_ERROR (1): Return the information in
+ *        array form. For DIT_CURRENT, the current call trace is returned,
+ *        for DIT_ERROR the trace of the last uncaught error.
+ *
  *        If the array has just one entry, the trace information is not
  *        available and the one entry is string with the reason.
  *
@@ -5389,6 +5518,9 @@ f_debug_info (svalue_t *sp, int num_arg)
  *                          closure code.
  *            _TYPE_LFUN:   the line number.
  *
+ *     <arg2> == DIT_STR_CURRENT (2): Return the information about the current
+ *        call trace as printable string.
+ *
  * TODO: debug_info() and all associated routines are almost big enough
  * TODO:: to justify a file on their own.
  */
@@ -5397,7 +5529,7 @@ f_debug_info (svalue_t *sp, int num_arg)
     svalue_t *arg;
     svalue_t res;
     object_t *ob;
-
+  
     arg = sp-num_arg+1;
     inter_sp = sp;
 
@@ -5644,52 +5776,78 @@ f_debug_info (svalue_t *sp, int num_arg)
          */
 
         vector_t *v;
-
-        if (num_arg != 2)
+        svalue_t *dinfo_arg;
+        int       value = -1;
+  
+        if (num_arg != 2 && num_arg != 3)
             error("bad number of arguments to debug_info\n");
         if (arg[1].type != T_NUMBER)
             vefun_arg_error(2, T_NUMBER, arg[1].type, sp);
+        if (num_arg == 3)
+        {
+            if (arg[2].type != T_NUMBER)
+                vefun_arg_error(3, T_NUMBER, arg[2].type, sp);
+            value = arg[2].u.number;
+        }
 
         switch(arg[1].u.number)
         {
-        case DID_STATUS:
-            v = allocate_array(DID_STATUS_MAX);
-            if (!v)
-                error("Out of memory: array[%d] for result.\n"
-                     , DID_STATUS_MAX);
+#define PREP(which) \
+            if (value == -1) { \
+                v = allocate_array(which); \
+                if (!v) \
+                    error("Out of memory: array[%d] for result.\n" \
+                         , which); \
+                dinfo_arg = v->item; \
+            } else { \
+                v = NULL; \
+                if (value < 0 || value >= which) \
+                    error("Illegal index for debug_info(): %d, " \
+                          "expected 0..%d\n", value, which-1); \
+                dinfo_arg = &res; \
+            }
 
-            dinfo_data_status(v->item);
-            otable_dinfo_status(v->item);
-            hbeat_dinfo_status(v->item);
-            callout_dinfo_status(v->item);
-            string_dinfo_status(v->item);
+        case DID_STATUS:
+            PREP(DID_STATUS_MAX)
+
+            dinfo_data_status(dinfo_arg, value);
+            otable_dinfo_status(dinfo_arg, value);
+            hbeat_dinfo_status(dinfo_arg, value);
+            callout_dinfo_status(dinfo_arg, value);
+            string_dinfo_status(dinfo_arg, value);
 #ifdef RXCACHE_TABLE
-            rxcache_dinfo_status(v->item);
+            rxcache_dinfo_status(dinfo_arg, value);
 #endif
-            put_array(&res, v);
+
+            if (value == -1)
+                put_array(&res, v);
             break;
 
         case DID_SWAP:
-            v = allocate_array(DID_SWAP_MAX);
-            if (!v)
-                error("Out of memory: array[%d] for result.\n", DID_SWAP_MAX);
-            swap_dinfo_data(v->item);
-            put_array(&res, v);
+            PREP(DID_SWAP_MAX)
+
+            swap_dinfo_data(dinfo_arg, value);
+            if (value == -1)
+                put_array(&res, v);
             break;
 
         case DID_MEMORY:
-            v = allocate_array(DID_MEMORY_MAX);
-            if (!v)
-                error("Out of memory: array[%d] for result.\n"
-                     , DID_MEMORY_MAX);
+            PREP(DID_MEMORY_MAX)
+
 #if defined(MALLOC_smalloc)
-            smalloc_dinfo_data(v->item);
+            smalloc_dinfo_data(dinfo_arg, value);
 #endif
 #if defined(MALLOC_sysmalloc)
-            put_ref_string(v->item+DID_MEM_NAME, STR_SYSTEM_MALLOC);
+            if (value == -1)
+                put_ref_string(v->item+DID_MEM_NAME, STR_SYSTEM_MALLOC);
+            else if (value == DID_MEM_NAME)
+                put_ref_string(dinfo_arg, STR_SYSTEM_MALLOC);
 #endif
-            put_array(&res, v);
+            if (value == -1)
+                put_array(&res, v);
             break;
+
+#undef PREP
         }
         break;
       }
@@ -5701,15 +5859,30 @@ f_debug_info (svalue_t *sp, int num_arg)
         if (num_arg != 1 && num_arg != 2)
             error("bad number of arguments to debug_info\n");
 
-        if (num_arg == 1
-         || (sp->type == T_NUMBER && sp->u.number == 0))
+        if (num_arg == 2 && sp->type != T_NUMBER)
+            error("bad arg 2 to debug_info(): not a number.\n");
+
+        if (num_arg == 1 || sp->u.number == DIT_CURRENT)
         {
             vector_t * vec;
 
             (void)collect_trace(NULL, &vec);
             put_array(&res, vec);
         }
-        else
+        else if (sp->u.number == DIT_ERROR)
+        {
+            if (current_error_trace)
+                put_ref_array(&res, current_error_trace);
+            else
+            {
+                vector_t *vec;
+
+                vec = allocate_uninit_array(1);
+                put_ref_string(vec->item, STR_NO_TRACE);
+                put_array(&res, vec);
+            }
+        }
+        else if (sp->u.number == DIT_STR_CURRENT)
         {
             strbuf_t sbuf;
 
@@ -5718,6 +5891,9 @@ f_debug_info (svalue_t *sp, int num_arg)
             put_string(&res, new_mstring(sbuf.buf));
             strbuf_free(&sbuf);
         }
+        else
+            error("bad arg 2 to debug_info(): %ld, expected 0..2\n"
+                 , sp->u.number);
         break;
       }
 

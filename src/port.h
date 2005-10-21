@@ -165,7 +165,7 @@ extern int errno;
 #    define PROT(x) ()
 #endif /* __STDC */
 
-#if defined(__GNUC__) && __GNUC__ >= 2 && (__GNUC_MINOR__ > 5 || __GNUC__ > 2)
+#if defined(__GNUC__) && __GNUC__ >= 2 && (__GNUC_MINOR__ > 5 || __GNUC__ > 2) && !defined(__APPLE_CC__)
 #    define NORETURN __attribute__ ((noreturn))
 #    define UNUSED   __attribute__ ((unused))
 #elif defined(__MWERKS__)

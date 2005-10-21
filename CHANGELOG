@@ -1,6 +1,86 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Mar-2001 (Lars Duening)
+    - (mstrings.c, array.c) xalloc_pass() was called with too many arguments,
+        clobbering the size of the allocate memory block.
+    - (gcollect.c) The global master name as tabled name was freed by
+        accident.
+    - (comm.c) add_message() didn't recognize the flush message.
+    - (interpret.c) Freeing an T_INVALID svalue is allowed.
+
+    Implemented changes up to 3.2.9-dev.263:
+    - (smalloc.c) Corrected a statistics error (reported by Freaky).
+    - (simulate, interpret, efuns.c) Added the last error trace as
+        possible return from debug_info(DINFO_TRACE) (suggested by Gnomi).
+    - (interpret.c) Removed a VM stack leak in ++/-- on floats (reported
+         by Dafire).
+    - (object.c) The previous object for object resets is this_object()
+         (reported by Gnomi).
+    - (Makefiles) Added 'lint' to the compiler defines to ensure a smooth
+         compilation of prolang.y.
+    - (backend.c) Simplified the error message output in write_file().
+    - (simulate.c) The master apply runtime_error() receives an extra
+         argument describing if the error is a normal error, or occured
+         during a heartbeat (suggested by Freaky).
+    - (func_spec) Efuns add_verb() and add_xverb() are now part of the
+         deprecated bunch.
+    - (gcollect.c) Added a dump function for closure literals.
+    - (lex.c, gcollect.c) Cosmetics.
+    - (smalloc.c, main.c) xfree() now accepts NULL pointers. Allocation of
+         MIN_(SMALL_)MALLOCED blocks actually check if the memory is
+         allocated (reported by Freaky).
+    - (main.c, backend.c, interpret.c) Swapping is no longer an optional
+         feature, though it still can be disabled by specifying swapping
+         times of 0.
+    - (configure.in, main.c, xalloc) New commandline options '--min-malloced'
+         and '--min-small-malloced' to complement the configuration options
+         (suggested by Freaky).
+    - (hosts/win32) Updated the various files with those provided by
+         Coogan (thanks!)
+    - (smalloc) Renamed the constant MASK to M_MASK, as MASK seems to clash
+         with one of Darwin's symbols.
+    - (func_spec, efuns) The efuns debug_info() and object_info() can now
+         return single values instead of whole arrays.
+    - (backend, comm.c) Added a check method which restarts the alarm
+         after some time of activity. This is required at least for
+         Cygwin on Windows, where the alarm often gets lost (thanks, Holger!).
+    - (interpret.c) The master apply valid_trace() now receives as second
+         argument the argument passed to the efun (suggested by Coogan).
+    - (lex.c, prolang) Inline closure 'inherit' the visibility modifiers
+        of their defining function (suggested by Coogan).
+    - (smalloc.c) Corrected an accounting error in consolidate_freelists().
+    - (autoconf/configure.in) Some more small fixes.
+    - (prolang.y) Recognize an inherited heart_beat() only if it is visible
+         (adopted from Morgengrauen).
+    - (efuns.c) debug_info(DINFO_DATA, DID_STATUS) now returns the number
+         of executed heartbeats as well as the total number of heartbeats.
+    - (settings/morgengrauen) New configuration file.
+    - (autoconf/configure.in) Corrected some replacement directives.
+    - (func_spec) Removed two duplicate efun definitions which caused
+        Cygwin compiles to hang.
+    - (make_func.y, lex.c) Added diagnostics to detect duplicate efun
+        and string definitions.
+    - (autoconf/configure.in) The option --enable-use-mysql now also
+        accepts a directory path under which the libmysqlclient can be
+        found (f-000918).
+    - (main.c) Added code to unblock SIGALRM on program start - on systems
+        it is blocked randomly for no obvious reason (thanks, Fini!)
+        (maybe fixes b-000308)
+    - (efuns, func_spec) New efun sgn() to retrieve the sign of a numeric
+        argument (suggested by Croft).
+    - (lots of files) New configuration option 'use-deprecated' allows
+        to disable obsolete and deprecated efuns. If enabled, the macro
+        __DEPRECATED__ is defined (suggested by Coogan).
+    - (lots of files) The UDP port is now a standard feature. The
+        option has been renamed from 'catch_udp_port' to just 'udp_port'.
+    - (lots of files) The UDP efuns have been renamed from send_imp()
+        and query_imp_port() to send_udp() and query_udp_port(); as were
+        the associated privilege violation string and the master apply.
+        The old names are still available with USE_DEPRECATED.
+    - (interpret.c) Assigning volatile strings was somehow no longer
+        supported under all circumstances (reported by Gnomi).
+
 11-Feb-2001 (Lars Duening)  (3.2.24)
    Included changes up to 3.2.9-dev.255:
     - (smalloc.c) Removed a compilation error (reported by Coogan).
@@ -25,7 +105,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
     - (prolang.y) The type tracking for multiplication returned an 'int'
         result even for 'mixed' operands (reported by Gnomi).
     - (interpret.c) The relations '==' and '!=' can now compare lfun-
-        and identifier closures (suggested by Gnomi).
+        and variable closures (suggested by Gnomi).
     - (func_spec, efuns) New efuns min() and max().
     - (configuration, smalloc.c) Added a new config parameter
         MIN_SMALL_MALLOCED which defines the size of the first small chunk

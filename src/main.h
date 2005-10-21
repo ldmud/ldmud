@@ -38,9 +38,7 @@ extern Bool check_string_table_flag;
 extern int port_numbers[];
 extern int numports;
 
-#ifdef CATCH_UDP_PORT
 extern int udp_port;
-#endif
 
 extern Bool compat_mode;
 

@@ -1,0 +1,17 @@
+SYNOPSIS
+        int sgn (int|float arg)
+
+DESCRIPTION
+        Return the sign of the argument: -1 if it's < 0, +1 if it's > 0, and
+        0 if it is 0.
+
+EXAMPLES
+        sgn(1)    - returns 1
+        sgn(-1.1) - returns -1
+        sgn(0)    - returns 0
+
+HISTORY
+        Introduced in LDMud 3.2.9.
+
+SEE ALSO
+        abs(E)

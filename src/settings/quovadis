@@ -27,7 +27,7 @@ with_time_to_swap_variables=1800
 with_time_to_reset=1800
 
 with_portno=4023
-with_catch_udp_port=4017
+with_udp_port=4017
 
 with_master_name=secure/master
 

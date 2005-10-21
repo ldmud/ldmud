@@ -11,7 +11,7 @@
 extern void rxcache_init(void);
 extern regexp * regcomp_cache(string_t * expr, Bool excompat, Bool from_ed);
 extern size_t rxcache_status(strbuf_t *sbuf, Bool verbose);
-extern void   rxcache_dinfo_status(svalue_t *svp);
+extern void   rxcache_dinfo_status(svalue_t *svp, int value);
 extern regexp * rx_dup(regexp *);
 extern void rx_free(regexp *);
 

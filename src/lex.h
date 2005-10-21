@@ -70,7 +70,7 @@ typedef char * (*defn_fun)(char **);
 struct defn
 {
     union {            /* The replacement text: */
-        char *str;     /*   given as xalloced literal (.special is false) */
+        char    *str;  /*   given as tabled literal (.special is false) */
         defn_fun fun;  /*   return by fun() (.special is true) */
     } exps;
     short nargs;       /* Number of arguments, 0 for non-function macros */

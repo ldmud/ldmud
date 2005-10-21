@@ -103,7 +103,7 @@ PREC= .PRECIOUS
 CC= dcc
 LD= dlink
 AS= das
-CFLAGS= -O ""
+CFLAGS= -Dlint -O ""
 
 # -gs: dynamic stack code (needed for its alloca)
 # -mC: large code model

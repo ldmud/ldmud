@@ -266,9 +266,7 @@ extern void  init_telopts(void);
 extern void  mudlib_telopts(void);
 extern svalue_t *f_input_to (svalue_t *sp, int num_arg);
 
-#ifdef CATCH_UDP_PORT
-extern svalue_t *f_query_imp_port(svalue_t *sp);
-#endif
+extern svalue_t *f_query_udp_port(svalue_t *sp);
 
 #ifdef ERQ_DEMON
 extern void  start_erq_demon(const char *suffix, size_t suffixlen);
@@ -293,9 +291,7 @@ extern svalue_t *f_remove_interactive(svalue_t *sp);
 extern void  count_comm_extra_refs(void);
 #endif /* DEBUG */
 
-#ifdef UDP_SEND
-extern svalue_t *f_send_imp(svalue_t *sp);
-#endif /* UDP_SEND */
+extern svalue_t *f_send_udp(svalue_t *sp);
 
 extern svalue_t *f_binary_message(svalue_t *sp);
 extern svalue_t *f_exec(svalue_t *sp);

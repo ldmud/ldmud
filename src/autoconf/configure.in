@@ -94,15 +94,13 @@ AC_MY_ARG_ENABLE(udp-send,yes,,)
 AC_MY_ARG_ENABLE(use-ipv6,no,,)
 AC_MY_ARG_ENABLE(use-mysql,no,,)
 AC_MY_ARG_ENABLE(lpc-nosave,yes,,[Enables the 'nosave' keyword])
+AC_MY_ARG_ENABLE(use-deprecated,yes,,[Enables obsolete and deprecated efuns])
 AC_MY_ARG_ENABLE(comm-stat,yes,,)
 AC_MY_ARG_ENABLE(apply-cache_stat,yes,,)
 AC_MY_ARG_ENABLE(malloc-trace,no,,)
 AC_MY_ARG_ENABLE(malloc-lpc-trace,no,,)
-AC_MY_ARG_ENABLE(max-malloced,yes,,)
-AC_MY_ARG_ENABLE(min-malloced,no,,)
 AC_MY_ARG_ENABLE(dynamic-costs,no,,)
 
-AC_MY_ARG_ENABLE(catch-udp-port,yes,,)
 AC_MY_ARG_ENABLE(rxcache_table,yes,,)
 
 AC_MY_ARG_WITH(access-file,ACCESS.ALLOW,,[access permissions file])
@@ -125,6 +123,7 @@ AC_MY_ARG_WITH(max-trace,65,,)
 AC_MY_ARG_WITH(compiler-stack-size,400,,)
 AC_MY_ARG_WITH(max-bits,6144,,)
 AC_MY_ARG_WITH(portno,4242,,)
+AC_MY_ARG_WITH(udp_port,4246,,)
 AC_MY_ARG_WITH(maxnumports,20,,)
 AC_MY_ARG_WITH(max-cost,1000000,,)
 AC_MY_ARG_WITH(catch-reserved-cost,2000,,)
@@ -148,7 +147,8 @@ AC_MY_ARG_WITH(max-byte-transfer,50000,,)
 AC_MY_ARG_WITH(catch-udp-port,4246,,)
 AC_MY_ARG_WITH(set-buffer-size-max,65536,,)
 AC_MY_ARG_WITH(malloc,smalloc,[smalloc/sysmalloc],[memory manager to use])
-AC_MY_ARG_WITH(min-malloced,0x1000000,,)
+AC_MY_ARG_WITH(min-malloced,0,,)
+AC_MY_ARG_WITH(min-small-malloced,0,,)
 AC_MY_ARG_WITH(max-malloced,0x4000000,,)
 AC_MY_ARG_WITH(total-trace-length,0x1000,,)
 
@@ -188,6 +188,20 @@ else
   erq_sub=
 fi
 
+AC_UPDATE_VAR(enable_use_mysql)
+if test "x$enable_use_mysql" = "x" || test "x$enable_use_mysql" = "xyes"; then
+  cdef_use_mysql="#define"
+  mysql_path=
+  enable_use_mysql="yes"
+elif test "x$enable_use_mysql" = "xno"; then
+  cdef_use_mysql="#undef"
+  mysql_path=
+else
+  cdef_use_mysql="#define"
+  mysql_path="$enable_use_mysql"
+  enable_use_mysql="yes"
+fi
+
 AC_CDEF_FROM_ENABLE(access_control)
 AC_CDEF_FROM_ENABLE(access_log)
 AC_CDEF_FROM_ENABLE(align_functions)
@@ -196,20 +210,15 @@ AC_CDEF_FROM_ENABLE(strict_euids)
 AC_CDEF_FROM_ENABLE(supply_parse_command)
 AC_CDEF_FROM_ENABLE(initialization_by___init)
 AC_CDEF_FROM_ENABLE(use_system_crypt)
-AC_CDEF_FROM_ENABLE(udp_send)
 AC_CDEF_FROM_ENABLE(use_ipv6)
-AC_CDEF_FROM_ENABLE(use_mysql)
 AC_CDEF_FROM_ENABLE(lpc_nosave)
+AC_CDEF_FROM_ENABLE(use_deprecated)
 AC_CDEF_FROM_ENABLE(comm_stat)
 AC_CDEF_FROM_ENABLE(apply_cache_stat)
 AC_CDEF_FROM_ENABLE(malloc_trace)
 AC_CDEF_FROM_ENABLE(malloc_lpc_trace)
-AC_CDEF_FROM_ENABLE(max_malloced)
-AC_CDEF_FROM_ENABLE(min_malloced)
-AC_CDEF_FROM_ENABLE(min_small_malloced)
 AC_CDEF_FROM_ENABLE(dynamic_costs)
 
-AC_CDEF_FROM_ENABLE(catch_udp_port)
 AC_CDEF_FROM_ENABLE(rxcache_table)
 
 AC_STRING_VAL_FROM_WITH(access_file)
@@ -249,7 +258,7 @@ AC_INT_VAL_FROM_WITH(defmax)
 AC_INT_VAL_FROM_WITH(apply_cache_bits)
 AC_INT_VAL_FROM_WITH(rxcache_table)
 AC_INT_VAL_FROM_WITH(max_byte_transfer)
-AC_INT_VAL_FROM_WITH(catch_udp_port)
+AC_INT_VAL_FROM_WITH(udp_port)
 AC_INT_VAL_FROM_WITH(set_buffer_size_max)
 AC_INT_VAL_FROM_WITH(malloc)
 AC_INT_VAL_FROM_WITH(min_malloced)
@@ -264,22 +273,6 @@ fi
 
 if test "x$cdef_access_log" = "x#undef"; then
   val_access_log=
-fi
-
-if test "x$cdef_catch_udp_port" = "x#undef"; then
-  val_catch_udp_port=
-fi
-
-if test "x$cdef_min_malloced" = "x#undef"; then
-  val_min_malloced=
-fi
-
-if test "x$cdef_min_small_malloced" = "x#undef"; then
-  val_min_small_malloced=
-fi
-
-if test "x$cdef_max_malloced" = "x#undef"; then
-  val_max_malloced=
 fi
 
 if test "x$cdef_rxcache_table" = "x#undef"; then
@@ -514,7 +507,12 @@ CFLAGS="$saveflags"
 if test $lp_cv_has_mysql = yes; then
   AC_DEFINE(HAS_MYSQL)
 if test $enable_use_mysql = yes; then
-  AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -lmysqlclient")
+  if test "x$mysql_path" = "x"; then
+      AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -lmysqlclient")
+  else
+      LIBS="$LIBS -L$mysql_path"
+      AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -L$mysql_path -lmysqlclient")
+  fi
 fi
 fi
 
@@ -652,8 +650,8 @@ void free PROT((POINTER));
 #else
 int free PROT((POINTER));
 #endif
-],,lp_cv_prop_malloc_return_type='void *',
-lp_cv_prop_malloc_return_type='char *'))
+],,lp_cv_prop_malloc_return_type="void *",
+lp_cv_prop_malloc_return_type="char *"))
 AC_DEFINE_UNQUOTED(POINTER,$lp_cv_prop_malloc_return_type)
 
 AC_CACHE_CHECK(if CHAR_BIT == 8 or undef,
@@ -1360,29 +1358,6 @@ case "$EXTRA_CFLAGS" in
       LDFLAGS= "-u dgettext -lintl"
   fi ;;
 esac
-AC_TRY_RUN([
-#include <sys/types.h>
-#include <stdio.h>
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-#ifdef HAVE_STDLIB_H
-#include <stdlib.h>
-#endif
-#ifdef HAVE_STRING_H
-#include <string.h>
-#else
-#include <strings.h>
-#endif
-#if !defined(STDC_HEADERS) && defined(HAVE_MEMORY_H)
-#include <memory.h>
-#endif
-int main(){
-    free((char *)0); /* linux libc 4.5.19 does this in fclose() */
-    exit(0);
-    return 0;
-}
-],AC_DEFINE(FREE_NULL_POINTER,1))
 
 AC_CACHE_CHECK(malloc overhead,lp_cv_sys_malloc_overhead,
 cat > conftest.c <<EOF
@@ -1433,20 +1408,16 @@ AC_SUBST(cdef_strict_euids)
 AC_SUBST(cdef_supply_parse_command)
 AC_SUBST(cdef_initialization_by___init)
 AC_SUBST(cdef_use_system_crypt)
-AC_SUBST(cdef_udp_send)
 AC_SUBST(cdef_use_ipv6)
 AC_SUBST(cdef_use_mysql)
 AC_SUBST(cdef_lpc_nosave)
+AC_SUBST(cdef_use_deprecated)
 AC_SUBST(cdef_comm_stat)
 AC_SUBST(cdef_apply_cache_stat)
 AC_SUBST(cdef_malloc_trace)
 AC_SUBST(cdef_malloc_lpc_trace)
 AC_SUBST(cdef_dynamic_costs)
 
-AC_SUBST(cdef_min_malloced)
-AC_SUBST(cdef_min_small_malloced)
-AC_SUBST(cdef_max_malloced)
-AC_SUBST(cdef_catch_udp_port)
 AC_SUBST(cdef_rxcache_table)
 
 dnl second: valued defines
@@ -1487,9 +1458,10 @@ AC_SUBST(val_apply_cache_bits)
 AC_SUBST(val_rxcache_table)
 AC_SUBST(val_master_name)
 AC_SUBST(val_max_byte_transfer)
-AC_SUBST(val_catch_udp_port)
+AC_SUBST(val_udp_port)
 AC_SUBST(val_set_buffer_size_max)
 AC_SUBST(val_malloc)
+AC_SUBST(val_min_malloced)
 AC_SUBST(val_min_small_malloced)
 AC_SUBST(val_max_malloced)
 AC_SUBST(val_total_trace_length)

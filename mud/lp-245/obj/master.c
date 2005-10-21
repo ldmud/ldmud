@@ -1094,7 +1094,8 @@ mixed heart_beat_error (object culprit, string err,
 }
 
 //---------------------------------------------------------------------------
-void runtime_error (string err, string prg, string curobj, int line)
+void runtime_error ( string err, string prg, string curobj, int line
+                   , mixed culprit)
 
 // Announce a runtime error.
 //
@@ -1103,15 +1104,26 @@ void runtime_error (string err, string prg, string curobj, int line)
 //   prg    : The executed program.
 //   curobj : The object causing the error.
 //   line   : The line number where the error occured.
+//   culprit: -1 for runtime errors; the object holding the heart_beat()
+//            function for heartbeat errors.
 //
-// This function has to announce a runtime error to the active player.
-// If it is a wizard, it might give him the full error message together
-// with the source line; if it is a player, it should issue a decent
-// message ("Your sensitive mind notices a wrongness in the fabric of space")
-// and could also announce the error to the wizards online.
+// This function has to announce a runtime error to the active user,
+// resp. handle a runtime error which occured during the execution of
+// heart_beat() of <culprit>.
+//
+// For a normal runtime error, if the active user is a wizard, it might
+// give him the full error message together with the source line; if the
+// user is a is a player, it should issue a decent message ("Your sensitive
+// mind notices a wrongness in the fabric of space") and could also announce
+// the error to the wizards online.
+//
+// If the error is a heartbeat error, the heartbeat for the offending
+// <culprit> has been turned off. The function itself shouldn't do much, since
+// the lfun heart_beat_error() will be called right after this one.
 //
 // Note that <prg> denotes the program actually executed (which might be
-// inherited one) whereas <curobj> is just the offending object.
+// inherited) whereas <curobj> is just the offending object for which the
+// program was executed.
 
 {
   if (this_player() && query_ip_number(this_player()))

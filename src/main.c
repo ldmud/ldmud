@@ -108,9 +108,8 @@ int port_numbers[MAXNUMPORTS] = { PORTNO };
    */
 int numports = 0;  /* Number of specified ports */
 
-#ifdef CATCH_UDP_PORT
-int udp_port = CATCH_UDP_PORT;  /* Port number for UDP */
-#endif
+int udp_port = UDP_PORT; 
+  /* Port number for UDP. A negative number disables it. */
 
 char *erq_file = NULL;        /* Name of the erq executable, or NULL */
 
@@ -163,6 +162,13 @@ main (int argc, char **argv)
 {
     int i;
     char *p;
+    sigset_t set;
+
+    /* On some systems, SIGALRM is sometimes blocked.
+     * The reasons are unknown, but this seems to be the cure.
+     */
+    sigaddset(&set, SIGALRM);
+    sigprocmask(SIG_UNBLOCK, &set, 0);
 
     /* Initialisations */
 
@@ -236,15 +242,7 @@ main (int argc, char **argv)
         numports = 1;
 
     init_closure_hooks();
-#ifdef MIN_MALLOCED
-    xfree(xalloc(MIN_MALLOCED));
-#endif
-    if (reserved_system_size > 0)
-        reserved_system_area = xalloc((size_t)reserved_system_size);
-    if (reserved_master_size > 0)
-        reserved_master_area = xalloc((size_t)reserved_master_size);
-    if (reserved_user_size > 0)
-        reserved_user_area = xalloc((size_t)reserved_user_size);
+    reserve_memory();
     init_otable();
     for (i = 0; i < (int)(sizeof consts / sizeof consts[0]); i++)
         consts[i] = exp(- i / 900.0);
@@ -702,67 +700,63 @@ typedef struct LongOpt {
 /* Every recognized option has a ordinal number */
 
 typedef enum OptNumber {
-   cUnknown = 0   /* unknown option                     */
- , cArgument      /* normal argument (for us: filename) */
- , cInherited     /* --inherit            */
-#ifdef CATCH_UDP_PORT
- , cUdpPort       /* --udp                */
-#endif
- , cTrace         /* --list-compiles      */
- , cCleanupTime   /* --cleanup-time       */
- , cCompat        /* --compat             */
- , cNoCompat      /* --no-compat          */
- , cDebug         /* --debug              */
- , cDefine        /* --define             */
- , cErq           /* --erq                */
- , cEvalcost      /* --eval-cost          */
- , cFuncall       /* --funcall            */
- , cMaster        /* --master             */
- , cMudlib        /* --mudlib             */
- , cDebugFile     /* --debug-file         */
-#ifdef MAX_MALLOCED
- , cMaxMalloc     /* --max-malloc         */
-#endif
- , cMaxArray      /* --max-array          */
- , cMaxBytes      /* --max-bytes          */
- , cMaxFile       /* --max-file           */
- , cMaxMapping    /* --max-mapping        */
- , cNoERQ         /* --no-erq             */
- , cNoHeart       /* --no-heart           */
- , cNoPreload     /* --no-preload         */
- , cPidFile       /* --pidfile            */
- , cResetTime     /* --reset-time         */
- , cReserved      /* -r                   */
- , cReserveUser   /* --reserve-user       */
- , cReserveMaster /* --reserve-master     */
- , cReserveSystem /* --reserve-system     */
- , cStrictEuids   /* --strict-euids       */
- , cNoStrictEuids /* --no-strict-euids    */
-#if TIME_TO_SWAP > 0
- , cSwap          /* -s                   */
- , cSwapTime      /* --swap-time          */
- , cSwapVars      /* --swap-variables     */
- , cSwapFile      /* --swap-file          */
- , cSwapCompact   /* --swap-compact       */
-#endif
+   cUnknown = 0     /* unknown option                     */
+ , cArgument        /* normal argument (for us: filename) */
+ , cInherited       /* --inherit            */
+ , cUdpPort         /* --udp                */
+ , cTrace           /* --list-compiles      */
+ , cCleanupTime     /* --cleanup-time       */
+ , cCompat          /* --compat             */
+ , cNoCompat        /* --no-compat          */
+ , cDebug           /* --debug              */
+ , cDefine          /* --define             */
+ , cErq             /* --erq                */
+ , cEvalcost        /* --eval-cost          */
+ , cFuncall         /* --funcall            */
+ , cMaster          /* --master             */
+ , cMudlib          /* --mudlib             */
+ , cDebugFile       /* --debug-file         */
+ , cMaxMalloc       /* --max-malloc         */
+ , cMaxArray        /* --max-array          */
+ , cMaxBytes        /* --max-bytes          */
+ , cMaxFile         /* --max-file           */
+ , cMaxMapping      /* --max-mapping        */
+ , cMinMalloc       /* --min-malloc         */
+ , cMinSmallMalloc  /* --min-small-malloc   */
+ , cNoERQ           /* --no-erq             */
+ , cNoHeart         /* --no-heart           */
+ , cNoPreload       /* --no-preload         */
+ , cPidFile         /* --pidfile            */
+ , cResetTime       /* --reset-time         */
+ , cReserved        /* -r                   */
+ , cReserveUser     /* --reserve-user       */
+ , cReserveMaster   /* --reserve-master     */
+ , cReserveSystem   /* --reserve-system     */
+ , cStrictEuids     /* --strict-euids       */
+ , cNoStrictEuids   /* --no-strict-euids    */
+ , cSwap            /* -s                   */
+ , cSwapTime        /* --swap-time          */
+ , cSwapVars        /* --swap-variables     */
+ , cSwapFile        /* --swap-file          */
+ , cSwapCompact     /* --swap-compact       */
 #ifdef GC_SUPPORT
- , cGcollectFD    /* --gcollect-outfd     */
+ , cGcollectFD      /* --gcollect-outfd     */
 #endif
 #ifdef DEBUG
- , cCheckRefs     /* --check-refcounts    */
- , cCheckState    /* --check-state        */
- , cGobbleFDs     /* --gobble-descriptors */
+ , cCheckRefs       /* --check-refcounts    */
+ , cCheckState      /* --check-state        */
+ , cGobbleFDs       /* --gobble-descriptors */
 #endif
 #ifdef CHECK_STRINGS
- , cCheckStrings  /* --check-strings      */
+ , cCheckStrings    /* --check-strings      */
 #endif
 #ifdef YYDEBUG
- , cYYDebug       /* --yydebug            */
+ , cYYDebug         /* --yydebug            */
 #endif
- , cOptions       /* --options            */
- , cVersion       /* --version            */
- , cLongHelp      /* --longhelp           */
- , cHelp          /* --help               */
+ , cOptions         /* --options            */
+ , cVersion         /* --version            */
+ , cLongHelp        /* --longhelp           */
+ , cHelp            /* --help               */
 } OptNumber;
 
 /* Comprehensive lists of recognized options */
@@ -779,13 +773,9 @@ static ShortOpt aShortOpts[]
     , { 'N', cNoERQ,     MY_FALSE }
     , { 'P', cInherited, MY_TRUE }
     , { 'r', cReserved,  MY_TRUE }
-#if TIME_TO_SWAP > 0
     , { 's', cSwap,      MY_TRUE }
-#endif
     , { 't', cNoHeart,   MY_FALSE }
-#ifdef CATCH_UDP_PORT
     , { 'u', cUdpPort,   MY_TRUE }
-#endif
 #ifdef YYDEBUG
     , { 'y', cYYDebug,   MY_FALSE }
 #endif
@@ -795,68 +785,64 @@ static ShortOpt aShortOpts[]
     };
 
 static LongOpt aLongOpts[]
-  = { { "cleanup-time",       cCleanupTime,   MY_TRUE }
-    , { "compat",             cCompat,        MY_FALSE }
-    , { "no-compat",          cNoCompat,      MY_FALSE }
-    , { "debug",              cDebug,         MY_FALSE }
-    , { "define",             cDefine,        MY_TRUE }
-    , { "debug-file",         cDebugFile,     MY_TRUE }
-    , { "debug_file",         cDebugFile,     MY_TRUE } /* TODO: COMPAT */
-    , { "erq",                cErq,           MY_TRUE }
-    , { "eval-cost",          cEvalcost,      MY_TRUE }
-    , { "funcall",            cFuncall,       MY_TRUE }
-    , { "list-compiles",      cTrace,         MY_FALSE }
-    , { "master",             cMaster,        MY_TRUE }
-    , { "mudlib",             cMudlib,        MY_TRUE }
-#ifdef MAX_MALLOCED
-    , { "max-malloc",         cMaxMalloc,     MY_TRUE }
-    , { "max_malloced",       cMaxMalloc,     MY_TRUE } /* TODO: COMPAT */
-#endif
-    , { "max-array",          cMaxArray,      MY_TRUE }
-    , { "max-bytes",          cMaxBytes,      MY_TRUE }
-    , { "max-file",           cMaxFile,       MY_TRUE }
-    , { "max-mapping",        cMaxMapping,    MY_TRUE }
-    , { "inherit",            cInherited,     MY_TRUE }
-    , { "no-erq",             cNoERQ,         MY_FALSE }
-    , { "no-heart",           cNoHeart,       MY_FALSE }
-    , { "no-preload",         cNoPreload,     MY_FALSE }
-    , { "pidfile",            cPidFile,       MY_TRUE }
-    , { "reset-time",         cResetTime,     MY_TRUE }
-    , { "reserve-user",       cReserveUser,   MY_TRUE }
-    , { "reserve-master",     cReserveMaster, MY_TRUE }
-    , { "reserve-system",     cReserveSystem, MY_TRUE }
-    , { "strict-euids",       cStrictEuids,   MY_FALSE }
-    , { "no-strict-euids",    cNoStrictEuids, MY_FALSE }
-#if TIME_TO_SWAP > 0
-    , { "swap-time",          cSwapTime,      MY_TRUE }
-    , { "swap-variables",     cSwapVars,      MY_TRUE }
-    , { "swap-file",          cSwapFile,      MY_TRUE }
-    , { "swap-compact",       cSwapCompact,   MY_FALSE }
-#endif
+  = { { "cleanup-time",       cCleanupTime,    MY_TRUE }
+    , { "compat",             cCompat,         MY_FALSE }
+    , { "no-compat",          cNoCompat,       MY_FALSE }
+    , { "debug",              cDebug,          MY_FALSE }
+    , { "define",             cDefine,         MY_TRUE }
+    , { "debug-file",         cDebugFile,      MY_TRUE }
+    , { "debug_file",         cDebugFile,      MY_TRUE } /* TODO: COMPAT */
+    , { "erq",                cErq,            MY_TRUE }
+    , { "eval-cost",          cEvalcost,       MY_TRUE }
+    , { "funcall",            cFuncall,        MY_TRUE }
+    , { "list-compiles",      cTrace,          MY_FALSE }
+    , { "master",             cMaster,         MY_TRUE }
+    , { "mudlib",             cMudlib,         MY_TRUE }
+    , { "max-malloc",         cMaxMalloc,      MY_TRUE }
+    , { "max_malloced",       cMaxMalloc,      MY_TRUE } /* TODO: COMPAT */
+    , { "max-array",          cMaxArray,       MY_TRUE }
+    , { "max-bytes",          cMaxBytes,       MY_TRUE }
+    , { "max-file",           cMaxFile,        MY_TRUE }
+    , { "max-mapping",        cMaxMapping,     MY_TRUE }
+    , { "min-malloc",         cMinMalloc,      MY_TRUE }
+    , { "min-small-malloc",   cMinSmallMalloc, MY_TRUE }
+    , { "inherit",            cInherited,      MY_TRUE }
+    , { "no-erq",             cNoERQ,          MY_FALSE }
+    , { "no-heart",           cNoHeart,        MY_FALSE }
+    , { "no-preload",         cNoPreload,      MY_FALSE }
+    , { "pidfile",            cPidFile,        MY_TRUE }
+    , { "reset-time",         cResetTime,      MY_TRUE }
+    , { "reserve-user",       cReserveUser,    MY_TRUE }
+    , { "reserve-master",     cReserveMaster,  MY_TRUE }
+    , { "reserve-system",     cReserveSystem,  MY_TRUE }
+    , { "strict-euids",       cStrictEuids,    MY_FALSE }
+    , { "no-strict-euids",    cNoStrictEuids,  MY_FALSE }
+    , { "swap-time",          cSwapTime,       MY_TRUE }
+    , { "swap-variables",     cSwapVars,       MY_TRUE }
+    , { "swap-file",          cSwapFile,       MY_TRUE }
+    , { "swap-compact",       cSwapCompact,    MY_FALSE }
 #ifdef GC_SUPPORT
-    , { "gcollect-outfd",     cGcollectFD,    MY_TRUE }
-    , { "gcollect_outfd",     cGcollectFD,    MY_TRUE } /* TODO: COMPAT */
+    , { "gcollect-outfd",     cGcollectFD,     MY_TRUE }
+    , { "gcollect_outfd",     cGcollectFD,     MY_TRUE } /* TODO: COMPAT */
 #endif
-#ifdef CATCH_UDP_PORT
-    , { "udp",                cUdpPort,       MY_TRUE }
-#endif
+    , { "udp",                cUdpPort,        MY_TRUE }
 #ifdef DEBUG
-    , { "check-refcounts",    cCheckRefs,     MY_FALSE }
-    , { "check-state",        cCheckState,    MY_TRUE }
-    , { "gobble-descriptors", cGobbleFDs,     MY_TRUE }
+    , { "check-refcounts",    cCheckRefs,      MY_FALSE }
+    , { "check-state",        cCheckState,     MY_TRUE }
+    , { "gobble-descriptors", cGobbleFDs,      MY_TRUE }
     , { "check_a_lot_of_ref_counts", cCheckRefs, MY_FALSE } /* TODO: COMPAT */
-    , { "gobble_descriptors", cGobbleFDs,     MY_TRUE }    /* TODO: COMPAT */
+    , { "gobble_descriptors", cGobbleFDs,      MY_TRUE }    /* TODO: COMPAT */
 #endif
 #ifdef CHECK_STRINGS
-    , { "check-strings",      cCheckStrings,  MY_FALSE }
+    , { "check-strings",      cCheckStrings,   MY_FALSE }
 #endif
 #ifdef YYDEBUG
-    , { "yydebug",            cYYDebug,       MY_FALSE }
+    , { "yydebug",            cYYDebug,        MY_FALSE }
 #endif
-    , { "options",            cOptions,       MY_FALSE }
-    , { "version",            cVersion,       MY_FALSE }
-    , { "longhelp",           cLongHelp,      MY_FALSE }
-    , { "help",               cHelp,          MY_FALSE }
+    , { "options",            cOptions,        MY_FALSE }
+    , { "version",            cVersion,        MY_FALSE }
+    , { "longhelp",           cLongHelp,       MY_FALSE }
+    , { "help",               cHelp,           MY_FALSE }
     };
 
 /*-------------------------------------------------------------------------*/
@@ -875,7 +861,7 @@ version (void)
       fputs(LONG_VERSION, stdout);
 
   fputs(LOCAL_LEVEL " - a LPMud Game Driver.\n"
-        "\nRelease:  " PROJ_VERSION ", " RELEASE_DATE
+        "\nRelease:  " PROJ_VERSION "; " RELEASE_DATE
         "\nCompiled: " __DATE__
 #ifdef __TIME__
         " " __TIME__
@@ -919,15 +905,7 @@ options (void)
 
   printf(" Multiple ports: %d ports max, default is %d.\n", MAXNUMPORTS, PORTNO);
 
-#ifdef CATCH_UDP_PORT
-#    ifdef UDP_SEND
-  printf("            UDP: default port is %d.\n", CATCH_UDP_PORT);
-#    else
-  printf("            UDP: recv only, default port is: %d.\n", CATCH_UDP_PORT);
-#    endif
-#else
-  fputs("            UDP: disabled.\n", stdout);
-#endif
+  printf("            UDP: default port is %d.\n", UDP_PORT);
 
 #ifdef ERQ_DEMON
   printf("            ERQ: max data length: send %d / recv %d bytes.\n"
@@ -976,24 +954,28 @@ options (void)
         "                 "
                           "'nosave' enabled\n"
 #endif
+#ifdef USE_DEPRECATED
+        "                 "
+                          "obsolete and deprecated efuns enabled\n"
+#endif
        , stdout);
 
-  printf(" Runtime limits: max read file size:    %7d\n"
-         "                 max byte read/write:   %7d\n"
-         "                 max socket buf size:   %7d\n"
-         "                 max eval cost:         %7d %s\n"
-         "                 catch eval cost:       %7d\n"
-         "                 master eval cost:      %7d\n"
-         "                 eval stack:            %7d\n"
-         "                 user call depth:       %7d\n"
-         "                 max call depth:        %7d\n"
-         "                 max bitfield length:   %7d\n"
-         "                 max array size:        %7d\n"
-         "                 max mapping size:      %7d\n"
-         "                 max number players:    %7d\n"
-         "                 ed cmd/cmd ratio:      %7d:1\n"
+  printf(" Runtime limits: max read file size:     %7d\n"
+         "                 max byte read/write:    %7d\n"
+         "                 max socket buf size:    %7d\n"
+         "                 max eval cost:          %7d %s\n"
+         "                 catch eval cost:        %7d\n"
+         "                 master eval cost:       %7d\n"
+         "                 eval stack:             %7d\n"
+         "                 user call depth:        %7d\n"
+         "                 max call depth:         %7d\n"
+         "                 max bitfield length:    %7d\n"
+         "                 max array size:         %7d\n"
+         "                 max mapping size:       %7d\n"
+         "                 max number players:     %7d\n"
+         "                 ed cmd/cmd ratio:       %7d:1\n"
 #if defined(TRACE_CODE)
-         "                 max trace length:      %7d\n"
+         "                 max trace length:       %7d\n"
 #endif
         , READ_FILE_MAX_SIZE, MAX_BYTE_TRANSFER
         , SET_BUFFER_SIZE_MAX
@@ -1014,16 +996,21 @@ options (void)
 #endif
         );
 
-  printf("         Timing: reset:                 %7d s\n"
-         "                 clean up:              %7d s\n"
+  printf("         Timing: reset:                  %7d s\n"
+         "                 clean up:               %7d s\n"
         , TIME_TO_RESET, TIME_TO_CLEAN_UP
         );
 
-#if TIME_TO_SWAP > 0
-  printf("       Swapping: objects             after %4d s\n"
-         "                 variables           after %4d s\n"
-        , TIME_TO_SWAP, TIME_TO_SWAP_VARIABLES
-        );
+  printf("       Swapping: objects              ");
+  if (TIME_TO_SWAP > 0)
+      printf("after %4d s\n", TIME_TO_SWAP);
+  else
+      printf("     never\n");
+  printf("                 variables            ");
+  if (TIME_TO_SWAP_VARIABLES > 0)
+      printf("after %4d s\n", TIME_TO_SWAP_VARIABLES);
+  else
+      printf("     never\n");
   if (SWAP_FILE[0] == '/')
       printf("                 file: %s.<host>\n"
             , SWAP_FILE
@@ -1032,13 +1019,10 @@ options (void)
       printf("                 file: <mudlib>/%s.<host>\n"
             , SWAP_FILE
             );
-#else
-  fputs("Swapping disabled.\n", stdout);
-#endif
 
-  printf("       Compiler: max stack size:         %6d\n"
-         "                 max local variables:    %6d\n"
-         "                 max define length:      %6d\n"
+  printf("       Compiler: max stack size:          %6d\n"
+         "                 max local variables:     %6d\n"
+         "                 max define length:       %6d\n"
 #ifdef ALIGN_FUNCTIONS
          "                 functions are aligned.\n"
 #endif
@@ -1048,18 +1032,11 @@ options (void)
         );
 
   printf("         Memory: using %s\n"
-         "                 reserved user size:   %8d\n"
-         "                 reserved master size: %8d\n"
-         "                 reserved system size: %8d\n"
-#ifdef MIN_MALLOCED
-         "                 initial allocation:   %8d\n"
-#endif
-#ifdef MIN_SMALL_MALLOCED
-         "                 initial small alloc:  %8d\n"
-#endif
-#if defined(MAX_MALLOCED)
-         "                 max allocation:       %8d\n"
-#endif
+         "                 reserved user size:    %8d\n"
+         "                 reserved master size:  %8d\n"
+         "                 reserved system size:  %8d\n"
+         "                 initial allocation:   %9d\n"
+         "                 initial small alloc:   %8d\n"
 #ifdef MALLOC_sysmalloc
         , "system malloc"
 #elif defined(MALLOC_smalloc)
@@ -1079,23 +1056,22 @@ options (void)
         , RESERVED_USER_SIZE
         , RESERVED_MASTER_SIZE
         , RESERVED_SYSTEM_SIZE
-#ifdef MIN_MALLOCED
         , MIN_MALLOCED
-#endif
-#ifdef MIN_SMALL_MALLOCED
         , MIN_SMALL_MALLOCED
-#endif
-#if defined(MAX_MALLOCED)
-        , MAX_MALLOCED
-#endif
         );
 
-  printf("Internal tables: shared string hash:     %6d entries\n"
-         "                 object hash:            %6d entries\n"
-         "                 reserved name hash:     %6d entries\n"
-         "                 apply cache:            %6d entries\n"
+  printf("                 max allocation:       ");
+  if (MAX_MALLOCED > 0)
+      printf("%9d\n", MAX_MALLOCED);
+  else
+      printf("unlimited\n");
+
+  printf("Internal tables: shared string hash:      %6d entries\n"
+         "                 object hash:             %6d entries\n"
+         "                 reserved name hash:      %6d entries\n"
+         "                 apply cache:             %6d entries\n"
 #ifdef RXCACHE_TABLE
-         "                 regexp cache:           %6d entries\n"
+         "                 regexp cache:            %6d entries\n"
 #endif
         , HTABLE_SIZE
         , OTABLE_SIZE
@@ -1202,9 +1178,7 @@ shortusage (void)
 "\nOptions are:\n"
 "\n"
 "  -P|--inherit <fd-number>\n"
-#ifdef CATCH_UDP_PORT
 "  -u|--udp <portnumber>\n"
-#endif
 "  -D|--define <macro>[=<text>]\n"
 "  -E|--eval-cost <ticks>\n"
 "  -M|--master <filename>\n"
@@ -1227,15 +1201,13 @@ shortusage (void)
 "  --max-mapping\n"
 "  --max-bytes\n"
 "  --max-file\n"
-#if TIME_TO_SWAP > 0
 "  -s <time>  | --swap-time <time>\n"
 "  -s v<time> | --swap-variables <time>\n"
 "  -s f<name> | --swap-file <name>\n"
 "  -s c       | --swap-compact\n"
-#endif
-#ifdef MAX_MALLOCED
 "  --max-malloc <size>\n"
-#endif
+"  --min-malloc <size>\n"
+"  --min-small-malloc <size>\n"
 "  -r u<size> | --reserve-user <size>\n"
 "  -r m<size> | --reserve-master <size>\n"
 "  -r s<size> | --reserve-system <size>\n"
@@ -1278,12 +1250,10 @@ usage (void)
 "    Inherit filedescriptor <fd-number> from the parent process\n"
 "    as socket to listen for connections.\n"
 "\n"
-#ifdef CATCH_UDP_PORT
 "  -u|--udp <portnumber>\n"
 "    Specify the <portnumber> for the UDP port, overriding the compiled-in\n"
 "    default.\n"
 "\n"
-#endif
 "  -D|--define <macro>[=<text>]\n"
 "    Add <macro> (optionally to be expanded to <text>) to the list of\n"
 "    predefined macros known by the LPC compiler.\n"
@@ -1359,7 +1329,6 @@ usage (void)
 "    can handle.\n"
 "    Set to 0, arrays of any size are allowed.\n"
 "\n"
-#if TIME_TO_SWAP > 0
 "  -s <time>  | --swap-time <time>\n"
 "  -s v<time> | --swap-variables <time>\n"
 "    Time in seconds before an object (or its variables) are swapped out.\n"
@@ -1371,12 +1340,15 @@ usage (void)
 "  -s c | --swap-compact\n"
 "    Reuse free space in the swap file immediately.\n"
 "\n"
-#endif
-#ifdef MAX_MALLOCED
 "  --max-malloc <size>\n"
-"    Restrict total memory allocations to <size> bytes.\n"
+"    Restrict total memory allocations to <size> bytes. A <size> of 0"
+"    or 'unlimited' removes any restriction.\n"
 "\n"
-#endif
+"  --min-malloc <size>\n"
+"  --min-small-malloc <size>\n"
+"    Determine the sizes for the explicite initial large resp. small chunk\n"
+"    allocation. A size of 0 disables the explicite initial allocations.\n"
+"\n"
 "  -r u<size> | --reserve-user <size>\n"
 "  -r m<size> | --reserve-master <size>\n"
 "  -r s<size> | --reserve-system <size>\n"
@@ -1468,14 +1440,12 @@ firstscan (int eOption, const char * pValue)
             fprintf(stderr, "Illegal fd '%s' ignored.\n", pValue);
         break;
 
-#ifdef CATCH_UDP_PORT
     case cUdpPort:
         if (atoi(pValue))
             udp_port = atoi(pValue);
         else
             fprintf(stderr, "Illegal portnumber '%s' ignored.\n", pValue);
         break;
-#endif
 
     case cDefine:
         {
@@ -1578,7 +1548,6 @@ firstscan (int eOption, const char * pValue)
         break;
       }
 
-#if TIME_TO_SWAP > 0
     case cSwap:
         /* Compatibility vs. one-char-only options *sigh* */
         switch (*pValue) {
@@ -1610,7 +1579,6 @@ firstscan (int eOption, const char * pValue)
         else /* cSwapCompact */
             swap_compact_mode = MY_TRUE;
         break;
-#endif
 
 #ifdef YYDEBUG
     case cYYDebug:
@@ -1626,16 +1594,39 @@ firstscan (int eOption, const char * pValue)
         strcpy(master_name, pValue);
         break;
 
-#ifdef MAX_MALLOCED
-    case cMaxMalloc:
-        max_malloced = strtol(pValue, (char **)0, 0);
-        if (!max_malloced)
+    case cMinMalloc:
+        min_malloced = strtol(pValue, (char **)0, 0);
+        if (min_malloced < 0)
         {
-            fprintf(stderr, "Illegal value '%s' for --max-malloc\n", pValue);
+            fprintf(stderr, "Illegal value '%s' for --min-malloc\n", pValue);
             return 1;
         }
         break;
-#endif
+
+    case cMinSmallMalloc:
+        min_small_malloced = strtol(pValue, (char **)0, 0);
+        if (min_small_malloced < 0)
+        {
+            fprintf(stderr, "Illegal value '%s' for --min-small-malloc\n", pValue);
+            return 1;
+        }
+        break;
+
+    case cMaxMalloc:
+        if (!strcasecmp(pValue, "unlimited"))
+        {
+            max_malloced = 0;
+        }
+        else
+        {
+            max_malloced = strtol(pValue, (char **)0, 0);
+            if (max_malloced < 0)
+            {
+                fprintf(stderr, "Illegal value '%s' for --max-malloc\n", pValue);
+                return 1;
+            }
+        }
+        break;
 
     case cMudlib:
         if (chdir(pValue) == -1) {

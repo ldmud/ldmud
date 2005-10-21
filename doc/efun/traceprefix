@@ -10,8 +10,8 @@ DESCRIPTION
         will be traced. Returns the last traceprefix or 0 if there
         wasn't any.
 
-        The master-lfun valid_trace() is called with "traceprefix"
-        as argument to verify the use of this efun.
+        The master-lfun valid_trace() is called with ("traceprefix", prefix)
+        as arguments to verify the use of this efun.
 
 EXAMPLE
         object obj;
@@ -26,6 +26,10 @@ EXAMPLE
         trace(1|2|4|8);
         ...
         trace(0);
+
+HISTORY
+        LDMud 3.2.9 passes the <prefix> argument to the valid_trace()
+            apply as well.
 
 SEE ALSO
         trace(E)

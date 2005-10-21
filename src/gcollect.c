@@ -885,6 +885,11 @@ printf("DEBUG: %s GC start: %ld objects in list, %ld allocated\n", time_stamp(),
     purge_shadow_sent();
     check_wizlist_for_destr();
     compact_mappings(num_dirty_mappings);
+    if (current_error_trace)
+    {
+        free_array(current_error_trace);
+        current_error_trace = NULL;
+    }
 
 printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object); /* TODO: Remove this line */
     /* --- Pass 1: clear the M_REF flag in all malloced blocks ---
@@ -1161,6 +1166,7 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
     else
         fatal("No master object\n");
 
+    MARK_MSTRING_REF(master_name_str);
     count_lex_refs();
     count_compiler_refs();
     count_simul_efun_refs();
@@ -1214,8 +1220,10 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
     dobj_count = 0;
     for (ob = gc_obj_list_destructed; ob; ob = next_ob)
     {
+#ifdef DEBUG
 #define W(s) write(1,s,strlen(s)) /* DEBUG: */
 W("DEBUG: GC frees destructed '"); W(get_txt(ob->name)); W("'\n");
+#endif
         next_ob = ob->next_all;
         free_object(ob, "garbage collection");
         dobj_count++;
@@ -1381,11 +1389,48 @@ show_object (int d, void *block, int depth)
         }
     }
     WRITES(d, "Object: ");
+    if (ob->flags & O_DESTRUCTED)
+        WRITES(d, "(destructed) ");
     show_mstring(d, ob->name, 0);
     WRITES(d, ", uid: ");
     show_string(d, ob->user->name ? get_txt(ob->user->name) : "0", 0);
     WRITES(d, "\n");
-}
+} /* show_object() */
+
+/*-------------------------------------------------------------------------*/
+static void
+show_cl_literal (int d, char *block, int depth UNUSED)
+
+/* Print the data about literal closure <block> on filedescriptor <d>.
+ */
+
+{
+#ifdef __MWERKS__
+#    pragma unused(depth)
+#endif
+    lambda_t *l;
+    object_t *obj;
+
+    l = (lambda_t *)block;
+
+    WRITES(d, "Closure literal: Object ");
+
+    obj = l->ob;
+    if (obj)
+    {
+        show_mstring(d, obj->name, 0);
+        if (obj->flags & O_DESTRUCTED)
+            WRITES(d, " (destructed)");
+    }
+    else
+        WRITES(d, "<null>");
+
+    WRITES(d, ", index ");
+    writed(d, l->function.index);
+    WRITES(d, ", ref ");
+    writed(d, l->ref);
+    WRITES(d, "\n");
+} /* show_cl_literal() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1432,7 +1477,9 @@ show_array(int d, void *block, int depth)
         user = a->user;
     }
 
-    WRITES(d, "Array size ");writed(d, (p_uint)a_size);
+    WRITES(d, "Array ");
+    write_x(d, (p_int)a);
+    WRITES(d, " size ");writed(d, (p_uint)a_size);
     WRITES(d, ", uid: "); show_string(d, user ? get_txt(user->name) : "0", 0);
     WRITES(d, "\n");
     if (depth > 2)
@@ -1469,6 +1516,18 @@ show_array(int d, void *block, int depth)
             WRITES(d, "\n");
             break;
 
+        case T_CLOSURE:
+            if (svp->x.closure_type == CLOSURE_LFUN
+             || svp->x.closure_type == CLOSURE_IDENTIFIER)
+               show_cl_literal(d, (char *)svp->u.lambda, depth);
+            else
+            {
+                WRITES(d, "Closure type ");
+                writed(d, svp->x.closure_type);
+                WRITES(d, "\n");
+            }
+            break;
+
         case T_OBJECT:
             show_object(d, (char *)svp->u.ob, 1);
             break;
@@ -1478,7 +1537,7 @@ show_array(int d, void *block, int depth)
             break;
         }
     }
-}
+} /* show_array() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1496,6 +1555,7 @@ setup_print_block_dispatcher (void)
  */
 
 {
+    svalue tmp_closure;
     vector_t *a, *b;
 
     assert_master_ob_loaded();
@@ -1526,6 +1586,19 @@ setup_print_block_dispatcher (void)
     free_array(a);
     free_array(b);
     store_print_block_dispatch_info((char *)master_ob, show_object);
+
+    tmp_closure.type = T_CLOSURE;
+    tmp_closure.x.closure_type = CLOSURE_EFUN + F_ALLOCATE;
+    tmp_closure.u.ob = master_ob;
+    push_number(1);
+    call_lambda(&tmp_closure, 1);
+    store_print_block_dispatch_info(inter_sp->u.vec, show_array);
+    free_svalue(inter_sp--);
+
+    current_object = master_ob;
+    closure_literal(&tmp_closure, 0);
+    store_print_block_dispatch_info(tmp_closure.u.lambda, show_cl_literal);
+    free_svalue(&tmp_closure);
 }
 #endif /* MALLOC_TRACE */
 
@@ -1558,6 +1631,11 @@ garbage_collection (void)
     purge_shadow_sent();
     check_wizlist_for_destr();
     compact_mappings(num_dirty_mappings);
+    if (current_error_trace)
+    {
+        free_array(current_error_trace);
+        current_error_trace = NULL;
+    }
 
     reallocate_reserved_areas();
     time_last_gc = time(NULL);

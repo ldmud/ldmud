@@ -94,6 +94,11 @@ Bool time_to_call_heart_beat;
   /* True: It's time to call the heart beat. Set by comm1.c when it recognizes
    *   an alarm(). */
 
+volatile mp_int alarm_called = MY_FALSE;
+  /* The alarm() handler sets this to TRUE whenever it is called,
+   * to allow check_alarm() to verify that the alarm is still alive.
+   */
+
 volatile Bool comm_time_to_call_heart_beat = MY_FALSE;
   /* True: An heart beat alarm() happened. Set from the alarm handler, this
    *   causes comm.c to set time_to_call_heart_beat.
@@ -192,7 +197,7 @@ do_state_check (int minlvl, const char *where)
     {
         debug_message("%s Inconsistency %s\n", time_stamp(), where);
         printf("%s Inconsistency %s\n", time_stamp(), where);
-        (void)dump_trace(MY_TRUE);
+        (void)dump_trace(MY_TRUE, NULL);
 #ifdef TRACE_CODE
         last_instructions(TOTAL_TRACE_LENGTH, 1, 0);
 #endif
@@ -305,17 +310,14 @@ backend (void)
      * Set up.
      */
 
-    printf("%s Setting up ipc.\n", time_stamp());
-    fflush(stdout);
-
     prepare_ipc();
 
     (void)signal(SIGHUP,  handle_hup);
     (void)signal(SIGUSR1, handle_usr1);
     if (!t_flag) {
+        /* Start the first alarm */
         ALARM_HANDLER_FIRST_CALL(catch_alarm);
         current_time = get_current_time();
-        /* Start the first alarm */
         comm_time_to_call_heart_beat = MY_FALSE;
         time_to_call_heart_beat = MY_FALSE;
         alarm(ALARM_TIME);
@@ -323,6 +325,10 @@ backend (void)
 #ifdef AMIGA
     atexit(exit_alarm_timer);
 #endif
+
+    printf("%s LDMud ready for users.\n", time_stamp());
+    fflush(stdout);
+    debug_message("%s LDMud ready for users.\n", time_stamp());
 
     toplevel_context.rt.type = ERROR_RECOVERY_BACKEND;
     setjmp(toplevel_context.con.text);
@@ -340,11 +346,13 @@ backend (void)
     {
         do_state_check(1, "in main loop");
 
+        check_alarm();
+
         RESET_LIMITS;
         CLEAR_EVAL_COST;
 
-        /* Execute pending deallocations */
 #ifdef C_ALLOCA
+        /* Execute pending deallocations */
         alloca(0); /* free alloca'd values from deeper levels of nesting */
 #endif
 
@@ -588,7 +596,7 @@ backend (void)
 
 #ifdef ALARM_HANDLER
 
-ALARM_HANDLER(catch_alarm, comm_time_to_call_heart_beat = 1; total_alarms++; )
+ALARM_HANDLER(catch_alarm, alarm_called = MY_TRUE; comm_time_to_call_heart_beat = 1; total_alarms++; )
 
 #else
 
@@ -598,11 +606,44 @@ void catch_alarm (int dummy UNUSED)
 #    pragma unused(dummy)
 #endif
     (void)signal(SIGALRM, (RETSIGTYPE(*)(int))catch_alarm);
+    alarm_called = MY_TRUE;
     comm_time_to_call_heart_beat = 1;
     total_alarms++;
 }
 
 #endif
+
+/*-------------------------------------------------------------------------*/
+void check_alarm (void)
+
+/* Check the time since the last recorded call to the alarm handler.
+ * If it is longer than a limit, assume that the alarm died and restart it.
+ *
+ * This function is necessary especially for Cygwin on Windows, where it
+ * is not unusual that the driver process receives so few cycles that it
+ * loses its alarm.
+ * TODO: It should be possible to get rid of alarms altogether if all
+ * TODO:: timebound methods check the time since the last checkpoint.
+ */
+
+{
+    static mp_int last_alarm_time = 0;
+    mp_int curtime = get_current_time();
+
+    if (last_alarm_time && !alarm_called && curtime - last_alarm_time > 30)
+    {
+        debug_message("%s Last alarm was %ld seconds ago - restarting it.\n"
+                     , time_stamp(), curtime - last_alarm_time);
+
+        alarm(0); /* in case the alarm is still alive, but just slow */
+        comm_time_to_call_heart_beat = MY_TRUE;
+        time_to_call_heart_beat = MY_TRUE;
+        alarm(ALARM_TIME);
+    }
+
+    alarm_called = MY_FALSE;
+    last_alarm_time = curtime;
+} /* check_alarm() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -758,14 +799,15 @@ static Bool did_swap;
                 if (obj->flags & O_DESTRUCTED)
                     continue;
 
-#if TIME_TO_SWAP > 0 || TIME_TO_SWAP_VARIABLES > 0
-                /* Restore old time_of_ref. This might result in a quick
-                 * swap-in/swap-out yoyo if this object was swapped out
-                 * in the first place. To make this less costly, variables
-                 * are not swapped out short before a reset (see below).
-                 */
-                obj->time_of_ref = current_time - time_since_ref;
-#endif
+                if (time_to_swap > 0 || time_to_swap_variables > 0)
+                {
+                    /* Restore old time_of_ref. This might result in a quick
+                     * swap-in/swap-out yoyo if this object was swapped out
+                     * in the first place. To make this less costly, variables
+                     * are not swapped out short before a reset (see below).
+                     */
+                    obj->time_of_ref = current_time - time_since_ref;
+                }
             } /* if (call reset or not) */
         } /* if (needs reset?) */
 
@@ -846,8 +888,6 @@ no_clean_up:
         }
 
 
-#if TIME_TO_SWAP > 0 || TIME_TO_SWAP_VARIABLES > 0
-
         /* ------ Swapping ------ */
 
         /* At last, there is a possibility that the object can be swapped
@@ -902,7 +942,6 @@ no_clean_up:
                     did_swap = MY_TRUE;
             }
         } /* if (obj can be swapped) */
-#endif /* TIME_TO_SWAP > 0 || TIME_TO_SWAP_VARIABLES > 0 */
 
         /* TODO: Here would be nice place to convert all strings in an
          * TODO:: object to shared strings, if the object was reset, cleant

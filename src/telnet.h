@@ -101,7 +101,8 @@ char *telcmds[] = {
 #define	 TELOPT_NEWENV        39        /* Environment opt for Port ID */
 #define  TELOPT_EXOPL        255        /* extended-options-list */
 
-#define  NTELOPTS   (1+TELOPT_NEWENV)
+#define  NTELOPTS            256        /* was: (1+TELOPT_NEWENV) */
+
 #ifdef TELOPTS
 char *telopts[NTELOPTS] = {
         "BINARY", "ECHO", "RCP", "SUPPRESS GO AHEAD", "NAME",

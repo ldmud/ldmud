@@ -1732,6 +1732,7 @@ f_write_file (svalue_t *sp)
             }
             if (f == NULL) {
                 char * emsg, * buf, * buf2;
+                int err = errno;
 
                 emsg = strerror(errno);
                 buf = alloca(strlen(emsg+1));
@@ -1740,21 +1741,21 @@ f_write_file (svalue_t *sp)
                 {
                     strcpy(buf, emsg);
                     extract_cstr(buf2, file, mstrsize(file)+1);
-                    error("Could not open %s for append: %s.\n"
-                         , buf2, buf);
+                    error("Could not open %s for append: (%d) %s.\n"
+                         , buf2, err, buf);
                 }
                 else if (buf2)
                 {
                     extract_cstr(buf2, file, mstrsize(file)+1);
                     perror("write_file");
                     error("Could not open %s for append: errno %d.\n"
-                         , buf2, errno);
+                         , buf2, err);
                 }
                 else
                 {
                     perror("write_file");
                     error("Could not open file for append: errno %d.\n"
-                         , errno);
+                         , err);
                 }
                 /* NOTREACHED */
             }

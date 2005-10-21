@@ -124,7 +124,7 @@
 
 #define ALLOC_VECTOR(nelem) \
       (vector_t *)xalloc_pass(sizeof (vector_t) + \
-                              sizeof(svalue_t) * (nelem - 1) MTRACE_PASS)
+                              sizeof(svalue_t) * (nelem - 1))
 
 /* ALLOC_VECTOR(size,file,line): Allocate dynamically the memory for
  *    a vector of <size> elements.

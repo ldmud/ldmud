@@ -7,7 +7,7 @@
 
 extern void init_otable(void);
 extern size_t show_otable_status(strbuf_t *sbuf, Bool verbose);
-extern void otable_dinfo_status(svalue_t *svp);
+extern void otable_dinfo_status(svalue_t *svp, int value);
 
 extern void enter_object_hash(object_t *ob);
 extern void remove_object_hash(object_t *ob);

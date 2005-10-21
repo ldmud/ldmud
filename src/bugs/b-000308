@@ -2,7 +2,7 @@ Short: call_out handling freezes
 From: Manu Maeki (Cendor)
 Date: 000308
 Type: Bug
-State: New
+State: Maybe fixed in 3.2.9-dev.256
 Driver: 3.2.8-dev.163
 
 After some time, the call_out handling stops and doesn't restart until
@@ -12,3 +12,7 @@ stopped while players are not in the vicinity.
 Ask Cendor to sent again their monster.c
 
 Does the call_out handling skip objets which eval_costs are expired?
+
+Analysis: Fiona discovered that on some systems SIGALRM is blocked when
+the program starts. Code to unblock the signal has been added in
+3.2.9-dev.256.

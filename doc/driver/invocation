@@ -128,11 +128,9 @@ DESCRIPTION
       -s v<time> | --swap-variables <time>
         Time in seconds before an object (or its variables) are swapped out.
         A time less or equal 0 disables swapping.
-        Only available if compiled with TIME_TO_SWAP > 0.
 
       -s f<name> | --swap-file <name>
         Swap into file <name> instead of <mudlib>/LP_SWAP.<host> .
-        Only available if compiled with TIME_TO_SWAP > 0.
 
       -s c       | --swap-compact
         Reuse free space in the swap file immediately.
@@ -141,7 +139,12 @@ DESCRIPTION
 
       --max-malloc <size>
         Restrict total memory allocations to <size> bytes.
-        Only available if compiled with MAX_MALLOCED.
+        A <size> of 0 or 'unlimited' removes any restriction.\n"
+
+      --min-malloc <size>
+      --min-small-malloc <size>
+        Determine the sizes for the explicite initial large resp. small chunk
+        allocation. A size of 0 disables the explicite initial allocations.
 
       -r u<size> | --reserve-user <size>
       -r m<size> | --reserve-master <size>

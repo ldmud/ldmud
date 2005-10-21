@@ -31,7 +31,7 @@ DESCRIPTION
 	                  it is shadowed by a nomask type simul_efun.
 	rename_object	  The object <who> tries to rename the object
 			  <arg3> to the name <arg4>.
-	send_imp	  Send UDP-data to host arg3.
+	send_udp	  Send UDP-data to host arg3.
 	set_auto_include_string Set the string automatically included
 			  by the compiler into every object.
 	get_extra_wizinfo Get the additional wiz-list info for user

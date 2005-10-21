@@ -85,6 +85,10 @@
  */
 #define USE_LPC_NOSAVE
 
+/* Define this if you want the obsolete and deprecated efuns.
+ */
+#define USE_DEPRECATED
+
 /*
  * Maximum number of bits in a bit field. They are stored in printable
  * strings, 6 bits per byte.
@@ -246,16 +250,11 @@
 
 #define MAX_BYTE_TRANSFER 50000
 
-/*
- * CATCH_UDP_PORT
- *
- * Define this if the mud are to catch incoming udp messages on a
- * specific port. If == -1 it will not be used unless the mud is started
- * with the -u### flag. Where ### is the portnumber for the udp port.
- * If undefined the -u flag will be ignored.
+/* Define this to the port on which the driver can receive UDP message.
+ * If set to -1, the port will not be opened unless the mud is given a valid
+ * port number on startup with the -u commandline option.
  */
-#undef CATCH_UDP_PORT	4246
-#undef UDP_SEND
+#define UDP_PORT                 4246
 
 #define COMM_STAT
 #define APPLY_CACHE_STAT
@@ -268,27 +267,27 @@
 
 #define MALLOC_smalloc
 
-/* If MIN_MALLOCED is defined, the gamedriver will reserve this amount of
+/* If MIN_MALLOCED is > 0, the gamedriver will reserve this amount of
  * memory on startup for large blocks, thus reducing the large block
  * fragmentation. The value therefore should be a significantly large
  * multiple of the large chunk size.
  * As a rule of thumb, reserve enough memory to cover the first couple
  * of days of uptime.
  */
-/* #define MIN_MALLOCED	   0x1000000 */
+#define MIN_MALLOCED	   0
 
-/* If MIN_SMALL_MALLOCED is defined, the gamedriver will reserve this
+/* If MIN_SMALL_MALLOCED is > 0, the gamedriver will reserve this
  * amount of memory on startup for small blocks, thus reducing the small block
  * fragmentation. The value therefore should be a significantly large
  * multiple of the small chunk size.
  * As a rule of thumb, reserve enough memory to cover the first couple
  * of days of uptime.
  */
-#undef MIN_SMALL_MALLOCED  
+#define MIN_SMALL_MALLOCED   0
 
-/* When smalloc is used, these two values give the upper limits for
- * large and small block allocation (useful for systems with no
- * functioning process limit).
+/* This value gives the upper limit for the total allocated memory
+ * (useful for systems with no functioning process limit).
+ * A value of 0 means 'unlimited'.
  */
 #define MAX_MALLOCED	   0x4000000
 

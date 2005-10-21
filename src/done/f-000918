@@ -2,7 +2,7 @@ Short: Add a path spec to --use-mysql on configuration.
 From: "Bastian Hoyer" <dafire@dafire.de>
 Date: Mon, 18 Sep 2000 12:53:03 +0200
 Type: Feature
-State: New
+State: Done - implemented in 3.2.9-dev.258
 
 
 Hallo Lars,

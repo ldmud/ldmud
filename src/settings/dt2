@@ -10,7 +10,7 @@ exit 1
 # --- The actual settings ---
 
 with_portno=7680
-with_catch_udp_port=8889
+with_udp_port=8889
 
 with_time_to_swap=0
 with_time_to_swap_variables=0

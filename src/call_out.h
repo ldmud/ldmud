@@ -9,7 +9,7 @@
 
 extern void  call_out(void);
 extern size_t  print_call_out_usage(strbuf_t *sbuf, Bool verbose);
-extern void  callout_dinfo_status(svalue_t *svp);
+extern void  callout_dinfo_status(svalue_t *svp, int value);
 extern void  remove_stale_call_outs(void);
 
 extern svalue_t *f_call_out(svalue_t *sp, int num_arg);

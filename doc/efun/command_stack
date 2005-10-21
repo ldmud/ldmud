@@ -19,7 +19,7 @@ DESCRIPTION
 
         CMD_ORIGIN and CMD_PLAYER are usually the same; there is a difference
         only if the modify_command hook changes the command giver with
-        set_this_player() .
+        set_this_player().
 
         Note that any of the entries may be returned as 0.
 

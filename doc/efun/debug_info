@@ -51,6 +51,10 @@ DESCRIPTION
             the driver specified by <arg2>. The result of the function
             is an array with the information, or 0 for unsupported values
             of <arg2>.
+            
+            If <arg3> is given and in the range of array indices
+            for the given <arg2>, the result will be just the indexed array
+            entry, but not the full array.
 
             Allowed values for <arg2> are: DID_STATUS, DID_SWAP, DID_MALLOC.
 
@@ -98,6 +102,12 @@ DESCRIPTION
 
               int DID_ST_HBEAT_CALLS
                   Number of heart_beats executed so far.
+
+              int DID_ST_HBEAT_CALLS_TOTAL
+                  Number of heart_beats calls so far. The difference to
+                  ST_HBEAT_CALLS is that the latter only counts heart beat
+                  calls during which at least one heart beat was actually
+                  executed.
 
               int DID_ST_HBEAT_SLOTS
               int DID_ST_HBEAT_SIZE
@@ -308,14 +318,15 @@ DESCRIPTION
                    of successes and the size of memory allocated this
                    way (smalloc only).
 
-        DINFO_TRACE (7): Return the current call stack 'trace' information
-            in the form specified by <arg2>. The result of the function is
-            either either an array (format explained below) if <arg2> is 0 or
-            missing, or a printable string for any non-zero value of <arg2>.
-
-            <arg2> == 0: Return the information in array form.
-               If the array has just one entry, the trace information is not
-               available and the one entry is a string with the reason.
+        DINFO_TRACE (7): Return the call stack 'trace' information as specified
+            by <arg2>. The result of the function is either an array (format
+            explained below), or a printable string. Omitting <arg2> defaults
+            to DIT_CURRENT.
+ 
+            <arg2> == DIT_CURRENT (0) or == DIT_ERROR (1): Return the
+               information in array form. For DIT_CURRENT, the current call
+               trace is returned, for DIT_ERROR the trace of the last 
+               uncaught error.
 
                If the array has more than one entries, the first entry is 0 or
                the name of the object with the heartbeat which started the
@@ -347,16 +358,20 @@ DESCRIPTION
                                  closure code.
                    _TYPE_LFUN:   the line number.
 
+            <arg2> == DIT_STR_CURRENT (2): Return the information about the
+               current call trace as printable string.
+
 HISTORY
         Since 3.2.7, DINFO_STATUS returns the status information instead
           of printing it.
         DINFO_DUMP introduced with 3.2.7.
         LDMud 3.2.8 added the data size of the object to the result of
           DINFO_MEMORY; the DINFO_DATA request; the DID_MEM_WASTED* stats.
+        LDMud 3.2.9 added DINFO_TRACE; the indexing feature for DINFO_DATA,
+          the DID_MEM_CLIB* and DID_MEM_PERM* stats,
+          and DID_ST_HBEAT_CALLS_TOTAL.
         LDMud 3.3 replaced the string related DID_ST_ constants according to
         the new string implementation.
-        LDMud 3.2.9 added DINFO_TRACE; the DID_MEM_CLIB* and DID_MEM_PERM*
-          stats.
 
 SEE ALSO
         trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)

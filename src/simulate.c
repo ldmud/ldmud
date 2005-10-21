@@ -223,6 +223,13 @@ mp_int    current_error_line_number;
    * line number in the program.
    */
 
+vector_t *current_error_trace = NULL;
+  /* When a non-caught error occured, this variable holds the
+   * call chain in the format used by efun debug_info() for evaluation
+   * by the mudlib.
+   * The variable is kept until the next error, or until a GC.
+   */
+
 /* --- Runtime limits --- */
 
 /* Each of these limits comes as pair: one def_... value which holds the
@@ -498,7 +505,7 @@ fatal (const char *fmt, ...)
                      , ts, current_object->name
                            ? get_txt(current_object->name) : "<null>");
     debug_message("%s Dump of the call chain:\n", ts);
-    (void)dump_trace(MY_TRUE);
+    (void)dump_trace(MY_TRUE, NULL);
     printf("%s LDMud aborting on fatal error.\n", time_stamp());
     fflush(stdout);
 
@@ -637,7 +644,7 @@ error (const char *fmt, ...)
              */
             debug_message("%s Caught error: %s", ts, emsg_buf + 1);
             printf("%s Caught error: %s", ts, emsg_buf + 1);
-            dump_trace(MY_FALSE);
+            dump_trace(MY_FALSE, NULL);
             debug_message("%s ... execution continues.\n", ts);
             printf("%s ... execution continues.\n", ts);
         }
@@ -696,7 +703,10 @@ error (const char *fmt, ...)
     }
 
     /* Dump the backtrace */
-    object_name = dump_trace(num_error == 3);
+    if (current_error_trace)
+        free_array(current_error_trace);
+
+    object_name = dump_trace(num_error == 3, &current_error_trace);
     fflush(stdout);
 
     if (rt->type == ERROR_RECOVERY_APPLY)
@@ -716,6 +726,11 @@ error (const char *fmt, ...)
                 free_mstring(malloced_file);
             if (malloced_name)
                 free_mstring(malloced_name);
+            if (current_error_trace)
+            {
+                free_array(current_error_trace);
+                current_error_trace = NULL;
+            }
         }
         unroll_context_stack();
         longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
@@ -766,6 +781,8 @@ error (const char *fmt, ...)
         
         int a;
         object_t *save_cmd;
+        object_t *culprit = NULL;
+
 
         CLEAR_EVAL_COST;
         RESET_LIMITS;
@@ -778,18 +795,12 @@ error (const char *fmt, ...)
             push_number(inter_sp, line_number);
             a += 3;
         }
-        save_cmd = command_giver;
-        apply_master_ob(STR_RUNTIME, a);
-        command_giver = save_cmd;
 
         if (current_heart_beat)
         {
-            /* Heartbeat error: call the master to log it
-             * and to see if the heartbeat shall be turned
-             * back on for this object.
+            /* Heartbeat error: turn off the heartbeat in the object
+             * and also pass it to RUNTIME_ERROR.
              */
-
-            object_t *culprit;
 
             culprit = current_heart_beat;
             current_heart_beat = NULL;
@@ -797,6 +808,29 @@ error (const char *fmt, ...)
             debug_message("%s Heart beat in %s turned off.\n"
                          , time_stamp(), get_txt(culprit->name));
             push_ref_valid_object(inter_sp, culprit, "heartbeat error");
+            a++;
+        }
+        else
+        {
+            /* Normal error: push -1 instead of a culprit. */
+            push_number(inter_sp, -1);
+            a++;
+        }
+
+        save_cmd = command_giver;
+        apply_master_ob(STR_RUNTIME, a);
+        command_giver = save_cmd;
+
+        if (culprit)
+        {
+            /* TODO: Merge heart_beat_error() in to runtime_error() */
+
+            /* Heartbeat error: call the master to log it
+             * and to see if the heartbeat shall be turned
+             * back on for this object.
+             */
+
+            push_ref_valid_object(inter_sp, culprit, "runtime_error");
             push_ref_string(inter_sp, malloced_error);
             a = 2;
             if (current_object)
@@ -811,6 +845,8 @@ error (const char *fmt, ...)
             command_giver = save_cmd;
             if (svp && (svp->type != T_NUMBER || svp->u.number) )
             {
+                debug_message("%s Heart beat in %s turned back on.\n"
+                             , time_stamp(), get_txt(culprit->name));
                 set_heart_beat(culprit, MY_TRUE);
             }
         }
@@ -2424,65 +2460,83 @@ status_parse (strbuf_t * sbuf, char * buff)
 
 /*-------------------------------------------------------------------------*/
 void
-dinfo_data_status (svalue_t *svp)
+dinfo_data_status (svalue_t *svp, int value)
 
 /* Fill in the "status" data for debug_info(DINFO_DATA, DID_STATUS)
  * into the svalue-block <svp>.
+ * If <value> is -1, <svp> points indeed to a value block; other it is
+ * the index of the desired value and <svp> points to a single svalue.
  */
  
 {
     STORE_DOUBLE_USED;
 
-    svp[DID_ST_ACTIONS].u.number      = alloc_action_sent;
-    svp[DID_ST_ACTIONS_SIZE].u.number = alloc_action_sent * sizeof (action_t);
-    svp[DID_ST_SHADOWS].u.number      = alloc_shadow_sent;
-    svp[DID_ST_SHADOWS_SIZE].u.number = alloc_shadow_sent * sizeof (shadow_t);
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code
+    
+#define ST_DOUBLE(which,code) \
+    if (value == -1) { \
+        svp[which].type = T_FLOAT; \
+        STORE_DOUBLE(svp+which, code); \
+    } else if (value == which) { \
+        svp->type = T_FLOAT; \
+        STORE_DOUBLE(svp, code); \
+    }
+    
+    ST_NUMBER(DID_ST_ACTIONS,           alloc_action_sent);
+    ST_NUMBER(DID_ST_ACTIONS_SIZE,      alloc_action_sent * sizeof (action_t));
+    ST_NUMBER(DID_ST_SHADOWS,           alloc_shadow_sent);
+    ST_NUMBER(DID_ST_SHADOWS_SIZE,      alloc_shadow_sent * sizeof (shadow_t));
 
-    svp[DID_ST_OBJECTS].u.number           = tot_alloc_object;
-    svp[DID_ST_OBJECTS_SIZE].u.number      = tot_alloc_object_size;
-    svp[DID_ST_OBJECTS_SWAPPED].u.number   = num_vb_swapped;
-    svp[DID_ST_OBJECTS_SWAP_SIZE].u.number = total_vb_bytes_swapped;
-    svp[DID_ST_OBJECTS_LIST].u.number = num_listed_objs;
-    svp[DID_ST_OBJECTS_PROCESSED].u.number = num_last_processed;
-    svp[DID_ST_OBJECTS_AVG_PROC].type = T_FLOAT;
-    STORE_DOUBLE(svp+DID_ST_OBJECTS_AVG_PROC
-                , (avg_in_list || avg_last_processed > avg_in_list)
-                  ? 1.0
-                  : (double)avg_last_processed / avg_in_list
-                );
+    ST_NUMBER(DID_ST_OBJECTS,           tot_alloc_object);
+    ST_NUMBER(DID_ST_OBJECTS_SIZE,      tot_alloc_object_size);
+    ST_NUMBER(DID_ST_OBJECTS_SWAPPED,   num_vb_swapped);
+    ST_NUMBER(DID_ST_OBJECTS_SWAP_SIZE, total_vb_bytes_swapped);
+    ST_NUMBER(DID_ST_OBJECTS_LIST,      num_listed_objs);
+    ST_NUMBER(DID_ST_OBJECTS_PROCESSED, num_last_processed);
+    ST_DOUBLE(DID_ST_OBJECTS_AVG_PROC
+             , (avg_in_list || avg_last_processed > avg_in_list)
+               ? 1.0
+               : (double)avg_last_processed / avg_in_list
+             );
         
-    svp[DID_ST_ARRAYS].u.number      = num_arrays;
-    svp[DID_ST_ARRAYS_SIZE].u.number = total_array_size();
+    ST_NUMBER(DID_ST_ARRAYS,         num_arrays);
+    ST_NUMBER(DID_ST_ARRAYS_SIZE,    total_array_size());
 
-    svp[DID_ST_MAPPINGS].u.number      = num_mappings;
-    svp[DID_ST_MAPPINGS_SIZE].u.number = total_mapping_size();
+    ST_NUMBER(DID_ST_MAPPINGS,       num_mappings);
+    ST_NUMBER(DID_ST_MAPPINGS_SIZE,  total_mapping_size());
 
-    svp[DID_ST_PROGS].u.number      = total_num_prog_blocks + num_swapped - num_unswapped;
-    svp[DID_ST_PROGS_SIZE].u.number = total_prog_block_size + total_bytes_swapped
-                                                            - total_bytes_unswapped;
-    svp[DID_ST_PROGS_SWAPPED].u.number   = num_swapped - num_unswapped;
-    svp[DID_ST_PROGS_SWAP_SIZE].u.number = total_bytes_swapped - total_bytes_unswapped;
+    ST_NUMBER(DID_ST_PROGS,          total_num_prog_blocks + num_swapped
+                                                           - num_unswapped);
+    ST_NUMBER(DID_ST_PROGS_SIZE,     total_prog_block_size + total_bytes_swapped
+                                                           - total_bytes_unswapped);
+    ST_NUMBER(DID_ST_PROGS_SWAPPED,   num_swapped - num_unswapped);
+    ST_NUMBER(DID_ST_PROGS_SWAP_SIZE, total_bytes_swapped - total_bytes_unswapped);
 
-    svp[DID_ST_USER_RESERVE].u.number   = reserved_user_size;
-    svp[DID_ST_MASTER_RESERVE].u.number = reserved_master_size;
-    svp[DID_ST_SYSTEM_RESERVE].u.number = reserved_system_size;
+    ST_NUMBER(DID_ST_USER_RESERVE,   reserved_user_size);
+    ST_NUMBER(DID_ST_MASTER_RESERVE, reserved_master_size);
+    ST_NUMBER(DID_ST_SYSTEM_RESERVE, reserved_system_size);
 
 #ifdef COMM_STAT
-    svp[DID_ST_ADD_MESSAGE].u.number = add_message_calls;
-    svp[DID_ST_PACKETS].u.number     = inet_packets;
-    svp[DID_ST_PACKET_SIZE].u.number = inet_volume;
+    ST_NUMBER(DID_ST_ADD_MESSAGE, add_message_calls);
+    ST_NUMBER(DID_ST_PACKETS,     inet_packets);
+    ST_NUMBER(DID_ST_PACKET_SIZE, inet_volume);
 #else
-    svp[DID_ST_ADD_MESSAGE].u.number = -1;
-    svp[DID_ST_PACKETS].u.number     = -1;
-    svp[DID_ST_PACKET_SIZE].u.number = -1;
+    ST_NUMBER(DID_ST_ADD_MESSAGE, -1);
+    ST_NUMBER(DID_ST_PACKETS,     -1);
+    ST_NUMBER(DID_ST_PACKET_SIZE, -1);
 #endif
 #ifdef APPLY_CACHE_STAT
-    svp[DID_ST_APPLY].u.number      = apply_cache_hit+apply_cache_miss;
-    svp[DID_ST_APPLY_HITS].u.number = apply_cache_hit;
+    ST_NUMBER(DID_ST_APPLY,      apply_cache_hit+apply_cache_miss);
+    ST_NUMBER(DID_ST_APPLY_HITS, apply_cache_hit);
 #else
-    svp[DID_ST_APPLY].u.number      = -1;
-    svp[DID_ST_APPLY_HITS].u.number = -1;
+    ST_NUMBER(DID_ST_APPLY,      -1);
+    ST_NUMBER(DID_ST_APPLY_HITS, -1);
 #endif
+
+#undef ST_NUMBER
+#undef ST_DOUBLE
 } /* dinfo_data_status() */
 
 /*-------------------------------------------------------------------------*/
@@ -3301,7 +3355,7 @@ print_svalue (svalue_t *arg)
         }
         else
         {
-            add_message("%s", get_txt(arg->u.str));
+            add_message(FMT_STRING, arg->u.str);
         }
     }
     else if (arg->type == T_OBJECT)

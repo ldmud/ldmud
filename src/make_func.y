@@ -423,6 +423,10 @@ static int last_current_lpc_type = 0;
 
 /* Variables used when parsing the lines of FUNC_SPEC */
 
+static int got_error = 0;
+  /* Set to TRUE if an error was found.
+   */
+
 static int min_arg = -1;
   /* Minimum number of arguments for this function if there
    * are optional arguments, or -1 if all arguments are needed.
@@ -532,6 +536,93 @@ make_f_name (char *str)
     return mystrdup(f_name);
 }
 
+/*-------------------------------------------------------------------------*/
+static int
+check_for_duplicate_instr (const char *f_name, const char *key, int redef_ok)
+
+/* Check if either <f_name> or <key> already appear in instr[], and print
+ * appropriate diagnostics. If <redef_ok> is true, a new <key> for an existing
+ * <f_name> is allowed.
+ * Return true if there is a duplicate for <f_name>, false if not.
+ */
+
+{
+    size_t i;
+    int rc;
+
+    rc = 0;
+
+    for (i = 0; i < num_buff; i++)
+    {
+        if (!strcmp(f_name, instr[i].f_name))
+        {
+            if (!strcmp(key, instr[i].key))
+            {
+                rc = 1;
+                got_error = 1;
+                fprintf(stderr, "Error: Entry '%s':'%s' duplicated.\n"
+                              , f_name, key);
+            }
+            else if (!redef_ok)
+            {
+                rc = 1;
+                got_error = 1;
+                fprintf(stderr, "Error: Entry '%s':'%s' redefined to '%s'.\n"
+                              , f_name, instr[i].key, key);
+            }
+        }
+        else if (!strcmp(key, instr[i].key))
+        {
+             fprintf(stderr, "Entry '%s':'%s' duplicated as '%s':... .\n"
+                           , instr[i].f_name, instr[i].key, f_name);
+        }
+        
+    }
+    return rc;
+}
+
+/*-------------------------------------------------------------------------*/
+static int
+check_for_duplicate_string (const char *key, const char *buf)
+
+/* Check if either <key> or <buf> already appear in instr[], and print
+ * appropriate diagnostics.
+ * Return true if there is a duplicate for <key>, false if not.
+ */
+
+{
+    size_t i;
+    int rc;
+
+    rc = 0;
+
+    for (i = 0; i < num_buff; i++)
+    {
+        if (!strcmp(key, instr[i].key))
+        {
+            rc = 1;
+            got_error = 1;
+            if (!strcmp(buf, instr[i].buf))
+            {
+                fprintf(stderr, "Error: Entry '%s':'%s' duplicated.\n"
+                              , key, buf);
+            }
+            else
+            {
+                fprintf(stderr, "Error: Entry '%s':'%s' redefined to '%s'.\n"
+                              , key, instr[i].buf, buf);
+            }
+        }
+        else if (!strcmp(buf, instr[i].buf))
+        {
+             fprintf(stderr, "Warning: Entry '%s':'%s' duplicated as '%s':... .\n"
+                           , instr[i].key, instr[i].buf, key);
+        }
+        
+    }
+    return rc;
+}
+
 #if defined(__MWERKS__) && !defined(WARN_ALL)
 #    pragma warn_possunwant off
 #    pragma warn_implicitconv off
@@ -613,6 +704,7 @@ code:     optional_name ID
         if (!$1)
             $1 = mystrdup($2);
         f_name = make_f_name($2);
+        check_for_duplicate_instr(f_name, $2, 0);
         instr[num_buff].code_class = current_code_class;
         num_instr[current_code_class]++;
         sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, 0, -1, -1, \"%s\" },\n"
@@ -689,6 +781,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
             }
 
             f_name = make_f_name($2);
+            check_for_duplicate_instr(f_name, $2, 0);
             instr[num_buff].code_class = code_class;
             num_instr[code_class]++;
             f_prefix = classprefix[code_class];
@@ -696,6 +789,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
         else
         {
             f_name = mystrdup($3);
+            check_for_duplicate_instr(f_name, $3, 1);
             instr[num_buff].code_class = code_class = C_ALIAS;
             num_instr[C_ALIAS]++;
             f_prefix = NULL;
@@ -857,6 +951,7 @@ stringdef: ID NAME
         /* Copy the data parsed into the instr[] array */
         /* Make the correct f_name and determine the code class
          */
+        check_for_duplicate_string($1, $2);
         instr[num_buff].key = mystrdup($1);
         instr[num_buff].buf = mystrdup($2);
 
@@ -2451,6 +2546,7 @@ read_func_spec (void)
         perror(FUNC_SPEC);
         exit(1);
     }
+    got_error = 0;
     current_line = 1;
     current_file = FUNC_SPEC;
     parsetype = PARSE_FUNC_SPEC;
@@ -2537,6 +2633,7 @@ read_string_spec (void)
         perror(STRING_SPEC);
         exit(1);
     }
+    got_error = 0;
     current_line = 1;
     current_file = STRING_SPEC;
     parsetype = PARSE_STRING_SPEC;
@@ -2625,9 +2722,18 @@ create_efun_defs (void)
                  " * the real instruction code.\n"
                  " */\n\n");
     fprintf(fpw, "short efun_aliases[] = {\n");
-    for (i = 0; i < num_buff; i++) {
-        if (instr[i].code_class == C_ALIAS)
-            fprintf(fpw, "    %s,\n", instr[i].f_name);
+    {
+        Bool gotone = MY_FALSE;
+
+        for (i = 0; i < num_buff; i++) {
+            if (instr[i].code_class == C_ALIAS)
+            {
+                fprintf(fpw, "    %s,\n", instr[i].f_name);
+                gotone = MY_TRUE;
+            }
+        }
+        if (!gotone)
+            fprintf(fpw, "    0 /* dummy to keep the compilers happy */\n");
     }
     fprintf(fpw, "};\n\n\n");
 
@@ -3205,6 +3311,9 @@ all: { $<p>$ = 0; } 'a'\n\
 
     if (action == MakeStrings)
         read_string_spec();
+
+    if (got_error)
+        return 1;
 
     /* --- Create the output files --- */
     if (action == MakeInstrs)

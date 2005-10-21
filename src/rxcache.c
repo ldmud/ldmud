@@ -209,14 +209,20 @@ rxcache_status (strbuf_t *sbuf, Bool verbose)
 
 /*-------------------------------------------------------------------------*/
 void
-rxcache_dinfo_status (svalue_t *svp)
+rxcache_dinfo_status (svalue_t *svp, int value)
 
 /* Return the rxcache information for debug_info(DINFO_DATA, DID_STATUS).
  * <svp> points to the svalue block for the result, this function fills in
  * the spots for the object table.
+ * If <value> is -1, <svp> points indeed to a value block; other it is
+ * the index of the desired value and <svp> points to a single svalue.
  */
 
 {
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code
+    
     int    i;
 
     uint32 iNumXEntries = 0;      /* Number of used cache entries */
@@ -232,12 +238,14 @@ rxcache_dinfo_status (svalue_t *svp)
         }
     }
 
-    svp[DID_ST_RX_CACHED].u.number     = iNumXEntries;
-    svp[DID_ST_RX_TABLE].u.number      = RXCACHE_TABLE;
-    svp[DID_ST_RX_TABLE_SIZE].u.number = iXSizeAlloc;
-    svp[DID_ST_RX_REQUESTS].u.number   = iNumXRequests;
-    svp[DID_ST_RX_REQ_FOUND].u.number  = iNumXFound;
-    svp[DID_ST_RX_REQ_COLL].u.number   = iNumXCollisions;
+    ST_NUMBER(DID_ST_RX_CACHED, iNumXEntries);
+    ST_NUMBER(DID_ST_RX_TABLE, RXCACHE_TABLE);
+    ST_NUMBER(DID_ST_RX_TABLE_SIZE, iXSizeAlloc);
+    ST_NUMBER(DID_ST_RX_REQUESTS, iNumXRequests);
+    ST_NUMBER(DID_ST_RX_REQ_FOUND, iNumXFound);
+    ST_NUMBER(DID_ST_RX_REQ_COLL, iNumXCollisions);
+
+#undef ST_NUMBER
 } /* rxcache_dinfo_status() */
 
 /*--------------------------------------------------------------------*/

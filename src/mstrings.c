@@ -262,11 +262,11 @@ make_new_tabled (const char * const pTxt, size_t size, int index MTRACE_DECL)
 
     /* Get the memory for a new one */
 
-    sdata = xalloc_pass(size + sizeof(*sdata) MTRACE_PASS);
+    sdata = xalloc_pass(size + sizeof(*sdata));
     if (!sdata)
         return NULL;
 
-    string = xalloc_pass(sizeof(*string) MTRACE_PASS);
+    string = xalloc_pass(sizeof(*string));
     if (!string)
     {
         xfree(sdata);
@@ -318,11 +318,11 @@ mstring_alloc_string (size_t iSize MTRACE_DECL)
 
     /* Get the memory */
 
-    sdata = xalloc_pass(iSize + sizeof(*sdata) MTRACE_PASS);
+    sdata = xalloc_pass(iSize + sizeof(*sdata));
     if (!sdata)
         return NULL;
 
-    string = xalloc_pass(sizeof(*string) MTRACE_PASS);
+    string = xalloc_pass(sizeof(*string));
     if (!string)
     {
         xfree(sdata);
@@ -538,7 +538,7 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
         /* No: create a new string structure, table it,
          * and then give it pStr's string_data pointer.
          */
-        string = xalloc_pass(sizeof(*string) MTRACE_PASS);
+        string = xalloc_pass(sizeof(*string));
         if (!string)
         {
             return NULL;
@@ -1334,7 +1334,7 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
     if (!verbose)
     {
         strbuf_addf(sbuf
-                   , "Strings alloced\t\t%8lu %8lu + %lu overhead\n"
+                   , "Strings alloced\t\t\t%8lu %8lu + %lu overhead\n"
                    , distinct_strings, distinct_size - distinct_overhead
                    , distinct_overhead + stringtable_size
                    );
@@ -1393,32 +1393,40 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
 
 /*-------------------------------------------------------------------------*/
 void
-string_dinfo_status (svalue_t *svp)
+string_dinfo_status (svalue_t *svp, int value)
 
 /* Return the string table information for debug_info(DINFO_DATA, DID_STATUS).
  * <svp> points to the svalue block for the result, this function fills in
  * the spots for the object table.
+ * If <value> is -1, <svp> points indeed to a value block; other it is
+ * the index of the desired value and <svp> points to a single svalue.
  */
 
 {
-    svp[DID_ST_STRINGS].u.number = mstr_used;
-    svp[DID_ST_STRING_SIZE].u.number = mstr_used_size;
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code
+   
+    ST_NUMBER(DID_ST_STRINGS, mstr_used);
+    ST_NUMBER(DID_ST_STRING_SIZE, mstr_used_size);
 
-    svp[DID_ST_STR_TABLE_SIZE].u.number = HTABLE_SIZE * sizeof(string_t *);
-    svp[DID_ST_STR_OVERHEAD].u.number = sizeof(string_t)+sizeof(string_data_t)-1;
-    svp[DID_ST_STR_IT_OVERHEAD].u.number = sizeof(string_t);
+    ST_NUMBER(DID_ST_STR_TABLE_SIZE, HTABLE_SIZE * sizeof(string_t *));
+    ST_NUMBER(DID_ST_STR_OVERHEAD, sizeof(string_t)+sizeof(string_data_t)-1);
+    ST_NUMBER(DID_ST_STR_IT_OVERHEAD, sizeof(string_t));
     
-    svp[DID_ST_UNTABLED].u.number      = mstr_untabled;
-    svp[DID_ST_UNTABLED_SIZE].u.number = mstr_untabled_size;
-    svp[DID_ST_ITABLED].u.number       = mstr_itabled;
-    svp[DID_ST_ITABLED_SIZE].u.number  = mstr_itabled_size;
-    svp[DID_ST_TABLED].u.number        = mstr_tabled;
-    svp[DID_ST_TABLED_SIZE].u.number   = mstr_tabled_size;
+    ST_NUMBER(DID_ST_UNTABLED,      mstr_untabled);
+    ST_NUMBER(DID_ST_UNTABLED_SIZE, mstr_untabled_size);
+    ST_NUMBER(DID_ST_ITABLED,       mstr_itabled);
+    ST_NUMBER(DID_ST_ITABLED_SIZE,  mstr_itabled_size);
+    ST_NUMBER(DID_ST_TABLED,        mstr_tabled);
+    ST_NUMBER(DID_ST_TABLED_SIZE,   mstr_tabled_size);
 
-    svp[DID_ST_STR_SEARCHES].u.number          = mstr_searches;
-    svp[DID_ST_STR_SEARCHLEN].u.number         = mstr_searchlen;
-    svp[DID_ST_STR_SEARCHES_BYVALUE].u.number  = mstr_searches_byvalue;
-    svp[DID_ST_STR_SEARCHLEN_BYVALUE].u.number = mstr_searchlen_byvalue;
+    ST_NUMBER(DID_ST_STR_SEARCHES,          mstr_searches);
+    ST_NUMBER(DID_ST_STR_SEARCHLEN,         mstr_searchlen);
+    ST_NUMBER(DID_ST_STR_SEARCHES_BYVALUE,  mstr_searches_byvalue);
+    ST_NUMBER(DID_ST_STR_SEARCHLEN_BYVALUE, mstr_searchlen_byvalue);
+
+#undef ST_NUMBER
 } /* string_dinfo_status() */
 
 /***************************************************************************/

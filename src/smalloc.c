@@ -20,11 +20,10 @@
  * Small blocks are allocations of up to SMALL_BLOCK_MAX*4 Bytes, currently
  * 128 Bytes. Such blocks are initially allocated from large memory blocks,
  * called "small chunks", of 16 or 32 KByte size.
-#ifdef MIN_SMALL_MALLOCED
- * To reduce fragmentation, the initial small chunk is of size
- * MIN_SMALL_MALLOCED, hopefully chosen to be a large multiple of the typical
+ * To reduce fragmentation, the initial small chunk (ok, the first small chunk
+ * allocated after all arguments have been parsed) is of size
+ * min_small_malloced, hopefully chosen to be a large multiple of the typical
  * small chunk size.
-#endif
  * When a small block is
  * freed, it is entered in a free list for blocks of its size, so that
  * later allocations can use the pre-allocated blocks in the free lists.
@@ -172,7 +171,7 @@ typedef p_uint word_t;
    */
 
 
-typedef struct { unsigned counter, size; } t_stat;
+typedef struct { unsigned long counter, size; } t_stat;
   /* A counter type for statistics and its functions: */
 
 #define count(a,b)      { a.size+=(b); if ((b)<0) --a.counter; else ++a.counter; }
@@ -256,7 +255,7 @@ typedef struct { unsigned counter, size; } t_stat;
 #define THIS_BLOCK  0x40000000  /* This block is allocated */
 #define M_REF       0x20000000  /* Block is referenced */
 #define M_GC_FREE   0x10000000  /* GC may free this block */
-#define MASK        0x0fffffff  /* Mask for the size, measured in word_t's */
+#define M_MASK      0x0fffffff  /* Mask for the size, measured in word_t's */
 
 
 #ifdef MALLOC_TRACE
@@ -358,21 +357,11 @@ static size_t smalloc_size;
 
 /* --- Small Block variables --- */
 
-#ifdef MIN_SMALL_MALLOCED
-
-static word_t small_chunk_size = MIN_SMALL_MALLOCED;
+static word_t small_chunk_size = SMALL_CHUNK_SIZE;
   /* The size of a small chunk. Usually SMALL_CHUNK_SIZE, the first
-   * small chunk of all can be allocated of MIN_SMALL_MALLOCED size;
+   * small chunk of all can be allocated of min_small_malloced size;
    * the allocator will then reset the value to SMALL_CHUNK_SIZE.
    */
-
-#else
-
-#define small_chunk_size SMALL_CHUNK_SIZE
-
-  /* The allocation size of all small chunks. */
-
-#endif
 
 static word_t *last_small_chunk = NULL;
   /* Pointer the most recently allocated small chunk.
@@ -704,7 +693,7 @@ smalloc (size_t size
             for (prev = NULL, this = sfltable[SMALL_BLOCK_MAX]
                 ; this; prev = this, this = *s_next_ptr(this))
             {
-                word_t bsize = *this & MASK;
+                word_t bsize = *this & M_MASK;
                 word_t rsize = bsize - wsize;
 
                 /* Make sure that the split leaves a legal block behind */
@@ -780,7 +769,7 @@ smalloc (size_t size
 
             /* Remove the block from the free list */
             pt = sfltable[ix];
-            count_back(small_free_stat, size);
+            count_back(small_free_stat, (ix + OVERHEAD + 1) * SINT);
             sfltable[ix] = *(word_t**) (pt+OVERHEAD);
 
             /* Split off the unused part as new block */
@@ -876,8 +865,30 @@ smalloc (size_t size
         /* Get a new small chunk; if possible, from fresh memory */
         next_unused = (word_t*)large_malloc(small_chunk_size + sizeof(word_t*)
                                            , MY_TRUE);
+
+        /* If this is the first small chunk allocation, it might fail because
+         * the driver was configured with a too big min_small_malloced value.
+         * If that happens, try again with the normal value.
+         */
+        if (next_unused == NULL && small_chunk_size != SMALL_CHUNK_SIZE)
+        {
+            dprintf1(2, "Low on MEMORY: Failed to allocated MIN_SMALL_MALLOCED "
+                       "block of %d bytes.\n"
+                     , (p_int)(small_chunk_size)
+                   );
+            small_chunk_size = SMALL_CHUNK_SIZE;
+            next_unused = (word_t*)large_malloc(small_chunk_size+sizeof(word_t*)
+                                               , MY_TRUE);
+        }
+
         if (next_unused == NULL)
+        {
+            dprintf1(2, "Low on MEMORY: Failed to allocated small chunk "
+                        "block of %d bytes.\n"
+                      , (p_int)(small_chunk_size)
+                    );
             return NULL;
+        }
 
         /* Enter the chunk into the list */
         *next_unused = (word_t)last_small_chunk;
@@ -888,9 +899,7 @@ smalloc (size_t size
         count_up(small_chunk_wasted, SINT*OVERHEAD+sizeof(word_t*));
         unused_size = small_chunk_size;
 
-#ifdef MIN_SMALL_MALLOCED
         small_chunk_size = SMALL_CHUNK_SIZE;
-#endif
 
     }
     else
@@ -933,10 +942,13 @@ xfree (POINTER ptr)
     word_t *block;
     word_t i;
 
+    if (!ptr)
+        return;
+
     /* Get the real block address and size */
     block = (word_t *) ptr;
     block -= OVERHEAD;
-    i = (*s_size_ptr(block) & MASK);
+    i = (*s_size_ptr(block) & M_MASK);
 
     if (i > SMALL_BLOCK_MAX + OVERHEAD)
     {
@@ -981,8 +993,8 @@ xfree (POINTER ptr)
   /* Non-AVL-Freelist pointers.
    */
 
-#define l_next_block(p)  ((p) + (MASK & (*(p))) )
-#define l_prev_block(p)  ((p) - (MASK & (*((p)-1))) )
+#define l_next_block(p)  ((p) + (M_MASK & (*(p))) )
+#define l_prev_block(p)  ((p) - (M_MASK & (*((p)-1))) )
   /* Address the previous resp. this block.
    */
 
@@ -1052,7 +1064,7 @@ _check_next (struct free_block *p)
         word_t *q;
 
         q = ((word_t *)p)-OVERHEAD;
-        q += *q & MASK;
+        q += *q & M_MASK;
     }
     _check_next(p->left);
     _check_next(p->right);
@@ -1161,7 +1173,7 @@ check_free_block (void *m)
     int size;
 
     p = (word_t *)(((char *)m)-OVERHEAD*SINT);
-    size = *p & MASK;
+    size = *p & M_MASK;
     if (!(*(p+size) & THIS_BLOCK))
     {
         if (!contains(free_tree, (struct free_block *)(p+size+OVERHEAD)) )
@@ -1522,7 +1534,7 @@ add_to_free_list (word_t *ptr)
 #ifdef MALLOC_TRACE
     ptr[M_MAGIC] = LFMAGIC;
 #endif
-    size = *ptr & MASK;
+    size = *ptr & M_MASK;
 #ifdef DEBUG_AVL
     dprintf1(2, "size:%d\n",size);
 #endif
@@ -1765,7 +1777,7 @@ remove_from_free_list (word_t *ptr)
        fatal("remove_from_free_list: magic match failed: "
              "expected %lx, found %lx\n", ptr[M_MAGIC], LFMAGIC);
 #endif
-   count_back(large_free_stat, *ptr & MASK);
+   count_back(large_free_stat, *ptr & M_MASK);
 
    /* Unlink it from the freelist */
    if (l_prev_ptr(ptr))
@@ -1785,7 +1797,7 @@ add_to_free_list (word_t *ptr)
  */
 
 {
-    count_up(large_free_stat, *ptr & MASK);
+    count_up(large_free_stat, *ptr & M_MASK);
 
 #ifdef DEBUG
     if (free_list && l_prev_ptr(free_list))
@@ -1998,7 +2010,7 @@ found_fit:
 #       endif
 
         first = best = NULL;
-        best_size = MASK;
+        best_size = M_MASK;
         ptr = free_list;
 
         while (ptr)
@@ -2010,7 +2022,7 @@ found_fit:
 #           endif
 
             /* Perfect fit? */
-            tempsize = *ptr & MASK;
+            tempsize = *ptr & M_MASK;
             if (tempsize == size)
             {
                 best = first = ptr;
@@ -2089,15 +2101,14 @@ found_fit:
 
         /* Get <chunk_size> more bytes from the system */
         {
-#ifdef MAX_MALLOCED
-            if ((mp_int)(sbrk_stat.size + chunk_size) > max_malloced
+            if (max_malloced > 0
+             && (mp_int)(sbrk_stat.size + chunk_size) > max_malloced
              && (chunk_size = max_malloced - sbrk_stat.size - (heap_start?0:SINT) )
                 < block_size)
             {
                 ptr = NULL;
             }
             else
-#endif /* MAX_MALLOCED */
             {
                 ptr = (word_t *)esbrk(chunk_size);
             }
@@ -2109,22 +2120,22 @@ found_fit:
 
             static Bool going_to_exit = MY_FALSE;
             static char mess1[] =
-                "Temporary out of MEMORY. Freeing user reserve.\n";
+                "Temporarily out of MEMORY. Freeing user reserve.\n";
             static char mess2[] =
-                "Temporary out of MEMORY. Freeing master reserve.\n";
+                "Temporarily out of MEMORY. Freeing master reserve.\n";
             static char mess3[] =
-                "Temporary out of MEMORY. Freeing system reserve.\n";
+                "Temporarily out of MEMORY. Freeing system reserve.\n";
             static char mess4[] =
                 "Totally out of MEMORY.\n";
             static char mess_d1[] = 
-                "Trying to allocate large ";
+                "Low on MEMORY: Trying to allocate large ";
             static char mess_d2[] = 
                 " bytes for ";
             static char mess_d3[] = 
                 " bytes request";
 #ifdef MALLOC_TRACE
             static char mess_d4[] = 
-                "(";
+                " (";
             static char mess_d5[] = 
                 " line ";
             static char mess_d6[] = 
@@ -2205,7 +2216,7 @@ found_fit:
 
             going_to_exit = MY_TRUE; /* Prevent recursions */
             write(2, mess4, sizeof(mess4)-1);
-            (void)dump_trace(MY_FALSE);
+            (void)dump_trace(MY_FALSE, NULL);
 #           ifdef DEBUG
                 fatal("Out of memory (%lu bytes for %lu byte req)\n"
                      , size * SINT, (unsigned long)smalloc_size);
@@ -2235,7 +2246,7 @@ found_fit:
     /* ptr is now a pointer to a free block in the free list */
 
     remove_from_free_list(ptr);
-    real_size = *ptr & MASK;
+    real_size = *ptr & M_MASK;
 
     if (real_size - size)
     {
@@ -2275,7 +2286,7 @@ found_fit:
         {
             mark_block(ptr+size);
             *(ptr+size) &= ~M_GC_FREE; /* Hands off, GC! */
-            count_up(large_wasted_stat, (*(ptr+size) & MASK) * SINT);
+            count_up(large_wasted_stat, (*(ptr+size) & M_MASK) * SINT);
         }
         else
 #       endif
@@ -2320,7 +2331,7 @@ large_free (char *ptr)
     /* Get the real block pointer */
     p = (word_t *) ptr;
     p -= OVERHEAD;
-    size = *p & MASK;
+    size = *p & M_MASK;
     count_back(large_alloc_stat, size);
 
 #ifdef MALLOC_TRACE
@@ -2336,7 +2347,7 @@ large_free (char *ptr)
     if (!(*(p+size) & THIS_BLOCK))
     {
         remove_from_free_list(p+size);
-        size += (*(p+size) & MASK);
+        size += (*(p+size) & M_MASK);
         *p = (*p & PREV_BLOCK) | size;
     }
 
@@ -2344,7 +2355,7 @@ large_free (char *ptr)
     if (l_prev_free(p))
     {
         remove_from_free_list(l_prev_block(p));
-        size += (*l_prev_block(p) & MASK);
+        size += (*l_prev_block(p) & M_MASK);
         p = l_prev_block(p);
     }
 
@@ -2482,7 +2493,7 @@ esbrk (word_t size)
             next = heap_start;
             do {
                 prev = next;
-                next = prev + (*prev & MASK);
+                next = prev + (*prev & M_MASK);
             } while (next < (word_t *)block);
             overlap = 0;
 
@@ -2541,7 +2552,7 @@ pxalloc (size_t size)
     if (temp)
     {
         temp[-OVERHEAD] &= ~M_GC_FREE;
-        count_up(perm_alloc_stat, (temp[-OVERHEAD] & MASK)*SINT);
+        count_up(perm_alloc_stat, (temp[-OVERHEAD] & M_MASK)*SINT);
     }
     return (POINTER)temp;
 } /* pxalloc() */
@@ -2557,7 +2568,7 @@ pfree (POINTER p)
     if (p)
     {
         ((word_t*)p)[-OVERHEAD] |= (M_REF|M_GC_FREE);
-        count_back(perm_alloc_stat, (((word_t*)p)[-OVERHEAD] & MASK)*SINT);
+        count_back(perm_alloc_stat, (((word_t*)p)[-OVERHEAD] & M_MASK)*SINT);
     }
     xfree(p);
 } /* pfree() */
@@ -2616,10 +2627,10 @@ afree (POINTER p)
 
 {
     word_t *q = (word_t *)p;
-#ifdef FREE_NULL_POINTER
+
     if (!q)
         return;
-#endif
+
 #if MALLOC_ALIGN > SINT
 
     /* amalloc() filled the alignment area with 0s.
@@ -2650,7 +2661,7 @@ rexalloc (POINTER p, size_t size)
    q = (word_t *) p;
 
    q -= OVERHEAD;
-   old_size = ((*q & MASK)-OVERHEAD)*SINT;
+   old_size = ((*q & M_MASK)-OVERHEAD)*SINT;
    if (old_size >= size)
       return p;
 
@@ -2701,7 +2712,7 @@ malloc_increment_size (void *vp, size_t size)
 
     start = (word_t*)p - OVERHEAD;
 
-    old_size = start[M_SIZE] & MASK;
+    old_size = start[M_SIZE] & M_MASK;
     if (old_size <= SMALL_BLOCK_MAX + OVERHEAD)
         return NULL; /* can't extent a small block */
 
@@ -2710,7 +2721,7 @@ malloc_increment_size (void *vp, size_t size)
     if (next & THIS_BLOCK)
         return NULL; /* no following free block */
 
-    next &= MASK;
+    next &= M_MASK;
 
     if (next == (word_t)size)
     {
@@ -2748,11 +2759,11 @@ int
 malloc_size_mask(void)
 
 /* For external users: the mask for size-extraction.
- * TODO: What for? MASK is in smalloc.h anyway.
+ * TODO: What for? M_MASK is in smalloc.h anyway.
  */
 
 {
-    return MASK;
+    return M_MASK;
 } /* malloc_size_mask() */
 
 /*-------------------------------------------------------------------------*/
@@ -2767,7 +2778,7 @@ dump_malloc_data (strbuf_t *sbuf)
     t_stat sbrk_st, clib_st, perm_st;
     t_stat l_alloc, l_free, l_wasted;
     t_stat s_alloc, s_free, s_wasted, s_chunk;
-    int    unused;
+    unsigned long unused;
 
     /* Get a snapshot of the statistics - strbuf_add() might do further
      * allocations while we're reading them.
@@ -2788,28 +2799,28 @@ dump_malloc_data (strbuf_t *sbuf)
 #   define dump_stat(str,stat) strbuf_addf(sbuf, str,stat.counter,stat.size)
 
     strbuf_add(sbuf, "Type                   Count      Space (bytes)\n");
-    dump_stat("sbrk requests:     %8d        %10d (a)\n",sbrk_st);
-    dump_stat("large blocks:      %8d        %10d (b)\n",l_alloc);
+    dump_stat("sbrk requests:     %8d        %10lu (a)\n",sbrk_st);
+    dump_stat("large blocks:      %8d        %10lu (b)\n",l_alloc);
     strbuf_addf(sbuf
                , "large net avail:                   %10d\n"
                , l_alloc.size - l_alloc.counter * OVERHEAD * SINT
                );
-    dump_stat("large free blocks: %8d        %10d (c)\n",l_free);
-    dump_stat("large wasted:      %8d        %10d (d)\n\n",l_wasted);
-    dump_stat("small chunks:      %8d        %10d (e)\n",s_chunk);
-    dump_stat("small blocks:      %8d        %10d (f)\n",s_alloc);
+    dump_stat("large free blocks: %8d        %10lu (c)\n",l_free);
+    dump_stat("large wasted:      %8d        %10lu (d)\n\n",l_wasted);
+    dump_stat("small chunks:      %8d        %10lu (e)\n",s_chunk);
+    dump_stat("small blocks:      %8d        %10lu (f)\n",s_alloc);
     strbuf_addf(sbuf
                , "small net avail:                   %10d\n"
                , s_alloc.size - s_alloc.counter * OVERHEAD * SINT
                );
-    dump_stat("small free blocks: %8d        %10d (g)\n",s_free);
-    dump_stat("small wasted:      %8d        %10d (h)\n",s_wasted);
+    dump_stat("small free blocks: %8d        %10lu (g)\n",s_free);
+    dump_stat("small wasted:      %8d        %10lu (h)\n",s_wasted);
     strbuf_addf(sbuf,
-"unused from current chunk          %10ld (i)\n\n",unused);
+"unused from current chunk          %10lu (i)\n\n",unused);
 
-    dump_stat("permanent blocks:  %8d        %10d\n", perm_st);
+    dump_stat("permanent blocks:  %8d        %10lu\n", perm_st);
 #ifdef SBRK_OK
-    dump_stat("clib allocations:  %8d        %10d\n", clib_st);
+    dump_stat("clib allocations:  %8d        %10lu\n", clib_st);
 #else
     strbuf_addf(sbuf, "clib allocations:       n/a               n/a\n");
 #endif
@@ -2822,24 +2833,24 @@ dump_malloc_data (strbuf_t *sbuf)
       malloc_increment_size_total
     );
     strbuf_addf(sbuf
-               , "Total storage:        (b+c+d)     %10d should equal (a) %10d\n"
+               , "Total storage:        (b+c+d)     %10lu should equal (a) %10lu\n"
                , l_alloc.size + l_free.size + l_wasted.size
                , sbrk_st.size
                );
     strbuf_addf(sbuf
-               , "Total small storage:  (f+g+h+i)   %10d should equal (e) %10d\n"
+               , "Total small storage:  (f+g+h+i)   %10lu should equal (e) %10lu\n"
                , s_alloc.size + s_free.size + s_wasted.size + unused
                , s_chunk.size
                );
     strbuf_addf(sbuf
-               , "Total storage in use: (b-g-h-i)   %10d net available:   %10d\n"
+               , "Total storage in use: (b-g-h-i)   %10lu net available:   %10lu\n"
                , l_alloc.size - s_free.size - s_wasted.size - unused
                , l_alloc.size - s_free.size - s_wasted.size - unused
                  - l_alloc.counter * OVERHEAD * SINT
                  - s_alloc.counter * OVERHEAD * SINT
                );
     strbuf_addf(sbuf
-               , "Total storage unused: (c+d+g+h+i) %10d\n"
+               , "Total storage unused: (c+d+g+h+i) %10lu\n"
                , l_free.size + l_wasted.size
                  + s_free.size + s_wasted.size + unused
                );
@@ -2847,40 +2858,48 @@ dump_malloc_data (strbuf_t *sbuf)
 
 /*-------------------------------------------------------------------------*/
 void
-smalloc_dinfo_data (svalue_t *svp)
+smalloc_dinfo_data (svalue_t *svp, int value)
 
 /* Fill in the data for debug_info(DINFO_DATA, DID_MEMORY) into the
  * svalue-block svp.
  */
 
 {
-    put_ref_string(svp+DID_MEM_NAME, STR_SMALLOC);
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code
+    
+    if (value == -1)
+        put_ref_string(svp+DID_MEM_NAME, STR_SMALLOC);
+    else if (value == DID_MEM_NAME)
+        put_ref_string(svp, STR_SMALLOC);
 
-    svp[DID_MEM_SBRK].u.number       = sbrk_stat.counter;
-    svp[DID_MEM_SBKR_SIZE].u.number  = sbrk_stat.size;
-    svp[DID_MEM_LARGE].u.number      = large_alloc_stat.counter;
-    svp[DID_MEM_LARGE_SIZE].u.number = large_alloc_stat.size * SINT;
-    svp[DID_MEM_LFREE].u.number      = large_free_stat.counter;
-    svp[DID_MEM_LFREE_SIZE].u.number = large_free_stat.size * SINT;
-    svp[DID_MEM_LWASTED].u.number      = large_wasted_stat.counter;
-    svp[DID_MEM_LWASTED_SIZE].u.number = large_wasted_stat.size;
-    svp[DID_MEM_CHUNK].u.number      = small_chunk_stat.counter;
-    svp[DID_MEM_CHUNK_SIZE].u.number = small_chunk_stat.size;
-    svp[DID_MEM_SMALL].u.number      = small_alloc_stat.counter;
-    svp[DID_MEM_SMALL_SIZE].u.number = small_alloc_stat.size;
-    svp[DID_MEM_SFREE].u.number      = small_free_stat.counter;
-    svp[DID_MEM_SFREE_SIZE].u.number = small_free_stat.size;
-    svp[DID_MEM_SWASTED].u.number    = small_chunk_wasted.counter;
-    svp[DID_MEM_SWASTED_SIZE].u.number = small_chunk_wasted.size;
-    svp[DID_MEM_UNUSED].u.number     = unused_size;
-    svp[DID_MEM_MINC_CALLS].u.number   = malloc_increment_size_calls;
-    svp[DID_MEM_MINC_SUCCESS].u.number = malloc_increment_size_success;
-    svp[DID_MEM_MINC_SIZE].u.number    = malloc_increment_size_total;
-    svp[DID_MEM_CLIB].u.number       = clib_alloc_stat.counter;
-    svp[DID_MEM_CLIB_SIZE].u.number  = clib_alloc_stat.size;
-    svp[DID_MEM_PERM].u.number       = perm_alloc_stat.counter;
-    svp[DID_MEM_PERM_SIZE].u.number  = perm_alloc_stat.size;
+    ST_NUMBER(DID_MEM_SBRK, sbrk_stat.counter);
+    ST_NUMBER(DID_MEM_SBKR_SIZE, sbrk_stat.size);
+    ST_NUMBER(DID_MEM_LARGE, large_alloc_stat.counter);
+    ST_NUMBER(DID_MEM_LARGE_SIZE, large_alloc_stat.size * SINT);
+    ST_NUMBER(DID_MEM_LFREE, large_free_stat.counter);
+    ST_NUMBER(DID_MEM_LFREE_SIZE, large_free_stat.size * SINT);
+    ST_NUMBER(DID_MEM_LWASTED, large_wasted_stat.counter);
+    ST_NUMBER(DID_MEM_LWASTED_SIZE, large_wasted_stat.size);
+    ST_NUMBER(DID_MEM_CHUNK, small_chunk_stat.counter);
+    ST_NUMBER(DID_MEM_CHUNK_SIZE, small_chunk_stat.size);
+    ST_NUMBER(DID_MEM_SMALL, small_alloc_stat.counter);
+    ST_NUMBER(DID_MEM_SMALL_SIZE, small_alloc_stat.size);
+    ST_NUMBER(DID_MEM_SFREE, small_free_stat.counter);
+    ST_NUMBER(DID_MEM_SFREE_SIZE, small_free_stat.size);
+    ST_NUMBER(DID_MEM_SWASTED, small_chunk_wasted.counter);
+    ST_NUMBER(DID_MEM_SWASTED_SIZE, small_chunk_wasted.size);
+    ST_NUMBER(DID_MEM_UNUSED, unused_size);
+    ST_NUMBER(DID_MEM_MINC_CALLS, malloc_increment_size_calls);
+    ST_NUMBER(DID_MEM_MINC_SUCCESS, malloc_increment_size_success);
+    ST_NUMBER(DID_MEM_MINC_SIZE, malloc_increment_size_total);
+    ST_NUMBER(DID_MEM_CLIB, clib_alloc_stat.counter);
+    ST_NUMBER(DID_MEM_CLIB_SIZE, clib_alloc_stat.size);
+    ST_NUMBER(DID_MEM_PERM, perm_alloc_stat.counter);
+    ST_NUMBER(DID_MEM_PERM_SIZE, perm_alloc_stat.size);
 
+#undef ST_NUMBER
 } /* smalloc_dinfo_data() */
 
 /*=========================================================================*/
@@ -2909,13 +2928,13 @@ get_block_size (POINTER ptr)
 #if MALLOC_ALIGN > SINT
         while ( !(size = *--q) ) NOOP;
 #if OVERHEAD != 1
-        size = (*(q + 1 - OVERHEAD) & MASK)*SINT;
+        size = (*(q + 1 - OVERHEAD) & M_MASK)*SINT;
 #else
-        size = (size & MASK)*SINT;
+        size = (size & M_MASK)*SINT;
 #endif /* OVERHEAD */
 #else /* MALLOC_ALIGN */
         q -= OVERHEAD;
-        size = (*q & MASK)*SINT;
+        size = (*q & M_MASK)*SINT;
 #endif /* MALLOC_ALIGN */
     }
 
@@ -2991,10 +3010,8 @@ realloc (POINTER p, size_t size)
    word_t old_size;
    POINTER t;
 
-#ifdef FREE_NULL_POINTER
-   if (!p) /* FreeBSD execl() does this */
+   if (!p)
         return malloc(size);
-#endif
 
    old_size = get_block_size(p) - OVERHEAD * SINT;
 
@@ -3081,7 +3098,7 @@ is_freed (void *p, p_uint minsize)
     if (block < heap_start || block + OVERHEAD >= heap_end)
         return MY_TRUE;
 
-    i = (*s_size_ptr(block) & MASK);
+    i = (*s_size_ptr(block) & M_MASK);
     if (i < OVERHEAD + ((minsize + 3) / SINT) || block + i >= heap_end)
         return MY_TRUE;
 
@@ -3121,7 +3138,7 @@ write_lpc_trace (int d, word_t *p)
     /* Try to find the object which allocated this block */
     if ( NULL != (obj = (object_t *)p[M_OBJ]) )
     {
-        WRITES(d, "Object: ");
+        WRITES(d, "By object: ");
         if (obj->flags & O_DESTRUCTED)
             WRITES(d, "(destructed) ");
         for (o = obj_list; o && o != obj; o = o->next_all) NOOP;
@@ -3137,7 +3154,7 @@ write_lpc_trace (int d, word_t *p)
     /* Try to find the program which allocated this block */
     if ( 0 != (id = p[M_PROG]) )
     {
-        WRITES(d, "Program: ");
+        WRITES(d, "By program: ");
         for ( o = obj_list
             ;    o
               && !(o->flags & O_DESTRUCTED)
@@ -3165,7 +3182,7 @@ write_lpc_trace (int d, word_t *p)
         }
         else
         {
-            WRITES(d, "Not found on old address.\n");
+            WRITES(d, "Not found at old address.\n");
         }
     }
 } /* write_lpc_trace() */
@@ -3201,7 +3218,7 @@ print_block (int d, word_t *block)
 #endif
 
     /* Print a hexdump, but not more than 70 characters */
-    size = ((*block & MASK) - OVERHEAD)*SINT;
+    size = ((*block & M_MASK) - OVERHEAD)*SINT;
     if (size > 70)
         return;
     write(d, (char *)(block+OVERHEAD), size);
@@ -3225,9 +3242,9 @@ clear_M_REF_flags (void)
     for (p = heap_start; p < last; )
     {
         *p &= ~M_REF;
-        if (p + (*p & MASK) > heap_end)
+        if (p + (*p & M_MASK) > heap_end)
             fatal("pointer larger than brk()\n");
-        p += *p & MASK;
+        p += *p & M_MASK;
     }
 
     /* Now mark the memory used for the small chunks as ref'd,
@@ -3238,7 +3255,7 @@ clear_M_REF_flags (void)
         word_t *end;
 
         note_malloced_block_ref(p);
-        end = p - OVERHEAD + (p[-OVERHEAD] & MASK);
+        end = p - OVERHEAD + (p[-OVERHEAD] & M_MASK);
 #ifdef DEBUG
         dprintf2(gcollect_outfd, "clearing M_REF in chunk %x, end %x\n",
           (word_t)(p - OVERHEAD), (word_t)end
@@ -3257,7 +3274,7 @@ clear_M_REF_flags (void)
             if (!size) break; /* End of used area in this chunk */
 
             *q &= ~M_REF;
-            q += size & MASK;
+            q += size & M_MASK;
         }
 
         if (q > end)
@@ -3321,19 +3338,19 @@ free_unreferenced_memory (void)
 #endif
 #ifdef MALLOC_TRACE
             dprintf3(gcollect_outfd, " %s %d size 0x%x\n",
-              p[M_FILE], p[M_LINE], size & MASK
+              p[M_FILE], p[M_LINE], size & M_MASK
             );
 #endif
 #ifdef MALLOC_LPC_TRACE
             write_lpc_trace(gcollect_outfd, p);
 #endif
             print_block(gcollect_outfd, p);
-            size2 = p[size & MASK];
+            size2 = p[size & M_MASK];
             large_free((char *)(p+OVERHEAD));
             if ( !(size2 & THIS_BLOCK) )
                 size += size2;
         }
-        p += size & MASK;
+        p += size & M_MASK;
     }
     if (success)
     {
@@ -3348,7 +3365,7 @@ free_unreferenced_memory (void)
     {
         word_t *end;
 
-        end = p - OVERHEAD + (p[-OVERHEAD] & MASK);
+        end = p - OVERHEAD + (p[-OVERHEAD] & M_MASK);
 #ifdef DEBUG
         dprintf2(gcollect_outfd, "scanning chunk %x, end %x for unref'd blocks\n",
           (word_t)(p - OVERHEAD), (word_t)end
@@ -3383,7 +3400,7 @@ free_unreferenced_memory (void)
                 *q |= M_REF;
                 xfree(q+OVERHEAD);
             }
-            q += size & MASK;
+            q += size & M_MASK;
         }
     }
     if (success) {
@@ -3403,7 +3420,7 @@ consolidate_freelists (void)
  */
 
 {
-#if 1
+#if 0
 #  define DEB1(s,t1)       dprintf1(2, s, (p_int)t1)
 #  define DEB2(s,t1,t2)    dprintf2(2, s, (p_int)t1, (p_int)t2)
 #  define DEB3(s,t1,t2,t3) dprintf3(2, s, (p_int)t1, (p_int)t2, (p_int)t3)
@@ -3439,14 +3456,16 @@ consolidate_freelists (void)
         write(gcollect_outfd, "\n", 1);
     }
 #endif
-#ifdef DEBUG
-    /* Make sure that the M_REF flag is set for all small blocks */
 
+    /* Make sure that the M_REF flag is set for all small blocks.
+     * This should be the case after a GC, but even then it might
+     * not be.
+     */
     for (chunk = last_small_chunk; chunk; chunk = *(word_t**)chunk)
     {
         word_t *end, *block;
 
-        end = chunk - OVERHEAD + (chunk[-OVERHEAD] & MASK);
+        end = chunk - OVERHEAD + (chunk[-OVERHEAD] & M_MASK);
 
         for (block = chunk+1; block < end; )
         {
@@ -3456,16 +3475,11 @@ consolidate_freelists (void)
 
             if (!(size & M_REF))
             {
-                dprintf2(gcollect_outfd
-                       , "%s Can't consolidate freelists: small block %d "
-                         "doesn't have the M_REF flag set.\n"
-                       , (p_int)time_stamp(), (p_int)block);
-                return;
+                *block |= M_REF;
             }
-            block += size & MASK;
+            block += size & M_MASK;
         }
     }
-#endif
 
     /* Clear the M_REF flag in all small blocks in the free lists,
      * and abolish the free lists. Small blocks in use keep their
@@ -3478,11 +3492,13 @@ consolidate_freelists (void)
         for (block = sfltable[ix]; block; block = *s_next_ptr(block))
         {
             *block &= ~M_REF;
-            count_back(small_free_stat, ix * SINT);
         }
         sfltable[ix] = NULL;
         small_free[ix] = 0;
     }
+
+    small_free_stat.counter = 0;
+    small_free_stat.size = 0;
 
     /* The small chunks are invalid for now, too */
     next_unused = NULL;
@@ -3495,10 +3511,11 @@ consolidate_freelists (void)
     {
         word_t *block, *end;
         p_int bchunk = 0;
+        word_t wasted_space = 0;  /* in words */
         Bool found_ref = MY_FALSE;
         Bool found_free = MY_FALSE;
 
-        end = chunk - OVERHEAD + (chunk[-OVERHEAD] & MASK);
+        end = chunk - OVERHEAD + (chunk[-OVERHEAD] & M_MASK);
 
         /* Merge all adjacent free small blocks in this chunk.
          * Also set the found_ref flag if we find a used block.
@@ -3510,12 +3527,10 @@ consolidate_freelists (void)
 
             if (!size)
             {
-                if ((end-block) <= OVERHEAD)
-                {
-                    count_back(small_chunk_wasted, (end-block) * SINT);
-                }
-                else
+                wasted_space = end - block;
+                if (wasted_space > OVERHEAD)
                     found_free = MY_TRUE;
+
                 break; /* Reached the unused space */
             }
 
@@ -3533,9 +3548,9 @@ consolidate_freelists (void)
                 word_t *next;
 
                 found_free = MY_TRUE;
-                DEB2("  Free block %x size %d\n", block, (size & MASK));
+                DEB2("  Free block %x size %d\n", block, (size & M_MASK));
 
-                for (next = block + (size & MASK); next < end; )
+                for (next = block + (size & M_MASK); next < end; )
                 {
                     word_t nsize = *next;
 
@@ -3543,12 +3558,12 @@ consolidate_freelists (void)
                     {
                         /* Add the unused space to the free block */
                         DEB3("    Unused space %x size %d, left %d\n"
-                            , next, (nsize & MASK), (end-next));
+                            , next, (nsize & M_MASK), (end-next));
                         if ((end-next) <= OVERHEAD)
                         {
                             count_back(small_chunk_wasted, (end-next) * SINT);
                         }
-                        size = ((size & MASK) + (end - next)) | (M_GC_FREE);
+                        size = ((size & M_MASK) + (end - next)) | (M_GC_FREE);
                         bdelta++;
                         break;
                     }
@@ -3557,26 +3572,26 @@ consolidate_freelists (void)
                     if (nsize & M_REF)
                     {
                         DEB2("    Used block %x size %d\n", next
-                            , (nsize & MASK));
+                            , (nsize & M_MASK));
                         break;
                     }
 
                     /* It's an adjacent free block: merge it */
-                    DEB2("    Merge block %x size %d\n", next, (nsize & MASK));
-                    size = ((size & MASK) + (nsize & MASK)) | (M_GC_FREE);
+                    DEB2("    Merge block %x size %d\n", next, (nsize & M_MASK));
+                    size = ((size & M_MASK) + (nsize & M_MASK)) | (M_GC_FREE);
                     bdelta++;
 
-                    next += nsize & MASK;
+                    next += nsize & M_MASK;
                 }
 
                 /* We merged as much as possible: update the size field
                  * in the memory block.
                  */
-                DEB2("  Update block %x size %d\n", block, (size & MASK));
+                DEB2("  Update block %x size %d\n", block, (size & M_MASK));
                 *block = size;
             }
 
-            block += size & MASK;
+            block += size & M_MASK;
         }
 
         /* If the block is completely unused, get rid of it altogether
@@ -3599,8 +3614,8 @@ consolidate_freelists (void)
             else
                 *(word_t **)prev_chunk = next;
 
-            count_back(small_chunk_stat, (chunk[-OVERHEAD] & MASK) * SINT);
-            count_back(small_chunk_wasted, SINT*OVERHEAD+sizeof(word_t*));
+            count_back(small_chunk_stat, (chunk[-OVERHEAD] & M_MASK) * SINT);
+            count_back(small_chunk_wasted, SINT*OVERHEAD+sizeof(word_t*)+wasted_space);
 
             xfree(chunk);
             chunk = next;
@@ -3623,7 +3638,7 @@ consolidate_freelists (void)
          * the next_unused and unused_size variables.
          */
         DEB2("Consolidate in Chunk %x..%x\n", chunk, end);
-        for (block = chunk+1; block < end; block += *block & MASK)
+        for (block = chunk+1; block < end; block += *block & M_MASK)
         {
             word_t size = *block;
 
@@ -3632,7 +3647,7 @@ consolidate_freelists (void)
                 /* If we're in the first chunk, this is the new unused space
                  * to use (if it's big enough).
                  */
-                DEB2("  Unused %x, size %d\n", block, (size & MASK));
+                DEB2("  Unused %x, size %d\n", block, (size & M_MASK));
                 if (chunk == last_small_chunk && (end - block) > OVERHEAD)
                 {
                     unused_size = (end - block) * SINT;
@@ -3649,28 +3664,28 @@ consolidate_freelists (void)
 
             if (size & M_REF)
             {
-                DEB2("  Used Block %x, size %d\n", block, (size & MASK));
+                DEB2("  Used Block %x, size %d\n", block, (size & M_MASK));
                 continue;
             }
 
-            DEB2("  Free Block %x, size %d\n", block, (size & MASK));
+            DEB2("  Free Block %x, size %d\n", block, (size & M_MASK));
 
             /* If this free block is the last block in the chunk, and we're in
              * the first chunk, count all the space as 'unused'.
              * The merge pass made sure that there is no following wasted
              * space in the chunk.
              */
-            if (chunk == last_small_chunk && block + (size & MASK) >= end)
+            if (chunk == last_small_chunk && block + (size & M_MASK) >= end)
             {
                 bdelta--;
-                unused_size = size & MASK;
+                unused_size = (size & M_MASK) * SINT;
                 next_unused = block;
                 DEB2("    New 'next_unused' space: %x, size %d\n", next_unused
                     , unused_size);
                 break;
             }
 
-            size = size & MASK;
+            size = size & M_MASK;
 
             /* Create a new free small block and insert it into the
              * appropriate freelist.
@@ -3684,7 +3699,7 @@ consolidate_freelists (void)
                 *s_size_ptr(block) = size | (M_GC_FREE|M_REF);
                 *s_next_ptr(block) = sfltable[SMALL_BLOCK_MAX];
                 sfltable[SMALL_BLOCK_MAX] = block;
-                count_up(small_free_stat, size * SINT); \
+                count_up(small_free_stat, size * SINT);
                 small_free[SMALL_BLOCK_MAX]++;
 
 #ifdef MALLOC_TRACE
@@ -3763,7 +3778,7 @@ test_small(void)
     {
         word_t *end;
 
-        end = p - OVERHEAD + (p[-OVERHEAD] & MASK);
+        end = p - OVERHEAD + (p[-OVERHEAD] & M_MASK);
         for (q = p+1; q < end; )
         {
             word_t size = *q;
@@ -3771,7 +3786,7 @@ test_small(void)
             if (!size)
                 break;
             *q &= ~M_REF;
-            q += size & MASK;
+            q += size & M_MASK;
         }
         if (q > end)
             fatal("Small block error\n");
@@ -3802,7 +3817,7 @@ walk_new_small_malloced (void (*func)(POINTER, long))
 
     for (p = last_small_chunk; p; p = *(word_t **)p)
     {
-        word_t *end = p - OVERHEAD + (p[-OVERHEAD] & MASK);
+        word_t *end = p - OVERHEAD + (p[-OVERHEAD] & M_MASK);
 
         dprintf2(2, "scanning chunk %x, end %x\n", (u)(p - OVERHEAD), (u)end);
         if (unused_size)
@@ -3814,10 +3829,10 @@ walk_new_small_malloced (void (*func)(POINTER, long))
             if (!size) break;
             if (size & M_REF)
             {
-                (*func)(s_next_ptr(q), (size & MASK) * SINT);
+                (*func)(s_next_ptr(q), (size & M_MASK) * SINT);
                 *s_size_ptr(q) &= ~M_REF;
             }
-            q += size & MASK;
+            q += size & M_MASK;
         }
     }
 
@@ -3835,7 +3850,7 @@ void
 show_block (word_t *ptr)
 {
   dprintf3(2, "[%c%d: %d]  ",(*ptr & THIS_BLOCK ? '+' : '-'),
-                (int) ptr, *ptr & MASK);
+                (int) ptr, *ptr & M_MASK);
 } /* show_block() */
 
 #endif /* 0 for debug code */

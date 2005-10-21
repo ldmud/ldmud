@@ -19,6 +19,12 @@
 #define DID_SWAP    1  /* Return the 'status swap' information */
 #define DID_MEMORY  2  /* Return the 'status malloc' information */
 
+/* Sub-request values for debug_info(DINFO_TRACE) */
+
+#define DIT_CURRENT      0  /* Return the current call chain as an array */
+#define DIT_ERROR        1  /* Return the last error call chain as an array */
+#define DIT_STR_CURRENT  2  /* Return the current call chain as a string */
+
 /* Indices into the array resulting from debug_info(DINFO_DATA, DID_STATUS)
  */
 
@@ -41,62 +47,63 @@
 
 #define DID_ST_HBEAT_OBJS         14
 #define DID_ST_HBEAT_CALLS        15
-#define DID_ST_HBEAT_SLOTS        16
-#define DID_ST_HBEAT_SIZE         17
-#define DID_ST_HBEAT_PROCESSED    18
-#define DID_ST_HBEAT_AVG_PROC     19
+#define DID_ST_HBEAT_CALLS_TOTAL  16
+#define DID_ST_HBEAT_SLOTS        17
+#define DID_ST_HBEAT_SIZE         18
+#define DID_ST_HBEAT_PROCESSED    19
+#define DID_ST_HBEAT_AVG_PROC     20 
 
-#define DID_ST_CALLOUTS           20
-#define DID_ST_CALLOUT_SLOTS      21
-#define DID_ST_CALLOUT_SIZE       22
+#define DID_ST_CALLOUTS           21
+#define DID_ST_CALLOUT_SLOTS      22
+#define DID_ST_CALLOUT_SIZE       23
 
-#define DID_ST_ARRAYS             23
-#define DID_ST_ARRAYS_SIZE        24
+#define DID_ST_ARRAYS             24
+#define DID_ST_ARRAYS_SIZE        25
 
-#define DID_ST_MAPPINGS           25
-#define DID_ST_MAPPINGS_SIZE      26
+#define DID_ST_MAPPINGS           26
+#define DID_ST_MAPPINGS_SIZE      27
 
-#define DID_ST_PROGS              27
-#define DID_ST_PROGS_SIZE         28
+#define DID_ST_PROGS              28
+#define DID_ST_PROGS_SIZE         29
 
-#define DID_ST_PROGS_SWAPPED      29
-#define DID_ST_PROGS_SWAP_SIZE    30
+#define DID_ST_PROGS_SWAPPED      30
+#define DID_ST_PROGS_SWAP_SIZE    31
 
-#define DID_ST_USER_RESERVE       31
-#define DID_ST_MASTER_RESERVE     32
-#define DID_ST_SYSTEM_RESERVE     33
+#define DID_ST_USER_RESERVE       32
+#define DID_ST_MASTER_RESERVE     33
+#define DID_ST_SYSTEM_RESERVE     34
 
-#define DID_ST_ADD_MESSAGE        34
-#define DID_ST_PACKETS            35
-#define DID_ST_PACKET_SIZE        36
+#define DID_ST_ADD_MESSAGE        35
+#define DID_ST_PACKETS            36
+#define DID_ST_PACKET_SIZE        37
 
-#define DID_ST_APPLY              37
-#define DID_ST_APPLY_HITS         38
+#define DID_ST_APPLY              38
+#define DID_ST_APPLY_HITS         39
 
-#define DID_ST_STRINGS            39
-#define DID_ST_STRING_SIZE        40
-#define DID_ST_STR_TABLE_SIZE     41
-#define DID_ST_STR_OVERHEAD       42
-#define DID_ST_STR_IT_OVERHEAD    43
-#define DID_ST_UNTABLED           44
-#define DID_ST_UNTABLED_SIZE      45
-#define DID_ST_ITABLED            46
-#define DID_ST_ITABLED_SIZE       47
-#define DID_ST_TABLED             48
-#define DID_ST_TABLED_SIZE        49
-#define DID_ST_STR_SEARCHES       50
-#define DID_ST_STR_SEARCHLEN      51
-#define DID_ST_STR_SEARCHES_BYVALUE   52
-#define DID_ST_STR_SEARCHLEN_BYVALUE  53
+#define DID_ST_STRINGS            40
+#define DID_ST_STRING_SIZE        41
+#define DID_ST_STR_TABLE_SIZE     42
+#define DID_ST_STR_OVERHEAD       43
+#define DID_ST_STR_IT_OVERHEAD    44
+#define DID_ST_UNTABLED           45
+#define DID_ST_UNTABLED_SIZE      46
+#define DID_ST_ITABLED            47
+#define DID_ST_ITABLED_SIZE       48
+#define DID_ST_TABLED             49
+#define DID_ST_TABLED_SIZE        50
+#define DID_ST_STR_SEARCHES       51
+#define DID_ST_STR_SEARCHLEN      52
+#define DID_ST_STR_SEARCHES_BYVALUE   53
+#define DID_ST_STR_SEARCHLEN_BYVALUE  54
 
-#define DID_ST_RX_CACHED          54
-#define DID_ST_RX_TABLE           55
-#define DID_ST_RX_TABLE_SIZE      56
-#define DID_ST_RX_REQUESTS        57
-#define DID_ST_RX_REQ_FOUND       58
-#define DID_ST_RX_REQ_COLL        59
+#define DID_ST_RX_CACHED          55
+#define DID_ST_RX_TABLE           56
+#define DID_ST_RX_TABLE_SIZE      57
+#define DID_ST_RX_REQUESTS        58
+#define DID_ST_RX_REQ_FOUND       59
+#define DID_ST_RX_REQ_COLL        60
 
-#define DID_STATUS_MAX            60 /* Total number of entries */
+#define DID_STATUS_MAX            61 /* Total number of entries */
 
 
 /* Indices into the array resulting from debug_info(DINFO_DATA, DID_SWAP)

@@ -237,9 +237,11 @@ object  this_player();
 /* void break_point(); */
 /* void swap(object); */ /* debugging only */
 
-        /* Backwards compatibility */
+        /* Obsolete and deprecated functions */
 
-mixed  *slice_array F_RANGE (mixed *,int,int);
+#ifdef USE_DEPRECATED
+
+#endif /* USE_DEPRECTED */
 
 /*---------------------------------------------------------------------------
  * The tabled efuns.
@@ -266,6 +268,7 @@ float   pow(int|float,int|float);
 
 mixed   max(mixed|mixed*, ...);
 mixed   min(mixed|mixed*, ...);
+int     sgn(int|float);
 
 int     to_int(int|string|float|closure);
 float   to_float(float|string|int);
@@ -391,7 +394,7 @@ int     interactive(object default: F_THIS_OBJECT);
 string  load_name(string|object default: F_THIS_OBJECT);
 object  load_object(string);
 string  function_exists(string, object default: F_THIS_OBJECT);
-mixed  *object_info(object, int);
+mixed  *object_info(object, int, void|int);
 string  object_name(object default: F_THIS_OBJECT);
 int     object_time(object default: F_THIS_OBJECT);
 object  present_clone(object|string, object default: F_THIS_OBJECT); /* PRELIMINARY */
@@ -419,13 +422,9 @@ void    unshadow();
 
 int     binary_message(int *|string, int default: F_CONST0);
 
-#ifdef CATCH_UDP_PORT
-int     query_imp_port();
-#ifdef UDP_SEND
-int     send_imp(string, int, string|int*);
-#endif
+int     query_udp_port();
+int     send_udp(string, int, string|int*);
 
-#endif
 object  query_input_pending(object);
 string  query_ip_name(null|object default: F_THIS_PLAYER);
 string  query_ip_number(null|object|mixed &  default: F_THIS_PLAYER);

@@ -71,6 +71,7 @@ with_time_to_clean_up=3600
 # programs, because swapping variables is quite expensive.
 # Both times should be shorter than the cleanup time and are given
 # in seconds.
+# A swapping time <= 0 disables that particular swapping feature.
 
 with_time_to_swap=900
 with_time_to_swap_variables=1800
@@ -99,24 +100,20 @@ with_reserved_user_size=700000
 with_reserved_master_size=100000
 with_reserved_system_size=200000
 
-# These two values give the upper limits for large and small block
-# allocation.
+# This value gives the upper limits for the total allocated memory.
+# A value of 0 means 'unlimited'.
 
-enable_max_malloced=yes
 with_max_malloced=0x4000000 
 
-# If these are enabled, the driver will reserve this amount of memory
+# If these values are >0, the driver will reserve this amount of memory
 # on startup for large resp. small blocks, reducing the block fragmentation.
 # The value should be a significantly large multiple of the large resp.
 # small chunk size.
 # As a rule of thumb, reserve enough memory for the first couple of days
 # of uptime.
 
-enable_min_malloced=no
-with_min_malloced=0x2000000 
-
-enable_min_small_malloced=no
-with_min_small_malloced=0x20000 
+with_min_malloced=0
+with_min_small_malloced=0
 
 # --- Interpreter ---
 
@@ -139,21 +136,15 @@ with_max_cost=1000000
 
 with_portno=4242
 
-# If enable_catch_udp_port=yes, this is the number of the UDP port to use.
+# This is the number of the UDP port to use.
 # If set to -1, and no number is given on the commandline, the port will
 # not be created.
 
-with_catch_udp_port=4246
+with_udp_port=4246
 
 # The maximum number of ports to listen for connections on.
 
 with_maxnumports=20
-
-# To use UDP communication at all, it must be enabled.
-# In order be able to send UDP, enable udp_send as well.
-
-enable_catch_udp_port=yes
-enable_udp_send=yes
 
 # Select the ERQ service to use.
 #   'no':   the driver is compiled without erq support.
@@ -265,8 +256,20 @@ enable_use_system_crypt=yes
 enable_lpc_nosave=yes
 
 # Enable support for mySQL (assuming your system supports it).
+#
+#  'no'  : mySQL support is not compiled in
+#  'yes' : mySQL support is compiled in, the libmysqlclient is expected
+#          in the normal library search path.
+#  <path>: mySQL support is compiled in, <path> is added to the link paths
+#          and should be the path to libmysqlclient, 
+#          e.g. enable_use_mysql=/usr/local/lib/mysql .
 
 enable_use_mysql=no
+
+# Enable obsolete and deprecated efuns.
+
+enable_use_deprecated=yes
+
 
 # --- Runtime limits ---
 

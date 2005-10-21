@@ -28,6 +28,9 @@ For a detailed list of all changes see the file CHANGELOG.
        + object_info(): OINFO_MEMORY also returns the program flags
            NO_INHERIT, NO_SHADOW and NO_CLONE, and gives a better account
            of the memory used for strings and variables.
+           Single values can be returned instead of the whole array.
+       + query_udp_port(), send_udp(): Renamed from query_imp_port() and
+           send_imp().
        + regexp functions: more compatible with 8-bit characters.
        + regexp functions: New metacharacters '+' allows to specifiy 'at
            least one match'.
@@ -35,7 +38,7 @@ For a detailed list of all changes see the file CHANGELOG.
            Integers are accepted as arguments, too.
 
     - Corrected efuns:
-       + call_out(): In Release 3.2.8 lvalues were not allowed as arguments -
+       + call_out(): In release 3.2.8 lvalues were not allowed as arguments -
            now they are again.
        + call_resolved(): Now accepts a destructed object as second parameter
            as it should.
@@ -49,9 +52,16 @@ For a detailed list of all changes see the file CHANGELOG.
          db_exec(), db_fetch(), *db_handles(): Optional: mySQL support.
        + min(), max(): To select the minimum resp. maximum among a bunch
            of numbers or strings.
+       + sgn(): Return the sign of a numeric argument.
        + utime(): Return the current time in microsecond resolution.
 
     - Master Object:
+       + receive_udp(): Renamed from receive_imp().
+       + privilege_violation(): Privilege "send_udp" replaced "send_imp".
+       + valid_trace(): New second argument to receives the argument
+           passed to the efun.
+       + runtime_error(): Receives an extra argument to distinguish between
+           normal runtime errors, and those occuring during a heartbeat.
        + Bugfix: When reactivating a destructed master, the lfuns
            inaugurate_master() and reactivate_destructed_master() are found
            even when static.
@@ -82,7 +92,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Closures bound to destructed objects are now treated uniformly
            like destructed objects and are replaced by 0s where required.
        + The equality operators '==' and '!=' now return a sensible result
-           for lfun and identifier closures.
+           for lfun and variable closures.
+       + Inline closures inherit the visibility of their defining function.
        + Experimental: Extended the construct catch() with the keyword
            'nolog', which suppresses logging the caught error in the logfiles.
            It is meant for objects like wizard tools.
@@ -92,6 +103,8 @@ For a detailed list of all changes see the file CHANGELOG.
 
     - Runtime:
        + Revamped the string handling to use refcounted strings everywhere.
+       + The internal alarm timing is monitored and restarted in case the
+           alarm gets lost (happens often on Cygwin).
        + IPv6 name lookup works again, and also with both xerq and erq.
        + Bugfix: The driver now longer gets a confused when a client like
            TinyFugue refuses to use CHARMODE.
@@ -108,7 +121,16 @@ For a detailed list of all changes see the file CHANGELOG.
           for the ERQ executable (default is 'erq').
        + The driver mode (plain or compat) can be selected with a commandline
            option ('--no-compat' resp. '--compat').
+       + New driver options '--min-malloced' and '--min-small-malloced' to
+           specify the size of the initial block allocations.
        + Removed a couple of fatal race-conditions in the xerq.
+       + New configuration option 'use-deprecated' allows
+           to disable obsolete and deprecated efuns. If enabled, the macro
+           __DEPRECATED__ is defined.
+       + The UDP port is now a standard feature. The option has been renamed
+           from 'catch_udp_port' to just 'udp_port'.
+       + Swapping is now a standard feature, though it still can be
+           disabled by specifying swapping times of 0.
 
 
 20-Aug-2000 (Lars Duening) -- Release 3.2.8
@@ -634,7 +656,7 @@ For a detailed list of all changes see the file CHANGELOG.
         Similar, a driver using euids defines __EUIDS__.
     - New defines __ERQ_MAX_SEND__ and __ERQ_MAX_REPLY__ when the
         driver supports the ERQ. The values are the max sizes of
-        the send and receive buffers (taken from x-erq by Brian Gerst).
+        the send and receive buffers.
     - MSDOS support removed (the MSDOS filesystem however is still
         supported).
     - It is now possible to use '..' in filenames as long as it
@@ -651,7 +673,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Bugfix: mapping_contains() freed the wrong values, clobbering
         passed mapping literals.
     - Bugfix: After an UDP packet was processed, the evaluation costs
-        are restored (provided by Tucita).
+        are restored.
     - Bugfix: The LPC compiler now accepts only regular files for includes.
     - Bugfix: If a npc was destructed between to command() calls, and
         the H_MODIFY_COMMAND hook was set to a string, the driver called
@@ -678,7 +700,6 @@ For a detailed list of all changes see the file CHANGELOG.
 
 21-Sep-1998 (Lars Duening) -- Release 3.2.3
     - Bugfix: mapping_contains() no longer returns destructed objects.
-        (found by Zora).
     - New special command 'status files' to append file usage statistics
         from within the mud to the file /FILESTAT.
     - New commandline option:
@@ -693,8 +714,8 @@ For a detailed list of all changes see the file CHANGELOG.
     - Objects may be loaded/inherited with filenames containing two or
       more consecutive '/'es, these are collapsed into just one.
       However, it is not possible to find objects using the wrong
-      names. (suggested by Zora)
-    - The dreaded __INIT() bug is fixed (provided by mubo).
+      names.
+    - The dreaded __INIT() bug is fixed.
     - New commandline options:
         --options : prints all options used in compiling the driver
         --version : prints the game driver version
@@ -708,7 +729,7 @@ For a detailed list of all changes see the file CHANGELOG.
       for further information.
 
 10-Jul-1998 (Lars Duening) -- Release 3.2.1@141-osb.16
-    - Bugfix for the "*":: problem (provided by Daniel von Dincklage).
+    - Bugfix for the "*":: problem.
     - Added a minimal master for simple driver tests.
 
 17-May-1998 (Lars Duening) -- Release 3.2.1@141-osb.14 and before

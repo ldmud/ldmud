@@ -912,6 +912,10 @@ free_svalue (svalue_t *v)
         /* NOTREACHED */
         break;
 
+    case T_INVALID:
+        NOOP;
+        break;
+
     case T_NUMBER:
         NOOP;
         break;
@@ -7276,6 +7280,7 @@ again:
             d = READ_DOUBLE(svp) + 1.0;
             sp->type = T_FLOAT;
             STORE_DOUBLE(svp, d);
+            sp--;
             break;
         }
         else if (svp->type == T_CHAR_LVALUE)
@@ -7329,6 +7334,7 @@ again:
             d = READ_DOUBLE(svp) - 1.0;
             sp->type = T_FLOAT;
             STORE_DOUBLE(svp, d);
+            sp--;
             break;
         }
         else if (svp->type == T_CHAR_LVALUE)
@@ -12821,6 +12827,8 @@ secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
             free_mstring(current_error);
             free_mstring(current_error_file);
             free_mstring(current_error_object_name);
+            free_array(current_error_trace);
+            current_error_trace = NULL;
         }
     }
     else if (!out_of_memory)
@@ -14121,6 +14129,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
 
             vec = allocate_array(1);
             put_ref_string(vec->item, STR_NO_PROG_TRACE);
+            *rvec = vec;
         }
         return NULL;
     }
@@ -14135,6 +14144,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
 
             vec = allocate_array(1);
             put_ref_string(vec->item, STR_NO_TRACE);
+            *rvec = vec;
         }
         return NULL;
     }
@@ -14369,6 +14379,7 @@ dump_trace (Bool how
 #ifndef TRACE_CODE
                      UNUSED
 #endif
+           , vector_t ** rvec
            )
 
 /* Write out a traceback, starting from the first frame. If a heart_beat()
@@ -14376,6 +14387,10 @@ dump_trace (Bool how
  *
  * If TRACE_CODE is defined and <how> is true, the last executed
  * instructions are printed, too.
+ *
+ * If <rvec> is not NULL, the traceback is returned in a newly created array
+ * which pointer is put into *<rvec>. For the format of the array, see
+ * efun debug_info().
  */
 
 {
@@ -14386,7 +14401,7 @@ dump_trace (Bool how
     string_t *hb_obj_name;
 
     strbuf_zero(&sbuf);
-    hb_obj_name = collect_trace(&sbuf, NULL);
+    hb_obj_name = collect_trace(&sbuf, rvec);
 
     /* Print the last instructions if required */
 #ifdef TRACE_CODE
@@ -15477,7 +15492,7 @@ check_a_lot_ref_counts (program_t *search_prog)
             if (ob->prog->ref != ob->prog->extra_ref)
             {
                 /* an inheriting file might be swapped */
-                if (TIME_TO_SWAP > 0 && time_to_swap + 1 > 0
+                if (time_to_swap + 1 > 0
                  && ob->prog->ref > ob->prog->extra_ref)
                 {
                     debug_message("%s high ref count in prog %s, %ld - %ld\n"
@@ -15910,7 +15925,8 @@ f_trace (svalue_t *sp)
         assign_eval_cost();
         inter_sp = sp;
         push_ref_string(inter_sp, STR_TRACE);
-        arg = apply_master_ob(STR_VALID_TRACE, 1);
+        push_number(inter_sp, sp->u.number);
+        arg = apply_master_ob(STR_VALID_TRACE, 2);
         if (!arg)
         {
             if (out_of_memory)
@@ -15967,8 +15983,9 @@ f_traceprefix (svalue_t *sp)
 
         inter_sp = sp;
         push_ref_string(inter_sp, STR_TRACEPREFIX);
+        inter_sp++; assign_svalue_no_free(inter_sp, sp);
         assign_eval_cost();
-        arg = apply_master_ob(STR_VALID_TRACE,1);
+        arg = apply_master_ob(STR_VALID_TRACE,2);
         if (!arg)
         {
             if (out_of_memory)

@@ -86,8 +86,8 @@
 // void quota_demon (void)
 //   Handle quotas in times of memory shortage.
 //
-// void receive_imp (string host, string msg, int port)
-//   Handle a received IMP message.
+// void receive_udp (string host, string msg, int port)
+//   Handle a received UDP message.
 //
 // void slow_shut_down (int minutes)
 //   Schedule a shutdown for the near future.
@@ -120,7 +120,7 @@
 // int query_allow_shadow (object victim)
 //   Validate a shadowing.
 //
-// int valid_trace (string what)
+// int valid_trace (string what, int|string arg)
 //   Check if the player may use tracing.
 //
 // int valid_exec (string name, object ob, object obfrom)
@@ -584,16 +584,16 @@ void quota_demon (void)
 
 
 //---------------------------------------------------------------------------
-void receive_imp (string host, string msg, int port)
+void receive_udp (string host, string msg, int port)
 
-// Handle a received IMP message.
+// Handle a received UDP message.
 //
 // Arguments:
 //   host: Name of the host the message comes from.
 //   msg : The received message.
 //   port: the port number from which the message was sent.
 //
-// This function is called for every message received on the IMP port.
+// This function is called for every message received on the UDP port.
 
 
 //---------------------------------------------------------------------------
@@ -725,7 +725,8 @@ mixed heart_beat_error (object culprit, string err,
 
 
 //---------------------------------------------------------------------------
-void runtime_error (string err, string prg, string curobj, int line)
+void runtime_error (string err, string prg, string curobj, int line
+                   , mixed culprit)
 
 // Announce a runtime error.
 //
@@ -734,15 +735,26 @@ void runtime_error (string err, string prg, string curobj, int line)
 //   prg    : The executed program.
 //   curobj : The object causing the error.
 //   line   : The line number where the error occured.
+//   culprit: -1 for runtime errors; the object holding the heart_beat()
+//            function for heartbeat errors.
 //
-// This function has to announce a runtime error to the active player.
-// If it is a wizard, it might give him the full error message together
-// with the source line; if it is a player, it should issue a decent
-// message ("Your sensitive mind notices a wrongness in the fabric of space")
-// and could also announce the error to the wizards online.
+// This function has to announce a runtime error to the active user,
+// resp. handle a runtime error which occured during the execution of
+// heart_beat() of <culprit>.
+//
+// For a normal runtime error, if the active user is a wizard, it might
+// give him the full error message together with the source line; if the
+// user is a is a player, it should issue a decent message ("Your sensitive
+// mind notices a wrongness in the fabric of space") and could also announce
+// the error to the wizards online.
+//
+// If the error is a heartbeat error, the heartbeat for the offending
+// <culprit> has been turned off. The function itself shouldn't do much, since
+// the lfun heart_beat_error() will be called right after this one.
 //
 // Note that <prg> denotes the program actually executed (which might be
-// inherited one) whereas <curobj> is just the offending object.
+// inherited) whereas <curobj> is just the offending object for which the
+// program was executed.
 
 
 //===========================================================================
@@ -785,7 +797,7 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //                       is shadowed by a 'nomask'-type simul_efun.
 //   rename_object     : The current object <who> renames object <arg>
 //                       to name <arg2>.
-//   send_imp          : Send UDP-data to host <arg>.
+//   send_udp          : Send UDP-data to host <arg>.
 //   set_auto_include_string : Set the string automatically included by
 //                       the compiler.
 //   get_extra_wizinfo : Get the additional wiz-list info for wizard <arg>.
@@ -809,7 +821,7 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 // wizlist field. While a toplevel array, if found, will be copied, this does
 // not apply to nested arrays or to any mappings. You might also have some
 // sensitive closures there.
-// send_imp() should be watched as it could be abused to mess up the IMP.
+// send_udp() should be watched as it could be abused to mess up the IMP.
 // The xxx_extra_wizinfo operations are necessary for a proper wizlist and
 // should therefore be restricted to admins.
 // All other operations are potential sources for direct security breaches -
@@ -833,19 +845,22 @@ int query_allow_shadow (object victim)
 
 
 //---------------------------------------------------------------------------
-int valid_trace (string what)
+int valid_trace (string what, int|string arg)
 
 // Check if the player is allowed to use tracing.
 //
 // Argument:
 //   what: The actual action (see below).
+//   arg:  The argument given to the traceing efun.
 //
 // Result:
 //   Return 0 to disallow, any other value to allow it.
 //
 // Actions asked for so far are:
 //   "trace":       Is the user allowed to use tracing?
+//                  <arg> is the tracelevel argument given.
 //   "traceprefix": Is the user allowed to set a traceprefix?
+//                  <arg> is the prefix given.
 
 //---------------------------------------------------------------------------
 int valid_exec (string name, object ob, object obfrom)

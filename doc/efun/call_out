@@ -3,8 +3,8 @@ SYNOPSIS
 	void call_out(closure cl, int delay, mixed arg, ...)
 
 DESCRIPTION
-	Set up a call to function fun or closure cl in the current
-	object. The call will take place in delay seconds, with the
+	Set up a call to function fun in the current object, or to
+        closure cl. The call will take place in delay seconds, with the
 	remaining argument list provided. delay can be a minimum time
 	of one second.
 	

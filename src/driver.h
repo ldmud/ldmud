@@ -73,10 +73,6 @@
 #  undef STRICT_EUIDS
 #endif
 
-#if !defined(CATCH_UDP_PORT)
-#  undef UDP_SEND
-#endif
-
 /* The string table is shadowed only in DEBUG mode */
 
 #if !defined(DEBUG) && defined(CHECK_STRINGS)

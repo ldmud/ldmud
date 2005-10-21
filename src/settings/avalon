@@ -10,7 +10,7 @@ exit 1
 # --- The actual settings ---
 
 with_portno=7777
-with_catch_udp_port=4246
+with_udp_port=4246
 with_max_players=200
 enable_access_control=no
 

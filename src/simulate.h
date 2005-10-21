@@ -182,6 +182,7 @@ extern string_t *current_error;
 extern string_t *current_error_file;
 extern string_t *current_error_object_name;
 extern mp_int current_error_line_number;
+extern vector_t *current_error_trace;
 
 extern int game_is_being_shut_down;
 extern int master_will_be_updated;
@@ -221,7 +222,7 @@ extern object_t *lookfor_object(string_t *str, Bool bLoad);
 #define get_object(str) lookfor_object((str), MY_TRUE)
 extern object_t *find_object_str(const char *str);
 extern Bool status_parse(strbuf_t * sbuf, char *buff);
-extern void dinfo_data_status(svalue_t * svp);
+extern void dinfo_data_status(svalue_t * svp, int value);
 extern void error VARPROT((const char *, ...), printf, 1, 2) NORETURN;
 extern void fatal VARPROT((const char *, ...), printf, 1, 2) NORETURN;
 extern void throw_error(void);

@@ -8,7 +8,7 @@ DESCRIPTION
 	nessasary to include an argument format string (AFS) in the
 	FMT.  An AFS is a series of characters starting with a percent
 	sign "%" and terminated with a argument type specifier.	 To
-	include a "%" sign in the output, it is nessasary to include a
+	include a "%" sign in the output, it is necessary to include a
 	double percent sign "%%".
 
 Valid argument type specifiers are:

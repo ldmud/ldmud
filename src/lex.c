@@ -663,6 +663,12 @@ init_lexer(void)
         p = make_shared_identifier(instrs[n].name, I_TYPE_GLOBAL, 0);
         if (!p)
             fatal("Out of memory\n");
+        if (p->type != I_TYPE_UNKNOWN)
+        {
+            fatal("Duplicate efun '%s'.\n", instrs[n].name);
+            /* NOTREACHED */
+            continue;
+        }
         p->type = I_TYPE_GLOBAL;
         p->u.global.efun     =  (short)n;
         p->u.global.sim_efun = -1;
@@ -719,6 +725,7 @@ init_lexer(void)
 
 
     /* Add the standard permanent macro definitions */
+    /* TODO: Make the strings tabled */
 
     add_permanent_define("LPC3", -1, string_copy(""), MY_FALSE);
     add_permanent_define("__LDMUD__", -1, string_copy(""), MY_FALSE);
@@ -752,11 +759,16 @@ init_lexer(void)
     add_permanent_define("__VERSION__", -1, (void *)get_version, MY_TRUE);
     add_permanent_define("__VERSION_MAJOR__", -1, string_copy(VERSION_MAJOR), MY_FALSE);
     add_permanent_define("__VERSION_MINOR__", -1, string_copy(VERSION_MINOR), MY_FALSE);
+#if IS_STABLE
     add_permanent_define("__VERSION_MICRO__", -1, string_copy(VERSION_MICRO), MY_FALSE);
     if (IS_RELEASE())
         add_permanent_define("__VERSION_PATCH__", -1, string_copy("0"), MY_FALSE);
     else
         add_permanent_define("__VERSION_PATCH__", -1, string_copy(VERSION_PATCH), MY_FALSE);
+#else
+    add_permanent_define("__VERSION_MICRO__", -1, string_copy(VERSION_PATCH), MY_FALSE);
+    add_permanent_define("__VERSION_PATCH__", -1, string_copy("0"), MY_FALSE);
+#endif
 
     add_permanent_define("__HOST_NAME__", -1, (void *)get_hostname, MY_TRUE);
     add_permanent_define("__DOMAIN_NAME__", -1, (void *)get_domainname, MY_TRUE);
@@ -781,6 +793,9 @@ init_lexer(void)
 #endif
 #ifdef USE_LPC_NOSAVE
     add_permanent_define("__LPC_NOSAVE__", -1, string_copy(""), MY_FALSE);
+#endif
+#ifdef USE_DEPRECATED
+    add_permanent_define("__DEPRECATED__", -1, string_copy(""), MY_FALSE);
 #endif
 
     /* Add the permanent macro definitions given on the commandline */
@@ -941,7 +956,7 @@ free_shared_identifier (ident_t *p)
     while (curr)
     {
         if (curr->name == s
-#if DEBUG
+#ifdef DEBUG
          || mstreq(curr->name, s)
 #endif
 
@@ -2438,7 +2453,6 @@ yylex1 (void)
 
     for(;;) {
         switch(c = *yyp++)
-
         {
 
         /* --- End Of File --- */
@@ -2800,13 +2814,24 @@ yylex1 (void)
                  * For now we insert a 'return' which we might 'space out'
                  * later.
                  */
-                strbuf_addf(textbuf
-                           , "\n#line %d\n"
+                strbuf_addf(textbuf, "\n#line %d\n", current_line-1);
+
+                if (exact_types & TYPE_MOD_PUBLIC)
+                    strbuf_add(textbuf, "public ");
+                else if (exact_types & TYPE_MOD_PROTECTED)
+                    strbuf_add(textbuf, "protected ");
+                else if (exact_types & TYPE_MOD_PRIVATE)
+                    strbuf_add(textbuf, "private ");
+                else if (exact_types & TYPE_MOD_STATIC)
+                    strbuf_add(textbuf, "static ");
+
+                strbuf_addf(textbuf,
                              "varargs mixed %s (mixed $1, mixed $2, mixed $3,"
                              " mixed $4, mixed $5, mixed $6, mixed $7,"
                              " mixed $8, mixed $9) {\n"
                              "return "
-                           , current_line-1, name);
+                           , name
+                           );
                 pos_return = (size_t)textbuf->length-7;
 
                 /* Set yyp to the end of (: ... :), and also check
@@ -4707,7 +4732,7 @@ _expand_define (struct defn *p, ident_t * macro)
        * stack would make _expand_define() reentrant, but
        * very slow on systems without proper alloca().
        * Right now the only possibility for a recursive call
-       * is an error during the expansing, with error handling requesting
+       * is an error during the expansion, with error handling requesting
        * another expansion. In this case, reentrancy is not an issue
        * because after returning from the error, the function itself
        * returns immediately.

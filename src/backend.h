@@ -23,6 +23,7 @@ extern Bool garbage_collect_to_do;
 /* --- Prototypes --- */
 
 extern void  clear_state (void);
+extern void check_alarm (void);
 extern void  logon (object_t *ob);
 extern void  backend (void);
 extern void  preload_objects (int eflag);

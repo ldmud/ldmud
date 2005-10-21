@@ -576,23 +576,31 @@ print_call_out_usage (strbuf_t *sbuf, Bool verbose)
 
 /*-------------------------------------------------------------------------*/
 void
-callout_dinfo_status (svalue_t *svp)
+callout_dinfo_status (svalue_t *svp, int value)
 
 /* Return the callout information for debug_info(DINFO_DATA, DID_STATUS).
  * <svp> points to the svalue block for the result, this function fills in
  * the spots for the object table.
+ * If <value> is -1, <svp> points indeed to a value block; other it is
+ * the index of the desired value and <svp> points to a single svalue.
  */
 
 {
+#define ST_NUMBER(which,code) \
+    if (value == -1) svp[which].u.number = code; \
+    else if (value == which) svp->u.number = code
+    
     long i;
     struct call *cop;
     
     for (i=0, cop = call_list; cop; cop = cop->next)
         i++;
 
-    svp[DID_ST_CALLOUTS].u.number      = i;
-    svp[DID_ST_CALLOUT_SLOTS].u.number = num_call;
-    svp[DID_ST_CALLOUT_SIZE].u.number  = num_call * sizeof(struct call);
+    ST_NUMBER(DID_ST_CALLOUTS, i);
+    ST_NUMBER(DID_ST_CALLOUT_SLOTS, num_call);
+    ST_NUMBER(DID_ST_CALLOUT_SIZE, num_call * sizeof(struct call));
+
+#undef ST_NUMBER
 } /* callout_dinfo_status() */
 
 /*-------------------------------------------------------------------------*/

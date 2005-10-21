@@ -29,7 +29,7 @@ with_max_cost=400000
 
 # --- Communication ---
 with_portno=3333
-with_catch_udp_port=3335
+with_udp_port=3335
 
 #----------- Compilation Options ----------
 enable_malloc_trace=yes

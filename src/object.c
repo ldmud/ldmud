@@ -661,6 +661,9 @@ reset_object (object_t *ob, int arg)
     {
         lambda_t *l;
 
+        if (arg == H_RESET)
+            previous_ob = ob;
+
         l = closure_hook[arg].u.lambda;
         if (l->function.code[1] && arg != H_RESET)
         {
@@ -691,6 +694,9 @@ reset_object (object_t *ob, int arg)
     }
     else if (closure_hook[arg].type == T_STRING)
     {
+        if (arg == H_RESET)
+            previous_ob = ob;
+
         push_number(inter_sp, arg == H_RESET);
         if (!sapply(closure_hook[arg].u.str, ob, 1) && arg == H_RESET)
             ob->time_reset = 0;

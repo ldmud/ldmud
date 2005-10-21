@@ -52,7 +52,7 @@ BIND_LAMBDA        "bind_lambda"
 CALL_OUT_INFO      "call_out_info"
 SEND_ERQ           "erq"
 INPUT_TO           "input_to"
-SEND_IMP           "send_imp"
+SEND_UDP           "send_udp"
 EXECUTE_COMMAND    "execute_command"
 GET_EXTRA_WIZINFO  "get_extra_wizinfo"
 LIMITED            "limited"
@@ -127,7 +127,7 @@ QUERY_SHADOW    "query_allow_shadow"
 QUOTA_DEMON     "quota_demon"
 RETR_ED         "retrieve_ed_setup"
 REACTIVATE      "reactivate_destructed_master"
-RECEIVE_IMP     "receive_imp"
+RECEIVE_UDP     "receive_udp"
 REMOVE_PL       "remove_player"
 RUNTIME         "runtime_error"
 SAVE_ED         "save_ed_setup"
@@ -150,6 +150,13 @@ DROP            "drop"
 GET             "get"
 QUERY_WEIGHT    "query_weight"
 PREVENT_INSERT  "prevent_insert"
+
+#ifdef USE_DEPRECATED
+
+RECEIVE_UDP     "receive_udp"
+
+#endif
+
 
 #ifdef SUPPLY_PARSE_COMMAND
 

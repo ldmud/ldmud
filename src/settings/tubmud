@@ -11,7 +11,7 @@ exit 1
 
 with_master_name=kernel/master
 
-with_catch_udp_port=7683
+with_udp_port=7683
 
 with_time_to_clean_up=10800
 with_time_to_swap=900

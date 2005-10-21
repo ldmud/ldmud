@@ -1,11 +1,16 @@
 SYNOPSIS
         #include <objectinfo.h>
         mixed * object_info (object ob, int what)
+        mixed * object_info (object ob, int what, int index)
 
 DESCRIPTION
         Returns some internal information about object <ob>, collected
         in an array. Argument <what> determines which information is
         returned.
+
+        The result is usually an array. However, if <index> is specified,
+        the result is the value from position <index> of the array which
+        would have been returned normally.
 
         The possible values of <what>, and the indices of the returned
         arrays are defined in the include file <objectinfo.h>, and may
@@ -107,8 +112,8 @@ HISTORY
               is not available.
           - basic result OIB_APPROVED is gone.
         LDMud 3.2.8 added OIM_DATA_SIZE to the result of OINFO_MEMORY.
-        LDMud 3.2.9 added OIM_NO_INHERIT, OIM_NO_SHADOW, OIM_NO_CLONE,
-          OIM_SIZE_STRINGS_DATA, OIM_SIZE_STRINGS_TOTAL, and
+        LDMud 3.2.9 added the index mechanism, OIM_NO_INHERIT, OIM_NO_SHADOW,
+          OIM_NO_CLONE, OIM_SIZE_STRINGS_DATA, OIM_SIZE_STRINGS_TOTAL, and
           OIM_DATA_SIZE_TOTAL to the result of OINFO_MEMORY.
 
 SEE ALSO

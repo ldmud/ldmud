@@ -15,7 +15,7 @@
 #else
 
 /* TODO: This assumes a 32-Bit machine */
-#define MASK   0x0fffffff  /* Mask for the size field */
+#define M_MASK 0x0fffffff  /* Mask for the size field */
 #define M_REF  0x20000000  /* REF'd flag */
 
 /* The SMALLOC_OVERHEAD */
@@ -34,7 +34,7 @@
 #    endif
 #endif /* MALLOC_LPC_TRACE */
 
-#define malloced_size(ptr) ( ((p_uint *)(ptr))[-SMALLOC_OVERHEAD] & MASK )
+#define malloced_size(ptr) ( ((p_uint *)(ptr))[-SMALLOC_OVERHEAD] & M_MASK )
 
 /* --- Variables --- */
 
@@ -64,7 +64,7 @@ extern void afree(POINTER ptr);
 extern char * smalloc_string_copy (const char *str, const char *file, int line);
 extern int malloc_size_mask(void);
 extern void dump_malloc_data(strbuf_t *sbuf);
-extern void smalloc_dinfo_data(svalue_t *svp);
+extern void smalloc_dinfo_data(svalue_t *svp, int value);
 extern void clear_M_REF_flags(void);
 extern void free_unreferenced_memory(void);
 extern void consolidate_freelists (void);

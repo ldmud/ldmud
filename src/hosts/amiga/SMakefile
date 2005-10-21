@@ -166,7 +166,7 @@ LIBS= $(NETLIB) lib=lib:scmffpnb.lib
 MPATH=def=MUD_LIB="\"$(MUD_LIB)\"" def=BINDIR="\"$(BINDIR)\" def=ERQ_DIR="\"$(ERQDIR)\""
 LDFLAGS= afp Data=FAR Code=FAR link
 DEFINES= $(DEBUG) $(PROFIL) $(MPATH) $(NETDEF)
-CFLAGS= $(CCOPTS) $(DEFINES)
+CFLAGS= -Dlint $(CCOPTS) $(DEFINES)
 YFLAGS= -d
 
 SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\

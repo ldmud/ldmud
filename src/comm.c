@@ -305,12 +305,8 @@ static SOCKET_T sos[MAXNUMPORTS];
   /* The login sockets.
    */
 
-#ifdef CATCH_UDP_PORT
-
 static SOCKET_T udp_s = -1;
   /* The UDP socket */
-
-#endif
 
 /* --- Networking information --- */
 
@@ -600,7 +596,7 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
                      , ts, current_object->name
                            ? get_txt(current_object->name) : "<null>");
     debug_message("%s Dump of the call chain:\n", ts);
-    (void)dump_trace(MY_TRUE); fflush(stdout);
+    (void)dump_trace(MY_TRUE, NULL); fflush(stdout);
 
     va_end(va);
     
@@ -850,7 +846,6 @@ initialize_host_ip_number (void)
     else
         domain_name = strdup("unknown");
 
-#ifdef CATCH_UDP_PORT
     /* Initialize upd at an early stage so that the master object can use
      * it in inaugurate_master() , and the port number is known.
      */
@@ -928,7 +923,6 @@ initialize_host_ip_number (void)
         if (socket_number(udp_s) >= min_nfds)
             min_nfds = socket_number(udp_s)+1;
     }
-#endif /* CATCH_UDP_PORT */
 
 } /* initialize_host_ip_number() */
 
@@ -1078,10 +1072,8 @@ ipc_remove (void)
     for (i = 0; i < numports; i++)
         socket_close(sos[i]);
 
-#ifdef CATCH_UDP_PORT
     if (udp_s >= 0)
         socket_close(udp_s);
-#endif
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1148,7 +1140,6 @@ add_message (const char *fmt, ...)
     object_t      *snooper;  /* Snooper of <ip> */
     int   n;
 
-
     source = NULL;
     srcstr = NULL;
     srclen = 0;
@@ -1207,13 +1198,11 @@ add_message (const char *fmt, ...)
 
         if (fmt == FMT_STRING)
         {
-            string_t * str;
-
-            str = va_arg(va, string_t *);
+            srcstr = va_arg(va, string_t *);
             va_end(va);
 
-            source = get_txt(str);
-            srclen = mstrsize(str);
+            source = get_txt(srcstr);
+            srclen = mstrsize(srcstr);
         }
         else if (fmt[0] == '%' && fmt[1] == 's' && !fmt[2])
         {
@@ -1250,7 +1239,9 @@ add_message (const char *fmt, ...)
              */
 
             if (shadow_catch_message(command_giver, source))
+            {
                 return;
+            }
 
             /* If there's a snooper, send it the new message prepended
              * with a '%'.
@@ -1358,7 +1349,7 @@ if (sending_telnet_command)
 }
 #endif
 
-    while (srclen != 0)
+    do /* while (srclen != 0) */
     {
         int    retries;   /* Number of retries left when sending data */
         ptrdiff_t chunk;  /* Current size of data in .message_buf[] */
@@ -1493,7 +1484,7 @@ if (sending_telnet_command)
 
         /* Continue with the processing of source */
         dest = &ip->message_buf[0];
-    } /* while (srclen != 0) */
+    } while (srclen != 0);
 
     /* --- Final touches --- */
 
@@ -1707,12 +1698,10 @@ get_message (char *buff)
                 FD_SET(erq_demon, &readfds);
             }
 #endif
-#ifdef CATCH_UDP_PORT
             if (udp_s >= 0)
             {
                 FD_SET(udp_s, &readfds);
             }
-#endif
 
             /* select() until time is up or there is data */
 
@@ -2064,7 +2053,6 @@ get_message (char *buff)
             }
         } /* if (no NextCmdGiver) */
 
-#ifdef CATCH_UDP_PORT
         /* See if we got any udp messages.
          * We don't test readfds so that we can accept udp messages with
          * short latency. But for the same reason, it was necessary to
@@ -2113,12 +2101,12 @@ get_message (char *buff)
                     push_string(inter_sp, udp_data); /* adopts the ref */
                     push_number(inter_sp, ntohs(addr.sin_port));
                     RESET_LIMITS;
-                    apply_master_ob(STR_RECEIVE_IMP, 3);
+                    apply_master_ob(STR_RECEIVE_UDP, 3);
                     CLEAR_EVAL_COST;
                 }
             }
         } /* if (upd_s) */
-#endif
+
         /* --- The Scan for User Commands --- */
 
         for (; NextCmdGiver >= 0; IncCmdGiver)
@@ -5231,15 +5219,13 @@ count_comm_extra_refs (void)
 #endif /* DEBUG */
 
 /*-------------------------------------------------------------------------*/
-#ifdef UDP_SEND
-
 svalue_t *
-f_send_imp (svalue_t *sp)
+f_send_udp (svalue_t *sp)
 
-/* EFUN: send_imp()
+/* EFUN: send_udp()
  *
- *   int send_imp(string host, int port, string message)
- *   int send_imp(string host, int port, int * message)
+ *   int send_udp(string host, int port, string message)
+ *   int send_udp(string host, int port, int * message)
  *
  * Sends The message in an UDP packet to the given host and port
  * number. Causes a privilege violation.
@@ -5290,8 +5276,9 @@ f_send_imp (svalue_t *sp)
 
         /* Is this call valid? */
 
-        if (!privilege_violation(STR_SEND_IMP, sp-2, sp))
+        if (!privilege_violation(STR_SEND_UDP, sp-2, sp))
             break;
+
         if (udp_s < 0)
             break;
 
@@ -5363,8 +5350,7 @@ f_send_imp (svalue_t *sp)
     free_svalue(--sp);
     put_number(sp, ret);
     return sp;
-}
-#endif /* UDP_SEND */
+} /* f_send_udp() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -6296,14 +6282,12 @@ f_users (svalue_t *sp)
 } /* f_users() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef F_QUERY_IMP_PORT
-
 svalue_t *
-f_query_imp_port (svalue_t *sp)
+f_query_udp_port (svalue_t *sp)
 
-/* EFUN query_imp_port()
+/* EFUN query_udp_port()
  *
- *   int query_imp_port(void)
+ *   int query_udp_port(void)
  *
  * Returns the port number that is used for the inter mud
  * protocol.
@@ -6313,9 +6297,7 @@ f_query_imp_port (svalue_t *sp)
     push_number(sp, udp_port);
 
     return sp;
-} /* f_query_imp_port() */
-
-#endif /* F_QUERY_IMP_PORT */
+} /* f_query_udp_port() */
 
 /***************************************************************************/
 
