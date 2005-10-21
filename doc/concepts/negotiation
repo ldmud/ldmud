@@ -159,7 +159,9 @@ DESCRIPTION
 	2. Make a telnet.h for your mudlib... just change the arrays in
 		src/driver/telnet.h.
 	3. define a function
+
 	        void telnet_neg(int cmd, int option, int * optargs)
+
 	   in your interactive objects (login.c , shells, player.c or
 	   whereever). And note, in ALL objects, through which a
 	   player is handed through (in TAPPMud these are login.c and

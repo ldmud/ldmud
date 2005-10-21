@@ -84,7 +84,6 @@ f-000505: Improve set_auto_include_string()
 f-000530: New input_to() efuns
 f-000616: Allow to set a certain umask
 f-000627: Search efun
-f-000716: New efun 'call_trace()' or so
 f-000905-1: More flexible wrapping for terminal_colour().
 
 
@@ -172,6 +171,8 @@ f-000413-0: Use ID numbers for error messages
 f-000814-1: net_connect()
 f-000830: telnet-Timing extension (RFC 860)
 f-000905-0: Graceful charmode recovery.
+f-001116: Faster callouts
+
 
 Installation
 --------------------------------------------------------------------------

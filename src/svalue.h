@@ -352,7 +352,7 @@ struct svalue_s
  * as long as the accesses are consistent.
  *
  * The DICE compiler for the Amiga lacks the ldexp() and frexp() functions,
- * therefore these functions here are the only way to get things done/
+ * therefore these functions here are the only way to get things done.
  *
  * STORE_DOUBLE doesn't do any rounding, but truncates off the least
  * significant bits of the mantissa that won't fit together with the exponent

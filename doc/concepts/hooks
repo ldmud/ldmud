@@ -321,28 +321,36 @@ DESCRIPTION
 	  If not set, most telnet options are rejected (read: only a
 	  very minimal negotiation takes place).
 
-	  If the setting is a string, it used as name of an lfun to
-	  call in this_player():
-
-	    void|mixed <name>(int action, int option)
-
-	  Similar, if the setting is a closure, it is called as:
-
-	    void|mixed <closure>(int action, int option)
-
-	  with unbound lambda-closures being bound to this_player()
-	  prior to execution.
-
 	  The hook is called whenever the driver receives a demand for
 	  option negotiation upon NAWS (window size) and TELOPT_TTYPE
 	  (terminal type). The hook has then to perform the
 	  negotiation using the efun binary_message().
-	  The first argument is the demanded action (DO, DONT, WILL,
-	  WONT), the second the actual option in question.
-	  The returned result from the call is irrelevant.
 
           Alternatively, if H_NOECHO is set, this hook is called
           for all telnet data received.
+
+	  If the setting is a string, it used as name of an lfun to
+	  call in this_player():
+
+	    void|mixed <name>(int action, int option [, int * opts ] )
+
+	  Similar, if the setting is a closure, it is called as:
+
+	    void|mixed <closure>(int action, int option [, int * opts ] )
+
+	  with unbound lambda-closures being bound to this_player()
+	  prior to execution.
+
+          The hook is called for a 'DO/DONT/WILL/WONT <opt>' with the action
+          (DO/DONT/...) as the first, and <opt> as the second argument.
+
+          If the driver receives the sequence
+
+            IAC SB <opt> <opts>...
+          
+          followed by IAC SB/SE,  the hook is called with 'SB' as first
+          argument, <opt> as second, and <opts> as an array of integers as
+          third argument.
 
 
 	H_NOECHO

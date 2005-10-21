@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-27-Nov-2000 (Lars Duening) -- Development Release 3.3
+06-Dec-2000 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -14,6 +14,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + add_action(): Historical usage with just one argument no longer
            supported.
        + ctime(): Accepts the output of new efun utime() as well.
+       + debug_info(): New argument DINFO_TRACE to return the current
+            call stack.
        + filter(), map(), sort_array(), walk_mapping(): Protected lvalues
             (e.g. &(i[0])) are not allowed as callback parameters.
        + object_info(): OINFO_MEMORY also returns the program flags
@@ -55,9 +57,14 @@ For a detailed list of all changes see the file CHANGELOG.
          of the driver version.
        + Numbers can also be specified as binary patterns with the '0b'
            prefix, and as octals with the '0' prefix.
+       + Floating point numbers can now also be specified in the
+           exponential notation, e.g. '3.14E-5'.
        + Character escape sequences can now specify the character code
            directly in decimal ('\[1-9]...'), octal ('\0...'), sedecimal
            ('\x...' and '\0x...') and binary ('\0b...').
+       + The operators '++' and '--' can now be used on floats, too.
+       + Closures bound to destructed objects are now treated uniformly
+           like destructed objects and are replaced by 0s where required.
        + Experimental: Extended the construct catch() with the keyword
            'nolog', which suppresses logging the caught error in the logfiles.
            It is meant for objects like wizard tools.

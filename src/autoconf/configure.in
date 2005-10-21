@@ -482,7 +482,9 @@ CFLAGS="$saveflags"
 ))
 if test $lp_cv_has_ipv6 = yes; then
   AC_DEFINE(HAS_IPV6)
+if test $enable_use_ipv6 = yes; then
   AC_CHECK_LIB(inet6,main, LIBS="$LIBS -linet6")
+fi
 fi
 
 AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
@@ -502,9 +504,12 @@ struct MYSQL * foo(void)
 lp_cv_has_mysql=no
 CFLAGS="$saveflags"
 ))
+
 if test $lp_cv_has_mysql = yes; then
   AC_DEFINE(HAS_MYSQL)
+if test $enable_use_mysql = yes; then
   AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -lmysqlclient")
+fi
 fi
 
 AC_CACHE_CHECK(if rename handles directories,

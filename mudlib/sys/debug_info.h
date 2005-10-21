@@ -11,6 +11,7 @@
 #define DINFO_STATUS  4  /* Return the 'status' information */
 #define DINFO_DUMP    5  /* Dump some special information into files */
 #define DINFO_DATA    6  /* Return internal information */
+#define DINFO_TRACE   7  /* Return the current call trace */
 
 /* Sub-request values for debug_info(DINFO_DATA) */
 
@@ -120,6 +121,7 @@
 
 #define DID_SWAP_MAX           16
     
+
 /* Indices into the array resulting from debug_info(DINFO_DATA, DID_MEMORY)
  */
 
@@ -146,5 +148,25 @@
 #define DID_MEM_MINC_SIZE      20
  
 #define DID_MEMORY_MAX         21
+
+
+/* Indices into the subarrays resulting from debug_info(DINFO_TRACE, 0)
+ */
+
+#define TRACE_TYPE    0
+#define TRACE_NAME    1
+#define TRACE_PROGRAM 2
+#define TRACE_OBJECT  3
+#define TRACE_LOC     4
+
+#define TRACE_MAX     5
+
+/* Values for entry TRACE_TYPE */
+
+#define TRACE_TYPE_SYMBOL  0
+#define TRACE_TYPE_SEFUN   1
+#define TRACE_TYPE_EFUN    2
+#define TRACE_TYPE_LAMBDA  3
+#define TRACE_TYPE_LFUN    4
 
 #endif /* _DEBUG_INFO_H_ */

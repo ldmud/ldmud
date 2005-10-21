@@ -3986,6 +3986,7 @@ if test $lp_cv_has_ipv6 = yes; then
 #define HAS_IPV6 1
 EOF
 
+if test $enable_use_ipv6 = yes; then
   echo $ac_n "checking for main in -linet6""... $ac_c" 1>&6
 echo "configure:3991: checking for main in -linet6" >&5
 ac_lib_var=`echo inet6'_'main | sed 'y%./+-%__p_%'`
@@ -4022,6 +4023,7 @@ else
   echo "$ac_t""no" 1>&6
 fi
 
+fi
 fi
 
 echo $ac_n "checking for mySQL""... $ac_c" 1>&6
@@ -4069,6 +4071,7 @@ if test $lp_cv_has_mysql = yes; then
 #define HAS_MYSQL 1
 EOF
 
+if test $enable_use_mysql = yes; then
   echo $ac_n "checking for main in -lmysqlclient""... $ac_c" 1>&6
 echo "configure:4074: checking for main in -lmysqlclient" >&5
 ac_lib_var=`echo mysqlclient'_'main | sed 'y%./+-%__p_%'`
@@ -4105,6 +4108,7 @@ else
   echo "$ac_t""no" 1>&6
 fi
 
+fi
 fi
 
 echo $ac_n "checking if rename handles directories""... $ac_c" 1>&6

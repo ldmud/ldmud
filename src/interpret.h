@@ -111,6 +111,7 @@ extern void pop_control_stack(void);
 extern struct longjump_s *push_error_context(svalue_t *sp, bytecode_t catch_inst);
 extern void pop_error_context (void);
 extern svalue_t *pull_error_context (svalue_t *sp);
+extern Bool destructed_object_ref (svalue_t *svp);
 extern void free_object_svalue(svalue_t *v);
 extern void zero_object_svalue(svalue_t *v);
 extern void free_svalue(svalue_t *v);
@@ -152,6 +153,7 @@ extern svalue_t *sapply_int(string_t *fun, object_t *ob, int num_arg, Bool b_ign
 extern svalue_t *apply(string_t *fun, object_t *ob, int num_arg);
 extern void call_function(program_t *progp, int fx);
 extern int get_line_number(bytecode_p p, program_t *progp, char **namep);
+extern char *collect_trace(strbuf_t * sbuf, vector_t ** rvec);
 extern char *dump_trace(Bool how);
 extern int get_line_number_if_any(char **name);
 extern void reset_machine(Bool first);

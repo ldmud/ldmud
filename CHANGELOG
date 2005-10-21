@@ -1,8 +1,31 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Dec-2000 (Lars Duening)  (3.3.18)
+    Included the changes up to 3.2.9-dev.244:
+    - (lots of files) Closures bound to destructed objects are now treated
+        like destructed objects and zeroed out where possible.
+    - (wiz_list) Destructed objects and closures is now removed from the
+        'extra' wizinfo in regular intervals. Note that this doesn't
+        extend to subarrays and -mappings held by the 'extra' info.
+    - (autoconf/configure.in, configure) If MySQL or IPv6 are not requested,
+        the configure script won't check for the libraries; consequently
+        they won't linked in unless needed (suggested by Coogan).
+    - (interpret.c, prolang.y) The operators '++' and '--' can now be
+        used on floats, too (suggested by Croft).
+    - (interpret.c) sqrt(0.0) caused a 'bad argument' error - corrected
+        that (thanks, Andre!).
+    - (interpret, efuns.c) debug_info(DINFO_TRACE) returns the current
+        call stack as either string or array. (f-000716)
+    - (interpret.c) The efuns sin(), cos(), tan(), atan(), atan2(),
+        log(), exp(), sqrt() and pow(), when given an integer argument,
+        returned a float result typed as integer. (reported by Slava)
+    - (lex.c) Oops, a last minute change to remove a warning broke the
+         recognition of escaped characters in strings (thanks, Slava!).
+    - (interpret.c) Efun pow() did not properly check its arguments.
+
 27-Nov-2000 (Lars Duening)  (3.3.17)
-    Included the changes from 3.2.9-dev.240:
+    Included the changes up to 3.2.9-dev.240:
     - (lex.c) Numbers can be specified in binary using the '0b' prefix.
     - (lex.c) Moved the parsing of escaped character sequences into a
          separate function, and implemented the specification of characters
@@ -29,6 +52,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
          which includes a means of measuring lag using TMs (thanks!).
 
 15-Nov-2000 (Lars Duening)  (3.3.16)
+    Included the changes up to 3.2.9-dev.238:
     - (efuns.c) The OIB_NAME returned by object_info(OINFO_BASIC) did
          not start with a '/' in plain mode. (reported by Fiona)
     - (mud/lp-245) Added secure/master.c as a wrapper for obj/master.c for

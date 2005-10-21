@@ -28,7 +28,8 @@ DESCRIPTION
           int [OIB_RESET_STATE]:      1 if <ob> is (still) reset, 0 else.
           int [OIB_WILL_CLEAN_UP]:    1 if <ob> will call clean_up(), 0 else.
           int [OIB_LAMBDA_REFERENCED]: 1 if <ob> has lambdas, 0 else.
-          int [OIB_SHADOW]:           1 if <ob> is shadowed, 0 else.
+          int [OIB_SHADOW]:           1 if <ob> has a shadow structure tied
+                                        to it, 0 if not.
           int [OIB_REPLACED]:         1 if the program for <ob> was replaced,
                                       0 else.
           int [OIB_TOTAL_LIGHT]:  the amount of light <ob> is emitting.

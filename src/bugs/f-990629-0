@@ -12,3 +12,7 @@ parameter 'is_caught', and if is_caught is true, the return value decides
 if the driver prints a traceback or not before doing the actual catch.
 
 In general, the error and diagnostic handling is much too confused.
+
+--- See the discussion on amylaar-users in November '2000. The error routine
+could be set by a hook, and if not set, the driver could fall back to the
+old routines.

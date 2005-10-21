@@ -6101,7 +6101,9 @@ expr0:
                   i = NV_VARIABLE(i)->flags & TYPE_MOD_MASK;
               }
 
-              if (exact_types && !BASIC_TYPE(i, TYPE_NUMBER))
+              if (exact_types
+               && !BASIC_TYPE(i, TYPE_NUMBER)
+               && !BASIC_TYPE(i, TYPE_FLOAT))
               {
                   argument_type_error($1.code, i);
               }
@@ -6115,7 +6117,7 @@ expr0:
           CURRENT_PROGRAM_SIZE += 1;
 
           add_f_code($1.code);
-          $$.type = TYPE_NUMBER;
+          $$.type = i;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -6130,11 +6132,13 @@ expr0:
             (last_expression = CURRENT_PROGRAM_SIZE + 2) + 1;
           add_f_code($1.code);
           i = type_of_locals[$2];
-          if (exact_types && !BASIC_TYPE(i, TYPE_NUMBER))
+          if (exact_types
+           && !BASIC_TYPE(i, TYPE_NUMBER)
+           && !BASIC_TYPE(i, TYPE_FLOAT))
           {
               argument_type_error($1.code, i);
           }
-          $$.type = TYPE_NUMBER;
+          $$.type = i;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -6172,7 +6176,8 @@ expr0:
                       break;
                   /* FALLTHROUGH */
               case TYPE_STRING:
-                  if (!BASIC_TYPE($3.type1, TYPE_NUMBER))
+                  if (!BASIC_TYPE($3.type1, TYPE_NUMBER)
+                   && !BASIC_TYPE($3.type1, TYPE_FLOAT))
                       type_error("Bad type of index", $3.type1);
                   break;
               }
@@ -6238,7 +6243,7 @@ expr0:
           *p = $1.code;
           last_expression = current + 1;
           CURRENT_PROGRAM_SIZE = current + 2;
-          $$.type = TYPE_NUMBER;
+          $$.type = $3.type1;
       } /* pre_inc_dec expr4 [index_expr] */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -6281,7 +6286,7 @@ expr0:
           *p = $1.code;
           last_expression = current + 1;
           CURRENT_PROGRAM_SIZE = current + 2;
-          $$.type = TYPE_NUMBER;
+          $$.type = TYPE_ANY;
       } /* pre_inc_dec expr4 [expr0 ',' expr0] */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -6356,10 +6361,13 @@ expr0:
           }
 
           /* Check the types */
-          if (exact_types && !BASIC_TYPE($1.type, TYPE_NUMBER))
+          if (exact_types
+           && !BASIC_TYPE($1.type, TYPE_NUMBER)
+           && !BASIC_TYPE($1.type, TYPE_FLOAT)
+             )
               type_error("Bad argument to ++", $1.type);
 
-          $$.type = TYPE_NUMBER;
+          $$.type = $1.type;
       } /* post-inc */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -6389,10 +6397,13 @@ expr0:
           }
 
           /* Check the types */
-          if (exact_types && !BASIC_TYPE($1.type, TYPE_NUMBER))
+          if (exact_types
+           && !BASIC_TYPE($1.type, TYPE_NUMBER)
+           && !BASIC_TYPE($1.type, TYPE_FLOAT)
+             )
               type_error("Bad argument to --", $1.type);
 
-          $$.type = TYPE_NUMBER;
+          $$.type = $1.type;
       } /* post-dec */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/

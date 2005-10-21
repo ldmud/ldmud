@@ -44,6 +44,7 @@ extern void load_wiz_file(void);
 extern void remove_wiz_list(void);
 extern void save_error(char *msg, char *file, int line);
 extern char *get_wiz_name(char *file);
+extern void check_wizlist_for_destr(void);
 extern svalue_t *f_get_error_file(svalue_t *sp);
 extern svalue_t *f_wizlist_info(svalue_t *sp);
 extern svalue_t *f_set_extra_wizinfo(svalue_t *sp);

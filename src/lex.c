@@ -3734,7 +3734,7 @@ yylex1 (void)
                           if (!cp)
                               yyerror("Illegal escaped character in string.");
                           p = cp;
-                          *yyp++ = c;
+                          *yyp++ = lc;
                           break;
                       }
                     }

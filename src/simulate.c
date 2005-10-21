@@ -2912,11 +2912,10 @@ execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel)
         for (j = 0; j < num_arg; j++, argp++)
         {
             inter_sp++;
-            if (argp->type == T_OBJECT && (O_DESTRUCTED & argp->u.ob->flags))
+            if (destructed_object_ref(argp))
             {
                 *inter_sp = const0;
-                free_object(argp->u.ob, "apply_callback");
-                put_number(argp, 0);
+                assign_svalue(argp, &const0);
             }
             else if (keep)
                 assign_svalue_no_free(inter_sp, argp);

@@ -235,6 +235,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/driver_hook.h"
+#include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/trace.h"
 
 /*-------------------------------------------------------------------------*/
@@ -603,7 +604,7 @@ special_lvalue;
    * Used knowingly by: (r)index_lvalue(), transfer_pointer_range(),
    *                    assign_string_range().
    * Used unknowingly by: assign_svalue(), transfer_svalue(),
-   *                    add_number_to_svalue(), F_VOID_ASSIGN.
+   *                    add_number_to_lvalue(), F_VOID_ASSIGN.
    */
 
 static svalue_t indexing_quickfix = { T_NUMBER };
@@ -725,6 +726,7 @@ init_interpret (void)
  * by the svalue_ts. 'Freeing' in this context therefore never means
  * a svalue_t, only the data referenced by it.
  *
+ * destructed_object_ref(v): test if <v> references a destructed object.
  * free_string_svalue(v): free string svalue <v>.
  * free_object_svalue(v): free object svalue <v>.
  * zero_object_svalue(v): replace the object in svalue <v> by number 0.
@@ -745,7 +747,7 @@ init_interpret (void)
  *                        considered empty.
  * transfer_svalue(dest,v): move <v> into <dest>; freeing <dest> first.
  *                        Also handles transfers to lvalues.
- * static add_number_to_svalue(dest,i): add <i> to lvalue <dest>.
+ * static add_number_to_lvalue(dest,i,pre,post): add <i> to lvalue <dest>.
  *
  * In addition there are some helper functions.
  *
@@ -1019,6 +1021,42 @@ free_svalue (svalue_t *v)
 } /* free_svalue() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE Bool
+_destructed_object_ref (svalue_t *svp)
+
+/* Return TRUE if the svalue in <svp> references a destructed object.
+ */
+
+{
+    lambda_t *l;
+    int type;
+
+    if (svp->type != T_OBJECT && svp->type != T_CLOSURE)
+        return MY_FALSE;
+
+    if (svp->type == T_OBJECT || !CLOSURE_MALLOCED(type = svp->x.closure_type))
+        return (svp->u.ob->flags & O_DESTRUCTED) ? MY_TRUE : MY_FALSE;
+
+    /* Lambda closure */
+    
+    l = svp->u.lambda;
+
+    if (CLOSURE_HAS_CODE(type) && type == CLOSURE_UNBOUND_LAMBDA)
+        return MY_FALSE;
+    
+    if (type == CLOSURE_ALIEN_LFUN
+     && (l->function.alien.ob->flags & O_DESTRUCTED))
+        return MY_TRUE;
+
+    return (l->ob->flags & O_DESTRUCTED) ? MY_TRUE : MY_FALSE;
+    
+} /* _destructed_object_ref() */
+
+Bool destructed_object_ref (svalue_t *v) { return _destructed_object_ref(v); }
+
+#define destructed_object_ref(v) _destructed_object_ref(v)
+
+/*-------------------------------------------------------------------------*/
 static INLINE void
 _assign_svalue_no_free (svalue_t *to, svalue_t *from)
 
@@ -1131,7 +1169,10 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from
         break;
 
     case T_CLOSURE:
-        addref_closure(from, "ass to var");
+        if (!destructed_object_ref(from))
+            addref_closure(from, "ass to var");
+        else
+            assign_svalue(from, &const0);
         break;
 
     case T_MAPPING:
@@ -1181,8 +1222,8 @@ assign_from_lvalue:
       case T_LVALUE:
       case T_PROTECTED_LVALUE:
         from = from->u.lvalue;
-        if (from->type == T_OBJECT && from->u.ob->flags & O_DESTRUCTED) {
-            zero_object_svalue(from);
+        if (destructed_object_ref(from)) {
+            assign_svalue(from, &const0);
             break;
         }
         goto assign_from_lvalue;
@@ -1261,7 +1302,10 @@ void assign_lrvalue_no_free (svalue_t *to, svalue_t *from)
         break;
 
     case T_CLOSURE:
-        addref_closure(to, "ass to var");
+        if (!destructed_object_ref(to))
+            addref_closure(to, "ass to var");
+        else
+            put_number(to, 0);
         break;
 
     case T_MAPPING:
@@ -1934,11 +1978,17 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
 } /* transfer_protected_string_range() */
 
 /*-------------------------------------------------------------------------*/
-static int
-add_number_to_svalue (svalue_t *dest, int i)
+static void
+add_number_to_lvalue (svalue_t *dest, int i, svalue_t *pre, svalue_t *post)
 
-/* Add the number <i> to the (PROTECTED_)LVALUE <dest>, and return
- * the sum. If <dest> is of the wrong type, an error is generated.
+/* Add the number <i> to the (PROTECTED_)LVALUE <dest>.
+ * If <pre> is not null, the <dest> value before the addition is copied
+ * into it.
+ * If <post> is not null, the <dest> value after the addition is copied
+ * into it.
+ * Both <pre> and <post> are supposed to be empty svalues when given.
+ *
+ * If <dest> is of the wrong type, an error is generated.
  */
 
 {
@@ -1952,16 +2002,47 @@ add_number_to_svalue (svalue_t *dest, int i)
     {
     default:
         error("Reference to bad type %s to ++/--\n", typename(dest->type));
-        return i;
+        break;
 
     case T_NUMBER:
-        return dest->u.number += i;
+        if (pre) put_number(pre, dest->u.number);
+        dest->u.number += i;
+        if (post) put_number(post, dest->u.number);
+        break;
+
+    case T_FLOAT:
+      {
+        STORE_DOUBLE_USED
+        double d;
+
+        d = READ_DOUBLE(dest);
+
+        if (pre)
+        {
+            pre->type = T_FLOAT;
+            STORE_DOUBLE(pre, d);
+        }
+
+        d += (double)i;
+        STORE_DOUBLE(dest, d);
+
+        if (post)
+        {
+            post->type = T_FLOAT;
+            STORE_DOUBLE(post, d);
+        }
+        break;
+      }
 
     case T_PROTECTED_LVALUE:
-        return add_number_to_svalue(dest, i);
+        add_number_to_lvalue(dest, i, pre, post);
+        break;
 
     case T_CHAR_LVALUE:
-        return (*dest->u.string) += i;
+        if (pre) put_number(pre, (*dest->u.string));
+        (*dest->u.string) += i;
+        if (post) put_number(post, (*dest->u.string));
+        break;
 
     case T_PROTECTED_CHAR_LVALUE:
       {
@@ -1971,14 +2052,14 @@ add_number_to_svalue (svalue_t *dest, int i)
         if (p->lvalue->type == T_OLD_STRING
          && p->lvalue->u.string == p->start)
         {
+            if (pre) put_number(pre, *p->v.u.string);
             i = *p->v.u.string += i;
+            if (post) put_number(post, i);
         }
-        return i;
+        break;
       }
     } /* switch() */
-
-    /* NOTREACHED */
-}
+} /* add_number_to_lvalue() */
 
 /*-------------------------------------------------------------------------*/
 static vector_t *
@@ -2085,8 +2166,8 @@ inter_add_array (vector_t *q, vector_t **vpp)
     {
         for (cnt = (mp_int)q_size; --cnt >= 0; )
         {
-            if (s->type == T_OBJECT && s->u.ob->flags & O_DESTRUCTED)
-                zero_object_svalue(s);
+            if (destructed_object_ref(s))
+                assign_svalue(s, &const0);
             *d++ = *s++;
         }
         *vpp = r;
@@ -4044,9 +4125,9 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
             /* gcc complains about tmp being clobbered */
 #endif
             p = &vec->u.vec->item[ind];
-            if (p->type == T_OBJECT && p->u.ob->flags & O_DESTRUCTED)
+            if (destructed_object_ref(p))
             {
-                free_object_svalue(p);
+                free_svalue(p);
                 put_number(&tmp, 0);
             }
             else
@@ -4203,9 +4284,9 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
             /* gcc complains about tmp being clobbered */
 #endif
             p = &vec->u.vec->item[ind];
-            if (p->type == T_OBJECT && p->u.ob->flags & O_DESTRUCTED)
+            if (destructed_object_ref(p))
             {
-                free_object_svalue(p);
+                free_svalue(p);
                 put_number(&tmp, 0);
             }
             else
@@ -7171,6 +7252,16 @@ again:
             sp--;
             break;
         }
+        else if (svp->type == T_FLOAT)
+        {
+            STORE_DOUBLE_USED
+            double d;
+
+            d = READ_DOUBLE(svp) + 1.0;
+            sp->type = T_FLOAT;
+            STORE_DOUBLE(svp, d);
+            break;
+        }
         else if (svp->type == T_CHAR_LVALUE)
         {
             (*svp->u.string)++;
@@ -7185,7 +7276,7 @@ again:
               || svp->type == T_PROTECTED_LVALUE)
         {
             inter_sp = sp;
-            add_number_to_svalue(svp, 1);
+            add_number_to_lvalue(svp, 1, NULL, NULL);
             sp--;
             break;
         }
@@ -7223,6 +7314,16 @@ again:
             sp--;
             break;
         }
+        else if (svp->type == T_FLOAT)
+        {
+            STORE_DOUBLE_USED
+            double d;
+
+            d = READ_DOUBLE(svp) - 1.0;
+            sp->type = T_FLOAT;
+            STORE_DOUBLE(svp, d);
+            break;
+        }
         else if (svp->type == T_CHAR_LVALUE)
         {
             (*svp->u.string)--;
@@ -7237,7 +7338,7 @@ again:
               || svp->type == T_PROTECTED_LVALUE)
         {
             inter_sp = sp;
-            add_number_to_svalue(svp, -1);
+            add_number_to_lvalue(svp, -1,  NULL, NULL);
             sp--;
             break;
         }
@@ -7275,6 +7376,18 @@ again:
             put_number(sp,  svp->u.number++ );
             break;
         }
+        else if (svp->type == T_FLOAT)
+        {
+            STORE_DOUBLE_USED
+            double d;
+
+            d = READ_DOUBLE(svp);
+            sp->type = T_FLOAT;
+            STORE_DOUBLE(sp, d);
+            d += 1.0;
+            STORE_DOUBLE(svp, d);
+            break;
+        }
         else if (svp->type == T_CHAR_LVALUE)
         {
             put_number(sp,  (*svp->u.string)++ );
@@ -7284,7 +7397,7 @@ again:
               || svp->type == T_PROTECTED_LVALUE)
         {
             inter_sp = sp;
-            put_number(sp, add_number_to_svalue(svp, 1) - 1);
+            add_number_to_lvalue(svp, 1, sp, NULL);
             break;
         }
 
@@ -7321,6 +7434,18 @@ again:
             put_number(sp,  svp->u.number-- );
             break;
         }
+        else if (svp->type == T_FLOAT)
+        {
+            STORE_DOUBLE_USED
+            double d;
+
+            d = READ_DOUBLE(svp);
+            sp->type = T_FLOAT;
+            STORE_DOUBLE(sp, d);
+            d -= 1.0;
+            STORE_DOUBLE(svp, d);
+            break;
+        }
         else if (svp->type == T_CHAR_LVALUE)
         {
             put_number(sp,  (*svp->u.string)-- );
@@ -7330,7 +7455,7 @@ again:
               || svp->type == T_PROTECTED_LVALUE)
         {
             inter_sp = sp;
-            put_number(sp, add_number_to_svalue(svp, -1) + 1);
+            add_number_to_lvalue(svp, -1, sp, NULL);
             break;
         }
 
@@ -7366,6 +7491,17 @@ again:
             put_number(sp,  ++(svp->u.number) );
             break;
         }
+        else if (svp->type == T_FLOAT)
+        {
+            STORE_DOUBLE_USED
+            double d;
+
+            d = READ_DOUBLE(svp) + 1.0;
+            sp->type = T_FLOAT;
+            STORE_DOUBLE(sp, d);
+            STORE_DOUBLE(svp, d);
+            break;
+        }
         else if (svp->type == T_CHAR_LVALUE)
         {
             put_number(sp,  ++(*svp->u.string) );
@@ -7375,7 +7511,7 @@ again:
               || svp->type == T_PROTECTED_LVALUE)
         {
             inter_sp = sp;
-            put_number(sp, add_number_to_svalue(svp, 1));
+            add_number_to_lvalue(svp, 1, NULL, sp);
             break;
         }
 
@@ -7411,6 +7547,17 @@ again:
             put_number(sp,  --(svp->u.number) );
             break;
         }
+        else if (svp->type == T_FLOAT)
+        {
+            STORE_DOUBLE_USED
+            double d;
+
+            d = READ_DOUBLE(svp) - 1.0;
+            sp->type = T_FLOAT;
+            STORE_DOUBLE(sp, d);
+            STORE_DOUBLE(svp, d);
+            break;
+        }
         else if (svp->type == T_CHAR_LVALUE)
         {
             put_number(sp,  --(*svp->u.string) );
@@ -7420,7 +7567,7 @@ again:
               || svp->type == T_PROTECTED_LVALUE)
         {
             inter_sp = sp;
-            put_number(sp, add_number_to_svalue(svp, -1));
+            add_number_to_lvalue(svp, -1, NULL, sp);
             break;
         }
 
@@ -14096,23 +14243,23 @@ get_line_number_if_any (char **name)
 
 /*-------------------------------------------------------------------------*/
 char *
-dump_trace (Bool how
-#ifndef TRACE_CODE
-                     UNUSED
-#endif
-           )
+collect_trace (strbuf_t * sbuf, vector_t ** rvec )
 
-/* Write out a traceback, starting from the first frame. If a heart_beat()
- * is involved, return the name of the object that had it.
+/* Collect the traceback for the current (resp. last) function call, starting
+ * from the first frame.
  *
- * If TRACE_CODE is defined and <how> is true, the last executed
- * instructions are printed, too.
+ * If <sbuf> is not NULL, traceback is written in readable form into the
+ * stringbuffer <sbuf>.
+ *
+ * If <rvec> is not NULL, the traceback is returned in a newly created array
+ * which pointer is put into *<rvec>. For the format of the array, see
+ * efun debug_info().
+ *
+ * If a heart_beat() is involved, return a pointer to the name of the object
+ * that had it, otherwise return NULL.
  */
 
 {
-#if defined(__MWERKS__) && !defined(TRACE_CODE)
-#    pragma unused(how)
-#endif
     struct control_stack *p;  /* Control frame under inspection */
     char *ret = NULL;
     bytecode_p pc = inter_pc;
@@ -14122,33 +14269,66 @@ dump_trace (Bool how
     object_t *ob = NULL;
     bytecode_p last_catch = NULL;  /* Last found catch */
 
+    /* Temporary structure to hold the tracedata before it is condensed
+     * into the result array.
+     */
+    struct traceentry {
+        vector_t          * vec;
+        struct traceentry * next;
+    } *first_entry, *last_entry;
+    size_t num_entries;
+
+#define NEW_ENTRY(var, type, progname) \
+        struct traceentry * var; \
+        var = alloca(sizeof(*var)); \
+        if (!var) \
+            error("Stack overflow in collect_trace()"); \
+        var->vec = allocate_array(TRACE_MAX); \
+        var->next = NULL; \
+        if (!first_entry) \
+            first_entry = last_entry = var; \
+        else { \
+            last_entry->next = var; \
+            last_entry = var; \
+        } \
+        num_entries++; \
+        put_number(var->vec->item+TRACE_TYPE, type); \
+        put_malloced_string(var->vec->item+TRACE_PROGRAM, string_copy(progname)); \
+        put_malloced_string(entry->vec->item+TRACE_OBJECT, string_copy(ob->name));
+
+#define PUT_LOC(entry, val) \
+        put_number(entry->vec->item+TRACE_LOC, (p_int)(val))
+
+    first_entry = last_entry = NULL;
+    num_entries = 0;
+
     if (!current_prog)
     {
-        printf("No program to trace.\n");
-        debug_message("No program to trace.\n");
+        if (sbuf)
+           strbuf_addf(sbuf, "%s", STR_NO_PROG_TRACE);
+        if (rvec)
+        {
+            vector_t * vec;
+
+            vec = allocate_array(1);
+            put_ref_string(vec->item, STR_NO_PROG_TRACE);
+        }
         return NULL;
     }
 
     if (csp < &control_stack[0])
     {
-        printf("No trace.\n");
-        debug_message("No trace.\n");
+        if (sbuf)
+           strbuf_addf(sbuf, "%s", STR_NO_TRACE);
+        if (rvec)
+        {
+            vector_t * vec;
+
+            vec = allocate_array(1);
+            put_ref_string(vec->item, STR_NO_TRACE);
+        }
         return NULL;
     }
-
-    /* Print the last instructions if required */
-#ifdef TRACE_CODE
-    if (how) {
-        /* TODO: This number of instructions should be a runtime arg */
-#ifdef DEBUG
-        (void)last_instructions(200, MY_TRUE, NULL);
-        printf("%6lx: %3d %3d %3d %3d %3d %3d %3d %3d\n", (long)pc,
-          pc[0], pc[1], pc[2], pc[3], pc[4], pc[5], pc[6], pc[7] );
-#else  /* DEBUG */
-        last_instructions(20, MY_TRUE, NULL);
-#endif /* DEBUG */
-    }
-#endif /* TRACE_CODE */
 
     /* Loop through the call stack.
      * The organisation of the control stack results in the information
@@ -14157,8 +14337,8 @@ dump_trace (Bool how
      */
     p = &control_stack[0];
     do {
-        bytecode_p      dump_pc;  /* the frame's pc */
-        program_t *prog;     /* the frame's program */
+        bytecode_p  dump_pc;  /* the frame's pc */
+        program_t  *prog;     /* the frame's program */
 
         if (p->extern_call)
         {
@@ -14237,20 +14417,27 @@ not_catch:  /* The frame does not point at a catch here */
             /* TODO: See comments in call_lambda(): this code
              * TODO:: should never be reached.
              */
-            printf("<function symbol> in '%20s' ('%20s')\n"
-                  , ob->prog->name, ob->name);
-            debug_message("<function symbol> in '%20s' ('%20s')\n"
-                         , ob->prog->name, ob->name);
+            if (sbuf)
+                strbuf_addf(sbuf, "<function symbol> in '%20s' ('%20s')\n"
+                           , ob->prog->name, ob->name);
+            if (rvec)
+            {
+                NEW_ENTRY(entry, TRACE_TYPE_SYMBOL, ob->prog->name);
+            }
             continue;
         }
 
         /* simul_efun closure? */
         if (p[0].funstart == SIMUL_EFUN_FUNSTART)
         {
-            printf("<simul_efun closure> bound to '%20s' ('%20s')\n",
-                ob->prog->name, ob->name);
-            debug_message("<simul_efun closure> bound to '%20s' ('%20s')\n",
-                ob->prog->name, ob->name);
+            if (sbuf)
+                strbuf_addf( sbuf
+                           , "<simul_efun closure> bound to '%20s' ('%20s')\n"
+                           , ob->prog->name, ob->name);
+            if (rvec)
+            {
+                NEW_ENTRY(entry, TRACE_TYPE_SEFUN, ob->prog->name);
+            }
             continue;
         }
 
@@ -14262,17 +14449,25 @@ not_catch:  /* The frame does not point at a catch here */
             iname = instrs[p[0].instruction].name;
             if (iname)
             {
-                printf("#\'%-14s for '%20s' ('%20s')\n"
-                  , iname, ob->prog->name, ob->name);
-                debug_message("#\'%-14s for '%20s' ('%20s')\n"
-                  , iname, ob->prog->name, ob->name);
+                if (sbuf)
+                    strbuf_addf(sbuf, "#\'%-14s for '%20s' ('%20s')\n"
+                               , iname, ob->prog->name, ob->name);
+                if (rvec)
+                {
+                    NEW_ENTRY(entry, TRACE_TYPE_EFUN, ob->prog->name);
+                    put_volatile_string(entry->vec->item+TRACE_NAME, iname);
+                }
             }
             else
             {
-                printf("<efun closure %d> for '%20s' ('%20s')\n",
-                    p[0].instruction, ob->prog->name, ob->name);
-                debug_message("<efun closure %d> for '%20s' ('%20s')\n",
-                    p[0].instruction, ob->prog->name, ob->name);
+                if (sbuf)
+                    strbuf_addf( sbuf, "<efun closure %d> for '%20s' ('%20s')\n"
+                               , p[0].instruction, ob->prog->name, ob->name);
+                if (rvec)
+                {
+                    NEW_ENTRY(entry, TRACE_TYPE_EFUN, ob->prog->name);
+                    put_number(entry->vec->item+TRACE_NAME, p[0].instruction);
+                }
             }
             continue;
         }
@@ -14281,12 +14476,18 @@ not_catch:  /* The frame does not point at a catch here */
         if (p[0].funstart < prog->program
          || p[0].funstart > PROGRAM_END(*prog))
         {
-            printf("<lambda 0x%6lx> in '%20s' ('%20s') offset %ld\n",
-                (long)p[0].funstart, ob->prog->name, ob->name,
-                (long)(FUNCTION_FROM_CODE(dump_pc) - p[0].funstart));
-            debug_message("<lambda 0x%6lx> in '%20s' ('%20s') offset %ld\n",
-                (long)p[0].funstart, ob->prog->name, ob->name,
-                (long)(FUNCTION_FROM_CODE(dump_pc) - p[0].funstart));
+            if (sbuf)
+                strbuf_addf( sbuf
+                           , "<lambda 0x%6lx> in '%20s' ('%20s') offset %ld\n"
+                           , (long)p[0].funstart, ob->prog->name, ob->name
+                           , (long)(FUNCTION_FROM_CODE(dump_pc) - p[0].funstart)
+                           );
+            if (rvec)
+            {
+                NEW_ENTRY(entry, TRACE_TYPE_LAMBDA, ob->prog->name);
+                put_number(entry->vec->item+TRACE_NAME, (p_int)p[0].funstart);
+                PUT_LOC(entry, (FUNCTION_FROM_CODE(dump_pc) - p[0].funstart));
+            }
             continue;
         }
 
@@ -14301,15 +14502,94 @@ name_computed: /* Jump target from the catch detection */
         if (strcmp(name, "heart_beat") == 0 && p != csp)
             ret = p->extern_call ? (p->ob ? p->ob->name : NULL) : ob->name;
 
-        printf("'%15s' in '%20s' ('%20s') line %d\n",
-                     name, file, ob->name, line);
-        debug_message("'%15s' in '%20s' ('%20s') line %d\n",
-                     name, file, ob->name, line);
+        if (sbuf)
+            strbuf_addf(sbuf, "'%15s' in '%20s' ('%20s') line %d\n"
+                       , name, file, ob->name, line);
+        if (rvec)
+        {
+            NEW_ENTRY(entry, TRACE_TYPE_LFUN, file);
+            put_malloced_string(entry->vec->item+TRACE_NAME, string_copy(name));
+            PUT_LOC(entry, line);
+        }
     } while (++p <= csp);
+
+    /* Condense the singular entries into the result array */
+    if (rvec)
+    {
+        vector_t * vec;
+        size_t ix;
+
+        vec = allocate_array(num_entries+1);
+
+        if (ret)
+            put_malloced_string(vec->item, string_copy(ret));
+
+        for (ix = 1; first_entry != NULL; ix++, first_entry = first_entry->next)
+        {
+            put_array(vec->item+ix, first_entry->vec);
+        }
+
+        *rvec = vec;
+    }
 
     /* Done */
     return ret;
-}
+
+#undef NEW_ENTRY
+#undef PUT_LOC
+
+} /* collect_trace() */
+
+/*-------------------------------------------------------------------------*/
+char *
+dump_trace (Bool how
+#ifndef TRACE_CODE
+                     UNUSED
+#endif
+           )
+
+/* Write out a traceback, starting from the first frame. If a heart_beat()
+ * is involved, return the name of the object that had it.
+ *
+ * If TRACE_CODE is defined and <how> is true, the last executed
+ * instructions are printed, too.
+ */
+
+{
+#if defined(__MWERKS__) && !defined(TRACE_CODE)
+#    pragma unused(how)
+#endif
+    strbuf_t sbuf;
+    char *hb_obj_name;
+
+    strbuf_zero(&sbuf);
+    hb_obj_name = collect_trace(&sbuf, NULL);
+
+    /* Print the last instructions if required */
+#ifdef TRACE_CODE
+    if (how) {
+        /* TODO: This number of instructions should be a runtime arg */
+#ifdef DEBUG
+        (void)last_instructions(200, MY_TRUE, NULL);
+        printf("%6lx: %3d %3d %3d %3d %3d %3d %3d %3d\n"
+              , (long)inter_pc
+              , inter_pc[0], inter_pc[1], inter_pc[2], inter_pc[3]
+              , inter_pc[4], inter_pc[5], inter_pc[6], inter_pc[7] );
+#else  /* DEBUG */
+        last_instructions(20, MY_TRUE, NULL);
+#endif /* DEBUG */
+    }
+#endif /* TRACE_CODE */
+
+    /* Print the trace */
+    fputs(sbuf.buf, stdout);
+    debug_message("%s", sbuf.buf);
+
+    /* Cleanup and return */
+    strbuf_free(&sbuf);
+
+    return hb_obj_name;
+} /* dump_trace() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -15468,7 +15748,7 @@ f_apply (svalue_t *sp, int num_arg)
         {
             for (svp = vec->item; --i >= 0; )
             {
-                if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
+                if (destructed_object_ref(svp))
                 {
                     put_number(sp, 0);
                     sp++;
@@ -15482,7 +15762,7 @@ f_apply (svalue_t *sp, int num_arg)
         {
             /* The array will be freed, so use a faster function */
             for (svp = vec->item; --i >= 0; ) {
-                if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
+                if (destructed_object_ref(svp))
                 {
                     put_number(sp, 0);
                     sp++;

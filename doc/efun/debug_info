@@ -298,6 +298,44 @@ DESCRIPTION
                    of successes and the size of memory allocated this
                    way (smalloc only).
 
+        DINFO_TRACE (7): Return the current call stack 'trace' information
+            in the form specifiec by <arg2>. The result of the function is
+            either an array (format explained below) if <arg2> is 0 or
+            missing, or a printable string for any non-zero value of <arg2>.
+
+            <arg2> == 0: Return the information in array form.
+               If the array has just one entry, the trace information is not
+               available and the one entry is string with the reason.
+
+               If the array has more than one entries, the first entry is 0 or
+               the name of the object with the heartbeat which started the
+               current thread; all following entries describe the call stack
+               starting with the topmost function called.
+
+               All call entries are arrays themselves with the following
+               elements:
+
+               int[TRACE_TYPE]: The type of the call frame:
+                   TRACE_TYPE_SYMBOL (0): a function symbol (shouldn't happen).
+                   TRACE_TYPE_SEFUN  (1): a simul-efun.
+                   TRACE_TYPE_EFUN   (2): an efun closure.
+                   TRACE_TYPE_LAMBDA (3): a lambda closure.
+                   TRACE_TYPE_LFUN   (4): a normal lfun.
+
+               mixed[TRACE_NAME]: The 'name' of the called frame:
+                   _TYPE_EFUN:   either the name of the efun, or the code of
+                                 the instruction for operator closures
+                   _TYPE_LAMBDA: the numeric lambda identifier.
+                   _TYPE_LFUN:   the name of the lfun.
+
+               string[TRACE_PROGRAM]: The (file)name of the program holding the
+                   code.
+               string[TRACE_OBJECT]:  The name of the object for which the code
+                                      was executed.
+               int[TRACE_LOC]:
+                   _TYPE_LAMBDA: current program offset from the start of the
+                                 closure code.
+                   _TYPE_LFUN:   the line number.
 
 HISTORY
         Since 3.2.7, DINFO_STATUS returns the status information instead
@@ -307,6 +345,7 @@ HISTORY
         DINFO_MEMORY; the DINFO_DATA request; the DID_MEM_WASTED* stats.
         LDMud 3.3 replaced the string related DID_ST_ constants according to
         the new string implementation.
+        LDMud 3.2.9 added DINFO_TRACE.
 
 SEE ALSO
         trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)

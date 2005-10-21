@@ -98,6 +98,7 @@
 #include "gcollect.h"
 #include "interpret.h"
 #include "main.h"
+#include "mapping.h"
 #include "object.h"
 #include "simulate.h"
 #include "stdstrings.h"
@@ -242,6 +243,8 @@ wiz_decay (void)
 
 /* Called after every complete walkaround of the reset, this 'decays'
  * the score of every wizard once per hour.
+ * Together with the decay, the wizlist is checked for destructed extra
+ * data.
  */
 
 {
@@ -259,6 +262,8 @@ wiz_decay (void)
         wl->cost = wl->cost * .9;  /* integer is prone to overflow */
         wl->heart_beats = wl->heart_beats * 9 / 10;
     }
+
+    check_wizlist_for_destr();
 } /* wiz_decay() */
 
 /*-------------------------------------------------------------------------*/
@@ -669,6 +674,61 @@ f_get_error_file (svalue_t *sp)
 } /* f_get_error_file() */
 
 /*=========================================================================*/
+
+/*-------------------------------------------------------------------------*/
+void
+check_wizlist_for_destr (void)
+
+/* Check the 'extra' info in all wizinfo and remove destructed objects
+ * and closures.
+ */
+
+{
+    wiz_list_t *wl;
+
+    for (wl = &default_wizlist_entry; wl; )
+    {
+        size_t num;
+        svalue_t *item;
+
+        if (wl->extra.type == T_POINTER)
+        {
+            num = VEC_SIZE(wl->extra.u.vec);
+            item = &(wl->extra.u.vec->item[0]);
+        }
+        else
+        {
+            num = 1;
+            item = &(wl->extra);
+        }
+
+        for ( ; num != 0 ; item++, num--)
+        {
+            switch(item->type)
+            {
+            case T_POINTER:
+                check_for_destr(item->u.vec);
+                break;
+            case T_MAPPING:
+                check_map_for_destr(item->u.map);
+                break;
+            case T_OBJECT:
+            case T_CLOSURE:
+                if (destructed_object_ref(item))
+                    assign_svalue(item, &const0);
+                break;
+            default:
+                NOOP;
+                break;
+            }
+        }
+
+        if (wl == &default_wizlist_entry)
+            wl = all_wiz;
+        else
+            wl = wl->next;
+    }
+} /* check_wizlist_for_destr() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef GC_SUPPORT

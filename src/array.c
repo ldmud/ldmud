@@ -431,8 +431,8 @@ set_vector_user (vector_t *p, object_t *owner)
 void
 check_for_destr (vector_t *v)
 
-/* Check the vector <v> for destructed objects and replace them with
- * svalue 0s. Subvectors are not checked, though.
+/* Check the vector <v> for destructed objects and closures on destructed
+ * objects and replace them with svalue 0s. Subvectors are not checked, though.
  *
  * This function is used by certain efuns (parse_command(), unique_array(),
  * map_array()) to make sure that the data passed to the efuns is valid,
@@ -449,11 +449,8 @@ check_for_destr (vector_t *v)
 
     for (p = v->item, i = (mp_int)VEC_SIZE(v); --i >= 0 ; p++ )
     {
-        if (p->type != T_OBJECT)
-            continue;
-        if (!(p->u.ob->flags & O_DESTRUCTED))
-            continue;
-        zero_object_svalue(p);
+        if (destructed_object_ref(p))
+            assign_svalue(p, &const0);
     }
 } /* check_for_destr() */
 
@@ -821,10 +818,10 @@ arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
         if (svp->type == T_STRING) {
             size += (mp_int)del_len + mstrsize(svp->u.str);
         }
-        else if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
+        else if (destructed_object_ref(svp))
         {
             /* While we're here anyway... */
-            zero_object_svalue(svp);
+            assign_svalue(svp, &const0);
         }
     }
 
@@ -1019,8 +1016,7 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
     /* Order the subtrahend */
     if (subtrahend_size == 1)
     {
-        if (subtrahend->item[0].type == T_OBJECT
-         && subtrahend->item[0].u.ob->flags & O_DESTRUCTED)
+        if (destructed_object_ref(&subtrahend->item[0]))
         {
             assign_svalue(&subtrahend->item[0], &const0);
         }
@@ -1045,13 +1041,13 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
     {
         for (source = minuend->item, i = minuend_size ; i-- ; source++)
         {
-            if (source->type == T_OBJECT && source->u.ob->flags & O_DESTRUCTED)
+            if (destructed_object_ref(source))
                 assign_svalue(source, &const0);
             if ( (*assoc_function)(source, subtrahend) >-1 ) break;
         }
-        for (dest = source++; i-->0 ; source++)
+        for (dest = source++; i-- > 0 ; source++)
         {
-            if (source->type == T_OBJECT && source->u.ob->flags & O_DESTRUCTED)
+            if (destructed_object_ref(source))
                 assign_svalue(source, &const0);
             if ( (*assoc_function)(source, subtrahend) < 0 )
                 assign_svalue(dest++, source);
@@ -1066,7 +1062,7 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
     for (source = minuend->item, dest = difference->item, i = minuend_size
         ; i--
         ; source++) {
-        if (source->type == T_OBJECT && source->u.ob->flags & O_DESTRUCTED)
+        if (destructed_object_ref(source))
             assign_svalue(source, &const0);
         if ( (*assoc_function)(source, subtrahend) < 0 )
             assign_svalue_no_free(dest++, source);
@@ -1207,14 +1203,12 @@ order_alist (svalue_t *inlists, int listnum, Bool reuse)
                 inpnt->u.str = make_tabled(inpnt->u.str);
             }
         }
-        else if (inpnt->type == T_OBJECT)
+        else if (destructed_object_ref(inpnt))
         {
-            if (inpnt->u.ob->flags & O_DESTRUCTED)
-            {
-                free_object_svalue(inpnt);
-                put_number(inpnt, 0);
-            }
+            free_svalue(inpnt);
+            put_number(inpnt, 0);
         }
+
         /* propagate the new element up in the heap as much as necessary */
         for (curix = j; 0 != (parix = curix>>1); ) {
             if ( alist_cmp(root[parix], inpnt) > 0 ) {
@@ -1308,10 +1302,9 @@ order_alist (svalue_t *inlists, int listnum, Bool reuse)
 
             for (j = keynum; --j >= 0; ) {
                 inpnt = inlists[i].u.vec->item + sorted[j];
-                if (inpnt->type == T_OBJECT &&
-                    inpnt->u.ob->flags & O_DESTRUCTED)
+                if (destructed_object_ref(inpnt))
                 {
-                    free_object_svalue(inpnt);
+                    free_svalue(inpnt);
                     put_number(outpnt, 0);
                     outpnt++;
                 } else {
@@ -1327,8 +1320,7 @@ order_alist (svalue_t *inlists, int listnum, Bool reuse)
 
             for (j = keynum; --j >= 0; ) {
                 inpnt = inlists[i].u.vec->item + sorted[j];
-                if (inpnt->type == T_OBJECT &&
-                    inpnt->u.ob->flags & O_DESTRUCTED)
+                if (destructed_object_ref(inpnt))
                 {
                     put_number(outpnt, 0);
                     outpnt++;
@@ -1482,8 +1474,8 @@ x_filter_array (svalue_t *sp, int num_arg)
 
         for (w = p->item, cnt = p_size; --cnt >= 0; )
         {
-            if (w->type == T_OBJECT && w->u.ob->flags & O_DESTRUCTED)
-                zero_object_svalue(w);
+            if (destructed_object_ref(w))
+                assign_svalue(w, &const0);
             if (get_map_value(m, w++) == &const0) {
                 flags[cnt] = 0;
                 continue;
@@ -1529,8 +1521,8 @@ x_filter_array (svalue_t *sp, int num_arg)
                  * flags array with 0es.
                  */
 
-            if (w->type == T_OBJECT && w->u.ob->flags & O_DESTRUCTED)
-                zero_object_svalue(w);
+            if (destructed_object_ref(w))
+                assign_svalue(w, &const0);
 
             if (!callback_object(&cb))
             {
@@ -1633,8 +1625,8 @@ x_map_array (svalue_t *sp, int num_arg)
 
         for (w = arr->item, x = res->item; --cnt >= 0; w++, x++)
         {
-            if (w->type == T_OBJECT && w->u.ob->flags & O_DESTRUCTED)
-                zero_object_svalue(w);
+            if (destructed_object_ref(w))
+                assign_svalue(w, &const0);
 
             v = get_map_value(m, w);
             if (v == &const0)
@@ -1675,8 +1667,8 @@ x_map_array (svalue_t *sp, int num_arg)
             if (current_object->flags & O_DESTRUCTED)
                 continue;
 
-            if (w->type == T_OBJECT && w->u.ob->flags & O_DESTRUCTED)
-                zero_object_svalue(w);
+            if (destructed_object_ref(w))
+                assign_svalue(w, &const0);
 
             if (!callback_object(&cb))
                 error("object used by map_array destructed");
@@ -2123,7 +2115,7 @@ f_map_objects (svalue_t *sp, int num_arg)
     free_array(p);
 
     return sp;
-}
+} /* f_map_objects() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -2520,8 +2512,7 @@ f_assoc (svalue_t *sp, int num_arg)
         assign_svalue(args
                      , ix == -1
                        ? fail_val
-                       : (data->item[ix].type == T_OBJECT
-                          && data->item[ix].u.ob->flags & O_DESTRUCTED
+                       : (destructed_object_ref(&data->item[ix])
                          ? &const0
                          : &data->item[ix])
                      );

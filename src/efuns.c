@@ -3405,6 +3405,7 @@ f_sin (svalue_t *sp)
         d = sin((double)(sp->u.number));
     else 
         d = sin(READ_DOUBLE(sp));
+    sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
 
     return sp;
@@ -3453,6 +3454,7 @@ f_cos (svalue_t *sp)
         d = cos((double)(sp->u.number));
     else 
         d = cos(READ_DOUBLE(sp));
+    sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
 
     return sp;
@@ -3501,6 +3503,7 @@ f_tan (svalue_t *sp)
         d = tan((double)(sp->u.number));
     else 
         d = tan(READ_DOUBLE(sp));
+    sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
 
     return sp;
@@ -3525,6 +3528,7 @@ f_atan (svalue_t *sp)
         d = atan((double)(sp->u.number));
     else 
         d = atan(READ_DOUBLE(sp));
+    sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
 
     return sp;
@@ -3555,6 +3559,7 @@ f_atan2 (svalue_t *sp)
         y = READ_DOUBLE(sp-1);
     d = atan2(y, x);
     sp--;
+    sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
 
     return sp;
@@ -3583,6 +3588,7 @@ f_log (svalue_t *sp)
     if (d <= 0.)
         error("Bad arg 1 for log(): value %f out of range\n", d);
     d = log(d);
+    sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
 
     return sp;
@@ -3607,6 +3613,7 @@ f_exp (svalue_t *sp)
         d = exp((double)sp->u.number);
     else 
         d = exp(READ_DOUBLE(sp));
+    sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
 
     return sp;
@@ -3631,9 +3638,10 @@ f_sqrt (svalue_t *sp)
         d = (double)sp->u.number;
     else
         d = READ_DOUBLE(sp);
-    if (d <= 0.)
+    if (d < 0.)
         error("Bad arg 1 for sqrt(): value %f out of range\n", d);
     d = sqrt(d);
+    sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
 
     return sp;
@@ -3712,6 +3720,7 @@ f_pow (svalue_t *sp)
         error("Can't raise negative number to fractional powers.\n");
     d = pow(x, y);
     sp--;
+    sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
 
     return sp;
@@ -4699,7 +4708,8 @@ f_member (svalue_t *sp)
             if (!sp_u.number)
             {
                 /* Search for 0 is special: it also finds destructed
-                 * objects (and changes them to 0).
+                 * objects resp. closures on destructed objects (and
+                 * changes them to 0).
                  */
 
                 svalue_t *item;
@@ -4712,13 +4722,10 @@ f_member (svalue_t *sp)
                         if ( !item->u.number )
                             break;
                     }
-                    else if (type == T_OBJECT)
+                    else if (destructed_object_ref(item))
                     {
-                        if (item->u.ob->flags & O_DESTRUCTED)
-                        {
-                            assign_svalue(item, &const0);
-                            break;
-                        }
+                        assign_svalue(item, &const0);
+                        break;
                     }
                 }
                 break;
@@ -5143,6 +5150,44 @@ f_debug_info (svalue_t *sp, int num_arg)
  *            of successes and the size of memory allocated this
  *            way (smalloc only).
  *
+ * DINFO_TRACE (7): Return the current call stack 'trace' information in the
+ *     form specifiec by <arg2>. The result of the function is either
+ *     an array (format explained below) if <arg2> is 0 or missing, or
+ *     a printable string for any non-zero value of <arg2>.
+ *
+ *     <arg2> == 0: Return the information in array form.
+ *        If the array has just one entry, the trace information is not
+ *        available and the one entry is string with the reason.
+ *
+ *        If the array has more than one entries, the first entry is 0 or the
+ *        name of the object with the heartbeat which started the current
+ *        thread; all following entries describe the call stack starting with
+ *        the topmost function called.
+ *
+ *        All call entries are arrays themselves with the following elements:
+ *
+ *        int[TRACE_TYPE]: The type of the call frame:
+ *            TRACE_TYPE_SYMBOL (0): a function symbol (shouldn't happen).
+ *            TRACE_TYPE_SEFUN  (1): a simul-efun.
+ *            TRACE_TYPE_EFUN   (2): an efun closure.
+ *            TRACE_TYPE_LAMBDA (3): a lambda closure.
+ *            TRACE_TYPE_LFUN   (4): a normal lfun.
+ *
+ *        mixed[TRACE_NAME]: The 'name' of the called frame:
+ *            _TYPE_EFUN:   either the name of the efun, or the code of
+ *                          the instruction for operator closures
+ *            _TYPE_LAMBDA: the numeric lambda identifier.
+ *            _TYPE_LFUN:   the name of the lfun.
+ *
+ *        string[TRACE_PROGRAM]: The (file)name of the program holding the
+ *            code.
+ *        string[TRACE_OBJECT]:  The name of the object for which the code
+ *                               was executed.
+ *        int[TRACE_LOC]:
+ *            _TYPE_LAMBDA: current program offset from the start of the
+ *                          closure code.
+ *            _TYPE_LFUN:   the line number.
+ *
  * TODO: debug_info() and all associated routines are almost big enough
  * TODO:: to justify a file on their own.
  */
@@ -5434,6 +5479,33 @@ f_debug_info (svalue_t *sp, int num_arg)
 #endif
             put_array(&res, v);
             break;
+        }
+        break;
+      }
+
+    case DINFO_TRACE:  /* --- DINFO_TRACE --- */
+      {
+        /* Return the trace information */
+
+        if (num_arg != 1 && num_arg != 2)
+            error("bad number of arguments to debug_info\n");
+
+        if (num_arg == 1
+         || (sp->type == T_NUMBER && sp->u.number == 0))
+        {
+            vector_t * vec;
+
+            (void)collect_trace(NULL, &vec);
+            put_array(&res, vec);
+        }
+        else
+        {
+            strbuf_t sbuf;
+
+            strbuf_zero(&sbuf);
+            (void)collect_trace(&sbuf, NULL);
+            put_malloced_string(&res, string_copy(sbuf.buf));
+            strbuf_free(&sbuf);
         }
         break;
       }

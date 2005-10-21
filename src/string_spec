@@ -20,6 +20,8 @@ OPCDUMP_FNAME   "/OPC_DUMP"
 PERCENT         "%"
 CRPATTERN       "\015$"
 SLASH           "/"
+NO_PROG_TRACE   "No program to trace."
+NO_TRACE        "No trace."
 
     /* Privilege violation names */
 

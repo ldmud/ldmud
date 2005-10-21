@@ -1218,7 +1218,7 @@ check_map_for_destr (mapping_t *m)
 /* Check the mapping <m> for references to destructed objects.
  * Where they appear as keys, both key and associated values are
  * deleted from the mapping. Where they appear as values, they are
- * replace by svalue-0.
+ * replaced by svalue-0.
  */
 
 {
@@ -1232,14 +1232,15 @@ check_map_for_destr (mapping_t *m)
 
     cm = m->condensed;
 
-    /* Scan the condensed part for destructed objects used as keys.
+    /* Scan the condensed part for destructed object references used as keys.
      */
 
     for (svp = CM_MISC(cm),i = cm->misc_size; (i -= sizeof *svp) >= 0; )
     {
         --svp;
-        if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
+        if (destructed_object_ref(svp))
         {
+            svalue_t dest_key = *svp;
             svalue_t *data = NULL;
 
             /* Clear all associated values */
@@ -1258,16 +1259,12 @@ check_map_for_destr (mapping_t *m)
             /* If the following keys have a matching (.u.number, x.generic)
              * move them forward to replace this no longer valid entry.
              * This is necessary to keep the sorting relation intact.
-             *
-             * Afterwards, svp might no longer point to a T_OBJECT svalue,
-             * but .u.number interpreted as .u.ob still points to object
-             * causing all this trouble.
              */
             while ( &svp[1] < CM_MISC(cm)
              &&      svp[1].u.number == svp[0].u.number
              &&      svp[1].x.generic == svp[0].x.generic)
             {
-                *SVALUE_FULLTYPE(&svp[0]) =  *SVALUE_FULLTYPE(&svp[1]);
+                *SVALUE_FULLTYPE(&svp[0]) = *SVALUE_FULLTYPE(&svp[1]);
                 svp++;
                 i += sizeof *svp;
                 for (j = num_values; --j >= 0; data++)
@@ -1275,11 +1272,12 @@ check_map_for_destr (mapping_t *m)
                 put_number(data, 0);
             }
 
-            /* We know that svp->u.ob is an object here, even if
-             * svp->type disagrees.
-             */
-            free_object_svalue(svp);
+            /* Get rid of the 'destructed' svalue */
+            free_svalue(&dest_key);
 
+            /* Invalidate the svalue entry. If keys have been moved, svp
+             * will point to the vacated entry after the moved keys.
+             */
             svp[0].type = T_INVALID;
 
             /* Count the deleted entry in the hash part.
@@ -1319,7 +1317,7 @@ check_map_for_destr (mapping_t *m)
     for (i = cm->misc_size * num_values; (i -= sizeof *svp) >= 0; )
     {
         svp--;
-        if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
+        if (destructed_object_ref(svp))
         {
             assign_svalue(svp, &const0);
         }
@@ -1333,7 +1331,7 @@ check_map_for_destr (mapping_t *m)
 
     for (i = cm->string_size * num_values; (i -= sizeof(char *)) >= 0; svp++)
     {
-        if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
+        if (destructed_object_ref(svp))
         {
             assign_svalue(svp, &const0);
         }
@@ -1357,8 +1355,7 @@ check_map_for_destr (mapping_t *m)
             {
                 /* Destructed object as key: remove entry */
 
-                if (mc->key.type == T_OBJECT
-                 && mc->key.u.ob->flags & O_DESTRUCTED)
+                if (destructed_object_ref(&(mc->key)))
                 {
                     svp = &mc->key;
                     *mcp2 = mc->next;
@@ -1389,8 +1386,7 @@ check_map_for_destr (mapping_t *m)
                  */
                 for (svp = mc->data, j = num_values; --j >= 0; )
                 {
-                    if (svp->type == T_OBJECT
-                     && svp->u.ob->flags & O_DESTRUCTED)
+                    if (destructed_object_ref(svp))
                     {
                         assign_svalue(svp, &const0);
                     }
@@ -3534,19 +3530,10 @@ count_ref_in_mapping (mapping_t *m)
     while ( (size -= sizeof(svalue_t)) >= 0)
     {
         --svp;
-        if ( (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
-         ||  (   svp->type == T_CLOSURE
-              && ( CLOSURE_MALLOCED(svp->x.closure_type) ?
-                  ( svp->x.closure_type != CLOSURE_UNBOUND_LAMBDA
-                   && ( svp->u.lambda->ob->flags & O_DESTRUCTED
-                       || (    svp->x.closure_type == CLOSURE_ALIEN_LFUN
-                           && svp->u.lambda->function.alien.ob->flags
-                                                            & O_DESTRUCTED))
-                  ) :
-                  svp->u.ob->flags & O_DESTRUCTED ) ) )
+        if (destructed_object_ref(svp))
         {
-            /* This key is / is bound to a destructed object. The entry has to
-             * be deleted (later).
+            /* This key is a destructed object, resp. is bound to a destructed
+             * object. The entry has to be deleted (later).
              */
 
             if (svp->type == T_CLOSURE &&
@@ -4697,8 +4684,7 @@ f_m_contains (svalue_t *sp, int num_arg)
     {
         /* get_map_lvalue() may return destructed objects. */
         /* TODO: May this cause problems elsewhere, too? */
-        if (T_OBJECT == item->type
-         && (O_DESTRUCTED & item->u.ob->flags))
+        if (destructed_object_ref(item))
         {
             assign_svalue(sp[i].u.lvalue, &const0);
             item++;

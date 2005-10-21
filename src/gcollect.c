@@ -883,6 +883,7 @@ printf("DEBUG: %s GC start: %ld objects in list, %ld allocated\n", time_stamp(),
     free_old_driver_hooks();
     purge_action_sent();
     purge_shadow_sent();
+    check_wizlist_for_destr();
     compact_mappings(num_dirty_mappings);
 
 printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object); /* TODO: Remove this line */
@@ -1552,6 +1553,7 @@ garbage_collection (void)
     remove_unknown_identifier();
     purge_action_sent();
     purge_shadow_sent();
+    check_wizlist_for_destr();
     compact_mappings(num_dirty_mappings);
 
     reallocate_reserved_areas();
