@@ -142,7 +142,6 @@ erq_rlookupv6(char *mesg, int msglen)
         strcat(mbuff, ai2->ai_canonname);
         reply1(get_handle(mesg), mbuff, strlen(mbuff)+1);
         free(mbuff);
-        free(buf);
     }
     else
         reply1(get_handle(mesg), msg_invalid, strlen(msg_invalid)+1);

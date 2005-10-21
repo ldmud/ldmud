@@ -77,6 +77,9 @@
 /* Does the machine offer IPv6? */
 #undef HAS_IPV6
 
+/* Does the machine offer mySQL? */
+#undef HAS_MYSQL
+
 /* define the erq include file. */
 #undef ERQ_INCLUDE
 

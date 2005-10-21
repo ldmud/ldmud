@@ -110,6 +110,8 @@ Lars Duening thanks:
  - Ron Koerner (ron.koerner@gmx.de, Righ@FinalFrontier) provided the
      initial implementation of inline closures modelled after MudOS' syntax.
  - Uwe (mai94cch@studserv.uni-leipzig.de) provided the basic IPv6 support.
+ - Mark Daniel Reidel (Karm@Nightfall) did the first implementation of
+     the mySQL efuns.
  - for bug reports, critics, fixes, patches and other support:
      Alex@TubMud (at16@st-andrews.ac.uk)
      Alexander Fetke (alfebtcd@cs.tu-berlin.de, Alfe@Tubmud)
@@ -179,7 +181,7 @@ Lars Duening thanks:
      Robert (mud@pc181.iaee.tuwien.ac.at, Nathan@Unholy Lands)
      Robert Reither (e8925573@student.tuwien.ac.at, Nathan@Unholy.Lands)
      Rodney Quaye (sark@oberon.krans.com)
-     Ron Dawson (rondawson@syd.eastlink.ca, Caper@PixieMud)
+     Ron Dawson (rondawson@syd.eastlink.ca, rdawson@cgc.ns.ca, Caper@PixieMud)
      Stephan Lichtenhagen (lichti@amethyst.chemie.uni-dortmund.de,
        stephan@lichtenhagen.de, Tiamak@Morgengrauen)
      Sieni (sampsa@netsonic.fi)

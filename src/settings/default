@@ -264,6 +264,10 @@ enable_use_system_crypt=yes
 
 enable_lpc_nosave=yes
 
+# Enable support for mySQL (assuming your system supports it).
+
+enable_use_mysql=no
+
 # --- Runtime limits ---
 
 # Maximum size of a socket send buffer.

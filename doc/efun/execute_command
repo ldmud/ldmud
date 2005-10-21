@@ -1,4 +1,3 @@
-PRELIMINARY
 SYNOPSIS
 
         int execute_command (string command, object origin, object player)

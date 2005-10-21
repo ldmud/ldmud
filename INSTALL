@@ -1,3 +1,13 @@
+Topics covered:
+
+  - Unix or Unix-like systems, with additional details for FreeBSD, AIX 3.4,
+      and DEC Ultrix.
+  - IPv 6
+  - mySQL
+  - BeOS
+  - Window 95/98/NT
+
+
 Unix or Unix-like system
 ------------------------
 
@@ -102,7 +112,6 @@ Unix or Unix-like system
 
 IPv6
 ----
-
   If your machine supports IPv6, the driver can be configured to use it: give
   '--enable-use-ipv6=yes' as argument to the configure script.
   
@@ -129,6 +138,25 @@ IPv6
   (<URL:http://www.join.uni-muenster.de/>).
 
   Newer versions of AIX also come with IPv6 support.
+
+
+mySQL
+-----
+  If your machine has mySQL installed, the driver can be configured to use
+  it: give '--enable-use-mysql=yes' as argument to the configure script.
+
+  Before you compile the driver, you have to add the username and password
+  of the Mud user to the driver (if you haven't done so already, now would
+  be a good time to set up this user in the mySQL database).
+  Enter this username and password in the file pkg-mysql.c, function
+  mysql_real_connect(), and compile the driver (the username and
+  password are built into the driver for security reasons).
+  If you chose to not create either a username and/or a password,
+  leave the corresponding entry at 0.
+
+  Use mysqladmin to create any databases you want to provide - the
+  names are later used in the efun db_connect() to connect to
+  the databases.
 
 
 BeOS

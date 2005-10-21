@@ -152,7 +152,7 @@ convert_number(n) {
 
 query_numbers() {
     if (!numbers) {
-	if (file_name(this_object()) == "room/room")
+	if (object_name(this_object()) == "room/room")
 	    numbers = ({"no", "one", "two", "three", "four", "five",
 			    "six", "seven", "eight", "nine" });
 	else

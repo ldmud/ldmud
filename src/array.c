@@ -1417,7 +1417,7 @@ f_allocate (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_filter_array (svalue_t *sp, int num_arg)
+x_filter_array (svalue_t *sp, int num_arg)
 
 /* EFUN: filter_array(), also filter() for arrays.
  *
@@ -1584,11 +1584,11 @@ f_filter_array (svalue_t *sp, int num_arg)
     arg->u.vec = vec;
 
     return arg;
-} /* f_filter_array() */
+} /* x_filter_array() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_map_array (svalue_t *sp, int num_arg)
+x_map_array (svalue_t *sp, int num_arg)
 
 /* EFUN map() on arrays
  *
@@ -1716,7 +1716,7 @@ f_map_array (svalue_t *sp, int num_arg)
     arg->u.vec = res;
 
     return arg;
-} /* f_map_array () */
+} /* x_map_array () */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

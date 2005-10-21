@@ -91,7 +91,7 @@ list_peoples() {
 	else
 	    write("\t");
 	if (environment(list[i]))
-	    write(file_name(environment(list[i])));
+	    write(object_name(environment(list[i])));
 	write("\n");
     }
     return 1;

@@ -65,11 +65,11 @@ int query_player_level (string what); // forward
 #ifndef __COMPAT_MODE__
 
 //---------------------------------------------------------------------------
-string file_name(object ob)
+string object_name(object ob)
 {
     string rc;
 
-    rc = efun::file_name(ob);
+    rc = efun::object_name(ob);
     return stringp(rc) ? rc[1..] : 0;
 }
 
@@ -546,8 +546,8 @@ mixed get_simul_efun ()
 // Load the simul_efun object(s) and return one or more paths of it.
 //
 // Result:
-//   Either a single string with the file_name() of the simul_efun object,
-//   or an array of strings which has to start with that file_name().
+//   Either a single string with the object_name() of the simul_efun object,
+//   or an array of strings which has to start with that object_name().
 //   Return 0 if this feature isn't wanted.
 //
 // Note that the object(s) must be loaded by this function!
@@ -975,7 +975,7 @@ void slow_shut_down (int minutes)
 //   fine, else the game is shut down by a call to this function.
 
 {
-    filter_array(users(), #'tell_object,
+    filter(users(), #'tell_object,
       "Game driver shouts: The memory is getting low !\n");
     "obj/shut"->shut(minutes);
 }
@@ -996,7 +996,7 @@ void notify_shutdown ()
 {
     if (previous_object() && previous_object() != this_object())
         return;
-    filter_array(users(), #'tell_object,
+    filter(users(), #'tell_object,
       "Game driver shouts: LPmud shutting down immediately.\n");
     save_wiz_file();
     mudwho_shutdown();
@@ -1136,7 +1136,7 @@ void runtime_error (string err, string prg, string curobj, int line)
 // trouble prematurely) and give root objects only the permission to
 // execute the real efuns.
 //
-// See also creator_file(), valid_read() and valid_write().
+// See also valid_read() and valid_write().
 //===========================================================================
 
 //---------------------------------------------------------------------------
@@ -1312,7 +1312,7 @@ int valid_exec (string name, object ob, object obfrom)
 //
 // Arguments:
 //    name  : The name of the _program_ attempting to rebind the connection.
-//            This is not the file_name() of the object, and has no leading
+//            This is not the object_name() of the object, and has no leading
 //            slash.
 //    ob    : The object to receive the connection.
 //    obfrom: The object giving the connection away.
@@ -1376,7 +1376,7 @@ int valid_snoop (object snoopee, object snooper)
     if (!geteuid(previous_object()))
         return 0;
     */
-    if (file_name(previous_object()) == get_simul_efun())
+    if (object_name(previous_object()) == get_simul_efun())
         return 1;
 }
 
@@ -1562,7 +1562,7 @@ mixed valid_write (string path, string euid, string fun, object caller)
              &&  sscanf(path, ".%s", user) == 0)
                 return path;
         } else {
-            user = file_name(previous_object());
+            user = object_name(previous_object());
             if ( user[0..3] == "obj/"
              ||  user[0..4] == "room/"
              ||  user[0..3] == "std/"  )
@@ -1587,8 +1587,8 @@ mixed valid_write (string path, string euid, string fun, object caller)
         break;
     case "rename_from":
     case "rename_to":
-        if ((   file_name(caller) == SIMUL_EFUN_FILE
-             || file_name(caller) == SPARE_SIMUL_EFUN_FILE)
+        if ((   object_name(caller) == SIMUL_EFUN_FILE
+             || object_name(caller) == SPARE_SIMUL_EFUN_FILE)
          && path[0..4] == "/log/"
          && !(   sizeof(regexp(({path[5..34]}), "/"))
               || path[5] == '.'
@@ -1934,7 +1934,7 @@ void save_wiz_file()
     write_file(
       "/WIZLIST",
       implode(
-        map_array(wizlist_info(),
+        map(wizlist_info(),
           lambda(({'a}),
             ({#'sprintf, "%s %d %d\n",
               ({#'[, 'a, WL_NAME}),
@@ -1958,8 +1958,8 @@ int verify_create_wizard (object ob)
 {
     int dummy;
 
-    if (sscanf(file_name(ob), "room/port_castle#%d", dummy) == 1
-      || sscanf(file_name(ob), "global/port_castle#%d", dummy) == 1)
+    if (sscanf(object_name(ob), "room/port_castle#%d", dummy) == 1
+      || sscanf(object_name(ob), "global/port_castle#%d", dummy) == 1)
 	return 1;
     return 0;
 }
@@ -2000,7 +2000,7 @@ string master_create_wizard(string owner, string domain, object caller)
 		    wizard + "\n");
 	mkdir(wizard);
     }
-    dest = file_name(environment(player));
+    dest = object_name(environment(player));
     def_castle = "#define NAME \"" + owner + "\"\n#define DEST \"" +
 	dest + "\"\n" + read_file("/room/def_castle.c");
     if (file_size(castle) > 0) {

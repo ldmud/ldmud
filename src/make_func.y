@@ -2405,6 +2405,30 @@ read_config (void)
 
 #undef MATCH
     
+    /* Sanity check on some of those USE_ defines: undefine
+     * those which are not supported on the host system.
+     */
+    {
+        char * defnames[] = {
+#ifndef HAS_IPV6
+                             "USE_IPV6",
+#endif
+#ifndef HAS_MYSQL
+                             "USE_MYSQL",
+#endif
+                             NULL };
+        int i;
+
+        for (i = 0; defnames[i] != NULL; i++)
+        {
+            struct defn *old_def;
+            old_def = lookup_define(defnames[i]);
+            if (old_def)
+            {
+                old_def->name[0] = '\0';
+            }
+        }
+    }
 } /* read_config() */
 
 /*-------------------------------------------------------------------------*/

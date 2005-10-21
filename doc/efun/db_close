@@ -1,3 +1,4 @@
+OPTIONAL
 SYNOPSIS
         int db_close(int handle)
 
@@ -5,6 +6,12 @@ DESCRIPTION
         Close the server-connection with the handle <handle>
         Return the handle-number on success.
 
+        The function is available only if the driver is compiled with
+        mySQL support. In that case, __MYSQL__ is defined.
+
+HISTORY
+        Added in LDMud 3.2.9 / 3.3 .
+
 SEE ALSO
         db_affected_rows(E), db_conv_string(E), db_connect(E),
-        db_exec(E), db_fetch(E), db_handles(E)
+        db_exec(E), db_fetch(E), db_handles(E), mysql(C)

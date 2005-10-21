@@ -886,6 +886,12 @@ options (void)
   fputs("           IPv6: supported.\n", stdout);
 #endif
 
+#ifndef USE_MYSQL
+  fputs("          mySQL: not supported.\n", stdout);
+#else
+  fputs("          mySQL: supported.\n", stdout);
+#endif
+
 #ifdef ACCESS_CONTROL
   fputs(" Access control: using <mudlib>/" ACCESS_FILE
 #    ifdef ACCESS_LOG

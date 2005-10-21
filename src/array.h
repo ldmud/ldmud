@@ -134,9 +134,9 @@ extern int is_alist(vector_t *v);
 extern vector_t *intersect_array(vector_t *a1, vector_t *a2);
 
 extern svalue_t *f_allocate(svalue_t *sp);
-extern svalue_t *f_filter_array(svalue_t *sp, int num_arg);
+extern svalue_t *x_filter_array(svalue_t *sp, int num_arg);
 extern svalue_t *f_sort_array(svalue_t *sp, int num_arg);
-extern svalue_t *f_map_array(svalue_t *sp, int num_arg);
+extern svalue_t *x_map_array(svalue_t *sp, int num_arg);
 extern svalue_t *f_transpose_array(svalue_t *sp);
 
 #ifdef F_MEMBER_ARRAY

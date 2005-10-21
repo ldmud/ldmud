@@ -217,7 +217,6 @@ int     strlen(null|string);
         /* Arrays and Mapings */
 
 int     sizeof(null|mixed|mixed *|mapping);
-int     m_sizeof F_SIZEOF (mapping);
 
         /* Functions and Closures */
 
@@ -327,19 +326,13 @@ mixed  *transpose_array(mixed *);
 mixed  *unique_array(mixed *, string, mixed default: F_CONST0);
 
 mixed   filter(mapping|mixed *, string|closure|mapping, ...);
-mixed  *filter_array(mixed *, string|closure|mapping, ...);
 mapping filter_indices(mapping, string|closure,  ...);
-mapping filter_mapping F_FILTER_INDICES (mapping, string|closure,  ...);
 
 mixed   map(mixed *|mapping, mapping|string|closure, ...);
-mixed  *map_array(mixed *, mapping|string|closure, ...);
 mapping map_indices(mapping, string|closure, ...);
-mapping map_mapping F_MAP_INDICES (mapping, string|closure, ...);
 
 mapping m_allocate(int, int default: F_CONST1);
-mapping allocate_mapping F_M_ALLOCATE (int, int default: F_CONST1);
 int     m_contains(mixed & | mapping, mixed & | mixed, ...);
-int     mapping_contains F_M_CONTAINS (mixed & | mapping, mixed & | mixed, ...);
 mapping m_delete(mapping, mixed);
 mixed  *m_indices(mapping);
 mapping m_reallocate(mapping, int);
@@ -390,7 +383,6 @@ int     input_to(string, void|int, ...);
 int     interactive(object default: F_THIS_OBJECT);
 string  load_name(string|object default: F_THIS_OBJECT);
 object  load_object(string);
-string  file_name F_OBJECT_NAME (object default: F_THIS_OBJECT);
 string  function_exists(string, object default: F_THIS_OBJECT);
 mixed  *object_info(object, int);
 string  object_name(object default: F_THIS_OBJECT);
@@ -497,7 +489,6 @@ void    move_object(object|string, object|string);
 object  present(object|string, void|object);
 void    say(string|mixed *, void|object|object *);
 void    set_environment(object, null|object);
-void    efun308 F_SET_ENVIRONMENT (object, object);
 void    tell_room(object|string, string|mixed *, void|object *);
 
 
@@ -535,6 +526,21 @@ string  creator (object); /* Same function, different name */
 
 
         /* Technical efuns */
+
+
+#ifdef USE_MYSQL
+
+        /* mySQL-Support */
+
+int     db_affected_rows(int);
+string  db_conv_string(string);
+int     db_close(int);
+int     db_connect(string);
+int     db_exec(int, string);
+mixed   db_fetch(int);
+int    *db_handles();
+
+#endif /* USE_MYSQL */
 
 
         /* Functions only used in compatibility mode. */

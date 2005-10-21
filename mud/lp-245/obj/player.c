@@ -1425,7 +1425,7 @@ list_peoples() {
 	else
 	    write("\t");
 	if (environment(list[i]))
-	    write(file_name(environment(list[i])));
+	    write(object_name(environment(list[i])));
 	write("\n");
     }
     return 1;
@@ -1634,7 +1634,7 @@ static bug(str)
     }
     log_file("BUGS", "\n");
     log_file("BUGS", cap_name + " (" +
-	     file_name(environment(this_object())) + "):\n");
+	     object_name(environment(this_object())) + "):\n");
     log_file("BUGS", str + "\n");
     smart_report("Bug " + cap_name + "\n" + str);
     write("Ok.\n");
@@ -1648,7 +1648,7 @@ static typo(str)
 	return 1;
     }
     log_file("TYPO", cap_name + " (" +
-	     file_name(environment(this_object())) + "):\n");
+	     object_name(environment(this_object())) + "):\n");
     log_file("TYPO", str + "\n");
     smart_report("Typo " + cap_name + "\n" + str);
     write("Ok.\n");
@@ -2311,7 +2311,7 @@ valid_write(str) {
 
     owner = name;
     if (previous_object() && previous_object() != this_object()) {
-	if (sscanf(file_name(previous_object()), "players/%s/", who) == 1)
+	if (sscanf(object_name(previous_object()), "players/%s/", who) == 1)
 	    owner = who;
     }
     if (str[0] != '/') {
@@ -2476,7 +2476,7 @@ smart_report(str) {
     string who;
     string current_room;
 
-    current_room = file_name(environment(this_object()));
+    current_room = object_name(environment(this_object()));
     if (sscanf(current_room, "players/%s/", who) != 1)
 	return;
     log_file(who + ".rep", current_room + " " + str + "\n");
@@ -2512,7 +2512,7 @@ set_quest(q) {
 #ifdef LOG_SET_QUEST
     if (previous_object()) {
 	log_file("QUESTS", name + ": " + q + " from " +
-		 file_name(previous_object()) + "\n");
+		 object_name(previous_object()) + "\n");
 	if (this_player() && this_player() != this_object() &&
 	  query_ip_number(this_player()))
 	    log_file("QUESTS", "Done by " +

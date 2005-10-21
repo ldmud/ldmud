@@ -1,6 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Aug-2000 (Lars Duening)  (3.3.3)
+    - (xerq/lookup.c) In the IPv6 lookup, a buffer was freed twice.
+         (found by Uwe and Fiona).
+    - (pkg-mysql, doc/..., INSTALL) Integrated the mySQL efuns into the
+         driver proper. They are activated on suitable hosts with the
+         configuration switch 'use-mysql' and, when activated, define
+         the macro '__MYSQL__' in LPC programs.
+    - (lex.c) Added new LPC defines __VERSION_MAJOR__, ..._MINOR__,
+         ..._MICRO__ and ..._PATCH__ do exactly what you expect.
+    - (various files) Removed obsolete efuns: file_name(), filter_array(),
+         m_sizeof() and map_array(). Removed deprecated efuns:
+         allocate_mapping(), efun308(), filter_mapping(), map_mapping()
+         and mapping_contains(). They were all just aliases of other efuns
+         anyway.
+
 23-Aug-2000 (Lars Duening)  (3.3.2)
     - Forked 3.3 off the 3.2 branch at 3.2.9-dev.227.
     - (bitstrings, files) New files holding the efuns for bitstrings

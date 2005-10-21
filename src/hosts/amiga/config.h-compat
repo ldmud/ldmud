@@ -260,6 +260,11 @@
  */
 #undef USE_IPV6
 
+/* Define this if you want mySQL support (assuming that your host
+ * actually offers this.
+ */
+#undef USE_MYSQL
+
 /* Define this if you want the 'nosave' keyword.
  */
 #define USE_LPC_NOSAVE

@@ -1,6 +1,6 @@
 SYNOPSIS
 	int    save_object (string name)
-	string save_object ()             (PRELIMINARY)
+	string save_object ()
 
 DESCRIPTION
         Encode the publicly visible variables of the current object

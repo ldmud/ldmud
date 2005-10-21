@@ -27,7 +27,7 @@
  *    TODO: Move into object.c.
  *    efun: clones()
  *    efun: object_info()
- *    efun: present_clone() (preliminary)
+ *    efun: present_clone()
  *    efun: set_is_wizard() (optional)
  *
  * Values:
@@ -4587,7 +4587,7 @@ f_filter (svalue_t *sp, int num_arg)
     if (sp[-num_arg+1].type == T_MAPPING)
         return x_filter_mapping(sp, num_arg, MY_TRUE);
     else
-        return f_filter_array(sp, num_arg);
+        return x_filter_array(sp, num_arg);
 
 } /* f_filter() */
 
@@ -4727,7 +4727,7 @@ f_map (svalue_t *sp, int num_arg)
     if (sp[-num_arg+1].type == T_MAPPING)
         return x_map_mapping(sp, num_arg, MY_TRUE);
     else
-        return f_map_array(sp, num_arg);
+        return x_map_array(sp, num_arg);
 
 } /* f_map() */
 

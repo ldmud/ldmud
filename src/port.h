@@ -140,6 +140,8 @@ extern int errno;
  *                extract a character from a memory location.
  *   USE_IPV6     check the definition from config.h in relation
  *                to HAS_IPV6 from autoconf.
+ *   USE_MYSQL    check the definition from config.h in relation
+ *                to HAS_MYSQL from autoconf.
  *   MSDOS_FS     if the filesystem uses MS-DOS semantics
  *                (i.e. backslashes as directory separators)
  */
@@ -197,6 +199,10 @@ extern int errno;
 
 #if !defined(HAS_IPV6) && defined(USE_IPV6)
 #    undef USE_IPV6
+#endif
+
+#if !defined(HAS_MYSQL) && defined(USE_MYSQL)
+#    undef USE_MYSQL
 #endif
 
 #if ( defined( atarist ) && !defined ( minix ) ) || defined( MSDOS ) || defined(__CYGWIN__)

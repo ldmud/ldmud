@@ -36,9 +36,9 @@ void start_simul_efun()
     if ( !(info = get_extra_wizinfo(0)) )
 	set_extra_wizinfo(0, info = allocate(BACKBONE_WIZINFO_SIZE));
     if (!(living_name_m = info[LIVING_NAME]))
-	living_name_m = info[LIVING_NAME] = allocate_mapping(0, 1);
+	living_name_m = info[LIVING_NAME] = m_allocate(0, 1);
     if (!(name_living_m = info[NAME_LIVING]))
-	name_living_m = info[NAME_LIVING] = allocate_mapping(0, 1);
+	name_living_m = info[NAME_LIVING] = m_allocate(0, 1);
     if (find_call_out("clean_simul_efun") < 0)
 	call_out("clean_simul_efun", 1800);
 }
@@ -273,9 +273,9 @@ varargs void add_worth(int value, object ob)
 {
     mixed old;
 #ifdef __COMPAT_MODE__
-    switch (explode(file_name(previous_object()), "/")[0]) {
+    switch (explode(object_name(previous_object()), "/")[0]) {
 #else
-    switch (explode(file_name(previous_object()), "/")[1]) {
+    switch (explode(object_name(previous_object()), "/")[1]) {
 #endif
       default:
 	raise_error("Illegal call of add_worth.\n");
@@ -346,7 +346,7 @@ varargs void wizlist(string name)
 //---------------------------------------------------------------------------
 void shout(string s)
 {
-    filter_array(users(), lambda(({'u}),({#'&&,
+    filter(users(), lambda(({'u}),({#'&&,
       ({#'environment, 'u}),
       ({#'!=, 'u, ({#'this_player})}),
       ({#'tell_object, 'u, to_string(s)})
@@ -440,15 +440,6 @@ string function_exists (string str, object ob)
     string rc;
 
     rc = efun::function_exists(str, ob);
-    return stringp(rc) ? rc[1..] : 0;
-}
-
-//---------------------------------------------------------------------------
-string file_name(object ob)
-{
-    string rc;
-
-    rc = efun::file_name(ob);
     return stringp(rc) ? rc[1..] : 0;
 }
 

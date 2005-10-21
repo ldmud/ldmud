@@ -1,4 +1,3 @@
-PRELIMINARY
 SYNOPSIS
         object present_clone (string str, object env)
         object present_clone (object obj, object env)

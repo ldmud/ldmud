@@ -28,7 +28,7 @@ set_ok_message( str)
 set_name(str)
 {
     string TmpString;
-    if (file_name(previous_object())[0..4] != "/obj" &&
+    if (object_name(previous_object())[0..4] != "/obj" &&
 	!creator(this_object())&&!creator(previous_file())) {
 	write("Illegal usage, Savefile-path is illegal.\n");
 	destruct(this_object());

@@ -67,8 +67,7 @@
 
 /* TODO: Use get_host_name() instead of gethostname()
  * TODO: Implement the # and ## operators.
- * TODO: New predefs' __DRIVER_VERSION__, _REVISION__, _PATCHLEVEL__, __PATH__
- * TODO:: and __BASENAME__.
+ * TODO: New predefs' __BASENAME__.
  * TODO: #define macro(a,b,...) -> ... is assigned to __VA_ARGS__ (see oncoming
  * TODO:: C standard).
  * TODO: Does Standard-C allow recursive macro expansion? If not, we
@@ -745,6 +744,14 @@ init_lexer(void)
     add_permanent_define("__PATH__", 1, (void *)get_sub_path, MY_TRUE);
     add_permanent_define("__LINE__", -1, (void *)get_current_line, MY_TRUE);
     add_permanent_define("__VERSION__", -1, (void *)get_version, MY_TRUE);
+    add_permanent_define("__VERSION_MAJOR__", -1, string_copy(VERSION_MAJOR), MY_FALSE);
+    add_permanent_define("__VERSION_MINOR__", -1, string_copy(VERSION_MINOR), MY_FALSE);
+    add_permanent_define("__VERSION_MICRO__", -1, string_copy(VERSION_MICRO), MY_FALSE);
+    if (IS_RELEASE())
+        add_permanent_define("__VERSION_PATCH__", -1, string_copy("0"), MY_FALSE);
+    else
+        add_permanent_define("__VERSION_PATCH__", -1, string_copy(VERSION_PATCH), MY_FALSE);
+
     add_permanent_define("__HOST_NAME__", -1, (void *)get_hostname, MY_TRUE);
     add_permanent_define("__DOMAIN_NAME__", -1, (void *)get_domainname, MY_TRUE);
     add_permanent_define("__HOST_IP_NUMBER__", -1
@@ -762,6 +769,9 @@ init_lexer(void)
     add_permanent_define("__MAX_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
 #ifdef USE_IPV6
     add_permanent_define("__IPV6__", -1, string_copy(""), MY_FALSE);
+#endif
+#ifdef USE_MYSQL
+    add_permanent_define("__MYSQL__", -1, string_copy(""), MY_FALSE);
 #endif
 #ifdef USE_LPC_NOSAVE
     add_permanent_define("__LPC_NOSAVE__", -1, string_copy(""), MY_FALSE);

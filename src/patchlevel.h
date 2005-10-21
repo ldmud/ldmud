@@ -1,6 +1,12 @@
 #ifndef PATCHLEVEL_H__
 #define PATCHLEVEL_H__ 1
 
+/*--------------------------------------------------------------------------
+ * Various version numbers and strings, collected here so that PRCS has
+ * to change only one file.
+ *--------------------------------------------------------------------------
+ */
+
 /* $Format: "#if $ReleaseMinor$ / 2 == 0"$ */
 #if 3 / 2 == 0
 #    define IS_STABLE 1
@@ -12,10 +18,10 @@
 #define IS_RELEASE() (!strcmp("dev", "rel"))
 
 /* $Format: "#define RELEASE_DATE \"$ProjectDate$\""$ */
-#define RELEASE_DATE "Thu, 24 Aug 2000 23:45:24 -0600"
+#define RELEASE_DATE "Sat, 26 Aug 2000 01:48:50 -0600"
 
 /* $Format: "#define PROJ_VERSION \"$ProjectVersion$\""$ */
-#define PROJ_VERSION "3-3.2"
+#define PROJ_VERSION "3-3.3"
 
 #if IS_STABLE
 
@@ -23,7 +29,7 @@
 #define GAME_VERSION "3.3.0"
 
 /* $Format: "#define LONG_VERSION \"$ReleaseVersion$-$ReleaseType$.$ProjectMinorVersion$\""$ */
-#define LONG_VERSION "3.3.0-dev.2"
+#define LONG_VERSION "3.3.0-dev.3"
 
 #else
 
@@ -34,6 +40,18 @@
 #define LONG_VERSION "3.3.$ProjectMinor$"
 
 #endif
+
+/* $Format: "#define VERSION_MAJOR \"$ReleaseMajor$\""$ */
+#define VERSION_MAJOR "3"
+
+/* $Format: "#define VERSION_MINOR \"$ReleaseMinor$\""$ */
+#define VERSION_MINOR "3"
+
+/* $Format: "#define VERSION_MICRO \"$ReleaseMicro$\""$ */
+#define VERSION_MICRO "0"
+
+/* $Format: "#define VERSION_PATCH \"$ProjectMinorVersion$\""$ */
+#define VERSION_PATCH "3"
 
 /* $Format: "#define LOCAL_LEVEL \"\""$ */
 #define LOCAL_LEVEL ""

@@ -92,6 +92,7 @@ AC_MY_ARG_ENABLE(initialization-by-__init,yes,,)
 AC_MY_ARG_ENABLE(use-system-crypt,yes,,)
 AC_MY_ARG_ENABLE(udp-send,yes,,)
 AC_MY_ARG_ENABLE(use-ipv6,no,,)
+AC_MY_ARG_ENABLE(use-mysql,no,,)
 AC_MY_ARG_ENABLE(lpc-nosave,yes,,[Enables the 'nosave' keyword])
 AC_MY_ARG_ENABLE(comm-stat,yes,,)
 AC_MY_ARG_ENABLE(apply-cache_stat,yes,,)
@@ -198,6 +199,7 @@ AC_CDEF_FROM_ENABLE(initialization_by___init)
 AC_CDEF_FROM_ENABLE(use_system_crypt)
 AC_CDEF_FROM_ENABLE(udp_send)
 AC_CDEF_FROM_ENABLE(use_ipv6)
+AC_CDEF_FROM_ENABLE(use_mysql)
 AC_CDEF_FROM_ENABLE(lpc_nosave)
 AC_CDEF_FROM_ENABLE(comm_stat)
 AC_CDEF_FROM_ENABLE(apply_cache_stat)
@@ -483,6 +485,28 @@ CFLAGS="$saveflags"
 if test $lp_cv_has_ipv6 = yes; then
   AC_DEFINE(HAS_IPV6)
   AC_CHECK_LIB(inet6,main, LIBS="$LIBS -linet6")
+fi
+
+AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
+saveflags="$CFLAGS"
+AC_TRY_COMPILE([
+#include <sys/types.h>
+#include <mysql/mysql.h>
+#include <mysql/errmsg.h>
+
+struct MYSQL * foo(void)
+{
+    static MYSQL var;
+    
+    return &var;
+}
+],,lp_cv_has_mysql=yes,
+lp_cv_has_mysql=no
+CFLAGS="$saveflags"
+))
+if test $lp_cv_has_mysql = yes; then
+  AC_DEFINE(HAS_MYSQL)
+  AC_CHECK_LIB(inet6,main, LIBS="$LIBS -lmysqlclient")
 fi
 
 AC_CACHE_CHECK(if rename handles directories,
@@ -1402,6 +1426,7 @@ AC_SUBST(cdef_initialization_by___init)
 AC_SUBST(cdef_use_system_crypt)
 AC_SUBST(cdef_udp_send)
 AC_SUBST(cdef_use_ipv6)
+AC_SUBST(cdef_use_mysql)
 AC_SUBST(cdef_lpc_nosave)
 AC_SUBST(cdef_comm_stat)
 AC_SUBST(cdef_apply_cache_stat)

@@ -817,7 +817,7 @@ query_wimpy() {
 }
 
 query_current_room() {
-    return file_name(environment(this_object()));
+    return object_name(environment(this_object()));
 }
 
 query_spell_points() {
@@ -846,7 +846,7 @@ reduce_hit_point(dam) {
 	    log_file("REDUCE_HP",this_player()->query_name());
 	    o=previous_object();
 	    if (o)
-		log_file("REDUCE_HP", " " + file_name(o) + ", " +
+		log_file("REDUCE_HP", " " + object_name(o) + ", " +
 			 o->short() + " (" + creator(o) + ")\n");
 	    else
 		log_file("REDUCE_HP", " ??\n");
@@ -930,7 +930,7 @@ set_flag(n) {
 	  query_ip_number(this_player()))
 	    log_file("FLAGS", "Done by " +
 		     this_player()->query_real_name() + " using " +
-		     file_name(previous_object()) + ".\n");
+		     object_name(previous_object()) + ".\n");
     }
 #endif
     flags = set_bit(flags, n);
@@ -952,7 +952,7 @@ clear_flag(n) {
 	  query_ip_number(this_player()))
 	    log_file("FLAGS", "Done by " +
 		     this_player()->query_real_name() + " using " +
-		     file_name(previous_object()) + ".\n");
+		     object_name(previous_object()) + ".\n");
     }
 #endif
 

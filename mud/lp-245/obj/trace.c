@@ -83,7 +83,7 @@ Dump(str) {
 	    else if (strlen(t) < 16)
 		t += "\t";
 	    if (objectp(tmp))
-		tmp = file_name(tmp);
+		tmp = object_name(tmp);
 	    else if (pointerp(tmp))
 		tmp = "<ARRAY>";
 	    write(t + "\t" + tmp + "\n");
@@ -300,7 +300,7 @@ parse_list(str) {
 }
 
 static disp(ob) {
-    write(file_name(ob) + "\n");
+    write(object_name(ob) + "\n");
 }
 
 Set(str) {

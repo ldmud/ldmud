@@ -77,7 +77,7 @@
 // mixed inherit_file (string file, string compiled_file)
 //   Return the full pathname for an inherited object.
 //
-// string object_name (object obj)
+// string printf_obj_name (object obj)
 //   Return a printable name for an object.
 //
 // mixed prepare_destruct (object obj)
@@ -753,7 +753,7 @@ void runtime_error (string err, string prg, string curobj, int line)
 // trouble prematurely) and give root objects only the permission to
 // execute the real efuns.
 //
-// See also creator_file(), valid_read() and valid_write().
+// See also valid_read() and valid_write().
 //===========================================================================
 
 //---------------------------------------------------------------------------
