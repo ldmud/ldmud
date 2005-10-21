@@ -586,7 +586,7 @@ call_obj (char *fnamn, object_t *on, char *apa)
 {
     svalue_t *ret;
 
-    push_volatile_string(apa);
+    push_volatile_string(inter_sp, apa);
     ret = apply(fnamn, on, 1);
     if (!ret) return 0;
     if ( ret->type == T_NUMBER) return ret->u.number;

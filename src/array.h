@@ -36,6 +36,7 @@
 #else
 #    define VEC_DEBUGREF(ref)
 #endif
+#include "svalue.h"
 
 #define VEC_HEAD(size) size, 1, VEC_DEBUGREF(1) NULL
 
@@ -47,7 +48,6 @@
 #else
 #    define VEC_SIZE(v) ((v)->size)
 #endif
-
 
 #define LOCAL_VEC1(name, type1) \
     struct { vector_t v; } name \
@@ -126,32 +126,36 @@ extern void check_for_destr(vector_t *v);
 extern vector_t *explode_string(char *str, char *del);
 extern vector_t *old_explode_string(char *str, char *del);
 extern vector_t *slice_array(vector_t *p, mp_int from, mp_int to);
-extern vector_t *make_unique(vector_t *arr, char *func, svalue_t *skipnum);
 extern vector_t *add_array(vector_t *p, vector_t *q);
 extern vector_t *subtract_array(vector_t *minuend, vector_t *subtrahend);
-extern vector_t *all_inventory(object_t *ob);
-extern vector_t *deep_inventory(object_t *ob, Bool take_top);
 extern vector_t *order_alist(svalue_t *inlists, int listnum, Bool reuse);
 extern int assoc(svalue_t *key, vector_t *list);
-extern vector_t *intersect_alist(vector_t *a1, vector_t *a2);
 extern int is_alist(vector_t *v);
 extern vector_t *intersect_array(vector_t *a1, vector_t *a2);
-extern vector_t *match_regexp(vector_t *v, char *pattern);
 
+extern svalue_t *f_allocate(svalue_t *sp);
 extern svalue_t *f_filter_array(svalue_t *sp, int num_arg);
 extern svalue_t *f_sort_array(svalue_t *sp, int num_arg);
 extern svalue_t *f_map_array(svalue_t *sp, int num_arg);
 extern svalue_t *f_transpose_array(svalue_t *sp);
-extern svalue_t *f_regexplode(svalue_t *sp);
 
-#ifdef F_INSERT_ALIST
-extern svalue_t *insert_alist(svalue_t *key, svalue_t *key_data, vector_t *list);
+#ifdef F_MEMBER_ARRAY
+extern svalue_t *f_member_array(svalue_t *sp);
 #endif
 
-extern svalue_t *f_inherit_list(svalue_t *sp);
+extern svalue_t *f_assoc(svalue_t *sp, int num_arg);
+extern svalue_t *f_intersect_alist(svalue_t *sp);
+#ifdef F_INSERT_ALIST
+extern svalue_t *f_insert_alist(svalue_t *sp, int num_arg);
+#endif
+
+#ifdef F_ORDER_ALIST
+extern svalue_t *f_order_alist(svalue_t *sp, int num_arg);
+#endif
+
 extern svalue_t *f_filter_objects(svalue_t *sp, int num_arg);
 extern svalue_t *f_map_objects(svalue_t *sp, int num_arg);
-extern svalue_t *f_functionlist(svalue_t *sp);
+extern svalue_t *f_unique_array(svalue_t *sp);
 
 extern void set_vector_user(vector_t *p, object_t *owner);
 extern long total_array_size(void);

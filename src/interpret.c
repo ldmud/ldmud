@@ -84,25 +84,37 @@
  *    Apart from the usual machine instructions (branches, stack
  *    manipulation, summarily called 'codes'), the machine implements every
  *    efun by its own instruction code. Since this leads to more than
- *    256 instructions, the less often used instructions are grouped into
- *    'xefuns'+'xcodes', 'tefuns'+'tcodes'  and 'vefuns'+'tcodes', and the
- *    byte defining for the instruction within its group is prefixed by
- *    a byte defining the group: F_ESCAPE for xefuns, F_TEFUN for tefuns,
- *    and F_VEFUN for vefuns.
+ *    256 instructions, the most of the efuns are encoded using prefix
+ *    bytes. The unprefixed opcodes in the range 0..255 are used for the
+ *    internal machine instructions and LPC operators, and for the small
+ *    and/or often used efuns. The prefix byte for the other efun
+ *    instructions reflects the type of the efun:
  *
- *    Like normal machine instructions and efuns, xefuns are implemented as
- *    cases in a giant switch() instruction, while the implementations of
- *    tefuns/vefuns are called via function tables (tefuns take a fixed
- *    number of arguments, vefuns a variable number).
+ *      F_EFUN0: efuns taking no argument
+ *      F_EFUN1: efuns taking one argument
+ *      F_EFUN2: efuns taking two arguments
+ *      F_EFUN3: efuns taking three arguments
+ *      F_EFUN4: efuns taking four arguments
+ *      F_EFUNV: efuns taking a variable number of arguments
  *
- *    Implementationwise, every machine instruction, efun or else, is assigned
- *    a unique number and a preprocessor symbol F_<name>. The relation between
- *    the assigned number and the bytecode is linear: normal instructions and
- *    efuns occupy the number range <offset>..<offset>+255, xefuns the range
- *    <offset>+256..<offset>+383, tefuns the range <offset>+384..<offset>+511,
- *    and vefuns the range from <offset>+512 . <offset> is currently 256, this
- *    allows the lexer to use the machine instruction numbers as an extension
- *    of the charset to encode references to efuns directly.
+ *    The implementation is such that the unprefixed instructions are
+ *    implemented directly in the interpreter loop in a big switch()
+ *    statement, whereas the prefixed instructions are implemented
+ *    in separated functions and called via the lookup tables efun_table[]
+ *    and vefun_table[].
+ *
+ *    Every machine instruction, efun or else, is assigned a unique number
+ *    and a preprocessor symbol F_<name>. The exact translation into
+ *    the prefix/opcode bytecodes depends on the number of instructions
+ *    in the various classes, but is linear and holds the following
+ *    conditions:
+ *
+ *       - all non-efun instructions do not need a prefix byte and start
+ *         at instruction code 0.
+ *       - selected efuns also don't need a prefix byte and directly follow
+ *         the non-efun instructions.
+ *       - the instruction codes for all tabled efuns are consecutive.
+ *       - the instruction codes for all tabled varargs efuns are consecutive.
  *
  *    All existing machine instructions are defined in the file func_spec,
  *    which during the compilation of the driver is evaluated by make_func.y
@@ -163,7 +175,6 @@
 #include "typedefs.h"
 
 #include "my-alloca.h"
-#include "my-rusage.h"
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -208,7 +219,6 @@
 #include "parse.h"
 #include "prolang.h"
 #include "ptrtable.h"
-#include "random.h"
 #include "sent.h"
 #include "simulate.h"
 #include "simul_efun.h"
@@ -281,31 +291,10 @@ struct cache
        */
 };
 
-/* --- struct mvf_info: structure used by m_values()/unmkmapping() ---
- *
- * This structure is passed by reference to the filter functions used
- * by the two efuns and passes information from one filter call to the
- * next.
- */
-struct mvf_info
-{
-    svalue_t * svp;
-      /* m_values_filter: Pointer to next result vector entry
-       * m_unmake_filter: Pointer to result array of svalues
-       */
-    int             num;
-      /* m_values_filter: Column to retrieve.
-       * m_unmake_filter: Next row to retrieve
-       */
-    int             width;
-      /* m_unmake_filter: width of the mapping
-       */
-};
-
 /*-------------------------------------------------------------------------*/
 /* Macros */
 
-#define ERRORF(s) {inter_pc = pc; inter_sp = sp; error s ;}
+#define ERRORF(s) do{inter_pc = pc; inter_sp = sp; error s ;}while(0)
 #define ERROR(s) ERRORF((s))
   /* ERRORF((...)) acts like error(...), except that first the local pc and sp
    * are copied into the global variables.
@@ -314,7 +303,7 @@ struct mvf_info
    * efuns.
    */
 
-#define FATALF(s) {inter_pc = pc; inter_sp = sp; fatal s ;}
+#define FATALF(s) do{inter_pc = pc; inter_sp = sp; fatal s ;}while(0)
 #define FATAL(s) FATALF((s))
   /* Analogue.
    */
@@ -437,6 +426,34 @@ static int              last = TOTAL_TRACE_LENGTH - 1;
    * it and return FALSE.
    * See trace_exec_active for the background.
    */
+
+/*-------------------------------------------------------------------------*/
+/* The names for the svalue types */
+
+static const char * svalue_typename[]
+ = { /* T_INVALID */  "invalid"
+   , /* T_LVALUE  */  "lvalue"
+   , /* T_NUMBER  */  "number"
+   , /* T_STRING  */  "string"
+   , /* T_POINTER */  "array"
+   , /* T_OBJECT  */  "object"
+   , /* T_MAPPING */  "mapping"
+   , /* T_FLOAT   */  "float"
+   , /* T_CLOSURE */  "closure"
+   , /* T_SYMBOL  */  "symbol"
+   , /* T_QUOTED_ARRAY */  "quoted-array"
+   , /* T_CHAR_LVALUE */           "char-lvalue"
+   , /* T_STRING_RANGE_LVALUE */   "string-range-lvalue"
+   , /* T_POINTER_RANGE_LVALUE */  "array-range-lvalue"
+   , /* T_PROTECTED_CHAR_LVALUE */           "prot-char-lvalue"
+   , /* T_PROTECTED_STRING_RANGE_LVALUE */   "prot-string-range-lvalue"
+   , /* T_PROTECTED_POINTER_RANGE_LVALUE */  "prot-array-range-lvalue"
+   , /* T_PROTECTED_LVALUE  */               "prot-lvalue"
+   , /* T_PROTECTOR_MAPPING  */              "protector-mapping"
+   , /* T_CALLBACK */       "callback-mapping"
+   , /* T_ERROR_HANDLER */  "error-handler"
+   , /* T_NULL */  "null"
+   };
 
 /*-------------------------------------------------------------------------*/
 /* Variables */
@@ -2086,7 +2103,7 @@ add_number_to_svalue (svalue_t *dest, int i)
     switch (dest->type)
     {
     default:
-        error("Reference to bad type to ++/--\n");
+        error("Reference to bad type %s to ++/--\n", typename(dest->type));
         return i;
 
     case T_NUMBER:
@@ -2267,160 +2284,21 @@ inter_add_array (vector_t *q, vector_t **vpp)
  *-------------------------------------------------------------------------
  * The functions are:
  *
- * _push_object(ob, sp), push_object(ob):
- *     Push a non-destructed object onto the stack.
- * _push_valid_object(ob, sp), push_valid_object(ob):
- *     Push an object onto the stack.
- * _push_number(n, sp), push_number(n):
- *     Push a number onto the stack.
- * _push_shared_string(p, sp), push_shared_string(p),
  * push_referenced_shared_string(p):
  *     Push a shared string onto the stack.
  * push_string_shared(p):
  *     Share a string and push it onto the stack.
  * _push_string_malloced(p, sp), push_string_malloced(p):
  *     Malloc a copy of a string and push it onto the stack.
- * _push_malloced_string(p, sp), push_malloced_string(p):
- *     Push a malloced string onto the stack.
- * put_malloced_string(p, sp):
- *     Put a malloced string onto the stack.
- * _push_volatile_string(p, sp), push_volatile_string(p):
- *     Push a volatile string onto the stack.
  * push_svalue(v), push_svalue_block(num,v):
  *     Push one or more svalues onto the stack.
  * pop_stack(), _drop_n_elems(n,sp):
  *     Pop (free) elements from the stack.
  * stack_overflow(sp,fp,pc):
  *     Handle a stack overflow.
- * push_vector(v), push_referenced_vector(v):
- *     Push a vector onto the stack.
  * push_referenced_mapping(m):
  *     Push a mapping onto the stack.
- *
- * and as macros only:
- *
- * push_mapping(m,sp):
- *     Push a mapping onto the stack.
  */
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-_push_object (object_t *ob, svalue_t *sp)
-
-/* Push the object <ob> onto the stack, currently ending at <sp>, and
- * return the new stackpointer.
- * <ob> must not be destructed.
- * The ref to <ob> is incremented.
- */
-
-{
-    sp++;
-    put_ref_object(sp, ob, "push_object");
-    return sp;
-}
-
-/*-------------------------------------------------------------------------*/
-void
-push_object (object_t *ob)
-
-/* Push the object <ob> onto the stack defined by <inter_sp>.
- * <ob> must not be destructed.
- * The ref to <ob> is incremented.
- */
-
-{
-    inter_sp++;
-    put_ref_object(inter_sp, ob, "push_object");
-}
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-_push_valid_ob (object_t *ob, svalue_t *sp)
-
-/* Push the object <ob> onto the stack, currently ending at <sp>, and
- * return the new stackpointer.
- * If <ob> is destructed, the number 0 is pushed.
- * The ref to <ob> is incremented if necessary.
- */
-
-{
-    sp++;
-    if (ob->flags & O_DESTRUCTED)
-        put_number(sp, 0);
-    else
-        put_ref_object(sp, ob, "push_valid_ob");
-    return sp;
-}
-
-/*-------------------------------------------------------------------------*/
-void
-push_valid_ob (object_t *ob)
-
-/* Push the object <ob> onto the stack defined by <inter_sp>.
- * If <ob> is destructed, the number 0 is pushed.
- * The ref to <ob> is incremented if necessary.
- */
-
-{
-    inter_sp++;
-    if (ob->flags & O_DESTRUCTED)
-        put_number(inter_sp, 0);
-    else
-        put_ref_object(inter_sp, ob, "push_valid_ob");
-}
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-_push_number (p_int n, svalue_t *sp)
-
-/* Push the number <n> onto the stack, currently ending at <sp>, and return
- * the new stackpointer.
- */
-
-{
-    sp++;
-    put_number(sp, n);
-    return sp;
-}
-
-/*-------------------------------------------------------------------------*/
-void
-push_number (p_int n)
-
-/* Push the number <n> onto the stack as defined by <inter_sp>.
- */
-
-{
-    inter_sp++;
-    put_number(inter_sp, n);
-}
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-_push_shared_string (char *p, svalue_t *sp)
-
-/* Push the shared string <p> onto the stack, currently ending at <sp>,
- * and return the new stackpointer.
- * The refs of <p> are incremented.
- */
-
-{
-    sp++;
-    put_ref_string(sp, p);
-    return sp;
-}
-
-/*-------------------------------------------------------------------------*/
-void
-push_shared_string (char *p)
-
-/* Push the shared string <p> onto the stack as defined by <inter_sp>.
- * The refs of <p> are incremented.
- */
-
-{
-    inter_sp = _push_shared_string(p, inter_sp);
-}
 
 /*-------------------------------------------------------------------------*/
 void
@@ -2452,6 +2330,8 @@ push_string_shared (char *p)
 }
 
 /*-------------------------------------------------------------------------*/
+static svalue_t * _push_string_malloced (char *p, svalue_t *sp) UNUSED;
+
 static svalue_t *
 _push_string_malloced (char *p, svalue_t *sp)
 
@@ -2485,59 +2365,6 @@ push_string_malloced (char *p)
     strcpy(s, p);
     sp = ++inter_sp;
     put_malloced_string(sp, s);
-}
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-_push_malloced_string (char *p, svalue_t *sp)
-
-/* Push malloced string <p> onto the stack, currently ending at <sp>,
- * and return the new stackpointer.
- * <p> is not copied!
- */
-
-{
-    sp++;
-    put_malloced_string(sp, p);
-    return sp;
-}
-
-/*-------------------------------------------------------------------------*/
-void push_malloced_string (char *p)
-
-/* Push malloced string <p> onto the stack as defined by <inter_sp>.
- * <p> is not copied!
- */
-
-{
-    inter_sp++;
-    put_malloced_string(inter_sp, p);
-}
-
-/*-------------------------------------------------------------------------*/
-static INLINE svalue_t *
-_push_volatile_string (char *p, svalue_t *sp)
-
-/* Push the volatile string <p> onto the stack, currently ending at <sp>,
- * and return the new stackpointer.
- */
-
-{
-    sp++;
-    put_volatile_string(sp, p);
-    return sp;
-}
-
-/*-------------------------------------------------------------------------*/
-void
-push_volatile_string (char *p)
-
-/* Push the volatile string <p> onto the stack as defined by <inter_sp>.
- */
-
-{
-    inter_sp++;
-    put_volatile_string(inter_sp, p);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -2623,33 +2450,7 @@ stack_overflow (svalue_t *sp, svalue_t *fp, bytecode_p pc)
 
 {
     _pop_n_elems(sp-fp, sp);
-    ERROR("stack overflow\n")
-}
-
-/*-------------------------------------------------------------------------*/
-void
-push_vector (vector_t *v)
-
-/* Push vector <v> onto the stack as defined by <inter_sp>.
- * The refs of <v> are incremented.
- */
-
-{
-    inter_sp++;
-    put_ref_array(inter_sp, v);
-}
-
-/*-------------------------------------------------------------------------*/
-void
-push_referenced_vector (vector_t *v)
-
-/* Push vector <v> onto the stack as defined by <inter_sp>.
- * The refs of <v> are _not_ incremented.
- */
-
-{
-    inter_sp++;
-    put_array(inter_sp, v);
+    ERROR("stack overflow\n");
 }
 
 /*-------------------------------------------------------------------------*/
@@ -2666,40 +2467,12 @@ push_referenced_mapping (mapping_t *m)
 }
 
 /*-------------------------------------------------------------------------*/
-/* Macro-only functions:
- */
-
-#define push_mapping(m) ( \
-    sp++,\
-    sp->type = T_MAPPING,\
-    sp->u.map = ref_mapping(m)\
-)
-
-/*-------------------------------------------------------------------------*/
 /* Fast version of several functions, must come last so to not disturb
  * the actual definitions:
  */
 
-#define push_object(ob)         (sp = _push_object((ob), sp))
-#define push_valid_ob(ob)       (sp = _push_valid_ob((ob), sp))
-#define push_number(n)          (sp = _push_number(n, sp))
-#define push_shared_string(p)   (sp = _push_shared_string((p), sp))
-#define push_string_malloced(p) (sp = _push_string_malloced(p, sp))
-#define push_malloced_string(s) (sp = _push_malloced_string((s), sp))
-#define push_volatile_string(s) (sp = _push_volatile_string((s), sp))
 #define pop_stack()             free_svalue(sp--)
 #define pop_n_elems(n)          (sp = _pop_n_elems((n), sp))
-#define push_vector(v) ( \
-        sp++,\
-        sp->type = T_POINTER,\
-        sp->u.vec = ref_array(v)\
-)
-
-#define push_referenced_vector(v) ( \
-        sp++,\
-        sp->type = T_POINTER,\
-        sp->u.vec = (v)\
-)
 
 /*=========================================================================*/
 
@@ -2778,16 +2551,22 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
      */
     if (vec->type == T_POINTER)
     {
-        if (i->type != T_NUMBER || (ind = i->u.number) < 0)
+        if (i->type != T_NUMBER)
         {
-            ERROR("Illegal index for []: not a (positive) number.\n")
-            /* TODO: Print type and value of i */
+            ERRORF(("Illegal index for []: got %s, expected number.\n"
+                   , typename(i->type)
+                   ));
+            return NULL;
+        }
+        if ((ind = i->u.number) < 0)
+        {
+            ERROR("Illegal index for []: not a positive number.\n");
             return NULL;
         }
         if ((size_t)ind >= VEC_SIZE(vec->u.vec))
         {
             ERRORF(("Index out of bounds for []: %ld, vector size: %lu.\n"
-                   , (long)ind, VEC_SIZE(vec->u.vec)))
+                   , (long)ind, VEC_SIZE(vec->u.vec)));
             return NULL;
         }
 
@@ -2821,7 +2600,7 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
         if (!m->num_values)
         {
-            ERROR("Indexing a mapping of width 0.\n")
+            ERROR("Indexing a mapping of width 0.\n");
             return NULL;
         }
 
@@ -2848,8 +2627,7 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
     /* Illegal type to index */
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type.\n");
-    /* TODO: Print the type */
+    error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
     return sp;
 } /* push_indexed_lvalue() */
 
@@ -2878,15 +2656,21 @@ push_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
      */
     if (vec->type == T_POINTER)
     {
-        if (i->type != T_NUMBER || (ind = i->u.number) <= 0)
+        if (i->type != T_NUMBER)
         {
-            ERROR("Illegal index for [<]: not a (positive) number.\n")
-            /* TODO: Print type and value of i */
+            ERRORF(("Illegal index for [<]: got %s, expected number.\n"
+                   , typename(i->type)
+                   ));
+            return NULL;
+        }
+        if ((ind = i->u.number) < 0)
+        {
+            ERROR("Illegal index for [<]: not a positive number.\n");
             return NULL;
         }
         if ( (ind = (mp_int)VEC_SIZE(vec->u.vec) - ind) < 0) {
             ERRORF(("Index out of bounds for [<]: %ld, vector size: %lu.\n"
-                   , (long)(i->u.number), VEC_SIZE(vec->u.vec)))
+                   , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
             return NULL;
         }
 
@@ -2913,8 +2697,7 @@ push_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
     /* Indexing on illegal type */
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type.\n");
-    /* TODO: Print type */
+    error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_rindexed_lvalue() */
 
@@ -2970,17 +2753,23 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
      */
     if (vec->type == T_POINTER)
     {
-        if (i->type != T_NUMBER || (ind = i->u.number) < 0)
+        if (i->type != T_NUMBER)
         {
-            ERROR("Illegal index for []: not a (positive) number.\n")
-            /* TODO: Print type and value */
+            ERRORF(("Illegal index for []: got %s, expected number.\n"
+                   , typename(i->type)
+                   ));
+            return NULL;
+        }
+        if ((ind = i->u.number) < 0)
+        {
+            ERROR("Illegal index for []: not a positive number.\n");
             return NULL;
         }
 
         if ((size_t)ind >= VEC_SIZE(vec->u.vec))
         {
             ERRORF(("Index out of bounds for []: %ld, vector size: %lu.\n"
-                   , (long)ind, VEC_SIZE(vec->u.vec)))
+                   , (long)ind, VEC_SIZE(vec->u.vec)));
             return NULL;
         }
 
@@ -3035,8 +2824,7 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type.\n");
-    /* TODO: Print type */
+    error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_protected_indexed_lvalue() */
 
@@ -3066,17 +2854,23 @@ push_protected_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
      */
     if (vec->type == T_POINTER)
     {
-        if (i->type != T_NUMBER || (ind = i->u.number) <= 0)
+        if (i->type != T_NUMBER)
         {
-            ERROR("Illegal index for [<]: not a (positive) number.\n")
-            /* TODO: Print type and value of i */
+            ERRORF(("Illegal index for [<]: got %s, expected number.\n"
+                   , typename(i->type)
+                   ));
+            return NULL;
+        }
+        if ((ind = i->u.number) < 0)
+        {
+            ERROR("Illegal index for [<]: not a positive number.\n");
             return NULL;
         }
 
         if ( (ind = (mp_int)VEC_SIZE(vec->u.vec) - ind) < 0)
         {
             ERRORF(("Index out of bounds for [<]: %ld, vector size: %lu\n"
-                   , (long) i->u.number, VEC_SIZE(vec->u.vec)))
+                   , (long) i->u.number, VEC_SIZE(vec->u.vec)));
             return NULL;
         }
 
@@ -3101,8 +2895,7 @@ push_protected_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type.\n");
-    /* TODO: Print type */
+    error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_protected_rindexed_lvalue() */
 
@@ -3134,13 +2927,19 @@ push_protected_indexed_map_lvalue (svalue_t *sp, bytecode_p pc)
         mapping_t *m;
 
         m = vec->u.map;
-        if (sp->u.number != T_NUMBER
-         || (p_uint)sp->u.number >= (p_uint)m->num_values
+        if (sp->type != T_NUMBER)
+        {
+            ERRORF(("Illegal subindex for []: got %s, expected number.\n"
+                   , typename(sp->type)
+                   ));
+            return NULL;
+        }
+        if ((p_uint)sp->u.number >= (p_uint)m->num_values
             /* using uints automagically checks for negative indices */
            )
         {
-            ERROR("Illegal subindex for []: not a number or out of bounds.\n")
-            /* TODO: This error message should be done nicer. */
+            ERRORF(("Too big subindex for []: value %ld, width %ld.\n"
+                 , sp->u.number, (long)m->num_values));
             return NULL;
         }
 
@@ -3166,8 +2965,7 @@ push_protected_indexed_map_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type.\n");
-    /* TODO: Print type */
+    error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_protected_indexed_map_lvalue() */
 
@@ -3208,17 +3006,23 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
     {
         vector_t *v = vec->u.vec;
 
-        if (i->type != T_NUMBER || (ind = i->u.number) < 0)
+        if (i->type != T_NUMBER)
         {
-            ERROR("Illegal index for []: not a (positive) number.\n")
-            /* TODO: Print type and value of i */
+            ERRORF(("Illegal index for []: got %s, expected number.\n"
+                   , typename(i->type)
+                   ));
+            return NULL;
+        }
+        if ((ind = i->u.number) < 0)
+        {
+            ERROR("Illegal index for []: not a positive number.\n");
             return NULL;
         }
 
         if ((size_t)ind >= VEC_SIZE(v))
         {
             ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
-                   , (long)ind, VEC_SIZE(v)))
+                   , (long)ind, VEC_SIZE(v)));
             return NULL;
         }
 
@@ -3235,17 +3039,23 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
      */
     if (type == T_STRING)
     {
-        if (i->type != T_NUMBER || (ind = i->u.number) < 0)
+        if (i->type != T_NUMBER)
         {
-            ERROR("Illegal index for []: not a (positive) number.\n")
-            /* TODO: Print type and value of i */
+            ERRORF(("Illegal index for []: got %s, expected number.\n"
+                   , typename(i->type)
+                   ));
+            return NULL;
+        }
+        if ((ind = i->u.number) < 0)
+        {
+            ERROR("Illegal index for []: not a positive number.\n");
             return NULL;
         }
 
         if (ind >= _svalue_strlen(vec) )
         {
             ERRORF(("Index out for [] of bounds: %ld, string length: %ld.\n"
-                   , (long)ind, (long)_svalue_strlen(vec)))
+                   , (long)ind, (long)_svalue_strlen(vec)));
             return NULL;
         }
 
@@ -3303,8 +3113,7 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type.\n");
-    /* TODO: Print type */
+    error("(lvalue)Indexing on illegal type '%s'.\n", typename(type));
     return NULL;
 } /* index_lvalue() */
 
@@ -3331,10 +3140,16 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
     vec = sp;
     i = sp -1;
 
-    if (i->type != T_NUMBER || (ind = i->u.number) <= 0)
+    if (i->type != T_NUMBER)
     {
-        ERROR("Illegal index for [<]: not a (positive) number.\n")
-        /* TODO: Print type and value of i */
+        ERRORF(("Illegal index for [<]: got %s, expected number.\n"
+               , typename(i->type)
+               ));
+        return NULL;
+    }
+    if ((ind = i->u.number) < 0)
+    {
+        ERROR("Illegal index for [<]: not a positive number.\n");
         return NULL;
     }
 
@@ -3355,7 +3170,7 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
         if ( (ind = (mp_int)VEC_SIZE(v) - ind) < 0)
         {
             ERRORF(("Index out of bounds for [<]: %ld, vector size: %lu\n"
-                   , (long) i->u.number, VEC_SIZE(vec->u.vec)))
+                   , (long) i->u.number, VEC_SIZE(vec->u.vec)));
             return NULL;
         }
 
@@ -3374,7 +3189,7 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
         if ( (ind = (mp_int)_svalue_strlen(vec) - ind) < 0)
         {
             ERRORF(("Index out of bounds for [<]: %ld, string length: %ld\n"
-                   , (long) i->u.number, (long)_svalue_strlen(vec)))
+                   , (long) i->u.number, (long)_svalue_strlen(vec)));
             return NULL;
         }
 
@@ -3405,8 +3220,7 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
 
     inter_sp = sp;
     inter_pc = pc;
-    error("(lvalue)Indexing on illegal type.\n");
-    /* TODO: Print the type */
+    error("(lvalue)Indexing on illegal type '%s'.\n", typename(type));
     return NULL;
 } /* rindex_lvalue() */
 
@@ -3452,17 +3266,23 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
             vector_t *v = vec->u.vec;
             struct protected_lvalue *lvalue;
 
-            if (i->type != T_NUMBER || (ind = i->u.number) < 0)
+            if (i->type != T_NUMBER)
             {
-                ERROR("Illegal index for []: not a (positive) number.\n")
-                /* TODO: Print type and value of i */
+                ERRORF(("Illegal index for []: got %s, expected number.\n"
+                       , typename(i->type)
+                       ));
+                return NULL;
+            }
+            if ((ind = i->u.number) < 0)
+            {
+                ERROR("Illegal index for []: not a positive number.\n");
                 return NULL;
             }
 
             if ((size_t)ind >= VEC_SIZE(v))
             {
                 ERRORF(("Index for [] out of bounds: %ld, vector size: %lu.\n"
-                       , (long)ind, VEC_SIZE(v)))
+                       , (long)ind, VEC_SIZE(v)));
                 return NULL;
             }
 
@@ -3488,17 +3308,23 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
         {
             struct protected_char_lvalue *val;
 
-            if (i->type != T_NUMBER || (ind = i->u.number) < 0)
+            if (i->type != T_NUMBER)
             {
-                ERROR("Illegal index for []: not a (positive) number.\n")
-                /* TODO: Print type and value of i */
+                ERRORF(("Illegal index for []: got %s, expected number.\n"
+                       , typename(i->type)
+                       ));
+                return NULL;
+            }
+            if ((ind = i->u.number) < 0)
+            {
+                ERROR("Illegal index for []: not a positive number.\n");
                 return NULL;
             }
 
             if (ind > svalue_strlen(vec) )
             {
                 ERRORF(("Index for [] out of bounds: %ld, string length: %ld.\n"
-                       , (long)ind, (long)_svalue_strlen(vec)))
+                       , (long)ind, (long)_svalue_strlen(vec)));
                 return NULL;
             }
 
@@ -3615,17 +3441,23 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
             vec = lvalue->v.u.lvalue; /* it's a string... */
 
-            if (i->type != T_NUMBER || (ind = i->u.number) < 0)
+            if (i->type != T_NUMBER)
             {
-                ERROR("Illegal index for []: not a (positive) number.\n")
-                /* TODO: Print type and value of i */
+                ERRORF(("Illegal index for []: got %s, expected number.\n"
+                       , typename(i->type)
+                       ));
+                return NULL;
+            }
+            if ((ind = i->u.number) < 0)
+            {
+                ERROR("Illegal index for []: not a positive number.\n");
                 return NULL;
             }
 
             if (ind > svalue_strlen(vec) )
             {
                 ERRORF(("Index for [] out of bounds: %ld, string length: %ld\n"
-                       , (long)ind, (long)_svalue_strlen(vec)))
+                       , (long)ind, (long)_svalue_strlen(vec)));
                 return NULL;
             }
 
@@ -3679,8 +3511,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
         /* Indexing on illegal type */
         inter_sp = sp;
         inter_pc = pc;
-        error("(lvalue)Indexing on illegal type.\n");
-        /* TODO: Print type */
+        error("(lvalue)Indexing on illegal type '%s'.\n", typename(type));
         return NULL;
     } /* for(ever) */
 
@@ -3714,10 +3545,16 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
     vec = sp->u.lvalue;
     i = sp -1;
 
-    if (i->type != T_NUMBER || (ind = i->u.number) <= 0)
+    if (i->type != T_NUMBER)
     {
-        ERROR("Illegal indexi for [<]: not a (positive) number.\n")
-        /* TODO: Print type and value of i */
+        ERRORF(("Illegal index for [<]: got %s, expected number.\n"
+               , typename(i->type)
+               ));
+        return NULL;
+    }
+    if ((ind = i->u.number) < 0)
+    {
+        ERROR("Illegal index for [<]: not a positive number.\n");
         return NULL;
     }
 
@@ -3739,7 +3576,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
             if ( (ind = (mp_int)VEC_SIZE(v) - ind) < 0)
             {
                 ERRORF(("Index for [<] out of bounds: %ld, vector size: %lu\n"
-                       , (long)i->u.number, VEC_SIZE(v)))
+                       , (long)i->u.number, VEC_SIZE(v)));
                 return NULL;
             }
 
@@ -3768,7 +3605,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
             if ( (ind = (mp_int)svalue_strlen(vec)  - ind) < 0)
             {
                 ERRORF(("Index for [<] out of bounds: %ld, string length: %ld.\n"
-                       , (long)i->u.number, (long)svalue_strlen(vec)))
+                       , (long)i->u.number, (long)svalue_strlen(vec)));
                 return NULL;
             }
 
@@ -3849,7 +3686,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
             if ( (ind = (mp_int)svalue_strlen(vec)  - ind) < 0)
             {
                 ERRORF(("Index for [<] out of bounds: %ld, string length: %ld.\n"
-                       , (long)i->u.number, (long)svalue_strlen(vec)))
+                       , (long)i->u.number, (long)svalue_strlen(vec)));
                 return NULL;
             }
 
@@ -3902,8 +3739,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
         /* Indexing on illegal type */
         inter_sp = sp;
         inter_pc = pc;
-        error("(lvalue)Indexing on illegal type.\n");
-        /* TODO: Print the type */
+        error("(lvalue)Indexing on illegal type '%s'.\n", typename(type));
         return NULL;
     } /* for(ever) */
 
@@ -3944,8 +3780,8 @@ range_lvalue (int code, svalue_t *sp)
 #ifdef DEBUG
     if (sp->type != T_LVALUE) {
         inter_sp = sp;
-        error("wrong type to range_lvalue\n");
-        /* TODO: Print type */
+        error("wrong type to range_lvalue: got %s, expected lvalue\n"
+             , typename(sp->type));
         return NULL;
     }
 #endif
@@ -3971,8 +3807,7 @@ range_lvalue (int code, svalue_t *sp)
         break;
     default:
         inter_sp = sp;
-        error("(lvalue)Range index on illegal type.\n");
-        /* TODO: Print type */
+        error("(lvalue)Range index on illegal type '%s'.\n", typename(type));
         return NULL;
     }
 
@@ -3981,8 +3816,8 @@ range_lvalue (int code, svalue_t *sp)
     if (i->type != T_NUMBER)
     {
         inter_sp = sp;
-        error("Illegal upper range index: not a number.\n");
-        /* TODO: Print type */
+        error("Illegal upper range index: got '%s', expected 'number'.\n"
+             , typename(i->type));
         return NULL;
     }
 
@@ -4009,8 +3844,8 @@ range_lvalue (int code, svalue_t *sp)
     if ((--i)->type != T_NUMBER)
     {
         inter_sp = sp;
-        error("Illegal lower range index: not a number.\n");
-        /* TODO: Print the type */
+        error("Illegal lower range index: got %s, expected number.\n"
+             , typename(i->type));
         return NULL;
     }
 
@@ -4052,7 +3887,7 @@ range_lvalue (int code, svalue_t *sp)
 static svalue_t *
 protected_range_lvalue (int code, svalue_t *sp)
 
-/* X-Operator F_PROTECTED_RANGE_LVALUE
+/* Operator F_PROTECTED_RANGE_LVALUE
  *                       (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
  * and the x-operators F_PROTECTED_{NR,RN,RR}_RANGE_LVALUE and
  * F_PROTECTED_LVALUE.
@@ -4088,8 +3923,8 @@ protected_range_lvalue (int code, svalue_t *sp)
     if (sp->type != T_LVALUE)
     {
         inter_sp = sp;
-        error("wrong type to protected_range_lvalue\n");
-        /* TODO: Print type */
+        error("wrong type to protected_range_lvalue: got %s, expected lvalue\n"
+             , typename(sp->type));
         return NULL;
     }
 #endif
@@ -4148,8 +3983,7 @@ protected_range_lvalue (int code, svalue_t *sp)
 
     default:
         inter_sp = sp;
-        error("(lvalue)Range index on illegal type.\n");
-        /* TODO: Print type */
+        error("(lvalue)Range index on illegal type '%s'.\n", typename(type));
         return NULL;
     }
 
@@ -4158,8 +3992,8 @@ protected_range_lvalue (int code, svalue_t *sp)
     if (i->type != T_NUMBER)
     {
         inter_sp = sp;
-        error("Illegal upper range index: not a number.\n");
-        /* TODO: Print type. */
+        error("Illegal upper range index: got '%s', expected 'number'.\n"
+             , typename(i->type));
         return NULL;
     }
 
@@ -4184,8 +4018,8 @@ protected_range_lvalue (int code, svalue_t *sp)
     if ((--i)->type != T_NUMBER)
     {
         inter_sp = sp;
-        error("Illegal lower range index: not a number.\n");
-        /* TODO: Print type. */
+        error("Illegal lower range index: got %s, expected number.\n"
+             , typename(i->type));
         return NULL;
     }
 
@@ -4254,10 +4088,16 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
     {
     case T_STRING:
       {
-        if (i->type != T_NUMBER || (ind = i->u.number) < 0)
+        if (i->type != T_NUMBER)
         {
-            ERROR("Illegal index for []: not a (positive) number.\n")
-            /* TODO: Print type and value */
+            ERRORF(("Illegal index for []: got %s, expected number.\n"
+                   , typename(i->type)
+                   ));
+            return NULL;
+        }
+        if ((ind = i->u.number) < 0)
+        {
+            ERROR("Illegal index for []: not a positive number.\n");
             return NULL;
         }
 
@@ -4278,10 +4118,16 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
       }
 
     case T_POINTER:
-        if (i->type != T_NUMBER || (ind = i->u.number) < 0)
+        if (i->type != T_NUMBER)
         {
-            ERROR("Illegal index for []: not a (positive) number.\n")
-            /* TODO: Print type and value */
+            ERRORF(("Illegal index for []: got %s, expected number.\n"
+                   , typename(i->type)
+                   ));
+            return NULL;
+        }
+        if ((ind = i->u.number) < 0)
+        {
+            ERROR("Illegal index for []: not a positive number.\n");
             return NULL;
         }
 
@@ -4291,7 +4137,7 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
         if (ind < 0 || (size_t)ind >= VEC_SIZE(vec->u.vec))
         {
             ERRORF(("Index for [] out of bounds: %ld, vector size: %lu\n"
-                   , (long)ind, VEC_SIZE(vec->u.vec)))
+                   , (long)ind, VEC_SIZE(vec->u.vec)));
             return NULL;
         }
 
@@ -4384,8 +4230,7 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
     default:
         inter_sp = sp;
         inter_pc = pc;
-        error("(value)Indexing on illegal type.\n");
-        /* TODO: Print type */
+        error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
         return NULL;
     }
 
@@ -4413,10 +4258,16 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
     i = sp;
     vec = sp - 1;
 
-    if (i->type != T_NUMBER || (ind = i->u.number) <= 0)
+    if (i->type != T_NUMBER)
     {
-        ERROR("Illegal index for [<]: not a (positive) number.\n")
-        /* TODO: Print type and value */
+        ERRORF(("Illegal index for [<]: got %s, expected number.\n"
+               , typename(i->type)
+               ));
+        return NULL;
+    }
+    if ((ind = i->u.number) < 0)
+    {
+        ERROR("Illegal index for [<]: not a positive number.\n");
         return NULL;
     }
 
@@ -4445,7 +4296,7 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
         sp = vec;
         if ( (ind = (mp_int)VEC_SIZE(vec->u.vec) - ind) < 0) {
             ERRORF(("Index for [<] out of bounds: %ld, vector size: %lu\n"
-                   , (long)i->u.number, VEC_SIZE(vec->u.vec)))
+                   , (long)i->u.number, VEC_SIZE(vec->u.vec)));
             return NULL;
         }
 
@@ -4496,8 +4347,7 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
     default:
         inter_sp = sp;
         inter_pc = pc;
-        error("(value)Indexing on illegal type.\n");
-        /* TODO: Print type */
+        error("(lvalue)Range index on illegal type '%s'.\n", typename(vec->type));
         return NULL;
     }
 
@@ -4507,9 +4357,10 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
 
 /*=========================================================================*/
 /*-------------------------------------------------------------------------*/
-void m_indices_filter ( svalue_t *key
-                      , svalue_t *data UNUSED
-                      , void *extra /* is a svalue_t ** */ )
+void
+m_indices_filter ( svalue_t *key
+                 , svalue_t *data UNUSED
+                 , void *extra /* is a svalue_t ** */ )
 
 /* Filter function used by mapping:m_indices() to implement the
  * m_indices() efun. It is here take advantage of the inline expansion
@@ -4530,9 +4381,9 @@ void m_indices_filter ( svalue_t *key
 }
 
 /*-------------------------------------------------------------------------*/
-static void m_values_filter ( svalue_t *key UNUSED
-                            , svalue_t *data
-                            , void *extra /* is a struct mvf_info * */ )
+void m_values_filter ( svalue_t *key UNUSED
+                     , svalue_t *data
+                     , void *extra /* is a struct mvf_info * */ )
 
 /* Filter function used by efun m_values().
  *
@@ -4552,9 +4403,10 @@ static void m_values_filter ( svalue_t *key UNUSED
 }
 
 /*-------------------------------------------------------------------------*/
-static void m_unmake_filter ( svalue_t *key
-                            , svalue_t *data
-                            , void *extra)
+void
+m_unmake_filter ( svalue_t *key
+                , svalue_t *data
+                , void *extra)
 
 /* Filter function used by efun unmkmapping().
  *
@@ -4572,107 +4424,6 @@ static void m_unmake_filter ( svalue_t *key
     for (i = 0; i < vip->width; i++)
         assign_svalue_no_free(vip->svp[i+1].u.vec->item + vip->num, data+i);
     vip->num++;
-}
-
-/*-------------------------------------------------------------------------*/
-static program_t *
-search_inherited (char *str, program_t *prg, int *offpnt)
-
-/* Auxiliary function to efun replace_program(): check if program <str>
- * is inherited by <prg>. If yes, return the originating program and
- * store the (accumulated) variable and function offsets in offpnt[0]
- * and offpnt[1] resp.
- *
- * If the program is not found, return NULL.
- *
- * Nested inherits are handled in a depth search, the function recurses
- * for this.
- */
-
-{
-    program_t *tmp;
-    int i;
-#ifdef DEBUG
-    char *ts;
-#endif
-
-#ifdef DEBUG
-    ts = NULL;
-    if (d_flag)
-    {
-        ts = time_stamp();
-        debug_message("%s search_inherited started\n", ts);
-        debug_message("%s searching for PRG(%s) in PRG(%s)\n"
-                     , ts, str, prg->name);
-        debug_message("%s num_inherited=%d\n", ts, prg->num_inherited);
-    }
-#endif
-
-    /* Loop through all inherited programs, returning directly when
-     * the name program was found.
-     */
-    for ( i = 0; i < prg->num_inherited; i++)
-    {
-#ifdef DEBUG
-        if (d_flag)
-        {
-            debug_message("%s index %d:\n", ts, i);
-            debug_message("%s checking PRG(%s)\n"
-                         , ts, prg->inherit[i].prog->name);
-        }
-#endif
-        /* Duplicate virtual inherits don't count */
-        if ( prg->inherit[i].inherit_type & INHERIT_TYPE_DUPLICATE )
-            continue;
-
-        if ( strcmp(str, prg->inherit[i].prog->name ) == 0 )
-        {
-#ifdef DEBUG
-            if (d_flag)
-                debug_message("%s match found\n", ts);
-#endif
-            offpnt[0] = prg->inherit[i].variable_index_offset;
-            offpnt[1] = prg->inherit[i].function_index_offset;
-            return prg->inherit[i].prog;
-        }
-        else if ( NULL != (tmp = search_inherited(str, prg->inherit[i].prog,offpnt)) )
-        {
-#ifdef DEBUG
-            if (d_flag)
-                debug_message("%s deferred match found\n", ts);
-#endif
-            offpnt[0] += prg->inherit[i].variable_index_offset;
-            offpnt[1] += prg->inherit[i].function_index_offset;
-            return tmp;
-        }
-    }
-
-#ifdef DEBUG
-    if (d_flag)
-        debug_message("%s search_inherited failed\n", ts);
-#endif
-
-    return NULL;
-} /* search_inherited() */
-
-/*-------------------------------------------------------------------------*/
-static replace_ob_t *
-retrieve_replace_program_entry (void)
-
-/* Auxiliary function to efun replace_program(): test if a program
- * replacement is already scheduled for the current object. If yes,
- * return the pointer to the replace_ob struct, else return NULL.
- */
-
-{
-    replace_ob_t *r_ob;
-
-    for (r_ob = obj_list_replace; r_ob; r_ob = r_ob->next)
-    {
-        if (r_ob->ob == current_object)
-            return r_ob;
-    }
-    return NULL;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -4813,87 +4564,366 @@ add_slash (char *str)
 #endif
 
 /*-------------------------------------------------------------------------*/
-static void
-bad_arg_pc (int arg, int instr, svalue_t *sp, bytecode_p pc)
-  NORETURN;
+static INLINE const char *
+typename_inline (int type)
 
-static void
-bad_arg_pc (int arg, int instr, svalue_t *sp, bytecode_p pc)
-
-/* Argument number <arg> to instruction <instr> was "bad".
- * Set inter_sp/pc to <sp>/<pc> and raise a runtime error with
- * a descriptive message.
- *
- * TODO: It would be nice if the function would say why the argument was bad.
- * TODO:: In general, the should be a generic error function which is used
- * TODO:: even within The Large Switch - not this 'goto bad_arg_1;' crap.
+/* Translate the svalue <type> into a readable string.
  */
 
 {
-    ERRORF(("Bad argument %d to %s()\n", arg, get_f_name(instr)))
-    /* NOTREACHED */
-}
+    type &= ~(T_MOD_SWAPPED);
+
+    if (type < 0
+     || type >= sizeof(svalue_typename)/sizeof(svalue_typename[0])
+       )
+        fatal("Unknown typevalue %d\n", type);
+
+    return svalue_typename[type];
+} /* typename_inline() */
+
+const char * typename (int type) { return typename_inline(type); }
+
+#define typename(type) typename_inline(type)
 
 /*-------------------------------------------------------------------------*/
-void
-bad_efun_arg (int arg, int instr, svalue_t *sp)
+const char *
+efun_arg_typename (long type)
 
-/* Argument number <arg> to instruction <instr> was "bad".
- *
- * inter_sp is updated to <sp>, inter_pc is supposed to be correct (and
- * pointing just after the opcode).
- *
- * If <instr> is negative, it is used as an offset to inter_pc to find
- * the actual instruction code at <inter_pc>+<instr>.
- *
- * TODO: It would be nice if the function would say why the argument was bad.
- * TODO: This function depends on the order and values of F_ESCAPE,
- * TODO:: F_TEFUN and F_VEFUN.
+/* Translate the bit-encoded efun argument <type> into a readable
+ * string and return it. The type encoding is the one used in
+ * efun_lpc_types[].
+ * Result is a pointer to a static buffer.
  */
 
 {
-    inter_sp = sp;
+    static char result[200];
+    int numtypes, i;
+
+    if (type == TF_ANYTYPE)
+        return "mixed";
+
+    result[0] = '\0';
+    numtypes = sizeof(svalue_typename)/sizeof(svalue_typename[0]);
+
+    for (i = 0; i < numtypes; i++)
+    {
+        if ((1 << i) & type)
+        {
+            if (result[0] != '\0')
+                strcat(result, "/");
+            strcat(result, typename(i));
+        }
+    }
+
+    return (const char *)result;
+} /* efun_arg_typename() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE int
+complete_instruction (int instr)
+
+/* If <instr> is negative, read the current instruction from
+ * inter_pc - <instr> and return it; otherwise return <instr> itself.
+ */
+
+{
     if (instr < 0)
     {
         /* Find and decode the actual instruction at the given offset */
         bytecode_p pc = inter_pc + instr;
 
         instr = *pc;
-        if (instr <= F_VEFUN)
-            instr = pc[1] | (instr << F_ESCAPE_BITS);
+        switch(instr)
+        {
+        case F_EFUN0:  instr = pc[1] + EFUN0_OFFSET; break;
+        case F_EFUN1:  instr = pc[1] + EFUN1_OFFSET; break;
+        case F_EFUN2:  instr = pc[1] + EFUN2_OFFSET; break;
+        case F_EFUN3:  instr = pc[1] + EFUN3_OFFSET; break;
+        case F_EFUN4:  instr = pc[1] + EFUN4_OFFSET; break;
+        case F_EFUNV:  instr = pc[1] + EFUNV_OFFSET; break;
+        default:
+            fatal("Unknown prefix code %d '%s' encountered.\n"
+                 , instr, get_f_name(instr));
+            break;
+        }
     }
-    error("Bad argument %d to %s()\n", arg, get_f_name(instr));
-}
+
+    return instr;
+} /* complete_instruction() */
 
 /*-------------------------------------------------------------------------*/
-void
-bad_xefun_arg (int arg, svalue_t *sp)
+static INLINE void
+raise_bad_arg (int instr, int arg)
+  NORETURN;
 
-/* Argument number <arg> to a xefun (fixed args) or tefun was "bad".
+static INLINE void
+raise_bad_arg (int instr, int arg)
+
+/* The argument <arg> to <instr> was unusable for some reason.
+ * If <instr> is negative, the instruction code is read from
+ * inter_pc - <instr>; otherwise it is the instruction code itself.
  *
- * inter_sp is updated to <sp>, inter_pc is supposed to be correct and
- * pointing just after the opcode.
- *
- * This function is also defined to bad_efun_vararg().
+ * inter_sp and inter_pc are assumed to be correct.
+ * Raise a proper error.
  */
 
 {
-    bad_efun_arg(arg, -2, sp);
-}
+    instr = complete_instruction(instr);
+
+    error("Bad argument %d to %s().\n", arg, get_f_name(instr));
+    /* NOTREACHED */
+} /* raise_bad_arg() */
 
 /*-------------------------------------------------------------------------*/
 void
-bad_xefun_vararg (int arg, svalue_t *sp)
+vefun_bad_arg (int arg, svalue_t *sp)
 
-/* Argument number <arg> to a xefun (var. args) or vefun was "bad".
- *
- * inter_sp is updated to <sp>, inter_pc is supposed to be correct and
- * pointing just after the opcode.
+/* The argument <arg> to the current tabled vefun was unusable.
+ * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
  */
 
 {
-    bad_efun_arg(arg, -3, sp);
-}
+    inter_sp = sp;
+    raise_bad_arg(-3, arg);
+    /* NOTREACHED */
+} /* vefun_bad_arg() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+raise_arg_error (int instr, int arg, long expected, int got)
+  NORETURN;
+
+static INLINE void
+raise_arg_error (int instr, int arg, long expected, int got)
+
+/* The argument <arg> to <instr> had the wrong type: expected was the
+ * type <expected> (bit-encoded as in the efun_lpc_types[]), but
+ * it got the type <got> (the svalue type tag).
+ * If <instr> is negative, the instruction code is read from
+ * inter_pc - <instr>; otherwise it is the instruction code itself.
+ *
+ * If <expected> is 0, the expected type is read from the
+ * instrs[] table.
+ *
+ * inter_sp and inter_pc are assumed to be correct.
+ * Raise a proper error.
+ */
+
+{
+    instr = complete_instruction(instr);
+
+    if (!expected)
+        expected = efun_lpc_types[instrs[instr].lpc_arg_index];
+
+    error("Bad arg %d to %s(): got '%s', expected '%s'.\n"
+         , arg, get_f_name(instr), typename(got), efun_arg_typename(expected)
+         );
+    /* NOTREACHED */
+} /* raise_arg_error() */
+
+/*-------------------------------------------------------------------------*/
+void
+efun_gen_arg_error (int arg, int got, svalue_t *sp)
+
+/* The argument <arg> to the current tabled efun had the wrong type <got>.
+ * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
+ */
+
+{
+    inter_sp = sp;
+    raise_arg_error(-2, arg, 0, got);
+    /* NOTREACHED */
+} /* efun_gen_arg_error() */
+
+/*-------------------------------------------------------------------------*/
+void
+vefun_gen_arg_error (int arg, int got, svalue_t *sp)
+
+/* The argument <arg> to the current tabled vefun had the wrong type <got>.
+ * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
+ */
+
+{
+    inter_sp = sp;
+    raise_arg_error(-3, arg, 0, got);
+    /* NOTREACHED */
+} /* vefun_gen_arg_error() */
+
+/*-------------------------------------------------------------------------*/
+void
+efun_arg_error (int arg, int expected, int got, svalue_t *sp)
+
+/* The argument <arg> to the current tabled efun had the wrong type:
+ * expected was the type <expected>, but it got the type <got>
+ * (both values are the svalue type tag).
+ * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
+ */
+
+{
+    inter_sp = sp;
+    raise_arg_error(-2, arg, 1 << expected, got);
+    /* NOTREACHED */
+} /* efun_arg_error() */
+
+/*-------------------------------------------------------------------------*/
+void
+vefun_arg_error (int arg, int expected, int got, svalue_t *sp)
+
+/* The argument <arg> to the current tabled vefun had the wrong type:
+ * expected was the type <expected>, but it got the type <got>
+ * (both values are the svalue type tag).
+ * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
+ */
+
+{
+    inter_sp = sp;
+    raise_arg_error(-3, arg, 1 << expected, got);
+    /* NOTREACHED */
+} /* vefun_arg_error() */
+
+/*-------------------------------------------------------------------------*/
+void
+vefun_exp_arg_error (int arg, long expected, int got, svalue_t *sp)
+
+/* The argument <arg> to the current tabled vefun had the wrong type:
+ * expected was the type <expected> (in the bit-encoded format), but
+ * it got the type <got> (the svalue type tag).
+ * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
+ */
+
+{
+    inter_sp = sp;
+    raise_arg_error(-3, arg, expected, got);
+    /* NOTREACHED */
+} /* vefun_exp_arg_error() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+code_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp)
+  NORETURN;
+
+static INLINE void
+code_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp)
+
+/* The argument <arg> to the current one-byte instruction had the wrong type:
+ * expected was the type <expected> (in bit-flag encoding), but it got the
+ * type <got> (the svalue type tag).
+ * inter_pc will be set from <pc>, inter_sp will be set from <sp>.
+ */
+
+{
+    int instr;
+
+    inter_sp = sp;
+    inter_pc = pc;
+
+    instr = complete_instruction(-1);
+
+    error("Bad arg %d to %s: got '%s', expected '%s'.\n"
+         , arg, get_f_name(instr), typename(got), efun_arg_typename(expected)
+         );
+    /* NOTREACHED */
+} /* code_exp_arg_error() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+code_arg_error (int arg, int expected, int got, bytecode_p pc, svalue_t *sp)
+  NORETURN;
+
+static INLINE void
+code_arg_error (int arg, int expected, int got, bytecode_p pc, svalue_t *sp)
+
+/* The argument <arg> to the current one-byte instruction had the wrong type:
+ * expected was the type <expected>, but it got the type <got>
+ * (both values are the svalue type tag).
+ * inter_pc will be set from <pc>, inter_sp will be set from <sp>.
+ */
+
+{
+    code_exp_arg_error(arg, 1 << expected, got, pc,sp);
+    /* NOTREACHED */
+} /* code_arg_error() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+op_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp)
+  NORETURN;
+
+static INLINE void
+op_exp_arg_error (int arg, long expected, int got, bytecode_p pc, svalue_t *sp)
+
+/* The argument <arg> to the current one-byte operator had the wrong type:
+ * expected was the type <expected> (bit-encoded as in efun_lpc_types[]),
+ * but it got the type <got> (the svalue type tag).
+ * inter_pc will be set from <pc>, inter_sp will be set from <sp>.
+ *
+ * This function is to be used with binary operators like + or *; the
+ * error message will say 'left' and 'right' instead of 'arg 1' or 'arg 2'.
+ */
+
+{
+    int instr;
+
+    inter_sp = sp;
+    inter_pc = pc;
+
+    instr = complete_instruction(-1);
+
+    error("Bad %s arg to %s: got '%s', expected '%s'.\n"
+         , arg == 1 ? "left" : "right"
+         , get_f_name(instr), typename(got), efun_arg_typename(expected)
+         );
+    /* NOTREACHED */
+} /* op_exp_arg_error() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+op_arg_error (int arg, int expected, int got, bytecode_p pc, svalue_t *sp)
+  NORETURN;
+
+static INLINE void
+op_arg_error (int arg, int expected, int got, bytecode_p pc, svalue_t *sp)
+
+/* The argument <arg> to the current one-byte operator had the wrong type:
+ * expected was the type <expected>, but it got the type <got>
+ * (both values are the svalue type tag).
+ * inter_pc will be set from <pc>, inter_sp will be set from <sp>.
+ *
+ * This function is to be used with binary operators like + or *; the
+ * error message will say 'left' and 'right' instead of 'arg 1' or 'arg 2'.
+ */
+
+{
+    op_exp_arg_error(arg, 1 << expected, got, pc, sp);
+    /* NOTREACHED */
+} /* op_arg_error() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+test_efun_args (int instr, int args, svalue_t *argp)
+
+/* Test the types of the <args> arguments for (v)efun <instr> starting at
+ * <argp> for their correct types according to efun_lpc_types[].
+ * Raise an error if they aren't correct (requires inter_pc and inter_sp
+ * to be valid).
+ */
+
+{
+    int i;
+    long * typep, type;
+
+    typep = &(efun_lpc_types[instrs[instr].lpc_arg_index]);
+    for (i = 1; i <= args; i++, typep++, argp++)
+    {
+        type = *typep;
+        if (argp->type == T_NUMBER && !argp->u.number
+         && (type & TF_NULL)
+           )
+            continue;
+        if (!(*typep & (1 << argp->type)))
+            raise_arg_error(instr, i, *typep, argp->type);
+    }
+} /* test_efun_args() */
 
 /*-------------------------------------------------------------------------*/
 Bool
@@ -4927,8 +4957,8 @@ _privilege_violation (char *what, svalue_t *where, svalue_t *sp)
     if (current_object == simul_efun_object) return MY_TRUE;
 
     /* Setup and call the lfun */
-    push_volatile_string(what);
-    push_valid_ob(current_object);
+    push_volatile_string(sp, what);
+    push_ref_valid_object(sp, current_object, "_privilege violation");
     sp++;
     assign_svalue_no_free(sp, where);
     inter_sp = sp;
@@ -4989,20 +5019,20 @@ privilege_violation4 ( char *what,    object_t *whom
 
     /* Set up the lfun call */
 
-    push_volatile_string(what);
-    push_valid_ob(current_object);
+    push_volatile_string(sp, what);
+    push_ref_valid_object(sp, current_object, "privilege_violation");
     if (!whom)
     {
-        push_volatile_string(how_str);
-        push_number(how_num);
+        push_volatile_string(sp, how_str);
+        push_number(sp, how_num);
     }
     else
     {
-        push_object(whom);
+        push_ref_object(sp, whom, "privilege_violation");
         if (how_str)
-            push_volatile_string(how_str);
+            push_volatile_string(sp, how_str);
         else
-            push_number(how_num);
+            push_number(sp, how_num);
     }
     inter_sp = sp;
     svp = apply_master_ob(STR_PRIVILEGE, 4);
@@ -5018,15 +5048,6 @@ privilege_violation4 ( char *what,    object_t *whom
     /* Return the result */
     return svp->u.number > 0;
 }
-
-/*-------------------------------------------------------------------------*/
-#define privilege_violation(what, where) (\
-        inter_pc = pc,\
-        _privilege_violation(what, where, sp)\
-)
-  /* Just as _privilege_violation(), just that it automatically uses
-   * local <sp> and <pc> and updates the inter_ variables from them.
-   */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -5286,7 +5307,7 @@ push_control_stack ( svalue_t *sp
     {
         if (!num_error || csp == &control_stack[MAX_TRACE-1])
         {
-            ERROR("Too deep recursion.\n")
+            ERROR("Too deep recursion.\n");
         }
     }
 
@@ -5808,11 +5829,61 @@ eval_instruction (bytecode_p first_instruction
       /* Get and/or test the number of arguments.
        */
 
-#   define TYPE_TEST1(arg, t) if ( (arg)->type != t ) goto bad_arg_1;
-#   define TYPE_TEST2(arg, t) if ( (arg)->type != t ) goto bad_arg_2;
-#   define TYPE_TEST3(arg, t) if ( (arg)->type != t ) goto bad_arg_3;
-#   define TYPE_TEST4(arg, t) if ( (arg)->type != t ) goto bad_arg_4;
+#   define RAISE_ARG_ERROR(arg, expected, got) \
+       do {\
+           inter_sp = sp; \
+           inter_pc = pc; \
+           raise_arg_error(instruction, arg, expected, got); \
+       }while(0)
+
+#   define BAD_ARG_ERROR(arg, expected, got) \
+       do {\
+           inter_sp = sp; \
+           inter_pc = pc; \
+           raise_arg_error(instruction, arg, 1 << expected, got); \
+       }while(0)
+
+#   define BAD_OP_ARG(arg, expected, got) \
+       do {\
+           inter_sp = sp; \
+           inter_pc = pc; \
+           op_arg_error(arg, expected, got, pc, sp); \
+       }while(0)
+
+#   define OP_ARG_ERROR(arg, expected, got) \
+       do {\
+           inter_sp = sp; \
+           inter_pc = pc; \
+           op_exp_arg_error(arg, expected, got, pc, sp); \
+       }while(0)
+
+#   define TYPE_TEST1(arg, t) \
+        if ( (arg)->type != t ) code_arg_error(1, t, (arg)->type, pc, sp); else NOOP;
+#   define TYPE_TEST2(arg, t) \
+        if ( (arg)->type != t ) code_arg_error(2, t, (arg)->type, pc, sp); else NOOP;;
+#   define TYPE_TEST3(arg, t) \
+        if ( (arg)->type != t ) code_arg_error(3, t, (arg)->type, pc, sp); else NOOP;
+#   define TYPE_TEST4(arg, t) \
+        if ( (arg)->type != t ) code_arg_error(4, t, (arg)->type, pc, sp); else NOOP;
+
+#   define TYPE_TEST_LEFT(arg, t) \
+        if ( (arg)->type != t ) op_arg_error(1, t, (arg)->type, pc, sp); else NOOP;
+#   define TYPE_TEST_RIGHT(arg, t) \
+        if ( (arg)->type != t ) op_arg_error(2, t, (arg)->type, pc, sp); else NOOP;
+
+#   define TYPE_TEST_EXP_LEFT(arg, t) \
+        if (!( (1 << (arg)->type) & (t)) ) op_exp_arg_error(1, (t), (arg)->type, pc, sp); else NOOP;
+#   define TYPE_TEST_EXP_RIGHT(arg, t) \
+        if (!( (1 << (arg)->type) & (t)) ) op_exp_arg_error(2, (t), (arg)->type, pc, sp); else NOOP;
       /* Test the type of a certain argument.
+       */
+
+#   define privilege_violation(what, where) (\
+        inter_pc = pc,\
+        _privilege_violation(what, where, sp)\
+        )
+      /* Just as _privilege_violation(), just that it automatically uses
+       * local <sp> and <pc> and updates the inter_ variables from them.
        */
 
 #   ifdef MARK
@@ -5916,7 +5987,7 @@ again:
 
         inter_pc = pc;
         inter_fp = fp;
-        ERROR("Too long evaluation. Execution aborted.\n")
+        ERROR("Too long evaluation. Execution aborted.\n");
     }
 
 #if defined(DEBUG)
@@ -5963,77 +6034,220 @@ again:
     switch(instruction)
     {
     default:
-        fatal("Undefined instruction %s (%d)\n", get_f_name(instruction),
+        fatal("Undefined instruction '%s' (%d)\n", get_f_name(instruction),
               instruction);
-        /* NOTREACHED */
-bad_arg_1: bad_arg_pc(1, instruction, sp, pc);
-bad_arg_2: bad_arg_pc(2, instruction, sp, pc);
-bad_arg_3: bad_arg_pc(3, instruction, sp, pc);
-bad_arg_4: bad_arg_pc(4, instruction, sp, pc);
-bad_left:  ERRORF(("Bad left type to %s.\n",  get_f_name(instruction)))
-bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* NOTREACHED */
         return; /* hint for data flow analysis */
 
 #ifdef F_ILLEGAL
-    case 255:
     CASE(F_ILLEGAL);                /* --- illegal             --- */
         inter_pc = pc;
         fatal("Illegal instruction\n");
         /* NOTREACHED */
 #endif /* F_ILLEGAL */
 
-    CASE(F_TEFUN);                  /* --- tefun <code>        --- */
+    CASE(F_UNDEF);                  /* --- undef               --- */
+      {
+        /* Catch-all instructions for declared but not implemented
+         * (defined) functions. Usually used by the compiler to
+         * handle prototypes (in that case it is the first and only
+         * instruction of the generated stub), it is also inserted
+         * into closures when the object the closure is bound to
+         * is destructed.
+         * Note: this instruction MUST be the first in the function.
+         */
+
+        char *name;
+
+        /* pc has already been incremented */
+        if (pc > current_prog->program && pc <= PROGRAM_END(*current_prog))
+        {
+            /* Copy the function name pointer into name.
+             */
+            memcpy(&name, FUNCTION_NAMEP(FUNCTION_FROM_CODE(pc-1)), sizeof name);
+        }
+        else
+        {
+            /* It is a vanished closure */
+            name = "Object the closure was bound to has been destructed";
+            /* TODO: WHich object? This can also happen as result of
+             * TODO:: a replace_program */
+        }
+        ERRORF(("Undefined function: %s\n", name));
+      }
+
+    CASE(F_EFUN0);                  /* --- efun0 <code>        --- */
     {
-        /* Call the tabled efun 0x100 + <code>, where <code> is
-         * a uint8 in the range 0x80..0xff.
-         * The efun takes a fixed number of arguments which are
-         * on the stack.
+        /* Call the tabled efun EFUN0_OFFSET + <code>, where <code> is
+         * a uint8.
+         * The efun takes no argument.
          */
 
         int code;
 
         code = LOAD_UINT8(pc);
 #ifdef TRACE_CODE
-        previous_instruction[last] = code + 0x100;
+        previous_instruction[last] = code + EFUN0_OFFSET;
 #endif
 #ifdef OPCPROF
-        opcount[code+0x100]++;
+        opcount[code+EFUN0_OFFSET]++;
 #endif
         inter_sp = sp;
         inter_pc = pc;
         ASSIGN_EVAL_COST
-        sp = (*efun_table[code-128])(sp);
+        sp = (*efun_table[code+EFUN0_OFFSET-TEFUN_OFFSET])(sp);
         break;
     }
 
-    CASE(F_VEFUN);                 /* --- vefun <code> <nargs> --- */
+    CASE(F_EFUN1);                  /* --- efun1 <code>        --- */
     {
-        /* Call the tabled efun 0x200 + <code>, where <code> is
-         * a uint8 in the range 0x00..0x7f, with uint8 <nargs>
-         * arguments on the stack.
+        /* Call the tabled efun EFUN1_OFFSET + <code>, where <code> is
+         * a uint8.
+         * The efun takes one argument.
          */
+
+        int code;
+
+        code = LOAD_UINT8(pc);
+        instruction = code + EFUN1_OFFSET;
+
+#ifdef TRACE_CODE
+        previous_instruction[last] = instruction;
+#endif
+#ifdef OPCPROF
+        opcount[instruction]++;
+#endif
+        inter_sp = sp;
+        inter_pc = pc;
+        ASSIGN_EVAL_COST
+        test_efun_args(instruction, 1, sp);
+        sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
+        break;
+    }
+
+    CASE(F_EFUN2);                  /* --- efun2 <code>        --- */
+    {
+        /* Call the tabled efun EFUN2_OFFSET + <code>, where <code> is
+         * a uint8.
+         * The efun takes two arguments.
+         */
+
+        int code;
+
+        code = LOAD_UINT8(pc);
+        instruction = code + EFUN2_OFFSET;
+
+#ifdef TRACE_CODE
+        previous_instruction[last] = instruction;
+#endif
+#ifdef OPCPROF
+        opcount[instruction]++;
+#endif
+        inter_sp = sp;
+        inter_pc = pc;
+        ASSIGN_EVAL_COST
+        test_efun_args(instruction, 2, sp-1);
+        sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
+        break;
+    }
+
+    CASE(F_EFUN3);                  /* --- efun3 <code>        --- */
+    {
+        /* Call the tabled efun EFUN3_OFFSET + <code>, where <code> is
+         * a uint8.
+         * The efun takes three or more arguments.
+         */
+
         int code;
         int numarg;
 
         code = LOAD_UINT8(pc);
-        numarg = LOAD_UINT8(pc);
+        instruction = code + EFUN3_OFFSET;
+        numarg = instrs[instruction].min_arg;
+
 #ifdef TRACE_CODE
-        previous_instruction[last] = code + 0x200;
+        previous_instruction[last] = instruction;
 #endif
 #ifdef OPCPROF
-        opcount[code+0x200]++;
+        opcount[instruction]++;
 #endif
         inter_sp = sp;
         inter_pc = pc;
         ASSIGN_EVAL_COST
-        sp = (*vefun_table[code])(sp, numarg);
+        test_efun_args(instruction, numarg, sp-numarg+1);
+        sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
         break;
     }
 
-    /* F_ESCAPE contains a sub-switch() and is handled at the
-     * end.
-     */
+    CASE(F_EFUN4);                  /* --- efun4 <code>        --- */
+    {
+        /* Call the tabled efun EFUN4_OFFSET + <code>, where <code> is
+         * a uint8.
+         * The efun takes four or more arguments.
+         */
+
+        int code;
+        int numarg;
+
+        code = LOAD_UINT8(pc);
+        instruction = code + EFUN4_OFFSET;
+        numarg = instrs[instruction].min_arg;
+
+#ifdef TRACE_CODE
+        previous_instruction[last] = instruction;
+#endif
+#ifdef OPCPROF
+        opcount[instruction]++;
+#endif
+        inter_sp = sp;
+        inter_pc = pc;
+        ASSIGN_EVAL_COST
+        test_efun_args(instruction, numarg, sp-numarg+1);
+        sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
+        break;
+    }
+
+    CASE(F_EFUNV);                  /* --- efunv <code> <nargs> --- */
+    {
+        /* Call the tabled efun EFUNV_OFFSET + <code>, where <code> is
+         * a uint8, with uint8 <nargs> argumentson the stack.
+         * The efun takes three arguments.
+         */
+
+        int code;
+        int min_arg, max_arg, numarg;
+
+        code = LOAD_UINT8(pc);
+        instruction = code + EFUNV_OFFSET;
+
+        numarg = LOAD_UINT8(pc);
+
+#ifdef TRACE_CODE
+        previous_instruction[last] = instruction;
+#endif
+#ifdef OPCPROF
+        opcount[instruction]++;
+#endif
+
+        inter_sp = sp;
+        inter_pc = pc;
+        ASSIGN_EVAL_COST
+
+        min_arg = instrs[instruction].min_arg;
+        max_arg = instrs[instruction].max_arg;
+
+        if (numarg < min_arg)
+            ERRORF(("Not enough args for %s: got %d, expected %d.\n"
+                   , instrs[instruction].name, numarg, min_arg));
+        if (max_arg >= 0 && numarg > max_arg)
+            ERRORF(("Too many args for %s: got %d, expected %d.\n"
+                   , instrs[instruction].name, numarg, max_arg));
+
+        test_efun_args(instruction, max_arg >= 0 ? numarg : min_arg
+                      , sp-numarg+1);
+        sp = (*vefun_table[instruction-EFUNV_OFFSET])(sp, numarg);
+        break;
+    }
 
     /* --- Predefined functions with counterparts in LPC --- */
 
@@ -6058,7 +6272,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         unsigned short string_number;
 
         LOAD_SHORT(string_number, pc);
-        push_shared_string(current_strings[string_number]);
+        push_ref_string(sp, current_strings[string_number]);
         break;
     }
 
@@ -6067,7 +6281,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Push the string current_strings[0x3<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_shared_string(current_strings[LOAD_UINT8(pc)+0x300]);
+        push_ref_string(sp, current_strings[LOAD_UINT8(pc)+0x300]);
         break;
     }
 
@@ -6076,7 +6290,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Push the string current_strings[0x2<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_shared_string(current_strings[LOAD_UINT8(pc)+0x200]);
+        push_ref_string(sp, current_strings[LOAD_UINT8(pc)+0x200]);
         break;
     }
 
@@ -6085,7 +6299,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Push the string current_strings[0x1<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_shared_string(current_strings[LOAD_UINT8(pc)+0x100]);
+        push_ref_string(sp, current_strings[LOAD_UINT8(pc)+0x100]);
         break;
     }
 
@@ -6094,7 +6308,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Push the string current_strings[0x0<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_shared_string(current_strings[LOAD_UINT8(pc)]);
+        push_ref_string(sp, current_strings[LOAD_UINT8(pc)]);
         break;
     }
 
@@ -6116,13 +6330,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
     CASE(F_CONST0);                 /* --- const0              --- */
         /* Push the number 0 onto the stack.
          */
-        push_number(0);
+        push_number(sp, 0);
         break;
 
     CASE(F_CONST1);                 /* --- const1              --- */
         /* Push the number 1 onto the stack.
          */
-        push_number(1);
+        push_number(sp, 1);
         break;
 
     CASE(F_CLIT);                   /* --- clit <num>          --- */
@@ -6130,7 +6344,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Push the number <num> onto the stack.
          * <num> is a 8-Bit uint.
          */
-        push_number((p_int)LOAD_UINT8(pc));
+        push_number(sp, (p_int)LOAD_UINT8(pc));
         break;
     }
 
@@ -6139,7 +6353,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Push the number -<num> onto the stack.
          * <num> is a 8-Bit uint.
          */
-        push_number(-(p_int)LOAD_UINT8(pc));
+        push_number(sp, -(p_int)LOAD_UINT8(pc));
         break;
     }
 
@@ -6246,7 +6460,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
     CASE(F_RETURN0);                /* --- return0             --- */
         /* Return from the function with result value 0.
          */
-        push_number(0);
+        push_number(sp, 0);
         /* FALLTHROUGH */
 
     CASE(F_RETURN);                 /* --- return              --- */
@@ -6599,15 +6813,15 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             }
             else
             {
+                BAD_ARG_ERROR(1, T_STRING, sp->type);
                 /* No string - bad wizard! */
-                goto bad_arg_1;
             }
         }
         else
         {
             /* Numeric switch */
 
-            if (sp->type != T_NUMBER) goto bad_arg_1;
+            TYPE_TEST1(sp, T_NUMBER);
             s = sp->u.number;
         }
         pop_stack();
@@ -6956,11 +7170,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           /* GET_NUM_ARG doesn't work here either. */
         arg = sp - num_arg + 1;
         if (arg[0].type != T_STRING)
-            goto bad_arg_1;
+            BAD_ARG_ERROR(1, T_STRING, arg[0].type);
         if (arg[1].type != T_OBJECT && arg[1].type != T_POINTER)
-            goto bad_arg_2;
+            RAISE_ARG_ERROR(2, TF_OBJECT|TF_POINTER, arg[1].type);
         if (arg[2].type != T_STRING)
-            goto bad_arg_3;
+            BAD_ARG_ERROR(3, T_STRING, arg[2].type);
         if (arg[1].type == T_POINTER)
             check_for_destr(arg[1].u.vec);
 
@@ -6969,7 +7183,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         i = e_parse_command(arg[0].u.string, &arg[1], arg[2].u.string
                            , &arg[3], num_arg-3);
         pop_n_elems(num_arg);        /* Get rid of all arguments */
-        push_number(i ? 1 : 0);      /* Push the result value */
+        push_number(sp, i ? 1 : 0);      /* Push the result value */
         break;
     }
 #endif /* PARSE_COMMAND */
@@ -7103,8 +7317,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Get the designated value */
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
-            ERROR("Bad argument to ++: not a lvalue.\n")
-            /* TODO: Give value and type */
+            ERRORF(("Bad argument to ++: got %s, expected lvalue.\n"
+                   , typename(sp->type)
+                   ));
 #endif
         svp = sp->u.lvalue;
 
@@ -7134,8 +7349,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        ERROR("++ of non-numeric argument\n")
-        /* TODO: Give type and value */
+        ERRORF(("Bad argument to ++: got %s, expected numeric type.\n"
+               , typename(svp->type)
+               ));
         break;
     }
 
@@ -7153,8 +7369,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Get the designated value */
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
-            ERROR("Bad argument to --: not a lvalue.\n")
-            /* TODO: Give type and value */
+            ERRORF(("Bad argument to --: got %s, expected lvalue.\n"
+                   , typename(sp->type)
+                   ));
 #endif
         svp = sp->u.lvalue;
 
@@ -7184,8 +7401,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        ERROR("-- of non-numeric argument\n")
-        /* TODO: Give type and value */
+        ERRORF(("Bad argument to --: got %s, expected numeric type.\n"
+               , typename(svp->type)
+               ));
         break;
     }
 
@@ -7204,8 +7422,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Get the designated value */
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
-            ERROR("Bad argument to ++: not a lvalue.\n")
-            /* TODO: Give the type and value */
+            ERRORF(("Bad argument to ++: got %s, expected lvalue.\n"
+                   , typename(sp->type)
+                   ));
 #endif
         svp = sp->u.lvalue;
 
@@ -7228,8 +7447,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        ERROR("++ of non-numeric argument\n")
-        /* TODO: Give type and value */
+        ERRORF(("Bad argument to ++: got %s, expected numeric type.\n"
+               , typename(svp->type)
+               ));
         break;
     }
 
@@ -7248,8 +7468,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Get the designated value */
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
-            ERROR("Bad argument to --: not a lvalue.\n")
-            /* TODO: Give the type and value */
+            ERRORF(("Bad argument to --: got %s, expected lvalue.\n"
+                   , typename(sp->type)
+                   ));
 #endif
         svp = sp->u.lvalue;
 
@@ -7272,8 +7493,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        ERROR("-- of non-numeric argument\n")
-        /* TODO: Give the type and value */
+        ERRORF(("Bad argument to --: got %s, expected numeric type.\n"
+               , typename(svp->type)
+               ));
         break;
     }
 
@@ -7291,8 +7513,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Get the designated value */
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
-            ERROR("Bad argument to ++: not a lvalue\n")
-            /* TODO: Give type and value */
+            ERRORF(("Bad argument to ++: got %s, expected lvalue.\n"
+                   , typename(sp->type)
+                   ));
 #endif
         svp = sp->u.lvalue;
 
@@ -7315,8 +7538,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        ERROR("++ of non-numeric argument\n")
-        /* TODO: Give type and value */
+        ERRORF(("Bad argument to ++: got %s, expected numeric type.\n"
+               , typename(svp->type)
+               ));
         break;
     }
 
@@ -7334,8 +7558,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Get the designated value */
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
-            ERROR("Bad argument to --: not a lvalue\n")
-            /* TODO: Give the type and value */
+            ERRORF(("Bad argument to --: got %s, expected lvalue.\n"
+                   , typename(sp->type)
+                   ));
 #endif
         svp = sp->u.lvalue;
 
@@ -7358,8 +7583,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        ERROR("-- of non-numeric argument\n")
-        /* TODO: Give the type and value */
+        ERRORF(("Bad argument to --: got %s, expected numeric type.\n"
+               , typename(svp->type)
+               ));
         break;
     }
 
@@ -7627,7 +7853,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 DYN_STRING_COST(l+l2)
                 res = xalloc(l + l2 + 1);
                 if (!res)
-                    ERROR("Out of memory\n")
+                    ERRORF(("Out of memory (%lu bytes)\n"
+                           , (unsigned long)(l+l2+1)));
                 strcpy(res, (sp-1)->u.string);
                 strcpy(res+l, sp->u.string);
                 free_string_svalue(sp);
@@ -7646,14 +7873,15 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%ld", sp->u.number);
                 if (buff[sizeof(buff)-1] != '\0')
-                    FATAL("Buffer overflow in F_ADD: int number too big.\n")
+                    FATAL("Buffer overflow in F_ADD: int number too big.\n");
                 res = xalloc((len1 = svalue_strlen(sp-1)) + strlen(buff) + 1);
                 if (!res)
-                    ERROR("Out of memory\n")
+                    ERRORF(("Out of memory (%lu bytes)\n"
+                           , (unsigned long)(len1+strlen(buff)+1)));
                 strcpy(res, (sp-1)->u.string);
                 strcpy(res+len1, buff);
                 pop_n_elems(2);
-                push_malloced_string(res);
+                push_malloced_string(sp, res);
                 DYN_STRING_COST(len1)
                 break;
               }
@@ -7667,10 +7895,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%g", READ_DOUBLE( sp ) );
                 if (buff[sizeof(buff)-1] != '\0')
-                    FATAL("Buffer overflow in F_ADD: float number too big.\n")
+                    FATAL("Buffer overflow in F_ADD: float number too big.\n");
                 res = xalloc((len1 = svalue_strlen(sp-1)) + strlen(buff) + 1);
                 if (!res)
-                    ERROR("Out of memory\n")
+                    ERRORF(("Out of memory (%lu bytes)\n"
+                           , (unsigned long)(len1+strlen(buff)+1)));
                 strcpy(res, (sp-1)->u.string);
                 strcpy(res+len1, buff);
                 sp--;
@@ -7681,7 +7910,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
               }
 
             default:
-                goto bad_add;
+                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+                /* NOTREACHED */
             }
             break;
             /* End of case T_STRING */
@@ -7697,12 +7927,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%ld", (sp-1)->u.number);
                 if (buff[sizeof(buff)-1] != '\0')
-                    FATAL("Buffer overflow in F_ADD: int number too big.\n")
+                    FATAL("Buffer overflow in F_ADD: int number too big.\n");
                 inter_pc = pc;
                 inter_sp = sp;
                 res = xalloc(svalue_strlen(sp) + (len1 = strlen(buff)) + 1);
                 if (!res)
-                    ERROR("Out of memory\n")
+                    ERRORF(("Out of memory (%lu bytes)\n"
+                           , (unsigned long)(len1+svalue_strlen(sp)+1)));
                 strcpy(res, buff);
                 strcpy(res+len1, sp->u.string);
                 free_string_svalue(sp);
@@ -7734,7 +7965,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
               }
 
             default:
-                goto bad_add;
+                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+                /* NOTREACHED */
             }
             break;
             /* End of case T_NUMBER */
@@ -7767,7 +7999,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%g", READ_DOUBLE(sp-1) );
                 if (buff[sizeof(buff)-1] != '\0')
-                    FATAL("Buffer overflow in F_ADD: float number too big.\n")
+                    FATAL("Buffer overflow in F_ADD: float number too big.\n");
                 res = xalloc(svalue_strlen(sp) + (len1 = strlen(buff)) + 1);
                 if (!res)
                     error("Out of memory\n");
@@ -7778,13 +8010,14 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 put_malloced_string(sp, res);
                 break;
             }
-            goto bad_add;
+            OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+            /* NOTREACHED */
           }
           /* End of case T_FLOAT */
 
         case T_POINTER:
           {
-            if (sp->type != T_POINTER) goto bad_add;
+            TYPE_TEST_RIGHT(sp, T_POINTER);
             inter_sp = sp;
             inter_pc = pc;
             inter_add_array(sp->u.vec, &(sp-1)->u.vec);
@@ -7796,27 +8029,25 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
           {
             mapping_t *m;
 
-            if (sp->type != T_MAPPING) goto bad_add;
+            TYPE_TEST_RIGHT(sp, T_MAPPING);
             check_map_for_destr((sp-1)->u.map);
             check_map_for_destr(sp->u.map);
             inter_pc = pc;
             inter_sp = sp;
             m = add_mapping((sp-1)->u.map,sp->u.map);
             if (!m) {
-                ERROR("Out of memory.n")
+                ERROR("Out of memory.n");
             }
             pop_n_elems(2);
-            push_mapping(m); /* This will make ref count == 2 */
-            deref_mapping(m);
+            push_mapping(sp, m);
             if (max_mapping_size && MAP_SIZE(m) > max_mapping_size)
                 ERRORF(("Illegal mapping size: %ld\n", MAP_SIZE(m)));
             break;
           }
 
         default:
-        bad_add:
-            ERROR("Bad type of arg to '+'\n")
-            /* TODO: Give type, value and position. */
+            OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_STRING|TF_FLOAT|TF_NUMBER
+                          , sp[-1].type);
             /* NOTREACHED */
         }
 
@@ -7858,6 +8089,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 sp->type = T_FLOAT;
                 break;
             }
+            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
+            /* NOTREACHED */
         }
         else if ((sp-1)->type == T_FLOAT)
         {
@@ -7878,11 +8111,14 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 STORE_DOUBLE(sp, diff);
                 break;
             }
+            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
+            /* NOTREACHED */
         }
-        else if ((sp-1)->type == T_POINTER && sp->type == T_POINTER)
+        else if ((sp-1)->type == T_POINTER)
         {
             vector_t *v;
 
+            TYPE_TEST_RIGHT(sp, T_POINTER);
             v = sp->u.vec;
             if (v->ref > 1)
             {
@@ -7894,10 +8130,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             sp->u.vec = subtract_array(sp->u.vec, v);
             break;
         }
-        else if ((sp-1)->type == T_MAPPING && sp->type == T_MAPPING)
+        else if ((sp-1)->type == T_MAPPING)
         {
             mapping_t *m;
 
+            TYPE_TEST_RIGHT(sp, T_MAPPING);
             m = subtract_mapping(sp[-1].u.map, sp->u.map);
             free_mapping(sp->u.map);
             sp--;
@@ -7905,10 +8142,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             sp->u.map = m;
             break;
         }
-        else if ((sp-1)->type == T_STRING && sp->type == T_STRING)
+        else if ((sp-1)->type == T_STRING)
         {
             char * result;
             
+            TYPE_TEST_RIGHT(sp, T_STRING);
             inter_sp = sp;
             result = intersect_strings((sp-1)->u.string, sp->u.string, MY_TRUE);
             free_string_svalue(sp);
@@ -7918,10 +8156,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        else
-            goto bad_arg_1;
-
-        goto bad_arg_2;
+        OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_STRING|TF_FLOAT|TF_NUMBER
+                      , sp[-1].type);
+        /* NOTREACHED */
     }
 
     CASE(F_MULTIPLY);               /* --- multiply            --- */
@@ -7970,7 +8207,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 size_t len;
 
                 if (sp[-1].u.number < 0)
-                    goto bad_arg_1;
+                    ERROR("Bad right arg to *: negative number.\n");
                 
                 len = svalue_strlen(sp);
                 reslen = (size_t)sp[-1].u.number * len;
@@ -8013,7 +8250,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 size_t len;
                 
                 if (sp[-1].u.number < 0)
-                    goto bad_arg_1;
+                    ERROR("Bad right arg to *: negative number.\n");
 
                 inter_sp = sp;
                 inter_pc = pc;
@@ -8062,7 +8299,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 put_array(sp, result);
                 break;
             }
-            goto bad_arg_2;
+            OP_ARG_ERROR(2, TF_POINTER|TF_STRING|TF_FLOAT|TF_NUMBER
+                          , sp->type);
+            /* NOTREACHED */
         case T_FLOAT:
           {
             STORE_DOUBLE_USED
@@ -8082,7 +8321,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 sp--;
                 break;
             }
-            goto bad_arg_2;
+            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
+            /* NOTREACHED */
           }
         case T_STRING:
           {
@@ -8094,7 +8334,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 size_t curlen;
 
                 if (sp->u.number < 0)
-                    goto bad_arg_2;
+                    ERROR("Bad left arg to *: negative number.\n");
                 
                 len = svalue_strlen(sp-1);
                 reslen = (size_t)sp->u.number * len;
@@ -8128,7 +8368,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 put_malloced_string(sp, result);
                 break;
             }
-            goto bad_arg_2;
+            BAD_OP_ARG(2, T_NUMBER, sp->type);
+            /* NOTREACHED */
           }
         case T_POINTER:
           {
@@ -8139,7 +8380,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 size_t len;
                 
                 if (sp->u.number < 0)
-                    goto bad_arg_2;
+                    ERROR("Bad left arg to *: negative number.\n");
 
                 inter_sp = sp;
                 inter_pc = pc;
@@ -8188,10 +8429,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 put_array(sp, result);
                 break;
               }
-            goto bad_arg_2;
+            BAD_OP_ARG(2, T_NUMBER, sp->type);
+            /* NOTREACHED */
           }
         default:
-            goto bad_arg_1;
+            OP_ARG_ERROR(1, TF_POINTER|TF_STRING|TF_FLOAT|TF_NUMBER
+                          , sp[-1].type);
+            /* NOTREACHED */
         }
         break;
     }
@@ -8215,7 +8459,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             if (sp->type == T_NUMBER) {
                 if (sp->u.number == 0)
-                    ERROR("Division by zero\n")
+                    ERROR("Division by zero\n");
                 i = (sp-1)->u.number / sp->u.number;
                 sp--;
                 sp->u.number = i;
@@ -8228,14 +8472,15 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
                 dtmp = READ_DOUBLE( sp );
                 if (dtmp == 0.)
-                    ERROR("Division by zero\n")
+                    ERROR("Division by zero\n");
                 sp--;
                 dtmp = sp->u.number / dtmp;
                 STORE_DOUBLE(sp, dtmp);
                 sp->type = T_FLOAT;
                 break;
             }
-            goto bad_arg_2;
+            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
+            /* NOTREACHED */
         }
         else if ((sp-1)->type == T_FLOAT)
         {
@@ -8246,7 +8491,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 dtmp = READ_DOUBLE( sp );
                 if (dtmp == 0.) {
-                    ERROR("Division by zero\n")
+                    ERROR("Division by zero\n");
                     return;
                 }
                 sp--;
@@ -8257,7 +8502,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (sp->type == T_NUMBER)
             {
                 if (sp->u.number == 0) {
-                    ERROR("Division by zero\n")
+                    ERROR("Division by zero\n");
                     return;
                 }
                 dtmp = (float)sp->u.number;
@@ -8266,9 +8511,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 STORE_DOUBLE(sp, dtmp);
                 break;
             }
-            goto bad_arg_2;
+            OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
+            /* NOTREACHED */
         }
-        goto bad_arg_1;
+        OP_ARG_ERROR(1, TF_FLOAT|TF_NUMBER, sp[-1].type);
+        /* NOTREACHED */
         break;
     }
 
@@ -8285,14 +8532,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         int i;
 
-        if ((sp-1)->type != T_NUMBER)
-            goto bad_arg_1;
-        if (sp->type != T_NUMBER)
-            goto bad_arg_2;
+        TYPE_TEST_LEFT((sp-1), T_NUMBER);
+        TYPE_TEST_RIGHT(sp, T_NUMBER);
         if (sp->u.number == 0)
         {
-            ERROR("Modulus by zero.\n")
-            return;
+            ERROR("Modulus by zero.\n");
+            break;
         }
         i = (sp-1)->u.number % sp->u.number;
         sp--;
@@ -8337,12 +8582,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        if (!( (sp-1)->type & (T_NUMBER|T_STRING|T_FLOAT) ))
-            goto bad_arg_1;
-        if (!(  sp   ->type & (T_NUMBER|T_STRING|T_FLOAT) ))
-            goto bad_arg_2;
-        ERROR("Arguments to > don't match\n")
-        /* TODO: Give type and value */
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
+        ERRORF(("Arguments to > don't match: %s vs %s\n"
+               , typename(sp[-1].type), typename(sp->type)
+               ));
     }
 
     CASE(F_GE);                     /* --- ge                  --- */
@@ -8382,12 +8626,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        if (!( (sp-1)->type & (T_NUMBER|T_STRING|T_FLOAT) ))
-            goto bad_arg_1;
-        if (!(  sp   ->type & (T_NUMBER|T_STRING|T_FLOAT) ))
-            goto bad_arg_2;
-        ERROR("Arguments to >= don't match\n")
-        /* TODO: Give type and value */
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
+        ERRORF(("Arguments to >= don't match: %s vs %s\n"
+               , typename(sp[-1].type), typename(sp->type)
+               ));
     }
 
     CASE(F_LT);                     /* --- lt                  --- */
@@ -8427,12 +8670,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        if (!( (sp-1)->type & (T_NUMBER|T_STRING|T_FLOAT) ))
-            goto bad_arg_1;
-        if (!(  sp   ->type & (T_NUMBER|T_STRING|T_FLOAT) ))
-            goto bad_arg_2;
-        ERROR("Arguments to < don't match\n")
-        /* TODO: Give error and type */
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
+        ERRORF(("Arguments to < don't match: %s vs %s\n"
+               , typename(sp[-1].type), typename(sp->type)
+               ));
     }
 
     CASE(F_LE);                     /* --- le                  --- */
@@ -8472,13 +8714,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        if (!( (sp-1)->type & (T_NUMBER|T_STRING|T_FLOAT) ))
-            goto bad_arg_1;
-        if (!(  sp   ->type & (T_NUMBER|T_STRING|T_FLOAT) ))
-            goto bad_arg_2;
-
-        ERROR("Arguments to <= don't match\n")
-        /* TODO: Give type and value */
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
+        ERRORF(("Arguments to <= don't match: %s vs %s\n"
+               , typename(sp[-1].type), typename(sp->type)
+               ));
     }
 
     CASE(F_EQ);                     /* --- eq                  --- */
@@ -8528,9 +8768,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         default:
             if (sp->type == T_LVALUE)
-                error("Reference passed to !=\n");
-            fatal("Illegal type to !=\n");
-              /* TODO: Give type and value */
+                error("Reference passed to ==\n");
+            FATALF(("Illegal type '%s' to ==\n",typename(sp->type)));
             /* NOTREACHED */
             return;
         }
@@ -8588,7 +8827,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         default:
             if (sp->type == T_LVALUE)
                 error("Reference passed to !=\n");
-            fatal("Illegal type to !=\n");
+            FATALF(("Illegal type '%s' to !=\n",typename(sp->type)));
             /* NOTREACHED */
             return;
         }
@@ -8603,9 +8842,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Compute the binary complement of number sp[0] and leave
          * that on the stack.
          */
-        if (sp->type != T_NUMBER)
-            ERROR("Bad argument to ~\n")
-            /* TODO: Give type and value */
+        TYPE_TEST1(sp, T_NUMBER);
         sp->u.number = ~ sp->u.number;
         break;
 
@@ -8645,15 +8882,20 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        if ((sp-1)->type != T_NUMBER)
-            goto bad_arg_1;
-        if (sp->type != T_NUMBER)
-            goto bad_arg_2;
+        if (sp->type == T_NUMBER && (sp-1)->type == T_NUMBER)
+        {
+            i = (sp-1)->u.number & sp->u.number;
+            sp--;
+            sp->u.number = i;
+            break;
+        }
 
-        i = (sp-1)->u.number & sp->u.number;
-        sp--;
-        sp->u.number = i;
-        break;
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_POINTER);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_POINTER);
+        ERRORF(("Arguments to & don't match: %s vs %s\n"
+               , typename(sp[-1].type), typename(sp->type)
+               ));
+
     }
 
     CASE(F_OR);                     /* --- or                  --- */
@@ -8669,13 +8911,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         int i;
 
-        if ((sp-1)->type != T_NUMBER)
-            goto bad_arg_1;
-        if (sp->type != T_NUMBER)
-            goto bad_arg_2;
+        TYPE_TEST_LEFT((sp-1), T_NUMBER);
+        TYPE_TEST_RIGHT(sp, T_NUMBER);
+
         i = (sp-1)->u.number | sp->u.number;
         sp--;
         sp->u.number = i;
+
         break;
     }
 
@@ -8692,10 +8934,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         int i;
 
-        if ((sp-1)->type != T_NUMBER)
-            goto bad_arg_1;
-        if (sp->type != T_NUMBER)
-            goto bad_arg_2;
+        TYPE_TEST_LEFT((sp-1), T_NUMBER);
+        TYPE_TEST_RIGHT(sp, T_NUMBER);
 
         i = (sp-1)->u.number ^ sp->u.number;
         sp--;
@@ -8717,10 +8957,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         int i;
 
-        if ((sp-1)->type != T_NUMBER)
-            goto bad_arg_1;
-        if (sp->type != T_NUMBER)
-            goto bad_arg_2;
+        TYPE_TEST_LEFT((sp-1), T_NUMBER);
+        TYPE_TEST_RIGHT(sp, T_NUMBER);
 
         i = sp->u.number;
         sp--;
@@ -8742,10 +8980,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         int i;
 
-        if ((sp-1)->type != T_NUMBER)
-            goto bad_arg_1;
-        if (sp->type != T_NUMBER)
-            goto bad_arg_2;
+        TYPE_TEST_LEFT((sp-1), T_NUMBER);
+        TYPE_TEST_RIGHT(sp, T_NUMBER);
 
         i = sp->u.number;
         sp--;
@@ -8792,11 +9028,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         if (sp[-1].type != T_NUMBER)
-            ERROR("Bad type of start interval to [..] range.\n")
-            /* TODO: Give type and value */
+            ERRORF(("Bad type '%s' of start interval to [..] range.\n"
+                   , typename(sp[-1].type)
+                   ));
         if (sp[0].type != T_NUMBER)
-            ERROR("Bad type of end interval to [..] range.\n")
-            /* TODO: Give type and value */
+            ERRORF(("Bad type '%s' of end interval to [..] range.\n"
+                   , typename(sp[0].type)
+                   ));
 
         if (sp[-2].type == T_POINTER)
         {
@@ -8867,7 +9105,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             if (to < from)
             {
                 pop_n_elems(3);
-                push_volatile_string("");
+                push_volatile_string(sp, "");
                 break;
             }
 
@@ -8875,7 +9113,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 res = string_copy(sp[-2].u.string + from);
                 pop_n_elems(3);
-                push_malloced_string(res);
+                push_malloced_string(sp, res);
                 break;
             }
 
@@ -8883,12 +9121,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             strncpy(res, sp[-2].u.string + from, (size_t)(to - from + 1));
             res[to - from + 1] = '\0';
             pop_n_elems(3);
-            push_malloced_string(res);
+            push_malloced_string(sp, res);
         }
         else
         {
-            ERROR("Bad argument to [..] range operand: neither string nor array.\n")
-            /* TODO: Give type and value */
+            ERRORF(("Bad argument to [..] operand: got %s, "
+                    "expected string/array.\n", typename(sp[-2].type)
+                    ));
         }
         break;
       }
@@ -8918,8 +9157,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         u2 = sp[-1].u;
 
 #ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            goto bad_arg_1;
+        TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
         /* Set argp to the actual value designated by sp[0] */
@@ -8961,7 +9199,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%ld", (long)u2.number);
                 if (buff[sizeof(buff)-1] != '\0')
-                    FATAL("Buffer overflow in F_ADD_EQ: int number too big.\n")
+                    FATAL("Buffer overflow in F_ADD_EQ: int number too big.\n");
                 inter_pc = pc;
                 if ( !(new_string =
                        xalloc(l + strlen(buff) + 1)) )
@@ -8979,7 +9217,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%g", READ_DOUBLE(sp-1) );
                 if (buff[sizeof(buff)-1] != '\0')
-                    FATAL("Buffer overflow in F_ADD_EQ: float number too big.\n")
+                    FATAL("Buffer overflow in F_ADD_EQ: float number too big.\n");
                 inter_pc = pc;
                 if ( !(new_string =
                        xalloc(l + strlen(buff) + 1)) )
@@ -8990,7 +9228,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             }
             else
             {
-                goto bad_arg_2;
+                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, type2);
+                /* NOTREACHED */
             }
 
             /* Replace *argp by the new string */
@@ -9039,12 +9278,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%ld", argp->u.number);
                 if (buff[sizeof(buff)-1] != '\0')
-                    FATAL("Buffer overflow in F_ADD_EQ: int number too big.\n")
+                    FATAL("Buffer overflow in F_ADD_EQ: int number too big.\n");
                 inter_pc = pc;
                 inter_sp = sp;
                 res = xalloc(svalue_strlen(sp-1) + (len1 = strlen(buff)) + 1);
                 if (!res)
-                    ERROR("Out of memory\n")
+                    ERROR("Out of memory\n");
                 strcpy(res, buff);
                 strcpy(res+len1, u2.string);
                 free_string_svalue(sp-1);
@@ -9061,15 +9300,15 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 --sp;
                 res = string_copy(res);
                 if (!res)
-                    ERROR("Out of memory\n")
+                    ERROR("Out of memory\n");
                 put_malloced_string(sp, res);
 
                 goto again;
             }
             else
             {
-                ERROR("Bad type number to rhs +=.\n")
-                /* TODO: Give type and value */
+                OP_ARG_ERROR(2, TF_NUMBER, type2);
+                /* NOTREACHED */
             }
             break;
 
@@ -9088,16 +9327,16 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             }
             else
             {
-                ERROR("Bad type number to rhs +=.\n")
-                /* TODO: Give type and value */
+                OP_ARG_ERROR(2, TF_NUMBER, type2);
+                /* NOTREACHED */
             }
             break;
 
         case T_MAPPING:  /* Add to a mapping */
             if (type2 != T_MAPPING)
             {
-                ERROR("Bad type to rhs +=.\n")
-                /* TODO: Give type and value */
+                OP_ARG_ERROR(2, TF_MAPPING, type2);
+                /* NOTREACHED */
             }
             else
             {
@@ -9113,8 +9352,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         case T_POINTER:  /* Add to an array */
             if (type2 != T_POINTER)
             {
-                ERROR("Bad type to rhs +=.\n")
-                /* TODO: Give type and value */
+                OP_ARG_ERROR(2, TF_POINTER, type2);
+                /* NOTREACHED */
             }
             else
             {
@@ -9158,13 +9397,15 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             }
             else
             {
-                goto bad_right;
+                OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, type2);
+                /* NOTREACHED */
             }
             break;
 
         default:
-            ERROR("Bad type to lhs +=\n")
-            /* TODO: Give type and value */
+            OP_ARG_ERROR(1, TF_STRING|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
+                        , argp->type);
+            /* NOTREACHED */
         } /* end of switch */
 
         /* If the instruction is F_ADD_EQ, leave the result on the stack */
@@ -9198,8 +9439,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         u2 = sp[-1].u;
 
 #ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            goto bad_arg_1;
+        TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
         /* Set argp to the actual value designated by sp[0] */
@@ -9213,14 +9453,20 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
         case T_NUMBER:  /* Subtract from a number */
             if (type2 != T_NUMBER)
-                goto bad_right;
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, type2);
+                /* NOTREACHED */
+            }
             sp--;
             sp->u.number = argp->u.number -= u2.number;
             break;
 
         case T_CHAR_LVALUE:  /* Subtract from a char in a string */
             if (type2 != T_NUMBER)
-                goto bad_right;
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, type2);
+                /* NOTREACHED */
+            }
             sp--;
             sp->u.number = *argp->u.string -= u2.number;
             /* TODO: May result in a 0x00 character in a string */
@@ -9231,7 +9477,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             char * result;
             
             if (type2 != T_STRING)
-                goto bad_right;
+            {
+                OP_ARG_ERROR(2, TF_STRING, type2);
+                /* NOTREACHED */
+            }
 
             inter_sp = sp;
             result = intersect_strings(argp->u.string, (sp-1)->u.string, MY_TRUE);
@@ -9249,7 +9498,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             vector_t *v, *v_old;
 
             if (type2 != T_POINTER)
-                goto bad_right;
+            {
+                OP_ARG_ERROR(2, TF_POINTER, type2);
+                /* NOTREACHED */
+            }
 
             v = u2.vec;
 
@@ -9295,7 +9547,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             }
             else
             {
-                goto bad_right;
+                OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, type2);
+                /* NOTREACHED */
             }
             break;
 
@@ -9321,14 +9574,22 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 free_mapping(m);
                 sp->u.map = ref_mapping(argp->u.map);
             }
+            else if (type2 == T_MAPPING && sp[-1].u.map->num_values)
+            {
+                ERROR("Bad right arg to -=: mapping has values.\n");
+                /* NOTREACHED */
+            }
             else
             {
-                goto bad_right;
+                OP_ARG_ERROR(2, TF_MAPPING, type2);
+                /* NOTREACHED */
             }
             break;
 
         default:
-            goto bad_left;
+            OP_ARG_ERROR(1, TF_STRING|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
+                        , argp->type);
+            /* NOTREACHED */
         } /* end of switch */
         break;
     }
@@ -9350,8 +9611,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         svalue_t *argp;
 
 #ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            goto bad_arg_1;
+        TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
         /* Set argp to the actual value designated by sp[0] */
@@ -9365,7 +9625,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             sp--;
             if (sp->type != T_NUMBER)
-                goto bad_right;
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
             sp->u.number = argp->u.number *= sp->u.number;
             break;
         }
@@ -9389,7 +9652,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 *sp = *argp;
             }
             else
-                goto bad_right;
+            {
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp->type);
+                /* NOTREACHED */
+            }
             break;
         }
 
@@ -9400,8 +9666,16 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             size_t len;
 
             sp--;
-            if (sp->type != T_NUMBER || sp->u.number < 0)
-                goto bad_right;
+            if (sp->type != T_NUMBER)
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
+            if (sp->u.number < 0)
+            {
+                ERROR("Bad right arg to *=: negative number\n");
+                /* NOTREACHED */
+            }
             
             len = svalue_strlen(argp);
             reslen = (size_t)sp->u.number * len;
@@ -9445,8 +9719,16 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             size_t len;
             
             sp--;
-            if (sp->type != T_NUMBER || sp->u.number < 0)
-                goto bad_right;
+            if (sp->type != T_NUMBER)
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
+            if (sp->u.number < 0)
+            {
+                ERROR("Bad right arg to *=: negative number\n");
+                /* NOTREACHED */
+            }
             
             inter_sp = sp;
             inter_pc = pc;
@@ -9495,8 +9777,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
         
-        goto bad_left;
-        /* NOTREACHED */ break;
+        OP_ARG_ERROR(1, TF_STRING|TF_FLOAT|TF_POINTER|TF_NUMBER
+                    , argp->type);
+        /* NOTREACHED */
+        break;
     }
 
     CASE(F_DIV_EQ);                 /* --- div_eq              --- */
@@ -9514,8 +9798,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         svalue_t *argp;
 
 #ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            goto bad_arg_1;
+        TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
         /* Set argp to the actual value designated by sp[0] */
@@ -9529,9 +9812,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             sp--;
             if (sp->type != T_NUMBER)
-                goto bad_right;
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
             if (sp->u.number == 0)
-                ERROR("Division by 0\n")
+                ERROR("Division by 0\n");
             sp->u.number = argp->u.number /= sp->u.number;
             break;
         }
@@ -9546,7 +9832,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 d = READ_DOUBLE(sp);
                 if (d == 0.0)
-                    ERROR("Division by 0\n")
+                    ERROR("Division by 0\n");
                 d = READ_DOUBLE(argp) / d;
                 STORE_DOUBLE(argp, d);
                 *sp = *argp;
@@ -9556,17 +9842,20 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                 p_int i;
                 i = sp->u.number;
                 if (i == 0)
-                    ERROR("Division by 0\n")
+                    ERROR("Division by 0\n");
                 d = READ_DOUBLE(argp) / (double)i;
                 STORE_DOUBLE(argp, d);
                 *sp = *argp;
             }
             else
-                goto bad_right;
+            {
+                OP_ARG_ERROR(2, TF_NUMBER|TF_FLOAT, sp->type);
+                /* NOTREACHED */
+            }
             break;
         }
-        goto bad_left;
-        /* NOTREACHED */ break;
+        OP_ARG_ERROR(1, TF_FLOAT|TF_NUMBER, argp->type);
+        /* NOTREACHED */
     }
 
     CASE(F_MOD_EQ);                 /* --- mod_eq              --- */
@@ -9585,8 +9874,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         svalue_t *argp;
 
 #ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            goto bad_arg_1;
+        TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
         /* Set argp to the actual value designated by sp[0] */
@@ -9600,14 +9888,17 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             sp--;
             if (sp->type != T_NUMBER)
-                goto bad_right;
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
             if (sp->u.number == 0)
-                ERROR("Division by 0\n")
+                ERROR("Division by 0\n");
             sp->u.number = argp->u.number %= sp->u.number;
             break;
         }
-        goto bad_left;
-        /* NOTREACHED */ break;
+        OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+        /* NOTREACHED */
     }
 
     CASE(F_AND_EQ);                 /* --- and_eq              --- */
@@ -9626,8 +9917,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         svalue_t *argp;
 
 #ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            goto bad_arg_1;
+        TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
         /* Set argp to the actual value designated by sp[0] */
@@ -9640,18 +9930,26 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (argp->type == T_NUMBER)  /* Intersect a number */
         {
             if (sp[-1].type != T_NUMBER)
-                goto bad_right;
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp[-1].type);
+                /* NOTREACHED */
+            }
             sp--;
             sp->u.number = argp->u.number &= sp->u.number;
             break;
         }
 
-        if (argp->type == T_POINTER && sp[-1].type == T_POINTER)
+        if (argp->type == T_POINTER)
         {
             /* Intersect an array */
 
             vector_t *vec1, *vec2;
 
+            if (sp[-1].type != T_POINTER)
+            {
+                OP_ARG_ERROR(2, TF_POINTER, sp[-1].type);
+                /* NOTREACHED */
+            }
             inter_sp = sp - 2;
             vec1 = argp->u.vec;
             vec2 = sp[-1].u.vec;
@@ -9664,10 +9962,15 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        if (argp->type == T_STRING && (sp-1)->type == T_STRING)
+        if (argp->type == T_STRING)
         {
             char * result;
             
+            if (sp[-1].type != T_STRING)
+            {
+                OP_ARG_ERROR(2, TF_STRING, sp[-1].type);
+                /* NOTREACHED */
+            }
             inter_sp = sp;
             result = intersect_strings(argp->u.string, (sp-1)->u.string, MY_FALSE);
             free_string_svalue(argp);
@@ -9679,8 +9982,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 
-        goto bad_left;
-        /* NOTREACHED */ break;
+        OP_ARG_ERROR(1, TF_NUMBER|TF_STRING|TF_POINTER, argp->type);
+        /* NOTREACHED */
+        break;
     }
 
     CASE(F_OR_EQ);                  /* --- or_eq               --- */
@@ -9697,8 +10001,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         svalue_t *argp;
 
 #ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            goto bad_arg_1;
+        TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
         /* Set argp to the actual value designated by sp[0] */
@@ -9712,12 +10015,16 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             sp--;
             if (sp->type != T_NUMBER)
-                goto bad_right;
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
             sp->u.number = argp->u.number |= sp->u.number;
             break;
         }
-        goto bad_left;
-        /* NOTREACHED */ break;
+        OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+        /* NOTREACHED */
+        break;
     }
 
     CASE(F_XOR_EQ);                 /* --- xor_eq              --- */
@@ -9734,8 +10041,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         svalue_t *argp;
 
 #ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            goto bad_arg_1;
+        TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
         /* Set argp to the actual value designated by sp[0] */
@@ -9749,12 +10055,16 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             sp--;
             if (sp->type != T_NUMBER)
-                goto bad_right;
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
             sp->u.number = argp->u.number ^= sp->u.number;
             break;
         }
-        goto bad_left;
-        /* NOTREACHED */ break;
+        OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+        /* NOTREACHED */
+        break;
     }
 
     CASE(F_LSH_EQ);                 /* --- lsh_eq              --- */
@@ -9772,8 +10082,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         svalue_t *argp;
 
 #ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            goto bad_arg_1;
+        TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
         /* Set argp to the actual value designated by sp[0] */
@@ -9787,14 +10096,18 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             sp--;
             if (sp->type != T_NUMBER)
-                goto bad_right;
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
             i = sp->u.number;
             argp->u.number <<= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
             sp->u.number = argp->u.number;
             break;
         }
-        goto bad_left;
-        /* NOTREACHED */ break;
+        OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+        /* NOTREACHED */
+        break;
     }
 
     CASE(F_RSH_EQ);                 /* --- rsh_eq              --- */
@@ -9811,8 +10124,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         int i;
         svalue_t *argp;
 #ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            goto bad_arg_1;
+        TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
         /* Set argp to the actual value designated by sp[0] */
@@ -9826,14 +10138,18 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         {
             sp--;
             if (sp->type != T_NUMBER)
-                goto bad_right;
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
             i = sp->u.number;
             argp->u.number >>= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
             sp->u.number = argp->u.number;
             break;
         }
-        goto bad_left;
-        /* NOTREACHED */ break;
+        OP_ARG_ERROR(1, TF_NUMBER, argp->type);
+        /* NOTREACHED */
+        break;
     }
 
     /* --- Machine internal instructions --- */
@@ -10517,6 +10833,212 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         sp = range_lvalue(0x101, sp);
         break;
 
+                          /* --- push_protected_indexed_lvalue --- */
+    CASE(F_PUSH_PROTECTED_INDEXED_LVALUE);
+        /* Op. (vector  v=sp[-1], int   i=sp[0])
+         * Op. (mapping v=sp[-1], mixed i=sp[0])
+         *
+         * Compute the lvalue &(v[i]), store it in a struct
+         * protected_lvalue, and push the protector as PROTECTED_LVALUE
+         * into the stack.
+         */
+
+        sp = push_protected_indexed_lvalue(sp, pc);
+        break;
+
+                         /* --- push_protected_rindexed_lvalue --- */
+    CASE(F_PUSH_PROTECTED_RINDEXED_LVALUE);
+        /* Op. (vector v=sp[-1], int i=sp[0])
+         *
+         * Compute the lvalue &(v[<i]), store it in a struct
+         * protected_lvalue, and push the protector as PROTECTED_LVALUE
+         * into the stack.
+         */
+
+        sp = push_protected_rindexed_lvalue(sp, pc);
+        break;
+
+                      /* --- push_protected_indexed_map_lvalue --- */
+    CASE(F_PUSH_PROTECTED_INDEXED_MAP_LVALUE);
+        /* Op. (mapping m=sp[-2], mixed i=sp[-1], int   j=sp[0])
+         *
+         * Compute the lvalue &(m[i:j]), store it in a struct
+         * protected_lvalue, and push the protector as PROTECTED_LVALUE
+         * into the stack.
+         */
+
+        push_protected_indexed_map_lvalue(sp, pc);
+        break;
+
+                                 /* --- protected_index_lvalue --- */
+    CASE(F_PROTECTED_INDEX_LVALUE);
+        /* Operator (string|vector &v=sp[0], int   i=sp[-1])
+         *          (mapping       &v=sp[0], mixed i=sp[-1])
+         *
+         * Compute the index &(*v[i]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector as
+         * PROTECTED_LVALUE onto the stack.
+         *
+         * If <v> is a protected non-string-lvalue, the protected_lvalue
+         * referenced by <v>.u.lvalue will be deallocated, and the
+         * protector itself will be stored in <last_indexing_protector>
+         * for the time being.
+         *
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary.
+         */
+
+        sp = protected_index_lvalue(sp, pc);
+        break;
+
+                                /* --- protected_rindex_lvalue --- */
+    CASE(F_PROTECTED_RINDEX_LVALUE);
+        /* Operator (string|vector &v=sp[0], int   i=sp[-1])
+         *
+         * Compute the index &(*v[<i]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector as
+         * PROTECTED_LVALUE onto the stack.
+         *
+         * If <v> is a protected non-string-lvalue, the protected_lvalue
+         * referenced by <v>.u.lvalue will be deallocated, and the
+         * protector itself will be stored in <last_indexing_protector>
+         * for the time being.
+         *
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary.
+         */
+
+        sp = protected_rindex_lvalue(sp, pc);
+        break;
+
+                              /* --- protected_range_lvalue --- */
+    CASE(F_PROTECTED_RANGE_LVALUE);
+        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
+         *
+         * Compute the range &(v[i1..i2]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector onto the
+         * stack.
+         *
+         * If <v> is a protected lvalue itself, its protecting svalue will
+         * be used in the result protector.
+         *
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary.
+         */
+
+        inter_pc = pc;
+        sp = protected_range_lvalue(0x000, sp);
+        break;
+
+                           /* --- protected_nr_range_lvalue --- */
+    CASE(F_PROTECTED_NR_RANGE_LVALUE);
+        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
+         *
+         * Compute the range &(v[i1..<i2]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector onto the
+         * stack.
+         *
+         * If <v> is a protected lvalue itself, its protecting svalue will
+         * be used in the result protector.
+         *
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary.
+         */
+
+        inter_pc = pc;
+        sp = protected_range_lvalue(0x001, sp);
+        break;
+
+                             /* --- protected_rn_range_lvalue --- */
+    CASE(F_PROTECTED_RN_RANGE_LVALUE);
+        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
+         *
+         * Compute the range &(v[<i1..i2]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector onto the
+         * stack.
+         *
+         * If <v> is a protected lvalue itself, its protecting svalue will
+         * be used in the result protector.
+         *
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary.
+         */
+
+        inter_pc = pc;
+        sp = protected_range_lvalue(0x100, sp);
+        break;
+
+                             /* --- protected_rr_range_lvalue --- */
+    CASE(F_PROTECTED_RR_RANGE_LVALUE);
+        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
+         *
+         * Compute the range &(v[<i1..<i2]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector onto the
+         * stack.
+         *
+         * If <v> is a protected lvalue itself, its protecting svalue will
+         * be used in the result protector.
+         *
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary.
+         */
+
+        inter_pc = pc;
+        sp = protected_range_lvalue(0x101, sp);
+        break;
+
+                              /* --- protected_nx_range_lvalue --- */
+    CASE(F_PROTECTED_NX_RANGE_LVALUE);
+        /* Operator (string|vector &v=sp[0], i1=sp[-1])
+         *
+         * Compute the range &(v[i1..]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector onto the
+         * stack.
+         *
+         * If <v> is a protected lvalue itself, its protecting svalue will
+         * be used in the result protector.
+         *
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary.
+         *
+         * We implement it by pushing '1' onto the stack and then
+         * calling protected_nr_range_lvalue, effectively computing
+         * &(v[i1..<1]).
+         */
+
+        inter_pc = pc;
+        sp++;
+        sp[0] = sp[-1];       /* Pull up the 'v' */
+        put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
+        sp = protected_range_lvalue(0x001, sp);
+        break;
+
+                          /* --- protected_rx_range_lvalue --- */
+    CASE(F_PROTECTED_RX_RANGE_LVALUE);
+        /* Operator (string|vector &v=sp[0], int i1=sp[-1])
+         *
+         * Compute the range &(v[<i1..]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector onto the
+         * stack.
+         *
+         * If <v> is a protected lvalue itself, its protecting svalue will
+         * be used in the result protector.
+         *
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary.
+         *
+         * We implement it by pushing '1' onto the stack and then
+         * calling protected_nr_range_lvalue, effectively computing
+         * &(v[i1..<1]).
+         */
+
+        inter_pc = pc;
+        sp++;
+        sp[0] = sp[-1];       /* Pull up the 'v' */
+        put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
+        sp = protected_range_lvalue(0x101, sp);
+        break;
+
     CASE(F_SIMUL_EFUN); /* --- simul_efun <code> [<num_arg>]   --- */
     {
         /* Call the simul_efun <code>. If it's a function taking varargs,
@@ -10552,7 +11074,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (current_object->flags & O_DESTRUCTED)
         {
             pop_n_elems(num_arg);
-            push_number(0);
+            push_number(sp, 0);
             break;
         }
 
@@ -10646,6 +11168,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         /* Get the size */
         LOAD_SHORT(num, pc);
+
         /* Allocate the array */
         i = num;
         v = allocate_uninit_array(i);
@@ -10710,7 +11233,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         /* Get the mapping */
         m = allocate_mapping(i, num_values);
         if (!m)
-            ERROR("Out of memory\n")
+            ERROR("Out of memory\n");
 
         /* Set sp and value to the first single value on the stack.
          */
@@ -10747,9 +11270,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          * TODO: How do other driver handle this?
          */
         if (previous_ob == 0 || (previous_ob->flags & O_DESTRUCTED))
-            push_number(0);
+            push_number(sp, 0);
         else
-            push_object(previous_ob);
+            push_ref_object(sp, previous_ob, "previous_object0");
         break;
 
     CASE(F_LAMBDA_CCONSTANT);    /* --- lambda_cconstant <num> --- */
@@ -10835,12 +11358,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         mp_int n;
         svalue_t *data;
 
-        if (sp[-2].type != T_MAPPING)
-            ERRORF(("Illegal value for <mapping>[,]: not a mapping.\n"));
-            /* TODO: Give type and value */
-        if (sp->type != T_NUMBER)
-            ERRORF(("Illegal sub-index for <mapping>[,]: not a number.\n"));
-            /* TODO: Give type and value */
+        TYPE_TEST1(sp-2, T_MAPPING)
+        TYPE_TEST3(sp, T_NUMBER)
 
         m = sp[-2].u.map;
         n = sp->u.number;
@@ -10848,7 +11367,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (n < 0 || n >= m->num_values)
         {
             ERRORF(("Illegal sub-index %ld, mapping width is %ld.\n"
-                 , (long)n, (long)m->num_values))
+                 , (long)n, (long)m->num_values));
         }
 
         sp--; /* the key */
@@ -10888,7 +11407,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (n < 0 || n >= m->num_values)
         {
             ERRORF(("Illegal sub-index %ld, mapping width is %ld.\n"
-                    , (long)n, (long)m->num_values))
+                    , (long)n, (long)m->num_values));
         }
 
         sp--; /* the key */
@@ -10948,8 +11467,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (sp->type != T_STRING
          && sp->type != T_POINTER
          && sp->type != T_MAPPING)
-            ERROR("foreach() requires a string, array or mapping.\n");
-            /* TODO: What type did it get? */
+            ERRORF(("foreach() got a %s, requires a string/array/mapping.\n"
+                   , typename(sp->type)
+                   ));
 
         /* Find out how many variables we require */
 
@@ -10996,8 +11516,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         }
 
         /* Push the count and the starting index */
-        push_number(count); sp->x.generic = nargs;
-        push_number(0);
+        push_number(sp, count); sp->x.generic = nargs;
+        push_number(sp, 0);
 
 #ifdef DEBUG
         /* The <nargs> lvalues and our temporaries act as hidden
@@ -11162,6 +11682,68 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         break;
     }
     
+    CASE(F_END_CATCH);                  /* --- end_catch       --- */
+        /* For a catch(...guarded code...) statement, the compiler
+         * generates a F_END_CATCH as last instruction of the
+         * guarded code.
+         *
+         * Executed when no error occured, it cleans up the
+         * error recovery information pushed by the F_CATCH
+         * and leaves a 0 on the stack.
+         *
+         * dump_trace() checks for this bytecode, but accepts a normal
+         * instruction as well as an escaped instruction.
+         */
+
+        pop_stack();
+        pop_control_stack();
+        pc = inter_pc;
+        fp = inter_fp;
+        pop_error_context();
+        push_number(sp, 0);
+        eval_cost -= CATCH_RESERVED_COST;
+        assigned_eval_cost -= CATCH_RESERVED_COST;
+        break;
+
+                          /* --- breakn_continue <num> <offset> ---*/
+    CASE(F_BREAKN_CONTINUE);
+        /* Implement the 'continue;' statement from within
+         * a nested surrounding structure.
+         *
+         * Pop <num>+1 (uint8) break-levels from the break stack
+         * and jump by (16-Bit) short <offset> bytes, counted from the
+         * first by of <offset>
+         */
+
+        break_sp +=
+          LOAD_UINT8(pc) * (sizeof(svalue_t)/sizeof(*break_sp));
+        /* FALLTHROUGH */
+
+    CASE(F_BREAK_CONTINUE);       /* --- break_continue <offset> ---*/
+    {
+        /* Implement the 'continue;' statement for the immediate
+         * surrounding structure.
+         *
+         * Pop one break-level from the break stack and jump
+         * by (16-Bit) unsigned short <offset> bytes, counted from the
+         * first by of <offset>
+         *
+         * Pitfall: the offset is added to the current pc in 16-Bit
+         * unsigned arithmetic, allowing to jump backwards using big
+         * enough values.
+         *
+         * TODO: Make that a proper signed short.
+         */
+
+        /* TODO: uint16 */ unsigned short offset;
+
+        break_sp += sizeof(svalue_t)/sizeof(*break_sp);
+        GET_SHORT(offset, pc);
+        offset += pc - current_prog->program;
+        pc = current_prog->program + offset;
+        break;
+    }
+
 #ifdef F_JUMP
     CASE(F_JUMP);                   /* --- jump <dest>         --- */
     {
@@ -11208,9 +11790,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             i = o->flags & O_CLONE;
         }
         else
-        {
             i = 0;
-        }
         free_svalue(sp);
         put_number(sp, i ? 1 : 0);
         break;
@@ -11318,6 +11898,24 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         break;
     }
 
+    CASE(F_REFERENCEP);                /* --- referencep      --- */
+      {
+        /* EFUN referencep()
+         *
+         *   int referencep(mixed arg)
+         *
+         * Returns true if arg was passed by reference to the current
+         * function, instead of the usual call-by-value.
+         */
+
+        int i;
+
+        i = sp->u.lvalue->type == T_LVALUE;
+        free_svalue(sp);
+        put_number(sp, i);
+        break;
+      }
+
     CASE(F_STRINGP);                /* --- stringp             --- */
     {
         /* EFUN stringp()
@@ -11352,99 +11950,21 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         break;
     }
 
-    CASE(F_CTIME);                  /* --- ctime               --- */
-    {
-        /* EFUN ctime()
+    CASE(F_TYPEOF);                    /* --- typeof          --- */
+      {
+        /* EFUN typeof()
          *
-         *   string ctime(int clock = time())
+         *   int typeof(mixed)
          *
-         * Interpret the argument clock as number of seconds since Jan,
-         * 1st, 1970, 0.00 and convert it to a nice date and time string.
+         * Returns a code for the type of the argument, as defined in
+         * <sys/lpctypes.h>
          */
 
-        char *ts, *cp;
-
-        TYPE_TEST1(sp, T_NUMBER)
-        ts = time_string(sp->u.number);
-        cp = strchr(ts, '\n');
-
-        /* If the string contains nl characters, extract the substring
-         * before the first one. Else just copy the (volatile) result
-         * we got.
-         */
-        if (cp)
-        {
-            int len = cp - ts;
-            cp = xalloc((size_t)(len + 1));
-            if (!cp)
-                ERROR("Out of memory\n")
-            strncpy(cp, ts, (size_t)len);
-            cp[len] = 0;
-        }
-        else
-        {
-            cp = string_copy(ts);
-            if (!cp)
-                ERROR("Out of memory\n")
-        }
-        put_malloced_string(sp, cp);
+        mp_int i = sp->type;
+        free_svalue(sp);
+        put_number(sp, i);
         break;
-    }
-
-    CASE(F_ED);                     /* --- ed <nargs>          --- */
-        /* EFUN ed()
-         *
-         *   int ed()
-         *   int ed(string file)
-         *   int ed(string file, string func)
-         *
-         * Calling without arguments will start the editor ed with the
-         * name of the error file, that was returned by
-         * master->valid_read(0, geteuid(this_player()), "ed_start",
-         * this_player()), usually something like ~/.err. If that file is
-         * empty, ed will immediatly exit again.
-         * Calling ed() with argument file will start the editor on the
-         * file. If the optional argument func is given, this function
-         * will be called after exiting the editor.
-         *
-         * Result is 1 if the editor could be started, else 0. TODO: ???
-         */
-
-        if (current_object->flags & O_DESTRUCTED)
-        {
-            /* could confuse the master... */
-            ERROR("Calling ed from destructed object.\n")
-        }
-
-        GET_NUM_ARG
-        assign_eval_cost();
-        inter_pc = pc;
-        inter_sp = sp;
-
-        if (num_arg == 0)
-        {
-            ed_start(NULL, NULL, NULL);
-            push_number(1);
-            break;
-        }
-        else if (num_arg == 1)
-        {
-            TYPE_TEST1(sp, T_STRING)
-            ed_start(sp->u.string, NULL, NULL);
-            break;
-        }
-        else
-        {
-            TYPE_TEST1(sp-1, T_STRING)
-            if (sp->type == T_STRING)
-                ed_start((sp-1)->u.string, sp->u.string, current_object);
-            else if (sp->type == T_NUMBER)
-                ed_start((sp-1)->u.string, NULL, NULL);
-            else
-                goto bad_arg_2;
-            pop_stack();
-            break;
-        }
+      }
 
     CASE(F_NEGATE);                 /* --- negate              --- */
         /* EFUN negate()
@@ -11474,55 +11994,27 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             break;
         }
 #endif
-        ERROR("Bad argument to unary minus\n")
+        ERRORF(("Bad arg to unary minus: got %s, expected number/float\n"
+               , typename(sp->type)
+               ));
 
-    CASE(F_PRINTF);                 /* --- printf <nargs>      --- */
+    CASE(F_RAISE_ERROR);               /* --- raise_error     --- */
       {
-        /* EFUN printf()
+        /* EFUN raise_error()
          *
-         *   void printf(string format, ...)
+         *   void raise_error(string arg)
          *
-         * A cross between sprintf() and write(). Returns void and prints
-         * the result string to the user.
+         * Abort execution. If the current program execution was initiated
+         * by catch(), that catch expression will return arg as error
+         * code, else the arg will printed as error message. This
+         * is very similar to throw(), but while throw() is intended to be
+         * called inside catch(), raise_error() can be called
+         * anywhere.
          */
 
-        char *str;
-        
-        assign_eval_cost();
-        GET_NUM_ARG
-        inter_pc = pc;
-        inter_sp = sp;
-        TYPE_TEST1(sp - num_arg + 1, T_STRING)
-        str = string_print_formatted((sp-num_arg+1)->u.string
-                                    , num_arg-1, sp-num_arg+2);
-        if (command_giver)
-            tell_object(command_giver, str);
-        else
-            add_message("%s", str);
-        pop_n_elems(num_arg);
-        break;
+        TYPE_TEST1(sp, T_STRING);
+        ERRORF(("%s", sp->u.string));
       }
-
-    CASE(F_RANDOM);                 /* --- random              --- */
-        /* EFUN random()
-         *
-         *   int random(int n)
-         *
-         * Returns a number in the random range [0 .. n-1].
-         *
-         * The random number generator is proven to deliver an equal
-         * distribution of numbers over a big range, with no repetition of
-         * number sequences for a long time.
-         */
-
-        TYPE_TEST1(sp, T_NUMBER)
-        if (sp->u.number <= 0)
-        {
-            sp->u.number = 0;
-            break;
-        }
-        sp->u.number = (p_int)random_number((uint32)sp->u.number);
-        break;
 
     CASE(F_THROW);                  /* --- throw               --- */
         /* EFUN throw()
@@ -11540,265 +12032,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         throw_error(); /* do the longjump, with extra checks... */
         break;
 
-    CASE(F_TIME);                   /* --- time                --- */
-        /* EFUN time()
-         *
-         *   int time()
-         *
-         * Return number of seconds ellapsed since 1. Jan 1970, 0.0:0 GMT
-         *
-         * Actually the time is updated only once in every backend cycle.
-         */
-
-        push_number(current_time);
-        break;
-
     /* --- Efuns: Strings --- */
-
-    CASE(F_CAPITALIZE);             /* --- capitalize          --- */
-        /* EFUN capitalize()
-         *
-         *     string capitalize(string str)
-         *
-         * Convert the first character in str to upper case, and return
-         * the new string.
-         */
-
-        TYPE_TEST1(sp, T_STRING)
-        if (islower((unsigned char)(sp->u.string[0])))
-        {
-            char *str;
-
-            /* Change malloc'ed strings in place, for others
-             * make a copy.
-             */
-            if (STRING_MALLOC == sp->x.string_type)
-                sp->u.string[0] += 'A' - 'a';
-            else
-            {
-                str = string_copy(sp->u.string);
-                str[0] += 'A' - 'a';
-                pop_stack();
-                push_malloced_string(str);
-            }
-        }
-        break;
-
-    CASE(F_CRYPT);                  /* --- crypt               --- */
-    {
-        /* EFUN crypt()
-         *
-         *   string crypt(string str, int seed)
-         *   string crypt(string str, string seed)
-         *
-         * Crypt the string str using the integer seed or two characters
-         * from the string seed as a seed. If seed is equal 0, then
-         * a random seed is used.
-         *
-         * The result has the first two characters as the seed.
-         */
-
-        char *salt;
-        char *res;
-        char temp[3];
-        static char choise[] =
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./";
-
-        TYPE_TEST1(sp-1, T_STRING)
-        if (sp->type == T_STRING && svalue_strlen(sp) >= 2)
-        {
-            salt = sp->u.string;
-        }
-        else if (sp->type == T_NUMBER)
-        {
-            temp[0] = choise[random_number((sizeof choise) - 1)];
-            temp[1] = choise[random_number((sizeof choise) - 1)];
-            temp[2] = '\0';
-            salt = temp;
-        }
-        else
-            goto bad_arg_2;
-
-        res = string_copy(crypt((sp-1)->u.string, salt));
-        pop_n_elems(2);
-        push_malloced_string(res);
-        break;
-    }
-
-    CASE(F_EXPLODE);                /* --- explode             --- */
-    {
-        /* EFUN explode()
-         *
-         *   string *explode(string str, string del)
-         *
-         * Return an array of strings, created when the string str is
-         * split into substrings as divided by del.
-         */
-
-        vector_t *v;
-
-        TYPE_TEST1(sp-1, T_STRING)
-        TYPE_TEST2(sp,   T_STRING)
-        inter_sp = sp;
-        inter_pc = pc;
-
-        v = explode_string((sp-1)->u.string, sp->u.string);
-        free_string_svalue(sp);
-        sp--;
-        free_string_svalue(sp);
-        put_array(sp,v);
-        break;
-    }
-
-    CASE(F_IMPLODE);                /* --- implode             --- */
-    {
-        /* EFUN implode()
-         *
-         *   string implode(mixed *arr, string del)
-         *
-         * Concatenate all strings found in array arr, with the string
-         * del between each element. Only strings are used from the array.
-         */
-
-        char *str;
-
-        TYPE_TEST1(sp-1, T_POINTER)
-        TYPE_TEST2(sp,   T_STRING)
-
-        str = implode_string((sp-1)->u.vec, sp->u.string);
-        if (!str)
-            ERROR("Out of memory\n")
-
-        free_string_svalue(sp);
-        sp--;
-        free_array(sp->u.vec);
-
-        if (str)
-            put_malloced_string(sp, str);
-        else
-            put_number(sp, 0);
-        break;
-    }
-
-    CASE(F_LOWER_CASE);             /* --- lower_case          --- */
-    {
-        /* EFUN lower_case()
-         *
-         *   string lower_case(string str)
-         *
-         * Convert all characters in str to lower case, and return the
-         * new string.
-         */
-
-        char *str, *s, *d, c;
-        ptrdiff_t initial_len;
-
-        TYPE_TEST1(sp, T_STRING)
-
-        /* Set s to the first uppercase character and store it in c */
-        for ( s = sp->u.string
-            ; '\0' != (c = *s) && !isupper((unsigned char)c)
-            ; s++) NOOP;
-
-        if (c)
-        {
-            /* Yes, there is something to change... */
-
-            if (STRING_MALLOC == sp->x.string_type)
-            {
-                /* Scan the rest of the string and lower it */
-                for ( ; '\0' != (c = *s); s++)
-                    if (isupper((unsigned char)c))
-                        *s = (char)tolower(c);
-            }
-            else
-            {
-                /* We need to make a copy of the shared string.
-                 * so fold the copying with the case changing.
-                 */
-
-                initial_len = s - sp->u.string;
-                str = xalloc(svalue_strlen(sp)+1);
-                if (initial_len)
-                    memcpy(str, sp->u.string, (size_t)initial_len);
-                for(d = str + initial_len; '\0' != (c = *s++) ; )
-                {
-                    if (isupper((unsigned char)c))
-                        c = (char)tolower(c);
-                    *d++ = c;
-
-                }
-                *d = '\0';
-                free_string_svalue(sp);
-                put_malloced_string(sp, str);
-            }
-        }
-        break;
-    }
-
-    CASE(F_REGEXP);                 /* --- regexp              --- */
-    {
-        /* EFUN regexp()
-         *
-         *   string *regexp(string *list, string pattern)
-         *
-         * Match the pattern pattern against all strings in list, and return a
-         * new array with all strings that matched. This function uses the
-         * same syntax for regular expressions as ed().
-         */
-
-        vector_t *v;
-
-        TYPE_TEST1(sp-1, T_POINTER)
-        TYPE_TEST2(sp,   T_STRING)
-        v = match_regexp((sp-1)->u.vec, sp->u.string);
-        pop_stack();
-        free_svalue(sp);
-        if (v == NULL)
-            put_number(sp, 0);
-        else
-            put_array(sp,v);
-        break;
-    }
-
-    CASE(F_SPRINTF);                /* --- sprintf <nargs>     --- */
-    {
-        /* EFUN sprintf()
-         *
-         *   string sprintf(string fmt, ...)
-         *
-         * Generate a string according to the <fmt> and the following
-         * arguments and put it onto the stack.
-         *
-         * <fmt> follows the C-style sprintf-format string in style,
-         * and partly in meaning, too.
-         */
-
-        char *s;
-
-        /*
-         * string_print_formatted() returns a pointer to it's internal
-         * buffer, or to an internal constant...  Either way, it must
-         * be copied before it's returned as a string.
-         */
-
-        assign_eval_cost();
-        GET_NUM_ARG
-        inter_pc = pc;
-        inter_sp = sp;
-        TYPE_TEST1(sp - num_arg + 1, T_STRING)
-        s = string_print_formatted((sp-num_arg+1)->u.string,
-                                   num_arg-1, sp-num_arg+2);
-        pop_n_elems(num_arg);
-        if (!s)
-            push_number(0);
-        else
-            /* string_print_formatted() owns the string returned,
-             * so copy it.
-             */
-            push_malloced_string(string_copy(s));
-        break;
-    }
 
     CASE(F_STRLEN);                 /* --- strlen              --- */
     {
@@ -11820,1114 +12054,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         }
         if (sp->type == T_NUMBER && sp->u.number == 0)
             break;
-        goto bad_arg_1;
-    }
-
-    CASE(F_TERMINAL_COLOUR);    /* --- terminal_colour <nargs> --- */
-    {
-        /* EFUN terminal_colour()
-         *
-         *   varargs string terminal_colour( string str, mapping map,
-         *                                   int wrap, int indent )
-         *
-         * Expands all colour-defines from the input-string and replaces them
-         * by the apropriate values found for the color-key inside the given
-         * mapping. The mapping has the format "KEY" : "value", non-string
-         * contents are ignored.
-         */
-
-        int    indent = 0;
-        int    wrap = 0;
-        mapping_t *map = NULL;
-        char * str;
-
-        GET_NUM_ARG;
-        if ( num_arg >= 3 )
-        {
-            if ( num_arg == 4 )
-            {
-                TYPE_TEST4(sp, T_NUMBER );
-                indent = (sp--)->u.number;
-                if (indent < 0)
-                {
-                    ERROR("terminal_colour() requires an indent >= 0.\n");
-                    break;
-                }
-            }
-            TYPE_TEST3(sp,T_NUMBER);
-            wrap = (sp--)->u.number;
-            if (wrap < 0)
-            {
-                ERROR("terminal_colour() requires a wrap >= 0.\n");
-                break;
-            }
-        }
-
-        TYPE_TEST1(sp-1, T_STRING);
-
-        if (sp->type == T_MAPPING)
-        {
-            if (sp->u.map->num_values < 1)
-            {
-                ERROR("terminal_colour() requires a mapping with values.\n");
-                break;
-            }
-            map = sp->u.map;
-        }
-        else if (sp->type != T_NUMBER || sp->u.number != 0)
-        {
-            goto bad_arg_2;
-        }
-
-
-        inter_sp = sp;
-        inter_pc = pc;
-
-        str = e_terminal_colour(sp[-1].u.string, map, indent, wrap);
-
-        pop_stack();
-
-        if (str != sp->u.string)
-        {
-            /* terminal_colour() actually changed the string */
-            free_svalue(sp);
-            put_malloced_string(sp, str);
-        }
-        break;
-    }
-
-    CASE(F_CLEAR_BIT);              /* --- clear_bit           --- */
-    {
-        /* EFUN clear_bit()
-         *
-         *     string clear_bit(string str, int n)
-         *
-         * Return the new string where bit n is cleared in string str.
-         * Note that the old string str is not modified.
-         *
-         * Each character contains 6 bits. So you can store a value
-         * between 0 and 63 ( 2^6=64) in one character. Starting
-         * character is the blank character " " which has the value 0.
-         * The first charcter in the string is the one with the lowest
-         * bits (0-5).
-         */
-
-        char *str;
-        size_t len, ind, bitnum;
-        svalue_t *strp;
-
-        /* Get and test the arguments */
-        TYPE_TEST1(sp-1, T_STRING)
-        TYPE_TEST2(sp,   T_NUMBER)
-        bitnum = (size_t)sp->u.number;
-        sp = strp = sp-1;
-        if (bitnum > MAX_BITS)
-            ERRORF(("clear_bit: too big bit number: %ld\n", (long)bitnum))
-        if (bitnum < 0)
-            ERRORF(("clear_bit: negative bit number: %ld\n", (long)bitnum))
-
-        len = svalue_strlen(strp);
-        ind = bitnum/6;
-        if (ind >= len)
-        {
-            /* Return first argument unmodified! */
-            break;
-        }
-
-        /* Malloc'ed strings are modified in place, others are copied first.
-         */
-        if (strp->x.string_type == STRING_MALLOC)
-        {
-            str = strp->u.string;
-        }
-        else
-        {
-            str = xalloc(len+1);
-            memcpy(str, strp->u.string, len+1); /* Including null byte */
-            free_string_svalue(strp);
-            strp->x.string_type = STRING_MALLOC;
-            strp->u.string = str;
-        }
-
-        if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
-            ERRORF(("Illegal bit pattern in clear_bit character %ld\n", (long)ind))
-
-        str[ind] = (char)(((str[ind] - ' ') & ~(1 << (bitnum % 6))) + ' ');
-
-        break;
-    }
-
-    CASE(F_SET_BIT);                /* --- set_bit             --- */
-    {
-        /* EFUN set_bit()
-         *
-         *   string set_bit(string str, int n)
-         *
-         * Return the new string where bit n is set in string str. Note
-         * that the old string str is not modified.
-         *
-         * The new string will automatically be extended if needed.
-         * TODO: Apply to an optional range (start, length) only.
-         */
-
-        char *str;
-        size_t len, old_len, ind, bitnum;
-        svalue_t *strp;
-
-        TYPE_TEST1(sp-1, T_STRING)
-        TYPE_TEST2(sp,   T_NUMBER)
-
-        bitnum = (size_t)sp->u.number;
-        sp = strp = sp-1;
-        if (bitnum > MAX_BITS)
-            ERRORF(("set_bit: too big bit number: %ld\n", (long)bitnum))
-        if (bitnum < 0)
-            ERRORF(("set_bit: negative bit number: %ld\n", (long)bitnum))
-
-        len = svalue_strlen(strp);
-        old_len = len;
-        ind = bitnum/6;
-
-        /* Malloc'ed strings of the right size are modified in place,
-         * others are copied first.
-         */
-        if ( (ind < len || (len = ind + 1, MY_FALSE) )
-         &&  strp->x.string_type == STRING_MALLOC )
-        {
-            str = strp->u.string;
-        }
-        else
-        {
-            str = xalloc(len+1);
-            str[len] = '\0';
-            if (old_len)
-                memcpy(str, strp->u.string, old_len);
-            if (len > old_len)
-                memset(str + old_len, ' ', len - old_len);
-            free_string_svalue(strp);
-            strp->x.string_type = STRING_MALLOC;
-            strp->u.string = str;
-        }
-
-        if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
-            ERRORF(("Illegal bit pattern in set_bit character %ld\n", (long)ind))
-
-        str[ind] = (char)(((str[ind] - ' ') | 1 << (bitnum % 6) ) + ' ');
-        sp = strp;
-        break;
-    }
-
-    CASE(F_TEST_BIT);               /* --- test_bit            --- */
-    {
-        /* EFUN test_bit()
-         *
-         *   int test_bit(string str, int n)
-         *
-         * Return 0 or 1 of bit n was set in string str.
-         * TODO: Apply to an optional range (start, length) only.
-         */
-
-        size_t len;
-
-        TYPE_TEST1(sp-1, T_STRING)
-        TYPE_TEST2(sp,   T_NUMBER)
-
-        if (sp->u.number < 0)
-            ERRORF(("test_bit: negative bit number: %ld\n", (long)sp->u.number))
-
-        len = svalue_strlen(sp-1);
-        if (sp->u.number/6 >= len)
-        {
-            sp--;
-            free_string_svalue(sp);
-            put_number(sp, 0);
-            break;
-        }
-
-        if ( ((sp-1)->u.string[sp->u.number/6] - ' ')
-            & 1 << (sp->u.number % 6) )
-        {
-            sp--;
-            free_string_svalue(sp);
-            put_number(sp, 1);
-        }
-        else
-        {
-            sp--;
-            free_string_svalue(sp);
-            put_number(sp, 0);
-        }
-        break;
-    }
-
-    CASE(F_OR_BITS);                /* --- or_bits             --- */
-    CASE(F_AND_BITS);               /* --- and_bits            --- */
-    CASE(F_XOR_BITS);               /* --- xor_bits            --- */
-    {
-        /* EFUN or_bits(), and_bits(), xor_bits()
-         *
-         *     string or_bits(string str1, string str2)
-         *     string and_bits(string str1, string str2)
-         *     string xor_bits(string str1, string str2)
-         *
-         * Perform a binary operation on the bitstrings <str1> and <str2>
-         * and return the resulting string.
-         *
-         * Each character contains 6 bits. So you can store a value
-         * between 0 and 63 ( 2^6=64) in one character. Starting
-         * character is the blank character " " which has the value 0.
-         * The first charcter in the string is the one with the lowest
-         * bits (0-5).
-         * TODO: Apply to an optional range (start, length) only.
-         */
-
-        size_t  len1, len2, result_len, arg_len;
-        char   *arg, *result, *to_copy;
-        Bool  use_short; /* TRUE for AND: use shorter string for result */
-
-        result_len = 0;
-        to_copy = NULL;
-
-        use_short = (instruction == F_AND_BITS);
-
-        /* Get and test the arguments */
-        TYPE_TEST1(sp-1, T_STRING)
-        TYPE_TEST2(sp,   T_STRING)
-
-        /* Sort the two arguments in shorter and longer string.
-         * We will try to modify one of the two strings in-place.
-         */
-        result = NULL;
-        len1 = svalue_strlen(sp-1);
-        len2 = svalue_strlen(sp);
-
-        if ((len1 >= len2 && !use_short)
-         || (len1 < len2 && use_short)
-           )
-        {
-            /* AND: sp-1 is the shorter result; sp the longer argument
-             * else: sp-1 is the longer result; sp the shorter argument
-             */
-
-            arg = sp->u.string;
-
-            if ((sp-1)->x.string_type == STRING_MALLOC)
-            {
-                result = (sp-1)->u.string;
-                *(sp-1) = const0;
-            }
-            else
-            {
-                result_len = len1;
-                to_copy = (sp-1)->u.string;
-            }
-        }
-        else
-        {
-            /* AND: sp is the shorter result; sp-1 the longer argument
-             * else: sp is the longer result; sp-1 the shorter argument
-             */
-            arg = (sp-1)->u.string;
-
-            if (sp->x.string_type == STRING_MALLOC)
-            {
-                result = sp->u.string;
-                *sp = const0;
-            }
-            else
-            {
-                result_len = len2;
-                to_copy = sp->u.string;
-            }
-        }
-
-        /* If needed, allocate a copy of the result string.
-         */
-        if (!result)
-        {
-            inter_pc = pc;
-            inter_sp = sp;
-            result = xalloc(result_len+1);
-            if (!result)
-                ERROR("Out of memory.\n")
-            memcpy(result, to_copy, result_len+1);
-        }
-
-        /* Now perform the operation. */
-
-        arg_len = (len2 > len1) ? len1 : len2;
-        while (arg_len-- != 0)
-        {
-            char c1, c2;
-
-            c1 = result[arg_len];
-            c2 = arg[arg_len];
-            if (c1 > 0x3f + ' ' || c1 < ' ')
-                ERRORF(("Illegal bit pattern in or_bits character %d\n"
-                       , (int)c1))
-            if (c2 > 0x3f + ' ' || c2 < ' ')
-                ERRORF(("Illegal bit pattern in or_bits character %d\n"
-                       , (int)c2))
-            if (instruction == F_AND_BITS)
-                result[arg_len] = (char)(c1 & c2);
-            else if (instruction == F_OR_BITS)
-                result[arg_len] = (char)(c1 | c2);
-            else if (instruction == F_XOR_BITS)
-                result[arg_len] = (char)((c1 ^ c2) + ' ');
-        }
-
-        /* Clean up the stack and push the result. */
-        free_svalue(sp--);
-        free_svalue(sp);
-        put_malloced_string(sp, result);
-
-        break;
-    }
-
-    CASE(F_INVERT_BITS);            /* --- invert_bits            --- */
-    {
-        /* EFUN invert_bits()
-         *
-         *     string invert_bits(string str)
-         *
-         * Invert all bits in the bitstring <str> and return the
-         * new string.
-         *
-         * TODO: Apply to an optional range (start, length) only.
-         */
-
-        char * src, * dest;
-        long   len;
-
-        /* Get and test the arguments */
-        TYPE_TEST1(sp, T_STRING)
-
-        src = sp->u.string;
-        len = (size_t)_svalue_strlen(sp);
-
-        /* If it is a malloced string, modify it in place,
-         * otherwise allocate a copy.
-         */
-        if (sp->x.string_type == STRING_MALLOC)
-            dest = src;
-        else
-        {
-            inter_pc = pc;
-            inter_sp = sp;
-            dest = xalloc((size_t)len+1);
-            if (!dest)
-                ERROR("Out of memory\n")
-        }
-
-        /* Invert the string */
-        while (len-- > 0)
-        {
-            *dest++ = (char)(' ' + (~(*src++ - ' ') & 0x3F));
-        }
-
-        *dest = '\0';
-
-        /* Push the result */
-        if (src != dest)
-        {
-            free_svalue(sp);
-            put_malloced_string(sp, dest);
-        }
-
-        break;
-    }
-
-    CASE(F_LAST_BIT);               /* --- last_bit            --- */
-    {
-        /* EFUN last_bit()
-         *
-         *     int last_bit(string str)
-         *
-         * Return the number of the last set bit in bitstring <str>.
-         * If no bit is set, return -1.
-         *
-         * TODO: extend this to true int-bitflags?
-         *
-         * Each character contains 6 bits. So you can store a value
-         * between 0 and 63 ( 2^6=64) in one character. Starting
-         * character is the blank character " " which has the value 0.
-         * The first charcter in the string is the one with the lowest
-         * bits (0-5).
-         * TODO: Apply to an optional range (start, length) only.
-         */
-
-        mp_int   pos;
-        long     len;
-        char   * str;
-        int      c;
-
-        pos = -1;
-
-        /* Get and test the arguments */
-        TYPE_TEST1(sp, T_STRING)
-
-        str = sp->u.string;
-        len = (long)_svalue_strlen(sp);
-
-        /* First, find the last non-zero character */
-        c = 0;
-        while (len-- > 0 && (c = str[len]) == ' ') NOOP;
-
-        if (len >= 0)
-        {
-            int pattern;
-
-            /* Found a character, now determine the bit position */
-            c -= ' ';
-            pos = 6 * len + 5;
-            for ( pattern = 1 << 5
-                ; pattern && !(c & pattern)
-                ; pattern >>= 1, pos--)
-                NOOP;
-        }
-
-        /* Clear the stack and push the result */
-        free_svalue(sp);
-        put_number(sp, pos);
-
-        break;
-    }
-
-    CASE(F_NEXT_BIT);               /* --- next_bit            --- */
-    {
-        /* EFUN next_bit()
-         *
-         *     int next_bit(string str, int start, int find_zero)
-         *
-         * Return the number of the next bit after position <start>
-         * in bitstring <str>. If <find_zero> is non-null, the next
-         * unset bit is found, else the next set bit.
-         * If there is no such bit, return -1.
-         *
-         * If <start> is negative, the string is searched from the
-         * beginning.
-         *
-         * TODO: extend this to true int-bitflags?
-         *
-         * Each character contains 6 bits. So you can store a value
-         * between 0 and 63 ( 2^6=64) in one character. Starting
-         * character is the blank character " " which has the value 0.
-         * The first charcter in the string is the one with the lowest
-         * bits (0-5).
-         */
-
-        mp_int   found;    /* Resultvalue */
-        size_t   pos;      /* Searchposition */
-        size_t   search;   /* Searchindex */
-        int      pattern;  /* Pattern for next bit to test */
-        long     len;      /* Length of the string */
-        long     start;    /* Startposition */
-        char   * str;      /* the bitstring */
-        int      invert;   /* when looking for 0 bits, an inverter mask */
-
-        /* Get and test the arguments */
-        TYPE_TEST1(sp-2, T_STRING)
-        TYPE_TEST2(sp-1, T_NUMBER)
-
-        str = (sp-2)->u.string;
-        len = (long)_svalue_strlen(sp-2);
-
-        start = (sp-1)->u.number;
-        if (start < 0)
-        {
-            pattern = 0x01;
-            pos = 0;
-            search = 0;
-        }
-        else if (start % 6 == 5)
-        {
-            pattern = 0x01;
-            pos = (size_t)start + 1;
-            search = (size_t)start / 6 + 1;
-        }
-        else
-        {
-            pattern = 1 << (start % 6 + 1);
-            pos = (size_t)start + 1;
-            search = (size_t)start / 6;
-        }
-
-        invert = 0;
-        if (!sp->type == T_NUMBER || sp->u.number)
-            invert = 0x3f;
-
-        /* Now search for the next bit */
-        found = -1;
-
-        while (found < 0 && search < len)
-        {
-            int c = str[search] - ' ';
-
-            if (c < 0 || c > 0x3f)
-                ERRORF(("Illegal bit pattern in next_bit character %d\n"
-                       , c+' '))
-            c ^= invert;
-
-            while (found < 0 && pattern < (1 << 6))
-            {
-                if (c & pattern)
-                {
-                    found = (mp_int)pos;
-                    break;
-                }
-                pattern <<= 1;
-                pos++;
-            }
-            pattern = 0x01;
-            search++;
-        }
-
-        /* Cleanup the stack and push the result */
-        free_svalue(sp--);
-        free_svalue(sp--);
-        free_svalue(sp);
-        put_number(sp, found);
-
-        break;
-    }
-
-    CASE(F_COUNT_BITS);             /* --- count_bits          --- */
-    {
-        /* EFUN count_bits()
-         *
-         *     int count_bits(string str)
-         *
-         * Return the number of set bits in bitstring <str>.
-         *
-         * TODO: Apply to an optional range (start, length) only.
-         */
-
-        char * str;
-        long   count;
-
-
-        /* Get and test the arguments */
-        TYPE_TEST1(sp, T_STRING)
-
-        str = sp->u.string;
-
-        for (count = 0; *str; str++)
-        {
-            int c = *str - ' ';
-
-            if (c > 0x3F || c < 0)
-                ERRORF(("Illegal character in count_bits: %d\n", (int)c + ' '))
-
-            /* Count the bits in this character */
-            count += ( (c & 0x01) )
-                   + ( (c & 0x02) >> 1)
-                   + ( (c & 0x04) >> 2)
-                   + ( (c & 0x08) >> 3)
-                   + ( (c & 0x10) >> 4)
-                   + ( (c & 0x20) >> 5);
-        }
-
-        /* Return the result */
-
-        free_svalue(sp);
-        put_number(sp, count);
-
-        break;
+        RAISE_ARG_ERROR(1, TF_NULL|TF_STRING, sp->type);
+        /* NOTREACHED */
     }
 
     /* --- Efuns: Arrays and Mappings --- */
-
-    CASE(F_ALLOCATE);               /* --- allocate            --- */
-    {
-        /* EFUN allocate()
-         *
-         *     mixed *allocate(int size)
-         *
-         * Allocate an empty array of <size> elements.
-         */
-
-        vector_t *v;
-
-        TYPE_TEST1(sp, T_NUMBER)
-        inter_sp = sp;
-        inter_pc = pc;
-        v = allocate_array(sp->u.number); /* Will have ref count == 1 */
-        put_array(sp, v);
-        break;
-    }
-
-    CASE (F_MEMBER_ARRAY);          /* --- member_array        --- */
-    {
-        /* EFUN member_array()
-         *
-         *   int member_array(mixed item, mixed *arr)
-         *   int member_array(mixed item, string arr)
-         *
-         * Returns the index of the first occurence of item in array arr,
-         * or occurence of a character in a string. If not found, then -1
-         * is returned.
-         * TODO: Practically obsoleted by member().
-         */
-
-        /* Search in an array */
-
-        if (sp->type == T_POINTER)
-        {
-            vector_t *vec;   /* Vector searched */
-            svalue_t *item;  /* Pointer into the vector array */
-            svalue_t *key;   /* Item searched */
-            long   cnt;           /* Size of vec */
-
-            vec = sp->u.vec;
-            item = vec->item;
-            key = sp - 1;
-            cnt = (long)VEC_SIZE(vec);
-            switch(key->type)
-            {
-            case T_STRING:
-              {
-                char *str;
-
-                str = key->u.string;
-                for(; --cnt >= 0; item++)
-                {
-                    if (item->type == T_STRING
-                     && !strcmp(key->u.string, item->u.string)
-                       )
-                        break;
-                }
-                break;
-              }
-
-            case T_FLOAT:
-            case T_CLOSURE:
-            case T_SYMBOL:
-            case T_QUOTED_ARRAY:
-              {
-                short type;
-                short x_generic;
-
-                type = key->type;
-                x_generic = key->x.generic;
-                for(; --cnt >= 0; item++)
-                {
-                    if (key->u.string == item->u.string
-                     && x_generic == item->x.generic
-                     && item->type == type
-                       )
-                        break;
-                }
-                break;
-              }
-
-            case T_NUMBER:
-                if (!key->u.number)
-                {
-                    /* Search for 0 is special: it also finds destructed
-                     * objects
-                     */
-                    short type;
-
-                    for (; --cnt >= 0; item++)
-                    {
-                        if ( (type = item->type) == T_NUMBER)
-                        {
-                            if ( !item->u.number )
-                                break;
-                        }
-                        else if (type == T_OBJECT)
-                        {
-                            if (item->u.ob->flags & O_DESTRUCTED)
-                            {
-                                assign_svalue(item, &const0);
-                                break;
-                            }
-                        }
-                    }
-                    break;
-                }
-
-                /* FALLTHROUGH */
-
-            case T_MAPPING:
-            case T_OBJECT:
-            case T_POINTER:
-              {
-                short type = key->type;
-
-                for(; --cnt >= 0; item++)
-                {
-                    if (key->u.number == item->u.number
-                     && item->type == type)
-                        break;
-                }
-                break;
-              }
-
-            default:
-                if (sp[-1].type == T_LVALUE)
-                    error("Reference passed to member_array()\n");
-                fatal("Bad type to member_array(): %d\n", sp[-1].type);
-            }
-
-            if (cnt >= 0)
-            {
-                cnt = (long)VEC_SIZE(vec) - cnt - 1;
-            }
-            /* else return -1 for failure */
-
-            pop_stack();
-            free_svalue(sp);
-            put_number(sp, cnt);
-            break;
-        }
-
-        /* Or search in a string */
-
-        if (sp->type == T_STRING)
-        {
-            char *str, *str2;
-            int i;
-
-            if (sp[-1].type != T_NUMBER)
-                goto bad_arg_1;
-            str = sp->u.string;
-            i = sp[-1].u.number;
-            str2 = i & ~0xff ? NULL : strchr(str, i);
-            i = str2 ? str2 - str : -1;
-            pop_stack();
-            free_svalue(sp);
-            put_number(sp, i);
-            break;
-        }
-
-        /* Otherwise, it's something unsearchable */
-
-        goto bad_arg_2;
-    }
-
-    CASE (F_MEMBER);                /* --- member              --- */
-    {
-        /* EFUN member()
-         *
-         *   int member(mixed *array, mixed elem)
-         *   int member(mapping m, mixed key)
-         *   int member(string s, int elem)
-         *
-         * For arrays and strings, returns the index of the second arg in
-         * the first arg, or -1 if none found. For mappings it checks, if
-         * key is present in mapping m and returns 1 if so, 0 if key is
-         * not in m.
-         */
-
-        /* --- Search an array --- */
-
-        if (sp[-1].type == T_POINTER)
-        {
-
-            vector_t *vec;
-            union  u       sp_u;
-            long cnt;
-
-            vec = sp[-1].u.vec;
-            cnt = (long)VEC_SIZE(vec);
-            sp_u = sp->u;
-
-            switch(sp->type)
-            {
-            case T_STRING:
-              {
-                char *str;
-                svalue_t *item;
-
-                str = sp_u.string;
-                for(item = vec->item; --cnt >= 0; item++)
-                {
-                    if (item->type == T_STRING
-                     && !strcmp(sp_u.string, item->u.string))
-                        break;
-                }
-                break;
-              }
-
-            case T_FLOAT:
-            case T_CLOSURE:
-            case T_SYMBOL:
-            case T_QUOTED_ARRAY:
-              {
-                short x_generic;
-                short type;
-                svalue_t *item;
-
-                type = sp->type;
-                x_generic = sp->x.generic;
-                for(item = vec->item; --cnt >= 0; item++)
-                {
-                    if (sp_u.string == item->u.string
-                     && x_generic == item->x.generic
-                     && item->type == type)
-                        break;
-                }
-                break;
-              }
-
-            case T_NUMBER:
-                if (!sp_u.number)
-                {
-                    /* Search for 0 is special: it also finds destructed
-                     * objects
-                     */
-
-                    svalue_t *item;
-                    short type;
-
-                    for (item = vec->item; --cnt >= 0; item++)
-                    {
-                        if ( (type = item->type) == T_NUMBER)
-                        {
-                            if ( !item->u.number )
-                                break;
-                        }
-                        else if (type == T_OBJECT)
-                        {
-                            if (item->u.ob->flags & O_DESTRUCTED)
-                            {
-                                assign_svalue(item, &const0);
-                                break;
-                            }
-                        }
-                    }
-                    break;
-                }
-
-                /* FALLTHROUGH */
-
-            case T_MAPPING:
-            case T_OBJECT:
-            case T_POINTER:
-              {
-                svalue_t *item;
-                short type = sp->type;
-
-                for (item = vec->item; --cnt >= 0; item++)
-                {
-                    if (sp_u.number == item->u.number
-                     && item->type == type)
-                        break;
-                }
-                break;
-              }
-
-            default:
-                if (sp->type == T_LVALUE)
-                    error("Reference passed to member()\n");
-                fatal("Bad type to member(): %d\n", sp->type);
-            }
-
-            if (cnt >= 0)
-            {
-                cnt = (long)VEC_SIZE(vec) - cnt - 1;
-            }
-            /* else return -1 for failure */
-
-            pop_stack();
-            free_svalue(sp);
-            put_number(sp, cnt);
-            break;
-        }
-
-        /* --- Search a string --- */
-
-        if (sp[-1].type == T_STRING)
-        {
-            char *str, *str2;
-            int i;
-
-            if (sp->type != T_NUMBER)
-                goto bad_arg_2;
-            str = sp[-1].u.string;
-            i = sp->u.number;
-            str2 = i & ~0xff ? NULL : strchr(str, i);
-            i = str2 ? str2 - str : -1;
-            pop_stack();
-            free_svalue(sp);
-            put_number(sp, i);
-            break;
-        }
-
-        /* --- Search a string --- */
-
-        if (sp[-1].type == T_MAPPING)
-        {
-            int i;
-
-            i = get_map_value(sp[-1].u.map, sp) != &const0;
-            pop_stack();
-            free_svalue(sp);
-            put_number(sp, i);
-            break;
-        }
-
-        /* Otherwise it's not searchable */
-
-        goto bad_arg_1;
-    }
-
-    CASE(F_MKMAPPING);              /* mkmapping <nargs>       --- */
-    {
-        /* EFUN mkmapping()
-         *
-         *   mapping mkmapping(mixed *arr1, mixed *arr2,...)
-         *
-         * Returns a mapping with indices from 'arr1' and values from
-         * 'arr2'... . arr1[0] will index arr2...[0], arr1[1] will index
-         * arr2...[1], etc. If the arrays are of unequal size, the mapping
-         * will only contain as much elements as are in the smallest
-         * array.
-         */
-
-        long i, length, num_values;
-        mapping_t *m;
-        svalue_t *key;
-
-        GET_NUM_ARG
-
-        /* Check the arguments and set length to the size of
-         * the shortest array.
-         */
-        length = LONG_MAX;
-        for (i = -num_arg; ++i <= 0; )
-        {
-            if ( sp[i].type != T_POINTER )
-                bad_arg_pc(i+num_arg, instruction, sp, pc);
-            if (length > (long)VEC_SIZE(sp[i].u.vec))
-                length = (long)VEC_SIZE(sp[i].u.vec);
-        }
-
-        if (max_mapping_size && length > max_mapping_size)
-            ERRORF(("Illegal mapping size: %ld\n", length));
-
-        /* Allocate the mapping */
-        num_values = num_arg - 1;
-        m = allocate_mapping(length, num_values);
-        if (!m)
-            ERROR("Out of memory\n")
-
-        /* Shift key through the first array and assign the values
-         * from the others.
-         */
-        key = &(sp-num_values)->u.vec->item[length];
-        while (--length >= 0)
-        {
-            svalue_t *dest;
-
-            dest = get_map_lvalue_unchecked(m, --key);
-            for (i = -num_values; ++i <= 0; )
-            {
-                /* If a key value appears multiple times, we have to free
-                 * a previous assigned value to avoid a memory leak
-                 */
-                assign_svalue(dest++, &sp[i].u.vec->item[length]);
-            }
-        }
-
-        /* Clean up the stack and push the result */
-        pop_n_elems(num_arg);
-        push_mapping(m);  /* Adds the second ref */
-        deref_mapping(sp->u.map); /* This will make ref count == 1 */
-        break;
-    }
-
-    CASE(F_M_DELETE);               /* --- m_delete            --- */
-    {
-        /* EFUN m_delete()
-         *
-         *   mapping m_delete(mapping map, mixed key)
-         *
-         * Remove the entry with index 'key' from mapping 'map'. The
-         * changed mapping 'map' is also returned as result.
-         * If the mapping does not have an        entry with index 'key',
-         * nothing is changed.
-         */
-
-        mapping_t *m;
-
-        TYPE_TEST1(sp-1, T_MAPPING)
-        m = (sp-1)->u.map;
-        remove_mapping(m, sp);
-        pop_stack();
-        /* leave the mapping on the stack */
-        break;
-    }
-
-    CASE(F_M_INDICES);              /* --- m_indices           --- */
-    {
-        /* EFUN m_indices()
-         *
-         *   mixed *m_indices(mapping map)
-         *
-         * Returns an array containing the indices of mapping 'map'.
-         */
-
-        mapping_t *m;
-        vector_t *v;
-
-        TYPE_TEST1(sp, T_MAPPING)
-        m = sp->u.map;
-        inter_pc = pc;
-        inter_sp = sp;
-
-        v = m_indices(m);
-
-        free_mapping(m);
-        put_array(sp,v);
-        break;
-    }
-
-    CASE(F_M_VALUES);               /* --- m_values            --- */
-    {
-        /* EFUN m_values()
-         *
-         *   mixed *m_values(mapping map)
-         *   mixed *m_values(mapping map, int index)
-         *
-         * Returns an array with the values of mapping 'map'.
-         * If <index> is given as a number between 0 and the width of
-         * the mapping, the values from the given column are returned,
-         * else the values of the first column.
-         */
-
-        mapping_t *m;
-        vector_t *v;
-        struct mvf_info vip;
-        mp_int size;
-        int num;
-
-        /* Get and check the arguments */
-        TYPE_TEST2(sp, T_NUMBER);
-        num = sp->u.number;
-        sp--;
-        if (sp->type != T_MAPPING || (m = sp->u.map)->num_values < 1)
-            goto bad_arg_1;
-        if (num < 0 || num >= m->num_values)
-            ERROR("Illegal index to m_values().\n");
-
-        /* Get the size of the mapping */
-        check_map_for_destr(m);
-        size = (mp_int)MAP_SIZE(m);
-
-        v = allocate_array(size);
-
-        /* Extract the desired column from the mapping */
-        vip.svp = v->item;
-        vip.num = num;
-        walk_mapping(m, m_values_filter, &vip);
-        free_mapping(m);
-
-        /* Push the result */
-        put_array(sp,v);
-        break;
-    }
 
     CASE(F_SIZEOF);                 /* --- sizeof              --- */
     {
@@ -12964,382 +12095,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (sp->type == T_NUMBER && sp->u.number == 0)
             break;
 
-        goto bad_arg_1;
-    }
-
-    CASE(F_UNIQUE_ARRAY);           /* --- unique_array        --- */
-    {
-        /* EFUN unique_array()
-         *
-         *   mixed unique_array(object *obarr, string seperator)
-         *   mixed unique_array(object *obarr, string seperator, mixed skip)
-         *
-         * Groups objects together for which the separator function
-         * returns the same value. obarr should be an array of objects,
-         * other types are ignored. The separator function is called only
-         * once in each object in obarr. If no separator function is
-         * given, 0 is used instead of a return value.
-         * If a 3rd argument is given and this argument matches the
-         * return value of the separator function this object will not be
-         * included in the returned array.
-         */
-
-        vector_t *res;
-
-        assign_eval_cost();
-        inter_pc = pc;
-        inter_sp = sp;
-        TYPE_TEST1(sp-2, T_POINTER)
-        TYPE_TEST2(sp-1, T_STRING)
-
-        check_for_destr((sp-2)->u.vec);
-        res = make_unique((sp-2)->u.vec, (sp-1)->u.string, sp);
-
-        /* Clean up the stack and push the result */
-        pop_stack();
-        pop_stack();
-        free_svalue(sp);
-
-        if (res)
-        {
-            put_array(sp, res);
-        }
-        else
-            put_number(sp, 0);
-
-        break;
-    }
-
-    CASE(F_UNMKMAPPING);            /* --- unmkmapping         --- */
-    {
-        /* EFUN unmkmapping()
-         *
-         *   mixed* unmkmapping(mapping map)
-         *
-         * Take mapping <map> and return an array of arrays with the keys
-         * and values from the mapping.
-         *
-         * The return array has the form ({ keys[], data0[], data1[], ... }).
-         */
-
-        svalue_t *svp;
-        mapping_t *m;
-        vector_t *v;
-        struct mvf_info vip;
-        mp_int size;
-        int i;
-
-        /* Get the arguments */
-        if (sp->type != T_MAPPING)
-            goto bad_arg_1;
-        m = sp->u.map;
-
-        /* Determine the size of the mapping and allocate the result vector */
-        check_map_for_destr(m);
-        size = (mp_int)MAP_SIZE(m);
-        v = allocate_array(m->num_values+1);
-
-        /* Allocate the sub vectors */
-        for (i = 0, svp = v->item; i <= m->num_values; i++, svp++)
-        {
-            vector_t *v2;
-
-            v2 = allocate_array(size);
-            put_array(svp, v2);
-        }
-
-        /* Copy the elements from the mapping into the vector brush */
-        vip.svp = v->item;
-        vip.num = 0;
-        vip.width = m->num_values;
-        walk_mapping(m, m_unmake_filter, &vip);
-
-        /* Clean up the stack and push the result */
-        free_mapping(m);
-        put_array(sp,v);
-        break;
-    }
-
-    CASE(F_WIDTHOF);                /* --- widthof             --- */
-    {
-        /* EFUN widthof()
-         *
-         *   int widthof (mapping map)
-         *
-         * Returns the number of values per key of mapping <map>.
-         * If <map> is 0, the result is 0.
-         */
-
-        int width;
-
-        if (sp->type == T_NUMBER && sp->u.number == 0)
-            break;
-        TYPE_TEST1(sp, T_MAPPING)
-        width = sp->u.map->num_values;
-        free_mapping(sp->u.map);
-        put_number(sp, width);
-        break;
+        RAISE_ARG_ERROR(1, TF_NULL|TF_MAPPING|TF_POINTER, sp->type);
+        /* NOTREACHED */
     }
 
     /* --- Efuns: Functions and Closures --- */
-
-    CASE(F_APPLY);                  /* --- apply <nargs>       --- */
-    {
-        /* EFUN apply()
-         *
-         *     mixed apply(closure cl, ...)
-         *
-         * Call the closure <cl> and pass it all the extra arguments
-         * given in the call. If the last argument is an array, it
-         * is flattened, ie. passed as a bunch of single arguments.
-         * TODO: Use the MudOS-Notation '(*f)(...)' as alternative.
-         */
-
-        svalue_t *args;
-
-        GET_NUM_ARG
-
-        args = sp -num_arg +1;
-
-        if (args->type != T_CLOSURE)
-        {
-            /* Not a closure: pop the excess args and return <cl>
-             * as result.
-             */
-
-            while (--num_arg)
-                free_svalue(sp--);
-            break;
-        }
-
-        if (sp->type == T_POINTER)
-        {
-            /* The last argument is an array: flatten it */
-
-            vector_t *vec;  /* the array */
-            svalue_t *svp;  /* pointer into the array */
-            long i;              /* (remaining) vector size */
-
-            vec = sp->u.vec;
-            i = (long)VEC_SIZE(vec);
-            num_arg += i - 1;
-
-            /* Check if the target closure can handle
-             * all the arguments without overflowing the stack.
-             */
-            switch( (sp - num_arg + i)->x.closure_type )
-            {
-            default:
-                if ((sp - num_arg + i)->x.closure_type >= 0)
-                    bad_arg_pc(num_arg - i + 1, instruction, sp, pc);
-                    /* TODO: Be more specific */
-                /* else: operator/sefun/efun closure: FALLTHROUGH */
-            case CLOSURE_LFUN:
-            case CLOSURE_ALIEN_LFUN:
-            case CLOSURE_LAMBDA:
-            case CLOSURE_BOUND_LAMBDA:
-                if (num_arg + (sp - start_of_stack) < EVALUATOR_STACK_SIZE)
-                    break;
-                ERRORF(("VM Stack overflow: %ld too high.\n"
-                       , (long)(num_arg + (sp - start_of_stack) - EVALUATOR_STACK_SIZE) ));
-                break;
-            }
-
-            /* Push the array elements onto the stack, overwriting the
-             * array value itself.
-             */
-            if (deref_array(vec))
-            {
-                for (svp = vec->item; --i >= 0; )
-                {
-                    if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
-                    {
-                        put_number(sp, 0);
-                        sp++;
-                        svp++;
-                    }
-                    else
-                        assign_svalue_no_free(sp++, svp++);
-                }
-            }
-            else
-            {
-                /* The array will be freed, so use a faster function */
-                for (svp = vec->item; --i >= 0; ) {
-                    if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
-                    {
-                        put_number(sp, 0);
-                        sp++;
-                        svp++;
-                    }
-                    else
-                        transfer_svalue_no_free_spc(sp++, svp++, sp, pc);
-                }
-                free_empty_vector(vec);
-            }
-
-            sp--; /* undo the last extraneous sp++ */
-        }
-
-        /* Prepare to call the closure */
-
-        args = sp -num_arg +1;
-        TYPE_TEST1(args, T_CLOSURE)
-
-        /* No external calls may be done when this object is
-         * destructed.
-         */
-        if (current_object->flags & O_DESTRUCTED)
-        {
-            pop_n_elems(num_arg);
-            push_number(0);
-            break;
-        }
-
-        inter_pc = pc;
-        inter_sp = sp;
-        ASSIGN_EVAL_COST
-
-        call_lambda(args, num_arg - 1);
-
-        /* Cleanup the stack */
-        sp = args;
-        free_closure(sp);
-        *sp = sp[1];
-        break;
-    }
-
-    CASE(F_BIND_LAMBDA);            /* --- bind_lambda         --- */
-    {
-        /* EFUN bind_lambda()
-         *
-         *     closure bind_lambda(closure cl, object ob = 1)
-         *
-         * Binds an unbound closure <cl> to object <ob> and return the
-         * bound closure.
-         *
-         * If the optional argument ob is not this_object(), the privilege
-         * violation ("bind_lambda", this_object(), ob) occurs.
-         *
-         * If the argument <ob> is omitted, the closure is bound to
-         * this_object(), and additionally the function accepts unbindable
-         * closures without complaint.
-         *
-         * Note: the 'default' value for <ob> is const1 so that the omittal
-         * can be detected.
-         */
-
-        object_t *ob;
-
-        TYPE_TEST1(sp-1, T_CLOSURE)
-        if (sp->type == T_OBJECT)
-        {
-            /* If <ob> is given, check for a possible privilege breach */
-            ob = sp->u.ob;
-            if (ob != current_object
-             && !privilege_violation("bind_lambda", sp))
-            {
-                free_object(ob, "bind_lambda");
-                sp--;
-                break;
-            }
-        }
-        else if (sp->type == T_NUMBER && sp->u.number == 1)
-        {
-            /* this_object is ok */
-            ob = ref_object(current_object, "bind_lambda");
-        }
-        else
-            goto bad_arg_2;
-
-        sp--;  /* points to the closure now */
-
-        switch(sp->x.closure_type)
-        {
-        case CLOSURE_LFUN:
-        case CLOSURE_LAMBDA:
-        case CLOSURE_IDENTIFIER:
-        case CLOSURE_PRELIMINARY:
-            /* Unbindable closures. Free the ob reference and
-             * throw an error (unless <ob> has been omitted)
-             */
-            free_object(ob, "bind_lambda");
-            if (sp[1].type == T_NUMBER)
-                break;
-            goto bad_arg_1;
-
-        case CLOSURE_ALIEN_LFUN:
-            /* Rebind an alien lfun to the given object */
-            free_object(sp->u.lambda->ob, "bind_lambda");
-            sp->u.lambda->ob = ob;
-            break;
-
-        default:
-            /* efun, simul_efun, operator closures: rebind it */
-
-            free_object(sp->u.ob, "bind_lambda");
-            sp->u.ob = ob;
-            break;
-
-        case CLOSURE_BOUND_LAMBDA:
-          {
-            /* Rebind an already bound lambda closure */
-
-            lambda_t *l;
-
-            if ( (l = sp->u.lambda)->ref == 1)
-            {
-                /* We are the only user of the lambda: simply rebind it.
-                 */
-
-                object_t **obp;
-
-                obp = &l->ob;
-                free_object(*obp, "bind_lambda");
-                *obp = ob;
-                break;
-            }
-            else
-            {
-                /* We share the closure with others: create our own
-                 * copy, bind it and put it onto the stack in place of
-                 * the original one.
-                 */
-                lambda_t *l2;
-
-                l->ref--;
-                l2 = xalloc(sizeof *l);
-                l2->ref = 1;
-                l2->ob = ob;
-                l2->function.lambda = l->function.lambda;
-                l->function.lambda->ref++;
-                sp->u.lambda = l2;
-                break;
-            }
-          }
-
-        case CLOSURE_UNBOUND_LAMBDA:
-          {
-            /* Whee, an unbound lambda: create the bound-lambda structure
-             * and put it onto the stack in place of the unbound one.
-             */
-
-            lambda_t *l;
-
-            l = xalloc(sizeof *l);
-            l->ref = 1;
-            l->ob = ob;
-            l->function.lambda = sp->u.lambda;
-            /* The ref to the unbound closure is just transferred from
-             * sp to l->function.lambda.
-             */
-            sp->x.closure_type = CLOSURE_BOUND_LAMBDA;
-            sp->u.lambda = l;
-            break;
-          }
-        }
-        break;
-    }
 
     CASE(F_CALL_OTHER);             /* --- call_other <nargs>  --- */
     {
@@ -13380,12 +12140,12 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          && arg[0].type != T_STRING
          && arg[0].type != T_POINTER
            )
-            goto bad_arg_1;
+            RAISE_ARG_ERROR(1, TF_OBJECT|TF_STRING|TF_POINTER, arg[0].type);
 
         TYPE_TEST2(arg+1, T_STRING)
         if (arg[1].u.string[0] == ':')
             ERRORF(("Illegal function name in call_other: %s\n",
-                  arg[1].u.string))
+                  arg[1].u.string));
 
         /* No external calls may be done when this object is
          * destructed.
@@ -13393,7 +12153,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         if (current_object->flags & O_DESTRUCTED)
         {
             pop_n_elems(num_arg);
-            push_number(0);
+            push_number(sp, 0);
             break;
         }
 
@@ -13405,14 +12165,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
             if (arg[0].type == T_OBJECT)
                 ob = arg[0].u.ob;
-            else if (arg[0].type == T_STRING)
+            else /* it's a string */
             {
                 ob = get_object(arg[0].u.string);
                 if (ob == NULL)
-                    ERROR("call_other() failed\n")
+                    ERRORF(("call_other() failed: can't get object '%s'\n"
+                           , arg[0].u.string));
             }
-            else
-                goto bad_arg_1;
 
             /* Traceing, if necessary */
             if (TRACEP(TRACE_CALL_OTHER))
@@ -13430,7 +12189,7 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
             {
                 /* Function not found */
                 pop_n_elems(num_arg);
-                push_number(0);
+                push_number(sp, 0);
                 break;
             }
             sp -= num_arg - 3;
@@ -13491,7 +12250,8 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                     ob = get_object(svp->u.string);
                     if (ob == NULL)
                     {
-                        ERROR("call_other() failed\n")
+                        ERRORF(("call_other() failed: can't get object '%s'\n"
+                               , svp->u.string));
                         /* NOTREACHED */
                         continue;
                     }
@@ -13503,8 +12263,11 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
                     continue;
                 }
                 else
-                    ERRORF(("Bad argument for call_other() at index %ld\n"
-                           , (long)(svp - arg->u.vec->item)));
+                    ERRORF(("Bad arg for call_other() at index %ld: "
+                            "got %s, expected string/object\n"
+                           , (long)(svp - arg->u.vec->item)
+                           , typename(svp->type)
+                           ));
 
                 /* Destructed objects yield 0 */
                 if (ob->flags & O_DESTRUCTED)
@@ -13565,1110 +12328,24 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         break;
     }
     
-    CASE(F_FUNCALL);                /* --- funcall <nargs>     --- */
-    {
-        /* EFUN funcall()
+    CASE(F_EXTERN_CALL);               /* --- extern_call     --- */
+      {
+        /* EFUN extern_call()
          *
-         *   mixed funcall(closure cl, mixed arg ...)
+         *   int extern_call();
          *
-         * Evaluates the closure. The extra args will be passed as args
-         * to the closure. If cl is not a closure, it will simply be
-         * returned.
+         * Returns zero, if the function that is currently being executed
+         * was called by a local call, non-zero for call_other(), driver
+         * applies, closure calls, etc. Currently the only return value
+         * for them is 1, but later the various methods may be
+         * distinguished by means of the return value.
          */
 
-        svalue_t *args;
-
-        GET_NUM_ARG
-        args = sp -num_arg +1;
-
-        if (args->type == T_CLOSURE)
-        {
-            /* No external calls may be done when this object is
-             * destructed.
-             */
-            if (current_object->flags & O_DESTRUCTED) {
-                pop_n_elems(num_arg);
-                push_number(0);
-                break;
-            }
-
-            inter_pc = pc;
-            inter_sp = sp;
-            ASSIGN_EVAL_COST
-
-            /* Call the closure and push the result */
-            call_lambda(args, num_arg - 1);
-            sp = args;
-            free_closure(sp);
-            *sp = sp[1];
-        }
-        else
-        {
-            /* Not a closure: pop the excess args and return <cl>
-             * as result.
-             */
-
-            while (--num_arg)
-                free_svalue(sp--);
-        }
+        push_number(sp, (csp->extern_call & ~CS_PRETEND) ? 1 : 0);
         break;
-    }
-
-    CASE(F_LAMBDA);                 /* --- lambda              --- */
-    {
-        /* EFUN lambda()
-         *
-         *   closure lambda(mixed *arr, mixed)
-         *
-         * Constructs a lambda closure, like lambda function in LISP.
-         * The closure is bound the creating object, and thus can contain
-         * references to global variables.
-         *
-         * The first argument is an array describing the arguments
-         * (symbols) passed to the closure upon evaluation by funcall()
-         * or apply(). It may be 0 if no arguments are required.
-         */
-
-        lambda_t *l;
-        vector_t *args;
-
-        inter_pc = pc;
-        inter_sp = sp;
-        if (sp[-1].type != T_POINTER)
-        {
-            /* If '0' is given for the args array, replace it
-             * with the null-vector.
-             */
-            if (sp[-1].type != T_NUMBER || sp[-1].u.number)
-                goto bad_arg_1;
-            args = ref_array(&null_vector);
-        }
-        else
-        {
-            args = sp[-1].u.vec;
-        }
-
-        /* Create the lambda closure */
-        l = lambda(args, sp, current_object);
-        l->ob = ref_object(current_object, "lambda");
-
-        /* Clean up the stack and push the result */
-        pop_stack();
-        free_array(args);
-
-        sp->type = T_CLOSURE;
-        sp->x.closure_type = CLOSURE_LAMBDA;
-        sp->u.lambda = l;
-        break;
-    }
-
-    CASE(F_QUOTE);                  /* --- quote               --- */
-    {
-        /* EFUN quote()
-         *
-         *   mixed quote(mixed)
-         *
-         * Converts arrays to quoted arrays and strings to symbols.
-         * Symbols and quoted arrays get quoted once more.
-         */
-
-        switch (sp->type)
-        {
-        case T_QUOTED_ARRAY:
-        case T_SYMBOL:
-            sp->x.quotes++;
-            break;
-
-        case T_POINTER:
-            sp->type = T_QUOTED_ARRAY;
-            sp->x.quotes = 1;
-            break;
-
-        case T_STRING:
-            if (sp->x.string_type != STRING_SHARED)
-            {
-                /* Symbols must be shared strings */
-
-                char *str = sp->u.string;
-
-                sp->u.string = make_shared_string(str);
-                if (sp->x.string_type == STRING_MALLOC)
-                    xfree(str);
-            }
-            sp->type = T_SYMBOL;
-            sp->x.quotes = 1;
-            break;
-
-        default:
-            goto bad_arg_1;
-        }
-
-        break;
-    }
-
-    CASE(F_SYMBOL_FUNCTION);        /* --- symbol_function     --- */
-    {
-        /* EFUN symbol_function()
-         *
-         *   closure symbol_function(symbol arg)
-         *   closure symbol_function(string arg)
-         *   closure symbol_function(string arg, object|string ob)
-         *
-         * Constructs a lfun closure, efun closure or operator closure
-         * from the first arg (string or symbol). For lfuns, the second
-         * arg is the object that the lfun belongs to, specified by
-         * the object itself or by its name (the object will be loaded
-         * in the second case)
-         *
-         * Private lfuns can never be accessed this way, static and
-         * protected lfuns only if <ob> is the current object.
-         */
-
-        object_t *ob;
-        program_t *prog;
-        int i;
-
-        /* If 'arg' is not a symbol, make sure it's a shared string. */
-        if (sp[-1].type != T_SYMBOL)
-        {
-            if (sp[-1].type == T_STRING)
-            {
-                if (sp[-1].x.string_type != STRING_SHARED)
-                {
-                    char *str;
-
-                    str = sp[-1].u.string;
-                    sp[-1].u.string = make_shared_string(str);
-                    if (sp[-1].x.string_type == STRING_MALLOC)
-                        xfree(str);
-                    sp[-1].x.string_type = STRING_SHARED;
-                }
-            }
-            else
-                goto bad_arg_1;
-        }
-
-        /* If 'ob' is not of type object, it might be the name of
-         * an object to load, or we need to make an efun symbol.
-         */
-        if (sp->type != T_OBJECT)
-        {
-            /* If it's the number 0, an efun symbol is desired */
-            if (sp->type == T_NUMBER && sp->u.number == 0)
-            {
-                sp--;
-                inter_pc = pc;
-                symbol_efun(sp);
-                break;
-            }
-
-            /* Find resp. load the object by name */
-            TYPE_TEST2(sp, T_STRING)
-            inter_sp = sp;
-            inter_pc = pc;
-            ob = get_object(sp->u.string);
-            if (!ob)
-                error("Object '%s' not found.\n", sp->u.string);
-            free_svalue(sp);
-            put_ref_object(sp, ob, "symbol_function");
-        }
-        else
-        {
-            ob = sp->u.ob;
-        }
-
-        /* We need the object's program */
-        if (O_PROG_SWAPPED(ob))
-        {
-            ob->time_of_ref = current_time;
-            if (load_ob_from_swap(ob) < 0)
-            {
-                inter_sp = sp;
-                error("Out of memory\n");
-            }
-        }
-
-        /* Find the function in the program */
-        prog = ob->prog;
-        i = find_function(sp[-1].u.string, prog);
-
-        /* If the function exists and is visible, create the closure
-         */
-        if ( i >= 0
-          && ( !(prog->functions[i] & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|TYPE_MOD_PRIVATE) )
-             || (    !(prog->functions[i] & TYPE_MOD_PRIVATE)
-                  && current_object == ob)
-             )
-           )
-        {
-            lambda_t *l;
-            ph_int closure_type;
-
-            l = xalloc(sizeof *l);
-            if (!l)
-            {
-                error("Out of memory.\n");
-                /* NOTREACHED */
-                break;
-            }
-
-            /* Set the closure */
-            if (ob == current_object)
-            {
-                l->function.index = (unsigned short)i;
-                closure_type = CLOSURE_LFUN;
-                  /* current_object already has an extra ref from being
-                   * argument, so we don't need to add one for the l->ob
-                   * below.
-                   */
-            }
-            else
-            {
-                l->function.alien.ob = ob;
-                l->function.alien.index = (unsigned short)i;
-                closure_type = CLOSURE_ALIEN_LFUN;
-                ref_object(current_object, "symbol_function");
-                  /* We adopt the ref of ob from the arguments, and
-                   * add a ref to current_object for the l->ob below.
-                   */
-            }
-
-            l->ref = 1;
-            l->ob = current_object; /* see above regarding the ref count */
-
-            /* Clean up the stack and push the result */
-            sp--;
-            deref_string(sp->u.string);
-            sp->type = T_CLOSURE;
-            sp->x.closure_type = closure_type;
-            sp->u.lambda = l;
-
-            /* A last thing: take care of a pending replace_program */
-            if ( !(prog->flags & P_REPLACE_ACTIVE)
-             ||  !lambda_ref_replace_program(l, closure_type, 0, 0, 0) )
-            {
-                ob->flags |= O_LAMBDA_REFERENCED;
-            }
-
-            break;
-        }
-
-        /* Symbol can't be created - free the stack and push 0 */
-        free_object(ob, "symbol_function");
-        sp--;
-        free_string(sp->u.string);
-        put_number(sp, 0);
-        break;
-    }
-
-    CASE(F_CALL_OUT);               /* --- call_out <nargs>    --- */
-        /* EFUN call_out()
-         *
-         *     void call_out(string fun, int delay, mixed arg, ...)
-         *     void call_out(closure cl, int delay, mixed arg, ...)
-         *
-         * Set up a call to function fun or closure cl in the current
-         * object. The call will take place in delay seconds, with the
-         * remaining argument list provided. delay can be a minimum time
-         * of one second.
-         */
-
-        GET_NUM_ARG
-        inter_pc = pc;
-        sp = new_call_out(sp, (short)num_arg);
-        break;
-
-    CASE(F_CALL_OUT_INFO);          /* --- call_out_info       --- */
-        /* EFUN call_out_info()
-         *
-         *     mixed *call_out_info(void)
-         *
-         * Get information about all pending call outs. The result is an
-         * array in which every entry is itself an array describing one
-         * call_out.
-         *
-         * The efun causes the the privilege violation ("call_out_info",
-         * this_object()). If it is not satisfied, the result will be
-         * the empty array.
-         */
-
-        inter_sp = sp;
-        inter_pc = pc;
-        if (privilege_violation("call_out_info", sp))
-        {
-            push_referenced_vector(get_all_call_outs());
-        }
-        else
-        {
-            push_vector(&null_vector);
-        }
-        break;
-
-    CASE(F_FIND_CALL_OUT);          /* --- find_call_out       --- */
-    {
-        /* EFUN find_call_out()
-         *
-         *   int find_call_out(string func)
-         *   int find_call_out(closure func)
-         *
-         * Find the first call-out due to be executed for function func
-         * in the current object, and return the time left. If no call-out
-         * is found return -1.
-         */
-
-        inter_pc = pc;
-        find_call_out(current_object, sp, MY_FALSE);
-        break;
-    }
-
-    CASE(F_REMOVE_CALL_OUT);        /* --- remove_call_out     --- */
-    {
-        /* EFUN remove_all_out()
-         *
-         *   int remove_call_out(string fun)
-         *   int remove_call_out(closure fun)
-         *
-         * Remove next pending call-out for function fun in this object.
-         * The time left is returned.
-         *
-         * -1 is returned if there were no call-outs pending to this
-         * function.
-         */
-
-        inter_pc = pc;
-        find_call_out(current_object, sp, MY_TRUE);
-        break;
-    }
-
-    CASE(F_SET_HEART_BEAT);         /* --- set_heart_beat      --- */
-    {
-        /* EFUN set_heart_beat()
-         *
-         *   int set_heart_beat(int flag)
-         *
-         * Enable or disable heart beat. The driver will apply
-         * the lfun heart_beat() to the current object every 2 seconds,
-         * if it is enabled. If the heart beat is not needed for the
-         * moment, then do disable it. This will reduce system overhead.
-         *
-         * Return true for success, and false for failure.
-         *
-         * Disabling an already disabled heart beat (and vice versa
-         * enabling and enabled heart beat) counts as failure.
-         */
-
-        int i;
-
-        TYPE_TEST1(sp, T_NUMBER)
-        i = set_heart_beat(current_object, sp->u.number);
-        sp->u.number = i;
-        break;
-    }
+      }
 
     /* --- Efuns: Objects --- */
-
-    CASE(F_CLONE_OBJECT);           /* --- clone_object        --- */
-    {
-        /* EFUN clone_object()
-         *
-         *   object clone_object(string name)
-         *   object clone_object(object template)
-         *
-         * Clone a new object from definition <name>, or alternatively from
-         * the object <template>. In both cases, the new object is given an
-         * unique name and returned.
-         */
-
-        object_t *ob;
-
-        assign_eval_cost();
-        inter_sp = sp;
-        inter_pc = pc;
-
-        /* Get the argument and clone the object */
-        if (sp->type == T_STRING)
-            ob = clone_object(sp->u.string);
-        else if (sp->type == T_OBJECT)
-            ob = clone_object(sp->u.ob->load_name);
-        else
-            goto bad_arg_1;
-
-        free_svalue(sp);
-
-        if (ob)
-            put_ref_object(sp, ob, "F_CLONE_OBJECT");
-        else
-            put_number(sp, 0);
-        break;
-    }
-
-    CASE(F_DESTRUCT);               /* --- destruct            --- */
-        /* EFUN destruct()
-         *
-         *   void destruct(object ob)
-         *
-         * Completely destroy and remove object ob (if not already done so).
-         * After the call to destruct(), no global variables will exist any
-         * longer, only local ones, and arguments.
-         *
-         * If an object self-destructs, it will not immediately terminate
-         * execution. If the efun this_object() will be called by the
-         * destructed object, the result will be 0.
-         *
-         * The efun accepts destructed objects as argument (which appear
-         * as the number 0) and the simply acts as a no-op in that case.
-         *
-         * Internally, the object is not destructed immediately, but
-         * instead put into a list and finally destructed after the
-         * current execution has ended.
-         */
-
-        if (T_NUMBER != sp->type || sp->u.number)
-        {
-            assign_eval_cost();
-            TYPE_TEST1(sp, T_OBJECT)
-            inter_sp = sp;
-            inter_pc = pc;
-            destruct_object(sp);
-        }
-        pop_stack();
-        break;
-
-    CASE(F_EXEC);                   /* --- exec                --- */
-    {
-        /* EFUN exec()
-         *
-         *   object exec(object new, object old)
-         *
-         * exec() switches the connection from the interactive object old
-         * to the object new. If the new object is also interactive, it's
-         * connection will be transferred to the old object, thus
-         * exchaning the two connections between the object. If the new
-         * object is not interactive, the old will not be interactive
-         * anymore after the exec call succeeded.
-         * It is used to load different "user objects" or to reconnect
-         * link dead users.
-         *
-         * To provide security mechanisms, the interpreter calls
-         * master->valid_exec(current_program, new, old), which must
-         * return anything other than 0 to allow this exec() invocation.
-         */
-
-        int i;
-
-        assign_eval_cost();
-        TYPE_TEST1(sp-1, T_OBJECT)
-        TYPE_TEST2(sp,   T_OBJECT)
-        inter_sp = sp;
-        inter_pc = pc;
-        i = replace_interactive((sp-1)->u.ob, sp->u.ob, current_prog->name);
-                   /* FinalFrontier suggests 'current_object->prog->name' */
-        pop_stack();
-        free_svalue(sp); /* object might have been destructed */
-        put_number(sp, i);
-        break;
-    }
-
-    CASE(F_FIND_OBJECT);            /* --- find_object         --- */
-    {
-        /* EXEC find_object()
-         *
-         *   object find_object(string str)
-         *
-         * Find an object with the file_name str. If the object isn't loaded,
-         * it will not be found.
-         */
-
-        object_t *ob;
-
-        TYPE_TEST1(sp, T_STRING)
-        ob = find_object(sp->u.string);
-        free_svalue(sp);
-        if (ob)
-            put_ref_object(sp, ob, "find_object");
-        else
-            put_number(sp, 0);
-        break;
-    }
-
-    CASE(F_FUNCTION_EXISTS);        /* --- function_exists     --- */
-    {
-        /* EXEC function_exists()
-         *
-         *   string function_exists(string str, object ob)
-         *
-         * Return the file name of the object that defines the function
-         * str in object ob. The returned value can be different from
-         * file_name(ob) if the function is defined in an inherited
-         * object. In native mode, the returned name always begins with a
-         * '/' (absolute path). 0 is returned if the function was not
-         * defined, or was defined as static.
-         */
-
-        char *str, *res, *p;
-
-        TYPE_TEST1(sp-1, T_STRING)
-        TYPE_TEST2(sp,   T_OBJECT)
-        inter_sp = sp; /* error possible when out of memory */
-        str = function_exists((sp-1)->u.string, sp->u.ob);
-        free_svalue(sp);
-        free_svalue(--sp);
-        if (str)
-        {
-            /* Make a copy of the string so that we can remove
-             * a the trailing '.c'. In non-compat mode, we also
-             * have to add the leading '/'.
-             */
-            p = strrchr (str, '.');
-
-            if (p)
-                *p = '\0';  /* temporarily mask out the '.c' */
-
-#ifdef COMPAT_MODE
-            res = string_copy (str);
-#else
-            res = add_slash(str);
-#endif
-            if (p)
-                *p = '.';  /* undo the change above */
-
-            if (!res)
-            {
-                sp--;
-                ERROR("Out of memory\n")
-            }
-            put_malloced_string(sp, res);
-        }
-        else
-        {
-            put_number(sp, 0);
-        }
-        break;
-    }
-
-    CASE(F_INPUT_TO);               /* --- input_to <nargs>    --- */
-    {
-        /* EFUN input_to()
-         *
-         *   void input_to(string fun)
-         *   void input_to(string fun, int flag, ...)
-         *
-         * Enable next line of user input to be sent to the local
-         * function fun as an argument. The input line will not be
-         * parsed, only when it starts with a "!" (like a kind of shell
-         * escape) (this feature may be disabled).
-         * The function <fun> may be static, but must not be private (or
-         * it won't be found).
-         *
-         * Note that fun is not called immediately but after pressing the
-         * RETURN key.
-         *
-         * If input_to() is called more than once in the same execution,
-         * only the first call has any effect.
-         *
-         * The optional 3rd and following args will be passed as second and
-         * subsequent args to the function fun. (This feature is was
-         * added only recently, to avoid the need for global variables)
-         */
-
-        GET_NUM_ARG
-        inter_pc = pc;
-        inter_sp = sp;
-        sp = e_input_to(sp, num_arg);
-        break;
-    }
-
-    CASE(F_INTERACTIVE);            /* --- interactive         --- */
-    {
-        /* EFUN interactive()
-         *
-         *   int interactive(object ob)
-         *
-         * Return non-zero if ob, or when the argument is omitted, this
-         * object(), is an interactive user. Will return 1 if the
-         * object is interactive, else 0.
-         */
-
-        int i;
-        object_t *ob;
-        interactive_t *ip;
-
-        TYPE_TEST1(sp, T_OBJECT)
-        ob = sp->u.ob;
-        (void)O_SET_INTERACTIVE(ip, ob);
-        i = ip && !ip->do_close;
-        deref_object(ob, "interactive");
-        put_number(sp, i);
-        break;
-    }
-
-    CASE(F_LOAD_NAME);              /* --- load_name           --- */
-    {
-        /* EFUN load_name()
-         *
-         *   string load_name()
-         *   string load_name(object obj)
-         *   string load_name(string obj)
-         *
-         * Return the load name for the object <obj> which may be given
-         * directly or by its name.
-         *
-         * If <obj> is a clone, return the load_name() of <obj>'s blueprint.
-         * If <obj> is a blueprint, return the filename from which the
-         * blueprint was compiled.
-         *
-         * If <obj> is given by name but not/no longer existing, the
-         * function synthesizes the load name as it should be and returns
-         * that. If the given name is illegal, the function returns 0.
-         *
-         * For virtual objects this efun of course returns the virtual
-         * filename.  If <obj> is omitted, the name for the current object is
-         * returned.
-         *
-         * In contrast to the object_name(), the load name can not be changed
-         * by with rename_object(). However, if an object uses
-         * replace_program() the load name no longer reflects the actual
-         * behaviour of an object.
-         *
-         * The returned name starts with a '/', unless the driver is running
-         * in COMPAT mode.
-         */
-
-        char *s;       /* String argument */
-        char *name;    /* Result string, maybe 's' itself */
-        char *hash;    /* Position of the hash in the name */
-        char *mem;     /* Allocated memory blocks */
-        object_t *ob;
-
-        /* If the argument is an object, we just need to read the name */
-        if (sp->type == T_OBJECT)
-        {
-            s = sp->u.ob->load_name;
-            free_object_svalue(sp);
-            put_ref_string(sp, s);
-            break;
-        }
-        
-        if (sp->type != T_STRING)
-            goto bad_arg_1;
-
-        /* Argument is a string: try to find the object for it */
-        s = sp->u.string;
-        ob = find_object(s);
-        if (ob)
-        {
-            /* Got it */
-            s = ob->load_name;
-            free_string_svalue(sp);
-            put_ref_string(sp, s);
-            break;
-        }
-
-        /* There is no object for the string argument: just normalize
-         * the string. First check if it ends in #<number>.
-         */
-        mem = NULL;
-        hash = strchr(s, '#');
-        if (!hash)
-        {
-            /* No '#' at all: make the name sane directly */
-#ifdef COMPAT_MODE
-            name = (char *)make_name_sane(s, MY_FALSE);
-#else
-            name = (char *)make_name_sane(s, MY_TRUE);
-#endif
-            if (!name)
-                name = s;
-        }
-        else
-        {
-            char *p;
-            size_t len;
-            
-            /* All characters after the '#' must be digits */
-            for (p = hash+1; '\0' != *p; p++)
-                if (*p < '0' || *p > '9')
-                    /* Illegal name: break to return svalue 0 */
-                    break;
-
-            if ('\0' != *p)
-            {
-                /* Illegal name: break to return svalue 0 */
-                free_string_svalue(sp);
-                put_number(sp, 0);
-                break;
-            }
-
-            /* Good, we can slash off the '#<number>' */
-            len = (size_t)(hash - s);
-            p = mem = xalloc(len+1);
-            if (!p)
-                ERROR("Out of memory.");
-            strncpy(p, s, len);
-            p[len] = '\0';
-
-            /* Now make the name sane */
-#ifdef COMPAT_MODE
-            name = (char *)make_name_sane(p, MY_FALSE);
-#else
-            name = (char *)make_name_sane(p, MY_TRUE);
-#endif
-            if (!name)
-                name = p;
-        }
-
-        /* name now points to the synthesized load_name and
-         * may be the argument (== s), allocated (== mem), or
-         * points to a static buffer otherwise.
-         */
-
-#ifdef COMPAT_MODE
-        /* '/.c' is a legal object name, so make sure that
-         * the result will be '/'.
-         */
-        if ('\0' == *name)
-            name = "/";
-#endif
-
-        /* Now return the result */
-        if (s != name)
-        {
-            free_string_svalue(sp);
-            if (name == mem)
-            {
-                put_malloced_string(sp, name);
-                mem = NULL;  /* do not deallocate this */
-            }
-            else
-            {
-                put_volatile_string(sp, name);
-            }
-        }
-
-        if (mem)
-            xfree(mem);
-         
-        break;
-    }
-
-    CASE(F_LOAD_OBJECT);            /* --- load_object         --- */
-    {
-        /* EFUN load_object()
-         *
-         *   object load_object(string name)
-         *
-         * Load the object from the file <name> and return it. If the
-         * object already exists, just return it.
-         *
-         * This efun can be used only to load blueprints - for clones, use
-         * the efun clone_object().
-         */
-
-        object_t *ob;
-
-        ASSIGN_EVAL_COST
-        inter_pc = pc;
-        inter_sp = sp;
-        TYPE_TEST1(sp, T_STRING);
-        ob = get_object(sp->u.string);
-        free_svalue(sp);
-        if (ob)
-            put_ref_object(sp, ob, "F_LOAD_OBJECT");
-        else
-            put_number(sp, 0);
-        break;
-    }
-
-    CASE(F_OBJECT_NAME);            /* --- object_name         --- */
-    {
-        /* EFUN object_name()
-         *
-         *   string object_name()
-         *   string object_name(object ob)
-         *
-         * Get the name of an object <ob> or, if no argument is given, of
-         * the current object.
-         *
-         * This name is the name under which the object is stored in the
-         * muds object table. It is initialised at the creation of the
-         * object such that blueprints are named after the file they are
-         * compiled from (without the trailing '.c'), and clones receive
-         * the name of their blueprint, extended by '#' followed by
-         * a unique non-negative number. These rules also apply to
-         * virtual objects - the real name/type of virtual objects
-         * is ignored.
-         *
-         * The name of an object can be changed with rename_object(), and
-         * object_name() will reflect any of these changes.
-         *
-         * The returned name always begins with '/' (absolute path),
-         * except when the parser runs in COMPAT mode.
-         */
-
-        char *name,*res;
-
-        TYPE_TEST1(sp, T_OBJECT)
-
-        name = sp->u.ob->name;
-#ifdef COMPAT_MODE
-        res = string_copy(name);
-#else
-        res = add_slash(name);
-#endif
-        if (!res)
-            ERROR("Out of memory\n")
-        free_object_svalue(sp);
-        put_malloced_string(sp, res);
-        break;
-    }
-
-    CASE(F_REPLACE_PROGRAM);        /* --- replace_program     --- */
-    {
-        /* EFUN replace_program()
-         *
-         *   void replace_program(string program)
-         *
-         * Substitutes a program with an inherited one. This is useful if you
-         * consider the performance and memory consumption of the driver. A
-         * program which doesn't need any additional variables and functions
-         * (except during creation) can call replace_program() to increase the
-         * function-cache hit-rate of
-         * the driver which decreases with the number of programs in the
-         * system. Any object can call replace_program() but looses all extra
-         * variables and functions which are not defined by the inherited
-         * program.
-         *
-         * When replace_program() takes effect, shadowing is stopped on
-         * the object since 3.2@166.
-         *
-         * It is not possible to replace the program of an object after
-         * (lambda) closures have been bound to it. It is of course
-         * possible to first replace the program and then bind lambda
-         * closures to it.
-         *
-         * The program replacement does not take place with the call to
-         * the efun, but is merely scheduled to be carried out at the end
-         * of the backend cycle. This may cause closures to have
-         * references to then vanished lfuns of the object. This poses no
-         * problem as long as these references are never executed after
-         * they became invalid.
-         */
-
-        replace_ob_t *tmp;
-        long name_len;
-        char *name;
-        program_t *new_prog;  /* the replacing program */
-        int offsets[2];            /* the offsets of the replacing prog */
-
-        TYPE_TEST1(sp, T_STRING)
-
-        if (!current_object)
-            ERROR("replace_program called with no current object\n")
-        if (current_object == simul_efun_object)
-            ERROR("replace_program on simul_efun object\n")
-        if (current_object->flags & O_LAMBDA_REFERENCED)
-            ERROR(
-              "Cannot schedule replace_program after binding lambda closures\n")
-
-        /* Create the full program name with a trailing '.c' and without
-         * a leading '/' to match the internal name representation.
-         */
-        name_len = (long)svalue_strlen(sp);
-        name = alloca((size_t)name_len+3);
-        strcpy(name, sp->u.string);
-        if (name[name_len-2] != '.' || name[name_len-1] != 'c')
-            strcat(name,".c");
-        if (*name == '/')
-            name++;
-
-        new_prog = search_inherited(name, current_object->prog, offsets);
-        if (!new_prog)
-        {
-            /* Given program not inherited, maybe it's the current already.
-             */
-            if (!strcmp(name, current_object->prog->name ))
-            {
-                new_prog = current_object->prog;
-                offsets[0] = offsets[1] = 0;
-            }
-            else
-            {
-                ERROR("program to replace the current one with has "
-                      "to be inherited\n")
-            }
-        }
-
-        /* Program found, now create a new replace program entry, or
-         * change an existing one.
-         */
-        if (!(current_object->prog->flags & P_REPLACE_ACTIVE)
-         || !(tmp = retrieve_replace_program_entry()) )
-        {
-            tmp = xalloc(sizeof *tmp);
-            tmp->lambda_rpp = NULL;
-            tmp->ob = current_object;
-            tmp->next = obj_list_replace;
-            obj_list_replace = tmp;
-            current_object->prog->flags |= P_REPLACE_ACTIVE;
-        }
-
-        tmp->new_prog = new_prog;
-        tmp->var_offset = offsets[0];
-        tmp->fun_offset = offsets[1];
-
-        pop_stack();
-        break;
-    }
-
-    CASE(F_SET_NEXT_RESET);         /* --- set_next_reset()    --- */
-    {
-        /* EFUN set_next_reset()
-         *
-         *   int set_next_reset (int delay)
-         *
-         * Instruct the gamedriver to reset this object not earlier than in
-         * <delay> seconds. If a negative value is given as delay, the object
-         * will never reset (useful for blueprints). If 0 is given, the
-         * object's reset time is not changed.
-         *
-         * Result is the former delay to the objects next reset (which can be
-         * negative if the reset was overdue).
-         */
-
-        int new_time;
-
-        TYPE_TEST1(sp, T_NUMBER)
-        new_time = sp->u.number;
-        if (current_object->flags & O_DESTRUCTED)
-        {
-            sp->u.number = 0;
-        }
-        else
-        {
-            sp->u.number = current_object->time_reset - current_time;
-            if (new_time < 0)
-                current_object->time_reset = 0;
-            else if (new_time > 0)
-                current_object->time_reset = new_time + current_time;
-        }
-        break;
-    }
-
-    CASE(F_SET_THIS_OBJECT);        /* --- set_this_object     --- */
-    {
-        /* EFUN set_this_object()
-         *
-         *   void set_this_object(object object_to_pretend_to_be);
-         *
-         * Set this_object() to <object_to_pretend_to_be>. A privilege
-         * violation ("set_this_object", this_object(), object_to_be)
-         * occurs.
-         *
-         * It changes the result of this_object() in the using function, and
-         * the result of previous_object() in functions called in other
-         * objects by call_other(). Its effect will remain till there is a
-         * return of an external function call, or another call of
-         * set_this_object(). While executing code in the master
-         * object's program or the primary simul_efun object's program,
-         * set_this_object() is granted even if this_object() is altered by
-         * set_this_object(). This does not apply to functions inherited from
-         * other programs.
-         *
-         * Use it with extreme care to avoid inconsistencies.  After a call of
-         * set_this_object(), some LPC-constructs might behave in an odd
-         * manner, or even crash the system. In particular, using global
-         * variables or calling local functions (except by call_other) is
-         * illegal.
-         *
-         * With the current implementation, global variables can be accessed,
-         * but this is not guaranteed to work in subsequent versions.
-         *
-         * Allowed are call_other, map functions, access of local variables
-         * (which might hold array pointers to a global array), simple
-         * arithmetic and the assignment operators.
-         */
-
-        TYPE_TEST1(sp, T_OBJECT)
-        if (current_variables == master_ob->variables
-         || current_variables == simul_efun_object->variables
-         || privilege_violation("set_this_object", sp))
-        {
-            struct control_stack *p;
-
-            /* Find the 'extern_call' entry in the call stack which
-             * determined the current this_object().
-             */
-            for (p = csp; !p->extern_call; p--) NOOP;
-
-            p->extern_call |= CS_PRETEND;
-            p->pretend_to_be = current_object = sp->u.ob;
-        }
-        pop_stack();
-        break;
-    }
-
-    CASE(F_SNOOP);                  /* --- snoop <nargs>       --- */
-    {
-        /* EFUN snoop()
-         *
-         *   object snoop(object snooper)
-         *   object snoop(object snooper, object snoopee)
-         *
-         * Starts a snoop from 'snooper' on 'snoopee', or if 'snoopee' is not
-         * given, terminates any snoop from 'snooper'.
-         * On success, 'snoopee' is returned, else 0.
-         *
-         * The snoop is checked with the master object for validity.
-         * It will also fail if the 'snoopee' is being snooped already or
-         * if a snoop would result in a recursive snoop action.
-         */
-
-        int i;
-
-        assign_eval_cost();
-        GET_NUM_ARG
-        inter_pc = pc;
-        inter_sp = sp;
-        if (num_arg == 1)
-        {
-            TYPE_TEST1(sp,   T_OBJECT)
-            i = set_snoop(sp->u.ob, 0);
-        }
-        else
-        {
-            TYPE_TEST1(sp-1, T_OBJECT)
-            TYPE_TEST2(sp,   T_OBJECT)
-            i = set_snoop((sp-1)->u.ob, sp->u.ob);
-            pop_stack();
-        }
-        free_svalue(sp);
-        put_number(sp, i);
-        break;
-    }
-
-    CASE(F_TELL_OBJECT);            /* --- tell_object         --- */
-        /* EFUN tell_object()
-         *
-         *   void tell_object(object ob, string str)
-         *
-         * Send a message str to object ob. If it is an interactive
-         * object (a user), then the message will go to him (her?),
-         * otherwise the lfun catch_tell() of the living will be called
-         * with the message as argument.
-         */
-
-        ASSIGN_EVAL_COST
-        TYPE_TEST1(sp-1, T_OBJECT)
-        TYPE_TEST2(sp,   T_STRING)
-        inter_sp = sp;
-        inter_pc = pc;
-        tell_object((sp-1)->u.ob, sp->u.string);
-        free_string_svalue(sp);
-        sp--;
-        if (sp->type == T_OBJECT) /* not self-destructed */
-            free_object_svalue(sp);
-        sp--;
-        break;
 
     CASE(F_THIS_INTERACTIVE);       /* --- this_interactive    --- */
         /* EFUN this_interactive()
@@ -14681,9 +12358,9 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         if (current_interactive
          && !(current_interactive->flags & O_DESTRUCTED))
-            push_object(current_interactive);
+            push_ref_object(sp, current_interactive, "this_interactive");
         else
-            push_number(0);
+            push_number(sp, 0);
         break;
 
     CASE(F_THIS_OBJECT);            /* --- this_object         --- */
@@ -14696,1210 +12373,13 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
         if (current_object->flags & O_DESTRUCTED)
         {
-            push_number(0);
+            push_number(sp, 0);
             break;
         }
-        push_object(current_object);
+        push_ref_object(sp, current_object, "this_object");
         break;
-
-    CASE(F_USERS);                  /* --- users               --- */
-        /* EFUN users
-         *
-         *   object *users(void)
-         *
-         * Return an array containing all interactive users.
-         */
-
-        push_referenced_vector(users());
-        break;
-
-    CASE(F_WRITE);                  /* --- write               --- */
-        /* EFUN write()
-         *
-         *   void write(mixed msg)
-         *
-         * Write out something to the current user. What exactly will
-         * be printed in the end depends of the type of msg.
-         *
-         * If it is a string or a number then just prints it out.
-         *
-         * If it is an object then the object will be printed in the
-         * form: "OBJ("+file_name((object)mix)+")"
-         *
-         * If it is an array just "<ARRAY>" will be printed.
-         *
-         * If the write() function is invoked by a command of an living
-         * but not interactive object and the given argument is a string
-         * then the lfun catch_tell() of the living will be invoked with
-         * the message as argument.
-         *
-         * TODO: this efun could be made the counterpart of MudOS' receive().
-         * TODO: the accepted types and their interpretations should follow
-         * TODO:: the to_string() or sprintf() representations.
-         */
-
-        assign_eval_cost();
-        inter_pc = pc;
-        inter_sp = sp;
-        e_write(sp);
-        pop_stack();
-        break;
-
-    /* --- Efuns: Files --- */
-
-    CASE(F_CAT);                    /* --- cat <nargs>         --- */
-    {
-        /* EFUN cat()
-         *
-         *     int cat(string pathi [, int start [, int num]])
-         *
-         * List the file found at path.
-         * The optional arguments start and num are start line
-         * number and number of lines. If they are not given the whole
-         * file is printed from the beginning.
-         *
-         * Result is the number of lines printed.
-         */
-
-        int i;
-        svalue_t *arg;
-        int start, len;
-
-        assign_eval_cost();
-        GET_NUM_ARG
-        inter_pc = pc;
-        inter_sp = sp;
-        arg = sp- num_arg + 1;
-
-        /* Get and test the arguments */
-        TYPE_TEST1(arg, T_STRING)
-        start = 0; len = 0;
-        if (num_arg > 1)
-        {
-            TYPE_TEST2(arg+1, T_NUMBER)
-            start = arg[1].u.number;
-            if (num_arg == 3)
-            {
-                if (arg[2].type != T_NUMBER)
-                    goto bad_arg_3;
-                len = arg[2].u.number;
-            }
-        }
-
-        /* Print the file */
-        i = e_print_file(arg[0].u.string, start, len);
-        pop_n_elems(num_arg);
-        push_number(i);
-        break;
-    }
-
-    CASE(F_FILE_SIZE);              /* --- file_size           --- */
-    {
-        /* EFUN file_size()
-         *
-         *   int file_size(string file)
-         *
-         * Returns the size of the file in bytes.
-         *
-         * Size FSIZE_NOFILE (-1) indicates that the file either does not
-         * exist, or that it is not readable for the calling object/user.
-         * Size FSIZE_DIR (-2) indicates that it is a directory.
-         */
-
-        int i;
-
-        assign_eval_cost();
-        TYPE_TEST1(sp, T_STRING)
-        inter_sp = sp;
-        inter_pc = pc;
-        i = e_file_size(sp->u.string);
-        free_svalue(sp);
-        put_number(sp, i);
-        break;
-    }
-
-    CASE(F_GET_DIR);                /* --- get_dir             --- */
-    {
-        /* EFUN get_dir()
-         *
-         *   string *get_dir(string str, int mask)
-         *
-         * This function takes a path as argument and returns an array of
-         * file names and attributes in that directory.
-         *
-         * The filename part of the path may contain '*' or '?' as
-         * wildcards: every '*' matches an arbitrary amount of characters
-         * (or just itself). Thus get_dir ("/path/ *") would return an
-         * array of all files in directory "/path/", or just ({ "/path/ *"
-         * }) if this file happens to exist.
-         *
-         * The optional second argument mask can be used to get
-         * information about the specified files.
-         *
-         * GETDIR_EMPTY (0x00)  return an empty array (not very useful)
-         * GETDIR_NAMES (0x01)  put the file names into the returned array.
-         * GETDIR_SIZES (0x02)  put the file sizes into the returned array.
-         * GETDIR_DATES (0x04)  put the file modification dates into the
-         *                      returned array.
-         * GETDIR_UNSORTED (0x20) if this mask bit is set, the result of
-         *                      get_dir() will _not_ be sorted.
-         * The values of mask can be added together.
-         */
-
-        vector_t *v;
-
-        TYPE_TEST1(sp-1, T_STRING)
-        TYPE_TEST2(sp,   T_NUMBER)
-        inter_sp = sp;
-        inter_pc = pc;
-
-        v = e_get_dir(sp[-1].u.string, sp->u.number);
-        sp--; /* think 'free_int_svalue(sp--) */
-        free_string_svalue(sp);
-        if (v)
-        {
-            put_array(sp, v);
-        }
-        else
-        {
-            put_number(sp, 0);
-        }
-        break;
-    }
-
-    CASE(F_MKDIR);                  /* --- mkdir               --- */
-    {
-        /* EFUN mkdir()
-         *
-         *   int mkdir(string path)
-         *
-         * Make a directory named path. Return 1 for success and 0 for
-         * failure.
-         */
-
-        int i;
-        char *path;
-
-        assign_eval_cost();
-        inter_pc = pc;
-        inter_sp = sp;
-        TYPE_TEST1(sp, T_STRING)
-
-        path = check_valid_path(sp->u.string, current_object, "mkdir", MY_TRUE);
-        i = !(path == 0 || mkdir(path, 0775) == -1);
-        free_svalue(sp);
-        put_number(sp, i);
-        break;
-    }
-
-    CASE(F_READ_BYTES);             /* --- read_bytes <nargs>  --- */
-    {
-        /* EFUN read_bytes()
-         *
-         *   string read_bytes (string file, int start, int number)
-         *
-         * Reads a given amount of bytes from file.
-         * If <start> is not given or 0, the file is read from the
-         * beginning, else from the <start>th byte on. If <start> is
-         * negative, it is counted from the end of the file.
-         * <number> is the number of bytes to read. 0 or negative values
-         * are possible, but not useful.
-         * If <start> would be outside the actual size of the file, 0 is
-         * returned instead of a string.
-         * TODO: Can't read nul-characters.
-         */
-
-        char *str;
-        svalue_t *arg;
-        int start, len;
-
-        assign_eval_cost();
-        GET_NUM_ARG
-        inter_pc = pc;
-        inter_sp = sp;
-        arg = sp- num_arg + 1;
-        TYPE_TEST1(arg,   T_STRING)
-
-        /* Get the arguments */
-        start = 0;
-        len = 0;
-        if (num_arg > 1)
-        {
-            TYPE_TEST2(arg+1, T_NUMBER)
-            start = arg[1].u.number;
-            if (num_arg == 3)
-            {
-                if (arg[2].type != T_NUMBER)
-                    goto bad_arg_2;
-                len = arg[2].u.number;
-                sp--;
-            }
-            sp--;
-        }
-
-        /* Read the file */
-        str = e_read_bytes(arg[0].u.string, start, len);
-        pop_stack();
-        if (str == 0)
-            push_number(0);
-        else
-        {
-            push_string_malloced(str);
-            xfree(str);
-        }
-        break;
-    }
-
-    CASE(F_READ_FILE);              /* --- read_file           --- */
-    {
-        /* EFUN read_file()
-         *
-         *   string read_file(string file, int start, int number)
-         *
-         * Reads lines from file.
-         * If <start> is not given or 0, the file is read from the
-         * beginning, else from the numbered line on.
-         * If <number> is not given or 0, the whole file is read, else
-         * just the given amount of lines.
-         * If <start> would be outside the actual size of the file, 0 is
-         * returned instead of a string.
-         */
-
-        char *str;
-        svalue_t *arg;
-        int start, len;
-
-        assign_eval_cost();
-        GET_NUM_ARG
-        inter_pc = pc;
-        inter_sp = sp;
-        arg = sp- num_arg + 1;
-        TYPE_TEST1(arg,   T_STRING)
-
-        /* Get the arguments */
-        start = 0;
-        len = 0;
-        if (num_arg > 1)
-        {
-            TYPE_TEST2(arg+1, T_NUMBER)
-            start = arg[1].u.number;
-            if (num_arg == 3)
-            {
-                if (arg[2].type != T_NUMBER)
-                    goto bad_arg_3;
-                len = arg[2].u.number;
-                sp--;
-            }
-            sp--;
-        }
-
-        /* Read the file */
-        str = e_read_file(arg[0].u.string, start, len);
-        pop_stack();
-        if (str == 0)
-            push_number(0);
-        else
-        {
-            push_malloced_string(str);
-        }
-        break;
-    }
-
-    CASE(F_RENAME);                 /* --- rename              --- */
-    {
-        /* EFUN rename()
-         *
-         *   int rename(string from, string to)
-         *
-         * The efun rename() will move from to the new name to. If from
-         * is a file, then to may be either a file or a directory. If
-         * from is a directory, then to has to be a directory. If to
-         * exists and is a directory, then from will be placed in that
-         * directory and keep its original name.
-         *
-         * You must have write permission for from to rename the file.
-         *
-         * On successfull completion rename() will return 0. If any error
-         * occurs 1 is returned.
-         */
-
-        int i;
-
-        assign_eval_cost();
-        inter_pc = pc;
-        inter_sp = sp;
-        TYPE_TEST1(sp-1, T_STRING)
-        TYPE_TEST2(sp,   T_STRING)
-
-        i = e_rename((sp-1)->u.string, sp->u.string);
-        pop_n_elems(2);
-        push_number(i);
-        break;
-    }
-
-    CASE(F_RM);                     /* --- rm                  --- */
-    {
-        /* EFUN rm()
-         *
-         *   int rm(string file)
-         *
-         * Remove the file. Returns 0 for failure and 1 for success.
-         */
-
-        int i;
-
-        assign_eval_cost();
-        TYPE_TEST1(sp, T_STRING)
-        inter_sp = sp;
-        inter_pc = pc;
-        i = e_remove_file(sp->u.string);
-        free_svalue(sp);
-        put_number(sp, i);
-        break;
-    }
-
-    CASE(F_RMDIR);                  /* --- rmdir               --- */
-    {
-        /* EFUN rmdir()
-         *
-         *   int rmdir(string dir)
-         *
-         * Remove directory dir. Return 1 on success, 0 on failure.
-         */
-
-        int i;
-        char *path;
-
-        assign_eval_cost();
-        inter_pc = pc;
-        inter_sp = sp;
-        TYPE_TEST1(sp, T_STRING)
-        path = check_valid_path(sp->u.string, current_object, "rmdir", MY_TRUE);
-        i = !(path == 0 || rmdir(path) == -1);
-        free_svalue(sp);
-        put_number(sp, i);
-        break;
-    }
-
-    CASE(F_TAIL);                   /* --- tail                --- */
-        /* EFUN tail()
-         *
-         *   void tail(string file)
-         *
-         * Print out the tail of a file. There is no specific amount of
-         * lines given to the output. Only a maximum of 1000 bytes will
-         * be printed.
-         */
-
-        assign_eval_cost();
-        TYPE_TEST1(sp, T_STRING)
-        inter_sp = sp;
-        inter_pc = pc;
-        if (e_tail(sp->u.string))
-            assign_svalue(sp, &const1);
-        else
-            assign_svalue(sp, &const0);
-        break;
-
-    CASE(F_WRITE_BYTES);            /* --- write_bytes         --- */
-    {
-        /* EFUN write_bytes()
-         *
-         *   int write_bytes(string file, int start, string str)
-         *
-         * Write string str to file file by overwriting the old bytes at
-         * position start. If start is a negative value then it will be
-         * counted from the end of the file. The file will not be
-         * appended, instead the function will be aborted. Returns 1 for
-         * success 0 for failure during execution.
-         */
-
-        int i;
-
-        assign_eval_cost();
-        TYPE_TEST1(sp-2, T_STRING)
-        TYPE_TEST2(sp-1, T_NUMBER)
-        inter_sp = sp;
-        inter_pc = pc;
-        if (sp->type != T_STRING)
-            goto bad_arg_3;
-
-        i = e_write_bytes((sp-2)->u.string, (sp-1)->u.number, sp->u.string);
-        pop_stack();
-        sp--;
-        free_svalue(sp);
-        put_number(sp, i);
-        break;
-    }
-
-    CASE(F_WRITE_FILE);             /* --- write_file          --- */
-    {
-        /* EFUN write_file()
-         *
-         *   int write_file(string file, string str)
-         *
-         * Append the string str to the file file. Returns 1 for success
-         * and 0 if any failure occured.
-         */
-
-        int i;
-
-        assign_eval_cost();
-        TYPE_TEST1(sp-1, T_STRING)
-        TYPE_TEST2(sp,   T_STRING)
-        inter_sp = sp;
-        inter_pc = pc;
-
-        i = e_write_file((sp-1)->u.string, sp->u.string);
-        pop_stack();
-        free_svalue(sp);
-        put_number(sp, i);
-        break;
-    }
-
-    /* --- Efuns: Driver and System --- */
-
-    CASE(F_QUERY_LOAD_AVERAGE);     /* --- query_load_average  --- */
-        /* EFUN query_load_average()
-         *
-         *   string query_load_average(void)
-         *
-         * Returns the load of the mud. Two figures are given, executed
-         * commands/second and compiled lines/second.
-         */
-
-        push_string_malloced(query_load_av());
-        break;
-
-    /* --- Efuns: Inventories --- */
-
-    CASE(F_ALL_INVENTORY);          /* --- all_inventory       --- */
-    {
-        /* EFUN all_inventory()
-         *
-         *     object *all_inventory(object ob = this_object())
-         *
-         * Returns an array of the objects contained in the inventory
-         * of ob.
-         */
-
-        vector_t *vec;
-
-        TYPE_TEST1(sp, T_OBJECT)
-        inter_sp = sp;
-        inter_pc = pc;
-
-        vec = all_inventory(sp->u.ob);
-        free_object_svalue(sp);
-
-        if (vec == NULL)
-        {
-            put_number(sp, 0);
-        }
-        else
-        {
-            put_array(sp, vec);
-        }
-        break;
-    }
-
-    CASE(F_DEEP_INVENTORY);         /* --- deep_inventory      --- */
-    {
-        /* EFUN deep_inventory()
-         *
-         *   object *deep_inventory(void)
-         *   object *deep_inventory(object ob)
-         *
-         * Returns an array of the objects contained in the inventory of
-         * ob (or this_object() if no arg given) and in the inventories
-         * of these objects, climbing down recursively.
-         */
-
-        vector_t *vec;
-
-        TYPE_TEST1(sp, T_OBJECT)
-        inter_sp = sp;
-        inter_pc = pc;
-        vec = deep_inventory(sp->u.ob, 0);
-        free_object_svalue(sp);
-        put_array(sp, vec);
-        break;
-    }
-
-    CASE(F_ENVIRONMENT);            /* --- environment <nargs> --- */
-    {
-        /* EFUN environment()
-         *
-         *   object environment(void)
-         *   object environment(object obj)
-         *   object environment(string obj)
-         *
-         * Returns the surrounding object of obj (which may be specified
-         * by name). If no argument is given, it returns the surrounding
-         * of the current object.
-         *
-         * Destructed objects do not have an environment.
-         */
-
-        object_t *ob;
-
-        GET_NUM_ARG
-        if (num_arg)
-        {
-            if (sp->type == T_OBJECT)
-            {
-                ob = sp->u.ob->super;
-                free_object_svalue(sp);
-            }
-            else if (sp->type == T_STRING)
-            {
-                ob = find_object(sp->u.string);
-                if (!ob || ob->super == NULL || (ob->flags & O_DESTRUCTED))
-                    ob = NULL;
-                else
-                    ob = ob->super;
-                free_string_svalue(sp);
-            }
-            else
-                goto bad_arg_1;
-        }
-        else if (!(current_object->flags & O_DESTRUCTED))
-        {
-            ob = current_object->super;
-            sp++;
-        }
-        else
-        {
-            ob = NULL; /* != environment(this_object()) *boggle* */
-            sp++;
-        }
-
-        if (ob)
-            put_ref_object(sp, ob, "environment");
-        else
-            put_number(sp, 0);
-        break;
-    }
-
-    CASE(F_FIRST_INVENTORY);        /* --- first_inventory     --- */
-    {
-        /* EFUN first_inventory()
-         *
-         *   object first_inventory()
-         *   object first_inventory(string ob)
-         *   object first_inventory(object ob)
-         *
-         * Get the first object in the inventory of ob, where ob is
-         * either an object or the file name of an object. If ob is not
-         * given, the current object is assumed.
-         */
-
-        object_t *ob;
-
-        if (sp->type == T_OBJECT)
-        {
-            ob = sp->u.ob->contains;
-            free_object_svalue(sp);
-        }
-        else if (sp->type == T_STRING)
-        {
-            ob = get_object(sp->u.string);
-            if (!ob)
-                ERRORF(("No object '%s' for first_inventory()\n", sp->u.string));
-            free_string_svalue(sp);
-            ob = ob->contains;
-        }
-        else
-            goto bad_arg_1;
-
-        if (ob)
-            put_ref_object(sp, ob, "first_inventory");
-        else
-            put_number(sp, 0);
-        break;
-    }
-
-    CASE(F_MOVE_OBJECT);            /* --- move_object         --- */
-    {
-        /* EFUN move_object()
-         *
-         *   void move_object(mixed item, mixed dest)
-         *
-         * The item, which can be a file_name or an object, is moved into
-         * it's new environment dest, which can also be file_name or an
-         * object.
-         *
-         * In !compat mode, the only object that can be moved with
-         * move_object() is the calling object itself.
-         *
-         * Since 3.2.1, the innards of move_object() are implemented in
-         * the mudlib, using the M_MOVE_OBJECT driver hooks.
-         */
-
-        object_t *item, *dest;
-
-        ASSIGN_EVAL_COST
-        inter_pc = pc;
-        inter_sp = sp;
-
-        if ((sp-1)->type == T_OBJECT)
-            item = (sp-1)->u.ob;
-        else if ((sp-1)->type == T_STRING)
-        {
-            item = get_object((sp-1)->u.string);
-            if (!item)
-                error("move_object failed\n");
-            free_string_svalue(sp-1);
-            put_ref_object(sp-1, item, "move_object");
-        }
-        else
-            goto bad_arg_1;
-
-        if (sp->type == T_OBJECT)
-            NOOP;
-        else if (sp->type == T_STRING)
-        {
-            dest = get_object(sp->u.string);
-            if (!dest)
-                error("move_object failed\n");
-            free_string_svalue(sp);
-            put_ref_object(sp, dest, "move_object");
-        }
-        else
-            goto bad_arg_2;
-
-        /* move_object() reads its arguments directly from the stack */
-        move_object();
-        sp -= 2;
-        break;
-    }
-
-    CASE(F_NEXT_INVENTORY);         /* --- next_inventory      --- */
-    {
-        /* EFUN next_inventory()
-         *
-         *   object next_inventory()
-         *   object next_inventory(object ob)
-         *
-         * Get next object in the same inventory as ob. If ob is not
-         * given, the current object will be used.
-         *
-         * This efun is mostly used together with the efun
-         * first_inventory().
-         */
-
-        object_t *ob;
-
-        TYPE_TEST1(sp, T_OBJECT)
-        ob = sp->u.ob;
-        free_object(ob, "next_inventory");
-        if (ob->next_inv)
-            put_ref_object(sp, ob->next_inv, "next_inventory");
-        else
-            put_number(sp, 0);
-        break;
-    }
-
-    CASE(F_PRESENT);                /* --- present             --- */
-      {
-        /* EFUN present()
-         *
-         *   object present(mixed str)
-         *   object present(mixed str, object ob)
-         *
-         * If an object that identifies (*) to the name ``str'' is present
-         * in the inventory or environment of this_object (), then return
-         * it. If "str" has the form "<id> <n>" the <n>-th object matching
-         * <id> will be returned.
-         *
-         * "str" can also be an object, in which case the test is much faster
-         * and easier.
-         *
-         * A second optional argument ob is the enviroment where the search
-         * for str takes place. Normally this_player() is a good choice.
-         * Only the inventory of ob is searched, not its environment.
-         */
-
-        svalue_t *arg;
-        object_t *ob;
-
-        assign_eval_cost();
-        GET_NUM_ARG
-        inter_pc = pc;
-        arg = sp - num_arg + 1;
-
-        /* Get the arguments */
-        if (arg->type != T_STRING && arg->type != T_OBJECT)
-            goto bad_arg_1;
-        ob = NULL;
-        if (num_arg > 1)
-        {
-            TYPE_TEST2(arg+1, T_OBJECT)
-            ob = arg[1].u.ob;
-            pop_stack();
-        }
-
-        inter_sp = sp;
-        ob = e_object_present(arg, ob);
-
-        free_svalue(arg);
-        if (ob)
-            put_ref_object(sp, ob, "present");
-        else
-            put_number(sp, 0);
-        break;
-      }
-
-    CASE(F_SAY);                    /* --- say <nargs>         --- */
-      {
-        /* EFUN say()
-         *
-         *   void say(string str)
-         *   void say(string str, object exclude)
-         *   void say(string str, object *excludes)
-         *   void say(mixed *arr)
-         *   void say(mixed *arr, object exclude)
-         *   void say(mixed *arr, object *excludes)
-         *
-         * There are two major modes of calling:
-         *
-         * If the first argument is a string <str>, it will be send to
-         * all livings in the current room	except to the initiator.
-         *
-         * If the first argument is an array <arr>, the lfun catch_msg()
-         * of all living objects except the initiator will be called.
-         * This array will be given as first argument to the lfun, and
-         * the initiating object as the second.
-         *
-         * By specifying a second argument to the efun one can exclude
-         * more objects than just the initiator. If the second argument
-         * is a single object <exclude>, both the given object and the
-         * initiator are excluded from the call. If the second argument
-         * is an array <excludes>, all objects and just the objects in
-         * this array are excluded from the call.
-         *
-         * The 'initiator' is determined according to these rules:
-         *   - if the say() is called from within a living object, this
-         *     becomes the initiator
-         *   - if the say() is called from within a dead object as result
-         *     of a user action (i.e. this_player() is valid), this_player()
-         *     becomes the initiator.
-         *   - Else the object calling the say() becomes the initiator.
-         */
-
-        static LOCAL_VEC2(vtmp, T_NUMBER, T_OBJECT);
-          /* Default 'avoid' array passed to say() giving the object
-           * to exclude in the second item. The first entry is reserved
-           * for e_say() to insert its command_giver object.
-           */
-
-        ASSIGN_EVAL_COST
-        GET_NUM_ARG
-        inter_pc = pc;
-        inter_sp = sp;
-
-#if defined(DEBUG) && defined(MALLOC_smalloc)
-        static_vector2 = &vtmp.v;
-        /* TODO: Remove this once VEC_SIZE() is proven to be accurate.
-         */
-#endif
-
-        if (num_arg == 1)
-        {
-            /* No objects to exclude */
-
-            if (sp->type != T_STRING && sp->type != T_POINTER)
-                goto bad_arg_1;
-
-            vtmp.v.item[0].type = T_NUMBER;
-              /* this marks the place for the command_giver */
-            vtmp.v.item[1].type = T_NUMBER;
-              /* nothing to exclude... */
-            e_say(sp, &vtmp.v);
-        }
-        else
-        {
-            /* We have objects to exclude */
-
-            if (sp[-1].type != T_STRING && sp[-1].type != T_POINTER)
-                goto bad_arg_1;
-
-            if ( sp->type == T_POINTER )
-            {
-                e_say(sp-1, sp->u.vec);
-            }
-            else if (sp->type == T_OBJECT)
-            {
-                vtmp.v.item[0].type = T_NUMBER;
-                put_ref_object(vtmp.v.item+1, sp->u.ob, "say");
-                e_say(sp-1, &vtmp.v);
-            }
-            else
-                goto bad_arg_2;
-            pop_stack();
-        }
-
-        pop_stack();
-        break;
-      }
-
-    CASE(F_TELL_ROOM);              /* --- tell_room <nargs>   --- */
-      {
-        /* EFUN tell_room()
-         *
-         *   void tell_room(string|object ob, string str)
-         *   void tell_room(string|object ob, string str, object *exclude)
-         *   void tell_room(string|object ob, mixed *msg)
-         *   void tell_room(string|object ob, mixed *msg, object *exclude)
-         *
-         * Send a message str to all living objects in the room ob. ob
-         * can also be the name of the room given as a string. If a
-         * receiving object is not a interactive user the lfun
-         * catch_tell() of the object will be invoked with the message as
-         * argument. If living objects define catch_tell(), the string
-         * will also be sent to that instead of being written to the
-	 * user. If the object is given as its filename, the driver
-         * looks up the object under that name, loading it if necessary.
-         * If array *exclude is given, all objects contained in
-         * *exclude are excluded from the message str.
-         *
-         * If the second arg is an array, catch_msg() will be called in
-         * all listening livings.
-         */
-
-        svalue_t *arg;
-        vector_t *avoid;
-        object_t *ob;
-
-        ASSIGN_EVAL_COST
-        GET_NUM_ARG
-        inter_pc = pc;
-        inter_sp = sp;
-        arg = sp- num_arg + 1;
-
-        /* Test the arguments */
-        if (arg[0].type == T_OBJECT)
-            ob = arg[0].u.ob;
-        else if (arg[0].type == T_STRING)
-        {
-            ob = get_object(arg[0].u.string);
-            if (!ob)
-                ERROR("Object not found.\n")
-        }
-        else
-            goto bad_arg_1;
-
-        if (arg[1].type != T_STRING && arg[1].type != T_POINTER)
-            goto bad_arg_2;
-
-        if (num_arg == 2)
-        {
-            avoid = &null_vector;
-        }
-        else
-        {
-            /* Sort the list of objects to exclude for faster
-             * operation.
-             */
-
-            vector_t *vtmpp;
-            static svalue_t stmp = { T_POINTER };
-
-            if (arg[2].type != T_POINTER)
-                goto bad_arg_3;
-
-            stmp.u.vec = arg[2].u.vec;
-            vtmpp = order_alist(&stmp, 1, MY_TRUE);
-            avoid = vtmpp->item[0].u.vec;
-            sp->u.vec = avoid; /* in case of an error, this will be freed. */
-            sp--;
-            vtmpp->item[0].u.vec = stmp.u.vec;
-            free_array(vtmpp);
-        }
-
-        e_tell_room(ob, sp, avoid);
-
-        if (num_arg > 2)
-            free_array(avoid);
-        pop_stack();
-        pop_stack();
-        break;
-      }
 
     /* --- Efuns: Verbs and Commands --- */
-
-    CASE(F_ADD_ACTION);             /* --- add_action <nargs>  --- */
-    {
-        /* EFUN add_action()
-         *
-         *   void add_action(string fun, string cmd [, int flag])
-         *   void add_action(string fun) // historical
-         *
-         * Add an action (verb + function) to the commandgiver.
-         * TODO: In the long run, get rid of actions.
-         */
-
-        svalue_t *arg;
-        svalue_t *verb;
-
-        GET_NUM_ARG
-        inter_pc = pc;
-        inter_sp = sp;
-        arg = sp - num_arg + 1;
-        TYPE_TEST1(arg, T_STRING)
-
-        verb = NULL;
-        if (num_arg >= 2)
-        {
-            TYPE_TEST2(arg+1, T_STRING)
-            if (num_arg > 2)
-            {
-                if (arg[2].type != T_NUMBER)
-                    goto bad_arg_3;
-            }
-            verb = &arg[1];
-        }
-
-        if (e_add_action( &arg[0], verb
-                      , num_arg > 2 ? arg[2].u.number : 0))
-        {
-            /* silent error condition, deallocate strings by hand */
-            pop_n_elems(num_arg);
-        }
-        else
-        {
-            /* add_action has reused the strings or freed it */
-            sp -= num_arg;
-        }
-        break;
-    }
-
-    CASE(F_COMMAND);                /* --- command <nargs>     --- */
-    {
-        /* EFUN command()
-         *
-         *   int command(string str)             // native
-         *   int command(string str, object ob)  // !native
-         *
-         * Execute str as a command given directly by the user. Any
-         * effects of the command will apply to the current object.
-         *
-         * Return value is 0 for failure. Otherwise a numeric value is
-         * returned which tells the evaluation cost. Bigger number means
-         * higher cost.  The evaluation cost is approximately the number
-         * of LPC machine code instructions executed.
-         *
-         * In native mode, command() can effect only the calling object.
-         * If native mode is not enabled, command() can get an optional
-         * second arg, that specifies the object that the command is to
-         * be applied to.
-         * If command() is called on another object, it is not possible
-         * to call static functions in this way, to give some protection
-         * against illegal forces.
-         *
-         * TODO: With add_action(), this should go in the long run.
-         */
-
-        int i;
-        svalue_t *arg;
-
-        assign_eval_cost();
-        GET_NUM_ARG
-        inter_pc = pc;
-        inter_sp = sp;
-
-        arg = sp - num_arg + 1;
-        if (num_arg == 1)
-        {
-            TYPE_TEST1(sp,   T_STRING)
-            i = e_command(arg[0].u.string, NULL);
-        }
-        else
-        {
-            TYPE_TEST1(sp-1, T_STRING)
-            TYPE_TEST2(sp,   T_OBJECT)
-            i = e_command(arg[0].u.string, arg[1].u.ob);
-            pop_stack();
-        }
-
-        free_svalue(sp);
-        put_number(sp, i);
-        break;
-    }
-
-    CASE(F_DISABLE_COMMANDS);       /* --- disable_commands    --- */
-        /* EFUN disable_commands()
-         *
-         *   void disable_commands()
-         *
-         * Disable this object to use commands normally accessible to
-         * users.
-         */
-
-        inter_sp = sp;
-        enable_commands(MY_FALSE);
-        break;
-
-    CASE(F_ENABLE_COMMANDS);        /* --- enable_commands     --- */
-        /* EFUN enable_commands()
-         *
-         *   void enable_commands()
-         *
-         * Enable this object to use commands normally accessible to
-         * users.
-         */
-
-        inter_sp = sp;
-        enable_commands(MY_TRUE);
-        break;
-
-    CASE(F_LIVING);                 /* --- living              --- */
-    {
-        /* EFUN living()
-         *
-         * int living(object ob)
-         *
-         * Return true if ob is a living object (that is,
-         * enable_commands() has been called from inside the ob).
-         * ob may be 0, in which case the result is obviously 0, too.
-         */
-
-        int i;
-
-        if (sp->type != T_OBJECT)
-        {
-            if (sp->type == T_NUMBER && !sp->u.number)
-                break;
-            goto bad_arg_1;
-        }
-
-        i = (sp->u.ob->flags & O_ENABLE_COMMANDS) != 0;
-        free_object_svalue(sp);
-        put_number(sp, i);
-        break;
-    }
-
-    CASE(F_QUERY_ACTIONS);          /* --- query_actions       --- */
-    {
-        /* EFUN query_actions()
-         *
-         *   mixed *query_actions(object ob, mixed mask_or_verb)
-         *
-         * query_actions takes either an object or a filename as first
-         * argument and a bitmask (int) or string as a second argument.
-         * If the second argument is a string, query_actions() will return
-         * an array containing information (see below) on the verb or
-         * zero if the living object "ob" cannot use the verb. If the
-         * second argument is a bitmask, query_actions() will return a
-         * flat array containing information on all verbs added to ob.
-         * The second argument is optional (default is the bitmask 1).
-         *      1:  the verb
-         *      2:  type
-         *      4:  short_verb
-         *      8:  object
-         *     16: function
-         *
-         * "type" is one of the values defined in <sent.h> (/sys/sent.h)
-         * (which is provided with the parser source).
-         *
-         * SENT_PLAIN       added with add_action (fun, cmd);
-         * SENT_SHORT_VERB  added with add_action (fun, cmd, 1);
-         * SENT_NO_SPACE    added with add_action (fun); add_xverb (cmd);
-         * SENT_NO_VERB     just an add_action (fun); without a verb
-         * SENT_MARKER      internal, won't be in the returned array
-         */
-
-        vector_t *v;
-        svalue_t *arg;
-        object_t *ob;
-
-        arg = sp - 1;
-        inter_sp = sp;
-        inter_pc = pc;
-
-        /* Get the arguments */
-        if (arg[0].type == T_OBJECT)
-            ob = arg[0].u.ob;
-        else
-        {
-            TYPE_TEST1(arg, T_STRING);
-            ob = get_object(arg[0].u.string);
-            if (!ob)
-                error("query_actions() failed\n");
-        }
-
-        /* Get the actions */
-        if (arg[1].type == T_STRING)
-            v = e_get_action(ob, arg[1].u.string);
-        else if (arg[1].type == T_NUMBER)
-            v = e_get_all_actions(ob, arg[1].u.number);
-        else {
-            TYPE_TEST2(arg+1, T_OBJECT);
-            v = e_get_object_actions(ob, arg[1].u.ob);
-        }
-
-        /* Clean up the stack and push the result */
-        pop_stack();
-        free_svalue(arg);
-        if (v)
-        {
-            put_array(arg, v);
-        } else
-            put_number(sp, 0);
-
-        break;
-    }
-
-    CASE(F_QUERY_VERB);             /* --- query_verb          --- */
-        /* EFUN query_verb()
-         *
-         *   string query_verb(void)
-         *
-         * Give the name of the current command, or 0 if not executing
-         * from a command. This allows add_action() of several commands
-         * to the same function. query_verb() returns 0 when invoked by a
-         * function which was started by a call_out or the heart beat.
-         * Also when a user logs in query_verb() returns 0.
-         */
-
-        if (!last_verb)
-        {
-            push_number(0);
-            break;
-        }
-        push_shared_string(last_verb);
-        break;
-
-    CASE(F_QUERY_COMMAND);          /* --- query_command       --- */
-      {
-        /* EFUN query_command()
-         *
-         *   string query_command(void)
-         *
-         * Return the full command string, or 0 if not executing from
-         * a command.
-         *
-         * The string returned is the string as seen by the parser:
-         * after any modify_command handling and after stripping
-         * trailing spaces.
-         */
-
-        char * str;
-
-        if (!last_command)
-        {
-            push_number(0);
-            break;
-        }
-        inter_pc = pc;
-        inter_sp = sp;
-        str = string_copy(last_command);
-        if (!str)
-            ERROR("Out of memory.\n")
-
-        push_malloced_string(str);
-        break;
-      }
 
     CASE(F_THIS_PLAYER);            /* --- this_player         --- */
         /* EFUN this_player()
@@ -15914,171 +12394,10 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
          */
 
         if (command_giver && !(command_giver->flags & O_DESTRUCTED))
-            push_object(command_giver);
+            push_ref_object(sp, command_giver, "this_player");
         else
-            push_number(0);
+            push_number(sp, 0);
         break;
-
-    /* --- Efuns: Uids and Euids --- */
-
-#ifdef F_EXPORT_UID
-    CASE(F_EXPORT_UID);             /* --- export_uid          --- */
-    {
-        /* EFUN export_uid()
-         *
-         *   void export_uid(object ob)
-         *
-         * Set the uid of object ob to the current object's effective uid.
-         * It is only possible when object ob has an effective uid of 0.
-         * TODO: seteuid() goes through the driver, why not this one, too?
-         * TODO:: Actually, this efun is redundant, archaic and should
-         * TODO:: vanish altogether.
-         */
-
-        object_t *ob;
-
-        TYPE_TEST1(sp, T_OBJECT)
-        if (!current_object->eff_user)
-            ERROR("Illegal to export uid 0\n")
-        ob = sp->u.ob;
-        if (!ob->eff_user)        /* Only allowed to export when null */
-            ob->user = current_object->eff_user;
-        free_object(ob, "export_uid");
-        sp--;
-        break;
-    }
-#endif /* F_EXPORT_UID */
-
-#ifdef F_GETEUID
-    CASE(F_GETEUID);             /* --- geteuid                --- */
-    {
-        /* EFUN geteuid()
-         *
-         *   string geteuid(object ob)
-         *
-         * Get the effective user-id of the object (mostly a wizard or
-         * domain name). Standard objects cloned by this object will get
-         * that userid. The effective userid is also used for checking access
-         * permissions. If ob is omitted, is this_object() as default.
-         */
-
-        object_t *ob;
-
-        TYPE_TEST1(sp, T_OBJECT)
-        ob = sp->u.ob;
-
-        if (ob->eff_user)
-        {
-            char *tmp;
-            tmp = ob->eff_user->name;
-            pop_stack();
-            push_volatile_string(tmp);
-        }
-        else
-        {
-            free_svalue(sp);
-            put_number(sp, 0);
-        }
-        break;
-    }
-#endif /* F_GETEUID */
-
-#ifdef F_SETEUID
-    CASE(F_SETEUID);                /* --- seteuid                --- */
-    {
-        /* EFUN seteuid()
-         *
-         *   int seteuid(string str)
-         *
-         * Set effective uid to str. The calling object must be
-         * privileged to do so by the master object. In most
-         * installations it can always be set to the current uid of the
-         * object, to the uid of the creator of the object file, or to 0.
-         *
-         * When this value is 0, the current object's uid can be changed
-         * by export_uid(), and only then.
-         *
-         * Objects with euid 0 cannot load or clone other objects.
-         */
-
-        svalue_t *ret;
-        svalue_t *argp;
-
-        argp = sp;
-        if (argp->type == T_NUMBER)
-        {
-            /* Clear the euid of this_object */
-
-            if (argp->u.number != 0)
-                goto bad_arg_1;
-            current_object->eff_user = 0;
-            free_svalue(argp);
-            put_number(argp, 1);
-            break;
-        }
-
-        if (argp->type != T_STRING)
-            goto bad_arg_1;
-
-        /* Call the master to clear this use of seteuid() */
-
-        assign_eval_cost();
-        inter_sp = _push_volatile_string(argp->u.string,
-            _push_valid_ob(current_object, sp) );
-        inter_pc = pc;
-        ret = apply_master_ob(STR_VALID_SETEUID, 2);
-        if (!ret || ret->type != T_NUMBER || ret->u.number != 1)
-        {
-            if (out_of_memory)
-            {
-                error("Out of memory\n");
-                /* NOTREACHED */
-                break;
-            }
-            free_svalue(argp);
-            put_number(argp, 0);
-            break;
-        }
-        current_object->eff_user = add_name(argp->u.string);
-        free_svalue(argp);
-        put_number(argp, 1);
-        break;
-    }
-#endif /* F_SETEUID */
-
-#if defined(F_GETUID) || defined(F_CREATOR)
-#ifdef F_GETUID
-    CASE(F_GETUID);                 /* --- getuid              --- */
-#else
-    CASE(F_CREATOR);                /* --- creator             --- */
-#endif
-    {
-        /* EFUN getuid()
-         *
-         *   string getuid(object ob)
-         *   string creator(object ob)
-         *
-         * User-ids are not used in compat mode, instead the uid is
-         * then called 'creator'.
-         * Get user-id of the object, i.e. the name of the wizard or
-         * domain that is responsible for the object. This name is also
-         * the name used in the wizlist. If no arg is given, use
-         * this_object() as default.
-         */
-
-        object_t *ob;
-        char *name;
-
-        TYPE_TEST1(sp, T_OBJECT)
-        ob = sp->u.ob;
-        deref_object(ob, "getuid");
-        if ( NULL != (name = ob->user->name) )
-            put_ref_string(sp, name);
-        else
-            put_number(sp, 0);
-        break;
-    }
-#endif
 
     /* --- Optional Efuns: Technical --- */
 
@@ -16099,2568 +12418,31 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
         break;
 #endif
 
-#ifdef F_RUSAGE
-    CASE(F_RUSAGE);                 /* --- rusage              --- */
-    {
-        /* EFUN rusage()
-         *
-         *   int *rusage(void)
-         *
-         * Return an array with current system resource usage statistics,
-         * as returned by the getrusage(2) of Unix.
-         * namely: utime, stime, maxrss, rus.ru_ixrss, rus.ru_idrss,
-         * rus.ru_isrss, rus.ru_minflt, rus.ru_majflt, rus.ru_nswap,
-         * rus.ru_inblock, rus.ru_oublock, rus.ru_msgsnd,
-         * rus.ru_msgrcv, rus.ru_nsignals, rus.ru_nvcsw,
-         * rus.ru_nivcsw
-         * TODO: The indices should be in an include file.
-         */
-
-        struct rusage rus;
-        vector_t *res;
-        svalue_t *v;
-#ifndef GETRUSAGE_RESTRICTED
-        int maxrss;
-#endif
-
-        if (getrusage(RUSAGE_SELF, &rus) < 0) {
-            push_number(0);
-            break;
-        }
-        res = allocate_array(16);
-        v = res->item;
-        v[ 0].u.number = RUSAGE_TIME(rus.ru_utime);
-        v[ 1].u.number = RUSAGE_TIME(rus.ru_stime);
-#ifndef GETRUSAGE_RESTRICTED
-        maxrss = rus.ru_maxrss;
-#ifdef sun
-        maxrss *= getpagesize() / 1024;
-#endif
-        v[ 2].u.number = maxrss;
-        v[ 3].u.number = rus.ru_ixrss;
-        v[ 4].u.number = rus.ru_idrss;
-        v[ 5].u.number = rus.ru_isrss;
-        v[ 6].u.number = rus.ru_minflt;
-        v[ 7].u.number = rus.ru_majflt;
-        v[ 8].u.number = rus.ru_nswap;
-        v[ 9].u.number = rus.ru_inblock;
-        v[10].u.number = rus.ru_oublock;
-        v[11].u.number = rus.ru_msgsnd;
-        v[12].u.number = rus.ru_msgrcv;
-        v[13].u.number = rus.ru_nsignals;
-        v[14].u.number = rus.ru_nvcsw;
-        v[15].u.number = rus.ru_nivcsw;
-#endif /* GETRUSAGE_RESTRICTED */
-        push_referenced_vector(res);
-        break;
-    }
-#endif
-
-    /* --- Optional Efuns: Alists --- */
-
-#ifdef F_ASSOC
-    CASE(F_ASSOC);                  /* --- assoc <nargs>       --- */
-    {
-        /* EFUN assoc()
-         *
-         *     int   assoc (mixed key, mixed *keys)
-         *     mixed assoc (mixed key, mixed *alist [, mixed fail] )
-         *     mixed assoc (mixed key, mixed *keys, mixed *data [, mixed fail])
-         *
-         * Search for <key> in the <alist> resp. in the <keys>.
-         *
-         * When the key list of an alist contains destructed objects
-         * it is better not to free them till the next reordering by
-         * order_alist to retain the alist property.
-         *
-         * TODO: Make the alist-efuns xefuns.
-         */
-        svalue_t *args;
-        vector_t *keys,*data;
-        svalue_t *fail_val;
-        int ix;
-
-        GET_NUM_ARG
-        args = sp -num_arg +1;
-        TYPE_TEST2(args+1, T_POINTER)
-
-        /* Analyse the arguments */
-        if ( !VEC_SIZE(args[1].u.vec)
-         ||  args[1].u.vec->item[0].type != T_POINTER )
-        {
-            keys = args[1].u.vec;
-            if (num_arg == 2)
-            {
-                data = NULL;
-            }
-            else
-            {
-                if (args[2].type != T_POINTER
-                 || VEC_SIZE(args[2].u.vec) != VEC_SIZE(keys))
-                {
-                    goto bad_arg_3;
-                }
-                data = args[2].u.vec;
-            }
-            if (num_arg == 4)
-            {
-                fail_val = &args[3];
-            }
-            else
-            {
-                fail_val = &const0;
-            }
-        }
-        else
-        {
-            keys = args[1].u.vec->item[0].u.vec;
-            if (VEC_SIZE(args[1].u.vec) > 1)
-            {
-                if (args[1].u.vec->item[1].type != T_POINTER
-                 || VEC_SIZE(args[1].u.vec->item[1].u.vec) != VEC_SIZE(keys))
-                {
-                    goto bad_arg_2;
-                }
-                data = args[1].u.vec->item[1].u.vec;
-            }
-            else
-            {
-                data = NULL;
-            }
-
-            if (num_arg == 3) fail_val = &args[2];
-            else if (num_arg == 2) fail_val = &const0;
-            else
-            {
-                ERROR ("too many args to efun assoc\n")
-                return;
-            }
-        }
-
-        /* Call assoc() and push the result */
-        ix = assoc(&args[0],keys);
-        if (data == NULL)
-        {
-            pop_n_elems(num_arg);
-            push_number(ix);
-        }
-        else
-        {
-            assign_svalue(args
-                         , ix == -1
-                           ? fail_val
-                           : (data->item[ix].type == T_OBJECT
-                              && data->item[ix].u.ob->flags & O_DESTRUCTED
-                             ? &const0
-                             : &data->item[ix])
-                         );
-            pop_n_elems(num_arg-1);
-        }
-        break;
-    }
-#endif /* F_ASSOC */
-
-#ifdef F_INSERT_ALIST
-    CASE(F_INSERT_ALIST)           /* --- insert_alist <nargs> --- */
-    {
-        /* EFUN insert_alist()
-         *
-         *   mixed* insert_alist (mixed key, mixed data..., mixed * alist)
-         *   int    insert_alist (mixed key, mixed * keys)
-         *
-         * 1. Form: Alist Insertion
-         *
-         *   The <key> and all following <data> values are inserted
-         *   into the <alist>. If an entry for <key> already exists
-         *   in the list, just the data values are replaced. The number
-         *   of <data> values must match the number of data arrays
-         *   in the alist, naturally.
-         *
-         *   Result is the updated <alist>.
-         *
-         * 2. Form: Key Insertion
-         *
-         *   Insert the <key> into the (ordered) array of <keys>, so that
-         *   subsequent assoc()s can perform quick lookups. Result is the
-         *   index at which <key> was inserted (or already found).
-         *
-         *   CAVEAT: when working with string keys, the index might no longer
-         *     be valid after the next call to insert_alist().
-         */
-        /* When the key list of an alist contains destructed objects
-           it is better not to free them till the next reordering by
-           order_alist to retain the alist property.
-         */
-        int i;
-        vector_t *list;
-        long listsize;
-        size_t keynum;
-        svalue_t *key,*key_data,*ret;
-        static LOCAL_VEC1(insert_alist_vec, T_NUMBER);
-          /* Mock-alist for the insert_alist() key-insertion form.
-           */
-
-        GET_NUM_ARG
-
-#if defined(DEBUG) && defined(MALLOC_smalloc)
-        static_vector1 = &insert_alist_vec.v;
-        /* TODO: Remove this once VEC_SIZE() is proven to be accurate.
-         */
-#endif
-
-        if (sp->type != T_POINTER)
-            bad_arg_pc(num_arg,F_INSERT_ALIST, sp, pc);
-
-        /* Make up an alist if only a key-insertion is required */
-        if ( !(listsize = (long)VEC_SIZE(sp->u.vec))
-         ||  sp->u.vec->item[0].type != T_POINTER )
-        {
-            list = &insert_alist_vec.v;
-            *list->item = *sp;
-            listsize = 1;
-        }
-        else
-            list = sp->u.vec;
-
-        /* Check the validity of the alist */
-        keynum = VEC_SIZE(list->item[0].u.vec);
-        for (i = 1; i < listsize; i++)
-        {
-            if (list->item[i].type != T_POINTER
-             || VEC_SIZE(list->item[i].u.vec) != keynum)
-            {
-                bad_arg_pc(num_arg,F_INSERT_ALIST, sp, pc);
-            }
-        }
-
-        /* Get and test the data to insert */
-        if (num_arg == 2)
-        {
-            if (sp[-1].type != T_POINTER)
-            {
-                key_data = NULL;
-                key = sp-1;
-            }
-            else
-            {
-                if (VEC_SIZE(sp[-1].u.vec) != (size_t)listsize)
-                    goto bad_arg_1;
-                key_data = key = sp[-1].u.vec->item;
-            }
-        }
-        else
-        {
-            if (num_arg - 1 != listsize)
-                goto bad_arg_1;
-            key_data = key = sp-num_arg+1;
-        }
-
-        /* Do the insertion */
-        inter_sp = sp; /* array might get too big */
-        ret = insert_alist(key,key_data,list);
-        pop_n_elems(num_arg);
-        sp++;
-        *sp = *ret;
-        break;
-    }
-#endif /* F_INSERT_ALIST */
-
-#ifdef F_INTERSECT_ALIST
-    CASE(F_INTERSECT_ALIST);        /* --- intersect_alist     --- */
-    {
-        /* EFUN intersect_alist()
-         *
-         *   mixed * intersect_alist (mixed * list1, mixed * list2)
-         *
-         * Does a fast set intersection on alist key vectors (NOT on full
-         * alists!).  The operator '&' does set intersection on arrays in
-         * general.
-         */
-
-        vector_t *tmp;
-
-        TYPE_TEST1(sp-1, T_POINTER)
-        TYPE_TEST2(sp,   T_POINTER)
-        tmp = intersect_alist( (sp-1)->u.vec, sp->u.vec );
-        pop_stack();
-        free_array(sp->u.vec);
-        sp->u.vec = tmp;
-        break;
-    }
-#endif /* F_INTERSECT_ALIST */
-
-#ifdef F_ORDER_ALIST
-    CASE(F_ORDER_ALIST);            /* --- order_alist <nargs> --- */
-    {
-        /* EFUN order_alist()
-         *
-         *   mixed *order_alist(mixed *keys, mixed *|void data, ...)
-         *
-         * Creates an alist.
-         *
-         * Either takes an array containing keys, and others containing
-         * the associated data, where all arrays are to be of the same
-         * length, or takes a single array that contains as first member
-         * the array of keys and has an arbitrary number of other members
-         * containing data, each of wich has to be of the same length as
-         * the key array. Returns an array holding the sorted key array
-         * and the data arrays; the same permutation that is applied to
-         * the key array is applied to all data arrays.
-         */
-
-        int i;
-        svalue_t *args;
-        vector_t *list;
-        long listsize;
-        Bool reuse;
-        size_t keynum;
-
-        GET_NUM_ARG
-        args = sp-num_arg+1;
-
-        /* Get the key array to order */
-        TYPE_TEST1(args, T_POINTER)
-        if (num_arg == 1
-          && ((list = args->u.vec), (listsize = (long)VEC_SIZE(list)))
-          && list->item[0].type == T_POINTER)
-        {
-            args     = list->item;
-            reuse = (list->ref == 1);
-        }
-        else
-        {
-            listsize = num_arg;
-            reuse = MY_TRUE;
-        }
-        keynum = VEC_SIZE(args[0].u.vec);
-
-        /* Get the data arrays to order */
-        for (i = 0; i < listsize; i++)
-        {
-            if (args[i].type != T_POINTER
-             || VEC_SIZE(args[i].u.vec) != keynum)
-            {
-                ERRORF(("bad data array %d in call to order_alist\n",i))
-            }
-        }
-
-        /* Create the alist */
-        list = order_alist(args, listsize, reuse);
-        pop_n_elems(num_arg);
-        sp++;
-        put_array(sp, list);
-        break;
-    }
-#endif /* F_ORDER_ALIST */
-
-    /* --- Optional Efuns: Miscellaneous --- */
-
-#ifdef F_SET_LIGHT
-    CASE(F_SET_LIGHT);              /* --- set_light           --- */
-    {
-        /* EFUN set_light()
-         *
-         * int set_light(int n)
-         *
-         * An object is by default dark. It can be set to not dark by
-         * calling set_light(1). The environment will then also get this
-         * light. The returned value is the total number of lights in
-         * this room. So if you call set_light(0) it will return the
-         * light level of the current object.
-         *
-         * Note that the value of the argument is added to the light of
-         * the current object.
-         */
-
-        object_t *o1;
-
-        TYPE_TEST1(sp, T_NUMBER)
-        add_light(current_object, sp->u.number);
-        o1 = current_object;
-        while (o1->super)
-            o1 = o1->super;
-        sp->u.number = o1->total_light;
-        break;
-    }
-#endif /* F_SET_LIGHT */
-
-    /* --- XEfun and XCodes --- */
-
-    CASE(F_ESCAPE);                  /* --- escape <instr> ... --- */
-      {
-
-        /* A prefixed instruction. */
-
-#define XCASE(x) CASE((x)-0x100)
-#undef GET_NUM_ARG
-#define GET_NUM_ARG num_arg = EXTRACT_UCHAR(pc); pc++;
-
-#undef TYPE_TEST1
-#define TYPE_TEST1(arg, t) if ( (arg)->type != t ) goto xbad_arg_1;
-
-        int code;  /* the actual instruction code */
-
-        code = LOAD_CODE(pc);
-
-#ifdef TRACE_CODE
-        previous_instruction[last] = code + 0x100;
-#endif
-
-#ifdef OPCPROF
-        opcount[code+0x100]++;
-#endif
-
-        switch(code)
-        {
-
-        default:
-            fatal("Unknown stackmachine escape code: %d (%d)\n"
-                 , code, code+0x100);
-        xbad_arg_1: instruction = code + 0x100; goto bad_arg_1;
-        xbad_arg_2: instruction = code + 0x100; goto bad_arg_2;
-        xbad_arg_3: instruction = code + 0x100; goto bad_arg_3;
-
-        /* --- Machine Instructions --- */
-
-        XCASE(F_END_CATCH);         /* --- esc end_catch       --- */
-            /* For a catch(...guarded code...) statement, the compiler
-             * generates a F_END_CATCH as last instruction of the
-             * guarded code.
-             *
-             * Executed when no error occured, it cleans up the
-             * error recovery information pushed by the F_CATCH
-             * and leaves a 0 on the stack.
-             *
-             * dump_trace() checks for this bytecode, but accepts a normal
-             * instruction as well as an escaped instruction.
-             */
-
-            pop_stack();
-            pop_control_stack();
-            pc = inter_pc;
-            fp = inter_fp;
-            pop_error_context();
-            push_number(0);
-            eval_cost -= CATCH_RESERVED_COST;
-            assigned_eval_cost -= CATCH_RESERVED_COST;
-            break;
-
-                      /* --- esc breakn_continue <num> <offset> ---*/
-        XCASE(F_BREAKN_CONTINUE);
-            /* Implement the 'continue;' statement from within
-             * a nested surrounding structure.
-             *
-             * Pop <num>+1 (uint8) break-levels from the break stack
-             * and jump by (16-Bit) short <offset> bytes, counted from the
-             * first by of <offset>
-             */
-
-            break_sp +=
-              LOAD_UINT8(pc) * (sizeof(svalue_t)/sizeof(*break_sp));
-            /* FALLTHROUGH */
-
-                             /* --- esc break_continue <offset> ---*/
-        XCASE(F_BREAK_CONTINUE);
-        {
-            /* Implement the 'continue;' statement for the immediate
-             * surrounding structure.
-             *
-             * Pop one break-level from the break stack and jump
-             * by (16-Bit) unsigned short <offset> bytes, counted from the
-             * first by of <offset>
-             *
-             * Pitfall: the offset is added to the current pc in 16-Bit
-             * unsigned arithmetic, allowing to jump backwards using big
-             * enough values.
-             *
-             * TODO: Make that a proper signed short.
-             */
-
-            /* TODO: uint16 */ unsigned short offset;
-
-            break_sp += sizeof(svalue_t)/sizeof(*break_sp);
-            GET_SHORT(offset, pc);
-            offset += pc - current_prog->program;
-            pc = current_prog->program + offset;
-            break;
-        }
-
-                      /* --- esc push_protected_indexed_lvalue --- */
-        XCASE(F_PUSH_PROTECTED_INDEXED_LVALUE);
-            /* Op. (vector  v=sp[-1], int   i=sp[0])
-             * Op. (mapping v=sp[-1], mixed i=sp[0])
-             *
-             * Compute the lvalue &(v[i]), store it in a struct
-             * protected_lvalue, and push the protector as PROTECTED_LVALUE
-             * into the stack.
-             */
-
-            sp = push_protected_indexed_lvalue(sp, pc);
-            break;
-
-                     /* --- esc push_protected_rindexed_lvalue --- */
-        XCASE(F_PUSH_PROTECTED_RINDEXED_LVALUE);
-            /* Op. (vector v=sp[-1], int i=sp[0])
-             *
-             * Compute the lvalue &(v[<i]), store it in a struct
-             * protected_lvalue, and push the protector as PROTECTED_LVALUE
-             * into the stack.
-             */
-
-            sp = push_protected_rindexed_lvalue(sp, pc);
-            break;
-
-                  /* --- esc push_protected_indexed_map_lvalue --- */
-        XCASE(F_PUSH_PROTECTED_INDEXED_MAP_LVALUE);
-            /* Op. (mapping m=sp[-2], mixed i=sp[-1], int   j=sp[0])
-             *
-             * Compute the lvalue &(m[i:j]), store it in a struct
-             * protected_lvalue, and push the protector as PROTECTED_LVALUE
-             * into the stack.
-             */
-
-            push_protected_indexed_map_lvalue(sp, pc);
-            break;
-
-                             /* --- esc protected_index_lvalue --- */
-        XCASE(F_PROTECTED_INDEX_LVALUE);
-            /* Operator (string|vector &v=sp[0], int   i=sp[-1])
-             *          (mapping       &v=sp[0], mixed i=sp[-1])
-             *
-             * Compute the index &(*v[i]) of lvalue <v>, wrap it into a
-             * protector, and push the reference to the protector as
-             * PROTECTED_LVALUE onto the stack.
-             *
-             * If <v> is a protected non-string-lvalue, the protected_lvalue
-             * referenced by <v>.u.lvalue will be deallocated, and the
-             * protector itself will be stored in <last_indexing_protector>
-             * for the time being.
-             *
-             * If <v> is a string-lvalue, it is made a malloced string if
-             * necessary.
-             */
-
-            sp = protected_index_lvalue(sp, pc);
-            break;
-
-                            /* --- esc protected_rindex_lvalue --- */
-        XCASE(F_PROTECTED_RINDEX_LVALUE);
-            /* Operator (string|vector &v=sp[0], int   i=sp[-1])
-             *
-             * Compute the index &(*v[<i]) of lvalue <v>, wrap it into a
-             * protector, and push the reference to the protector as
-             * PROTECTED_LVALUE onto the stack.
-             *
-             * If <v> is a protected non-string-lvalue, the protected_lvalue
-             * referenced by <v>.u.lvalue will be deallocated, and the
-             * protector itself will be stored in <last_indexing_protector>
-             * for the time being.
-             *
-             * If <v> is a string-lvalue, it is made a malloced string if
-             * necessary.
-             */
-
-            sp = protected_rindex_lvalue(sp, pc);
-            break;
-
-                              /* --- esc protected_range_lvalue --- */
-        XCASE(F_PROTECTED_RANGE_LVALUE);
-            /* X-Op (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
-             *
-             * Compute the range &(v[i1..i2]) of lvalue <v>, wrap it into a
-             * protector, and push the reference to the protector onto the
-             * stack.
-             *
-             * If <v> is a protected lvalue itself, its protecting svalue will
-             * be used in the result protector.
-             *
-             * If <v> is a string-lvalue, it is made a malloced string if
-             * necessary.
-             */
-
-            inter_pc = pc;
-            sp = protected_range_lvalue(0x000, sp);
-            break;
-
-                           /* --- esc protected_nr_range_lvalue --- */
-        XCASE(F_PROTECTED_NR_RANGE_LVALUE);
-            /* X-Op (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
-             *
-             * Compute the range &(v[i1..<i2]) of lvalue <v>, wrap it into a
-             * protector, and push the reference to the protector onto the
-             * stack.
-             *
-             * If <v> is a protected lvalue itself, its protecting svalue will
-             * be used in the result protector.
-             *
-             * If <v> is a string-lvalue, it is made a malloced string if
-             * necessary.
-             */
-
-            inter_pc = pc;
-            sp = protected_range_lvalue(0x001, sp);
-            break;
-
-                           /* --- esc protected_rn_range_lvalue --- */
-        XCASE(F_PROTECTED_RN_RANGE_LVALUE);
-            /* X-Op (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
-             *
-             * Compute the range &(v[<i1..i2]) of lvalue <v>, wrap it into a
-             * protector, and push the reference to the protector onto the
-             * stack.
-             *
-             * If <v> is a protected lvalue itself, its protecting svalue will
-             * be used in the result protector.
-             *
-             * If <v> is a string-lvalue, it is made a malloced string if
-             * necessary.
-             */
-
-            inter_pc = pc;
-            sp = protected_range_lvalue(0x100, sp);
-            break;
-
-                           /* --- esc protected_rr_range_lvalue --- */
-        XCASE(F_PROTECTED_RR_RANGE_LVALUE);
-            /* X-Op (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
-             *
-             * Compute the range &(v[<i1..<i2]) of lvalue <v>, wrap it into a
-             * protector, and push the reference to the protector onto the
-             * stack.
-             *
-             * If <v> is a protected lvalue itself, its protecting svalue will
-             * be used in the result protector.
-             *
-             * If <v> is a string-lvalue, it is made a malloced string if
-             * necessary.
-             */
-
-            inter_pc = pc;
-            sp = protected_range_lvalue(0x101, sp);
-            break;
-
-                           /* --- esc protected_nx_range_lvalue --- */
-        XCASE(F_PROTECTED_NX_RANGE_LVALUE);
-            /* X-Op (string|vector &v=sp[0], i1=sp[-1])
-             *
-             * Compute the range &(v[i1..]) of lvalue <v>, wrap it into a
-             * protector, and push the reference to the protector onto the
-             * stack.
-             *
-             * If <v> is a protected lvalue itself, its protecting svalue will
-             * be used in the result protector.
-             *
-             * If <v> is a string-lvalue, it is made a malloced string if
-             * necessary.
-             *
-             * We implement it by pushing '1' onto the stack and then
-             * calling protected_nr_range_lvalue, effectively computing
-             * &(v[i1..<1]).
-             */
-
-            inter_pc = pc;
-            sp++;
-            sp[0] = sp[-1];       /* Pull up the 'v' */
-            put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-            sp = protected_range_lvalue(0x001, sp);
-            break;
-
-                           /* --- esc protected_rx_range_lvalue --- */
-        XCASE(F_PROTECTED_RX_RANGE_LVALUE);
-            /* X-Op (string|vector &v=sp[0], int i1=sp[-1])
-             *
-             * Compute the range &(v[<i1..]) of lvalue <v>, wrap it into a
-             * protector, and push the reference to the protector onto the
-             * stack.
-             *
-             * If <v> is a protected lvalue itself, its protecting svalue will
-             * be used in the result protector.
-             *
-             * If <v> is a string-lvalue, it is made a malloced string if
-             * necessary.
-             *
-             * We implement it by pushing '1' onto the stack and then
-             * calling protected_nr_range_lvalue, effectively computing
-             * &(v[i1..<1]).
-             */
-
-            inter_pc = pc;
-            sp++;
-            sp[0] = sp[-1];       /* Pull up the 'v' */
-            put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-            sp = protected_range_lvalue(0x101, sp);
-            break;
-
-        XCASE(F_UNDEF);             /* --- esc undef           --- */
-          {
-            /* Catch-all instructions for declared but not implemented
-             * (defined) functions. Usually used by the compiler to
-             * handle prototypes (in that case it is the first and only
-             * instruction of the generated stub), it is also inserted
-             * into closures when the object the closure is bound to
-             * is destructed.
-             * Note: this instruction MUST be the first in the function.
-             */
-
-            char *name;
-
-            /* pc has already been incremented */
-            if (pc > current_prog->program && pc <= PROGRAM_END(*current_prog))
-            {
-                /* Copy the function name pointer into name.
-                 */
-                memcpy(&name, FUNCTION_NAMEP(FUNCTION_FROM_CODE(pc-2)), sizeof name);
-            }
-            else
-            {
-            	/* It is a vanished closure */
-                name = "Object the closure was bound to has been destructed";
-                /* TODO: WHich object? This can also happen as result of
-                 * TODO:: a replace_program */
-            }
-            ERRORF(("Undefined function: %s\n", name))
-          }
-
-        /* --- XEfuns: Miscellaneous --- */
-
-        XCASE(F_ABS);               /* --- esc abs             --- */
-        {
-            /* XEFUN abs()
-             *
-             *  int   abs (int arg)
-             *  float abs (float arg)
-             *
-             * Returns the absolute value of the argument <arg>.
-             */
-
-            switch(sp->type)
-            {
-            default:
-                goto xbad_arg_1;
-
-            case T_NUMBER:
-                if (sp->u.number < 0)
-                    sp->u.number = - sp->u.number;
-                break;
-
-            case T_FLOAT:
-              {
-                STORE_DOUBLE_USED
-                double x;
-
-                x = READ_DOUBLE(sp);
-                if (x < 0.0)
-                    STORE_DOUBLE(sp, -(x));
-                break;
-              }
-            }
-            break;
-        }
-
-        XCASE(F_SIN);               /* --- esc sin             --- */
-          {
-            /* XEFUN sin()
-             *
-             *  float sin(float)
-             *
-             * Returns the sinus of the argument.
-             */
-
-            STORE_DOUBLE_USED
-            double d;
-
-            if (sp->type != T_FLOAT) goto xbad_arg_1;
-            d = sin(READ_DOUBLE(sp));
-            STORE_DOUBLE(sp, d);
-            break;
-          }
-
-        XCASE(F_ASIN);              /* --- esc asin            --- */
-          {
-            /* XEFUN asin()
-             *
-             *  float asin(float)
-             *
-             * Returns the inverse sinus of the argument.
-             */
-
-            STORE_DOUBLE_USED
-            double d;
-
-            if (sp->type != T_FLOAT || (d = READ_DOUBLE(sp)) < -1. || d > 1. )
-                goto xbad_arg_1;
-            d = asin(d);
-            STORE_DOUBLE(sp, d);
-            break;
-          }
-
-        XCASE(F_COS);               /* --- esc cos             --- */
-          {
-            /* XEFUN cos()
-             *
-             *  float cos(float)
-             *
-             * Returns the cosinus of the argument.
-             */
-
-            STORE_DOUBLE_USED
-            double d;
-
-            if (sp->type != T_FLOAT) goto xbad_arg_1;
-            d = cos(READ_DOUBLE(sp));
-            STORE_DOUBLE(sp, d);
-            break;
-          }
-
-        XCASE(F_ACOS);              /* --- esc acos            --- */
-          {
-            /* XEFUN acos()
-             *
-             *  float acos(float)
-             *
-             * Returns the inverse cosinus of the argument.
-             */
-
-            STORE_DOUBLE_USED
-            double d;
-
-            if (sp->type != T_FLOAT || (d = READ_DOUBLE(sp)) < -1. || d > 1. )
-                goto xbad_arg_1;
-            d = acos(d);
-            STORE_DOUBLE(sp, d);
-            break;
-          }
-
-        XCASE(F_TAN);               /* --- esc tan             --- */
-          {
-            /* XEFUN tan()
-             *
-             *  float tan(float)
-             *
-             * Returns the tangens of the argument.
-             */
-
-            STORE_DOUBLE_USED
-            double d;
-
-            if (sp->type != T_FLOAT) goto xbad_arg_1;
-            d = tan(READ_DOUBLE(sp));
-            STORE_DOUBLE(sp, d);
-            break;
-          }
-
-        XCASE(F_ATAN);              /* --- esc atan            --- */
-          {
-            /* XEFUN atan()
-             *
-             *   float atan(float)
-             *
-             * Returns the inverse tangens of the argument.
-             */
-
-            STORE_DOUBLE_USED
-            double d;
-
-            if (sp->type != T_FLOAT) goto xbad_arg_1;
-            d = atan(READ_DOUBLE(sp));
-            STORE_DOUBLE(sp, d);
-            break;
-          }
-
-        XCASE(F_ATAN2);             /* --- esc atan2           --- */
-          {
-            /* XEFUN atan()
-             *
-             *   float atan(float y, float x)
-             *
-             * Returns the inverse tangens of the argument.
-             */
-
-            STORE_DOUBLE_USED
-            double x, y, d;
-
-            if (sp->type != T_FLOAT) goto xbad_arg_2;
-            if (sp[-1].type != T_FLOAT) goto xbad_arg_1;
-            y = READ_DOUBLE(sp-1);
-            x = READ_DOUBLE(sp);
-            d = atan2(y, x);
-            pop_stack();
-            STORE_DOUBLE(sp, d);
-            break;
-          }
-
-        XCASE(F_LOG);               /* --- esc log             --- */
-          {
-            /* XEFUN log()
-             *
-             *   float log(float)
-             *
-             * Returns the natural logarithmus of the argument.
-             */
-
-            STORE_DOUBLE_USED
-            double d;
-
-            if (sp->type != T_FLOAT || (d = READ_DOUBLE(sp)) <= 0.)
-                goto xbad_arg_1;
-            d = log(d);
-            STORE_DOUBLE(sp, d);
-            break;
-          }
-
-        XCASE(F_EXP);               /* --- esc exp             --- */
-          {
-            /* XEFUN exp()
-             *
-             *   float exp(float)
-             *
-             * Returns the e to the power of the argument.
-             */
-
-            STORE_DOUBLE_USED
-            double d;
-
-            if (sp->type != T_FLOAT) goto xbad_arg_1;
-            d = exp(READ_DOUBLE(sp));
-            STORE_DOUBLE(sp, d);
-            break;
-          }
-
-        XCASE(F_SQRT);              /* --- esc sqrt            --- */
-          {
-            /* XEFUN sqrt()
-             *
-             *   float sqrt(float)
-             *
-             * Returns the square root of the argument.
-             */
-
-            STORE_DOUBLE_USED
-            double d;
-
-            if (sp->type != T_FLOAT || (d = READ_DOUBLE(sp)) < 0.)
-                goto xbad_arg_1;
-            d = sqrt(d);
-            STORE_DOUBLE(sp, d);
-            break;
-          }
-
-        XCASE(F_CEIL);              /* --- esc ceil            --- */
-          {
-            /* XEFUN ceil()
-             *
-             *   float ceil(float)
-             *
-             * Returns the smallest whole number which is still bigger
-             * than the argument.
-             */
-
-            STORE_DOUBLE_USED
-            double d;
-
-            if (sp->type != T_FLOAT)
-                goto xbad_arg_1;
-            d = ceil(READ_DOUBLE(sp));
-            STORE_DOUBLE(sp, d);
-            break;
-          }
-
-        XCASE(F_FLOOR);             /* --- esc floor           --- */
-          {
-            /* XEFUN floor()
-             *
-             *   float floor(float)
-             *
-             * Returns the biggest whole number which is not larger
-             * than the argument.
-             */
-
-            STORE_DOUBLE_USED
-            double d;
-
-            if (sp->type != T_FLOAT)
-                goto xbad_arg_1;
-            d = floor(READ_DOUBLE(sp));
-            STORE_DOUBLE(sp, d);
-            break;
-          }
-
-        XCASE(F_POW);               /* --- esc pow             --- */
-          {
-            /* XEFUN pow()
-             *
-             *   float pow(float x, float y)
-             *
-             * Returns x to the power of y.
-             */
-
-            STORE_DOUBLE_USED
-            double x, y, d;
-
-            if (sp[-1].type != T_FLOAT)
-                goto xbad_arg_1;
-            if (sp->type != T_FLOAT)
-                goto xbad_arg_2;
-            x = READ_DOUBLE(sp-1);
-            y = READ_DOUBLE(sp);
-            if (x == 0. && y < 0.)
-                ERROR("Can't raise 0 to negative powers.\n")
-            if (x < 0.  && y != (double)((long)y))
-                ERROR("Can't raise negative number to fractional powers.\n")
-            d = pow(x, y);
-            pop_stack();
-            STORE_DOUBLE(sp, d);
-            break;
-          }
-
-        XCASE(F_GET_TYPE_INFO);     /* --- esc get_type_info   --- */
-          {
-            /* XEFUN get_type_info()
-             *
-             *   mixed get_type_info(mixed arg, int flag)
-             *
-             * Returns info about the type of arg, as controlled by the flag.
-             *
-             * If the optional argument flag is not a number, an array is
-             * returned, whose first element is an integer denoting the data
-             * type, as defined in <lpctypes.h>. The second entry can contain
-             * additional information about arg.
-             * If flag is the number 0, only the first element of that array
-             * (i.e. the data type) is returned (as int). If flag is 1, the
-             * second element is returned.
-             * If <arg> is a closure, the <flag> setting 2 lets the efun
-             * return the object the closure is bound to.
-             * For every other <flag> setting, -1 is returned.
-             *
-             * The secondary information is:
-             *   - for mappings the width, ie the number of data items per key.
-             *   - for closures, symbols and quoted arrays the number of quotes.
-             *   - for strings 0 for shared strings, and non-0 for others.
-             *   - -1 for all other datatypes.
-             *
-             * TODO: The flags should be defined in an include file.
-             * TODO: The array returned for closures should contain all
-             * TODO:: three items.
-             */
-
-            mp_int i, j;
-
-            i = sp[-1].type;
-
-            /* Determine the second return value */
-            switch(i)
-            {
-            default:
-                j = -1;
-                break;
-            case T_STRING:
-                j = (sp[-1].x.string_type == STRING_SHARED) ? 0 : 1;
-                break;
-            case T_MAPPING:
-                j = sp[-1].u.map->num_values;
-                break;
-            case T_CLOSURE:
-                if ( sp->type == T_NUMBER && sp->u.number == 2)
-                {
-                    object_t *ob;
-
-                    sp--;
-                    switch(sp->x.closure_type)
-                    {
-                    default:
-                        ob = NULL;
-                        break;
-                    case CLOSURE_LFUN:
-                    case CLOSURE_IDENTIFIER:
-                    case CLOSURE_BOUND_LAMBDA:
-                    case CLOSURE_LAMBDA:
-                        ob = sp->u.lambda->ob;
-                        break;
-                    case CLOSURE_ALIEN_LFUN:
-                        ob = sp->u.lambda->function.alien.ob;
-                        break;
-                    }
-                    free_closure(sp);
-                    if (!ob || ob->flags & O_DESTRUCTED)
-                        put_number(sp, 0);
-                    else
-                        put_ref_object(sp, ob, "get_type_info");
-                    goto again;
-                    /* NOTREACHED */
-                }
-            case T_SYMBOL:
-            case T_QUOTED_ARRAY:
-                j = sp[-1].x.generic;
-                break;
-            }
-
-            /* Depending on flag, return the proper value */
-            if (sp->type == T_NUMBER)
-            {
-                free_svalue(--sp);
-                if (sp[1].u.number != 1)
-                {
-                    if (sp[1].u.number)
-                        j = -1;
-                    else
-                        j = i;
-                }
-                put_number(sp, j);
-            }
-            else
-            {
-                vector_t *v;
-
-                inter_sp = sp;
-                inter_pc = pc;
-                v = allocate_array(2);
-                v->item[0].u.number = i;
-                v->item[1].u.number = j;
-                free_svalue(sp);
-                free_svalue(--sp);
-                put_array(sp,v);
-            }
-
-            break;
-          }
-
-        XCASE(F_RAISE_ERROR);       /* --- esc raise_error     --- */
-          {
-            /* XEFUN raise_error()
-             *
-             *   void raise_error(string arg)
-             *
-             * Abort execution. If the current program execution was initiated
-             * by catch(), that catch expression will return arg as error
-             * code, else the arg will printed as error message. This
-             * is very similar to throw(), but while throw() is intended to be
-             * called inside catch(), raise_error() can be called
-             * anywhere.
-             */
-
-            if (sp->type != T_STRING)
-                goto xbad_arg_1;
-            ERRORF(("%s", sp->u.string));
-          }
-
-        XCASE(F_REFERENCEP);        /* --- esc referencep      --- */
-          {
-            /* XEFUN referencep()
-             *
-             *   int referencep(mixed arg)
-             *
-             * Returns true if arg was passed by reference to the current
-             * function, instead of the usual call-by-value.
-             */
-
-            int i;
-
-            if (sp->type != T_LVALUE)
-                goto xbad_arg_1;
-            i = sp->u.lvalue->type == T_LVALUE;
-            free_svalue(sp);
-            put_number(sp, i);
-            break;
-          }
-
-        XCASE(F_TYPEOF);            /* --- esc typeof          --- */
-          {
-            /* XEFUN typeof()
-             *
-             *   int typeof(mixed)
-             *
-             * Returns a code for the type of the argument, as defined in
-             * <sys/lpctypes.h>
-             */
-
-            mp_int i = sp->type;
-            free_svalue(sp);
-            put_number(sp, i);
-            break;
-          }
-
-        XCASE(F_TO_INT);            /* --- esc to_int          --- */
-          {
-            /* EFUN to_int()
-             *
-             *   int to_int(string)
-             *   int to_int(float)
-             *   int to_int(int)
-             *   int to_int(closure)
-             *
-             * Floats are truncated to integer values, strings with leadings
-             * digits are converted to integers up to the first non-digit.
-             * variable-closures are converted into their function index.
-             * Integers are just returned.
-             */
-
-            int n;
-
-            switch(sp->type)
-            {
-            default:
-                goto xbad_arg_1;
-
-            case T_FLOAT:
-                n = (long)READ_DOUBLE(sp);
-                break;
-
-            case T_STRING:
-                n = atol(sp->u.string);
-                /* TODO: make this strtol() */
-                free_string_svalue(sp);
-                break;
-
-            case T_CLOSURE:
-                if (sp->x.closure_type != CLOSURE_IDENTIFIER)
-                    goto xbad_arg_1;
-                n = sp->u.lambda->function.index;
-                free_closure(sp);
-                break;
-
-            case T_NUMBER:
-                n = sp->u.number;
-                break;
-            }
-            put_number(sp, n);
-            break;
-          }
-
-        XCASE(F_TO_FLOAT);          /* --- esc to_float           --- */
-          {
-            /* EFUN to_float()
-             *
-             *   float to_float(int)
-             *   float to_float(string)
-             *   float to_float(float)
-             *
-             * Ints are expanded to floats, strings are converted up to the
-             * first character that doesnt belong into a float.
-             * Floats are just returned.
-             */
-
-            STORE_DOUBLE_USED
-            double d;
-
-            d = 0.0;
-            switch(sp->type)
-            {
-            default:
-                goto xbad_arg_1;
-
-            case T_NUMBER:
-                d = (double)sp->u.number;
-                break;
-
-            case T_FLOAT:
-                NOOP;
-                break;
-
-            case T_STRING:
-                d = atof(sp->u.string);
-                /* TODO: make this strtof() or so */
-                free_string_svalue(sp);
-                break;
-            }
-
-            if (sp->type != T_FLOAT)
-            {
-                sp->type = T_FLOAT;
-                STORE_DOUBLE(sp, d);
-            }
-            break;
-          }
-
-        XCASE(F_TO_STRING);         /* --- esc to_string       --- */
-          {
-            /* XEFUN to_string()
-             *
-             *   string to_string(mixed)
-             *
-             * The argument is converted to a string. Works with int, float,
-             * object, arrays (to convert an array of int back into a string),
-             * symbols, strings, and closures.
-             *
-             * Converts variable/lfun closure to the appropriate names.
-             */
-
-            char buf[1024], *s;
-
-            s = NULL;
-            buf[sizeof(buf)-1] = '\0';
-            switch(sp->type)
-            {
-            default:
-                goto xbad_arg_1;
-
-            case T_NUMBER:
-                sprintf(buf,"%ld", sp->u.number);
-                if (buf[sizeof(buf)-1] != '\0')
-                    FATAL("Buffer overflow in F_TO_STRING: "
-                          "int number too big.\n")
-                s = string_copy(buf);
-                break;
-
-            case T_FLOAT:
-                sprintf(buf,"%g", READ_DOUBLE(sp));
-                if (buf[sizeof(buf)-1] != '\0')
-                    FATAL("Buffer overflow in F_TO_STRING: "
-                          "int number too big.\n")
-                s = string_copy(buf);
-                break;
-
-            case T_OBJECT:
-#ifndef COMPAT_MODE
-                s = add_slash(sp->u.ob->name);
-#else
-                s = string_copy(sp->u.ob->name);
-#endif
-                if (!s)
-                    ERROR("Out of memory\n")
-                free_object_svalue(sp);
-                break;
-
-            case T_POINTER:
-              {
-                /* Arrays of ints are considered exploded strings and
-                 * converted back accordingly, ie. up to the first 0
-                 * or the first non-int.
-                 */
-
-                long size;
-                svalue_t *svp;
-                char c, *d;
-
-                size = (long)VEC_SIZE(sp->u.vec) + 1;
-                svp = sp->u.vec->item;
-                d = s = xalloc((size_t)size);
-                for (;;)
-                {
-                    if (!--size)
-                    {
-                        *d++ = '\0';
-                        break;
-                    }
-                    if (svp->type != T_NUMBER || !(c = (char)svp->u.number) )
-                    {
-                        *d++ = '\0';
-                        d = string_copy(s);
-                        xfree(s);
-                        s = d;
-                        break;
-                    }
-                    *d++ = c;
-                    svp++;
-                }
-                free_array(sp->u.vec);
-                break;
-              }
-
-            case T_CLOSURE:
-              {
-                /* Convert the various types of closures into a string */
-
-                lambda_t *l = sp->u.lambda;
-                object_t *ob;
-                int ix;
-
-                switch(sp->x.closure_type)
-                {
-
-                case CLOSURE_IDENTIFIER: /* Variable Closure */
-                  {
-                    /* We need the program resident */
-                    if (O_PROG_SWAPPED(l->ob))
-                    {
-                        l->ob->time_of_ref = current_time;
-                        if (load_ob_from_swap(l->ob) < 0)
-                            ERROR("Out of memory.\n");
-                    }
-
-                    if (l->function.index != VANISHED_VARCLOSURE_INDEX)
-                    {
-                        /* Get the variable name */
-                        put_ref_string(sp
-                         , l->ob->prog->variable_names[l->function.index].name
-                        );
-                    }
-                    else
-                    {
-                        /* Variable vanished in a replace_program() */
-                        put_volatile_string(sp, "dangling var closure");
-                    }
-                    break;
-                  }
-
-                case CLOSURE_LFUN: /* Lfun closure */
-                case CLOSURE_ALIEN_LFUN:
-                  {
-                    program_t *prog;
-                    fun_hdr_p fun;
-                    funflag_t flags;
-                    char *function_name;
-                    inherit_t *inheritp;
-
-                    if (sp->x.closure_type == CLOSURE_LFUN)
-                    {
-                        ob = l->ob;
-                        ix = l->function.index;
-                    }
-                    else
-                    {
-                        ob = l->function.alien.ob;
-                        ix = l->function.alien.index;
-                        /* TODO: ix: After a replace_program, can this index
-                         * TODO:: be negative?
-                         */
-                    }
-
-                    /* Get the program resident */
-                    if (O_PROG_SWAPPED(ob)) {
-                        ob->time_of_ref = current_time;
-                        if (load_ob_from_swap(ob) < 0)
-                            ERROR("Out of memory\n");
-                    }
-
-                    /* Find the true definition of the function */
-                    prog = ob->prog;
-                    flags = prog->functions[ix];
-                    while (flags & NAME_INHERITED)
-                    {
-                        inheritp = &prog->inherit[flags & INHERIT_MASK];
-                        ix -= inheritp->function_index_offset;
-                        prog = inheritp->prog;
-                        flags = prog->functions[ix];
-                    }
-
-                    /* Copy the function name pointer (a shared string) */
-                    fun = prog->program + (flags & FUNSTART_MASK);
-                    memcpy(&function_name, FUNCTION_NAMEP(fun)
-                          , sizeof function_name
-                    );
-                    put_ref_string(sp, function_name);
-                    break;
-                  }
-
-                case CLOSURE_UNBOUND_LAMBDA: /* Unbound-Lambda Closure */
-                case CLOSURE_PRELIMINARY:    /* Preliminary Lambda Closure */
-                  {
-                      char *rc;
-
-                      if (sp->x.closure_type == CLOSURE_PRELIMINARY)
-                          sprintf(buf, "<prelim lambda 0x%p>", l);
-                      else
-                          sprintf(buf, "<free lambda 0x%p>", l);
-                      rc = string_copy(buf);
-                      put_malloced_string(sp, rc);
-                      break;
-                  }
-
-                case CLOSURE_LAMBDA:         /* Lambda Closure */
-                case CLOSURE_BOUND_LAMBDA:   /* Bound-Lambda Closure */
-                  {
-                      char     *rc;
-
-                      if (sp->x.closure_type == CLOSURE_BOUND_LAMBDA)
-                          sprintf(buf, "<bound lambda 0x%p:", l);
-                      else
-                          sprintf(buf, "<lambda 0x%p:", l);
-
-                      ob = l->ob;
-
-                      if (!ob)
-                      {
-                          strcat(buf, "{null}>");
-                          rc = string_copy(buf);
-                      }
-                      else
-                      {
-                          if (ob->flags & O_DESTRUCTED)
-                              strcat(buf, "{dest}");
-                          xallocate(rc, strlen(buf)+strlen(ob->name)+3
-                                   , "string-repr of lambda closure");
-                          strcat(buf, "/");
-                          strcpy(rc, buf);
-                          strcat(rc, ob->name);
-                          strcat(rc, ">");
-                      }
-
-                      put_malloced_string(sp, rc);
-                      break;
-                  }
-
-                default:
-                    goto xbad_arg_1;
-                }
-                break;
-              }
-
-            case T_SYMBOL:
-              {
-                /* Easy: the symbol value is a string */
-                sp->type = T_STRING;
-                sp->x.string_type = STRING_SHARED;
-                break;
-              }
-
-            case T_STRING:
-                break;
-            }
-
-            if (sp->type != T_STRING)
-                put_malloced_string(sp, s);
-            break;
-          }
-
-        XCASE(F_TO_ARRAY);          /* --- esc to_array        --- */
-          {
-            /* XEFUN to_array()
-             *
-             *   mixed *to_array(string)
-             *   mixed *to_array(symbol)
-             *   mixed *to_array(quotedarray)
-             *   mixed *to_array(mixed *)
-             *
-             * Strings and symbols are converted to an int array that
-             * consists of the args characters, with 0 == '\0' as last
-             * character stored.
-             * Quoted arrays are ``dequoted'', and arrays are left as they
-             * are.
-             */
-
-            vector_t *v;
-            char *s, ch;
-            svalue_t *svp;
-
-            if (sp->type == T_STRING || sp->type == T_SYMBOL)
-            {
-                /* Split the string into an array of ints */
-
-                inter_sp = sp;
-                inter_pc = pc;
-                v = allocate_uninit_array((mp_int)svalue_strlen(sp) + 1);
-                s = sp->u.string;
-                svp = v->item;
-                do {
-                    ch = *s++;
-                    put_number(svp, ch);
-                    svp++;
-                } while (ch);
-                free_string_svalue(sp);
-                put_array(sp, v);
-                break;
-            }
-            else if (sp->type == T_QUOTED_ARRAY)
-            {
-                /* Unquote it fully */
-                sp->type = T_POINTER;
-                break;
-            }
-            else if (sp->type == T_POINTER)
-            {
-                /* Good as it is */
-                break;
-            }
-            else
-                goto xbad_arg_1;
-            break;
-          }
-
-        /* --- XEfuns: Strings --- */
-
-        XCASE(F_STRSTR);            /* --- esc strstr          --- */
-          {
-            /* XEFUN strstr()
-             *
-             *   int strstr (string str, string str2, int pos)
-             *
-             * Returns the index of str2 in str searching from position pos.
-             * If str2 is not found in str, -1 is returned. The returned
-             * index is relativ to the beginning of the string.
-             *
-             * If pos is negativ, it counts from the end of the string.
-             */
-
-            char *p1, *p2;
-            int offs;
-
-            if (sp[-2].type != T_STRING) goto xbad_arg_1;
-            if (sp[-1].type != T_STRING) goto xbad_arg_2;
-            if (sp[ 0].type != T_NUMBER) goto xbad_arg_3;
-
-            p1 = sp[-2].u.string;
-            if ( 0 != (offs = sp->u.number) )
-            {
-                /* Set p1 to the offset */
-
-                if (offs < 0)
-                {
-                    offs += svalue_strlen(sp-2);
-                    if (offs < 0)
-                        offs = 0;
-                }
-
-                /* The loop is necessary because the allocated
-                 * length might not be the real length.
-                 * TODO: Lars sighs deeply.
-                 */
-                if (offs)
-                {
-                    do {
-                        if (!*p1++)
-                        {
-                            p1--;
-                            break;
-                        }
-                    } while (--offs);
-                }
-            }
-
-            /* Now do the search starting at p1 */
-            p2 = strstr(p1, sp[-1].u.string);
-            p1 = sp[-2].u.string;
-            sp--;
-            pop_stack();
-            free_string_svalue(sp);
-            put_number(sp, p2 ? (p2 - p1) : -1);
-            break;
-          }
-
-        /* --- XEfuns: Arrays and Mappings --- */
-
-        XCASE(F_M_ALLOCATE);        /* --- esc m_allocate      --- */
-          {
-            /* XEFUN m_allocate()
-             *
-             *   mapping m_allocate(int size, int width)
-             *
-             * Reserve memory for a mapping.
-             *
-             * size is the number of entries (i.e. keys) to reserve, width is
-             * the number of data items per entry. If the optional width is
-             * omitted, 1 is used as default.
-             */
-
-            if ( sp[-1].type != T_NUMBER || sp[-1].u.number < 0)
-                goto xbad_arg_1;
-            if ( sp->type != T_NUMBER || sp->u.number < 0)
-                goto xbad_arg_2;
-            sp--;
-
-            if (max_mapping_size && sp->u.number > max_mapping_size)
-                ERRORF(("Illegal mapping size: %ld\n", sp->u.number));
-
-            if (!(sp->u.map = allocate_mapping(sp->u.number, sp[1].u.number)))
-            {
-                sp++;
-                /* sp points to a number-typed svalue, so freeing won't
-                 * be a problem.
-                 */
-                ERROR("Out of memory\n")
-            }
-            sp->type = T_MAPPING;
-            break;
-          }
-
-        XCASE(F_M_CONTAINS);     /* --- esc m_contains <nargs> --- */
-          {
-            /* XEFUN m_contains()
-             *
-             *   int m_contains(mixed &data1, ..., &dataN, map, key)
-             *
-             * If the mapping contains the key map, the corresponding values
-             * are assigned to the data arguments, which massed be passed by
-             * reference, and 1 is returned. If key is not in map, 0 is
-             * returned and the data args are left unchanged.
-             * It is possible to use this function for a 0-value mapping, in
-             * which case it has the same effect as member(E).
-             */
-
-            svalue_t *item;
-            int i;
-
-            GET_NUM_ARG
-
-            /* Test the arguments */
-            for (i = -num_arg; ++i < -1; )
-                if (sp[i].type != T_LVALUE)
-                    bad_arg_pc(num_arg + i, code + 0x100, sp, pc);
-            if (sp[-1].type != T_MAPPING ||
-                sp[-1].u.map->num_values != num_arg -2)
-                    bad_arg_pc(num_arg + i, code + 0x100, sp, pc);
-
-            item = get_map_value(sp[-1].u.map, sp);
-            if (item == &const0)
-            {
-                /* Not found */
-                pop_n_elems(num_arg-1);
-                free_svalue(sp);
-                put_number(sp, 0);
-                break;
-            }
-
-            free_svalue(sp--); /* free key */
-
-            /* Copy the elements */
-            for (i = -num_arg + 1; ++i < 0; )
-            {
-                /* get_map_lvalue() may return destructed objects. */
-                /* TODO: May this cause problems elsewhere, too? */
-                if (T_OBJECT == item->type
-                 && (O_DESTRUCTED & item->u.ob->flags))
-                {
-                    assign_svalue(sp[i].u.lvalue, &const0);
-                    item++;
-                }
-                else
-                    /* mapping must not have been freed yet */
-                    assign_svalue(sp[i].u.lvalue, item++);
-                free_svalue(&sp[i]);
-            }
-
-            free_svalue(sp--); /* free mapping */
-            sp += 3 - num_arg;
-            put_number(sp, 1);
-            break;
-          }
-
-        /* --- XEfuns: Functions and Closures --- */
-
-        XCASE(F_CALLER_STACK);      /* --- esc caller_stack    --- */
-          {
-            /* XEFUN caller_stack()
-             *
-             *   object *caller_stack()
-             *   object *caller_stack(int add_interactive)
-             *
-             * Returns an array of the previous_object()s who caused the
-             * call_other() to this_object().  previous_object(i) equals
-             * caller_stack()[i].
-
-             * If you pass the optional argument <add_interactive> (as true
-             * value), this_interactive() (or 0 if not existing) is appended
-             * to the array.
-             */
-
-            int depth, i;
-            Bool done;
-            struct control_stack *p;
-            vector_t *v;
-            svalue_t *svp;
-
-            TYPE_TEST1(sp, T_NUMBER)
-
-            /* Determine the depth of the call stack */
-            p = csp;
-            for (depth = 0, done = MY_FALSE; ; depth++)
-            {
-                do {
-                    if (p == control_stack)
-                    {
-                        done = MY_TRUE;
-                        break;
-                    }
-                } while ( !(--p)[1].extern_call );
-                if (done)
-                    break;
-            }
-
-            /* Allocate and fill in the result array */
-            v = allocate_uninit_array(depth + (sp->u.number ? 1 : 0));
-            p = csp;
-            for (i = 0, svp = v->item, done = MY_FALSE; i < depth; i++, svp++)
-            {
-                object_t *prev;
-                do {
-                    if (p == control_stack)
-                    {
-                        done = MY_TRUE;
-                        break;
-                    }
-                } while ( !(--p)[1].extern_call);
-
-                /* Break if end of stack */
-                if (done)
-                    break;
-
-                /* Get 'the' calling object */
-                if (p[1].extern_call & CS_PRETEND)
-                    prev = p[1].pretend_to_be;
-                else
-                    prev = p[1].ob;
-
-                /* Enter it into the array */
-                if (prev == NULL || prev->flags & O_DESTRUCTED)
-                    put_number(svp, 0);
-                else
-                    put_ref_object(svp, prev, "caller_stack");
-            }
-
-#ifdef DEBUG
-            if (i < depth)
-            {
-                error("Computed stack depth to %d, but found only %d objects\n"
-                     , depth, i);
-                /* NOTREACHED */
-                break;
-            }
-#endif
-
-            /* If so desired, add the interactive object */
-            if (sp->u.number)
-            {
-                if ( current_interactive
-                 && !(current_interactive->flags & O_DESTRUCTED))
-                {
-                    put_ref_object(svp, current_interactive, "caller_stack");
-                }
-                else
-                    put_number(svp, 0);
-            }
-
-            /* Assign the result and return */
-            put_array(sp, v);
-            break;
-          }
-
-        XCASE(F_CALLER_STACK_DEPTH);  /* esc caller_stack_depth --- */
-          {
-            /* XEFUN caller_stack_depth()
-             *
-             *   int caller_stack_depth(void)
-             *
-             * Returns the number of previous objects on the stack. This
-             * can be used for security checks.
-             */
-
-            int depth;
-            Bool done;
-            struct control_stack *p;
-
-            /* Determine the depth of the call stack */
-            p = csp;
-            for (depth = 0, done = MY_FALSE; ; depth++)
-            {
-                do {
-                    if (p == control_stack)
-                    {
-                        done = MY_TRUE;
-                        break;
-                    }
-                } while ( !(--p)[1].extern_call );
-                if (done)
-                    break;
-            }
-
-            push_number(depth);
-            break;
-          }
-
-        XCASE(F_CALL_RESOLVED);   /* --- esc call_resolved <nargs> --- */
-          {
-            /* XEFUN call_resolved()
-             *
-             *   int call_resolved(mixed & result, object ob, string func, ...)
-             *
-             * Similar to call_other(). If ob->func() is defined and publicly
-             * accessible, any of the optional extra arguments are passed to
-             * ob->func(...). The result of that function call is stored in
-             * result, which must be passed by reference.
-             *
-             * If the current object is already destructed, or the ob does not
-             * exist, or ob does not define a public accessible function named
-             * func, call_resolved() returns 0 as failure code, else 1 for
-             * success.
-             *
-             * ob can also be a file_name. If a string is passed for ob, and
-             * no object with that name does exist, an error occurs.
-             */
-
-            svalue_t *arg;
-            object_t *ob;
-
-            ASSIGN_EVAL_COST
-            GET_NUM_ARG
-            inter_pc = pc;
-            inter_sp = sp;
-            arg = sp - num_arg + 1;
-
-            /* Test the arguments */
-            if (arg[0].type != T_LVALUE)
-                goto xbad_arg_1;
-
-            if (arg[1].type == T_OBJECT)
-                ob = arg[1].u.ob;
-            else if (arg[1].type == T_STRING)
-            {
-                ob = get_object(arg[1].u.string);
-                if (!ob)
-                    ERROR("call_resolved() failed: can't get object.\n")
-            }
-            else
-                goto xbad_arg_2;
-
-            if (arg[2].type != T_STRING)
-                goto xbad_arg_3;
-
-            /* No external calls may be done when this object is
-             * destructed.
-             */
-            if (current_object->flags & O_DESTRUCTED)
-            {
-                pop_n_elems(num_arg);
-                push_number(0);
-                break;
-            }
-
-            /* Handle traceing. */
-            if (TRACEP(TRACE_CALL_OTHER))
-            {
-                if (!++traceing_recursion)
-                {
-                    inter_sp = sp;
-                    do_trace("Call other ", arg[1].u.string, "\n");
-                }
-                traceing_recursion--;
-            }
-
-            /* Send the remaining arguments to the function.
-             */
-            if (!apply_low(arg[2].u.string, ob, num_arg-3, MY_FALSE))
-            {
-                /* Function not found */
-                pop_n_elems(num_arg-1);
-                free_svalue(sp);
-                put_number(sp, 0);
-                break;
-            }
-
-            /* The result of the function call is on the stack. But, so
-             * is the function name and object that was called.
-             * These have to be removed.
-             */
-            sp = inter_sp;
-            transfer_svalue(arg, sp--);  /* Copy the function call result */
-            pop_n_elems(2);        /* Remove old arguments to call_solved */
-            free_svalue(sp);        /* Free the lvalue */
-            put_number(sp, 1);
-            break;
-          }
-
-        XCASE(F_EXTERN_CALL);       /* --- esc extern_call     --- */
-          {
-            /* XEFUN extern_call()
-             *
-             *   int extern_call();
-             *
-             * Returns zero, if the function that is currently being executed
-             * was called by a local call, non-zero for call_other(), driver
-             * applies, closure calls, etc. Currently the only return value
-             * for them is 1, but later the various methods may be
-             * distinguished by means of the return value.
-             */
-
-            push_number((csp->extern_call & ~CS_PRETEND) ? 1 : 0);
-            break;
-          }
-
-        XCASE(F_GET_EVAL_COST);     /* --- esc get_eval_cost   --- */
-          {
-            /* XEFUN get_eval_cost()
-             *
-             *   int get_eval_cost()
-             *
-             * Returns the remaining evaluation cost the current
-             * execution (the current command) may use up.
-             *
-             * It starts at a driver given high value (__MAX_EVAL_COST__) and
-             * is reduced with each executed statement.
-             */
-
-            push_number((max_eval_cost ? max_eval_cost : LONG_MAX) - eval_cost);
-            break;
-          }
-
-        XCASE(F_PREVIOUS_OBJECT);   /* --- esc previous_object --- */
-          {
-            /* XEFUN previous_object()
-             *
-             *   object previous_object(int i)
-             *
-             * Follow back the last <i> call_other()s and return the calling
-             * object (i.e. previous_object(2) returns the caller of the
-             * caller). It must hold 0 <= i < caller_stack_depth().
-             *
-             * There is an important special case: in functions called by the
-             * gamedriver in reaction to some external event (e.g. commands
-             * added by add_action), previous_object() will return
-             * this_object(), but previous_object(0) will return 0.
-             */
-
-            int i;
-            struct control_stack *p;
-            object_t *prev_ob;
-
-            /* Test the arguments */
-            if (sp->type != T_NUMBER)
-                goto xbad_arg_1;
-            i = sp->u.number;
-            if (i > MAX_TRACE) {
-                sp->u.number = 0;
-                break;
-            }
-
-            /* Set p back to the <i>th extern call */
-            p = csp;
-            do {
-                do {
-                    if (p == control_stack) {
-                        sp->u.number = 0;
-                        goto again;
-                    }
-                } while ( !(--p)[1].extern_call );
-            } while (--i >= 0);
-
-            /* Determine the object and push it */
-            if (p[1].extern_call & CS_PRETEND)
-                prev_ob = p[1].pretend_to_be;
-            else
-                prev_ob = p[1].ob;
-
-            if (!prev_ob || prev_ob->flags & O_DESTRUCTED)
-                sp->u.number = 0;
-            else
-                put_ref_object(sp, prev_ob, "previous_object");
-            break;
-          }
-
-        /* --- XEfuns: Objects --- */
-
-        XCASE(F_OBJECT_TIME);       /* --- esc object_time     --- */
-          {
-            /* XEFUN object_time()
-             *
-             *   int object_time()
-             *   int object_time(object ob)
-             *
-             * Returns the creation time of the object.
-             * Default is this_object(), if no arg is given.
-             */
-
-            mp_int load_time;
-
-            if (sp->type != T_OBJECT)
-                goto xbad_arg_1;
-
-            load_time = sp->u.ob->load_time;
-
-            free_object_svalue(sp);
-            put_number(sp, load_time);
-            break;
-          }
-
-        XCASE(F_PROGRAM_TIME);      /* --- esc program_time    --- */
-          {
-            /* XEFUN program_time()
-             *
-             *   int program_time()
-             *   int program_time(object ob)
-             *
-             * Returns the creation (compilation) time of the object's
-             * program. Default is this_object(), if no arg is given.
-             */
-
-            mp_int load_time;
-
-            if (sp->type != T_OBJECT)
-                goto xbad_arg_1;
-
-            if (O_PROG_SWAPPED(sp->u.ob))
-            {
-                sp->u.ob->time_of_ref = current_time;
-                if (load_ob_from_swap(sp->u.ob) < 0)
-                {
-                    sp--;
-                    ERROR("Out of memory\n")
-                }
-            }
-            load_time = sp->u.ob->prog->load_time;
-
-            free_object_svalue(sp);
-            put_number(sp, load_time);
-            break;
-          }
-
-        XCASE(F_PROGRAM_NAME);      /* --- esc program_name    --- */
-          {
-            /* XEFUN program_name()
-             *
-             *   string program_name()
-             *   string program_name(object obj)
-             *
-             * Returns the name of the program of <obj>, resp. the name of the
-             * program of the current object if <obj> is omitted.
-             *
-             * The returned name is usually the name from which the blueprint
-             * of <obj> was compiled (the 'load name'), but changes if an
-             * object replaces its programs with the efun replace_program().
-             *
-             * The name always ends in '.c'. It starts with a '/' unless the
-             * driver is running in COMPAT mode.
-             */
-
-            char *name, *res;
-            object_t *ob;
-
-            TYPE_TEST1(sp, T_OBJECT)
-
-            ob = sp->u.ob;
-            if (O_PROG_SWAPPED(ob))
-            {
-                ob->time_of_ref = current_time;
-                if (load_ob_from_swap(ob) < 0)
-                {
-                    ERROR("Out of memory\n");
-                }
-            }
-            name = ob->prog->name;
-#ifdef COMPAT_MODE
-            res = string_copy(name);
-#else
-            res = add_slash(name);
-#endif
-            if (!res)
-                ERROR("Out of memory\n")
-            free_object_svalue(sp);
-            put_malloced_string(sp, res);
-            break;
-          }
-
-                             /* --- esc query_once_interactive --- */
-        XCASE(F_QUERY_ONCE_INTERACTIVE);
-          {
-            /* XEFUN query_once_interactive()
-             *
-             *   int query_once_interactive(object ob)
-             *
-             * True if the object is or once was interactive.
-             */
-
-            object_t *obj;
-
-            if (sp->type != T_OBJECT) goto xbad_arg_1;
-
-            obj = sp->u.ob;
-            put_number(sp, obj->flags & O_ONCE_INTERACTIVE ? 1 : 0);
-            deref_object(obj, "query_once_interactive");
-            break;
-          }
-
-        /* --- XEfuns: Network IO --- */
-
-#ifdef F_QUERY_IMP_PORT
-        XCASE(F_QUERY_IMP_PORT);    /* --- esc query_imp_port  --- */
-          {
-            /* XEFUN query_imp_port()
-             *
-             *   int query_imp_port(void)
-             *
-             * Returns the port number that is used for the inter mud
-             * protocol.
-             */
-
-            push_number(udp_port);
-            break;
-          }
-#endif
-
-        XCASE(F_QUERY_INPUT_PENDING); /* --- esc query_input_pending --- */
-          {
-            /* XEFUN query_input_pending()
-             *
-             *   object query_input_pending(object ob)
-             *
-             * If ob is interactive and currently has an input_to() pending,
-             * the object that has called the input_to() is returned,
-             * else 0.
-             */
-
-            object_t *ob, *cb;
-            interactive_t *ip;
-
-            TYPE_TEST1(sp, T_OBJECT)
-
-            ob = sp->u.ob;
-            if (O_SET_INTERACTIVE(ip, ob) && ip->input_to)
-            {
-                cb = callback_object(&(ip->input_to->fun));
-                if (cb)
-                    sp->u.ob = ref_object(cb, "query_input_pending");
-                else
-                    put_number(sp, 0);
-            }
-            else
-            {
-                put_number(sp, 0);
-            }
-
-            deref_object(ob, "query_input_pending");
-            break;
-          }
-
-        XCASE(F_QUERY_IP_NAME);     /* --- esc query_ip_name   --- */
-          {
-            /* XEFUN query_ip_name()
-             *
-             *   string query_ip_name(object ob)
-             *
-             * Give the ip-name for user the current user or for the optional
-             * argument ob. An asynchronous process 'hname' is used to find
-             * out these names in parallel. If there are any failures to find
-             * the ip-name, then the ip-number is returned instead.
-             */
-
-            inter_pc = pc;
-            sp = query_ip_name(sp, MY_TRUE);
-            break;
-          }
-
-        XCASE(F_QUERY_IP_NUMBER);   /* --- esc query_ip_number --- */
-          {
-            /* XEFUN query_ip_number()
-             *
-             *   string query_ip_number(object  ob)
-             *   string query_ip_number(mixed & ob)
-             *
-             * Give the ip-number for the current user or the optional
-             * argument ob.
-             *
-             * If ob is given as reference (and it must be a valid object
-             * then), it will upon return be set to the struct sockaddr_in of
-             * the queried object, represented by an array of integers, one
-             * integer per address byte:
-             *   ob[0.. 1]: sin_family
-             *   ob[2.. 3]: sin_port
-             *   ob[4.. 7]: sin_addr
-             *   ob[8..15]: undefined.
-             */
-
-            inter_pc = pc;
-            sp = query_ip_name(sp, MY_FALSE);
-            break;
-          }
-
-        XCASE(F_QUERY_MUD_PORT);    /* --- esc query_mud_port  --- */
-          {
-            /* XEFUN query_mud_port()
-             *
-             *   int query_mud_port(void)
-             *   int query_mud_port(object user)
-             *   int query_mud_port(int num)
-             *
-             * Returns the port number the parser uses for user connections.
-             *
-             * If no argument is given, the port for this_player() is
-             * returned. If this_player() is not existing or not interactive,
-             * the first port number open for connections is returned.
-             *
-             * If an user object is given, the port used for its connection is
-             * returned.
-             * If a positive number is given, the <num>th port number the
-             * parser uses for connections is returned (given that there are
-             * that many ports).
-             * If -1 is given, the number of ports open for connections is
-             * returned.
-             */
-
-            inter_pc = pc;
-            sp = query_ip_port(sp);
-            break;
-          }
-
-        /* --- XEfuns: Driver and System --- */
-
-        XCASE(F_GARBAGE_COLLECTION);  /* --- esc garbage_collection --- */
-          {
-            /* XEFUN garbage_collection()
-             *
-             *   void garbage_collection(void)
-             *
-             * Tell the parser to initiate a garbage collection after the
-             * current execution ended.
-             */
-
-            extra_jobs_to_do = garbage_collect_to_do = MY_TRUE;
-            time_last_gc = 0;  /* mark it as an 'unconditional' GC */
-            break;
-          }
-
-        /* --- XEfuns: Inventories */
-
-        XCASE(F_ALL_ENVIRONMENT); /* --- esc all_environment <nargs> --- */
-        {
-            /* XEFUN all_environment()
-             *
-             *   object *all_environment()
-             *   object *all_environment(object o)
-             *
-             * Returns an array with all environments object <o> is in. If <o>
-             * is omitted, the environments of the current object is returned.
-             *
-             * If <o> has no environment, or if <o> is destructed, 0 is
-             * returned.
-             */
-
-            GET_NUM_ARG
-            if (num_arg && sp->type != T_OBJECT) goto xbad_arg_1;
-            inter_sp = sp;
-            sp = x_all_environment(sp, num_arg);
-            break;
-        }
-
-        /* --- Optional XEfuns --- */
-
-#ifdef F_COPY_MAPPING
-        XCASE(F_COPY_MAPPING);      /* --- esc copy_mapping    --- */
-          {
-            /* XEFUN copy_mapping()
-             *
-             *   mapping copy_mapping(mapping)
-             *
-             * This efun is needed to create copies of mappings instead of
-             * just passing a reference, like adding/subtraction from a
-             * mapping do.
-             * TODO: This efun is outdated by the copy() efun.
-             */
-
-            mapping_t *m, *m2;
-
-            TYPE_TEST1(sp, T_MAPPING)
-            m = sp->u.map;
-            check_map_for_destr(m);
-            m2 = copy_mapping(m);
-            free_mapping(m);
-            sp->u.map = m2;
-            break;
-          }
-#endif
-
-#ifdef F_EXTRACT
-          /* TODO: Get rid of efun extract() altogether */
-        XCASE(F_EXTRACT2);          /* --- esc extract2        --- */
-          {
-            /* Compute the range sp[0]..end from string/array sp[-1]
-             * and leave it on the stack. If sp[0] is negative, it is
-             * counted from the end of the string/array.
-             *
-             * The compiler generates this if the efun extract() is called
-             * with just two arguments.
-             * TODO: Get rid of efun extract() .
-             */
-
-            long len, from;
-            svalue_t *arg;
-
-            arg = sp - 1;
-
-            if (arg->type == T_STRING)
-            {
-                /* Slice an array */
-                char *res;
-
-                len = (long)_svalue_strlen(&arg[0]);
-                if ((arg+1)->type != T_NUMBER)
-                {
-                    ERRORF(("Index value must be a number.\n"));
-                    /* NOTREACHED */
-                    return; /* Flow control hint */
-                }
-                from = arg[1].u.number;
-                sp--;
-                if (from < 0) {
-                    from = len + from;
-                    if (from < 0)
-                        from = 0;
-                }
-                if (from >= len) {
-                    pop_stack();
-                    push_volatile_string("");
-                    break;
-                }
-                res = string_copy(arg->u.string + from);
-                free_string_svalue(sp);
-                put_malloced_string(sp, res);
-                break;
-            }
-
-            if (arg->type != T_POINTER)
-            {
-                ERRORF(("Indexed value is neither string nor array.\n"));
-                /* NOTREACHED */
-                return; /* Flow control hint */
-            }
-
-            /* Slice an array */
-            {
-                vector_t *v, *res;
-
-                if ((arg+1)->type != T_NUMBER)
-                {
-                    ERRORF(("Index value must be a number.\n"));
-                    /* NOTREACHED */
-                    return; /* Flow control hint */
-                }
-                v = arg->u.vec;
-                len = (long)VEC_SIZE(v);
-                from = arg[1].u.number;
-                sp--;
-                if (from < 0) {
-                    from = len + from;
-                }
-                res = slice_array(v, from, len-1);
-                free_array(v);
-                put_array(sp,res);
-                break;
-            }
-          }
-
-        XCASE(F_EXTRACT1);          /* --- esc extract1        --- */
-          {
-            /* XEFUN extract1()
-             *
-             *   string extract(string arg)
-             *
-             * Generated by the compiler when it finds efun extract()
-             * used with just the string, this efun returns the string.
-             */
-
-            if (sp->type != T_STRING)
-                goto xbad_arg_1;
-
-            break;
-          }
-
-        XCASE(F_EXTRACT);           /* --- esc extract         --- */
-          {
-            /* XEFUN extract()
-             *
-             *   string  extract(string str, int from, int to)
-             *   string  extract(string str, int from)
-             *   mixed * extract(mixed * arr, int from, int to)
-             *   mixed * extract(mixed * arr, int from)
-             *
-             * Extract a substring from a string, resp. a subarray
-             * from an array.
-             *
-             * This is the old notation for str[from..to] and supported
-             * only for hysterical raisins. The distinctive point is that
-             * negative values for from and to implement the from-the-end
-             * indexing.
-             */
-
-            if (sp[-1].type != T_NUMBER) goto xbad_arg_2;
-            if (sp[0].type != T_NUMBER) goto xbad_arg_3;
-
-            if (sp[-2].type == T_POINTER)
-            {
-                /* Extract from an array */
-
-                vector_t *v;
-                mp_int end, size;
-
-                v = sp[-2].u.vec;
-                v =
-                  slice_array(
-                    v,
-                    sp[-1].u.number,
-                    (end = sp[0].u.number) >= (size = (mp_int)VEC_SIZE(v)) ?
-                      size - 1 :
-                      end
-                  );
-                pop_n_elems(3);
-                if (v)
-                {
-                    push_referenced_vector(v);
-                }
-                else
-                {
-                    push_number(0);
-                }
-            }
-            else if (sp[-2].type == T_STRING)
-            {
-                /* Extract from a string */
-
-                long len, from, to;
-                char *res;
-
-                len = (long)_svalue_strlen(&sp[-2]);
-                from = sp[-1].u.number;
-                if (from < 0) {
-                    from = len + from;
-                    if (from < 0)
-                        from = 0;
-                }
-                to = sp[0].u.number;
-                if (to < 0)
-                    to = len + to;
-                if (to >= len)
-                    to = len-1;
-                if (to < from) {
-                    pop_n_elems(3);
-                    push_volatile_string("");
-                    break;
-                }
-                if (to == len-1) {
-                    res = string_copy(sp[-2].u.string + from);
-                    pop_n_elems(3);
-                    push_malloced_string(res);
-                    break;
-                }
-                res = xalloc((size_t)(to - from + 2));
-                strncpy(res, sp[-2].u.string + from, (size_t)(to - from + 1));
-                res[to - from + 1] = '\0';
-                pop_n_elems(3);
-                push_malloced_string(res);
-            }
-            else
-            {
-                goto xbad_arg_1;
-            }
-            break;
-          }
-#endif
-
 #ifdef F_SWAP
-        XCASE(F_SWAP);              /* --- esc swap            --- */
-          {
-            /* XEFUN swap()
-             *
-             *   void swap(object obj)
-             *
-             * Swap out an object. This efun is only used for system internal
-             * debugging and can cause a crash.
-             */
+    CASE(F_SWAP);                      /* --- swap            --- */
+      {
+        /* EFUN swap()
+         *
+         *   void swap(object obj)
+         *
+         * Swap out an object. This efun is only used for system internal
+         * debugging and can cause a crash.
+         */
 
-            object_t *ob;
+        object_t *ob;
 
-            if (sp->type != T_OBJECT) goto xbad_arg_1;
-            ob = sp->u.ob;
-            if (ob != current_object) /* should also check csp */
-            {
-                if (!O_PROG_SWAPPED(ob))
-                    (void)swap_program(ob);
-                if (!O_VAR_SWAPPED(ob))
-                    (void)swap_variables(ob);
-            }
-            pop_stack();
-            break;
-          }
-#endif
-
-        } /* switch(code) */
+        ob = sp->u.ob;
+        if (ob != current_object) /* should also check csp */
+        {
+            if (!O_PROG_SWAPPED(ob))
+                (void)swap_program(ob);
+            if (!O_VAR_SWAPPED(ob))
+                (void)swap_variables(ob);
+        }
+        free_svalue(sp--);
         break;
-      } /* end of F_ESCAPE */
+      }
+#endif
 
     } /* end of the monumental switch */
 
@@ -18707,19 +12489,21 @@ bad_right: ERRORF(("Bad right type to %s.\n", get_f_name(instruction)))
 
     /* Get rid of the handy but highly local macros */
 #   undef GET_NUM_ARG
+#   undef RAISE_ARG_ERROR
+#   undef BAD_ARG_ERROR
+#   undef OP_ARG_ERROR
+#   undef BAD_OP_ARG
 #   undef TYPE_TEST1
 #   undef TYPE_TEST2
 #   undef TYPE_TEST3
 #   undef TYPE_TEST4
+#   undef TYPE_TEST_LEFT
+#   undef TYPE_TEST_RIGHT
+#   undef TYPE_TEST_EXP_LEFT
+#   undef TYPE_TEST_EXP_RIGHT
 #   undef CASE
+#   undef privilege_violation
 } /* eval_instruction() */
-
-/*-------------------------------------------------------------------------*/
-
-/* These macros are no longer needed:
- */
-#undef push_malloced_string
-#undef push_number
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -19176,13 +12960,13 @@ secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
         int a;
         object_t *save_cmd;
 
-        push_malloced_string(current_error);
+        push_malloced_string(inter_sp, current_error);
         a = 1;
         if (current_error_file)
         {
-            push_malloced_string(current_error_file);
-            push_malloced_string(current_error_object_name);
-            push_number(current_error_line_number);
+            push_malloced_string(inter_sp, current_error_file);
+            push_malloced_string(inter_sp, current_error_object_name);
+            push_number(inter_sp, current_error_line_number);
             a += 3;
         }
         save_cmd = command_giver;
@@ -19460,9 +13244,9 @@ assert_master_ob_loaded (void)
             master_ob = ref_object(ob, "assert_master_ob_loaded");
             if (current_object == &dummy_current_object_for_loads)
                 current_object = master_ob;
-            push_number(removed);
+            push_number(inter_sp, removed);
             sapply(STR_REACTIVATE, ob, 1);
-            push_number(2 - (removed ? 1 : 0));
+            push_number(inter_sp, 2 - (removed ? 1 : 0));
             sapply(STR_INAUGURATE, ob, 1);
             fprintf(stderr, "%s Old master reactivated.\n", time_stamp());
             inside = MY_FALSE;
@@ -19505,7 +13289,7 @@ assert_master_ob_loaded (void)
         }
 
         initialize_master_uid();
-        push_number(3);
+        push_number(inter_sp, 3);
         apply_master_ob(STR_INAUGURATE, 1);
         assert_master_ob_loaded();
           /* ...in case inaugurate_master() destructed this object again */
@@ -19898,9 +13682,9 @@ call_lambda (svalue_t *lsvp, int num_arg)
                 }
 
                 /* Store the instruction code */
-                if (i > 0xff)
-                    *p++ = (bytecode_t)(i >> F_ESCAPE_BITS);
-                *p++ = (bytecode_t)i;
+                if (instrs[i].prefix)
+                    *p++ = instrs[i].prefix;
+                *p++ = instrs[i].opcode;
 
                 /* Store the <nargs> code, if necessary */
                 if (min != max)
@@ -20051,75 +13835,6 @@ call_simul_efun (int code, object_t *ob, int num_arg)
      * The result of the function call is on the stack.
      */
 } /* call_simul_efun() */
-
-/*-------------------------------------------------------------------------*/
-char *
-function_exists (char *fun, object_t *ob)
-
-/* Search for the function <fun> in the object <ob>. If existing, return
- * the name of the program, if not return NULL.
- *
- * Visibility rules apply: static and protected functions can't be
- * found from the outside.
- */
-
-{
-    char *shared_name;
-    fun_hdr_p funstart;
-    program_t *progp;
-    int ix;
-    funflag_t flags;
-
-#ifdef DEBUG
-    if (ob->flags & O_DESTRUCTED)
-        fatal("function_exists() on destructed object\n");
-#endif
-
-    /* Make the program resident */
-    if (O_PROG_SWAPPED(ob))
-    {
-        ob->time_of_ref = current_time;
-        if (load_ob_from_swap(ob) < 0)
-            error("Out of memory\n");
-    }
-
-    shared_name = findstring(fun);
-    progp = ob->prog;
-
-    /* Check if the function exists at all */
-    if ( (ix = find_function(shared_name, progp)) < 0)
-        return NULL;
-
-    /* Is it visible for the caller? */
-    flags = progp->functions[ix];
-
-    if (flags & TYPE_MOD_PRIVATE
-     || (flags & TYPE_MOD_STATIC && current_object != ob))
-        return NULL;
-
-    /* Resolve inheritance */
-    while (flags & NAME_INHERITED)
-    {
-        inherit_t *inheritp;
-
-        inheritp = &progp->inherit[flags & INHERIT_MASK];
-        ix -= inheritp->function_index_offset;
-        progp = inheritp->prog;
-        flags = progp->functions[ix];
-    }
-
-    funstart = progp->program  + (flags & FUNSTART_MASK);
-
-    /* And after all this, the function may be undefined */
-    if (FUNCTION_CODE(funstart)[0] == F_ESCAPE
-     && FUNCTION_CODE(funstart)[1] == F_UNDEF  - 0x100)
-    {
-        return NULL;
-    }
-
-    /* We got it. */
-    return progp->name;
-} /* function_exists() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -20579,16 +14294,6 @@ dump_trace (Bool how
                 pc2 += offset;
             }
 
-#if F_END_CATCH >= 0x100
-            if (pc2 - FUNCTION_CODE(p->funstart) < 2)
-                goto not_catch;
-
-            if (GET_CODE(pc2-2) != F_ESCAPE
-             || GET_CODE(pc2-1) != F_END_CATCH-0x100)
-            {
-                goto not_catch;
-            }
-#else
             if (pc2 - FUNCTION_CODE(p->funstart) < 1)
                 goto not_catch;
 
@@ -20596,7 +14301,7 @@ dump_trace (Bool how
             {
                 goto not_catch;
             }
-#endif
+
             if (last_catch == pc2)
                 goto not_catch;
             last_catch = pc2;
@@ -21067,9 +14772,200 @@ last_instructions (int length, Bool verbose, svalue_t **svpp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_caller_stack_depth (svalue_t *sp)
+
+/* EFUN caller_stack_depth()
+ *
+ *   int caller_stack_depth(void)
+ *
+ * Returns the number of previous objects on the stack. This
+ * can be used for security checks.
+ */
+
+{
+    int depth;
+    Bool done;
+    struct control_stack *p;
+
+    /* Determine the depth of the call stack */
+    p = csp;
+    for (depth = 0, done = MY_FALSE; ; depth++)
+    {
+        do {
+            if (p == control_stack)
+            {
+                done = MY_TRUE;
+                break;
+            }
+        } while ( !(--p)[1].extern_call );
+        if (done)
+            break;
+    }
+
+    push_number(sp, depth);
+
+    return sp;
+} /* f_caller_stack_depth() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_caller_stack (svalue_t *sp)
+
+/* EFUN caller_stack()
+ *
+ *   object *caller_stack()
+ *   object *caller_stack(int add_interactive)
+ *
+ * Returns an array of the previous_object()s who caused the
+ * call_other() to this_object().  previous_object(i) equals
+ * caller_stack()[i].
+
+ * If you pass the optional argument <add_interactive> (as true
+ * value), this_interactive() (or 0 if not existing) is appended
+ * to the array.
+ */
+
+{
+    int depth, i;
+    Bool done;
+    struct control_stack *p;
+    vector_t *v;
+    svalue_t *svp;
+
+    /* Determine the depth of the call stack */
+    p = csp;
+    for (depth = 0, done = MY_FALSE; ; depth++)
+    {
+        do {
+            if (p == control_stack)
+            {
+                done = MY_TRUE;
+                break;
+            }
+        } while ( !(--p)[1].extern_call );
+        if (done)
+            break;
+    }
+
+    /* Allocate and fill in the result array */
+    v = allocate_uninit_array(depth + (sp->u.number ? 1 : 0));
+    p = csp;
+    for (i = 0, svp = v->item, done = MY_FALSE; i < depth; i++, svp++)
+    {
+        object_t *prev;
+        do {
+            if (p == control_stack)
+            {
+                done = MY_TRUE;
+                break;
+            }
+        } while ( !(--p)[1].extern_call);
+
+        /* Break if end of stack */
+        if (done)
+            break;
+
+        /* Get 'the' calling object */
+        if (p[1].extern_call & CS_PRETEND)
+            prev = p[1].pretend_to_be;
+        else
+            prev = p[1].ob;
+
+        /* Enter it into the array */
+        if (prev == NULL || prev->flags & O_DESTRUCTED)
+            put_number(svp, 0);
+        else
+            put_ref_object(svp, prev, "caller_stack");
+    }
+
+#ifdef DEBUG
+    if (i < depth)
+    {
+        error("Computed stack depth to %d, but found only %d objects\n"
+             , depth, i);
+        /* NOTREACHED */
+        return sp;
+    }
+#endif
+
+    /* If so desired, add the interactive object */
+    if (sp->u.number)
+    {
+        if ( current_interactive
+         && !(current_interactive->flags & O_DESTRUCTED))
+        {
+            put_ref_object(svp, current_interactive, "caller_stack");
+        }
+        else
+            put_number(svp, 0);
+    }
+
+    /* Assign the result and return */
+    put_array(sp, v);
+
+    return sp;
+} /* f_caller_stack() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_previous_object (svalue_t *sp)
+
+/* EFUN previous_object()
+ *
+ *   object previous_object(int i)
+ *
+ * Follow back the last <i> call_other()s and return the calling
+ * object (i.e. previous_object(2) returns the caller of the
+ * caller). It must hold 0 <= i < caller_stack_depth().
+ *
+ * There is an important special case: in functions called by the
+ * gamedriver in reaction to some external event (e.g. commands
+ * added by add_action), previous_object() will return
+ * this_object(), but previous_object(0) will return 0.
+ */
+
+{
+    int i;
+    struct control_stack *p;
+    object_t *prev_ob;
+
+    /* Test the arguments */
+    i = sp->u.number;
+    if (i > MAX_TRACE) {
+        sp->u.number = 0;
+        return sp;
+    }
+
+    /* Set p back to the <i>th extern call */
+    p = csp;
+    do {
+        do {
+            if (p == control_stack) {
+                sp->u.number = 0;
+                return sp;
+            }
+        } while ( !(--p)[1].extern_call );
+    } while (--i >= 0);
+
+    /* Determine the object and push it */
+    if (p[1].extern_call & CS_PRETEND)
+        prev_ob = p[1].pretend_to_be;
+    else
+        prev_ob = p[1].ob;
+
+    if (!prev_ob || prev_ob->flags & O_DESTRUCTED)
+        sp->u.number = 0;
+    else
+        put_ref_object(sp, prev_ob, "previous_object");
+
+    return sp;
+} /* f_previous_object() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_last_instructions (svalue_t *sp)
 
-/* TEFUN last_instructions()
+/* EFUN last_instructions()
  *
  *   string *last_instructions (int length, int verbose)
  *
@@ -21100,10 +14996,9 @@ f_last_instructions (svalue_t *sp)
     svalue_t *svp;
 
     /* Test the arguments */
-    if (sp[-1].type != T_NUMBER || (num_instr = sp[-1].u.number) <= 0)
-        bad_xefun_arg(1, sp);
-    if (sp->type != T_NUMBER)
-        bad_xefun_arg(2, sp);
+    num_instr = sp[-1].u.number;
+    if (num_instr <= 0)
+        error("Illegal number of instructions: %ld.\n", num_instr);
 
     sp--;
     inter_sp = sp; /* Out of memory possible */
@@ -21584,25 +15479,345 @@ check_a_lot_ref_counts (program_t *search_prog)
 #undef ERROR
 #define ERROR(s) {inter_sp = sp; error(s);}
 
-#undef TYPE_TEST1
-#define TYPE_TEST1(arg1, type1, instruction) {\
-    if ((arg1)->type != (type1)) {\
-        bad_efun_arg(1, (instruction), sp);\
-    }\
-}
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_apply (svalue_t *sp, int num_arg)
 
-#undef TYPE_TEST2
-#define TYPE_TEST2(arg1, type2, instruction) {\
-    if ((arg1)->type != (type2)) {\
-        bad_efun_arg(2, (instruction), sp);\
-    }\
-}
+/* EFUN apply()
+ *
+ *     mixed apply(closure cl, ...)
+ *
+ * Call the closure <cl> and pass it all the extra arguments
+ * given in the call. If the last argument is an array, it
+ * is flattened, ie. passed as a bunch of single arguments.
+ * TODO: Use the MudOS-Notation '(*f)(...)' as alternative.
+ */
+
+{
+    svalue_t *args;
+
+    args = sp -num_arg +1;
+
+    if (args->type != T_CLOSURE)
+    {
+        /* Not a closure: pop the excess args and return <cl>
+         * as result.
+         */
+
+        while (--num_arg)
+            free_svalue(sp--);
+        return sp;
+    }
+
+    if (sp->type == T_POINTER)
+    {
+        /* The last argument is an array: flatten it */
+
+        vector_t *vec;  /* the array */
+        svalue_t *svp;  /* pointer into the array */
+        long i;              /* (remaining) vector size */
+
+        vec = sp->u.vec;
+        i = (long)VEC_SIZE(vec);
+        num_arg += i - 1;
+
+        /* Check if the target closure can handle
+         * all the arguments without overflowing the stack.
+         */
+        switch( (sp - num_arg + i)->x.closure_type )
+        {
+        default:
+            if ((sp - num_arg + i)->x.closure_type >= 0)
+                error("Uncallable closure in apply().\n");
+            /* else: operator/sefun/efun closure: FALLTHROUGH */
+        case CLOSURE_LFUN:
+        case CLOSURE_ALIEN_LFUN:
+        case CLOSURE_LAMBDA:
+        case CLOSURE_BOUND_LAMBDA:
+            if (num_arg + (sp - start_of_stack) < EVALUATOR_STACK_SIZE)
+                break;
+            error("VM Stack overflow: %ld too high.\n"
+                 , (long)(num_arg + (sp - start_of_stack) - EVALUATOR_STACK_SIZE) );
+            break;
+        }
+
+        /* Push the array elements onto the stack, overwriting the
+         * array value itself.
+         */
+        if (deref_array(vec))
+        {
+            for (svp = vec->item; --i >= 0; )
+            {
+                if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
+                {
+                    put_number(sp, 0);
+                    sp++;
+                    svp++;
+                }
+                else
+                    assign_svalue_no_free(sp++, svp++);
+            }
+        }
+        else
+        {
+            /* The array will be freed, so use a faster function */
+            for (svp = vec->item; --i >= 0; ) {
+                if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
+                {
+                    put_number(sp, 0);
+                    sp++;
+                    svp++;
+                }
+                else
+                    transfer_svalue_no_free(sp++, svp++);
+            }
+            free_empty_vector(vec);
+        }
+
+        sp--; /* undo the last extraneous sp++ */
+    }
+
+    /* Prepare to call the closure */
+
+    args = sp -num_arg +1;
+
+    /* No external calls may be done when this object is
+     * destructed.
+     */
+    if (current_object->flags & O_DESTRUCTED)
+    {
+        sp = _pop_n_elems(num_arg, sp);
+        push_number(sp, 0);
+        return sp;
+    }
+
+    inter_sp = sp;
+
+    call_lambda(args, num_arg - 1);
+
+    /* Cleanup the stack */
+    sp = args;
+    free_closure(sp);
+    *sp = sp[1];
+
+    return sp;
+} /* f_apply() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_funcall (svalue_t *sp, int num_arg)
+
+/* EFUN funcall()
+ *
+ *   mixed funcall(mixed|closure cl, mixed arg ...)
+ *
+ * Evaluates the closure. The extra args will be passed as args
+ * to the closure. If cl is not a closure, it will simply be
+ * returned.
+ */
+
+{
+    svalue_t *args;
+
+    args = sp -num_arg +1;
+
+    if (args->type == T_CLOSURE)
+    {
+        /* No external calls may be done when this object is
+         * destructed.
+         */
+        if (current_object->flags & O_DESTRUCTED) {
+            sp = _pop_n_elems(num_arg, sp);
+            push_number(sp, 0);
+            return sp;
+        }
+
+        /* Call the closure and push the result */
+        call_lambda(args, num_arg - 1);
+        sp = args;
+        free_closure(sp);
+        *sp = sp[1];
+    }
+    else
+    {
+        /* Not a closure: pop the excess args and return <cl>
+         * as result.
+         */
+
+        while (--num_arg)
+            free_svalue(sp--);
+    }
+
+    return sp;
+} /* f_funcall() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_call_resolved (svalue_t *sp, int num_arg)
+
+/* EFUN call_resolved()
+ *
+ *   int call_resolved(mixed & result, object ob, string func, ...)
+ *
+ * Similar to call_other(). If ob->func() is defined and publicly
+ * accessible, any of the optional extra arguments are passed to
+ * ob->func(...). The result of that function call is stored in
+ * result, which must be passed by reference.
+ *
+ * If the current object is already destructed, or the ob does not
+ * exist, or ob does not define a public accessible function named
+ * func, call_resolved() returns 0 as failure code, else 1 for
+ * success.
+ *
+ * ob can also be a file_name. If a string is passed for ob, and
+ * no object with that name does exist, an error occurs.
+ */
+
+{
+    svalue_t *arg;
+    object_t *ob;
+
+    arg = sp - num_arg + 1;
+
+    /* Test the arguments */
+    if (arg[1].type == T_OBJECT)
+        ob = arg[1].u.ob;
+    else /* it's a string */
+    {
+        ob = get_object(arg[1].u.string);
+        if (!ob)
+            error("call_resolved() failed: can't get object.\n");
+    }
+
+    /* No external calls may be done when this object is
+     * destructed.
+     */
+    if (current_object->flags & O_DESTRUCTED)
+    {
+        sp = _pop_n_elems(num_arg, sp);
+        push_number(sp, 0);
+        return sp;
+    }
+
+    /* Handle traceing. */
+    if (TRACEP(TRACE_CALL_OTHER))
+    {
+        if (!++traceing_recursion)
+        {
+            inter_sp = sp;
+            do_trace("Call other ", arg[1].u.string, "\n");
+        }
+        traceing_recursion--;
+    }
+
+    /* Send the remaining arguments to the function.
+     */
+    if (!apply_low(arg[2].u.string, ob, num_arg-3, MY_FALSE))
+    {
+        /* Function not found */
+        sp = _pop_n_elems(num_arg-1, sp);
+        free_svalue(sp);
+        put_number(sp, 0);
+        return sp;
+    }
+
+    /* The result of the function call is on the stack. But, so
+     * is the function name and object that was called.
+     * These have to be removed.
+     */
+    sp = inter_sp;
+    transfer_svalue(arg, sp--);  /* Copy the function call result */
+    sp = _pop_n_elems(2, sp);     /* Remove old arguments to call_solved */
+    free_svalue(sp);             /* Free the lvalue */
+    put_number(sp, 1);
+
+    return sp;
+} /* f_call_resolved() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_get_eval_cost (svalue_t *sp)
+
+/* EFUN get_eval_cost()
+ *
+ *   int get_eval_cost()
+ *
+ * Returns the remaining evaluation cost the current
+ * execution (the current command) may use up.
+ *
+ * It starts at a driver given high value (__MAX_EVAL_COST__) and
+ * is reduced with each executed statement.
+ */
+
+{
+    push_number(sp, (max_eval_cost ? max_eval_cost : LONG_MAX) - eval_cost);
+
+    return sp;
+} /* f_get_eval_cost() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_set_this_object (svalue_t *sp)
+
+/* EFUN set_this_object()
+ *
+ *   void set_this_object(object object_to_pretend_to_be);
+ *
+ * Set this_object() to <object_to_pretend_to_be>. A privilege
+ * violation ("set_this_object", this_object(), object_to_be)
+ * occurs.
+ *
+ * It changes the result of this_object() in the using function, and
+ * the result of previous_object() in functions called in other
+ * objects by call_other(). Its effect will remain till there is a
+ * return of an external function call, or another call of
+ * set_this_object(). While executing code in the master
+ * object's program or the primary simul_efun object's program,
+ * set_this_object() is granted even if this_object() is altered by
+ * set_this_object(). This does not apply to functions inherited from
+ * other programs.
+ *
+ * Use it with extreme care to avoid inconsistencies.  After a call of
+ * set_this_object(), some LPC-constructs might behave in an odd
+ * manner, or even crash the system. In particular, using global
+ * variables or calling local functions (except by call_other) is
+ * illegal.
+ *
+ * With the current implementation, global variables can be accessed,
+ * but this is not guaranteed to work in subsequent versions.
+ *
+ * Allowed are call_other, map functions, access of local variables
+ * (which might hold array pointers to a global array), simple
+ * arithmetic and the assignment operators.
+ */
+
+{
+
+    if (current_variables == master_ob->variables
+     || current_variables == simul_efun_object->variables
+     || _privilege_violation("set_this_object", sp, sp))
+    {
+        struct control_stack *p;
+
+        /* Find the 'extern_call' entry in the call stack which
+         * determined the current this_object().
+         */
+        for (p = csp; !p->extern_call; p--) NOOP;
+
+        p->extern_call |= CS_PRETEND;
+        p->pretend_to_be = current_object = sp->u.ob;
+    }
+
+    free_svalue(sp);
+    sp--;
+    return sp;
+} /* f_set_this_object() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
 f_trace (svalue_t *sp)
 
-/* TEFUN trace()
+/* EFUN trace()
  *
  *   int trace(int traceflags)
  *
@@ -21640,7 +15855,6 @@ f_trace (svalue_t *sp)
     int ot;
     interactive_t *ip;
 
-    TYPE_TEST1(sp, T_NUMBER, F_TRACE)
     ot = -1;
 
     /* If the command_giver is allowed to do so... */
@@ -21650,7 +15864,8 @@ f_trace (svalue_t *sp)
         svalue_t *arg;
 
         assign_eval_cost();
-        inter_sp = _push_volatile_string("trace", sp);
+        push_volatile_string(sp, "traceprefix");
+        inter_sp = sp;
         arg = apply_master_ob(STR_VALID_TRACE, 1);
         if (!arg)
         {
@@ -21679,7 +15894,7 @@ f_trace (svalue_t *sp)
 svalue_t *
 f_traceprefix (svalue_t *sp)
 
-/* TEFUN traceprefix()
+/* EFUN traceprefix()
  *
  *   string traceprefix(string prefix)
  *   string traceprefix(int dummy)
@@ -21698,9 +15913,6 @@ f_traceprefix (svalue_t *sp)
     char *old;
     interactive_t *ip;
 
-    if (sp->type != T_STRING && sp->type != T_NUMBER)
-        bad_xefun_arg(1, sp);
-
     old = 0;
 
     /* If the command_giver is allowed to do that... */
@@ -21709,7 +15921,8 @@ f_traceprefix (svalue_t *sp)
     {
         svalue_t *arg;
 
-        inter_sp = _push_volatile_string("traceprefix", sp);
+        push_volatile_string(sp, "trace");
+        inter_sp = sp;
         assign_eval_cost();
         arg = apply_master_ob(STR_VALID_TRACE,1);
         if (!arg)

@@ -61,14 +61,14 @@ MFLAGS = "BINDIR=$(BINDIR)" "MUD_LIB=$(MUD_LIB)"
 #
 SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\
     comm.c ed.c regexp.c mapping.c wiz_list.c swap.c xalloc.c\
-    call_out.c otable.c dumpstat.c stralloc.c hash.c port.c\
-    ptrtable.c heartbeat.c actions.c mempools.c \
+    call_out.c otable.c dumpstat.c stralloc.c hash.c port.c files.c\
+    ptrtable.c heartbeat.c actions.c mempools.c bitstrings.c \
     access_check.c parse_old.c parse.c prolang.y\
     efuns.c simul_efun.c strfuns.c sprintf.c gcollect.c closure.c random.c
 OBJ=lang.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
     comm.o ed.o regexp.o mapping.o wiz_list.o swap.o xalloc.o\
-    call_out.o otable.o dumpstat.o stralloc.o hash.o port.o\
-    ptrtable.o heartbeat.o actions.o mempools.o \
+    call_out.o otable.o dumpstat.o stralloc.o hash.o port.o files.o\
+    ptrtable.o heartbeat.o actions.o mempools.o bitstrings.o \
     access_check.o parse_old.o parse.o simul_efun.o strfuns.o sprintf.o\
     efuns.o gcollect.o closure.o random.o
 

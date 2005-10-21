@@ -55,8 +55,8 @@
 /* --- Prototypes --- */
 extern void init_shared_strings(void);
 
-extern char  *findstring(char *s);
-extern char  *make_shared_string(char *str);
+extern char  *findstring(const char *s);
+extern char  *make_shared_string(const char *str);
 extern void   deref_string(char *str);
 extern void   free_string(char *str);
 extern mp_int add_string_status(strbuf_t *sbuf, Bool verbose);

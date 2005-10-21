@@ -25,11 +25,6 @@
  * is detected, get_message() select()s, but returns immediately with the
  * variable time_to_call_heart_beat set, else it selects() in one second
  * intervals until either commands come in or the time runs out.
- *
- * Also in this file (slighly misplaced) are the file handling efuns,
- * regreplace.
- *
- * TODO: Move the file efuns into separate files.
  *---------------------------------------------------------------------------
  */
 
@@ -430,7 +425,7 @@ backend (void)
                     malloc_privilege = MALLOC_MASTER;
                     sprintf(shut_msg, "%s slow_shut_down(%d)\n", time_stamp(), minutes);
                     write(1, shut_msg, strlen(shut_msg));
-                    push_number(minutes);
+                    push_number(inter_sp, minutes);
                     apply_master_ob(STR_SLOW_SHUT, 1);
                 }
                 malloc_privilege = MALLOC_USER;
@@ -802,7 +797,7 @@ static Bool did_swap;
              * have a ref count > 1 (and will have an invalid ob->prog
              * pointer).
              */
-            push_number(obj->flags & (O_CLONE|O_REPLACED) ? 0 :
+            push_number(inter_sp, obj->flags & (O_CLONE|O_REPLACED) ? 0 :
               ( O_PROG_SWAPPED(obj) ? 1 : obj->prog->ref) );
             RESET_LIMITS;
             CLEAR_EVAL_COST;
@@ -815,7 +810,7 @@ static Bool did_swap;
                 l = closure_hook[H_CLEAN_UP].u.lambda;
                 if (closure_hook[H_CLEAN_UP].x.closure_type == CLOSURE_LAMBDA)
                     l->ob = obj;
-                push_object(obj);
+                push_ref_object(inter_sp, obj, "clean up");
                 call_lambda(&closure_hook[H_CLEAN_UP], 2);
                 svp = inter_sp;
                 pop_stack();
@@ -948,7 +943,7 @@ preload_objects (int eflag)
 
     /* Call master->epilog(<eflag>)
      */
-    push_number(eflag);
+    push_number(inter_sp, eflag);
     ret = apply_master_ob(STR_EPILOG, 1);
 
     if ((ret == 0) || (ret->type != T_POINTER))
@@ -1059,8 +1054,27 @@ static int acc = 0;    /* Sum of lines for this backend loop */
 /*                               EFUNS                                     */
 
 /*-------------------------------------------------------------------------*/
-char *
-query_load_av (void)
+svalue_t *
+f_garbage_collection (svalue_t *sp)
+
+/* XEFUN garbage_collection()
+ *
+ *   void garbage_collection(void)
+ *
+ * Tell the parser to initiate a garbage collection after the
+ * current execution ended.
+ */
+
+{
+    extra_jobs_to_do = garbage_collect_to_do = MY_TRUE;
+    time_last_gc = 0;  /* mark it as an 'unconditional' GC */
+
+    return sp;
+} /* f_garbage_collection() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_query_load_average (svalue_t *sp)
 
 /* EFUN query_load_average()
  *
@@ -1078,14 +1092,15 @@ static char buff[100];
 #if defined(__MWERKS__)
 #    pragma warn_largeargs reset
 #endif
-    return buff;
-}
+    push_volatile_string(sp, buff);
+    return sp;
+} /* f_query_load_average() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
 f_debug_message (svalue_t *sp)
 
-/* TEFUN debug_message()
+/* EFUN debug_message()
  *
  *   debug_message(string text)
  *
@@ -1093,608 +1108,9 @@ f_debug_message (svalue_t *sp)
  */
 
 {
-    if (sp->type != T_STRING)
-        bad_xefun_arg(1, sp);
     printf("%s", sp->u.string);
     free_svalue(sp);
     return sp - 1;
-}
-
-/*-------------------------------------------------------------------------*/
-int
-e_write_file (char *file, char *str)
-
-/* EFUN write_file()
- *
- * Append the text <str> to the end of <file>
- * Return 0 for failure, otherwise 1.
- *
- * Note that this function might be called recursively (see below).
- */
-
-{
-    FILE *f;
-
-    file = check_valid_path(file, current_object, "write_file", MY_TRUE);
-    if (!file)
-        return 0;
-
-    f = fopen(file, "a");
-    if (f == NULL) {
-        if ((errno == EMFILE
-#ifdef ENFILE
-             || errno == ENFILE
-            ) && current_file
-#endif
-        ) {
-            /* We are called from within the compiler, probably to write
-             * an error message into a log.
-             * Call lex_close() (-> lexerror() -> yyerror() -> parse_error()
-             * -> apply_master_ob() ) to try to close some files, the try
-             * again.
-             */
-            push_apply_value();
-            lex_close(NULL);
-            pop_apply_value();
-            f = fopen(file, "a");
-        }
-        if (f == NULL) {
-            char * emsg, * buf;
-
-            emsg = strerror(errno);
-            buf = alloca(strlen(emsg+1));
-            if (buf)
-            {
-                strcpy(buf, emsg);
-                error("Could not open %s for append: %s.\n", file, buf);
-            }
-            else
-            {
-                perror("write_file");
-                error("Could not open %s for append: errno %d.\n"
-                     , file, errno);
-            }
-            /* NOTREACHED */
-        }
-    }
-    FCOUNT_WRITE(file);
-    fwrite(str, strlen(str), 1, f);
-    fclose(f);
-    return 1;
-} /* e_write_file() */
-
-/*-------------------------------------------------------------------------*/
-char *
-e_read_file (char *file, int start, int len)
-
-/* EFUN read_file()
- *
- * Read <len> lines from <file>, starting with line <start> (counting
- * up from 1). If <len> is 0, the whole file is read.
- *
- * Result is a pointer to a buffer with the read text, or NULL
- * on failures. The single lines of the text read are always
- * terminated with a single '\n'.
- *
- * When <start> or <len> are given, the function returns up max_file_xfer
- * bytes of text. If the whole file should be read, but is greater than
- * the above limit, or if not all of <len> lines fit into the buffer,
- * NULL is returned.
- *
- * TODO: What does <len> == -1 do?
- */
-
-{
-    struct stat st;
-    FILE *f;
-    char *str, *p, *p2, *end, c;
-    long size; /* TODO: fpos_t? */
-
-    if (len < 0 && len != -1)
-        return NULL;
-
-    file = check_valid_path(file, current_object, "read_file", MY_FALSE);
-    if (!file)
-        return NULL;
-
-    /* If the file would be opened in text mode, the size from fstat would
-     * not match the number of characters that we can read.
-     */
-    f = fopen(file, "rb");
-    if (f == NULL)
-        return NULL;
-    FCOUNT_READ(file);
-
-    /* Check if the file is small enough to be read. */
-
-    if (fstat(fileno(f), &st) == -1)
-    {
-        fatal("Could not stat an open file.\n");
-        /* NOTREACHED */
-        return NULL;
-    }
-
-    size = (long)st.st_size;
-    if (max_file_xfer && size > max_file_xfer)
-    {
-        if ( start || len )
-            size = max_file_xfer;
-        else {
-            fclose(f);
-            return NULL;
-        }
-    }
-
-    /* Make the arguments sane */
-    if (!start) start = 1;
-    if (!len) len = size;
-
-    /* Get the memory */
-    str = xalloc((size_t)size + 2); /* allow a trailing \0 and leading ' ' */
-    if (!str) {
-        fclose(f);
-        error("(read_file) Out of memory (%ld bytes) for buffer\n", size+2);
-        /* NOTREACHED */
-        return NULL;
-    }
-
-    *str++ = ' '; /* this way, we can always read the 'previous' char... */
-    str[size] = '\0';
-
-    /* Search for the first line to read.
-     * For this, the file is read in chunks of <size> bytes, st.st_size
-     * records the remaining length of the file.
-     */
-    do {
-        /* Read the next chunk */
-        if (size > st.st_size) /* Happens with the last block */
-            size = (long)st.st_size;
-
-        if ((!size && start > 1) || fread(str, (size_t)size, 1, f) != 1) {
-                fclose(f);
-            xfree(str-1);
-                return NULL;
-        }
-        st.st_size -= size;
-        end = str+size;
-
-        /* Find all the '\n' in the chunk and count them */
-        for (p = str; NULL != ( p2 = memchr(p, '\n', (size_t)(end-p)) ) && --start; )
-            p = p2+1;
-
-    } while ( start > 1 );
-
-    /* p now points to the first requested line.
-     * st.st_size is the remaining size of the file.
-     */
-
-    /* Shift the found lines back to the front of the buffer, and
-     * count them.
-     * Also convert \r\n pairs into \n on MS-DOS filesystems.
-     */
-    for (p2 = str; p != end; ) {
-        c = *p++;
-        if ( c == '\n' ) {
-#ifdef MSDOS_FS
-            if ( p2[-1] == '\r' ) p2--;
-#endif
-            if (!--len) {
-                *p2++=c;
-                break;
-            }
-        }
-        *p2++ = c;
-    }
-
-    /* If there are still some lines missing, and parts of the file
-     * are not read yet, read and scan those remaining parts.
-     */
-
-    if ( len && st.st_size ) {
-
-        /* Read the remaining file, but only as much as there is
-         * space left in the buffer. As that one is max_file_xfer
-         * long, it has to be sufficient.
-         */
-
-        size -= ( p2-str) ;
-        if (size > st.st_size)
-            size = (long)st.st_size;
-
-        if (fread(p2, (size_t)size, 1, f) != 1) {
-                fclose(f);
-            xfree(str-1);
-                return NULL;
-        }
-
-        st.st_size -= size;
-        end = p2+size;
-
-        /* Count the remaining lines, again converting \r\n into \n
-         * when necessary.
-         */
-        for (p = p2; p != end; ) {
-            c = *p++;
-            if ( c == '\n' ) {
-#ifdef MSDOS_FS
-                if ( p2[-1] == '\r' ) p2--;
-#endif
-                if (!--len) {
-                    *p2++ = c;
-                    break;
-                }
-            }
-            *p2++ = c;
-        }
-
-        /* If there are lines missing and the file is not at its end,
-         * we have a failure.
-         */
-        if ( st.st_size && len > 0) {
-            /* tried to read more than READ_MAX_FILE_SIZE */
-            fclose(f);
-            xfree(str-1);
-            return NULL;
-        }
-    }
-
-    *p2 = '\0';
-    fclose(f);
-
-    /* Make a copy of the valid parts of the str buffer, then
-     * get rid of the largish buffer itself.
-     */
-    p2 = string_copy(str); /* TODO: string_n_copy() */
-    xfree(str-1);
-    if (!p2)
-        error("(read_file) Out of memory for result\n");
-
-    return p2;
-} /* e_read_file() */
-
-/*-------------------------------------------------------------------------*/
-char *
-e_read_bytes (char *file, int start, int len)
-
-/* EFUN read_bytes()
- *
- * Read <len> bytes (but mostly max_byte_xfer) from <file>, starting
- * with byte <start> (counting up from 0). If <start> is negative, it is
- * counted from the end of the file. If <len> is 0, an empty (but valid)
- * string is returned.
- *
- * Result is a pointer to a buffer with the read text, or NULL
- * on failures.
- */
-
-{
-    struct stat st;
-
-    char *str,*p;
-    int f;
-    long size; /* TODO: fpos_t? */
-
-    /* Perform some sanity checks */
-    if (len < 0 || (max_byte_xfer && len > max_byte_xfer))
-        return NULL;
-
-    file = check_valid_path(file, current_object, "read_bytes", MY_FALSE);
-    if (!file)
-        return NULL;
-
-    /* Open the file and determine its size */
-    f = ixopen(file, O_RDONLY);
-    if (f < 0)
-        return NULL;
-    FCOUNT_READ(file);
-
-    if (fstat(f, &st) == -1)
-        fatal("Could not stat an open file.\n");
-    size = (long)st.st_size;
-
-    /* Determine the proper start and len to use */
-    if (start < 0)
-        start = size + start;
-
-    if (start >= size) {
-        close(f);
-        return NULL;
-    }
-    if ((start+len) > size)
-        len = (size - start);
-
-    /* Seek and read */
-    if ((size = (long)lseek(f,start, 0)) < 0) {
-        close(f);
-        return NULL;
-    }
-
-    str = xalloc((size_t)len + 1);
-    if (!str) {
-        close(f);
-        return NULL;
-    }
-
-    size = read(f, str, (size_t)len);
-
-    close(f);
-
-    if (size <= 0) {
-        xfree(str);
-        return NULL;
-    }
-
-    /* No postprocessing, except for the adding of the '\0' without
-     * the gamedriver won't be happy.
-     */
-    str[size] = '\0';
-
-    /* We return a copy of the life parts of the buffer, and get rid
-     * of the largish buffer itself.
-     */
-    p = string_copy(str);
-    xfree(str);
-
-    return p;
-} /* e_read_bytes() */
-
-/*-------------------------------------------------------------------------*/
-int
-e_write_bytes (char *file, int start, char *str)
-
-/* EFUN write_bytes()
- *
- * Write <str> (but not more than max_byte_xfer bytes) to <file>,
- * starting with byte <start> (counting up from 0). If <start> is negative,
- * it is counted from the end of the file.
- *
- * Result is 0 on failure, and 1 otherwise.
- */
-
-{
-    struct stat st;
-
-    mp_int size, len;
-    int f;
-
-    /* Sanity checks */
-    file = check_valid_path(file, current_object, "write_bytes", MY_TRUE);
-    if (!file)
-        return 0;
-
-    len = (mp_int)strlen(str);
-    if (max_byte_xfer && len > max_byte_xfer)
-        return 0;
-
-    f = ixopen(file, O_WRONLY);
-    if (f < 0)
-        return 0;
-    FCOUNT_WRITE(file);
-
-    if (fstat(f, &st) == -1)
-        fatal("Could not stat an open file.\n");
-    size = (mp_int)st.st_size;
-
-    if(start < 0)
-        start = size + start;
-
-    if (start > size) {
-        close(f);
-        return 0;
-    }
-    if ((size = (mp_int)lseek(f,start, 0)) < 0) {
-        close(f);
-        return 0;
-    }
-
-    size = write(f, str, (size_t)len);
-
-    close(f);
-
-    if (size <= 0) {
-        return 0;
-    }
-
-    return 1;
-} /* e_write_bytes() */
-
-/*-------------------------------------------------------------------------*/
-long
-e_file_size (char *file)
-
-/* EFUN file_size()
- *
- * Determine the length of <file> and return it.
- * Return -1 if the file doesn't exist, -2 if the name points to a directory.
- * These values must match the definitions in mudlib/sys/files.h.
- */
-
-{
-    struct stat st;
-
-    file = check_valid_path(file, current_object, "file_size", MY_FALSE);
-    if (!file)
-        return -1;
-    if (ixstat(file, &st) == -1)
-        return -1;
-    if (S_IFDIR & st.st_mode)
-        return -2;
-    return (long)st.st_size;
-} /* e_file_size() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t*
-f_regreplace (svalue_t *sp)
-
-/* TEFUN regreplace()
- *
- *     string regreplace (string txt, string pattern, string replace
- *                                                  , int flags)
- *
- * Search through <txt> for one/all occurences of <pattern> and replace them
- * with the <replace> pattern, returning the result. <flags> is the bit-or
- * of these values:
- *   F_GLOBAL   = 1: when given, all occurences of <pattern> are replace,
- *                   else just the first
- *   F_EXCOMPAT = 2: when given, the expressions are ex-compatible,
- *                   else they aren't.
- * TODO: The gamedriver should write these values into an include file.
- *
- * The function behaves like the s/<pattern>/<replace>/<flags> command
- * in sed or vi. It offers an efficient and far more powerful replacement
- * for implode(regexplode()).
- */
-
-{
-#define F_GLOBAL   0x1
-#define F_EXCOMPAT 0x2
-
-    struct regexp *pat;
-    int   flags;
-    char *oldbuf, *buf, *curr, *new, *start, *old, *sub;
-    long  space;
-    size_t  origspace;
-
-    /*
-     * Must set inter_sp before call to regcomp,
-     * because it might call regerror.
-     */
-    inter_sp = sp;
-
-    /* Extract the arguments */
-    if (sp->type != T_NUMBER)
-        bad_xefun_arg(4, sp);
-    flags = sp->u.number;
-
-    if (sp[-1].type != T_STRING)
-        bad_xefun_arg(3, sp);
-    sub = sp[-1].u.string;
-
-    if (sp[-2].type != T_STRING)
-        bad_xefun_arg(2, sp);
-
-    if (sp[-3].type != T_STRING)
-        bad_xefun_arg(1, sp);
-
-    start = curr = sp[-3].u.string;
-
-    space = (long)(origspace = (strlen(start)+1)*2);
-
-/* reallocate on the fly */
-#define XREALLOC \
-    space += origspace;\
-    origspace = origspace*2;\
-    oldbuf = buf;\
-    buf = (char*)rexalloc(buf,origspace);\
-    if (!buf) { \
-        xfree(oldbuf); \
-        if (pat) REGFREE(pat); \
-        error("(regreplace) Out of memory (%lu bytes) for buffer\n"\
-             , (unsigned long)origspace); \
-    } \
-    new = buf + (new-oldbuf)
-
-/* The rexalloc() above read originally 'rexalloc(buf, origspace*2)'.
- * Marcus inserted the '*2' since he experienced strange driver
- * crashes without. I think that the error corrected in dev.28 was the
- * real reason for the crashes, so that the safety factor is no longer
- * necessary. However, if regreplace() causes crashes again, this
- * is one thing to try.
- */
-
-    xallocate(buf, (size_t)space, "buffer");
-    new = buf;
-    pat = REGCOMP(sp[-2].u.string,(flags & F_EXCOMPAT) ? 1 : 0, MY_FALSE);
-    /* regcomp returns NULL on bad regular expressions. */
-
-    if (pat && regexec(pat,curr,start)) {
-        do {
-            size_t diff = (size_t)(pat->startp[0]-curr);
-            space -= diff;
-            while (space <= 0) {
-                XREALLOC;
-            }
-            strncpy(new,curr,(size_t)diff);
-            new += diff;
-            old  = new;
-            *old = '\0';
-
-            /* Now what may have happen here. We *could*
-             * be out of mem (as in 'space') or it could be
-             * a regexp problem. the 'space' problem we
-             * can handle, the regexp problem not.
-             * hack: we store a \0 into *old ... if it is
-             * still there on failure, it is a real failure.
-             * if not, increase space. The player could get
-             * some irritating messages from regerror()
-             */
-            while (NULL == (new = regsub(pat, sub, new, space, 1)) )
-            {
-                int xold;
-
-                if (!*old)
-                {
-                    xfree(buf);
-                    if (pat)
-                        REGFREE(pat);
-                    error("Internal error in regreplace().\n");
-                    /* NOTREACHED */
-                    return NULL;
-                }
-                xold = old - buf;
-                XREALLOC;
-                new = buf + xold;
-                old = buf + xold;
-                *old='\0';
-            }
-            space -= new - old;
-            while (space <= 0) {
-                XREALLOC;
-            }
-            if (curr == pat->endp[0])
-            {
-                /* prevent infinite loop
-                 * by advancing one character.
-                 */
-                if (!*curr) break;
-                --space;
-                while (space <= 0) {
-                    XREALLOC;
-                }
-                *new++ = *curr++;
-            }
-            else
-                curr = pat->endp[0];
-        } while ((flags&F_GLOBAL) && !pat->reganch && regexec(pat,curr,start));
-        space -= strlen(curr)+1;
-        if (space <= 0) {
-            XREALLOC;
-        }
-        strcpy(new,curr);
-    }
-    else
-    {
-        /* Pattern not found -> no editing necessary */
-        strcpy(buf,start);
-    }
-
-    if (pat)
-        REGFREE(pat);
-
-    free_svalue(sp);
-    sp--;
-    free_svalue(sp);
-    sp--;
-    free_svalue(sp);
-    sp--;
-    free_svalue(sp);
-    put_malloced_string(sp, string_copy(buf));
-    xfree(buf);
-    return sp;
-
-#undef F_EXCOMPAT
-#undef F_GLOBAL
-#undef XREALLOC
 }
 
 /***************************************************************************/

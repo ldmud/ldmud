@@ -240,7 +240,6 @@ extern void  add_message VARPROT((char *, ...), printf, 1, 2);
 extern void  flush_all_player_mess(void);
 extern Bool get_message(char *buff);
 extern void remove_interactive(object_t *ob);
-extern vector_t *users(void);
 extern void set_noecho(interactive_t *i, char noecho);
 extern int  find_no_bang (interactive_t *ip);
 extern Bool call_function_interactive(interactive_t *i, char *str);
@@ -248,11 +247,13 @@ extern void remove_all_players(void);
 extern void set_prompt(char *str);
 extern svalue_t *query_prompt(object_t *ob);
 extern void  print_prompt(void);
-extern int   set_snoop(object_t *me, object_t *you);
 extern void  init_telopts(void);
 extern void  mudlib_telopts(void);
-extern svalue_t *query_ip_name(svalue_t *sp, Bool lookup);
-extern svalue_t *e_input_to (svalue_t *sp, int num_arg);
+extern svalue_t *f_input_to (svalue_t *sp, int num_arg);
+
+#ifdef CATCH_UDP_PORT
+extern svalue_t *f_query_imp_port(svalue_t *sp);
+#endif
 
 #ifdef ERQ_DEMON
 extern void  start_erq_demon(char *suffix);
@@ -272,7 +273,6 @@ extern char *get_host_ip_number(void);
 extern svalue_t *f_query_snoop(svalue_t *sp);
 extern svalue_t *f_query_idle(svalue_t *sp);
 extern svalue_t *f_remove_interactive(svalue_t *sp);
-extern int   replace_interactive(object_t *ob, object_t *obfrom, char *name);
 
 #ifdef DEBUG
 extern void  count_comm_extra_refs(void);
@@ -282,11 +282,19 @@ extern void  count_comm_extra_refs(void);
 extern svalue_t *f_send_imp(svalue_t *sp);
 #endif /* UDP_SEND */
 
-extern svalue_t *f_set_buffer_size(svalue_t *sp);
 extern svalue_t *f_binary_message(svalue_t *sp);
+extern svalue_t *f_exec(svalue_t *sp);
+extern svalue_t *f_interactive(svalue_t *sp);
+extern svalue_t *f_query_input_pending(svalue_t *sp);
+extern svalue_t *f_query_ip_name(svalue_t *sp);
+extern svalue_t *f_query_ip_number(svalue_t *sp);
+extern svalue_t *f_query_mud_port(svalue_t *sp);
+extern svalue_t *f_set_buffer_size(svalue_t *sp);
 extern svalue_t *f_set_combine_charset(svalue_t *sp);
 extern svalue_t *f_set_connection_charset(svalue_t *sp);
-extern svalue_t *query_ip_port(svalue_t *sp);
+extern svalue_t *f_set_prompt(svalue_t *sp);
+extern svalue_t *f_snoop(svalue_t *sp, int num_arg);
+extern svalue_t *f_users(svalue_t *sp);
 
 #if defined(ACCESS_CONTROL)
 extern void refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) );

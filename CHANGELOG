@@ -1,6 +1,49 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Aug-2000 (Lars Duening)  (3.3.2)
+    - Forked 3.3 off the 3.2 branch at 3.2.9-dev.227.
+    - (bitstrings, files) New files holding the efuns for bitstrings
+         and files.
+    - (almost all files) Rewrote the codegeneration and -interpretation,
+         which has these effects:
+           - In func_spec, non-int arguments may be given the type
+             'null' if the number 0 is accepted at runtime.
+           - The relation between instruction code and prefix byte
+             is now defined via a table lookup and not a shift operation.
+           - The old prefixes 'escape', 'tefun' and 'vefun' are gone,
+             instead we have 'efun0'..'efun4' for efuns with fixed
+             argumens, and 'efunv' for vararg efuns.
+           - All LPC-related and machine internal instructions are
+             encoded without a prefix byte.
+           - Almost all efuns are now tabled, drastically reducing
+             the size of the switch() in the interpreter.
+           - The types of the tabled efuns are checked at runtime
+             by the interpreter against the specs in func_spec
+             _before_ the tabled efun itself is called. This means
+             that the efuns only have to check against illegal
+             type combinations and invalid values.
+           - New functions to handle argument-type errors were
+             introduced, which print the expected and the actual
+             type as part of their message.
+    - (hosts/msdos) Dropped from the release.
+    - (INSTALL) Added compilation notes provided by Bruce (thanks!)
+    - (xerq/erq.c) The DEBUG part was missing the data to generate proper
+         error messages for RLOOKUPV6 requests (reported by Fiona).
+    - And of course I forgot for 3.3.1 to remake all the dependencies *sigh*.
+
+23-Aug-2000 (Lars Duening)  (3.2.9-dev.227)
+    - (util/indent/, autoconf/configure.in) The Makefile is now under
+        configure control, and I removed a couple of warnings.
+    - (util/erq/erq.c) Oops, the check for HAVE_SYS_TIME came before
+        machine.h was included, so it couldn't work (reported by Betram
+        and Fiona).
+
+22-Aug-2000 (Lars Duening)  (3.2.9-dev.226)
+    - (hash, stralloc) Changed a few parameters from 'char*' to 'const char*'.
+    - (comm.c, erq, xerq) The IPv6 lookup was totally broken - fixed it.
+         (reported by Holger)
+
 20-Aug-2000 (Lars Duening)  (3.2.8-dev.225 == 3.2.8)
     - RELEASE 3.2.8
     - (func_spec, prolang.y) Efun clonep() now accepts 'mixed' arguments.

@@ -5,7 +5,7 @@
 #include "typedefs.h"
 
 #include "sent.h"    /* O_GET_* */
-#include "instrs.h"  /* F_SET_LIGHT */
+#include "instrs.h"  /* F_SET_LIGHT, F_TRANSFER */
 
 #ifdef DEBUG
 #include <stdio.h>      /* printf() for refcount tracing */
@@ -231,6 +231,7 @@ extern void remove_all_objects(void);
 #endif
 extern void do_free_sub_strings(int num_strings, char ** strings, int num_variables, variable_t *variable_names);
 extern void free_prog(program_t *progp, Bool free_sub_strings);
+extern char *function_exists(char *fun, object_t *ob);
 extern void reset_object(object_t *ob, int arg);
 extern void replace_programs(void);
 extern Bool shadow_catch_message(object_t *ob, char *str);
@@ -240,6 +241,53 @@ extern void _free_object(object_t *);
 extern object_t *get_empty_object(int num_var);
 #else
 extern object_t *get_empty_object(int num_var, variable_t * variables, svalue_t *initialisers);
+#endif
+
+extern svalue_t *f_function_exists(svalue_t *sp);
+extern svalue_t *f_functionlist(svalue_t *sp);
+extern svalue_t *f_inherit_list(svalue_t *sp);
+extern svalue_t *f_load_name(svalue_t *sp);
+extern svalue_t *f_object_name(svalue_t *sp);
+extern svalue_t *f_object_time(svalue_t *sp);
+extern svalue_t *f_program_name(svalue_t *sp);
+extern svalue_t *f_program_time(svalue_t *sp);
+extern svalue_t *f_query_once_interactive(svalue_t *sp);
+extern svalue_t *f_rename_object(svalue_t *sp);
+extern svalue_t *f_replace_program(svalue_t *sp);
+extern svalue_t *f_tell_object(svalue_t *sp);
+extern svalue_t *f_set_next_reset(svalue_t *sp);
+
+extern svalue_t *f_export_uid(svalue_t *sp);
+extern svalue_t *f_geteuid(svalue_t *sp);
+extern svalue_t *f_seteuid(svalue_t *sp);
+#ifndef COMPAT_MODE
+extern svalue_t *f_getuid(svalue_t *sp);
+#else
+extern svalue_t *f_creator(svalue_t *sp);
+#endif
+
+extern svalue_t *f_all_environment(svalue_t *sp, int num_arg);
+extern svalue_t *f_all_inventory(svalue_t *sp);
+#if defined(SUPPLY_PARSE_COMMAND) && !defined(COMPAT_MODE)
+extern vector_t *deep_inventory(object_t *ob, Bool take_top);
+  /* needed by parse.c */
+#endif
+extern svalue_t *f_deep_inventory(svalue_t *sp);
+extern svalue_t *f_environment(svalue_t *sp, int num_arg);
+extern svalue_t *f_first_inventory(svalue_t *sp);
+extern svalue_t *f_next_inventory(svalue_t *sp);
+extern svalue_t *f_move_object (svalue_t *sp);
+extern svalue_t *f_present(svalue_t *sp, int num_arg);
+extern svalue_t *f_say(svalue_t *sp, int num_arg);
+extern svalue_t *f_tell_room(svalue_t *sp, int num_arg);
+extern svalue_t *f_set_environment(svalue_t *sp);
+#ifdef F_TRANSFER
+extern svalue_t *f_transfer(svalue_t *svp);
+#endif /* F_TRANSFER */
+
+#ifdef F_SET_LIGHT
+extern void add_light(object_t *p, int n);
+extern svalue_t *f_set_light(svalue_t *sp);
 #endif
 
 extern svalue_t *f_save_object(svalue_t *sp, int numarg);

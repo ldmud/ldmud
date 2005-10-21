@@ -265,8 +265,7 @@ get_simul_efun_object (void)
         funstart = inherit_progp->program + (flags2 & FUNSTART_MASK);
 
         /* Don't stumble over undefined functions */
-        if (GET_CODE(FUNCTION_CODE(funstart)) == F_ESCAPE
-         && GET_CODE(FUNCTION_CODE(funstart)+1) == F_UNDEF - 0x100)
+        if (GET_CODE(FUNCTION_CODE(funstart)) == F_UNDEF)
         {
             flags |= NAME_UNDEFINED;
         }

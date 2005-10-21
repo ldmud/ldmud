@@ -113,6 +113,27 @@ struct condensed_mapping {
      */
 };
 
+/* --- struct mvf_info: structure used by m_values()/unmkmapping() ---
+ *
+ * This structure is passed by reference to the filter functions used
+ * by the two efuns and passes information from one filter call to the
+ * next.
+ */
+struct mvf_info
+{
+    svalue_t * svp;
+      /* m_values_filter: Pointer to next result vector entry
+       * m_unmake_filter: Pointer to result array of svalues
+       */
+    int             num;
+      /* m_values_filter: Column to retrieve.
+       * m_unmake_filter: Next row to retrieve
+       */
+    int             width;
+      /* m_unmake_filter: width of the mapping
+       */
+};
+
 /* --- Macros --- */
 
 #define CM_MISC(m) ((svalue_t *)(m))
@@ -175,7 +196,6 @@ extern svalue_t *_get_map_lvalue(mapping_t *m, svalue_t *map_index, Bool need_lv
 #define get_map_lvalue(m,x) _get_map_lvalue(m,x,MY_TRUE, MY_TRUE)
 #define get_map_lvalue_unchecked(m,x) _get_map_lvalue(m,x,MY_TRUE, MY_FALSE)
 extern void check_map_for_destr(mapping_t *m);
-extern void remove_mapping(mapping_t *m, svalue_t *map_index);
 extern mapping_t *copy_mapping(mapping_t *m);
 extern mapping_t *resize_mapping(mapping_t *m, mp_int new_width);
 extern mapping_t *add_mapping(mapping_t *m1, mapping_t *m2);
@@ -184,7 +204,14 @@ extern void compact_mappings(mp_int num);
 extern mp_int total_mapping_size(void);
 extern void set_mapping_user(mapping_t *m, object_t *owner);
 
+extern svalue_t *f_copy_mapping(svalue_t *sp);
+extern svalue_t *f_m_allocate(svalue_t *sp);
+extern svalue_t *f_m_contains(svalue_t *sp, int num_arg);
+extern svalue_t *f_m_delete(svalue_t *sp);
 extern vector_t *m_indices(mapping_t *m);
+extern svalue_t *f_m_indices(svalue_t *sp);
+extern svalue_t *f_m_values(svalue_t *sp);
+extern svalue_t *f_mkmapping (svalue_t *sp, int num_arg);
 extern void sub_from_mapping_filter(svalue_t *key, svalue_t *data, void *extra);
 extern void add_to_mapping(mapping_t *m1, mapping_t *m2);
 extern mapping_t *subtract_mapping(mapping_t *minuend, mapping_t *subtrahend);
@@ -194,6 +221,8 @@ extern svalue_t *x_map_mapping(svalue_t *sp, int num_arg, Bool bFull);
 extern svalue_t *f_map_indices (svalue_t *sp, int num_arg);
 extern svalue_t *f_walk_mapping(svalue_t *sp, int num_arg);
 extern svalue_t *f_m_reallocate (svalue_t *sp);
+extern svalue_t *f_unmkmapping (svalue_t *sp);
+extern svalue_t *f_widthof (svalue_t *sp);
 
 #ifdef DEBUG
 extern void check_dirty_mapping_list(void);

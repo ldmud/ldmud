@@ -279,7 +279,7 @@ inhibit_newline:
     paren_target = -parser_state_tos->paren_indents[parser_state_tos->paren_level - 1];
     not_first_line = 1;
     return;
-};
+}
 
 /* Figure out where we should put the code in codebuf.
    Return the column number in spaces.  */
@@ -545,7 +545,7 @@ pad_output(current, target)	/* writes tabs and blanks (if necessary) to
 	    putc(' ', output);	/* pad with final blanks */
     }
     return (target);
-};
+}
 
 /*
  * Copyright (C) 1976 by the Board of Trustees of the University of Illinois
@@ -603,7 +603,7 @@ count_spaces(current, buffer)
 	}			/* end of switch */
     }				/* end of for loop */
     return (cur);
-};
+}
 
 /* Nonzero if we have found an error (not a warning).  */
 int	found_err;

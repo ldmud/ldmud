@@ -287,7 +287,7 @@ main (int argc, char **argv)
      */
     ref_object(master_ob, "main");
     initialize_master_uid();
-    push_number(0);
+    push_number(inter_sp, 0);
     apply_master_ob(STR_INAUGURATE, 1);
     setup_print_block_dispatcher();
 
@@ -1685,7 +1685,7 @@ secondscan (int eOption, const char * pValue)
     switch (eOption)
     {
     case cFuncall:
-        push_volatile_string((char *)pValue);
+        push_volatile_string(inter_sp, (char *)pValue);
         (void)apply_master_ob(STR_FLAG, 1);
         if (game_is_being_shut_down) {
             fprintf(stderr, "%s Shutdown by master object.\n", time_stamp());

@@ -162,7 +162,6 @@
 #include <stdio.h>
 #include <fcntl.h>
 
-#define NO_REF_STRING
 #define USES_SVALUE_STRLEN
 #include "object.h"
 
@@ -174,6 +173,7 @@
 #include "exec.h"
 #include "filestat.h"
 #include "interpret.h"
+#include "instrs.h"
 #include "main.h"
 #include "mapping.h"
 #include "otable.h"
@@ -183,6 +183,7 @@
 #include "sent.h"
 #include "smalloc.h"
 #include "simulate.h"
+#include "simul_efun.h"
 #include "stdstrings.h"
 #include "stralloc.h"
 #include "strfuns.h"
@@ -540,6 +541,74 @@ free_prog (program_t *progp, Bool free_sub_strings)
 }
 
 /*-------------------------------------------------------------------------*/
+char *
+function_exists (char *fun, object_t *ob)
+
+/* Search for the function <fun> in the object <ob>. If existing, return
+ * the name of the program, if not return NULL.
+ *
+ * Visibility rules apply: static and protected functions can't be
+ * found from the outside.
+ */
+
+{
+    char *shared_name;
+    fun_hdr_p funstart;
+    program_t *progp;
+    int ix;
+    funflag_t flags;
+
+#ifdef DEBUG
+    if (ob->flags & O_DESTRUCTED)
+        fatal("function_exists() on destructed object\n");
+#endif
+
+    /* Make the program resident */
+    if (O_PROG_SWAPPED(ob))
+    {
+        ob->time_of_ref = current_time;
+        if (load_ob_from_swap(ob) < 0)
+            error("Out of memory: unswap object '%s'\n", ob->name);
+    }
+
+    shared_name = findstring(fun);
+    progp = ob->prog;
+
+    /* Check if the function exists at all */
+    if ( (ix = find_function(shared_name, progp)) < 0)
+        return NULL;
+
+    /* Is it visible for the caller? */
+    flags = progp->functions[ix];
+
+    if (flags & TYPE_MOD_PRIVATE
+     || (flags & TYPE_MOD_STATIC && current_object != ob))
+        return NULL;
+
+    /* Resolve inheritance */
+    while (flags & NAME_INHERITED)
+    {
+        inherit_t *inheritp;
+
+        inheritp = &progp->inherit[flags & INHERIT_MASK];
+        ix -= inheritp->function_index_offset;
+        progp = inheritp->prog;
+        flags = progp->functions[ix];
+    }
+
+    funstart = progp->program  + (flags & FUNSTART_MASK);
+
+    /* And after all this, the function may be undefined */
+    if (FUNCTION_CODE(funstart)[0] == F_UNDEF)
+    {
+        return NULL;
+    }
+
+    /* We got it. */
+    return progp->name;
+} /* function_exists() */
+
+/*-------------------------------------------------------------------------*/
 void
 reset_object (object_t *ob, int arg)
 
@@ -599,7 +668,7 @@ reset_object (object_t *ob, int arg)
              * object.
              */
             l->ob = current_object;
-            push_object(ob);
+            push_ref_object(inter_sp, ob, "reset");
             call_lambda(&closure_hook[arg], 1);
         }
         else
@@ -621,7 +690,7 @@ reset_object (object_t *ob, int arg)
     }
     else if (closure_hook[arg].type == T_STRING)
     {
-        push_number(arg == H_RESET);
+        push_number(inter_sp, arg == H_RESET);
         if (!sapply(closure_hook[arg].u.string, ob, 1) && arg == H_RESET)
             ob->time_reset = 0;
     }
@@ -816,17 +885,118 @@ replace_programs (void)
 }  /* replace_programs() */
 
 /*-------------------------------------------------------------------------*/
+static replace_ob_t *
+retrieve_replace_program_entry (void)
+
+/* Auxiliary function to efun replace_program(): test if a program
+ * replacement is already scheduled for the current object. If yes,
+ * return the pointer to the replace_ob struct, else return NULL.
+ */
+
+{
+    replace_ob_t *r_ob;
+
+    for (r_ob = obj_list_replace; r_ob; r_ob = r_ob->next)
+    {
+        if (r_ob->ob == current_object)
+            return r_ob;
+    }
+    return NULL;
+}
+
+/*-------------------------------------------------------------------------*/
+static program_t *
+search_inherited (char *str, program_t *prg, int *offpnt)
+
+/* Auxiliary function to efun replace_program(): check if program <str>
+ * is inherited by <prg>. If yes, return the originating program and
+ * store the (accumulated) variable and function offsets in offpnt[0]
+ * and offpnt[1] resp.
+ *
+ * If the program is not found, return NULL.
+ *
+ * Nested inherits are handled in a depth search, the function recurses
+ * for this.
+ */
+
+{
+    program_t *tmp;
+    int i;
+#ifdef DEBUG
+    char *ts;
+#endif
+
+#ifdef DEBUG
+    ts = NULL;
+    if (d_flag)
+    {
+        ts = time_stamp();
+        debug_message("%s search_inherited started\n", ts);
+        debug_message("%s searching for PRG(%s) in PRG(%s)\n"
+                     , ts, str, prg->name);
+        debug_message("%s num_inherited=%d\n", ts, prg->num_inherited);
+    }
+#endif
+
+    /* Loop through all inherited programs, returning directly when
+     * the name program was found.
+     */
+    for ( i = 0; i < prg->num_inherited; i++)
+    {
+#ifdef DEBUG
+        if (d_flag)
+        {
+            debug_message("%s index %d:\n", ts, i);
+            debug_message("%s checking PRG(%s)\n"
+                         , ts, prg->inherit[i].prog->name);
+        }
+#endif
+        /* Duplicate virtual inherits don't count */
+        if ( prg->inherit[i].inherit_type & INHERIT_TYPE_DUPLICATE )
+            continue;
+
+        if ( strcmp(str, prg->inherit[i].prog->name ) == 0 )
+        {
+#ifdef DEBUG
+            if (d_flag)
+                debug_message("%s match found\n", ts);
+#endif
+            offpnt[0] = prg->inherit[i].variable_index_offset;
+            offpnt[1] = prg->inherit[i].function_index_offset;
+            return prg->inherit[i].prog;
+        }
+        else if ( NULL != (tmp = search_inherited(str, prg->inherit[i].prog,offpnt)) )
+        {
+#ifdef DEBUG
+            if (d_flag)
+                debug_message("%s deferred match found\n", ts);
+#endif
+            offpnt[0] += prg->inherit[i].variable_index_offset;
+            offpnt[1] += prg->inherit[i].function_index_offset;
+            return tmp;
+        }
+    }
+
+#ifdef DEBUG
+    if (d_flag)
+        debug_message("%s search_inherited failed\n", ts);
+#endif
+
+    return NULL;
+} /* search_inherited() */
+
+/*-------------------------------------------------------------------------*/
 void
 tell_npc (object_t *ob, char *str)
 
 /* Call the lfun 'catch_tell()' in object <ob> with <str> as argument.
  *
- * This function is used to talk to non-i nteractive commandgivers
+ * This function is used to talk to non-interactive commandgivers
  * (aka NPCs).
  */
 
 {
-    push_volatile_string(str);
+    push_volatile_string(inter_sp, str);
     (void)sapply(STR_CATCH_TELL, ob, 1);
 }
 
@@ -894,7 +1064,7 @@ shadow_catch_message (object_t *ob, char *str)
         return MY_FALSE;
 
     trace_level |= ip->trace_level;
-    push_volatile_string(str);
+    push_volatile_string(inter_sp, str);
     if (sapply(STR_CATCH_TELL, ob, 1))
         return MY_TRUE;
 
@@ -988,6 +1158,2657 @@ renumber_programs (void)
     invalidate_apply_low_cache();
     return ++current_id_number;
 }
+
+/*=========================================================================*/
+/*                                EFUNS                                    */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_function_exists (svalue_t *sp)
+
+/* EXEC function_exists()
+ *
+ *   string function_exists(string str, object ob)
+ *
+ * Return the file name of the object that defines the function
+ * str in object ob. The returned value can be different from
+ * file_name(ob) if the function is defined in an inherited
+ * object. In native mode, the returned name always begins with a
+ * '/' (absolute path). 0 is returned if the function was not
+ * defined, or was defined as static.
+ */
+
+{
+    char *str, *res, *p;
+
+    str = function_exists((sp-1)->u.string, sp->u.ob);
+    free_svalue(sp);
+    free_svalue(--sp);
+    if (str)
+    {
+        /* Make a copy of the string so that we can remove
+         * a the trailing '.c'. In non-compat mode, we also
+         * have to add the leading '/'.
+         */
+        p = strrchr (str, '.');
+
+        if (p)
+            *p = '\0';  /* temporarily mask out the '.c' */
+
+#ifdef COMPAT_MODE
+        res = string_copy (str);
+#else
+        res = add_slash(str);
+#endif
+        if (p)
+            *p = '.';  /* undo the change above */
+
+        if (!res)
+        {
+            sp--;
+            inter_sp = sp;
+            error("Out of memory\n");
+        }
+        put_malloced_string(sp, res);
+    }
+    else
+    {
+        put_number(sp, 0);
+    }
+
+    return sp;
+} /* f_function_exists() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_functionlist (svalue_t *sp)
+
+/* EFUN functionlist()
+ *
+ *   mixed *functionlist (object ob, int flags = RETURN_FUNCTION_NAME)
+ *
+ * Return an array with information about <ob>s lfunctions. For every
+ * function, 1 to 4 values (depending on <flags>) are stored in
+ * the result array conveying in this order:
+ *   - the name of the function
+ *   - the function flags (see below)
+ *   - the return type (listed in mudlib/sys/lpctypes.h)
+ *   - the number of accepted argumens
+ *
+ * <ob> may be given as true object or as a filename. In the latter
+ * case, the efun does not try to load the object before proceeding.
+ *
+ * <flags> determines both which information is returned for every
+ * function, and which functions should be considered at all.
+ * Its value is created by bin-or'ing together following flags from
+ * mudlib/sys/functionlist.h:
+ *
+ *   Control of returned information:
+ *     RETURN_FUNCTION_NAME    include the function name
+ *     RETURN_FUNCTION_FLAGS   include the function flags
+ *     RETURN_FUNCTION_TYPE    include the return type
+ *     RETURN_FUNCTION_NUMARG  include the number of arguments.
+ *
+ *     The name RETURN_FUNCTION_ARGTYPE is defined but not implemented.
+ *
+ *   Control of listed functions:
+ *     NAME_INHERITED      list if defined by inheritance
+ *     TYPE_MOD_STATIC     list if static function
+ *     TYPE_MOD_PRIVATE    list if private
+ *     TYPE_MOD_PROTECTED  list if protected
+ *     NAME_HIDDEN         list if not visible through inheritance
+ *
+ * The 'flags' information consists of the bin-or of the list control
+ * flags given above, plus the following:
+ *
+ *     TYPE_MOD_VARARGS    function takes varargs
+ *     NAME_UNDEFINED      function not defined yet, but referenced.
+ *     NAME_CROSS_DEFINED  function is defined to be in a different program
+ *     TYPE_MOD_NO_MASK    function is nomask
+ *     TYPE_MOD_PUBLIC     function is public
+ *
+ * All these flags are defined in mudlib/sys/functionlist.h, which
+ * should be copied into an accessible place in the mudlib. The
+ * return types are defined in mudlib/sys/lpctypes.h which also
+ * should be copied into the mudlib.
+ *
+ * TODO: All these defs are in mudlib/sys/functionlist.h and mudlib/sys/lpctypes.h
+ * TODO:: as well as in exec.h and this file. This should be centralized.
+ * TODO:: Maybe write the files on mud startup?
+ * TODO:: Include mudlib/sys/functionlist.h doesn't help because then
+ * TODO:: mkdepend stumbles over the embedded include <sys/lpctypes.h>.
+ */
+
+{
+#define RETURN_FUNCTION_NAME    0x01
+#define RETURN_FUNCTION_FLAGS   0x02
+#define RETURN_FUNCTION_TYPE    0x04
+#define RETURN_FUNCTION_NUMARG  0x08
+
+#define RETURN_FUNCTION_MASK    0x0f  /* union of all RETURN_FUNCTION_ defs */
+
+#define RETURN_FUNCTION_ARGTYPE 0x10 /* not implemented */
+
+    object_t *ob;         /* <ob> argument to list */
+    mp_int mode_flags;    /* <flags> argument */
+    program_t *prog;      /* <ob>'s program */
+    unsigned short num_functions;  /* Number of functions to list */
+    char *vis_tags;
+      /* Bitflag array describing the visibility of every function in prog
+       * in relation to the passed <flags>: */
+#define VISTAG_INVIS '\0'  /* Function should not be listed */
+#define VISTAG_VIS   '\1'  /* Function matches the <flags> list criterium */
+#define VISTAG_ALL   '\2'  /* Function should be listed, no list restrictions */
+
+    vector_t *list;       /* Result vector */
+    svalue_t *svp;        /* Last element in list which was filled in. */
+    uint32 *fun;          /* Current function under examination */
+    uint32 active_flags;  /* A functions definition status flags */
+    program_t *defprog;   /* Program which actually defines *fun */
+    uint32 flags;
+    unsigned short *ixp;
+    long i, j;
+
+    inter_sp = sp; /* In case of errors leave a clean stack */
+
+    /* Extract the arguments from the vm stack.
+     */
+    if (sp[-1].type != T_OBJECT)
+    {
+        if (!(ob = find_object(sp[-1].u.string)))
+            error("Object '%s' not found.\n", sp[-1].u.string);
+    }
+    else
+        ob = sp[-1].u.ob;
+
+    mode_flags = sp->u.number;
+
+    if (O_PROG_SWAPPED(ob))
+        if (load_ob_from_swap(ob) < 0)
+        {
+            error("Out of memory: unswap object '%s'\n", ob->name);
+            /* NOTREACHED */
+            return NULL;
+        }
+
+    prog = ob->prog;
+
+    /* Initialize the vistag[] flag array.
+     */
+    num_functions = prog->num_functions;
+    vis_tags = alloca(num_functions);
+    if (!vis_tags)
+    {
+        error("Stack overflow in functionlist()");
+        /* NOTREACHED */
+        return NULL;
+    }
+
+    memset(
+      vis_tags,
+      mode_flags &
+      (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|
+       NAME_INHERITED) ?
+        VISTAG_INVIS :
+        VISTAG_ALL  ,
+      num_functions
+    );
+
+    flags = mode_flags &
+        (TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|NAME_INHERITED);
+
+    /* Count how many functions need to be listed in the result.
+     * Flag every function to list in vistag[].
+     * TODO: Document me properly when the layout of programs and functions
+     * TODO:: is clear.
+     */
+    fun = prog->functions;
+    num_functions = 0;
+    j = prog->num_function_names;
+    for (ixp = prog->function_names + j; --j >= 0; ) {
+        i = *--ixp;
+        if ( !(fun[i] & flags) ) {
+            vis_tags[i] = VISTAG_VIS;
+            num_functions++;
+        }
+    }
+
+    /* If <flags> accepts all functions, use the total number of functions
+     * instead of the count computed above.
+     */
+    if ( !(mode_flags &
+           (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|
+            NAME_INHERITED) ) )
+    {
+        num_functions = prog->num_functions;
+    }
+
+    /* Compute the size of the result vector to
+     *  2**(number of RETURN_FUNCTION_ bits set)
+     */
+    for (i = mode_flags & RETURN_FUNCTION_MASK, j = 0; i; i >>= 1) {
+        if (i & 1)
+            j += num_functions;
+    }
+
+    /* Allocate the result vector and set svp to its end
+     */
+    list = allocate_array(j);
+    svp = list->item + j;
+
+    /* Loop backwards through all functions, check their flags if
+     * they are to be listed and store the requested data in
+     * the result vector.
+     */
+
+    for(i = prog->num_functions, fun += i; --i >= 0; ) {
+        fun_hdr_p funstart; /* Pointer to function in the executable */
+
+        fun--;
+
+        if (!vis_tags[i]) continue; /* Don't list this one */
+
+        flags = *fun;
+
+        active_flags = (flags & ~INHERIT_MASK);
+        if (vis_tags[i] & VISTAG_ALL)
+            active_flags |= NAME_HIDDEN; /* TODO: Why? */
+
+        defprog = prog;
+
+        /* If its a cross-defined function, get the flags from
+         * real definition and let j point to it.
+         */
+        if ( !~(flags | ~(NAME_INHERITED|NAME_CROSS_DEFINED) ) ) {
+            active_flags |= NAME_CROSS_DEFINED;
+            j = (long)CROSSDEF_NAME_OFFSET(flags);
+            flags = fun[j];
+            j += i;
+        } else {
+            j = i;
+        }
+
+        /* If the function is inherited, find the original definition.
+         */
+        while (flags & NAME_INHERITED) {
+            inherit_t *ip = &defprog->inherit[flags & INHERIT_MASK];
+
+            defprog = ip->prog;
+            j -= ip->function_index_offset;
+            flags = defprog->functions[j];
+        }
+
+        /* defprog now points to the program which really defines
+         * the function fun.
+         */
+
+        funstart = defprog->program + (flags & FUNSTART_MASK);
+
+        /* Add the data to the result vector as <flags> determines.
+         */
+
+        if (mode_flags & RETURN_FUNCTION_NUMARG) {
+            svp--;
+            svp->u.number = FUNCTION_NUM_ARGS(funstart) & 0x7f;
+        }
+
+        if (mode_flags & RETURN_FUNCTION_TYPE) {
+            svp--;
+            svp->u.number = FUNCTION_TYPE(funstart); /* return type */
+        }
+
+        if (mode_flags & RETURN_FUNCTION_FLAGS) {
+
+            /* If the function starts with the bytecodes F_UNDEF,
+             * it referenced but undefined. But you know that.
+             */
+            if (FUNCTION_CODE(funstart)[0] == F_UNDEF)
+            {
+                active_flags |= NAME_UNDEFINED;
+            }
+            svp--;
+            svp->u.number = (p_int)active_flags;
+        }
+
+        if (mode_flags & RETURN_FUNCTION_NAME) {
+            svp--;
+            svp->type = T_STRING;
+            svp->x.string_type = STRING_SHARED;
+            memcpy( &svp->u.string, FUNCTION_NAMEP(funstart)
+                  , sizeof svp->u.string);
+            ref_string(svp->u.string);
+        }
+    } /* for() */
+
+    /* Cleanup and return */
+    free_svalue(sp);
+    sp--;
+    free_svalue(sp);
+
+    put_array(sp, list);
+    return sp;
+
+#undef VISTAG_INVIS
+#undef VISTAG_VIS
+#undef VISTAG_ALL
+
+#undef RETURN_FUNCTION_NAME
+#undef RETURN_FUNCTION_FLAGS
+#undef RETURN_FUNCTION_TYPE
+#undef RETURN_FUNCTION_NUMARG
+#undef RETURN_FUNCTION_ARGTYPE
+#undef RETURN_FUNCTION_MASK
+} /* f_function_list() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_inherit_list (svalue_t *sp)
+
+/* EFUN inherit_list()
+ *
+ *   string* inherit_list (object ob = this_object())
+ *
+ * Return a list with the filenames of all programs inherited by <ob>, include
+ * <ob>'s program itself.
+ * TODO: Must be fixed so that any number of files can be returned, not just 256.
+ */
+
+{
+    object_t *ob;           /* Analyzed object */
+    vector_t *vec;          /* Result vector */
+    svalue_t *svp;          /* Pointer to next vec entry to fill in */
+    program_t *pr;          /* Next program to count */
+    program_t **prp;        /* Pointer to pr->inherit[x].prog */
+      /* Incrementing prp by sizeof(inherit) bytes walks along the
+       * the vector of inherited programs.
+       */
+    program_t *plist[256];  /* Table of found programs */
+    int next;               /* Next free entry in plist[] */
+    int cur;                /* Current plist[] entry analyzed */
+
+    /* Get the argument */
+    ob = sp->u.ob;
+
+    inter_sp = sp;
+      /* three possibilities for 'out of memory' follow, so clean
+       * up the stack now.
+       */
+
+    if (O_PROG_SWAPPED(ob))
+        if (load_ob_from_swap(ob) < 0) {
+            error("Out of memory: unswap object '%s'\n", ob->name);
+            /* NOTREACHED */
+            return NULL;
+        }
+
+    /* Perform a breadth search on ob's inherit tree and store the
+     * program pointers into plist[] while counting them.
+     */
+
+    plist[0] = ob->prog;
+    next = 1;
+    for (cur = 0; cur < next; cur++)
+    {
+        int cnt;
+        inherit_t *inheritp;
+
+        pr = plist[cur];
+        cnt = pr->num_inherited;
+        if (next + cnt > (int)(sizeof plist/sizeof *plist))
+            break;
+
+        /* Store the inherited programs in the list.
+         */
+        for (inheritp = &pr->inherit[0]; cnt--; inheritp++)
+        {
+            if (inheritp->inherit_type == INHERIT_TYPE_NORMAL)
+                plist[next++] = inheritp->prog;
+        }
+    }
+
+    /* next is also the actual number of files found :-) */
+    vec = allocate_array(next);
+
+    /* Take the filenames of the program and copy them into
+     * the result vector.
+     * TODO: What? The filenames are not shared a priori?
+     */
+    for (svp = vec->item, prp = plist; --next >= 0; svp++) {
+        char *str;
+
+        pr = *prp++;
+#ifdef COMPAT_MODE
+        str = string_copy(pr->name);
+#else
+        str = add_slash(pr->name);
+#endif
+        if (!str)
+        {
+            free_array(vec);
+            error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
+                 , (unsigned long)strlen(pr->name));
+        }
+        put_malloced_string(svp, str);
+    }
+
+    free_object_svalue(sp);
+
+    put_array(sp, vec);
+    return sp;
+} /* f_inherit_list() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_load_name (svalue_t *sp)
+
+/* EFUN load_name()
+ *
+ *   string load_name()
+ *   string load_name(object obj)
+ *   string load_name(string obj)
+ *
+ * Return the load name for the object <obj> which may be given
+ * directly or by its name.
+ *
+ * If <obj> is a clone, return the load_name() of <obj>'s blueprint.
+ * If <obj> is a blueprint, return the filename from which the
+ * blueprint was compiled.
+ *
+ * If <obj> is given by name but not/no longer existing, the
+ * function synthesizes the load name as it should be and returns
+ * that. If the given name is illegal, the function returns 0.
+ *
+ * For virtual objects this efun of course returns the virtual
+ * filename.  If <obj> is omitted, the name for the current object is
+ * returned.
+ *
+ * In contrast to the object_name(), the load name can not be changed
+ * by with rename_object(). However, if an object uses
+ * replace_program() the load name no longer reflects the actual
+ * behaviour of an object.
+ *
+ * The returned name starts with a '/', unless the driver is running
+ * in COMPAT mode.
+ */
+
+{
+    char *s;       /* String argument */
+    char *name;    /* Result string, maybe 's' itself */
+    char *hash;    /* Position of the hash in the name */
+    char *mem;     /* Allocated memory blocks */
+    object_t *ob;
+
+    /* If the argument is an object, we just need to read the name */
+    if (sp->type == T_OBJECT)
+    {
+        s = sp->u.ob->load_name;
+        free_object_svalue(sp);
+        put_ref_string(sp, s);
+        return sp;
+    }
+
+    /* Argument is a string: try to find the object for it */
+    s = sp->u.string;
+    ob = find_object(s);
+    if (ob)
+    {
+        /* Got it */
+        s = ob->load_name;
+        free_string_svalue(sp);
+        put_ref_string(sp, s);
+        return sp;
+    }
+
+    /* There is no object for the string argument: just normalize
+     * the string. First check if it ends in #<number>.
+     */
+    mem = NULL;
+    hash = strchr(s, '#');
+    if (!hash)
+    {
+        /* No '#' at all: make the name sane directly */
+#ifdef COMPAT_MODE
+        name = (char *)make_name_sane(s, MY_FALSE);
+#else
+        name = (char *)make_name_sane(s, MY_TRUE);
+#endif
+        if (!name)
+            name = s;
+    }
+    else
+    {
+        char *p;
+        size_t len;
+        
+        /* All characters after the '#' must be digits */
+        for (p = hash+1; '\0' != *p; p++)
+            if (*p < '0' || *p > '9')
+                /* Illegal name: break to return svalue 0 */
+                break;
+
+        if ('\0' != *p)
+        {
+            /* Illegal name: break to return svalue 0 */
+            free_string_svalue(sp);
+            put_number(sp, 0);
+            return sp;
+        }
+
+        /* Good, we can slash off the '#<number>' */
+        len = (size_t)(hash - s);
+        p = mem = xalloc(len+1);
+        if (!p)
+            error("(load_name) Out of memory (%lu bytes) for filename.", len+1);
+        strncpy(p, s, len);
+        p[len] = '\0';
+
+        /* Now make the name sane */
+#ifdef COMPAT_MODE
+        name = (char *)make_name_sane(p, MY_FALSE);
+#else
+        name = (char *)make_name_sane(p, MY_TRUE);
+#endif
+        if (!name)
+            name = p;
+    }
+
+    /* name now points to the synthesized load_name and
+     * may be the argument (== s), allocated (== mem), or
+     * points to a static buffer otherwise.
+     */
+
+#ifdef COMPAT_MODE
+    /* '/.c' is a legal object name, so make sure that
+     * the result will be '/'.
+     */
+    if ('\0' == *name)
+        name = "/";
+#endif
+
+    /* Now return the result */
+    if (s != name)
+    {
+        free_string_svalue(sp);
+        if (name == mem)
+        {
+            put_malloced_string(sp, name);
+            mem = NULL;  /* do not deallocate this */
+        }
+        else
+        {
+            put_volatile_string(sp, name);
+        }
+    }
+
+    if (mem)
+        xfree(mem);
+     
+    return sp;
+} /* f_load_name() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_object_name (svalue_t *sp)
+
+/* EFUN object_name()
+ *
+ *   string object_name()
+ *   string object_name(object ob)
+ *
+ * Get the name of an object <ob> or, if no argument is given, of
+ * the current object.
+ *
+ * This name is the name under which the object is stored in the
+ * muds object table. It is initialised at the creation of the
+ * object such that blueprints are named after the file they are
+ * compiled from (without the trailing '.c'), and clones receive
+ * the name of their blueprint, extended by '#' followed by
+ * a unique non-negative number. These rules also apply to
+ * virtual objects - the real name/type of virtual objects
+ * is ignored.
+ *
+ * The name of an object can be changed with rename_object(), and
+ * object_name() will reflect any of these changes.
+ *
+ * The returned name always begins with '/' (absolute path),
+ * except when the parser runs in COMPAT mode.
+ */
+
+{
+    char *name,*res;
+
+    name = sp->u.ob->name;
+#ifdef COMPAT_MODE
+    res = string_copy(name);
+#else
+    res = add_slash(name);
+#endif
+    if (!res)
+        error("Out of memory\n");
+    free_object_svalue(sp);
+    put_malloced_string(sp, res);
+
+    return sp;
+} /* f_object_name() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_object_time (svalue_t *sp)
+
+/* EFUN object_time()
+ *
+ *   int object_time()
+ *   int object_time(object ob)
+ *
+ * Returns the creation time of the object.
+ * Default is this_object(), if no arg is given.
+ */
+
+{
+    mp_int load_time;
+
+    load_time = sp->u.ob->load_time;
+
+    free_object_svalue(sp);
+    put_number(sp, load_time);
+
+    return sp;
+} /* f_object_time() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_program_name (svalue_t *sp)
+
+/* EFUN program_name()
+ *
+ *   string program_name()
+ *   string program_name(object obj)
+ *
+ * Returns the name of the program of <obj>, resp. the name of the
+ * program of the current object if <obj> is omitted.
+ *
+ * The returned name is usually the name from which the blueprint
+ * of <obj> was compiled (the 'load name'), but changes if an
+ * object replaces its programs with the efun replace_program().
+ *
+ * The name always ends in '.c'. It starts with a '/' unless the
+ * driver is running in COMPAT mode.
+ */
+
+{
+    char *name, *res;
+    object_t *ob;
+
+    ob = sp->u.ob;
+    if (O_PROG_SWAPPED(ob))
+    {
+        ob->time_of_ref = current_time;
+        if (load_ob_from_swap(ob) < 0)
+        {
+            error("Out of memory: unswap object '%s'\n", ob->name);
+        }
+    }
+    name = ob->prog->name;
+#ifdef COMPAT_MODE
+    res = string_copy(name);
+#else
+    res = add_slash(name);
+#endif
+    if (!res)
+        error("Out of memory\n");
+    free_object_svalue(sp);
+    put_malloced_string(sp, res);
+
+    return sp;
+} /* f_program_name() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_program_time (svalue_t *sp)
+
+/* EFUN program_time()
+ *
+ *   int program_time()
+ *   int program_time(object ob)
+ *
+ * Returns the creation (compilation) time of the object's
+ * program. Default is this_object(), if no arg is given.
+ */
+
+{
+    mp_int load_time;
+
+    if (O_PROG_SWAPPED(sp->u.ob))
+    {
+        sp->u.ob->time_of_ref = current_time;
+        if (load_ob_from_swap(sp->u.ob) < 0)
+        {
+            sp--;
+            error("Out of memory: unswap object '%s'\n", sp->u.ob->name);
+        }
+    }
+    load_time = sp->u.ob->prog->load_time;
+
+    free_object_svalue(sp);
+    put_number(sp, load_time);
+
+    return sp;
+} /* f_program_time() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_query_once_interactive (svalue_t *sp)
+
+/* EFUN query_once_interactive()
+ *
+ *   int query_once_interactive(object ob)
+ *
+ * True if the object is or once was interactive.
+ */
+
+{
+    object_t *obj;
+
+    obj = sp->u.ob;
+    put_number(sp, obj->flags & O_ONCE_INTERACTIVE ? 1 : 0);
+    deref_object(obj, "query_once_interactive");
+
+    return sp;
+} /* f_query_once_interactive() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_rename_object (svalue_t *sp)
+
+/* EFUN rename_object()
+ *
+ *   void rename_object (object ob, string new_name);
+ *
+ * Give the current object a new file_name. Causes a privilege
+ * violation. The new name must not contain a # character, except
+ * at the end, to avoid confusion with clone numbers.
+ *
+ * Raises a privilege violation ("rename_object", this_object(), ob, name).
+ */
+
+{
+    object_t *ob;
+    char *name;
+    mp_int length;
+
+    inter_sp = sp; /* this is needed for assert_master_ob_loaded(), and for
+                    * the possible errors before.
+                    */
+    ob = sp[-1].u.ob;
+    name = sp[0].u.string;
+
+    /* Remove leading '/' if any. */
+    while(name[0] == '/')
+        name++;
+
+    /* Truncate possible .c in the object name. */
+    length = strlen(name);
+    if (name[length-2] == '.' && name[length-1] == 'c') {
+        /* A new writeable copy of the name is needed. */
+        char *p;
+        p = (char *)alloca(length+1);
+        strcpy(p, name);
+        name = p;
+        name[length -= 2] = '\0';
+    }
+
+    {
+        char c;
+        char *p;
+        mp_int i;
+
+        i = length;
+        p = name + length;
+        while (--i > 0)
+        {
+            /* isdigit would need to check isascii first... */
+            if ( (c = *--p) < '0' || c > '9' )
+            {
+                if (c == '#' && length - i > 1) {
+                    error("Illegal name to rename_object: '%s'.\n", name);
+                }
+                break;
+            }
+        }
+    }
+
+    if (lookup_object_hash(name))
+    {
+        error("Attempt to rename to object '%s'\n", name);
+    }
+
+    assert_master_ob_loaded();
+    if (master_ob == ob)
+        error("Attempt to rename the master object\n");
+
+    if (privilege_violation4("rename_object", ob, name, 0, sp))
+    {
+        remove_object_hash(ob);
+        xfree(ob->name);
+        ob->name = string_copy(name);
+        enter_object_hash(ob);
+    }
+
+    free_svalue(sp--);
+    free_svalue(sp--);
+    return sp;
+} /* f_rename_object() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_replace_program (svalue_t *sp)
+
+/* EFUN replace_program()
+ *
+ *   void replace_program(string program)
+ *
+ * Substitutes a program with an inherited one. This is useful if you
+ * consider the performance and memory consumption of the driver. A
+ * program which doesn't need any additional variables and functions
+ * (except during creation) can call replace_program() to increase the
+ * function-cache hit-rate of
+ * the driver which decreases with the number of programs in the
+ * system. Any object can call replace_program() but looses all extra
+ * variables and functions which are not defined by the inherited
+ * program.
+ *
+ * When replace_program() takes effect, shadowing is stopped on
+ * the object since 3.2@166.
+ *
+ * It is not possible to replace the program of an object after
+ * (lambda) closures have been bound to it. It is of course
+ * possible to first replace the program and then bind lambda
+ * closures to it.
+ *
+ * The program replacement does not take place with the call to
+ * the efun, but is merely scheduled to be carried out at the end
+ * of the backend cycle. This may cause closures to have
+ * references to then vanished lfuns of the object. This poses no
+ * problem as long as these references are never executed after
+ * they became invalid.
+ */
+
+{
+    replace_ob_t *tmp;
+    long name_len;
+    char *name;
+    program_t *new_prog;  /* the replacing program */
+    int offsets[2];            /* the offsets of the replacing prog */
+
+    if (!current_object)
+        error("replace_program called with no current object\n");
+    if (current_object == simul_efun_object)
+        error("replace_program on simul_efun object\n");
+    if (current_object->flags & O_LAMBDA_REFERENCED)
+        error(
+          "Cannot schedule replace_program after binding lambda closures\n");
+
+    /* Create the full program name with a trailing '.c' and without
+     * a leading '/' to match the internal name representation.
+     */
+    name_len = (long)svalue_strlen(sp);
+    name = alloca((size_t)name_len+3);
+    strcpy(name, sp->u.string);
+    if (name[name_len-2] != '.' || name[name_len-1] != 'c')
+        strcat(name,".c");
+    if (*name == '/')
+        name++;
+
+    new_prog = search_inherited(name, current_object->prog, offsets);
+    if (!new_prog)
+    {
+        /* Given program not inherited, maybe it's the current already.
+         */
+        if (!strcmp(name, current_object->prog->name ))
+        {
+            new_prog = current_object->prog;
+            offsets[0] = offsets[1] = 0;
+        }
+        else
+        {
+            error("program to replace the current one with has "
+                  "to be inherited\n");
+        }
+    }
+
+    /* Program found, now create a new replace program entry, or
+     * change an existing one.
+     */
+    if (!(current_object->prog->flags & P_REPLACE_ACTIVE)
+     || !(tmp = retrieve_replace_program_entry()) )
+    {
+        tmp = xalloc(sizeof *tmp);
+        tmp->lambda_rpp = NULL;
+        tmp->ob = current_object;
+        tmp->next = obj_list_replace;
+        obj_list_replace = tmp;
+        current_object->prog->flags |= P_REPLACE_ACTIVE;
+    }
+
+    tmp->new_prog = new_prog;
+    tmp->var_offset = offsets[0];
+    tmp->fun_offset = offsets[1];
+
+    free_svalue(sp);
+    sp--;
+
+    return sp;
+} /* f_replace_program() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_set_next_reset (svalue_t *sp)
+
+/* EFUN set_next_reset()
+ *
+ *   int set_next_reset (int delay)
+ *
+ * Instruct the gamedriver to reset this object not earlier than in
+ * <delay> seconds. If a negative value is given as delay, the object
+ * will never reset (useful for blueprints). If 0 is given, the
+ * object's reset time is not changed.
+ *
+ * Result is the former delay to the objects next reset (which can be
+ * negative if the reset was overdue).
+ */
+
+{
+    int new_time;
+
+    new_time = sp->u.number;
+    if (current_object->flags & O_DESTRUCTED)
+            sp->u.number = 0;
+    else
+    {
+        sp->u.number = current_object->time_reset - current_time;
+        if (new_time < 0)
+            current_object->time_reset = 0;
+        else if (new_time > 0)
+            current_object->time_reset = new_time + current_time;
+    }
+    return sp;
+} /* f_set_next_reset() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_tell_object (svalue_t *sp)
+
+/* EFUN tell_object()
+ *
+ *   void tell_object(object ob, string str)
+ *
+ * Send a message str to object ob. If it is an interactive
+ * object (a user), then the message will go to him (her?),
+ * otherwise the lfun catch_tell() of the living will be called
+ * with the message as argument.
+ */
+
+{
+    tell_object((sp-1)->u.ob, sp->u.string);
+    free_string_svalue(sp);
+    sp--;
+    if (sp->type == T_OBJECT) /* not self-destructed */
+        free_object_svalue(sp);
+    sp--;
+
+    return sp;
+} /* f_tell_object() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef F_EXPORT_UID
+
+svalue_t *
+f_export_uid (svalue_t *sp)
+
+/* EFUN export_uid()
+ *
+ *   void export_uid(object ob)
+ *
+ * Set the uid of object ob to the current object's effective uid.
+ * It is only possible when object ob has an effective uid of 0.
+ * TODO: seteuid() goes through the mudlib, why not this one, too?
+ * TODO:: Actually, this efun is redundant, archaic and should
+ * TODO:: vanish altogether.
+ */
+
+{
+    object_t *ob;
+
+    if (!current_object->eff_user)
+        error("Illegal to export uid 0\n");
+    ob = sp->u.ob;
+    if (!ob->eff_user)        /* Only allowed to export when null */
+        ob->user = current_object->eff_user;
+    free_object(ob, "export_uid");
+    sp--;
+
+    return sp;
+} /* f_export_uid() */
+
+#endif
+
+/*-------------------------------------------------------------------------*/
+#ifdef F_GETEUID
+
+svalue_t *
+f_geteuid (svalue_t *sp)
+
+/* EFUN geteuid()
+ *
+ *   string geteuid(object ob)
+ *
+ * Get the effective user-id of the object (mostly a wizard or
+ * domain name). Standard objects cloned by this object will get
+ * that userid. The effective userid is also used for checking access
+ * permissions. If ob is omitted, is this_object() as default.
+ */
+
+{
+    object_t *ob;
+
+     ob = sp->u.ob;
+
+    if (ob->eff_user)
+    {
+        char *tmp;
+        tmp = ob->eff_user->name;
+        free_svalue(sp);
+        put_volatile_string(sp, tmp);
+    }
+    else
+    {
+        free_svalue(sp);
+        put_number(sp, 0);
+    }
+
+    return sp;
+} /* f_geteuid() */
+
+#endif
+
+/*-------------------------------------------------------------------------*/
+#ifdef F_SETEUID
+
+svalue_t *
+f_seteuid (svalue_t *sp)
+
+/* EFUN seteuid()
+ *
+ *   int seteuid(string str)
+ *
+ * Set effective uid to str. The calling object must be
+ * privileged to do so by the master object. In most
+ * installations it can always be set to the current uid of the
+ * object, to the uid of the creator of the object file, or to 0.
+ *
+ * When this value is 0, the current object's uid can be changed
+ * by export_uid(), and only then.
+ *
+ * Objects with euid 0 cannot load or clone other objects.
+ */
+
+{
+    svalue_t *ret;
+    svalue_t *argp;
+
+    argp = sp;
+    if (argp->type == T_NUMBER)
+    {
+        /* Clear the euid of this_object */
+
+        if (argp->u.number != 0)
+            efun_arg_error(1, T_STRING, sp->type, sp);
+        current_object->eff_user = 0;
+        free_svalue(argp);
+        put_number(argp, 1);
+        return sp;
+    }
+
+    /* Call the master to clear this use of seteuid() */
+
+    push_ref_valid_object(sp, current_object, "seteuid");
+    push_volatile_string(sp,  argp->u.string);
+    inter_sp = sp;
+    ret = apply_master_ob(STR_VALID_SETEUID, 2);
+    if (!ret || ret->type != T_NUMBER || ret->u.number != 1)
+    {
+        if (out_of_memory)
+        {
+            error("Out of memory\n");
+            /* NOTREACHED */
+            return sp;
+        }
+        free_svalue(argp);
+        put_number(argp, 0);
+    }
+    else
+    {
+        current_object->eff_user = add_name(argp->u.string);
+        free_svalue(argp);
+        put_number(argp, 1);
+    }
+
+    return sp;
+} /* f_seteuid() */
+
+#endif
+
+/*-------------------------------------------------------------------------*/
+#if defined(F_GETUID) || defined(F_CREATOR)
+#ifdef F_GETUID
+
+svalue_t *
+f_getuid (svalue_t *sp)
+
+#else
+
+svalue_t *
+f_creator (svalue_t *sp)
+
+#endif
+
+/* EFUN getuid()
+ *
+ *   string getuid(object ob)
+ *   string creator(object ob)
+ *
+ * User-ids are not used in compat mode, instead the uid is
+ * then called 'creator'.
+ * Get user-id of the object, i.e. the name of the wizard or
+ * domain that is responsible for the object. This name is also
+ * the name used in the wizlist. If no arg is given, use
+ * this_object() as default.
+ */
+
+{
+    object_t *ob;
+    char *name;
+
+    ob = sp->u.ob;
+    deref_object(ob, "getuid");
+    if ( NULL != (name = ob->user->name) )
+        put_ref_string(sp, name);
+    else
+        put_number(sp, 0);
+
+    return sp;
+} /* f_getuid() == f_creator() */
+
+#endif
+
+/*=========================================================================*/
+/*                             INVENTORIES                                 */
+
+/*-------------------------------------------------------------------------*/
+#ifdef F_SET_LIGHT
+
+void
+add_light (object_t *p, int n)
+
+/* The light emission of <p> and all surrounding objects is
+ * changed by <n>. This is used by the efun set_light() and when
+ * moving and destructing objects.
+ */
+
+{
+    if (n == 0)
+        return;
+    do {
+        p->total_light += n;
+    } while ( NULL != (p = p->super) );
+} /* add_light() */
+#endif
+
+/*-------------------------------------------------------------------------*/
+static void
+move_object (void)
+
+/* Move the object inter_sp[-1] into object inter_sp[0]; both objects
+ * are removed from the stack.
+ *
+ * The actual move performed by the hooks H_MOVE_OBJECT0/1, this
+ * function is called to implement the efuns move_object() and transfer().
+ */
+
+{
+    lambda_t *l;
+    object_t *save_command = command_giver;
+
+    if (NULL != ( l = closure_hook[H_MOVE_OBJECT1].u.lambda) ) {
+        l->ob = inter_sp[-1].u.ob;
+        call_lambda(&closure_hook[H_MOVE_OBJECT1], 2);
+    } else if (NULL != ( l = closure_hook[H_MOVE_OBJECT0].u.lambda) ) {
+        l->ob = current_object;
+        call_lambda(&closure_hook[H_MOVE_OBJECT0], 2);
+    }
+    else
+        error("Don't know how to move objects.\n");
+    command_giver = check_object(save_command);
+} /* move_object() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_all_environment (svalue_t *sp, int num_arg)
+
+/* EFUN all_environment()
+ *
+ *   object *all_environment()
+ *   object *all_environment(object o)
+ *
+ * Returns an array with all environments object <o> is in. If <o>
+ * is omitted, the environments of the current object is returned.
+ *
+ * If <o> has no environment, or if <o> is destructed, 0 is
+ * returned.
+ */
+
+{
+    object_t *o;
+
+    /* Get the arg from the stack, if any */
+    if (num_arg)
+    {
+        o = ref_object(sp->u.ob, "all_environment");
+        free_object_svalue(sp);
+    }
+    else
+    {
+        o = current_object;
+        sp++;
+    }
+
+
+    /* Default return value: 0 */
+    put_number(sp, 0);
+
+    if (!(o->flags & O_DESTRUCTED))
+    {
+        mp_int num;
+        object_t *env;
+        vector_t *v;
+        svalue_t *svp;
+
+        /* Count the number of environments */
+        for ( num = 0, env = o->super
+            ; NULL != env
+            ; num++, env = env->super)
+            NOOP;
+
+        if (num)
+        {
+            /* Get the array and fill it */
+            v = allocate_uninit_array(num);
+            for ( svp = v->item, env = o->super
+                ; NULL != env
+                ; svp++, env = env->super)
+            {
+                put_ref_object(svp, env, "all_environment");
+            }
+
+            /* Put the result on the stack and return */
+            put_array(sp, v);
+        }
+    }
+
+    if (num_arg)
+        free_object(o, "all_environment");
+
+    return sp;
+} /* f_all_environment() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_all_inventory (svalue_t *sp)
+
+/* EFUN all_inventory()
+ *
+ *     object *all_inventory(object ob = this_object())
+ *
+ * Returns an array of the objects contained in the inventory
+ * of ob.
+ */
+
+{
+    vector_t *vec;
+    object_t *ob;
+    object_t *cur;  /* Current inventory object */
+    int cnt, res;
+
+    ob = sp->u.ob;
+
+    /* Count how many inventory objects there are. */
+    cnt = 0;
+    for (cur = ob->contains; cur; cur = cur->next_inv)
+        cnt++;
+
+    if (!cnt)
+        vec = allocate_array(0);
+    else
+    {
+        vec = allocate_array(cnt);
+
+        /* Copy the object references */
+        cur = ob->contains;
+        for (res = 0; res < cnt; res++) {
+            put_ref_object(vec->item+res, cur, "all_inventory");
+            cur = cur->next_inv;
+        }
+    }
+
+    free_object_svalue(sp);
+
+    if (vec == NULL)
+        put_number(sp, 0);
+    else
+        put_array(sp, vec);
+    
+    return sp;
+} /* f_all_inventory() */
+
+/*-------------------------------------------------------------------------*/
+static int
+deep_inventory_size (object_t *ob)
+
+/* Helper function for deep_inventory()
+ *
+ * Count the size of <ob>'s inventory by counting the contained objects,
+ * invoking this function for every object and then returning the sum
+ * of all numbers.
+ */
+
+{
+    int n;
+
+    n = 0;
+    do {
+        if (ob->contains)
+            n += deep_inventory_size(ob->contains);
+        n++;
+    } while ( NULL != (ob = ob->next_inv) );
+
+    return n;
+} /* deep_inventory_size() */
+
+/*-------------------------------------------------------------------------*/
+static svalue_t *
+write_deep_inventory (object_t *first, svalue_t *svp)
+
+/* Helper function for deep_inventory()
+ *
+ * Copy into <svp> and following a reference to all objects in the
+ * inventory chain starting with <first>; then invoke this function
+ * for every inventory chain in the found objects.
+ *
+ * <svp> has to point into a suitably big area of svalue elements, like
+ * a vector.
+ *
+ * Result is the updated <svp>, pointing to the next free svalue element
+ * in the storage area.
+ */
+
+{
+    object_t *ob;
+
+    ob = first;
+    do {
+        put_ref_object(svp, ob, "deep_inventory");
+        svp++;
+    } while ( NULL != (ob = ob->next_inv) );
+
+    ob = first;
+    do {
+        if (ob->contains)
+            svp = write_deep_inventory(ob->contains, svp);
+    } while ( NULL != (ob = ob->next_inv) );
+
+    return svp;
+} /* write_deep_inventory() */
+
+/*-------------------------------------------------------------------------*/
+#if !defined(SUPPLY_PARSE_COMMAND) || defined(COMPAT_MODE)
+static
+#endif
+       vector_t *
+deep_inventory (object_t *ob, Bool take_top)
+
+/* Return a vector with the full inventory of <ob>, i.e. all objects contained
+ * by <ob> and all deep inventories of those objects, too. The resulting
+ * vector is created by a recursive breadth search.
+ *
+ * If <take_top> is true, <ob> itself is included as first element in the
+ * result vector.
+ *
+ * The function is used for the efuns deep_inventory() and parse_command().
+ */
+
+{
+    vector_t *dinv;  /* The resulting inventory vector */
+    svalue_t *svp;   /* Next element to fill in dinv */
+    int n;                /* Number of elements in dinv */
+
+    /* Count the contained objects */
+    n = take_top ? 1 : 0;
+    if (ob->contains) {
+        n += deep_inventory_size(ob->contains);
+    }
+
+    /* Get the array */
+    dinv = allocate_array(n);
+    svp = dinv->item;
+
+    /* Fill in <ob> if desired */
+    if (take_top) {
+        put_ref_object(svp, ob, "deep_inventory");
+        svp++;
+    }
+
+    /* Fill in the deep inventory */
+    if (ob->contains) {
+        write_deep_inventory(ob->contains, svp);
+    }
+
+    return dinv;
+} /* deep_inventory() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_deep_inventory (svalue_t *sp)
+
+/* EFUN deep_inventory()
+ *
+ *   object *deep_inventory(void)
+ *   object *deep_inventory(object ob)
+ *
+ * Returns an array of the objects contained in the inventory of
+ * ob (or this_object() if no arg given) and in the inventories
+ * of these objects, climbing down recursively.
+ */
+
+{
+    vector_t *vec;
+
+    vec = deep_inventory(sp->u.ob, MY_FALSE);
+
+    free_object_svalue(sp);
+    put_array(sp, vec);
+
+    return sp;
+} /* f_deep_inventory() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_environment (svalue_t *sp, int num_arg)
+
+/* EFUN environment()
+ *
+ *   object environment(void)
+ *   object environment(object obj)
+ *   object environment(string obj)
+ *
+ * Returns the surrounding object of obj (which may be specified
+ * by name). If no argument is given, it returns the surrounding
+ * of the current object.
+ *
+ * Destructed objects do not have an environment.
+ */
+
+{
+    object_t *ob;
+
+    if (num_arg)
+    {
+        if (sp->type == T_OBJECT)
+        {
+            ob = sp->u.ob->super;
+            free_object_svalue(sp);
+        }
+        else /* it's a string */
+        {
+            ob = find_object(sp->u.string);
+            if (!ob || ob->super == NULL || (ob->flags & O_DESTRUCTED))
+                ob = NULL;
+            else
+                ob = ob->super;
+            free_string_svalue(sp);
+        }
+    }
+    else if (!(current_object->flags & O_DESTRUCTED))
+    {
+        ob = current_object->super;
+        sp++;
+    }
+    else
+    {
+        ob = NULL; /* != environment(this_object()) *boggle* */
+        sp++;
+    }
+
+    if (ob)
+        put_ref_object(sp, ob, "environment");
+    else
+        put_number(sp, 0);
+
+    return sp;
+} /* f_environment() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_first_inventory (svalue_t *sp)
+
+/* EFUN first_inventory()
+ *
+ *   object first_inventory()
+ *   object first_inventory(string ob)
+ *   object first_inventory(object ob)
+ *
+ * Get the first object in the inventory of ob, where ob is
+ * either an object or the file name of an object. If ob is not
+ * given, the current object is assumed.
+ */
+
+{
+    object_t *ob;
+
+    ob = NULL;
+    if (sp->type == T_OBJECT)
+    {
+        ob = sp->u.ob->contains;
+        free_object_svalue(sp);
+    }
+    else if (sp->type == T_STRING)
+    {
+        ob = get_object(sp->u.string);
+        if (!ob)
+            error("No object '%s' for first_inventory()\n", sp->u.string);
+        free_string_svalue(sp);
+        ob = ob->contains;
+    }
+
+    if (ob)
+        put_ref_object(sp, ob, "first_inventory");
+    else
+        put_number(sp, 0);
+
+    return sp;
+} /* f_first_inventory() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_next_inventory (svalue_t *sp)
+
+/* EFUN next_inventory()
+ *
+ *   object next_inventory()
+ *   object next_inventory(object ob)
+ *
+ * Get next object in the same inventory as ob. If ob is not
+ * given, the current object will be used.
+ *
+ * This efun is mostly used together with the efun
+ * first_inventory().
+ */
+
+{
+    object_t *ob;
+
+    ob = sp->u.ob;
+    free_object(ob, "next_inventory");
+    if (ob->next_inv)
+        put_ref_object(sp, ob->next_inv, "next_inventory");
+    else
+        put_number(sp, 0);
+
+    return sp;
+} /* f_next_inventory() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_move_object (svalue_t *sp)
+
+/* EFUN move_object()
+ *
+ *   void move_object(mixed item, mixed dest)
+ *
+ * The item, which can be a file_name or an object, is moved into
+ * it's new environment dest, which can also be file_name or an
+ * object.
+ *
+ * In !compat mode, the only object that can be moved with
+ * move_object() is the calling object itself.
+ *
+ * Since 3.2.1, the innards of move_object() are implemented in
+ * the mudlib, using the M_MOVE_OBJECT driver hooks.
+ */
+
+{
+    object_t *item, *dest;
+
+    inter_sp = sp;
+
+    if ((sp-1)->type == T_STRING)
+    {
+        item = get_object((sp-1)->u.string);
+        if (!item)
+            error("Bad arg 1 to move_object(): object '%s' not found.\n"
+                 , sp[-1].u.string);
+        free_string_svalue(sp-1);
+        put_ref_object(sp-1, item, "move_object");
+    }
+
+    if (sp->type == T_STRING)
+    {
+        dest = get_object(sp->u.string);
+        if (!dest)
+            error("Bad arg 2 to move_object(): object '%s' not found.\n"
+                 , sp[0].u.string);
+        free_string_svalue(sp);
+        put_ref_object(sp, dest, "move_object");
+    }
+
+    /* move_object() reads its arguments directly from the stack */
+    move_object();
+    sp -= 2;
+
+    return sp;
+} /* f_move_object() */
+
+/*-------------------------------------------------------------------------*/
+static object_t *
+object_present_in (char *str, object_t *ob)
+
+/* <ob> is the first object in an environment: test all the objects there
+ * if they match the id <str>.
+ * <str> may be of the form "<id> <num>" - then the <num>th object with
+ * this <id> is returned, it it is found.
+ */
+
+{
+    svalue_t *ret;
+    char *p;
+    int   count = 0; /* >0: return the <count>th object */
+    int   length;
+    char *item;
+
+    length = strlen(str);
+    xallocate(item, (size_t)length + 1, "work string");
+    strcpy(item, str);
+    push_malloced_string(inter_sp, item); /* free on error */
+
+    /* Check if there is a number in the string */
+    p = item + length - 1;
+    if (*p >= '0' && *p <= '9')
+    {
+        while(p > item && *p >= '0' && *p <= '9')
+            p--;
+
+        if (p > item && *p == ' ')
+        {
+            count = atoi(p+1) - 1;
+            *p = '\0';
+        }
+    }
+
+    /* Now look for the object */
+    for (; ob; ob = ob->next_inv)
+    {
+        push_volatile_string(inter_sp, item);
+        ret = sapply(STR_ID, ob, 1);
+        if (ob->flags & O_DESTRUCTED)
+        {
+            xfree(item);
+            inter_sp--;
+            return NULL;
+        }
+
+        if (ret == NULL || (ret->type == T_NUMBER && ret->u.number == 0))
+            continue;
+
+        if (count-- > 0)
+            continue;
+        xfree(item);
+        inter_sp--;
+        return ob;
+    }
+    xfree(item);
+    inter_sp--;
+
+    /* Not found */
+    return NULL;
+} /* object_present_in() */
+
+/*-------------------------------------------------------------------------*/
+static object_t *
+e_object_present (svalue_t *v, object_t *ob)
+
+/* Implementation of the efun present().
+ *
+ * Look for an object matching <v> in <ob> and return it if found.
+ */
+
+{
+    svalue_t *ret;
+    object_t *ret_ob;
+    Bool specific = MY_FALSE;
+
+    /* Search where? */
+    if (!ob)
+        ob = current_object;
+    else
+        specific = MY_TRUE;
+
+    if (ob->flags & O_DESTRUCTED)
+        return NULL;
+
+    if (v->type == T_OBJECT)
+    {
+        /* Oooh, that's easy. */
+
+        if (specific)
+        {
+            if (v->u.ob->super == ob)
+                return v->u.ob;
+            else
+                return NULL;
+        }
+        if (v->u.ob->super == ob
+         || (v->u.ob->super == ob->super && ob->super != 0))
+            return v->u.ob;
+        return NULL;
+    }
+
+    /* Always search in the object's inventory */
+    ret_ob = object_present_in(v->u.string, ob->contains);
+    if (ret_ob)
+        return ret_ob;
+
+    if (specific)
+        return NULL;
+
+    /* Search in the environment of <ob> if it was not specified */
+    if (!specific && ob->super)
+    {
+        /* Is it _the_ environment? */
+        push_volatile_string(inter_sp, v->u.string);
+        ret = sapply(STR_ID, ob->super, 1);
+        if (ob->super->flags & O_DESTRUCTED)
+            return NULL;
+        if (ret && !(ret->type == T_NUMBER && ret->u.number == 0))
+            return ob->super;
+
+        /* No, search the other objects here. */
+        return object_present_in(v->u.string, ob->super->contains);
+    }
+
+    /* Not found */
+    return NULL;
+} /* e_object_present() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_present (svalue_t *sp, int num_arg)
+
+/* EFUN present()
+ *
+ *   object present(mixed str)
+ *   object present(mixed str, object ob)
+ *
+ * If an object that identifies (*) to the name ``str'' is present
+ * in the inventory or environment of this_object (), then return
+ * it. If "str" has the form "<id> <n>" the <n>-th object matching
+ * <id> will be returned.
+ *
+ * "str" can also be an object, in which case the test is much faster
+ * and easier.
+ *
+ * A second optional argument ob is the enviroment where the search
+ * for str takes place. Normally this_player() is a good choice.
+ * Only the inventory of ob is searched, not its environment.
+ */
+
+{
+    svalue_t *arg;
+    object_t *ob;
+
+    arg = sp - num_arg + 1;
+
+    /* Get the arguments */
+    ob = NULL;
+    if (num_arg > 1)
+    {
+        ob = arg[1].u.ob;
+        free_svalue(sp--);
+    }
+
+    inter_sp = sp;
+    ob = e_object_present(arg, ob);
+
+    free_svalue(arg);
+    if (ob)
+        put_ref_object(sp, ob, "present");
+    else
+        put_number(sp, 0);
+    
+    return sp;
+} /* f_present() */
+
+/*-------------------------------------------------------------------------*/
+static void
+e_say (svalue_t *v, vector_t *avoid)
+
+/* Implementation of the EFUN say().
+ * <v> is the value to say, <avoid> the array of objects to exclude.
+ * If the first element of <avoid> is not an object, the function
+ * will store its command_giver object into it.
+ */
+ 
+{
+    static svalue_t ltmp = { T_POINTER };
+    static svalue_t stmp = { T_OBJECT };
+
+    object_t *ob;
+    object_t *save_command_giver = command_giver;
+    object_t *origin;
+    char buff[256];
+    char *message;
+#define INITIAL_MAX_RECIPIENTS 48
+    int max_recipients = INITIAL_MAX_RECIPIENTS;
+      /* Current size of the recipients table.
+       */
+    object_t *first_recipients[INITIAL_MAX_RECIPIENTS];
+      /* Initial table of recipients.
+       */
+    object_t **recipients = first_recipients;
+      /* Pointer to the current table of recipients.
+       * The end is marked with a NULL entry.
+       */
+    object_t **curr_recipient = first_recipients;
+      /* Next recipient to enter.
+       */
+    object_t **last_recipients =
+                 &first_recipients[INITIAL_MAX_RECIPIENTS-1];
+      /* Last entry in the current table.
+       */
+    object_t *save_again;
+
+    /* Determine the command_giver to use */
+    if (current_object->flags & O_ENABLE_COMMANDS)
+    {
+        command_giver = current_object;
+    }
+    else if (current_object->flags & O_SHADOW
+          && O_GET_SHADOW(current_object)->shadowing)
+    {
+        command_giver = O_GET_SHADOW(current_object)->shadowing;
+    }
+
+    /* Determine the originating object */
+    if (command_giver)
+    {
+        interactive_t *ip;
+
+        if (O_SET_INTERACTIVE(ip, command_giver))
+        {
+            trace_level |= ip->trace_level;
+        }
+        origin = command_giver;
+
+        /* Save the commandgiver to avoid, if needed */
+        if (avoid->item[0].type == T_NUMBER)
+        {
+            put_ref_object(avoid->item, command_giver, "say");
+        }
+    }
+    else
+        origin = current_object;
+
+    /* Sort the avoid vector for fast lookups
+     */
+    ltmp.u.vec = avoid;
+    avoid = order_alist(&ltmp, 1, 1);
+    push_array(inter_sp, avoid); /* in case of errors... */
+    avoid = avoid->item[0].u.vec;
+
+    /* Collect the list of propable recipients.
+     * First, look in the environment.
+     */
+    if ( NULL != (ob = origin->super) )
+    {
+        interactive_t *ip;
+
+        /* The environment itself? */
+        if (ob->flags & O_ENABLE_COMMANDS
+         || O_SET_INTERACTIVE(ip, ob))
+        {
+            *curr_recipient++ = ob;
+        }
+
+        for (ob = ob->contains; ob; ob = ob->next_inv)
+        {
+            if (ob->flags & O_ENABLE_COMMANDS
+             || O_SET_INTERACTIVE(ip,ob))
+            {
+                if (curr_recipient >= last_recipients)
+                {
+                    /* Increase the table */
+                    max_recipients *= 2;
+                    curr_recipient = alloca(max_recipients * sizeof(object_t *));
+                    memcpy( curr_recipient, recipients
+                           , max_recipients * sizeof(object_t *) / 2);
+                    recipients = curr_recipient;
+                    last_recipients = &recipients[max_recipients-1];
+                    curr_recipient += (max_recipients / 2) - 1;
+                }
+                *curr_recipient++ = ob;
+            }
+        } /* for() */
+    } /* if(environment) */
+
+    /* Now check this environment */
+    for (ob = origin->contains; ob; ob = ob->next_inv)
+    {
+        interactive_t *ip;
+
+        if (ob->flags & O_ENABLE_COMMANDS
+         || O_SET_INTERACTIVE(ip, ob))
+        {
+            if (curr_recipient >= last_recipients)
+            {
+                /* Increase the table */
+                max_recipients *= 2;
+                curr_recipient = alloca(max_recipients * sizeof(object_t *));
+                memcpy( curr_recipient, recipients
+                      , max_recipients * sizeof(object_t *) / 2);
+                recipients = curr_recipient;
+                last_recipients = &recipients[max_recipients-1];
+                curr_recipient += (max_recipients / 2) - 1;
+            }
+            *curr_recipient++ = ob;
+        }
+    }
+
+    *curr_recipient = NULL;  /* Mark the end of the list */
+
+    /* Construct the message. */
+
+    switch(v->type)
+    {
+    case T_STRING:
+        message = v->u.string;
+        break;
+
+    case T_OBJECT:
+        strncpy(buff, v->u.ob->name, sizeof buff);
+        buff[sizeof buff - 1] = '\0';
+        message = buff;
+        break;
+
+    case T_NUMBER:
+        sprintf(buff, "%ld", v->u.number);
+        message = buff;
+        break;
+
+    case T_POINTER:
+        /* say()'s evil twin: send <v> to all recipients' catch_msg() lfun */
+        
+        for (curr_recipient = recipients; NULL != (ob = *curr_recipient++) ; )
+        {
+            if (ob->flags & O_DESTRUCTED)
+                continue;
+            stmp.u.ob = ob;
+            if (assoc(&stmp, avoid) >= 0)
+                continue;
+            push_ref_array(inter_sp, v->u.vec);
+            push_ref_object(inter_sp, origin, "say");
+            sapply(STR_CATCH_MSG, ob, 2);
+        }
+        pop_stack(); /* free avoid alist */
+        command_giver = check_object(save_command_giver);
+        return;
+
+    default:
+        error("Invalid argument %d to say()\n", v->type);
+    }
+
+    /* Now send the message to all recipients */
+    
+    for (curr_recipient = recipients; NULL != (ob = *curr_recipient++); )
+    {
+        interactive_t *ip;
+
+        if (ob->flags & O_DESTRUCTED)
+            continue;
+        stmp.u.ob = ob;
+        if (assoc(&stmp, avoid) >= 0)
+            continue;
+        if (!(O_SET_INTERACTIVE(ip, ob)))
+        {
+            tell_npc(ob, message);
+            continue;
+        }
+        save_again = command_giver;
+        command_giver = ob;
+        add_message("%s", message);
+        command_giver = save_again;
+    }
+
+    pop_stack(); /* free avoid alist */
+    command_giver = check_object(save_command_giver);
+} /* e_say() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_say (svalue_t *sp, int num_arg)
+
+/* EFUN say()
+ *
+ *   void say(string str)
+ *   void say(string str, object exclude)
+ *   void say(string str, object *excludes)
+ *   void say(mixed *arr)
+ *   void say(mixed *arr, object exclude)
+ *   void say(mixed *arr, object *excludes)
+ *
+ * There are two major modes of calling:
+ *
+ * If the first argument is a string <str>, it will be send to
+ * all livings in the current room	except to the initiator.
+ *
+ * If the first argument is an array <arr>, the lfun catch_msg()
+ * of all living objects except the initiator will be called.
+ * This array will be given as first argument to the lfun, and
+ * the initiating object as the second.
+ *
+ * By specifying a second argument to the efun one can exclude
+ * more objects than just the initiator. If the second argument
+ * is a single object <exclude>, both the given object and the
+ * initiator are excluded from the call. If the second argument
+ * is an array <excludes>, all objects and just the objects in
+ * this array are excluded from the call.
+ *
+ * The 'initiator' is determined according to these rules:
+ *   - if the say() is called from within a living object, this
+ *     becomes the initiator
+ *   - if the say() is called from within a dead object as result
+ *     of a user action (i.e. this_player() is valid), this_player()
+ *     becomes the initiator.
+ *   - Else the object calling the say() becomes the initiator.
+ */
+
+{
+    static LOCAL_VEC2(vtmp, T_NUMBER, T_OBJECT);
+      /* Default 'avoid' array passed to say() giving the object
+       * to exclude in the second item. The first entry is reserved
+       * for e_say() to insert its command_giver object.
+       */
+
+#if defined(DEBUG) && defined(MALLOC_smalloc)
+        static_vector2 = &vtmp.v;
+        /* TODO: Remove this once VEC_SIZE() is proven to be accurate.
+         */
+#endif
+
+    if (num_arg == 1)
+    {
+        /* No objects to exclude */
+
+        vtmp.v.item[0].type = T_NUMBER;
+          /* this marks the place for the command_giver */
+        vtmp.v.item[1].type = T_NUMBER;
+          /* nothing to exclude... */
+        e_say(sp, &vtmp.v);
+    }
+    else
+    {
+        /* We have objects to exclude */
+
+        if ( sp->type == T_POINTER )
+        {
+            e_say(sp-1, sp->u.vec);
+        }
+        else /* it's an object */
+        {
+            vtmp.v.item[0].type = T_NUMBER;
+            put_ref_object(vtmp.v.item+1, sp->u.ob, "say");
+            e_say(sp-1, &vtmp.v);
+        }
+        free_svalue(sp--);
+    }
+
+    free_svalue(sp--);
+
+    return sp;
+} /* f_say() */
+
+/*-------------------------------------------------------------------------*/
+static void
+e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
+
+/* Implementation of the EFUN tell_room().
+ *
+ * Value <v> is sent to all living objects in <room>, except those
+ * in <avoid>. <avoid> has to be in order_alist() order.
+ */
+
+{
+    object_t *ob;
+    object_t *save_command_giver;
+    int num_recipients = 0;
+    object_t *some_recipients[20];
+    object_t **recipients;
+    object_t **curr_recipient;
+    char buff[256], *message;
+    static svalue_t stmp = { T_OBJECT, } ;
+
+    /* Like in say(), collect the possible recipients.
+     * First count how many there are.
+     */
+    
+    for (ob = room->contains; ob; ob = ob->next_inv)
+    {
+        interactive_t *ip;
+
+        if ( ob->flags & O_ENABLE_COMMANDS
+         ||  O_SET_INTERACTIVE(ip, ob))
+        {
+            num_recipients++;
+        }
+    }
+
+    /* Allocate the table */
+    if (num_recipients < 20)
+        recipients = some_recipients;
+    else
+        recipients = 
+          alloca( (num_recipients+1) * sizeof(object_t *) );
+
+    /* Now fill the table */
+    curr_recipient = recipients;
+    for (ob = room->contains; ob; ob = ob->next_inv)
+    {
+        interactive_t *ip;
+
+        if ( ob->flags & O_ENABLE_COMMANDS
+         ||  O_SET_INTERACTIVE(ip, ob))
+        {
+            *curr_recipient++ = ob;
+        }
+    }
+
+    *curr_recipient = NULL; /* Mark the end of the table */
+
+    /* Construct the message */
+    switch(v->type)
+    {
+    case T_STRING:
+        message = v->u.string;
+        break;
+
+    case T_OBJECT:
+        strncpy(buff, v->u.ob->name, sizeof buff);
+        buff[sizeof buff - 1] = '\0';
+        message = buff;
+        break;
+
+    case T_NUMBER:
+        sprintf(buff, "%ld", v->u.number);
+        message = buff;
+        break;
+
+    case T_POINTER:
+      {
+        /* say()s evil brother: send <v> to all recipients'
+         * catch_msg() lfun
+         */
+        object_t *origin = command_giver;
+
+        if (!origin)
+            origin = current_object;
+
+        for (curr_recipient = recipients; NULL != (ob = *curr_recipient++); )
+        {
+            if (ob->flags & O_DESTRUCTED)
+                continue;
+            stmp.u.ob = ob;
+            if (assoc(&stmp, avoid) >= 0)
+                continue;
+            push_ref_array(inter_sp, v->u.vec);
+            push_ref_object(inter_sp, origin, "tell_room");
+            sapply(STR_CATCH_MSG, ob, 2);
+        }
+        return;
+      }
+
+    default:
+        error("Invalid argument %d to tell_room()\n", v->type);
+    }
+
+    /* Now send the message to all recipients */
+    
+    for (curr_recipient = recipients; NULL != (ob = *curr_recipient++); )
+    {
+        interactive_t *ip;
+
+        if (ob->flags & O_DESTRUCTED) continue;
+        stmp.u.ob = ob;
+        if (assoc(&stmp, avoid) >= 0) continue;
+        if (!(O_SET_INTERACTIVE(ip, ob)))
+        {
+            tell_npc(ob, message);
+            continue;
+        }
+        save_command_giver = command_giver;
+        command_giver = ob;
+        add_message("%s", message);
+        command_giver = save_command_giver;
+    }
+} /* e_tell_room() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_tell_room (svalue_t *sp, int num_arg)
+
+/* EFUN tell_room()
+ *
+ *   void tell_room(string|object ob, string str)
+ *   void tell_room(string|object ob, string str, object *exclude)
+ *   void tell_room(string|object ob, mixed *msg)
+ *   void tell_room(string|object ob, mixed *msg, object *exclude)
+ *
+ * Send a message str to all living objects in the room ob. ob
+ * can also be the name of the room given as a string. If a
+ * receiving object is not a interactive user the lfun
+ * catch_tell() of the object will be invoked with the message as
+ * argument. If living objects define catch_tell(), the string
+ * will also be sent to that instead of being written to the
+ * user. If the object is given as its filename, the driver
+ * looks up the object under that name, loading it if necessary.
+ * If array *exclude is given, all objects contained in
+ * *exclude are excluded from the message str.
+ *
+ * If the second arg is an array, catch_msg() will be called in
+ * all listening livings.
+ */
+
+{
+    svalue_t *arg;
+    vector_t *avoid;
+    object_t *ob;
+
+    arg = sp- num_arg + 1;
+
+    /* Test the arguments */
+    if (arg[0].type == T_OBJECT)
+        ob = arg[0].u.ob;
+    else /* it's a string */
+    {
+        ob = get_object(arg[0].u.string);
+        if (!ob)
+            error("Object not found.\n");
+    }
+
+    if (num_arg == 2)
+    {
+        avoid = &null_vector;
+    }
+    else
+    {
+        /* Sort the list of objects to exclude for faster
+         * operation.
+         */
+
+        vector_t *vtmpp;
+        static svalue_t stmp = { T_POINTER };
+
+        stmp.u.vec = arg[2].u.vec;
+        vtmpp = order_alist(&stmp, 1, MY_TRUE);
+        avoid = vtmpp->item[0].u.vec;
+        sp->u.vec = avoid; /* in case of an error, this will be freed. */
+        sp--;
+        vtmpp->item[0].u.vec = stmp.u.vec;
+        free_array(vtmpp);
+    }
+
+    e_tell_room(ob, sp, avoid);
+
+    if (num_arg > 2)
+        free_array(avoid);
+    free_svalue(sp--);
+    free_svalue(sp--);
+
+    return sp;
+} /* f_tell_room() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef F_SET_LIGHT
+
+svalue_t *
+f_set_light (svalue_t *sp)
+
+/* EFUN set_light()
+ *
+ * int set_light(int n)
+ *
+ * An object is by default dark. It can be set to not dark by
+ * calling set_light(1). The environment will then also get this
+ * light. The returned value is the total number of lights in
+ * this room. So if you call set_light(0) it will return the
+ * light level of the current object.
+ *
+ * Note that the value of the argument is added to the light of
+ * the current object.
+ */
+
+{
+    object_t *o1;
+
+    add_light(current_object, sp->u.number);
+    o1 = current_object;
+    while (o1->super)
+        o1 = o1->super;
+    sp->u.number = o1->total_light;
+
+    return sp;
+} /* f_set_light() */
+
+#endif
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_set_environment (svalue_t *sp)
+
+/* EFUN set_environment()
+ *
+ *   void set_environment(object item, object env)
+ *
+ * The item is moved into its new environment env, which may be 0.
+ * This efun is to be used in the H_MOVE_OBJECTx hook, as it does
+ * nothing else than moving the item - no calls to init() or such.
+ */
+
+{
+    object_t *item, *dest;
+    object_t **pp, *ob;
+    object_t *save_cmd = command_giver;
+
+    /* Get and test the arguments */
+    
+    item = sp[-1].u.ob;
+
+    if (item->flags & O_SHADOW && O_GET_SHADOW(item)->shadowing)
+        error("Can't move an object that is shadowing.\n");
+
+    if (sp->type != T_OBJECT)
+    {
+        dest = NULL;
+    }
+    else
+    {
+        dest = sp->u.ob;
+        /* Recursive moves are not allowed. */
+        for (ob = dest; ob; ob = ob->super)
+            if (ob == item)
+                error("Can't move object inside itself.\n");
+
+#       ifdef F_SET_LIGHT
+            add_light(dest, item->total_light);
+#       endif
+        dest->flags &= ~O_RESET_STATE;
+    }
+
+    item->flags &= ~O_RESET_STATE; /* touch it */
+
+    if (item->super)
+    {
+        /* First remove the item out of its current environment */
+        Bool okey = MY_FALSE;
+
+        if (item->sent)
+        {
+            remove_environment_sent(item);
+        }
+
+        if (item->super->sent)
+            remove_action_sent(item, item->super);
+
+#       ifdef F_SET_LIGHT
+            add_light(item->super, - item->total_light);
+#       endif
+
+        for (pp = &item->super->contains; *pp;)
+        {
+            if (*pp != item)
+            {
+                if ((*pp)->sent)
+                    remove_action_sent(item, *pp);
+                pp = &(*pp)->next_inv;
+                continue;
+            }
+            *pp = item->next_inv;
+            okey = MY_TRUE;
+        }
+
+        if (!okey)
+            fatal("Failed to find object %s in super list of %s.\n",
+                  item->name, item->super->name);
+    }
+
+    /* Now put it into its new environment (if any) */
+    item->super = dest;
+    if (!dest)
+    {
+        item->next_inv = NULL;
+    }
+    else
+    {
+        item->next_inv = dest->contains;
+        dest->contains = item;
+    }
+
+    command_giver = check_object(save_cmd);
+    free_svalue(sp);
+    sp--;
+    free_svalue(sp);
+    return sp - 1;
+} /* f_set_environment() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef F_TRANSFER
+
+svalue_t *
+f_transfer (svalue_t *sp)
+
+/* EFUN transfer()
+ *
+ *   int transfer(object item, object dest)
+ *
+ * This efun is for backward compatibility only. It is only
+ * available in compat mode.
+ *
+ * Move the object "item" to the object "dest". All kinds of
+ * tests are done, and a number is returned specifying the
+ * result:
+ *
+ *     0: Success.
+ *     1: To heavy for destination.
+ *     2: Can't be dropped.
+ *     3: Can't take it out of it's container.
+ *     4: The object can't be inserted into bags etc.
+ *     5: The destination doesn't allow insertions of objects.
+ *     6: The object can't be picked up.
+ *
+ * If an object is transfered to a newly created object, make
+ * sure that the new object first is transfered to it's
+ * destination.
+ *
+ * The efun calls add_weight(), drop(), get(), prevent_insert(),
+ * add_weight(), and can_put_and_get() where needed.
+ */
+
+{
+    object_t *ob, *to;
+    svalue_t *v_weight, *ret;
+    int       weight;
+    object_t *from;
+    int       result;
+
+    /* Get and test the arguments */
+    ob = sp[-1].u.ob;
+
+    if (sp->type == T_OBJECT)
+        to = sp->u.ob;
+    else /* it's a string */
+    {
+        to = get_object(sp->u.string);
+        if (!to)
+            error("Object %s not found.\n", sp->u.string);
+        free_string_svalue(sp);
+        put_ref_object(sp, to, "transfer"); /* for move_object() below */
+    }
+        
+    from = ob->super;
+    result = 0; /* Default: success result */
+
+    /* Perform the transfer step by step */
+    switch(0){default:
+
+        /* Get the weight of the object
+         */
+        weight = 0;
+        v_weight = sapply(STR_QUERY_WEIGHT, ob, 0);
+        if (v_weight && v_weight->type == T_NUMBER)
+            weight = v_weight->u.number;
+
+        if (ob->flags & O_DESTRUCTED)
+        {
+            result = 3;
+            break;
+        }
+
+        /* If the original place of the object is a living object,
+         * then we must call drop() to check that the object can be dropped.
+         */
+        if (from && (from->flags & O_ENABLE_COMMANDS))
+        {
+            ret = sapply(STR_DROP, ob, 0);
+            if (ret && (ret->type != T_NUMBER || ret->u.number != 0))
+            {
+                result = 2;
+                break;
+            }
+
+            /* This should not happen, but we can not trust LPC hackers. :-) */
+            if (ob->flags & O_DESTRUCTED)
+            {
+                result = 2;
+                break;
+            }
+        }
+
+        /* If 'from' is not a room and not a player, check that we may
+         * remove things out of it.
+         */
+        if (from && from->super && !(from->flags & O_ENABLE_COMMANDS))
+        {
+            ret = sapply(STR_CANPUTGET, from, 0);
+            if (!ret || (ret->type != T_NUMBER && ret->u.number != 1)
+             || (from->flags & O_DESTRUCTED))
+            {
+                result = 3;
+                break;
+            }
+        }
+
+        /* If the destination is not a room, and not a player,
+         * Then we must test 'prevent_insert', and 'can_put_and_get'.
+         */
+        if (to->super && !(to->flags & O_ENABLE_COMMANDS))
+        {
+            ret = sapply(STR_PREVENT_INSERT, ob, 0);
+            if (ret && (ret->type != T_NUMBER || ret->u.number != 0))
+            {
+                result = 4;
+                break;
+            }
+
+            ret = sapply(STR_CANPUTGET, to, 0);
+            if (!ret || (ret->type != T_NUMBER && ret->type != 0)
+             || (to->flags & O_DESTRUCTED) || (ob->flags & O_DESTRUCTED))
+            {
+                result = 5;
+                break;
+            }
+        }
+
+        /* If the destination is a player, check that he can pick it up.
+         */
+        if (to->flags & O_ENABLE_COMMANDS)
+        {
+            ret = sapply(STR_GET, ob, 0);
+            if (!ret || (ret->type == T_NUMBER && ret->u.number == 0)
+             || (ob->flags & O_DESTRUCTED))
+            {
+                result = 6;
+                break;
+            }
+
+            /* If it is not a room, correct the total weight in
+             * the destination.
+             */
+            if (to->super && weight)
+            {
+                /* Check if the destination can carry that much.
+                 */
+                push_number(inter_sp, weight);
+                ret = sapply(STR_ADD_WEIGHT, to, 1);
+                if (ret && ret->type == T_NUMBER && ret->u.number == 0)
+                {
+                    result = 1;
+                    break;
+                }
+
+                if (to->flags & O_DESTRUCTED)
+                {
+                    result = 1;
+                    break;
+                }
+            }
+
+            /* If it is not a room, correct the weight in
+             * the 'from' object.
+             */
+            if (from && from->super && weight)
+            {
+                push_number(inter_sp, -weight);
+                (void)sapply(STR_ADD_WEIGHT, from, 1);
+            }
+        }
+
+        /* When we come here, the move is ok */
+    } /* pseudo-switch() */
+        
+    if (result)
+    {
+        /* All the applys might have changed these */
+        free_svalue(sp);
+        free_svalue(sp-1);
+    }
+    else
+    {
+        /* The move is ok: do it (and use up both arguments) */
+        inter_sp = sp;
+        move_object();
+    }
+
+    put_number(sp-1, result);
+    return sp-1;
+} /* f_transfer() */
+
+#endif /* F_TRANSFER */
 
 /*=========================================================================*/
 /*                        Save/Restore an Object                           */
@@ -1552,7 +4373,7 @@ register_array (vector_t *vec)
 svalue_t *
 f_save_object (svalue_t *sp, int numarg)
 
-/* VEFUN save_object()
+/* EFUN save_object()
  *
  *   int    save_object (string file)
  *   string save_object ()
@@ -1612,12 +4433,6 @@ f_save_object (svalue_t *sp, int numarg)
     if (!numarg)
     {
         strbuf_zero(&save_string_buffer);
-    }
-    else if (sp->type != T_STRING)
-    {
-        bad_xefun_arg(1, sp);
-        /* NOTREACHED */
-        return sp;
     }
     else
       file = sp->u.string;
@@ -1895,7 +4710,7 @@ f_save_object (svalue_t *sp, int numarg)
 svalue_t *
 f_save_value (svalue_t *sp)
 
-/* TEFUN save_value()
+/* EFUN save_value()
  *
  *   string save_value(mixed value)
  *
@@ -2753,7 +5568,7 @@ old_restore_string (svalue_t *v, char *str)
 svalue_t *
 f_restore_object (svalue_t *sp)
 
-/* TEFUN restore_object()
+/* EFUN restore_object()
  *
  *   int restore_object (string name)
  *   int restore_object (string str)
@@ -2804,13 +5619,6 @@ f_restore_object (svalue_t *sp)
     } * dp = NULL;
       /* List of values for which the variables no longer exist. */
 
-
-    /* Test the arguments */
-    if (sp->type != T_STRING)
-    {
-        bad_xefun_arg(1, sp);
-        return sp;
-    }
 
     /* Check if got a filename or the value string itself */
     buff = NULL;
@@ -2929,7 +5737,7 @@ f_restore_object (svalue_t *sp)
 
     max_shared_restored = 256;
     current_shared_restored = 0;
-
+  
     if (shared_restored_values)
     {
         debug_message("(restore) Freeing lost shared_restored_values.\n");
@@ -2937,6 +5745,7 @@ f_restore_object (svalue_t *sp)
     }
 
     shared_restored_values = xalloc(sizeof(svalue_t)*max_shared_restored);
+
     if (!shared_restored_values)
     {
         if (f)
@@ -3156,7 +5965,7 @@ f_restore_object (svalue_t *sp)
 svalue_t *
 f_restore_value (svalue_t *sp)
 
-/* TEFUN restore_value()
+/* EFUN restore_value()
  *
  *   mixed restore_value (string str)
  *
@@ -3169,12 +5978,6 @@ f_restore_value (svalue_t *sp)
     int restored_version; /* Formatversion of the saved data */
     char *buff;  /* The string to parse */
     char *p;
-
-    if (sp->type != T_STRING)
-    {
-        bad_xefun_arg(1, sp);
-        return sp; /* flow control hint */
-    }
 
     /* The restore routines will put \0s into the string, so we
      * need to make a copy of all but malloced strings.
@@ -3235,6 +6038,7 @@ f_restore_value (svalue_t *sp)
              , max_shared_restored * sizeof(svalue_t));
         return sp; /* flow control hint */
     }
+
     current_shared_restored = 0;
 
     /* Place the result variable onto the stack */

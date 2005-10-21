@@ -192,11 +192,15 @@ struct svalue_s
    * operations.
    */
 
+#define T_NULL                            0x15
+  /* Not an actual type, this is used in the efun_lpc_types[] table
+   * to encode the acceptance of '0' instead of the real datatype.
+   */
+
 #define T_MOD_SWAPPED    0x80
   /* This flag is |-ed to the swapped-out type value if the value
    * data has been swapped out.
    */
-
 
 /* T_STRING secondary information */
 
@@ -279,6 +283,30 @@ struct svalue_s
 
 #define CLOSURE_CALLABLE(c) ((c) >= CLOSURE_EFUN && (c) <= CLOSURE_LAMBDA)
   /* TRUE if the closure is callable.
+   */
+
+/* --- The primary types in bit-flag encoding --- 
+ *
+ * This flag encoding is used for the runtime typetests.
+ * Not all svalue types have a corresponding bitflag.
+ */
+
+#define TF_INVALID       (1 << T_INVALID)
+#define TF_LVALUE        (1 << T_LVALUE)
+#define TF_NUMBER        (1 << T_NUMBER)
+#define TF_STRING        (1 << T_STRING)
+#define TF_POINTER       (1 << T_POINTER)
+#define TF_OBJECT        (1 << T_OBJECT)
+#define TF_MAPPING       (1 << T_MAPPING)
+#define TF_FLOAT         (1 << T_FLOAT)
+#define TF_CLOSURE       (1 << T_CLOSURE)
+#define TF_SYMBOL        (1 << T_SYMBOL)
+#define TF_QUOTED_ARRAY  (1 << T_QUOTED_ARRAY)
+#define TF_NULL          (1 << T_NULL)
+
+#define TF_ANYTYPE       (~0)
+  /* This is used in the efun_lpc_types[]
+   * table to encode the acceptance of any type.
    */
 
 /* --- Float Support --- */
@@ -407,6 +435,9 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
  *   otherwise empty svalue. <value> must be a refcounted value, and
  *   its refcount is incremented.
  *
+ * void push_<type>(), void push_ref_<type>()
+ *   As the put_() macros, but <sp> is incremented once first.
+ *
  * TODO: Add push_xxx() macros, see MudOS:interpret.h. In general, get
  * TODO:: rid of the local sp/pc copies since they make error handling
  * TODO:: very difficult.
@@ -433,6 +464,14 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
 #define put_object(sp,val) \
     ( (sp)->type = T_OBJECT, (sp)->u.ob = val )
 
+#define put_ref_valid_object(sp,val,from) \
+    ( ((val) && !((val)->flags & O_DESTRUCTED)) \
+      ? (put_ref_object(sp,val,from), 0) : put_number(sp, 0))
+
+#define put_valid_object(sp,val,from) \
+    ( ((val) && !((val)->flags & O_DESTRUCTED)) \
+      ? (put_object(sp,val,from), 0) : put_number(sp, 0))
+
 #define put_volatile_string(sp,val) \
     ( (sp)->type = T_STRING, (sp)->x.string_type = STRING_VOLATILE, \
       (sp)->u.string = val )
@@ -449,6 +488,41 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
 #define put_callback(sp,val) \
     ( (sp)->type = T_CALLBACK, (sp)->u.cb = val )
 
+#define push_number(sp,num) \
+    ( (sp)++, put_number(sp, num) )
+
+#define push_ref_array(sp,arr) \
+    ( (sp)++, put_ref_array(sp, arr) )
+#define push_array(sp,arr) \
+    ( (sp)++, put_array(sp, arr) )
+
+#define psh_ref_mapping(sp,val) \
+    ( (sp)++, put_ref_mapping(sp,val) )
+#define push_mapping(sp,val) \
+    ( (sp)++, put_mapping(sp,val) )
+
+#define push_ref_object(sp,val,from) \
+    ( (sp)++, put_ref_object(sp,val,from) )
+#define push_object(sp,val) \
+    ( (sp)++, put_object(sp,val,from) )
+
+#define push_ref_valid_object(sp,val,from) \
+    ( (sp)++, put_ref_valid_object(sp,val,from) )
+#define push_valid_object(sp,val) \
+    ( (sp)++, put_valid_object(sp,val,from) )
+
+#define push_volatile_string(sp,val) \
+    ( (sp)++, put_volatile_string(sp,val) )
+#define push_malloced_string(sp,val) \
+    ( (sp)++, put_malloced_string(sp,val) )
+#define push_ref_string(sp,val) \
+    ( (sp)++, put_ref_string(sp,val) )
+#define psh_string(sp,val) \
+    ( (sp)++, put_string(sp,val) )
+
+#define psh_callback(sp,val) \
+    ( (sp)++, put_callback(sp,val) )
+
 /* --- Prototypes (in interpret.c) --- */
 
 extern void free_string_svalue(svalue_t *v);
@@ -459,5 +533,6 @@ extern void assign_svalue_no_free(svalue_t *to, svalue_t *from);
 extern void assign_svalue(svalue_t *dest, svalue_t *v);
 extern void transfer_svalue_no_free(svalue_t *dest, svalue_t *v);
 extern void transfer_svalue(svalue_t *dest, svalue_t *v);
+extern svalue_t *pop_n_elems (int n, svalue_t *sp);
 
 #endif /* SVALUE_H__ */

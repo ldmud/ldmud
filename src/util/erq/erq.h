@@ -1,7 +1,7 @@
 /* external request demon interface definitions */
 
-#ifndef __ERQ_H__
-#define __ERQ_H__ 1
+#ifndef ERQ_H__
+#define ERQ_H__ 1
 
 /* servive request types */
 
@@ -47,6 +47,7 @@
 /* reserved handles */
 
 #define ERQ_HANDLE_RLOOKUP (-1)
-#define ERQ_HANDLE_KEEP_HANDLE (-2)
+#define ERQ_HANDLE_RLOOKUPV6 (-2)
+#define ERQ_HANDLE_KEEP_HANDLE (-3)
 
-#endif /* __ERQ_H__ */
+#endif /* ERQ_H__ */

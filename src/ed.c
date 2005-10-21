@@ -1689,8 +1689,8 @@ set (void)
 
     if ( !strcmp(word,"save") ) {
         svalue_t *ret;
-        push_object(command_giver);
-        push_number( P_SHIFTWIDTH | P_FLAGS );
+        push_ref_object(inter_sp, command_giver, "save ed");
+        push_number(inter_sp, P_SHIFTWIDTH | P_FLAGS );
         ret = apply_master_ob(STR_SAVE_ED,2);
         if ( ret && ret->type==T_NUMBER && ret->u.number > 0 )
             return ED_OK;
@@ -2770,7 +2770,7 @@ doglob (void)
 
 
 /*-------------------------------------------------------------------------*/
-void
+static void
 ed_start (char *file_arg, char *exit_fn, object_t *exit_ob)
 
 /* Start the editor on file <file_arg>. Because several players can edit
@@ -2837,7 +2837,7 @@ ed_start (char *file_arg, char *exit_fn, object_t *exit_ob)
 
     set_ed_buf();
     push_apply_value();
-    push_object(command_giver);
+    push_ref_object(inter_sp, command_giver, "retr ed");
 
     setup = apply_master_ob(STR_RETR_ED,1);
     if ( setup && setup->type==T_NUMBER && setup->u.number )
@@ -3177,6 +3177,60 @@ save_ed_buffer (void)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_ed (svalue_t *sp, int num_arg)
+
+/* EFUN ed()
+ *
+ *   int ed()
+ *   int ed(string file)
+ *   int ed(string file, string func)
+ *
+ * Calling without arguments will start the editor ed with the
+ * name of the error file, that was returned by
+ * master->valid_read(0, geteuid(this_player()), "ed_start",
+ * this_player()), usually something like ~/.err. If that file is
+ * empty, ed will immediatly exit again.
+ * Calling ed() with argument file will start the editor on the
+ * file. If the optional argument func is given, this function
+ * will be called after exiting the editor.
+ *
+ * Result is 1 if the editor could be started, else 0. TODO: ???
+ */
+
+{
+    if (current_object->flags & O_DESTRUCTED)
+    {
+        /* could confuse the master... */
+        error("Calling ed from destructed object.\n");
+    }
+
+    if (num_arg == 0)
+    {
+        ed_start(NULL, NULL, NULL);
+        push_number(sp, 1);
+    }
+    else if (num_arg == 1)
+    {
+        ed_start(sp->u.string, NULL, NULL);
+        free_svalue(sp);
+        put_number(sp, 1);
+    }
+    else /* num_arg == 2 */
+    {
+        if (sp->type == T_STRING)
+            ed_start((sp-1)->u.string, sp->u.string, current_object);
+        else /* sp is number 0 */
+            ed_start((sp-1)->u.string, NULL, NULL);
+        free_svalue(sp--);
+        free_svalue(sp);
+        put_number(sp, 1);
+    }
+
+    return sp;
+} /* f_ed() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_query_editing (svalue_t *sp)
 
 /* EFUN: query_editing()
@@ -3192,12 +3246,6 @@ f_query_editing (svalue_t *sp)
 {
     object_t *ob;
     shadow_t *sent;
-
-    if (sp->type != T_OBJECT)
-    {
-        bad_xefun_arg(1, sp);
-        /* NOTREACHED */
-    }
 
     ob = sp->u.ob;
     deref_object(ob, "query_editing");

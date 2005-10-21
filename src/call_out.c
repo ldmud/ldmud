@@ -106,7 +106,7 @@ free_call (struct call *cop)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-new_call_out (svalue_t *sp, short num_arg)
+f_call_out (svalue_t *sp, int num_arg)
 
 /* EFUN: call_out()
  *
@@ -147,20 +147,6 @@ new_call_out (svalue_t *sp, short num_arg)
         num_call += CHUNK_SIZE;
     }
 
-    /* Test if the expected arguments are on the stack */
-
-    if (arg[0].type != T_STRING && arg[0].type != T_CLOSURE)
-    {
-        bad_efun_vararg(1, sp);
-        /* NOTREACHED */
-    }
-
-    if (arg[1].type != T_NUMBER)
-    {
-        bad_efun_vararg(2, sp);
-        /* NOTREACHED */
-    }
-
     /* If the current object is destructed, free everything on the stack
      * and return.
      */
@@ -195,8 +181,9 @@ new_call_out (svalue_t *sp, short num_arg)
         /* call structure is still in the free list, and the
          * callback structure was invalidated automatically.
          */
-        bad_efun_vararg(error_index, arg - 1);
+        vefun_bad_arg(error_index, arg-1);
         /* NOTREACHED */
+        return arg-1;
     }
 
     /* We can do the callout, so lets remove it from the freelist and
@@ -237,7 +224,7 @@ new_call_out (svalue_t *sp, short num_arg)
     cop->next = NULL;
 
     return sp;
-} /* new_call_out() */
+} /* f_call_out() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -435,7 +422,7 @@ call_out (void)
 } /* call_out() */
 
 /*-------------------------------------------------------------------------*/
-void
+static void
 find_call_out (object_t *ob, svalue_t *fun, Bool do_free_call)
 
 /* Find the (first) callout for <ob>/<fun> (or <fun> if it is a closure).
@@ -518,7 +505,8 @@ found:
                 return;
             }
         }
-        bad_efun_arg(1, -1, fun);
+        fatal("find_call_out() got %s, expected string/closure.\n"
+             , typename(fun->type));
         /* NOTREACHED */
     }
 
@@ -718,7 +706,7 @@ count_ref_from_call_outs (void)
 #endif /* GC_SUPPORT */
 
 /*-------------------------------------------------------------------------*/
-vector_t *
+static vector_t *
 get_all_call_outs (void)
 
 /* Construct an array of all pending call_outs (whose object is not
@@ -798,7 +786,77 @@ get_all_call_outs (void)
     }
 
     return v;
-}
+} /* get_all_call_outs() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_call_out_info (svalue_t *sp)
+
+/* EFUN call_out_info()
+ *
+ *     mixed *call_out_info(void)
+ *
+ * Get information about all pending call outs. The result is an
+ * array in which every entry is itself an array describing one
+ * call_out.
+ *
+ * The efun causes the the privilege violation ("call_out_info",
+ * this_object()). If it is not satisfied, the result will be
+ * the empty array.
+ */
+
+{
+    if (_privilege_violation("call_out_info", &const0, sp))
+    {
+        push_array(sp, get_all_call_outs());
+    }
+    else
+    {
+        push_ref_array(sp, &null_vector);
+    }
+
+    return sp;
+} /* f_call_out_info() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_find_call_out (svalue_t *sp) 
+
+/* EFUN find_call_out()
+ *
+ *   int find_call_out(string func)
+ *   int find_call_out(closure func)
+ *
+ * Find the first call-out due to be executed for function func
+ * in the current object, and return the time left. If no call-out
+ * is found return -1.
+ */
+
+{
+    find_call_out(current_object, sp, MY_FALSE);
+    return sp;
+} /* f_find_call_out() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_remove_call_out (svalue_t *sp) 
+
+/* EFUN remove_call_out()
+ *
+ *   int remove_call_out(string fun)
+ *   int remove_call_out(closure fun)
+ *
+ * Remove next pending call-out for function fun in this object.
+ * The time left is returned.
+ *
+ * -1 is returned if there were no call-outs pending to this
+ * function.
+ */
+
+{
+    find_call_out(current_object, sp, MY_TRUE);
+    return sp;
+} /* f_remove_call_out() */
 
 /***************************************************************************/
 

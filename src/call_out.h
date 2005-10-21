@@ -7,13 +7,15 @@
 
 /* --- Prototypes --- */
 
-extern svalue_t *new_call_out(svalue_t *sp, short num_arg);
 extern void  call_out(void);
-extern void  find_call_out(object_t *ob, svalue_t *fun, Bool do_free_call);
 extern size_t  print_call_out_usage(strbuf_t *sbuf, Bool verbose);
 extern void  callout_dinfo_status(svalue_t *svp);
 extern void  remove_stale_call_outs(void);
-extern vector_t *get_all_call_outs(void);
+
+extern svalue_t *f_call_out(svalue_t *sp, int num_arg);
+extern svalue_t *f_call_out_info(svalue_t *sp);
+extern svalue_t *f_find_call_out(svalue_t *sp);
+extern svalue_t *f_remove_call_out(svalue_t *sp);
 
 #ifdef DEBUG
 extern void count_extra_ref_from_call_outs(void);

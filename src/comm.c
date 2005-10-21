@@ -282,9 +282,9 @@ static svalue_t *free_erq;
 #endif
 
 static struct ipentry {
-    long addr;  /* TODO: make this an struct in_addr */
-    char *name;  /* shared string with the hostname for <addr> */
-} iptable[IPSIZE] = { {0, 0}, };
+    struct in_addr  addr;  /* The address (only .s_addr is significant) */
+    char           *name;  /* shared string with the hostname for <addr> */
+} iptable[IPSIZE] = { { { 0 } , 0}, };
   /* Cache of known names for given IP addresses.
    * It is used as a ringbuffer, indexed by ipcur.
    * TODO: Null all entries in the table? Std-C should do that automatically.
@@ -292,7 +292,7 @@ static struct ipentry {
    * TODO:: hashed over the IP address. Worst case would still be O(IPSIZE),
    * TODO:: but best case would be O(1).
    */
-
+ 
 static int ipcur = 0;
   /* Index of the next entry to use in the iptable[].
    */
@@ -442,8 +442,11 @@ static void new_player(SOCKET_T new_socket, struct sockaddr_in *addr, size_t len
 static long read_32(char *);
 static Bool send_erq(int handle, int request, char *arg, size_t arglen);
 static void stop_erq_demon(Bool);
-static char * lookup_ip_entry (long addr, Bool useErq);
-static void add_ip_entry(long addr, char *name);
+static char * lookup_ip_entry (struct in_addr addr, Bool useErq);
+static void add_ip_entry(struct in_addr addr, const char *name);
+#ifdef USE_IPV6
+static void update_ip_entry(const char *oldname, const char *newname);
+#endif
 
 #endif /* ERQ_DEMON */
 
@@ -461,6 +464,40 @@ static void add_ip_entry(long addr, char *name);
 
 #endif
 
+/* These are the typical IPv6 structures - we use them transparently.
+ *
+ * --- arpa/inet.h ---
+ *
+ * struct in6_addr {
+ *         union {
+ *                 uint32_t u6_addr32[4];
+ * #ifdef notyet
+ *                 uint64_t u6_addr64[2];
+ * #endif
+ *                 uint16_t u6_addr16[8];
+ *                 uint8_t  u6_addr8[16];
+ *         } u6_addr;
+ * };
+ * #define s6_addr32       u6_addr.u6_addr32
+ * #ifdef notyet
+ * #define s6_addr64       u6_addr.u6_addr64
+ * #endif
+ * #define s6_addr16       u6_addr.u6_addr16
+ * #define s6_addr8        u6_addr.u6_addr8
+ * #define s6_addr         u6_addr.u6_addr8
+ *
+ * --- netinet/in.h ---
+ *
+ * struct sockaddr_in6 {
+ *    u_char		sin6_len;
+ *    u_char		sin6_family;
+ *    u_int16_t	sin6_port;
+ *    u_int32_t	sin6_flowinfo;
+ *    struct 		in6_addr	sin6_addr;
+ * };
+ *
+ */
+
 /*-------------------------------------------------------------------------*/
 static char *
 inet6_ntoa (struct in6_addr in)
@@ -470,9 +507,12 @@ inet6_ntoa (struct in6_addr in)
  */
 
 {
-    static char str[4097];
+    static char str[INET6_ADDRSTRLEN+1];
 
-    inet_ntop(AF_INET6, &in, str, 4096);
+    if (NULL == inet_ntop(AF_INET6, &in, str, INET6_ADDRSTRLEN))
+    {
+        perror("inet_ntop");
+    }
     return str;
 } /* inet6_ntoa() */
 
@@ -1612,8 +1652,6 @@ get_message (char *buff)
                         {
                             /* The result of a hostname lookup. */
 
-                            int32 net_addr;
-
                             if (msglen < 13 || rp[msglen-1]) {
 #ifdef DEBUG
                               if (msglen == 12) {
@@ -1626,11 +1664,50 @@ get_message (char *buff)
                               }
 #endif
                             } else {
-                                memcpy((char*)&net_addr, rp+8, 4);
+                                int32 naddr;
+                                struct in_addr net_addr;
+
+                                memcpy((char*)&naddr, rp+8, 4);
+#ifndef USE_IPV6
+                                net_addr.s_addr = naddr;
+#else
+                                CREATE_IPV6_MAPPED(net_addr, naddr);
+#endif
                                 add_ip_entry(net_addr, rp+12);
                             }
                             continue;
                         }
+#ifdef USE_IPV6
+                        else if (handle == ERQ_HANDLE_RLOOKUPV6)
+                        {
+                            /* The result of a hostname lookup. */
+
+                            if (msglen < 9 || rp[msglen-1]) {
+#ifdef DEBUG
+                                debug_message("%s Bogus reverse name lookup.\n"
+                                             , time_stamp());
+#else
+                                NOOP;
+#endif
+                            } else {
+                                char * space;
+
+                                space = strchr(rp+8, ' ');
+
+                                if (space == NULL)
+                                {
+                                    debug_message("%s IP6 Host lookup failed: %s\n"
+                                                 , time_stamp(), rp+8);
+                                }
+                                else if (strlen(space+1))
+                                {
+                                    *space = '\0';
+                                    update_ip_entry(rp+8, space+1);
+                                }
+                            }
+                            continue;
+                        }
+#endif /* USE_IPV6 */
                         else
                         {
                             /* remove the callback handle after processing
@@ -1663,8 +1740,8 @@ get_message (char *buff)
                             current_object = ob;
                             v = allocate_array(rest);
                             current_object = NULL;
-                            push_referenced_vector(v);
-                            push_number(rest);
+                            push_array(inter_sp, v);
+                            push_number(inter_sp, rest);
                             cp = rp + 8;
                             for (svp = v->item; --rest >=0; svp++)
                             {
@@ -1778,7 +1855,7 @@ get_message (char *buff)
 #endif
                 push_string_malloced(st);
                 push_string_malloced(udp_buf);
-                push_number(ntohs(addr.sin_port));
+                push_number(inter_sp, ntohs(addr.sin_port));
                 RESET_LIMITS;
                 apply_master_ob(STR_RECEIVE_IMP, 3);
                 CLEAR_EVAL_COST;
@@ -2125,7 +2202,7 @@ remove_interactive (object_t *ob)
     {
         command_giver = NULL;
         current_interactive = NULL;
-        push_object(ob);
+        push_ref_object(inter_sp, ob, "remove_interactive");
         malloc_privilege = MALLOC_MASTER;
         apply_master_ob(STR_DISCONNECT, 1);
         /* master might have used exec() */
@@ -2260,48 +2337,6 @@ refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) )
 }
 
 #endif /* ACCESS_CONTROL */
-
-/*-------------------------------------------------------------------------*/
-vector_t *
-users (void)
-
-/* EFUN users()
- *
- * Return a (possibly empty) vector of all interactive user objects.
- */
-
-{
-    object_t *ob;
-    int n, num;
-    vector_t *ret;
-    interactive_t **user;
-    svalue_t *svp;
-
-    /* Count the active users */
-    num = 0;
-    user = all_players;
-    for (n = max_player + 2; --n; user++)
-    {
-        if (*user && !((*user)->ob->flags & O_DESTRUCTED))
-            num++;
-    }
-
-    /* Get the result array and fill it */
-
-    ret = allocate_array(num);
-    svp = ret->item;
-    user = all_players;
-    for (n = max_player + 2; --n; user++)
-    {
-        if (*user && !((ob = (*user)->ob)->flags & O_DESTRUCTED))
-        {
-            put_ref_object(svp, ob, "users");
-            svp++;
-        }
-    }
-
-    return ret;
-}
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -2516,7 +2551,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
         new_interactive->snoop_on->snoop_by = ob;
     }
 #ifdef ERQ_DEMON
-    (void) lookup_ip_entry((long)(new_interactive->addr.sin_addr.s_addr), MY_TRUE);
+    (void) lookup_ip_entry(new_interactive->addr.sin_addr, MY_TRUE);
     /* TODO: We could pass the retrieved hostname right to login */
 #endif
     logon(ob);
@@ -2551,8 +2586,8 @@ set_noecho (interactive_t *i, char noecho)
         if (closure_hook[H_NOECHO].type == T_STRING)
         {
             DT(("'%s' set_noecho():   calling H_NOECHO\n", i->ob->name));
-            push_number(noecho);
-            push_object(ob);
+            push_number(inter_sp, noecho);
+            push_ref_object(inter_sp, ob, "set_no_echo");
             secure_apply(closure_hook[H_NOECHO].u.string, ob, 2);
         }
         else if (closure_hook[H_NOECHO].type == T_CLOSURE)
@@ -2560,8 +2595,8 @@ set_noecho (interactive_t *i, char noecho)
             DT(("'%s' set_noecho():   calling H_NOECHO\n", i->ob->name));
             if (closure_hook[H_NOECHO].x.closure_type == CLOSURE_LAMBDA)
                 closure_hook[H_NOECHO].u.lambda->ob = ob;
-            push_number(noecho);
-            push_object(ob);
+            push_number(inter_sp, noecho);
+            push_ref_object(inter_sp, ob, "set_no_echo");
             secure_call_lambda(&closure_hook[H_NOECHO], 2);
         }
         else
@@ -2787,7 +2822,7 @@ call_function_interactive (interactive_t *i, char *str)
 
     /* Call the input_to() function with the newly input string */
 
-    push_volatile_string(str);
+    push_volatile_string(inter_sp, str);
     (void)backend_callback(&(current_it.fun), 1);
 
     rt_context = error_recovery_info.rt.last;
@@ -2855,7 +2890,7 @@ remove_all_players (void)
         trace_level |= all_players[i]->trace_level;
         RESET_LIMITS;
         CLEAR_EVAL_COST;
-        push_object(all_players[i]->ob);
+        push_ref_object(inter_sp, all_players[i]->ob, "remove_all_players");
         (void)apply_master_ob(STR_REMOVE_PL, 1);
         if ( !(all_players[i]->ob->flags & O_DESTRUCTED) ) {
             destruct(all_players[i]->ob);
@@ -2954,7 +2989,7 @@ print_prompt (void)
 } /* print_prompt() */
 
 /*-------------------------------------------------------------------------*/
-int
+static int
 set_snoop (object_t *me, object_t *you)
 
 /* Set a snoop from <me> on the IO of <you>. If <you> is NULL, an
@@ -2981,11 +3016,11 @@ set_snoop (object_t *me, object_t *you)
         return 0;
 
     /* Check for permissions with valid_snoop in master */
-    push_object(me);
+    push_ref_object(inter_sp, me, "snoop");
     if (you == NULL)
-        push_number(0);
+        push_number(inter_sp, 0);
     else
-        push_object(you);
+        push_ref_object(inter_sp, you, "snoop");
     ret = apply_master_ob(STR_VALID_SNOOP, 2);
 
     if (!ret || ret->type != T_NUMBER || ret->u.number == 0)
@@ -3376,8 +3411,8 @@ reply_h_telnet_neg (int option)
              , time_stamp(), ip->tn_state, ip->ob->name);
         break;
     }
-    push_number(i);
-    push_number(option);
+    push_number(inter_sp, i);
+    push_number(inter_sp, option);
     if (!h_telnet_neg(2)) {
         DT(("'%s'   using default methods\n", ip->ob->name));
         switch(ip->tn_state) {
@@ -3875,14 +3910,14 @@ telnet_neg (interactive_t *ip)
 
                 str = (unsigned char *)&ip->text[ip->tn_start];
                 DT(("'%s' t_n: that is: state TS_SB_IAC got useful SE or SB: neg SB %02x (%d bytes)\n", ip->ob->name, *str, size));
-                push_number(SB);
-                push_number(*str++);
+                push_number(inter_sp, SB);
+                push_number(inter_sp, *str++);
                 svp = v->item;
                 while (--size >= 0) {
                     svp->u.number = *str++;
                     svp++;
                 }
-                push_referenced_vector(v);
+                push_array(inter_sp, v);
                 command_giver = ip->ob;
                 h_telnet_neg(3);
             }
@@ -4058,7 +4093,7 @@ stop_erq_demon (Bool notify)
 svalue_t *
 f_attach_erq_demon (svalue_t *sp)
 
-/* TEFUN: attach_erq_demon()
+/* EFUN: attach_erq_demon()
  *
  *   int attach_erq_demon(object ob, int do_close)
  *   int attach_erq_demon(string name, int do_close)
@@ -4081,14 +4116,16 @@ f_attach_erq_demon (svalue_t *sp)
     char *suffix;
 
     /* Test for the first form: (object ob, int do_close) */
-    if (sp[-1].type == T_OBJECT
-     && (ob = sp[-1].u.ob, O_SET_INTERACTIVE(ip, ob)))
+    if (sp[-1].type == T_OBJECT)
     {
-        if (sp->type != T_NUMBER)
+        ob = sp[-1].u.ob;
+        if (!O_SET_INTERACTIVE(ip, ob))
         {
-            bad_xefun_arg(2, sp);
+            error("Bad arg 1 to attach_erq_demon(): object is not interactive.\n");
             /* NOTREACHED */
+            return sp;
         }
+
         sp--;
         deref_object(ob, "attach_erq_demon");
         put_number(sp, 0);
@@ -4110,19 +4147,20 @@ f_attach_erq_demon (svalue_t *sp)
         }
         return sp;
     }
-    else
 
-    /* Test for the second form: (string name, int do_close) */
-    if (sp[-1].type == T_STRING
-          && !strstr((suffix = sp[-1].u.string), "/.."))
+    /* Otherwise the argument is a string */
+
+    suffix = sp[-1].u.string;
+    if (strstr(suffix, "/.."))
+    {
+        error("Bad arg 1 to attach_erq_demon(): illegal path.\n");
+        /* NOTREACHED */
+        return sp;
+    }
+
     {
         int n;
 
-        if (sp->type != T_NUMBER)
-        {
-            bad_xefun_arg(2, sp);
-            /* NOTREACHED */
-        }
         sp--;
         n = 0;
         if (privilege_violation4("attach_erq_demon",
@@ -4145,15 +4183,10 @@ return_result:
         put_number(sp, n);
         return sp;
     }
-    else
-    {
-        bad_xefun_arg(1, sp);
-        /* NOTREACHED */
-    }
 
     /* NOTREACHED */
     return NULL;
-}
+} /* f_attach_erq_demon() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -4211,7 +4244,7 @@ send_erq (int handle, int request, char *arg, size_t arglen)
 svalue_t *
 f_send_erq (svalue_t *sp)
 
-/* TEFUN: send_erq()
+/* EFUN: send_erq()
  *
  *   int send_erq(int request, string|int* data, closure callback)
  *
@@ -4230,19 +4263,13 @@ f_send_erq (svalue_t *sp)
     svalue_t *new_erq;
     int i;
 
-    if (sp[-2].type != T_NUMBER)
-    {
-        bad_xefun_arg(1, sp);
-        /* NOTREACHED */
-    }
-
     /* Set arg with the data to send. */
 
     if (sp[-1].type == T_STRING) {
         arg = sp[-1].u.string;
         arglen = strlen(arg);
     }
-    else if (sp[-1].type == T_POINTER)
+    else /* it's a pointer */
     {
         vector_t *v;
         svalue_t *svp;
@@ -4256,11 +4283,6 @@ f_send_erq (svalue_t *sp)
         for (j = (mp_int)arglen; --j >= 0; )
             *cp++ = (char)(*svp++).u.number;
     }
-    else
-    {
-        bad_xefun_arg(2, sp);
-        /* NOTREACHED */
-    }
 
     /* Test if this call is allowed. */
 
@@ -4272,7 +4294,9 @@ f_send_erq (svalue_t *sp)
      * default callback.
      */
 
-    if (sp->type == T_NUMBER && !sp->u.number) {
+    new_erq = NULL;
+
+    if (sp->type == T_NUMBER) { /* it's the number 0 */
         new_erq = &pending_erq[MAX_PENDING_ERQ];
         new_erq->u.lvalue = free_erq;
     }
@@ -4280,11 +4304,6 @@ f_send_erq (svalue_t *sp)
           && sp->x.closure_type != CLOSURE_UNBOUND_LAMBDA)
     {
         new_erq = free_erq;
-    }
-    else
-    {
-        bad_xefun_arg(3, sp);
-        /* NOTREACHED */
     }
 
     /* Send the request and make up the result. */
@@ -4306,7 +4325,7 @@ failure:
     (*--sp).u.number = i;
 
     return sp;
-}
+} /* f_send_erq() */
 
 /*-------------------------------------------------------------------------*/
 static long
@@ -4324,7 +4343,7 @@ read_32 (char *str)
 
 /*-------------------------------------------------------------------------*/
 static void
-add_ip_entry (long addr, char *name)
+add_ip_entry (struct in_addr addr, const char *name)
 
 /* Add a new IP address <addr>/hostname <name> pair to the cache iptable[].
  * If the <addr> already exists in the table, replace the old tabled name
@@ -4339,7 +4358,7 @@ add_ip_entry (long addr, char *name)
     new_entry = MY_FALSE;
     for (i = 0; i < IPSIZE; i++)
     {
-        if (iptable[i].addr == addr)
+        if (!memcmp(&(iptable[i].addr.s_addr), &addr.s_addr, sizeof(iptable[i].addr.s_addr)))
         {
             ix = i;
             break;
@@ -4362,8 +4381,36 @@ add_ip_entry (long addr, char *name)
 } /* add_ip_entry() */
 
 /*-------------------------------------------------------------------------*/
+#ifdef USE_IPV6
+
+static void
+update_ip_entry (const char *oldname, const char *newname)
+
+/* Change the IP name <oldname> in the iptable[] to <newname>.
+ * If the <oldname> is not in the table, nothing happens.
+ */
+
+{
+    int i, ix;
+    Bool new_entry;
+
+    ix = -1;
+    new_entry = MY_FALSE;
+    for (i = 0; i < IPSIZE; i++)
+    {
+        if (iptable[i].name && !strcmp(iptable[i].name, oldname))
+        {
+            free_string(iptable[i].name);
+            iptable[i].name = make_shared_string(newname);
+        }
+    }
+} /* update_ip_entry() */
+
+#endif
+
+/*-------------------------------------------------------------------------*/
 static char *
-lookup_ip_entry (long addr, Bool useErq)
+lookup_ip_entry (struct in_addr addr, Bool useErq)
 
 /* Lookup the IP address <addr> and return an uncounted pointer to
  * a shared string with the hostname. The function looks first in the
@@ -4373,6 +4420,7 @@ lookup_ip_entry (long addr, Bool useErq)
 
 {
     int i;
+    char *ipname;
     struct in_addr tmp;
 
     /* Search for the address backwards from the last added entry,
@@ -4384,8 +4432,11 @@ lookup_ip_entry (long addr, Bool useErq)
         if (i < 0)
             i += IPSIZE;
 
-        if (iptable[i].addr == addr && iptable[i].name)
+        if (!memcmp(&(iptable[i].addr.s_addr), &addr.s_addr, sizeof(iptable[i].addr.s_addr))
+         && iptable[i].name)
+        {
             return iptable[i].name;
+        }
     } while (i != ipcur );
 
     /* The address is new to us.
@@ -4394,25 +4445,29 @@ lookup_ip_entry (long addr, Bool useErq)
      * This also handles the case of an unresolvable hostname.
      */
 
-    tmp.s_addr = addr;
-
     iptable[ipcur].addr = addr;
     if (iptable[ipcur].name)
         free_string(iptable[ipcur].name);
 
+    memcpy(&tmp, &addr, sizeof(tmp));
 #ifndef USE_IPV6
-    iptable[ipcur].name = make_shared_string(inet_ntoa(tmp));
+    ipname = make_shared_string(inet_ntoa(tmp));
 #else
-    iptable[ipcur].name = make_shared_string(inet6_ntoa(tmp));
+    ipname = make_shared_string(inet6_ntoa(tmp));
 #endif
+
+    iptable[ipcur].name = ipname;
 
     ipcur = (ipcur+1) % IPSIZE;
 
     /* If we have the erq and may use it, lookup the real hostname */
     if (erq_demon >= 0 && useErq)
     {
-
-        send_erq(ERQ_HANDLE_RLOOKUP, ERQ_RLOOKUP, (char *)&addr, 4);
+#ifndef USE_IPV6
+        send_erq(ERQ_HANDLE_RLOOKUP, ERQ_RLOOKUP, (char *)&addr.s_addr, sizeof(addr.s_addr));
+#else
+        send_erq(ERQ_HANDLE_RLOOKUPV6, ERQ_RLOOKUPV6, ipname, strlen(ipname));
+#endif
     }
 
     return iptable[ipcur].name;
@@ -4503,7 +4558,7 @@ count_comm_refs (void)
 /*=========================================================================*/
 
 /*-------------------------------------------------------------------------*/
-svalue_t *
+static svalue_t *
 query_ip_name (svalue_t *sp, Bool lookup)
 
 /* Lookup the IP address (<lookup> is false) or IP hostname (<lookup> is
@@ -4543,7 +4598,8 @@ query_ip_name (svalue_t *sp, Bool lookup)
             svp = svp->u.lvalue;
         if (svp->type != T_OBJECT)
         {
-            bad_xefun_arg(1, sp);
+            error("Bad arg 1 to query_ip_number(): expected object/object&, got %s&.\n"
+                 , typename(svp->type));
             /* NOTREACHED */
         }
         ob = svp->u.ob;
@@ -4599,7 +4655,7 @@ query_ip_name (svalue_t *sp, Bool lookup)
 #ifdef ERQ_DEMON
         char * hname;
 
-        hname = lookup_ip_entry((long)(ip->addr.sin_addr.s_addr), MY_FALSE);
+        hname = lookup_ip_entry(ip->addr.sin_addr, MY_FALSE);
         if (hname)
         {
             put_ref_string(sp, hname);
@@ -4625,7 +4681,7 @@ query_ip_name (svalue_t *sp, Bool lookup)
     }
     put_malloced_string(sp, str);
     return sp;
-}
+} /* query_ip_number() */
 
 /*-------------------------------------------------------------------------*/
 char *
@@ -4671,7 +4727,7 @@ get_host_ip_number (void)
 svalue_t *
 f_query_snoop (svalue_t *sp)
 
-/* TEFUN: query_snoop()
+/* EFUN: query_snoop()
  *
  *   object query_snoop(object victim)
  *
@@ -4682,12 +4738,6 @@ f_query_snoop (svalue_t *sp)
 {
     svalue_t *arg1;
     object_t *ob;
-
-    if (sp->type != T_OBJECT)
-    {
-        bad_xefun_arg(1, sp);
-        /* NOTREACHED */
-    }
 
     /* Do some test and set ob to the snooper (if any) */
     switch (0) /* try {...} */
@@ -4736,7 +4786,7 @@ svalue_t *
 f_query_idle (svalue_t *sp)
 
 
-/* TEFUN: query_idle()
+/* EFUN: query_idle()
  *
  *   int query_idle(object ob)
  *
@@ -4746,12 +4796,6 @@ f_query_idle (svalue_t *sp)
 {
     int i;
     object_t *ob;
-
-    if (sp->type != T_OBJECT)
-    {
-        bad_xefun_arg(1, sp);
-        /* NOTREACHED */
-    }
 
     ob = sp->u.ob;
     if (!O_IS_INTERACTIVE(ob))
@@ -4771,7 +4815,7 @@ f_query_idle (svalue_t *sp)
 svalue_t *
 f_remove_interactive (svalue_t *sp)
 
-/* TEFUN: remove_interactive()
+/* EFUN: remove_interactive()
  *
  *   void remove_interactive(object ob)
  *
@@ -4784,12 +4828,6 @@ f_remove_interactive (svalue_t *sp)
 
 {
     interactive_t *victim;
-
-    if (sp->type != T_OBJECT)
-    {
-        bad_xefun_arg(1, sp);
-        /* NOTREACHED */
-    }
 
     if (O_SET_INTERACTIVE(victim, sp->u.ob)
      && !victim->closing
@@ -4807,117 +4845,6 @@ f_remove_interactive (svalue_t *sp)
     }
     free_svalue(sp);
     return sp - 1;
-}
-
-/*-------------------------------------------------------------------------*/
-int
-replace_interactive (object_t *ob, object_t * obfrom, char *name)
-
-/* EFUN: exec()
- *
- * Switch the network connection from <obfrom> to <ob>. If <ob> is already
- * interactive, its connection will be switched to <obfrom>. The efun is
- * called from the program <name>.
- *
- * If <obfrom> was command_giver, <ob> will be the new command_giver.
- *
- * The call is validated by master->valid_exec() and has to return 0 on
- * failure, and 1 on success.
- */
-
-{
-    svalue_t *v;
-    interactive_t *stale_interactive, *ip;
-    object_t *save_command;
-
-    /* Ask the master if this exec() is ok. */
-    push_volatile_string(name);
-    push_object(ob);
-    push_object(obfrom);
-    v = apply_master_ob(STR_VALID_EXEC, 3);
-    if (!v || v->type != T_NUMBER || v->u.number == 0)
-        return 0;
-
-    /* stale_interactive becomes the former interactive _if_ it
-     * still is an interactive_t.
-     */
-    if (!(O_SET_INTERACTIVE(stale_interactive, ob)))
-    {
-        stale_interactive = NULL;
-    }
-
-    if (!(O_SET_INTERACTIVE(ip, obfrom)))
-        error("Bad argument 2 to exec()\n");
-
-    /* When we have to have an out of memory error, have it before pointers
-     * get changed.
-     */
-    assert_shadow_sent(ob);
-
-    save_command = command_giver;
-
-    /* If <ob> has a connection, flush it */
-    if (stale_interactive)
-    {
-        prompt_from_ed_buffer(stale_interactive);
-        if (stale_interactive->message_length)
-        {
-            command_giver = ob;
-            add_message(message_flush);
-        }
-    }
-
-    /* Flush the connection of <obfrom> */
-
-    prompt_from_ed_buffer(ip);
-    if (ip->message_length) {
-        command_giver = obfrom;
-        add_message(message_flush);
-    }
-    command_giver = save_command;
-
-    /* Switch a possible snooper */
-
-    if (ip->snoop_on)
-        ip->snoop_on->snoop_by = ob;
-
-    /* Switch the interactive */
-
-    O_GET_INTERACTIVE(ob) = ip;
-    O_GET_INTERACTIVE(obfrom) = NULL;
-    ob->flags |= O_ONCE_INTERACTIVE;
-    ip->ob = ob;
-    ip->catch_tell_activ = MY_TRUE;
-
-    if (stale_interactive)
-    {
-        /* Tie <ob>s stale connection to <obfrom>. */
-
-        O_GET_INTERACTIVE(obfrom) = stale_interactive;
-        stale_interactive->ob = obfrom;
-        if (stale_interactive->snoop_on)
-            stale_interactive->snoop_on->snoop_by = obfrom;
-        stale_interactive->catch_tell_activ = MY_TRUE;
-        prompt_to_ed_buffer(stale_interactive);
-    }
-    else
-    {
-        /* Clean up <obfrom> after the loss of connection */
-
-        obfrom->flags &= ~O_ONCE_INTERACTIVE;
-        check_shadow_sent(obfrom);
-
-        ref_object(ob, "exec");
-        free_object(obfrom, "exec");
-    }
-
-    prompt_to_ed_buffer(ip);
-    if (obfrom == command_giver)
-        command_giver = ob;
-    else if (ob == command_giver)
-        command_giver = obfrom;
-
-    return 1;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -4972,7 +4899,7 @@ count_comm_extra_refs (void)
 svalue_t *
 f_send_imp (svalue_t *sp)
 
-/* TEFUN: send_imp()
+/* EFUN: send_imp()
  *
  *   int send_imp(string host, int port, string message)
  *   int send_imp(string host, int port, int * message)
@@ -4998,9 +4925,6 @@ f_send_imp (svalue_t *sp)
     struct hostent *hp;
     int ret = 0;
 
-    if ((sp-2)->type != T_STRING) bad_xefun_arg(1, sp);
-    if ((sp-1)->type != T_NUMBER) bad_xefun_arg(2, sp);
-
     switch(0) { default: /* try {...} */
 
         /* Set msg/msglen to the data of the message to send */
@@ -5010,7 +4934,7 @@ f_send_imp (svalue_t *sp)
             msg = sp->u.string;
             msglen = strlen(msg);
         }
-        else if (sp->type == T_POINTER)
+        else /* it's an array */
         {
             vector_t *v;
             svalue_t *svp;
@@ -5025,11 +4949,6 @@ f_send_imp (svalue_t *sp)
             svp = &v->item[0];
             for (j = (mp_int)msglen; --j >= 0; )
                 *cp++ = (char)(*svp++).u.number;
-        }
-        else
-        {
-            bad_xefun_arg(3, sp);
-            /* NOTREACHED */
         }
 
         /* Is this call valid? */
@@ -5100,7 +5019,7 @@ f_send_imp (svalue_t *sp)
 svalue_t *
 f_set_buffer_size (svalue_t *sp)
 
-/* TEFUN: set_buffer_size()
+/* EFUN: set_buffer_size()
  *
  *   int set_buffer_size(int size)
  *
@@ -5117,10 +5036,12 @@ f_set_buffer_size (svalue_t *sp)
 
     /* Get the desired buffer size */
 
-    if (sp->type != T_NUMBER || sp->u.number > SET_BUFFER_SIZE_MAX)
+    if (sp->u.number > SET_BUFFER_SIZE_MAX)
     {
-        bad_xefun_arg(1, sp);
+        error("Bad arg 1 to set_buffer_size(): value %ld exceeds maximum %ld\n"
+             , sp->u.number, (long) SET_BUFFER_SIZE_MAX);
         /* NOTREACHED */
+        return sp;
     }
     new = sp->u.number;
 
@@ -5155,7 +5076,7 @@ f_set_buffer_size (svalue_t *sp)
 svalue_t *
 f_binary_message (svalue_t *sp)
 
-/* TEFUN: binary_message()
+/* EFUN: binary_message()
  *
  *   int binary_message(int *|string message, int flags)
  *
@@ -5202,28 +5123,19 @@ f_binary_message (svalue_t *sp)
         {
             if (svp->type != T_NUMBER)
             {
-                bad_xefun_arg(1, sp);
+                error("Bad arg 1 to binary_message(): got %s*, "
+                      "expected string/int*.\n", typename(svp->type));
                 /* NOTREACHED */
+                return sp;
             }
             *p++ = (char)svp->u.number;
         }
         *p = '\0';
     }
-    else if (sp[-1].type == T_STRING)
+    else /* it's a string */
     {
         message = sp[-1].u.string;
         size = strlen(message);
-    }
-    else
-    {
-        bad_xefun_arg(1, sp);
-        /* NOTREACHED */
-    }
-
-    if (sp->type != T_NUMBER)
-    {
-        bad_xefun_arg(2, sp);
-        /* NOTREACHED */
     }
 
     /* Send the message */
@@ -5341,9 +5253,416 @@ f_binary_message (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_exec (svalue_t *sp)
+
+/* EFUN exec()
+ *
+ *   object exec(object new, object old)
+ *
+ * Switch the network connection from <old> to <new>. If <new> is already
+ * interactive, its connection will be switched to <old>.
+ *
+ * It is used to load different "user objects" or to reconnect
+ * link dead users.
+ *
+ * If <old> was command_giver, <news> will be the new command_giver.
+ *
+ * The call is validated by master->valid_exec() and returns 0 on
+ * failure, and 1 on success.
+ */
+
+{
+    int rc;
+    object_t *ob;
+    object_t *obfrom;
+    char * name;
+
+    rc = 0;
+
+    ob = sp[-1].u.ob;
+    obfrom = sp[0].u.ob;
+    name = current_prog->name;
+        /* TODO: FinalFrontier suggests 'current_object->prog->name' */
+
+    do {
+        svalue_t *v;
+        interactive_t *stale_interactive, *ip;
+        object_t *save_command;
+
+        /* Ask the master if this exec() is ok. */
+        push_volatile_string(inter_sp, name);
+        push_ref_object(inter_sp, ob, "exec");
+        push_ref_object(inter_sp, obfrom, "exec");
+        v = apply_master_ob(STR_VALID_EXEC, 3);
+        if (!v || v->type != T_NUMBER || v->u.number == 0)
+            break;
+
+        /* stale_interactive becomes the former interactive _if_ it
+         * still is an interactive_t.
+         */
+        if (!(O_SET_INTERACTIVE(stale_interactive, ob)))
+        {
+            stale_interactive = NULL;
+        }
+
+        if (!(O_SET_INTERACTIVE(ip, obfrom)))
+            error("Bad argument 2 to exec(): not interactive.\n");
+
+        /* When we have to have an out of memory error, have it before pointers
+         * get changed.
+         */
+        assert_shadow_sent(ob);
+
+        save_command = command_giver;
+
+        /* If <ob> has a connection, flush it */
+        if (stale_interactive)
+        {
+            prompt_from_ed_buffer(stale_interactive);
+            if (stale_interactive->message_length)
+            {
+                command_giver = ob;
+                add_message(message_flush);
+            }
+        }
+
+        /* Flush the connection of <obfrom> */
+
+        prompt_from_ed_buffer(ip);
+        if (ip->message_length) {
+            command_giver = obfrom;
+            add_message(message_flush);
+        }
+        command_giver = save_command;
+
+        /* Switch a possible snooper */
+
+        if (ip->snoop_on)
+            ip->snoop_on->snoop_by = ob;
+
+        /* Switch the interactive */
+
+        O_GET_INTERACTIVE(ob) = ip;
+        O_GET_INTERACTIVE(obfrom) = NULL;
+        ob->flags |= O_ONCE_INTERACTIVE;
+        ip->ob = ob;
+        ip->catch_tell_activ = MY_TRUE;
+
+        if (stale_interactive)
+        {
+            /* Tie <ob>s stale connection to <obfrom>. */
+
+            O_GET_INTERACTIVE(obfrom) = stale_interactive;
+            stale_interactive->ob = obfrom;
+            if (stale_interactive->snoop_on)
+                stale_interactive->snoop_on->snoop_by = obfrom;
+            stale_interactive->catch_tell_activ = MY_TRUE;
+            prompt_to_ed_buffer(stale_interactive);
+        }
+        else
+        {
+            /* Clean up <obfrom> after the loss of connection */
+
+            obfrom->flags &= ~O_ONCE_INTERACTIVE;
+            check_shadow_sent(obfrom);
+
+            ref_object(ob, "exec");
+            free_object(obfrom, "exec");
+        }
+
+        prompt_to_ed_buffer(ip);
+        if (obfrom == command_giver)
+            command_giver = ob;
+        else if (ob == command_giver)
+            command_giver = obfrom;
+
+        rc = 1;
+    }while(0);
+
+    free_svalue(sp--);
+    free_svalue(sp); /* object might have been destructed */
+    put_number(sp, rc);
+
+    return sp;
+} /* f_exec() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_interactive (svalue_t *sp)
+
+/* EFUN interactive()
+ *
+ *   int interactive(object ob)
+ *
+ * Return non-zero if ob, or when the argument is omitted, this
+ * object(), is an interactive user. Will return 1 if the
+ * object is interactive, else 0.
+ */
+
+{
+    int i;
+    object_t *ob;
+    interactive_t *ip;
+
+    ob = sp->u.ob;
+    (void)O_SET_INTERACTIVE(ip, ob);
+    i = ip && !ip->do_close;
+    deref_object(ob, "interactive");
+    put_number(sp, i);
+
+    return sp;
+} /* f_interactive() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_input_to (svalue_t *sp, int num_arg)
+
+/* EFUN input_to()
+ *
+ *   void input_to(string fun)
+ *   void input_to(string fun, int flag, ...)
+ *
+ * Enable next line of user input to be sent to the local
+ * function fun as an argument. The input line will not be
+ * parsed, only when it starts with a "!" (like a kind of shell
+ * escape) (this feature may be disabled).
+ * The function <fun> may be static, but must not be private (or
+ * it won't be found).
+ *
+ * Note that fun is not called immediately but after pressing the
+ * RETURN key.
+ *
+ * If input_to() is called more than once in the same execution,
+ * only the first call has any effect.
+ *
+ * The optional 3rd and following args will be passed as second and
+ * subsequent args to the function fun. (This feature is was
+ * added only recently, to avoid the need for global variables)
+ */
+
+{
+    svalue_t *arg;  /* Pointer to the arguments of the efun */
+    int flags;           /* The flags passed to input_to() */
+    input_to_t *it;
+    int extra;           /* Number of extra arguments */
+    int error_index;
+
+    arg = sp - num_arg + 1;
+
+    /* Extract the arguments */
+
+    flags = 0;
+    extra = 0;
+    if (num_arg > 1)
+    {
+        flags = arg[1].u.number & (NOECHO_REQ|CHARMODE_REQ|IGNORE_BANG);
+        extra = num_arg - 2;
+    }
+
+    /* Allocate and setup the input_to structure */
+
+    xallocate(it, sizeof *it, "new input_to");
+
+    if (arg[0].type == T_STRING)
+    {
+        error_index = setup_function_callback(&(it->fun), current_object
+                                             , arg[0].u.string
+                                             , extra, arg + 2
+                                             , MY_TRUE
+                                             );
+        free_string_svalue(arg);
+    }
+    else
+        error_index = setup_closure_callback(&(it->fun), arg
+                                            , extra, arg + 2
+                                            , MY_TRUE
+                                            );
+
+    if (error_index >= 0)
+    {
+        free_input_to(it);
+        vefun_bad_arg(error_index, arg-1);
+        /* NOTREACHED */
+        return arg-1;
+    }
+
+    /* If the master agrees (only in case of IGNORE_BANG) the
+     * the input_to can be set - return 1.
+     */
+
+    sp->type = T_NUMBER;
+    if (!(flags & IGNORE_BANG)
+     || privilege_violation4("input_to", command_giver, 0, flags, sp))
+    {
+        if (set_call(command_giver, it, (char)flags)) {
+            put_number(arg, 1);
+            return arg;
+        }
+    }
+
+    /* input_to() was not allowed - return 0. */
+
+    free_input_to(it);
+    put_number(arg, 0);
+    return arg;
+} /* e_input_to() */
+
+/*-------------------------------------------------------------------------*/
+static void
+free_input_to (input_to_t *it)
+
+/* Deallocate the input_to structure <it> and all referenced memory.
+ */
+
+{
+    free_callback(&(it->fun));
+    xfree(it);
+} /* free_input_to() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_query_input_pending (svalue_t *sp)
+
+/* EFUN query_input_pending()
+ *
+ *   object query_input_pending(object ob)
+ *
+ * If ob is interactive and currently has an input_to() pending,
+ * the object that has called the input_to() is returned,
+ * else 0.
+ */
+
+{
+    object_t *ob, *cb;
+    interactive_t *ip;
+
+    ob = sp->u.ob;
+    if (O_SET_INTERACTIVE(ip, ob) && ip->input_to)
+    {
+        cb = callback_object(&(ip->input_to->fun));
+        if (cb)
+            sp->u.ob = ref_object(cb, "query_input_pending");
+        else
+            put_number(sp, 0);
+    }
+    else
+    {
+        put_number(sp, 0);
+    }
+
+    deref_object(ob, "query_input_pending");
+
+    return sp;
+} /* f_query_input_pending() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_query_ip_name (svalue_t *sp)
+
+/* EFUN query_ip_name()
+ *
+ *   string query_ip_name(object ob)
+ *
+ * Give the ip-name for user the current user or for the optional
+ * argument ob. An asynchronous process 'erq' is used to find
+ * out these names in parallel. If there are any failures to find
+ * the ip-name, then the ip-number is returned instead.
+ */
+
+{
+    return query_ip_name(sp, MY_TRUE);
+} /* f_query_ip_name() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_query_ip_number (svalue_t *sp)
+
+/* EFUN query_ip_number()
+ *
+ *   string query_ip_number(object  ob)
+ *   string query_ip_number(mixed & ob)
+ *
+ * Give the ip-number for the current user or the optional
+ * argument ob.
+ *
+ * If ob is given as reference (and it must be a valid object
+ * then), it will upon return be set to the struct sockaddr_in of
+ * the queried object, represented by an array of integers, one
+ * integer per address byte:
+ *   ob[0.. 1]: sin_family
+ *   ob[2.. 3]: sin_port
+ *   ob[4.. 7]: sin_addr
+ *   ob[8..15]: undefined.
+ */
+
+{
+    return query_ip_name(sp, MY_FALSE);
+} /* f_query_ip_number() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_query_mud_port (svalue_t *sp)
+
+/* EFUN: query_mud_port()
+ *
+ * Returns the port number the parser uses for user connections.
+ *
+ *   int query_mud_port(void)
+ *
+ * If no argument is given, the port for this_player() is
+ * returned. If this_player() is not existing or not interactive,
+ * the first port number open for connections is returned.
+ *
+ *   int query_mud_port(object user)
+ *   int query_mud_port(int num)
+ *
+ * If an user object is given, the port used for its connection
+ * is returned.
+ * If a positive number is given, the <num>th port number the
+ * parser uses for connections is returned (given that there are
+ * that many ports).
+ * If -1 is given, the number of ports open for connections is
+ * returned.
+ */
+
+{
+    object_t *ob;
+    interactive_t *ip;
+    struct sockaddr_in addr;
+    length_t length;
+
+    length = sizeof(addr);
+
+    if (sp->type == T_NUMBER)
+    {
+        if (sp->u.number < -1 || sp->u.number >= numports)
+        {
+            error("Bad arg 1 to query_mud_port(): value %ld out of range.\n"
+                 , sp->u.number);
+            /* NOTREACHED */
+        }
+        sp->u.number = sp->u.number < 0 ? numports : port_numbers[sp->u.number];
+        return sp;
+    }
+
+    ob = sp->u.ob;
+    deref_object(ob, "query_ip_port");
+
+    if ( !(O_SET_INTERACTIVE(ip, ob))) {
+        put_number(sp, port_numbers[0]);
+        return sp;
+    }
+
+    getsockname(ip->socket, (struct sockaddr *)&addr, &length);
+    put_number(sp, ntohs(addr.sin_port));
+    return sp;
+} /* f_query_mud_port() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_set_combine_charset (svalue_t *sp)
 
-/* TEFUN: set_combine_charset()
+/* EFUN: set_combine_charset()
  *
  *   void set_combine_charset (int* bitvector)
  *   void set_combine_charset (string chars)
@@ -5371,11 +5690,12 @@ f_set_combine_charset (svalue_t *sp)
     interactive_t *ip;
 
     i = 0;
-    if (sp->type != T_STRING
-     && (sp->type != T_POINTER || (i = (mp_int)VEC_SIZE(sp->u.vec)) > 32))
+    if (sp->type == T_POINTER && (i = (mp_int)VEC_SIZE(sp->u.vec)) > 32)
     {
-        bad_xefun_arg(1, sp);
+        error("Bad arg 1 to set_combine_charset(): int[] too long (%ld)\n"
+             , (long)i);
         /* NOTREACHED */
+        return sp;
     }
 
     if (command_giver && O_SET_INTERACTIVE(ip, command_giver))
@@ -5413,7 +5733,7 @@ f_set_combine_charset (svalue_t *sp)
 svalue_t *
 f_set_connection_charset (svalue_t *sp)
 
-/* TEFUN: set_connection_charset()
+/* EFUN: set_connection_charset()
  *
  *   void set_connection_charset (int* bitvector, int quote_iac)
  *   void set_connection_charset (string charset, int quote_iac)
@@ -5443,16 +5763,12 @@ f_set_connection_charset (svalue_t *sp)
     interactive_t *ip;
 
     i = 0;
-    if ( sp[-1].type != T_STRING
-     && (sp[-1].type != T_POINTER || (i = (mp_int)VEC_SIZE(sp[-1].u.vec)) > 32))
+    if (sp[-1].type == T_POINTER && (i = (mp_int)VEC_SIZE(sp[-1].u.vec)) > 32)
     {
-        bad_xefun_arg(1, sp);
+        error("Bad arg 1 to set_connection_charset(): array too big (%ld)\n"
+             , i);
         /* NOTREACHED */
-    }
-    if (sp->type != T_NUMBER)
-    {
-        bad_xefun_arg(2, sp);
-        /* NOTREACHED */
+        return sp;
     }
 
     if (O_SET_INTERACTIVE(ip, current_object))
@@ -5497,163 +5813,191 @@ f_set_connection_charset (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-e_input_to (svalue_t *sp, int num_arg)
+f_set_prompt (svalue_t *sp)
 
-/* EFUN: input_to()
+/* EFUN set_prompt()
  *
- * Set up a function in the current object to be called with the
- * next user input.
+ *       string set_prompt(mixed prompt, object ob)
  *
- * This function can do a lot - I won't repeat the external
- * man page here :-)
+ * Set the prompt given by the first argument for the interactive object
+ * instead of the default ``> ''. If the second argument is omitted,
+ * this_player() is used as default. The first arg can be a string or a
+ * closure. If the <prompt> arg is 0, the prompt is not changed.
+ * TODO: Remove the acceptance of -1 here.
+ *
+ * The result returned is the old prompt.
  */
 
 {
-    svalue_t *arg;  /* Pointer to the arguments of the efun */
-    int flags;           /* The flags passed to input_to() */
-    input_to_t *it;
-    int extra;           /* Number of extra arguments */
-    int error_index;
+    svalue_t *prompt;
+    interactive_t *ip;
 
-    arg = sp - num_arg + 1;
-    if (arg[0].type != T_STRING && arg[0].type != T_CLOSURE)
+    /* Make sure the object is interactive */
+    if (!(O_SET_INTERACTIVE(ip, sp->u.ob))
+     || ip->closing)
     {
-        bad_efun_vararg(1, sp);
-        /* NOTREACHED */
+        error("Bad arg 2 to set_prompt(): object not interactive.\n");
+        return sp;
     }
 
-    /* Extract the arguments */
+    /* Get the address of the prompt svalue */
+    prompt = query_prompt(sp->u.ob);
 
-    flags = 0;
-    extra = 0;
-    if (num_arg > 1)
+    free_object_svalue(sp);
+    sp--;
+
+    if (sp->type == T_STRING || sp->type == T_CLOSURE)
     {
-        if (arg[1].type != T_NUMBER)
+        if (sp->type == T_STRING
+         && sp->x.string_type == STRING_VOLATILE)
         {
-            bad_efun_vararg(2, sp);
+            char *str = make_shared_string(sp->u.string);
+
+            if (!str)
+            {
+                inter_sp = sp;
+                error("(set_prompt) Out of memory (%lu bytes) for prompt\n"
+                     , (unsigned long) strlen(sp->u.string));
+            }
+            else
+            {
+                sp->u.string = str;
+                sp->x.string_type = STRING_SHARED;
+            }
+        }
+
+        /* Three-way exchange to set the new prompt and put
+         * the old one onto the stack.
+         */
+        sp[1] = *prompt;
+        *prompt = *sp;
+        *sp = sp[1];
+        if (sp->type == T_CLOSURE)
+        {
+            /* In case the prompt is changed from within the prompt
+             * closure.
+             */
+            addref_closure(sp, "unset_prompt");
+            free_closure_hooks(sp, 1);
+        }
+    }
+    else /* It's a number */
+    {
+        if (sp->u.number == 0 || sp->u.number == -1)
+            assign_svalue(sp, prompt);
+        else
+        {
+            error("Bad int arg 1 to set_prompt(): got %ld, expected 0 or -1.\n"
+                 , sp->u.number);
             /* NOTREACHED */
-        }
-        flags = arg[1].u.number & (NOECHO_REQ|CHARMODE_REQ|IGNORE_BANG);
-        extra = num_arg - 2;
-    }
-
-    /* Allocate and setup the input_to structure */
-
-    xallocate(it, sizeof *it, "new input_to");
-
-    if (arg[0].type == T_STRING)
-    {
-        error_index = setup_function_callback(&(it->fun), current_object
-                                             , arg[0].u.string
-                                             , extra, arg + 2
-                                             , MY_TRUE
-                                             );
-        free_string_svalue(arg);
-    }
-    else
-        error_index = setup_closure_callback(&(it->fun), arg
-                                            , extra, arg + 2
-                                            , MY_TRUE
-                                            );
-
-    if (error_index >= 0)
-    {
-        free_input_to(it);
-        bad_efun_vararg(error_index, arg - 1);
-        /* NOTREACHED */
-    }
-
-    /* If the master agrees (only in case of IGNORE_BANG) the
-     * the input_to can be set - return 1.
-     */
-
-    sp->type = T_NUMBER;
-    if (!(flags & IGNORE_BANG)
-     || privilege_violation4("input_to", command_giver, 0, flags, sp))
-    {
-        if (set_call(command_giver, it, (char)flags)) {
-            put_number(arg, 1);
-            return arg;
+            return sp;
         }
     }
 
-    /* input_to() was not allowed - return 0. */
-
-    free_input_to(it);
-    put_number(arg, 0);
-    return arg;
-} /* e_input_to() */
-
-/*-------------------------------------------------------------------------*/
-static void
-free_input_to (input_to_t *it)
-
-/* Deallocate the input_to structure <it> and all referenced memory.
- */
-
-{
-    free_callback(&(it->fun));
-    xfree(it);
-} /* free_input_to() */
+    return sp;
+} /* f_set_prompt() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-query_ip_port (svalue_t *sp)
+f_snoop (svalue_t *sp, int num_arg)
 
-/* EFUN: query_mud_port()
+/* EFUN snoop()
  *
- * Returns the port number the parser uses for user connections.
+ *   object snoop(object snooper)
+ *   object snoop(object snooper, object snoopee)
  *
- *   int query_mud_port(void)
+ * Starts a snoop from 'snooper' on 'snoopee', or if 'snoopee' is not
+ * given, terminates any snoop from 'snooper'.
+ * On success, 'snoopee' is returned, else 0.
  *
- * If no argument is given, the port for this_player() is
- * returned. If this_player() is not existing or not interactive,
- * the first port number open for connections is returned.
+ * The snoop is checked with the master object for validity.
+ * It will also fail if the 'snoopee' is being snooped already or
+ * if a snoop would result in a recursive snoop action.
+ */
+
+{
+    int i;
+
+    if (num_arg == 1)
+    {
+        i = set_snoop(sp->u.ob, 0);
+    }
+    else
+    {
+        i = set_snoop((sp-1)->u.ob, sp->u.ob);
+        free_svalue(sp--);
+    }
+    free_svalue(sp);
+    put_number(sp, i);
+
+    return sp;
+} /* f_snoop() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_users (svalue_t *sp)
+
+/* EFUN users()
  *
- *   int query_mud_port(object user)
- *   int query_mud_port(int num)
- *
- * If an user object is given, the port used for its connection
- * is returned.
- * If a positive number is given, the <num>th port number the
- * parser uses for connections is returned (given that there are
- * that many ports).
- * If -1 is given, the number of ports open for connections is
- * returned.
+ * Return a (possibly empty) vector of all interactive user objects.
  */
 
 {
     object_t *ob;
-    interactive_t *ip;
-    struct sockaddr_in addr;
-    length_t length;
+    int n, num;
+    vector_t *ret;
+    interactive_t **user;
+    svalue_t *svp;
 
-    length = sizeof(addr);
+    /* Count the active users */
+    num = 0;
+    user = all_players;
+    for (n = max_player + 2; --n; user++)
+    {
+        if (*user && !((*user)->ob->flags & O_DESTRUCTED))
+            num++;
+    }
 
-    if (sp->type != T_OBJECT) {
-        if (   sp->type != T_NUMBER
-            || sp->u.number < -1 || sp->u.number >= numports
-           )
+    /* Get the result array and fill it */
+
+    ret = allocate_array(num);
+    svp = ret->item;
+    user = all_players;
+    for (n = max_player + 2; --n; user++)
+    {
+        if (*user && !((ob = (*user)->ob)->flags & O_DESTRUCTED))
         {
-            bad_xefun_arg(1, sp);
-            /* NOTREACHED */
+            put_ref_object(svp, ob, "users");
+            svp++;
         }
-        sp->u.number = sp->u.number < 0 ? numports : port_numbers[sp->u.number];
-        return sp;
     }
 
-    ob = sp->u.ob;
-    deref_object(ob, "query_ip_port");
+    push_array(sp, ret);
 
-    if ( !(O_SET_INTERACTIVE(ip, ob))) {
-        put_number(sp, port_numbers[0]);
-        return sp;
-    }
-
-    getsockname(ip->socket, (struct sockaddr *)&addr, &length);
-    put_number(sp, ntohs(addr.sin_port));
     return sp;
-}
+} /* f_users() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef F_QUERY_IMP_PORT
+
+svalue_t *
+f_query_imp_port (svalue_t *sp)
+
+/* EFUN query_imp_port()
+ *
+ *   int query_imp_port(void)
+ *
+ * Returns the port number that is used for the inter mud
+ * protocol.
+ */
+
+{
+    push_number(sp, udp_port);
+
+    return sp;
+} /* f_query_imp_port() */
+
+#endif /* F_QUERY_IMP_PORT */
 
 /***************************************************************************/
 

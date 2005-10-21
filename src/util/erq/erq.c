@@ -40,7 +40,7 @@
 #include <sys/wait.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <sys/time.h>
+#include <time.h>
 #include <signal.h>
 #include <sys/times.h>
 #include <fcntl.h>
@@ -48,6 +48,9 @@
 
 #include "machine.h"
 
+#ifdef HAVE_SYS_TIME_H
+#    include <sys/time.h>
+#endif
 #ifdef HAVE_UNISTD_H
 #    include <unistd.h>
 #endif
@@ -1038,6 +1041,64 @@ start_subserver (long server_num, long seed)
             break;
           }
 #endif
+
+#ifdef ERQ_RLOOKUPV6
+            case ERQ_RLOOKUPV6:
+              {
+                int i;
+                char *mbuff;
+                struct addrinfo req, *ai, *ai2;
+
+                /* handle stays in header[4..7] */
+                header[8] = CHILD_FREE;
+                buf[msglen] = 0;
+
+                memset(&req, 0, sizeof(struct addrinfo));
+                req.ai_family = AF_INET6;
+                req.ai_flags = AI_CANONNAME;
+
+                i = getaddrinfo(buf, NULL, &req, &ai);
+
+                if (!i)
+                    for (ai2 = ai
+                        ; ai2 && (ai2->ai_family != AF_INET)
+                              && (ai2->ai_family != AF_INET6)
+                        ; ai2 = ai2->ai_next) /* NOOP */;
+
+                if (!i && ai2 &&ai2->ai_canonname)
+                {
+                    mbuff = malloc(strlen(ai2->ai_canonname)+strlen(buf)+2);
+                    if (!mbuff)
+                    {
+                        perror("malloc");
+                        exit(errno);
+                    }
+                    strcpy(mbuff, buf);
+                    strcat(mbuff, " ");
+                    strcat(mbuff, ai2->ai_canonname);
+                    msglen = strlen(mbuff) + 1;
+                }
+                else
+                {
+                    mbuff = malloc(strlen("invalid-format")+strlen(buf)+1);
+                    if (!mbuff)
+                    {
+                        perror("malloc");
+                        exit(errno);
+                    }
+                    strcpy(mbuff, "invalid-format");
+                    msglen = strlen(mbuff) + 1;
+                }
+
+                write_32(header, msglen + 8);
+                write1(header, 9);
+                write1(mbuff, msglen);
+                free(mbuff);
+                if (!i)
+                    freeaddrinfo(ai);
+                break;
+              }
+#endif /* ERQ_RLOOKUPV6 */
 
         case ERQ_EXECUTE:
           {
@@ -2357,65 +2418,6 @@ main (int argc, char **argv)
               }
               break;
 #endif /* ERQ_ACCEPT */
-
-#ifdef ERQ_RLOOKUPV6
-            case ERQ_RLOOKUPV6:
-              {
-                int i;
-                char *mbuff;
-                struct addrinfo req, *ai, *ai2;
-
-                /* handle stays in header[4..7] */
-                header[8] = CHILD_FREE;
-                buf[msglen] = 0;
-
-                memset(&req, 0, sizeof(struct addrinfo));
-                req.ai_family = AF_INET6;
-                req.ai_flags = AI_CANONNAME;
-
-                i = getaddrinfo(buf, NULL, &req, &ai);
-
-                if (!i)
-                    for (ai2 = ai
-                        ; ai2 && (ai2->ai_family != AF_INET)
-                              && (ai2->ai_family != AF_INET6)
-                        ; ai2 = ai2->ai_next) /* NOOP */;
-
-                if (!i && ai2 &&ai2->ai_canonname)
-                {
-                    mbuff = malloc(strlen(ai2->ai_canonname)+strlen(buf)+2);
-                    if (!mbuff)
-                    {
-                        perror("malloc");
-                        exit(errno);
-                    }
-                    strcpy(mbuff, buf);
-                    strcat(mbuff, " ");
-                    strcat(mbuff, ai2->ai_canonname);
-                    msglen = strlen(mbuff) + 1;
-                }
-                else
-                {
-                    mbuff = malloc(strlen("invalid-format")+strlen(buf)+2);
-                    if (!mbuff)
-                    {
-                        perror("malloc");
-                        exit(errno);
-                    }
-                    strcpy(mbuff, buf);
-                    strcat(mbuff, " ");
-                    strcat(mbuff, "invalid-format");
-                    msglen = strlen(mbuff) + 1;
-                }
-                write_32(header, msglen + 9);
-                write1(header, 9);
-                write1(mbuff, msglen);
-                free(mbuff);
-                if (!i)
-                    freeaddrinfo(ai);
-                break;
-              }
-#endif /* ERQ_RLOOKUPV6 */
 
             } /* switch() */
         } /* if (num_ready > 0 && FD_ISSET(1, &readfds)) */

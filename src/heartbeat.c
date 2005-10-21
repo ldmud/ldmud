@@ -488,6 +488,34 @@ hbeat_dinfo_status (svalue_t *svp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_set_heart_beat (svalue_t *sp)
+
+/* EFUN set_heart_beat()
+ *
+ *   int set_heart_beat(int flag)
+ *
+ * Enable or disable heart beat. The driver will apply
+ * the lfun heart_beat() to the current object every 2 seconds,
+ * if it is enabled. If the heart beat is not needed for the
+ * moment, then do disable it. This will reduce system overhead.
+ *
+ * Return true for success, and false for failure.
+ *
+ * Disabling an already disabled heart beat (and vice versa
+ * enabling and enabled heart beat) counts as failure.
+ */
+
+{
+    int i;
+
+    i = set_heart_beat(current_object, sp->u.number != 0);
+    sp->u.number = i;
+
+    return sp;
+} /* f_set_heart_beat() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_heart_beat_info (svalue_t *sp)
 
 /* EFUN heart_beat_info()
@@ -519,10 +547,10 @@ f_heart_beat_info (svalue_t *sp)
         v++;
         i--;
     }
-    sp++;
-    put_array(sp, vec);
+
+    push_array(sp, vec);
     return sp;
-}
+} /* f_heart_beat_info() */
 
 /***************************************************************************/
 

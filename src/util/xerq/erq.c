@@ -28,12 +28,19 @@ void (*erq_table[])(char *, int)
     , erq_listen
     , erq_accept
     , erq_lookup
+#ifdef USE_IPV6
+    , erq_rlookupv6
+#endif
 };
   /* Dispatchtable for the ERQ request functions.
    * Arguments are (message, msg_len).
    */
 
-#define ERQ_REQUEST_MAX ERQ_LOOKUP
+#ifndef USE_IPV6
+#    define ERQ_REQUEST_MAX ERQ_LOOKUP
+#else
+#    define ERQ_REQUEST_MAX ERQ_RLOOKUPV6
+#endif
 
 /*-------------------------------------------------------------------------*/
 child_t *childs;
@@ -339,7 +346,7 @@ erq_cmd (void)
 #ifdef DEBUG
         char *mesg, *mesgs[]={
             "rlookup","fork","auth","execute","spawn","send","kill",
-            "open_udp","open_tcp","listen","accept","lookup"};
+            "open_udp","open_tcp","listen","accept","lookup", "rlookupv6"};
         mesg=mesgs[(int)request];
         fprintf(stderr, "%s command: %s\n", time_stamp(), mesg);
 #endif

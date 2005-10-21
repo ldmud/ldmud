@@ -1,5 +1,5 @@
-#ifndef __XERQ_DEFS_H__
-#define __XERQ_DEFS_H__ 1
+#ifndef XERQ_DEFS_H__
+#define XERQ_DEFS_H__ 1
 
 /* Standard include for all modules of xerq containing all possible
  * system includes, datatypes and external definitions.
@@ -7,12 +7,19 @@
 
 #include "driver.h"
 
+#ifdef USE_IPV6
+#    define __IPV6__
+#endif
+
 #include "erq.h"
 #include "random.h"
 
 #include <stdio.h>
 #include <sys/socket.h>
-#include <sys/time.h>
+#ifdef HAVE_SYS_TIME_H
+#    include <sys/time.h>
+#endif
+#include <time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <netinet/in.h>
@@ -245,5 +252,5 @@ write_32(char *a, int32 i)
 
 #define get_handle(x) read_32((x)+4)
 
-#endif /* __XERQ_DEFS_H__ */
+#endif /* XERQ_DEFS_H__ */
 

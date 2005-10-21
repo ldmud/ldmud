@@ -32,12 +32,18 @@
  * as efuns. A complication is that every bytecode can occupy only one
  * byte, but there are more than 256 codes and functions. This is solved
  * by the use of multi-byte instructions, where the first byte is
- * one of a set of prefix bytes, followed by the instructions code
- * byte within the range for this prefix. The code ranges are:
- *    normal instructions:   0..255 (0x000..0x0ff)
- *          xcodes+xefuns: 256..383 (0x100..0x17f)
- *          tcodes+tefuns: 384..511 (0x180..0x1ff)
- *          vcodes+vefuns: 512..639 (0x200..0x27f)
+ * one of a set of prefix bytes, followed by the instruction's opcode
+ * byte. The prefix bytes divide the instructions into several classes:
+ * efuns with no argument, efuns with one argument, etc. The translation
+ * from instruction code to prefix/opcode is written down in the
+ * instrs[] table created by make_func.
+ *
+ * The instructions and their prefix/opcode encodings follow the
+ * following rules:
+ *   - all non-efun instructions do not need a prefix byte and start
+ *     at instruction code 0.
+ *   - the instruction codes for the tabled efuns are consecutive
+ *   - the instruction codes for all tabled varargs efuns are consecutive.
  *
  * When make_func is run, it first reads the file 'config.h' to determine
  * which defines are used in the compilation of the driver. For this
@@ -55,8 +61,6 @@
  *     The file also contains the tables for the driver-specific ctype
  *     implementation.
  *     It is included into the lexer lex.c and compiled there.
- *     Note that 'efun_defs.c' is not created directly, instead all
- *     this data is just printed on stdout.
  *
  *  instrs.h
  *     This file defines the bytecodes representing all the efuns
@@ -68,31 +72,16 @@
  *
  *     %codes
  *         Internal machine codes used by the compiler to generate code.
- *         The first codes must be the special codes 'illegal', 'dummy',
- *         'escape', 'tefun' and 'vefun. The interpreter requires these
- *         to have fixed values in order to apply simple bit-manipulation.
- *         TODO: Bad interpreter. No cookie.
  *
  *     %efuns
  *         The efuns which are represented by one bytecode.
  *
- *     %xcodes
- *         Internal machine codes used by the compiler to generate code.
- *         These codes are multi-byte codes, using 'escape' as prefix.
- *
- *     %xefuns
- *         The efuns which are represented by 'escape' prefix codes.
- *
- *     %tcodes
- *         Internal machines codes, represented by 'tefun' prefix codes.
- *
  *     %tefuns
- *         The tabled efuns which are represented by 'tefun' prefix codes,
- *         resp. 'vefun' prefix codes if the efun takes an arbitrary
- *         number of arguments.
- *         The special thing about these functions is that their 'instruction
- *         code' is in fact just an index into (v)efun_table[] generated
- *         in efun_defs.c which holds the address of the actual function.
+ *         The tabled efuns. make_func will sort the efuns into
+ *         various classes depending on the number of arguments.
+ *         Each class is assigned it's own 'efun<n>' prefix code, with
+ *         <n> being the number of arguments. Efuns with a variable number
+ *         or arguments will be prefixed by 'efunv'.
  *
  * The entries in the sections are separated by whitespace.
  *
@@ -130,6 +119,11 @@
  *        Alternatively, the last argument can be given as '...' if the
  *        efun can handle arbitrarily many arguments.
  *
+ *        The following types are recognized:
+ *           void, int, string, object, mapping, float, closure, symbol
+ *           quoted_array, mixed, null, unknown
+ *        'null' is to be used as alternate type when the efun accepts
+ *        the number 0 instead of the actual type.
  *---------------------------------------------------------------------------
  * make_func lang
  * --------------
@@ -293,31 +287,70 @@
  * These are the class type definitions and associated predicate macros.
  */
 
-#define C_CODE    0  /* Internal machine instructions */
-#define C_EFUN    1  /* Efuns with own instruction codes */
-#define C_XCODE   2  /* Dito for the 'escape' prefix */
-#define C_XEFUN   3
-#define C_TCODE   4  /* Dito for the 'tefun' prefix */
-#define C_TEFUN   5
-#define C_VCODE   6  /* Dito for the 'vefun' prefix */
-#define C_VEFUN   7
-#define C_ALIAS   8  /* Aliased efuns */
-#define C_TOTAL   9  /* Number of different classes */
+enum ClassCodes {
+    C_CODE  = 0  /* Internal machine instructions */
+  , C_EFUN       /* Efuns with own instruction codes */
+  , C_EFUN0      /* Tabled efuns with 0 arguments */
+  , C_EFUN1      /* Tabled efuns with 1 argument */
+  , C_EFUN2      /* Tabled efuns with 2 argument */
+  , C_EFUN3      /* Tabled efuns with 3 argument */
+  , C_EFUN4      /* Tabled efuns with 4 argument */
+  , C_EFUNV      /* Tabled efuns with variable arguments */
+  , C_ALIAS      /* Aliased efuns. This must come right after
+                  * the last C_EFUN*.
+                  */
+  , C_SEFUN      /* Virtual class used by the lexer when parsing
+                  * the classes C_EFUN*.
+                  */
+  , C_TOTAL      /* Number of different classes */
+};
 
 #define C_IS_CODE(x) \
- ((x) == C_CODE || (x) == C_XCODE || (x) == C_TCODE || (x) == C_VCODE)
+ ((x) == C_CODE)
 #define C_IS_EFUN(x) \
- ((x) == C_EFUN || (x) == C_XEFUN || (x) == C_TEFUN || (x) == C_VEFUN)
+ ((x) != C_CODE && (x) != C_ALIAS)
 
 /*-------------------------------------------------------------------------*/
+
+static char * classtag[]
+ = { /* C_CODE */ "CODE"
+   , /* C_EFUN */ "EFUN"
+   , /* C_EFUN0 */ "EFUN0"
+   , /* C_EFUN1 */ "EFUN1"
+   , /* C_EFUN2 */ "EFUN2"
+   , /* C_EFUN3 */ "EFUN3"
+   , /* C_EFUN4 */ "EFUN4"
+   , /* C_EFUNV */ "EFUNV"
+   };
+  /* Tag names of the code classes, used to create the '<class>_OFFSET'
+   * values in efun_defs.c:instrs[].
+   */
+
+static char * classprefix[]
+ = { /* C_CODE */ "0"
+   , /* C_EFUN */ "0"
+   , /* C_EFUN0 */ "F_EFUN0"
+   , /* C_EFUN1 */ "F_EFUN1"
+   , /* C_EFUN2 */ "F_EFUN2"
+   , /* C_EFUN3 */ "F_EFUN3"
+   , /* C_EFUN4 */ "F_EFUN4"
+   , /* C_EFUNV */ "F_EFUNV"
+   };
+  /* Instruction names of the prefixes used for the various code classes.
+   */
 
 static int num_buff = 0;
   /* Total number of instructions encountered so far.
    */
 
-static int num_instr[C_TOTAL] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+static int num_instr[C_TOTAL];
   /* Number of instructions encountered, counted separately for
    * every type.
+   */
+
+static int instr_offset[C_TOTAL];
+  /* Derived from num_instrs, the offset of the instruction classes
+   * within the whole table.
    */
 
 struct instrdata_s {
@@ -341,15 +374,49 @@ static int arg_types[MAX_ARGTYPES];
    * by the starting index of the first argument's type.
    * The description of one argument's type is itself a list of the
    * typecodes, terminated by 0.
-   * Different signatures may overlap, e.g. a (T_STRING) signature
-   * could be embedded in a (T_POINTER, T_INT|T_STRING) signature.
+   * Different signatures may overlap, e.g. a (STRING) signature
+   * could be embedded in a (POINTER, INT|STRING) signature.
    *
    * The content of this array is later written as efun_arg_types[]
-   * into EFUN_DEFS and used by the instrs[].arg_index entries.
+   * into EFUN_DEFS and indexed by the instrs[].arg_index entries.
    */
 
-static int last_current_type;
+static long lpc_types[MAX_ARGTYPES];
+  /* The table of distinct function argument signatures again, this
+   * time expressed in svalue runtime types.
+   * One signature is a list of all arguments' types, identified
+   * by the starting index of the first argument's type.
+   * The description of one argument's type is a bitword, where
+   * a 1 is set when the associated type is accepted.
+   * For example, if an argument can be string or object, the
+   * word in the table is set to (1<<T_STRING)|(1<<T_OBJECT).
+   *
+   * The content of this array is later written as efun_lpc_types[]
+   * into EFUN_DEFS and indexed by the instrs[].lpc_arg_index entries.
+   *
+   * The recognized bitflags are:
+   */
+
+# define LPC_T_ANY           (1 << 0)
+# define LPC_T_LVALUE        (1 << 1)
+# define LPC_T_POINTER       (1 << 2)
+# define LPC_T_NUMBER        (1 << 3)
+# define LPC_T_OBJECT        (1 << 4)
+# define LPC_T_STRING        (1 << 5)
+# define LPC_T_MAPPING       (1 << 6)
+# define LPC_T_FLOAT         (1 << 7)
+# define LPC_T_CLOSURE       (1 << 8)
+# define LPC_T_SYMBOL        (1 << 9)
+# define LPC_T_QUOTED_ARRAY  (1 << 10)
+# define LPC_T_NULL          (1 << 11)
+
+
+static int last_current_type = 0;
   /* Index of the first unused entry in arg_types[].
+   */
+
+static int last_current_lpc_type = 0;
+  /* Index of the first unused entry in lpc_types[].
    */
 
 /*-------------------------------------------------------------------------*/
@@ -361,7 +428,7 @@ static int min_arg = -1;
    * are optional arguments, or -1 if all arguments are needed.
    */
 
-static Bool limit_max = MY_FALSE;
+static Bool unlimit_max = MY_FALSE;
   /* True when the last argument for a function is the '...'
    */
 
@@ -376,8 +443,19 @@ static int curr_arg_types[MAX_LOCAL];
    * are lists of typecodes, each argument's list terminated by 0.
    */
 
-static int curr_arg_type_size;
+static int curr_lpc_types[MAX_LOCAL];
+  /* The function argument signature of the current function expressed
+   * in svalue types.
+   * The signature is a list of all argument's types, each a word
+   * denoting by set bits which bytes are accepted.
+   */
+
+static int curr_arg_type_size = 0;
   /* Index of the first unused entry in curr_arg_types[].
+   */
+
+static int curr_lpc_type_size = 0;
+  /* Index of the first unused entry in curr_lpc_types[].
    */
 
 /*-------------------------------------------------------------------------*/
@@ -389,8 +467,8 @@ static int yylex(void);
 int yyparse(void);
 int ungetc(int c, FILE *f);
 static char *type_str(int);
-static char *etype(int);
-static char *etype1(int);
+static long type2flag (int n);
+static char *etype(long);
 static char *ctype(int);
 #ifndef toupper
 int toupper(int);
@@ -476,13 +554,13 @@ make_f_name (char *str)
 %token NAME ID
 
 %token VOID INT STRING OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
-%token MIXED UNKNOWN
+%token MIXED UNKNOWN NUL
 
 %token DEFAULT
 
-%token CODES EFUNS XCODES XEFUNS TCODES TEFUNS END
+%token CODES EFUNS TEFUNS END
 
-%type <number> VOID MIXED UNKNOWN
+%type <number> VOID MIXED UNKNOWN NUL
 %type <number> INT STRING OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
 %type <number> basic arg_type
   /* Value is the basic type value
@@ -512,20 +590,12 @@ all: PARSE_FUNC_SPEC   func_spec
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
-func_spec: codes END efuns END xcodes END xefuns END tcodes END tefuns;
+func_spec: codes END efuns END tefuns;
 
 codes:    CODES
         | codes code;
 
-xcodes:   XCODES
-        | xcodes code;
-
-tcodes:   TCODES
-        | tcodes code;
-
 efuns:    EFUNS  funcs;
-
-xefuns:   XEFUNS funcs;
 
 tefuns:   TEFUNS funcs;
 
@@ -545,7 +615,10 @@ code:     optional_name ID
         f_name = make_f_name($2);
         instr[num_buff].code_class = current_code_class;
         num_instr[current_code_class]++;
-        sprintf(buff, "{ 0, 0, { 0, 0 }, -1, 0, 0, \"%s\" },\n", $1);
+        sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, 0, -1, -1, \"%s\" },\n"
+                    , classprefix[instr[num_buff].code_class]
+                    , f_name, classtag[instr[num_buff].code_class]
+                    , $1);
         if (strlen(buff) > sizeof buff)
             fatal("Local buffer overflow!\n");
         instr[num_buff].f_name = f_name;
@@ -570,7 +643,10 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
     {
         char buff[500];
         char *f_name;
+        char *f_prefix;
+        int  code_class;
         int i;
+        int max_arg, arg_index, lpc_index;
 
         if (num_buff >= MAX_FUNC)
             yyerror("Too many codes and efuns in total!\n");
@@ -578,21 +654,49 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
         if (min_arg == -1)
             min_arg = $5;
 
+        max_arg = $5;
+
         /* Make the correct f_name and determine the code class
          */
         if ($3[0] == '\0')
         {
+            code_class = current_code_class;
+            if (current_code_class == C_SEFUN)
+            {
+                if (!unlimit_max && min_arg == max_arg)
+                {
+                    if (max_arg < 5)
+                        code_class = C_EFUN0 + min_arg;
+                    else
+                    {
+                        char buf[100];
+                        sprintf(buf, "Efun '%s' has too many arguments.\n", $2);
+                        fatal(buf);
+                    }
+                }
+
+                if (unlimit_max || min_arg != max_arg)
+                {
+                    code_class = C_EFUNV;
+                }
+
+                if (code_class == C_SEFUN)
+                {
+                    char buf[100];
+                    sprintf(buf, "Efun '%s' can't be classified.\n", $2);
+                    fatal(buf);
+                }
+            }
+
             f_name = make_f_name($2);
-            num_instr[
-              (int)(instr[num_buff].code_class =
-                (limit_max || $5 != min_arg) && current_code_class == C_TEFUN ?
-                  C_VEFUN : current_code_class)
-            ]++;
+            instr[num_buff].code_class = code_class;
+            num_instr[code_class]++;
+            f_prefix = classprefix[code_class];
         }
         else
         {
             f_name = mystrdup($3);
-            instr[num_buff].code_class = C_ALIAS;
+            instr[num_buff].code_class = code_class = C_ALIAS;
             num_instr[C_ALIAS]++;
         }
 
@@ -622,13 +726,56 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
             }
         }
 
+        arg_index = i;
+
+        /* Search the function's signature in lpc_types[] */
+
+        for (i = 0; i < last_current_lpc_type; i++)
+        {
+            int j;
+            for (j = 0
+                ; j+i < last_current_lpc_type && j < curr_lpc_type_size
+                ; j++)
+            {
+                if (curr_lpc_types[j] != lpc_types[i+j])
+                    break;
+            }
+            if (j == curr_lpc_type_size)
+                break;
+        }
+
+        if (i == last_current_lpc_type)
+        {
+            /* It's a new signature, put it into lpc_types[] */
+            int j;
+            for (j = 0; j < curr_lpc_type_size; j++)
+            {
+                lpc_types[last_current_lpc_type++] = curr_lpc_types[j];
+                if (last_current_lpc_type == NELEMS(lpc_types))
+                    yyerror("Array 'lpc_types' is too small");
+            }
+        }
+
+        lpc_index = i;
+
         /* Store the data */
 
-        sprintf(buff, "{ %d, %d, { %s, %s }, %s, %s, %d, \"%s\" },\n"
-                    , limit_max ? -1 : $5, min_arg
-                    , etype(0), etype(1)
-                    , $6, ctype($1), i, $2
-               );
+        if (code_class != C_ALIAS && code_class != C_SEFUN)
+        {
+            char * tag;
+
+            tag = (code_class == C_EFUN) ? classtag[C_CODE] : classtag[code_class];
+            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, %s, %s, %d, %d, \"%s\" },\n"
+                        , f_prefix, f_name, tag
+                        , unlimit_max ? -1 : max_arg, min_arg
+                        , $6, ctype($1), arg_index, lpc_index, $2
+                   );
+        }
+        else
+            sprintf(buff, "{ 0, 0, %d, %d, %s, %s, %d, %d, \"%s\" },\n"
+                        , unlimit_max ? -1 : max_arg, min_arg
+                        , $6, ctype($1), arg_index, lpc_index, $2
+                   );
 
         if (strlen(buff) > sizeof buff)
              fatal("Local buffer overwritten !\n");
@@ -641,8 +788,10 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
         /* Reset for next function */
 
         min_arg = -1;
-        limit_max = MY_FALSE;
+        unlimit_max = MY_FALSE;
         curr_arg_type_size = 0;
+        curr_lpc_type_size = 0;
+        curr_lpc_types[0] = 0;
     } ;
 
 /* --- Types and Argument lists --- */
@@ -650,7 +799,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 type: basic opt_star opt_ref { $$ = $1 | $2 | $3; };
 
 basic: VOID | INT | STRING | MAPPING | FLOAT | MIXED | OBJECT | CLOSURE |
-        UNKNOWN | SYMBOL | QUOTED_ARRAY ;
+        UNKNOWN | SYMBOL | QUOTED_ARRAY | NUL ;
 
 opt_star : '*' { $$ = MF_TYPE_MOD_POINTER; }
         |      { $$ = 0;                   } ;
@@ -668,22 +817,27 @@ typel2: typel
         curr_arg_types[curr_arg_type_size++] = 0;
         if (curr_arg_type_size == NELEMS(curr_arg_types))
             yyerror("Too many arguments");
+        curr_lpc_type_size++;
+        if (curr_lpc_type_size == NELEMS(curr_lpc_types))
+            yyerror("Too many arguments");
     } ;
 
 arg_type: type
     {
         if ($1 != VOID)
         {
-            curr_arg_types[curr_arg_type_size++] = $1;
+            if ($1 != NUL)
+                curr_arg_types[curr_arg_type_size++] = $1;
             if (curr_arg_type_size == NELEMS(curr_arg_types))
                 yyerror("Too many arguments");
+            curr_lpc_types[curr_lpc_type_size] |= type2flag($1);
         }
         $$ = $1;
     } ;
 
 typel: arg_type              { $$ = ($1 == VOID && min_arg == -1); }
      | typel '|' arg_type    { $$ = (min_arg == -1 && ($1 || $3 == VOID));}
-     | '.' '.' '.'           { $$ = min_arg == -1 ; limit_max = MY_TRUE; } ;
+     | '.' '.' '.'           { $$ = min_arg == -1 ; unlimit_max = MY_TRUE; } ;
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -753,6 +907,7 @@ static struct type types[]
     , { "symbol",       SYMBOL }
     , { "quoted_array", QUOTED_ARRAY }
     , { "mixed",        MIXED }
+    , { "null",         NUL }
     , { "unknown",      UNKNOWN }
     };
 
@@ -1890,10 +2045,7 @@ yylex1 (void)
             {
                 if (MATCH("codes"))  { current_code_class=C_CODE;  return CODES;  }
                 if (MATCH("efuns"))  { current_code_class=C_EFUN;  return EFUNS;  }
-                if (MATCH("xcodes")) { current_code_class=C_XCODE; return XCODES; }
-                if (MATCH("xefuns")) { current_code_class=C_XEFUN; return XEFUNS; }
-                if (MATCH("tcodes")) { current_code_class=C_TCODE; return TCODES; }
-                if (MATCH("tefuns")) { current_code_class=C_TEFUN; return TEFUNS; }
+                if (MATCH("tefuns")) { current_code_class=C_SEFUN; return TEFUNS; }
             }
             return '%';
 
@@ -1994,92 +2146,91 @@ yyerror (char *str)
 
 /*-------------------------------------------------------------------------*/
 static char *
-etype1 (int n)
+etype (long n)
 
-/* Express type <n> in the runtime type symbols of interpret.h.
+/* Express type <n> (in bitfield encoding) in the runtime type symbols
+ * of interpret.h.
  * Return a pointer to a constant string.
  */
 
 {
-    if (n & MF_TYPE_MOD_REFERENCE)
-        return "T_LVALUE";
-    if (n & MF_TYPE_MOD_POINTER)
-        return "T_POINTER";
-    switch(n) {
-    case INT:
-        return "T_NUMBER";
-    case OBJECT:
-        return "T_OBJECT";
-    case STRING:
-        return "T_STRING";
-    case MAPPING:
-        return "T_MAPPING";
-    case FLOAT:
-        return "T_FLOAT";
-    case CLOSURE:
-        return "T_CLOSURE";
-    case SYMBOL:
-        return "T_SYMBOL";
-    case QUOTED_ARRAY:
-        return "T_QUOTED_ARRAY";
-    case MIXED:
-        return "0";        /* 0 means any type */
-    default:
-        yyerror("Illegal type for argument");
+    static char str[200];
+
+    if (n & LPC_T_ANY)
+        return "TF_ANYTYPE";
+
+    if (!n)
+        return "0";
+
+    str[0] = '\0';
+
+#   define CONVERT(type, string) \
+    if (n & type) \
+    { \
+        if (str[0] != '\0') \
+            strcat(str, "|"); \
+        strcat(str, string); \
+        n ^= type; \
     }
-    return "What ?";
-}
+
+    CONVERT(LPC_T_LVALUE, "TF_LVALUE");
+    CONVERT(LPC_T_POINTER, "TF_POINTER");
+    CONVERT(LPC_T_NUMBER, "TF_NUMBER");
+    CONVERT(LPC_T_STRING, "TF_STRING");
+    CONVERT(LPC_T_OBJECT, "TF_OBJECT");
+    CONVERT(LPC_T_MAPPING, "TF_MAPPING");
+    CONVERT(LPC_T_FLOAT, "TF_FLOAT");
+    CONVERT(LPC_T_CLOSURE, "TF_CLOSURE");
+    CONVERT(LPC_T_SYMBOL, "TF_SYMBOL");
+    CONVERT(LPC_T_QUOTED_ARRAY, "TF_QUOTED_ARRAY");
+    CONVERT(LPC_T_NULL, "TF_NULL");
+
+#   undef CONVERT
+
+    if (n != 0)
+    {
+        printf("Error: Can't convert bit-flags %x to LPC runtime type.\n", n);
+        yyerror("Illegal type for argument");
+        return "What ?";
+    }
+
+    return str;
+} /* etype() */
 
 /*-------------------------------------------------------------------------*/
-static char *
-etype (int n)
+static long 
+type2flag (int n)
 
-/* Express the type(s) of current function argument <n> in the
- * runtime type symbols of interpret.h, multiple types concatenated by '|'.
- * Return a pointer to a static buffer with the text.
+/* Convert type <n> into the bitfield value needed to create the LPC
+ * argument types.
  */
 
 {
-    int i;
-    size_t local_size = 100;
-    char *buff = malloc(local_size);
+    if (n & MF_TYPE_MOD_REFERENCE)
+        return LPC_T_LVALUE;
 
-    /* Find the argument <n> in the current signature */
+    if (n & MF_TYPE_MOD_POINTER)
+        return LPC_T_POINTER;
 
-    for (i = 0; i < curr_arg_type_size; i++)
-    {
-        if (n == 0)
-            break;
-        if (curr_arg_types[i] == 0)
-            n--;
+    n &= ~(MF_TYPE_MOD_REFERENCE|MF_TYPE_MOD_POINTER);
+
+    switch(n) {
+      case VOID:    return 0;            break;
+      case STRING:  return LPC_T_STRING; break;
+      case INT:     return LPC_T_NUMBER; break;
+      case OBJECT:  return LPC_T_OBJECT; break;
+      case MAPPING: return LPC_T_MAPPING; break;
+      case FLOAT:   return LPC_T_FLOAT;   break;
+      case CLOSURE: return LPC_T_CLOSURE; break;
+      case SYMBOL:  return LPC_T_SYMBOL;  break;
+      case MIXED:   return LPC_T_ANY;     break;
+      case NUL:     return LPC_T_NULL;     break;
+      case UNKNOWN: return LPC_T_ANY;     break;
+      case QUOTED_ARRAY:
+        return LPC_T_QUOTED_ARRAY; break;
+    default: yyerror("(type2flag) Bad type!"); return 0;
     }
-    if (i == curr_arg_type_size || !curr_arg_types[i])
-        return "0";
-
-    /* Create the type string */
-
-    buff[0] = '\0';
-    for(; curr_arg_types[i] != 0; i++)
-    {
-        char *p;
-        if (curr_arg_types[i] == VOID)
-            continue;
-        if (buff[0] != '\0')
-            strcat(buff, "|");
-        p = etype1(curr_arg_types[i]);
-        /* The number 2 below is to include the zero-byte and the next
-         * '|' (which may not come).
-         */
-        if (strlen(p) + strlen(buff) + 2 > local_size)
-        {
-            fprintf(stderr, "Buffer overflow!\n");
-            exit(1);
-        }
-        strcat(buff, etype1(curr_arg_types[i]));
-    }
-
-    return buff;
-} /* etype() */
+} /* type2flag() */
 
 /*-------------------------------------------------------------------------*/
 static char *
@@ -2110,9 +2261,10 @@ ctype (int n)
       case SYMBOL:  p = "TYPE_SYMBOL";  break;
       case MIXED:   p = "TYPE_ANY";     break;
       case UNKNOWN: p = "TYPE_UNKNOWN"; break;
+      case NUL:     p = "0";             break;
       case QUOTED_ARRAY:
         p = "TYPE_QUOTED_ARRAY"; break;
-    default: yyerror("Bad type!"); return 0;
+    default: yyerror("(ctype) Bad type!"); return 0;
     }
     strcat(buff, p);
     if (strlen(buff) + 1 > sizeof buff)
@@ -2265,6 +2417,9 @@ read_func_spec (void)
 {
     int i, j;
 
+    for (i = 0; i < C_TOTAL; i++)
+        num_instr[i] = 0;
+
     if ((fpr = fopen(FUNC_SPEC, "r")) == NULL)
     {
         perror(FUNC_SPEC);
@@ -2275,33 +2430,59 @@ read_func_spec (void)
     parsetype = PARSE_FUNC_SPEC;
     parsetype_sent = MY_FALSE;
     num_buff = 0;
+    min_arg = -1;
+    unlimit_max = MY_FALSE;
+    curr_arg_type_size = 0;
+    curr_lpc_type_size = 0;
+    curr_lpc_types[0] = 0;
     yyparse();
     fclose(fpr);
 
     /* Print code usage statistics */
 
     fprintf(stderr,
-"Primary codes: %3d (%3d + %3d) - Secondary codes:      %3d (%3d + %3d)\n"
-"Tabled codes:  %3d (%3d + %3d) - Tabled varargs codes: %3d (%3d + %3d)\n"
-           , num_instr[C_CODE]  + num_instr[C_EFUN]
-           , num_instr[C_CODE],   num_instr[C_EFUN]
-           , num_instr[C_XCODE] + num_instr[C_XEFUN]
-           , num_instr[C_XCODE],  num_instr[C_XEFUN]
-           , num_instr[C_TCODE] + num_instr[C_TEFUN]
-           , num_instr[C_TCODE],  num_instr[C_TEFUN]
-           , num_instr[C_VCODE] + num_instr[C_VEFUN]
-           , num_instr[C_VCODE],  num_instr[C_VEFUN]
+"Primary codes:        %3d\n"
+"Primary efuns:        %3d\n"
+"Tabled efuns:         %3d (%d + %d + %d + %d + %d)\n"
+"Tabled vararg efuns:  %3d\n"
+           , num_instr[C_CODE]
+           , num_instr[C_EFUN]
+           , num_instr[C_EFUN0]+num_instr[C_EFUN1]+num_instr[C_EFUN2]
+                               +num_instr[C_EFUN3]+num_instr[C_EFUN4]
+           , num_instr[C_EFUN0], num_instr[C_EFUN1], num_instr[C_EFUN2]
+           , num_instr[C_EFUN3], num_instr[C_EFUN4]
+           , num_instr[C_EFUNV]
     );
 
-    if ( (num_instr[C_CODE] + num_instr[C_EFUN]) & ~0xff
-     ||  (  (num_instr[C_XCODE]+ num_instr[C_XEFUN])
-          | (num_instr[C_TCODE]+ num_instr[C_TEFUN])
-          | (num_instr[C_VCODE]+ num_instr[C_VEFUN]) ) & ~0x7f)
-    {
+    /* Compute the code offsets.
+     * This means that instr_offset[C_ALIAS] is also the
+     * the number of real instructions.
+     */
+    instr_offset[C_CODE] = 0;
+    for (i = C_CODE+1; i < C_TOTAL; i++)
+        instr_offset[i] = instr_offset[i-1] + num_instr[i-1];
+
+    /* Check if the code ranges has been exhausted
+     */
+    if ( (num_instr[C_CODE] + num_instr[C_EFUN]) > 255 )
         fatal("Codes exhausted!");
+
+    for (i = C_EFUN+1; i < C_ALIAS; i++)
+        if (num_instr[i] > 255)
+            fatal("Codes exhausted!\n");
+
+    if (num_instr[C_SEFUN])
+    {
+        printf("Sefuns: %d\n", num_instr[C_SEFUN]);
+        fatal("Unclassified sefuns encountered.\n");
     }
 
     /* Now sort the table of functions and codes (eeek, bubblesort!)
+     * This sort makes sure that functions of the same class
+     * are consecutive within the instr[] array, and therefore
+     * really are at the places where instr_offset[] says they are.
+     * It therefore estables that the index in instr[] is the
+     * instruction code.
      */
 
     for (i = num_buff; --i >= 0; )
@@ -2380,52 +2561,35 @@ create_efun_defs (void)
 "\n"
 "instr_t instrs[] = {\n"
            );
-    fprintf(fpw, "\n  /* --- codes and efuns --- */\n\n");
-    k = 0;
-    j = num_instr[C_CODE] + num_instr[C_EFUN];
-    for (i = 0; i < j; i++, k++) {
-        fprintf(fpw, "  /* %3d */ %s", k, instr[i].buf);
-    }
-    for (i -= 256 ; ++i <= 0; k++) {
-        fprintf(fpw
-               , "  /* %3d */ { 0, 0, { 0, 0 }, -1, 0, 0, 0 }, /* unused */\n"
-               , k
-               );
-    }
-    fprintf(fpw, "\n  /* --- xcodes and xefuns --- */\n\n");
-    i = j;
-    j += num_instr[C_XCODE] + num_instr[C_XEFUN];
-    for (; i < j; i++, k++) {
-        fprintf(fpw, "  /* %3d */ %s", k, instr[i].buf);
-    }
-    for (i = 128 - num_instr[C_XCODE] - num_instr[C_XEFUN]; --i >= 0; k++) {
-        fprintf(fpw
-               , "  /* %3d */ { 0, 0, { 0, 0 }, -1, 0, 0, 0 }, /* unused */\n"
-               , k
-               );
-    }
-    fprintf(fpw, "\n  /* --- tcodes and tefuns --- */\n\n");
-    i = j;
-    j += num_instr[C_TCODE] + num_instr[C_TEFUN];
-    for (; i < j; i++, k++) {
-        fprintf(fpw, "  /* %3d */ %s", k, instr[i].buf);
-    }
-    for (i = 128 - num_instr[C_TCODE] - num_instr[C_TEFUN]; --i >= 0; k++) {
-        fprintf(fpw
-               , "  /* %3d */ { 0, 0, { 0, 0 }, -1, 0, 0, 0 }, /* unused */\n"
-               , k
-               );
-    }
-    fprintf(fpw, "\n  /* --- vcodes and vefuns --- */\n\n");
-    i = j;
-    j += num_instr[C_VCODE] + num_instr[C_VEFUN];
-    for (; i < j; i++, k++) {
-        fprintf(fpw, "  /* %3d */ %s", k, instr[i].buf);
-    }
-    fprintf(fpw, "\n  /* --- aliased efuns --- */\n\n");
-    i = j;
-    for (; i < num_buff; i++, k++) {
-        fprintf(fpw, "  /* %3d */ %s", k, instr[i].buf);
+
+    for (k = C_CODE, i = 0; k <= C_ALIAS; k++)
+    {
+        switch(k)
+        {
+        case C_CODE:  fprintf(fpw, "\n  /* --- codes --- */\n\n");
+                      break;
+        case C_EFUN:  fprintf(fpw, "\n  /* --- efuns --- */\n\n");
+                      break;
+        case C_EFUN0: fprintf(fpw, "\n  /* --- 0-arg efuns --- */\n\n");
+                      break;
+        case C_EFUN1: fprintf(fpw, "\n  /* --- 1-arg efuns --- */\n\n");
+                      break;
+        case C_EFUN2: fprintf(fpw, "\n  /* --- 2-arg efuns --- */\n\n");
+                      break;
+        case C_EFUN3: fprintf(fpw, "\n  /* --- 3-arg efuns --- */\n\n");
+                      break;
+        case C_EFUN4: fprintf(fpw, "\n  /* --- 4-arg efuns --- */\n\n");
+                      break;
+        case C_EFUNV: fprintf(fpw, "\n  /* --- vararg efuns --- */\n\n");
+                      break;
+        case C_ALIAS: fprintf(fpw, "\n  /* --- aliased efuns --- */\n\n");
+                      break;
+        }
+
+        j = instr_offset[k] + num_instr[k];
+        for (; i < j; i++) {
+            fprintf(fpw, "  /* %3d */ %s", i, instr[i].buf);
+        }
     }
     fprintf(fpw, "};\n\n\n");
 
@@ -2441,51 +2605,85 @@ create_efun_defs (void)
     fprintf(fpw, "};\n\n\n");
 
     fprintf(fpw,
-"/* Table of function argument signatures\n"
+"/* Table of function argument signatures (compiler).\n"
 " * The internal structure is that of arg_types[] in make_func.\n"
 " */\n\n"
           );
-    fprintf(fpw, "fulltype_t efun_arg_types[] = {\n ");
+    fprintf(fpw, "fulltype_t efun_arg_types[] = {\n    /*   0 */ ");
     for (i = 0; i < last_current_type; i++) {
         if (arg_types[i] == 0)
-            fprintf(fpw, "0,\n ");
+        {
+            fprintf(fpw, "0,\n");
+            if (i < last_current_type - 1)
+                fprintf(fpw, "    /* %3d */ ", i+1);
+        }
         else
             fprintf(fpw, "%s,", ctype(arg_types[i]));
     }
     fprintf(fpw, "};\n\n\n");
 
-    fprintf(fpw, "/* Prototypes of the tabled efuns\n */\n\n");
-    for (j = C_CODE, i = 0; j < C_TCODE; j++)
-        i += num_instr[j];
-    j = i + num_instr[C_TCODE] + num_instr[C_TEFUN];
-    k = i;
-    while (k < j)
+    fprintf(fpw,
+"/* Table of function argument signatures (runtime).\n"
+" * The internal structure is that of lpc_types[] in make_func.\n"
+" */\n\n"
+          );
+    fprintf(fpw, "long efun_lpc_types[] = {\n ");
+    for (i = 0; i < last_current_lpc_type; i++) {
+        fprintf(fpw, "    /* %3d */ %s,\n", i, etype(lpc_types[i]));
+    }
+    fprintf(fpw, "};\n\n\n");
+
+    for (k = C_EFUN0; k < C_ALIAS; k++)
     {
-        fprintf(fpw, "extern svalue_t *f_%s(svalue_t *);\n", instr[k++].key);
-    }
-    fprintf(fpw, "\n\n");
+        char * pattern;
 
-    fprintf(fpw, "/* The table of tabled efuns\n */\n\n");
-    fprintf(fpw, "svalue_t *(*efun_table[]) (svalue_t *) = {\n");
-    while(i < j) {
-        fprintf(fpw, "  f_%s,\n", instr[i++].key);
-    }
-    fprintf(fpw, "};\n\n\n");
+        switch(k)
+        {
+        case C_EFUN0: 
+            fprintf(fpw, "/* Prototypes of the tabled efuns\n */\n\n");
+            pattern = "extern svalue_t *f_%s(svalue_t *);\n";
+            break;
+        case C_EFUNV: 
+            fprintf(fpw, "/* Prototypes of the tabled vararg efuns\n */\n\n");
+            pattern = "extern svalue_t *f_%s(svalue_t *, int);\n";
+            break;
+        }
 
-    fprintf(fpw, "/* Prototypes of the tabled vararg efuns\n */\n\n");
-    j = i + num_instr[C_VCODE] + num_instr[C_VEFUN];
-    k = i;
-    while(k < j) {
-        fprintf(fpw, "extern svalue_t *f_%s(svalue_t *, int);\n", instr[k++].key);
-    }
-    fprintf(fpw, "\n\n");
+        i = instr_offset[k];
+        j = i + num_instr[k];
+        for (; i < j; i++)
+        {
+            fprintf(fpw, pattern, instr[i].key);
+        }
 
-    fprintf(fpw, "/* The table of tabled vararg efuns\n */\n\n");
-    fprintf(fpw, "svalue_t *(*vefun_table[])(svalue_t *, int) = {\n");
-    while(i < j) {
-        fprintf(fpw, "  f_%s,\n", instr[i++].key);
+        if (num_instr[k])
+            fprintf(fpw, "\n\n");
     }
-    fprintf(fpw, "};\n\n\n");
+
+    for (k = C_EFUN0; k < C_ALIAS; k++)
+    {
+        switch(k)
+        {
+        case C_EFUN0: 
+            fprintf(fpw, "/* The table of tabled efuns\n */\n\n");
+            fprintf(fpw, "svalue_t *(*efun_table[]) (svalue_t *) = {\n");
+            break;
+        case C_EFUNV: 
+            fprintf(fpw, "/* The table of tabled vararg efuns\n */\n\n");
+            fprintf(fpw, "svalue_t *(*vefun_table[]) (svalue_t *, int) = {\n");
+            break;
+        }
+
+        i = instr_offset[k];
+        j = i + num_instr[k];
+        for(; i < j; i++)
+        {
+            fprintf(fpw, "    /* %3d */ f_%s,\n", i, instr[i].key);
+        }
+
+        if (k == C_EFUNV-1 || k == C_ALIAS-1)
+            fprintf(fpw, "};\n\n\n");
+    }
 
     /* TODO: create a my-ctype.[ch] and a utility program to create
      * TODO:: these two files once and for all.
@@ -2539,7 +2737,8 @@ create_instrs (void)
  */
 
 {
-    int i, j;
+    int i, j, k;
+    int last_instr;
 
     if ((fpw = fopen(THE_INSTRS, "w")) == NULL)
     {
@@ -2564,51 +2763,93 @@ create_instrs (void)
 "\n"
            );
 
+    last_instr = instr_offset[C_ALIAS] - 1;
+
+    for (k = C_CODE; k < C_ALIAS; k++)
+    {
+        char * str;
+
+        switch (k)
+        {
+        case C_CODE:  str = "internal"; break;
+        case C_EFUN:  str = "efun"; break;
+        case C_EFUN0: str = "efun0"; break;
+        case C_EFUN1: str = "efun1"; break;
+        case C_EFUN2: str = "efun2"; break;
+        case C_EFUN3: str = "efun3"; break;
+        case C_EFUN4: str = "efun4"; break;
+        case C_EFUNV: str = "efunv"; break;
+        }
+
+        fprintf(fpw,
+"#define %s_OFFSET  (%d)\n"
+"#define %s_COUNT   (%d)\n"
+"  /* First offset and number of %s opcodes.\n"
+"   */\n\n"
+                , classtag[k], instr_offset[k]
+                , classtag[k], num_instr[k]
+                , str
+                );
+    }
+
     fprintf(fpw,
-"#define LAST_INSTRUCTION_CODE %d\n"
+"#define LAST_INSTRUCTION_CODE (%d)\n"
 "  /* The highest token value in use.\n"
 "   */\n\n"
-           , 256+128+128+num_instr[C_VCODE]+num_instr[C_VEFUN] - 1
+           , last_instr
     );
+
+    fprintf(fpw,
+"#define TEFUN_OFFSET EFUN0_OFFSET\n"
+"  /* Offset of the first tabled efun.\n"
+"   */\n\n"
+    );
+
     fprintf(fpw, "extern instr_t instrs[];\n"
                  "extern short efun_aliases[];\n"
                  "extern fulltype_t efun_arg_types[];\n"
+                 "extern long efun_lpc_types[];\n"
                  "extern svalue_t *(*efun_table[])(svalue_t *);\n"
                  "extern svalue_t *(*vefun_table[])(svalue_t *, int);\n"
     );
+
     fprintf(fpw,
 "  /* All tables are defined in " EFUN_DEFS " and compiled into lex.c\n"
 "   * TODO: We might as well create efun_defs.h and compile it separately.\n"
-"   */\n\n"
+"   */\n"
            );
 
-    fprintf(fpw,"/* --- codes --- */\n\n");
-    for (i = j = 0; i < num_buff; i++)
+    for (k = C_CODE; k < C_ALIAS; k++)
     {
-        if (j == num_instr[C_CODE])
+        if (!num_instr[k])
+            continue;
+
+        switch(k)
         {
-            fprintf(fpw,"\n/* --- efuns --- */\n\n");
+        case C_CODE:  fprintf(fpw,"\n/* --- codes --- */\n\n");
+                      break;
+        case C_EFUN:  fprintf(fpw,"\n/* --- efuns --- */\n\n");
+                      break;
+        case C_EFUN0: fprintf(fpw,"\n/* --- efun0s --- */\n\n");
+                      break;
+        case C_EFUN1: fprintf(fpw,"\n/* --- efun1s --- */\n\n");
+                      break;
+        case C_EFUN2: fprintf(fpw,"\n/* --- efun2s --- */\n\n");
+                      break;
+        case C_EFUN3: fprintf(fpw,"\n/* --- efun3s --- */\n\n");
+                      break;
+        case C_EFUN4: fprintf(fpw,"\n/* --- efun4s --- */\n\n");
+                      break;
+        case C_EFUNV: fprintf(fpw,"\n/* --- vefuns --- */\n\n");
+                      break;
         }
-        if (j == num_instr[C_CODE] + num_instr[C_EFUN])
+
+        i = instr_offset[k];
+        j = i + num_instr[k];
+        for ( ; i < j; i++)
         {
-            j = 256;
-            fprintf(fpw,"\n/* --- xefuns and xcodes --- */\n\n");
-        }
-        if (j == 256 + num_instr[C_XCODE] + num_instr[C_XEFUN])
-        {
-            j = 256+128;
-            fprintf(fpw,"\n/* --- tefuns and tcodes --- */\n\n");
-        }
-        if (j == 256 + 128 + num_instr[C_TCODE] + num_instr[C_TEFUN])
-        {
-            j = 256+128+128;
-            fprintf(fpw,"\n/* --- vefuns and vcodes --- */\n\n");
-        }
-        if (instr[i].code_class != C_ALIAS)
-        {
-            fprintf(fpw, "#define %-30s (%d)\n"
-                       , make_f_name(instr[i].key), j);
-            j++;
+           fprintf(fpw, "#define %-30s (%d)\n"
+                       , make_f_name(instr[i].key), i);
         }
     }
 

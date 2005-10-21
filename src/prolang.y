@@ -670,7 +670,7 @@ static p_uint last_include_start;
 
 static void insert_pop_value(void);
 static void arrange_protected_lvalue(p_int, int, p_int, int);
-static int insert_inherited(char *,char *, program_t **, function_t *, int, bytecode_p);
+static int insert_inherited(char *, char *, program_t **, function_t *, int, bytecode_p);
 static void store_line_number_relocation(int relocated_from);
 int yyparse(void);
 %ifdef INITIALIZATION_BY___INIT
@@ -986,11 +986,10 @@ get_type_name (fulltype_t type)
         fatal("Bad type\n");
 
     strcat(buff, type_name[type]);
-    strcat(buff," ");
     if (pointer)
-        strcat(buff, "* ");
+        strcat(buff, " *");
     if (reference)
-        strcat(buff, "& ");
+        strcat(buff, " &");
 
     return buff;
 } /* get_type_name() */
@@ -1006,7 +1005,7 @@ get_two_types (fulltype_t type1, fulltype_t type2)
 
     strcpy(buff, "( ");
     strcat(buff, get_type_name(type1));
-    strcat(buff, "vs ");
+    strcat(buff, " vs ");
     strcat(buff, get_type_name(type2));
     strcat(buff, ")");
     return buff;
@@ -1038,6 +1037,25 @@ argument_type_error (int instr, fulltype_t type)
     p = get_type_name(type);
     yyerrorf("Bad argument to %s: \"%s\"", instrs[instr].name, p);
 } /* argument_type_error() */
+
+/*-------------------------------------------------------------------------*/
+static void
+efun_argument_error(int arg, int instr
+                   , fulltype_t * expected, fulltype_t got
+                   )
+{
+    char msg[1024];
+
+    msg[0] = '\0';
+    for (; *expected; expected++)
+    {
+        if (msg[0] != '\0')
+            strcat(msg, "/");
+        strcat(msg, get_type_name(*expected));
+    }
+    yyerrorf("Bad arg %d type to %s(): got %s, expected %s;"
+            , arg, instrs[instr].name, get_type_name(got), msg);
+} /* efun_argument_error() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -1182,9 +1200,9 @@ ins_f_code (unsigned int b)
  */
 
 {
-    if (b > 0x100)
-        ins_byte(b >> F_ESCAPE_BITS);
-    ins_byte(b);
+    if (instrs[b].prefix)
+        ins_byte(instrs[b].prefix);
+    ins_byte(instrs[b].opcode);
 } /* ins_f_code() */
 
 /*-------------------------------------------------------------------------*/
@@ -1272,8 +1290,12 @@ ins_long (int32 l)
  *
  * among the variables and can the use the following macros to add bytes:
  *
+ *    add_f_code(i): to add instruction <i> to the program
  *    add_byte(b):   to add byte <b> to the program
  *    add_short(s):  to add short <s> to the program
+ *
+ * Except for add_f_code(), none of the macros adapts CURRENT_PROGRAM_SIZE,
+ * and add_f_code() increments the _SIZE only for the prefix byte if any.
  */
 
 #define PREPARE_INSERT(n) \
@@ -1289,6 +1311,14 @@ ins_long (int32 l)
 #define add_byte(b)   (void) STORE_INT8(__PREPARE_INSERT__p, (b))
 
 #define add_short(s) STORE_SHORT(__PREPARE_INSERT__p, (s))
+
+#define add_f_code(i) \
+    do{ if (instrs[i].prefix) { \
+            add_byte(instrs[i].prefix); \
+            CURRENT_PROGRAM_SIZE++; \
+        }\
+        add_byte(instrs[i].opcode); \
+    }while(0)
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -2998,7 +3028,7 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
                       start + sizeof $3->name + 1, 0, $2);
               ref_string($3->name);
 
-              ins_byte(F_RETURN0); /* catch a missing return */
+              ins_f_code(F_RETURN0); /* catch a missing return */
           }
 
           /* Clean up */
@@ -3121,9 +3151,9 @@ inheritance:
               filename = alloca(strlen(current_file)+2);
               *filename = '/';
               strcpy(filename+1, current_file);
-              push_volatile_string(filename);
+              push_volatile_string(inter_sp, filename);
 #else
-              push_volatile_string(current_file);
+              push_volatile_string(inter_sp, current_file);
 #endif
               res = apply_master_ob(STR_INHERIT_FILE, 2);
 
@@ -3234,11 +3264,11 @@ inheritance:
                   /* We inherited a __INIT() function: create a call */
               
                   transfer_init_control();
-                  ins_byte(F_CALL_EXPLICIT_INHERITED);
+                  ins_f_code(F_CALL_EXPLICIT_INHERITED);
                   ins_short(INHERIT_COUNT);
                   ins_short(initializer);
                   ins_byte(0);        /* Actual number of arguments */
-                  ins_byte(F_POP_VALUE);
+                  ins_f_code(F_POP_VALUE);
                   add_new_init_jump();
               }
 %else  /* INITIALIZATION_BY___INIT */
@@ -3548,13 +3578,13 @@ new_name:
 
           if (i + num_virtual_variables > 0xff)
           {
-              add_byte(F_PUSH_IDENTIFIER16_LVALUE);
+              add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
               add_short(i + num_virtual_variables);
               CURRENT_PROGRAM_SIZE += 1;
           }
           else
           {
-              add_byte(F_PUSH_IDENTIFIER_LVALUE);
+              add_f_code(F_PUSH_IDENTIFIER_LVALUE);
               add_byte(i + num_virtual_variables);
           }
 
@@ -3570,7 +3600,7 @@ new_name:
           }
 
           /* Ok, assign */
-          add_byte(F_VOID_ASSIGN);
+          add_f_code(F_VOID_ASSIGN);
           CURRENT_PROGRAM_SIZE += 3;
           add_new_init_jump();
       }
@@ -3785,7 +3815,7 @@ statement:
           insert_pop_value();
 #ifdef F_BREAK_POINT
           if (d_flag)
-              ins_byte(F_BREAK_POINT);
+              ins_f_code(F_BREAK_POINT);
 #endif /* F_BREAK_POINT */
           /* if (exact_types && !BASIC_TYPE($1.type, TYPE_VOID))
            *    yyerror("Value thrown away");
@@ -3809,13 +3839,13 @@ statement:
           {
               /* We break from a switch() */
 
-              ins_byte(F_BREAK);
+              ins_f_code(F_BREAK);
           }
           else
           {
               /* A normal loop break: add the LBRANCH to the list */
               
-              ins_byte(F_LBRANCH);
+              ins_f_code(F_LBRANCH);
               ins_short(current_break_address);
               current_break_address = CURRENT_PROGRAM_SIZE - 2;
           }
@@ -3858,7 +3888,7 @@ statement:
           else
           {
               /* Normal continue */
-              ins_byte(F_LBRANCH);
+              ins_f_code(F_LBRANCH);
           }
 
           /* In either case, handle the list of continues alike */
@@ -3877,7 +3907,7 @@ return:
            && !BASIC_TYPE(exact_types & TYPE_MOD_MASK, TYPE_VOID))
               type_error("Must return a value for a function declared",
                          exact_types);
-          ins_byte(F_RETURN0);
+          ins_f_code(F_RETURN0);
       }
 
     | L_RETURN comma_expr
@@ -3907,7 +3937,7 @@ return:
               last_expression = -1;
           }
           else
-              ins_byte(F_RETURN);
+              ins_f_code(F_RETURN);
       }
 ; /* return */
 
@@ -3974,7 +4004,7 @@ while:
           last_expression = -1;
 
           /* The initial branch to the condition code */
-          ins_byte(F_BRANCH);
+          ins_f_code(F_BRANCH);
           push_address();
           ins_byte(0);
 
@@ -4286,7 +4316,7 @@ for:
           last_expression = -1;
           current_break_address = BREAK_DELIMITER;
 
-          ins_byte(F_BRANCH); /* over the body to the condition */
+          ins_f_code(F_BRANCH); /* over the body to the condition */
           ins_byte(0);
 
           /* Fix the number of locals to clear, now that we know it
@@ -4397,7 +4427,7 @@ for_init_expr:
       /* EMPTY */
       {
           last_expression = mem_block[A_PROGRAM].current_size;
-          ins_byte(F_CONST1);
+          ins_f_code(F_CONST1);
             /* insert_pop_value() will optimize this away */
       }
     | comma_expr_decl
@@ -4477,7 +4507,7 @@ for_expr:
       /* EMPTY */
       {
           last_expression = mem_block[A_PROGRAM].current_size;
-          ins_byte(F_CONST1);
+          ins_f_code(F_CONST1);
       }
     | comma_expr
 ; /* for_expr */
@@ -4793,7 +4823,7 @@ switch:
         push_explicit(switch_pc);
 
         /* Create the SWITCH instruction plus two empty bytes */
-        ins_byte(F_SWITCH);
+        ins_f_code(F_SWITCH);
         switch_pc = mem_block[A_PROGRAM].current_size;
         ins_short(0);
 
@@ -4830,7 +4860,7 @@ switch:
         }
 
         /* it isn't unusual that the last case/default has no break */
-        ins_byte(F_BREAK);
+        ins_f_code(F_BREAK);
 
         /* Create the lookup tables */
         store_case_labels(
@@ -5083,7 +5113,7 @@ optional_else:
     | L_ELSE
       {
           /* Add the branch over the else part */
-          ins_byte(F_BRANCH);
+          ins_f_code(F_BRANCH);
           $<address>$ = CURRENT_PROGRAM_SIZE;
           ins_byte(0);
       }
@@ -5263,7 +5293,7 @@ expr0:
     | expr0 '?' %prec '?'
       {
           /* Insert the branch to the :-part and remember this address */
-          ins_byte(F_BRANCH_WHEN_ZERO);
+          ins_f_code(F_BRANCH_WHEN_ZERO);
           $<address>$ = CURRENT_PROGRAM_SIZE;
           ins_byte(0);
       }
@@ -5280,7 +5310,7 @@ expr0:
           address = (p_int)$<address>3;
 
           /* The branch to the end */
-          ins_byte(F_BRANCH);
+          ins_f_code(F_BRANCH);
           $<address>$ = CURRENT_PROGRAM_SIZE;
           ins_byte(0);
 
@@ -5384,7 +5414,7 @@ expr0:
       {
           /* Insert the LOR and remember the position */
           
-          ins_byte(F_LOR);
+          ins_f_code(F_LOR);
           $<address>$ = CURRENT_PROGRAM_SIZE;
           ins_byte(0);
       }
@@ -5451,7 +5481,7 @@ expr0:
       {
           /* Insert the LAND and remember the position */
 
-          ins_byte(F_LAND);
+          ins_f_code(F_LAND);
           $<address>$ = CURRENT_PROGRAM_SIZE;
           ins_byte(0);
       }
@@ -5522,7 +5552,7 @@ expr0:
           if (exact_types && !BASIC_TYPE($3.type,TYPE_NUMBER))
               type_error("Bad argument 2 to |", $3.type);
           $$.type = TYPE_NUMBER;
-          ins_byte(F_OR);
+          ins_f_code(F_OR);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -5533,13 +5563,13 @@ expr0:
           if (exact_types && !BASIC_TYPE($3.type,TYPE_NUMBER))
               type_error("Bad argument 2 to ^", $3.type);
           $$.type = TYPE_NUMBER;
-          ins_byte(F_XOR);
+          ins_f_code(F_XOR);
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '&' expr0
       {
-          ins_byte(F_AND);
+          ins_f_code(F_AND);
           $$.type = TYPE_ANY;
 
           /* Check the types */
@@ -5607,7 +5637,7 @@ expr0:
               yyerrorf("== always false because of different types %s"
                       , get_two_types($1.type, $3.type));
           }
-          ins_byte(F_EQ);
+          ins_f_code(F_EQ);
           $$.type = TYPE_NUMBER;
       }
 
@@ -5621,20 +5651,20 @@ expr0:
               yyerrorf("!= always true because of different types %s"
                       , get_two_types($1.type, $3.type));
           }
-          ins_byte(F_NE);
+          ins_f_code(F_NE);
           $$.type = TYPE_NUMBER;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
-    | expr0 '>'  expr0  { $$.type = TYPE_NUMBER; ins_byte(F_GT); }
-    | expr0 L_GE expr0  { $$.type = TYPE_NUMBER; ins_byte(F_GE); }
-    | expr0 '<'  expr0  { $$.type = TYPE_NUMBER; ins_byte(F_LT); }
-    | expr0 L_LE expr0  { $$.type = TYPE_NUMBER; ins_byte(F_LE); }
+    | expr0 '>'  expr0  { $$.type = TYPE_NUMBER; ins_f_code(F_GT); }
+    | expr0 L_GE expr0  { $$.type = TYPE_NUMBER; ins_f_code(F_GE); }
+    | expr0 '<'  expr0  { $$.type = TYPE_NUMBER; ins_f_code(F_LT); }
+    | expr0 L_LE expr0  { $$.type = TYPE_NUMBER; ins_f_code(F_LE); }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_LSH expr0
       {
-          ins_byte(F_LSH);
+          ins_f_code(F_LSH);
           $$.type = TYPE_NUMBER;
           if (exact_types)
           {
@@ -5648,7 +5678,7 @@ expr0:
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 L_RSH expr0
       {
-          ins_byte(F_RSH);
+          ins_f_code(F_RSH);
           $$.type = TYPE_NUMBER;
           if (exact_types)
           {
@@ -5737,7 +5767,7 @@ expr0:
           else
           {
               /* Just add */
-              ins_byte(F_ADD);
+              ins_f_code(F_ADD);
               $$.type = TYPE_ANY;
               if ($1.type == $4.type)
                   $$.type = $1.type;
@@ -5875,7 +5905,7 @@ expr0:
               }
           } /* if (exact_types) */
 
-          ins_byte(F_SUBTRACT);
+          ins_f_code(F_SUBTRACT);
       } /* '-' */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -5902,7 +5932,7 @@ expr0:
                   type_error("Bad argument number 2 to '*'", type2);
           }
 
-          ins_byte(F_MULTIPLY);
+          ins_f_code(F_MULTIPLY);
 
           if (type1 == TYPE_FLOAT || type2 == TYPE_FLOAT )
           {
@@ -5937,7 +5967,7 @@ expr0:
                   type_error("Bad argument number 2 to '%'", $3.type);
           }
 
-          ins_byte(F_MOD);
+          ins_f_code(F_MOD);
           $$.type = TYPE_NUMBER;
       }
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -5956,7 +5986,7 @@ expr0:
                   type_error("Bad argument number 2 to '/'", type2);
           }
 
-          ins_byte(F_DIVIDE);
+          ins_f_code(F_DIVIDE);
 
           if (type1 == TYPE_FLOAT || type2 == TYPE_FLOAT )
           {
@@ -6031,7 +6061,7 @@ expr0:
           {
               if (i & VIRTUAL_VAR_TAG)
               {
-                  add_byte(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
+                  add_f_code(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
                   add_byte(i);
                   i = V_VARIABLE(i)->flags & TYPE_MOD_MASK;
               }
@@ -6039,13 +6069,13 @@ expr0:
               {
                   if ((i + num_virtual_variables) & ~0xff)
                   {
-                      add_byte(F_PUSH_IDENTIFIER16_LVALUE);
+                      add_f_code(F_PUSH_IDENTIFIER16_LVALUE);
                       add_short(i + num_virtual_variables);
                       CURRENT_PROGRAM_SIZE += 1;
                   }
                   else
                   {
-                      add_byte(F_PUSH_IDENTIFIER_LVALUE);
+                      add_f_code(F_PUSH_IDENTIFIER_LVALUE);
                       add_byte(i + num_virtual_variables);
                   }
                   i = NV_VARIABLE(i)->flags & TYPE_MOD_MASK;
@@ -6064,7 +6094,7 @@ expr0:
 
           CURRENT_PROGRAM_SIZE += 1;
 
-          add_byte($1.code);
+          add_f_code($1.code);
           $$.type = TYPE_NUMBER;
       }
 
@@ -6074,11 +6104,11 @@ expr0:
           int i;
           PREPARE_INSERT(3)
 %line
-          add_byte(F_PUSH_LOCAL_VARIABLE_LVALUE);
+          add_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
           add_byte($2);
           CURRENT_PROGRAM_SIZE =
             (last_expression = CURRENT_PROGRAM_SIZE + 2) + 1;
-          add_byte($1.code);
+          add_f_code($1.code);
           i = type_of_locals[$2];
           if (exact_types && !BASIC_TYPE(i, TYPE_NUMBER))
           {
@@ -6239,7 +6269,7 @@ expr0:
       {
           $$ = $2;
           last_expression = CURRENT_PROGRAM_SIZE;
-          ins_byte(F_NOT);        /* Any type is valid here. */
+          ins_f_code(F_NOT);        /* Any type is valid here. */
           $$.type = TYPE_NUMBER;
       }
 
@@ -6248,7 +6278,7 @@ expr0:
       {
 %line
           $$ = $2;
-          ins_byte(F_COMPL);
+          ins_f_code(F_COMPL);
           if (exact_types && !BASIC_TYPE($2.type, TYPE_NUMBER))
               type_error("Bad argument to ~", $2.type);
           $$.type = TYPE_NUMBER;
@@ -6270,7 +6300,7 @@ expr0:
           }
           else
           {
-              ins_byte(F_NEGATE);
+              ins_f_code(F_NEGATE);
           }
           type = $2.type;
 
@@ -6290,7 +6320,7 @@ expr0:
               add_to_mem_block(A_PROGRAM, $1.u.p, $1.length);
               yfree($1.u.p);
               last_expression = CURRENT_PROGRAM_SIZE;
-              ins_byte(F_POST_INC);
+              ins_f_code(F_POST_INC);
           }
           else
           {
@@ -6302,7 +6332,7 @@ expr0:
               source = $1.u.simple;
               add_byte(*source++);
               add_byte(*source);
-              add_byte(F_POST_INC);
+              add_f_code(F_POST_INC);
           }
 
           /* Check the types */
@@ -6335,7 +6365,7 @@ expr0:
               source = $1.u.simple;
               add_byte(*source++);
               add_byte(*source);
-              add_byte(F_POST_DEC);
+              add_f_code(F_POST_DEC);
           }
 
           /* Check the types */
@@ -6384,27 +6414,27 @@ expr4:
           string_number = store_prog_string(p);
           if ( string_number <= 0xff )
           {
-              add_byte(F_CSTRING0);
+              add_f_code(F_CSTRING0);
               add_byte(string_number);
           }
           else if ( string_number <= 0x1ff )
           {
-              add_byte(F_CSTRING1);
+              add_f_code(F_CSTRING1);
               add_byte(string_number);
           }
           else if ( string_number <= 0x2ff )
           {
-              add_byte(F_CSTRING2);
+              add_f_code(F_CSTRING2);
               add_byte(string_number);
           }
           else if ( string_number <= 0x3ff )
           {
-              add_byte(F_CSTRING3);
+              add_f_code(F_CSTRING3);
               add_byte(string_number);
           }
           else
           {
-              add_byte(F_STRING);
+              add_f_code(F_STRING);
               add_short(string_number);
               CURRENT_PROGRAM_SIZE++;
           }
@@ -6426,25 +6456,25 @@ expr4:
           if ( number == 0 )
           {
               current++;
-              add_byte(F_CONST0);
+              add_f_code(F_CONST0);
               $$.type = TYPE_ANY;
           }
           else if ( number == 1 )
           {
-              add_byte(F_CONST1);
+              add_f_code(F_CONST1);
               current++;
               $$.type = TYPE_NUMBER;
           }
           else if ( number >= 0 && number <= 0xff )
           {
-              add_byte(F_CLIT);
+              add_f_code(F_CLIT);
               add_byte(number);
               current += 2;
               $$.type = TYPE_NUMBER;
           }
           else
           {
-              add_byte(F_NUMBER);
+              add_f_code(F_NUMBER);
               memcpy(__PREPARE_INSERT__p, &$1, sizeof $1);
               current += 1 + sizeof (p_int);
               $$.type = TYPE_NUMBER;
@@ -6460,7 +6490,7 @@ expr4:
           $$.start = CURRENT_PROGRAM_SIZE;
           $$.code = -1;
           ix = $1.number;
-          ins_byte(F_CLOSURE);
+          ins_f_code(F_CLOSURE);
           ins_short(ix);
           $$.type = TYPE_CLOSURE;
       }
@@ -6480,13 +6510,13 @@ expr4:
           if (quotes == 1 && string_number < 0x100)
           {
                 /* One byte shorter than the other way */
-                ins_byte(F_CSTRING0);
+                ins_f_code(F_CSTRING0);
                 ins_byte(string_number);
-                ins_byte(F_QUOTE);
+                ins_f_code(F_QUOTE);
           }
           else
           {
-                ins_byte(F_SYMBOL);
+                ins_f_code(F_SYMBOL);
                 ins_short(string_number);
                 ins_byte(quotes);
           }
@@ -6502,7 +6532,7 @@ expr4:
 
           $$.start = CURRENT_PROGRAM_SIZE;
           $$.code = -1;
-          ins_byte(F_FLOAT);
+          ins_f_code(F_FLOAT);
           ins_long ( SPLIT_DOUBLE( $1, &exponent) );
           ins_short( exponent );
           $$.type = TYPE_FLOAT;
@@ -6528,7 +6558,7 @@ expr4:
              * unless a reference appears
              */
 
-          ins_byte(F_AGGREGATE);
+          ins_f_code(F_AGGREGATE);
           ins_short($4);
           if (max_array_size && $4 > max_array_size)
               yyerror("Illegal array size");
@@ -6552,7 +6582,7 @@ expr4:
              * unless a reference appears
              */
 
-          ins_byte(F_AGGREGATE);
+          ins_f_code(F_AGGREGATE);
           ins_short($3);
           if (max_array_size && $3 > max_array_size)
               yyerror("Illegal array size");
@@ -6561,7 +6591,7 @@ expr4:
           $$.code = -1;
           quotes = $1;
           do {
-                ins_byte(F_QUOTE);
+                ins_f_code(F_QUOTE);
           } while (--quotes);
       }
 
@@ -6581,13 +6611,13 @@ expr4:
 
           if ( (num_keys | $4[1]) &~0xff)
           {
-              ins_byte(F_M_AGGREGATE);
+              ins_f_code(F_M_AGGREGATE);
               ins_short(num_keys);
               ins_short($4[1]);
           }
           else
           {
-              ins_byte(F_M_CAGGREGATE);
+              ins_f_code(F_M_CAGGREGATE);
               ins_byte(num_keys);
               ins_byte($4[1]);
           }
@@ -6928,12 +6958,12 @@ expr4:
           if ($2.inst == F_INDEX)
           {
               $$.code = F_PUSH_INDEXED_LVALUE;
-              ins_byte(F_INDEX);
+              ins_f_code(F_INDEX);
           }
           else
           {
               $$.code = F_PUSH_RINDEXED_LVALUE;
-              ins_byte(F_RINDEX);
+              ins_f_code(F_RINDEX);
           }
 
           if ($2.type1 & TYPE_MOD_REFERENCE)
@@ -6983,7 +7013,7 @@ expr4:
           $$.end = CURRENT_PROGRAM_SIZE;
           $$.code = F_PUSH_INDEXED_MAP_LVALUE;
           $$.type = TYPE_ANY;
-          ins_byte(F_MAP_INDEX);
+          ins_f_code(F_MAP_INDEX);
 
           if ($3.type & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
@@ -7227,11 +7257,11 @@ lvalue:
               current -= start;
 
               /* Insert the indexing code */
-              if (indexing_code > 0xff)
+              if (instrs[indexing_code].prefix)
               {
-                  q[current++] = indexing_code >> F_ESCAPE_BITS;
+                  q[current++] = instrs[indexing_code].prefix;
               }
-              q[current] = indexing_code;
+              q[current] = instrs[indexing_code].opcode;
           }
 
           /* This is what we return */
@@ -7600,10 +7630,10 @@ function_call:
                   char *p;
 
                   p = ref_string(real_name->name);
-                  add_byte(F_STRING);
+                  add_f_code(F_STRING);
                   add_short(store_prog_string(
                     make_shared_string(query_simul_efun_file_name())));
-                  add_byte(F_STRING);
+                  add_f_code(F_STRING);
                   add_short(store_prog_string(p));
                   CURRENT_PROGRAM_SIZE += 6;
               }
@@ -7665,7 +7695,7 @@ function_call:
                   /* call-other: the number of arguments will be
                    * corrected at runtime.
                    */
-                  add_byte(F_CALL_OTHER);
+                  add_f_code(F_CALL_OTHER);
                   add_byte($4 + 2);
                   CURRENT_PROGRAM_SIZE += 2;
               }
@@ -7694,11 +7724,11 @@ function_call:
                       CURRENT_PROGRAM_SIZE += i;
                       while ( --i >= 0 )
                       {
-                          add_byte(F_CONST0);
+                          add_f_code(F_CONST0);
                       }
                   }
 
-                  add_byte(F_SIMUL_EFUN);
+                  add_f_code(F_SIMUL_EFUN);
                   add_byte(simul_efun);
                   if (funp->num_arg == SIMUL_EFUN_VARARGS
                    || funp->flags & TYPE_MOD_XVARARGS)
@@ -7764,7 +7794,7 @@ function_call:
               {
                   /* Normal lfun in this program */
 
-                  add_byte(F_CALL_FUNCTION_BY_ADDRESS);
+                  add_f_code(F_CALL_FUNCTION_BY_ADDRESS);
                   add_short(f);
                   funp = FUNCTION(f);
                   arg_types = (vartype_t *)mem_block[A_ARGUMENT_TYPES].block;
@@ -7884,7 +7914,7 @@ function_call:
               if (def && num_arg == min-1)
               {
                   /* Default argument */
-                  add_byte(def);
+                  add_f_code(def);
                   CURRENT_PROGRAM_SIZE++;
                   max--;
                   min--;
@@ -7918,6 +7948,7 @@ function_call:
                   for (argn = 0; argn < num_arg; argn++)
                   {
                       fulltype_t tmp1, tmp2;
+                      fulltype_t *beginArgp = argp;
 
                       tmp1 = *aargp++ & TYPE_MOD_MASK;
                       for (;;)
@@ -7925,8 +7956,8 @@ function_call:
                           if ( !(tmp2 = *argp) )
                           {
                               /* Possible types for this arg exhausted */
-                              yyerrorf("Bad argument %d type to efun %s()",
-                                    argn+1, instrs[f].name);
+                              efun_argument_error(argn+1, f, beginArgp
+                                                 , aargp[-1]);
                               break;
                           }
                           argp++;
@@ -7974,13 +8005,13 @@ function_call:
               if (f > LAST_INSTRUCTION_CODE)
                   f = efun_aliases[f-LAST_INSTRUCTION_CODE-1];
 
-              if (f > 255)
+              if (instrs[f].prefix)
               {
                   /* This efun needs a prefix byte */
-                  add_byte(f >> F_ESCAPE_BITS);
+                  add_byte(instrs[f].prefix);
                   CURRENT_PROGRAM_SIZE++;
               }
-              add_byte(f);
+              add_byte(instrs[f].opcode);
               CURRENT_PROGRAM_SIZE++;
 
               /* Only store number of arguments for instructions
@@ -7996,7 +8027,7 @@ function_call:
               if ( instrs[f].ret_type == TYPE_VOID )
               {
                   last_expression = mem_block[A_PROGRAM].current_size;
-                  add_byte(F_CONST0);
+                  add_f_code(F_CONST0);
                   CURRENT_PROGRAM_SIZE++;
               }
           } /* efun */
@@ -8017,7 +8048,7 @@ function_call:
               f = define_new_function(MY_FALSE,
                   $1.real, 0, 0, 0, NAME_UNDEFINED, TYPE_UNKNOWN
               );
-              add_byte(F_CALL_FUNCTION_BY_ADDRESS);
+              add_f_code(F_CALL_FUNCTION_BY_ADDRESS);
               add_short(f);
               add_byte($4);        /* Number of actual arguments */
               CURRENT_PROGRAM_SIZE += 4;
@@ -8092,27 +8123,27 @@ function_call:
               string_number = store_prog_string(p);
               if (string_number <= 0x0ff )
               {
-                  ins_byte(F_CSTRING0);
+                  ins_f_code(F_CSTRING0);
                   ins_byte(string_number);
               }
               else if ( string_number <= 0x1ff )
               {
-                  ins_byte(F_CSTRING1);
+                  ins_f_code(F_CSTRING1);
                   ins_byte(string_number);
               }
               else if ( string_number <= 0x2ff )
               {
-                  ins_byte(F_CSTRING2);
+                  ins_f_code(F_CSTRING2);
                   ins_byte(string_number);
               }
               else if ( string_number <= 0x3ff )
               {
-                  ins_byte(F_CSTRING3);
+                  ins_f_code(F_CSTRING3);
                   ins_byte(string_number);
               }
               else
               {
-                  ins_byte(F_STRING);
+                  ins_f_code(F_STRING);
                   ins_short(string_number);
               }
           } /* if (p) */
@@ -8145,7 +8176,7 @@ function_call:
                   /* call-other: the number of arguments will be
                    * corrected at runtime.
                    */
-                  add_byte(F_CALL_OTHER);
+                  add_f_code(F_CALL_OTHER);
                   add_byte(num_arg + 2);
                   CURRENT_PROGRAM_SIZE += 2;
               }
@@ -8174,11 +8205,11 @@ function_call:
                       CURRENT_PROGRAM_SIZE += i;
                       while ( --i >= 0 )
                       {
-                          add_byte(F_CONST0);
+                          add_f_code(F_CONST0);
                       }
                   }
 
-                  add_byte(F_SIMUL_EFUN);
+                  add_f_code(F_SIMUL_EFUN);
                   add_byte(call_other_sefun);
                   if (funp->num_arg == SIMUL_EFUN_VARARGS
                    || funp->flags & TYPE_MOD_XVARARGS)
@@ -8193,7 +8224,7 @@ function_call:
           }
           else /* true call_other */
           {
-              ins_byte(F_CALL_OTHER);
+              ins_f_code(F_CALL_OTHER);
               ins_byte($7 + 2);
               $$.type = instrs[F_CALL_OTHER].ret_type;
           }
@@ -8294,9 +8325,9 @@ function_name:
 
               svalue_t *res;
 
-              push_volatile_string("nomask simul_efun");
-              push_volatile_string(current_file);
-              push_volatile_string($3->name);
+              push_volatile_string(inter_sp, "nomask simul_efun");
+              push_volatile_string(inter_sp, current_file);
+              push_volatile_string(inter_sp, $3->name);
               res = apply_master_ob(STR_PRIVILEGE, 3);
               if (!res || res->type != T_NUMBER || res->u.number < 0)
               {
@@ -8415,7 +8446,7 @@ inline_fun:
 
            $$.start = CURRENT_PROGRAM_SIZE;
            $$.code = -1;
-           ins_byte(F_CLOSURE);
+           ins_f_code(F_CLOSURE);
            ins_short(num);
            $$.type = TYPE_CLOSURE;
 
@@ -8431,7 +8462,7 @@ catch:
       L_CATCH
       {
           $<address>$ = CURRENT_PROGRAM_SIZE;
-          ins_byte(F_CATCH);
+          ins_f_code(F_CATCH);
           ins_byte(0);
       }
 
@@ -8505,7 +8536,7 @@ catch:
 sscanf:
       L_SSCANF note_start '(' expr0 ',' expr0 lvalue_list ')'
       {
-          ins_byte(F_SSCANF);
+          ins_f_code(F_SSCANF);
           ins_byte($7 + 2);
           $$.start = $2.start;
           $$.type = TYPE_NUMBER;
@@ -8518,7 +8549,7 @@ parse_command:
       L_PARSE_COMMAND note_start
       '(' expr0 ',' expr0 ',' expr0 lvalue_list ')'
       {
-          ins_byte(F_PARSE_COMMAND);
+          ins_f_code(F_PARSE_COMMAND);
           ins_byte($9 + 3);
           $$.start = $2.start;
           $$.type = TYPE_NUMBER;
@@ -8542,19 +8573,19 @@ lvalue_list:
           i = verify_declared($3);
           if (i & VIRTUAL_VAR_TAG)
           {
-              ins_byte(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
+              ins_f_code(F_PUSH_VIRTUAL_VARIABLE_LVALUE);
               ins_byte(i);
           }
           else
           {
               if ((i + num_virtual_variables) & ~0xff)
               {
-                  ins_byte(F_PUSH_IDENTIFIER16_LVALUE);
+                  ins_f_code(F_PUSH_IDENTIFIER16_LVALUE);
                   ins_short(i + num_virtual_variables);
               }
               else
               {
-                  ins_byte(F_PUSH_IDENTIFIER_LVALUE);
+                  ins_f_code(F_PUSH_IDENTIFIER_LVALUE);
                   ins_byte(i + num_virtual_variables);
               }
           }
@@ -8567,7 +8598,7 @@ lvalue_list:
           /* Push the lvalue for a local variable */
 
           $$ = 1 + $1;
-          ins_byte(F_PUSH_LOCAL_VARIABLE_LVALUE);
+          ins_f_code(F_PUSH_LOCAL_VARIABLE_LVALUE);
           ins_byte($3);
       }
 
@@ -9046,7 +9077,7 @@ insert_pop_value (void)
         case F_CONST1:
             mem_block[A_PROGRAM].current_size = last_expression;
             break;
-        default: ins_byte(F_POP_VALUE);
+        default: ins_f_code(F_POP_VALUE);
         }
         last_expression = -1;
     }
@@ -9054,7 +9085,7 @@ insert_pop_value (void)
         /* The last expression is too long ago: just pop whatever there
          * is on the stack.
          */
-        ins_byte(F_POP_VALUE);
+        ins_f_code(F_POP_VALUE);
 } /* insert_pop_value() */
 
 /*-------------------------------------------------------------------------*/
@@ -9096,9 +9127,9 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
  *
  * code >= 0 && end == 0:
  *     The instruction at <start> (1 byte code, 1 byte argument)
- *     has to be replaced by its alternative <code> (the argument byte
- *     is preserved), and the two-byte instruction <newcode> is then
- *     inserted after the replaced instruction and the following code.
+ *     removed (the argument byte is preserved), instead the instructions
+ *     <code> plus the preserved argument byte and <newcode> are appended
+ *     to the end of the current code.
  *
  *     Cases are:
  *         global:
@@ -9150,7 +9181,14 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
             while (current + length > mem_block[A_PROGRAM].max_size)
                 realloc_a_program();
 
-            /* Cycle the indexing code to the end, where it belongs */
+            /* Cycle the indexing code to the end, where it belongs:
+             *
+             *   <indexing-code> <instrs>
+             * is changed via
+             *   <...>           <instrs> <indexing-code>
+             * to
+             *   <instrs> <indexing-code>
+             */
             p = PROGRAM_BLOCK;
             memcpy(p + current, p + start, length);
             p += start;
@@ -9177,32 +9215,37 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
                 fatal("Unexpected lvalue code\n");
             }
 
-            /* ...and store it */
-            PUT_CODE(p-1, code >> F_ESCAPE_BITS);
-            STORE_CODE(p, code);
-            current++;
+            /* ...and store it in place of the indexing instruction
+             * right before p == current
+             */
+            PUT_CODE(p-1, instrs[code].opcode);
         code_stored:
-            STORE_CODE(p, newcode >> F_ESCAPE_BITS);
-            PUT_CODE(p, newcode);
+            /* Append the newcode instruction (current will be adjusted
+             * at the end of the function).
+             */
+            PUT_CODE(p, instrs[newcode].opcode);
         }
         else
         {
-            /* Variant 2: Overwrite the old <code> and insert <newcode> */
+            /* Variant 2: Change
+             *   <old-code> <arg> <instrs...>
+             * to
+             *   <instrs...> <code> <arg> <newcode>
+             */
             
-            int i;
+            int instr_arg;
             p_int length;
 
-            while (current + 2 > mem_block[A_PROGRAM].max_size)
+            while (current + 1 > mem_block[A_PROGRAM].max_size)
                 realloc_a_program();
 
             p = PROGRAM_BLOCK + start;
-            i = p[1];
+            instr_arg = p[1];
             length = current - start - 2;
             for( ; --length >= 0; p++) PUT_CODE(p, GET_CODE(p+2));
             STORE_CODE(p, code);
-            STORE_CODE(p, i);
-            STORE_CODE(p, newcode >> F_ESCAPE_BITS);
-            PUT_CODE(p, newcode);
+            STORE_CODE(p, instr_arg);
+            PUT_CODE(p, instrs[newcode].opcode);
         }
     }
     else
@@ -9221,16 +9264,15 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
             yyerror("Need lvalue for range lvalue.");
         }
         
-        while (current + 2 > mem_block[A_PROGRAM].max_size)
+        while (current + 1 > mem_block[A_PROGRAM].max_size)
             realloc_a_program();
             
         p = PROGRAM_BLOCK + current;
-        STORE_CODE(p, newcode >> F_ESCAPE_BITS);
-        PUT_CODE(p, newcode);
+        PUT_CODE(p, instrs[newcode].opcode);
     }
 
     /* Correct the program size */
-    CURRENT_PROGRAM_SIZE = current + 2;
+    CURRENT_PROGRAM_SIZE = current + 1;
 } /* arrange_protected_lvalue() */
 
 /*-------------------------------------------------------------------------*/
@@ -9243,21 +9285,8 @@ proxy_efun (int function, int num_arg UNUSED)
  */
 
 {
-#if defined(__MWERKS__) && !defined(F_EXTRACT)
+#if defined(__MWERKS__)
 #    pragma unused(num_arg)
-#endif
-#ifdef F_EXTRACT
-    if (function == F_EXTRACT)
-    {
-        if (num_arg == 2)
-        {
-            return F_EXTRACT2;
-        }
-        if (num_arg == 1)
-        {
-            return F_EXTRACT1;
-        }
-    }
 #endif
 
     if (function == F_PREVIOUS_OBJECT)
@@ -9333,7 +9362,7 @@ add_new_init_jump (void)
  */
 
 {
-    ins_byte(F_JUMP);
+    ins_f_code(F_JUMP);
     last_initializer_end = (p_int)mem_block[A_PROGRAM].current_size;
     ins_short(0);
 } /* add_new_init_jump() */
@@ -9465,7 +9494,7 @@ insert_inherited (char *super_name, char *real_name
         }
 
         /* Generate the function call */
-        add_byte(F_CALL_EXPLICIT_INHERITED);
+        add_f_code(F_CALL_EXPLICIT_INHERITED);
         add_short(ip - (inherit_t *)mem_block[A_INHERITS].block);
         add_short(found_ix);
         add_byte(num_arg);
@@ -9582,7 +9611,7 @@ insert_inherited (char *super_name, char *real_name
                 continue;
 
             /* Generate the function call */
-            add_byte(F_CALL_EXPLICIT_INHERITED);
+            add_f_code(F_CALL_EXPLICIT_INHERITED);
             add_short(ip_index);
             add_short(i);
             add_byte(num_arg);
@@ -9621,7 +9650,7 @@ insert_inherited (char *super_name, char *real_name
          */
         {
             PREPARE_INSERT(3)
-            add_byte(F_AGGREGATE);
+            add_f_code(F_AGGREGATE);
             add_short(calls);
             CURRENT_PROGRAM_SIZE += 3;
         }
@@ -9796,8 +9825,7 @@ copy_functions (program_t *from, fulltype_t type)
         fun_p->num_arg = FUNCTION_NUM_ARGS(funstart) & 0x7f;
         if (FUNCTION_NUM_ARGS(funstart) & ~0x7f)
             fun_p->type |= TYPE_MOD_XVARARGS;
-        if (FUNCTION_CODE(funstart)[0] == F_ESCAPE
-         && FUNCTION_CODE(funstart)[1] == F_UNDEF  -0x100)
+        if (FUNCTION_CODE(funstart)[0] == F_UNDEF)
         {
             fun_p->flags |= NAME_UNDEFINED;
         }
@@ -10916,7 +10944,7 @@ epilog (void)
             }
 
             /* If the function is undefined, generate a dummy function
-             * with ESCAPE UNDEF as body.
+             * with UNDEF as body.
              * Except __INIT, which is created as CONST1 RETURN.
              */
             if ((f->flags & (NAME_UNDEFINED|NAME_INHERITED)) == NAME_UNDEFINED)
@@ -10951,8 +10979,7 @@ epilog (void)
                     *p   = F_RETURN;
                 } else {
 %endif
-                    *p++ = F_ESCAPE;
-                    *p   = F_UNDEF-0x100;
+                    *p = F_UNDEF;
 %ifdef INITIALIZATION_BY___INIT
                 }
 %endif

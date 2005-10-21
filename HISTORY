@@ -4,6 +4,26 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
+23-Aug-2000 (Lars Duening) -- Development Release 3.3
+
+    - Changed efuns:
+
+    - Corrected efuns:
+
+    - New efuns:
+
+    - Master Object:
+
+    - Fixed Crashers:
+
+    - Language:
+
+    - Runtime:
+       + IPv6 name lookup works again, and also with both xerq and erq.
+
+    - Other Changes:
+
+
 20-Aug-2000 (Lars Duening) -- Release 3.2.8
 
     - Changed efuns:

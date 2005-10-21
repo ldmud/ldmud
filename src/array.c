@@ -9,7 +9,7 @@
  * The structure of an array ("vector") is defined in datatypes.h as this:
  *
  *   vector_t_s {
- *       p_int size;
+ *       p_int size; 
  *       p_int ref;
  *       p_int extra_ref;          (ifdef DEBUG)
  *       wiz_list_t *user;
@@ -689,7 +689,7 @@ explode_string (char *str, char *del)
     }
 
     return ret;
-}
+} /* explode_string() */
 
 /*-------------------------------------------------------------------------*/
 vector_t *
@@ -1099,142 +1099,6 @@ static svalue_t ltmp = { T_POINTER };
 }
 
 /*-------------------------------------------------------------------------*/
-vector_t *
-all_inventory (object_t *ob)
-
-/* Return a vector with all objects contained in <ob>.
- * TODO: Make this a proper f_all_inventory(sp, num_arg) efun?
- */
-
-{
-    vector_t *d;    /* The result vector */
-    object_t *cur;  /* Current inventory object */
-    int cnt, res;
-
-    /* Count how many inventory objects there are. */
-    cnt=0;
-    for (cur=ob->contains; cur; cur = cur->next_inv)
-        cnt++;
-
-    if (!cnt)
-        return allocate_array(0);
-
-    d = allocate_array(cnt);
-
-    /* Copy the object references */
-    cur=ob->contains;
-    for (res=0; res < cnt; res++) {
-        d->item[res].type=T_OBJECT;
-        d->item[res].u.ob = ref_object(cur, "all_inventory");
-        cur=cur->next_inv;
-    }
-
-    return d;
-}
-
-/*-------------------------------------------------------------------------*/
-static int
-deep_inventory_size (object_t *ob)
-
-/* Helper function for deep_inventory()
- *
- * Count the size of <ob>'s inventory by counting the contained objects,
- * invoking this function for every object and then returning the sum
- * of all numbers.
- */
-
-{
-    int n;
-
-    n = 0;
-    do {
-        if (ob->contains)
-            n += deep_inventory_size(ob->contains);
-        n++;
-    } while ( NULL != (ob = ob->next_inv) );
-
-    return n;
-}
-
-/*-------------------------------------------------------------------------*/
-static svalue_t *
-write_deep_inventory (object_t *first, svalue_t *svp)
-
-/* Helper function for deep_inventory()
- *
- * Copy into <svp> and following a reference to all objects in the
- * inventory chain starting with <first>; then invoke this function
- * for every inventory chain in the found objects.
- *
- * <svp> has to point into a suitably big area of svalue elements, like
- * a vector.
- *
- * Result is the updated <svp>, pointing to the next free svalue element
- * in the storage area.
- */
-
-{
-    object_t *ob;
-
-    ob = first;
-    do {
-        put_ref_object(svp, ob, "deep_inventory");
-        svp++;
-    } while ( NULL != (ob = ob->next_inv) );
-
-    ob = first;
-    do {
-        if (ob->contains)
-            svp = write_deep_inventory(ob->contains, svp);
-    } while ( NULL != (ob = ob->next_inv) );
-
-    return svp;
-}
-
-/*-------------------------------------------------------------------------*/
-vector_t *
-deep_inventory (object_t *ob, Bool take_top)
-
-/* Return a vector with the full inventory of <ob>, i.e. all objects contained
- * by <ob> and all deep inventories of those objects, too. The resulting
- * vector is created by a recursive breadth search.
- *
- * If <take_top> is true, <ob> itself is included as first element in the
- * result vector.
- *
- * The function is used for the efuns deep_inventory() and parse_command().
- */
-
-{
-    vector_t *dinv;  /* The resulting inventory vector */
-    svalue_t *svp;   /* Next element to fill in dinv */
-    int n;                /* Number of elements in dinv */
-
-    /* Count the contained objects */
-    n = take_top ? 1 : 0;
-    if (ob->contains) {
-        n += deep_inventory_size(ob->contains);
-    }
-
-    /* Get the array */
-    dinv = allocate_array(n);
-    svp = dinv->item;
-
-    /* Fill in <ob> if desired */
-    if (take_top) {
-        put_ref_object(svp, ob, "deep_inventory");
-        svp++;
-    }
-
-    /* Fill in the deep inventory */
-    if (ob->contains) {
-        write_deep_inventory(ob->contains, svp);
-    }
-
-    return dinv;
-}
-
-/*-------------------------------------------------------------------------*/
 static INLINE int
 alist_cmp (svalue_t *p1, svalue_t *p2)
 
@@ -1533,9 +1397,29 @@ is_alist (vector_t *v)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_allocate (svalue_t *sp)
+
+/* EFUN allocate()
+ *
+ *     mixed *allocate(int size)
+ *
+ * Allocate an empty array of <size> elements.
+ */
+
+{
+    vector_t *v;
+
+    v = allocate_array(sp->u.number); /* Will have ref count == 1 */
+    put_array(sp, v);
+
+    return sp;
+} /* f_allocate() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_filter_array (svalue_t *sp, int num_arg)
 
-/* VEFUN: filter_array(), also filter() for arrays.
+/* EFUN: filter_array(), also filter() for arrays.
  *
  *   mixed *filter_array(mixed *arr, string fun)
  *   mixed *filter_array(mixed *arr, string fun, string|object obj, mixed extra, ...)
@@ -1580,8 +1464,6 @@ f_filter_array (svalue_t *sp, int num_arg)
      * and allocate the flags vector.
      */
     arg = sp - num_arg + 1;
-    if (arg->type != T_POINTER)
-        bad_xefun_vararg(1, sp);
 
     p = arg->u.vec;
     p_size = (mp_int)VEC_SIZE(p);
@@ -1591,7 +1473,7 @@ f_filter_array (svalue_t *sp, int num_arg)
     {
         error("Stack overflow in filter_array()");
         /* NOTREACHED */
-        return NULL;
+        return sp;
     }
 
     /* Every element in flags is associated by index number with an
@@ -1642,7 +1524,7 @@ f_filter_array (svalue_t *sp, int num_arg)
 
         if (error_index >= 0)
         {
-            bad_xefun_vararg(error_index+2, arg);
+            vefun_bad_arg(error_index+2, arg);
             /* NOTREACHED */
             return arg;
         }
@@ -1708,7 +1590,7 @@ f_filter_array (svalue_t *sp, int num_arg)
 svalue_t *
 f_map_array (svalue_t *sp, int num_arg)
 
-/* VEFUN map() on arrays
+/* EFUN map() on arrays
  *
  *   mixed * map(mixed *arg, string func, string|object ob, mixed extra...)
  *   mixed * map(mixed *arg, closure cl, mixed extra...)
@@ -1744,13 +1626,6 @@ f_map_array (svalue_t *sp, int num_arg)
 
     arg = sp - num_arg + 1;
 
-    if (arg[0].type != T_POINTER)
-    {
-        bad_xefun_vararg(1, sp);
-        /* NOTREACHED */
-        return sp;
-    }
-
     arr = arg->u.vec;
     cnt = (mp_int)VEC_SIZE(arr);
 
@@ -1769,7 +1644,7 @@ f_map_array (svalue_t *sp, int num_arg)
         res = allocate_array(cnt);
         if (!res)
             error("(map_array) Out of memory: array[%ld] for result\n", cnt);
-        push_referenced_vector(res); /* In case of errors */
+        push_array(inter_sp, res); /* In case of errors */
 
         for (w = arr->item, x = res->item; --cnt >= 0; w++, x++)
         {
@@ -1796,7 +1671,7 @@ f_map_array (svalue_t *sp, int num_arg)
         error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
         if (error_index >= 0)
         {
-            bad_xefun_vararg(error_index+2, arg);
+            vefun_bad_arg(error_index+2, arg);
             /* NOTREACHED */
             return arg;
         }
@@ -1807,7 +1682,7 @@ f_map_array (svalue_t *sp, int num_arg)
         res = allocate_array(cnt);
         if (!res)
             error("(map_array) Out of memory: array[%ld] for result\n", cnt);
-        push_referenced_vector(res); /* In case of errors */
+        push_array(inter_sp, res); /* In case of errors */
 
         /* Loop through arr and res, mapping the values from arr */
         for (w = arr->item, x = res->item; --cnt >= 0; w++, x++)
@@ -1847,7 +1722,7 @@ f_map_array (svalue_t *sp, int num_arg)
 svalue_t *
 f_sort_array (svalue_t * sp, int num_arg)
 
-/* VEFUN sort_array()
+/* EFUN sort_array()
  *
  *   mixed *sort_array(mixed *arr, string wrong_order
  *                               , object|string ob, mixed extra...)
@@ -1886,17 +1761,10 @@ f_sort_array (svalue_t * sp, int num_arg)
 
     arg = sp - num_arg + 1;
 
-    if (arg[0].type != T_POINTER)
-    {
-        bad_xefun_vararg(1, sp);
-        /* NOTREACHED */
-        return sp;
-    }
-
     error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
     if (error_index >= 0)
     {
-        bad_xefun_vararg(error_index+2, arg);
+        vefun_bad_arg(error_index+2, arg);
         /* NOTREACHED */
         return arg;
     }
@@ -2012,7 +1880,7 @@ f_sort_array (svalue_t * sp, int num_arg)
 svalue_t *
 f_filter_objects (svalue_t *sp, int num_arg)
 
-/* VEFUN filter_objects()
+/* EFUN filter_objects()
  *
  *   object *filter_objects (object *arr, string fun, mixed extra, ...)
  *
@@ -2045,10 +1913,6 @@ f_filter_objects (svalue_t *sp, int num_arg)
 
     /* Locate the arguments on the stack and extract them */
     arguments = sp-num_arg+3;
-    if (arguments[-2].type != T_POINTER)
-        bad_xefun_vararg(1, sp);
-    if (arguments[-1].type != T_STRING)
-        bad_xefun_vararg(2, sp);
 
     p = arguments[-2].u.vec;
     func = arguments[-1].u.string;
@@ -2189,7 +2053,7 @@ f_filter_objects (svalue_t *sp, int num_arg)
 svalue_t *
 f_map_objects (svalue_t *sp, int num_arg)
 
-/* VEFUN map_objects()
+/* EFUN map_objects()
  *
  *   mixed *map_objects (object *arr, string fun, mixed extra, ...)
  *
@@ -2218,10 +2082,6 @@ f_map_objects (svalue_t *sp, int num_arg)
     inter_sp = sp;  /* In case of errors leave a clean stack behind */
 
     arguments = sp-num_arg+3;
-    if (arguments[-2].type != T_POINTER)
-        bad_xefun_vararg(1, sp);
-    if (arguments[-1].type != T_STRING)
-        bad_xefun_vararg(2, sp);
 
     p = arguments[-2].u.vec;
     func = arguments[-1].u.string;
@@ -2230,7 +2090,7 @@ f_map_objects (svalue_t *sp, int num_arg)
     r = allocate_array(size = (mp_int)VEC_SIZE(p));
     arguments[-2].u.vec = r;
 
-    push_referenced_vector(p); /* Ref it from the stack in case of errors */
+    push_array(inter_sp, p); /* Ref it from the stack in case of errors */
 
     /* Call <func> in every object, storing the result in r.
      *
@@ -2346,10 +2206,10 @@ search_alist (svalue_t *key, vector_t *keylist)
 /*-------------------------------------------------------------------------*/
 #ifdef F_INSERT_ALIST
 
-svalue_t *
+static svalue_t *
 insert_alist (svalue_t *key, svalue_t * /* TODO: bool */ key_data, vector_t *list)
 
-/* EFUN insert_alist()
+/* Implementation of efun insert_alist()
  *
  * The function can be used in two ways:
  *
@@ -2443,9 +2303,129 @@ insert_alist (svalue_t *key, svalue_t * /* TODO: bool */ key_data, vector_t *lis
 
     /* Done */
     return &stmp;
-}
+} /* insert_alist() */
 
 #endif
+
+/*-------------------------------------------------------------------------*/
+#ifdef F_INSERT_ALIST
+
+svalue_t *
+f_insert_alist (svalue_t *sp, int num_arg)
+
+/* EFUN insert_alist()
+ *
+ *   mixed* insert_alist (mixed key, mixed data..., mixed * alist)
+ *   int    insert_alist (mixed key, mixed * keys)
+ *
+ * 1. Form: Alist Insertion
+ *
+ *   The <key> and all following <data> values are inserted
+ *   into the <alist>. If an entry for <key> already exists
+ *   in the list, just the data values are replaced. The number
+ *   of <data> values must match the number of data arrays
+ *   in the alist, naturally.
+ *
+ *   Result is the updated <alist>.
+ *
+ * 2. Form: Key Insertion
+ *
+ *   Insert the <key> into the (ordered) array of <keys>, so that
+ *   subsequent assoc()s can perform quick lookups. Result is the
+ *   index at which <key> was inserted (or already found).
+ *
+ *   CAVEAT: when working with string keys, the index might no longer
+ *     be valid after the next call to insert_alist().
+ */
+/* When the key list of an alist contains destructed objects
+   it is better not to free them till the next reordering by
+   order_alist to retain the alist property.
+ */
+
+{
+    int i;
+    vector_t *list;
+    long listsize;
+    size_t keynum;
+    svalue_t *key,*key_data,*ret;
+    static LOCAL_VEC1(insert_alist_vec, T_NUMBER);
+      /* Mock-alist for the insert_alist() key-insertion form.
+       */
+
+
+#if defined(DEBUG) && defined(MALLOC_smalloc)
+    static_vector1 = &insert_alist_vec.v;
+    /* TODO: Remove this once VEC_SIZE() is proven to be accurate.
+     */
+#endif
+
+    if (sp->type != T_POINTER)
+        vefun_arg_error(num_arg, T_POINTER, sp->type, sp);
+
+    /* Make up an alist if only a key-insertion is required */
+    if ( !(listsize = (long)VEC_SIZE(sp->u.vec))
+     ||  sp->u.vec->item[0].type != T_POINTER )
+    {
+        list = &insert_alist_vec.v;
+        *list->item = *sp;
+        listsize = 1;
+    }
+    else
+        list = sp->u.vec;
+
+    /* Check the validity of the alist */
+    keynum = VEC_SIZE(list->item[0].u.vec);
+    for (i = 1; i < listsize; i++)
+    {
+        if (list->item[i].type != T_POINTER
+         || VEC_SIZE(list->item[i].u.vec) != keynum)
+        {
+            error("Type or size mismatch of the data arrays.\n");
+            /* NOTREACHED */
+            return sp;
+        }
+    }
+
+    /* Get and test the data to insert */
+    if (num_arg == 2)
+    {
+        if (sp[-1].type != T_POINTER)
+        {
+            key_data = NULL;
+            key = sp-1;
+        }
+        else
+        {
+            if (VEC_SIZE(sp[-1].u.vec) != (size_t)listsize)
+            {
+                error("Size mismatch of the data arrays.\n");
+                /* NOTREACHED */
+                return sp;
+            }
+            key_data = key = sp[-1].u.vec->item;
+        }
+    }
+    else
+    {
+        if (num_arg - 1 != listsize)
+        {
+            error("Not enough data given.\n");
+            /* NOTREACHED */
+            return sp;
+        }
+        key_data = key = sp-num_arg+1;
+    }
+
+    /* Do the insertion */
+    ret = insert_alist(key,key_data,list);
+    sp = pop_n_elems(num_arg, sp);
+    sp++;
+    *sp = *ret;
+
+    return sp;
+} /* f_insert_alist() */
+
+#endif /* F_INSERT_ALIST */
 
 /*-------------------------------------------------------------------------*/
 int
@@ -2477,19 +2457,129 @@ assoc (svalue_t *key, vector_t *list)
         i = -1;
 
     return i;
-}
+} /* assoc() */
 
 /*-------------------------------------------------------------------------*/
-vector_t *
+#ifdef F_ASSOC
+
+svalue_t *
+f_assoc (svalue_t *sp, int num_arg)
+
+/* EFUN assoc()
+ *
+ *     int   assoc (mixed key, mixed *keys)
+ *     mixed assoc (mixed key, mixed *alist [, mixed fail] )
+ *     mixed assoc (mixed key, mixed *keys, mixed *data [, mixed fail])
+ *
+ * Search for <key> in the <alist> resp. in the <keys>.
+ *
+ * When the key list of an alist contains destructed objects
+ * it is better not to free them till the next reordering by
+ * order_alist to retain the alist property.
+ */
+
+{
+    svalue_t *args;
+    vector_t *keys,*data;
+    svalue_t *fail_val;
+    int ix;
+
+    args = sp -num_arg +1;
+
+    /* Analyse the arguments */
+    if ( !VEC_SIZE(args[1].u.vec)
+     ||  args[1].u.vec->item[0].type != T_POINTER )
+    {
+        keys = args[1].u.vec;
+        if (num_arg == 2)
+        {
+            data = NULL;
+        }
+        else
+        {
+            if (args[2].type != T_POINTER
+             || VEC_SIZE(args[2].u.vec) != VEC_SIZE(keys))
+            {
+                error("Number of values in key and data arrays differ.\n");
+                /* NOTREACHED */
+                return sp;
+            }
+            data = args[2].u.vec;
+        }
+        if (num_arg == 4)
+        {
+            fail_val = &args[3];
+        }
+        else
+        {
+            fail_val = &const0;
+        }
+    }
+    else
+    {
+        keys = args[1].u.vec->item[0].u.vec;
+        if (VEC_SIZE(args[1].u.vec) > 1)
+        {
+            if (args[1].u.vec->item[1].type != T_POINTER
+             || VEC_SIZE(args[1].u.vec->item[1].u.vec) != VEC_SIZE(keys))
+            {
+                error("Number of values in key and data arrays differ.\n");
+                /* NOTREACHED */
+                return sp;
+            }
+            data = args[1].u.vec->item[1].u.vec;
+        }
+        else
+        {
+            data = NULL;
+        }
+
+        if (num_arg == 3) fail_val = &args[2];
+        else if (num_arg == 2) fail_val = &const0;
+        else
+        {
+            error("too many args to efun assoc\n");
+            /* NOTREACHED */
+            return sp;
+        }
+    }
+
+    /* Call assoc() and push the result */
+    ix = assoc(&args[0],keys);
+    if (data == NULL)
+    {
+        sp = pop_n_elems(num_arg, sp);
+        push_number(sp, ix);
+    }
+    else
+    {
+        assign_svalue(args
+                     , ix == -1
+                       ? fail_val
+                       : (data->item[ix].type == T_OBJECT
+                          && data->item[ix].u.ob->flags & O_DESTRUCTED
+                         ? &const0
+                         : &data->item[ix])
+                     );
+        sp = pop_n_elems(num_arg-1, sp);
+    }
+
+    return sp;
+} /* f_assoc() */
+
+#endif
+
+/*-------------------------------------------------------------------------*/
+static vector_t *
 intersect_alist (vector_t *a1, vector_t *a2)
 
-/* EFUN intersect_alist(), also used by generic array intersection.
+/* Used by efun intersect_alist() and by generic array intersection.
  *
  * Perform a fast intersection of the alist key vectors <a1> and <a2>.
  * The result is a new sorted(!) vector with all elements, which are present
  * in both input vectors.
  *
- * TODO: Maybe rename the efun.
+ * TODO: Maybe rename the fun.
  */
 
 {
@@ -2511,6 +2601,42 @@ intersect_alist (vector_t *a1, vector_t *a2)
     }
     return shrink_array(a3, l);
 }
+
+/*-------------------------------------------------------------------------*/
+#ifdef F_INTERSECT_ALIST
+
+svalue_t *
+f_intersect_alist (svalue_t *sp)
+
+/* EFUN intersect_alist()
+ *
+ *   mixed * intersect_alist (mixed * list1, mixed * list2)
+ *
+ * Does a fast set intersection on alist key vectors (NOT on full
+ * alists!).
+ *
+ * The result is a new sorted(!) vector with all elements, which are present
+ * in both input vectors.
+ *
+ * The operator '&' does set intersection on arrays in
+ * general.
+ *
+ * TODO: Maybe rename the efun.
+ */
+
+{
+    vector_t *rc;
+
+    rc = intersect_alist(sp[-1].u.vec, sp->u.vec);
+
+    free_svalue(sp--);
+    free_array(sp->u.vec);
+    sp->u.vec = rc;
+
+    return sp;
+} /* f_intersect_alist() */
+
+#endif /* F_INTERSECT_ALIST */
 
 /*-------------------------------------------------------------------------*/
 vector_t *
@@ -2550,80 +2676,78 @@ intersect_array (vector_t *a1, vector_t *a2)
 }
 
 /*-------------------------------------------------------------------------*/
-vector_t *
-match_regexp (vector_t *v, char *pattern)
+#ifdef F_ORDER_ALIST
 
-/* EFUN regexp()
+svalue_t *
+f_order_alist (svalue_t *sp, int num_arg)
+
+/* EFUN order_alist()
  *
- * Match the content of <v> against the regexp <pattern>
- * Return a new vector of all strings in <v> which match the pattern.
- * Evalcost is sizeof(<v>).
+ *   mixed *order_alist(mixed *keys, mixed *|void data, ...)
+ *
+ * Creates an alist.
+ *
+ * Either takes an array containing keys, and others containing
+ * the associated data, where all arrays are to be of the same
+ * length, or takes a single array that contains as first member
+ * the array of keys and has an arbitrary number of other members
+ * containing data, each of wich has to be of the same length as
+ * the key array. Returns an array holding the sorted key array
+ * and the data arrays; the same permutation that is applied to
+ * the key array is applied to all data arrays.
  */
 
 {
-    struct regexp *reg;        /* compiled regexp */
-    CBool *res;                /* res[i] true -> v[i] matches */
-    mp_int num_match, v_size;  /* Number of matches, size of <v> */
-    vector_t *ret;             /* The result vector */
-    mp_int i;
+    int i;
+    svalue_t *args;
+    vector_t *list;
+    long listsize;
+    Bool reuse;
+    size_t keynum;
 
-    /* Simple case: empty input yields empty output */
-    if ((v_size = (mp_int)VEC_SIZE(v)) == 0)
-        return allocate_array(0);
+    args = sp-num_arg+1;
 
-    /* Compile the regexp (or take it from the cache) */
-    reg = REGCOMP(pattern, 0, MY_FALSE);
-    if (reg == NULL)
-        return NULL;
-
-    /* Check every string in <v> if it matches and set res[]
-     * accordingly.
-     */
-    res = alloca(v_size * sizeof(*res));
-    if (!res)
+    /* Get the key array to order */
+    if (num_arg == 1
+      && ((list = args->u.vec), (listsize = (long)VEC_SIZE(list)))
+      && list->item[0].type == T_POINTER)
     {
-        REGFREE(reg);
-        error("Stack overflow in regexp()");
-        /* NOTREACHED */
-        return NULL;
+        args     = list->item;
+        reuse = (list->ref == 1);
+    }
+    else
+    {
+        listsize = num_arg;
+        reuse = MY_TRUE;
+    }
+    keynum = VEC_SIZE(args[0].u.vec);
+
+    /* Get the data arrays to order */
+    for (i = 0; i < listsize; i++)
+    {
+        if (args[i].type != T_POINTER
+         || VEC_SIZE(args[i].u.vec) != keynum)
+        {
+            error("bad data array %d in call to order_alist\n",i);
+        }
     }
 
-    for (num_match = i = 0; i < v_size; i++) {
-        char *line;
+    /* Create the alist */
+    list = order_alist(args, listsize, reuse);
+    sp = pop_n_elems(num_arg, sp);
+    sp++;
+    put_array(sp, list);
 
-        res[i] = MY_FALSE;
+    return sp;
+} /* f_order_alist() */
 
-        if (v->item[i].type != T_STRING)
-            continue;
-
-        eval_cost++;
-        line = v->item[i].u.string;
-        if (regexec(reg, line, line) == 0)
-            continue;
-
-        res[i] = MY_TRUE;
-        num_match++;
-    }
-
-    /* Create the result vector and copy the matching lines */
-    ret = allocate_array(num_match);
-    for (num_match=i=0; i < v_size; i++) {
-        if (!res[i])
-            continue;
-        assign_svalue_no_free(&ret->item[num_match], &v->item[i]);
-        num_match++;
-    }
-
-    REGFREE(reg);
-
-    return ret;
-}
+#endif /* F_ORDER_ALIST */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
 f_transpose_array (svalue_t *sp)
 
-/* TEFUN transpose_array()
+/* EFUN transpose_array()
  *
  *   mixed *transpose_array (mixed *arr);
  *
@@ -2651,9 +2775,6 @@ f_transpose_array (svalue_t *sp)
     int o;
 
     /* Get and test the arguments */
-    if (sp->type != T_POINTER)
-        bad_xefun_arg(1, sp);
-
     v = sp->u.vec;
 
     if ( !(a = (mp_int)VEC_SIZE(v)) )
@@ -2666,7 +2787,11 @@ f_transpose_array (svalue_t *sp)
         mp_int c;
 
         if (x->type != T_POINTER)
-            bad_xefun_arg(1, sp);
+        {
+              error("Bad arg 1 to transpose_array(): not an array of arrays.\n");
+              /* NOTREACHED */
+              return sp;
+        }
         c = (mp_int)VEC_SIZE(x->u.vec);
         if (c > b)
             b = c;
@@ -2746,516 +2871,158 @@ f_transpose_array (svalue_t *sp)
 } /* f_transpose_array() */
 
 /*-------------------------------------------------------------------------*/
-svalue_t *
-f_regexplode (svalue_t *sp)
+#ifdef F_MEMBER_ARRAY
 
-/* TEFUN regexplode()
+svalue_t *
+f_member_array (svalue_t *sp)
+
+/* EFUN member_array()
  *
- *   string *regexplode (string text, string pattern)
+ *   int member_array(mixed item, mixed *arr)
+ *   int member_array(mixed item, string arr)
  *
- * Explode the <text> by the delimiter <pattern>, returning a vector
- * of the exploded text. Every second element in the result vector
- * is the text that matched the delimiter.
- * Evalcost: number of matches.
+ * Returns the index of the first occurence of item in array arr,
+ * or occurence of a character in a string. If not found, then -1
+ * is returned.
+ * TODO: Practically obsoleted by member().
  */
 
 {
-    /* The found delimiter matches are kept in a list of these
-     * structures which are allocated on the stack.
-     */
-    struct regexplode_match {
-        char *start, *end;              /* Start and end of the match in text */
-        struct regexplode_match *next;  /* Next list element */
-    };
+    /* Search in an array */
 
-    char *text;                        /* Input text from the vm stack */
-    char *pattern;                     /* Delimiter pattern from the vm stack */
-    struct regexp *reg;                /* Compiled pattern */
-    struct regexplode_match *matches;  /* List of matches */
-    struct regexplode_match **matchp;  /* Pointer to previous_match.next */
-    struct regexplode_match *match;    /* Current match structure */
-    vector_t *ret;                     /* Result vector */
-    svalue_t *svp;                     /* Next element in ret to fill in */
-    int num_match;                     /* Number of matches */
-    char *str;
-
-    /* Get the efun arguments */
-    if (sp[-1].type != T_STRING)
-        bad_xefun_arg(1, sp);
-    if (sp->type != T_STRING)
-        bad_xefun_arg(2, sp);
-
-    text = sp[-1].u.string;
-    pattern = sp->u.string;
-
-    reg = REGCOMP(pattern, 0, MY_FALSE);
-    if (reg == 0) {
-        inter_sp = sp;
-        error("Unrecognized search pattern");
-        /* NOTREACHED */
-        return NULL;
-    }
-
-    /* Loop over <text>, repeatedly matching it against the pattern,
-     * until all matches have been found and recorded.
-     */
-    str = text;        /* Remaining <text> to analyse */
-    num_match = 0;
-    matchp = &matches;
-    while (regexec(reg, str, text)) {
-        eval_cost++;
-        match = (struct regexplode_match *)alloca(sizeof *match);
-        if (!match)
-        {
-            error("Stack overflow in regexplode()");
-            /* NOTREACHED */
-            return NULL;
-        }
-        match->start = reg->startp[0];
-        match->end = str = reg->endp[0];
-        *matchp = match;
-        matchp = &match->next;
-        num_match++;
-        if (!*str || (match->start == str && !*++str) )
-            break;
-    }
-    *matchp = 0; /* Terminate list properly */
-
-    /* Prepare the result vector */
-    if (max_array_size && num_match > ((max_array_size-1) >> 1) ) {
-        REGFREE(reg);
-        inter_sp = sp;
-        error("Illegal array size");
-        /* NOTREACHED */
-        return NULL;
-    }
-    ret = allocate_array((num_match << 1) + 1);
-
-    /* Walk down the list of matches, extracting the
-     * text parts and matched delimiters, copying them
-     * into ret.
-     */
-    svp = ret->item;
-    for (match = matches; match; match = match->next) {
-        mp_int len;
-
-        /* Copy the text leading up to the current delimiter match. */
-        len = match->start - text;
-        xallocate(str, (size_t)len + 1, "text before delimiter");
-        strncpy(str, text, (size_t)len);
-        str[len] = 0;
-        text += len;
-        put_malloced_string(svp, str);
-        svp++;
-
-        /* Copy the matched delimiter */
-        len = match->end - text;
-        xallocate(str, (size_t)len + 1, "matched delimiter");
-        strncpy(str, text, (size_t)len);
-        str[len] = 0;
-        text += len;
-        put_malloced_string(svp, str);
-        svp++;
-    }
-
-    /* Copy the remaining text (maybe the empty string) */
-    put_malloced_string(svp, string_copy(text));
-
-    /* Cleanup */
-    REGFREE(reg);
-    free_string_svalue(sp);
-    sp--;
-    free_string_svalue(sp);
-
-    /* Return the result */
-    put_array(sp, ret);
-    return sp;
-}
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_inherit_list (svalue_t *sp)
-
-/* TEFUN inherit_list()
- *
- *   string* inherit_list (object ob = this_object())
- *
- * Return a list with the filenames of all programs inherited by <ob>, include
- * <ob>'s program itself.
- * TODO: Must be fixed so that any number of files can be returned, not just 256.
- */
-
-{
-    object_t *ob;           /* Analyzed object */
-    vector_t *vec;          /* Result vector */
-    svalue_t *svp;          /* Pointer to next vec entry to fill in */
-    program_t *pr;          /* Next program to count */
-    program_t **prp;        /* Pointer to pr->inherit[x].prog */
-      /* Incrementing prp by sizeof(inherit) bytes walks along the
-       * the vector of inherited programs.
-       */
-    program_t *plist[256];  /* Table of found programs */
-    int next;               /* Next free entry in plist[] */
-    int cur;                /* Current plist[] entry analyzed */
-
-    /* Get the argument */
-    if (sp->type != T_OBJECT)
-        bad_xefun_arg(1, sp);
-    ob = sp->u.ob;
-
-    inter_sp = sp;
-      /* three possibilities for 'out of memory' follow, so clean
-       * up the stack now.
-       */
-
-    if (O_PROG_SWAPPED(ob))
-        if (load_ob_from_swap(ob) < 0) {
-            error("Out of memory: unswap object '%s'\n", ob->name);
-            /* NOTREACHED */
-            return NULL;
-        }
-
-    /* Perform a breadth search on ob's inherit tree and store the
-     * program pointers into plist[] while counting them.
-     */
-
-    plist[0] = ob->prog;
-    next = 1;
-    for (cur = 0; cur < next; cur++)
+    if (sp->type == T_POINTER)
     {
-        int cnt;
-        inherit_t *inheritp;
+        vector_t *vec;   /* Vector searched */
+        svalue_t *item;  /* Pointer into the vector array */
+        svalue_t *key;   /* Item searched */
+        long   cnt;      /* Size of vec */
 
-        pr = plist[cur];
-        cnt = pr->num_inherited;
-        if (next + cnt > (int)(sizeof plist/sizeof *plist))
-            break;
-
-        /* Store the inherited programs in the list.
-         */
-        for (inheritp = &pr->inherit[0]; cnt--; inheritp++)
+        vec = sp->u.vec;
+        item = vec->item;
+        key = sp - 1;
+        cnt = (signed)VEC_SIZE(vec);
+        switch(key->type)
         {
-            if (inheritp->inherit_type == INHERIT_TYPE_NORMAL)
-                plist[next++] = inheritp->prog;
-        }
-    }
+        case T_STRING:
+          {
+            char *str;
 
-    /* next is also the actual number of files found :-) */
-    vec = allocate_array(next);
-
-    /* Take the filenames of the program and copy them into
-     * the result vector.
-     * TODO: What? The filenames are not shared a priori?
-     */
-    for (svp = vec->item, prp = plist; --next >= 0; svp++) {
-        char *str;
-
-        pr = *prp++;
-#ifdef COMPAT_MODE
-        str = string_copy(pr->name);
-#else
-        str = add_slash(pr->name);
-#endif
-        if (!str)
-        {
-            free_array(vec);
-            error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
-                 , (unsigned long)strlen(pr->name));
-        }
-        put_malloced_string(svp, str);
-    }
-
-    free_object_svalue(sp);
-
-    put_array(sp, vec);
-    return sp;
-}
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_functionlist (svalue_t *sp)
-
-/* TEFUN functionlist()
- *
- *   mixed *functionlist (object ob, int flags = RETURN_FUNCTION_NAME)
- *
- * Return an array with information about <ob>s lfunctions. For every
- * function, 1 to 4 values (depending on <flags>) are stored in
- * the result array conveying in this order:
- *   - the name of the function
- *   - the function flags (see below)
- *   - the return type (listed in mudlib/sys/lpctypes.h)
- *   - the number of accepted argumens
- *
- * <ob> may be given as true object or as a filename. In the latter
- * case, the efun does not try to load the object before proceeding.
- *
- * <flags> determines both which information is returned for every
- * function, and which functions should be considered at all.
- * Its value is created by bin-or'ing together following flags from
- * mudlib/sys/functionlist.h:
- *
- *   Control of returned information:
- *     RETURN_FUNCTION_NAME    include the function name
- *     RETURN_FUNCTION_FLAGS   include the function flags
- *     RETURN_FUNCTION_TYPE    include the return type
- *     RETURN_FUNCTION_NUMARG  include the number of arguments.
- *
- *     The name RETURN_FUNCTION_ARGTYPE is defined but not implemented.
- *
- *   Control of listed functions:
- *     NAME_INHERITED      list if defined by inheritance
- *     TYPE_MOD_STATIC     list if static function
- *     TYPE_MOD_PRIVATE    list if private
- *     TYPE_MOD_PROTECTED  list if protected
- *     NAME_HIDDEN         list if not visible through inheritance
- *
- * The 'flags' information consists of the bin-or of the list control
- * flags given above, plus the following:
- *
- *     TYPE_MOD_VARARGS    function takes varargs
- *     NAME_UNDEFINED      function not defined yet, but referenced.
- *     NAME_CROSS_DEFINED  function is defined to be in a different program
- *     TYPE_MOD_NO_MASK    function is nomask
- *     TYPE_MOD_PUBLIC     function is public
- *
- * All these flags are defined in mudlib/sys/functionlist.h, which
- * should be copied into an accessible place in the mudlib. The
- * return types are defined in mudlib/sys/lpctypes.h which also
- * should be copied into the mudlib.
- *
- * TODO: All these defs are in mudlib/sys/functionlist.h and mudlib/sys/lpctypes.h
- * TODO:: as well as in exec.h and this file. This should be centralized.
- * TODO:: Maybe write the files on mud startup?
- * TODO:: Include mudlib/sys/functionlist.h doesn't help because then
- * TODO:: mkdepend stumbles over the embedded include <sys/lpctypes.h>.
- */
-
-{
-#define RETURN_FUNCTION_NAME    0x01
-#define RETURN_FUNCTION_FLAGS   0x02
-#define RETURN_FUNCTION_TYPE    0x04
-#define RETURN_FUNCTION_NUMARG  0x08
-
-#define RETURN_FUNCTION_MASK    0x0f  /* union of all RETURN_FUNCTION_ defs */
-
-#define RETURN_FUNCTION_ARGTYPE 0x10 /* not implemented */
-
-    object_t *ob;         /* <ob> argument to list */
-    mp_int mode_flags;    /* <flags> argument */
-    program_t *prog;      /* <ob>'s program */
-    unsigned short num_functions;  /* Number of functions to list */
-    char *vis_tags;
-      /* Bitflag array describing the visibility of every function in prog
-       * in relation to the passed <flags>: */
-#define VISTAG_INVIS '\0'  /* Function should not be listed */
-#define VISTAG_VIS   '\1'  /* Function matches the <flags> list criterium */
-#define VISTAG_ALL   '\2'  /* Function should be listed, no list restrictions */
-
-    vector_t *list;       /* Result vector */
-    svalue_t *svp;        /* Last element in list which was filled in. */
-    uint32 *fun;          /* Current function under examination */
-    uint32 active_flags;  /* A functions definition status flags */
-    program_t *defprog;   /* Program which actually defines *fun */
-    uint32 flags;
-    unsigned short *ixp;
-    long i, j;
-
-    inter_sp = sp; /* In case of errors leave a clean stack */
-
-    /* Extract the arguments from the vm stack.
-     */
-    if (sp[-1].type != T_OBJECT)
-    {
-        if (sp[-1].type != T_STRING)
-            bad_xefun_arg(1, sp);
-        if (!(ob = find_object(sp[-1].u.string)))
-            error("Object '%s' not found.\n", sp[-1].u.string);
-    }
-    else
-        ob = sp[-1].u.ob;
-    if (sp->type != T_NUMBER)
-        bad_xefun_arg(2, sp);
-
-    mode_flags = sp->u.number;
-
-    if (O_PROG_SWAPPED(ob))
-        if (load_ob_from_swap(ob) < 0)
-        {
-            error("Out of memory: unswap object '%s'\n", ob->name);
-            /* NOTREACHED */
-            return NULL;
-        }
-
-    prog = ob->prog;
-
-    /* Initialize the vistag[] flag array.
-     */
-    num_functions = prog->num_functions;
-    vis_tags = alloca(num_functions);
-    if (!vis_tags)
-    {
-        error("Stack overflow in functionlist()");
-        /* NOTREACHED */
-        return NULL;
-    }
-
-    memset(
-      vis_tags,
-      mode_flags &
-      (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|
-       NAME_INHERITED) ?
-        VISTAG_INVIS :
-        VISTAG_ALL  ,
-      num_functions
-    );
-
-    flags = mode_flags &
-        (TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|NAME_INHERITED);
-
-    /* Count how many functions need to be listed in the result.
-     * Flag every function to list in vistag[].
-     * TODO: Document me properly when the layout of programs and functions
-     * TODO:: is clear.
-     */
-    fun = prog->functions;
-    num_functions = 0;
-    j = prog->num_function_names;
-    for (ixp = prog->function_names + j; --j >= 0; ) {
-        i = *--ixp;
-        if ( !(fun[i] & flags) ) {
-            vis_tags[i] = VISTAG_VIS;
-            num_functions++;
-        }
-    }
-
-    /* If <flags> accepts all functions, use the total number of functions
-     * instead of the count computed above.
-     */
-    if ( !(mode_flags &
-           (NAME_HIDDEN|TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|
-            NAME_INHERITED) ) )
-    {
-        num_functions = prog->num_functions;
-    }
-
-    /* Compute the size of the result vector to
-     *  2**(number of RETURN_FUNCTION_ bits set)
-     */
-    for (i = mode_flags & RETURN_FUNCTION_MASK, j = 0; i; i >>= 1) {
-        if (i & 1)
-            j += num_functions;
-    }
-
-    /* Allocate the result vector and set svp to its end
-     */
-    list = allocate_array(j);
-    svp = list->item + j;
-
-    /* Loop backwards through all functions, check their flags if
-     * they are to be listed and store the requested data in
-     * the result vector.
-     */
-
-    for(i = prog->num_functions, fun += i; --i >= 0; ) {
-        fun_hdr_p funstart; /* Pointer to function in the executable */
-
-        fun--;
-
-        if (!vis_tags[i]) continue; /* Don't list this one */
-
-        flags = *fun;
-
-        active_flags = (flags & ~INHERIT_MASK);
-        if (vis_tags[i] & VISTAG_ALL)
-            active_flags |= NAME_HIDDEN; /* TODO: Why? */
-
-        defprog = prog;
-
-        /* If its a cross-defined function, get the flags from
-         * real definition and let j point to it.
-         */
-        if ( !~(flags | ~(NAME_INHERITED|NAME_CROSS_DEFINED) ) ) {
-            active_flags |= NAME_CROSS_DEFINED;
-            j = (long)CROSSDEF_NAME_OFFSET(flags);
-            flags = fun[j];
-            j += i;
-        } else {
-            j = i;
-        }
-
-        /* If the function is inherited, find the original definition.
-         */
-        while (flags & NAME_INHERITED) {
-            inherit_t *ip = &defprog->inherit[flags & INHERIT_MASK];
-
-            defprog = ip->prog;
-            j -= ip->function_index_offset;
-            flags = defprog->functions[j];
-        }
-
-        /* defprog now points to the program which really defines
-         * the function fun.
-         */
-
-        funstart = defprog->program + (flags & FUNSTART_MASK);
-
-        /* Add the data to the result vector as <flags> determines.
-         */
-
-        if (mode_flags & RETURN_FUNCTION_NUMARG) {
-            svp--;
-            svp->u.number = FUNCTION_NUM_ARGS(funstart) & 0x7f;
-        }
-
-        if (mode_flags & RETURN_FUNCTION_TYPE) {
-            svp--;
-            svp->u.number = FUNCTION_TYPE(funstart); /* return type */
-        }
-
-        if (mode_flags & RETURN_FUNCTION_FLAGS) {
-
-            /* If the function starts with the bytecodes F_ESCAPE F_UNDEF,
-             * it referenced but undefined. But you know that.
-             */
-            if (FUNCTION_CODE(funstart)[0] == F_ESCAPE
-             && FUNCTION_CODE(funstart)[1] == F_UNDEF-0x100)
+            str = key->u.string;
+            for(; --cnt >= 0; item++)
             {
-                active_flags |= NAME_UNDEFINED;
+                if (item->type == T_STRING
+                 && !strcmp(key->u.string, item->u.string)
+                   )
+                    break;
             }
-            svp--;
-            svp->u.number = (p_int)active_flags;
+            break;
+          }
+
+        case T_FLOAT:
+        case T_CLOSURE:
+        case T_SYMBOL:
+        case T_QUOTED_ARRAY:
+          {
+            short type;
+            short x_generic;
+
+            type = key->type;
+            x_generic = key->x.generic;
+            for(; --cnt >= 0; item++)
+            {
+                if (key->u.string == item->u.string
+                 && x_generic == item->x.generic
+                 && item->type == type
+                   )
+                    break;
+            }
+            break;
+          }
+
+        case T_NUMBER:
+            if (!key->u.number)
+            {
+                /* Search for 0 is special: it also finds destructed
+                 * objects
+                 */
+                short type;
+
+                for (; --cnt >= 0; item++)
+                {
+                    if ( (type = item->type) == T_NUMBER)
+                    {
+                        if ( !item->u.number )
+                            break;
+                    }
+                    else if (type == T_OBJECT)
+                    {
+                        if (item->u.ob->flags & O_DESTRUCTED)
+                        {
+                            assign_svalue(item, &const0);
+                            break;
+                        }
+                    }
+                }
+                break;
+            }
+
+            /* FALLTHROUGH */
+
+        case T_MAPPING:
+        case T_OBJECT:
+        case T_POINTER:
+          {
+            short type = key->type;
+
+            for(; --cnt >= 0; item++)
+            {
+                if (key->u.number == item->u.number
+                 && item->type == type)
+                    break;
+            }
+            break;
+          }
+
+        default:
+            if (sp[-1].type == T_LVALUE)
+                error("Reference passed to member_array()\n");
+            fatal("Bad type to member_array(): %s\n", typename(sp[-1].type));
         }
 
-        if (mode_flags & RETURN_FUNCTION_NAME) {
-            svp--;
-            svp->type = T_STRING;
-            svp->x.string_type = STRING_SHARED;
-            memcpy( &svp->u.string, FUNCTION_NAMEP(funstart)
-                  , sizeof svp->u.string);
-            ref_string(svp->u.string);
+        if (cnt >= 0)
+        {
+            cnt = (long)VEC_SIZE(vec) - cnt - 1;
         }
-    } /* for() */
+        /* else return -1 for failure */
 
-    /* Cleanup and return */
-    free_svalue(sp);
-    sp--;
-    free_svalue(sp);
+        free_svalue(sp--);
+        free_svalue(sp);
+        put_number(sp, cnt);
+        return sp;
+    }
 
-    put_array(sp, list);
-    return sp;
+    /* Or search in a string */
 
-#undef VISTAG_INVIS
-#undef VISTAG_VIS
-#undef VISTAG_ALL
+    {
+        char *str, *str2;
+        int i;
 
-#undef RETURN_FUNCTION_NAME
-#undef RETURN_FUNCTION_FLAGS
-#undef RETURN_FUNCTION_TYPE
-#undef RETURN_FUNCTION_NUMARG
-#undef RETURN_FUNCTION_ARGTYPE
-#undef RETURN_FUNCTION_MASK
-}
+        if (sp[-1].type != T_NUMBER)
+            efun_arg_error(1, T_NUMBER, sp[-1].type, sp);
+        str = sp->u.string;
+        i = sp[-1].u.number;
+        str2 = i & ~0xff ? NULL : strchr(str, i);
+        i = str2 ? str2 - str : -1;
+
+        free_svalue(sp--);
+        free_svalue(sp);
+        put_number(sp, i);
+        return sp;
+    }
+
+} /* f_member_array() */
+
+#endif
 
 /*=========================================================================*/
 
@@ -3429,12 +3196,10 @@ put_in (Mempool pool, struct unique **ulist
 
 
 /*-------------------------------------------------------------------------*/
-vector_t *
+static vector_t *
 make_unique (vector_t *arr, char *func, svalue_t *skipnum)
 
-/* EFUN unique_array()
- *
- * See above for the commentary :-)
+/* The actual implementation of efun unique_array();
  *
  * The caller made sure that <arr> contains no destructed objects.
  */
@@ -3513,6 +3278,44 @@ make_unique (vector_t *arr, char *func, svalue_t *skipnum)
     
     return ret;
 } /* make_unique() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_unique_array (svalue_t *sp)
+
+/* EFUN unique_array()
+ *
+ *   mixed unique_array(object *obarr, string seperator)
+ *   mixed unique_array(object *obarr, string seperator, mixed skip)
+ *
+ * Groups objects together for which the separator function
+ * returns the same value. obarr should be an array of objects,
+ * other types are ignored. The separator function is called only
+ * once in each object in obarr. If no separator function is
+ * given, 0 is used instead of a return value.
+ * If a 3rd argument is given and this argument matches the
+ * return value of the separator function this object will not be
+ * included in the returned array.
+ */
+
+{
+    vector_t *res;
+
+    check_for_destr((sp-2)->u.vec);
+    res = make_unique((sp-2)->u.vec, (sp-1)->u.string, sp);
+
+    /* Clean up the stack and push the result */
+    free_svalue(sp--);
+    free_svalue(sp--);
+    free_svalue(sp);
+
+    if (res)
+        put_array(sp, res);
+    else
+        put_number(sp, 0);
+
+    return sp;
+} /* f_unique_array() */
 
 /***************************************************************************/
 

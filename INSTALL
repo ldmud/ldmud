@@ -74,6 +74,31 @@ Unix or Unix-like system
 
       CC=xlc ./configure ...
 
+  DEC Ultrix:
+    Depending on the system configuration you might be unable to
+    compile 'interpret.c' with any kind of optimization at all.
+    The typical symptom is a failure during the compilation with
+    "Error code 1". When that happens, do the following steps:
+
+      - Make as usual until the "interpret" compilation
+         fails.  The symptom is "Error code 1".
+
+      - Edit the makefile.  Uncomment the compilation
+         line for debugging, and comment the compilation
+         line containing the optimization switches and
+         options.
+
+      - Start the make again.  After the "interpret"
+         compilation completes, control-C out of the
+         compilation.
+
+      - Edit the makefile again.  Re-comment the line
+         for debugging, and uncomment the line with
+         the optimization switches and options.
+
+      - Start the make again.  This time it will
+         complete as expected.
+
 
 IPv6
 ----

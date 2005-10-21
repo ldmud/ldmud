@@ -1291,7 +1291,7 @@ check_type:
 	    break;		/* subsequent processing of the newline
 				 * character will cause the line to be printed */
 
-	case comment:		/* we have gotten a /*  this is a biggie */
+	case comment:		/* we have gotten a '/ *'  this is a biggie */
     proc_comment:
 	    if (flushed_nl) {	/* we should force a broken line here */
 		flushed_nl = false;
@@ -1308,7 +1308,7 @@ check_type:
 	    parser_state_tos->last_token = type_code;
 
       }				/* end of main while (1) loop */
-};
+}
 
 /*
  * copy input file to backup file if in_name is /blah/blah/blah/file, then

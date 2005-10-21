@@ -389,7 +389,7 @@ checked (char * s, char *str)
 
 /*-------------------------------------------------------------------------*/
 char *
-findstring (char *s)
+findstring (const char *s)
 
 /* Find the shared version of string <s> (which might be <s> itself) in
  * the string table and return its pointer (not counted as reference!).
@@ -463,7 +463,7 @@ findstring (char *s)
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
-alloc_new_string (char *str)
+alloc_new_string (const char *str)
 
 /* Enter new string <str> into the hash table at index <str> computed
  * by a previous call to findstring(). Return the pointer to the
@@ -525,7 +525,7 @@ alloc_new_string (char *str)
 
 /*-------------------------------------------------------------------------*/
 char *
-make_shared_string (char *str)
+make_shared_string (const char *str)
 
 /* Find or make a shared string for <str> and return its pointer
  * with one (more) refcount.

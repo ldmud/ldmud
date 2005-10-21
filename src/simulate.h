@@ -6,7 +6,6 @@
 #include "driver.h"
 #include "typedefs.h"
 
-#include "instrs.h"     /* F_TRANSFER, F_RENAME */
 #include "sent.h"       /* shadow_sentence_t */
 #include "strfuns.h"    /* strbuf_t */
 #include "svalue.h"
@@ -202,7 +201,6 @@ extern void init_closure_hooks(void);
 extern void free_closure_hooks(svalue_t* svp, int count);
 extern void free_old_driver_hooks (void);
 extern void set_svalue_user(svalue_t *svp, object_t *owner);
-extern object_t *clone_object(char *str1);
 extern void destruct_object(svalue_t *v);
 extern void destruct(object_t *ob);
 extern void remove_destruct_objects(void);
@@ -211,7 +209,6 @@ extern const char *make_name_sane(const char *pName, Bool addSlash);
 extern object_t *lookfor_object(char *str, Bool bLoad);
 #define find_object(str) lookfor_object((str), MY_FALSE)
 #define get_object(str) lookfor_object((str), MY_TRUE)
-extern void move_object(void);
 extern Bool status_parse(strbuf_t * sbuf, char *buff);
 extern void dinfo_data_status(svalue_t * svp);
 extern void error VARPROT((char *, ...), printf, 1, 2) NORETURN;
@@ -224,9 +221,11 @@ extern void parse_error(Bool warning, char *error_file, int line, char *what, ch
 extern char *check_valid_path(char *path, object_t *caller, char *call_fun, Bool writeflg);
 extern Bool match_string(char *match, char *str, mp_int len);
 
-extern void e_write(svalue_t *arg);
-extern svalue_t *f_set_environment(svalue_t *sp);
-extern svalue_t *f_rename_object(svalue_t *sp);
+extern svalue_t *f_write(svalue_t *sp);
+extern svalue_t *f_clone_object(svalue_t *sp);
+extern svalue_t *f_destruct(svalue_t *sp);
+extern svalue_t *f_find_object(svalue_t *sp);
+extern svalue_t *f_load_object(svalue_t *sp);
 extern svalue_t *f_set_driver_hook(svalue_t *sp);
 extern svalue_t *f_shadow(svalue_t *sp);
 extern svalue_t *f_query_shadowing(svalue_t *sp);
@@ -234,16 +233,5 @@ extern svalue_t *f_unshadow(svalue_t *sp);
 extern svalue_t *f_limited(svalue_t * sp, int num_arg);
 extern svalue_t *f_set_limits(svalue_t * sp, int num_arg);
 extern svalue_t *f_query_limits(svalue_t * sp);
-
-#ifdef F_SET_LIGHT
-extern void add_light(object_t *p, int n);
-#endif
-
-extern vector_t *e_get_dir(char *path, int mask);
-extern Bool e_tail(char *path);
-extern int e_print_file(char *path, int start, int len);
-extern Bool e_remove_file(char *path);
-extern int e_rename(char *fr, char *t);
-extern svalue_t *f_copy_file(svalue_t *sp);
 
 #endif  /* SIMULATE_H__ */

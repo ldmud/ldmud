@@ -1,0 +1,7 @@
+Short: Blocksatz in sprintf()
+Date: 2001-07-17
+From: Largo
+Type: Feature
+State: New
+
+The wordwrapping mode '=' should be able to do block justification, too.

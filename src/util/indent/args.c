@@ -45,7 +45,7 @@ enum profile {PRO_BOOL, /* boolean */
 	    PRO_STDIN, /* -st switch */
 	    PRO_KEY, /* -T switch */
 	    PRO_SETTINGS, /* bundled set of settings */
-	    PRO_PRSTRING, /* Print string and exit */
+	    PRO_PRSTRING /* Print string and exit */
 	      };
 
 /* profile specials for booleans */

@@ -1512,8 +1512,8 @@ setup_print_block_dispatcher (void)
     tmp_closure.type = T_CLOSURE;
     tmp_closure.x.closure_type = CLOSURE_EFUN + F_ADD;
     tmp_closure.u.ob = master_ob;
-    push_volatile_string("");
-    push_volatile_string("");
+    push_volatile_string(inter_sp, "");
+    push_volatile_string(inter_sp, "");
     call_lambda(&tmp_closure, 2);
     store_print_block_dispatch_info(inter_sp->u.string, show_added_string);
     free_svalue(inter_sp--);

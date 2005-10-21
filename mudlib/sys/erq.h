@@ -47,6 +47,7 @@
 /* reserved handles */
 
 #define ERQ_HANDLE_RLOOKUP (-1)
-#define ERQ_HANDLE_KEEP_HANDLE (-2)
+#define ERQ_HANDLE_RLOOKUPV6 (-2)
+#define ERQ_HANDLE_KEEP_HANDLE (-3)
 
 #endif /* __ERQ_H__ */

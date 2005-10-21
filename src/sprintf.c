@@ -63,8 +63,10 @@
 #define NO_REF_STRING
 #include "sprintf.h"
 
+#include "actions.h"
 #include "array.h"
 #include "closure.h"
+#include "comm.h"
 #include "exec.h"
 #include "interpret.h"
 #include "instrs.h"
@@ -664,7 +666,7 @@ svalue_to_string ( fmt_state_t *st
         stradd(st, &str, "/");
 #endif
         stradd(st, &str, obj->u.ob->name);
-        push_object(obj->u.ob);
+        push_ref_object(inter_sp, obj->u.ob, "sprintf");
         temp = apply_master_ob(STR_PRINTF_OBJ_NAME, 1);
         if (temp && (temp->type == T_STRING)) {
             stradd(st, &str, " (\"");
@@ -1186,7 +1188,7 @@ add_table (fmt_state_t *st, cst **table)
 } /* add_table() */
 
 /*-------------------------------------------------------------------------*/
-char *
+static char *
 string_print_formatted (char *format_str, int argc, svalue_t *argv)
 
 /* The (s)printf() function: format <format_str> with the given arguments
@@ -1949,6 +1951,70 @@ add_table_now:
 #undef SAVE_CHAR
 
 } /* string_print_formatted() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_printf (svalue_t *sp, int num_arg)
+
+/* EFUN printf()
+ *
+ *   void printf(string format, ...)
+ *
+ * A cross between sprintf() and write(). Returns void and prints
+ * the result string to the user.
+ */
+
+{
+    char *str;
+    
+    str = string_print_formatted((sp-num_arg+1)->u.string
+                                , num_arg-1, sp-num_arg+2);
+    if (command_giver)
+        tell_object(command_giver, str);
+    else
+        add_message("%s", str);
+    sp = pop_n_elems(num_arg, sp);
+
+    return sp;
+} /* f_printf() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_sprintf (svalue_t *sp, int num_arg)
+
+/* EFUN sprintf()
+ *
+ *   string sprintf(string fmt, ...)
+ *
+ * Generate a string according to the <fmt> and the following
+ * arguments and put it onto the stack.
+ *
+ * <fmt> follows the C-style sprintf-format string in style,
+ * and partly in meaning, too.
+ */
+
+{
+    char *s;
+
+    /*
+     * string_print_formatted() returns a pointer to it's internal
+     * buffer, or to an internal constant...  Either way, it must
+     * be copied before it's returned as a string.
+     */
+
+    s = string_print_formatted((sp-num_arg+1)->u.string,
+                               num_arg-1, sp-num_arg+2);
+    sp = pop_n_elems(num_arg, sp);
+    if (!s)
+        push_number(sp, 0);
+    else
+        /* string_print_formatted() owns the string returned,
+         * so copy it.
+         */
+        push_malloced_string(sp, string_copy(s));
+
+    return sp;
+} /* f_sprintf() */
 
 /***************************************************************************/
 

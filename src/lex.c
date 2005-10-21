@@ -631,7 +631,6 @@ init_lexer(void)
         , F_LT, F_GT, F_EQ, F_GE, F_LE, F_NE
         , F_OR, F_XOR, F_LSH, F_RSH
         , F_INDEX, F_RINDEX, F_NX_RANGE, F_RX_RANGE
-        , F_EXTRACT2
         };
     static short ternary_operators[]
       = { F_RANGE, F_NR_RANGE, F_RR_RANGE, F_RN_RANGE
@@ -1496,11 +1495,11 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
         filename = alloca(strlen(current_file)+2);
         *filename = '/';
         strcpy(filename+1, current_file);
-        push_volatile_string(filename);
+        push_volatile_string(inter_sp, filename);
 #else
-        push_volatile_string(current_file);
+        push_volatile_string(inter_sp, current_file);
 #endif
-        push_number((delim == '"') ? 0 : 1);
+        push_number(inter_sp, (delim == '"') ? 0 : 1);
         res = apply_master_ob(STR_INCLUDE_FILE, 3);
 
         if (res && !(res->type == T_NUMBER && !res->u.number))
@@ -1620,7 +1619,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
 
         /* Setup and call the closure */
         push_string_malloced(name);
-        push_volatile_string(current_file);
+        push_volatile_string(inter_sp, current_file);
         if (closure_hook[H_INCLUDE_DIRS].x.closure_type == CLOSURE_LAMBDA)
             closure_hook[H_INCLUDE_DIRS].u.lambda->ob = current_object;
         svp = secure_call_lambda(&closure_hook[H_INCLUDE_DIRS], 2);
@@ -2963,9 +2962,9 @@ yylex1 (void)
                 {
                     svalue_t *res;
 
-                    push_volatile_string("nomask simul_efun");
-                    push_volatile_string(current_file);
-                    push_shared_string(p->name);
+                    push_volatile_string(inter_sp, "nomask simul_efun");
+                    push_volatile_string(inter_sp, current_file);
+                    push_ref_string(inter_sp, p->name);
                     res = apply_master_ob(STR_PRIVILEGE, 3);
                     if (!res || res->type != T_NUMBER || res->u.number < 0)
                     {
@@ -5844,9 +5843,6 @@ f_set_auto_include_string (svalue_t *sp)
 {
     char *s;
 
-    if (sp->type != T_STRING)
-        bad_xefun_arg(1, sp);
-
     if (_privilege_violation("set_auto_include_string", sp, sp) > 0)
     {
         clear_auto_include_string();
@@ -5888,15 +5884,11 @@ f_expand_define (svalue_t *sp)
     ident_t *d;
 
     /* Get the arguments from the stack */
-    if (sp[-1].type != T_STRING)
-        bad_xefun_arg(1, sp);
 
-    arg = sp->u.string;
-    if (sp->type != T_STRING) {
-        if (sp->type != T_NUMBER || sp->u.number)
-            bad_xefun_arg(2, sp);
+    if (sp->type == T_STRING)
+        arg = sp->u.string;
+    else /* it's the number 0 */
         arg = "";
-    }
 
     res = NULL;
 
@@ -5931,7 +5923,7 @@ f_expand_define (svalue_t *sp)
     }
 
     return sp;
-}
+} /* f_expand_define() */
 
 /***************************************************************************/
 

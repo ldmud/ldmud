@@ -12,7 +12,6 @@
  *   - function callbacks
  *   - management of the driver hooks
  *   - handling of object inventories and shadows.
- *   - a few file efuns.
  *
  * The data structures, especially the runtime stack, are described where
  * they are defined.
@@ -23,56 +22,17 @@
 #include "typedefs.h"
 
 #include "my-alloca.h"
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <setjmp.h>
 #include <stdio.h>
-#include <sys/stat.h>
 #include <stdarg.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #ifdef AMIGA
 #    include "hosts/amiga/nsignal.h"
 #else
 #    include <signal.h>
-#endif
-
-#if defined(HAVE_DIRENT_H) || defined(_POSIX_VERSION)
-#    include <dirent.h>
-#    define generic_dirent dirent
-#    define DIRENT_NLENGTH(dirent) (strlen((dirent)->d_name))
-#else /* not (DIRENT or _POSIX_VERSION) */
-#    define generic_dirent direct
-#    define DIRENT_NLENGTH(dirent) ((dirent)->d_namlen)
-#    ifdef HAVE_SYS_NDIR_H
-#        include <sys/ndir.h>
-#    endif /* SYSNDIR */
-#    ifdef HAVE_SYS_DIR_H
-#        include <sys/dir.h>
-#    endif /* SYSDIR */
-#    ifdef HAVE_NDIR_H
-#        include <ndir.h>
-#    endif /* NDIR */
-#endif /* not (HAVE_DIRENT_H or _POSIX_VERSION) */
-
-#if defined(__CYGWIN__)
-extern int lstat(const char *, struct stat *);
-#endif
-
-#ifndef S_ISDIR
-#    define S_ISDIR(m) (((m)&S_IFMT) == S_IFDIR)
-#endif
-
-#ifndef S_ISREG
-#    define S_ISREG(m) (((m)&S_IFMT) == S_IFREG)
-#endif
-
-
-#ifdef SunOS4
-#    if !defined (__GNUC__) || __GNUC__ < 2 || __GNUC__ == 2 && __GNUC_MINOR__ < 7
-extern int lstat PROT((CONST char *, struct stat *));
-#    endif
-extern int fchmod PROT((int, int));
 #endif
 
 #if defined(OS2)
@@ -691,13 +651,13 @@ error (char *fmt, ...)
 
         CLEAR_EVAL_COST;
         RESET_LIMITS;
-        push_volatile_string(malloced_error);
+        push_volatile_string(inter_sp, malloced_error);
         a = 1;
         if (current_object)
         {
-            push_volatile_string(malloced_file);
-            push_volatile_string(malloced_name);
-            push_number(line_number);
+            push_volatile_string(inter_sp, malloced_file);
+            push_volatile_string(inter_sp, malloced_name);
+            push_number(inter_sp, line_number);
             a += 3;
         }
         save_cmd = command_giver;
@@ -715,17 +675,17 @@ error (char *fmt, ...)
 
             culprit = current_heart_beat;
             current_heart_beat = NULL;
-            set_heart_beat(culprit, 0);
+            set_heart_beat(culprit, MY_FALSE);
             debug_message("%s Heart beat in %s turned off.\n"
                          , time_stamp(), culprit->name);
-            push_valid_ob(culprit);
-            push_volatile_string(malloced_error);
+            push_ref_valid_object(inter_sp, culprit, "heartbeat error");
+            push_volatile_string(inter_sp, malloced_error);
             a = 2;
             if (current_object)
             {
-                push_volatile_string(malloced_file);
-                push_volatile_string(malloced_name);
-                push_number(line_number);
+                push_volatile_string(inter_sp, malloced_file);
+                push_volatile_string(inter_sp, malloced_name);
+                push_number(inter_sp, line_number);
                 a += 3;
             }
 
@@ -733,7 +693,7 @@ error (char *fmt, ...)
             command_giver = save_cmd;
             if (svp && (svp->type != T_NUMBER || svp->u.number) )
             {
-                set_heart_beat(culprit, 1);
+                set_heart_beat(culprit, MY_TRUE);
             }
         }
 
@@ -797,9 +757,9 @@ parse_error (Bool warning, char *error_file, int line, char *what
     /* Don't call the master if it isn't loaded! */
     if (master_ob && !(master_ob->flags & O_DESTRUCTED) )
     {
-        push_volatile_string(error_file);
-        push_volatile_string(buff);
-        push_number(warning ? 1 : 0);
+        push_volatile_string(inter_sp, error_file);
+        push_volatile_string(inter_sp, buff);
+        push_number(inter_sp, warning ? 1 : 0);
         apply_master_ob(STR_LOG_ERROR, 3);
     }
 } /* parse_error() */
@@ -1257,7 +1217,7 @@ load_object (const char *lname, Bool create_super, int depth)
 
         svalue_t *svp;
 
-        push_volatile_string(fname);
+        push_volatile_string(inter_sp, fname);
         svp = apply_master_ob(STR_COMP_OBJ, 1);
         if (svp && svp->type == T_OBJECT)
         {
@@ -1565,7 +1525,7 @@ make_new_name (char *str)
 } /* make_new_name() */
 
 /*-------------------------------------------------------------------------*/
-object_t *
+static object_t *
 clone_object (char *str1)
 
 /* Create a clone of the object named <str1>, which may be a clone itself.
@@ -1642,7 +1602,7 @@ clone_object (char *str1)
     /* We do not want the heart beat to be running for unused copied objects */
 
     if (!(ob->flags & O_CLONE) && ob->flags & O_HEART_BEAT)
-        set_heart_beat(ob, 0);
+        set_heart_beat(ob, MY_FALSE);
 
     /* Got the blueprint - now get a new object */
 
@@ -1680,8 +1640,8 @@ clone_object (char *str1)
     num_listed_objs++;
     enter_object_hash(new_ob);        /* Add name to fast object lookup table */
     push_give_uid_error_context(new_ob);
-    push_object(ob);
-    push_volatile_string(new_ob->name);
+    push_ref_object(inter_sp, ob, "clone_object");
+    push_volatile_string(inter_sp, new_ob->name);
     give_uid_to_object(new_ob, H_CLONE_UIDS, 2);
     reset_object(new_ob, H_CREATE_CLONE);
     command_giver = check_object(save_command_giver);
@@ -1776,7 +1736,7 @@ destruct_object (svalue_t *v)
                      , time_stamp(), ob->name, ob->ref);
     }
 
-    push_object(ob);
+    push_ref_object(inter_sp, ob, "destruct");
     result = apply_master_ob(STR_PREP_DEST, 1);
     if (!result)
         error("No prepare_destruct\n");
@@ -1905,7 +1865,7 @@ destruct (object_t *ob)
     if (ob == simul_efun_object)
         simul_efun_object = NULL;
 
-    set_heart_beat(ob, 0);
+    set_heart_beat(ob, MY_FALSE);
 
     /* Remove us out of this current room (if any).
      * Remove all sentences defined by this object from all objects here.
@@ -2411,15 +2371,15 @@ check_valid_path (char *path, object_t *caller, char* call_fun, Bool writeflg)
     if (path)
         push_string_malloced(path);
     else
-        push_number(0);
+        push_number(inter_sp, 0);
 
     if ( NULL != (eff_user = caller->eff_user) )
-        push_shared_string(eff_user->name);
+        push_ref_string(inter_sp, eff_user->name);
     else
-        push_number(0);
+        push_number(inter_sp, 0);
 
-    push_volatile_string(call_fun);
-    push_valid_ob(caller);
+    push_volatile_string(inter_sp, call_fun);
+    push_ref_valid_object(inter_sp, caller, "check_valid_path");
     if (writeflg)
         v = apply_master_ob(STR_VALID_WRITE, 4);
     else
@@ -3052,25 +3012,6 @@ free_old_driver_hooks (void)
 } /* free_old_driver_hooks() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef F_SET_LIGHT
-
-void
-add_light (object_t *p, int n)
-
-/* The light emission of <p> and all surrounding objects is
- * changed by <n>.
- */
-
-{
-    if (n == 0)
-        return;
-    do {
-        p->total_light += n;
-    } while ( NULL != (p = p->super) );
-} /* add_light() */
-#endif
-
-/*-------------------------------------------------------------------------*/
 Bool
 match_string (char * match, char * str, mp_int len)
 
@@ -3081,7 +3022,7 @@ match_string (char * match, char * str, mp_int len)
  *   \: escapes the following wildcard
  *
  * The function is used by the compiler for inheritance specs, and by
- * e_get_dir().
+ * f_get_dir().
  * TODO: Another utils.c candidate.
  */
 
@@ -3230,6 +3171,128 @@ print_svalue (svalue_t *arg)
 /*                              EFUNS                                      */
 
 /*-------------------------------------------------------------------------*/
+svalue_t *
+f_clone_object (svalue_t * sp)
+
+/* EFUN clone_object()
+ *
+ *   object clone_object(string name)
+ *   object clone_object(object template)
+ *
+ * Clone a new object from definition <name>, or alternatively from
+ * the object <template>. In both cases, the new object is given an
+ * unique name and returned.
+ */
+
+{
+    object_t *ob;
+
+    /* Get the argument and clone the object */
+    if (sp->type == T_STRING)
+        ob = clone_object(sp->u.string);
+    else
+        ob = clone_object(sp->u.ob->load_name);
+
+    free_svalue(sp);
+
+    if (ob)
+        put_ref_object(sp, ob, "F_CLONE_OBJECT");
+    else
+        put_number(sp, 0);
+
+    return sp;
+} /* f_clone_object() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_destruct (svalue_t * sp)
+
+/* EFUN destruct()
+ *
+ *   void destruct(object ob)
+ *
+ * Completely destroy and remove object ob (if not already done so).
+ * After the call to destruct(), no global variables will exist any
+ * longer, only local ones, and arguments.
+ *
+ * If an object self-destructs, it will not immediately terminate
+ * execution. If the efun this_object() will be called by the
+ * destructed object, the result will be 0.
+ *
+ * The efun accepts destructed objects as argument (which appear
+ * as the number 0) and the simply acts as a no-op in that case.
+ *
+ * Internally, the object is not destructed immediately, but
+ * instead put into a list and finally destructed after the
+ * current execution has ended.
+ */
+
+{
+    if (T_NUMBER != sp->type || sp->u.number)
+    {
+        if (sp->type != T_OBJECT)
+            efun_arg_error(1, T_OBJECT, sp->type, sp);
+        destruct_object(sp);
+    }
+    free_svalue(sp);
+    sp--;
+
+    return sp;
+} /* f_destruct() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_find_object (svalue_t *sp)
+
+/* EFUN find_object()
+ *
+ *   object find_object(string str)
+ *
+ * Find an object with the file_name str. If the object isn't loaded,
+ * it will not be found.
+ */
+
+{
+    object_t *ob;
+
+    ob = find_object(sp->u.string);
+    free_svalue(sp);
+    if (ob)
+        put_ref_object(sp, ob, "find_object");
+    else
+        put_number(sp, 0);
+
+    return sp;
+} /* f_find_object() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_load_object (svalue_t *sp)
+
+/* EFUN load_object()
+ *
+ *   object load_object(string name)
+ *
+ * Load the object from the file <name> and return it. If the
+ * object already exists, just return it.
+ *
+ * This efun can be used only to load blueprints - for clones, use
+ * the efun clone_object().
+ */
+
+{
+    object_t *ob;
+
+    ob = get_object(sp->u.string);
+    free_svalue(sp);
+    if (ob)
+        put_ref_object(sp, ob, "F_LOAD_OBJECT");
+    else
+        put_number(sp, 0);
+    return sp;
+} /* f_load_object() */
+
+/*-------------------------------------------------------------------------*/
 static Bool
 validate_shadowing (object_t *ob)
 
@@ -3310,7 +3373,7 @@ validate_shadowing (object_t *ob)
         }
     }
 
-    push_object(ob);
+    push_ref_object(inter_sp, ob, "shadow");
     ret = apply_master_ob(STR_QUERY_SHADOW, 1);
     if (out_of_memory)
         error("(shadow) Out of memory detected\n");
@@ -3328,7 +3391,7 @@ validate_shadowing (object_t *ob)
 svalue_t *
 f_shadow (svalue_t *sp)
 
-/* TEFUN shadow()
+/* EFUN shadow()
  *
  *   object shadow(object ob, int flag)
  *
@@ -3362,11 +3425,6 @@ f_shadow (svalue_t *sp)
     object_t *ob;
 
     /* Get the arguments */
-    if (sp[-1].type != T_OBJECT)
-        bad_xefun_arg(1, sp);
-    if (sp->type != T_NUMBER)
-        bad_xefun_arg(2, sp);
-
     sp--;
     ob = sp->u.ob;
     deref_object(ob, "shadow");
@@ -3422,7 +3480,7 @@ f_shadow (svalue_t *sp)
 svalue_t *
 f_query_shadowing (svalue_t *sp)
 
-/* TEFUN query_shadowing()
+/* EFUN query_shadowing()
  *
  *   object query_shadowing (object obj)
  *
@@ -3433,9 +3491,6 @@ f_query_shadowing (svalue_t *sp)
 {
 
     object_t *ob;
-
-    if (sp->type != T_OBJECT)
-        bad_xefun_arg(1, sp);
 
     ob = sp->u.ob;
     deref_object(ob, "shadow");
@@ -3452,7 +3507,7 @@ f_query_shadowing (svalue_t *sp)
 svalue_t *
 f_unshadow (svalue_t *sp)
 
-/* TEFUN unshadow()
+/* EFUN unshadow()
  *
  *   void unshadow(void)
  *
@@ -3499,11 +3554,11 @@ f_unshadow (svalue_t *sp)
 svalue_t *
 f_set_driver_hook (svalue_t *sp)
 
-/* TEFUN set_driver_hook()
+/* EFUN set_driver_hook()
  *
  *   void set_driver_hook(int what, closure arg)
- * 	void set_driver_hook(int what, string arg)
- * 	void set_driver_hook(int what, string * arg)
+ *   void set_driver_hook(int what, string arg)
+ *   void set_driver_hook(int what, string * arg)
  * 
  * This privileged efun sets the driver hook 'what' (values are
  * defined in /sys/driverhooks.h) to 'arg'.
@@ -3520,10 +3575,14 @@ f_set_driver_hook (svalue_t *sp)
     svalue_t old;
 
     /* Get the arguments */
-    if (sp[-1].type != T_NUMBER
-     || (n = sp[-1].u.number) < 0 || n > NUM_CLOSURE_HOOKS)
+    n = sp[-1].u.number;
+     
+    if (n < 0 || n >= NUM_CLOSURE_HOOKS)
     {
-        bad_xefun_arg(1, sp);
+        error("Bad hook number: %ld, expected 0..%ld\n"
+             , n, (long)NUM_CLOSURE_HOOKS-1);
+        /* NOTREACHED */
+        return sp;
     }
 
     /* Legal call? */
@@ -3540,8 +3599,6 @@ f_set_driver_hook (svalue_t *sp)
     switch(sp->type)
     {
     case T_NUMBER:
-        if (sp->u.number != 0)
-            goto bad_arg_2;
         put_number(closure_hook + n, 0);
         break;
 
@@ -3550,7 +3607,8 @@ f_set_driver_hook (svalue_t *sp)
         char *str;
 
         if ( !((1 << T_STRING) & hook_type_map[n]) )
-            goto bad_arg_2;
+            error("Bad value for hook %ld: got string, expected %s.\n"
+                 , n, efun_arg_typename(hook_type_map[n]));
 
         if ( NULL != (str = make_shared_string(sp->u.string)) )
         {
@@ -3570,7 +3628,9 @@ f_set_driver_hook (svalue_t *sp)
         if (!sp->u.map->num_values
          ||  sp->u.map->ref != 1 /* add_to_mapping() could zero num_values */)
         {
-            goto bad_arg_2;
+            error("Bad value for hook %ld: mapping is empty "
+                  "or has other references.\n", n);
+            return sp;
         }
         goto default_test;
 
@@ -3608,7 +3668,8 @@ f_set_driver_hook (svalue_t *sp)
         }
         else if (!CLOSURE_IS_LFUN(sp->x.closure_type))
         {
-            goto bad_arg_2;
+            error("Bad value for hook %ld: unbound lambda or "
+                  "lfun closure expected.\n", n);
         }
         /* FALLTHROUGH */
 
@@ -3616,8 +3677,8 @@ f_set_driver_hook (svalue_t *sp)
 default_test:
         if ( !((1 << sp->type) & hook_type_map[n]) )
         {
-bad_arg_2:
-            bad_xefun_arg(2, sp);
+            error("Bad value for hook %ld: got %s, expected %s.\n"
+                 , n, typename(sp->type), efun_arg_typename(hook_type_map[n]));
             break; /* flow control hint */
         }
 
@@ -3633,94 +3694,7 @@ bad_arg_2:
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_rename_object (svalue_t *sp)
-
-/* TEFUN rename_object()
- *
- *   void rename_object (object ob, string new_name);
- *
- * Give the current object a new file_name. Causes a privilege
- * violation. The new name must not contain a # character, except
- * at the end, to avoid confusion with clone numbers.
- *
- * Raises a privilege violation ("rename_object", this_object(), ob, name).
- */
-
-{
-    object_t *ob;
-    char *name;
-    mp_int length;
-
-    inter_sp = sp; /* this is needed for assert_master_ob_loaded(), and for
-                    * the possible errors before.
-                    */
-    if (sp[-1].type != T_OBJECT)
-        bad_xefun_arg(1, sp);
-    if (sp[0].type != T_STRING)
-        bad_xefun_arg(2, sp);
-    ob = sp[-1].u.ob;
-    name = sp[0].u.string;
-
-    /* Remove leading '/' if any. */
-    while(name[0] == '/')
-        name++;
-
-    /* Truncate possible .c in the object name. */
-    length = strlen(name);
-    if (name[length-2] == '.' && name[length-1] == 'c') {
-        /* A new writeable copy of the name is needed. */
-        char *p;
-        p = (char *)alloca(length+1);
-        strcpy(p, name);
-        name = p;
-        name[length -= 2] = '\0';
-    }
-
-    {
-        char c;
-        char *p;
-        mp_int i;
-
-        i = length;
-        p = name + length;
-        while (--i > 0)
-        {
-            /* isdigit would need to check isascii first... */
-            if ( (c = *--p) < '0' || c > '9' )
-            {
-                if (c == '#' && length - i > 1) {
-                    error("Illegal name to rename_object: '%s'.\n", name);
-                }
-                break;
-            }
-        }
-    }
-
-    if (lookup_object_hash(name))
-    {
-        error("Attempt to rename to object '%s'\n", name);
-    }
-
-    assert_master_ob_loaded();
-    if (master_ob == ob)
-        error("Attempt to rename the master object\n");
-
-    if (privilege_violation4("rename_object", ob, name, 0, sp))
-    {
-        remove_object_hash(ob);
-        xfree(ob->name);
-        ob->name = string_copy(name);
-        enter_object_hash(ob);
-    }
-
-    free_svalue(sp--);
-    free_svalue(sp--);
-    return sp;
-} /* f_rename_object() */
-
-/*-------------------------------------------------------------------------*/
-void
-e_write (svalue_t *arg)
+f_write (svalue_t *sp)
 
 /* EFUN write()
  *
@@ -3762,10 +3736,13 @@ e_write (svalue_t *arg)
                 command_giver = O_GET_SHADOW(command_giver)->shadowing;
     }
 
-    print_svalue(arg);
+    print_svalue(sp);
     command_giver = check_object(save_command_giver);
 
-} /* e_write() */
+    free_svalue(sp); sp--;
+
+    return sp;
+} /* f_write() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3899,7 +3876,7 @@ extract_limits ( struct limits_context_s * result
 svalue_t *
 f_limited (svalue_t * sp, int num_arg)
 
-/* VEFUN limited()
+/* EFUN limited()
  *
  *   mixed limited(closure fun)
  *   mixed limited(closure fun, int tag, int value, ...)
@@ -3933,9 +3910,6 @@ f_limited (svalue_t * sp, int num_arg)
     argp = sp - num_arg + 1;
     cl_args = 0;
 
-    if (argp->type != T_CLOSURE)
-        bad_xefun_vararg(1, sp);
-    
     /* Get the limits */
     if (num_arg == 1)
     {
@@ -3958,7 +3932,11 @@ f_limited (svalue_t * sp, int num_arg)
         cl_args = 0;
     }
     else
-        bad_xefun_vararg(num_arg, sp);
+    {
+        error("limited(): Invalid limit specification.\n");
+        /* NOTREACHED */
+        return sp;
+    }
 
     /* If this object is destructed, no extern calls may be done */
     if (current_object->flags & O_DESTRUCTED
@@ -4018,7 +3996,7 @@ f_limited (svalue_t * sp, int num_arg)
 svalue_t *
 f_set_limits (svalue_t * sp, int num_arg)
 
-/* VEFUN set_limits()
+/* EFUN set_limits()
  *
  *   void set_limits(int tag, int value, ...)
  *   void set_limits(int * limits)
@@ -4051,7 +4029,11 @@ f_set_limits (svalue_t * sp, int num_arg)
     else if (num_arg % 2 == 0)
         extract_limits(&limits, argp, num_arg, MY_TRUE);
     else
-        bad_xefun_vararg(num_arg, sp);
+    {
+        error("set_limits(): Invalid limit specification.\n");
+        /* NOTREACHED */
+        return sp;
+    }
 
     if (_privilege_violation("set_limits", argp, sp))
     {
@@ -4071,7 +4053,7 @@ f_set_limits (svalue_t * sp, int num_arg)
 svalue_t *
 f_query_limits (svalue_t * sp)
 
-/* TEFUN query_limits()
+/* EFUN query_limits()
  *
  *   int * query_limits(int defaults)
  *
@@ -4092,8 +4074,6 @@ f_query_limits (svalue_t * sp)
     vector_t *vec;
     Bool def;
     
-    if (sp->type != T_NUMBER)
-        bad_xefun_arg(1, sp);
     def = sp->u.number != 0;
     
     vec = allocate_uninit_array(LIMIT_MAX);
@@ -4111,1145 +4091,6 @@ f_query_limits (svalue_t * sp)
     put_array(sp, vec);
     return sp;
 } /* f_query_limits() */
-
-/*=========================================================================*/
-
-/*                          INVENTORY EFUNS                                */
-
-/*-------------------------------------------------------------------------*/
-void
-move_object (void)
-
-/* Move the object inter_sp[-1] into object inter_sp[0]; both objects
- * are removed from the stack.
- *
- * The actual move performed by the hooks H_MOVE_OBJECT0/1, this
- * function is called to implement the efuns move_object() and transfer().
- */
-
-{
-    lambda_t *l;
-    object_t *save_command = command_giver;
-
-    if (NULL != ( l = closure_hook[H_MOVE_OBJECT1].u.lambda) ) {
-        l->ob = inter_sp[-1].u.ob;
-        call_lambda(&closure_hook[H_MOVE_OBJECT1], 2);
-    } else if (NULL != ( l = closure_hook[H_MOVE_OBJECT0].u.lambda) ) {
-        l->ob = current_object;
-        call_lambda(&closure_hook[H_MOVE_OBJECT0], 2);
-    }
-    else
-        error("Don't know how to move objects.\n");
-    command_giver = check_object(save_command);
-} /* move_object() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_set_environment (svalue_t *sp)
-
-/* TEFUN set_environment()
- *
- *   void set_environment(object item, object env)
- *
- * The item is moved into its new environment env, which may be 0.
- * This efun is to be used in the H_MOVE_OBJECTx hook, as it does
- * nothing else than moving the item - no calls to init() or such.
- */
-
-{
-    object_t *item, *dest;
-    object_t **pp, *ob;
-    object_t *save_cmd = command_giver;
-
-    /* Get and test the arguments */
-    
-    if (sp[-1].type != T_OBJECT)
-        bad_xefun_arg(1, sp);
-
-    item = sp[-1].u.ob;
-
-    if (item->flags & O_SHADOW && O_GET_SHADOW(item)->shadowing)
-        error("Can't move an object that is shadowing.\n");
-
-    if (sp->type != T_OBJECT)
-    {
-        if (sp->type != T_NUMBER || sp->u.number)
-            bad_xefun_arg(2, sp);
-        dest = NULL;
-    }
-    else
-    {
-        dest = sp->u.ob;
-        /* Recursive moves are not allowed. */
-        for (ob = dest; ob; ob = ob->super)
-            if (ob == item)
-                error("Can't move object inside itself.\n");
-
-#       ifdef F_SET_LIGHT
-            add_light(dest, item->total_light);
-#       endif
-        dest->flags &= ~O_RESET_STATE;
-    }
-
-    item->flags &= ~O_RESET_STATE; /* touch it */
-
-    if (item->super)
-    {
-        /* First remove the item out of its current environment */
-        Bool okey = MY_FALSE;
-
-        if (item->sent)
-        {
-            remove_environment_sent(item);
-        }
-
-        if (item->super->sent)
-            remove_action_sent(item, item->super);
-
-#       ifdef F_SET_LIGHT
-            add_light(item->super, - item->total_light);
-#       endif
-
-        for (pp = &item->super->contains; *pp;)
-        {
-            if (*pp != item)
-            {
-                if ((*pp)->sent)
-                    remove_action_sent(item, *pp);
-                pp = &(*pp)->next_inv;
-                continue;
-            }
-            *pp = item->next_inv;
-            okey = MY_TRUE;
-        }
-
-        if (!okey)
-            fatal("Failed to find object %s in super list of %s.\n",
-                  item->name, item->super->name);
-    }
-
-    /* Now put it into its new environment (if any) */
-    item->super = dest;
-    if (!dest)
-    {
-        item->next_inv = NULL;
-    }
-    else
-    {
-        item->next_inv = dest->contains;
-        dest->contains = item;
-    }
-
-    command_giver = check_object(save_cmd);
-    free_svalue(sp);
-    sp--;
-    free_svalue(sp);
-    return sp - 1;
-} /* f_set_environment() */
-
-/*=========================================================================*/
-
-/*                            FILE EFUNS                                   */
-
-/*-------------------------------------------------------------------------*/
-#ifdef atarist
-/* this code is provided to speed up ls() on an Atari ST/TT . */
-
-#include <support.h>
-#include <limits.h>
-#include <osbind.h>
-
-extern long _unixtime PROT((unsigned, unsigned));
-
-struct xdirect {
-    /* inode and position in directory aren't usable in a portable way,
-     * so why support them anyway?
-     */
-    short d_namlen;
-    char  d_name[16];
-    int   size;
-    int   time;
-};
-
-typedef struct
-{
-    _DTA dta;
-    char *dirname;
-    long status;
-} xdir;
-#define XDIR xdir
-
-static long olddta;
-
-/*-------------------------------------------------------------------------*/
-static XDIR *xopendir(path)
-char *path;
-{
-    char pattern[MAXPATHLEN+1];
-    XDIR *d;
-    long status;
-
-    d = (XDIR *)xalloc(sizeof(XDIR));
-    _unx2dos(path, pattern);
-    strcat(pattern, "\\*.*");
-    olddta = Fgetdta();
-    Fsetdta(&d->dta);
-    d->status = status = Fsfirst(pattern, 0xff);
-    if (status && status != -ENOENT) {
-        xfree(d);
-        return 0;
-    }
-    d->dirname = string_copy(pattern);
-    return d;
-}
-
-/*-------------------------------------------------------------------------*/
-#define XOPENDIR(dest, path) ((dest) = xopendir(path))
-
-static struct xdirect *xreaddir(d)
-XDIR *d;
-{
-    static struct xdirect xde;
-
-    if (d->status)
-        return 0;
-    _dos2unx(d->dta.dta_name, xde.d_name);
-    xde.d_namlen = strlen(xde.d_name);
-    if (FA_DIR & d->dta.dta_attribute)
-        xde.size = -2;
-    else
-        xde.size = d->dta.dta_size;
-    xde.time = _unixtime(d->dta.dta_time, d->dta.dta_date);
-    d->status = Fsnext();
-    return &xde;
-}
-
-/*-------------------------------------------------------------------------*/
-static void xclosedir(d)
-XDIR *d;
-{
-    Fsetdta(olddta);
-    xfree(d->dirname);
-    xfree(d);
-}
-
-/*-------------------------------------------------------------------------*/
-static void xrewinddir(d)
-XDIR *d;
-{
-    long status;
-
-    Fsetdta(&d->dta);
-    d->status = status = Fsfirst(d->dirname, 0xff);
-}
-
-#endif /* atarist */
-
-/*-------------------------------------------------------------------------*/
-#ifndef XDIR
-
-struct xdirect
-{
-    /* inode and position in directory aren't usable in a portable way,
-     * so why support them anyway?
-     */
-    short d_namlen;
-    char  *d_name;
-    int   size;
-    int   time;
-};
-
-#define XOPENDIR(dest, path) (\
-    (!chdir(path) &&\
-    NULL != ((dest) = opendir("."))) ||\
-        (chdir(mud_lib),MY_FALSE)\
-)
-
-#define xclosedir(dir_ptr)   (chdir(mud_lib),closedir(dir_ptr))
-#define xrewinddir(dir_ptr)  rewinddir(dir_ptr)
-#define XDIR DIR
-
-/*-------------------------------------------------------------------------*/
-static struct xdirect *
-xreaddir (XDIR *dir_ptr, int mask)
-
-/* Read the next entry from <dir_ptr> and return it via a pointer
- * to a static xdirect structure.
- * <mask> is tested for GETDIR_SIZES and GETDIR_DATES - only the data
- * for requested items is returned.
- */
-
-{
-    static struct xdirect xde;
-    struct generic_dirent *de;
-    int namelen;
-    struct stat st;
-
-    de = readdir(dir_ptr);
-    if (!de)
-        return NULL;
-    namelen = DIRENT_NLENGTH(de);
-    xde.d_namlen = namelen;
-    xde.d_name   = de->d_name;
-    if (mask & (GETDIR_SIZES|GETDIR_DATES) )
-    {
-        if (ixstat(xde.d_name, &st) == -1) /* who knows... */
-        {
-            xde.size = FSIZE_NOFILE;
-            xde.time = 0;
-        }
-        else
-        {
-            if (S_IFDIR & st.st_mode)
-                xde.size = FSIZE_DIR;
-            else
-                xde.size = st.st_size;
-            xde.time = st.st_mtime;
-        }
-    }
-    return &xde;
-} /* xreaddir() */
-
-#endif /* XDIR */
-
-/*-------------------------------------------------------------------------*/
-static int
-pstrcmp (const void *p1, const void *p2)
-
-/* qsort() comparison function: strcmp() on two svalue-strings.
- */
-
-{
-    return strcmp(((svalue_t*)p1)->u.string, ((svalue_t*)p2)->u.string);
-} /* pstrcmp() */
-
-
-/*-------------------------------------------------------------------------*/
-struct get_dir_error_context
-{
-    svalue_t head;
-    XDIR *dirp;
-    vector_t *v;
-};
-
-/*-------------------------------------------------------------------------*/
-static void
-get_dir_error_handler (svalue_t *arg)
-
-/* T_ERROR_HANDLER function: <arg> is a (struct get_dir_error_context*)
- * with the directory which needs to be closed.
- */
-
-{
-    struct get_dir_error_context *ecp;
-
-    ecp = (struct get_dir_error_context *)arg;
-    xclosedir(ecp->dirp);
-    if (ecp->v)
-        free_array(ecp->v);
-} /* get_dir_error_handler() */
-
-/*-------------------------------------------------------------------------*/
-vector_t *
-e_get_dir (char *path, int mask)
-
-/* EFUN get_dir()
- *
- *   string *get_dir(string str, int mask)
- *
- * This function takes a path as argument and returns an array of
- * file names and attributes in that directory.
- * 
- * The filename part of the path may contain '*' or '?' as
- * wildcards: every '*' matches an arbitrary amount of characters
- * (or just itself). Thus get_dir ("/path/ *") would return an
- * array of all files in directory "/path/", or just ({ "/path/ *"
- * }) if this file happens to exist.
- * 
- * The optional second argument mask can be used to get
- * information about the specified files.
- * 
- *   GETDIR_EMPTY (0x00)  get_dir returns an emtpy array (not very useful)
- *   GETDIR_NAMES (0x01)  put the file names into the returned array.
- *   GETDIR_SIZES (0x02)  put the file sizes into the returned array.
- *                        directories have size FSIZE_DIR (-2)
- *   GETDIR_DATES (0x04)  put the file modification dates into the returned
- *                        array.
- *   GETDIR_UNSORTED (0x20)  if this mask bit is set, the result of will
- *                           _not_ be sorted.
- * 
- * The values of mask can be added together.
- */
-
-{
-    static struct get_dir_error_context ec; /* must survive errors */
-
-    vector_t       *v, *w;
-    int             i, j, count = 0;
-    XDIR           *dirp;
-    int             namelen;
-    Bool            do_match = MY_FALSE;
-    struct xdirect *de;
-    struct stat     st;
-    char           *temppath;
-    char           *p; 
-    char           *regexpr = 0;
-    int             nqueries;
-
-    if (!path)
-        return NULL;
-
-    path = check_valid_path(path, current_object, "get_dir", MY_FALSE);
-
-    if (path == NULL)
-        return NULL;
-
-    /* We need to modify the returned path, and thus to make a
-     * writeable copy.
-     * The path "" needs 2 bytes to store ".\0".
-     */
-    temppath = alloca(strlen(path) + 2);
-    if (strlen(path) < 2)
-    {
-        temppath[0] = path[0] ? path[0] : '.';
-        temppath[1] = '\000';
-        p = temppath;
-    }
-    else
-    {
-        strcpy(temppath, path);
-
-        /* If path ends with '/' or "/." remove it
-         */
-        if ((p = strrchr(temppath, '/')) == NULL)
-            p = temppath;
-
-        if ((p[0] == '/' && p[1] == '.' && p[2] == '\0')
-         || (p[0] == '/' && p[1] == '\0')
-           )
-            *p = '\0';
-    }
-
-    /* Number of data items per file */
-    nqueries = (mask & 1) + (mask>>1 & 1) + (mask>>2 & 1);
-
-    if (strchr(p, '*') || ixstat(temppath, &st) < 0)
-    {
-        /* We got a wildcard and/or a directory:
-         * prepare to match.
-         */
-        if (*p == '\0')
-            return NULL;
-        regexpr = alloca(strlen(p)+2);
-        if (p != temppath)
-        {
-            strcpy(regexpr, p + 1);
-            *p = '\0';
-        }
-        else
-        {
-            strcpy(regexpr, p);
-            strcpy(temppath, ".");
-        }
-        do_match = MY_TRUE;
-    }
-    else if (*p != '\0' && strcmp(temppath, "."))
-    {
-        /* We matched a single file */
-        
-        svalue_t *stmp;
-
-        if (*p == '/' && *(p + 1) != '\0')
-            p++;
-        v = allocate_array(nqueries);
-        stmp = v->item;
-        if (mask & GETDIR_NAMES)
-        {
-            put_malloced_string(stmp, string_copy(p));
-            stmp++;
-        }
-        if (mask & GETDIR_SIZES){
-            put_number(stmp, (S_IFDIR & st.st_mode) ? FSIZE_DIR : st.st_size);
-            stmp++;
-        }
-        if (mask & GETDIR_DATES)
-        {
-            put_number(stmp, st.st_mtime);
-            stmp++;
-        }
-        return v;
-    }
-
-    if ( XOPENDIR(dirp, temppath) == 0)
-        return NULL;
-
-    /* Prepare the error handler to do clean up.
-     */
-    ec.head.type = T_ERROR_HANDLER;
-    ec.head.u.error_handler = get_dir_error_handler;
-    ec.dirp = dirp;
-    ec.v = NULL;
-    inter_sp++;
-    inter_sp->type = T_LVALUE;
-    inter_sp->u.lvalue = &ec.head;
-
-    /* Count files
-     */
-    for (de = xreaddir(dirp, 1); de; de = xreaddir(dirp, 1))
-    {
-        namelen = de->d_namlen;
-        if (do_match)
-        {
-            if ( !match_string(regexpr, de->d_name, namelen) )
-                continue;
-        }
-        else
-        {
-            if (namelen <= 2 && *de->d_name == '.'
-             && (namelen == 1 || de->d_name[1] == '.' ) )
-                continue;
-        }
-        count += nqueries;
-        if (max_array_size && count >= max_array_size)
-            break;
-    }
-
-    if (nqueries)
-        count /= nqueries;
-
-    /* Make array and put files on it.
-     */
-    v = allocate_array(count * nqueries);
-    if (count == 0)
-    {
-        /* This is the easy case :-) */
-        inter_sp--;
-        xclosedir(dirp);
-        return v;
-    }
-
-    ec.v = v;
-    xrewinddir(dirp);
-    w = v;
-    j = 0;
-
-    /* Taken into account that files might be added/deleted from outside. */
-    for(i = 0, de = xreaddir(dirp,mask); de; de = xreaddir(dirp,mask))
-    {
-
-        namelen = de->d_namlen;
-        if (do_match)
-        {
-            if ( !match_string(regexpr, de->d_name, namelen) )
-                continue;
-        }
-        else
-        {
-            if (namelen <= 2 && *de->d_name == '.'
-             && (namelen == 1 || de->d_name[1] == '.' ) )
-                continue;
-        }
-        if (i >= count)
-        {
-            /* New file. Don't need efficience here, but consistence. */
-
-            vector_t *tmp, *new;
-
-            count++;
-            tmp = allocate_array(nqueries);
-            new = add_array(v, tmp);
-            free_array(v);
-            free_array(tmp);
-            ec.v = v = new;
-            w = v;
-        }
-
-        if (mask & GETDIR_NAMES)
-        {
-            char *name;
-
-            xallocate(name, (size_t)namelen+1, "getdir() names");
-            if (namelen)
-                memcpy(name, de->d_name, namelen);
-            name[namelen] = '\0';
-            put_malloced_string(w->item+j, name);
-            j++;
-        }
-        if (mask & GETDIR_SIZES)
-        {
-            put_number(w->item + j, de->size);
-            j++;
-        }
-        if (mask & GETDIR_DATES)
-        {
-            put_number(w->item + j, de->time);
-            j++;
-        }
-        i++;
-    }
-    xclosedir(dirp);
-    inter_sp--;
-
-    if ( !((mask ^ 1) & (GETDIR_NAMES|GETDIR_UNSORTED)) )
-    {
-        /* Sort by names. */
-        qsort(v->item, i, sizeof v->item[0] * nqueries, pstrcmp);
-    }
-
-    return v;
-} /* e_get_dir() */
-
-/*-------------------------------------------------------------------------*/
-Bool
-e_tail (char *path)
-
-/* EFUN tail()
- *
- *   void tail(string file)
- *
- * Print out the tail of a file. There is no specific amount of
- * lines given to the output. Only a maximum of 1000 bytes will
- * be printed.
- *
- * Return TRUE on success.
- */
-{
-    char buff[1000];
-    FILE *f;
-    struct stat st;
-    int offset;
-
-    path = check_valid_path(path, current_object, "tail", MY_FALSE);
-
-    if (path == NULL)
-        return MY_FALSE;
-    f = fopen(path, "r");
-    if (f == NULL)
-        return MY_FALSE;
-    FCOUNT_READ(path);
-    if (fstat(fileno(f), &st) == -1)
-        fatal("Could not stat an open file.\n");
-    if ( !S_ISREG(st.st_mode) ) {
-        fclose(f);
-        return MY_FALSE;
-    }
-    offset = st.st_size - 54 * 20;
-    if (offset < 0)
-        offset = 0;
-    if (fseek(f, offset, 0) == -1)
-        fatal("Could not seek.\n");
-
-    /* Throw away the first incomplete line. */
-    if (offset > 0)
-        (void)fgets(buff, sizeof buff, f);
-
-    while(fgets(buff, sizeof buff, f))
-    {
-        add_message("%s", buff);
-    }
-    fclose(f);
-    return MY_TRUE;
-} /* e_tail() */
-
-/*-------------------------------------------------------------------------*/
-int
-e_print_file (char *path, int start, int len)
-
-/* EFUN cat()
- *
- *     int cat(string pathi [, int start [, int num]])
- *
- * List the file found at path.
- * The optional arguments start and num are start line
- * number and number of lines. If they are not given the 
- * file is printed from the beginning.
- *
- * Result is the number of lines printed, but never more than 50.
- */
-
-{
-#   define MAX_LINES 50
-
-    char buff[1000];
-    FILE *f;
-    int i;
-
-    if (len < 0)
-        return 0;
-
-    path = check_valid_path(path, current_object, "print_file", MY_FALSE);
-
-    if (path == 0)
-        return 0;
-    if (start < 0)
-        return 0;
-    f = fopen(path, "r");
-    if (f == NULL)
-        return 0;
-    FCOUNT_READ(path);
-
-    if (len == 0)
-        len = MAX_LINES;
-    if (len > MAX_LINES)
-        len = MAX_LINES;
-
-    if (start == 0)
-        start = 1;
-
-    for (i = 1; i < start + len; i++)
-    {
-        if (fgets(buff, sizeof buff, f) == 0)
-            break;
-        if (i >= start)
-            add_message("%s", buff);
-    }
-    fclose(f);
-
-    if (i <= start)
-        return 0;
-
-    if (i == MAX_LINES + start)
-        add_message("*****TRUNCATED****\n");
-
-    return i-start;
-
-#   undef MAX_LINES
-} /* e_print_file() */
-
-/*-------------------------------------------------------------------------*/
-Bool
-e_remove_file (char *path)
-
-/* EFUN rm()
- *
- *   int rm(string file)
- *
- * Remove the file. Returns 0 for failure and 1 for success.
- */
-{
-    path = check_valid_path(path, current_object, "remove_file", MY_TRUE);
-
-    if (path == 0)
-        return MY_FALSE;
-    if (unlink(path) == -1)
-        return MY_FALSE;
-    FCOUNT_DEL(path);
-    return MY_TRUE;
-} /* e_remove_file() */
-
-/*-------------------------------------------------------------------------*/
-static Bool
-isdir (char *path)
-
-/* Helper function for copy and move: test if <path> is a directory.
- */
-
-{
-    struct stat stats;
-
-    return ixstat (path, &stats) == 0 && S_ISDIR (stats.st_mode);
-} /* isdir() */
-
-/*-------------------------------------------------------------------------*/
-static void
-strip_trailing_slashes (char *path)
-
-/* Strip trailing slashed from <path>, which is modified in-place.
- */
-
-{
-    int last;
-
-    last = strlen (path) - 1;
-    while (last > 0 && path[last] == '/')
-        path[last--] = '\0';
-} /* strip_trailing_slashes() */
-
-/*-------------------------------------------------------------------------*/
-static int
-copy_file (char *from, char *to, int mode)
-
-/* Copy the file <from> to <to> with access <mode>. 
- * Return 0 on success, 1 or errno on failure.
- */
-
-{
-    int ifd;
-    int ofd;
-    char buf[1024 * 8];
-    int len;                        /* Number of bytes read into `buf'. */
-
-    if (unlink(to) && errno != ENOENT)
-    {
-        error("cannot remove `%s'\n", to);
-        return 1;
-    }
-
-    ifd = ixopen3(from, O_RDONLY | O_BINARY, 0);
-    if (ifd < 0)
-    {
-        error("%s: open failed\n", from);
-        return errno;
-    }
-
-    ofd = ixopen3(to, O_WRONLY | O_CREAT | O_TRUNC | O_BINARY, 0600);
-    if (ofd < 0)
-    {
-        error("%s: open failed\n", to);
-        close(ifd);
-        return 1;
-    }
-
-#ifdef HAVE_FCHMOD
-    if (fchmod(ofd, mode))
-    {
-        error("%s: fchmod failed\n", to);
-        close(ifd);
-        close(ofd);
-        unlink(to);
-        return 1;
-    }
-#endif
-
-    FCOUNT_READ(from);
-    FCOUNT_WRITE(to);
-
-    while ((len = read(ifd, buf, sizeof (buf))) > 0)
-    {
-        int wrote = 0;
-        char *bp = buf;
-
-        do
-        {
-            wrote = write(ofd, bp, len);
-            if (wrote < 0)
-            {
-                error("%s: write failed\n", to);
-                close(ifd);
-                close(ofd);
-                unlink(to);
-                return 1;
-            }
-            bp += wrote;
-            len -= wrote;
-        } while (len > 0);
-    }
-
-    if (len < 0)
-    {
-        error("%s: read failed\n", from);
-        close(ifd);
-        close(ofd);
-        unlink(to);
-        return 1;
-    }
-
-    if (close (ifd) < 0)
-    {
-        error("%s: close failed", from);
-        close(ofd);
-        return 1;
-    }
-
-    if (close (ofd) < 0)
-    {
-        error("%s: close failed", to);
-        return 1;
-    }
-
-#ifndef HAVE_FCHMOD
-    if (chmod (to, mode))
-    {
-        error("%s: chmod failed\n", to);
-        return 1;
-    }
-#endif
-
-    return 0;
-} /* copy_file() */
-
-/*-------------------------------------------------------------------------*/
-static int
-move_file (char *from, char *to)
-
-/* Move the file or directory <from> to <to>, copying it if necessary.
- * Result is 0 on success, 1 or errno on failure.
- */
-
-{
-    struct stat to_stats, from_stats;
-
-    if (lstat(from, &from_stats) != 0)
-    {
-        error("%s: lstat failed\n", from);
-        return 1;
-    }
-
-    if (lstat (to, &to_stats) == 0)
-    {
-        if (from_stats.st_dev == to_stats.st_dev
-          && from_stats.st_ino == to_stats.st_ino)
-        {
-            error("`%s' and `%s' are the same file", from, to);
-            return 1;
-        }
-
-        if (S_ISDIR (to_stats.st_mode))
-        {
-            error("%s: cannot overwrite directory", to);
-            return 1;
-        }
-
-    }
-    else if (errno != ENOENT)
-    {
-        perror("do_move");
-        error("%s: unknown error\n", to);
-        return 1;
-    }
-#ifndef RENAME_HANDLES_DIRECTORIES
-    /* old SYSV */
-    if (isdir(from))
-    {
-        char cmd_buf[100];
-
-        if (strchr(from, '\'') || strchr(to, '\''))
-            return 0;
-        sprintf(cmd_buf, "/usr/lib/mv_dir '%s' '%s'", from, to);
-        return system(cmd_buf);
-    }
-    else
-#endif /* RENAME_HANDLES_DIRECTORIES */
-    if (rename (from, to) == 0)
-    {
-        FCOUNT_DEL(from);
-        return 0;
-    }
-
-#if !defined(AMIGA)
-    if (errno != EXDEV)
-    {
-        error("cannot move `%s' to `%s'", from, to);
-        return 1;
-    }
-#endif
-
-    /* rename failed on cross-filesystem link.  Copy the file instead. */
-
-    if (!S_ISREG(from_stats.st_mode))
-    {
-        error("cannot move `%s' across filesystems: Not a regular file\n", from);
-        return 1;
-    }
-
-    if (copy_file(from, to, from_stats.st_mode & 0777))
-       return 1;
-
-    if (unlink(from))
-    {
-        error("cannot remove `%s'", from);
-        return 1;
-    }
-    FCOUNT_DEL(from);
-
-    return 0;
-} /* move_file() */
-
-/*-------------------------------------------------------------------------*/
-int
-e_rename (char *fr, char *t)
-
-/* EFUN rename()
- *
- *   int rename(string from, string to)
- *
- * The efun rename() will move from to the new name to. If from
- * is a file, then to may be either a file or a directory. If
- * from is a directory, then to has to be a directory. If to
- * exists and is a directory, then from will be placed in that
- * directory and keep its original name.
- *
- * You must have write permission for from to rename the file.
- *
- * On successfull completion rename() will return 0. If any error
- * occurs 1 is returned.
- */
-
-{
-    char *from, *to;
-    int i;
-
-    from = check_valid_path(fr, current_object, "rename_from", MY_TRUE);
-    if (!from)
-        return 1;
-
-    push_apply_value();
-
-    to = check_valid_path(t, current_object, "rename_to", MY_TRUE);
-    if (!to)
-    {
-        pop_apply_value();
-        return 1;
-    }
-
-    if (!strlen(to) && !strcmp(t, "/"))
-    {
-        to = alloca(3);
-        sprintf(to, "./");
-    }
-
-    strip_trailing_slashes (from);
-
-    if (isdir(to))
-    {
-        /* Target is a directory; build full target filename. */
-        char *cp;
-        char *newto;
-
-        cp = strrchr(from, '/');
-        if (cp)
-            cp++;
-        else
-            cp = from;
-
-        newto = alloca(strlen(to) + 1 + strlen(cp) + 1);
-        sprintf(newto, "%s/%s", to, cp);
-        pop_apply_value();
-        return move_file(from, newto);
-    }
-
-    /* File to file move */
-    i = move_file(from, to);
-    pop_apply_value();
-    return i;
-} /* e_rename() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_copy_file (svalue_t *sp)
-
-/* TEFUN copy_file()
- *
- *   int copy_file(string from, string to)
- *
- * The efun rename() will copy the file <from> to the new name <to>.
- * If <to> is a directory, then <from> will be placed in that
- * directory and keep its original name.
- *
- * You must have read permission for <from> and write permission
- * for the target name to copy the file.
- *
- * On successfull completion copy_file() will return 0. If any error
- * occurs, 1 is returned, or a runtime is generated.
- *
- * TODO: Add two more args: start, length to implement slicing?
- * TODO:: See f-981229-10 "truncate_file()".
- */
-
-{
-    struct stat to_stats, from_stats;
-    char *from, *to, *cp;
-    int result;
-    
-    /* Check the arguments */
-    if (sp[-1].type != T_STRING)
-        bad_xefun_arg(1, sp);
-    if (sp->type != T_STRING)
-        bad_xefun_arg(2, sp);
-
-    switch(0){default:
-        result = 1; /* Default: failure */
-
-        from = check_valid_path(sp[-1].u.string, current_object, "copy_file"
-                               , MY_FALSE);
-
-        if (!from || isdir(from))
-            break;
-
-        /* We need our own copy of the result */
-        cp = alloca(strlen(from)+1);
-        strcpy(cp, from);
-        from = cp;
-
-        to = check_valid_path(sp->u.string, current_object, "copy_file"
-                             , MY_TRUE);
-        if (!to)
-            break;
-
-        if (!strlen(to) && !strcmp(sp->u.string, "/"))
-        {
-            to = alloca(3);
-            strcpy(to, "./");
-        }
-
-        strip_trailing_slashes(from);
-
-        if (isdir(to))
-        {
-            /* Target is a directory; build full target filename. */
-
-            char *newto;
-
-            cp = strrchr(from, '/');
-            if (cp)
-                cp++;
-            else
-                cp = from;
-
-            newto = alloca(strlen(to) + 1 + strlen(cp) + 1);
-            strcpy(newto, to);
-            strcat(newto, "/");
-            strcat(newto, cp);
-            to = newto;
-        }
-
-        /* Now copy the file */
-
-        if (lstat(from, &from_stats) != 0)
-        {
-            error("%s: lstat failed\n", from);
-            break;
-        }
-
-        if (lstat(to, &to_stats) == 0)
-        {
-            if (from_stats.st_dev == to_stats.st_dev
-              && from_stats.st_ino == to_stats.st_ino)
-            {
-                error("`%s' and `%s' are the same file", from, to);
-                break;
-            }
-
-            if (S_ISDIR(to_stats.st_mode))
-            {
-                error("%s: cannot overwrite directory", to);
-                break;
-            }
-
-        }
-        else if (errno != ENOENT)
-        {
-            perror("copy_file");
-            error("%s: unknown error\n", to);
-            break;
-        }
-
-        if (!S_ISREG(from_stats.st_mode))
-        {
-            error("cannot copy `%s': Not a regular file\n", from);
-            break;
-        }
-
-        result = copy_file(from, to, from_stats.st_mode & 0777);
-    } /* switch(0) */
-
-    /* Clean up the stack and return the result */
-    free_svalue(sp);
-    free_svalue(sp-1);
-    put_number(sp-1, result);
-   
-    return sp-1;
-} /* f_copy_file() */
 
 /***************************************************************************/
 

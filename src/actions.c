@@ -112,12 +112,12 @@ object_t *command_giver;
    * The reference is not counted.
    */
 
-char *last_verb = NULL;
+static char *last_verb = NULL;
   /* During a command execution, this is the shared string with the
    * command verb.
    */
 
-char *last_command = NULL;
+static char *last_command = NULL;
   /* During a command execution, this points to a (stack) buffer with
    * the full command.
    */
@@ -442,7 +442,7 @@ call_modify_command (char *buff)
         }
         else if (closure_hook[H_MODIFY_COMMAND_FNAME].type == T_STRING)
         {
-            push_volatile_string(buff);
+            push_volatile_string(inter_sp, buff);
             svp = sapply(closure_hook[H_MODIFY_COMMAND_FNAME].u.string, ob, 1);
             /* !command_giver means that the command_giver has been destructed. */
             if (!command_giver)
@@ -458,8 +458,8 @@ call_modify_command (char *buff)
             l = closure_hook[H_MODIFY_COMMAND].u.lambda;
             if (closure_hook[H_MODIFY_COMMAND].x.closure_type == CLOSURE_LAMBDA)
                 l->ob = command_giver;
-            push_volatile_string(buff);
-            push_object(command_giver);
+            push_volatile_string(inter_sp, buff);
+            push_ref_object(inter_sp, command_giver, "call_modify_command");
             call_lambda(&closure_hook[H_MODIFY_COMMAND], 2);
             transfer_svalue(svp = &apply_return_value, inter_sp--);
             if (!command_giver)
@@ -468,7 +468,7 @@ call_modify_command (char *buff)
         else if (closure_hook[H_MODIFY_COMMAND].type == T_STRING
             && !(O_DESTRUCTED & command_giver->flags))
         {
-            push_volatile_string(buff);
+            push_volatile_string(inter_sp, buff);
             svp =
               sapply(closure_hook[H_MODIFY_COMMAND].u.string, command_giver, 1);
             if (!command_giver)
@@ -486,8 +486,8 @@ call_modify_command (char *buff)
                   get_map_value(closure_hook[H_MODIFY_COMMAND].u.map, &sv);
                 if (svp->type == T_CLOSURE)
                 {
-                    push_shared_string(sv.u.string);
-                    push_object(command_giver);
+                    push_ref_string(inter_sp, sv.u.string);
+                    push_ref_object(inter_sp, command_giver, "call_modify_command");
                     call_lambda(svp, 2);
                     transfer_svalue(svp = &apply_return_value, inter_sp--);
                     if (!command_giver)
@@ -611,7 +611,7 @@ notify_no_command (char *command, object_t *save_command_giver)
     }
     else if (svp->type == T_CLOSURE)
     {
-        push_valid_ob(save_command_giver);
+        push_ref_valid_object(inter_sp, save_command_giver, "notify_no_command");
         call_lambda(svp, 1);
         /* add_message might cause an error, thus, we free the closure first. */
         if (inter_sp->type == T_STRING)
@@ -626,8 +626,8 @@ notify_no_command (char *command, object_t *save_command_giver)
     {
         if (closure_hook[H_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
             closure_hook[H_NOTIFY_FAIL].u.lambda->ob = command_giver;
-        push_volatile_string(command);
-        push_valid_ob(save_command_giver);
+        push_volatile_string(inter_sp, command);
+        push_ref_valid_object(inter_sp, save_command_giver, "notify_no_command");
         call_lambda(&closure_hook[H_NOTIFY_FAIL], 2);
         if (inter_sp->type == T_STRING)
             tell_object(command_giver, inter_sp->u.string);
@@ -683,7 +683,7 @@ parse_command (char *buff, Bool from_efun)
 #endif
 
     /* Strip trailing spaces.
-     * Afterwards, p will point to the last non-space character.
+     * Afterwards, p will point at the last non-space character.
      */
     for (p = buff + strlen(buff) - 1; p >= buff; p--)
     {
@@ -872,7 +872,7 @@ parse_command (char *buff, Bool from_efun)
         {
             if (strlen(buff) > strlen(sa->verb))
             {
-                push_volatile_string(&buff[strlen(sa->verb)]);
+                push_volatile_string(inter_sp, &buff[strlen(sa->verb)]);
                 ret = sapply(sa->function, sa->ob, 1);
             }
             else
@@ -882,7 +882,7 @@ parse_command (char *buff, Bool from_efun)
         }
         else if (buff[length] == ' ')
         {
-            push_volatile_string(&buff[length+1]);
+            push_volatile_string(inter_sp, &buff[length+1]);
             ret = sapply(sa->function, sa->ob, 1);
         }
         else
@@ -1016,7 +1016,7 @@ execute_command (char *str, object_t *ob)
     {
         svalue_t *svp;
 
-        push_volatile_string(str);
+        push_volatile_string(inter_sp, str);
         svp = sapply_int(closure_hook[H_COMMAND].u.string, ob, 1, MY_TRUE);
         res = (svp->type != T_NUMBER) || (svp->u.number != 0);
     }
@@ -1027,8 +1027,8 @@ execute_command (char *str, object_t *ob)
         l = closure_hook[H_COMMAND].u.lambda;
         if (closure_hook[H_COMMAND].x.closure_type == CLOSURE_LAMBDA)
             l->ob = ob;
-        push_volatile_string(str);
-        push_object(ob);
+        push_volatile_string(inter_sp, str);
+        push_ref_object(inter_sp, ob, "execute_command");
         call_lambda(&closure_hook[H_COMMAND], 2);
         res = (inter_sp->type != T_NUMBER) || (inter_sp->u.number != 0);
         free_svalue(inter_sp);
@@ -1045,63 +1045,15 @@ execute_command (char *str, object_t *ob)
 } /* execute_command() */
 
 /*-------------------------------------------------------------------------*/
-int
-e_command (char *str, object_t *ob)
-
-/* EFUN command()
- *
- * Execute command <str> for object <ob> (if not given the current object
- * is used). Return 0 on failure, otherwise the execution cost.
- *
- * This function is the frontend of the command parser for the efun command().
- */
-
-{
-    char buff[COMMAND_FOR_OBJECT_BUFSIZE];
-    int save_eval_cost = eval_cost - 1000;
-    interactive_t *ip;
-
-    if (ob == NULL)
-        ob = current_object;
-
-    if (current_object->flags & O_DESTRUCTED || ob->flags & O_DESTRUCTED)
-        return 0;
-
-    /* Make a copy of the given command as the parser might change it */
-
-    if (strlen(str) > sizeof(buff) - 1)
-        error("Too long command.\n");
-    strncpy(buff, str, sizeof buff);
-    buff[sizeof buff - 1] = '\0';
-
-    if (O_SET_INTERACTIVE(ip, ob))
-        trace_level |= ip->trace_level;
-
-    if (execute_command(buff, ob))
-        return eval_cost - save_eval_cost;
-    else
-        return 0;
-} /* e_command() */
-
-/*-------------------------------------------------------------------------*/
-Bool
+static Bool
 e_add_action (svalue_t *func, svalue_t *cmd, int flag)
 
-/* EFUN add_action()
- *
- *   void add_action(string fun, string cmd [, int flag])
- *   void add_action(string fun) // historical
- *
- * Add an action (verb + function) to the commandgiver.
+/* Implementation of the efun add_action().
  *
  * This function returns TRUE if an error occured, or FALSE if the
  * action was successfull.
- *
- * Attempting to add an action from a shadow causes a privilege violation
- * ("shadow_add_action", shadow, func).
- *
- * TODO: In the long run, make actions an optional feature.
  */
+
 {
     action_t *p;
     object_t *ob;
@@ -1258,9 +1210,124 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_add_action (svalue_t *sp, int num_arg)
+
+/* EFUN add_action()
+ *
+ *   void add_action(string fun, string cmd [, int flag])
+ *   void add_action(string fun) // historical
+ *
+ * Add an action (verb + function) to the commandgiver.
+ *
+ * Attempting to add an action from a shadow causes a privilege violation
+ * ("shadow_add_action", shadow, func).
+ *
+ * TODO: In the long run, get rid of actions.
+ */
+
+{
+    svalue_t *arg;
+    svalue_t *verb;
+
+    arg = sp - num_arg + 1;
+
+    verb = NULL;
+    if (num_arg >= 2)
+    {
+        verb = &arg[1];
+    }
+
+    if (e_add_action(&arg[0], verb
+                  , num_arg > 2 ? arg[2].u.number : 0))
+    {
+        /* silent error condition, deallocate strings by hand */
+        sp = pop_n_elems(num_arg, sp);
+    }
+    else
+    {
+        /* add_action has reused the strings or freed it */
+        sp -= num_arg;
+    }
+
+    return sp;
+} /* f_add_action() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_command (svalue_t *sp, int num_arg)
+
+/* EFUN command()
+ *
+ *   int command(string str)             // native
+ *   int command(string str, object ob)  // !native
+ *
+ * Execute str as a command given directly by the user. Any
+ * effects of the command will apply to the current object.
+ *
+ * Return value is 0 for failure. Otherwise a numeric value is
+ * returned which tells the evaluation cost. Bigger number means
+ * higher cost.  The evaluation cost is approximately the number
+ * of LPC machine code instructions executed.
+ *
+ * In native mode, command() can effect only the calling object.
+ * If native mode is not enabled, command() can get an optional
+ * second arg, that specifies the object that the command is to
+ * be applied to.
+ * If command() is called on another object, it is not possible
+ * to call static functions in this way, to give some protection
+ * against illegal forces.
+ *
+ * TODO: With add_action(), this should go in the long run.
+ */
+
+{
+    int rc;
+    svalue_t *arg;
+    object_t *ob;
+    char buff[COMMAND_FOR_OBJECT_BUFSIZE];
+    int save_eval_cost = eval_cost - 1000;
+    interactive_t *ip;
+
+    arg = sp - num_arg + 1;
+    if (num_arg == 1)
+        ob = current_object;
+    else
+        ob = arg[1].u.ob;
+
+    rc = 0;
+
+    if (!(current_object->flags & O_DESTRUCTED)
+     && !(ob->flags & O_DESTRUCTED))
+    {
+
+        /* Make a copy of the given command as the parser might change it */
+
+        if (svalue_strlen(arg) > sizeof(buff) - 1)
+            error("Too long command.\n");
+        strncpy(buff, arg[0].u.string, sizeof buff);
+        buff[sizeof buff - 1] = '\0';
+
+        if (O_SET_INTERACTIVE(ip, ob))
+            trace_level |= ip->trace_level;
+
+        if (execute_command(buff, ob))
+            rc = eval_cost - save_eval_cost;
+    }
+
+    if (num_arg > 1)
+        free_svalue(sp--);
+
+    free_svalue(sp);
+    put_number(sp, rc);
+
+    return sp;
+} /* f_command() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_execute_command (svalue_t *sp)
 
-/* TEFUN execute_command()
+/* EFUN execute_command()
  *
  *   int execute_command (string command, object origin, object player)
  *
@@ -1287,13 +1354,6 @@ f_execute_command (svalue_t *sp)
 
     /* Test and get the arguments from the stack */
     argp = sp - 2;
-
-    if (argp[0].type != T_STRING)
-        bad_xefun_arg(1, sp);
-    if (argp[1].type != T_OBJECT)
-        bad_xefun_arg(2, sp);
-    if (argp[2].type != T_OBJECT)
-        bad_xefun_arg(3, sp);
 
     if (svalue_strlen(argp) >= COMMAND_FOR_OBJECT_BUFSIZE)
         error("Command too long.\n");
@@ -1335,7 +1395,7 @@ f_execute_command (svalue_t *sp)
 svalue_t *
 f_remove_action (svalue_t *sp)
 
-/* TEFUN: remove_action()
+/* EFUN: remove_action()
  *
  *   int remove_action(string verb, object ob)
  *
@@ -1351,10 +1411,6 @@ f_remove_action (svalue_t *sp)
     action_t *s;
 
     /* Get and test the arguments */
-    if (sp[-1].type != T_STRING)
-        bad_xefun_arg(1, sp);
-    if (sp->type != T_OBJECT)
-        bad_xefun_arg(2, sp);
 
     ob = sp->u.ob;
     verb = sp[-1].u.string;
@@ -1388,7 +1444,7 @@ f_remove_action (svalue_t *sp)
 } /* f_remove_action() */
 
 /*-------------------------------------------------------------------------*/
-vector_t *
+static vector_t *
 e_get_action (object_t *ob, char *verb)
 
 /* EFUN query_actions()
@@ -1398,7 +1454,7 @@ e_get_action (object_t *ob, char *verb)
  * Return information about the <verb> attached to <ob>ject, or 0 if
  * there is no such verb.
  *
- * See interpret.c:F_QUERY_ACTIONS for a long explanation.
+ * See f_query_actions() for a long explanation.
  */
 
 {
@@ -1440,7 +1496,7 @@ e_get_action (object_t *ob, char *verb)
 } /* e_get_action() */
 
 /*-------------------------------------------------------------------------*/
-vector_t *
+static vector_t *
 e_get_all_actions (object_t *ob, int mask)
 
 /* EFUN query_actions()
@@ -1450,7 +1506,7 @@ e_get_all_actions (object_t *ob, int mask)
  * Return information about all verbs attached to <ob>ject which match
  * the <mask>.
  *
- * See interpret.c:F_QUERY_ACTIONS for a long explanation.
+ * See f_query_actions() for a long explanation.
  */
 
 {
@@ -1521,7 +1577,7 @@ e_get_all_actions (object_t *ob, int mask)
 } /* e_get_all_actions() */
 
 /*-------------------------------------------------------------------------*/
-vector_t *
+static vector_t *
 e_get_object_actions (object_t *ob1, object_t *ob2)
 
 /* EFUN query_actions()
@@ -1531,7 +1587,7 @@ e_get_object_actions (object_t *ob1, object_t *ob2)
  * Return information about all verbs attached to <ob>ject which are
  * defined by object <from>.
  *
- * See interpret.c:F_QUERY_ACTIONS for a long explanation.
+ * See f_query_actions() for a long explanation.
  */
 
 {
@@ -1572,17 +1628,124 @@ e_get_object_actions (object_t *ob1, object_t *ob2)
 } /* e_get_object_actions() */
 
 /*-------------------------------------------------------------------------*/
-void
-enable_commands (Bool num)
+svalue_t *
+f_query_actions (svalue_t *sp)
 
-/* Enable/disable O_ENABLE_COMMANDS for the current object.
+/* EFUN query_actions()
  *
- * Called in context of the efuns enable_commands()/disable_commands().
+ *   mixed *query_actions(object ob, mixed mask_or_verb)
+ *
+ * query_actions takes either an object or a filename as first
+ * argument and a bitmask (int) or string as a second argument.
+ * If the second argument is a string, query_actions() will return
+ * an array containing information (see below) on the verb or
+ * zero if the living object "ob" cannot use the verb. If the
+ * second argument is a bitmask, query_actions() will return a
+ * flat array containing information on all verbs added to ob.
+ * The second argument is optional (default is the bitmask 1).
+ *      1:  the verb
+ *      2:  type
+ *      4:  short_verb
+ *      8:  object
+ *     16: function
+ *
+ * "type" is one of the values defined in <sent.h> (/sys/sent.h)
+ * (which is provided with the parser source).
+ *
+ * SENT_PLAIN       added with add_action (fun, cmd);
+ * SENT_SHORT_VERB  added with add_action (fun, cmd, 1);
+ * SENT_NO_SPACE    added with add_action (fun); add_xverb (cmd);
+ * SENT_NO_VERB     just an add_action (fun); without a verb
+ * SENT_MARKER      internal, won't be in the returned array
+ */
+
+{
+    vector_t *v;
+    svalue_t *arg;
+    object_t *ob;
+
+    arg = sp - 1;
+
+    /* Get the arguments */
+    if (arg[0].type == T_OBJECT)
+        ob = arg[0].u.ob;
+    else
+    {
+        if (arg->type != T_STRING)
+            efun_arg_error(1, T_STRING, arg->type, sp);
+        ob = get_object(arg[0].u.string);
+        if (!ob)
+            error("query_actions() failed\n");
+    }
+
+    /* Get the actions */
+    if (arg[1].type == T_STRING)
+        v = e_get_action(ob, arg[1].u.string);
+    else if (arg[1].type == T_NUMBER)
+        v = e_get_all_actions(ob, arg[1].u.number);
+    else {
+        if (arg[1].type != T_OBJECT)
+            efun_arg_error(2, T_OBJECT, arg[1].type, sp);
+        v = e_get_object_actions(ob, arg[1].u.ob);
+    }
+
+    /* Clean up the stack and push the result */
+    free_svalue(sp--);
+    free_svalue(sp);
+    if (v)
+    {
+        put_array(sp, v);
+    } else
+        put_number(sp, 0);
+
+    return sp;
+} /* f_query_actions() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_disable_commands (svalue_t *sp)
+
+/* EFUN disable_commands()
+ *
+ *   void disable_commands()
+ *
+ * Disable this object to use commands normally accessible to
+ * users.
  */
 
 {
     if (current_object->flags & O_DESTRUCTED)
-        return;
+        return sp;
+
+    if (d_flag > 1) {
+        debug_message("%s Disable commands %s (ref %ld)\n"
+                     , time_stamp(), current_object->name
+                     , current_object->ref);
+    }
+
+    current_object->flags &= ~O_ENABLE_COMMANDS;
+    command_giver = NULL;
+
+    return sp;
+} /* f_disable_commands() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_enable_commands (svalue_t *sp)
+
+/* EFUN enable_commands()
+ *
+ *   void enable_commands()
+ *
+ * Enable this object to use commands normally accessible to
+ * users.
+ */
+
+{
+    interactive_t *ip;
+
+    if (current_object->flags & O_DESTRUCTED)
+        return sp;
 
     if (d_flag > 1) {
         debug_message("%s Enable commands %s (ref %ld)\n"
@@ -1590,29 +1753,21 @@ enable_commands (Bool num)
                      , current_object->ref);
     }
 
-    if (num)
+    current_object->flags |= O_ENABLE_COMMANDS;
+    command_giver = current_object;
+    if (O_SET_INTERACTIVE(ip, command_giver))
     {
-        interactive_t *ip;
+        trace_level |= ip->trace_level;
+    }
 
-        current_object->flags |= O_ENABLE_COMMANDS;
-        command_giver = current_object;
-        if (O_SET_INTERACTIVE(ip, command_giver))
-        {
-            trace_level |= ip->trace_level;
-        }
-    }
-    else
-    {
-        current_object->flags &= ~O_ENABLE_COMMANDS;
-        command_giver = NULL;
-    }
-} /* enable_commands() */
+    return sp;
+} /* f_enable_commands() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
 f_notify_fail (svalue_t *sp)
 
-/* TEFUN notify_fail()
+/* EFUN notify_fail()
  *
  *   int notify_fail(string str)
  *   int notify_fail(closure cl)
@@ -1630,9 +1785,6 @@ f_notify_fail (svalue_t *sp)
  */
 
 {
-    if (sp->type != T_STRING && sp->type != T_CLOSURE)
-        bad_xefun_arg(1, sp);
-
     if (command_giver && !(command_giver->flags & O_DESTRUCTED))
     {
         if (error_msg.type == T_CLOSURE)
@@ -1657,9 +1809,65 @@ f_notify_fail (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_query_verb (svalue_t *sp)
+
+/* EFUN query_verb()
+ *
+ *   string query_verb(void)
+ *
+ * Give the name of the current command, or 0 if not executing
+ * from a command. This allows add_action() of several commands
+ * to the same function. query_verb() returns 0 when invoked by a
+ * function which was started by a call_out or the heart beat.
+ * Also when a user logs in query_verb() returns 0.
+ */
+
+{
+    if (!last_verb)
+        push_number(sp, 0);
+    else
+        push_ref_string(sp, last_verb);
+    
+    return sp;
+} /* f_query_verb() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_query_command (svalue_t *sp)
+
+/* EFUN query_command()
+ *
+ *   string query_command(void)
+ *
+ * Return the full command string, or 0 if not executing from
+ * a command.
+ *
+ * The string returned is the string as seen by the parser:
+ * after any modify_command handling and after stripping
+ * trailing spaces.
+ */
+
+{
+    char * str;
+
+    if (!last_command)
+        push_number(sp, 0);
+    else
+    {
+        str = string_copy(last_command);
+        if (!str)
+            error("Out of memory.\n");
+        push_malloced_string(sp, str);
+    }
+
+    return sp;
+} /* f_query_command() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_query_notify_fail (svalue_t *sp)
 
-/* TEFUN query_notify_fail()
+/* EFUN query_notify_fail()
  *
  *   mixed query_notify_fail()
  *   mixed query_notify_fail(int flag = 0)
@@ -1674,9 +1882,6 @@ f_query_notify_fail (svalue_t *sp)
 {
     p_int flag;
     
-    if (sp->type != T_NUMBER)
-        bad_xefun_arg(1, sp);
-
     flag = sp->u.number;
     free_svalue(sp);
 
@@ -1700,9 +1905,102 @@ f_query_notify_fail (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_set_modify_command (svalue_t *sp)
+
+/* EFUN set_modify_command()
+ *
+ *   object set_modify_command(object)
+ *   object set_modify_command(string)
+ *   object set_modify_command(int)
+ *
+ * All commands for the current object (that must obviously be interactive)
+ * will be passed to ob->modify_command() before actually being executed. The
+ * argument can be passed an object or a file_name.
+ *
+ * When set_modify_command() was called, the parser won't expand the standard
+ * abbreviations n,e,s,w,nw,sw,ne,se for that user anymore, nor use any hook
+ * set for this.
+ *
+ * 0 as argument will stop the command modification and reinstall
+ *   the standard abbreviations.
+ * -1 as argument will just return the object previously set.
+ *
+ * The return value is the object that was previously set with
+ * set_modify_command(), if any.
+ */
+
+{
+    object_t *old, *new;
+    interactive_t *ip;
+
+    inter_sp = sp;
+
+    /* Make sure the current_object is interactive */
+
+    if (!(O_SET_INTERACTIVE(ip, current_object))
+     || ip->closing)
+    {
+        error("set_modify_command in non-interactive object\n");
+    }
+
+    /* Get the old setting */
+    old = ip->modify_command;
+    if (old && old->flags & O_DESTRUCTED)
+    {
+        free_object(old, "set_modify_command");
+        old = NULL;
+        ip->modify_command = NULL;
+    }
+
+    /* Set the new setting */
+    new = sp->u.ob;
+    switch(sp->type)
+    {
+    default:
+        efun_gen_arg_error(1, sp->type, sp);
+        break;
+
+    case T_STRING:
+        new = get_object(sp->u.string);
+        if (!new)
+            error("Object '%s' not found.\n", sp->u.string);
+        /* FALLTHROUGH */
+
+    case T_OBJECT:
+        ip->modify_command = ref_object(new, "set_modify_command");
+        break;
+
+    case T_NUMBER:
+        if (sp->u.number == 0 )
+        {
+            /* ref count of old is reused below, so don't free now */
+            ip->modify_command = NULL;
+        }
+        else
+        {
+            if (sp->u.number != -1)
+                error("Bad num arg 1 to set_modify_command(): got %ld, "
+                      "expected 0 or -1\n", sp->u.number);
+            if (old) ref_object(old, "set_modify_command");
+        }
+    }
+
+    free_svalue(sp);
+
+    /* Return the old setting */
+    if (old)
+        put_object(sp, old); /* reuse ref count */
+    else
+        put_number(sp, 0);
+
+    return sp;
+} /* f_set_modify_command() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_set_this_player (svalue_t *sp)
 
-/* TEFUN set_this_player()
+/* EFUN set_this_player()
  *
  *   void set_this_player(object ob)
  *
@@ -1729,7 +2027,7 @@ f_set_this_player (svalue_t *sp)
     }
 
     if (sp->type != T_OBJECT)
-        bad_xefun_arg(1, sp);
+        efun_arg_error(1, T_OBJECT, sp->type, sp);
 
     ob = sp->u.ob;
     command_giver = ob;
@@ -1745,7 +2043,7 @@ f_set_this_player (svalue_t *sp)
 svalue_t *
 f_command_stack_depth (svalue_t *sp)
 
-/* TEFUN command_stack_depth()
+/* EFUN command_stack_depth()
  *
  *   int command_stack_depth(void)
  *
@@ -1764,8 +2062,7 @@ f_command_stack_depth (svalue_t *sp)
         if (context->type == COMMAND_CONTEXT)
             num++;
 
-    sp++;
-    put_number(sp, num);
+    push_number(sp, num);
 
     return sp;
 } /* f_command_stack_depth() */
@@ -1774,7 +2071,7 @@ f_command_stack_depth (svalue_t *sp)
 svalue_t *
 f_command_stack (svalue_t *sp)
 
-/* TEFUN command_stack()
+/* EFUN command_stack()
  *
  *   mixed * command_stack(void)
  *
@@ -1882,11 +2179,41 @@ f_command_stack (svalue_t *sp)
     }
 
     /* Put the result onto the stack */
-    sp++;
-    put_array(sp, result);
+    push_array(sp, result);
 
     return sp;
 } /* f_command_stack() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_living (svalue_t *sp)
+
+/* EFUN living()
+ *
+ * int living(object ob)
+ *
+ * Return true if ob is a living object (that is,
+ * enable_commands() has been called from inside the ob).
+ * ob may be 0, in which case the result is obviously 0, too.
+ */
+
+{
+    int i;
+
+    if (sp->type == T_NUMBER && !sp->u.number)
+        return sp;
+
+    if (sp->type != T_OBJECT)
+    {
+        efun_arg_error(1, T_OBJECT, sp->type, sp);
+        return sp;
+    }
+
+    i = (sp->u.ob->flags & O_ENABLE_COMMANDS) != 0;
+    free_object_svalue(sp);
+    put_number(sp, i);
+    return sp;
+} /* f_living() */
 
 /*-------------------------------------------------------------------------*/
 /* I won't comment these. The sooner add_verb()/add_xverb() are gone,
@@ -1898,8 +2225,6 @@ static svalue_t *add_verb(sp, type)
     svalue_t *sp;
     int type;
 {
-    if (sp->type != T_STRING)
-        bad_xefun_arg(1, sp);
     if (command_giver  && !(command_giver->flags & O_DESTRUCTED)) {
         action_t *sent;
 

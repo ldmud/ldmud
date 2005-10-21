@@ -1,0 +1,219 @@
+Short: Problem with H_DEFAULT_METHOD
+Date: Sun, 24 Mar 2002 23:49:28 +0100 (CET)
+From: Markus Peter <warp@spin.de>
+Driver: 3.3.182
+Type: Bug
+State: New
+
+
+Ich wollte mal ein wenig mit H_DEFAULT_METHOD rumspielen in 3.3.182 und
+hab den hook einfach mal auf einen string gesetzt (auf "default_method"),
+wobei noch keins meiner Objekte im MUD diese methode implementiert hat.
+Ergebnis war, dass das MUD innerhalb von etwa 30 Sekunden saemtlichen
+Speicher gefressen hat und anschliessend gecrasht ist.
+
+Ist das jetzt ein Bug oder ist das so vorgesehen, dass die lfun gefunden
+werden muss? In letzterem Fall waere die Moeglichkeit einfach einen lfun
+Namen anzugeben statt eine Closure fuer den Hook zu setzen ja etwas
+unnuetz, da man nie 100% garantieren kann, ob die Methode wirklich da ist.
+
+
+
+Date: Thu, 14 Mar 2002 07:34:40 +0100 (CET)
+From: Markus Peter <warp@spin.de>
+To: Lars Duening <lars@bearnip.com>
+Subject: Re: =?US-ASCII?Q?Re: 3.3.182 - Problem mit H=5FDEFAULT=5FMETHOD?=
+
+  This message is in MIME format.  The first part should be readable text,
+  while the remaining parts are likely unreadable without MIME-aware tools.
+  Send mail to mime@docserver.cac.washington.edu for more info.
+
+--1891785058-1552384905-1016087680=:8688
+Content-Type: TEXT/PLAIN; charset=US-ASCII
+
+On Wed, 13 Mar 2002, Lars Duening wrote:
+
+> >Ich wollte mal ein wenig mit H_DEFAULT_METHOD rumspielen in 3.3.182 und
+> >hab den hook einfach mal auf einen string gesetzt (auf "default_method"),
+> >wobei noch keins meiner Objekte im MUD diese methode implementiert hat.
+> >Ergebnis war, dass das MUD innerhalb von etwa 30 Sekunden saemtlichen
+> >Speicher gefressen hat und anschliessend gecrasht ist.
+>
+> Das ist offensichtlich ein Fehler. Hast du einen Coredump oder logs vom
+> Crash?
+
+Morgen...
+
+Ich kann das mittlerweile recht zuverlaessig reproduzieren, core hab ich
+allerdings keinen mehr bekommen, in meinen Versuchen wurde der driver
+jetzt einfach nur noch unbenutzbar.
+
+STDERR log und debug log von einem der Versuche ist angehaengt. Startet
+man das MUD bereits mit dem Master mit dem Hook kommt es zumindestens
+nicht zu den Speicherproblemen, wobei ich allerdings trotzdem recht
+schnell Crashes hab (refcount 0 but object not destructed oder so aehnlich
+- wenn du willst kann ich das auch nochmal reproduzieren). Dieser Versuch
+hier mit den Logs ist entstanden indem ich das MUD ohne default_method
+hook gestartet habe, dann H_DEFAULT_METHOD zuerst auf "blablafoo" gesetzt
+habe, master reload, anschliessend sofort auf "default_method" gesetzt und
+erneuten master reload. Das MUD laeuft dann noch etwa 30 Sekunden normal,
+anschliessend tauchen offensichtlich die ersten Probleme in der
+Speicherverwaltung auf (ploetzlich gab es z.b. in jedem Raum angeblich
+einen Exit der zufaellig meinem gesetzten Title entsprach, geriet wohl was
+mit den mapping keys durcheinander). Kurz darauf fiel auch saemtliche
+Farbunterstuetzung aus (wobei das auch einfach ein Verlust z.b. der
+mapping keys in dem termcap mapping was von den farbtags auf die ESC codes
+mapped sein koennte) und etwa 30 Sekunden spaeter fingen die
+Speicherprobleme an.
+
+  ----------------- err.log ----------------------
+2002.03.14 07:17:45 [xerq] Demon started
+2002.03.14 07:17:45 LDMud 3.3.183 (3-3.183)
+2002.03.14 07:17:45 Random seed: 0x3c904089
+MAX_MALLOCED limit reached.
+Low on MEMORY: Trying to allocate large 137309276 bytes for 137309269 bytes request
+Temporarily out of MEMORY. Freeing user reserve.
+MAX_MALLOCED limit reached.
+Low on MEMORY: Trying to allocate large 137309276 bytes for 137309269 bytes request
+g(0x83701f8 'dom/main/castle/castlepark-s-1.c') ref 0
+DEBUG: (object.c:940) free_prog(0x83701f8 'dom/main/castle/castlepark-s-1.c') ref 0 : blueprint (0x84292a8 'dom/main/castle/castlepark-s-1') ref 889, flags 1200
+DEBUG: new_object(0x8429438 'dom/main/castle/castlepark-s-2') ref 1245 flags 300
+DEBUG: new_object(0x842949c 'dom/main/castle/entrance') ref 1388 flags 700
+DEBUG: (object.c:940) free_prog(0x83701f8 'dom/main/castle/castlepark-s-2.c') ref 0
+DEBUG: (object.c:940) free_prog(0x83701f8 'dom/main/castle/castlepark-s-2.c') ref 0 : blueprint (0x8429438 'dom/main/castle/castlepark-s-2') ref 2, flags 1200
+DEBUG: new_object(0x84296f8 'dom/main/castle/castlepark-s-3') ref 1218 flags 300
+DEBUG: (object.c:940) free_prog(0x8371a04 'dom/main/castle/castlepark-s-3.c') ref 0
+DEBUG: (object.c:940) free_prog(0x8371a04 'dom/main/castle/castlepark-s-3.c') ref 0 : blueprint (0x84296f8 'dom/main/castle/castlepark-s-3') ref 1117, flags 1200
+DEBUG: new_object(0x8428c84 'dom/main/castle/hall') ref 2050 flags 700
+DEBUG: new_object(0x8427ad4 'dom/main/castle/castle-ground-w') ref 1492 flags 700
+DEBUG: new_object(0x8427ed4 'dom/main/castle/castle-ground-e') ref 1595 flags 700
+2002.03.14 07:22:08 Garbage collection, slow_shut to do: 0
+DEBUG: GC frees destructed 'std/player#2'
+Reallocated User reserve.
+DEBUG: GC object 08428c84 'dom/main/castle/hall': refs 5, extra_refs 3
+DEBUG: GC object 0831b16c 'command/wizobj': refs 2, extra_refs 10
+MAX_MALLOCED limit reached.
+Low on MEMORY: Trying to allocate large 137309268 bytes for 137309263 bytes request
+Temporarily out of MEMORY. Freeing user reserve.
+MAX_MALLOCED limit reached.
+Low on MEMORY: Trying to allocate large 137309268 bytes for 137309263 bytes request
+DEBUG: (simulate.c:2621) free_object(0x8425614 'dom/world/room/15016+15016') ref 0 flags 218
+2002.03.14 07:22:15 No garbage collection, slow_shut to do: 0
+Reallocated User reserve.
+MAX_MALLOCED limit reached.
+Low on MEMORY: Trying to allocate large 137309268 bytes for 137309263 bytes request
+Temporarily out of MEMORY. Freeing user reserve.
+MAX_MALLOCED limit reached.
+Low on MEMORY: Trying to allocate large 137309268 bytes for 137309263 bytes request
+2002.03.14 07:22:17 No garbage collection, slow_shut to do: 0
+Reallocated User reserve.
+MAX_MALLOCED limit reached.
+Low on MEMORY: Trying to allocate large 137309276 bytes for 137309269 bytes request
+Temporarily out of MEMORY. Freeing user reserve.
+MAX_MALLOCED limit reached.
+Low on MEMORY: Trying to allocate large 137309276 bytes for 137309269 bytes request
+2002.03.14 07:22:19 No garbage collection, slow_shut to do: 0
+Reallocated User reserve.
+MAX_MALLOCED limit reached.
+Low on MEMORY: Trying to allocate large 137309268 bytes for 137309263 bytes request
+Temporarily out of MEMORY. Freeing user reserve.
+MAX_MALLOCED limit reached.
+Low on MEMORY: Trying to allocate large 137309268 bytes for 137309263 bytes request
+2002.03.14 07:23:04 No garbage collection, slow_shut to do: 0
+Reallocated User reserve.
+MAX_MALLOCED limit reached.
+Low on MEMORY: Trying to allocate large 137309264 bytes for 137309257 bytes request
+Temporarily out of MEMORY. Freeing user reserve.
+MAX_MALLOCED limit reached.
+Low on MEMORY: Trying to allocate large 137309264 bytes for 137309257 bytes request
+2002.03.14 07:23:06 No garbage collection, slow_shut to do: 0
+Reallocated User reserve.
+MAX_MALLOCED limit reached.
+Low on MEMORY: Trying to allocate large 137309264 bytes for 137309257 bytes request
+Temporarily out of MEMORY. Freeing user reserve.
+MAX_MALLOCED limit reached.
+Low on MEMORY: Trying to allocate large 137309264 bytes for 137309257 bytes request
+2002.03.14 07:23:16 Garbage collection, slow_shut to do: 0
+Reallocated User reserve.
+[xerq] read: Resource temporarily unavailable
+2002.03.14 07:23:45 [xerq] Demon exiting.
+  ---------------- debug.log ---------------------
+2002.03.14 07:17:45 LDMud 3.3.183 (3-3.183)
+2002.03.14 07:17:45 Random seed: 0x3c904089
+2002.03.14 07:17:45 UDP recv-socket requested for port: 4246
+Loading init file /etc/init_file
+Preloading: daemon/boot
+Preloading: kernel/login
+Preloading: daemon/aliasd
+Preloading: daemon/sould
+Preloading: daemon/strings
+Preloading: daemon/parserd
+Preloading: daemon/userd
+Preloading: daemon/saved
+Preloading: daemon/banishd
+Preloading: daemon/channeld
+Preloading: daemon/language
+Preloading: std/player
+Preloading: std/room
+Preloading: daemon/autodoc
+Preloading: daemon/net
+Preloading: dom/world/servers/timed
+Preloading: dom/world/servers/map
+Preloading: dom/world/servers/bankd
+2002.03.14 07:17:46 LDMud ready for users.
+2002.03.14 07:22:08 Out of memory (137309261 bytes)
+2002.03.14 07:22:08 program: std/room.c, object: dom/main/room/north-1 line 334
+'   auto_command' in '        std/player.c' ('      std/player#192') line 192
+'   auto_command' in '        std/living.c' ('      std/player#192') line 48
+'        exec_go' in '      command/move.c' ('        command/move') line 19
+'       use_exit' in '          std/room.c' ('dom/main/room/north-1') line 334
+2002.03.14 07:22:15 Out of memory for implode() result.
+2002.03.14 07:22:15 program: daemon/strings.c, object: daemon/strings line 31
+'   auto_command' in '        std/player.c' ('      std/player#192') line 192
+'   auto_command' in '        std/living.c' ('      std/player#192') line 43
+'     do_command' in '    daemon/parserd.c' ('      daemon/parserd') line 1019
+'      exec_look' in '     command/sense.c' ('       command/sense') line 19
+'       describe' in '          std/room.c' ('dom/main/room/north-1') line 395
+'get_exit_string' in '          std/room.c' ('dom/main/room/north-1') line 265
+' pretty_implode' in '    daemon/strings.c' ('      daemon/strings') line 31
+2002.03.14 07:22:17 Out of memory for implode() result.
+2002.03.14 07:22:17 program: daemon/strings.c, object: daemon/strings line 31
+'   auto_command' in '        std/player.c' ('      std/player#192') line 192
+'   auto_command' in '        std/living.c' ('      std/player#192') line 43
+'     do_command' in '    daemon/parserd.c' ('      daemon/parserd') line 1019
+'      exec_look' in '     command/sense.c' ('       command/sense') line 19
+'       describe' in '          std/room.c' ('dom/main/room/north-1') line 395
+'get_exit_string' in '          std/room.c' ('dom/main/room/north-1') line 265
+' pretty_implode' in '    daemon/strings.c' ('      daemon/strings') line 31
+2002.03.14 07:22:19 Out of memory (137309261 bytes)
+2002.03.14 07:22:19 program: std/room.c, object: dom/main/room/north-1 line 334
+'   auto_command' in '        std/player.c' ('      std/player#192') line 192
+'   auto_command' in '        std/living.c' ('      std/player#192') line 48
+'        exec_go' in '      command/move.c' ('        command/move') line 19
+'       use_exit' in '          std/room.c' ('dom/main/room/north-1') line 334
+2002.03.14 07:23:04 Out of memory for implode() result.
+2002.03.14 07:23:04 program: daemon/strings.c, object: daemon/strings line 31
+'   auto_command' in '        std/player.c' ('      std/player#192') line 192
+'   auto_command' in '        std/living.c' ('      std/player#192') line 43
+'     do_command' in '    daemon/parserd.c' ('      daemon/parserd') line 1019
+'      exec_look' in '     command/sense.c' ('       command/sense') line 19
+'       describe' in '          std/room.c' ('dom/main/room/north-1') line 395
+'get_exit_string' in '          std/room.c' ('dom/main/room/north-1') line 265
+' pretty_implode' in '    daemon/strings.c' ('      daemon/strings') line 31
+2002.03.14 07:23:06 Out of memory (137309249 bytes)
+2002.03.14 07:23:06 program: <lambda 0x82d9f8d>, object: daemon/userd line 115
+'   auto_command' in '        std/player.c' ('      std/player#192') line 192
+'   auto_command' in '        std/living.c' ('      std/player#192') line 43
+'     do_command' in '    daemon/parserd.c' ('      daemon/parserd') line 1019
+'       exec_who' in 'command/communication.c' ('command/communication') line 343
+'   get_who_list' in '      daemon/userd.c' ('        daemon/userd') line 343
+<lambda 0x82d9f8d> in '      daemon/userd.c' ('        daemon/userd') offset 115
+2002.03.14 07:23:16 Out of memory (137309249 bytes)
+2002.03.14 07:23:16 program: <lambda 0x82d9f8d>, object: daemon/userd line 115
+'   auto_command' in '        std/player.c' ('      std/player#192') line 192
+'   auto_command' in '        std/living.c' ('      std/player#192') line 43
+'     do_command' in '    daemon/parserd.c' ('      daemon/parserd') line 1019
+'       exec_who' in 'command/communication.c' ('command/communication') line 343
+'   get_who_list' in '      daemon/userd.c' ('        daemon/userd') line 343
+<lambda 0x82d9f8d> in '      daemon/userd.c' ('        daemon/userd') offset 115
+  ---------------------------------------

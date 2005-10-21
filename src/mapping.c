@@ -1397,7 +1397,7 @@ check_map_for_destr (mapping_t *m)
 } /* check_map_for_destr() */
 
 /*-------------------------------------------------------------------------*/
-void
+static void
 remove_mapping (mapping_t *m, svalue_t *map_index)
 
 /* Remove from mapping <m> that entry which is index by key value
@@ -3697,6 +3697,99 @@ clean_stale_mappings (void)
 /*                            EFUNS                                        */
 
 /*-------------------------------------------------------------------------*/
+#ifdef F_COPY_MAPPING
+
+svalue_t *
+f_copy_mapping (svalue_t *sp)
+
+/* EFUN copy_mapping()
+ *
+ *   mapping copy_mapping(mapping)
+ *
+ * This efun is needed to create copies of mappings instead of
+ * just passing a reference, like adding/subtraction from a
+ * mapping do.
+ * TODO: This efun is outdated by the copy() efun.
+ */
+
+{
+    mapping_t *m, *m2;
+
+    m = sp->u.map;
+    check_map_for_destr(m);
+    m2 = copy_mapping(m);
+    free_mapping(m);
+    sp->u.map = m2;
+
+    return sp;
+} /* f_copy_mapping() */
+
+#endif
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_m_allocate (svalue_t *sp)
+
+/* EFUN m_allocate()
+ *
+ *   mapping m_allocate(int size, int width)
+ *
+ * Reserve memory for a mapping.
+ *
+ * size is the number of entries (i.e. keys) to reserve, width is
+ * the number of data items per entry. If the optional width is
+ * omitted, 1 is used as default.
+ */
+
+{
+    if (sp[-1].u.number < 0)
+        error("Illegal mapping size: %ld\n", sp[-1].u.number);
+    if (sp->u.number < 0)
+        error("Illegal mapping width: %ld\n", sp->u.number);
+
+    if (max_mapping_size && sp[-1].u.number > max_mapping_size)
+        error("Illegal mapping size: %ld\n", sp[-1].u.number);
+
+    sp--;
+
+    if (!(sp->u.map = allocate_mapping(sp->u.number, sp[1].u.number)))
+    {
+        sp++;
+        /* sp points to a number-typed svalue, so freeing won't
+         * be a problem.
+         */
+        error("Out of memory\n");
+    }
+    sp->type = T_MAPPING;
+
+    return sp;
+} /* f_m_allocate() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_m_delete (svalue_t *sp)
+
+/* EFUN m_delete()
+ *
+ *   mapping m_delete(mapping map, mixed key)
+ *
+ * Remove the entry with index 'key' from mapping 'map'. The
+ * changed mapping 'map' is also returned as result.
+ * If the mapping does not have an entry with index 'key',
+ * nothing is changed.
+ */
+
+{
+    mapping_t *m;
+
+    m = (sp-1)->u.map;
+    remove_mapping(m, sp);
+    free_svalue(sp--);
+    /* leave the modified mapping on the stack */
+    return sp;
+} /* f_m_delete() */
+
+/*-------------------------------------------------------------------------*/
 vector_t *
 m_indices (mapping_t *m)
 
@@ -3704,7 +3797,11 @@ m_indices (mapping_t *m)
  * If the mapping contains destructed objects, m_indices() will remove
  * them.
  *
- * The function is used by interpret.c for M_INDICES and by map_mapping().
+ * The helper function m_indices_filter() is located in interpret.c
+ * to take advantage of inlined assign_svalue_no_free().
+ *
+ * The function is used for efuns m_indices(), map_mapping(), and for
+ * the loop construct foreach().
  */
 
 {
@@ -3718,7 +3815,86 @@ m_indices (mapping_t *m)
     svp = v->item;
     walk_mapping(m, m_indices_filter, &svp);
     return v;
-}
+} /* m_indices() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_m_indices (svalue_t *sp)
+
+/* EFUN m_indices()
+ *
+ *   mixed *m_indices(mapping map)
+ *
+ * Returns an array containing the indices of mapping 'map'.
+ */
+
+{
+    mapping_t *m;
+    vector_t *v;
+
+    m = sp->u.map;
+    v = m_indices(m);
+
+    free_mapping(m);
+    put_array(sp,v);
+
+    return sp;
+} /* f_m_indices() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_m_values (svalue_t *sp)
+
+/* EFUN m_values()
+ *
+ *   mixed *m_values(mapping map)
+ *   mixed *m_values(mapping map, int index)
+ *
+ * Returns an array with the values of mapping 'map'.
+ * If <index> is given as a number between 0 and the width of
+ * the mapping, the values from the given column are returned,
+ * else the values of the first column.
+ *
+ * The called filter function m_values_filter() is in interpret.c
+ * to take advantage of inline expansion.
+ */
+
+{
+    mapping_t *m;
+    vector_t *v;
+    struct mvf_info vip;
+    mp_int size;
+    int num;
+
+    /* Get and check the arguments */
+    num = sp->u.number;
+    sp--;
+    inter_sp = sp;
+
+    m = sp->u.map;
+    if (m->num_values < 1)
+        error("m_values() applied on mapping with no values.\n");
+    if (num < 0 || num >= m->num_values)
+        error("Illegal index %d to m_values(): should be in 0..%d.\n"
+             , num, m->num_values-1);
+
+    /* Get the size of the mapping */
+    check_map_for_destr(m);
+    size = (mp_int)MAP_SIZE(m);
+
+    v = allocate_array(size);
+
+    /* Extract the desired column from the mapping */
+    vip.svp = v->item;
+    vip.num = num;
+    walk_mapping(m, m_values_filter, &vip);
+    free_mapping(m);
+
+    /* Push the result */
+    put_array(sp,v);
+
+    return sp;
+} /* f_m_values() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3972,7 +4148,7 @@ walk_mapping_prologue (mapping_t *m, svalue_t *sp, callback_t *cb)
 svalue_t *
 f_walk_mapping (svalue_t *sp, int num_arg)
 
-/* VEFUN walk_mapping()
+/* EFUN walk_mapping()
  *
  *   void walk_mapping(mapping m, string func, string|object ob, mixed extra,...)
  *   void walk_mapping(mapping m, closure cl, mixed extra,...)
@@ -3998,8 +4174,6 @@ f_walk_mapping (svalue_t *sp, int num_arg)
     /* Locate the arguments on the stack and extract them */
     arg = sp - num_arg + 1;
     inter_sp = sp;
-    if (arg[0].type != T_MAPPING)
-        bad_xefun_vararg(1, sp);
 
     error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
     inter_sp = sp = arg;
@@ -4007,7 +4181,7 @@ f_walk_mapping (svalue_t *sp, int num_arg)
 
     if (error_index >= 0)
     {
-        bad_xefun_vararg(error_index+2, sp);
+        vefun_bad_arg(error_index+2, sp);
         /* NOTREACHED */
         return sp;
     }
@@ -4070,7 +4244,7 @@ f_walk_mapping (svalue_t *sp, int num_arg)
 svalue_t *
 x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
-/* VEFUN filter() on mappings, filter_mapping() == filter_indices()
+/* EFUN filter() on mappings, filter_mapping() == filter_indices()
  *
  *   mapping filter_mapping(mapping, string func, string|object ob, ...)
  *   mapping filter_mapping(mapping, closure cl, ...)
@@ -4108,9 +4282,6 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
     /* Locate the arguments on the stack and extract them */
     arg = sp - num_arg + 1;
-    inter_sp = sp;
-    if (arg[0].type != T_MAPPING)
-        bad_xefun_vararg(1, sp);
 
     error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
     inter_sp = sp = arg;
@@ -4118,7 +4289,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
     if (error_index >= 0)
     {
-        bad_xefun_vararg(error_index+2, sp);
+        vefun_bad_arg(error_index+2, sp);
         /* NOTREACHED */
         return sp;
     }
@@ -4182,7 +4353,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
         {
             if (!num_values)
             {
-                push_number(0);
+                push_number(inter_sp, 0);
             }
             else if (1 == num_values)
             {
@@ -4244,7 +4415,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
 svalue_t *
 f_filter_indices (svalue_t *sp, int num_arg)
 
-/* VEFUN filter_indices()
+/* EFUN filter_indices()
  *
  *   mapping filter_indices(mapping, string func, string|object ob, ...)
  *   mapping filter_indices(mapping, closure cl, ...)
@@ -4317,8 +4488,6 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
     /* Locate and extract arguments */
     arg = sp - num_arg + 1;
     inter_sp = sp;
-    if (arg[0].type != T_MAPPING)
-        bad_xefun_vararg(1, sp);
 
     error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
     inter_sp = sp = arg;
@@ -4326,7 +4495,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
     if (error_index >= 0)
     {
-        bad_xefun_vararg(error_index+2, sp);
+        vefun_bad_arg(error_index+2, sp);
         /* NOTREACHED */
         return sp;
     }
@@ -4390,7 +4559,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
         if (bFull) /* Push the data */
         {
             if (!num_values)
-                push_number(0);
+                push_number(inter_sp, 0);
             else if (1 == num_values)
             {
                 v = get_map_value(arg_m, key);
@@ -4465,9 +4634,75 @@ f_map_indices (svalue_t *sp, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_m_contains (svalue_t *sp, int num_arg)
+
+/* EFUN m_contains()
+ *
+ *   int m_contains(mixed &data1, ..., &dataN, map, key)
+ *
+ * If the mapping contains the key map, the corresponding values
+ * are assigned to the data arguments, which massed be passed by
+ * reference, and 1 is returned. If key is not in map, 0 is
+ * returned and the data args are left unchanged.
+ * It is possible to use this function for a 0-value mapping, in
+ * which case it has the same effect as member(E).
+ */
+
+{
+    svalue_t *item;
+    int i;
+
+    /* Test the arguments */
+    for (i = -num_arg; ++i < -1; )
+        if (sp[i].type != T_LVALUE)
+            vefun_arg_error(num_arg + i, T_LVALUE, sp[i].type, sp);
+    if (sp[-1].type != T_MAPPING)
+        vefun_arg_error(num_arg-1, T_MAPPING, sp[-1].type, sp);
+    if (sp[-1].u.map->num_values != num_arg -2)
+        error("Not enough lvalues: given %ld, required %ld.\n"
+             , (long)num_arg-2, (long)sp[-1].u.map->num_values);
+
+    item = get_map_value(sp[-1].u.map, sp);
+    if (item == &const0)
+    {
+        /* Not found */
+        sp = pop_n_elems(num_arg-1, sp);
+        free_svalue(sp);
+        put_number(sp, 0);
+        return sp;
+    }
+
+    free_svalue(sp--); /* free key */
+
+    /* Copy the elements */
+    for (i = -num_arg + 1; ++i < 0; )
+    {
+        /* get_map_lvalue() may return destructed objects. */
+        /* TODO: May this cause problems elsewhere, too? */
+        if (T_OBJECT == item->type
+         && (O_DESTRUCTED & item->u.ob->flags))
+        {
+            assign_svalue(sp[i].u.lvalue, &const0);
+            item++;
+        }
+        else
+            /* mapping must not have been freed yet */
+            assign_svalue(sp[i].u.lvalue, item++);
+        free_svalue(&sp[i]);
+    }
+
+    free_svalue(sp--); /* free mapping */
+    sp += 3 - num_arg;
+    put_number(sp, 1);
+
+    return sp;
+} /* f_m_contains() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_m_reallocate (svalue_t *sp)
 
-/* TEFUN m_reallocate()
+/* EFUN m_reallocate()
  *
  *    mapping m_reallocate(mapping m, int width)
  *
@@ -4483,29 +4718,16 @@ f_m_reallocate (svalue_t *sp)
     mapping_t *new_m;  /* New mapping */
 
     /* Test and get arguments */
-    if (sp->type != T_NUMBER)
-    {
-        bad_xefun_arg(2, sp);
-        /* NOTREACHED */
-        return sp;
-    }
-
     new_width = sp->u.number;
     if (new_width < 0)
     {
-        error("Illegal width to m_reallocate()\n");
+        error("Illegal width to m_reallocate(): %ld\n", (long)new_width);
         /* NOTREACHED */
         return sp;
     }
 
     inter_sp = --sp;
 
-    if (sp->type != T_MAPPING)
-    {
-        bad_xefun_arg(1, sp);
-        /* NOTREACHED */
-        return sp;
-    }
     m = sp->u.map;
 
     /* Resize the mapping */
@@ -4524,6 +4746,152 @@ f_m_reallocate (svalue_t *sp)
 
     return sp;
 } /* f_m_reallocate() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_mkmapping (svalue_t *sp, int num_arg)
+
+/* EFUN mkmapping()
+ *
+ *   mapping mkmapping(mixed *arr1, mixed *arr2,...)
+ *
+ * Returns a mapping with indices from 'arr1' and values from
+ * 'arr2'... . arr1[0] will index arr2...[0], arr1[1] will index
+ * arr2...[1], etc. If the arrays are of unequal size, the mapping
+ * will only contain as much elements as are in the smallest
+ * array.
+ */
+
+{
+    long i, length, num_values;
+    mapping_t *m;
+    svalue_t *key;
+
+    /* Check the arguments and set length to the size of
+     * the shortest array.
+     */
+    length = LONG_MAX;
+    for (i = -num_arg; ++i <= 0; )
+    {
+        if ( sp[i].type != T_POINTER )
+            vefun_arg_error(i+num_arg, T_POINTER, sp[i].type, sp);
+        if (length > (long)VEC_SIZE(sp[i].u.vec))
+            length = (long)VEC_SIZE(sp[i].u.vec);
+    }
+
+    if (max_mapping_size && length > max_mapping_size)
+        error("Illegal mapping size: %ld\n", length);
+
+    /* Allocate the mapping */
+    num_values = num_arg - 1;
+    m = allocate_mapping(length, num_values);
+    if (!m)
+        error("Out of memory\n");
+
+    /* Shift key through the first array and assign the values
+     * from the others.
+     */
+    key = &(sp-num_values)->u.vec->item[length];
+    while (--length >= 0)
+    {
+        svalue_t *dest;
+
+        dest = get_map_lvalue_unchecked(m, --key);
+        for (i = -num_values; ++i <= 0; )
+        {
+            /* If a key value appears multiple times, we have to free
+             * a previous assigned value to avoid a memory leak
+             */
+            assign_svalue(dest++, &sp[i].u.vec->item[length]);
+        }
+    }
+
+    /* Clean up the stack and push the result */
+    sp = pop_n_elems(num_arg, sp);
+    push_mapping(sp, m);
+
+    return sp;
+} /* f_mkmapping() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_unmkmapping (svalue_t *sp)
+
+/* EFUN unmkmapping()
+ *
+ *   mixed* unmkmapping(mapping map)
+ *
+ * Take mapping <map> and return an array of arrays with the keys
+ * and values from the mapping.
+ *
+ * The return array has the form ({ keys[], data0[], data1[], ... }).
+ */
+
+{
+    svalue_t *svp;
+    mapping_t *m;
+    vector_t *v;
+    struct mvf_info vip;
+    mp_int size;
+    int i;
+
+    /* Get the arguments */
+    m = sp->u.map;
+
+    /* Determine the size of the mapping and allocate the result vector */
+    check_map_for_destr(m);
+    size = (mp_int)MAP_SIZE(m);
+    v = allocate_array(m->num_values+1);
+
+    /* Allocate the sub vectors */
+    for (i = 0, svp = v->item; i <= m->num_values; i++, svp++)
+    {
+        vector_t *v2;
+
+        v2 = allocate_array(size);
+        put_array(svp, v2);
+    }
+
+    /* Copy the elements from the mapping into the vector brush */
+    vip.svp = v->item;
+    vip.num = 0;
+    vip.width = m->num_values;
+    walk_mapping(m, m_unmake_filter, &vip);
+
+    /* Clean up the stack and push the result */
+    free_mapping(m);
+    put_array(sp,v);
+
+    return sp;
+} /* f_unmkmapping() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_widthof (svalue_t *sp)
+
+/* EFUN widthof()
+ *
+ *   int widthof (mapping map)
+ *
+ * Returns the number of values per key of mapping <map>.
+ * If <map> is 0, the result is 0.
+ */
+
+{
+    int width;
+
+    if (sp->type == T_NUMBER && sp->u.number == 0)
+        return sp;
+
+    if (sp->type != T_MAPPING)
+        efun_arg_error(1, T_MAPPING, sp->type, sp);
+
+    width = sp->u.map->num_values;
+    free_mapping(sp->u.map);
+    put_number(sp, width);
+
+    return sp;
+} /* f_widthof() */
 
 /***************************************************************************/
 

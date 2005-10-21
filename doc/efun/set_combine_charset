@@ -25,11 +25,11 @@ EXAMPLE
         // In a screen-oriented editor, most of the printable characters
         // (excluding answers to editor prompts 'j', 'n' and 'q') can be
         // combined into strings.
-        set_connection_charset("abcdefghijklmoprstuvwxz0123456789"
-                               "ABCDEFGHIJKLMOPRSTUVWXZ");
+        set_combine_charset("abcdefghijklmoprstuvwxz0123456789"
+                            "ABCDEFGHIJKLMOPRSTUVWXZ");
 
         // Disable any previous setting.
-        set_connection_charset("");
+        set_combine_charset("");
 
 
 HISTORY

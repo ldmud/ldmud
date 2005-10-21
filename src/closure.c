@@ -163,6 +163,7 @@
 #include "stdstrings.h"
 #include "stralloc.h"
 #include "svalue.h"
+#include "swap.h"
 #include "switch.h"
 #include "xalloc.h"
 
@@ -691,8 +692,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
 
         /* Replace the function with "undef" */
         p = LAMBDA_CODE(lrpp->l.u.lambda->function.code);
-        p[0] = F_ESCAPE;
-        p[1] = F_UNDEF - 0x100;
+        p[0] = F_UNDEF;
 
         /* Free the protector and all held values */
         free_array(lrpp->args);
@@ -812,7 +812,7 @@ closure_literal (svalue_t *dest, int ix)
     if (!l)
     {
     	put_number(dest, 0);
-    	error("Out of memory (%lu bytes) for closure literal"
+        error("Out of memory (%lu bytes) for closure literal"
              , (unsigned long) sizeof(*l));
     	/* NOTREACHED */
     	return;
@@ -2142,6 +2142,7 @@ compile_value (svalue_t *value, int opt_flags)
                             /* First assignemnts: forget the value */
                             STORE_CODE(current.codep, F_VOID_ASSIGN);
                         }
+                        current.code_left--;
                     }
                     break;
                   }
@@ -2179,6 +2180,7 @@ compile_value (svalue_t *value, int opt_flags)
                         {
                             STORE_CODE(current.codep, F_PRE_INC);
                         }
+                        current.code_left--;
                     }
                     else
                     {
@@ -2191,6 +2193,7 @@ compile_value (svalue_t *value, int opt_flags)
                         }
                         else
                             STORE_CODE(current.codep, F_ADD_EQ);
+                        current.code_left--;
                     }
                     break;
 
@@ -2227,12 +2230,14 @@ compile_value (svalue_t *value, int opt_flags)
                         {
                             STORE_CODE(current.codep, F_PRE_DEC);
                         }
+                        current.code_left--;
                     }
                     else
                     {
                         compile_value(argp+2, REF_REJECTED);
                         compile_lvalue(argp+1, USE_INDEX_LVALUE);
                         STORE_CODE(current.codep, F_SUB_EQ);
+                        current.code_left--;
                     }
                     break;
 
@@ -2264,6 +2269,7 @@ compile_value (svalue_t *value, int opt_flags)
                     compile_value(argp+2, REF_REJECTED);
                     compile_lvalue(argp+1, USE_INDEX_LVALUE);
                     STORE_CODE(current.codep, (bytecode_t)type);
+                    current.code_left--;
                     break;
 
                 /* ({#'++, <lvalue> })
@@ -2297,6 +2303,7 @@ compile_value (svalue_t *value, int opt_flags)
                     }
                     else
                         STORE_CODE(current.codep, (bytecode_t)type);
+                    current.code_left--;
 
                     break;
 
@@ -2589,7 +2596,6 @@ compile_value (svalue_t *value, int opt_flags)
                         if (!is_lvalue(argp, 0))
                             lambda_error("Missing variable lvalue to #'foreach\n");
                         compile_lvalue(argp, 0);
-                        current.code_left++; /* Don't need that assign byte */
                     }
                     else
                     {
@@ -2607,7 +2613,6 @@ compile_value (svalue_t *value, int opt_flags)
                             if (!is_lvalue(svp, 0))
                                 lambda_error("Missing variable lvalue to #'foreach\n");
                             compile_lvalue(svp, 0);
-                            current.code_left++; /* Don't need that assign byte */
                         }
                     }
 
@@ -2689,12 +2694,11 @@ compile_value (svalue_t *value, int opt_flags)
                     start = current.code_max - current.code_left;
 
                     void_given = compile_value(++argp, 0);
-                    if (current.code_left < 2)
+                    if (current.code_left < 1)
                         realloc_code();
 
-                    current.code_left -= 2;
-                    STORE_CODE(current.codep, F_ESCAPE);
-                    STORE_CODE(current.codep, F_END_CATCH - 0x100);
+                    current.code_left -= 1;
+                    STORE_CODE(current.codep, F_END_CATCH);
 
                     offset = current.code_max - current.code_left - start;
                     if (offset > 0xff)
@@ -2774,7 +2778,6 @@ compile_value (svalue_t *value, int opt_flags)
                         if (opt_flags & REF_REJECTED)
                             lambda_error("Reference value in bad position\n");
                         compile_lvalue(++argp, PROTECT_LVALUE|USE_INDEX_LVALUE);
-                        current.code_left++;
                     }
                     else
                     {
@@ -2811,7 +2814,6 @@ compile_value (svalue_t *value, int opt_flags)
                     while (--lvalues >= 0)
                     {
                         compile_lvalue(++argp, PROTECT_LVALUE|USE_INDEX_LVALUE);
-                        current.code_left++;
                     }
                     
                     if (current.code_left < 2)
@@ -2854,7 +2856,6 @@ compile_value (svalue_t *value, int opt_flags)
                     while (--lvalues >= 0)
                     {
                         compile_lvalue(++argp, PROTECT_LVALUE|USE_INDEX_LVALUE);
-                        current.code_left++;
                     }
                     
                     if (current.code_left < 2)
@@ -3444,15 +3445,12 @@ compile_value (svalue_t *value, int opt_flags)
                 }
 
                 /* Store function bytecode. */
-                if (f > 0xff)
+                if (instrs[f].prefix)
                 {
-                    STORE_CODE(p, (bytecode_t)(f >> F_ESCAPE_BITS));
-                    /* This relies on the known encoding of the prefix
-                     * codes.
-                     */
+                    STORE_CODE(p, instrs[f].prefix);
                     current.code_left--;
                 }
-                STORE_CODE(p, (bytecode_t)f);
+                STORE_CODE(p, instrs[f].opcode);
                 current.code_left--;
 
                 /* Store the number of arguments if required */
@@ -3610,10 +3608,11 @@ compile_value (svalue_t *value, int opt_flags)
                 compile_value(++argp, 0);
             }
             
-            if (current.code_left < 2)
+            if (current.code_left < 3)
                 realloc_code();
-            current.code_left -= 2;
-            STORE_CODE(current.codep, F_FUNCALL);
+            current.code_left -= 3;
+            STORE_CODE(current.codep, instrs[F_FUNCALL].prefix);
+            STORE_CODE(current.codep, instrs[F_FUNCALL].opcode);
             STORE_UINT8(current.codep, (bytecode_t)block_size);
             break;
           } /* CLOSURE_ALIEN_LFUN */
@@ -3645,10 +3644,11 @@ compile_value (svalue_t *value, int opt_flags)
                 {
                     compile_value(++argp, 0);
                 }
-                if (current.code_left < 2)
+                if (current.code_left < 3)
                     realloc_code();
-                current.code_left -= 2;
-                STORE_CODE(current.codep, F_FUNCALL);
+                current.code_left -= 3;
+                STORE_CODE(current.codep, instrs[F_FUNCALL].prefix);
+                STORE_CODE(current.codep, instrs[F_FUNCALL].opcode);
                 STORE_CODE(current.codep, (bytecode_t)block_size);
             }
             else
@@ -3696,10 +3696,11 @@ compile_value (svalue_t *value, int opt_flags)
             	/* We need the FUNCALL */
             	
                 insert_value_push(argp);
-                if (current.code_left < 2)
+                if (current.code_left < 3)
                     realloc_code();
-                current.code_left -= 2;
-                STORE_CODE(current.codep, F_FUNCALL);
+                current.code_left -= 3;
+                STORE_CODE(current.codep, instrs[F_FUNCALL].prefix);
+                STORE_CODE(current.codep, instrs[F_FUNCALL].opcode);
                 STORE_UINT8(current.codep, 1);
             }
             else
@@ -3887,7 +3888,7 @@ compile_lvalue (svalue_t *argp, int flags)
 
 /* Compile the <argp> into an lvalue, according to the <flags>. The function
  * allocates enough space in the code buffer to store the assignment code
- * (1 Byte) as well.
+ * (1 Byte) as well, so on return .code_left >= 1 holds.
  */
 
 {
@@ -3914,7 +3915,7 @@ compile_lvalue (svalue_t *argp, int flags)
             
         if (current.code_left < 3)
             realloc_code();
-        current.code_left -= 3;
+        current.code_left -= 2;
         STORE_CODE(current.codep, F_PUSH_LOCAL_VARIABLE_LVALUE);
         STORE_UINT8(current.codep, (bytecode_t)sym->index);
         return;
@@ -3949,14 +3950,13 @@ compile_lvalue (svalue_t *argp, int flags)
                             realloc_code();
                         if (flags & PROTECT_LVALUE)
                         {
-                            current.code_left -= 2;
-                            STORE_CODE(current.codep, F_ESCAPE);
+                            current.code_left -= 1;
                             STORE_CODE(current.codep, (bytecode_t)(
                               argp->x.closure_type == F_RINDEX +CLOSURE_EFUN ?
-                                F_PROTECTED_RINDEX_LVALUE - 0x100 :
-                                F_PROTECTED_INDEX_LVALUE  - 0x100));
+                                F_PROTECTED_RINDEX_LVALUE :
+                                F_PROTECTED_INDEX_LVALUE ));
                         } else {
-                            current.code_left--;
+                            current.code_left -= 1;
                             STORE_CODE(current.codep, (bytecode_t)(
                               argp->x.closure_type == F_RINDEX + CLOSURE_EFUN ?
                                 F_RINDEX_LVALUE :
@@ -3967,17 +3967,16 @@ compile_lvalue (svalue_t *argp, int flags)
                     
                     compile_value(argp+1, 0);
                     compile_value(argp+2, 0);
-                    if (current.code_left < 3)
+                    if (current.code_left < 2)
                         realloc_code();
                     if (flags & PROTECT_LVALUE) {
-                        current.code_left -= 3;
-                        STORE_CODE(current.codep, F_ESCAPE);
+                        current.code_left -= 1;
                         STORE_CODE(current.codep, (bytecode_t)(
                           argp->x.closure_type == F_RINDEX +CLOSURE_EFUN ?
-                            F_PUSH_PROTECTED_RINDEXED_LVALUE - 0x100 :
-                            F_PUSH_PROTECTED_INDEXED_LVALUE  - 0x100));
+                            F_PUSH_PROTECTED_RINDEXED_LVALUE :
+                            F_PUSH_PROTECTED_INDEXED_LVALUE ));
                     } else {
-                        current.code_left -= 2;
+                        current.code_left -= 1;
                         STORE_CODE(current.codep, (bytecode_t)(
                           argp->x.closure_type == F_RINDEX +CLOSURE_EFUN ?
                             F_PUSH_RINDEXED_LVALUE :
@@ -3994,19 +3993,19 @@ compile_lvalue (svalue_t *argp, int flags)
                     compile_value(argp+1, 0);
                     compile_value(argp+2, 0);
                     compile_value(argp+3, 0);
-                    if (current.code_left < 3)
+
+                    if (current.code_left < 2)
                         realloc_code();
                         
                     if (flags & PROTECT_LVALUE)
                     {
-                        current.code_left -= 3;
-                        STORE_CODE(current.codep, F_ESCAPE);
+                        current.code_left -= 1;
                         STORE_CODE(current.codep, 
-                          F_PUSH_PROTECTED_INDEXED_MAP_LVALUE  -0x100);
+                          F_PUSH_PROTECTED_INDEXED_MAP_LVALUE);
                     }
                     else
                     {
-                        current.code_left -= 2;
+                        current.code_left -= 1;
                         STORE_CODE(current.codep,
                                      F_PUSH_INDEXED_MAP_LVALUE);
                     }
@@ -4029,14 +4028,12 @@ compile_lvalue (svalue_t *argp, int flags)
                     realloc_code();
                 if (flags & PROTECT_LVALUE)
                 {
-                    current.code_left -= 2;
-                    STORE_CODE(current.codep, F_ESCAPE);
-                    STORE_CODE(current.codep,
-                                 F_PROTECTED_RANGE_LVALUE - 0x100);
+                    current.code_left -= 1;
+                    STORE_CODE(current.codep, F_PROTECTED_RANGE_LVALUE);
                 }
                 else
                 {
-                    current.code_left--;
+                    current.code_left -= 1;
                     STORE_CODE(current.codep, F_RANGE_LVALUE);
                 }
                 return;
@@ -4077,8 +4074,7 @@ compile_lvalue (svalue_t *argp, int flags)
                 
                 if (current.code_left < 2)
                     realloc_code();
-                current.code_left -= 2;
-                STORE_CODE(current.codep, F_ESCAPE);
+                current.code_left -= 1;
                 STORE_CODE(current.codep, (bytecode_t)code);
                 return;
               }
@@ -4093,18 +4089,17 @@ compile_lvalue (svalue_t *argp, int flags)
                 compile_value(++argp, 0);
                 compile_value(++argp, 0);
                 
-                if (current.code_left < 3)
+                if (current.code_left < 2)
                     realloc_code();
                 if (flags & PROTECT_LVALUE)
                 {
-                    current.code_left -= 3;
-                    STORE_CODE(current.codep, F_ESCAPE);
+                    current.code_left -= 1;
                     STORE_CODE(current.codep,
-                      F_PUSH_PROTECTED_INDEXED_MAP_LVALUE - 0x100);
+                      F_PUSH_PROTECTED_INDEXED_MAP_LVALUE);
                 }
                 else
                 {
-                    current.code_left -= 2;
+                    current.code_left -= 1;
                     STORE_CODE(current.codep, F_PUSH_INDEXED_MAP_LVALUE);
                 }
                 return;
@@ -4122,7 +4117,7 @@ compile_lvalue (svalue_t *argp, int flags)
                     break;
                 if (current.code_left < 3)
                     realloc_code();
-                current.code_left -= 3;
+                current.code_left -= 2;
                 if ((short)l->function.index < 0)
                     lambda_error("Variable not inherited\n");
                 STORE_CODE(current.codep, F_PUSH_IDENTIFIER_LVALUE);
@@ -4149,7 +4144,7 @@ compile_lvalue (svalue_t *argp, int flags)
                 break;
             if (current.code_left < 3)
                 realloc_code();
-            current.code_left -= 3;
+            current.code_left -= 2;
             if ((short)l->function.index < 0)
                 lambda_error("Variable not inherited\n");
             STORE_CODE(current.codep, F_PUSH_IDENTIFIER_LVALUE);
@@ -4232,8 +4227,8 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
     current.code_left = CODE_BUFFER_START_SIZE-3;
     current.levels_left = MAX_LAMBDA_LEVELS;
     if ( !(current.code = current.codep = xalloc((size_t)current.code_max)) )
-        lambda_error("Out of memory (%ld bytes) for initial codebuffer\n"
-                    , current.code_max);
+       lambda_error("Out of memory (%ld bytes) for initial codebuffer\n"
+                   , current.code_max);
 
     /* Store the lambda code header */
     STORE_UINT8(current.codep, 0);          /* dummy for num values */
@@ -4747,7 +4742,7 @@ symbol_operator (char *symbol, char **endp)
 void
 symbol_efun (svalue_t *sp)
 
-/* This function implements the efun symbol_efun(). It is also called by
+/* This function implements the efun symbol_function(). It is also called by
  * parse_command to lookup the (simul)efuns find_living() and find_player()
  * at runtime.
  *
@@ -4913,9 +4908,9 @@ undefined_function:
             svalue_t *res;
 
             inter_sp = sp;
-            push_volatile_string("nomask simul_efun");
-            push_valid_ob(current_object);
-            push_shared_string(p->name);
+            push_volatile_string(inter_sp, "nomask simul_efun");
+            push_ref_valid_object(inter_sp, current_object, "nomask simul_efun");
+            push_ref_string(inter_sp, p->name);
             res = apply_master_ob(STR_PRIVILEGE, 3);
             
             if (!res || res->type != T_NUMBER || res->u.number < 0)
@@ -4986,38 +4981,175 @@ undefined_function:
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_unbound_lambda (svalue_t *sp)
+f_bind_lambda (svalue_t *sp)
 
-/* TEFUN closure unbound_lambda()
+/* EFUN bind_lambda()
  *
- *   closure unbound_lambda(mixed *args, mixed)
+ *     closure bind_lambda(closure cl, object ob = 1)
  *
+ * Binds an unbound closure <cl> to object <ob> and return the
+ * bound closure.
  *
- * Constructs a lambda closure that is not bound to an object,
- * like lambda function in LISP.
- * The closure cannot contain references to global variables, and
- * all lfun closures are inserted as is, since there is no native
- * object for this closure. You need to bind it before it can be
- * called. Ordinary objects can only bind to themselves, binding
- * to other objects causes a privilege violation(). The point is
- * that previous_object for calls done from inside the closure
- * will reflect the object doing bind_lambda(), and all object /
- * uid based security will also refer to this object.
+ * If the optional argument ob is not this_object(), the privilege
+ * violation ("bind_lambda", this_object(), ob) occurs.
+ *
+ * If the argument <ob> is omitted, the closure is bound to
+ * this_object(), and additionally the function accepts unbindable
+ * closures without complaint.
+ *
+ * Note: the 'default' value for <ob> is const1 so that the omittal
+ * can be detected.
+ */
+
+{
+    object_t *ob;
+
+    if (sp->type == T_OBJECT)
+    {
+        /* If <ob> is given, check for a possible privilege breach */
+        ob = sp->u.ob;
+        if (ob != current_object
+         && !_privilege_violation("bind_lambda", sp, sp))
+        {
+            free_object(ob, "bind_lambda");
+            sp--;
+            return sp;
+        }
+    }
+    else if (sp->type == T_NUMBER && sp->u.number == 1)
+    {
+        /* this_object is ok */
+        ob = ref_object(current_object, "bind_lambda");
+    }
+    else
+    {
+        efun_arg_error(2, T_OBJECT, sp->type, sp);
+        /* NOTREACHED */
+        return sp;
+    }
+
+    sp--;  /* points to the closure now */
+    inter_sp = sp;
+
+    switch(sp->x.closure_type)
+    {
+    case CLOSURE_LFUN:
+    case CLOSURE_LAMBDA:
+    case CLOSURE_IDENTIFIER:
+    case CLOSURE_PRELIMINARY:
+        /* Unbindable closures. Free the ob reference and
+         * throw an error (unless <ob> has been omitted)
+         */
+        free_object(ob, "bind_lambda");
+        if (sp[1].type == T_NUMBER)
+            break;
+        error("Bad arg 1 to bind_lambda(): unbindable closure\n");
+        /* NOTREACHED */
+        return sp;
+        break;
+
+    case CLOSURE_ALIEN_LFUN:
+        /* Rebind an alien lfun to the given object */
+        free_object(sp->u.lambda->ob, "bind_lambda");
+        sp->u.lambda->ob = ob;
+        break;
+
+    default:
+        /* efun, simul_efun, operator closures: rebind it */
+
+        free_object(sp->u.ob, "bind_lambda");
+        sp->u.ob = ob;
+        break;
+
+    case CLOSURE_BOUND_LAMBDA:
+      {
+        /* Rebind an already bound lambda closure */
+
+        lambda_t *l;
+
+        if ( (l = sp->u.lambda)->ref == 1)
+        {
+            /* We are the only user of the lambda: simply rebind it.
+             */
+
+            object_t **obp;
+
+            obp = &l->ob;
+            free_object(*obp, "bind_lambda");
+            *obp = ob;
+            break;
+        }
+        else
+        {
+            /* We share the closure with others: create our own
+             * copy, bind it and put it onto the stack in place of
+             * the original one.
+             */
+            lambda_t *l2;
+
+            l->ref--;
+            l2 = xalloc(sizeof *l);
+            l2->ref = 1;
+            l2->ob = ob;
+            l2->function.lambda = l->function.lambda;
+            l->function.lambda->ref++;
+            sp->u.lambda = l2;
+            break;
+        }
+      }
+
+    case CLOSURE_UNBOUND_LAMBDA:
+      {
+        /* Whee, an unbound lambda: create the bound-lambda structure
+         * and put it onto the stack in place of the unbound one.
+         */
+
+        lambda_t *l;
+
+        l = xalloc(sizeof *l);
+        l->ref = 1;
+        l->ob = ob;
+        l->function.lambda = sp->u.lambda;
+        /* The ref to the unbound closure is just transferred from
+         * sp to l->function.lambda.
+         */
+        sp->x.closure_type = CLOSURE_BOUND_LAMBDA;
+        sp->u.lambda = l;
+        break;
+      }
+    }
+
+    return sp;
+} /* bind_lambda() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_lambda (svalue_t *sp)
+
+/* EFUN lambda()
+ *
+ *   closure lambda(mixed *arr, mixed)
+ *
+ * Constructs a lambda closure, like lambda function in LISP.
+ * The closure is bound the creating object, and thus can contain
+ * references to global variables.
  *
  * The first argument is an array describing the arguments
  * (symbols) passed to the closure upon evaluation by funcall()
- * or apply(), the second arg forms the code of the closure.
+ * or apply(). It may be 0 if no arguments are required.
  */
 
 {
     lambda_t *l;
     vector_t *args;
 
-    /* Get and test the arguments */
     if (sp[-1].type != T_POINTER)
     {
+        /* If '0' is given for the args array, replace it
+         * with the null-vector.
+         */
         if (sp[-1].type != T_NUMBER || sp[-1].u.number)
-            bad_xefun_arg(1, sp);
+            efun_arg_error(1, T_POINTER, sp->type, sp);
         args = ref_array(&null_vector);
     }
     else
@@ -5025,26 +5157,179 @@ f_unbound_lambda (svalue_t *sp)
         args = sp[-1].u.vec;
     }
 
-    /* Compile the lambda */
-    inter_sp = sp;
-    l = lambda(args, sp, 0);
-    l->ob = NULL;
+    /* Create the lambda closure */
+    l = lambda(args, sp, current_object);
+    l->ob = ref_object(current_object, "lambda");
 
     /* Clean up the stack and push the result */
-    
     free_svalue(sp--);
     free_array(args);
+
     sp->type = T_CLOSURE;
-    sp->x.closure_type = CLOSURE_UNBOUND_LAMBDA;
+    sp->x.closure_type = CLOSURE_LAMBDA;
     sp->u.lambda = l;
+
     return sp;
-} /* f_unbound_lambda() */
+} /* f_lambda() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_symbol_function (svalue_t *sp)
+
+/* EFUN symbol_function()
+ *
+ *   closure symbol_function(symbol arg)
+ *   closure symbol_function(string arg)
+ *   closure symbol_function(string arg, object|string ob)
+ *
+ * Constructs a lfun closure, efun closure or operator closure
+ * from the first arg (string or symbol). For lfuns, the second
+ * arg is the object that the lfun belongs to, specified by
+ * the object itself or by its name (the object will be loaded
+ * in the second case)
+ *
+ * Private lfuns can never be accessed this way, static and
+ * protected lfuns only if <ob> is the current object.
+ */
+
+{
+    object_t *ob;
+    program_t *prog;
+    int i;
+
+    /* If 'arg' is not a symbol, make sure it's a shared string. */
+    if (sp[-1].type != T_SYMBOL && sp[-1].x.string_type != STRING_SHARED)
+    {
+        char *str;
+
+        str = sp[-1].u.string;
+        sp[-1].u.string = make_shared_string(str);
+        if (sp[-1].x.string_type == STRING_MALLOC)
+            xfree(str);
+        sp[-1].x.string_type = STRING_SHARED;
+    }
+
+    /* If 'ob' is not of type object, it might be the name of
+     * an object to load, or we need to make an efun symbol.
+     */
+    if (sp->type != T_OBJECT)
+    {
+        /* If it's the number 0, an efun symbol is desired */
+        if (sp->type == T_NUMBER && sp->u.number == 0)
+        {
+            sp--;
+            symbol_efun(sp);
+            return sp;
+        }
+
+        /* Find resp. load the object by name */
+        if (sp->type != T_STRING)
+        {
+            efun_arg_error(2, T_STRING, sp->type, sp);
+            /* NOTREACHED */
+            return sp;
+        }
+        ob = get_object(sp->u.string);
+        if (!ob)
+            error("Object '%s' not found.\n", sp->u.string);
+        free_svalue(sp);
+        put_ref_object(sp, ob, "symbol_function");
+    }
+    else
+    {
+        ob = sp->u.ob;
+    }
+
+    /* We need the object's program */
+    if (O_PROG_SWAPPED(ob))
+    {
+        ob->time_of_ref = current_time;
+        if (load_ob_from_swap(ob) < 0)
+        {
+            inter_sp = sp;
+            error("Out of memory\n");
+        }
+    }
+
+    /* Find the function in the program */
+    prog = ob->prog;
+    i = find_function(sp[-1].u.string, prog);
+
+    /* If the function exists and is visible, create the closure
+     */
+    if ( i >= 0
+      && ( !(prog->functions[i] & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|TYPE_MOD_PRIVATE) )
+         || (    !(prog->functions[i] & TYPE_MOD_PRIVATE)
+              && current_object == ob)
+         )
+       )
+    {
+        lambda_t *l;
+        ph_int closure_type;
+
+        l = xalloc(sizeof *l);
+        if (!l)
+        {
+            error("Out of memory.\n");
+            /* NOTREACHED */
+            return sp;
+        }
+
+        /* Set the closure */
+        if (ob == current_object)
+        {
+            l->function.index = (unsigned short)i;
+            closure_type = CLOSURE_LFUN;
+              /* current_object already has an extra ref from being
+               * argument, so we don't need to add one for the l->ob
+               * below.
+               */
+        }
+        else
+        {
+            l->function.alien.ob = ob;
+            l->function.alien.index = (unsigned short)i;
+            closure_type = CLOSURE_ALIEN_LFUN;
+            ref_object(current_object, "symbol_function");
+              /* We adopt the ref of ob from the arguments, and
+               * add a ref to current_object for the l->ob below.
+               */
+        }
+
+        l->ref = 1;
+        l->ob = current_object; /* see above regarding the ref count */
+
+        /* Clean up the stack and push the result */
+        sp--;
+        deref_string(sp->u.string);
+        sp->type = T_CLOSURE;
+        sp->x.closure_type = closure_type;
+        sp->u.lambda = l;
+
+        /* A last thing: take care of a pending replace_program */
+        if ( !(prog->flags & P_REPLACE_ACTIVE)
+         ||  !lambda_ref_replace_program(l, closure_type, 0, 0, 0) )
+        {
+            ob->flags |= O_LAMBDA_REFERENCED;
+        }
+
+        return sp;
+    }
+
+    /* Symbol can't be created - free the stack and push 0 */
+    free_object(ob, "symbol_function");
+    sp--;
+    free_string(sp->u.string);
+    put_number(sp, 0);
+
+    return sp;
+} /* f_symbol_function() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
 f_symbol_variable (svalue_t *sp)
 
-/* TEFUN symbol_variable()
+/* EFUN symbol_variable()
  *
  *   closure symbol_variable(string arg)
  *   closure symbol_variable(symbol arg)
@@ -5091,7 +5376,8 @@ f_symbol_variable (svalue_t *sp)
     switch(sp->type)
     {
     default:
-        bad_xefun_arg(1, sp);
+        fatal("Bad arg 1 to symbol_variable(): type %s\n", typename(sp->type));
+        break;
 
     case T_NUMBER:  /* The index is given directly */
         n = sp->u.number;
@@ -5182,6 +5468,62 @@ f_symbol_variable (svalue_t *sp)
 
     return sp;
 } /* f_symbol_variable() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_unbound_lambda (svalue_t *sp)
+
+/* EFUN closure unbound_lambda()
+ *
+ *   closure unbound_lambda(mixed *args, mixed)
+ *
+ *
+ * Constructs a lambda closure that is not bound to an object,
+ * like lambda function in LISP.
+ * The closure cannot contain references to global variables, and
+ * all lfun closures are inserted as is, since there is no native
+ * object for this closure. You need to bind it before it can be
+ * called. Ordinary objects can only bind to themselves, binding
+ * to other objects causes a privilege violation(). The point is
+ * that previous_object for calls done from inside the closure
+ * will reflect the object doing bind_lambda(), and all object /
+ * uid based security will also refer to this object.
+ *
+ * The first argument is an array describing the arguments
+ * (symbols) passed to the closure upon evaluation by funcall()
+ * or apply(), the second arg forms the code of the closure.
+ */
+
+{
+    lambda_t *l;
+    vector_t *args;
+
+    /* Get and test the arguments */
+    if (sp[-1].type != T_POINTER)
+    {
+        if (sp[-1].type != T_NUMBER || sp[-1].u.number)
+            efun_gen_arg_error(1, sp->type, sp);
+        args = ref_array(&null_vector);
+    }
+    else
+    {
+        args = sp[-1].u.vec;
+    }
+
+    /* Compile the lambda */
+    inter_sp = sp;
+    l = lambda(args, sp, 0);
+    l->ob = NULL;
+
+    /* Clean up the stack and push the result */
+    
+    free_svalue(sp--);
+    free_array(args);
+    sp->type = T_CLOSURE;
+    sp->x.closure_type = CLOSURE_UNBOUND_LAMBDA;
+    sp->u.lambda = l;
+    return sp;
+} /* f_unbound_lambda() */
 
 /*=========================================================================*/
 

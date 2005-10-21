@@ -2,9 +2,9 @@
 #define SPRINTF_H__ 1
 
 #include "driver.h"
-
 #include "typedefs.h" 
 
-extern char *string_print_formatted(char *format_str, int argc, svalue_t *argv);
+extern svalue_t *f_printf(svalue_t *sp, int num_arg);
+extern svalue_t *f_sprintf(svalue_t *sp, int num_arg);
 
 #endif /* SPRINTF_H__ */

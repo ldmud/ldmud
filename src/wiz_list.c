@@ -99,6 +99,7 @@
 #include "interpret.h"
 #include "main.h"
 #include "object.h"
+#include "simulate.h"
 #include "stdstrings.h"
 #include "stralloc.h"
 #include "svalue.h"
@@ -275,7 +276,7 @@ get_wiz_name (char *file)
     svalue_t *ret;
     static char buff[50];
 
-    push_volatile_string(file);
+    push_volatile_string(inter_sp, file);
     ret = apply_master_ob(STR_GET_WNAME, 1);
     if (ret == 0 || ret->type != T_STRING)
         return NULL;
@@ -415,7 +416,7 @@ save_error (char *msg, char *file, int line)
 svalue_t *
 f_wizlist_info (svalue_t *sp)
 
-/* TEFUN wizlist_info()
+/* EFUN wizlist_info()
  *
  *    mixed *wizlist_info()
  *
@@ -469,8 +470,8 @@ f_wizlist_info (svalue_t *sp)
                 assign_svalue_no_free(&(svp[WL_EXTRA]), &w->extra);
         } /* end for */
     } /* end if */
-    sp++;
-    put_array(sp, all);
+
+    push_array(sp, all);
     return sp;
 } /* f_wizlist_info() */
 
@@ -478,7 +479,7 @@ f_wizlist_info (svalue_t *sp)
 svalue_t *
 f_set_extra_wizinfo (svalue_t *sp)
 
-/* TEFUN set_extra_wizinfo()
+/* EFUN set_extra_wizinfo()
  *
  *   void set_extra_wizinfo (object wiz, mixed extra)
  *   void set_extra_wizinfo (string wiz, mixed extra)
@@ -513,7 +514,7 @@ f_set_extra_wizinfo (svalue_t *sp)
         if (type == T_NUMBER && sp[-1].u.number == 0)
             user = NULL;
         else
-            bad_xefun_arg(1, sp);
+            efun_gen_arg_error(1, sp->type, sp);
     }
 
     if (!_privilege_violation("set_extra_wizinfo", sp-1, sp))
@@ -530,7 +531,7 @@ f_set_extra_wizinfo (svalue_t *sp)
 svalue_t *
 f_get_extra_wizinfo (svalue_t *sp)
 
-/* TEFUN get_extra_wizinfo()
+/* EFUN get_extra_wizinfo()
  *
  *   mixed get_extra_wizinfo (object wiz)
  *   mixed get_extra_wizinfo (string wiz)
@@ -562,11 +563,11 @@ f_get_extra_wizinfo (svalue_t *sp)
         if (type == T_NUMBER && sp->u.number == 0)
             user = NULL;
         else
-            bad_xefun_arg(1, sp);
+            error("Bad arg 1 to get_extra_wizinfo(): no valid uid given.\n");
     }
 
     if (!_privilege_violation("get_extra_wizinfo", sp, sp))
-        bad_xefun_arg(1, sp);
+        error("Error in get_extra_wizinfo(): privilege violation.\n");
 
     assign_svalue(sp, user ? &user->extra : &default_wizlist_entry.extra);
 
@@ -577,7 +578,7 @@ f_get_extra_wizinfo (svalue_t *sp)
 svalue_t *
 f_set_extra_wizinfo_size (svalue_t *sp)
 
-/* TEFUN set_extra_wizinfo_size()
+/* EFUN set_extra_wizinfo_size()
  *
  *   void set_extra_wizinfo_size(int size)
  *
@@ -597,9 +598,6 @@ f_set_extra_wizinfo_size (svalue_t *sp)
  */
 
 {
-    if (sp->type != T_NUMBER)
-        bad_xefun_arg(1, sp);
-
     if (!_privilege_violation("set_extra_wizinfo_size", &const0, sp))
         wiz_info_extra_size = sp->u.number;
 
@@ -612,7 +610,7 @@ f_set_extra_wizinfo_size (svalue_t *sp)
 svalue_t *
 f_get_error_file (svalue_t *sp)
 
-/* TEFUN get_error_file()
+/* EFUN get_error_file()
  *
  *   mixed * get_error_file(string name, int set_forget_flag)
  *
@@ -639,11 +637,6 @@ f_get_error_file (svalue_t *sp)
     vector_t *vec;
     svalue_t *v;
 #   define FORGET_FLAG 0x4000000 /* 0x80...0 would be the sign! */
-
-    if (sp[-1].type != T_STRING)
-        bad_xefun_arg(1, sp);
-    if (sp->type != T_NUMBER)
-        bad_xefun_arg(2, sp);
 
     /* Get the function arguments */
     name = sp[-1].u.string;
@@ -673,7 +666,7 @@ f_get_error_file (svalue_t *sp)
     put_array(sp, vec);
     return sp;
 
-#   undef FORGET_FLAG
+#   undef FORGET_FLAG 
 } /* f_get_error_file() */
 
 /*=========================================================================*/

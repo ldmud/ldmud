@@ -1,0 +1,8 @@
+Short: Allow a closure in regreplace()
+Date: 2001-05-16
+From: Fiona
+Type: Feature
+State: New
+
+Allow a closure instead of a string as replacement text. The closure
+would get the matched text and has to return the new text.

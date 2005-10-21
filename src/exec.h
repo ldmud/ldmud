@@ -87,11 +87,10 @@
  *
  * As the name conveys, the LPC programs are compiled into a bytecode,
  * assuming 8-Bit-Bytes. Since we have more than 256 opcodes, the less
- * often used instructions are encoded in two-byte opcodes: the highbyte
- * is (instruction / 128), the low byte (instruction % 128). The resulting
- * values for the highbyte are 'coincidentally' the values of the prefix
- * opcodes F_ESCAPE, F_TEFUN and F_VEFUN. The divisor 128 is symbolically
- * defined by F_ESCAPE_BITS below.
+ * often used instructions are encoded in two-byte opcodes: a prefix
+ * byte and an sub-opcode. The translation opcode -> prefix:sub-opcode
+ * is defined in the instrs[] table using the .prefix and .opcode
+ * fields.
  *
  * To achieve platform independance, the driver does not operate directly
  * with 'char's and 'char *'s, but instead with 'bytecode_t' and
@@ -220,42 +219,6 @@ typedef uint32          fulltype_t;  /* Full: type and visibility */
    */
 
 
-/* --- struct instr_s: description of stackmachine instructions ---
- *
- * Stackmachine instructions are both 'internal' codes with no external
- * representation, as well as efuns.
- *
- * The information about all instructions is collected in the table
- * instrs[] which is indexed by the bytecode of the instructions.
- *
- * The table is declared in instrs.h and defined in the file efun_defs.c
- * both of which are created by make_func from the func_spec file.
- * The table is compiled into the lexer module and exported from there.
- */
-
-struct instr_s
-{
-    short max_arg;    /* Maximum number of arguments, -1 for '...' */
-    short min_arg;
-      /* Minimum number of arguments.
-       * The number 0 marks incallable closures: instructions which
-       * are used as syntactic markers in lambda closures, but by
-       * themselves can't be executed.
-       */
-    char  type[2];    /* Types of arguments 1 and 2, using the svalue codes */
-    short Default;
-      /* An efun to use as default value for last argument.
-       * > 0: index into instrs[] to the efun to use.
-       *   0: no default value.
-       *  -1: this whole entry describes an internal stackmachine code,
-       *      not a normal efun (an 'operator' in closure lingo).
-       */
-    vartype_t ret_type;  /* The return type used by the compiler. */
-    short arg_index;     /* Indexes the efun_arg_types[] array (see make_func). */
-    char *name;          /* The printable name of the instruction. */
-};
-
-
 /* --- Byte code ---
  *
  * The program code is stored as byte code. The following definitions
@@ -307,10 +270,6 @@ struct instr_s
  *   void LOAD_INT32([unsigned] int32 d, bytecode_p p)
  *     Load the (unsigned) in32 'd' stored at <p>, then increment <p>.
  */
-
-#define F_ESCAPE_BITS 7
-   /* The number of bits the lowbyte of a dual-byte-opcode can hold
-    */
 
 #if CHAR_BIT == 8
 typedef unsigned char   bytecode_t;
@@ -410,6 +369,49 @@ typedef bytecode_t    * bytecode_p;
 #ifndef GET_CODE
 #  error "No bytecode type defined."
 #endif
+
+
+/* --- struct instr_s: description of stackmachine instructions ---
+ *
+ * Stackmachine instructions are both 'internal' codes with no external
+ * representation, as well as efuns.
+ *
+ * The information about all instructions is collected in the table
+ * instrs[] which is indexed by the code of the instructions.
+ * The .prefix and .opcode fields give the proper stackmachine opcodes
+ * for every instruction.
+ *
+ * The table is declared in instrs.h and defined in the file efun_defs.c
+ * both of which are created by make_func from the func_spec file.
+ * The table is compiled into the lexer module and exported from there.
+ */
+
+struct instr_s
+{
+    bytecode_t prefix;  /* 0 or prefix code if required */
+    bytecode_t opcode;  /* The instructions (sub-)opcode */
+    short max_arg;    /* Maximum number of arguments, -1 for '...' */
+    short min_arg;
+      /* Minimum number of arguments.
+       * The number 0 marks incallable closures: instructions which
+       * are used as syntactic markers in lambda closures, but by
+       * themselves can't be executed.
+       */
+    short Default;
+      /* An efun to use as default value for last argument.
+       * > 0: index into instrs[] to the efun to use.
+       *   0: no default value.
+       *  -1: this whole entry describes an internal stackmachine code,
+       *      not a normal efun (an 'operator' in closure lingo).
+       */
+    vartype_t ret_type;  /* The return type used by the compiler. */
+    short arg_index;     /* Indexes the efun_arg_types[] arrays. */
+    short lpc_arg_index; /* Indexes the efun_lpc_types[] arrays. */
+                         /* A '-1' index means that no type information
+                          * is available.
+                          */
+    char *name;          /* The printable name of the instruction. */
+};
 
 
 /* --- Function flags ---

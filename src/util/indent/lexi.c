@@ -540,7 +540,7 @@ lexi()
     parser_state_tos->last_u_d = unary_delim;
 
     return (code);
-};
+}
 
 /*
  * Add the given keyword to the keyword table, using val as the keyword type

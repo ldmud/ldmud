@@ -32,3 +32,40 @@ enable_dynamic_costs=yes
 with_max_players=70
 with_max_local=100
 enable_align_functions=yes
+#!/bin/sh   
+#
+# Settings for the Evermore mudlib greater v 1.4.0 (Native Mode)
+#
+# configure will strip this part from the script.
+#-------------------------------------------------------------------------
+
+exec ./configure --prefix=/home/evermore/ --libexec=/home/evermore/bin/erq_dir --with-setting=evermore-native $*
+exit 1
+
+# --- The actual settings ---
+
+with_max_array_size=0
+with_max_mapping_size=0
+with_read_file_max_size=0
+with_max_byte_transfer=0
+with_time_to_reset=2700
+with_max_cost=2000000
+with_portno=23
+with_udp_port=7780
+enable_compat_mode=no
+with_master_name=kernel/master
+with_swap_file=tmp/LP_SWAP.3
+with_access_file=etc/ACCESS.ALLOW
+with_maxnumports=2
+enable_erq=xerq
+enable_initialization_by___init=no
+enable_supply_parse_command=no
+enable_use_system_crypt=yes
+enable_lpc_nosave=yes
+enable_dynamic_costs=yes
+enable_use_mysql=yes
+enable_use_deprecated=no
+enable_use_alists=yes
+with_max_players=70
+with_max_local=100
+enable_align_functions=yes
