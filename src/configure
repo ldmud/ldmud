@@ -4090,14 +4090,14 @@ if test $lp_cv_has_mysql = yes; then
 #define HAS_MYSQL 1
 EOF
 
-  echo $ac_n "checking for main in -linet6""... $ac_c" 1>&6
-echo "configure:4095: checking for main in -linet6" >&5
-ac_lib_var=`echo inet6'_'main | sed 'y%./+-%__p_%'`
+  echo $ac_n "checking for main in -lmysqlclient""... $ac_c" 1>&6
+echo "configure:4095: checking for main in -lmysqlclient" >&5
+ac_lib_var=`echo mysqlclient'_'main | sed 'y%./+-%__p_%'`
 if eval "test \"`echo '$''{'ac_cv_lib_$ac_lib_var'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   ac_save_LIBS="$LIBS"
-LIBS="-linet6  $LIBS"
+LIBS="-lmysqlclient  $LIBS"
 cat > conftest.$ac_ext <<EOF
 #line 4103 "configure"
 #include "confdefs.h"
@@ -4121,7 +4121,7 @@ LIBS="$ac_save_LIBS"
 fi
 if eval "test \"`echo '$ac_cv_lib_'$ac_lib_var`\" = yes"; then
   echo "$ac_t""yes" 1>&6
-  LIBS="$LIBS -lmysqlclient"
+  PKGLIBS="$PKGLIBS -lmysqlclient"
 else
   echo "$ac_t""no" 1>&6
 fi
@@ -5555,6 +5555,7 @@ fi
 
 
 
+
 trap '' 1 2 15
 cat > confcache <<\EOF
 # This file is a shell script that caches the results of configure
@@ -5772,6 +5773,7 @@ s%@val_min_malloced@%$val_min_malloced%g
 s%@val_max_malloced@%$val_max_malloced%g
 s%@val_total_trace_length@%$val_total_trace_length%g
 s%@erq_sub@%$erq_sub%g
+s%@PKGLIBS@%$PKGLIBS%g
 
 CEOF
 EOF

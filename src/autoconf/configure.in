@@ -506,7 +506,7 @@ CFLAGS="$saveflags"
 ))
 if test $lp_cv_has_mysql = yes; then
   AC_DEFINE(HAS_MYSQL)
-  AC_CHECK_LIB(inet6,main, LIBS="$LIBS -lmysqlclient")
+  AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -lmysqlclient")
 fi
 
 AC_CACHE_CHECK(if rename handles directories,
@@ -1488,6 +1488,7 @@ AC_SUBST(val_total_trace_length)
 dnl finally: some remaining stuff
 dnl
 AC_SUBST(erq_sub)
+AC_SUBST(PKGLIBS)
 
 dnl
 dnl Ok. now lets make the Makefiles; also these in subdirs! [Mubo]

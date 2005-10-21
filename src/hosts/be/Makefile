@@ -108,7 +108,7 @@ endif
 
 # Generated source files (overlaps with of SRCS) which need to be
 # present for mkdepend to work.
-    GENSRCS = make_func.c stdstrings.c lang.c
+    GENSRCS = make_func.c stdstrings.c lang.c instrs.h
 
 # Macros for MkDepend:
     SKELETON = $(SRCS) make_func.c
@@ -129,6 +129,11 @@ endif
 # The following variables are used to describe the version
 # of the driver binary.
 
+# $Format: "ifeq ($(shell echo $(($ReleaseMinor: 3 $ / 2))), 0)"
+ifeq ($(shell echo $((3 / 2))), 0)
+
+# --- Stable Versions ---
+
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ReleaseMicro$"$
 SETVERFLAGS = -app 3 3 0
 
@@ -142,16 +147,30 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 3
+  SETVERFLAGS += d 4
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.3
+  VSTRING = 3.3.0-pre.4
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 3
+  SETVERFLAGS += d 4
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.3
+  VSTRING = 3.3.0-dev.4
+endif
+
+else
+
+# --- Development Versions ---
+
+# $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
+SETVERFLAGS = -app 3 3 4
+
+# $Format: "  SETVERFLAGS += f"$
+  SETVERFLAGS += f
+# $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
+  VSTRING = 3.3.4
+
 endif
 
 SETVERFLAGS += -short $(VSTRING) -long "LDMud $(VSTRING) - a LPMud Gamedriver."

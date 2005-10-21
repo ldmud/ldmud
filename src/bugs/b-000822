@@ -1,4 +1,4 @@
-Short: Crash in simul_efun
+Short: Crash in walk_mapping()
 Date: Tue, 22 Aug 2000 11:47:19 -0300
 From: Ron Dawson <rondawson@syd.eastlink.ca>
 Type: Bug
@@ -354,4 +354,132 @@ Phone: (902) 564-3660 x1345          Fax: (902) 562-6113
 Email: rdawson/@cgc.ns.ca  Pager Email: pageron@cgc.ns.ca
 --------------------------------------------------------
 
+
+Date sent:      	Fri, 25 Aug 2000 20:21:20 -0300
+From:           	Ron Dawson <rondawson@syd.eastlink.ca>
+To:             	Lars Duening <lars@bearnip.com>
+Copies to:      	Ron Dawson <rdawson@cgc.ns.ca>
+Subject:        	Re: ldmud 3.2.8 crash continued
+
+Lars Duening wrote:
+
+> How does all_data get its data - with a restore_object()? And if yes,
+> are there any changes to the data between the restore and save?
+
+Hi again.  Right now, the mapping gets it's data via a restore_object().
+There is the possibility that the mapping could chage, but not in any
+of the tests I ran.  The data only changes when someone adds a new
+terrain type (or modifies one). 
+ 
+> If the data comes indeed from a restore, make a backup copy of the
+> savefile (just in case), comment out the restore_object() call and
+> replace it with a manual setup of the mapping with the exact same
+> data usually restored from the savefile.
+> 
+> If this with walk_mapping() and save_object() in place causes the
+> crashes to vanish, the culprit is most likely restore_object() in
+> combination with the restored data and the data in all_data at the
+> time of the restore.
+
+I tried this and I had the same results.
+
+Another thing I did was switch to using map() instead of using
+walk_mapping().
+Using map() would not cause the driver to shut down (but it did still
+generate
+an error).  I'll include those errors below.
+
+> > P.S.  In answer to your question about the debug data, yes, I always
+> >       get the same backtrace each time the driver dumps core and it
+> >       always happens immediately after the weirdness with terrain_d.c
+> >       cleanup.
+> 
+> Do you already have a clue what exactly goes wrong during this
+> 'weirdness'?
+
+What I think is happening is that the object is being pulled out from
+under itself and dested before/during the walk_mapping and the driver
+can't deal with the closure/mapping once that's happened.  This virtual 
+grid implemention is a bit over convoluted with regard to handling 
+clean_up()'s and I suspect something isn't quite right with this
+object (terrain_d).  Looking at the driver files called, backend 
+is calling remove_destructed_objects() and so on up to where the
+mappings are supposed to be deallocated - only they can't. 
+
+Just a few minutes ago, I switched terrain_d to inherit our "regular"
+/std/Object file and now it works fine with no errors (because it's no
+longer doing clean_up() the vgrid way).  This isn't really a problem
+because terrain_d is a daemon that configures terrain types.  I don't
+see why it ever was inheriting the virtual rooms/container objects.
+
+Getting back to the crash, here are a few more logs.  
+
+On the 3.2.7 driver, I get the following error messages for the
+the original terrain_d in the run-time log.  The driver doesn't
+dump core.
+
+Object 'virtual/rooms/daemons/terrain_d' the closure was bound to has
+been destructed
+program: virtual/rooms/daemons/terrain_d.c, object:
+virtual/rooms/daemons/terrain_d line 28
+'       clean_up' in ' virtual/std/basic.c'
+('virtual/rooms/daemons/terrain_d')line 143
+'         remove' in 'virtual/rooms/daemons/terrain_d.c'
+('virtual/rooms/daemons/terrain_d')line 32
+'        save_me' in 'virtual/rooms/daemons/terrain_d.c'
+('virtual/rooms/daemons/terrain_d')line 28
+Error in process_objects().
+
+Line 28 is the call to walk_mapping() that I've been talking about.
+
+In 3.2.8, I'll the following in the run-time log (and the driver will
+dump core):
+
+2000.08.25 19:08:25 Object used by walk_mapping destructed2000.08.25
+19:08:25 pr
+ogram: virtual/rooms/daemons/terrain_d.c, object:
+virtual/rooms/daemons/terrain_
+d line 36
+'       clean_up' in ' virtual/std/basic.c'
+('virtual/rooms/daemons/terrain_d')l
+ine 144
+'         remove' in 'virtual/rooms/daemons/terrain_d.c'
+('virtual/rooms/daemons
+/terrain_d')line 45
+'        save_me' in 'virtual/rooms/daemons/terrain_d.c'
+('virtual/rooms/daemons
+/terrain_d')line 36
+2000.08.25 19:08:25 Error in process_objects().
+2000.08.25 19:08:25 Ref count in freed hash mapping: 1
+2000.08.25 19:08:25 Dump of the call chain:
+No program to trace.
+
+Now if I change things so that I can use map() instead
+of walk_mapping(), I'll get something like:
+
+2000.08.25 20:10:08 Object used by map destructed2000.08.25 20:10:08
+program: vi
+rtual/rooms/daemons/terrain_d.c, object: virtual/rooms/daemons/terrain_d
+line 37
+'       clean_up' in ' virtual/std/basic.c'
+('virtual/rooms/daemons/terrain_d')l
+ine 144
+'         remove' in 'virtual/rooms/daemons/terrain_d.c'
+('virtual/rooms/daemons
+/terrain_d')line 43
+'        save_me' in 'virtual/rooms/daemons/terrain_d.c'
+('virtual/rooms/daemons
+/terrain_d')line 37
+2000.08.25 20:10:08 Error in process_objects().
+
+
+Again this seems to be suggesting that the object is being destroyed
+prematurely.
+In the case of map(), the driver won't crash.
+
+As I said, I've found a way to fix the problem by staying away from the
+virtual
+grid inheritables for the terrain_d daemon.  
+
+- Ron
 

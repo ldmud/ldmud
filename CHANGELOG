@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Aug-2000 (Lars Duening)  (3.3.4)
+    - (pkg-mysql.c, configure, Makefile.in) Made the mySQL code work again.
+         Additionally the mysqlclient library is now part of the @PKGLIBS@
+         template in Makefile.in, so that utils like xerq don't have to
+         link it in. (thanks, Michael!)
+
 25-Aug-2000 (Lars Duening)  (3.3.3)
     - (xerq/lookup.c) In the IPv6 lookup, a buffer was freed twice.
          (found by Uwe and Fiona).

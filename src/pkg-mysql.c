@@ -27,8 +27,12 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <mysql/mysql.h>
+#include <mysql/errmsg.h>
+
 #include "pkg-mysql.h"
 
+#include "array.h"
 #include "interpret.h"
 #include "svalue.h"
 #include "xalloc.h"

@@ -23,15 +23,12 @@
 ;; TODO::   it is changed?
 ;; TODO: One .c-file per efun.
               
-(Project-Version lpmud 3-3 3)
-(Parent-Version lpmud 3-3 2)
-(Version-Log "Corrected a bug in xerq.
-mySQL support is now integrated into the driver.
-New LPC defines for version major, minor, micro and patchlevel.
-Removed obsolete and deprecated efuns.")
+(Project-Version lpmud 3-3 4)
+(Parent-Version lpmud 3-3 3)
+(Version-Log "Corrected the mySQL configuration.")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 26 Aug 2000 01:48:50 -0600")
+(Checkin-Time "Mon, 28 Aug 2000 21:05:02 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -64,20 +61,20 @@ Removed obsolete and deprecated efuns.")
   (README (lpmud/n/0_README 1.4 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.1 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.1 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.66 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.67 644))
   (HISTORY (lpmud/f/49_HISTORY 1.137 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.9 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.13 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.14 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.1 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.1 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.12 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.13 644))
   (src/mkinstalldirs (lpmud/C/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/C/5_install-sh 1.2 644))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.1 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.2 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.1 644))
 
   (src/settings/README (lpmud/C/22_README 1.14 644))
@@ -162,7 +159,7 @@ Removed obsolete and deprecated efuns.")
   (src/parse_old.c (lpmud/41_parse_old. 1.14.1.4 644))
   (src/parse.c (lpmud/42_parse.c 1.26.1.3 644))
   (src/patchlevel.h (lpmud/40_patchlevel 1.21 644))
-  (src/pkg-mysql.c (lpmud/J/1_pkg-mysql. 1.1 644))
+  (src/pkg-mysql.c (lpmud/J/1_pkg-mysql. 1.2 644))
   (src/pkg-mysql.h (lpmud/J/2_pkg-mysql. 1.1 644))
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.1 644))
   (src/port.c (lpmud/39_port.c 1.17 644))
@@ -276,7 +273,7 @@ Removed obsolete and deprecated efuns.")
   (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.1 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/I/39_beyacc 1.1 744))
-  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.19 644))
+  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.20 644))
   (src/hosts/be/icon-32x32.raw (lpmud/s/37_icon-32x32 1.1 644) :no-keywords)
   (src/hosts/be/icon-16x16.raw (lpmud/s/38_icon-16x16 1.1 644) :no-keywords)
   (src/hosts/be/driver.rsrc (lpmud/s/39_driver.rsr 1.1 644) :no-keywords)
@@ -405,7 +402,7 @@ Removed obsolete and deprecated efuns.")
   ;; Bug reports and Feature requests
   (src/bugs/README (lpmud/g/40_README 1.5 644) :no-keywords)
 
-  (src/bugs/b-summary (lpmud/C/34_b-summary 1.47 644) :no-keywords)
+  (src/bugs/b-summary (lpmud/C/34_b-summary 1.47.1.1 644) :no-keywords)
   (src/bugs/b-981028 (lpmud/g/37_b-981028 1.6 644) :no-keywords)
   (src/bugs/b-981202-3 (lpmud/h/27_b-981202-3 1.1 644) :no-keywords)
   (src/bugs/order_alist/room/dino.c (lpmud/h/28_dino.c 1.2 644) :no-keywords)
@@ -447,7 +444,7 @@ Removed obsolete and deprecated efuns.")
   (src/bugs/b-000718-1 (lpmud/I/31_b-000718-1 1.2 644) :no-keywords)
   (src/bugs/b-000718-2 (lpmud/I/32_b-000718-2 1.2 644) :no-keywords)
   (src/bugs/b-000818 (lpmud/I/45_b-000818 1.1.1.1 644) :no-keywords)
-  (src/bugs/b-000822 (lpmud/I/46_b-000822 1.3 644) :no-keywords)
+  (src/bugs/b-000822 (lpmud/I/46_b-000822 1.4 644) :no-keywords)
 
   (src/bugs/f-summary (lpmud/C/37_f-summary 1.39 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
