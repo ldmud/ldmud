@@ -1229,7 +1229,7 @@ legal_path (const char *path)
 
 #ifdef MSDOS_FS
     {
-        char *name;
+        const char *name;
 
         if (strchr(path,'\\'))
             return MY_FALSE; /* better save than sorry ... */

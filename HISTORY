@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-11-Feb-2001 (Lars Duening) -- Development Release 3.3
+14-Feb-2001 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -76,6 +76,8 @@ For a detailed list of all changes see the file CHANGELOG.
            the driver when the heart_beat() was called.
        + When creating long value save strings, the driver crashed on
            corrupted memory.
+       + If the object for a prompt-closure is destructed, the driver
+           could crash under extremely unlucky circumstances.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.
@@ -125,6 +127,8 @@ For a detailed list of all changes see the file CHANGELOG.
            option ('--no-compat' resp. '--compat').
        + New driver options '--min-malloced' and '--min-small-malloced' to
            specify the size of the initial block allocations.
+       + The driver option '--erq' can now be used to specify the full
+           pathname of the erq executable.
        + Removed a couple of fatal race-conditions in the xerq.
        + New configuration option 'use-deprecated' allows
            to disable obsolete and deprecated efuns. If enabled, the macro

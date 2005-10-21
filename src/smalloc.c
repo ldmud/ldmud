@@ -3215,6 +3215,7 @@ print_block (int d, word_t *block)
          && dispatch_table[i].line == line)
         {
             (*dispatch_table[i].func)(d, (char *)(block+OVERHEAD), 0);
+            write(d, "\n", 1);
             return;
         }
     }
@@ -3225,7 +3226,7 @@ print_block (int d, word_t *block)
     if (size > 70)
         return;
     write(d, (char *)(block+OVERHEAD), size);
-    write(d, "\n", 1);
+    write(d, "\n\n", 2);
 } /* print_block() */
 
 /*-------------------------------------------------------------------------*/

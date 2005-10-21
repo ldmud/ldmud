@@ -1228,7 +1228,7 @@ f_read_file (svalue_t *sp, int num_arg)
 
         file = check_valid_path(arg[0].u.str, current_object, STR_READ_FILE, MY_FALSE);
         if (!file)
-            return NULL;
+            break;
 
         /* If the file would be opened in text mode, the size from fstat would
          * not match the number of characters that we can read.

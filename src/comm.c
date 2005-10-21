@@ -3301,6 +3301,12 @@ print_prompt (void)
         prompt = &ip->prompt;
         if (prompt->type == T_CLOSURE)
         {
+            /* TODO: Add a check if the closure is still bound to an existing
+             * TODO:: object. If not, restore the prompt to the default and
+             * TODO:: then throw an error by calling the lambda.
+             */
+            previous_ob = 0;
+            current_object = command_giver;
             call_lambda(prompt, 0);
             prompt = inter_sp;
             if (prompt->type != T_STRING)
@@ -4317,7 +4323,7 @@ telnet_neg (interactive_t *ip)
 void
 start_erq_demon (const char *suffix, size_t suffixlen)
 
-/* Start the ERQ demon from the path 'BINDIR/erq.<suffix>' and setup
+/* Start the ERQ demon from the path 'ERQFILE<suffix>' and setup
  * the pending_erq[] array.
  */
 
@@ -4350,20 +4356,16 @@ start_erq_demon (const char *suffix, size_t suffixlen)
 
     if ((pid = fork()) == 0)
     {
-        char *erqname;
-
         /* Child */
         dup2(sockets[0], 0);
         dup2(sockets[0], 1);
         close(sockets[0]);
         close(sockets[1]);
 
-        erqname = erq_file ? erq_file : "erq";
-
-        if (   strlen(BINDIR) + 2 + strlen(erqname) + suffixlen
+        if (   strlen(erq_file) + 1 + strlen(erq_file) + suffixlen
             <= sizeof path)
         {
-            sprintf(path, "%s/%s%.*s", BINDIR, erqname, (int)suffixlen, suffix);
+            sprintf(path, "%s%.*s", erq_file, (int)suffixlen, suffix);
             execl((char *)path, "erq", "--forked", 0);
         }
         write(1, "0", 1);  /* indicate failure back to the driver */
@@ -4455,7 +4457,8 @@ f_attach_erq_demon (svalue_t *sp)
  * In the first form, take away the connection from <ob> and store it as
  * _the_ erq connection. <ob> thus becomes a normal non-interactive object.
  * In the second form, try to start the ERQ demon from the path
- * 'BINDIR/erq.<name>'. <name> must not contain '/..' sequences.
+ * 'ERQFILE<name>' (ERQFILE defaults to BINDIR/erq). <name> must not
+ * contain '/..' sequences.
  *
  * If there is already an ERQ demon connected to the driver, the function
  * will fail unless <do_close> is set to 1 or any other odd integer; in

@@ -111,7 +111,8 @@ int numports = 0;  /* Number of specified ports */
 int udp_port = UDP_PORT; 
   /* Port number for UDP. A negative number disables it. */
 
-char *erq_file = NULL;        /* Name of the erq executable, or NULL */
+char *erq_file = NULL;        /* Base- or pathname of the erq executable,
+                               * or NULL */
 
 char *mud_lib;                /* Path to the mudlib */
 char master_name[100] = "";   /* Name of the master object */
@@ -302,6 +303,35 @@ main (int argc, char **argv)
     }
 
 #ifdef ERQ_DEMON
+    /* Make sure that erq_file contains a complete absolute pathname. */
+
+    if (!erq_file)
+    {
+        erq_file = malloc(strlen(BINDIR)+6);
+        if (!erq_file)
+        {
+            fatal("Out of memory for erq pathname (%lu bytes).\n"
+                 , strlen(BINDIR)+6);
+        }
+        strcpy(erq_file, BINDIR);
+        strcat(erq_file, "/erq");
+    }
+    else if (*erq_file != '/')
+    {
+        char * tmp;
+        tmp = malloc(strlen(BINDIR)+1+strlen(erq_file)+1);
+        if (!tmp)
+        {
+            fatal("Out of memory for erq pathname (%lu bytes).\n"
+                 , strlen(BINDIR)+2+strlen(erq_file));
+        }
+        strcpy(tmp, BINDIR);
+        strcat(tmp, "/");
+        strcat(tmp, erq_file);
+        free(erq_file);
+        erq_file = tmp;
+    }
+
     if (!no_erq_demon)
         start_erq_demon("", 0);
 #endif
@@ -1291,8 +1321,9 @@ usage (void)
 "    and other objects.\n"
 "\n"
 "  --erq <filename>\n"
-"    Use <filename> instead of 'erq' as the basename of the ERQ executable.\n"
-"    The name is interpreted relative to " BINDIR ".\n"
+"    Use <filename> instead of 'erq' as the name of the ERQ executable.\n"
+"    If the name starts with a '/', it is take to be an absolute pathname,\n"
+"    otherwise it is interpreted relative to " BINDIR ".\n"
 "    If not specified, 'erq' is used as executable name.\n"
 "\n"
 "  -N|--no-erq\n"

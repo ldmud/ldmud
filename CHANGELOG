@@ -1,6 +1,22 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Mar-2001 (Lars Duening)  (3.3.29)
+    - (interpret.c) collect_trace() freed a filename information which
+        was still needed.
+    - (prolang.y, closure.c) Sorting and searching of aligned functions
+        must be done by comparing the name pointers downcasted to (char*).
+        If not, the differences reported don't allow for reliable searching.
+    - (efuns.c) regreplace() didn't work well with empty strings.
+    - (files.c) Reading an invalid file caused a fatal() error.
+    - (rxcache.c) The condition to check for a match was reversed.
+    - (main.c, comm.c) The command option '--erq' can now be used to
+        specify the full pathname of the erq executable (suggested 
+        by Freaky).
+    - (comm.c) Before printing a prompt via a closure, the current object
+        is set to the command giver. This avoids a crash under (admittedly
+        rare) circumstances of closure destruction.
+
 13-Mar-2001 (Lars Duening)  (3.3.28)
     - (backend.c) When calling the master apply slow_shut_down(), it is
         made sure that previous_object(), this_player(), and

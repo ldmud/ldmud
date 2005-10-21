@@ -121,7 +121,7 @@ regcomp_cache (string_t * expr, Bool excompat, Bool from_ed)
     if (pHash->pString != NULL
      && pHash->hString == hExpr
      && pHash->from_ed == from_ed
-     && !mstreq(pHash->pString, expr)
+     && mstreq(pHash->pString, expr)
        )
     {
         iNumXFound++;

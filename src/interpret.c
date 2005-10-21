@@ -189,14 +189,6 @@
 #include <prof.h>
 #endif
 
-#ifdef HAVE_CRYPT_H
-     /* solaris defines crypt() here */
-#    include <crypt.h>
-#endif
-#if !defined(HAVE_CRYPT) && defined(HAVE__CRYPT)
-#    define crypt(pass, salt) _crypt(pass, salt)
-#endif
-
 #define USES_SVALUE_STRLEN
 #include "interpret.h"
      
@@ -14114,7 +14106,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
     bytecode_p pc = inter_pc;
     int line = 0;
     string_t *name;           /* Uncounted ref to function name */
-    string_t *file;           /* Counted ref to file name */
+    string_t *file;           /* Counted ref to most recent file name */
     object_t *ob = NULL;
     bytecode_p last_catch = NULL;  /* Last found catch */
 
@@ -14154,7 +14146,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
     if (!current_prog)
     {
         if (sbuf)
-           strbuf_addf(sbuf, "%s", get_txt(STR_NO_PROG_TRACE));
+           strbuf_addf(sbuf, "%s\n", get_txt(STR_NO_PROG_TRACE));
         if (rvec)
         {
             vector_t * vec;
@@ -14169,7 +14161,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
     if (csp < &control_stack[0])
     {
         if (sbuf)
-           strbuf_addf(sbuf, "%s", get_txt(STR_NO_TRACE));
+           strbuf_addf(sbuf, "%s\n", get_txt(STR_NO_TRACE));
         if (rvec)
         {
             vector_t * vec;
@@ -14186,12 +14178,15 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
      * for this frame (p[0]) being stored in the next (p[1]).
      * Confused now? Good.
      */
+    file = ref_mstring(STR_EMPTY);
     p = &control_stack[0];
     do {
         bytecode_p  dump_pc;  /* the frame's pc */
         program_t  *prog;     /* the frame's program */
 
-        file = NULL;
+        /* Note: Under certain circumstances the value of file carried over
+         * from the previous iteration is reused in this one.
+         */
 
         if (p->extern_call)
         {
@@ -14353,6 +14348,7 @@ not_catch:  /* The frame does not point at a catch here */
         }
 
         /* Nothing of the above: a normal program */
+        free_mstring(file);
         line = get_line_number(dump_pc, prog, &file);
         memcpy(&name, FUNCTION_NAMEP(p[0].funstart), sizeof name);
 
@@ -14373,10 +14369,11 @@ name_computed: /* Jump target from the catch detection */
             PUT_LOC(entry, line);
         }
 
-        if (file)
-            free_mstring(file);
-
     } while (++p <= csp);
+
+    if (file)
+        free_mstring(file);
+
 
     /* Condense the singular entries into the result array */
     if (rvec)

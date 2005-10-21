@@ -578,7 +578,9 @@ f_regreplace (svalue_t *sp)
     sub = get_txt(sp[-1].u.str);
     start = curr = get_txt(sp[-3].u.str);
 
-    space = (long)(origspace = mstrsize(sp[-3].u.str)*2);
+    space = (long)(origspace = (mstrsize(sp[-3].u.str) + 1)*2);
+      /* The '+1' so that empty strings don't cause a 'malloc size = 0' error.
+       */
 
 /* reallocate on the fly */
 #define XREALLOC \

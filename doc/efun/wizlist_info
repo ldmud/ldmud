@@ -20,5 +20,5 @@ DESCRIPTION
 	  mixed  w[WL_EXTRA]       = Extra wizlist-info if set.
 
 SEE ALSO
-	wizlist(E), privilege_violation(M), set_extra_wizinfo_size(E)
+	privilege_violation(M), set_extra_wizinfo_size(E)
 	get_extra_wizinfo(E), set_extra_wizinfo(E)

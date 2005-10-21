@@ -13,9 +13,11 @@ DESCRIPTION
 	non-interactive object then.
 
 	In the second form, the string will be combined as suffix to
-	the filename BINDIR/erq<obname>, which is then the binary to be
+	the filename ERQFILE<obname>, which is then the binary to be
 	forked off as new erq demon. The communication with this erq
-	will take place over unix domain sockets.
+	will take place over unix domain sockets. ERQFILE defaults to
+    BINDIR/erq, where BINDIR is the configuration value for the
+    executable directory.
 
 	If there is alreay an erq demon connected to the driver, the
 	function will fail unless 'do_close' (default 0) is specified

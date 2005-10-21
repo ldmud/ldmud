@@ -403,11 +403,20 @@ extern char *memmem(const char *, size_t, const char *, size_t);
 extern void move_memory(char *, char *, size_t);
 #endif
 
+#ifdef HAVE_CRYPT_H
+     /* solaris defines crypt() here */
+#    include <crypt.h>
+#endif
+
 #if ((!defined(HAVE_CRYPT) && !defined(HAVE__CRYPT))) || \
     !defined(USE_SYSTEM_CRYPT) || \
     (defined(sgi) && !defined(_MODERN_C)) || defined(ultrix) \
     || defined(sun)
 extern char *crypt(const char *, const char *);
+#endif
+
+#if !defined(HAVE_CRYPT) && defined(HAVE__CRYPT)
+#    define crypt(pass, salt) _crypt(pass, salt)
 #endif
 
 #if defined(AMIGA) || defined(__CYGWIN__)

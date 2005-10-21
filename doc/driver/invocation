@@ -84,7 +84,8 @@ DESCRIPTION
 
       --erq <filename>
         Use <filename> instead of 'erq' as the basename of the ERQ executable.
-        The name is interpreted relative to the <bindir>. If not specified,
+        If the name starts with a '/', it is take to be an absolute pathname,
+        otherwise it is interpreted relative to <bindir>. If not specified,
         'erq' is used as the executable name.
 
       -N|--no-erq

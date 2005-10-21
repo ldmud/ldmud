@@ -371,8 +371,8 @@ function_cmp (string_t *name, program_t *prog, int ix)
 
     /* Return the result of the comparison */
 #ifdef ALIGN_FUNCTIONS
-    return (int)(*((string_t **)FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK)))
-                 - name);
+      /* Compare as (char*) to get the exact numerical difference */
+    return (int)(*((char **)FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK))) - (char *)name);
 #else
     return memcmp( &name, FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK))
                  , sizeof name

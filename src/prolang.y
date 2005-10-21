@@ -11202,11 +11202,14 @@ epilog (void)
                 {
                     while (1) {
 #ifdef ALIGN_FUNCTIONS
-                        if ((funname_start1->name - funname_start2->name) < 0)
-#else
-                        /* must use memcmp(), because it is used later for the
-                         * program. byteorder is non-portable.
+                        /* Compare as (char*) so that the pointers end
+                         * up in numerical order. If not done, binary
+                         * search won't work.
                          */
+                        if ((  (char *)(funname_start1->name)
+                             - (char *)(funname_start2->name)
+                            ) < 0)
+#else
                         if (memcmp(
                               &funname_start2->name,
                               &funname_start1->name,
