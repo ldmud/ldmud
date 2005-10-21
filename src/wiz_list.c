@@ -445,7 +445,7 @@ f_wizlist_info (svalue_t *sp)
     svalue_t *wsvp, *svp;
     wiz_list_t *w;
 
-    if (!_privilege_violation("wizlist_info", &const0, sp))
+    if (!privilege_violation("wizlist_info", &const0, sp))
     {
         all = allocate_array(0);
     }
@@ -521,7 +521,7 @@ f_set_extra_wizinfo (svalue_t *sp)
             efun_gen_arg_error(1, sp->type, sp);
     }
 
-    if (!_privilege_violation("set_extra_wizinfo", sp-1, sp))
+    if (!privilege_violation("set_extra_wizinfo", sp-1, sp))
         free_svalue(sp);
     else
         transfer_svalue(user ? &user->extra : &default_wizlist_entry.extra, sp);
@@ -570,7 +570,7 @@ f_get_extra_wizinfo (svalue_t *sp)
             error("Bad arg 1 to get_extra_wizinfo(): no valid uid given.\n");
     }
 
-    if (!_privilege_violation("get_extra_wizinfo", sp, sp))
+    if (!privilege_violation("get_extra_wizinfo", sp, sp))
         error("Error in get_extra_wizinfo(): privilege violation.\n");
 
     assign_svalue(sp, user ? &user->extra : &default_wizlist_entry.extra);
@@ -602,7 +602,7 @@ f_set_extra_wizinfo_size (svalue_t *sp)
  */
 
 {
-    if (!_privilege_violation("set_extra_wizinfo_size", &const0, sp))
+    if (!privilege_violation("set_extra_wizinfo_size", &const0, sp))
         wiz_info_extra_size = sp->u.number;
 
     sp--;

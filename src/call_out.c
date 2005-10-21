@@ -801,7 +801,7 @@ f_call_out_info (svalue_t *sp)
  */
 
 {
-    if (_privilege_violation(STR_CALL_OUT_INFO, &const0, sp))
+    if (privilege_violation(STR_CALL_OUT_INFO, &const0, sp))
     {
         push_array(sp, get_all_call_outs());
     }

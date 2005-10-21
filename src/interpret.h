@@ -144,8 +144,8 @@ extern void efun_arg_error (int arg, int expected, int got, svalue_t *sp) NORETU
 extern void efun_exp_arg_error (int arg, long expected, int got, svalue_t *sp) NORETURN;
 extern void vefun_arg_error (int arg, int expected, int got, svalue_t *sp) NORETURN;
 extern void vefun_exp_arg_error (int arg, long expected, int got, svalue_t *sp) NORETURN;
-extern Bool _privilege_violation(const string_t *what, svalue_t *where, svalue_t *sp);
-extern Bool privilege_violation4(const string_t *what, object_t *whom, const string_t *how_str, int how_num, svalue_t *sp);
+extern Bool privilege_violation(string_t *what, svalue_t *where, svalue_t *sp);
+extern Bool privilege_violation4(string_t *what, object_t *whom, string_t *how_str, int how_num, svalue_t *sp);
 extern void push_apply_value(void);
 extern void pop_apply_value (void);
 extern svalue_t *sapply_int(string_t *fun, object_t *ob, int num_arg, Bool b_ign_prot);

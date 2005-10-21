@@ -212,6 +212,10 @@ main (int argc, char **argv)
     printf("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
           , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
           );
+    debug_message("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
+          , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
+          );
+      /* This also assures the existance of the fd for the debug log */
 
     /* If the master_name hasn't been set, select a sensible default */
     if ('\0' == master_name[0])
@@ -281,10 +285,6 @@ main (int argc, char **argv)
 #endif
     initialize_host_ip_number();
 
-    /* if we get low on file descriptors, the descriptor for debug_message
-     * should be there
-     */
-    debug_message((char *)(long)"");
     (void)signal(SIGFPE, SIG_IGN);
     current_object = &dummy_current_object_for_loads;
     if (setjmp(toplevel_context.con.text)) {

@@ -1,0 +1,477 @@
+Short: Another bug in the CHARMODE telnet routine.
+Date: Wed, 20 Dec 2000 01:57:22 +0100
+From: Gnomi <gnomi@UNItopia.rus.uni-stuttgart.de>
+Type: Bug
+State: New
+
+Hallo,
+
+Unitopia ist wieder 2mal mit dem 'comm: data length < 0: -1' gecrasht.
+Beim zweiten Mal lief der dev247 mit dem Patch zur Ausgabe der
+interactive_t-Struktur:
+
+Derjenige Gott war im xeditor aktiv und zwar mit Windows-Telnet.
+Man braucht dort nur ein paar mal Enter zu druecken, und schon kommt dieser
+Fehler.
+Ich bin noch nicht so ganz hinter den Code gestiegen, habe daher ein wenig
+mit ein paar zusaetzlichen Debugausgaben gespielt: Es scheint so,
+als ob der Windows-Telnet eine Folge von \r\n fuer eine Enter-Taste sendet,
+waehrend das Unix-Telnet sich mit einem einfachen \r begnuegt. Es muss da
+aber noch ein weiteres Geheimnis geben, denn ich kann im TeraTerm
+entscheiden, ob ich \r oder \r\n senden will und dort wird bei letzterem der
+xeditor genauso unbedienbar (Ausrufezeichen anstatt Zeilenumbruechen) wie
+beim Windows-Telnet, aber diese Fehlermeldung/Crash kommt nicht...
+
+Ich hoffe, diese Informationen helfen irgendwie...
+
+2000.12.19 12:51:49 ... execution continues.
+2000.12.19 12:54:26 comm: data length < 0: -1
+2000.12.19 12:54:26 Current object was obj/zauberstab#596
+obj/zauberstab#596 i/xeditor/xeditor.c (utils.inc) line 292
+8c05c91:  24        5 local                      (1: 12)	line 292
+8c05c93:  12          const0                     (2: 13)
+8c05c94:   5        1 identifier                 (3: 14)
+8c05c96:   7       15 cstring0                   (4: 15)
+8c05c98:  97          index                      (5: 16)
+8c05c99:   5        5 identifier                 (4: 15)
+8c05c9b:  38          -                          (5: 16)
+8c05c9c:  56          ..                         (4: 15)
+8c05c9d:  37          +                          (2: 13)
+8c05c9e:   5       24 identifier                 (1: 12)
+8c05ca0:  37          +                          (2: 13)
+8c05ca1:  85          call_function_by_address   (1: 12)
+8c0576b:   5       15 identifier                 (0: 12)	line 63
+8c0576d:  81          branch_when_zero           (1: 13)
+8c05774:   5        1 identifier                 (0: 12)	line 66
+8c05776:   7        8 cstring0                   (1: 13)
+8c05778:  97          index                      (2: 14)
+8c05779:  81        6 branch_when_zero           (1: 13)
+8c0577b:  85          call_function_by_address   (0: 12)
+8c055e3:   5       15 identifier                 (0: 12)	line 15
+8c055e5:  81          branch_when_zero           (1: 13)
+8c05645:   5        1 identifier                 (0: 12)	line 24
+8c05647:   7        8 cstring0                   (1: 13)
+8c05649:  97          index                      (2: 14)
+8c0564a:  81       58 branch_when_zero           (1: 13)
+8c0564c:   5       28 identifier                 (0: 12)	line 25
+8c0564e:   5        1 identifier                 (1: 13)
+8c05650:   7        2 cstring0                   (2: 14)
+8c05652:  97          index                      (3: 15)
+8c05653:  13          const1                     (2: 14)
+8c05654:  37          +                          (3: 15)
+8c05655:  37          +                          (2: 14)
+8c05656:   7        3 cstring0                   (1: 13)
+8c05658:  37          +                          (2: 14)
+8c05659:  13          const1                     (1: 13)
+8c0565a:  37          +                          (2: 14)
+8c0565b:   7        4 cstring0                   (1: 13)
+8c0565d:  37          +                          (2: 14)
+8c0565e:   5       23 identifier                 (1: 13)
+8c05660:  37          +                          (2: 14)
+8c05661:   7        9 cstring0                   (1: 13)	line 26
+8c05663:  37          +                          (2: 14)
+8c05664:   5       24 identifier                 (1: 13)
+8c05666:  37          +                          (2: 14)
+8c05667:   5        1 identifier                 (1: 13)	line 27
+8c05669:   7       10 cstring0                   (2: 14)
+8c0566b:  97          index                      (3: 15)
+8c0566c:  81        4 branch_when_zero           (2: 14)
+8c0566e:   7       11 cstring0                   (1: 13)
+8c05670:  80          branch                     (2: 14)
+8c05674:   5        9 identifier                 (2: 14)	line 28
+8c05676:  14       30 clit                       (3: 15)
+8c05678:  61          rx_range                   (4: 16)
+8c05679:   5        5 identifier                 (3: 15)
+8c0567b:   5        7 identifier                 (4: 16)
+8c0567d:  37          +                          (5: 17)
+8c0567e:   5        6 identifier                 (4: 16)
+8c05680:   5        8 identifier                 (5: 17)
+8c05682:  37          +                          (6: 18)
+8c05683: 213        5 sprintf                    (5: 17)
+8c05685:  19          return                     (1: 13)
+8c0577f:  80          branch                     (1: 13)	line 66
+8c05783:   5       28 identifier                 (1: 13)	line 67
+8c05785:  37          +                          (2: 14)
+8c05786:   5        1 identifier                 (1: 13)
+8c05788:   7        2 cstring0                   (2: 14)
+8c0578a:  97          index                      (3: 15)
+8c0578b:   5       14 identifier                 (2: 14)
+8c0578d:  81          branch_when_zero           (3: 15)
+8c05796:   5        6 identifier                 (2: 14)
+8c05798:  37          +                          (3: 15)
+8c05799:  13          const1                     (2: 14)
+8c0579a:  37          +                          (3: 15)
+8c0579b:  37          +                          (2: 14)
+8c0579c:   7        3 cstring0                   (1: 13)
+8c0579e:  37          +                          (2: 14)
+8c0579f:   5        5 identifier                 (1: 13)
+8c057a1:  37          +                          (2: 14)
+8c057a2:   7        4 cstring0                   (1: 13)
+8c057a4:  37          +                          (2: 14)
+8c057a5:  19          return                     (1: 13)
+8c05ca5:  37          +                          (2: 13)	line 292
+8c05ca6:  85          call_function_by_address   (1: 12)
+8c058ff:   5       10 identifier                 (0: 12)	line 110
+8c05901:  24        0 local                      (1: 13)
+8c05903: 219          tell_object                (2: 14)
+obj/editor_shadow#3517 obj/editor_shadow.c line 85
+bd76fb7:  12          const0                     (0: 15)	line 85
+bd76fb8:  12          const0                     (1: 16)
+bd76fb9: 225          this_player                (2: 17)
+bd76fba:  24        0 local                      (3: 18)
+bd76fbc:  85          call_function_by_address   (4: 19)
+bd76f4f:   5        2 identifier                 (0: 19)	line 59
+bd76f51: 160          interactive                (1: 20)
+bd76f52:  82          branch_when_non_zero       (1: 20)
+bd76f5a: 223          this_interactive           (0: 19)	line 65
+bd76f5b:   5        2 identifier                 (1: 20)
+bd76f5d:  47          !=                         (2: 21)
+bd76f5e:  81          branch_when_zero           (1: 20)
+bd76f9e:   5        2 identifier                 (0: 19)	line 79
+bd76fa0:   7        4 cstring0                   (1: 20)
+bd76fa2:  24        0 local                      (2: 21)
+bd76fa4:  24        1 local                      (3: 22)
+bd76fa6:  24        2 local                      (4: 23)
+bd76fa8:  24        3 local                      (5: 24)
+bd76faa: 125          call_other                 (6: 25)
+obj/player#573 i/player/player.c line 688
+8be861b:  24        3 local                      (0: 25)	line 688
+8be861d: 214          stringp                    (1: 26)
+8be861e:  33       16 &&                         (1: 26)
+8be8620:  24        0 local                      (0: 25)
+8be8622:  55          !                          (1: 26)
+8be8623:  34          ||                         (1: 26)
+8be8630:  81       43 branch_when_zero           (1: 26)	line 689
+8be8632:   5      239 identifier                 (0: 25)	line 690
+8be8634:  81          branch_when_zero           (1: 26)
+8be8642: 224          this_object                (0: 25)	line 695
+8be8643:  24        0 local                      (1: 26)
+8be8645:  24        1 local                      (2: 27)
+8be8647:  24        3 local                      (3: 28)
+8be8649:  85          call_function_by_address   (4: 29)
+obj/player#573 i/player/colours.c line 129
+8bd42e7:  76      259 clear_locals               (0: 30)	line 129
+8bd42ea:  24        0 local                      (0: 30)	line 131
+8bd42ec:  14       64 clit                       (1: 31)
+8bd42ee:  46          ==                         (2: 32)
+8bd42ef:  81          branch_when_zero           (1: 31)
+8bd42f8:  24        1 local                      (0: 30)	line 134
+8bd42fa:  92        3 push_local_variable_lvalue (1: 31)
+8bd42fc:  36          (void)=                    (2: 32)
+8bd42fd:   5        1 identifier                 (0: 30)	line 136
+8bd42ff:  24        3 local                      (1: 31)
+8bd4301:  12          const0                     (2: 32)
+8bd4302: 112          map_index                  (3: 33)
+8bd4303:  81          branch_when_zero           (1: 31)
+8bd431a:  24        2 local                      (0: 30)	line 138
+8bd431c:  19          return                     (1: 31)
+obj/player#573 i/player/player.c line 695
+8be864d: 219          tell_object                (2: 27)	line 695
+8be864e:  24        1 local                      (0: 25)	line 696
+8be8650:  14       22 clit                       (1: 26)
+8be8652:  46          ==                         (2: 27)
+8be8653:  81          branch_when_zero           (1: 26)
+8be865d:  20          return0                    (0: 25)	line 699
+obj/editor_shadow#3517 obj/editor_shadow.c line 79
+bd76fac:  74          pop_value                  (1: 20)	line 79
+bd76fad:  20          return0                    (0: 19)	line 80
+bd76fc0:  74          pop_value                  (1: 16)	line 85
+bd76fc1:  20          return0                    (0: 15)	line 86
+obj/zauberstab#596 i/xeditor/xeditor.c (utils.inc) line 111
+8c05904:  20          return0                    (0: 12)	line 111
+8c05caa:  74          pop_value                  (1: 12)	line 294
+8c05cab:  80          branch                     (0: 11)
+8c05cb4:   5        6 identifier                 (0: 11)	line 300
+8c05cb6:   5        1 identifier                 (1: 12)
+8c05cb8:   7       14 cstring0                   (2: 13)
+8c05cba:  97          index                      (3: 14)
+8c05cbb:  13          const1                     (2: 13)
+8c05cbc:  37          +                          (3: 14)
+8c05cbd:  43          >=                         (2: 13)
+8c05cbe:  81 470177539 branch_when_zero           (1: 12)
+8c05cc3:  92        1 push_local_variable_lvalue (0: 11)	line 252
+8c05cc5:  27          ++                         (1: 12)
+8c05cc6:  24        1 local                      (0: 11)
+8c05cc8:  24        0 local                      (1: 12)
+8c05cca: 215          strlen                     (2: 13)
+8c05ccb:  44          <                          (2: 13)
+8c05ccc:  79     -273 lbranch_when_non_zero      (1: 12)
+8c05ccf:  20          return0                    (0: 11)	line 303
+obj/zauberstab#596 i/xeditor/xeditor.c (loop.inc) line 273
+8c07f03:  74          pop_value                  (1:  6)	line 273
+8c07f04:  85          call_function_by_address   (0:  5)
+obj/zauberstab#596 i/xeditor/xeditor.c (utils.inc) line 312
+8c05cd7:   5        0 identifier                 (0:  5)	line 312
+8c05cd9:  87        2 push_identifier_lvalue     (1:  6)
+8c05cdb:  36          (void)=                    (2:  7)
+8c05cdc:   7        0 cstring0                   (0:  5)	line 313
+8c05cde:  87        4 push_identifier_lvalue     (1:  6)
+8c05ce0:  36          (void)=                    (2:  7)
+8c05ce1:  20          return0                    (0:  5)	line 314
+obj/zauberstab#596 i/xeditor/xeditor.c (loop.inc) line 275
+8c07f08:  74          pop_value                  (1:  6)	line 275
+8c07f09:   7       44 cstring0                   (0:  5)	line 277
+8c07f0b:  13          const1                     (1:  6)
+8c07f0c:  14        2 clit                       (2:  7)
+8c07f0e:  50          |                          (3:  8)
+8c07f0f:  14      128 clit                       (2:  7)
+8c07f11:  50          |                          (3:  8)
+8c07f12: 158          input_to                   (2:  7)
+secure/master secure/master.c (/secure/master/compiler_control.inc) line 224
+89ee05f:   5        9 identifier                 (0: 12)	line 224
+89ee061:  82          branch_when_non_zero       (1: 13)
+89ee069:  24        0 local                      (0: 12)	line 226
+89ee06b:  87        9 push_identifier_lvalue     (1: 13)
+89ee06d:  95          index_lvalue               (2: 14)
+89ee06e:  27          ++                         (1: 13)
+89ee06f:  24        0 local                      (0: 12)	line 227
+89ee071:  22          switch                     (1: 13)
+89ee075:  24        1 local                      (0: 12)	line 230
+89ee077: 182          object_name                (1: 13)
+89ee078:   7       60 cstring0                   (1: 13)
+89ee07a:  12          const0                     (2: 14)
+89ee07b: 310       54 strstr                     (3: 15)
+89ee07d:  55          !                          (1: 13)
+89ee07e:  34          ||                         (1: 13)
+89ee089:  81        2 branch_when_zero           (1: 13)	line 231
+89ee08b:  13          const1                     (0: 12)	line 232
+89ee08c:  19          
+--- Dump of current interactive structure (0x9cad350..0xa6b5a34) --- 
+  .socket:            50
+  .ob:                0xa52ac24 (obj/player#573)
+  .input_to:          0xb521d3c
+  .modify_command:    0xa52ac24 (obj/player#573)
+  .prompt:            0x9cad360: 08 00 00 00 f8 5f dd 0b
+  .addr:              0x9cad368: 02 00 04 a2 3e 99 08 a5 87 02 00 00 ff ff ff ff
+  .set_input_to:      01
+  .closing:           00
+  .do_close:          00
+  .noecho:            8f (NOECHO_REQ, CHARMODE_REQ, NOECHO, CHARMODE, IGNORE_BANK)
+  .tn_state:          0 (TS_DATA)
+  .save_tn_state:     11 (TS_INVALID)
+  .supress_go_ahead:  01
+  .text_end:          0 (0x9cad3f8)
+  .command_start:     1 (0x9cad3f9)
+  .command_end:       0 (0x9cad3f8)
+  .tn_start:          1 (0x9cad3f9)
+  .tn_end:            0 (0x9cad3f8)
+  .chars_ready:       0
+  .snoop_on:          (nil)
+  .snoop_by:          (nil)
+  .last_time:         977226865
+  .trace_level:       0
+  .trace_prefix:      (nil)
+  .message_length:    0 (0x9cadbfa)
+  .next_for_flush:    (nil)
+  .prev_for_flush:    (nil)
+  .access_class:      1952804416
+  .charset:           0x9cad3b4: fe fb ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+                      0x9cad3c4: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+  .combine_cset:      0x9cad3d4: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+                      0x9cad3e4: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  .quote_iac:         61
+  .catch_tell_activ:  01
+  .gobble_char:       00
+  .ts_data:           00
+  .text:              0x9cad3f8: 31 00 0a 03 6d 65 6e 61 75 72 65 73 00 0a 61 6c
+                      0x9cad408: 61 6e 65 40 67 6d 78 2e 6e 65 74 5d 0a 47 65 73
+                      0x9cad418: 65 6e 64 65 74 3a 20 44 6f 6e 6e 65 72 73 74 61
+                      0x9cad428: 67 2c 20 31 39 2e 20 4f 6b 74 6f 62 65 72 20 32
+                      0x9cad438: 30 30 30 20 31 32 3a 34 30 0a 41 6e 3a 20 61 6e
+                      0x9cad448: 64 72 65 61 77 40 67 6d 78 2e 63 68 3b 20 42 72
+                      0x9cad458: 69 6e 61 31 37 40 67 6d 78 2e 64 65 3b 20 62 61
+                      0x9cad468: 65 72 62 6c 65 2d 63 68 40 67 6d 78 2e 63 68 3b
+                      0x9cad478: 0a 64 61 67 69 5f 76 61 72 65 73 61 6e 6f 40 67
+                      0x9cad488: 6d 78 2e 63 68 3b 20 61 73 75 6b 61 5f 31 32 40
+                      0x9cad498: 68 6f 74 6d 61 69 6c 2e 63 6f 6d 3b 20 65 73 74
+                      0x9cad4a8: 68 65 72 7a 69 6d 6d 65 72 6c 69 40 68 6f 74 6d
+                      0x9cad4b8: 61 69 6c 2e 63 6f 6d 3b 0a 65 76 65 62 31 37 40
+                      0x9cad4c8: 68 6f 74 6d 61 69 6c 2e 63 6f 6d 3b 20 66 72 61
+                      0x9cad4d8: 6e 7a 69 73 6b 61 2e 63 68 40 67 6d 78 2e 63 68
+                      0x9cad4e8: 3b 20 73 61 6e 64 79 5f 66 61 6e 6b 79 40 68 6f
+                      0x9cad4f8: 74 6d 61 69 6c 2e 63 6f 6d 3b 0a 6a 61 6e 40 64
+                      0x9cad508: 61 72 6b 65 6c 76 65 73 2e 64 65 3b 20 6a 61 6e
+                      0x9cad518: 67 6f 31 35 40 67 6d 78 2e 64 65 3b 20 6f 72 69
+                      0x9cad528: 73 6f 6e 40 62 6c 75 65 77 69 6e 2e 63 68 3b 0a
+                      0x9cad538: 6c 61 64 79 5f 65 6c 69 73 61 62 65 74 61 40 68
+                      0x9cad548: 6f 74 6d 61 69 6c 2e 63 6f 6d 3b 20 6d 61 6e 75
+                      0x9cad558: 65 6c 61 2e 6d 69 6e 64 65 72 40 67 6d 78 2e 6e
+                      0x9cad568: 65 74 3b 0a 6c 61 7a 79 6d 65 6c 65 40 68 6f 74
+                      0x9cad578: 6d 61 69 6c 2e 63 6f 6d 3b 20 61 6e 64 79 2e 6b
+                      0x9cad588: 6c 40 67 6d 78 2e 6e 65 74 3b 20 68 6f 6c 79 6d
+                      0x9cad598: 69 72 69 40 68 6f 74 6d 61 69 6c 2e 63 6f 6d 3b
+                      0x9cad5a8: 0a 61 2e 68 69 6c 74 62 72 75 6e 6e 65 72 40 64
+                      0x9cad5b8: 61 74 61 63 6f 6d 6d 2e 63 68 3b 20 6e 63 2d 68
+                      0x9cad5c8: 75 77 69 67 73 74 40 6e 65 74 63 6f 6c 6f 67 6e
+                      0x9cad5d8: 65 2e 64 65 3b 20 6d 6f 73 69 2e 63 68 40 67 6d
+                      0x9cad5e8: 78 2e 63 68 3b 0a 72 65 67 75 6c 61 6c 61 65 6e
+                      0x9cad5f8: 67 40 68 6f 74 6d 61 69 6c 2e 63 6f 6d 3b 20 62
+                      0x9cad608: 61 72 61 6e 69 6e 61 40 68 6f 74 6d 61 69 6c 2e
+                      0x9cad618: 63 6f 6d 3b 20 73 6b 75 62 79 32 36 40 68 6f 74
+                      0x9cad628: 6d 61 69 6c 2e 63 6f 6d 3b 0a 79 76 6f 6e 6e 65
+                      0x9cad638: 66 72 69 65 64 6c 69 40 68 6f 74 6d 61 69 6c 2e
+                      0x9cad648: 63 6f 6d 0a 42 65 74 72 65 66 66 3a 20 46 77 64
+                      0x9cad658: 3a 20 57 47 3a 20 54 7a 7a 73 73 73 2e 2e 2e 20
+                      0x9cad668: 64 69 65 73 65 20 48 69 70 70 69 65 73 20 2e 2e
+                      0x9cad678: 20 21 0a 0a 0a 3e 0a 3e 0a 3e 0a 3e 20 3e 20 3e
+                      0x9cad688: 20 53 69 74 7a 74 20 65 69 6e 65 20 4e 6f 6e 6e
+                      0x9cad698: 65 20 69 6e 20 65 69 6e 65 6d 20 42 75 73 2e 20
+                      0x9cad6a8: 4b 6f 6d 6d 74 20 65 69 6e 20 48 69 70 70 79 20
+                      0x9cad6b8: 75 6e 64 20 73 65 74 7a 74 20 73 69 63 68 20 6e
+                      0x9cad6c8: 65 62 65 6e 0a 3e 20 64 69 65 0a 3e 20 3e 20 3e
+                      0x9cad6d8: 20 4e 6f 6e 6e 65 2e 20 53 63 68 6c 69 65 df 6c
+                      0x9cad6e8: 69 63 68 20 66 72 61 67 74 20 64 65 72 20 48 69
+                      0x9cad6f8: 70 70 79 3a 20 54 73 63 68 75 6c 64 69 67 75 6e
+                      0x9cad708: 67 2c 20 68 e4 74 74 65 73 74 20 64 75 20 4c 75
+                      0x9cad718: 73 74 0a 3e 20 7a 75 0a 3e 20 3e 20 3e 20 66 69
+                      0x9cad728: 2a 2a 65 6e 3f 0a 3e 20 3e 20 3e 20 44 69 65 20
+                      0x9cad738: 4e 6f 6e 6e 65 3a 20 4e 65 69 6e 2c 20 64 61 73
+                      0x9cad748: 20 6b 61 6e 6e 20 69 63 68 20 6e 69 63 68 74 20
+                      0x9cad758: 6d 61 63 68 65 6e 2c 20 69 63 68 20 62 69 6e 20
+                      0x9cad768: 65 69 6e 65 20 44 69 65 6e 65 72 69 6e 0a 3e 20
+                      0x9cad778: 3e 20 3e 20 47 6f 74 74 65 73 21 0a 3e 20 3e 20
+                      0x9cad788: 3e 20 41 62 65 72 20 65 72 20 67 69 62 74 20 6e
+                      0x9cad798: 69 63 68 74 20 61 75 66 20 75 6e 64 20 70 72 6f
+                      0x9cad7a8: 62 69 65 72 74 20 65 73 20 65 69 6e 20 7a 77 65
+                      0x9cad7b8: 69 74 65 73 20 4d 61 6c 2c 20 64 6f 63 68 20 77
+                      0x9cad7c8: 69 65 64 65 72 0a 3e 20 3e 20 3e 20 6c 65 68 6e
+                      0x9cad7d8: 74 20 73 69 65 20 61 62 2e 0a 3e 20 3e 20 3e 20
+                      0x9cad7e8: 41 6e 20 64 65 72 20 42 75 73 68 61 6c 74 65 73
+                      0x9cad7f8: 74 65 6c 6c 65 20 73 74 65 69 67 74 20 64 65 72
+                      0x9cad808: 20 48 69 70 70 79 20 61 75 73 20 75 6e 64 20 64
+                      0x9cad818: 65 72 20 42 75 73 66 61 68 72 65 72 20 68 e4 6c
+                      0x9cad828: 74 0a 3e 20 69 68 6e 0a 3e 20 3e 20 3e 20 66 65
+                      0x9cad838: 73 74 20 75 6e 64 20 73 61 67 74 3a 20 57 65 6e
+                      0x9cad848: 6e 20 64 75 20 64 69 65 73 65 20 4e 6f 6e 6e 65
+                      0x9cad858: 20 66 69 2a 2a 65 6e 20 77 69 6c 6c 73 74 2c 20
+                      0x9cad868: 64 61 6e 6e 20 67 65 62 20 69 63 68 20 64 69 72
+                      0x9cad878: 0a 3e 20 6e 65 6e 0a 3e 20 3e 20 3e 20 54 69 70
+                      0x9cad888: 21 0a 3e 20 3e 20 3e 20 4a 65 64 65 6e 20 41 62
+                      0x9cad898: 65 6e 64 20 75 6d 20 32 32 3a 30 30 20 55 68 72
+                      0x9cad8a8: 20 67 65 68 74 20 73 69 65 20 61 75 66 20 64 65
+                      0x9cad8b8: 6e 20 46 72 69 65 64 68 6f 66 20 75 6e 64 20 62
+                      0x9cad8c8: 65 74 65 74 21 0a 3e 20 3e 20 3e 20 44 65 72 20
+                      0x9cad8d8: 48 69 70 70 79 20 62 65 64 61 6e 6b 74 20 73 69
+                      0x9cad8e8: 63 68 20 75 6e 64 20 66 6f 6c 67 74 20 64 65 6d
+                      0x9cad8f8: 20 52 61 74 20 64 65 73 20 42 75 73 66 61 68 72
+                      0x9cad908: 65 72 73 2e 0a 3e 20 3e 20 3e 20 55 6d 20 32 32
+                      0x9cad918: 3a 30 30 20 55 68 72 20 6b 6f 6d 6d 74 20 65 72
+                      0x9cad928: 20 6d 69 74 20 4a 65 73 75 73 67 65 77 e4 6e 64
+                      0x9cad938: 65 72 6e 20 7a 75 6d 20 46 72 69 65 64 68 6f 66
+                      0x9cad948: 20 75 6e 64 20 73 69 65 68 74 20 64 69 65 0a 3e
+                      0x9cad958: 20 3e 20 3e 20 4e 6f 6e 6e 65 20 62 65 74 65 6e
+                      0x9cad968: 2e 20 45 72 20 74 72 69 74 74 20 76 6f 72 20 73
+                      0x9cad978: 69 65 20 75 6e 64 20 72 75 66 74 3a 20 49 63 68
+                      0x9cad988: 20 62 69 6e 20 4a 65 73 75 73 20 75 6e 64 20 68
+                      0x9cad998: 61 62 65 20 76 6f 6e 0a 3e 20 47 6f 74 74 0a 3e
+                      0x9cad9a8: 20 3e 20 3e 20 64 65 6e 20 42 65 66 65 68 6c 20
+                      0x9cad9b8: 65 72 68 61 6c 74 65 6e 20 64 69 63 68 20 7a 75
+                      0x9cad9c8: 20 6e 65 68 6d 65 6e 21 20 44 69 65 20 4e 6f 6e
+                      0x9cad9d8: 6e 65 20 73 69 65 68 74 20 76 65 72 77 75 6e 64
+                      0x9cad9e8: 65 72 74 20 61 75 66 0a 3e 20 75 6e 64 0a 3e 20
+                      0x9cad9f8: 3e 20 3e 20 66 72 61 67 74 3a 20 57 65 6e 6e 20
+                      0x9cada08: 64 75 20 77 69 72 6b 6c 69 63 68 20 4a 65 73 75
+                      0x9cada18: 73 20 62 69 73 74 20 75 6e 64 20 47 6f 74 74 20
+                      0x9cada28: 64 69 72 20 64 61 73 20 61 75 66 67 65 74 72 61
+                      0x9cada38: 67 65 6e 0a 3e 20 68 61 74 2c 20 73 6f 0a 3e 20
+                      0x9cada48: 3e 20 3e 20 6e 69 6d 6d 20 6d 69 63 68 2c 20 61
+                      0x9cada58: 62 65 72 20 62 69 74 74 65 20 76 6f 6e 20 68 69
+                      0x9cada68: 6e 74 65 6e 2c 20 64 61 73 73 20 64 75 20 6d 65
+                      0x9cada78: 69 6e 20 48 61 75 70 74 20 6e 69 63 68 74 0a 3e
+                      0x9cada88: 20 62 65 74 72 61 63 68 74 65 6e 0a 3e 20 3e 20
+                      0x9cada98: 3e 20 6d 75 73 73 74 2e 0a 3e 20 3e 20 3e 20 4e
+                      0x9cadaa8: 61 63 68 20 35 20 4d 69 6e 75 74 65 6e 20 77 69
+                      0x9cadab8: 6c 64 65 6d 20 54 72 65 69 62 65 6e 20 72 65 69
+                      0x9cadac8: df 74 20 73 69 63 68 20 64 65 72 20 48 69 70 70
+                      0x9cadad8: 79 20 64 69 65 0a 3e 20 4a 65 73 75 73 67 65 77
+                      0x9cadae8: e4 6e 64 65 72 0a 3e 20 3e 20 3e 20 76 6f 6d 20
+                      0x9cadaf8: 4c 65 69 62 20 75 6e 64 20 73 63 68 72 65 69 74
+                      0x9cadb08: 3a 20 52 65 69 6e 67 65 66 61 6c 6c 65 6e 2c 20
+                      0x9cadb18: 69 63 68 20 62 69 6e 20 64 65 72 20 48 69 70 70
+                      0x9cadb28: 79 21 20 44 61 72 61 75 66 20 72 65 69 df 74 0a
+                      0x9cadb38: 3e 20 73 69 63 68 0a 3e 20 3e 20 3e 20 64 69 65
+                      0x9cadb48: 20 4e 6f 6e 6e 65 20 64 69 65 20 47 65 77 e4 6e
+                      0x9cadb58: 64 65 72 20 76 6f 6d 20 4c 65 69 62 20 75 6e 64
+                      0x9cadb68: 20 72 75 66 74 3a 20 c4 74 73 63 68 20 42 ffffffe4 74
+                      0x9cadb78: 73 63 68 2c 20 69 63 68 20 62 69 6e 20 64 65 72
+                      0x9cadb88: 0a 3e 20 3e 20 3e 20 42 75 73 66 61 68 72 65 72
+                      0x9cadb98: 21 0a 3e 20 3e 20 3e 0a 3e 20 3e 20 3e 0a 3e 0a
+                      0x9cadba8: 0a 2d 2d 0a 53 65 6e 74 20 74 68 72 6f 75 67 68
+                      0x9cadbb8: 20 47 4d 58 20 46 72 65 65 4d 61 69 6c 20 2d 20
+                      0x9cadbc8: 68 74 74 70 3a 2f 2f 77 77 77 2e 67 6d 78 2e 6e
+                      0x9cadbd8: 65 74 0a 0a 2b 02 00 00 af 00 00 70 5c 8a 23 09
+                      0x9cadbe8: 19 00 00 00 e9 42 b8 08 d4 2d 10 08 e4 01 00 00
+                      0x9cadbf8: 6e 14
+  .message_buf:       0x9cadbfa: ff fb 03 30 6d 1b 5b 31 3b 31 48 1b 5b 37 6d 20
+                      0x9cadc0a: 49 20 7e 2f 6d 65 6e 61 75 72 65 73 20 20 20 20
+                      0x9cadc1a: 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+                      0x9cadc2a: 20 20 53 70 61 6c 74 65 3a 20 20 20 35 20 20 20
+                      0x9cadc3a: 5a 65 69 6c 65 3a 20 20 20 31 20 20 20 43 74 72
+                      0x9cadc4a: 6c 2d 4f 20 3d 20 48 69 6c 66 65 20 20 20 0d 0a
+                      0x9cadc5a: 1b 5b 30 6d 1b 5b 32 3b 35 48 ff fb 01 65 73 20
+                      0x9cadc6a: 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+                      0x9cadc7a: 20 20 20 20 20 53 70 61 6c 74 65 3a 20 20 20 31
+                      0x9cadc8a: 20 20 20 5a 65 69 6c 65 3a 20 20 20 31 20 20 20
+                      0x9cadc9a: 43 74 72 6c 2d 4f 20 3d 20 48 69 6c 66 65 20 20
+                      0x9cadcaa: 20 0d 0a 1b 5b 30 6d 1b 5b 32 3b 31 48 20 1b 5b
+                      0x9cadcba: 30 6d 1b 5b 31 3b 31 48 1b 5b 37 6d 20 49 20 7e
+                      0x9cadcca: 2f 6d 65 6e 61 75 72 65 73 20 20 20 20 20 20 20
+                      0x9cadcda: 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 53
+                      0x9cadcea: 70 61 6c 74 65 3a 20 20 20 32 20 20 20 5a 65 69
+                      0x9cadcfa: 6c 65 3a 20 20 20 31 20 20 20 43 74 72 6c 2d 4f
+                      0x9cadd0a: 20 3d 20 48 69 6c 66 65 20 20 20 0d 0a 1b 5b 30
+                      0x9cadd1a: 6d 1b 5b 32 3b 32 48 31 1b 5b 30 6d 1b 5b 31 3b
+                      0x9cadd2a: 31 48 1b 5b 37 6d 20 49 20 7e 2f 6d 65 6e 61 75
+                      0x9cadd3a: 72 65 73 20 20 20 20 20 20 20 20 20 20 20 20 20
+                      0x9cadd4a: 20 20 20 20 20 20 20 20 20 53 70 61 6c 74 65 3a
+                      0x9cadd5a: 20 20 20 33 20 20 20 5a 65 69 6c 65 3a 20 20 20
+                      0x9cadd6a: 31 20 20 20 43 74 72 6c 2d 4f 20 3d 20 48 69 6c
+                      0x9cadd7a: 66 65 20 20 20 0d 0a 1b 5b 30 6d 1b 5b 32 3b 33
+                      0x9cadd8a: 48 ff fb 01 0a 20 20 20 20 20 20 20 20 44 65 72
+                      0x9cadd9a: 20 65 69 6e 65 20 69 73 74 20 65 69 6e 20 53 70
+                      0x9caddaa: 69 65 67 65 6c 62 69 6c 64 20 64 65 73 20 43 61
+                      0x9caddba: 6d 70 75 73 20 64 65 72 20 55 6e 69 20 53 74 75
+                      0x9caddca: 74 74 67 61 72 74 3b 0d 0a 20 20 20 20 68 69 65
+                      0x9caddda: 72 20 6b 61 6e 6e 20 6d 61 6e 20 73 69 63 68 20
+                      0x9caddea: 75 6d 73 63 68 61 75 65 6e 2c 20 6d 69 74 20 4c
+                      0x9caddfa: 65 75 74 65 6e 20 72 65 64 65 6e 2c 20 49 6e 66
+                      0x9cade0a: 6f 72 6d 61 74 69 6f 6e 65 6e 20 73 61 6d 6d 65
+                      0x9cade1a: 6c 6e 0d 0a 20 20 20 20 20 20 20 20 75 6e 64 20
+                      0x9cade2a: 73 6f 20 65 69 6e 69 67 65 73 20 75 65 62 65 72
+                      0x9cade3a: 20 64 69 65 20 55 6e 69 20 75 6e 64 20 69 68 72
+                      0x9cade4a: 65 20 22 42 65 77 6f 68 6e 65 72 22 20 65 72 66
+                      0x9cade5a: 61 68 72 65 6e 2e 0d 0a 0d 0a 20 20 20 20 44 65
+                      0x9cade6a: 72 20 61 6e 64 65 72 65 20 54 65 69 6c 2c 20 4d
+                      0x9cade7a: 41 47 59 52 41 20 67 65 6e 61 6e 6e 74 2c 20 69
+                      0x9cade8a: 73 74 20 77 61 68 72 68 61 66 74 20 65 69 6e 65
+                      0x9cade9a: 20 6e 65 75 65 20 44 69 6d 65 6e 73 69 6f 6e 2c
+                      0x9cadeaa: 0d 0a 20 20 20 20 20 20 20 20 20 69 6e 20 64 65
+                      0x9cadeba: 72 20 56 65 72 67 61 6e 67 65 6e 68 65 69 74 2c
+                      0x9cadeca: 20 47 65 67 65 6e 77 61 72 74 20 75 6e 64 20 5a
+                      0x9cadeda: 75 6b 75 6e 66 74 20 7a 75 20 65 69 6e 65 6d 20
+                      0x9cadeea: 52 61 75 6d 0d 0a 20 20 20 20 20 20 20 20 20 20
+                      0x9cadefa: 6f 68 6e 65 20 47 72 65 6e 7a 65 6e 20 7a 75 73
+                      0x9cadf0a: 61 6d 6d 65 6e 66 6c 69 65 73 73 65 6e 2c 20 69
+                      0x9cadf1a: 6e 20 64 65 72 20 61 6c 6c 65 73 20 6d 6f 65 67
+                      0x9cadf2a: 6c 69 63 68 0d 0a 20 20 20 20 20 20 20 20 20 20
+                      0x9cadf3a: 20 20 20 20 20 20 20 20 20 20 20 20 20 20 75 6e
+                      0x9cadf4a: 64 20 6e 69 63 68 74 73 20 75 6e 6d 6f 65 67 6c
+                      0x9cadf5a: 69 63 68 20 69 73 74 2e 0d 0a 0d 0a 20 20 20 20
+                      0x9cadf6a: 20 20 20 44 75 20 6b 61 6e 6e 73 74 20 64 69 65
+                      0x9cadf7a: 73 65 20 57 65 6c 74 65 6e 20 62 65 73 75 63 68
+                      0x9cadf8a: 65 6e 2c 20 69 6e 64 65 6d 20 44 75 20 44 69 72
+                      0x9cadf9a: 20 65 69 6e 65 6e 20 4e 61 6d 65 6e 20 75 6e 64
+                      0x9cadfaa: 20 65 69 6e 0d 0a 20 20 20 20 20 20 20 20 20 50
+                      0x9cadfba: 61 73 73 77 6f 72 74 20 61 75 73 73 75 63 68 73
+                      0x9cadfca: 74 2e 20 57 69 6c 6c 73 74 20 44 75 20 44 69 63
+                      0x9cadfda: 68 20 6e 75 72 20 65 69 6e 20 62 69 73 73 63 68
+                      0x9cadfea: 65 6e 20 75 6d 73 63 68 61 75 65 6e 0d 0a 20 20
+------
+return                     (1: 13)	line 233
+obj/zauberstab#596 i/xeditor/xeditor.c (loop.inc) line 277
+8c07f14:  74          pop_value                  (1:  6)	line 277
+8c07f15:  20          return0                    (0:  5)	line 278
+977d996:  92   0  30  84  18   8   0   7
+No trace.read: Bad file descriptor
+Erq demon exiting.
+********************************************************************************

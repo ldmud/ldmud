@@ -895,6 +895,31 @@ mstring_add_slash (const string_t *str MTRACE_DECL)
 } /* mstring_add_slash() */
 
 /*-------------------------------------------------------------------------*/
+Bool
+mstring_prefixed (const string_t *p, const string_t *s)
+
+/* Aliased to: mstrprefixed(p,s)
+ *
+ * Return TRUE if string <s> begins with string <p>, FALSE if not.
+ */
+
+{
+    char *pp, *ps;
+    size_t lp, ls;
+
+    lp = mstrsize(p); pp = get_txt(p);
+    ls = mstrsize(s); ps = get_txt(s);
+
+    for (; lp > 0 && ls > 0; lp--, ls--)
+    {
+        if (*pp++ != *ps++)
+            return MY_FALSE;
+    }
+
+    return (lp == 0) ? MY_TRUE : MY_FALSE;
+} /* mstring_prefixed() */
+
+/*-------------------------------------------------------------------------*/
 void
 mstring_init (void)
 

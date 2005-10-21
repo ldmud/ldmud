@@ -3773,10 +3773,15 @@ yylex1 (void)
             if ('.' == c && '.' != *yyp)
             {
                 char * numend;  /* Because yyp is 'register' */
+                errno = 0; /* Because strtod() doesn't clear it on success */
                 yylval.float_number = strtod(numstart, &numend);
                 if (errno == ERANGE)
                 {
                     yywarn("Floating point number out of range.");
+                }
+                else if (errno == EINVAL)
+                {
+                    yyerror("Floating point number can't be represented.");
                 }
                 outp = numend;
                 return L_FLOAT;
@@ -5992,7 +5997,7 @@ f_set_auto_include_string (svalue_t *sp)
 {
     char *s;
 
-    if (_privilege_violation("set_auto_include_string", sp, sp) > 0)
+    if (privilege_violation("set_auto_include_string", sp, sp) > 0)
     {
         clear_auto_include_string();
         s = sp->u.string;

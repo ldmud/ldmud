@@ -535,7 +535,7 @@ dump_bytes (void * data, size_t length, int indent)
 
 {
     int cur_indent = 0;
-    char * datap = (char *)data;
+    unsigned char * datap = (unsigned char *)data;
 
     while (length > 0)
     {
@@ -563,6 +563,8 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
  * Dump the data from the current interactive structure and disconnect
  * the user (we have to assume that the interactive structure is
  * irrecoverably hosed).
+ * TODO: Make similar functions comm_error(), comm_perror() which prefix
+ * TODO:: the error message with the ip %p and obj name.
  */
 
 {
@@ -575,7 +577,7 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
 
     /* Prevent double fatal. */
     if (in_fatal)
-        abort();
+        fatal("Recursive call to comm_fatal().");
     in_fatal = MY_TRUE;
     ts = time_stamp();
     
@@ -590,15 +592,15 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
     if (current_object)
         fprintf(stderr, "%s Current object was %s\n"
                       , ts, current_object->name
-                            ? current_object->name : "<null>");
+                            ? get_txt(current_object->name) : "<null>");
     debug_message("%s ", ts);
     vdebug_message(fmt, va);
     if (current_object)
         debug_message("%s Current object was %s\n"
                      , ts, current_object->name
-                           ? current_object->name : "<null>");
+                           ? get_txt(current_object->name) : "<null>");
     debug_message("%s Dump of the call chain:\n", ts);
-    (void)dump_trace(MY_TRUE);
+    (void)dump_trace(MY_TRUE); fflush(stdout);
 
     va_end(va);
     
@@ -612,22 +614,22 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
       putc('\n', stderr);
     fprintf(stderr, "  .input_to:          %p\n", ip->input_to);
     fprintf(stderr, "  .modify_command:    %p", ip->modify_command);
-      if (ip->modify_command)  fprintf(stderr, " (%s)", ip->modify_command->name);
+      if (ip->modify_command)  fprintf(stderr, " (%s)", get_txt(ip->modify_command->name));
       putc('\n', stderr);
     fprintf(stderr, "  .prompt:           ");
       dump_bytes(&(ip->prompt), sizeof(ip->prompt), 21);
     fprintf(stderr, "  .addr:             ");
       dump_bytes(&(ip->addr), sizeof(ip->addr), 21);
-    fprintf(stderr, "  .set_input_to:      %02x\n", ip->set_input_to);
-    fprintf(stderr, "  .closing:           %02x\n", ip->closing);
-    fprintf(stderr, "  .do_close:          %02x", ip->do_close);
+    fprintf(stderr, "  .set_input_to:      %02x\n", (unsigned char)ip->set_input_to);
+    fprintf(stderr, "  .closing:           %02x\n", (unsigned char)ip->closing);
+    fprintf(stderr, "  .do_close:          %02x", (unsigned char)ip->do_close);
       if (ip->do_close & (FLAG_DO_CLOSE|FLAG_PROTO_ERQ)) fprintf(stderr, " (");
       if (ip->do_close & FLAG_DO_CLOSE) fprintf(stderr, "DO_CLOSE");
       if (ip->do_close & (FLAG_DO_CLOSE|FLAG_PROTO_ERQ)) fprintf(stderr, ", ");
       if (ip->do_close & FLAG_PROTO_ERQ) fprintf(stderr, "PROTO_ERQ");
       if (ip->do_close & (FLAG_DO_CLOSE|FLAG_PROTO_ERQ)) fprintf(stderr, ")");
       putc('\n', stderr);
-    fprintf(stderr, "  .noecho:            %02x", ip->noecho);
+    fprintf(stderr, "  .noecho:            %02x", (unsigned char)ip->noecho);
       if (ip->noecho) fprintf(stderr, " (");
       if (ip->noecho & NOECHO_REQ) fprintf(stderr, "NOECHO_REQ, ");
       if (ip->noecho & CHARMODE_REQ) fprintf(stderr, "CHARMODE_REQ, ");
@@ -637,6 +639,8 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
       if (ip->noecho & CHARMODE_ACK) fprintf(stderr, "CHARMODE_ACK, ");
       if (ip->noecho & NOECHO_STALE) fprintf(stderr, "NOECHO_STALE, ");
       if (ip->noecho & IGNORE_BANG) fprintf(stderr, "IGNORE_BANK");
+      if (ip->noecho) putc(')', stderr);
+      putc('\n', stderr);
     fprintf(stderr, "  .tn_state:          %d", ip->tn_state);
       switch(ip->tn_state) {
       case TS_DATA:    fprintf(stderr, " (TS_DATA)\n"); break;
@@ -669,7 +673,7 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
       case TS_INVALID: fprintf(stderr, " (TS_INVALID)\n"); break;
       default: putc('\n', stderr);
       }
-    fprintf(stderr, "  .supress_go_ahead:  %02x\n", ip->supress_go_ahead);
+    fprintf(stderr, "  .supress_go_ahead:  %02x\n", (unsigned char)ip->supress_go_ahead);
     fprintf(stderr, "  .text_end:          %hd (%p)\n", ip->text_end, ip->text+ip->text_end);
     fprintf(stderr, "  .command_start:     %hd (%p)\n", ip->command_start, ip->text+ip->command_start);
     fprintf(stderr, "  .command_end:       %hd (%p)\n", ip->command_end, ip->text+ip->command_end);
@@ -677,32 +681,32 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
     fprintf(stderr, "  .tn_end:            %hd (%p)\n", ip->tn_end, ip->text+ip->tn_end);
     fprintf(stderr, "  .chars_ready:       %ld\n", (long)ip->chars_ready);
     fprintf(stderr, "  .snoop_on:          %p", ip->snoop_on);
-      if (ip->snoop_on && ip->snoop_on->ob) fprintf(stderr, " (%s)", ip->snoop_on->ob->name);
+      if (ip->snoop_on && ip->snoop_on->ob) fprintf(stderr, " (%s)", get_txt(ip->snoop_on->ob->name));
       putc('\n', stderr);
     fprintf(stderr, "  .snoop_by:          %p", ip->snoop_by);
-      if (ip->snoop_by) fprintf(stderr, " (%s)", ip->snoop_by->name);
+      if (ip->snoop_by) fprintf(stderr, " (%s)", get_txt(ip->snoop_by->name));
       putc('\n', stderr);
     fprintf(stderr, "  .last_time:         %ld\n", (long)ip->last_time);
     fprintf(stderr, "  .trace_level:       %d\n", ip->trace_level);
     fprintf(stderr, "  .trace_prefix:      %p", ip->trace_prefix);
-      if (ip->trace_prefix) fprintf(stderr, " '%s'", ip->trace_prefix);
+      if (ip->trace_prefix) fprintf(stderr, " '%s'", get_txt(ip->trace_prefix));
       putc('\n', stderr);
     fprintf(stderr, "  .message_length:    %d (%p)\n", ip->message_length, ip->message_buf+ip->message_length);
     fprintf(stderr, "  .next_for_flush:    %p", ip->next_player_for_flush);
-      if (ip->next_player_for_flush) fprintf(stderr, " (%s)", ip->next_player_for_flush->name);
+      if (ip->next_player_for_flush) fprintf(stderr, " (%s)", get_txt(ip->next_player_for_flush->name));
       putc('\n', stderr);
     fprintf(stderr, "  .prev_for_flush:    %p", ip->previous_player_for_flush);
-      if (ip->previous_player_for_flush) fprintf(stderr, " (%s)", ip->previous_player_for_flush->name);
+      if (ip->previous_player_for_flush) fprintf(stderr, " (%s)", get_txt(ip->previous_player_for_flush->name));
       putc('\n', stderr);
     fprintf(stderr, "  .access_class:      %ld\n", ip->access_class);
     fprintf(stderr, "  .charset:          ");
       dump_bytes(&(ip->charset), sizeof(ip->charset), 21);
     fprintf(stderr, "  .combine_cset:     ");
       dump_bytes(&(ip->combine_cset), sizeof(ip->combine_cset), 21);
-    fprintf(stderr, "  .quote_iac:         %02x\n", ip->quote_iac);
-    fprintf(stderr, "  .catch_tell_activ:  %02x\n", ip->catch_tell_activ);
-    fprintf(stderr, "  .gobble_char:       %02x\n", ip->gobble_char);
-    fprintf(stderr, "  .ts_data:           %02x\n", ip->ts_data);
+    fprintf(stderr, "  .quote_iac:         %02x\n", (unsigned char)ip->quote_iac);
+    fprintf(stderr, "  .catch_tell_activ:  %02x\n", (unsigned char)ip->catch_tell_activ);
+    fprintf(stderr, "  .gobble_char:       %02x\n", (unsigned char)ip->gobble_char);
+    fprintf(stderr, "  .ts_data:           %02x\n", (unsigned char)ip->ts_data);
     fprintf(stderr, "  .text:             ");
       dump_bytes(&(ip->text), sizeof(ip->text), 21);
     fprintf(stderr, "  .message_buf:      ");
@@ -713,6 +717,8 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
     socket_write(ip->socket, msg, strlen(msg));
     remove_interactive(ip->ob, MY_TRUE);
 
+    /* Unset mutex */
+    in_fatal = MY_FALSE;
 } /* comm_fatal() */
 
 /*-------------------------------------------------------------------------*/
@@ -2173,6 +2179,17 @@ get_message (char *buff)
                         remove_interactive(ip->ob, MY_FALSE);
                         continue;
                     }
+                    if (errno == EBADF) {
+                        if (ip->ob)
+                            debug_message("%s Socket %d (ip %p '%s') is a bad descriptor.\n"
+                                         , time_stamp(), ip->socket, ip
+                                         , ip->ob->name);
+                        else
+                            debug_message("%s Socket %d (ip %p) is a bad descriptor.\n"
+                                         , time_stamp(), ip->socket, ip);
+                        remove_interactive(ip->ob, MY_FALSE);
+                        continue;
+                    }
                     perror("read");
                     debug_message("%s Unknown errno %d\n", time_stamp(), errno);
                     remove_interactive(ip->ob, MY_FALSE);
@@ -2554,7 +2571,8 @@ remove_interactive (object_t *ob, Bool force)
     check_shadow_sent(ob);
 
     xfree(interactive);
-    all_players[i] = NULL;
+    if (i < MAX_PLAYERS)
+        all_players[i] = NULL;
     while (max_player && !all_players[max_player])
         max_player--;
     free_object(ob, "remove_interactive");
@@ -5235,7 +5253,7 @@ f_send_imp (svalue_t *sp)
 
         /* Is this call valid? */
 
-        if (!_privilege_violation(STR_SEND_IMP, sp-2, sp))
+        if (!privilege_violation(STR_SEND_IMP, sp-2, sp))
             break;
         if (udp_s < 0)
             break;

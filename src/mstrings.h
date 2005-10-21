@@ -86,6 +86,7 @@ extern Bool       mstring_equal(const string_t * const pStr1
 extern void mstring_free (string_t *s);
 extern char *     mstring_mstr_n_str(const string_t * const pStr, size_t start, const char * const pTxt, size_t len);
 extern string_t * mstring_add_slash (const string_t *str MTRACE_DECL);
+extern Bool       mstring_prefixed (const string_t *p, const string_t *s);
 
 #ifdef GC_SUPPORT
 
@@ -212,5 +213,6 @@ extern void string_dinfo_status (svalue_t *svp);
 #define mstreq(pStr1,pStr2)      mstring_equal(pStr1, pStr2)
 #define mstrstr(pStr,pTxt)       mstring_mstr_n_str(pStr, 0, pTxt, strlen(pTxt))
 #define add_slash(pStr)          mstring_add_slash(pStr MTRACE_ARG)
+#define mstrprefixed(pStr1, pStr2) mstring_prefixed(pStr1, pStr2)
 
 #endif /* MSTRINGS_H_ */

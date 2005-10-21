@@ -3720,7 +3720,7 @@ f_set_driver_hook (svalue_t *sp)
     }
 
     /* Legal call? */
-    if (!_privilege_violation("set_driver_hook", sp-1, sp))
+    if (!privilege_violation("set_driver_hook", sp-1, sp))
     {
         free_svalue(sp);
         return sp - 2;
@@ -4074,7 +4074,7 @@ f_limited (svalue_t * sp, int num_arg)
 
     /* If this object is destructed, no extern calls may be done */
     if (current_object->flags & O_DESTRUCTED
-     || !_privilege_violation("limited", argp, sp)
+     || !privilege_violation("limited", argp, sp)
         )
     {
         sp = pop_n_elems(num_arg, sp);
@@ -4169,7 +4169,7 @@ f_set_limits (svalue_t * sp, int num_arg)
         return sp;
     }
 
-    if (_privilege_violation("set_limits", argp, sp))
+    if (privilege_violation("set_limits", argp, sp))
     {
         /* Now store the parsed limits into the variables */
         def_eval_cost = limits.max_eval;

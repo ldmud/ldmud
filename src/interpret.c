@@ -4555,8 +4555,65 @@ find_virtual_value (int num)
 } /* find_virtual_value() */
 
 
-=== Adapted until here ===
 /*=========================================================================*/
+
+/*                  T Y P E S   A N D   E R R O R S                        */
+
+/*-------------------------------------------------------------------------*/
+/* The following functions deal with the readable display of LPC runtime
+ * types, and of errors in general.
+ *
+ *   typename(type) : Return a descriptive string for a type.
+ *   efun_arg_typename(type) : Return a descriptive string for the bit-
+ *                    encoded type information of an efun.
+ *   complete_instruction(instr) : Return the name of the given instruction,
+ *                    resp. of the instruction found a the given negative
+ *                    offset.
+ *   raise_bad_arg(instr, arg) : Argument no. <arg> for the instruction
+ *                    was bad.
+ *   vefun_bad_arg(arg,sp) : Argument no. <arg> for the current vefun
+ *                    was bad. Also restore inter_sp from sp.
+ *   raise_arg_error(instr, arg, expected, got) : (internal) The argument
+ *                    no. <arg> to the instruction did not have the
+ *                    <expected> type (bit-encoded), but instead <got>
+ *                    (the LPC type tag).
+ *   (v)efun_gen_arg_error(arg, got, sp): Argument no. <arg> to the current
+ *                    tabled (v)efun had the wrong type <got>. inter_sp is
+ *                    restored from <sp>.
+ *   (v)efun_arg_error(arg, expected, got, sp): Argument no. <arg> to the
+ *                    current tabled (v)efun had the wrong type <got> (LPC
+ *                    type tag), not the type <expected> (LPC type tag).
+ *                    inter_sp is restored from <sp>.
+ *   (v)efun_exp_arg_error(arg, expected, got, sp): Argument no. <arg> to the
+ *                    current tabled (v)efun had the wrong type <got> (LPC
+ *                    type tag), not the type <expected> (bit-encoded).
+ *                    inter_sp is restored from <sp>.
+ *   code_arg_error(arg, expected, got, pc, sp): Argument no. <arg> to the
+ *                    current one-byte instruction had the wrong type <got>
+ *                    (LPC type tag), not the type <expected> (LPC type tag).
+ *                    inter_sp is restored from <sp>, inter_pc from <pc>.
+ *   code_exp_arg_error(arg, expected, got, pc, sp): Argument no. <arg> to the
+ *                    current one-byte instruction had the wrong type <got>
+ *                    (LPC type tag), not the type <expected> (bit-encoded).
+ *                    inter_sp is restored from <sp>, inter_pc from <pc>.
+ *   op_arg_error(arg, expected, got, pc, sp): Argument no. <arg> to the
+ *                    current one-byte operator had the wrong type <got>
+ *                    (LPC type tag), not the type <expected> (LPC type tag).
+ *                    inter_sp is restored from <sp>, inter_pc from <pc>.
+ *   op_exp_arg_error(arg, expected, got, pc, sp): Argument no. <arg> to the
+ *                    current one-byte operator had the wrong type <got>
+ *                    (LPC type tag), not the type <expected> (bit-encoded).
+ *                    inter_sp is restored from <sp>, inter_pc from <pc>.
+ *
+ *     The difference between code_... and op_... is that the op_...
+ *     will use 'right' and 'left' for the argument names.
+ *
+ *   test_efun_args(instr, args, argp): (internal) Test the types for
+ *                    <args> arguments for the given instruction, starting
+ *                    at <argp> against the expected types according to
+ *                    efun_lpc_types[].
+ */
+
 /*-------------------------------------------------------------------------*/
 static INLINE const char *
 typename_inline (int type)
@@ -4944,17 +5001,19 @@ test_efun_args (int instr, int args, svalue_t *argp)
     }
 } /* test_efun_args() */
 
+
 /*=========================================================================*/
 /*-------------------------------------------------------------------------*/
 Bool
-_privilege_violation (char *what, svalue_t *where, svalue_t *sp)
+privilege_violation (string_t *what, svalue_t *where, svalue_t *sp)
 
 /* Call the mudlib to check for a privilege violation:
  *
  *   master->privilege_violation(what, current_object, where)
  *
- * where <what> describes the type of the violation, and <where> is the
- * data used in the violation. <sp> is the current stack setting.
+ * where <what> describes the type of the violation (uncounted string ref),
+ * and <where> is the data used in the violation.
+ * <sp> is the current stack setting.
  *
  * If the apply returns a positive number, the privilege is granted and
  * the function returns TRUE.
@@ -4977,8 +5036,8 @@ _privilege_violation (char *what, svalue_t *where, svalue_t *sp)
     if (current_object == simul_efun_object) return MY_TRUE;
 
     /* Setup and call the lfun */
-    push_volatile_string(sp, what);
-    push_ref_valid_object(sp, current_object, "_privilege violation");
+    push_ref_string(sp, what);
+    push_ref_valid_object(sp, current_object, "privilege violation");
     sp++;
     assign_svalue_no_free(sp, where);
     inter_sp = sp;
@@ -4994,12 +5053,12 @@ _privilege_violation (char *what, svalue_t *where, svalue_t *sp)
 
     /* Return the result */
     return svp->u.number > 0;
-} /* _privilege_violation() */
+} /* privilege_violation() */
 
 /*-------------------------------------------------------------------------*/
 Bool
-privilege_violation4 ( char *what,    object_t *whom
-                     , char *how_str, int how_num
+privilege_violation4 ( string_t *what,    object_t *whom
+                     , string_t *how_str, int how_num
                      , svalue_t *sp)
 
 /* Call the mudlib to check for a privilege violation:
@@ -5013,6 +5072,7 @@ privilege_violation4 ( char *what,    object_t *whom
  *
  * where <what> describes the type of the violation, and <whom>/<how_str>/
  * <how_num> are data used in the violation. <sp> is the current stack setting.
+ * All strings are not counted.
  *
  * If the apply returns a positive number, the privilege is granted and
  * the function returns TRUE.
@@ -5039,18 +5099,18 @@ privilege_violation4 ( char *what,    object_t *whom
 
     /* Set up the lfun call */
 
-    push_volatile_string(sp, what);
+    push_ref_string(sp, what);
     push_ref_valid_object(sp, current_object, "privilege_violation");
     if (!whom)
     {
-        push_volatile_string(sp, how_str);
+        push_ref_string(sp, how_str);
         push_number(sp, how_num);
     }
     else
     {
         push_ref_object(sp, whom, "privilege_violation");
         if (how_str)
-            push_volatile_string(sp, how_str);
+            push_ref_string(sp, how_str);
         else
             push_number(sp, how_num);
     }
@@ -5067,22 +5127,7 @@ privilege_violation4 ( char *what,    object_t *whom
 
     /* Return the result */
     return svp->u.number > 0;
-}
-
-/*-------------------------------------------------------------------------*/
-static Bool
-strpref (const char *p, const char *s)
-
-/* Return TRUE if string <s> begins with string <p>, FALSE if not.
- * Used by the function trace_test().
- */
-
-{
-    while (*p)
-        if (*p++ != *s++)
-            return MY_FALSE;
-    return MY_TRUE;
-}
+} /* privilege_violation4() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -5102,7 +5147,7 @@ trace_test (int b)
         && (ip->trace_level & b)
         && (ip->trace_prefix == NULL
             || (current_object
-                && strpref(ip->trace_prefix, current_object->name)))
+                && mstrprefixed(ip->trace_prefix, current_object->name)))
     ;
 } /* trace_test() */
 
@@ -5125,8 +5170,9 @@ do_trace (char *msg, char *fname, char *post)
     if (!TRACEHB)
         return;
     objname = TRACETST(TRACE_OBJNAME)
-              ? (current_object && current_object->name ? current_object->name
-                                                        : "?")
+              ? (current_object && current_object->name
+                   ? get_txt(current_object->name)
+                   : "?")
               : "";
     sprintf(buf, "*** %d %*s %s %s %s%s", tracedepth, tracedepth, ""
                , msg, objname, fname, post);
@@ -5144,7 +5190,7 @@ do_trace_call (fun_hdr_p funstart)
  */
 
 {
-    char *name;
+    string_t *name;
 
     if (!++traceing_recursion) /* Do not recurse! */
     {
@@ -5153,7 +5199,7 @@ do_trace_call (fun_hdr_p funstart)
 
         /* Trace the function itself */
         memcpy(&name, FUNCTION_NAMEP(funstart), sizeof name);
-        do_trace("Call direct ", name, " ");
+        do_trace("Call direct ", get_txt(name), " ");
 
         /* If requested, also trace the arguments */
         if (TRACEHB)
@@ -5586,7 +5632,7 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp)
     /* Initialize the break stack, pointing to the entry above
      * the first available svalue.
      */
-    break_sp = (bytecode_p *)&sp[1].u.string;
+    break_sp = (bytecode_p *)&sp[1].u.str;
 
     return sp;
 } /* setup_new_frame2() */
@@ -5610,7 +5656,7 @@ setup_new_frame (int fx)
     if (!current_object->variables && variable_index_offset)
         fatal("%s Fatal: new frame for object %p '%s' w/o variables, "
               "but offset %d\n"
-             , time_stamp(), current_object, current_object->name
+             , time_stamp(), current_object, get_txt(current_object->name)
              , variable_index_offset);
 #endif
     current_variables = current_object->variables;
@@ -5755,6 +5801,7 @@ remove_object_from_stack (object_t *ob)
     }
 }
 
+=== Adapted until here ===
 /*-------------------------------------------------------------------------*/
 Bool
 eval_instruction (bytecode_p first_instruction
@@ -5797,9 +5844,35 @@ eval_instruction (bytecode_p first_instruction
     svalue_t *expected_stack; /* Expected stack at the instr end */
 #endif
 
-    /* Handy macros. Some of these are redefined later for multi-
-     * byte instructions.
+    /* Handy macros:
+     *
+     *   GET_NUM_ARG: Get the number of arguments, resp. check if the
+     *                number was read correctly.
+     *
+     *   RAISE_ARG_ERROR(arg,expected,got),
+     *   OP_ARG_ERROR(arg,expected.got):
+     *                Argument <arg> had type <got> (LPC type tag), not
+     *                type <expected> (bit-encoded).
+     *
+     *   BAD_ARG_ERROR(arg,expected,got),
+     *   BAD_OP_ARG(arg,expected,got):
+     *                Argument <arg> had type <got> (LPC type tag), not
+     *                type <expected> (LPC type tag).
+     *
+     *   TYPE_TEST1/2/3/4(arg, t): Test argument <arg> of a one-byte
+     *                instruction if it has type <t> (LPC type tag).
+     *                The 1/2/3/4 is the number of the argument.
+     *   TYPE_TEST_LEFT(arg, t), TYPE_TEST_RIGHT(arg, t): Test the
+     *                argument <arg> if it has type <t> (LPC type tag).
+     *                It is either the left or the right argument to a
+     *                one-byte operator.
+     *   TYPE_TEST_EXP_LEFT(arg, t), TYPE_TEST_EXP_RIGHT(arg, t): Test the
+     *                argument <arg> if it has type <t> (bit-encoded).
+     *                It is either the left or the right argument to a
+     *                one-byte operator.
+     *
      */
+
 #   ifdef DEBUG
 #       define GET_NUM_ARG \
             if (num_arg != GET_UINT8(pc-1)) {\
@@ -5861,14 +5934,6 @@ eval_instruction (bytecode_p first_instruction
 #   define TYPE_TEST_EXP_RIGHT(arg, t) \
         if (!( (1 << (arg)->type) & (t)) ) op_exp_arg_error(2, (t), (arg)->type, pc, sp); else NOOP;
       /* Test the type of a certain argument.
-       */
-
-#   define privilege_violation(what, where) (\
-        inter_pc = pc,\
-        _privilege_violation(what, where, sp)\
-        )
-      /* Just as _privilege_violation(), just that it automatically uses
-       * local <sp> and <pc> and updates the inter_ variables from them.
        */
 
 #   ifdef MARK
@@ -12597,7 +12662,6 @@ again:
 #   undef TYPE_TEST_EXP_LEFT
 #   undef TYPE_TEST_EXP_RIGHT
 #   undef CASE
-#   undef privilege_violation
 } /* eval_instruction() */
 
 /*-------------------------------------------------------------------------*/
@@ -16027,7 +16091,7 @@ f_set_this_object (svalue_t *sp)
 
     if (current_variables == master_ob->variables
      || current_variables == simul_efun_object->variables
-     || _privilege_violation("set_this_object", sp, sp))
+     || privilege_violation("set_this_object", sp, sp))
     {
         struct control_stack *p;
 

@@ -5049,7 +5049,7 @@ f_bind_lambda (svalue_t *sp)
         /* If <ob> is given, check for a possible privilege breach */
         ob = sp->u.ob;
         if (ob != current_object
-         && !_privilege_violation(STR_BIND_LAMBDA, sp, sp))
+         && !privilege_violation(STR_BIND_LAMBDA, sp, sp))
         {
             free_object(ob, "bind_lambda");
             sp--;
@@ -5422,7 +5422,7 @@ f_symbol_variable (svalue_t *sp)
 
         if (current_prog->variable_names[n].flags & NAME_HIDDEN)
         {
-            if (!_privilege_violation(STR_SYMBOL_VARIABLE, sp, sp))
+            if (!privilege_violation(STR_SYMBOL_VARIABLE, sp, sp))
             {
                 sp->u.number = 0;
                 return sp;

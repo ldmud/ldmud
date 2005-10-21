@@ -13,6 +13,4 @@ Other files are:
   erq-tool.c       : for 2.4.5 muds, a tool for interactive erq experiments.
   dhrystone.c      : an implementation of Dhrystone, called by the
                      test_master.
-  floattest.c      : a program to check the floatingpoint characteristics,
-                     called by the test_master.
 
