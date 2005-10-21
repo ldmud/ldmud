@@ -1656,7 +1656,7 @@ optpat (void)
         REGFREE(P_OLDPAT);
 
     memsafe(buf = new_mstring(str), strlen(str), "regexp pattern string");
-    P_OLDPAT = REGCOMP((unsigned char *)buf,P_EXCOMPAT, MY_TRUE);
+    P_OLDPAT = REGCOMP(buf,P_EXCOMPAT, MY_TRUE);
     free_mstring(buf);
     return P_OLDPAT;
 }
@@ -2574,7 +2574,7 @@ docmd (Bool glob)
         if (*inptr != NL)
             return ERR;
 
-        nchng = subst(REGCOMP((unsigned char *)STR_CRPATTERN, P_EXCOMPAT, MY_TRUE), "", 0, 0);
+        nchng = subst(REGCOMP(STR_CRPATTERN, P_EXCOMPAT, MY_TRUE), "", 0, 0);
 
         if (nchng < 0)
             return ERR;

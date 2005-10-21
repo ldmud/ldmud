@@ -78,6 +78,11 @@ DESCRIPTION
           int    [OIM_TOTAL_SIZE]:     total size of the program.
           int    [OIM_DATA_SIZE]:      total size of the values held in the
                                        object's variables
+          int    [OIM_NO_INHERIT]:     1 if the program can't be inherited.
+          int    [OIM_NO_CLONE]:       1 if the program/blueprint can't be
+                                       cloned.
+          int    [OIM_NO_SHADOW]:      1 if the program's functions can't be
+                                       shadowed.
 
           This call swaps in the program if necessary.
           Note that the OIM_SIZE_xxx entries only give the size spent on
@@ -92,6 +97,8 @@ HISTORY
               is not available.
           - basic result OIB_APPROVED is gone.
         LDMud 3.2.8 added OIM_DATA_SIZE to the result of OINFO_MEMORY.
+        LDMud 3.2.9 added OIM_NO_INHERIT, OIM_NO_SHADOW and OIM_NO_CLONE
+          to the result of OINFO_MEMORY.
 
 SEE ALSO
         debug_info(E)

@@ -187,7 +187,7 @@ remove_dat (db_dat_t *dat)
     if ( dat == my_dat )
         my_dat = NULL;
 
-    pxfree(dat);
+    pfree(dat);
     return i;
 } /* remove_dat() */
 

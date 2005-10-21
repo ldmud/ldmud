@@ -1,7 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-02-Nov-2000 (Lars Duening)  (3.3.14)
+07-Nov-2000 (Lars Duening)  (3.3.15)
+    Included the remaining changes from 3.2.9-dev.237:
+    - (efuns.c) object_info(OINFO_MEMORY) also returns the program flags
+         NO_SHADOW, NO_CLONE and NO_INHERIT.
+    - (pkg-mysql.c) Small bugfix (thanks, Michael!)
+    - (settings/forgottendreams) Updated according to Michael.
+    - (util/[x]erq/erq.h) Around dev.220 I accidentally broke 
+         compatibility with older erq binaries by renumbering the KEEP_HANDLE
+         constant - fixed that now. (reported by Coogan)
+
+05-Nov-2000 (Lars Duening)  (3.3.14)
     Included the changes from upcoming 3.2.9-dev.237:
     - (interpret.c) call_resolved() now accepts a destructed object as
          second argument and returns 0 instead of throwing an error.
@@ -20,7 +30,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
     - (simulate, interpret) Moved the catch_instruction() function into
          simulate to keep aggressive optimizers from over-optimizing this
          function. I hope this finally cures the catch() related crashes.
-         (thanks, Christian!) (b-001010-1)
+         (thanks, Coogan!) (b-001010-1)
     - (simulate, array.c, call_out.c, comm.c, mapping.c) Callbacks now accept
          protected lvalues as arguments only if they are called just once.
          Reason is that the protectors don't count references: at the first
@@ -33,7 +43,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
          work (provided by Casey, thanks!).
     - (pkg-mysql.c) Changed some xalloc()s into pxalloc()s to protect them
          against the GC (provided by Michael Fedrowitz, thanks!).
-    - (interpret.c) Cosmetics to the traceback output (thanks, Christian M.).
+    - (interpret.c) Cosmetics to the traceback output (thanks, Coogan).
     - (simulate.c) A semicolon was missing (thanks, Christian B.).
 
 13-Sep-2000 (Lars Duening)  (3.3.13)
@@ -1071,7 +1081,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
          standard.
     - (mempools) Added an include of <sys/types.h> for ssize_t.
     - (settings/tubmud) Corrected some settings from "<foo>=<value>"
-         to the correct "with_<foo>=<value>". (thanks, Christian!)
+         to the correct "with_<foo>=<value>". (thanks, Coogan!)
     - (interpret.c) When apply() expanded an array, it didn't check
          the elements for destructed objects. (thanks, Coogan!)
     - (interpret.c) Before calling a vefun, inter_sp and inter_pc
@@ -1421,7 +1431,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
     - (configure.in, configure) Corrected (I hope!) the tests for
          inet_ntoa() and ipv6 support.
     - (func_spec, interpret.c, doc/efun/) Efun load_name() also accepts
-         strings, following a suggestion by Christian.
+         strings, following a suggestion by Coogan.
 
 16-Sep-1999 (Lars Duening)  (3.2.8-dev.143)
     - (efuns.c) Documented process_string().

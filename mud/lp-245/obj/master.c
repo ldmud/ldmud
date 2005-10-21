@@ -18,6 +18,7 @@
 
 #include "/sys/wizlist.h"
 #include "/sys/driver_hook.h"
+#include "/sys/objectinfo.h"
 #include "/sys/functionlist.h"
 #include "/sys/erq.h"
 
@@ -1240,6 +1241,8 @@ int query_allow_shadow (object victim)
 // This function simply asks the victim if it denies a shadow.
 
 {
+    if (object_info(victim, OINFO_MEMORY)[OIM_NO_SHADOW])
+        return 0;
     return !victim->query_prevent_shadow(previous_object());
 }
 

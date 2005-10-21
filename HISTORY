@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-05-Nov-2000 (Lars Duening) -- Development Release 3.3
+07-Nov-2000 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -15,6 +15,8 @@ For a detailed list of all changes see the file CHANGELOG.
            supported.
        + filter(), map(), sort_array(), walk_mapping(): Protected lvalues
             (e.g. &(i[0])) are not allowed as callback parameters.
+       + object_info(): OINFO_MEMORY also returns the program flags
+           NO_INHERIT, NO_SHADOW and NO_CLONE.
        + regexp functions: more compatible with 8-bit characters.
 
     - Corrected efuns:

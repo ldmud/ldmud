@@ -3139,7 +3139,7 @@ f_object_info (svalue_t *sp)
 
         break;
 
-    /* --- Memory information */
+    /* --- Memory and program information */
     case OINFO_MEMORY:
         v = allocate_array(OIM_MAX);
         svp = v->item;
@@ -3187,6 +3187,10 @@ f_object_info (svalue_t *sp)
         svp[OIM_TOTAL_SIZE].u.number = prog->total_size;
 
         svp[OIM_DATA_SIZE].u.number = data_size(o);
+
+        svp[OIM_NO_INHERIT].u.number = (prog->flags & P_NO_INHERIT) ? 1 : 0;
+        svp[OIM_NO_CLONE].u.number   = (prog->flags & P_NO_CLONE) ? 1 : 0;
+        svp[OIM_NO_SHADOW].u.number  = (prog->flags & P_NO_SHADOW) ? 1 : 0;
         break;
     }
 

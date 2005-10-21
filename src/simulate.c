@@ -495,6 +495,7 @@ fatal (char *fmt, ...)
                            ? current_object->name : "<null>");
     debug_message("%s Dump of the call chain:\n", ts);
     (void)dump_trace(MY_TRUE);
+    printf("%s LDMud aborting on fatal error.\n", time_stamp());
     fflush(stdout);
 
 #if !defined(AMIGA) || !defined(__SASC)

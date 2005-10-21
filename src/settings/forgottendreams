@@ -14,7 +14,8 @@ enable_dynamic_costs=yes
 enable_lpc_nosave=yes
 enable_supply_parse_command=no
 enable_initialization_by___init=no
-enable_erq=xerq
+enable_erq=erq
+enable_pkg_mysql=yes
 
 with_max_local=100
 with_master_name=kernel/master

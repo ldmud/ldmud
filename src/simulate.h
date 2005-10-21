@@ -6,6 +6,7 @@
 #include "driver.h"
 #include "typedefs.h"
 
+#include "exec.h"       /* bytecode_p */
 #include "sent.h"       /* shadow_sentence_t */
 #include "strfuns.h"    /* strbuf_t */
 #include "svalue.h"

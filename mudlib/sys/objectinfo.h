@@ -67,7 +67,10 @@
 #define OIM_SIZE_INHERITED  10
 #define OIM_TOTAL_SIZE      11
 #define OIM_DATA_SIZE       12
+#define OIM_NO_INHERIT      13
+#define OIM_NO_CLONE        14
+#define OIM_NO_SHADOW       15
 
-#define OIM_MAX 13
+#define OIM_MAX 16
 
 #endif /* _OBJECTINFO_H_ */
