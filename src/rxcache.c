@@ -44,6 +44,7 @@
 
 #include "gcollect.h"
 #include "hash.h"
+#include "mstrings.h"
 #include "regexp.h"
 #include "strfuns.h"
 #include "svalue.h"
@@ -67,11 +68,11 @@
 /* One expression hashtable entry */
 
 typedef struct RxHashEntry {
-    unsigned char * pString;  /* Generator string, a shared string
-                               * NULL if unused */
-    p_uint   hString;  /* Hash of pString */
-    Bool     from_ed;  /* The from_ed value */
-    regexp * pRegexp;  /* The generated regular expression from regcomp() */
+    string_t * pString;  /* Generator string, a counted tabled string
+                          * NULL if unused */
+    p_uint     hString;  /* Hash of pString */
+    Bool       from_ed;  /* The from_ed value */
+    regexp   * pRegexp;  /* The generated regular expression from regcomp() */
 } RxHashEntry;
 
 
@@ -94,7 +95,7 @@ void rxcache_init(void)
 
 /*--------------------------------------------------------------------*/
 regexp *
-regcomp_cache(unsigned char * expr, Bool excompat, Bool from_ed)
+regcomp_cache (string_t * expr, Bool excompat, Bool from_ed)
 
 /* Compile a regexp structure from the expression <expr>, more or
  * less ex compatible.
@@ -113,14 +114,14 @@ regcomp_cache(unsigned char * expr, Bool excompat, Bool from_ed)
 
     iNumXRequests++;
 
-    hExpr = whashstr((char *)expr, 50);
+    hExpr = whashmem(get_txt(expr), mstrsize(expr), 100);
     pHash = xtable+RxStrHash(hExpr);
 
     /* Look for a ready-compiled regexp */
     if (pHash->pString != NULL
      && pHash->hString == hExpr
      && pHash->from_ed == from_ed
-     && !strcmp((char *)pHash->pString, (char *)expr)
+     && !mstreq(pHash->pString, expr)
        )
     {
         iNumXFound++;
@@ -130,16 +131,16 @@ regcomp_cache(unsigned char * expr, Bool excompat, Bool from_ed)
     /* Regexp not found: compile a new one and enter it
      * into the table.
      */
-    pRegexp = regcomp(expr, excompat, from_ed);
+    pRegexp = regcomp((unsigned char *)get_txt(expr), excompat, from_ed);
     if (NULL == pRegexp)
         return NULL;
 
-    expr = (unsigned char *)make_shared_string((char *)expr);
+    expr = make_tabled(expr);
 
     if (NULL != pHash->pString)
     {
         iNumXCollisions++;
-        free_string((char *)pHash->pString);
+        free_mstring(pHash->pString);
         rx_free(pHash->pRegexp);
     }
     pHash->pString = expr; /* refs are transferred */
@@ -298,7 +299,7 @@ count_rxcache_refs (void)
     {
         if (NULL != xtable[i].pString)
         {
-            count_ref_from_string((char *)xtable[i].pString);
+            count_ref_from_string(xtable[i].pString);
             count_rxcache_ref(xtable[i].pRegexp);
         }
     } /* for (i) */

@@ -1,6 +1,69 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Feb-2001 (Lars Duening)  (3.2.24)
+   Included changes up to 3.2.9-dev.255:
+    - (smalloc.c) Removed a compilation error (reported by Coogan).
+    - (strfuns.c) When (re)allocating the strbuf buffer, the length was
+        accidentally casted down to unsigned short, causing the program
+        to write outside the allocated memory (reported by Sebastian).
+    - (smalloc.c) Using the time_stamp() from within the allocation routines
+        was really stupid.
+    - (smalloc.c) The large block allocator had an off-by-one error which
+        left free large blocks of 'small' size behind. These blocks could
+        never be allocated, just merged again.
+    - (smalloc.c) The routine to split largish free small blocks was faulty,
+        causing coredumps.
+    - (parse_old.c) Expanded the list of hard coded prepositions.
+    - (lex.c) Added new standard predefine __LDMUD__, expanding to an empty
+        string.
+    - (settings/heaven7, mud/heaven7/) Added basic support for Heaven7: you can
+        boot the mud and log in. There are probably still errors in the
+        areas.
+    - (func_spec) The result of set_prompt() can be a string or a closure,
+        yet it was declared to return only string (reported by Gnomi).
+    - (prolang.y) The type tracking for multiplication returned an 'int'
+        result even for 'mixed' operands (reported by Gnomi).
+    - (interpret.c) The relations '==' and '!=' can now compare lfun-
+        and identifier closures (suggested by Gnomi).
+    - (func_spec, efuns) New efuns min() and max().
+    - (configuration, smalloc.c) Added a new config parameter
+        MIN_SMALL_MALLOCED which defines the size of the first small chunk
+        allocated by the system.
+    - (xerq) With ERQ_FORK started subprocesses are now as well handled
+        with a child_t structure. While not exactly necessary, it allows
+        for useful diagnostics in the sig_child() handler (reported by
+        Freaky).
+    - (dumpstat, efuns.c) The internal data measuring routines now return
+        both the total data size, as well as the data size scaled down
+        according to the extend of data sharing. The results are also
+        returned by object_info(OI_MEMORY) (suggested by Freaky).
+
+07-Feb-2001 (Lars Duening)
+    - (Many files) Bugfixes. The driver is now able to boot the test_master.c
+       and call simple functions, but dies in a garbage_collection or when
+       printing the 'status' on login. This however could be caused by
+       the pending bug in smalloc and strbuf (fixed in 3.2.9-dev.255).
+
+06-Feb-2001 (Lars Duening)
+    - (sprintf, swap, wiz_list, xalloc) Adapted to new string implementation.
+
+    This completes the basic string adaption - it compiles, it links, it
+    can display its options, it probably crashes and burns when you try
+    to boot a mud with it.
+
+05-Feb-2001 (Lars Duening)
+    - (simulate, simul_efun, strfuns) Adapted to new string implementation.
+
+02-Feb-2001 (Lars Duening)
+    - (object, otable, parse, parse_old, rxcache) Adapted to new string
+        implementation.
+
+31-Jan-2001 (Lars Duening)
+    - (prolang, main, pkg-mysql, mapping) Adapted to the new string
+        implementation.
+    - (array, mstrings, xalloc.h) Removed compilation errors.
+
 26-Jan-2001 (Lars Duening)  (3.3.23)
     Included changes up to 3.2.9-dev.254:
     - (smalloc.c) Introduced a free list for 'oversized' small blocks which

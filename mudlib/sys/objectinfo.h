@@ -55,23 +55,26 @@
 
 /* Indices in the array resulting from OINFO_MEMORY
  */
-#define OIM_REF              0
-#define OIM_NAME             1
-#define OIM_PROG_SIZE        2
-#define OIM_NUM_FUNCTIONS    3
-#define OIM_SIZE_FUNCTIONS   4
-#define OIM_NUM_VARIABLES    5
-#define OIM_SIZE_VARIABLES   6
-#define OIM_NUM_STRINGS      7
-#define OIM_SIZE_STRINGS     8
-#define OIM_NUM_INHERITED    9
-#define OIM_SIZE_INHERITED  10
-#define OIM_TOTAL_SIZE      11
-#define OIM_DATA_SIZE       12
-#define OIM_NO_INHERIT      13
-#define OIM_NO_CLONE        14
-#define OIM_NO_SHADOW       15
+#define OIM_REF                  0
+#define OIM_NAME                 1
+#define OIM_PROG_SIZE            2
+#define OIM_NUM_FUNCTIONS        3
+#define OIM_SIZE_FUNCTIONS       4
+#define OIM_NUM_VARIABLES        5
+#define OIM_SIZE_VARIABLES       6
+#define OIM_NUM_STRINGS          7
+#define OIM_SIZE_STRINGS         8
+#define OIM_SIZE_STRINGS_DATA    9
+#define OIM_SIZE_STRINGS_TOTAL  10 
+#define OIM_NUM_INHERITED       11
+#define OIM_SIZE_INHERITED      12
+#define OIM_TOTAL_SIZE          13
+#define OIM_DATA_SIZE           14
+#define OIM_TOTAL_DATA_SIZE     15
+#define OIM_NO_INHERIT          16
+#define OIM_NO_CLONE            17
+#define OIM_NO_SHADOW           18
 
-#define OIM_MAX 16  /* Number of OIM_ result elements */
+#define OIM_MAX 19  /* Number of OIM_ result elements */
 
 #endif /* _OBJECTINFO_H_ */

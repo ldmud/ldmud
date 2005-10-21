@@ -12,7 +12,7 @@ extern int32 current_id_number;
 extern int approved_object;
 extern int num_virtual_variables;
 extern short hook_type_map[];
-extern char *inherit_file;
+extern string_t *inherit_file;
 extern int num_parse_error;
 extern program_t *compiled_prog;
 
@@ -22,10 +22,10 @@ extern svalue_t *prog_variable_values;
 
 /* --- Prototypes --- */
 extern int proxy_efun(int, int);
-extern void yyerrorf VARPROT((char *format, ...), printf, 1, 2);
-extern void yyerror(char *str);
-extern void yywarnf VARPROT((char *format, ...), printf, 1, 2);
-extern void yywarn(char *str);
+extern void yyerrorf VARPROT((const char *format, ...), printf, 1, 2);
+extern void yyerror(const char *str);
+extern void yywarnf VARPROT((const char *format, ...), printf, 1, 2);
+extern void yywarn(const char *str);
 extern void free_all_local_names(void);
 extern void store_line_number_info(void);
 extern void store_line_number_backward(int offset);

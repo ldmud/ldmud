@@ -832,6 +832,14 @@ if test "${enable_min_malloced+set}" = set; then
 fi
 
 
+DEFAULTenable_min_small_malloced=no
+# Check whether --enable-min-small-malloced or --disable-min-small-malloced was given.
+if test "${enable_min_small_malloced+set}" = set; then
+  enableval="$enable_min_small_malloced"
+  :
+fi
+
+
 DEFAULTenable_dynamic_costs=no
 # Check whether --enable-dynamic-costs or --disable-dynamic-costs was given.
 if test "${enable_dynamic_costs+set}" = set; then
@@ -1181,6 +1189,14 @@ if test "${with_min_malloced+set}" = set; then
 fi
 
 
+DEFAULTwith_min_small_malloced=0x10000
+# Check whether --with-min-malloced or --without-min-malloced was given.
+if test "${with_min_small_malloced+set}" = set; then
+  withval="$with_min_small_malloced"
+  :
+fi
+
+
 DEFAULTwith_max_malloced=0x4000000
 # Check whether --with-max-malloced or --without-max-malloced was given.
 if test "${with_max_malloced+set}" = set; then
@@ -1422,6 +1438,16 @@ if test "x$enable_min_malloced" = "xyes"; then
   cdef_min_malloced="#define"
 else
   cdef_min_malloced="#undef"
+fi
+
+if test "x$enable_min_small_malloced" = "x" && test "x$DEFAULTenable_min_small_malloced" != "x"; then
+  enable_min_small_malloced=$DEFAULTenable_min_small_malloced
+fi
+
+if test "x$enable_min_small_malloced" = "xyes"; then
+  cdef_min_small_malloced="#define"
+else
+  cdef_min_small_malloced="#undef"
 fi
 
 if test "x$enable_dynamic_costs" = "x" && test "x$DEFAULTenable_dynamic_costs" != "x"; then
@@ -1857,6 +1883,16 @@ fi
 
 val_min_malloced=$with_min_malloced
 
+if test "x$with_min_small_malloced" != "x"; then
+  with_min_small_malloced=`echo $with_min_small_malloced|
+             sed -e 's/^\(-\?\(0x[0-9a-fA-F]\+\)\?[0-9]*\)[^0-9]\?.*$/\1/'`
+fi
+if test "x$with_min_small_malloced" = "x" && test "x$DEFAULTwith_min_small_malloced" != "x"; then
+  with_min_small_malloced=$DEFAULTwith_min_small_malloced
+fi
+
+val_min_small_malloced=$with_min_small_malloced
+
 if test "x$with_max_malloced" != "x"; then
   with_max_malloced=`echo $with_max_malloced|
              sed -e 's/^\(-\?\(0x[0-9a-fA-F]\+\)\?[0-9]*\)[^0-9]\?.*$/\1/'`
@@ -1893,6 +1929,10 @@ fi
 
 if test "x$cdef_min_malloced" = "x#undef"; then
   val_min_malloced=
+fi
+
+if test "x$cdef_min_small_malloced" = "x#undef"; then
+  val_min_small_malloced=
 fi
 
 if test "x$cdef_max_malloced" = "x#undef"; then
@@ -5708,6 +5748,7 @@ s%@cdef_malloc_trace@%$cdef_malloc_trace%g
 s%@cdef_malloc_lpc_trace@%$cdef_malloc_lpc_trace%g
 s%@cdef_dynamic_costs@%$cdef_dynamic_costs%g
 s%@cdef_min_malloced@%$cdef_min_malloced%g
+s%@cdef_min_small_malloced@%$cdef_min_small_malloced%g
 s%@cdef_max_malloced@%$cdef_max_malloced%g
 s%@cdef_catch_udp_port@%$cdef_catch_udp_port%g
 s%@cdef_rxcache_table@%$cdef_rxcache_table%g
@@ -5751,6 +5792,7 @@ s%@val_catch_udp_port@%$val_catch_udp_port%g
 s%@val_set_buffer_size_max@%$val_set_buffer_size_max%g
 s%@val_malloc@%$val_malloc%g
 s%@val_min_malloced@%$val_min_malloced%g
+s%@val_min_small_malloced@%$val_min_small_malloced%g
 s%@val_max_malloced@%$val_max_malloced%g
 s%@val_total_trace_length@%$val_total_trace_length%g
 s%@erq_sub@%$erq_sub%g

@@ -36,9 +36,6 @@
  *
  * Some macros help with the use of vector variables:
  *
- *   ALLOC_VECTOR(size,file,line): Allocate dynamically the memory for
- *      a vector of <size> elements.
- *
  *   VEC_SIZE(v): Return the number of elements in v.
  *
  *   VEC_HEAD(size): Expand to the initializers of a vector with
@@ -125,6 +122,16 @@
 
 /*-------------------------------------------------------------------------*/
 
+#define ALLOC_VECTOR(nelem) \
+      (vector_t *)xalloc_pass(sizeof (vector_t) + \
+                              sizeof(svalue_t) * (nelem - 1) MTRACE_PASS)
+
+/* ALLOC_VECTOR(size,file,line): Allocate dynamically the memory for
+ *    a vector of <size> elements.
+ */
+
+/*-------------------------------------------------------------------------*/
+
 int num_arrays;
   /* Total number of allocated arrays */
 
@@ -133,7 +140,7 @@ vector_t null_vector = { VEC_HEAD(0), { { T_INVALID } } };
    * Reusing it is cheaper than repeated allocations/deallocations.
    */
 
-void (*allocate_array_error_handler) (char *, ...)
+void (*allocate_array_error_handler) (const char *, ...)
   = error; /* from simulate.c */
   /* This handler is called if an allocation fails.
    * Usually it points to simulate::error(), but the swapper
@@ -142,17 +149,8 @@ void (*allocate_array_error_handler) (char *, ...)
    */
 
 /*-------------------------------------------------------------------------*/
-#ifndef allocate_array
-
 vector_t *
-allocate_array (mp_int n)
-
-#else
-
-vector_t *
-_allocate_array(mp_int n, char * file, int line)
-
-#endif
+_allocate_array(mp_int n MTRACE_DECL)
 
 /* Allocate an array for <n> elements (but not more than the current
  * maximum) and return the pointer.
@@ -165,7 +163,7 @@ _allocate_array(mp_int n, char * file, int line)
  * Allocating an array of size 0 will return a reference to the
  * globally shared empty array.
  *
- * If possible, annotate the allocations with <file> and <line>
+ * If possible, annotate the allocations with <malloc_trace> and <...line>
  */
 
 {
@@ -183,13 +181,14 @@ _allocate_array(mp_int n, char * file, int line)
 
     num_arrays++;
 
-    p = ALLOC_VECTOR(n, file, line);
+    p = ALLOC_VECTOR(n);
     if (!p) {
-#ifndef allocate_array
+#ifndef MALLOC_TRACE
         (*allocate_array_error_handler)("Out of memory: array[%ld]\n", n);
 #else
         (*allocate_array_error_handler)
-            ("(%s:%d) Out of memory: array[%ld]\n", file, line, n);
+            ("(%s:%d) Out of memory: array[%ld]\n"
+             MTRACE_PASS, n);
 #endif
         return 0;
     }
@@ -206,17 +205,8 @@ _allocate_array(mp_int n, char * file, int line)
 }
 
 /*-------------------------------------------------------------------------*/
-#ifndef allocate_array_unlimited
-
 vector_t *
-allocate_array_unlimited (mp_int n)
-
-#else
-
-vector_t *
-_allocate_array_unlimited(mp_int n, char * file, int line)
-
-#endif
+_allocate_array_unlimited(mp_int n MTRACE_DECL)
 
 /* Allocate an array for <n> elements and return the pointer.
  * The elements are initialised to the svalue 0.
@@ -228,7 +218,7 @@ _allocate_array_unlimited(mp_int n, char * file, int line)
  * Allocating an array of size 0 will return a reference to the
  * globally shared empty array.
  *
- * If possible, annotate the allocations with <file> and <line>
+ * If possible, annotate the allocations with <malloc_trace_file> and <...line>
  */
 
 {
@@ -246,14 +236,15 @@ _allocate_array_unlimited(mp_int n, char * file, int line)
 
     num_arrays++;
 
-    p = ALLOC_VECTOR(n, file, line);
+    p = ALLOC_VECTOR(n);
     if (!p) {
-#ifndef allocate_array_unlimited
+#ifndef MALLOC_TRACE
         (*allocate_array_error_handler)
             ("Out of memory: unlimited array[%ld]\n", n);
 #else
         (*allocate_array_error_handler)
-            ("(%s:%d) Out of memory: unlimited array[%ld]\n", file, line, n);
+            ("(%s:%d) Out of memory: unlimited array[%ld]\n"
+            MTRACE_PASS, n);
 #endif
         return 0;
     }
@@ -270,17 +261,8 @@ _allocate_array_unlimited(mp_int n, char * file, int line)
 }
 
 /*-------------------------------------------------------------------------*/
-#ifndef allocate_uninit_array
-
 vector_t *
-allocate_uninit_array (mp_int n)
-
-#else
-
-vector_t *
-_allocate_uninit_array (mp_int n, char *file, int line)
-
-#endif
+_allocate_uninit_array (mp_int n MTRACE_DECL)
 
 /* Allocate an array for <n> elements (but no more than the current
  * maximum) and return the pointer.
@@ -291,7 +273,7 @@ _allocate_uninit_array (mp_int n, char *file, int line)
  * Allocating an array of size 0 will return a reference to the
  * globally shared empty array.
  *
- * If possible, annotate the allocations with <file> and <line>
+ * If possible, annotate the allocations with <malloc_trace_file> and <...line>
  */
 
 {
@@ -307,14 +289,15 @@ _allocate_uninit_array (mp_int n, char *file, int line)
 
     num_arrays++;
 
-    p = ALLOC_VECTOR(n, file, line);
+    p = ALLOC_VECTOR(n);
     if (!p) {
-#ifndef allocate_uninit_array
+#ifndef MALLOC_TRACE
         (*allocate_array_error_handler)
             ("Out of memory: uninited array[%ld]\n", n);
 #else
         (*allocate_array_error_handler)
-            ("(%s:%d) Out of memory: uninited array[%ld]\n", file, line, n);
+            ("(%s:%d) Out of memory: uninited array[%ld]\n"
+            MTRACE_PASS, n);
 #endif
         return 0;
     }
@@ -519,7 +502,7 @@ explode_string (string_t *str, string_t *del)
                 buff = new_n_mstring(p, 1);
                 if (!buff) {
                     free_array(ret);
-                    error("(explode_string) Out of memory (1 byte string).\n");
+                    outofmem(1, "explode() on a string");
                 }
                 put_string(svp, buff);
             }
@@ -553,8 +536,7 @@ explode_string (string_t *str, string_t *del)
                 buff = new_n_mstring(txt, (size_t)len);
                 if (!buff) {
                     free_array(ret);
-                    error("(explode_string) Out of memory (%ld byte string)\n"
-                         , len);
+                    outofmem(len, "explode() on a string");
                 }
                 put_string(svp, buff);
             }
@@ -566,8 +548,7 @@ explode_string (string_t *str, string_t *del)
             buff = new_n_mstring(txt, (size_t)len);
             if (!buff) {
                 free_array(ret);
-                error("(explode_string) Out of memory (%ld byte string)\n"
-                     , len);
+                outofmem(len, "explode() on a string");
             }
             put_string(svp, buff);
 
@@ -617,8 +598,7 @@ explode_string (string_t *str, string_t *del)
             buff = new_n_mstring(beg, (size_t)bufflen);
             if (!buff) {
                 free_array(ret);
-                error("(explode_string) Out of memory (%ld bytes) for buffer\n"
-                     , bufflen);
+                outofmem(bufflen, "buffer for explode()");
             }
 
             put_string(ret->item+num, buff);
@@ -639,8 +619,7 @@ explode_string (string_t *str, string_t *del)
     buff = new_n_mstring(beg, (size_t)len);
     if (!buff) {
         free_array(ret);
-        error("(explode_string) Out of memory (%ld bytes) for last fragment\n"
-             , len);
+        outofmem(len, "last fragment in explode()");
     }
     put_string(ret->item + num, buff);
 
@@ -739,8 +718,7 @@ old_explode_string (string_t *str, string_t *del)
             if (!buff)
             {
                 free_array(ret);
-                error("(old_explode_string) Out of memory (%ld bytes) for buffer\n"
-                     , bufflen);
+                outofmem(bufflen, "buffer in old explode()");
             }
 
             put_string(ret->item + num, buff);
@@ -772,8 +750,7 @@ old_explode_string (string_t *str, string_t *del)
         if (!buff)
         {
             free_array(ret);
-            error("(old_explode_string) Out of memory (%ld bytes) for buffer\n"
-                 , bufflen);
+            outofmem(bufflen, "buffer in old explode()");
         }
 
         put_string(ret->item + num, buff);

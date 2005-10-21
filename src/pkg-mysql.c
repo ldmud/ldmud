@@ -277,24 +277,21 @@ f_db_conv_string (svalue_t *sp)
  */
 
 {
-    char *s;
+    string_t *s;
     char *buff;
 
-    s = sp->u.string;
-    buff = alloca(strlen(s)*2 +1);
+    s = sp->u.str;
+    buff = alloca(mstrsize(s)*2 +1);
     if ( !buff )
     {
         error("Out of memory.\n");
         /* NOTREACHED */
         return sp;
     }
-    mysql_escape_string(buff, s, strlen(s));
-
-    /* Re-allocate the escaped string to its proper length */
-    s = string_copy(buff);
+    mysql_escape_string(buff, get_txt(s), strlen(get_txt(s)) );
 
     free_string_svalue(sp);
-    put_malloced_string(sp, s);
+    put_c_string(sp, buff);
     return sp;
 } /* f_db_conv_string() */
 
@@ -342,11 +339,11 @@ f_db_connect (svalue_t *sp)
  */
 
 {
-    char     *database;
+    string_t *database;
     p_int     sock;
     db_dat_t *tmp;
 
-    database = sp->u.string;
+    database = sp->u.str;
 
     tmp = allocate_new_dat();
     if ( !tmp )
@@ -370,7 +367,7 @@ f_db_connect (svalue_t *sp)
      * TCP (that's something for ERQ wizards :-).
      */
     if ( !mysql_real_connect(tmp->mysql_dat, "localhost", 0, 0,
-                             database, 0, 0, 0))
+                             get_txt(database), 0, 0, 0))
     {
         raise_db_error(tmp);
         /* NOTREACHED */
@@ -397,13 +394,13 @@ f_db_exec (svalue_t *sp)
  */
 
 {
-    char         *s;
+    string_t     *s;
     db_dat_t     *dat;
     unsigned int  handle;
     unsigned int  err_no;
 
     handle = (unsigned int)sp[-1].u.number;
-    s = sp->u.string;
+    s = sp->u.str;
 
     if ( !(dat = find_dat_by_handle(handle)) )
     {
@@ -412,7 +409,7 @@ f_db_exec (svalue_t *sp)
         return sp;
     }
 
-    if ( mysql_query(dat->mysql_dat, s) )
+    if ( mysql_query(dat->mysql_dat, get_txt(s)) )
     {
         /* either a REAL error occured or just an error in the SQL-statement
          */
@@ -518,7 +515,7 @@ f_db_fetch (svalue_t *sp)
     
     for (i = 0; i < num_cols; i++)
         if (dat->mysql_row[i])
-            put_malloced_string(v->item+i, string_copy(dat->mysql_row[i]));
+            put_c_string(v->item+i, dat->mysql_row[i]);
         /* else return 0 for that entry */
 
     free_svalue(sp); /* It's a number */

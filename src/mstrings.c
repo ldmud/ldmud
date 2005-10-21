@@ -86,14 +86,20 @@
 
 #include "gcollect.h"
 #include "hash.h"
+#include "main.h"
+#include "simulate.h"
+#include "stdstrings.h"
+#include "strfuns.h"
+#include "svalue.h"
 #include "xalloc.h"
+
+#include "../mudlib/sys/debug_info.h"
 
 /*-------------------------------------------------------------------------*/
 
 /* Hash function, adapted to our table size.
  */
 
-extern int wlhashstr(const char * const,  size_t, size_t);
 #if !( (HTABLE_SIZE) & (HTABLE_SIZE)-1 )
 #    define StrHash(s,siz) (whashmem((s), siz, 100) & ((HTABLE_SIZE)-1))
 #else
@@ -181,7 +187,7 @@ find_and_move (const char * const s, size_t size, int index)
 
     for ( prev = NULL, rover = stringtable[index]
         ;    rover != NULL
-          && get_cstr(rover) != s && memcmp(get_cstr(rover), s, size)
+          && get_txt(rover) != s && memcmp(get_txt(rover), s, size)
         ; prev = rover, rover = rover->link
         )
         mstr_searchlen_byvalue++;
@@ -256,11 +262,11 @@ make_new_tabled (const char * const pTxt, size_t size, int index MTRACE_DECL)
 
     /* Get the memory for a new one */
 
-    sdata = xalloc_traced(size + sizeof(*sdata) MTRACE_PASS);
+    sdata = xalloc_pass(size + sizeof(*sdata) MTRACE_PASS);
     if (!sdata)
         return NULL;
 
-    string = xalloc_traced(sizeof(*string) MTRACE_PASS);
+    string = xalloc_pass(sizeof(*string) MTRACE_PASS);
     if (!string)
     {
         xfree(sdata);
@@ -271,7 +277,7 @@ make_new_tabled (const char * const pTxt, size_t size, int index MTRACE_DECL)
 
     sdata->size = size;
     memcpy(sdata->txt, pTxt, size);
-    sdata.txt[size] = '\0';
+    sdata->txt[size] = '\0';
 
     string->str = sdata;
     string->info.tabled = MY_TRUE;
@@ -312,11 +318,11 @@ mstring_alloc_string (size_t iSize MTRACE_DECL)
 
     /* Get the memory */
 
-    sdata = xalloc_traced(iSize + sizeof(*sdata) MTRACE_PASS);
+    sdata = xalloc_pass(iSize + sizeof(*sdata) MTRACE_PASS);
     if (!sdata)
         return NULL;
 
-    string = xalloc_traced(sizeof(*string) MTRACE_PASS);
+    string = xalloc_pass(sizeof(*string) MTRACE_PASS);
     if (!string)
     {
         xfree(sdata);
@@ -389,7 +395,7 @@ mstring_new_n_string (const char * const pTxt, size_t len MTRACE_DECL)
     string = mstring_alloc_string(len MTRACE_PASS);
     if (string && len)
     {
-        memcpy(string->str->txt, pTxt, size);
+        memcpy(string->str->txt, pTxt, len);
     }
 
     return string;
@@ -455,7 +461,7 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
     if (pStr->info.tabled)
     {
         if (!deref_arg)
-            pStr->info.ref += 1;
+            (void)ref_mstring(pStr);
         return pStr;
     }
 
@@ -474,7 +480,7 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
     size = pStr->str->size;
     index = StrHash(pStr->str->txt, size);
 
-    if (pStr->info.ref == 1 && !make_new)
+    if (pStr->info.ref == 1 && deref_arg)
     {
         /* We can simply reuse the string_t we already have */
 
@@ -532,7 +538,7 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
         /* No: create a new string structure, table it,
          * and then give it pStr's string_data pointer.
          */
-        string = xalloc_traced(sizeof(*string) MTRACE_PASS);
+        string = xalloc_pass(sizeof(*string) MTRACE_PASS);
         if (!string)
         {
             return NULL;
@@ -662,7 +668,6 @@ mstring_find_tabled (const string_t * pStr)
  */
 
 {
-    string_t *string;
     int       index;
     size_t    size;
 
@@ -696,7 +701,6 @@ mstring_find_tabled_str (const char * const pTxt, size_t size)
  */
 
 {
-    string_t *string;
     int       index;
 
     index = StrHash(pTxt, size);
@@ -715,10 +719,9 @@ mstring_free (string_t *s)
  */
 
 {
-    int    index;
     size_t msize;
 
-    if (!s->info.ref)
+    if (!s || !s->info.ref)
         return;
 
     msize = mstr_mem_size(s);
@@ -776,6 +779,36 @@ mstring_free (string_t *s)
 } /* mstring_free() */
 
 /*-------------------------------------------------------------------------*/
+string_t *
+mstring_ref ( string_t * str)
+
+/* Aliased to: ref_mstring_safe(s)
+ *
+ * Increment the refcount for string <str> and return the ref'ed string.
+ * In contrast to macro ref_mstring(), this function can handle arguments
+ * with sideeffects.
+ */
+
+{
+    return ref_mstring(str);
+} /* mstring_ref() */
+
+/*-------------------------------------------------------------------------*/
+unsigned long
+mstring_deref ( string_t * str)
+
+/* Aliased to: deref_mstring_safe(s)
+ *
+ * Decrement the refcount for string <str> and return the new refcount.
+ * In contrast to macro deref_mstring(), this function can handle arguments
+ * with sideeffects.
+ */
+
+{
+    return deref_mstring(str);
+} /* mstring_deref() */
+
+/*-------------------------------------------------------------------------*/
 Bool
 mstring_equal(const string_t * const pStr1, const string_t * const pStr2) 
 
@@ -786,7 +819,7 @@ mstring_equal(const string_t * const pStr1, const string_t * const pStr2)
  */
 
 {
-    if (pStr1 == pStr2)
+    if (pStr1 == pStr2 || get_txt(pStr1) == get_txt(pStr2))
         return MY_TRUE;
     if (mstr_d_tabled(pStr1) && mstr_i_tabled(pStr2) && pStr2->link == pStr1)
         return MY_TRUE;
@@ -795,7 +828,7 @@ mstring_equal(const string_t * const pStr1, const string_t * const pStr2)
     if (mstrsize(pStr1) != mstrsize(pStr2))
         return MY_FALSE;
 
-    return (memcmp(get_txt(pStr1), get_txt(pStr2), mstrsize(pStr1)) != 0);
+    return (memcmp(get_txt(pStr1), get_txt(pStr2), mstrsize(pStr1)) == 0);
 } /* mstring_equal() */
 
 /*-------------------------------------------------------------------------*/
@@ -811,16 +844,27 @@ mstring_compare (const string_t * const pStr1, const string_t * const pStr2)
  */
 
 {
-    if (pStr1 == pStr2)
-        return MY_TRUE;
-    if (mstr_d_tabled(pStr1) && mstr_i_tabled(pStr2) && pStr2->link == pStr1)
-        return MY_TRUE;
-    if (mstr_i_tabled(pStr1) && mstr_d_tabled(pStr2) && pStr1->link == pStr2)
-        return MY_TRUE;
-    if (mstrsize(pStr1) <= mstrsize(pStr2))
-        return memcmp(get_txt(pStr1), get_txt(pStr2), mstrsize(pStr1));
+    int rc;
 
-    return memcmp(get_txt(pStr1), get_txt(pStr2), mstrsize(pStr2));
+    if (pStr1 == pStr2 || get_txt(pStr1) == get_txt(pStr2))
+        return 0;
+    if (mstr_d_tabled(pStr1) && mstr_i_tabled(pStr2) && pStr2->link == pStr1)
+        return 0;
+    if (mstr_i_tabled(pStr1) && mstr_d_tabled(pStr2) && pStr1->link == pStr2)
+        return 0;
+
+    /* We have to compare two strings by byte. 
+     * Remember to take the difference in length into account when the
+     * leading parts match.
+     */
+    if (mstrsize(pStr1) <= mstrsize(pStr2))
+    {
+        rc = memcmp(get_txt(pStr1), get_txt(pStr2), mstrsize(pStr1));
+        return rc != 0 ? rc : -1;
+    }
+
+    rc = memcmp(get_txt(pStr1), get_txt(pStr2), mstrsize(pStr2));
+    return rc != 0 ? rc : 1;
 } /* mstring_compare() */
 
 /*-------------------------------------------------------------------------*/
@@ -830,7 +874,7 @@ mstring_mstr_n_str ( const string_t * const pStr, size_t start
 
 /* Aliased to: mstrstr(pStr, pTxt)
  *
-/* Find the partial string <pTxt> of <len> bytes (which my contain '\0' as
+ * Find the partial string <pTxt> of <len> bytes (which my contain '\0' as
  * part of the data to be found) inside of <pStr> starting at position <start>
  * and return a pointer to the location found.
  * If not found, return NULL.
@@ -877,6 +921,8 @@ mstring_add_slash (const string_t *str MTRACE_DECL)
  * Create and return a new string with the data of <str> prepended
  * by a slash ('/'). The result string is untabled and has one reference,
  * the old string <str> is not changed.
+ *
+ * If memory runs out, NULL is returned.
  */
 
 {
@@ -887,11 +933,84 @@ mstring_add_slash (const string_t *str MTRACE_DECL)
     if (tmp)
     {
         txt = get_txt(tmp);
-        *tmp = '/';
-        memcpy(tmp+1, get_txt(str), mstrsize(str));
+        *txt = '/';
+        memcpy(txt+1, get_txt(str), mstrsize(str));
     }
     return tmp;
 } /* mstring_add_slash() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_del_slash (string_t *str MTRACE_DECL)
+
+/* Aliased to: del_slash(str)
+ *
+ * Remove any given leading slash from the string <str> and return the
+ * resulting string. If <str> has no slashed to begin with, the result
+ * is a new reference to <str>.
+ *
+ * If memory runs out, NULL is returned.
+ */
+
+{
+    char * txt;
+
+    txt = get_txt(str);
+    while (*txt == '/')
+        txt++;
+    if (txt == get_txt(str))
+        return ref_mstring(str);
+
+    return new_mstring(txt);
+} /* mstring_del_slash() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_cvt_progname (const string_t *str MTRACE_DECL)
+
+/* Aliased to: cvt_progname(str)
+ *
+ * <str> is a program name: no leading slash, but a trailing '.c'.
+ * Create and return a new string with the '.c' removed, and a leading slash
+ * added if compat_mode is set.
+ *
+ * The result string is untabled and has one reference, the old string <str>
+ * is not changed.
+ *
+ * If memory runs out, NULL is returned.
+ */
+
+{
+    string_t *tmp;
+    size_t len;
+    char * txt, *txt2, *p;
+
+    txt = get_txt(str);
+    len = mstrsize(str);
+
+    p = strrchr(txt, '.');
+
+    if (p)
+        len = (size_t)(p - txt);
+
+    if (compat_mode)
+        len++;
+
+    tmp = mstring_alloc_string(len MTRACE_PASS);
+    if (tmp)
+    {
+        txt2 = get_txt(tmp);
+        if (compat_mode)
+        {
+            *txt2 = '/';
+            txt2++;
+            len--;
+        }
+        memcpy(txt2, txt, len);
+    }
+
+    return tmp;
+} /* mstring_cvt_progname() */
 
 /*-------------------------------------------------------------------------*/
 string_t *
@@ -918,8 +1037,8 @@ mstring_add (const string_t *left, const string_t *right MTRACE_DECL)
     if (tmp)
     {
         txt = get_txt(tmp);
-        memcpy(tmp, get_txt(left), lleft);
-        memcpy(tmp+lleft, get_text(right), lright);
+        memcpy(txt, get_txt(left), lleft);
+        memcpy(txt+lleft, get_txt(right), lright);
     }
     return tmp;
 } /* mstring_add() */
@@ -948,8 +1067,8 @@ mstring_add_txt (const string_t *left, const char *right, size_t len MTRACE_DECL
     if (tmp)
     {
         txt = get_txt(tmp);
-        memcpy(tmp, get_txt(left), lleft);
-        memcpy(tmp+lleft, right, len);
+        memcpy(txt, get_txt(left), lleft);
+        memcpy(txt+lleft, right, len);
     }
     return tmp;
 } /* mstring_add_txt() */
@@ -978,8 +1097,8 @@ mstring_add_to_txt (const char *left, size_t len, const string_t *right MTRACE_D
     if (tmp)
     {
         txt = get_txt(tmp);
-        memcpy(tmp, left, len);
-        memcpy(tmp+len, get_txt(right), lright);
+        memcpy(txt, left, len);
+        memcpy(txt+len, get_txt(right), lright);
     }
     return tmp;
 } /* mstring_add_to_txt() */
@@ -1043,7 +1162,7 @@ mstring_extract (const string_t *str, size_t start, long end MTRACE_DECL)
  */
 
 {
-    size_t len;
+    size_t len, reslen;
     string_t *result;
 
     len = mstrsize(str);
@@ -1214,7 +1333,8 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
 
     if (!verbose)
     {
-        strbuf_addf("Strings alloced\t\t%8lu %8lu + %lu overhead\n"
+        strbuf_addf(sbuf
+                   , "Strings alloced\t\t%8lu %8lu + %lu overhead\n"
                    , distinct_strings, distinct_size - distinct_overhead
                    , distinct_overhead + stringtable_size
                    );

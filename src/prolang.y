@@ -28,7 +28,7 @@
  * keywords %if, %elif, %else and %endif; mainly to activate the proper
  * parsing rules for INITIALIZATION_BY___INIT.
  *---------------------------------------------------------------------------
- * A compile file, open it to yield a filedescriptor 'fd', then call the
+ * To compile a file, open it to yield a filedescriptor 'fd', then call the
  * functions
  *
  *     start_new_file(fd); : lex.c
@@ -42,7 +42,7 @@
  * "inherit 'name'" statement for which no object could be found: the
  * 'name' was stored in inherit_file and has to be compiled first.
  *
- * It is the task of the caller to make sure not to call the compiler
+ * It is the task of the caller to make sure that the compiler is not called
  * recursively.
  *
 %ifdef INITIALIZATION_BY___INIT
@@ -96,6 +96,7 @@
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
+#include "mstrings.h"
 #include "object.h"
 #include "simulate.h"
 #include "simul_efun.h"
@@ -136,8 +137,8 @@ program_t *compiled_prog;
   /* After yyparse(), the finished program.
    */
 
-char *inherit_file;
-  /* Used as a flag: if it is set to a string after yyparse(),
+string_t *inherit_file;
+  /* Used as a flag: if it is set to a tabled string after yyparse(),
    * this string should be loaded as an object, and the original object
    * must be loaded again.
    */
@@ -262,7 +263,7 @@ struct efun_shadow_s
    /* (bytecode_t): Program code.
     */
 #define A_STRINGS                  1
-   /* (shared char*) Strings used by the program.
+   /* (string_t*) Strings used by the program, all tabled.
     */
 #define A_VARIABLES                2
    /* (variable_t) The information for all non-virtual variables.
@@ -308,7 +309,7 @@ struct efun_shadow_s
     * a chain is marked by a negative next-index.
     */
 #define A_INCLUDE_NAMES           12
-   /* (char*) Names of include files in the order of appearance.
+   /* (string_t *) Tabled names of include files in the order of appearance.
     */
 
 #define NUMAREAS                  13  /* Total number of areas */
@@ -405,11 +406,11 @@ static mem_block_t mem_block[NUMAREAS];
   /* Return the number of inherits encountered so far.
    */
 
-#define PROG_STRING(n) ((char **)mem_block[A_STRINGS].block)[n]
+#define PROG_STRING(n) ((string_t **)mem_block[A_STRINGS].block)[n]
   /* Index the pointer for program string <n>.
    */
 
-#define STRING_COUNT  (mem_block[A_STRINGS].current_size / sizeof(char *))
+#define STRING_COUNT  (mem_block[A_STRINGS].current_size / sizeof(string_t *))
   /* Return the number of program strings encountered so far.
    */
 
@@ -629,8 +630,8 @@ static char prog_string_tags[32];
    * if (_tags[n] & (1 << b)) then _indizes[n*8 + b] is valid.
    */
 
-static char *last_string_constant = NULL;
-  /* The current (last) string constant, a shared string.
+static string_t *last_string_constant = NULL;
+  /* The current (last) string constant, a tabled string.
    * It is also used to optimize "foo"+"bar" constructs.
    */
 
@@ -669,7 +670,7 @@ static p_uint last_include_start;
 
 static void insert_pop_value(void);
 static void arrange_protected_lvalue(p_int, int, p_int, int);
-static int insert_inherited(char *, char *, program_t **, function_t *, int, bytecode_p);
+static int insert_inherited(char *, string_t *, program_t **, function_t *, int, bytecode_p);
 static void store_line_number_relocation(int relocated_from);
 int yyparse(void);
 %ifdef INITIALIZATION_BY___INIT
@@ -686,7 +687,7 @@ static void fix_variable_index_offsets(program_t *);
 
 /*-------------------------------------------------------------------------*/
 void
-yyerror (char *str)
+yyerror (const char *str)
 
 /* Raise the parse error <str>: usually generate the error message and log it.
  * If this is the first error in this file, account the wizard with an error.
@@ -710,7 +711,7 @@ yyerror (char *str)
 
 /*-------------------------------------------------------------------------*/
 void
-yyerrorf (char *format, ...)
+yyerrorf (const char *format, ...)
 
 /* Generate an yyerror() using printf()-style arguments.
  */
@@ -729,7 +730,7 @@ yyerrorf (char *format, ...)
 
 /*-------------------------------------------------------------------------*/
 void
-yywarn (char *str)
+yywarn (const char *str)
 
 /* Raise the parse warning <str>: usually generate the warning message and
  * log it.
@@ -749,7 +750,7 @@ yywarn (char *str)
 
 /*-------------------------------------------------------------------------*/
 void
-yywarnf (char *format, ...)
+yywarnf (const char *format, ...)
 
 /* Generate an yywarn() using printf()-style arguments.
  */
@@ -833,17 +834,24 @@ add_string_constant (void)
  */
 
 {
-    size_t len1;
-    char *tmp;
+    string_t *tmp;
 
-    len1 = strlen(last_string_constant);
-    tmp = alloca(len1 + strlen(last_lex_string) + 1);
-    strcpy(tmp, last_string_constant);
-    strcpy(tmp + len1, last_lex_string);
-    free_string(last_string_constant);
-    free_string(last_lex_string);
-    last_string_constant = make_shared_string(tmp);
-    last_lex_string = NULL;
+    tmp = mstr_add(last_string_constant, last_lex_string);
+    if (!tmp)
+    {
+        yyerrorf("Out of memory for string literal (%ld bytes)"
+                , (long)(mstrsize(last_string_constant)
+                         +mstrsize(last_lex_string))
+                );
+        return;
+    }
+    free_mstring(last_string_constant);
+    free_mstring(last_lex_string); last_lex_string = NULL;
+    last_string_constant = make_tabled(tmp);
+    if (!last_string_constant)
+    {
+        yyerror("Out of memory for string literal (%ld bytes)");
+    }
 } /* add_string_constant() */
 
 /*-------------------------------------------------------------------------*/
@@ -1503,7 +1511,7 @@ yymove_switch_instructions (int len, p_int blocklen)
 
 /*-------------------------------------------------------------------------*/
 static void
-yycerrorl (char *s1, char *s2, int line1, int line2)
+yycerrorl (const char *s1, const char *s2, int line1, int line2)
 
 /* Callback function for switch: Raise an error <s1> in file <s2> at
  * lines <line1> and <line2>.
@@ -1597,7 +1605,7 @@ add_local_name (ident_t *ident, fulltype_t type, int depth)
         if (ident->type != I_TYPE_UNKNOWN)
         {
             /* We're overlaying some other definition */
-            ident = make_shared_identifier(ident->name, I_TYPE_LOCAL, depth);
+            ident = make_shared_identifier(get_txt(ident->name), I_TYPE_LOCAL, depth);
         }
 
         /* Initialize the ident */
@@ -1719,11 +1727,12 @@ redeclare_local (int num, fulltype_t type, int depth)
      || (q->u.local.depth == 1 && depth == 2)
        )
     {
-        yyerrorf("Illegal to redeclare local name '%s'", q->name);
+        yyerrorf("Illegal to redeclare local name '%s'", get_txt(q->name));
     }
     else
     {
-        /* TODO: Add a warning for shadowed variable */
+        yywarnf( "Variable '%s' shadows previous declaration"
+               , get_txt(q->name));
         q = add_local_name(q, type, depth);
     }
 
@@ -1824,13 +1833,14 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
         {
             if (funp->flags & TYPE_MOD_NO_MASK
              && !((funp->flags|flags) & (NAME_PROTOTYPE|NAME_UNDEFINED)) )
-                yyerrorf("Illegal to redefine 'nomask' function \"%s\"", p->name);
+                yyerrorf("Illegal to redefine 'nomask' function \"%s\""
+                        , get_txt(p->name));
 
             if (!(funp->flags & (NAME_UNDEFINED|NAME_PROTOTYPE|NAME_INHERITED) ) )
             {
-                yyerrorf("Redeclaration of function %s.", p->name);
+                yyerrorf("Redeclaration of function %s.", get_txt(p->name));
                 if ( !(flags & NAME_PROTOTYPE) )
-                    free_string(p->name);
+                    free_mstring(p->name);
                 return num;
             }
 
@@ -1986,7 +1996,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
     /* It's a new function! */
     
-    if (strcmp(p->name, "heart_beat") == 0)
+    if (mstreq(p->name, STR_HEART_BEAT))
         heart_beat = FUNCTION_COUNT;
 
     /* Fill in the function_t */
@@ -2010,7 +2020,7 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
             /* The ident has been used before otherwise, so
              * get a fresh structure.
              */
-            p = make_shared_identifier(p->name, I_TYPE_GLOBAL, 0);
+            p = make_shared_identifier(get_txt(p->name), I_TYPE_GLOBAL, 0);
         }
         /* should be I_TYPE_UNKNOWN now. */
 
@@ -2083,7 +2093,7 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
             /* The ident has been used before otherwise, so
              * get a fresh structure.
              */
-            name = make_shared_identifier(name->name, I_TYPE_GLOBAL, 0);
+            name = make_shared_identifier(get_txt(name->name), I_TYPE_GLOBAL, 0);
         }
 
         name->type = I_TYPE_GLOBAL;
@@ -2113,7 +2123,7 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
     {
         if ( VARIABLE(n)->flags & TYPE_MOD_NO_MASK && !(flags & NAME_HIDDEN))
             yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
-                    , name->name);
+                    , get_txt(name->name));
 
         /* Make sure that at least one of the two definitions is 'static'.
          * The variable which has not been inherited gets first pick.
@@ -2137,7 +2147,7 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
         flags ^= TYPE_MOD_NOSAVE;
     }
 
-    dummy.name = ref_string(name->name);
+    dummy.name = ref_mstring(name->name);
     dummy.flags = flags;
 
     if (flags & TYPE_MOD_VIRTUAL)
@@ -2210,13 +2220,14 @@ redeclare_variable (ident_t *name, fulltype_t flags, int n)
     {
         if (VARIABLE(name->u.global.variable)->flags & TYPE_MOD_NO_MASK )
             yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
-                    , name->name);
+                    , get_txt(name->name));
     }
     else if (V_VARIABLE(n)->flags & TYPE_MOD_NO_MASK
           && !(V_VARIABLE(n)->flags & NAME_HIDDEN)
           && (V_VARIABLE(n)->flags ^ flags) & TYPE_MOD_STATIC )
     {
-        yyerrorf("Illegal to redefine 'nomask' variable \"%s\"", name->name);
+        yyerrorf("Illegal to redefine 'nomask' variable \"%s\""
+                , get_txt(name->name));
     }
     
     if (flags & TYPE_MOD_NOSAVE)
@@ -2244,7 +2255,7 @@ verify_declared (ident_t *p)
     if (p->type != I_TYPE_GLOBAL
      || (r = p->u.global.variable) < 0)
     {
-        yyerrorf("Variable %s not declared !", p->name);
+        yyerrorf("Variable %s not declared !", get_txt(p->name));
         return -1;
     }
     
@@ -2256,7 +2267,7 @@ verify_declared (ident_t *p)
 
 /*-------------------------------------------------------------------------*/
 static short
-store_prog_string (char *str)
+store_prog_string (string_t *str)
 
 /* Add the shared string <str> to the strings used by the program.
  * The function takes care that the same string is not stored twice.
@@ -2290,7 +2301,7 @@ store_prog_string (char *str)
         {
             if ( PROG_STRING(i) == str )
             {
-                free_string(str); /* Drop the extra ref. */
+                free_mstring(str); /* Drop the extra ref. */
                 last_string_is_new = MY_FALSE;
                 return i;
             }
@@ -2316,7 +2327,7 @@ store_prog_string (char *str)
     next_size = mem_block[A_STRING_NEXT].current_size;
 
     /* Make sure we have enough memory */
-    if (str_size + sizeof(char *) > mem_block[A_STRINGS].max_size
+    if (str_size + sizeof(string_t *) > mem_block[A_STRINGS].max_size
      || next_size + sizeof(int) > mem_block[A_STRING_NEXT].max_size
        )
     {
@@ -2331,8 +2342,8 @@ store_prog_string (char *str)
     }
 
     /* Add the string pointer */
-    mem_block[A_STRINGS].current_size = str_size + sizeof(char *);
-    *((char **)(mem_block[A_STRINGS].block+str_size)) = str;
+    mem_block[A_STRINGS].current_size = str_size + sizeof(string_t *);
+    *((string_t **)(mem_block[A_STRINGS].block+str_size)) = str;
 
     /* Add the old prog_string_index[] */
     mem_block[A_STRING_NEXT].current_size = next_size + sizeof(int);
@@ -2353,16 +2364,16 @@ delete_prog_string (void)
  */
 
 {
-    char *str;
+    string_t *str;
     int size;
     long hash;
     char mask, *tagp;
     int *indexp;
 
     /* Remove the string from the A_STRINGS area and free it */
-    size = mem_block[A_STRINGS].current_size - sizeof(char *);
-    free_string(
-      str = *(char**)(mem_block[A_STRINGS].block+size)
+    size = mem_block[A_STRINGS].current_size - sizeof(string_t *);
+    free_mstring(
+      str = *(string_t**)(mem_block[A_STRINGS].block+size)
     );
     mem_block[A_STRINGS].current_size = size;
 
@@ -2435,12 +2446,12 @@ copy_svalue (svalue_t *svp)
     case T_NUMBER:
     case T_FLOAT:
         break;
-    case T_OLD_STRING:
-        if (svp->x.string_type != STRING_SHARED)
+    case T_STRING:
+        if (!mstr_tabled(svp->u.str))
             return &const0;
         /* FALLTHROUGH */
     case T_SYMBOL:
-        ref_string(svp->u.string);
+        ref_mstring(svp->u.str);
         break;
     case T_POINTER:
     case T_QUOTED_ARRAY:
@@ -3014,6 +3025,7 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
               /* FUNCTION_NAME */
               memcpy(p, &$3->name, sizeof $3->name);
               p += sizeof $3->name;
+              ref_mstring($3->name);
 
               /* FUNCTION_TYPE */
               *p++ = $2;
@@ -3030,7 +3042,6 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
               define_new_function(MY_TRUE, $3, $6, max_number_of_locals - $6+
                       max_break_stack_need,
                       start + sizeof $3->name + 1, 0, $2);
-              ref_string($3->name);
 
               ins_f_code(F_RETURN0); /* catch a missing return */
           }
@@ -3147,7 +3158,7 @@ inheritance:
           {
               svalue_t *res;
 
-              push_string_shared(last_string_constant);
+              push_ref_string(inter_sp, last_string_constant);
 
               if (!compat_mode)
               {
@@ -3155,10 +3166,10 @@ inheritance:
                   filename = alloca(strlen(current_file)+2);
                   *filename = '/';
                   strcpy(filename+1, current_file);
-                  push_volatile_string(inter_sp, filename);
+                  push_c_string(inter_sp, filename);
               }
               else
-                  push_volatile_string(inter_sp, current_file);
+                  push_c_string(inter_sp, current_file);
 
               res = apply_master_ob(STR_INHERIT_FILE, 2);
 
@@ -3170,25 +3181,26 @@ inheritance:
                    
                   char * cp;
             
-                  if (res->type != T_OLD_STRING)
+                  if (res->type != T_STRING)
                   {
-                      yyerrorf("Illegal to inherit file '%s'.", last_string_constant);
+                      yyerrorf("Illegal to inherit file '%s'."
+                              , get_txt(last_string_constant));
                       YYACCEPT;
                   }
 
-                  for (cp = res->u.string; *cp == '/'; cp++) NOOP;
+                  for (cp = get_txt(res->u.str); *cp == '/'; cp++) NOOP;
             
                   if (!legal_path(cp))
                   {
-                      yyerrorf("Illegal path '%s'.", res->u.string);
+                      yyerrorf("Illegal path '%s'.", get_txt(res->u.str));
                       YYACCEPT;
                   }
 
                   /* Ok, now replace the parsed string with the name
                    * we just got.
                    */
-                  free_string(last_string_constant);
-                  last_string_constant = make_shared_string(cp);
+                  free_mstring(last_string_constant);
+                  last_string_constant = new_tabled(cp);
               }
               /* else: no result - use the string as it is */
           }
@@ -3208,9 +3220,9 @@ inheritance:
 
           if (ob->flags & O_SWAPPED && load_ob_from_swap(ob) < 0)
           {
-              free_string(last_string_constant);
+              free_mstring(last_string_constant);
               last_string_constant = NULL;
-              yyerrorf("Out of memory when unswapping '%s'", ob->name);
+              yyerrorf("Out of memory when unswapping '%s'", get_txt(ob->name));
               YYACCEPT;
           }
 
@@ -3222,7 +3234,7 @@ inheritance:
               YYACCEPT;
           }
 
-          free_string(last_string_constant);
+          free_mstring(last_string_constant);
           last_string_constant = NULL;
 
           /* Set up the inherit structure */
@@ -3376,12 +3388,12 @@ inheritance_qualifier:
           }
 
           /* The L_IDENTIFIER must be one of "functions" or "variables" */
-          if (strcmp(last_identifier->name, "functions") == 0)
+          if (mstreq(last_identifier->name, STR_FUNCTIONS))
           {
                 $$[0] = last_modifier;
                 $$[1] = 0;
           }
-          else if (strcmp(last_identifier->name, "variables") == 0)
+          else if (mstreq(last_identifier->name, STR_VARIABLES))
           {
                 $$[0] = 0;
                 $$[1] = last_modifier;
@@ -3389,7 +3401,7 @@ inheritance_qualifier:
           else
           {
               yyerrorf("Unrecognized inheritance modifier '%s'"
-                      , last_identifier->name);
+                      , get_txt(last_identifier->name));
               $$[0] = $$[1] = 0;
           }
 
@@ -3600,8 +3612,9 @@ new_name:
           /* Do the types match? */
           if (!compatible_types((current_type | $1) & TYPE_MOD_MASK, $5.type))
           {
-              yyerrorf("Type mismatch %s when initializing %s",
-                      get_two_types(current_type | $1, $5.type), $2->name);
+              yyerrorf("Type mismatch %s when initializing %s"
+                      , get_two_types(current_type | $1, $5.type)
+                      , get_txt($2->name));
           }
 
           /* Ok, assign */
@@ -4342,7 +4355,7 @@ for:
       {
 %line
           /* The loop is complete, now add the <incr> and <cond>
-           * code save on the compiler stack and patch up
+           * code saved on the compiler stack and patch up
            * the break and continues.
            */
            
@@ -4757,7 +4770,7 @@ foreach_in:
       L_IDENTIFIER
 
       {
-          if (strcmp($1->name, "in"))
+          if (!mstreq($1->name, STR_IN))
               yyerror("Expected keyword 'in' in foreach()");
           if ($1->type == I_TYPE_UNKNOWN)
               free_shared_identifier($1);
@@ -4773,7 +4786,7 @@ foreach_in:
               if (id->u.local.num == $1)
                   break;
           
-          if (id && strcmp(id->name, "in"))
+          if (id && !mstreq(id->name, STR_IN))
               yyerror("Expected keyword 'in' in foreach()");
       }
 
@@ -5293,7 +5306,10 @@ expr0:
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | error L_ASSIGN expr0  %prec L_ASSIGN
-      {   yyerror("Illegal LHS"); $$.type = TYPE_ANY; };
+      {
+          yyerror("Bad assignment: illegal lhs (target)");
+          $$.type = TYPE_ANY;
+      }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | expr0 '?' %prec '?'
@@ -5741,19 +5757,24 @@ expr0:
           {
               /* Yup, we can combine the two strings.
                */
-              char *str1, *str2, *sum;
+              string_t *str1, *str2, *sum;
               int i;
 
               /* Retrieve both strings from the A_STRINGS area
                * and catenate them.
                */
-              str1 = ((char**)(mem_block[A_STRINGS].block))
+              str1 = ((string_t**)(mem_block[A_STRINGS].block))
                 [p[-3] | (p[-4]-(F_CSTRING0))<<8 ];
-              str2 = ((char**)(mem_block[A_STRINGS].block))
+              str2 = ((string_t**)(mem_block[A_STRINGS].block))
                 [p[-1] | (p[-2]-(F_CSTRING0))<<8 ];
-              sum = xalloc(strlen(str1) + strlen(str2) + 1);
-              strcpy(sum, str1);
-              strcat(sum, str2);
+              sum = mstr_add(str1, str2);
+              if (!sum)
+              {
+                  yyerrorf("Out of memory for string literal (%ld bytes)"
+                          , mstrsize(str1)+mstrsize(str2)
+                          );
+                  YYACCEPT;
+              }
 
               /* If possible, try to delete the constituent strings
                * from the string area.
@@ -5766,8 +5787,13 @@ expr0:
               /* Store the new string and update the CSTRING
                * instructions.
                */
-              i = store_prog_string(make_shared_string(sum));
-              xfree(sum);
+              sum = make_tabled(sum);
+              if (!sum)
+              {
+                  yyerror("Out of memory for string literal");
+                  YYACCEPT;
+              }
+              i = store_prog_string(sum);
 
               last_expression = current_size - 4;
               if (i < 0x400)
@@ -5969,6 +5995,10 @@ expr0:
           else if (type2 & TYPE_MOD_POINTER)
           {
               $$.type = type2;
+          }
+          else if (type1 == TYPE_ANY || type2 == TYPE_ANY)
+          {
+              $$.type = TYPE_ANY;
           }
           else
           {
@@ -6436,7 +6466,7 @@ expr4:
           
           int string_number;
           PREPARE_INSERT(3)
-          char *p;
+          string_t *p;
 %line
           p = last_lex_string;
           last_lex_string = NULL;
@@ -6639,7 +6669,7 @@ expr4:
           num_keys = $4[0] / ($4[1]+1);
 
           if ((num_keys|$4[1]) & ~0xffff)
-              yyerror("cannot handle more than 65525 keys/values "
+              yyerror("cannot handle more than 65535 keys/values "
                       "in mapping aggregate");
 
           if ( (num_keys | $4[1]) &~0xff)
@@ -7660,12 +7690,12 @@ function_call:
                    * prepare the extra args for the call_other
                    */
                   PREPARE_INSERT(6)
-                  char *p;
+                  string_t *p;
 
-                  p = ref_string(real_name->name);
+                  p = ref_mstring(real_name->name);
                   add_f_code(F_STRING);
                   add_short(store_prog_string(
-                    make_shared_string(query_simul_efun_file_name())));
+                    ref_mstring(query_simul_efun_file_name())));
                   add_f_code(F_STRING);
                   add_short(store_prog_string(p));
                   CURRENT_PROGRAM_SIZE += 6;
@@ -7687,7 +7717,7 @@ function_call:
           vartype_t *arg_types = NULL;  /* Argtypes from the program */
           int        first_arg;         /* Startindex in arg_types[] */
 
-          efun_override = ($1.super && strcmp($1.super, "efun") == 0);
+          efun_override = ($1.super && strcmp($1.super, get_txt(STR_EFUN)) == 0);
 
           $$.start = $<function_call_head>2.start;
           $$.code = -1;
@@ -7710,16 +7740,16 @@ function_call:
               {
                   if ($4 > funp->num_arg)
                       yyerrorf("Too many arguments to simul_efun %s"
-                              , funp->name);
+                              , get_txt(funp->name));
 
                   if ($4 < funp->num_arg)
                   {
                       if (pragma_pedantic)
                           yyerrorf("Missing arguments to simul_efun %s"
-                                  , funp->name);
+                                  , get_txt(funp->name));
                       else
                           yywarnf("Missing arguments to simul_efun %s"
-                                 , funp->name);
+                                 , get_txt(funp->name));
                   }
               }
 
@@ -7844,13 +7874,13 @@ function_call:
                   if ( !(funp->flags & (NAME_PROTOTYPE|NAME_INHERITED))
                    && exact_types )
                   {
-                      yyerrorf("Function %.50s undefined", funp->name);
+                      yyerrorf("Function %.50s undefined", get_txt(funp->name));
                   }
                   else if ((funp->flags
                             & (NAME_UNDEFINED|NAME_PROTOTYPE|NAME_HIDDEN))
                            == NAME_HIDDEN)
                   {
-                      yyerrorf("Function %.50s is private", funp->name);
+                      yyerrorf("Function %.50s is private", get_txt(funp->name));
                   }
               }
 
@@ -7864,7 +7894,8 @@ function_call:
                && exact_types)
               {
                   if (funp->num_arg-1 > $4 || !(funp->flags & TYPE_MOD_XVARARGS))
-                    yyerrorf("Wrong number of arguments to %.60s", $1.real->name);
+                    yyerrorf("Wrong number of arguments to %.60s"
+                            , get_txt($1.real->name));
               }
 
               /* Check the argument types.
@@ -7898,7 +7929,7 @@ function_call:
                           {
                               yyerrorf("Bad type for argument %d of %s %s",
                                 anum_arg - i,
-                                funp->name,
+                                get_txt(funp->name),
                                 get_two_types(tmp2, tmp1));
                           }
                       } /* for (all args) */
@@ -7916,7 +7947,7 @@ function_call:
                               {
                                   yyerrorf("Bad type for argument %d of %s %s",
                                       anum_arg - i,
-                                      funp->name,
+                                      get_txt(funp->name),
                                       get_two_types(tmp2, tmp1));
                               }
                           }
@@ -8067,7 +8098,7 @@ function_call:
 
           else if (efun_override)
           {
-              yyerrorf("Unknown efun: %s", $1.real->name);
+              yyerrorf("Unknown efun: %s", get_txt($1.real->name));
               $$.type = TYPE_ANY;
           }
           else
@@ -8088,7 +8119,7 @@ function_call:
               funp = FUNCTION(f);
               if (exact_types)
               {
-                  yyerrorf("Undefined function %.50s", $1.real->name);
+                  yyerrorf("Undefined function %.50s", get_txt($1.real->name));
               }
               $$.type = TYPE_ANY;  /* Just a guess */
           }
@@ -8105,8 +8136,8 @@ function_call:
           /* If call_other() has been replaced by a sefun, and
            * if we need to use F_CALL_OTHER to call it, we have
            * to insert additional code before the <expr4> already parsed.
-           * Putting this block before the <expr4> yields a
-           * faulty grammar.
+           * Putting this code block before the <expr4> in the rule
+           * however yields a faulty grammar.
            */
            
           if (call_other_sefun >= 0
@@ -8131,9 +8162,9 @@ function_call:
                */
               p[0] = F_STRING;
               upd_short($1.start+1, store_prog_string(
-                        make_shared_string(query_simul_efun_file_name())));
+                        ref_mstring(query_simul_efun_file_name())));
               p[3] = F_STRING;
-              upd_short($1.start+4, store_prog_string(ref_string(STR_CALL_OTHER)));
+              upd_short($1.start+4, store_prog_string(ref_mstring(STR_CALL_OTHER)));
 
               CURRENT_PROGRAM_SIZE += 6;
           }
@@ -8144,7 +8175,7 @@ function_call:
       {
 %line
           int string_number;
-          char *p;
+          string_t *p;
 
           /* If we received a string, it's a constant call. */
           p = $4;
@@ -8202,7 +8233,8 @@ function_call:
 
               funp = &simul_efunp[call_other_sefun];
               if (num_arg > funp->num_arg && !(funp->flags & TYPE_MOD_XVARARGS))
-                  yyerrorf("Too many arguments to simul_efun %s", funp->name);
+                  yyerrorf("Too many arguments to simul_efun %s"
+                          , get_txt(funp->name));
 
               if (call_other_sefun & ~0xff)
               {
@@ -8275,10 +8307,10 @@ function_call:
 call_other_name:
       L_IDENTIFIER
       {
-          char *p;
+          string_t *p;
 
           /* Extract the string from the ident structure */
-          p = ref_string($1->name);
+          p = ref_mstring($1->name);
           if ($1->type == I_TYPE_UNKNOWN)
               free_shared_identifier($1);
           $$ = p;
@@ -8300,7 +8332,7 @@ call_other_name:
           }
 
           if (p)
-              $$ = ref_string(p->name);
+              $$ = ref_mstring(p->name);
           else
               fatal("Local variable %ld vanished.\n", (long)$1);
       }
@@ -8358,14 +8390,14 @@ function_name:
 
               svalue_t *res;
 
-              push_volatile_string(inter_sp, "nomask simul_efun");
-              push_volatile_string(inter_sp, current_file);
-              push_volatile_string(inter_sp, $3->name);
+              push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
+              push_c_string(inter_sp, current_file);
+              push_ref_string(inter_sp, $3->name);
               res = apply_master_ob(STR_PRIVILEGE, 3);
               if (!res || res->type != T_NUMBER || res->u.number < 0)
               {
                   yyerrorf("Privilege violation: nomask simul_efun %s"
-                          , $3->name);
+                          , get_txt($3->name));
                   yfree($1);
                   $$.super = NULL;
               }
@@ -8390,7 +8422,7 @@ function_name:
 anchestor:
       L_IDENTIFIER
       {
-          $$ = ystring_copy($1->name);
+          $$ = ystring_copy(get_txt($1->name));
           if ($1->type == I_TYPE_UNKNOWN)
               free_shared_identifier($1);
       }
@@ -8400,8 +8432,8 @@ anchestor:
 
     | L_STRING
       {
-          $$ = ystring_copy(last_lex_string);
-          free_string(last_lex_string);
+          $$ = ystring_copy(get_txt(last_lex_string));
+          free_mstring(last_lex_string);
           last_lex_string = NULL;
       }
 ; /* anchestor */
@@ -8482,7 +8514,6 @@ inline_fun:
            ins_f_code(F_CLOSURE);
            ins_short(num);
            $$.type = TYPE_CLOSURE;
-
       }
 ; /* inline_fun */
 
@@ -8569,7 +8600,7 @@ opt_catch_mods :
       ';' L_IDENTIFIER
 
       {
-          if (strcmp($2->name, "nolog"))
+          if (!mstreq($2->name, STR_NOLOG))
               yyerror("Expected keyword 'nolog' in catch()");
           if ($2->type == I_TYPE_UNKNOWN)
               free_shared_identifier($2);
@@ -8586,7 +8617,7 @@ opt_catch_mods :
               if (id->u.local.num == $2)
                   break;
           
-          if (id && strcmp(id->name, "nolog"))
+          if (id && !mstreq(id->name, STR_NOLOG))
               yyerror("Expected keyword 'nolog' in catch()");
 
           $$ = 1;
@@ -8829,7 +8860,7 @@ svalue_constant:
       {
           svalue_t *svp = currently_initialized;
 %line
-          put_old_string(svp, last_string_constant);
+          put_string(svp, last_string_constant);
           last_string_constant = NULL;
       }
 
@@ -8839,7 +8870,7 @@ svalue_constant:
 %line
           svp->type = T_SYMBOL;
           svp->x.quotes = $1.quotes;
-          svp->u.string = $1.name;
+          svp->u.str = $1.name;
       }
 
     | L_QUOTED_AGGREGATE
@@ -9402,10 +9433,10 @@ transfer_init_control (void)
         /* Must happen before PREPARE_INSERT()! */
 #endif
         {
-            char *name;
+            string_t *name;
             PREPARE_INSERT(sizeof name + 3);
 
-            name = ref_string(STR_VARINIT);
+            name = ref_mstring(STR_VARINIT);
             memcpy(__PREPARE_INSERT__p , (char *)&name, sizeof name);
             __PREPARE_INSERT__p += sizeof(name);
             add_byte(TYPE_ANY);  /* return type */
@@ -9449,7 +9480,7 @@ add_new_init_jump (void)
 
 /*-------------------------------------------------------------------------*/
 static int
-insert_inherited (char *super_name, char *real_name
+insert_inherited (char *super_name, string_t *real_name
                  , program_t **super_p, function_t *fun_p
                  , int num_arg, bytecode_p __prepare_insert__p
                  )
@@ -9483,7 +9514,29 @@ insert_inherited (char *super_name, char *real_name
     super_length = strlen(super_name);
     num_inherits = INHERIT_COUNT;
 
-    real_name = findstring(real_name); /* TODO: Isn't this a shared string anyway? */
+    /* TODO: Is this really necessary?  real_name should be tabled
+     * already.
+     */
+    {
+        string_t *tmp;
+
+        tmp = find_tabled(real_name);
+
+#ifdef DEBUG
+        if (!tmp)
+            fprintf(stderr, "DEBUG: insert_inherited(): Can't find function "
+                            "'%s'.\n", get_txt(real_name));
+        else if (tmp != real_name)
+            fprintf(stderr, "DEBUG: insert_inherited(): Function "
+                            "'%s' is not a tabled string.\n"
+                          , get_txt(real_name));
+#endif
+        if (tmp && tmp != real_name)
+        {
+            free_mstring(real_name);
+            real_name = ref_mstring(tmp);
+        }
+    }
 
     /* Search the function in all inherits.
      * For normal inherits its sufficient to search the inherits
@@ -9505,13 +9558,14 @@ insert_inherited (char *super_name, char *real_name
         if (*super_name)
         {
             /* ip->prog->name includes .c */
-            int l = strlen(ip->prog->name + 2);
+            int l = mstrsize(ip->prog->name)-2;
 
             if (l < super_length)
                 continue;
-            if (l > super_length && ip->prog->name[l-super_length-1] != '/')
+            if (l > super_length
+             && get_txt(ip->prog->name)[l-super_length-1] != '/')
                 continue;
-            if (strncmp(super_name, ip->prog->name + l - super_length,
+            if (strncmp(super_name, get_txt(ip->prog->name) + l - super_length,
                         super_length) != 0)
                 continue;
         }
@@ -9631,7 +9685,7 @@ insert_inherited (char *super_name, char *real_name
             PREPARE_INSERT(6)
 
             /* ip->prog->name includes .c */
-            int l = strlen(ip0->prog->name + 2);
+            int l = mstrsize(ip0->prog->name) - 2;
 
             ip = ip0; /* ip will be changed in the body */
 
@@ -9639,7 +9693,7 @@ insert_inherited (char *super_name, char *real_name
                 /* duplicate inherit */
                 continue;
 
-            if ( !match_string(super_name, ip->prog->name, l) )
+            if ( !match_string(super_name, get_txt(ip->prog->name), l) )
                 continue;
 
             if ( (i = find_function(real_name, ip->prog)) < 0)
@@ -9955,9 +10009,9 @@ copy_functions (program_t *from, fulltype_t type)
                 break;
 
             /* Visible: create a new identifier for it */
-            p = make_shared_identifier(fun.name, I_TYPE_GLOBAL, 0);
+            p = make_shared_identifier(get_txt(fun.name), I_TYPE_GLOBAL, 0);
             if (!p) {
-                yyerrorf("Out of memory: identifier '%s'", fun.name);
+                yyerrorf("Out of memory: identifier '%s'", get_txt(fun.name));
                 break;
             }
 
@@ -10027,7 +10081,7 @@ copy_functions (program_t *from, fulltype_t type)
                              */
                             yywarnf(
                                 "Misplaced prototype for %s in %s\n"
-                                , fun.name, current_file
+                                , get_txt(fun.name), current_file
                             );
                             cross_define( &fun, OldFunction
                                         , current_func_index - n );
@@ -10057,7 +10111,7 @@ copy_functions (program_t *from, fulltype_t type)
                         {
                             yyerrorf(
                               "Illegal to inherit 'nomask' function '%s' twice",
-                              fun.name);
+                              get_txt(fun.name));
                         }
                         else if ((   fun.flags & TYPE_MOD_NO_MASK
                                   || OldFunction->flags & (NAME_HIDDEN|NAME_UNDEFINED))
@@ -10150,15 +10204,14 @@ copy_functions (program_t *from, fulltype_t type)
              * to mask it.
              */
             if ((heart_beat == -1)
-             && fun.name[0] == 'h'
-             && (strcmp(fun.name, "heart_beat") == 0))
+             && mstreq(fun.name, STR_HEART_BEAT))
             {
                 heart_beat = current_func_index;
             }
 
 %ifdef INITIALIZATION_BY___INIT
             /* Recognize the initializer function */
-            if (fun.name[0] == '_' && strcmp(fun.name+1, "_INIT") == 0)
+            if (mstreq(fun.name, STR_VARINIT))
             {
                 initializer = i;
                 fun.flags |= NAME_UNDEFINED;
@@ -10407,11 +10460,11 @@ copy_variables (program_t *from, fulltype_t type
             ident_t *p;
             fulltype_t new_type;
 
-            p = make_shared_identifier(from->variable_names[j].name,
+            p = make_shared_identifier(get_txt(from->variable_names[j].name),
                 I_TYPE_GLOBAL, 0);
             if (!p) {
                 yyerrorf("Out of memory: identifier '%s'"
-                        , from->variable_names[j].name);
+                        , get_txt(from->variable_names[j].name));
                 return;
             }
 
@@ -10653,6 +10706,8 @@ store_include_info (char *name)
  */
 
 {
+    string_t *sname;
+
     if (last_include_start == mem_block[A_LINENUMBERS].current_size)
     {
         simple_includes++;
@@ -10680,13 +10735,13 @@ store_include_info (char *name)
     last_include_start = mem_block[A_LINENUMBERS].current_size;
 
     /* Remember the included filename in A_INCLUDE_NAMES */
-    name = make_shared_string(name);
-    if (!name)
+    sname = new_tabled(name);
+    if (!sname)
     {
-        name = ref_string(STR_DEFAULT);
+        sname = ref_mstring(STR_DEFAULT);
         yyerror("Out of memory: sharing string");
     }
-    add_to_mem_block(A_INCLUDE_NAMES, &name, sizeof name);
+    add_to_mem_block(A_INCLUDE_NAMES, &sname, sizeof sname);
 
     /* Restart linecount */
     stored_lines = 0;
@@ -10724,9 +10779,9 @@ store_include_end (void)
         {
             last_include_start--;
         }
-        free_string( *(char **)
+        free_mstring( *(string_t **)
           (mem_block[A_INCLUDE_NAMES].block +
-           (mem_block[A_INCLUDE_NAMES].current_size -= sizeof(char *)))
+           (mem_block[A_INCLUDE_NAMES].current_size -= sizeof(string_t *)))
         );
 
         /* If we return to the auto_include_string, current_line has been
@@ -10813,10 +10868,10 @@ prolog(void)
      */
     call_other_sefun = -1;
 
-    id = make_shared_identifier(STR_CALL_OTHER, I_TYPE_UNKNOWN, 0);
+    id = make_shared_identifier(get_txt(STR_CALL_OTHER), I_TYPE_UNKNOWN, 0);
 
     if (!id)
-        fatal("Out of memory: identifier '%s'.\n", STR_CALL_OTHER);
+        fatal("Out of memory: identifier '%s'.\n", get_txt(STR_CALL_OTHER));
 
     if (id->type == I_TYPE_UNKNOWN)
     {
@@ -10870,7 +10925,7 @@ epilog (void)
     if (last_string_constant)
 
     {
-        free_string(last_string_constant);
+        free_mstring(last_string_constant);
         last_string_constant = NULL;
     }
 
@@ -10911,11 +10966,11 @@ epilog (void)
     {
         ident_t *ip;
 
-        ip = make_shared_identifier("__INIT", I_TYPE_UNKNOWN, 0);
+        ip = make_shared_identifier(get_txt(STR_VARINIT), I_TYPE_UNKNOWN, 0);
         switch (0) { default:
             if (!ip)
             {
-                yyerror("Out of memory: identifer '__INIT'");
+                yyerrorf("Out of memory: identifer '%s'", get_txt(STR_VARINIT));
                 break;
             }
 
@@ -10961,7 +11016,7 @@ epilog (void)
     /* Check the string block. We don't have to count the include file names
      * as those won't be accessed from the program code.
      */
-    if (mem_block[A_STRINGS].current_size > 0x10000 * sizeof (char *))
+    if (mem_block[A_STRINGS].current_size > 0x10000 * sizeof (string_t *))
         yyerror("Too many strings");
 
     /* Add the names of the include files in reversed order
@@ -10972,8 +11027,8 @@ epilog (void)
         add_to_mem_block(
           A_STRINGS,
           mem_block[A_INCLUDE_NAMES].block +
-            (mem_block[A_INCLUDE_NAMES].current_size -= sizeof(char *)),
-          sizeof(char*)
+            (mem_block[A_INCLUDE_NAMES].current_size -= sizeof(string_t *)),
+          sizeof(string_t*)
         );
     }
 
@@ -11037,7 +11092,7 @@ epilog (void)
                 {
                     realloc_a_program();
                 }
-                ref_string(f->name);
+                (void)ref_mstring(f->name);
                 f->offset.pc = CURRENT_PROGRAM_SIZE + sizeof f->name + 1;
                 p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE;
                 memcpy(p, (char *)&f->name, sizeof f->name);
@@ -11051,8 +11106,7 @@ epilog (void)
                  * then a dummy function is generated. This prevents crashes
                  * when this program is inherited later.
                  */
-                if (f->name[0] == '_' && !strcmp(f->name, "__INIT")
-                 && !f->num_arg)
+                if (mstreq(f->name, STR_VARINIT) && !f->num_arg)
                 {
                     f->flags &= ~NAME_UNDEFINED;
                     *p++ = F_CONST1;
@@ -11149,7 +11203,7 @@ epilog (void)
                         if ((funname_start1->name - funname_start2->name) < 0)
 #else
                         /* must use memcmp(), because it is used later for the
-                         * program.    byteorder is non-portable.
+                         * program. byteorder is non-portable.
                          */
                         if (memcmp(
                               &funname_start2->name,
@@ -11223,7 +11277,7 @@ epilog (void)
                 if ( !(functions->flags & (NAME_UNDEFINED|NAME_INHERITED)) ==
                       NAME_UNDEFINED)
                 {
-                    free_string(functions->name);
+                    free_mstring(functions->name);
                 }
             }
         }
@@ -11305,7 +11359,7 @@ epilog (void)
         *prog = NULL_program;
 
         /* Set up the program structure */
-        if ( !(prog->name = string_copy(current_file)) )
+        if ( !(prog->name = new_mstring(current_file)) )
         {
             xfree(prog);
             yyerrorf("Out of memory: filename '%s'", current_file);
@@ -11321,7 +11375,7 @@ epilog (void)
                     | (pragma_no_shadow ? P_NO_SHADOW : 0);
         prog->load_time = current_time;
 
-        total_prog_block_size += prog->total_size + strlen(prog->name)+1;
+        total_prog_block_size += prog->total_size + mstrsize(prog->name);
         total_num_prog_blocks += 1;
         p += align(sizeof (program_t));
 
@@ -11369,7 +11423,7 @@ epilog (void)
 
         /* Add the program strings
          */
-        prog->strings = (char **)p;
+        prog->strings = (string_t **)p;
         prog->num_strings = num_strings;
         if (mem_block[A_STRINGS].current_size)
             memcpy(p, mem_block[A_STRINGS].block,
@@ -11483,11 +11537,11 @@ epilog (void)
             if ( !(functions->flags & (NAME_INHERITED|NAME_UNDEFINED))
              && functions->name )
             {
-                free_string(functions->name);
+                free_mstring(functions->name);
             }
 
         do_free_sub_strings( num_strings
-                           , (char **)mem_block[A_STRINGS].block
+                           , (string_t **)mem_block[A_STRINGS].block
                            , num_variables
                            , (variable_t *)mem_block[A_VIRTUAL_VAR].block );
 

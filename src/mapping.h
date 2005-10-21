@@ -98,7 +98,7 @@ struct condensed_mapping {
        * for the search when indexing
        */
 
-    /* char *string[ ... ];
+    /* string_t *string[ ... ];
      *
      *   Pointer to the key strings. Uneven pointer values denote
      *   deleted/invalidated keys and no longer point to valid
@@ -141,7 +141,7 @@ struct mvf_info
    * after the last misc key in that mapping.
    */
 
-#define CM_STRING(m) ((char **)((m)+1))
+#define CM_STRING(m) ((string_t **)((m)+1))
   /* For condensed_mapping <m>, return a pointer to the first
    * string key in that mapping.
    */
@@ -153,7 +153,7 @@ struct mvf_info
    */
 
 #define MAP_SIZE(m) (\
-        (m)->condensed->string_size / sizeof(char *) + \
+        (m)->condensed->string_size / sizeof(string_t *) + \
         (m)->condensed->misc_size   / sizeof(svalue_t) + \
         ((m)->hash ? (m)->hash->used - (m)->hash->condensed_deleted : 0) \
                     )

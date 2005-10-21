@@ -1383,7 +1383,7 @@ show_object (int d, void *block, int depth)
     WRITES(d, "Object: ");
     show_mstring(d, ob->name, 0);
     WRITES(d, ", uid: ");
-    show_string(d, ob->user->name ? ob->user->name : "0", 0);
+    show_string(d, ob->user->name ? get_txt(ob->user->name) : "0", 0);
     WRITES(d, "\n");
 }
 
@@ -1433,7 +1433,7 @@ show_array(int d, void *block, int depth)
     }
 
     WRITES(d, "Array size ");writed(d, (p_uint)a_size);
-    WRITES(d, ", uid: ");show_string(d, user ? user->name : "0", 0);
+    WRITES(d, ", uid: "); show_string(d, user ? get_txt(user->name) : "0", 0);
     WRITES(d, "\n");
     if (depth > 2)
         return;

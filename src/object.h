@@ -224,18 +224,19 @@ extern object_t NULL_object;
 extern int32 renumber_programs(void);
 extern void remove_destructed_objects(void);
 extern void tell_object(object_t *, string_t *);
+extern void tell_object_str(object_t *, const char *);
 extern void tell_npc(object_t *, string_t *);
 extern void tell_npc_str(object_t *, const char *);
 extern void reference_prog(program_t *, char *);
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
 extern void remove_all_objects(void);
 #endif
-extern void do_free_sub_strings(int num_strings, char ** strings, int num_variables, variable_t *variable_names);
+extern void do_free_sub_strings(int num_strings, string_t ** strings, int num_variables, variable_t *variable_names);
 extern void free_prog(program_t *progp, Bool free_sub_strings);
-extern char *function_exists(char *fun, object_t *ob);
+extern string_t *function_exists(string_t *fun, object_t *ob);
 extern void reset_object(object_t *ob, int arg);
 extern void replace_programs(void);
-extern Bool shadow_catch_message(object_t *ob, char *str);
+extern Bool shadow_catch_message(object_t *ob, const char *str);
 
 extern void _free_object(object_t *);
 #ifdef INITIALIZATION_BY___INIT

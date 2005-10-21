@@ -10,9 +10,8 @@
 struct wiz_list_s
 {
     wiz_list_t *next;        /* Next entry in list */
-    char *name;              /* Name of this wizard (shared string),
+    string_t *name;          /* Name of this wizard (shared string),
                               * NULL for the default entry */
-    size_t length;           /* strlen(.name) */
     int32  score;            /* Number of actions executed by t.w. objects */
     int32  cost;             /* Evalticks spent on this wizards objects */
     int32  heart_beats;      /* Number of heart_beat() calls */
@@ -25,8 +24,8 @@ struct wiz_list_s
     /* The following values are all used to store the last error
      * message.
      */
-    char *file_name;         /* Allocated: the object's filename */
-    char *error_message;     /* Allocated: the error message */
+    string_t *file_name;     /* Untabled: the object's filename */
+    string_t *error_message; /* Untabled: the error message */
     int32 line_number;       /* The line number. Bit 30 is the forget-flag */
 };
 
@@ -42,8 +41,7 @@ extern wiz_list_t *add_name(string_t *str);
 extern void wiz_decay(void);
 extern void load_wiz_file(void);
 extern void remove_wiz_list(void);
-extern void save_error(char *msg, char *file, int line);
-extern char *get_wiz_name(char *file);
+extern void save_error(const char *msg, const char *file, int line);
 extern void check_wizlist_for_destr(void);
 extern svalue_t *f_get_error_file(svalue_t *sp);
 extern svalue_t *f_wizlist_info(svalue_t *sp);

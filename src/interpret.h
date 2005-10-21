@@ -121,13 +121,6 @@ extern void transfer_svalue_no_free(svalue_t *dest, svalue_t *v);
 extern void transfer_svalue(svalue_t *dest, svalue_t *v);
 
 extern void put_c_string (svalue_t *sp, const char *p);
-extern void push_c_string (svalue_t *sp, const char *p);
-
-#if 0
-extern void push_referenced_shared_string(char *p);
-extern void push_string_malloced(char *p);
-extern void push_string_shared(char *p);
-#endif
 
 extern void push_svalue(svalue_t *v);
 extern void push_svalue_block(int num, svalue_t *v);

@@ -21,11 +21,22 @@
 /* void outofmem(size_t size, const char * txt)
  *   Throw an 'out of memory' error for an allocation of <size> with the
  *   description <txt>.
+ *
+ * void outofmem1(size_t size, const char * txt, mixed arg)
+ *   Like outofmem(), but allows for printf-style args. In return, txt must
+ *   be a string literal.
+ * TODO: Add more macros like: outofmem_swap(ob), outofmem_fun(funname,len,txt),
+ * TODO:: outofmem_gen(txt but no length)..., then convert all out-of-mem
+ * TODO:: descriptions.
  */
 
 #define outofmem(size,txt) \
     error("(%s:%d) Out of memory (%lu bytes) for %s\n"\
          , __FILE__, __LINE__, (unsigned long)(size), txt)
+
+#define outofmem1(size,txt,arg1) \
+    error("(%s:%d) Out of memory (%lu bytes) for " txt "\n"\
+         , __FILE__, __LINE__, (unsigned long)(size), arg1)
 
 
 /* void memsafe(void * expr, size_t size, const char * txt)
@@ -70,24 +81,32 @@ extern mp_int max_malloced;
 
 #ifdef MALLOC_smalloc
 
+/* xalloc(): normal allocation
+ * xalloc_traced(): allocation with given file/line
+ * xalloc_pass(): allocation using MTRACE_PASS as file/line args
+ */
+
 #if defined(MALLOC_TRACE)
 
-#define xalloc_traced(size,  file, line) smalloc((size), (file), (line))
-#define xalloc(size) (smalloc((size), __FILE__, __LINE__))
+#define xalloc_traced(size, file, line)  smalloc((size), (file), (line))
+#define xalloc(size) smalloc((size), __FILE__, __LINE__)
 
 extern POINTER smalloc(size_t, const char *, int);
 
-#define string_copy_traced(s, file, line) (smalloc_string_copy(s, file, line))
-#define string_copy(s) (smalloc_string_copy(s, __FILE__ "::string_copy", __LINE__))
+#define string_copy_traced(s, file, line) smalloc_string_copy(s, file, line)
+#define string_copy(s) smalloc_string_copy(s, __FILE__ "::string_copy", __LINE__)
 extern char * smalloc_string_copy(const char *, const char *, int);
 
 #else
 
-#define xalloc_traced(size,  file, line) smalloc((size))
-#define xalloc(size) (smalloc((size)))
+#define xalloc_traced(size, file, line) smalloc((size))
+#define xalloc(size)                    smalloc((size))
+
 extern POINTER smalloc(size_t);
 
 #endif
+
+#define xalloc_pass(size)  smalloc((size) MTRACE_PASS)
 
 extern POINTER rexalloc(POINTER, size_t);
 extern POINTER amalloc(size_t);

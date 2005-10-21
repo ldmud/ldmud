@@ -55,6 +55,8 @@
  *    efun: get_type_info()
  *    efun: map()
  *    efun: member()
+ *    efun: min()
+ *    efun: max()
  *    efun: quote()
  *
  * Others:
@@ -3037,6 +3039,7 @@ f_object_info (svalue_t *sp)
     object_t *o, *o2, *prev;
     program_t *prog;
     svalue_t *svp;
+    mp_int v0, v1, v2;
     int flags, pos;
 
     /* Get the arguments from the stack */
@@ -3181,9 +3184,11 @@ f_object_info (svalue_t *sp)
         svp[OIM_SIZE_VARIABLES].u.number
                      = (p_int)(prog->num_variables * sizeof(variable_t));
           /* Number of variables and the memory usage */
+        v1 = program_string_size(prog, &v0, &v2);
         svp[OIM_NUM_STRINGS].u.number = prog->num_strings;
-        svp[OIM_SIZE_STRINGS].u.number
-                                 = (p_int)(prog->num_strings * sizeof(string_t*));
+        svp[OIM_SIZE_STRINGS].u.number = (p_int)v0;
+        svp[OIM_SIZE_STRINGS_DATA].u.number = v1;
+        svp[OIM_SIZE_STRINGS_TOTAL].u.number = v2;
           /* Number of strings and the memory usage */
         {
             int i = prog->num_inherited;
@@ -3202,7 +3207,12 @@ f_object_info (svalue_t *sp)
           /* Number of inherites and the memory usage */
         svp[OIM_TOTAL_SIZE].u.number = prog->total_size;
 
-        svp[OIM_DATA_SIZE].u.number = data_size(o);
+        {
+            mp_int totalsize;
+
+            svp[OIM_DATA_SIZE].u.number = data_size(o, &totalsize);
+            svp[OIM_TOTAL_DATA_SIZE].u.number = totalsize;
+        }
 
         svp[OIM_NO_INHERIT].u.number = (prog->flags & P_NO_INHERIT) ? 1 : 0;
         svp[OIM_NO_CLONE].u.number   = (prog->flags & P_NO_CLONE) ? 1 : 0;
@@ -3361,6 +3371,176 @@ f_set_is_wizard (svalue_t *sp)
 } /* f_set_is_wizard() */
 
 #endif /* F_SET_IS_WIZARD */
+
+/*-------------------------------------------------------------------------*/
+static svalue_t *
+x_min_max (svalue_t *sp, int num_arg, Bool bMax)
+
+/* Implementation of VEFUNs max() and min().
+ * <bMax> is true if the maximum is to be returned, false for the minimum.
+ */
+
+{
+    char * fname = bMax ? "max" : "min";
+    svalue_t *argp = sp-num_arg+1;
+    svalue_t *valuep = argp;
+    int left = num_arg;
+    Bool gotArray = MY_FALSE;
+    svalue_t *result = NULL;
+
+
+    if (argp->type == T_POINTER)
+    {
+        if (num_arg > 1)
+        {
+           error("Bad arguments to %s: only one array accepted.\n", fname); 
+           /* NOTREACHED */
+        }
+        valuep = argp->u.vec->item;
+        left = (int)VEC_SIZE(argp->u.vec);
+        gotArray = MY_TRUE;
+        if (left < 1)
+        {
+           error("Bad argument 1 to %s: array must not be empty.\n", fname); 
+           /* NOTREACHED */
+        }
+    }
+
+    if (valuep->type == T_STRING)
+    {
+        result = valuep;
+
+        for (valuep++, left--; left > 0; valuep++, left--)
+        {
+            int cmp;
+
+            if (valuep->type != T_STRING)
+            {
+                if (gotArray)
+                    error("Bad argument to %s(): array[%d] is a '%s', "
+                          "expected 'string'.\n"
+                         , fname, (int)VEC_SIZE(argp->u.vec) - left + 1
+                         , typename(valuep->type));
+                else
+                    vefun_arg_error(num_arg - left + 1, T_STRING, valuep->type, sp);
+                /* NOTREACHED */
+            }
+            
+            cmp = mstrcmp(valuep->u.str, result->u.str);
+            if (bMax ? (cmp > 0) : (cmp < 0))
+                result = valuep;
+        }
+    }
+    else if (valuep->type == T_NUMBER || valuep->type == T_FLOAT)
+    {
+        result = valuep;
+
+        for (valuep++, left--; left > 0; valuep++, left--)
+        {
+            if (valuep->type != T_FLOAT && valuep->type != T_NUMBER)
+            {
+                if (gotArray)
+                    error("Bad argument to %s(): array[%d] is a '%s', "
+                          "expected 'int' or 'float'.\n"
+                         , fname, (int)VEC_SIZE(argp->u.vec) - left + 1
+                         , typename(valuep->type));
+                else
+                    vefun_exp_arg_error(num_arg - left + 1, TF_NUMBER|TF_FLOAT, valuep->type, sp);
+                /* NOTREACHED */
+            }
+
+            if (valuep->type == T_NUMBER && result->type == T_NUMBER)
+            {
+                if (bMax ? (valuep->u.number > result->u.number)
+                         : (valuep->u.number < result->u.number))
+                    result = valuep;
+            }
+            else
+            {
+                double v, r;
+
+                if (valuep->type == T_FLOAT)
+                    v = READ_DOUBLE(valuep);
+                else
+                    v = (double)(valuep->u.number);
+
+                if (result->type == T_FLOAT)
+                    r = READ_DOUBLE(result);
+                else
+                    r = (double)(result->u.number);
+
+                if (bMax ? (v > r)
+                         : (v < r))
+                    result = valuep;
+            }
+        } /* for (values) */
+    }
+    else
+    {
+        if (gotArray)
+            error("Bad argument to %s(): array[0] is a '%s', "
+                  "expected 'string', 'int' or 'float'.\n"
+                 , fname, typename(valuep->type));
+        else
+            vefun_exp_arg_error(1, TF_STRING|TF_NUMBER|TF_FLOAT, valuep->type, sp);
+        /* NOTREACHED */
+    }
+
+    /* Assign the result.
+     * We need to make a local copy, otherwise we might lose it in the pop.
+     */
+    {
+        svalue_t resvalue;
+
+        assign_svalue_no_free(&resvalue, result);
+        sp = pop_n_elems(num_arg, sp) + 1;
+        transfer_svalue_no_free(sp, &resvalue);
+    }
+
+    return sp;
+} /* x_min_max() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_max (svalue_t *sp, int num_arg)
+
+/* VEFUN max()
+ *
+ *   string    max (string arg, ...)
+ *   string    max (string * arg_array)
+ *
+ *   int|float max (int|float arg, ...)
+ *   int|float max (int|float * arg_array)
+ *
+ * Determine the maximum value of the <arg>uments and return it.
+ * If max() is called with an array (which must not be empty) as only
+ * argument, it returns the maximum value of the array contents.
+ */
+
+{
+    return x_min_max(sp, num_arg, MY_TRUE);
+} /* f_max() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_min (svalue_t *sp, int num_arg)
+
+/* VEFUN min()
+ *
+ *   string    min (string arg, ...)
+ *   string    min (string * arg_array)
+ *
+ *   int|float min (int|float arg, ...)
+ *   int|float min (int|float * arg_array)
+ *
+ * Determine the minimum value of the <arg>uments and return it.
+ * If min() is called with an array (which must not be empty) as only
+ * argument, it returns the minimum value of the array contents.
+ */
+
+{
+    return x_min_max(sp, num_arg, MY_FALSE);
+} /* f_min() */
 
 /*=========================================================================*/
 /*                              VALUES                                     */
@@ -5300,6 +5480,7 @@ f_debug_info (svalue_t *sp, int num_arg)
          */
 
         program_t *pg;
+        mp_int v0, v1, v2;
 
         if (num_arg != 2)
             error("bad number of arguments to debug_info\n");
@@ -5317,8 +5498,16 @@ f_debug_info (svalue_t *sp, int num_arg)
                   pg->num_function_names * sizeof(short)));
         add_message("num vars:    %3d (%4ld)\n", pg->num_variables
           , (long)(pg->num_variables * sizeof(variable_t)));
-        add_message("num strings: %3d (%4ld)\n", pg->num_strings
-          , (long)(pg->num_strings   * sizeof(string_t *)));
+
+        v1 = program_string_size(pg, &v0, &v2);
+        add_message("num strings: %3d (%4ld) : overhead %ld + data %ld (%ld)\n"
+                   , pg->num_strings
+                   , (long)(v0 + v1)
+                   , (long)v0
+                   , (long)v1
+                   , (long)v2
+                   );
+
         {
             int i = pg->num_inherited;
             int cnt = 0;
@@ -5334,8 +5523,9 @@ f_debug_info (svalue_t *sp, int num_arg)
         }
         add_message("total size      %6ld\n"
           ,pg->total_size);
-        add_message("data size       %6ld\n"
-          ,data_size(sp->u.ob));
+
+        v1 = data_size(sp->u.ob, &v2);
+        add_message("data size       %6ld (%6ld)\n", v1, v2);
         break;
       }
 
@@ -5496,7 +5686,7 @@ f_debug_info (svalue_t *sp, int num_arg)
             smalloc_dinfo_data(v->item);
 #endif
 #if defined(MALLOC_sysmalloc)
-            put_c_string(v->item+DID_MEM_NAME, "system malloc");
+            put_ref_string(v->item+DID_MEM_NAME, STR_SYSTEM_MALLOC);
 #endif
             put_array(&res, v);
             break;

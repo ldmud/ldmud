@@ -87,9 +87,11 @@ pid_t master_pid;
  * To avoid this, the spawning code employs a synchronisation scheme to
  * make sure that the child doesn't execute before the parent completed
  * initialisation.
- * As a fallback solution in case the synchronisation fails and the child
- * terminates prematurely, sig_child() stores the relevant data in these
- * globals for the main process to evaluate. The calling pattern (one ERQ
+ *
+ * For ERQ_FORKed children (which are not synchronized), and as a fallback
+ * solution in case the synchronisation fails and the child terminates
+ * prematurely, sig_child() stores the relevant data in these globals for
+ * the main process to evaluate. The calling pattern (one ERQ
  * command per select() round) guarantees that there can be only one such
  * 'unfinished' child control structure at a time.
  */
@@ -205,11 +207,14 @@ main(int argc, char *argv[])
 
             chp = chp->next;
 
-            /* If there is a pending SIG_CLD for this child, handle it */
+            /* If there is a pending SIG_CLD for this child, handle it.
+             * This is to be expected for CHILD_FORK children.
+             */
             if (pending_sig && this->pid == pending_pid)
             {
-                fprintf(stderr, "%s Pending SIG_CLD for pid %d delivered.\n"
-                              , time_stamp(), pending_pid);
+                if (this->type != CHILD_FORK)
+                    fprintf(stderr, "%s Pending SIG_CLD for pid %d delivered.\n"
+                                  , time_stamp(), pending_pid);
                 this->status = pending_status;
                 this->pid = pending_pid;
                 pending_sig = 0;
@@ -506,7 +511,8 @@ sig_child(int sig)
     if (!chp)
     {
         /* There is no valid child. Maybe we caught the signal before
-         * the child structure was complete?
+         * the child structure was complete (this can happen especially
+         * with short-lived CHILD_FORK sub processes).
          */
         if (pending_sig)
         {
@@ -514,8 +520,10 @@ sig_child(int sig)
                           , time_stamp(), pending_pid);
         }
 
+#ifdef DEBUG
         fprintf(stderr, "%s [sigchild] SIGCLD for unknown pid %d received.\n"
-                      , time_stamp(), pending_pid);
+                      , time_stamp(), pid);
+#endif
 
         pending_status = status;
         pending_pid = pid;

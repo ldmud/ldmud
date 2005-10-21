@@ -333,7 +333,7 @@ static work_area_t current
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
-static void lambda_error VARPROT((char *error_str, ...), printf, 1, 2) NORETURN;
+static void lambda_error VARPROT((const char *error_str, ...), printf, 1, 2) NORETURN;
 static void free_symbols(void);
 static Bool is_lvalue (svalue_t *argp, int index_lvalue);
 static void compile_lvalue(svalue_t *, int);
@@ -812,8 +812,7 @@ closure_literal (svalue_t *dest, int ix)
     if (!l)
     {
     	put_number(dest, 0);
-        error("Out of memory (%lu bytes) for closure literal"
-             , (unsigned long) sizeof(*l));
+        outofmem(sizeof(*l), "closure literal");
     	/* NOTREACHED */
     	return;
     }
@@ -929,7 +928,7 @@ realloc_code (void)
 
 /*-------------------------------------------------------------------------*/
 static void
-lambda_error(char *error_str, ...)
+lambda_error(const char *error_str, ...)
 
 /* Raise an error(error_str, ...) with 0 or 1 extra argument from within
  * the lambda compiler.
@@ -964,7 +963,7 @@ lambda_error(char *error_str, ...)
 
 /*-------------------------------------------------------------------------*/
 static void
-lambda_cerror (char *s)
+lambda_cerror (const char *s)
 
 /* Callback for store_case_labels: raise an error(s) from within the
  * lambda compiler.
@@ -978,7 +977,7 @@ lambda_cerror (char *s)
 
 /*-------------------------------------------------------------------------*/
 static void
-lambda_cerrorl ( char *s1, char *s2 UNUSED
+lambda_cerrorl ( const char *s1, const char *s2 UNUSED
                , int line1 UNUSED, int line2 UNUSED)
 
 /* Callback for store_case_labels(): Raise an error(s1) from within the lambda
@@ -4829,8 +4828,7 @@ symbol_efun (svalue_t *sp)
         if (!cstr)
         {
             inter_sp = sp;
-            error("Out of memory (%lu bytes) for identifier\n"
-                 , (unsigned long) len);
+            outofmem(len, "identifier");
         }
         memcpy(cstr, str, len);
         cstr[len] = '\0';
@@ -4841,8 +4839,7 @@ symbol_efun (svalue_t *sp)
         if ( !(p = make_shared_identifier(cstr, I_TYPE_GLOBAL, 0)) )
         {
             inter_sp = sp;
-            error("Out of memory (%lu bytes) for identifier\n"
-                 , (unsigned long) len);
+            outofmem(len, "identifier");
         }
 
         /* Loop through the possible multiple definitions.
@@ -5304,7 +5301,7 @@ f_symbol_function (svalue_t *sp)
         l = xalloc(sizeof *l);
         if (!l)
         {
-            error("Out of memory.\n");
+            outofmem(sizeof(*l), "function symbol");
             /* NOTREACHED */
             return sp;
         }
@@ -5483,8 +5480,7 @@ f_symbol_variable (svalue_t *sp)
     if (!l)
     {
         inter_sp = sp - 1;
-        error("Out of memory (%lu bytes) for variable symbol\n"
-             , (unsigned long) sizeof(*l));
+        outofmem(sizeof(*l), "variable symbol");
     }
     
     l->ob = ref_object(current_object, "symbol_variable");
@@ -5647,8 +5643,8 @@ store_case_labels( p_int total_length
                  , case_list_entry_t *zero
                  , bytecode_p (*get_space)(p_int)
                  , void (*move_instructions)(int, p_int)
-                 , void (*cerror)(char *)
-                 , void (*cerrorl) (char *, char *, int, int)
+                 , void (*cerror)(const char *)
+                 , void (*cerrorl)(const char *, const char *, int, int)
                  )
 
 /* This function creates the lookup tables for a switch instruction.

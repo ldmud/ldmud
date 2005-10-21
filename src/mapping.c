@@ -46,7 +46,7 @@
  *       p_int                     ref;
  *       struct hash_mapping      *hash;
  *       struct condensed_mapping *condensed;
- *       wiz_list_t          *user;
+ *       wiz_list_t               *user;
  *       int                       num_values;
  *   }
  *
@@ -69,7 +69,7 @@
  *       "svalue_t misc[ ... ];"
  *       p_int misc_size;
  *       p_int string_size;
- *       "char *string[ ... ];"
+ *       "string_t *string[ ... ];"
  *       "svalue_t s_values[ ... ];"
  *   }
  *
@@ -126,7 +126,7 @@
  *       p_int condensed_deleted;
  *       p_int ref;
  *       struct map_chain *deleted;
- *       mapping_t   *next_dirty;
+ *       mapping_t        *next_dirty;
  *       struct map_chain *chains[ 1 +.mask ];
  *   }
  *
@@ -198,9 +198,11 @@
 #include "gcollect.h"
 #include "interpret.h"
 #include "main.h"
+#include "mstrings.h"
 #include "object.h"
 #include "regexp.h"
 #include "simulate.h"
+#include "smalloc.h"
 #include "svalue.h"
 #include "wiz_list.h"
 #include "xalloc.h"
@@ -266,7 +268,7 @@ mapping_t *stale_mappings;
    */
 
 static svalue_t walk_mapping_string_svalue
-  = { T_OLD_STRING };
+  = { T_STRING };
   /* Stand-in svalue for string-keys, to be passed to the callback
    * function when doing a walk_mapping().
    */
@@ -401,8 +403,8 @@ _free_mapping (mapping_t *m)
 {
     struct hash_mapping *hm;       /* Hashed part of <m> */
     struct condensed_mapping *cm;  /* Condensed part of <m> */
-    char **str;                    /* First/next string key in <cm> */
-    svalue_t *svp;            /* Last+1 misc key in <cm> */
+    string_t **str;                /* First/next string key in <cm> */
+    svalue_t *svp;                 /* Last+1 misc key in <cm> */
     int num_values;                /* Number of values in <m> */
     int i, j;
 
@@ -429,7 +431,7 @@ _free_mapping (mapping_t *m)
     while ( (i -= sizeof *str) >= 0)
     {
         if ( !((p_int)*str & 1) )
-            free_string(*str);
+            free_mstring(*str);
         str++;
     }
 
@@ -561,11 +563,11 @@ free_empty_mapping (mapping_t *m)
     m->user->mapping_total -=   sizeof *m + sizeof(char *) + sizeof *cm
                               + sizeof(char *)
                               +   (   cm->string_size
-                                   * (sizeof(svalue_t)/sizeof(char*))
+                                   * (sizeof(svalue_t)/sizeof(string_t*))
                                    + cm->misc_size)
                                 * (1 + num_values)
                               -    cm->string_size
-                                * (sizeof(svalue_t)/sizeof(char*) - 1)
+                                * (sizeof(svalue_t)/sizeof(string_t*) - 1)
                             ;
 
     /* free the condensed mapping part */
@@ -826,26 +828,20 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
     {
     /* ----- String Indexing ----- */
 
-    case T_OLD_STRING:
+    case T_STRING:
       {
-        char *str;
-        char *key; /* means a char **, but pointer arithmetic wants char * */
+        string_t *str;
+        char *key; /* means a string_t **, but pointer arithmetic wants char * */
         char *keystart, *keyend;
 
         /* We need a shared string for the search */
 
-        if (map_index->x.string_type != STRING_SHARED)
+        if (!mstr_tabled(map_index->u.str))
         {
-            char *tmpstr;
-
-            tmpstr = make_shared_string(map_index->u.string);
-            if (map_index->x.string_type == STRING_MALLOC)
-                xfree(map_index->u.string);
-            map_index->x.string_type = STRING_SHARED;
-            map_index->u.string = tmpstr;
+            map_index->u.str = make_tabled(map_index->u.str);
         }
 
-        str = map_index->u.string;
+        str = map_index->u.str;
         keystart = (char *)CM_STRING(cm);
         size = cm->string_size;
         if (size)
@@ -875,12 +871,12 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
             if ( (offset = (offset+1) >> 1) >= (p_int)sizeof str)
                 do {
                     if (key + offset >= keyend) continue;
-                    if ( str >= *(char **)(key+offset) ) key += offset;
+                    if ( str >= *(string_t **)(key+offset) ) key += offset;
                 } while ( (offset >>= 1) >= (p_int)sizeof str);
 
             /* If the correct string key was found, return the values */
 
-            if ( str == *(char **)key )
+            if ( str == *(string_t **)key )
             {
 #ifndef FAST_MULTIPLICATION
                 if (num_values == 1) /* speed up this case */
@@ -1288,7 +1284,7 @@ check_map_for_destr (mapping_t *m)
                 hm = (struct hash_mapping *)xalloc(sizeof *hm);
                 if (!hm)
                 {
-                    error("Out of memory\n");
+                    outofmem(sizeof *hm, "hash mapping");
                     /* NOTREACHED */
                     return;
                 }
@@ -1329,7 +1325,7 @@ check_map_for_destr (mapping_t *m)
 
     svp = (svalue_t *)( (char *)CM_STRING(cm) + cm->string_size );
 
-    for (i = cm->string_size * num_values; (i -= sizeof(char *)) >= 0; svp++)
+    for (i = cm->string_size * num_values; (i -= sizeof(string_t *)) >= 0; svp++)
     {
         if (destructed_object_ref(svp))
         {
@@ -1409,7 +1405,7 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
  *
  * Sideeffect: if <map_index> is an unshared string, it is made shared.
  *
- * TODO: This function could be combined with _get_map_lvalue().
+ * TODO: The lookup in this function could be combined with _get_map_lvalue().
  */
 
 {
@@ -1426,29 +1422,26 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
     {
     /* ----- String Indexing ----- */
 
-    case T_OLD_STRING:
+    case T_STRING:
       {
-        char *str;
-        char *key; /* means a char **, but pointer arithmetic wants char * */
+        string_t *str;
+        char *key; /* means a string_t **, but pointer arithmetic wants char * */
         char *keystart, *keyend;
 
         /* We need a shared string for the search */
 
-        if (map_index->x.string_type != STRING_SHARED)
+        if (!mstr_tabled(map_index->u.str))
         {
-            char *tmpstr;
+            string_t * tmpstr;
 
-            tmpstr = findstring(map_index->u.string);
-            if (!tmpstr) {
+            tmpstr = find_tabled(map_index->u.str);
+            if (!tmpstr)
                 return;
-            }
-            if (map_index->x.string_type == STRING_MALLOC)
-                xfree(map_index->u.string);
-            map_index->x.string_type = STRING_SHARED;
-            map_index->u.string = ref_string(tmpstr);
+            free_mstring(map_index->u.str);
+            map_index->u.str = ref_mstring(tmpstr);
         }
 
-        str = map_index->u.string;
+        str = map_index->u.str;
         keystart = (char *)CM_STRING(cm);
         size = cm->string_size;
         if (size) {
@@ -1476,19 +1469,19 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
             if ( (offset = (offset+1) >> 1) >= (p_int)sizeof str)
                 do {
                     if (key + offset >= keyend) continue;
-                    if ( str >= *(char **)(key+offset) ) key += offset;
+                    if ( str >= *(string_t **)(key+offset) ) key += offset;
                 } while ( (offset >>= 1) >= (p_int)sizeof str);
 
 
             /* If the correct string key was found, remove the entry */
 
-            if ( str == *(char **)key )
+            if ( str == *(string_t **)key )
             {
                 int i;
 
                 /* Deallocate the string and mark the pointer as 'invalid'
                  */
-                free_string(str);
+                free_mstring(str);
                 (*(char **)key)++;
 
                 /* Zero out all associated values */
@@ -1633,7 +1626,7 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
                         hm = (struct hash_mapping *)xalloc(sizeof *hm);
                         if (!hm)
                         {
-                            error("Out of memory\n");
+                            outofmem(sizeof *hm, "hash mapping");
                             /* NOTREACHED */
                             return;
                         }
@@ -1747,7 +1740,7 @@ copy_mapping (mapping_t *m)
     mp_int num_values = m->num_values;
     mp_int size;
     mp_int i;
-    char **str, **str2;
+    string_t **str, **str2;
     svalue_t *svp, *svp2;
 
     /* --- Copy the hash part, if existent ---
@@ -1765,7 +1758,7 @@ copy_mapping (mapping_t *m)
           xalloc(sizeof *hm - sizeof *mcp + sizeof *mcp * size);
         if (!hm2)
         {
-            error("Out of memory.\n");
+            outofmem(sizeof *hm - sizeof *mcp + sizeof *mcp * size, "hash structure");
             /* NOTREACHED */
             return NULL;
         }
@@ -1791,7 +1784,7 @@ copy_mapping (mapping_t *m)
                 mc2 = (struct map_chain *)xalloc((size_t)linksize);
                 if (!mc2)
                 {
-                    error("Out of memory.\n");
+                    outofmem(linksize, "hash link");
                     /* NOTREACHED */
                     return NULL;
                 }
@@ -1826,15 +1819,15 @@ copy_mapping (mapping_t *m)
       ) - SMALLOC_OVERHEAD) * sizeof (p_int));
 #else
     size = sizeof *cm2 +
-      (cm->string_size  * (sizeof *svp/sizeof(char *)) + cm->misc_size) *
+      (cm->string_size  * (sizeof *svp/sizeof(string_t *)) + cm->misc_size) *
         (1 + num_values) -
-      cm->string_size * (sizeof *svp/sizeof(char *) - 1);
+      cm->string_size * (sizeof *svp/sizeof(string_t *) - 1);
 #endif
     cm2 = (struct condensed_mapping *)
       ( (char *)xalloc((size_t)size) + cm->misc_size * (1 + num_values) );
     if (!cm2)
     {
-        error("Out of memory.\n");
+        outofmem(size, "condensed mapping");
         /* NOTREACHED */
         return NULL;
     }
@@ -1853,7 +1846,7 @@ copy_mapping (mapping_t *m)
     {
         *str2 = *str;
         if ( !((p_int)*str & 1) )
-            ref_string(*str);
+            (void)ref_mstring(*str);
     }
 
 
@@ -1923,7 +1916,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
     mp_int ign_width;     /* == max(0, num_values - new_width) */
     mp_int size;
     mp_int i;
-    char **str, **str2;
+    string_t **str, **str2;
     svalue_t *svp, *svp2;
 
     /* Set the width variables */
@@ -1956,7 +1949,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
           xalloc(sizeof *hm - sizeof *mcp + sizeof *mcp * size);
         if (!hm2)
         {
-            error("Out of memory.\n");
+            outofmem(sizeof *hm - sizeof *mcp + sizeof *mcp * size, "hash structure");
             /* NOTREACHED */
             return NULL;
         }
@@ -1982,7 +1975,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
                 mc2 = (struct map_chain *)xalloc((size_t)linksize);
                 if (!mc2)
                 {
-                    error("Out of memory.\n");
+                    outofmem(linksize, "hash link");
                     /* NOTREACHED */
                     return NULL;
                 }
@@ -2017,16 +2010,16 @@ resize_mapping (mapping_t *m, mp_int new_width)
      * to hold all values, and let cm2 point to it.
      */
     size = (mp_int)(sizeof *cm2
-           +   (  cm->string_size  * (sizeof *svp/sizeof(char *))
+           +   (  cm->string_size  * (sizeof *svp/sizeof(string_t *))
                 + cm->misc_size)
              * (1 + new_width)
-           - cm->string_size * (sizeof *svp/sizeof(char *) - 1));
+           - cm->string_size * (sizeof *svp/sizeof(string_t *) - 1));
     cm2 = (struct condensed_mapping *)
       ( (char *)xalloc((size_t)size) + cm->misc_size * (1 + new_width) );
 
     if (!cm2)
     {
-        error("Out of memory.\n");
+        outofmem(size, "condensed mapping");
         /* NOTREACHED */
         return NULL;
     }
@@ -2045,7 +2038,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
     {
         *str2 = *str;
         if ( !((p_int)*str & 1) )
-            ref_string(*str);
+            (void)ref_mstring(*str);
     }
 
 
@@ -2162,7 +2155,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
     struct hash_mapping *hm;
     svalue_t *svp1, *svp2, *svp3;
     svalue_t *data1, *data2, *data3;
-    char **str1, **str2, **str3;
+    string_t **str1, **str2, **str3;
     mp_int size, size1, size2;
     mp_int i;
     mp_int u_d;
@@ -2271,7 +2264,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
         /* Don't forget the refcount */
 
         if ( !((p_int)*str3 & 1) )
-            ref_string(*str3);
+            (void)ref_mstring(*str3);
     }
 
     /* If there is data left uncopied in cm1, copy it now. */
@@ -2284,7 +2277,7 @@ add_mapping (mapping_t *m1, mapping_t *m2)
     for (;(size1 -= sizeof *str1) >= 0;)
     {
         if ( !( (p_int)(*str3 = *str1++) & 1) )
-            ref_string(*str3);
+            (void)ref_mstring(*str3);
         str3++;
         for (i = num_values; --i >= 0; )
             assign_svalue_no_free(data3++, data1++);
@@ -2455,14 +2448,11 @@ walk_mapping ( mapping_t *m
  */
 
 {
-    char **str;
+    string_t **str;
     svalue_t *svp, *data;
     mp_int size;
     mp_int num_values;
     struct hash_mapping *hm;
-
-    walk_mapping_string_svalue.x.string_type = STRING_SHARED;
-      /* Needed only the first time, but who cares */
 
     num_values = m->num_values;
 
@@ -2472,9 +2462,9 @@ walk_mapping ( mapping_t *m
     str = CM_STRING(m->condensed);
     size = m->condensed->string_size;
     data = (svalue_t *)((char *)str + size);
-    while ( (size -= sizeof(char *)) >= 0)
+    while ( (size -= sizeof(string_t *)) >= 0)
     {
-        if ( !( (p_int)(walk_mapping_string_svalue.u.string = *str++) & 1 ) )
+        if ( !( (p_int)(walk_mapping_string_svalue.u.str = *str++) & 1 ) )
             (*func)(&walk_mapping_string_svalue, data, extra);
         data += num_values;
     }
@@ -2666,7 +2656,7 @@ compact_mappings (mp_int num)
             {
                 next = mcp->next;
 
-                if (mcp->key.type != T_OLD_STRING)
+                if (mcp->key.type != T_STRING)
                 {
                     if (last_misc)
                     {
@@ -2700,7 +2690,7 @@ compact_mappings (mp_int num)
                 {
                     if (last_string)
                     {
-                        if (last_string->key.u.string > mcp->key.u.string)
+                        if (last_string->key.u.str > mcp->key.u.str)
                         {
                             last_string->next = string_hook1;
                             mcp->next = last_string;
@@ -2787,8 +2777,8 @@ compact_mappings (mp_int num)
                 /* Sort the next runlength elements onto out1 */
                 while (1)
                 {
-                    if (string_hook2->key.u.string <
-                        string_hook1->key.u.string)
+                    if (string_hook2->key.u.str <
+                        string_hook1->key.u.str)
                     {
                         *out1 = string_hook2;
                         out1 = &string_hook2->next;
@@ -2962,7 +2952,7 @@ compact_mappings (mp_int num)
             char *cm1_end, *cm2_end;
               /* End of string-keyed value areas in cm resp. cm2 */
 
-            char **str1, **str2;
+            string_t **str1, **str2;
             svalue_t *key1, *key2;
             svalue_t *data1, *data2;
               /* Auxiliaries */
@@ -2989,7 +2979,7 @@ compact_mappings (mp_int num)
             /* Compute the total number of entries */
 
             string_total = (mp_int)
-                           (string_used + cm->string_size/sizeof(char *) -
+                           (string_used + cm->string_size/sizeof(string_t *) -
                         (hm->condensed_deleted - misc_deleted));
             misc_total = (mp_int)
                          (misc_used + cm->misc_size/sizeof(svalue_t) -
@@ -3005,7 +2995,7 @@ compact_mappings (mp_int num)
             cm2 = (struct condensed_mapping *)
                    (condensed_start +
                     misc_total * (num_values+1) * sizeof(svalue_t) );
-            cm2->string_size = (p_int)(string_total * sizeof(char*));
+            cm2->string_size = (p_int)(string_total * sizeof(string_t*));
             cm2->misc_size = (p_int)(misc_total * sizeof(svalue_t));
 
 
@@ -3040,7 +3030,7 @@ compact_mappings (mp_int num)
             {
                 while (1)
                 {
-                    if (string_hook1->key.u.string < *str1)
+                    if (string_hook1->key.u.str < *str1)
                     {
                         /* Take entry from string_hook1 */
 
@@ -3049,7 +3039,7 @@ compact_mappings (mp_int num)
                         int i;
 
                         temp = string_hook1;
-                        *str2++ = temp->key.u.string;
+                        *str2++ = temp->key.u.str;
                         data = temp->data;
                         i = num_values;
                         while (--i >= 0)
@@ -3143,7 +3133,7 @@ compact_mappings (mp_int num)
                     int i;
 
                     temp = string_hook1;
-                    *str2++ = temp->key.u.string;
+                    *str2++ = temp->key.u.str;
                     data = temp->data;
                     i = num_values;
                     while (--i >= 0) {
@@ -3436,9 +3426,9 @@ set_mapping_user (mapping_t *m, object_t *owner)
      */
     total = (mp_int)(
       sizeof *m + sizeof(char *) + sizeof *cm + sizeof(char *) +
-        ( cm->string_size * (sizeof(svalue_t)/sizeof(char*)) +
+        ( cm->string_size * (sizeof(svalue_t)/sizeof(string_t*)) +
           cm->misc_size) * (1 + num_values) -
-        cm->string_size * (sizeof(svalue_t)/sizeof(char *) - 1));
+        cm->string_size * (sizeof(svalue_t)/sizeof(string_t *) - 1));
     m->user->mapping_total -= total;
     user = owner->user;
     m->user = user;
@@ -3501,7 +3491,7 @@ count_ref_in_mapping (mapping_t *m)
  */
 
 {
-    char **str;
+    string_t **str;
     svalue_t *svp, *data;
     mp_int size;
     mp_int num_values;
@@ -3514,7 +3504,7 @@ count_ref_in_mapping (mapping_t *m)
 
     str = CM_STRING(m->condensed);
     size = m->condensed->string_size;
-    while ( (size -= sizeof(char *)) >= 0)
+    while ( (size -= sizeof(string_t *)) >= 0)
     {
         count_ref_from_string(*str++);
     }
@@ -3652,7 +3642,7 @@ clean_stale_mappings (void)
         deleted_size = (mp_int)(num_deleted * sizeof(svalue_t) * (num_values + 1));
         preserved_size = (mp_int)(sizeof(*cm2) +
           cm->string_size *
-          (1 + (sizeof(svalue_t)/sizeof(char *)) * num_values));
+          (1 + (sizeof(svalue_t)/sizeof(string_t *)) * num_values));
         m->user->mapping_total -= deleted_size;
 
         /* Allocate the new condensed part and initialise it */
@@ -3660,7 +3650,8 @@ clean_stale_mappings (void)
         cm2_start = xalloc((size_t)(data_size + size - deleted_size + preserved_size));
         if (!cm2_start)
         {
-            fatal("Out of memory.\n");
+            fatal("Out of memory (%lu bytes) for condensed mapping.\n"
+                 , (unsigned long)(data_size + size - deleted_size + preserved_size));
             /* NOTREACHED */
             continue;
         }
@@ -4129,7 +4120,7 @@ walk_mapping_prologue (mapping_t *m, svalue_t *sp, callback_t *cb)
     svalue_t *write_pointer, *read_pointer;
     mp_int i;
 
-    i = (mp_int)(m->condensed->string_size/sizeof(char *) +
+    i = (mp_int)(m->condensed->string_size/sizeof(string_t *) +
         m->condensed->misc_size/sizeof(svalue_t));
     if ( NULL != (hm = m->hash) ) {
         i += hm->used - hm->condensed_deleted;

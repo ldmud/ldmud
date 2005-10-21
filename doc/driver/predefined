@@ -7,6 +7,7 @@ DESCRIPTION
     options and parser invocation options:
 
       LPC3            : always defined.
+      __LDMUD__       : always defined.
       __EUIDS__       : always (for compatibility).
       COMPAT_FLAG     : defined if the driver runs in compat mode.
       __COMPAT_MODE__ : ditto
@@ -58,7 +59,7 @@ HISTORY
     3.2.6 added __MAX_EVAL_COST__.
     3.2.7 added __STRICT_EUIDS__ and made __EUIDS__ standard.
     3.2.8 added __IPV6__, __LPC_NOSAVE__, __DIR__, __PATH__().
-    3.2.9 added __MYSQL__, __VERSION_MAJOR__, __VERSION_MINOR__, 
+    3.2.9 added __LDMUD__, __MYSQL__, __VERSION_MAJOR__, __VERSION_MINOR__, 
         __VERSION_MICRO__ and __VERSION_PATCH__.
 
 SEE ALSO

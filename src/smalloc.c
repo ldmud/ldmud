@@ -19,7 +19,13 @@
  *
  * Small blocks are allocations of up to SMALL_BLOCK_MAX*4 Bytes, currently
  * 128 Bytes. Such blocks are initially allocated from large memory blocks,
- * called "small chunks", of 16 or 32 KByte size. When a small block is
+ * called "small chunks", of 16 or 32 KByte size.
+#ifdef MIN_SMALL_MALLOCED
+ * To reduce fragmentation, the initial small chunk is of size
+ * MIN_SMALL_MALLOCED, hopefully chosen to be a large multiple of the typical
+ * small chunk size.
+#endif
+ * When a small block is
  * freed, it is entered in a free list for blocks of its size, so that
  * later allocations can use the pre-allocated blocks in the free lists.
  * The free lists use the first word in the "user area" for their link
@@ -116,6 +122,8 @@
 #include "gcollect.h"
 #include "interpret.h"
 #include "main.h"
+#include "mstrings.h"
+#include "stdstrings.h"
 #include "simulate.h"
 #include "svalue.h"
 
@@ -323,20 +331,12 @@ static word_t samagic[]
 
 #ifdef DEBUG_SMALLOC_ALLOCS
 #    define ulog(s) \
-       write(gcollect_outfd, time_stamp(), strlen(time_stamp())), \
-       write(gcollect_outfd, " ", 1), \
        write(gcollect_outfd, s, strlen(s))
 #    define ulog1f(s,t) \
-       write(gcollect_outfd, time_stamp(), strlen(time_stamp())), \
-       write(gcollect_outfd, " ", 1), \
        dprintf1(gcollect_outfd, s, (p_int)(t))
 #    define ulog2f(s,t1,t2) \
-       write(gcollect_outfd, time_stamp(), strlen(time_stamp())), \
-       write(gcollect_outfd, " ", 1), \
        dprintf2(gcollect_outfd, s, (p_int)(t1), (p_int)(t2))
 #    define ulog3f(s,t1,t2,t3) \
-       write(gcollect_outfd, time_stamp(), strlen(time_stamp())), \
-       write(gcollect_outfd, " ", 1), \
        dprintf3(gcollect_outfd, s, (p_int)(t1), (p_int)(t2), (p_int)(t3))
 #else
 #    define ulog(s)             (void)0
@@ -357,6 +357,22 @@ static size_t smalloc_size;
    */
 
 /* --- Small Block variables --- */
+
+#ifdef MIN_SMALL_MALLOCED
+
+static word_t small_chunk_size = MIN_SMALL_MALLOCED;
+  /* The size of a small chunk. Usually SMALL_CHUNK_SIZE, the first
+   * small chunk of all can be allocated of MIN_SMALL_MALLOCED size;
+   * the allocator will then reset the value to SMALL_CHUNK_SIZE.
+   */
+
+#else
+
+#define small_chunk_size SMALL_CHUNK_SIZE
+
+  /* The allocation size of all small chunks. */
+
+#endif
 
 static word_t *last_small_chunk = NULL;
   /* Pointer the most recently allocated small chunk.
@@ -683,7 +699,7 @@ smalloc (size_t size
          */
         {
             word_t *prev, *this;
-            word_t wsize = size / SINT;
+            word_t wsize = size / SINT; /* size incl overhead in words */
 
             for (prev = NULL, this = sfltable[SMALL_BLOCK_MAX]
                 ; this; prev = this, this = *s_next_ptr(this))
@@ -763,13 +779,13 @@ smalloc (size_t size
             wsize = size / SINT; /* size incl. overhead in words */
 
             /* Remove the block from the free list */
-            pt = SIZE_PNT_INDEX(sfltable, size);
+            pt = sfltable[ix];
             count_back(small_free_stat, size);
-            SIZE_PNT_INDEX(sfltable, size) = *(word_t**) (pt+OVERHEAD);
+            sfltable[ix] = *(word_t**) (pt+OVERHEAD);
 
             /* Split off the unused part as new block */
-            split = pt + OVERHEAD + wsize;
-            usize = ix - wsize;
+            split = pt + wsize;
+            usize = ix + OVERHEAD + 1 - wsize;
             MAKE_SMALL_FREE(split, usize * SINT);
 
             /* Initialize the header of the new block */
@@ -858,7 +874,7 @@ smalloc (size_t size
         }
 
         /* Get a new small chunk; if possible, from fresh memory */
-        next_unused = (word_t*)large_malloc(SMALL_CHUNK_SIZE + sizeof(word_t*)
+        next_unused = (word_t*)large_malloc(small_chunk_size + sizeof(word_t*)
                                            , MY_TRUE);
         if (next_unused == NULL)
             return NULL;
@@ -868,9 +884,14 @@ smalloc (size_t size
         last_small_chunk = next_unused++;
         *(next_unused) = 0; /* Sentinel in chunk */
 
-        count_up(small_chunk_stat, SMALL_CHUNK_SIZE+SINT*OVERHEAD+sizeof(word_t*));
+        count_up(small_chunk_stat, small_chunk_size+SINT*OVERHEAD+sizeof(word_t*));
         count_up(small_chunk_wasted, SINT*OVERHEAD+sizeof(word_t*));
-        unused_size = SMALL_CHUNK_SIZE;
+        unused_size = small_chunk_size;
+
+#ifdef MIN_SMALL_MALLOCED
+        small_chunk_size = SMALL_CHUNK_SIZE;
+#endif
+
     }
     else
     {
@@ -1881,7 +1902,7 @@ retry:
         word_t tempsize;
 
         ptr += OVERHEAD;
-        minsplit = size + SMALL_BLOCK_MAX + OVERHEAD;
+        minsplit = size + SMALL_BLOCK_MAX + OVERHEAD + 1;
           /* The split-off block must still count as 'large' */
         q = free_tree;
         for ( ; ; ) {
@@ -2225,8 +2246,8 @@ found_fit:
 #ifdef DEBUG
         if (real_size - size <= SMALL_BLOCK_MAX + OVERHEAD)
         {
-            dprintf3(2,"%s DEBUG: lmalloc(%d / %d): "
-                      , (p_int)time_stamp(), orig_size, size * SINT);
+            dprintf2(2,"DEBUG: lmalloc(%d / %d): "
+                      , orig_size, size * SINT);
             dprintf2(2
                     , "Split off block of %d bytes, small limit is %d bytes.\n"
                     , (p_int)(real_size - size) * SINT
@@ -2234,9 +2255,9 @@ found_fit:
 #ifdef DEBUG_SMALLOC_ALLOCS
             if (gcollect_outfd != 2)
             {
-                dprintf3(gcollect_outfd
-                        ,"%s DEBUG: lmalloc(%d / %d): "
-                        , (p_int)time_stamp(), orig_size, size * SINT);
+                dprintf2(gcollect_outfd
+                        ,"DEBUG: lmalloc(%d / %d): "
+                        , orig_size, size * SINT);
                 dprintf2(gcollect_outfd
                         , "Split off block of %d bytes, small limit is %d bytes.\n"
                         , (p_int)(real_size - size) * SINT
@@ -2833,7 +2854,7 @@ smalloc_dinfo_data (svalue_t *svp)
  */
 
 {
-    put_volatile_string(svp+DID_MEM_NAME, "smalloc");
+    put_ref_string(svp+DID_MEM_NAME, STR_SMALLOC);
 
     svp[DID_MEM_SBRK].u.number       = sbrk_stat.counter;
     svp[DID_MEM_SBKR_SIZE].u.number  = sbrk_stat.size;
@@ -2890,7 +2911,7 @@ get_block_size (POINTER ptr)
 #if OVERHEAD != 1
         size = (*(q + 1 - OVERHEAD) & MASK)*SINT;
 #else
-        size = (old_size & MASK)*SINT;
+        size = (size & MASK)*SINT;
 #endif /* OVERHEAD */
 #else /* MALLOC_ALIGN */
         q -= OVERHEAD;
@@ -3107,7 +3128,7 @@ write_lpc_trace (int d, word_t *p)
         if (!o)
             WRITES(d, "(not in list) ");
         else if (o->name)
-            WRITES(d, o->name); /* TODO: If this cores, it has to go again */
+            WRITES(d, get_txt(o->name)); /* TODO: If this cores, it has to go again */
     }
     else
         WRITES(d, "No object.");
@@ -3134,10 +3155,10 @@ write_lpc_trace (int d, word_t *p)
 
         if (o)
         {
-            char *file;
+            string_t *file;
 
             line = get_line_number(pc, prog, &file);
-            dprintf2(d, "%s line:%d\n", (p_int)file, line);
+            dprintf2(d, "%s line:%d\n", (p_int)get_txt(file), line);
         
             if (file)
                 free_mstring(file);
@@ -3605,7 +3626,6 @@ consolidate_freelists (void)
         for (block = chunk+1; block < end; block += *block & MASK)
         {
             word_t size = *block;
-            word_t remaining;
 
             if (!size) /* Reached the unused space */
             {

@@ -663,7 +663,7 @@ struct program_s
        */
     string_t **strings;
       /* Array [.num_strings] of the shared strings used by the program.
-       * Stored in reverse order at the end of the array the pointers
+       * Stored in reverse order at the end of the array are the pointers
        * to the names of all included files, used when retrieving line
        * numbers.
        */

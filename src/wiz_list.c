@@ -23,8 +23,7 @@
  *
  *   struct wiz_list_s {
  *      wiz_list_t *next;
- *      char *name;
- *      size_t length;
+ *      string_t *name;
  *      int32  score;
  *      int32  cost;
  *      int32  heart_beats;
@@ -33,14 +32,13 @@
  *      svalue_t extra;    
  *      int32  last_call_out;
  *      int32  call_out_cost;
- *      char *file_name;
- *      char *error_message;
+ *      string_t *file_name;
+ *      string_t *error_message;
  *      int32 line_number;
  *  };
  *
- * .name is the shared uid string of this wizlist entry, .length the
- * length of the string. .next is the pointer to the next entry in
- * the wizlist.
+ * .name is the tabled uid string of this wizlist entry.
+ * .next is the pointer to the next entry in the wizlist.
  *
  * .score, .cost, .heart_beats, .size_array and .mapping_total collect
  * statistics about the objects for this uid/wizard. .score is the
@@ -88,6 +86,8 @@
 #include "driver.h"
 #include "typedefs.h"
 
+#include "my-alloca.h"
+
 #include <stdio.h>
 
 #include "wiz_list.h"
@@ -99,6 +99,7 @@
 #include "interpret.h"
 #include "main.h"
 #include "mapping.h"
+#include "mstrings.h"
 #include "object.h"
 #include "simulate.h"
 #include "stdstrings.h"
@@ -111,7 +112,6 @@ wiz_list_t default_wizlist_entry
    */
   = { NULL          /* next */
     , NULL          /* name */
-    , 0             /* length */
     , 0             /* score */
     , 0             /* cost */
     , 0             /* heart_beats */
@@ -153,7 +153,7 @@ wiz_list_size (void)
 
 /*-------------------------------------------------------------------------*/
 static wiz_list_t *
-find_wiz (char *name)
+find_wiz (string_t *name)
 
 /* Find the entry for the user 'name' and return it's pointer.
  * Return NULL if it can't be found.
@@ -162,14 +162,16 @@ find_wiz (char *name)
 {
     wiz_list_t *wl;
 
-    if ( !( name = findstring(name) ) )
+    if ( !( name = find_tabled(name) ) )
         return NULL;
 
     for (wl = all_wiz; wl; wl = wl->next)
     {
-        if (wl->name == name)
+        int rc = mstrcmp(wl->name, name);
+
+        if (!rc)
             return wl;
-        if (wl->name > name)
+        if (rc > 0)
             break;
     }
     return NULL;
@@ -177,10 +179,11 @@ find_wiz (char *name)
 
 /*-------------------------------------------------------------------------*/
 wiz_list_t *
-add_name (char * str)
+add_name (string_t * str)
 
 /* Check if an entry for wizard <str> exists; add it, if it doesn't.
  * Return the pointer to the wiz_list entry.
+ * Must not change refcount of <str>.
  */
 
 {
@@ -194,11 +197,10 @@ add_name (char * str)
     number_of_wiz++;
     wl = xalloc(sizeof (wiz_list_t));
 
-    str = make_shared_string(str);
+    str = make_tabled_from(str);
 
     wl->next          = NULL;
     wl->name          = str;
-    wl->length        = strlen(str);
     wl->score         = 0;
     wl->cost          = 0;
     wl->heart_beats   = 0;
@@ -218,7 +220,7 @@ add_name (char * str)
 
     /* Find the insertion point and insert the new entry */
     for ( prev = NULL, this = all_wiz
-        ; this && this->name < str
+        ; this && mstrcmp(this->name, str) < 0
         ; prev = this, this = this->next
         )
     { NOOP; }
@@ -267,26 +269,23 @@ wiz_decay (void)
 } /* wiz_decay() */
 
 /*-------------------------------------------------------------------------*/
-char *
-get_wiz_name (char *file)
+static string_t *
+get_wiz_name (const char *file)
 
 /* For the filename <file> return the name of the wizard responsible
  * for it. This actual query is done with a master apply.
  *
- * Result is NULL or a pointer to a static buffer.
+ * Result is NULL or an uncounted string reference.
  */
 
 {
     svalue_t *ret;
-    static char buff[50];
 
-    push_volatile_string(inter_sp, file);
+    push_c_string(inter_sp, file);
     ret = apply_master_ob(STR_GET_WNAME, 1);
-    if (ret == 0 || ret->type != T_OLD_STRING)
+    if (ret == 0 || ret->type != T_STRING)
         return NULL;
-    xstrncpy(buff, ret->u.string, sizeof buff - 1);
-    buff[sizeof(buff)-1] = '\0';
-    return buff;
+    return ret->u.str;
 } /* get_wiz_name() */
 
 /*-------------------------------------------------------------------------*/
@@ -330,7 +329,11 @@ load_wiz_file (void)
         score = atoi(p);
         if (score > 0)
         {
-            add_name(buff)->score += score;
+            string_t * tmp;
+
+            tmp = new_mstring(buff);
+            add_name(tmp)->score += score;
+            free_mstring(tmp);
         }
     }
     fclose(f);
@@ -350,7 +353,7 @@ remove_wiz_list (void)
 
     for (w = all_wiz; w; w = wl)
     {
-        free_string(w->name);
+        free_mstring(w->name);
         wl = w->next;
         xfree(w);
     }
@@ -358,7 +361,7 @@ remove_wiz_list (void)
 
 /*-------------------------------------------------------------------------*/
 void
-save_error (char *msg, char *file, int line)
+save_error (const char *msg, const char *file, int line)
 
 /* A runtime error <msg> occured for object <file> in line number <line>.
  * Store this information in the wizlist so that the mudlib can handle
@@ -369,25 +372,22 @@ save_error (char *msg, char *file, int line)
 
 {
     wiz_list_t *wl;
-    char name[100];
     char *copy, *p;
+    string_t *name;
     size_t len;
 
-    /* Get the wizard name */
-    p = get_wiz_name(file);
-    if (!p)
+    /* Get the wizard name and the wizlist entry. */
+    name = get_wiz_name(file);
+    if (!name)
         return;
-    strcpy(name, p);
-
-    /* Get the wizlist entry */
     wl = add_name(name);
 
     /* Set the file_name */
     if (wl->file_name)
-        xfree(wl->file_name);
+        free_mstring(wl->file_name);
         
     len = strlen(file);
-    copy = xalloc(len + 4); /* May add .c plus the null byte, and / */
+    copy = alloca(len + 4); /* May add .c plus the null byte, and / */
     *copy = '/';
     strcpy(copy+1, file);
 
@@ -401,12 +401,12 @@ save_error (char *msg, char *file, int line)
         p[1] = 'c';
         p[2] = '\0';
     }
-    wl->file_name = copy;
+    wl->file_name = new_mstring(copy);
 
     /* Set the error_message */
     if (wl->error_message)
-        xfree(wl->error_message);
-    wl->error_message = string_copy(msg);
+        free_mstring(wl->error_message);
+    wl->error_message = new_mstring(msg);
 
     /* Set the line_number */
     wl->line_number = line;
@@ -445,7 +445,7 @@ f_wizlist_info (svalue_t *sp)
     svalue_t *wsvp, *svp;
     wiz_list_t *w;
 
-    if (!privilege_violation("wizlist_info", &const0, sp))
+    if (!privilege_violation(STR_WIZLIST_INFO, &const0, sp))
     {
         all = allocate_array(0);
     }
@@ -459,7 +459,7 @@ f_wizlist_info (svalue_t *sp)
             put_array(wsvp, entry);
             wsvp++;
             svp = entry->item;
-            put_ref_old_string(&(svp[WL_NAME]), w->name);
+            put_ref_string(&(svp[WL_NAME]), w->name);
             put_number(&(svp[WL_COMMANDS]), w->score);
             put_number(&(svp[WL_EVAL_COST]), w->cost);
             put_number(&(svp[WL_HEART_BEATS]), w->heart_beats);
@@ -513,7 +513,7 @@ f_set_extra_wizinfo (svalue_t *sp)
     {
         user = sp[-1].u.ob->user;
     }
-    else if (type != T_OLD_STRING || !(user = find_wiz(sp[-1].u.string)))
+    else if (type != T_STRING || !(user = find_wiz(sp[-1].u.str)))
     {
         if (type == T_NUMBER && sp[-1].u.number == 0)
             user = NULL;
@@ -521,7 +521,7 @@ f_set_extra_wizinfo (svalue_t *sp)
             efun_gen_arg_error(1, sp->type, sp);
     }
 
-    if (!privilege_violation("set_extra_wizinfo", sp-1, sp))
+    if (!privilege_violation(STR_SET_EXTRA_WIZINFO, sp-1, sp))
         free_svalue(sp);
     else
         transfer_svalue(user ? &user->extra : &default_wizlist_entry.extra, sp);
@@ -562,7 +562,7 @@ f_get_extra_wizinfo (svalue_t *sp)
     {
         user = sp->u.ob->user;
     }
-    else if (type != T_OLD_STRING || !(user = find_wiz(sp->u.string)))
+    else if (type != T_STRING || !(user = find_wiz(sp->u.str)))
     {
         if (type == T_NUMBER && sp->u.number == 0)
             user = NULL;
@@ -570,7 +570,7 @@ f_get_extra_wizinfo (svalue_t *sp)
             error("Bad arg 1 to get_extra_wizinfo(): no valid uid given.\n");
     }
 
-    if (!privilege_violation("get_extra_wizinfo", sp, sp))
+    if (!privilege_violation(STR_GET_EXTRA_WIZINFO, sp, sp))
         error("Error in get_extra_wizinfo(): privilege violation.\n");
 
     assign_svalue(sp, user ? &user->extra : &default_wizlist_entry.extra);
@@ -602,7 +602,7 @@ f_set_extra_wizinfo_size (svalue_t *sp)
  */
 
 {
-    if (!privilege_violation("set_extra_wizinfo_size", &const0, sp))
+    if (!privilege_violation(STR_SET_EXTRA_WIZINFO_SIZE, &const0, sp))
         wiz_info_extra_size = sp->u.number;
 
     sp--;
@@ -635,7 +635,7 @@ f_get_error_file (svalue_t *sp)
  */
 
 {
-    char *name;
+    string_t *name;
     int forget;
     wiz_list_t *wl;
     vector_t *vec;
@@ -643,7 +643,7 @@ f_get_error_file (svalue_t *sp)
 #   define FORGET_FLAG 0x4000000 /* 0x80...0 would be the sign! */
 
     /* Get the function arguments */
-    name = sp[-1].u.string;
+    name = sp[-1].u.str;
     forget = sp->u.number;
     wl = find_wiz(name);
     sp--;
@@ -659,9 +659,9 @@ f_get_error_file (svalue_t *sp)
 
     vec = allocate_array(4);
     v = vec->item;
-    put_malloced_string(v, string_copy(wl->file_name));
+    put_ref_string(v, wl->file_name);
     put_number(v+1, wl->line_number & ~0x40000000);
-    put_malloced_string(v+2, string_copy(wl->error_message));
+    put_ref_string(v+2, wl->error_message);
     put_number(v+3, (wl->line_number & 0x40000000) != 0);
 
     if (forget)
@@ -762,9 +762,9 @@ count_ref_from_wiz_list (void)
         count_ref_from_string(w->name);
         count_ref_in_vector(&w->extra, 1);
         if(w->file_name)
-            note_malloced_block_ref(w->file_name);
+            count_ref_from_string(w->file_name);
         if (w->error_message)
-            note_malloced_block_ref(w->error_message);
+            count_ref_from_string(w->error_message);
         note_malloced_block_ref((char *)w);
     }
     count_ref_in_vector(&default_wizlist_entry.extra, 1);

@@ -446,6 +446,8 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
  * void push_<type>(), void push_ref_<type>()
  *   As the put_() macros, but <sp> is incremented once first.
  *
+ * As a rule, all arguments must not have sideeffects!
+ *
  * The psh_ macros are not in use (yet) - they have been renamed from push_
  * so that the first use stands out.
  *
@@ -518,6 +520,9 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
     ( (sp)++, put_ref_string(sp,val) )
 #define push_string(sp,val) \
     ( (sp)++, put_string(sp,val) )
+#define push_c_string(sp,txt) \
+    ( (sp)++, put_c_string(sp, txt) )
+
 
 #define psh_callback(sp,val) \
     ( (sp)++, put_callback(sp,val) )

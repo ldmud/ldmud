@@ -72,12 +72,14 @@
 #include "instrs.h"
 #include "main.h"
 #include "mapping.h"
+#include "mstrings.h"
 #include "object.h"
 #include "ptrtable.h"
 #include "sent.h"
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
+#include "svalue.h"
 #include "swap.h"
 #include "xalloc.h"
 
@@ -257,6 +259,7 @@ struct fmt_state
     savechars  * saves;            /* Characters to restore */
     cst        * csts;             /* list of columns/tables to be done */
     svalue_t     clean;            /* holds a temporary string */
+    char       * tmp;              /* holds a temporary string buffer */
     char         buff[BUFF_SIZE];  /* Buffer for returned string. */
     size_t       bpos;             /* Position in buff. */
     ssize_t      sppos;
@@ -560,9 +563,9 @@ svalue_to_string ( fmt_state_t *st
         break;
       }
 
-    case T_OLD_STRING:
+    case T_STRING:
         stradd(st, &str, "\"");
-        stradd(st, &str, obj->u.string);
+        stradd(st, &str, get_txt(obj->u.str));
         stradd(st, &str, "\"");
         break;
 
@@ -663,12 +666,12 @@ svalue_to_string ( fmt_state_t *st
         }
         if (!compat_mode)
             stradd(st, &str, "/");
-        stradd(st, &str, obj->u.ob->name);
+        stradd(st, &str, get_txt(obj->u.ob->name));
         push_ref_object(inter_sp, obj->u.ob, "sprintf");
         temp = apply_master_ob(STR_PRINTF_OBJ_NAME, 1);
-        if (temp && (temp->type == T_OLD_STRING)) {
+        if (temp && (temp->type == T_STRING)) {
             stradd(st, &str, " (\"");
-            stradd(st, &str, temp->u.string);
+            stradd(st, &str, get_txt(temp->u.str));
             stradd(st, &str, "\")");
         }
         break;
@@ -679,7 +682,7 @@ svalue_to_string ( fmt_state_t *st
         do {
             stradd(st, &str, "\'");
         } while (--i);
-        stradd(st, &str, obj->u.string);
+        stradd(st, &str, get_txt(obj->u.str));
         break;
 
     case T_CLOSURE:
@@ -695,7 +698,7 @@ svalue_to_string ( fmt_state_t *st
             program_t *prog;
             int ix;
             funflag_t flags;
-            char *function_name;
+            string_t *function_name;
             object_t *ob;
 
             l = obj->u.lambda;
@@ -718,7 +721,7 @@ svalue_to_string ( fmt_state_t *st
             if (O_PROG_SWAPPED(ob))
                 load_ob_from_swap(ob);
             stradd(st, &str, "#'");
-            stradd(st, &str, ob->name);
+            stradd(st, &str, get_txt(ob->name));
             stradd(st, &str, "->");
             prog = ob->prog;
             flags = prog->functions[ix];
@@ -736,7 +739,7 @@ svalue_to_string ( fmt_state_t *st
                   , FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK))
                   , sizeof function_name
                   );
-            stradd(st, &str, function_name);
+            stradd(st, &str, get_txt(function_name));
             break;
           }
 
@@ -759,9 +762,9 @@ svalue_to_string ( fmt_state_t *st
             if (O_PROG_SWAPPED(l->ob))
                 load_ob_from_swap(l->ob);
             stradd(st, &str, "#'");
-            stradd(st, &str, l->ob->name);
+            stradd(st, &str, get_txt(l->ob->name));
             stradd(st, &str, "->");
-            stradd(st, &str, l->ob->prog->variable_names[l->function.index].name);
+            stradd(st, &str, get_txt(l->ob->prog->variable_names[l->function.index].name));
             break;
           }
 
@@ -851,7 +854,7 @@ svalue_to_string ( fmt_state_t *st
                 case CLOSURE_SIMUL_EFUN:
                   {
                     stradd(st, &str, "#'");
-                    stradd(st, &str, simul_efunp[type - CLOSURE_SIMUL_EFUN].name);
+                    stradd(st, &str, get_txt(simul_efunp[type - CLOSURE_SIMUL_EFUN].name));
                     break;
                   }
                 }
@@ -894,7 +897,7 @@ svalue_to_string ( fmt_state_t *st
                   if (ob->flags & O_DESTRUCTED)
                       stradd(st, &str, "{dest}");
                   stradd(st, &str, "/");
-                  stradd(st, &str, ob->name);
+                  stradd(st, &str, get_txt(ob->name));
                   stradd(st, &str, ">");
               }
               break;
@@ -908,7 +911,7 @@ svalue_to_string ( fmt_state_t *st
     {
         char buf[2];
 
-        buf[0] = *(obj->u.string);
+        buf[0] = *obj->u.charp;
         buf[1] = '\0';
         stradd(st, &str, "'");
         stradd(st, &str, buf);
@@ -931,7 +934,7 @@ svalue_to_string ( fmt_state_t *st
         if (obj->type == T_PROTECTED_STRING_RANGE_LVALUE)
             stradd(st, &str, "prot: ");
         stradd(st, &str, "\"");
-        stradd(st, &str, obj->u.string);
+        stradd(st, &str, get_txt(obj->u.str));
         stradd(st, &str, "\"");
         break;
     }
@@ -1230,7 +1233,8 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
     xallocate(st, sizeof *st, "sprintf() context");
 
     st->saves = NULL;
-    st->clean.u.string = NULL;
+    st->clean.u.str = NULL;
+    st->tmp = NULL;
     st->csts = NULL;
     st->ptable = NULL;
 
@@ -1254,8 +1258,10 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
         }
 
         /* Get rid of a temp string */
-        if (st->clean.u.string)
-            xfree(st->clean.u.string);
+        if (st->clean.u.str)
+            free_mstring(st->clean.u.str);
+        if (st->tmp)
+            xfree(st->tmp);
 
         /* Free column and table data */
         while ( NULL != (tcst = st->csts) )
@@ -1331,10 +1337,11 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
         if ((err_num & ERR_ID_NUMBER) != ERR_NOMEM)
         {
             int line;
-            char *file;
+            string_t *file;
 
+            file = NULL;
             line = get_line_number_if_any(&file);
-            sprintf(st->buff, "%s:%d: ", file, line);
+            sprintf(st->buff, "%s:%d: ", get_txt(file), line);
 
             if (file)
                 free_mstring(file);
@@ -1620,7 +1627,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                   {
                     /* never reached... */
                     fprintf(stderr, "%s: (s)printf: INFO_T_NULL.... found.\n"
-                                  , current_object->name);
+                                  , get_txt(current_object->name));
                     ADD_CHAR('%');
                     break;
                   }
@@ -1630,13 +1637,16 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                     sprintf_buffer_t *b;
 #                   define CLEANSIZ 0x200
 
-                    if (st->clean.u.string)
-                        xfree(st->clean.u.string);
+                    if (st->clean.u.str)
+                        free_mstring(st->clean.u.str);
+                    st->clean.u.str = NULL;
+                    if (st->tmp)
+                        xfree(st->tmp);
 
-                    put_malloced_string(&st->clean, xalloc(CLEANSIZ));
-                    if (!st->clean.u.string)
+                    st->tmp = xalloc(CLEANSIZ);
+                    if (!st->tmp)
                         ERROR(ERR_NOMEM);
-                    st->clean.u.string[0] = '\0';
+                    st->tmp[0] = '\0';
 
                     st->ptable = new_pointer_table();
                     if (!st->ptable)
@@ -1644,12 +1654,18 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                     st->pointer_id = 1;
 
                     b = (sprintf_buffer_t *)
-                        ( st->clean.u.string+CLEANSIZ-sizeof(sprintf_buffer_t) );
+                        ( st->tmp+CLEANSIZ-sizeof(sprintf_buffer_t) );
                     b->offset = -CLEANSIZ+(p_int)sizeof(sprintf_buffer_t);
                     b->size = CLEANSIZ;
-                    b->start = &st->clean.u.string;
+                    b->start = &st->tmp;
                     svalue_to_string(st, carg, b, 0, MY_FALSE);
-                    carg = &st->clean; /* passed to INFO_T_STRING */
+
+                    /* Store the created result in .clean and pass it
+                     * to case INFO_T_STRING is 'the' carg.
+                     */
+                    put_string(&st->clean, new_mstring(st->tmp));
+                    carg = &st->clean;
+
                     free_pointer_table(st->ptable);
                     st->ptable = NULL;
                     /* FALLTHROUGH */
@@ -1659,9 +1675,9 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                   {
                     int slen;
 
-                    if (carg->type != T_OLD_STRING)
+                    if (carg->type != T_STRING)
                         ERROR1(ERR_INCORRECT_ARG, 's');
-                    slen = strlen(carg->u.string);
+                    slen = strlen(get_txt(carg->u.str));
 
 
                     if (finfo & (INFO_COLS | INFO_TABLE) )
@@ -1686,7 +1702,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                             if (!*temp)
                                 ERROR(ERR_NOMEM);
                             (*temp)->next = NULL;
-                            (*temp)->d.col = carg->u.string;
+                            (*temp)->d.col = get_txt(carg->u.str);
                             (*temp)->pad = pad;
                             (*temp)->size = fs;
                             (*temp)->pres = (pres) ? pres : fs;
@@ -1707,7 +1723,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                             char c, *s, *start;
                             p_uint i;
 
-#                    define TABLE carg->u.string
+#                    define TABLE get_txt(carg->u.str)
 
                             /* Create the new table structure */
                             (*temp) = (cst *)xalloc(sizeof(cst));
@@ -1818,12 +1834,12 @@ add_table_now:
                         }
                         if (fs && fs > (unsigned int)slen)
                         {
-                            add_justified(st, carg->u.string, slen, pad, fs
-                                         , finfo);
+                            add_justified(st, get_txt(carg->u.str)
+                                         , slen, pad, fs, finfo);
                         }
                         else
                         {
-                            ADD_STRN(carg->u.string, slen)
+                            ADD_STRN(get_txt(carg->u.str), slen)
                         }
                     }
                     break;
@@ -1938,8 +1954,10 @@ add_table_now:
     }
 
     /* Free the temp string */
-    if (st->clean.u.string)
-        xfree(st->clean.u.string);
+    if (st->clean.u.str)
+        free_mstring(st->clean.u.str);
+    if (st->tmp)
+        xfree(st->tmp);
 
     /* Copy over the result */
     strcpy(buff, st->buff);
@@ -1968,10 +1986,10 @@ f_printf (svalue_t *sp, int num_arg)
 {
     char *str;
     
-    str = string_print_formatted((sp-num_arg+1)->u.string
+    str = string_print_formatted(get_txt((sp-num_arg+1)->u.str)
                                 , num_arg-1, sp-num_arg+2);
     if (command_giver)
-        tell_object(command_giver, str);
+        tell_object_str(command_giver, str);
     else
         add_message("%s", str);
     sp = pop_n_elems(num_arg, sp);
@@ -2003,7 +2021,7 @@ f_sprintf (svalue_t *sp, int num_arg)
      * be copied before it's returned as a string.
      */
 
-    s = string_print_formatted((sp-num_arg+1)->u.string,
+    s = string_print_formatted(get_txt((sp-num_arg+1)->u.str),
                                num_arg-1, sp-num_arg+2);
     sp = pop_n_elems(num_arg, sp);
     if (!s)
@@ -2012,7 +2030,7 @@ f_sprintf (svalue_t *sp, int num_arg)
         /* string_print_formatted() owns the string returned,
          * so copy it.
          */
-        push_malloced_string(sp, string_copy(s));
+        push_c_string(sp, s);
 
     return sp;
 } /* f_sprintf() */

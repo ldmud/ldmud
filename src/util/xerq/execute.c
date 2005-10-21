@@ -290,6 +290,7 @@ remove_child (child_t *chp)
 
     switch(chp->type)
     {
+    case CHILD_FORK:
     case CHILD_EXECUTE:
       {
         mesg[0] = ERQ_OK;
@@ -315,21 +316,26 @@ remove_child (child_t *chp)
       }
     }
 
-    if (WIFEXITED(chp->return_code))
+    /* Send an exit message for non-forked children */
+    if (chp->type != CHILD_FORK)
     {
-        mesg[1] = WEXITSTATUS(chp->return_code);
+        if (WIFEXITED(chp->return_code))
+        {
+            mesg[1] = WEXITSTATUS(chp->return_code);
+        }
+        else if (WIFSIGNALED(chp->return_code))
+        {
+            mesg[0] = ERQ_SIGNALED;
+            mesg[1] = WTERMSIG(chp->return_code);
+        }
+        else
+        {
+            mesg[0] = ERQ_E_UNKNOWN;
+        }
+        XPRINTF((stderr, "%s   Sending exit message.\n", time_stamp()));
+        reply1(chp->handle, mesg, 2);
     }
-    else if (WIFSIGNALED(chp->return_code))
-    {
-        mesg[0] = ERQ_SIGNALED;
-        mesg[1] = WTERMSIG(chp->return_code);
-    }
-    else
-    {
-        mesg[0] = ERQ_E_UNKNOWN;
-    }
-    XPRINTF((stderr, "%s   Sending exit message.\n", time_stamp()));
-    reply1(chp->handle, mesg, 2);
+
     free_child(chp);
 } /* remove_child() */
 
@@ -337,14 +343,21 @@ remove_child (child_t *chp)
 void
 erq_fork (char *mesg, int msglen)
 
-/* ERQ_FORK: fire-and-forget a command.
+/* ERQ_FORK: fire-and-(almost)forget a command.
  */
 
 {
     char status[2];
+    child_t *chp;
+    pid_t pid;
 
-    if (execute(&mesg[9], msglen-9, status, NULL, 0))
+    chp = new_child();
+    chp->type = CHILD_FORK;
+    chp->handle = 0;
+
+    if (0 != (pid = execute(&mesg[9], msglen-9, status, NULL, 0)))
     {
+        chp->pid = pid;
         status[0] = ERQ_OK;
     }
     reply1(get_handle(mesg), status, 2);

@@ -61,6 +61,7 @@
 #include "simul_efun.h"
 #include "stdstrings.h"
 #include "strfuns.h"
+#include "svalue.h"
 #include "xalloc.h"
 
 #include "../mudlib/sys/driver_hook.h"
@@ -720,6 +721,7 @@ init_lexer(void)
     /* Add the standard permanent macro definitions */
 
     add_permanent_define("LPC3", -1, string_copy(""), MY_FALSE);
+    add_permanent_define("__LDMUD__", -1, string_copy(""), MY_FALSE);
     if (compat_mode)
     {
         add_permanent_define("COMPAT_FLAG", -1, string_copy(""), MY_FALSE);
@@ -2316,9 +2318,8 @@ add_lex_string (char *str)
  */
 
 {
-    size_t len1, len2, len3;
+    size_t len1, len2;
     string_t *new;
-    char *tmp;
 
     len1 = mstrsize(last_lex_string);
     len2 = strlen(str);
@@ -3088,7 +3089,7 @@ yylex1 (void)
                              */
                             yyerrorf(
                               "No closure associated with reserved word '%s'",
-                              p->name
+                              get_txt(p->name)
                             );
                             code = CLOSURE_EFUN_OFFS;
                             break;
@@ -3169,15 +3170,15 @@ yylex1 (void)
                 {
                     svalue_t *res;
 
-                    push_volatile_string(inter_sp, "nomask simul_efun");
-                    push_volatile_string(inter_sp, current_file);
-                    push_ref_old_string(inter_sp, p->name);
+                    push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
+                    push_c_string(inter_sp, current_file);
+                    push_ref_string(inter_sp, p->name);
                     res = apply_master_ob(STR_PRIVILEGE, 3);
                     if (!res || res->type != T_NUMBER || res->u.number < 0)
                     {
                         yyerrorf(
                           "Privilege violation: nomask simul_efun %s",
-                          p->name
+                          get_txt(p->name)
                         );
                         efun_override = MY_FALSE;
                     }
@@ -3208,7 +3209,7 @@ yylex1 (void)
                             if (i >= CLOSURE_IDENTIFIER_OFFS)
                                 yyerrorf(
                                   "Too high function index of %s for #'",
-                                  p->name
+                                  get_txt(p->name)
                                 );
                             break;
                         }
@@ -3529,7 +3530,7 @@ yylex1 (void)
                             {
                                 p->inferior->next = p->next;
                                 *q = p->inferior;
-                                ref_mstring(p->name);
+                                (void)ref_mstring(p->name);
                             }
                             else
                             {
@@ -4802,7 +4803,7 @@ _expand_define (struct defn *p, ident_t * macro)
         /* Look for the argument list */
         SKIPW;
         if (c != '(') {
-            yyerrorf("Macro '%s': Missing '(' in call", macro->name);
+            yyerrorf("Macro '%s': Missing '(' in call", get_txt(macro->name));
             DEMUTEX;
             return MY_FALSE;
         }
@@ -4828,7 +4829,7 @@ _expand_define (struct defn *p, ident_t * macro)
             {
                 if (q >= expbuf + DEFMAX - 5)
                 {
-                    lexerrorf("Macro '%s': argument overflow", macro->name);
+                    lexerrorf("Macro '%s': argument overflow", get_txt(macro->name));
                     DEMUTEX;
                     return MY_FALSE;
                 }
@@ -5021,7 +5022,7 @@ _expand_define (struct defn *p, ident_t * macro)
         /* Proper number of arguments? */
         if (n != p->nargs)
         {
-            yyerrorf("Macro '%s': Wrong number of arguments", macro->name);
+            yyerrorf("Macro '%s': Wrong number of arguments", get_txt(macro->name));
             DEMUTEX;
             return MY_FALSE;
         }
@@ -5274,7 +5275,7 @@ cond_get_exp (int priority, svalue_t *svp)
                 if (c == '\n')
                 {
                     yyerror("unexpected end of string in #if");
-                    put_malloced_string(svp, string_copy(""));
+                    put_ref_string(svp, STR_EMPTY);
                     return 0;
                 }
                 if (c == '\\')
@@ -5290,7 +5291,7 @@ cond_get_exp (int priority, svalue_t *svp)
                 *q++ = (char)c;
             }
             *q = '\0';
-            put_malloced_string(svp, string_copy(outp));
+            put_c_string(svp, outp);
             outp = p;
         }
         else

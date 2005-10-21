@@ -50,17 +50,6 @@
     struct { vector_t v; svalue_t item[1]; } name \
       = { { VEC_HEAD(2), { { type1, { 0 } } } }, { { type2, { 0 } } } }
 
-#if !defined(MALLOC_TRACE)
-#    define ALLOC_VECTOR(nelem, file, line) \
-        (vector_t *)xalloc(sizeof (vector_t) + \
-                                sizeof(svalue_t) * (nelem - 1))
-#else
-#    define ALLOC_VECTOR(nelem, file, line) \
-        (vector_t *)xalloc_traced(sizeof (vector_t) + \
-                                sizeof(svalue_t) * (nelem - 1), file, line)
-#endif /* MALLOC_TRACE */
-
-
 /* --- Types --- */
 
 /* --- struct vector: the array datatype ---
@@ -85,7 +74,7 @@ struct vector_s {
 extern vector_t null_vector;
 
 extern int num_arrays;
-extern void (*allocate_array_error_handler) (char *, ...);
+extern void (*allocate_array_error_handler) (const char *, ...);
 
 /* --- Prototypes --- */
 
@@ -96,20 +85,18 @@ extern void (*allocate_array_error_handler) (char *, ...);
 #define allocate_uninit_array(n) (_allocate_array(n, __FILE__ "::allocate_uninit_array", __LINE__))
 #define implode_string(a,d) (arr_implode_string(a,d, __FILE__ "::implode_string", __LINE__))
 
-extern vector_t *_allocate_array(mp_int, char *, int);
-extern vector_t *_allocate_array_unlimited(mp_int, char *, int);
-extern vector_t *_allocate_uninit_array(mp_int, char *, int);
-
 #else
 
-#define implode_string(a,d) (arr_implode_string(a,d))
-
-extern vector_t *allocate_array(mp_int);
-extern vector_t *allocate_array_unlimited(mp_int);
-extern vector_t *allocate_uninit_array(mp_int);
+#define allocate_array(n)           _allocate_array(n)
+#define allocate_array_unlimited(n) _allocate_array_unlimited(n)
+#define allocate_uninit_array(n)    _allocate_array(n)
+#define implode_string(a,d)         arr_implode_string(a,d)
 
 #endif /* MALLOC_TRACE */
 
+extern vector_t *_allocate_array(mp_int MTRACE_DECL);
+extern vector_t *_allocate_array_unlimited(mp_int MTRACE_DECL);
+extern vector_t *_allocate_uninit_array(mp_int MTRACE_DECL);
 extern void _free_vector(vector_t *p);
 extern void free_empty_vector(vector_t *p);
 extern void check_for_destr(vector_t *v);

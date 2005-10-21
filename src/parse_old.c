@@ -105,6 +105,7 @@
 
 #include "typedefs.h"
 
+#include "my-alloca.h"
 #include <stdio.h>
 #include <ctype.h>
 #include <time.h>
@@ -117,6 +118,7 @@
 #include "interpret.h"
 #include "gcollect.h"
 #include "main.h"
+#include "mstrings.h"
 #include "object.h"
 #include "random.h"
 #include "simulate.h"
@@ -220,7 +222,7 @@ static svalue_t find_living_closures[2]
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-find_living_object (char *name, Bool player)
+find_living_object (const char *name, Bool player)
 
 /* Find the living (<player> is false) or player (<player> is true)
  * with the name <name>.
@@ -231,9 +233,15 @@ find_living_object (char *name, Bool player)
  */
 
 {
-    static char *function_names[2] = { "find_living", "find_player"};
+    static string_t *function_names[2] = { NULL };
 
     svalue_t *sp, *svp;
+
+    if (function_names[0] == NULL)
+    {
+        function_names[0] = ref_mstring(STR_PC_FIND_LIVING);
+        function_names[1] = ref_mstring(STR_PC_FIND_PLAYER);
+    }
 
     sp = inter_sp;
     sp++;
@@ -243,10 +251,7 @@ find_living_object (char *name, Bool player)
     if (svp->type == T_INVALID)
     {
         /* We have to create the closure */
-        put_old_string(sp, make_shared_string(function_names[player ? 1 : 0]));
-        if (!sp->u.string)
-            error("(old_parse_command) Out of memory (%lu bytes) for string\n"
-                 , strlen(function_names[player ? 1 : 0]));
+        put_ref_string(sp, function_names[player ? 1 : 0]);
         inter_sp = sp;
         symbol_efun(sp);
         *svp = *sp;
@@ -254,9 +259,9 @@ find_living_object (char *name, Bool player)
     }
 
     /* Call the closure */
-    put_old_string(sp, make_shared_string(name));
-    if ( !sp->u.string)
-        error("(old_parse_command) Out of memory (%lu bytes) for result\n"
+    put_c_string(sp, name);
+    if (!sp->u.str)
+        error("(parse_command) Out of memory (%lu bytes) for result\n"
              , strlen(name));
     inter_sp = sp;
     call_lambda(svp, 1);
@@ -575,7 +580,7 @@ lookfirst (char *cmd)
 
 /*-------------------------------------------------------------------------*/
 static int
-call_obj (char *fnamn, object_t *on, char *apa)
+call_obj (string_t *fnamn, object_t *on, char *apa)
 
 /* Call the lfun <on>:<fnamn>(<apa>). If the result is a number, return it,
  * otherwise return 0.
@@ -584,7 +589,7 @@ call_obj (char *fnamn, object_t *on, char *apa)
 {
     svalue_t *ret;
 
-    push_volatile_string(inter_sp, apa);
+    push_c_string(inter_sp, apa);
     ret = apply(fnamn, on, 1);
     if (!ret) return 0;
     if ( ret->type == T_NUMBER) return ret->u.number;
@@ -682,15 +687,15 @@ matchadjective (char *adjs)
         {
             on = ao->ao_obj;
             ret = apply(STR_PC_SHORT,on,0);
-            if (ret && ret->type==T_OLD_STRING)
+            if (ret && ret->type==T_STRING)
             {
-                sp = ret->u.string;
+                sp = get_txt(ret->u.str);
                 sp2 = backstrchr(sp,' ');
                 if (sp2)
                     sp = sp2;
                 sprintf(tot, "%s%s", adjs, sp);
                 lowercase(tot);
-                if (!call_obj(STR_ID,on,tot))
+                if (!call_obj(STR_ID, on, tot))
                     on = NULL;
             }
             else
@@ -1154,8 +1159,8 @@ findword (char **cmd, svalue_t *v)
     f = -1;
     for (cnt = 0, m = VEC_SIZE(p); cnt < m; cnt++)
     {
-        if (p->item[cnt].type == T_OLD_STRING
-         && strcmp(p->item[cnt].u.string,w) == 0)
+        if (p->item[cnt].type == T_STRING
+         && strcmp(get_txt(p->item[cnt].u.str), w) == 0)
         {
             f=cnt; cnt=m;
         }
@@ -1185,7 +1190,11 @@ findprepos (char **cmd)
  */
 
 {
-    static char *hard_prep[] = {"on","in","under","from","behind","beside",0};
+    static char *hard_prep[] = { "in", "from", "on", "under", "behind", "of"
+                               , "for", "to", "with", "at", "off", "out"
+                               , "down", "up", "around", "over", "into"
+                               , "about", "inside"
+                               , 0 };
 
     char *w;
     svalue_t *v;
@@ -1209,7 +1218,7 @@ findprepos (char **cmd)
             getfirst(cmd); /* Skip this word */
             if (gCarg)
             {
-                put_malloced_string(&sv_tmp, string_copy(w));
+                put_string(&sv_tmp, new_mstring(w));
                 transfer_svalue(gCarg->u.lvalue, &sv_tmp);
                 return MY_TRUE;
             }
@@ -1321,16 +1330,16 @@ addword (char *d, char *s)
     }
     if (gTxarg)
     {
-        put_malloced_string(&sv_tmp, string_copy(d));
+        put_string(&sv_tmp, new_mstring(d));
         transfer_svalue(gTxarg->u.lvalue, &sv_tmp);
     }
 } /* addword() */
 
 /*-------------------------------------------------------------------------*/
 Bool
-e_old_parse_command ( char     *cs           /* Command to parse */
+e_old_parse_command ( string_t     *cs           /* Command to parse */
                 , svalue_t *ob_or_array  /* Object or array of objects */
-                , char     *ps           /* Special parsing pattern */
+                , string_t     *ps           /* Special parsing pattern */
                 , svalue_t *dest_args    /* Pointer to lvalue args on stack */
                 , int       num_arg      /* Number of lvalues on stack */
                 )
@@ -1362,10 +1371,12 @@ e_old_parse_command ( char     *cs           /* Command to parse */
         return MY_FALSE;
 
     /* In mudlib 3.0 we will not have this. */
-    if (cs[0] == '@')
+    if (get_txt(cs)[0] == '@')
         error("Unsupported @ construct.\n");
 
-    ocs = cmd = string_copy(cs);
+    memsafe(cmd = alloca(mstrsize(cs)), mstrsize(cs), "copy of command to parse");
+    strcpy(cmd, get_txt(cs));
+    ocs = cmd;
 
     /* Get the accessible objects
      */
@@ -1390,7 +1401,9 @@ e_old_parse_command ( char     *cs           /* Command to parse */
         gPobjects = NULL;
     }
 
-    ops = parsep = string_copy(ps);
+    memsafe(ops = alloca(mstrsize(ps)), mstrsize(ps), "copy of parse pattern");
+    strcpy(ops, get_txt(ps));
+    parsep = ops;
     gPobjects = NULL;
 
     /* Start parsing

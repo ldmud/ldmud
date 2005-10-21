@@ -264,6 +264,9 @@ float   ceil(float);
 float   floor(float);
 float   pow(int|float,int|float);
 
+mixed   max(mixed|mixed*, ...);
+mixed   min(mixed|mixed*, ...);
+
 int     to_int(int|string|float|closure);
 float   to_float(float|string|int);
 string  to_string(mixed);
@@ -430,7 +433,7 @@ int     query_mud_port(int|object default: F_THIS_PLAYER);
 int     set_buffer_size(int);
 void    set_combine_charset(int *|string);
 void    set_connection_charset(int *|string, int default: F_CONST1);
-string  set_prompt(string|closure|int, object default: F_THIS_PLAYER);
+mixed   set_prompt(string|closure|int, object default: F_THIS_PLAYER);
 
 void    write(mixed);
 object *users();

@@ -53,9 +53,9 @@
 
 #ifdef MALLOC_TRACE
 
-#define MTRACE_DECL , const char * malloc_trace_file, int malloc_trace_line
-#define MTRACE_PASS , malloc_trace_file, malloc_trace_line
-#define MTRACE_ARG  , __FILE__, __LINE__
+#define MTRACE_DECL     , const char * malloc_trace_file, int malloc_trace_line
+#define MTRACE_PASS     , malloc_trace_file, malloc_trace_line
+#define MTRACE_ARG      , __FILE__, __LINE__
 
 #else
 

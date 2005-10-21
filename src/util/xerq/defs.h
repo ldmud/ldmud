@@ -152,6 +152,7 @@ struct child_s
 
 #define CHILD_EXECUTE  1
 #define CHILD_SPAWN    2
+#define CHILD_FORK     3
 
 /* Values for child_t.status */
 

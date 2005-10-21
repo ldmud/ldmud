@@ -1060,3 +1060,84 @@ Only in amylaar.2: hosts/win32/config.h
 Only in amylaar.2: hosts/win32/Readme.rtf
 Only in amylaar.2: hosts/win32/Makefile
 ----------------------------------------------------
+
+This are the diffs of the Morgengrauen driver 2000.10.23 against Morgengrauen
+driver 2000.01.18 .
+
+Only in mg-driver-001023: Makefile
+diff -u -r mg-driver-000118/config.h mg-driver-001023/config.h
+--- mg-driver-000118/config.h	Thu May 13 18:01:40 1999
++++ mg-driver-001023/config.h	Thu Jul  6 09:07:21 2000
+@@ -185,9 +185,9 @@
+  * of memory to get some warning and start Armageddon.
+  * If this value is 0, no area will be reserved.
+  */
+-#define RESERVED_USER_SIZE	800000
+-#define RESERVED_MASTER_SIZE   100000
+-#define RESERVED_SYSTEM_SIZE   200000
++#define RESERVED_USER_SIZE	8500000
++#define RESERVED_MASTER_SIZE	 500000
++#define RESERVED_SYSTEM_SIZE	1000000
+ 
+ /* Define the size of the shared string hash table.  This number needn't
+  * be prime, probably between 1000 and 30000; if you set it to about 1/5
+@@ -306,8 +306,8 @@
+  */
+ 
+ #define MIN_MALLOCED	   0x80000
+-#define MAX_MALLOCED	   0xe000000
+-#define MAX_SMALL_MALLOCED 0x4000000
++#define MAX_MALLOCED	   0x1f000000
++#define MAX_SMALL_MALLOCED 0x1e000000
+ 
+ #undef SMALLOC_TRACE /* do 'make clean' after changing this... */
+ #undef SMALLOC_LPC_TRACE /* do 'make clean' after changing this... */
+Only in mg-driver-001023: config.status
+diff -u -r mg-driver-000118/interpret.c mg-driver-001023/interpret.c
+--- mg-driver-000118/interpret.c	Wed Jan 12 07:17:42 2000
++++ mg-driver-001023/interpret.c	Fri Sep 22 20:14:55 2000
+@@ -9434,7 +9434,8 @@
+ 	    ob = sp->u.ob;
+ 	    decr_object_ref(ob, "query_input_pending");
+ 	    if ((ip = O_GET_INTERACTIVE(ob)) &&
+-		ip->sent.type == SENT_INTERACTIVE && ip->input_to)
++		ip->sent.type == SENT_INTERACTIVE && ip->input_to &&
++            !(ip->input_to->ob->flags & O_DESTRUCTED) )
+ 	    {
+ 		add_ref(sp->u.ob = ip->input_to->ob, "query_input_pending");
+ 	    } else {
+Only in mg-driver-001023: interpret.c_tiamak
+Only in mg-driver-001023: machine.h
+diff -u -r mg-driver-000118/prolang.y mg-driver-001023/prolang.y
+--- mg-driver-000118/prolang.y	Wed Dec 15 16:39:33 1999
++++ mg-driver-001023/prolang.y	Mon Oct 23 15:27:55 2000
+@@ -6465,7 +6465,8 @@
+ 	     * thus to mask it if wanted.
+ 	     */
+ 	    if ((heart_beat == -1) && fun.name[0] == 'h' &&
+-	      (strcmp(fun.name, "heart_beat") == 0))
++	      (strcmp(fun.name, "heart_beat") == 0) &&
++	      !(fun.flags & (NAME_HIDDEN|NAME_UNDEFINED)))
+ 		heart_beat = current_func_index;
+ %ifdef INITIALIZATION_BY___INIT
+ 	    else if (fun.name[0] == '_' && strcmp(fun.name+1, "_INIT") == 0) {
+diff -u -r mg-driver-000118/regexp.c mg-driver-001023/regexp.c
+--- mg-driver-000118/regexp.c	Wed Nov 26 07:49:31 1997
++++ mg-driver-001023/regexp.c	Sun Oct 22 16:38:57 2000
+@@ -330,12 +330,12 @@
+  * of the structure of the compiled regexp.
+  */
+ regexp *regcomp(expr,excompat)
+-char           *expr;
++unsigned char           *expr;
+ int		excompat;	/* \( \) operators like in unix ex */
+ {
+     register regexp *r;
+-    register char  *scan;
+-    register char  *longest;
++    register unsigned char  *scan;
++    register unsigned char  *longest;
+     register int    len;
+     int             flags;
+     short	   *expr2,*dest,c;
+----------------------------------------------------

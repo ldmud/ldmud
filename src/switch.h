@@ -201,8 +201,8 @@ extern void store_case_labels( p_int total_length
                              , case_list_entry_t *zero
                              , bytecode_p (*get_space)(p_int)
                              , void (*move_instructions)(int, p_int)
-                             , void (*cerror)(char *)
-                             , void (*cerrorl)(char *, char*, int, int)
+                             , void (*cerror)(const char *)
+                             , void (*cerrorl)(const char *, const char*, int, int)
 );
 
 #endif  /* SWITCH_H__ */

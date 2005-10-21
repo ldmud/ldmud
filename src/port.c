@@ -104,8 +104,6 @@ utime_string (mp_int t, mp_int ut)
     size_t len;
     mp_int last_t = -1, last_ut = -1;
 
-    mp_int last_time = -1;
-
     if (t != last_t || ut != last_ut)
     {
         last_t= t;
@@ -217,7 +215,7 @@ strtol(register char *str, char **ptr, register int base)
 #ifndef HAVE_STRCSPN
 
 size_t
-strcspn(char *s, char *set)
+strcspn(const char *s, const char *set)
 {
     register char *t, *s, c, d;
 
@@ -275,14 +273,14 @@ memset (char *s, int c, size_t n)
 #ifndef HAVE_MEMMEM
 
 char *
-memmem (char *needle, size_t needlelen, char *haystack, size_t haystacklen)
+memmem (const char *needle, size_t needlelen, const char *haystack, size_t haystacklen)
 {
     mp_int i;
 
     i = (mp_int)(haystacklen - needlelen);
     if (i >= 0) do {
         if ( !strncmp(needle, haystack, needlelen) )
-            return haystack;
+            return (char *)haystack;
         haystack++;
     } while (--i >= 0);
     return 0;

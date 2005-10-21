@@ -92,12 +92,14 @@
 #include "interpret.h"
 #include "main.h"
 #include "mapping.h"
+#include "mstrings.h"
 #include "object.h"
 #include "otable.h"
 #include "prolang.h"
 #include "random.h"
 #include "simulate.h"
 #include "simul_efun.h"
+#include "stdstrings.h"
 #include "strfuns.h"
 #include "svalue.h"
 #include "wiz_list.h"
@@ -335,7 +337,7 @@ locate_out (program_t *prog)
     prog->line_numbers   = MAKEOFFSET(unsigned char*, line_numbers);
     prog->functions      = MAKEOFFSET(uint32*, functions);
     prog->function_names = MAKEOFFSET(unsigned short *, function_names);
-    prog->strings        = MAKEOFFSET(char**, strings);
+    prog->strings        = MAKEOFFSET(string_t**, strings);
     prog->variable_names = MAKEOFFSET(variable_t *, variable_names);
     prog->inherit        = MAKEOFFSET(inherit_t *, inherit);
     if (prog->type_start)
@@ -378,7 +380,7 @@ locate_in (program_t *prog)
     prog->line_numbers   = NULL;
     prog->functions      = MAKEPTR(uint32*, functions);
     prog->function_names = MAKEPTR(unsigned short *, function_names);
-    prog->strings        = MAKEPTR(char**, strings);
+    prog->strings        = MAKEPTR(string_t**, strings);
     prog->variable_names = MAKEPTR(variable_t*, variable_names);
     prog->inherit        = MAKEPTR(inherit_t*, inherit);
     if (prog->type_start)
@@ -642,7 +644,7 @@ swap_program (object_t *ob)
     if (d_flag > 1)
     {
         debug_message("%s Swap object %s (ref %ld)\n", time_stamp()
-                     , ob->name, ob->ref);
+                     , get_txt(ob->name), ob->ref);
     }
 
     prog = ob->prog;
@@ -768,10 +770,13 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
  * The data values are added to the end of the varblock in the following
  * formats:
  *
- * swtype == (ph_int)svp->type | TYPE_MOD_SWAPPED.
+ * swtype := (ph_int)svp->type | TYPE_MOD_SWAPPED.
  *
  * STRING, SYMBOL:
  *    swtype, (ph_int)svp->x, string, \0
+ *
+ *    For strings, svp->x.generic is 1 for untabled strings, and 0 for
+ *    tabled string.
  *
  * POINTER:
  *    swtype, (size_t)size, (wiz_list_t*) user, values...
@@ -834,7 +839,10 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
         switch(svp->type)
         {
 
-        case T_OLD_STRING:
+        case T_STRING:
+            svp->x.generic = (mstr_tabled(svp->u.str) ? 0 : 1);
+            /* FALL THROUGH */
+
         case T_SYMBOL:
           {
             mp_int len, size;
@@ -842,7 +850,7 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
             if (swapping_alist)
                 goto swap_opaque;
 
-            len = strlen(svp->u.string) + 1;
+            len = mstrsize(svp->u.str) + 1;
             size = 1 + sizeof svp->x + len;
             CHECK_SPACE(size)
             rest -= size;
@@ -850,7 +858,7 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
             *p++ = svp->type | T_MOD_SWAPPED;
             memcpy(p, &svp->x, sizeof(svp->x));
             p += sizeof svp->x;
-            memcpy(p, svp->u.string, len);
+            memcpy(p, get_txt(svp->u.str), len);
             p += len;
             break;
           }
@@ -1026,21 +1034,10 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
     {
         switch(*p)
         {
-        case T_OLD_STRING | T_MOD_SWAPPED:
-            if (svp->x.string_type == STRING_MALLOC)
-            {
-                if (!garbage_collection_in_progress)
-                    xfree(svp->u.string);
-                p = (unsigned char *)strchr(
-                  (char *)p + 1 + sizeof svp->x, 0
-                ) + 1;
-                break;
-            }
-            /* else fall through */
-
+        case T_STRING | T_MOD_SWAPPED:
         case T_SYMBOL | T_MOD_SWAPPED:
             if (!garbage_collection_in_progress)
-                free_string(svp->u.string);
+                free_mstring(svp->u.str);
             p = (unsigned char *)strchr((char *)p + 1 + sizeof svp->x, 0) + 1;
             break;
 
@@ -1109,7 +1106,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
               }
             }
 
-        case T_OLD_STRING:
+        case T_STRING:
         case T_SYMBOL:
         case T_POINTER:
         case T_QUOTED_ARRAY:
@@ -1324,10 +1321,10 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         
         switch(*p++)
         {
-        case T_OLD_STRING | T_MOD_SWAPPED:
+        case T_STRING | T_MOD_SWAPPED:
         case T_SYMBOL | T_MOD_SWAPPED:
           {
-            char *s;
+            string_t *s;
 
             memcpy(&svp->x, p, sizeof svp->x);
             p += sizeof svp->x;
@@ -1337,14 +1334,14 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             }
             else
             {
-                if (svp->type == T_OLD_STRING
-                 && svp->x.string_type == STRING_MALLOC)
+                if (svp->type == T_STRING
+                 && svp->x.generic != 0)
                 {
-                    s = string_copy((char *)p);
+                    s = new_mstring((char *)p);
                 }
                 else
                 {
-                    s = make_shared_string((char *)p);
+                    s = new_tabled((char *)p);
                 }
 
                 if (!s)
@@ -1353,7 +1350,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
                     return NULL;
                 }
 
-                svp->u.string = s;
+                svp->u.str = s;
             }
             p = (unsigned char *)strchr((char *)p, '\0') + 1;
             break;
@@ -1499,7 +1496,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             break;
           }
 
-        case T_OLD_STRING:
+        case T_STRING:
         case T_SYMBOL:
         case T_POINTER:
         case T_QUOTED_ARRAY:
@@ -1524,7 +1521,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
 
 /*-------------------------------------------------------------------------*/
 static void
-dummy_handler(char * fmt UNUSED, ...)
+dummy_handler(const char * fmt UNUSED, ...)
 
 /* Dummy error handler for array allocations in a swap-in.
  */
@@ -1578,7 +1575,7 @@ load_ob_from_swap (object_t *ob)
         if (d_flag > 1)
         {
             debug_message("%s Unswap object %s (ref %ld)\n", time_stamp()
-                         , ob->name, ob->ref);
+                         , get_txt(ob->name), ob->ref);
         }
 
         /* The size of the program is unkown, so read first part to
@@ -1632,7 +1629,7 @@ load_ob_from_swap (object_t *ob)
         svalue_t *variables;
         object_t dummy;
         object_t *save_current = current_object;
-        void (*save_handler)(char *, ...);
+        void (*save_handler)(const char *, ...);
 
         swap_num &= ~1;
         if (swapfile_size <= swap_num)
@@ -1643,7 +1640,7 @@ load_ob_from_swap (object_t *ob)
         if (d_flag > 1)
         {
             debug_message("%s Unswap variables of %s\n", time_stamp()
-                         , ob->name);
+                         , get_txt(ob->name));
         }
 
         /* Read the size of the block from the file */
@@ -1713,7 +1710,7 @@ load_ob_from_swap (object_t *ob)
     /* Update the object flags */
     ob->flags &= ~O_SWAPPED;
     if (!(ob->flags & (O_DESTRUCTED|O_WILL_CLEAN_UP))
-     && function_exists("clean_up",ob))
+     && function_exists(STR_CLEAN_UP, ob))
     {
         ob->flags |= O_WILL_CLEAN_UP;
     }

@@ -36,6 +36,7 @@
 #include "backend.h"
 #include "gcollect.h"
 #include "hash.h"
+#include "mstrings.h"
 #include "object.h"
 #include "strfuns.h"
 #include "simulate.h"
@@ -49,9 +50,9 @@
 /*-------------------------------------------------------------------------*/
 
 #if !( (OTABLE_SIZE) & (OTABLE_SIZE)-1 )
-#    define ObjHash(s) (whashstr((s), 100) & ((OTABLE_SIZE)-1) )
+#    define ObjHash(s,len) (whashmem(s, 100, len) & ((OTABLE_SIZE)-1) )
 #else
-#    define ObjHash(s) (whashstr((s), 100) % OTABLE_SIZE)
+#    define ObjHash(s,len) (whashmem(s, 100, len) % OTABLE_SIZE)
 #endif
 /* Hash the string <s> and compute the appropriate table index
  */
@@ -78,10 +79,10 @@ static long user_obj_found = 0;
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-find_obj_n (char *s)
+find_obj_n (string_t *s)
 
-/* Lookup the object with name <s> in the table and return the pointer
- * to its structure. If it is not in the table, return NULL.
+/* Lookup the object with name <s> in the table and return
+ * the pointer to its structure. If it is not in the table, return NULL.
  *
  * The call updates the statistics and also moves the found object
  * to the head of its hash chain.
@@ -90,7 +91,7 @@ find_obj_n (char *s)
 {
     object_t * curr, *prev;
 
-    int h = ObjHash(s);
+    int h = ObjHash(get_txt(s),mstrsize(s));
 
     curr = obj_table[h];
     prev = NULL;
@@ -100,7 +101,51 @@ find_obj_n (char *s)
     while (curr)
     {
         obj_probes++;
-        if (!strcmp(curr->name, s)) /* found it */
+        if (mstreq(curr->name, s)) /* found it */
+        {
+            if (prev) /* not at head of list */
+            {
+                prev->next_hash = curr->next_hash;
+                curr->next_hash = obj_table[h];
+                obj_table[h] = curr;
+            }
+            objs_found++;
+            return curr;
+        }
+        prev = curr;
+        curr = curr->next_hash;
+    }
+
+    /* Not found */
+    return NULL;
+
+} /* find_obj_n() */
+
+/*-------------------------------------------------------------------------*/
+static object_t *
+find_obj_n_str (const char *s)
+
+/* Lookup the object with name <s> (length <slen>) in the table and return
+ * the pointer to its structure. If it is not in the table, return NULL.
+ *
+ * The call updates the statistics and also moves the found object
+ * to the head of its hash chain.
+ */
+
+{
+    object_t * curr, *prev;
+
+    int h = ObjHash(s,strlen(s));
+
+    curr = obj_table[h];
+    prev = NULL;
+
+    obj_searches++;
+
+    while (curr)
+    {
+        obj_probes++;
+        if (!strcmp(get_txt(curr->name), s)) /* found it */
         {
             if (prev) /* not at head of list */
             {
@@ -132,7 +177,7 @@ enter_object_hash (object_t *ob)
 #ifdef DEBUG
     object_t * s;
 #endif
-    int h = ObjHash(ob->name);
+    int h = ObjHash(get_txt(ob->name), mstrsize(ob->name));
 
 #ifdef DEBUG
     s = find_obj_n(ob->name);
@@ -140,14 +185,14 @@ enter_object_hash (object_t *ob)
     {
         if (s != ob)
             fatal("Duplicate object \"%s\" in object hash table"
-                 , ob->name);
+                 , get_txt(ob->name));
         else
             fatal( "Entering object \"%s\" twice in object table"
-                 , ob->name);
+                 , get_txt(ob->name));
     }
     if (ob->next_hash)
         fatal( "Object \"%s\" not found in object table but next link not null"
-             , ob->name);
+             , get_txt(ob->name));
 #endif
 
     ob->next_hash = obj_table[h];
@@ -164,13 +209,13 @@ remove_object_hash (object_t *ob)
 
 {
     object_t * s;
-    int h = ObjHash(ob->name);
+    int h = ObjHash(get_txt(ob->name), mstrsize(ob->name));
 
     s = find_obj_n(ob->name);
 
     if (s != ob)
         fatal( "Remove object \"%s\": found a different object!"
-             , ob->name);
+             , get_txt(ob->name));
 
     obj_table[h] = ob->next_hash;
     ob->next_hash = NULL;
@@ -179,7 +224,7 @@ remove_object_hash (object_t *ob)
 
 /*-------------------------------------------------------------------------*/
 object_t *
-lookup_object_hash (char *s)
+lookup_object_hash (string_t *s)
 
 /* Lookup an object by name <s>. If found, return its pointer, if not,
  * return NULL.
@@ -187,6 +232,22 @@ lookup_object_hash (char *s)
 
 {
     object_t * ob = find_obj_n(s);
+    user_obj_lookups++;
+    if (ob)
+        user_obj_found++;
+    return ob;
+}
+
+/*-------------------------------------------------------------------------*/
+object_t *
+lookup_object_hash_str (const char *s)
+
+/* Lookup an object by name <s>. If found, return its pointer, if not,
+ * return NULL.
+ */
+
+{
+    object_t * ob = find_obj_n_str(s);
     user_obj_lookups++;
     if (ob)
         user_obj_found++;

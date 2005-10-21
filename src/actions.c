@@ -68,6 +68,7 @@
 #include "stdstrings.h"
 #include "sent.h"
 #include "simulate.h"
+#include "svalue.h"
 #include "wiz_list.h"
 #include "xalloc.h"
 

@@ -4,8 +4,6 @@
 #include "driver.h"
 #include "typedefs.h"
 
-#include "instrs.h"      /* F_PROCESS_STRING, F_DESCRIBE */
-
 #if defined(SUPPLY_PARSE_COMMAND)
 
 /* implemented in parse.c (!compat) */

@@ -72,6 +72,7 @@
 #include "rxcache.h"
 #include "simulate.h"
 #include "stdstrings.h"
+#include "svalue.h"
 #include "swap.h"
 #include "wiz_list.h"
 #include "xalloc.h"

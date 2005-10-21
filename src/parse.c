@@ -181,6 +181,7 @@
 #include "instrs.h"
 #include "interpret.h"
 #include "main.h"
+#include "mstrings.h"
 #include "object.h"
 #include "simulate.h"
 #include "stdstrings.h"
@@ -196,8 +197,7 @@
 /*-------------------------------------------------------------------------*/
 /* Some useful string macros
  */
-#define EQ(x,y)  (strcmp(x,y)==0)
-#define EQN(x,y) (strncmp(x,y,strlen(x))==0)
+#define PREFIXED(x,y) (strncmp(x, y, strlen(x)) == 0)
 
 /*-------------------------------------------------------------------------*/
 /* To make parse_command() reentrant, the module maintains a list
@@ -211,7 +211,7 @@ struct parse_context_s
 
   vector_t *id,   *plid,   *adjid;
   vector_t *id_d, *plid_d, *adjid_d, *prepos;
-  char     *allword;
+  string_t *allword;
     /* This context: the lists of ids and such. */
     
   vector_t *wvec, *patvec, *obvec;
@@ -292,13 +292,13 @@ static vector_t *gId_list_d    = NULL;
 static vector_t *gPluid_list_d = NULL;
 static vector_t *gAdjid_list_d = NULL;
 static vector_t *gPrepos_list  = NULL;
-static char     *gAllword      = NULL;
+static string_t *gAllword      = NULL;
   /* The lists and the 'all' word from the master object.
    */
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-find_living_object (char *name, Bool player)
+find_living_object (string_t *name, Bool player)
 
 /* Find the living (<player> is false) or player (<player> is true)
  * with the name <name>.
@@ -309,9 +309,15 @@ find_living_object (char *name, Bool player)
  */
 
 {
-    static char *function_names[2] = { "find_living", "find_player"};
+    static string_t *function_names[2] = { NULL };
 
     svalue_t *sp, *svp;
+
+    if (function_names[0] == NULL)
+    {
+        function_names[0] = ref_mstring(STR_PC_FIND_LIVING);
+        function_names[1] = ref_mstring(STR_PC_FIND_PLAYER);
+    }
 
     sp = inter_sp;
     sp++;
@@ -321,10 +327,7 @@ find_living_object (char *name, Bool player)
     if (svp->type == T_INVALID)
     {
         /* We have to create the closure */
-        put_old_string(sp, make_shared_string(function_names[player ? 1 : 0]));
-        if (!sp->u.string)
-            error("(parse_command) Out of memory (%lu bytes) for string\n"
-                 , strlen(function_names[player ? 1 : 0]));
+        put_ref_string(sp, function_names[player ? 1 : 0]);
         inter_sp = sp;
         symbol_efun(sp);
         *svp = *sp;
@@ -332,10 +335,10 @@ find_living_object (char *name, Bool player)
     }
 
     /* Call the closure */
-    put_old_string(sp, make_shared_string(name));
-    if ( !sp->u.string)
+    put_ref_string(sp, name);
+    if (!sp->u.str)
         error("(parse_command) Out of memory (%lu bytes) for result\n"
-             , strlen(name));
+             , mstrsize(name));
     inter_sp = sp;
     call_lambda(svp, 1);
     pop_stack();
@@ -377,11 +380,12 @@ count_parse_refs (void)
 #ifndef PARSE_FOREIGN
 
 /*-------------------------------------------------------------------------*/
-static char *
-parse_one_plural (char *str)
+static string_t *
+parse_one_plural (string_t *str)
 
 /* Change the singular noun <str> to a plural and return it.
- * The result is either <str> itself, or a pointer to a static buffer.
+ * The result is either a new string with one reference, or <str> itself
+ * with an added reference.
  */
 
 {
@@ -390,15 +394,15 @@ parse_one_plural (char *str)
     char   ch, ch2;  /* Last two characters in <str> */
     size_t sl;       /* Last index in <str> */
 
-    sl = strlen(str);
+    sl = mstrsize(str);
     if (sl < 3 || sl > sizeof(pbuf) - 10)
         return str;
     sl--;
 
     /* Copy <str> except for the last char into pbuf */
-    ch = str[sl];
-    ch2 = str[sl-1];
-    strcpy(pbuf, str); pbuf[sl] = '\0';
+    ch = get_txt(str)[sl];
+    ch2 = get_txt(str)[sl-1];
+    strcpy(pbuf, get_txt(str)); pbuf[sl] = '\0';
 
     /* Try to make plural based on the last two chars */
     switch (ch)
@@ -406,39 +410,39 @@ parse_one_plural (char *str)
     case 's':
     case 'x':
     case 'h':
-        return strcat(pbuf, "ses");
+        return new_mstring(strcat(pbuf, "ses"));
 
     case 'y':
-        return strcat(pbuf, "ies");
+        return new_mstring(strcat(pbuf, "ies"));
 
     case 'e':
         if (ch2 == 'f')
         {
             pbuf[sl-1] = 0;
-            return strcat(pbuf, "ves");
+            return new_mstring(strcat(pbuf, "ves"));
         }
     }
 
     /* Some known special cases */
-    if (EQ(str,"corpse")) return "corpses";
-    if (EQ(str,"tooth")) return "teeth";
-    if (EQ(str,"foot")) return "feet";
-    if (EQ(str,"man")) return "men";
-    if (EQ(str,"woman")) return "women";
-    if (EQ(str,"child")) return "children";
-    if (EQ(str,"sheep")) return "sheep";
+    if (mstreq(str, STR_PC_CORPSE)) return ref_mstring(STR_PC_CORPSES);
+    if (mstreq(str, STR_PC_TOOTH)) return ref_mstring(STR_PC_TEETH);
+    if (mstreq(str, STR_PC_FOOT)) return ref_mstring(STR_PC_FEET);
+    if (mstreq(str, STR_PC_MAN)) return ref_mstring(STR_PC_MEN);
+    if (mstreq(str, STR_PC_WOMAN)) return ref_mstring(STR_PC_WOMEN);
+    if (mstreq(str, STR_PC_CHILD)) return ref_mstring(STR_PC_CHILDREN);
+    if (mstreq(str, STR_PC_SHEEP)) return ref_mstring(STR_PC_SHEEP);
 
     /* Default: just append 's' */
     pbuf[sl] = ch;
-    return strcat(pbuf, "s");
+    return new_mstring(strcat(pbuf, "s"));
 } /* parse_one_plural() */
 
 /*-------------------------------------------------------------------------*/
-static char *
-parse_to_plural (char *str)
+static string_t *
+parse_to_plural (string_t *str)
 
-/* Change the singular name <str> to a plural name. The result is a newly
- * allocated string.
+/* Change the singular name <str> to a plural name. The result is a new
+ * string with one reference.
  *
  * The algorithm groups the <str> into runs delimited by 'of' (e.g. "the box
  * of the king" and pluralizes the last word before each 'of' and the last
@@ -449,33 +453,35 @@ parse_to_plural (char *str)
 {
     vector_t *words;
     svalue_t  stmp;
-    char     *sp;
+    string_t *sp;
     size_t    il;
     Bool      changed;
 
     /* If it's a single word, it's easy */
-    if (!(strchr(str,' ')))
-        return string_copy(parse_one_plural(str));
+    if (!(strchr(get_txt(str), ' ')))
+        return parse_one_plural(str);
 
     /* Multiple words, possible grouped into runs delimited by 'of':
      * pluralize the last word in the string, and the last word
      * before each 'of'.
      */
-    words = old_explode_string(str, " ");
+    words = old_explode_string(str, STR_SPACE);
 
     for (changed = MY_FALSE, il = 1; il < VEC_SIZE(words); il++)
     {
-        if ((EQ(words->item[il].u.string,"of"))
+        if ((mstreq(words->item[il].u.str, STR_PC_OF))
          || il+1 == VEC_SIZE(words))
          {
             /* Got one to pluralize */
-            sp = parse_one_plural(words->item[il-1].u.string);
-            if (sp != words->item[il-1].u.string)
+            sp = parse_one_plural(words->item[il-1].u.str);
+            if (sp != words->item[il-1].u.str)
             {
-                put_malloced_string(&stmp, string_copy(sp));
+                put_string(&stmp, sp);
                 transfer_svalue(&words->item[il-1], &stmp);
                 changed = MY_TRUE;
             }
+            else
+                free_mstring(sp); /* Reuse the old reference */
         }
     }
 
@@ -483,11 +489,11 @@ parse_to_plural (char *str)
     if (!changed)
     {
         free_array(words);
-        return string_copy(str);
+        return ref_mstring(str);
     }
 
     /* We changed it: return the new name */
-    sp = implode_string(words, " ");
+    sp = implode_string(words, STR_SPACE);
     free_array(words);
     return sp;
 } /* parse_to_plural() */
@@ -551,7 +557,7 @@ load_lpc_info (size_t ix, object_t *ob)
                 
                 vector_t *tmp, *sing;
                 svalue_t sval;
-                char *str;
+                string_t *str;
                 size_t il;
 
                 tmp = allocate_array(VEC_SIZE(ret->u.vec));
@@ -561,10 +567,10 @@ load_lpc_info (size_t ix, object_t *ob)
                 sing = ret->u.vec;
                 for (il = 0; il < VEC_SIZE(tmp); il++)
                 {
-                    if (sing->item[il].type == T_OLD_STRING)
+                    if (sing->item[il].type == T_STRING)
                     {
-                        str = parse_to_plural(sing->item[il].u.string);
-                        put_malloced_string(&sval, str);
+                        str = parse_to_plural(sing->item[il].u.str);
+                        put_string(&sval, str);
                         transfer_svalue_no_free(&tmp->item[il],&sval);
                     }
                 }
@@ -634,7 +640,7 @@ parse_error_handler (svalue_t *arg UNUSED)
         free_array(gPrepos_list);
 
     if (gAllword)
-        xfree(gAllword);
+        free_mstring(gAllword);
 
     /* Restore the previous lists */
     
@@ -676,14 +682,14 @@ stack_put (svalue_t *pval, svalue_t *sp, size_t pos, int max)
 static svalue_t *
 slice_words (vector_t *wvec, size_t from, size_t to)
 
-/* Return an imploded string of words from <wvec>[<from>..<to>] as static shared
+/* Return an imploded string of words from <wvec>[<from>..<to>] as tabled
  * string svalue.
  * Return NULL if there is nothing to slice.
  */
 
 {
     vector_t        *slice;
-    char            *tx;
+    string_t        *tx;
     static svalue_t  stmp;
 
     if (from > to)
@@ -692,15 +698,14 @@ slice_words (vector_t *wvec, size_t from, size_t to)
     slice = slice_array(wvec, from, to);
 
     if (VEC_SIZE(slice))
-        tx = implode_string(slice," ");
+        tx = implode_string(slice, STR_SPACE);
     else
         tx = NULL;
 
     free_array(slice);
     if (tx)
     {
-        put_old_string(&stmp, make_shared_string(tx));
-        xfree(tx);
+        put_string(&stmp, make_tabled(tx));
         return &stmp;
     }
     else
@@ -709,7 +714,7 @@ slice_words (vector_t *wvec, size_t from, size_t to)
 
 /*-------------------------------------------------------------------------*/
 static int
-find_string (char *str, vector_t *wvec, size_t *cix_in)
+find_string (string_t *str, vector_t *wvec, size_t *cix_in)
 
 /* Test if the (multi-word) string <str> exists in the array of words <wvec>
  * at or after position <cix_in>.
@@ -720,21 +725,23 @@ find_string (char *str, vector_t *wvec, size_t *cix_in)
  
 {
     int fpos;
-    char *p1, *p2;
+    string_t *p1;
+    char *p2;
     vector_t *split;
 
     /* Step through wvec and look for a match */
     for (; *cix_in < VEC_SIZE(wvec); (*cix_in)++)
     {
-        p1 = wvec->item[*cix_in].u.string;
+        p1 = wvec->item[*cix_in].u.str;
         
-        if (p1[0] != str[0])  /* Quick test: first character has to match */
+        /* Quick test: first character has to match */
+        if (get_txt(p1)[0] != get_txt(str)[0])
             continue;
 
-        if (strcmp(p1, str) == 0) /* str was one word and we found it */
+        if (mstreq(p1, str)) /* str was one word and we found it */
             return (int)*cix_in;
 
-        if (!(p2 = strchr(str,' ')))
+        if (!(p2 = strchr(get_txt(str), ' ')))
             continue;
 
         /* If str is a multiword string and we need to make some special checks
@@ -742,7 +749,7 @@ find_string (char *str, vector_t *wvec, size_t *cix_in)
         if (*cix_in + 1 == VEC_SIZE(wvec))
             continue;
 
-        split = old_explode_string(str," ");
+        split = old_explode_string(str, STR_SPACE);
 
         /* Now: wvec->size - *cix_in = 2: One extra word
          *                           = 3: Two extra words
@@ -758,8 +765,8 @@ find_string (char *str, vector_t *wvec, size_t *cix_in)
         fpos = (int)*cix_in;
         for (; *cix_in < VEC_SIZE(split) + (size_t)fpos; (*cix_in)++)
         {
-            if (strcmp(split->item[*cix_in-fpos].u.string,
-                       wvec->item[*cix_in].u.string))
+            if (!mstreq(split->item[*cix_in-fpos].u.str,
+                       wvec->item[*cix_in].u.str))
                 break;
         }
 
@@ -779,7 +786,7 @@ find_string (char *str, vector_t *wvec, size_t *cix_in)
 
 /*-------------------------------------------------------------------------*/
 static int
-member_string (char *str, vector_t *svec)
+member_string (string_t *str, vector_t *svec)
 
 /* Test if string <str> is member of the array <svec>.
  * Return the position if found, and -1 otherwise.
@@ -793,10 +800,10 @@ member_string (char *str, vector_t *svec)
 
     for (il = 0; il < VEC_SIZE(svec); il++)
     {
-        if (svec->item[il].type != T_OLD_STRING)
+        if (svec->item[il].type != T_STRING)
             continue;
 
-        if (strcmp(svec->item[il].u.string, str) == 0)
+        if (mstreq(svec->item[il].u.str, str))
             return (int)il;
     }
     
@@ -817,7 +824,8 @@ check_adjectiv (size_t obix, vector_t *wvec, size_t from, size_t to)
     size_t    sum;    /* Total length of command words tested */
     size_t    back;
     Bool      fail;   /* TRUE if not found */
-    char     *adstr;
+    string_t *adstr;
+    char     *adstrp;
     vector_t *ids;    /* Adj list of the object */
 
     /* Get the objects adj-list if existing */
@@ -831,9 +839,9 @@ check_adjectiv (size_t obix, vector_t *wvec, size_t from, size_t to)
      */
     for (sum = 0, fail = MY_FALSE, il = from; il <= to; il++)
     {
-        sum += strlen(wvec->item[il].u.string) + 1;
-        if ((member_string(wvec->item[il].u.string, ids) < 0)
-         && (member_string(wvec->item[il].u.string, gAdjid_list_d) < 0))
+        sum += mstrsize(wvec->item[il].u.str) + 1;
+        if ((member_string(wvec->item[il].u.str, ids) < 0)
+         && (member_string(wvec->item[il].u.str, gAdjid_list_d) < 0))
         {
             fail = MY_TRUE;
         }
@@ -855,7 +863,8 @@ check_adjectiv (size_t obix, vector_t *wvec, size_t from, size_t to)
      * TODO: This test could be implemented faster.
      */
      
-    adstr = xalloc(sum);  /* Workspace */
+    adstr = NULL;
+    adstrp = xalloc(sum);  /* Workspace */
 
     /* Test the adjectives one after the other */
     for (il = from; il < to;)
@@ -867,14 +876,16 @@ check_adjectiv (size_t obix, vector_t *wvec, size_t from, size_t to)
         for (back = to; back > il; back--)
         {
             /* Catenate the adjective from the command words */
-            adstr[0] = '\0';
+            adstrp[0] = '\0';
             for (sum = il; sum <= back; sum++)
             {
                 if (sum > il)
-                    strcat(adstr, " ");
-                strcat(adstr, wvec->item[sum].u.string);
+                    strcat(adstrp, " ");
+                strcat(adstrp, get_txt(wvec->item[sum].u.str));
             }
             
+            adstr = new_mstring(adstrp);
+
             if ((member_string(adstr, ids) >= 0)
              || (member_string(adstr, gAdjid_list_d) >= 0))
             {
@@ -884,13 +895,15 @@ check_adjectiv (size_t obix, vector_t *wvec, size_t from, size_t to)
             }
 
             /* Not found: abort */
-            xfree(adstr);
+            mstring_free(adstr);
+            xfree(adstrp);
             return MY_FALSE;
         }
     }
 
     /* Found: clean up and return */
-    xfree(adstr);
+    mstring_free(adstr);
+    xfree(adstrp);
     return MY_TRUE;
 } /* check_adjectiv() */
 
@@ -928,7 +941,7 @@ number_parse( vector_t *obvec UNUSED  /* in: array of objects to match against *
     ones = 0;
     
     /* First try to parse the number in digit representation */
-    if (sscanf(wvec->item[cix].u.string, "%d", &num))
+    if (sscanf(get_txt(wvec->item[cix].u.str), "%d", &num))
     {
         if (num >= 0)
         {
@@ -941,7 +954,7 @@ number_parse( vector_t *obvec UNUSED  /* in: array of objects to match against *
     }
 
     /* Is it the 'all' word? */
-    if (gAllword && EQ(wvec->item[cix].u.string, gAllword))
+    if (gAllword && mstreq(wvec->item[cix].u.str, gAllword))
     {
         (*cix_in)++;
         put_number(&stmp, 0);
@@ -950,23 +963,23 @@ number_parse( vector_t *obvec UNUSED  /* in: array of objects to match against *
 
     /* Test the number against every known textual number.
      */
-    for (ten = 0;ten < 10; ten++)
+    for (ten = 0; ten < 10; ten++)
     {
         char *second;
         
         /* Test if the first part of the word matches */
-        if (!EQN(num10[ten], wvec->item[cix].u.string))
+        if (!PREFIXED(num10[ten], get_txt(wvec->item[cix].u.str)))
             continue;
 
         /* Yup, now match the rest */
-        second = wvec->item[cix].u.string + strlen(num10[ten]);
+        second = get_txt(wvec->item[cix].u.str) + strlen(num10[ten]);
 
         for (ones = 0; ones < 10; ones++)
         {
             char *tmp;
             
             tmp = (ten>1) ? num1[ones] : num1[ten*10+ones];
-            if (EQ(second, tmp))
+            if (!strcmp(second, tmp))
             {
                 (*cix_in)++;
                 put_number(&stmp, ten*10+ones);
@@ -982,7 +995,7 @@ number_parse( vector_t *obvec UNUSED  /* in: array of objects to match against *
         char *second;
 
         /* Multiples of 10 have their own words */
-        if (EQ(sord10[ten], wvec->item[cix].u.string))
+        if (!strcmp(sord10[ten], get_txt(wvec->item[cix].u.str)))
         {
             (*cix_in)++;
             put_number(&stmp, -(ten*10+ones));
@@ -990,18 +1003,18 @@ number_parse( vector_t *obvec UNUSED  /* in: array of objects to match against *
         }
 
         /* Test if the first part of the word matches */
-        if (!EQN(ord10[ten], wvec->item[cix].u.string))
+        if (!PREFIXED(ord10[ten], get_txt(wvec->item[cix].u.str)))
             continue;
 
         /* Yup, now match the rest */
-        second = wvec->item[cix].u.string + strlen(ord10[ten]);
+        second = get_txt(wvec->item[cix].u.str) + strlen(ord10[ten]);
 
         for(ones = 1; ones < 10; ones++)
         {
             char *tmp;
 
             tmp = (ten > 1) ? ord1[ones] : ord1[ten*10+ones];
-            if (EQ(second, tmp))
+            if (!strcmp(second, tmp))
             {
                 (*cix_in)++;
                 put_number(&stmp, -(ten*10+ones));
@@ -1033,7 +1046,7 @@ match_object (size_t obix, vector_t *wvec, size_t *cix_in, Bool *plur)
     int       cplur;  /* Which id-list to test (0..3) */
     size_t    il, old_cix;
     int       pos;
-    char     *str;
+    string_t  *str;
 
     /* Loop over the four lists of ids */
     for (cplur = *plur ? 2 : 0; cplur < 4; cplur++)
@@ -1078,9 +1091,9 @@ match_object (size_t obix, vector_t *wvec, size_t *cix_in, Bool *plur)
         /* Loop over the ids and find a match */
         for (il = 0; il < VEC_SIZE(ids); il++)
         {
-            if (ids->item[il].type == T_OLD_STRING)
+            if (ids->item[il].type == T_STRING)
             {
-                str = ids->item[il].u.string;  /* A given id of the object */
+                str = ids->item[il].u.str;  /* A given id of the object */
                 old_cix = *cix_in;
                 if ((pos = find_string(str, wvec, cix_in)) >= 0)
                 {
@@ -1101,7 +1114,6 @@ match_object (size_t obix, vector_t *wvec, size_t *cix_in, Bool *plur)
     /* Doesn't match */
     return MY_FALSE;
 } /* match_object() */
-
 
 /*-------------------------------------------------------------------------*/
 static svalue_t *
@@ -1216,7 +1228,8 @@ living_parse (vector_t *obvec, vector_t *wvec, size_t *cix_in, Bool *fail)
  * description given in commandvector <wvec>[<cix_in>..].
  * Result is a vector with the found objects, and the first element is
  * a number returning a found numeral: 0 for 'all' or a generic plural,
- * > 0: for a numeral 'one', 'two' etc, < 0 for an ordinal 'first', 'second', etc.
+ * > 0: for a numeral 'one', 'two' etc, < 0 for an ordinal 'first', 'second',
+ *      etc.
  * <cix_in> is updated and <fail> is set to FALSE.
  *
  * On failure, return NULL, update <cix_in> and set <fail> to TRUE.
@@ -1263,9 +1276,9 @@ living_parse (vector_t *obvec, vector_t *wvec, size_t *cix_in, Bool *fail)
     /* We can't find a matching living object in obvec, but
      * maybe the command names a player or living by name.
      */
-    ob = find_living_object(wvec->item[*cix_in].u.string, MY_TRUE);
+    ob = find_living_object(wvec->item[*cix_in].u.str, MY_TRUE);
     if (!ob)
-        ob = find_living_object(wvec->item[*cix_in].u.string, MY_FALSE);
+        ob = find_living_object(wvec->item[*cix_in].u.str, MY_FALSE);
 
     if (ob)
     {
@@ -1327,7 +1340,6 @@ single_parse (vector_t *obvec, vector_t *wvec, size_t *cix_in, Bool *fail)
 static svalue_t *
 prepos_parse (vector_t *wvec, size_t *cix_in, Bool *fail, svalue_t *prepos)
 
-
 /* Match the commandwords <wvec>[<cix_in>..] against a list of prepositions.
  * On return, <cix_in> has been updated and <fail> gives the success.
  *
@@ -1345,7 +1357,7 @@ prepos_parse (vector_t *wvec, size_t *cix_in, Bool *fail, svalue_t *prepos)
   static svalue_t stmp;
 
   vector_t *pvec, *tvec;
-  char     *tmp;
+  string_t *tmp;
   size_t    pix, tix;
 
   /* Determine list to match against */
@@ -1356,15 +1368,15 @@ prepos_parse (vector_t *wvec, size_t *cix_in, Bool *fail, svalue_t *prepos)
 
   for (pix = 0; pix < VEC_SIZE(pvec); pix++)
   {
-      if (pvec->item[pix].type != T_OLD_STRING)
+      if (pvec->item[pix].type != T_STRING)
           continue;
 
-      tmp = pvec->item[pix].u.string;
-      if (!strchr(tmp,' '))
+      tmp = pvec->item[pix].u.str;
+      if (!strchr(get_txt(tmp),' '))
       {
           /* A single word match */
           
-          if (EQ(tmp, wvec->item[*cix_in].u.string))
+          if (mstreq(tmp, wvec->item[*cix_in].u.str))
           {
               (*cix_in)++;
               break;
@@ -1374,11 +1386,11 @@ prepos_parse (vector_t *wvec, size_t *cix_in, Bool *fail, svalue_t *prepos)
       {
           /* Multiword match */
           
-          tvec = old_explode_string(tmp, " ");
+          tvec = old_explode_string(tmp, STR_SPACE);
           for (tix = 0; tix < VEC_SIZE(tvec); tix++)
           {
               if (*cix_in+tix >= VEC_SIZE(wvec)
-               || (!EQ(wvec->item[*cix_in+tix].u.string, tvec->item[tix].u.string))
+               || (!mstreq(wvec->item[*cix_in+tix].u.str, tvec->item[tix].u.str))
                  )
                   break;
           }
@@ -1419,7 +1431,7 @@ prepos_parse (vector_t *wvec, size_t *cix_in, Bool *fail, svalue_t *prepos)
 /*-------------------------------------------------------------------------*/
 static svalue_t *
 one_parse ( vector_t *obvec       /* in: array of objects to match against */
-          , char     *pat         /* in: word */
+          , string_t *pat         /* in: word */
           , vector_t *wvec        /* in: array of command words */
           , size_t   *cix_in      /* in-out: position in wvec */
           , Bool     *fail        /* out: TRUE if mismatch */
@@ -1450,10 +1462,10 @@ one_parse ( vector_t *obvec       /* in: array of objects to match against */
     }
 
     /* Get the command character */
-    ch = pat[0];
+    ch = get_txt(pat)[0];
     if (ch == '%')
     {
-        ch = pat[1];
+        ch = get_txt(pat)[1];
     }
 
     pval = NULL;
@@ -1474,7 +1486,7 @@ one_parse ( vector_t *obvec       /* in: array of objects to match against */
         break;
 
     case 'w': case 'W':  /* Match the next word */
-        put_old_string(&stmp, make_shared_string(wvec->item[*cix_in].u.string));
+        put_string(&stmp, make_tabled_from(wvec->item[*cix_in].u.str));
         pval = &stmp;
         (*cix_in)++;
         *fail = MY_FALSE;
@@ -1493,8 +1505,8 @@ one_parse ( vector_t *obvec       /* in: array of objects to match against */
         break;
 
     case '\'':           /* Match a required word */
-        str1 = &pat[1];
-        str2 = wvec->item[*cix_in].u.string;
+        str1 = &get_txt(pat)[1];
+        str2 = get_txt(wvec->item[*cix_in].u.str);
         if (strncmp(str1, str2, strlen(str1)-1) == 0
          && strlen(str1) == strlen(str2)+1)
         {
@@ -1506,8 +1518,8 @@ one_parse ( vector_t *obvec       /* in: array of objects to match against */
         break;
 
     case '[':            /* Match an optional word */
-        str1 = &pat[1];
-        str2 = wvec->item[*cix_in].u.string;
+        str1 = &get_txt(pat)[1];
+        str2 = get_txt(wvec->item[*cix_in].u.str);
         if (strncmp(str1, str2, strlen(str1)-1) == 0
          && strlen(str1) == strlen(str2)+1)
         {
@@ -1557,7 +1569,7 @@ sub_parse ( vector_t *obvec   /* in: array of objects to match against */
     cix = *cix_in; pix = *pix_in; subfail = MY_FALSE;
 
     /* Try to parse a single pattern element */
-    pval = one_parse( obvec, patvec->item[pix].u.string
+    pval = one_parse( obvec, patvec->item[pix].u.str
                     , wvec, &cix, &subfail, sp);
 
     /* If no match (so far), try the next alternative.
@@ -1569,14 +1581,14 @@ sub_parse ( vector_t *obvec   /* in: array of objects to match against */
         cix = *cix_in;
 
         while (pix < VEC_SIZE(patvec)
-            && EQ(patvec->item[pix].u.string, "/"))
+            && mstreq(patvec->item[pix].u.str, STR_SLASH))
         {
             subfail = MY_FALSE;
             pix++;
         }
 
         if (!subfail && pix < VEC_SIZE(patvec))
-            pval = one_parse( obvec, patvec->item[pix].u.string, wvec, &cix
+            pval = one_parse( obvec, patvec->item[pix].u.str, wvec, &cix
                             , &subfail, sp);
         else
         {
@@ -1587,9 +1599,11 @@ sub_parse ( vector_t *obvec   /* in: array of objects to match against */
     }
 
     /* We have a match: skip remaining alternatives */
-    if (pix+1 < VEC_SIZE(patvec) && EQ(patvec->item[pix+1].u.string,"/"))
+    if (pix+1 < VEC_SIZE(patvec)
+     && mstreq(patvec->item[pix+1].u.str, STR_SLASH))
     {
-        while (pix+1 < VEC_SIZE(patvec) && EQ(patvec->item[pix+1].u.string,"/"))
+        while (pix+1 < VEC_SIZE(patvec)
+            && mstreq(patvec->item[pix+1].u.str, STR_SLASH))
         {
             pix += 2;
         }
@@ -1607,9 +1621,9 @@ sub_parse ( vector_t *obvec   /* in: array of objects to match against */
 
 /*-------------------------------------------------------------------------*/
 Bool
-e_parse_command ( char     *cmd          /* Command to parse */
+e_parse_command ( string_t *cmd          /* Command to parse */
                 , svalue_t *ob_or_array  /* Object or array of objects */
-                , char     *pattern      /* Special parsing pattern */
+                , string_t *pattern      /* Special parsing pattern */
                 , svalue_t *stack_args   /* Pointer to lvalue args on stack */
                 , int       num_arg      /* Number of lvalues on stack */
                 )
@@ -1635,18 +1649,18 @@ e_parse_command ( char     *cmd          /* Command to parse */
 
     /* Pattern and commands can not be empty
      */
-    if (!strlen(cmd) || !strlen(pattern))
+    if (!mstrsize(cmd) || !mstrsize(pattern))
         return MY_FALSE;
 
     /* Prepare some variables */
     
     xallocate(old, sizeof *old, "parse context");
         
-    wvec = old_explode_string(cmd," ");
+    wvec = old_explode_string(cmd, STR_SPACE);
     if (!wvec)
         wvec = allocate_array(0);
 
-    patvec = old_explode_string(pattern," ");
+    patvec = old_explode_string(pattern, STR_SPACE);
     if (!patvec)
         patvec = allocate_array(0);
 
@@ -1734,8 +1748,8 @@ e_parse_command ( char     *cmd          /* Command to parse */
         gPrepos_list = allocate_array(0);
 
     pval = apply_master_ob(STR_PC_ALLWORD,0);
-    if (pval && pval->type == T_OLD_STRING)
-        gAllword = string_copy(pval->u.string);
+    if (pval && pval->type == T_STRING)
+        gAllword = ref_mstring(pval->u.str);
     else
         gAllword = NULL;
 
@@ -1747,7 +1761,7 @@ e_parse_command ( char     *cmd          /* Command to parse */
         pval = NULL;
         fail = MY_FALSE;
 
-        if (EQ(patvec->item[pix].u.string, "%s"))
+        if (mstreq(patvec->item[pix].u.str, STR_PERCENT_S))
         {
             /* If at the end of the pattern, %s matches everything left
              * in the wvec.
@@ -1796,7 +1810,7 @@ e_parse_command ( char     *cmd          /* Command to parse */
                 }
             }
         }
-        else if (!EQ(patvec->item[pix].u.string,"/"))
+        else if (!mstreq(patvec->item[pix].u.str, STR_SLASH))
         {
             /* Everything else is handled by sub_parse() */
             pval = sub_parse( obvec, patvec, &pix, wvec, &cix, &fail

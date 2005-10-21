@@ -80,7 +80,7 @@ object connect ()
 {
     object obj;
     debug_message(sprintf("%O: connect()\n", this_object()));
-    obj = clone_object(file_name(this_object()));
+    obj = clone_object(object_name(this_object()));
     return obj;
 }
 

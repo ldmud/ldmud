@@ -60,12 +60,14 @@
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
+#include "mstrings.h"
 #include "object.h"
 #include "otable.h"
 #include "prolang.h"
 #include "rxcache.h"
 #include "sent.h"
 #include "simul_efun.h"
+#include "smalloc.h" /* dump_malloc_data() */
 #include "stdstrings.h"
 #include "strfuns.h"
 #include "swap.h"
@@ -211,13 +213,13 @@ static char emsg_buf[2000];
   /* The buffer for the error message to be created.
    */
 
-char   *current_error;
-char   *current_error_file;
-char   *current_error_object_name;
-mp_int  current_error_line_number;
+string_t *current_error;
+string_t *current_error_file;
+string_t *current_error_object_name;
+mp_int    current_error_line_number;
   /* When an error occured during secure_apply(), these four
-   * variables receive allocated copies of the error message,
-   * the name of the active program and object, and the
+   * variables receive allocated copies (resp. counted refs) of
+   * the error message, the name of the active program and object, and the
    * line number in the program.
    */
 
@@ -266,7 +268,7 @@ static void free_shadow_sent (shadow_t *p);
 
 /*-------------------------------------------------------------------------*/
 Bool
-catch_instruction (bytecode_t catch_inst, uint offset
+catch_instruction ( bytecode_t catch_inst, uint offset
                   , volatile svalue_t ** volatile i_sp
                   , bytecode_p i_pc, svalue_t * i_fp)
 
@@ -375,7 +377,7 @@ catch_instruction (bytecode_t catch_inst, uint offset
             pop_error_context();
 
             /* Since no error happened, push 0 onto the stack */
-            push_number(0);
+            push_number(inter_sp, 0);
         }
 
         eval_cost -= CATCH_RESERVED_COST;
@@ -462,7 +464,7 @@ unroll_context_stack (void)
 
 /*-------------------------------------------------------------------------*/
 void
-fatal (char *fmt, ...)
+fatal (const char *fmt, ...)
 
 /* A fatal error occured. Generate a message from printf-style <fmt>, including
  * a timestamp, dump the backtrace and abort.
@@ -488,13 +490,13 @@ fatal (char *fmt, ...)
     if (current_object)
         fprintf(stderr, "%s Current object was %s\n"
                       , ts, current_object->name
-                            ? current_object->name : "<null>");
+                            ? get_txt(current_object->name) : "<null>");
     debug_message("%s ", ts);
     vdebug_message(fmt, va);
     if (current_object)
         debug_message("%s Current object was %s\n"
                      , ts, current_object->name
-                           ? current_object->name : "<null>");
+                           ? get_txt(current_object->name) : "<null>");
     debug_message("%s Dump of the call chain:\n", ts);
     (void)dump_trace(MY_TRUE);
     printf("%s LDMud aborting on fatal error.\n", time_stamp());
@@ -522,7 +524,7 @@ fatal (char *fmt, ...)
 
 /*-------------------------------------------------------------------------*/
 char *
-limit_error_format (char *fixed_fmt, char *fmt)
+limit_error_format (char *fixed_fmt, const char *fmt)
 
 /* Safety function for error messages: in the error message <fmt>
  * every '%s' spec is changed to '%.200s' to avoid buffer overflows.
@@ -553,7 +555,7 @@ limit_error_format (char *fixed_fmt, char *fmt)
 
 /*-------------------------------------------------------------------------*/
 void
-error (char *fmt, ...)
+error (const char *fmt, ...)
 
 /* A system runtime error occured: generate a message from printf-style
  * <fmt> with a timestamp, and handle it.
@@ -569,14 +571,14 @@ error (char *fmt, ...)
 
 {
     rt_context_t *rt;
-    char     *object_name;
+    string_t *object_name;
     char     *ts;
     svalue_t *svp;
     Bool      do_save_error;
-    char     *file;                  /* program name */
-    char     *malloced_error;        /* copy of emsg_buf+1 */
-    char     *malloced_file = NULL;  /* copy of program name */
-    char     *malloced_name = NULL;  /* copy of the object name */
+    string_t *file;                  /* program name */
+    string_t *malloced_error;        /* copy of emsg_buf+1 */
+    string_t *malloced_file = NULL;  /* copy of program name */
+    string_t *malloced_name = NULL;  /* copy of the object name */
     char      fixed_fmt[200];
     mp_int    line_number = 0;
     va_list   va;
@@ -625,7 +627,7 @@ error (char *fmt, ...)
     {
         /* User catches this error */
 
-        put_malloced_string(&catch_value, string_copy(emsg_buf));
+        put_c_string(&catch_value, emsg_buf);
           /* always reallocate */
 
         if (rt->type != ERROR_RECOVERY_CATCH_NOLOG)
@@ -657,10 +659,7 @@ error (char *fmt, ...)
     do_save_error = MY_FALSE;
 
     /* Get a copy of the error message */
-    if ( NULL != (malloced_error = xalloc(strlen(emsg_buf))) )
-    {
-        strcpy(malloced_error, emsg_buf+1);
-    }
+    malloced_error = new_mstring(emsg_buf+1);
 
     /* If we have a current_object, determine the program location
      * of the fault.
@@ -669,24 +668,15 @@ error (char *fmt, ...)
     {
         line_number = get_line_number_if_any(&file);
         debug_message("%s program: %s, object: %s line %ld\n"
-                     , ts, file, current_object->name, line_number);
+                     , ts, get_txt(file), get_txt(current_object->name)
+                     , line_number);
         if (current_prog && num_error < 3)
         {
             do_save_error = MY_TRUE;
         }
 
-        if ( NULL != (malloced_file = xalloc(strlen(file) + 1)) )
-        {
-            strcpy(malloced_file, file);
-        }
-
-        if ( NULL != (malloced_name = xalloc(strlen(current_object->name) + 1)) )
-        {
-            strcpy(malloced_name, current_object->name);
-        }
-
-        if (file)
-            free_mstring(file);
+        malloced_file = file; /* Adopt reference */
+        malloced_name = ref_mstring(current_object->name);
     }
 
     /* Duplicate the error messages so far on stdout */
@@ -699,7 +689,8 @@ error (char *fmt, ...)
         if (current_object)
         {
             printf("%s program: %s, object: %s line %ld\n"
-                  , ts, file, current_object->name, line_number
+                  , ts, get_txt(file), get_txt(current_object->name)
+                  , line_number
                   );
         }
     }
@@ -720,11 +711,11 @@ error (char *fmt, ...)
         if (out_of_memory)
         {
             if (malloced_error)
-                xfree(malloced_error);
+                free_mstring(malloced_error);
             if (malloced_file)
-                xfree(malloced_file);
+                free_mstring(malloced_file);
             if (malloced_name)
-                xfree(malloced_name);
+                free_mstring(malloced_name);
         }
         unroll_context_stack();
         longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
@@ -742,7 +733,7 @@ error (char *fmt, ...)
 
     if (do_save_error)
     {
-        save_error(emsg_buf, file, line_number);
+        save_error(emsg_buf, get_txt(file), line_number);
     }
 
     if (object_name)
@@ -756,9 +747,9 @@ error (char *fmt, ...)
         {
             if (command_giver && num_error < 2)
                 add_message("error when executing program in destroyed object %s\n",
-                            object_name);
+                            get_txt(object_name));
             debug_message("%s error when executing program in destroyed object %s\n"
-                         , ts, object_name);
+                         , ts, get_txt(object_name));
         }
     }
 
@@ -778,12 +769,12 @@ error (char *fmt, ...)
 
         CLEAR_EVAL_COST;
         RESET_LIMITS;
-        push_volatile_string(inter_sp, malloced_error);
+        push_ref_string(inter_sp, malloced_error);
         a = 1;
         if (current_object)
         {
-            push_volatile_string(inter_sp, malloced_file);
-            push_volatile_string(inter_sp, malloced_name);
+            push_ref_string(inter_sp, malloced_file);
+            push_ref_string(inter_sp, malloced_name);
             push_number(inter_sp, line_number);
             a += 3;
         }
@@ -804,14 +795,14 @@ error (char *fmt, ...)
             current_heart_beat = NULL;
             set_heart_beat(culprit, MY_FALSE);
             debug_message("%s Heart beat in %s turned off.\n"
-                         , time_stamp(), culprit->name);
+                         , time_stamp(), get_txt(culprit->name));
             push_ref_valid_object(inter_sp, culprit, "heartbeat error");
-            push_volatile_string(inter_sp, malloced_error);
+            push_ref_string(inter_sp, malloced_error);
             a = 2;
             if (current_object)
             {
-                push_volatile_string(inter_sp, malloced_file);
-                push_volatile_string(inter_sp, malloced_name);
+                push_ref_string(inter_sp, malloced_file);
+                push_ref_string(inter_sp, malloced_name);
                 push_number(inter_sp, line_number);
                 a += 3;
             }
@@ -830,11 +821,11 @@ error (char *fmt, ...)
 
     /* Clean up */
     if (malloced_error)
-        xfree(malloced_error);
+        free_mstring(malloced_error);
     if (malloced_file)
-        xfree(malloced_file);
+        free_mstring(malloced_file);
     if (malloced_name)
-        xfree(malloced_name);
+        free_mstring(malloced_name);
 
     num_error--;
 
@@ -859,8 +850,8 @@ error (char *fmt, ...)
 
 /*-------------------------------------------------------------------------*/
 void
-parse_error (Bool warning, char *error_file, int line, char *what
-            , char *context)
+parse_error (Bool warning, const char *error_file, int line, const char *what
+            , const char *context)
 
 /* The compiler found an error <what> (<warning> is FALSE) resp.
  * a warning <what> (<warning> is TRUE) while compiling <line> of
@@ -884,8 +875,8 @@ parse_error (Bool warning, char *error_file, int line, char *what
     /* Don't call the master if it isn't loaded! */
     if (master_ob && !(master_ob->flags & O_DESTRUCTED) )
     {
-        push_volatile_string(inter_sp, error_file);
-        push_volatile_string(inter_sp, buff);
+        push_c_string(inter_sp, error_file);
+        push_c_string(inter_sp, buff);
         push_number(inter_sp, warning ? 1 : 0);
         apply_master_ob(STR_LOG_ERROR, 3);
     }
@@ -978,7 +969,7 @@ push_give_uid_error_context (object_t *ob)
     {
         destruct(ob);
         error("Out of memory (%lu bytes) for new object '%s' uids\n"
-             , (unsigned long) sizeof(*ecp), ob->name);
+             , (unsigned long) sizeof(*ecp), get_txt(ob->name));
     }
     ecp->head.type = T_ERROR_HANDLER;
     ecp->head.u.error_handler = give_uid_error_handler;
@@ -1013,27 +1004,27 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
         ret = inter_sp;
         xfree(ret[-1].u.lvalue); /* free error context */
 
-        if (ret->type == T_OLD_STRING)
+        if (ret->type == T_STRING)
         {
-            ob->user = add_name(ret->u.string);
+            ob->user = add_name(ret->u.str);
             ob->eff_user = ob->user;
             pop_stack();        /* deallocate result */
             inter_sp--;         /* skip error context */
             return MY_TRUE;
         }
         else if (ret->type == T_POINTER && VEC_SIZE(ret->u.vec) == 2
-              && (   ret->u.vec->item[0].type == T_OLD_STRING
+              && (   ret->u.vec->item[0].type == T_STRING
                   || (!strict_euids && ret->u.vec->item[0].u.number)
                  )
                 )
         {
             ret = ret->u.vec->item;
-            ob->user =   ret[0].type != T_OLD_STRING
+            ob->user =   ret[0].type != T_STRING
                        ? &default_wizlist_entry
-                       : add_name(ret[0].u.string);
-            ob->eff_user = ret[1].type != T_OLD_STRING
+                       : add_name(ret[0].u.str);
+            ob->eff_user = ret[1].type != T_STRING
                            ? 0
-                           : add_name(ret[1].u.string);
+                           : add_name(ret[1].u.str);
             pop_stack();
             inter_sp--;
             return MY_TRUE;
@@ -1064,12 +1055,12 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
     if (master_ob == NULL)
     {
         /* Only for the master object. */
-        ob->user = add_name("NONAME");
+        ob->user = add_name(STR_NONAME);
         ob->eff_user = NULL;
         return MY_TRUE;
     }
 
-    ob->user = add_name("NONAME");
+    ob->user = add_name(STR_NONAME);
     ob->eff_user = ob->user;
     put_object(&arg, ob);
     destruct_object(&arg);
@@ -1157,7 +1148,7 @@ make_name_sane (const char *pName, Bool addSlash)
 
 /*-------------------------------------------------------------------------*/
 Bool
-check_no_parentdirs (char *path)
+check_no_parentdirs (const char *path)
 
 /* Check that there are no '/../' constructs in the path.
  * Return TRUE if there aren't.
@@ -1186,7 +1177,7 @@ check_no_parentdirs (char *path)
 
 /*-------------------------------------------------------------------------*/
 Bool
-legal_path (char *path)
+legal_path (const char *path)
 
 /* Check that <path> is a legal relative path. This means no spaces
  * and no '/../' are allowed.
@@ -1233,9 +1224,10 @@ legal_path (char *path)
 static object_t *
 load_object (const char *lname, Bool create_super, int depth)
 
-/* Load (compile) an object blueprint from the file <lname>. <create_super>
- * is true if the object has to be initialized with CREATE_SUPER, and false
- * if CREATE_OB is to be used. <depth> is the limit of allowed recursive loads.
+/* Load (compile) an object blueprint from the file <lname>.
+ * <create_super> is true if the object has to be
+ * initialized with CREATE_SUPER, and false if CREATE_OB is to be used.
+ * <depth> is the limit of allowed recursive loads.
  *
  * If the object can't be loaded because it inherits some other unloaded
  * object, call load_object() recursively to load the inherited object, then
@@ -1269,7 +1261,7 @@ load_object (const char *lname, Bool create_super, int depth)
     /* It could be that the passed filename is one of an already loaded
      * object. In that case, simply return that object.
      */
-    ob = lookup_object_hash((char *)lname);
+    ob = lookup_object_hash_str((char *)lname);
     if (ob)
     {
         return ob;
@@ -1302,13 +1294,13 @@ load_object (const char *lname, Bool create_super, int depth)
          */
         assert_master_ob_loaded();
         /* has the object been loaded by assert_master_ob_loaded ? */
-        if ( NULL != (ob = find_object(name)) )
+        if ( NULL != (ob = find_object_str(name)) )
         {
             if (ob->flags & O_SWAPPED && load_ob_from_swap(ob) < 0)
                 /* The master has swapped this object and used up most
                  * memory... strange, but thinkable
                  */
-                error("Out of memory: unswap object '%s'\n", ob->name);
+                error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
             return ob;
         }
     }
@@ -1343,14 +1335,14 @@ load_object (const char *lname, Bool create_super, int depth)
 
         svalue_t *svp;
 
-        push_volatile_string(inter_sp, fname);
+        push_c_string(inter_sp, fname);
         svp = apply_master_ob(STR_COMP_OBJ, 1);
         if (svp && svp->type == T_OBJECT)
         {
             /* We got an object from the call, but is it what it
              * claims to be?
              */
-            if ( NULL != (ob = lookup_object_hash(name)) )
+            if ( NULL != (ob = lookup_object_hash_str(name)) )
             {
                 /* An object for <name> magically appeared - is it
                  * the one we received?
@@ -1365,8 +1357,8 @@ load_object (const char *lname, Bool create_super, int depth)
                  */
                 ob = svp->u.ob;
                 remove_object_hash(ob);
-                xfree(ob->name);
-                ob->name = string_copy(name);
+                free_mstring(ob->name);
+                ob->name = new_mstring(name);
                 enter_object_hash(ob);
                 return ob;
             }
@@ -1398,7 +1390,7 @@ load_object (const char *lname, Bool create_super, int depth)
     while (MY_TRUE)
     {
         /* This can happen after loading an inherited object: */
-        ob = lookup_object_hash((char *)name);
+        ob = lookup_object_hash_str((char *)name);
         if (ob)
         {
             return ob;
@@ -1456,10 +1448,10 @@ load_object (const char *lname, Bool create_super, int depth)
             char * pInherited;
             const char * tmp;
 
-            tmp = make_name_sane(inherit_file, MY_FALSE);
+            tmp = make_name_sane(get_txt(inherit_file), MY_FALSE);
             if (!tmp)
             {
-                pInherited = inherit_file;
+                pInherited = get_txt(inherit_file);
             }
             else
             {
@@ -1467,7 +1459,7 @@ load_object (const char *lname, Bool create_super, int depth)
                 strcpy(pInherited, tmp);
             }
 
-            push_referenced_shared_string(inherit_file);
+            push_string(inter_sp, inherit_file);
               /* Automagic freeing in case of errors */
             inherit_file = NULL;
 
@@ -1491,7 +1483,7 @@ load_object (const char *lname, Bool create_super, int depth)
             }
 
             ob = load_object(pInherited, MY_TRUE, depth-1);
-            free_string(inter_sp->u.string);
+            free_mstring(inter_sp->u.str);
             inter_sp--;
             if (!ob || ob->flags & O_DESTRUCTED)
             {
@@ -1532,11 +1524,11 @@ load_object (const char *lname, Bool create_super, int depth)
     if (!ob)
         error("Out of memory for new object '%s'\n", name);
 
-    ob->name = string_copy(name);  /* Shared string is no good here */
-    tot_alloc_object_size += strlen(ob->name)+1;
+    ob->name = new_mstring(name);  /* Shared string is no good here */
+    tot_alloc_object_size += mstrsize(ob->name);
     if (!compat_mode)
         name--;  /* Make the leading '/' visible again */
-    ob->load_name = make_shared_string(name);  /* but here it is */
+    ob->load_name = new_tabled(name);  /* but here it is */
     ob->prog = prog;
     ob->ticks = ob->gigaticks = 0;
     ob->next_all = obj_list;
@@ -1551,7 +1543,7 @@ load_object (const char *lname, Bool create_super, int depth)
 
     /* Give the object its uids */
     push_give_uid_error_context(ob);
-    push_string_shared(ob->name);
+    push_ref_string(inter_sp, ob->name);
     if (give_uid_to_object(ob, H_LOAD_UIDS, 1))
     {
         /* The object has an uid - now we can update the .user
@@ -1589,24 +1581,24 @@ load_object (const char *lname, Bool create_super, int depth)
         }
     }
 
-    if ( !(ob->flags & O_DESTRUCTED) && function_exists("clean_up",ob) )
+    if ( !(ob->flags & O_DESTRUCTED) && function_exists(STR_CLEAN_UP, ob) )
         ob->flags |= O_WILL_CLEAN_UP;
 
     /* Restore the command giver */
     command_giver = check_object(save_command_giver);
 
     if (d_flag > 1 && ob)
-        debug_message("%s --%s loaded\n", time_stamp(), ob->name);
+        debug_message("%s --%s loaded\n", time_stamp(), get_txt(ob->name));
 
     return ob;
 } /* load_object() */
 
 /*-------------------------------------------------------------------------*/
-static char *
-make_new_name (char *str)
+static string_t *
+make_new_name (string_t *str)
 
 /* <str> is a basic object name - generate a clone name "<str>#<num>"
- * and return it.
+ * and return it. The result will be an untabled string with one reference.
  *
  * The number is guaranteed to be unique in combination with this name.
  */
@@ -1621,37 +1613,35 @@ make_new_name (char *str)
        * first time.
        */
 
-    char *p;
-    size_t l;
+    string_t *p;
     char buff[40];
 
-    if ('/' == *str)
-        str++;
+    str = del_slash(str);
 
     for (;;)
     {
         /* Generate the clone name */
         (void)sprintf(buff, "#%lu", clone_id_number);
-        l = strlen(str);
-        p = xalloc(l + strlen(buff) + 1);
-        strcpy(p, str);
-        strcpy(p+l, buff);
+        p = mstr_add_txt(str, buff, strlen(buff));
 
         clone_id_number++;
         if (clone_id_number == 0) /* Wrap around */
             test_conflict = MY_TRUE;
 
         if (!test_conflict || !find_object(p))
+        {
+            free_mstring(str);
             return p;
+        }
 
         /* The name was already taken */
-        xfree(p);
+        free_mstring(p);
     }
 } /* make_new_name() */
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-clone_object (char *str1)
+clone_object (string_t *str1)
 
 /* Create a clone of the object named <str1>, which may be a clone itself.
  * On success, return the new object, otherwise NULL.
@@ -1660,8 +1650,9 @@ clone_object (char *str1)
 {
     object_t *ob, *new_ob;
     object_t *save_command_giver = command_giver;
-    char *name;
+    string_t *name;
 
+printf("DEBUG: clone_object(%p '%s')\n", str1, get_txt(str1));
     if (strict_euids && current_object && current_object->eff_user == NULL)
         error("Illegal to call clone_object() with effective user 0\n");
 
@@ -1684,7 +1675,7 @@ clone_object (char *str1)
 
     if (ob->super)
         error("Cloning a bad object: '%s' is contained in '%s'.\n"
-             , ob->name, ob->super->name);
+             , get_txt(ob->name), get_txt(ob->super->name));
 
     name = ob->name;
 
@@ -1698,9 +1689,9 @@ clone_object (char *str1)
         char *p;
         mp_int name_length, i;
 
-        name_length = strlen(name);
+        name_length = mstrsize(name);
         i = name_length;
-        p = ob->name+name_length;
+        p = get_txt(ob->name)+name_length;
         while (--i > 0) {
             /* isdigit would need to check isascii first... */
             if ( (c = *--p) < '0' || c > '9' )
@@ -1716,11 +1707,11 @@ clone_object (char *str1)
     }
 
     if ((ob->flags & O_SWAPPED) && load_ob_from_swap(ob) < 0)
-        error("Out of memory: unswap object '%s'\n", ob->name);
+        error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
 
     if (ob->prog->flags & P_NO_CLONE)
         error("Cloning a bad object: '%s' sets '#pragma no_clone'.\n"
-             , ob->name);
+             , get_txt(ob->name));
 
     ob->time_of_ref = current_time;
 
@@ -1742,11 +1733,11 @@ clone_object (char *str1)
      * TODO:: in the program.
      */
     if (!new_ob)
-        error("Out of memory for new clone '%s'\n", name);
+        error("Out of memory for new clone '%s'\n", get_txt(name));
 
     new_ob->name = make_new_name(name);
-    tot_alloc_object_size += strlen(new_ob->name)+1;
-    new_ob->load_name = ref_string(ob->load_name);
+    tot_alloc_object_size += mstrsize(new_ob->name);
+    new_ob->load_name = ref_mstring(ob->load_name);
     new_ob->flags |= O_CLONE | (ob->flags & O_WILL_CLEAN_UP ) ;
     new_ob->prog = ob->prog;
     reference_prog (ob->prog, "clone_object");
@@ -1766,7 +1757,7 @@ clone_object (char *str1)
     enter_object_hash(new_ob);        /* Add name to fast object lookup table */
     push_give_uid_error_context(new_ob);
     push_ref_object(inter_sp, ob, "clone_object");
-    push_volatile_string(inter_sp, new_ob->name);
+    push_ref_string(inter_sp, new_ob->name);
     give_uid_to_object(new_ob, H_CLONE_UIDS, 2);
     reset_object(new_ob, H_CREATE_CLONE);
     command_giver = check_object(save_command_giver);
@@ -1780,7 +1771,7 @@ clone_object (char *str1)
 
 /*-------------------------------------------------------------------------*/
 object_t *
-lookfor_object(char * str, Bool bLoad)
+lookfor_object (string_t * str, Bool bLoad)
 
 /* Look for a named object <str>, optionally loading it (<bLoad> is true).
  * Return a pointer to the object structure, or NULL.
@@ -1807,11 +1798,11 @@ lookfor_object(char * str, Bool bLoad)
      * TODO:: and move the make_name_sane() into those where it can
      * TODO:: be dirty.
      */
-    pName = make_name_sane(str, MY_FALSE);
+    pName = make_name_sane(get_txt(str), MY_FALSE);
     if (!pName)
-        pName = str;
+        pName = get_txt(str);
 
-    ob = lookup_object_hash((char *)pName);
+    ob = lookup_object_hash_str(pName);
     if (!bLoad)
         return ob;
 
@@ -1821,6 +1812,29 @@ lookfor_object(char * str, Bool bLoad)
         return NULL;
     return ob;
 } /* lookfor_object() */
+
+/*-------------------------------------------------------------------------*/
+object_t *
+find_object_str (const char * str)
+
+/* Look for a named object <str>.
+ * Return a pointer to the object structure, or NULL.
+ *
+ * The object is not swapped in.
+ */
+{
+    const char * pName;
+
+    /* TODO: It would be more useful to check all callers of lookfor()
+     * TODO:: and move the make_name_sane() into those where it can
+     * TODO:: be dirty.
+     */
+    pName = make_name_sane(str, MY_FALSE);
+    if (!pName)
+        pName = str;
+
+    return lookup_object_hash_str(pName);
+} /* find_object_str() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1843,9 +1857,9 @@ destruct_object (svalue_t *v)
         ob = v->u.ob;
     else
     {
-        ob = find_object(v->u.string);
+        ob = find_object(v->u.str);
         if (ob == 0)
-            error("destruct_object: Could not find %s\n", v->u.string);
+            error("destruct_object: Could not find %s\n", get_txt(v->u.str));
     }
 
     if (ob->flags & O_DESTRUCTED)
@@ -1853,12 +1867,12 @@ destruct_object (svalue_t *v)
 
     if (ob->flags & O_SWAPPED)
         if (load_ob_from_swap(ob) < 0)
-            error("Out of memory: unswap object '%s'\n", ob->name);
+            error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
 
     if (d_flag)
     {
         debug_message("%s destruct_object: %s (ref %ld)\n"
-                     , time_stamp(), ob->name, ob->ref);
+                     , time_stamp(), get_txt(ob->name), ob->ref);
     }
 
     push_ref_object(inter_sp, ob, "destruct");
@@ -1866,8 +1880,8 @@ destruct_object (svalue_t *v)
     if (!result)
         error("No prepare_destruct\n");
 
-    if (result->type == T_OLD_STRING)
-        error(result->u.string);
+    if (result->type == T_STRING)
+        error(get_txt(result->u.str));
 
     if (result->type != T_NUMBER || result->u.number != 0)
         return;
@@ -2067,7 +2081,7 @@ remove_object (object_t *ob)
     if (d_flag > 1)
     {
         debug_message("%s remove_object: object %s (ref %ld)\n"
-                     , time_stamp(), ob->name, ob->ref);
+                     , time_stamp(), get_txt(ob->name), ob->ref);
     }
 
     if (O_IS_INTERACTIVE(ob))
@@ -2139,7 +2153,7 @@ remove_destructed_objects (void)
 #ifdef DEBUG
         if (!(ob->flags & O_DESTRUCTED))
             fatal("Non-destructed object %p '%s' in list of destructed objects.\n"
-                 , ob, ob->name ? ob->name : "<null>"
+                 , ob, ob->name ? get_txt(ob->name) : "<null>"
                  );
 #endif
         remove_object(ob);
@@ -2475,8 +2489,6 @@ dinfo_data_status (svalue_t *svp)
 string_t *
 check_valid_path (string_t *path, object_t *caller, string_t* call_fun, Bool writeflg)
 
-TODO: result is a string_t with its own reference, path is not dereferenced
-
 /* Object <caller> will read resp. write (<writeflg>) the file <path>
  * for the efun <call_fun>.
  *
@@ -2484,9 +2496,7 @@ TODO: result is a string_t with its own reference, path is not dereferenced
  * valid_write().
  *
  * If the operation is valid, the path to use is returned (always without
- * leading '/', the path "/" will be returned as "."). This path is either
- * a pointer into the <path> argument, or a pointer to a static buffer in
- * apply().
+ * leading '/', the path "/" will be returned as ".").
  *
  * If the operation is invalid, NULL is returned.
  */
@@ -2496,16 +2506,16 @@ TODO: result is a string_t with its own reference, path is not dereferenced
     wiz_list_t *eff_user;
 
     if (path)
-        push_string_malloced(path);
+        push_ref_string(inter_sp, path);
     else
         push_number(inter_sp, 0);
 
     if ( NULL != (eff_user = caller->eff_user) )
-        push_ref_old_string(inter_sp, eff_user->name);
+        push_ref_string(inter_sp, eff_user->name);
     else
         push_number(inter_sp, 0);
 
-    push_volatile_string(inter_sp, call_fun);
+    push_ref_string(inter_sp, call_fun);
     push_ref_valid_object(inter_sp, caller, "check_valid_path");
     if (writeflg)
         v = apply_master_ob(STR_VALID_WRITE, 4);
@@ -2515,30 +2525,41 @@ TODO: result is a string_t with its own reference, path is not dereferenced
     if (!v || (v->type == T_NUMBER && v->u.number == 0))
         return NULL;
 
-    if (v->type != T_OLD_STRING)
+    if (v->type != T_STRING)
     {
         if (!path)
         {
             debug_message("%s master returned bogus filename\n", time_stamp());
             return NULL;
         }
+        (void)ref_mstring(path);
     }
     else
     {
-        path = v->u.string;
+        path = ref_mstring(v->u.str);
     }
 
-    if (path[0] == '/')
-        path++;
+    if (get_txt(path)[0] == '/')
+    {
+        string_t *npath;
+        memsafe(npath = del_slash(path), mstrsize(path)-1
+               , "path for file operation");
+        free_mstring(path);
+        path = npath;
+    }
 
     /* The string "/" will be converted to "." */
-    if (path[0] == '\0')
-        path = ".";
+    if (mstreq(path, STR_EMPTY))
+    {
+        free_mstring(path);
+        path = ref_mstring(STR_PERIOD);
+    }
 
-    if (legal_path(path))
+    if (legal_path(get_txt(path)))
         return path;
 
-    error("Illegal path %s for %s() by %s\n", path, call_fun, caller->name);
+    error("Illegal path %s for %s() by %s\n", get_txt(path), get_txt(call_fun)
+         , get_txt(caller->name));
     return NULL;
 } /* check_valid_path() */
 
@@ -2597,7 +2618,7 @@ free_callback (callback_t *cb)
         if (cb->function.named.ob)
             free_object(cb->function.named.ob, "free_callback");
         if (cb->function.named.name)
-            free_string(cb->function.named.name);
+            free_mstring(cb->function.named.name);
         cb->function.named.ob = NULL;
         cb->function.named.name = NULL;
     }
@@ -2685,7 +2706,7 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
 
 /*-------------------------------------------------------------------------*/
 int
-setup_function_callback ( callback_t *cb, object_t * ob, char * fun
+setup_function_callback ( callback_t *cb, object_t * ob, string_t * fun
                         , int nargs, svalue_t * args, Bool allow_prot_lvalues)
 
 /* Setup the empty/uninitialized callback <cb> to hold a function
@@ -2704,14 +2725,14 @@ setup_function_callback ( callback_t *cb, object_t * ob, char * fun
     int error_index;
     
     cb->is_lambda = MY_FALSE;
-    cb->function.named.name = make_shared_string(fun);
+    cb->function.named.name = make_tabled_from(fun);
     cb->function.named.ob = ref_object(ob, "callback");
 
     error_index = setup_callback_args(cb, nargs, args, allow_prot_lvalues);
     if (error_index >= 0)
     {
         free_object(cb->function.named.ob, "callback");
-        free_string(cb->function.named.name);
+        free_mstring(cb->function.named.name);
         cb->function.named.ob = NULL;
         cb->function.named.name = NULL;
     }
@@ -2783,7 +2804,7 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
         if (error_index >= 0)
             error_index++;
     }
-    else if (args[0].type == T_OLD_STRING)
+    else if (args[0].type == T_STRING)
     {
         object_t *ob;
         int       first_arg;
@@ -2797,9 +2818,9 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
                 ob = args[1].u.ob;
                 first_arg = 2;
             }
-            else if (args[1].type == T_OLD_STRING)
+            else if (args[1].type == T_STRING)
             {
-                ob = get_object(args[1].u.string);
+                ob = get_object(args[1].u.str);
                 first_arg = 2;
             }
             else
@@ -2810,8 +2831,9 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
 
         if (ob != NULL)
         {
-            error_index = setup_function_callback(cb, ob, args[0].u.string
-                                                 , nargs-first_arg, args+first_arg
+            error_index = setup_function_callback(cb, ob, args[0].u.str
+                                                 , nargs-first_arg
+                                                 , args+first_arg
                                                  , MY_FALSE);
             if (error_index >= 0)
                 error_index += first_arg;
@@ -3150,7 +3172,7 @@ free_old_driver_hooks (void)
 
 /*-------------------------------------------------------------------------*/
 Bool
-match_string (char * match, char * str, mp_int len)
+match_string (const char * match, const char * str, mp_int len)
 
 /* Test if the string <str> of length <len> matches the pattern <match>.
  * Allowed wildcards are
@@ -3267,7 +3289,7 @@ print_svalue (svalue_t *arg)
     {
         add_message("<NULL>");
     }
-    else if (arg->type == T_OLD_STRING)
+    else if (arg->type == T_STRING)
     {
         interactive_t *ip;
 
@@ -3275,15 +3297,15 @@ print_svalue (svalue_t *arg)
         if (command_giver && (command_giver->flags & O_ENABLE_COMMANDS)
          && !(O_SET_INTERACTIVE(ip, command_giver)) )
         {
-            tell_npc(command_giver, arg->u.string);
+            tell_npc(command_giver, arg->u.str);
         }
         else
         {
-            add_message("%s", arg->u.string);
+            add_message("%s", get_txt(arg->u.str));
         }
     }
     else if (arg->type == T_OBJECT)
-        add_message("OBJ(%s)", arg->u.ob->name);
+        add_message("OBJ(%s)", get_txt(arg->u.ob->name));
     else if (arg->type == T_NUMBER)
         add_message("%ld", arg->u.number);
     else if (arg->type == T_FLOAT)
@@ -3325,10 +3347,16 @@ f_clone_object (svalue_t * sp)
     object_t *ob;
 
     /* Get the argument and clone the object */
-    if (sp->type == T_OLD_STRING)
-        ob = clone_object(sp->u.string);
+    if (sp->type == T_STRING)
+    {
+printf("DEBUG: Cloning string %p '%s'\n", sp->u.str, get_txt(sp->u.str));
+        ob = clone_object(sp->u.str);
+    }
     else
+    {
+printf("DEBUG: Cloning object %p (%p '%s')\n", sp->u.ob, sp->u.ob->load_name, get_txt(sp->u.ob->load_name));
         ob = clone_object(sp->u.ob->load_name);
+    }
 
     free_svalue(sp);
 
@@ -3392,7 +3420,7 @@ f_find_object (svalue_t *sp)
 {
     object_t *ob;
 
-    ob = find_object(sp->u.string);
+    ob = find_object(sp->u.str);
     free_svalue(sp);
     if (ob)
         put_ref_object(sp, ob, "find_object");
@@ -3420,7 +3448,7 @@ f_load_object (svalue_t *sp)
 {
     object_t *ob;
 
-    ob = get_object(sp->u.string);
+    ob = get_object(sp->u.str);
     free_svalue(sp);
     if (ob)
         put_ref_object(sp, ob, "F_LOAD_OBJECT");
@@ -3452,7 +3480,7 @@ validate_shadowing (object_t *ob)
 
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0)
-            error("Out of memory: unswap object '%s'\n", ob->name);
+            error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
 
     victim = ob->prog;
 
@@ -3483,7 +3511,7 @@ validate_shadowing (object_t *ob)
     for (i = shadow->num_function_names; --i >= 0; )
     {
         funflag_t flags;
-        char *name;
+        string_t *name;
         program_t *progp;
 
         j = shadow->function_names[i];
@@ -3506,7 +3534,8 @@ validate_shadowing (object_t *ob)
         if ( (j = find_function(name, victim)) >= 0
          && victim->functions[j] & TYPE_MOD_NO_MASK )
         {
-            error("Illegal to shadow 'nomask' function \"%s\".\n", name);
+            error("Illegal to shadow 'nomask' function \"%s\".\n"
+                 , get_txt(name));
         }
     }
 
@@ -3723,7 +3752,7 @@ f_set_driver_hook (svalue_t *sp)
     }
 
     /* Legal call? */
-    if (!privilege_violation("set_driver_hook", sp-1, sp))
+    if (!privilege_violation(STR_SET_DRIVER_HOOK, sp-1, sp))
     {
         free_svalue(sp);
         return sp - 2;
@@ -3739,24 +3768,25 @@ f_set_driver_hook (svalue_t *sp)
         put_number(closure_hook + n, 0);
         break;
 
-    case T_OLD_STRING:
+    case T_STRING:
       {
-        char *str;
+        string_t *str;
 
-        if ( !((1 << T_OLD_STRING) & hook_type_map[n]) )
+        if ( !((1 << T_STRING) & hook_type_map[n]) )
             error("Bad value for hook %ld: got string, expected %lx %s.\n"
-                 , n, hook_type_map[n], efun_arg_typename(hook_type_map[n]));
+                 , n, (unsigned long)hook_type_map[n]
+                 , efun_arg_typename(hook_type_map[n]));
 
-        if ( NULL != (str = make_shared_string(sp->u.string)) )
+        if ( NULL != (str = make_tabled_from(sp->u.str)) )
         {
-            put_old_string(closure_hook + n, str);
+            put_string(closure_hook + n, str);
             if (n == H_NOECHO)
                 mudlib_telopts();
         }
         else
         {
             error("Out of memory (%lu bytes) for driver hook\n"
-                 , (unsigned long) strlen(sp->u.string));
+                 , (unsigned long) mstrsize(sp->u.str));
         }
         break;
       }
@@ -3918,8 +3948,8 @@ extract_limits ( struct limits_context_s * result
         {
         
             if (svp[limit].type != T_NUMBER)
-                error("Illegal %s value: not a number\n", limitnames[limit]);
-                /* TODO: Give type and value */
+                error("Illegal %s value: got a %s, expected a number\n"
+                     , limitnames[limit], typename(svp[limit].type));
             val = svp[limit].u.number;
             if (val >= 0)
             {
@@ -3964,15 +3994,15 @@ extract_limits ( struct limits_context_s * result
             int limit;
 
             if (svp[i].type != T_NUMBER)
-                error("Illegal limit tag: not a number.\n");
-                /* TODO: Give type and value */
+                error("Illegal limit value: got a %s, expected a number\n"
+                     , typename(svp[i].type));
             limit = (int)svp[i].u.number;
             if (limit < 0 || limit >= LIMIT_MAX)
                 error("Illegal limit tag: %ld\n", (long)limit);
 
             if (svp[i+1].type != T_NUMBER)
-                error("Illegal %s value: not a number\n", limitnames[limit]);
-                /* TODO: Give type and value */
+                error("Illegal %s value: got a %s, expected a number\n"
+                     , limitnames[limit], typename(svp[i+1].type));
             val = svp[i+1].u.number;
             if (val >= 0)
             {
@@ -4077,7 +4107,7 @@ f_limited (svalue_t * sp, int num_arg)
 
     /* If this object is destructed, no extern calls may be done */
     if (current_object->flags & O_DESTRUCTED
-     || !privilege_violation("limited", argp, sp)
+     || !privilege_violation(STR_LIMITED, argp, sp)
         )
     {
         sp = pop_n_elems(num_arg, sp);
@@ -4172,7 +4202,7 @@ f_set_limits (svalue_t * sp, int num_arg)
         return sp;
     }
 
-    if (privilege_violation("set_limits", argp, sp))
+    if (privilege_violation(STR_SET_LIMITS, argp, sp))
     {
         /* Now store the parsed limits into the variables */
         def_eval_cost = limits.max_eval;

@@ -388,7 +388,7 @@ extern char * utime_string(mp_int, mp_int);
 extern char * time_stamp(void);
 
 #ifndef HAVE_STRCSPN
-extern size_t strcspn(char *s, char *set);
+extern size_t strcspn(const char *s, const char *set);
 #endif
 
 #ifndef HAVE_STRDUP
@@ -396,7 +396,7 @@ extern char *strdup(const char *);
 #endif
 
 #ifndef HAVE_MEMMEM
-extern char *memmem(char *, size_t, char *, size_t);
+extern char *memmem(const char *, size_t, const char *, size_t);
 #endif
 
 #if !defined(HAVE_MEMMOVE) && !defined(OVERLAPPING_BCOPY)

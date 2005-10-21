@@ -40,6 +40,7 @@
 #include "instrs.h"
 #include "interpret.h"
 #include "lex.h"
+#include "mstrings.h"
 #include "object.h"
 #include "ptrtable.h"
 #include "simulate.h"
@@ -80,7 +81,7 @@ static int total_simul_efun  = 0;
   /* Allocated size of simul_efunp.
    */
 
-static char *simul_efun_file_name = NULL;
+static string_t *simul_efun_file_name = NULL;
   /* The shared name of the primary simul_efun object
    */
 
@@ -114,7 +115,7 @@ get_simul_efun_object (void)
     program_t          *progp;
     ident_t            *id;
     CBool              *visible; /* Flag for every function: visible or not */
-    char               *name;
+    string_t           *name;
     int                 i, j, num_fun;
 
     /* Invalidate the simul_efun table */
@@ -165,26 +166,24 @@ get_simul_efun_object (void)
             svp = svp->u.vec->item;
     }
 
-    if (svp->type != T_OLD_STRING)
+    if (svp->type != T_STRING)
     {
         printf("%s No simul_efun\n", time_stamp());
         return NULL;
     }
 
     /* Make the (primary) simul_efun name */
-    name = svp->u.string;
-    while (*name == '/')
-        name++;
+    name = del_slash(svp->u.str);
     if (simul_efun_file_name)
-        free_string(simul_efun_file_name);
-    simul_efun_file_name = make_shared_string(name);
+        free_mstring(simul_efun_file_name);
+    simul_efun_file_name = make_tabled(name);
 
     /* Get the object and load the program */
     ob = find_object(simul_efun_file_name);
     if (ob == NULL)
     {
         fprintf(stderr, "%s The simul_efun file %s was not loaded.\n"
-               , time_stamp(), simul_efun_file_name);
+               , time_stamp(), get_txt(simul_efun_file_name));
         fprintf(stderr, "%s The function get_simul_efun() in the master must load it.\n"
                , time_stamp());
         exit(1); /* TODO: Use the proper constant here */
@@ -192,7 +191,7 @@ get_simul_efun_object (void)
     if (O_PROG_SWAPPED(ob) && load_ob_from_swap(ob) < 0)
     {
         fprintf(stderr, "%s Out of memory (unswap object '%s') ==> "
-                        "No simul_efun\n", time_stamp(), ob->name);
+                        "No simul_efun\n", time_stamp(), get_txt(ob->name));
         return NULL;
     }
     reference_prog( (simul_efun_program = ob->prog), "get_simul_efun");
@@ -272,7 +271,7 @@ get_simul_efun_object (void)
         /* If the function is indeed visible, get its information */
         if ( !(flags & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE|NAME_UNDEFINED)) )
         {
-            char *function_name;
+            string_t *function_name;
             ident_t *p;
             unsigned char type, num_arg, num_locals;
 
@@ -283,7 +282,7 @@ get_simul_efun_object (void)
             num_locals = FUNCTION_NUM_VARS(funstart);
 
             /* Find or make the identifier for the function */
-            p = make_shared_identifier(function_name, I_TYPE_GLOBAL, 0);
+            p = make_shared_identifier(get_txt(function_name), I_TYPE_GLOBAL, 0);
             if (p->type == I_TYPE_UNKNOWN)
             {
                 p->type = I_TYPE_GLOBAL;
@@ -322,7 +321,7 @@ get_simul_efun_object (void)
                         {
                             if (num_arg != simul_efunp[j].num_arg)
                                 continue;
-                            if (strcmp(function_name, simul_efunp[j].name))
+                            if (!mstreq(function_name, simul_efunp[j].name))
                                 continue;
 
                             /* Found one: remove it from the 'discarded' list */
@@ -339,7 +338,7 @@ get_simul_efun_object (void)
                 }
 
                 /* New simul_efun: make a new entry */
-                ref_string(function_name);
+                (void)ref_mstring(function_name);
                 j = num_simul_efun++;
                 if (num_simul_efun > num_fun)
                 {
@@ -376,11 +375,11 @@ get_simul_efun_object (void)
 } /* get_simul_efun_object() */
 
 /*-------------------------------------------------------------------------*/
-char *
+string_t *
 query_simul_efun_file_name(void)
 
 /* Return the name of the primary simul_efun object.
- * Result is a shared string, but no extra reference is added.
+ * Result is a tabled string, but no extra reference is added.
  */
 
 {

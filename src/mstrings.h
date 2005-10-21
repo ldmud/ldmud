@@ -84,8 +84,12 @@ extern int        mstring_compare(const string_t * const pStr1
 extern Bool       mstring_equal(const string_t * const pStr1
                                , const string_t * const pStr2); 
 extern void mstring_free (string_t *s);
+extern string_t * mstring_ref ( string_t * str);
+extern unsigned long mstring_deref ( string_t * str);
 extern char *     mstring_mstr_n_str(const string_t * const pStr, size_t start, const char * const pTxt, size_t len);
 extern string_t * mstring_add_slash (const string_t *str MTRACE_DECL);
+extern string_t * mstring_del_slash (string_t *str MTRACE_DECL);
+extern string_t * mstring_cvt_progname (const string_t *str MTRACE_DECL);
 extern string_t * mstring_add (const string_t *left, const string_t *right MTRACE_DECL);
 extern string_t * mstring_add_txt (const string_t *left, const char *right, size_t len MTRACE_DECL);
 extern string_t * mstring_add_to_txt (const char *left, size_t len, const string_t *right MTRACE_DECL);
@@ -120,6 +124,7 @@ extern void string_dinfo_status (svalue_t *svp);
 
   /* Bool mstr_untabled (string_t *s)
    *   Return TRUE if string <s> is not tabled.
+   *   The argument must not have sideeffects!
    */
 
 #define mstr_tabled(s) \
@@ -127,6 +132,7 @@ extern void string_dinfo_status (svalue_t *svp);
 
   /* Bool mstr_tabled (string_t *s)
    *   Return TRUE if string <s> is tabled - directly or indirectly.
+   *   The argument must not have sideeffects!
    */
 
 #define mstr_d_tabled(s) \
@@ -134,6 +140,7 @@ extern void string_dinfo_status (svalue_t *svp);
 
   /* Bool mstr_d_tabled (string_t *s)
    *   Return TRUE if string <s> is tabled directly.
+   *   The argument must not have sideeffects!
    */
 
 #define mstr_i_tabled(s) \
@@ -141,6 +148,7 @@ extern void string_dinfo_status (svalue_t *svp);
 
   /* Bool mstr_i_tabled (string_t *s)
    *   Return TRUE if string <s> is tabled indirectly.
+   *   The argument must not have sideeffects!
    */
 
 #define mstrsize(s) \
@@ -153,21 +161,29 @@ extern void string_dinfo_status (svalue_t *svp);
 #define ref_mstring(s) \
     (mstr_used++, mstr_used_size += mstr_mem_size(s), (s)->info.ref ? ++((s)->info.ref) : 0, (s))
 
+#define ref_mstring_safe(s) mstring_ref(s)
+
   /* string_t * ref_mstring (string_t *s)
+   * string_t * ref_mstring_safe (string_t *s)
    *   Increment the refcount for string <s> and return the ref'ed string.
+   *   The argument <s> to ref_mstring() must not have sideeffects!
    */
 
 
 #define deref_mstring(s) \
     (mstr_used--, mstr_used_size -= mstr_mem_size(s), (s)->info.ref ? --((s)->info.ref) : (s)->info.ref)
 
+#define deref_mstring_safe(s) mstring_deref(s)
+
   /* int deref_mstring (string_t *s)
+   * int deref_mstring_safe (string_t *s)
    *   Decrement the refcount for string <s> and return the new count.
+   *   The argument <s> to deref_mstring() must not have sideeffects!
    */
 
 
 #define free_mstring(s) \
-    MACRO(if ((s)->info.ref == 1) mstring_free(s); else deref_mstring(s); )
+    MACRO(string_t * fmsttmp = s; if (fmsttmp != NULL) { if (fmsttmp->info.ref == 1) mstring_free(fmsttmp); else deref_mstring(fmsttmp); } )
 
   /* void free_mstring(s)
    *
@@ -192,7 +208,7 @@ extern void string_dinfo_status (svalue_t *svp);
             d[(l)-1] = '\0'; \
          )
 
-  /* void extract_str (char * d, string_t *s, size_t l)
+  /* void extract_cstr (char * d, string_t *s, size_t l)
    *
    *   Extract the C string from <s> (that is: all characters up to the
    *   first '\0' resp the end of the string) and copy it into buffer <d>
@@ -223,6 +239,8 @@ extern void string_dinfo_status (svalue_t *svp);
 #define mstr_repeat(pStr,num)    mstring_repeat(pStr,num MTRACE_ARG)
 #define mstr_extract(pStr,start,end) mstring_extract (pStr,start,end MTRACE_ARG)
 #define add_slash(pStr)          mstring_add_slash(pStr MTRACE_ARG)
+#define del_slash(pStr)          mstring_del_slash(pStr MTRACE_ARG)
+#define cvt_progname(pStr)       mstring_cvt_progname(pStr MTRACE_ARG)
 #define mstrprefixed(pStr1, pStr2) mstring_prefixed(pStr1, pStr2)
 
 #endif /* MSTRINGS_H_ */

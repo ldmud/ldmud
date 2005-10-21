@@ -26,7 +26,9 @@
 #include "strfuns.h"
 
 #include "comm.h"
+#include "mstrings.h"
 #include "simulate.h"
+#include "stdstrings.h"
 #include "svalue.h"
 #include "xalloc.h"
 
@@ -97,7 +99,7 @@ strbuf_grow (strbuf_t *buf, size_t len)
     if (!buf->buf)
     {
         buf->buf = xalloc(new_len);
-        buf->alloc_len = (ushort)new_len;
+        buf->alloc_len = (u_long)new_len;
         buf->length = 0;
         *(buf->buf) = '\0';
         return len;
@@ -114,20 +116,20 @@ strbuf_grow (strbuf_t *buf, size_t len)
     new_buf = malloc_increment_size(buf->buf, new_len - buf->alloc_len);
     if (new_buf)
     {
-        buf->alloc_len = (ushort)new_len;
+        buf->alloc_len = (u_long)new_len;
         return len;
     }
 #endif
      */
 
     buf->buf = rexalloc(buf->buf, new_len);
-    buf->alloc_len = (ushort)new_len;
+    buf->alloc_len = (u_long)new_len;
     return len;
 } /* strbuf_grow() */
 
 /*--------------------------------------------------------------------*/
 void
-strbuf_add (strbuf_t *buf, char * text)
+strbuf_add (strbuf_t *buf, const char * text)
 
 /* Add the <text> to string buffer <buf>.
  */
@@ -151,7 +153,7 @@ strbuf_add (strbuf_t *buf, char * text)
 
 /*--------------------------------------------------------------------*/
 void
-strbuf_addn (strbuf_t *buf, char * text, size_t len)
+strbuf_addn (strbuf_t *buf, const char * text, size_t len)
 
 /* Add the <len> characters starting at <text> to string buffer <buf>.
  */
@@ -195,7 +197,7 @@ strbuf_addc (strbuf_t *buf, char ch)
 
 /*--------------------------------------------------------------------*/
 void
-strbuf_addf (strbuf_t *buf, char * format, ...)
+strbuf_addf (strbuf_t *buf, const char * format, ...)
 
 /* Create a string from <format> and the following arguments using
  * sprintf() rules, and add the result to the string buffer <buf>.
@@ -246,21 +248,14 @@ strbuf_store (strbuf_t *buf, svalue_t *svp)
  */
 
 {
-    svp->type = T_OLD_STRING;
+    svp->type = T_STRING;
     if (buf->buf && buf->length)
     {
-        /* The buffer is most likely allocated longer than necessary,
-         * and svalue_strlen() gets confused. Therefore create a fresh
-         * copy.
-         */
-        svp->x.string_type = STRING_MALLOC;
-        svp->u.string = xalloc(buf->length+1);
-        memcpy(svp->u.string, buf->buf, buf->length+1);
+        svp->u.str = new_n_mstring(buf->buf, buf->length);
     }
     else
     {
-        svp->x.string_type = STRING_VOLATILE;
-        svp->u.string = "";
+        svp->u.str = ref_mstring(STR_EMPTY);
     }
 
     /* Empty the string buffer */
@@ -273,7 +268,7 @@ strbuf_store (strbuf_t *buf, svalue_t *svp)
 
 /*--------------------------------------------------------------------*/
 static char *
-sort_string (char * in, size_t len, long ** pos)
+sort_string (const string_t * p_in, size_t len, long ** pos)
 
 /* Sort the characters of string <in> (with length <len>) by their numeric
  * values and return a newly allocated memory block with the sorted string.
@@ -285,6 +280,7 @@ sort_string (char * in, size_t len, long ** pos)
  */
 
 {
+    char   * in;      /* Input string */
     char   * out;     /* Result string */
     long   * outpos;  /* Result position array */
     char   * tmp;     /* Temporary string */
@@ -292,6 +288,7 @@ sort_string (char * in, size_t len, long ** pos)
     size_t   step;
     size_t   i, j;
     
+    in = get_txt(p_in);
     out = xalloc(len+1);
     tmp = xalloc(len+1);
     if (!out || !tmp)
@@ -427,8 +424,8 @@ sort_string (char * in, size_t len, long ** pos)
 } /* sort_string() */
 
 /*--------------------------------------------------------------------*/
-char *
-intersect_strings (char * left, char * right, Bool bSubtract)
+string_t *
+intersect_strings (const string_t * p_left, const string_t * p_right, Bool bSubtract)
 
 /* !bSubtract: Intersect string <left> with string <right> and return
  *   a newly allocated string with all those characters which are in
@@ -445,11 +442,11 @@ intersect_strings (char * left, char * right, Bool bSubtract)
     size_t   ix_left, ix_right;
     long   * pos;
     CBool  * matches;
-    char   * left_in, *result;
+    char   * left, * right, *left_txt, *result_txt;
+    string_t *result;
 
-    left_in = left;            /* Needed to create the result */
-    len_left = strlen(left);
-    len_right = strlen(right);
+    len_left = mstrsize(p_left);
+    len_right = mstrsize(p_right);
 
     xallocate(matches, len_left+1, "intersection matches");
       /* +1 so that smalloc won't complain when given an empty left string */
@@ -458,8 +455,8 @@ intersect_strings (char * left, char * right, Bool bSubtract)
         matches[ix_left] = bSubtract ? MY_TRUE : MY_FALSE;
 
     /* Sort the two strings */
-    left = sort_string(left, len_left, &pos);
-    right = sort_string(right, len_right, NULL);
+    left = sort_string(p_left, len_left, &pos);
+    right = sort_string(p_right, len_right, NULL);
 
     /* Intersect the two strings by mutual comparison.
      * Each non-matched character in left gets is pos[] set to -1.
@@ -490,11 +487,12 @@ intersect_strings (char * left, char * right, Bool bSubtract)
     }
 
     /* Create the result: copy all flagged characters */
-    xallocate(result, len_out+1, "intersection result");
-    result[len_out] = '\0';
+    memsafe(result = alloc_mstring(len_out), len_out, "intersection result");
+    left_txt = get_txt(p_left);
+    result_txt = get_txt(result);
     for (ix_left = 0, ix_right = 0; ix_left < len_left; ix_left++)
         if (matches[ix_left])
-            result[ix_right++] = left_in[ix_left];
+            result_txt[ix_right++] = left_txt[ix_left];
 
     /* Free intermediate results */
     xfree(pos);

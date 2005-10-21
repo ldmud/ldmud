@@ -178,9 +178,9 @@ extern object_t *previous_ob;
 extern svalue_t closure_hook[];
 
 extern int num_error;
-extern char *current_error;
-extern char *current_error_file;
-extern char *current_error_object_name;
+extern string_t *current_error;
+extern string_t *current_error_file;
+extern string_t *current_error_object_name;
 extern mp_int current_error_line_number;
 
 extern int game_is_being_shut_down;
@@ -219,17 +219,18 @@ extern const char *make_name_sane(const char *pName, Bool addSlash);
 extern object_t *lookfor_object(string_t *str, Bool bLoad);
 #define find_object(str) lookfor_object((str), MY_FALSE)
 #define get_object(str) lookfor_object((str), MY_TRUE)
+extern object_t *find_object_str(const char *str);
 extern Bool status_parse(strbuf_t * sbuf, char *buff);
 extern void dinfo_data_status(svalue_t * svp);
-extern void error VARPROT((char *, ...), printf, 1, 2) NORETURN;
-extern void fatal VARPROT((char *, ...), printf, 1, 2) NORETURN;
+extern void error VARPROT((const char *, ...), printf, 1, 2) NORETURN;
+extern void fatal VARPROT((const char *, ...), printf, 1, 2) NORETURN;
 extern void throw_error(void);
-extern char *limit_error_format(char *fixed_fmt, char *fmt);
-extern Bool legal_path(char *path);
-extern Bool check_no_parentdirs(char *path);
-extern void parse_error(Bool warning, char *error_file, int line, char *what, char *context);
-extern string_t *check_valid_path(const string_t *path, object_t *caller, const string_t *call_fun, Bool writeflg);
-extern Bool match_string(char *match, char *str, mp_int len);
+extern char *limit_error_format(char *fixed_fmt, const char *fmt);
+extern Bool legal_path(const char *path);
+extern Bool check_no_parentdirs(const char *path);
+extern void parse_error(Bool warning, const char *error_file, int line, const char *what, const char *context);
+extern string_t *check_valid_path(string_t *path, object_t *caller, string_t *call_fun, Bool writeflg);
+extern Bool match_string(const char *match, const char *str, mp_int len);
 
 extern svalue_t *f_write(svalue_t *sp);
 extern svalue_t *f_clone_object(svalue_t *sp);

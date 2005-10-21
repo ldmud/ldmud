@@ -310,13 +310,23 @@
 
 #define MALLOC_smalloc
 
-/* When smalloc is used without SBRK_OK and MIN_MALLOCED is defined,
- * the gamedriver will reserve this amount of memory on startup for
- * large blocks, thus reducing the large block fragmentation. The value
- * therefore should be a significantly large multiple of the large
- * chunk size.
+/* If MIN_MALLOCED is defined, the gamedriver will reserve this amount of
+ * memory on startup for large blocks, thus reducing the large block
+ * fragmentation. The value therefore should be a significantly large
+ * multiple of the large chunk size.
+ * As a rule of thumb, reserve enough memory to cover the first couple
+ * of days of uptime.
  */
 /* #define MIN_MALLOCED         0x1000000 */
+
+/* If MIN_SMALL_MALLOCED is defined, the gamedriver will reserve this
+ * amount of memory on startup for small blocks, thus reducing the small block
+ * fragmentation. The value therefore should be a significantly large
+ * multiple of the small chunk size.
+ * As a rule of thumb, reserve enough memory to cover the first couple
+ * of days of uptime.
+ */
+#undef MIN_SMALL_MALLOCED  
 
 /* When smalloc is used, these two values give the upper limits for
  * large and small block allocation (useful for systems with no

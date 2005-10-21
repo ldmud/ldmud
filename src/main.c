@@ -52,6 +52,7 @@
 #include "interpret.h"
 #include "lex.h"
 #include "mapping.h"
+#include "mstrings.h"
 #include "object.h"
 #include "otable.h"
 #include "patchlevel.h"
@@ -230,6 +231,26 @@ main (int argc, char **argv)
           );
       /* This also assures the existance of the fd for the debug log */
 
+
+    if (numports < 1) /* then use the default port */
+        numports = 1;
+
+    init_closure_hooks();
+#ifdef MIN_MALLOCED
+    xfree(xalloc(MIN_MALLOCED));
+#endif
+    if (reserved_system_size > 0)
+        reserved_system_area = xalloc((size_t)reserved_system_size);
+    if (reserved_master_size > 0)
+        reserved_master_area = xalloc((size_t)reserved_master_size);
+    if (reserved_user_size > 0)
+        reserved_user_area = xalloc((size_t)reserved_user_size);
+    init_otable();
+    for (i = 0; i < (int)(sizeof consts / sizeof consts[0]); i++)
+        consts[i] = exp(- i / 900.0);
+    mstring_init(); /* Also initializes the standard strings */
+    init_lexer();
+
     /* If the master_name hasn't been set, select a sensible default */
     if ('\0' == master_name[0])
     {
@@ -246,9 +267,9 @@ main (int argc, char **argv)
      * This is important for modules like the lexer which
      * use it directly.
      *
-     * We also need a copy of the master name as string_t.
+     * We also need a copy of the master name as string_t (for
+     * this the strings module has to be initialized).
      */
-
     {
         const char *pName = make_name_sane(master_name, MY_FALSE);
         if (pName)
@@ -262,24 +283,6 @@ main (int argc, char **argv)
         }
     }
 
-    if (numports < 1) /* then use the default port */
-        numports = 1;
-
-    init_closure_hooks();
-#ifdef MIN_MALLOCED
-    xfree(xalloc(MIN_MALLOCED));
-#endif
-    if (reserved_system_size > 0)
-        reserved_system_area = xalloc((size_t)reserved_system_size);
-    if (reserved_master_size > 0)
-        reserved_master_area = xalloc((size_t)reserved_master_size);
-    if (reserved_user_size > 0)
-        reserved_user_area = xalloc((size_t)reserved_user_size);
-    init_shared_strings();
-    init_otable();
-    for (i = 0; i < (int)(sizeof consts / sizeof consts[0]); i++)
-        consts[i] = exp(- i / 900.0);
-    init_lexer();
     reset_machine(MY_TRUE); /* Cold reset the machine */
     RESET_LIMITS;
     CLEAR_EVAL_COST;
@@ -312,7 +315,7 @@ main (int argc, char **argv)
     else
     {
         toplevel_context.rt.type = ERROR_RECOVERY_BACKEND;
-        master_ob = get_object(master_name);
+        master_ob = get_object(master_name_str);
     }
     current_object = master_ob;
     toplevel_context.rt.type = ERROR_RECOVERY_NONE;
@@ -399,17 +402,17 @@ void initialize_master_uid (void)
         master_ob->user = &default_wizlist_entry;
         master_ob->eff_user = 0;
     }
-    else if (ret == 0 || ret->type != T_OLD_STRING)
+    else if (ret == 0 || ret->type != T_STRING)
     {
         printf("%s %s: %s() in %s does not work\n"
               , time_stamp(), strict_euids ? "Fatal" : "Warning"
-              , STR_GET_M_UID, master_name);
+              , get_txt(STR_GET_M_UID), master_name);
         if (strict_euids)
             exit(1);
     }
     else
     {
-        master_ob->user = add_name(ret->u.string);
+        master_ob->user = add_name(ret->u.str);
         master_ob->eff_user = master_ob->user;
     }
 } /* initialize_master_uid() */
@@ -417,7 +420,7 @@ void initialize_master_uid (void)
 
 /*-------------------------------------------------------------------------*/
 void
-vdebug_message(char *fmt, va_list va)
+vdebug_message(const char *fmt, va_list va)
 
 /* Print a message into the debug logfile, vprintf() style.
  */
@@ -448,7 +451,7 @@ vdebug_message(char *fmt, va_list va)
 
 /*-------------------------------------------------------------------------*/
 void
-debug_message(char *a, ...)
+debug_message(const char *a, ...)
 
 /* Print a message into the debug logfile, printf() style.
  */
@@ -1051,6 +1054,9 @@ options (void)
 #ifdef MIN_MALLOCED
          "                 initial allocation:   %8d\n"
 #endif
+#ifdef MIN_SMALL_MALLOCED
+         "                 initial small alloc:  %8d\n"
+#endif
 #if defined(MAX_MALLOCED)
          "                 max allocation:       %8d\n"
 #endif
@@ -1075,6 +1081,9 @@ options (void)
         , RESERVED_SYSTEM_SIZE
 #ifdef MIN_MALLOCED
         , MIN_MALLOCED
+#endif
+#ifdef MIN_SMALL_MALLOCED
+        , MIN_SMALL_MALLOCED
 #endif
 #if defined(MAX_MALLOCED)
         , MAX_MALLOCED
@@ -1793,7 +1802,7 @@ secondscan (int eOption, const char * pValue)
     switch (eOption)
     {
     case cFuncall:
-        push_volatile_string(inter_sp, (char *)pValue);
+        push_c_string(inter_sp, (char *)pValue);
         (void)apply_master_ob(STR_FLAG, 1);
         if (game_is_being_shut_down) {
             fprintf(stderr, "%s Shutdown by master object.\n", time_stamp());

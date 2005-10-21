@@ -177,6 +177,7 @@
 #include "instrs.h"
 #include "main.h"
 #include "mapping.h"
+#include "mstrings.h"
 #include "otable.h"
 #include "prolang.h"
 #include "ptrtable.h"
@@ -229,13 +230,13 @@ _free_object (object_t *ob)
         fatal("Object with %ld refs passed to _free_object()\n", ob->ref);
 
     if (d_flag)
-        printf("%s free_object: %s.\n", time_stamp(), ob->name);
+        printf("%s free_object: %s.\n", time_stamp(), get_txt(ob->name));
 
     /* Freeing a non-destructed object should never happen */
 
     if (!(ob->flags & O_DESTRUCTED)) {
         fatal("Object 0x%lx %s ref count 0, but not destructed.\n"
-             , (long)ob, ob->name);
+             , (long)ob, get_txt(ob->name));
     }
 
 #endif /* DEBUG */
@@ -260,18 +261,19 @@ _free_object (object_t *ob)
     if (ob->name)
     {
         if (d_flag > 1)
-            debug_message("%s Free object %s\n", time_stamp(), ob->name);
+            debug_message("%s Free object %s\n", time_stamp(), get_txt(ob->name));
         if (lookup_object_hash(ob->name) == ob)
-            fatal("Freeing object %s but name still in name table\n", ob->name);
-        tot_alloc_object_size -= strlen(ob->name)+1;
-        xfree(ob->name);
+            fatal("Freeing object %s but name still in name table\n"
+                 , get_txt(ob->name));
+        tot_alloc_object_size -= mstrsize(ob->name);
+        free_mstring(ob->name);
         ob->name = NULL;
     }
 
     /* Dereference the load_name */
     if (ob->load_name)
     {
-        free_string(ob->load_name);
+        free_mstring(ob->load_name);
         ob->load_name = NULL;
     }
 
@@ -414,12 +416,12 @@ reference_prog (program_t *progp, char *from)
     progp->ref++;
     if (d_flag)
         printf("%s reference_prog: %s ref %ld (%s)\n"
-              , time_stamp(), progp->name, progp->ref, from);
+              , time_stamp(), get_txt(progp->name), progp->ref, from);
 }
 
 /*-------------------------------------------------------------------------*/
 void
-do_free_sub_strings (int num_strings,   char **strings
+do_free_sub_strings (int num_strings,   string_t **strings
                     ,int num_variables, variable_t *variable_names
                     )
 
@@ -435,12 +437,12 @@ do_free_sub_strings (int num_strings,   char **strings
 
     /* Free all strings */
     for (i = 0; i < num_strings; i++)
-        free_string(strings[i]);
+        free_mstring(strings[i]);
 
     /* Free all variable names */
     for (i = num_variables; --i >= 0; )
     {
-        free_string(variable_names[i].name);
+        free_mstring(variable_names[i].name);
     }
 }
 
@@ -471,7 +473,7 @@ free_prog (program_t *progp, Bool free_sub_strings)
         return;
 
     if (d_flag)
-        printf("%s free_prog: %s\n", time_stamp(), progp->name);
+        printf("%s free_prog: %s\n", time_stamp(), get_txt(progp->name));
     if (progp->ref < 0)
         fatal("Negative ref count for prog ref.\n");
 
@@ -510,14 +512,14 @@ free_prog (program_t *progp, Bool free_sub_strings)
         {
             if ( !(functions[i] & NAME_INHERITED) )
             {
-                char *name;
+                string_t *name;
 
                 memcpy(
                   &name,
                   FUNCTION_NAMEP(program + (functions[i] & FUNSTART_MASK)),
                   sizeof name
                 );
-                free_string(name);
+                free_mstring(name);
             }
         }
 
@@ -531,8 +533,8 @@ free_prog (program_t *progp, Bool free_sub_strings)
             free_prog(progp->inherit[i].prog, MY_TRUE);
 
         /* Free the program name */
-        total_prog_block_size -= strlen(progp->name)+1;
-        xfree(progp->name);
+        total_prog_block_size -= mstrsize(progp->name);
+        free_mstring(progp->name);
     }
 
     /* Remove the program structure */
@@ -540,18 +542,18 @@ free_prog (program_t *progp, Bool free_sub_strings)
 }
 
 /*-------------------------------------------------------------------------*/
-char *
-function_exists (char *fun, object_t *ob)
+string_t *
+function_exists (string_t *fun, object_t *ob)
 
 /* Search for the function <fun> in the object <ob>. If existing, return
- * the name of the program, if not return NULL.
+ * the name of the program (without added reference), if not return NULL.
  *
  * Visibility rules apply: static and protected functions can't be
  * found from the outside.
  */
 
 {
-    char *shared_name;
+    string_t *shared_name;
     fun_hdr_p funstart;
     program_t *progp;
     int ix;
@@ -567,10 +569,10 @@ function_exists (char *fun, object_t *ob)
     {
         ob->time_of_ref = current_time;
         if (load_ob_from_swap(ob) < 0)
-            error("Out of memory: unswap object '%s'\n", ob->name);
+            error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
     }
 
-    shared_name = findstring(fun);
+    shared_name = find_tabled(fun);
     progp = ob->prog;
 
     /* Check if the function exists at all */
@@ -687,10 +689,10 @@ reset_object (object_t *ob, int arg)
 
         pop_stack();
     }
-    else if (closure_hook[arg].type == T_OLD_STRING)
+    else if (closure_hook[arg].type == T_STRING)
     {
         push_number(inter_sp, arg == H_RESET);
-        if (!sapply(closure_hook[arg].u.string, ob, 1) && arg == H_RESET)
+        if (!sapply(closure_hook[arg].u.str, ob, 1) && arg == H_RESET)
             ob->time_reset = 0;
     }
 
@@ -905,7 +907,7 @@ retrieve_replace_program_entry (void)
 
 /*-------------------------------------------------------------------------*/
 static program_t *
-search_inherited (char *str, program_t *prg, int *offpnt)
+search_inherited (string_t *str, program_t *prg, int *offpnt)
 
 /* Auxiliary function to efun replace_program(): check if program <str>
  * is inherited by <prg>. If yes, return the originating program and
@@ -932,7 +934,7 @@ search_inherited (char *str, program_t *prg, int *offpnt)
         ts = time_stamp();
         debug_message("%s search_inherited started\n", ts);
         debug_message("%s searching for PRG(%s) in PRG(%s)\n"
-                     , ts, str, prg->name);
+                     , ts, get_txt(str), get_txt(prg->name));
         debug_message("%s num_inherited=%d\n", ts, prg->num_inherited);
     }
 #endif
@@ -947,14 +949,14 @@ search_inherited (char *str, program_t *prg, int *offpnt)
         {
             debug_message("%s index %d:\n", ts, i);
             debug_message("%s checking PRG(%s)\n"
-                         , ts, prg->inherit[i].prog->name);
+                         , ts, get_txt(prg->inherit[i].prog->name));
         }
 #endif
         /* Duplicate virtual inherits don't count */
         if ( prg->inherit[i].inherit_type & INHERIT_TYPE_DUPLICATE )
             continue;
 
-        if ( strcmp(str, prg->inherit[i].prog->name ) == 0 )
+        if (mstreq(str, prg->inherit[i].prog->name ))
         {
 #ifdef DEBUG
             if (d_flag)
@@ -986,7 +988,7 @@ search_inherited (char *str, program_t *prg, int *offpnt)
 
 /*-------------------------------------------------------------------------*/
 void
-tell_npc (object_t *ob, char *str)
+tell_npc (object_t *ob, string_t *str)
 
 /* Call the lfun 'catch_tell()' in object <ob> with <str> as argument.
  *
@@ -995,13 +997,56 @@ tell_npc (object_t *ob, char *str)
  */
 
 {
-    push_volatile_string(inter_sp, str);
+    push_ref_string(inter_sp, str);
     (void)sapply(STR_CATCH_TELL, ob, 1);
 }
 
 /*-------------------------------------------------------------------------*/
 void
-tell_object (object_t *ob, char *str)
+tell_npc_str (object_t *ob, const char *str)
+
+/* Call the lfun 'catch_tell()' in object <ob> with <str> as argument.
+ *
+ * This function is used to talk to non-interactive commandgivers
+ * (aka NPCs).
+ */
+
+{
+    push_c_string(inter_sp, str);
+    (void)sapply(STR_CATCH_TELL, ob, 1);
+}
+
+/*-------------------------------------------------------------------------*/
+void
+tell_object (object_t *ob, string_t *str)
+
+/* Send message <str> to object <ob>. If <ob> is an interactive player,
+ * it will go to his screen (unless a shadow catches it - see shadow_catch_
+ * message() ). If <ob> is not interactive, the message will go
+ * to the lfun 'catch_tell()' via a call to tell_npc().
+ */
+
+{
+    object_t *save_command_giver;
+    interactive_t *ip;
+
+    if (ob->flags & O_DESTRUCTED)
+        return;
+
+    if (O_SET_INTERACTIVE(ip, ob))
+    {
+        save_command_giver = command_giver;
+        command_giver = ob;
+        add_message("%s", get_txt(str));
+        command_giver = save_command_giver;
+        return;
+    }
+    tell_npc(ob, str);
+}
+
+/*-------------------------------------------------------------------------*/
+void
+tell_object_str (object_t *ob, const char *str)
 
 /* Send message <str> to object <ob>. If <ob> is an interactive player,
  * it will go to his screen (unless a shadow catches it - see shadow_catch_
@@ -1024,12 +1069,12 @@ tell_object (object_t *ob, char *str)
         command_giver = save_command_giver;
         return;
     }
-    tell_npc(ob, str);
+    tell_npc_str(ob, str);
 }
 
 /*-------------------------------------------------------------------------*/
 Bool
-shadow_catch_message (object_t *ob, char *str)
+shadow_catch_message (object_t *ob, const char *str)
 
 /* Called by comm:add_message() to handle the case that messages <str> sent
  * to interactive objects <ob> are to be delivered to shadows of the
@@ -1063,7 +1108,7 @@ shadow_catch_message (object_t *ob, char *str)
         return MY_FALSE;
 
     trace_level |= ip->trace_level;
-    push_volatile_string(inter_sp, str);
+    push_c_string(inter_sp, str);
     if (sapply(STR_CATCH_TELL, ob, 1))
         return MY_TRUE;
 
@@ -1178,29 +1223,14 @@ f_function_exists (svalue_t *sp)
  */
 
 {
-    char *str, *res, *p;
+    string_t *str, *res;
 
-    str = function_exists((sp-1)->u.string, sp->u.ob);
+    str = function_exists((sp-1)->u.str, sp->u.ob);
     free_svalue(sp);
     free_svalue(--sp);
     if (str)
     {
-        /* Make a copy of the string so that we can remove
-         * a the trailing '.c'. In non-compat mode, we also
-         * have to add the leading '/'.
-         */
-        p = strrchr (str, '.');
-
-        if (p)
-            *p = '\0';  /* temporarily mask out the '.c' */
-
-        if (compat_mode)
-            res = string_copy (str);
-        else
-            res = add_slash(str);
-
-        if (p)
-            *p = '.';  /* undo the change above */
+        res = cvt_progname(str);
 
         if (!res)
         {
@@ -1208,7 +1238,7 @@ f_function_exists (svalue_t *sp)
             inter_sp = sp;
             error("Out of memory\n");
         }
-        put_malloced_string(sp, res);
+        put_string(sp, res);
     }
     else
     {
@@ -1314,8 +1344,8 @@ f_functionlist (svalue_t *sp)
      */
     if (sp[-1].type != T_OBJECT)
     {
-        if (!(ob = find_object(sp[-1].u.string)))
-            error("Object '%s' not found.\n", sp[-1].u.string);
+        if (!(ob = find_object(sp[-1].u.str)))
+            error("Object '%s' not found.\n", get_txt(sp[-1].u.str));
     }
     else
         ob = sp[-1].u.ob;
@@ -1325,7 +1355,7 @@ f_functionlist (svalue_t *sp)
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0)
         {
-            error("Out of memory: unswap object '%s'\n", ob->name);
+            error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
             /* NOTREACHED */
             return NULL;
         }
@@ -1471,11 +1501,10 @@ f_functionlist (svalue_t *sp)
 
         if (mode_flags & RETURN_FUNCTION_NAME) {
             svp--;
-            svp->type = T_OLD_STRING;
-            svp->x.string_type = STRING_SHARED;
-            memcpy( &svp->u.string, FUNCTION_NAMEP(funstart)
-                  , sizeof svp->u.string);
-            ref_string(svp->u.string);
+            svp->type = T_STRING;
+            memcpy( &svp->u.str, FUNCTION_NAMEP(funstart)
+                  , sizeof svp->u.str);
+            (void)ref_mstring(svp->u.str);
         }
     } /* for() */
 
@@ -1535,7 +1564,7 @@ f_inherit_list (svalue_t *sp)
 
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0) {
-            error("Out of memory: unswap object '%s'\n", ob->name);
+            error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
             /* NOTREACHED */
             return NULL;
         }
@@ -1570,15 +1599,14 @@ f_inherit_list (svalue_t *sp)
 
     /* Take the filenames of the program and copy them into
      * the result vector.
-     * TODO: What? The filenames are not shared a priori?
      */
     for (svp = vec->item, prp = plist; --next >= 0; svp++) {
-        char *str;
+        string_t *str;
 
         pr = *prp++;
 
         if (compat_mode)
-            str = string_copy(pr->name);
+            str = ref_mstring(pr->name);
         else
             str = add_slash(pr->name);
 
@@ -1586,9 +1614,9 @@ f_inherit_list (svalue_t *sp)
         {
             free_array(vec);
             error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
-                 , (unsigned long)strlen(pr->name));
+                 , (unsigned long)mstrsize(pr->name));
         }
-        put_malloced_string(svp, str);
+        put_string(svp, str);
     }
 
     free_object_svalue(sp);
@@ -1632,7 +1660,7 @@ f_load_name (svalue_t *sp)
  */
 
 {
-    char *s;       /* String argument */
+    string_t *s;   /* String argument */
     char *name;    /* Result string, maybe 's' itself */
     char *hash;    /* Position of the hash in the name */
     char *mem;     /* Allocated memory blocks */
@@ -1643,19 +1671,19 @@ f_load_name (svalue_t *sp)
     {
         s = sp->u.ob->load_name;
         free_object_svalue(sp);
-        put_ref_old_string(sp, s);
+        put_ref_string(sp, s);
         return sp;
     }
 
     /* Argument is a string: try to find the object for it */
-    s = sp->u.string;
+    s = sp->u.str;
     ob = find_object(s);
     if (ob)
     {
         /* Got it */
         s = ob->load_name;
         free_string_svalue(sp);
-        put_ref_old_string(sp, s);
+        put_ref_string(sp, s);
         return sp;
     }
 
@@ -1663,13 +1691,13 @@ f_load_name (svalue_t *sp)
      * the string. First check if it ends in #<number>.
      */
     mem = NULL;
-    hash = strchr(s, '#');
+    hash = strchr(get_txt(s), '#');
     if (!hash)
     {
         /* No '#' at all: make the name sane directly */
-        name = (char *)make_name_sane(s, !compat_mode);
+        name = (char *)make_name_sane(get_txt(s), !compat_mode);
         if (!name)
-            name = s;
+            name = get_txt(s);
     }
     else
     {
@@ -1691,12 +1719,12 @@ f_load_name (svalue_t *sp)
         }
 
         /* Good, we can slash off the '#<number>' */
-        len = (size_t)(hash - s);
+        len = (size_t)(hash - get_txt(s));
         p = mem = xalloc(len+1);
         if (!p)
             error("(load_name) Out of memory (%lu bytes) for filename."
                  , (long)len+1);
-        strncpy(p, s, len);
+        strncpy(p, get_txt(s), len);
         p[len] = '\0';
 
         /* Now make the name sane */
@@ -1717,18 +1745,10 @@ f_load_name (svalue_t *sp)
         name = "/";
 
     /* Now return the result */
-    if (s != name)
+    if (get_txt(s) != name)
     {
         free_string_svalue(sp);
-        if (name == mem)
-        {
-            put_malloced_string(sp, name);
-            mem = NULL;  /* do not deallocate this */
-        }
-        else
-        {
-            put_volatile_string(sp, name);
-        }
+        put_c_string(sp, name);
     }
 
     if (mem)
@@ -1766,17 +1786,17 @@ f_object_name (svalue_t *sp)
  */
 
 {
-    char *name,*res;
+    string_t *name, *res;
 
     name = sp->u.ob->name;
     if (compat_mode)
-        res = string_copy(name);
+        res = ref_mstring(name);
     else
         res = add_slash(name);
     if (!res)
         error("Out of memory\n");
     free_object_svalue(sp);
-    put_malloced_string(sp, res);
+    put_string(sp, res);
 
     return sp;
 } /* f_object_name() */
@@ -1826,7 +1846,7 @@ f_program_name (svalue_t *sp)
  */
 
 {
-    char *name, *res;
+    string_t *name, *res;
     object_t *ob;
 
     ob = sp->u.ob;
@@ -1835,18 +1855,18 @@ f_program_name (svalue_t *sp)
         ob->time_of_ref = current_time;
         if (load_ob_from_swap(ob) < 0)
         {
-            error("Out of memory: unswap object '%s'\n", ob->name);
+            error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
         }
     }
     name = ob->prog->name;
     if (compat_mode)
-        res = string_copy(name);
+        res = ref_mstring(name);
     else
         res = add_slash(name);
     if (!res)
         error("Out of memory\n");
     free_object_svalue(sp);
-    put_malloced_string(sp, res);
+    put_string(sp, res);
 
     return sp;
 } /* f_program_name() */
@@ -1873,7 +1893,7 @@ f_program_time (svalue_t *sp)
         if (load_ob_from_swap(sp->u.ob) < 0)
         {
             sp--;
-            error("Out of memory: unswap object '%s'\n", sp->u.ob->name);
+            error("Out of memory: unswap object '%s'\n", get_txt(sp->u.ob->name));
         }
     }
     load_time = sp->u.ob->prog->load_time;
@@ -1922,14 +1942,15 @@ f_rename_object (svalue_t *sp)
 
 {
     object_t *ob;
-    char *name;
+    char     *name;
+    string_t *m_name;
     mp_int length;
 
     inter_sp = sp; /* this is needed for assert_master_ob_loaded(), and for
                     * the possible errors before.
                     */
     ob = sp[-1].u.ob;
-    name = sp[0].u.string;
+    name = get_txt(sp[0].u.str);
 
     /* Remove leading '/' if any. */
     while(name[0] == '/')
@@ -1966,22 +1987,29 @@ f_rename_object (svalue_t *sp)
         }
     }
 
-    if (lookup_object_hash(name))
-    {
-        error("Attempt to rename to object '%s'\n", name);
-    }
-
     assert_master_ob_loaded();
     if (master_ob == ob)
         error("Attempt to rename the master object\n");
 
-    if (privilege_violation4("rename_object", ob, name, 0, sp))
+    m_name = new_mstring(name);
+    if (!m_name)
+        error("Out of memory for object name (%ld bytes)\n", strlen(name));
+
+    if (lookup_object_hash(m_name))
+    {
+        free_mstring(m_name);
+        error("Attempt to rename to existing object '%s'\n", name);
+    }
+
+    if (privilege_violation4(STR_RENAME_OBJECT, ob, m_name, 0, sp))
     {
         remove_object_hash(ob);
-        xfree(ob->name);
-        ob->name = string_copy(name);
+        free_mstring(ob->name);
+        ob->name = m_name;
         enter_object_hash(ob);
     }
+    else
+        free_mstring(m_name);
 
     free_svalue(sp--);
     free_svalue(sp--);
@@ -2026,6 +2054,7 @@ f_replace_program (svalue_t *sp)
     replace_ob_t *tmp;
     long name_len;
     char *name;
+    string_t *sname;
     program_t *new_prog;  /* the replacing program */
     int offsets[2];            /* the offsets of the replacing prog */
 
@@ -2040,26 +2069,28 @@ f_replace_program (svalue_t *sp)
     /* Create the full program name with a trailing '.c' and without
      * a leading '/' to match the internal name representation.
      */
-    name_len = (long)svalue_strlen(sp);
+    name_len = (long)mstrsize(sp->u.str);
     name = alloca((size_t)name_len+3);
-    strcpy(name, sp->u.string);
+    strcpy(name, get_txt(sp->u.str));
     if (name[name_len-2] != '.' || name[name_len-1] != 'c')
         strcat(name,".c");
     if (*name == '/')
         name++;
+    memsafe(sname = new_mstring(name), name_len+3, "normalized program name");
 
-    new_prog = search_inherited(name, current_object->prog, offsets);
+    new_prog = search_inherited(sname, current_object->prog, offsets);
     if (!new_prog)
     {
         /* Given program not inherited, maybe it's the current already.
          */
-        if (!strcmp(name, current_object->prog->name ))
+        if (mstreq(sname, current_object->prog->name ))
         {
             new_prog = current_object->prog;
             offsets[0] = offsets[1] = 0;
         }
         else
         {
+            free_mstring(sname);
             error("program to replace the current one with has "
                   "to be inherited\n");
         }
@@ -2082,6 +2113,8 @@ f_replace_program (svalue_t *sp)
     tmp->new_prog = new_prog;
     tmp->var_offset = offsets[0];
     tmp->fun_offset = offsets[1];
+
+    free_mstring(sname);
 
     free_svalue(sp);
     sp--;
@@ -2138,7 +2171,7 @@ f_tell_object (svalue_t *sp)
  */
 
 {
-    tell_object((sp-1)->u.ob, sp->u.string);
+    tell_object((sp-1)->u.ob, sp->u.str);
     free_string_svalue(sp);
     sp--;
     if (sp->type == T_OBJECT) /* not self-destructed */
@@ -2204,10 +2237,10 @@ f_geteuid (svalue_t *sp)
 
     if (ob->eff_user)
     {
-        char *tmp;
-        tmp = ob->eff_user->name;
+        string_t *tmp;
+        tmp = ref_mstring(ob->eff_user->name);
         free_svalue(sp);
-        put_volatile_string(sp, tmp);
+        put_string(sp, tmp);
     }
     else
     {
@@ -2251,7 +2284,7 @@ f_seteuid (svalue_t *sp)
         /* Clear the euid of this_object */
 
         if (argp->u.number != 0)
-            efun_arg_error(1, T_OLD_STRING, sp->type, sp);
+            efun_arg_error(1, T_STRING, sp->type, sp);
         current_object->eff_user = 0;
         free_svalue(argp);
         put_number(argp, 1);
@@ -2261,7 +2294,7 @@ f_seteuid (svalue_t *sp)
     /* Call the master to clear this use of seteuid() */
 
     push_ref_valid_object(sp, current_object, "seteuid");
-    push_volatile_string(sp,  argp->u.string);
+    push_ref_string(sp, argp->u.str);
     inter_sp = sp;
     ret = apply_master_ob(STR_VALID_SETEUID, 2);
     if (!ret || ret->type != T_NUMBER || ret->u.number != 1)
@@ -2277,7 +2310,7 @@ f_seteuid (svalue_t *sp)
     }
     else
     {
-        current_object->eff_user = add_name(argp->u.string);
+        current_object->eff_user = add_name(argp->u.str);
         free_svalue(argp);
         put_number(argp, 1);
     }
@@ -2316,12 +2349,12 @@ f_creator (svalue_t *sp)
 
 {
     object_t *ob;
-    char *name;
+    string_t *name;
 
     ob = sp->u.ob;
     deref_object(ob, "getuid");
     if ( NULL != (name = ob->user->name) )
-        put_ref_old_string(sp, name);
+        put_ref_string(sp, name);
     else
         put_number(sp, 0);
 
@@ -2658,7 +2691,7 @@ f_environment (svalue_t *sp, int num_arg)
         }
         else /* it's a string */
         {
-            ob = find_object(sp->u.string);
+            ob = find_object(sp->u.str);
             if (!ob || ob->super == NULL || (ob->flags & O_DESTRUCTED))
                 ob = NULL;
             else
@@ -2709,11 +2742,11 @@ f_first_inventory (svalue_t *sp)
         ob = sp->u.ob->contains;
         free_object_svalue(sp);
     }
-    else if (sp->type == T_OLD_STRING)
+    else if (sp->type == T_STRING)
     {
-        ob = get_object(sp->u.string);
+        ob = get_object(sp->u.str);
         if (!ob)
-            error("No object '%s' for first_inventory()\n", sp->u.string);
+            error("No object '%s' for first_inventory()\n", get_txt(sp->u.str));
         free_string_svalue(sp);
         ob = ob->contains;
     }
@@ -2779,22 +2812,22 @@ f_move_object (svalue_t *sp)
 
     inter_sp = sp;
 
-    if ((sp-1)->type == T_OLD_STRING)
+    if ((sp-1)->type == T_STRING)
     {
-        item = get_object((sp-1)->u.string);
+        item = get_object((sp-1)->u.str);
         if (!item)
             error("Bad arg 1 to move_object(): object '%s' not found.\n"
-                 , sp[-1].u.string);
+                 , get_txt(sp[-1].u.str));
         free_string_svalue(sp-1);
         put_ref_object(sp-1, item, "move_object");
     }
 
-    if (sp->type == T_OLD_STRING)
+    if (sp->type == T_STRING)
     {
-        dest = get_object(sp->u.string);
+        dest = get_object(sp->u.str);
         if (!dest)
             error("Bad arg 2 to move_object(): object '%s' not found.\n"
-                 , sp[0].u.string);
+                 , get_txt(sp[0].u.str));
         free_string_svalue(sp);
         put_ref_object(sp, dest, "move_object");
     }
@@ -2808,7 +2841,7 @@ f_move_object (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static object_t *
-object_present_in (char *str, object_t *ob)
+object_present_in (string_t *str, object_t *ob)
 
 /* <ob> is the first object in an environment: test all the objects there
  * if they match the id <str>.
@@ -2818,17 +2851,17 @@ object_present_in (char *str, object_t *ob)
 
 {
     svalue_t *ret;
-    char *p;
     int   count = 0; /* >0: return the <count>th object */
     int   length;
-    char *item;
+    char *p, *item;
+    string_t *sitem;
 
-    length = strlen(str);
-    xallocate(item, (size_t)length + 1, "work string");
-    strcpy(item, str);
-    push_malloced_string(inter_sp, item); /* free on error */
+    length = mstrsize(str);
+    item = get_txt(str);
 
-    /* Check if there is a number in the string */
+    /* Check if there is a number in the string.
+     * If yes parse it, and use the remainder as 'the' id string.
+     */
     p = item + length - 1;
     if (*p >= '0' && *p <= '9')
     {
@@ -2838,18 +2871,27 @@ object_present_in (char *str, object_t *ob)
         if (p > item && *p == ' ')
         {
             count = atoi(p+1) - 1;
-            *p = '\0';
+            length = p - item;
         }
     }
+
+    if (length != mstrsize(str))
+    {
+        memsafe(sitem = new_n_mstring(item, length), length, "id string");
+    }
+    else
+        sitem = ref_mstring(str);
+
+    push_string(inter_sp, sitem); /* free on error */
 
     /* Now look for the object */
     for (; ob; ob = ob->next_inv)
     {
-        push_volatile_string(inter_sp, item);
+        push_ref_string(inter_sp, sitem);
         ret = sapply(STR_ID, ob, 1);
         if (ob->flags & O_DESTRUCTED)
         {
-            xfree(item);
+            free_mstring(sitem);
             inter_sp--;
             return NULL;
         }
@@ -2859,11 +2901,11 @@ object_present_in (char *str, object_t *ob)
 
         if (count-- > 0)
             continue;
-        xfree(item);
+        free_mstring(sitem);
         inter_sp--;
         return ob;
     }
-    xfree(item);
+    free_mstring(sitem);
     inter_sp--;
 
     /* Not found */
@@ -2911,7 +2953,7 @@ e_object_present (svalue_t *v, object_t *ob)
     }
 
     /* Always search in the object's inventory */
-    ret_ob = object_present_in(v->u.string, ob->contains);
+    ret_ob = object_present_in(v->u.str, ob->contains);
     if (ret_ob)
         return ret_ob;
 
@@ -2922,7 +2964,7 @@ e_object_present (svalue_t *v, object_t *ob)
     if (!specific && ob->super)
     {
         /* Is it _the_ environment? */
-        push_volatile_string(inter_sp, v->u.string);
+        push_ref_string(inter_sp, v->u.str);
         ret = sapply(STR_ID, ob->super, 1);
         if (ob->super->flags & O_DESTRUCTED)
             return NULL;
@@ -2930,7 +2972,7 @@ e_object_present (svalue_t *v, object_t *ob)
             return ob->super;
 
         /* No, search the other objects here. */
-        return object_present_in(v->u.string, ob->super->contains);
+        return object_present_in(v->u.str, ob->super->contains);
     }
 
     /* Not found */
@@ -3126,12 +3168,12 @@ e_say (svalue_t *v, vector_t *avoid)
 
     switch(v->type)
     {
-    case T_OLD_STRING:
-        message = v->u.string;
+    case T_STRING:
+        message = get_txt(v->u.str);
         break;
 
     case T_OBJECT:
-        xstrncpy(buff, v->u.ob->name, sizeof buff);
+        xstrncpy(buff, get_txt(v->u.ob->name), sizeof buff);
         buff[sizeof buff - 1] = '\0';
         message = buff;
         break;
@@ -3160,7 +3202,9 @@ e_say (svalue_t *v, vector_t *avoid)
         return;
 
     default:
-        error("Invalid argument %d to say()\n", v->type);
+        error("Invalid argument to say(): expected '%s', got '%s'.\n"
+              , efun_arg_typename(T_POINTER|T_NUMBER|T_STRING|T_OBJECT)
+              , typename(v->type));
     }
 
     /* Now send the message to all recipients */
@@ -3176,7 +3220,7 @@ e_say (svalue_t *v, vector_t *avoid)
             continue;
         if (!(O_SET_INTERACTIVE(ip, ob)))
         {
-            tell_npc(ob, message);
+            tell_npc_str(ob, message);
             continue;
         }
         save_again = command_giver;
@@ -3327,12 +3371,12 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     /* Construct the message */
     switch(v->type)
     {
-    case T_OLD_STRING:
-        message = v->u.string;
+    case T_STRING:
+        message = get_txt(v->u.str);
         break;
 
     case T_OBJECT:
-        xstrncpy(buff, v->u.ob->name, sizeof buff);
+        xstrncpy(buff, get_txt(v->u.ob->name), sizeof buff);
         buff[sizeof buff - 1] = '\0';
         message = buff;
         break;
@@ -3367,7 +3411,9 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
       }
 
     default:
-        error("Invalid argument %d to tell_room()\n", v->type);
+        error("Invalid argument to tell_room(): expected '%s', got '%s'.\n"
+              , efun_arg_typename(T_POINTER|T_NUMBER|T_STRING|T_OBJECT)
+              , typename(v->type));
     }
 
     /* Now send the message to all recipients */
@@ -3381,7 +3427,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
         if (assoc(&stmp, avoid) >= 0) continue;
         if (!(O_SET_INTERACTIVE(ip, ob)))
         {
-            tell_npc(ob, message);
+            tell_npc_str(ob, message);
             continue;
         }
         save_command_giver = command_giver;
@@ -3429,9 +3475,9 @@ f_tell_room (svalue_t *sp, int num_arg)
         ob = arg[0].u.ob;
     else /* it's a string */
     {
-        ob = get_object(arg[0].u.string);
+        ob = get_object(arg[0].u.str);
         if (!ob)
-            error("Object not found.\n");
+            error("Object '%s' not found.\n", get_txt(arg[0].u.str));
     }
 
     if (num_arg == 2)
@@ -3577,7 +3623,7 @@ f_set_environment (svalue_t *sp)
 
         if (!okey)
             fatal("Failed to find object %s in super list of %s.\n",
-                  item->name, item->super->name);
+                  get_txt(item->name), get_txt(item->super->name));
     }
 
     /* Now put it into its new environment (if any) */
@@ -3648,7 +3694,7 @@ f_transfer (svalue_t *sp)
     {
         to = get_object(sp->u.string);
         if (!to)
-            error("Object %s not found.\n", sp->u.string);
+            error("Object %s not found.\n", get_txt(sp->u.str));
         free_string_svalue(sp);
         put_ref_object(sp, to, "transfer"); /* for move_object() below */
     }
@@ -3797,7 +3843,7 @@ f_transfer (svalue_t *sp)
 /*                        Save/Restore an Object                           */
 
 /*
- * TODO: The function don't work properly if an object contains several
+ * TODO: The functions don't work properly if an object contains several
  * TODO:: variables of the same name, and their order/location in the
  * TODO:: variable block change between save and restore.
  * TODO: The functions should push an error-handler-svalue on the stack so
@@ -4057,19 +4103,24 @@ recall_pointer (void *pointer)
 
 /*-------------------------------------------------------------------------*/
 static void
-save_string (char *src)
+save_string (string_t *src)
 
 /* Write string <src> to the write buffer, but escape all funny
  * characters.
  */
 
 {
-    register char c;
+    register char c, *cp;
+    size_t len;
+
     L_PUTC_PROLOG
 
     L_PUTC('\"')
-    while ( '\0' != (c = *src++) )
+    len = mstrsize(src);
+    cp = get_txt(src);
+    while ( len-- )
     {
+        c = *cp++;
         if (isescaped(c))
         {
             switch(c) {
@@ -4081,6 +4132,11 @@ save_string (char *src)
             case '\014': c = 'f'; break;
             case '\r'  : c = 'r'; break;
             }
+            L_PUTC('\\')
+        }
+        else if (c == '\0')
+        {
+            c = '0';
             L_PUTC('\\')
         }
         L_PUTC(c)
@@ -4214,8 +4270,8 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
 
     switch(v->type)
     {
-    case T_OLD_STRING:
-        save_string(v->u.string);
+    case T_STRING:
+        save_string(v->u.str);
         break;
 
     case T_POINTER:
@@ -4418,7 +4474,7 @@ f_save_object (svalue_t *sp, int numarg)
         strbuf_zero(&save_string_buffer);
     }
     else
-      file = sp->u.string;
+      file = get_txt(sp->u.str);
     
     /* No need in saving destructed objects */
 
@@ -4437,10 +4493,12 @@ f_save_object (svalue_t *sp, int numarg)
      */
     if (file)
     {
+        string_t *sfile;
+
         /* Get a valid filename */
 
-        file = check_valid_path(file, ob, "save_object", MY_TRUE);
-        if (file == NULL)
+        sfile = check_valid_path(sp->u.str, ob, STR_SAVE_OBJECT, MY_TRUE);
+        if (sfile == NULL)
         {
             error("Illegal use of save_object()\n");
             /* NOTREACHED */
@@ -4450,19 +4508,20 @@ f_save_object (svalue_t *sp, int numarg)
 
         /* Create the final and the temporary filename */
 
-        len = (long)strlen(file);
+        len = (long)mstrsize(sfile);
         name = alloca(len + (sizeof save_file_suffix) +
                       len + (sizeof save_file_suffix) + 4);
 
         if (!name)
         {
+            free_mstring(sfile);
             error("Stack overflow in save_object()\n");
             /* NOTREACHED */
             return sp;
         }
 
         tmp_name = name + len + sizeof save_file_suffix;
-        strcpy(name, file);
+        strcpy(name, get_txt(sfile));
 
 #ifndef MSDOS_FS
         strcpy(name+len, save_file_suffix);
@@ -4472,6 +4531,7 @@ f_save_object (svalue_t *sp, int numarg)
         strcpy(name+len, save_file_suffix);
 #endif
 
+        free_mstring(sfile);
 
         /* Open the file */
 
@@ -4571,7 +4631,7 @@ f_save_object (svalue_t *sp, int numarg)
             char *var_name, c;
             L_PUTC_PROLOG
 
-            var_name = names->name;
+            var_name = get_txt(names->name);
             c = *var_name++;
             do {
                 L_PUTC(c)
@@ -4658,14 +4718,9 @@ f_save_object (svalue_t *sp, int numarg)
                 /* Less than SAVE_OBJECT_BUFSIZE bytes generated
                  * we bypass the strbuf for speed.
                  */
-                char *s;
-
                 len = SAVE_OBJECT_BUFSIZE-buf_left;
-
-                xallocate(s, len+1, "resulting value string");
-                memcpy(s, save_object_bufstart, len);
-                s[len] = '\0';
-                put_malloced_string(sp, s);
+                save_object_bufstart[len] = '\0';
+                put_c_string(sp, save_object_bufstart);
                 strbuf_free(&save_string_buffer);
             }
             else
@@ -4769,13 +4824,10 @@ f_save_value (svalue_t *sp)
             /* Less than SAVE_OBJECT_BUFSIZE bytes generated
              * we bypass the strbuf for speed.
              */
-            char *s;
             size_t len = SAVE_OBJECT_BUFSIZE-buf_left;
 
-            xallocate(s, len+1, "resulting value string");
-            memcpy(s, save_object_bufstart, len);
-            s[len] = '\0';
-            put_malloced_string(sp, s);
+            save_object_bufstart[len] = '\0';
+            put_c_string(sp, save_object_bufstart);
             strbuf_free(&save_string_buffer);
         }
         else
@@ -5202,7 +5254,7 @@ restore_size (char **str)
 } /* restore_size() */
 
 /*-------------------------------------------------------------------------*/
-INLINE static Bool
+static INLINE Bool
 restore_array (svalue_t *svp, char **str)
 
 /* Restore an array from the text starting at *<str> (which points
@@ -5311,6 +5363,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
                 }
                 switch(c)
                 {
+                    case '0': c = '\0';   break;
                     case 'a': c = '\007'; break;
                     case 'b': c = '\b'  ; break;
                     case 't': c = '\t'  ; break;
@@ -5324,8 +5377,8 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         }
         *cp = '\0';
         *pt = source;
-        put_old_string(svp, make_shared_string(start));
-        if (!svp->u.string)
+        put_string(svp, new_tabled(start));
+        if (!svp->u.str)
         {
             *svp = const0;
             free_shared_restored_values();
@@ -5532,8 +5585,8 @@ old_restore_string (svalue_t *v, char *str)
         if (cp[-2] == '\n' && cp[-3] == '\"')
         {
             cp[-3] = '\0';
-            put_old_string(v, make_shared_string(str));
-            if (!v->u.string)
+            put_string(v, new_tabled(str));
+            if (!v->u.str)
             {
                 *v = const0;
                 free_shared_restored_values();
@@ -5577,7 +5630,7 @@ f_restore_object (svalue_t *sp)
     int restored_version; /* Formatversion of the saved data */
     char *name;      /* Full name of the file to read */
     char *file;      /* Filename passed, NULL if restoring from a string */
-    char *var;
+    string_t *var;
     char *buff;      /* Current line read from the savefile
                       * resp. a copy of the string passed.
                       */
@@ -5608,27 +5661,18 @@ f_restore_object (svalue_t *sp)
     name = NULL;
     file = NULL;
     f = NULL;
-    if (sp->u.string[0] == '#')
+    if (get_txt(sp->u.str)[0] == '#')
     {
         /* We need a copy of the value string because we're
          * going to modify it a bit.
          */
-        if (sp->x.string_type != STRING_MALLOC)
-        {
-            len = svalue_strlen(sp);
-            xallocate(buff, len+1, "copy of value string");
-            memcpy(buff, sp->u.string, len);
-            buff[len] = '\0';
-        }
-        else
-        {
-            /* We can adopt the string */
-            buff = sp->u.string;
-            put_number(sp, 0);
-        }
+        len = mstrsize(sp->u.str);
+        xallocate(buff, len+1, "copy of value string");
+        memcpy(buff, get_txt(sp->u.str), len);
+        buff[len] = '\0';
     }
     else
-        file = sp->u.string;
+        file = get_txt(sp->u.str);
     
     
     /* No use in restoring a destructed object, or an object
@@ -5639,6 +5683,7 @@ f_restore_object (svalue_t *sp)
     {
         free_svalue(sp);
         put_number(sp, 0);
+        if (buff) xfree(buff);
         return sp;
     }
 
@@ -5646,6 +5691,7 @@ f_restore_object (svalue_t *sp)
     {
         free_svalue(sp);
         put_number(sp, 1);
+        if (buff) xfree(buff);
         return sp;
     }
 
@@ -5653,9 +5699,11 @@ f_restore_object (svalue_t *sp)
 
     if (file)
     {
+        string_t *sfile;
+
         /* Get a valid filename */
 
-        file = check_valid_path(file, ob, "restore_object", MY_FALSE);
+        sfile = check_valid_path(sp->u.str, ob, STR_RESTORE_OBJECT, MY_FALSE);
         if (file == NULL)
         {
             error("Illegal use of restore_object()\n");
@@ -5666,11 +5714,12 @@ f_restore_object (svalue_t *sp)
 
         /* Create the full filename */
 
-        len = strlen(file);
+        len = mstrsize(sfile);
         name = alloca(len + (sizeof save_file_suffix));
 
         if (!name)
         {
+            free_mstring(sfile);
             error("Stack overflow in restore_object()\n");
             /* NOTREACHED */
             return sp;
@@ -5681,6 +5730,7 @@ f_restore_object (svalue_t *sp)
             len -= 2;
         strcpy(name+len, save_file_suffix);
 
+        free_mstring(sfile);
 
         /* Open the file and gets its length */
 
@@ -5798,7 +5848,7 @@ f_restore_object (svalue_t *sp)
             free_shared_restored_values();
             xfree(buff);
             error("Illegal format (version line) when restoring %s.\n"
-                  , file ? name : current_object->name);
+                  , file ? name : get_txt(current_object->name));
             /* NOTREACHED */
             return sp;
         }
@@ -5814,7 +5864,7 @@ f_restore_object (svalue_t *sp)
 
         do { /* A simple try.. environment */
 
-            if ( NULL != (var = findstring(cur)) )
+            if ( NULL != (var = find_tabled_str(cur)) )
             {
                 /* The name exists in an object somewhere, now check if it
                  * is one of our variables
@@ -5915,7 +5965,7 @@ f_restore_object (svalue_t *sp)
             free_shared_restored_values();
             xfree(buff);
             error("Illegal format (value string) when restoring %s.\n"
-                 , file ? name : current_object->name);
+                 , file ? name : get_txt(current_object->name));
             /* NOTREACHED */
             return sp;
         }
@@ -5933,7 +5983,8 @@ f_restore_object (svalue_t *sp)
     }
     if (d_flag > 1)
         debug_message("%s Object %s restored from %s.\n"
-                     , time_stamp(), ob->name, file ? name : "passed value");
+                     , time_stamp(), get_txt(ob->name)
+                     , file ? name : "passed value");
     if (f)
         fclose(f);
     free_shared_restored_values();
@@ -5965,11 +6016,10 @@ f_restore_value (svalue_t *sp)
     /* The restore routines will put \0s into the string, so we
      * need to make a copy of all but malloced strings.
      */
-    if (sp->x.string_type != STRING_MALLOC)
     {
         size_t len;
 
-        len = strlen(sp->u.string);
+        len = mstrsize(sp->u.str);
         buff = alloca(len+1);
         if (!buff)
         {
@@ -5978,11 +6028,9 @@ f_restore_value (svalue_t *sp)
             /* NOTREACHED */
             return sp;
         }
-        memcpy(buff, sp->u.string, len);
+        memcpy(buff, get_txt(sp->u.str), len);
         buff[len] = '\0';
     }
-    else
-        buff = sp->u.string;
 
     restored_version = -1;
     restored_host = -1;

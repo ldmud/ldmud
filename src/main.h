@@ -48,8 +48,8 @@ extern Bool compat_mode;
 
 extern int main(int argc, char **argv);
 extern void initialize_master_uid(void);
-extern void debug_message(char *, ...) FORMATDEBUG(printf, 1, 2);
-extern void vdebug_message(char *, va_list);
+extern void debug_message(const char *, ...) FORMATDEBUG(printf, 1, 2);
+extern void vdebug_message(const char *, va_list);
 
 void reallocate_reserved_areas(void);
 

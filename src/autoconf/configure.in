@@ -206,6 +206,7 @@ AC_CDEF_FROM_ENABLE(malloc_trace)
 AC_CDEF_FROM_ENABLE(malloc_lpc_trace)
 AC_CDEF_FROM_ENABLE(max_malloced)
 AC_CDEF_FROM_ENABLE(min_malloced)
+AC_CDEF_FROM_ENABLE(min_small_malloced)
 AC_CDEF_FROM_ENABLE(dynamic_costs)
 
 AC_CDEF_FROM_ENABLE(catch_udp_port)
@@ -252,6 +253,7 @@ AC_INT_VAL_FROM_WITH(catch_udp_port)
 AC_INT_VAL_FROM_WITH(set_buffer_size_max)
 AC_INT_VAL_FROM_WITH(malloc)
 AC_INT_VAL_FROM_WITH(min_malloced)
+AC_INT_VAL_FROM_WITH(min_small_malloced)
 AC_INT_VAL_FROM_WITH(max_malloced)
 AC_INT_VAL_FROM_WITH(total_trace_length)
 
@@ -270,6 +272,10 @@ fi
 
 if test "x$cdef_min_malloced" = "x#undef"; then
   val_min_malloced=
+fi
+
+if test "x$cdef_min_small_malloced" = "x#undef"; then
+  val_min_small_malloced=
 fi
 
 if test "x$cdef_max_malloced" = "x#undef"; then
@@ -1438,6 +1444,7 @@ AC_SUBST(cdef_malloc_lpc_trace)
 AC_SUBST(cdef_dynamic_costs)
 
 AC_SUBST(cdef_min_malloced)
+AC_SUBST(cdef_min_small_malloced)
 AC_SUBST(cdef_max_malloced)
 AC_SUBST(cdef_catch_udp_port)
 AC_SUBST(cdef_rxcache_table)
@@ -1483,7 +1490,7 @@ AC_SUBST(val_max_byte_transfer)
 AC_SUBST(val_catch_udp_port)
 AC_SUBST(val_set_buffer_size_max)
 AC_SUBST(val_malloc)
-AC_SUBST(val_min_malloced)
+AC_SUBST(val_min_small_malloced)
 AC_SUBST(val_max_malloced)
 AC_SUBST(val_total_trace_length)
 

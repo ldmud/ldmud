@@ -912,6 +912,10 @@ free_svalue (svalue_t *v)
         /* NOTREACHED */
         break;
 
+    case T_NUMBER:
+        NOOP;
+        break;
+
     case T_STRING:
       {
         string_t *str = v->u.str;
@@ -1867,7 +1871,7 @@ assign_string_range (svalue_t *source, Bool do_free)
         if (!rs)
         {
             /* We don't pop the stack here --> don't free source */
-            error("Out of memory\n");
+            outofmem((dsize + ssize + index1 - index2), "new string");
         }
 
         if (index1)
@@ -1946,7 +1950,7 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
         rs = alloc_mstring((size_t)(dsize + ssize + index1 - index2));
         if (!rs)
         {
-            error("Out of memory\n");
+            outofmem((dsize + ssize + index1 - index2), "new string");
         }
 
         if (index1)
@@ -2217,9 +2221,6 @@ inter_add_array (vector_t *q, vector_t **vpp)
  *
  * put_c_string (sp, p)
  *     Convert the C-String <p> into a mstring and put it into <sp>.
- * push_c_string (sp, p)
- *     Convert the C-String <p> into a mstring and push it onto the stack
- *     above <sp>.
  * push_svalue(v), push_svalue_block(num,v):
  *     Push one or more svalues onto the stack.
  * pop_stack(), _drop_n_elems(n,sp):
@@ -2243,21 +2244,6 @@ put_c_string (svalue_t *sp, const char *p)
     memsafe(str = new_mstring(p), strlen(p), "string");
     put_string(sp, str);
 } /* put_c_string() */
-
-/*-------------------------------------------------------------------------*/
-void
-push_c_string (svalue_t *sp, const char *p)
-
-/* Push a copy of the C string *<p> onto the stack at <sp>.
- */
-
-{
-    string_t * str;
-
-    memsafe(str = new_mstring(p), strlen(p), "string");
-    sp++;
-    put_string(sp, str);
-} /* push_c_string() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -6277,7 +6263,8 @@ again:
         /* Push the string current_strings[0x3<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_ref_string(sp, current_strings[LOAD_UINT8(pc)+0x300]);
+        unsigned int ix = LOAD_UINT8(pc);
+        push_ref_string(sp, current_strings[ix+0x300]);
         break;
     }
 
@@ -6286,7 +6273,8 @@ again:
         /* Push the string current_strings[0x2<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_ref_string(sp, current_strings[LOAD_UINT8(pc)+0x200]);
+        unsigned int ix = LOAD_UINT8(pc);
+        push_ref_string(sp, current_strings[ix+0x200]);
         break;
     }
 
@@ -6295,7 +6283,8 @@ again:
         /* Push the string current_strings[0x1<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_ref_string(sp, current_strings[LOAD_UINT8(pc)+0x100]);
+        unsigned int ix = LOAD_UINT8(pc);
+        push_ref_string(sp, current_strings[ix+0x100]);
         break;
     }
 
@@ -6304,7 +6293,8 @@ again:
         /* Push the string current_strings[0x0<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_ref_string(sp, current_strings[LOAD_UINT8(pc)]);
+        unsigned int ix = LOAD_UINT8(pc);
+        push_ref_string(sp, current_strings[ix]);
         break;
     }
 
@@ -8361,7 +8351,7 @@ again:
 
         if ((sp-1)->type == T_STRING && sp->type == T_STRING)
         {
-            i = mmstrcmp((sp-1)->u.str, sp->u.str) > 0;
+            i = mstrcmp((sp-1)->u.str, sp->u.str) > 0;
             free_string_svalue(sp);
             sp--;
             free_string_svalue(sp);
@@ -8534,7 +8524,7 @@ again:
          * Vectors and mappings are compared by ref only.
          */
 
-        int i;
+        int i = 0;
 
         if ((sp-1)->type != sp->type)
         {
@@ -8561,6 +8551,32 @@ again:
         case T_FLOAT:
             /* This is of little use... well, at least 0. == 0. ... */
         case T_CLOSURE:
+            i = (sp-1)->u.generic == sp->u.generic &&
+                (sp-1)->x.generic == sp->x.generic;
+            
+            /* Lfun- and identifier closure can be equal even if
+             * their pointers differ.
+             */
+            if (!i
+             && (sp-1)->x.closure_type == sp->x.closure_type
+             && (   (sp-1)->x.closure_type == CLOSURE_LFUN
+                 || (sp-1)->x.closure_type == CLOSURE_ALIEN_LFUN
+                 || (sp-1)->x.closure_type == CLOSURE_IDENTIFIER
+                )
+             && (sp-1)->u.lambda->ob == sp->u.lambda->ob
+               )
+            {
+                if ((sp-1)->x.closure_type == CLOSURE_ALIEN_LFUN)
+                    i =    (   (sp-1)->u.lambda->function.alien.ob 
+                            == sp->u.lambda->function.alien.ob)
+                        && (   (sp-1)->u.lambda->function.alien.index 
+                            == sp->u.lambda->function.alien.index);
+                else
+                    i =    (sp-1)->u.lambda->function.index
+                        == sp->u.lambda->function.index;
+            }
+            break;
+
         case T_SYMBOL:
         case T_QUOTED_ARRAY:
             i = (sp-1)->u.generic  == sp->u.generic &&
@@ -8593,7 +8609,7 @@ again:
          * Vectors and mappings are compared by ref only.
          */
 
-        int i;
+        int i = 0;
 
         if ((sp-1)->type != sp->type)
         {
@@ -8619,6 +8635,32 @@ again:
         case T_FLOAT:
             /* This is of little use... well, at least 0. != 0. ... */
         case T_CLOSURE:
+            i = (sp-1)->u.generic  != sp->u.generic ||
+                (sp-1)->x.generic != sp->x.generic;
+
+            /* Lfun- and identifier closure can be equal even if
+             * their lambda pointers differ.
+             */
+            if (i
+             && (sp-1)->x.closure_type == sp->x.closure_type
+             && (   (sp-1)->x.closure_type == CLOSURE_LFUN
+                 || (sp-1)->x.closure_type == CLOSURE_ALIEN_LFUN
+                 || (sp-1)->x.closure_type == CLOSURE_IDENTIFIER
+                )
+             && (sp-1)->u.lambda->ob == sp->u.lambda->ob
+               )
+            {
+                if ((sp-1)->x.closure_type == CLOSURE_ALIEN_LFUN)
+                    i =    (   (sp-1)->u.lambda->function.alien.ob 
+                            != sp->u.lambda->function.alien.ob)
+                        || (   (sp-1)->u.lambda->function.alien.index 
+                            != sp->u.lambda->function.alien.index);
+                else
+                    i =    (sp-1)->u.lambda->function.index
+                        != sp->u.lambda->function.index;
+            }
+            break;
+
         case T_SYMBOL:
         case T_QUOTED_ARRAY:
             i = (sp-1)->u.generic  != sp->u.generic ||
@@ -12504,20 +12546,19 @@ retry_for_shadow:
     else
     {
         /* we have to search the function */
-        string_t *shared_name;
 
 #ifdef APPLY_CACHE_STAT
         apply_cache_miss++;
 #endif
-        shared_name = (cache[ix].name == fun) ? fun : NULL;
-        if ( NULL != shared_name)
+
+        if ( NULL != fun)
         {
             int fx;
 
             /* Yup, fun is a function _somewhere_ */
 
             eval_cost++;
-            fx = find_function(shared_name, progp);
+            fx = find_function(fun, progp);
             if (fx >= 0)
             {
                 /* Found the function - setup the control stack and
@@ -12537,7 +12578,7 @@ retry_for_shadow:
                     free_mstring(cache[ix].name);
 
                 cache[ix].id = progp->id_number;
-                cache[ix].name = ref_mstring(shared_name);
+                cache[ix].name = ref_mstring(fun);
 
                 csp->num_local_variables = num_arg;
                 current_prog = progp;
@@ -12605,7 +12646,7 @@ retry_for_shadow:
                  */
                 return MY_TRUE;
             } /* end if (fx >= 0) */
-        } /* end if(shared_name) */
+        } /* end if(fun) */
 
         /* We have to mark this function as non-existant in this object. */
 
@@ -12713,7 +12754,8 @@ sapply_int (string_t *fun, object_t *ob, int num_arg, Bool b_find_static)
 
 #ifdef DEBUG
     if (expected_sp != inter_sp)
-        fatal("Corrupt stack pointer.\n");
+        fatal("Corrupt stack pointer: expected %p, got %p.\n"
+             , expected_sp, inter_sp);
 #endif
 
     return &apply_return_value;
@@ -12774,10 +12816,11 @@ secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
     {
         if (!out_of_memory)
         {
-            debug_message("%s Master failure: %s", time_stamp(), current_error);
-            xfree(current_error);
-            xfree(current_error_file);
-            xfree(current_error_object_name);
+            debug_message("%s Master failure: %s", time_stamp()
+                         , get_txt(current_error));
+            free_mstring(current_error);
+            free_mstring(current_error_file);
+            free_mstring(current_error_object_name);
         }
     }
     else if (!out_of_memory)
@@ -12785,12 +12828,12 @@ secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
         int a;
         object_t *save_cmd;
 
-        push_malloced_string(inter_sp, current_error);
+        push_ref_string(inter_sp, current_error);
         a = 1;
         if (current_error_file)
         {
-            push_malloced_string(inter_sp, current_error_file);
-            push_malloced_string(inter_sp, current_error_object_name);
+            push_ref_string(inter_sp, current_error_file);
+            push_ref_string(inter_sp, current_error_object_name);
             push_number(inter_sp, current_error_line_number);
             a += 3;
         }
@@ -13297,7 +13340,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
         if (l->ob->flags & O_DESTRUCTED)
         {
             error("Object '%s' the closure was bound to has been destructed\n"
-                 , l->ob->name);
+                 , get_txt(l->ob->name));
             /* NOTREACHED */
             return;
         }
@@ -13767,9 +13810,9 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
     if (p < progp->program || p > PROGRAM_END(*progp))
     {
         printf("%s get_line_number(): Illegal offset %d in object %s\n"
-              , time_stamp(), offset, progp->name);
+              , time_stamp(), offset, get_txt(progp->name));
         debug_message("%s get_line_number(): Illegal offset %d in object %s\n"
-                     , time_stamp(), offset, progp->name);
+                     , time_stamp(), offset, get_txt(progp->name));
         return 0;
     }
 
@@ -14407,7 +14450,7 @@ interpreter_overhead (void)
  */
 
 {
-    size_t sum, ix;
+    size_t sum;
 
     sum = 0;
 
@@ -14726,11 +14769,12 @@ last_instructions (int length, Bool verbose, svalue_t **svpp)
                 }
 
                 if (previous_objects[i] != old_obj
-                 || (old_file && streq(file, old_file))
+                 || (old_file && mstreq(file, old_file))
                    )
                 {
-                    sprintf(buf, "%.170s %.160s line %d",
-                      previous_objects[i]->name, get_txt(file), line
+                    sprintf(buf, "%.170s %.160s line %d"
+                               , get_txt(previous_objects[i]->name)
+                               , get_txt(file), line
                     );
                     last_instr_output(buf, svpp);
                     old_obj = previous_objects[i];
