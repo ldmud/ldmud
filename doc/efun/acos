@@ -3,3 +3,6 @@ SYNOPSIS
 
 DESCRIPTION
 	Returns the arcus cosine of the argument.
+
+SEE ALSO
+        sin(E), asin(E), cos(E), tan(E), atan(E), atan2(E)

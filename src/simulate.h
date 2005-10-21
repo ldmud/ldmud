@@ -52,25 +52,33 @@ struct rt_context_s
  * a error_recovery_info structure.
  */
 
-#define ERROR_RECOVERY_NONE      0
+#define ERROR_RECOVERY_NONE         0
   /* No error recovery available (used by the top entry in the stack).
    */
-#define ERROR_RECOVERY_BACKEND   1
+#define ERROR_RECOVERY_BACKEND      1
   /* Errors fall back to the backend, e.g. process_objects(),
    * call_heart_beat() and others.
    */
-#define ERROR_RECOVERY_APPLY     2
+#define ERROR_RECOVERY_APPLY        2
   /* Errors fall back into the secure_apply() function used for sensitive
    * applies.
    */
-#define ERROR_RECOVERY_CATCH     3
-  /* Errors are caught in interpret.c by the catch() construct.
+#define ERROR_RECOVERY_CATCH        3
+#define ERROR_RECOVERY_CATCH_NOLOG  4
+  /* Errors are caught in interpret.c by the catch()/catch_nolog() construct.
    * This is in fact an extended error_recovery_info structure which
    * is allocated on the heap.
+   * _CATCH_NOLOG catches don't log the error in the logfiles and is meant
+   * for objects like wiztools.
    */
 
 #define ERROR_RECOVERY_CONTEXT(t) ((t) >= ERROR_RECOVERY_NONE)
   /* True, if rt_context_s.type 't' denotes a error recovery context.
+   */
+
+#define ERROR_RECOVERY_CAUGHT(t) (  (t) == ERROR_RECOVERY_CATCH \
+                                 || (t) == ERROR_RECOVERY_CATCH_NOLOG )
+  /* True, if rt_context_s.type 't' denotes a catch recovery context.
    */
 
 /* --- struct longjump_s: longjump context information
@@ -180,7 +188,7 @@ extern int master_will_be_updated;
 
 /* --- Prototypes --- */
 
-extern Bool catch_instruction (uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp);
+extern Bool catch_instruction (bytecode_t catch_inst, uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp);
 extern void purge_shadow_sent(void);
 extern void check_shadow_sent (object_t *ob);
 extern void assert_shadow_sent (object_t *ob);

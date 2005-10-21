@@ -1,6 +1,33 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Nov-2000 (Lars Duening)  (3.3.17)
+    Included the changes from 3.2.9-dev.240:
+    - (lex.c) Numbers can be specified in binary using the '0b' prefix.
+    - (lex.c) Moved the parsing of escaped character sequences into a
+         separate function, and implemented the specification of characters
+         through their numeric code (expressed in decimal, octal, sedecimal
+         and binary). (f-990203-04)
+    - (closure.c) Implemented catch-nolog as '({#'catch, <body>, 'nolog })'.
+    - (prolang) Folded catch() and catch_nolog() back into one catch(),
+        distinguished by the keyword 'nolog'.
+    - (func_spec, efuns.c) The efuns sin(), cos(), tan(), atan(), atan2(),
+        log(), exp(), sqrt() and pow() now accept integers as arguments, too.
+        The results remain float. (suggested by Croft).
+    - (interpret.c, mapping.c) When testing for a 'mapping too large' condition
+        on mapping addition or element assignment, it is made sure that all
+        invalid keys have been removed. (reported by Fiona)
+    - (func_spec, lex.c, interpret.c, simulate, prolang.y) New language
+        construct catch_nolog() as alternative to catch(): the new statement
+        doesn't log the error in the driver logfiles (thanks, Michael!)
+        (p-990901).
+    - (lots of files) The mode of the driver (plain or compat) can now be
+        selected with the commandline options '--no-compat' resp. '--compat'.
+        The default is still selected during configuration. (f-981229-00)
+    - (mudlib/sys, doc/) Small corrections (thanks, Coogan!).
+    - (mudlib/telnet_neg.txt) Added Slava's example on telnet negotiation,
+         which includes a means of measuring lag using TMs (thanks!).
+
 15-Nov-2000 (Lars Duening)  (3.3.16)
     - (efuns.c) The OIB_NAME returned by object_info(OINFO_BASIC) did
          not start with a '/' in plain mode. (reported by Fiona)

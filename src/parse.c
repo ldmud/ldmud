@@ -164,7 +164,7 @@
 
 #include "driver.h"
 
-#if defined(SUPPLY_PARSE_COMMAND) && !defined(COMPAT_MODE)
+#if defined(SUPPLY_PARSE_COMMAND)
 
 #include "typedefs.h"
 
@@ -1819,7 +1819,7 @@ e_parse_command ( char     *cmd          /* Command to parse */
     return !fail;
 } /* e_parse_command() */
 
-#endif /* SUPPLY_PARSE_COMMAND && !COMPAT_MODE */
+#endif /* SUPPLY_PARSE_COMMAND */
 
 /***************************************************************************/
 

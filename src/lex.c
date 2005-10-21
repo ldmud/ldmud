@@ -719,24 +719,28 @@ init_lexer(void)
     /* Add the standard permanent macro definitions */
 
     add_permanent_define("LPC3", -1, string_copy(""), MY_FALSE);
-#ifdef COMPAT_MODE
+    if (compat_mode)
+    {
         add_permanent_define("COMPAT_FLAG", -1, string_copy(""), MY_FALSE);
         add_permanent_define("__COMPAT_MODE__", -1, string_copy(""), MY_FALSE);
-#endif
+    }
     add_permanent_define("__EUIDS__", -1, string_copy(""), MY_FALSE);
     if (strict_euids)
         add_permanent_define("__STRICT_EUIDS__", -1, string_copy(""), MY_FALSE);
 
-#ifdef COMPAT_MODE
-    mtext[0] = '"';
-    strcpy(mtext+1, master_name);
-    strcat(mtext+1, "\"");
-#else
-    mtext[0] = '"';
-    mtext[1] = '/';
-    strcpy(mtext+2, master_name);
-    strcat(mtext+2, "\"");
-#endif
+    if (compat_mode)
+    {
+        mtext[0] = '"';
+        strcpy(mtext+1, master_name);
+        strcat(mtext+1, "\"");
+    }
+    else
+    {
+        mtext[0] = '"';
+        mtext[1] = '/';
+        strcpy(mtext+2, master_name);
+        strcat(mtext+2, "\"");
+    }
     add_permanent_define("__MASTER_OBJECT__", -1, string_copy(mtext), MY_FALSE);
     add_permanent_define("__FILE__", -1, (void *)get_current_file, MY_TRUE);
     add_permanent_define("__DIR__", -1, (void *)get_current_dir, MY_TRUE);
@@ -1495,19 +1499,20 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
     if (master_ob && !(master_ob->flags & O_DESTRUCTED))
     {
         svalue_t *res;
-#ifndef COMPAT_MODE
-        char * filename;
-#endif
 
         push_string_malloced(name);
-#ifndef COMPAT_MODE
-        filename = alloca(strlen(current_file)+2);
-        *filename = '/';
-        strcpy(filename+1, current_file);
-        push_volatile_string(inter_sp, filename);
-#else
-        push_volatile_string(inter_sp, current_file);
-#endif
+
+        if (!compat_mode)
+        {
+            char * filename;
+            filename = alloca(strlen(current_file)+2);
+            *filename = '/';
+            strcpy(filename+1, current_file);
+            push_volatile_string(inter_sp, filename);
+        }
+        else
+            push_volatile_string(inter_sp, current_file);
+
         push_number(inter_sp, (delim == '"') ? 0 : 1);
         res = apply_master_ob(STR_INCLUDE_FILE, 3);
 
@@ -2136,6 +2141,159 @@ number (long i)
     yylval.number = i;
     return L_NUMBER;
 }
+
+/*-------------------------------------------------------------------------*/
+static INLINE char *
+parse_number (char * cp, unsigned long * p_num)
+
+/* Parse a positive integer number in one of the following formats:
+ *   <decimal>
+ *   0<octal>
+ *   0x<sedecimal>
+ *   x<sedecimal>
+ *   0b<binary>
+ *
+ * with <cp> pointing to the first character.
+ *
+ * The parsed number is stored in *<p_num>, the function returns the pointer
+ * to the first character after the number.
+ */
+
+{
+    char c;
+    unsigned long l;
+    unsigned long base = 10;
+
+    c = *cp++;
+
+    if ('0' == c)
+    {
+        /* '0' introduces octal (not implemented), binary and sedecimal
+         * numbers, or it can be a float
+         *
+         * Sedecimals are handled in a following if-clause to allow the
+         * two possible prefixes.
+         */
+
+        c = *cp++;
+
+        if ( c != 'X' && c != 'x' )
+        {
+            if ( c == 'b' || c == 'B' )
+            {
+                l = 0;
+                --cp;
+                while('0' == (c = *++cp) || '1' == c)
+                {
+                    l <<= 1;
+                    l += c - '0';
+                }
+
+                *p_num = l;
+                return cp;
+            }
+
+            /* If some non-digit follows, it's just the number 0.
+             */
+            cp--;
+            if (!lexdigit(c))
+            {
+                *p_num = 0;
+                return cp;
+            }
+
+            c = '0';
+            base = 8;
+        } /* if ('X' != c) */
+    } /* if ('0' == c) */
+
+    if ( c == 'X' || c == 'x' )
+    {
+
+        /* strtol() gets the sign bit wrong,
+         * strtoul() isn't portable enough.
+         */
+        l = 0;
+        --cp;
+        while(leXdigit(c = *++cp))
+        {
+            if (c > '9')
+                c = (char)((c & 0xf) + ( '9' + 1 - ('a' & 0xf) ));
+            l <<= 4;
+            l += c - '0';
+        }
+        *p_num = l;
+        return cp;
+    }
+
+    /* Parse a normal decimal number from here */
+
+    l = c - '0';
+    while (lexdigit(c = *cp++)) l = l * base + (c - '0');
+
+    *p_num = l;
+    return cp-1;
+
+} /* parse_number() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE char *
+parse_escaped_char (char * cp, char * p_char)
+
+/* Parse the sequence for an escaped character:
+ *
+ *   \a : Bell (0x07)
+ *   \b : Backspace (0x08)
+ *   \e : Escape (0x1b)
+ *   \f : Formfeed (0x0c)
+ *   \n : Newline (0x0a)
+ *   \r : Carriage-Return (0x0d)
+ *   \t : Tab (0x09)
+ *   \<decimal>, \0<octal>, \x<sedecimal>, \0x<sedecimal>, \0b<binary>:
+ *        the character with the given code.
+ *   \<other printable character> : the printable character
+ *
+ * with <cp> pointing to the character after the '\'.
+ *
+ * The parsed character is stored in *<p_char>, the function returns the
+ * pointer to the first character after the sequence.
+ *
+ * If the sequence is not one of the recognized sequences, NULL is returned.
+ */
+
+{
+    char c;
+
+    switch (c = *cp++)
+    {
+    case '\n':
+    case CHAR_EOF:
+        return NULL; break;
+
+    case 'a': c = '\007'; break;
+    case 'b': c = '\b';   break;
+    case 'e': c = '\033'; break;
+    case 'f': c = '\014'; break;
+    case 'n': c = '\n';   break;
+    case 'r': c = '\r';   break;
+    case 't': c = '\t';   break;
+    case '0': case '1': case '2': case '3': case '4':
+    case '5': case '6': case '7': case '8': case '9':
+    case 'x': case 'X':
+      {
+        unsigned long l;
+
+        cp = parse_number(cp-1, &l);
+        if (l >= 256)
+            yywarn("Character constant out of range (> 255).");
+
+        c = l & 0xff;
+      }
+    } /* switch() */
+
+    *p_char = c;
+    return cp;
+} /* parse_escaped_char() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3408,20 +3566,22 @@ yylex1 (void)
             if (c == '\\')
             {
                 /* Parse an escape sequence */
-                switch(c = *yyp++)
+
+                if ('\n' != *yyp && CHAR_EOF != *yyp)
                 {
-                    case '\n':
-                    case CHAR_EOF:
-                        yyp--; /* this will be noted as error below */
-                        break;
-                    case 'a': c = '\007'; break;
-                    case 'b': c = '\b';   break;
-                    case 'e': c = '\033'; break;
-                    case 'f': c = '\014'; break;
-                    case 'n': c = '\n';   break;
-                    case 'r': c = '\r';   break;
-                    case 't': c = '\t';   break;
+                    char *cp;
+                    char lc; /* Since c is 'register' */
+
+                    cp = parse_escaped_char(yyp, &lc);
+                    if (!cp)
+                        yyerror("Illegal character constant");
+                    yyp = cp;
+                    c = lc;
                 }
+
+                /* Test if it's terminated by a quote (this also
+                 * catches the \<nl> and \<eof> case).
+                 */
                 if (*yyp++ != '\'')
                 {
                     yyp--;
@@ -3566,14 +3726,17 @@ yylex1 (void)
                             p--;
                         break;
 
-                    case 'a': *yyp++ = '\007'; break;
-                    case 'b': *yyp++ = '\b';   break;
-                    case 'e': *yyp++ = '\033'; break;
-                    case 'f': *yyp++ = '\014'; break;
-                    case 'n': *yyp++ = '\n'; break;
-                    case 'r': *yyp++ = '\r'; break;
-                    case 't': *yyp++ = '\t'; break;
-                    default : *yyp++ = c;
+                    default:
+                      {
+                          char *cp, lc;
+
+                          cp = parse_escaped_char(p-1, &lc);
+                          if (!cp)
+                              yyerror("Illegal escaped character in string.");
+                          p = cp;
+                          *yyp++ = c;
+                          break;
+                      }
                     }
                 }
             } /* for() */
@@ -3585,79 +3748,35 @@ yylex1 (void)
 
         /* --- Numbers --- */
 
-        case '0':
-
-            /* '0' introduces octal and sedecimal numbers, or it
-             * can be a float
-             */
-
-            c = *yyp++;
-            if ( c == 'X' || c == 'x' )
-            {
-                unsigned long l;
-
-                /* strtol() gets the sign bit wrong,
-                 * strtoul() isn't portable enough.
-                 */
-                l = 0;
-                --yyp;
-                while(leXdigit(c = *++yyp))
-                {
-                    if (c > '9')
-                        c = (char)((c & 0xf) + ( '9' + 1 - ('a' & 0xf) ));
-                    l <<= 4;
-                    l += c - '0';
-                }
-                outp = yyp;
-                return number((long)l);
-            }
-
-            /* If one '.' follows, it's the start of a float.
-             * If two '..' follow, it's one end of a range
-             * If some other non-digit follows, it's just the number 0.
-             */
-            yyp--;
-            if (!lexdigit(c) && (c != '.' || yyp[1] == '.') )
-            {
-                outp = yyp;
-                return number(0);
-            }
-            c = '0';
-
-            /* FALLTHROUGH */
-
-        case '1':case '2':case '3':case '4':
+        case '0':case '1':case '2':case '3':case '4':
         case '5':case '6':case '7':case '8':case '9':
         {
-            char *numstart = yyp;
-            long l;
+            char *numstart = yyp-1;
+            unsigned long l;
 
-            l = c - '0';
-            while(lexdigit(c = *yyp++)) l = (((l << 2)+l) << 1) +
-#if defined(atarist) || defined(sun)
-/* everybody with ascii is invited to join in... */
-                  (c & 0xf ); /* can be done in the same step as the type conversion */
-#else
-                  (c - '0');
-#endif
+            /* Scan ahead to see if this is a float number */
+            while (lexdigit(c = *yyp++)) NOOP ;
 
-            /* If it's a float (and not a range), gobble up all remaining
-             * digits and simply use atof() to convert the float.
-             * TODO: This breaks on floats in exponential repr. like 1.2E-3.
+            /* If it's a float (and not a range), simply use strtod()
+             * to convert the float and to update the text pointer.
              */
-            if (c == '.' && *yyp != '.')
+            if ('.' == c && '.' != *yyp)
             {
-                while(lexdigit(*yyp++)) NOOP;
-                c = *--yyp;
-                *yyp = 0;
-                yylval.float_number = atof(numstart-1);
-                *yyp = c;
-                outp = yyp;
+                char * numend;  /* Because yyp is 'register' */
+                yylval.float_number = strtod(numstart, &numend);
+                if (errno == ERANGE)
+                {
+                    yywarn("Floating point number out of range.");
+                }
+                outp = numend;
                 return L_FLOAT;
             }
-            --yyp;
+
+            /* Nope, normal number */
+            yyp = parse_number(numstart, &l);
+
             outp = yyp;
-            return number(l);
+            return number((long)l);
         }
 
 
@@ -5473,11 +5592,10 @@ get_current_file (char ** args UNUSED)
     buf = xalloc(strlen(current_file)+4);
     if (!buf)
         return NULL;
-#ifdef COMPAT_MODE
-    sprintf(buf, "\"%s\"", current_file);
-#else
-    sprintf(buf, "\"/%s\"", current_file);
-#endif
+    if (compat_mode)
+        sprintf(buf, "\"%s\"", current_file);
+    else
+        sprintf(buf, "\"/%s\"", current_file);
     return buf;
 } /* get_current_file() */
 
@@ -5502,11 +5620,10 @@ get_current_dir (char ** args UNUSED)
     buf = xalloc(len + 4);
     if (!buf)
         return NULL;
-#ifdef COMPAT_MODE
-    sprintf(buf, "\"%.*s\"", len, current_file);
-#else
-    sprintf(buf, "\"/%.*s\"", len, current_file);
-#endif
+    if (compat_mode)
+        sprintf(buf, "\"%.*s\"", len, current_file);
+    else
+        sprintf(buf, "\"/%.*s\"", len, current_file);
     return buf;
 } /* get_current_dir() */
 
@@ -5533,11 +5650,10 @@ get_sub_path (char ** args)
             rm--;
     len = (buf - current_file) + 1;
     buf = alloca(len + 4);
-#ifdef COMPAT_MODE
-    sprintf(buf, "\"%.*s\"", len, current_file);
-#else
-    sprintf(buf, "\"/%.*s\"", len, current_file);
-#endif
+    if (compat_mode)
+        sprintf(buf, "\"%.*s\"", len, current_file);
+    else
+        sprintf(buf, "\"/%.*s\"", len, current_file);
     add_input(buf);
     return NULL;
 } /* get_sub_path() */

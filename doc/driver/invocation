@@ -59,6 +59,11 @@ DESCRIPTION
       --debug-file <filename>
         Log all debug output in <filename> instead of <mudlib>/<host>.debug.log .
 
+      --no-compat
+      --compat
+        Select the mode (plain or compat) of the driver.
+        This choice does not affect the default name of the master object.
+
       -d|--debug
         Generate debug output; repeat the argument for even more output:
           >= 1: log resets, clean ups, swaps, reception of urgend data,

@@ -104,8 +104,6 @@ VALID_SNOOP     "valid_snoop"
 VALID_TRACE     "valid_trace"
 VALID_WRITE     "valid_write"
 
-#ifdef COMPAT_MODE
-
     /* Compat mode lfuns */
 
 ADD_WEIGHT      "add_weight"
@@ -115,14 +113,9 @@ GET             "get"
 QUERY_WEIGHT    "query_weight"
 PREVENT_INSERT  "prevent_insert"
 
-#endif
-
 #ifdef SUPPLY_PARSE_COMMAND
 
-
     /* parse_command() lfuns */
-
-#ifndef COMPAT_MODE
 
 PC_ID_LIST      "parse_command_id_list"
 PC_P_ID_LIST    "parse_command_plural_id_list"
@@ -130,13 +123,10 @@ PC_ADJ_LIST     "parse_command_adjectiv_id_list"
 PC_PREPOS       "parse_command_prepos_list"
 PC_ALLWORD      "parse_command_all_word"
 
-#else
-
 PC_PLURAL_ID    "plural_id"
 PC_ADJ_ID       "adjectiv_id"
 PC_SHORT        "short"
 
-#endif /* COMPAT_MODE */
 #endif /* SUPPLY_PARSE_COMMAND */
 
 /***************************************************************************/

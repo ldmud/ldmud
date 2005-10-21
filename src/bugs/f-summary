@@ -104,7 +104,6 @@ f-990213:   Extended value range for ints.
 f-990727:  Enums.
 f-990813-0: Operator ':=:' for swaps
 f-990813-1: Operator '<=>' for comparisons.
-p-990901:  Alternative to catch(): catch_no_log()
 f-000106: Special -> for array calls
 f-000221: LDMUD foreach idea
 f-000430-1: C++-style variable definitions
@@ -117,7 +116,6 @@ f-990203-07: Pragma to reserve (s)efun names
 f-981027-1: Spaces after \ should give a better error message.
 f-981110-1: static evalstack sizecheck for functions and closures
 f-981229-30: Preprocessor lacks: #, ##, and two bugs
-f-990203-04: \octal and \hex codes in strings
 f-990228:  Replace __INIT by a nameless function with special callpattern
 f-991104-1: Inline closures are not real closures.
 b-000217-1: F_M_CAGGREGATE acts strange
@@ -140,7 +138,6 @@ f-990204-0: explains p-990204-1:create hooks
 f-981114-0: Query compilation and runtime options at runtime
 f-981208:   f-981114-0 again
 f-981222:   'Apply on destructed object' should be a runtime error, not a fatal
-f-981229-00: Get rid of hardcoded modes.
 f-981229-02: Get rid of hardcoded commands.
 f-990203-32: Make all extras (parsing, inventories, light) optional.
 f-981229-28: Information about MudOS compatibility

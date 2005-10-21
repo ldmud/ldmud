@@ -266,9 +266,11 @@ static void free_shadow_sent (shadow_t *p);
 
 /*-------------------------------------------------------------------------*/
 Bool
-catch_instruction (uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp)
+catch_instruction (bytecode_t catch_inst, uint offset
+                  , volatile svalue_t ** volatile i_sp
+                  , bytecode_p i_pc, svalue_t * i_fp)
 
-/* Implement the F_CATCH instruction.
+/* Implement the F_CATCH/F_CATCH_NO_LOG instruction.
  *
  * At the time of call, all important locals from eval_instruction() are
  * have been stored in their global locations.
@@ -317,7 +319,7 @@ catch_instruction (uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i
     /* Save some globals on the error stack that must be restored
      * separately after a longjmp, then set the jump.
      */
-    if ( setjmp( push_error_context(INTER_SP)->text ) )
+    if ( setjmp( push_error_context(INTER_SP, catch_inst)->text ) )
     {
         /* A throw() or error occured. We have to restore the
          * control and error stack manually here.
@@ -626,14 +628,17 @@ error (char *fmt, ...)
         put_malloced_string(&catch_value, string_copy(emsg_buf));
           /* always reallocate */
 
-        /* Even though caught, dump the backtrace - it makes mudlib
-         * debugging much easier.
-         */
-        debug_message("%s Caught error: %s", ts, emsg_buf + 1);
-        printf("%s Caught error: %s", ts, emsg_buf + 1);
-        dump_trace(MY_FALSE);
-        debug_message("%s ... execution continues.\n", ts);
-        printf("%s ... execution continues.\n", ts);
+        if (rt->type != ERROR_RECOVERY_CATCH_NOLOG)
+        {
+            /* Even though caught, dump the backtrace - it makes mudlib
+             * debugging much easier.
+             */
+            debug_message("%s Caught error: %s", ts, emsg_buf + 1);
+            printf("%s Caught error: %s", ts, emsg_buf + 1);
+            dump_trace(MY_FALSE);
+            debug_message("%s ... execution continues.\n", ts);
+            printf("%s ... execution continues.\n", ts);
+        }
 
         unroll_context_stack();
         longjmp(((struct error_recovery_info *)rt_context)->con.text, 1);
@@ -1276,9 +1281,8 @@ load_object (const char *lname, Bool create_super, int depth)
     fname = alloca(name_length+4);
     if (!name || !fname)
         fatal("Stack overflow in load_object()");
-#ifndef COMPAT_MODE
-    *name++ = '/';  /* Add and hide a leading '/' */
-#endif
+    if (!compat_mode)
+        *name++ = '/';  /* Add and hide a leading '/' */
     strcpy(name, lname);
     strcpy(fname, lname);
 
@@ -1527,9 +1531,8 @@ load_object (const char *lname, Bool create_super, int depth)
 
     ob->name = string_copy(name);  /* Shared string is no good here */
     tot_alloc_object_size += strlen(ob->name)+1;
-#ifndef COMPAT_MODE
-    name--;  /* Make the leading '/' visible again */
-#endif
+    if (!compat_mode)
+        name--;  /* Make the leading '/' visible again */
     ob->load_name = make_shared_string(name);  /* but here it is */
     ob->prog = prog;
     ob->ticks = ob->gigaticks = 0;

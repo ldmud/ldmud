@@ -2,7 +2,7 @@ Short: New statement catch_no_log()
 From: Michael Fedrowitz
 Date: 990901, updated 991109
 Type: Patch
-State: Unclassified
+State: Done - implemented in 3.3.16
 
 - catch_no_log.diff implementiert ein catch_no_log(), daﬂ genauso
 funktioniert wie catch(), aber keinen stack trace ausgibt. Damit kann man

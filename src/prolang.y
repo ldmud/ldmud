@@ -2835,6 +2835,10 @@ free_const_list_svalue (svalue_t *svp)
   /* Number of variables given to foreach
    */
 
+%type <number> opt_catch_mods
+  /* Bitflags for catch() modes: 1: nolog
+   */
+
 /* Special uses of <numbers> */
 
 %type <numbers> condStart
@@ -3142,19 +3146,20 @@ inheritance:
           if (master_ob && !(master_ob->flags & O_DESTRUCTED))
           {
               svalue_t *res;
-#ifndef COMPAT_MODE
-              char * filename;
-#endif
 
               push_string_shared(last_string_constant);
-#ifndef COMPAT_MODE
-              filename = alloca(strlen(current_file)+2);
-              *filename = '/';
-              strcpy(filename+1, current_file);
-              push_volatile_string(inter_sp, filename);
-#else
-              push_volatile_string(inter_sp, current_file);
-#endif
+
+              if (!compat_mode)
+              {
+                  char * filename;
+                  filename = alloca(strlen(current_file)+2);
+                  *filename = '/';
+                  strcpy(filename+1, current_file);
+                  push_volatile_string(inter_sp, filename);
+              }
+              else
+                  push_volatile_string(inter_sp, current_file);
+
               res = apply_master_ob(STR_INHERIT_FILE, 2);
 
               if (res && !(res->type == T_NUMBER && !res->u.number))
@@ -8481,7 +8486,7 @@ catch:
           ins_byte(0);
       }
 
-      '(' comma_expr ')'
+      '(' comma_expr opt_catch_mods ')'
 
       {
 %line
@@ -8489,8 +8494,18 @@ catch:
 
           ins_f_code(F_END_CATCH);
 
-          /* Update the offset field of the CATCH instruction */
+          /* Get the address of the CATCH instruction */
           start = $<address>2;
+
+          /* Modify the instruction if necessary */
+          if ($5)
+          {
+              bytecode_p p;
+              p = PROGRAM_BLOCK + start;
+              *p = F_CATCH_NO_LOG;
+          }
+
+          /* Update the offset field of the CATCH instruction */
           offset = CURRENT_PROGRAM_SIZE - (start + 2);
           if (offset >= 0x100)
           {
@@ -8535,6 +8550,41 @@ catch:
           $$.code = -1;
       }
 ; /* catch */
+
+
+opt_catch_mods : 
+      ';' L_IDENTIFIER
+
+      {
+          if (strcmp($2->name, "nolog"))
+              yyerror("Expected keyword 'nolog' in catch()");
+          if ($2->type == I_TYPE_UNKNOWN)
+              free_shared_identifier($2);
+          $$ = 1;
+      }
+
+    | ';' L_LOCAL
+
+      {
+          ident_t *id;
+
+          /* Find the ident structure for this local */
+          for (id = all_locals; id; id = id->next_all)
+              if (id->u.local.num == $2)
+                  break;
+          
+          if (id && strcmp(id->name, "nolog"))
+              yyerror("Expected keyword 'nolog' in catch()");
+
+          $$ = 1;
+      }
+
+    | /* empty */
+
+      {
+         $$  = 0;
+      }
+; /* opt_catch_mods */
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/

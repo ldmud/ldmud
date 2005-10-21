@@ -41,7 +41,8 @@
 #define OIB_NEXT_ALL           23
 #define OIB_PREV_ALL           24
 
-#define OIB_MAX 25
+#define OIB_MAX 25  /* Number of OIB_ result elements */
+
 
 /* Indices in the array resulting from OINFO_POSITION
  */
@@ -49,7 +50,7 @@
 #define OIP_PREV  1
 #define OIP_POS   2
 
-#define OIP_MAX 3
+#define OIP_MAX 3  /* Number of OIP_ result elements */
 
 
 /* Indices in the array resulting from OINFO_MEMORY
@@ -71,6 +72,6 @@
 #define OIM_NO_CLONE        14
 #define OIM_NO_SHADOW       15
 
-#define OIM_MAX 16
+#define OIM_MAX 16  /* Number of OIM_ result elements */
 
 #endif /* _OBJECTINFO_H_ */

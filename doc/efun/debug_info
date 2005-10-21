@@ -1,5 +1,5 @@
 SYNOPSIS
-        #include <sys/debug_info.h>
+        #include <debug_info.h>
 
         mixed debug_info(int flag)
         mixed debug_info(int flag, mixed arg)

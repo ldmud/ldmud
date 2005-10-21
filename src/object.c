@@ -1194,11 +1194,11 @@ f_function_exists (svalue_t *sp)
         if (p)
             *p = '\0';  /* temporarily mask out the '.c' */
 
-#ifdef COMPAT_MODE
-        res = string_copy (str);
-#else
-        res = add_slash(str);
-#endif
+        if (compat_mode)
+            res = string_copy (str);
+        else
+            res = add_slash(str);
+
         if (p)
             *p = '.';  /* undo the change above */
 
@@ -1576,11 +1576,12 @@ f_inherit_list (svalue_t *sp)
         char *str;
 
         pr = *prp++;
-#ifdef COMPAT_MODE
-        str = string_copy(pr->name);
-#else
-        str = add_slash(pr->name);
-#endif
+
+        if (compat_mode)
+            str = string_copy(pr->name);
+        else
+            str = add_slash(pr->name);
+
         if (!str)
         {
             free_array(vec);
@@ -1666,11 +1667,7 @@ f_load_name (svalue_t *sp)
     if (!hash)
     {
         /* No '#' at all: make the name sane directly */
-#ifdef COMPAT_MODE
-        name = (char *)make_name_sane(s, MY_FALSE);
-#else
-        name = (char *)make_name_sane(s, MY_TRUE);
-#endif
+        name = (char *)make_name_sane(s, !compat_mode);
         if (!name)
             name = s;
     }
@@ -1703,11 +1700,7 @@ f_load_name (svalue_t *sp)
         p[len] = '\0';
 
         /* Now make the name sane */
-#ifdef COMPAT_MODE
-        name = (char *)make_name_sane(p, MY_FALSE);
-#else
-        name = (char *)make_name_sane(p, MY_TRUE);
-#endif
+        name = (char *)make_name_sane(p, !compat_mode);
         if (!name)
             name = p;
     }
@@ -1717,13 +1710,11 @@ f_load_name (svalue_t *sp)
      * points to a static buffer otherwise.
      */
 
-#ifdef COMPAT_MODE
     /* '/.c' is a legal object name, so make sure that
-     * the result will be '/'.
+     * the result will be '/' (in compat mode).
      */
-    if ('\0' == *name)
+    if (compat_mode && '\0' == *name)
         name = "/";
-#endif
 
     /* Now return the result */
     if (s != name)
@@ -1778,11 +1769,10 @@ f_object_name (svalue_t *sp)
     char *name,*res;
 
     name = sp->u.ob->name;
-#ifdef COMPAT_MODE
-    res = string_copy(name);
-#else
-    res = add_slash(name);
-#endif
+    if (compat_mode)
+        res = string_copy(name);
+    else
+        res = add_slash(name);
     if (!res)
         error("Out of memory\n");
     free_object_svalue(sp);
@@ -1849,11 +1839,10 @@ f_program_name (svalue_t *sp)
         }
     }
     name = ob->prog->name;
-#ifdef COMPAT_MODE
-    res = string_copy(name);
-#else
-    res = add_slash(name);
-#endif
+    if (compat_mode)
+        res = string_copy(name);
+    else
+        res = add_slash(name);
     if (!res)
         error("Out of memory\n");
     free_object_svalue(sp);

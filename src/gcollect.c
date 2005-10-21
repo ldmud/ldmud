@@ -1003,6 +1003,7 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
     clear_ref_from_call_outs();
 #if defined(SUPPLY_PARSE_COMMAND)
     clear_parse_refs();
+    clear_old_parse_refs();
 #endif
     clear_simul_efun_refs();
     clear_interpreter_refs();
@@ -1163,7 +1164,7 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
     count_compiler_refs();
     count_simul_efun_refs();
 #if defined(SUPPLY_PARSE_COMMAND)
-    count_parse_refs();
+    count_old_parse_refs();
 #endif
     mstring_note_refs();
     note_otable_ref();

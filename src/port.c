@@ -34,11 +34,13 @@ get_current_time (void)
  * should be defined in such a way as to return the number of seconds since
  * some chosen year. The old behaviour of time() is to return the number
  * of seconds since 1970.
+ *
  * On a SUN Sparc I, a negative time offset of 22 seconds between two
- * sucessive calls to time() has been observed. Negative time offsets
- * can mess up the call_out tables. Since they also could mess up the
- * mudlib, completely hide them by forcing the visible time to continue
- * to run in positive direction.
+ * sucessive calls to time() has been observed. Similar discrepancies can
+ * occur whenever a system clock is set, e.g. by automatick synchronisation
+ * via ntp. These negative time offsets can mess up the call_out tables. Since
+ * they also could mess up the mudlib, completely hide them by forcing the
+ * visible time to continue to run in positive direction.
  */
 
 {

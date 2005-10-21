@@ -507,6 +507,12 @@ Table of Contents
            ates to true (not 0) and returns it. If all evaluate to 0 it
            returns 0.
 
+      #'catch executes the closure given as argument, but catches any
+           runtime error (see catch(E)). Optionally the symbol 'nolog
+           may be given as third argument to suppress the log of any
+           caught error.
+
+
 2.4 Closures with Strange Names
 
     #'negate is the unary minus that returns -x for the argument x.

@@ -3084,11 +3084,11 @@ f_object_info (svalue_t *sp)
         svp[OIB_PROG_SWAPPED].u.number = O_PROG_SWAPPED(o) ? 1 : 0;
         svp[OIB_VAR_SWAPPED].u.number = O_VAR_SWAPPED(o) ? 1 : 0;
 
-#ifdef COMPAT_MODE
-        put_ref_string(svp+OIB_NAME, o->name);
-#else
-        put_string(svp+OIB_NAME, add_slash(o->name));
-#endif
+        if (compat_mode)
+            put_ref_string(svp+OIB_NAME, o->name);
+        else
+            put_string(svp+OIB_NAME, add_slash(o->name));
+
         put_ref_string(svp+OIB_LOAD_NAME, o->load_name);
 
         o2 = o->next_all;
@@ -3274,11 +3274,8 @@ f_present_clone (svalue_t *sp)
         }
 
         /* Now make the name sane */
-#ifndef COMPAT_MODE
-        sane_name = (char *)make_name_sane(name0, MY_TRUE);
-#else
-        sane_name = (char *)make_name_sane(name0, MY_FALSE);
-#endif
+        sane_name = (char *)make_name_sane(name0, !compat_mode);
+
         if (sane_name)
             name = find_tabled_str(sane_name);
         else
@@ -3395,7 +3392,7 @@ f_sin (svalue_t *sp)
 
 /* EFUN sin()
  *
- *  float sin(float)
+ *  float sin(int|float)
  *
  * Returns the sinus of the argument.
  */
@@ -3404,7 +3401,10 @@ f_sin (svalue_t *sp)
     STORE_DOUBLE_USED
     double d;
 
-    d = sin(READ_DOUBLE(sp));
+    if (sp->type != T_FLOAT)
+        d = sin((double)(sp->u.number));
+    else 
+        d = sin(READ_DOUBLE(sp));
     STORE_DOUBLE(sp, d);
 
     return sp;
@@ -3440,7 +3440,7 @@ f_cos (svalue_t *sp)
 
 /* EFUN cos()
  *
- *  float cos(float)
+ *  float cos(int|float)
  *
  * Returns the cosinus of the argument.
  */
@@ -3449,7 +3449,10 @@ f_cos (svalue_t *sp)
     STORE_DOUBLE_USED
     double d;
 
-    d = cos(READ_DOUBLE(sp));
+    if (sp->type != T_FLOAT)
+        d = cos((double)(sp->u.number));
+    else 
+        d = cos(READ_DOUBLE(sp));
     STORE_DOUBLE(sp, d);
 
     return sp;
@@ -3485,7 +3488,7 @@ f_tan (svalue_t *sp)
 
 /* EFUN tan()
  *
- *  float tan(float)
+ *  float tan(int|float)
  *
  * Returns the tangens of the argument.
  */
@@ -3494,7 +3497,10 @@ f_tan (svalue_t *sp)
     STORE_DOUBLE_USED
     double d;
 
-    d = tan(READ_DOUBLE(sp));
+    if (sp->type != T_FLOAT)
+        d = tan((double)(sp->u.number));
+    else 
+        d = tan(READ_DOUBLE(sp));
     STORE_DOUBLE(sp, d);
 
     return sp;
@@ -3506,7 +3512,7 @@ f_atan (svalue_t *sp)
 
 /* EFUN atan()
  *
- *  float atan(float)
+ *  float atan(int|float)
  *
  * Returns the inverse tangens of the argument.
  */
@@ -3515,7 +3521,10 @@ f_atan (svalue_t *sp)
     STORE_DOUBLE_USED
     double d;
 
-    d = atan(READ_DOUBLE(sp));
+    if (sp->type != T_FLOAT)
+        d = atan((double)(sp->u.number));
+    else 
+        d = atan(READ_DOUBLE(sp));
     STORE_DOUBLE(sp, d);
 
     return sp;
@@ -3527,7 +3536,7 @@ f_atan2 (svalue_t *sp)
 
 /* EFUN atan2()
  *
- *   float atan2(float y, float x)
+ *   float atan2(int|float y, int|float x)
  *
  * Returns the inverse tangens of the argument.
  */
@@ -3536,8 +3545,14 @@ f_atan2 (svalue_t *sp)
     STORE_DOUBLE_USED
     double x, y, d;
 
-    y = READ_DOUBLE(sp-1);
-    x = READ_DOUBLE(sp);
+    if (sp->type != T_FLOAT)
+        x = (double)(sp->u.number);
+    else
+        x = READ_DOUBLE(sp);
+    if (sp[-1].type != T_FLOAT)
+        y = (double)sp[-1].u.number;
+    else
+        y = READ_DOUBLE(sp-1);
     d = atan2(y, x);
     sp--;
     STORE_DOUBLE(sp, d);
@@ -3551,7 +3566,7 @@ f_log (svalue_t *sp)
 
 /* EFUN log()
  *
- *   float log(float)
+ *   float log(int|float)
  *
  * Returns the natural logarithm of the argument.
  */
@@ -3561,7 +3576,11 @@ f_log (svalue_t *sp)
     double d;
 
     d = READ_DOUBLE(sp);
-    if (d <= 0.0)
+    if (sp->type != T_FLOAT)
+        d = (double)sp->u.number;
+    else
+        d = READ_DOUBLE(sp);
+    if (d <= 0.)
         error("Bad arg 1 for log(): value %f out of range\n", d);
     d = log(d);
     STORE_DOUBLE(sp, d);
@@ -3575,7 +3594,7 @@ f_exp (svalue_t *sp)
 
 /* EFUN exp()
  *
- *   float exp(float)
+ *   float exp(int|float)
  *
  * Returns the e to the power of the argument.
  */
@@ -3584,7 +3603,10 @@ f_exp (svalue_t *sp)
     STORE_DOUBLE_USED
     double d;
 
-    d = exp(READ_DOUBLE(sp));
+    if (sp->type != T_FLOAT)
+        d = exp((double)sp->u.number);
+    else 
+        d = exp(READ_DOUBLE(sp));
     STORE_DOUBLE(sp, d);
 
     return sp;
@@ -3596,7 +3618,7 @@ f_sqrt (svalue_t *sp)
 
 /* EFUN sqrt()
  *
- *   float sqrt(float)
+ *   float sqrt(int|float)
  *
  * Returns the square root of the argument.
  */
@@ -3605,8 +3627,11 @@ f_sqrt (svalue_t *sp)
     STORE_DOUBLE_USED
     double d;
 
-    d = READ_DOUBLE(sp);
-    if (d <= 0.0)
+    if (sp->type != T_FLOAT)
+        d = (double)sp->u.number;
+    else
+        d = READ_DOUBLE(sp);
+    if (d <= 0.)
         error("Bad arg 1 for sqrt(): value %f out of range\n", d);
     d = sqrt(d);
     STORE_DOUBLE(sp, d);
@@ -3664,7 +3689,7 @@ f_pow (svalue_t *sp)
 
 /* EFUN pow()
  *
- *   float pow(float x, float y)
+ *   float pow(int|float x, int|float y)
  *
  * Returns x to the power of y.
  */
@@ -3673,8 +3698,14 @@ f_pow (svalue_t *sp)
     STORE_DOUBLE_USED
     double x, y, d;
 
-    x = READ_DOUBLE(sp-1);
-    y = READ_DOUBLE(sp);
+    if (sp->type != T_FLOAT)
+        y = (double)(sp->u.number);
+    else
+        y = READ_DOUBLE(sp);
+    if (sp[-1].type != T_FLOAT)
+        x = (double)sp[-1].u.number;
+    else
+        x = READ_DOUBLE(sp-1);
     if (x == 0.0 && y < 0.0)
         error("Can't raise 0 to negative powers.\n");
     if (x < 0.0  && y != (double)((long)y))
@@ -3830,11 +3861,10 @@ f_to_string (svalue_t *sp)
         break;
 
     case T_OBJECT:
-#ifndef COMPAT_MODE
-        s = add_slash(sp->u.ob->name);
-#else
-        s = ref_mstring(sp->u.ob->name);
-#endif
+        if (!compat_mode)
+            s = add_slash(sp->u.ob->name);
+        else
+            s = ref_mstring(sp->u.ob->name);
         if (!s)
             error("Out of memory\n");
         free_object_svalue(sp);

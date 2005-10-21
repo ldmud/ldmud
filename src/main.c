@@ -67,6 +67,11 @@
 
 /*-------------------------------------------------------------------------*/
 
+#define PLAIN_MASTER "secure/master"
+#define COMPAT_MASTER "obj/master"
+
+/*-------------------------------------------------------------------------*/
+
 /* -- Pure commandline arguments -- */
 
 int d_flag    = 0;  /* Debuglevel */
@@ -84,6 +89,8 @@ Bool check_string_table_flag = MY_FALSE;
 #endif
 
 Bool strict_euids = MY_FALSE;  /* Enforce use of the euids */
+
+/* -- Configuration options -- */
 
 long time_to_reset          = TIME_TO_RESET;
 long time_to_cleanup        = TIME_TO_CLEAN_UP;
@@ -104,11 +111,17 @@ int numports = 0;  /* Number of specified ports */
 int udp_port = CATCH_UDP_PORT;  /* Port number for UDP */
 #endif
 
-char *mud_lib;                        /* Path to the mudlib */
-char master_name[100] = MASTER_NAME;  /* Name of the master object */
+char *mud_lib;                /* Path to the mudlib */
+char master_name[100] = "";   /* Name of the master object */
 
 static int new_mudlib = 0;    /* True: mudlib directory was specified */
 static int no_erq_demon = 0;  /* True: don't start the erq */
+
+#ifndef COMPAT_MODE
+Bool compat_mode = MY_FALSE; /* Plain mode */
+#else
+Bool compat_mode = MY_TRUE;  /* Compat mode */
+#endif
 
 /* -- Other Global Variables -- */
 svalue_t const0, const1;
@@ -200,10 +213,23 @@ main (int argc, char **argv)
           , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
           );
 
+    /* If the master_name hasn't been set, select a sensible default */
+    if ('\0' == master_name[0])
+    {
+#ifdef MASTER_NAME
+        strcpy(master_name, MASTER_NAME);
+#elif defined(COMPAT_MODE)
+        strcpy(master_name, COMPAT_MASTER);
+#else
+        strcpy(master_name, PLAIN_MASTER);
+#endif
+    }
+
     /* Make sure the name of the master object is sensible.
      * This is important for modules like the lexer which
      * use it directly.
      */
+
     {
         const char *pName = make_name_sane(master_name, MY_FALSE);
         if (pName)
@@ -663,6 +689,8 @@ typedef enum OptNumber {
 #endif
  , cTrace         /* --list-compiles      */
  , cCleanupTime   /* --cleanup-time       */
+ , cCompat        /* --compat             */
+ , cNoCompat      /* --no-compat          */
  , cDebug         /* --debug              */
  , cDefine        /* --define             */
  , cEvalcost      /* --eval-cost          */
@@ -746,6 +774,8 @@ static ShortOpt aShortOpts[]
 
 static LongOpt aLongOpts[]
   = { { "cleanup-time",       cCleanupTime,   MY_TRUE }
+    , { "compat",             cCompat,        MY_FALSE }
+    , { "no-compat",          cNoCompat,      MY_FALSE }
     , { "debug",              cDebug,         MY_FALSE }
     , { "define",             cDefine,        MY_TRUE }
     , { "debug-file",         cDebugFile,     MY_TRUE }
@@ -855,7 +885,13 @@ options (void)
 
   fputs("    Mudlib path: " MUD_LIB "\n"
         "    Binary path: " BINDIR "\n"
+#ifdef MASTER_NAME
         "  Master object: <mudlib>/" MASTER_NAME "\n"
+#elif defined(COMPAT_MODE)
+        "  Master object: <mudlib>/" COMPAT_MASTER "\n"
+#else
+        "  Master object: <mudlib>/" PLAIN_MASTER "\n"
+#endif
        , stdout);
 
   printf(" Multiple ports: %d ports max, default is %d.\n", MAXNUMPORTS, PORTNO);
@@ -1145,6 +1181,8 @@ shortusage (void)
 "  -M|--master <filename>\n"
 "  -m|--mudlib <pathname>\n"
 "  --debug-file <filename>\n"
+"  --compat\n"
+"  --no-compat\n"
 "  -d|--debug\n"
 "  -c|--list-compiles\n"
 "  -e|--no-preload\n"
@@ -1231,6 +1269,12 @@ usage (void)
 "\n"
 "  --debug-file <filename>\n"
 "    Log all debug output in <filename> instead of <host>.debug.log .\n"
+"\n"
+"  --compat\n"
+"  --no-compat\n"
+"    Select the mode (compat or plain) of the driver.\n"
+"    Note that this choice does not affect the default name of the master\n"
+"    object.\n"
 "\n"
 "  -d|--debug\n"
 "    Generate debug output; repeat the argument for even more output.\n"
@@ -1420,6 +1464,14 @@ firstscan (int eOption, const char * pValue)
             fprintf(stderr, "Illegal eval-cost '%s' ignored.\n", pValue);
         break;
       }
+
+    case cCompat:
+        compat_mode = MY_TRUE;
+        break;
+
+    case cNoCompat:
+        compat_mode = MY_FALSE;
+        break;
 
     case cNoPreload:
         e_flag++;

@@ -1024,6 +1024,11 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
             msize = (mp_int)MAP_SIZE(m);
             if (msize >= max_mapping_size)
             {
+                check_map_for_destr(m);
+                msize = (mp_int)MAP_SIZE(m);
+            }
+            if (msize >= max_mapping_size)
+            {
                 error("Illegal mapping size: %ld\n", msize+1);
                 return NULL;
             }
@@ -1114,6 +1119,11 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
             mp_int msize;
 
             msize = (mp_int)MAP_SIZE(m);
+            if (msize >= max_mapping_size)
+            {
+                check_map_for_destr(m);
+                msize = (mp_int)MAP_SIZE(m);
+            }
             if (msize >= max_mapping_size)
             {
                 error("Illegal mapping size: %ld\n", msize+1);

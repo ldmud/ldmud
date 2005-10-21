@@ -3,3 +3,6 @@ SYNOPSIS
 
 DESCRIPTION
 	Returns the arcus sine of its argument.
+
+SEE ALSO
+        sin(E), cos(E), acos(E), tan(E), atan(E), atan2(E)

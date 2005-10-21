@@ -1,7 +1,7 @@
 Short: Get rid of hardcoded driver modes
 Date: Mon, 14 Dec 1998 11:33:40 +0100
 Type: Feature
-State: Acknowledged
+State: Done - implemented in 3.3.16
 
 I'd like to get rid of the hardcoded native/compat/euids mode. The
 differences in code are small enough to make these runtime options,

@@ -101,7 +101,7 @@
 
 #include "driver.h"
 
-#if defined(SUPPLY_PARSE_COMMAND) && defined(COMPAT_MODE)
+#if defined(SUPPLY_PARSE_COMMAND)
 
 #include "typedefs.h"
 
@@ -245,7 +245,7 @@ find_living_object (char *name, Bool player)
         /* We have to create the closure */
         put_old_string(sp, make_shared_string(function_names[player ? 1 : 0]));
         if (!sp->u.string)
-            error("(parse_command) Out of memory (%lu bytes) for string\n"
+            error("(old_parse_command) Out of memory (%lu bytes) for string\n"
                  , strlen(function_names[player ? 1 : 0]));
         inter_sp = sp;
         symbol_efun(sp);
@@ -256,7 +256,7 @@ find_living_object (char *name, Bool player)
     /* Call the closure */
     put_old_string(sp, make_shared_string(name));
     if ( !sp->u.string)
-        error("(parse_command) Out of memory (%lu bytes) for result\n"
+        error("(old_parse_command) Out of memory (%lu bytes) for result\n"
              , strlen(name));
     inter_sp = sp;
     call_lambda(svp, 1);
@@ -270,7 +270,7 @@ find_living_object (char *name, Bool player)
 #ifdef GC_SUPPORT
 
 void
-clear_parse_refs (void)
+clear_old_parse_refs (void)
 
 /* GC support: Clear the references of all memory held by the parser.
  */
@@ -283,7 +283,7 @@ clear_parse_refs (void)
 
 /*-------------------------------------------------------------------------*/
 void
-count_parse_refs (void)
+count_old_parse_refs (void)
 
 /* GC support: Count the references of all memory held by the parser.
  */
@@ -1092,7 +1092,7 @@ findobject (char **cmd)
             {
                 ob = italt(nm+1-s);
                 if (ob)
-                    put_ref_object(p->item+s, ob, "parse_command");
+                    put_ref_object(p->item+s, ob, "old_parse_command");
             }
             put_array(&sv_tmp, p);
             transfer_svalue(gCarg->u.lvalue, &sv_tmp);
@@ -1126,7 +1126,7 @@ findplay (char **cmd)
         getfirst(cmd);
         if (gCarg)
         {
-            put_ref_object(&sv_tmp, pn, "parse_command(%l)");
+            put_ref_object(&sv_tmp, pn, "old_parse_command(%l)");
             transfer_svalue(gCarg->u.lvalue, &sv_tmp);
         }
     }
@@ -1232,7 +1232,7 @@ findsingle (char **cmd)
     {
         if (itnumalt() == 1 && gCarg)
         {
-            put_ref_object(&sv_tmp, italt(1), "parse_command(%o)" );
+            put_ref_object(&sv_tmp, italt(1), "old_parse_command(%o)" );
             transfer_svalue(gCarg->u.lvalue, &sv_tmp);
         }
         return MY_TRUE;
@@ -1328,7 +1328,7 @@ addword (char *d, char *s)
 
 /*-------------------------------------------------------------------------*/
 Bool
-e_parse_command ( char     *cs           /* Command to parse */
+e_old_parse_command ( char     *cs           /* Command to parse */
                 , svalue_t *ob_or_array  /* Object or array of objects */
                 , char     *ps           /* Special parsing pattern */
                 , svalue_t *dest_args    /* Pointer to lvalue args on stack */
@@ -1337,8 +1337,8 @@ e_parse_command ( char     *cs           /* Command to parse */
 
 /* EFUN parse_command()
  *
- * This function implements the parse_command() efun, called from interpret.c.
- * Result is TRUE on success, and FALSE otherwise.
+ * This function implements the old parse_command() efun, called from
+ * interpret.c.  Result is TRUE on success, and FALSE otherwise.
  */
 
 {
@@ -1542,9 +1542,9 @@ e_parse_command ( char     *cs           /* Command to parse */
     }
 
     return (ptyp == EP);
-} /* e_parse_command() */
+} /* e_old_parse_command() */
 
-#endif /* SUPPLY_PARSE_COMMAND && COMPAT_MODE */
+#endif /* SUPPLY_PARSE_COMMAND */
 
 /***************************************************************************/
 

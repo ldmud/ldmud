@@ -5145,7 +5145,7 @@ EOF
 if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
   egrep "yes" >/dev/null 2>&1; then
   rm -rf conftest*
-   EXTRA_CFLAGS='-Dsolaris' 
+   EXTRA_CFLAGS="${EXTRA_CFLAGS} -Dsolaris" 
 fi
 rm -f conftest*
 
@@ -5154,7 +5154,7 @@ fi
 # Check whether --with-target or --without-target was given.
 if test "${with_target+set}" = set; then
   withval="$with_target"
-  EXTRA_CFLAGS="-D${withval}"
+  EXTRA_CFLAGS="${EXTRA_CFLAGS} -D${withval}"
 fi
 
 

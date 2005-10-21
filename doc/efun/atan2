@@ -1,10 +1,13 @@
 SYNOPSIS
-	float atan2 (float y, float x)
+	float atan2 (int|float y, int|float x)
 
 DESCRIPTION
 	Returns the argument's arcus tangent as if computed from <y>/<x>,
         except that the signs of both arguments are used to determine the
         quadrant of the result.
+
+HISTORY
+        LDMud 3.2.9 added integers as arguments.
 
 SEE ALSO
         sin(E), cos(E), tan(E), asin(E), acos(E), atan(E)

@@ -4,6 +4,8 @@ From: Freaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
 See also: f-990203-28
 
 
+--- Or maybe put this functionality into debug_info().
+
 Hi,
 
 Waere es moeglich, eine Funktion 'function_trace()' oder wie auch immer sie

@@ -65,8 +65,10 @@
  *      ERROR_RECOVERY_APPLY:    Errors fall back into the secure_apply()
  *                               function used for sensitive applies.
  *      ERROR_RECOVERY_CATCH:    Errors are caught by the catch() construct.
+ *      ERROR_RECOVERY_CATCH_NOLOG: Errors are caught by the catch_nolog()
+ *                               construct.
  *
- *    The _CATCH context differs from the others in that it allows the
+ *    The _CATCH contexts differs from the others in that it allows the
  *    continuing execution after the error. In order to achieve this, the
  *    stack entry holds the necessary additional information to re-init
  *    the interpreter.
@@ -243,7 +245,7 @@
  * This extension of the struct error_recovery_info (see backend.h)
  * stores the additional information needed to reinitialize the global
  * variables when bailing out of a catch(). The type is always
- * ERROR_RECOVERY_CATCH.
+ * ERROR_RECOVERY_CATCH or ERROR_RECOVERY_CATCH_NOLOG.
  *
  * It is handled by the functions push_, pop_ and pull_error_context().
  */
@@ -3987,6 +3989,9 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
         /* Index the string */
         if (ind > _svalue_strlen(vec))
             ind = 0;
+            /* TODO: Throw an out-of-bounds exception instead.
+             * TODO:: Also treat the other indexings similar
+             */
         else
             ind = vec->u.string[ind];
 
@@ -4424,8 +4429,6 @@ find_virtual_value (int num)
 } /* find_virtual_value() */
 
 /*-------------------------------------------------------------------------*/
-#ifndef COMPAT_MODE
-
 char *
 add_slash (char *str)
 
@@ -4443,8 +4446,6 @@ add_slash (char *str)
     }
     return tmp;
 } /* add_slash() */
-
-#endif
 
 /*-------------------------------------------------------------------------*/
 static INLINE const char *
@@ -5101,10 +5102,12 @@ do_trace_return (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 struct longjump_s *
-push_error_context (svalue_t *sp)
+push_error_context (svalue_t *sp, bytecode_t catch_inst)
 
 /* Create a catch recovery context, using <sp> as the stackpointer to save,
  * link it into the recovery stack and return the longjmp context struct.
+ * The actual type of the catch context is chosen on the actual
+ * <catch_inst>ruction (CATCH or CATCH_NO_LOG).
  */
 
 {
@@ -5115,7 +5118,9 @@ push_error_context (svalue_t *sp)
     p->save_csp = csp;
     p->save_command_giver = command_giver;
     p->recovery_info.rt.last = rt_context;
-    p->recovery_info.rt.type = ERROR_RECOVERY_CATCH;
+    p->recovery_info.rt.type
+      = (catch_inst == F_CATCH) ? ERROR_RECOVERY_CATCH
+                                : ERROR_RECOVERY_CATCH_NOLOG;
     rt_context = (rt_context_t *)&p->recovery_info;
     return &p->recovery_info.con;
 } /* push_error_context() */
@@ -5136,7 +5141,7 @@ pop_error_context (void)
     p = (struct catch_context *)rt_context;
 
 #ifdef DEBUG
-    if (p->recovery_info.rt.type != ERROR_RECOVERY_CATCH)
+    if (!ERROR_RECOVERY_CAUGHT(p->recovery_info.rt.type))
         fatal("Catch: runtime stack underflow");
     if (csp != p->save_csp-1)
         fatal("Catch: Lost track of csp");
@@ -5167,7 +5172,7 @@ pull_error_context (svalue_t *sp)
 
     p = (struct catch_context *)rt_context;
 
-    if (p->recovery_info.rt.type != ERROR_RECOVERY_CATCH)
+    if (!ERROR_RECOVERY_CAUGHT(p->recovery_info.rt.type))
         fatal("Catch: runtime stack underflow");
 
     /* If there was a call_other() or similar, previous_ob and current_object
@@ -7059,8 +7064,12 @@ again:
 
         inter_sp = sp;
         inter_pc = pc;
-        i = e_parse_command(arg[0].u.string, &arg[1], arg[2].u.string
-                           , &arg[3], num_arg-3);
+        if (compat_mode)
+            i = e_old_parse_command(arg[0].u.string, &arg[1], arg[2].u.string
+                                   , &arg[3], num_arg-3);
+        else
+            i = e_parse_command(arg[0].u.string, &arg[1], arg[2].u.string
+                               , &arg[3], num_arg-3);
         pop_n_elems(num_arg);        /* Get rid of all arguments */
         push_number(sp, i ? 1 : 0);      /* Push the result value */
         break;
@@ -7077,8 +7086,10 @@ again:
         break;
 
     CASE(F_CATCH);        /* --- catch <offset> <guarded code> --- */
+    CASE(F_CATCH_NO_LOG); /* --- catch_no_log <offset> <guarded code> --- */
     {
         /* catch(...instructions...)
+         * catch_nolog(...instructions...)
          *
          * Execute the instructions (max. uint8 <offset> bytes) following the
          * catch statement. If an error occurs, or a throw() is executed,
@@ -7116,7 +7127,7 @@ again:
         inter_fp = fp;
 
         /* Perform the catch() */
-        if (!catch_instruction(offset, (volatile svalue_t ** volatile) &inter_sp, inter_pc, inter_fp))
+        if (!catch_instruction(instruction, offset, (volatile svalue_t ** volatile) &inter_sp, inter_pc, inter_fp))
             return MY_FALSE; /* Guarded code terminated with 'return' itself */
 
         /* Restore the important variables */
@@ -7861,7 +7872,6 @@ again:
 
             TYPE_TEST_RIGHT(sp, T_MAPPING);
             check_map_for_destr((sp-1)->u.map);
-            check_map_for_destr(sp->u.map);
             inter_pc = pc;
             inter_sp = sp;
             m = add_mapping((sp-1)->u.map,sp->u.map);
@@ -7871,7 +7881,11 @@ again:
             pop_n_elems(2);
             push_mapping(sp, m);
             if (max_mapping_size && MAP_SIZE(m) > max_mapping_size)
-                ERRORF(("Illegal mapping size: %ld\n", MAP_SIZE(m)));
+            {
+                check_map_for_destr(m);
+                if (max_mapping_size && MAP_SIZE(m) > max_mapping_size)
+                    ERRORF(("Illegal mapping size: %ld\n", MAP_SIZE(m)));
+            }
             break;
           }
 
@@ -9206,7 +9220,11 @@ again:
                 sp -= 2;
                 free_mapping(u2.map);
                 if (max_mapping_size && MAP_SIZE(argp->u.map) > max_mapping_size)
-                    ERRORF(("Illegal mapping size: %ld\n", MAP_SIZE(argp->u.map)));
+                {
+                    check_map_for_destr(argp->u.map);
+                    if (max_mapping_size && MAP_SIZE(argp->u.map) > max_mapping_size)
+                        ERRORF(("Illegal mapping size: %ld\n", MAP_SIZE(argp->u.map)));
+                }
             }
             break;
 

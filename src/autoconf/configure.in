@@ -1152,10 +1152,10 @@ AC_EGREP_CPP(yes,[
 yes
 #endif
 ],
-[ EXTRA_CFLAGS='-Dsolaris' ])
+[ EXTRA_CFLAGS="${EXTRA_CFLAGS} -Dsolaris" ])
 fi
 
-AC_ARG_WITH(target,[  --with-target    ??], EXTRA_CFLAGS="-D${withval}")
+AC_ARG_WITH(target,[  --with-target    ??], EXTRA_CFLAGS="${EXTRA_CFLAGS} -D${withval}")
 
 AC_MSG_CHECKING(if ${YACC} includes bogus malloc prototypes)
 cat > conftest.y <<EOF

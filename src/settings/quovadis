@@ -4,7 +4,8 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/usr/home/quovadis --libexec=/usr/home/quovadis/erq --libdir=/usr/home/quovadis/mudlib --with-setting=quovadis $*
+exec ./configure --prefix=/usr/home/quovadis --libexec=/usr/home/quovadis/erq 
+--libdir=/usr/home/quovadis/mudlib --with-setting=quovadis $*
 exit 1
 
 # --- The actual settings ---
@@ -15,7 +16,7 @@ enable_strict_euids=no
 enable_supply_parse_command=yes
 enable_initialization_by___init=yes
 enable_use_system_crypt=no
-
+enable_use_mysql=yes
 enable_erq=xerq
 
 enable_lpc_nosave=no

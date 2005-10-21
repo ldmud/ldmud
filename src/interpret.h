@@ -108,7 +108,7 @@ extern Bool eval_instruction(bytecode_p first_instruction, svalue_t *initial_sp)
 extern void free_string_svalue(svalue_t *v);
 extern void push_control_stack(svalue_t *sp, bytecode_p pc, svalue_t *fp);
 extern void pop_control_stack(void);
-extern struct longjump_s *push_error_context(svalue_t *sp);
+extern struct longjump_s *push_error_context(svalue_t *sp, bytecode_t catch_inst);
 extern void pop_error_context (void);
 extern svalue_t *pull_error_context (svalue_t *sp);
 extern void free_object_svalue(svalue_t *v);
@@ -180,10 +180,7 @@ extern svalue_t *f_last_instructions(svalue_t *sp);
 extern svalue_t *f_set_this_object (svalue_t *sp);
 extern svalue_t *f_trace(svalue_t *sp);
 extern svalue_t *f_traceprefix(svalue_t *sp);
-
-#ifndef COMPAT_MODE
 extern string_t *add_slash (string_t *str);
-#endif
 
 #ifdef OPCPROF
 extern Bool opcdump(char *fname);

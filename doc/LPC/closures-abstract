@@ -36,6 +36,10 @@ forms:
 	Evaluate expression, then evaluate the result form labeled with
 	the value equal to the value evaluated from expression.
 	If no matching label exists, the value of #'switch is 0.
+  ({#'catch, <body> [ 'nolog ] })
+        Evaluates the <body> and catches any runtime error. If the symbol
+        'nolog is also given, a caught error is not logged.
+
 
 lisp similars:
   #',		progn

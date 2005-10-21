@@ -16,14 +16,6 @@
 
 /* Verify some of the definitions in config.h */
 
-#ifndef MASTER_NAME
-#  ifdef COMPAT_MODE
-#    define MASTER_NAME "obj/master"
-#  else
-#    define MASTER_NAME "secure/master"
-#  endif
-#endif
-
 #if !defined(MALLOC_smalloc) && !defined(MALLOC_sysmalloc)
 #  define MALLOC_smalloc
 #endif

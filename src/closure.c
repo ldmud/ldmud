@@ -2671,12 +2671,13 @@ compile_value (svalue_t *value, int opt_flags)
                   }
 
                 /* ({#'catch, <body> })
+                 * ({#'catch, <body>, 'nolog })
                  */
                 case F_CATCH:
                   {
                     /* This is compiled as:
                      *
-                     *      CATCH l
+                     *      CATCH l / CATCH_NO_LOG l
                      *      <body>
                      *   l: END_CATCH
                      */
@@ -2684,13 +2685,21 @@ compile_value (svalue_t *value, int opt_flags)
                     mp_int start, offset;
                     int void_given;
 
-                    if (block_size != 2)
+                    if (block_size != 2 && block_size != 3)
                         lambda_error("Wrong number of arguments to #'catch\n");
                         
                     if (current.code_left < 2)
                         realloc_code();
                     current.code_left -= 2;
-                    STORE_CODE(current.codep, F_CATCH);
+
+                    if (block_size == 2)
+                        STORE_CODE(current.codep, F_CATCH);
+                    else if (argp[2].type != T_SYMBOL
+                     || strcmp(argp[2].u.string, "nolog"))
+                        lambda_error("Expected 'nolog as second argument.\n");
+                    else
+                        STORE_CODE(current.codep, F_CATCH_NO_LOG);
+
                     STORE_UINT8(current.codep, 0);
                     start = current.code_max - current.code_left;
 
@@ -4771,20 +4780,20 @@ symbol_efun (svalue_t *sp)
  *
  *   #'<operator>: see symbol_operator()
  *
- *   #'if       -> F_BRANCH_WHEN_ZERO       +CLOSURE_OPERATOR
- *   #'do       -> F_BBRANCH_WHEN_NON_ZERO  +CLOSURE_OPERATOR
- *   #'while    -> F_BBRANCH_WHEN_ZERO      +CLOSURE_OPERATOR
- *   #'foreach  -> F_FOREACH                +CLOSURE_OPERATOR
- *   #'continue -> F_BRANCH                 +CLOSURE_OPERATOR
- *   #'default  -> F_CSTRING0               +CLOSURE_OPERATOR
- *   #'switch   -> F_SWITCH                 +CLOSURE_OPERATOR
- *   #'break    -> F_BREAK                  +CLOSURE_OPERATOR
- *   #'return   -> F_RETURN                 +CLOSURE_OPERATOR
- *   #'sscanf   -> F_SSCANF                 +CLOSURE_OPERATOR
- *   #'catch    -> F_CATCH                  +CLOSURE_OPERATOR
+ *   #'if          -> F_BRANCH_WHEN_ZERO       +CLOSURE_OPERATOR
+ *   #'do          -> F_BBRANCH_WHEN_NON_ZERO  +CLOSURE_OPERATOR
+ *   #'while       -> F_BBRANCH_WHEN_ZERO      +CLOSURE_OPERATOR
+ *   #'foreach     -> F_FOREACH                +CLOSURE_OPERATOR
+ *   #'continue    -> F_BRANCH                 +CLOSURE_OPERATOR
+ *   #'default     -> F_CSTRING0               +CLOSURE_OPERATOR
+ *   #'switch      -> F_SWITCH                 +CLOSURE_OPERATOR
+ *   #'break       -> F_BREAK                  +CLOSURE_OPERATOR
+ *   #'return      -> F_RETURN                 +CLOSURE_OPERATOR
+ *   #'sscanf      -> F_SSCANF                 +CLOSURE_OPERATOR
+ *   #'catch       -> F_CATCH                  +CLOSURE_OPERATOR
  *
- *   #'<efun>   -> F_<efun>                          +CLOSURE_EFUN
- *   #'<sefun>  -> <function-index>                  +CLOSURE_SIMUL_EFUN
+ *   #'<efun>      -> F_<efun>                 +CLOSURE_EFUN
+ *   #'<sefun>     -> <function-index>         +CLOSURE_SIMUL_EFUN
  */
 
 {

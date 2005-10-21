@@ -40,6 +40,8 @@ extern int numports;
 extern int udp_port;
 #endif
 
+extern Bool compat_mode;
+
 /* --- Prototypes --- */
 
 extern int main(int argc, char **argv);

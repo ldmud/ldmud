@@ -401,7 +401,7 @@ HISTORY
 	The hook for telnet negotiation was introduced in 3.2.1@60.
 	The hooks for no-echo negotiation and erq-lossage notification
 	    were introduced in 3.2.1@85.
-        H_COMMAND was introducedin 3.2.7.
+        H_COMMAND was introduced in 3.2.7.
 
 SEE ALSO
 	native(C), set_driver_hook(E)

@@ -661,9 +661,8 @@ svalue_to_string ( fmt_state_t *st
             stradd(st, &str,"0");
             break;
         }
-#ifndef COMPAT_MODE
-        stradd(st, &str, "/");
-#endif
+        if (!compat_mode)
+            stradd(st, &str, "/");
         stradd(st, &str, obj->u.ob->name);
         push_ref_object(inter_sp, obj->u.ob, "sprintf");
         temp = apply_master_ob(STR_PRINTF_OBJ_NAME, 1);

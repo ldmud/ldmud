@@ -69,6 +69,7 @@
 #endif
         local
         catch
+ 	catch_no_log
 "++"    inc
 "--"    dec
 "x++"   post_inc
@@ -249,19 +250,19 @@ mixed  *slice_array F_RANGE (mixed *,int,int);
         /* Miscellaneous */
 
 mixed   abs(int|float);
-float   sin(float);
+float   sin(int|float);
 float   asin(float);
-float   cos(float);
+float   cos(int|float);
 float   acos(float);
-float   tan(float);
-float   atan(float);
-float   atan2(float,float);
-float   log(float);
-float   exp(float);
-float   sqrt(float);
+float   tan(int|float);
+float   atan(int|float);
+float   atan2(int|float,int|float);
+float   log(int|float);
+float   exp(int|float);
+float   sqrt(int|float);
 float   ceil(float);
 float   floor(float);
-float   pow(float,float);
+float   pow(int|float,int|float);
 
 int     to_int(int|string|float|closure);
 float   to_float(float|string|int);

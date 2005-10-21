@@ -1095,7 +1095,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
     if (get_txt(func->u.str)[0] == ':')
         error("Illegal function name: %s\n", get_txt(func->u.str));
 
-#ifdef COMPAT_MODE
+    if (compat_mode)
     {
         char *s;
         s = get_txt(func->u.str);
@@ -1107,7 +1107,6 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
             return MY_TRUE;
         }
     }
-#endif
 
     /* Allocate and initialise a new sentence */
     p = new_action_sent();
