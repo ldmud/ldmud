@@ -143,6 +143,9 @@ DESCRIPTION
       --no-strict-euids
         Enable/disable the enforced use of euids.
 
+      --pidfile <filename>\n"
+        Write the pid of the driver process into <filename>.\n"
+
       --gcollect-outfd <filename>|<num>
         Garbage collector output (like a log of all reclaimed memory blocks)
         is sent to <filename> (or inherited fd <num>) instead of stderr.

@@ -67,8 +67,8 @@
 /* One expression hashtable entry */
 
 typedef struct RxHashEntry {
-    char   * pString;  /* Generator string, a shared string
-                        * NULL if unused */
+    unsigned char * pString;  /* Generator string, a shared string
+                               * NULL if unused */
     p_uint   hString;  /* Hash of pString */
     Bool     from_ed;  /* The from_ed value */
     regexp * pRegexp;  /* The generated regular expression from regcomp() */
@@ -94,7 +94,7 @@ void rxcache_init(void)
 
 /*--------------------------------------------------------------------*/
 regexp *
-regcomp_cache(char * expr, Bool excompat, Bool from_ed)
+regcomp_cache(unsigned char * expr, Bool excompat, Bool from_ed)
 
 /* Compile a regexp structure from the expression <expr>, more or
  * less ex compatible.
@@ -113,14 +113,14 @@ regcomp_cache(char * expr, Bool excompat, Bool from_ed)
 
     iNumXRequests++;
 
-    hExpr = whashstr(expr, 50);
+    hExpr = whashstr((char *)expr, 50);
     pHash = xtable+RxStrHash(hExpr);
 
     /* Look for a ready-compiled regexp */
     if (pHash->pString != NULL
      && pHash->hString == hExpr
      && pHash->from_ed == from_ed
-     && !strcmp(pHash->pString, expr)
+     && !strcmp((char *)pHash->pString, (char *)expr)
        )
     {
         iNumXFound++;
@@ -134,12 +134,12 @@ regcomp_cache(char * expr, Bool excompat, Bool from_ed)
     if (NULL == pRegexp)
         return NULL;
 
-    expr = make_shared_string(expr);
+    expr = (unsigned char *)make_shared_string((char *)expr);
 
     if (NULL != pHash->pString)
     {
         iNumXCollisions++;
-        free_string(pHash->pString);
+        free_string((char *)pHash->pString);
         rx_free(pHash->pRegexp);
     }
     pHash->pString = expr; /* refs are transferred */
@@ -298,7 +298,7 @@ count_rxcache_refs (void)
     {
         if (NULL != xtable[i].pString)
         {
-            count_ref_from_string(xtable[i].pString);
+            count_ref_from_string((char *)xtable[i].pString);
             count_rxcache_ref(xtable[i].pRegexp);
         }
     } /* for (i) */

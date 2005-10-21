@@ -71,7 +71,7 @@ allocate_new_dat(void)
 
     if ( !my_dat ) /* The chained list has not been allocated */
     {
-        my_dat = xalloc(sizeof(*my_dat));
+        my_dat = pxalloc(sizeof(*my_dat));
        if ( !my_dat )
        {
            error("Out of memory.\n");
@@ -87,7 +87,7 @@ allocate_new_dat(void)
 
     /* The chained list exists */
     
-    tmp = my_dat->prev = xalloc(sizeof(db_dat_t));
+    tmp = my_dat->prev = pxalloc(sizeof(db_dat_t));
     if ( !tmp )
     {
        error("Out of memory.\n");
@@ -187,7 +187,7 @@ remove_dat (db_dat_t *dat)
     if ( dat == my_dat )
         my_dat = NULL;
 
-    xfree(dat);
+    pxfree(dat);
     return i;
 } /* remove_dat() */
 

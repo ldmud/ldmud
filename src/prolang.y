@@ -5144,7 +5144,7 @@ constant:
     | constant '<'   constant { $$ = $1 <  $3; }
     | constant L_LE  constant { $$ = $1 <= $3; }
     | constant L_LSH constant { $$ = (p_uint)$3 > MAX_SHIFT ? 0 : $1 << $3; }
-    | constant L_RSH constant { $$ = (p_uint)$3 > MAX_SHIFT ? ($1 >> (MAX_SHIFT+1)) : ($1 >> $3); }
+    | constant L_RSH constant { $$ = (p_uint)$3 > MAX_SHIFT ? ($1 >= 0 ? 0 : -1) : ($1 >> $3); }
     | constant L_RSHL constant { $$ = (p_uint)$3 > MAX_SHIFT ? 0 : ((p_uint)$1 >> $3); }
     | constant '+'   constant { $$ = $1 +  $3; }
     | constant '-'   constant { $$ = $1 -  $3; }
@@ -9682,13 +9682,12 @@ cross_define (function_t *from, function_t *to, int32 offset)
 
 /* The function <to> is a cross-definition from real function <from>,
  * separated by <offset>.
- * Set the flags and offset of <to> accordingly, and synchronize
- * the NO_MASK flag of both.
+ * Set the flags and offset of <to> accordingly to point to <from>, and
+ * synchronize the NO_MASK flag of both.
  */
 
 {
     short nomask;
-
     to->flags = (to->flags & ~NAME_UNDEFINED)
               | (from->flags & (NAME_UNDEFINED|NAME_PROTOTYPE))
               | NAME_CROSS_DEFINED | NAME_HIDDEN | NAME_INHERITED;
@@ -9845,7 +9844,7 @@ copy_functions (program_t *from, fulltype_t type)
             fun_p->flags |= NAME_UNDEFINED;
         }
 
-    } /* for (inherited functions) */
+    } /* for (inherited functions) pass 1 */
 
     /* Point back to the begin of the copied function data */
     fun_p = (function_t *)
@@ -9947,7 +9946,6 @@ copy_functions (program_t *from, fulltype_t type)
                      * to the non-standard preference would be very hard to
                      * reconstruct.
                      */
-
                     if ((uint32)n < first_func_index)
                     {
                         /* We already have a function definition/prototype
@@ -10003,8 +10001,9 @@ copy_functions (program_t *from, fulltype_t type)
                               && !(fun.flags & (NAME_HIDDEN|NAME_UNDEFINED))
                                 )
                         {
-                            /* This function is nomask, but the previous entry
-                             * is hidden or undefined: prefer the inherited one.
+                            /* This function is visible and existing, but the
+                             * inherited one is not, or this one is also nomask:
+                             * prefer the inherited one.
                              */
                             cross_define( &fun, OldFunction
                                         , current_func_index - n );
@@ -10090,7 +10089,9 @@ copy_functions (program_t *from, fulltype_t type)
             if ((heart_beat == -1)
              && fun.name[0] == 'h'
              && (strcmp(fun.name, "heart_beat") == 0))
+            {
                 heart_beat = current_func_index;
+            }
 
 %ifdef INITIALIZATION_BY___INIT
             /* Recognize the initializer function */
@@ -10134,7 +10135,7 @@ copy_functions (program_t *from, fulltype_t type)
 
         /* Finally update the entry in the A_FUNCTIONS area */
         fun_p[i] = fun;
-    }
+    } /* for (inherited functions), pass 2 */
 
 %ifdef INITIALIZATION_BY___INIT
     return initializer;
@@ -10901,7 +10902,7 @@ epilog (void)
         yyerror("Too many strings");
 
     /* Add the names of the include files in reversed order
-     * the program strings.
+     * to the program strings.
      */
     while (mem_block[A_INCLUDE_NAMES].current_size)
     {
@@ -10943,8 +10944,9 @@ epilog (void)
         {
             funflag_t flags;
 
-            /* If the function was cross-defined, resolve f->offset.func
-             * to use the proper offset to point to the actual definition.
+            /* If the function was cross-defined, the targeted function might
+             * be a cross-definition itself. Unravel such a cross-definition
+             * chain and let f->offset.func point to the actual definition.
              */
             if ( f->flags & NAME_CROSS_DEFINED )
             {
@@ -11008,7 +11010,6 @@ epilog (void)
             f->flags = flags & NAME_INHERITED ?
               (flags & ~INHERIT_MASK)  | (f->offset.inherit & INHERIT_MASK) :
               (flags & ~FUNSTART_MASK) | (f->offset.pc & FUNSTART_MASK);
-
             /* If the function is visible, add it to the list of names
              * to be sorted.
              */

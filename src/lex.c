@@ -1579,6 +1579,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
         if (errno == ENFILE)
             lexerror("File table overflow");
 #endif
+        /* Include not found - fall back onto <> search pattern */
     }
 
     /* Handle a '<'-include. */

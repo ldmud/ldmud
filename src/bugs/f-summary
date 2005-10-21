@@ -124,6 +124,7 @@ f-991104-1: Inline closures are not real closures.
 b-000217-1: F_M_CAGGREGATE acts strange
 p-000316: Binary codefile support
 f-000906: Revamp the bytecode design
+f-001102: Separate Programs from Blueprints
 
 
 Runtime
@@ -182,6 +183,7 @@ f-981226-2: Check for and use <arpa/telnet.h>
 f-990708-3: Improved options selection process.
 f-000407: More options for setting files
 f-000814: configure-with_portno should take a string
+f-000918: Add a path spec to --use-mysql on configuration.
 
 Other
 --------------------------------------------------------------------------

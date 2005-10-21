@@ -2162,15 +2162,25 @@ add_mapping (mapping_t *m1, mapping_t *m2)
     cm1 = m1->condensed;
     cm2 = m2->condensed;
 
-    /* Special case: number of values per entry differs */
+    /* Special case: number of values per entry differs.
+     * If one of the mappings is empty, the other one is returned.
+     * If both mappings contain data, an error is thrown.
+     */
 
     if (m2->num_values != num_values)
     {
-        if (!cm1->string_size && !cm1->misc_size && !m1->hash) {
+        if (!cm1->string_size && !cm1->misc_size && !m1->hash)
+        {
             return copy_mapping(m2);
-        } else {
+        }
+
+        if (!cm2->string_size && !cm2->misc_size && !m2->hash)
+        {
             return copy_mapping(m1);
         }
+
+        error("Mappings to be added are of different width: %ld vs. %ld\n"
+             , (long)num_values, (long)m2->num_values);
     }
 
 

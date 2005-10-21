@@ -284,7 +284,7 @@ call_out (void)
         wiz_list_t *user;
 
         clear_state();
-        debug_message("%s: Error in call out.\n", time_stamp());
+        debug_message("%s Error in call out.\n", time_stamp());
         cop = current_call_out;
         ob = called_object;
         if (ob)

@@ -1,6 +1,41 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+02-Nov-2000 (Lars Duening)  (3.3.14)
+    Included the changes from upcoming 3.2.9-dev.237:
+    - (interpret.c) call_resolved() now accepts a destructed object as
+         second argument and returns 0 instead of throwing an error.
+         (reported by Coogan)
+    - (settings/tubmud) 'nosave' is now on by default.
+
+    Included the changes from 3.2.9-dev.236:
+    - (interpret.c) When setting up the frame for a function, resolve a
+         possible cross-definition first. (b-000616, b-001004)
+    - (interpret.c, prolang.y) Right shifts of 32 or more are now properly
+         defined.
+    - (mapping.c) Adding two mappings of different width throws an error
+         (reported by Holger and Fiona). (b-001010)
+    - (regexp.c) Added a patch by Marcus Meissner to make regexp more
+         compatible with 8-bit characters (thanks!).
+    - (simulate, interpret) Moved the catch_instruction() function into
+         simulate to keep aggressive optimizers from over-optimizing this
+         function. I hope this finally cures the catch() related crashes.
+         (thanks, Christian!) (b-001010-1)
+    - (simulate, array.c, call_out.c, comm.c, mapping.c) Callbacks now accept
+         protected lvalues as arguments only if they are called just once.
+         Reason is that the protectors don't count references: at the first
+         return from a callback the lvalue would be freed even though it
+         is still needed.
+         (b-001002)
+    - (main.c) New driver option '--pidfile <filename>' to write the
+         pid of the driver into a file (suggested by Freaky).
+    - (backend.c) The IGNORE_BANG option to efun input_to() didn't
+         work (provided by Casey, thanks!).
+    - (pkg-mysql.c) Changed some xalloc()s into pxalloc()s to protect them
+         against the GC (provided by Michael Fedrowitz, thanks!).
+    - (interpret.c) Cosmetics to the traceback output (thanks, Christian M.).
+    - (simulate.c) A semicolon was missing (thanks, Christian B.).
+
 13-Sep-2000 (Lars Duening)  (3.3.13)
     - (func_spec, lex.c, closure.c, interpret.c, prolang.y) Added the
          operators '>>>' and its cousin '>>>=' for logical right shifts.
@@ -172,7 +207,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
          memory (most of the time the compiled program) because the attributes
          of <expr> weren't promoted up by the '-' (reported by Mammi).
     - (prolang.y) In the expression '++<ident>' the opcode for '++' was
-         overwritten if the <ident> required a 2-Byte index. (b-000810)
+         overwritten if the <ident> required a 2-Byte index. (b-000803,
+         b-000810)
     - (comm.c) Looking up hostname first enters the IP address as string
          into the lookup table, to be replaced later by the ERQ. This neatly
          handles unresolved hostnames as well (provided by LynX).

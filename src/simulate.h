@@ -179,6 +179,7 @@ extern int master_will_be_updated;
 
 /* --- Prototypes --- */
 
+extern Bool catch_instruction (uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp);
 extern void purge_shadow_sent(void);
 extern void check_shadow_sent (object_t *ob);
 extern void assert_shadow_sent (object_t *ob);

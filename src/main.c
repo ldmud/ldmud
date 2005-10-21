@@ -680,6 +680,7 @@ typedef enum OptNumber {
  , cNoERQ         /* --no-erq             */
  , cNoHeart       /* --no-heart           */
  , cNoPreload     /* --no-preload         */
+ , cPidFile       /* --pidfile            */
  , cResetTime     /* --reset-time         */
  , cReserved      /* -r                   */
  , cReserveUser   /* --reserve-user       */
@@ -766,6 +767,7 @@ static LongOpt aLongOpts[]
     , { "no-erq",             cNoERQ,         MY_FALSE }
     , { "no-heart",           cNoHeart,       MY_FALSE }
     , { "no-preload",         cNoPreload,     MY_FALSE }
+    , { "pidfile",            cPidFile,       MY_TRUE }
     , { "reset-time",         cResetTime,     MY_TRUE }
     , { "reserve-user",       cReserveUser,   MY_TRUE }
     , { "reserve-master",     cReserveMaster, MY_TRUE }
@@ -1169,6 +1171,7 @@ shortusage (void)
 "  -r u<size> | --reserve-user <size>\n"
 "  -r m<size> | --reserve-master <size>\n"
 "  -r s<size> | --reserve-system <size>\n"
+"  --pidfile <filename>\n"
 #ifdef GC_SUPPORT
 "  --gcollect-outfd <filename>|<num>\n"
 #endif
@@ -1304,6 +1307,9 @@ usage (void)
 "  --strict-euids\n"
 "  --no-strict-euids\n"
 "    Enforce/don't enforce the proper use of euids.\n"
+"\n"
+"  --pidfile <filename>\n"
+"    Write the pid of the driver process into <filename>.\n"
 "\n"
 #ifdef GC_SUPPORT
 "  --gcollect-outfd <filename>|<num>\n"
@@ -1620,6 +1626,22 @@ firstscan (int eOption, const char * pValue)
     case cLongHelp:
         usage();
         return 1;
+
+    case cPidFile:
+        {
+            FILE * pidfile;
+
+            pidfile = fopen(pValue, "w");
+            if (!pidfile)
+            {
+                fprintf(stderr, "Can't open pidfile '%s': %s.\n"
+                       , pValue, strerror(errno));
+                return 1;
+            }
+            fprintf(pidfile, "%ld\n", (long)getpid());
+            fclose(pidfile);
+            break;
+        }
 
 #ifdef DEBUG
     case cCheckRefs:

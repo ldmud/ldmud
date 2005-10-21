@@ -21,10 +21,10 @@ DESCRIPTION
 	If <arg> is an array, the function will be called with
 	each of the mapping keys as first, and (if existing) the
 	associated values as second parameter, followed by the <extra>
-	arguments. If the result is true, the array element in question
-	is included into the result. Analog, if a mapping <map> is given
-	instead of a function, every array element which is key in <map>
-	is included into the result.
+        arguments (these must not be protected references like &(i[0])). If
+        the result is true, the array element in question is included into the
+        result. Analog, if a mapping <map> is given instead of a function,
+        every array element which is key in <map> is included into the result.
 
 
 	If <arg> is a mapping, the function will be called with

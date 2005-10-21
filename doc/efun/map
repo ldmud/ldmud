@@ -41,8 +41,9 @@ DESCRIPTION
 	If <arg> is a mapping, the function will be called with
 	each of the mapping keys as first, and (if existing) the
 	associated values as second parameter, followed by the <extra>
-	arguments. The result of the efun is a mapping of all results
-	of the function calls, stored under their corresponding key.
+        arguments (these must not be protected references like &(i[0]). The
+        result of the efun is a mapping of all results of the function calls,
+        stored under their corresponding key.
 
 	Depending on the width of the mapping <arg>, the operation can
 	be described as:

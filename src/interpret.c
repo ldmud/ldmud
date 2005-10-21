@@ -238,63 +238,6 @@
 /*-------------------------------------------------------------------------*/
 /* Types */
 
-/* --- struct control_stack: one control stack element
- *
- * Every structure describes the previous function call levels, the
- * current function call data is kept in interpret's global variables..
- * 'prog' is usually the same as ob->prog, except when
- * executing inherited functions.
- *
- * TODO: The frames should have special flags to mark stuff like
- * TODO:: sefun closures, closures, etc.
- */
-
-struct control_stack {
-    object_t   *ob;         /* Current object */
-    object_t   *prev_ob;    /* Save previous object */
-    program_t  *prog;       /* Current program, NULL in the bottom entry */
-    bytecode_p  pc;         /* Program counter, points to next bytecode */
-    svalue_t   *fp;         /* Frame pointer: first arg on stack */
-    bytecode_p  funstart;
-      /* Start of the function code.
-       * Two magic values (SIMUL_EFUN_FUNSTART and EFUN_FUNSTART) mark
-       * entries for simul-efun and efun closures.
-       */
-    int num_local_variables;    /* Number of local vars + arguments */
-    int function_index_offset;
-      /* Index of current program's function block within the functions of the
-       * current objects program (needed for inheritance).
-       */
-    svalue_t *current_variables;        /* Same */
-    int   extern_call;
-      /* TRUE if the call came from outside the object (call_others to
-       * oneself are a special case of this). Only entries with this flag
-       * set save the .ob and .prev_ob for the flagged and all previous
-       * unflagged entries.
-       * If the current this_object was changed, the 'imposter' object is
-       * stored in .pretend_to_be and this flag is or'ed with CS_PRETEND.
-       */
-#   define CS_PRETEND 0x80
-    Bool  catch_call;
-      /* This is the 'faked' call context for the code inside a catch().
-       * Since the interpreter fakes a subroutine call for this, F_RETURN
-       * must be able to tell the contexts apart.
-       * (Right now the LPC compiler prohibits the use of 'return' inside
-       * of a catch, but providing it on this level already doesn't hurt).
-       */
-    int   instruction;
-      /* For EFUN_FUNSTART entries, this is the efun executed.
-       */
-
-    bytecode_p *break_sp;
-      /* Points to address to branch to at next F_BREAK, which is also
-       * the actual bottom of the break stack.
-       */
-    object_t *pretend_to_be;
-      /* After set_this_object(), the this_object imposter.
-       */
-};
-
 /* --- struct catch_context: error_recovery subclass for catch() ---
  *
  * This extension of the struct error_recovery_info (see backend.h)
@@ -616,7 +559,7 @@ svalue_t catch_value = { T_INVALID } ;
    */
 
 static struct control_stack control_stack[MAX_TRACE];
-static struct control_stack *csp;
+struct control_stack *csp;
   /* The control stack holds copies of the machine registers for previous
    * function call levels, with <csp> pointing to the last valid
    * entry, describing the last context.
@@ -718,11 +661,9 @@ static struct pointer_table *ptable;
 
 static Bool apply_low(char *, object_t *, int, Bool);
 static void call_simul_efun(int code, object_t *ob, int num_arg);
-static Bool catch_instruction (uint offset);
 #ifdef DEBUG
 static void check_extra_ref_in_vector(svalue_t *svp, size_t num);
 #endif
-static Bool eval_instruction(bytecode_p first_instruction, svalue_t *initial_sp);
 
 /*-------------------------------------------------------------------------*/
 
@@ -5159,7 +5100,7 @@ do_trace_return (svalue_t *sp)
 }
 
 /*-------------------------------------------------------------------------*/
-static INLINE struct longjump_s *
+struct longjump_s *
 push_error_context (svalue_t *sp)
 
 /* Create a catch recovery context, using <sp> as the stackpointer to save,
@@ -5180,7 +5121,7 @@ push_error_context (svalue_t *sp)
 } /* push_error_context() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE void
+void
 pop_error_context (void)
 
 /* Pop and discard the top entry in the error recovery stack, assuming
@@ -5208,7 +5149,7 @@ pop_error_context (void)
 } /* pop_error_context() */
 
 /*-------------------------------------------------------------------------*/
-static svalue_t *
+svalue_t *
 pull_error_context (svalue_t *sp)
 
 /* Restore the context saved by a catch() after a throw() or runtime error
@@ -5257,7 +5198,7 @@ pull_error_context (svalue_t *sp)
 } /* pull_error_context() */
 
 /*-------------------------------------------------------------------------*/
-static INLINE void
+void
 push_control_stack ( svalue_t *sp
                    , bytecode_p     pc
                    , svalue_t *fp
@@ -5294,7 +5235,7 @@ push_control_stack ( svalue_t *sp
 } /* push_control_stack() */
 
 /*-------------------------------------------------------------------------*/
-static void
+void
 pop_control_stack (void)
 
 /* Pop the last entry from the control stack and restore the execution
@@ -5318,124 +5259,6 @@ pop_control_stack (void)
     csp--;
 } /* pop_control_stack() */
 
-
-/*-------------------------------------------------------------------------*/
-static Bool
-catch_instruction (uint offset)
-
-/* Implement the F_CATCH instruction.
- *
- * At the time of call, all important locals from eval_instruction() are
- * have been stored in their global locations.
- *
- * Result is TRUE on a normal exit (error or not), and FALSE if the
- * guarded code terminated with a 'return' itself;
- *
- * Hard experience showed that it is advantageous to have the setjmp()
- * have its own stackframe, and call the longjmp() from a deeper
- * frame. Additionally it prevents over-optimistic optimizers from
- * removing vital reloads of possibly clobbered local variables after
- * the setjmp().
- */
-
-{
-    Bool rc;
-
-    bytecode_p new_pc;  /* Address of first instruction after the catch() */
-
-    /* Compute address of next instruction after the CATCH statement.
-     */
-    new_pc = inter_pc + offset;
-
-    /* Increase the eval_cost for the duration of the catch so that
-     * there is enough time left to handle an eval-too-big error.
-     */
-    eval_cost += CATCH_RESERVED_COST;
-    assigned_eval_cost += CATCH_RESERVED_COST;
-
-    /* 'Fake' a subroutine call from <new_pc>
-     */
-    push_control_stack(inter_sp, new_pc, inter_fp);
-    csp->ob = current_object;
-    csp->extern_call = MY_FALSE;
-    csp->catch_call = MY_TRUE;
-#ifndef DEBUG
-    csp->num_local_variables = 0;        /* No extra variables */
-#else
-    csp->num_local_variables = (csp-1)->num_local_variables;
-      /* TODO: Marion added this, but why? For 'expected_stack'? */
-#endif
-    csp->funstart = csp[-1].funstart;
-
-    /* Save some globals on the error stack that must be restored
-     * separately after a longjmp, then set the jump.
-     */
-    if ( setjmp( push_error_context(inter_sp)->text ) )
-    {
-        /* A throw() or error occured. We have to restore the
-         * control and error stack manually here.
-         *
-         * The error value to return will be stored in
-         * the global <catch_value>.
-         */
-        svalue_t *sp;
-
-        /* Remove the catch context and get the old stackpointer setting */
-        sp = pull_error_context(inter_sp);
-
-        /* beware of errors after set_this_object() */
-        current_object = csp->ob;
-
-        /* catch() faked a subroutine call internally, which has to be
-         * undone again. This will also set the pc to the proper
-         * continuation address.
-         */
-        pop_control_stack();
-
-        /* Push the catch return value */
-        *(++sp) = catch_value;
-        catch_value.type = T_INVALID;
-
-        inter_sp = sp;
-
-        /* Restore the old eval costs */
-        eval_cost -= CATCH_RESERVED_COST;
-        assigned_eval_cost -= CATCH_RESERVED_COST;
-
-        /* If we are out of memory, throw a new error */
-        if (out_of_memory)
-        {
-            error("(catch) Out of memory detected.\n");
-        }
-
-        rc = MY_TRUE;
-    }
-    else
-    {
-
-        /* Recursively call the interpreter */
-        rc = eval_instruction(inter_pc, inter_sp);
-
-        if (rc)
-        {
-            /* Get rid of the code result */
-            _pop_stack();
-
-            /* Restore the old execution context */
-            pop_control_stack();
-            pop_error_context();
-
-            /* Since no error happened, push 0 onto the stack */
-            inter_sp = _push_number(0, inter_sp);
-        }
-
-        eval_cost -= CATCH_RESERVED_COST;
-        assigned_eval_cost -= CATCH_RESERVED_COST;
-    }
-
-    return rc;
-} /* catch_instruction() */
-
 /*-------------------------------------------------------------------------*/
 static INLINE funflag_t
 setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
@@ -5457,6 +5280,18 @@ setup_new_frame1 (int fx, int fun_ix_offs, int var_ix_offs)
 
     progp = current_prog;
     flags = progp->functions[fx];
+
+    /* Handle a cross-define.
+     * This is a rather rare occasion and usually happens only with functions
+     * like heart_beat() which are called by function index and not by name.
+     * This index, determined at compile time, might point to the
+     * cross-defined function entry.
+     */
+    if (flags & NAME_CROSS_DEFINED)
+    {
+        fx += CROSSDEF_NAME_OFFSET(flags);
+        flags = progp->functions[fx];
+    }
 
     /* If the function is inherited, find the real function definition
      * and adjust the offsets to point to its code and variables.
@@ -5805,7 +5640,7 @@ remove_object_from_stack (object_t *ob)
 }
 
 /*-------------------------------------------------------------------------*/
-static Bool
+Bool
 eval_instruction (bytecode_p first_instruction
                  , svalue_t *initial_sp)
 
@@ -7281,7 +7116,7 @@ again:
         inter_fp = fp;
 
         /* Perform the catch() */
-        if (!catch_instruction(offset))
+        if (!catch_instruction(offset, (volatile svalue_t ** volatile) &inter_sp, inter_pc, inter_fp))
             return MY_FALSE; /* Guarded code terminated with 'return' itself */
 
         /* Restore the important variables */
@@ -8981,7 +8816,12 @@ again:
 
         i = sp->u.number;
         sp--;
-        sp->u.number >>= (uint)i > MAX_SHIFT ? (MAX_SHIFT+1) : i;
+        if ((uint)i <= MAX_SHIFT)
+            sp->u.number >>= i;
+        else if (sp->u.number >= 0)
+            sp->u.number = 0;
+        else
+            sp->u.number = -1;
         break;
     }
 
@@ -14423,10 +14263,10 @@ not_catch:  /* The frame does not point at a catch here */
         if (p[0].funstart < prog->program
          || p[0].funstart > PROGRAM_END(*prog))
         {
-            printf("<lambda 0x%6lx> in '%20s' ('%20s')offset %ld\n",
+            printf("<lambda 0x%6lx> in '%20s' ('%20s') offset %ld\n",
                 (long)p[0].funstart, ob->prog->name, ob->name,
                 (long)(FUNCTION_FROM_CODE(dump_pc) - p[0].funstart));
-            debug_message("<lambda 0x%6lx> in '%20s' ('%20s')offset %ld\n",
+            debug_message("<lambda 0x%6lx> in '%20s' ('%20s') offset %ld\n",
                 (long)p[0].funstart, ob->prog->name, ob->name,
                 (long)(FUNCTION_FROM_CODE(dump_pc) - p[0].funstart));
             continue;
@@ -14443,9 +14283,9 @@ name_computed: /* Jump target from the catch detection */
         if (strcmp(name, "heart_beat") == 0 && p != csp)
             ret = p->extern_call ? (p->ob ? p->ob->name : NULL) : ob->name;
 
-        printf("'%15s' in '%20s' ('%20s')line %d\n",
+        printf("'%15s' in '%20s' ('%20s') line %d\n",
                      name, file, ob->name, line);
-        debug_message("'%15s' in '%20s' ('%20s')line %d\n",
+        debug_message("'%15s' in '%20s' ('%20s') line %d\n",
                      name, file, ob->name, line);
     } while (++p <= csp);
 
@@ -15742,7 +15582,9 @@ f_call_resolved (svalue_t *sp, int num_arg)
     arg = sp - num_arg + 1;
 
     /* Test the arguments */
-    if (arg[1].type == T_OBJECT)
+    if (arg[1].type == T_NUMBER)
+        ob = NULL;
+    else if (arg[1].type == T_OBJECT)
         ob = arg[1].u.ob;
     else /* it's a string */
     {
@@ -15753,8 +15595,10 @@ f_call_resolved (svalue_t *sp, int num_arg)
 
     /* No external calls may be done when this object is
      * destructed.
+     * Similar, don't do calls if the target object is destructed.
      */
-    if (current_object->flags & O_DESTRUCTED)
+    if (current_object->flags & O_DESTRUCTED
+     || NULL == ob)
     {
         sp = _pop_n_elems(num_arg, sp);
         push_number(sp, 0);

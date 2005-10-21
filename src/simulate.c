@@ -265,6 +265,125 @@ int32 max_file_xfer = READ_FILE_MAX_SIZE;
 static void free_shadow_sent (shadow_t *p);
 
 /*-------------------------------------------------------------------------*/
+Bool
+catch_instruction (uint offset, volatile svalue_t ** volatile i_sp, bytecode_p i_pc, svalue_t * i_fp)
+
+/* Implement the F_CATCH instruction.
+ *
+ * At the time of call, all important locals from eval_instruction() are
+ * have been stored in their global locations.
+ *
+ * Result is TRUE on a normal exit (error or not), and FALSE if the
+ * guarded code terminated with a 'return' itself;
+ *
+ * Hard experience showed that it is advantageous to have the setjmp()
+ * have its own stackframe, and call the longjmp() from a deeper
+ * frame. Additionally it prevents over-optimistic optimizers from
+ * removing vital reloads of possibly clobbered local variables after
+ * the setjmp().
+ */
+
+{
+#define INTER_SP ((svalue_t *)(*i_sp))
+
+    Bool rc;
+
+    bytecode_p new_pc;  /* Address of first instruction after the catch() */
+
+    /* Compute address of next instruction after the CATCH statement.
+     */
+    new_pc = i_pc + offset;
+
+    /* Increase the eval_cost for the duration of the catch so that
+     * there is enough time left to handle an eval-too-big error.
+     */
+    eval_cost += CATCH_RESERVED_COST;
+    assigned_eval_cost += CATCH_RESERVED_COST;
+
+    /* 'Fake' a subroutine call from <new_pc>
+     */
+    push_control_stack(INTER_SP, new_pc, i_fp);
+    csp->ob = current_object;
+    csp->extern_call = MY_FALSE;
+    csp->catch_call = MY_TRUE;
+#ifndef DEBUG
+    csp->num_local_variables = 0;        /* No extra variables */
+#else
+    csp->num_local_variables = (csp-1)->num_local_variables;
+      /* TODO: Marion added this, but why? For 'expected_stack'? */
+#endif
+    csp->funstart = csp[-1].funstart;
+
+    /* Save some globals on the error stack that must be restored
+     * separately after a longjmp, then set the jump.
+     */
+    if ( setjmp( push_error_context(INTER_SP)->text ) )
+    {
+        /* A throw() or error occured. We have to restore the
+         * control and error stack manually here.
+         *
+         * The error value to return will be stored in
+         * the global <catch_value>.
+         */
+        svalue_t *sp;
+
+        /* Remove the catch context and get the old stackpointer setting */
+        sp = pull_error_context(INTER_SP);
+
+        /* beware of errors after set_this_object() */
+        current_object = csp->ob;
+
+        /* catch() faked a subroutine call internally, which has to be
+         * undone again. This will also set the pc to the proper
+         * continuation address.
+         */
+        pop_control_stack();
+
+        /* Push the catch return value */
+        *(++sp) = catch_value;
+        catch_value.type = T_INVALID;
+
+        *i_sp = (volatile svalue_t *)sp;
+
+        /* Restore the old eval costs */
+        eval_cost -= CATCH_RESERVED_COST;
+        assigned_eval_cost -= CATCH_RESERVED_COST;
+
+        /* If we are out of memory, throw a new error */
+        if (out_of_memory)
+        {
+            error("(catch) Out of memory detected.\n");
+        }
+
+        rc = MY_TRUE;
+    }
+    else
+    {
+
+        /* Recursively call the interpreter */
+        rc = eval_instruction(i_pc, INTER_SP);
+
+        if (rc)
+        {
+            /* Get rid of the code result */
+            pop_stack();
+
+            /* Restore the old execution context */
+            pop_control_stack();
+            pop_error_context();
+
+            /* Since no error happened, push 0 onto the stack */
+            push_number(0);
+        }
+
+        eval_cost -= CATCH_RESERVED_COST;
+        assigned_eval_cost -= CATCH_RESERVED_COST;
+    }
+
+    return rc;
+} /* catch_instruction() */
+
+/*-------------------------------------------------------------------------*/
 static INLINE void
 save_limits_context (struct limits_context_s * context)
 
@@ -2333,7 +2452,7 @@ dinfo_data_status (svalue_t *svp)
     svp[DID_ST_PACKET_SIZE].u.number = inet_volume;
 #else
     svp[DID_ST_ADD_MESSAGE].u.number = -1;
-    svp[DID_ST_PACKETS].u.number     = -1
+    svp[DID_ST_PACKETS].u.number     = -1;
     svp[DID_ST_PACKET_SIZE].u.number = -1;
 #endif
 #ifdef APPLY_CACHE_STAT
@@ -2482,16 +2601,20 @@ free_callback (callback_t *cb)
 /*-------------------------------------------------------------------------*/
 static INLINE int
 setup_callback_args (callback_t *cb, int nargs, svalue_t * args
-                    , Bool use_lvalues)
+                    , Bool allow_prot_lvalues)
 
 /* Setup the function arguments in the callback <cb> to hold the <nargs>
- * arguments starting from <args>. If <use_lvalues> is FALSE, no argument
- * may be an lvalue. The arguments are transferred into the callback
- * structure.
+ * arguments starting from <args>. If <allow_prot_lvalues> is FALSE, no
+ * argument may be a protected lvalue. The arguments are transferred into the
+ * callback structure.
  *
  * Result is -1 on success, or, when encountering an illegal argument,
  * the index of the faulty argument (but even then all caller arguments
  * have been transferred or freed).
+ *
+ * TODO: It should be possible to accept protected lvalues by careful
+ * TODO:: juggling of the protector structures. That, or rewriting the
+ * TODO:: lvalue system.
  */
 
 {
@@ -2520,9 +2643,15 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
 
         while (--nargs >= 0)
         {
-            if (!use_lvalues && args->type == T_LVALUE)
+            if (!allow_prot_lvalues && args->type == T_LVALUE
+             && (   args->u.lvalue->type == T_PROTECTED_CHAR_LVALUE
+                 || args->u.lvalue->type == T_PROTECTED_STRING_RANGE_LVALUE
+                 || args->u.lvalue->type == T_PROTECTED_POINTER_RANGE_LVALUE
+                 || args->u.lvalue->type == T_PROTECTED_LVALUE
+                )
+               )
             {
-                /* We don't handle lvalues - abort the process.
+                /* We don't handle protected lvalues - abort the process.
                  * But to do that, we first have to free all
                  * remaining arguments from the caller.
                  */
@@ -2550,11 +2679,11 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
 /*-------------------------------------------------------------------------*/
 int
 setup_function_callback ( callback_t *cb, object_t * ob, char * fun
-                        , int nargs, svalue_t * args, Bool use_lvalues)
+                        , int nargs, svalue_t * args, Bool allow_prot_lvalues)
 
 /* Setup the empty/uninitialized callback <cb> to hold a function
  * call to <ob>:<fun> with the <nargs> arguments starting from <args>.
- * If <use_lvalues> is FALSE, no argument may be an lvalue.
+ * If <allow_prot_lvalues> is FALSE, no argument may be a protected lvalue.
  *
  * Both <ob> and <fun> are copied from the caller, but the arguments are
  * adopted (taken away from the caller).
@@ -2571,7 +2700,7 @@ setup_function_callback ( callback_t *cb, object_t * ob, char * fun
     cb->function.named.name = make_shared_string(fun);
     cb->function.named.ob = ref_object(ob, "callback");
 
-    error_index = setup_callback_args(cb, nargs, args, use_lvalues);
+    error_index = setup_callback_args(cb, nargs, args, allow_prot_lvalues);
     if (error_index >= 0)
     {
         free_object(cb->function.named.ob, "callback");
@@ -2586,11 +2715,11 @@ setup_function_callback ( callback_t *cb, object_t * ob, char * fun
 /*-------------------------------------------------------------------------*/
 int
 setup_closure_callback ( callback_t *cb, svalue_t *cl
-                       , int nargs, svalue_t * args, Bool use_lvalues)
+                       , int nargs, svalue_t * args, Bool allow_prot_lvalues)
 
 /* Setup the empty/uninitialized callback <cb> to hold a closure
  * call to <cl> with the <nargs> arguments starting from <args>.
- * If <use_lvalues> is FALSE, no argument may be an lvalue.
+ * If <allow_prot_lvalues> is FALSE, no argument may be a protected lvalue.
  *
  * Both <cl> and the arguments are adopted (taken away from the caller).
  *
@@ -2605,7 +2734,7 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
     cb->is_lambda = MY_TRUE;
     transfer_svalue_no_free(&(cb->function.lambda), cl);
 
-    error_index = setup_callback_args(cb, nargs, args, use_lvalues);
+    error_index = setup_callback_args(cb, nargs, args, allow_prot_lvalues);
     if (error_index >= 0)
     {
         free_svalue(&(cb->function.lambda));
@@ -2630,7 +2759,8 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
  * If the first argument is a string and the second neither an object
  * nor a string, this_object() is used as object specification.
  *
- * All arguments are adopted (taken away from the caller).
+ * All arguments are adopted (taken away from the caller). Protected lvalues
+ * like &(i[0]) are not allowed as 'extra' arguments.
  *
  * Result is -1 on success, or, when encountering an illegal argument,
  * the index of the faulty argument (but even then all caller arguments
@@ -2642,7 +2772,7 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
 
     if (args[0].type == T_CLOSURE)
     {
-        error_index = setup_closure_callback(cb, args, nargs-1, args+1, MY_TRUE);
+        error_index = setup_closure_callback(cb, args, nargs-1, args+1, MY_FALSE);
         if (error_index >= 0)
             error_index++;
     }
@@ -2675,7 +2805,7 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
         {
             error_index = setup_function_callback(cb, ob, args[0].u.string
                                                  , nargs-first_arg, args+first_arg
-                                                 , MY_TRUE);
+                                                 , MY_FALSE);
             if (error_index >= 0)
                 error_index += first_arg;
         }

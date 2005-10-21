@@ -481,21 +481,22 @@ backend (void)
 
             if (buff[0] == '!'
              && buff[1] != '\0'
-             && command_giver->super
-             && !call_function_interactive(ip, buff))
+             && command_giver->super)
             {
-                /* We got a bang-input, but no input context wants
-                 * to handle it - treat it as a normal command.
-                 */
-                if (ip->noecho & NOECHO)
-                {
-                    /* !message while in NOECHO - simulate the
-                     * echo by sending the (remaining) raw data we got.
-                     */
-                    add_message("%s\n", buff + ip->chars_ready);
-                    ip->chars_ready = 0;
+                if(!call_function_interactive(ip, buff)) {
+                    /* We got a bang-input, but no input context wants
+                    * to handle it - treat it as a normal command.
+                    */
+                    if (ip->noecho & NOECHO)
+                    {
+                        /* !message while in NOECHO - simulate the
+                        * echo by sending the (remaining) raw data we got.
+                        */
+                        add_message("%s\n", buff + ip->chars_ready);
+                        ip->chars_ready = 0;
+                    }
+                    execute_command(buff+1, command_giver);
                 }
-                execute_command(buff+1, command_giver);
             }
             else if (O_GET_EDBUFFER(command_giver))
                 ed_cmd(buff);

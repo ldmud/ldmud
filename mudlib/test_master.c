@@ -33,6 +33,12 @@ void flag (string arg)
 // Evaluate an argument given as option '-f' to the driver.
 
 {
+    if (arg == "test")
+    {
+        /* Insert your test code here */
+        return;
+    }
+
     if (arg == "gc")
     {
         garbage_collection();

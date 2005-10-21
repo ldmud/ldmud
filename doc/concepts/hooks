@@ -287,7 +287,8 @@ DESCRIPTION
 
 	H_INCLUDE_DIRS
 	  Semi-mandatory hook specifying the directories where <>-type
-	  include files are searched.
+	  include files are searched (this includes ""-includes not
+          found as specified).
 	  Hook setting may be any closure or a string array.
 	  If not set, only ""-type includes may be used in LPC
 	  programs.

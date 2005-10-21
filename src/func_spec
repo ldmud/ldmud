@@ -365,7 +365,7 @@ int     remove_call_out(string|closure);
 
 object *caller_stack(int default: F_CONST0);
 int     caller_stack_depth();
-int     call_resolved(mixed &, object|string, string, ...);
+int     call_resolved(mixed &, null|object|string, string, ...);
 object  previous_object(int);
 
 mixed  *heart_beat_info();

@@ -1,0 +1,25 @@
+Short: StickMud crashes on dev.232
+From: "Michael Conley" <mpc@sgi.net>
+Date: Sun, 1 Oct 2000 18:16:15 -0400
+Type: Bug
+State: New
+
+Driver version: 3.2.9-dev.232
+
+2000.10.01 16:57:08 LDMud shutting down.
+2000.10.01 16:57:08 Shutting down ipc...
+2000.10.01 16:57:08 [erq] read: EOF
+2000.10.01 16:57:08 [erq] Read 0, should be 9!
+2000.10.01 16:57:08 [erq] Giving up.
+** MUD CRASHED (exit status 0) ** 01/10/00 16:57:08
+** restart 3. 01/10/00 16:57:28
+
+Crashes StickLib, StickMUD, etc... note that the ip name does not show up as
+an ip name, just the numbers also.  Everything is fine with the 220 version,
+but 232 does this.
+
+Thanks,
+
+Mike Conley aka Tamarindo
+
+

@@ -1763,6 +1763,7 @@ f_sort_array (svalue_t * sp, int num_arg)
      */
     data = arg->u.vec;
     check_for_destr(data);
+
     if (data->ref != 1)
     {
         vector_t *vcopy;
