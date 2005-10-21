@@ -1159,7 +1159,37 @@ add_message (const char *fmt, ...)
        )
     {
         putchar(']');
-        if ( fmt != message_flush ) {
+        if ( fmt == FMT_STRING )
+        {
+            /* Make sure to print embedded '\0' characters as well */
+
+            size_t len;
+
+            srcstr = va_arg(va, string_t *);
+            source = get_txt(srcstr);
+            srclen = mstrsize(srcstr);
+
+            for ( len = 0; len < srclen; )
+            {
+                if (*source == '\0')
+                {
+                    putc('\0', stdout);
+                    source++;
+                    len++;
+                }
+                else
+                {
+                    size_t slen;
+
+                    fputs(source, stdout);
+                    slen = strlen(source);
+                    source += slen;
+                    len += slen;
+                }
+            }
+        }
+        else if ( fmt != message_flush )
+        {
             vprintf(fmt, va);
         }
         fflush(stdout);

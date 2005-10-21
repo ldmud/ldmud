@@ -22,13 +22,11 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 25)
-(Parent-Version lpmud 3-3 24)
-(Version-Log "Bugfixes. It is now possible to boot and log into the
-test master.
-Included the changes up to 3.2.9-dev.263.")
+(Project-Version lpmud 3-3 26)
+(Parent-Version lpmud 3-3 25)
+(Version-Log "Some more bugfixes, allowing us to run dhrystones.")
 (New-Version-Log "")
-(Checkin-Time "Tue, 06 Mar 2001 23:50:21 -0700")
+(Checkin-Time "Wed, 07 Mar 2001 22:35:39 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -61,7 +59,7 @@ Included the changes up to 3.2.9-dev.263.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.2 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.10 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.88 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.89 644))
   (HISTORY (lpmud/f/49_HISTORY 1.154 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.9 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -121,7 +119,7 @@ Included the changes up to 3.2.9-dev.263.")
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.10 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.3 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.20 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.29 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.30 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.11 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.6 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.7 644))
@@ -135,13 +133,13 @@ Included the changes up to 3.2.9-dev.263.")
   (src/files.c (lpmud/I/50_files.c 1.5 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.3 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.21 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.22 644))
   (src/hash.h (lpmud/f/32_hash.h 1.5 644))
   (src/hash.c (lpmud/c/28_hash.c 1.12 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.5 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.16 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.45 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.46 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.7 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.34 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.5 644))
@@ -203,7 +201,7 @@ Included the changes up to 3.2.9-dev.263.")
 
   ;; Build files
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.18 644))
-  (src/string_spec (lpmud/F/6_string_spe 1.12 644))
+  (src/string_spec (lpmud/F/6_string_spe 1.13 644))
   (src/make_func.y (lpmud/b/7_make_func. 1.25.1.10 644))
 
   ;; Generic host files
@@ -658,7 +656,7 @@ Included the changes up to 3.2.9-dev.263.")
 
   ;; Work files
   (src/wk/README (lpmud/f/9_README 1.1 644))
-  (src/wk/dhrystones.txt (lpmud/E/37_dhrystones 1.2.1.1 644))
+  (src/wk/dhrystones.txt (lpmud/E/37_dhrystones 1.2.1.2 644))
   (src/wk/perl-patchlevel.h (lpmud/e/40_perl-patch 1.2 644))
   (src/wk/gcc_defs.log (lpmud/f/6_gcc_defs.l 1.1 644))
   (src/wk/DEC-Unix-Setup (lpmud/m/39_DEC-Unix-S 1.2 644))

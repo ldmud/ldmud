@@ -1399,7 +1399,7 @@ show_object (int d, void *block, int depth)
 
 /*-------------------------------------------------------------------------*/
 static void
-show_cl_literal (int d, char *block, int depth UNUSED)
+show_cl_literal (int d, void *block, int depth UNUSED)
 
 /* Print the data about literal closure <block> on filedescriptor <d>.
  */
@@ -1555,7 +1555,7 @@ setup_print_block_dispatcher (void)
  */
 
 {
-    svalue tmp_closure;
+    svalue_t tmp_closure;
     vector_t *a, *b;
 
     assert_master_ob_loaded();
@@ -1590,7 +1590,7 @@ setup_print_block_dispatcher (void)
     tmp_closure.type = T_CLOSURE;
     tmp_closure.x.closure_type = CLOSURE_EFUN + F_ALLOCATE;
     tmp_closure.u.ob = master_ob;
-    push_number(1);
+    push_number(inter_sp, 1);
     call_lambda(&tmp_closure, 1);
     store_print_block_dispatch_info(inter_sp->u.vec, show_array);
     free_svalue(inter_sp--);

@@ -913,10 +913,8 @@ free_svalue (svalue_t *v)
         break;
 
     case T_INVALID:
-        NOOP;
-        break;
-
     case T_NUMBER:
+    case T_FLOAT:
         NOOP;
         break;
 
@@ -14823,6 +14821,80 @@ last_instructions (int length, Bool verbose, svalue_t **svpp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_last_instructions (svalue_t *sp)
+
+/* EFUN last_instructions()
+ *
+ *   string *last_instructions (int length, int verbose)
+ *
+ * Return an array showing the 'length' last executed
+ * instructions in disassembled form. If 'verbose' is non-zero
+ * (the default), line number information are also included.
+ * Each string is built as this:
+ *
+ *   Opcode-Address: Opcode Operand Mnemonic (Stackdepth) Linenumber
+ *
+ * The Stackdepth information consists of two numbers <rel>:<abs>:
+ * <rel> is the relative stack usage in this function, <abs> is the
+ * absolute stack usage.
+ *
+ * The linenumber information is appended if requested and a new
+ * source line is reached. Also, calls between objects produce a
+ *
+ *   Objectname Programname Linenumber
+ *
+ * entry in the resulting array (in verbose mode only).
+ *
+ * There is a preconfigured upper limit for the backtrace.
+ */
+
+{
+    vector_t *v, *v2;
+    mp_int num_instr, size;
+    svalue_t *svp;
+
+    /* Test the arguments */
+    num_instr = sp[-1].u.number;
+    if (num_instr <= 0)
+        error("Illegal number of instructions: %ld.\n", num_instr);
+
+    sp--;
+    inter_sp = sp; /* Out of memory possible */
+    if (num_instr > TOTAL_TRACE_LENGTH)
+        num_instr = TOTAL_TRACE_LENGTH;
+
+    /* Allocate the result vector */
+    size = sp[1].u.number ? num_instr << 1 : num_instr;
+    v = allocate_array(size);
+
+    /* Enter the vector into the stack for now, so that it will be
+     * freed when an out of memory error occurs.
+     */
+    put_array(sp, v);
+    svp = v->item;
+    last_instructions(num_instr, sp[1].u.number != 0, &svp);
+
+    /* If we allocated the vector to big, get a shorter one and copy
+     * the data.
+     */
+    if (svp - v->item < size)
+    {
+        size = svp - v->item;
+        v2 = allocate_array(size);
+        memcpy(v2->item, v->item, size * sizeof *svp);
+        sp->u.vec = v2;
+        free_empty_vector(v);
+    }
+
+    return sp;
+} /* f_last_instructions() */
+
+/*-------------------------------------------------------------------------*/
+
+#endif /* TRACE_CODE */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_caller_stack_depth (svalue_t *sp)
 
 /* EFUN caller_stack_depth()
@@ -15012,79 +15084,6 @@ f_previous_object (svalue_t *sp)
     return sp;
 } /* f_previous_object() */
 
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_last_instructions (svalue_t *sp)
-
-/* EFUN last_instructions()
- *
- *   string *last_instructions (int length, int verbose)
- *
- * Return an array showing the 'length' last executed
- * instructions in disassembled form. If 'verbose' is non-zero
- * (the default), line number information are also included.
- * Each string is built as this:
- *
- *   Opcode-Address: Opcode Operand Mnemonic (Stackdepth) Linenumber
- *
- * The Stackdepth information consists of two numbers <rel>:<abs>:
- * <rel> is the relative stack usage in this function, <abs> is the
- * absolute stack usage.
- *
- * The linenumber information is appended if requested and a new
- * source line is reached. Also, calls between objects produce a
- *
- *   Objectname Programname Linenumber
- *
- * entry in the resulting array (in verbose mode only).
- *
- * There is a preconfigured upper limit for the backtrace.
- */
-
-{
-    vector_t *v, *v2;
-    mp_int num_instr, size;
-    svalue_t *svp;
-
-    /* Test the arguments */
-    num_instr = sp[-1].u.number;
-    if (num_instr <= 0)
-        error("Illegal number of instructions: %ld.\n", num_instr);
-
-    sp--;
-    inter_sp = sp; /* Out of memory possible */
-    if (num_instr > TOTAL_TRACE_LENGTH)
-        num_instr = TOTAL_TRACE_LENGTH;
-
-    /* Allocate the result vector */
-    size = sp[1].u.number ? num_instr << 1 : num_instr;
-    v = allocate_array(size);
-
-    /* Enter the vector into the stack for now, so that it will be
-     * freed when an out of memory error occurs.
-     */
-    put_array(sp, v);
-    svp = v->item;
-    last_instructions(num_instr, sp[1].u.number != 0, &svp);
-
-    /* If we allocated the vector to big, get a shorter one and copy
-     * the data.
-     */
-    if (svp - v->item < size)
-    {
-        size = svp - v->item;
-        v2 = allocate_array(size);
-        memcpy(v2->item, v->item, size * sizeof *svp);
-        sp->u.vec = v2;
-        free_empty_vector(v);
-    }
-
-    return sp;
-} /* f_last_instructions() */
-
-/*-------------------------------------------------------------------------*/
-
-#endif /* TRACE_CODE */
 
 
 #ifdef DEBUG

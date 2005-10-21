@@ -1,7 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-06-Mar-2001 (Lars Duening)
+07-Mar-2001 (Lars Duening)  (3.3.26)
+    - (gcollect.c, string_spec) Corrected compilation errors.
+    - (interpret.c) Freeing a T_FLOAT svalue is allowed, too. And  not
+         defining TRACE_CODE accidentally removed a handful of
+         efuns.
+    - (comm.c) Writing a string to stdout via add_message() didn't work.
+
+06-Mar-2001 (Lars Duening)  (3.3.25)
     - (mstrings.c, array.c) xalloc_pass() was called with too many arguments,
         clobbering the size of the allocate memory block.
     - (gcollect.c) The global master name as tabled name was freed by
@@ -23,8 +30,6 @@ See the file HISTORY for a user-oriented summary of all the changes.
     - (simulate.c) The master apply runtime_error() receives an extra
          argument describing if the error is a normal error, or occured
          during a heartbeat (suggested by Freaky).
-    - (func_spec) Efuns add_verb() and add_xverb() are now part of the
-         deprecated bunch.
     - (gcollect.c) Added a dump function for closure literals.
     - (lex.c, gcollect.c) Cosmetics.
     - (smalloc.c, main.c) xfree() now accepts NULL pointers. Allocation of
@@ -77,9 +82,6 @@ See the file HISTORY for a user-oriented summary of all the changes.
     - (lots of files) The UDP efuns have been renamed from send_imp()
         and query_imp_port() to send_udp() and query_udp_port(); as were
         the associated privilege violation string and the master apply.
-        The old names are still available with USE_DEPRECATED.
-    - (interpret.c) Assigning volatile strings was somehow no longer
-        supported under all circumstances (reported by Gnomi).
 
 11-Feb-2001 (Lars Duening)  (3.2.24)
    Included changes up to 3.2.9-dev.255:

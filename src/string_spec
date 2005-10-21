@@ -151,12 +151,6 @@ GET             "get"
 QUERY_WEIGHT    "query_weight"
 PREVENT_INSERT  "prevent_insert"
 
-#ifdef USE_DEPRECATED
-
-RECEIVE_UDP     "receive_udp"
-
-#endif
-
 
 #ifdef SUPPLY_PARSE_COMMAND
 
