@@ -1999,7 +1999,7 @@ f_rename_object (svalue_t *sp)
 
     m_name = new_mstring(name);
     if (!m_name)
-        error("Out of memory for object name (%ld bytes)\n", strlen(name));
+        error("Out of memory for object name (%ld bytes)\n", (long)strlen(name));
 
     if (lookup_object_hash(m_name))
     {
@@ -3901,7 +3901,7 @@ static void register_mapping (mapping_t *map);
 
 static const char save_file_suffix[] = ".o";
   /* The suffix of the save file, in an array for easier computations.
-   * (sizeof() vs. strlen().
+   * (sizeof() vs. strlen()+1.
    */
 
 static struct pointer_table *ptable = NULL;
@@ -4554,7 +4554,7 @@ f_save_object (svalue_t *sp, int numarg)
             char * emsg, * buf;
 
             emsg = strerror(errno);
-            buf = alloca(strlen(emsg+1));
+            buf = alloca(strlen(emsg)+1);
             if (buf)
             {
                 strcpy(buf, emsg);
@@ -5731,7 +5731,7 @@ f_restore_object (svalue_t *sp)
             return sp;
         }
 
-        strcpy(name, file);
+        strcpy(name, get_txt(sfile));
         if (name[len-2] == '.' && name[len-1] == 'c')
             len -= 2;
         strcpy(name+len, save_file_suffix);

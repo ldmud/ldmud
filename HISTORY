@@ -62,6 +62,8 @@ For a detailed list of all changes see the file CHANGELOG.
            passed to the efun.
        + runtime_error(): Receives an extra argument to distinguish between
            normal runtime errors, and those occuring during a heartbeat.
+       + Bugfix: slow_shut_down() was not called with previous_object(),
+           this_player() and this_interactive() being 0.
        + Bugfix: When reactivating a destructed master, the lfuns
            inaugurate_master() and reactivate_destructed_master() are found
            even when static.

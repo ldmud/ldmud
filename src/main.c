@@ -247,7 +247,6 @@ main (int argc, char **argv)
     for (i = 0; i < (int)(sizeof consts / sizeof consts[0]); i++)
         consts[i] = exp(- i / 900.0);
     mstring_init(); /* Also initializes the standard strings */
-    init_lexer();
 
     /* If the master_name hasn't been set, select a sensible default */
     if ('\0' == master_name[0])
@@ -276,10 +275,14 @@ main (int argc, char **argv)
         if (!master_name_str)
         {
             printf("%s Out of memory for master object name (%lu bytes).\n"
-                  , time_stamp(), strlen(master_name));
+                  , time_stamp()
+                  , (unsigned long)strlen(master_name));
             exit(1);
         }
     }
+
+    /* The lexer needs the master_name */
+    init_lexer();
 
     reset_machine(MY_TRUE); /* Cold reset the machine */
     RESET_LIMITS;

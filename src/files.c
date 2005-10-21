@@ -1737,7 +1737,7 @@ f_write_file (svalue_t *sp)
                 int err = errno;
 
                 emsg = strerror(errno);
-                buf = alloca(strlen(emsg+1));
+                buf = alloca(strlen(emsg)+1);
                 buf2 = alloca(mstrsize(file)+1);
                 if (buf && buf2)
                 {

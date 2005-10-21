@@ -425,6 +425,11 @@ backend (void)
                     malloc_privilege = MALLOC_MASTER;
                     sprintf(shut_msg, "%s slow_shut_down(%d)\n", time_stamp(), minutes);
                     write(1, shut_msg, strlen(shut_msg));
+
+                    previous_ob = NULL;
+                    command_giver = NULL;
+                    current_interactive = NULL;
+
                     push_number(inter_sp, minutes);
                     apply_master_ob(STR_SLOW_SHUT, 1);
                 }

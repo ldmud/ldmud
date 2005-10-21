@@ -86,6 +86,7 @@ f-000616: Allow to set a certain umask
 f-000627: Search efun
 f-000905-1: More flexible wrapping for terminal_colour().
 f-001220-0: Extend the debug_info() method to handle interactives.
+f-010307: Short(est) Path Algorithms
 
 
 Language

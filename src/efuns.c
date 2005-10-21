@@ -1345,7 +1345,7 @@ e_terminal_colour ( string_t * text, mapping_t * map
     /* Now we have the final string in parts and length in j.
      * let's compose the result, wrapping it where necessary.
      */
-    memsafe(deststr = alloc_mstring((size_t)j+1), (size_t)j+1, "result string");
+    memsafe(deststr = alloc_mstring((size_t)j), (size_t)j, "result string");
 
     cp = get_txt(deststr); /* destination pointer */
 
@@ -1681,7 +1681,8 @@ process_value (const char *str, Bool original)
     {
         func = alloca(strlen(str)+1);
         if (!func)
-            error("Out of stack memory (%lu bytes)\n", strlen(str)+1);
+            error("Out of stack memory (%lu bytes)\n"
+                 , (unsigned long)(strlen(str)+1));
         strcpy(func, str);
     }
     else
@@ -4155,20 +4156,26 @@ f_to_string (svalue_t *sp)
         svalue_t *svp;
         char *d;
 
-        size = (long)VEC_SIZE(sp->u.vec) + 1;
+        size = (long)VEC_SIZE(sp->u.vec);
         svp = sp->u.vec->item;
         memsafe(s = alloc_mstring(size), size, "converted array");
         d = get_txt(s);
         for (;;)
         {
-            if (!--size)
+            if (!size--)
             {
                 break;
             }
             if (svp->type != T_NUMBER)
             {
-                memsafe(s = resize_mstring(s, d-get_txt(s)), d-get_txt(s)
-                       , "converted array");
+                if (d == get_txt(s))
+                {
+                    free_mstring(s);
+                    s = ref_mstring(STR_EMPTY);
+                }
+                else
+                    memsafe(s = resize_mstring(s, d-get_txt(s))
+                           , d-get_txt(s), "converted array");
                 break;
             }
             *d++ = (char)svp->u.number;

@@ -229,7 +229,9 @@ strbuf_send (strbuf_t *buf)
 
 {
     if (buf->buf && buf->length)
+    {
         add_message("%s", buf->buf);
+    }
 
     /* Empty the string buffer */
     if (buf->buf)

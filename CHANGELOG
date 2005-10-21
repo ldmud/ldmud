@@ -1,6 +1,34 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Mar-2001 (Lars Duening)  (3.3.28)
+    - (backend.c) When calling the master apply slow_shut_down(), it is
+        made sure that previous_object(), this_player(), and
+        this_interactive() are all 0 (reported by Freaky).
+    - (comm.c, ed.c, interpret.c, simulate.c) Removed spurious checks
+        for out-of-memory condition. While the intention is noble, it hasn't
+        been implemented consequently enough to be of any use.
+    - (mstrings.c) cvt_progname() got the meaning of compat_mode reversed.
+    - (object.c) restore_object() tried to restore from the wrong filename.
+    - (comm.c) If a CRLF as expansion of a NL character was to be inserted,
+         but only one character was left in the buffer, the code errorneously
+         detected a 'message shorter than minimum, needs not be send'
+         condition, thus swallowing all following characters after the NL.
+    - (main.c) The lexer, and with it the permanent defines, was initialized
+         before the master name had been determined.
+    - (interpret.c) Reverse-indexing before the start of a string is allowed
+         and returns 0.
+    - (interpret.c) Argl. Letting the ==/!= comparison for floats fall through
+         to the all new and improved closure comparison was not a good idea
+         (reported by Gnomi and Freaky).
+
+12-Mar-2001 (Lars Duening)
+    - (pkg-mysql.c) db_connect() optionally takes a username and a password
+        (thanks, Andre!)
+    - (mapping.c) Keyvalues for strings were computed incorrectly.
+    - (efuns.c) The result for terminal_colour() and to_string(array)
+        was alloced one too long.
+
 09-Mar-2001 (Lars Duening)  (3.3.27)
     - (array.c, rxcache.c, interpret.c, mstrings, simulate.c, mud/lp-245)
          Bugfixes.

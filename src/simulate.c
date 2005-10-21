@@ -3602,8 +3602,6 @@ validate_shadowing (object_t *ob)
 
     push_ref_object(inter_sp, ob, "shadow");
     ret = apply_master_ob(STR_QUERY_SHADOW, 1);
-    if (out_of_memory)
-        error("(shadow) Out of memory detected\n");
 
     if (!((ob->flags|cob->flags) & O_DESTRUCTED)
      && ret && !(ret->type == T_NUMBER && ret->u.number == 0))

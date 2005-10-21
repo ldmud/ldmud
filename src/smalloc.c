@@ -2106,6 +2106,9 @@ found_fit:
              && (chunk_size = max_malloced - sbrk_stat.size - (heap_start?0:SINT) )
                 < block_size)
             {
+                static char mess[] = "MAX_MALLOCED limit reached.\n";
+                write(2, mess, sizeof(mess)-1);
+
                 ptr = NULL;
             }
             else

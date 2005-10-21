@@ -1204,7 +1204,11 @@ add_message (const char *fmt, ...)
     /* Create the final message and handle snoopers and shadows.
      */
 
-    min_length = MAX_SOCKET_PACKET_SIZE;
+    min_length = MAX_SOCKET_PACKET_SIZE-1;
+      /* Allow some wiggle room for source characters like NL which
+       * expand into two characters.
+       */
+
     if ( fmt == message_flush )
     {
         /* Just flush, nothing to add */
@@ -5113,10 +5117,6 @@ f_query_snoop (svalue_t *sp)
             arg1 = apply_master_ob(STR_VALID_QSNOOP, 1);
             if (arg1 == 0 || arg1->type != T_NUMBER || !arg1->u.number)
             {
-                if (out_of_memory)
-                {
-                    error("Out of memory detected.\n");
-                }
                 ob = NULL;
                 break;
             }
@@ -5323,7 +5323,7 @@ f_send_udp (svalue_t *sp)
             {
                 inter_sp = sp;
                 error("Out of stack (%lu bytes) for host address\n"
-                     , adrlen+1);
+                     , (unsigned long)(adrlen+1));
                 /* NOTREACHED */
             }
             memcpy(to_host, get_txt((sp-2)->u.str), adrlen);

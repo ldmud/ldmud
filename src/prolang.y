@@ -5773,7 +5773,7 @@ expr0:
               if (!sum)
               {
                   yyerrorf("Out of memory for string literal (%ld bytes)"
-                          , mstrsize(str1)+mstrsize(str2)
+                          , (unsigned long)(mstrsize(str1)+mstrsize(str2))
                           );
                   YYACCEPT;
               }

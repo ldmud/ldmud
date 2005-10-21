@@ -2539,6 +2539,7 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
         }
 
         /* Compute the indexed element */
+
         item = get_map_lvalue(m, i);
 
         if (m->ref == 1)
@@ -4174,7 +4175,7 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
     default:
         inter_sp = sp;
         inter_pc = pc;
-        error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
+        error("(value)Indexing on illegal type '%s'.\n", typename(vec->type));
         return NULL;
     }
 
@@ -4223,9 +4224,9 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
 
         if ( (ind = (mp_int)mstrsize(vec->u.str) - ind) < 0 )
         {
-            ERRORF(("Index for [<] out of bounds: %ld, string size: %lu\n"
-                   , (long)i->u.number, mstrsize(vec->u.str)));
-            return NULL;
+            debug_message("Index for [<] out of bounds: %ld, string size: %lu\n"
+                   , (long)i->u.number, (unsigned long)mstrsize(vec->u.str));
+            ind = 0;
         }
         else
             ind = get_txt(vec->u.str)[ind];
@@ -5898,7 +5899,24 @@ again:
     instruction = LOAD_CODE(pc);
       /* If this a xcode, the second byte will be added later */
 
-    /* printf("DEBUG: %p (%p): %d %s\n", pc-1, sp, instruction, get_f_name(instruction)); */
+#if 0
+    printf("DEBUG: %p (%p):", pc-1, sp);
+    if (instruction == F_EFUN0)
+        printf(" %3d %s %s\n", GET_CODE(pc)+EFUN0_OFFSET, get_f_name(instruction), get_f_name(GET_CODE(pc)+EFUN0_OFFSET));
+    else if (instruction == F_EFUN1)
+        printf(" %3d %s %s\n", GET_CODE(pc)+EFUN1_OFFSET, get_f_name(instruction), get_f_name(GET_CODE(pc)+EFUN1_OFFSET));
+    else if (instruction == F_EFUN2)
+        printf(" %3d %s %s\n", GET_CODE(pc)+EFUN2_OFFSET, get_f_name(instruction), get_f_name(GET_CODE(pc)+EFUN2_OFFSET));
+    else if (instruction == F_EFUN3)
+        printf(" %3d %s %s\n", GET_CODE(pc)+EFUN3_OFFSET, get_f_name(instruction), get_f_name(GET_CODE(pc)+EFUN3_OFFSET));
+    else if (instruction == F_EFUN4)
+        printf(" %3d %s %s\n", GET_CODE(pc)+EFUN4_OFFSET, get_f_name(instruction), get_f_name(GET_CODE(pc)+EFUN4_OFFSET));
+    else if (instruction == F_EFUNV)
+        printf(" %3d %s %s\n", GET_CODE(pc)+EFUNV_OFFSET, get_f_name(instruction), get_f_name(GET_CODE(pc)+EFUNV_OFFSET));
+    else
+        printf(" %3d %s\n", instruction, get_f_name(instruction));
+#endif
+
 #   ifdef TRACE_CODE
         /* Store some vitals in the trace buffer */
 
@@ -8558,6 +8576,10 @@ again:
             break;
         case T_FLOAT:
             /* This is of little use... well, at least 0. == 0. ... */
+            i = (sp-1)->u.generic == sp->u.generic &&
+                (sp-1)->x.generic == sp->x.generic;
+            break;
+
         case T_CLOSURE:
             i = (sp-1)->u.generic == sp->u.generic &&
                 (sp-1)->x.generic == sp->x.generic;
@@ -8642,6 +8664,10 @@ again:
             break;
         case T_FLOAT:
             /* This is of little use... well, at least 0. != 0. ... */
+            i = (sp-1)->u.generic  != sp->u.generic ||
+                (sp-1)->x.generic != sp->x.generic;
+            break;
+
         case T_CLOSURE:
             i = (sp-1)->u.generic  != sp->u.generic ||
                 (sp-1)->x.generic != sp->x.generic;
@@ -11256,6 +11282,7 @@ again:
         }
 
         sp--; /* the key */
+
         data = get_map_value(m, sp);
         pop_stack();
 
@@ -15933,12 +15960,7 @@ f_trace (svalue_t *sp)
         push_ref_string(inter_sp, STR_TRACE);
         push_number(inter_sp, sp->u.number);
         arg = apply_master_ob(STR_VALID_TRACE, 2);
-        if (!arg)
-        {
-            if (out_of_memory)
-                error("Out of memory\n");
-        }
-        else
+        if (arg)
         {
             /* ... then set the new tracelevel */
             if (arg->type != T_NUMBER || arg->u.number != 0)
@@ -15992,12 +16014,7 @@ f_traceprefix (svalue_t *sp)
         inter_sp++; assign_svalue_no_free(inter_sp, sp);
         assign_eval_cost();
         arg = apply_master_ob(STR_VALID_TRACE,2);
-        if (!arg)
-        {
-            if (out_of_memory)
-                error("Out of memory\n");
-        }
-        else
+        if (arg)
         {
             /* ... then so shall it be */
             if (arg && (arg->type != T_NUMBER || arg->u.number))

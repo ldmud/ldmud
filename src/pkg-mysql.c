@@ -326,24 +326,43 @@ f_db_close (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_db_connect (svalue_t *sp)
+f_db_connect (svalue_t *sp, int num_args)
 
 /* EFUN db_connect()
  *
- *   int db_connect(string database)
+ *   int db_connect(string database, void|string user, void|string password)
  *
  * Connect to the database <database> on the local mySQL-server.
  * The return-value is the handle for this connection.
  * If the database does not exist or the server is NOT started,
  * a runtime-error is raised.
+ *
+ * Use user and password if supplied.
  */
 
 {
-    string_t *database;
+    string_t *database, *user, *password;
     p_int     sock;
     db_dat_t *tmp;
 
-    database = sp->u.str;
+    switch(num_args)
+    {
+    case 3:
+        database = sp[-2].u.str;
+        user = sp[-1].u.str;
+        password = sp->u.str;
+        break;
+    case 2:
+        database = sp[-1].u.str;
+        user = sp->u.str;
+        password = NULL;
+        break;
+    default:
+        database = sp->u.str;
+        user     = NULL;
+        password = NULL;
+        break;
+    }
 
     tmp = allocate_new_dat();
     if ( !tmp )
@@ -366,15 +385,29 @@ f_db_connect (svalue_t *sp)
      * I wouldn't dare to implement synchronous DB-access via
      * TCP (that's something for ERQ wizards :-).
      */
-    if ( !mysql_real_connect(tmp->mysql_dat, "localhost", 0, 0,
-                             get_txt(database), 0, 0, 0))
+    if ( !mysql_real_connect( tmp->mysql_dat, "localhost"
+                            , get_txt(database)
+                            , user ? get_txt(user) : NULL
+                            , password ? get_txt(password) : NULL
+                            , 0, 0, 0))
     {
         raise_db_error(tmp);
         /* NOTREACHED */
         return sp;
     }
 
-    free_string_svalue(sp);
+    switch (num_args)
+    {
+      case 3:
+        free_string_svalue(sp);
+        sp--;
+      case 2:
+        free_string_svalue(sp);
+        sp--;
+      case 1:
+        free_string_svalue(sp);
+    }
+
     sock = (signed)tmp->mysql_dat->thread_id;
     put_number(sp, sock);
     return sp;

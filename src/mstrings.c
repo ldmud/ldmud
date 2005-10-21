@@ -170,9 +170,9 @@ static mp_uint mstr_searches = 0;
 
 /*-------------------------------------------------------------------------*/
 static INLINE string_t *
-find_and_move (const char * const s, size_t size, int index)
+find_and_move (const char * const s, size_t size, int idx)
 
-/* If <s> is a tabled string of length <size> in the stringtable[<index>]
+/* If <s> is a tabled string of length <size> in the stringtable[<idx>]
  * chain: find it, move it to the head of the chain and return its string_t*.
  *
  * If <s> is not tabled, return NULL.
@@ -185,7 +185,7 @@ find_and_move (const char * const s, size_t size, int index)
 
     /* Find the string in the table */
 
-    for ( prev = NULL, rover = stringtable[index]
+    for ( prev = NULL, rover = stringtable[idx]
         ;    rover != NULL
           && get_txt(rover) != s
           && !(   size == mstrsize(rover)
@@ -201,8 +201,8 @@ find_and_move (const char * const s, size_t size, int index)
     if (rover && prev)
     {
         prev->link = rover->link;
-        rover->link = stringtable[index];
-        stringtable[index] = rover;
+        rover->link = stringtable[idx];
+        stringtable[idx] = rover;
     }
 
     return rover;
@@ -210,7 +210,7 @@ find_and_move (const char * const s, size_t size, int index)
 
 /*-------------------------------------------------------------------------*/
 static INLINE string_t *
-move_to_head (string_t *s, int index)
+move_to_head (string_t *s, int idx)
 
 /* If <s> is a tabled string in the stringtable[<index>] chain: move it to
  * the head of the chain and return its pointer.
@@ -224,7 +224,7 @@ move_to_head (string_t *s, int index)
 
     /* Find the string in the table */
 
-    for ( prev = NULL, rover = stringtable[index]
+    for ( prev = NULL, rover = stringtable[idx]
         ; rover != NULL && rover != s
         ; prev = rover, rover = rover->link
         )
@@ -240,8 +240,8 @@ move_to_head (string_t *s, int index)
 
     {
         prev->link = s->link;
-        s->link = stringtable[index];
-        stringtable[index] = s;
+        s->link = stringtable[idx];
+        stringtable[idx] = s;
     }
 
     return rover;
@@ -249,7 +249,7 @@ move_to_head (string_t *s, int index)
 
 /*-------------------------------------------------------------------------*/
 static INLINE string_t *
-make_new_tabled (const char * const pTxt, size_t size, int index MTRACE_DECL)
+make_new_tabled (const char * const pTxt, size_t size, int idx MTRACE_DECL)
 
 /* Helper function for mstring_new_tabled(), mstring_make_tabled() and
  * mstring_table_inplace().
@@ -288,8 +288,8 @@ make_new_tabled (const char * const pTxt, size_t size, int index MTRACE_DECL)
     string->info.tabled = MY_TRUE;
     string->info.ref = 1;
 
-    string->link = stringtable[index];
-    stringtable[index] = string;
+    string->link = stringtable[idx];
+    stringtable[idx] = string;
 
     {
         size_t msize;
@@ -368,8 +368,8 @@ mstring_new_string (const char * const pTxt MTRACE_DECL)
  */
 
 {
-    string_t      *string;
-    size_t         size;
+    string_t *string;
+    size_t    size;
 
     size = strlen(pTxt);
 
@@ -420,22 +420,22 @@ mstring_new_tabled (const char * const pTxt MTRACE_DECL)
  */
 
 {
-    int        index;
+    int        idx;
     size_t     size;
     string_t * string;
 
     size = strlen(pTxt);
-    index = StrHash(pTxt, size);
+    idx = StrHash(pTxt, size);
 
     /* Check if the string has already been tabled */
-    string = find_and_move(pTxt, size, index);
+    string = find_and_move(pTxt, size, idx);
     if (string)
     {
         return ref_mstring(string);
     }
 
     /* No: create a new one */
-    return make_new_tabled(pTxt, size, index MTRACE_PASS);
+    return make_new_tabled(pTxt, size, idx MTRACE_PASS);
 } /* mstring_new_tabled() */
 
 /*-------------------------------------------------------------------------*/
@@ -458,9 +458,9 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
  */
 
 {
-    int            index;
-    size_t         size;
-    string_t      *string;
+    int       idx;
+    size_t    size;
+    string_t *string;
 
     /* If the string is already tabled directly, our work is done */
     if (pStr->info.tabled)
@@ -483,9 +483,9 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
     /* Check if there already is a copy of this string tabled */
 
     size = pStr->str->size;
-    index = StrHash(pStr->str->txt, size);
+    idx = StrHash(pStr->str->txt, size);
 
-    string = find_and_move(pStr->str->txt, size, index);
+    string = find_and_move(pStr->str->txt, size, idx);
     if (string)
     {
         string = ref_mstring(string);
@@ -501,14 +501,14 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
 
         string = pStr;
         string->info.tabled = MY_TRUE;
-        string->link = stringtable[index];
-        stringtable[index] = string;
+        string->link = stringtable[idx];
+        stringtable[idx] = string;
     }
     else
     {
         /* We need a completely new tabled string */
 
-        string = make_new_tabled(pStr->str->txt, size, index MTRACE_PASS);
+        string = make_new_tabled(pStr->str->txt, size, idx MTRACE_PASS);
         if (deref_arg) free_mstring(pStr);
     }
 
@@ -530,7 +530,7 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
 
 {
     string_t *string;
-    int        index;
+    int        idx;
     size_t     size;
     size_t     msize;
 
@@ -543,10 +543,10 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
     /* Get or create the tabled string for this untabled one */
 
     size = pStr->str->size;
-    index = StrHash(pStr->str->txt, size);
+    idx = StrHash(pStr->str->txt, size);
 
     /* Check if the string has already been tabled */
-    string = find_and_move(pStr->str->txt, size, index);
+    string = find_and_move(pStr->str->txt, size, idx);
 
     if (!string)
     {
@@ -563,8 +563,8 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
         string->info.tabled = MY_TRUE;
         string->info.ref = 1;
 
-        string->link = stringtable[index];
-        stringtable[index] = string;
+        string->link = stringtable[idx];
+        stringtable[idx] = string;
 
         mstr_used++;
         mstr_used_size += msize;
@@ -683,8 +683,8 @@ mstring_find_tabled (const string_t * pStr)
  */
 
 {
-    int       index;
-    size_t    size;
+    int    idx;
+    size_t size;
 
     /* If pStr is tabled, our work is done */
     if (pStr->info.tabled)
@@ -697,9 +697,9 @@ mstring_find_tabled (const string_t * pStr)
     /* Worst case: an untabled string we have to look for */
 
     size = mstrsize(pStr);
-    index = StrHash(pStr->str->txt, size);
+    idx = StrHash(pStr->str->txt, size);
 
-    return find_and_move(pStr->str->txt, size, index);
+    return find_and_move(pStr->str->txt, size, idx);
 } /* mstring_find_tabled() */
 
 /*-------------------------------------------------------------------------*/
@@ -716,11 +716,11 @@ mstring_find_tabled_str (const char * const pTxt, size_t size)
  */
 
 {
-    int       index;
+    int idx;
 
-    index = StrHash(pTxt, size);
+    idx = StrHash(pTxt, size);
 
-    return find_and_move(pTxt, size, index);
+    return find_and_move(pTxt, size, idx);
 } /* mstring_find_tabled_str() */
 
 /*-------------------------------------------------------------------------*/
@@ -757,19 +757,19 @@ mstring_free (string_t *s)
     {
         /* A tabled string */
 
-        int index;
+        int idx;
 
         mstr_tabled--;
         mstr_tabled_size -= msize;
 
-        index = StrHash(s->str->txt, mstrsize(s));
-        if (NULL == move_to_head(s, index))
+        idx = StrHash(s->str->txt, mstrsize(s));
+        if (NULL == move_to_head(s, idx))
         {
             fatal("String %p (%s) doesn't hash to the same spot.\n"
                  , s, s->str ? s->str->txt : "<null>"
                  );
         }
-        stringtable[index] = s->link;
+        stringtable[idx] = s->link;
         xfree(s->str);
         xfree(s);
     }
@@ -989,7 +989,7 @@ mstring_cvt_progname (const string_t *str MTRACE_DECL)
  *
  * <str> is a program name: no leading slash, but a trailing '.c'.
  * Create and return a new string with the '.c' removed, and a leading slash
- * added if compat_mode is set.
+ * added if compat_mode is not set.
  *
  * The result string is untabled and has one reference, the old string <str>
  * is not changed.
@@ -1010,14 +1010,14 @@ mstring_cvt_progname (const string_t *str MTRACE_DECL)
     if (p)
         len = (size_t)(p - txt);
 
-    if (compat_mode)
+    if (!compat_mode)
         len++;
 
     tmp = mstring_alloc_string(len MTRACE_PASS);
     if (tmp)
     {
         txt2 = get_txt(tmp);
-        if (compat_mode)
+        if (!compat_mode)
         {
             *txt2 = '/';
             txt2++;
@@ -1046,13 +1046,14 @@ mstring_add (const string_t *left, const string_t *right MTRACE_DECL)
 {
     size_t lleft, lright;
     string_t *tmp;
-    char * txt;
 
     lleft = mstrsize(left);
     lright = mstrsize(right);
     tmp = mstring_alloc_string(lleft+lright MTRACE_PASS);
     if (tmp)
     {
+        char * txt;
+
         txt = get_txt(tmp);
         memcpy(txt, get_txt(left), lleft);
         memcpy(txt+lleft, get_txt(right), lright);

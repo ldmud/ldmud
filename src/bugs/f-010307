@@ -1,0 +1,97 @@
+Short: LDMUD - Driver - Idea: Short(est) Path Algorithms
+From: Andy <Andreas.Klauer@epost.de>
+To: lars@bearnip.com
+Date: Wed, 7 Mar 2001 23:11:03 +0100
+Type: Feature
+State: New
+
+Hi Lars,
+
+for a long time, finding a short(est) path from one point to another was a
+great problem for many computer games. Today it isn't a problem anymore for
+games, since fast and efficient algorithms for almost every situation can be
+found on the net, and newer machines are fast enough to compute those paths in
+real-time.
+
+In MUDs, finding a short(est) path is still a great problem, but it becomes (at
+least I think so) more and more important, because players want to have more
+intelligent NPCs, Monsters that follow and hunt players, NPCs in towns who
+arent always in the same room... and also special units, like horses who follow
+a road by themselves, or ships which connect different continents.
+
+Some wizards in UNItopia had these problems and tried to do these shortest path
+algorithms in LPC. It works, but its very slow... some load all rooms and make
+a database of all exits of the rooms once, which takes loads of RAM... others
+load and check rooms in runtime, thats very slow.
+
+Other problems, like the ships, can't be solved at all... in UNItopia, the
+ships make large 'hops' (because its not the best thing to load 1000 rooms for
+every player who wants to drive 1000 sea-miles with his ship...). But that has
+the effect, that on some places players can 'hop' with their ships over land.
+
+LPC is just not fast enough to make a really efficient short(est) path
+algorithm... additionally, in LPC you normally have (as long as you don't have
+a master which saves a whole database...) to load a whole room first before you
+can see wether a unit (ship, for example) can enter the room or not.
+
+So, my idea was, that it could be possible to implement a short(est) path
+routine into the driver. Because most muds use the standard 8 directions:
+north, west, south, east, northeast, ..., and most of the time there are
+just 2 cases: something can move there oder not, something like a 2dimensional
+bitmatrix would be a great thing, and useable in most muds for most of these
+problems.
+
+A map of a town could then look like the following:
+00000000000000000000000
+00001001001000000000000
+00011111111000010000000
+00000000001111110000000
+01000000110000011111111
+01010001100010010000000  (the 1 are the positions where players can walk on...)
+11111111100011110000000
+00010001000010010000000
+00010001110000011111111 
+00000001000000000000000
+00000001000000000000000
+
+Or, for an island a ship cant drive on, it could look like this:
+00001000000000000000000
+00111001100000100000000 
+00011111110000111110000
+00000011110101111111000
+00000001111111111100000
+00011111111111111111000  (the 1 are land mass where ships can't drive on)
+01111111110000000000000
+00011111111111000000000
+00000011111100000000000 
+00000000001111110000000
+00000000000011110000000
+
+In UNItopia, such continents are up to 1000*1000 fields large (which would make
+it somewhat inefficient to save it in another format than bits...)
+
+As you may already have noticed, I'm not an Informatician at all. I don't know
+how fast something like this would be if it was implemented in the driver (and
+some new bitmatrixlike-datatype for LPC), or if something like that can be
+implemented in the driver at all. It's just one of my crazy ideas...
+
+With such a matrix, there could be functions which cut out submatrixes of a
+large matrix, a line function that tells if on a line from (x1|y1) to (x2|y2)
+are just 0's or just 1's or some 0's and 1's, and of course a short(est) path
+from point A to B, or from point A to a border of the matrix, or something
+similar... in this function one should be able to specify which of the 8
+directions are possible, if 0's or 1's can be walked on and so on...
+
+So, thats my idea. Something that may be possible and may be useful for many
+muds.
+
+You know the driver - of course - much better than I do. And certainly you know
+muds better than I do. And you are a much better programmer than I am.
+
+What do you think - is there a possibility to implement something like this?
+
+Greetings,
+
+Menaures@UNItopia (I'm not an admin, just a little wizard who doesn't know
+much 'bout all this stuff;)
+

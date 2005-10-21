@@ -1049,7 +1049,7 @@ getfn (Bool writeflg)
         if (!file)
         {
             add_message("Out of memory (%lu bytes) for filename.\n"
-                       , 1+mstrsize(P_FNAME));
+                       , (unsigned long) (1+mstrsize(P_FNAME)));
             return NULL;
         }
         get_txt(file)[0] = '/';
@@ -1070,7 +1070,8 @@ getfn (Bool writeflg)
         file = alloc_mstring(len);
         if (!file)
         {
-            add_message("Out of memory (%lu bytes) for filename.\n", len);
+            add_message("Out of memory (%lu bytes) for filename.\n"
+                       , (unsigned long)len);
             return NULL;
         }
 
@@ -1093,8 +1094,6 @@ getfn (Bool writeflg)
         if (!ret || (ret->type == T_NUMBER && ret->u.number == 0))
         {
             free_mstring(file);
-            if (out_of_memory)
-                error("(ed) Out of memory detected.\n");
             return NULL;
         }
 
@@ -3230,7 +3229,7 @@ save_ed_buffer (void)
             if (!tmp)
             {
                 add_message("(ed) Out of memory (%lu bytes) for filename.\n"
-                           , mstrsize(fname)-1);
+                           , (unsigned long)(mstrsize(fname)-1));
                 free_mstring(fname);
                 return;
             }

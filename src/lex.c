@@ -751,6 +751,7 @@ init_lexer(void)
         strcpy(mtext+2, master_name);
         strcat(mtext+2, "\"");
     }
+
     add_permanent_define("__MASTER_OBJECT__", -1, string_copy(mtext), MY_FALSE);
     add_permanent_define("__FILE__", -1, (void *)get_current_file, MY_TRUE);
     add_permanent_define("__DIR__", -1, (void *)get_current_dir, MY_TRUE);
