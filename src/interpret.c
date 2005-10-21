@@ -14663,10 +14663,13 @@ dump_trace (Bool how
         /* TODO: This number of instructions should be a runtime arg */
 #ifdef DEBUG
         (void)last_instructions(200, MY_TRUE, NULL);
-        printf("%6lx: %3d %3d %3d %3d %3d %3d %3d %3d\n"
-              , (long)inter_pc
-              , inter_pc[0], inter_pc[1], inter_pc[2], inter_pc[3]
-              , inter_pc[4], inter_pc[5], inter_pc[6], inter_pc[7] );
+        if (inter_pc)
+            printf("%6lx: %3d %3d %3d %3d %3d %3d %3d %3d\n"
+                  , (long)inter_pc
+                  , inter_pc[0], inter_pc[1], inter_pc[2], inter_pc[3]
+                  , inter_pc[4], inter_pc[5], inter_pc[6], inter_pc[7] );
+        else
+            printf("No program counter.\n");
 #else  /* DEBUG */
         last_instructions(20, MY_TRUE, NULL);
 #endif /* DEBUG */

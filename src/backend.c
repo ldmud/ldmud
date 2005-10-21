@@ -77,6 +77,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/driver_hook.h"
+#include "../mudlib/sys/debug_message.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -1097,15 +1098,29 @@ f_debug_message (svalue_t *sp)
 /* EFUN debug_message()
  *
  *   debug_message(string text)
+ *   debug_message(string text, int where)
  *
- * Print the <text> to stdout.
+ * Print the <text> to stdout, stderr, and/or the <host>.debug.log file.
+ *
+ * The parameter <where> is a combination of bitflags determining the
+ * target: DMSG_STDOUT, DMSG_STDERR and DMSG_LOGOUT. If <where> is
+ * given as 0 or left out, it defaults to DMSG_STDOUT | DMSG_LOGFILE.
  */
 
 {
-    printf("%s", get_txt(sp->u.str));
+    if ((sp->u.number & ~(DMSG_STDOUT|DMSG_STDERR|DMSG_LOGFILE)) != 0)
+        error("Argument 2 to debug_message() out of range: %ld, expected 0..7\n"
+             , (long)sp->u.number);
+    if (!sp->u.number || (sp->u.number & DMSG_STDOUT))
+        printf("%s", get_txt((sp-1)->u.str));
+    if (sp->u.number & DMSG_STDERR)
+        fprintf(stderr, "%s", get_txt((sp-1)->u.str));
+    if (!sp->u.number || (sp->u.number & DMSG_LOGFILE))
+        debug_message("%s", get_txt((sp-1)->u.str));
     free_svalue(sp);
-    return sp - 1;
-}
+    free_svalue(sp-1);
+    return sp - 2;
+} /* f_debug_message() */
 
 /***************************************************************************/
 

@@ -217,7 +217,10 @@ struct interactive_s {
 #define CHARMODE_REQ      2
   /* Charmode requested
    * The driver orients its behaviour according to this flag so that it
-   * can act correctly while even before the negotiation is complete.
+   * can act correctly even before the negotiation is complete.
+   * Moreover, this flag serves as indicator that the input buffer
+   * variables are set up to 'charmode', so it should not be reset except
+   * through a call to set_noecho().
    */
 #define CHARMODE       /* 8 */ CHARMODE_REQ_TO_CHARMODE(CHARMODE_REQ)
   /* Charmode active (requested via telnet negotiation)

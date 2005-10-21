@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-15-Dec-2000 (Lars Duening) -- Development Release 3.3
+21-Dec-2000 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -14,6 +14,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + add_action(): Historical usage with just one argument no longer
            supported.
        + ctime(): Accepts the output of new efun utime() as well.
+       + debug_message(): New second argument determines where to
+            log the message.
        + debug_info(): New argument DINFO_TRACE to return the current
             call stack.
        + filter(), map(), sort_array(), walk_mapping(): Protected lvalues
@@ -31,7 +33,8 @@ For a detailed list of all changes see the file CHANGELOG.
            now they are again.
        + call_resolved(): Now accepts a destructed object as second parameter
            as it should.
-       + input_to(): The option IGNORE_BANG didn't work.
+       + input_to(): The option IGNORE_BANG didn't work. In charmode, !-escapes
+           after the first received data are now recognized. 
        + object_info(): The return OIB_NAME now starts with a '/' in plain
            mode.
 

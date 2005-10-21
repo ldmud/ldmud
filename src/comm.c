@@ -571,9 +571,9 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
     va_list va;
     static Bool in_fatal = MY_FALSE;
     char * ts;
-    char * msg = "\n=== Internal communications error in mud driver.\n"
-                   "=== Please log back in and inform the administration.\n"
-                   "\n";
+    char * msg = "\r\n=== Internal communications error in mud driver.\r\n"
+                   "=== Please log back in and inform the administration.\r\n"
+                   "\r\n";
 
     /* Prevent double fatal. */
     if (in_fatal)
@@ -1353,7 +1353,7 @@ if (sending_telnet_command)
     printf("%s TDEBUG: '%s' Sending telnet (%d bytes): "
           , time_stamp(), get_txt(ip->ob->name), strlen(source));
     for (cp = source, left = srclen; left > 0; cp++, left--)
-        printf(" %02x", *cp);
+        printf(" %02x", (unsigned char)*cp);
     printf("\n");
 }
 #endif
@@ -2247,9 +2247,24 @@ get_message (char *buff)
                             comm_fatal(ip, "comm: data length < 0: %ld\n", (long)length);
                             continue;
                         }
+                        DT(("'%s'     save machine state %d, set to %d (READY)\n"
+                          , ip->ob->name, ip->tn_state, TS_READY));
                         ip->save_tn_state = ip->tn_state;
                         ip->chars_ready = length;
                         ip->tn_state = TS_READY;
+                    }
+                    else if (!ip->chars_ready)
+                    {
+                        /* Empty input: we received an end of line.
+                         * The telnet machine is already suspended, but
+                         * we have to set the state for it to return to.
+                         * At the moment it is TS_INVALID, so the next
+                         * character received would be thrown away.
+                         */
+                        DT(("'%s'     save machine state %d (DATA)\n"
+                          , ip->ob->name, TS_DATA));
+                        ip->save_tn_state = TS_DATA;
+                        /* tn_state is TS_READY */
                     }
 
                     /* Copy as many characters from the text[] into
@@ -2306,7 +2321,8 @@ get_message (char *buff)
                          * old telnet machine state.
                          * Leave the first char in to make '!' possible
                          */
-                        DTN(("    restore old telnet machine state\n"));
+                        DTN(("    restore old telnet machine state %d\n"
+                            , ip->save_tn_state));
                         ip->tn_state = ip->save_tn_state;
                         ip->save_tn_state = TS_INVALID;
                         ip->tn_start -= ip->command_start - 1;
@@ -2918,19 +2934,23 @@ set_noecho (interactive_t *ip, char noecho)
              * To make more sophisticated negotiations, e.g. using LINEMODE,
              * use the H_NOECHO hook.
              */
-            if (~confirm & old & CHARMODE_MASK)
+            if((~confirm & old & CHARMODE_MASK)
+            || (~confirm & old & NOECHO_STALE) && (old & CHARMODE_MASK))
             {
-                DTN(("set_noecho():   turn off charmode\n"));
-                if (old & CHARMODE)
+                if(~confirm & old & CHARMODE_MASK)
                 {
-                    DTN(("set_noecho():     DONT TELOPT_SGA\n"));
-                    send_dont(TELOPT_SGA);
-                }
-                if (ip->save_tn_state != TS_INVALID)
-                {
-                    DTN(("set_noecho():     0 chars ready, saved state %d\n",  ip->save_tn_state));
-                    ip->chars_ready = 0;
-                    ip->tn_state = ip->save_tn_state;
+                    DTN(("set_noecho():   turn off charmode\n"));
+                    if (old & CHARMODE)
+                    {
+                        DTN(("set_noecho():     DONT TELOPT_SGA\n"));
+                        send_dont(TELOPT_SGA);
+                    }
+                    if (i->save_tn_state != TS_INVALID)
+                    {
+                        DTN(("set_noecho():     0 chars ready, saved state %d\n", i->save_tn_state));
+                        i->chars_ready = 0;
+                        i->tn_state = i->save_tn_state;
+                    }
                 }
                 if (ip->command_start)
                 {
@@ -2958,8 +2978,8 @@ set_noecho (interactive_t *ip, char noecho)
                 DTN(("set_noecho():   turn on charmode\n"));
                 DTN(("set_noecho():     DO+WILL TELOPT_SGA\n"));
                 send_do(TELOPT_SGA);
-                /* some telnet implementations mix up DO and WILL SGA, thus
-                 * we send WILL SGA as well.
+                /* some telnet implementations (Windows' telnet is one) mix
+                 * up DO and WILL SGA, thus we send WILL SGA as well.
                  */
                 send_will(TELOPT_SGA);
                 ip->supress_go_ahead = MY_TRUE;
@@ -3540,7 +3560,7 @@ reply_to_dont_echo (int option)
 
     DTN(("reply to DONT ECHO\n"));
     if (ip->noecho & NOECHO_MASK) {
-        if (~(ip->noecho | ~NOECHO_MASK)) {
+        if (!~(ip->noecho | ~NOECHO_MASK)) {
             /* We were granted the option before */
             send_wont(option);
         }
@@ -3627,13 +3647,21 @@ reply_to_wont_sga (int option)
 
     DTN(("reply to WONT SGA\n"));
     if (ip->noecho & CHARMODE_MASK) {
-        if (!(ip->noecho | ~CHARMODE_MASK)) {
+        if (!~(ip->noecho | ~CHARMODE_MASK)) {
             /* We were granted the option before */
             send_dont(option);
         }
         DTN(("  we don't need to say DONT\n"));
-        DTN(("  noecho: %02x -> %02x\n", ip->noecho, (char)((ip->noecho & ~(CHARMODE|CHARMODE_REQ)) | CHARMODE_ACK)));
-        ip->noecho = (char)((ip->noecho & ~(CHARMODE|CHARMODE_REQ)) | CHARMODE_ACK);
+        DTN(("  noecho: %02x -> %02x\n", ip->ob->name, ip->noecho, (unsigned char)((ip->noecho & ~CHARMODE) | CHARMODE_ACK)));
+        ip->noecho = (char)((ip->noecho & ~CHARMODE) | CHARMODE_ACK);
+          /* Don't reset CHARMODE_REQ here: this WONT can be the answer
+           * to the DO SGA we sent before, and the client can still answer
+           * with DO SGA to the WILL SGA we sent as well (Windows' telnet
+           * for example does this).
+           * Besides, the variables are now set up to treat the input
+           * in charmode, and changing the flag without the variables
+           * will do Bad Things(tm).
+           */
     }
 }
 
@@ -3883,6 +3911,8 @@ telnet_neg (interactive_t *ip)
 
     do {
         ch = (*from++ & 0xff);
+        DTN(("t_n: processing %02x '%c'\n"
+            , ip->ob->name, (unsigned char)ch, ch));
         switch(ip->tn_state)
         {
         case TS_READY:
@@ -3991,33 +4021,33 @@ telnet_neg (interactive_t *ip)
                     ch = (*from++ & 0xff);
         ts_cr:
                     if (ch != '\n')
-                    {
                         from--;
-                        if ((ip->noecho & CHARMODE_REQ) &&
-                            (ip->text[0] != '!' || find_no_bang(ip) & IGNORE_BANG))
-                        {
-                            if (from == to)
-                            {
-                                /* The client sent a single CR in CHARMODE,
-                                 * there were no previous negotiations and thus
-                                 * we have to make space to insert the CR.
-                                 */
-                                char * cp;
 
-                                if (ip->text_end < MAX_TEXT-1)
-                                {
-                                    ip->text_end++;
-                                    end++;
-                                }
-                                from++;
-                                for (cp = end; cp != from-1; cp--)
-                                    *cp = *(cp-1);
+                    if ((ip->noecho & CHARMODE_REQ) &&
+                        (ip->text[0] != '!' || find_no_bang(ip) & IGNORE_BANG))
+                    {
+                        if (from == to)
+                        {
+                            /* The client sent a single CR in CHARMODE,
+                             * there were no previous negotiations and thus
+                             * we have to make space to insert the CR.
+                             */
+                            char * cp;
+
+                            if (ip->text_end < MAX_TEXT-1)
+                            {
+                                ip->text_end++;
+                                end++;
                             }
                                 
-                            ip->tn_state = TS_DATA;
-                            *to++ = '\r';
-                            goto ts_data;
+                            from++;
+                            for (cp = end; cp != from-1; cp--)
+                                *cp = *(cp-1);
                         }
+                            
+                        ip->tn_state = TS_DATA;
+                        *to++ = '\r';
+                        goto ts_data;
                     }
                 } /* if (from >= end) or not */
 

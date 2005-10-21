@@ -1,6 +1,28 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Dec-2000 (Lars Duening)  (3.3.21)
+     Included changes up to 3.2.9-dev.250:
+     - (comm.c, interpret.c) More small corrections to the new telnet
+         error reporting.
+     - (func_spec, backend.c) Extended the efun debug_message() to take
+         a parameter telling where to log the message (suggested by Freaky).
+     - (comm.c) If the driver received only a NL in charmode, the first
+         following character was ignored.
+     - (comm.c) Found and corrected a problem concerning the use
+         of CHARMODE with Windows' telnet: the charmode negotiation were
+         considere a failure too early, and moreover the CHARMODE_REQ flag was
+         reset without adjusting the input buffer variables. Unfortunately
+         this re-opens b-000818. (b-001214)
+     - (comm.c) Clients sending CRLF in Charmode instead of just CR
+         are now handled properly: the LF is ignored like the NUL in CR NUL
+         already is. This also re-fixes b-000818.
+     - (comm.c) When receiving DONT ECHO or WONT SGA, the check for if
+         the option has already been granted was wrong.
+     - (comm.c) After a charmode input_to() has been received, the driver
+         did not properly reset the text pointers, causing !-escaped
+         commands to go unrecognized.
+ 
 19-Dec-2000 (Lars Duening)  (3.3.20)
     - (interpret.c) Continued adaptation.
     Included the changes up to 3.2.9-dev.249:

@@ -461,7 +461,7 @@ int     write_file(string, string);
         /* Driver and System functions */
 
 mixed   debug_info(int, ...);
-void    debug_message(string);
+void    debug_message(string, int default: F_CONST0);
 string  expand_define(string, null|string default: F_CONST0);
 void    garbage_collection();
 mixed  *get_error_file(string, int default: F_CONST1);

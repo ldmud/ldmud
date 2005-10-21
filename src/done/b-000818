@@ -2,11 +2,16 @@ Short: INPUT_CHARMODE problems with TinyFugue
 Date: 18 Aug 2000 12:44:48 +0200 (CEST)
 From: Unholy Lands mud <mud@pc181.iaee.tuwien.ac.at>
 Type: Bug
-State: Done - fixed in 3.2.9-dev.213
+State: Done - fixed in 3.2.9-dev.251
 
-Analysis: TinyFugue does not support linemode (at least not through the SGA
-negotiation), but the driver did not properly reset its CHARMODE_REQ flag when
-TinyFugue declined the request.
+Analysis (3.2.9-dev.231): TinyFugue does not support linemode (at least not
+through the SGA negotiation), but the driver did not properly reset its
+CHARMODE_REQ flag when TinyFugue declined the request.
+Analysis (3.2.9-dev.251): The bugfix applied in 3.2.9-dev.231 (reset the
+CHARMODE_REQ flag when a WONT SGA is received) in fact made things worse
+for clients which don't accept DO SGA as charmode request, but do accept
+WILL SGA (b-001214). However, the correction Gnomi applied to the handling
+of NL in charmode also fixes this problem.
 
 -----------------------------------------------------------------------------
 I noticed a change in the behaviour of the input_to function from 3.2.7 to

@@ -19,7 +19,6 @@ b-000822: Crash in walk_mapping()
 b-000909: dev.226 crashes TubMud
 b-001016: Unitopia crashes on invalid string in reset()
 b-001016-1: Wunderland crashes after 0-ref string
-b-001214: Drivers crashes in telnet-charmode code
 
 
 Efuns
@@ -51,7 +50,6 @@ b-000217-3: Memoryleak in Finalfrontier
 b-000306-3: Memoryleak in the actions?
 b-000308: call_out freezes totally
 b-000830: malloc status is inconsistent
-b-001219: Another bug in the CHARMODE telnet routine.
 
 
 Installation
