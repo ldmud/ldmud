@@ -147,16 +147,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 21
+  SETVERFLAGS += d 22
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.21
+  VSTRING = 3.3.0-pre.22
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 21
+  SETVERFLAGS += d 22
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.21
+  VSTRING = 3.3.0-dev.22
 endif
 
 else
@@ -164,12 +164,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 21
+SETVERFLAGS = -app 3 3 22
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.21
+  VSTRING = 3.3.22
 
 endif
 
@@ -466,13 +466,14 @@ $(OBJ)/array.o : xalloc.h wiz_list.h swap.h svalue.h simulate.h \
     hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
     machine.h ./hosts/amiga/ixfile.h
 
-$(OBJ)/backend.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h \
-    stdstrings.h simulate.h rxcache.h regexp.h random.h otable.h object.h \
-    mstrings.h mapping.h main.h lex.h interpret.h heartbeat.h gcollect.h \
-    filestat.h exec.h ed.h comm.h closure.h call_out.h array.h actions.h \
-    backend.h hosts/amiga/nsignal.h my-alloca.h typedefs.h driver.h \
-    svalue.h strfuns.h sent.h instrs.h port.h config.h hosts/unix.h \
-    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+$(OBJ)/backend.o : ../mudlib/sys/debug_message.h \
+    ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h stdstrings.h \
+    simulate.h rxcache.h regexp.h random.h otable.h object.h mstrings.h \
+    mapping.h main.h lex.h interpret.h heartbeat.h gcollect.h filestat.h \
+    exec.h ed.h comm.h closure.h call_out.h array.h actions.h backend.h \
+    hosts/amiga/nsignal.h my-alloca.h typedefs.h driver.h svalue.h \
+    strfuns.h sent.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h \
+    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
 $(OBJ)/bitstrings.o : xalloc.h svalue.h simulate.h mstrings.h main.h lex.h \

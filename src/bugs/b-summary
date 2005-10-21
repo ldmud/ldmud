@@ -50,6 +50,8 @@ b-000217-3: Memoryleak in Finalfrontier
 b-000306-3: Memoryleak in the actions?
 b-000308: call_out freezes totally
 b-000830: malloc status is inconsistent
+b-010115: Memory leaks in dev.251
+b-010115-1: Make sure that all master calls use leading slashes.
 
 
 Installation

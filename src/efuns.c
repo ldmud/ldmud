@@ -5504,7 +5504,7 @@ f_debug_info (svalue_t *sp, int num_arg)
 
             strbuf_zero(&sbuf);
             (void)collect_trace(&sbuf, NULL);
-            put_malloced_string(&res, string_copy(sbuf.buf));
+            put_string(&res, new_mstring(sbuf.buf));
             strbuf_free(&sbuf);
         }
         break;

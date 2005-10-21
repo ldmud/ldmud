@@ -34,16 +34,18 @@ OPTIMIZE = @OCFLAGS@ # high optimization
 #OPTIMIZE= @MCFLAGS@ # for better debugging
 #OPTIMIZE= @DCFLAGS@ # no optimization; for frequent recompilations.
 #
-# debugging options: [-DDEBUG] [-DYYDEBUG|-DYYDEBUG=1] [-DTRACE_CODE]
+# debugging options: [-DDEBUG] [-DXDEBUG]
 # -DDEBUG: Enable run time debugging. It will use more time and space.
+# -DXDEBUG: Enable extensive run time debugging. It will create lots of
+#           log messages.
 # When the flag is changed, be sure to recompile everything.
 # Simply comment out this line if not wanted.
 # If you change anything in the source, you are strongly encouraged to have
 # DEBUG defined.
 # If you will not change anything, you are still encouraged to have
-# it defined, if you want to locate any game driver bugs.
-#DEBUG=-DDEBUG -DTRACE_CODE
-DEBUG=
+# it defined, if you want to locate any bugs.
+#DEBUG=-DDEBUG -DXDEBUG
+DEBUG= -DDEBUG -DXDEBUG
 #
 MPATH=-I../.. -DMUD_LIB='"$(MUD_LIB)"' -DBINDIR='"$(BINDIR)"' -DERQ_DIR='"$(ERQ_DIR)"'
 #

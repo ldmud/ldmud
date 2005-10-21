@@ -299,13 +299,13 @@ DESCRIPTION
                    way (smalloc only).
 
         DINFO_TRACE (7): Return the current call stack 'trace' information
-            in the form specifiec by <arg2>. The result of the function is
-            either an array (format explained below) if <arg2> is 0 or
+            in the form specified by <arg2>. The result of the function is
+            either either an array (format explained below) if <arg2> is 0 or
             missing, or a printable string for any non-zero value of <arg2>.
 
             <arg2> == 0: Return the information in array form.
                If the array has just one entry, the trace information is not
-               available and the one entry is string with the reason.
+               available and the one entry is a string with the reason.
 
                If the array has more than one entries, the first entry is 0 or
                the name of the object with the heartbeat which started the

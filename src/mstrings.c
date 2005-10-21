@@ -876,7 +876,7 @@ mstring_add_slash (const string_t *str MTRACE_DECL)
 /* Aliased to: add_slash(str)
  *
  * Create and return a new string with the data of <str> prepended
- * by a slash ('/'). The result string is untable and has one reference,
+ * by a slash ('/'). The result string is untabled and has one reference,
  * the old string <str> is not changed.
  */
 
@@ -893,6 +893,91 @@ mstring_add_slash (const string_t *str MTRACE_DECL)
     }
     return tmp;
 } /* mstring_add_slash() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_add (const string_t *left, const string_t *right MTRACE_DECL)
+
+/* Aliased to: mstr_add(left,right)
+ *
+ * Create and return a new string with the data of <left> concatenated
+ * with the data of <right>.
+ * The result string is untabled and has one reference,
+ * the old strings <left> and <right> are not changed.
+ */
+
+{
+    size_t lleft, lright;
+    string_t *tmp;
+    char * txt;
+
+    lleft = mstrsize(left);
+    lright = mstrsize(right);
+    tmp = mstring_alloc_string(lleft+lright MTRACE_PASS);
+    if (tmp)
+    {
+        txt = get_txt(tmp);
+        memcpy(tmp, get_txt(left), lleft);
+        memcpy(tmp+lleft, get_text(right), lright);
+    }
+    return tmp;
+} /* mstring_add() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_add_txt (const string_t *left, const char *right, size_t len MTRACE_DECL)
+
+/* Aliased to: mstr_add_txt(left,right,len)
+ *
+ * Create and return a new string with the data of <left> concatenated
+ * with the <len> bytes of data in buffer <right>.
+ * The result string is untabled and has one reference,
+ * the old string <left> is not changed.
+ */
+
+{
+    size_t lleft;
+    string_t *tmp;
+    char * txt;
+
+    lleft = mstrsize(left);
+    tmp = mstring_alloc_string(lleft+len MTRACE_PASS);
+    if (tmp)
+    {
+        txt = get_txt(tmp);
+        memcpy(tmp, get_txt(left), lleft);
+        memcpy(tmp+lleft, right, len);
+    }
+    return tmp;
+} /* mstring_add_txt() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_add_to_txt (const char *left, size_t len, const string_t *right MTRACE_DECL)
+
+/* Aliased to: mstr_add_to_txt(left,len,right)
+ *
+ * Create and return a new string with the <len> bytes of data in buffer <left>
+ * concatenated with the string <right>.
+ * The result string is untabled and has one reference,
+ * the old string <right> is not changed.
+ */
+
+{
+    size_t lright;
+    string_t *tmp;
+    char * txt;
+
+    lright = mstrsize(right);
+    tmp = mstring_alloc_string(lright+len MTRACE_PASS);
+    if (tmp)
+    {
+        txt = get_txt(tmp);
+        memcpy(tmp, left, len);
+        memcpy(tmp+len, get_txt(right), lright);
+    }
+    return tmp;
+} /* mstring_add_to_txt() */
 
 /*-------------------------------------------------------------------------*/
 Bool

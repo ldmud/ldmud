@@ -16,7 +16,7 @@ DESCRIPTION
 	return anything other than 0 to allow this exec() invocation.
 
 	After the exec(), if arg 2 was this_player(), this_player()
-	becomes arg 1, else vice versa.
+	becomes arg 1, else vice versa. Ditto for this_interactive().
 
 	Take care when writing a simul-efun around exec(): the
 	'current_program' passed to the valid_exec() function will be
@@ -28,6 +28,9 @@ EXAMPLE
 	ob = clone_object("std/player");
 	exec(ob, this_object());
 	destruct(this_object());
+
+HISTORY
+    LDMud 3.2.9 added the switchover of this_interactive().
 
 SEE ALSO
 	connect(M), disconnect(M), logon(A), interactive(E)

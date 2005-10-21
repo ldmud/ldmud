@@ -155,8 +155,8 @@ struct child_s
 
 /* Values for child_t.status */
 
-#define CHILD_RUNNING  1
-#define CHILD_EXITED   2
+#define CHILD_RUNNING  1  /* Child is being started up or running */
+#define CHILD_EXITED   2  /* Child exited */
 
 /* --- struct auth_s: one auth_d query
  * auth_t is treated as subclass of socket_t.
@@ -195,6 +195,7 @@ struct retry_s
 extern child_t *childs;
 extern socket_t *sockets;
 extern int seq_number, seq_interval;
+extern pid_t master_pid;
 
 /* --- Prototypes --- */
 
@@ -204,7 +205,7 @@ extern void bad_request(char *);
 extern void erq_cmd(void);
 extern void sig_child();
 extern void remove_child(child_t *);
-extern void read_socket(socket_t *, int);
+extern int read_socket(socket_t *, int);
 extern socket_t *new_socket(int, char);
 extern void reply_errno(int32);
 extern void reply1(int32, const void *, int32);
@@ -232,6 +233,17 @@ extern void erq_rlookupv6(char *, int);
 #endif
 
 extern void close_socket(socket_t *);
+
+/* --- Debug Functions --- */
+
+#ifdef XDEBUG
+#   ifndef DEBUG
+#       define DEBUG
+#   endif
+#   define XPRINTF(x) fprintf x
+#else
+#   define XPRINTF(x)
+#endif
 
 /* --- Inline Functions --- */
 

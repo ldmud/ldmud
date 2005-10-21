@@ -113,4 +113,63 @@ Total storage unused: (c+d+g+h+i)   19913124
 
 /i/monster 1008 0>
 
+---------------------------------------------------------------------
+
+From: Freaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
+
+Lars Duening:
+> Freaky wrote on Monday, January 08 2001, 15:47:44:
+
+> >Das komische ist, dass wenn ich alle Datasizes in OBJ_DUMP
+> >zusammenzaehle und das mit dem vergleiche, was malloc liefert, ich eine
+> >Differenz von 60 MB habe (140MB aus OBJ_DUMP und 200MB bei malloc)
+> >
+> >Wo koennen diese 60MB stecken?
+> 
+> Die 200 MB, ist das der Brutto- oder der Nettospeicherverbrauch?
+
+Ja... malloc sagt:
+Type                   Count      Space (bytes)
+sbrk requests:         8682         238907288 (a)
+large blocks:        108124         213173600 (b)
+large net avail:                    210146128
+large free blocks:     7033          25733684 (c)
+large wasted:             0                 0 (d)
+
+small chunks:          8494         139437504 (e)
+small blocks:       1827282         108436412 (f)
+small net avail:                     57272516
+small free blocks:   534412          30654132 (g)
+small wasted:         12668            336736 (h)
+unused from current chunk               10224 (i)
+
+malloc_increment_size: calls 82915148 success 2349051 total 1374548544
+
+Total storage:        (b+c+d)      238907284 should equal (a)  238907288
+Total small storage:  (f+g+h+i)    139437504 should equal (e)  139437504
+Total storage in use: (b-g-h-i)    182172508 net available:  127981140
+Total storage unused: (c+d+g+h+i)   56734776
+
+Wenn ich alle sizes in OBJ_DUMP zusammezaehle kommt heraus:
+123936128 bytes (27935 Objekte)
+
+status sagt:
+Actions:                          345295  8287080
+Shadows:                             600    14400
+Objects:                           30919 21673416 (0 swapped, 0 Kbytes)
+Arrays:                           317347 15402832
+Mappings:                          88468 12479996
+Prog blocks:                        8188 26939948 (0 swapped, 0 Kbytes)
+Memory reserved:                          7340032
+hash table overhead                         65536
+Strings malloced                  290016 13748636 + 6904640 overhead
+call out:                            600    21600 (current length 291)
+Regexp cache:                       7491  3888816
+Lexer structures                           216532
+Comm structures                            220784
+Other structures                           102353
+                                         --------
+Total:                                   117309697
+
+-> Differenz zwischen status und malloc/net-available.
 

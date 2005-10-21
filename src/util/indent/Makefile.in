@@ -48,7 +48,6 @@ all: indent
 
 indent: ${OBJS} ${LIBC}
 	${CC} -o $@ ${LDFLAGS} ${OBJS}
-	cp indent ${BINDIR}/indent
 
 indent.tar.Z: ${SRCS} Makefile ${MAN} ${HEADERS}
 	tar -c -z -f indent.tar.Z ${SRCS} Makefile ${MAN} ${HEADERS}

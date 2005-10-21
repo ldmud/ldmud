@@ -587,7 +587,7 @@ static struct
     svalue_t v;
       /* The target value:
        *   .v.type: T_CHAR_LVALUE
-       *   .v.u.string: the char to modify
+       *   .v.u.charp: the char to modify
        * or
        *   .v.type: T_{POINTER,STRING}_RANGE_LVALUE
        *   .v.u.{vec,string}: the target value holding the range
@@ -1447,7 +1447,7 @@ assign_svalue (svalue_t *dest, svalue_t *v)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-_transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
+inl_transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
 
 /* Move the value <v> into <dest>. If <v> is an unshared string, it
  * is made shared.
@@ -1471,16 +1471,16 @@ _transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
     {
         *dest = *v;
     }
-} /* _transfer_svalue_no_free() */
+} /* inl_transfer_svalue_no_free() */
 
 void transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
-{  _transfer_svalue_no_free(dest,v); }
+{  inl_transfer_svalue_no_free(dest,v); }
 
-#define transfer_svalue_no_free(dest,v) _transfer_svalue_no_free(dest,v)
+#define transfer_svalue_no_free(dest,v) inl_transfer_svalue_no_free(dest,v)
 
 /*-------------------------------------------------------------------------*/
-void
-transfer_svalue (svalue_t *dest, svalue_t *v)
+static INLINE void
+inl_transfer_svalue (svalue_t *dest, svalue_t *v)
 
 /* Move svalue <v> into svalue <dest>.
  *
@@ -1490,7 +1490,8 @@ transfer_svalue (svalue_t *dest, svalue_t *v)
  * If <dest> is a lvalue, <v> will be moved into the svalue referenced
  * to by <dest>. If <v> is a volatile string, it is made shared.
  *
- * F_VOID_ASSIGN uses a modified copy of this code (for speed reasons).
+ * TODO: Test if copying this function into F_VOID_ASSIGN case speeds up
+ * TODO:: the interpreter.
  */
 
 {
@@ -1611,7 +1612,12 @@ transfer_svalue (svalue_t *dest, svalue_t *v)
     {
         *dest = *v;
     }
-} /* transfer_svalue() */
+} /* inl_transfer_svalue() */
+
+void transfer_svalue (svalue_t *dest, svalue_t *v)
+{  inl_transfer_svalue(dest,v); }
+
+#define transfer_svalue(dest,v) inl_transfer_svalue(dest,v)
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -3356,7 +3362,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
             /* Add another reference to the string to keep it alive while
              * we use it.
              */
-            ref_mstring(vec->u.str);
+            (void)ref_mstring(vec->u.str);
 
             /* Drop the arguments */
             sp = i;
@@ -3486,7 +3492,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
             /* Add another reference to the string to keep it alive while
              * we use it.
              */
-            ref_mstring(vec->u.str);
+            (void)ref_mstring(vec->u.str);
 
             /* Build the protector */
             val = (struct protected_char_lvalue *)xalloc(sizeof *val);
@@ -3633,7 +3639,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
             /* Add another reference to the string to keep it alive while
              * we use it.
              */
-            ref_mstring(vec->u.str);
+            (void)ref_mstring(vec->u.str);
 
             /* Build the protector */
             val = (struct protected_char_lvalue *)xalloc(sizeof *val);
@@ -3713,7 +3719,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
             /* Add another reference to the string to keep it alive while
              * we use it.
              */
-            ref_mstring(vec->u.str);
+            (void)ref_mstring(vec->u.str);
 
             /* Build the protector */
             val = (struct protected_char_lvalue *)xalloc(sizeof *val);
@@ -3991,7 +3997,7 @@ protected_range_lvalue (int code, svalue_t *sp)
         /* Add another reference to the string to keep it alive while
          * we use it.
          */
-        ref_mstring(vec->u.str);
+        (void)ref_mstring(vec->u.str);
 
         lvalue_type = T_PROTECTED_STRING_RANGE_LVALUE;
         size = (mp_int)mstrsize(vec->u.str);
@@ -5047,7 +5053,7 @@ privilege_violation (string_t *what, svalue_t *where, svalue_t *sp)
     if (!svp || svp->type != T_NUMBER || svp->u.number < 0)
     {
         inter_sp = sp-3;
-        error("privilege violation: %s\n", what);
+        error("privilege violation: %s\n", get_txt(what));
         /* TODO: Print full args and types */
     }
 
@@ -5121,7 +5127,7 @@ privilege_violation4 ( string_t *what,    object_t *whom
     if (!svp || svp->type != T_NUMBER || svp->u.number < 0)
     {
         inter_sp = sp-4;
-        error("privilege violation : %s\n", what);
+        error("privilege violation : %s\n", get_txt(what));
         /* TODO: Print full args and types */
     }
 
@@ -5801,7 +5807,6 @@ remove_object_from_stack (object_t *ob)
     }
 }
 
-=== Adapted until here ===
 /*-------------------------------------------------------------------------*/
 Bool
 eval_instruction (bytecode_p first_instruction
@@ -5887,52 +5892,49 @@ eval_instruction (bytecode_p first_instruction
       /* Get and/or test the number of arguments.
        */
 
-#   define RAISE_ARG_ERROR(arg, expected, got) \
+#   define ARG_ERROR_TEMPL(fun, arg, expected, got) \
        do {\
            inter_sp = sp; \
            inter_pc = pc; \
-           raise_arg_error(instruction, arg, expected, got); \
+           fun(instruction, arg, expected, got); \
        }while(0)
 
+#   define RAISE_ARG_ERROR(arg, expected, got) \
+       ARG_ERROR_TEMPL(raise_arg_error, arg, expected, got)
+
 #   define BAD_ARG_ERROR(arg, expected, got) \
+       ARG_ERROR_TEMPL(raise_arg_error, arg, 1 << expected, got)
+
+#   define OP_ARG_ERROR_TEMPL(fun, arg, expected, got) \
        do {\
            inter_sp = sp; \
            inter_pc = pc; \
-           raise_arg_error(instruction, arg, 1 << expected, got); \
+           fun(arg, expected, got, pc, sp); \
        }while(0)
 
 #   define BAD_OP_ARG(arg, expected, got) \
-       do {\
-           inter_sp = sp; \
-           inter_pc = pc; \
-           op_arg_error(arg, expected, got, pc, sp); \
-       }while(0)
+       OP_ARG_ERROR_TEMPL(op_arg_error, arg, expected, got)
 
 #   define OP_ARG_ERROR(arg, expected, got) \
-       do {\
-           inter_sp = sp; \
-           inter_pc = pc; \
-           op_exp_arg_error(arg, expected, got, pc, sp); \
-       }while(0)
+       OP_ARG_ERROR_TEMPL(op_exp_arg_error, arg, expected, got)
 
-#   define TYPE_TEST1(arg, t) \
-        if ( (arg)->type != t ) code_arg_error(1, t, (arg)->type, pc, sp); else NOOP;
-#   define TYPE_TEST2(arg, t) \
-        if ( (arg)->type != t ) code_arg_error(2, t, (arg)->type, pc, sp); else NOOP;;
-#   define TYPE_TEST3(arg, t) \
-        if ( (arg)->type != t ) code_arg_error(3, t, (arg)->type, pc, sp); else NOOP;
-#   define TYPE_TEST4(arg, t) \
-        if ( (arg)->type != t ) code_arg_error(4, t, (arg)->type, pc, sp); else NOOP;
+#   define TYPE_TEST_TEMPL(num, arg, t) \
+        if ( (arg)->type != t ) code_arg_error(num, t, (arg)->type, pc, sp); else NOOP;
+#   define OP_TYPE_TEST_TEMPL(num, arg, t) \
+        if ( (arg)->type != t ) op_arg_error(num, t, (arg)->type, pc, sp); else NOOP;
+#   define EXP_TYPE_TEST_TEMPL(num, arg, t) \
+        if (!( (1 << (arg)->type) & (t)) ) op_exp_arg_error(num, (t), (arg)->type, pc, sp); else NOOP;
 
-#   define TYPE_TEST_LEFT(arg, t) \
-        if ( (arg)->type != t ) op_arg_error(1, t, (arg)->type, pc, sp); else NOOP;
-#   define TYPE_TEST_RIGHT(arg, t) \
-        if ( (arg)->type != t ) op_arg_error(2, t, (arg)->type, pc, sp); else NOOP;
+#   define TYPE_TEST1(arg, t) TYPE_TEST_TEMPL(1, arg, t)
+#   define TYPE_TEST2(arg, t) TYPE_TEST_TEMPL(2, arg, t)
+#   define TYPE_TEST3(arg, t) TYPE_TEST_TEMPL(3, arg, t)
+#   define TYPE_TEST4(arg, t) TYPE_TEST_TEMPL(4, arg, t)
 
-#   define TYPE_TEST_EXP_LEFT(arg, t) \
-        if (!( (1 << (arg)->type) & (t)) ) op_exp_arg_error(1, (t), (arg)->type, pc, sp); else NOOP;
-#   define TYPE_TEST_EXP_RIGHT(arg, t) \
-        if (!( (1 << (arg)->type) & (t)) ) op_exp_arg_error(2, (t), (arg)->type, pc, sp); else NOOP;
+#   define TYPE_TEST_LEFT(arg, t)  OP_TYPE_TEST_TEMPL(1, arg, t)
+#   define TYPE_TEST_RIGHT(arg, t) OP_TYPE_TEST_TEMPL(2, arg, t)
+
+#   define TYPE_TEST_EXP_LEFT(arg, t)  EXP_TYPE_TEST_TEMPL(1, arg, t)
+#   define TYPE_TEST_EXP_RIGHT(arg, t) EXP_TYPE_TEST_TEMPL(2, arg, t)
       /* Test the type of a certain argument.
        */
 
@@ -6093,7 +6095,7 @@ again:
 #ifdef F_ILLEGAL
     CASE(F_ILLEGAL);                /* --- illegal             --- */
         inter_pc = pc;
-        fatal("Illegal instruction\n");
+        fatal("'illegal' instruction encountered.\n");
         /* NOTREACHED */
 #endif /* F_ILLEGAL */
 
@@ -6108,7 +6110,7 @@ again:
          * Note: this instruction MUST be the first in the function.
          */
 
-        char *name;
+        string_t *name;
 
         /* pc has already been incremented */
         if (pc > current_prog->program && pc <= PROGRAM_END(*current_prog))
@@ -6120,11 +6122,11 @@ again:
         else
         {
             /* It is a vanished closure */
-            name = "Object the closure was bound to has been destructed";
-            /* TODO: WHich object? This can also happen as result of
+            name = STR_CL_OBJ_DESTR;
+            /* TODO: Which object? This can also happen as result of
              * TODO:: a replace_program */
         }
-        ERRORF(("Undefined function: %s\n", name));
+        ERRORF(("Undefined function: %s\n", get_txt(name)));
       }
 
     CASE(F_EFUN0);                  /* --- efun0 <code>        --- */
@@ -6206,7 +6208,7 @@ again:
     {
         /* Call the tabled efun EFUN3_OFFSET + <code>, where <code> is
          * a uint8.
-         * The efun takes three or more arguments.
+         * The efun takes three arguments.
          */
 
         int code;
@@ -6234,7 +6236,7 @@ again:
     {
         /* Call the tabled efun EFUN4_OFFSET + <code>, where <code> is
          * a uint8.
-         * The efun takes four or more arguments.
+         * The efun takes four arguments.
          */
 
         int code;
@@ -6262,7 +6264,8 @@ again:
     {
         /* Call the tabled efun EFUNV_OFFSET + <code>, where <code> is
          * a uint8, with uint8 <nargs> argumentson the stack.
-         * The efun takes three arguments.
+         * The number of arguments accepted by the efun is given by the
+         * .min_arg and .max_arg entries in the instrs[] table.
          */
 
         int code;
@@ -6322,7 +6325,7 @@ again:
         unsigned short string_number;
 
         LOAD_SHORT(string_number, pc);
-        push_ref_old_string(sp, current_strings[string_number]);
+        push_ref_string(sp, current_strings[string_number]);
         break;
     }
 
@@ -6331,7 +6334,7 @@ again:
         /* Push the string current_strings[0x3<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_ref_old_string(sp, current_strings[LOAD_UINT8(pc)+0x300]);
+        push_ref_string(sp, current_strings[LOAD_UINT8(pc)+0x300]);
         break;
     }
 
@@ -6340,7 +6343,7 @@ again:
         /* Push the string current_strings[0x2<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_ref_old_string(sp, current_strings[LOAD_UINT8(pc)+0x200]);
+        push_ref_string(sp, current_strings[LOAD_UINT8(pc)+0x200]);
         break;
     }
 
@@ -6349,7 +6352,7 @@ again:
         /* Push the string current_strings[0x1<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_ref_old_string(sp, current_strings[LOAD_UINT8(pc)+0x100]);
+        push_ref_string(sp, current_strings[LOAD_UINT8(pc)+0x100]);
         break;
     }
 
@@ -6358,7 +6361,7 @@ again:
         /* Push the string current_strings[0x0<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_ref_old_string(sp, current_strings[LOAD_UINT8(pc)]);
+        push_ref_string(sp, current_strings[LOAD_UINT8(pc)]);
         break;
     }
 
@@ -6495,7 +6498,6 @@ again:
          * <ix> is a uint16, stored low byte first. <num> is a uint8.
          */
 
-        char *str;
         /* TODO: uint16 */ unsigned short string_number;
 
         LOAD_SHORT(string_number, pc);
@@ -6503,7 +6505,7 @@ again:
         sp++;
         sp->type = T_SYMBOL;
         sp->x.quotes = LOAD_UINT8(pc);
-        sp->u.string = str = ref_string(current_strings[string_number]);
+        sp->u.str = ref_mstring(current_strings[string_number]);
         break;
     }
 
@@ -6651,7 +6653,7 @@ again:
          *                         of <len> (b1, bits 1..0).
          *  l[]: range lookup table: each <len> bytes, network byte order
          *       (numeric switch only)
-         *  v[]: case values, char* or p_int, host byte order
+         *  v[]: case values, string_t* or p_int, host byte order
          *  o[]: case offsets : each <len> bytes, network byte order
          *
          * The case value table v[] holds (sorted numerically) all values
@@ -6768,8 +6770,6 @@ again:
          *
          * with the code taking into account that the _variable_ tablen
          * already comes as 'tablen * sizeof(char*)'.
-         *
-         * TODO: This code assumes sizeof(char*) == 4.
          */
         if (len > 1)
         {
@@ -6853,26 +6853,18 @@ again:
                  */
                 s = (mp_int)ZERO_AS_STR_CASE_LABEL;
             }
-            else if ( sp->type == T_OLD_STRING )
+            else if ( sp->type == T_STRING )
             {
                 /* The case strings in the program shared, so whatever
                  * string we get on the stack, it must at least have
                  * a shared twin to be sensible. Get the address of
                  * that twin.
                  */
-                switch(sp->x.string_type)
-                {
-                case STRING_SHARED:
-                    s = (mp_int)sp->u.string;
-                    break;
-                default:
-                    s = (mp_int)findstring(sp->u.string);
-                    break;
-                }
+                s = (mp_int)find_tabled(sp->u.str);
             }
             else
             {
-                BAD_ARG_ERROR(1, T_OLD_STRING, sp->type);
+                BAD_ARG_ERROR(1, T_STRING, sp->type);
                 /* No string - bad wizard! */
             }
         }
@@ -7197,7 +7189,7 @@ again:
         int i;
 
         num_arg = LOAD_UINT8(pc);
-          /* GET_NUM_ARG doesn't work here. Trust me. */
+          /* GET_NUM_ARG doesn't work here. Trust me on that. */
         inter_sp = sp;
         inter_pc = pc;
         i = e_sscanf(num_arg, sp);
@@ -7228,22 +7220,22 @@ again:
         num_arg = LOAD_UINT8(pc);
           /* GET_NUM_ARG doesn't work here either. */
         arg = sp - num_arg + 1;
-        if (arg[0].type != T_OLD_STRING)
-            BAD_ARG_ERROR(1, T_OLD_STRING, arg[0].type);
+        if (arg[0].type != T_STRING)
+            BAD_ARG_ERROR(1, T_STRING, arg[0].type);
         if (arg[1].type != T_OBJECT && arg[1].type != T_POINTER)
             RAISE_ARG_ERROR(2, TF_OBJECT|TF_POINTER, arg[1].type);
-        if (arg[2].type != T_OLD_STRING)
-            BAD_ARG_ERROR(3, T_OLD_STRING, arg[2].type);
+        if (arg[2].type != T_STRING)
+            BAD_ARG_ERROR(3, T_STRING, arg[2].type);
         if (arg[1].type == T_POINTER)
             check_for_destr(arg[1].u.vec);
 
         inter_sp = sp;
         inter_pc = pc;
         if (compat_mode)
-            i = e_old_parse_command(arg[0].u.string, &arg[1], arg[2].u.string
+            i = e_old_parse_command(arg[0].u.str, &arg[1], arg[2].u.str
                                    , &arg[3], num_arg-3);
         else
-            i = e_parse_command(arg[0].u.string, &arg[1], arg[2].u.string
+            i = e_parse_command(arg[0].u.str, &arg[1], arg[2].u.str
                                , &arg[3], num_arg-3);
         pop_n_elems(num_arg);        /* Get rid of all arguments */
         push_number(sp, i ? 1 : 0);      /* Push the result value */
@@ -7302,7 +7294,9 @@ again:
         inter_fp = fp;
 
         /* Perform the catch() */
-        if (!catch_instruction(instruction, offset, (volatile svalue_t ** volatile) &inter_sp, inter_pc, inter_fp))
+        if (!catch_instruction(instruction, offset
+                              , (volatile svalue_t ** volatile) &inter_sp
+                              , inter_pc, inter_fp))
             return MY_FALSE; /* Guarded code terminated with 'return' itself */
 
         /* Restore the important variables */
@@ -7331,12 +7325,7 @@ again:
         svalue_t *svp;
 
         /* Get the designated value */
-#ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            ERRORF(("Bad argument to ++: got %s, expected lvalue.\n"
-                   , typename(sp->type)
-                   ));
-#endif
+        TYPE_TEST1(sp, T_LVALUE);
         svp = sp->u.lvalue;
 
         /* Now increment where we can */
@@ -7358,11 +7347,7 @@ again:
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            (*svp->u.string)++;
-            /* TODO: This might shorten the string if *(svp->u.string) is 0xff.
-             * TODO:: And since u.string is 'signed char', overflow behaviour
-             * TODO:: isn't even defined.
-             */
+            (*svp->u.charp)++;
             sp--;
             break;
         }
@@ -7375,7 +7360,7 @@ again:
             break;
         }
 
-        ERRORF(("Bad argument to ++: got %s, expected numeric type.\n"
+        ERRORF(("Bad arg to ++: got '%s', expected numeric type.\n"
                , typename(svp->type)
                ));
         break;
@@ -7393,12 +7378,7 @@ again:
         svalue_t *svp;
 
         /* Get the designated value */
-#ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            ERRORF(("Bad argument to --: got %s, expected lvalue.\n"
-                   , typename(sp->type)
-                   ));
-#endif
+        TYPE_TEST1(sp, T_LVALUE);
         svp = sp->u.lvalue;
 
         /* Now decrement where we can */
@@ -7420,11 +7400,7 @@ again:
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            (*svp->u.string)--;
-            /* TODO: This might shorten the string if *(svp->u.string) is 0x01.
-             * TODO:: And since u.string is 'signed char', underflow behaviour
-             * TODO:: isn't even defined.
-             */
+            (*svp->u.charp)--;
             sp--;
             break;
         }
@@ -7437,7 +7413,7 @@ again:
             break;
         }
 
-        ERRORF(("Bad argument to --: got %s, expected numeric type.\n"
+        ERRORF(("Bad arg to --: got '%s', expected numeric type.\n"
                , typename(svp->type)
                ));
         break;
@@ -7456,12 +7432,7 @@ again:
         svalue_t *svp;
 
         /* Get the designated value */
-#ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            ERRORF(("Bad argument to ++: got %s, expected lvalue.\n"
-                   , typename(sp->type)
-                   ));
-#endif
+        TYPE_TEST1(sp, T_LVALUE);
         svp = sp->u.lvalue;
 
         /* Do the push and increment */
@@ -7484,7 +7455,7 @@ again:
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            put_number(sp,  (*svp->u.string)++ );
+            put_number(sp,  (*svp->u.charp)++ );
             break;
         }
         else if (svp->type == T_LVALUE
@@ -7495,7 +7466,7 @@ again:
             break;
         }
 
-        ERRORF(("Bad argument to ++: got %s, expected numeric type.\n"
+        ERRORF(("Bad arg to ++: got '%s', expected numeric type.\n"
                , typename(svp->type)
                ));
         break;
@@ -7514,12 +7485,7 @@ again:
         svalue_t *svp;
 
         /* Get the designated value */
-#ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            ERRORF(("Bad argument to --: got %s, expected lvalue.\n"
-                   , typename(sp->type)
-                   ));
-#endif
+        TYPE_TEST1(sp, T_LVALUE);
         svp = sp->u.lvalue;
 
         /* Do the push and decrement */
@@ -7542,7 +7508,7 @@ again:
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            put_number(sp,  (*svp->u.string)-- );
+            put_number(sp,  (*svp->u.charp)-- );
             break;
         }
         else if (svp->type == T_LVALUE
@@ -7553,7 +7519,7 @@ again:
             break;
         }
 
-        ERRORF(("Bad argument to --: got %s, expected numeric type.\n"
+        ERRORF(("Bad arg to --: got '%s', expected numeric type.\n"
                , typename(svp->type)
                ));
         break;
@@ -7571,12 +7537,7 @@ again:
         svalue_t *svp;
 
         /* Get the designated value */
-#ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            ERRORF(("Bad argument to ++: got %s, expected lvalue.\n"
-                   , typename(sp->type)
-                   ));
-#endif
+        TYPE_TEST1(sp, T_LVALUE);
         svp = sp->u.lvalue;
 
         /* Do the increment and push */
@@ -7598,7 +7559,7 @@ again:
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            put_number(sp,  ++(*svp->u.string) );
+            put_number(sp,  ++(*svp->u.charp) );
             break;
         }
         else if (svp->type == T_LVALUE
@@ -7609,7 +7570,7 @@ again:
             break;
         }
 
-        ERRORF(("Bad argument to ++: got %s, expected numeric type.\n"
+        ERRORF(("Bad arg to ++: got '%s', expected numeric type.\n"
                , typename(svp->type)
                ));
         break;
@@ -7627,12 +7588,7 @@ again:
         svalue_t *svp;
 
         /* Get the designated value */
-#ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            ERRORF(("Bad argument to --: got %s, expected lvalue.\n"
-                   , typename(sp->type)
-                   ));
-#endif
+        TYPE_TEST1(sp, T_LVALUE);
         svp = sp->u.lvalue;
 
         /* Do the decrement and push */
@@ -7654,7 +7610,7 @@ again:
         }
         else if (svp->type == T_CHAR_LVALUE)
         {
-            put_number(sp,  --(*svp->u.string) );
+            put_number(sp,  --(*svp->u.charp) );
             break;
         }
         else if (svp->type == T_LVALUE
@@ -7665,7 +7621,7 @@ again:
             break;
         }
 
-        ERRORF(("Bad argument to --: got %s, expected numeric type.\n"
+        ERRORF(("Bad arg to --: got '%s', expected numeric type.\n"
                , typename(svp->type)
                ));
         break;
@@ -7728,8 +7684,9 @@ again:
         /* Get the designated lvalue */
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
-            fatal("Bad argument to F_ASSIGN: not a lvalue\n");
-            /* TODO: Give type and value */
+            FATALF(("Bad left arg to F_ASSIGN s: got '%s', expected 'lvalue'.\n"
+                   , typename(sp->type)
+                   ));
 #endif
         dest = sp->u.lvalue;
         assign_svalue(dest, sp-1);
@@ -7742,164 +7699,18 @@ again:
         /* Assign the value sp[-1] to the value designated by lvalue sp[0],
          * then remove both values from the stack.
          *
-         * VOID_ASSIGNs occur pretty often, so the implementation uses an
-         * adopted copy of the transfer_svalue() code.
-         *
          * Make sure that complex destinations like arrays are not freed
          * before the assignment is complete - see the comments to
          * assign_svalue().
          */
 
-        svalue_t *dest;
-
-        /* Get the designated value */
 #ifdef DEBUG
         if (sp->type != T_LVALUE)
-            fatal("Bad argument to F_VOID_ASSIGN: not a lvalue\n");
-            /* TODO: Give type and value */
+            FATALF(("Bad left arg to F_VOID_ASSIGN s: got '%s', expected 'lvalue'.\n"
+                   , typename(sp->type)
+                   ));
 #endif
-        dest = sp->u.lvalue;
-
-        /* Free the destination svalue so that transfer_svalue_no_free()
-         * can be used. However, if the dest is a lvalue, a pointer or
-         * mapping, the assignment takes place right here and the next
-         * instruction will be executed by means of a 'goto again'.
-         */
-        switch(dest->type)
-        {
-        case T_OLD_STRING:
-            switch(dest->x.string_type)
-            {
-            case STRING_MALLOC:
-                xfree(dest->u.string);
-                break;
-            case STRING_SHARED:
-                free_string(dest->u.string);
-                break;
-            }
-            break;
-
-        case T_OBJECT:
-          {
-            object_t *ob = dest->u.ob;
-            free_object(ob, "void_assign");
-            break;
-          }
-
-        case T_SYMBOL:
-            free_string(dest->u.string);
-            break;
-
-        case T_CLOSURE:
-            free_closure(dest);
-            break;
-
-
-        /* The cases below all assign right in the case block */
-
-        case T_QUOTED_ARRAY:
-        case T_POINTER:
-          {
-            vector_t *v = dest->u.vec;
-
-            transfer_svalue_no_free(dest, sp-1);
-            sp -= 2;
-            free_array(v);
-            goto again;
-          }
-
-        case T_MAPPING:
-          {
-            mapping_t *m = dest->u.map;
-
-            transfer_svalue_no_free(dest, sp-1);
-            sp -= 2;
-            free_mapping(m);
-            goto again;
-          }
-
-        case T_CHAR_LVALUE:
-          {
-            if (sp[-1].type == T_NUMBER)
-            {
-                *dest->u.string = (char)sp[-1].u.number;
-            }
-            else
-            {
-                free_svalue(sp-1);
-            }
-            sp -= 2;
-            goto again;
-          }
-
-        /* the assignment class of operators always gets 'fresh' lvalues.
-         * Thus, if we encounter a protected lvalue of any flavour, this is
-         * due to a dereference of a reference stored in the original
-         * lvalue, and the protected lvalue must not be freed.
-         */
-
-        case T_PROTECTED_CHAR_LVALUE:
-          {
-            struct protected_char_lvalue *p;
-
-            p = (struct protected_char_lvalue *)dest;
-            if (p->lvalue->type == T_OLD_STRING
-             && p->lvalue->u.string == p->start)
-            {
-                if (sp[-1].type == T_NUMBER)
-                {
-                    *p->v.u.string = (char)sp[-1].u.number;
-                    sp -= 2;
-                    goto again;
-                }
-            }
-            sp--;
-            pop_stack();
-            goto again;
-          }
-
-        case T_POINTER_RANGE_LVALUE:
-            transfer_pointer_range(sp-1);
-            sp -= 2;
-            goto again;
-
-        case T_PROTECTED_POINTER_RANGE_LVALUE:
-            transfer_protected_pointer_range(
-              (struct protected_range_lvalue *)dest, sp-1
-            );
-            sp -= 2;
-            goto again;
-
-        case T_STRING_RANGE_LVALUE:
-            inter_sp = sp;
-            assign_string_range(sp-1, MY_TRUE);
-            sp -= 2;
-            goto again;
-
-        case T_PROTECTED_STRING_RANGE_LVALUE:
-            inter_sp = sp;
-            assign_protected_string_range(
-              (struct protected_range_lvalue *)dest, sp-1, MY_TRUE
-            );
-            sp -= 2;
-            goto again;
-
-        case T_LVALUE:
-        case T_PROTECTED_LVALUE:
-          {
-            /* This may be a chain of LVALUEs - we might as well
-             * call transfer_svalue() to deal with it
-             */
-            transfer_svalue(dest->u.lvalue, sp-1);
-            sp -= 2;
-            goto again;
-          }
-        }
-
-        /* Nothing complicated: dest was just freed, now transfer
-         * the data.
-         */
-        transfer_svalue_no_free(dest, sp-1);
+        transfer_svalue(sp->u.lvalue, sp-1);
         sp -= 2;
         break;
     }
@@ -7921,107 +7732,110 @@ again:
         switch ( sp[-1].type )
         {
 
-        case T_OLD_STRING:
+        case T_STRING:
             inter_pc = pc;
             inter_sp = sp;
             switch ( sp->type )
             {
-            case T_OLD_STRING:
+            case T_STRING:
               {
-                char *res;
-                size_t l = _svalue_strlen(sp-1);
-                size_t l2 = _svalue_strlen(sp);
+                string_t *left, *right, *res;
 
-                DYN_STRING_COST(l+l2)
-                res = xalloc(l + l2 + 1);
+                left = (sp-1)->u.str;
+                right = sp->u.str;
+
+                DYN_STRING_COST(mstrsize(left) + mstrsize(right))
+                res = mstr_add(left, right);
                 if (!res)
                     ERRORF(("Out of memory (%lu bytes)\n"
-                           , (unsigned long)(l+l2+1)));
-                strcpy(res, (sp-1)->u.string);
-                strcpy(res+l, sp->u.string);
+                           , (unsigned long) mstrsize(left) + mstrsize(right)
+                           ));
                 free_string_svalue(sp);
                 sp--;
                 free_string_svalue(sp);
-                put_malloced_string(sp, res);
+                put_string(sp, res);
                 break;
               }
 
             case T_NUMBER:
               {
+                string_t *left, *res;
                 char buff[80];
-                char *res;
-                size_t len1;
+                size_t len;
 
+                left = (sp-1)->u.str;
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%ld", sp->u.number);
                 if (buff[sizeof(buff)-1] != '\0')
                     FATAL("Buffer overflow in F_ADD: int number too big.\n");
-                res = xalloc((len1 = svalue_strlen(sp-1)) + strlen(buff) + 1);
+                len = mstrsize(left)+strlen(buff);
+                DYN_STRING_COST(len)
+                res = mstr_add_txt(left, buff, strlen(buff));
                 if (!res)
                     ERRORF(("Out of memory (%lu bytes)\n"
-                           , (unsigned long)(len1+strlen(buff)+1)));
-                strcpy(res, (sp-1)->u.string);
-                strcpy(res+len1, buff);
+                           , (unsigned long) len
+                           ));
                 pop_n_elems(2);
-                push_malloced_string(sp, res);
-                DYN_STRING_COST(len1)
+                push_string(sp, res);
                 break;
               }
 
             case T_FLOAT:
               {
                 char buff[160];
-                char *res;
-                size_t len1;
+                string_t *left, *res;
+                size_t len;
 
+                left = (sp-1)->u.str;
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%g", READ_DOUBLE( sp ) );
                 if (buff[sizeof(buff)-1] != '\0')
                     FATAL("Buffer overflow in F_ADD: float number too big.\n");
-                res = xalloc((len1 = svalue_strlen(sp-1)) + strlen(buff) + 1);
+                len = mstrsize(left)+strlen(buff);
+                DYN_STRING_COST(len)
+                res = mstr_add_txt(left, buff, strlen(buff));
                 if (!res)
                     ERRORF(("Out of memory (%lu bytes)\n"
-                           , (unsigned long)(len1+strlen(buff)+1)));
-                strcpy(res, (sp-1)->u.string);
-                strcpy(res+len1, buff);
+                           , (unsigned long) len
+                           ));
                 sp--;
                 free_string_svalue(sp);
-                put_malloced_string(sp, res);
-                DYN_STRING_COST(len1)
+                put_string(sp, res);
                 break;
               }
 
             default:
-                OP_ARG_ERROR(2, TF_OLD_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
             break;
-            /* End of case T_OLD_STRING */
+            /* End of case T_STRING */
 
           case T_NUMBER:
             switch ( sp->type )
             {
-            case T_OLD_STRING:
+            case T_STRING:
               {
-                char buff[80], *res;
-                size_t len1;
+                char buff[80];
+                string_t *right, *res;
+                size_t len;
 
+                right = sp->u.str;
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%ld", (sp-1)->u.number);
                 if (buff[sizeof(buff)-1] != '\0')
                     FATAL("Buffer overflow in F_ADD: int number too big.\n");
-                inter_pc = pc;
-                inter_sp = sp;
-                res = xalloc(svalue_strlen(sp) + (len1 = strlen(buff)) + 1);
+                len = mstrsize(right)+strlen(buff);
+                DYN_STRING_COST(len)
+                res = mstr_add_to_txt(buff, strlen(buff), right);
                 if (!res)
                     ERRORF(("Out of memory (%lu bytes)\n"
-                           , (unsigned long)(len1+svalue_strlen(sp)+1)));
-                strcpy(res, buff);
-                strcpy(res+len1, sp->u.string);
+                           , (unsigned long) len
+                           ));
                 free_string_svalue(sp);
                 sp--;
                 /* Overwrite the number at sp */
-                put_malloced_string(sp, res);
+                put_string(sp, res);
                 break;
               }
 
@@ -8047,7 +7861,7 @@ again:
               }
 
             default:
-                OP_ARG_ERROR(2, TF_OLD_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
             break;
@@ -8072,27 +7886,31 @@ again:
                 sp--;
                 break;
             }
-            if (sp->type == T_OLD_STRING)
+            if (sp->type == T_STRING)
             {
                 char buff[160];
-                char *res;
-                size_t len1;
+                string_t *right, *res;
+                size_t len;
 
+                right = sp->u.str;
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%g", READ_DOUBLE(sp-1) );
                 if (buff[sizeof(buff)-1] != '\0')
                     FATAL("Buffer overflow in F_ADD: float number too big.\n");
-                res = xalloc(svalue_strlen(sp) + (len1 = strlen(buff)) + 1);
+                len = mstrsize(right)+strlen(buff);
+                DYN_STRING_COST(len)
+                res = mstr_add_to_txt(buff, strlen(buff), right);
                 if (!res)
-                    error("Out of memory\n");
-                strcpy(res, buff);
-                strcpy(res+len1, (sp)->u.string);
+                    ERRORF(("Out of memory (%lu bytes)\n"
+                           , (unsigned long) len
+                           ));
                 free_string_svalue(sp);
                 sp--;
-                put_malloced_string(sp, res);
+                /* Overwrite the number at sp */
+                put_string(sp, res);
                 break;
             }
-            OP_ARG_ERROR(2, TF_OLD_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+            OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
             /* NOTREACHED */
           }
           /* End of case T_FLOAT */
@@ -8132,13 +7950,14 @@ again:
           }
 
         default:
-            OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_OLD_STRING|TF_FLOAT|TF_NUMBER
+            OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_STRING|TF_FLOAT|TF_NUMBER
                           , sp[-1].type);
             /* NOTREACHED */
         }
 
         break;
 
+=== Adapted until here ===
     CASE(F_SUBTRACT);               /* --- subtract            --- */
     {
         /* Subtract sp[0] from sp[-1] (the order is important), pop both
@@ -12662,6 +12481,12 @@ again:
 #   undef TYPE_TEST_EXP_LEFT
 #   undef TYPE_TEST_EXP_RIGHT
 #   undef CASE
+#   undef ARG_ERROR_TEMPL
+#   undef OP_ARG_ERROR_TEMPL
+#   undef TYPE_TEST_TEMPL
+#   undef OP_TYPE_TEST_TEMPL
+#   undef EXP_TYPE_TEST_TEMPL
+
 } /* eval_instruction() */
 
 /*-------------------------------------------------------------------------*/

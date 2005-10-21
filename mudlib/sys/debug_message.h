@@ -8,4 +8,11 @@
 #define DMSG_STDERR  (1 << 1)  /* log to stderr */
 #define DMSG_LOGFILE (1 << 2)  /* log to .debug.log */
 
+#define DMSG_STAMP   (1 << 3)  /* Prepend the timestamp */
+
+/* Derived macros */
+
+#define DMSG_TARGET (DMSG_STDOUT|DMSG_STDERR|DMSG_LOGFILE)
+  /* Mask for all target bitflags */
+
 #endif /* _DEBUG_MESSAGE_H_ */

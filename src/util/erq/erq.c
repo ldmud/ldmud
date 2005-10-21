@@ -836,6 +836,44 @@ start_subserver (long server_num, long seed)
             abort ();
         }
 
+        /* Look for data from our child.
+         * We do this before we wait for a died child to make sure that
+         * all the data produced by the child is received by us.
+         */
+
+        if (child)
+        {
+            int n = 3;
+            do {
+                if (FD_ISSET(child_sockets[n], &readfds))
+                {
+                    do
+                        num = read(child_sockets[n], buf+14, MAX_REPLY - 13);
+                    while (num == -1 && errno == EINTR);
+
+                    if (num <= 0)
+                    {
+                        perror("read from spawned child\n");
+                    }
+                    else
+                    {
+#ifdef DEBUG
+                        fprintf(stderr,
+                          "%s %d bytes from socket no. %d\n", time_stamp(), num, n);
+                        fprintf(stderr,
+                          "%s '%.*s'\n", time_stamp(), num, buf+14);
+#endif
+                        write_32(buf, (num += 14) - 1);
+                        write_32(buf+4, ERQ_HANDLE_KEEP_HANDLE);
+                        buf[8] = CHILD_LISTEN;
+                        memcpy(buf+9, child_handle, 4);
+                        buf[13] = n == 1 ? ERQ_STDOUT : ERQ_STDERR;
+                        write1(buf, num);
+                    }
+                }
+            } while ((n-=2) > 0);
+        }
+
         /* Check for zombie children and wait for them */
 
 #ifdef HAVE_WAITPID
@@ -903,41 +941,6 @@ start_subserver (long server_num, long seed)
             childs_waited_for++;
         } /* wait for zombies */
         
-        if (child)
-        {
-            /* Look for data from our child */
-
-            int n = 3;
-            do {
-                if (FD_ISSET(child_sockets[n], &readfds))
-                {
-                    do
-                        num = read(child_sockets[n], buf+14, MAX_REPLY - 13);
-                    while (num == -1 && errno == EINTR);
-
-                    if (num <= 0)
-                    {
-                        perror("read from spawned child\n");
-                    }
-                    else
-                    {
-#ifdef DEBUG
-                        fprintf(stderr,
-                          "%s %d bytes from socket no. %d\n", time_stamp(), num, n);
-                        fprintf(stderr,
-                          "%s '%.*s'\n", time_stamp(), num, buf+14);
-#endif
-                        write_32(buf, (num += 14) - 1);
-                        write_32(buf+4, ERQ_HANDLE_KEEP_HANDLE);
-                        buf[8] = CHILD_LISTEN;
-                        memcpy(buf+9, child_handle, 4);
-                        buf[13] = n == 1 ? ERQ_STDOUT : ERQ_STDERR;
-                        write1(buf, num);
-                    }
-                }
-            } while ((n-=2) > 0);
-        }
-
         if (!FD_ISSET(0, &readfds))
             continue;
 

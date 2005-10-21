@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-21-Dec-2000 (Lars Duening) -- Development Release 3.3
+19-Jan-2001 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -15,9 +15,11 @@ For a detailed list of all changes see the file CHANGELOG.
            supported.
        + ctime(): Accepts the output of new efun utime() as well.
        + debug_message(): New second argument determines where to
-            log the message.
+            log the message, and if to prepend a timestamp.
        + debug_info(): New argument DINFO_TRACE to return the current
             call stack.
+       + exec(): If this_interactive() points to one of the involved
+            objects, it is switched over as well, like this_player().
        + filter(), map(), sort_array(), walk_mapping(): Protected lvalues
             (e.g. &(i[0])) are not allowed as callback parameters.
        + object_info(): OINFO_MEMORY also returns the program flags
@@ -86,10 +88,13 @@ For a detailed list of all changes see the file CHANGELOG.
            size.
 
     - Other Changes:
-       +  New driver option '--pidfile <filename>' to write the pid of the
+       + New driver option '--pidfile <filename>' to write the pid of the
           driver process into a file.
+       + New driver option '--erq <filename>' to choose a different name
+          for the ERQ executable (default is 'erq').
        + The driver mode (plain or compat) can be selected with a commandline
            option ('--no-compat' resp. '--compat').
+       + Removed a couple of fatal race-conditions in the xerq.
 
 
 20-Aug-2000 (Lars Duening) -- Release 3.2.8

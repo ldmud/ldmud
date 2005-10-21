@@ -23,6 +23,7 @@ SLASH           "/"
 NO_PROG_TRACE   "No program to trace."
 NO_TRACE        "No trace."
 NOLOG           "nolog"
+CL_OBJ_DESTR    "Object the closure was bound to has been destructed"
 
     /* Privilege violation names */
 

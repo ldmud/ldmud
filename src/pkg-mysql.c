@@ -29,6 +29,7 @@
 
 #include <mysql/mysql.h>
 #include <mysql/errmsg.h>
+#include <mysql/mysql_version.h>
 
 #include "pkg-mysql.h"
 
@@ -436,8 +437,12 @@ f_db_exec (svalue_t *sp)
     }
 
     /* If we used a select-statement, how many columns are returned? */
-    
-    if ( mysql_field_count(dat->mysql_dat) )
+
+#ifdef MYSQL_VERSION_ID < 32224
+    if ( mysql_num_fields(dat->mysql_dat) )
+#else
+	if ( mysql_field_count(dat->mysql_dat) )
+#endif
     {
         /* Try to initiate a row-by-row transfer */
         if ( !(dat->mysql_result = mysql_use_result(dat->mysql_dat)) )

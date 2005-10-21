@@ -187,3 +187,4 @@ f-000918: Add a path spec to --use-mysql on configuration.
 Other
 --------------------------------------------------------------------------
 p-000630: Morgengrauen diffs
+f-010115: Improvements to smalloc.

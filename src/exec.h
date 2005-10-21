@@ -507,7 +507,7 @@ typedef fulltype_t funflag_t;  /* Function flags */
  * and information about arguments and types:
  *
  * struct fun_hdr {
- *     shared string_t * name_of_function; (4 Bytes)
+ *     shared string_t * name_of_function;   (4 Bytes)
  *     byte              return_type;        (1 Byte)
  * --> byte              number_formal_args; (1 Byte)
  *         Bit 7: set if the function has a 'varargs' argument

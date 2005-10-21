@@ -1098,25 +1098,46 @@ f_debug_message (svalue_t *sp)
 /* EFUN debug_message()
  *
  *   debug_message(string text)
- *   debug_message(string text, int where)
+ *   debug_message(string text, int flags)
  *
  * Print the <text> to stdout, stderr, and/or the <host>.debug.log file.
  *
- * The parameter <where> is a combination of bitflags determining the
- * target: DMSG_STDOUT, DMSG_STDERR and DMSG_LOGOUT. If <where> is
- * given as 0 or left out, it defaults to DMSG_STDOUT | DMSG_LOGFILE.
+ * The parameter <flags> is a combination of bitflags determining the
+ * target and the mode of writing.
+ * 
+ * The target flags are: DMSG_STDOUT, DMSG_STDERR and DMSG_LOGFILE.
+ * If the flag DMSG_STAMP is given, the message is prepended with the
+ * current date and time in the format 'YYYY.MM.DD HH:MM:SS '.
+ *
+ * If <flags> is given as 0, left out, or contains no target
+ * definition, debug_message() will print to stdout and to the logfile.
  */
 
 {
-    if ((sp->u.number & ~(DMSG_STDOUT|DMSG_STDERR|DMSG_LOGFILE)) != 0)
-        error("Argument 2 to debug_message() out of range: %ld, expected 0..7\n"
+    if ((sp->u.number & ~(DMSG_STDOUT|DMSG_STDERR|DMSG_LOGFILE|DMSG_STAMP)) != 0)
+        error("Argument 2 to debug_message() out of range: %ld, expected 0..15\n"
              , (long)sp->u.number);
-    if (!sp->u.number || (sp->u.number & DMSG_STDOUT))
-        printf("%s", get_txt((sp-1)->u.str));
+    if (!(sp->u.number & DMSG_TARGET) || (sp->u.number & DMSG_STDOUT))
+    {
+        if (sp->u.number & DMSG_STAMP)
+            printf("%s %s", time_stamp(), get_txt((sp-1)->u.str));
+        else
+            printf("%s", get_txt((sp-1)->u.str));
+    }
     if (sp->u.number & DMSG_STDERR)
-        fprintf(stderr, "%s", get_txt((sp-1)->u.str));
-    if (!sp->u.number || (sp->u.number & DMSG_LOGFILE))
-        debug_message("%s", get_txt((sp-1)->u.str));
+    {
+        if (sp->u.number & DMSG_STAMP)
+            fprintf(stderr, "%s %s", time_stamp(), get_txt((sp-1)->u.str));
+        else
+            fprintf(stderr, "%s", get_txt((sp-1)->u.str));
+    }
+    if (!(sp->u.number & DMSG_TARGET) || (sp->u.number & DMSG_LOGFILE))
+    {
+        if (sp->u.number & DMSG_STAMP)
+            debug_message("%s %s", time_stamp(), get_txt((sp-1)->u.str));
+        else
+            debug_message("%s", get_txt((sp-1)->u.str));
+    }
     free_svalue(sp);
     free_svalue(sp-1);
     return sp - 2;

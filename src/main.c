@@ -111,6 +111,8 @@ int numports = 0;  /* Number of specified ports */
 int udp_port = CATCH_UDP_PORT;  /* Port number for UDP */
 #endif
 
+char *erq_file = NULL;        /* Name of the erq executable, or NULL */
+
 char *mud_lib;                /* Path to the mudlib */
 char master_name[100] = "";   /* Name of the master object */
 
@@ -209,6 +211,16 @@ main (int argc, char **argv)
     if (getargs(argc, argv, firstscan))
       exit(1);
 
+    /* Change to the mudlib dir early so that the debug.log file
+     * is opened in the right place.
+     * If a mudlib dir has been given by command option, we are already
+     * in it.
+     */
+    if (!new_mudlib && chdir(MUD_LIB) == -1) {
+        printf("%s Bad mudlib directory: %s\n", time_stamp(), MUD_LIB);
+        exit(1);
+    }
+
     printf("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
           , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
           );
@@ -261,10 +273,6 @@ main (int argc, char **argv)
     reset_machine(MY_TRUE); /* Cold reset the machine */
     RESET_LIMITS;
     CLEAR_EVAL_COST;
-    if (!new_mudlib && chdir(MUD_LIB) == -1) {
-        printf("%s Bad mudlib directory: %s\n", time_stamp(), MUD_LIB);
-        exit(1);
-    }
     {
         char path[MAXPATHLEN+1];
 #ifdef HAVE_GETCWD
@@ -693,6 +701,7 @@ typedef enum OptNumber {
  , cNoCompat      /* --no-compat          */
  , cDebug         /* --debug              */
  , cDefine        /* --define             */
+ , cErq           /* --erq                */
  , cEvalcost      /* --eval-cost          */
  , cFuncall       /* --funcall            */
  , cMaster        /* --master             */
@@ -780,6 +789,7 @@ static LongOpt aLongOpts[]
     , { "define",             cDefine,        MY_TRUE }
     , { "debug-file",         cDebugFile,     MY_TRUE }
     , { "debug_file",         cDebugFile,     MY_TRUE } /* TODO: COMPAT */
+    , { "erq",                cErq,           MY_TRUE }
     , { "eval-cost",          cEvalcost,      MY_TRUE }
     , { "funcall",            cFuncall,       MY_TRUE }
     , { "list-compiles",      cTrace,         MY_FALSE }
@@ -1186,6 +1196,7 @@ shortusage (void)
 "  -d|--debug\n"
 "  -c|--list-compiles\n"
 "  -e|--no-preload\n"
+"  --erq <filename>\n"
 "  -N|--no-erq\n"
 "  -t|--no-heart\n"
 "  -f|--funcall <word>\n"
@@ -1286,6 +1297,11 @@ usage (void)
 "    Pass a non-zero argument (the number of occurences of this option)\n"
 "    to master->preload(), which usually inhibits all preloads of castles\n"
 "    and other objects.\n"
+"\n"
+"  --erq <filename>\n"
+"    Use <filename> instead of 'erq' as the basename of the ERQ executable.\n"
+"    The name is interpreted relative to " BINDIR ".\n"
+"    If not specified, 'erq' is used as executable name.\n"
 "\n"
 "  -N|--no-erq\n"
 "    Don't start the erq demon (if it would be started at all).\n"
@@ -1475,6 +1491,12 @@ firstscan (int eOption, const char * pValue)
 
     case cNoPreload:
         e_flag++;
+        break;
+
+    case cErq:
+        if (erq_file != NULL)
+            free(erq_file);
+        erq_file = strdup(pValue);
         break;
 
     case cNoERQ:

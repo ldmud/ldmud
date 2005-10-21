@@ -1,6 +1,34 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Jan-2001 (Lars Duening)  (3.3.22)
+    - (interpret.c, mstrings) Continued adaptation.
+
+    Included changes up to 3.2.9-dev.251:
+    - (main.c) Change to the default MUD_LIB directory early, so that the
+        debug.log file is opened in the right place (reported by Ralph).
+    - (xerq) The parent now synchronizes with the child by sending a specific
+        byte of data.
+    - (pkg-mysql.c) Markus Peter provided a patch for backwards compatibility
+        with mySQL before 3.22.24.
+    - (main, comm.c) The name of the erq executable can now be given on the
+        commandline with the option '--erq <filename>' (suggested by Freaky).
+    - (comm.c) In efun exec(), if this_interactive() points to one of the
+        the involved objects, it is switched over as well, like this_player()
+        already is (reported by Elric).
+    - (xerq) Freaky found and corrected a couple race conditions in the
+        clean-up loops of socket and children.
+    - (backend.c) Efun debug_message() now allows to preprend the message
+        with a timestamp for the current date and time, controlled by
+        a new bitflag (suggested by Freaky).
+    - (xerq) Added additional diagnostic output, activated with compiler
+        option XDEBUG. Also, removed two uninitialized variables (the stdout/
+        stderr sockets in the child_t structure) in the handling of child
+        processes, and added measures against buffer overflows.
+    - (erq.c, xerq/socket.c) When closing the connection to a child
+        process, the erq makes sure to read all still remaining data
+        from the connection (reported by Freaky).
+
 21-Dec-2000 (Lars Duening)  (3.3.21)
      Included changes up to 3.2.9-dev.250:
      - (comm.c, interpret.c) More small corrections to the new telnet

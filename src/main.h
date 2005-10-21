@@ -19,6 +19,7 @@ extern long time_to_swap_variables;
 extern svalue_t const0, const1;
 extern double consts[5];
 extern char *mud_lib;
+extern char *erq_file;
 extern char master_name[];
 extern char *debug_file;
 extern object_t dummy_current_object_for_loads;

@@ -610,7 +610,7 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
                   , ip, ip + sizeof(*ip) - 1);
     fprintf(stderr, "  .socket:            %d\n", ip->socket);
     fprintf(stderr, "  .ob:                %p", ip->ob);
-      if (ip->ob)  fprintf(stderr, " (%s)", ip->ob->name);
+      if (ip->ob)  fprintf(stderr, " (%s)", get_txt(ip->ob->name));
       putc('\n', stderr);
     fprintf(stderr, "  .input_to:          %p\n", ip->input_to);
     fprintf(stderr, "  .modify_command:    %p", ip->modify_command);
@@ -2183,7 +2183,7 @@ get_message (char *buff)
                         if (ip->ob)
                             debug_message("%s Socket %d (ip %p '%s') is a bad descriptor.\n"
                                          , time_stamp(), ip->socket, ip
-                                         , ip->ob->name);
+                                         , get_txt(ip->ob->name));
                         else
                             debug_message("%s Socket %d (ip %p) is a bad descriptor.\n"
                                          , time_stamp(), ip->socket, ip);
@@ -2934,8 +2934,9 @@ set_noecho (interactive_t *ip, char noecho)
              * To make more sophisticated negotiations, e.g. using LINEMODE,
              * use the H_NOECHO hook.
              */
-            if((~confirm & old & CHARMODE_MASK)
-            || (~confirm & old & NOECHO_STALE) && (old & CHARMODE_MASK))
+            if ((~confirm & old & CHARMODE_MASK)
+            ||  ((~confirm & old & NOECHO_STALE) && (old & CHARMODE_MASK))
+               )
             {
                 if(~confirm & old & CHARMODE_MASK)
                 {
@@ -2945,11 +2946,11 @@ set_noecho (interactive_t *ip, char noecho)
                         DTN(("set_noecho():     DONT TELOPT_SGA\n"));
                         send_dont(TELOPT_SGA);
                     }
-                    if (i->save_tn_state != TS_INVALID)
+                    if (ip->save_tn_state != TS_INVALID)
                     {
                         DTN(("set_noecho():     0 chars ready, saved state %d\n", i->save_tn_state));
-                        i->chars_ready = 0;
-                        i->tn_state = i->save_tn_state;
+                        ip->chars_ready = 0;
+                        ip->tn_state = ip->save_tn_state;
                     }
                 }
                 if (ip->command_start)
@@ -4327,14 +4328,20 @@ start_erq_demon (const char *suffix, size_t suffixlen)
 
     if ((pid = fork()) == 0)
     {
+        char *erqname;
+
         /* Child */
         dup2(sockets[0], 0);
         dup2(sockets[0], 1);
         close(sockets[0]);
         close(sockets[1]);
-        if (strlen(BINDIR) + 5 <= sizeof path)
+
+        erqname = erq_file ? erq_file : "erq";
+
+        if (   strlen(BINDIR) + 2 + strlen(erqname) + suffixlen
+            <= sizeof path)
         {
-            sprintf(path, "%.95s/erq%.*s", BINDIR, (int)suffixlen, suffix);
+            sprintf(path, "%s/%s%.*s", BINDIR, erqname, (int)suffixlen, suffix);
             execl((char *)path, "erq", "--forked", 0);
         }
         write(1, "0", 1);  /* indicate failure back to the driver */
@@ -5674,10 +5681,19 @@ f_exec (svalue_t *sp)
         }
 
         prompt_to_ed_buffer(ip);
+
+        /* If this_player() or this_interactive() point to one of the
+         * involved objects, switch it too.
+         */
         if (obfrom == command_giver)
             command_giver = ob;
         else if (ob == command_giver)
             command_giver = obfrom;
+
+        if (obfrom == current_interactive)
+            current_interactive = ob;
+        else if (ob == current_interactive)
+            current_interactive = obfrom;
 
         rc = 1;
     }while(0);
