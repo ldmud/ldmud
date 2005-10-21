@@ -1335,6 +1335,9 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
 
             line = get_line_number_if_any(&file);
             sprintf(st->buff, "%s:%d: ", file, line);
+
+            if (file)
+                free_mstring(file);
         }
 
 #ifdef RETURN_ERROR_MESSAGES

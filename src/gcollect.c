@@ -1260,6 +1260,9 @@ W("DEBUG: GC frees destructed '"); W(get_txt(ob->name)); W("'\n");
         remove_uids(res && (res->type != T_NUMBER || res->u.number) );
     }
 
+    /* Reconsolidate the free lists */
+    consolidate_freelists();
+
     /* Finally, try to reclaim the reserved areas */
 
     reallocate_reserved_areas();

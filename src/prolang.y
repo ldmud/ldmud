@@ -2623,8 +2623,8 @@ free_const_list_svalue (svalue_t *svp)
        */
 
     struct {
-        char *name;    /* The shared string with the name */
-        int   quotes;  /* Number of quotes */
+        string_t *name;  /* The tabled string with the name */
+        int   quotes;    /* Number of quotes */
     } symbol;
       /* A literal symbol.
        */
@@ -2733,7 +2733,7 @@ free_const_list_svalue (svalue_t *svp)
     char *string;
       /* An allocated string */
 
-    char *sh_string;
+    string_t *sh_string;
       /* A shared string */
 
     struct {

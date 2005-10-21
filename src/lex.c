@@ -53,6 +53,7 @@
 #include "lang.h"
 #include "main.h"
 #include "mempools.h"
+#include "mstrings.h"
 #include "object.h"
 #include "patchlevel.h"
 #include "prolang.h"
@@ -178,7 +179,7 @@ Bool pragma_pedantic;
   /* True: treat a number of sloppy language constructs as errors.
    */
 
-char *last_lex_string;
+string_t *last_lex_string;
   /* When lexing string literals, this is the (shared) string lexed
    * so far. It is used to pass string values to lang.c and may be
    * freed there.
@@ -288,7 +289,7 @@ static mp_int inc_list_maxlen;
   /* The lenght of the longest name in <inc_list>.
    */
 
-static char * auto_include_string = NULL;
+static string_t * auto_include_string = NULL;
   /* Shared string to be compiled as the very first thing in every lpc
    * source file. It may contain any text which is valid in a file.
    */
@@ -332,7 +333,7 @@ static ident_t *ident_table[ITABLE_SIZE];
 #else
 #    define identhash(s) (whashstr((s), 12) % ITABLE_SIZE)
 #endif
-  /* Hash an identifier name into a table index.
+  /* Hash an identifier name (c-string) into a table index.
    */
 
   /* In addition to this, the lexer keeps two lists for all efuns and
@@ -823,9 +824,9 @@ make_shared_identifier (char *s, int n, int depth)
  */
 
 {
-    ident_t *curr, *prev;
-    int   h;
-    char *str;
+    ident_t  *curr, *prev;
+    int       h;
+    string_t *str;
 
 #if defined(LEXDEBUG)
     printf("%s make_shared_identifier called: %s\n", time_stamp(), s);
@@ -840,12 +841,12 @@ make_shared_identifier (char *s, int n, int depth)
     while (curr)
     {
 #if defined(LEXDEBUG)
-        printf("%s checking %s.\n", time_stamp(), curr->name);
+        printf("%s checking %s.\n", time_stamp(), get_txt(curr->name));
 #endif
-        if (!strcmp(curr->name, s)) /* found it */
+        if (!strcmp(get_txt(curr->name), s)) /* found it */
         {
 #if defined(LEXDEBUG)
-            printf("%s found.\n", time_stamp());
+            printf("%s  -> found.\n", time_stamp());
 #endif
             /* Move the found entry to the head of the chain */
             if (prev) /* not at head of chain */
@@ -864,7 +865,7 @@ make_shared_identifier (char *s, int n, int depth)
                 ident_t *inferior = curr;
 
 #if defined(LEXDEBUG)
-                printf("%s shifting down inferior.\n", time_stamp());
+                printf("%s     shifting down inferior.\n", time_stamp());
 #endif
                 curr = xalloc(sizeof *curr);
                 if ( NULL != curr )
@@ -888,13 +889,13 @@ make_shared_identifier (char *s, int n, int depth)
 
     /* Identifier is not in table, so create a new entry */
 
-    str = make_shared_string(s);
+    str = new_tabled(s);
     if (!str)
         return NULL;
     curr = xalloc(sizeof *curr);
     if (!curr)
     {
-        free_string(str);
+        free_mstring(str);
         return NULL;
     }
 
@@ -920,7 +921,7 @@ free_shared_identifier (ident_t *p)
 {
     ident_t *curr, **q;
     int  h;
-    char *s;
+    string_t *s;
 
     h = p->hash;
 
@@ -929,7 +930,7 @@ free_shared_identifier (ident_t *p)
     s = p->name;
 
 #if defined(LEXDEBUG)
-    printf("%s freeing '%s'\n", time_stamp(), s);
+    printf("%s freeing '%s'\n", time_stamp(), get_txt(s));
     fflush(stdout);
 #endif
 
@@ -939,7 +940,7 @@ free_shared_identifier (ident_t *p)
     {
         if (curr->name == s
 #if DEBUG
-         || !strcmp(curr->name, s)
+         || mstreq(curr->name, s)
 #endif
 
            ) /* found matching name */
@@ -964,19 +965,20 @@ free_shared_identifier (ident_t *p)
                             return; /* success */
                         }
                         *q = curr->next;
-                        free_string(curr->name);
-                        xfree((char *)curr);
+                        free_mstring(curr->name);
+                        xfree(curr);
                         return;
                     }
 
                     *q = curr->inferior;
-                    xfree((char *)curr);
+                    xfree(curr);
                     return; /* success */
                 }
                 q = &curr->inferior;
                 curr = *q;
             }
-            fatal("free_shared_identifier: entry '%s' not found!\n", p->name);
+            fatal("free_shared_identifier: entry '%s' not found!\n"
+                 , get_txt(p->name));
             /* NOTREACHED */
         }
 
@@ -984,7 +986,7 @@ free_shared_identifier (ident_t *p)
         curr = *q;
     } /* not found */
 
-    fatal("free_shared_identifier: name '%s' not found!\n", p->name);
+    fatal("free_shared_identifier: name '%s' not found!\n", get_txt(p->name));
     /* NOTREACHED */
 } /* free_shared_identifier() */
 
@@ -1500,7 +1502,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
     {
         svalue_t *res;
 
-        push_string_malloced(name);
+        push_c_string(inter_sp, name);
 
         if (!compat_mode)
         {
@@ -1508,10 +1510,10 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
             filename = alloca(strlen(current_file)+2);
             *filename = '/';
             strcpy(filename+1, current_file);
-            push_volatile_string(inter_sp, filename);
+            push_c_string(inter_sp, filename);
         }
         else
-            push_volatile_string(inter_sp, current_file);
+            push_c_string(inter_sp, current_file);
 
         push_number(inter_sp, (delim == '"') ? 0 : 1);
         res = apply_master_ob(STR_INCLUDE_FILE, 3);
@@ -1524,23 +1526,23 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
 
             char * cp;
             
-            if (res->type != T_OLD_STRING)
+            if (res->type != T_STRING)
             {
                 yyerrorf("Illegal to include file '%s'.", name);
                 return -1;
             }
 
-            if (strlen(res->u.string) >= INC_OPEN_BUFSIZE)
+            if (mstrsize(res->u.str) >= INC_OPEN_BUFSIZE)
             {
-                yyerror("Include name too long.");
+                yyerrorf("Include name '%s' too long.", get_txt(res->u.str));
                 return -1;
             }
 
-            for (cp = res->u.string; *cp == '/'; cp++) NOOP;
+            for (cp = get_txt(res->u.str); *cp == '/'; cp++) NOOP;
             
             if (!legal_path(cp))
             {
-                yyerrorf("Illegal path '%s'.", res->u.string);
+                yyerrorf("Illegal path '%s'.", get_txt(res->u.str));
                 return -1;
             }
 
@@ -1608,7 +1610,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
          */
         for (i = 0; i < inc_list_size; i++)
         {
-            sprintf(buf, "%s%s", inc_list[i].u.string, name);
+            sprintf(buf, "%s%s", get_txt(inc_list[i].u.str), name);
             if (!stat(buf, &aStat)
              && S_ISREG(aStat.st_mode)
              && (fd = ixopen(buf, O_RDONLY|O_BINARY)) >= 0 )
@@ -1633,18 +1635,18 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
         svalue_t *svp;
 
         /* Setup and call the closure */
-        push_string_malloced(name);
-        push_volatile_string(inter_sp, current_file);
+        push_c_string(inter_sp, name);
+        push_c_string(inter_sp, current_file);
         if (closure_hook[H_INCLUDE_DIRS].x.closure_type == CLOSURE_LAMBDA)
             closure_hook[H_INCLUDE_DIRS].u.lambda->ob = current_object;
         svp = secure_call_lambda(&closure_hook[H_INCLUDE_DIRS], 2);
 
         /* The result must be legal relative pathname */
 
-        if (svp && svp->type == T_OLD_STRING
-         && strlen(svp->u.string) < INC_OPEN_BUFSIZE)
+        if (svp && svp->type == T_STRING
+         && mstrsize(svp->u.str) < INC_OPEN_BUFSIZE)
         {
-            strcpy(buf, svp->u.string);
+            strcpy(buf, get_txt(svp->u.str));
             if (legal_path(buf))
             {
                 if (!stat(buf, &aStat)
@@ -2314,12 +2316,13 @@ add_lex_string (char *str)
  */
 
 {
-    size_t len1, len3;
+    size_t len1, len2, len3;
+    string_t *new;
     char *tmp;
 
-    len1 = strlen(last_lex_string);
-    len3 = len1 + strlen(str) + 1;
-    if (len3 > MAX_ANSI_CONCAT)
+    len1 = mstrsize(last_lex_string);
+    len2 = strlen(str);
+    if (len1+len2 > MAX_ANSI_CONCAT)
     {
         /* Without this test, compilation would still terminate eventually,
          * thus it would still be 'correct', but it could take several hours.
@@ -2328,12 +2331,20 @@ add_lex_string (char *str)
         /* leave the old string, ignore the new addition */
         return;
     }
-    tmp = alloca(len3);
-    strcpy(tmp, last_lex_string);
-    strcpy(tmp + len1, str);
-    free_string(last_lex_string);
-    last_lex_string = make_shared_string(tmp);
-}
+    new = mstr_add_txt(last_lex_string, str, len2);
+    if (!new)
+    {
+        lexerrorf("Out of memory for string concatenation (%lu bytes)"
+                , (unsigned long)len1+len2);
+    }
+    free_mstring(last_lex_string);
+    last_lex_string = make_tabled(new);
+    if (!last_lex_string)
+    {
+        lexerrorf("Out of memory for string concatenation (%lu bytes)"
+                , (unsigned long)len1+len2);
+    }
+} /* add_lex_string() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE int
@@ -2352,7 +2363,12 @@ string (char *str)
     }
     else
     {
-        last_lex_string = make_shared_string(str);
+        last_lex_string = new_tabled(str);
+        if (!last_lex_string)
+        {
+            lexerrorf("Out of memory for string literal (%lu bytes)"
+                    , (unsigned long)strlen(str));
+        }
     }
     return L_STRING;
 }
@@ -2376,7 +2392,7 @@ yylex1 (void)
  *              '=' itself is returned as F_ASSIGN.
  *   L_NUMBER:  yylval.number is the parsed whole number or char constant.
  *   L_FLOAT:   yylval.float_number is the parsed float number.
- *   L_STRING:  last_lex_string is the (shared) parsed string literal.
+ *   L_STRING:  last_lex_string is the (tabled) parsed string literal.
  *   L_CLOSURE: yylval.closure.number identifies the closure. See the
  *              source for which value means what (it's a bit longish).
  *   L_QUOTED_AGGREGATE: yylval.number is the number of quotes
@@ -3476,7 +3492,7 @@ yylex1 (void)
                     h = identhash(sp);
                     for (q = &ident_table[h]; NULL != ( p= *q); q=&p->next)
                     {
-                        if (strcmp(sp, p->name))
+                        if (strcmp(sp, get_txt(p->name)))
                             continue;
 
                         if (p->type != I_TYPE_DEFINE) /* failure */
@@ -3486,7 +3502,8 @@ yylex1 (void)
                         {
 #if defined(LEXDEBUG)
                             fprintf(stderr, "%s #undef define '%s' %d '%s'\n"
-                                   , time_stamp(), p->name, p->u.define.nargs
+                                   , time_stamp(), get_txt(p->name)
+                                   , p->u.define.nargs
                                    , p->u.define.exps.str);
                             fflush(stderr);
 #endif
@@ -3498,7 +3515,7 @@ yylex1 (void)
                             else
                             {
                                 *q = p->next;
-                                free_string(p->name);
+                                free_mstring(p->name);
                             }
                             xfree(p->u.define.exps.str);
                             p->name = NULL;
@@ -3512,7 +3529,7 @@ yylex1 (void)
                             {
                                 p->inferior->next = p->next;
                                 *q = p->inferior;
-                                ref_string(p->name);
+                                ref_mstring(p->name);
                             }
                             else
                             {
@@ -3651,7 +3668,7 @@ yylex1 (void)
                 while (isalunum(*++yyp)) NOOP;
                 c = *yyp;
                 *yyp = 0;
-                yylval.symbol.name = make_shared_string(wordstart);
+                yylval.symbol.name = new_tabled(wordstart);
                 *yyp = c;
                 yylval.symbol.quotes = quotes;
                 outp = yyp;
@@ -3943,7 +3960,7 @@ start_new_file (int fd)
 
     if (auto_include_string)
     {
-        add_input(auto_include_string);
+        add_input(get_txt(auto_include_string));
         current_line = auto_include_start;
     }
 
@@ -3996,7 +4013,7 @@ end_new_file (void)
 
     if (last_lex_string)
     {
-        free_string(last_lex_string);
+        free_mstring(last_lex_string);
         last_lex_string = NULL;
     }
 
@@ -4427,7 +4444,7 @@ add_define (char *name, short nargs, char *exps)
     p = make_shared_identifier(name, I_TYPE_DEFINE, 0);
     if (!p)
     {
-        lexerror("Out of memory");
+        lexerrorf("Out of memory for new macro '%s'", name);
         return;
     }
 
@@ -4458,7 +4475,7 @@ add_define (char *name, short nargs, char *exps)
     if ( !(p->u.define.exps.str = xalloc(strlen(exps)+1)) )
     {
         free_shared_identifier(p);
-        lexerror("Out of memory");
+        lexerrorf("Out of memory for new macro '%s'", name);
         return;
     }
     strcpy(p->u.define.exps.str, exps);
@@ -4499,7 +4516,7 @@ add_permanent_define (char *name, short nargs, void *exps, Bool special)
     p = make_shared_identifier(name, I_TYPE_DEFINE, 0);
     if (!p)
     {
-        error("Out of memory\n");
+        error("Out of memory for permanent macro '%s'\n", name);
     }
 
     /* If such a macro already exists with different meaning,
@@ -4579,7 +4596,7 @@ free_defines (void)
             if (curr->name == p->name) /* found it */
             {
                 p->next = curr->next;
-                free_string(p->name);
+                free_mstring(p->name);
                 break;
             }
             prev = &curr->next;
@@ -4609,7 +4626,7 @@ lookup_define (char *s)
     prev = 0;
     while (curr)
     {
-        if (!strcmp(curr->name, s)) /* found it */
+        if (!strcmp(get_txt(curr->name), s)) /* found it */
         {
             if (prev) /* not at head of list */
             {
@@ -5470,23 +5487,21 @@ cond_get_exp (int priority, svalue_t *svp)
                   break;
             } /* switch() */
         }
-        else if (svp->type == T_OLD_STRING && sv2.type == T_OLD_STRING)
+        else if (svp->type == T_STRING && sv2.type == T_STRING)
         {
             x = optab2[x+1];
             if (x == BPLUS)
             {
-                char *str;
+                string_t *str;
 
-                str = xalloc(strlen(svp->u.string) + strlen(sv2.u.string) + 1);
-                strcpy(str, svp->u.string);
-                strcat(str, sv2.u.string);
+                str = mstr_add(svp->u.str, sv2.u.str);
                 free_string_svalue(svp);
                 free_string_svalue(&sv2);
-                svp->u.string = str;
+                svp->u.str = str;
             }
             else
             {
-                value = strcmp(svp->u.string, sv2.u.string);
+                value = mstrcmp(svp->u.str, sv2.u.str);
                 free_string_svalue(svp);
                 svp->type = T_NUMBER;
                 free_string_svalue(&sv2);
@@ -5543,7 +5558,8 @@ set_inc_list (vector_t *v)
     svp = v->item;
     for (i = 0, max = 0; i < VEC_SIZE(v); i++, svp++)
     {
-        if (svp->type != T_OLD_STRING)
+        string_t *new;
+        if (svp->type != T_STRING)
         {
             error("H_INCLUDE_DIRS argument has a non-string array element\n");
         }
@@ -5551,7 +5567,7 @@ set_inc_list (vector_t *v)
         /* Set p to the beginning of the pathname, skipping leading
          * '/' and './'.
          */
-        p = svp->u.string;
+        p = get_txt(svp->u.str);
         for(;;) {
             if (*p == '/')
                 p++;
@@ -5576,13 +5592,11 @@ set_inc_list (vector_t *v)
             error("H_INCLUDE_DIRS path ends in single prefix dot\n");
 
         /* Get and store our own copy of the pathname */
-        p = string_copy(p);
-        if (!p)
+        new = dup_mstring(svp->u.str);
+        if (!new)
             error("Out of memory\n");
 
-        free_svalue(svp);
-        svp->x.string_type = STRING_MALLOC;
-        svp->u.string = p;
+        put_string(svp, new); /* dup() already freed it */
     }
 
     inc_list = v->item;
@@ -5856,7 +5870,7 @@ show_lexer_status (strbuf_t * sbuf, Bool verbose UNUSED)
     sum += defbuf_len;
     sum += 2 * DEFMAX; /* for the buffers in _expand_define() */
     if (auto_include_string)
-        sum += strlen(auto_include_string)+1;
+        sum += mstr_mem_size(auto_include_string);
 
     strbuf_addf(sbuf, "Lexer structures\t\t\t %8lu\n", sum);
     return sum;
@@ -5892,7 +5906,7 @@ count_lex_refs (void)
     }
 
     if (auto_include_string)
-        note_malloced_block_ref(auto_include_string);
+        count_ref_from_string(auto_include_string);
 
     if (defbuf_len)
         note_malloced_block_ref(defbuf);
@@ -5972,7 +5986,7 @@ clear_auto_include_string (void)
 {
     if (auto_include_string)
     {
-        xfree(auto_include_string);
+        free_mstring(auto_include_string);
         auto_include_string = NULL;
     }
 } /* clear_auto_include_string() */
@@ -5997,17 +6011,15 @@ f_set_auto_include_string (svalue_t *sp)
 {
     char *s;
 
-    if (privilege_violation("set_auto_include_string", sp, sp) > 0)
+    if (privilege_violation(STR_SET_AUTO_INCLUDE, sp, sp) > 0)
     {
         clear_auto_include_string();
-        s = sp->u.string;
-        auto_include_string = xalloc(strlen(s)+2);
-        *auto_include_string = '\n';
-        strcpy(auto_include_string+1, s);
+        memsafe(auto_include_string = mstr_add(STR_NEWLINE, sp->u.str)
+               , mstrsize(sp->u.str)+1, "new auto_include_string");
 
         /* Count the number of lines of the added string */
-        for (auto_include_start = 0; *s
-            ; auto_include_start -= *s++ == '\n') NOOP;
+        for (auto_include_start = 0, s = get_txt(auto_include_string)+1; *s
+            ; auto_include_start -= (*s++ == '\n')) NOOP;
     }
     free_svalue(sp);
     return sp - 1;
@@ -6031,16 +6043,21 @@ f_expand_define (svalue_t *sp)
  * therefore its usage is restricted to a few functions like the
  * H_INCLUDE_DIRS driver hook, or the masters runtime_error()
  * function.
+ * TODO: Right now, only one arg is evaluated.
  */
 
 {
-    char *arg, *res, *end;
+    char *arg, *end;
+    string_t *res;
     ident_t *d;
 
     /* Get the arguments from the stack */
 
-    if (sp->type == T_OLD_STRING)
-        arg = sp->u.string;
+    if (sp->type == T_STRING)
+    {
+        arg = get_txt(sp->u.str);
+        /* TODO: Concatenate all strings on the stack */
+    }
     else /* it's the number 0 */
         arg = "";
 
@@ -6054,11 +6071,11 @@ f_expand_define (svalue_t *sp)
         myungetc('\n');
         end = outp;
         add_input(arg);
-        d = lookup_define(sp[-1].u.string);
+        d = lookup_define(get_txt(sp[-1].u.str));
         if (d && _expand_define(&d->u.define, d) )
         {
             *end = '\0';
-            res = string_copy(outp);
+            res = new_mstring(outp);
         }
         outp = &end[1];
     }
@@ -6072,8 +6089,7 @@ f_expand_define (svalue_t *sp)
     }
     else
     {
-        sp->x.string_type = STRING_MALLOC;
-        sp->u.string = res;
+        put_string(sp, res);
     }
 
     return sp;

@@ -41,6 +41,7 @@ f_clear_bit (svalue_t *sp)
 
 {
     char *str;
+    string_t *new;
     size_t len, ind, bitnum;
     svalue_t *strp;
 
@@ -62,7 +63,10 @@ f_clear_bit (svalue_t *sp)
         return sp;
     }
 
-    strp->u.str = dup_mstring(strp->u.str);
+    memsafe(new = dup_mstring(strp->u.str), mstrsize(strp->u.str)
+           , "new bitstring");
+    free_mstring(strp->u.str);
+    strp->u.str = new;
     str = get_txt(strp->u.str);
 
     if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
@@ -105,12 +109,23 @@ f_set_bit (svalue_t *sp)
 
     if (ind < len)
     {
-        strp->u.str = dup_mstring(strp->u.str);
+        string_t *new;
+
+        memsafe(new = dup_mstring(strp->u.str), mstrsize(strp->u.str)
+               , "new bitstring");
+        free_mstring(strp->u.str);
+        strp->u.str = new;
         str = get_txt(strp->u.str);
     }
     else
     {
-        strp->u.str = resize_mstring(strp->u.str, ind+1);
+        string_t *new;
+
+        (void)ref_mstring(strp->u.str); /* In case resize_ fails */
+        memsafe(new = resize_mstring(strp->u.str, ind+1), ind+1
+               , "new bitstring");
+        free_mstring(strp->u.str);
+        strp->u.str = new;
         str = get_txt(strp->u.str);
         for ( ; len <= ind; len++)
             str[len] = ' ';
@@ -213,7 +228,9 @@ binop_bits (svalue_t *sp, int instr)
          */
 
         arg = sp->u.str;
-        result = dup_mstring(sp[-1].u.str); sp[-1] = const0;
+        memsafe(result = dup_mstring(sp[-1].u.str), mstrsize(sp[-1].u.str)
+               , "new bitstring");
+        free_mstring(sp[-1].u.str);
     }
     else
     {
@@ -221,7 +238,9 @@ binop_bits (svalue_t *sp, int instr)
          * else: sp is the longer result; sp-1 the shorter argument
          */
         arg = (sp-1)->u.str;
-        result = dup_mstring(sp->u.str); *sp = const0;
+        memsafe(result = dup_mstring(sp->u.str), mstrsize(sp->u.str)
+               , "new bitstring");
+        free_mstring(sp->u.str);
     }
 
     /* Now perform the operation. */
@@ -325,12 +344,16 @@ f_invert_bits (svalue_t *sp)
 
 {
     char * str;
+    string_t *new;
     long   len;
 
     /* Get the arguments */
 
     len = (long)mstrsize(sp->u.str);
-    sp->u.str = dup_mstring(sp->u.str);
+    memsafe(new = dup_mstring(sp->u.str), len
+           , "new bitstring");
+    free_mstring(sp->u.str);
+    sp->u.str = new;
     str = get_txt(sp->u.str);
 
     /* Invert the string */

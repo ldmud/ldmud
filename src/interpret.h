@@ -152,10 +152,10 @@ extern svalue_t *sapply_int(string_t *fun, object_t *ob, int num_arg, Bool b_ign
 #define sapply(f,o,n) sapply_int(f,o,n, MY_FALSE)
 extern svalue_t *apply(string_t *fun, object_t *ob, int num_arg);
 extern void call_function(program_t *progp, int fx);
-extern int get_line_number(bytecode_p p, program_t *progp, char **namep);
-extern char *collect_trace(strbuf_t * sbuf, vector_t ** rvec);
-extern char *dump_trace(Bool how);
-extern int get_line_number_if_any(char **name);
+extern int get_line_number(bytecode_p p, program_t *progp, string_t **namep);
+extern string_t *collect_trace(strbuf_t * sbuf, vector_t ** rvec);
+extern string_t *dump_trace(Bool how);
+extern int get_line_number_if_any(string_t **name);
 extern void reset_machine(Bool first);
 extern svalue_t *secure_apply(string_t *fun, object_t *ob, int num_arg);
 extern svalue_t *apply_master_ob(string_t *fun, int num_arg);

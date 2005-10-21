@@ -442,7 +442,8 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
  *   make_tabled_from() to get a new tabled 'copy' of a given string
  *     without losing the original.
  *
- * If memory runs out, NULL is returned.
+ * If memory runs out, NULL is returned (but, with <deref_arg> set, the
+ * original string is still dereferenced).
  */
 
 {
@@ -586,8 +587,7 @@ mstring_dup (string_t * pStr MTRACE_DECL)
  *
  * If <pStr> is a tabled string or an untabled string with more than one
  * reference, create and return a new untabled string with the same text but
- * just one reference, and remove one reference from <pStr>. Otherwise, just
- * return <pStr>.
+ * just one reference. Otherwise, just return <pStr> with one more reference.
  * If memory runs out, NULL is returned.
  *
  * Purpose is to create an instance of a string which an be freely modified.
@@ -598,7 +598,7 @@ mstring_dup (string_t * pStr MTRACE_DECL)
 
     /* Check for the easy case */
     if (!pStr->info.tabled && pStr->info.ref == 1 && pStr->link == NULL)
-        return pStr;
+        return ref_mstring(pStr);
 
     /* Otherwise create a new untabled string from the tabled one */
 
@@ -607,8 +607,6 @@ mstring_dup (string_t * pStr MTRACE_DECL)
     {
         memcpy(string->str->txt,  pStr->str->txt, pStr->str->size);
     }
-
-    free_mstring(pStr);
 
     return string;
 } /* mstring_dup() */
@@ -622,7 +620,8 @@ mstring_resize (string_t * pStr, size_t newlen MTRACE_DECL)
  * Create an untabled copy of <pStr> with just one reference and space
  * for <newlen> bytes, remove one reference from <pStr>, and then return
  * the new string.
- * If memory runs out, NULL is returned.
+ * If memory runs out, NULL is returned, but the original string is still
+ * dereferenced.
  */
 
 {
@@ -904,6 +903,8 @@ mstring_add (const string_t *left, const string_t *right MTRACE_DECL)
  * with the data of <right>.
  * The result string is untabled and has one reference,
  * the old strings <left> and <right> are not changed.
+ *
+ * If memory runs out, NULL is returned.
  */
 
 {
@@ -933,6 +934,8 @@ mstring_add_txt (const string_t *left, const char *right, size_t len MTRACE_DECL
  * with the <len> bytes of data in buffer <right>.
  * The result string is untabled and has one reference,
  * the old string <left> is not changed.
+ *
+ * If memory runs out, NULL is returned.
  */
 
 {
@@ -961,6 +964,8 @@ mstring_add_to_txt (const char *left, size_t len, const string_t *right MTRACE_D
  * concatenated with the string <right>.
  * The result string is untabled and has one reference,
  * the old string <right> is not changed.
+ *
+ * If memory runs out, NULL is returned.
  */
 
 {
@@ -978,6 +983,104 @@ mstring_add_to_txt (const char *left, size_t len, const string_t *right MTRACE_D
     }
     return tmp;
 } /* mstring_add_to_txt() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_repeat (const string_t *base, size_t num MTRACE_DECL)
+
+/* Aliased to: mstr_repeat(base,num)
+ *
+ * Create and return a new string which is the <base> string repeated <num>
+ * times.
+ * The result string is untabled and has one reference,
+ * the old string <base> is not changed.
+ *
+ * If memory runs out, NULL is returned.
+ */
+
+{
+    size_t len, reslen;
+    string_t *result;
+
+    len = mstrsize(base);
+    reslen = len * num;
+    result = mstring_alloc_string(reslen MTRACE_PASS);
+    if (result && len)
+    {
+        size_t   curlen;
+        char   * txt = get_txt(result);
+
+        /* Seed result[] with one copy of the string */
+        memcpy(txt, get_txt(base), len);
+
+        /* Repeatedly double the string in result */
+        curlen = len;
+        while (2*curlen < reslen)
+        {
+            memcpy(txt+curlen, txt, curlen);
+            curlen *= 2;
+        }
+
+        /* Fill up result to the full length */
+        if (reslen > curlen)
+            memcpy(txt+curlen, txt, reslen-curlen);
+    }
+    return result;
+} /* mstring_repeat() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_extract (const string_t *str, size_t start, long end MTRACE_DECL)
+
+/* Aliased to: mstr_extract(str,start,len)
+ *
+ * Create and return a new string made of <str>[<start>..<end>].
+ * If <end> is negative, the result is made of <str>[<start>..].
+ * The result string is untabled and has one reference,
+ * the old string <str> is not changed.
+ *
+ * If memory runs out, NULL is returned.
+ */
+
+{
+    size_t len;
+    string_t *result;
+
+    len = mstrsize(str);
+    if (len)
+    {
+        error("(mstring_extract) Can't extract from empty string.\n");
+        /* NOTREACHED */
+        return NULL;
+    }
+
+    if (end < 0)
+        end = (long)len-1;
+
+    if (end < (long)start)
+    {
+        error("(mstring_extract) end %ld < start %lu\n"
+             , end, (unsigned long) start);
+        /* NOTREACHED */
+        return NULL;
+    }
+
+    if (start >= len)
+    {
+        error("(mstring_extract) start %lu > string length %lu\n"
+             , (unsigned long) start, (unsigned long)len);
+        /* NOTREACHED */
+        return NULL;
+    }
+
+    reslen = (size_t)end - start + 1;
+    result = mstring_alloc_string(reslen MTRACE_PASS);
+    if (result && reslen)
+    {
+        memcpy(get_txt(result), get_txt(str)+start, reslen);
+    }
+    return result;
+} /* mstring_extract() */
 
 /*-------------------------------------------------------------------------*/
 Bool

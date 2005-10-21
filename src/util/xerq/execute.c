@@ -135,7 +135,7 @@ execute (char *buf, int buflen, char *status, int *esockets, int keep_sockets)
 
         if (esockets)
         {
-            char c, expected;
+            char ch, expected;
             int num;
 
             expected = getpid() & 0xff;
@@ -143,7 +143,7 @@ execute (char *buf, int buflen, char *status, int *esockets, int keep_sockets)
                            , time_stamp(), expected));
 
             do {
-                num = read(esockets[0], &c, sizeof(c));
+                num = read(esockets[0], &ch, sizeof(c));
             } while (num < 0 && errno == EINTR);
 
             if (num < 0)
@@ -156,10 +156,10 @@ execute (char *buf, int buflen, char *status, int *esockets, int keep_sockets)
                 perror(" ");
             }
 
-            if (c != expected)
+            if (ch != expected)
             {
                 fprintf(stderr, "%s Child received go-ahead byte '%02x', expected '%02x'\n"
-                              , time_stamp(), c, expected);
+                              , time_stamp(), ch, expected);
             }
 
             XPRINTF((stderr, "%s Child resumes.\n", time_stamp()));
@@ -389,7 +389,7 @@ erq_execute (char *mesg, int msglen)
         {
             int myerrno = errno;
 
-            fprintf(stderr, "%s Couldn't send go-ahead byte '02x' to child %p, errno %d"
+            fprintf(stderr, "%s Couldn't send go-ahead byte '%02x' to child %p, errno %d"
                           , time_stamp(), ga_data, chp, myerrno);
             errno = myerrno;
             perror(" ");
@@ -457,7 +457,7 @@ erq_spawn (char *mesg, int msglen)
         {
             int myerrno = errno;
 
-            fprintf(stderr, "%s Couldn't send go-ahead byte '02x' to child %p, errno %d"
+            fprintf(stderr, "%s Couldn't send go-ahead byte '%02x' to child %p, errno %d"
                           , time_stamp(), ga_data, chp, myerrno);
             errno = myerrno;
             perror(" ");

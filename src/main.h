@@ -21,6 +21,7 @@ extern double consts[5];
 extern char *mud_lib;
 extern char *erq_file;
 extern char master_name[];
+extern string_t * master_name_str;
 extern char *debug_file;
 extern object_t dummy_current_object_for_loads;
 extern int slow_shut_down_to_do;

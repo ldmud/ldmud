@@ -684,6 +684,9 @@ error (char *fmt, ...)
         {
             strcpy(malloced_name, current_object->name);
         }
+
+        if (file)
+            free_mstring(file);
     }
 
     /* Duplicate the error messages so far on stdout */

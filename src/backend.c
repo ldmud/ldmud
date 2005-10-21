@@ -191,7 +191,7 @@ do_state_check (int minlvl, const char *where)
     {
         debug_message("%s Inconsistency %s\n", time_stamp(), where);
         printf("%s Inconsistency %s\n", time_stamp(), where);
-        dump_trace(MY_TRUE);
+        (void)dump_trace(MY_TRUE);
 #ifdef TRACE_CODE
         last_instructions(TOTAL_TRACE_LENGTH, 1, 0);
 #endif
@@ -445,6 +445,11 @@ backend (void)
         {
             interactive_t *ip;
 
+            /* Create the new time_stamp string in the function's local
+             * buffer.
+             */
+            (void)time_stamp();
+
             /* Note that the size of buff[] is determined by MAX_TEXT, which
              * is the max size of the network receive buffer. Iow: no
              * buffer overruns possible.
@@ -521,6 +526,13 @@ backend (void)
             }
         
             do_state_check(2, "after handling message");
+        }
+        else
+        {
+            /* No new message, just reate the new time_stamp string in
+             * the function's local buffer.
+             */
+            (void)time_stamp();
         } /* if (get_message()) */
 
         /* Do the periodic functions if it's time.

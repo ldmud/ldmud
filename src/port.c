@@ -37,7 +37,7 @@ get_current_time (void)
  *
  * On a SUN Sparc I, a negative time offset of 22 seconds between two
  * sucessive calls to time() has been observed. Similar discrepancies can
- * occur whenever a system clock is set, e.g. by automatick synchronisation
+ * occur whenever a system clock is set, e.g. by automatic synchronisation
  * via ntp. These negative time offsets can mess up the call_out tables. Since
  * they also could mess up the mudlib, completely hide them by forcing the
  * visible time to continue to run in positive direction.
@@ -81,9 +81,14 @@ time_string (mp_int t)
 {
     static char result[80];
     struct tm *tm;
+    mp_int last_time = -1;
 
-    tm = localtime((time_t *)&t);
-    strftime(result, sizeof(result)-1, "%a %b %d %H:%M:%S %Y", tm);
+    if (t != last_time)
+    {
+        last_time = t;
+        tm = localtime((time_t *)&t);
+        strftime(result, sizeof(result)-1, "%a %b %d %H:%M:%S %Y", tm);
+    }
     return result;
 }
 
@@ -97,11 +102,19 @@ utime_string (mp_int t, mp_int ut)
     static char result[80];
     struct tm *tm;
     size_t len;
+    mp_int last_t = -1, last_ut = -1;
 
-    tm = localtime((time_t *)&t);
-    len = strftime(result, sizeof(result)-1, "%a %b %d %H:%M:%S:", tm);
-    sprintf(result+len, "%06ld", ut);
-    strftime(result+len+6, sizeof(result)-7-len, " %Y", tm);
+    mp_int last_time = -1;
+
+    if (t != last_t || ut != last_ut)
+    {
+        last_t= t;
+        last_ut= ut;
+        tm = localtime((time_t *)&t);
+        len = strftime(result, sizeof(result)-1, "%a %b %d %H:%M:%S:", tm);
+        sprintf(result+len, "%06ld", ut);
+        strftime(result+len+6, sizeof(result)-7-len, " %Y", tm);
+    }
     return result;
 }
 
@@ -121,10 +134,15 @@ time_stamp (void)
     mp_int t;
     static char result[21];
     struct tm *tm;
+    mp_int last_time = -1;
 
     t = get_current_time();
-    tm = localtime((time_t *)&t);
-    strftime(result, sizeof(result)-1, "%Y.%m.%d %H:%M:%S", tm);
+    if (t != last_time)
+    {
+        last_time = t;
+        tm = localtime((time_t *)&t);
+        strftime(result, sizeof(result)-1, "%Y.%m.%d %H:%M:%S", tm);
+    }
     return result;
 } /* time_stamp() */
 

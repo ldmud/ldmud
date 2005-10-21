@@ -142,7 +142,10 @@ f_capitalize(svalue_t *sp)
 {
     if (islower((unsigned char)(get_txt(sp->u.str)[0])))
     {
-        memsafe(sp->u.str = dup_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
+        string_t *new;
+        memsafe(new = dup_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
+        free_mstring(sp->u.str);
+        sp->u.str = new;
         get_txt(sp->u.str)[0] += 'A' - 'a';
     }
     return sp;
@@ -272,7 +275,10 @@ f_lower_case (svalue_t *sp)
     {
         /* Yes, there is something to change... */
 
-        memsafe(sp->u.str = dup_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
+        string_t *new;
+        memsafe(new = dup_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
+        free_mstring(sp->u.str);
+        sp->u.str = new;
 
         for ( s = get_txt(sp->u.str)+count; count < len; s++, count++)
         {
@@ -874,7 +880,11 @@ f_upper_case (svalue_t *sp)
 
     if (count < len)  /* there are lowercase characters */
     {
-        memsafe(sp->u.str = dup_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
+        string_t *new;
+        memsafe(new = dup_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
+        free_mstring(sp->u.str);
+        sp->u.str = new;
+
         for (s = get_txt(sp->u.str)+count; count < len; s++, count++)
         {
             c = *s;
@@ -5149,6 +5159,17 @@ f_debug_info (svalue_t *sp, int num_arg)
  *            Number of calls to malloc_increment(), the number
  *            of successes and the size of memory allocated this
  *            way (smalloc only).
+ *
+ *        int DID_MEM_PERM
+ *        int DID_MEM_PERM_SIZE
+ *            Number and size of permanent (non-GCable) allocations
+ *            (smalloc only).
+ *
+ *        int DID_MEM_CLIB
+ *        int DID_MEM_CLIB_SIZE
+ *            Number and size of allocations done through the
+ *            clib functions (smalloc only with SBRK_OK).
+ *
  *
  * DINFO_TRACE (7): Return the current call stack 'trace' information in the
  *     form specifiec by <arg2>. The result of the function is either

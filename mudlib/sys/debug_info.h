@@ -146,8 +146,12 @@
 #define DID_MEM_MINC_CALLS     18
 #define DID_MEM_MINC_SUCCESS   19 
 #define DID_MEM_MINC_SIZE      20
+#define DID_MEM_PERM           21
+#define DID_MEM_PERM_SIZE      22
+#define DID_MEM_CLIB           23
+#define DID_MEM_CLIB_SIZE      24
  
-#define DID_MEMORY_MAX         21
+#define DID_MEMORY_MAX         25
 
 
 /* Indices into the subarrays resulting from debug_info(DINFO_TRACE, 0)

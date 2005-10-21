@@ -53,7 +53,7 @@ typedef char * (*defn_fun)(char **);
  * time the macro is used.
  *
  * The function is passed an char*[] with the current macro argument values,
- * terminated with a NULL, and has to return an allocated string with
+ * terminated with a NULL, and has to return an allocated c-string with
  * the replacement text.
  *
  * The replacement text must not contain comments.
@@ -98,7 +98,10 @@ struct defn
 
 struct ident_s
 {
-    string_t *name;          /* Name of the identifier (shared string) */
+    string_t *name;          /* Name of the identifier (tabled string)
+                              * The inferiour structures (if any) and this
+                              * structure all share the same reference to
+                              * the string. */
     short type;              /* Type of this entry */
     short hash;              /* Hashvalue of this identifier */
     ident_t *next;           /* Next in hash chain */
@@ -174,7 +177,7 @@ extern Bool pragma_no_clone;
 extern Bool pragma_no_inherit;
 extern Bool pragma_no_shadow;
 extern Bool pragma_pedantic;
-extern char *last_lex_string;
+extern string_t *last_lex_string;
 extern ident_t *all_efuns;
 extern struct inline_fun * first_inline_fun;
 extern Bool insert_inline_fun_now;

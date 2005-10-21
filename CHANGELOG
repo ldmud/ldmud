@@ -1,12 +1,44 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Jan-2001 (Lars Duening)  (3.3.23)
+    Included changes up to 3.2.9-dev.254:
+    - (smalloc.c) Introduced a free list for 'oversized' small blocks which
+        is used much like the unused space in a small chunk. This list
+        allows the consolidation function to keep large free blocks
+        together even if they exceed the legal maximum size for small
+        blocks.
+    - (smalloc, gcollect.c) New function consolidate_freelists() to
+        rebuild the small block free lists, merging adjacent free small
+        blocks where possible. Additionally, when a small chunk is exhausted
+        the small block allocator first tries to split one of the larger
+        free blocks before getting a new small chunk.
+    - (xerq/execute.c) Corrected some small bugs (thanks, Freaky!)
+    - (port.c) The time_stamp routines recompute the string result only
+        if the time has changed since the last call.
+    - (efuns.c, smalloc.c) smalloc now keeps a statistic about the number
+        and size of permanent and clib allocations; and debug_info()
+        returns this statistics as part of (DINFO_DATA, DID_MEMORY).
+    - (smalloc.c) Defining the macro DEBUG_SMALLOC_ALLOCS causes smalloc
+        to log all new allocations which can't be satisfied directly
+        from the free lists. The output is written to the same stream
+        as the GC log (default is stderr).
+
+23-Jan-2001 (Lars Duening)
+    - (mstrings) Made the reference behaviour of mstring_dup() and
+        mstring_resize() more intuitive.
+    - (lex) Adapted to new string implementation.
+
+22-Jan-2001 (Lars Duening)
+    - (interpret.c, mstrings, string_spec) Completed adaption of interpret.c
+        to new string implementation.
+
 19-Jan-2001 (Lars Duening)  (3.3.22)
     - (interpret.c, mstrings) Continued adaptation.
 
     Included changes up to 3.2.9-dev.251:
     - (main.c) Change to the default MUD_LIB directory early, so that the
-        debug.log file is opened in the right place (reported by Ralph).
+        debug.log file is opened in the right place (reported by Elric).
     - (xerq) The parent now synchronizes with the child by sending a specific
         byte of data.
     - (pkg-mysql.c) Markus Peter provided a patch for backwards compatibility

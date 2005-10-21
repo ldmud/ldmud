@@ -274,6 +274,7 @@ struct cache
     string_t *name;
       /* The name of the cached function, shared for existing functions,
        * allocated if the object does not have the function.
+       * This pointer counts as reference.
        */
     program_t *progp;
       /* The pointer to the program code of the function, or NULL if the
@@ -661,7 +662,7 @@ static struct pointer_table *ptable;
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
-static Bool apply_low(char *, object_t *, int, Bool);
+static Bool apply_low(string_t *, object_t *, int, Bool);
 static void call_simul_efun(int code, object_t *ob, int num_arg);
 #ifdef DEBUG
 static void check_extra_ref_in_vector(svalue_t *svp, size_t num);
@@ -711,6 +712,7 @@ init_interpret (void)
 
     invalid_entry.id = 0;
     invalid_entry.progp = (program_t *)1;
+    invalid_entry.name = NULL;
 
     for (i = 0; i < CACHE_SIZE; i++)
         cache[i] = invalid_entry;
@@ -2218,16 +2220,6 @@ inter_add_array (vector_t *q, vector_t **vpp)
  * push_c_string (sp, p)
  *     Convert the C-String <p> into a mstring and push it onto the stack
  *     above <sp>.
- *
-#if 0
- * TOOD: Remove the following functions completely.
- * push_referenced_shared_string(p):
- *     Push a shared string onto the stack.
- * push_string_shared(p):
- *     Share a string and push it onto the stack.
- * _push_string_malloced(p, sp), push_string_malloced(p):
- *     Malloc a copy of a string and push it onto the stack.
-#endif
  * push_svalue(v), push_svalue_block(num,v):
  *     Push one or more svalues onto the stack.
  * pop_stack(), _drop_n_elems(n,sp):
@@ -2266,76 +2258,6 @@ push_c_string (svalue_t *sp, const char *p)
     sp++;
     put_string(sp, str);
 } /* push_c_string() */
-
-#if 0
-/*-------------------------------------------------------------------------*/
-void
-push_referenced_shared_string (char *p)
-
-/* Push the shared string <p> onto the stack as defined by <inter_sp>.
- * The refs of <p> are _not_ incremented.
- */
-
-{
-    svalue_t *sp = inter_sp;
-
-    sp++;
-    put_old_string(sp, p);
-    inter_sp = sp;
-}
-
-/*-------------------------------------------------------------------------*/
-void
-push_string_shared (char *p)
-
-/* Make a shared string of <p> and push it onto the stack as defined
- * by <inter_sp>.
- */
-
-{
-    inter_sp++;
-    put_old_string(inter_sp, make_shared_string(p));
-}
-
-/*-------------------------------------------------------------------------*/
-static svalue_t * _push_string_malloced (char *p, svalue_t *sp) UNUSED;
-
-static svalue_t *
-_push_string_malloced (char *p, svalue_t *sp)
-
-/* Malloc a copy of string <p>, push it onto the stack currently ending
- * at <sp>, and return the new stackpointer.
- */
-
-{
-    char *s;
-
-    s = xalloc(strlen(p)+1);
-    strcpy(s, p);
-    sp++;
-    put_malloced_string(sp, s);
-    return sp;
-}
-
-/*-------------------------------------------------------------------------*/
-void
-push_string_malloced (char *p)
-
-/* Malloc a copy of string <p> and push it onto the stack as defined
- * by <inter_sp>.
- */
-
-{
-    svalue_t *sp;
-    char *s;
-
-    s = xalloc(strlen(p)+1);
-    strcpy(s, p);
-    sp = ++inter_sp;
-    put_malloced_string(sp, s);
-}
-
-#endif /* of #if 0 */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -3088,7 +3010,10 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
          */
         if (mstr_tabled(vec->u.str))
         {
-            string_t *p = dup_mstring(vec->u.str);
+            string_t *p;
+            
+            memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
+                   , "modifiable string");
 
             free_mstring(vec->u.str);
             vec->u.str = p;
@@ -3220,7 +3145,10 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
          */
         if (mstr_tabled(vec->u.str))
         {
-            string_t *p = dup_mstring(vec->u.str);
+            string_t *p;
+            
+            memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
+                   , "modifiable string");
 
             free_mstring(vec->u.str);
             vec->u.str = p;
@@ -3353,7 +3281,10 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
              */
             if (mstr_tabled(vec->u.str))
             {
-                string_t *p = dup_mstring(vec->u.str);
+                string_t *p;
+                
+                memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
+                       , "modifiable string");
 
                 free_mstring(vec->u.str);
                 vec->u.str = p;
@@ -3483,7 +3414,10 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
              */
             if (mstr_tabled(vec->u.str))
             {
-                string_t *p = dup_mstring(vec->u.str);
+                string_t *p;
+                
+                memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
+                       , "modifiable string");
 
                 free_mstring(vec->u.str);
                 vec->u.str = p;
@@ -3630,7 +3564,10 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
              */
             if (mstr_tabled(vec->u.str))
             {
-                string_t *p = dup_mstring(vec->u.str);
+                string_t *p;
+                
+                memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
+                       , "modifiable string");
 
                 free_mstring(vec->u.str);
                 vec->u.str = p;
@@ -3710,7 +3647,10 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
              */
             if (mstr_tabled(vec->u.str))
             {
-                string_t *p = dup_mstring(vec->u.str);
+                string_t *p;
+                
+                memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
+                       , "modifiable string");
 
                 free_mstring(vec->u.str);
                 vec->u.str = p;
@@ -3988,7 +3928,10 @@ protected_range_lvalue (int code, svalue_t *sp)
          */
         if (mstr_tabled(vec->u.str))
         {
-            string_t *p = dup_mstring(vec->u.str);
+            string_t *p;
+            
+            memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
+                   , "modifiable string");
 
             free_mstring(vec->u.str);
             vec->u.str = p;
@@ -7957,7 +7900,6 @@ again:
 
         break;
 
-=== Adapted until here ===
     CASE(F_SUBTRACT);               /* --- subtract            --- */
     {
         /* Subtract sp[0] from sp[-1] (the order is important), pop both
@@ -8047,21 +7989,21 @@ again:
             sp->u.map = m;
             break;
         }
-        else if ((sp-1)->type == T_OLD_STRING)
+        else if ((sp-1)->type == T_STRING)
         {
-            char * result;
+            string_t * result;
             
-            TYPE_TEST_RIGHT(sp, T_OLD_STRING);
+            TYPE_TEST_RIGHT(sp, T_STRING);
             inter_sp = sp;
-            result = intersect_strings((sp-1)->u.string, sp->u.string, MY_TRUE);
+            result = intersect_strings((sp-1)->u.str, sp->u.str, MY_TRUE);
             free_string_svalue(sp);
             sp--;
             free_string_svalue(sp);
-            put_malloced_string(sp, result);
+            put_string(sp, result);
             break;
         }
 
-        OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_OLD_STRING|TF_FLOAT|TF_NUMBER
+        OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_STRING|TF_FLOAT|TF_NUMBER
                       , sp[-1].type);
         /* NOTREACHED */
     }
@@ -8105,47 +8047,23 @@ again:
                 sp->type = T_FLOAT;
                 break;
             }
-            if (sp->type == T_OLD_STRING)
+            if (sp->type == T_STRING)
             {
-                char * result;
-                size_t reslen;
-                size_t len;
+                string_t * result;
 
                 if (sp[-1].u.number < 0)
                     ERROR("Bad right arg to *: negative number.\n");
                 
-                len = svalue_strlen(sp);
-                reslen = (size_t)sp[-1].u.number * len;
-                result = xalloc(reslen+1);
+                result = mstr_repeat(sp->u.str, (size_t)sp[-1].u.number);
                 if (!result)
-                    ERROR("Out of memory.\n");
+                    ERRORF(("Out of memory (%ld bytes).\n"
+                           , (long)(mstrsize(sp->u.str) * sp[-1].u.number)));
                 
-                if (sp[-1].u.number > 0 && len)
-                {
-                    size_t curlen;
-
-                    /* Seed result[] with one copy of the string */
-                    memcpy(result, sp->u.string, len);
-
-                    /* Repeatedly double the string in result */
-                    curlen = len;
-                    while (2*curlen < reslen)
-                    {
-                        memcpy(result+curlen, result, curlen);
-                        curlen *= 2;
-                    }
-
-                    /* Fill up result to the full length */
-                    if (reslen > curlen)
-                        memcpy(result+curlen, result, reslen-curlen);
-                }
-
-                result[reslen] = '\0';
-                DYN_STRING_COST(reslen)
+                DYN_STRING_COST(mstrsize(result))
                 free_svalue(sp);
                 sp--;
                 /* No free_svalue(sp): it's just a number */
-                put_malloced_string(sp, result);
+                put_string(sp, result);
                 break;
             }
             if (sp->type == T_POINTER)
@@ -8176,13 +8094,14 @@ again:
                         ; left
                         ; from++, to++, left--)
                     {
-                        if (from->type == T_OLD_STRING
-                         && from->x.string_type == STRING_MALLOC
+                        if (from->type == T_STRING
+                         && !mstr_tabled(from->u.str)
                            )
                         {
-                            put_old_string(to, make_shared_string(from->u.string));
-                            if (!to->u.string)
-                                ERROR("Out of memory.\n");
+                            put_string(to, make_tabled_from(from->u.str));
+                            if (!to->u.str)
+                                ERRORF(("Out of memory (%lu bytes).\n"
+                                       , (unsigned long)mstrsize(from->u.str)));
                         }
                         else
                             assign_svalue_no_free(to, from);
@@ -8204,7 +8123,7 @@ again:
                 put_array(sp, result);
                 break;
             }
-            OP_ARG_ERROR(2, TF_POINTER|TF_OLD_STRING|TF_FLOAT|TF_NUMBER
+            OP_ARG_ERROR(2, TF_POINTER|TF_STRING|TF_FLOAT|TF_NUMBER
                           , sp->type);
             /* NOTREACHED */
         case T_FLOAT:
@@ -8229,48 +8148,26 @@ again:
             OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
             /* NOTREACHED */
           }
-        case T_OLD_STRING:
+        case T_STRING:
           {
             if (sp->type == T_NUMBER)
             {
-                char * result;
-                size_t reslen;
-                size_t len;
-                size_t curlen;
+                string_t * result;
 
                 if (sp->u.number < 0)
                     ERROR("Bad left arg to *: negative number.\n");
                 
-                len = svalue_strlen(sp-1);
-                reslen = (size_t)sp->u.number * len;
-                result = xalloc(reslen+1);
+                result = mstr_repeat(sp[-1].u.str, (size_t)sp->u.number);
                 if (!result)
-                    ERROR("Out of memory.\n");
+                    ERRORF(("Out of memory (%ld bytes).\n"
+                           , (long)(mstrsize(sp[-1].u.str) * sp->u.number)));
                 
-                if (sp->u.number > 0 && len)
-                {
-                    /* Seed result[] with one copy of the string */
-                    memcpy(result, sp[-1].u.string, len);
+                DYN_STRING_COST(mstrsize(result))
 
-                    /* Repeatedly double the string in result */
-                    curlen = len;
-                    while (2*curlen < reslen)
-                    {
-                        memcpy(result+curlen, result, curlen);
-                        curlen *= 2;
-                    }
-
-                    /* Fill up result to the full length */
-                    if (reslen > curlen)
-                        memcpy(result+curlen, result, reslen-curlen);
-                }
-
-                result[reslen] = '\0';
-                DYN_STRING_COST(reslen)
                 /* No free_svalue(sp): it's just a number */
                 sp--;
                 free_string_svalue(sp);
-                put_malloced_string(sp, result);
+                put_string(sp, result);
                 break;
             }
             BAD_OP_ARG(2, T_NUMBER, sp->type);
@@ -8306,13 +8203,14 @@ again:
                         ; left
                         ; from++, to++, left--)
                     {
-                        if (from->type == T_OLD_STRING
-                         && from->x.string_type == STRING_MALLOC
+                        if (from->type == T_STRING
+                         && !mstr_tabled(from->u.str)
                            )
                         {
-                            put_old_string(to, make_shared_string(from->u.string));
-                            if (!to->u.string)
-                                ERROR("Out of memory.\n");
+                            put_string(to, make_tabled_from(from->u.str));
+                            if (!to->u.str)
+                                ERRORF(("Out of memory (%lu bytes).\n"
+                                       , (unsigned long)mstrsize(from->u.str)));
                         }
                         else
                             assign_svalue_no_free(to, from);
@@ -8338,7 +8236,7 @@ again:
             /* NOTREACHED */
           }
         default:
-            OP_ARG_ERROR(1, TF_POINTER|TF_OLD_STRING|TF_FLOAT|TF_NUMBER
+            OP_ARG_ERROR(1, TF_POINTER|TF_STRING|TF_FLOAT|TF_NUMBER
                           , sp[-1].type);
             /* NOTREACHED */
         }
@@ -8461,9 +8359,9 @@ again:
 
         int i;
 
-        if ((sp-1)->type == T_OLD_STRING && sp->type == T_OLD_STRING)
+        if ((sp-1)->type == T_STRING && sp->type == T_STRING)
         {
-            i = strcmp((sp-1)->u.string, sp->u.string) > 0;
+            i = mmstrcmp((sp-1)->u.str, sp->u.str) > 0;
             free_string_svalue(sp);
             sp--;
             free_string_svalue(sp);
@@ -8487,8 +8385,8 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
         ERRORF(("Arguments to > don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -8505,9 +8403,9 @@ again:
 
         int i;
 
-        if ((sp-1)->type == T_OLD_STRING && sp->type == T_OLD_STRING)
+        if ((sp-1)->type == T_STRING && sp->type == T_STRING)
         {
-            i = strcmp((sp-1)->u.string, sp->u.string) >= 0;
+            i = mstrcmp((sp-1)->u.str, sp->u.str) >= 0;
             free_string_svalue(sp);
             sp--;
             free_string_svalue(sp);
@@ -8531,8 +8429,8 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
         ERRORF(("Arguments to >= don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -8549,9 +8447,9 @@ again:
 
         int i;
 
-        if ((sp-1)->type == T_OLD_STRING && sp->type == T_OLD_STRING)
+        if ((sp-1)->type == T_STRING && sp->type == T_STRING)
         {
-            i = strcmp((sp-1)->u.string, sp->u.string) < 0;
+            i = mstrcmp((sp-1)->u.str, sp->u.str) < 0;
             free_string_svalue(sp);
             sp--;
             free_string_svalue(sp);
@@ -8575,8 +8473,8 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
         ERRORF(("Arguments to < don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -8593,9 +8491,9 @@ again:
 
         int i;
 
-        if ((sp-1)->type == T_OLD_STRING && sp->type == T_OLD_STRING)
+        if ((sp-1)->type == T_STRING && sp->type == T_STRING)
         {
-            i = strcmp((sp-1)->u.string, sp->u.string) <= 0;
+            i = mstrcmp((sp-1)->u.str, sp->u.str) <= 0;
             free_string_svalue(sp);
             sp--;
             free_string_svalue(sp);
@@ -8619,8 +8517,8 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
         ERRORF(("Arguments to <= don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -8654,8 +8552,8 @@ again:
         case T_POINTER:
             i = (sp-1)->u.vec == sp->u.vec;
             break;
-        case T_OLD_STRING:
-            i = strcmp((sp-1)->u.string, sp->u.string) == 0;
+        case T_STRING:
+            i = mstreq((sp-1)->u.str, sp->u.str);
             break;
         case T_OBJECT:
             i = (sp-1)->u.ob == sp->u.ob;
@@ -8665,7 +8563,7 @@ again:
         case T_CLOSURE:
         case T_SYMBOL:
         case T_QUOTED_ARRAY:
-            i = (sp-1)->u.string  == sp->u.string &&
+            i = (sp-1)->u.generic  == sp->u.generic &&
                 (sp-1)->x.generic == sp->x.generic;
             break;
         case T_MAPPING:
@@ -8709,8 +8607,8 @@ again:
         case T_NUMBER:
             i = (sp-1)->u.number != sp->u.number;
             break;
-        case T_OLD_STRING:
-            i = strcmp((sp-1)->u.string, sp->u.string);
+        case T_STRING:
+            i = !mstreq((sp-1)->u.str, sp->u.str);
             break;
         case T_POINTER:
             i = (sp-1)->u.vec != sp->u.vec;
@@ -8719,11 +8617,11 @@ again:
             i = (sp-1)->u.ob != sp->u.ob;
             break;
         case T_FLOAT:
-            /* This is of little use... well, at least 0. == 0. ... */
+            /* This is of little use... well, at least 0. != 0. ... */
         case T_CLOSURE:
         case T_SYMBOL:
         case T_QUOTED_ARRAY:
-            i = (sp-1)->u.string  != sp->u.string ||
+            i = (sp-1)->u.generic  != sp->u.generic ||
                 (sp-1)->x.generic != sp->x.generic;
             break;
         case T_MAPPING:
@@ -8774,15 +8672,15 @@ again:
             break;
         }
 
-        if (sp->type == T_OLD_STRING && (sp-1)->type == T_OLD_STRING)
+        if (sp->type == T_STRING && (sp-1)->type == T_STRING)
         {
-            char * result;
+            string_t * result;
             
             inter_sp = sp;
-            result = intersect_strings(sp[-1].u.string, sp->u.string, MY_FALSE);
+            result = intersect_strings(sp[-1].u.str, sp->u.str, MY_FALSE);
             free_string_svalue(sp-1);
             free_string_svalue(sp);
-            put_malloced_string(sp-1, result);
+            put_string(sp-1, result);
             sp--;
             break;
         }
@@ -8795,8 +8693,8 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_OLD_STRING|TF_POINTER);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_OLD_STRING|TF_POINTER);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_POINTER);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_POINTER);
         ERRORF(("Arguments to & don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -8884,10 +8782,8 @@ again:
 
         int i;
 
-        if ((sp-1)->type != T_NUMBER)
-            goto bad_arg_1;
-        if (sp->type != T_NUMBER)
-            goto bad_arg_2;
+        TYPE_TEST_LEFT((sp-1), T_NUMBER);
+        TYPE_TEST_RIGHT(sp, T_NUMBER);
 
         i = sp->u.number;
         sp--;
@@ -9011,14 +8907,14 @@ again:
                 put_number(sp, 0);
             }
         }
-        else if (sp[-2].type == T_OLD_STRING)
+        else if (sp[-2].type == T_STRING)
         {
             /* Slice a range from string */
 
-            int len, from, to;
-            char *res;
+            long len, from, to;
+            string_t *res;
 
-            len = (int)svalue_strlen(&sp[-2]);
+            len = (long)mstrsize(sp[-2].u.str);
             if (instruction == F_RANGE
              || instruction == F_NR_RANGE
              || instruction == F_NX_RANGE)
@@ -9041,23 +8937,25 @@ again:
             if (to < from)
             {
                 pop_n_elems(3);
-                push_volatile_string(sp, "");
+                push_ref_string(sp, STR_EMPTY);
                 break;
             }
 
             if (to == len-1)
             {
-                res = string_copy(sp[-2].u.string + from);
-                pop_n_elems(3);
-                push_malloced_string(sp, res);
-                break;
+                res = mstr_extract(sp[-2].u.str, from, -1);
             }
-
-            res = xalloc((size_t)(to - from + 2));
-            strncpy(res, sp[-2].u.string + from, (size_t)(to - from + 1));
-            res[to - from + 1] = '\0';
+            else
+            {
+                res = mstr_extract(sp[-2].u.str, from, to);
+            }
+            
+            if (res == NULL)
+            {
+                ERRORF(("Out of memory (%ld bytes).\n", to-from+1));
+            }
             pop_n_elems(3);
-            push_malloced_string(sp, res);
+            push_string(sp, res);
         }
         else
         {
@@ -9106,72 +9004,73 @@ again:
         switch(argp->type)
         {
 
-        case T_OLD_STRING:  /* Adding to a string */
+        case T_STRING:  /* Adding to a string */
           {
-            char *new_string;
+            string_t *new_string;
 
             /* Perform the addition, creating new_string */
             /* TODO: Make this use memcpy() instead of strcpy() */
-            if (type2 == T_OLD_STRING)
+            if (type2 == T_STRING)
             {
-                size_t l = _svalue_strlen(argp);
-                size_t l2 = _svalue_strlen(sp-1);
+                string_t *left, *right;
+                size_t len;
 
-                DYN_STRING_COST(l+l2)
-                inter_pc = pc;
-                if ( !(new_string = xalloc(l + l2 + 1)) )
-                    ERROR("Out of memory\n");
-                memcpy(new_string, argp->u.string, l);
-                memcpy(new_string+l, u2.string, l2+1);
+                left = argp->u.str;
+                right = (sp-1)->u.str;
+
+                len = mstrsize(left) + mstrsize(right);
+                DYN_STRING_COST(len)
+                new_string = mstr_add(left, right);
+                if (!new_string)
+                    ERRORF(("Out of memory (%lu bytes)\n"
+                           , (unsigned long) len
+                           ));
                 free_string_svalue(sp-1);
                 sp -= 2;
             }
             else if (type2 == T_NUMBER)
             {
                 char buff[80];
-                size_t l = _svalue_strlen(argp);
-
-                DYN_STRING_COST(l)
+                size_t len;
+                
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%ld", (long)u2.number);
                 if (buff[sizeof(buff)-1] != '\0')
                     FATAL("Buffer overflow in F_ADD_EQ: int number too big.\n");
-                inter_pc = pc;
-                if ( !(new_string =
-                       xalloc(l + strlen(buff) + 1)) )
-                    ERROR("Out of memory\n");
-                strcpy(new_string, argp->u.string);
-                strcat(new_string, buff);
+                len = mstrsize(argp->u.str)+strlen(buff);
+                DYN_STRING_COST(len)
+                new_string = mstr_add_txt(argp->u.str, buff, strlen(buff));
+                if (!new_string)
+                    ERRORF(("Out of memory (%lu bytes)\n"
+                           , (unsigned long) len
+                           ));
                 sp -= 2;
             }
             else if (type2 == T_FLOAT)
             {
                 char buff[160];
-                size_t l = _svalue_strlen(argp);
+                size_t len;
 
-                DYN_STRING_COST(l)
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%g", READ_DOUBLE(sp-1) );
                 if (buff[sizeof(buff)-1] != '\0')
                     FATAL("Buffer overflow in F_ADD_EQ: float number too big.\n");
-                inter_pc = pc;
-                if ( !(new_string =
-                       xalloc(l + strlen(buff) + 1)) )
-                    ERROR("Out of memory\n");
-                strcpy(new_string, argp->u.string);
-                strcat(new_string, buff);
+                len = mstrsize(argp->u.str) + strlen(buff);
+                DYN_STRING_COST(len)
+                new_string = mstr_add_txt(argp->u.str, buff, strlen(buff));
+                if (!new_string)
+                    ERRORF(("Out of memory (%lu bytes).\n", (unsigned long)len));
                 sp -= 2;
             }
             else
             {
-                OP_ARG_ERROR(2, TF_OLD_STRING|TF_FLOAT|TF_NUMBER, type2);
+                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, type2);
                 /* NOTREACHED */
             }
 
             /* Replace *argp by the new string */
             free_string_svalue(argp);
-            argp->x.string_type = STRING_MALLOC;
-            argp->u.string = new_string;
+            put_string(argp, new_string);
             break;
           }
 
@@ -9206,26 +9105,28 @@ again:
                 STORE_DOUBLE(sp, sum);
                 goto again;
             }
-            else if (type2 == T_OLD_STRING)
+            else if (type2 == T_STRING)
             {
-                char buff[80], *res;
-                size_t len1;
+                char buff[80];
+                string_t *right, *res;
+                size_t len;
 
+                right = (sp-1)->u.str;
                 buff[sizeof(buff)-1] = '\0';
                 sprintf(buff, "%ld", argp->u.number);
                 if (buff[sizeof(buff)-1] != '\0')
                     FATAL("Buffer overflow in F_ADD_EQ: int number too big.\n");
-                inter_pc = pc;
-                inter_sp = sp;
-                res = xalloc(svalue_strlen(sp-1) + (len1 = strlen(buff)) + 1);
+                len = mstrsize(right)+strlen(buff);
+                DYN_STRING_COST(len)
+                res = mstr_add_to_txt(buff, strlen(buff), right);
                 if (!res)
-                    ERROR("Out of memory\n");
-                strcpy(res, buff);
-                strcpy(res+len1, u2.string);
+                    ERRORF(("Out of memory (%lu bytes)\n"
+                           , (unsigned long) len
+                           ));
                 free_string_svalue(sp-1);
 
                 /* Overwrite the number in argp */
-                put_malloced_string(argp, res);
+                put_string(argp, res);
 
                 if (instruction == F_VOID_ADD_EQ)
                 {
@@ -9234,10 +9135,7 @@ again:
                 }
 
                 --sp;
-                res = string_copy(res);
-                if (!res)
-                    ERROR("Out of memory\n");
-                put_malloced_string(sp, res);
+                put_ref_string(sp, res);
 
                 goto again;
             }
@@ -9253,12 +9151,11 @@ again:
             {
                 if (instruction == F_VOID_ADD_EQ)
                 {
-                    *argp->u.string += u2.number;
+                    *argp->u.charp += u2.number;
                     sp -= 2;
                     goto again;
                 }
-                (--sp)->u.number = *argp->u.string += u2.number;
-                /* TODO: This might create a 0x00 character in a string */
+                (--sp)->u.number = *argp->u.charp += u2.number;
                 goto again;
             }
             else
@@ -9343,7 +9240,7 @@ again:
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_OLD_STRING|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
+            OP_ARG_ERROR(1, TF_STRING|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
                         , argp->type);
             /* NOTREACHED */
         } /* end of switch */
@@ -9408,28 +9305,27 @@ again:
                 /* NOTREACHED */
             }
             sp--;
-            sp->u.number = *argp->u.string -= u2.number;
-            /* TODO: May result in a 0x00 character in a string */
+            sp->u.number = *argp->u.charp -= u2.number;
             break;
 
-        case T_OLD_STRING:   /* Subtract from a string */
+        case T_STRING:   /* Subtract from a string */
         {
-            char * result;
+            string_t * result;
             
-            if (type2 != T_OLD_STRING)
+            if (type2 != T_STRING)
             {
-                OP_ARG_ERROR(2, TF_OLD_STRING, type2);
+                OP_ARG_ERROR(2, TF_STRING, type2);
                 /* NOTREACHED */
             }
 
             inter_sp = sp;
-            result = intersect_strings(argp->u.string, (sp-1)->u.string, MY_TRUE);
+            result = intersect_strings(argp->u.str, (sp-1)->u.str, MY_TRUE);
             free_string_svalue(argp);
-            put_malloced_string(argp, result);
+            put_string(argp, result);
             free_svalue(sp);
             sp--;
             free_string_svalue(sp);
-            put_malloced_string(sp, string_copy(result));
+            put_ref_string(sp, result);
             break;
         }
 
@@ -9527,7 +9423,7 @@ again:
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_OLD_STRING|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
+            OP_ARG_ERROR(1, TF_STRING|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
                         , argp->type);
             /* NOTREACHED */
         } /* end of switch */
@@ -9599,9 +9495,9 @@ again:
             break;
         }
 
-        if (argp->type == T_OLD_STRING)
+        if (argp->type == T_STRING)
         {
-            char * result;
+            string_t * result;
             size_t reslen;
             size_t len;
 
@@ -9617,37 +9513,16 @@ again:
                 /* NOTREACHED */
             }
             
-            len = svalue_strlen(argp);
+            len = mstrsize(argp->u.str);
             reslen = (size_t)sp->u.number * len;
-            result = xalloc(reslen+1);
+            result = mstr_repeat(argp->u.str, (size_t)sp->u.number);
             if (!result)
-                ERROR("Out of memory.\n");
+                ERRORF(("Out of memory (%lu bytes).\n", (unsigned long)reslen));
             
-            if (sp->u.number > 0 && len)
-            {
-                size_t curlen;
-
-                /* Seed result[] with one copy of the string */
-                memcpy(result, argp->u.string, len);
-
-                /* Repeatedly double the string in result */
-                curlen = len;
-                while (2*curlen < reslen)
-                {
-                    memcpy(result+curlen, result, curlen);
-                    curlen *= 2;
-                }
-
-                /* Fill up result to the full length */
-                if (reslen > curlen)
-                    memcpy(result+curlen, result, reslen-curlen);
-            }
-
-            result[reslen] = '\0';
             DYN_STRING_COST(reslen)
 
             free_string_svalue(argp);
-            put_malloced_string(argp, result);
+            put_string(argp, result);
             assign_svalue_no_free(sp, argp);
             break;
         }
@@ -9689,13 +9564,14 @@ again:
                     ; left
                     ; from++, to++, left--)
                 {
-                    if (from->type == T_OLD_STRING
-                     && from->x.string_type == STRING_MALLOC
+                    if (from->type == T_STRING
+                     && !mstr_tabled(from->u.str)
                        )
                     {
-                        put_old_string(to, make_shared_string(from->u.string));
-                        if (!to->u.string)
-                            ERROR("Out of memory.\n");
+                        put_string(to, make_tabled_from(from->u.str));
+                        if (!to->u.str)
+                            ERRORF(("Out of memory (%lu bytes).\n"
+                                   , (unsigned long)mstrsize(from->u.str)));
                     }
                     else
                         assign_svalue_no_free(to, from);
@@ -9717,7 +9593,7 @@ again:
             break;
         }
         
-        OP_ARG_ERROR(1, TF_OLD_STRING|TF_FLOAT|TF_POINTER|TF_NUMBER
+        OP_ARG_ERROR(1, TF_STRING|TF_FLOAT|TF_POINTER|TF_NUMBER
                     , argp->type);
         /* NOTREACHED */
         break;
@@ -9902,27 +9778,27 @@ again:
             break;
         }
 
-        if (argp->type == T_OLD_STRING)
+        if (argp->type == T_STRING)
         {
-            char * result;
+            string_t * result;
             
-            if (sp[-1].type != T_OLD_STRING)
+            if (sp[-1].type != T_STRING)
             {
-                OP_ARG_ERROR(2, TF_OLD_STRING, sp[-1].type);
+                OP_ARG_ERROR(2, TF_STRING, sp[-1].type);
                 /* NOTREACHED */
             }
             inter_sp = sp;
-            result = intersect_strings(argp->u.string, (sp-1)->u.string, MY_FALSE);
+            result = intersect_strings(argp->u.str, (sp-1)->u.str, MY_FALSE);
             free_string_svalue(argp);
-            put_malloced_string(argp, result);
+            put_string(argp, result);
             free_svalue(sp);
             sp--;
             free_string_svalue(sp);
-            put_malloced_string(sp, string_copy(result));
+            put_ref_string(sp, result);
             break;
         }
 
-        OP_ARG_ERROR(1, TF_NUMBER|TF_OLD_STRING|TF_POINTER, argp->type);
+        OP_ARG_ERROR(1, TF_NUMBER|TF_STRING|TF_POINTER, argp->type);
         /* NOTREACHED */
         break;
     }
@@ -9933,7 +9809,7 @@ again:
          * assign the result to sp[0] and also leave it on the stack.
          *
          * Possible type combinations:
-         *   int         & int                -> int
+         *   int         | int                -> int
          *
          * TODO: Extend this to mappings and arrays.
          */
@@ -10061,9 +9937,9 @@ again:
 
         int i;
         svalue_t *argp;
+
 #ifdef DEBUG
-        if (sp->type != T_LVALUE)
-            goto bad_arg_1;
+        TYPE_TEST_LEFT(sp, T_LVALUE);
 #endif
 
         /* Set argp to the actual value designated by sp[0] */
@@ -10077,13 +9953,16 @@ again:
         {
             sp--;
             if (sp->type != T_NUMBER)
-                goto bad_right;
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
             i = sp->u.number;
             argp->u.number >>= (uint)i > MAX_SHIFT ? (MAX_SHIFT+1) : i;
             sp->u.number = argp->u.number;
             break;
         }
-        goto bad_left;
+        OP_ARG_ERROR(1, TF_NUMBER, argp->type);
         /* NOTREACHED */ break;
     }
 
@@ -10396,7 +10275,7 @@ again:
         if (!current_object->variables && variable_index_offset)
             fatal("%s Fatal: call function for object %p '%s' w/o variables, "
                   "but offset %d\n"
-                 , time_stamp(), current_object, current_object->name
+                 , time_stamp(), current_object, get_txt(current_object->name)
                  , variable_index_offset);
 #endif
         current_variables = current_object->variables;
@@ -10506,8 +10385,9 @@ again:
                         "%s from %s into %s (topmost program %s) FAILED.\n"
                         "%s Please check the inherit tree and report it.\n"
                        , ts, ts
-                       , current_prog->name, inheritp->prog->name
-                       , current_object->prog->name
+                       , get_txt(current_prog->name)
+                       , get_txt(inheritp->prog->name)
+                       , get_txt(current_object->prog->name)
                        , ts);
             }
 #endif
@@ -10542,8 +10422,8 @@ again:
         printf("DEBUG: %s:%d : call_inherited for object %p '%s', "
                "program %p '%s' w/o variables, but offset %d\n"
                  , __FILE__, __LINE__
-                 , current_object, current_object->name
-                 , current_prog, current_prog->name
+                 , current_object, get_txt(current_object->name)
+                 , current_prog, get_txt(current_prog->name)
                  , variable_index_offset);
 #endif
         current_variables += variable_index_offset;
@@ -10729,7 +10609,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = range_lvalue(NN_INDEX, sp);
+        sp = range_lvalue(NN_RANGE, sp);
         break;
 
     CASE(F_NR_RANGE_LVALUE);           /* --- nr_range_lvalue     --- */
@@ -10743,7 +10623,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = range_lvalue(NR_INDEX, sp);
+        sp = range_lvalue(NR_RANGE, sp);
         break;
 
     CASE(F_RN_RANGE_LVALUE);           /* --- rn_range_lvalue     --- */
@@ -10757,7 +10637,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = range_lvalue(RN_INDEX, sp);
+        sp = range_lvalue(RN_RANGE, sp);
         break;
 
     CASE(F_RR_RANGE_LVALUE);           /* --- rr_range_lvalue     --- */
@@ -10771,7 +10651,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = range_lvalue(RR_INDEX, sp);
+        sp = range_lvalue(RR_RANGE, sp);
         break;
 
     CASE(F_NX_RANGE_LVALUE);           /* --- nx_range_lvalue     --- */
@@ -10791,7 +10671,7 @@ again:
         sp++;
         sp[0] = sp[-1];       /* Pull up the 'v' */
         put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-        sp = range_lvalue(NR_INDEX, sp);
+        sp = range_lvalue(NR_RANGE, sp);
         break;
 
     CASE(F_RX_RANGE_LVALUE);           /* --- rx_range_lvalue     --- */
@@ -10811,7 +10691,7 @@ again:
         sp++;
         sp[0] = sp[-1];       /* Pull up the 'v' */
         put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-        sp = range_lvalue(RR_INDEX, sp);
+        sp = range_lvalue(RR_RANGE, sp);
         break;
 
                           /* --- push_protected_indexed_lvalue --- */
@@ -10908,7 +10788,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = protected_range_lvalue(NN_INDEX, sp);
+        sp = protected_range_lvalue(NN_RANGE, sp);
         break;
 
                            /* --- protected_nr_range_lvalue --- */
@@ -10927,7 +10807,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = protected_range_lvalue(NR_INDEX, sp);
+        sp = protected_range_lvalue(NR_RANGE, sp);
         break;
 
                              /* --- protected_rn_range_lvalue --- */
@@ -10946,7 +10826,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = protected_range_lvalue(RN_INDEX, sp);
+        sp = protected_range_lvalue(RN_RANGE, sp);
         break;
 
                              /* --- protected_rr_range_lvalue --- */
@@ -10965,7 +10845,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = protected_range_lvalue(RR_INDEX, sp);
+        sp = protected_range_lvalue(RR_RANGE, sp);
         break;
 
                               /* --- protected_nx_range_lvalue --- */
@@ -10991,7 +10871,7 @@ again:
         sp++;
         sp[0] = sp[-1];       /* Pull up the 'v' */
         put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-        sp = protected_range_lvalue(NR_INDEX, sp);
+        sp = protected_range_lvalue(NR_RANGE, sp);
         break;
 
                           /* --- protected_rx_range_lvalue --- */
@@ -11017,7 +10897,7 @@ again:
         sp++;
         sp[0] = sp[-1];       /* Pull up the 'v' */
         put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-        sp = protected_range_lvalue(RR_INDEX, sp);
+        sp = protected_range_lvalue(RR_RANGE, sp);
         break;
 
     CASE(F_SIMUL_EFUN); /* --- simul_efun <code> [<num_arg>]   --- */
@@ -11098,7 +10978,7 @@ again:
             if (!ob->variables && entry->variable_index_offset)
                 fatal("%s Fatal: call sefun for object %p '%s' w/o variables, "
                       "but offset %ld\n"
-                     , time_stamp(), ob, ob->name
+                     , time_stamp(), ob, get_txt(ob->name)
                      , (long)(entry->variable_index_offset));
 #endif
             current_variables = ob->variables;
@@ -11265,8 +11145,6 @@ again:
          * function code and uint8 <num> is used to index that array
          * from the end.
          */
-#define MY_LAMBDA_VALUE_OFFSET (sizeof(svalue_t) + \
-            ((PTRTYPE)(&((lambda_t *)0)->function.code[1])-(PTRTYPE) 0) )
         int ix;
         svalue_t * cstart;
 
@@ -11276,17 +11154,6 @@ again:
         /* Get the pointer to the last constant value */
         cstart = (svalue_t *)((char *)(csp->funstart)
                                    - LAMBDA_VALUE_OFFSET);
-#ifdef DEBUG
-        /* TODO: Remove this if nobody complains. */
-        if (MY_LAMBDA_VALUE_OFFSET != LAMBDA_VALUE_OFFSET)
-        {
-           fprintf(stderr, "DEBUG: %s:lambda offset: %ld should be %ld\n"
-                  , time_stamp(), (long)LAMBDA_VALUE_OFFSET, (long)MY_LAMBDA_VALUE_OFFSET
-                  );
-            cstart = (svalue_t *)((char *)(csp->funstart)
-                                   - MY_LAMBDA_VALUE_OFFSET);
-        }
-#endif
         sp++;
         assign_checked_svalue_no_free(sp, cstart - ix);
         break;
@@ -11310,19 +11177,6 @@ again:
         /* Get the pointer to the last constant value */
         cstart = (svalue_t *)((char *)(csp->funstart)
                                    - LAMBDA_VALUE_OFFSET);
-
-#ifdef DEBUG
-        /* TODO: Remove this if nobody complains. */
-        if (MY_LAMBDA_VALUE_OFFSET != LAMBDA_VALUE_OFFSET)
-        {
-           fprintf(stderr, "DEBUG: %s lambda offset: %ld should be %ld\n"
-                  , time_stamp(), (long)LAMBDA_VALUE_OFFSET, (long)MY_LAMBDA_VALUE_OFFSET
-                  );
-            cstart = (svalue_t *)((char *)(csp->funstart)
-                                   - MY_LAMBDA_VALUE_OFFSET);
-        }
-#endif
-
         sp++;
         assign_checked_svalue_no_free(sp, cstart - ix);
         break;
@@ -11445,7 +11299,7 @@ again:
         nargs = LOAD_UINT8(pc);
         LOAD_SHORT(offset, pc);
 
-        if (sp->type != T_OLD_STRING
+        if (sp->type != T_STRING
          && sp->type != T_POINTER
          && sp->type != T_MAPPING)
             ERRORF(("foreach() got a %s, requires a string/array/mapping.\n"
@@ -11454,9 +11308,9 @@ again:
 
         /* Find out how many variables we require */
 
-        if (sp->type == T_OLD_STRING)
+        if (sp->type == T_STRING)
         {
-            count = (p_int)svalue_strlen(sp);
+            count = (p_int)mstrsize(sp->u.str);
             vars_required = 1;
         }
         else if (sp->type == T_POINTER)
@@ -11609,10 +11463,10 @@ again:
 #endif
             lvalue = lvalue->u.lvalue;
 
-            if (sp[-2].type == T_OLD_STRING)
+            if (sp[-2].type == T_STRING)
             {
                 free_svalue(lvalue);
-                put_number(lvalue, sp[-2].u.string[ix]);
+                put_number(lvalue, get_txt(sp[-2].u.str)[ix]);
             }
             else if (sp[-2].type == T_POINTER)
             {
@@ -11755,13 +11609,13 @@ again:
         {
             i = (sp->u.ob->flags & O_CLONE);
         }
-        else if (sp->type == T_OLD_STRING)
+        else if (sp->type == T_STRING)
         {
             object_t *o;
 
-            o = find_object(sp->u.string);
+            o = find_object(sp->u.str);
             if (!o)
-                ERRORF(("No such object '%s'.\n", sp->u.string));
+                ERRORF(("No such object '%s'.\n", get_txt(sp->u.str)));
             i = o->flags & O_CLONE;
         }
         else
@@ -11902,7 +11756,7 @@ again:
 
         int i;
 
-        i = sp->type == T_OLD_STRING;
+        i = sp->type == T_STRING;
         free_svalue(sp);
         put_number(sp, i);
         break;
@@ -11987,8 +11841,8 @@ again:
          * anywhere.
          */
 
-        TYPE_TEST1(sp, T_OLD_STRING);
-        ERRORF(("%s", sp->u.string));
+        TYPE_TEST1(sp, T_STRING);
+        ERRORF(("%s", get_txt(sp->u.str)));
       }
 
     CASE(F_THROW);                  /* --- throw               --- */
@@ -12020,16 +11874,16 @@ again:
 
         size_t i;
 
-        if (sp->type == T_OLD_STRING)
+        if (sp->type == T_STRING)
         {
-            i = _svalue_strlen(sp);
+            i = mstrsize(sp->u.str);
             free_string_svalue(sp);
             put_number(sp, (p_int)i);
             break;
         }
         if (sp->type == T_NUMBER && sp->u.number == 0)
             break;
-        RAISE_ARG_ERROR(1, TF_NULL|TF_OLD_STRING, sp->type);
+        RAISE_ARG_ERROR(1, TF_NULL|TF_STRING, sp->type);
         /* NOTREACHED */
     }
 
@@ -12112,15 +11966,15 @@ again:
 
         /* Test the arguments */
         if (arg[0].type != T_OBJECT
-         && arg[0].type != T_OLD_STRING
+         && arg[0].type != T_STRING
          && arg[0].type != T_POINTER
            )
-            RAISE_ARG_ERROR(1, TF_OBJECT|TF_OLD_STRING|TF_POINTER, arg[0].type);
+            RAISE_ARG_ERROR(1, TF_OBJECT|TF_STRING|TF_POINTER, arg[0].type);
 
-        TYPE_TEST2(arg+1, T_OLD_STRING)
-        if (arg[1].u.string[0] == ':')
+        TYPE_TEST2(arg+1, T_STRING)
+        if (get_txt(arg[1].u.str)[0] == ':')
             ERRORF(("Illegal function name in call_other: %s\n",
-                  arg[1].u.string));
+                  get_txt(arg[1].u.str)));
 
         /* No external calls may be done when this object is
          * destructed.
@@ -12142,10 +11996,10 @@ again:
                 ob = arg[0].u.ob;
             else /* it's a string */
             {
-                ob = get_object(arg[0].u.string);
+                ob = get_object(arg[0].u.str);
                 if (ob == NULL)
                     ERRORF(("call_other() failed: can't get object '%s'\n"
-                           , arg[0].u.string));
+                           , get_txt(arg[0].u.str)));
             }
 
             /* Traceing, if necessary */
@@ -12153,14 +12007,14 @@ again:
             {
                 if (!++traceing_recursion)
                 {
-                    do_trace("Call other ", arg[1].u.string, "\n");
+                    do_trace("Call other ", get_txt(arg[1].u.str), "\n");
                 }
                 traceing_recursion--;
             }
 
             /* Call the function with the remaining args on the stack.
              */
-            if (!apply_low(arg[1].u.string, ob, num_arg-2, MY_FALSE))
+            if (!apply_low(arg[1].u.str, ob, num_arg-2, MY_FALSE))
             {
                 /* Function not found */
                 pop_n_elems(num_arg);
@@ -12220,13 +12074,13 @@ again:
 
                 if (svp->type == T_OBJECT)
                     ob = svp->u.ob;
-                else if (svp->type == T_OLD_STRING)
+                else if (svp->type == T_STRING)
                 {
-                    ob = get_object(svp->u.string);
+                    ob = get_object(svp->u.str);
                     if (ob == NULL)
                     {
                         ERRORF(("call_other() failed: can't get object '%s'\n"
-                               , svp->u.string));
+                               , get_txt(svp->u.str)));
                         /* NOTREACHED */
                         continue;
                     }
@@ -12257,7 +12111,7 @@ again:
                 {
                     if (!++traceing_recursion)
                     {
-                        do_trace("Call other ", arg[1].u.string, "\n");
+                        do_trace("Call other ", get_txt(arg[1].u.str), "\n");
                     }
                     traceing_recursion--;
                 }
@@ -12272,7 +12126,7 @@ again:
                 /* Call the function with the remaining args on the stack.
                  */
                 inter_sp = sp; /* was clobbered by the previous loop */
-                if (!apply_low(arg[1].u.string, ob, num_arg-2, MY_FALSE))
+                if (!apply_low(arg[1].u.str, ob, num_arg-2, MY_FALSE))
                 {
                     /* Function not found: clean up the stack and
                      * assign 0 as result.
@@ -12491,7 +12345,7 @@ again:
 
 /*-------------------------------------------------------------------------*/
 static Bool
-apply_low (char *fun, object_t *ob, int num_arg, Bool b_ign_prot)
+apply_low (string_t *fun, object_t *ob, int num_arg, Bool b_ign_prot)
 
 /* The low-level implementation of function calls.
  *
@@ -12561,27 +12415,22 @@ retry_for_shadow:
 #ifdef DEBUG
     if (ob->flags & O_DESTRUCTED)
         fatal("apply() on destructed object '%s' function '%s'\n"
-             , ob->name != NULL ? ob->name : "<null>"
-             , fun != NULL ? fun : "<null>"
+             , ob->name != NULL ? get_txt(ob->name) : "<null>"
+             , fun != NULL ? get_txt(fun) : "<null>"
              );
 #endif
 
-    if ( ((p_int)fun & 2) != ((p_int)SHSTR_OVERHEAD & 2) )
+    /* Get the function name as a shared (directly tabled) string.
+     * Since function names are always tabled, such a string must exist
+     * if the function exists.
+     */
+    if (!mstr_d_tabled(fun))
     {
-        /* Heuristic to find out if fun is an unshared string,
-         * building on the six-byte-overhead of shared strings.
-         * This means that every shared string has a set bit 1,
-         * whereas other strings have no overhead and thus bit 1
-         * cleared. Function names are always shared, so if there
-         * is no shared string twin for fun, the called function does
-         * not exist anywhere. As a side effect, we get the shared
-         * string for fun which makes the cache-lookup much faster.
-         */
-        fun = findstring(fun);
+        fun = find_tabled(fun);
         if (!fun)
             goto failure2;
     }
-    /* *fun is now (more or less) guaranteed to be a shared string */
+    /* fun is now guaranteed to be a shared string */
 
     /* Get the hashed index into the cache */
     ix =
@@ -12590,7 +12439,7 @@ retry_for_shadow:
 
     /* Check if we have an entry for this function call */
     if (cache[ix].id == progp->id_number
-     && (cache[ix].name == fun || !strcmp(cache[ix].name, fun))
+     && (cache[ix].name == fun || mstreq(cache[ix].name, fun))
        )
     {
         /* We have found a matching entry in the cache. The contents have
@@ -12627,7 +12476,7 @@ retry_for_shadow:
             if (!ob->variables && cache[ix].variable_index_offset)
                 fatal("%s Fatal: apply (cached) for object %p '%s' "
                       "w/o variables, but offset %d\n"
-                     , time_stamp(), ob, ob->name
+                     , time_stamp(), ob, get_txt(ob->name)
                      , cache[ix].variable_index_offset);
 #endif
             current_variables = ob->variables;
@@ -12655,16 +12504,12 @@ retry_for_shadow:
     else
     {
         /* we have to search the function */
-        char *shared_name;
+        string_t *shared_name;
 
 #ifdef APPLY_CACHE_STAT
         apply_cache_miss++;
 #endif
-        /* This call to findstring() is not really necessary, but serves
-         * as safeguard should a non-shared string escape the attention
-         * of the 'heuristic' filter before.
-         */
-        shared_name = (cache[ix].name == fun) ? fun : findstring(fun);
+        shared_name = (cache[ix].name == fun) ? fun : NULL;
         if ( NULL != shared_name)
         {
             int fx;
@@ -12688,33 +12533,33 @@ retry_for_shadow:
                    */
                 csp->ob = current_object;
                 csp->prev_ob = previous_ob;
-                if (!cache[ix].progp)
-                {
-                    /* The old cache entry was for an undefined function,
-                     * so the name had to be malloced.
-                     */
-                    xfree(cache[ix].name);
-                }
+                if (cache[ix].name)
+                    free_mstring(cache[ix].name);
 
                 cache[ix].id = progp->id_number;
-                cache[ix].name = shared_name;
+                cache[ix].name = ref_mstring(shared_name);
+
                 csp->num_local_variables = num_arg;
                 current_prog = progp;
                 flags = setup_new_frame1(fx, 0, 0);
                 current_strings = current_prog->strings;
+
                 cache[ix].progp = current_prog;
                 cache[ix].function_index_offset = function_index_offset;
                 cache[ix].variable_index_offset = variable_index_offset;
+
 #ifdef DEBUG
                 if (!ob->variables && variable_index_offset)
                     fatal("%s Fatal: apply for object %p '%s' w/o variables, "
                           "but offset %d\n"
-                         , time_stamp(), ob, ob->name, variable_index_offset);
+                         , time_stamp(), ob, get_txt(ob->name)
+                         , variable_index_offset);
 #endif
                 current_variables = ob->variables;
                 if (current_variables)
                     current_variables += variable_index_offset;
                 funstart = current_prog->program + (flags & FUNSTART_MASK);
+
                 cache[ix].funstart = funstart;
                 cache[ix].flags = progp->functions[fx]
                                   & (TYPE_MOD_STATIC|TYPE_MOD_PROTECTED);
@@ -12764,15 +12609,11 @@ retry_for_shadow:
 
         /* We have to mark this function as non-existant in this object. */
 
-        if (!cache[ix].progp)
-        {
-            /* The old cache entry was for an undefined function, so the
-               name had to be malloced */
-            xfree(cache[ix].name);
-        }
+        if (cache[ix].name)
+            free_mstring(cache[ix].name);
 
         cache[ix].id = progp->id_number;
-        cache[ix].name = string_copy(fun);
+        cache[ix].name = ref_mstring(fun);
         cache[ix].progp = NULL;
     }
 
@@ -12788,7 +12629,7 @@ retry_for_shadow:
     }
 
 failure:
-    if (fun[0] == ':')
+    if (get_txt(fun)[0] == ':')
         error("Illegal function call\n");
 
 failure2:
@@ -12824,7 +12665,7 @@ pop_apply_value (void)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-sapply_int (char *fun, object_t *ob, int num_arg, Bool b_find_static)
+sapply_int (string_t *fun, object_t *ob, int num_arg, Bool b_find_static)
 
 /* Call function <fun> in <ob>ject with <num_arg> arguments pushed
  * onto the stack (<inter_sp> points to the last one). static and protected
@@ -12880,7 +12721,7 @@ sapply_int (char *fun, object_t *ob, int num_arg, Bool b_find_static)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-apply (char *fun, object_t *ob, int num_arg)
+apply (string_t *fun, object_t *ob, int num_arg)
 
 /* Call function <fun> in <ob>ject with <num_arg> arguments pushed
  * onto the stack (<inter_sp> points to the last one). static and protected
@@ -12963,7 +12804,7 @@ secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-secure_apply (char *fun, object_t *ob, int num_arg)
+secure_apply (string_t *fun, object_t *ob, int num_arg)
 
 /* Call function <fun> in <ob>ject with <num_arg> arguments pushed
  * onto the stack (<inter_sp> points to the last one). static and protected
@@ -13010,7 +12851,7 @@ secure_apply (char *fun, object_t *ob, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-apply_master_ob (char *fun, int num_arg)
+apply_master_ob (string_t *fun, int num_arg)
 
 /* Call function <fun> in the master object with <num_arg> arguments pushed
  * onto the stack (<inter_sp> points to the last one). static and protected
@@ -13070,8 +12911,8 @@ apply_master_ob (char *fun, int num_arg)
     if (setjmp(error_recovery_info.con.text))
     {
         secure_apply_error(save_sp - num_arg, save_csp);
-        printf("%s Error in master_ob->%s()\n", time_stamp(), fun);
-        debug_message("%s Error in master_ob->%s()\n", time_stamp(), fun);
+        printf("%s Error in master_ob->%s()\n", time_stamp(), get_txt(fun));
+        debug_message("%s Error in master_ob->%s()\n", time_stamp(), get_txt(fun));
         result = NULL;
     }
     else
@@ -13156,7 +12997,7 @@ assert_master_ob_loaded (void)
             /* First, make sure that there is no half-done object
              * using the masters name.
              */
-            if ( NULL != (ob = find_object(master_name)) )
+            if ( NULL != (ob = find_object(master_name_str)) )
             {
                 destruct(ob);
             }
@@ -13263,7 +13104,7 @@ assert_master_ob_loaded (void)
 
         init_telopts();
 
-        master_ob = get_object(master_name);
+        master_ob = get_object(master_name_str);
         if (current_object == &dummy_current_object_for_loads)
         {
             /* This might be due to the above assignment, or to setting
@@ -13337,7 +13178,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
             /* inter_sp == sp */
             CLEAN_CSP
             error("Object '%s' the closure was bound to has been "
-                  "destructed\n", l->ob->name);
+                  "destructed\n", get_txt(l->ob->name));
             /* NOTREACHED */
             return;
         }
@@ -13382,7 +13223,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
             /* inter_sp == sp */
             CLEAN_CSP
             error("Object '%s' the closure was bound to has been "
-                  "destructed\n", l->ob->name);
+                  "destructed\n", get_txt(l->ob->name));
             /* NOTREACHED */
             return;
         }
@@ -13400,7 +13241,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
             /* inter_sp == sp */
             CLEAN_CSP
             error("Object '%s' holding the closure has been "
-                  "destructed\n", l->function.alien.ob->name);
+                  "destructed\n", get_txt(l->function.alien.ob->name));
             /* NOTREACHED */
             return;
         }
@@ -13484,7 +13325,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
         if (!l->ob->variables)
             fatal("%s Fatal: call_lambda on variable for object %p '%s' "
                   "w/o variables, index %d\n"
-                 , time_stamp(), l->ob, l->ob->name, i);
+                 , time_stamp(), l->ob, get_txt(l->ob->name), i);
 #endif
         assign_svalue_no_free(++sp, &l->ob->variables[i]);
         inter_sp = sp;
@@ -13514,7 +13355,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
             /* inter_sp == sp */
             CLEAN_CSP
             error("Object '%s' the closure was bound to has been "
-                  "destructed\n", l->ob->name);
+                  "destructed\n", get_txt(l->ob->name));
             /* NOTREACHED */
             return;
         }
@@ -13569,7 +13410,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
             /* inter_sp == sp */
             CLEAN_CSP
             error("Object '%s' the closure was bound to has been "
-                  "destructed\n", current_object->name);
+                  "destructed\n", get_txt(current_object->name));
             /* NOTREACHED */
             return;
         }
@@ -13597,6 +13438,8 @@ call_lambda (svalue_t *lsvp, int num_arg)
             {
                 /* The closure was discovered to be bound to a destructed
                  * object and thus disabled.
+                 * TODO: The disabling code could leave the name of the object
+                 * TODO:: somewhere behind.
                  */
                 CLEAN_CSP
                 error("Object the closure was bound to has been destructed\n");
@@ -13784,7 +13627,7 @@ call_simul_efun (int code, object_t *ob, int num_arg)
  */
 
 {
-    char *function_name;
+    string_t *function_name;
 
     function_name = simul_efunp[code].name;
 
@@ -13800,12 +13643,12 @@ call_simul_efun (int code, object_t *ob, int num_arg)
             i = (long)VEC_SIZE(simul_efun_vector);
             for (v = simul_efun_vector->item+1; MY_TRUE; v++)
             {
-                if (--i <= 0 || v->type != T_OLD_STRING)
+                if (--i <= 0 || v->type != T_STRING)
                 {
                     error("Calling a vanished simul_efun\n");
                     return;
                 }
-                if ( !(ob = get_object(v->u.string)) )
+                if ( !(ob = get_object(v->u.str)) )
                     continue;
                 if (apply_low(function_name, ob, num_arg, MY_FALSE))
                     return;
@@ -13856,7 +13699,7 @@ call_function (program_t *progp, int fx)
 
 /*-------------------------------------------------------------------------*/
 int
-get_line_number (bytecode_p p, program_t *progp, char **namep)
+get_line_number (bytecode_p p, program_t *progp, string_t **namep)
 
 /* Look up the line number for address <p> within the program <progp>.
  * Result is the line number, and *<namep> is set to the name of the
@@ -13864,7 +13707,10 @@ get_line_number (bytecode_p p, program_t *progp, char **namep)
  *
  * If the code was generated from an included file, and if the name lengths
  * allow it, the returned name is "<program name> (<include filename>)".
- * In this case, the returned *<namep> points to a static buffer.
+ * In this case, the returned *<namep> points to an untabled string.
+ *
+ * In either case, the string returned in *<namep> has one reference
+ * added.
  *
  * TODO: (an old comment which might no longer be true): This can be done
  * TODO:: much more efficiently, but that change has low priority.)
@@ -13873,14 +13719,14 @@ get_line_number (bytecode_p p, program_t *progp, char **namep)
     /* Datastructure to keep track of included files */
     struct incinfo
     {
-        char *name;             /* Name of parent file */
+        string_t *name;         /* Name of parent file */
         struct incinfo *super;  /* Pointer to parent entry */
         int super_line;         /* Line number within parent file */
     };
 
     int offset;            /* (Remaining) program offset to resolve */
     int i;                 /* Current line number */
-    char **include_names;  /* Pointer to the array of include file names */
+    string_t **include_names;  /* Pointer to the array of include file names */
     struct incinfo *inctop = NULL;  /* The include information stack. */
     int relocated_from = 0;
     int relocated_to = -1;
@@ -13893,7 +13739,7 @@ get_line_number (bytecode_p p, program_t *progp, char **namep)
 
     if (!progp || !p)
     {
-        *namep = "UNDEFINED";
+        *namep = ref_mstring(STR_UNDEFINED);
         return 0;
     }
 
@@ -14056,12 +13902,14 @@ get_line_number (bytecode_p p, program_t *progp, char **namep)
 
         static char namebuf[80];
 
-        *namep = inctop->name;
-        if (strlen(*namep) + strlen(progp->name) < sizeof(namebuf) - 3)
+        if (mstrsize(inctop->name) + mstrsize(progp->name) < sizeof(namebuf) - 3)
         {
-            sprintf(namebuf, "%s (%s)", progp->name, *namep);
-            *namep = namebuf;
+            sprintf(namebuf, "%s (%s)"
+                           , get_txt(progp->name), get_txt(inctop->name));
+            memsafe(*namep = new_mstring(namebuf), strlen(namebuf), "filename");
         }
+        else 
+            *namep = ref_mstring(inctop->name);
 
         /* Free the include stack structures */
         do {
@@ -14076,7 +13924,7 @@ get_line_number (bytecode_p p, program_t *progp, char **namep)
     {
         /* Normal code */
 
-        *namep = progp->name;
+        *namep = ref_mstring(progp->name);
     }
 
     if (old_total)
@@ -14096,7 +13944,7 @@ get_line_number (bytecode_p p, program_t *progp, char **namep)
 
 /*-------------------------------------------------------------------------*/
 int
-get_line_number_if_any (char **name)
+get_line_number_if_any (string_t **name)
 
 /* Look up the line number for the current execution address.
  * Result is the line number, and *<namep> is set to the name of the
@@ -14106,13 +13954,14 @@ get_line_number_if_any (char **name)
  * the approximate position offset of the offending instruction within
  * the closure.
  *
- * *<namep> may point to a static buffer.
+ * *<namep> may point to an untabled string; and in any case has its
+ * own reference.
  */
 
 {
     if (csp >= &control_stack[0] && csp->funstart == SIMUL_EFUN_FUNSTART)
     {
-        *name = "<simul_efun closure>";
+        *name = ref_mstring(STR_SEFUN_CLOSURE);
         return 0;
     }
 
@@ -14131,12 +13980,11 @@ get_line_number_if_any (char **name)
             if (buf[sizeof buf - 1] != '\0')
                 fatal("interpret:get_line_number_if_any(): "
                       "buffer overflow.\n");
-            iname = buf;
+            memsafe(*name = new_mstring(buf), strlen(buf), "instruction name");
         }
         else
-            iname = "<efun closure>";
+            *name = ref_mstring(STR_EFUN_CLOSURE);
 
-        *name = iname;
         return 0;
     }
 
@@ -14148,18 +13996,19 @@ get_line_number_if_any (char **name)
             static char name_buffer[24];
 
             sprintf(name_buffer, "<lambda 0x%6lx>", (long)csp->funstart);
-            *name = name_buffer;
+            memsafe(*name = new_mstring(name_buffer), strlen(name_buffer)
+                   , "lambda name");
             return inter_pc - csp->funstart - 2;
         }
         return get_line_number(inter_pc, current_prog, name);
     }
 
-    *name = "";
+    *name = ref_mstring(STR_EMPTY);
     return 0;
 }
 
 /*-------------------------------------------------------------------------*/
-char *
+string_t *
 collect_trace (strbuf_t * sbuf, vector_t ** rvec )
 
 /* Collect the traceback for the current (resp. last) function call, starting
@@ -14172,17 +14021,17 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
  * which pointer is put into *<rvec>. For the format of the array, see
  * efun debug_info().
  *
- * If a heart_beat() is involved, return a pointer to the name of the object
- * that had it, otherwise return NULL.
+ * If a heart_beat() is involved, return an uncounted pointer to the name of
+ * the object that had it, otherwise return NULL.
  */
 
 {
     struct control_stack *p;  /* Control frame under inspection */
-    char *ret = NULL;
+    string_t *ret = NULL;     /* Uncounted ref to object name */
     bytecode_p pc = inter_pc;
     int line = 0;
-    char *name;
-    char *file;
+    string_t *name;           /* Uncounted ref to function name */
+    string_t *file;           /* Counted ref to file name */
     object_t *ob = NULL;
     bytecode_p last_catch = NULL;  /* Last found catch */
 
@@ -14210,8 +14059,8 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
         } \
         num_entries++; \
         put_number(var->vec->item+TRACE_TYPE, type); \
-        put_malloced_string(var->vec->item+TRACE_PROGRAM, string_copy(progname)); \
-        put_malloced_string(entry->vec->item+TRACE_OBJECT, string_copy(ob->name));
+        put_ref_string(var->vec->item+TRACE_PROGRAM, progname); \
+        put_ref_string(entry->vec->item+TRACE_OBJECT, ob->name);
 
 #define PUT_LOC(entry, val) \
         put_number(entry->vec->item+TRACE_LOC, (p_int)(val))
@@ -14222,7 +14071,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
     if (!current_prog)
     {
         if (sbuf)
-           strbuf_addf(sbuf, "%s", STR_NO_PROG_TRACE);
+           strbuf_addf(sbuf, "%s", get_txt(STR_NO_PROG_TRACE));
         if (rvec)
         {
             vector_t * vec;
@@ -14236,7 +14085,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
     if (csp < &control_stack[0])
     {
         if (sbuf)
-           strbuf_addf(sbuf, "%s", STR_NO_TRACE);
+           strbuf_addf(sbuf, "%s", get_txt(STR_NO_TRACE));
         if (rvec)
         {
             vector_t * vec;
@@ -14256,6 +14105,8 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
     do {
         bytecode_p  dump_pc;  /* the frame's pc */
         program_t  *prog;     /* the frame's program */
+
+        file = NULL;
 
         if (p->extern_call)
         {
@@ -14322,7 +14173,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
             if (last_catch == pc2)
                 goto not_catch;
             last_catch = pc2;
-            name = "CATCH";
+            name = STR_CATCH;
             goto name_computed;
         }
 
@@ -14336,7 +14187,7 @@ not_catch:  /* The frame does not point at a catch here */
              */
             if (sbuf)
                 strbuf_addf(sbuf, "<function symbol> in '%20s' ('%20s')\n"
-                           , ob->prog->name, ob->name);
+                           , get_txt(ob->prog->name), get_txt(ob->name));
             if (rvec)
             {
                 NEW_ENTRY(entry, TRACE_TYPE_SYMBOL, ob->prog->name);
@@ -14350,7 +14201,7 @@ not_catch:  /* The frame does not point at a catch here */
             if (sbuf)
                 strbuf_addf( sbuf
                            , "<simul_efun closure> bound to '%20s' ('%20s')\n"
-                           , ob->prog->name, ob->name);
+                           , get_txt(ob->prog->name), get_txt(ob->name));
             if (rvec)
             {
                 NEW_ENTRY(entry, TRACE_TYPE_SEFUN, ob->prog->name);
@@ -14368,18 +14219,24 @@ not_catch:  /* The frame does not point at a catch here */
             {
                 if (sbuf)
                     strbuf_addf(sbuf, "#\'%-14s for '%20s' ('%20s')\n"
-                               , iname, ob->prog->name, ob->name);
+                               , iname, get_txt(ob->prog->name)
+                               , get_txt(ob->name));
                 if (rvec)
                 {
+                    string_t *tmp;
+
                     NEW_ENTRY(entry, TRACE_TYPE_EFUN, ob->prog->name);
-                    put_volatile_string(entry->vec->item+TRACE_NAME, iname);
+                    memsafe(tmp = new_mstring(iname), strlen(iname)
+                           , "instruction name");
+                    put_string(entry->vec->item+TRACE_NAME, tmp);
                 }
             }
             else
             {
                 if (sbuf)
                     strbuf_addf( sbuf, "<efun closure %d> for '%20s' ('%20s')\n"
-                               , p[0].instruction, ob->prog->name, ob->name);
+                               , p[0].instruction, get_txt(ob->prog->name)
+                               , get_txt(ob->name));
                 if (rvec)
                 {
                     NEW_ENTRY(entry, TRACE_TYPE_EFUN, ob->prog->name);
@@ -14396,7 +14253,9 @@ not_catch:  /* The frame does not point at a catch here */
             if (sbuf)
                 strbuf_addf( sbuf
                            , "<lambda 0x%6lx> in '%20s' ('%20s') offset %ld\n"
-                           , (long)p[0].funstart, ob->prog->name, ob->name
+                           , (long)p[0].funstart
+                           , get_txt(ob->prog->name)
+                           , get_txt(ob->name)
                            , (long)(FUNCTION_FROM_CODE(dump_pc) - p[0].funstart)
                            );
             if (rvec)
@@ -14416,18 +14275,22 @@ name_computed: /* Jump target from the catch detection */
 
         /* Print the name and line */
 
-        if (strcmp(name, "heart_beat") == 0 && p != csp)
+        if (mstreq(name, STR_HEART_BEAT) && p != csp)
             ret = p->extern_call ? (p->ob ? p->ob->name : NULL) : ob->name;
 
         if (sbuf)
             strbuf_addf(sbuf, "'%15s' in '%20s' ('%20s') line %d\n"
-                       , name, file, ob->name, line);
+                       , get_txt(name), get_txt(file), get_txt(ob->name), line);
         if (rvec)
         {
             NEW_ENTRY(entry, TRACE_TYPE_LFUN, file);
-            put_malloced_string(entry->vec->item+TRACE_NAME, string_copy(name));
+            put_ref_string(entry->vec->item+TRACE_NAME, name);
             PUT_LOC(entry, line);
         }
+
+        if (file)
+            free_mstring(file);
+
     } while (++p <= csp);
 
     /* Condense the singular entries into the result array */
@@ -14439,7 +14302,7 @@ name_computed: /* Jump target from the catch detection */
         vec = allocate_array(num_entries+1);
 
         if (ret)
-            put_malloced_string(vec->item, string_copy(ret));
+            put_ref_string(vec->item, ret);
 
         for (ix = 1; first_entry != NULL; ix++, first_entry = first_entry->next)
         {
@@ -14458,7 +14321,7 @@ name_computed: /* Jump target from the catch detection */
 } /* collect_trace() */
 
 /*-------------------------------------------------------------------------*/
-char *
+string_t *
 dump_trace (Bool how
 #ifndef TRACE_CODE
                      UNUSED
@@ -14466,7 +14329,7 @@ dump_trace (Bool how
            )
 
 /* Write out a traceback, starting from the first frame. If a heart_beat()
- * is involved, return the name of the object that had it.
+ * is involved, return (uncounted) the name of the object that had it.
  *
  * If TRACE_CODE is defined and <how> is true, the last executed
  * instructions are printed, too.
@@ -14477,7 +14340,7 @@ dump_trace (Bool how
 #    pragma unused(how)
 #endif
     strbuf_t sbuf;
-    char *hb_obj_name;
+    string_t *hb_obj_name;
 
     strbuf_zero(&sbuf);
     hb_obj_name = collect_trace(&sbuf, NULL);
@@ -14525,8 +14388,11 @@ invalidate_apply_low_cache (void)
     for (i = 0; i < CACHE_SIZE; i++)
     {
         cache[i].id = 0;
-        if (!cache[i].progp && cache[i].name)
-            xfree(cache[i].name);
+        if (cache[i].name)
+        {
+            free_mstring(cache[i].name);
+            cache[i].name = NULL;
+        }
     }
 }
 
@@ -14537,22 +14403,13 @@ size_t
 interpreter_overhead (void)
 
 /* Return the amount of memory allocated for the interpreter.
- * Right now this is the apply cache overhead.
+ * Right now, there is none.
  */
 
 {
     size_t sum, ix;
 
     sum = 0;
-
-    for (ix = 0; ix < CACHE_SIZE; ix++)
-    {
-        if (!cache[ix].progp && cache[ix].name)
-        {
-            sum += strlen(cache[ix].name)+1;
-        }
-
-    }
 
     return sum;
 } /* interpreter_overhead() */
@@ -14600,6 +14457,8 @@ count_interpreter_refs (void)
     for (i = CACHE_SIZE; --i>= 0; ) {
         if (!cache[i].progp)
             note_malloced_block_ref(cache[i].name);
+        if (cache[i].name)
+            count_ref_from_string(cache[i].name);
     }
 #ifdef TRACE_CODE
     for (i = TOTAL_TRACE_LENGTH; --i >= 0; )
@@ -14625,6 +14484,7 @@ count_interpreter_refs (void)
 /*-------------------------------------------------------------------------*/
 
 #endif /* GC_SUPPORT */
+
 /*=========================================================================*/
 
 /*                            D E B U G G I N G                            */
@@ -14642,7 +14502,7 @@ opcdump (char * fname)
     int i;
     FILE *f;
 
-    fname = check_valid_path(fname, current_object, "opcdump", MY_TRUE);
+    fname = check_valid_path(fname, current_object, STR_OPCDUMP, MY_TRUE);
     if (!fname)
         return MY_FALSE;
     f = fopen(fname, "w");
@@ -14716,7 +14576,7 @@ get_arg (int a)
     }
 
     return "";
-}
+} /* get_arg() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -14734,16 +14594,17 @@ last_instr_output (char *str, svalue_t **svpp)
 {
     if (svpp)
     {
-        if ( !(str = string_copy(str)) )
-            error("Out of memory\n");
-        put_malloced_string((*svpp), str);
+        string_t *s;
+        memsafe(s = new_mstring(str), strlen(str), "copy of instruction name");
+        put_string((*svpp), s);
         (*svpp)++;
     }
     else
     {
-        printf("%s\n", str);
+        fputs(str, stdout);
+        putc('\n', stdout);
     }
-}
+} /* last_instr_output() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -14824,11 +14685,12 @@ last_instructions (int length, Bool verbose, svalue_t **svpp)
 {
     int i;
     object_t *old_obj;
-    char old_file[160], buf[400];
+    char buf[400];
+    string_t *old_file;
     int old_line, line = 0;
 
     old_obj = NULL;
-    old_file[0] = old_file[sizeof old_file - 1] = '\0';
+    old_file = NULL;
     old_line = 0;
     i = (last - length + TOTAL_TRACE_LENGTH) % TOTAL_TRACE_LENGTH;
 
@@ -14842,7 +14704,7 @@ last_instructions (int length, Bool verbose, svalue_t **svpp)
         {
             if (verbose)
             {
-                char *file;
+                string_t *file;
                 program_t *ppr;
                 bytecode_p ppc;
 
@@ -14850,12 +14712,12 @@ last_instructions (int length, Bool verbose, svalue_t **svpp)
                 ppc = previous_pc[i]+1;
                 if (!program_exists(ppr, previous_objects[i]))
                 {
-                    file = "program deallocated";
+                    file = ref_mstring(STR_PROG_DEALLOCATED);
                     line = 0;
                 }
                 else if (ppc < ppr->program || ppc > PROGRAM_END(*ppr))
                 {
-                    file = "<lambda ?>";
+                    file = ref_mstring(STR_UNKNOWN_LAMBDA);
                     line = 0;
                 }
                 else
@@ -14863,15 +14725,22 @@ last_instructions (int length, Bool verbose, svalue_t **svpp)
                     line = get_line_number(ppc, ppr, &file);
                 }
 
-                if (previous_objects[i] != old_obj || strcmp(file, old_file))
+                if (previous_objects[i] != old_obj
+                 || (old_file && streq(file, old_file))
+                   )
                 {
                     sprintf(buf, "%.170s %.160s line %d",
-                      previous_objects[i]->name, file, line
+                      previous_objects[i]->name, get_txt(file), line
                     );
                     last_instr_output(buf, svpp);
                     old_obj = previous_objects[i];
-                    xstrncpy(old_file, file, sizeof old_file - 1);
+                    if (old_file)
+                        free_mstring(old_file);
+                    old_file = ref_mstring(file);
                 }
+
+                if (file)
+                    free_mstring(file);
             }
             sprintf(buf, "%6lx: %3d %8s %-26s (%ld:%3ld)"
                    , (long)previous_pc[i]
@@ -14886,6 +14755,9 @@ last_instructions (int length, Bool verbose, svalue_t **svpp)
             last_instr_output(buf, svpp);
         }
     } while (i != last);
+
+    if (old_file)
+        free_mstring(old_file);
 
     return last;
 } /* last_instructions() */
@@ -15181,7 +15053,7 @@ count_inherits (program_t *progp)
         progp2->extra_ref++;
         if (progp2 == check_a_lot_ref_counts_search_prog)
             printf("%s Found prog, inherited by %s, new total ref %ld\n"
-                  , time_stamp(), progp->name, progp2->ref);
+                  , time_stamp(), get_txt(progp->name), progp2->ref);
         if (NULL == register_pointer(ptable, progp2))
             continue;
         progp2->extra_ref = 1;
@@ -15239,7 +15111,8 @@ count_extra_ref_in_object (object_t *ob)
     {
         ob->prog->extra_ref++;
         if (ob->prog == check_a_lot_ref_counts_search_prog)
-            printf("%s Found program for object %s\n", time_stamp(), ob->name);
+            printf("%s Found program for object %s\n", time_stamp()
+                  , get_txt(ob->name));
     }
 
     /* Clones will not add to the ref count of inherited progs */
@@ -15454,7 +15327,7 @@ check_a_lot_ref_counts (program_t *search_prog)
         {
             /* This shouldn't happen */
             debug_message("%s Found destructed object '%s' where it shouldn't "
-                          "be.\n", time_stamp(), ob->name);
+                          "be.\n", time_stamp(), get_txt(ob->name));
             continue;
         }
         if (O_VAR_SWAPPED(ob))
@@ -15552,8 +15425,8 @@ check_a_lot_ref_counts (program_t *search_prog)
             continue;
 
         if (ob->ref != ob->extra_ref)
-             fatal("Bad ref count in object %s, %ld - %ld\n", ob->name,
-                  ob->ref, ob->extra_ref);
+             fatal("Bad ref count in object %s, %ld - %ld\n"
+                  , get_txt(ob->name), ob->ref, ob->extra_ref);
 
         if ( !(ob->flags & O_SWAPPED) )
         {
@@ -15564,14 +15437,16 @@ check_a_lot_ref_counts (program_t *search_prog)
                  && ob->prog->ref > ob->prog->extra_ref)
                 {
                     debug_message("%s high ref count in prog %s, %ld - %ld\n"
-                                 , time_stamp(), ob->prog->name, ob->prog->ref
+                                 , time_stamp()
+                                 , get_txt(ob->prog->name), ob->prog->ref
                                  , ob->prog->extra_ref);
                 }
                 else
                 {
                     check_a_lot_ref_counts(ob->prog);
-                    fatal("Bad ref count in prog %s, %ld - %ld\n",
-                        ob->prog->name, ob->prog->ref, ob->prog->extra_ref);
+                    fatal("Bad ref count in prog %s, %ld - %ld\n"
+                         , get_txt(ob->prog->name)
+                         , ob->prog->ref, ob->prog->extra_ref);
                 }
             }
         } /* !SWAPPED */
@@ -15806,9 +15681,10 @@ f_call_resolved (svalue_t *sp, int num_arg)
         ob = arg[1].u.ob;
     else /* it's a string */
     {
-        ob = get_object(arg[1].u.string);
+        ob = get_object(arg[1].u.str);
         if (!ob)
-            error("call_resolved() failed: can't get object.\n");
+            error("call_resolved() failed: can't get object '%s'.\n"
+                 , get_txt(arg[1].u.str));
     }
 
     /* No external calls may be done when this object is
@@ -15829,14 +15705,14 @@ f_call_resolved (svalue_t *sp, int num_arg)
         if (!++traceing_recursion)
         {
             inter_sp = sp;
-            do_trace("Call other ", arg[1].u.string, "\n");
+            do_trace("Call other ", get_txt(arg[1].u.str), "\n");
         }
         traceing_recursion--;
     }
 
     /* Send the remaining arguments to the function.
      */
-    if (!apply_low(arg[2].u.string, ob, num_arg-3, MY_FALSE))
+    if (!apply_low(arg[2].u.str, ob, num_arg-3, MY_FALSE))
     {
         /* Function not found */
         sp = _pop_n_elems(num_arg-1, sp);
@@ -15919,7 +15795,7 @@ f_set_this_object (svalue_t *sp)
 
     if (current_variables == master_ob->variables
      || current_variables == simul_efun_object->variables
-     || privilege_violation("set_this_object", sp, sp))
+     || privilege_violation(STR_SET_THIS_OBJECT, sp, sp))
     {
         struct control_stack *p;
 
@@ -15989,7 +15865,7 @@ f_trace (svalue_t *sp)
 
         assign_eval_cost();
         inter_sp = sp;
-        push_volatile_string(inter_sp, "traceprefix");
+        push_ref_string(inter_sp, STR_TRACE);
         arg = apply_master_ob(STR_VALID_TRACE, 1);
         if (!arg)
         {
@@ -16034,10 +15910,10 @@ f_traceprefix (svalue_t *sp)
  */
 
 {
-    char *old;
+    string_t *old;
     interactive_t *ip;
 
-    old = 0;
+    old = NULL;
 
     /* If the command_giver is allowed to do that... */
     if (command_giver
@@ -16046,7 +15922,7 @@ f_traceprefix (svalue_t *sp)
         svalue_t *arg;
 
         inter_sp = sp;
-        push_volatile_string(inter_sp, "trace");
+        push_ref_string(inter_sp, STR_TRACEPREFIX);
         assign_eval_cost();
         arg = apply_master_ob(STR_VALID_TRACE,1);
         if (!arg)
@@ -16060,9 +15936,9 @@ f_traceprefix (svalue_t *sp)
             if (arg && (arg->type != T_NUMBER || arg->u.number))
             {
                 old = ip->trace_prefix;
-                if (sp->type == T_OLD_STRING)
+                if (sp->type == T_STRING)
                 {
-                    ip->trace_prefix = make_shared_string(sp->u.string);
+                    ip->trace_prefix = make_tabled_from(sp->u.str);
                 }
                 else
                     ip->trace_prefix = NULL;
@@ -16074,10 +15950,10 @@ f_traceprefix (svalue_t *sp)
 
     /* Return the old prefix */
     if (old)
-        put_old_string(sp, old);
+        put_string(sp, old);
     else
         put_number(sp, 0);
     return sp;
-} /* f_trace() */
+} /* f_traceprefix() */
 
 /***************************************************************************/

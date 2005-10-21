@@ -58,6 +58,7 @@ OPTIMIZE = @OCFLAGS@ # high optimization
 #   -DTRACE_CODE: Enable the LPC code tracing.
 #   -DNO_INLINES: Disable inlining
 #   -DDEBUG_TELNET: Activates debug prints in the telnet machine
+#   -DDEBUG_SMALLOC_ALLOCS: Activates allocation debug prints in smalloc.
 #DEBUG = -DDEBUG -DTRACE_CODE
 DEBUG = -DDEBUG -DTRACE_CODE # -DDEBUG_TELNET
 #DEBUG=

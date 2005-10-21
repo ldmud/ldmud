@@ -67,6 +67,7 @@ extern void dump_malloc_data(strbuf_t *sbuf);
 extern void smalloc_dinfo_data(svalue_t *svp);
 extern void clear_M_REF_flags(void);
 extern void free_unreferenced_memory(void);
+extern void consolidate_freelists (void);
 extern void *malloc_increment_size(void *p, size_t size);
 extern void walk_new_small_malloced( void (*func)(POINTER, long) );
 

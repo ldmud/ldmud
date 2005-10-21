@@ -248,6 +248,16 @@ DESCRIPTION
                int DID_SW_RECYCLE_FREE
                    TRUE if the swapper is currently recycling free block.
 
+               int DID_MEM_PERM
+               int DID_MEM_PERM
+                   Number and size of permanent (non-GCable) allocations
+                   (smalloc only).
+
+               int DID_MEM_CLIB
+               int DID_MEM_CLIB_SIZE
+                   Number and size of allocations done through the
+                   clib functions (smalloc only with SBRK_OK).
+
 
             <arg2> == DID_MEMORY (2): Returns the "status malloc" information:
 
@@ -339,13 +349,14 @@ DESCRIPTION
 
 HISTORY
         Since 3.2.7, DINFO_STATUS returns the status information instead
-        of printing it.
+          of printing it.
         DINFO_DUMP introduced with 3.2.7.
         LDMud 3.2.8 added the data size of the object to the result of
-        DINFO_MEMORY; the DINFO_DATA request; the DID_MEM_WASTED* stats.
+          DINFO_MEMORY; the DINFO_DATA request; the DID_MEM_WASTED* stats.
         LDMud 3.3 replaced the string related DID_ST_ constants according to
         the new string implementation.
-        LDMud 3.2.9 added DINFO_TRACE.
+        LDMud 3.2.9 added DINFO_TRACE; the DID_MEM_CLIB* and DID_MEM_PERM*
+          stats.
 
 SEE ALSO
         trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)

@@ -63,6 +63,11 @@ union u {
        * knows how to free it, but that's all.
        */
       
+    void *generic;
+      /* Use read-only, this member is used to read the svalue generically
+       * as "a pointer". It is mostly used in comparisons.
+       */
+
     svalue_t *lvalue;
       /* T_LVALUE: pointer to a (usually 'normal') svalue which
        *   this lvalue references. Also, lvalues may be chained through

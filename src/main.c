@@ -115,6 +115,7 @@ char *erq_file = NULL;        /* Name of the erq executable, or NULL */
 
 char *mud_lib;                /* Path to the mudlib */
 char master_name[100] = "";   /* Name of the master object */
+string_t * master_name_str = NULL;  /* master_name[] as tabled string */
 
 static int new_mudlib = 0;    /* True: mudlib directory was specified */
 static int no_erq_demon = 0;  /* True: don't start the erq */
@@ -244,12 +245,21 @@ main (int argc, char **argv)
     /* Make sure the name of the master object is sensible.
      * This is important for modules like the lexer which
      * use it directly.
+     *
+     * We also need a copy of the master name as string_t.
      */
 
     {
         const char *pName = make_name_sane(master_name, MY_FALSE);
         if (pName)
             strcpy(master_name, pName);
+        master_name_str = new_tabled(master_name);
+        if (!master_name_str)
+        {
+            printf("%s Out of memory for master object name (%lu bytes).\n"
+                  , time_stamp(), strlen(master_name));
+            exit(1);
+        }
     }
 
     if (numports < 1) /* then use the default port */

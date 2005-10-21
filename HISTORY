@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-19-Jan-2001 (Lars Duening) -- Development Release 3.3
+26-Jan-2001 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -18,6 +18,9 @@ For a detailed list of all changes see the file CHANGELOG.
             log the message, and if to prepend a timestamp.
        + debug_info(): New argument DINFO_TRACE to return the current
             call stack.
+       + debug_info(): Argument (DINFO_DATA, DID_MEMORY) also returns
+            the number and size of permanent and clib allocations (where
+            applicable).
        + exec(): If this_interactive() points to one of the involved
             objects, it is switched over as well, like this_player().
        + filter(), map(), sort_array(), walk_mapping(): Protected lvalues

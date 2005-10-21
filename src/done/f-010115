@@ -2,7 +2,7 @@ Short: Improvements to smalloc
 Date: 2001-01-15
 From: Lars
 Type: Feature
-State: New
+State: Done - implemented in 3.3.23
 
 When looking for n-Byte small Blocks,consider splitting a free >n-Byte Block.
 
