@@ -611,8 +611,7 @@ static svalue_t indexing_quickfix = { T_NUMBER };
   /* When indexing arrays and mappings with just one ref, especially
    * for the purpose of getting a lvalue, the indexed item is copied
    * into this variable and indexed from here.
-   * Used by operators: push_(r)indexed_lvalue, push_indexed_value,
-   *                    push_indexed_map_lvalue.
+   * Used by operators: push_(r)indexed_lvalue, push_indexed_map_lvalue.
    * TODO: Rename this variable, or better: devise a nice solution.
    * TODO:: Use the protected_lvalues instead?
    * TODO:: To quote Marion:
@@ -733,7 +732,7 @@ init_interpret (void)
  * free_svalue(v):        free the svalue <v>.
  * assign_svalue_no_free(to,from): put a copy of <from> into <to>; <to>
  *                        is considered empty.
- * assign_checked_svalue_no_free(to,from,sp,pc): put a copy of <from> into <to>;
+ * assign_checked_svalue_no_free(to,from): put a copy of <from> into <to>;
  *                        <to> is considered empty, <from> may be destructed
  *                        object.
  * assign_local_svalue_no_free(to,from): put a copy of local var <from>
@@ -811,14 +810,14 @@ struct protected_range_lvalue {
       /* .v.type: T_PROTECTED_{POINTER,STRING}_RANGE_LVALUE
        * .v.u.{str,vec}: the target value holding the range
        */
-    svalue_t protector; /* protects .lvalue */
-    svalue_t *lvalue;   /* the value holding the range */
-    int index1, index2;      /* first and last index of the range */
-    int size;                /* original size of .lvalue */
+    svalue_t protector;  /* protects .lvalue */
+    svalue_t *lvalue;    /* the original svalue holding the range */
+    int index1, index2;  /* first and last index of the range */
+    int size;            /* original size of .lvalue */
 
-    /* .v.u.{vec,str} must be == .lvalue->u.{vec,str}, otherwise
-     * the target has been changed and the range information (index, size)
-     * is no longer valid.
+    /* On creation, .v.u.{vec,str} == .lvalue->u.{vec,str}.
+     * If that condition no longer holds, the target has been changed and
+     * the range information (index, size) is no longer valid.
      */
 };
 
@@ -1123,9 +1122,7 @@ void assign_svalue_no_free (svalue_t *to, svalue_t *from)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-assign_checked_svalue_no_free (svalue_t *to, svalue_t *from
-                              , svalue_t *sp UNUSED, bytecode_p pc UNUSED
-                              )
+assign_checked_svalue_no_free (svalue_t *to, svalue_t *from)
 
 /* Put a duplicate of svalue <from> into svalue <to>, meaning that the original
  * value is either copied when appropriate, or its refcount is increased.
@@ -1133,15 +1130,9 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from
  * <from> may point to a variable or vector element, so it might contain
  * a destructed object. In that case, <from> and <to> are set to
  * svalue-number 0.
- *
- * <sp> and <pc> are the current stackpointer and program counter and are
- * needed to update <inter_xx> in case of errors.
  */
 
 {
-#ifdef __MWERKS__
-#    pragma unused(sp,pc)
-#endif
     switch (from->type)
     {
     case T_STRING:
@@ -1809,7 +1800,8 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
             }
 
             s = sv->item;
-            for (i = ssize; --i >= 0; ) {
+            for (i = ssize; --i >= 0; )
+            {
                 assign_svalue_no_free(d++, s++);
             }
             free_array(sv);
@@ -1824,12 +1816,12 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
         }
     }
     else
+    {
         /* Not a pointer: just free it */
         free_svalue(source);
+    }
 
 } /* transfer_protected_pointer_range() */
-
-=== Adapted until here ===
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1843,12 +1835,12 @@ assign_string_range (svalue_t *source, Bool do_free)
  */
 
 {
-    if (source->type == T_OLD_STRING)
+    if (source->type == T_STRING)
     {
         svalue_t *dsvp;     /* destination svalue (from special_lvalue) */
-        char *ds;                /* destination string (from dsvp) */
-        char *ss;                /* source string (from source) */
-        char *rs;                /* result string */
+        string_t *ds;            /* destination string (from dsvp) */
+        string_t *ss;            /* source string (from source) */
+        string_t *rs;            /* result string */
         mp_int dsize;            /* size of destination string */
         mp_int ssize;            /* size of source string */
         mp_int index1, index2;   /* range indices */
@@ -1858,12 +1850,12 @@ assign_string_range (svalue_t *source, Bool do_free)
         index1 = special_lvalue.index1;
         index2 = special_lvalue.index2;
         dsvp = special_lvalue.v.u.lvalue;
-        ds = dsvp->u.string;
-        ss = source->u.string;
-        ssize = (mp_int)svalue_strlen(source);
+        ds = dsvp->u.str;
+        ss = source->u.str;
+        ssize = (mp_int)mstrsize(ss);
 
         /* Create the new string */
-        rs = xalloc((size_t)(dsize + ssize + index1 - index2 + 1));
+        rs = alloc_mstring((size_t)(dsize + ssize + index1 - index2));
         if (!rs)
         {
             /* We don't pop the stack here --> don't free source */
@@ -1871,15 +1863,16 @@ assign_string_range (svalue_t *source, Bool do_free)
         }
 
         if (index1)
-            memcpy(rs, ds, (size_t)index1);
+            memcpy(get_txt(rs), get_txt(ds), (size_t)index1);
         if (ssize)
-            memcpy(rs + index1, ss, (size_t)ssize);
-        strcpy(rs + index1 + ssize, ds + index2);
+            memcpy(get_txt(rs) + index1, get_txt(ss), (size_t)ssize);
+        if (dsize > index2)
+            memcpy( get_txt(rs) + index1 + ssize, get_txt(ds) + index2
+                  , (size_t)(dsize - index2));
 
         /* Assign the new string in place of the old */
         free_string_svalue(dsvp);
-        dsvp->x.string_type = STRING_MALLOC;
-        dsvp->u.string = rs;
+        dsvp->u.str = rs;
 
         if (do_free)
             free_string_svalue(source);
@@ -1910,12 +1903,12 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
  */
 
 {
-    if (source->type == T_OLD_STRING)
+    if (source->type == T_STRING)
     {
         svalue_t *dsvp;     /* destination value (from dest) */
-        char *ss;                /* source string (from source) */
-        char *ds;                /* destination string (from dsvp) */
-        char *rs;                /* result string */
+        string_t *ds;            /* destination string (from dsvp) */
+        string_t *ss;            /* source string (from source) */
+        string_t *rs;            /* result string */
         mp_int dsize;            /* size of destination string */
         mp_int ssize;            /* size of source string */
         mp_int index1, index2;   /* range indices */
@@ -1925,24 +1918,24 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
         index1 = dest->index1;
         index2 = dest->index2;
         dsvp = dest->lvalue;
-        ds = dest->v.u.string;
+        ds = dest->v.u.str;
 
         /* If the lvalue is no longer valid, free it */
-        if (dsvp->u.string != ds)
+        if (dsvp->u.str != ds)
         {
             if (do_free)
             {
                 free_svalue(source);
-                xfree(dest->v.u.string);
+                free_mstring(dest->v.u.str);
                 xfree(dest);
             }
             return;
         }
 
         /* Create a new string */
-        ss = source->u.string;
-        ssize = (mp_int)svalue_strlen(source);
-        rs = xalloc((size_t)(dsize + ssize + index1 - index2 + 1));
+        ss = source->u.str;
+        ssize = (mp_int)mstrsize(ss);
+        rs = alloc_mstring((size_t)(dsize + ssize + index1 - index2));
         if (!rs)
         {
             error("Out of memory\n");
@@ -1952,14 +1945,16 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
             memcpy(rs, ds, (size_t)index1);
         if (ssize)
             memcpy(rs + index1, ss, (size_t)ssize);
-        strcpy(rs + (dest->index2 = (int)(index1 + ssize)), ds + index2);
+        dest->index2 = (int)(index1 + ssize);
+        if (dsize > index2)
+            memcpy( get_txt(rs) + dest->index2, get_txt(ds) + index2
+                  , (size_t)(dsize - index2));
         xfree(ds);
 
-        dest->v.u.string = dsvp->u.string = rs;
+        dest->v.u.str = dsvp->u.str = rs;
         if (do_free)
         {
             free_string_svalue(source);
-            dest->v.x.string_type = STRING_MALLOC;
             free_protector_svalue(&dest->protector);
             xfree(dest);
         }
@@ -1970,7 +1965,6 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
         if (do_free)
         {
             free_svalue(source);
-            dest->v.x.string_type = STRING_MALLOC;
             free_protector_svalue(&dest->protector);
             xfree(dest);
         }
@@ -2039,9 +2033,9 @@ add_number_to_lvalue (svalue_t *dest, int i, svalue_t *pre, svalue_t *post)
         break;
 
     case T_CHAR_LVALUE:
-        if (pre) put_number(pre, (*dest->u.string));
-        (*dest->u.string) += i;
-        if (post) put_number(post, (*dest->u.string));
+        if (pre) put_number(pre, *dest->u.charp);
+        *(dest->u.charp) += i;
+        if (post) put_number(post, *dest->u.charp);
         break;
 
     case T_PROTECTED_CHAR_LVALUE:
@@ -2049,11 +2043,11 @@ add_number_to_lvalue (svalue_t *dest, int i, svalue_t *pre, svalue_t *post)
         struct protected_char_lvalue *p;
 
         p = (struct protected_char_lvalue *)dest;
-        if (p->lvalue->type == T_OLD_STRING
-         && p->lvalue->u.string == p->start)
+        if (p->lvalue->type == T_STRING
+         && get_txt(p->lvalue->u.str) == p->start)
         {
-            if (pre) put_number(pre, *p->v.u.string);
-            i = *p->v.u.string += i;
+            if (pre) put_number(pre, *(p->v.u.charp));
+            i = *(p->v.u.charp) += i;
             if (post) put_number(post, i);
         }
         break;
@@ -2156,7 +2150,7 @@ inter_add_array (vector_t *q, vector_t **vpp)
         deref_array(p);
         d = r->item;
         for (cnt = (mp_int)p_size; --cnt >= 0; ) {
-            assign_checked_svalue_no_free (d++, s++, inter_sp, inter_pc);
+            assign_checked_svalue_no_free (d++, s++);
         }
     }
 
@@ -2176,7 +2170,7 @@ inter_add_array (vector_t *q, vector_t **vpp)
     else /* q->ref > 1 */
     {
         for (cnt = (mp_int)q_size; --cnt >= 0; ) {
-            assign_checked_svalue_no_free (d++, s++, inter_sp, inter_pc);
+            assign_checked_svalue_no_free (d++, s++);
         }
         *vpp = r;
 
@@ -2219,12 +2213,15 @@ inter_add_array (vector_t *q, vector_t **vpp)
  *     Convert the C-String <p> into a mstring and push it onto the stack
  *     above <sp>.
  *
+#if 0
+ * TOOD: Remove the following functions completely.
  * push_referenced_shared_string(p):
  *     Push a shared string onto the stack.
  * push_string_shared(p):
  *     Share a string and push it onto the stack.
  * _push_string_malloced(p, sp), push_string_malloced(p):
  *     Malloc a copy of a string and push it onto the stack.
+#endif
  * push_svalue(v), push_svalue_block(num,v):
  *     Push one or more svalues onto the stack.
  * pop_stack(), _drop_n_elems(n,sp):
@@ -2331,7 +2328,8 @@ push_string_malloced (char *p)
     sp = ++inter_sp;
     put_malloced_string(sp, s);
 }
-#endif
+
+#endif /* of #if 0 */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -2457,6 +2455,59 @@ push_referenced_mapping (mapping_t *m)
  * update <inter_pc> in case of errors. Result of the call is the new
  * stackpointer pointing to the result on the machine stack.
  *
+ * Some typical layouts:
+ *
+ *     (LVALUE) -> indexed svalue from vector/mapping
+ *                 (might be copied into indexing_quickfix)
+ *
+ *       by: push_(r)indexed_lvalue()
+ *           (r)index_lvalue()
+ *
+ *
+ *     (LVALUE) -> (CHAR_LVALUE)
+ *                 special_lvalue.u.charp -> character in untabled string
+ *
+ *       by: (r)index_lvalue() on string lvalues
+ *
+ *
+ *     (LVALUE) -> (PROTECTED_LVALUE) -> indexed svalue in vector/mapping
+ *                 protector          -> vector/mapping
+ *       by: push_protected_(r)indexed_lvalue()
+ *           push_protected_indexed_map_lvalue()
+ *           protected_(r)index_lvalue() 
+ *     
+ *
+ *     (LVALUE) -> (PROTECTED_CHAR_LVALUE)
+ *                    .lvalue -> untabled string svalue
+ *                    .charp -> indexed character in untabled string
+ *                    .start  -> first character of actual string text
+ *                    .protector: T_INVALID or the string's .protector value
+ *                                if the string itself is result of a protected
+ *                                lvalue index.
+ *     
+ *       by: protected_(r)index_lvalue() on string lvalue
+ *
+ *
+ *     (LVALUE) -> (T_{STRING,POINTER}_RANGE_LVALUE)
+ *                   special_lvalue.v   -> indexed-on string/vector
+ *                   special_lvalue.size:  size of the string/vector
+ *                                 .ind1:  lower index
+ *                                 .ind2:  upper index
+ *     
+ *       by: range_lvalue()
+ *     
+ *     
+ *     (LVALUE) -> (T_PROTECTED_{STRING,POINTER}_RANGE_LVALUE)
+ *                   .v   :   indexed-on string/vector
+ *                   .lvalue -> svalue of indexed-on string/vector
+ *                   .size:  size of the string/vector
+ *                   .ind1:  lower index
+ *                   .ind2:  upper index
+ *                   .protector: the protector of the initial lvalue, if any.
+ *     
+ *       by: protected_range_lvalue()
+ *     
+ *
  * TODO: A lot of the functions differ only in minute details - test how
  * TODO:: much time merging the functions (and adding if()s for the
  * TODO:: differences) really costs.
@@ -2501,6 +2552,7 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
  * Compute the lvalue &(v[i]) and push it into the stack. If v has just
  * one ref left, the indexed item is stored in indexing_quickfix and the
  * lvalue refers to that variable.
+ * TODO: indexing_quickfix could be implemented using protected lvalues.
  */
 
 {
@@ -3003,7 +3055,7 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
 
     /* Index a string.
      */
-    if (type == T_OLD_STRING)
+    if (type == T_STRING)
     {
         if (i->type != T_NUMBER)
         {
@@ -3018,24 +3070,22 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
             return NULL;
         }
 
-        if (ind >= _svalue_strlen(vec) )
+        if (ind >= mstrsize(vec->u.str) )
         {
             ERRORF(("Index out for [] of bounds: %ld, string length: %ld.\n"
-                   , (long)ind, (long)_svalue_strlen(vec)));
+                   , (long)ind, (long)mstrsize(vec->u.str)));
             return NULL;
         }
 
-        /* If the string is not malloced, i.e. changeable, allocate
+        /* If the string is tabled, i.e. not changeable, allocate
          * a new copy which can be changed.
          */
-        if (vec->x.string_type != STRING_MALLOC)
+        if (mstr_tabled(vec->u.str))
         {
-            char *p = string_copy(vec->u.string);
+            string_t *p = dup_mstring(vec->u.str);
 
-            if (vec->x.string_type == STRING_SHARED)
-                free_string(vec->u.string);
-            vec->x.string_type = STRING_MALLOC;
-            vec->u.string = p;
+            free_mstring(vec->u.str);
+            vec->u.str = p;
         }
 
         /* Remove the arguments and create and push the result. */
@@ -3045,7 +3095,7 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
         sp->type = T_LVALUE;
         sp->u.lvalue = &special_lvalue.v;
         special_lvalue.v.type = T_CHAR_LVALUE;
-        special_lvalue.v.u.string = &vec->u.string[ind];
+        special_lvalue.v.u.charp = &(get_txt(vec->u.str)[ind]);
         return sp;
     }
 
@@ -3150,26 +3200,24 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
 
     /* Index a string
      */
-    if (type == T_OLD_STRING)
+    if (type == T_STRING)
     {
-        if ( (ind = (mp_int)_svalue_strlen(vec) - ind) < 0)
+        if ( (ind = (mp_int)mstrsize(vec->u.str) - ind) < 0)
         {
             ERRORF(("Index out of bounds for [<]: %ld, string length: %ld\n"
-                   , (long) i->u.number, (long)_svalue_strlen(vec)));
+                   , (long) i->u.number, (long)mstrsize(vec->u.str)));
             return NULL;
         }
 
-        /* If the string is not malloced, i.e. changeable, allocate a
-         * copy in vec which can be changed.
+        /* If the string is tabled, i.e. not changeable, allocate
+         * a new copy which can be changed.
          */
-        if (vec->x.string_type != STRING_MALLOC)
+        if (mstr_tabled(vec->u.str))
         {
-            char *p = string_copy(vec->u.string);
+            string_t *p = dup_mstring(vec->u.str);
 
-            if (vec->x.string_type == STRING_SHARED)
-                free_string(vec->u.string);
-            vec->x.string_type = STRING_MALLOC;
-            vec->u.string = p;
+            free_mstring(vec->u.str);
+            vec->u.str = p;
         }
 
         /* Remove the argument and return the result */
@@ -3178,7 +3226,7 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
         sp->type = T_LVALUE;
         sp->u.lvalue = &special_lvalue.v;
         special_lvalue.v.type = T_CHAR_LVALUE;
-        special_lvalue.v.u.string = &vec->u.string[ind];
+        special_lvalue.v.u.charp = &(get_txt(vec->u.str)[ind]);
         return sp;
     }
 
@@ -3270,7 +3318,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
         /* Index a string.
          */
-        if (type == T_OLD_STRING)
+        if (type == T_STRING)
         {
             struct protected_char_lvalue *val;
 
@@ -3287,31 +3335,28 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
                 return NULL;
             }
 
-            if (ind > svalue_strlen(vec) )
+            if (ind > mstrsize(vec->u.str) )
             {
                 ERRORF(("Index for [] out of bounds: %ld, string length: %ld.\n"
-                       , (long)ind, (long)_svalue_strlen(vec)));
+                       , (long)ind, (long)mstrsize(vec->u.str)));
                 return NULL;
             }
 
-            /* If the string is not allocated, ie. changeable, allocate
-             * a new changeable copy.
+            /* If the string is tabled, i.e. not changeable, allocate
+             * a new copy which can be changed.
              */
-            if (vec->x.string_type != STRING_MALLOC)
+            if (mstr_tabled(vec->u.str))
             {
-                char *p = string_copy(vec->u.string);
+                string_t *p = dup_mstring(vec->u.str);
 
-                if (vec->x.string_type == STRING_SHARED)
-                    free_string(vec->u.string);
-                vec->u.string = p;
-                /* string_type is used by svalue_strlen */
-                vec->x.string_type = STRING_MALLOC;
+                free_mstring(vec->u.str);
+                vec->u.str = p;
             }
 
-            /* Make the string 'VOLATILE' so that we have full control
-             * over its deallocation.
+            /* Add another reference to the string to keep it alive while
+             * we use it.
              */
-            vec->x.string_type = STRING_VOLATILE;
+            ref_mstring(vec->u.str);
 
             /* Drop the arguments */
             sp = i;
@@ -3320,9 +3365,9 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
             val = (struct protected_char_lvalue *)xalloc(sizeof *val);
             val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.string = &vec->u.string[ind];
+            val->v.u.charp = &(get_txt(vec->u.str)[ind]);
             val->lvalue = vec;
-            val->start = vec->u.string;
+            val->start = get_txt(vec->u.str);
             val->protector.type = T_INVALID;
 
             sp->type = T_LVALUE;
@@ -3384,7 +3429,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
             lvalue = (struct protected_lvalue *)vec;
 
-            if (lvalue->v.u.lvalue->type != T_OLD_STRING)
+            if (lvalue->v.u.lvalue->type != T_STRING)
             {
                 /* Deref a non-string protected lvalue.
                  * If this is the lvalue passed to the operator, also free
@@ -3420,36 +3465,35 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
                 return NULL;
             }
 
-            if (ind > svalue_strlen(vec) )
+            if (ind > mstrsize(vec->u.str) )
             {
                 ERRORF(("Index for [] out of bounds: %ld, string length: %ld\n"
-                       , (long)ind, (long)_svalue_strlen(vec)));
+                       , (long)ind, (long)mstrsize(vec->u.str)));
                 return NULL;
             }
 
-            /* If the string is not allocated, ie changeable, allocate
-             * a copy we can change.
+            /* If the string is tabled, i.e. not changeable, allocate
+             * a new copy which can be changed.
              */
-            if (vec->x.string_type != STRING_MALLOC)
+            if (mstr_tabled(vec->u.str))
             {
-                char *p = string_copy(vec->u.string);
+                string_t *p = dup_mstring(vec->u.str);
 
-                if (vec->x.string_type == STRING_SHARED)
-                    free_string(vec->u.string);
-                vec->u.string = p;
+                free_mstring(vec->u.str);
+                vec->u.str = p;
             }
 
-            /* Make the string 'VOLATILE' so that we have full control
-             * over its deallocation.
+            /* Add another reference to the string to keep it alive while
+             * we use it.
              */
-            vec->x.string_type = STRING_VOLATILE;
+            ref_mstring(vec->u.str);
 
             /* Build the protector */
             val = (struct protected_char_lvalue *)xalloc(sizeof *val);
             val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.string = &vec->u.string[ind];
+            val->v.u.charp = &(get_txt(vec->u.str)[ind]);
             val->lvalue = vec;
-            val->start = vec->u.string;
+            val->start = get_txt(vec->u.str);
 
             /* Drop the arguments and return the result.
              * If this was the lvalue passed to the operator in the
@@ -3564,40 +3608,39 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
 
         /* Index a string.
          */
-        if (type == T_OLD_STRING)
+        if (type == T_STRING)
         {
             struct protected_char_lvalue *val;
 
-            if ( (ind = (mp_int)svalue_strlen(vec)  - ind) < 0)
+            if ( (ind = (mp_int)mstrsize(vec->u.str)  - ind) < 0)
             {
                 ERRORF(("Index for [<] out of bounds: %ld, string length: %ld.\n"
-                       , (long)i->u.number, (long)svalue_strlen(vec)));
+                       , (long)i->u.number, (long)mstrsize(vec->u.str)));
                 return NULL;
             }
 
-            /* If the string is not allocated, ie. changeable, allocate
-             * a new changeable copy.
+            /* If the string is tabled, i.e. not changeable, allocate
+             * a new copy which can be changed.
              */
-            if (vec->x.string_type != STRING_MALLOC)
+            if (mstr_tabled(vec->u.str))
             {
-                char *p = string_copy(vec->u.string);
+                string_t *p = dup_mstring(vec->u.str);
 
-                if (vec->x.string_type == STRING_SHARED)
-                    free_string(vec->u.string);
-                vec->u.string = p;
+                free_mstring(vec->u.str);
+                vec->u.str = p;
             }
 
-            /* Make the string 'VOLATILE' so that we have full control
-             * over its deallocation.
+            /* Add another reference to the string to keep it alive while
+             * we use it.
              */
-            vec->x.string_type = STRING_VOLATILE;
+            ref_mstring(vec->u.str);
 
             /* Build the protector */
             val = (struct protected_char_lvalue *)xalloc(sizeof *val);
             val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.string = &vec->u.string[ind];
+            val->v.u.charp = &(get_txt(vec->u.str)[ind]);
             val->lvalue = vec;
-            val->start = vec->u.string;
+            val->start = get_txt(vec->u.str);
             val->protector.type = T_INVALID;
 
             /* Drop the arguments and return the result */
@@ -3627,7 +3670,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
 
             lvalue = (struct protected_lvalue *)vec;
 
-            if (lvalue->v.u.lvalue->type != T_OLD_STRING)
+            if (lvalue->v.u.lvalue->type != T_STRING)
             {
                 /* Deref a non-string protected lvalue.
                  * If this is the lvalue passed to the operator, also free
@@ -3649,35 +3692,35 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
 
             vec = lvalue->v.u.lvalue; /* it's a string... */
 
-            if ( (ind = (mp_int)svalue_strlen(vec)  - ind) < 0)
+            if ( (ind = (mp_int)mstrsize(vec->u.str) - ind) < 0)
             {
                 ERRORF(("Index for [<] out of bounds: %ld, string length: %ld.\n"
-                       , (long)i->u.number, (long)svalue_strlen(vec)));
+                       , (long)i->u.number, (long)mstrsize(vec->u.str)));
                 return NULL;
             }
 
-            /* If the string is not allocated, ie changeable, allocate
-             * a copy we can change.
+            /* If the string is tabled, i.e. not changeable, allocate
+             * a new copy which can be changed.
              */
-            if (vec->x.string_type != STRING_MALLOC)
+            if (mstr_tabled(vec->u.str))
             {
-                char *p = string_copy(vec->u.string);
-                if (vec->x.string_type == STRING_SHARED)
-                    free_string(vec->u.string);
-                vec->u.string = p;
+                string_t *p = dup_mstring(vec->u.str);
+
+                free_mstring(vec->u.str);
+                vec->u.str = p;
             }
 
-            /* Make the string 'VOLATILE' so that we have full control
-             * over its deallocation.
+            /* Add another reference to the string to keep it alive while
+             * we use it.
              */
-            vec->x.string_type = STRING_VOLATILE;
+            ref_mstring(vec->u.str);
 
             /* Build the protector */
             val = (struct protected_char_lvalue *)xalloc(sizeof *val);
             val->v.type = T_PROTECTED_CHAR_LVALUE;
-            val->v.u.string = &vec->u.string[ind];
+            val->v.u.charp = &(get_txt(vec->u.str)[ind]);
             val->lvalue = vec;
-            val->start = vec->u.string;
+            val->start = get_txt(vec->u.str);
 
             /* Drop the arguments and return the result.
              * If this was the lvalue passed to the operator in the
@@ -3714,6 +3757,15 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
 } /* protected_rindex_lvalue() */
 
 /*-------------------------------------------------------------------------*/
+
+/* Code values used by range_lvalue() and protected_range_lvalue()
+ */
+
+#define NN_RANGE (0)
+#define RN_RANGE (1 << 0)
+#define NR_RANGE (1 << 1)
+#define RR_RANGE (RN_RANGE|NR_RANGE)
+
 static svalue_t *
 range_lvalue (int code, svalue_t *sp)
 
@@ -3721,15 +3773,14 @@ range_lvalue (int code, svalue_t *sp)
  * and the operators F_{NR,RN,RR}_RANGE_LVALUE.
  *
  * Compute the range &(v[i1..i2]) of lvalue <v> and push it into the stack.
- * The value pushed is a lvalue pointint to <special_lvalue>. <special_lvalue>
+ * The value pushed is a lvalue pointing to <special_lvalue>. <special_lvalue>
  * then is the POINTER_RANGE_- resp. STRING_RANGE_LVALUE.
  *
- * <code> is a two-byte flag determining whether the indexes are counted
+ * <code> is a two-bit flag determining whether the indexes are counted
  * from the beginning ('[i1..' and '..i2]') or the the end of the vector
- * or string ('[<i1..' and '..<i2]'). If <code>&0xff00 is TRUE, the lower
- * index is counted from the end, if <code>&0x00ff is TRUE, the upper
+ * or string ('[<i1..' and '..<i2]'). If <code>&RN_RANGE is TRUE, the lower
+ * index is counted from the end, if <code>&NR_RANGE is TRUE, the upper
  * index is counted from the end.
- * TODO: This code thingy is not really nice.
  */
 
 {
@@ -3767,9 +3818,9 @@ range_lvalue (int code, svalue_t *sp)
         special_lvalue.v.type = T_POINTER_RANGE_LVALUE;
         size = (mp_int)VEC_SIZE(vec->u.vec);
         break;
-    case T_OLD_STRING:
+    case T_STRING:
         special_lvalue.v.type = T_STRING_RANGE_LVALUE;
-        size = (mp_int)svalue_strlen(vec);
+        size = (mp_int)mstrsize(vec->u.str);
         break;
     default:
         inter_sp = sp;
@@ -3787,7 +3838,7 @@ range_lvalue (int code, svalue_t *sp)
         return NULL;
     }
 
-    if (code & 0xff)
+    if (code & NR_RANGE)
     {
         ind2 = size - i->u.number;
     }
@@ -3815,7 +3866,7 @@ range_lvalue (int code, svalue_t *sp)
         return NULL;
     }
 
-    if (code & 0xff00)
+    if (code & RN_RANGE)
     {
         ind1 = size - i->u.number;
     }
@@ -3866,12 +3917,11 @@ protected_range_lvalue (int code, svalue_t *sp)
  *
  * If <v> is a string-lvalue, it is made a malloced string if necessary.
  *
- * <code> is a two-byte flag determining whether the indexes are counted
+ * <code> is a two-bit flag determining whether the indexes are counted
  * from the beginning ('[i1..' and '..i2]') or the the end of the vector
- * or string ('[<i1..' and '..<i2]'). If <code>&0xff00 is TRUE, the lower
- * index is counted from the end, if <code>&0x00ff is TRUE, the upper
+ * or string ('[<i1..' and '..<i2]'). If <code>&RN_RANGE is TRUE, the lower
+ * index is counted from the end, if <code>&NR_RANGE is TRUE, the upper
  * index is counted from the end.
- * TODO: This code thingy is not really nice.
  */
 
 {
@@ -3926,25 +3976,25 @@ protected_range_lvalue (int code, svalue_t *sp)
         size = (mp_int)VEC_SIZE(vec->u.vec);
         break;
 
-    case T_OLD_STRING:
-        /* If the string is not allocated, ie changeable, allocate
-         * a copy we can change.
+    case T_STRING:
+        /* If the string is tabled, i.e. not changeable, allocate
+         * a new copy which can be changed.
          */
-        if (vec->x.string_type != STRING_MALLOC)
+        if (mstr_tabled(vec->u.str))
         {
-            char *p = string_copy(vec->u.string);
+            string_t *p = dup_mstring(vec->u.str);
 
-            if (vec->x.string_type == STRING_SHARED)
-                free_string(vec->u.string);
-            vec->u.string = p;
+            free_mstring(vec->u.str);
+            vec->u.str = p;
         }
-        /* Make the string 'VOLATILE' so that we have full control
-         * over its deallocation.
+
+        /* Add another reference to the string to keep it alive while
+         * we use it.
          */
-        vec->x.string_type = STRING_VOLATILE;
+        ref_mstring(vec->u.str);
 
         lvalue_type = T_PROTECTED_STRING_RANGE_LVALUE;
-        size = (mp_int)svalue_strlen(vec);
+        size = (mp_int)mstrsize(vec->u.str);
         break;
 
     default:
@@ -3963,7 +4013,7 @@ protected_range_lvalue (int code, svalue_t *sp)
         return NULL;
     }
 
-    if (code & 0xff)
+    if (code & NR_RANGE)
     {
         ind2 = size - i->u.number;
     }
@@ -3989,7 +4039,7 @@ protected_range_lvalue (int code, svalue_t *sp)
         return NULL;
     }
 
-    if (code & 0xff00)
+    if (code & RN_RANGE)
     {
         ind1 = size - i->u.number;
     }
@@ -4037,8 +4087,6 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
  * Compute the value (v[i]) and push it onto the stack.
  * If the value would be a destructed object, 0 is pushed onto the stack
  * and the ref to the object is removed from the vector/mapping.
- *
- * Mapping indices may use <indexing_quickfix> for temporary storage.
  */
 
 {
@@ -4052,7 +4100,7 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
 
     switch (vec->type)
     {
-    case T_OLD_STRING:
+    case T_STRING:
       {
         if (i->type != T_NUMBER)
         {
@@ -4068,19 +4116,19 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
         }
 
         /* Index the string */
-        if (ind > _svalue_strlen(vec))
-            ind = 0;
-            /* TODO: Throw an out-of-bounds exception instead.
-             * TODO:: Also treat the other indexings similar
-             */
+        if (ind > mstrsize(vec->u.str))
+        {
+            error("Index for [] out of bounds: %ld, string size: %ld.\n"
+                 , (long)ind, (long)mstrsize(vec->u.str));
+        }
         else
-            ind = vec->u.string[ind];
+            ind = get_txt(vec->u.str)[ind];
 
         /* Drop the args and return the result */
 
         free_string_svalue(vec);
 
-        sp = vec;
+        sp = vec; /* == sp-1 */
         put_number(sp, ind);
 
         return sp;
@@ -4101,7 +4149,7 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
         }
 
         /* Drop the arguments */
-        sp = vec;
+        sp = vec; /* == sp-1 */
 
         if (ind < 0 || (size_t)ind >= VEC_SIZE(vec->u.vec))
         {
@@ -4151,12 +4199,12 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
         /* The vector continues to live: keep the refcount as it is
          * and just assign the indexed element for the result.
          */
-        assign_checked_svalue_no_free(sp, &vec->u.vec->item[ind], sp, pc);
+        assign_checked_svalue_no_free(sp, &vec->u.vec->item[ind]);
         return sp;
 
     case T_MAPPING:
       {
-        svalue_t *item;
+        svalue_t item;
         mapping_t *m;
 
         m = vec->u.map;
@@ -4169,30 +4217,20 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
             return NULL;
         }
 
-        /* Get the item */
-        item = get_map_value(m, i);
+        /* Get the item.
+         * We are getting a copy in case the subsequent free() actions
+         * free the mapping and all it's data.
+         */
+        assign_checked_svalue_no_free(&item, get_map_value(m, i));
 
         /* Drop the arguments */
 
-        free_svalue(i); /* must come before the free(m) in case i and m are
-                         * identical: if not done, the following test for
-                         * m->ref == 1 would not be possible.
-                         */
-
-        if (m->ref == 1)
-        {
-            /* Only one ref left to the mapping: rescue the indexed
-             * item in indexing_quickfix before the free(m) will deallocate
-             * it.
-             */
-            assign_svalue (&indexing_quickfix, item);
-            item = &indexing_quickfix;
-        }
+        free_svalue(i);
         free_mapping(m);
 
         /* Return the result */
-        sp = vec;
-        assign_checked_svalue_no_free(sp, item, sp, pc);
+        sp = vec; /* == sp-1 */
+        transfer_svalue_no_free(sp, &item);
         return sp;
       }
 
@@ -4242,20 +4280,24 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
 
     switch (vec->type)
     {
-    case T_OLD_STRING:
+    case T_STRING:
       {
         /* Index the string */
 
-        if ( (ind = (mp_int)_svalue_strlen(vec) - ind) < 0 )
-            ind = 0;
+        if ( (ind = (mp_int)mstrsize(vec->u.str) - ind) < 0 )
+        {
+            ERRORF(("Index for [<] out of bounds: %ld, string size: %lu\n"
+                   , (long)i->u.number, mstrsize(vec->u.str)));
+            return NULL;
+        }
         else
-            ind = vec->u.string[ind];
+            ind = get_txt(vec->u.str)[ind];
 
         /* Drop the args and return the result */
 
         free_string_svalue(vec);
 
-        sp = vec;
+        sp = vec; /* == sp-1 */
         put_number(sp, ind);
         return sp;
       }
@@ -4263,7 +4305,8 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
     case T_POINTER:
         /* Drop the arguments */
         sp = vec;
-        if ( (ind = (mp_int)VEC_SIZE(vec->u.vec) - ind) < 0) {
+        if ( (ind = (mp_int)VEC_SIZE(vec->u.vec) - ind) < 0)
+        {
             ERRORF(("Index for [<] out of bounds: %ld, vector size: %lu\n"
                    , (long)i->u.number, VEC_SIZE(vec->u.vec)));
             return NULL;
@@ -4310,7 +4353,7 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
         /* The vector continues to live: keep the refcount as it is
          * and just assign the indexed element for the result.
          */
-        assign_checked_svalue_no_free(sp, &vec->u.vec->item[ind], sp, pc);
+        assign_checked_svalue_no_free(sp, &vec->u.vec->item[ind]);
         return sp;
 
     default:
@@ -4497,11 +4540,13 @@ find_virtual_value (int num)
         if (num)
             fatal("%s Fatal: find_virtual_value() on object %p '%s' "
                   "w/o variables, num %d\n"
-                 , time_stamp(), current_object, current_object->name, num);
+                 , time_stamp(), current_object, get_txt(current_object->name)
+                 , num);
         else
             error("%s Error: find_virtual_value() on object %p '%s' "
                   "w/o variables, num %d\n"
-                 , time_stamp(), current_object, current_object->name, num);
+                 , time_stamp(), current_object, get_txt(current_object->name)
+                 , num);
     }
 #endif
 
@@ -4509,25 +4554,9 @@ find_virtual_value (int num)
       /* TODO: Why not '&current_variables[num]'? */
 } /* find_virtual_value() */
 
-/*-------------------------------------------------------------------------*/
-char *
-add_slash (char *str)
 
-/* Prepend a slash ('/') in front of string <str> and return an allocated
- * copy of the result.
- */
-
-{
-    char *tmp;
-
-    tmp = xalloc(strlen(str)+2);
-    if (tmp) {
-        *tmp = '/';
-        strcpy(tmp+1,str);
-    }
-    return tmp;
-} /* add_slash() */
-
+=== Adapted until here ===
+/*=========================================================================*/
 /*-------------------------------------------------------------------------*/
 static INLINE const char *
 typename_inline (int type)
@@ -4915,6 +4944,7 @@ test_efun_args (int instr, int args, svalue_t *argp)
     }
 } /* test_efun_args() */
 
+/*=========================================================================*/
 /*-------------------------------------------------------------------------*/
 Bool
 _privilege_violation (char *what, svalue_t *where, svalue_t *sp)
@@ -6215,8 +6245,7 @@ again:
          * <var_ix> is a uint8.
          */
         sp++;
-        assign_checked_svalue_no_free(sp, find_value((int)(LOAD_UINT8(pc)))
-                                     , sp, pc);
+        assign_checked_svalue_no_free(sp, find_value((int)(LOAD_UINT8(pc))) );
         break;
 
     CASE(F_STRING);                /* --- string <ix>          --- */
@@ -8019,6 +8048,7 @@ again:
 
             TYPE_TEST_RIGHT(sp, T_MAPPING);
             check_map_for_destr((sp-1)->u.map);
+            check_map_for_destr(sp->u.map);
             inter_pc = pc;
             inter_sp = sp;
             m = add_mapping((sp-1)->u.map,sp->u.map);
@@ -10659,10 +10689,8 @@ again:
          * variable table.
          */
         sp++;
-        assign_checked_svalue_no_free(
-          sp,
-          find_virtual_value((int)(LOAD_UINT8(pc))),
-          sp, pc
+        assign_checked_svalue_no_free(sp
+                                     , find_virtual_value((int)(LOAD_UINT8(pc)))
         );
         break;
 
@@ -10693,7 +10721,7 @@ again:
 
         LOAD_SHORT(var_index, pc);
         sp++;
-        assign_checked_svalue_no_free(sp, find_value((int)var_index), sp, pc);
+        assign_checked_svalue_no_free(sp, find_value((int)var_index));
         break;
     }
 
@@ -10817,7 +10845,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = range_lvalue(0x000, sp);
+        sp = range_lvalue(NN_INDEX, sp);
         break;
 
     CASE(F_NR_RANGE_LVALUE);           /* --- nr_range_lvalue     --- */
@@ -10831,7 +10859,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = range_lvalue(0x001, sp);
+        sp = range_lvalue(NR_INDEX, sp);
         break;
 
     CASE(F_RN_RANGE_LVALUE);           /* --- rn_range_lvalue     --- */
@@ -10845,7 +10873,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = range_lvalue(0x100, sp);
+        sp = range_lvalue(RN_INDEX, sp);
         break;
 
     CASE(F_RR_RANGE_LVALUE);           /* --- rr_range_lvalue     --- */
@@ -10859,7 +10887,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = range_lvalue(0x101, sp);
+        sp = range_lvalue(RR_INDEX, sp);
         break;
 
     CASE(F_NX_RANGE_LVALUE);           /* --- nx_range_lvalue     --- */
@@ -10879,7 +10907,7 @@ again:
         sp++;
         sp[0] = sp[-1];       /* Pull up the 'v' */
         put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-        sp = range_lvalue(0x001, sp);
+        sp = range_lvalue(NR_INDEX, sp);
         break;
 
     CASE(F_RX_RANGE_LVALUE);           /* --- rx_range_lvalue     --- */
@@ -10899,7 +10927,7 @@ again:
         sp++;
         sp[0] = sp[-1];       /* Pull up the 'v' */
         put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-        sp = range_lvalue(0x101, sp);
+        sp = range_lvalue(RR_INDEX, sp);
         break;
 
                           /* --- push_protected_indexed_lvalue --- */
@@ -10996,7 +11024,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = protected_range_lvalue(0x000, sp);
+        sp = protected_range_lvalue(NN_INDEX, sp);
         break;
 
                            /* --- protected_nr_range_lvalue --- */
@@ -11015,7 +11043,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = protected_range_lvalue(0x001, sp);
+        sp = protected_range_lvalue(NR_INDEX, sp);
         break;
 
                              /* --- protected_rn_range_lvalue --- */
@@ -11034,7 +11062,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = protected_range_lvalue(0x100, sp);
+        sp = protected_range_lvalue(RN_INDEX, sp);
         break;
 
                              /* --- protected_rr_range_lvalue --- */
@@ -11053,7 +11081,7 @@ again:
          */
 
         inter_pc = pc;
-        sp = protected_range_lvalue(0x101, sp);
+        sp = protected_range_lvalue(RR_INDEX, sp);
         break;
 
                               /* --- protected_nx_range_lvalue --- */
@@ -11079,7 +11107,7 @@ again:
         sp++;
         sp[0] = sp[-1];       /* Pull up the 'v' */
         put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-        sp = protected_range_lvalue(0x001, sp);
+        sp = protected_range_lvalue(NR_INDEX, sp);
         break;
 
                           /* --- protected_rx_range_lvalue --- */
@@ -11105,7 +11133,7 @@ again:
         sp++;
         sp[0] = sp[-1];       /* Pull up the 'v' */
         put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
-        sp = protected_range_lvalue(0x101, sp);
+        sp = protected_range_lvalue(RR_INDEX, sp);
         break;
 
     CASE(F_SIMUL_EFUN); /* --- simul_efun <code> [<num_arg>]   --- */
@@ -11376,7 +11404,7 @@ again:
         }
 #endif
         sp++;
-        assign_checked_svalue_no_free(sp, cstart - ix, sp, pc);
+        assign_checked_svalue_no_free(sp, cstart - ix);
         break;
     }
 
@@ -11412,7 +11440,7 @@ again:
 #endif
 
         sp++;
-        assign_checked_svalue_no_free(sp, cstart - ix, sp, pc);
+        assign_checked_svalue_no_free(sp, cstart - ix);
         break;
     }
 
@@ -11449,7 +11477,7 @@ again:
         }
         else
         {
-            assign_checked_svalue_no_free(sp, data + n, sp, pc);
+            assign_checked_svalue_no_free(sp, data + n);
         }
         free_mapping(m);
         break;

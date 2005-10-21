@@ -6146,10 +6146,12 @@ expr0:
       {
           mp_uint current;
           bytecode_p p;
-          int start;
+          int start, restype;
 %line
           if ($3.type1 & TYPE_MOD_REFERENCE)
               yyerror("Reference used as index");
+
+          restype = TYPE_ANY;
 
           /* Check the types */
           if (exact_types)
@@ -6176,9 +6178,9 @@ expr0:
                       break;
                   /* FALLTHROUGH */
               case TYPE_STRING:
-                  if (!BASIC_TYPE($3.type1, TYPE_NUMBER)
-                   && !BASIC_TYPE($3.type1, TYPE_FLOAT))
+                  if (!BASIC_TYPE($3.type1, TYPE_NUMBER))
                       type_error("Bad type of index", $3.type1);
+                  restype = TYPE_NUMBER;
                   break;
               }
           } /* if (exact_types) */
@@ -6243,7 +6245,7 @@ expr0:
           *p = $1.code;
           last_expression = current + 1;
           CURRENT_PROGRAM_SIZE = current + 2;
-          $$.type = $3.type1;
+          $$.type = restype;
       } /* pre_inc_dec expr4 [index_expr] */
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/

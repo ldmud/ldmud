@@ -2148,7 +2148,7 @@ parse_number (char * cp, unsigned long * p_num)
 
 /* Parse a positive integer number in one of the following formats:
  *   <decimal>
- *   0<octal>
+ *   0o<octal>
  *   0x<sedecimal>
  *   x<sedecimal>
  *   0b<binary>
@@ -2168,8 +2168,8 @@ parse_number (char * cp, unsigned long * p_num)
 
     if ('0' == c)
     {
-        /* '0' introduces octal (not implemented), binary and sedecimal
-         * numbers, or it can be a float
+        /* '0' introduces decimal, octal, binary and sedecimal numbers, or it
+         * can be a float.
          *
          * Sedecimals are handled in a following if-clause to allow the
          * two possible prefixes.
@@ -2177,34 +2177,44 @@ parse_number (char * cp, unsigned long * p_num)
 
         c = *cp++;
 
-        if ( c != 'X' && c != 'x' )
+        switch (c)
         {
-            if ( c == 'b' || c == 'B' )
-            {
-                l = 0;
-                --cp;
-                while('0' == (c = *++cp) || '1' == c)
-                {
-                    l <<= 1;
-                    l += c - '0';
-                }
+        case 'X': case 'x':
+            /* Sedecimal number are handled below - here just fall
+             * through.
+             */
+            NOOP;
+            break;
 
-                *p_num = l;
-                return cp;
+        case 'b': case 'B':
+          {
+            l = 0;
+            --cp;
+            while('0' == (c = *++cp) || '1' == c)
+            {
+                l <<= 1;
+                l += c - '0';
             }
 
+            *p_num = l;
+            return cp;
+          }
+
+        case 'o': case 'O':
+            c = '0';
+            base = 8;
+            break;
+
+        default:
             /* If some non-digit follows, it's just the number 0.
              */
-            cp--;
             if (!lexdigit(c))
             {
                 *p_num = 0;
-                return cp;
+                return cp-1;
             }
-
-            c = '0';
-            base = 8;
-        } /* if ('X' != c) */
+            break;
+        } /* switch(c) */
     } /* if ('0' == c) */
 
     if ( c == 'X' || c == 'x' )
@@ -2226,10 +2236,10 @@ parse_number (char * cp, unsigned long * p_num)
         return cp;
     }
 
-    /* Parse a normal decimal number from here */
+    /* Parse a normal number from here */
 
     l = c - '0';
-    while (lexdigit(c = *cp++)) l = l * base + (c - '0');
+    while (lexdigit(c = *cp++) && c < '0'+base) l = l * base + (c - '0');
 
     *p_num = l;
     return cp-1;
@@ -2249,7 +2259,7 @@ parse_escaped_char (char * cp, char * p_char)
  *   \n : Newline (0x0a)
  *   \r : Carriage-Return (0x0d)
  *   \t : Tab (0x09)
- *   \<decimal>, \0<octal>, \x<sedecimal>, \0x<sedecimal>, \0b<binary>:
+ *   \<decimal>, \0o<octal>, \x<sedecimal>, \0x<sedecimal>, \0b<binary>:
  *        the character with the given code.
  *   \<other printable character> : the printable character
  *

@@ -1,6 +1,28 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Dec-2000 (Lars Duening)  (3.3.19)
+    - (interpret.c) Continued adaptation.
+    Included the changes up to 3.2.9-dev.248:
+    - (comm, simulate.c) When the telnet machine for a player gets into
+        an inconsistent state, the driver no longer aborts. Instead, the
+        player's interactive structure is dumped to stderr, and then
+        removed the hard way.
+    - (regexp.c) Added the metacharacter '+' (match at least once'
+        to the regexp code (provided by Terry Penn, thanks!).
+    - (mudlib/floattest) This LPC program computes the floating point
+        characteristics; it can be called from the test_master (provided
+        by Croft, thanks!)
+    - (lex.c) Octal numbers are now prefixed by '0o' - it's cleaner
+        and avoids compatibility problems with existing code.
+    - (interpret.c) Omitting a check_map_for_destr() in a mapping addition
+        caused data in a wiz_info mapping to mysteriously disappear (thanks,
+        Coogan) (b-001204).
+    - (prolang.y) The result type for '++map[mixed]' was computed
+        incorrectly (reported by Freaky).
+    - (comm.c) If an error occurs on accept(), the driver no longer abort()s
+        but prints a better error message.
+
 06-Dec-2000 (Lars Duening)  (3.3.18)
     Included the changes up to 3.2.9-dev.244:
     - (lots of files) Closures bound to destructed objects are now treated

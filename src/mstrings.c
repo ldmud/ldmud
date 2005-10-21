@@ -870,6 +870,31 @@ mstring_mstr_n_str ( const string_t * const pStr, size_t start
 } /* mstring_mstr_n_str() */
 
 /*-------------------------------------------------------------------------*/
+string_t *
+mstring_add_slash (const string_t *str MTRACE_DECL)
+
+/* Aliased to: add_slash(str)
+ *
+ * Create and return a new string with the data of <str> prepended
+ * by a slash ('/'). The result string is untable and has one reference,
+ * the old string <str> is not changed.
+ */
+
+{
+    string_t *tmp;
+    char * txt;
+
+    tmp = mstring_alloc_string(mstrsize(str)+1 MTRACE_PASS);
+    if (tmp)
+    {
+        txt = get_txt(tmp);
+        *tmp = '/';
+        memcpy(tmp+1, get_txt(str), mstrsize(str));
+    }
+    return tmp;
+} /* mstring_add_slash() */
+
+/*-------------------------------------------------------------------------*/
 void
 mstring_init (void)
 

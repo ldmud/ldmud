@@ -302,7 +302,7 @@ static int ipcur = 0;
 /* --- Communication sockets --- */
 
 static SOCKET_T sos[MAXNUMPORTS];
-  /* The login ports.
+  /* The login sockets.
    */
 
 #ifdef CATCH_UDP_PORT
@@ -524,6 +524,196 @@ inet6_addr (char *to_host)
 } /* inet6_addr() */
 
 #endif /* USE_IPV6 */
+
+/*-------------------------------------------------------------------------*/
+static void
+dump_bytes (void * data, size_t length, int indent)
+
+/* Write the datablock starting at <data> of size <length> to stderr.
+ * If it spans more than one line, indent the following lines by <indent>.
+ */
+
+{
+    int cur_indent = 0;
+    char * datap = (char *)data;
+
+    while (length > 0)
+    {
+        size_t count;
+
+        if (cur_indent)
+            fprintf(stderr, "%*.*s", cur_indent, cur_indent, " ");
+        else
+            cur_indent = indent;
+        fprintf(stderr, " %p:", datap);
+
+        for (count = 0; count < 16 && length > 0; ++count, --length, ++datap)
+        {
+            fprintf(stderr, " %02x", *datap);
+        }
+        putc('\n', stderr);
+    }
+} /* dump_bytes() */
+
+/*-------------------------------------------------------------------------*/
+static void
+comm_fatal (interactive_t *ip, char *fmt, ...)
+
+/* The telnet code ran into a fatal error.
+ * Dump the data from the current interactive structure and disconnect
+ * the user (we have to assume that the interactive structure is
+ * irrecoverably hosed).
+ */
+
+{
+    va_list va;
+    static Bool in_fatal = MY_FALSE;
+    char * ts;
+    char * msg = "\n=== Internal communications error in mud driver.\n"
+                   "=== Please log back in and inform the administration.\n"
+                   "\n";
+
+    /* Prevent double fatal. */
+    if (in_fatal)
+        abort();
+    in_fatal = MY_TRUE;
+    ts = time_stamp();
+    
+    /* Print the error message */
+
+    va_start(va, fmt);
+
+    fflush(stdout);
+    fprintf(stderr, "%s ", ts);
+    vfprintf(stderr, fmt, va);
+    fflush(stderr);
+    if (current_object)
+        fprintf(stderr, "%s Current object was %s\n"
+                      , ts, current_object->name
+                            ? current_object->name : "<null>");
+    debug_message("%s ", ts);
+    vdebug_message(fmt, va);
+    if (current_object)
+        debug_message("%s Current object was %s\n"
+                     , ts, current_object->name
+                           ? current_object->name : "<null>");
+    debug_message("%s Dump of the call chain:\n", ts);
+    (void)dump_trace(MY_TRUE);
+
+    va_end(va);
+    
+    /* Dump the interactive structure */
+
+    fprintf(stderr, "--- Dump of current interactive structure (%p..%p) --- \n"
+                  , ip, ip + sizeof(*ip) - 1);
+    fprintf(stderr, "  .socket:            %d\n", ip->socket);
+    fprintf(stderr, "  .ob:                %p", ip->ob);
+      if (ip->ob)  fprintf(stderr, " (%s)", ip->ob->name);
+      putc('\n', stderr);
+    fprintf(stderr, "  .input_to:          %p\n", ip->input_to);
+    fprintf(stderr, "  .modify_command:    %p", ip->modify_command);
+      if (ip->modify_command)  fprintf(stderr, " (%s)", ip->modify_command->name);
+      putc('\n', stderr);
+    fprintf(stderr, "  .prompt:           ");
+      dump_bytes(&(ip->prompt), sizeof(ip->prompt), 21);
+    fprintf(stderr, "  .addr:             ");
+      dump_bytes(&(ip->addr), sizeof(ip->addr), 21);
+    fprintf(stderr, "  .set_input_to:      %02x\n", ip->set_input_to);
+    fprintf(stderr, "  .closing:           %02x\n", ip->closing);
+    fprintf(stderr, "  .do_close:          %02x", ip->do_close);
+      if (ip->do_close & (FLAG_DO_CLOSE|FLAG_PROTO_ERQ)) fprintf(stderr, " (");
+      if (ip->do_close & FLAG_DO_CLOSE) fprintf(stderr, "DO_CLOSE");
+      if (ip->do_close & (FLAG_DO_CLOSE|FLAG_PROTO_ERQ)) fprintf(stderr, ", ");
+      if (ip->do_close & FLAG_PROTO_ERQ) fprintf(stderr, "PROTO_ERQ");
+      if (ip->do_close & (FLAG_DO_CLOSE|FLAG_PROTO_ERQ)) fprintf(stderr, ")");
+      putc('\n', stderr);
+    fprintf(stderr, "  .noecho:            %02x", ip->noecho);
+      if (ip->noecho) fprintf(stderr, " (");
+      if (ip->noecho & NOECHO_REQ) fprintf(stderr, "NOECHO_REQ, ");
+      if (ip->noecho & CHARMODE_REQ) fprintf(stderr, "CHARMODE_REQ, ");
+      if (ip->noecho & NOECHO) fprintf(stderr, "NOECHO, ");
+      if (ip->noecho & CHARMODE) fprintf(stderr, "CHARMODE, ");
+      if (ip->noecho & NOECHO_ACK) fprintf(stderr, "NOECHO_ACK, ");
+      if (ip->noecho & CHARMODE_ACK) fprintf(stderr, "CHARMODE_ACK, ");
+      if (ip->noecho & NOECHO_STALE) fprintf(stderr, "NOECHO_STALE, ");
+      if (ip->noecho & IGNORE_BANG) fprintf(stderr, "IGNORE_BANK");
+    fprintf(stderr, "  .tn_state:          %d", ip->tn_state);
+      switch(ip->tn_state) {
+      case TS_DATA:    fprintf(stderr, " (TS_DATA)\n"); break;
+      case TS_IAC:     fprintf(stderr, " (TS_IAC)\n"); break;
+      case TS_WILL:    fprintf(stderr, " (TS_WILL)\n"); break;
+      case TS_WONT:    fprintf(stderr, " (TS_WONT)\n"); break;
+      case TS_DO:      fprintf(stderr, " (TS_DO)\n"); break;
+      case TS_DONT:    fprintf(stderr, " (TS_DONT)\n"); break;
+      case TS_SB:      fprintf(stderr, " (TS_SB)\n"); break;
+      case TS_SB_IAC:  fprintf(stderr, " (TS_SB_IAC)\n"); break;
+      case TS_READY:   fprintf(stderr, " (TS_READY)\n"); break;
+      case TS_CR:      fprintf(stderr, " (TS_CR)\n"); break;
+      case TS_SYNCH:   fprintf(stderr, " (TS_SYNCH)\n"); break;
+      case TS_INVALID: fprintf(stderr, " (TS_INVALID)\n"); break;
+      default: putc('\n', stderr);
+      }
+    fprintf(stderr, "  .save_tn_state:     %d", ip->save_tn_state);
+      switch(ip->save_tn_state) {
+      case TS_DATA:    fprintf(stderr, " (TS_DATA)\n"); break;
+      case TS_IAC:     fprintf(stderr, " (TS_IAC)\n"); break;
+      case TS_WILL:    fprintf(stderr, " (TS_WILL)\n"); break;
+      case TS_WONT:    fprintf(stderr, " (TS_WONT)\n"); break;
+      case TS_DO:      fprintf(stderr, " (TS_DO)\n"); break;
+      case TS_DONT:    fprintf(stderr, " (TS_DONT)\n"); break;
+      case TS_SB:      fprintf(stderr, " (TS_SB)\n"); break;
+      case TS_SB_IAC:  fprintf(stderr, " (TS_SB_IAC)\n"); break;
+      case TS_READY:   fprintf(stderr, " (TS_READY)\n"); break;
+      case TS_CR:      fprintf(stderr, " (TS_CR)\n"); break;
+      case TS_SYNCH:   fprintf(stderr, " (TS_SYNCH)\n"); break;
+      case TS_INVALID: fprintf(stderr, " (TS_INVALID)\n"); break;
+      default: putc('\n', stderr);
+      }
+    fprintf(stderr, "  .supress_go_ahead:  %02x\n", ip->supress_go_ahead);
+    fprintf(stderr, "  .text_end:          %hd (%p)\n", ip->text_end, ip->text+ip->text_end);
+    fprintf(stderr, "  .command_start:     %hd (%p)\n", ip->command_start, ip->text+ip->command_start);
+    fprintf(stderr, "  .command_end:       %hd (%p)\n", ip->command_end, ip->text+ip->command_end);
+    fprintf(stderr, "  .tn_start:          %hd (%p)\n", ip->tn_start, ip->text+ip->tn_start);
+    fprintf(stderr, "  .tn_end:            %hd (%p)\n", ip->tn_end, ip->text+ip->tn_end);
+    fprintf(stderr, "  .chars_ready:       %ld\n", (long)ip->chars_ready);
+    fprintf(stderr, "  .snoop_on:          %p", ip->snoop_on);
+      if (ip->snoop_on && ip->snoop_on->ob) fprintf(stderr, " (%s)", ip->snoop_on->ob->name);
+      putc('\n', stderr);
+    fprintf(stderr, "  .snoop_by:          %p", ip->snoop_by);
+      if (ip->snoop_by) fprintf(stderr, " (%s)", ip->snoop_by->name);
+      putc('\n', stderr);
+    fprintf(stderr, "  .last_time:         %ld\n", (long)ip->last_time);
+    fprintf(stderr, "  .trace_level:       %d\n", ip->trace_level);
+    fprintf(stderr, "  .trace_prefix:      %p", ip->trace_prefix);
+      if (ip->trace_prefix) fprintf(stderr, " '%s'", ip->trace_prefix);
+      putc('\n', stderr);
+    fprintf(stderr, "  .message_length:    %d (%p)\n", ip->message_length, ip->message_buf+ip->message_length);
+    fprintf(stderr, "  .next_for_flush:    %p", ip->next_player_for_flush);
+      if (ip->next_player_for_flush) fprintf(stderr, " (%s)", ip->next_player_for_flush->name);
+      putc('\n', stderr);
+    fprintf(stderr, "  .prev_for_flush:    %p", ip->previous_player_for_flush);
+      if (ip->previous_player_for_flush) fprintf(stderr, " (%s)", ip->previous_player_for_flush->name);
+      putc('\n', stderr);
+    fprintf(stderr, "  .access_class:      %ld\n", ip->access_class);
+    fprintf(stderr, "  .charset:          ");
+      dump_bytes(&(ip->charset), sizeof(ip->charset), 21);
+    fprintf(stderr, "  .combine_cset:     ");
+      dump_bytes(&(ip->combine_cset), sizeof(ip->combine_cset), 21);
+    fprintf(stderr, "  .quote_iac:         %02x\n", ip->quote_iac);
+    fprintf(stderr, "  .catch_tell_activ:  %02x\n", ip->catch_tell_activ);
+    fprintf(stderr, "  .gobble_char:       %02x\n", ip->gobble_char);
+    fprintf(stderr, "  .ts_data:           %02x\n", ip->ts_data);
+    fprintf(stderr, "  .text:             ");
+      dump_bytes(&(ip->text), sizeof(ip->text), 21);
+    fprintf(stderr, "  .message_buf:      ");
+      dump_bytes(&(ip->message_buf), sizeof(ip->message_buf), 21);
+    fprintf(stderr, "------\n");
+
+    /* Disconnect the user */
+    socket_write(ip->socket, msg, strlen(msg));
+    remove_interactive(ip->ob, MY_TRUE);
+
+} /* comm_fatal() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1032,7 +1222,10 @@ add_message (const char *fmt, ...)
             vsprintf(buff+1,fmt,va);
             va_end(va);
             if (buff[(sizeof buff) - 1])
-                fatal("To long message!\n");
+            {
+                comm_fatal(ip, "To long message!\n");
+                return;
+            }
             source = buff+1;
             srclen = strlen(buff+1);
             srcstr = NULL;
@@ -1486,7 +1679,7 @@ get_message (char *buff)
                 if (ip->do_close)
                 {
                     ip->do_close &= FLAG_PROTO_ERQ;
-                    remove_interactive(ip->ob);
+                    remove_interactive(ip->ob, MY_FALSE);
                     continue;
                 }
 
@@ -1836,11 +2029,24 @@ get_message (char *buff)
                       && errno != EWOULDBLOCK && errno != EINTR
                       && errno != EAGAIN && errno != EPROTO )
                     {
-                        /* EBADF is a valid cause for an abort,
-                         * same goes for ENOTSOCK, EOPNOTSUPP, EFAULT
+                        /* EBADF would be a valid cause for an abort,
+                         * same goes for ENOTSOCK, EOPNOTSUPP, EFAULT.
+                         * However, don't abort() because it tends to
+                         * leave Mud admins baffled.
                          */
-                        perror("accept");
-                        abort();
+                        int errorno = errno;
+                        fprintf( stderr
+                               , "%s comm: Can't accept on socket %d "
+                                 "(port %d): %s\n"
+                               , time_stamp(), sos[i], port_numbers[i]
+                               , strerror(errorno)
+                               );
+                        debug_message("%s comm: Can't accept on socket %d "
+                                      "(port %d): %s\n"
+                                     , time_stamp(), sos[i], port_numbers[i]
+                                     , strerror(errorno)
+                                     );
+                        /* TODO: Was: perror(); abort(); */
                     }
                 }
             } /* for */
@@ -1930,31 +2136,31 @@ get_message (char *buff)
                     if (errno == ENETUNREACH) {
                         debug_message("%s Net unreachable detected.\n"
                                      , time_stamp());
-                        remove_interactive(ip->ob);
+                        remove_interactive(ip->ob, MY_FALSE);
                         continue;
                     }
                     if (errno == EHOSTUNREACH) {
                         debug_message("%s Host unreachable detected.\n"
                                      , time_stamp());
-                        remove_interactive(ip->ob);
+                        remove_interactive(ip->ob, MY_FALSE);
                         continue;
                     }
                     if (errno == ETIMEDOUT) {
                         debug_message("%s Connection timed out detected.\n"
                                      , time_stamp());
-                        remove_interactive(ip->ob);
+                        remove_interactive(ip->ob, MY_FALSE);
                         continue;
                     }
                     if (errno == ECONNRESET) {
                         debug_message("%s Connection reset by peer detected.\n"
                                      , time_stamp());
-                        remove_interactive(ip->ob);
+                        remove_interactive(ip->ob, MY_FALSE);
                         continue;
                     }
                     if (errno == EWOULDBLOCK) {
                         debug_message("%s read would block socket %d!\n"
                                      , time_stamp(), ip->socket);
-                        remove_interactive(ip->ob);
+                        remove_interactive(ip->ob, MY_FALSE);
                         continue;
                     }
                     if (errno == EMSGSIZE) {
@@ -1964,18 +2170,20 @@ get_message (char *buff)
                     if (errno == ESHUTDOWN) {
                         debug_message("%s Connection to socket %d lost.\n"
                                      , time_stamp(), ip->socket);
-                        remove_interactive(ip->ob);
+                        remove_interactive(ip->ob, MY_FALSE);
                         continue;
                     }
                     perror("read");
                     debug_message("%s Unknown errno %d\n", time_stamp(), errno);
-                    remove_interactive(ip->ob);
+                    remove_interactive(ip->ob, MY_FALSE);
                     continue;
                 }
                 if (l == 0) {
                     if (ip->closing)
-                        fatal("Tried to read from closing socket.\n");
-                    remove_interactive(ip->ob);
+                        comm_fatal(ip, "Tried to read from closing socket.\n");
+                        /* This will forcefully disconnect the user */
+                    else
+                        remove_interactive(ip->ob, MY_FALSE);
                     continue;
                 }
                 ip->text_end += l;
@@ -2018,7 +2226,10 @@ get_message (char *buff)
                         if (!length)
                             continue;
                         if (length < 0)
-                            fatal("comm: data length < 0: %ld\n", (long)length);
+                        {
+                            comm_fatal(ip, "comm: data length < 0: %ld\n", (long)length);
+                            continue;
+                        }
                         ip->save_tn_state = ip->tn_state;
                         ip->chars_ready = length;
                         ip->tn_state = TS_READY;
@@ -2122,7 +2333,10 @@ get_message (char *buff)
                              ) - ip->command_start;
                     DTN(("  data length %d\n", length));
                     if (length < 0)
-                        fatal("comm: data length < 0: %ld\n", (long)length);
+                    {
+                        comm_fatal(ip, "comm: data length < 0: %ld\n", (long)length);
+                        continue;
+                    }
                     if (length > ip->chars_ready)
                     {
                         socket_write(ip->socket, ip->text + ip->chars_ready
@@ -2210,9 +2424,11 @@ get_message (char *buff)
 
 /*-------------------------------------------------------------------------*/
 void
-remove_interactive (object_t *ob)
+remove_interactive (object_t *ob, Bool force)
 
 /* Remove the interactive user <ob> immediately.
+ * If <force> is true, the user is removed under all circumstances and
+ * without even flushing the outgoing buffer.
  * This function should not be called from within a LPC command execution.
  */
 
@@ -2231,7 +2447,7 @@ remove_interactive (object_t *ob)
         fatal("Could not find and remove player %s\n", get_txt(ob->name));
         abort();
     }
-    if (interactive->closing)
+    if (interactive->closing && !force)
         fatal("Double call to remove_interactive()\n");
 
     interactive->closing = MY_TRUE;
@@ -2280,7 +2496,8 @@ remove_interactive (object_t *ob)
      * a new ERQ, put the connection into place and greet the ERQ.
      */
     if (interactive->do_close & FLAG_PROTO_ERQ
-     && interactive->socket == erq_proto_demon)
+     && interactive->socket == erq_proto_demon
+     && !force)
     {
         static unsigned char erq_welcome[] = { IAC, TELOPT_BINARY };
 
@@ -2292,9 +2509,12 @@ remove_interactive (object_t *ob)
     else
 #endif
     {
-        /* Say goodbye to the user. */
-        trace_level |= interactive->trace_level;
-        add_message(message_flush);
+        if (!force)
+        {
+            /* Say goodbye to the user. */
+            trace_level |= interactive->trace_level;
+            add_message(message_flush);
+        }
         shutdown(interactive->socket, 2);
         socket_close(interactive->socket);
     } /* if (erq or user) */
@@ -2342,7 +2562,7 @@ remove_interactive (object_t *ob)
     command_giver = check_object(save);
     current_object = NULL;
     malloc_privilege = save_privilege;
-}
+} /* remove_interactive() */
 
 #ifdef ACCESS_CONTROL
 
@@ -2576,7 +2796,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
      || ret->type != T_OBJECT
      || (ob = ret->u.ob, O_IS_INTERACTIVE(ob)))
     {
-        remove_interactive(master_ob);
+        remove_interactive(master_ob, MY_FALSE);
         return;
     }
     command_giver = master_ob;

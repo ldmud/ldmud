@@ -120,10 +120,14 @@ union u {
  * are to be assigned. A special case are protected lvalues where the
  * svalue referenced by the T_LVALUE.u.lvalue is not the target svalue,
  * but instead a T_PROTECTED_xxx_LVALUE which then points to the target
- * and its protector.
+ * and its protector. Similar, indexed and range-indexed lvalues don't
+ * point to the data itself, but instead to one of the dedicated T_xxx_LVALUE
+ * types which contain the necessary information to perform the indexing
+ * operation; effectively limiting the access to the target value to
+ * the view specified by the index/range bounds.
  *
  * T_LVALUEs are also used to reference meta data, like T_ERROR_HANDLER
- * svalues.
+ * svalues. TODO: Maybe they should get the T_META type.
  */
 struct svalue_s
 {

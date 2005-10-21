@@ -5,14 +5,16 @@ DESCRIPTION
 	A request of given type ('request', default is 0), equipped
 	with the given 'data', is sent to the erq. If 'callback' is
 	set to a closure, it will be called when the response from the
-	erq arrives, if the response carries enough data to work on:
+        erq (a status code) arrives, if the response carries enough data to
+        work on:
 	  void <closure>(int * response_data, int len)
 
 	The data given to send_erq() may be either a string, or an
 	array of integers, which are then interpreted as characters.
 	The various requests are defined in /sys/erq.h.
 
-	The result returned is 0 on failure, or non-zero on success.
+	The result returned is 0 on failure to send the data, or
+        non-zero on a successful send.
 
 	The function causes a privilege violation "erq".
 

@@ -2,7 +2,7 @@ Short: Extra wiz_info data vanishes
 Date: Mon, 4 Dec 2000 11:38:05 +0100
 From: Christian Mudra <mudra@informatik.uni-kl.de>
 Type: Bug
-State: New
+State: Fixed - corrected in 3.2.9-dev.246
 
 Hi Lars,
 
@@ -48,3 +48,9 @@ um einen echten Treiberbug handelt.
 
 Ich werde fuer Tub jetzt erstmal wieder zu dev238 wechseln, augenblicklich
 laeuft einfach nichts mehr im Mud.
+
+
+Analysis: The bug was triggered by not cleaning a rhs mapping in a mapping
+addition from destructed objects. The exact reasons why this happens are
+unclear. Originally the mapping has been cleaned, but in dev-239 I removed
+the call for performance reasons.

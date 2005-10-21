@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-06-Dec-2000 (Lars Duening) -- Development Release 3.3
+15-Dec-2000 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -21,6 +21,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + object_info(): OINFO_MEMORY also returns the program flags
            NO_INHERIT, NO_SHADOW and NO_CLONE.
        + regexp functions: more compatible with 8-bit characters.
+       + regexp functions: New metacharacters '+' allows to specifiy 'at
+           least one match'.
        + sin(), cos(), tan(), atan(), atan2(), log(), exp(), sqrt(), pow():
            Integers are accepted as arguments, too.
 
@@ -56,11 +58,11 @@ For a detailed list of all changes see the file CHANGELOG.
          __VERSION_MICRO__, __VERSION_PATCH__ expand to the various parts
          of the driver version.
        + Numbers can also be specified as binary patterns with the '0b'
-           prefix, and as octals with the '0' prefix.
+           prefix, and as octals with the '0o' prefix.
        + Floating point numbers can now also be specified in the
            exponential notation, e.g. '3.14E-5'.
        + Character escape sequences can now specify the character code
-           directly in decimal ('\[1-9]...'), octal ('\0...'), sedecimal
+           directly in decimal ('\[1-9]...'), octal ('\0o...'), sedecimal
            ('\x...' and '\0x...') and binary ('\0b...').
        + The operators '++' and '--' can now be used on floats, too.
        + Closures bound to destructed objects are now treated uniformly

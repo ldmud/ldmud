@@ -9,8 +9,8 @@ DESCRIPTION
                 are -2,147,483,648 to 2,147,483,648.
                 Integer values can be specified in decimal, in sedecimal when
                 preceeded by '0x' (e.g. 0x11), binary when preceeded by
-                '0b' (e.g. 0b00010001), octal when preceeded by '0'
-                (e.g. 021) and as character yielding the
+                '0b' (e.g. 0b00010001), octal when preceeded by '0o'
+                (e.g. 0o21) and as character yielding the
                 charset value for the character as the number to use (e.g. '0'
                 yields 48 on ASCII machines).
 

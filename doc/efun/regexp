@@ -24,6 +24,8 @@ DESCRIPTION
 	() Match enclosed regexp like a 'simple' one.
 	
 	x* Match any number (0 or more) of regexp x.
+
+	x+ Match any number (1 or more) of regexp x.
 	
 	[..] Match one of the characters enclosed.
 	
@@ -50,5 +52,8 @@ EXAMPLE
 	packed into an array) if there is something like "help ... me"
 	inside of it.
 	
+HISTORY
+        LDMud 3.2.9 added metacharacter '+'.
+
 SEE ALSO
 	regexplode(E), regreplace(E), sscanf(E)

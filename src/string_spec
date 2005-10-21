@@ -22,6 +22,7 @@ CRPATTERN       "\015$"
 SLASH           "/"
 NO_PROG_TRACE   "No program to trace."
 NO_TRACE        "No trace."
+NOLOG           "nolog"
 
     /* Privilege violation names */
 

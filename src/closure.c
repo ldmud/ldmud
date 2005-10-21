@@ -2695,7 +2695,7 @@ compile_value (svalue_t *value, int opt_flags)
                     if (block_size == 2)
                         STORE_CODE(current.codep, F_CATCH);
                     else if (argp[2].type != T_SYMBOL
-                     || strcmp(argp[2].u.string, "nolog"))
+                     || mstrcmp(argp[2].u.str, STR_NOLOG))
                         lambda_error("Expected 'nolog as second argument.\n");
                     else
                         STORE_CODE(current.codep, F_CATCH_NO_LOG);

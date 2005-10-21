@@ -2068,7 +2068,7 @@ remove_object (object_t *ob)
     }
 
     if (O_IS_INTERACTIVE(ob))
-        remove_interactive(ob);
+        remove_interactive(ob, MY_FALSE);
 
     /* We must deallocate variables here, not in 'free_object()'.
      * That is because one of the local variables may point to this object,

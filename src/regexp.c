@@ -101,9 +101,10 @@
 #define EXACTLY    8   /* str   Match this string. */
 #define NOTHING    9   /* no    Match empty string. */
 #define STAR      10   /* node  Match this (simple) thing 0 or more times. */
-#define WORDSTART 11   /* node  matching a start of a word          */
-#define WORDEND   12   /* node  matching an end of a word           */
-#define NOTEDGE   13   /* node  matching anything not at word edge  */
+#define PLUS      11   /* node  Match this (simple) thing 1 or more times */
+#define WORDSTART 12   /* node  matching a start of a word          */
+#define WORDEND   13   /* node  matching an end of a word           */
+#define NOTEDGE   14   /* node  matching anything not at word edge  */
 #define OPEN      20   /* no    Mark this point in input as start of #n. */
   /* OPEN+1 is number 1, etc. */
 #define CLOSE (OPEN+NSUBEXP)    /* no        Analogous to OPEN. */
@@ -126,9 +127,9 @@
  * BACK         Normal "nxt" pointers all implicitly point forward; BACK
  *              exists to make loop structures possible.
  *
- * STAR         complex '*', are implemented as circular BRANCH structures
- *              using BACK.  Simple cases (one character per match) are
- *              implemented with STAR for speed and to minimize recursive
+ * STAR,PLUS    complex '*' and '+', are implemented as circular BRANCH
+ *              structures using BACK.  Simple cases (one character per match)
+ *              are implemented with STAR for speed and to minimize recursive
  *              plunges.
  *
  * OPEN,CLOSE   ...are numbered at compile time.
@@ -155,6 +156,7 @@
 #define LBRAC    ('('|SPECIAL)
 #define RBRAC    (')'|SPECIAL)
 #define ASTERIX  ('*'|SPECIAL)
+#define CROSS    ('+'|SPECIAL)
 #define OR_OP    ('|'|SPECIAL)
 #define DOLLAR   ('$'|SPECIAL)
 #define DOT      ('.'|SPECIAL)
@@ -166,8 +168,8 @@
 #define SLASHB   ('B'|SPECIAL)
 #define FAIL(m)   { regerror(m); return(NULL); }
 #define XFREE(m)  { if (m) xfree(m); m = NULL; }
-#define ISMULT(c) ((c) == ASTERIX)
-#define META      "^$.[()|*\\"
+#define ISMULT(c) ((c) == ASTERIX || (c) == CROSS)
+#define META      "^$.[()|+*\\"
 #ifndef CHAR_BIT
 #define UCHARAT(p) ((int)*(unsigned char *)(p))
 #else
@@ -179,7 +181,7 @@
  * Flags to be passed up and down.
  */
 #define HASWIDTH 01   /* Known never to match null string. */
-#define SIMPLE   02   /* Simple enough to be STAR operand. */
+#define SIMPLE   02   /* Simple enough to be STAR or PLUS operand. */
 #define SPSTART  04   /* Starts with * */
 #define WORST     0   /* Worst case. */
 
@@ -295,9 +297,9 @@ regnext (unsigned char *p)
 static unsigned char *
 regpiece (int *flagp)
 
-/* regpiece - something followed by possible [*]
+/* regpiece - something followed by possible [*+]
  *
- * Note that the branching code sequence used for * is somewhat optimized:
+ * Note that the branching code sequence used for * and + is somewhat optimized:
  * they use the same NOTHING node as both the endmarker for their branch
  * list and the body of the last branch.  It might seem that this node could
  * be dispensed with entirely, but the endmarker role is not redundant.
@@ -305,6 +307,7 @@ regpiece (int *flagp)
 
 {
     unsigned char  *ret;
+    unsigned char  *nxt;
     short  op;
     int    flags;
 
@@ -321,7 +324,7 @@ regpiece (int *flagp)
 
     if (!(flags & HASWIDTH))
         FAIL("* operand could be empty");
-    *flagp = (WORST | SPSTART);
+    *flagp = (op != CROSS) ? (WORST | SPSTART) : (WORST | HASWIDTH);
 
     if (op == ASTERIX && (flags & SIMPLE))
         reginsert(STAR, ret);
@@ -334,9 +337,20 @@ regpiece (int *flagp)
         regtail(ret, regnode(BRANCH));  /* or */
         regtail(ret, regnode(NOTHING)); /* null. */
     }
+    else if (op == CROSS && (flags & SIMPLE))
+        reginsert(PLUS, ret);
+    else if (op == CROSS)
+    {
+        /* Emit x+ as x(&|), where & means "self" */
+        nxt = regnode(BRANCH);          /* Either x */
+        regtail(ret, nxt);
+        regtail(regnode(BACK), ret);    /* and loop back */
+        regtail(nxt, regnode(BRANCH));  /* or */
+        regtail(nxt, regnode(NOTHING)); /* null. */
+    }
     regparse++;
     if (ISMULT(*regparse))
-        FAIL("nested *");
+        FAIL("nested */+");
 
     return ret;
 } /* regpiece() */
@@ -525,6 +539,10 @@ regatom (int *flagp)
 
     case ASTERIX:
         FAIL("* follows nothing");
+        break;
+
+    case CROSS:
+        FAIL("+ follows nothing");
         break;
 
     default:
@@ -757,6 +775,7 @@ regcomp (unsigned char *expr, Bool excompat, Bool from_ed)
             break;
         case '.':
         case '*':
+        case '+':
         case '|':
         case '$':
         case '^':
@@ -1113,6 +1132,7 @@ regmatch (unsigned char *prog)
             break;
           }
         case STAR:
+        case PLUS:
           {
             unsigned char   nextch;
             int    no;
@@ -1303,6 +1323,9 @@ regprop (unsigned char *op)
         break;
     case STAR:
         p = "STAR";
+        break;
+    case PLUS:
+        p = "PLUS";
         break;
     case WORDSTART:
         p = "WORDSTART";

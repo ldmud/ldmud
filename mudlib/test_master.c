@@ -52,6 +52,13 @@ void flag (string arg)
         return;
     }
 
+    if (arg == "float")
+    {
+        limited( (: load_object("floattest")->main() :) );
+        shutdown();
+        return;
+    }
+
     if (arg == "shutdown")
     {
         shutdown();
