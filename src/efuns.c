@@ -62,6 +62,8 @@
  *    efun: debug_info()
  *    efun: rusage() (optional)
  *    efun: shutdown()
+ *    efun: time()
+ *    efun: utime()
  *
  *---------------------------------------------------------------------------
  */
@@ -3082,7 +3084,11 @@ f_object_info (svalue_t *sp)
         svp[OIB_PROG_SWAPPED].u.number = O_PROG_SWAPPED(o) ? 1 : 0;
         svp[OIB_VAR_SWAPPED].u.number = O_VAR_SWAPPED(o) ? 1 : 0;
 
+#ifdef COMPAT_MODE
         put_ref_string(svp+OIB_NAME, o->name);
+#else
+        put_string(svp+OIB_NAME, add_slash(o->name));
+#endif
         put_ref_string(svp+OIB_LOAD_NAME, o->load_name);
 
         o2 = o->next_all;
@@ -5534,22 +5540,44 @@ f_ctime(svalue_t *sp)
 /* EFUN ctime()
  *
  *   string ctime(int clock = time())
+ *   string ctime(int* uclock)
  *
  * Interpret the argument clock as number of seconds since Jan,
  * 1st, 1970, 0.00 and convert it to a nice date and time string.
+ *
+ * Alternatively, accept an array of two ints: the first is <clock>
+ * value as in the first form, the second int is the number of
+ * microseconds elapsed in the current second.
  */
 
 {
     char *ts, *cp;
     string_t *rc;
 
-    ts = time_string(sp->u.number);
-    cp = strchr(ts, '\n');
+    if (sp->type != T_NUMBER)
+    {
+        if (VEC_SIZE(sp->u.vec) != 2)
+            error("Bad arg 1 to ctime(): Invalid array size %ld, expected 2.\n"
+                 , (long)VEC_SIZE(sp->u.vec));
+        if (sp->u.vec->item[0].type != T_NUMBER)
+            error("Bad arg 1 to ctime(): Element 0 is '%s', expected 'int'.\n"
+                 , efun_arg_typename(sp->u.vec->item[0].type));
+        if (sp->u.vec->item[1].type != T_NUMBER)
+            error("Bad arg 1 to ctime(): Element 1 is '%s', expected 'int'.\n"
+                 , efun_arg_typename(sp->u.vec->item[0].type));
+        ts = utime_string( sp->u.vec->item[0].u.number
+                         , sp->u.vec->item[1].u.number);
+    }
+    else
+    {
+        ts = time_string(sp->u.number);
+    }
 
     /* If the string contains nl characters, extract the substring
      * before the first one. Else just copy the (volatile) result
      * we got.
      */
+    cp = strchr(ts, '\n');
     if (cp)
     {
         int len = cp - ts;
@@ -5581,6 +5609,47 @@ f_time (svalue_t *sp)
 
     return sp;
 } /* f_time() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_utime (svalue_t *sp)
+
+/* EFUN utime()
+ *
+ *   int* utime()
+ *
+ * Return the time since 1. Jan 1970, 00:00:00 GMT in microsecond
+ * precision.
+ * 
+ * Return is an array:
+ *   int[0]: number of seconds elapsed
+ *   int[1]: number of microseconds within the current second.
+ */
+
+{
+    svalue_t *v;
+    vector_t *res;
+    struct timeval tv;
+
+    res = allocate_array(2);
+    v = res->item;
+    if (!gettimeofday(&tv, NULL))
+    {
+        v[0].u.number = tv.tv_sec;
+        v[1].u.number = tv.tv_usec;
+    }
+    else
+    {
+        int errnum = errno;
+        fprintf(stderr, "%s gettimeofday() failed: %d %s\n"
+               , time_stamp(), errnum, strerror(errnum));
+        v[0].u.number = current_time;
+        v[1].u.number = 0;
+    }
+    push_array(sp, res);
+
+    return sp;
+} /* f_utime() */
 
 /***************************************************************************/
 

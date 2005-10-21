@@ -16,8 +16,9 @@
  *            but has been retained for "compatability" ;)
  *  "|"   centered within field size.
  *  "="   column mode if strings are greater than field size.  this is only
- *        meaningful with strings, all other types ignore
- *        this.  columns are auto-magically word wrapped.
+ *        meaningful with strings, all other types are ignored. The strings
+ *        are broken into the size of 'precision', and the last line is
+ *        padded to have a length of 'fs'.
  *  "#"   table mode, print a list of '\n' separated 'words' in a
  *        table within the field size.  only meaningful with strings.
  *   n    specifies the field size, a '*' specifies to use the corresponding

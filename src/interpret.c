@@ -14652,7 +14652,7 @@ last_instructions (int length, Bool verbose, svalue_t **svpp)
                     );
                     last_instr_output(buf, svpp);
                     old_obj = previous_objects[i];
-                    strncpy(old_file, file, sizeof old_file - 1);
+                    xstrncpy(old_file, file, sizeof old_file - 1);
                 }
             }
             sprintf(buf, "%6lx: %3d %8s %-26s (%ld:%3ld)"

@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-07-Nov-2000 (Lars Duening) -- Development Release 3.3
+15-Nov-2000 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -13,6 +13,7 @@ For a detailed list of all changes see the file CHANGELOG.
          map_mapping(), mapping_contains() and member_array().
        + add_action(): Historical usage with just one argument no longer
            supported.
+       + ctime(): Accepts the output of new efun utime() as well.
        + filter(), map(), sort_array(), walk_mapping(): Protected lvalues
             (e.g. &(i[0])) are not allowed as callback parameters.
        + object_info(): OINFO_MEMORY also returns the program flags
@@ -25,10 +26,13 @@ For a detailed list of all changes see the file CHANGELOG.
        + call_resolved(): Now accepts a destructed object as second parameter
            as it should.
        + input_to(): The option IGNORE_BANG didn't work.
+       + object_info(): The return OIB_NAME now starts with a '/' in plain
+           mode.
 
     - New efuns:
        + db_affected_rows(), db_conv_string(), db_close(), db_connect(string),
          db_exec(), db_fetch(), *db_handles(): Optional: mySQL support.
+       + utime(): Return the current time in microsecond resolution.
 
     - Master Object:
        + Bugfix: When reactivating a destructed master, the lfuns

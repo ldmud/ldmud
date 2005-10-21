@@ -3142,7 +3142,7 @@ e_say (svalue_t *v, vector_t *avoid)
         break;
 
     case T_OBJECT:
-        strncpy(buff, v->u.ob->name, sizeof buff);
+        xstrncpy(buff, v->u.ob->name, sizeof buff);
         buff[sizeof buff - 1] = '\0';
         message = buff;
         break;
@@ -3343,7 +3343,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
         break;
 
     case T_OBJECT:
-        strncpy(buff, v->u.ob->name, sizeof buff);
+        xstrncpy(buff, v->u.ob->name, sizeof buff);
         buff[sizeof buff - 1] = '\0';
         message = buff;
         break;

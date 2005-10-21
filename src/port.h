@@ -383,7 +383,8 @@ typedef signed long ssize_t;
  */
 
 extern mp_int get_current_time(void);
-extern char * time_string(int);
+extern char * time_string(mp_int);
+extern char * utime_string(mp_int, mp_int);
 extern char * time_stamp(void);
 
 #ifndef HAVE_STRCSPN

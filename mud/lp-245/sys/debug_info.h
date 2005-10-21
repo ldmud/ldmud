@@ -75,19 +75,27 @@
 #define DID_ST_STRINGS            39
 #define DID_ST_STRING_SIZE        40
 #define DID_ST_STR_TABLE_SIZE     41
-#define DID_ST_STR_REQ            42
-#define DID_ST_STR_REQ_SIZE       43
-#define DID_ST_STR_SEARCHES       44
-#define DID_ST_STR_SEARCH_LEN     45
+#define DID_ST_STR_OVERHEAD       42
+#define DID_ST_STR_IT_OVERHEAD    43
+#define DID_ST_UNTABLED           44
+#define DID_ST_UNTABLED_SIZE      45
+#define DID_ST_ITABLED            46
+#define DID_ST_ITABLED_SIZE       47
+#define DID_ST_TABLED             48
+#define DID_ST_TABLED_SIZE        49
+#define DID_ST_STR_SEARCHES       50
+#define DID_ST_STR_SEARCHLEN      51
+#define DID_ST_STR_SEARCHES_BYVALUE   52
+#define DID_ST_STR_SEARCHLEN_BYVALUE  53
 
-#define DID_ST_RX_CACHED          46
-#define DID_ST_RX_TABLE           47
-#define DID_ST_RX_TABLE_SIZE      48
-#define DID_ST_RX_REQUESTS        49
-#define DID_ST_RX_REQ_FOUND       50
-#define DID_ST_RX_REQ_COLL        51
+#define DID_ST_RX_CACHED          54
+#define DID_ST_RX_TABLE           55
+#define DID_ST_RX_TABLE_SIZE      56
+#define DID_ST_RX_REQUESTS        57
+#define DID_ST_RX_REQ_FOUND       58
+#define DID_ST_RX_REQ_COLL        59
 
-#define DID_STATUS_MAX            52 /* Total number of entries */
+#define DID_STATUS_MAX            60 /* Total number of entries */
 
 
 /* Indices into the array resulting from debug_info(DINFO_DATA, DID_SWAP)
@@ -122,17 +130,21 @@
 #define DID_MEM_LARGE_SIZE      4
 #define DID_MEM_LFREE           5
 #define DID_MEM_LFREE_SIZE      6
-#define DID_MEM_CHUNK           7
-#define DID_MEM_CHUNK_SIZE      8
-#define DID_MEM_SMALL           9
-#define DID_MEM_SMALL_SIZE     10
-#define DID_MEM_SFREE          11
-#define DID_MEM_SFREE_SIZE     12
-#define DID_MEM_UNUSED         13
-#define DID_MEM_MINC_CALLS     14
-#define DID_MEM_MINC_SUCCESS   15
-#define DID_MEM_MINC_SIZE      16
+#define DID_MEM_LWASTED         7
+#define DID_MEM_LWASTED_SIZE    8
+#define DID_MEM_CHUNK           9
+#define DID_MEM_CHUNK_SIZE     10
+#define DID_MEM_SMALL          11
+#define DID_MEM_SMALL_SIZE     12
+#define DID_MEM_SFREE          13
+#define DID_MEM_SFREE_SIZE     14
+#define DID_MEM_SWASTED        15
+#define DID_MEM_SWASTED_SIZE   16
+#define DID_MEM_UNUSED         17
+#define DID_MEM_MINC_CALLS     18
+#define DID_MEM_MINC_SUCCESS   19 
+#define DID_MEM_MINC_SIZE      20
  
-#define DID_MEMORY_MAX         17
+#define DID_MEMORY_MAX         21
 
 #endif /* _DEBUG_INFO_H_ */

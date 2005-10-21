@@ -72,12 +72,35 @@ get_current_time (void)
 
 /*-------------------------------------------------------------------------*/
 char *
-time_string (int t)
+time_string (mp_int t)
 
 /* Return a textual representation of the time <t>. */
 
 {
-    return ctime((time_t *)&t);
+    static char result[80];
+    struct tm *tm;
+
+    tm = localtime((time_t *)&t);
+    strftime(result, sizeof(result)-1, "%a %b %d %H:%M:%S %Y", tm);
+    return result;
+}
+
+/*-------------------------------------------------------------------------*/
+char *
+utime_string (mp_int t, mp_int ut)
+
+/* Return a textual representation of the time <t> secs:<ut> microseconds. */
+
+{
+    static char result[80];
+    struct tm *tm;
+    size_t len;
+
+    tm = localtime((time_t *)&t);
+    len = strftime(result, sizeof(result)-1, "%a %b %d %H:%M:%S:", tm);
+    sprintf(result+len, "%06ld", ut);
+    strftime(result+len+6, sizeof(result)-7-len, " %Y", tm);
+    return result;
 }
 
 /*-------------------------------------------------------------------------*/

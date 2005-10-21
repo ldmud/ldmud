@@ -10,4 +10,4 @@ EXAMPLE
 	Print out the current date and time.
 
 SEE ALSO
-	ctime(E)
+	ctime(E), time(E)

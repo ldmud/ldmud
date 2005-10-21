@@ -141,6 +141,34 @@ with_portno=4242
 
 with_catch_udp_port=4246
 
+# The maximum number of ports to listen for connections on.
+
+with_maxnumports=20
+
+# To use UDP communication at all, it must be enabled.
+# In order be able to send UDP, enable udp_send as well.
+
+enable_catch_udp_port=yes
+enable_udp_send=yes
+
+# Select the ERQ service to use.
+#   'no':   the driver is compiled without erq support.
+#   'erq':  the driver is compiled with erq support, the Makefiles
+#           are set up to compile the standard erq.
+#   'xerq': the driver is compiled with erq support, the Makefiles
+#           are set up to compile Brian's xerq.
+
+enable_erq=erq
+
+# Max size of a packet received from/send to the ERQ.
+# TODO: Do the current erqs compile this in?
+
+with_erq_max_reply=1024 
+with_erq_max_send=1024 
+
+# Enable support for IPv6 (assuming your system supports it).
+
+enable_use_ipv6=no
 
 #----------- Compilation Options ----------
 # To change these options, the config.h must be recreated and the
@@ -201,38 +229,6 @@ enable_access_log=no
 # The name of the file where all connections are logged.
 
 with_access_log=access.allow.log
-
-
-# --- Communication ---
-
-# The maximum number of ports to listen for connections on.
-
-with_maxnumports=20
-
-# To use UDP communication at all, it must be enabled.
-# In order be able to send UDP, enable udp_send as well.
-
-enable_catch_udp_port=yes
-enable_udp_send=yes
-
-# Select the ERQ service to use.
-#   'no':   the driver is compiled without erq support.
-#   'erq':  the driver is compiled with erq support, the Makefiles
-#           are set up to compile the standard erq.
-#   'xerq': the driver is compiled with erq support, the Makefiles
-#           are set up to compile Brian's xerq.
-
-enable_erq=erq
-
-# Max size of a packet received from/send to the ERQ.
-# TODO: Do the current erqs compile this in?
-
-with_erq_max_reply=1024 
-with_erq_max_send=1024 
-
-# Enable support for IPv6 (assuming your system supports it).
-
-enable_use_ipv6=no
 
 
 # --- Language ---
@@ -319,7 +315,6 @@ with_max_players=50
 # Allowed number of ed commands per backend cycle (for faster file upload).
 
 with_allowed_ed_cmds=20
-
 
 # --- Compiler ---
 

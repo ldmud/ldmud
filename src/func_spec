@@ -278,9 +278,10 @@ mixed   quote(mixed *|quoted_array|symbol|string);
 string  save_value(mixed);
 mixed   restore_value(string);
 
-string  ctime(int default: F_TIME);
+string  ctime(int*|int default: F_TIME);
 int     random(int);
 int     time();
+int*    utime();
 
 mixed  *wizlist_info();
 mixed   get_extra_wizinfo(null|object|string);

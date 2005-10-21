@@ -443,7 +443,7 @@ more_append (char *str)
         }
         for (i = 0; i < P_LEADBLANKS; )
             inlin[i++]=' ';
-        strncpy(inlin+P_LEADBLANKS, str, (size_t)(MAXLINE-P_LEADBLANKS));
+        xstrncpy(inlin+P_LEADBLANKS, str, (size_t)(MAXLINE-P_LEADBLANKS));
         inlin[MAXLINE-1] = '\0';
         _count_blanks(inlin, 0);
         add_message("%*s", P_LEADBLANKS, "");
@@ -3123,7 +3123,7 @@ ed_cmd (char *str)
     if (strlen(str) < MAXLINE)
         strcat(str, "\n");
 
-    strncpy(inlin, str, MAXLINE-1);
+    xstrncpy(inlin, str, MAXLINE-1);
     inlin[MAXLINE-1] = 0;
     inptr = inlin;
 

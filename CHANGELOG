@@ -1,6 +1,22 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Nov-2000 (Lars Duening)  (3.3.16)
+    - (efuns.c) The OIB_NAME returned by object_info(OINFO_BASIC) did
+         not start with a '/' in plain mode. (reported by Fiona)
+    - (mud/lp-245) Added secure/master.c as a wrapper for obj/master.c for
+         use with plain drivers.
+    - (func_spec, efuns, port) Added new efun utime() (provided by
+         Slavis) and adapted ctime() to accepts its output.
+    - (settings/unitopia) Updated with new version provided by Freaky.
+    - (settings/default) Clean up.
+
+14-Nov-2000 (Lars Duening)
+    - (strfuns, actions.c, ed.c, efuns.c, interpret.c, object.c, swap.c,
+       wiz_list.c) New function xstrncpy() to copy a string up to a certain
+         length, but without adding extra 0 padding if the string is shorter
+         than the given length.
+
 07-Nov-2000 (Lars Duening)  (3.3.15)
     Included the remaining changes from 3.2.9-dev.237:
     - (efuns.c) object_info(OINFO_MEMORY) also returns the program flags

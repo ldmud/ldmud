@@ -1808,7 +1808,7 @@ name_swap_file (const char *name)
  */
  
 {
-    strncpy(file_name, name, sizeof file_name);
+    xstrncpy(file_name, name, sizeof file_name);
     file_name[sizeof file_name - 1] = '\0';
 } /* name_swap_file()*/
 

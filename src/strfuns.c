@@ -505,5 +505,24 @@ intersect_strings (char * left, char * right, Bool bSubtract)
     return result;
 } /* intersect_strings() */
 
+/*--------------------------------------------------------------------*/
+char *
+xstrncpy (char * dest, const char * src, size_t num)
+
+/* Copy string <src> at address <dest> up to and including the terminating
+ * 0 or up to size <num>, whichever comes first. Result is <dest>.
+ *
+ * In contrast to strncpy(), the copying terminates if a terminating 0
+ * is found (and copied) in <src> - strncpy() would add additional 0s
+ * until a total of <num> characters has been written to <dest>.
+ */
+
+{
+    char * p = dest;
+
+    while (num-- != 0 && (*p++ = *src++) != '\0') NOOP;
+    return dest;
+} /* xstrncpy() */
+
 /*====================================================================*/
 

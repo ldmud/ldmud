@@ -698,6 +698,7 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
             f_name = mystrdup($3);
             instr[num_buff].code_class = code_class = C_ALIAS;
             num_instr[C_ALIAS]++;
+            f_prefix = NULL;
         }
 
         /* Search the function's signature in arg_types[] */
@@ -2556,6 +2557,7 @@ create_efun_defs (void)
 {
     int i, j, k;
     char c;
+    char * pattern;
 
     if ((fpw = fopen(EFUN_DEFS, "w")) == NULL)
     {
@@ -2658,9 +2660,9 @@ create_efun_defs (void)
     }
     fprintf(fpw, "};\n\n\n");
 
+    pattern = "Variable 'pattern' not initialized.";
     for (k = C_EFUN0; k < C_ALIAS; k++)
     {
-        char * pattern;
 
         switch(k)
         {
@@ -2804,6 +2806,14 @@ create_instrs (void)
         case C_EFUN3: str = "efun3"; break;
         case C_EFUN4: str = "efun4"; break;
         case C_EFUNV: str = "efunv"; break;
+        default:
+          {
+            char buf[100];
+            sprintf(buf, "create_instrs(): Invalid value %ld for loop index.\n", (long)k);
+            fatal(buf);
+            str = NULL; /* To keep the compiler happy */
+            break;
+          }
         }
 
         fprintf(fpw,

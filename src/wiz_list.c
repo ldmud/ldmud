@@ -279,7 +279,7 @@ get_wiz_name (char *file)
     ret = apply_master_ob(STR_GET_WNAME, 1);
     if (ret == 0 || ret->type != T_OLD_STRING)
         return NULL;
-    strncpy(buff, ret->u.string, sizeof buff - 1);
+    xstrncpy(buff, ret->u.string, sizeof buff - 1);
     buff[sizeof(buff)-1] = '\0';
     return buff;
 } /* get_wiz_name() */

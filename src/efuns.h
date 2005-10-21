@@ -71,6 +71,7 @@ extern svalue_t *f_rusage(svalue_t *sp);
 extern svalue_t *f_random(svalue_t *);
 extern svalue_t *f_shutdown(svalue_t *sp);
 extern svalue_t *f_time(svalue_t *);
+extern svalue_t *f_utime(svalue_t *);
 
 #endif /* EFUNS_H__ */
 

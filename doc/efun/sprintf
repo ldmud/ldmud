@@ -57,10 +57,11 @@ Modifiers:
 	    but has been retained for "compatability" ;)
   "|"	centered within field size.
   "="	column mode.  Ignored unless the argument type specifier is s.
-	Field size must be specified, if presision is specified then it
+	Field size must be specified, if precision is specified then it
 	specifies the width for the string to be wordwrapped in, if not
 	then the field size is.	 The field size specifies the width of
-	the column.
+	the column and has the effect that the last line of the column
+        is padded with spaces to achieve this length.
   "#"	table mode.  Ignored unless the argument type specifier is s.
 	Field size must be specified, if presision is specified then it
 	specifys the number of columns in the table, otherwise the
