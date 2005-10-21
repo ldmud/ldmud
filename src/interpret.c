@@ -47,8 +47,8 @@
  *    functions are stored on the control stack.
  *
  *    One particularity about the current implementation is that every
- *    inter-object call (ie. every 'extern_call') constitutes in a recursive
- *    call to eval_instruction().
+ *    inter-object call (ie. every 'extern_call') and every catch()
+ *    constitutes in a recursive call to eval_instruction().
  *
  *
  * --- Error Recovery Stack --- (implemented in backend.c)
@@ -214,6 +214,7 @@
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
+#include "mstrings.h"
 #include "object.h"
 #include "otable.h"
 #include "parse.h"
@@ -223,8 +224,7 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
-#include "stralloc.h"
-#include "smalloc.h" /* USES_SVALUE_STRLEN, malloc_increment_size() */
+#include "smalloc.h" /* malloc_increment_size() */
 #include "sprintf.h"
 #include "svalue.h"
 #include "swap.h"
@@ -237,6 +237,63 @@
 
 /*-------------------------------------------------------------------------*/
 /* Types */
+
+/* --- struct control_stack: one control stack element
+ *
+ * Every structure describes the previous function call levels, the
+ * current function call data is kept in interpret's global variables..
+ * 'prog' is usually the same as ob->prog, except when
+ * executing inherited functions.
+ *
+ * TODO: The frames should have special flags to mark stuff like
+ * TODO:: sefun closures, closures, etc.
+ */
+
+struct control_stack {
+    object_t   *ob;         /* Current object */
+    object_t   *prev_ob;    /* Save previous object */
+    program_t  *prog;       /* Current program, NULL in the bottom entry */
+    bytecode_p  pc;         /* Program counter, points to next bytecode */
+    svalue_t   *fp;         /* Frame pointer: first arg on stack */
+    bytecode_p  funstart;
+      /* Start of the function code.
+       * Two magic values (SIMUL_EFUN_FUNSTART and EFUN_FUNSTART) mark
+       * entries for simul-efun and efun closures.
+       */
+    int num_local_variables;    /* Number of local vars + arguments */
+    int function_index_offset;
+      /* Index of current program's function block within the functions of the
+       * current objects program (needed for inheritance).
+       */
+    svalue_t *current_variables;        /* Same */
+    int   extern_call;
+      /* TRUE if the call came from outside the object (call_others to
+       * oneself are a special case of this). Only entries with this flag
+       * set save the .ob and .prev_ob for the flagged and all previous
+       * unflagged entries.
+       * If the current this_object was changed, the 'imposter' object is
+       * stored in .pretend_to_be and this flag is or'ed with CS_PRETEND.
+       */
+#   define CS_PRETEND 0x80
+    Bool  catch_call;
+      /* This is the 'faked' call context for the code inside a catch().
+       * Since the interpreter fakes a subroutine call for this, F_RETURN
+       * must be able to tell the contexts apart.
+       * (Right now the LPC compiler prohibits the use of 'return' inside
+       * of a catch, but providing it on this level already doesn't hurt).
+       */
+    int   instruction;
+      /* For EFUN_FUNSTART entries, this is the efun executed.
+       */
+
+    bytecode_p *break_sp;
+      /* Points to address to branch to at next F_BREAK, which is also
+       * the actual bottom of the break stack.
+       */
+    object_t *pretend_to_be;
+      /* After set_this_object(), the this_object imposter.
+       */
+};
 
 /* --- struct catch_context: error_recovery subclass for catch() ---
  *
@@ -268,7 +325,7 @@ struct catch_context
 
 struct cache
 {
-    char *name;
+    string_t *name;
       /* The name of the cached function, shared for existing functions,
        * allocated if the object does not have the function.
        */
@@ -496,7 +553,7 @@ program_t *current_prog;
    * differ when executing an inherited program.
    */
 
-static char **current_strings;
+static string_t **current_strings;
   /* Pointer to the string literal block of the current program for
    * faster access.
    */
@@ -566,11 +623,6 @@ static struct control_stack *csp;
    * This also means that control_stack[0] will have almost no interesting
    * values as it will terminate execution. Especially control_stack[0].prog
    * is NULL to mark the bottom.
-   */
-
-static void (*caught_error)(svalue_t **, bytecode_p *, svalue_t **) = NULL;
-  /* The function pointer for the handler of a caught error.
-   * See handle_caught_error() for a detailed explanation.
    */
 
 #ifdef APPLY_CACHE_STAT
@@ -666,10 +718,11 @@ static struct pointer_table *ptable;
 
 static Bool apply_low(char *, object_t *, int, Bool);
 static void call_simul_efun(int code, object_t *ob, int num_arg);
-static void handle_caught_error (svalue_t ** spp, bytecode_p * pcp, svalue_t **fpp);
+static Bool catch_instruction (uint offset);
 #ifdef DEBUG
 static void check_extra_ref_in_vector(svalue_t *svp, size_t num);
 #endif
+static Bool eval_instruction(bytecode_p first_instruction, svalue_t *initial_sp);
 
 /*-------------------------------------------------------------------------*/
 
@@ -708,9 +761,6 @@ init_interpret (void)
     struct cache invalid_entry;
     int i;
 
-    /* Setup the catch handling */
-    caught_error = handle_caught_error;
-
     /* The cache is inited to hold entries for 'functions' in a non-existing
      * program (id 0). The first real apply calls will thus see a (virtual)
      * collision with 'older' cache entries.
@@ -741,7 +791,7 @@ init_interpret (void)
  * assign_checked_svalue_no_free(to,from,sp,pc): put a copy of <from> into <to>;
  *                        <to> is considered empty, <from> may be destructed
  *                        object.
- * assign_local_svalue_no_free(to,from,sp,pc): put a copy of local var <from>
+ * assign_local_svalue_no_free(to,from): put a copy of local var <from>
  *                        into <to>; <to> is considered empty, <from> may
  *                        be destructed object.
  * static assign_lrvalue_no_free(to,from): like assign_svalue_no_free(),
@@ -799,12 +849,12 @@ struct protected_char_lvalue
 {
     svalue_t v;
       /* .v.type: T_PROTECTED_CHAR_LVALUE
-       * .v.u.string: points to the char to access
+       * .v.u.charp: points to the char to access
        */
     svalue_t protector; /* protects .lvalue */
     svalue_t *lvalue;   /* the string containing the char */
     char *start;
-      /* must be == lvalue->u.string, otherwise the string has been
+      /* must be == get_txt(lvalue->u.str), otherwise the string has been
        * changed and this lvalue is invalid
        */
 };
@@ -814,14 +864,14 @@ struct protected_char_lvalue
 struct protected_range_lvalue {
     svalue_t v;
       /* .v.type: T_PROTECTED_{POINTER,STRING}_RANGE_LVALUE
-       * .v.u.{string,vec}: the target value holding the range
+       * .v.u.{str,vec}: the target value holding the range
        */
     svalue_t protector; /* protects .lvalue */
     svalue_t *lvalue;   /* the value holding the range */
     int index1, index2;      /* first and last index of the range */
     int size;                /* original size of .lvalue */
 
-    /* .v.u.{vec,string} must be == .lvalue->u.{vec,string}, otherwise
+    /* .v.u.{vec,str} must be == .lvalue->u.{vec,str}, otherwise
      * the target has been changed and the range information (index, size)
      * is no longer valid.
      */
@@ -838,27 +888,17 @@ static void assign_protected_string_range(
     struct protected_range_lvalue *dest,svalue_t *source, Bool do_free);
 
 /*-------------------------------------------------------------------------*/
-static INLINE void
-_free_string_svalue (svalue_t *v)
+void
+free_string_svalue (svalue_t *v)
 
 /* Free the string svalue <v>; <v> must be of type T_STRING.
  */
 
 {
-    switch(v->x.string_type)
-    {
-    case STRING_MALLOC:
-        xfree(v->u.string);
-        break;
-    case STRING_SHARED:
-        free_string(v->u.string);
-        break;
-    }
+    free_mstring(v->u.str);
 }
 
-void free_string_svalue (svalue_t *v) { _free_string_svalue(v); }
-
-#define free_string_svalue(v) _free_string_svalue(v)
+#define free_string_svalue(v) free_mstring((v)->u.str)
 
 /*-------------------------------------------------------------------------*/
 void
@@ -921,17 +961,17 @@ free_svalue (svalue_t *v)
 {
     switch (v->type)
     {
-    case T_STRING:
-        switch(v->x.string_type)
-        {
-        case STRING_MALLOC:
-            xfree(v->u.string);
-            break;
-        case STRING_SHARED:
-            free_string(v->u.string);
-            break;
-        }
+    default:
+        fatal("(free_svalue) Illegal svalue type %d\n", v->type);
+        /* NOTREACHED */
         break;
+
+    case T_STRING:
+      {
+        string_t *str = v->u.str;
+        free_mstring(str);
+        break;
+      }
 
     case T_OBJECT:
       {
@@ -950,7 +990,7 @@ free_svalue (svalue_t *v)
         break;
 
     case T_SYMBOL:
-        free_string(v->u.string);
+        free_mstring(v->u.str);
         break;
 
     case T_CLOSURE:
@@ -978,16 +1018,15 @@ free_svalue (svalue_t *v)
           {
               struct protected_char_lvalue *p;
 
+              /* TODO: Are these checks necessary? See RANGE_LVALUE below */
               p = v->u.protected_char_lvalue;
-              if (p->lvalue->type == T_STRING
-               && p->lvalue->u.string == p->start)
-              {
-                  p->lvalue->x.string_type = STRING_MALLOC;
-              }
-              else
+              if (p->lvalue->type != T_STRING
+               || get_txt(p->lvalue->u.str) != p->start)
               {
                   xfree(p->start);
               }
+              if (p->lvalue->type == T_STRING)
+                  free_mstring(p->lvalue->u.str);
               free_protector_svalue(&p->protector);
               xfree(p);
               break;
@@ -997,16 +1036,15 @@ free_svalue (svalue_t *v)
           {
               struct protected_range_lvalue *p;
 
+              /* TODO: Are these checks necessary? See RANGE_LVALUE below */
               p = v->u.protected_range_lvalue;
-              if (p->lvalue->type == T_STRING
-               && p->lvalue->u.string == p->v.u.string)
+              if (p->lvalue->type != T_STRING
+               || get_txt(p->lvalue->u.str) == get_txt(p->v.u.str))
               {
-                  p->lvalue->x.string_type = STRING_MALLOC;
+                  free_mstring(p->v.u.str);
               }
-              else
-              {
-                  xfree(p->v.u.string);
-              }
+              if (p->lvalue->type == T_STRING)
+                  free_mstring(p->lvalue->u.str);
               free_protector_svalue(&p->protector);
               xfree(p);
               break;
@@ -1063,39 +1101,7 @@ _assign_svalue_no_free (svalue_t *to, svalue_t *from)
     switch(from->type)
     {
     case T_STRING:
-        switch(from->x.string_type)
-        {
-        case STRING_MALLOC:        /* No idea to make the string shared */
-          {
-              char *p, *str;
-
-              str = from->u.string;
-              p = xalloc(malloced_strlen(str));
-              if (!p)
-              {
-                  put_number(to, 0);
-                  error("Out of memory\n");
-              }
-              strcpy(p, str);
-              to->u.string = p;
-              break;
-          }
-        case STRING_VOLATILE:      /* Good idea to make it shared */
-            put_string(to, make_shared_string(from->u.string));
-            if (!to->u.string)
-            {
-                put_number(to, 0);
-                error("Out of memory\n");
-            }
-            break;
-        case STRING_SHARED:        /* It already is shared */
-            ref_string(from->u.string);
-            break;
-#ifdef DEBUG
-        default:
-            fatal("assign_svalue_no_free(): bad string type %d\n", from->x.string_type);
-#endif
-        }
+        (void)ref_mstring(from->u.str);
         break;
 
     case T_OBJECT:
@@ -1116,7 +1122,7 @@ _assign_svalue_no_free (svalue_t *to, svalue_t *from)
         break;
 
     case T_SYMBOL:
-        ref_string(to->u.string);
+        (void)ref_mstring(to->u.str);
         break;
 
     case T_CLOSURE:
@@ -1137,7 +1143,7 @@ void assign_svalue_no_free (svalue_t *to, svalue_t *from)
 /*-------------------------------------------------------------------------*/
 static INLINE void
 assign_checked_svalue_no_free (svalue_t *to, svalue_t *from
-                              , svalue_t *sp, bytecode_p pc
+                              , svalue_t *sp UNUSED, bytecode_p pc UNUSED
                               )
 
 /* Put a duplicate of svalue <from> into svalue <to>, meaning that the original
@@ -1152,35 +1158,13 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from
  */
 
 {
+#ifdef __MWERKS__
+#    pragma unused(sp,pc)
+#endif
     switch (from->type)
     {
     case T_STRING:
-        switch(from->x.string_type)
-        {
-        case STRING_MALLOC:        /* No idea to make the string shared */
-          {
-            char *p;
-            char *str;
-
-            p = xalloc(malloced_strlen(str = from->u.string));
-            if (!p) {
-                put_number(to, 0);
-                inter_sp = sp;
-                inter_pc = pc;
-                error("Out of memory\n");
-            }
-            (void)strcpy(p, str);
-            put_malloced_string(to, p);
-            return;
-          }
-
-        case STRING_SHARED:        /* It already is shared */
-            put_ref_string(to, from->u.string);
-            return;
-        }
-#ifdef DEBUG
-        fatal("assign_checked_svalue_no_free(): bad string type %d\n", from->x.string_type);
-#endif
+        (void)ref_mstring(from->u.str);
         break;
 
     case T_OBJECT:
@@ -1200,7 +1184,7 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from
         break;
 
     case T_SYMBOL:
-        ref_string(from->u.string);
+        (void)ref_mstring(from->u.str);
         break;
 
     case T_CLOSURE:
@@ -1216,68 +1200,25 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-assign_local_svalue_no_free ( svalue_t *to, svalue_t *from
-                            , svalue_t *sp, bytecode_p pc
-                            )
+assign_local_svalue_no_free ( svalue_t *to, svalue_t *from )
 
 /* Put a duplicate of svalue <from> into svalue <to>, meaning that the original
  * value is either copied when appropriate, or its refcount is increased.
  * <to> is considered empty at the time of call.
  *
  * <from> is meant to point to a local variable, which might be an arg
- * to the current lfun and may thus contain a VOLATILE string. If that is
- * the case, the string is made shared before assignment.
+ * to the current lfun.
  * If <from> is a lvalue, the chain is unraveled and the final non-lvalue
  * is assigned. If that value is a destructed object, 0 is assigned.
- *
- * <sp> and <pc> are the current stackpointer and program counter and are
- * needed to update <inter_xx> in case of errors.
  */
 
 {
 assign_from_lvalue:
-    switch (from->type) {
+    switch (from->type)
+    {
       case T_STRING:
-        switch(from->x.string_type) {
-          case STRING_MALLOC:        /* No idea to make the string shared */
-          {
-            char *p;
-            char *str;
-
-            p = xalloc(malloced_strlen(str = from->u.string));
-            if (!p) {
-                put_number(to, 0);
-                inter_sp = sp;
-                inter_pc = pc;
-                error("Out of memory\n");
-            }
-            (void)strcpy(p, str);
-            put_malloced_string(sp, p);
-            return;
-          }
-          case STRING_SHARED:        /* It already is shared */
-            put_ref_string(to, from->u.string);
-            break;
-          case STRING_VOLATILE:
-          {
-            char *str;
-
-            str = make_shared_string(from->u.string);
-            if ( !str ) {
-                put_ref_string(to, STR_DEFAULT);
-                inter_sp = sp;
-                inter_pc = pc;
-                error("Out of memory\n");
-            }
-            put_string(to, str);
-            break;
-          }
-#ifdef DEBUG
-          default:
-            fatal("assign_local_svalue_no_free(): bad string type %d\n", from->x.string_type);
-#endif
-        }
-        return;
+        (void)ref_mstring(from->u.str);
+        break;
       case T_OBJECT:
         (void)ref_object(from->u.ob, "assign_local_lvalue_no_free");
         break;
@@ -1286,7 +1227,7 @@ assign_from_lvalue:
         (void)ref_array(from->u.vec);
         break;
       case T_SYMBOL:
-        ref_string(from->u.string);
+        (void)ref_mstring(from->u.str);
         break;
       case T_CLOSURE:
         addref_closure(from, "ass to var");
@@ -1303,7 +1244,7 @@ assign_from_lvalue:
         }
         goto assign_from_lvalue;
       case T_PROTECTED_CHAR_LVALUE:
-        put_number(to, *from->u.string);
+        put_number(to, *from->u.charp);
         return;
     }
     *to = *from;
@@ -1344,17 +1285,23 @@ void assign_lrvalue_no_free (svalue_t *to, svalue_t *from)
     switch(from->type)
     {
     case T_STRING:
-        if (to->x.string_type != STRING_SHARED)
+        if (mstr_tabled(to->u.str))
         {
-            to->x.string_type = STRING_SHARED;
-            to->u.string = make_shared_string(from->u.string);
-            if (from->x.string_type == STRING_MALLOC)
-            {
-                xfree(from->u.string);
-            }
-            *from = *to;
+            (void)ref_mstring(to->u.str);
         }
-        ref_string(from->u.string);
+        else
+        {
+            to->u.str = make_tabled_from(from->u.str);
+            if (!to->u.str)
+            {
+                to->u.str = ref_mstring(from->u.str);
+            }
+            else
+            {
+                free_mstring(from->u.str);
+                from->u.str = ref_mstring(to->u.str);
+            }
+        }
         break;
 
     case T_OBJECT:
@@ -1367,7 +1314,7 @@ void assign_lrvalue_no_free (svalue_t *to, svalue_t *from)
         break;
 
     case T_SYMBOL:
-        ref_string(to->u.string);
+        (void)ref_mstring(to->u.str);
         break;
 
     case T_CLOSURE:
@@ -1422,15 +1369,7 @@ assign_svalue (svalue_t *dest, svalue_t *v)
             continue;
 
         case T_STRING:
-            switch(dest->x.string_type)
-            {
-            case STRING_MALLOC:
-                xfree(dest->u.string);
-                break;
-            case STRING_SHARED:
-                free_string(dest->u.string);
-                break;
-            }
+            free_mstring(dest->u.str);
             break;
 
         case T_OBJECT:
@@ -1459,7 +1398,7 @@ assign_svalue (svalue_t *dest, svalue_t *v)
           }
 
         case T_SYMBOL:
-            free_string(dest->u.string);
+            free_mstring(dest->u.str);
             break;
 
         case T_CLOSURE:
@@ -1473,7 +1412,7 @@ assign_svalue (svalue_t *dest, svalue_t *v)
 
         case T_CHAR_LVALUE:
             if (v->type == T_NUMBER)
-                *dest->u.string = (char)v->u.number;
+                *dest->u.charp = (char)v->u.number;
             return;
 
         case T_PROTECTED_CHAR_LVALUE:
@@ -1482,10 +1421,10 @@ assign_svalue (svalue_t *dest, svalue_t *v)
 
             p = (struct protected_char_lvalue *)dest;
             if (p->lvalue->type == T_STRING
-             && p->lvalue->u.string == p->start)
+             && get_txt(p->lvalue->u.str) == p->start)
             {
                 if (v->type == T_NUMBER)
-                    *p->v.u.string = (char)v->u.number;
+                    *p->v.u.charp = (char)v->u.number;
             }
             return;
           }
@@ -1540,14 +1479,15 @@ _transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
 
 {
     /* If <v> is a string, share it */
-    if (v->type == T_STRING && v->x.string_type == STRING_VOLATILE)
+    if (v->type == T_STRING && !mstr_tabled(v->u.str))
     {
-        put_string(dest, make_shared_string(v->u.string));
-        if ( !dest->u.string )
+        put_string(dest, make_tabled_from(v->u.str));
+        if (dest->u.str)
         {
-            put_number(dest, 0);
-            error("Out of memory\n");
+            free_mstring(v->u.str);
         }
+        else
+            dest->u.str = v->u.str;
     }
     else /* just copy the data */
     {
@@ -1559,38 +1499,6 @@ void transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
 {  _transfer_svalue_no_free(dest,v); }
 
 #define transfer_svalue_no_free(dest,v) _transfer_svalue_no_free(dest,v)
-
-/*-------------------------------------------------------------------------*/
-static INLINE void
-transfer_svalue_no_free_spc ( svalue_t *dest, svalue_t *v
-                            , svalue_t *sp, bytecode_p pc)
-
-/* Move the value <v> into <dest>. If <v> is a volatile string, it
- * is made shared.
- *
- * <dest> is assumed to be invalid before the call, <v> is invalid after.
- *
- * This function may be called from eval_instruction() and needs to receive
- * the current stackpointer <sp> and the current programcounter <pc>.
- */
-
-{
-    if (v->type == T_STRING && v->x.string_type == STRING_VOLATILE)
-    {
-        put_string(dest, make_shared_string(v->u.string));
-        if ( !dest->u.string )
-        {
-            put_number(dest, 0);
-            inter_sp = sp;
-            inter_pc = pc;
-            error("Out of memory\n");
-        }
-    }
-    else
-    {
-        *dest = *v;
-    }
-} /* transfer_svalue_no_free_spc() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1626,15 +1534,7 @@ transfer_svalue (svalue_t *dest, svalue_t *v)
             continue;
 
         case T_STRING:
-            switch(dest->x.string_type)
-            {
-            case STRING_MALLOC:
-                xfree(dest->u.string);
-                break;
-            case STRING_SHARED:
-                free_string(dest->u.string);
-                break;
-            }
+            free_mstring(dest->u.str);
             break;
 
         case T_OBJECT:
@@ -1650,7 +1550,7 @@ transfer_svalue (svalue_t *dest, svalue_t *v)
             break;
 
         case T_SYMBOL:
-            free_string(dest->u.string);
+            free_mstring(dest->u.str);
             break;
 
         case T_CLOSURE:
@@ -1669,7 +1569,7 @@ transfer_svalue (svalue_t *dest, svalue_t *v)
         case T_CHAR_LVALUE:
             if (v->type == T_NUMBER)
             {
-                *dest->u.string = (char)v->u.number;
+                *dest->u.charp = (char)v->u.number;
             }
             else
                 free_svalue(v);
@@ -1681,11 +1581,11 @@ transfer_svalue (svalue_t *dest, svalue_t *v)
 
             p = (struct protected_char_lvalue *)dest;
             if (p->lvalue->type == T_STRING
-             && p->lvalue->u.string == p->start)
+             && get_txt(p->lvalue->u.str) == p->start)
             {
                 if (v->type == T_NUMBER)
                 {
-                    *p->v.u.string = (char)v->u.number;
+                    *p->v.u.charp = (char)v->u.number;
                     return;
                 }
             }
@@ -1719,12 +1619,15 @@ transfer_svalue (svalue_t *dest, svalue_t *v)
     } /* end for */
 
     /* Transfer the value, making volatile strings shared */
-    if (v->type == T_STRING && v->x.string_type == STRING_VOLATILE)
+    if (v->type == T_STRING && !mstr_tabled(v->u.str))
     {
-        put_string(dest, make_shared_string(v->u.string));
-        /* TODO: Nanue? No check for dest->u.string != NULL?
-         * TODO:: Like in transfer_svalue_no_free_spc()?
-         */
+        put_string(dest, make_tabled_from(v->u.str));
+        if (dest->u.str)
+        {
+            free_mstring(v->u.str);
+        }
+        else
+            dest->u.str = v->u.str;
     }
     else
     {
@@ -1939,6 +1842,8 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
 
 } /* transfer_protected_pointer_range() */
 
+=== Adapted until here ===
+
 /*-------------------------------------------------------------------------*/
 static void
 assign_string_range (svalue_t *source, Bool do_free)
@@ -1951,7 +1856,7 @@ assign_string_range (svalue_t *source, Bool do_free)
  */
 
 {
-    if (source->type == T_STRING)
+    if (source->type == T_OLD_STRING)
     {
         svalue_t *dsvp;     /* destination svalue (from special_lvalue) */
         char *ds;                /* destination string (from dsvp) */
@@ -2018,7 +1923,7 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
  */
 
 {
-    if (source->type == T_STRING)
+    if (source->type == T_OLD_STRING)
     {
         svalue_t *dsvp;     /* destination value (from dest) */
         char *ss;                /* source string (from source) */
@@ -2120,7 +2025,7 @@ add_number_to_svalue (svalue_t *dest, int i)
         struct protected_char_lvalue *p;
 
         p = (struct protected_char_lvalue *)dest;
-        if (p->lvalue->type == T_STRING
+        if (p->lvalue->type == T_OLD_STRING
          && p->lvalue->u.string == p->start)
         {
             i = *p->v.u.string += i;
@@ -2284,6 +2189,12 @@ inter_add_array (vector_t *q, vector_t **vpp)
  *-------------------------------------------------------------------------
  * The functions are:
  *
+ * put_c_string (sp, p)
+ *     Convert the C-String <p> into a mstring and put it into <sp>.
+ * push_c_string (sp, p)
+ *     Convert the C-String <p> into a mstring and push it onto the stack
+ *     above <sp>.
+ *
  * push_referenced_shared_string(p):
  *     Push a shared string onto the stack.
  * push_string_shared(p):
@@ -2302,6 +2213,36 @@ inter_add_array (vector_t *q, vector_t **vpp)
 
 /*-------------------------------------------------------------------------*/
 void
+put_c_string (svalue_t *sp, const char *p)
+
+/* Put a copy of the C string *<p> into <sp>.
+ */
+
+{
+    string_t * str;
+
+    memsafe(str = new_mstring(p), strlen(p), "string");
+    put_string(sp, str);
+} /* put_c_string() */
+
+/*-------------------------------------------------------------------------*/
+void
+push_c_string (svalue_t *sp, const char *p)
+
+/* Push a copy of the C string *<p> onto the stack at <sp>.
+ */
+
+{
+    string_t * str;
+
+    memsafe(str = new_mstring(p), strlen(p), "string");
+    sp++;
+    put_string(sp, str);
+} /* push_c_string() */
+
+#if 0
+/*-------------------------------------------------------------------------*/
+void
 push_referenced_shared_string (char *p)
 
 /* Push the shared string <p> onto the stack as defined by <inter_sp>.
@@ -2312,7 +2253,7 @@ push_referenced_shared_string (char *p)
     svalue_t *sp = inter_sp;
 
     sp++;
-    put_string(sp, p);
+    put_old_string(sp, p);
     inter_sp = sp;
 }
 
@@ -2326,7 +2267,7 @@ push_string_shared (char *p)
 
 {
     inter_sp++;
-    put_string(inter_sp, make_shared_string(p));
+    put_old_string(inter_sp, make_shared_string(p));
 }
 
 /*-------------------------------------------------------------------------*/
@@ -2366,6 +2307,7 @@ push_string_malloced (char *p)
     sp = ++inter_sp;
     put_malloced_string(sp, s);
 }
+#endif
 
 /*-------------------------------------------------------------------------*/
 void
@@ -3037,7 +2979,7 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
 
     /* Index a string.
      */
-    if (type == T_STRING)
+    if (type == T_OLD_STRING)
     {
         if (i->type != T_NUMBER)
         {
@@ -3184,7 +3126,7 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
 
     /* Index a string
      */
-    if (type == T_STRING)
+    if (type == T_OLD_STRING)
     {
         if ( (ind = (mp_int)_svalue_strlen(vec) - ind) < 0)
         {
@@ -3304,7 +3246,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
         /* Index a string.
          */
-        if (type == T_STRING)
+        if (type == T_OLD_STRING)
         {
             struct protected_char_lvalue *val;
 
@@ -3418,7 +3360,7 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
             lvalue = (struct protected_lvalue *)vec;
 
-            if (lvalue->v.u.lvalue->type != T_STRING)
+            if (lvalue->v.u.lvalue->type != T_OLD_STRING)
             {
                 /* Deref a non-string protected lvalue.
                  * If this is the lvalue passed to the operator, also free
@@ -3598,7 +3540,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
 
         /* Index a string.
          */
-        if (type == T_STRING)
+        if (type == T_OLD_STRING)
         {
             struct protected_char_lvalue *val;
 
@@ -3661,7 +3603,7 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
 
             lvalue = (struct protected_lvalue *)vec;
 
-            if (lvalue->v.u.lvalue->type != T_STRING)
+            if (lvalue->v.u.lvalue->type != T_OLD_STRING)
             {
                 /* Deref a non-string protected lvalue.
                  * If this is the lvalue passed to the operator, also free
@@ -3801,7 +3743,7 @@ range_lvalue (int code, svalue_t *sp)
         special_lvalue.v.type = T_POINTER_RANGE_LVALUE;
         size = (mp_int)VEC_SIZE(vec->u.vec);
         break;
-    case T_STRING:
+    case T_OLD_STRING:
         special_lvalue.v.type = T_STRING_RANGE_LVALUE;
         size = (mp_int)svalue_strlen(vec);
         break;
@@ -3960,7 +3902,7 @@ protected_range_lvalue (int code, svalue_t *sp)
         size = (mp_int)VEC_SIZE(vec->u.vec);
         break;
 
-    case T_STRING:
+    case T_OLD_STRING:
         /* If the string is not allocated, ie changeable, allocate
          * a copy we can change.
          */
@@ -4086,7 +4028,7 @@ push_indexed_value (svalue_t *sp, bytecode_p pc)
 
     switch (vec->type)
     {
-    case T_STRING:
+    case T_OLD_STRING:
       {
         if (i->type != T_NUMBER)
         {
@@ -4273,7 +4215,7 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
 
     switch (vec->type)
     {
-    case T_STRING:
+    case T_OLD_STRING:
       {
         /* Index the string */
 
@@ -4596,7 +4538,7 @@ efun_arg_typename (long type)
  */
 
 {
-    static char result[200];
+    static char result[400];
     int numtypes, i;
 
     if (type == TF_ANYTYPE)
@@ -4613,8 +4555,17 @@ efun_arg_typename (long type)
                 strcat(result, "/");
             strcat(result, typename(i));
         }
+        type &=~(1 << i);
     }
 
+    if (type != 0)
+    {
+        char tmp[100];
+        if (result[0] != '\0')
+            strcat(result, "/");
+        sprintf(tmp, "unknown %lx", type);
+        strcat(result, tmp);
+    }
     return (const char *)result;
 } /* efun_arg_typename() */
 
@@ -4762,6 +4713,22 @@ efun_arg_error (int arg, int expected, int got, svalue_t *sp)
 {
     inter_sp = sp;
     raise_arg_error(-2, arg, 1 << expected, got);
+    /* NOTREACHED */
+} /* efun_arg_error() */
+
+/*-------------------------------------------------------------------------*/
+void
+efun_exp_arg_error (int arg, long expected, int got, svalue_t *sp)
+
+/* The argument <arg> to the current tabled efun had the wrong type:
+ * expected was the type <expected> (given as bitflags), but it got the type
+ * <got> (given as svalue type tag).
+ * inter_pc is assumed to be correct, inter_sp will be set from <sp>.
+ */
+
+{
+    inter_sp = sp;
+    raise_arg_error(-2, arg, expected, got);
     /* NOTREACHED */
 } /* efun_arg_error() */
 
@@ -5319,6 +5286,7 @@ push_control_stack ( svalue_t *sp
     csp->fp = fp;
     csp->prog = current_prog;
     /* csp->extern_call = MY_FALSE; It is set by eval_instruction() */
+    csp->catch_call = MY_FALSE;
     csp->pc = pc;
     csp->function_index_offset = function_index_offset;
     csp->current_variables = current_variables;
@@ -5352,59 +5320,121 @@ pop_control_stack (void)
 
 
 /*-------------------------------------------------------------------------*/
-static void
-handle_caught_error (svalue_t ** spp, bytecode_p * pcp, svalue_t **fpp)
+static Bool
+catch_instruction (uint offset)
 
-/* Handle the error caught by the F_CATCH in the interpreter switch.
- * *<spp>, *<pcp> and *<fpp> are to be set to the new stackpointer,
- * programcounter and framepointer values to be used by the interpreter.
+/* Implement the F_CATCH instruction.
  *
- * The reason why this code is in a separate function is to thwart
- * overzealous optimizers. F_CATCH is implemented with setjmp/longjmp,
- * after which the register contents of the CPU are most likely clobbered.
- * Some optimizers don't take this into account and neglect to reload
- * the values into the registers. For the same reason the interpreter
- * does not call this function directly, but over a function variabe;
- * otherwise the same overzealous optimizer might inline this function
- * with the same desastrous result.
+ * At the time of call, all important locals from eval_instruction() are
+ * have been stored in their global locations.
+ *
+ * Result is TRUE on a normal exit (error or not), and FALSE if the
+ * guarded code terminated with a 'return' itself;
+ *
+ * Hard experience showed that it is advantageous to have the setjmp()
+ * have its own stackframe, and call the longjmp() from a deeper
+ * frame. Additionally it prevents over-optimistic optimizers from
+ * removing vital reloads of possibly clobbered local variables after
+ * the setjmp().
  */
 
 {
-    svalue_t * sp;
+    Bool rc;
 
-    /* Remove the catch context and get the old stackpointer setting */
-    sp = pull_error_context(inter_sp);
+    bytecode_p new_pc;  /* Address of first instruction after the catch() */
 
-    /* beware of errors after set_this_object() */
-    current_object = csp->ob;
-
-    /* catch() fakes a subroutine call internally, which has to be
-     * undone again.
+    /* Compute address of next instruction after the CATCH statement.
      */
-    pop_control_stack();
+    new_pc = inter_pc + offset;
 
-    /* Export the restored program counter and frame pointer */
-    *pcp = inter_pc;
-    *fpp = inter_fp;
+    /* Increase the eval_cost for the duration of the catch so that
+     * there is enough time left to handle an eval-too-big error.
+     */
+    eval_cost += CATCH_RESERVED_COST;
+    assigned_eval_cost += CATCH_RESERVED_COST;
 
-    /* Push the catch return value */
-    *(++sp) = catch_value;
-    catch_value.type = T_INVALID;
+    /* 'Fake' a subroutine call from <new_pc>
+     */
+    push_control_stack(inter_sp, new_pc, inter_fp);
+    csp->ob = current_object;
+    csp->extern_call = MY_FALSE;
+    csp->catch_call = MY_TRUE;
+#ifndef DEBUG
+    csp->num_local_variables = 0;        /* No extra variables */
+#else
+    csp->num_local_variables = (csp-1)->num_local_variables;
+      /* TODO: Marion added this, but why? For 'expected_stack'? */
+#endif
+    csp->funstart = csp[-1].funstart;
 
-    /* Restore the old eval costs */
-    eval_cost -= CATCH_RESERVED_COST;
-    assigned_eval_cost -= CATCH_RESERVED_COST;
-
-    /* If we are out of memory, throw a new error */
-    if (out_of_memory)
+    /* Save some globals on the error stack that must be restored
+     * separately after a longjmp, then set the jump.
+     */
+    if ( setjmp( push_error_context(inter_sp)->text ) )
     {
+        /* A throw() or error occured. We have to restore the
+         * control and error stack manually here.
+         *
+         * The error value to return will be stored in
+         * the global <catch_value>.
+         */
+        svalue_t *sp;
+
+        /* Remove the catch context and get the old stackpointer setting */
+        sp = pull_error_context(inter_sp);
+
+        /* beware of errors after set_this_object() */
+        current_object = csp->ob;
+
+        /* catch() faked a subroutine call internally, which has to be
+         * undone again. This will also set the pc to the proper
+         * continuation address.
+         */
+        pop_control_stack();
+
+        /* Push the catch return value */
+        *(++sp) = catch_value;
+        catch_value.type = T_INVALID;
+
         inter_sp = sp;
-        error("(catch) Out of memory detected.\n");
+
+        /* Restore the old eval costs */
+        eval_cost -= CATCH_RESERVED_COST;
+        assigned_eval_cost -= CATCH_RESERVED_COST;
+
+        /* If we are out of memory, throw a new error */
+        if (out_of_memory)
+        {
+            error("(catch) Out of memory detected.\n");
+        }
+
+        rc = MY_TRUE;
+    }
+    else
+    {
+
+        /* Recursively call the interpreter */
+        rc = eval_instruction(inter_pc, inter_sp);
+
+        if (rc)
+        {
+            /* Get rid of the code result */
+            _pop_stack();
+
+            /* Restore the old execution context */
+            pop_control_stack();
+            pop_error_context();
+
+            /* Since no error happened, push 0 onto the stack */
+            inter_sp = _push_number(0, inter_sp);
+        }
+
+        eval_cost -= CATCH_RESERVED_COST;
+        assigned_eval_cost -= CATCH_RESERVED_COST;
     }
 
-    /* Export the new stack pointer */
-    *spp = sp;
-} /* handle_caught_error() */
+    return rc;
+} /* catch_instruction() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE funflag_t
@@ -5775,14 +5805,18 @@ remove_object_from_stack (object_t *ob)
 }
 
 /*-------------------------------------------------------------------------*/
-static void
+static Bool
 eval_instruction (bytecode_p first_instruction
                  , svalue_t *initial_sp)
 
 /* Evaluate the code starting at <first_instruction>, using <inital_sp>
  * as the stack pointer. All other variables like current_prog must be
  * setup before the call. The function will return upon encountering
- * a F_RETURN instruction for which extern_call is true.
+ * a F_RETURN instruction for which .extern_call or .catch_call is true,
+ * or upon encountering a F_END_CATCH instruction.
+ *
+ * The result will state the reason for returning: FALSE for F_RETURN,
+ * and TRUE for F_END_CATCH.
  *
  * This also means that for every intra-object call eval_instruction()
  * is called recursively.
@@ -5898,7 +5932,8 @@ eval_instruction (bytecode_p first_instruction
     /* Setup the variables.
      * The next F_RETURN at this level will return out of eval_instruction().
      */
-    csp->extern_call = MY_TRUE;
+    if (!csp->catch_call)
+        csp->extern_call = MY_TRUE;
     sp = initial_sp;
     pc = first_instruction;
     fp = inter_fp;
@@ -6037,7 +6072,7 @@ again:
         fatal("Undefined instruction '%s' (%d)\n", get_f_name(instruction),
               instruction);
         /* NOTREACHED */
-        return; /* hint for data flow analysis */
+        return MY_FALSE; /* hint for data flow analysis */
 
 #ifdef F_ILLEGAL
     CASE(F_ILLEGAL);                /* --- illegal             --- */
@@ -6272,7 +6307,7 @@ again:
         unsigned short string_number;
 
         LOAD_SHORT(string_number, pc);
-        push_ref_string(sp, current_strings[string_number]);
+        push_ref_old_string(sp, current_strings[string_number]);
         break;
     }
 
@@ -6281,7 +6316,7 @@ again:
         /* Push the string current_strings[0x3<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_ref_string(sp, current_strings[LOAD_UINT8(pc)+0x300]);
+        push_ref_old_string(sp, current_strings[LOAD_UINT8(pc)+0x300]);
         break;
     }
 
@@ -6290,7 +6325,7 @@ again:
         /* Push the string current_strings[0x2<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_ref_string(sp, current_strings[LOAD_UINT8(pc)+0x200]);
+        push_ref_old_string(sp, current_strings[LOAD_UINT8(pc)+0x200]);
         break;
     }
 
@@ -6299,7 +6334,7 @@ again:
         /* Push the string current_strings[0x1<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_ref_string(sp, current_strings[LOAD_UINT8(pc)+0x100]);
+        push_ref_old_string(sp, current_strings[LOAD_UINT8(pc)+0x100]);
         break;
     }
 
@@ -6308,7 +6343,7 @@ again:
         /* Push the string current_strings[0x0<ix>] onto the stack.
          * <ix> is a 8-Bit uint.
          */
-        push_ref_string(sp, current_strings[LOAD_UINT8(pc)]);
+        push_ref_old_string(sp, current_strings[LOAD_UINT8(pc)]);
         break;
     }
 
@@ -6466,12 +6501,20 @@ again:
     CASE(F_RETURN);                 /* --- return              --- */
     {
         /* Return from the function with the result topmost on the stack.
-         * If this is an .extern_call, eval_instruction() is left here.
+         * If this is an .extern_call, eval_instruction()
+         * is left here.
          */
 
         svalue_t *svp; /* Save of current sp */
 
         svp = sp;
+
+        /* Remove any intermediate error contexts */
+        while (csp->catch_call)
+        {
+            pop_control_stack();
+            pop_error_context();
+        }
 
         /* Deallocate frame, but not the result value.
          */
@@ -6490,6 +6533,7 @@ again:
         /* Restore the previous execution context */
         if ( NULL != (current_prog = csp->prog) ) /* is 0 when we reach the bottom */
             current_strings = current_prog->strings;
+
         function_index_offset = csp->function_index_offset;
         current_variables     = csp->current_variables;
         break_sp = csp->break_sp;
@@ -6512,7 +6556,7 @@ again:
             }
             csp--;
             inter_sp = sp;
-            return;
+            return MY_FALSE;
         }
 
         /* We stay in eval_instruction() */
@@ -6794,7 +6838,7 @@ again:
                  */
                 s = (mp_int)ZERO_AS_STR_CASE_LABEL;
             }
-            else if ( sp->type == T_STRING )
+            else if ( sp->type == T_OLD_STRING )
             {
                 /* The case strings in the program shared, so whatever
                  * string we get on the stack, it must at least have
@@ -6813,7 +6857,7 @@ again:
             }
             else
             {
-                BAD_ARG_ERROR(1, T_STRING, sp->type);
+                BAD_ARG_ERROR(1, T_OLD_STRING, sp->type);
                 /* No string - bad wizard! */
             }
         }
@@ -7169,12 +7213,12 @@ again:
         num_arg = LOAD_UINT8(pc);
           /* GET_NUM_ARG doesn't work here either. */
         arg = sp - num_arg + 1;
-        if (arg[0].type != T_STRING)
-            BAD_ARG_ERROR(1, T_STRING, arg[0].type);
+        if (arg[0].type != T_OLD_STRING)
+            BAD_ARG_ERROR(1, T_OLD_STRING, arg[0].type);
         if (arg[1].type != T_OBJECT && arg[1].type != T_POINTER)
             RAISE_ARG_ERROR(2, TF_OBJECT|TF_POINTER, arg[1].type);
-        if (arg[2].type != T_STRING)
-            BAD_ARG_ERROR(3, T_STRING, arg[2].type);
+        if (arg[2].type != T_OLD_STRING)
+            BAD_ARG_ERROR(3, T_OLD_STRING, arg[2].type);
         if (arg[1].type == T_POINTER)
             check_for_destr(arg[1].u.vec);
 
@@ -7194,7 +7238,7 @@ again:
          * onto the stack.
          */
         sp++;
-        assign_local_svalue_no_free(sp, fp + LOAD_UINT8(pc), sp, pc);
+        assign_local_svalue_no_free(sp, fp + LOAD_UINT8(pc));
         break;
 
     CASE(F_CATCH);        /* --- catch <offset> <guarded code> --- */
@@ -7226,73 +7270,24 @@ again:
          */
 
         uint offset;
-        bytecode_p new_pc;  /* Address of first instruction after the catch() */
 
-        /* Compute address of next instruction after the CATCH statement.
+        /* Get the offset to the next instruction after the CATCH statement.
          */
         offset = LOAD_UINT8(pc);
-        new_pc = pc + offset;
 
-        /* Increase the eval_cost for the duration of the catch so that
-         * there is enough time left to handle an eval-too-big error.
-         */
-        eval_cost += CATCH_RESERVED_COST;
-        assigned_eval_cost += CATCH_RESERVED_COST;
-
-        /* 'Fake' a subroutine call from <new_pc>
-         */
-        push_control_stack(sp, new_pc, fp);
-        csp->ob = current_object;
-        csp->extern_call = MY_FALSE;
-#ifndef DEBUG
-        csp->num_local_variables = 0;        /* No extra variables */
-#else
-        csp->num_local_variables = (csp-1)->num_local_variables;
-          /* TODO: Marion added this, but why? For 'expected_stack'? */
-#endif
-        csp->funstart = csp[-1].funstart;
-
-        /* Not really necessary, but tells gcc to complain less */
+        /* Save the important variables in their global locations */
         inter_pc = pc;
         inter_sp = sp;
         inter_fp = fp;
 
-        /* Save some globals on the error stack that must be restored
-         * separately after a longjmp, then set the jump.
-         */
-        if ( setjmp( push_error_context(sp)->text ) )
-        {
-            /* A throw() or error occured. We have to restore the
-             * control and error stack manually here.
-             *
-             * The error value to return is stored in
-             * the global <catch_value>.
-             *
-             * The actual handling has been exported into the separate,
-             * indirectly called function handle_caught_error() to
-             * protect ourself against overzealous optimizers.
-             */
-            svalue_t *spl, *fpl;
-            bytecode_p pcl;
+        /* Perform the catch() */
+        if (!catch_instruction(offset))
+            return MY_FALSE; /* Guarded code terminated with 'return' itself */
 
-#ifdef DEBUG
-            /* Restore the value of expected_stack also. It is always 0
-             * for catch().
-             */
-            expected_stack = NULL;
-#endif
-            (*caught_error)(&spl, &pcl, &fpl);
-            sp = spl; pc = pcl; fp = fpl;
-
-            /* Execution continues at the <new_pc> stored before */
-        }
-        else  /* catch() setup */
-        {
-            /* Not really necessary, but tells gcc to complain less */
-            pc = inter_pc;
-            sp = inter_sp;
-            fp = inter_fp;
-        }
+        /* Restore the important variables */
+        pc = inter_pc;
+        sp = inter_sp;
+        fp = inter_fp;
 
         /* Not really necessary, but tells gcc to complain less */
         instruction = F_CATCH;
@@ -7678,14 +7673,14 @@ again:
 #endif
         dest = sp->u.lvalue;
 
-        /* Free the destination svalue so that transfer_svalue_no_free_spc()
+        /* Free the destination svalue so that transfer_svalue_no_free()
          * can be used. However, if the dest is a lvalue, a pointer or
          * mapping, the assignment takes place right here and the next
          * instruction will be executed by means of a 'goto again'.
          */
         switch(dest->type)
         {
-        case T_STRING:
+        case T_OLD_STRING:
             switch(dest->x.string_type)
             {
             case STRING_MALLOC:
@@ -7720,7 +7715,7 @@ again:
           {
             vector_t *v = dest->u.vec;
 
-            transfer_svalue_no_free_spc(dest, sp-1, sp, pc);
+            transfer_svalue_no_free(dest, sp-1);
             sp -= 2;
             free_array(v);
             goto again;
@@ -7730,7 +7725,7 @@ again:
           {
             mapping_t *m = dest->u.map;
 
-            transfer_svalue_no_free_spc(dest, sp-1, sp, pc);
+            transfer_svalue_no_free(dest, sp-1);
             sp -= 2;
             free_mapping(m);
             goto again;
@@ -7761,7 +7756,7 @@ again:
             struct protected_char_lvalue *p;
 
             p = (struct protected_char_lvalue *)dest;
-            if (p->lvalue->type == T_STRING
+            if (p->lvalue->type == T_OLD_STRING
              && p->lvalue->u.string == p->start)
             {
                 if (sp[-1].type == T_NUMBER)
@@ -7817,7 +7812,7 @@ again:
         /* Nothing complicated: dest was just freed, now transfer
          * the data.
          */
-        transfer_svalue_no_free_spc(dest, sp-1, sp, pc);
+        transfer_svalue_no_free(dest, sp-1);
         sp -= 2;
         break;
     }
@@ -7839,12 +7834,12 @@ again:
         switch ( sp[-1].type )
         {
 
-        case T_STRING:
+        case T_OLD_STRING:
             inter_pc = pc;
             inter_sp = sp;
             switch ( sp->type )
             {
-            case T_STRING:
+            case T_OLD_STRING:
               {
                 char *res;
                 size_t l = _svalue_strlen(sp-1);
@@ -7910,16 +7905,16 @@ again:
               }
 
             default:
-                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+                OP_ARG_ERROR(2, TF_OLD_STRING|TF_FLOAT|TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
             break;
-            /* End of case T_STRING */
+            /* End of case T_OLD_STRING */
 
           case T_NUMBER:
             switch ( sp->type )
             {
-            case T_STRING:
+            case T_OLD_STRING:
               {
                 char buff[80], *res;
                 size_t len1;
@@ -7965,7 +7960,7 @@ again:
               }
 
             default:
-                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+                OP_ARG_ERROR(2, TF_OLD_STRING|TF_FLOAT|TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
             break;
@@ -7990,7 +7985,7 @@ again:
                 sp--;
                 break;
             }
-            if (sp->type == T_STRING)
+            if (sp->type == T_OLD_STRING)
             {
                 char buff[160];
                 char *res;
@@ -8010,7 +8005,7 @@ again:
                 put_malloced_string(sp, res);
                 break;
             }
-            OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, sp->type);
+            OP_ARG_ERROR(2, TF_OLD_STRING|TF_FLOAT|TF_NUMBER, sp->type);
             /* NOTREACHED */
           }
           /* End of case T_FLOAT */
@@ -8046,7 +8041,7 @@ again:
           }
 
         default:
-            OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_STRING|TF_FLOAT|TF_NUMBER
+            OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_OLD_STRING|TF_FLOAT|TF_NUMBER
                           , sp[-1].type);
             /* NOTREACHED */
         }
@@ -8142,11 +8137,11 @@ again:
             sp->u.map = m;
             break;
         }
-        else if ((sp-1)->type == T_STRING)
+        else if ((sp-1)->type == T_OLD_STRING)
         {
             char * result;
             
-            TYPE_TEST_RIGHT(sp, T_STRING);
+            TYPE_TEST_RIGHT(sp, T_OLD_STRING);
             inter_sp = sp;
             result = intersect_strings((sp-1)->u.string, sp->u.string, MY_TRUE);
             free_string_svalue(sp);
@@ -8156,7 +8151,7 @@ again:
             break;
         }
 
-        OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_STRING|TF_FLOAT|TF_NUMBER
+        OP_ARG_ERROR(1, TF_POINTER|TF_MAPPING|TF_OLD_STRING|TF_FLOAT|TF_NUMBER
                       , sp[-1].type);
         /* NOTREACHED */
     }
@@ -8200,7 +8195,7 @@ again:
                 sp->type = T_FLOAT;
                 break;
             }
-            if (sp->type == T_STRING)
+            if (sp->type == T_OLD_STRING)
             {
                 char * result;
                 size_t reslen;
@@ -8271,11 +8266,11 @@ again:
                         ; left
                         ; from++, to++, left--)
                     {
-                        if (from->type == T_STRING
+                        if (from->type == T_OLD_STRING
                          && from->x.string_type == STRING_MALLOC
                            )
                         {
-                            put_string(to, make_shared_string(from->u.string));
+                            put_old_string(to, make_shared_string(from->u.string));
                             if (!to->u.string)
                                 ERROR("Out of memory.\n");
                         }
@@ -8299,7 +8294,7 @@ again:
                 put_array(sp, result);
                 break;
             }
-            OP_ARG_ERROR(2, TF_POINTER|TF_STRING|TF_FLOAT|TF_NUMBER
+            OP_ARG_ERROR(2, TF_POINTER|TF_OLD_STRING|TF_FLOAT|TF_NUMBER
                           , sp->type);
             /* NOTREACHED */
         case T_FLOAT:
@@ -8324,7 +8319,7 @@ again:
             OP_ARG_ERROR(2, TF_FLOAT|TF_NUMBER, sp->type);
             /* NOTREACHED */
           }
-        case T_STRING:
+        case T_OLD_STRING:
           {
             if (sp->type == T_NUMBER)
             {
@@ -8401,11 +8396,11 @@ again:
                         ; left
                         ; from++, to++, left--)
                     {
-                        if (from->type == T_STRING
+                        if (from->type == T_OLD_STRING
                          && from->x.string_type == STRING_MALLOC
                            )
                         {
-                            put_string(to, make_shared_string(from->u.string));
+                            put_old_string(to, make_shared_string(from->u.string));
                             if (!to->u.string)
                                 ERROR("Out of memory.\n");
                         }
@@ -8433,7 +8428,7 @@ again:
             /* NOTREACHED */
           }
         default:
-            OP_ARG_ERROR(1, TF_POINTER|TF_STRING|TF_FLOAT|TF_NUMBER
+            OP_ARG_ERROR(1, TF_POINTER|TF_OLD_STRING|TF_FLOAT|TF_NUMBER
                           , sp[-1].type);
             /* NOTREACHED */
         }
@@ -8492,7 +8487,7 @@ again:
                 dtmp = READ_DOUBLE( sp );
                 if (dtmp == 0.) {
                     ERROR("Division by zero\n");
-                    return;
+                    return MY_FALSE;
                 }
                 sp--;
                 dtmp = READ_DOUBLE(sp) / dtmp;
@@ -8503,7 +8498,7 @@ again:
             {
                 if (sp->u.number == 0) {
                     ERROR("Division by zero\n");
-                    return;
+                    return MY_FALSE;
                 }
                 dtmp = (float)sp->u.number;
                 sp--;
@@ -8556,7 +8551,7 @@ again:
 
         int i;
 
-        if ((sp-1)->type == T_STRING && sp->type == T_STRING)
+        if ((sp-1)->type == T_OLD_STRING && sp->type == T_OLD_STRING)
         {
             i = strcmp((sp-1)->u.string, sp->u.string) > 0;
             free_string_svalue(sp);
@@ -8582,8 +8577,8 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
         ERRORF(("Arguments to > don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -8600,7 +8595,7 @@ again:
 
         int i;
 
-        if ((sp-1)->type == T_STRING && sp->type == T_STRING)
+        if ((sp-1)->type == T_OLD_STRING && sp->type == T_OLD_STRING)
         {
             i = strcmp((sp-1)->u.string, sp->u.string) >= 0;
             free_string_svalue(sp);
@@ -8626,8 +8621,8 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
         ERRORF(("Arguments to >= don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -8644,7 +8639,7 @@ again:
 
         int i;
 
-        if ((sp-1)->type == T_STRING && sp->type == T_STRING)
+        if ((sp-1)->type == T_OLD_STRING && sp->type == T_OLD_STRING)
         {
             i = strcmp((sp-1)->u.string, sp->u.string) < 0;
             free_string_svalue(sp);
@@ -8670,8 +8665,8 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
         ERRORF(("Arguments to < don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -8688,7 +8683,7 @@ again:
 
         int i;
 
-        if ((sp-1)->type == T_STRING && sp->type == T_STRING)
+        if ((sp-1)->type == T_OLD_STRING && sp->type == T_OLD_STRING)
         {
             i = strcmp((sp-1)->u.string, sp->u.string) <= 0;
             free_string_svalue(sp);
@@ -8714,8 +8709,8 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_FLOAT);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_OLD_STRING|TF_FLOAT);
         ERRORF(("Arguments to <= don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -8749,7 +8744,7 @@ again:
         case T_POINTER:
             i = (sp-1)->u.vec == sp->u.vec;
             break;
-        case T_STRING:
+        case T_OLD_STRING:
             i = strcmp((sp-1)->u.string, sp->u.string) == 0;
             break;
         case T_OBJECT:
@@ -8771,7 +8766,7 @@ again:
                 error("Reference passed to ==\n");
             FATALF(("Illegal type '%s' to ==\n",typename(sp->type)));
             /* NOTREACHED */
-            return;
+            return MY_FALSE;
         }
 
         pop_stack();
@@ -8804,7 +8799,7 @@ again:
         case T_NUMBER:
             i = (sp-1)->u.number != sp->u.number;
             break;
-        case T_STRING:
+        case T_OLD_STRING:
             i = strcmp((sp-1)->u.string, sp->u.string);
             break;
         case T_POINTER:
@@ -8829,7 +8824,7 @@ again:
                 error("Reference passed to !=\n");
             FATALF(("Illegal type '%s' to !=\n",typename(sp->type)));
             /* NOTREACHED */
-            return;
+            return MY_FALSE;
         }
 
         pop_stack();
@@ -8869,7 +8864,7 @@ again:
             break;
         }
 
-        if (sp->type == T_STRING && (sp-1)->type == T_STRING)
+        if (sp->type == T_OLD_STRING && (sp-1)->type == T_OLD_STRING)
         {
             char * result;
             
@@ -8890,8 +8885,8 @@ again:
             break;
         }
 
-        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_STRING|TF_POINTER);
-        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_STRING|TF_POINTER);
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_OLD_STRING|TF_POINTER);
+        TYPE_TEST_EXP_RIGHT(sp, TF_NUMBER|TF_OLD_STRING|TF_POINTER);
         ERRORF(("Arguments to & don't match: %s vs %s\n"
                , typename(sp[-1].type), typename(sp->type)
                ));
@@ -8968,14 +8963,37 @@ again:
 
     CASE(F_RSH);                    /* --- rsh                 --- */
     {
-        /* Shift number sp[-1] right by sp[0] bits and leave
+        /* Arithmetically shift number sp[-1] right by sp[0] bits and leave
          * the result on the stack.
          *
          * Possible type combinations:
          *   int >> int    -> int
          *
          * TODO: Extend this to vectors and mappings.
-         * TODO: Implement an arithmetic shift.
+         */
+
+        int i;
+
+        if ((sp-1)->type != T_NUMBER)
+            goto bad_arg_1;
+        if (sp->type != T_NUMBER)
+            goto bad_arg_2;
+
+        i = sp->u.number;
+        sp--;
+        sp->u.number >>= (uint)i > MAX_SHIFT ? (MAX_SHIFT+1) : i;
+        break;
+    }
+
+    CASE(F_RSHL);                   /* --- rshl                --- */
+    {
+        /* Logically shift number sp[-1] right by sp[0] bits and leave
+         * the result on the stack.
+         *
+         * Possible type combinations:
+         *   int >> int    -> int
+         *
+         * TODO: Extend this to vectors and mappings.
          */
 
         int i;
@@ -8985,7 +9003,10 @@ again:
 
         i = sp->u.number;
         sp--;
-        sp->u.number >>= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
+        if ((uint)i > MAX_SHIFT)
+            sp->u.number = 0;
+        else
+            sp->u.number = (p_uint)sp->u.number >> i;
         break;
     }
 
@@ -9075,7 +9096,7 @@ again:
                 put_number(sp, 0);
             }
         }
-        else if (sp[-2].type == T_STRING)
+        else if (sp[-2].type == T_OLD_STRING)
         {
             /* Slice a range from string */
 
@@ -9170,13 +9191,13 @@ again:
         switch(argp->type)
         {
 
-        case T_STRING:  /* Adding to a string */
+        case T_OLD_STRING:  /* Adding to a string */
           {
             char *new_string;
 
             /* Perform the addition, creating new_string */
             /* TODO: Make this use memcpy() instead of strcpy() */
-            if (type2 == T_STRING)
+            if (type2 == T_OLD_STRING)
             {
                 size_t l = _svalue_strlen(argp);
                 size_t l2 = _svalue_strlen(sp-1);
@@ -9228,7 +9249,7 @@ again:
             }
             else
             {
-                OP_ARG_ERROR(2, TF_STRING|TF_FLOAT|TF_NUMBER, type2);
+                OP_ARG_ERROR(2, TF_OLD_STRING|TF_FLOAT|TF_NUMBER, type2);
                 /* NOTREACHED */
             }
 
@@ -9270,7 +9291,7 @@ again:
                 STORE_DOUBLE(sp, sum);
                 goto again;
             }
-            else if (type2 == T_STRING)
+            else if (type2 == T_OLD_STRING)
             {
                 char buff[80], *res;
                 size_t len1;
@@ -9403,7 +9424,7 @@ again:
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_STRING|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
+            OP_ARG_ERROR(1, TF_OLD_STRING|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
                         , argp->type);
             /* NOTREACHED */
         } /* end of switch */
@@ -9472,13 +9493,13 @@ again:
             /* TODO: May result in a 0x00 character in a string */
             break;
 
-        case T_STRING:   /* Subtract from a string */
+        case T_OLD_STRING:   /* Subtract from a string */
         {
             char * result;
             
-            if (type2 != T_STRING)
+            if (type2 != T_OLD_STRING)
             {
-                OP_ARG_ERROR(2, TF_STRING, type2);
+                OP_ARG_ERROR(2, TF_OLD_STRING, type2);
                 /* NOTREACHED */
             }
 
@@ -9587,7 +9608,7 @@ again:
             break;
 
         default:
-            OP_ARG_ERROR(1, TF_STRING|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
+            OP_ARG_ERROR(1, TF_OLD_STRING|TF_FLOAT|TF_MAPPING|TF_POINTER|TF_NUMBER
                         , argp->type);
             /* NOTREACHED */
         } /* end of switch */
@@ -9659,7 +9680,7 @@ again:
             break;
         }
 
-        if (argp->type == T_STRING)
+        if (argp->type == T_OLD_STRING)
         {
             char * result;
             size_t reslen;
@@ -9749,11 +9770,11 @@ again:
                     ; left
                     ; from++, to++, left--)
                 {
-                    if (from->type == T_STRING
+                    if (from->type == T_OLD_STRING
                      && from->x.string_type == STRING_MALLOC
                        )
                     {
-                        put_string(to, make_shared_string(from->u.string));
+                        put_old_string(to, make_shared_string(from->u.string));
                         if (!to->u.string)
                             ERROR("Out of memory.\n");
                     }
@@ -9777,7 +9798,7 @@ again:
             break;
         }
         
-        OP_ARG_ERROR(1, TF_STRING|TF_FLOAT|TF_POINTER|TF_NUMBER
+        OP_ARG_ERROR(1, TF_OLD_STRING|TF_FLOAT|TF_POINTER|TF_NUMBER
                     , argp->type);
         /* NOTREACHED */
         break;
@@ -9962,13 +9983,13 @@ again:
             break;
         }
 
-        if (argp->type == T_STRING)
+        if (argp->type == T_OLD_STRING)
         {
             char * result;
             
-            if (sp[-1].type != T_STRING)
+            if (sp[-1].type != T_OLD_STRING)
             {
-                OP_ARG_ERROR(2, TF_STRING, sp[-1].type);
+                OP_ARG_ERROR(2, TF_OLD_STRING, sp[-1].type);
                 /* NOTREACHED */
             }
             inter_sp = sp;
@@ -9982,7 +10003,7 @@ again:
             break;
         }
 
-        OP_ARG_ERROR(1, TF_NUMBER|TF_STRING|TF_POINTER, argp->type);
+        OP_ARG_ERROR(1, TF_NUMBER|TF_OLD_STRING|TF_POINTER, argp->type);
         /* NOTREACHED */
         break;
     }
@@ -10112,13 +10133,48 @@ again:
 
     CASE(F_RSH_EQ);                 /* --- rsh_eq              --- */
     {
-        /* Shift the value designated by lvalue sp[0] right by sp[-1],
-         * assign the result to sp[0] and also leave it on the stack.
+        /* Arithmetically shift the value designated by lvalue sp[0] right by
+         * sp[-1], assign the result to sp[0] and also leave it on the stack.
          *
          * Possible type combinations:
          *   int        << int                -> int
+         */
+
+        int i;
+        svalue_t *argp;
+#ifdef DEBUG
+        if (sp->type != T_LVALUE)
+            goto bad_arg_1;
+#endif
+
+        /* Set argp to the actual value designated by sp[0] */
+        for ( argp = sp->u.lvalue
+            ; T_LVALUE == argp->type || T_PROTECTED_LVALUE == argp->type
+            ; argp = argp->u.lvalue)
+            NOOP;
+
+        /* Now do it */
+        if (argp->type == T_NUMBER)
+        {
+            sp--;
+            if (sp->type != T_NUMBER)
+                goto bad_right;
+            i = sp->u.number;
+            argp->u.number >>= (uint)i > MAX_SHIFT ? (MAX_SHIFT+1) : i;
+            sp->u.number = argp->u.number;
+            break;
+        }
+        goto bad_left;
+        /* NOTREACHED */ break;
+    }
+
+    CASE(F_RSHL_EQ);               /* --- rshl_eq              --- */
+    {
+        /* Logically shift the value designated by lvalue sp[0] right by
+         * sp[-1], assign the result to sp[0] and also leave it on the stack.
          *
-         * TODO: Implement an arithmetic shift.
+         * Possible type combinations:
+         *   int        << int                -> int
          */
 
         int i;
@@ -10143,7 +10199,10 @@ again:
                 /* NOTREACHED */
             }
             i = sp->u.number;
-            argp->u.number >>= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
+            if ((uint)i > MAX_SHIFT)
+                argp->u.number = 0;
+            else
+                argp->u.number = (p_uint)argp->u.number >> i;
             sp->u.number = argp->u.number;
             break;
         }
@@ -10560,8 +10619,13 @@ again:
         pc = FUNCTION_CODE(funstart);
 #ifdef DEBUG
     /* TODO: Once nobody complains, this can go */
-    if (!current_variables)
-        printf("DEBUG: %s:%d : current variables are NULL\n", __FILE__, __LINE__);
+    if (!current_variables && variable_index_offset)
+        printf("DEBUG: %s:%d : call_inherited for object %p '%s', "
+               "program %p '%s' w/o variables, but offset %d\n"
+                 , __FILE__, __LINE__
+                 , current_object, current_object->name
+                 , current_prog, current_prog->name
+                 , variable_index_offset);
 #endif
         current_variables += variable_index_offset;
         current_strings = current_prog->strings;
@@ -11181,7 +11245,7 @@ again:
          */
         item = v->item;
         while (--i >= 0)
-            transfer_svalue_no_free_spc(item++, value++, sp, pc);
+            transfer_svalue_no_free(item++, value++);
 
         /* Leave the array on the stack (ref count is already ok) */
         put_array(sp, v);
@@ -11248,7 +11312,7 @@ again:
                 /* Copy over the entry data */
                 if (data->type != T_NUMBER)
                     free_svalue(data);
-                transfer_svalue_no_free_spc(data++, value++, sp, pc);
+                transfer_svalue_no_free(data++, value++);
             }
         }
 
@@ -11464,7 +11528,7 @@ again:
         nargs = LOAD_UINT8(pc);
         LOAD_SHORT(offset, pc);
 
-        if (sp->type != T_STRING
+        if (sp->type != T_OLD_STRING
          && sp->type != T_POINTER
          && sp->type != T_MAPPING)
             ERRORF(("foreach() got a %s, requires a string/array/mapping.\n"
@@ -11473,7 +11537,7 @@ again:
 
         /* Find out how many variables we require */
 
-        if (sp->type == T_STRING)
+        if (sp->type == T_OLD_STRING)
         {
             count = (p_int)svalue_strlen(sp);
             vars_required = 1;
@@ -11628,7 +11692,7 @@ again:
 #endif
             lvalue = lvalue->u.lvalue;
 
-            if (sp[-2].type == T_STRING)
+            if (sp[-2].type == T_OLD_STRING)
             {
                 free_svalue(lvalue);
                 put_number(lvalue, sp[-2].u.string[ix]);
@@ -11687,22 +11751,16 @@ again:
          * generates a F_END_CATCH as last instruction of the
          * guarded code.
          *
-         * Executed when no error occured, it cleans up the
+         * Executed when no error occured, it returns into
+         * catch_instruction() to clean up the
          * error recovery information pushed by the F_CATCH
-         * and leaves a 0 on the stack.
+         * and leave a 0 on the stack.
          *
          * dump_trace() checks for this bytecode, but accepts a normal
          * instruction as well as an escaped instruction.
          */
 
-        pop_stack();
-        pop_control_stack();
-        pc = inter_pc;
-        fp = inter_fp;
-        pop_error_context();
-        push_number(sp, 0);
-        eval_cost -= CATCH_RESERVED_COST;
-        assigned_eval_cost -= CATCH_RESERVED_COST;
+        return MY_TRUE;
         break;
 
                           /* --- breakn_continue <num> <offset> ---*/
@@ -11780,7 +11838,7 @@ again:
         {
             i = (sp->u.ob->flags & O_CLONE);
         }
-        else if (sp->type == T_STRING)
+        else if (sp->type == T_OLD_STRING)
         {
             object_t *o;
 
@@ -11927,7 +11985,7 @@ again:
 
         int i;
 
-        i = sp->type == T_STRING;
+        i = sp->type == T_OLD_STRING;
         free_svalue(sp);
         put_number(sp, i);
         break;
@@ -12012,7 +12070,7 @@ again:
          * anywhere.
          */
 
-        TYPE_TEST1(sp, T_STRING);
+        TYPE_TEST1(sp, T_OLD_STRING);
         ERRORF(("%s", sp->u.string));
       }
 
@@ -12026,7 +12084,7 @@ again:
          */
 
         assign_eval_cost();
-        transfer_svalue_no_free_spc(&catch_value, sp--, sp, pc);
+        transfer_svalue_no_free(&catch_value, sp--);
         inter_sp = sp;
         inter_pc = pc;
         throw_error(); /* do the longjump, with extra checks... */
@@ -12045,7 +12103,7 @@ again:
 
         size_t i;
 
-        if (sp->type == T_STRING)
+        if (sp->type == T_OLD_STRING)
         {
             i = _svalue_strlen(sp);
             free_string_svalue(sp);
@@ -12054,7 +12112,7 @@ again:
         }
         if (sp->type == T_NUMBER && sp->u.number == 0)
             break;
-        RAISE_ARG_ERROR(1, TF_NULL|TF_STRING, sp->type);
+        RAISE_ARG_ERROR(1, TF_NULL|TF_OLD_STRING, sp->type);
         /* NOTREACHED */
     }
 
@@ -12137,12 +12195,12 @@ again:
 
         /* Test the arguments */
         if (arg[0].type != T_OBJECT
-         && arg[0].type != T_STRING
+         && arg[0].type != T_OLD_STRING
          && arg[0].type != T_POINTER
            )
-            RAISE_ARG_ERROR(1, TF_OBJECT|TF_STRING|TF_POINTER, arg[0].type);
+            RAISE_ARG_ERROR(1, TF_OBJECT|TF_OLD_STRING|TF_POINTER, arg[0].type);
 
-        TYPE_TEST2(arg+1, T_STRING)
+        TYPE_TEST2(arg+1, T_OLD_STRING)
         if (arg[1].u.string[0] == ':')
             ERRORF(("Illegal function name in call_other: %s\n",
                   arg[1].u.string));
@@ -12245,7 +12303,7 @@ again:
 
                 if (svp->type == T_OBJECT)
                     ob = svp->u.ob;
-                else if (svp->type == T_STRING)
+                else if (svp->type == T_OLD_STRING)
                 {
                     ob = get_object(svp->u.string);
                     if (ob == NULL)
@@ -12341,7 +12399,11 @@ again:
          * distinguished by means of the return value.
          */
 
-        push_number(sp, (csp->extern_call & ~CS_PRETEND) ? 1 : 0);
+
+        struct control_stack * pt = csp;
+
+        while (pt->catch_call) pt--;
+        push_number(sp, (pt->extern_call & ~CS_PRETEND) ? 1 : 0);
         break;
       }
 
@@ -13245,9 +13307,9 @@ assert_master_ob_loaded (void)
             if (current_object == &dummy_current_object_for_loads)
                 current_object = master_ob;
             push_number(inter_sp, removed);
-            sapply(STR_REACTIVATE, ob, 1);
+            sapply_int(STR_REACTIVATE, ob, 1, MY_TRUE);
             push_number(inter_sp, 2 - (removed ? 1 : 0));
-            sapply(STR_INAUGURATE, ob, 1);
+            sapply_int(STR_INAUGURATE, ob, 1, MY_TRUE);
             fprintf(stderr, "%s Old master reactivated.\n", time_stamp());
             inside = MY_FALSE;
             return;
@@ -13816,7 +13878,7 @@ call_simul_efun (int code, object_t *ob, int num_arg)
             i = (long)VEC_SIZE(simul_efun_vector);
             for (v = simul_efun_vector->item+1; MY_TRUE; v++)
             {
-                if (--i <= 0 || v->type != T_STRING)
+                if (--i <= 0 || v->type != T_OLD_STRING)
                 {
                     error("Calling a vanished simul_efun\n");
                     return;
@@ -15485,7 +15547,7 @@ f_apply (svalue_t *sp, int num_arg)
 
 /* EFUN apply()
  *
- *     mixed apply(closure cl, ...)
+ *     mixed apply(mixed|closure cl, ...)
  *
  * Call the closure <cl> and pass it all the extra arguments
  * given in the call. If the last argument is an array, it
@@ -15864,8 +15926,8 @@ f_trace (svalue_t *sp)
         svalue_t *arg;
 
         assign_eval_cost();
-        push_volatile_string(sp, "traceprefix");
         inter_sp = sp;
+        push_volatile_string(inter_sp, "traceprefix");
         arg = apply_master_ob(STR_VALID_TRACE, 1);
         if (!arg)
         {
@@ -15921,8 +15983,8 @@ f_traceprefix (svalue_t *sp)
     {
         svalue_t *arg;
 
-        push_volatile_string(sp, "trace");
         inter_sp = sp;
+        push_volatile_string(inter_sp, "trace");
         assign_eval_cost();
         arg = apply_master_ob(STR_VALID_TRACE,1);
         if (!arg)
@@ -15936,7 +15998,7 @@ f_traceprefix (svalue_t *sp)
             if (arg && (arg->type != T_NUMBER || arg->u.number))
             {
                 old = ip->trace_prefix;
-                if (sp->type == T_STRING)
+                if (sp->type == T_OLD_STRING)
                 {
                     ip->trace_prefix = make_shared_string(sp->u.string);
                 }
@@ -15950,7 +16012,7 @@ f_traceprefix (svalue_t *sp)
 
     /* Return the old prefix */
     if (old)
-        put_string(sp, old);
+        put_old_string(sp, old);
     else
         put_number(sp, 0);
     return sp;

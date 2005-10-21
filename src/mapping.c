@@ -201,8 +201,6 @@
 #include "object.h"
 #include "regexp.h"
 #include "simulate.h"
-#include "smalloc.h"
-#include "stralloc.h"
 #include "svalue.h"
 #include "wiz_list.h"
 #include "xalloc.h"
@@ -268,7 +266,7 @@ mapping_t *stale_mappings;
    */
 
 static svalue_t walk_mapping_string_svalue
-  = { T_STRING };
+  = { T_OLD_STRING };
   /* Stand-in svalue for string-keys, to be passed to the callback
    * function when doing a walk_mapping().
    */
@@ -828,7 +826,7 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
     {
     /* ----- String Indexing ----- */
 
-    case T_STRING:
+    case T_OLD_STRING:
       {
         char *str;
         char *key; /* means a char **, but pointer arithmetic wants char * */
@@ -1422,7 +1420,7 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
     {
     /* ----- String Indexing ----- */
 
-    case T_STRING:
+    case T_OLD_STRING:
       {
         char *str;
         char *key; /* means a char **, but pointer arithmetic wants char * */
@@ -1540,7 +1538,7 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
     case T_SYMBOL:
     case T_QUOTED_ARRAY:
       {
-        /* map_index->type != T_STRING */
+        /* map_index->type != T_OLD_STRING */
 
         p_int offset;
         char *key; /* means a char **, but pointer arithmetic wants char * */
@@ -2647,7 +2645,7 @@ compact_mappings (mp_int num)
             {
                 next = mcp->next;
 
-                if (mcp->key.type != T_STRING)
+                if (mcp->key.type != T_OLD_STRING)
                 {
                     if (last_misc)
                     {

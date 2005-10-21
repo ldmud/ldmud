@@ -1,0 +1,50 @@
+Short: Extra wiz_info data vanishes
+Date: Mon, 4 Dec 2000 11:38:05 +0100
+From: Christian Mudra <mudra@informatik.uni-kl.de>
+Type: Bug
+State: New
+
+Hi Lars,
+
+es gibt Probleme bei get_extra_wizinfo():
+Ich habe hier bei get_extra_wizinfo() viele Listen der Art
+  0: ({ /* #2, size: 1 */
+   -500
+ }); ({ /* #3, size: 1 */
+   <local function in destructed object>
+ }),
+da wir ueber set/get_extra_wizinfo() die event-listen abspeichern,
+d.h.  get_extra_wizinfo(0)["events"] liefert
+([ "event-type":
+     ([ object : ({ liste der event-prioritaeten });
+                 ({ liste der jeweiligen callback-funktionen }),
+     ]),
+])
+
+Ein weiteres Problem ist seit 239, dass z.B. aus dem Eintrag fuer
+global/commands/comm, der so
+
+   <global/commands/comm> : ({ 0 });
+                            ({ #'global/commands/comm->receive_event });
+
+aussehen sollte, unter nicht geklaerten Umstaenden ein
+
+   <global/commands/comm> : 0;
+                            ({ #'global/commands/comm->receive_event });
+
+wird, und damit funktionieren alle communication-events nicht mehr.
+Analog fuer move-events. Mir scheint, in der einen Aenderung von
+238 zu 239 loescht Du irgendwo zuviel, und bei gespeicherten Objekt-Mappings
+zu wenig ...
+Wenn ich z.B. unser global/commands/comm destructe und neu lade, dann meldet
+es sich wieder beim event-server an, der dann ueber etc/shared in
+set_extra_wizinfo() eintraegt, dass global/commands/comm mit prio 0 auf
+alle Kommunikation hoert. Dann funktionieren die events wieder, aber nur
+eine begrenzte Zeit (und der event-server holt sich immer nur per
+get_extra_wizinfo() die Prios der Objekte, die auf einen bestimmten
+event lauschen, also er schreibts nicht selbst dortrein, ausser ein Objekt
+meldet sich an oder ab). Daher gehe ich davon aus, dass es sich hierbei
+um einen echten Treiberbug handelt.
+
+Ich werde fuer Tub jetzt erstmal wieder zu dev238 wechseln, augenblicklich
+laeuft einfach nichts mehr im Mud.

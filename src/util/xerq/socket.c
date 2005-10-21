@@ -286,7 +286,7 @@ read_socket (socket_t *sp, int rw)
             if (num <= 0)
                 break;
             replyn(sp->handle, 1, 2,
-              (sp->type==SOCKET_LISTEN) ? r_err : r_out, 1, 
+              (sp->type==SOCKET_STDERR) ? r_err : r_out, 1, 
               buf, num);
         } while(1);
         break;

@@ -38,11 +38,4 @@ extern svalue_t *f_set_modify_command(svalue_t *sp);
 extern svalue_t *f_set_this_player(svalue_t *sp);
 extern svalue_t *f_remove_action(svalue_t *sp);
 
-#ifdef F_ADD_VERB
-extern svalue_t *f_add_verb(svalue_t *sp);
-#endif
-#ifdef F_ADD_XVERB
-extern svalue_t *f_add_xverb(svalue_t *sp);
-#endif
-
 #endif /* ACTIONS_H__ */

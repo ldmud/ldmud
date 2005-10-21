@@ -75,19 +75,27 @@
 #define DID_ST_STRINGS            39
 #define DID_ST_STRING_SIZE        40
 #define DID_ST_STR_TABLE_SIZE     41
-#define DID_ST_STR_REQ            42
-#define DID_ST_STR_REQ_SIZE       43
-#define DID_ST_STR_SEARCHES       44
-#define DID_ST_STR_SEARCH_LEN     45
+#define DID_ST_STR_OVERHEAD       42
+#define DID_ST_STR_IT_OVERHEAD    43
+#define DID_ST_UNTABLED           44
+#define DID_ST_UNTABLED_SIZE      45
+#define DID_ST_ITABLED            46
+#define DID_ST_ITABLED_SIZE       47
+#define DID_ST_TABLED             48
+#define DID_ST_TABLED_SIZE        49
+#define DID_ST_STR_SEARCHES       50
+#define DID_ST_STR_SEARCHLEN      51
+#define DID_ST_STR_SEARCHES_BYVALUE   52
+#define DID_ST_STR_SEARCHLEN_BYVALUE  53
 
-#define DID_ST_RX_CACHED          46
-#define DID_ST_RX_TABLE           47
-#define DID_ST_RX_TABLE_SIZE      48
-#define DID_ST_RX_REQUESTS        49
-#define DID_ST_RX_REQ_FOUND       50
-#define DID_ST_RX_REQ_COLL        51
+#define DID_ST_RX_CACHED          54
+#define DID_ST_RX_TABLE           55
+#define DID_ST_RX_TABLE_SIZE      56
+#define DID_ST_RX_REQUESTS        57
+#define DID_ST_RX_REQ_FOUND       58
+#define DID_ST_RX_REQ_COLL        59
 
-#define DID_STATUS_MAX            52 /* Total number of entries */
+#define DID_STATUS_MAX            60 /* Total number of entries */
 
 
 /* Indices into the array resulting from debug_info(DINFO_DATA, DID_SWAP)

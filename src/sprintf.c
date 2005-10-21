@@ -60,7 +60,6 @@
 #include <setjmp.h>
 #include <sys/types.h>
 
-#define NO_REF_STRING
 #include "sprintf.h"
 
 #include "actions.h"
@@ -78,7 +77,6 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
-#include "stralloc.h"
 #include "swap.h"
 #include "xalloc.h"
 
@@ -561,7 +559,7 @@ svalue_to_string ( fmt_state_t *st
         break;
       }
 
-    case T_STRING:
+    case T_OLD_STRING:
         stradd(st, &str, "\"");
         stradd(st, &str, obj->u.string);
         stradd(st, &str, "\"");
@@ -668,7 +666,7 @@ svalue_to_string ( fmt_state_t *st
         stradd(st, &str, obj->u.ob->name);
         push_ref_object(inter_sp, obj->u.ob, "sprintf");
         temp = apply_master_ob(STR_PRINTF_OBJ_NAME, 1);
-        if (temp && (temp->type == T_STRING)) {
+        if (temp && (temp->type == T_OLD_STRING)) {
             stradd(st, &str, " (\"");
             stradd(st, &str, temp->u.string);
             stradd(st, &str, "\")");
@@ -1658,7 +1656,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                   {
                     int slen;
 
-                    if (carg->type != T_STRING)
+                    if (carg->type != T_OLD_STRING)
                         ERROR1(ERR_INCORRECT_ARG, 's');
                     slen = strlen(carg->u.string);
 

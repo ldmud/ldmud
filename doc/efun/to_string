@@ -10,10 +10,10 @@ DESCRIPTION
 	Converts closures into an appropriate name (this has mostly
         debugging purposes).
 
-        CAVEAT: Arrays are considered exploded strings, ie. arrays of
-        char codes, and are 'imploded' up to the first 0 or the first
-        non-number entry, whatever comes first. That means that
-        to_string( ({ 33, 34 }) ) will return "12" and not "({ 33, 34 })".
+        CAVEAT: Arrays are considered exploded strings, ie. arrays of char
+        codes, and are 'imploded' up to the first non-number entry, whatever
+        comes first. That means that to_string( ({ 33, 34 }) ) will return
+        "12" and not "({ 33, 34 })".
 
 HISTORY
         LDMud 3.2.8 adds lambda closures to the accepted data types.

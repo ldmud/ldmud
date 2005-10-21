@@ -3,7 +3,6 @@ SYNOPSIS
 
 	void add_action(string fun, string cmd)
 	void add_action(string fun, string cmd, int flag)
-	void add_action(string fun)	/* historical */
 
 DESCRIPTION
 	Set up a local function fun to be called when user input
@@ -97,6 +96,7 @@ EXAMPLES
 HISTORY
 	The flag < 0 argument was supported since 3.2@127, but not
         really implemented before LDMud 3.2.8.
+    LDMud 3.3 removed the historical add_action(fun) notation.
 
 SEE ALSO
-	query_verb(E), query_command(E), add_verb(E), add_xverb(E), init(A)
+	query_verb(E), query_command(E), init(A)

@@ -32,9 +32,6 @@
  *        A special case of 'action_t' sentence which is used to
  *        control the search for a command.
  *
- *    SENT_NO_VERB
- *        TODO: This can go with add_(x)verb() gone.
- *
  *    SENT_SHADOW:
  *        The sentence is of type 'shadow_sentence' and describes
  *        an object shadow. It also holds the ed_buffer_t* for
@@ -50,7 +47,6 @@ enum sent_type_e {
     SENT_PLAIN = 0   /* Normal action */
  ,  SENT_SHORT_VERB  /* Action with abbreviatable verb */
  ,  SENT_NO_SPACE    /* Action with embedded verb */
- ,  SENT_NO_VERB     /* Action with no verb given */
  ,  SENT_MARKER      /* Internal: marker for a command search */
  ,  SENT_SHADOW      /* Internal: shadow data */
 };
@@ -81,7 +77,7 @@ struct sentence_s
 struct action_s
 {
     sentence_t sent;  /* The basic sentence */
-    char *verb;
+    string_t *verb;
       /* Shared string: the defined verb.
        * For SENT_PLAIN and SENT_SHORT_VERB, this is the whole verb.
        * For SENT_NO_SPACE, only the first letters of the command have
@@ -91,11 +87,10 @@ struct action_s
       /* Object defining this sentence. This value is used for comparisons
        * only, and in case of SENT_MARKER it is in fact a *rt_context_t.
        */
-    char *function;             /* the name of the action function */
+    string_t *function;             /* the name of the action function */
     unsigned short short_verb;
       /* SENT_SHORT_VERB: the number of characters which have to
        *   match at minimum.
-       * SENT_NO_VERB: number of times this sentence was encountered.
        */
 };
 

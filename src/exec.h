@@ -43,19 +43,20 @@
  *       Through inheritance and cross-definition these functions can
  *       be resolved on a higher level.
  *
- *   char *strings[]: An array of pointers to the string literals (stored
+ *   string_t *strings[]: An array of pointers to the string literals (stored
  *       as shared strings) used by the program. This way the program can
  *       use the strings simply by an (easily swappable) index. The compiler
  *       makes sure that each string is unique.
  *
  *       The last strings are the names of all files included by the programs
- *       source file, stored in reverse order of their appearance (multiply
+ *       source file, stored in reverse order of their appearance (multiple
  *       included files appear several times).
  *
  *       When a program is swapped, the reference counts to these strings are
  *       not removed so that the string literals stay in memory all the time.
  *       This saves time on swap-in, and the string sharing saves more memory
  *       than swapping might gain.
+ * TODO: Does it?
  *
  *   struct variable_s variable_names[]: an array describing all variables
  *       with type and name, inherited or own.
@@ -506,16 +507,16 @@ typedef fulltype_t funflag_t;  /* Function flags */
  * and information about arguments and types:
  *
  * struct fun_hdr {
- *     shared char * name_of_function; (4 Bytes)
- *     byte          return_type;        (1 Byte)
- * --> byte          number_formal_args; (1 Byte)
+ *     shared string_t * name_of_function; (4 Bytes)
+ *     byte              return_type;        (1 Byte)
+ * --> byte              number_formal_args; (1 Byte)
  *         Bit 7: set if the function has a 'varargs' argument
  * TODO: some code makes use of the fact that this makes the number negative
  *         Bit 6..0: the number of arguments
- *     byte          number_local_vars;  (1 Byte)
+ *     byte              number_local_vars;  (1 Byte)
  *         This includes the svalues needed for the break stack for
  *         switch() statements.
- *     bytecode_t    opcode[...]
+ *     bytecode_t        opcode[...]
  * }
  *
  * The function address given in the program's function block points to
@@ -549,14 +550,14 @@ typedef bytecode_p fun_hdr_p;
    */
 
 
-#define FUNCTION_NAMEP(p)     ((void*)((char *)p - sizeof(char) - sizeof(char *)))
+#define FUNCTION_NAMEP(p)     ((void *)((char *)p - sizeof(char) - sizeof(string_t *)))
 #define FUNCTION_TYPE(p)      (*((unsigned char *)((char *)p - sizeof(char))))
 #define FUNCTION_NUM_ARGS(p)  EXTRACT_SCHAR((char *)p)
 #define FUNCTION_NUM_VARS(p)  (*((unsigned char *)((char *)p + sizeof(char))))
 #define FUNCTION_CODE(p)      ((bytecode_p)((unsigned char *)p + 2* sizeof(char)))
 #define FUNCTION_FROM_CODE(p) ((fun_hdr_p)((unsigned char *)p - 2* sizeof(char)))
 
-#define FUNCTION_HDR_SIZE     (sizeof(char*) + 3)
+#define FUNCTION_HDR_SIZE     (sizeof(string_t*) + 3)
 
 
 /* --- struct variable_s: description of one variable
@@ -567,7 +568,7 @@ typedef bytecode_p fun_hdr_p;
 
 struct variable_s
 {
-    char       *name;   /* Name of the variable (shared string) */
+    string_t   *name;   /* Name of the variable (shared string) */
     fulltype_t  flags;
       /* Flags and type of the variable.
        * If a variable is inherited virtually, the function flag
@@ -627,9 +628,9 @@ struct program_s
     p_int           extra_ref;     /* Used to verify ref count */
 #endif
     bytecode_p      program;       /* The binary instructions */
-    char           *name;
-      /* Name of file that defined prog (allocated, no leading '/',
-       * but a trailing '.c')
+    string_t       *name;
+      /* Name of file that defined prog (untabled, no leading '/',
+       * but a trailing '.c', no embedded '\0')
        */
     int32           id_number;
       /* The id-number is unique among all programs and used to store
@@ -660,7 +661,7 @@ struct program_s
        * TODO: Instead of hiding the function information in the bytecode
        * TODO:: it should be tabled here.
        */
-    char **strings;
+    string_t **strings;
       /* Array [.num_strings] of the shared strings used by the program.
        * Stored in reverse order at the end of the array the pointers
        * to the names of all included files, used when retrieving line
@@ -740,7 +741,7 @@ struct program_s
 
 struct function_s
 {
-    char *name;  /* Name of function (shared string) */
+    string_t *name;  /* Name of function (shared string) */
     union {
         uint32 pc;       /* lfuns: Address of function header */
         uint32 inherit;  /* Inherit table index from where inherited. */

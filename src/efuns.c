@@ -11,7 +11,6 @@
  *    TODO: Move into strfuns.c, rename the old strfuns to strutil.
  *    efun: capitalize()
  *    efun: crypt()
- *    efun: extract() (optional)
  *    efun: make_shared_string()
  *    efun: regexp()
  *    efun: regexplode()
@@ -77,7 +76,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define USES_SVALUE_STRLEN
 #include "efuns.h"
 
 #include "actions.h"
@@ -92,15 +90,15 @@
 #include "interpret.h"
 #include "main.h"
 #include "mapping.h"
+#include "mstrings.h"
 #include "object.h"
 #include "otable.h"
 #include "ptrtable.h"
 #include "random.h"
 #include "rxcache.h"
-#include "simulate.h"
-#include "smalloc.h"
 #include "stdstrings.h"
-#include "stralloc.h"
+#include "simulate.h"
+#include "smalloc.h" /* smalloc_dinfo_data() */
 #include "strfuns.h"
 #include "swap.h"
 #include "svalue.h"
@@ -140,22 +138,10 @@ f_capitalize(svalue_t *sp)
  */
 
 {
-    if (islower((unsigned char)(sp->u.string[0])))
+    if (islower((unsigned char)(get_txt(sp->u.str)[0])))
     {
-        char *str;
-
-        /* Change malloc'ed strings in place, for others
-         * make a copy.
-         */
-        if (STRING_MALLOC == sp->x.string_type)
-            sp->u.string[0] += 'A' - 'a';
-        else
-        {
-            str = string_copy(sp->u.string);
-            str[0] += 'A' - 'a';
-            free_svalue(sp);
-            put_malloced_string(sp, str);
-        }
+        memsafe(sp->u.str = dup_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
+        get_txt(sp->u.str)[0] += 'A' - 'a';
     }
     return sp;
 } /* f_capitalize() */
@@ -183,9 +169,9 @@ f_crypt(svalue_t *sp)
     static char choise[] =
         "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./";
 
-    if (sp->type == T_STRING && svalue_strlen(sp) >= 2)
+    if (sp->type == T_STRING && mstrsize(sp->u.str) >= 2)
     {
-        salt = sp->u.string;
+        salt = get_txt(sp->u.str);
     }
     else if (sp->type == T_NUMBER)
     {
@@ -197,9 +183,9 @@ f_crypt(svalue_t *sp)
     else /* it can't be anything but a too short string */
         error("Bad argument 2 to crypt(): string too short.\n");
 
-    res = string_copy(crypt((sp-1)->u.string, salt));
+    res = crypt(get_txt((sp-1)->u.str), salt);
     sp = pop_n_elems(2, sp);
-    push_malloced_string(sp, res);
+    push_c_string(sp, res);
 
     return sp;
 } /* f_crypt() */
@@ -219,7 +205,7 @@ f_explode (svalue_t * sp)
 {
     vector_t *v;
 
-    v = explode_string((sp-1)->u.string, sp->u.string);
+    v = explode_string((sp-1)->u.str, sp->u.str);
     free_string_svalue(sp);
     sp--;
     free_string_svalue(sp);
@@ -227,113 +213,6 @@ f_explode (svalue_t * sp)
 
     return sp;
 } /* f_explode() */
-
-/*-------------------------------------------------------------------------*/
-#ifdef F_EXTRACT
-
-svalue_t *
-f_extract (svalue_t *sp, int num_arg)
-
-/* EFUN extract()
- *
- *   string  extract(string str, int from, int to)
- *   string  extract(string str, int from)
- *   string  extract(string str)
- *   mixed * extract(mixed * arr, int from, int to)
- *   mixed * extract(mixed * arr, int from)
- *   mixed * extract(mixed * arr)
- *
- * Extract a substring from a string, resp. a subarray
- * from an array.
- *
- * This is the old notation for str[from..to] and supported
- * only for hysterical raisins. The distinctive point is that
- * negative values for from and to implement the from-the-end
- * indexing.
- */
-
-{
-    svalue_t * argp;
-    mp_int from, to;
-
-    argp = sp - num_arg + 1;
-
-    if (num_arg == 1)
-    {
-        return argp;
-    }
-
-    from = argp[1].u.number;
-
-    to = 0;
-    if (num_arg > 2)
-    {
-        to = argp[2].u.number;
-    }
-    else
-    {
-        if (argp->type == T_POINTER)
-            to = (signed)VEC_SIZE(argp->u.vec)-1;
-        if (argp->type == T_STRING)
-            to = (signed)_svalue_strlen(argp)-1;
-    }
-
-    if (argp->type == T_POINTER)
-    {
-        /* Extract from an array */
-
-        vector_t *v;
-        mp_int size;
-
-        v = argp->u.vec;
-        size = (signed)VEC_SIZE(v);
-        v = slice_array(v, from, to >= size ? size - 1 : to );
-        sp = pop_n_elems(num_arg, sp) + 1;
-        if (v)
-            put_ref_array(sp, v);
-        else
-            put_number(sp, 0);
-    }
-    else /* it's a string */
-    {
-        /* Extract from a string */
-
-        long len;
-        char *res;
-
-        len = (signed)_svalue_strlen(argp);
-        if (from < 0) {
-            from = len + from;
-            if (from < 0)
-                from = 0;
-        }
-        if (to < 0)
-            to = len + to;
-        if (to >= len)
-            to = len-1;
-        if (to < from) {
-            sp = pop_n_elems(num_arg, sp) + 1;
-            put_volatile_string(sp, "");
-        }
-        else if (to == len-1) {
-            res = string_copy(sp[-2].u.string + from);
-            sp = pop_n_elems(num_arg, sp) + 1;
-            put_malloced_string(sp, res);
-        }
-        else
-        {
-            res = xalloc((unsigned)(to - from + 2));
-            strncpy(res, sp[-2].u.string + from, (unsigned)(to - from + 1));
-            res[to - from + 1] = '\0';
-            sp = pop_n_elems(num_arg, sp) + 1;
-            put_malloced_string(sp, res);
-        }
-    }
-
-    return sp;
-} /* f_extract() */
-
-#endif /* F_EXTRACT */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -348,18 +227,18 @@ f_implode (svalue_t * sp)
  */
 
 {
-    char *str;
+    string_t *str;
 
-    str = implode_string((sp-1)->u.vec, sp->u.string);
+    str = implode_string((sp-1)->u.vec, sp->u.str);
     if (!str)
-        error("Out of memory\n");
+        error("Out of memory for implode() result.\n");
 
     free_string_svalue(sp);
     sp--;
     free_array(sp->u.vec);
 
     if (str)
-        put_malloced_string(sp, str);
+        put_string(sp, str);
     else
         put_number(sp, 0);
     return sp;
@@ -378,45 +257,26 @@ f_lower_case (svalue_t *sp)
  */
 
 {
-    char *str, *s, *d, c;
-    ptrdiff_t initial_len;
+    char *s, c;
+    size_t count, len;
 
-    /* Set s to the first uppercase character and store it in c */
-    for ( s = sp->u.string
-        ; '\0' != (c = *s) && !isupper((unsigned char)c)
-        ; s++) NOOP;
+    /* Find the first uppercase character */
+    len = mstrsize(sp->u.str);
+    for ( s = get_txt(sp->u.str), count = 0
+        ; count < len && ('\0' == (c = *s) || !isupper((unsigned char)c))
+        ; s++, count++) NOOP;
 
-    if (c)
+    if (count < len)
     {
         /* Yes, there is something to change... */
 
-        if (STRING_MALLOC == sp->x.string_type)
-        {
-            /* Scan the rest of the string and lower it */
-            for ( ; '\0' != (c = *s); s++)
-                if (isupper((unsigned char)c))
-                    *s = (char)tolower(c);
-        }
-        else
-        {
-            /* We need to make a copy of the shared string.
-             * so fold the copying with the case changing.
-             */
+        memsafe(sp->u.str = dup_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
 
-            initial_len = s - sp->u.string;
-            str = xalloc(svalue_strlen(sp)+1);
-            if (initial_len)
-                memcpy(str, sp->u.string, (size_t)initial_len);
-            for(d = str + initial_len; '\0' != (c = *s++) ; )
-            {
-                if (isupper((unsigned char)c))
-                    c = (char)tolower(c);
-                *d++ = c;
-
-            }
-            *d = '\0';
-            free_string_svalue(sp);
-            put_malloced_string(sp, str);
+        for ( s = get_txt(sp->u.str)+count; count < len; s++, count++)
+        {
+            c = *s;
+            if (c != '\0' && isupper((unsigned char)c))
+                *s = (char)tolower(c);
         }
     }
 
@@ -434,21 +294,10 @@ f_make_shared_string (svalue_t *sp)
  * If the passed string <s> is not shared, the efun enters it into
  * the shared string table and returns the shared version. Else the
  * passed string is returned.
- *
- * TODO: Improve the string handling of the driver so that this efun
- * TODO:: becomes unnecessary.
  */
 
 {
-    if (sp->x.string_type != STRING_SHARED)
-    {
-        char *s = make_shared_string(sp->u.string);
-
-        if (sp->x.string_type == STRING_MALLOC)
-            xfree(sp->u.string);
-        sp->u.string = s;
-        sp->x.string_type = STRING_SHARED;
-    }
+    memsafe(sp->u.str = make_tabled(sp->u.str), mstrsize(sp->u.str), "result string");
 
     return sp;
 } /* f_make_shared_string() */
@@ -472,11 +321,11 @@ f_regexp (svalue_t *sp)
     CBool *res;                /* res[i] true -> v[i] matches */
     mp_int num_match, v_size;  /* Number of matches, size of <v> */
     vector_t *ret;             /* The result vector */
-    char * pattern;            /* The pattern passed in */
+    string_t * pattern;        /* The pattern passed in */
     mp_int i;
 
     v = (sp-1)->u.vec;
-    pattern = sp->u.string;
+    pattern = sp->u.str;
     ret = NULL;
 
     do {
@@ -507,7 +356,7 @@ f_regexp (svalue_t *sp)
         }
 
         for (num_match = i = 0; i < v_size; i++) {
-            char *line;
+            string_t *line;
 
             res[i] = MY_FALSE;
 
@@ -515,8 +364,8 @@ f_regexp (svalue_t *sp)
                 continue;
 
             eval_cost++;
-            line = v->item[i].u.string;
-            if (regexec(reg, line, line) == 0)
+            line = v->item[i].u.str;
+            if (regexec(reg, get_txt(line), get_txt(line)) == 0)
                 continue;
 
             res[i] = MY_TRUE;
@@ -568,8 +417,9 @@ f_regexplode (svalue_t *sp)
         struct regexplode_match *next;  /* Next list element */
     };
 
-    char *text;                        /* Input text from the vm stack */
-    char *pattern;                     /* Delimiter pattern from the vm stack */
+    char     *text;                    /* Input text from the vm stack */
+    string_t *textstr;                 /* ditto, as string_t */
+    string_t *pattern;                 /* Delimiter pattern from the vm stack */
     struct regexp *reg;                /* Compiled pattern */
     struct regexplode_match *matches;  /* List of matches */
     struct regexplode_match **matchp;  /* Pointer to previous_match.next */
@@ -581,8 +431,9 @@ f_regexplode (svalue_t *sp)
 
     /* Get the efun arguments */
 
-    text = sp[-1].u.string;
-    pattern = sp->u.string;
+    textstr = sp[-1].u.str;
+    text = get_txt(textstr);
+    pattern = sp->u.str;
 
     reg = REGCOMP(pattern, 0, MY_FALSE);
     if (reg == 0) {
@@ -634,28 +485,32 @@ f_regexplode (svalue_t *sp)
     svp = ret->item;
     for (match = matches; match; match = match->next) {
         mp_int len;
+        string_t *txt;
 
         /* Copy the text leading up to the current delimiter match. */
         len = match->start - text;
-        xallocate(str, (size_t)len + 1, "text before delimiter");
-        strncpy(str, text, (size_t)len);
-        str[len] = 0;
+        memsafe(txt = new_n_mstring(text, (size_t)len), (size_t)len, "text before delimiter");
         text += len;
-        put_malloced_string(svp, str);
+        put_string(svp, txt);
         svp++;
 
         /* Copy the matched delimiter */
         len = match->end - text;
-        xallocate(str, (size_t)len + 1, "matched delimiter");
-        strncpy(str, text, (size_t)len);
-        str[len] = 0;
+        memsafe(txt = new_n_mstring(text, (size_t)len), (size_t)len, "matched delimiter");
         text += len;
-        put_malloced_string(svp, str);
+        put_string(svp, txt);
         svp++;
     }
 
     /* Copy the remaining text (maybe the empty string) */
-    put_malloced_string(svp, string_copy(text));
+    {
+        mp_int len;
+        string_t *txt;
+
+        len = (mp_int)mstrsize(textstr) - (text - get_txt(textstr));
+        memsafe(txt = new_n_mstring(text, (size_t)len), (size_t)len, "remaining text");
+        put_string(svp, txt);
+    }
 
     /* Cleanup */
     REGFREE(reg);
@@ -709,10 +564,10 @@ f_regreplace (svalue_t *sp)
 
     /* Extract the arguments */
     flags = sp->u.number;
-    sub = sp[-1].u.string;
-    start = curr = sp[-3].u.string;
+    sub = get_txt(sp[-1].u.str);
+    start = curr = get_txt(sp[-3].u.str);
 
-    space = (long)(origspace = (strlen(start)+1)*2);
+    space = (long)(origspace = mstrsize(sp[-3].u.str)*2);
 
 /* reallocate on the fly */
 #define XREALLOC \
@@ -738,7 +593,7 @@ f_regreplace (svalue_t *sp)
 
     xallocate(buf, (size_t)space, "buffer");
     new = buf;
-    pat = REGCOMP(sp[-2].u.string,(flags & F_EXCOMPAT) ? 1 : 0, MY_FALSE);
+    pat = REGCOMP(sp[-2].u.str,(flags & F_EXCOMPAT) ? 1 : 0, MY_FALSE);
     /* regcomp returns NULL on bad regular expressions. */
 
     if (pat && regexec(pat,curr,start)) {
@@ -822,7 +677,7 @@ f_regreplace (svalue_t *sp)
     free_svalue(sp);
     sp--;
     free_svalue(sp);
-    put_malloced_string(sp, string_copy(buf));
+    put_c_string(sp, buf);
     xfree(buf);
     return sp;
 
@@ -835,7 +690,7 @@ f_regreplace (svalue_t *sp)
 svalue_t *
 f_strstr (svalue_t *sp)
 
-/* XEFUN strstr()
+/* EFUN strstr()
  *
  *   int strstr (string str, string str2, int pos)
  *
@@ -847,44 +702,29 @@ f_strstr (svalue_t *sp)
  */
 
 {
-    char *p1, *p2;
-    int offs;
+    char *found;
+    string_t *base, *pattern;
+    p_int start;
 
-    p1 = sp[-2].u.string;
-    if ( 0 != (offs = sp->u.number) )
+    base = sp[-2].u.str;
+    pattern = sp[-1].u.str;
+
+    if ( 0 != (start = sp->u.number) )
     {
-        /* Set p1 to the offset */
-
-        if (offs < 0)
+        if (start < 0)
         {
-            offs += svalue_strlen(sp-2);
-            if (offs < 0)
-                offs = 0;
-        }
-
-        /* The loop is necessary because the allocated
-         * length might not be the real length.
-         * TODO: Lars sighs deeply.
-         */
-        if (offs)
-        {
-            do {
-                if (!*p1++)
-                {
-                    p1--;
-                    break;
-                }
-            } while (--offs);
+            start += mstrsize(base);
+            if (start < 0)
+                start = 0;
         }
     }
 
-    /* Now do the search starting at p1 */
-    p2 = strstr(p1, sp[-1].u.string);
-    p1 = sp[-2].u.string;
+    found = mstring_mstr_n_str(base, start, get_txt(pattern), mstrsize(pattern));
+
     sp--;
     free_svalue(sp--);
     free_string_svalue(sp);
-    put_number(sp, p2 ? (p2 - p1) : -1);
+    put_number(sp, found ? (found - get_txt(base)) : -1);
 
     return sp;
 } /* f_strstr() */
@@ -911,6 +751,8 @@ f_trim (svalue_t *sp, int num_arg)
 
 {
     svalue_t * argp;
+    string_t *strarg;    /* The string argument */
+    size_t    strarg_l;  /* Length of *strarg */
     char *str, *end;     /* Pointer to string begin and end */
     char *left, *right;  /* Pointer to the strings left and right end */
     char def_ch[3]       /* Buffer for single characters to strip */
@@ -922,7 +764,9 @@ f_trim (svalue_t *sp, int num_arg)
     /* Get and test the arguments */
     argp = sp - num_arg + 1;
 
-    str = argp->u.string;
+    strarg = argp->u.str;
+    str = get_txt(strarg);
+    strarg_l = mstrsize(strarg);
 
     if (num_arg > 1)
     {
@@ -949,8 +793,8 @@ f_trim (svalue_t *sp, int num_arg)
         }
         else /* it's a string */
         {
-            strip = argp[2].u.string;
-            strip_l = svalue_strlen(argp+2);
+            strip = get_txt(argp[2].u.str);
+            strip_l = mstrsize(argp[2].u.str);
         }
     }
     else
@@ -960,19 +804,21 @@ f_trim (svalue_t *sp, int num_arg)
     }
 
     /* Get the string limits */
-    end = str + strlen(str);
+    end = str + strarg_l;
     if (where & TRIM_LEFT)
     {
-        for (left = str
-            ; *left != '\0' && strchr(strip, *left) != NULL
+        for ( left = str
+            ; left < str+strarg_l && memchr(strip, *left, strip_l) != NULL
             ; left++
             ) NOOP;
     }
     else
         left = str;
+
     if (where & TRIM_RIGHT && end != left)
     {
-        for (right = end; right != left && NULL != strchr(strip, right[-1])
+        for (right = end
+            ; right != left && NULL != memchr(strip, right[-1], strip_l)
             ; right--) NOOP;
     }
     else
@@ -983,15 +829,13 @@ f_trim (svalue_t *sp, int num_arg)
      */
     if (left != str || right != end)
     {
-        char * trimmed;
+        string_t * trimmed;
         size_t newlen;
 
         newlen = (size_t)(right - left);
-        xallocate(trimmed, newlen+1, "trimmed result");
-        memcpy(trimmed, left, newlen);
-        trimmed[newlen] = '\0';
+        memsafe(trimmed = new_n_mstring(left, newlen), newlen, "trimmed result");
         free_string_svalue(argp);
-        put_malloced_string(argp, trimmed);
+        put_string(argp, trimmed);
     }
 
     /* argp+2 might need to be freed, but argp+1 is always just a number.
@@ -1016,45 +860,25 @@ f_upper_case (svalue_t *sp)
  */
 
 {
-    char *str, *s, *d, c;
-    ptrdiff_t initial_len;
+    char *s, c;
+    size_t count, len;
 
     /* Find the first non-uppercase character in the string */
-    for (s = sp->u.string; '\0' != (c = *s) && !islower((unsigned char)c); s++)
+    len = mstrsize(sp->u.str);
+    for (s = get_txt(sp->u.str), count = 0
+        ; count < len && ('\0' == (c = *s) || !islower((unsigned char)c))
+        ; s++, count++)
         NOOP;
 
-    if ('\0' != *s)  /* there are lowercase characters */
+    if (count < len)  /* there are lowercase characters */
     {
-        if (STRING_MALLOC == sp->x.string_type)
+        memsafe(sp->u.str = dup_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
+        for (s = get_txt(sp->u.str)+count; count < len; s++, count++)
         {
-            /* MALLOCed strings can be changed in-place */
-            for ( ; '\0' != (c = *s); s++)
-            {
-                if (islower((unsigned)c))
-                    *s = (char)toupper(c);
-            }
-        }
-        else
-        {
-            /* Other strings must be duplicated and then changed */
-            xallocate(str, svalue_strlen(sp)+1, "uppercase result");
+            c = *s;
 
-            initial_len = s - sp->u.string;
-            /* Copy the initial part */
-            if (initial_len)
-                memcpy(str, sp->u.string, (size_t)initial_len);
-
-            /* Copy and change the rest */
-            for (d = str + initial_len; '\0' != (c = *s++) ; )
-            {
-                if (islower((unsigned)c))
-                    c = (char)toupper(c);
-                *d++ = c;
-            }
-
-            *d = '\0';
-            free_string_svalue(sp);
-            put_malloced_string(sp, str);
+            if ('\0' != c && islower((unsigned char)c))
+                *s = (char)toupper(c);
         }
     }
 
@@ -1064,7 +888,7 @@ f_upper_case (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-at_end (int i, int imax, int z, int *lens)
+at_end (int i, int imax, int z, p_int *lens)
 
 /* Auxilary function for e_terminal_colour().
  *
@@ -1086,8 +910,8 @@ at_end (int i, int imax, int z, int *lens)
 }
 
 /*-------------------------------------------------------------------------*/
-static char *
-e_terminal_colour ( char * text, mapping_t * map
+static string_t *
+e_terminal_colour ( string_t * text, mapping_t * map
                   , int indent, int wrap
                   )
 
@@ -1117,17 +941,18 @@ e_terminal_colour ( char * text, mapping_t * map
    */
 
     char *cp;              /* Workpointer */
-    char *savestr = NULL;  /* Allocated auxiliary string */
+    string_t *savestr = NULL;  /* Allocated auxiliary string */
     char *instr;
-      /* The input string. This may be <text> itself, or a working copy. */
-    char *deststr;         /* Result string */
+      /* The input string. This may be get_txt(<text>) itself, or a working
+       * copy. */
+    string_t *deststr;         /* Result string */
     char **parts;
       /* The <num> delimited parts from <instr>. This are mostly
        * pointers into *<instr>, but can also be (uncounted) pointers to
        * the string data in <map>.
        */
     int num;               /* Number of delimited parts in <instr> */
-    int *lens;
+    p_int *lens = NULL;
       /* Length of the <num> parts. This value is negative for strings
        * 'retrieved' from the <map>ping when wrapping is required. This
        * is necessary to determine which parts[] to exempt from the
@@ -1143,7 +968,7 @@ e_terminal_colour ( char * text, mapping_t * map
     Bool maybe_at_end;     /* TRUE if the next text might start a new line */
     Bool no_keys;          /* TRUE if no delimiter in the string */
 
-    instr = text;
+    instr = get_txt(text);
 
     /* Find the first occurance of the magic character pair.
      * If found, duplicate the input string into instr and
@@ -1153,16 +978,17 @@ e_terminal_colour ( char * text, mapping_t * map
 
     if (map != NULL)
     {
-        cp = text;
+        cp = instr;
         do {
-            cp = strchr(cp, TC_FIRST_CHAR);
+            cp = memchr(cp, TC_FIRST_CHAR, mstrsize(text));
             if (cp)
             {
                 if (cp[1] == TC_SECOND_CHAR)
                 {
-                    savestr = string_copy(text);
-                    cp = savestr + (cp - text);
-                    instr = savestr;
+                    memsafe(savestr = dup_mstring(text), mstrsize(text)
+                           , "working string");
+                    cp = get_txt(savestr) + (cp - instr);
+                    instr = get_txt(savestr);
                     break;
                 }
                 cp++;
@@ -1187,6 +1013,8 @@ e_terminal_colour ( char * text, mapping_t * map
             num = 1;
             parts = CALLOCATE(1, char *);
             parts[0] = instr;
+            lens = CALLOCATE(1, p_int);
+            lens[0] = mstrsize(text);
             savestr = NULL;  /* should be NULL anyway */
             no_keys = MY_TRUE;
         }
@@ -1194,7 +1022,7 @@ e_terminal_colour ( char * text, mapping_t * map
         {
             /* no delimiter in string and no wrapping, so return the original.
              */
-            return text;
+            return ref_mstring(text);
         }
     }
     else
@@ -1205,6 +1033,8 @@ e_terminal_colour ( char * text, mapping_t * map
          * This means modifying the *<instr>, but it is already
          * a copy.
          */
+
+        p_int left;
 
         /* cp here points to the first delimiter found */
 
@@ -1218,29 +1048,42 @@ e_terminal_colour ( char * text, mapping_t * map
             return NULL;
         }
 
+        lens = CALLOCATE(NSTRSEGS, p_int);
+        if (!lens)
+        {
+            xfree(parts);
+            error("(terminal_colour) Out of memory (%lu bytes) "
+                  "for %d parts.\n"
+                 , (unsigned long) NSTRSEGS * sizeof(p_int), NSTRSEGS);
+            /* NOTREACHED */
+            return NULL;
+        }
+
         /* The string by definition starts with a non-keyword,
          * which might be empty.
          * Initialize our variables accordingly.
          */
         num = 1;
         parts[0] = instr;
-        *cp = '\0';
+        lens[0] = cp - instr;
+        left = mstrsize(text) - lens[0];
 
         /* Search and find the other delimited segments.
          * Loop variant: cp points to the last delimiter found,
-         * its first character replaced by \0, or cp points to NULL (exit
-         * condition)
+         * or cp is NULL (exit condition)
          * Loop invariant: instr points to the begin of the last delimited
-         * segment.
+         * segment, left is the number of characters left in the string.
          */
         while (cp)
         {
             /* Skip the delimiter found last and search the next */
             cp += 2;
             instr = cp;
+            left -= 2;
+
             do
             {
-                cp = strchr(cp,TC_FIRST_CHAR);
+                cp = memchr(cp, TC_FIRST_CHAR, left);
                 if (cp) {
                     if (cp[1] == TC_SECOND_CHAR)
                         break;
@@ -1252,24 +1095,26 @@ e_terminal_colour ( char * text, mapping_t * map
             {
                 /* Another delimiter found: put it into the parts array.
                  */
-                *cp = '\0';
                 parts[num] = instr;
+                lens[num] = cp - instr;
+                left -= lens[num];
                 num++;
                 if (num % NSTRSEGS == 0)
+                {
                     parts = RESIZE(parts, num + NSTRSEGS, char * );
+                    lens = RESIZE(lens, num + NSTRSEGS, p_int );
+                }
             }
         }
 
         /* Trailing part, or maybe just a delimiter */
         if (*instr)
-            parts[num++] = instr;
+        {
+            parts[num] = instr;
+            lens[num] = left;
+            num++;
+        }
     } /* if (delimiter found or not) */
-
-    /* Prepare the lens[] array */
-    if ( num )
-        lens = CALLOCATE(num, int);
-    else
-        lens = NULL;
 
     /* Do the the keyword replacement and calculate the lengths.
      * The lengths are collected in the lens[] array to save the
@@ -1283,8 +1128,7 @@ e_terminal_colour ( char * text, mapping_t * map
     j_extra = 0; /* gathers the extra length needed during fmt'ing */
     for (i = 0; i < num; i++)
     {
-        long len;
-        char * str;
+        string_t * str;
         svalue_t * mdata;
 
         /* If parts[i] is a valid colour key, there must exist a shared
@@ -1296,10 +1140,10 @@ e_terminal_colour ( char * text, mapping_t * map
         mdata = NULL;
         if (i % 2 && !no_keys)
         {
-            if (parts[i][0] == '\0') /* Empty key - already handled */
+            if (lens[i] == 0) /* Empty key - already handled */
                 str = NULL;
             else
-                str = findstring(parts[i]);
+                str = find_tabled_str_n(parts[i], lens[i]);
             if (str != NULL)
             {
                 svalue_t mkey;
@@ -1316,13 +1160,13 @@ e_terminal_colour ( char * text, mapping_t * map
             }
         }
         else if (!(i % 2) && !no_keys
-              && i < num -1 && parts[i+1][0] == '\0')
+              && i < num -1 && lens[i+1] == 0)
         {
             /* Special case: the following colour key is the empty "%^%^".
              * We interpret it as literal "%^" and add it to this part.
-             * Both part[i] and part[i+1] will end with the same '\0'.
+             * Both part[i] and part[i+1] will end with the same char.
              */
-            parts[i+1][-2] = TC_FIRST_CHAR;
+            lens[i] += 2;
         }
 
         /* If mdata found a string, use it instead of the old parts[i].
@@ -1330,19 +1174,18 @@ e_terminal_colour ( char * text, mapping_t * map
          */
         if ( mdata && mdata->type == T_STRING )
         {
-            parts[i] = mdata->u.string;
-            len = (long)svalue_strlen( mdata );
+            parts[i] = get_txt(mdata->u.str);
+            lens[i] = (p_int)mstrsize(mdata->u.str);
             if (wrap)
-                len = -len;
+                lens[i] = -lens[i];
         }
-        else
-            len = (long)strlen(parts[i]);
 
-        lens[i] = len;
-        if (len > 0)
+        if (lens[i] > 0)
         {
             /* This part must be considered for wrapping/indentation */
+            p_int len;
 
+            len = lens[i];
             if (maybe_at_end)
             {
                 /* This part may start a new line, so count in the indent */
@@ -1470,7 +1313,7 @@ e_terminal_colour ( char * text, mapping_t * map
         else
         {
             /* This replacement does not need to be wrapped. */
-            j += -len;
+            j += -lens[i];
             if (j > MAX_STRING_LENGTH)
             {
                 /* Max length exceeded: shrink the working length
@@ -1480,16 +1323,16 @@ e_terminal_colour ( char * text, mapping_t * map
                 lens[i] = -(-(lens[i]) - (j - MAX_STRING_LENGTH));
                 j = MAX_STRING_LENGTH;
             }
-        } /* if (len > 0) */
+        } /* if (lens[i] > 0) */
     } /* for (i = 0..num) */
 
 
     /* Now we have the final string in parts and length in j.
      * let's compose the result, wrapping it where necessary.
      */
-    xallocate(deststr, (size_t)(j+1), "result string");
+    memsafe(deststr = alloc_mstring((size_t)j+1), (size_t)j+1, "result string");
 
-    cp = deststr; /* destination pointer */
+    cp = get_txt(deststr); /* destination pointer */
 
     if (wrap)
     {
@@ -1523,7 +1366,7 @@ e_terminal_colour ( char * text, mapping_t * map
         {
             int kind;            /* The kind of a line break */
             int len;             /* Actual length of the line */
-            int l = lens[i];     /* Length of current part */
+            p_int l = lens[i];   /* Length of current part */
             char *p = parts[i];  /* Current part */
 
             if (pt - tmpmem + ((l < 0) ? -l : l) >= tmpmem_size)
@@ -1673,25 +1516,25 @@ e_terminal_colour ( char * text, mapping_t * map
         }
     }
 
-    /* Terminate the string */
-    *cp = '\0';
-
     if ( lens )
       xfree(lens);
     if ( parts )
       xfree(parts);
     if (savestr)
-      xfree(savestr);
+      free_mstring(savestr);
 
     /* now we have what we want */
 #ifdef DEBUG
-    if (cp - deststr != j) {
+    if (cp - get_txt(deststr) != j) {
       fatal("Length miscalculated in terminal_colour()\n"
             "    Expected: %i Was: %ld\n"
-            "    In string: %s\n"
-            "    Out string: %s\n"
+            "    In string: %.*s\n"
+            "    Out string: %.*s\n"
             "    Indent: %i Wrap: %i\n"
-           , j, (long)(cp - deststr), text, deststr, indent, wrap);
+           , j, (long)(cp - get_txt(deststr))
+           , (int)mstrsize(text), get_txt(text)
+           , (int)mstrsize(deststr), get_txt(deststr)
+           , indent, wrap);
     }
 #endif
     return deststr;
@@ -1738,9 +1581,9 @@ f_terminal_colour (svalue_t *sp, int num_arg)
  */
 
 {
-    int    indent = 0;
-    int    wrap = 0;
-    char * str;
+    int        indent = 0;
+    int        wrap = 0;
+    string_t * str;
     mapping_t * map = NULL;
 
     if ( num_arg >= 3 )
@@ -1780,29 +1623,24 @@ f_terminal_colour (svalue_t *sp, int num_arg)
 
     inter_sp = sp;
 
-    str = e_terminal_colour(sp[-1].u.string, map, indent, wrap);
+    str = e_terminal_colour(sp[-1].u.str, map, indent, wrap);
 
     free_svalue(sp--);
-
-    if (str != sp->u.string)
-    {
-        /* terminal_colour() actually changed the string */
-        free_svalue(sp);
-        put_malloced_string(sp, str);
-    }
+    free_svalue(sp);
+    put_string(sp, str);
 
     return sp;
 } /* f_terminal_colour() */
 
 #ifdef F_PROCESS_STRING
 /*-------------------------------------------------------------------------*/
-static char *
-process_value (char *str)
+static string_t *
+process_value (const char *str, Bool original)
 
 /* Helper function for process_string(): take a function call in <str>
  * in the form "function[:objectname]{|arg}" and try to call it.
- * If the function exists and returns a string, the result is a pointer
- * to the string, which must be copied immediately.
+ * If the function exists and returns a string, the result is an uncounted
+ * pointer to the string.
  * If the function can't be called, or does not return a string, the
  * result is NULL.
  */
@@ -1810,7 +1648,7 @@ process_value (char *str)
 {
     svalue_t *ret;     /* Return value from the function call */
     char     *func;    /* Copy of the <str> string for local modifications */
-    char     *func2;   /* Shared string with the function name from <func> */
+    string_t *func2;   /* Shared string with the function name from <func> */
     char     *obj;     /* NULL or points to the object part in <func> */
     char     *arg;     /* NULL or points to the first arg in <func> */
     char     *narg;    /* Next argument while pushing them */
@@ -1821,10 +1659,20 @@ process_value (char *str)
     if (strlen(str) < 1 || !isalpha((unsigned)(str[0])))
         return NULL;
 
-    /* Copy the argument so that we can separate the various
+    /* If necessary, copy the argument so that we can separate the various
      * parts with \0 characters.
      */
-    func = string_copy(str);
+    if (original)
+    {
+        func = alloca(strlen(str)+1);
+        if (!func)
+            error("Out of stack memory (%lu bytes)\n", strlen(str)+1);
+        strcpy(func, str);
+    }
+    else
+    {
+        func = (char *)str;
+    }
 
     /* Find the object and the argument part */
     arg = strchr(func,'|'); if (arg) { *arg='\0'; arg++; }
@@ -1833,9 +1681,8 @@ process_value (char *str)
     /* Check if the function exists at all. apply() will be delighted
      * over the shared string anyway.
      */
-    if ( NULL == (func2 = findstring(func)) )
+    if ( NULL == (func2 = find_tabled_str(func)) )
     {
-        xfree(func);
         return NULL;
     }
 
@@ -1844,11 +1691,16 @@ process_value (char *str)
     if (!obj)
         ob = current_object;
     else
-        ob = find_object(obj);
+    {
+        string_t *objstr;
+
+        memsafe(objstr = new_mstring(obj), strlen(obj), "object name");
+        ob = find_object(objstr);
+        free_mstring(objstr);
+    }
 
     if (!ob)
     {
-        xfree(func);
         return NULL;
     }
 
@@ -1859,7 +1711,7 @@ process_value (char *str)
         narg = strchr(arg,'|');
         if (narg)
             *narg = '\0';
-        push_string_malloced(arg);
+        push_c_string(inter_sp, arg);
         numargs++;
         if (narg)
         {
@@ -1868,15 +1720,12 @@ process_value (char *str)
         }
     }
 
-    /* We no longer need this */
-    xfree(func);
-    
     /* Apply the function and see if adequate answer is returned.
      */
     ret = apply(func2, ob, numargs);
 
     if (ret && ret->type == T_STRING)
-        return ret->u.string;
+        return ret->u.str;
         /* The svalue is stored statically in apply_return_value */
 
     return NULL;
@@ -1918,13 +1767,12 @@ f_process_string(svalue_t *sp)
     int         il;            /* Index in vec */
     Bool        changed;       /* True if there was a replacement */
     Bool        ch_last;       /* True if the last vec-entry was replaced */
-    char *p0, *p1, *p2;
-    char *buf;                 /* Result string(s) */
-    char *str;                 /* The argument string */
+    string_t *buf;             /* Result string(s) */
+    string_t *str;             /* The argument string */
 
-    str = sp->u.string;
+    str = sp->u.str;
     
-    if (!str || !(p1 = strchr(str,'@')))
+    if (NULL == strchr(get_txt(str), '@'))
         return sp;  /* Nothing to do */
 
     old_eff_user = NULL;
@@ -1952,7 +1800,7 @@ f_process_string(svalue_t *sp)
         {
             old_eff_user = current_object->eff_user;
             if (ret->type == T_STRING)
-                current_object->eff_user = add_name(ret->u.string);
+                current_object->eff_user = add_name(ret->u.str);
             else
                 current_object->eff_user = NULL;
         }
@@ -1960,31 +1808,34 @@ f_process_string(svalue_t *sp)
 
     /* Explode the argument by the '@@' */
     /* TODO: Rewrite to use new explode_string() */
-    vec = old_explode_string(str,"@@");
+    vec = old_explode_string(str, STR_ATAT);
     if (!vec)
         return sp;
     push_array(inter_sp, vec); /* automatic free in case of errors */
 
-    pr_start = ((str[0]=='@') && (str[1]=='@')) ? 0 : 1;
+    pr_start = ((get_txt(str)[0]=='@') && (get_txt(str)[1]=='@')) ? 0 : 1;
 
     for ( ch_last = MY_FALSE, changed = MY_FALSE, il = pr_start
         ; (size_t)il < VEC_SIZE(vec)
         ; il++)
     {
-        p0 = vec->item[il].u.string;
+        string_t *p0, *p2;
+        char *p1;
+
+        p0 = vec->item[il].u.str;
 
         /* Try to interpret the entry as function call.
          * If that succeeds, hold the result (freshly allocated) in p2.
          */
-        p1 = strchr(p0, ' ');
+        p1 = strchr(get_txt(p0), ' ');
         if (!p1)
         {
             /* No space, the whole entry might be a function call */
-            p2 = process_value(p0);
+            p2 = process_value(get_txt(p0), MY_TRUE);
             if (p2)
             {
                 /* Yup, it is: copy the result */
-                p2 = string_copy(p2);
+                p2 = ref_mstring(p2);
                 ch_last = MY_TRUE;
             }
         }
@@ -1994,26 +1845,28 @@ f_process_string(svalue_t *sp)
              * as possible function call.
              */
             size_t len;
+            char * tmpbuf;
 
-            len = (size_t)(p1 - p0);
-            buf = xalloc(len + 1);
-            strncpy(buf, p0, len);
-            buf[len] = '\0';
-            p2 = process_value(buf);
+            len = (size_t)(p1 - get_txt(p0));
+            tmpbuf = xalloc(len + 1);
+            strncpy(tmpbuf, get_txt(p0), len);
+            tmpbuf[len] = '\0';
+            p2 = process_value(tmpbuf, MY_FALSE);
             if (p2)
             {
                 /* We got a result: join it with the remains after the
                  * space and put it into p2.
                  */
-                char * tmp;
+                string_t * tmp;
 
-                len = strlen(p2);
-                tmp = xalloc(len + strlen(p1) + 1);
-                strcpy(tmp,p2);
-                strcpy(tmp+len,p1);
+                len = mstrsize(p2);
+                memsafe(tmp = alloc_mstring(len+strlen(p1)), len+strlen(p1)
+                       , "intermediate result string");
+                memcpy(get_txt(tmp), get_txt(p2), len);
+                strcpy(get_txt(tmp)+len, p1);
                 p2 = tmp;
             }
-            xfree(buf);
+            xfree(tmpbuf);
         }
         
         if (!p2)
@@ -2022,9 +1875,10 @@ f_process_string(svalue_t *sp)
             if (!ch_last)
             {
                 /* ...but we have to recreate the '@@' from the original */
-                p2 = xalloc(3+strlen(p0));
-                strcpy(p2,"@@");
-                strcpy(p2+2,p0);
+                memsafe(p2 = alloc_mstring(2+mstrsize(p0)), 2+mstrsize(p0)
+                       , "intermediate result string");
+                memcpy(get_txt(p2), "@@", 2);
+                memcpy(get_txt(p2)+2, get_txt(p0), mstrsize(p0));
             }
             else
             {
@@ -2040,14 +1894,14 @@ f_process_string(svalue_t *sp)
         /* If we have a replacement string, put it into place. */
         if (p2)
         {
-            xfree(p0);
-            vec->item[il].u.string = p2;
+            free_mstring(p0);
+            vec->item[il].u.str = p2;
         }
     } /* for() */
 
     /* If there were changes, implode the vector again */
     if (changed)
-        buf = implode_string(vec, "");
+        buf = implode_string(vec, STR_EMPTY);
     else
         buf = NULL;
 
@@ -2066,7 +1920,7 @@ f_process_string(svalue_t *sp)
     if (buf)
     {
         free_string_svalue(sp);
-        put_malloced_string(sp, buf);
+        put_string(sp, buf);
     }
 
     return sp;
@@ -2840,11 +2694,11 @@ e_sscanf (int num_arg, svalue_t *sp)
 
     /* First get the string to be parsed.
      */
-    in_string = arg0[0].u.string;
+    in_string = get_txt(arg0[0].u.str);
 
     /* Now get the format description.
      */
-    fmt = arg0[1].u.string;
+    fmt = get_txt(arg0[1].u.str);
 
     info.arg_end = arg0 + num_arg;
     info.arg_current = arg0 + 2;
@@ -2910,10 +2764,10 @@ match_skipped:
 
                 if (flags.do_assign)
                 {
-                    xallocate(match, (size_t)num+1, "matchstring");
-                    strncpy(match, in_string, (size_t)num);
-                    match[num] = '\0';
-                    put_malloced_string(&sv_tmp, match);
+                    string_t *matchstr;
+                    memsafe(matchstr = new_n_mstring(in_string, (size_t)num)
+                           , num, "matchstring");
+                    put_string(&sv_tmp, matchstr);
                     transfer_svalue(arg->u.lvalue, &sv_tmp);
                 }
 
@@ -2932,7 +2786,7 @@ match_skipped:
     }
 
     return info.number_of_matches;
-}
+} /* f_sscanf() */
 
 
 /*=========================================================================*/
@@ -2963,7 +2817,7 @@ f_clones (svalue_t *sp, int num_arg)
  */
  
 {
-    char      *name;     /* The load-name to search */
+    string_t  *name;     /* The (tabled) load-name to search */
     mp_int     mintime;  /* 0 or lowest load_time for an object to qualify */
     mp_int     maxtime;  /* 0 or highest load_time for an object to qualify */
     mp_int     load_id;  /* The load_id of the reference */
@@ -2992,9 +2846,9 @@ f_clones (svalue_t *sp, int num_arg)
             if (sp->type == T_OBJECT)
                 reference = sp->u.ob;
             else if (sp->type == T_STRING) {
-                reference = get_object(sp->u.string);
+                reference = get_object(sp->u.str);
                 if (!reference) {
-                    error("Object not found: %s\n", sp->u.string);
+                    error("Object not found: %s\n", get_txt(sp->u.str));
                     /* NOTREACHED */
                     return sp;
                 }
@@ -3027,10 +2881,10 @@ f_clones (svalue_t *sp, int num_arg)
                 reference = sp->u.ob;
             else /* it's a string */
             {
-                reference = get_object(sp->u.string);
+                reference = get_object(sp->u.str);
                 if (!reference)
                 {
-                    error("Object not found: %s\n", sp->u.string);
+                    error("Object not found: %s\n", get_txt(sp->u.str));
                     /* NOTREACHED */
                     return sp;
                 }
@@ -3228,7 +3082,7 @@ f_object_info (svalue_t *sp)
         svp[OIB_PROG_SWAPPED].u.number = O_PROG_SWAPPED(o) ? 1 : 0;
         svp[OIB_VAR_SWAPPED].u.number = O_VAR_SWAPPED(o) ? 1 : 0;
 
-        put_malloced_string(svp+OIB_NAME, string_copy(o->name));
+        put_ref_string(svp+OIB_NAME, o->name);
         put_ref_string(svp+OIB_LOAD_NAME, o->load_name);
 
         o2 = o->next_all;
@@ -3291,13 +3145,13 @@ f_object_info (svalue_t *sp)
         svp = v->item;
 
         if ((o->flags & O_SWAPPED) && load_ob_from_swap(o) < 0)
-            error("Out of memory: unswap object '%s'.\n", o->name);
+            error("Out of memory: unswap object '%s'.\n", get_txt(o->name));
 
         prog = o->prog;
 
         svp[OIM_REF].u.number = prog->ref;
 
-        put_malloced_string(svp+OIM_NAME, string_copy(prog->name));
+        put_ref_string(svp+OIM_NAME, prog->name);
 
         svp[OIM_PROG_SIZE].u.number
                                = (long)(PROGRAM_END(*prog) - prog->program);
@@ -3313,7 +3167,7 @@ f_object_info (svalue_t *sp)
           /* Number of variables and the memory usage */
         svp[OIM_NUM_STRINGS].u.number = prog->num_strings;
         svp[OIM_SIZE_STRINGS].u.number
-                                 = (p_int)(prog->num_strings * sizeof(char*));
+                                 = (p_int)(prog->num_strings * sizeof(string_t*));
           /* Number of strings and the memory usage */
         {
             int i = prog->num_inherited;
@@ -3363,8 +3217,8 @@ f_present_clone (svalue_t *sp)
  */
 
 {
-    char * name;         /* the shared loadname to look for */
-    object_t *obj;  /* the object under scrutiny */
+    string_t * name; /* the shared loadname to look for */
+    object_t *obj;   /* the object under scrutiny */
 
     /* Test and get the arguments from the stack */
     if (sp[-1].type == T_STRING)
@@ -3372,9 +3226,10 @@ f_present_clone (svalue_t *sp)
         size_t len;
         long i;
         char * end;
+        char * sane_name;
         char * name0;  /* Intermediate name */
 
-        name0 = sp[-1].u.string;
+        name0 = get_txt(sp[-1].u.str);
 
         /* Normalize the given string and check if it is
          * in the shared string table. If not, we know that
@@ -3383,7 +3238,7 @@ f_present_clone (svalue_t *sp)
 
         /* First, slash of a trailing '#<num>' */
 
-        len = svalue_strlen(sp-1);
+        len = mstrsize((sp-1)->u.str);
         i = (long)len;
         end = name0 + len;
 
@@ -3400,7 +3255,7 @@ f_present_clone (svalue_t *sp)
                     name0 = alloca((size_t)i + 1);
                     if (!name0)
                         error("Out of stack memory.\n");
-                    strncpy(name0, sp[-1].u.string, (size_t)i);
+                    strncpy(name0, get_txt(sp[-1].u.str), (size_t)i);
                     name0[i] = '\0';
                 }
 
@@ -3410,14 +3265,14 @@ f_present_clone (svalue_t *sp)
 
         /* Now make the name sane */
 #ifndef COMPAT_MODE
-        name = (char *)make_name_sane(name0, MY_TRUE);
+        sane_name = (char *)make_name_sane(name0, MY_TRUE);
 #else
-        name = (char *)make_name_sane(name0, MY_FALSE);
+        sane_name = (char *)make_name_sane(name0, MY_FALSE);
 #endif
-        if (name)
-            name = findstring(name);
+        if (sane_name)
+            name = find_tabled_str(sane_name);
         else
-            name = findstring(name0);
+            name = find_tabled_str(name0);
 
     }
     else if (sp[-1].type == T_OBJECT)
@@ -3852,8 +3707,7 @@ f_to_int (svalue_t *sp)
         break;
 
     case T_STRING:
-        n = atol(sp->u.string);
-        /* TODO: make this strtol() */
+        n = strtol(get_txt(sp->u.str), NULL, 10);
         free_string_svalue(sp);
         break;
 
@@ -3908,8 +3762,7 @@ f_to_float (svalue_t *sp)
         break;
 
     case T_STRING:
-        d = atof(sp->u.string);
-        /* TODO: make this strtof() or so */
+        d = strtod(get_txt(sp->u.str), NULL);
         free_string_svalue(sp);
         break;
     }
@@ -3939,7 +3792,8 @@ f_to_string (svalue_t *sp)
  */
 
   {
-    char buf[1024], *s;
+    char buf[1024];
+    string_t *s;
 
     s = NULL;
     buf[sizeof(buf)-1] = '\0';
@@ -3954,7 +3808,7 @@ f_to_string (svalue_t *sp)
         if (buf[sizeof(buf)-1] != '\0')
             fatal("Buffer overflow in to_string(): "
                   "int number too big.\n");
-        s = string_copy(buf);
+        memsafe(s = new_mstring(buf), strlen(buf), "converted number");
         break;
 
     case T_FLOAT:
@@ -3962,14 +3816,14 @@ f_to_string (svalue_t *sp)
         if (buf[sizeof(buf)-1] != '\0')
             fatal("Buffer overflow in to_string: "
                   "int number too big.\n");
-        s = string_copy(buf);
+        memsafe(s = new_mstring(buf), strlen(buf), "converted number");
         break;
 
     case T_OBJECT:
 #ifndef COMPAT_MODE
         s = add_slash(sp->u.ob->name);
 #else
-        s = string_copy(sp->u.ob->name);
+        s = ref_mstring(sp->u.ob->name);
 #endif
         if (!s)
             error("Out of memory\n");
@@ -3979,33 +3833,30 @@ f_to_string (svalue_t *sp)
     case T_POINTER:
       {
         /* Arrays of ints are considered exploded strings and
-         * converted back accordingly, ie. up to the first 0
-         * or the first non-int.
+         * converted back accordingly, ie. up to the first non-int.
          */
 
         long size;
         svalue_t *svp;
-        char c, *d;
+        char *d;
 
         size = (long)VEC_SIZE(sp->u.vec) + 1;
         svp = sp->u.vec->item;
-        d = s = xalloc((size_t)size);
+        memsafe(s = alloc_mstring(size), size, "converted array");
+        d = get_txt(s);
         for (;;)
         {
             if (!--size)
             {
-                *d++ = '\0';
                 break;
             }
-            if (svp->type != T_NUMBER || !(c = (char)svp->u.number) )
+            if (svp->type != T_NUMBER)
             {
-                *d++ = '\0';
-                d = string_copy(s);
-                xfree(s);
-                s = d;
+                memsafe(s = resize_mstring(s, d-get_txt(s)), d-get_txt(s)
+                       , "converted array");
                 break;
             }
-            *d++ = c;
+            *d++ = (char)svp->u.number;
             svp++;
         }
         free_array(sp->u.vec);
@@ -4043,7 +3894,7 @@ f_to_string (svalue_t *sp)
             else
             {
                 /* Variable vanished in a replace_program() */
-                put_volatile_string(sp, "dangling var closure");
+                put_ref_string(sp, STR_DANGLING_V_CL);
             }
             break;
           }
@@ -4054,7 +3905,7 @@ f_to_string (svalue_t *sp)
             program_t *prog;
             fun_hdr_p fun;
             funflag_t flags;
-            char *function_name;
+            string_t *function_name;
             inherit_t *inheritp;
 
             if (sp->x.closure_type == CLOSURE_LFUN)
@@ -4101,21 +3952,21 @@ f_to_string (svalue_t *sp)
         case CLOSURE_UNBOUND_LAMBDA: /* Unbound-Lambda Closure */
         case CLOSURE_PRELIMINARY:    /* Preliminary Lambda Closure */
           {
-              char *rc;
+              string_t *rc;
 
               if (sp->x.closure_type == CLOSURE_PRELIMINARY)
                   sprintf(buf, "<prelim lambda 0x%p>", l);
               else
                   sprintf(buf, "<free lambda 0x%p>", l);
-              rc = string_copy(buf);
-              put_malloced_string(sp, rc);
+              memsafe(rc = new_mstring(buf), strlen(buf), "converted lambda");
+              put_string(sp, rc);
               break;
           }
 
         case CLOSURE_LAMBDA:         /* Lambda Closure */
         case CLOSURE_BOUND_LAMBDA:   /* Bound-Lambda Closure */
           {
-              char     *rc;
+              string_t *rc;
 
               if (sp->x.closure_type == CLOSURE_BOUND_LAMBDA)
                   sprintf(buf, "<bound lambda 0x%p:", l);
@@ -4127,21 +3978,26 @@ f_to_string (svalue_t *sp)
               if (!ob)
               {
                   strcat(buf, "{null}>");
-                  rc = string_copy(buf);
+                  memsafe(rc = new_mstring(buf), strlen(buf), "converted lambda");
               }
               else
               {
+                  char *tmp;
+                  size_t len;
+
                   if (ob->flags & O_DESTRUCTED)
                       strcat(buf, "{dest}");
-                  xallocate(rc, strlen(buf)+strlen(ob->name)+3
+                  len = strlen(buf)+mstrsize(ob->name)+2;
+                  memsafe(rc = alloc_mstring(len), len
                            , "string-repr of lambda closure");
+                  tmp = get_txt(rc);
                   strcat(buf, "/");
-                  strcpy(rc, buf);
-                  strcat(rc, ob->name);
-                  strcat(rc, ">");
+                  strcpy(tmp, buf);
+                  strcat(tmp, get_txt(ob->name));
+                  strcat(tmp, ">");
               }
 
-              put_malloced_string(sp, rc);
+              put_string(sp, rc);
               break;
           }
 
@@ -4155,7 +4011,6 @@ f_to_string (svalue_t *sp)
       {
         /* Easy: the symbol value is a string */
         sp->type = T_STRING;
-        sp->x.string_type = STRING_SHARED;
         break;
       }
 
@@ -4164,7 +4019,7 @@ f_to_string (svalue_t *sp)
     }
 
     if (sp->type != T_STRING)
-        put_malloced_string(sp, s);
+        put_string(sp, s);
 
     return sp;
 } /* f_to_string() */
@@ -4181,8 +4036,7 @@ f_to_array (svalue_t *sp)
  *   mixed *to_array(mixed *)
  *
  * Strings and symbols are converted to an int array that
- * consists of the args characters, with 0 == '\0' as last
- * character stored.
+ * consists of the args characters.
  * Quoted arrays are ``dequoted'', and arrays are left as they
  * are.
  */
@@ -4191,6 +4045,7 @@ f_to_array (svalue_t *sp)
     vector_t *v;
     char *s, ch;
     svalue_t *svp;
+    p_int len;
 
     switch (sp->type)
     {
@@ -4201,14 +4056,15 @@ f_to_array (svalue_t *sp)
     case T_SYMBOL:
         /* Split the string into an array of ints */
 
-        v = allocate_uninit_array((mp_int)svalue_strlen(sp) + 1);
-        s = sp->u.string;
+        len = (p_int)mstrsize(sp->u.str);
+        v = allocate_uninit_array((mp_int)len);
+        s = get_txt(sp->u.str);
         svp = v->item;
-        do {
+        while (len-- > 0) {
             ch = *s++;
             put_number(svp, ch);
             svp++;
-        } while (ch);
+        }
         free_string_svalue(sp);
         put_array(sp, v);
         break;
@@ -4278,7 +4134,7 @@ f_to_object (svalue_t *sp)
         return sp;
 
     case T_STRING:
-        o = find_object(sp->u.string);
+        o = find_object(sp->u.str);
         free_svalue(sp);
         break;
     }
@@ -4635,7 +4491,7 @@ f_get_type_info (svalue_t *sp)
         j = -1;
         break;
     case T_STRING:
-        j = (sp[-1].x.string_type == STRING_SHARED) ? 0 : 1;
+        j = (mstr_tabled(sp[-1].u.str)) ? 0 : 1;
         break;
     case T_MAPPING:
         j = sp[-1].u.map->num_values;
@@ -4764,14 +4620,14 @@ f_member (svalue_t *sp)
         {
         case T_STRING:
           {
-            char *str;
+            string_t *str;
             svalue_t *item;
 
-            str = sp_u.string;
+            str = sp_u.str;
             for(item = vec->item; --cnt >= 0; item++)
             {
                 if (item->type == T_STRING
-                 && !strcmp(sp_u.string, item->u.string))
+                 && mstreq(str, item->u.str))
                     break;
             }
             break;
@@ -4790,7 +4646,8 @@ f_member (svalue_t *sp)
             x_generic = sp->x.generic;
             for(item = vec->item; --cnt >= 0; item++)
             {
-                if (sp_u.string == item->u.string
+                /* TODO: Is this C99 compliant? */
+                if (sp_u.str == item->u.str
                  && x_generic == item->x.generic
                  && item->type == type)
                     break;
@@ -4838,6 +4695,7 @@ f_member (svalue_t *sp)
 
             for (item = vec->item; --cnt >= 0; item++)
             {
+                /* TODO: Is this C99 compliant? */
                 if (sp_u.number == item->u.number
                  && item->type == type)
                     break;
@@ -4867,15 +4725,16 @@ f_member (svalue_t *sp)
 
     if (sp[-1].type == T_STRING)
     {
-        char *str, *str2;
-        int i;
+        string_t *str;
+        char *str2;
+        ptrdiff_t i;
 
         if (sp->type != T_NUMBER)
             efun_arg_error(2, T_NUMBER, sp->type, sp);
-        str = sp[-1].u.string;
+        str = sp[-1].u.str;
         i = sp->u.number;
-        str2 = i & ~0xff ? NULL : strchr(str, i);
-        i = str2 ? str2 - str : -1;
+        str2 = (i & ~0xff) ? NULL : memchr(get_txt(str), i, mstrsize(str));
+        i = str2 ? (str2 - get_txt(str)) : -1;
         free_svalue(sp--);
         free_svalue(sp);
         put_number(sp, i);
@@ -4927,16 +4786,8 @@ f_quote (svalue_t *sp)
         break;
 
     case T_STRING:
-        if (sp->x.string_type != STRING_SHARED)
-        {
-            /* Symbols must be shared strings */
-
-            char *str = sp->u.string;
-
-            sp->u.string = make_shared_string(str);
-            if (sp->x.string_type == STRING_MALLOC)
-                xfree(str);
-        }
+        memsafe(sp->u.str = make_tabled(sp->u.str), mstrsize(sp->u.str)
+               , "tabled symbol string");
         sp->type = T_SYMBOL;
         sp->x.quotes = 1;
         break;
@@ -5107,22 +4958,42 @@ f_debug_info (svalue_t *sp, int num_arg)
  *            If the driver is not compiled with APPLY_CACHE_STAT, all two
  *            values are returned as -1.
  *
+ *
  *        int DID_ST_STRINGS
  *        int DID_ST_STRING_SIZE
- *            Number of distinct strings in the string table, and
- *            their size.
+ *            Total number and size of string requests.
  *
  *        int DID_ST_STR_TABLE_SIZE
- *            Size of the string table.
+ *            Size of the string table structure itself.
  *
- *        int DID_ST_STR_REQ
- *        int DID_ST_STR_REQ_SIZE
- *            Total number of string allocations, and their size.
+ *        int DID_ST_STR_OVERHEAD
+ *            Size of the overhead per string.
+ *
+ *        int DID_ST_STR_IT_OVERHEAD
+ *            Size of the additional overhead per indirectly tabled string.
+ *
+ *        int DID_ST_UNTABLED
+ *        int DID_ST_UNTABLED_SIZE
+ *            Total number and size of existing untabled strings.
+ *
+ *        int DID_ST_ITABLED
+ *        int DID_ST_ITABLED_SIZE
+ *            Total number and size of existing indirectly tabled strings.
+ *            Of the memory, only DID_ST_ITABLED * DID_ST_STR_IT_OVERHEAD
+ *            is not shared with the tabled strings.
+ *
+ *        int DID_ST_TABLED
+ *        int DID_ST_TABLED_SIZE
+ *            Total number and size of existing directly tabled strings.
  *
  *        int DID_ST_STR_SEARCHES
- *        int DID_ST_STR_SEARCH_LEN
- *            Number of searches in the string table, and the
- *            accumulated search length.
+ *        int DID_ST_STR_SEARCHLEN
+ *            Number and accumulated length of string searches by address.
+ *
+ *        int DID_ST_STR_SEARCHES_BYVALUE
+ *        int DID_ST_STR_SEARCHLEN_BYVALUE
+ *            Number and accumulated length of string searches by value.
+ *
  *
  *        int DID_ST_RX_CACHED
  *            Number of regular expressions cached.
@@ -5300,16 +5171,16 @@ f_debug_info (svalue_t *sp, int num_arg)
         else
             add_message("evalcost   :  %lu\n", ob->ticks);
         add_message("swap_num    : %ld\n", O_SWAP_NUM(ob));
-        add_message("name        : '%s'\n", ob->name);
-        add_message("load_name   : '%s'\n", ob->load_name);
+        add_message("name        : '%s'\n", get_txt(ob->name));
+        add_message("load_name   : '%s'\n", get_txt(ob->load_name));
         obj2 = ob->next_all;
         if (obj2)
             add_message("next_all    : OBJ(%s)\n",
-              obj2->next_all?obj2->name:"NULL");
+              obj2->next_all ? get_txt(obj2->name) : "NULL");
         prev = ob->prev_all;
         if (prev) {
             add_message("Previous object in object list: OBJ(%s)\n"
-                       , prev->name);
+                       , get_txt(prev->name));
         } else
             add_message("This object is the head of the object list.\n");
         break;
@@ -5329,10 +5200,10 @@ f_debug_info (svalue_t *sp, int num_arg)
         if (sp->type != T_OBJECT)
             vefun_arg_error(2, T_OBJECT, sp->type, sp);
         if ((sp->u.ob->flags & O_SWAPPED) && load_ob_from_swap(sp->u.ob) < 0)
-            error("Out of memory: unswap object '%s'\n", sp->u.ob->name);
+            error("Out of memory: unswap object '%s'\n", get_txt(sp->u.ob->name));
         pg = sp->u.ob->prog;
         add_message("program ref's %3ld\n",        pg->ref);
-        add_message("Name: '%s'\n",                pg->name);
+        add_message("Name: '%s'\n",                get_txt(pg->name));
         add_message("program size    %6ld\n"
           ,(long)(PROGRAM_END(*pg) - pg->program));
         add_message("num func's:  %3d (%4ld)\n", pg->num_functions
@@ -5341,7 +5212,7 @@ f_debug_info (svalue_t *sp, int num_arg)
         add_message("num vars:    %3d (%4ld)\n", pg->num_variables
           , (long)(pg->num_variables * sizeof(variable_t)));
         add_message("num strings: %3d (%4ld)\n", pg->num_strings
-          , (long)(pg->num_strings   * sizeof(char *)));
+          , (long)(pg->num_strings   * sizeof(string_t *)));
         {
             int i = pg->num_inherited;
             int cnt = 0;
@@ -5417,13 +5288,13 @@ f_debug_info (svalue_t *sp, int num_arg)
             error("bad number of arguments to debug_info\n");
         if (num_arg == 1
          || (sp->type == T_NUMBER && sp->u.number == 0)) {
-            sp->u.string = "";
+            sp->u.str = STR_EMPTY; /* Just for status_parse() */
         } else {
             if (arg[1].type != T_OBJECT)
                 vefun_exp_arg_error(2, (1 << T_OBJECT)|(1 << T_NULL)
                                      , arg[1].type, sp);
         }
-        if (status_parse(&sbuf, sp->u.string))
+        if (status_parse(&sbuf, get_txt(sp->u.str)))
             strbuf_store(&sbuf, &res);
         else
             strbuf_free(&sbuf);
@@ -5434,7 +5305,7 @@ f_debug_info (svalue_t *sp, int num_arg)
       {
         /* Dump information into files */
 
-        char * fname;
+        string_t * fname;
 
         if (num_arg != 2 && num_arg != 3)
             error("bad number of arguments to debug_info\n");
@@ -5446,26 +5317,26 @@ f_debug_info (svalue_t *sp, int num_arg)
             fname = NULL;
         } else {
             if (arg[2].type != T_STRING)
-                vefun_exp_arg_error(3, (1 << T_NULL)|(1 << T_STRING)
+                vefun_exp_arg_error(3, TF_NULL|TF_STRING
                                      , arg[2].type, sp);
-            fname = sp->u.string;
+            fname = sp->u.str;
         }
 
-        if (!strcmp(arg[1].u.string, "objects"))
+        if (!strcmp(get_txt(arg[1].u.str), "objects"))
         {
-            res.u.number = dumpstat(fname ? fname : "/OBJ_DUMP") ? 1 : 0;
+            res.u.number = dumpstat(fname ? fname : STR_OBJDUMP) ? 1 : 0;
             break;
         }
 
-        if (!strcmp(arg[1].u.string, "opcodes"))
+        if (!strcmp(get_txt(arg[1].u.str), "opcodes"))
         {
 #ifdef OPCPROF
-            res.u.number = opcdump(fname ? fname : "/OPC_DUMP") ? 1 : 0;
+            res.u.number = opcdump(fname ? fname : STR_OPCDUMP) ? 1 : 0;
 #endif
             break;
         }
 
-        error("Bad argument '%s' to debug_info(DINFO_DUMP).\n", arg[1].u.string);
+        error("Bad argument '%s' to debug_info(DINFO_DUMP).\n", get_txt(arg[1].u.str));
         break;
       }
 
@@ -5519,7 +5390,7 @@ f_debug_info (svalue_t *sp, int num_arg)
             smalloc_dinfo_data(v->item);
 #endif
 #if defined(MALLOC_sysmalloc)
-            put_volatile_string(v->item+DID_MEM_NAME, "system malloc");
+            put_c_string(v->item+DID_MEM_NAME, "system malloc");
 #endif
             put_array(&res, v);
             break;
@@ -5666,6 +5537,7 @@ f_ctime(svalue_t *sp)
 
 {
     char *ts, *cp;
+    string_t *rc;
 
     ts = time_string(sp->u.number);
     cp = strchr(ts, '\n');
@@ -5677,19 +5549,13 @@ f_ctime(svalue_t *sp)
     if (cp)
     {
         int len = cp - ts;
-        cp = xalloc((size_t)(len + 1));
-        if (!cp)
-            error("Out of memory\n");
-        strncpy(cp, ts, (size_t)len);
-        cp[len] = 0;
+        memsafe(rc = new_n_mstring(ts, len), len, "ctime() result");
     }
     else
     {
-        cp = string_copy(ts);
-        if (!cp)
-            error("Out of memory\n");
+        memsafe(rc = new_mstring(ts), strlen(ts), "ctime() result");
     }
-    put_malloced_string(sp, cp);
+    put_string(sp, rc);
     return sp;
 } /* f_ctime() */
 

@@ -38,9 +38,10 @@
 #include "gcollect.h"
 #include "interpret.h"
 #include "main.h"
+#include "mstrings.h"
 #include "object.h"
 #include "simulate.h"
-#include "stralloc.h"
+#include "stdstrings.h"
 #include "strfuns.h"
 #include "svalue.h"
 #include "swap.h"
@@ -164,7 +165,7 @@ f_call_out (svalue_t *sp, int num_arg)
     if (arg[0].type == T_STRING)
     {
         error_index = setup_function_callback(&(cop->fun), current_object
-                                             , arg[0].u.string
+                                             , arg[0].u.str
                                              , num_arg-2, arg+2
                                              , MY_TRUE
                                              );
@@ -181,7 +182,7 @@ f_call_out (svalue_t *sp, int num_arg)
         /* call structure is still in the free list, and the
          * callback structure was invalidated automatically.
          */
-        vefun_bad_arg(error_index, arg-1);
+        vefun_bad_arg(error_index+2, arg-1);
         /* NOTREACHED */
         return arg-1;
     }
@@ -336,7 +337,8 @@ call_out (void)
          && load_ob_from_swap(ob) < 0)
         {
             debug_message("%s: Error in call_out: out of memory: "
-                          "unswap object '%s'.\n", time_stamp(), ob->name);
+                          "unswap object '%s'.\n", time_stamp()
+                         , get_txt(ob->name));
             free_call(cop);
             continue;
         }
@@ -435,7 +437,7 @@ find_call_out (object_t *ob, svalue_t *fun, Bool do_free_call)
 {
     struct call **copp, *cop;
     int delay = 0;
-    char *fun_name;
+    string_t *fun_name;
 
     /* Find callout by closure */
 
@@ -513,16 +515,9 @@ found:
 
     /* Find callout by object/name */
 
-    if (fun->x.string_type == STRING_SHARED) {
-        fun_name = fun->u.string;
-    }
-    else
-    {
-        fun_name = make_shared_string(fun->u.string);
-        if (fun->x.string_type == STRING_MALLOC)
-            xfree(fun->u.string);
-    }
+    fun_name = find_tabled(fun->u.str);
 
+    if (fun_name != NULL)
     for (copp = &call_list; NULL != (cop = *copp); copp = &cop->next)
     {
         delay += cop->delta;
@@ -530,7 +525,6 @@ found:
          && cop->fun.function.named.name == fun_name
          && !cop->fun.is_lambda)
         {
-            deref_string(fun_name);
             if (do_free_call)
             {
                 if (cop->next)
@@ -540,11 +534,12 @@ found:
             }
             if (delay < 0)
                 delay = 0;
+            free_svalue(fun);
             put_number(fun, delay);
             return;
         }
-    }
-    free_string(fun_name);
+    } /* if()for() */
+
     put_number(fun, -1);
 }
 
@@ -806,7 +801,7 @@ f_call_out_info (svalue_t *sp)
  */
 
 {
-    if (_privilege_violation("call_out_info", &const0, sp))
+    if (_privilege_violation(STR_CALL_OUT_INFO, &const0, sp))
     {
         push_array(sp, get_all_call_outs());
     }

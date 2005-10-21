@@ -67,7 +67,6 @@
 #include "sent.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
-#include "stralloc.h"
 #include "strfuns.h"
 #include "swap.h"
 #include "svalue.h"
@@ -886,7 +885,7 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
         ret = inter_sp;
         xfree(ret[-1].u.lvalue); /* free error context */
 
-        if (ret->type == T_STRING)
+        if (ret->type == T_OLD_STRING)
         {
             ob->user = add_name(ret->u.string);
             ob->eff_user = ob->user;
@@ -895,16 +894,16 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
             return MY_TRUE;
         }
         else if (ret->type == T_POINTER && VEC_SIZE(ret->u.vec) == 2
-              && (   ret->u.vec->item[0].type == T_STRING
+              && (   ret->u.vec->item[0].type == T_OLD_STRING
                   || (!strict_euids && ret->u.vec->item[0].u.number)
                  )
                 )
         {
             ret = ret->u.vec->item;
-            ob->user =   ret[0].type != T_STRING
+            ob->user =   ret[0].type != T_OLD_STRING
                        ? &default_wizlist_entry
                        : add_name(ret[0].u.string);
-            ob->eff_user = ret[1].type != T_STRING
+            ob->eff_user = ret[1].type != T_OLD_STRING
                            ? 0
                            : add_name(ret[1].u.string);
             pop_stack();
@@ -1741,7 +1740,7 @@ destruct_object (svalue_t *v)
     if (!result)
         error("No prepare_destruct\n");
 
-    if (result->type == T_STRING)
+    if (result->type == T_OLD_STRING)
         error(result->u.string);
 
     if (result->type != T_NUMBER || result->u.number != 0)
@@ -2347,8 +2346,10 @@ dinfo_data_status (svalue_t *svp)
 } /* dinfo_data_status() */
 
 /*-------------------------------------------------------------------------*/
-char *
-check_valid_path (char *path, object_t *caller, char* call_fun, Bool writeflg)
+string_t *
+check_valid_path (string_t *path, object_t *caller, string_t* call_fun, Bool writeflg)
+
+TODO: result is a string_t with its own reference, path is not dereferenced
 
 /* Object <caller> will read resp. write (<writeflg>) the file <path>
  * for the efun <call_fun>.
@@ -2374,7 +2375,7 @@ check_valid_path (char *path, object_t *caller, char* call_fun, Bool writeflg)
         push_number(inter_sp, 0);
 
     if ( NULL != (eff_user = caller->eff_user) )
-        push_ref_string(inter_sp, eff_user->name);
+        push_ref_old_string(inter_sp, eff_user->name);
     else
         push_number(inter_sp, 0);
 
@@ -2388,7 +2389,7 @@ check_valid_path (char *path, object_t *caller, char* call_fun, Bool writeflg)
     if (!v || (v->type == T_NUMBER && v->u.number == 0))
         return NULL;
 
-    if (v->type != T_STRING)
+    if (v->type != T_OLD_STRING)
     {
         if (!path)
         {
@@ -2481,10 +2482,10 @@ free_callback (callback_t *cb)
 /*-------------------------------------------------------------------------*/
 static INLINE int
 setup_callback_args (callback_t *cb, int nargs, svalue_t * args
-                    , Bool no_lvalues)
+                    , Bool use_lvalues)
 
 /* Setup the function arguments in the callback <cb> to hold the <nargs>
- * arguments starting from <args>. If <no_lvalues> is TRUE, no argument
+ * arguments starting from <args>. If <use_lvalues> is FALSE, no argument
  * may be an lvalue. The arguments are transferred into the callback
  * structure.
  *
@@ -2519,7 +2520,7 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
 
         while (--nargs >= 0)
         {
-            if (no_lvalues && args->type == T_LVALUE)
+            if (!use_lvalues && args->type == T_LVALUE)
             {
                 /* We don't handle lvalues - abort the process.
                  * But to do that, we first have to free all
@@ -2549,11 +2550,11 @@ setup_callback_args (callback_t *cb, int nargs, svalue_t * args
 /*-------------------------------------------------------------------------*/
 int
 setup_function_callback ( callback_t *cb, object_t * ob, char * fun
-                        , int nargs, svalue_t * args, Bool no_lvalues)
+                        , int nargs, svalue_t * args, Bool use_lvalues)
 
 /* Setup the empty/uninitialized callback <cb> to hold a function
  * call to <ob>:<fun> with the <nargs> arguments starting from <args>.
- * If <no_lvalues> is TRUE, no argument may be an lvalue.
+ * If <use_lvalues> is FALSE, no argument may be an lvalue.
  *
  * Both <ob> and <fun> are copied from the caller, but the arguments are
  * adopted (taken away from the caller).
@@ -2570,7 +2571,7 @@ setup_function_callback ( callback_t *cb, object_t * ob, char * fun
     cb->function.named.name = make_shared_string(fun);
     cb->function.named.ob = ref_object(ob, "callback");
 
-    error_index = setup_callback_args(cb, nargs, args, no_lvalues);
+    error_index = setup_callback_args(cb, nargs, args, use_lvalues);
     if (error_index >= 0)
     {
         free_object(cb->function.named.ob, "callback");
@@ -2585,11 +2586,11 @@ setup_function_callback ( callback_t *cb, object_t * ob, char * fun
 /*-------------------------------------------------------------------------*/
 int
 setup_closure_callback ( callback_t *cb, svalue_t *cl
-                       , int nargs, svalue_t * args, Bool no_lvalues)
+                       , int nargs, svalue_t * args, Bool use_lvalues)
 
 /* Setup the empty/uninitialized callback <cb> to hold a closure
  * call to <cl> with the <nargs> arguments starting from <args>.
- * If <no_lvalues> is TRUE, no argument may be an lvalue.
+ * If <use_lvalues> is FALSE, no argument may be an lvalue.
  *
  * Both <cl> and the arguments are adopted (taken away from the caller).
  *
@@ -2604,7 +2605,7 @@ setup_closure_callback ( callback_t *cb, svalue_t *cl
     cb->is_lambda = MY_TRUE;
     transfer_svalue_no_free(&(cb->function.lambda), cl);
 
-    error_index = setup_callback_args(cb, nargs, args, no_lvalues);
+    error_index = setup_callback_args(cb, nargs, args, use_lvalues);
     if (error_index >= 0)
     {
         free_svalue(&(cb->function.lambda));
@@ -2641,11 +2642,11 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
 
     if (args[0].type == T_CLOSURE)
     {
-        error_index = setup_closure_callback(cb, args, nargs-1, args+1, MY_FALSE);
+        error_index = setup_closure_callback(cb, args, nargs-1, args+1, MY_TRUE);
         if (error_index >= 0)
             error_index++;
     }
-    else if (args[0].type == T_STRING)
+    else if (args[0].type == T_OLD_STRING)
     {
         object_t *ob;
         int       first_arg;
@@ -2659,7 +2660,7 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
                 ob = args[1].u.ob;
                 first_arg = 2;
             }
-            else if (args[1].type == T_STRING)
+            else if (args[1].type == T_OLD_STRING)
             {
                 ob = get_object(args[1].u.string);
                 first_arg = 2;
@@ -2674,7 +2675,7 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
         {
             error_index = setup_function_callback(cb, ob, args[0].u.string
                                                  , nargs-first_arg, args+first_arg
-                                                 , MY_FALSE);
+                                                 , MY_TRUE);
             if (error_index >= 0)
                 error_index += first_arg;
         }
@@ -3130,7 +3131,7 @@ print_svalue (svalue_t *arg)
     {
         add_message("<NULL>");
     }
-    else if (arg->type == T_STRING)
+    else if (arg->type == T_OLD_STRING)
     {
         interactive_t *ip;
 
@@ -3188,7 +3189,7 @@ f_clone_object (svalue_t * sp)
     object_t *ob;
 
     /* Get the argument and clone the object */
-    if (sp->type == T_STRING)
+    if (sp->type == T_OLD_STRING)
         ob = clone_object(sp->u.string);
     else
         ob = clone_object(sp->u.ob->load_name);
@@ -3602,17 +3603,17 @@ f_set_driver_hook (svalue_t *sp)
         put_number(closure_hook + n, 0);
         break;
 
-    case T_STRING:
+    case T_OLD_STRING:
       {
         char *str;
 
-        if ( !((1 << T_STRING) & hook_type_map[n]) )
-            error("Bad value for hook %ld: got string, expected %s.\n"
-                 , n, efun_arg_typename(hook_type_map[n]));
+        if ( !((1 << T_OLD_STRING) & hook_type_map[n]) )
+            error("Bad value for hook %ld: got string, expected %lx %s.\n"
+                 , n, hook_type_map[n], efun_arg_typename(hook_type_map[n]));
 
         if ( NULL != (str = make_shared_string(sp->u.string)) )
         {
-            put_string(closure_hook + n, str);
+            put_old_string(closure_hook + n, str);
             if (n == H_NOECHO)
                 mudlib_telopts();
         }

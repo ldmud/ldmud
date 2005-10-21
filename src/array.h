@@ -40,14 +40,7 @@
 
 #define VEC_HEAD(size) size, 1, VEC_DEBUGREF(1) NULL
 
-
-#if defined(DEBUG) && defined(MALLOC_smalloc)
-#    define VEC_SIZE(v) vec_size(v)
-     extern p_int vec_size (vector_t *vec);
-     extern vector_t *static_vector1, *static_vector2;
-#else
-#    define VEC_SIZE(v) ((v)->size)
-#endif
+#define VEC_SIZE(v) ((v)->size)
 
 #define LOCAL_VEC1(name, type1) \
     struct { vector_t v; } name \
@@ -92,10 +85,7 @@ struct vector_s {
 extern vector_t null_vector;
 
 extern int num_arrays;
-extern char *last_insert_alist_shared_string;
 extern void (*allocate_array_error_handler) (char *, ...);
-extern svalue_t assoc_shared_string_key;
-
 
 /* --- Prototypes --- */
 
@@ -104,27 +94,28 @@ extern svalue_t assoc_shared_string_key;
 #define allocate_array(n) (_allocate_array(n, __FILE__ "::allocate_array", __LINE__))
 #define allocate_array_unlimited(n) (_allocate_array_unlimited(n, __FILE__ "::allocate_array", __LINE__))
 #define allocate_uninit_array(n) (_allocate_array(n, __FILE__ "::allocate_uninit_array", __LINE__))
-#define implode_string(a,d) (_implode_string(a,d, __FILE__ "::implode_string", __LINE__))
+#define implode_string(a,d) (arr_implode_string(a,d, __FILE__ "::implode_string", __LINE__))
 
 extern vector_t *_allocate_array(mp_int, char *, int);
 extern vector_t *_allocate_array_unlimited(mp_int, char *, int);
 extern vector_t *_allocate_uninit_array(mp_int, char *, int);
-extern char *_implode_string(vector_t *, char *, char *, int);
 
 #else
+
+#define implode_string(a,d) (arr_implode_string(a,d))
 
 extern vector_t *allocate_array(mp_int);
 extern vector_t *allocate_array_unlimited(mp_int);
 extern vector_t *allocate_uninit_array(mp_int);
-extern char *implode_string(vector_t *, char *);
 
 #endif /* MALLOC_TRACE */
 
 extern void _free_vector(vector_t *p);
 extern void free_empty_vector(vector_t *p);
 extern void check_for_destr(vector_t *v);
-extern vector_t *explode_string(char *str, char *del);
-extern vector_t *old_explode_string(char *str, char *del);
+extern string_t *arr_implode_string(vector_t *, string_t * MTRACE_DECL);
+extern vector_t *explode_string(string_t *str, string_t *del);
+extern vector_t *old_explode_string(string_t *str, string_t *del);
 extern vector_t *slice_array(vector_t *p, mp_int from, mp_int to);
 extern vector_t *add_array(vector_t *p, vector_t *q);
 extern vector_t *subtract_array(vector_t *minuend, vector_t *subtrahend);

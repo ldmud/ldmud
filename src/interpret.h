@@ -9,60 +9,6 @@
 
 /* --- Types --- */
 
-/* --- struct control_stack: one control stack element
- *
- * Every structure describes the previous function call levels, the
- * current function call data is kept in interpret's global variables..
- * 'prog' is usually the same as ob->prog, except when
- * executing inherited functions.
- *
- * TODO: The frames should have special flags to mark stuff like catches,
- * TODO:: sefun closures, closures, etc.
- */
-
-struct control_stack {
-    object_t *ob;          /* Current object */
-    object_t *prev_ob;     /* Save previous object */
-    program_t *prog;       /* Current program, NULL in the bottom entry */
-    bytecode_p pc;         /* Program counter, points to next bytecode */
-    svalue_t *fp;          /* Frame pointer: first arg on stack */
-    bytecode_p funstart;
-      /* Start of the function code.
-       * Two magic values (SIMUL_EFUN_FUNSTART and EFUN_FUNSTART) mark
-       * entries for simul-efun and efun closures.
-       */
-    int num_local_variables;    /* Number of local vars + arguments */
-    int function_index_offset;
-      /* Index of current program's function block within the functions of the
-       * current objects program (needed for inheritance).
-       */
-    svalue_t *current_variables;        /* Same */
-    int   extern_call;
-      /* TRUE if the call came from outside the object (call_others to
-       * oneself are a special case of this). Only entries with this flag
-       * set save the .ob and .prev_ob for the flagged and all previous
-       * unflagged entries.
-       * If the current this_object was changed, the 'imposter' object is
-       * stored in .pretend_to_be and this flag is or'ed with CS_PRETEND.
-       */
-#   define CS_PRETEND 0x80
-    int   instruction;
-      /* For EFUN_FUNSTART entries, this is the efun executed.
-       */
-
-#if 0  /* TODO: Remove me fully if nobody complains */
-    short dummy; /* TODO: ??? */
-#endif
-
-    bytecode_p *break_sp;
-      /* Points to address to branch to at next F_BREAK, which is also
-       * the actual bottom of the break stack.
-       */
-    object_t *pretend_to_be;
-      /* After set_this_object(), the this_object imposter.
-       */
-};
-
 /* --- Macros --- */
 
 #define MAX_SHIFT ((sizeof(p_int) << 3) - 1)
@@ -109,13 +55,19 @@ extern void assign_svalue(svalue_t *dest, svalue_t *v);
 extern void transfer_svalue_no_free(svalue_t *dest, svalue_t *v);
 extern void transfer_svalue(svalue_t *dest, svalue_t *v);
 
+extern void put_c_string (svalue_t *sp, const char *p);
+extern void push_c_string (svalue_t *sp, const char *p);
+
+#if 0
 extern void push_referenced_shared_string(char *p);
+extern void push_string_malloced(char *p);
+extern void push_string_shared(char *p);
+#endif
+
 extern void push_svalue(svalue_t *v);
 extern void push_svalue_block(int num, svalue_t *v);
 extern svalue_t *pop_n_elems (int n, svalue_t *sp);
 extern void pop_stack(void);
-extern void push_string_malloced(char *p);
-extern void push_string_shared(char *p);
 
 extern void init_interpret(void);
 extern const char *typename(int type);
@@ -124,22 +76,23 @@ extern void vefun_bad_arg (int arg, svalue_t *sp) NORETURN;
 extern void efun_gen_arg_error (int arg, int got, svalue_t *sp) NORETURN;
 extern void vefun_gen_arg_error (int arg, int got, svalue_t *sp) NORETURN;
 extern void efun_arg_error (int arg, int expected, int got, svalue_t *sp) NORETURN;
+extern void efun_exp_arg_error (int arg, long expected, int got, svalue_t *sp) NORETURN;
 extern void vefun_arg_error (int arg, int expected, int got, svalue_t *sp) NORETURN;
 extern void vefun_exp_arg_error (int arg, long expected, int got, svalue_t *sp) NORETURN;
-extern Bool _privilege_violation(char *what, svalue_t *where, svalue_t *sp);
-extern Bool privilege_violation4(char *what, object_t *whom, char *how_str, int how_num, svalue_t *sp);
+extern Bool _privilege_violation(const string_t *what, svalue_t *where, svalue_t *sp);
+extern Bool privilege_violation4(const string_t *what, object_t *whom, const string_t *how_str, int how_num, svalue_t *sp);
 extern void push_apply_value(void);
 extern void pop_apply_value (void);
-extern svalue_t *sapply_int(char *fun, object_t *ob, int num_arg, Bool b_ign_prot);
+extern svalue_t *sapply_int(string_t *fun, object_t *ob, int num_arg, Bool b_ign_prot);
 #define sapply(f,o,n) sapply_int(f,o,n, MY_FALSE)
-extern svalue_t *apply(char *fun, object_t *ob, int num_arg);
+extern svalue_t *apply(string_t *fun, object_t *ob, int num_arg);
 extern void call_function(program_t *progp, int fx);
 extern int get_line_number(bytecode_p p, program_t *progp, char **namep);
 extern char *dump_trace(Bool how);
 extern int get_line_number_if_any(char **name);
 extern void reset_machine(Bool first);
-extern svalue_t *secure_apply(char *fun, object_t *ob, int num_arg);
-extern svalue_t *apply_master_ob(char *fun, int num_arg);
+extern svalue_t *secure_apply(string_t *fun, object_t *ob, int num_arg);
+extern svalue_t *apply_master_ob(string_t *fun, int num_arg);
 extern void assert_master_ob_loaded(void);
 extern svalue_t *secure_call_lambda(svalue_t *closure, int num_arg);
 extern void remove_object_from_stack(object_t *ob);
@@ -165,7 +118,7 @@ extern svalue_t *f_trace(svalue_t *sp);
 extern svalue_t *f_traceprefix(svalue_t *sp);
 
 #ifndef COMPAT_MODE
-extern char *add_slash (char *str);
+extern string_t *add_slash (string_t *str);
 #endif
 
 #ifdef OPCPROF

@@ -1,17 +1,3 @@
---- Into hash.c: ---
-Modify washstr() to ignore \0 and instead just go for the size.
---- Into gcollect.c: ---
-Adapt the string handling.
-Adapt the memblock interpretation in MALLOC_TRACE.
-New fun: count_ref_from_mstring(string_t *s);
-New fun: remove_unreferenced_mstring(string_t *s);
---- Into stdstrings.c: ---
-Adapt it.
---- Other ---
-CHECKSTRINGS, KEEPSTRINGS gone
-Adapt debug_info() and includefile
---- ---
-
 /*---------------------------------------------------------------------------
  * String Management
  *
@@ -30,8 +16,10 @@ Adapt debug_info() and includefile
  *
  * Strings are sequences of chars, stored in an array of known size. The
  * size itself is stored separately, allowing the string to contain every
- * possible character. CAVEAT: In contrast to C, these strings are not
- * terminated by '\0'!
+ * possible character. Internally the module appends a '\0' character
+ * to the string data to make it somewhat compatible with C system
+ * functions; however, this character itself is not counted in the size
+ * of the string, and the module itself doesn't rely on it.
  *
  * Strings are managed using two structures: string_data_t and string_t.
  *
@@ -40,7 +28,8 @@ Adapt debug_info() and includefile
  *    struct string_data_s
  *    {
  *        size_t size;            Length of the string
- *        char   txt[1.. .size]; 
+ *        char   txt[1.. .size];
+ *        char   null             Gratuituous terminator
  *    }
  *
  * This structure is hardly ever used by other parts of the driver
@@ -84,6 +73,8 @@ Adapt debug_info() and includefile
  *    allocator.
  *  - untabled strings can easily be made (indirectly) tabled even
  *    if they have many active refs pending.
+ * TODO: If indirectly tabled strings are not used, think about merging
+ * TODO:: string_data_t and string_t.
  *---------------------------------------------------------------------------
  */
 
@@ -104,9 +95,9 @@ Adapt debug_info() and includefile
 
 extern int wlhashstr(const char * const,  size_t, size_t);
 #if !( (HTABLE_SIZE) & (HTABLE_SIZE)-1 )
-#    define StrHash(s,siz) (wlhashstr((s), 100, siz) & ((HTABLE_SIZE)-1))
+#    define StrHash(s,siz) (whashmem((s), siz, 100) & ((HTABLE_SIZE)-1))
 #else
-#    define StrHash(s,siz) (wlhashstr((s), 100, siz) % HTABLE_SIZE)
+#    define StrHash(s,siz) (whashmem((s), siz, 100) % HTABLE_SIZE)
 #endif
 
 /*-------------------------------------------------------------------------*/
@@ -247,7 +238,7 @@ move_to_head (string_t *s, int index)
 
 /*-------------------------------------------------------------------------*/
 static INLINE string_t *
-make_new_tabled (const char * const pTxt, size_t size, int index)
+make_new_tabled (const char * const pTxt, size_t size, int index MTRACE_DECL)
 
 /* Helper function for mstring_new_tabled(), mstring_make_tabled() and
  * mstring_table_inplace().
@@ -265,11 +256,11 @@ make_new_tabled (const char * const pTxt, size_t size, int index)
 
     /* Get the memory for a new one */
 
-    sdata = xalloc(size + sizeof(*sdata) - 1);
+    sdata = xalloc_traced(size + sizeof(*sdata) MTRACE_PASS);
     if (!sdata)
         return NULL;
 
-    string = xalloc(sizeof(*string));
+    string = xalloc_traced(sizeof(*string) MTRACE_PASS);
     if (!string)
     {
         xfree(sdata);
@@ -280,6 +271,7 @@ make_new_tabled (const char * const pTxt, size_t size, int index)
 
     sdata->size = size;
     memcpy(sdata->txt, pTxt, size);
+    sdata.txt[size] = '\0';
 
     string->str = sdata;
     string->info.tabled = MY_TRUE;
@@ -303,7 +295,7 @@ make_new_tabled (const char * const pTxt, size_t size, int index)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_alloc_string (size_t iSize)
+mstring_alloc_string (size_t iSize MTRACE_DECL)
 
 /* Aliased to: alloc_mstring(iSize)
  * Also called by mstring_new_string().
@@ -320,11 +312,11 @@ mstring_alloc_string (size_t iSize)
 
     /* Get the memory */
 
-    sdata = xalloc(iSize + sizeof(*sdata) - 1);
+    sdata = xalloc_traced(iSize + sizeof(*sdata) MTRACE_PASS);
     if (!sdata)
         return NULL;
 
-    string = xalloc(sizeof(*string));
+    string = xalloc_traced(sizeof(*string) MTRACE_PASS);
     if (!string)
     {
         xfree(sdata);
@@ -333,6 +325,7 @@ mstring_alloc_string (size_t iSize)
 
     /* Set up the structures */
     sdata->size = iSize;
+    sdata->txt[iSize] = '\0';
     string->link = NULL;
     string->str = sdata;
     string->info.tabled = MY_FALSE;
@@ -353,7 +346,7 @@ mstring_alloc_string (size_t iSize)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_new_string (const char * const pTxt)
+mstring_new_string (const char * const pTxt MTRACE_DECL)
 
 /* Aliased to: new_mstring(pTxt)
  *
@@ -369,7 +362,7 @@ mstring_new_string (const char * const pTxt)
 
     size = strlen(pTxt);
 
-    string = mstring_alloc_string(size);
+    string = mstring_alloc_string(size MTRACE_PASS);
     if (string && size)
     {
         memcpy(string->str->txt, pTxt, size);
@@ -380,7 +373,31 @@ mstring_new_string (const char * const pTxt)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_new_tabled (const char * const pTxt)
+mstring_new_n_string (const char * const pTxt, size_t len MTRACE_DECL)
+
+/* Aliased to: new_n_mstring(pTxt, len)
+ *
+ * Create a new untabled string by copying the <len> characters at <pTxt>
+ * and return it, counting the result as one reference.
+ *
+ * If memory runs out, NULL is returned.
+ */
+
+{
+    string_t *string;
+
+    string = mstring_alloc_string(len MTRACE_PASS);
+    if (string && len)
+    {
+        memcpy(string->str->txt, pTxt, size);
+    }
+
+    return string;
+} /* mstring_new_n_string() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_new_tabled (const char * const pTxt MTRACE_DECL)
 
 /* Aliased to: new_tabled(pTxt)
  *
@@ -407,18 +424,23 @@ mstring_new_tabled (const char * const pTxt)
     }
 
     /* No: create a new one */
-    return make_new_tabled(pTxt, size, index);
+    return make_new_tabled(pTxt, size, index MTRACE_PASS);
 } /* mstring_new_tabled() */
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_make_tabled (string_t * pStr)
+mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
 
-/* Aliased to: make_tabled(pStr)
+/* Aliased to: make_tabled(pStr), make_tabled_from(pStr)
  *
  * Take the string <pStr> and create resp. find a tabled instance of it.
- * Return the counted reference to the tabled instance, and dereference
- * the <pStr> once.
+ * Return the counted reference to the tabled instance, and, if <deref_arg>
+ * is TRUE, dereference the <pStr> once.
+ *
+ * The usage should be obvious:
+ *   make_tabled() to convert a given string into a tabled one
+ *   make_tabled_from() to get a new tabled 'copy' of a given string
+ *     without losing the original.
  *
  * If memory runs out, NULL is returned.
  */
@@ -430,7 +452,11 @@ mstring_make_tabled (string_t * pStr)
 
     /* If the string is already tabled directly, our work is done */
     if (pStr->info.tabled)
+    {
+        if (!deref_arg)
+            pStr->info.ref += 1;
         return pStr;
+    }
 
     /* If the string is tabled indirectly, return the directly tabled
      * instance.
@@ -438,7 +464,7 @@ mstring_make_tabled (string_t * pStr)
     if (pStr->link != NULL)
     {
         string = ref_mstring(pStr->link); /* Must come first! */
-        free_mstring(pStr);
+        if (deref_arg) free_mstring(pStr);
         return string;
     }
 
@@ -447,7 +473,7 @@ mstring_make_tabled (string_t * pStr)
     size = pStr->str->size;
     index = StrHash(pStr->str->txt, size);
 
-    if (pStr->info.ref == 1)
+    if (pStr->info.ref == 1 && !make_new)
     {
         /* We can simply reuse the string_t we already have */
 
@@ -460,8 +486,8 @@ mstring_make_tabled (string_t * pStr)
     {
         /* We need a completely new table string */
 
-        string = make_new_tabled(pStr->str->txt, size, index);
-        free_mstring(pStr);
+        string = make_new_tabled(pStr->str->txt, size, index MTRACE_PASS);
+        if (deref_arg) free_mstring(pStr);
     }
 
     return string;
@@ -469,7 +495,7 @@ mstring_make_tabled (string_t * pStr)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_table_inplace (string_t * pStr)
+mstring_table_inplace (string_t * pStr MTRACE_DECL)
 
 /* Aliased to: table_inplace(pStr)
  *
@@ -505,7 +531,7 @@ mstring_table_inplace (string_t * pStr)
         /* No: create a new string structure, table it,
          * and then give it pStr's string_data pointer.
          */
-        string = xalloc(sizeof(*string));
+        string = xalloc_traced(sizeof(*string) MTRACE_PASS);
         if (!string)
         {
             return NULL;
@@ -554,14 +580,14 @@ mstring_table_inplace (string_t * pStr)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_dup (string_t * pStr)
+mstring_dup (string_t * pStr MTRACE_DECL)
 
 /* Aliased to: dup_mstring(pStr)
  *
- * If <pStr> is a tabled string, an untabled string with more than one
- * reference, create and return a new untabled string
- * with the same text but just one reference, and remove one reference from
- * <pStr>. Otherwise, just return <pStr>.
+ * If <pStr> is a tabled string or an untabled string with more than one
+ * reference, create and return a new untabled string with the same text but
+ * just one reference, and remove one reference from <pStr>. Otherwise, just
+ * return <pStr>.
  * If memory runs out, NULL is returned.
  *
  * Purpose is to create an instance of a string which an be freely modified.
@@ -576,7 +602,7 @@ mstring_dup (string_t * pStr)
 
     /* Otherwise create a new untabled string from the tabled one */
 
-    string = mstring_alloc_string(pStr->str->size);
+    string = mstring_alloc_string(pStr->str->size MTRACE_PASS);
     if (string)
     {
         memcpy(string->str->txt,  pStr->str->txt, pStr->str->size);
@@ -586,6 +612,42 @@ mstring_dup (string_t * pStr)
 
     return string;
 } /* mstring_dup() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+mstring_resize (string_t * pStr, size_t newlen MTRACE_DECL)
+
+/* Aliased to: resize_mstring(pStr,newlen)
+ *
+ * Create an untabled copy of <pStr> with just one reference and space
+ * for <newlen> bytes, remove one reference from <pStr>, and then return
+ * the new string.
+ * If memory runs out, NULL is returned.
+ */
+
+{
+    string_t *string;
+
+    /* Check for the easy case */
+    if (!pStr->info.tabled && pStr->info.ref == 1 && pStr->link == NULL
+     && pStr->str->size == newlen)
+        return pStr;
+
+    /* Otherwise create a new untabled string from the tabled one */
+
+    string = mstring_alloc_string(newlen MTRACE_PASS);
+    if (string)
+    {
+        if (newlen > pStr->str->size)
+            memcpy(string->str->txt,  pStr->str->txt, pStr->str->size);
+        else
+            memcpy(string->str->txt,  pStr->str->txt, newlen);
+    }
+
+    free_mstring(pStr);
+
+    return string;
+} /* mstring_resize() */
 
 /*-------------------------------------------------------------------------*/
 string_t *
@@ -623,9 +685,9 @@ mstring_find_tabled (const string_t * pStr)
 
 /*-------------------------------------------------------------------------*/
 string_t *
-mstring_find_tabled_str (const char * const pTxt)
+mstring_find_tabled_str (const char * const pTxt, size_t size)
 
-/* Aliased to: find_tabled_str(pTxt)
+/* Aliased to: find_tabled_str(pTxt), find_tabled_str_n(pTxt)
  *
  * Find the tabled string with the same content as the C string <pTxt> and
  * return it.
@@ -637,9 +699,7 @@ mstring_find_tabled_str (const char * const pTxt)
 {
     string_t *string;
     int       index;
-    size_t    size;
 
-    size = strlen(pTxt);
     index = StrHash(pTxt, size);
 
     return find_and_move(pTxt, size, index);
@@ -649,7 +709,9 @@ mstring_find_tabled_str (const char * const pTxt)
 void
 mstring_free (string_t *s)
 
-/* Decrement the refcount of string <s>. If it reaches 0, deallocate it
+/* Aliased to: free_mstring(pStr)
+ *
+ * Decrement the refcount of string <s>. If it reaches 0, deallocate it
  * altogether.
  */
 
@@ -715,6 +777,99 @@ mstring_free (string_t *s)
 } /* mstring_free() */
 
 /*-------------------------------------------------------------------------*/
+Bool
+mstring_equal(const string_t * const pStr1, const string_t * const pStr2) 
+
+/* Aliased to: mstreq(pStr1, pStr2)
+ *
+ * Compare the two strings <pStr1> and <pStr2> and return TRUE if they
+ * have the same content, FALSE otherwise.
+ */
+
+{
+    if (pStr1 == pStr2)
+        return MY_TRUE;
+    if (mstr_d_tabled(pStr1) && mstr_i_tabled(pStr2) && pStr2->link == pStr1)
+        return MY_TRUE;
+    if (mstr_i_tabled(pStr1) && mstr_d_tabled(pStr2) && pStr1->link == pStr2)
+        return MY_TRUE;
+    if (mstrsize(pStr1) != mstrsize(pStr2))
+        return MY_FALSE;
+
+    return (memcmp(get_txt(pStr1), get_txt(pStr2), mstrsize(pStr1)) != 0);
+} /* mstring_equal() */
+
+/*-------------------------------------------------------------------------*/
+int
+mstring_compare (const string_t * const pStr1, const string_t * const pStr2) 
+
+/* Aliased to: mstrcmp(pStr1, pStr2)
+ *
+ * Compare the two strings <pStr1> and <pStr2> and return
+ *   -1 if <pStr1> < <pStr2>
+ *    0 if <pStr1> == <pStr2>
+ *   +1 if <pStr1> > <pStr2>
+ */
+
+{
+    if (pStr1 == pStr2)
+        return MY_TRUE;
+    if (mstr_d_tabled(pStr1) && mstr_i_tabled(pStr2) && pStr2->link == pStr1)
+        return MY_TRUE;
+    if (mstr_i_tabled(pStr1) && mstr_d_tabled(pStr2) && pStr1->link == pStr2)
+        return MY_TRUE;
+    if (mstrsize(pStr1) <= mstrsize(pStr2))
+        return memcmp(get_txt(pStr1), get_txt(pStr2), mstrsize(pStr1));
+
+    return memcmp(get_txt(pStr1), get_txt(pStr2), mstrsize(pStr2));
+} /* mstring_compare() */
+
+/*-------------------------------------------------------------------------*/
+char *
+mstring_mstr_n_str ( const string_t * const pStr, size_t start
+                   , const char * const pTxt, size_t len)
+
+/* Aliased to: mstrstr(pStr, pTxt)
+ *
+/* Find the partial string <pTxt> of <len> bytes (which my contain '\0' as
+ * part of the data to be found) inside of <pStr> starting at position <start>
+ * and return a pointer to the location found.
+ * If not found, return NULL.
+ */
+
+{
+    char * cp;
+    size_t left;
+    char   first;
+
+    if (len < 1 || start >= mstrsize(pStr))
+        return NULL;
+
+    left = mstrsize(pStr);
+    cp = get_txt(pStr)+start;
+    first = *pTxt;
+
+    while (left >= len)
+    {
+        char * next;
+
+        next = memchr(cp, first, left);
+        if (NULL == next)
+            break;
+        left -= next - cp;
+        if (left >= len && 0 == memcmp(next, pTxt, len))
+            return next;
+        if (left > 0)
+        {
+            cp = next+1;
+            left--;
+        }
+    }
+
+    return NULL;
+} /* mstring_mstr_n_str() */
+
+/*-------------------------------------------------------------------------*/
 void
 mstring_init (void)
 
@@ -768,7 +923,7 @@ mstring_note_refs (void)
 
     note_malloced_block_ref(stringtable);
     for (i = 0; i < SHSTR_NOSTRINGS; i++)
-        count_ref_from_mstring(shstring[i]);
+        count_ref_from_string(shstring[i]);
 } /* mstring_note_refs() */
 
 /*-------------------------------------------------------------------------*/
@@ -777,7 +932,7 @@ mstring_walk_strings (void (*func) (string_t *))
 
 /* GC support: Call (*func)(str) for all tabled strings in the string table.
  *
- * Usually the function is "remove_unreferenced_strings()" which removes
+ * Usually the function is "remove_unreferenced_string()" which removes
  * unref'd strings from the table.
  */
 
@@ -897,10 +1052,10 @@ string_dinfo_status (svalue_t *svp)
     
     svp[DID_ST_UNTABLED].u.number      = mstr_untabled;
     svp[DID_ST_UNTABLED_SIZE].u.number = mstr_untabled_size;
-    svp[DID_ST_ITABLED].u.number       = mstr_tabled;
-    svp[DID_ST_ITABLED_SIZE].u.number  = mstr_tabled_size;
+    svp[DID_ST_ITABLED].u.number       = mstr_itabled;
+    svp[DID_ST_ITABLED_SIZE].u.number  = mstr_itabled_size;
     svp[DID_ST_TABLED].u.number        = mstr_tabled;
-    svp[DID_ST_TABLED_SIZE].u.number  = mstr_tabled_size;
+    svp[DID_ST_TABLED_SIZE].u.number   = mstr_tabled_size;
 
     svp[DID_ST_STR_SEARCHES].u.number          = mstr_searches;
     svp[DID_ST_STR_SEARCHLEN].u.number         = mstr_searchlen;

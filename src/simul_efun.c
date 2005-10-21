@@ -44,7 +44,6 @@
 #include "ptrtable.h"
 #include "simulate.h"
 #include "stdstrings.h"
-#include "stralloc.h"
 #include "svalue.h"
 #include "swap.h"
 #include "xalloc.h"
@@ -166,7 +165,7 @@ get_simul_efun_object (void)
             svp = svp->u.vec->item;
     }
 
-    if (svp->type != T_STRING)
+    if (svp->type != T_OLD_STRING)
     {
         printf("%s No simul_efun\n", time_stamp());
         return NULL;

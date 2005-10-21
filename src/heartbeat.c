@@ -37,7 +37,6 @@
 #include <sys/types.h>
 #include <math.h>
 
-#define NO_REF_STRING
 #include "heartbeat.h"
 
 #include "actions.h"
@@ -46,6 +45,7 @@
 #include "comm.h"
 #include "gcollect.h"
 #include "interpret.h"
+#include "mstrings.h"
 #include "object.h"
 #include "sent.h"
 #include "simulate.h"
@@ -201,12 +201,12 @@ call_heart_beat (void)
 #ifdef DEBUG
         if (!(obj->flags & O_HEART_BEAT))
             fatal("Heart beat not set in object '%s' on heart beat list!\n"
-                 , obj->name
+                 , get_txt(obj->name)
                  );
         if (obj->flags & O_SWAPPED)
-            fatal("Heart beat in swapped object '%s'.\n", obj->name);
+            fatal("Heart beat in swapped object '%s'.\n", get_txt(obj->name));
         if (obj->flags & O_DESTRUCTED)
-            fatal("Heart beat in destructed object '%s'.\n", obj->name);
+            fatal("Heart beat in destructed object '%s'.\n", get_txt(obj->name));
 #endif
 
         if (obj->prog->heart_beat == -1)
@@ -378,7 +378,7 @@ set_heart_beat (object_t *ob, Bool to)
             NOOP;
 #ifdef DEBUG
         if (!this)
-            fatal("Object '%s' not found in heart beat list.\n", ob->name);
+            fatal("Object '%s' not found in heart beat list.\n", get_txt(ob->name));
 #endif
         if (this->next)
             this->next->prev = this->prev;

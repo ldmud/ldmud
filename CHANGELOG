@@ -1,6 +1,93 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Sep-2000 (Lars Duening)  (3.3.13)
+    - (func_spec, lex.c, closure.c, interpret.c, prolang.y) Added the
+         operators '>>>' and its cousin '>>>=' for logical right shifts.
+    - (interpret.c) Continued adaption.
+
+11-Sep-2000 (Lars Duening)
+    - (configure) Removed no longer used option 'max-log-size' (reported
+         by Malcom).
+
+09-Sep-2000 (Lars Duening)  (3.3.12)
+    - (simulate.c) Callbacks in efuns like filter() can now take references,
+         too (reported by Freaky).
+
+08-Sep-2000 (Lars Duening)
+    - (gcollect, heartbeat) Adapted to new string handling.
+    - (files.c) Corrected a control flow bug in read_file().
+    - (interpret) Began adaptation.
+
+07-Sep-2000 (Lars Duening)  (3.3.11)
+    - (simulate, call_out) Due to a flag inversion, call_out() was unable
+         to take lvalues as arguments. It also gave the error message
+         with an off argument count (reported by Thorsten).
+    - (files) Adapted to new string handling.
+
+06-Sep-2000 (Lars Duening)
+    - (interpret) The setjmp() for a catch() instruction has been moved into
+         its own stack frame and eval_instruction() is called recursively
+         on the guarded code. This seems to prevent failures and cores
+         when using gcc as compiler, and doesn't hurt on other platforms
+         either (reported by Parsec).
+
+05-Sep-2000 (Lars Duening)
+    - (xerq/socket.c) A faulty comparison caused the xerq to ignore
+         SOCKET_STDERR and send everything on stdout (thanks, Fiona!).
+
+04-Sep-2000 (Lars Duening)  (3.3.10)
+    - (mstrings) Added allocation tracing.
+    - (func_spec, efuns) Removed obsolete efun extract().
+    - (efuns) Adapted to new string handling.
+
+03-Sep-2000 (Lars Duening)
+    - (ed.c) Adapted.
+
+01-Sep-2000 (Lars Duening)  (3.3.9)
+    - (comm, dumpstat) Adapted to new string handling.
+    - (mstrings) Some new functions; strings are now internally terminated
+         with '\0' to simply interfacing with normal C library functions.
+
+31-Aug-2000 (Lars Duening)  (3.3.8)
+    - (array.c) Completed adaption, also removed obsolete efun member_array().
+    - (backend, bitstrings, call_out, closure) Adapted to new string handling.
+
+30-Aug-2000 (Lars Duening)  (3.3.7)
+    - (comm.c) The driver did not fully recover from a failed INPUT_CHARMODE
+         notification - treating the input as in charmode even after the
+         failure. (b-000818)
+    - (array.c) Continued adaptation.
+
+29-Aug-2000 (Lars Duening)
+    - (interpret.c) When reactivating a destructed master, the function
+         applies failed to find static functions, even though all other
+         master applies do (thanks, Daniel!)
+
+29-Aug-2000 (Lars Duening)  (3.3.6)
+    - (interpret.c, object.c) The applies to valid_seteuid() and valid_trace()
+         clobbered the stackpointer (reported by Freaky).
+    - (func_spec) The argument definitions for apply() and input_to()
+         were incomplete (reported by Freaky).
+    - (actions, sent.h) Adapted the actions to use mstrings.
+    - (actions, func_spec) Removed the efuns add_verb(), add_xverb(),
+         and the historic add_actions(fun) mode.
+
+28-Aug-2000 (Lars Duening)  (3.3.5)
+    - (make_func.y) Adapted the creation of stdstrings.[ch].
+    - (Makefiles) Adapted.
+    - (svalue.h) Modified the definition of svalue_t to use string_t
+         instead of char* for strings. Also, the string_type is gone.
+    - (hash) Added whashmem() which hashes a memory block of a given
+         length.
+    - (gcollect.c) Adapted the basic functions to the new stringhandler,
+         but not all the places where at the moment normal strings are
+         referenced.
+    - (efuns.c) Adapted debug_info() to the new string handler.
+    - (other files) All uses of T_STRING changed to T_OLD_STRING (which
+         of course doesn't exist). This way it's easier to find all
+         the places which have to be changed.
+
 28-Aug-2000 (Lars Duening)  (3.3.4)
     - (pkg-mysql.c, configure, Makefile.in) Made the mySQL code work again.
          Additionally the mysqlclient library is now part of the @PKGLIBS@

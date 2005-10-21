@@ -42,8 +42,8 @@
  *     void reference_destructed_object(object_t *ob)
  *         Note the reference to a destructed object <ob>.
  *
- *     void count_ref_from_string(char *p);
- *         Count the reference to shared string <p>.
+ *     void count_ref_from_string(string_t *p);
+ *         Count the reference to string <p>.
  *
  *     void clear_ref_in_vector(svalue_t *svp, size_t num);
  *         Clear the refs of the <num> elements of vector <svp>.
@@ -66,7 +66,6 @@
 #include <sys/time.h>
 #include <stdio.h>
 
-#define NO_REF_STRING
 #include "gcollect.h"
 #include "actions.h"
 #include "array.h"
@@ -83,6 +82,7 @@
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
+#include "mstrings.h"
 #include "object.h"
 #include "otable.h"
 #include "parse.h"
@@ -93,7 +93,6 @@
 #include "simul_efun.h"
 #include "smalloc.h"
 #include "stdstrings.h"
-#include "stralloc.h"
 #include "swap.h"
 #include "wiz_list.h"
 #include "xalloc.h"
@@ -143,11 +142,6 @@ static lambda_t *stale_lambda_closures;
    * The now irrelevant .ob pointer is used to link the list elements.
    */
 
-static size_t size_alloc_strings;
-static size_t num_alloc_strings;
-  /* Number and size of unshared strings encountered.
-   */
-
 #endif /* GC_SUPPORT */
 
 /*-------------------------------------------------------------------------*/
@@ -171,62 +165,16 @@ static size_t num_alloc_strings;
    * Return TRUE if the marker was not set, FALSE else.
    */
 
-#define STRING_REFS(str)  (*(unsigned short *)((char *) (str)\
-                           - sizeof(unsigned short)))
-  /* Return the refcount of shared string <str>
+#define MSTRING_REFS(str) ((str)->info.ref)
+  /* Return the refcount of mstring <str>
    */
-
-#if !defined(CHECK_STRINGS) && !defined(DEBUG)
-
-#define MARK_STRING_REF(str) ((void)(\
-    STRING_REFS(str)++ || (\
-        CHECK_REF( (str)-sizeof(short)-sizeof(char *) ) ||\
-            /* reached max ref count, which is given as 0... */ \
-            STRING_REFS(str)--\
-    ))\
-)
-  /* Increment the refcount of shared string <str>. How it works:
-   * If STRING_REFS() is 0, the refcount either overflowed or it is
-   * the first visit to the block. If it's the first visit, CHECK_REF
-   * will return TRUE, otherwise we have an overflow and the STRING_REFS--
-   * will undo the ++ from earlier.
-   */
-#else
-
-static void MARK_STRING_REF (char * str)
-{
-    if (CHECK_REF( (str)-sizeof(short)-sizeof(char *) ) )
-    {
-        /* First visit to this block */
-        STRING_REFS(str)++;
-#ifdef CHECK_STRINGS
-        mark_shadow_string_ref(str);
-#endif
-    }
-    else if (STRING_REFS(str))
-    {
-        /* Not the first visit, and refcounts didn't overrun either */
-        STRING_REFS(str)++;
-        if (!STRING_REFS(str))
-        {
-            /* Refcount overflow */
-            dprintf2(gout, "DEBUG: mark string: %x '%s' refcount reaches max!\n"
-                    , (p_int)str, (p_int)str);
-        }
-#ifdef CHECK_STRINGS
-        inc_shadow_string_ref(str);
-#endif
-    }
-}
-
-#endif /* DEBUG || CHECK_STRINGS */
-
 
 /* Forward declarations */
 
 static void clear_map_ref_filter (svalue_t *, svalue_t *, void *);
 static void clear_ref_in_closure (lambda_t *l, ph_int type);
 static void count_ref_in_closure (svalue_t *csvp);
+static void MARK_MSTRING_REF (string_t * str);
 
 #endif /* MALLOC_smalloc */
 
@@ -345,7 +293,7 @@ mark_program_ref (program_t *p)
 
         unsigned char *program = p->program;
         uint32 *functions = p->functions;
-        char **strings;
+        string_t **strings;
         variable_t *variable_names;
 
         if (p->ref++)
@@ -360,14 +308,14 @@ mark_program_ref (program_t *p)
         {
             if ( !(functions[i] & NAME_INHERITED) )
             {
-                char *name;
+                string_t *name;
 
                 memcpy(
-                  (char *)&name,
+                  &name,
                   program + (functions[i] & FUNSTART_MASK) - 1 - sizeof name,
                   sizeof name
                 );
-                MARK_STRING_REF(name);
+                MARK_MSTRING_REF(name);
             }
         }
 
@@ -376,22 +324,22 @@ mark_program_ref (program_t *p)
         strings = p->strings;
         for (i = p->num_strings; --i >= 0; )
         {
-            char *str = *strings++;
-            MARK_STRING_REF(str);
+            string_t *str = *strings++;
+            MARK_MSTRING_REF(str);
         }
 
         /* Variable names */
 
         variable_names = p->variable_names;
         for (i = p->num_variables; --i >= 0; variable_names++)
-            MARK_STRING_REF(variable_names->name);
+            MARK_MSTRING_REF(variable_names->name);
 
         /* Inherited programs */
 
         for (i=0; i< p->num_inherited; i++)
             mark_program_ref(p->inherit[i].prog);
 
-        note_ref(p->name);
+        MARK_MSTRING_REF(p->name);
     }
     else
     {
@@ -420,8 +368,8 @@ reference_destructed_object (object_t *ob)
         gc_obj_list_destructed = ob;
         MARK_REF(ob);
         mark_program_ref(ob->prog);
-        note_ref(ob->name);
-        MARK_STRING_REF(ob->load_name);
+        MARK_MSTRING_REF(ob->name);
+        MARK_MSTRING_REF(ob->load_name);
         ob->ref++;
     }
     else
@@ -435,15 +383,58 @@ reference_destructed_object (object_t *ob)
 }
 
 /*-------------------------------------------------------------------------*/
-void
-count_ref_from_string (char *p)
+static void
+MARK_MSTRING_REF (string_t * str)
 
-/* Count the reference to shared string <p>.
+/* Increment the refcount of mstring <str>. How it works:
+ * If MSTRING_REFS() is 0, the refcount either overflowed or it is
+ * the first visit to the block. If it's the first visit, CHECK_REF
+ * will return TRUE, otherwise we have an overflow and the MSTRING_REFS--
+ * will undo the ++ from earlier.
  */
 
 {
-   MARK_STRING_REF(p);
-}
+    if (CHECK_REF(str))
+    {
+        /* First visit to this block */
+        MSTRING_REFS(str)++;
+    }
+    else if (MSTRING_REFS(str))
+    {
+        /* Not the first visit, and refcounts didn't overrun either */
+        MSTRING_REFS(str)++;
+        if (!MSTRING_REFS(str))
+        {
+            /* Refcount overflow */
+            dprintf2(gout, "DEBUG: mark string: %x '%s' refcount reaches max!\n"
+                    , (p_int)str, (p_int)str->str->txt);
+        }
+    }
+
+    /* Figure out and reference the secondary blocks */
+
+    if (str->info.tabled || str->link == NULL)
+    {
+        /* A tabled or a free string */
+
+        note_ref(str->str);
+    }
+    else
+    {
+        MARK_MSTRING_REF(str->link);
+    }
+} /* MARK_MSTRING_REF(str) */
+
+/*-------------------------------------------------------------------------*/
+void
+count_ref_from_string (string_t *p)
+
+/* Count the reference to mstring <p>.
+ */
+
+{
+   MARK_MSTRING_REF(p);
+} /* count_ref_from_string() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -592,84 +583,64 @@ count_ref_in_vector (svalue_t *svp, size_t num)
             p->u.map->ref++;
             continue;
 
-          case T_STRING:
-              switch(p->x.string_type)
-              {
-              case STRING_MALLOC:
-                  note_ref(p->u.string);
-                  size_alloc_strings += strlen(p->u.string)+1;
-                  num_alloc_strings++;
-                  break;
-              case STRING_SHARED:
-                  MARK_STRING_REF(p->u.string);
-                  break;
-              }
-              continue;
+        case T_STRING:
+            MARK_MSTRING_REF(p->u.str);
+            continue;
 
-          case T_CLOSURE:
-              if (CLOSURE_MALLOCED(p->x.closure_type))
-              {
-                  if (p->u.lambda->ref++ <= 0)
-                  {
-                      count_ref_in_closure(p);
-                  }
-              }
-              else
-              {
-                  object_t *ob;
+        case T_CLOSURE:
+            if (CLOSURE_MALLOCED(p->x.closure_type))
+            {
+                if (p->u.lambda->ref++ <= 0)
+                {
+                    count_ref_in_closure(p);
+                }
+            }
+            else
+            {
+                object_t *ob;
 
-                  ob = p->u.ob;
-                  if (ob->flags & O_DESTRUCTED)
-                  {
-                      p->x.closure_type = F_UNDEF+CLOSURE_EFUN;
-                      p->u.ob = master_ob;
-                      master_ob->ref++;
-                      reference_destructed_object(ob);
-                  }
-                  else
-                  {
-                      ob->ref++;
-                  }
-              }
-              continue;
+                ob = p->u.ob;
+                if (ob->flags & O_DESTRUCTED)
+                {
+                    p->x.closure_type = F_UNDEF+CLOSURE_EFUN;
+                    p->u.ob = master_ob;
+                    master_ob->ref++;
+                    reference_destructed_object(ob);
+                }
+                else
+                {
+                    ob->ref++;
+                }
+            }
+            continue;
 
-          case T_SYMBOL:
-              MARK_STRING_REF(p->u.string);
-              continue;
+        case T_SYMBOL:
+            MARK_MSTRING_REF(p->u.str);
+            continue;
         }
     } /* for */
 }
 
 /*-------------------------------------------------------------------------*/
 static void
-remove_unreferenced_string (char *start, char *string)
+remove_unreferenced_string (string_t *string)
 
 /* If the shared string <string> stored in the memory block <start> is
  * not referenced, it is deallocated.
  */
 
 {
-    if (TEST_REF(start))
+    if (TEST_REF(string))
     {
-#ifdef KEEP_STRINGS
-        dprintf1(gout, "shared string %x was left unreferenced.\n",
-          (p_int) string
-        );
-
-        MARK_REF(start);
-#else
         dprintf2(gout,
-"shared string %x '%s' was left unreferenced, freeing now.\n",
-          (p_int) string, (p_int)string
+"tabled string %x '%s' was left unreferenced, freeing now.\n",
+          (p_int) string, (p_int)string->str->txt
         );
 
-        MARK_REF(start);
-#ifdef CHECK_STRINGS
-        mark_shadow_string_ref(string);
-#endif
-        STRING_REFS(string)++;
-        free_string(string);
-#endif
+        MARK_REF(string);
+        MARK_REF(string->str);
+        MSTRING_REFS(string)++;
+        free_mstring(string);
     }
 }
 
@@ -683,9 +654,9 @@ note_action_ref (action_t *p)
 {
     do {
         if (p->function)
-            MARK_STRING_REF(p->function);
+            MARK_MSTRING_REF(p->function);
         if (p->verb)
-            MARK_STRING_REF(p->verb);
+            MARK_MSTRING_REF(p->verb);
         note_ref(p);
     } while ( NULL != (p = (action_t *)p->sent.next) );
 }
@@ -890,9 +861,6 @@ garbage_collection(void)
     int i;
     long dobj_count; /* DEBUG: of Object count */
 
-    size_alloc_strings = 0;
-    num_alloc_strings = 0;
-
     /* --- Pass 0: dispose of some unnecessary stuff ---
      */
 
@@ -939,7 +907,7 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
         if (d_flag > 4)
         {
             debug_message("%s clearing refs for object '%s'\n"
-                         , time_stamp(), ob->name);
+                         , time_stamp(), get_txt(ob->name));
         }
         was_swapped = 0;
         if (ob->flags & O_SWAPPED
@@ -956,7 +924,7 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
         }
         if (was_swapped < 0)
             fatal("Totally out of MEMORY in GC: (swapping in '%s')\n"
-                 , ob->name);
+                 , get_txt(ob->name));
 
         clear_inherit_ref(ob->prog);
         ob->ref = 0;
@@ -1030,7 +998,7 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
 
     /* Let the modules process their data */
 
-    clear_shared_string_refs();
+    mstring_clear_refs();
     clear_ref_from_wiz_list();
     clear_ref_from_call_outs();
 #if defined(SUPPLY_PARSE_COMMAND)
@@ -1108,8 +1076,8 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
                 note_action_ref((action_t *)sent);
         }
 
-        note_ref(ob->name);
-        MARK_STRING_REF(ob->load_name);
+        MARK_MSTRING_REF(ob->name);
+        MARK_MSTRING_REF(ob->load_name);
 
         if (was_swapped)
         {
@@ -1191,19 +1159,13 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
     else
         fatal("No master object\n");
 
-    /* TODO: see array.c */
-    if (last_insert_alist_shared_string)
-    {
-        MARK_STRING_REF(last_insert_alist_shared_string);
-    }
-
     count_lex_refs();
     count_compiler_refs();
     count_simul_efun_refs();
 #if defined(SUPPLY_PARSE_COMMAND)
     count_parse_refs();
 #endif
-    note_shared_string_table_ref();
+    mstring_note_refs();
     note_otable_ref();
     count_comm_refs();
     count_interpreter_refs();
@@ -1239,7 +1201,7 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
     /* --- Pass 4: remove stralloced strings with M_REF cleared ---
      */
 
-    walk_shared_strings(remove_unreferenced_string);
+    mstring_walk_strings(remove_unreferenced_string);
 
     /* --- Pass 5: Release all destructed objects ---
      *
@@ -1251,7 +1213,7 @@ printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp()
     for (ob = gc_obj_list_destructed; ob; ob = next_ob)
     {
 #define W(s) write(1,s,strlen(s)) /* DEBUG: */
-W("DEBUG: GC frees destructed '"); W(ob->name); W("'\n");
+W("DEBUG: GC frees destructed '"); W(get_txt(ob->name)); W("'\n");
         next_ob = ob->next_all;
         free_object(ob, "garbage collection");
         dobj_count++;
@@ -1301,7 +1263,6 @@ W("DEBUG: GC frees destructed '"); W(ob->name); W("'\n");
     reallocate_reserved_areas();
     time_last_gc = time(NULL);
 printf("DEBUG: %s GC end: %ld objects in list, %ld allocated; %ld destructed removed\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object, dobj_count); /* TODO: Remove this line */
-printf("DEBUG: %s         %ld malloced strings using %ld bytes.\n", time_stamp(), (long)num_alloc_strings, (long)size_alloc_strings); /* TODO: Remove this line */
 }
 
 
@@ -1339,24 +1300,62 @@ show_string (int d, char *block, int depth UNUSED)
 
 /*-------------------------------------------------------------------------*/
 static void
-show_added_string (int d, char *block, int depth UNUSED)
+show_mstring_data (int d, void *block, int depth UNUSED)
 
-/* Print the string from memory <block> on filedescriptor <d>, prefixed
- * by 'Added string: '.
+/* Print the stringdata from memory <block> on filedescriptor <d>.
  */
 
 {
 #ifdef __MWERKS__
 #    pragma unused(depth)
 #endif
-    WRITES(d, "Added string: ");
-    show_string(d, block, 0);
-    WRITES(d, "\n");
+    string_data_t *str;
+
+    str = (string_data_t *)block;
+    WRITES(d, "(");
+    writed(d, (p_uint)str->size);
+    WRITES(d, ")\"");
+    if (str->size < 50)
+    {
+        write(d, block, str->size);
+        WRITES(d, "\"");
+    }
+    else
+    {
+        write(d, block, 50);
+        WRITES(d, "\" (truncated)");
+    }
 }
 
 /*-------------------------------------------------------------------------*/
 static void
-show_object (int d, char *block, int depth)
+show_mstring (int d, void *block, int depth)
+
+/* Print the mstring from memory <block> on filedescriptor <d>.
+ */
+
+{
+    string_t *str;
+
+    str = (string_t *)block;
+    if (str->info.tabled)
+    {
+        WRITES(d, "Tabled string: ");
+    }
+    else if (NULL == str->link)
+    {
+        WRITES(d, "Untabled string: ");
+    }
+    else
+    {
+        WRITES(d, "Ind. tabled string: ");
+    }
+    show_mstring_data(d, str->str, depth);
+}
+
+/*-------------------------------------------------------------------------*/
+static void
+show_object (int d, void *block, int depth)
 
 /* Print the data about object <block> on filedescriptor <d>.
  */
@@ -1377,7 +1376,7 @@ show_object (int d, char *block, int depth)
         }
     }
     WRITES(d, "Object: ");
-    show_string(d, ob->name, 0);
+    show_mstring(d, ob->name, 0);
     WRITES(d, ", uid: ");
     show_string(d, ob->user->name ? ob->user->name : "0", 0);
     WRITES(d, "\n");
@@ -1385,7 +1384,7 @@ show_object (int d, char *block, int depth)
 
 /*-------------------------------------------------------------------------*/
 static void
-show_array(int d, char *block, int depth)
+show_array(int d, void *block, int depth)
 
 /* Print the array at recursion <depth> from memory <block> on
  * filedescriptor <d>. Recursive printing stops at <depth> == 2.
@@ -1453,29 +1452,15 @@ show_array(int d, char *block, int depth)
             break;
 
         case T_STRING:
-            if (svp->x.string_type == STRING_MALLOC &&
-                  is_freed(svp->u.string, 1) )
+            if (is_freed(svp->u.str, 1) )
             {
-                WRITES(d, "Malloced string in freed block 0x");
+                WRITES(d, "String in freed block 0x");
                 write_x(d, (p_uint)((unsigned *)block - SMALLOC_OVERHEAD));
                 WRITES(d, "\n");
                 break;
             }
-            if (svp->x.string_type == STRING_SHARED &&
-                is_freed(SHSTR_BLOCK(svp->u.string),
-                         sizeof(char *) + sizeof(short) + 1) )
-            {
-
-                WRITES(d, "Shared string in freed block 0x");
-                write_x(d, (p_uint)(
-                  (unsigned *)(block-sizeof(char *)-sizeof(short))
-                  - SMALLOC_OVERHEAD
-                ));
-                WRITES(d, "\n");
-                break;
-            }
             WRITES(d, "String: ");
-            show_string(d, svp->u.string, 0);
+            show_mstring(d, svp->u.str, 0);
             WRITES(d, "\n");
             break;
 
@@ -1497,7 +1482,8 @@ setup_print_block_dispatcher (void)
 /* Setup the tracing data dispatcher in smalloc with the show_ functions
  * above. Remember that the data dispatcher works by storing the file
  * and line information of sample allocations. We just have to make sure
- * to cover all possible allocation locations.
+ * to cover all possible allocation locations (with the string module and
+ * its pervasive inlining this is not easy).
  *
  * This is here because I like to avoid smalloc calling closures, and
  * gcollect.c is already notorious for including almost every header file
@@ -1505,18 +1491,29 @@ setup_print_block_dispatcher (void)
  */
 
 {
-    svalue_t tmp_closure;
     vector_t *a, *b;
 
     assert_master_ob_loaded();
-    tmp_closure.type = T_CLOSURE;
-    tmp_closure.x.closure_type = CLOSURE_EFUN + F_ADD;
-    tmp_closure.u.ob = master_ob;
-    push_volatile_string(inter_sp, "");
-    push_volatile_string(inter_sp, "");
-    call_lambda(&tmp_closure, 2);
-    store_print_block_dispatch_info(inter_sp->u.string, show_added_string);
-    free_svalue(inter_sp--);
+
+#if 0
+    /* Since the strings store the location of the call to the function
+     * which in turn called the string module function, the print
+     * block dispatcher won't be able to recognize them.
+     */
+    store_print_block_dispatch_info(STR_EMPTY, show_mstring);
+    store_print_block_dispatch_info(STR_EMPTY->str, show_mstring_data);
+    str = mstring_alloc_string(1);
+    store_print_block_dispatch_info(str, show_mstring);
+    store_print_block_dispatch_info(str->str, show_mstring_data);
+    mstring_free(str);
+    str = mstring_new_string("\t");
+    store_print_block_dispatch_info(str, show_mstring);
+    store_print_block_dispatch_info(str->str, show_mstring_data);
+    str = mstring_table_inplace(str);
+    store_print_block_dispatch_info(str->link, show_mstring);
+    mstring_free(str);
+#endif
+
     a = allocate_array(1);
     store_print_block_dispatch_info((char *)a, show_array);
     b = slice_array(a, 0, 0);

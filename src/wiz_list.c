@@ -101,7 +101,6 @@
 #include "object.h"
 #include "simulate.h"
 #include "stdstrings.h"
-#include "stralloc.h"
 #include "svalue.h"
 #include "xalloc.h"
 
@@ -278,7 +277,7 @@ get_wiz_name (char *file)
 
     push_volatile_string(inter_sp, file);
     ret = apply_master_ob(STR_GET_WNAME, 1);
-    if (ret == 0 || ret->type != T_STRING)
+    if (ret == 0 || ret->type != T_OLD_STRING)
         return NULL;
     strncpy(buff, ret->u.string, sizeof buff - 1);
     buff[sizeof(buff)-1] = '\0';
@@ -455,7 +454,7 @@ f_wizlist_info (svalue_t *sp)
             put_array(wsvp, entry);
             wsvp++;
             svp = entry->item;
-            put_ref_string(&(svp[WL_NAME]), w->name);
+            put_ref_old_string(&(svp[WL_NAME]), w->name);
             put_number(&(svp[WL_COMMANDS]), w->score);
             put_number(&(svp[WL_EVAL_COST]), w->cost);
             put_number(&(svp[WL_HEART_BEATS]), w->heart_beats);
@@ -509,7 +508,7 @@ f_set_extra_wizinfo (svalue_t *sp)
     {
         user = sp[-1].u.ob->user;
     }
-    else if (type != T_STRING || !(user = find_wiz(sp[-1].u.string)))
+    else if (type != T_OLD_STRING || !(user = find_wiz(sp[-1].u.string)))
     {
         if (type == T_NUMBER && sp[-1].u.number == 0)
             user = NULL;
@@ -558,7 +557,7 @@ f_get_extra_wizinfo (svalue_t *sp)
     {
         user = sp->u.ob->user;
     }
-    else if (type != T_STRING || !(user = find_wiz(sp->u.string)))
+    else if (type != T_OLD_STRING || !(user = find_wiz(sp->u.string)))
     {
         if (type == T_NUMBER && sp->u.number == 0)
             user = NULL;

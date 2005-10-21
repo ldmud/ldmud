@@ -36,88 +36,8 @@
 
 #define malloced_size(ptr) ( ((p_uint *)(ptr))[-SMALLOC_OVERHEAD] & MASK )
 
-/* TODO: svalue_strlen() should go into a strings/datatypes module.
- * This would also make the include of svalue.h unnecessary.
- */
-#    ifdef USES_SVALUE_STRLEN
-
-static INLINE size_t _svalue_strlen (svalue_t *v)
-
-/* A quick function to determine a string length by inspecting
- * the memory structures.
- */
-
-{
-    short type = v->x.string_type;
-    char *p = v->u.string;
-    long i;
-
-    if (type == STRING_MALLOC)
-    {
-        i = (long)(
-                     ( ((p_uint*)p)[-SMALLOC_OVERHEAD] & MASK)
-                     - SMALLOC_OVERHEAD - 1
-                    ) * SIZEOF_CHAR_P;
-        if (*(p += i))
-        {
-            /* The string ends somewhere in this word */
-            if (*++p)
-                if (!*++p) return (size_t)(i+2);
-#if SIZEOF_CHAR_P == 4
-                else return (size_t)(i+3);
-#else
-                else return (size_t)(i+3)+strlen(p+1);
-#endif
-            else return (size_t)(i+1);
-        }
-        /* Got the end in one */
-        return (size_t)i;
-    }
-    else if (type == STRING_SHARED)
-    {
-        i = (long)
-            ((*(p_uint*)
-                 (p - sizeof(short) - (SMALLOC_OVERHEAD+1) * SIZEOF_CHAR_P) &
-                MASK) * SIZEOF_CHAR_P -
-               sizeof(short) -
-               (SMALLOC_OVERHEAD+2) * SIZEOF_CHAR_P
-            );
-        if (i >= 0)
-#if SIZEOF_CHAR_P == 4
-        {
-            if (*(p+=i))
-            {
-                if (*++p)
-                {
-                    if (!*++p) return (size_t)(i+2);
-                    else return (size_t)(i+3);
-                }
-                else return (size_t)(i+1);
-            }
-            return (size_t)i;
-        }
-        if (!*p) return 0;
-        return 1;
-#else
-        return (size_t)i + strlen(p+i);
-        return strlen(p);
-#endif
-    }
-    else /* volatile/constant string */
-    {
-        return strlen(p);
-    }
-} /* _svalue_strlen() */
-
-#    define svalue_strlen(v) (_svalue_strlen((v)))
-
-#endif /* USES_SVALUE_STRLEN */
-
-#define malloced_strlen(s) ( ( \
-        (*(p_uint *)((s)-sizeof(p_int)*SMALLOC_OVERHEAD) & MASK) \
-        - SMALLOC_OVERHEAD) * SIZEOF_CHAR_P)
-
 /* --- Variables --- */
+
 extern int debugmalloc;
 
 /* --- Prototypes --- */
@@ -151,7 +71,7 @@ extern void *malloc_increment_size(void *p, size_t size);
 extern void walk_new_small_malloced( void (*func)(POINTER, long) );
 
 #ifdef MALLOC_TRACE
-extern void store_print_block_dispatch_info(void *block, void (*func)(int, char *, int) );
+extern void store_print_block_dispatch_info(void *block, void (*func)(int, void *, int) );
 extern int is_freed(void *p, p_uint minsize);
 #endif /* MALLOC_TRACE */
 

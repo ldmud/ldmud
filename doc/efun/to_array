@@ -8,8 +8,7 @@ SYNOPSIS
 
 DESCRIPTION
 	Strings and symbols are converted to an int array that
-	consists of the args characters, with 0 == '\0' as last
-	character stored.
+	consists of the args characters.
 	Quoted arrays are ``dequoted'', and arrays are left as they
 	are.
 

@@ -28,10 +28,6 @@
 #include "comm.h"
 #include "simulate.h"
 #include "svalue.h"
-#if 0 /* See below */
-#define USES_SVALUE_STRLEN
-#include "smalloc.h"
-#endif
 #include "xalloc.h"
 
 /*--------------------------------------------------------------------*/
@@ -250,7 +246,7 @@ strbuf_store (strbuf_t *buf, svalue_t *svp)
  */
 
 {
-    svp->type = T_STRING;
+    svp->type = T_OLD_STRING;
     if (buf->buf && buf->length)
     {
         /* The buffer is most likely allocated longer than necessary,

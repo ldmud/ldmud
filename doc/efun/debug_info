@@ -157,20 +157,39 @@ DESCRIPTION
 
               int DID_ST_STRINGS
               int DID_ST_STRING_SIZE
-                  Number of distinct strings in the string table, and
-                  their size.
+                  Total number and size of string requests.
 
               int DID_ST_STR_TABLE_SIZE
-                  Size of the string table.
+                  Size of the string table structure itself.
 
-              int DID_ST_STR_REQ
-              int DID_ST_STR_REQ_SIZE
-                  Total number of string allocations, and their size.
+              int DID_ST_STR_OVERHEAD
+                  Size of the overhead per string.
+
+              int DID_ST_STR_IT_OVERHEAD
+                  Size of the additional overhead per indirectly tabled
+                  string.
+
+              int DID_ST_UNTABLED
+              int DID_ST_UNTABLED_SIZE
+                  Total number and size of existing untabled strings.
+
+              int DID_ST_ITABLED
+              int DID_ST_ITABLED_SIZE
+                  Total number and size of existing indirectly tabled strings.
+                  Of the memory, only DID_ST_ITABLED * DID_ST_STR_IT_OVERHEAD
+                  is not shared with the tabled strings.
+
+              int DID_ST_TABLED
+              int DID_ST_TABLED_SIZE
+                  Total number and size of existing directly tabled strings.
 
               int DID_ST_STR_SEARCHES
-              int DID_ST_STR_SEARCH_LEN
-                  Number of searches in the string table, and the
-                  accumulated search length.
+              int DID_ST_STR_SEARCHLEN
+                  Number and accumulated length of string searches by address.
+
+              int DID_ST_STR_SEARCHES_BYVALUE
+              int DID_ST_STR_SEARCHLEN_BYVALUE
+                  Number and accumulated length of string searches by value.
 
               int DID_ST_RX_CACHED
                   Number of regular expressions cached.
@@ -286,6 +305,8 @@ HISTORY
         DINFO_DUMP introduced with 3.2.7.
         LDMud 3.2.8 added the data size of the object to the result of
         DINFO_MEMORY; the DINFO_DATA request; the DID_MEM_WASTED* stats.
+        LDMud 3.3 replaced the string related DID_ST_ constants according to
+        the new string implementation.
 
 SEE ALSO
         trace(E), traceprefix(E), malloc(D), status(D), dumpallobj(D)

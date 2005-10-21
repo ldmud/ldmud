@@ -17,17 +17,15 @@
 #include "driver.h"
 #include "typedefs.h"
 
-#define USES_SVALUE_STRLEN
 #include "bitstrings.h"
 
-#include "instrs.h"
 #include "interpret.h"
 #include "lex.h"
 #include "main.h"
+#include "mstrings.h"
 #include "simulate.h"
 #include "svalue.h"
 #include "xalloc.h"
-#include "smalloc.h" /* svalue_strlen() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -54,28 +52,18 @@ f_clear_bit (svalue_t *sp)
     if (bitnum < 0)
         error("clear_bit: negative bit number: %ld\n", (long)bitnum);
 
-    len = svalue_strlen(strp);
+    len = mstrsize(strp->u.str);
     ind = bitnum/6;
     if (ind >= len)
     {
-        /* Return first argument unmodified! */
+        /* Bits beyond the current end of the string are assumged to
+         * be cleared anyway. Therefore, return the argument unmodified.
+         */
         return sp;
     }
 
-    /* Malloc'ed strings are modified in place, others are copied first.
-     */
-    if (strp->x.string_type == STRING_MALLOC)
-    {
-        str = strp->u.string;
-    }
-    else
-    {
-        str = xalloc(len+1);
-        memcpy(str, strp->u.string, len+1); /* Including null byte */
-        free_string_svalue(strp);
-        strp->x.string_type = STRING_MALLOC;
-        strp->u.string = str;
-    }
+    strp->u.str = dup_mstring(strp->u.str);
+    str = get_txt(strp->u.str);
 
     if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
         error("Illegal bit pattern in clear_bit character %ld\n", (long)ind);
@@ -102,7 +90,7 @@ f_set_bit (svalue_t *sp)
 
 {
     char *str;
-    size_t len, old_len, ind, bitnum;
+    size_t len, ind, bitnum;
     svalue_t *strp;
 
     bitnum = (size_t)sp->u.number;
@@ -112,29 +100,20 @@ f_set_bit (svalue_t *sp)
     if (bitnum < 0)
         error("set_bit: negative bit number: %ld\n", (long)bitnum);
 
-    len = svalue_strlen(strp);
-    old_len = len;
+    len = mstrsize(strp->u.str);
     ind = bitnum/6;
 
-    /* Malloc'ed strings of the right size are modified in place,
-     * others are copied first.
-     */
-    if ( (ind < len || (len = ind + 1, MY_FALSE) )
-     &&  strp->x.string_type == STRING_MALLOC )
+    if (ind < len)
     {
-        str = strp->u.string;
+        strp->u.str = dup_mstring(strp->u.str);
+        str = get_txt(strp->u.str);
     }
     else
     {
-        str = xalloc(len+1);
-        str[len] = '\0';
-        if (old_len)
-            memcpy(str, strp->u.string, old_len);
-        if (len > old_len)
-            memset(str + old_len, ' ', len - old_len);
-        free_string_svalue(strp);
-        strp->x.string_type = STRING_MALLOC;
-        strp->u.string = str;
+        strp->u.str = resize_mstring(strp->u.str, ind+1);
+        str = get_txt(strp->u.str);
+        for ( ; len <= ind; len++)
+            str[len] = ' ';
     }
 
     if (str[ind] > 0x3f + ' ' || str[ind] < ' ')
@@ -167,7 +146,7 @@ f_test_bit (svalue_t *sp)
     if (bitnum < 0)
         error("test_bit: negative bit number: %ld\n", (long)bitnum);
 
-    len = svalue_strlen(sp-1);
+    len = mstrsize(sp[-1].u.str);
     if (bitnum/6 >= len)
     {
         sp--;
@@ -176,7 +155,7 @@ f_test_bit (svalue_t *sp)
         return sp;
     }
 
-    if ( ((sp-1)->u.string[bitnum/6] - ' ')
+    if ( (get_txt((sp-1)->u.str)[bitnum/6] - ' ')
         & 1 << (bitnum % 6) )
     {
         sp--;
@@ -210,12 +189,10 @@ binop_bits (svalue_t *sp, int instr)
  */
 
 {
-    size_t  len1, len2, result_len, arg_len;
-    char   *arg, *result, *to_copy;
+    size_t  len1, len2, arg_len;
+    string_t *result, *arg;
+    char *restxt, *argtxt;
     Bool  use_short; /* TRUE for AND: use shorter string for result */
-
-    result_len = 0;
-    to_copy = NULL;
 
     use_short = (instr == F_AND_BITS);
 
@@ -224,8 +201,8 @@ binop_bits (svalue_t *sp, int instr)
      * We will try to modify one of the two strings in-place.
      */
     result = NULL;
-    len1 = svalue_strlen(sp-1);
-    len2 = svalue_strlen(sp);
+    len1 = mstrsize(sp[-1].u.str);
+    len2 = mstrsize(sp->u.str);
 
     if ((len1 >= len2 && !use_short)
      || (len1 < len2 && use_short)
@@ -235,58 +212,30 @@ binop_bits (svalue_t *sp, int instr)
          * else: sp-1 is the longer result; sp the shorter argument
          */
 
-        arg = sp->u.string;
-
-        if ((sp-1)->x.string_type == STRING_MALLOC)
-        {
-            result = (sp-1)->u.string;
-            *(sp-1) = const0;
-        }
-        else
-        {
-            result_len = len1;
-            to_copy = (sp-1)->u.string;
-        }
+        arg = sp->u.str;
+        result = dup_mstring(sp[-1].u.str); sp[-1] = const0;
     }
     else
     {
         /* AND: sp is the shorter result; sp-1 the longer argument
          * else: sp is the longer result; sp-1 the shorter argument
          */
-        arg = (sp-1)->u.string;
-
-        if (sp->x.string_type == STRING_MALLOC)
-        {
-            result = sp->u.string;
-            *sp = const0;
-        }
-        else
-        {
-            result_len = len2;
-            to_copy = sp->u.string;
-        }
-    }
-
-    /* If needed, allocate a copy of the result string.
-     */
-    if (!result)
-    {
-        inter_sp = sp;
-        result = xalloc(result_len+1);
-        if (!result)
-            error("Out of memory.\n");
-        memcpy(result, to_copy, result_len+1);
+        arg = (sp-1)->u.str;
+        result = dup_mstring(sp->u.str); *sp = const0;
     }
 
     /* Now perform the operation. */
+
+    restxt = get_txt(result);
+    argtxt = get_txt(arg);
 
     arg_len = (len2 > len1) ? len1 : len2;
     while (arg_len-- != 0)
     {
         char c1, c2;
 
-        c1 = result[arg_len];
-        c2 = arg[arg_len];
+        c1 = restxt[arg_len];
+        c2 = argtxt[arg_len];
         if (c1 > 0x3f + ' ' || c1 < ' ')
             error("Illegal bit pattern in %s character %d\n"
                    , get_f_name(instr), (int)c1);
@@ -294,17 +243,17 @@ binop_bits (svalue_t *sp, int instr)
             error("Illegal bit pattern in %s character %d\n"
                    , get_f_name(instr), (int)c2);
         if (instr == F_AND_BITS)
-            result[arg_len] = (char)(c1 & c2);
+            restxt[arg_len] = (char)(c1 & c2);
         else if (instr == F_OR_BITS)
-            result[arg_len] = (char)(c1 | c2);
+            restxt[arg_len] = (char)(c1 | c2);
         else if (instr == F_XOR_BITS)
-            result[arg_len] = (char)((c1 ^ c2) + ' ');
+            restxt[arg_len] = (char)((c1 ^ c2) + ' ');
     }
 
     /* Clean up the stack and push the result. */
     free_svalue(sp--);
     free_svalue(sp);
-    put_malloced_string(sp, result);
+    put_string(sp, result);
 
     return sp;
 } /* binop_bits() */
@@ -375,40 +324,20 @@ f_invert_bits (svalue_t *sp)
  */
 
 {
-    char * src, * dest;
+    char * str;
     long   len;
 
     /* Get the arguments */
 
-    src = sp->u.string;
-    len = (size_t)_svalue_strlen(sp);
-
-    /* If it is a malloced string, modify it in place,
-     * otherwise allocate a copy.
-     */
-    if (sp->x.string_type == STRING_MALLOC)
-        dest = src;
-    else
-    {
-        inter_sp = sp;
-        dest = xalloc((size_t)len+1);
-        if (!dest)
-            error("Out of memory\n");
-    }
+    len = (long)mstrsize(sp->u.str);
+    sp->u.str = dup_mstring(sp->u.str);
+    str = get_txt(sp->u.str);
 
     /* Invert the string */
     while (len-- > 0)
     {
-        *dest++ = (char)(' ' + (~(*src++ - ' ') & 0x3F));
-    }
-
-    *dest = '\0';
-
-    /* Push the result */
-    if (src != dest)
-    {
-        free_svalue(sp);
-        put_malloced_string(sp, dest);
+        *str = (char)(' ' + (~(*str - ' ') & 0x3F));
+        str++;
     }
 
     return sp;
@@ -438,8 +367,8 @@ f_last_bit (svalue_t *sp)
     pos = -1;
 
     /* Get the arguments */
-    str = sp->u.string;
-    len = (long)_svalue_strlen(sp);
+    str = get_txt(sp->u.str);
+    len = (long)mstrsize(sp->u.str);
 
     /* First, find the last non-zero character */
     c = 0;
@@ -496,8 +425,8 @@ f_next_bit (svalue_t *sp)
 
     /* Get the arguments */
 
-    str = (sp-2)->u.string;
-    len = (long)_svalue_strlen(sp-2);
+    str = get_txt((sp-2)->u.str);
+    len = (long)mstrsize((sp-2)->u.str);
 
     start = (sp-1)->u.number;
     if (start < 0)
@@ -574,11 +503,13 @@ f_count_bits (svalue_t *sp)
 {
     char * str;
     long   count;
+    long   len;
 
     /* Get the arguments */
-    str = sp->u.string;
+    str = get_txt(sp->u.str);
+    len = (long)mstrsize(sp->u.str);
 
-    for (count = 0; *str; str++)
+    for (count = 0; len > 0; str++, len--)
     {
         int c = *str - ' ';
 

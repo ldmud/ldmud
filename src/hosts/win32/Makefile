@@ -41,10 +41,8 @@ OPTIMIZE= -g # no optimization; for frequent recompilations.
 #            Nevertheless you are strongly encouraged to keep it defined.
 #   -DYYDEBUG[=1]: Debug output for the LPC compiler.
 #   -DTRACE_CODE: Enable the LPC code tracing.
-#   -DCHECK_STRINGS: Enable the shared string checking.
-#   -DKEEP_STRINGS: Shared strings are never really freed.
 #   -DDEBUG_TELNET: Activates debug prints in the telnet machine
-DEBUG = -DDEBUG -DTRACE_CODE -DCHECK_STRINGS # -DKEEP_STRINGS -DDEBUG_TELNET
+DEBUG = -DDEBUG -DTRACE_CODE # -DDEBUG_TELNET
 
 MPATH=-DMUD_LIB='"$(MUD_LIB)"' -DBINDIR='"$(BINDIR)"'
 #
@@ -61,13 +59,13 @@ MFLAGS = "BINDIR=$(BINDIR)" "MUD_LIB=$(MUD_LIB)"
 #
 SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\
     comm.c ed.c regexp.c mapping.c wiz_list.c swap.c xalloc.c\
-    call_out.c otable.c dumpstat.c stralloc.c hash.c port.c files.c\
+    call_out.c otable.c dumpstat.c mstrings.c hash.c port.c files.c\
     pkg-mysql.c ptrtable.c heartbeat.c actions.c mempools.c bitstrings.c \
     access_check.c parse_old.c parse.c prolang.y\
     efuns.c simul_efun.c strfuns.c sprintf.c gcollect.c closure.c random.c
 OBJ=lang.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
     comm.o ed.o regexp.o mapping.o wiz_list.o swap.o xalloc.o\
-    call_out.o otable.o dumpstat.o stralloc.o hash.o port.o files.o\
+    call_out.o otable.o dumpstat.o mstrings.o hash.o port.o files.o\
     pkg-mysql.o ptrtable.o heartbeat.o actions.o mempools.o bitstrings.o \
     access_check.o parse_old.o parse.o simul_efun.o strfuns.o sprintf.o\
     efuns.o gcollect.o closure.o random.o
@@ -134,13 +132,13 @@ access_check.o : access_check.c lint.h config.h machine.h comm.h interpret.h
 alloca.o : alloca.c
 
 array.o : array.c config.h machine.h lint.h interpret.h object.h wiz_list.h \
-  regexp.h exec.h lang.h instrs.h stralloc.h
+  regexp.h exec.h lang.h instrs.h 
 
 backend.o : backend.c lint.h config.h machine.h interpret.h object.h \
   wiz_list.h exec.h comm.h
 
 call_out.o : call_out.c lint.h config.h machine.h interpret.h object.h comm.h \
-  stralloc.h exec.h wiz_list.h
+   exec.h wiz_list.h
 
 closure.o : closure.c lint.h config.h machine.h lex.h exec.h interpret.h \
   object.h lang.h instrs.h
@@ -154,18 +152,18 @@ dumpstat.o : dumpstat.c lint.h config.h machine.h interpret.h object.h exec.h \
 ed.o : ed.c lint.h config.h machine.h regexp.h interpret.h object.h comm.h
 
 gcollect.o : gcollect.c lint.h config.h machine.h interpret.h object.h exec.h \
-  sent.h comm.h smalloc.h instrs.h lang.h wiz_list.h stralloc.h
+  sent.h comm.h smalloc.h instrs.h lang.h wiz_list.h 
 
 hash.o : hash.c
 
 interpret.o : interpret.c lint.h config.h machine.h interpret.h lang.h exec.h \
-  object.h wiz_list.h instrs.h comm.h sent.h switch.h smalloc.h stralloc.h
+  object.h wiz_list.h instrs.h comm.h sent.h switch.h smalloc.h 
 
 lang.o : lang.c lint.h config.h machine.h lex.h interpret.h object.h exec.h \
-  instrs.h incralloc.h switch.h stralloc.h
+  instrs.h incralloc.h switch.h 
 
 lex.o : lex.c lint.h config.h machine.h interpret.h lang.h exec.h lex.h \
-  instrs.h patchlevel.h stralloc.h efun_defs.c
+  instrs.h patchlevel.h  efun_defs.c
 
 main.o : main.c lint.h config.h machine.h interpret.h object.h lex.h \
   patchlevel.h
@@ -174,7 +172,7 @@ make_func.o : make_func.c lint.h config.h machine.h
 	$(CC) $(CFLAGS) -DYACC='"$(YACC)"' -c make_func.c
 
 mapping.o : mapping.c config.h machine.h lint.h interpret.h \
-  object.h wiz_list.h regexp.h stralloc.h smalloc.h
+  object.h wiz_list.h regexp.h  smalloc.h
 
 object.o : object.c lint.h config.h machine.h comm.h interpret.h object.h \
   sent.h wiz_list.h exec.h
@@ -191,17 +189,15 @@ port.o : port.c lint.h config.h machine.h
 regexp.o : regexp.c regexp.h lint.h config.h machine.h
 
 simul_efun.o : simul_efun.c lint.h config.h machine.h interpret.h object.h \
-  exec.h lex.h lang.h instrs.h stralloc.h
+  exec.h lex.h lang.h instrs.h 
 
 simulate.o : simulate.c lint.h config.h machine.h interpret.h instrs.h \
-  object.h sent.h wiz_list.h exec.h comm.h stralloc.h
+  object.h sent.h wiz_list.h exec.h comm.h 
 
 sprintf.o : sprintf.c config.h machine.h lint.h interpret.h lang.h instrs.h \
   exec.h object.h sent.h
 
-stralloc.o : stralloc.c stralloc.h config.h machine.h lint.h
-
 swap.o : swap.c lint.h config.h machine.h interpret.h object.h exec.h
 
 wiz_list.o : wiz_list.c config.h machine.h lint.h interpret.h object.h \
-  wiz_list.h stralloc.h
+  wiz_list.h 

@@ -46,6 +46,32 @@
 #  define GC_SUPPORT 1
 #endif
  
+/* When we have allocation tracing, the allocator annotates every
+ * allocation with the source filename and line where the allocation
+ * occured. To allow the annotation of the allocations of higher structures
+ * like strings with the place where the string as such is allocated (and not
+ * the places in the string module), the following macros can be used
+ * to declare and pass the necessary information transparently:
+ *
+ *   MTRACE_DECL: the declaration of the tracing arguments
+ *   MTRACE_PASS: the tracing arguments when passed on to lower
+ *                functions
+ *   MTRACE_ARG:  the tracing arguments on the toplevel call
+ */
+
+#ifdef MALLOC_TRACE
+
+#define MTRACE_DECL , const char * malloc_trace_file, int malloc_trace_line
+#define MTRACE_PASS , malloc_trace_file, malloc_trace_line
+#define MTRACE_ARG  , __FILE__, __LINE__
+
+#else
+
+#define MTRACE_DECL
+#define MTRACE_PASS
+#define MTRACE_ARG
+
+#endif
 
 /* This one is for backwards compatibility with old config.hs */
 

@@ -17,6 +17,8 @@ DESCRIPTION
 	of all living objects except the initiator will be called.
         This array will be given as first argument to the lfun, and
         the initiating object as the second.
+        CAVEAT: If the lfun catch_msg() modifies the <arr>, all subsequent
+        objects will receive the modified <arr>.
 
         By specifying a second argument to the efun one can exclude
         more objects than just the initiator. If the second argument

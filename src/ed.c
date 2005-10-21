@@ -48,7 +48,6 @@
 #include <stdio.h>
 #include <ctype.h>
 
-#define NO_REF_STRING
 #include "ed.h"
 #include "actions.h"
 #include "closure.h"
@@ -57,12 +56,12 @@
 #include "gcollect.h"
 #include "interpret.h"
 #include "main.h"
+#include "mstrings.h"
 #include "object.h"
 #include "regexp.h"
 #include "rxcache.h"
 #include "simulate.h"
 #include "stdstrings.h"
-#include "stralloc.h"
 #include "svalue.h"
 #include "xalloc.h"
 
@@ -184,7 +183,7 @@ struct ed_buffer_s
     int     nonascii;          /* count of non-ascii chars read */
     int     nullchar;          /* count of null chars read */
     int     truncated;         /* count of lines truncated */
-    char    fname[MAXFNAME+1]; /* name of the file */
+    string_t *fname;           /* name of the file */
     Bool    fchanged;          /* True: file-changed */
     int     nofname;
     int     mark['z'-'a'+1];
@@ -203,7 +202,8 @@ struct ed_buffer_s
     int     leading_blanks;    /* Current number of leading blanks when
                                   using autoindentation. */
     int     cur_autoindent;
-    char    *exit_fn;          /* Function to be called when player exits */
+    string_t    *exit_fn;       /* Function to be called when player exits */
+                                /* TODO: Make this a callback */
     object_t *exit_ob;    /* Object holding <exit_fn> */
     svalue_t old_prompt;  /* Original prompt */
 };
@@ -488,7 +488,7 @@ prompt_to_ed_buffer (interactive_t *ip)
 
     if ( NULL != (ed_buffer = O_GET_EDBUFFER(ip->ob)) ) {
         transfer_svalue(&ed_buffer->old_prompt, &ip->prompt);
-        put_volatile_string(&ip->prompt, ed_buffer->appending ? "*\b" : ":");
+        put_c_string(&ip->prompt, ed_buffer->appending ? "*\b" : ":");
     }
 }
 
@@ -844,7 +844,7 @@ egets (char *str, int size, FILE * stream)
 
 /*-------------------------------------------------------------------------*/
 static int
-doread (int lin, char *fname)
+doread (int lin, string_t *fname)
 
 /* Read the file <fname> and insert the lines at line <lin>
  * Return success code.
@@ -860,14 +860,14 @@ doread (int lin, char *fname)
     err = 0;
     P_NONASCII = P_NULLCHAR = P_TRUNCATED = 0;
 
-    if (P_DIAG) add_message("\"%s\" ",fname);
-    if ((fp = fopen(fname, "r")) == NULL )
+    if (P_DIAG) add_message("\"%s\" ",get_txt(fname));
+    if ((fp = fopen(get_txt(fname), "r")) == NULL )
     {
-        if (!P_DIAG) add_message("\"%s\" ",fname);
+        if (!P_DIAG) add_message("\"%s\" ",get_txt(fname));
         add_message(" isn't readable.\n");
         return ERR ;
     }
-    FCOUNT_READ(fname);
+    FCOUNT_READ(get_txt(fname));
     _setCurLn( lin );
     for(lines = 0, bytes = 0;(err = egets(str,MAXLINE,fp)) > 0;) {
         bytes += err;
@@ -899,7 +899,7 @@ doread (int lin, char *fname)
 
 /*-------------------------------------------------------------------------*/
 static int
-dowrite (int from, int to, char *fname, Bool apflg)
+dowrite (int from, int to, string_t *fname, Bool apflg)
 
 /* Write the lines <from> to <to> into the file <fname>. If the <apflg>
  * is true, the file is opened for appending, else it is written
@@ -918,13 +918,13 @@ dowrite (int from, int to, char *fname, Bool apflg)
     err = 0;
     lines = bytes = 0;
 
-    add_message("\"%s\" ",fname);
-    if ((fp = fopen(fname,(apflg?"a":"w"))) == NULL)
+    add_message("\"%s\" ",get_txt(fname));
+    if ((fp = fopen(get_txt(fname),(apflg?"a":"w"))) == NULL)
     {
         add_message(" can't be opened for writing!\n");
         return ERR;
     }
-    FCOUNT_WRITE(fname);
+    FCOUNT_WRITE(get_txt(fname));
 
     lptr = getptr(from);
     for (lin = from; lin <= to; lin++)
@@ -1024,11 +1024,11 @@ findg (regexp *pat, Bool dir)
 #endif /* 0 */
 
 /*-------------------------------------------------------------------------*/
-static char *
+static string_t *
 getfn (Bool writeflg)
 
-/* Get a filename from the input buffer, store it in a static array and
- * return a pointer to it. Relative filenames are made absolute by
+/* Get a filename from the input buffer, create a string from it and return
+ * the pointer to it (counts as ref). Relative filenames are made absolute by
  * master->make_path_absolute(). If there is no filename, set P_NOFNAME to
  * true and set the filename to '/'+P_FNAME. In either case the filename
  * is validated by check_valid_path().
@@ -1037,65 +1037,96 @@ getfn (Bool writeflg)
  */
 
 {
-    static char  file[MAXFNAME+1]; /* TODO: make this ed_buffer based? */
-    char        *cp;
-    char        *file2;
+    string_t *file; /* TODO: make this ed_buffer based? */
+    char     *cp;
+    string_t *file2;
     svalue_t *ret;
 
     if (*inptr == NL)
     {
         P_NOFNAME = TRUE;
-        file[0] = '/';
-        strcpy(file+1, P_FNAME);
+        file = alloc_mstring(1+mstrsize(P_FNAME));
+        if (!file)
+        {
+            add_message("Out of memory (%lu bytes) for filename.\n"
+                       , 1+mstrsize(P_FNAME));
+            return NULL;
+        }
+        get_txt(file)[0] = '/';
+        memcpy(get_txt(file)+1, get_txt(P_FNAME), mstrsize(P_FNAME));
     }
     else
     {
+        size_t len;
+        char *tmp;
+
         P_NOFNAME = FALSE;
         Skip_White_Space;
 
-        cp = file;
+        for (len = 0, tmp = inptr
+            ; *tmp && *tmp != NL && *tmp != SP && *tmp != HT
+            ; tmp++, len++) NOOP;
+
+        file = alloc_mstring(len);
+        if (!file)
+        {
+            add_message("Out of memory (%lu bytes) for filename.\n", len);
+            return NULL;
+        }
+
+        cp = get_txt(file);
         while (*inptr && *inptr != NL && *inptr != SP && *inptr != HT)
             *cp++ = *inptr++;
-        *cp = '\0';
     }
 
-    if (strlen(file) == 0)
+    if (mstrsize(file) == 0)
     {
         add_message("bad file name\n");
+        free_mstring(file);
         return NULL;
     }
 
-    if (file[0] != '/')
+    if (get_txt(file)[0] != '/')
     {
-        push_string_malloced(file);
+        push_ref_string(inter_sp, file);
         ret = apply_master_ob(STR_ABS_PATH, 1);
         if (!ret || (ret->type == T_NUMBER && ret->u.number == 0))
         {
+            free_mstring(file);
             if (out_of_memory)
                 error("(ed) Out of memory detected.\n");
             return NULL;
         }
 
         if (ret->type == T_STRING)
-            strncpy(file, ret->u.string, sizeof file - 1);
+        {
+            free_mstring(file);
+            file = ref_mstring(ret->u.str);
+        }
     }
 
     /* add_message() / apply() might have nasty effects */
     if (!command_giver || command_giver->flags & O_DESTRUCTED)
-        return NULL;
-
-    file2 = check_valid_path(file, command_giver, "ed_start", writeflg);
-    if (!file2)
-        return NULL;
-    strncpy(file, file2, MAXFNAME);
-    file[MAXFNAME] = 0;
-
-    if(strlen(file) == 0) {
-        add_message("no file name\n");
+    {
+        free_mstring(file);
         return NULL;
     }
 
-    return file;
+    file2 = check_valid_path(file, command_giver, STR_ED_START, writeflg);
+    free_mstring(file);
+
+    if (!file2)
+    {
+        return NULL;
+    }
+
+    if (mstrsize(file2) == 0) {
+        add_message("no file name\n");
+        free_mstring(file2);
+        return NULL;
+    }
+
+    return file2;
 }  /* getfn */
 
 /*-------------------------------------------------------------------------*/
@@ -1601,6 +1632,7 @@ optpat (void)
 
 {
     char delim, str[MAXPAT], *cp;
+    string_t *buf;
 
     delim = *inptr++;
     if (delim == NL)
@@ -1622,7 +1654,11 @@ optpat (void)
         return(P_OLDPAT);
     if(P_OLDPAT)
         REGFREE(P_OLDPAT);
-    return P_OLDPAT = REGCOMP(str,P_EXCOMPAT, MY_TRUE);
+
+    memsafe(buf = new_mstring(str), strlen(str), "regexp pattern string");
+    P_OLDPAT = REGCOMP(buf,P_EXCOMPAT, MY_TRUE);
+    free_mstring(buf);
+    return P_OLDPAT;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -2377,7 +2413,7 @@ docmd (Bool glob)
     int          c, err, line3;
     int          apflg, pflag, gflag;
     int          nchng;
-    char        *fptr;
+    string_t    *fptr;
 
     pflag = FALSE;
     Skip_White_Space;
@@ -2458,7 +2494,7 @@ docmd (Bool glob)
         clrbuf();
         (void)doread(0, fptr);
 
-        strcpy(P_FNAME, fptr);
+        P_FNAME = fptr;
         P_FCHANGED = FALSE;
         break;
 
@@ -2472,12 +2508,12 @@ docmd (Bool glob)
         fptr = getfn(MY_FALSE);
 
         if (P_NOFNAME)
-            add_message("%s\n", P_FNAME);
+            add_message("%s\n", get_txt(P_FNAME));
         else
         {
             if (fptr == NULL)
                 return ERR;
-            strcpy(P_FNAME, fptr);
+            P_FNAME = fptr;
         }
         break;
 
@@ -2538,7 +2574,7 @@ docmd (Bool glob)
         if (*inptr != NL)
             return ERR;
 
-        nchng = subst(REGCOMP("\015$", P_EXCOMPAT, MY_TRUE), "", 0, 0);
+        nchng = subst(REGCOMP(STR_CRPATTERN, P_EXCOMPAT, MY_TRUE), "", 0, 0);
 
         if (nchng < 0)
             return ERR;
@@ -2608,7 +2644,10 @@ docmd (Bool glob)
             return ERR;
 
         if ((err = doread(P_LINE2, fptr)) < 0)
+        {
+            free_mstring(fptr);
             return err;
+        }
         P_FCHANGED = TRUE;
         break;
 
@@ -2656,9 +2695,16 @@ docmd (Bool glob)
             return ERR;
 
         if (deflt(1, P_LASTLN) < 0)
+        {
+            free_mstring(fptr);
             return ERR;
+        }
         if (dowrite(P_LINE1, P_LINE2, fptr, apflg) < 0)
+        {
+            free_mstring(fptr);
             return ERR;
+        }
+        free_mstring(fptr);
         P_FCHANGED = FALSE;
         break;
 
@@ -2669,7 +2715,11 @@ docmd (Bool glob)
                 return ERR;
             if (dowrite(1, P_LASTLN, fptr, 0) >= 0
              && command_giver && command_giver->flags & O_SHADOW)
+            {
+                free_mstring(fptr);
                 return EOF;
+            }
+            free_mstring(fptr);
         }
         return ERR;
 
@@ -2771,7 +2821,7 @@ doglob (void)
 
 /*-------------------------------------------------------------------------*/
 static void
-ed_start (char *file_arg, char *exit_fn, object_t *exit_ob)
+ed_start (string_t *file_arg, string_t *exit_fn, object_t *exit_ob)
 
 /* Start the editor on file <file_arg>. Because several players can edit
  * simultaneously, they will each need a separate editor data block.
@@ -2782,7 +2832,7 @@ ed_start (char *file_arg, char *exit_fn, object_t *exit_ob)
  */
 
 {
-    char *new_path;
+    string_t *new_path;
     svalue_t *setup, *prompt;
     ed_buffer_t *old_ed_buffer;
 
@@ -2795,7 +2845,7 @@ ed_start (char *file_arg, char *exit_fn, object_t *exit_ob)
     /* Check for read on startup, since the buffer is read in. But don't
      * check for write, since we may want to change the file name.
      */
-    new_path = check_valid_path(file_arg, command_giver, "ed_start", MY_FALSE);
+    new_path = check_valid_path(file_arg, command_giver, STR_ED_START, MY_FALSE);
     if (!file_arg && !new_path)
         return;
 
@@ -2822,11 +2872,11 @@ ed_start (char *file_arg, char *exit_fn, object_t *exit_ob)
     ED_BUFFER->shiftwidth= 4;
     prompt = query_prompt(command_giver);
     ED_BUFFER->old_prompt = *prompt;
-    put_volatile_string(prompt, ":");
+    put_c_string(prompt, ":");
     ED_BUFFER->CurPtr = &ED_BUFFER->Line0;
     if (exit_fn)
     {
-        ED_BUFFER->exit_fn = string_copy(exit_fn);
+        ED_BUFFER->exit_fn = ref_mstring(exit_fn);
         ref_object(exit_ob, "ed_start");
     }
     else
@@ -2859,9 +2909,8 @@ ed_start (char *file_arg, char *exit_fn, object_t *exit_ob)
 
     if (new_path)
     {
-        strncpy(P_FNAME, new_path, MAXFNAME);
-        P_FNAME[MAXFNAME] = 0;
-        add_message("/%s, %d lines\n", new_path, P_LASTLN);
+        P_FNAME = new_path;
+        add_message("/%s, %d lines\n", get_txt(new_path), P_LASTLN);
     }
     else
     {
@@ -2928,9 +2977,12 @@ count_ed_buffer_refs (ed_buffer_t *b)
         }
     }
 
+    if (b->fname)
+        count_ref_from_string(b->fname);
+
     if (b->exit_fn)
     {
-        note_malloced_block_ref(b->exit_fn);
+        count_ref_from_string(b->exit_fn);
         if ( NULL != (ob = b->exit_ob) )
         {
             if (ob->flags & O_DESTRUCTED)
@@ -2986,7 +3038,7 @@ free_ed_buffer (void)
  */
 
 {
-    char *name;
+    string_t *name;
     object_t *ob;
 
     ED_BUFFER = EXTERN_ED_BUFFER;
@@ -3009,6 +3061,9 @@ free_ed_buffer (void)
         P_OLDPAT = NULL;
     }
 
+    if (P_FNAME)
+        free_mstring(P_FNAME);
+
     xfree(ED_BUFFER);
     EXTERN_ED_BUFFER = NULL;
 
@@ -3030,7 +3085,7 @@ free_ed_buffer (void)
         }
         if (ob)
             free_object(ob, "ed EOF");
-        xfree(name);
+        free_mstring(name);
     }
     else
     {
@@ -3154,12 +3209,12 @@ save_ed_buffer (void)
 
 {
     svalue_t *stmp;
-    char *fname;
+    string_t *fname;
     interactive_t *save = O_GET_INTERACTIVE(command_giver);
 
     (void)O_SET_INTERACTIVE(save, command_giver);
     ED_BUFFER = EXTERN_ED_BUFFER;
-    push_string_shared(P_FNAME);
+    push_ref_string(inter_sp, P_FNAME);
     stmp = apply_master_ob(STR_GET_ED_FNAME,1);
     if (save)
     {
@@ -3167,10 +3222,23 @@ save_ed_buffer (void)
         command_giver = save->ob;
     }
     if (stmp && stmp->type == T_STRING) {
-        fname = stmp->u.string;
-        if (*fname == '/')
-            fname++;
+        fname = ref_mstring(stmp->u.str);
+        if (*get_txt(fname) == '/')
+        {
+            string_t *tmp;
+            tmp = new_n_mstring(get_txt(fname)+1, mstrsize(fname)-1);
+            if (!tmp)
+            {
+                add_message("(ed) Out of memory (%lu bytes) for filename.\n"
+                           , mstrsize(fname)-1);
+                free_mstring(fname);
+                return;
+            }
+            free_mstring(fname);
+            fname = tmp;
+        }
         dowrite(1, P_LASTLN, fname , MY_FALSE);
+        free_mstring(fname);
     }
     free_ed_buffer();
 }
@@ -3211,16 +3279,16 @@ f_ed (svalue_t *sp, int num_arg)
     }
     else if (num_arg == 1)
     {
-        ed_start(sp->u.string, NULL, NULL);
+        ed_start(sp->u.str, NULL, NULL);
         free_svalue(sp);
         put_number(sp, 1);
     }
     else /* num_arg == 2 */
     {
         if (sp->type == T_STRING)
-            ed_start((sp-1)->u.string, sp->u.string, current_object);
+            ed_start((sp-1)->u.str, sp->u.str, current_object);
         else /* sp is number 0 */
-            ed_start((sp-1)->u.string, NULL, NULL);
+            ed_start((sp-1)->u.str, NULL, NULL);
         free_svalue(sp--);
         free_svalue(sp);
         put_number(sp, 1);

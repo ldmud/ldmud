@@ -2189,7 +2189,8 @@ etype (long n)
 
     if (n != 0)
     {
-        printf("Error: Can't convert bit-flags %x to LPC runtime type.\n", n);
+        printf("Error: Can't convert bit-flags %lx to LPC runtime type.\n"
+              , (long)n);
         yyerror("Illegal type for argument");
         return "What ?";
     }
@@ -3012,6 +3013,9 @@ create_stdstrings (void)
 " * the specifications in " STRING_SPEC ".\n"
 " */\n"
 "\n"
+"#include \"driver.h\"\n"
+"#include \"typedefs.h\"\n"
+"\n"
 "/* --- Common used shared strings. --- */\n"
 "/* The most common strings, including all the predefined applies,\n"
 " * are kept in shstrings[] for faster usage.\n"
@@ -3036,7 +3040,7 @@ create_stdstrings (void)
 "  , SHSTR_NOSTRINGS /* The number of strings */\n"
 "};\n"
 "\n"
-"extern char *shstring[SHSTR_NOSTRINGS];\n"
+"extern string_t *shstring[SHSTR_NOSTRINGS];\n"
 "\n"
          , fpw);
 
@@ -3072,19 +3076,17 @@ create_stdstrings (void)
 " *\n"
 " * It's purpose is to define and initialize the standard shared string\n"
 " * table shstring[].\n"
-" * TODO: When shared strings use proper structures, we can build the table\n"
-" * TODO:: directly from the structures and avoid copying the string texts.\n"
 " */\n"
 "\n"
-"#define NO_REF_STRING\n"
 "#include \"driver.h\"\n"
+"#include \"typedefs.h\"\n"
 "\n"
 "#include \"" STDSTRINGS ".h\"\n"
-"#include \"stralloc.h\"\n"
+"#include \"mstrings.h\"\n"
 "\n"
 "/*-------------------------------------------------------------------------*/\n"
 "\n"
-"char *shstring[SHSTR_NOSTRINGS];\n"
+"string_t *shstring[SHSTR_NOSTRINGS];\n"
 "  /* Table of common used and therefore shared strings.\n"
 "   */\n"
 "\n"
@@ -3096,7 +3098,7 @@ create_stdstrings (void)
 " */\n"
 "\n"
 "{\n"
-"#   define INIT(x,s) shstring[x] = make_shared_string(s);\n"
+"#   define INIT(x,s) shstring[x] = mstring_new_tabled(s);\n"
 "\n"
          , fpw);
 

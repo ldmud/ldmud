@@ -12,18 +12,18 @@
 
 #include <stdio.h>
 
-#define USES_SVALUE_STRLEN
 #include "dumpstat.h"
 #include "array.h"
 #include "closure.h"
 #include "exec.h"
 #include "filestat.h"
-#include "instrs.h"
 #include "mapping.h"
+#include "mstrings.h"
 #include "object.h"
 #include "ptrtable.h"
 #include "simulate.h"
-#include "smalloc.h"
+#include "stdstrings.h"
+#include "smalloc.h" /* malloced_size() */
 #include "svalue.h"
 
 /*-------------------------------------------------------------------------*/
@@ -83,15 +83,8 @@ svalue_size (svalue_t *v)
         return 0;
 
     case T_STRING:
-        /* Include some malloc overhead. */
-        if (v->x.string_type == STRING_SHARED)
-            return (strlen(v->u.string) + sizeof(short) + 3*sizeof(char*)) &
-              (~(sizeof(char *) - 1));
-        return (svalue_strlen(v) + 2*sizeof(char *)) & (~(sizeof(char *) - 1));
-
     case T_SYMBOL:
-        return (strlen(v->u.string) + sizeof(short) + 3*sizeof(char*)) &
-          (~(sizeof(char *) - 1));
+        return mstr_mem_size(v->u.str);
 
     case T_MAPPING:
     {
@@ -216,7 +209,7 @@ data_size (object_t *ob)
 
 /*-------------------------------------------------------------------------*/
 Bool
-dumpstat(char *fname)
+dumpstat (string_t *fname)
 
 /* Called by the command parser, this function dumps statistics about
  * all objects into the file $MUDLIB/<fname>.
@@ -230,13 +223,13 @@ dumpstat(char *fname)
     static char *swapstrings[] =
         {"", "PROG SWAPPED", "VAR SWAPPED", "SWAPPED", };
 
-    fname = check_valid_path(fname, current_object, "objdump", MY_TRUE);
+    fname = check_valid_path(fname, current_object, STR_OBJDUMP, MY_TRUE);
     if (!fname)
         return MY_FALSE;
-    f = fopen(fname, "w");
+    f = fopen(get_txt(fname), "w");
     if (!f)
         return MY_FALSE;
-    FCOUNT_WRITE(fname);
+    FCOUNT_WRITE(get_txt(fname));
 
     for (ob = obj_list; ob; ob = ob->next_all)
     {
@@ -254,13 +247,18 @@ dumpstat(char *fname)
         {
             tmp = 0;
         }
-        fprintf(f, "%-20s %5ld ref %2ld %s %s ", ob->name,
+        fprintf(f, "%-20s %5ld ref %2ld %s ",
+                 get_txt(ob->name),
                 tmp + (long)data_size(ob) + sizeof (object_t) +
                 sizeof(p_int) /* smalloc overhead */ ,
                 ob->ref,
-                ob->flags & O_HEART_BEAT ? "HB" : "  ",
-                ob->super ? ob->super->name : "--"
+                ob->flags & O_HEART_BEAT ? "HB" : "  "
         );
+        if (ob->super)
+            fprintf(f, "%s ", get_txt(ob->super->name));
+        else
+            fprintf(f, "-- ");
+
         if (ob->gigaticks)
             fprintf(f, " (%lu%09lu)", ob->gigaticks, ob->ticks);
         else

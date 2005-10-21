@@ -10,7 +10,48 @@
 
 DEFAULT "This string is used as a substitute if allocating another one failed."
 EMPTY           ""
+
+ATAT            "@@"
 CALL_OTHER      "call_other"
+DANGLING_V_CL   "dangling var closure"
+DEFAULT_PROMPT  "> "
+OBJDUMP_FNAME   "/OBJ_DUMP"
+OPCDUMP_FNAME   "/OPC_DUMP"
+PERCENT         "%"
+CRPATTERN       "\015$"
+SLASH           "/"
+
+    /* Privilege violation names */
+
+ATTACH_ERQ_DEMON   "attach_erq_demon"
+BIND_LAMBDA        "bind_lambda"
+CALL_OUT_INFO      "call_out_info"
+SEND_ERQ           "erq"
+INPUT_TO           "input_to"
+SEND_IMP           "send_imp"
+EXECUTE_COMMAND    "execute_command"
+NOMASK_SIMUL_EFUN  "nomask simul_efun"
+SHADOW_ADD_ACTION  "shadow_add_action"
+SYMBOL_VARIABLE    "symbol_variable"
+
+    /* check_valid_path function names */
+
+COPY_FILE          "copy_file"
+ED_START           "ed_start"
+FILE_SIZE          "file_size"
+GET_DIR            "get_dir"
+MKDIR              "mkdir"
+OBJDUMP            "objdump"
+PRINT_FILE         "print_file"
+READ_BYTES         "read_bytes"
+READ_FILE          "read_file"
+REMOVE_FILE        "remove_file"
+RENAME_FROM        "rename_from"
+RENAME_TO          "rename_to"
+RMDIR              "rmdir"
+TAIL               "tail"
+WRITE_BYTES        "write_bytes"
+WRITE_FILE         "write_file"
 
     /* Object lfuns */
 
@@ -24,6 +65,7 @@ VARINIT         "__INIT"
 ABS_PATH        "make_path_absolute"
 COMP_OBJ        "compile_object"
 CONNECT         "connect"
+DANGLING_LFUN   "dangling_lfun_closure"
 DISCONNECT      "disconnect"
 EPILOG          "epilog"
 EXT_RELOAD      "external_master_reload"

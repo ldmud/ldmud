@@ -31,10 +31,10 @@ struct object_s
     p_int extra_ref;      /* Used to check ref count. */
 #endif
     program_t *prog;      /* Program code for this object */
-    char *name;
-      /* name of the object (allocated), always w/o leading '/' */
-    char *load_name;
-      /* name of the object's blueprint (shared string), in compat
+    string_t *name;
+      /* name of the object (untabled), always w/o leading '/' */
+    string_t *load_name;
+      /* name of the object's blueprint (tabled), in compat
        * mode without leading '/'
        */
     object_t *next_all;   /* Next object in global list */
@@ -161,7 +161,7 @@ struct replace_ob_s
 #    define ref_object(o,from) (\
      (o)->ref++,\
      d_flag > 1 ? printf("Add ref to object %s: %ld (%s)\n" \
-                        , (o)->name, (o)->ref, from) : 0, \
+                        , get_txt((o)->name), (o)->ref, from) : 0, \
      (o))
 
 #endif
@@ -180,7 +180,7 @@ struct replace_ob_s
 #  define free_object(o,from) MACRO(\
       (o)->ref--;\
       if (d_flag > 1) printf("Sub ref from object %s: %ld (%s)\n"\
-                            , (o)->name, (o)->ref, from);\
+                            , get_txt((o)->name), (o)->ref, from);\
       if ((o)->ref <= 0) _free_object(o); \
     )
 
@@ -199,7 +199,7 @@ struct replace_ob_s
 
 #    define deref_object(o,from) (--(o)->ref, \
        d_flag > 1 ? printf("Sub ref from object %s: %ld (%s)\n" \
-                          , (o)->name, (o)->ref, from) : 0)
+                          , get_txt((o)->name), (o)->ref, from) : 0)
 
 #endif
 
@@ -223,8 +223,9 @@ extern object_t NULL_object;
 
 extern int32 renumber_programs(void);
 extern void remove_destructed_objects(void);
-extern void tell_object(object_t *, char *);
-extern void tell_npc(object_t *, char *);
+extern void tell_object(object_t *, string_t *);
+extern void tell_npc(object_t *, string_t *);
+extern void tell_npc_str(object_t *, const char *);
 extern void reference_prog(program_t *, char *);
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN
 extern void remove_all_objects(void);

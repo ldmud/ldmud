@@ -16,9 +16,6 @@ extern Bool is_wizard_used;
 extern svalue_t *f_capitalize(svalue_t *);
 extern svalue_t *f_crypt(svalue_t *);
 extern svalue_t *f_explode(svalue_t *);
-#ifdef F_EXTRACT
-extern svalue_t *f_extract(svalue_t *, int);
-#endif
 extern svalue_t *f_implode(svalue_t *);
 extern svalue_t *f_lower_case(svalue_t *);
 extern svalue_t *f_make_shared_string(svalue_t *);

@@ -172,7 +172,6 @@
 #include <ctype.h>
 #include <time.h>
 
-#define NO_REF_STRING
 #include "parse.h"
 
 #include "actions.h"
@@ -185,7 +184,6 @@
 #include "object.h"
 #include "simulate.h"
 #include "stdstrings.h"
-#include "stralloc.h"
 #include "svalue.h"
 #include "wiz_list.h"
 #include "xalloc.h"
@@ -323,7 +321,7 @@ find_living_object (char *name, Bool player)
     if (svp->type == T_INVALID)
     {
         /* We have to create the closure */
-        put_string(sp, make_shared_string(function_names[player ? 1 : 0]));
+        put_old_string(sp, make_shared_string(function_names[player ? 1 : 0]));
         if (!sp->u.string)
             error("(parse_command) Out of memory (%lu bytes) for string\n"
                  , strlen(function_names[player ? 1 : 0]));
@@ -334,7 +332,7 @@ find_living_object (char *name, Bool player)
     }
 
     /* Call the closure */
-    put_string(sp, make_shared_string(name));
+    put_old_string(sp, make_shared_string(name));
     if ( !sp->u.string)
         error("(parse_command) Out of memory (%lu bytes) for result\n"
              , strlen(name));
@@ -563,7 +561,7 @@ load_lpc_info (size_t ix, object_t *ob)
                 sing = ret->u.vec;
                 for (il = 0; il < VEC_SIZE(tmp); il++)
                 {
-                    if (sing->item[il].type == T_STRING)
+                    if (sing->item[il].type == T_OLD_STRING)
                     {
                         str = parse_to_plural(sing->item[il].u.string);
                         put_malloced_string(&sval, str);
@@ -701,7 +699,7 @@ slice_words (vector_t *wvec, size_t from, size_t to)
     free_array(slice);
     if (tx)
     {
-        put_string(&stmp, make_shared_string(tx));
+        put_old_string(&stmp, make_shared_string(tx));
         xfree(tx);
         return &stmp;
     }
@@ -795,7 +793,7 @@ member_string (char *str, vector_t *svec)
 
     for (il = 0; il < VEC_SIZE(svec); il++)
     {
-        if (svec->item[il].type != T_STRING)
+        if (svec->item[il].type != T_OLD_STRING)
             continue;
 
         if (strcmp(svec->item[il].u.string, str) == 0)
@@ -1080,7 +1078,7 @@ match_object (size_t obix, vector_t *wvec, size_t *cix_in, Bool *plur)
         /* Loop over the ids and find a match */
         for (il = 0; il < VEC_SIZE(ids); il++)
         {
-            if (ids->item[il].type == T_STRING)
+            if (ids->item[il].type == T_OLD_STRING)
             {
                 str = ids->item[il].u.string;  /* A given id of the object */
                 old_cix = *cix_in;
@@ -1358,7 +1356,7 @@ prepos_parse (vector_t *wvec, size_t *cix_in, Bool *fail, svalue_t *prepos)
 
   for (pix = 0; pix < VEC_SIZE(pvec); pix++)
   {
-      if (pvec->item[pix].type != T_STRING)
+      if (pvec->item[pix].type != T_OLD_STRING)
           continue;
 
       tmp = pvec->item[pix].u.string;
@@ -1476,7 +1474,7 @@ one_parse ( vector_t *obvec       /* in: array of objects to match against */
         break;
 
     case 'w': case 'W':  /* Match the next word */
-        put_string(&stmp, make_shared_string(wvec->item[*cix_in].u.string));
+        put_old_string(&stmp, make_shared_string(wvec->item[*cix_in].u.string));
         pval = &stmp;
         (*cix_in)++;
         *fail = MY_FALSE;
@@ -1736,7 +1734,7 @@ e_parse_command ( char     *cmd          /* Command to parse */
         gPrepos_list = allocate_array(0);
 
     pval = apply_master_ob(STR_PC_ALLWORD,0);
-    if (pval && pval->type == T_STRING)
+    if (pval && pval->type == T_OLD_STRING)
         gAllword = string_copy(pval->u.string);
     else
         gAllword = NULL;

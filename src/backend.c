@@ -31,6 +31,7 @@
 #include "driver.h"
 #include "typedefs.h"
 
+#include "my-alloca.h"
 #include <stddef.h>
 #include <ctype.h>
 #include <limits.h>
@@ -48,7 +49,6 @@
 #include <time.h>
 #include <math.h>
 
-#define NO_REF_STRING
 #include "backend.h"
 #include "actions.h"
 #include "array.h"
@@ -64,16 +64,14 @@
 #include "lex.h"
 #include "main.h"
 #include "mapping.h"
-#include "my-alloca.h"
+#include "mstrings.h"
 #include "object.h"
 #include "otable.h"
 #include "random.h"
 #include "regexp.h"
 #include "rxcache.h"
 #include "simulate.h"
-#include "smalloc.h"
 #include "stdstrings.h"
-#include "stralloc.h"
 #include "swap.h"
 #include "wiz_list.h"
 #include "xalloc.h"
@@ -226,8 +224,8 @@ logon (object_t *ob)
     current_object = ob;
     ret = apply(STR_LOGON, ob, 0);
     if (ret == 0) {
-        add_message("prog %s:\n", ob->name);
-        error("Could not find logon() on the player %s\n", ob->name);
+        add_message("prog %s:\n", get_txt(ob->name));
+        error("Could not find logon() on the player %s\n", get_txt(ob->name));
     }
     current_object = save;
 }
@@ -367,10 +365,6 @@ backend (void)
             check_a_lot_ref_counts(NULL);
             /* after removing destructed objects! */
 #endif
-#ifdef CHECK_STRINGS
-        if (check_string_table_flag)
-            check_string_table();
-#endif
 
         /*
          * Do the extra jobs, if any.
@@ -505,8 +499,7 @@ backend (void)
             }
             else if (O_GET_EDBUFFER(command_giver))
                 ed_cmd(buff);
-            else if (
-              call_function_interactive(ip, buff))
+            else if (call_function_interactive(ip, buff))
                 NOOP;
             else
                 execute_command(buff, command_giver);
@@ -726,7 +719,7 @@ static Bool did_swap;
             {
 #ifdef DEBUG
                 if (d_flag)
-                    fprintf(stderr, "%s RESET (virtual) %s\n", time_stamp(), obj->name);
+                    fprintf(stderr, "%s RESET (virtual) %s\n", time_stamp(), get_txt(obj->name));
 #endif
                 obj->time_reset = current_time+time_to_reset/2
                                   +(mp_int)random_number((uint32)time_to_reset/2);
@@ -735,7 +728,7 @@ static Bool did_swap;
             {
 #ifdef DEBUG
                 if (d_flag)
-                    fprintf(stderr, "%s RESET %s\n", time_stamp(), obj->name);
+                    fprintf(stderr, "%s RESET %s\n", time_stamp(), get_txt(obj->name));
 #endif
                 if (obj->flags & O_SWAPPED
                  && load_ob_from_swap(obj) < 0)
@@ -786,7 +779,7 @@ static Bool did_swap;
 
 #ifdef DEBUG
             if (d_flag)
-                fprintf(stderr, "%s CLEANUP %s\n", time_stamp(), obj->name);
+                fprintf(stderr, "%s CLEANUP %s\n", time_stamp(), get_txt(obj->name));
 #endif
 
             did_swap = MY_TRUE;
@@ -817,7 +810,7 @@ static Bool did_swap;
             }
             else if (closure_hook[H_CLEAN_UP].type == T_STRING)
             {
-                svp = apply(closure_hook[H_CLEAN_UP].u.string, obj, 1);
+                svp = apply(closure_hook[H_CLEAN_UP].u.str, obj, 1);
             }
             else
             {
@@ -827,8 +820,8 @@ static Bool did_swap;
             if (obj->flags & O_DESTRUCTED)
                 continue;
 
-            if ((!svp || (svp->type == T_NUMBER && svp->u.number == 0)) &&
-                was_swapped )
+            if ((!svp || (svp->type == T_NUMBER && svp->u.number == 0))
+              && was_swapped )
                 obj->flags &= ~O_WILL_CLEAN_UP;
             obj->flags |= save_reset_state;
 
@@ -872,7 +865,7 @@ no_clean_up:
             {
 #ifdef DEBUG
                 if (d_flag)
-                   fprintf(stderr, "%s swap vars of %s\n", time_stamp(), obj->name);
+                   fprintf(stderr, "%s swap vars of %s\n", time_stamp(), get_txt(obj->name));
 #endif
                 swap_variables(obj);
                 if (O_VAR_SWAPPED(obj))
@@ -887,7 +880,7 @@ no_clean_up:
             {
 #ifdef DEBUG
                 if (d_flag)
-                    fprintf(stderr, "%s swap %s\n", time_stamp(), obj->name);
+                    fprintf(stderr, "%s swap %s\n", time_stamp(), get_txt(obj->name));
 #endif
                 swap_program(obj);
                 if (O_PROG_SWAPPED(obj))
@@ -978,7 +971,7 @@ preload_objects (int eflag)
 
         RESET_LIMITS;
         CLEAR_EVAL_COST;
-        push_string_malloced(prefiles->item[ix].u.string);
+        push_ref_string(inter_sp, prefiles->item[ix].u.str);
         (void)apply_master_ob(STR_PRELOAD, 1);
 
     }
@@ -1057,7 +1050,7 @@ static int acc = 0;    /* Sum of lines for this backend loop */
 svalue_t *
 f_garbage_collection (svalue_t *sp)
 
-/* XEFUN garbage_collection()
+/* EFUN garbage_collection()
  *
  *   void garbage_collection(void)
  *
@@ -1083,7 +1076,7 @@ f_query_load_average (svalue_t *sp)
  */
 
 {
-static char buff[100];
+    char buff[100];
 
 #if defined(__MWERKS__) && !defined(WARN_ALL)
 #    pragma warn_largeargs off
@@ -1092,7 +1085,7 @@ static char buff[100];
 #if defined(__MWERKS__)
 #    pragma warn_largeargs reset
 #endif
-    push_volatile_string(sp, buff);
+    push_c_string(sp, buff);
     return sp;
 } /* f_query_load_average() */
 
@@ -1108,7 +1101,7 @@ f_debug_message (svalue_t *sp)
  */
 
 {
-    printf("%s", sp->u.string);
+    printf("%s", get_txt(sp->u.str));
     free_svalue(sp);
     return sp - 1;
 }

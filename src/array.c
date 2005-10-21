@@ -112,16 +112,16 @@
 #include "main.h"
 #include "mapping.h"
 #include "mempools.h"
+#include "mstrings.h"
 #include "object.h"
 #include "regexp.h"
 #include "rxcache.h"
+#include "stdstrings.h"
 #include "simulate.h"
 #include "svalue.h"
-#include "stralloc.h"
 #include "swap.h"
 #include "wiz_list.h"
 #include "xalloc.h"
-#include "smalloc.h" /* TODO: DEBUG: as long as vec_size() is used */
 
 /*-------------------------------------------------------------------------*/
 
@@ -140,66 +140,6 @@ void (*allocate_array_error_handler) (char *, ...)
    * replaces it temporarily with its own dummy handler when
    * swapping in an object.
    */
-
-char *last_insert_alist_shared_string = NULL; /* TODO: Remove me */
-  /* The last key string inserted into an alist.
-   * gcollect needs to know this.
-   * At the moment this value is not used and could as well be
-   * avoided immediately in insert_alist().
-   */
-
-svalue_t assoc_shared_string_key; /* TODO: Remove me */
-  /* The svalue assoc() uses to pass the shared search key to
-   * search_alist(). It is initialised by main() on startup,
-   * probably in order to save a few cycles (assoc() was once
-   * heavily used). This should be done on every call (static
-   * initialisation is not possible as it would confuse the
-   * garbage collector).
-   */
-
-#if defined(DEBUG) && defined(MALLOC_smalloc)
-
-vector_t * static_vector1 = NULL;
-vector_t * static_vector2 = NULL;
-  /* Filled in by interpret.c at runtime, these are the other two
-   * arrays not allocated from the heap.
-   * TODO: When vec_size() is no longer needed, these can go, too.
-   */
-
-/*-------------------------------------------------------------------------*/
-p_int
-vec_size (vector_t *vec)
-
-/* TODO: Remove this function if nobody complains.
- * Return the size of vector <vec>.
- * This function compares the size stored in the vector with the
- * size of the memory block in case the driver forgets to update
- * the stored size.
- */
-
-{
-    p_int memsize;
-
-    if (vec == &null_vector
-     || vec == static_vector1
-     || vec == static_vector2
-       )
-        return vec->size;
-
-    memsize = (  malloced_size(vec)
-               - ( SMALLOC_OVERHEAD + 
-                   ( sizeof(vector_t) - sizeof(svalue_t) ) / SIZEOF_CHAR_P 
-                 ) 
-
-              ) / (sizeof(svalue_t)/SIZEOF_CHAR_P);
-    if (vec->size != memsize)
-        fatal("Size %ld of vector %p doesn't match memsize %ld\n"
-             , vec->size, vec, memsize);
-
-    return vec->size;
-} /* vec_size() */
-
-#endif
 
 /*-------------------------------------------------------------------------*/
 #ifndef allocate_array
@@ -539,7 +479,7 @@ total_array_size (void)
 
 /*-------------------------------------------------------------------------*/
 vector_t *
-explode_string (char *str, char *del)
+explode_string (string_t *str, string_t *del)
 
 /* Explode the string <str> by delimiter string <del> and return an array
  * of the (unshared) strings found between the delimiters.
@@ -548,7 +488,7 @@ explode_string (char *str, char *del)
  * TODO: At some later point in the execution thread, all the longlived
  *   unshared strings should maybe be converted into shared strings.
  *
- * This is the new, logical behaviour: nothing is occured.
+ * This is the new, logical behaviour: nothing is assumed.
  * The relation implode(explode(x,y),y) == x holds.
  *
  *   explode("xyz", "")         -> { "x", "y", "z" }
@@ -559,11 +499,11 @@ explode_string (char *str, char *del)
 {
     char *p, *beg;
     long num;
-    long len;
+    long len, left;
     vector_t *ret;
-    char *buff;
+    string_t *buff;
 
-    len = (long)strlen(del);
+    len = (long)mstrsize(del);
 
     /* --- Special case: Delimiter is an empty or one-char string --- */
     if (len <= 1) {
@@ -574,57 +514,65 @@ explode_string (char *str, char *del)
         if (len < 1) {
             svalue_t *svp;
 
-            len = (long)strlen(str);
+            len = (long)mstrsize(str);
             ret = allocate_array(len);
-            for( svp = ret->item; --len >= 0; svp++, str++ ) {
-                buff = xalloc(2);
+            for ( svp = ret->item, p = get_txt(str)
+                ; --len >= 0
+                ; svp++, p++ ) {
+                buff = new_n_mstring(p, 1);
                 if (!buff) {
                     free_array(ret);
-                    error("(explode_string) Out of memory (2 bytes)\n");
+                    error("(explode_string) Out of memory (1 byte string).\n");
                 }
-                buff[0] = *str;
-                buff[1] = '\0';
-                put_malloced_string(svp, buff);
+                put_string(svp, buff);
             }
             return ret;
 
         }
 
         /* Delimiter is one-char string: speedy implementation which uses
-         *   direct character comparisons instead of calls to strncmp().
+         *   direct character comparisons instead of calls to memcmp().
          */
         else {
             char c;
+            char * txt;
             svalue_t *svp;
 
-            c = *del;
+            txt = get_txt(str);
+            c = get_txt(del)[0];
+
             /* TODO: Remember positions here */
             /* Determine the number of delimiters in the string. */
-            for (num = 1, p = str; NULL != (p = strchr(p, c)); p++, num++) NOOP;
+            for (num = 1, p = txt
+                ; p < txt + len && NULL != (p = memchr(p, c, len - (p - txt)))
+                ; p++, num++) NOOP;
 
             ret = allocate_array(num);
-            for (svp = ret->item; NULL != (p = strchr(str, c)); str = p + 1, svp++) {
-                len = p - str;
-                buff = xalloc((size_t)(len + 1));
+            for ( svp = ret->item, left = len
+                ; NULL != (p = memchr(txt, c, left))
+                ; left -= (p + 1 - txt), txt = p + 1, svp++)
+            {
+                len = p - txt;
+                buff = new_n_mstring(txt, (size_t)len);
                 if (!buff) {
                     free_array(ret);
-                    error("(explode_string) Out of memory (%ld bytes)\n"
-                         , len+1);
+                    error("(explode_string) Out of memory (%ld byte string)\n"
+                         , len);
                 }
-                memcpy(buff, str, (size_t)len);
-                buff[len] = '\0';
-                put_malloced_string(svp, buff);
+                put_string(svp, buff);
             }
 
-            /* str now points to the (possibly empty) remains after
+            /* txt now points to the (possibly empty) remains after
              * the last delimiter.
              */
-            put_malloced_string(svp, string_copy(str));
-            if ( !svp->u.string ) {
+            len = get_txt(str) + mstrsize(str) - txt;
+            buff = new_n_mstring(txt, (size_t)len);
+            if (!buff) {
                 free_array(ret);
-                error("(explode_string) Out of memory (%lu bytes) for result.\n"
-                     , (unsigned long)strlen(str));
+                error("(explode_string) Out of memory (%ld byte string)\n"
+                     , len);
             }
+            put_string(svp, buff);
 
             return ret;
         }
@@ -642,12 +590,18 @@ explode_string (char *str, char *del)
      * TODO: Remember the found positions so that we don't have to
      *   do the comparisons again.
      */
-    for (p=str, num=1; *p;) {
-        if (strncmp(p, del, (size_t)len) == 0) {
+    for (p = get_txt(str), left = mstrsize(str), num=1 ; left > 0; )
+    {
+        if (left >= len && memcmp(p, get_txt(del), (size_t)len) == 0) {
             p += len;
+            left -= len;
             num++;
-        } else
+        }
+        else
+        {
             p += 1;
+            left -= 1;
+        }
     }
 
     ret = allocate_array(num);
@@ -655,45 +609,50 @@ explode_string (char *str, char *del)
     /* Extract the <num> strings into the result array <ret>.
      *   <buff> serves as temporary buffer for the copying.
      */
-    for (p=str, beg = str, num=0; *p; ) {
-        if (strncmp(p, del, (size_t)len) == 0) {
-            long bufflen;
+    for (p = get_txt(str), beg = get_txt(str), num = 0, left = mstrsize(str)
+        ; left > 0; )
+    {
+        if (left >= len && memcmp(p, get_txt(del), (size_t)len) == 0)
+        {
+            ptrdiff_t bufflen;
 
             bufflen = p - beg;
-            buff = xalloc((size_t)bufflen + 1);
+            buff = new_n_mstring(beg, (size_t)bufflen);
             if (!buff) {
                 free_array(ret);
                 error("(explode_string) Out of memory (%ld bytes) for buffer\n"
-                     , bufflen+1);
+                     , bufflen);
             }
-            memcpy(buff, beg, (size_t)bufflen);
-            buff[bufflen] = '\0';
 
-            put_malloced_string(ret->item+num, buff);
+            put_string(ret->item+num, buff);
 
             num++;
             beg = p + len;
             p = beg;
+            left -= len;
 
         } else {
             p += 1;
+            left -= 1;
         }
     }
 
     /* Copy the last occurence (may be empty). */
-    put_malloced_string(ret->item + num, string_copy(beg));
-    if ( !ret->item[num].u.string) {
+    len = get_txt(str) + mstrsize(str) - beg;
+    buff = new_n_mstring(beg, (size_t)len);
+    if (!buff) {
         free_array(ret);
-        error("(explode_string) Out of memory (%lu bytes) for last fragment\n"
-             , (unsigned long)strlen(beg));
+        error("(explode_string) Out of memory (%ld bytes) for last fragment\n"
+             , len);
     }
+    put_string(ret->item + num, buff);
 
     return ret;
 } /* explode_string() */
 
 /*-------------------------------------------------------------------------*/
 vector_t *
-old_explode_string (char *str, char *del)
+old_explode_string (string_t *str, string_t *del)
 
 /* Explode the string <str> by delimiter string <del> and return an array
  * of the (unshared) strings found between the delimiters.
@@ -710,28 +669,33 @@ old_explode_string (char *str, char *del)
  */
 
 {
-    char *p, *beg;
-    size_t num, len;
+    char *p, *beg, *strtxt, *deltxt;
+    size_t num, len, txtlen, left;
     vector_t *ret;
-    char *buff;
 
-    len = strlen(del);
+    len = mstrsize(del);
+    deltxt = get_txt(del);
 
     /* Take care of the case where the delimiter is an
      * empty string. Then, return an array with only one element,
      * which is the original string.
      */
-    if (len == 0) {
+    if (len == 0)
+    {
         ret = allocate_array(1);
-        put_malloced_string(ret->item, string_copy(str));
+        put_ref_string(ret->item, str);
         return ret;
     }
 
     /* Skip leading 'del' strings, if any.
      */
-    while(strncmp(str, del, len) == 0) {
-        str += len;
-        if (str[0] == '\0')
+    strtxt = get_txt(str);
+    txtlen = mstrsize(str);
+    while (txtlen >= len && memcmp(strtxt, deltxt, (size_t)len) == 0)
+    {
+        strtxt += len;
+        txtlen -= len;
+        if (txtlen <= 0)
             return allocate_array(0);
     }
 
@@ -745,71 +709,85 @@ old_explode_string (char *str, char *del)
      * TODO: Remember the found positions so that we don't have to
      *   do the comparisons again.
      */
-    for (p=str, num=1; *p;) {
-        if (strncmp(p, del, len) == 0) {
+    for (p = strtxt, num = 1, left = txtlen; left > 0;)
+    {
+        if (left >= len && memcmp(p, deltxt, len) == 0)
+        {
             p += len;
+            left -= len;
             if (*p)
                 num++;
-        } else
+        }
+        else
+        {
             p += 1;
+            left -= 1;
+        }
     }
 
     ret = allocate_array(num);
 
     /* Extract the <num> strings into the result array <ret>.
-     *   <buff> serves as temporary buffer for the copying.
      */
-    buff = xalloc(strlen(str) + 1);
-    if (!buff)
-    {
-        free_array(ret);
-        error("(old_explode) Out of memory (%lu bytes) for result.\n"
-             , (unsigned long)strlen(str)+1);
-        /* NOTREACHED */
-        return NULL;
-    }
 
-    for (p=str, beg = str, num=0; *p; ) {
-        if (strncmp(p, del, len) == 0) {
-            strncpy(buff, beg, p - beg);
-            buff[p-beg] = '\0';
-            put_malloced_string(ret->item + num, string_copy(buff));
-            /* TODO: implement a string_copy_n(beg, n) */
+    for (p = strtxt, beg = strtxt, num = 0, left = txtlen; left > 0; )
+    {
+        if (left >= len && memcmp(p, deltxt, len) == 0)
+        {
+            ptrdiff_t bufflen;
+            string_t *buff;
+
+            bufflen = p - beg;
+            buff = new_n_mstring(beg, (size_t)bufflen);
+            if (!buff)
+            {
+                free_array(ret);
+                error("(old_explode_string) Out of memory (%ld bytes) for buffer\n"
+                     , bufflen);
+            }
+
+            put_string(ret->item + num, buff);
+
             num++;
+            left -= p - beg + len;
             beg = p + len;
             p = beg;
-        } else {
+        }
+        else
+        {
             p += 1;
+            left -= 1;
         }
     }
 
     /* Copy last occurence, if there was not a 'del' at the end.
      */
-    if (*beg != '\0') {
-#if defined(DEBUG) || 1
+    if (beg - strtxt < txtlen)
+    {
+        ptrdiff_t bufflen;
+        string_t *buff;
+
         if (num >= VEC_SIZE(ret))
             fatal("Index out of bounds in old explode(): estimated %ld, got %ld.\n", (long)num, VEC_SIZE(ret));
-#endif
-        put_malloced_string(ret->item + num, string_copy(beg));
-    }
 
-    xfree(buff);
+        bufflen = p - beg;
+        buff = new_n_mstring(beg, (size_t)bufflen);
+        if (!buff)
+        {
+            free_array(ret);
+            error("(old_explode_string) Out of memory (%ld bytes) for buffer\n"
+                 , bufflen);
+        }
+
+        put_string(ret->item + num, buff);
+    }
 
     return ret;
 } /* old_explode_string() */
 
 /*-------------------------------------------------------------------------*/
-#ifndef implode_string
-
-char *
-implode_string (vector_t *arr, char *del)
-
-#else
-
-char *
-_implode_string (vector_t *arr, char *del, char *file, int line)
-
-#endif
+string_t *
+arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
 
 /* Implode the string vector <arr> by <del>, i.e. all strings from <arr>
  * with <del> interspersed are contatenated into one string. The
@@ -826,40 +804,42 @@ _implode_string (vector_t *arr, char *del, char *file, int line)
 
 {
     mp_int size, i, arr_size;
-    mp_int del_len;
-    char *p, *q;
+    size_t del_len;
+    char *deltxt;
+    char *p;
+    string_t *result;
     svalue_t *svp;
 
-    del_len = (mp_int)strlen(del);
+    del_len = mstrsize(del);
+    deltxt = get_txt(del);
 
     /* Compute the <size> of the final string
      */
-    size = -del_len;
+    size = -(mp_int)del_len;
     for (i = (arr_size = (mp_int)VEC_SIZE(arr)), svp = arr->item; --i >= 0; svp++)
     {
         if (svp->type == T_STRING) {
-            size += del_len + strlen(svp->u.string);
-        } else if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED) {
+            size += (mp_int)del_len + mstrsize(svp->u.str);
+        }
+        else if (svp->type == T_OBJECT && svp->u.ob->flags & O_DESTRUCTED)
+        {
+            /* While we're here anyway... */
             zero_object_svalue(svp);
         }
     }
 
     /* Allocate the string; cop out if there's nothing to implode.
      */
-#ifndef implode_string
     if (size <= 0)
-        return string_copy("");
-    p = xalloc((size_t)size + 1);
-#else
-    if (size <= 0)
-        return string_copy_traced("", file, line);
-    p = xalloc_traced((size_t)size + 1, file, line);
-#endif
-    if (!p) {
+        return ref_mstring(STR_EMPTY);
+
+    result = mstring_alloc_string(size MTRACE_PASS);
+    if (!result)
+    {
         /* caller raises the error() */
         return NULL;
     }
-    q = p; /* Remember the start of the allocated string */
+    p = get_txt(result);
 
     /* Concatenate the result string.
      *
@@ -871,27 +851,30 @@ _implode_string (vector_t *arr, char *del, char *file, int line)
     svp = arr->item;
 
     /* Look for the first element to add (there is at least one!) */
-    for (i = arr_size; svp->type != T_STRING; ) {
+    for (i = arr_size; svp->type != T_STRING; )
+    {
         --i;
         svp++;
     }
 
-    strcpy(p, svp->u.string);
-    p += strlen(svp->u.string);
+    memcpy(p, get_txt(svp->u.str), mstrsize(svp->u.str));
+    p += mstrsize(svp->u.str);
 
     /* Copy the others if any */
-    while (--i > 0) {
+    while (--i > 0)
+    {
         svp++;
-        if (svp->type == T_STRING) {
-            strcpy(p, del);
+        if (svp->type == T_STRING)
+        {
+            memcpy(p, deltxt, del_len);
             p += del_len;
-            strcpy(p, svp->u.string);
-            p += strlen(svp->u.string);
+            memcpy(p, get_txt(svp->u.str), mstrsize(svp->u.str));
+            p += mstrsize(svp->u.str);
         }
     }
 
-    return q;
-}
+    return result;
+} /* implode_array() */
 
 /*-------------------------------------------------------------------------*/
 vector_t *
@@ -916,7 +899,7 @@ slice_array (vector_t *p, mp_int from, mp_int to)
 
     d = allocate_array(to-from+1);
     for (cnt = from; cnt <= to; cnt++)
-        assign_svalue_no_free (&d->item[cnt-from], &p->item[cnt]);
+        assign_svalue_no_free(&d->item[cnt-from], &p->item[cnt]);
 
     return d;
 }
@@ -965,11 +948,11 @@ compare_single (svalue_t *svp, vector_t *v)
 
     if (svp->type == T_STRING)
     {
-        if (svp->u.string == p2->u.string)
-            return 0;
-        return strcmp(svp->u.string, p2->u.string) ? -1 : 0;
+        return mstreq(svp->u.str, p2->u.str) ? 0 : -1;
     }
 
+    /* All other types have to be equal by address, visible in u.number */
+    /* TODO: This comparison is not valid according to ISO C */
     if (svp->u.number != p2->u.number)
         return -1;
 
@@ -1002,10 +985,8 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
  */
 
 {
-static svalue_t ltmp = { T_POINTER };
-  /* Temporary svalue to pass vectors to order_alist().
-   * The static initialisation saves a few cycles.
-   */
+    svalue_t ltmp = { T_POINTER };
+      /* Temporary svalue to pass vectors to order_alist(). */
 
     vector_t *difference;    /* Resulting difference vector,
                                 with extra zeroes at the end */
@@ -1113,6 +1094,8 @@ alist_cmp (svalue_t *p1, svalue_t *p2)
  *
  * The relation need not make sense with the actual interpretation
  * of <p1>/<p2>, as long as it defines a deterministic order relation.
+ * Especially, it works for strings because the caller makes sure
+ * that only directly tabled strings are used.
  *
  * TODO: Is the assumption '.number is big enough to hold everything
  * TODO:: in the svalue' true for future hardware?
@@ -1217,21 +1200,23 @@ order_alist (svalue_t *inlists, int listnum, Bool reuse)
         int curix, parix;
 
         /* make sure that strings can be compared by their pointer */
-        if (inpnt->type == T_STRING) {
-            if (inpnt->x.string_type != STRING_SHARED) {
-                char *str = make_shared_string(inpnt->u.string);
-                free_string_svalue(inpnt);
-                inpnt->x.string_type = STRING_SHARED;
-                inpnt->u.string = str;
+        if (inpnt->type == T_STRING)
+        {
+            if (!mstr_d_tabled(inpnt->u.str))
+            {
+                inpnt->u.str = make_tabled(inpnt->u.str);
             }
-        } else if (inpnt->type == T_OBJECT) {
-            if (inpnt->u.ob->flags & O_DESTRUCTED) {
+        }
+        else if (inpnt->type == T_OBJECT)
+        {
+            if (inpnt->u.ob->flags & O_DESTRUCTED)
+            {
                 free_object_svalue(inpnt);
                 put_number(inpnt, 0);
             }
         }
         /* propagate the new element up in the heap as much as necessary */
-        for(curix = j; 0 != (parix = curix>>1); ) {
+        for (curix = j; 0 != (parix = curix>>1); ) {
             if ( alist_cmp(root[parix], inpnt) > 0 ) {
                 root[curix] = root[parix];
                 curix = parix;
@@ -1380,15 +1365,15 @@ is_alist (vector_t *v)
     mp_int i;
 
     for (svp = v->item, i = (mp_int)VEC_SIZE(v); --i > 0; svp++) {
-        if (svp->type == T_STRING && svp->x.string_type != STRING_SHARED)
-            return 0;
+        if (svp->type == T_STRING && !mstr_d_tabled(svp->u.str))
+            return MY_FALSE;
         if (alist_cmp(svp, svp+1) > 0)
-            return 0;
+            return MY_FALSE;
     }
-    if (svp->type == T_STRING && svp->x.string_type != STRING_SHARED)
-        return 0;
+    if (svp->type == T_STRING && !mstr_d_tabled(svp->u.str))
+        return MY_FALSE;
 
-    return 1;
+    return MY_TRUE;
 }
 
 /*=========================================================================*/
@@ -1419,12 +1404,12 @@ f_allocate (svalue_t *sp)
 svalue_t *
 x_filter_array (svalue_t *sp, int num_arg)
 
-/* EFUN: filter_array(), also filter() for arrays.
+/* EFUN: filter() for arrays.
  *
- *   mixed *filter_array(mixed *arr, string fun)
- *   mixed *filter_array(mixed *arr, string fun, string|object obj, mixed extra, ...)
- *   mixed *filter_array(mixed *arr, closure cl, mixed extra, ...)
- *   mixed *filter_array(mixed *arr, mapping map)
+ *   mixed *filter(mixed *arr, string fun)
+ *   mixed *filter(mixed *arr, string fun, string|object obj, mixed extra, ...)
+ *   mixed *filter(mixed *arr, closure cl, mixed extra, ...)
+ *   mixed *filter(mixed *arr, mapping map)
  *
  * Filter the elements of <arr> through a filter defined by the other
  * arguments, and return an array of those elements, for which the
@@ -1449,13 +1434,13 @@ x_filter_array (svalue_t *sp, int num_arg)
  */
 
 {
-    svalue_t *arg;   /* First argument the vm stack */
-    vector_t *p;     /* The filtered vector */
-    mp_int    p_size;   /* sizeof(*p) */
+    svalue_t *arg;    /* First argument the vm stack */
+    vector_t *p;      /* The filtered vector */
+    mp_int    p_size; /* sizeof(*p) */
     vector_t *vec;
     svalue_t *v, *w;
-    char     *flags;     /* Flag array, one flag for each element of <p> */
-    int       res;         /* Number of surviving elements */
+    char     *flags;  /* Flag array, one flag for each element of <p> */
+    int       res;    /* Number of surviving elements */
     int       cnt;
 
     res = 0;
@@ -1471,7 +1456,7 @@ x_filter_array (svalue_t *sp, int num_arg)
     flags = alloca((size_t)p_size+1);
     if (!flags)
     {
-        error("Stack overflow in filter_array()");
+        error("Stack overflow in filter()");
         /* NOTREACHED */
         return sp;
     }
@@ -1594,7 +1579,7 @@ x_map_array (svalue_t *sp, int num_arg)
  *
  *   mixed * map(mixed *arg, string func, string|object ob, mixed extra...)
  *   mixed * map(mixed *arg, closure cl, mixed extra...)
- *   mixed *filter_array(mixed *arr, mapping map)
+ *   mixed * map(mixed *arr, mapping map)
  *
  * Map the elements of <arr> through a filter defined by the other
  * arguments, and return an array of the elements returned by the filter.
@@ -1898,7 +1883,7 @@ f_filter_objects (svalue_t *sp, int num_arg)
 
 {
     vector_t *p;          /* The <arr> argument */
-    char *func;           /* The <fun> argument */
+    string_t *func;       /* The <fun> argument */
     svalue_t *arguments;  /* Beginning of 'extra' arguments on vm stack */
     vector_t *w;          /* Result vector */
     CBool *flags = NULL;  /* Flag array, one flag for each element of <p> */
@@ -1915,7 +1900,7 @@ f_filter_objects (svalue_t *sp, int num_arg)
     arguments = sp-num_arg+3;
 
     p = arguments[-2].u.vec;
-    func = arguments[-1].u.string;
+    func = arguments[-1].u.str;
     num_arg -= 2;
 
     p_size = (mp_int)VEC_SIZE(p);
@@ -1936,15 +1921,10 @@ f_filter_objects (svalue_t *sp, int num_arg)
      */
 
     res = 0;
-    switch(arguments[-1].x.string_type) {
 
-      default:
-        if ( !(func = findstring(func)) )
-            break;
-        /* FALLTHROUGH */
-
-      case STRING_SHARED:
-
+    func = find_tabled(func);
+    if (NULL != func)
+    {
         flags = alloca((p_size+1)*sizeof(*flags));
         if (!flags)
         {
@@ -1961,14 +1941,16 @@ f_filter_objects (svalue_t *sp, int num_arg)
              * by loading it). If that doesn't work, simply continue
              * with the next element.
              */
-            if (v->type != T_OBJECT) {
+            if (v->type != T_OBJECT)
+            {
                 if (v->type != T_STRING)
                     continue;
-                if ( !(ob = get_object(v->u.string)) )
+                if ( !(ob = get_object(v->u.str)) )
                     continue;
             } else {
                 ob = v->u.ob;
-                if (ob->flags & O_DESTRUCTED) {
+                if (ob->flags & O_DESTRUCTED)
+                {
                     assign_svalue(v, &const0);
                     continue;
                 }
@@ -1988,7 +1970,7 @@ f_filter_objects (svalue_t *sp, int num_arg)
                 res++;
             }
         } /* for() */
-    } /* switch() */
+    } /* if() */
 
     /* Now: cnt == p_size, res == number of 'true' flags */
 
@@ -2006,25 +1988,19 @@ f_filter_objects (svalue_t *sp, int num_arg)
 
         v = &w->item[res];
         for (;;) {
-            if (flags[--cnt]) {
+            if (flags[--cnt])
+            {
                 svalue_t sv;
 
                 /* Copy the element and update the ref-count */
 
                 *--v = sv = p->item[cnt];
-                if (sv.type == T_STRING) {
-                    if (sv.x.string_type == STRING_MALLOC) {
-                        if ( !(v->u.string = string_copy(sv.u.string)) ) {
-                            v->type = T_INVALID;
-                            free_array(w);
-                            error("(map_array) Out of memory (%lu bytes) "
-                                  "for string\n"
-                                 , (unsigned long)strlen(sv.u.string));
-                        }
-                    } else {
-                        ref_string(sv.u.string);
-                    }
-                } else {
+                if (sv.type == T_STRING)
+                {
+                    (void)ref_mstring(sv.u.str);
+                }
+                else
+                {
                     (void)ref_object(sv.u.ob, "filter");
                 }
 
@@ -2070,7 +2046,7 @@ f_map_objects (svalue_t *sp, int num_arg)
 
 {
     vector_t *p;          /* The <arr> argument */
-    char *func;           /* The <fun> argument */
+    string_t *func;       /* The <fun> argument */
     svalue_t *arguments;  /* Beginning of 'extra' arguments on vm stack */
     vector_t *r;          /* Result vector */
     object_t *ob;         /* Object to call */
@@ -2084,7 +2060,7 @@ f_map_objects (svalue_t *sp, int num_arg)
     arguments = sp-num_arg+3;
 
     p = arguments[-2].u.vec;
-    func = arguments[-1].u.string;
+    func = arguments[-1].u.str;
     num_arg -= 2;
 
     r = allocate_array(size = (mp_int)VEC_SIZE(p));
@@ -2100,14 +2076,9 @@ f_map_objects (svalue_t *sp, int num_arg)
      * the whole function call loop.
      */
 
-    switch(arguments[-1].x.string_type) {
-
-      default:
-        if ( !(func = findstring(func)) )
-            break;
-        /* FALLTHROUGH */
-
-      case STRING_SHARED:
+    func = find_tabled(func);
+    if (NULL != func)
+    {
         for (cnt = size, v = p->item, x = r->item; --cnt >= 0; v++, x++) {
 
             /* Coerce <v> into a (non-destructed) object ob (if necessary
@@ -2117,7 +2088,7 @@ f_map_objects (svalue_t *sp, int num_arg)
             if (v->type != T_OBJECT) {
                 if (v->type != T_STRING)
                     continue;
-                if ( !(ob = get_object(v->u.string)) )
+                if ( !(ob = get_object(v->u.str)) )
                     continue;
             } else {
                 ob = v->u.ob;
@@ -2136,12 +2107,13 @@ f_map_objects (svalue_t *sp, int num_arg)
             /* Call the lfun and record the result */
             push_svalue_block(num_arg, arguments);
             w = sapply (func, ob, num_arg);
-            if (w) {
+            if (w)
+            {
                 *x = *w;
                 w->type = T_INVALID;
             }
         } /* for() */
-    } /* switch() */
+    } /* if() */
 
     /* Clean up and return */
     do {
@@ -2240,16 +2212,9 @@ insert_alist (svalue_t *key, svalue_t * /* TODO: bool */ key_data, vector_t *lis
     int new_member;            /* Flag if a new tuple is given */
 
     /* If key is a string, make it shared */
-    if (key->type == T_STRING && key->x.string_type != STRING_SHARED) {
-        char *tmpstr;
-
-        if (last_insert_alist_shared_string)
-            free_string(last_insert_alist_shared_string);
-        tmpstr = make_shared_string(key->u.string);
-        if (key->x.string_type == STRING_MALLOC)
-            xfree(key->u.string);
-        put_ref_string(key, tmpstr);
-        last_insert_alist_shared_string = tmpstr;
+    if (key->type == T_STRING && !mstr_d_tabled(key->u.str))
+    {
+        key->u.str = make_tabled(key->u.str);
     }
 
     keynum = (mp_int)VEC_SIZE(list->item[0].u.vec);
@@ -2259,7 +2224,7 @@ insert_alist (svalue_t *key, svalue_t * /* TODO: bool */ key_data, vector_t *lis
 
     /* If its just a lookup: return the result.
      */
-    if (key_data == 0) {
+    if (key_data == NULL) {
          put_number(&stmp, ix);
          return &stmp;
     }
@@ -2352,13 +2317,6 @@ f_insert_alist (svalue_t *sp, int num_arg)
       /* Mock-alist for the insert_alist() key-insertion form.
        */
 
-
-#if defined(DEBUG) && defined(MALLOC_smalloc)
-    static_vector1 = &insert_alist_vec.v;
-    /* TODO: Remove this once VEC_SIZE() is proven to be accurate.
-     */
-#endif
-
     if (sp->type != T_POINTER)
         vefun_arg_error(num_arg, T_POINTER, sp->type, sp);
 
@@ -2442,14 +2400,19 @@ assoc (svalue_t *key, vector_t *list)
 
 {
     int i;
+    svalue_t shared_string_key; 
+      /* The svalue used to pass the shared search key to search_alist().
+       * It does not count as reference!
+       */
 
     /* If key is a non-shared string, lookup and use the shared copy.
      */
-    if (key->type == T_STRING && key->x.string_type != STRING_SHARED) {
+    if (key->type == T_STRING && !mstr_d_tabled(key->u.str)) {
 
-        if ( !(assoc_shared_string_key.u.string = findstring(key->u.string)) )
+        shared_string_key.type = T_STRING;
+        if ( !(shared_string_key.u.str = find_tabled(key->u.str)) )
             return -1;
-        key = &assoc_shared_string_key;
+        key = &shared_string_key;
     }
 
     i = search_alist(key, list);
@@ -2870,160 +2833,6 @@ f_transpose_array (svalue_t *sp)
     return sp;
 } /* f_transpose_array() */
 
-/*-------------------------------------------------------------------------*/
-#ifdef F_MEMBER_ARRAY
-
-svalue_t *
-f_member_array (svalue_t *sp)
-
-/* EFUN member_array()
- *
- *   int member_array(mixed item, mixed *arr)
- *   int member_array(mixed item, string arr)
- *
- * Returns the index of the first occurence of item in array arr,
- * or occurence of a character in a string. If not found, then -1
- * is returned.
- * TODO: Practically obsoleted by member().
- */
-
-{
-    /* Search in an array */
-
-    if (sp->type == T_POINTER)
-    {
-        vector_t *vec;   /* Vector searched */
-        svalue_t *item;  /* Pointer into the vector array */
-        svalue_t *key;   /* Item searched */
-        long   cnt;      /* Size of vec */
-
-        vec = sp->u.vec;
-        item = vec->item;
-        key = sp - 1;
-        cnt = (signed)VEC_SIZE(vec);
-        switch(key->type)
-        {
-        case T_STRING:
-          {
-            char *str;
-
-            str = key->u.string;
-            for(; --cnt >= 0; item++)
-            {
-                if (item->type == T_STRING
-                 && !strcmp(key->u.string, item->u.string)
-                   )
-                    break;
-            }
-            break;
-          }
-
-        case T_FLOAT:
-        case T_CLOSURE:
-        case T_SYMBOL:
-        case T_QUOTED_ARRAY:
-          {
-            short type;
-            short x_generic;
-
-            type = key->type;
-            x_generic = key->x.generic;
-            for(; --cnt >= 0; item++)
-            {
-                if (key->u.string == item->u.string
-                 && x_generic == item->x.generic
-                 && item->type == type
-                   )
-                    break;
-            }
-            break;
-          }
-
-        case T_NUMBER:
-            if (!key->u.number)
-            {
-                /* Search for 0 is special: it also finds destructed
-                 * objects
-                 */
-                short type;
-
-                for (; --cnt >= 0; item++)
-                {
-                    if ( (type = item->type) == T_NUMBER)
-                    {
-                        if ( !item->u.number )
-                            break;
-                    }
-                    else if (type == T_OBJECT)
-                    {
-                        if (item->u.ob->flags & O_DESTRUCTED)
-                        {
-                            assign_svalue(item, &const0);
-                            break;
-                        }
-                    }
-                }
-                break;
-            }
-
-            /* FALLTHROUGH */
-
-        case T_MAPPING:
-        case T_OBJECT:
-        case T_POINTER:
-          {
-            short type = key->type;
-
-            for(; --cnt >= 0; item++)
-            {
-                if (key->u.number == item->u.number
-                 && item->type == type)
-                    break;
-            }
-            break;
-          }
-
-        default:
-            if (sp[-1].type == T_LVALUE)
-                error("Reference passed to member_array()\n");
-            fatal("Bad type to member_array(): %s\n", typename(sp[-1].type));
-        }
-
-        if (cnt >= 0)
-        {
-            cnt = (long)VEC_SIZE(vec) - cnt - 1;
-        }
-        /* else return -1 for failure */
-
-        free_svalue(sp--);
-        free_svalue(sp);
-        put_number(sp, cnt);
-        return sp;
-    }
-
-    /* Or search in a string */
-
-    {
-        char *str, *str2;
-        int i;
-
-        if (sp[-1].type != T_NUMBER)
-            efun_arg_error(1, T_NUMBER, sp[-1].type, sp);
-        str = sp->u.string;
-        i = sp[-1].u.number;
-        str2 = i & ~0xff ? NULL : strchr(str, i);
-        i = str2 ? str2 - str : -1;
-
-        free_svalue(sp--);
-        free_svalue(sp);
-        put_number(sp, i);
-        return sp;
-    }
-
-} /* f_member_array() */
-
-#endif
-
 /*=========================================================================*/
 
 /* EFUN unique_array()
@@ -3106,7 +2915,7 @@ sameval (svalue_t *arg1, svalue_t *arg2)
     } else if (arg1->type == T_POINTER && arg2->type == T_POINTER) {
         return arg1->u.vec == arg2->u.vec;
     } else if (arg1->type == T_STRING && arg2->type == T_STRING) {
-        return !strcmp(arg1->u.string, arg2->u.string);
+        return mstreq(arg1->u.str, arg2->u.str);
     } else if (arg1->type == T_OBJECT && arg2->type == T_OBJECT) {
         return arg1->u.ob == arg2->u.ob;
     } else
@@ -3197,7 +3006,7 @@ put_in (Mempool pool, struct unique **ulist
 
 /*-------------------------------------------------------------------------*/
 static vector_t *
-make_unique (vector_t *arr, char *func, svalue_t *skipnum)
+make_unique (vector_t *arr, string_t *func, svalue_t *skipnum)
 
 /* The actual implementation of efun unique_array();
  *
@@ -3302,7 +3111,7 @@ f_unique_array (svalue_t *sp)
     vector_t *res;
 
     check_for_destr((sp-2)->u.vec);
-    res = make_unique((sp-2)->u.vec, (sp-1)->u.string, sp);
+    res = make_unique((sp-2)->u.vec, (sp-1)->u.str, sp);
 
     /* Clean up the stack and push the result */
     free_svalue(sp--);

@@ -23,6 +23,7 @@ DESCRIPTION
 	var ^= expr
 	var <<= expr
 	var >>= expr
+	var >>>= expr
 	var *= expr
 	var %= expr
 	var /= expr
@@ -68,6 +69,11 @@ DESCRIPTION
 	expr1 << expr2	Shift 'expr1' left by 'expr2' bits.
 
 	expr1 >> expr2	Shift 'expr1' right by 'expr2' bits.
+                        This shift preserves the sign of 'expr1'.
+
+	expr1 >>> expr2	Shift 'expr1' right by 'expr2' bits.
+                        This shift does not preserve the sign of 'expr1',
+                        instead it shifts in 0 bits.
 
 	expr1 + expr2	Add 'expr1' and 'expr2'. If numbers, then
 			arithmetic addition is used. If one of the
@@ -160,6 +166,9 @@ DESCRIPTION
 
 NOTE
 	The closure operators are not described here.
+
+HISTORY
+        LDMud 3.2.9 added '>>>' and '>>>='.
 
 SEE ALSO
 	arrays(LPC), alists(LPC), mappings(LPC), closures(LPC)

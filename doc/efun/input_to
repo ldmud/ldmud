@@ -42,7 +42,8 @@ DESCRIPTION
               Note that the players frontend is free to stay in
               linemode all the time: even if you request a single
               character, the player might be forced to type (and send)
-              that character plus the return key.
+              that character plus the return key. You might even get
+              multiple 'single' characters together as one string.
 
               If you plan to stay in charmode a longer time , you can
               reduce the call overhead by using set_combine_charset()

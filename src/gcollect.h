@@ -22,7 +22,7 @@ extern void clear_inherit_ref(program_t *p);
 extern void mark_program_ref(program_t *p);
 extern void reference_destructed_object(object_t *ob);
 extern void note_malloced_block_ref(void *p);
-extern void count_ref_from_string(char *p);
+extern void count_ref_from_string(string_t *p);
 extern void count_ref_in_vector(svalue_t *svp, size_t num);
 extern void clear_ref_in_vector(svalue_t *svp, size_t num);
 

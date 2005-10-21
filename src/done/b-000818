@@ -2,9 +2,13 @@ Short: INPUT_CHARMODE problems with TinyFugue
 Date: 18 Aug 2000 12:44:48 +0200 (CEST)
 From: Unholy Lands mud <mud@pc181.iaee.tuwien.ac.at>
 Type: Bug
-State: New
+State: Done - fixed in 3.2.9-dev.213
 
+Analysis: TinyFugue does not support linemode (at least not through the SGA
+negotiation), but the driver did not properly reset its CHARMODE_REQ flag when
+TinyFugue declined the request.
 
+-----------------------------------------------------------------------------
 I noticed a change in the behaviour of the input_to function from 3.2.7 to
 3.2.8.dev.221(checked)
 

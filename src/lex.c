@@ -59,7 +59,6 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
-#include "stralloc.h"
 #include "strfuns.h"
 #include "xalloc.h"
 
@@ -628,7 +627,7 @@ init_lexer(void)
     static short binary_operators[]
       = { F_ADD, F_SUBTRACT, F_MULTIPLY, F_DIVIDE, F_MOD
         , F_LT, F_GT, F_EQ, F_GE, F_LE, F_NE
-        , F_OR, F_XOR, F_LSH, F_RSH
+        , F_OR, F_XOR, F_LSH, F_RSH, F_RSHL
         , F_INDEX, F_RINDEX, F_NX_RANGE, F_RX_RANGE
         };
     static short ternary_operators[]
@@ -1520,7 +1519,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
 
             char * cp;
             
-            if (res->type != T_STRING)
+            if (res->type != T_OLD_STRING)
             {
                 yyerrorf("Illegal to include file '%s'.", name);
                 return -1;
@@ -1636,7 +1635,7 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
 
         /* The result must be legal relative pathname */
 
-        if (svp && svp->type == T_STRING
+        if (svp && svp->type == T_OLD_STRING
          && strlen(svp->u.string) < INC_OPEN_BUFSIZE)
         {
             strcpy(buf, svp->u.string);
@@ -2459,6 +2458,19 @@ yylex1 (void)
                     outp = yyp;
                     return L_ASSIGN;
                 }
+                if (*yyp == '>')
+                {
+                    yyp++;
+                    if (*yyp == '=')
+                    {
+                        yyp++;
+                        yylval.number = F_RSHL_EQ;
+                        outp = yyp;
+                        return L_ASSIGN;
+                    }
+                    outp = yyp;
+                    return L_RSHL;
+                }
                 outp = yyp;
                 return L_RSH;
             }
@@ -2974,7 +2986,7 @@ yylex1 (void)
 
                     push_volatile_string(inter_sp, "nomask simul_efun");
                     push_volatile_string(inter_sp, current_file);
-                    push_ref_string(inter_sp, p->name);
+                    push_ref_old_string(inter_sp, p->name);
                     res = apply_master_ob(STR_PRIVILEGE, 3);
                     if (!res || res->type != T_NUMBER || res->u.number < 0)
                     {
@@ -5323,7 +5335,7 @@ cond_get_exp (int priority, svalue_t *svp)
                   break;
             } /* switch() */
         }
-        else if (svp->type == T_STRING && sv2.type == T_STRING)
+        else if (svp->type == T_OLD_STRING && sv2.type == T_OLD_STRING)
         {
             x = optab2[x+1];
             if (x == BPLUS)
@@ -5396,7 +5408,7 @@ set_inc_list (vector_t *v)
     svp = v->item;
     for (i = 0, max = 0; i < VEC_SIZE(v); i++, svp++)
     {
-        if (svp->type != T_STRING)
+        if (svp->type != T_OLD_STRING)
         {
             error("H_INCLUDE_DIRS argument has a non-string array element\n");
         }
@@ -5895,7 +5907,7 @@ f_expand_define (svalue_t *sp)
 
     /* Get the arguments from the stack */
 
-    if (sp->type == T_STRING)
+    if (sp->type == T_OLD_STRING)
         arg = sp->u.string;
     else /* it's the number 0 */
         arg = "";

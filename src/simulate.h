@@ -108,7 +108,7 @@ struct error_recovery_info
 struct callback_s {
     union {               /* The function to call: by name or the closure */
         struct {
-            char     *name;  /* the shared function name */
+            string_t *name;  /* the tabled function name */
             object_t *ob;    /* reference to the object to call */
         } named;
         svalue_t lambda;     /* the closure to call */
@@ -182,12 +182,12 @@ extern int master_will_be_updated;
 extern void purge_shadow_sent(void);
 extern void check_shadow_sent (object_t *ob);
 extern void assert_shadow_sent (object_t *ob);
-extern int  setup_function_callback(callback_t *cb, object_t* ob, char *fun, int nargs, svalue_t * args, Bool no_lvalues);
-extern int  setup_closure_callback(callback_t *cb, svalue_t *cl, int nargs, svalue_t * args, Bool no_lvalues);
+extern int  setup_function_callback(callback_t *cb, object_t* ob, string_t *fun, int nargs, svalue_t * args, Bool use_lvalues);
+extern int  setup_closure_callback(callback_t *cb, svalue_t *cl, int nargs, svalue_t * args, Bool use_lvalues);
 extern int  setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs);
 extern void free_callback (callback_t *cb);
 extern svalue_t *execute_callback (callback_t *cb, int nargs, Bool keep, Bool toplevel);
-#define apply_callback(cb,nargs)     execute_callback(cb,nargs,MY_TRUE,MY_FALSE)
+#define apply_callback(cb,nargs)   execute_callback(cb,nargs,MY_TRUE,MY_FALSE)
 #define backend_callback(cb,nargs) execute_callback(cb,nargs,MY_FALSE,MY_TRUE)
 extern object_t *callback_object(callback_t *cb);
 #ifdef DEBUG
@@ -206,7 +206,7 @@ extern void destruct(object_t *ob);
 extern void remove_destruct_objects(void);
 extern void print_svalue(svalue_t *arg);
 extern const char *make_name_sane(const char *pName, Bool addSlash);
-extern object_t *lookfor_object(char *str, Bool bLoad);
+extern object_t *lookfor_object(string_t *str, Bool bLoad);
 #define find_object(str) lookfor_object((str), MY_FALSE)
 #define get_object(str) lookfor_object((str), MY_TRUE)
 extern Bool status_parse(strbuf_t * sbuf, char *buff);
@@ -218,7 +218,7 @@ extern char *limit_error_format(char *fixed_fmt, char *fmt);
 extern Bool legal_path(char *path);
 extern Bool check_no_parentdirs(char *path);
 extern void parse_error(Bool warning, char *error_file, int line, char *what, char *context);
-extern char *check_valid_path(char *path, object_t *caller, char *call_fun, Bool writeflg);
+extern string_t *check_valid_path(const string_t *path, object_t *caller, const string_t *call_fun, Bool writeflg);
 extern Bool match_string(char *match, char *str, mp_int len);
 
 extern svalue_t *f_write(svalue_t *sp);

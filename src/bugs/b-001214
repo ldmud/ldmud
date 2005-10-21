@@ -1,0 +1,18 @@
+Short: Drivers crashes in telnet-charmode code
+Date: Fri, 15 Dec 2000 16:27:25 +0100
+From: Freaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
+Type: Bug
+State: New
+
+
+Ich hatte jetzt mehrere Driver-Crashes in der Art:
+2000.12.14 18:52:34 comm: data length < 0: -1
+2000.12.14 18:52:34 Current object was obj/zauberstab#846211
+2000.12.14 18:52:34 Dump of the call chain:
+No trace.
+
+> Gnomi hat mir dieses Problem auch schon genannt - ich vermute, es haengt mal 
+> wieder mit dem xeditor und dem CHARMODE telnet code zusammen. Gnomi versucht, 
+> diesen Fehler reproduzierbar zu machen.
+> For the time being, such errors no longer abort the driver, but starting
+> with 3.2.9-dev.248 they just terminate the affected connection.

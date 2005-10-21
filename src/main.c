@@ -42,7 +42,6 @@
 #include "hosts/amiga/socket.h"
 #endif
 
-#define NO_REF_STRING
 #include "main.h"
 
 #include "backend.h"
@@ -61,7 +60,6 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
-#include "stralloc.h"
 #include "svalue.h"
 #include "swap.h"
 #include "wiz_list.h"
@@ -158,8 +156,6 @@ main (int argc, char **argv)
 
     put_number(&const0, 0);
     put_number(&const1, 1);
-    assoc_shared_string_key.type = T_STRING;
-    assoc_shared_string_key.x.string_type = STRING_SHARED;
 
     current_time = get_current_time();
     seed_random((uint32)current_time);
@@ -255,7 +251,7 @@ main (int argc, char **argv)
 
 #ifdef ERQ_DEMON
     if (!no_erq_demon)
-        start_erq_demon("");
+        start_erq_demon("", 0);
 #endif
     initialize_host_ip_number();
 
@@ -359,7 +355,7 @@ void initialize_master_uid (void)
         master_ob->user = &default_wizlist_entry;
         master_ob->eff_user = 0;
     }
-    else if (ret == 0 || ret->type != T_STRING)
+    else if (ret == 0 || ret->type != T_OLD_STRING)
     {
         printf("%s %s: %s() in %s does not work\n"
               , time_stamp(), strict_euids ? "Fatal" : "Warning"

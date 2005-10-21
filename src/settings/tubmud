@@ -31,7 +31,7 @@ with_reserved_user_size=800000
 with_catch_reserved_cost=20000
 with_master_reserved_cost=0x2000
 
-with_max_array_size=4000
+with_max_array_size=0
 with_max_mapping_size=0
 with_htable_size=16384
 

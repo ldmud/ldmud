@@ -47,7 +47,7 @@ b-000104: Memory leak in clone_object()?
 b-000217-3: Memoryleak in Finalfrontier
 b-000306-3: Memoryleak in the actions?
 b-000308: call_out freezes totally
-b-000818: INPUT_CHARMODE problems with TinyFugue
+b-000830: malloc status is inconsistent
 
 
 Installation

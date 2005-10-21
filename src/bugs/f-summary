@@ -85,6 +85,7 @@ f-000530: New input_to() efuns
 f-000616: Allow to set a certain umask
 f-000627: Search efun
 f-000716: New efun 'call_trace()' or so
+f-000905-1: More flexible wrapping for terminal_colour().
 
 
 Language
@@ -122,6 +123,7 @@ f-990228:  Replace __INIT by a nameless function with special callpattern
 f-991104-1: Inline closures are not real closures.
 b-000217-1: F_M_CAGGREGATE acts strange
 p-000316: Binary codefile support
+f-000906: Revamp the bytecode design
 
 
 Runtime
@@ -171,6 +173,8 @@ f-000327-1: Driver should pass signals to the mudlib
 p-000401-0: xerq: new request ERQ_INET6_ATON
 f-000413-0: Use ID numbers for error messages
 f-000814-1: net_connect()
+f-000830: telnet-Timing extension (RFC 860)
+f-000905-0: Graceful charmode recovery.
 
 Installation
 --------------------------------------------------------------------------

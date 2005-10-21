@@ -38,7 +38,7 @@ extern wiz_list_t default_wizlist_entry;
 /* --- Prototypes --- */
 
 extern size_t wiz_list_size (void);
-extern wiz_list_t *add_name(char *str);
+extern wiz_list_t *add_name(string_t *str);
 extern void wiz_decay(void);
 extern void load_wiz_file(void);
 extern void remove_wiz_list(void);

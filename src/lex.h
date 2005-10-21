@@ -98,7 +98,7 @@ struct defn
 
 struct ident_s
 {
-    char *name;              /* Name of the identifier (shared string) */
+    string_t *name;          /* Name of the identifier (shared string) */
     short type;              /* Type of this entry */
     short hash;              /* Hashvalue of this identifier */
     ident_t *next;           /* Next in hash chain */

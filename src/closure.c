@@ -156,12 +156,12 @@
 #include "lang.h"     /* for the L_ tokens */
 #include "lex.h"
 #include "main.h"
+#include "mstrings.h"
 #include "object.h"
 #include "prolang.h"
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
-#include "stralloc.h"
 #include "svalue.h"
 #include "swap.h"
 #include "switch.h"
@@ -247,7 +247,7 @@ struct lambda_replace_program_protector
 
 struct symbol_s
 {
-    char *name;            /* Shared name of the symbol (not counted as ref) */
+    string_t *name;       /* Tabled name of the symbol (not counted as ref) */
     symbol_t *next;        /* Next symbol structure in hash list */
     symbol_t *next_local;
     int index;             /* Index number of this symbol, -1 if unassigned */
@@ -340,14 +340,14 @@ static void compile_lvalue(svalue_t *, int);
 
 /*-------------------------------------------------------------------------*/
 static INLINE int
-function_cmp (char *name, program_t *prog, int ix)
+function_cmp (string_t *name, program_t *prog, int ix)
 
 /* Compare <name> with the name of function number <ix> in <prog>ram.
  * Result:  0: <name> is equal to the indexed name
  *         >0: <name> is smaller
  *         <0: <name> is bigger
  *
- * Note that both names are shared strings, so only the pointers are
+ * Note that both names are directly tabled strings, so only the pointers are
  * compared.
  */
 
@@ -371,7 +371,7 @@ function_cmp (char *name, program_t *prog, int ix)
 
     /* Return the result of the comparison */
 #ifdef ALIGN_FUNCTIONS
-    return (int)(*((char **)FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK)))
+    return (int)(*((string_t **)FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK)))
                  - name);
 #else
     return memcmp( &name, FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK))
@@ -382,7 +382,7 @@ function_cmp (char *name, program_t *prog, int ix)
 
 /*-------------------------------------------------------------------------*/
 long
-find_function (char *name, program_t *prog)
+find_function (string_t *name, program_t *prog)
 
 /* Find the function <name> (a shared string) in the <prog>ram.
  * Result is the index of the function in the functions[] table,
@@ -622,7 +622,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
                     assert_master_ob_loaded();
                     free_object(l->ob, "replace_program_lambda_adjust");
                     l->ob = ref_object(master_ob, "replace_program_lambda_adjust");
-                    i = find_function( findstring("dangling_lfun_closure")
+                    i = find_function( STR_DANGLING_LFUN
                                      , master_ob->prog);
                     l->function.index = (unsigned short)(i < 0 ? 0 : i);
                 }
@@ -645,7 +645,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
                     l->function.alien.ob
                         = ref_object(master_ob
                                     , "replace_program_lambda_adjust");
-                    i = find_function( findstring("dangling_lfun_closure")
+                    i = find_function( STR_DANGLING_LFUN
                                      , master_ob->prog);
                     l->function.index = (unsigned short)(i < 0 ? 0 :i);
                 }
@@ -755,7 +755,7 @@ replace_program_lambda_adjust (replace_ob_t *r_ob)
                 lrpp->block.u.lambda = l2;
                 
                 error("Cannot adjust lambda closure after replace_program(), "
-                      "object %s\n", r_ob->ob->name);
+                      "object %s\n", get_txt(r_ob->ob->name));
             }
 
             /* The recompiled lambda can be used (and has to: think changed
@@ -1076,7 +1076,7 @@ free_symbols (void)
 
 /*-------------------------------------------------------------------------*/
 static symbol_t *
-make_symbol (char *name)
+make_symbol (string_t *name)
 
 /* Look up the symbol <name> in the current symbol table and return the
  * pointer to the symbol_t structure. If <name> is not yet in the table,
@@ -2242,7 +2242,7 @@ compile_value (svalue_t *value, int opt_flags)
                     break;
 
                 /* ({#'op=, <lvalue>, <expr> })
-                 * with op: *, &, |, ^, <<, >>, /, %
+                 * with op: *, &, |, ^, <<, >>, >>>, /, %
                  */
                 case F_MULT_EQ:
                 case F_AND_EQ:
@@ -2250,6 +2250,7 @@ compile_value (svalue_t *value, int opt_flags)
                 case F_XOR_EQ:
                 case F_LSH_EQ:
                 case F_RSH_EQ:
+                case F_RSHL_EQ:
                 case F_DIV_EQ:
                 case F_MOD_EQ:
                     /* This is compiled as:
@@ -3249,14 +3250,14 @@ compile_value (svalue_t *value, int opt_flags)
                                     realloc_values();
                                 no_string = MY_FALSE;
                                 put_string(&stmp
-                                          , make_shared_string(labels->u.string));
-                                if (!stmp.u.string)
+                                          , make_tabled_from(labels->u.str));
+                                if (!stmp.u.str)
                                     lambda_error("Out of memory (%lu bytes) "
                                                  "for string\n"
-                                                , (unsigned long) strlen(labels->u.string));
+                                                , (unsigned long) mstrsize(labels->u.str));
                                 *--current.valuep = stmp;
 
-                                l->key = (p_int)stmp.u.string;
+                                l->key = (p_int)stmp.u.str;
 
                             }
                             else if (labels->type == T_NUMBER)
@@ -3507,10 +3508,9 @@ compile_value (svalue_t *value, int opt_flags)
             	/* We have to call the sefun by name */
                 static svalue_t string_sv = { T_STRING };
 
-                string_sv.x.string_type = STRING_SHARED;
-                string_sv.u.string = query_simul_efun_file_name();
+                string_sv.u.str = query_simul_efun_file_name();
                 compile_value(&string_sv, 0);
-                string_sv.u.string = simul_efunp[simul_efun].name;
+                string_sv.u.str = simul_efunp[simul_efun].name;
                 compile_value(&string_sv, 0);
             }
 
@@ -3545,7 +3545,8 @@ compile_value (svalue_t *value, int opt_flags)
                 funp = &simul_efunp[simul_efun];
                 if (num_arg > funp->num_arg)
                     lambda_error(
-                      "Too many arguments to simul_efun %s\n", funp->name
+                      "Too many arguments to simul_efun %s\n"
+                     , get_txt(funp->name)
                     );
                     
                 if (funp->num_arg != 0xff)
@@ -3749,9 +3750,10 @@ compile_value (svalue_t *value, int opt_flags)
              */
             symbol_t *sym;
 
-            sym = make_symbol(value->u.string);
+            sym = make_symbol(value->u.str);
             if (sym->index < 0)
-                lambda_error("Symbol '%s' not bound\n", sym->name);
+                lambda_error("Symbol '%s' not bound\n"
+                            , get_txt(sym->name));
             if (current.code_left < 2)
                 realloc_code();
             STORE_CODE(current.codep, F_LOCAL);
@@ -3909,7 +3911,7 @@ compile_lvalue (svalue_t *argp, int flags)
             break;
 
         /* Find (or create) the variable for this symbol */
-        sym = make_symbol(argp->u.string);
+        sym = make_symbol(argp->u.str);
         if (sym->index < 0)
             sym->index = current.num_locals++;
             
@@ -4211,7 +4213,7 @@ lambda (vector_t *args, svalue_t *block, object_t *origin)
         {
             lambda_error("Illegal argument type to lambda()\n");
         }
-        sym = make_symbol(argp->u.string);
+        sym = make_symbol(argp->u.str);
         if (sym->index >= 0)
             lambda_error("Double symbol name in lambda arguments\n");
         sym->index = i;
@@ -4444,6 +4446,8 @@ symbol_operator (char *symbol, char **endp)
  *   #'<      -> F_LT                   
  *   #'>=     -> F_GE                   
  *   #'>>=    -> F_RSH_EQ               
+ *   #'>>>=   -> F_RSHL_EQ               
+ *   #'>>>    -> F_RSHL                  
  *   #'>>     -> F_RSH                  
  *   #'>      -> F_GT                   
  *   #'==     -> F_EQ                   
@@ -4626,6 +4630,18 @@ symbol_operator (char *symbol, char **endp)
                 ret = F_RSH_EQ;
                 break;
             }
+            if (symbol[1] == '>')
+            {
+                symbol++;
+                if (symbol[1] == '=')
+                {
+                    symbol++;
+                    ret = F_RSHL_EQ;
+                    break;
+                }
+                ret = F_RSHL;
+                break;
+            }
             ret = F_RSH;
             break;
         }
@@ -4774,8 +4790,10 @@ symbol_efun (svalue_t *sp)
 {
     Bool efun_override = MY_FALSE;
     char *str;
+    size_t len;
 
-    str = sp->u.string;
+    str = get_txt(sp->u.str);
+    len = mstrsize(sp->u.str);
 
     /* If the first character is alphanumeric, the string names a function,
      * otherwise an operator.
@@ -4786,23 +4804,36 @@ symbol_efun (svalue_t *sp)
     	 */
 
         ident_t *p;
+        char *cstr;
 
         /* Take care of an leading efun override */
         
-        if ( !strncmp(str, "efun::", 6) )
+        if ( len >= 6 && !strncmp(str, "efun::", 6) )
         {
             str += 6;
+            len -= 6;
             efun_override = MY_TRUE;
         }
+
+        /* Convert the string_t into a C string for local purposes */
+        cstr = alloca(len+1);
+        if (!cstr)
+        {
+            inter_sp = sp;
+            error("Out of memory (%lu bytes) for identifier\n"
+                 , (unsigned long) len);
+        }
+        memcpy(cstr, str, len);
+        cstr[len] = '\0';
 
         /* Lookup the identifier in the string in the global table
          * of identifers.
          */
-        if ( !(p = make_shared_identifier(str, I_TYPE_GLOBAL, 0)) )
+        if ( !(p = make_shared_identifier(cstr, I_TYPE_GLOBAL, 0)) )
         {
             inter_sp = sp;
             error("Out of memory (%lu bytes) for identifier\n"
-                 , (unsigned long) strlen(str));
+                 , (unsigned long) len);
         }
 
         /* Loop through the possible multiple definitions.
@@ -4908,7 +4939,7 @@ undefined_function:
             svalue_t *res;
 
             inter_sp = sp;
-            push_volatile_string(inter_sp, "nomask simul_efun");
+            push_ref_string(inter_sp, STR_NOMASK_SIMUL_EFUN);
             push_ref_valid_object(inter_sp, current_object, "nomask simul_efun");
             push_ref_string(inter_sp, p->name);
             res = apply_master_ob(STR_PRIVILEGE, 3);
@@ -4918,7 +4949,7 @@ undefined_function:
             	/* Override attempt is fatal */
                 error(
                   "Privilege violation: nomask simul_efun %s\n",
-                  p->name
+                  get_txt(p->name)
                 );
             }
             else if (!res->u.number)
@@ -5009,7 +5040,7 @@ f_bind_lambda (svalue_t *sp)
         /* If <ob> is given, check for a possible privilege breach */
         ob = sp->u.ob;
         if (ob != current_object
-         && !_privilege_violation("bind_lambda", sp, sp))
+         && !_privilege_violation(STR_BIND_LAMBDA, sp, sp))
         {
             free_object(ob, "bind_lambda");
             sp--;
@@ -5198,15 +5229,9 @@ f_symbol_function (svalue_t *sp)
     int i;
 
     /* If 'arg' is not a symbol, make sure it's a shared string. */
-    if (sp[-1].type != T_SYMBOL && sp[-1].x.string_type != STRING_SHARED)
+    if (sp[-1].type != T_SYMBOL)
     {
-        char *str;
-
-        str = sp[-1].u.string;
-        sp[-1].u.string = make_shared_string(str);
-        if (sp[-1].x.string_type == STRING_MALLOC)
-            xfree(str);
-        sp[-1].x.string_type = STRING_SHARED;
+        sp[-1].u.str = make_tabled(sp[-1].u.str);
     }
 
     /* If 'ob' is not of type object, it might be the name of
@@ -5225,13 +5250,13 @@ f_symbol_function (svalue_t *sp)
         /* Find resp. load the object by name */
         if (sp->type != T_STRING)
         {
-            efun_arg_error(2, T_STRING, sp->type, sp);
+            efun_exp_arg_error(2, TF_STRING|TF_OBJECT, sp->type, sp);
             /* NOTREACHED */
             return sp;
         }
-        ob = get_object(sp->u.string);
+        ob = get_object(sp->u.str);
         if (!ob)
-            error("Object '%s' not found.\n", sp->u.string);
+            error("Object '%s' not found.\n", get_txt(sp->u.str));
         free_svalue(sp);
         put_ref_object(sp, ob, "symbol_function");
     }
@@ -5253,7 +5278,7 @@ f_symbol_function (svalue_t *sp)
 
     /* Find the function in the program */
     prog = ob->prog;
-    i = find_function(sp[-1].u.string, prog);
+    i = find_function(sp[-1].u.str, prog);
 
     /* If the function exists and is visible, create the closure
      */
@@ -5301,7 +5326,7 @@ f_symbol_function (svalue_t *sp)
 
         /* Clean up the stack and push the result */
         sp--;
-        deref_string(sp->u.string);
+        free_mstring(sp->u.str);
         sp->type = T_CLOSURE;
         sp->x.closure_type = closure_type;
         sp->u.lambda = l;
@@ -5319,7 +5344,7 @@ f_symbol_function (svalue_t *sp)
     /* Symbol can't be created - free the stack and push 0 */
     free_object(ob, "symbol_function");
     sp--;
-    free_string(sp->u.string);
+    free_mstring(sp->u.str);
     put_number(sp, 0);
 
     return sp;
@@ -5350,7 +5375,6 @@ f_symbol_variable (svalue_t *sp)
  */
 
 {
-    char *str;
     object_t *ob;
     int n;         /* Index of the desired variable */
     lambda_t *l;
@@ -5389,7 +5413,7 @@ f_symbol_variable (svalue_t *sp)
 
         if (current_prog->variable_names[n].flags & NAME_HIDDEN)
         {
-            if (!_privilege_violation("symbol_variable", sp, sp))
+            if (!_privilege_violation(STR_SYMBOL_VARIABLE, sp, sp))
             {
                 sp->u.number = 0;
                 return sp;
@@ -5398,33 +5422,35 @@ f_symbol_variable (svalue_t *sp)
         break;
 
     case T_STRING:  /* Name is given by string */
-        if (sp->x.string_type != STRING_SHARED)
+        if (!mstr_d_tabled(sp->u.str))
         {
-            /* If the variable exists, it must exist as shared
+            /* If the variable exists, it must exist as tabled
              * string.
              */
-            str = findstring(sp->u.string);
-            if (sp->x.string_type == STRING_MALLOC)
-                xfree(sp->u.string);
+            string_t *str;
+
+            str = find_tabled(sp->u.str);
             if (!str)
             {
+                free_svalue(sp);
             	put_number(sp, 0);
             	return sp;
             }
 
-            /* Fake a shared string value to continue processing */
-            sp->x.string_type = STRING_SHARED;
-            sp->u.string = ref_string(str);
+            /* Make sp a tabled string value to continue processing */
+            free_mstring(sp->u.str);
+            sp->u.str = ref_mstring(str);
         }
         /* FALL THROUGH */
 
     case T_SYMBOL:  /* Name is given as shared string (symbol) */
       {
+        string_t *str;
         variable_t *var;
         program_t *prog;
         int num_var;
 
-        str = sp->u.string;
+        str = sp->u.str;
         prog = current_prog;
         var = prog->variable_names;
         num_var = prog->num_variables;
@@ -5433,7 +5459,7 @@ f_symbol_variable (svalue_t *sp)
             if (var->name == str && !(var->flags & NAME_HIDDEN))
                 break;
         }
-        free_string(str);
+        free_mstring(str);
         if (n < 0)
         {
             put_number(sp, 0);

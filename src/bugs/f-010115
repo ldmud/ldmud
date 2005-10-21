@@ -1,0 +1,13 @@
+Short: Improvements to smalloc
+Date: 2001-01-15
+From: Lars
+Type: Feature
+State: New
+
+When looking for n-Byte small Blocks,consider splitting a free >n-Byte Block.
+
+During a GC, coalesce adjacent free small blocks. This would require rebuilding
+all freelists, which could be done simply by scanning for GC_FREE small blocks.
+
+When coalescing small blocks, maybe allow 'odd' sizes. These could be held in a separate free list, and used in a 'splitting' maneuver if the appropriate free list is exhausted.
+

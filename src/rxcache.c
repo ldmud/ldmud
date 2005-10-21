@@ -40,14 +40,11 @@
 #include <stdio.h>
 #include <string.h>
 
-#define NO_REF_STRING
 #include "rxcache.h"
 
 #include "gcollect.h"
 #include "hash.h"
 #include "regexp.h"
-#include "smalloc.h"
-#include "stralloc.h"
 #include "strfuns.h"
 #include "svalue.h"
 #include "xalloc.h"

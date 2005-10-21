@@ -28,8 +28,8 @@
  *       p_int           load_id;
  *       p_int           extra_ref;            (ifdef DEBUG)
  *       program_t     * prog;
- *       char          * name;
- *       char          * load_name;
+ *       string_t      * name;
+ *       string_t      * load_name;
  *       object_t      * next_all;
  *       object_t      * prev_all;
  *       object_t      * next_hash;
@@ -97,17 +97,19 @@
  * can't be shared between master and clones. The number of variables
  * implicitely known by the program.
  *
- * .name and .load_name are the two names of the object. .name (an allocated
+ * .name and .load_name are the two names of the object. .name (an untabled
  * string) is the objects 'real' name: something like "std/thing" for
  * a blueprint, and "std/thing#45" for a clone. This name never has
  * a leading '/'. However, this name can be changed with the efun
  * rename_object().
  *
- * The .load_name (a shared string) is the name of the file from which
+ * The .load_name (a tabled string) is the name of the file from which
  * the object was created. It is identical in both blueprint and clones
  * (in our example "/std/thing") and can't be changed. In compat mode,
  * this name has no leading '/'. However, for virtual objects .load_name
  * is the virtual name - the real program name is .prog->name.
+ *
+ * Both .name and .load_name never contain a '\0' as part of the name.
  *
  * .sent is the list of annotations to the object. Primary use is to
  * hold the list of commands ("sentences") defined by this object. Just
@@ -162,7 +164,6 @@
 #include <stdio.h>
 #include <fcntl.h>
 
-#define USES_SVALUE_STRLEN
 #include "object.h"
 
 #include "actions.h"
@@ -181,11 +182,9 @@
 #include "ptrtable.h"
 #include "random.h"
 #include "sent.h"
-#include "smalloc.h"
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
-#include "stralloc.h"
 #include "strfuns.h"
 #include "swap.h"
 #include "svalue.h"
@@ -688,7 +687,7 @@ reset_object (object_t *ob, int arg)
 
         pop_stack();
     }
-    else if (closure_hook[arg].type == T_STRING)
+    else if (closure_hook[arg].type == T_OLD_STRING)
     {
         push_number(inter_sp, arg == H_RESET);
         if (!sapply(closure_hook[arg].u.string, ob, 1) && arg == H_RESET)
@@ -1472,7 +1471,7 @@ f_functionlist (svalue_t *sp)
 
         if (mode_flags & RETURN_FUNCTION_NAME) {
             svp--;
-            svp->type = T_STRING;
+            svp->type = T_OLD_STRING;
             svp->x.string_type = STRING_SHARED;
             memcpy( &svp->u.string, FUNCTION_NAMEP(funstart)
                   , sizeof svp->u.string);
@@ -1643,7 +1642,7 @@ f_load_name (svalue_t *sp)
     {
         s = sp->u.ob->load_name;
         free_object_svalue(sp);
-        put_ref_string(sp, s);
+        put_ref_old_string(sp, s);
         return sp;
     }
 
@@ -1655,7 +1654,7 @@ f_load_name (svalue_t *sp)
         /* Got it */
         s = ob->load_name;
         free_string_svalue(sp);
-        put_ref_string(sp, s);
+        put_ref_old_string(sp, s);
         return sp;
     }
 
@@ -1698,7 +1697,8 @@ f_load_name (svalue_t *sp)
         len = (size_t)(hash - s);
         p = mem = xalloc(len+1);
         if (!p)
-            error("(load_name) Out of memory (%lu bytes) for filename.", len+1);
+            error("(load_name) Out of memory (%lu bytes) for filename."
+                 , (long)len+1);
         strncpy(p, s, len);
         p[len] = '\0';
 
@@ -2262,7 +2262,7 @@ f_seteuid (svalue_t *sp)
         /* Clear the euid of this_object */
 
         if (argp->u.number != 0)
-            efun_arg_error(1, T_STRING, sp->type, sp);
+            efun_arg_error(1, T_OLD_STRING, sp->type, sp);
         current_object->eff_user = 0;
         free_svalue(argp);
         put_number(argp, 1);
@@ -2293,7 +2293,7 @@ f_seteuid (svalue_t *sp)
         put_number(argp, 1);
     }
 
-    return sp;
+    return argp;
 } /* f_seteuid() */
 
 #endif
@@ -2332,7 +2332,7 @@ f_creator (svalue_t *sp)
     ob = sp->u.ob;
     deref_object(ob, "getuid");
     if ( NULL != (name = ob->user->name) )
-        put_ref_string(sp, name);
+        put_ref_old_string(sp, name);
     else
         put_number(sp, 0);
 
@@ -2720,7 +2720,7 @@ f_first_inventory (svalue_t *sp)
         ob = sp->u.ob->contains;
         free_object_svalue(sp);
     }
-    else if (sp->type == T_STRING)
+    else if (sp->type == T_OLD_STRING)
     {
         ob = get_object(sp->u.string);
         if (!ob)
@@ -2790,7 +2790,7 @@ f_move_object (svalue_t *sp)
 
     inter_sp = sp;
 
-    if ((sp-1)->type == T_STRING)
+    if ((sp-1)->type == T_OLD_STRING)
     {
         item = get_object((sp-1)->u.string);
         if (!item)
@@ -2800,7 +2800,7 @@ f_move_object (svalue_t *sp)
         put_ref_object(sp-1, item, "move_object");
     }
 
-    if (sp->type == T_STRING)
+    if (sp->type == T_OLD_STRING)
     {
         dest = get_object(sp->u.string);
         if (!dest)
@@ -3137,7 +3137,7 @@ e_say (svalue_t *v, vector_t *avoid)
 
     switch(v->type)
     {
-    case T_STRING:
+    case T_OLD_STRING:
         message = v->u.string;
         break;
 
@@ -3246,12 +3246,6 @@ f_say (svalue_t *sp, int num_arg)
        * for e_say() to insert its command_giver object.
        */
 
-#if defined(DEBUG) && defined(MALLOC_smalloc)
-        static_vector2 = &vtmp.v;
-        /* TODO: Remove this once VEC_SIZE() is proven to be accurate.
-         */
-#endif
-
     if (num_arg == 1)
     {
         /* No objects to exclude */
@@ -3344,7 +3338,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
     /* Construct the message */
     switch(v->type)
     {
-    case T_STRING:
+    case T_OLD_STRING:
         message = v->u.string;
         break;
 
@@ -4231,7 +4225,7 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
 
     switch(v->type)
     {
-    case T_STRING:
+    case T_OLD_STRING:
         save_string(v->u.string);
         break;
 
@@ -5341,7 +5335,7 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
         }
         *cp = '\0';
         *pt = source;
-        put_string(svp, make_shared_string(start));
+        put_old_string(svp, make_shared_string(start));
         if (!svp->u.string)
         {
             *svp = const0;
@@ -5549,7 +5543,7 @@ old_restore_string (svalue_t *v, char *str)
         if (cp[-2] == '\n' && cp[-3] == '\"')
         {
             cp[-3] = '\0';
-            put_string(v, make_shared_string(str));
+            put_old_string(v, make_shared_string(str));
             if (!v->u.string)
             {
                 *v = const0;

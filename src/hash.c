@@ -7,6 +7,8 @@
  *---------------------------------------------------------------------------
  */
 
+#include <stdlib.h>
+
 #include "hash.h"
 
 /*-------------------------------------------------------------------------*/
@@ -29,6 +31,35 @@ static unsigned char T[]
         140, 36, 210, 172, 41, 54, 159, 8, 185, 232, 113, 196, 231, 47, 146, 120,
         51, 65, 28, 144, 254, 221, 93, 189, 194, 139, 112, 43, 71, 109, 184, 209,
  };
+
+/*-------------------------------------------------------------------------*/
+unsigned short
+whashmem (const char *s, size_t len, int maxn)
+
+/* Hash the first min(<len>,<maxn>) characters of string <s> into a short
+ * integer and return this hashed value.
+ */
+
+{
+    register unsigned char c, hi, lo;
+    register unsigned char *p = (unsigned char *)s;
+    register int i = maxn;
+
+    if (i > len)
+        i = len;
+
+    if ( '\0' != (c = *p++) ) {
+        for (hi = T[c], lo = (unsigned char)(c + 1)
+            ; --i; )
+        {
+            c = *p++;
+            hi = T[hi ^ c];
+            lo = T[lo ^ c];
+        }
+        return (unsigned short)((hi << 8) + lo);
+    }
+    return 0;
+}
 
 /*-------------------------------------------------------------------------*/
 unsigned short

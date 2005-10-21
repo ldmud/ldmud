@@ -96,6 +96,7 @@
 "^"     xor
 "<<"    lsh
 ">>"    rsh
+">>>"   rshl
 "!"     not
 ".."    range
 "..<"   nr_range
@@ -114,6 +115,7 @@
 "^="    xor_eq
 "<<="   lsh_eq
 ">>="   rsh_eq
+">>>="  rshl_eq
 
 /*---------------------------------------------------------------------------
 /* These values are used by the stack machine, and can not be directly
@@ -346,7 +348,7 @@ int     widthof(null|mapping);
 
         /* Functions and Closures */
 
-mixed   apply(closure, ...);
+mixed   apply(mixed|closure, ...);
 mixed   funcall(mixed|closure, ...);
 
 closure bind_lambda(closure, object default: F_CONST1);
@@ -379,7 +381,7 @@ int     exec(object, object);
 object  find_object(string);
 mixed  *functionlist(object|string, int default: F_CONST1);
 string *inherit_list(object default: F_THIS_OBJECT);
-int     input_to(string, void|int, ...);
+int     input_to(string|closure, void|int, ...);
 int     interactive(object default: F_THIS_OBJECT);
 string  load_name(string|object default: F_THIS_OBJECT);
 object  load_object(string);
@@ -494,7 +496,7 @@ void    tell_room(object|string, string|mixed *, void|object *);
 
         /* Verbs and Commands (TODO: should be optional) */
 
-void    add_action(string, void|string, void|int);
+void    add_action(string, string, void|int);
 int     command(string, void|object);
 mixed  *command_stack();
 int     command_stack_depth();
@@ -554,15 +556,11 @@ int     transfer(object, object|string);
  * Beware that some may be used in mudlib 2.4.5.
  */
 
-string  extract(string, void|int, void|int);
-  /* TODO: Get rid of extract().
-   */
         /* Arrays and Mappings */
 
 mapping copy_mapping(mapping);
-int     member_array(mixed, mixed *|string);
 
-        /* Alists (TODO: Make this xefuns) */
+        /* Alists */
 
 mixed   assoc(mixed, mixed *, mixed|void, mixed|void);
 mixed   insert_alist(mixed, mixed, ...);
@@ -577,12 +575,5 @@ string  process_string(string);
 
 int     set_light(int);
 int     set_is_wizard(object, int default: F_CONST1);
-
-        /* Verbs and Commands */
-
-void    add_verb(string);
-void    add_xverb(string);
-  /* TODO: Get rid of add_verb(), add_xverb()
-   */
 
 /***************************************************************************/

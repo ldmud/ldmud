@@ -82,7 +82,6 @@
 #include <values.h>
 #endif
 
-#define NO_REF_STRING
 #include "swap.h"
 
 #include "array.h"
@@ -99,7 +98,6 @@
 #include "random.h"
 #include "simulate.h"
 #include "simul_efun.h"
-#include "stralloc.h"
 #include "strfuns.h"
 #include "svalue.h"
 #include "wiz_list.h"
@@ -836,7 +834,7 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
         switch(svp->type)
         {
 
-        case T_STRING:
+        case T_OLD_STRING:
         case T_SYMBOL:
           {
             mp_int len, size;
@@ -1028,7 +1026,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
     {
         switch(*p)
         {
-        case T_STRING | T_MOD_SWAPPED:
+        case T_OLD_STRING | T_MOD_SWAPPED:
             if (svp->x.string_type == STRING_MALLOC)
             {
                 if (!garbage_collection_in_progress)
@@ -1111,7 +1109,7 @@ free_swapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
               }
             }
 
-        case T_STRING:
+        case T_OLD_STRING:
         case T_SYMBOL:
         case T_POINTER:
         case T_QUOTED_ARRAY:
@@ -1326,7 +1324,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
         
         switch(*p++)
         {
-        case T_STRING | T_MOD_SWAPPED:
+        case T_OLD_STRING | T_MOD_SWAPPED:
         case T_SYMBOL | T_MOD_SWAPPED:
           {
             char *s;
@@ -1339,7 +1337,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             }
             else
             {
-                if (svp->type == T_STRING
+                if (svp->type == T_OLD_STRING
                  && svp->x.string_type == STRING_MALLOC)
                 {
                     s = string_copy((char *)p);
@@ -1501,7 +1499,7 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
             break;
           }
 
-        case T_STRING:
+        case T_OLD_STRING:
         case T_SYMBOL:
         case T_POINTER:
         case T_QUOTED_ARRAY:

@@ -64,6 +64,11 @@
 
 #define MAX_TEXT  2048
 
+/* 'Format string' to use with add_message() when sending
+ * a string_t* string to the player.
+ */
+
+#define FMT_STRING ((const char *)&add_message)
 
 /* --- Types --- */
 
@@ -106,7 +111,10 @@ struct interactive_s {
 
     char tn_state;              /* current state of telnet machine */
     char save_tn_state;         /* saved state of telnet machine */
-    CBool supress_go_ahead;
+    CBool supress_go_ahead;     /* Keep track of the WILL SGA negotiation state
+                                 * as some clients mix that up with DO SGA.
+                                 * Other than that, this is of no concern.
+                                 */
 
     short text_end;             /* first free char in buffer */
     short command_start;        /* used for charmode */
@@ -120,7 +128,7 @@ struct interactive_s {
     object_t *snoop_by;         /* by whom we're snooped */
     mp_int last_time;           /* Time of last command executed */
     int trace_level;            /* Trace flags. 0 means no tracing */
-    char *trace_prefix;         /* Trace only objects which have this string
+    string_t *trace_prefix;     /* Trace only objects which have this string
                                    as name prefix. NULL traces everything. */
     int message_length;         /* Current length of message in message_buf[] */
 
@@ -194,7 +202,8 @@ struct interactive_s {
   /* noecho active (requested via telnet negotiation)
    */
 #define NOECHO_ACK    /* 16 */ NOECHO_ACKSHIFT(NOECHO)
-  /* noecho acknowledged (by telnet negotiation)
+  /* noecho negotiation complete (acknowledged)
+   * TODO: We need a _NACK flag, too.
    */
 #define NOECHO_STALE     64
   /* Set prior to performing a noecho input, this bit causes the deactivation
@@ -206,13 +215,16 @@ struct interactive_s {
    */
 
 #define CHARMODE_REQ      2
-  /* charmode requested
+  /* Charmode requested
+   * The driver orients its behaviour according to this flag so that it
+   * can act correctly while even before the negotiation is complete.
    */
 #define CHARMODE       /* 8 */ CHARMODE_REQ_TO_CHARMODE(CHARMODE_REQ)
-  /* charmode active (requested via telnet negotiation)
+  /* Charmode active (requested via telnet negotiation)
    */
 #define CHARMODE_ACK  /* 32 */ NOECHO_ACKSHIFT(CHARMODE)
-  /* charmode acknowledged (by telnet negotiation)
+  /* Charmode negotiation complete (acknowledged)
+   * TODO: We need a _NACK flag, too.
    */
 #define CHARMODE_MASK    (CHARMODE|CHARMODE_ACK)
   /* Mask for active charmode states.
@@ -236,7 +248,7 @@ extern int inet_volume;
 extern void  initialize_host_ip_number(void);
 extern void  prepare_ipc(void);
 extern void  ipc_remove(void);
-extern void  add_message VARPROT((char *, ...), printf, 1, 2);
+extern void  add_message VARPROT((const char *, ...), printf, 1, 2);
 extern void  flush_all_player_mess(void);
 extern Bool get_message(char *buff);
 extern void remove_interactive(object_t *ob);
@@ -244,7 +256,7 @@ extern void set_noecho(interactive_t *i, char noecho);
 extern int  find_no_bang (interactive_t *ip);
 extern Bool call_function_interactive(interactive_t *i, char *str);
 extern void remove_all_players(void);
-extern void set_prompt(char *str);
+extern void set_prompt(const char *str);
 extern svalue_t *query_prompt(object_t *ob);
 extern void  print_prompt(void);
 extern void  init_telopts(void);
@@ -256,7 +268,7 @@ extern svalue_t *f_query_imp_port(svalue_t *sp);
 #endif
 
 #ifdef ERQ_DEMON
-extern void  start_erq_demon(char *suffix);
+extern void  start_erq_demon(const char *suffix, size_t suffixlen);
 extern svalue_t *f_attach_erq_demon(svalue_t *sp);
 extern svalue_t *f_send_erq(svalue_t *sp);
 #endif

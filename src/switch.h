@@ -89,12 +89,12 @@
  *---------------------------------------------------------------------------
  */
 
-#define ZERO_AS_STR_CASE_LABEL ((char *)&findstring)
+#define ZERO_AS_STR_CASE_LABEL ((char *)&main)
   /* This value is used to compile 'case 0' into switch on string types.
    * We can't use the NULL pointer for this purpose, which is used when
-   * looking up a string that is not in the shared string table and
+   * looking up a string that is not in the tabled string table and
    * therefore must not be found.
-   * This value must not be misinterpreted as shared string.
+   * This value must not be misinterpreted as tabled string.
    * If the string handling is changed, this value must be adapted.
    */
 

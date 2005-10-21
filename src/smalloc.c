@@ -2625,7 +2625,7 @@ static int num_dispatched_types = 0;
 static struct {
     char *file;
     word_t line;
-    void (*func)(int, char *, int);
+    void (*func)(int, void *, int);
 } dispatch_table[12];
   /* The dispatch table used to recognize and print datablocks.
    * The recognition is simple and uses the file/line information received
@@ -2637,7 +2637,7 @@ static struct {
 /*-------------------------------------------------------------------------*/
 void
 store_print_block_dispatch_info (void *block
-                                , void (*func)(int, char *, int)
+                                , void (*func)(int, void *, int)
                                 )
 
 /* Add a new block type: get the file/line information from the

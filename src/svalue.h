@@ -24,13 +24,15 @@
  * union regardless of its actual content, therefore it is of type 'p_int'.
  */
 union u {
-    char *string;
-      /* T_STRING: pointer to the first character of the string.
-       * T_SYMBOL: pointer to the shared symbol string.
-       * T_CHAR_LVALUE: pointer to the referenced character (referenced
-       *           from a T_LVALUE).
+    string_t *str;
+      /* T_STRING: pointer to the string.
+       * T_SYMBOL: pointer to the (shared) symbol string.
        * T_(PROTECTED_)STRING_RANGE_LVALUE: the target string holding
        *   the range.
+       */
+    char     *charp;
+      /* T_(PROTECTED_)CHAR_LVALUE: pointer to the referenced character
+       *           (referenced from a T_LVALUE).
        */
     p_int number;
       /* T_NUMBER: the number.
@@ -127,7 +129,6 @@ struct svalue_s
 {
     ph_int type;  /* Primary type information */
     union {       /* Secondary type information */
-        ph_int string_type;  /* Allocation method of the string */
         ph_int exponent;     /* Exponent of a T_FLOAT */
         ph_int closure_type; /* Type of a T_CLOSURE */
         ph_int quotes;       /* Number of quotes of a quoted array or symbol */
@@ -150,7 +151,13 @@ struct svalue_s
 /* TODO: Sanity test: sizeof struct { ph_int, ph_int } <= sizeof p_int */
 
 
-/* struct svalue_s.type: Primary types */
+/* struct svalue_s.type: Primary types.
+ *   There must be no more than 16 different primary types, as some
+ *   type tables (prolang.y::hook_type_map[] for example) store
+ *   them as bitflags in shorts.
+ * TODO: Create these constants, plus the names in
+ * TODO:: interpret.c::svalue_typename[] from a descriptive _spec file.
+ */
 
 #define T_INVALID       0x0  /* empty svalue */
 #define T_LVALUE        0x1  /* a lvalue */
@@ -166,11 +173,12 @@ struct svalue_s
 
 #define T_CHAR_LVALUE                     0xb
   /* .u.string points to the referenced character in a string */
+
   /* The following types must be used only in svalues referenced
    * by a T_LVALUE svalue.
    */
-#define T_STRING_RANGE_LVALUE             0xc /* TODO: ??? */
-#define T_POINTER_RANGE_LVALUE            0xd /* TODO: ??? */
+#define T_STRING_RANGE_LVALUE             0x0c /* TODO: ??? */
+#define T_POINTER_RANGE_LVALUE            0x0d /* TODO: ??? */
 #define T_PROTECTED_CHAR_LVALUE           0x0e
   /* A protected character lvalue */
 #define T_PROTECTED_STRING_RANGE_LVALUE   0x0f
@@ -200,15 +208,6 @@ struct svalue_s
 #define T_MOD_SWAPPED    0x80
   /* This flag is |-ed to the swapped-out type value if the value
    * data has been swapped out.
-   */
-
-/* T_STRING secondary information */
-
-#define STRING_MALLOC    0  /* Allocated by malloc() */
-#define STRING_VOLATILE  1  /* Static storage, must not be freed */
-#define STRING_SHARED    2  /* Allocated by the shared string module */
-  /* Constant strings are handled as volatile strings - they don't
-   * appear often enough that special treatment would be valuable.
    */
 
 /* T_CLOSURE secondary information. */
@@ -438,6 +437,9 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
  * void push_<type>(), void push_ref_<type>()
  *   As the put_() macros, but <sp> is incremented once first.
  *
+ * The psh_ macros are not in use (yet) - they have been renamed from push_
+ * so that the first use stands out.
+ *
  * TODO: Add push_xxx() macros, see MudOS:interpret.h. In general, get
  * TODO:: rid of the local sp/pc copies since they make error handling
  * TODO:: very difficult.
@@ -472,18 +474,10 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
     ( ((val) && !((val)->flags & O_DESTRUCTED)) \
       ? (put_object(sp,val,from), 0) : put_number(sp, 0))
 
-#define put_volatile_string(sp,val) \
-    ( (sp)->type = T_STRING, (sp)->x.string_type = STRING_VOLATILE, \
-      (sp)->u.string = val )
-#define put_malloced_string(sp,val) \
-    ( (sp)->type = T_STRING, (sp)->x.string_type = STRING_MALLOC, \
-      (sp)->u.string = val )
 #define put_ref_string(sp,val) \
-    ( (sp)->type = T_STRING, (sp)->x.string_type = STRING_SHARED, \
-      (sp)->u.string = ref_string(val) )
+    ( (sp)->type = T_STRING, (sp)->u.str = ref_mstring(val) )
 #define put_string(sp,val) \
-    ( (sp)->type = T_STRING, (sp)->x.string_type = STRING_SHARED, \
-      (sp)->u.string = val )
+    ( (sp)->type = T_STRING, (sp)->u.str = val )
 
 #define put_callback(sp,val) \
     ( (sp)->type = T_CALLBACK, (sp)->u.cb = val )
@@ -511,13 +505,9 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
 #define push_valid_object(sp,val) \
     ( (sp)++, put_valid_object(sp,val,from) )
 
-#define push_volatile_string(sp,val) \
-    ( (sp)++, put_volatile_string(sp,val) )
-#define push_malloced_string(sp,val) \
-    ( (sp)++, put_malloced_string(sp,val) )
 #define push_ref_string(sp,val) \
     ( (sp)++, put_ref_string(sp,val) )
-#define psh_string(sp,val) \
+#define push_string(sp,val) \
     ( (sp)++, put_string(sp,val) )
 
 #define psh_callback(sp,val) \

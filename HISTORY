@@ -4,30 +4,44 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-25-Aug-2000 (Lars Duening) -- Development Release 3.3
+13-Sep-2000 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
-       + Removed obsolete and deprecated efuns: file_name(), filter_array(),
-         m_sizeof(), map_array(), allocate_mapping(), efun308(),
-         filter_mapping(), map_mapping() and mapping_contains().
+       + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
+         allocate_mapping(), efun308(), extract(), file_name(),
+         filter_array(), filter_mapping(), m_sizeof(), map_array(),
+         map_mapping(), mapping_contains() and member_array().
+       + add_action(): Historical usage with just one argument no longer
+           supported.
 
     - Corrected efuns:
+       + call_out(): In Release 3.2.8 lvalues were not allowed as arguments -
+           now they are again.
 
     - New efuns:
        + db_affected_rows(), db_conv_string(), db_close(), db_connect(string),
          db_exec(), db_fetch(), *db_handles(): Optional: mySQL support.
 
     - Master Object:
+       + Bugfix: When reactivating a destructed master, the lfuns
+           inaugurate_master() and reactivate_destructed_master() are found
+           even when static.
 
     - Fixed Crashers:
+       + Catching errors with catch() did not work reliably when the
+           driver was compiled with gcc.
 
     - Language:
+       + New operators '>>>' and '>>>=' for logical right shifts.
        + New LPC defines __VERSION_MAJOR__, __VERSION_MINOR__,
          __VERSION_MICRO__, __VERSION_PATCH__ expand to the various parts
          of the driver version.
+       + Bugfix: Right shift by 32 or more bits was computed incorrectly.
 
     - Runtime:
        + IPv6 name lookup works again, and also with both xerq and erq.
+       + Bugfix: The driver now longer gets a confused when a client like
+           TinyFugue refuses to use CHARMODE.
 
     - Other Changes:
 

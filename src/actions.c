@@ -53,7 +53,6 @@
 
 #include <stddef.h>
 
-#define USES_SVALUE_STRLEN
 #include "actions.h"
 #include "array.h"
 #include "backend.h"
@@ -64,11 +63,11 @@
 #include "exec.h"
 #include "interpret.h"
 #include "mapping.h"
+#include "mstrings.h"
 #include "object.h"
+#include "stdstrings.h"
 #include "sent.h"
 #include "simulate.h"
-#include "smalloc.h"
-#include "stralloc.h"
 #include "wiz_list.h"
 #include "xalloc.h"
 
@@ -96,7 +95,7 @@ struct command_context_s
     object_t * mark_player;  /* the marked command_giver */
     action_t * marker;       /* the marker sentence */
     char * cmd;              /* the full command, a stack buffer */
-    char * verb;             /* the shared verb */
+    string_t * verb;         /* the tabled verb */
     svalue_t errmsg;         /* the error message */
     object_t * errobj;       /* object which set the error message */
 };
@@ -112,8 +111,8 @@ object_t *command_giver;
    * The reference is not counted.
    */
 
-static char *last_verb = NULL;
-  /* During a command execution, this is the shared string with the
+static string_t *last_verb = NULL;
+  /* During a command execution, this is the tabled string with the
    * command verb.
    */
 
@@ -172,7 +171,7 @@ free_action_temporaries (void)
     error_obj = NULL;
 
     if (last_verb)
-        free_string(last_verb);
+        free_mstring(last_verb);
     last_verb = NULL;
 
 } /* free_action_temporaries() */
@@ -216,9 +215,9 @@ _free_action_sent (action_t *p)
 #endif
 
     if (p->function)
-        free_string(p->function);
+        free_mstring(p->function);
     if (p->verb)
-        free_string(p->verb);
+        free_mstring(p->verb);
     p->sent.next = free_sent;
     free_sent = (sentence_t *)p;
 } /* _free_action_sent() */
@@ -288,7 +287,7 @@ _restore_command_context (struct command_context_s * context)
 {
     /* Clear up the current context */
     if (last_verb)
-        free_string(last_verb);
+        free_mstring(last_verb);
 
     if (command_marker)
         free_action_sent(command_marker);
@@ -341,13 +340,14 @@ remove_action_sent (object_t *ob, object_t *player)
             {
                 if (tmp->function && tmp->verb)
                     debug_message("%s --Unlinking sentence fun='%s', verb='%s'\n"
-                                 , time_stamp(), tmp->function, tmp->verb);
+                                 , time_stamp(), get_txt(tmp->function)
+                                 , get_txt(tmp->verb));
                 else if (tmp->function)
                     debug_message("%s --Unlinking sentence fun='%s', verb=0\n"
-                                 , time_stamp(), tmp->function);
+                                 , time_stamp(), get_txt(tmp->function));
                 else if (tmp->verb)
                     debug_message("%s --Unlinking sentence fun=0, verb='%s'\n"
-                                 , time_stamp(), tmp->verb);
+                                 , time_stamp(), get_txt(tmp->verb));
                 else 
                     debug_message("%s --Unlinking sentence fun=0, verb=0\n"
                                  , time_stamp());
@@ -390,7 +390,7 @@ remove_environment_sent (object_t *player)
 #ifdef DEBUG
                 if (d_flag > 1)
                     debug_message("%s --Unlinking sentence %s\n"
-                                 , time_stamp(), s->function);
+                                 , time_stamp(), get_txt(s->function));
 #endif
                 tmp = s;
                 s = (action_t *)s->sent.next;
@@ -442,8 +442,8 @@ call_modify_command (char *buff)
         }
         else if (closure_hook[H_MODIFY_COMMAND_FNAME].type == T_STRING)
         {
-            push_volatile_string(inter_sp, buff);
-            svp = sapply(closure_hook[H_MODIFY_COMMAND_FNAME].u.string, ob, 1);
+            push_c_string(inter_sp, buff);
+            svp = sapply(closure_hook[H_MODIFY_COMMAND_FNAME].u.str, ob, 1);
             /* !command_giver means that the command_giver has been destructed. */
             if (!command_giver)
                 return MY_TRUE;
@@ -458,7 +458,7 @@ call_modify_command (char *buff)
             l = closure_hook[H_MODIFY_COMMAND].u.lambda;
             if (closure_hook[H_MODIFY_COMMAND].x.closure_type == CLOSURE_LAMBDA)
                 l->ob = command_giver;
-            push_volatile_string(inter_sp, buff);
+            push_c_string(inter_sp, buff);
             push_ref_object(inter_sp, command_giver, "call_modify_command");
             call_lambda(&closure_hook[H_MODIFY_COMMAND], 2);
             transfer_svalue(svp = &apply_return_value, inter_sp--);
@@ -468,25 +468,25 @@ call_modify_command (char *buff)
         else if (closure_hook[H_MODIFY_COMMAND].type == T_STRING
             && !(O_DESTRUCTED & command_giver->flags))
         {
-            push_volatile_string(inter_sp, buff);
+            push_c_string(inter_sp, buff);
             svp =
-              sapply(closure_hook[H_MODIFY_COMMAND].u.string, command_giver, 1);
+              sapply(closure_hook[H_MODIFY_COMMAND].u.str, command_giver, 1);
             if (!command_giver)
                 return MY_TRUE;
         }
         else if (closure_hook[H_MODIFY_COMMAND].type == T_MAPPING)
         {
             svalue_t sv;
-            char * str;
+            string_t * str;
 
-            if ( NULL != (str = findstring(buff)) )
+            if ( NULL != (str = find_tabled_str(buff)) )
             {
                 put_string(&sv, str);
                 svp =
                   get_map_value(closure_hook[H_MODIFY_COMMAND].u.map, &sv);
                 if (svp->type == T_CLOSURE)
                 {
-                    push_ref_string(inter_sp, sv.u.string);
+                    push_ref_string(inter_sp, sv.u.str);
                     push_ref_object(inter_sp, command_giver, "call_modify_command");
                     call_lambda(svp, 2);
                     transfer_svalue(svp = &apply_return_value, inter_sp--);
@@ -501,9 +501,9 @@ call_modify_command (char *buff)
      */
     if (svp)
     {
-        if (svp->type == T_STRING) {
-            strncpy(buff, svp->u.string, COMMAND_FOR_OBJECT_BUFSIZE-1);
-            buff[COMMAND_FOR_OBJECT_BUFSIZE-1] = '\0';
+        if (svp->type == T_STRING)
+        {
+            extract_cstr(buff, svp->u.str, COMMAND_FOR_OBJECT_BUFSIZE);
         } else if (svp->type == T_NUMBER && svp->u.number) {
             return MY_TRUE;
         }
@@ -545,7 +545,7 @@ special_parse (char *buff)
                 no_curobj = MY_TRUE;
             }
             add_message("Dumping to /OBJ_DUMP ... ");
-            dumpstat("/OBJ_DUMP");
+            dumpstat(STR_OBJDUMP_FNAME);
             add_message("done\n");
             if (no_curobj)
             {
@@ -607,7 +607,7 @@ notify_no_command (char *command, object_t *save_command_giver)
 
     if (svp->type == T_STRING)
     {
-        tell_object(command_giver, svp->u.string);
+        tell_object(command_giver, svp->u.str);
     }
     else if (svp->type == T_CLOSURE)
     {
@@ -615,22 +615,22 @@ notify_no_command (char *command, object_t *save_command_giver)
         call_lambda(svp, 1);
         /* add_message might cause an error, thus, we free the closure first. */
         if (inter_sp->type == T_STRING)
-            tell_object(command_giver, inter_sp->u.string);
+            tell_object(command_giver, inter_sp->u.str);
         pop_stack();
     }
     else if (closure_hook[H_NOTIFY_FAIL].type == T_STRING)
     {
-        tell_object(command_giver, closure_hook[H_NOTIFY_FAIL].u.string);
+        tell_object(command_giver, closure_hook[H_NOTIFY_FAIL].u.str);
     }
     else if (closure_hook[H_NOTIFY_FAIL].type == T_CLOSURE)
     {
         if (closure_hook[H_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
             closure_hook[H_NOTIFY_FAIL].u.lambda->ob = command_giver;
-        push_volatile_string(inter_sp, command);
+        push_c_string(inter_sp, command);
         push_ref_valid_object(inter_sp, save_command_giver, "notify_no_command");
         call_lambda(&closure_hook[H_NOTIFY_FAIL], 2);
         if (inter_sp->type == T_STRING)
-            tell_object(command_giver, inter_sp->u.string);
+            tell_object(command_giver, inter_sp->u.str);
         pop_stack();
     }
 
@@ -679,7 +679,7 @@ parse_command (char *buff, Bool from_efun)
 #ifdef DEBUG
     if (d_flag > 1)
         debug_message("%s cmd [%s]: %s\n", time_stamp()
-                     , command_giver->name, buff);
+                     , get_txt(command_giver->name), buff);
 #endif
 
     /* Strip trailing spaces.
@@ -709,19 +709,19 @@ parse_command (char *buff, Bool from_efun)
      */
 
     if (last_verb)
-        free_string(last_verb);
+        free_mstring(last_verb);
 
     length = p - buff;
     p = strchr(buff, ' ');
     if (p == NULL)
     {
         length += 1;
-        last_verb = make_shared_string(buff);
+        last_verb = new_tabled(buff);
     }
     else
     {
         *p = '\0';
-        last_verb = make_shared_string(buff);
+        last_verb = new_tabled(buff);
         *p = ' ';
         length = p - buff;
     }
@@ -758,17 +758,17 @@ parse_command (char *buff, Bool from_efun)
             size_t len;
             if (sa->short_verb)
             {
-                len = strlen(last_verb);
+                len = mstrsize(last_verb);
                 if (len < sa->short_verb
-                 || len > strlen(sa->verb)
+                 || len > mstrsize(sa->verb)
                  || (   sa->verb != last_verb
-                     && strncmp(sa->verb, last_verb, len) != 0))
+                     && strncmp(get_txt(sa->verb), get_txt(last_verb), len) != 0))
                     continue;
             }
             else
             {
-                len = strlen(sa->verb);
-                if (strncmp(buff, sa->verb, len) != 0)
+                len = mstrsize(sa->verb);
+                if (strncmp(buff, get_txt(sa->verb), len) != 0)
                     continue;
             }
         }
@@ -779,18 +779,9 @@ parse_command (char *buff, Bool from_efun)
              * with sa->verb.
              */
             size_t len;
-            len = strlen(sa->verb);
-            if (strncmp(buff, sa->verb, len) != 0)
+            len = mstrsize(sa->verb);
+            if (strncmp(buff, get_txt(sa->verb), len) != 0)
                 continue;
-        }
-        else if (type == SENT_NO_VERB)
-        {
-            /* TODO: Without add_(x)verb(), this case can go, too. */
-            /* Give an error only the first time we scan this sentence */
-            if (sa->short_verb)
-                continue;
-            sa->short_verb++;
-            error("An 'action' had an undefined verb.\n");
         }
         else
         {
@@ -805,7 +796,8 @@ parse_command (char *buff, Bool from_efun)
 #ifdef DEBUG
         if (d_flag > 1)
             debug_message("%s Local command %s on %s\n", time_stamp()
-                         , sa->function, sa->ob->name);
+                         , get_txt(sa->function)
+                         , get_txt(sa->ob->name));
 #endif
 
         /* If the function is static and not defined by current object,
@@ -870,9 +862,9 @@ parse_command (char *buff, Bool from_efun)
          */
         if (s->type == SENT_NO_SPACE)
         {
-            if (strlen(buff) > strlen(sa->verb))
+            if (strlen(buff) > mstrsize(sa->verb))
             {
-                push_volatile_string(inter_sp, &buff[strlen(sa->verb)]);
+                push_c_string(inter_sp, &buff[mstrsize(sa->verb)]);
                 ret = sapply(sa->function, sa->ob, 1);
             }
             else
@@ -882,7 +874,7 @@ parse_command (char *buff, Bool from_efun)
         }
         else if (buff[length] == ' ')
         {
-            push_volatile_string(inter_sp, &buff[length+1]);
+            push_c_string(inter_sp, &buff[length+1]);
             ret = sapply(sa->function, sa->ob, 1);
         }
         else
@@ -892,7 +884,7 @@ parse_command (char *buff, Bool from_efun)
 
         if (ret == 0)
         {
-            error("function %s not found.\n", sa->function);
+            error("function %s not found.\n", get_txt(sa->function));
         }
 
         /* Restore the old current_object and command_giver */
@@ -1016,8 +1008,8 @@ execute_command (char *str, object_t *ob)
     {
         svalue_t *svp;
 
-        push_volatile_string(inter_sp, str);
-        svp = sapply_int(closure_hook[H_COMMAND].u.string, ob, 1, MY_TRUE);
+        push_c_string(inter_sp, str);
+        svp = sapply_int(closure_hook[H_COMMAND].u.str, ob, 1, MY_TRUE);
         res = (svp->type != T_NUMBER) || (svp->u.number != 0);
     }
     else if (closure_hook[H_COMMAND].type == T_CLOSURE)
@@ -1027,7 +1019,7 @@ execute_command (char *str, object_t *ob)
         l = closure_hook[H_COMMAND].u.lambda;
         if (closure_hook[H_COMMAND].x.closure_type == CLOSURE_LAMBDA)
             l->ob = ob;
-        push_volatile_string(inter_sp, str);
+        push_c_string(inter_sp, str);
         push_ref_object(inter_sp, ob, "execute_command");
         call_lambda(&closure_hook[H_COMMAND], 2);
         res = (inter_sp->type != T_NUMBER) || (inter_sp->u.number != 0);
@@ -1057,8 +1049,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
 {
     action_t *p;
     object_t *ob;
-    char *str;
-    short string_type;
+    string_t *str;
 
     /* Can't take actions from destructed objects */
     if (current_object->flags & O_DESTRUCTED)
@@ -1069,14 +1060,14 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
     /* Check if the call comes from a shadow of the current object */
     if (ob->flags & O_SHADOW && O_GET_SHADOW(ob)->shadowing)
     {
-        str = findstring(func->u.string);
+        str = find_tabled(func->u.str);
         do
         {
             ob = O_GET_SHADOW(ob)->shadowing;
             if (find_function(str, ob->prog) >= 0)
             {
                 if (!privilege_violation4(
-                    "shadow_add_action", ob, str, 0, inter_sp)
+                    STR_SHADOW_ADD_ACTION, ob, str, 0, inter_sp)
                 )
                     return MY_TRUE;
             }
@@ -1093,102 +1084,75 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
      && ob->super != command_giver->super
      && ob != command_giver->super)
         error("add_action from object '%s' that was not present to '%s'.\n"
-             , ob->name, command_giver->name);
+             , get_txt(ob->name), get_txt(command_giver->name));
 
 #ifdef DEBUG
     if (d_flag > 1)
-        debug_message("%s --Add action %s\n", time_stamp(), func->u.string);
+        debug_message("%s --Add action %s\n", time_stamp(), get_txt(func->u.str));
 #endif
 
     /* Sanity checks */
-    if (*func->u.string == ':')
-        error("Illegal function name: %s\n", func->u.string);
+    if (get_txt(func->u.str)[0] == ':')
+        error("Illegal function name: %s\n", get_txt(func->u.str));
 
 #ifdef COMPAT_MODE
-    str = func->u.string;
-    if (*str++=='e' && *str++=='x' && *str++=='i' && *str++=='t' && !*str)
     {
-        error("Illegal to define a command to the exit() function.\n");
-        /* NOTREACHED */
-        return MY_TRUE;
+        char *s;
+        s = get_txt(func->u.str);
+        if (*s++=='e' && *s++=='x' && *s++=='i' && *s++=='t'
+         && (!*s || mstrsize(func->u.str) == 4))
+        {
+            error("Illegal to define a command to the exit() function.\n");
+            /* NOTREACHED */
+            return MY_TRUE;
+        }
     }
 #endif
 
     /* Allocate and initialise a new sentence */
     p = new_action_sent();
 
-    /* Set str to the function, made shared */
-    str = func->u.string;
-    if ((string_type = func->x.string_type) != STRING_SHARED)
-    {
-        char *str2;
-        str = make_shared_string(str2 = str);
-        if (string_type == STRING_MALLOC)
-        {
-            xfree(str2);
-        }
-    }
-
-    p->function = str;
+    /* Set ->function to the function name, made tabled */
+    p->function = make_tabled(func->u.str);
     p->ob = ob;
 
-    if (cmd)
-    {
-        /* Set str to the command verb, made shared */
-        str = cmd->u.string;
-        if ((string_type = cmd->x.string_type) != STRING_SHARED)
-        {
-            char *str2;
-            str = make_shared_string(str2 = str);
-            if (string_type == STRING_MALLOC)
-            {
-                xfree(str2);
-            }
-        }
-        p->verb = str;
-        p->sent.type = SENT_PLAIN;
-        p->short_verb = 0;
+    /* Set ->verb to the command verb, made tabled */
+    p->verb = make_tabled(cmd->u.str);
+    p->sent.type = SENT_PLAIN;
+    p->short_verb = 0;
 
-        if (flag)
+    if (flag)
+    {
+        if (flag == AA_SHORT)
         {
-            if (flag == AA_SHORT)
+            p->sent.type = SENT_SHORT_VERB;
+        }
+        else if (flag == AA_NOSPACE)
+        {
+            p->sent.type = SENT_NO_SPACE;
+        }
+        else if (flag < AA_VERB)
+        {
+            if (-flag >= mstrsize(p->verb))
             {
-                p->sent.type = SENT_SHORT_VERB;
-            }
-            else if (flag == AA_NOSPACE)
-            {
-                p->sent.type = SENT_NO_SPACE;
-            }
-            else if (flag < AA_VERB)
-            {
-                if (-flag >= strlen(p->verb))
-                {
-                    error("Bad arg 3 to add_action(): value %ld larger than verb '%s'.\n"
-                         , (long)flag, p->verb);
-                    /* NOTREACHED */
-                    return MY_TRUE;
-                }
-                else
-                {
-                    p->sent.type = SENT_SHORT_VERB;
-                    p->short_verb = 0 - (unsigned short)flag;
-                }
-            }
-            else
-            {
-                error("Bad arg 3 to add_action(): value %ld too big.\n"
-                     , (long)flag);
+                error("Bad arg 3 to add_action(): value %ld larger than verb '%s'.\n"
+                     , (long)flag, get_txt(p->verb));
                 /* NOTREACHED */
                 return MY_TRUE;
             }
+            else
+            {
+                p->sent.type = SENT_SHORT_VERB;
+                p->short_verb = 0 - (unsigned short)flag;
+            }
         }
-    }
-    else
-    {
-        /* No verb given */
-        p->short_verb = 0;
-        p->verb = NULL;
-        p->sent.type = SENT_NO_VERB;
+        else
+        {
+            error("Bad arg 3 to add_action(): value %ld too big.\n"
+                 , (long)flag);
+            /* NOTREACHED */
+            return MY_TRUE;
+        }
     }
 
     /* Now chain in the sentence */
@@ -1215,7 +1179,6 @@ f_add_action (svalue_t *sp, int num_arg)
 /* EFUN add_action()
  *
  *   void add_action(string fun, string cmd [, int flag])
- *   void add_action(string fun) // historical
  *
  * Add an action (verb + function) to the commandgiver.
  *
@@ -1231,11 +1194,7 @@ f_add_action (svalue_t *sp, int num_arg)
 
     arg = sp - num_arg + 1;
 
-    verb = NULL;
-    if (num_arg >= 2)
-    {
-        verb = &arg[1];
-    }
+    verb = &arg[1];
 
     if (e_add_action(&arg[0], verb
                   , num_arg > 2 ? arg[2].u.number : 0))
@@ -1299,13 +1258,15 @@ f_command (svalue_t *sp, int num_arg)
     if (!(current_object->flags & O_DESTRUCTED)
      && !(ob->flags & O_DESTRUCTED))
     {
+        size_t len;
 
         /* Make a copy of the given command as the parser might change it */
 
-        if (svalue_strlen(arg) > sizeof(buff) - 1)
+        len = mstrsize(arg->u.str);
+        if (len >= sizeof(buff) - 1)
             error("Too long command.\n");
-        strncpy(buff, arg[0].u.string, sizeof buff);
-        buff[sizeof buff - 1] = '\0';
+        strncpy(buff, get_txt(arg[0].u.str), len);
+        buff[len+1] = '\0';
 
         if (O_SET_INTERACTIVE(ip, ob))
             trace_level |= ip->trace_level;
@@ -1350,31 +1311,36 @@ f_execute_command (svalue_t *sp)
     svalue_t *argp;
     object_t *origin, *player;
     char buf[COMMAND_FOR_OBJECT_BUFSIZE];
+    size_t len;
     Bool res;
 
     /* Test and get the arguments from the stack */
     argp = sp - 2;
 
-    if (svalue_strlen(argp) >= COMMAND_FOR_OBJECT_BUFSIZE)
-        error("Command too long.\n");
-    strcpy(buf, argp->u.string);
+    /* Make a copy of the given command as the parser might change it */
+
+    len = mstrsize(argp->u.str);
+    if (len >= sizeof(buf) - 1)
+        error("Too long command.\n");
+    strncpy(buf, get_txt(argp->u.str), len);
+    buf[len+1] = '\0';
 
     origin = check_object(argp[1].u.ob);
     if (!origin)
-        error("origin '%s' destructed.\n", argp[1].u.ob->name);
+        error("origin '%s' destructed.\n", get_txt(argp[1].u.ob->name));
     if (!(O_ENABLE_COMMANDS & origin->flags))
-        error("origin '%s' not a living.\n", origin->name);
+        error("origin '%s' not a living.\n", get_txt(origin->name));
 
     player = check_object(argp[2].u.ob);
     if (!player)
-        error("player '%s' destructed.\n", argp[2].u.ob->name);
+        error("player '%s' destructed.\n", get_txt(argp[2].u.ob->name));
     if (!(O_ENABLE_COMMANDS & player->flags))
-        error("player '%s' not a living.\n", player->name);
+        error("player '%s' not a living.\n", get_txt(player->name));
 
     res = MY_FALSE;  /* default result */
 
     /* Test if we are allowed to use this function */
-    if (privilege_violation4("execute_command", origin, buf, 0, sp))
+    if (privilege_violation4(STR_EXECUTE_COMMAND, origin, argp->u.str, 0, sp))
     {
         marked_command_giver = origin;
         command_giver = player;
@@ -1406,18 +1372,17 @@ f_remove_action (svalue_t *sp)
 
 {
     object_t *ob;
-    char *verb;
+    string_t *verb;
     sentence_t **sentp;
     action_t *s;
 
     /* Get and test the arguments */
 
     ob = sp->u.ob;
-    verb = sp[-1].u.string;
 
-    if (sp[-1].x.string_type != STRING_SHARED)
-        if ( !(verb = findstring(verb)) )
-            verb = (char *)f_remove_action; /* won't be found */
+    verb = find_tabled(sp[-1].u.str);
+    if (!verb)
+        verb = (string_t *)f_remove_action; /* won't be found */
 
     /* Now search and remove the sentence */
     sentp = &ob->sent;
@@ -1445,7 +1410,7 @@ f_remove_action (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 static vector_t *
-e_get_action (object_t *ob, char *verb)
+e_get_action (object_t *ob, string_t *verb)
 
 /* EFUN query_actions()
  *
@@ -1462,7 +1427,7 @@ e_get_action (object_t *ob, char *verb)
     sentence_t *s;
     svalue_t *p;
 
-    if ( !(verb = findstring(verb)) )
+    if ( !(verb = find_tabled(verb)) )
         return NULL;
 
     for (s = ob->sent; s; s = s->next)
@@ -1544,7 +1509,7 @@ e_get_all_actions (object_t *ob, int mask)
         
         if (mask & 1)
         {
-            char * str;
+            string_t * str;
             if ( NULL != (str = sa->verb) ) {
                 put_ref_string(p, str);
             }
@@ -1655,7 +1620,6 @@ f_query_actions (svalue_t *sp)
  * SENT_PLAIN       added with add_action (fun, cmd);
  * SENT_SHORT_VERB  added with add_action (fun, cmd, 1);
  * SENT_NO_SPACE    added with add_action (fun); add_xverb (cmd);
- * SENT_NO_VERB     just an add_action (fun); without a verb
  * SENT_MARKER      internal, won't be in the returned array
  */
 
@@ -1673,14 +1637,14 @@ f_query_actions (svalue_t *sp)
     {
         if (arg->type != T_STRING)
             efun_arg_error(1, T_STRING, arg->type, sp);
-        ob = get_object(arg[0].u.string);
+        ob = get_object(arg[0].u.str);
         if (!ob)
             error("query_actions() failed\n");
     }
 
     /* Get the actions */
     if (arg[1].type == T_STRING)
-        v = e_get_action(ob, arg[1].u.string);
+        v = e_get_action(ob, arg[1].u.str);
     else if (arg[1].type == T_NUMBER)
         v = e_get_all_actions(ob, arg[1].u.number);
     else {
@@ -1719,7 +1683,7 @@ f_disable_commands (svalue_t *sp)
 
     if (d_flag > 1) {
         debug_message("%s Disable commands %s (ref %ld)\n"
-                     , time_stamp(), current_object->name
+                     , time_stamp(), get_txt(current_object->name)
                      , current_object->ref);
     }
 
@@ -1749,7 +1713,7 @@ f_enable_commands (svalue_t *sp)
 
     if (d_flag > 1) {
         debug_message("%s Enable commands %s (ref %ld)\n"
-                     , time_stamp(), current_object->name
+                     , time_stamp(), get_txt(current_object->name)
                      , current_object->ref);
     }
 
@@ -1848,17 +1812,10 @@ f_query_command (svalue_t *sp)
  */
 
 {
-    char * str;
-
     if (!last_command)
         push_number(sp, 0);
     else
-    {
-        str = string_copy(last_command);
-        if (!str)
-            error("Out of memory.\n");
-        push_malloced_string(sp, str);
-    }
+        push_c_string(sp, last_command);
 
     return sp;
 } /* f_query_command() */
@@ -1961,9 +1918,9 @@ f_set_modify_command (svalue_t *sp)
         break;
 
     case T_STRING:
-        new = get_object(sp->u.string);
+        new = get_object(sp->u.str);
         if (!new)
-            error("Object '%s' not found.\n", sp->u.string);
+            error("Object '%s' not found.\n", get_txt(sp->u.str));
         /* FALLTHROUGH */
 
     case T_OBJECT:
@@ -2114,7 +2071,8 @@ f_command_stack (svalue_t *sp)
     {
         vector_t * sub;
         svalue_t * svp;
-        char * t_verb, * t_cmd; /* current verb and command */
+        string_t * t_verb;    /* current verb */
+        char     * t_cmd;     /* current command */
         object_t * t_player, * t_mplayer; /* current command givers */
         svalue_t * t_errmsg;  /* current error message */
         object_t * t_errobj;  /* current error message giver */
@@ -2162,7 +2120,7 @@ f_command_stack (svalue_t *sp)
             put_ref_string(svp+CMD_VERB, t_verb);
 
         if (t_cmd)
-            put_malloced_string(svp+CMD_TEXT, string_copy(t_cmd));
+            put_c_string(svp+CMD_TEXT, t_cmd);
 
         if (t_mplayer)
             put_ref_object(svp+CMD_ORIGIN, t_mplayer, "command_stack");
@@ -2214,51 +2172,6 @@ f_living (svalue_t *sp)
     put_number(sp, i);
     return sp;
 } /* f_living() */
-
-/*-------------------------------------------------------------------------*/
-/* I won't comment these. The sooner add_verb()/add_xverb() are gone,
- * the better.
- */
-
-#if defined(F_ADD_VERB) || defined(F_ADD_XVERB)
-static svalue_t *add_verb(sp, type)
-    svalue_t *sp;
-    int type;
-{
-    if (command_giver  && !(command_giver->flags & O_DESTRUCTED)) {
-        action_t *sent;
-
-        sent = (action_t *)command_giver->sent;
-        if (command_giver->flags & O_SHADOW)
-            sent = (action_t *)sent->sent.next;
-        if (!sent)
-            error("No add_action().\n");
-        if (sent->verb != 0)
-            error("Tried to set verb again.\n");
-        sent->verb = make_shared_string(sp->u.string);
-        sent->sent.type = (sent_type_t)type;
-        if (d_flag > 1)
-            debug_message("%s --Adding verb %s to action %s\n"
-                         , time_stamp(), sp->u.string, sent->function);
-    }
-    free_svalue(sp--);
-    return sp;
-}
-#endif
-
-#ifdef F_ADD_VERB
-svalue_t *f_add_verb (svalue_t *sp)
-{
-    return add_verb(sp, SENT_PLAIN);
-}
-#endif
-
-#ifdef F_ADD_XVERB
-svalue_t *f_add_xverb (svalue_t *sp)
-{
-    return add_verb(sp, SENT_NO_SPACE);
-}
-#endif
 
 /***************************************************************************/
 

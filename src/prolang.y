@@ -100,7 +100,6 @@
 #include "simulate.h"
 #include "simul_efun.h"
 #include "stdstrings.h"
-#include "stralloc.h"
 #include "svalue.h"
 #include "swap.h"
 #include "switch.h"
@@ -2436,7 +2435,7 @@ copy_svalue (svalue_t *svp)
     case T_NUMBER:
     case T_FLOAT:
         break;
-    case T_STRING:
+    case T_OLD_STRING:
         if (svp->x.string_type != STRING_SHARED)
             return &const0;
         /* FALLTHROUGH */
@@ -2583,6 +2582,7 @@ free_const_list_svalue (svalue_t *svp)
 %token L_RANGE
 %token L_RETURN
 %token L_RSH
+%token L_RSHL
 %token L_SSCANF
 %token L_STATIC
 %token L_STATUS
@@ -2865,7 +2865,7 @@ free_const_list_svalue (svalue_t *svp)
 %left     '&'
 %left     L_EQ    L_NE
 %left     '<'     L_LE  '>' L_GE
-%left     L_LSH   L_RSH
+%left     L_LSH   L_RSH L_RSHL
 %left     '+'     '-'
 %left     '*'     '/'   '%'
 %right    '~'     L_NOT
@@ -3165,7 +3165,7 @@ inheritance:
                    
                   char * cp;
             
-                  if (res->type != T_STRING)
+                  if (res->type != T_OLD_STRING)
                   {
                       yyerrorf("Illegal to inherit file '%s'.", last_string_constant);
                       YYACCEPT;
@@ -5144,7 +5144,8 @@ constant:
     | constant '<'   constant { $$ = $1 <  $3; }
     | constant L_LE  constant { $$ = $1 <= $3; }
     | constant L_LSH constant { $$ = (p_uint)$3 > MAX_SHIFT ? 0 : $1 << $3; }
-    | constant L_RSH constant { $$ = $1 >> ((p_uint)$3 > MAX_SHIFT ? MAX_SHIFT : $3); }
+    | constant L_RSH constant { $$ = (p_uint)$3 > MAX_SHIFT ? ($1 >> (MAX_SHIFT+1)) : ($1 >> $3); }
+    | constant L_RSHL constant { $$ = (p_uint)$3 > MAX_SHIFT ? 0 : ((p_uint)$1 >> $3); }
     | constant '+'   constant { $$ = $1 +  $3; }
     | constant '-'   constant { $$ = $1 -  $3; }
     | constant '*'   constant { $$ = $1 *  $3; }
@@ -5686,6 +5687,20 @@ expr0:
                   type_error("Bad argument number 1 to '>>'", $1.type);
               if (!BASIC_TYPE($3.type, TYPE_NUMBER))
                   type_error("Bad argument number 2 to '>>'", $3.type);
+          }
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | expr0 L_RSHL expr0
+      {
+          ins_byte(F_RSHL);
+          $$.type = TYPE_NUMBER;
+          if (exact_types)
+          {
+              if (!BASIC_TYPE($1.type, TYPE_NUMBER))
+                  type_error("Bad argument number 1 to '>>>'", $1.type);
+              if (!BASIC_TYPE($3.type, TYPE_NUMBER))
+                  type_error("Bad argument number 2 to '>>>'", $3.type);
           }
       }
 
@@ -8751,7 +8766,7 @@ svalue_constant:
       {
           svalue_t *svp = currently_initialized;
 %line
-          put_string(svp, last_string_constant);
+          put_old_string(svp, last_string_constant);
           last_string_constant = NULL;
       }
 

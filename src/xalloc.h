@@ -27,6 +27,22 @@
     error("(%s:%d) Out of memory (%lu bytes) for %s\n"\
          , __FILE__, __LINE__, (unsigned long)(size), txt)
 
+
+/* void memsafe(void * expr, size_t size, const char * txt)
+ *   <expr> is a memory allocating function (allocating roughly <size> bytes),
+ *   returning a pointer. If this pointer is NULL, an 'out of memory' error
+ *   is thrown using <txt> as description.
+ */
+
+#define memsafe(expr,size,txt) \
+    do { \
+        size_t memsafe_size = size; \
+        if (NULL == (expr)) {\
+            error("(%s:%d) Out of memory (%lu bytes) for %s\n"\
+                 , __FILE__, __LINE__, (unsigned long)(memsafe_size), txt); \
+        } else {} \
+    } while(0)
+
 /* --- Constants --- */
 
 /* Allocation privilege levels */

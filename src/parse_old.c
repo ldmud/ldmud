@@ -109,7 +109,6 @@
 #include <ctype.h>
 #include <time.h>
 
-#define NO_REF_STRING
 #include "parse.h"
 
 #include "actions.h"
@@ -122,7 +121,6 @@
 #include "random.h"
 #include "simulate.h"
 #include "stdstrings.h"
-#include "stralloc.h"
 #include "svalue.h"
 #include "wiz_list.h"
 #include "xalloc.h"
@@ -245,7 +243,7 @@ find_living_object (char *name, Bool player)
     if (svp->type == T_INVALID)
     {
         /* We have to create the closure */
-        put_string(sp, make_shared_string(function_names[player ? 1 : 0]));
+        put_old_string(sp, make_shared_string(function_names[player ? 1 : 0]));
         if (!sp->u.string)
             error("(parse_command) Out of memory (%lu bytes) for string\n"
                  , strlen(function_names[player ? 1 : 0]));
@@ -256,7 +254,7 @@ find_living_object (char *name, Bool player)
     }
 
     /* Call the closure */
-    put_string(sp, make_shared_string(name));
+    put_old_string(sp, make_shared_string(name));
     if ( !sp->u.string)
         error("(parse_command) Out of memory (%lu bytes) for result\n"
              , strlen(name));
@@ -684,7 +682,7 @@ matchadjective (char *adjs)
         {
             on = ao->ao_obj;
             ret = apply(STR_PC_SHORT,on,0);
-            if (ret && ret->type==T_STRING)
+            if (ret && ret->type==T_OLD_STRING)
             {
                 sp = ret->u.string;
                 sp2 = backstrchr(sp,' ');
@@ -1156,7 +1154,7 @@ findword (char **cmd, svalue_t *v)
     f = -1;
     for (cnt = 0, m = VEC_SIZE(p); cnt < m; cnt++)
     {
-        if (p->item[cnt].type == T_STRING
+        if (p->item[cnt].type == T_OLD_STRING
          && strcmp(p->item[cnt].u.string,w) == 0)
         {
             f=cnt; cnt=m;
