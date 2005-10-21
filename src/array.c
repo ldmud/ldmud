@@ -519,6 +519,7 @@ explode_string (string_t *str, string_t *del)
             svalue_t *svp;
 
             txt = get_txt(str);
+            len = (long)mstrsize(str);
             c = get_txt(del)[0];
 
             /* TODO: Remember positions here */

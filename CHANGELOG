@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-Mar-2001 (Lars Duening)  (3.3.27)
+    - (array.c, rxcache.c, interpret.c, mstrings, simulate.c, mud/lp-245)
+         Bugfixes.
+    - (configure) Another define for 'void' signal return types - this one
+        can be tested directly, as a comparison of the values of RETSIGTYPE
+        is not portable.
+   The driver is now able to run lp-245, and boot into Evermore-native.
+
+08-Mar-2001 (Lars Duening)
+    - (mstrings.c) Removed a couple of bugs.
+
 07-Mar-2001 (Lars Duening)  (3.3.26)
     - (gcollect.c, string_spec) Corrected compilation errors.
     - (interpret.c) Freeing a T_FLOAT svalue is allowed, too. And  not

@@ -112,7 +112,7 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
 /* --- Inline functions and macros --- */
 
 #define mstr_mem_size(s) \
-    (sizeof(string_t) + sizeof(string_data_t) + (s)->str->size)
+    (sizeof(string_t) + sizeof(string_data_t) + (s)->str->size - 1)
 
   /* size_t mstr_mem_size(string_t * s)
    *   The amount of memory used to hold all this strings' data.
@@ -202,8 +202,8 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
 
 #define extract_cstr(d,s,l) \
     MACRO(strncpy((d), get_txt(s), (l)-1); \
-          if ((l) >= mstrsize(s)) \
-            d[mstrsize(s)-1] = '\0'; \
+          if ((l) > mstrsize(s)) \
+            d[mstrsize(s)] = '\0'; \
           else \
             d[(l)-1] = '\0'; \
          )

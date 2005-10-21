@@ -349,7 +349,6 @@ set_init_ob(ob)
 }
 
 init() {
-
     create_room = environment(me);
     if(this_player() == me)
 	return;

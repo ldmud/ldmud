@@ -34,6 +34,11 @@
 /* Define as the return type of signal handlers (int or void).  */
 #define RETSIGTYPE void
 
+/* Set in response to the signal handler return type, since not all
+ * compilers understand direct definition comparisons
+ */
+#define RETSIGTYPE_VOID 1
+
 /* Define to `unsigned' if <sys/types.h> doesn't define.  */
 /* #undef size_t */
 

@@ -2024,7 +2024,7 @@ string master_create_wizard(string owner, string domain, object caller)
 	/* The master object can do this ! */
 	if (write_file(castle, def_castle)) {
 	    tell_object(player, "You now have a castle: " + castle + "\n");
-	    if (!write_file("/room/init_file", extract(castle, 1) + "\n"))
+	    if (!write_file("/room/init_file", castle[1..] + "\n"))
 		tell_object(player, "It couldn't be loaded automatically!\n");
 	} else {
 	    tell_object(player, "Failed to make castle for you!\n");

@@ -89,7 +89,6 @@ object	ob;	/* used to hold this_player() */
     reset(arg)
 {
 
-
     if(is_debug) {
 	write("reset(" + arg + ")\n");
 	write(VERSION + "\n");
@@ -97,7 +96,10 @@ object	ob;	/* used to hold this_player() */
 	write("this_object()="); write(this_object()); write("\n");
 	write("environment(this_object())="); write(environment(this_object())); write("\n");
 	write("this_player()="); write(this_player()); write("\n");
-	write("environment(this_player())="); write(environment(this_player())); write("\n");
+	write("environment(this_player())=");
+    if (this_player()) write(environment(this_player()));
+    else write("none");
+    write("\n");
     }
 
     if(!refreshing && this_player()) {

@@ -187,7 +187,10 @@ find_and_move (const char * const s, size_t size, int index)
 
     for ( prev = NULL, rover = stringtable[index]
         ;    rover != NULL
-          && get_txt(rover) != s && memcmp(get_txt(rover), s, size)
+          && get_txt(rover) != s
+          && !(   size == mstrsize(rover)
+               && 0 == memcmp(get_txt(rover), s, size)
+              )
         ; prev = rover, rover = rover->link
         )
         mstr_searchlen_byvalue++;
@@ -198,7 +201,7 @@ find_and_move (const char * const s, size_t size, int index)
     if (rover && prev)
     {
         prev->link = rover->link;
-        rover->link = prev;
+        rover->link = stringtable[index];
         stringtable[index] = rover;
     }
 
@@ -225,7 +228,9 @@ move_to_head (string_t *s, int index)
         ; rover != NULL && rover != s
         ; prev = rover, rover = rover->link
         )
+    {
         mstr_searchlen++;
+    }
 
     /* If s is found (rover != NULL), but not at the beginning of the chain,
      * move it there
@@ -235,7 +240,7 @@ move_to_head (string_t *s, int index)
 
     {
         prev->link = s->link;
-        s->link = prev;
+        s->link = stringtable[index];
         stringtable[index] = s;
     }
 
@@ -475,10 +480,20 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
         return string;
     }
 
-    /* Create a completely new tabled string from the old one */
+    /* Check if there already is a copy of this string tabled */
 
     size = pStr->str->size;
     index = StrHash(pStr->str->txt, size);
+
+    string = find_and_move(pStr->str->txt, size, index);
+    if (string)
+    {
+        string = ref_mstring(string);
+        if (deref_arg) free_mstring(pStr);
+        return string;
+    }
+
+    /* Create a completely new tabled string from the old one */
 
     if (pStr->info.ref == 1 && deref_arg)
     {
@@ -491,7 +506,7 @@ mstring_make_tabled (string_t * pStr, Bool deref_arg MTRACE_DECL)
     }
     else
     {
-        /* We need a completely new table string */
+        /* We need a completely new tabled string */
 
         string = make_new_tabled(pStr->str->txt, size, index MTRACE_PASS);
         if (deref_arg) free_mstring(pStr);
@@ -729,10 +744,12 @@ mstring_free (string_t *s)
     if (--(s->info.ref))
     {
         mstr_used--;
-        mstr_used_size -=  sizeof(*s) + sizeof(*(s->str))
-                         + s->str->size - 1;
+        mstr_used_size -= msize;
         return;
     }
+
+    mstr_used--;
+    mstr_used_size -= msize;
 
     /* String has no refs left - deallocate it */
 
@@ -1166,7 +1183,7 @@ mstring_extract (const string_t *str, size_t start, long end MTRACE_DECL)
     string_t *result;
 
     len = mstrsize(str);
-    if (len)
+    if (!len)
     {
         error("(mstring_extract) Can't extract from empty string.\n");
         /* NOTREACHED */
@@ -1346,7 +1363,9 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
         strbuf_addf(sbuf,  "Total asked for\t%8lu %8lu (%8lu+%8lu)\n"
                         , mstr_used
                         , mstr_used_size
-                        , mstr_used_size - mstr_used * STR_OVERHEAD
+                        , mstr_used_size
+                          ? mstr_used_size - mstr_used * STR_OVERHEAD
+                          : 0
                         , mstr_used * STR_OVERHEAD
                         );
         strbuf_addf(sbuf,  "Total allocated\t%8lu %8lu (%8lu+%8lu)\n"
@@ -1358,23 +1377,33 @@ add_string_status (strbuf_t *sbuf, Bool verbose)
         strbuf_addf(sbuf,  " - tabled\t%8lu %8lu (%8lu+%8lu)\n"
                         , mstr_tabled
                         , mstr_tabled_size + stringtable_size
-                        , mstr_tabled_size - mstr_tabled * STR_OVERHEAD
+                        , mstr_tabled_size
+                          ? mstr_tabled_size - mstr_tabled * STR_OVERHEAD
+                          : 0
                         , mstr_tabled * STR_OVERHEAD + stringtable_size
                         );
         strbuf_addf(sbuf,  " - ind. tabled\t%8lu %8lu (%8lu+%8lu)\n"
                         , mstr_itabled
                         , mstr_itabled_size
-                        , mstr_itabled_size - mstr_tabled * STR_OVERHEAD
+                        , mstr_itabled_size
+                          ? mstr_itabled_size - mstr_tabled * STR_OVERHEAD
+                          : 0
                         , mstr_itabled * sizeof(string_t)
                         );
         strbuf_addf(sbuf,  " - untabled\t%8lu %8lu (%8lu+%8lu)\n"
                         , mstr_untabled
                         , mstr_untabled_size
-                        , mstr_untabled_size - mstr_untabled * STR_OVERHEAD
+                        , mstr_untabled_size
+                          ? mstr_untabled_size - mstr_untabled * STR_OVERHEAD
+                          : 0
                         , mstr_untabled * STR_OVERHEAD
                         );
-        strbuf_addf(sbuf, "\nSpace required / total string bytes: %lu%%\n"
+        strbuf_addf(sbuf, "\nSpace required / total string bytes: "
+                          "%lu%% with, %lu%% without overhead.\n"
                         , ((distinct_size + stringtable_size) * 100L) 
+                          / (mstr_used_size)
+                        , ((distinct_size + stringtable_size
+                                          - distinct_overhead) * 100L) 
                           / (mstr_used_size - mstr_used * STR_OVERHEAD)
                         );
         strbuf_addf(sbuf, "Searches by address: %lu - average length: %7.3f\n"

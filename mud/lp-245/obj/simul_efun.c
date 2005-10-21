@@ -497,8 +497,6 @@ varargs void add_action(string fun, string cmd, int flag)
     efun::set_this_object(previous_object());
     if (cmd)
         efun::add_action(fun, cmd, flag);
-    else /* historic usage */
-        efun::add_action(fun);
 }
 
 //---------------------------------------------------------------------------
@@ -701,7 +699,7 @@ mixed extract (mixed data, varargs mixed*from_to)
         if (from >= 0)
             return data[from..];
         return data[<-from..];
-    case 2;
+    case 2:
         if (!intp(from_to[0]) || !intp(from_to[1]))
         {
             raise_error("Illegal index for extract(): must be a number.\n");

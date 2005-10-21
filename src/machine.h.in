@@ -41,6 +41,11 @@
 /* Define if you have the ANSI C header files.  */
 #undef STDC_HEADERS
 
+/* Set in response to the signal handler return type, since not all
+ * compilers understand direct definition comparisons
+ */
+#undef RETSIGTYPE_VOID
+
 /* does the compiler provide inline functions? */
 #undef HAS_INLINE
 
@@ -65,9 +70,6 @@
 
 /* the atari strtol() used to consider characters '9' < c < 'A' to be numeric */
 #undef STRTOL_BROKEN
-
-/* does the libc consider it normal to free a null pointer? */
-#undef FREE_NULL_POINTER
 
 /* needs the first argument of strtol be declared as const ? */
 #undef STRTOL_CONST_CHARP

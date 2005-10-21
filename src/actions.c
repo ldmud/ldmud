@@ -1077,7 +1077,9 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
 
     /* We must have a valid commandgiver to succeed */
     if (command_giver == 0 || (command_giver->flags & O_DESTRUCTED))
+    {
         return MY_TRUE;
+    }
 
     /* And the commandgiver must be in the vicinity */
     if (ob != command_giver
@@ -1266,7 +1268,7 @@ f_command (svalue_t *sp, int num_arg)
         if (len >= sizeof(buff) - 1)
             error("Too long command.\n");
         strncpy(buff, get_txt(arg[0].u.str), len);
-        buff[len+1] = '\0';
+        buff[len] = '\0';
 
         if (O_SET_INTERACTIVE(ip, ob))
             trace_level |= ip->trace_level;

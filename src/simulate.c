@@ -721,7 +721,9 @@ error (const char *fmt, ...)
         if (out_of_memory)
         {
             if (malloced_error)
+            {
                 free_mstring(malloced_error);
+            }
             if (malloced_file)
                 free_mstring(malloced_file);
             if (malloced_name)
@@ -857,7 +859,9 @@ error (const char *fmt, ...)
 
     /* Clean up */
     if (malloced_error)
+    {
         free_mstring(malloced_error);
+    }
     if (malloced_file)
         free_mstring(malloced_file);
     if (malloced_name)
@@ -1688,7 +1692,6 @@ clone_object (string_t *str1)
     object_t *save_command_giver = command_giver;
     string_t *name;
 
-printf("DEBUG: clone_object(%p '%s')\n", str1, get_txt(str1));
     if (strict_euids && current_object && current_object->eff_user == NULL)
         error("Illegal to call clone_object() with effective user 0\n");
 
@@ -2417,6 +2420,8 @@ status_parse (strbuf_t * sbuf, char * buff)
 #ifdef RXCACHE_TABLE
         tot += rxcache_status(sbuf, verbose);
 #endif
+        if (verbose)
+            strbuf_addf(sbuf, "\n");
         tot += show_lexer_status(sbuf, verbose);
         tot += show_comm_status(sbuf, verbose);
         if (!verbose)
@@ -2588,7 +2593,11 @@ check_valid_path (string_t *path, object_t *caller, string_t* call_fun, Bool wri
         }
         (void)ref_mstring(path);
     }
-    else
+    else if (v->u.str == path)
+    {
+        (void)ref_mstring(path);
+    }
+    else 
     {
         path = ref_mstring(v->u.str);
     }
@@ -3403,12 +3412,10 @@ f_clone_object (svalue_t * sp)
     /* Get the argument and clone the object */
     if (sp->type == T_STRING)
     {
-printf("DEBUG: Cloning string %p '%s'\n", sp->u.str, get_txt(sp->u.str));
         ob = clone_object(sp->u.str);
     }
     else
     {
-printf("DEBUG: Cloning object %p (%p '%s')\n", sp->u.ob, sp->u.ob->load_name, get_txt(sp->u.ob->load_name));
         ob = clone_object(sp->u.ob->load_name);
     }
 

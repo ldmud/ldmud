@@ -62,4 +62,3 @@ New Themis: IBM RS6000/?/?, AIX 3.4, xlc
   3.3.25,                             -O4:             1260.6
   3.3.25,        -DDEBUG -DTRACE_CODE -O4:              681.9
 
-

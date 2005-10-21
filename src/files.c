@@ -791,8 +791,9 @@ f_get_dir (svalue_t *sp)
 
 {
     vector_t *v;
-    char path[MAXPATHLEN+1];
-    int mask;
+    char      path[MAXPATHLEN+1];
+    int       mask;
+    string_t *fpath = NULL;
 
     mask = sp->u.number;
 
@@ -810,7 +811,6 @@ f_get_dir (svalue_t *sp)
         char           *p; 
         char           *regexpr = 0;
         int             nqueries;
-        string_t       *fpath;
 
         if (!sp[-1].u.str)
             break;
@@ -1011,6 +1011,8 @@ f_get_dir (svalue_t *sp)
 
     }while(0);
 
+    if (fpath)
+        free_mstring(fpath);
     sp--; /* just an int */
     free_string_svalue(sp);
 
@@ -1741,18 +1743,21 @@ f_write_file (svalue_t *sp)
                 {
                     strcpy(buf, emsg);
                     extract_cstr(buf2, file, mstrsize(file)+1);
+                    free_mstring(file);
                     error("Could not open %s for append: (%d) %s.\n"
                          , buf2, err, buf);
                 }
                 else if (buf2)
                 {
                     extract_cstr(buf2, file, mstrsize(file)+1);
+                    free_mstring(file);
                     perror("write_file");
                     error("Could not open %s for append: errno %d.\n"
                          , buf2, err);
                 }
                 else
                 {
+                    free_mstring(file);
                     perror("write_file");
                     error("Could not open file for append: errno %d.\n"
                          , err);

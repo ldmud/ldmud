@@ -135,7 +135,7 @@ regcomp_cache (string_t * expr, Bool excompat, Bool from_ed)
     if (NULL == pRegexp)
         return NULL;
 
-    expr = make_tabled(expr);
+    expr = make_tabled_from(expr);
 
     if (NULL != pHash->pString)
     {

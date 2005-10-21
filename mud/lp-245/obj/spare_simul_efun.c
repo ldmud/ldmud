@@ -36,9 +36,9 @@ void start_simul_efun()
     if ( !(info = get_extra_wizinfo(0)) )
 	set_extra_wizinfo(0, info = allocate(BACKBONE_WIZINFO_SIZE));
     if (!(living_name_m = info[LIVING_NAME]))
-	living_name_m = info[LIVING_NAME] = allocate_mapping(0, 1);
+	living_name_m = info[LIVING_NAME] = m_allocate(0, 1);
     if (!(name_living_m = info[NAME_LIVING]))
-	name_living_m = info[NAME_LIVING] = allocate_mapping(0, 1);
+	name_living_m = info[NAME_LIVING] = m_allocate(0, 1);
     if (find_call_out("clean_simul_efun") < 0)
 	call_out("clean_simul_efun", 1800);
 }
@@ -227,10 +227,13 @@ varargs mixed snoop(mixed snoopee)
     switch (result) {
 	case -1:
 	    write("Busy.\n");
+	    break;
 	case  0:
 	    write("Failed.\n");
+	    break;
 	case  1:
 	    write("Ok.\n");
+	    break;
     }
     if (result > 0) return snoopee;
 }
@@ -270,9 +273,9 @@ varargs void add_worth(int value, object ob)
 {
     mixed old;
 #ifdef __COMPAT_MODE__
-    switch (explode(file_name(previous_object()), "/")[0]) {
+    switch (explode(object_name(previous_object()), "/")[0]) {
 #else
-    switch (explode(file_name(previous_object()), "/")[1]) {
+    switch (explode(object_name(previous_object()), "/")[1]) {
 #endif
       default:
 	raise_error("Illegal call of add_worth.\n");
@@ -343,7 +346,7 @@ varargs void wizlist(string name)
 //---------------------------------------------------------------------------
 void shout(string s)
 {
-    filter_array(users(), lambda(({'u}),({#'&&,
+    filter(users(), lambda(({'u}),({#'&&,
       ({#'environment, 'u}),
       ({#'!=, 'u, ({#'this_player})}),
       ({#'tell_object, 'u, to_string(s)})
@@ -441,15 +444,6 @@ string function_exists (string str, object ob)
 }
 
 //---------------------------------------------------------------------------
-string file_name(object ob)
-{
-    string rc;
-
-    rc = efun::file_name(ob);
-    return stringp(rc) ? rc[1..] : 0;
-}
-
-//---------------------------------------------------------------------------
 string object_name(object ob)
 {
     string rc;
@@ -503,8 +497,6 @@ varargs void add_action(string fun, string cmd, int flag)
     efun::set_this_object(previous_object());
     if (cmd)
         efun::add_action(fun, cmd, flag);
-    else /* historic usage */
-        efun::add_action(fun);
 }
 
 //---------------------------------------------------------------------------
@@ -707,7 +699,7 @@ mixed extract (mixed data, varargs mixed*from_to)
         if (from >= 0)
             return data[from..];
         return data[<-from..];
-    case 2;
+    case 2:
         if (!intp(from_to[0]) || !intp(from_to[1]))
         {
             raise_error("Illegal index for extract(): must be a number.\n");

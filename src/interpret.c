@@ -5349,7 +5349,9 @@ pop_control_stack (void)
 #endif
 
     if ( NULL != (current_prog = csp->prog) ) /* is 0 when we reach the bottom */
+    {
         current_strings = current_prog->strings;
+    }
     inter_pc = csp->pc;
     inter_fp = csp->fp;
     function_index_offset = csp->function_index_offset;
@@ -6484,7 +6486,9 @@ again:
 
         /* Restore the previous execution context */
         if ( NULL != (current_prog = csp->prog) ) /* is 0 when we reach the bottom */
+        {
             current_strings = current_prog->strings;
+        }
 
         function_index_offset = csp->function_index_offset;
         current_variables     = csp->current_variables;
@@ -12834,18 +12838,21 @@ secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
         int a;
         object_t *save_cmd;
 
-        push_ref_string(inter_sp, current_error);
+        push_string(inter_sp, current_error);
         a = 1;
         if (current_error_file)
         {
-            push_ref_string(inter_sp, current_error_file);
-            push_ref_string(inter_sp, current_error_object_name);
+            push_string(inter_sp, current_error_file);
+            push_string(inter_sp, current_error_object_name);
             push_number(inter_sp, current_error_line_number);
             a += 3;
         }
         save_cmd = command_giver;
         apply_master_ob(STR_RUNTIME, a);
         command_giver = save_cmd;
+        /* STR_RUNTIME freed all the current_ variables, except
+         * current_error_trace.
+         */
     }
     num_error--;
 
@@ -14782,7 +14789,7 @@ last_instructions (int length, Bool verbose, svalue_t **svpp)
                 }
 
                 if (previous_objects[i] != old_obj
-                 || (old_file && mstreq(file, old_file))
+                 || (old_file && !mstreq(file, old_file))
                    )
                 {
                     sprintf(buf, "%.170s %.160s line %d"

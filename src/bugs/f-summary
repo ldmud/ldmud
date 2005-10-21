@@ -108,6 +108,8 @@ f-000106: Special -> for array calls
 f-000221: LDMUD foreach idea
 f-000430-1: C++-style variable definitions
 f-000430-2: C-style prototypes
+f-010309-1: foreach() should allow dummy variables
+f-010309-2:'yield' to convert statements into expressions
 
 
 Compiler

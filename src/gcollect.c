@@ -859,12 +859,13 @@ garbage_collection(void)
     object_t *ob, *next_ob;
     lambda_t *l, *next_l;
     int i;
-    long dobj_count; /* DEBUG: of Object count */
+    long dobj_count;
 
     /* --- Pass 0: dispose of some unnecessary stuff ---
      */
 
-printf("DEBUG: %s GC start: %ld objects in list, %ld allocated\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object); /* TODO: Remove this line */
+    dobj_count = tot_alloc_object;
+
     malloc_privilege = MALLOC_MASTER;
     RESET_LIMITS;
     CLEAR_EVAL_COST;
@@ -891,7 +892,12 @@ printf("DEBUG: %s GC start: %ld objects in list, %ld allocated\n", time_stamp(),
         current_error_trace = NULL;
     }
 
-printf("DEBUG: %s GC pass 1: %ld objects in list, %ld allocated\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object); /* TODO: Remove this line */
+    if (dobj_count != tot_alloc_object)
+    {
+        dprintf2(gcollect_outfd, "%s GC pass 1: Freed %d objects.\n"
+                , (long)time_stamp(), dobj_count - tot_alloc_object);
+    }
+
     /* --- Pass 1: clear the M_REF flag in all malloced blocks ---
      */
     clear_M_REF_flags();
@@ -1274,8 +1280,10 @@ W("DEBUG: GC frees destructed '"); W(get_txt(ob->name)); W("'\n");
     /* Finally, try to reclaim the reserved areas */
 
     reallocate_reserved_areas();
+
     time_last_gc = time(NULL);
-printf("DEBUG: %s GC end: %ld objects in list, %ld allocated; %ld destructed removed\n", time_stamp(), (long)num_listed_objs, (long)tot_alloc_object, dobj_count); /* TODO: Remove this line */
+    dprintf2(gcollect_outfd, "%s GC freed %d destructed objects.\n"
+            , (long)time_stamp(), dobj_count);
 }
 
 

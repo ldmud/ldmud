@@ -7,14 +7,14 @@ string a_chat_str;
 string function, type, match;
 
 reset(arg) {
-    start_harry();
-    if (arg)
-	return;
     dest_dir = ({ "room/vill_road1","west",
 		  "room/vill_shore","east",
 		  "room/adv_guild","south",
 		  "room/station", "down",
 		  "room/shop","north" });
+    start_harry(); /* Requires dest_dir set */
+    if (arg)
+	return;
     short_desc = "Village road";
     no_castle_flag = 1;
     long_desc = "A long road going through the village. There are stairs going down.\n" +

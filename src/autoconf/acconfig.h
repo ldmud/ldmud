@@ -4,6 +4,11 @@
 
 @TOP@
 
+/* Set in response to the signal handler return type, since not all
+ * compilers understand direct definition comparisons
+ */
+#undef RETSIGTYPE_VOID
+
 /* does the compiler provide inline functions? */
 #undef HAS_INLINE
 

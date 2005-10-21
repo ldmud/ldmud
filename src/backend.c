@@ -265,10 +265,8 @@ handle_hup (int sig UNUSED)
 #endif
     extra_jobs_to_do = MY_TRUE;
     game_is_being_shut_down = MY_TRUE;
-#ifndef __MWERKS__
-#if RETSIGTYPE != void
+#ifndef RETSIGTYPE_VOID
     return 0;
-#endif
 #endif
 } /* handle_hup() */
 
@@ -287,10 +285,8 @@ handle_usr1 (int sig UNUSED)
     master_will_be_updated = MY_TRUE;
     eval_cost += max_eval_cost >> 3;
     (void)signal(SIGUSR1, handle_usr1);
-#ifndef __MWERKS__
-#if RETSIGTYPE != void
+#ifndef RETSIGTYPE_VOID
     return 0;
-#endif
 #endif
 } /* handle_usr1() */
 

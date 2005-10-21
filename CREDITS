@@ -112,6 +112,8 @@ Lars Duening thanks:
  - Uwe (mai94cch@studserv.uni-leipzig.de) provided the basic IPv6 support.
  - Mark Daniel Reidel (Karm@Nightfall) did the first implementation of
      the mySQL efuns.
+ - Dennis VanHoey (devanhoe@usol.com) did the compiling and testing for the
+     Darwin port.
  - for bug reports, critics, fixes, patches and other support:
      Acius (acius@bigfoot.com)
      Alex@TubMud (at16@st-andrews.ac.uk)

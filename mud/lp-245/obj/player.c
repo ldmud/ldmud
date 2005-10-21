@@ -2449,7 +2449,10 @@ load_auto_obj(str) {
 	str = rest;
 	ob = find_object(file);
 	if (!ob)
+    {
+        write("Can't autoload '" + file + "': not in game.\n");
 	    continue;
+    }
 	ob = clone_object(file);
 	if (argument)
 	    ob->init_arg(argument);
