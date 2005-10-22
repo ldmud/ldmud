@@ -86,6 +86,7 @@ f-010307: Short(est) Path Algorithms
 f-010223: Useful coloured string efuns
 f-010320: limited() vs resetting of runtime costs
 f-010406-0: Improved RegExps, using PCRE
+f-010406-2: PCRE Implementation Notes
 f-010411: Extend map(),filter(),... for strings.
 f-010516-0: Allow add_actions() on closures
 f-010516-1: Add a priority to notify_fail()
@@ -111,6 +112,7 @@ f-011230: Implement seeded randoms
 f-020127: Bitstring efuns for shifting and copying
 f-020310: inherits() returns all programs inheriting a given program
 f-020312: Filename argument to garbage_collection()
+f-020327-0: Use PCRE and traditional regexps in parallel
 
 
 Language

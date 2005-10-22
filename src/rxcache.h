@@ -6,6 +6,9 @@
 #include "regexp.h"
 #include "mstrings.h"
 #include "strfuns.h"
+#ifdef USE_PCRE
+#include "pcre/pcre.h"
+#endif
 
 /* --- Types --- */
 
@@ -21,7 +24,12 @@
 
 struct regexp_s {
     p_uint ref;   /* Number of refs */
+#ifdef USE_PCRE
+    pcre        * pProg;   /* The generated regular expression */
+    pcre_extra  * pHints;  /* Study data */
+#else
     regexp * rx;  /* The actual regular expression */
+#endif
 };
 
 /* --- Variables --- */
@@ -51,7 +59,11 @@ struct regexp_s {
 /* --- Prototypes --- */
 
 extern void rx_init(void);
+#ifdef USE_PCRE
+extern regexp_t * rx_compile (string_t * expr, int opt);
+#else
 extern regexp_t * rx_compile(string_t * expr, Bool excompat, Bool from_ed);
+#endif
 extern Bool   rx_exec (regexp_t *prog, char *string, char *start);
 extern char * rx_sub (regexp_t *prog, char *source, char *dest, int n, Bool quiet);
 extern void   rx_free(regexp_t *);

@@ -46,6 +46,9 @@
 #include "hash.h"
 #include "mstrings.h"
 #include "regexp.h"
+#ifdef USE_PCRE
+#include "pcre/pcre.h"
+#endif
 #include "simulate.h"
 #include "strfuns.h"
 #include "svalue.h"
@@ -70,11 +73,15 @@
 
 typedef struct RxHashEntry {
     regexp_t   base;     /* The base regexp_t structure */
+
     string_t * pString;  /* Generator string, a counted tabled string
                           * NULL if unused */
     p_uint     hString;  /* Hash of pString */
-    Bool       from_ed;  /* The from_ed value */
+    size_t     size;     /* Size of regexp expressions for statistics */
+#ifndef USE_PCRE
     Bool       excompat; /* The excompat value */
+    Bool       from_ed;  /* The from_ed value */
+#endif
 } RxHashEntry;
 
 
@@ -90,6 +97,36 @@ static uint32 iXSizeAlloc     = 0;  /* Dynamic memory held in regexp structs */
 
 #endif /* RXCACHE_TABLE */
 
+#ifdef USE_PCRE
+static size_t pcre_malloc_size;
+  /* Accumulated size from pcre_malloc() calls. Used when creating
+   * a new PCRE to capture its allocated size for statistics.
+   */
+
+static const char* pcre_malloc_err;
+  /* Set by the caller of PCRE functions so that an out-of-memory
+   * condition in the pcre_xalloc() wrapper can get the proper
+   * error message.
+   */
+
+/*--------------------------------------------------------------------*/
+static void *
+pcre_xalloc (size_t size)
+
+/* Wrapper function so that PCRE will use our special allocator. */
+
+{
+    void * p;
+
+    if (!pcre_malloc_err)
+        pcre_malloc_err = "in PCRE function";
+    xallocate(p, size, pcre_malloc_err);
+    pcre_malloc_size += size;
+    return p;
+} /* pcre_xalloc() */
+
+#endif /* USE_PCRE */
+
 /*--------------------------------------------------------------------*/
 void rx_init(void)
 
@@ -99,11 +136,24 @@ void rx_init(void)
 #ifdef RXCACHE_TABLE
     memset(xtable, 0, sizeof(xtable));
 #endif
-}
+
+#ifdef USE_PCRE
+    pcre_malloc = pcre_xalloc;
+    pcre_free = xfree;
+#endif /* USE_PCRE */
+} /* rx_init() */
 
 /*--------------------------------------------------------------------*/
 regexp_t *
-rx_compile (string_t * expr, Bool excompat, Bool from_ed)
+rx_compile (string_t * expr
+#ifdef USE_PCRE
+           , int opt
+#else
+           , Bool excompat, Bool from_ed
+#endif
+           )
+
+/* TODO: Unify the two option settings, and also store them in the cache. */
 
 /* Compile a regexp structure from the expression <expr>, more or
  * less ex compatible.
@@ -116,7 +166,14 @@ rx_compile (string_t * expr, Bool excompat, Bool from_ed)
  */
 
 {
+#ifdef USE_PCRE
+    pcre       * pProg;   /* The generated regular expression */
+    pcre_extra * pHints;  /* Study data */
+    const char * pErrmsg;
+    int          erridx;
+#else
     regexp * pRegexp;
+#endif
 
 #ifdef RXCACHE_TABLE
     p_uint hExpr;
@@ -133,8 +190,10 @@ rx_compile (string_t * expr, Bool excompat, Bool from_ed)
     if (pHash != NULL
      && pHash->pString != NULL
      && pHash->hString == hExpr
+#ifndef USE_PCRE
      && pHash->from_ed == from_ed
      && pHash->excompat == excompat
+#endif
      && mstreq(pHash->pString, expr)
        )
     {
@@ -145,9 +204,33 @@ rx_compile (string_t * expr, Bool excompat, Bool from_ed)
 
     /* Regexp not found: compile a new one.
      */
+#ifdef USE_PCRE
+     pcre_malloc_size = 0;
+     pcre_malloc_err  = "compiling regex";
+     pProg = pcre_compile(get_txt(expr), opt, &pErrmsg, &erridx, NULL);
+ 
+     if (NULL == pProg)
+     {
+         error("pcre: %s at offset %d\n", pErrmsg, erridx);
+         /* NOTREACHED */
+         return NULL;
+     }
+ 
+     pcre_malloc_err  = "studying regex";
+     pHints = pcre_study(pProg, 0, &pErrmsg);
+ 
+     if (pErrmsg)
+     {
+         xfree(pProg);
+         error("pcre: %s\n", pErrmsg);
+         /* NOTREACHED */
+         return NULL;
+     }
+#else
     pRegexp = regcomp((unsigned char *)get_txt(expr), excompat, from_ed);
     if (NULL == pRegexp)
         return NULL;
+#endif
 
 #ifndef RXCACHE_TABLE
 
@@ -157,7 +240,12 @@ rx_compile (string_t * expr, Bool excompat, Bool from_ed)
 
         xallocate(rc, sizeof(*rc), "Regexp structure");
         rc->ref = 1;
+#ifdef USE_PCRE
+        rc->pProg = pProg;
+        rc->pHints = pHints;
+#else
         rc->rx = pRegexp;
+#endif
         return rc;
     }
 #else
@@ -169,22 +257,29 @@ rx_compile (string_t * expr, Bool excompat, Bool from_ed)
     {
         iNumXCollisions++;
         iNumXEntries--;
-        iXSizeAlloc -= pHash->base.rx->regalloc;
+        iXSizeAlloc -= pHash->size;
         free_regexp((regexp_t *)pHash);
     }
 
     xallocate(pHash, sizeof(*pHash), "Regexp cache structure");
     xtable[h] = pHash;
 
-    pHash->base.rx = pRegexp;
     pHash->base.ref = 1;
     pHash->pString = expr; /* refs are transferred */
     pHash->hString = hExpr;
+#ifdef USE_PCRE
+    pHash->base.pProg = pProg;
+    pHash->base.pHints = pHints;
+    pHash->size = pcre_malloc_size;
+#else
+    pHash->base.rx = pRegexp;
+    pHash->size = pRegexp->regalloc;
     pHash->from_ed = from_ed;
     pHash->excompat = excompat;
+#endif
 
     iNumXEntries++;
-    iXSizeAlloc += pRegexp->regalloc;
+    iXSizeAlloc += pHash->size;
 
     return ref_regexp((regexp_t *)pHash);
 #endif
@@ -201,7 +296,10 @@ rx_exec (regexp_t *prog, char *string, char *start)
  */
 
 {
+#ifdef USE_PCRE
+#else
     return regexec(prog->rx, string, start);
+#endif
 } /* rx_exec() */
 
 /*-------------------------------------------------------------------------*/
@@ -217,7 +315,10 @@ rx_sub (regexp_t *prog, char *source, char *dest, int n, Bool quiet)
  */
 
 {
+#ifdef USE_PCRE
+#else
     return regsub (prog->rx, source, dest, n, quiet);
+#endif
 } /* rx_sub() */
 
 /*--------------------------------------------------------------------*/
@@ -237,7 +338,12 @@ rx_free (regexp_t * expr)
         free_mstring(pHash->pString);
     }
 #endif
+#ifdef USE_PCRE
+    if (expr->pHints) xfree(expr->pHints);
+    xfree(expr->pProg);
+#else
     xfree(expr->rx);
+#endif
     xfree(expr);
 } /* rx_free() */
 
@@ -355,7 +461,13 @@ count_regexp_ref (regexp_t * pRegexp)
 
 {
     note_malloced_block_ref(pRegexp);
+#ifdef USE_PCRE
+    note_malloced_block_ref(pRegexp->pProg);
+    if (pRegexp->pHints)
+        note_malloced_block_ref(pRegexp->pHints);
+#else
     note_malloced_block_ref(pRegexp->rx);
+#endif
 #ifdef RXCACHE_TABLE
     count_ref_from_string(((RxHashEntry *)pRegexp)->pString);
 #endif

@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Mar-2002 (Lars Duening)  (3.3.189)
+    - (rxcache) Added the basic code to compile and free PCREs. The
+         matching is still not supported, so at the moment the driver
+         won't even compile with PCRE activated :-)
+
 27-Mar-2002 (Lars Duening)  (3.3.188)
     - (wiz_list.c) Don't call master::get_wiz_name() when there is no
          master. Otherwise a simple warning during the initial master

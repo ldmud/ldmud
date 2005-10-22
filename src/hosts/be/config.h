@@ -302,7 +302,6 @@
 
 /* Define this if you want PCRE instead of traditional regexps.
  */
-
 #undef USE_PCRE
 
 /* Define this if you want mySQL support (assuming that your host
