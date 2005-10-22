@@ -6300,6 +6300,7 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp, Bool allowRefs)
  * ('(varargs mixed *)'). Currently this is used only for simul efuns.
  * TODO: Investigate if holding references in arrays is really such a
  * TODO:: a bad thing. Maybe it's just an implementation issue.
+ * TODO:: This also affects apply_low() and call_lambda().
  *
  * csp->num_local_variables is supposed to hold the number of actual
  * arguments on the stack.
@@ -14783,7 +14784,8 @@ again:
 
 /*-------------------------------------------------------------------------*/
 static Bool
-apply_low (string_t *fun, object_t *ob, int num_arg, Bool b_ign_prot)
+apply_low ( string_t *fun, object_t *ob, int num_arg
+          , Bool b_ign_prot, Bool allowRefs)
 
 /* The low-level implementation of function calls.
  *
@@ -14791,6 +14793,9 @@ apply_low (string_t *fun, object_t *ob, int num_arg, Bool b_ign_prot)
  * onto the stack (<inter_sp> points to the last one). static and protected
  * functions can't be called from the outside unless <b_ign_prot> is true.
  * apply_low() takes care of calling shadows where necessary.
+ *
+ * If <allowRefs> is TRUE, references may be passed as extended varargs
+ * ('(varargs mixed *)'). Currently this is used only for simul efuns.
  *
  * When apply_low() returns true, the call was successful, the arguments
  * one the stack have been popped and replaced with the result. But note
@@ -14920,7 +14925,7 @@ retry_for_shadow:
             current_variables = ob->variables;
             if (current_variables)
                 current_variables += cache[ix].variable_index_offset;
-            inter_sp = setup_new_frame2(funstart, inter_sp, MY_FALSE);
+            inter_sp = setup_new_frame2(funstart, inter_sp, allowRefs);
             previous_ob = current_object;
             current_object = ob;
             save_csp = csp;
@@ -15028,7 +15033,7 @@ retry_for_shadow:
                         goto failure;
                 }
                 csp->funstart = funstart;
-                inter_sp = setup_new_frame2(funstart, inter_sp, MY_FALSE);
+                inter_sp = setup_new_frame2(funstart, inter_sp, allowRefs);
                 previous_ob = current_object;
                 current_object = ob;
                 save_csp = csp;
@@ -15110,7 +15115,7 @@ int_apply (string_t *fun, object_t *ob, int num_arg
  */
 
 {
-    if (apply_low(fun, ob, num_arg, b_ign_prot))
+    if (apply_low(fun, ob, num_arg, b_ign_prot, MY_FALSE))
         return APPLY_FOUND;
 
     if (b_use_default)
@@ -15152,11 +15157,11 @@ int_apply (string_t *fun, object_t *ob, int num_arg
             /* Call the function */
             if (hook->type == T_STRING)
             {
-                rc = apply_low(hook->u.str, ob, num_arg+num_extra, b_ign_prot);
+                rc = apply_low(hook->u.str, ob, num_arg+num_extra, b_ign_prot, MY_TRUE);
             }
             else /* hook->type == T_CLOSURE */
             {
-                call_lambda(hook, num_arg+num_extra);
+                int_call_lambda(hook, num_arg+num_extra, MY_TRUE);
                 rc = 1; /* This call obviously succeeds */
             }
 
@@ -15830,10 +15835,13 @@ assert_master_ob_loaded (void)
 
 /*-------------------------------------------------------------------------*/
 void
-call_lambda (svalue_t *lsvp, int num_arg)
+int_call_lambda (svalue_t *lsvp, int num_arg, Bool allowRefs)
 
 /* Call the closure <lsvp> with <num_arg> arguments on the stack. On
  * success, the arguments are replaced with the result, else an error()
+ *
+ * If <allowRefs> is TRUE, references may be passed as extended varargs
+ * ('(varargs mixed *)'). Currently this is used only for simul efuns.
  * is generated.
  */
 
@@ -16098,7 +16106,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
         function_index_offset = 0;
         funstart = l->function.code + 1;
         csp->funstart = funstart;
-        sp = setup_new_frame2(funstart, sp, MY_FALSE);
+        sp = setup_new_frame2(funstart, sp, allowRefs);
         current_variables = current_object->variables;
         current_strings = current_prog->strings;
         eval_instruction(FUNCTION_CODE(funstart), sp);
@@ -16283,7 +16291,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
     return;
 
 #   undef CLEAN_CSP
-} /* call_lambda() */
+} /* int_call_lambda() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

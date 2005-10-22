@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-May-2002 (Lars Duening)  (3.3.206)
+    - (interpret) The H_DEFAULT_METHOD can now be specified with varargs
+         arguments and still receive by-reference variables, similar to
+         the call_other() sefun (reported by Bardioc).
+    - (prolang.y) Reworked the program block reallocations to make sure
+         that their bounds won't be overwritten. This could have been
+         the reasons for the crashers on corrupted memory (reported by Coogan).
+
+01-May-2002 (Lars Duening)
+    - (settings/dt2) Updated the DeeperTrouble settings file; and also
+         removed the mud/dt2 directory since it's no longer necessary
+         (thanks, Lasse!).
+
 26-Apr-2002 (Lars Duening)  (3.3.205)
     - (prolang.y) Hiding an inherited private nosave variable with an
          inherited non-private variable didn't work (reported by Gnomi).

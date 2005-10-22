@@ -4,21 +4,34 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/export/home/mud --libexec=/export/home/mud/mud/erq --libdir=/export/home/mud/lib --with-setting=dt2 $*
+exec ./configure --prefix=/other/deeper --libexec=/other/deeper/erq-exec --with-setting=dt2 $*
 exit 1
 
 # --- The actual settings ---
 
-enable_use_alists=yes
-
-with_portno=7680
-with_udp_port=8889
+enable_erq=erq
+enable_compat_mode=yes
+enable_supply_parse_command=no
 
 with_time_to_swap=0
 with_time_to_swap_variables=0
-with_swap_file="/tmp/LP_SWAP.1"
+with_time_to_reset=5400
+with_time_to_clean_up=5600
 
-with_time_to_reset=7200
+with_portno=4242
+with_udp_port=8889
 
-enable_erq=xerq
+with_max_cost=5000000
 
+with_swap_file="/tmp/LD_SWAP.1"
+
+with_max_array_size=9000
+with_max_mapping_size=27000
+with_max_players=100
+
+with_min_malloced=0x1000000
+with_max_malloced=0x8000000
+
+with_htable_size=65536
+with_itable_size=4096
+with_otable_size=32768

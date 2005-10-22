@@ -920,7 +920,7 @@ realloc_mem_block (mem_block_t *mbp, mp_int size)
  */
 
 {
-    mp_int max_size;
+    mp_uint max_size;
     char *p;
 
     max_size = mbp->max_size;
@@ -1265,13 +1265,22 @@ check_aggregate_types (int n)
 
 /*-------------------------------------------------------------------------*/
 static INLINE char *
-realloc_a_program (void)
+realloc_a_program (size_t size)
 
-/* Double the allocated size of the A_PROGRAM area.
+/* If necessary, increase the allocated size of the A_PROGRAM area so that at
+ * least <size> more bytes can be stored in it.
+ *
+ * Return NULL when out of memory, or a pointer to the (possibly newly
+ * allocated) memory area (ie. mem_block[A_PROGRAM].block).
  */
 
 {
-    return realloc_mem_block(&mem_block[A_PROGRAM], 0);
+    mem_block_t * mbp = &mem_block[A_PROGRAM];
+    mp_uint new_size = mbp->current_size + size;
+
+    if (new_size <= mbp->max_size)
+        return mbp->block;
+    return realloc_mem_block(mbp, new_size);
 } /* realloc_a_program() */
 
 /*-------------------------------------------------------------------------*/
@@ -1287,9 +1296,14 @@ ins_byte (unsigned char b)
  */
 
 {
-    if (mem_block[A_PROGRAM].current_size == mem_block[A_PROGRAM].max_size ) {
-        if (!realloc_a_program())
+    if (mem_block[A_PROGRAM].current_size == mem_block[A_PROGRAM].max_size )
+    {
+        if (!realloc_a_program(1))
+        {
+            yyerrorf("Out of memory: program size %lu\n"
+                    , mem_block[A_PROGRAM].current_size + 1);
             return;
+        }
     }
     mem_block[A_PROGRAM].block[mem_block[A_PROGRAM].current_size++] = b;
 } /* ins_byte() */
@@ -1318,16 +1332,20 @@ ins_short (short l)
  */
 
 {
-    mp_uint current_size;
-    char *dest;
-
-    current_size = CURRENT_PROGRAM_SIZE;
-    CURRENT_PROGRAM_SIZE = current_size + 2;
-    if (current_size +1 < mem_block[A_PROGRAM].max_size
-     || realloc_a_program())
+    if (realloc_a_program(2))
     {
+        mp_uint current_size;
+        char *dest;
+
+        current_size = CURRENT_PROGRAM_SIZE;
+        CURRENT_PROGRAM_SIZE = current_size + 2;
         dest = mem_block[A_PROGRAM].block + current_size;
         PUT_SHORT(dest, l);
+    }
+    else
+    {
+        yyerrorf("Out of memory: program size %lu\n"
+                , mem_block[A_PROGRAM].current_size + 2);
     }
 } /* ins_short() */
 
@@ -1370,19 +1388,21 @@ ins_long (int32 l)
  */
 
 {
-    mp_uint current_size;
-    char *dest;
-
-    current_size = CURRENT_PROGRAM_SIZE;
-    CURRENT_PROGRAM_SIZE = current_size + 4;
-    if (current_size +3 >= mem_block[A_PROGRAM].max_size
-     && !realloc_a_program())
+    if (realloc_a_program(4))
     {
-        return;
-    }
+        mp_uint current_size;
+        char *dest;
 
-    dest = mem_block[A_PROGRAM].block + current_size;
-    PUT_INT32(dest, l);
+        current_size = CURRENT_PROGRAM_SIZE;
+        CURRENT_PROGRAM_SIZE = current_size + 4;
+        dest = mem_block[A_PROGRAM].block + current_size;
+        PUT_INT32(dest, l);
+    }
+    else
+    {
+        yyerrorf("Out of memory: program size %lu\n"
+                , mem_block[A_PROGRAM].current_size + 4);
+    }
 } /* ins_long() */
 
 /*-------------------------------------------------------------------------*/
@@ -1405,13 +1425,7 @@ ins_long (int32 l)
 
 #define PREPARE_INSERT(n) \
     bytecode_p __PREPARE_INSERT__p = (\
-      (\
-        CURRENT_PROGRAM_SIZE+(n) > mem_block[A_PROGRAM].max_size ?\
-          realloc_a_program()\
-        :\
-          0\
-      ),\
-      PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE);
+      realloc_a_program(n) ? (PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE) : NULL);
 
 #define add_byte(b)   (void) STORE_INT8(__PREPARE_INSERT__p, (b))
 
@@ -1572,10 +1586,14 @@ yyget_space (p_int size)
  */
 
 {
-    while (CURRENT_PROGRAM_SIZE + size > mem_block[A_PROGRAM].max_size)
-        realloc_a_program();
-    CURRENT_PROGRAM_SIZE += size;
-    return PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE - size;
+    if (realloc_a_program(size))
+    {
+        CURRENT_PROGRAM_SIZE += size;
+        return PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE - size;
+    }
+    yyerrorf("Out of memory: program size %lu\n"
+            , mem_block[A_PROGRAM].current_size + size);
+    return NULL;
 } /* yyget_space() */
 
 /*-------------------------------------------------------------------------*/
@@ -1590,27 +1608,34 @@ yymove_switch_instructions (int len, p_int blocklen)
 {
     mp_int i, j;
 
-    if ( (CURRENT_PROGRAM_SIZE += len) > mem_block[A_PROGRAM].max_size )
-        realloc_a_program();
-
-    /* Adjust the continue address, if any */
-    if ( (current_continue_address & CONTINUE_ADDRESS_MASK) > switch_pc
-     && !(current_continue_address & CONTINUE_DELIMITER ) )
+    if (realloc_a_program(len))
     {
-        for(i = current_continue_address & CONTINUE_ADDRESS_MASK;
-          (j=read_short(i)) > switch_pc; )
+        CURRENT_PROGRAM_SIZE += len;
+
+        /* Adjust the continue address, if any */
+        if ( (current_continue_address & CONTINUE_ADDRESS_MASK) > switch_pc
+         && !(current_continue_address & CONTINUE_DELIMITER ) )
         {
-                upd_short(i, j+len);
-                i = j;
+            for(i = current_continue_address & CONTINUE_ADDRESS_MASK;
+              (j=read_short(i)) > switch_pc; )
+            {
+                    upd_short(i, j+len);
+                    i = j;
+            }
+            current_continue_address += len;
         }
-        current_continue_address += len;
+        
+        move_memory(
+          mem_block[A_PROGRAM].block + switch_pc + len,
+          mem_block[A_PROGRAM].block + switch_pc,
+          blocklen
+        );
     }
-    
-    move_memory(
-      mem_block[A_PROGRAM].block + switch_pc + len,
-      mem_block[A_PROGRAM].block + switch_pc,
-      blocklen
-    );
+    else
+    {
+        yyerrorf("Out of memory: program size %lu\n"
+                , mem_block[A_PROGRAM].current_size + len);
+    }
 } /* yymove_switch_instructions() */
 
 /*-------------------------------------------------------------------------*/
@@ -3321,10 +3346,15 @@ function_body:
           CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
 #endif
           $<number>$ = CURRENT_PROGRAM_SIZE;
-          if ( (CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE)
-                > mem_block[A_PROGRAM].max_size )
+          if (realloc_a_program(FUNCTION_HDR_SIZE))
           {
-              realloc_a_program();
+              CURRENT_PROGRAM_SIZE += FUNCTION_HDR_SIZE;
+          }
+          else
+          {
+              yyerrorf("Out of memory: program size %lu\n"
+                      , mem_block[A_PROGRAM].current_size + FUNCTION_HDR_SIZE);
+              YYACCEPT;
           }
       }
 
@@ -4092,13 +4122,12 @@ new_local :
 
               source = $1.u.simple;
               current_size = CURRENT_PROGRAM_SIZE;
-              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
-              if (current_size + 3 > mem_block[A_PROGRAM].max_size
-               && !realloc_a_program())
+              if (!realloc_a_program(3))
               {
                   yyerrorf("Out of memory: program size %lu", current_size+3);
                   YYACCEPT;
               }
+              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
               dest = PROGRAM_BLOCK + current_size;
               *dest++ = *source++;
               *dest++ = *source;
@@ -4506,8 +4535,11 @@ do:
           bytecode_p dest;
 
           current = CURRENT_PROGRAM_SIZE;
-          if (current + 3 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+          if (!realloc_a_program(3))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+3);
+              YYACCEPT;
+          }
 
           /* Add the branch statement */
           dest = PROGRAM_BLOCK + current;
@@ -4849,13 +4881,12 @@ expr_decl:
 
               source = $1.u.simple;
               current_size = CURRENT_PROGRAM_SIZE;
-              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
-              if (current_size + 3 > mem_block[A_PROGRAM].max_size
-               && !realloc_a_program())
+              if (!realloc_a_program(3))
               {
                   yyerrorf("Out of memory: program size %lu", current_size+3);
                   YYACCEPT;
               }
+              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
               dest = PROGRAM_BLOCK + current_size;
               *dest++ = *source++;
               *dest++ = *source;
@@ -4892,13 +4923,12 @@ expr_decl:
 
               source = $1.u.simple;
               current_size = CURRENT_PROGRAM_SIZE;
-              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
-              if (current_size + 3 > mem_block[A_PROGRAM].max_size
-               && !realloc_a_program())
+              if (!realloc_a_program(3))
               {
                   yyerrorf("Out of memory: program size %lu", current_size+3);
                   YYACCEPT;
               }
+              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
               dest = PROGRAM_BLOCK + current_size;
               *dest++ = *source++;
               *dest++ = *source;
@@ -5121,13 +5151,12 @@ foreach_var_decl:  /* Generate the code for one lvalue */
 
               source = $1.u.simple;
               current_size = CURRENT_PROGRAM_SIZE;
-              CURRENT_PROGRAM_SIZE = current_size + 2;
-              if (current_size + 2 > mem_block[A_PROGRAM].max_size
-               && !realloc_a_program())
+              if (!realloc_a_program(2))
               {
                   yyerrorf("Out of memory: program size %lu", current_size+2);
                   YYACCEPT;
               }
+              CURRENT_PROGRAM_SIZE = current_size + 2;
               dest = PROGRAM_BLOCK + current_size;
               *dest++ = *source++;
               *dest++ = *source;
@@ -5513,8 +5542,11 @@ condStart:
           current_break_address &= ~CASE_LABELS_ENABLED;
 
           current = CURRENT_PROGRAM_SIZE;
-          if (current + 2 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+          if (!realloc_a_program(2))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+3);
+              YYACCEPT;
+          }
           current_code = PROGRAM_BLOCK + current;
 
           /* Add the branch instruction, with the usual optimization */
@@ -5816,13 +5848,12 @@ expr0:
 
               source = $1.u.simple;
               current_size = CURRENT_PROGRAM_SIZE;
-              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
-              if (current_size + 3 > mem_block[A_PROGRAM].max_size
-               && !realloc_a_program())
+              if (!realloc_a_program(3))
               {
                   yyerrorf("Out of memory: program size %lu", current_size+3);
                   YYACCEPT;
               }
+              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
               dest = PROGRAM_BLOCK + current_size;
               *dest++ = *source++;
               *dest++ = *source;
@@ -6793,8 +6824,12 @@ expr0:
                   bytecode_p q;
 
                   length = $2.end - start + 1;
-                  if (current+length > mem_block[A_PROGRAM].max_size)
-                      realloc_a_program();
+                  if (!realloc_a_program(length))
+                  {
+                      yyerrorf("Out of memory: program size %lu\n"
+                              , current+length);
+                      YYACCEPT;
+                  }
                   p = PROGRAM_BLOCK;
                   memcpy(p + current, p + start, length);
                   p += start;
@@ -6818,8 +6853,11 @@ expr0:
                   int i;
                   int length;
 
-                  if (current + 2 > mem_block[A_PROGRAM].max_size)
-                      realloc_a_program();
+                  if (!realloc_a_program(3))
+                  {
+                      yyerrorf("Out of memory: program size %lu\n", current+3);
+                      YYACCEPT;
+                  }
                   p = PROGRAM_BLOCK + start;
                   i = p[1];
                   length = current - start - 2;
@@ -6837,8 +6875,11 @@ expr0:
           }
           else
           {
-              if (current + 2 > mem_block[A_PROGRAM].max_size)
-                  realloc_a_program();
+              if (!realloc_a_program(2))
+              {
+                  yyerrorf("Out of memory: program size %lu\n", current+2);
+                  YYACCEPT;
+              }
               p = PROGRAM_BLOCK + start;
               if ($3.inst == F_INDEX)
                   *p++ = F_PUSH_INDEXED_LVALUE;
@@ -6886,8 +6927,11 @@ expr0:
            * produced by <expr4> and add our PUSH_INDEXED_MAP_LVALUE
            */
           current = CURRENT_PROGRAM_SIZE;
-          if (current + 2 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+          if (!realloc_a_program(2))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+2);
+              YYACCEPT;
+          }
           p = PROGRAM_BLOCK + current;
           *p++ = F_PUSH_INDEXED_MAP_LVALUE;
 
@@ -7340,8 +7384,11 @@ expr4:
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.code = -1;
 
-          if (current + 3 > mem_block[A_PROGRAM].max_size)
-                realloc_a_program();
+          if (!realloc_a_program(3))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+3);
+              YYACCEPT;
+          }
           p = PROGRAM_BLOCK + current;
 
           if (i & VIRTUAL_VAR_TAG)
@@ -7384,8 +7431,11 @@ expr4:
 %line
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.code = -1;
-          if (current + 2 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+          if (!realloc_a_program(2))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+2);
+              YYACCEPT;
+          }
           p = PROGRAM_BLOCK + current;
           *p++ = F_PUSH_LOCAL_VARIABLE_LVALUE;
           *p = $2;
@@ -7559,8 +7609,11 @@ expr4:
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.end = 0;
 
-          if (current + 3 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+          if (!realloc_a_program(3))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+3);
+              YYACCEPT;
+          }
           p = PROGRAM_BLOCK + current;
 
           if (i & VIRTUAL_VAR_TAG)
@@ -7608,8 +7661,11 @@ expr4:
           $$.start = current = CURRENT_PROGRAM_SIZE;
           $$.code = F_PUSH_LOCAL_VARIABLE_LVALUE;
           $$.end = 0;
-          if (current + 2 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+          if (!realloc_a_program(2))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+2);
+              YYACCEPT;
+          }
           p = PROGRAM_BLOCK + current;
           *p++ = F_LOCAL;
           *p = $1;
@@ -8092,8 +8148,11 @@ index_range :
 
           current = CURRENT_PROGRAM_SIZE;
               
-          while (current + 1 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+          if (!realloc_a_program(1))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+1);
+              YYACCEPT;
+          }
 
           mark = PROGRAM_BLOCK + $3.start;
           p = PROGRAM_BLOCK + current;
@@ -8126,8 +8185,11 @@ index_range :
 
           current = CURRENT_PROGRAM_SIZE;
               
-          while (current + 1 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+          if (!realloc_a_program(1))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+1);
+              YYACCEPT;
+          }
 
           mark = PROGRAM_BLOCK + $4.start;
           p = PROGRAM_BLOCK + current;
@@ -8160,8 +8222,11 @@ index_range :
 
           current = CURRENT_PROGRAM_SIZE;
               
-          while (current + 1 > mem_block[A_PROGRAM].max_size)
-              realloc_a_program();
+          if (!realloc_a_program(1))
+          {
+              yyerrorf("Out of memory: program size %lu\n", current+1);
+              YYACCEPT;
+          }
 
           mark = PROGRAM_BLOCK + $4.start;
           p = PROGRAM_BLOCK + current;
@@ -9038,8 +9103,12 @@ function_call:
               char *p, *q;
               p_int left;
 
-              if (CURRENT_PROGRAM_SIZE + 1 >= mem_block[A_PROGRAM].max_size)
-                  realloc_a_program();
+              if (!realloc_a_program(1))
+              {
+                  yyerrorf("Out of memory: program size %lu\n"
+                          , mem_block[A_PROGRAM].current_size + 2);
+                  YYACCEPT;
+              }
 
               /* Move the generated code forward by 1 */
               p = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE - 1;
@@ -9080,8 +9149,12 @@ function_call:
               char *p, *q;
               p_int left;
 
-              if (CURRENT_PROGRAM_SIZE + 6 >= mem_block[A_PROGRAM].max_size)
-                  realloc_a_program();
+              if (!realloc_a_program(6))
+              {
+                  yyerrorf("Out of memory: program size %lu\n"
+                          , mem_block[A_PROGRAM].current_size + 2);
+                  YYACCEPT;
+              }
 
               /* Move the generated code forward by 6 */
               p = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE - 1;
@@ -9200,11 +9273,15 @@ function_call:
                       if (funp->flags & TYPE_MOD_XVARARGS)
                           i--; /* Last argument may be omitted */
                           
-                      if (i > 4
-                       && CURRENT_PROGRAM_SIZE + i + 2 >
-                                  mem_block[A_PROGRAM].max_size)
+                      if (i > 4)
                       {
-                          realloc_a_program();
+                          if (!realloc_a_program(i+2))
+                          {
+                              yyerrorf("Out of memory: program size %lu\n"
+                                      , mem_block[A_PROGRAM].current_size + i+2);
+                              YYACCEPT;
+                          }
+                          
                           __PREPARE_INSERT__p = PROGRAM_BLOCK 
                                                 + CURRENT_PROGRAM_SIZE;
                       }
@@ -9645,8 +9722,12 @@ catch:
               int i;
               bytecode_p p;
 
-              if (CURRENT_PROGRAM_SIZE + 5 > mem_block[A_PROGRAM].max_size)
-                  realloc_a_program();
+              if (!realloc_a_program(5))
+              {
+                  yyerrorf("Out of memory: program size %lu\n"
+                          , CURRENT_PROGRAM_SIZE + 5);
+                  YYACCEPT;
+              }
               CURRENT_PROGRAM_SIZE += 5;
               p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE - 1;
               for( i = offset; --i >= 0; --p ) *p = p[-5];
@@ -10380,8 +10461,12 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
             length = end - start + 1;
 
             /* Get enough memory */
-            while (current + length > mem_block[A_PROGRAM].max_size)
-                realloc_a_program();
+            if (!realloc_a_program(length))
+            {
+                yyerrorf("Out of memory: program size %lu\n"
+                        , CURRENT_PROGRAM_SIZE + length);
+                return;
+            }
 
             /* Cycle the indexing code to the end, where it belongs:
              *
@@ -10441,8 +10526,12 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
             int instr_arg;
             p_int length;
 
-            while (current + 1 > mem_block[A_PROGRAM].max_size)
-                realloc_a_program();
+            if (!realloc_a_program(2))
+            {
+                yyerrorf("Out of memory: program size %lu\n"
+                        , CURRENT_PROGRAM_SIZE + 2);
+                return;
+            }
 
             p = PROGRAM_BLOCK + start;
             instr_arg = p[1];
@@ -10472,8 +10561,12 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
             yyerror("Need lvalue for range lvalue.");
         }
         
-        while (current + 1 > mem_block[A_PROGRAM].max_size)
-            realloc_a_program();
+        if (!realloc_a_program(2))
+        {
+            yyerrorf("Out of memory: program size %lu\n"
+                    , CURRENT_PROGRAM_SIZE + 2);
+            return;
+        }
             
         p = PROGRAM_BLOCK + current;
         PUT_CODE(p, instrs[newcode].opcode);
@@ -12230,37 +12323,40 @@ epilog (void)
 #ifdef ALIGN_FUNCTIONS
                 CURRENT_PROGRAM_SIZE = align(CURRENT_PROGRAM_SIZE);
 #endif
-                if (CURRENT_PROGRAM_SIZE + FUNCTION_HDR_SIZE + 2 >
-                    mem_block[A_PROGRAM].max_size)
+                if (!realloc_a_program(FUNCTION_HDR_SIZE + 2))
                 {
-                    realloc_a_program();
+                    yyerrorf("Out of memory: program size %lu\n"
+                            , CURRENT_PROGRAM_SIZE + FUNCTION_HDR_SIZE + 2);
                 }
-                (void)ref_mstring(f->name);
-                f->offset.pc = CURRENT_PROGRAM_SIZE + sizeof f->name + 1;
-                p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE;
-                memcpy(p, (char *)&f->name, sizeof f->name);
-                p += sizeof f->name;
-                *p++ = f->type;
-                *p++ = f->num_arg;
-                *p++ = f->num_local;
-%ifdef INITIALIZATION_BY___INIT
-                /* If __INIT() is undefined (i.e. there was a prototype, but
-                 * no explicit function nor the automagic initialization code,
-                 * then a dummy function is generated. This prevents crashes
-                 * when this program is inherited later.
-                 */
-                if (mstreq(f->name, STR_VARINIT) && !f->num_arg)
+                else
                 {
-                    f->flags &= ~NAME_UNDEFINED;
-                    *p++ = F_CONST1;
-                    *p   = F_RETURN;
-                } else {
-%endif
-                    *p = F_UNDEF;
+                    (void)ref_mstring(f->name);
+                    f->offset.pc = CURRENT_PROGRAM_SIZE + sizeof f->name + 1;
+                    p = PROGRAM_BLOCK + CURRENT_PROGRAM_SIZE;
+                    memcpy(p, (char *)&f->name, sizeof f->name);
+                    p += sizeof f->name;
+                    *p++ = f->type;
+                    *p++ = f->num_arg;
+                    *p++ = f->num_local;
 %ifdef INITIALIZATION_BY___INIT
-                }
+                    /* If __INIT() is undefined (i.e. there was a prototype, but
+                     * no explicit function nor the automagic initialization code,
+                     * then a dummy function is generated. This prevents crashes
+                     * when this program is inherited later.
+                     */
+                    if (mstreq(f->name, STR_VARINIT) && !f->num_arg)
+                    {
+                        f->flags &= ~NAME_UNDEFINED;
+                        *p++ = F_CONST1;
+                        *p   = F_RETURN;
+                    } else {
 %endif
-                CURRENT_PROGRAM_SIZE += sizeof f->name + 5;
+                        *p = F_UNDEF;
+%ifdef INITIALIZATION_BY___INIT
+                    }
+%endif
+                    CURRENT_PROGRAM_SIZE += sizeof f->name + 5;
+                }
             }
 
             /* Set the function address resp. inherit index in

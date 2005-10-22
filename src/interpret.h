@@ -160,7 +160,8 @@ extern svalue_t *apply_master_ob(string_t *fun, int num_arg);
 extern void assert_master_ob_loaded(void);
 extern svalue_t *secure_call_lambda(svalue_t *closure, int num_arg);
 extern void remove_object_from_stack(object_t *ob);
-extern void call_lambda(svalue_t *lsvp, int num_arg);
+extern void int_call_lambda(svalue_t *lsvp, int num_arg, Bool allowRefs);
+#define call_lambda(lsvp, num_arg) int_call_lambda(lsvp, num_arg, MY_FALSE)
 extern void free_interpreter_temporaries(void);
 extern void invalidate_apply_low_cache(void);
 extern void push_referenced_mapping(mapping_t *m);
