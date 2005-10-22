@@ -279,7 +279,8 @@ mapping.o : xalloc.h wiz_list.h svalue.h smalloc.h simulate.h object.h \
     mapping.h my-alloca.h typedefs.h driver.h strfuns.h sent.h exec.h \
     instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
-md5.o : md5.h machine.h
+md5.o : strfuns.h md5.h machine.h typedefs.h driver.h port.h config.h \
+    hosts/unix.h hosts/be/be.h
 
 mempools.o : xalloc.h gcollect.h mempools.h driver.h typedefs.h port.h \
     config.h hosts/unix.h hosts/be/be.h machine.h

@@ -114,7 +114,8 @@ mapping.o : mapping.c xalloc.h wiz_list.h svalue.h smalloc.h simulate.h \
     array.h mapping.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
     exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
-md5.o : md5.c md5.h machine.h
+md5.o : md5.c strfuns.h md5.h machine.h typedefs.h driver.h port.h config.h \
+    hosts/unix.h hosts/be/be.h
 
 mempools.o : mempools.c xalloc.h gcollect.h mempools.h driver.h typedefs.h \
     port.h config.h hosts/unix.h hosts/be/be.h machine.h

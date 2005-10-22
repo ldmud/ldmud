@@ -3647,26 +3647,33 @@ validate_shadowing (object_t *ob)
     victim = ob->prog;
 
     if (victim->flags & P_NO_SHADOW)
-        error("shadow: Can't shadow a 'no_shadow' program.\n");
+        error("shadow '%s' on '%s': Can't shadow a 'no_shadow' program.\n"
+             , get_txt(cob->name), get_txt(ob->name));
     
     if (cob->flags & O_SHADOW)
     {
         shadow_t *shadow_sent = O_GET_SHADOW(cob);
 
         if (shadow_sent->shadowing)
-            error("shadow: Already shadowing.\n");
+            error("shadow '%s' on '%s': Already shadowing.\n"
+                 , get_txt(cob->name), get_txt(ob->name));
         if (shadow_sent->shadowed_by)
-            error("shadow: Can't shadow when shadowed.\n");
+            error("shadow '%s' on '%s': Can't shadow when shadowed.\n"
+                 , get_txt(cob->name), get_txt(ob->name));
     }
 
     if (cob->super)
-        error("The shadow must not reside inside another object.\n");
+        error("shadow '%s' on '%s': The shadow resides inside another object ('%s').\n"
+             , get_txt(cob->name), get_txt(ob->name)
+             , get_txt(cob->super->name));
 
     if (ob->flags & O_SHADOW && O_GET_SHADOW(ob)->shadowing)
-        error("Can't shadow a shadow.\n");
+        error("shadow '%s' on '%s': Can't shadow a shadow.\n"
+             , get_txt(cob->name), get_txt(ob->name));
 
     if (ob == cob)
-        error("Can't shadow self.\n");
+        error("shadow '%s' on '%s': Can't shadow self.\n"
+             , get_txt(cob->name), get_txt(ob->name));
 
     /* Make sure that we don't shadow 'nomask' functions.
      */
@@ -3696,8 +3703,8 @@ validate_shadowing (object_t *ob)
         if ( (j = find_function(name, victim)) >= 0
          && victim->functions[j] & TYPE_MOD_NO_MASK )
         {
-            error("Illegal to shadow 'nomask' function \"%s\".\n"
-                 , get_txt(name));
+            error("shadow '%s' on '%s': Illegal to shadow 'nomask' function '%s'.\n"
+                 , get_txt(ob->name), get_txt(cob->name), get_txt(name));
         }
     }
 

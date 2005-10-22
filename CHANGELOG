@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Oct-2001 (Lars Duening)  (3.3.109)
+    - (prolang.y) Function definition errors and warnings now all print
+        the name of the function involved (suggested by Freaky).
+    - (simulate.c) Shadowing a nomask function now prints the names of
+        objects involved as well (suggested by Freaky).
+
 06-Oct-2001 (Lars Duening)  (3.3.108)
     - (prolang.y) Warnings about redefinition of visibility apply
         to prototype/functions only, but no longer to redefinitions

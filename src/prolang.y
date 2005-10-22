@@ -1981,11 +1981,11 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                 fulltype_t t1, t2;
 
                 if (funp->num_arg != num_arg && !(funp->flags & TYPE_MOD_VARARGS))
-                    yyerror("Incorrect number of arguments in redefinition.");
+                    yyerrorf("Incorrect number of arguments in redefinition of '%s'.", get_txt(p->name));
                 else if (funp->num_arg == num_arg
                       && ((funp->flags ^ flags) & TYPE_MOD_XVARARGS)
                       && !(funp->flags & TYPE_MOD_VARARGS))
-                    yyerror("Incorrect number of arguments in redefinition.");
+                    yyerrorf("Incorrect number of arguments in redefinition of '%s'.", get_txt(p->name));
                 else
                 {
                     unsigned short first_arg;
@@ -1994,9 +1994,9 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                     if (first_arg == INDEX_START_NONE)
                     {
                         if (num_arg && !(funp->flags & NAME_TYPES_LOST) )
-                            yyerror(
-                              "Redefined function not compiled with type testing."
-                            );
+                            yyerrorf(
+                              "Redefined function '%s' not compiled with type testing."
+                            , get_txt(p->name));
                     }
                     else
                     {
@@ -2027,8 +2027,8 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                         char buff[100];
 
                         strcpy(buff, get_visibility(funp->flags));
-                        yywarnf("Inconsistent function declaration: Visibility changed from '%s' to '%s'"
-                               , buff, get_visibility(flags));
+                        yywarnf("Inconsistent declaration of '%s': Visibility changed from '%s' to '%s'"
+                               , get_txt(p->name), buff, get_visibility(flags));
                     }
 #                   undef TYPE_MOD_VIS
                 }
@@ -2040,9 +2040,9 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                 if (!MASKED_TYPE(t1, t2))
                 {
                     if (pragma_pedantic)
-                        yyerrorf("Return type mismatch %s", get_two_types(t2, t1));
+                        yyerrorf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_types(t2, t1));
                     else
-                        yywarnf("Return type mismatch %s", get_two_types(t2, t1));
+                        yywarnf("Inconsistent declaration of '%s': Return type mismatch %s", get_txt(p->name), get_two_types(t2, t1));
                 }
 
                 if (pragma_pedantic
@@ -2050,7 +2050,8 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                  &&  funp->flags & TYPE_MOD_VARARGS
                    )
                 {
-                    yywarn("Redefinition loses 'varargs' modifier.");
+                    yywarnf("Redefinition of '%s' loses 'varargs' modifier."
+                           , get_txt(p->name));
                 }
 
                 /* Check that the two argument lists are compatible */
@@ -2083,13 +2084,13 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                             args_differ = MY_TRUE;
                             if (pragma_pedantic)
                                 yyerrorf("Argument type mismatch in "
-                                         "redefinition: arg %d %s"
-                                        , i+1, get_two_types(t1, t2)
+                                         "redefinition of '%s': arg %d %s"
+                                        , get_txt(p->name), i+1, get_two_types(t1, t2)
                                         );
                             else
                                 yywarnf("Argument type mismatch in "
-                                         "redefinition: arg %d %s"
-                                        , i+1, get_two_types(t1, t2)
+                                         "redefinition of '%s': arg %d %s"
+                                        , get_txt(p->name), i+1, get_two_types(t1, t2)
                                         );
                         }
                     } /* for (all args) */

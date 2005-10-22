@@ -22,15 +22,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 108)
-(Parent-Version lpmud 3-3 107)
-(Version-Log "Macro definition termination EOF in include files confused the lexer.
-If messages are discarded, the user will be informed.
-binary_message() wrote random data.
-Made visibility redefinition warnings applicable to prototypes only.")
+(Project-Version lpmud 3-3 109)
+(Parent-Version lpmud 3-3 108)
+(Version-Log "Improved some error messages.")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 06 Oct 2001 18:43:49 -0600")
+(Checkin-Time "Mon, 08 Oct 2001 20:11:08 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -63,7 +60,7 @@ Made visibility redefinition warnings applicable to prototypes only.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.4 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.27 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.171 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.172 644))
   (HISTORY (lpmud/f/49_HISTORY 1.207 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -72,7 +69,7 @@ Made visibility redefinition warnings applicable to prototypes only.")
   (src/configure (lpmud/d/0_configure 1.19.1.34 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.3 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.32 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.33 644))
   (src/mkinstalldirs (lpmud/C/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/C/5_install-sh 1.2 755))
 
@@ -174,7 +171,7 @@ Made visibility redefinition warnings applicable to prototypes only.")
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.9 644))
   (src/port.c (lpmud/39_port.c 1.17.1.6 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.12 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.73 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.74 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -187,7 +184,7 @@ Made visibility redefinition warnings applicable to prototypes only.")
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.4 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.7 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.18 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.48 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.49 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.7 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.34 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.2 644))
@@ -227,7 +224,7 @@ Made visibility redefinition warnings applicable to prototypes only.")
   (src/hosts/amiga/config.h (lpmud/c/7_config.h 1.23.1.8 644))
   (src/hosts/amiga/README.Amiga (lpmud/c/12_README.Ami 1.4 644))
   (src/hosts/amiga/README (lpmud/c/13_README 1.4 644))
-  (src/hosts/amiga/Makefile (lpmud/c/24_Makefile 1.29.1.24 644))
+  (src/hosts/amiga/Makefile (lpmud/c/24_Makefile 1.29.1.25 644))
 
   ;; Host: BeOS
   (src/hosts/be/socketinc.h (lpmud/e/32_socketinc. 1.3 644))
@@ -248,7 +245,7 @@ Made visibility redefinition warnings applicable to prototypes only.")
 
   ;; Host: OS/2
   (src/hosts/os2/machine.h (lpmud/M/36_machine.h 1.1 644))
-  (src/hosts/os2/Makefile (lpmud/M/37_Makefile 1.4 644))
+  (src/hosts/os2/Makefile (lpmud/M/37_Makefile 1.5 644))
 
   ;; Host: Win32
   (src/hosts/win32/tubmud.bmp (lpmud/g/20_tubmud.bmp 1.1 644) :no-keywords)
