@@ -4684,8 +4684,110 @@ f_to_string (svalue_t *sp)
           }
 
         default:
-            error("Bad arg 1 to to_string(): closure type %d.\n", sp->x.closure_type);
-        }
+          {
+            int type = sp->x.closure_type;
+
+            if (type >= 0)
+                error("Bad arg 1 to to_string(): closure type %d.\n"
+                     , sp->x.closure_type);
+            else
+            {
+                string_t *rc;
+                switch(type & -0x0800)
+                {
+                case CLOSURE_OPERATOR:
+                  {
+                    char *str = NULL;
+                    switch(type - CLOSURE_OPERATOR)
+                    {
+                    case F_POP_VALUE:
+                        str = ",";
+                        break;
+
+                    case F_BBRANCH_WHEN_NON_ZERO:
+                        str = "do";
+                        break;
+
+                    case F_BBRANCH_WHEN_ZERO:
+                        str = "while";
+                        break;
+
+                    case F_BRANCH:
+                        str = "continue";
+                        break;
+
+                    case F_CSTRING0:
+                        str = "default";
+                        break;
+
+                    case F_BRANCH_WHEN_ZERO:
+                        str = "?";
+                        break;
+
+                    case F_BRANCH_WHEN_NON_ZERO:
+                        str = "?!";
+                        break;
+
+                    case F_RANGE:
+                        str = "[..]";
+                        break;
+
+                    case F_NR_RANGE:
+                        str = "[..<]";
+                        break;
+
+                    case F_RR_RANGE:
+                        str = "[<..<]";
+                        break;
+
+                    case F_RN_RANGE:
+                        str = "[<..]";
+                        break;
+
+                    case F_MAP_INDEX:
+                        str = "[,]";
+                        break;
+
+                    case F_NX_RANGE:
+                        str = "[..";
+                        break;
+
+                    case F_RX_RANGE:
+                        str = "[<..";
+                        break;
+
+                    }
+
+                    if (str)
+                    {
+                        memsafe(rc = new_mstring(str), strlen(str)
+                                 , "string-repr of operator closure");
+                        put_string(sp, rc);
+                        break;
+                    }
+                    type += CLOSURE_EFUN - CLOSURE_OPERATOR;
+                  }
+                /* default action for operators: FALLTHROUGH */
+
+                case CLOSURE_EFUN:
+                    sprintf(buf, "#'%s", instrs[type - CLOSURE_EFUN].name);
+                    memsafe(rc = new_mstring(buf), strlen(buf)
+                           , "string-repr of efun closure");
+                    put_string(sp, rc);
+                    break;
+
+                case CLOSURE_SIMUL_EFUN:
+                    sprintf(buf, "#'<sefun>%s"
+                               , instrs[type - CLOSURE_SIMUL_EFUN].name);
+                    memsafe(rc = new_mstring(buf), strlen(buf)
+                           , "string-repr of sefun closure");
+                    put_string(sp, rc);
+                    break;
+                }
+                break;
+            } /* if (type) */
+          } /* case default */
+        } /* switch(closure_type) */
         break;
       }
 

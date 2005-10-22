@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-Dec-2001 (Lars Duening)  (3.3.147)
+    - (efuns.c) to_string() can now handle operator closures (suggested
+        by Gnomi).
+
 30-Dec-2001 (Lars Duening)  (3.3.146)
     - (interpret.c) abs(INT_MIN) now generates an overflow error (reported
         by Menaures).

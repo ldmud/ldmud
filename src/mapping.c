@@ -2712,26 +2712,47 @@ count_ref_in_mapping (mapping_t *m)
             if (key->type == T_CLOSURE &&
                 key->x.closure_type == CLOSURE_BOUND_LAMBDA)
             {
-                /* We don't want changing keys, even if they are still valid
-                 * unbound closures
+                /* Avoid changing keys: collapse the bound/unbound combination
+                 * into a single lambda closure bound to the destructed
+                 * object. This way the GC will treat it correctly.
                  */
                 lambda_t *l = key->u.lambda;
 
                 key->x.closure_type = CLOSURE_LAMBDA;
                 key->u.lambda = l->function.lambda;
-                if (!l->ref) {
+                if (!l->ref)
+                {
+                    /* This would have been the first reference to the
+                     * lambda closure: add it to the stale list and mark
+                     * it as 'stale'.
+                     */
                     l->function.lambda->ob = l->ob;
                     l->ref = -1;
                     l->ob = (object_t *)stale_misc_closures;
                     stale_misc_closures = l;
-                } else {
+                }
+                else
+                {
+                    /* Closure is already been marked as 'stale': no need
+                     * to do anything about it, but but since l->ob is no
+                     * longer a valid object, we need to use a known
+                     * destructed object as stand-in for remaining lambda.
+                     * TODO: Having a type CLOSURE_DESTRUCTED_LAMBDA
+                     * TODO:: might be safer? After all,
+                     * TODO:: gc_obj_list_destructed might be NULL.
+                     */
+#ifdef DEBUG
+                    if (gc_obj_list_destructed)
+                        fatal("gc_obj_list_destructed is NULL\n");
+#endif
                     l->function.lambda->ob = gc_obj_list_destructed;
                 }
             }
             count_ref_in_vector(key, 1);
-            if (key->type == T_CLOSURE) {
+            if (key->type == T_CLOSURE)
+            {
                 /* *key has been transformed by count_ref_in_vector()
-                 * into an efun closure bound to the master
+                 * into an efun closure bound to the master.
                  */
                 key->u.ob->ref--;
             }

@@ -20,15 +20,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 146)
-(Parent-Version lpmud 3-3 145)
-(Version-Log "Explained the format of the OBJDUMP file.
-New tubmud settings.
-abs(INT_MIN) now generates an overflow.
-Corrected the handling of one-line columns in (s)sprintf.")
+(Project-Version lpmud 3-3 147)
+(Parent-Version lpmud 3-3 146)
+(Version-Log "to_string() can handle operator closures now.")
 (New-Version-Log
 "")
-(Checkin-Time "Mon, 31 Dec 2001 00:32:13 -0700")
+(Checkin-Time "Tue, 01 Jan 2002 18:21:44 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -61,8 +58,8 @@ Corrected the handling of one-line columns in (s)sprintf.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.4 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.34 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.209 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.230 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.210 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.231 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -132,13 +129,13 @@ Corrected the handling of one-line columns in (s)sprintf.")
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.4 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.15 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.11 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.3 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.4 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.16 644))
   (src/files.h (lpmud/I/49_files.h 1.1 644))
   (src/files.c (lpmud/I/50_files.c 1.12 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.5 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.39 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.40 644))
   (src/hash.h (lpmud/f/32_hash.h 1.5 644))
   (src/hash.c (lpmud/c/28_hash.c 1.12 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
@@ -150,7 +147,7 @@ Corrected the handling of one-line columns in (s)sprintf.")
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.8 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.1 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.9 644))
-  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.34 644))
+  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.35 644))
   (src/md5.h (lpmud/L/18_md5.h 1.2 644))
   (src/md5.c (lpmud/L/19_md5.c 1.5 644))
   (src/mempools.h (lpmud/D/48_mempools.h 1.2.1.3 644))

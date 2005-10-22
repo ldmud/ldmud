@@ -422,11 +422,10 @@ mark_object_ref (object_t *ob)
  */
 
 {
-    MARK_REF(ob);
+    MARK_REF(ob); ob->ref++;
     mark_program_ref(ob->prog);
     MARK_MSTRING_REF(ob->name);
     MARK_MSTRING_REF(ob->load_name);
-    ob->ref++;
 } /* mark_object_ref() */
 
 /*-------------------------------------------------------------------------*/
