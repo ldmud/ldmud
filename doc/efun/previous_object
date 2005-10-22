@@ -3,9 +3,9 @@ SYNOPSIS
         object previous_object(int i)
 
 DESCRIPTION
-        Returns an object pointer to the object that did a
-        call_other() to the current object, if any. If that object
-        is destructed, the function returns 0.
+        Returns an object pointer to the object that did a call (call_other(),
+        funcall(), etc) to the current object, if any. If that object is
+        destructed, the function returns 0.
 
         If the optional arg is given, the call_other()s are followed
         back i times (i.e. previous_object(2) returns the caller of

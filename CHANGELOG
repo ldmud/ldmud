@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Oct-2001 (Lars Duening)  (3.3.117)
+    - (doc/LPC/arrays, doc/efun/sprintf) Improved examples by
+        Coogan (thanks!).
+    - (sprintf.c) Removed a crasher in justified formatting when the string
+        to format contained only one word (reported by Slava and Coogan).
+
 17-Oct-2001 (Lars Duening)  (3.3.116)
    - (interpret.c) I had to deactivate the tests against assignments
         to negative ranges - this feature is in fact in use (thanks,

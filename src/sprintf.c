@@ -10,12 +10,12 @@
  * This version supports the following as modifiers:
  *  " "   pad positive integers with a space.
  *  "+"   pad positive integers with a plus sign.
- *  "-"   left adjusted within field size.
- *        NB: std (s)printf() defaults to right justification, which is
+ *  "-"   left aligned within field size.
+ *        NB: std (s)printf() defaults to right alignment, which is
  *            unnatural in the context of a mainly string based language
  *            but has been retained for "compatability" ;)
  *  "|"   centered within field size.
- *  "$"   flushed to field size. Makes sense only for strings and columns
+ *  "$"   justified to field size. Makes sense only for strings and columns
  *        of strings.
  *  "="   column mode if strings are greater than field size.  this is only
  *        meaningful with strings, all other types are ignored. The strings
@@ -107,11 +107,11 @@
  *                                0100 : string;
  *                                0101 : integer;
  *                                0110 : float
- *   00000000 00xx0000 : justification INFO_J:
+ *   00000000 00xx0000 : alignment INFO_A:
  *                                00 : right;
  *                                01 : centre;
  *                                10 : left;
- *                                11 : flush;
+ *                                11 : justified;
  *   00000000 xx000000 : positive pad char INFO_PP:
  *                                00 : none;
  *                                01 : ' ';
@@ -135,10 +135,10 @@ typedef unsigned int format_info;
 #define INFO_T_INT    0x6
 #define INFO_T_FLOAT  0x7
 
-#define INFO_J        0x30
-#define INFO_J_CENTRE 0x10
-#define INFO_J_LEFT   0x20
-#define INFO_J_FLUSH  0x30
+#define INFO_A          0x30  /* Right alignment */
+#define INFO_A_CENTRE   0x10
+#define INFO_A_LEFT     0x20
+#define INFO_A_JUSTIFY  0x30
 
 #define INFO_PP       0xC0
 #define INFO_PP_SPACE 0x40
@@ -1122,12 +1122,11 @@ svalue_to_string ( fmt_state_t *st
 
 /*-------------------------------------------------------------------------*/
 static void
-add_flush ( fmt_state_t *st
-          , char *str, size_t len, int fs
-          )
+add_justified ( fmt_state_t *st
+              , char *str, size_t len, int fs
+              )
 
-/* Justify string <str> (length <len>) within the fieldsize <fs> to flush
- * at both borders.
+/* Justify string <str> (length <len>) within the fieldsize <fs>.
  * After that, add it to the global buff[].
  */
 
@@ -1174,7 +1173,7 @@ add_flush ( fmt_state_t *st
 
 #ifdef DEBUG
     if (fs < num_words - 1 + num_chars)
-        fatal("add_flush(): fieldsize %d < data length %d\n", fs, num_words - 1 + num_chars);
+        fatal("add_justified(): fieldsize %d < data length %d\n", fs, num_words - 1 + num_chars);
 #endif
 
     /* Compute the number of spaces we need to insert.
@@ -1182,8 +1181,11 @@ add_flush ( fmt_state_t *st
      * at least one space between each word.
      */
     num_spaces = fs - num_chars;
-    min_spaces = num_spaces / (num_words-1);
-      /* min_spaces * (num_words-1) <= num_spaces < min_spaces * num_words */
+    if (num_words == 1)
+        min_spaces = num_spaces;
+    else
+        min_spaces = num_spaces / (num_words-1);
+        /* min_spaces * (num_words-1) <= num_spaces < min_spaces * num_words */
 
     /* Loop again over the data, now adding spaces as we go. */
 
@@ -1223,15 +1225,15 @@ add_flush ( fmt_state_t *st
         /* Find the start of the next word */
         for ( ; pos < len && str[pos] == ' '; pos++) NOOP;
     }
-} /* add_flush() */
+} /* add_justified() */
 
 /*-------------------------------------------------------------------------*/
 static void
-add_justified ( fmt_state_t *st
-              , char *str, size_t len, char *pad, int fs
-              , format_info finfo)
+add_aligned ( fmt_state_t *st
+            , char *str, size_t len, char *pad, int fs
+            , format_info finfo)
 
-/* Justify string <str> (length <len>) within the fieldsize <fs> according
+/* Align string <str> (length <len>) within the fieldsize <fs> according
  * to the <finfo>. After that, add it to the global buff[].
  */
 
@@ -1248,11 +1250,11 @@ add_justified ( fmt_state_t *st
     if (pad[0] == ' ' && pad[1] == '\0' && !(finfo & INFO_PS_KEEP))
         is_space_pad = MY_TRUE;
 
-    switch(finfo & INFO_J)
+    switch(finfo & INFO_A)
     {
-    case INFO_J_FLUSH:
-    case INFO_J_LEFT:
-        /* Also called for the last line of a flush block */
+    case INFO_A_JUSTIFY:
+    case INFO_A_LEFT:
+        /* Also called for the last line of a justified block */
         ADD_STRN(str, len)
         if (is_space_pad)
             sppos = st->bpos;
@@ -1261,7 +1263,7 @@ add_justified ( fmt_state_t *st
             st->sppos = sppos;
         break;
 
-    case INFO_J_CENTRE:
+    case INFO_A_CENTRE:
         if (finfo & INFO_PS_ZERO)
         {
             ADD_PADDING("0", (fs - len + 1) >> 1)
@@ -1279,7 +1281,7 @@ add_justified ( fmt_state_t *st
         break;
 
     default:
-      { /* std (s)printf defaults to right justification.
+      { /* std (s)printf defaults to right alignment.
          */
         if (finfo & INFO_PS_ZERO)
         {
@@ -1292,7 +1294,7 @@ add_justified ( fmt_state_t *st
         ADD_STRN(str, len)
       }
     }
-} /* end of add_justified() */
+} /* add_aligned() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -1317,7 +1319,7 @@ add_column (fmt_state_t *st, cst **column)
     /* Set done to the actual number of characters to copy.
      */
     length = COL->pres;
-    if ((COL->info & INFO_J) == INFO_J_FLUSH && length > COL->size)
+    if ((COL->info & INFO_A) == INFO_A_JUSTIFY && length > COL->size)
         length = COL->size;
     for (p = COL_D; length && *p && *p !='\n'; p++, length--) NOOP;
     done = p - COL_D;
@@ -1344,19 +1346,19 @@ add_column (fmt_state_t *st, cst **column)
         }
     }
 
-    /* On flush formatting, don't format the last line that way, nor
-     * flush lines ending in NL.
+    /* On justified formatting, don't format the last line that way, nor
+     * justified lines ending in NL.
      */
-    if ((COL->info & INFO_J) == INFO_J_FLUSH
+    if ((COL->info & INFO_A) == INFO_A_JUSTIFY
      && *COL_D && *(COL_D+1)
      && *p != '\n' && *p != '\0'
        )
     {
-        add_flush(st, COL_D, p - COL_D, COL->size);
+        add_justified(st, COL_D, p - COL_D, COL->size);
     }
     else
     {
-        add_justified(st, COL_D, p - COL_D, COL->pad, COL->size, COL->info);
+        add_aligned(st, COL_D, p - COL_D, COL->pad, COL->size, COL->info);
     }
 
     COL_D += done; /* inc'ed below ... */
@@ -1408,7 +1410,7 @@ add_table (fmt_state_t *st, cst **table)
         /* Get the length to add */
         for (done = 0; (TAB_D[done]) && (TAB_D[done] != '\n'); done++) NOOP;
 
-        add_justified(st, TAB_D, done, TAB->pad, TAB->size, TAB->info);
+        add_aligned(st, TAB_D, done, TAB->pad, TAB->size, TAB->info);
 
         TAB_D += done; /* inc'ed next line ... */
         if (!(*TAB_D) || !(*(++TAB_D)))
@@ -1772,7 +1774,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                                 if ((int)(fs = carg->u.number) < 0)
                                 {
                                     fs = -fs;
-                                    finfo |= INFO_J_LEFT;
+                                    finfo |= INFO_A_LEFT;
                                 }
 
                                 if (pres == -2)
@@ -1796,7 +1798,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
 
                     fpos--; /* bout to get incremented */
                     continue;
-                } /* if (precision/justification field) */
+                } /* if (precision/alignment field) */
 
                 /* fpos now points to format type */
 
@@ -1804,9 +1806,9 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                 {
                 case ' ': finfo |= INFO_PP_SPACE; break;
                 case '+': finfo |= INFO_PP_PLUS; break;
-                case '-': finfo |= INFO_J_LEFT; break;
-                case '|': finfo |= INFO_J_CENTRE; break;
-                case '$': finfo |= INFO_J_FLUSH; break;
+                case '-': finfo |= INFO_A_LEFT; break;
+                case '|': finfo |= INFO_A_CENTRE; break;
+                case '$': finfo |= INFO_A_JUSTIFY; break;
                 case '@': finfo |= INFO_ARRAY; break;
                 case '=': finfo |= INFO_COLS; break;
                 case '#': finfo |= INFO_TABLE; break;
@@ -2097,7 +2099,7 @@ add_table_now:
                     }
                     else
                     {
-                        Bool flushString;
+                        Bool justifyString;
 
                         /* not column or table */
                         if (pres && pres < slen)
@@ -2106,10 +2108,10 @@ add_table_now:
                         }
 
                         /* Determine whether to print this string
-                         * flushed, or not.
+                         * justified, or not.
                          */
-                        flushString = MY_FALSE;
-                        if (fs && (finfo & INFO_J) == INFO_J_FLUSH)
+                        justifyString = MY_FALSE;
+                        if (fs && (finfo & INFO_A) == INFO_A_JUSTIFY)
                         {
                             /* Flush the string only if it doesn't
                              * end in a NL.
@@ -2124,19 +2126,19 @@ add_table_now:
                               && (unsigned int)slen <= fs
                               && get_txt(carg->u.str)[slen-1] != '\n'
                                )
-                                flushString = MY_TRUE;
+                                justifyString = MY_TRUE;
                         }
 
                         /* not column or table */
 
-                        if (flushString)
+                        if (justifyString)
                         {
-                            add_flush(st, get_txt(carg->u.str), slen, fs);
+                            add_justified(st, get_txt(carg->u.str), slen, fs);
                         }
                         else if (fs && fs > (unsigned int)slen)
                         {
-                            add_justified(st, get_txt(carg->u.str)
-                                         , slen, pad, fs, finfo);
+                            add_aligned(st, get_txt(carg->u.str)
+                                       , slen, pad, fs, finfo);
                         }
                         else
                         {
@@ -2223,18 +2225,18 @@ add_table_now:
                              || temp[0] == '+'
                              || temp[0] == '-'
                             )
-                         && (finfo & INFO_J) != INFO_J_LEFT
+                         && (finfo & INFO_A) != INFO_A_LEFT
                            )
                         {
-                            /* Non-left justification and we're printing
+                            /* Non-left alignment and we're printing
                              * with leading zeroes: preserve the sign
                              * character in the right place.
                              */
                             ADD_STRN(temp, 1);
-                            add_justified(st, temp+1, tmpl-1, pad, fs-1, finfo);
+                            add_aligned(st, temp+1, tmpl-1, pad, fs-1, finfo);
                         }
                         else
-                            add_justified(st, temp, tmpl, pad, fs, finfo);
+                            add_aligned(st, temp, tmpl, pad, fs, finfo);
                     }
                     else
                         ADD_STRN(temp, tmpl)

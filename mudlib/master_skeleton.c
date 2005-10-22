@@ -137,7 +137,7 @@
 //     Userids and depending Security
 //
 // string get_bb_uid()
-//   Return the string to be used as backbone-uid.
+//   Return the string to be used as temporary euid by process_string().
 //
 // int valid_seteuid (object obj, string neweuid)
 //   Validate the change of an objects euid by efun seteuid().
@@ -938,9 +938,13 @@ int valid_snoop (object snoopee, object snooper)
 //---------------------------------------------------------------------------
 string get_bb_uid()
 
-// Return the string (or 0) to be used as backbone-euid.
-// It is just used by process_string() only if no this_object() is present.
-// If strict-euids, the function must exist and return a string.
+// This method is called when efun process_string() is used without a
+// current object (e.g. from notify_fail method). The current object
+// will be set to the current command giver, and will receive the euid
+// returned from this function.
+// 
+// If strict-euids, this function must exist and return a string.
+// Otherwise the function is optional and/or may return 0.
 
 //---------------------------------------------------------------------------
 int valid_seteuid (object obj, string neweuid)
