@@ -3703,7 +3703,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
         /* Check if somebody took a reference to the old dvec.
          * If yes, we need to create a new one.
          */
-        if (dvec->ref > 1)
+        if (dvec != NULL && dvec->ref > 1)
         {
             free_array(dvec);
             dvec = allocate_array(num_values);
@@ -3937,7 +3937,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
         /* Check if somebody took a reference to the old dvec.
          * If yes, we need to create a new one.
          */
-        if (dvec->ref > 1)
+        if (dvec != NULL && dvec->ref > 1)
         {
             free_array(dvec);
             dvec = allocate_array(num_values);

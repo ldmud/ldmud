@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Aug-2002 (Lars Duening)  (3.3.216)
+    - (mapping.c) Embarassing: the bugfix broke map() and filter()
+         for all non-multi-value mappings (reported by Casey).
+
 05-Aug-2002 (Lars Duening)  (3.3.215)
     - (prolang.y) Inheriting the same program twice at the top level
          now raises a warning, resp. an error in pedantic mode.
