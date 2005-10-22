@@ -55,7 +55,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-15-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
+16-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -69,8 +69,9 @@ For a detailed list of all changes see the file CHANGELOG.
        + debug_info(): New argument DINFO_TRACE to return the current
             or the last error call stack.
             Argument (DINFO_DATA, DID_MEMORY) also returns the number
-            and size of permanent and clib allocations (where
-            applicable).
+            and size of permanent and clib allocations, the amount of
+            memory allocated and available, and the amount of memory
+            unused (where applicable).
             Argument (DINFO_DATA, DID_STATUS) also returns
             the total number of heartbeat calls.
             Single values of (DINFO_DATA) can be returned instead of the
@@ -195,6 +196,8 @@ For a detailed list of all changes see the file CHANGELOG.
            the driver to clobber memory.
        + Tracing active when the control flow changes the current player
            to a non-interactive object.
+       + Allowing adding an action between two objects with no environment.
+       + "stack overflow" runtime errors freed svalues twice.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.

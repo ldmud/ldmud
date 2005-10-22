@@ -2472,7 +2472,9 @@ _pop_n_elems (int n, svalue_t *sp)
         fatal("pop_n_elems: %d elements.\n", n);
 #endif
     for (; --n >= 0; )
+    {
         free_svalue(sp--);
+    }
     return sp;
 }
 
@@ -2492,9 +2494,9 @@ stack_overflow (svalue_t *sp, svalue_t *fp, bytecode_p pc)
 {
     if (sp >= &start_of_stack[SIZEOF_STACK])
         fatal("Fatal stack overflow: %ld too high.\n"
-             , sp - &start_of_stack[SIZEOF_STACK]
+             , (long)(sp - &start_of_stack[SIZEOF_STACK])
              );
-    _pop_n_elems(sp-fp, sp);
+    sp = _pop_n_elems(sp-fp, sp);
     ERROR("stack overflow\n");
 }
 

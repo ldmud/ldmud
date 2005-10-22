@@ -2916,7 +2916,7 @@ smalloc_dinfo_data (svalue_t *svp, int value)
         put_ref_string(svp, STR_SMALLOC);
 
     ST_NUMBER(DID_MEM_SBRK, sbrk_stat.counter);
-    ST_NUMBER(DID_MEM_SBKR_SIZE, sbrk_stat.size);
+    ST_NUMBER(DID_MEM_SBRK_SIZE, sbrk_stat.size);
     ST_NUMBER(DID_MEM_LARGE, large_alloc_stat.counter);
     ST_NUMBER(DID_MEM_LARGE_SIZE, large_alloc_stat.size * SINT);
     ST_NUMBER(DID_MEM_LFREE, large_free_stat.counter);
@@ -2939,7 +2939,22 @@ smalloc_dinfo_data (svalue_t *svp, int value)
     ST_NUMBER(DID_MEM_CLIB_SIZE, clib_alloc_stat.size);
     ST_NUMBER(DID_MEM_PERM, perm_alloc_stat.counter);
     ST_NUMBER(DID_MEM_PERM_SIZE, perm_alloc_stat.size);
-
+    ST_NUMBER(DID_MEM_OVERHEAD, OVERHEAD * SINT);
+    ST_NUMBER(DID_MEM_ALLOCATED, large_alloc_stat.size * SINT
+                              - small_free_stat.size
+                              - small_chunk_wasted.size
+                              - unused_size);
+    ST_NUMBER(DID_MEM_USED, large_alloc_stat.size * SINT
+                              - small_free_stat.size
+                              - small_chunk_wasted.size
+                              - unused_size
+                              - large_alloc_stat.counter * OVERHEAD * SINT
+                              - small_alloc_stat.counter * OVERHEAD * SINT);
+    ST_NUMBER(DID_MEM_TOTAL_UNUSED, large_free_stat.size * SINT
+                                    + large_wasted_stat.size
+                                    + small_free_stat.size
+                                    + small_chunk_wasted.size
+                                    + unused_size);
 #undef ST_NUMBER
 } /* smalloc_dinfo_data() */
 
@@ -3235,7 +3250,15 @@ write_lpc_trace (int d, word_t *p)
 
 /*-------------------------------------------------------------------------*/
 void
-dump_lpc_trace (int d, void *p)
+dump_lpc_trace (int d
+#ifndef MALLOC_LPC_TRACE
+                      UNUSED
+#endif
+               , void *p
+#ifndef MALLOC_LPC_TRACE
+                         UNUSED
+#endif
+               )
 
 /* Write the object and program which allocated the memory block <p>
  * onto file <d>.
@@ -3247,14 +3270,20 @@ dump_lpc_trace (int d, void *p)
 {
 #if defined(MALLOC_LPC_TRACE)
     write_lpc_trace(d, ((word_t *)p) - OVERHEAD);
+#else
+#   ifdef __MWERKS__
+#       pragma unused(d)
+#       pragma unused(p)
+#   endif
 #endif /* MALLOC_LPC_TRACE */
 } /* dump_lpc_trace() */
 
 /*-------------------------------------------------------------------------*/
 void
-dump_malloc_trace (int d, void *adr
+dump_malloc_trace (int d
+                  , void *adr
 #if !defined(MALLOC_TRACE) && !defined(MALLOC_LPC_TRACE)
-                                    UNUSED
+                              UNUSED
 #endif
                   )
 

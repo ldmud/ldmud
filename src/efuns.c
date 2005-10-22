@@ -1153,6 +1153,14 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
        * is necessary to determine which parts[] to exempt from the
        * wrapping calculation.
        */
+    svalue_t * mdata_save = NULL;
+      /* Pointer into an array on the stack, pointing to the next
+       * free entry.
+       * The array is used to keep copies of the replacement string
+       * svalues to make sure that the strings exist as long as we
+       * need them.
+       * By keeping the array itself on the stack, cleanup is automatic.
+       */
     int num_tmp;           /* Number of temporary svalues on the stack */
     int k;                 /* Index within a string */
     int col;               /* Current print column */
@@ -1359,6 +1367,18 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
         }
     } /* if (delimiter found or not) */
 
+    /* If required, allocate the mdata save array on the stack */
+    if (!no_keys)
+    {
+        vector_t *vec;
+
+        vec = allocate_array_unlimited(num/2 + 1);
+          /* Slightly bigger than required */
+        mdata_save = vec->item;
+        push_array(inter_sp, vec);
+        num_tmp++;
+    }
+
     /* Do the the keyword replacement and calculate the lengths.
      * The lengths are collected in the lens[] array to save the
      * need for repeated strlens().
@@ -1416,13 +1436,14 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 else
                 {
                     /* It's a closure.
-                     * We keep the result on the stack to make sure
-                     * it lives until we are done processing it.
+                     * We keep the result in the array on the stack
+                     * to make sure it lives until we are done processing it.
                      */
                     push_c_n_string(inter_sp, parts[i], lens[i]);
                     call_lambda(cl, 1);
-                    num_tmp++;
-                    mdata = inter_sp;
+                    *mdata_save = *inter_sp;
+                    inter_sp--;
+                    mdata = mdata_save++;
                     if (mdata->type != T_STRING)
                     {
                         error("(terminal_colour) Closure did not return a string.\n");
@@ -5768,7 +5789,7 @@ f_debug_info (svalue_t *sp, int num_arg)
  *            The name of the allocator: "sysmalloc" or "smalloc".
  *
  *        int DID_MEM_SBRK
- *        int DID_MEM_SBKR_SIZE
+ *        int DID_MEM_SBRK_SIZE
  *            Number and size of memory blocks requested from the
  *            operating system (smalloc only).
  *
@@ -5821,6 +5842,21 @@ f_debug_info (svalue_t *sp, int num_arg)
  *            Number and size of allocations done through the
  *            clib functions (smalloc only with SBRK_OK).
  *
+ *        int DID_MEM_OVERHEAD
+ *            Overhead for every allocation (smalloc only).
+ *
+ *        int DID_MEM_ALLOCATED
+ *            The amount of memory currently allocated from the
+ *            allocator, including the overhead for the allocator
+ *            (smalloc only).
+ *
+ *        int DID_MEM_USED
+ *            The amount of memory currently used for driver data,
+ *            excluding the overhead from the allocator (smalloc only).
+ *
+ *        int DID_MEM_TOTAL_UNUSED
+ *            The amount of memory allocated from the system, but
+ *            not used by the driver.
  *
  * DINFO_TRACE (7): Return the call stack 'trace' information as specified
  *     by <arg2>. The result of the function is either an array (format
