@@ -1,9 +1,13 @@
 SYNOPSIS
+        #include <regexp.h>
+
         string *regexp(string *list, string pattern)
+        string *regexp(string *list, string pattern, int opt)
 
 DESCRIPTION
-        Match the pattern pattern against all strings in list, and
-        return a new array with all strings that matched. This
+        Match the pattern <pattern> (interpreted according to <opt>
+        if given) against all strings in list, and return a new array
+        with all strings that matched. This
         function uses the same syntax for regular expressions as ed():
         
         . Match any character.
@@ -54,6 +58,7 @@ EXAMPLE
         
 HISTORY
         LDMud 3.2.9 added metacharacter '+'.
+        LDMud 3.3 added the optional <opt> argument.
 
 SEE ALSO
         regexplode(E), regreplace(E), sscanf(E)

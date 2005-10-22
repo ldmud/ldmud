@@ -1,4 +1,6 @@
 SYNOPSIS
+        #include <regexp.h>
+
         string regreplace( string txt, string pattern
                          , closure|string replacepattern, int flags)
 
@@ -11,11 +13,12 @@ DESCRIPTION
         the matched substring and the position at which it was found
         as arguments and returning the replacement pattern string.
         
-        The flag is a bitmask, where bit 0 specifies
-        that the search and replace should repeat as often as the
-        pattern matches, and bit 1 (mask 2) specifies if the regular
-        expressions are 'ex' compatible or not. The function returns
-        the modified string (or the original if it wasn't modified).
+        The flag is a bitmask of the usual regexp options. Additionally
+        the efun recognizes RE_GLOBAL: if set, the search and replace 
+        is repeated as often as the pattern matches.
+
+        The function returns the modified string (or the original if it
+        wasn't modified).
 
         The function behaves like the s/pattern/replacepattern/flags
         in editors as ed/vi or sed. The power of this function lies in

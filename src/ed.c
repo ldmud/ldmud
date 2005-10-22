@@ -65,6 +65,8 @@
 #include "svalue.h"
 #include "xalloc.h"
 
+#include "../mudlib/sys/regexp.h"
+
 /*-------------------------------------------------------------------------*/
 
 /* Default TAB size */
@@ -1656,7 +1658,7 @@ optpat (void)
         free_regexp(P_OLDPAT);
 
     memsafe(buf = new_mstring(str), strlen(str), "regexp pattern string");
-    P_OLDPAT = rx_compile(buf, P_EXCOMPAT, MY_TRUE);
+    P_OLDPAT = rx_compile(buf, P_EXCOMPAT ? RE_EXCOMPATIBLE : 0, MY_TRUE);
     free_mstring(buf);
     return P_OLDPAT;
 }
@@ -2767,7 +2769,7 @@ docmd (Bool glob)
         if (*inptr != NL)
             return ERR;
 
-        nchng = subst(rx_compile(STR_CRPATTERN, P_EXCOMPAT, MY_TRUE), "", 0, 0);
+        nchng = subst(rx_compile(STR_CRPATTERN, P_EXCOMPAT ? RE_EXCOMPATIBLE : 0, MY_TRUE), "", 0, 0);
 
         if (nchng < 0)
             return ERR;

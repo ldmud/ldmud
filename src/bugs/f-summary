@@ -113,6 +113,7 @@ f-020127: Bitstring efuns for shifting and copying
 f-020310: inherits() returns all programs inheriting a given program
 f-020312: Filename argument to garbage_collection()
 f-020327-0: Use PCRE and traditional regexps in parallel
+f-020328-0: Introduce 'regexp' LPC datatype
 
 
 Language

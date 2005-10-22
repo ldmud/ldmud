@@ -122,6 +122,7 @@
 
 #include "../mudlib/sys/debug_info.h"
 #include "../mudlib/sys/objectinfo.h"
+#include "../mudlib/sys/regexp.h"
 #include "../mudlib/sys/strings.h"
 #include "../mudlib/sys/time.h"
 
@@ -423,10 +424,12 @@ f_regexp (svalue_t *sp)
 /* EFUN regexp()
  *
  *   string *regexp(string *list, string pattern)
+ *   string *regexp(string *list, string pattern, int opt)
  *
  * Match the pattern pattern against all strings in list, and return a
  * new array with all strings that matched. This function uses the
- * same syntax for regular expressions as ed().
+ * same syntax for regular expressions as ed(), and can be given
+ * additional options <opt> for the pattern interpretation.
  */
 
 {
@@ -436,10 +439,12 @@ f_regexp (svalue_t *sp)
     mp_int num_match, v_size;  /* Number of matches, size of <v> */
     vector_t *ret;             /* The result vector */
     string_t * pattern;        /* The pattern passed in */
+    int        opt;            /* The RE options passed in */
     mp_int i;
 
-    v = (sp-1)->u.vec;
-    pattern = sp->u.str;
+    v = (sp-2)->u.vec;
+    pattern = (sp-1)->u.str;
+    opt = (int)sp->u.number;
     ret = NULL;
 
     do {
@@ -451,7 +456,7 @@ f_regexp (svalue_t *sp)
         }
 
         /* Compile the regexp (or take it from the cache) */
-        reg = rx_compile(pattern, 0, MY_FALSE);
+        reg = rx_compile(pattern, opt, MY_FALSE);
         if (reg == NULL)
         {
             break;
@@ -499,6 +504,7 @@ f_regexp (svalue_t *sp)
     }while(0);
 
     free_svalue(sp--);
+    free_svalue(sp--);
     free_svalue(sp);
     if (ret == NULL)
         put_number(sp, 0);
@@ -515,10 +521,11 @@ f_regexplode (svalue_t *sp)
 /* EFUN regexplode()
  *
  *   string *regexplode (string text, string pattern)
+ *   string *regexplode (string text, string pattern, int opt)
  *
- * Explode the <text> by the delimiter <pattern>, returning a vector
- * of the exploded text. Every second element in the result vector
- * is the text that matched the delimiter.
+ * Explode the <text> by the delimiter <pattern> (interpreted according
+ * to <opt> if given), returning a vector of the exploded text. Every second
+ * element in the result vector is the text that matched the delimiter.
  * Evalcost: number of matches.
  */
 
@@ -541,15 +548,17 @@ f_regexplode (svalue_t *sp)
     vector_t *ret;                     /* Result vector */
     svalue_t *svp;                     /* Next element in ret to fill in */
     int num_match;                     /* Number of matches */
+    int       opt;                     /* RE options */
     char *str;
 
     /* Get the efun arguments */
 
-    textstr = sp[-1].u.str;
+    textstr = sp[-2].u.str;
     text = get_txt(textstr);
-    pattern = sp->u.str;
+    pattern = sp[-1].u.str;
+    opt = (int)sp->u.number;
 
-    reg = rx_compile(pattern, 0, MY_FALSE);
+    reg = rx_compile(pattern, opt, MY_FALSE);
     if (reg == 0) {
         inter_sp = sp;
         error("Unrecognized search pattern");
@@ -651,12 +660,10 @@ f_regreplace (svalue_t *sp)
  * <replace> can be a string, or a closure returning a string. If it is
  * a closure, it will be called with the matched substring and
  * the position at which it was found as arguments.
- * <flags> is the bit-or of these values:
- *   F_GLOBAL   = 1: when given, all occurences of <pattern> are replace,
- *                   else just the first
- *   F_EXCOMPAT = 2: when given, the expressions are ex-compatible,
- *                   else they aren't.
- * TODO: The gamedriver should write these values into an include file.
+ *
+ * <flags> is the bit-or of the regexp options, including:
+ *   RE_GLOBAL       = 1: when given, all occurences of <pattern> are replace,
+ *                        else just the first
  *
  * The function behaves like the s/<pattern>/<replace>/<flags> command
  * in sed or vi. It offers an efficient and far more powerful replacement
@@ -664,9 +671,6 @@ f_regreplace (svalue_t *sp)
  */
 
 {
-#define F_GLOBAL   0x1
-#define F_EXCOMPAT 0x2
-
     regexp_t *pat;
     int   flags;
     char *oldbuf, *buf, *curr, *new, *start, *old, *sub, *match = NULL;
@@ -724,7 +728,7 @@ f_regreplace (svalue_t *sp)
 
     xallocate(buf, (size_t)space, "buffer");
     new = buf;
-    pat = rx_compile(sp[-2].u.str,(flags & F_EXCOMPAT) ? 1 : 0, MY_FALSE);
+    pat = rx_compile(sp[-2].u.str, flags, MY_FALSE);
     /* rx_compile() returns NULL on bad regular expressions. */
 
     if (pat && rx_exec(pat,curr,start)) {
@@ -839,7 +843,7 @@ f_regreplace (svalue_t *sp)
             }
             else
                 curr = pat->rx->endp[0];
-        } while (  (flags & F_GLOBAL)
+        } while (  (flags & RE_GLOBAL)
                  && !pat->rx->reganch
                  && *curr != '\0'
                  && rx_exec(pat,curr,start)
@@ -872,8 +876,6 @@ f_regreplace (svalue_t *sp)
     xfree(buf);
     return sp;
 
-#undef F_EXCOMPAT
-#undef F_GLOBAL
 #undef XREALLOC
 }
 

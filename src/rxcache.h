@@ -23,7 +23,9 @@
  */
 
 struct regexp_s {
-    p_uint ref;   /* Number of refs */
+    p_uint ref;      /* Number of refs */
+    Bool   from_ed;  /* TRUE: Print error msgs directly to user */
+    int    opt;      /* Additional options */
 #ifdef USE_PCRE
     pcre        * pProg;   /* The generated regular expression */
     pcre_extra  * pHints;  /* Study data */
@@ -59,11 +61,7 @@ struct regexp_s {
 /* --- Prototypes --- */
 
 extern void rx_init(void);
-#ifdef USE_PCRE
-extern regexp_t * rx_compile (string_t * expr, int opt);
-#else
-extern regexp_t * rx_compile(string_t * expr, Bool excompat, Bool from_ed);
-#endif
+extern regexp_t * rx_compile (string_t * expr, int opt, Bool from_ed);
 extern Bool   rx_exec (regexp_t *prog, char *string, char *start);
 extern char * rx_sub (regexp_t *prog, char *source, char *dest, int n, Bool quiet);
 extern void   rx_free(regexp_t *);

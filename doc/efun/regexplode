@@ -1,17 +1,17 @@
 SYNOPSIS
+        #include <regexp.h>
+
         string *regexplode (string text, string pattern)
+        string *regexplode (string text, string pattern, int opt)
 
 DESCRIPTION
         This function is similar to explode but accepts a regular
-        expression as delimiter. Every second part of the returned
-        array is a delimiter.
+        expression <pattern> as delimiter (interpreted according to <opt>
+        if given). Every second part of the returned array is a delimiter.
 
 HISTORY
         Introduced in 3.2@61
+        LDMud 3.3 added the optional <opt> argument.
 
 SEE ALSO
         explode(E), regexp(E), regreplace(E)
-
-
-
-

@@ -4,12 +4,11 @@ From: Lars
 Type: Memo
 See: f-010406-0
 
- - Combine the PCRE opts and regexp from_ed/excompat into one 'options'
-   integer. Use this to streamline the rx_compile() call, and also store
-   it in the cache as comparison criterium.
- - The PCRE options should be accessible to LPC.
  - rxcache.ch needs to be renamed to mregex.ch; also, regexp_t should
    be renamed to mregexp_t (lower chance of name collision).
+ - Teach edit the PCRE options in PERL modifier syntax
+ - Add the options to the RE functions.
+ - Document the regexp patterns and options in a (C) manpage.
 
 ---------------------------------------------------------------------------
 ( A copy of those parts of f-010406-0 which still need consideration)

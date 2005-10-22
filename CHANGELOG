@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Mar-2002 (Lars Duening)  (3.3.190)
+    - (rxcache, efuns.c, ed.c, func_spec, mudlib/sys/regexp.h)
+         Streamlined the regexp compilation options and made them
+         accessible from LPC. The actual RE matching is still not
+         supported for PCRE.
+         
 27-Mar-2002 (Lars Duening)  (3.3.189)
     - (rxcache) Added the basic code to compile and free PCREs. The
          matching is still not supported, so at the moment the driver

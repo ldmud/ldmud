@@ -55,6 +55,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/debug_info.h"
+#include "../mudlib/sys/regexp.h"
 
 #ifdef RXCACHE_TABLE
 
@@ -78,10 +79,6 @@ typedef struct RxHashEntry {
                           * NULL if unused */
     p_uint     hString;  /* Hash of pString */
     size_t     size;     /* Size of regexp expressions for statistics */
-#ifndef USE_PCRE
-    Bool       excompat; /* The excompat value */
-    Bool       from_ed;  /* The from_ed value */
-#endif
 } RxHashEntry;
 
 
@@ -145,18 +142,12 @@ void rx_init(void)
 
 /*--------------------------------------------------------------------*/
 regexp_t *
-rx_compile (string_t * expr
-#ifdef USE_PCRE
-           , int opt
-#else
-           , Bool excompat, Bool from_ed
-#endif
-           )
+rx_compile (string_t * expr, int opt, Bool from_ed)
 
-/* TODO: Unify the two option settings, and also store them in the cache. */
-
-/* Compile a regexp structure from the expression <expr>, more or
- * less ex compatible.
+/* Compile a regexp structure from the expression <expr>, according
+ * to the options in <opt>. If <from_ed> is TRUE, the RE is used
+ * from the editor, so error messages will be printed directly
+ * to the user.
  *
  * If possible, take a ready-compiled structure from the hashtable,
  * else enter the newly compiled structure into the table.
@@ -167,10 +158,11 @@ rx_compile (string_t * expr
 
 {
 #ifdef USE_PCRE
-    pcre       * pProg;   /* The generated regular expression */
-    pcre_extra * pHints;  /* Study data */
+    pcre       * pProg;     /* The generated regular expression */
+    pcre_extra * pHints;    /* Study data */
     const char * pErrmsg;
     int          erridx;
+    int          pcre_opt;  /* <opt> translated into PCRE opts */
 #else
     regexp * pRegexp;
 #endif
@@ -179,7 +171,26 @@ rx_compile (string_t * expr
     p_uint hExpr;
     int h;
     RxHashEntry *pHash;
+#endif
 
+    /* Sanitize the <opt> value */
+#ifdef USE_PCRE
+    opt = opt & ~(RE_EXCOMPATIBLE);
+
+    /* Determine the RE compilation options */
+
+    pcre_opt = 0;
+    if (opt & RE_CASELESS)       pcre_opt |= PCRE_CASELESS;
+    if (opt & RE_MULTILINE)      pcre_opt |= PCRE_MULTILINE;
+    if (opt & RE_DOTALL)         pcre_opt |= PCRE_DOTALL;
+    if (opt & RE_EXTENDED)       pcre_opt |= PCRE_EXTENDED;
+    if (opt & RE_DOLLAR_ENDONLY) pcre_opt |= PCRE_DOLLAR_ENDONLY;
+    if (opt & RE_UNGREEDY)       pcre_opt |= PCRE_UNGREEDY;
+#else
+    opt = opt & RE_EXCOMPATIBLE;
+#endif
+
+#ifdef RXCACHE_TABLE
     iNumXRequests++;
 
     hExpr = whashmem(get_txt(expr), mstrsize(expr), 100);
@@ -190,10 +201,8 @@ rx_compile (string_t * expr
     if (pHash != NULL
      && pHash->pString != NULL
      && pHash->hString == hExpr
-#ifndef USE_PCRE
-     && pHash->from_ed == from_ed
-     && pHash->excompat == excompat
-#endif
+     && pHash->base.from_ed == from_ed
+     && pHash->base.opt == opt
      && mstreq(pHash->pString, expr)
        )
     {
@@ -207,12 +216,14 @@ rx_compile (string_t * expr
 #ifdef USE_PCRE
      pcre_malloc_size = 0;
      pcre_malloc_err  = "compiling regex";
-     pProg = pcre_compile(get_txt(expr), opt, &pErrmsg, &erridx, NULL);
+     pProg = pcre_compile(get_txt(expr), pcre_opt, &pErrmsg, &erridx, NULL);
  
      if (NULL == pProg)
      {
-         error("pcre: %s at offset %d\n", pErrmsg, erridx);
-         /* NOTREACHED */
+         if (from_ed)
+             add_message("pcre: %s at offset %d\n", pErrmsg, erridx);
+         else
+             error("pcre: %s at offset %d\n", pErrmsg, erridx);
          return NULL;
      }
  
@@ -222,12 +233,15 @@ rx_compile (string_t * expr
      if (pErrmsg)
      {
          xfree(pProg);
-         error("pcre: %s\n", pErrmsg);
-         /* NOTREACHED */
+         if (from_ed)
+             add_message("pcre: %s\n", pErrmsg);
+         else
+             error("pcre: %s\n", pErrmsg);
          return NULL;
      }
 #else
-    pRegexp = regcomp((unsigned char *)get_txt(expr), excompat, from_ed);
+    pRegexp = regcomp((unsigned char *)get_txt(expr)
+                     , opt & RE_EXCOMPATIBLE, from_ed);
     if (NULL == pRegexp)
         return NULL;
 #endif
@@ -240,6 +254,8 @@ rx_compile (string_t * expr
 
         xallocate(rc, sizeof(*rc), "Regexp structure");
         rc->ref = 1;
+        rc->from_ed = from_ed;
+        rc->opt = opt;
 #ifdef USE_PCRE
         rc->pProg = pProg;
         rc->pHints = pHints;
@@ -257,7 +273,7 @@ rx_compile (string_t * expr
     {
         iNumXCollisions++;
         iNumXEntries--;
-        iXSizeAlloc -= pHash->size;
+        iXSizeAlloc -= sizeof(*pHash) + pHash->size;
         free_regexp((regexp_t *)pHash);
     }
 
@@ -265,6 +281,8 @@ rx_compile (string_t * expr
     xtable[h] = pHash;
 
     pHash->base.ref = 1;
+    pHash->base.from_ed = from_ed;
+    pHash->base.opt = opt;
     pHash->pString = expr; /* refs are transferred */
     pHash->hString = hExpr;
 #ifdef USE_PCRE
@@ -274,12 +292,10 @@ rx_compile (string_t * expr
 #else
     pHash->base.rx = pRegexp;
     pHash->size = pRegexp->regalloc;
-    pHash->from_ed = from_ed;
-    pHash->excompat = excompat;
 #endif
 
     iNumXEntries++;
-    iXSizeAlloc += pHash->size;
+    iXSizeAlloc += sizeof(*pHash) + pHash->size;
 
     return ref_regexp((regexp_t *)pHash);
 #endif
