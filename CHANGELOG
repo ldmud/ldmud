@@ -1,6 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Aug-2001 (Lars Duening)  (3.3.95)
+    - (interpret.c) Oops, one string argument was passed in the
+        wrong way.
+
+28-Aug-2001 (Lars Duening)  (3.3.94)
+    - (interpret.c) More corrections to the refcount checking code.
+        Furthermore, an failure no longer crashes the driver (but
+        generates lots of debugging output)
+        (reported by Tomba).
+    - (pkg-mysql.c) Removed a memory leak caused by the result set
+        not begin freed after all the data has been fetched.
+    - (backend.c) Added safeguard so that slow_shut_down() is not
+        called repeated while a previous one is still pending (suggested by
+        Dafire).
+
 28-Aug-2001 (Lars Duening)  (3.3.93)
     - (interpret.c) The reference loop check was too strict and also
         flagged legal assignments (thanks, Dan).

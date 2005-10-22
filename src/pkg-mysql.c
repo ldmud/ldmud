@@ -171,7 +171,10 @@ remove_dat (db_dat_t *dat)
     if ( dat->mysql_dat )
     {
         if (dat->mysql_result)
+        {
             mysql_free_result(dat->mysql_result);
+            dat->mysql_result = NULL;
+        }
         i = dat->mysql_dat->thread_id;
         mysql_close(dat->mysql_dat);
     }
@@ -493,6 +496,12 @@ f_db_exec (svalue_t *sp)
         return sp;
     }
 
+    if ( dat->mysql_result )
+    {
+        mysql_free_result(dat->mysql_result);
+        dat->mysql_result = NULL;
+    }
+
     if ( mysql_query(dat->mysql_dat, get_txt(s)) )
     {
         /* either a REAL error occured or just an error in the SQL-statement
@@ -581,6 +590,8 @@ f_db_fetch (svalue_t *sp)
     if ( dat->mysql_row == NULL )
     {
         /* No more rows to fetch */
+        mysql_free_result(dat->mysql_result);
+        dat->mysql_result = NULL;
         free_svalue(sp); /* It's a number */
         put_number(sp, 0);
         return sp;

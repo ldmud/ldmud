@@ -144,6 +144,11 @@ static double compile_av = 0.0;
    * of time.
    */
 
+static time_t time_last_slow_shut = 0;
+  /* Time of the last call to slow_shut_down(), to avoid repeated
+   * calls while the previous ones are still working.
+   */
+
 /*-------------------------------------------------------------------------*/
 
 /* --- Forward declarations --- */
@@ -417,9 +422,9 @@ backend (void)
                 time_t time_now = time(NULL);
                 char buf[90];
 
-                if (time_now - time_last_gc >= 300)
+                if (time_now - time_last_gc >= 60)
                 {
-                  sprintf(buf, "%s Garbage collection, slow_shut: %d\n", time_stamp(), slow_shut_down_to_do);
+                  sprintf(buf, "%s Garbage collection, slow_shut to do: %d\n", time_stamp(), slow_shut_down_to_do);
                   write(1, buf, strlen(buf));
                   command_giver = NULL;
                   current_object = NULL;
@@ -427,7 +432,7 @@ backend (void)
                 }
                 else
                 {
-                  sprintf(buf, "%s No garbage collection, slow_shut: %d\n", time_stamp(), slow_shut_down_to_do);
+                  sprintf(buf, "%s No garbage collection, slow_shut to do: %d\n", time_stamp(), slow_shut_down_to_do);
                   write(1, buf, strlen(buf));
                   reallocate_reserved_areas();
                 }
@@ -436,20 +441,33 @@ backend (void)
 
                 if (slow_shut_down_to_do)
                 {
-                    int minutes = slow_shut_down_to_do;
-                    char shut_msg[90];
+                    if (time_now - time_last_slow_shut
+                        >= slow_shut_down_to_do * 60
+                       )
+                    {
+                        int minutes = slow_shut_down_to_do;
+                        char shut_msg[90];
 
-                    slow_shut_down_to_do = 0;
-                    malloc_privilege = MALLOC_MASTER;
-                    sprintf(shut_msg, "%s slow_shut_down(%d)\n", time_stamp(), minutes);
-                    write(1, shut_msg, strlen(shut_msg));
+                        slow_shut_down_to_do = 0;
+                        time_last_slow_shut = time_now;
+                        malloc_privilege = MALLOC_MASTER;
+                        sprintf(shut_msg, "%s slow_shut_down(%d)\n", time_stamp(), minutes);
+                        write(1, shut_msg, strlen(shut_msg));
 
-                    previous_ob = NULL;
-                    command_giver = NULL;
-                    current_interactive = NULL;
+                        previous_ob = NULL;
+                        command_giver = NULL;
+                        current_interactive = NULL;
 
-                    push_number(inter_sp, minutes);
-                    apply_master_ob(STR_SLOW_SHUT, 1);
+                        push_number(inter_sp, minutes);
+                        apply_master_ob(STR_SLOW_SHUT, 1);
+                    }
+                    else
+                    {
+                        sprintf(buf, "%s Last slow_shut_down() still pending.\n"
+                                   , time_stamp()
+                               );
+                        write(1, buf, strlen(buf));
+                    }
                 }
                 malloc_privilege = MALLOC_USER;
             }

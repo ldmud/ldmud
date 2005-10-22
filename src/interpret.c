@@ -16989,8 +16989,14 @@ count_inherits (program_t *progp)
             printf("%s Found prog, inherited by %s, new total ref %ld\n"
                   , time_stamp(), get_txt(progp->name), progp2->ref);
         if (NULL == register_pointer(ptable, progp2))
+        {
             continue;
+        }
         progp2->extra_ref = 1;
+        if (progp2->blueprint)
+        {
+            count_extra_ref_in_object(progp2->blueprint);
+        }
         count_inherits(progp2);
     }
 } /* count_inherits() */
@@ -17036,6 +17042,8 @@ count_extra_ref_in_object (object_t *ob)
  */
 
 {
+    int was_swapped = MY_FALSE;
+
     ob->extra_ref++;
     if ( NULL == register_pointer(ptable, ob) )
     {
@@ -17054,27 +17062,29 @@ count_extra_ref_in_object (object_t *ob)
     /* Clones will not add to the ref count of inherited progs */
     if (O_PROG_SWAPPED(ob))
     {
-        /* hmmm, what are we going to do here?
-           we could swap in the object, but this would make debugging
-           of swapping rather unrealistic.
-           At any rate, doing nothing is probably better then referencing
-           a pointer to a freed memory block... unless you can guarantee
-           that freed blocks are never reused again...
-           ... and the pointer is lost, anyway.
-        */
-        NOOP
+         if (load_ob_from_swap(ob) < 0)
+            debug_message( "%s check-refcounts: Program for '%s' can't be "
+                           "swapped in - extra refcounts may be wrong.\n"
+                         , time_stamp(), get_txt(ob->name));
+         else
+             was_swapped = MY_TRUE;
     }
-    else
+
+    if (!O_PROG_SWAPPED(ob))
     {
-        if (NULL == register_pointer(ptable, ob->prog))
-            return;
-        ob->prog->extra_ref = 1;
-        if (ob->prog->blueprint)
+        if (NULL != register_pointer(ptable, ob->prog))
         {
-            count_extra_ref_in_object(ob->prog->blueprint);
+            ob->prog->extra_ref = 1;
+            if (ob->prog->blueprint)
+            {
+                count_extra_ref_in_object(ob->prog->blueprint);
+            }
+            count_inherits(ob->prog);
         }
-        count_inherits(ob->prog);
     }
+
+    if (was_swapped)
+        swap_program(ob);
 
     if (ob->flags & O_SHADOW)
     {
@@ -17123,7 +17133,9 @@ count_extra_ref_in_closure (lambda_t *l, ph_int type)
     }
 
     if (type != CLOSURE_UNBOUND_LAMBDA)
+    {
         count_extra_ref_in_object(l->ob);
+    }
 } /* count_extra_ref_in_closure() */
 
 /*-------------------------------------------------------------------------*/
@@ -17235,7 +17247,6 @@ check_a_lot_ref_counts (program_t *search_prog)
  * The function must be called after removing all destructed objects.
  *
  * TODO: No extra_refs implemented in mappings.
- * TODO: Is the process still correct?
  * TODO: Put this code somewhere else.
  */
 
@@ -17342,10 +17353,13 @@ check_a_lot_ref_counts (program_t *search_prog)
             continue;
 
         if (ob->ref != ob->extra_ref)
-             fatal("Bad ref count in object %s: listed %ld - counted %ld\n"
-                  , get_txt(ob->name), ob->ref, ob->extra_ref);
-
-        if ( !(ob->flags & O_SWAPPED) )
+        {
+             debug_message("%s Bad ref count in object %s: listed %ld - "
+                           "counted %ld\n"
+                          , time_stamp(), get_txt(ob->name)
+                          , ob->ref, ob->extra_ref);
+        }
+        else if ( !(ob->flags & O_SWAPPED) )
         {
             if (ob->prog->ref != ob->prog->extra_ref)
             {
@@ -17362,9 +17376,11 @@ check_a_lot_ref_counts (program_t *search_prog)
                 else
                 {
                     check_a_lot_ref_counts(ob->prog);
-                    fatal("Bad ref count in prog %s: listed %ld - counted %ld\n"
-                         , get_txt(ob->prog->name)
-                         , ob->prog->ref, ob->prog->extra_ref);
+                    debug_message("%s Bad ref count in prog %s: listed %ld - "
+                                  "counted %ld\n"
+                                 , time_stamp()
+                                 , get_txt(ob->prog->name)
+                                 , ob->prog->ref, ob->prog->extra_ref);
                 }
             }
         } /* !SWAPPED */
