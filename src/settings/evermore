@@ -5,7 +5,7 @@
 # configure will strip this part from the script.
 #-------------------------------------------------------------------------
 
-exec ./configure --prefix=/home/evermore/ --bindir=/home/evermore/bin/native --libdir=/home/evermore/lib/nativelib --libexec=/home/evermore/bin/native/erq_dir --with-setting=evermore-native $*
+exec ./configure --prefix=/home/evermore/ --bindir=/home/evermore/bin/native --libdir=/home/evermore/lib/nativelib --libexec=/home/evermore/bin/native/erq_dir --with-setting=evermore $*
 exit 1
 
 # --- The actual settings ---

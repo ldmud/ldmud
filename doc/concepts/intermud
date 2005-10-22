@@ -66,15 +66,19 @@ SERVICES
             Check whether a certain player is logged on at a remote mud.
             This request is usually send to all known muds at the same time. 
 
-            "USER"
+            "user"
                 Name of the person who requests the information. 
+                This is used by the sending mud only and has to be included
+                in the reply.
 
-            "VBS"
+            "vbs"
                 The verbose option has only two pre-defined values: 
                 1 Even report when the result was negative 
                 2 Don't do timeouts, but keep waiting 
+                This is used by the sending mud only and has to be included
+                in the reply.
 
-            "FND"
+            "fnd"
                 The found option is only used in the reply and it's value
                 is either 1 (success) or 0 (failure). The absence of a
                 found parameter indicates failure as well. 
@@ -156,11 +160,15 @@ SERVICES
                 This field is only used in a response to a "query" request
                 and should be equal to the "DATA" field of that request 
 
-            "VBS"
+            "vbs"
                 This field is only used in a response to a "locate" request
-                and should be equal to the "VBS" field of that request 
+                and should be equal to the "vbs" field of that request 
 
-            "FND"
+            "user"
+                This field is only used in a response to a "locate" request
+                and should be equal to the "user" field of that request 
+
+            "fnd"
                 This field is only used in a response to a "locate" request
                 and should be 1 if the player was located and 0 otherwise 
 

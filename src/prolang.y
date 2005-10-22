@@ -10746,10 +10746,27 @@ copy_functions (program_t *from, fulltype_t type)
         switch (0) {
             Bool forcenew;
         default:
-            /* Test if the function is visible at all */
-            if ( (fun.flags & (NAME_HIDDEN|TYPE_MOD_NO_MASK|NAME_UNDEFINED) ) ==
-                 (NAME_HIDDEN|TYPE_MOD_NO_MASK) )
-                break;
+            /* Test if the function is visible at all.
+             * For this test, 'private nomask' degenerates to 'private'
+             * if we didn't do that, the driver would crash on a second
+             * level inherit (possible on a multiple second-level inherit).
+             * TODO: Find out why it crashes.
+             */
+            {
+                fulltype_t fflags = fun.flags;
+
+                if ((fflags & (TYPE_MOD_PRIVATE|TYPE_MOD_NO_MASK))
+                 == (TYPE_MOD_PRIVATE|TYPE_MOD_NO_MASK)
+                   )
+                    fflags &= ~(TYPE_MOD_NO_MASK);
+
+                if ( (fflags & (NAME_HIDDEN|TYPE_MOD_NO_MASK|NAME_UNDEFINED) ) ==
+
+                     (NAME_HIDDEN|TYPE_MOD_NO_MASK) )
+                {
+                    break;
+                }
+            }
 
             /* Visible: create a new identifier for it */
             p = make_global_identifier(get_txt(fun.name), I_TYPE_GLOBAL);
@@ -10821,7 +10838,7 @@ copy_functions (program_t *from, fulltype_t type)
                                         , n - current_func_index );
                         }
                         else if ( (fun.flags & OldFunction->flags & TYPE_MOD_NO_MASK)
-                             &&  !( (fun.flags|OldFunction->flags) & NAME_UNDEFINED ) )
+                             &&  !( (fun.flags|OldFunction->flags) & (TYPE_MOD_PRIVATE|NAME_UNDEFINED) ) )
                         {
                             yyerrorf(
                               "Illegal to inherit 'nomask' function '%s' twice",

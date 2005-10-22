@@ -22,12 +22,13 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 98)
-(Parent-Version lpmud 3-3 97)
-(Version-Log "New helper function in the memory allocator to dump the malloc trace, if any.")
+(Project-Version lpmud 3-3 99)
+(Parent-Version lpmud 3-3 98)
+(Version-Log "The driver couldn't handle multiple second-level inherits of a 'private
+nomask' function.")
 (New-Version-Log
 "")
-(Checkin-Time "Mon, 03 Sep 2001 20:58:26 -0600")
+(Checkin-Time "Wed, 05 Sep 2001 07:32:10 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -60,7 +61,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.3 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.26 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.161 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.162 644))
   (HISTORY (lpmud/f/49_HISTORY 1.199 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -86,7 +87,7 @@
   (src/settings/carledon (lpmud/C/24_carledon 1.3.1.2 744))
   (src/settings/dt2 (lpmud/F/5_dt2 1.1.1.2 744))
   (src/settings/eotl (lpmud/G/40_eotl 1.2.1.2 744))
-  (src/settings/evermore (lpmud/E/31_evermore 1.1.1.4 744))
+  (src/settings/evermore (lpmud/E/31_evermore 1.1.1.5 744))
   (src/settings/finalfrontier (lpmud/I/29_finalfront 1.1.1.3 744))
   (src/settings/forgottendreams (lpmud/H/2_forgottend 1.2.1.2 744))
   (src/settings/heaven7 (lpmud/K/22_heaven7 1.3 644))
@@ -99,7 +100,7 @@
   (src/settings/silberland (lpmud/C/26_silberland 1.4.1.2 744))
   (src/settings/sticklib (lpmud/D/14_sticklib 1.2.1.1.1.2 744))
   (src/settings/tubmud (lpmud/C/27_tubmud 1.7.1.7 744))
-  (src/settings/unitopia (lpmud/C/7_unitopia 1.6.1.4.1.9 744))
+  (src/settings/unitopia (lpmud/C/7_unitopia 1.6.1.4.1.10 744))
   (src/settings/wunderland (lpmud/D/24_wunderland 1.3.1.2 744))
 
   (src/C_COMPILER_BUGS (lpmud/d/21_C_COMPILER 1.6.1.2 644))
@@ -171,7 +172,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.8 644))
   (src/port.c (lpmud/39_port.c 1.17.1.6 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.12 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.69 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.70 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -711,7 +712,7 @@
   (doc/concepts/files (lpmud/n/33_files 1.2 644))
   (doc/concepts/hooks (lpmud/h/9_hooks 1.10.1.7 644))
   (doc/concepts/imp (lpmud/n/34_imp 1.4 644))
-  (doc/concepts/intermud (lpmud/M/48_intermud 1.3 644))
+  (doc/concepts/intermud (lpmud/M/48_intermud 1.4 644))
   (doc/concepts/intermud.basic (lpmud/M/49_intermud.b 1.2 644))
   (doc/concepts/memory (lpmud/n/35_memory 1.3 644))
   (doc/concepts/mysql (lpmud/F/18_HOWTO 1.1.1.4 644))
