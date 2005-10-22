@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Mar-2002 (Lars Duening)  (3.3.185)
+    - (interpret.c) CHECK_OBJECT_REF: The destructed objects are now
+        checked on F_RETURNs and after all efuns, in order to use
+        fewer cycles.
+
 16-Mar-2002 (Lars Duening)  (3.3.184)
     - (array.c) And this should be the last piece of code which made
         assumptions about free_svalue().

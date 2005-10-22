@@ -6823,9 +6823,6 @@ eval_instruction (bytecode_p first_instruction
 
 again:
     /* Get the next instruction and increment the pc */
-#ifdef CHECK_OBJECT_REF
-    check_all_object_shadows();
-#endif /* CHECK_OBJECT_REF */
 
     instruction = LOAD_CODE(pc);
       /* If this a xcode, the second byte will be added later */
@@ -7054,6 +7051,9 @@ again:
         inter_pc = pc;
         ASSIGN_EVAL_COST
         sp = (*efun_table[code+EFUN0_OFFSET-TEFUN_OFFSET])(sp);
+#ifdef CHECK_OBJECT_REF
+        check_all_object_shadows();
+#endif /* CHECK_OBJECT_REF */
         break;
     }
 
@@ -7101,6 +7101,9 @@ again:
         ASSIGN_EVAL_COST
         test_efun_args(instruction, 1, sp);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
+#ifdef CHECK_OBJECT_REF
+        check_all_object_shadows();
+#endif /* CHECK_OBJECT_REF */
         break;
     }
 
@@ -7148,6 +7151,9 @@ again:
         ASSIGN_EVAL_COST
         test_efun_args(instruction, 2, sp-1);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
+#ifdef CHECK_OBJECT_REF
+        check_all_object_shadows();
+#endif /* CHECK_OBJECT_REF */
         break;
     }
 
@@ -7196,6 +7202,9 @@ again:
         ASSIGN_EVAL_COST
         test_efun_args(instruction, 3, sp-2);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
+#ifdef CHECK_OBJECT_REF
+        check_all_object_shadows();
+#endif /* CHECK_OBJECT_REF */
         break;
     }
 
@@ -7243,6 +7252,9 @@ again:
         ASSIGN_EVAL_COST
         test_efun_args(instruction, 4, sp-3);
         sp = (*efun_table[instruction-TEFUN_OFFSET])(sp);
+#ifdef CHECK_OBJECT_REF
+        check_all_object_shadows();
+#endif /* CHECK_OBJECT_REF */
         break;
     }
 
@@ -7288,6 +7300,9 @@ again:
         test_efun_args(instruction, max_arg >= 0 ? numarg : min_arg
                       , sp-numarg+1);
         sp = (*vefun_table[instruction-EFUNV_OFFSET])(sp, numarg);
+#ifdef CHECK_OBJECT_REF
+        check_all_object_shadows();
+#endif /* CHECK_OBJECT_REF */
         break;
     }
 
@@ -7578,6 +7593,9 @@ again:
             }
             csp--;
             inter_sp = sp;
+#ifdef CHECK_OBJECT_REF
+            check_all_object_shadows();
+#endif /* CHECK_OBJECT_REF */
             return MY_FALSE;
         }
 
@@ -8336,7 +8354,12 @@ again:
                               , (svalue_t ** volatile) &inter_sp
 #endif
                               , inter_pc, inter_fp))
+        {
+#ifdef CHECK_OBJECT_REF
+            check_all_object_shadows();
+#endif /* CHECK_OBJECT_REF */
             return MY_FALSE; /* Guarded code terminated with 'return' itself */
+        }
 
         /* Restore the important variables */
         pc = inter_pc;
