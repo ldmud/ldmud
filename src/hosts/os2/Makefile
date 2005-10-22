@@ -168,9 +168,9 @@ actions.o : ../mudlib/sys/driver_hook.h ../mudlib/sys/commands.h xalloc.h \
 
 array.o : xalloc.h wiz_list.h swap.h svalue.h simulate.h stdstrings.h \
     rxcache.h regexp.h object.h mstrings.h mempools.h mapping.h main.h \
-    interpret.h instrs.h backend.h array.h my-alloca.h typedefs.h driver.h \
-    strfuns.h sent.h exec.h port.h config.h hosts/unix.h hosts/be/be.h \
-    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    interpret.h instrs.h closure.h backend.h array.h my-alloca.h typedefs.h \
+    driver.h strfuns.h sent.h exec.h port.h config.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
 backend.o : ../mudlib/sys/debug_message.h ../mudlib/sys/driver_hook.h \
@@ -344,10 +344,10 @@ parser.o : lang.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h switch.h \
     hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
-pkg-mysql.o : xalloc.h svalue.h interpret.h array.h pkg-mysql.h my-alloca.h \
-    typedefs.h driver.h instrs.h port.h config.h exec.h hosts/unix.h \
-    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
-    ./hosts/amiga/ixfile.h
+pkg-mysql.o : xalloc.h svalue.h mstrings.h interpret.h array.h pkg-mysql.h \
+    my-alloca.h typedefs.h driver.h instrs.h port.h config.h exec.h \
+    hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
+    machine.h ./hosts/amiga/ixfile.h
 
 port.o : hosts/crypt.c main.h backend.h my-rusage.h driver.h typedefs.h \
     port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \

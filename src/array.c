@@ -104,6 +104,7 @@
 
 #include "array.h"
 #include "backend.h"
+#include "closure.h"    /* closure_cmp(), closure_eq() */
 #include "instrs.h"     /* F_INHERIT_LIST */
 #include "interpret.h"  /* for the efuns */
 #include "main.h"

@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Apr-2001 (Lars Duening)  (3.3.42)
+    - (object.c) Ooops, didn't compile in COMPAT mode (reported by Ralph).
+
 13-Apr-2001 (Lars Duening)  (3.3.41)
     - (simulate.c) Made the 'illegal object to load' error message
          more informative (suggested by Freaky).

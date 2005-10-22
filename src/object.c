@@ -3729,7 +3729,7 @@ f_transfer (svalue_t *sp)
         to = sp->u.ob;
     else /* it's a string */
     {
-        to = get_object(sp->u.string);
+        to = get_object(sp->u.str);
         if (!to)
             error("Object %s not found.\n", get_txt(sp->u.str));
         free_string_svalue(sp);
