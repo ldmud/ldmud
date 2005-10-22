@@ -1,6 +1,22 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Mar-2001 (Lars Duening)  (3.3.30)
+    - (settings/unitopia) Updated (thanks, Freaky!).
+    - (comm.c) The pathlength safety check in the start-erq-demon routine
+        was too cautious (thanks, Freaky).
+    - (mudlib/dhrystone.c) Added a missing assignment.
+    - (mstrings.c) String comparisons of equal length failed to detect
+        equality (reported by Nostradamus).
+    - (xerq/Makefile.in) Accidentally left the XDEBUG option enabled.
+    - (make_func.y) The LPC runtime argument types for all but the first
+        efun arguments were corrupt. Also made this table a wee bit more
+        compact.
+    - (comm.c) A prompt closure bound to a destructed object is detected
+        and restored to the default prompt. An error is still thrown, to
+        give the mudlib hackers something to do.
+    - (pkg-mysql.c) The version check did not really work (thanks, Dafire).
+
 14-Mar-2001 (Lars Duening)  (3.3.29)
     - (interpret.c) collect_trace() freed a filename information which
         was still needed.

@@ -4919,9 +4919,11 @@ test_efun_args (int instr, int args, svalue_t *argp)
     long * typep, type;
 
     typep = &(efun_lpc_types[instrs[instr].lpc_arg_index]);
+if (instr == F_TELL_OBJECT) printf("DEBUG: Arg index %d\n", instrs[instr].lpc_arg_index);
     for (i = 1; i <= args; i++, typep++, argp++)
     {
         type = *typep;
+if (instr == F_TELL_OBJECT) printf("DEBUG: [%d] typep %x, type %x from %s\n", i, *typep, (1 << argp->type), typename(argp->type));
         if (argp->type == T_NUMBER && !argp->u.number
          && (type & TF_NULL)
            )

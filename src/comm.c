@@ -3301,12 +3301,29 @@ print_prompt (void)
         prompt = &ip->prompt;
         if (prompt->type == T_CLOSURE)
         {
-            /* TODO: Add a check if the closure is still bound to an existing
-             * TODO:: object. If not, restore the prompt to the default and
-             * TODO:: then throw an error by calling the lambda.
-             */
+            object_t *ob;
+            
+            /* Needed for clean error recovery */
+
             previous_ob = 0;
             current_object = command_giver;
+
+            /* Check if the object the closure is bound to still exists.
+             * If not, restore the prompt, then throw an error.
+             */
+            ob = !CLOSURE_MALLOCED(prompt->x.closure_type)
+                 ? prompt->u.ob
+                 : prompt->u.lambda->ob;
+
+            if (ob->flags & O_DESTRUCTED)
+            {
+                free_svalue(prompt);
+                put_ref_string(prompt, STR_DEFAULT_PROMPT);
+                add_message(FMT_STRING, prompt->u.str);
+                error("Prompt of %s was a closure bound to a now-destructed object - default prompt restored.\n", get_txt(command_giver->name));
+                /* NOTREACHED */
+            }
+
             call_lambda(prompt, 0);
             prompt = inter_sp;
             if (prompt->type != T_STRING)
@@ -4362,8 +4379,7 @@ start_erq_demon (const char *suffix, size_t suffixlen)
         close(sockets[0]);
         close(sockets[1]);
 
-        if (   strlen(erq_file) + 1 + strlen(erq_file) + suffixlen
-            <= sizeof path)
+        if (strlen(erq_file) + 1 + suffixlen <= sizeof path)
         {
             sprintf(path, "%s%.*s", erq_file, (int)suffixlen, suffix);
             execl((char *)path, "erq", "--forked", 0);

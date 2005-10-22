@@ -874,7 +874,12 @@ mstring_compare (const string_t * const pStr1, const string_t * const pStr2)
      * Remember to take the difference in length into account when the
      * leading parts match.
      */
-    if (mstrsize(pStr1) <= mstrsize(pStr2))
+    if (mstrsize(pStr1) == mstrsize(pStr2))
+    {
+        rc = memcmp(get_txt(pStr1), get_txt(pStr2), mstrsize(pStr1));
+        return rc;
+    }
+    if (mstrsize(pStr1) < mstrsize(pStr2))
     {
         rc = memcmp(get_txt(pStr1), get_txt(pStr2), mstrsize(pStr1));
         return rc != 0 ? rc : -1;

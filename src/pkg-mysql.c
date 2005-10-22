@@ -468,10 +468,10 @@ f_db_exec (svalue_t *sp)
 
     /* If we used a select-statement, how many columns are returned? */
 
-#ifdef MYSQL_VERSION_ID < 32224
+#if MYSQL_VERSION_ID < 32224
     if ( mysql_num_fields(dat->mysql_dat) )
 #else
-	if ( mysql_field_count(dat->mysql_dat) )
+    if ( mysql_field_count(dat->mysql_dat) )
 #endif
     {
         /* Try to initiate a row-by-row transfer */

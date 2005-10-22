@@ -122,13 +122,12 @@ For a detailed list of all changes see the file CHANGELOG.
        + New driver option '--pidfile <filename>' to write the pid of the
           driver process into a file.
        + New driver option '--erq <filename>' to choose a different name
-          for the ERQ executable (default is 'erq').
+          for the ERQ executable (default is 'erq'). The option can also
+          be used to specify the full pathname of the executable.
        + The driver mode (plain or compat) can be selected with a commandline
            option ('--no-compat' resp. '--compat').
        + New driver options '--min-malloced' and '--min-small-malloced' to
            specify the size of the initial block allocations.
-       + The driver option '--erq' can now be used to specify the full
-           pathname of the erq executable.
        + Removed a couple of fatal race-conditions in the xerq.
        + New configuration option 'use-deprecated' allows
            to disable obsolete and deprecated efuns. If enabled, the macro

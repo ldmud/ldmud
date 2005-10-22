@@ -375,7 +375,7 @@ static int arg_types[MAX_ARGTYPES];
    * The description of one argument's type is itself a list of the
    * typecodes, terminated by 0.
    * Different signatures may overlap, e.g. a (STRING) signature
-   * could be embedded in a (POINTER, INT|STRING) signature.
+   * could be embedded in a (POINTER, STRING) signature.
    *
    * The content of this array is later written as efun_arg_types[]
    * into EFUN_DEFS and indexed by the instrs[].arg_index entries.
@@ -385,7 +385,8 @@ static long lpc_types[MAX_ARGTYPES];
   /* The table of distinct function argument signatures again, this
    * time expressed in svalue runtime types.
    * One signature is a list of all arguments' types, identified
-   * by the starting index of the first argument's type.
+   * by the starting index of the first argument's type. The length
+   * of the signature is stored in the instr structure for the function.
    * The description of one argument's type is a bitword, where
    * a 1 is set when the associated type is accepted.
    * For example, if an argument can be string or object, the
@@ -397,18 +398,18 @@ static long lpc_types[MAX_ARGTYPES];
    * The recognized bitflags are:
    */
 
-# define LPC_T_ANY           (1 << 0)
-# define LPC_T_LVALUE        (1 << 1)
-# define LPC_T_POINTER       (1 << 2)
-# define LPC_T_NUMBER        (1 << 3)
-# define LPC_T_OBJECT        (1 << 4)
-# define LPC_T_STRING        (1 << 5)
-# define LPC_T_MAPPING       (1 << 6)
-# define LPC_T_FLOAT         (1 << 7)
-# define LPC_T_CLOSURE       (1 << 8)
-# define LPC_T_SYMBOL        (1 << 9)
-# define LPC_T_QUOTED_ARRAY  (1 << 10)
-# define LPC_T_NULL          (1 << 11)
+#    define LPC_T_ANY           (1 << 0)
+#    define LPC_T_LVALUE        (1 << 1)
+#    define LPC_T_POINTER       (1 << 2)
+#    define LPC_T_NUMBER        (1 << 3)
+#    define LPC_T_OBJECT        (1 << 4)
+#    define LPC_T_STRING        (1 << 5)
+#    define LPC_T_MAPPING       (1 << 6)
+#    define LPC_T_FLOAT         (1 << 7)
+#    define LPC_T_CLOSURE       (1 << 8)
+#    define LPC_T_SYMBOL        (1 << 9)
+#    define LPC_T_QUOTED_ARRAY  (1 << 10)
+#    define LPC_T_NULL          (1 << 11)
 
 
 static int last_current_type = 0;
@@ -823,29 +824,48 @@ func: type ID optional_ID '(' arg_list optional_default ')' ';'
 
         arg_index = i;
 
-        /* Search the function's signature in lpc_types[] */
+        /* Search the function's signature in lpc_types[].
+         * For efuns using a (...) argument the last listed lpc_type is 0,
+         * which doesn't need to be compared or stored.
+         */
 
         for (i = 0; i < last_current_lpc_type; i++)
         {
             int j;
-            for (j = 0
+            Bool mismatch = MY_FALSE;
+
+            for ( j = 0
                 ; j+i < last_current_lpc_type && j < curr_lpc_type_size
                 ; j++)
             {
-                if (curr_lpc_types[j] != lpc_types[i+j])
+                if ((j+1 < curr_lpc_type_size || curr_lpc_types[j] != 0)
+                 && (curr_lpc_types[j] != lpc_types[i+j]))
+                {
+                    mismatch = MY_TRUE;
                     break;
+                }
             }
-            if (j == curr_lpc_type_size)
+            if (!mismatch)
                 break;
         }
 
-        if (i == last_current_lpc_type)
+        if (i + curr_lpc_type_size > last_current_lpc_type)
         {
-            /* It's a new signature, put it into lpc_types[] */
+            /* It's a new signature, its first (last_current_lpc_type - i)
+             * args matching the last entries in lpc_types.
+             * TODO: An even better strategy would be to sort the signatures
+             * TODO:: by size and then do the overlapping store with the
+             * TODO:: longest one first.
+             */
+
             int j;
-            for (j = 0; j < curr_lpc_type_size; j++)
+            
+            for (j = last_current_lpc_type - i; j < curr_lpc_type_size; j++)
             {
-                lpc_types[last_current_lpc_type++] = curr_lpc_types[j];
+                if (j+1 < curr_lpc_type_size || curr_lpc_types[j] != 0)
+                {
+                    lpc_types[last_current_lpc_type++] = curr_lpc_types[j];
+                }
                 if (last_current_lpc_type == NELEMS(lpc_types))
                     yyerror("Array 'lpc_types' is too small");
             }
@@ -915,6 +935,7 @@ typel2: typel
         curr_lpc_type_size++;
         if (curr_lpc_type_size == NELEMS(curr_lpc_types))
             yyerror("Too many arguments");
+        curr_lpc_types[curr_lpc_type_size] = 0;
     } ;
 
 arg_type: type

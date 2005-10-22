@@ -45,7 +45,7 @@ OPTIMIZE = @OCFLAGS@ # high optimization
 # If you will not change anything, you are still encouraged to have
 # it defined, if you want to locate any bugs.
 #DEBUG=-DDEBUG -DXDEBUG
-DEBUG= -DDEBUG -DXDEBUG
+DEBUG= -DDEBUG
 #
 MPATH=-I../.. -DMUD_LIB='"$(MUD_LIB)"' -DBINDIR='"$(BINDIR)"' -DERQ_DIR='"$(ERQ_DIR)"'
 #

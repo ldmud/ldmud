@@ -311,7 +311,7 @@ main (int argc, char **argv)
         if (!erq_file)
         {
             fatal("Out of memory for erq pathname (%lu bytes).\n"
-                 , strlen(BINDIR)+6);
+                 , (unsigned long)strlen(BINDIR)+6);
         }
         strcpy(erq_file, BINDIR);
         strcat(erq_file, "/erq");
@@ -323,7 +323,7 @@ main (int argc, char **argv)
         if (!tmp)
         {
             fatal("Out of memory for erq pathname (%lu bytes).\n"
-                 , strlen(BINDIR)+2+strlen(erq_file));
+                 , (unsigned long)(strlen(BINDIR)+2+strlen(erq_file)));
         }
         strcpy(tmp, BINDIR);
         strcat(tmp, "/");

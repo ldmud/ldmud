@@ -211,6 +211,7 @@ void Proc_1(mapping Ptr_Val_Par) {
   Next_Record                    = Ptr_Val_Par["Ptr_Comp"];
   Ptr_Val_Par["Ptr_Comp"]        = copy_record(Ptr_Glob);
   Ptr_Val_Par["var_1"][Int_Comp] = 5;
+  Next_Record["var_1"][Str_Comp] = Ptr_Val_Par["var_1"][Str_Comp];
   Next_Record["var_1"][Int_Comp] = Ptr_Val_Par["var_1"][Int_Comp];
   Next_Record["Ptr_Comp"]        = Ptr_Val_Par["Ptr_Comp"];
   Proc_3(&(Next_Record["Ptr_Comp"]));
