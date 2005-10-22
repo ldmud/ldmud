@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Dec-2001 (Lars Duening)  (3.3.141)
+    - (interpret.c) Efun set_this_object() queried the master and
+         simul-efun object without checking if they actually exist.
+    - (autoconf, main, comm.c, backend.c) The input escape character
+         can now be configured to something else than '!' (suggested
+         by Tomba).
+    - (settings/bat) New settings for BatMUD.
+
 12-Dec-2001 (Lars Duening)  (3.3.140)
     - (call_out.c) Efun call_out_info() did not return the target object
          if the call_out is a closure (reported by Menaures).

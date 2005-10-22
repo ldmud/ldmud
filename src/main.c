@@ -145,6 +145,10 @@ int slow_shut_down_to_do = 0;
    * The value is the number of minutes to still last before shutting down.
    */
 
+char input_escape = '!';
+  /* The input escape/input_to() bypass character.
+   */
+
 /*-------------------------------------------------------------------------*/
 
 /* Forward declarations for the argument parser in the lower half */
@@ -211,6 +215,23 @@ main (int argc, char **argv)
 
 #ifdef STRICT_EUIDS
     strict_euids = MY_TRUE;
+#endif
+
+    /* Check the definition of the INPUT_ESCAPE character */
+#ifdef INPUT_ESCAPE
+    if (strlen(INPUT_ESCAPE) < 1)
+    {
+        fprintf(stderr, "Bad definition of INPUT_ESCAPE: string is empty.\n");
+        exit(1);
+    }
+    if (strlen(INPUT_ESCAPE) > 1)
+    {
+        fprintf(stderr, "Bad definition of INPUT_ESCAPE: "
+                        "'%s' contains more than one character.\n"
+                      , INPUT_ESCAPE);
+        exit(1);
+    }
+    input_escape = INPUT_ESCAPE[0];
 #endif
 
     /*
@@ -1071,9 +1092,15 @@ options (void)
 #endif
 
 #ifndef USE_ALISTS
-  fputs("          alists: not supported.\n", stdout);
+  fputs("         Alists: not supported.\n", stdout);
 #else
-  fputs("          alists: supported.\n", stdout);
+  fputs("         Alists: supported.\n", stdout);
+#endif
+
+#ifndef INPUT_ESCAPE
+  fputs("   Input Escape: '!'\n", stdout);
+#else
+  fputs("   Input Escape: '" INPUT_ESCAPE "'\n", stdout);
 #endif
 
 #ifdef ACCESS_CONTROL

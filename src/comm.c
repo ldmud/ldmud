@@ -2294,12 +2294,13 @@ get_message (char *buff)
             } /* if (cmdgiver socket ready) */
 
             /* if ip->text[0] does not hold a valid character, the outcome
-             * of the comparison to '!' does not matter.
+             * of the comparison to input_escape does not matter.
              */
             if ((ip->noecho & (CHARMODE_REQ|CHARMODE)) == (CHARMODE_REQ|CHARMODE))
             {
                 DTN(("CHARMODE_REQ\n"));
-                if (ip->text[0] != '!' || find_no_bang(ip) & IGNORE_BANG )
+                if (ip->text[0] != input_escape
+                 || find_no_bang(ip) & IGNORE_BANG )
                 {
                     /* Unescaped input.
                      * Puts the next character(s) (addressed by
@@ -2409,7 +2410,8 @@ get_message (char *buff)
                     {
                         /* All the pure data was read, now restore the
                          * old telnet machine state.
-                         * Leave the first char in to make '!' possible
+                         * Leave the first char in to make input escape
+                         * possible
                          */
                         DTN(("    restore old telnet machine state %d\n"
                             , ip->save_tn_state));
@@ -3164,8 +3166,8 @@ call_function_interactive (interactive_t *i, char *str)
     if (!it)
         return MY_FALSE;
 
-    /* Yes, there are. Check if we have to handle '!'. */
-    if (*str == '!')
+    /* Yes, there are. Check if we have to handle input escape. */
+    if (*str == input_escape)
     {
         input_to_t * prev;
 
@@ -3194,7 +3196,7 @@ call_function_interactive (interactive_t *i, char *str)
                 i->chars_ready = 0;
             }
 
-            /* Don't hide the leading '!' */
+            /* Don't hide the leading input escape */
         }
         else
         {
@@ -4157,7 +4159,8 @@ telnet_neg (interactive_t *ip)
                     goto ts_data;
                 }
 
-                if (ip->text[0] == '!' && ! (find_no_bang(ip) & IGNORE_BANG) )
+                if (ip->text[0] == input_escape
+                 && ! (find_no_bang(ip) & IGNORE_BANG) )
                 {
                     if (to > &ip->text[ip->chars_ready])
                     {
@@ -4191,7 +4194,8 @@ telnet_neg (interactive_t *ip)
                      * next character to make our decisions.
                      */
                     if ( !(ip->noecho & CHARMODE_REQ)
-                     || (ip->text[0] == '!' && ! (find_no_bang(ip) & IGNORE_BANG))
+                     || (   ip->text[0] == input_escape
+                         && ! (find_no_bang(ip) & IGNORE_BANG))
                        )
                     {
                         ip->gobble_char = '\n';
@@ -4208,7 +4212,8 @@ telnet_neg (interactive_t *ip)
                         from--;
 
                     if ((ip->noecho & CHARMODE_REQ) &&
-                        (ip->text[0] != '!' || find_no_bang(ip) & IGNORE_BANG))
+                        (   ip->text[0] != input_escape
+                         || find_no_bang(ip) & IGNORE_BANG))
                     {
                         if (from == to)
                         {
@@ -4256,7 +4261,8 @@ telnet_neg (interactive_t *ip)
                     ip->tn_end = (short)(from - first);
                     /*if ((ip->noecho & (CHARMODE_REQ|CHARMODE)) == (CHARMODE_REQ|CHARMODE) */
                     if (ip->noecho & CHARMODE_REQ
-                     && (ip->text[0] != '!' || find_no_bang(ip) & IGNORE_BANG))
+                     && (   ip->text[0] != input_escape
+                         || find_no_bang(ip) & IGNORE_BANG))
                     {
                         /* In charmode, we need to return the NL.
                          * We will also append the NUL in case the client
@@ -4272,7 +4278,8 @@ telnet_neg (interactive_t *ip)
 
             case '\n':
                 if ( !(ip->noecho & CHARMODE_REQ) ||
-                     (ip->text[0] == '!' && ! (find_no_bang(ip) & IGNORE_BANG)) )
+                     (   ip->text[0] == input_escape
+                      && ! (find_no_bang(ip) & IGNORE_BANG)) )
                 {
                     ip->gobble_char = '\r';
                 }

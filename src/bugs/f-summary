@@ -137,6 +137,7 @@ f-010917: default arguments for functions
 f-011015-2: Comparison-by-Value for Arrays and Mappings
 f-011015-0: Long Ints on LPC Level
 f-011016-1: Make negative range assignments switchable
+f-011213-1: Better functiona arg definitions
 
 
 Compiler
@@ -154,6 +155,7 @@ f-001102: Separate Programs from Blueprints
 f-010726: Add location to defined identifiers
 f-010801: Proper inline compilation of inline closures
 f-010802: Allow wildcarded calls with arguments
+f-011213-0: Lexer should not use magic EOF characters
 
 
 Runtime

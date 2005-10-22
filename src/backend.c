@@ -507,8 +507,8 @@ backend (void)
 
             /*
              * Now we have a string from the player. This string can go to
-             * one of several places. If it is prepended with a '!', then
-             * it is an escape from the 'ed' editor, so we send it
+             * one of several places. If it is prepended with input escape
+             * char, then it is an escape from the 'ed' editor, so we send it
              * as a command to the parser.
              * If any object function is waiting for an input string, then
              * send it there.
@@ -532,7 +532,7 @@ backend (void)
             ip->set_input_to = MY_FALSE;
             tracedepth = 0;
 
-            if (buff[0] == '!'
+            if (buff[0] == input_escape
              && buff[1] != '\0'
              && command_giver->super)
             {

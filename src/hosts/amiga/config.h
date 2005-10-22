@@ -282,6 +282,10 @@
  */
 #define MASTER_NAME              "secure/master"
 
+/* The input escape character.
+ */
+#define INPUT_ESCAPE             "!"
+
 /*
  * Define MAX_BYTE_TRANSFER to the number of bytes you allow to be read
  * and written with read_bytes and write_bytes

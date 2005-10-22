@@ -43,6 +43,8 @@ extern int udp_port;
 
 extern Bool compat_mode;
 
+extern char input_escape;
+
 /* --- Prototypes --- */
 
 extern int main(int argc, char **argv);

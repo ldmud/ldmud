@@ -62,7 +62,8 @@ DESCRIPTION
               no prompt specified, nothing will be printed.
 
           INPUT_IGNORE_BANG  (128):
-              Input lines starting with '!' will _not_ be parsed as
+              Input lines starting with '!' (or whatever the input
+              escape character was configured to be) will _not_ be parsed as
               commands, but are given to the function as well. Usage
               of this option is privileged.
 
@@ -99,6 +100,8 @@ HISTORY
         LDMud 3.3 changed the handling of newline sequences in charmode
           to verbatim passing. Earlier drivers passed an empty string
           instead.
+        LDMud 3.3 allowed the driver to be configured to use a different
+          input escape character.
 
 SEE ALSO
         remove_input_to(E), query_input_pending(E),

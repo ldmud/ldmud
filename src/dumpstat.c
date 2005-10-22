@@ -179,8 +179,8 @@ svalue_size (svalue_t *v, mp_int * pTotal)
                 }
                 break;
             } while (1);
-            overhead += p - (bytecode_p)l
-                     + (sizeof(bytecode_p) - 1) & ~(sizeof(bytecode_p) - 1);
+            overhead +=   (p - (bytecode_p)l + (sizeof(bytecode_p) - 1))
+                        & ~(sizeof(bytecode_p) - 1);
         }
 #endif
 

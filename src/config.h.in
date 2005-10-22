@@ -276,6 +276,10 @@
  */
 #define MASTER_NAME              @val_master_name@
 
+/* The input escape character.
+ */
+#define INPUT_ESCAPE             @val_input_escape@
+
 /*
  * Define MAX_BYTE_TRANSFER to the number of bytes you allow to be read
  * and written with read_bytes and write_bytes

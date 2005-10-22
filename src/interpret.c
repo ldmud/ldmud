@@ -18273,8 +18273,8 @@ f_set_this_object (svalue_t *sp)
 
 {
 
-    if (current_variables == master_ob->variables
-     || current_variables == simul_efun_object->variables
+    if ((master_ob != NULL && current_variables == master_ob->variables)
+     || (simul_efun_object != NULL && current_variables == simul_efun_object->variables)
      || privilege_violation(STR_SET_THIS_OBJECT, sp, sp))
     {
         struct control_stack *p;

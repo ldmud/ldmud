@@ -136,6 +136,12 @@ with_max_cost=1000000
 
 # --- Communication ---
 
+# The Input escape character.
+# If this character is typed as first on the line, the normal input_to()s
+# are bypassed.
+
+with_input_escape="!"
+
 # The TCP port to listen for connections on.
 # This value is used only when no ports are given on the commandline.
 
