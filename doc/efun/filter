@@ -12,18 +12,20 @@ DESCRIPTION
         Call the function <ob>-><func>() resp. the closure <cl> for
         every element of the array or mapping <arg>, and return
         a result made from those elements for which the function
-        call returns TRUE.
+        call returns TRUE. The <extra> arguments are passed as additional
+        parameters to the function calls and must not be references of array
+        of mapping elements (like &(i[1]) ).
 
         If <ob> is omitted, or neither a string nor an object, it
         defaults to this_object().
 
 
         If <arg> is an array, the function will be called with
-        each of the mapping keys as first, and (if existing) the
-        associated values as second parameter, followed by the <extra>
-        arguments (these must not be protected references like &(i[0])). If
-        the result is true, the array element in question is included into the
-        result. Analog, if a mapping <map> is given instead of a function,
+        each of the array values as first parameter, followed by the <extra>
+        arguments. If the result from the function call is true, the array
+        element in question is included into the efun result.
+        
+        If the efun is used with a mapping <map> instead of a function,
         every array element which is key in <map> is included into the result.
 
 

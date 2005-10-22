@@ -75,6 +75,9 @@
  *    if they have many active refs pending.
  * TODO: If indirectly tabled strings are not used, think about merging
  * TODO:: string_data_t and string_t.
+ * TODO: Distinguish between the allocated size of a string and the
+ * TODO:: used size. To use this efficiently, functions like mstr_insert()...
+ * TODO:: might become necessary.
  *---------------------------------------------------------------------------
  */
 

@@ -1,6 +1,8 @@
 /* start_mark.c */
 /* Mrpr 901122 */
 
+start_death();
+
 /*
  * Function name: init
  * Description:   Init this object

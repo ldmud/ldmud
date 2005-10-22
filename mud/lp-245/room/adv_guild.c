@@ -41,6 +41,17 @@ string title;         /* now with arrays. :) */
 object player_ob;
 string banished_by;
 
+get_next_exp();
+get_new_title();
+raise_cost();
+raise_con();
+raise_dex();
+raise_int();
+raise_str();
+too_high_average();
+alas();
+gnd_prn();
+
 /* some minor changes by Iggy. */
 /* get level asks get_next_exp() and  get_next_title() */
 

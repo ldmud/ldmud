@@ -7,7 +7,7 @@ DESCRIPTION
 
         The values for the entry are taken from the <data> arguments.
         Unassigned entry values default to 0, extraneous <data> arguments
-        are ignore.
+        are ignored.
 
 EXAMPLES
         mapping m;
@@ -22,7 +22,7 @@ EXAMPLES
         m_add(m, "bar", 1) --> ([ "foo":1;2, "bar":1;0 ])
 
 HISTORY
-        Introduced in LDMud 3.2.9 .
+        Introduced in LDMud 3.2.9.
 
 SEE ALSO
         mappingp(E), mkmapping(E), m_delete(E), m_indices(E), m_values(E),

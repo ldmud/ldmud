@@ -1743,14 +1743,18 @@ load_line_numbers_from_swap (program_t *prog)
               errno, swap_num);
 
     size = tmp_prog.total_size - prog->total_size;
-    if ( !(lines = xalloc(size)) )
-        return MY_FALSE;
+    if (size != 0)
+    {
+        /* Programs without code don't have line numbers */
+        if ( !(lines = xalloc(size)) )
+            return MY_FALSE;
 
-    fread(lines, size, 1, swap_file);
+        fread(lines, size, 1, swap_file);
 
-    prog->total_size = tmp_prog.total_size + sizeof(p_int);
-    prog->line_numbers = (unsigned char *)lines;
-    total_prog_block_size += size + sizeof(p_int);
+        prog->total_size = tmp_prog.total_size + sizeof(p_int);
+        prog->line_numbers = (unsigned char *)lines;
+        total_prog_block_size += size + sizeof(p_int);
+    }
     return MY_TRUE;
 } /* load_line_numbers_from_swap() */
 

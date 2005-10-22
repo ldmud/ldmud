@@ -82,7 +82,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package.
 
 
-18-Apr-2002 (Lars Duening) -- upcoming Release 3.2.9
+20-Apr-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -340,6 +340,8 @@ For a detailed list of all changes see the file CHANGELOG.
           initialisation (e.g. 'for (int i; ...)').
        + Definitions of local variables can appear anywhere in a block. The
           variables are defined from the point of definition onward.
+       + If pragma 'pedantic' is in effect, the compiler warns about
+           calls to undefined functions even if typechecking is off.
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.
        + Bugfix: Right shift by 32 or more bits was computed incorrectly.
@@ -396,6 +398,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + New optional driver hook  H_AUTO_INCLUDE to set a string or
            closure for auto-include information.
        + Errors while loading objects now include the inheritance chain.
+       + 'Too long evaluation' errors during a compilation (caused by too many
+           master calls) are considered compilation errors.
        + Bugfix: IPv6 name lookup works again, and also with both xerq and erq.
        + Bugfix: The driver now longer gets a confused when a client like
            TinyFugue refuses to use CHARMODE.

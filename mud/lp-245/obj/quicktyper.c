@@ -40,6 +40,9 @@ int	no_history_add;
 int	refreshing;
 int	needs_refresh;
 
+refresh();
+contains();
+
 /*
   return som info for the interested
  */
@@ -732,6 +735,40 @@ string	more_cmds;
 int	first_call;
 int	paused;
 
+heart_beat()
+{
+    string	the_rest;
+    string	cmd;
+
+    if(ob && more_cmds && more_cmds != "") {
+	if(sscanf(more_cmds, "%s,%s", cmd, the_rest) == 2) {
+	    tell_object(ob, "doing: " + cmd + "\n");
+	    no_history_add = 1;
+	    command(cmd, ob);
+	    no_history_add = 0;
+	    more_cmds = the_rest;
+	} else {
+	    cmd = more_cmds;
+	    tell_object(ob, "doing: " + cmd + "\n");
+	    no_history_add = 1;
+	    command(cmd, ob);
+	    no_history_add = 0;
+	    more_cmds = 0;
+	    if(!first_call) {
+		set_heart_beat(0);
+	    }
+	    tell_object(ob, "Done.\n");
+	}
+	
+    } else {
+	ob = 0;
+	more_cmds = 0;
+	if(!first_call) {
+	    set_heart_beat(0);
+	}
+    }
+}
+
 do_cmd(str)
 {
 
@@ -774,40 +811,6 @@ resume() {
     }
     write("Nothing to resume.\n");
     return 1;
-}
-
-heart_beat()
-{
-    string	the_rest;
-    string	cmd;
-
-    if(ob && more_cmds && more_cmds != "") {
-	if(sscanf(more_cmds, "%s,%s", cmd, the_rest) == 2) {
-	    tell_object(ob, "doing: " + cmd + "\n");
-	    no_history_add = 1;
-	    command(cmd, ob);
-	    no_history_add = 0;
-	    more_cmds = the_rest;
-	} else {
-	    cmd = more_cmds;
-	    tell_object(ob, "doing: " + cmd + "\n");
-	    no_history_add = 1;
-	    command(cmd, ob);
-	    no_history_add = 0;
-	    more_cmds = 0;
-	    if(!first_call) {
-		set_heart_beat(0);
-	    }
-	    tell_object(ob, "Done.\n");
-	}
-	
-    } else {
-	ob = 0;
-	more_cmds = 0;
-	if(!first_call) {
-	    set_heart_beat(0);
-	}
-    }
 }
 
 /* ------- contains ----------- */

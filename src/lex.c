@@ -1665,7 +1665,9 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
      * Since simulate::load_object() makes sure that the master has been
      * loaded, this test can only fail when the master is compiled.
      */
-    if (master_ob && !(master_ob->flags & O_DESTRUCTED))
+    if (master_ob && !(master_ob->flags & O_DESTRUCTED)
+     && (!max_eval_cost || eval_cost < max_eval_cost)
+       )
     {
         svalue_t *res;
 
@@ -1729,6 +1731,11 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
             /* If we come here, we fail: file not found */
             return -1;
         }
+    }
+    else if (max_eval_cost && eval_cost >= max_eval_cost)
+    {
+        yyerrorf("Can't call master::%s for '%s': eval cost too big"
+                , get_txt(STR_INCLUDE_FILE), name);
     }
 
     /* The master apply didn't succeed, try the manual handling */
@@ -3722,7 +3729,9 @@ yylex1 (void)
                  && p->u.global.sim_efun >= 0
                  && simul_efunp[p->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
                  && p->u.global.efun >= 0
-                 && master_ob)
+                 && master_ob
+                 && (!max_eval_cost || eval_cost < max_eval_cost)
+                   )
                 {
                     svalue_t *res;
 
@@ -3742,6 +3751,13 @@ yylex1 (void)
                     {
                         efun_override = MY_FALSE;
                     }
+                }
+                else if (max_eval_cost && eval_cost >= max_eval_cost)
+                {
+                    yyerrorf("Can't call master::%s for "
+                             "'nomask simul_efun %s': eval cost too big"
+                            , get_txt(STR_PRIVILEGE), get_txt(p->name));
+                    efun_override = MY_FALSE;
                 }
 
                 /* The code will be L_CLOSURE, now determine the right

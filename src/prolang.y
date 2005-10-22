@@ -3129,7 +3129,7 @@ possible_semi_colon:
       /* empty */
     | ';' { yywarn("Extra ';'. Ignored."); };
 
-note_start: { $$.start = CURRENT_PROGRAM_SIZE; }
+note_start: { $$.start = CURRENT_PROGRAM_SIZE; };
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 
@@ -3395,7 +3395,9 @@ inheritance:
            * Since simulate::load_object() makes sure that the master has been
            * loaded, this test can only fail when the master is compiled.
            */
-          if (master_ob && !(master_ob->flags & O_DESTRUCTED))
+          if (master_ob && !(master_ob->flags & O_DESTRUCTED)
+           && (!max_eval_cost || eval_cost < max_eval_cost)
+             )
           {
               svalue_t *res;
 
@@ -3444,6 +3446,14 @@ inheritance:
                   last_string_constant = new_tabled(cp);
               }
               /* else: no result - use the string as it is */
+          }
+          else if (max_eval_cost && eval_cost >= max_eval_cost)
+          {
+              yyerrorf("Can't call master::%s for "
+                       "'%s': eval cost too big"
+                      , get_txt(STR_INHERIT_FILE)
+                      , get_txt(last_string_constant));
+              /* use the string as it is */
           }
 
 
@@ -8424,10 +8434,12 @@ m_expr_list2:
           $$[1] = $1[1];
           add_arg_type($3.type);
       }
+; /* m_expr_list2 */
 
 m_expr_values:
       ':' expr0                { $$ = 1;      add_arg_type($2.type); }
     | m_expr_values ';' expr0  { $$ = $1 + 1; add_arg_type($3.type); }
+; /* m_expr_values */
 
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
@@ -8966,6 +8978,10 @@ function_call:
               {
                   yyerrorf("Undefined function '%.50s'", get_txt($1.real->name));
               }
+              else if (pragma_pedantic)
+              {
+                  yywarnf("Undefined function '%.50s'", get_txt($1.real->name));
+              }
               $$.type = TYPE_ANY;  /* Just a guess */
           }
 
@@ -9370,6 +9386,7 @@ function_name:
            && $3->u.global.sim_efun >= 0
            && simul_efunp[$3->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
            && master_ob
+           && (!max_eval_cost || eval_cost < max_eval_cost)
              )
           {
               /* Yup, check it with a privilege violation.
@@ -9399,6 +9416,14 @@ function_name:
                   $$.super = $1;
               }
           }
+          else if (max_eval_cost && eval_cost >= max_eval_cost)
+          {
+              yyerrorf("Can't call master::%s for "
+                       "'nomask simul_efun %s': eval cost too big"
+                      , get_txt(STR_PRIVILEGE), get_txt($3->name));
+              yfree($1);
+              $$.super = NULL;
+          }
           else /* the qualifier is ok */
               $$.super = $1;
 
@@ -9418,6 +9443,7 @@ function_name:
            && lvar->u.global.sim_efun >= 0
            && simul_efunp[lvar->u.global.sim_efun].flags & TYPE_MOD_NO_MASK
            && master_ob
+           && (!max_eval_cost || eval_cost < max_eval_cost)
              )
           {
               /* Yup, check it with a privilege violation.
@@ -9446,6 +9472,14 @@ function_name:
               {
                   $$.super = $1;
               }
+          }
+          else if (max_eval_cost && eval_cost >= max_eval_cost)
+          {
+              yyerrorf("Can't call master::%s for "
+                       "'nomask simul_efun %s': eval cost too big"
+                      , get_txt(STR_PRIVILEGE), get_txt(lvar->name));
+              yfree($1);
+              $$.super = NULL;
           }
           else /* the qualifier is ok */
               $$.super = $1;

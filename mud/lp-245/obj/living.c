@@ -109,6 +109,14 @@ int Str, Int, Con, Dex;
  * reduce_hit_point	Reduce hit points, but not below 0.
  */
 
+attack_object();
+stop_fight();
+transfer_all_to();
+short();
+query_gender_string();
+query_stats();
+show_age();
+
 /*
  * This routine is called from objects that moves the player.
  * Special: direction "X" means teleport.

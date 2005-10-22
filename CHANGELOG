@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+20-Apr-2002 (Lars Duening)  (3.3.202)
+    - (prolang.y, lex.c) Calls to the master during a compilation now check
+         the available evaluation costs. If the limit is exceeded, a
+         compilation error is generated.
+    - (swap.c) Removing a program block from the swap no longer crashes
+         if the program doesn't have line numbers (reported by Pixie).
+    - (prolang.y) Calls to undefined functions now generate a warning
+         when detected in functions without typechecking if #pragma
+         pedantic is in effect (before the compiler silently inserted
+         a prototype).
+
+19-Apr-2002 (Lars Duening)
+    - (prolang.y) Removed a few bison warnings (reported by Menaures).
+
 18-Apr-2002 (Lars Duening)  (3.3.201)
     - (prolang.y) When passing a wrong argument to a varargs function, the
          error message gave the wrong argument number (reported by Gnomi).
