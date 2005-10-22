@@ -58,6 +58,11 @@ with_read_file_max_size=50000
 
 with_max_byte_transfer=50000
 
+# Maximum number of callouts at one time.
+# If 0, any number is allowed.
+
+with_max_callouts=0
+
 # --- Timing ---
 
 # If an object is left alone for this time, it will be 'cleaned up'.

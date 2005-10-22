@@ -138,6 +138,11 @@
  */
 #define MAX_MAPPING_SIZE            5000
 
+/* This is the maximum number of callouts allowed at one time.
+ * If 0, any number is allowed.
+ */
+#define MAX_CALLOUTS              0
+
 /*
  * If this is defined, expensive operations like string additions
  * receive additional evalcosts depending on the amount of data handled.

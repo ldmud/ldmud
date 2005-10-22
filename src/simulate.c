@@ -96,6 +96,7 @@ struct limits_context_s
     int32  max_eval;     /* max eval cost */
     int32  max_byte;     /* max byte xfer */
     int32  max_file;     /* max file xfer */
+    int32  max_callouts; /* max callouts */
     int32  eval_cost;    /* the then-current eval costs used */
 };
 
@@ -268,6 +269,11 @@ int32 max_file_xfer = READ_FILE_MAX_SIZE;
   /* Maximum number of bytes to read/write in one read/write_file() call.
    */
 
+int32 def_callouts = MAX_CALLOUTS;
+int32 max_callouts = MAX_CALLOUTS;
+  /* If != 0: the max. number of callouts at one time.
+   */
+
 /*-------------------------------------------------------------------------*/
 /* Forward declarations */
 
@@ -405,6 +411,7 @@ save_limits_context (struct limits_context_s * context)
 {
     context->rt.type = LIMITS_CONTEXT;
     context->max_array = max_array_size;
+    context->max_callouts = max_callouts;
     context->max_mapping = max_mapping_size;
     context->max_eval = max_eval_cost;
     context->eval_cost = eval_cost;
@@ -433,6 +440,7 @@ restore_limits_context (struct limits_context_s * context)
     }
     max_array_size = context->max_array;
     max_mapping_size = context->max_mapping;
+    max_callouts = context->max_callouts;
     max_eval_cost = context->max_eval;
     max_byte_xfer = context->max_byte;
     max_file_xfer = context->max_file;
@@ -4052,6 +4060,7 @@ extract_limits ( struct limits_context_s * result
     result->max_eval = max_eval_cost;
     result->max_array = max_array_size;
     result->max_mapping = max_mapping_size;
+    result->max_callouts = max_callouts;
     result->max_byte = max_byte_xfer;
     result->max_file = max_file_xfer;
 
@@ -4071,29 +4080,32 @@ extract_limits ( struct limits_context_s * result
             {
                 switch(limit)
                 {
-                case LIMIT_EVAL:    result->max_eval = val;    break;
-                case LIMIT_ARRAY:   result->max_array = val;   break;
-                case LIMIT_MAPPING: result->max_mapping = val; break;
-                case LIMIT_BYTE:    result->max_byte = val;    break;
-                case LIMIT_FILE:    result->max_file = val;    break;
-                default: fatal("Unimplemented limit #%d\n", limit);
+                case LIMIT_EVAL:     result->max_eval = val;    break;
+                case LIMIT_ARRAY:    result->max_array = val;   break;
+                case LIMIT_MAPPING:  result->max_mapping = val; break;
+                case LIMIT_BYTE:     result->max_byte = val;    break;
+                case LIMIT_FILE:     result->max_file = val;    break;
+                case LIMIT_CALLOUTS: result->max_callouts = val; break;
+                default: error("Unimplemented limit #%d\n", limit);
                 }
             }
             else if (val == LIMIT_DEFAULT)
             {
                 switch(limit)
                 {
-                case LIMIT_EVAL:    result->max_eval = def_eval_cost;
-                                    break;
-                case LIMIT_ARRAY:   result->max_array = def_array_size;
-                                    break;
-                case LIMIT_MAPPING: result->max_mapping = def_mapping_size;
-                                    break;
-                case LIMIT_BYTE:    result->max_byte = def_byte_xfer;
-                                    break;
-                case LIMIT_FILE:    result->max_file = def_file_xfer;
-                                    break;
-                default: fatal("Unimplemented limit #%d\n", limit);
+                case LIMIT_EVAL:     result->max_eval = def_eval_cost;
+                                     break;
+                case LIMIT_ARRAY:    result->max_array = def_array_size;
+                                     break;
+                case LIMIT_MAPPING:  result->max_mapping = def_mapping_size;
+                                     break;
+                case LIMIT_BYTE:     result->max_byte = def_byte_xfer;
+                                     break;
+                case LIMIT_FILE:     result->max_file = def_file_xfer;
+                                     break;
+                case LIMIT_CALLOUTS: result->max_callouts = def_callouts;
+                                     break;
+                default: error("Unimplemented limit #%d\n", limit);
                 }
             }
             else if (val != LIMIT_KEEP)
@@ -4124,29 +4136,32 @@ extract_limits ( struct limits_context_s * result
             {
                 switch(limit)
                 {
-                case LIMIT_EVAL:    result->max_eval = val;    break;
-                case LIMIT_ARRAY:   result->max_array = val;   break;
-                case LIMIT_MAPPING: result->max_mapping = val; break;
-                case LIMIT_BYTE:    result->max_byte = val;    break;
-                case LIMIT_FILE:    result->max_file = val;    break;
-                default: fatal("Unimplemented limit #%d\n", limit);
+                case LIMIT_EVAL:     result->max_eval = val;    break;
+                case LIMIT_ARRAY:    result->max_array = val;   break;
+                case LIMIT_MAPPING:  result->max_mapping = val; break;
+                case LIMIT_BYTE:     result->max_byte = val;    break;
+                case LIMIT_FILE:     result->max_file = val;    break;
+                case LIMIT_CALLOUTS: result->max_callouts = val;    break;
+                default: error("Unimplemented limit #%d\n", limit);
                 }
             }
             else if (val == LIMIT_DEFAULT)
             {
                 switch(limit)
                 {
-                case LIMIT_EVAL:    result->max_eval = def_eval_cost;
-                                    break;
-                case LIMIT_ARRAY:   result->max_array = def_array_size;
-                                    break;
-                case LIMIT_MAPPING: result->max_mapping = def_mapping_size;
-                                    break;
-                case LIMIT_BYTE:    result->max_byte = def_byte_xfer;
-                                    break;
-                case LIMIT_FILE:    result->max_file = def_file_xfer;
-                                    break;
-                default: fatal("Unimplemented limit #%d\n", limit);
+                case LIMIT_EVAL:     result->max_eval = def_eval_cost;
+                                     break;
+                case LIMIT_ARRAY:    result->max_array = def_array_size;
+                                     break;
+                case LIMIT_MAPPING:  result->max_mapping = def_mapping_size;
+                                     break;
+                case LIMIT_BYTE:     result->max_byte = def_byte_xfer;
+                                     break;
+                case LIMIT_FILE:     result->max_file = def_file_xfer;
+                                     break;
+                case LIMIT_CALLOUTS: result->max_callouts = def_callouts;
+                                     break;
+                default: error("Unimplemented limit #%d\n", limit);
                 }
             }
             else if (val != LIMIT_KEEP)
@@ -4199,6 +4214,7 @@ f_limited (svalue_t * sp, int num_arg)
         limits.max_eval = 0;
         limits.max_array = 0;
         limits.max_mapping = 0;
+        limits.max_callouts = 0;
         limits.max_byte = 0;
         limits.max_file = 0;
     }
@@ -4247,6 +4263,7 @@ f_limited (svalue_t * sp, int num_arg)
         max_mapping_size = limits.max_mapping;
         max_byte_xfer = limits.max_byte;
         max_file_xfer = limits.max_file;
+        max_callouts = limits.max_callouts;
 
         assign_eval_cost();
         inter_sp = sp;
@@ -4326,6 +4343,7 @@ f_set_limits (svalue_t * sp, int num_arg)
         def_mapping_size = limits.max_mapping;
         def_byte_xfer = limits.max_byte;
         def_file_xfer = limits.max_file;
+        def_callouts = limits.max_callouts;
     }
 
     sp = pop_n_elems(num_arg, sp);
@@ -4364,11 +4382,12 @@ f_query_limits (svalue_t * sp)
         error("(query_limits) Out of memory: array[%d] for result.\n"
              , LIMIT_MAX);
     
-    put_number(vec->item+LIMIT_EVAL,    def ? def_eval_cost : max_eval_cost);
-    put_number(vec->item+LIMIT_ARRAY,   def ? def_array_size : max_array_size);
-    put_number(vec->item+LIMIT_MAPPING, def ? def_mapping_size : max_mapping_size);
-    put_number(vec->item+LIMIT_BYTE,    def ? def_byte_xfer : max_byte_xfer);
-    put_number(vec->item+LIMIT_FILE,    def ? def_file_xfer : max_file_xfer);
+    put_number(vec->item+LIMIT_EVAL,     def ? def_eval_cost : max_eval_cost);
+    put_number(vec->item+LIMIT_ARRAY,    def ? def_array_size : max_array_size);
+    put_number(vec->item+LIMIT_MAPPING,  def ? def_mapping_size : max_mapping_size);
+    put_number(vec->item+LIMIT_BYTE,     def ? def_byte_xfer : max_byte_xfer);
+    put_number(vec->item+LIMIT_FILE,     def ? def_file_xfer : max_file_xfer);
+    put_number(vec->item+LIMIT_CALLOUTS, def ? def_callouts : max_callouts);
 
     /* No free_svalue: sp is a number */
     put_array(sp, vec);

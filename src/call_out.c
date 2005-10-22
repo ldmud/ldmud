@@ -82,6 +82,10 @@ static long num_call = 0;
   /* Number of allocated callouts.
    */
 
+static long num_callouts = 0;
+  /* Number of active callouts.
+   */
+
 static object_t call_out_nil_object;
   /* Callouts with no argument let call.v use this variable as
    * placeholder.
@@ -187,10 +191,17 @@ f_call_out (svalue_t *sp, int num_arg)
         return arg-1;
     }
 
+    if (max_callouts && max_callouts <= num_callouts)
+    {
+        error("Too many callouts at once (max. %ld).\n", (long)max_callouts);
+        /* NOTREACHED */
+    }
+
     /* We can do the callout, so lets remove it from the freelist and
      * store the missing data.
      */
 
+    num_callouts++;
     call_list_free = cop->next;
     cop->command_giver = command_giver; /* save current player context */
     if (command_giver)
@@ -313,6 +324,7 @@ call_out (void)
         cop = call_list;
         call_list = cop->next;
         current_call_out = cop;
+        num_callouts--;
 
         /* A special case:
          * If a lot of time has passed, so that current call out was missed,
@@ -552,23 +564,18 @@ print_call_out_usage (strbuf_t *sbuf, Bool verbose)
  */
 
 {
-    long i;
-    struct call *cop;
-
-    for (i=0, cop = call_list; cop; cop = cop->next)
-        i++;
     if (verbose)
     {
         strbuf_add(sbuf, "\nCall out information:\n");
         strbuf_add(sbuf,"---------------------\n");
         strbuf_addf(sbuf, "Number of allocated call outs: %8ld, %8ld bytes\n",
                     num_call, num_call * sizeof (struct call));
-        strbuf_addf(sbuf, "Current length: %ld\n", i);
+        strbuf_addf(sbuf, "Current length: %ld\n", num_callouts);
     }
     else
     {
         strbuf_addf(sbuf, "call out:\t\t\t%8ld %8ld (current length %ld)\n"
-                   , num_call, num_call * sizeof (struct call), i);
+                   , num_call, num_call * sizeof (struct call), num_callouts);
     }
 
     return num_call * sizeof (struct call);
@@ -590,13 +597,7 @@ callout_dinfo_status (svalue_t *svp, int value)
     if (value == -1) svp[which].u.number = code; \
     else if (value == which) svp->u.number = code
     
-    long i;
-    struct call *cop;
-    
-    for (i=0, cop = call_list; cop; cop = cop->next)
-        i++;
-
-    ST_NUMBER(DID_ST_CALLOUTS, i);
+    ST_NUMBER(DID_ST_CALLOUTS, num_callouts);
     ST_NUMBER(DID_ST_CALLOUT_SLOTS, num_call);
     ST_NUMBER(DID_ST_CALLOUT_SIZE, num_call * sizeof(struct call));
 
@@ -642,6 +643,7 @@ remove_stale_call_outs (void)
         ob = callback_object(&(cop->fun));
         if (!ob)
         {
+            num_callouts--;
             if (cop->next)
                 cop->next->delta += cop->delta;
             *copp = cop->next;

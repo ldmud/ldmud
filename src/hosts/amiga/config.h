@@ -123,6 +123,11 @@
  */
 #define MAX_PLAYERS             40
 
+/* This is the maximum number of callouts allowed at one time.
+ * If 0, any number is allowed.
+ */
+#define MAX_CALLOUTS              0
+
 /*
  * When uploading files, we want fast response; however, normal players
  * shouldn't be able to hog the system in this way.  Define ALLOWED_ED_CMDS

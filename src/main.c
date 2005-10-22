@@ -752,6 +752,7 @@ typedef enum OptNumber {
  , cMaxMalloc       /* --max-malloc         */
  , cMaxArray        /* --max-array          */
  , cMaxBytes        /* --max-bytes          */
+ , cMaxCallouts     /* --max-callouts       */
  , cMaxFile         /* --max-file           */
  , cMaxMapping      /* --max-mapping        */
  , cMinMalloc       /* --min-malloc         */
@@ -835,6 +836,7 @@ static LongOpt aLongOpts[]
     , { "max_malloced",       cMaxMalloc,      MY_TRUE } /* TODO: COMPAT */
     , { "max-array",          cMaxArray,       MY_TRUE }
     , { "max-bytes",          cMaxBytes,       MY_TRUE }
+    , { "max-callouts",       cMaxCallouts,    MY_TRUE }
     , { "max-file",           cMaxFile,        MY_TRUE }
     , { "max-mapping",        cMaxMapping,     MY_TRUE }
     , { "min-malloc",         cMinMalloc,      MY_TRUE }
@@ -1005,6 +1007,7 @@ options (void)
          "                 max bitfield length:    %7d\n"
          "                 max array size:         %7d\n"
          "                 max mapping size:       %7d\n"
+         "                 max number callouts:    %7d\n"
          "                 max number players:     %7d\n"
          "                 ed cmd/cmd ratio:       %7d:1\n"
 #if defined(TRACE_CODE)
@@ -1022,7 +1025,7 @@ options (void)
         , EVALUATOR_STACK_SIZE
         , MAX_USER_TRACE, MAX_TRACE
         , MAX_BITS, MAX_ARRAY_SIZE, MAX_MAPPING_SIZE
-        , MAX_PLAYERS
+        , MAX_CALLOUTS, MAX_PLAYERS
         , ALLOWED_ED_CMDS /* MAX_CMDS_PER_BEAT is not implemented */
 #ifdef TRACE_CODE
         , TOTAL_TRACE_LENGTH
@@ -1231,6 +1234,7 @@ shortusage (void)
 "  --cleanup-time\n"
 "  --reset-time\n"
 "  --max-array\n"
+"  --max-callouts\n"
 "  --max-mapping\n"
 "  --max-bytes\n"
 "  --max-file\n"
@@ -1348,6 +1352,10 @@ usage (void)
 "  --max-array <size>\n"
 "    The maximum number of elements an array can hold.\n"
 "    Set to 0, arrays of any size are allowed.\n"
+"\n"
+"  --max-callouts <size>\n"
+"    The maximum number of callouts at one time.\n"
+"    Set to 0, any number of callouts is allowed.\n"
 "\n"
 "  --max-mapping <size>\n"
 "    The maximum number of elements a mapping can hold.\n"
@@ -1562,6 +1570,7 @@ firstscan (int eOption, const char * pValue)
 
     case cMaxArray:
     case cMaxBytes:
+    case cMaxCallouts:
     case cMaxFile:
     case cMaxMapping:
       {
@@ -1571,10 +1580,11 @@ firstscan (int eOption, const char * pValue)
         {
             switch(eOption)
             {
-            case cMaxArray:   def_array_size = (size_t)val;   break;
-            case cMaxBytes:   def_byte_xfer = val;            break;
-            case cMaxFile:    def_file_xfer = val;            break;
-            case cMaxMapping: def_mapping_size = (size_t)val; break;
+            case cMaxArray:    def_array_size = (size_t)val;   break;
+            case cMaxBytes:    def_byte_xfer = val;            break;
+            case cMaxCallouts: def_callouts = val;             break;
+            case cMaxFile:     def_file_xfer = val;            break;
+            case cMaxMapping:  def_mapping_size = (size_t)val; break;
             }
         }
         else

@@ -106,6 +106,10 @@ DESCRIPTION
         The maximum number of elements a mapping can hold.
         Set to 0, mappings of any size are allowed.
 
+      --max-callouts <size>
+        The maximum number of callouts at one time.
+        Set to 0, any number is allowed.
+
       --max-bytes <size>
         The maximum number of bytes one read_bytes()/write_bytes() call
         can handle.

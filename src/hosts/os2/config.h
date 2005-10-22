@@ -143,6 +143,11 @@
  */
 #define MAX_ARRAY_SIZE 3000
 
+/* This is the maximum number of callouts allowed at one time.
+ * If 0, any number is allowed.
+ */
+#define MAX_CALLOUTS              0
+
 /*
  * Define LOG_SHOUT if you want all shouts to be logged in
  * mudlib/log/SHOUTS.
