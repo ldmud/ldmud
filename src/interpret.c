@@ -9080,10 +9080,20 @@ again:
             if (sp->type == T_STRING)
             {
                 string_t * result;
+                size_t slen;
 
                 if (sp[-1].u.number < 0)
                     ERROR("Bad right arg to *: negative number.\n");
                 
+                slen = mstrsize(sp->u.str);
+                if (slen > (size_t)PINT_MAX
+                 || PINT_MAX / (p_int)slen < sp[-1].u.number
+                 || PINT_MAX / sp[-1].u.number < (p_int)slen
+                   )
+                    ERRORF(("Result string too long (%lu * %ld).\n"
+                           , (unsigned long)slen, (long)sp[-1].u.number
+                           ));
+
                 result = mstr_repeat(sp->u.str, (size_t)sp[-1].u.number);
                 if (!result)
                     ERRORF(("Out of memory (%ld bytes).\n"
@@ -9183,10 +9193,20 @@ again:
             if (sp->type == T_NUMBER)
             {
                 string_t * result;
+                size_t slen;
 
                 if (sp->u.number < 0)
                     ERROR("Bad left arg to *: negative number.\n");
                 
+                slen = mstrsize(sp[-1].u.str);
+                if (slen > (size_t)PINT_MAX
+                 || PINT_MAX / (p_int)slen < sp->u.number
+                 || PINT_MAX / sp->u.number < (p_int)slen
+                   )
+                    ERRORF(("Result string too long (%ld * %lu).\n"
+                           , (long)sp->u.number, (unsigned long)slen
+                           ));
+
                 result = mstr_repeat(sp[-1].u.str, (size_t)sp->u.number);
                 if (!result)
                     ERRORF(("Out of memory (%ld bytes).\n"
@@ -9372,7 +9392,15 @@ again:
             ERROR("Modulus by zero.\n");
             break;
         }
-        i = (sp-1)->u.number % sp->u.number;
+        else if (sp->u.number == 1
+              || sp->u.number == -1
+                )
+            i = 0;
+              /* gcc 2.91 on Linux/x86 generates buggy code
+               * for MIN_INT % -1. Might as well catch it all.
+               */
+        else
+            i = (sp-1)->u.number % sp->u.number;
         sp--;
         sp->u.number = i;
         break;
@@ -10699,6 +10727,15 @@ again:
             }
             
             len = mstrsize(argp->u.str);
+
+            if (len > (size_t)PINT_MAX
+             || PINT_MAX / (p_int)len < sp->u.number
+             || PINT_MAX / sp->u.number < (p_int)len
+               )
+                ERRORF(("Result string too long (%ld * %lu).\n"
+                       , (long)sp->u.number, (unsigned long)len
+                       ));
+
             reslen = (size_t)sp->u.number * len;
             result = mstr_repeat(argp->u.str, (size_t)sp->u.number);
             if (!result)

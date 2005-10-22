@@ -630,14 +630,21 @@ smalloc (size_t size
 
     smalloc_size = size;
 
-#ifdef DEBUG
     if (size == 0)
 #       ifndef MALLOC_TRACE
             fatal("Malloc size = 0.\n");
 #       else
             fatal("(%s, %d) Malloc size = 0.\n", file, line);
 #       endif
-#endif
+
+    /* TODO: For the following test, see SIZET_limits in port.h */
+    if (size >= ULONG_MAX - OVERHEAD*SINT - SINT)
+#       ifndef MALLOC_TRACE
+            fatal("Malloc size exceeds numerical limit.\n");
+#       else
+            fatal("(%s, %d) Malloc size exceeds numerical limit.\n"
+                 , file, line);
+#       endif
 
     if (size > SMALL_BLOCK_MAX_BYTES)
       return large_malloc(size, MY_FALSE);

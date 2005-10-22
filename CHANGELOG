@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Dec-2001 (Lars Duening)  (3.3.137)
+    - (interpret.c) gcc 2.91 on Linux/x86 generates buggy code for
+         MIN_INT % -1, so this case is now explicitely check for
+         (reported by Menaures).
+    - (interpret.c) Multiplication of a string with a number was
+         not checked for numeric overflows in the computation of
+         the result length (reported by Menaures).
+    - (smalloc.c) Added a check against numeric overflows in the
+         computation of the final memory block size.
+    - (mapping.c) When allocating/resizing mappings, a check against
+         numeric overflows in the size computations has been added
+         (reported Menaures).
+
 05-Dec-2001 (Lars Duening)  (3.3.136)
     - (backend.c) Before calling reset() or clean_up() from the backend,
         the previous_object is cleared (reported by Gnomi).

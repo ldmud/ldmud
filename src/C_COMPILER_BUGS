@@ -1,3 +1,6 @@
+gcc 2.91.66 19990314/Linux (egcs-1.1.2) on Linux/x86:
+  Computing MIN_LONG % -1 causes a floating point exception.
+
 xlc on AIX 3.4:
   Optimization level -O4 -qipa crashes in the code generation if a void
   returning function is casted to a value returning one.
