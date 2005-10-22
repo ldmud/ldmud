@@ -145,8 +145,21 @@ int slow_shut_down_to_do = 0;
 /* Forward declarations for the argument parser in the lower half */
 
 static int getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) );
-static int firstscan (int, const char *);
-static int secondscan (int, const char *);
+static int eval_arg (int, const char *);
+
+/* Datastructures used to gather data during the argument scan which
+ * needs to be evaluated later.
+ *
+ * struct FData: the values given to the '-f' options, allocated to size.
+ */
+
+typedef struct FData {
+    struct FData * next;
+    char           txt[1];  /* The value, allocated to size */
+} FData;
+
+static FData * f_head = NULL;
+static FData * f_tail = NULL;
 
 /*-------------------------------------------------------------------------*/
 int
@@ -222,7 +235,7 @@ main (int argc, char **argv)
     /* First scan of the arguments.
      * This evaluates everything but the 'f' arguments.
      */
-    if (getargs(argc, argv, firstscan))
+    if (getargs(argc, argv, eval_arg))
       exit(1);
 
     /* Change to the mudlib dir early so that the debug.log file
@@ -370,11 +383,20 @@ main (int argc, char **argv)
     apply_master_ob(STR_INAUGURATE, 1);
     setup_print_block_dispatcher();
 
-    /* Second scan of the arguments, now we're looking just for
-     * the 'f' flag.
-     */
-    if (getargs(argc, argv, secondscan))
-        exit(1);
+    /* Evaluate all the 'f' arguments we received, if any. */
+    while (f_head != NULL)
+    {
+        FData * fdata = f_head;
+
+        f_head = f_head->next;
+        push_c_string(inter_sp, fdata->txt);
+        (void)apply_master_ob(STR_FLAG, 1);
+        free(fdata);
+        if (game_is_being_shut_down) {
+            fprintf(stderr, "%s Shutdown by master object.\n", time_stamp());
+            exit(0);
+        }
+    }
 
 #ifdef DEBUG
     if (d_flag > 1 && time_to_swap_variables <= 0)
@@ -880,6 +902,28 @@ static LongOpt aLongOpts[]
     , { "longhelp",           cLongHelp,       MY_FALSE }
     , { "help",               cHelp,           MY_FALSE }
     };
+
+/*-------------------------------------------------------------------------*/
+
+/* Internal management structure to handle an (argc,argv) input source.
+ * It is allocated to the proper length.
+ */
+
+typedef struct InputSource {
+    struct InputSource * next;  /* Link pointer */
+    int     arg;   /* Number of next argument to evaluate */
+    int     argc;  /* Total number of arguments */
+    char ** argv;  /* Allocated array of argument pointers */
+    char  * name;  /* Filename from where the arguments have been read,
+                    * NULL for commandline */
+    char    data[1];
+      /* Block holding the filename and the text read from
+       * the file.
+       *
+       * The data read from the file has been broken up into separate
+       * strings which are pointed to from the argv array.
+       */
+} InputSource;
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1480,7 +1524,7 @@ usage (void)
 
 /*-------------------------------------------------------------------------*/
 static int
-firstscan (int eOption, const char * pValue)
+eval_arg (int eOption, const char * pValue)
 
 /* Callback from getargs() for the first scan of the commandline
  * arguments. <eOption> is the option recognized, <pValue> a value
@@ -1845,49 +1889,60 @@ firstscan (int eOption, const char * pValue)
 #endif
 
     case cFuncall:
-        /* ignored */
+        /* Store the value in a list for later evaluation */
+        {
+            FData * fdata;
+
+            fdata = malloc(sizeof(*fdata) + strlen(pValue));
+            if (!fdata)
+            {
+                fprintf(stderr, "Out of memory for '-f %s'.\n", pValue);
+                return 1;
+            }
+
+            fdata->next = NULL;
+            strcpy(fdata->txt, pValue);
+
+            if (f_tail)
+                f_tail->next = fdata;
+            f_tail = fdata;
+            if (!f_head)
+                f_head = fdata;
+        }
         break;
 
     default:
         /* This shouldn't happen. */
-        fprintf(stderr, "%s driver: (firstscan) Internal error, eOption is %d\n"
+        fprintf(stderr, "%s driver: (eval_arg) Internal error, eOption is %d\n"
                       , time_stamp(), eOption);
         return 1;
     } /* switch */
 
   return 0;
-} /* firstscan() */
+} /* eval_arg() */
 
 /*-------------------------------------------------------------------------*/
-static int
-secondscan (int eOption, const char * pValue)
+static INLINE void
+free_sources (InputSource * pInput)
 
-/* Callback from getargs() for the second scan of the commandline
- * arguments. <eOption> is the option recognized, <pValue> a value
- * or NULL.
- * Return 0 on success, non-zero on a failure.
+/* <pInput> points at the head of a list of input sources.
+ * Deallocate all of them.
  */
 
 {
-    switch (eOption)
+    while (pInput != NULL)
     {
-    case cFuncall:
-        push_c_string(inter_sp, (char *)pValue);
-        (void)apply_master_ob(STR_FLAG, 1);
-        if (game_is_being_shut_down) {
-            fprintf(stderr, "%s Shutdown by master object.\n", time_stamp());
-            exit(0);
-        }
-        /* ignored */
-        break;
+        InputSource * pSrc = pInput;
 
-    default:
-        /* ignored */
-        break;
-    } /* switch */
+        pInput = pInput->next;
 
-  return 0;
-} /* secondscan() */
+        if (pSrc->name != NULL)
+            /* Not the commandline */
+            free(pSrc->argv);
+
+        free(pSrc);
+    }
+} /* free_sources() */
 
 /*-------------------------------------------------------------------------*/
 static int
@@ -1902,172 +1957,208 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
  */
 
 {
-  int         i;        /* all purpose */
-  int         iArg;     /* Number of argument under inspection */
-  OptNumber   eOption;  /* The current recognized option */
-  int         iOption;  /* The index of the recognized option */
-  short       bCont;    /* True: find another option in the same argument */
-  short       bDone;    /* True: all options parsed, only args left */
-  short       bShort;   /* True: current argument is a short option */
-  char      * pArg;     /* Next argument character to consider */
+  int           i;        /* all purpose */
+  int           iArg;     /* Number of argument under inspection */
+  OptNumber     eOption;  /* The current recognized option */
+  int           iOption;  /* The index of the recognized option */
+  short         bCont;    /* True: find another option in the same argument */
+  short         bDone;    /* True: all options parsed, only args left */
+  short         bShort;   /* True: current argument is a short option */
+  char        * pArg;     /* Next argument character to consider */
+  InputSource * pInput;   /* Head of list of input sources */
 
   /* Make the compiler happy */
   bShort = MY_FALSE;
   pArg = NULL;
 
-  /* Scan all arguments */
-  bCont = MY_FALSE;
-  bDone = MY_FALSE;
-  for (iArg = 1; iArg < argc; !bCont ? iArg++ : iArg)
+  /* Set up the basic input source with the commandline arguments */
+  pInput = malloc(sizeof(*pInput));
+  if (!pInput)
   {
-    size_t   iArglen;      /* Length of remaining argument */
-    char   * pValue;       /* First character of an option value, or NULL */
-    int      bTakesValue;  /* This option takes a value */
+      fputs("driver: Out of memory.\n", stderr);
+      return 1;
+  }
+  pInput->argc = argc-1;
+  pInput->argv = argv+1;
+  pInput->arg = 0;
+  pInput->name = NULL;
+  pInput->next = NULL;
 
-    /* Make the compiler happy */
-    iArglen = 0;
-    pValue = NULL;
-    bTakesValue = MY_FALSE;
+  /* Scan arguments from all input sources.
+   */
+  while (pInput != NULL)
+  {
+      /* Scan all arguments */
+      bCont = MY_FALSE;
+      bDone = MY_FALSE;
+      for (iArg = pInput->arg; iArg < pInput->argc; !bCont ? iArg++ : iArg)
+      {
+        size_t   iArglen;      /* Length of remaining argument */
+        char   * pValue;       /* First character of an option value, or NULL */
+        int      bTakesValue;  /* This option takes a value */
 
-    if (bDone)
-      eOption = cArgument;
-    else
-    /* If this is not a continuation, reinitialise the inspection vars.
-     * For --opt=val arguments, pValue is set to the first character of val.
-     */
-    if (!bCont)
-    {
-      pArg = argv[iArg];
-      if ('-' == pArg[0] && '-' == pArg[1]) /* Long option? */
-      {
-        eOption = cUnknown;
-        bShort = MY_FALSE;
-        pArg += 2;
-        /* Special case: if the argument is just '--', it marks the
-         * end of all options.
-         * We set a flag and continue with the next argument.
-         */
-        if ('\0' == *pArg)
-        {
-          bDone = MY_TRUE;
-          continue;
-        }
-        pValue = strchr(pArg, '=');
-        if (pValue != NULL)
-        {
-          iArglen = (size_t)(pValue - pArg);
-          pValue++;
-        }
-        else
-          iArglen = strlen(pArg);
-      }
-      else if ('-' == pArg[0]) /* Short option? */
-      {
-        eOption = cUnknown;
-        bShort = MY_TRUE;
-        pArg++;
-        iArglen = strlen(pArg);
-        pValue = NULL;
-      }
-      else /* No option */
-      {
-        eOption = cArgument;
-        pValue = pArg;
+        /* Make the compiler happy */
         iArglen = 0;
-      }
-    }
-    else
-      eOption = cUnknown;
+        pValue = NULL;
+        bTakesValue = MY_FALSE;
 
-    /* If the option is not determined yet, do it.
-     * Set pValue to the first character of the value if any.
-     */
-    if (cUnknown == eOption)
-    {
-      if (bShort) /* search the short option */
-      {
-        for (iOption = 0; iOption < sizeof(aShortOpts) / sizeof(aShortOpts[0]); iOption++)
-        {
-          if (*pArg == aShortOpts[iOption].cOption)
-          {
-            eOption = (OptNumber)aShortOpts[iOption].eNumber;
-            bTakesValue = aShortOpts[iOption].bValue;
-            pArg++; iArglen--;  /* Consume this character */
-            break;
-          }
-        }
-        /* Consume a following '=' if appropriate */
-        if (cUnknown != eOption && bTakesValue && iArglen > 0 && '=' == *pArg)
-        {
-          pArg++; iArglen--;
-        }
-
-        /* If there is a value following in the same argument, set pValue to
-         * it and mark the remaining characters as 'consumed'
+        if (bDone)
+          eOption = cArgument;
+        else
+        /* If this is not a continuation, reinitialise the inspection vars.
+         * For --opt=val arguments, pValue is set to the first character of val.
          */
-        if (cUnknown != eOption && bTakesValue && iArglen > 0)
+        if (!bCont)
         {
-          pValue = pArg;
-          pArg += iArglen;
-          iArglen = 0;
-        }
-      }
-      else  /* search the long option */
-      {
-        for (iOption = 0; iOption < sizeof(aLongOpts) / sizeof(aLongOpts[0]); iOption++)
-          if (iArglen == strlen(aLongOpts[iOption].pOption)
-           && !strncasecmp(pArg, aLongOpts[iOption].pOption, iArglen))
+          pArg = pInput->argv[iArg];
+          if ('-' == pArg[0] && '-' == pArg[1]) /* Long option? */
           {
-            eOption = (OptNumber)aLongOpts[iOption].eNumber;
-            bTakesValue = aLongOpts[iOption].bValue;
-            break;
+            eOption = cUnknown;
+            bShort = MY_FALSE;
+            pArg += 2;
+            /* Special case: if the argument is just '--', it marks the
+             * end of all options.
+             * We set a flag and continue with the next argument.
+             */
+            if ('\0' == *pArg)
+            {
+              bDone = MY_TRUE;
+              continue;
+            }
+            pValue = strchr(pArg, '=');
+            if (pValue != NULL)
+            {
+              iArglen = (size_t)(pValue - pArg);
+              pValue++;
+            }
+            else
+              iArglen = strlen(pArg);
           }
-      }
-
-      if (cUnknown == eOption)
-      {
-        fputs("driver: Unknown option '", stderr);
-        if (bShort)
-          fprintf(stderr, "-%c", *pArg);
+          else if ('-' == pArg[0]) /* Short option? */
+          {
+            eOption = cUnknown;
+            bShort = MY_TRUE;
+            pArg++;
+            iArglen = strlen(pArg);
+            pValue = NULL;
+          }
+          else /* No option */
+          {
+            eOption = cArgument;
+            pValue = pArg;
+            iArglen = 0;
+          }
+        }
         else
-          fprintf(stderr, "--%*.*s", (int)iArglen, (int)iArglen, pArg);
-        fputs("'.\n", stderr);
-        return 1;
-      }
+          eOption = cUnknown;
 
-      /* If at this point bTakesValue is true, but pValue is still NULL,
-       * then the value is in the next argument. Get it if it's there.
-       */
-      if (bTakesValue && pValue == NULL && iArg + 1 < argc)
+        /* If the option is not determined yet, do it.
+         * Set pValue to the first character of the value if any.
+         */
+        if (cUnknown == eOption)
+        {
+          if (bShort) /* search the short option */
+          {
+            for (iOption = 0; iOption < sizeof(aShortOpts) / sizeof(aShortOpts[0]); iOption++)
+            {
+              if (*pArg == aShortOpts[iOption].cOption)
+              {
+                eOption = (OptNumber)aShortOpts[iOption].eNumber;
+                bTakesValue = aShortOpts[iOption].bValue;
+                pArg++; iArglen--;  /* Consume this character */
+                break;
+              }
+            }
+            /* Consume a following '=' if appropriate */
+            if (cUnknown != eOption && bTakesValue && iArglen > 0 && '=' == *pArg)
+            {
+              pArg++; iArglen--;
+            }
+
+            /* If there is a value following in the same argument, set pValue to
+             * it and mark the remaining characters as 'consumed'
+             */
+            if (cUnknown != eOption && bTakesValue && iArglen > 0)
+            {
+              pValue = pArg;
+              pArg += iArglen;
+              iArglen = 0;
+            }
+          }
+          else  /* search the long option */
+          {
+            for (iOption = 0; iOption < sizeof(aLongOpts) / sizeof(aLongOpts[0]); iOption++)
+              if (iArglen == strlen(aLongOpts[iOption].pOption)
+               && !strncasecmp(pArg, aLongOpts[iOption].pOption, iArglen))
+              {
+                eOption = (OptNumber)aLongOpts[iOption].eNumber;
+                bTakesValue = aLongOpts[iOption].bValue;
+                break;
+              }
+          }
+
+          if (cUnknown == eOption)
+          {
+            if (pInput->name != NULL)
+                fprintf(stderr, "driver: (%s) Unknown option '");
+            else
+                fputs("driver: Unknown option '", stderr);
+            if (bShort)
+              fprintf(stderr, "-%c", *pArg);
+            else
+              fprintf(stderr, "--%*.*s", (int)iArglen, (int)iArglen, pArg);
+            fputs("'.\n", stderr);
+            free_sources(pInput);
+            return 1;
+          }
+
+          /* If at this point bTakesValue is true, but pValue is still NULL,
+           * then the value is in the next argument. Get it if it's there.
+           */
+          if (bTakesValue && pValue == NULL && iArg + 1 < pInput->argc)
+          {
+            iArg++;
+            pValue = pInput->argv[iArg];
+          }
+
+          /* Signal an error if pValue is still NULL or if it's empty. */
+          if (bTakesValue && (pValue == NULL || !strlen(pValue)))
+          {
+            fputs("driver: Option '", stderr);
+            if (bShort)
+              putc((unsigned char)(aShortOpts[iOption].cOption), stderr);
+            else
+              fputs(aLongOpts[iOption].pOption, stderr);
+            fputs("' expects a value.\n", stderr);
+            free_sources(pInput);
+            return 1;
+          }
+
+        } /* if (unknown option) */
+
+        /* Before evaluation of the parsed option, determine 'bCont' */
+        bCont = bShort && (iArglen > 0) && !bTakesValue;
+
+        /* --- The option evaluation --- */
+
+        i = (*opt_eval)(eOption, pValue);
+        if (i)
+        {
+          free_sources(pInput);
+          return i;
+        }
+
+      } /* for (iArg) */
+
+      /* We are done with this input source - free it */
       {
-        iArg++;
-        pValue = argv[iArg];
+          InputSource * pSrc = pInput;
+
+          pInput = pInput->next;
+          pSrc->next = NULL;
+          free_sources(pSrc);
       }
-
-      /* Signal an error if pValue is still NULL or if it's empty. */
-      if (bTakesValue && (pValue == NULL || !strlen(pValue)))
-      {
-        fputs("driver: Option '", stderr);
-        if (bShort)
-          putc((unsigned char)(aShortOpts[iOption].cOption), stderr);
-        else
-          fputs(aLongOpts[iOption].pOption, stderr);
-        fputs("' expects a value.\n", stderr);
-        return 1;
-      }
-
-    } /* if (unknown option) */
-
-    /* Before evaluation of the parsed option, determine 'bCont' */
-    bCont = bShort && (iArglen > 0) && !bTakesValue;
-
-    /* --- The option evaluation --- */
-
-    i = (*opt_eval)(eOption, pValue);
-    if (i)
-      return i;
-
-  } /* for (iArg) */
+  } /* while(pInput) */
 
   return 0;
 } /* getargs() */

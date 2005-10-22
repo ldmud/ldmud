@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Jun-2001 (Lars Duening)  (3.3.66)
+    - (configure) The evaluation of the '--with-wizlist-file' configuration
+        option was less than flawless.
+    - (main.c) Instead of scanning the arguments twice, all encountered
+        -f options are stored in a temporary list and evaluated when
+        it's time.
+    - (main.c) Laid the groundwork for nested sources for the command
+        arguments.
+
 27-Jun-2001 (Lars Duening)  (3.3.65)
     - (simulate.c) When parsing callback arguments, the pattern 'function,
       object, extra' was parsed such that 'object' became part of the
