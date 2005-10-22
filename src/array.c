@@ -874,6 +874,36 @@ compare_single (svalue_t *svp1, svalue_t *svp2)
 } /* compare_single() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE void
+sanitize_array (vector_t * vec)
+
+/* In the given array, make all strings shared, and replace destructed
+ * object references by svalue 0s.
+ */
+
+{
+    size_t     j, keynum;
+    svalue_t * inpnt;
+
+    keynum = VEC_SIZE(vec);
+    for ( j = 0, inpnt = vec->item; j < keynum; j++, inpnt++)
+    {
+        if (inpnt->type == T_STRING)
+        {
+            if (!mstr_d_tabled(inpnt->u.str))
+            {
+                inpnt->u.str = make_tabled(inpnt->u.str);
+            }
+        }
+        else if (destructed_object_ref(inpnt))
+        {
+            free_svalue(inpnt);
+            put_number(inpnt, 0);
+        }
+    }
+} /* sanitize_array() */
+
+/*-------------------------------------------------------------------------*/
 ptrdiff_t *
 get_array_order (vector_t * vec )
 
@@ -915,24 +945,7 @@ get_array_order (vector_t * vec )
        * case keynum is 0.
        */
 
-    /* Make sure that strings can be compared by their pointer,
-     * and null out destructed objects.
-     */
-    for ( j = 0, inpnt = vec->item; j < keynum; j++, inpnt++)
-    {
-        if (inpnt->type == T_STRING)
-        {
-            if (!mstr_d_tabled(inpnt->u.str))
-            {
-                inpnt->u.str = make_tabled(inpnt->u.str);
-            }
-        }
-        else if (destructed_object_ref(inpnt))
-        {
-            free_svalue(inpnt);
-            put_number(inpnt, 0);
-        }
-    }
+    sanitize_array(vec);
 
     /* For small arrays, use something else but Heapsort - trading
      * less overhead for worse complexity.
@@ -1286,6 +1299,9 @@ match_arrays (vector_t *vec1, vector_t *vec2)
         svalue_t * elem;   /* Pointer to the single-elem vector elements */
         Bool     * rflag;  /* Pointer to the long vector flags */
         Bool     * eflag;  /* Pointer to the single-elem vector flag */
+
+        sanitize_array(vec1);
+        sanitize_array(vec2);
 
         /* Sort out which vector is which */
         if  (len1 == 1)
