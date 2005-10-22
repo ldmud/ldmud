@@ -87,11 +87,17 @@
  *
  * A token or code entry follows this syntax:
  *
- *    [ "name" ] id
+ *    [ "name" ] id [op-type]
  *
  *        <id> is the name used in the compiler source, the generated token
  *        will be called F_<ID>. If <name> is specified, it will be used
  *        in tracedumps instead of the plain <id>.
+ *
+ *        If the instruction is an operator which can be used as a operator
+ *        closure (like +), the optional <op-type> specifies, how many operands
+ *        the operator takes. <op-type> must be one of the keywords 'unary',
+ *        'binary' and 'ternary'.
+ *
  *
  * An efun is defined this way:
  *
@@ -652,6 +658,8 @@ check_for_duplicate_string (const char *key, const char *buf)
 
 %token CODES EFUNS TEFUNS END
 
+%token UN_OP BIN_OP TRI_OP
+
 %type <number> VOID MIXED UNKNOWN NUL
 %type <number> INT STRING OBJECT MAPPING FLOAT CLOSURE SYMBOL QUOTED_ARRAY
 %type <number> basic arg_type
@@ -668,6 +676,12 @@ check_for_duplicate_string (const char *key, const char *buf)
 
 %type <number> arg_list typel typel2
   /* Value is the number of arguments (so far)
+   */
+
+%type <number>optional_optype
+  /* 0: No op-type given
+   * 1: UN_OP, 2: BIN_OP, 3: TRI_OP
+   * Or in other words: the number of operands :-)
    */
 
 %type <string> ID optional_ID optional_default NAME optional_name
@@ -696,7 +710,13 @@ tefuns:   TEFUNS funcs;
 optional_name: /* empty */ { $$ = NULL; }
                | NAME;
 
-code:     optional_name ID
+optional_optype: /* empty */ { $$ = 0; }
+               | UN_OP       { $$ = 1; }
+               | BIN_OP      { $$ = 2; }
+               | TRI_OP      { $$ = 3; }
+               ;
+
+code:     optional_name ID optional_optype
     {
         char *f_name, buff[500];
 
@@ -708,10 +728,17 @@ code:     optional_name ID
         check_for_duplicate_instr(f_name, $2, 0);
         instr[num_buff].code_class = current_code_class;
         num_instr[current_code_class]++;
-        sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, 0, -1, -1, \"%s\" },\n"
-                    , classprefix[instr[num_buff].code_class]
-                    , f_name, classtag[instr[num_buff].code_class]
-                    , $1);
+        if ($3 == 0)
+            sprintf(buff, "{ %s, %s-%s_OFFSET, 0, 0, -1, 0, -1, -1, \"%s\" },\n"
+                        , classprefix[instr[num_buff].code_class]
+                        , f_name, classtag[instr[num_buff].code_class]
+                        , $1);
+        else
+            sprintf(buff, "{ %s, %s-%s_OFFSET, %d, %d, 0, TYPE_ANY, -1, -1, \"%s\" },\n"
+                        , classprefix[instr[num_buff].code_class]
+                        , f_name, classtag[instr[num_buff].code_class]
+                        , $3, $3
+                        , $1);
         if (strlen(buff) > sizeof buff)
             fatal("Local buffer overflow!\n");
         instr[num_buff].f_name = f_name;
@@ -1975,9 +2002,14 @@ static int
 ident (char c)
 
 /* Parse an identifier (first character is <c>) from fpr and classify it.
+ *
  * The typenames in types[] return the associated type code, the
  * string "default" returns DEFAULT (both only when currently parsing
  * for EFUN class identifiers in FUNC_SPEC).
+ *
+ * When parsing CODEs in FUNC_SPEC, the strings "unary", "binary" and
+ * "ternary" return UN_OP, BIN_OP and TRI_OP respectively.
+ *
  * Other identifiers are stored in yylval.string and return ID.
  */
 
@@ -2011,6 +2043,16 @@ ident (char c)
         }
         if (strcmp(buff, "default") == 0)
             return DEFAULT;
+    }
+
+    if ( parsetype == PARSE_FUNC_SPEC && C_IS_CODE(current_code_class) )
+    {
+        if (strcmp(buff, "unary") == 0)
+            return UN_OP;
+        if (strcmp(buff, "binary") == 0)
+            return BIN_OP;
+        if (strcmp(buff, "ternary") == 0)
+            return TRI_OP;
     }
     yylval.string = mystrdup(buff);
     return ID;

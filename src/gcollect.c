@@ -1469,7 +1469,17 @@ show_array(int d, void *block, int depth)
     mp_int a_size;
 
     a = (vector_t *)block;
-    a_size = (mp_int)VEC_SIZE(a);
+
+    /* Can't use VEC_SIZE() here, as the memory block may have been
+     * partly overwritten by the smalloc pointers already.
+     */
+    a_size = (mp_int)(  malloced_size(a)
+                   - ( SMALLOC_OVERHEAD + 
+                       ( sizeof(vector_t) - sizeof(svalue_t) ) / SIZEOF_CHAR_P 
+                     ) 
+
+                  ) / (sizeof(svalue_t)/SIZEOF_CHAR_P);
+
     if (depth && a != &null_vector)
     {
         int freed;

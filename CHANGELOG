@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Jul-2001 (Lars Duening)  (3.3.77)
+    - (mapping.c) Removed an extraneous increment in the mapping statistics:
+        the hash part of a new mapping was counted twice.
+    - (lp-245/) Removed the uses order_alist() from the simul_efun objects.
+    - (func_spec, lex.c, prolang.y, interpret.c, closure.c) Added [>]
+        indexing method (both single and ranges) to fully replace the
+        gone extract() efun.
+    - (make_func.y, lex.c, func_spec) Closure operators can now be declared
+        directly in the func_spec; no need for manual patching by lex.c .
+    - (gcollect.c) Oops. Freeing a circular array reference with
+        MALLOC_LPC_TRACE enabled crashed the driver in the dump
+        of the array contents.
+
 15-Jul-2001 (Lars Duening)  (3.3.76)
     - (actions, simulate) Removing or destructing a shadow now properly
         removes all associated actions (reported by Nathan).

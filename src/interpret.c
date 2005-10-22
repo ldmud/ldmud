@@ -2476,20 +2476,28 @@ push_referenced_mapping (mapping_t *m)
  *     Return &(v[i]), unprotected.
  *   push_rindexed_lvalue(vector v, int i)
  *     Return &(v[<i]), unprotected.
+ *   push_aindexed_lvalue(vector v, int i)
+ *     Return &(v[>i]), unprotected.
  *   push_protected_indexed_lvalue(vector|mapping v, int|mixed i)
  *     Return &(v[i]), protected.
  *   push_protected_rindexed_lvalue(vector v, int i)
  *     Return &(v[<i]), protected.
+ *   push_protected_aindexed_lvalue(vector v, int i)
+ *     Return &(v[>i]), protected.
  *   push_protected_indexed_map_lvalue(mapping m, mixed i, int j)
  *     Return &(m[i:j]), protected.
  *   index_lvalue(vector|mapping|string & v, int|mixed i)
  *     Return &(*v[i]), unprotected, using special_lvalue.
  *   rindex_lvalue(vector|string & v, int i)
  *     Return &(*v[<i]), unprotected, using special_lvalue.
+ *   aindex_lvalue(vector|string & v, int i)
+ *     Return &(*v[>i]), unprotected, using special_lvalue.
  *   protected_index_lvalue(vector|mapping|string & v, int|mixed i)
  *     Return &(*v[i]), protected.
  *   protected_rindex_lvalue(vector|string & v, int i)
  *     Return &(*v[<i]), protected.
+ *   protected_aindex_lvalue(vector|string & v, int i)
+ *     Return &(*v[>i]), protected.
  *   range_lvalue(vector|string & v, int i2, int i1)
  *     Return &(*v[i1..i2]), unprotected, using special_lvalue.
  *   protected_range_lvalue(vector|string & v, int i2, int i1)
@@ -2498,6 +2506,8 @@ push_referenced_mapping (mapping_t *m)
  *     Return v[i].
  *   push_rindexed_value(string|vector v, int i)
  *     Return v[<i].
+ *   push_aindexed_value(string|vector v, int i)
+ *     Return v[>i].
  */
 
 /*-------------------------------------------------------------------------*/
@@ -2677,6 +2687,74 @@ push_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
     error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_rindexed_lvalue() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+push_aindexed_lvalue (svalue_t *sp, bytecode_p pc)
+
+/* Operator F_PUSH_AINDEXED_LVALUE(vector v=sp[-1], int i=sp[0])
+ *
+ * Compute the lvalue &(v[>i]) and push it into the stack. If v has just
+ * one ref left, the indexed item is stored in indexing_quickfix and the
+ * lvalue refers to that variable.
+ */
+
+{
+    svalue_t *i;     /* the index value */
+    svalue_t *vec;   /* the vector */
+    svalue_t *item;  /* the indexed item */
+    mp_int    ind;   /* the numeric value of *i */
+
+    /* Get the arguments */
+    i = sp;
+    vec = sp - 1;
+
+    /* Index a vector.
+     */
+    if (vec->type == T_POINTER)
+    {
+        if (i->type != T_NUMBER)
+        {
+            ERRORF(("Illegal index for [>]: got %s, expected number.\n"
+                   , typename(i->type)
+                   ));
+            return NULL;
+        }
+        if (0 > (ind = i->u.number))
+            ind = (mp_int)VEC_SIZE(vec->u.vec) + ind;
+        if (ind >= (mp_int)VEC_SIZE(vec->u.vec))
+        {
+            ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
+                   , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
+            return NULL;
+        }
+
+        /* Compute the indexed item */
+        item = &vec->u.vec->item[ind];
+
+        if (vec->u.vec->ref == 1)
+        {
+            /* Rescue the indexed item as vec will go away */
+            assign_svalue (&indexing_quickfix, item);
+            item = &indexing_quickfix;
+        }
+
+        /* Remove the arguments from the stack */
+        sp = vec;
+        free_array(vec->u.vec);
+
+        /* Return the result */
+        vec->type = T_LVALUE;
+        vec->u.lvalue = item;
+        return sp;
+    }
+
+    /* Indexing on illegal type */
+    inter_sp = sp;
+    inter_pc = pc;
+    error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
+    return NULL;
+} /* push_aindexed_lvalue() */
 
 /*-------------------------------------------------------------------------*/
 /* void BUILD_MAP_PROTECTOR(svalue_t *dest, mapping_t *m)
@@ -2875,6 +2953,73 @@ push_protected_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
     error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
     return NULL;
 } /* push_protected_rindexed_lvalue() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+push_protected_aindexed_lvalue (svalue_t *sp, bytecode_p pc)
+
+/* Op. F_PUSH_PROTECTED_AINDEXED_LVALUE(vector v=sp[-1], int i=sp[0])
+ *
+ * Compute the lvalue &(v[>i]), store it in a struct protected_lvalue, and
+ * push the protector as PROTECTED_LVALUE into the stack.
+ */
+
+{
+    svalue_t           * i;       /* the index */
+    svalue_t           * vec;     /* the vector */
+    svalue_t           * item;    /* the indexed element */
+    struct protected_lvalue * lvalue;  /* the protector */
+    mp_int                    ind;     /* numeric value of *i */
+
+    /* Get the arguments */
+
+    i = sp;
+    vec = sp - 1;
+
+    /* Index a vector
+     */
+    if (vec->type == T_POINTER)
+    {
+        if (i->type != T_NUMBER)
+        {
+            ERRORF(("Illegal index for [>]: got %s, expected number.\n"
+                   , typename(i->type)
+                   ));
+            return NULL;
+        }
+        if (0 > (ind = i->u.number))
+            ind = (mp_int)VEC_SIZE(vec->u.vec) + ind;
+        if (ind >= (mp_int)VEC_SIZE(vec->u.vec))
+        {
+            ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
+                   , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
+            return NULL;
+        }
+
+        /* Compute the indexed element and setup the protector */
+
+        item = &vec->u.vec->item[ind];
+
+        lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
+        lvalue->v.type = T_PROTECTED_LVALUE;
+        lvalue->v.u.lvalue = item;
+        put_array(&(lvalue->protector), vec->u.vec);
+          /* The one ref is transferred from the stack */
+
+        /* Remove arguments and return result */
+        sp = vec;
+        vec->type = T_LVALUE;
+        vec->u.lvalue = &lvalue->v;
+        return sp;
+    }
+
+    /* Indexing in illegal type */
+
+    inter_sp = sp;
+    inter_pc = pc;
+    error("(lvalue)Indexing on illegal type '%s'.\n", typename(vec->type));
+    return NULL;
+} /* push_protected_aindexed_lvalue() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
@@ -3202,6 +3347,114 @@ rindex_lvalue (svalue_t *sp, bytecode_p pc)
     error("(lvalue)Indexing on illegal type '%s'.\n", typename(type));
     return NULL;
 } /* rindex_lvalue() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+aindex_lvalue (svalue_t *sp, bytecode_p pc)
+
+/* Operator F_AINDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
+ *
+ * Compute the index &(v[>i]) of lvalue <v> and push it into the stack. The
+ * computed index is a lvalue itself.
+ * If <v> is a string-lvalue, it is made a malloced string if necessary,
+ * and the pushed result will be a lvalue pointing to a CHAR_LVALUE stored
+ * in <special_lvalue>.
+ */
+
+{
+    svalue_t *vec;   /* the vector/string */
+    svalue_t *i;     /* the index */
+    mp_int         ind;   /* numeric value of <i> */
+    short          type;  /* type of <vec> */
+
+    /* get the arguments */
+    vec = sp;
+    i = sp -1;
+
+    if (i->type != T_NUMBER)
+    {
+        ERRORF(("Illegal index for [>]: got %s, expected number.\n"
+               , typename(i->type)
+               ));
+        return NULL;
+    }
+    ind = i->u.number;
+
+    /* Dereference the initial (and possibly more) lvalue-indirection
+     */
+    do {
+        vec = vec->u.lvalue;
+        type = vec->type;
+    } while (type == T_LVALUE || type == T_PROTECTED_LVALUE);
+
+    /* Index a vector
+     */
+    if (type == T_POINTER)
+    {
+        vector_t *v = vec->u.vec;
+
+
+        if (0 > ind)
+            ind = (mp_int)VEC_SIZE(vec->u.vec) + ind;
+        if (ind >= (mp_int)VEC_SIZE(vec->u.vec))
+        {
+            ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
+                   , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
+            return NULL;
+        }
+
+        /* Remove the arguments and return the result */
+
+        sp = i;
+        sp->type = T_LVALUE;
+        sp->u.lvalue = &v->item[ind];
+        return sp;
+    }
+
+    /* Index a string
+     */
+    if (type == T_STRING)
+    {
+        if (0 > ind)
+            ind = (mp_int)mstrsize(vec->u.str) + ind;
+        if (ind >= (mp_int)mstrsize(vec->u.str))
+        {
+            ERRORF(("Index out of bounds for [>]: %ld, string length: %ld\n"
+                   , (long) i->u.number, (long)mstrsize(vec->u.str)));
+            return NULL;
+        }
+
+        /* If the string is tabled, i.e. not changeable, allocate
+         * a new copy which can be changed.
+         */
+        if (mstr_tabled(vec->u.str))
+        {
+            string_t *p;
+            
+            memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
+                   , "modifiable string");
+
+            free_mstring(vec->u.str);
+            vec->u.str = p;
+        }
+
+        /* Remove the argument and return the result */
+
+        sp = i;
+        sp->type = T_LVALUE;
+        sp->u.lvalue = &special_lvalue.v;
+        special_lvalue.v.type = T_CHAR_LVALUE;
+        special_lvalue.v.u.charp = &(get_txt(vec->u.str)[ind]);
+        return sp;
+    }
+
+    /* Indexing on illegal type */
+
+    inter_sp = sp;
+    inter_pc = pc;
+    error("(lvalue)Indexing on illegal type '%s'.\n", typename(type));
+    return NULL;
+} /* aindex_lvalue() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE svalue_t *
@@ -3734,30 +3987,276 @@ protected_rindex_lvalue (svalue_t *sp, bytecode_p pc)
 } /* protected_rindex_lvalue() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+protected_aindex_lvalue (svalue_t *sp, bytecode_p pc)
+
+/* Operator F_PROTECTED_AINDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
+ *
+ * Compute the index &(*v[>i]) of lvalue <v>, wrap it into a protector, and
+ * push the reference to the protector as PROTECTED_LVALUE onto the stack.
+ *
+ * If <v> is a protected non-string-lvalue, the protected_lvalue referenced
+ * by <v>.u.lvalue will be deallocated, and the protector itself will be
+ * stored in <last_indexing_protector> for the time being.
+ *
+ * If <v> is a string-lvalue, it is made a malloced string if necessary.
+ */
+
+{
+    svalue_t *vec;   /* the indexed value */
+    svalue_t *i;     /* the index */
+    mp_int         ind;   /* numeric value of <i> */
+    short          type;  /* type of <vec> */
+
+    /* Get arguments */
+    vec = sp->u.lvalue;
+    i = sp -1;
+
+    if (i->type != T_NUMBER)
+    {
+        ERRORF(("Illegal index for [>]: got %s, expected number.\n"
+               , typename(i->type)
+               ));
+        return NULL;
+    }
+    ind = i->u.number;
+
+    /* The loop unravels the (possible) lvalue chain starting at vec.
+     * When a non-lvalue is encountered, the indexing takes place
+     * the function returns.
+     */
+    for (;;)
+    {
+        type = vec->type;
+
+        /* Index a vector.
+         */
+        if (type == T_POINTER)
+        {
+            vector_t *v = vec->u.vec;
+            struct protected_lvalue *lvalue;
+
+            if (0 > ind)
+                ind = (mp_int)VEC_SIZE(vec->u.vec) + ind;
+            if (ind >= (mp_int)VEC_SIZE(vec->u.vec))
+            {
+                ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
+                       , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
+                return NULL;
+            }
+
+            /* Create the protector for the result */
+
+            lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
+            lvalue->v.type = T_PROTECTED_LVALUE;
+            lvalue->v.u.lvalue = &v->item[ind];
+            put_ref_array(&(lvalue->protector), v);
+
+            /* Drop the arguments and return the result */
+
+            sp = i;
+
+            sp->type = T_LVALUE;
+            sp->u.lvalue = &lvalue->v;
+            return sp;
+        }
+
+        /* Index a string.
+         */
+        if (type == T_STRING)
+        {
+            struct protected_char_lvalue *val;
+
+            if (0 > ind)
+                ind = (mp_int)mstrsize(vec->u.str) + ind;
+            if (ind >= (mp_int)mstrsize(vec->u.str))
+            {
+                ERRORF(("Index out of bounds for [>]: %ld, string length: %ld\n"
+                       , (long) i->u.number, (long)mstrsize(vec->u.str)));
+                return NULL;
+            }
+
+            /* If the string is tabled, i.e. not changeable, allocate
+             * a new copy which can be changed.
+             */
+            if (mstr_tabled(vec->u.str))
+            {
+                string_t *p;
+                
+                memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
+                       , "modifiable string");
+
+                free_mstring(vec->u.str);
+                vec->u.str = p;
+            }
+
+            /* Add another reference to the string to keep it alive while
+             * we use it.
+             */
+            (void)ref_mstring(vec->u.str);
+
+            /* Build the protector */
+            val = (struct protected_char_lvalue *)xalloc(sizeof *val);
+            val->v.type = T_PROTECTED_CHAR_LVALUE;
+            val->v.u.charp = &(get_txt(vec->u.str)[ind]);
+            val->lvalue = vec;
+            val->start = get_txt(vec->u.str);
+            val->protector.type = T_INVALID;
+
+            /* Drop the arguments and return the result */
+            sp = i;
+
+            sp->type = T_LVALUE;
+            sp->u.protected_char_lvalue = val;
+
+            return sp;
+        }
+
+        /* lvalues are just dereferenced.
+         */
+        if (type == T_LVALUE)
+        {
+            vec = vec->u.lvalue;
+            continue;
+        }
+
+        /* Non-string protected lvalues are dereferenced, a protected
+         * string lvalue is indexed immediately.
+         */
+        if (type == T_PROTECTED_LVALUE)
+        {
+            struct protected_lvalue *lvalue;
+            struct protected_char_lvalue *val;
+
+            lvalue = (struct protected_lvalue *)vec;
+
+            if (lvalue->v.u.lvalue->type != T_STRING)
+            {
+                /* Deref a non-string protected lvalue.
+                 * If this is the lvalue passed to the operator, also free
+                 * the protector structure (since its stack space will be
+                 * used for the result), but keep the protector itself
+                 * in a global variable.
+                 */
+                if (vec == sp->u.lvalue)
+                {
+                    free_protector_svalue(&last_indexing_protector);
+                    last_indexing_protector = lvalue->protector;
+                    vec = lvalue->v.u.lvalue;
+                    xfree(lvalue);
+                    continue;
+                }
+                vec = lvalue->v.u.lvalue;
+                continue;
+            }
+
+            vec = lvalue->v.u.lvalue; /* it's a string... */
+
+            if (0 > ind)
+                ind = (mp_int)mstrsize(vec->u.str) + ind;
+            if (ind >= (mp_int)mstrsize(vec->u.str))
+            {
+                ERRORF(("Index out of bounds for [>]: %ld, string length: %ld\n"
+                       , (long) i->u.number, (long)mstrsize(vec->u.str)));
+                return NULL;
+            }
+
+            /* If the string is tabled, i.e. not changeable, allocate
+             * a new copy which can be changed.
+             */
+            if (mstr_tabled(vec->u.str))
+            {
+                string_t *p;
+                
+                memsafe(p = dup_mstring(vec->u.str), mstrsize(vec->u.str)
+                       , "modifiable string");
+
+                free_mstring(vec->u.str);
+                vec->u.str = p;
+            }
+
+            /* Add another reference to the string to keep it alive while
+             * we use it.
+             */
+            (void)ref_mstring(vec->u.str);
+
+            /* Build the protector */
+            val = (struct protected_char_lvalue *)xalloc(sizeof *val);
+            val->v.type = T_PROTECTED_CHAR_LVALUE;
+            val->v.u.charp = &(get_txt(vec->u.str)[ind]);
+            val->lvalue = vec;
+            val->start = get_txt(vec->u.str);
+
+            /* Drop the arguments and return the result.
+             * If this was the lvalue passed to the operator in the
+             * first place, adopt the protecting value and free the old
+             * operator structure. If not, just don't assign a protecting
+             * value.
+             */
+            if (lvalue == sp->u.protected_lvalue)
+            {
+                val->protector = lvalue->protector;
+                xfree(lvalue);
+            }
+            else
+            {
+                val->protector.type = T_INVALID;
+            }
+
+            sp = i;
+            sp->type = T_LVALUE;
+            sp->u.protected_char_lvalue = val;
+
+            return sp;
+        }
+
+        /* Indexing on illegal type */
+        inter_sp = sp;
+        inter_pc = pc;
+        error("(lvalue)Indexing on illegal type '%s'.\n", typename(type));
+        return NULL;
+    } /* for(ever) */
+
+    /* NOTREACHED */
+    return NULL;
+} /* protected_aindex_lvalue() */
+
+/*-------------------------------------------------------------------------*/
 
 /* Code values used by range_lvalue() and protected_range_lvalue()
  */
 
 #define NN_RANGE (0)
 #define RN_RANGE (1 << 0)
-#define NR_RANGE (1 << 1)
+#define AN_RANGE (2 << 0)
+#define NR_RANGE (1 << 2)
+#define NA_RANGE (2 << 2)
+
 #define RR_RANGE (RN_RANGE|NR_RANGE)
+#define RA_RANGE (RN_RANGE|NA_RANGE)
+#define AR_RANGE (AN_RANGE|NR_RANGE)
+#define AA_RANGE (AN_RANGE|NA_RANGE)
+
+#define NX_MASK (3)
+#define XN_MASK (3 << 2)
 
 static svalue_t *
 range_lvalue (int code, svalue_t *sp)
 
 /* Operator F_RANGE_LVALUE (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
- * and the operators F_{NR,RN,RR}_RANGE_LVALUE.
+ * and the operators F_*_RANGE_LVALUE.
  *
  * Compute the range &(v[i1..i2]) of lvalue <v> and push it into the stack.
  * The value pushed is a lvalue pointing to <special_lvalue>. <special_lvalue>
  * then is the POINTER_RANGE_- resp. STRING_RANGE_LVALUE.
  *
- * <code> is a two-bit flag determining whether the indexes are counted
- * from the beginning ('[i1..' and '..i2]') or the the end of the vector
- * or string ('[<i1..' and '..<i2]'). If <code>&RN_RANGE is TRUE, the lower
- * index is counted from the end, if <code>&NR_RANGE is TRUE, the upper
- * index is counted from the end.
+ * <code> is a four-bit flag determining whether the indexes are counted
+ * from the beginning ('[i1..' and '..i2]'), the end of the vector
+ * or string ('[<i1..' and '..<i2]'), or depending on the sign of the
+ * index either from the beginning or end ('[>i1..' and '..>i2]').
+ * <code>&NX_MASK determines the mode for the lower index (NN_RANGE,
+ * RN_RANGE or AN_RANGE), <code>&XN_MASK the upper index (NN_RANGE,
+ * NR_RANGE or NA_RANGE).
  */
 
 {
@@ -3815,9 +4314,16 @@ range_lvalue (int code, svalue_t *sp)
         return NULL;
     }
 
-    if (code & NR_RANGE)
+    if ((code & XN_MASK) == NR_RANGE)
     {
         ind2 = size - i->u.number;
+    }
+    else if ((code & XN_MASK) == NA_RANGE)
+    {
+        if (i->u.number < 0)
+            ind2 = size + i->u.number;
+        else
+            ind2 = i->u.number;
     }
     else
     {
@@ -3843,9 +4349,16 @@ range_lvalue (int code, svalue_t *sp)
         return NULL;
     }
 
-    if (code & RN_RANGE)
+    if ((code & NX_MASK) == RN_RANGE)
     {
         ind1 = size - i->u.number;
+    }
+    else if ((code & NX_MASK) == AN_RANGE)
+    {
+        if (i->u.number < 0)
+            ind1 = size + i->u.number;
+        else
+            ind1 = i->u.number;
     }
     else
     {
@@ -3883,7 +4396,7 @@ protected_range_lvalue (int code, svalue_t *sp)
 
 /* Operator F_PROTECTED_RANGE_LVALUE
  *                       (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
- * and the x-operators F_PROTECTED_{NR,RN,RR}_RANGE_LVALUE and
+ * and the x-operators F_PROTECTED_*_RANGE_LVALUE and
  * F_PROTECTED_LVALUE.
  *
  * Compute the range &(v[i1..i2]) of lvalue <v>, wrap it into a protector,
@@ -3894,11 +4407,13 @@ protected_range_lvalue (int code, svalue_t *sp)
  *
  * If <v> is a string-lvalue, it is made a malloced string if necessary.
  *
- * <code> is a two-bit flag determining whether the indexes are counted
- * from the beginning ('[i1..' and '..i2]') or the the end of the vector
- * or string ('[<i1..' and '..<i2]'). If <code>&RN_RANGE is TRUE, the lower
- * index is counted from the end, if <code>&NR_RANGE is TRUE, the upper
- * index is counted from the end.
+ * <code> is a four-bit flag determining whether the indexes are counted
+ * from the beginning ('[i1..' and '..i2]'), the end of the vector
+ * or string ('[<i1..' and '..<i2]'), or depending on the sign of the
+ * index either from the beginning or end ('[>i1..' and '..>i2]').
+ * <code>&NX_MASK determines the mode for the lower index (NN_RANGE,
+ * RN_RANGE or AN_RANGE), <code>&XN_MASK the upper index (NN_RANGE,
+ * NR_RANGE or NA_RANGE).
  */
 
 {
@@ -3993,9 +4508,16 @@ protected_range_lvalue (int code, svalue_t *sp)
         return NULL;
     }
 
-    if (code & NR_RANGE)
+    if ((code & XN_MASK) == NR_RANGE)
     {
         ind2 = size - i->u.number;
+    }
+    else if ((code & XN_MASK) == NA_RANGE)
+    {
+        if (i->u.number < 0)
+            ind2 = size + i->u.number;
+        else
+            ind2 = i->u.number;
     }
     else
     {
@@ -4019,9 +4541,16 @@ protected_range_lvalue (int code, svalue_t *sp)
         return NULL;
     }
 
-    if (code & RN_RANGE)
+    if ((code & NX_MASK) == RN_RANGE)
     {
         ind1 = size - i->u.number;
+    }
+    else if ((code & NX_MASK) == AN_RANGE)
+    {
+        if (i->u.number < 0)
+            ind1 = size + i->u.number;
+        else
+            ind1 = i->u.number;
     }
     else
     {
@@ -4344,6 +4873,128 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
     /* NOTREACHED */
     return NULL;
 } /* push_rindexed_value() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE svalue_t *
+push_aindexed_value (svalue_t *sp, bytecode_p pc)
+
+/* Operator F_AINDEX (string|vector v=sp[0], int   i=sp[-1])
+ *
+ * Compute the value (v[>i]) and push it onto the stack.
+ * If the value would be a destructed object, 0 is pushed onto the stack
+ * and the ref to the object is removed from the vector/mapping.
+ */
+
+{
+    svalue_t *vec;  /* the indexed value */
+    svalue_t *i;    /* the index */
+    mp_int         ind;  /* numeric value of <i> */
+
+    /* Get arguments */
+    i = sp;
+    vec = sp - 1;
+
+    if (i->type != T_NUMBER)
+    {
+        ERRORF(("Illegal index for [>]: got %s, expected number.\n"
+               , typename(i->type)
+               ));
+        return NULL;
+    }
+    ind = i->u.number;
+
+    switch (vec->type)
+    {
+    case T_STRING:
+      {
+        /* Index the string */
+
+        if (0 > ind)
+            ind = (mp_int)mstrsize(vec->u.str) + ind;
+        if (ind >= (mp_int)mstrsize(vec->u.str))
+        {
+            ERRORF(("Index out of bounds for [>]: %ld, string length: %ld\n"
+                   , (long) i->u.number, (long)mstrsize(vec->u.str)));
+            return NULL;
+        }
+
+        ind = get_txt(vec->u.str)[ind];
+
+        /* Drop the args and return the result */
+
+        free_string_svalue(vec);
+
+        sp = vec; /* == sp-1 */
+        put_number(sp, ind);
+        return sp;
+      }
+
+    case T_POINTER:
+        /* Drop the arguments */
+        sp = vec;
+        if (0 > (ind = i->u.number))
+            ind = (mp_int)VEC_SIZE(vec->u.vec) + ind;
+        if (ind >= (mp_int)VEC_SIZE(vec->u.vec))
+        {
+            ERRORF(("Index out of bounds for [>]: %ld, vector size: %lu.\n"
+                   , (long)(i->u.number), VEC_SIZE(vec->u.vec)));
+            return NULL;
+        }
+
+        /* Assign the indexed element to the sp entry holding vec.
+         * Decrement the vector ref manually to optimize the case that
+         * this is the last ref to the vector.
+         */
+        if (vec->u.vec->ref == 1)
+        {
+            svalue_t *p, tmp;
+
+            /* Copy the indexed element into <tmp>
+             */
+#if !defined(NO_INLINES) && defined(__GNUC__)
+            tmp = const0;
+            /* gcc complains about tmp being clobbered */
+#endif
+            p = &vec->u.vec->item[ind];
+            if (destructed_object_ref(p))
+            {
+                free_svalue(p);
+                put_number(&tmp, 0);
+            }
+            else
+            {
+                tmp = *p;
+            }
+
+            /* Invalidate the old space of the result value and free
+             * the vector.
+             */
+            p->type = T_INVALID;
+            free_array(vec->u.vec);
+
+            /* Return the result */
+            *sp = tmp;
+            return sp;
+        }
+
+        deref_array(vec->u.vec);
+
+        /* The vector continues to live: keep the refcount as it is
+         * and just assign the indexed element for the result.
+         */
+        assign_checked_svalue_no_free(sp, &vec->u.vec->item[ind]);
+        return sp;
+
+    default:
+        inter_sp = sp;
+        inter_pc = pc;
+        error("(lvalue)Range index on illegal type '%s'.\n", typename(vec->type));
+        return NULL;
+    }
+
+    /* NOTREACHED */
+    return NULL;
+} /* push_aindexed_value() */
 
 /*=========================================================================*/
 /*-------------------------------------------------------------------------*/
@@ -9168,6 +9819,7 @@ again:
 
     CASE(F_NX_RANGE);               /* --- nx_range            --- */
     CASE(F_RX_RANGE);               /* --- rx_range            --- */
+    CASE(F_AX_RANGE);               /* --- ax_range            --- */
         /* Push '1' onto the stack to make up for the missing
          * upper range bound, then fall through to the normal
          * range handling.
@@ -9180,11 +9832,16 @@ again:
     CASE(F_NR_RANGE);               /* --- nr_range            --- */
     CASE(F_RN_RANGE);               /* --- rn_range            --- */
     CASE(F_RR_RANGE);               /* --- rr_range            --- */
+    CASE(F_NA_RANGE);               /* --- na_range            --- */
+    CASE(F_AN_RANGE);               /* --- an_range            --- */
+    CASE(F_RA_RANGE);               /* --- ra_range            --- */
+    CASE(F_AR_RANGE);               /* --- ar_range            --- */
+    CASE(F_AA_RANGE);               /* --- aa_range            --- */
       {
         /* Compute the range sp[-1]..sp[0] from string/array sp[-2]
          * and leave it on the stack.
-         * This code also handles the NX/RX_RANGE, pretending that
-         * they are NR/RR_RANGEs.
+         * This code also handles the NX/RX/AX_RANGE, pretending that
+         * they are NR/RR/AR_RANGEs.
          */
 
         if (sp[-1].type != T_NUMBER)
@@ -9207,16 +9864,40 @@ again:
 
             if (instruction == F_RANGE
              || instruction == F_NR_RANGE
+             || instruction == F_NA_RANGE
              || instruction == F_NX_RANGE)
                 i1 = sp[-1].u.number;
+            else
+            if (instruction == F_AN_RANGE
+             || instruction == F_AR_RANGE
+             || instruction == F_AA_RANGE
+             || instruction == F_AX_RANGE)
+            {
+                if (sp[-1].u.number < 0)
+                    i1 = size + sp[-1].u.number;
+                else
+                    i1 = sp[-1].u.number;
+            }
             else
                 i1 = size - sp[-1].u.number;
 
             if (instruction == F_RANGE
-             || instruction == F_RN_RANGE)
+             || instruction == F_RN_RANGE
+             || instruction == F_AN_RANGE)
                 i2 = sp[0].u.number;
             else
+            if (instruction == F_NA_RANGE
+             || instruction == F_RA_RANGE
+             || instruction == F_AA_RANGE)
+            {
+                if (sp[0].u.number < 0)
+                    i2 = size + sp[0].u.number;
+                else
+                    i2 = sp[0].u.number;
+            }
+            else
                 i2 = size - sp[0].u.number;
+
             if (i2 >= size)
                 i2 = size - 1;
 
@@ -9245,8 +9926,20 @@ again:
             len = (long)mstrsize(sp[-2].u.str);
             if (instruction == F_RANGE
              || instruction == F_NR_RANGE
-             || instruction == F_NX_RANGE)
+             || instruction == F_NX_RANGE
+             || instruction == F_NA_RANGE)
                 from = sp[-1].u.number;
+            else
+            if (instruction == F_AN_RANGE
+             || instruction == F_AR_RANGE
+             || instruction == F_AX_RANGE
+             || instruction == F_AA_RANGE)
+            {
+                if (sp[-1].u.number < 0)
+                    from = len + sp[-1].u.number;
+                else
+                    from = sp[-1].u.number;
+            }
             else
                 from = len - sp[-1].u.number;
             if (from < 0)
@@ -9255,8 +9948,19 @@ again:
             }
 
             if (instruction == F_RANGE
-             || instruction == F_RN_RANGE)
+             || instruction == F_RN_RANGE
+             || instruction == F_AN_RANGE)
                 to = sp[0].u.number;
+            else
+            if (instruction == F_NA_RANGE
+             || instruction == F_RA_RANGE
+             || instruction == F_AA_RANGE)
+            {
+                if (sp[0].u.number < 0)
+                    to = len + sp[0].u.number;
+                else
+                    to = sp[0].u.number;
+            }
             else
                 to = len - sp[0].u.number;
             if (to >= len)
@@ -10994,16 +11698,6 @@ again:
         /* Finish the setup */
         fp = inter_fp;
         pc = FUNCTION_CODE(funstart);
-#ifdef DEBUG
-    /* TODO: Once nobody complains, this can go */
-    if (!current_variables && variable_index_offset)
-        printf("DEBUG: %s:%d : call_inherited for object %p '%s', "
-               "program %p '%s' w/o variables, but offset %d\n"
-                 , __FILE__, __LINE__
-                 , current_object, get_txt(current_object->name)
-                 , current_prog, get_txt(current_prog->name)
-                 , variable_index_offset);
-#endif
         current_variables += variable_index_offset;
         current_strings = current_prog->strings;
         csp->extern_call = MY_FALSE;
@@ -11121,6 +11815,17 @@ again:
         sp = push_rindexed_lvalue(sp, pc);
         break;
 
+    CASE(F_PUSH_AINDEXED_LVALUE);   /* --- push_aindexed_lvalue --- */
+        /* Operator F_PUSH_AINDEXED_LVALUE(vector v=sp[-1], int i=sp[0])
+         *
+         * Compute the lvalue &(v[>i]) and push it into the stack. If v has
+         * just one ref left, the indexed item is stored in indexing_quickfix
+         * and the lvalue refers to that variable.
+         */
+
+        sp = push_aindexed_lvalue(sp, pc);
+        break;
+
     CASE(F_INDEX_LVALUE);           /* --- index_lvalue       --- */
         /* Operator F_INDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
          *          F_INDEX_LVALUE (mapping       &v=sp[0], mixed i=sp[-1])
@@ -11148,6 +11853,19 @@ again:
         sp = rindex_lvalue(sp, pc);
         break;
 
+    CASE(F_AINDEX_LVALUE);          /* --- aindex_lvalue      --- */
+        /* Operator F_AINDEX_LVALUE (string|vector &v=sp[0], int   i=sp[-1])
+         *
+         * Compute the index &(v[>i]) of lvalue <v> and push it into the
+         * stack. The computed index is a lvalue itself.
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary, and the pushed result will be a lvalue pointing to a
+         * CHAR_LVALUE stored in <special_lvalue>.
+         */
+
+        sp = aindex_lvalue(sp, pc);
+        break;
+
     CASE(F_INDEX);                  /* --- index              --- */
         /* Operator F_INDEX (string|vector v=sp[0], int   i=sp[-1])
          *          F_INDEX (mapping       v=sp[0], mixed i=sp[-1])
@@ -11171,6 +11889,17 @@ again:
          */
 
         sp = push_rindexed_value(sp, pc);
+        break;
+
+    CASE(F_AINDEX);                 /* --- aindex              --- */
+        /* Operator F_AINDEX (string|vector v=sp[0], int   i=sp[-1])
+         *
+         * Compute the value (v[<i]) and push it onto the stack.  If the value
+         * would be a destructed object, 0 is pushed onto the stack and the
+         * ref to the object is removed from the vector/mapping.
+         */
+
+        sp = push_aindexed_value(sp, pc);
         break;
 
     CASE(F_RANGE_LVALUE);           /* --- range_lvalue        --- */
@@ -11232,6 +11961,76 @@ again:
         sp = range_lvalue(RR_RANGE, sp);
         break;
 
+    CASE(F_NA_RANGE_LVALUE);           /* --- na_range_lvalue     --- */
+        /* Operator F_NA_RANGE_LVALUE (string|vector &v=sp[0]
+         *                         , int i2=sp[-1], i1=sp[-2])
+         *
+         * Compute the range &(v[i1..>i2]) of lvalue <v> and push it into the
+         * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the POINTER_RANGE_- resp.
+         * STRING_RANGE_LVALUE.
+         */
+
+        inter_pc = pc;
+        sp = range_lvalue(NA_RANGE, sp);
+        break;
+
+    CASE(F_AN_RANGE_LVALUE);           /* --- an_range_lvalue     --- */
+        /* Operator F_AN_RANGE_LVALUE (string|vector &v=sp[0]
+         *                         , int i2=sp[-1], i1=sp[-2])
+         *
+         * Compute the range &(v[>i1..i2]) of lvalue <v> and push it into the
+         * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the POINTER_RANGE_- resp.
+         * STRING_RANGE_LVALUE.
+         */
+
+        inter_pc = pc;
+        sp = range_lvalue(AN_RANGE, sp);
+        break;
+
+    CASE(F_RA_RANGE_LVALUE);           /* --- ra_range_lvalue     --- */
+        /* Operator F_RA_RANGE_LVALUE (string|vector &v=sp[0]
+         *                         , int i2=sp[-1], i1=sp[-2])
+         *
+         * Compute the range &(v[<i1..>i2]) of lvalue <v> and push it into the
+         * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the POINTER_RANGE_- resp.
+         * STRING_RANGE_LVALUE.
+         */
+
+        inter_pc = pc;
+        sp = range_lvalue(RA_RANGE, sp);
+        break;
+
+    CASE(F_AR_RANGE_LVALUE);           /* --- ar_range_lvalue     --- */
+        /* Operator F_AR_RANGE_LVALUE (string|vector &v=sp[0]
+         *                         , int i2=sp[-1], i1=sp[-2])
+         *
+         * Compute the range &(v[>i1..<i2]) of lvalue <v> and push it into the
+         * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the POINTER_RANGE_- resp.
+         * STRING_RANGE_LVALUE.
+         */
+
+        inter_pc = pc;
+        sp = range_lvalue(AR_RANGE, sp);
+        break;
+
+    CASE(F_AA_RANGE_LVALUE);           /* --- aa_range_lvalue     --- */
+        /* Operator F_AA_RANGE_LVALUE (string|vector &v=sp[0]
+         *                         , int i2=sp[-1], i1=sp[-2])
+         *
+         * Compute the range &(v[>i1..>i2]) of lvalue <v> and push it into the
+         * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the POINTER_RANGE_- resp.
+         * STRING_RANGE_LVALUE.
+         */
+
+        inter_pc = pc;
+        sp = range_lvalue(AA_RANGE, sp);
+        break;
+
     CASE(F_NX_RANGE_LVALUE);           /* --- nx_range_lvalue     --- */
         /* Operator F_NX_RANGE_LVALUE (string|vector &v=sp[0]
          *                            , int i1=sp[-1])
@@ -11272,6 +12071,26 @@ again:
         sp = range_lvalue(RR_RANGE, sp);
         break;
 
+    CASE(F_AX_RANGE_LVALUE);           /* --- ax_range_lvalue     --- */
+        /* Operator F_AX_RANGE_LVALUE (string|vector &v=sp[0]
+         *                            , int i1=sp[-1])
+         *
+         * Compute the range &(v[>i1..]) of lvalue <v> and push it into the
+         * stack.  The value pushed is a lvalue pointing to <special_lvalue>.
+         * <special_lvalue> then is the POINTER_RANGE_- resp.
+         * STRING_RANGE_LVALUE.
+         *
+         * We implement this by pushing '1' onto the stack and then
+         * call F_AR_RANGE_LVALUE, effectively computing &(v[>i1..<1]).
+         */
+
+        inter_pc = pc;
+        sp++;
+        sp[0] = sp[-1];       /* Pull up the 'v' */
+        put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
+        sp = range_lvalue(AR_RANGE, sp);
+        break;
+
                           /* --- push_protected_indexed_lvalue --- */
     CASE(F_PUSH_PROTECTED_INDEXED_LVALUE);
         /* Op. (vector  v=sp[-1], int   i=sp[0])
@@ -11295,6 +12114,18 @@ again:
          */
 
         sp = push_protected_rindexed_lvalue(sp, pc);
+        break;
+
+                         /* --- push_protected_aindexed_lvalue --- */
+    CASE(F_PUSH_PROTECTED_AINDEXED_LVALUE);
+        /* Op. (vector v=sp[-1], int i=sp[0])
+         *
+         * Compute the lvalue &(v[>i]), store it in a struct
+         * protected_lvalue, and push the protector as PROTECTED_LVALUE
+         * into the stack.
+         */
+
+        sp = push_protected_aindexed_lvalue(sp, pc);
         break;
 
                       /* --- push_protected_indexed_map_lvalue --- */
@@ -11348,6 +12179,26 @@ again:
          */
 
         sp = protected_rindex_lvalue(sp, pc);
+        break;
+
+                                /* --- protected_aindex_lvalue --- */
+    CASE(F_PROTECTED_AINDEX_LVALUE);
+        /* Operator (string|vector &v=sp[0], int   i=sp[-1])
+         *
+         * Compute the index &(*v[>i]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector as
+         * PROTECTED_LVALUE onto the stack.
+         *
+         * If <v> is a protected non-string-lvalue, the protected_lvalue
+         * referenced by <v>.u.lvalue will be deallocated, and the
+         * protector itself will be stored in <last_indexing_protector>
+         * for the time being.
+         *
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary.
+         */
+
+        sp = protected_aindex_lvalue(sp, pc);
         break;
 
                               /* --- protected_range_lvalue --- */
@@ -11426,6 +12277,101 @@ again:
         sp = protected_range_lvalue(RR_RANGE, sp);
         break;
 
+                           /* --- protected_na_range_lvalue --- */
+    CASE(F_PROTECTED_NA_RANGE_LVALUE);
+        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
+         *
+         * Compute the range &(v[i1..>i2]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector onto the
+         * stack.
+         *
+         * If <v> is a protected lvalue itself, its protecting svalue will
+         * be used in the result protector.
+         *
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary.
+         */
+
+        inter_pc = pc;
+        sp = protected_range_lvalue(NA_RANGE, sp);
+        break;
+
+                             /* --- protected_an_range_lvalue --- */
+    CASE(F_PROTECTED_AN_RANGE_LVALUE);
+        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
+         *
+         * Compute the range &(v[>i1..i2]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector onto the
+         * stack.
+         *
+         * If <v> is a protected lvalue itself, its protecting svalue will
+         * be used in the result protector.
+         *
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary.
+         */
+
+        inter_pc = pc;
+        sp = protected_range_lvalue(AN_RANGE, sp);
+        break;
+
+                           /* --- protected_ra_range_lvalue --- */
+    CASE(F_PROTECTED_RA_RANGE_LVALUE);
+        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
+         *
+         * Compute the range &(v[<i1..>i2]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector onto the
+         * stack.
+         *
+         * If <v> is a protected lvalue itself, its protecting svalue will
+         * be used in the result protector.
+         *
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary.
+         */
+
+        inter_pc = pc;
+        sp = protected_range_lvalue(RA_RANGE, sp);
+        break;
+
+                             /* --- protected_ar_range_lvalue --- */
+    CASE(F_PROTECTED_AR_RANGE_LVALUE);
+        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
+         *
+         * Compute the range &(v[>i1..<i2]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector onto the
+         * stack.
+         *
+         * If <v> is a protected lvalue itself, its protecting svalue will
+         * be used in the result protector.
+         *
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary.
+         */
+
+        inter_pc = pc;
+        sp = protected_range_lvalue(AR_RANGE, sp);
+        break;
+
+                             /* --- protected_aa_range_lvalue --- */
+    CASE(F_PROTECTED_AA_RANGE_LVALUE);
+        /* Operator (string|vector &v=sp[0], int i2=sp[-1], i1=sp[-2])
+         *
+         * Compute the range &(v[>i1..>i2]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector onto the
+         * stack.
+         *
+         * If <v> is a protected lvalue itself, its protecting svalue will
+         * be used in the result protector.
+         *
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary.
+         */
+
+        inter_pc = pc;
+        sp = protected_range_lvalue(AA_RANGE, sp);
+        break;
+
                               /* --- protected_nx_range_lvalue --- */
     CASE(F_PROTECTED_NX_RANGE_LVALUE);
         /* Operator (string|vector &v=sp[0], i1=sp[-1])
@@ -11468,7 +12414,7 @@ again:
          *
          * We implement it by pushing '1' onto the stack and then
          * calling protected_nr_range_lvalue, effectively computing
-         * &(v[i1..<1]).
+         * &(v[<i1..<1]).
          */
 
         inter_pc = pc;
@@ -11476,6 +12422,32 @@ again:
         sp[0] = sp[-1];       /* Pull up the 'v' */
         put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
         sp = protected_range_lvalue(RR_RANGE, sp);
+        break;
+
+                          /* --- protected_ax_range_lvalue --- */
+    CASE(F_PROTECTED_AX_RANGE_LVALUE);
+        /* Operator (string|vector &v=sp[0], int i1=sp[-1])
+         *
+         * Compute the range &(v[>i1..]) of lvalue <v>, wrap it into a
+         * protector, and push the reference to the protector onto the
+         * stack.
+         *
+         * If <v> is a protected lvalue itself, its protecting svalue will
+         * be used in the result protector.
+         *
+         * If <v> is a string-lvalue, it is made a malloced string if
+         * necessary.
+         *
+         * We implement it by pushing '1' onto the stack and then
+         * calling protected_ar_range_lvalue, effectively computing
+         * &(v[>i1..<1]).
+         */
+
+        inter_pc = pc;
+        sp++;
+        sp[0] = sp[-1];       /* Pull up the 'v' */
+        put_number(sp-1, 1);  /* 'Push' the 1 for the upper bound */
+        sp = protected_range_lvalue(AR_RANGE, sp);
         break;
 
     CASE(F_SIMUL_EFUN);             /* --- simul_efun <code>   --- */

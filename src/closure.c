@@ -3127,21 +3127,40 @@ compile_value (svalue_t *value, int opt_flags)
                  */
                 case F_NX_RANGE:
                 case F_RX_RANGE:
+                case F_AX_RANGE:
                   {
                     /* This is compiled as:
                      *     <value>
                      *     <index>
                      *     CONST1
-                     *     NR_RANGE/RR_RANGE
+                     *     NR_RANGE/RR_RANGE/AR_RANGE
                      */
 
-                    Bool is_rindex;
+                    bytecode_t opcode = (type - CLOSURE_OPERATOR);
+                    const char *opname;
 
-                    is_rindex = ((type - CLOSURE_OPERATOR) == F_RX_RANGE);
-                    
+                    switch (type - CLOSURE_OPERATOR)
+                    {
+                    case F_NX_RANGE:
+                        opcode = F_NR_RANGE;
+                        opname = "#'[..";
+                        break;
+                    case F_RX_RANGE:
+                        opcode = F_RR_RANGE;
+                        opname = "#'[<..";
+                        break;
+                    case F_AX_RANGE:
+                        opcode = F_AR_RANGE;
+                        opname = "#'[>..";
+                        break;
+                    default:
+                        fatal("Illegal operator %d\n", type - CLOSURE_OPERATOR);
+                        break;
+                    }
+
                     if (block_size != 3)
                         lambda_error("Bad number of arguments to %s\n"
-                                    , is_rindex ? "#'[<.." : "#'[..");
+                                    , opname);
                         
                     compile_value(++argp, REF_REJECTED);
 
@@ -3157,7 +3176,7 @@ compile_value (svalue_t *value, int opt_flags)
                         realloc_code();
                     current.code_left -= 2;
                     STORE_CODE(current.codep, F_CONST1);
-                    STORE_CODE(current.codep, is_rindex ? F_RR_RANGE : F_NR_RANGE);
+                    STORE_CODE(current.codep, opcode);
                     break;
                   }
 
@@ -4049,6 +4068,7 @@ is_lvalue (svalue_t *argp, int index_lvalue)
             {
               case F_INDEX +CLOSURE_EFUN:
               case F_RINDEX+CLOSURE_EFUN:
+              case F_AINDEX+CLOSURE_EFUN:
               case CLOSURE_IDENTIFIER:
                 return MY_TRUE;
             }
@@ -4121,6 +4141,7 @@ compile_lvalue (svalue_t *argp, int flags)
              */
             case F_INDEX +CLOSURE_EFUN:
             case F_RINDEX+CLOSURE_EFUN:
+            case F_AINDEX+CLOSURE_EFUN:
                 if (VEC_SIZE(block) == 3)
                 {
                     /* Indexing of an array or normal mapping.
@@ -4134,16 +4155,32 @@ compile_lvalue (svalue_t *argp, int flags)
                         if (flags & PROTECT_LVALUE)
                         {
                             current.code_left -= 1;
-                            STORE_CODE(current.codep, (bytecode_t)(
-                              argp->x.closure_type == F_RINDEX +CLOSURE_EFUN ?
-                                F_PROTECTED_RINDEX_LVALUE :
-                                F_PROTECTED_INDEX_LVALUE ));
+                            if (argp->x.closure_type == F_INDEX + CLOSURE_EFUN)
+                                STORE_CODE(current.codep
+                                          , (bytecode_t)
+                                            (F_PROTECTED_INDEX_LVALUE));
+                            else if (argp->x.closure_type == F_RINDEX + CLOSURE_EFUN)
+                                STORE_CODE(current.codep
+                                          , (bytecode_t)
+                                            (F_PROTECTED_RINDEX_LVALUE));
+                            else 
+                                STORE_CODE(current.codep
+                                          , (bytecode_t)
+                                            (F_PROTECTED_AINDEX_LVALUE));
                         } else {
                             current.code_left -= 1;
-                            STORE_CODE(current.codep, (bytecode_t)(
-                              argp->x.closure_type == F_RINDEX + CLOSURE_EFUN ?
-                                F_RINDEX_LVALUE :
-                                F_INDEX_LVALUE));
+                            if (argp->x.closure_type == F_INDEX + CLOSURE_EFUN)
+                                STORE_CODE(current.codep
+                                          , (bytecode_t)
+                                            (F_INDEX_LVALUE));
+                            else if (argp->x.closure_type == F_RINDEX + CLOSURE_EFUN)
+                                STORE_CODE(current.codep
+                                          , (bytecode_t)
+                                            (F_RINDEX_LVALUE));
+                            else 
+                                STORE_CODE(current.codep
+                                          , (bytecode_t)
+                                            (F_AINDEX_LVALUE));
                         }
                         return;
                     }
@@ -4154,16 +4191,32 @@ compile_lvalue (svalue_t *argp, int flags)
                         realloc_code();
                     if (flags & PROTECT_LVALUE) {
                         current.code_left -= 1;
-                        STORE_CODE(current.codep, (bytecode_t)(
-                          argp->x.closure_type == F_RINDEX +CLOSURE_EFUN ?
-                            F_PUSH_PROTECTED_RINDEXED_LVALUE :
-                            F_PUSH_PROTECTED_INDEXED_LVALUE ));
+                        if (argp->x.closure_type == F_INDEX + CLOSURE_EFUN)
+                            STORE_CODE(current.codep
+                                      , (bytecode_t)
+                                        (F_PUSH_PROTECTED_INDEXED_LVALUE));
+                        else if (argp->x.closure_type == F_RINDEX + CLOSURE_EFUN)
+                            STORE_CODE(current.codep
+                                      , (bytecode_t)
+                                        (F_PUSH_PROTECTED_RINDEXED_LVALUE));
+                        else 
+                            STORE_CODE(current.codep
+                                      , (bytecode_t)
+                                        (F_PUSH_PROTECTED_AINDEXED_LVALUE));
                     } else {
                         current.code_left -= 1;
-                        STORE_CODE(current.codep, (bytecode_t)(
-                          argp->x.closure_type == F_RINDEX +CLOSURE_EFUN ?
-                            F_PUSH_RINDEXED_LVALUE :
-                            F_PUSH_INDEXED_LVALUE));
+                        if (argp->x.closure_type == F_INDEX + CLOSURE_EFUN)
+                            STORE_CODE(current.codep
+                                      , (bytecode_t)
+                                        (F_PUSH_INDEXED_LVALUE));
+                        else if (argp->x.closure_type == F_RINDEX + CLOSURE_EFUN)
+                            STORE_CODE(current.codep
+                                      , (bytecode_t)
+                                        (F_PUSH_RINDEXED_LVALUE));
+                        else 
+                            STORE_CODE(current.codep
+                                      , (bytecode_t)
+                                        (F_PUSH_AINDEXED_LVALUE));
                     }
                     return;
                 } /* if (VEC_SIZE(block) == 3) */
@@ -4224,10 +4277,20 @@ compile_lvalue (svalue_t *argp, int flags)
             /* ({#'[..<], map/array, index, index })
              * ({#'[<..], map/array, index, index })
              * ({#'[<..<], map/array, index, index })
+             * ({#'[..>], map/array, index, index })
+             * ({#'[>..], map/array, index, index })
+             * ({#'[<..>], map/array, index, index })
+             * ({#'[>..<], map/array, index, index })
+             * ({#'[>..>], map/array, index, index })
              */
             case F_NR_RANGE +CLOSURE_EFUN:
             case F_RN_RANGE +CLOSURE_EFUN:
             case F_RR_RANGE +CLOSURE_EFUN:
+            case F_NA_RANGE +CLOSURE_EFUN:
+            case F_AN_RANGE +CLOSURE_EFUN:
+            case F_RA_RANGE +CLOSURE_EFUN:
+            case F_AR_RANGE +CLOSURE_EFUN:
+            case F_AA_RANGE +CLOSURE_EFUN:
               {
               	int code;
               	
@@ -4248,6 +4311,25 @@ compile_lvalue (svalue_t *argp, int flags)
                 case F_RR_RANGE+CLOSURE_EFUN:
                     code = (flags & PROTECT_LVALUE) ? F_PROTECTED_RR_RANGE_LVALUE
                                                     : F_RR_RANGE_LVALUE;
+                case F_NA_RANGE+CLOSURE_EFUN:
+                    code = (flags & PROTECT_LVALUE) ? F_PROTECTED_NA_RANGE_LVALUE
+                                                    : F_NA_RANGE_LVALUE;
+                    break;
+                case F_AN_RANGE+CLOSURE_EFUN:
+                    code = (flags & PROTECT_LVALUE) ? F_PROTECTED_AN_RANGE_LVALUE
+                                                    : F_AN_RANGE_LVALUE;
+                    break;
+                case F_RA_RANGE+CLOSURE_EFUN:
+                    code = (flags & PROTECT_LVALUE) ? F_PROTECTED_RA_RANGE_LVALUE
+                                                    : F_RA_RANGE_LVALUE;
+                    break;
+                case F_AR_RANGE+CLOSURE_EFUN:
+                    code = (flags & PROTECT_LVALUE) ? F_PROTECTED_AR_RANGE_LVALUE
+                                                    : F_AR_RANGE_LVALUE;
+                    break;
+                case F_AA_RANGE+CLOSURE_EFUN:
+                    code = (flags & PROTECT_LVALUE) ? F_PROTECTED_AA_RANGE_LVALUE
+                                                    : F_AA_RANGE_LVALUE;
                     break;
                 }
 
@@ -4637,15 +4719,22 @@ symbol_operator (char *symbol, char **endp)
  *   #'!      -> F_NOT                  
  *   #'?!     -> F_BRANCH_WHEN_NON_ZERO 
  *   #'?      -> F_BRANCH_WHEN_ZERO     
- *   #'[<..]  -> F_RN_RANGE             
- *   #'[<..<] -> F_RR_RANGE             
- *   #'[<..   -> F_RX_RANGE       
- *   #'[<     -> F_RINDEX               
  *   #'[..]   -> F_RANGE                
  *   #'[..<]  -> F_NR_RANGE             
+ *   #'[<..]  -> F_RN_RANGE             
+ *   #'[<..<] -> F_RR_RANGE             
+ *   #'[..>]  -> F_NA_RANGE             
+ *   #'[>..]  -> F_AN_RANGE             
+ *   #'[<..>] -> F_RA_RANGE             
+ *   #'[>..<] -> F_AR_RANGE             
+ *   #'[>..>] -> F_AA_RANGE             
  *   #'[..    -> F_NX_RANGE
+ *   #'[<..   -> F_RX_RANGE       
+ *   #'[>..   -> F_AX_RANGE       
  *   #'[,]    -> F_MAP_INDEX            
  *   #'[      -> F_INDEX                
+ *   #'[<     -> F_RINDEX               
+ *   #'[>     -> F_AINDEX               
  *   #'({     -> F_AGGREGATE            
  *   #'([     -> F_M_CAGGREGATE         
  *
@@ -4872,6 +4961,12 @@ symbol_operator (char *symbol, char **endp)
                     ret = F_RN_RANGE;
                     break;
                 }
+                else if (c == '>' && symbol[1] == ']')
+                {
+                    symbol++;
+                    ret = F_RA_RANGE;
+                    break;
+                }
                 else if (c == '<' && symbol[1] == ']')
                 {
                     symbol++;
@@ -4885,11 +4980,44 @@ symbol_operator (char *symbol, char **endp)
             ret = F_RINDEX;
             break;
         }
+        else if (c == '>')
+        {
+            if (symbol[1] == '.' && symbol[2] == '.')
+            {
+                c = *(symbol+=3);
+                if (c == ']')
+                {
+                    ret = F_AN_RANGE;
+                    break;
+                }
+                else if (c == '>' && symbol[1] == ']')
+                {
+                    symbol++;
+                    ret = F_AA_RANGE;
+                    break;
+                }
+                else if (c == '<' && symbol[1] == ']')
+                {
+                    symbol++;
+                    ret = F_AR_RANGE;
+                    break;
+                }
+                symbol--;
+                ret = F_AX_RANGE;
+                break;
+            }
+            ret = F_AINDEX;
+            break;
+        }
         else if (c == '.' && symbol[1] == '.')
         {
             c = *(symbol+=2);
             if (c == ']') {
                 ret = F_RANGE;
+                break;
+            } else if (c == '>' && symbol[1] == ']') {
+                symbol++;
+                ret = F_NA_RANGE;
                 break;
             } else if (c == '<' && symbol[1] == ']') {
                 symbol++;

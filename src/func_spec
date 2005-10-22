@@ -69,7 +69,7 @@
 #endif
         local
         catch
- 	catch_no_log
+        catch_no_log
 "++"    inc
 "--"    dec
 "x++"   post_inc
@@ -80,31 +80,41 @@
 "||"    lor
 "="     assign
 "(void)="  void_assign
-"+"     add
-"-"	subtract
-"*"     multiply
-"/"     divide
-"%"     mod
-">"     gt
-">="    ge
-"<"     lt
-"<="    le
-"=="    eq
-"!="    ne
-"~"     compl
-"&"     and
-"|"     or
-"^"     xor
-"<<"    lsh
-">>"    rsh
-">>>"   rshl
-"!"     not
-".."    range
-"..<"   nr_range
-"<.."   rn_range
-"<..<"  rr_range
-        nx_range
-        rx_range
+"+"     add       binary
+"-"     subtract  binary
+"*"     multiply  binary
+"/"     divide    binary
+"%"     mod       binary
+">"     gt        binary
+">="    ge        binary
+"<"     lt        binary
+"<="    le        binary
+"=="    eq        binary
+"!="    ne        binary
+"~"     compl     unary
+"&"     and       binary
+"|"     or        binary
+"^"     xor       binary
+"<<"    lsh       binary
+">>"    rsh       binary
+">>>"   rshl      binary
+"!"     not       unary
+        index     binary
+        rindex    binary
+        aindex    binary
+        map_index ternary
+".."    range     ternary
+"..<"   nr_range  ternary
+"<.."   rn_range  ternary
+"<..<"  rr_range  ternary
+"..>"   na_range  ternary
+"<..>"  ra_range  ternary
+">.."   an_range  ternary
+">..<"  ar_range  ternary
+">..>"  aa_range  ternary
+        nx_range  binary
+        rx_range  binary
+        ax_range  binary
 "(void)+=" void_add_eq
 "+="    add_eq
 "-="    sub_eq
@@ -149,27 +159,41 @@
         push_local_variable_lvalue
         push_indexed_lvalue
         push_rindexed_lvalue
+        push_aindexed_lvalue
         index_lvalue
         rindex_lvalue
-        index
-        rindex
+        aindex_lvalue
         range_lvalue
         nr_range_lvalue
         rn_range_lvalue
         rr_range_lvalue
+        na_range_lvalue
+        ra_range_lvalue
+        an_range_lvalue
+        ar_range_lvalue
+        aa_range_lvalue
         nx_range_lvalue
         rx_range_lvalue
+        ax_range_lvalue
         push_protected_indexed_lvalue
         push_protected_rindexed_lvalue
+        push_protected_aindexed_lvalue
         push_protected_indexed_map_lvalue
         protected_index_lvalue
         protected_rindex_lvalue
+        protected_aindex_lvalue
         protected_range_lvalue
         protected_nr_range_lvalue
         protected_rn_range_lvalue
         protected_rr_range_lvalue
+        protected_na_range_lvalue
+        protected_ra_range_lvalue
+        protected_an_range_lvalue
+        protected_ar_range_lvalue
+        protected_aa_range_lvalue
         protected_nx_range_lvalue
         protected_rx_range_lvalue
+        protected_ax_range_lvalue
         simul_efun
         aggregate
         m_aggregate
@@ -177,7 +201,6 @@
         previous_object0
         lambda_cconstant
         lambda_constant
-        map_index
         push_indexed_map_lvalue
         foreach
         foreach_ref

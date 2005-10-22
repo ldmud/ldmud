@@ -186,31 +186,33 @@ void localcmd()
 mixed *unique_array(mixed *arr,string func,mixed skipnum)
 {
     mixed *al, last;
+    mapping m;
     int i, j, k, *ordinals;
 
-    if (sizeof(arr) < 32) return efun::unique_array(arr, func, skipnum);
+    if (sizeof(arr) < 32)
+        return efun::unique_array(arr, func, skipnum);
     for (ordinals = allocate(i = sizeof(arr)); i--; )
-	ordinals[i] = i;
-    al = order_alist(map_objects(arr, func), ordinals, (ordinals=0,arr));
-    arr = al[2];
-    ordinals = al[1];
-    al = al[0];
+	    ordinals[i] = i;
+    m = mkmapping(map_objects(arr, func), ordinals, arr);
+    al = m_indices(m);
+    ordinals = m_values(m, 0);
+    arr = m_values(m, 1);
     if (k = i = sizeof(al)) {
-	for (last = al[j = --i]; i--; ) {
-	    if (al[i] != last) {
-		if (last != skipnum) {
-		    arr[--k] = arr[i+1..j];
-		    ordinals[k] = ordinals[j];
-		}
-		last = al[j = i];
-	    }
-	}
-	if (last != skipnum) {
-	    arr[--k] = arr[0..j];
-	    ordinals[k] = ordinals[j];
-	}
+        for (last = al[j = --i]; i--; ) {
+            if (al[i] != last) {
+                if (last != skipnum) {
+                    arr[--k] = arr[i+1..j];
+                    ordinals[k] = ordinals[j];
+                }
+                last = al[j = i];
+            }
+        }
+        if (last != skipnum) {
+            arr[--k] = arr[0..j];
+            ordinals[k] = ordinals[j];
+        }
     }
-    return order_alist(ordinals[k..], arr[k..])[1];
+    return m_values(mkmapping(ordinals[k..], arr[k..]),0);
 }
 
 //---------------------------------------------------------------------------
@@ -308,10 +310,12 @@ varargs void wizlist(string name)
     cmds = a[WL_COMMANDS];
     a[WL_COMMANDS] = a[0];
     a[0] = cmds;
-    a = order_alist(a);
+
+    a = unmkmapping(apply(#'mkmapping, a));
     cmds = a[0];
     a[0] = a[WL_COMMANDS];
     a[WL_COMMANDS] = cmds;
+
     if ((pos = member(a[WL_NAME], name)) < 0 && name != "ALL")
         return;
     b = allocate(sizeof(cmds));

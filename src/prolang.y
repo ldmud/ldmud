@@ -2821,12 +2821,19 @@ free_const_list_svalue (svalue_t *svp)
        * .inst gives the type of the operation:
        *   F_INDEX:     [x]
        *   F_RINDEX:    [<x]
+       *   F_AINDEX:    [>x]
        *   F_RANGE:     [ x.. y]
        *   F_RN_RANGE:  [<x.. y]
        *   F_NR_RANGE:  [ x..<y]
        *   F_RR_RANGE:  [<x..<y]
+       *   F_AN_RANGE:  [>x.. y]
+       *   F_AR_RANGE:  [>x..<y]
+       *   F_NA_RANGE:  [ x..>y]
+       *   F_RA_RANGE:  [<x..>y]
+       *   F_AA_RANGE:  [>x..>y]
        *   F_NX_RANGE:  [ x..  ]
        *   F_RX_RANGE:  [<x..  ]
+       *   F_AX_RANGE:  [>x..  ]
        * .start and .end are the bytecode limits of the whole
        * operation.
        * .type1 and optionally .type2 are the types of the
@@ -6545,8 +6552,12 @@ expr0:
                       p[-3] = $2.code;
                   else
                       p[-1] = $2.code;
-                  *p++ = ($3.inst == F_INDEX) ? F_INDEX_LVALUE
-                                              : F_RINDEX_LVALUE;
+                  if ($3.inst == F_INDEX)
+                      *p++ = F_INDEX_LVALUE;
+                  else if ($3.inst == F_RINDEX)
+                      *p++ = F_RINDEX_LVALUE;
+                  else
+                      *p++ = F_AINDEX_LVALUE;
               }
               else
               {
@@ -6562,8 +6573,12 @@ expr0:
                       *p = p[2];
                   *p++ = $2.code;
                   *p++ = i;
-                  *p++ = ($3.inst == F_INDEX) ? F_INDEX_LVALUE
-                                              : F_RINDEX_LVALUE;
+                  if ($3.inst == F_INDEX)
+                      *p++ = F_INDEX_LVALUE;
+                  else if ($3.inst == F_RINDEX)
+                      *p++ = F_RINDEX_LVALUE;
+                  else
+                      *p++ = F_AINDEX_LVALUE;
               }
           }
           else
@@ -6571,8 +6586,12 @@ expr0:
               if (current + 2 > mem_block[A_PROGRAM].max_size)
                   realloc_a_program();
               p = PROGRAM_BLOCK + start;
-              *p++ = ($3.inst == F_INDEX) ? F_PUSH_INDEXED_LVALUE
-                                          : F_PUSH_RINDEXED_LVALUE;
+              if ($3.inst == F_INDEX)
+                  *p++ = F_PUSH_INDEXED_LVALUE;
+              else if ($3.inst == F_RINDEX)
+                  *p++ = F_PUSH_RINDEXED_LVALUE;
+              else
+                  *p++ = F_PUSH_AINDEXED_LVALUE;
           }
 
           /* Finally store the actual instruction */
@@ -7111,9 +7130,13 @@ expr4:
               arrange_protected_lvalue($3.start, $3.code, $3.end,
                  F_PROTECTED_INDEX_LVALUE
               );
-          else
+          else if ($4.inst == F_RINDEX)
               arrange_protected_lvalue($3.start, $3.code, $3.end,
                  F_PROTECTED_RINDEX_LVALUE
+              );
+          else
+              arrange_protected_lvalue($3.start, $3.code, $3.end,
+                 F_PROTECTED_AINDEX_LVALUE
               );
 
           $$.start = $3.start;
@@ -7203,8 +7226,14 @@ expr4:
           case F_NR_RANGE: prot_op = F_PROTECTED_NR_RANGE_LVALUE; break;
           case F_RN_RANGE: prot_op = F_PROTECTED_RN_RANGE_LVALUE; break;
           case F_RR_RANGE: prot_op = F_PROTECTED_RR_RANGE_LVALUE; break;
+          case F_NA_RANGE: prot_op = F_PROTECTED_NA_RANGE_LVALUE; break;
+          case F_AN_RANGE: prot_op = F_PROTECTED_AN_RANGE_LVALUE; break;
+          case F_RA_RANGE: prot_op = F_PROTECTED_RA_RANGE_LVALUE; break;
+          case F_AR_RANGE: prot_op = F_PROTECTED_AR_RANGE_LVALUE; break;
+          case F_AA_RANGE: prot_op = F_PROTECTED_AA_RANGE_LVALUE; break;
           case F_NX_RANGE: prot_op = F_PROTECTED_NX_RANGE_LVALUE; break;
           case F_RX_RANGE: prot_op = F_PROTECTED_RX_RANGE_LVALUE; break;
+          case F_AX_RANGE: prot_op = F_PROTECTED_AX_RANGE_LVALUE; break;
           default:
               fatal("Unsupported range type %d %s\n"
                    , $4.inst, get_f_name($4.inst));
@@ -7328,10 +7357,15 @@ expr4:
               $$.code = F_PUSH_INDEXED_LVALUE;
               ins_f_code(F_INDEX);
           }
-          else
+          else if ($2.inst == F_RINDEX)
           {
               $$.code = F_PUSH_RINDEXED_LVALUE;
               ins_f_code(F_RINDEX);
+          }
+          else
+          {
+              $$.code = F_PUSH_AINDEXED_LVALUE;
+              ins_f_code(F_AINDEX);
           }
 
           if ($2.type1 & TYPE_MOD_REFERENCE)
@@ -7438,9 +7472,12 @@ lvalue:
                       p[end] = $1.code;
                   memcpy(q, p + start2, current - start2);
                   memcpy(q + current - start2, p + start, start2 - start);
-                  q[current - start] = ($2.inst == F_INDEX)
-                                        ? F_INDEX_LVALUE
-                                        : F_RINDEX_LVALUE;
+                  if ($2.inst == F_INDEX)
+                      q[current - start] = F_INDEX_LVALUE;
+                  else if ($2.inst == F_RINDEX)
+                      q[current - start] = F_RINDEX_LVALUE;
+                  else 
+                      q[current - start] = F_AINDEX_LVALUE;
               }
               else
               {
@@ -7453,9 +7490,12 @@ lvalue:
                   p = q + current - start2;
                   *p++ = $1.code;
                   *p++ = c;
-                  *p = ($2.inst == F_INDEX)
-                        ? F_INDEX_LVALUE
-                        : F_RINDEX_LVALUE;
+                  if ($2.inst == F_INDEX)
+                      *p = F_INDEX_LVALUE;
+                  else if ($2.inst == F_RINDEX)
+                      *p = F_RINDEX_LVALUE;
+                  else 
+                      *p = F_AINDEX_LVALUE;
               }
           }
           else
@@ -7464,9 +7504,12 @@ lvalue:
                * and add a PUSH_(R)INDEXED_LVALUE
                */
               memcpy(q, p + start, current - start);
-              q[current - start] = ($2.inst == F_INDEX)
-                                    ? F_PUSH_INDEXED_LVALUE
-                                    : F_PUSH_RINDEXED_LVALUE;
+              if ($2.inst == F_INDEX)
+                  q[current - start] = F_PUSH_INDEXED_LVALUE;
+              else if ($2.inst == F_RINDEX)
+                  q[current - start] = F_PUSH_RINDEXED_LVALUE;
+              else 
+                  q[current - start] = F_PUSH_AINDEXED_LVALUE;
           }
 
           /* This is what we return */
@@ -7577,8 +7620,14 @@ lvalue:
           case F_NR_RANGE: indexing_code = F_NR_RANGE_LVALUE; break;
           case F_RN_RANGE: indexing_code = F_RN_RANGE_LVALUE; break;
           case F_RR_RANGE: indexing_code = F_RR_RANGE_LVALUE; break;
+          case F_NA_RANGE: indexing_code = F_NA_RANGE_LVALUE; break;
+          case F_AN_RANGE: indexing_code = F_AN_RANGE_LVALUE; break;
+          case F_RA_RANGE: indexing_code = F_RA_RANGE_LVALUE; break;
+          case F_AR_RANGE: indexing_code = F_AR_RANGE_LVALUE; break;
+          case F_AA_RANGE: indexing_code = F_AA_RANGE_LVALUE; break;
           case F_NX_RANGE: indexing_code = F_NX_RANGE_LVALUE; break;
           case F_RX_RANGE: indexing_code = F_RX_RANGE_LVALUE; break;
+          case F_AX_RANGE: indexing_code = F_AX_RANGE_LVALUE; break;
           default:
               error("Unsupported range type %d %s\n"
                    , $2.inst, get_f_name($2.inst));
@@ -7745,6 +7794,14 @@ index_expr :
             $$.type1 = $3.type;
         }
 
+    | '[' '>' expr0 ']'
+        {
+            $$.inst = F_AINDEX;
+            $$.start = $3.start;
+            $$.end = $3.end;
+            $$.type1 = $3.type;
+        }
+
 ; /* index_expr */
 
 index_range :
@@ -7817,6 +7874,40 @@ index_range :
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '['           L_RANGE '>' expr0 ']'
+
+      {
+          /* Simulate an expression yielding 0 for the lower bound.
+           * We pretend that it's part of the upper bound expr.
+           */
+          
+          p_int current;
+          p_int length;
+          bytecode_p mark, p;
+
+          current = CURRENT_PROGRAM_SIZE;
+              
+          while (current + 1 > mem_block[A_PROGRAM].max_size)
+              realloc_a_program();
+
+          mark = PROGRAM_BLOCK + $4.start;
+          p = PROGRAM_BLOCK + current;
+          length = current - $4.start;
+          for( ; --length >= 0; p--) PUT_CODE(p, GET_CODE(p-1));
+          STORE_CODE(mark, F_CONST0);
+          CURRENT_PROGRAM_SIZE++;
+          $4.end++;
+
+          /* Return the data */
+
+          $$.inst  = F_NA_RANGE;
+          $$.start = $4.start;
+          $$.end   = $4.end;
+          $$.type1 = TYPE_NUMBER;
+          $$.type2 = $4.type;
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '['     expr0 L_RANGE     expr0 ']'
       {
           $$.inst  = F_RANGE;
@@ -7857,6 +7948,56 @@ index_range :
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '['     expr0 L_RANGE '>' expr0 ']'
+      {
+          $$.inst  = F_NA_RANGE;
+          $$.start = $2.start;
+          $$.end   = $5.end;
+          $$.type1 = $2.type;
+          $$.type2 = $5.type;
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' '>' expr0 L_RANGE     expr0 ']'
+      {
+          $$.inst  = F_AN_RANGE;
+          $$.start = $3.start;
+          $$.end   = $5.end;
+          $$.type1 = $3.type;
+          $$.type2 = $5.type;
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' '<' expr0 L_RANGE '>' expr0 ']'
+      {
+          $$.inst  = F_RA_RANGE;
+          $$.start = $3.start;
+          $$.end   = $6.end;
+          $$.type1 = $3.type;
+          $$.type2 = $6.type;
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' '>' expr0 L_RANGE '<' expr0 ']'
+      {
+          $$.inst  = F_AR_RANGE;
+          $$.start = $3.start;
+          $$.end   = $6.end;
+          $$.type1 = $3.type;
+          $$.type2 = $6.type;
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' '>' expr0 L_RANGE '>' expr0 ']'
+      {
+          $$.inst  = F_AA_RANGE;
+          $$.start = $3.start;
+          $$.end   = $6.end;
+          $$.type1 = $3.type;
+          $$.type2 = $6.type;
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '['     expr0 L_RANGE           ']'
       {
           $$.inst  = F_NX_RANGE;
@@ -7874,6 +8015,20 @@ index_range :
            */
           
           $$.inst  = F_RX_RANGE;
+          $$.start = $3.start;
+          $$.end   = $3.end;
+          $$.type1 = $3.type;
+          $$.type2 = TYPE_NUMBER;
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '[' '>' expr0 L_RANGE           ']'
+      {
+          /* Simulate an expression yielding <1 for the upper bound.
+           * We pretend that it's part of the lower bound expr.
+           */
+          
+          $$.inst  = F_AX_RANGE;
           $$.start = $3.start;
           $$.end   = $3.end;
           $$.type1 = $3.type;
@@ -9270,9 +9425,13 @@ lvalue_list:
               arrange_protected_lvalue($3.start, $3.code, $3.end,
                 F_PROTECTED_INDEX_LVALUE
               );
-          else
+          else if ($4.inst == F_RINDEX)
               arrange_protected_lvalue($3.start, $3.code, $3.end,
                 F_PROTECTED_RINDEX_LVALUE
+              );
+          else
+              arrange_protected_lvalue($3.start, $3.code, $3.end,
+                F_PROTECTED_AINDEX_LVALUE
               );
 
           if ($4.type1 & TYPE_MOD_REFERENCE)
@@ -9350,8 +9509,14 @@ lvalue_list:
           case F_NR_RANGE: prot_op = F_PROTECTED_NR_RANGE_LVALUE; break;
           case F_RN_RANGE: prot_op = F_PROTECTED_RN_RANGE_LVALUE; break;
           case F_RR_RANGE: prot_op = F_PROTECTED_RR_RANGE_LVALUE; break;
+          case F_NA_RANGE: prot_op = F_PROTECTED_NA_RANGE_LVALUE; break;
+          case F_AN_RANGE: prot_op = F_PROTECTED_AN_RANGE_LVALUE; break;
+          case F_RA_RANGE: prot_op = F_PROTECTED_RA_RANGE_LVALUE; break;
+          case F_AR_RANGE: prot_op = F_PROTECTED_AR_RANGE_LVALUE; break;
+          case F_AA_RANGE: prot_op = F_PROTECTED_AA_RANGE_LVALUE; break;
           case F_NX_RANGE: prot_op = F_PROTECTED_NX_RANGE_LVALUE; break;
           case F_RX_RANGE: prot_op = F_PROTECTED_RX_RANGE_LVALUE; break;
+          case F_AX_RANGE: prot_op = F_PROTECTED_AX_RANGE_LVALUE; break;
           default:
               error("Unsupported range type %d %s\n"
                    , $4.inst, get_f_name($4.inst));
@@ -9777,6 +9942,8 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
  *             INDEX        -> PUSH_PROTECTED_INDEXED_LVALUE
  *         expr4[<x]
  *             RINDEX       -> PUSH_PROTECTED_RINDEXED_LVALUE
+ *         expr4[>x]
+ *             AINDEX       -> PUSH_PROTECTED_AINDEXED_LVALUE
  *         expr4[x,y]
  *             MAP_INDEX    -> PUSH_PROTECTED_INDEXED_MAP_LVALUE
  *
@@ -9865,6 +10032,9 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
             case F_PUSH_RINDEXED_LVALUE:
                 code = F_PUSH_PROTECTED_RINDEXED_LVALUE;
                 break;
+            case F_PUSH_AINDEXED_LVALUE:
+                code = F_PUSH_PROTECTED_AINDEXED_LVALUE;
+                break;
             case F_PUSH_INDEXED_MAP_LVALUE:
                 code = F_PUSH_PROTECTED_INDEXED_MAP_LVALUE;
                 break;
@@ -9919,6 +10089,9 @@ arrange_protected_lvalue (p_int start, int code, p_int end, int newcode)
             break;
         case F_PROTECTED_RINDEX_LVALUE:
             newcode = F_PUSH_PROTECTED_RINDEXED_LVALUE;
+            break;
+        case F_PROTECTED_AINDEX_LVALUE:
+            newcode = F_PUSH_PROTECTED_AINDEXED_LVALUE;
             break;
         default:
             yyerror("Need lvalue for range lvalue.");

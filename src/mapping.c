@@ -285,6 +285,26 @@ mapping_t *stale_mappings;
 
 static void remove_empty_mappings (void);
 
+#if 0
+
+/* TODO: Remove these defines when the statistics prove to be correct */
+#define LOG_ADD(where,add) \
+printf("DEBUG: %s: m %p user %p total %ld + %ld = %ld\n", where, m, m->user, m->user->mapping_total, add, m->user->mapping_total + (add))
+
+#define LOG_SUB(where,sub) \
+printf("DEBUG: %s: m %p user %p total %ld - %ld = %ld\n", where, m, m->user, m->user->mapping_total, sub, m->user->mapping_total - (sub))
+
+#define LOG_SUB_M(where,m,sub) \
+printf("DEBUG: %s: m %p user %p total %ld - %ld = %ld\n", where, (m), (m)->user, (m)->user->mapping_total, sub, (m)->user->mapping_total - (sub))
+
+#else
+
+#define LOG_ADD(where,add)
+#define LOG_SUB(where,add)
+#define LOG_SUB_M(where,m,add)
+
+#endif
+
 /*-------------------------------------------------------------------------*/
 static INLINE map_chain_t *
 new_map_chain (mapping_t * m)
@@ -300,7 +320,10 @@ new_map_chain (mapping_t * m)
 
     rc = xalloc(SIZEOF_MCH(rc, m->num_values));
     if (rc)
+    {
+        LOG_ADD("new_map_chain", SIZEOF_MCH(rc, m->num_values));
         m->user->mapping_total += SIZEOF_MCH(rc, m->num_values);
+    }
 
     return rc;
 } /* new_map_chain() */
@@ -324,6 +347,7 @@ free_map_chain (mapping_t * m, map_chain_t *mch, Bool no_data)
         }
     }
 
+    LOG_SUB("free_map_chain", SIZEOF_MCH(mch, m->num_values));
     m->user->mapping_total -= SIZEOF_MCH(mch, m->num_values);
     xfree(mch);
 } /* free_map_chain() */
@@ -386,6 +410,7 @@ get_new_hash ( mapping_t *m, mp_int hash_size)
     mcp = hm->chains;
     do *mcp++ = NULL; while (--hash_size >= 0);
 
+    LOG_ADD("get_new_hash", SIZEOF_MH(hm));
     m->user->mapping_total += SIZEOF_MH(hm);
 
     return hm;
@@ -486,9 +511,13 @@ get_new_mapping ( wiz_list_t * user, mp_int num_values
     m->ref = 1;
 
     /* Statistics */
+    LOG_ADD("get_new_mapping - base", sizeof *m);
     m->user->mapping_total += sizeof *m;
     if (cm)
+    {
+        LOG_ADD("get_new_mapping - cond", SIZEOF_MC(cm, num_values));
         m->user->mapping_total += SIZEOF_MC(cm, num_values);
+    }
     /* hm has already been counted */
 
     num_mappings++;
@@ -572,6 +601,7 @@ _free_mapping (mapping_t *m, Bool no_data)
         for (; !no_data && left > 0; left--, data++)
             free_svalue(data);
 
+        LOG_SUB("free_mapping cond", SIZEOF_MC(m->cond, m->num_values));
         m->user->mapping_total -= SIZEOF_MC(m->cond, m->num_values);
         xfree(m->cond);
         m->cond = NULL;
@@ -591,6 +621,7 @@ _free_mapping (mapping_t *m, Bool no_data)
         if (hm->ref)
             fatal("Ref count in freed hash mapping: %ld\n", hm->ref);
 #endif
+        LOG_SUB("free_mapping hash", SIZEOF_MH(hm));
         m->user->mapping_total -= SIZEOF_MH(hm);
 
         mcp = hm->chains;
@@ -637,6 +668,7 @@ _free_mapping (mapping_t *m, Bool no_data)
         /* No hash: free the base structure.
          */
 
+        LOG_SUB("free_mapping base", sizeof(*m));
         m->user->mapping_total -= sizeof(*m);
         xfree(m);
     }
@@ -715,6 +747,7 @@ remove_empty_mappings (void)
         hm = m->hash;
         if (!m->ref && !m->num_entries)
         {
+            LOG_SUB("remove_empty_mappings", (sizeof(*m) + SIZEOF_MH(hm)));
             m->user->mapping_total -= sizeof(*m) + SIZEOF_MH(hm);
             xfree(m);
             *mp = m = hm->next_dirty;
@@ -1090,8 +1123,6 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
         m->hash = hm;
         new_dirty_mapping(m);
 
-        m->user->mapping_total += SIZEOF_MH(hm);
-
         /* Now insert the map_chain structure into its chain */
         hm->chains[0] = mc;
         mc->next = NULL;
@@ -1124,6 +1155,7 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
                 return NULL;
             }
 
+            LOG_ADD("get_map_lvalue - existing hash", SIZEOF_MH(hm) - SIZEOF_MH(hm2));
             m->user->mapping_total += SIZEOF_MH(hm) - SIZEOF_MH(hm2);
 
             /* Initialise the new structure except for the chains */
@@ -1544,6 +1576,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
 
         /* Plug the new hash into the new mapping */
         m2->hash = hm2;
+        LOG_ADD("copy_mapping - hash", SIZEOF_MH(hm2));
         m->user->mapping_total += SIZEOF_MH(hm2);
     }
 
@@ -2038,6 +2071,7 @@ compact_mappings (mp_int num)
          */
         if (1 == m->ref && !m->num_entries)
         {
+            LOG_SUB("compact_mappings: empty mapping", sizeof(*m) + SIZEOF_MH(hm));
             m->user->mapping_total -= sizeof(*m) + SIZEOF_MH(hm);
             xfree(m);
             m = hm->next_dirty;
@@ -2054,6 +2088,7 @@ compact_mappings (mp_int num)
          */
         if (!hm->used && !hm->cond_deleted)
         {
+            LOG_SUB("compact_mappings: no need to", SIZEOF_MH(hm));
             m->user->mapping_total -= SIZEOF_MH(hm);
             m->hash = NULL;
 
@@ -2359,6 +2394,7 @@ compact_mappings (mp_int num)
 
         m->hash = NULL; /* Since we compacted it away */
 
+        LOG_SUB("compact_mappings - remove old hash", SIZEOF_MH(hm));
         m->user->mapping_total -= SIZEOF_MH(hm);
           /* The memorysize for the map_chain_t structure has already been
            * subtracted.
@@ -2502,9 +2538,11 @@ set_mapping_user (mapping_t *m, object_t *owner)
     total = (mp_int)( sizeof(*m)
                      + ((m->cond) ? SIZEOF_MC(m->cond, m->num_values) : 0)
                     );
+    LOG_SUB("set_mapping_user", total);
     m->user->mapping_total -= total;
     user = owner->user;
     m->user = user;
+    LOG_ADD("set_mapping_user", total);
     m->user->mapping_total += total;
 
 
@@ -2729,6 +2767,7 @@ clean_stale_mappings (void)
             }
 
             /* Replace the old keyblock by the new one. */
+            LOG_ADD("clean_stale - new keyblock", SIZEOF_MC(cm2, num_values));
             m->user->mapping_total += SIZEOF_MC(cm2, num_values);
             m->cond = cm2;
         }
@@ -2741,6 +2780,7 @@ clean_stale_mappings (void)
         /* Delete the old condensed block, if any */
         if (cm)
         {
+            LOG_SUB("clean_state - old keyblock", SIZEOF_MC(cm, num_values));
             m->user->mapping_total -= SIZEOF_MC(cm, num_values);
             xfree(cm);
         }
@@ -2970,6 +3010,7 @@ add_to_mapping (mapping_t *m1, mapping_t *m2)
         {
             if (m2->cond != NULL)
             {
+                LOG_SUB_M("add_to_mapping - m2 no cond", m2, SIZEOF_MC(m2->cond, m2->num_values));
                 m2->user->mapping_total -= SIZEOF_MC(m2->cond, m2->num_values);
                 xfree(m2->cond);
                 m2->cond = NULL;
@@ -2980,6 +3021,7 @@ add_to_mapping (mapping_t *m1, mapping_t *m2)
         {
             if (m1->cond != NULL)
             {
+                LOG_SUB_M("add_to_mapping - m1 no cond", m1, SIZEOF_MC(m2->cond, m2->num_values));
                 m1->user->mapping_total -= SIZEOF_MC(m1->cond, m1->num_values);
                 xfree(m1->cond);
                 m1->cond = NULL;

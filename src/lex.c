@@ -618,16 +618,6 @@ init_lexer(void)
 {
     size_t i, n;
     char mtext[MLEN];
-    static short binary_operators[]
-      = { F_ADD, F_SUBTRACT, F_MULTIPLY, F_DIVIDE, F_MOD
-        , F_LT, F_GT, F_EQ, F_GE, F_LE, F_NE
-        , F_OR, F_XOR, F_LSH, F_RSH, F_RSHL
-        , F_INDEX, F_RINDEX, F_NX_RANGE, F_RX_RANGE
-        };
-    static short ternary_operators[]
-      = { F_RANGE, F_NR_RANGE, F_RR_RANGE, F_RN_RANGE
-        , F_MAP_INDEX
-        };
 
     /* Allocate enough memory for 20 nested includes/ifs */
     lexpool = new_fifopool(fifopool_size(sizeof(struct ifstate), 20)
@@ -686,34 +676,6 @@ init_lexer(void)
         p->type = I_TYPE_RESWORD;
         p->u.code = reswords[i].code;
     }
-
-    /* Operators are difficult to specify properly in func_spec syntax,
-     * therefore update their instrs[] entries manually.
-     */
-    for (i = 0; i < NELEM(binary_operators); i++)
-    {
-        n = (unsigned)binary_operators[i];
-        instrs[n].min_arg = instrs[n].max_arg = 2;
-        instrs[n].Default = 0;
-        instrs[n].ret_type = TYPE_ANY;
-    }
-    for (i=0; i<NELEM(ternary_operators); i++)
-    {
-        n = (unsigned)ternary_operators[i];
-        instrs[n].min_arg = instrs[n].max_arg = 3;
-        instrs[n].Default = 0;
-        instrs[n].ret_type = TYPE_ANY;
-    }
-    n = F_AND;
-        instrs[n].min_arg = instrs[n].max_arg = 2;
-        instrs[n].ret_type = TYPE_ANY;
-    n = F_COMPL;
-        instrs[n].min_arg = instrs[n].max_arg = 1;
-        instrs[n].Default = 0;
-        instrs[n].ret_type = TYPE_ANY;
-    n = F_NOT;
-        instrs[n].min_arg = instrs[n].max_arg = 1;
-        instrs[n].ret_type = TYPE_ANY;
 
 
     /* Add the standard permanent macro definitions */

@@ -4,7 +4,7 @@
 #
 # configure will strip this part from the script.
 
-CFLAGS="-I/usr/local/include" EXTRA_CFLAGS="$CFLAGS" exec ./configure --prefix=/users/phil/osb --libexec=/users/phil/osb/erq --libdir=/users/phil/osb/mudlib --with-setting=osb $*
+exec ./configure --prefix=/usr/home/osb --libexec=/usr/home/osb/erq --libdir=/usr/home/osb/mudlib --with-setting=osb $*
 exit 1
 
 # --- The actual settings ---
@@ -17,7 +17,7 @@ with_apply_cache_bits=14
 enable_compat_mode=no
 enable_strict_euids=no
 
-enable_use_alists=no
+enable_use_alists=yes
 enable_supply_parse_command=no
 enable_initialization_by___init=yes
 enable_use_system_crypt=no

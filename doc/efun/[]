@@ -11,9 +11,16 @@ DESCRIPTION
 
         The indexes <index>, <from> and <to> are numbered 0 to
         strlen(str)-1 resp. sizeof(arr)-1 .
+
         If an index is written '<value', the value is counted from the
         end of the string/array and is numbered 1 to strlen(str) resp.
         sizeof(arr).
+
+        If an index is written '>value', the value is counted from the
+        end of the string/array if it is negative (starting with -1 for
+        the last element), and from the beginning if it is positive
+        (starting with 0 for the first element).
+
         If <from> is omitted, it defaults to the beginning of the
         string/array.
         If <to> is omitted, it defaults to the beginning of the
@@ -30,10 +37,16 @@ DESCRIPTION
 
           [index]      -> ({'#[,      arr, index })
           [<index]     -> ({'#[<,     arr, index })
+          [>index]     -> ({'#[>,     arr, index })
           [from..to]   -> ({'#[..],   arr, from, to })
           [<from..to]  -> ({'#[<..],  arr, from, to })
           [from..<to]  -> ({'#[..<],  arr, from, to })
           [<from..<to] -> ({'#[<..<], arr, from, to })
+          [>from..to]  -> ({'#[>..],  arr, from, to })
+          [from..>to]  -> ({'#[..>],  arr, from, to })
+          [>from..<to] -> ({'#[>..<], arr, from, to })
+          [<from..>to] -> ({'#[<..>], arr, from, to })
+          [>from..>to] -> ({'#[>..>], arr, from, to })
 
 EXAMPLES
         foo = ({ 1, 2, 3, 4 });         str = "test";
@@ -61,6 +74,8 @@ HISTORY
         The syntax for ``counting from last element'' has changed
         between versions 3.1.J and 3.1.K from ``-1'' to ``<1''.
         foo[0..-1] is now an empty string resp. array.
+
+        LDMud 3.3 introduced the '>' indexing method.
 
 SEE ALSO
         member(E), sizeof(E)
