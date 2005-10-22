@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Aug-2001 (Lars Duening)  (3.3.93)
+    - (interpret.c) The reference loop check was too strict and also
+        flagged legal assignments (thanks, Dan).
+
 27-Aug-2001 (Lars Duening)  (3.3.92)
     - (interpret.c) Improved the check for reference loop creation on
         assignment (suggested by Menaures).

@@ -1115,10 +1115,16 @@ check_for_ref_loop (svalue_t * dest)
         do {
             if (rover1->type == T_LVALUE || rover1->type == T_PROTECTED_LVALUE)
                 rover1 = rover1->u.lvalue;
+            else
+                break;
             if (rover1->type == T_LVALUE || rover1->type == T_PROTECTED_LVALUE)
                 rover1 = rover1->u.lvalue;
+            else
+                break;
             if (rover2->type == T_LVALUE || rover2->type == T_PROTECTED_LVALUE)
                 rover2 = rover2->u.lvalue;
+            else
+                break;
             if (rover1 == rover2)
             {
                 free_svalue(dest);
