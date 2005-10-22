@@ -178,6 +178,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Adding a mapping to itself with '+='.
        + The MAX_MALLOCED limit check was faulty, sometimes allowing
            the driver to clobber memory.
+       + Tracing active when the control flow changes the current player
+           to a non-interactive object.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.

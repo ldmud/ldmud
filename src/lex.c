@@ -2135,7 +2135,7 @@ handle_pragma (char *str)
 
 /* Handle the pragma <str>. Unknown pragmas are ignored.
  * One pragma string can contain multiple actual pragmas, separated
- * with space and/or comma.
+ * with comma (and additional spaces).
  */
 
 {
@@ -2174,7 +2174,21 @@ handle_pragma (char *str)
         /* Evaluate the found pragma name */
         validPragma = MY_FALSE;
 
-        if (strncmp(base, "strict_types", namelen) == 0)
+        if (namelen == 0)
+        {
+            if (master_ob)
+            {
+                yywarnf("Empty #pragma");
+            }
+            else
+            {
+                debug_message("Warning: Empty #pragma"
+                              ": file %s, line %d\n"
+                             , current_file, current_line);
+            }
+            validPragma = MY_TRUE; /* Since we already issued a warning */
+        }
+        else if (strncmp(base, "strict_types", namelen) == 0)
         {
             pragma_strict_types = PRAGMA_STRICT_TYPES;
             instrs[F_CALL_OTHER].ret_type = TYPE_UNKNOWN;
@@ -2270,7 +2284,9 @@ handle_pragma (char *str)
 
             if (',' == *next)
             {
-                /* Skip the one allowed comma */
+                /* Skip the one allowed comma.
+                 * We allow the comma to be followed by lineend
+                 */
                 next++;
             }
             else if ('\0' != *next && '\r' != *next)

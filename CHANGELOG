@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+30-Sep-2001 (Lars Duening)  (3.3.104)
+    - (lex.c) Added a warning about empty #pragmas (reported by Slava).
+    - (interpret.c) Tracing no longer crashes when the command_giver
+        turns non-interactive (reported by Dafire).
+
 28-Sep-2001 (Lars Duening)  (3.3.103)
     - (lex.c) Spaces before the lineend caused the lexer to complain about
         an unrecognized pragma, even though the pragma had been recognized

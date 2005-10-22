@@ -387,7 +387,15 @@ static int              last = TOTAL_TRACE_LENGTH - 1;
 
 /* --- Macros --- */
 
-#define TRACETST(b) (O_GET_INTERACTIVE(command_giver)->trace_level & (b))
+#define TRACE_IS_INTERACTIVE() (command_giver && O_IS_INTERACTIVE(command_giver))
+
+  /* Return TRUE if the current command_giver is interactive.
+   * TODO: Instead of disabling all traceoutput whenever the command_giver
+   * TODO:: turns non-interactive, output should be redirected (with a
+   * TODO:: special mark) to the current_interactive.
+   */
+
+#define TRACETST(b) (TRACE_IS_INTERACTIVE() && (O_GET_INTERACTIVE(command_giver)->trace_level & (b)))
 
   /* Return TRUE if the any of the tracing options <b> are requested
    * by the interactive user.
@@ -399,8 +407,7 @@ static int              last = TOTAL_TRACE_LENGTH - 1;
    */
 
 #define TRACEHB \
-  ( current_heart_beat == NULL || \
-    (O_GET_INTERACTIVE(command_giver)->trace_level & TRACE_HEART_BEAT))
+  ( current_heart_beat == NULL || TRACETST(TRACE_HEART_BEAT))
 
   /* Return TRUE if either the current execution is not caused
    * by a heart beat call, or if heartbeat tracing is allowed.
@@ -5876,6 +5883,8 @@ do_trace (char *msg, char *fname, char *post)
  * a tracemessage of the form '<tracedepth> <msg> <objname> <fname> <post>'
  * and print it to the player using add_message().
  *
+ * Don't do anything if the current command_giver is not interactive.
+ *
  * <obj_name> is filled in only if TRACE_OBJNAME is requested, else
  * the empty string is used.
  */
@@ -5909,7 +5918,7 @@ do_trace_call (fun_hdr_p funstart)
 {
     string_t *name;
 
-    if (!++traceing_recursion) /* Do not recurse! */
+    if (!++traceing_recursion || !TRACE_IS_INTERACTIVE()) /* Do not recurse! */
     {
         int save_var_ix_offset = variable_index_offset;
           /* TODO: Might be clobbered, but where? */
@@ -5953,7 +5962,7 @@ do_trace_return (svalue_t *sp)
 {
     tracedepth--; /* We leave this level */
 
-    if (!++traceing_recursion)
+    if (!++traceing_recursion || !TRACE_IS_INTERACTIVE())
     {
         if (trace_test(TRACE_RETURN))
         {
@@ -6350,7 +6359,7 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp, Bool allowRefs)
 
     /* Count the call depth for traces and handle tracing */
     tracedepth++;
-    if (TRACEP(TRACE_CALL))
+    if (TRACEP(TRACE_CALL) && TRACE_IS_INTERACTIVE())
     {
       inter_sp = sp;
       do_trace_call(funstart);
@@ -6815,7 +6824,7 @@ again:
     /* If requested, trace the instruction.
      * Print the name of the instruction, but guard against recursions.
      */
-    if (trace_exec_active && TRACE_EXEC_P)
+    if (trace_exec_active && TRACE_EXEC_P && TRACE_IS_INTERACTIVE())
     {
         if (!++traceing_recursion)
         {
@@ -13883,7 +13892,7 @@ again:
             }
 
             /* Traceing, if necessary */
-            if (TRACEP(TRACE_CALL_OTHER))
+            if (TRACEP(TRACE_CALL_OTHER) && TRACE_IS_INTERACTIVE())
             {
                 if (!++traceing_recursion)
                 {
@@ -13987,7 +13996,7 @@ again:
                 }
 
                 /* Traceing, if necessary */
-                if (TRACEP(TRACE_CALL_OTHER))
+                if (TRACEP(TRACE_CALL_OTHER) && TRACE_IS_INTERACTIVE())
                 {
                     if (!++traceing_recursion)
                     {
@@ -14574,7 +14583,7 @@ sapply_int (string_t *fun, object_t *ob, int num_arg, Bool b_find_static)
 #endif
 
     /* Handle tracing */
-    if (TRACEP(TRACE_APPLY))
+    if (TRACEP(TRACE_APPLY) && TRACE_IS_INTERACTIVE())
     {
         if (!++traceing_recursion)
         {
@@ -17658,7 +17667,7 @@ f_call_resolved (svalue_t *sp, int num_arg)
     }
 
     /* Handle traceing. */
-    if (TRACEP(TRACE_CALL_OTHER))
+    if (TRACEP(TRACE_CALL_OTHER) && TRACE_IS_INTERACTIVE())
     {
         if (!++traceing_recursion)
         {
