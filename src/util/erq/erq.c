@@ -1428,6 +1428,23 @@ main (int argc, char **argv)
     child_t *child, *next_child;
     union ticket_u ticket;
 
+    /* Print information about this daemon to help debugging */
+    {
+        fprintf(stderr, "Amylaar ERQ (%s), compiled %s"
+#if defined(DEBUG)
+                        " (DEBUG)"
+#  if defined(DEBUG2)
+                        " (DEBUG, DEBUG2)"
+#  else
+#  endif
+#elif defined(DEBUG2)
+                        " (DEBUG2)"
+#endif
+                        "\n"
+                      , argv[0], __DATE__
+                );
+    }
+
     /* Quick and dirty commandline parser */
     {
         int is_forked = 0;

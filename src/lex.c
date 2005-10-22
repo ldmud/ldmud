@@ -5152,7 +5152,7 @@ add_permanent_define (char *name, short nargs, void *exps, Bool special)
          || p->u.define.special
          || strcmp(exps,p->u.define.exps.str) != 0)
         {
-            error("Redefinition of #define %s", name);
+            error("Redefinition of #define %s\n", name);
         }
         return;
     }

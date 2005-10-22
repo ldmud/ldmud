@@ -152,6 +152,23 @@ main(int argc, char *argv[])
 
     master_pid = getpid();
 
+    /* Print information about this daemon to help debugging */
+    {
+        fprintf(stderr, "XERQ (%s), compiled %s"
+#if defined(DEBUG)
+                        " (DEBUG)"
+#  if defined(XDEBUG)
+                        " (DEBUG, XDEBUG)"
+#  else
+#  endif
+#elif defined(XDEBUG)
+                        " (XDEBUG)"
+#endif
+                        "\n"
+                      , argv[0], __DATE__
+                );
+    }
+
     /* Quick and dirty commandline parser */
     {
         int is_forked = 0;

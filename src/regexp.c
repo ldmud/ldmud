@@ -969,7 +969,7 @@ regexec (regexp *prog, char *string, char *start)
         } while (*s++ != '\0');
 
     /* Failure. */
-    return RE_MATCH;
+    return RE_NOMATCH;
 } /* regexec() */
 
 /*-------------------------------------------------------------------------*/

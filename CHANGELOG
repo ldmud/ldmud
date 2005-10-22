@@ -1,6 +1,26 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Aug-2002 (Lars Duening)  (3.3.230)
+   - (lex.c) An error in a permanent define given on the command line
+        would crash the driver because the lexer called error() before
+        the VM had been set up.
+   - (Makefile.in) Some makes don't like ':=' variable assignments (reported
+        by Coogan).
+   - (main.c) If the driver uses the default debug.log file, its (mudlib)
+        name is available in the predefined macro __DEBUG_LOG__ (suggested
+        by Mandragon).
+   - (driver.h, config.h) Made the config.h macro DEBUG invisible to the
+        ERQs as their debugging mode is controlled by their Makefiles.
+   - (util/erq/erq.c, util/xerq/erq.c) The ERQs now print their name
+        and compilation date to stderr on startup.
+   - (closure.c) Efun symbol_efun() freed symbol-svalues as strings
+        (reported by Dafire).
+
+19-Aug-2002 (Lars Duening)  (3.3.229)
+   - (regexp.c) regexec() returned a RE_MATCH for a failed match,
+        causing all kinds of neat failures (thanks, Guandalug!)
+
 18-Aug-2002 (Lars Duening)  (3.3.228)
    - (lex.c) Added predefined macros __RESET_TIME__ and __CLEANUP_TIME__
         (suggested by Elric).

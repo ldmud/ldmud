@@ -140,7 +140,7 @@ svalue_t const0, const1;
 
 double consts[5];  /* Weight constants used to compute average figures */
 
-char *debug_file;  /* Name of the debug log file. */
+char *debug_file = NULL;  /* Name of the debug log file. */
 
 object_t dummy_current_object_for_loads;
   /* Dummy object for functions, which need a current_object though
@@ -289,6 +289,32 @@ main (int argc, char **argv)
         exit(1);
     }
 
+    /* If the name of the debug log file hasn't been set, use a sensible
+     * default and make it available in the macro __DEBUG_LOG__. This must
+     * happen before the first debug_message().
+     */
+
+    if  (!debug_file)
+    {
+        char buf[MAXHOSTNAMELEN+40];
+        char * name;
+        struct lpc_predef_s *tmp;
+
+        if (compat_mode)
+            strcpy(buf, "__DEBUG_LOG__=\"");
+        else
+            strcpy(buf, "__DEBUG_LOG__=\"/");
+        name = buf + strlen(buf);
+        sprintf(name, "%s.debug.log", query_host_name());
+        debug_file = strdup(name);
+        strcat(name, "\"");
+
+        tmp = (struct lpc_predef_s *) xalloc(sizeof(struct lpc_predef_s));
+        tmp->flag = string_copy(buf);
+        tmp->next = lpc_predefs;
+        lpc_predefs = tmp;
+    }
+
     printf("%s LDMud %s" LOCAL_LEVEL " (" PROJ_VERSION ")\n"
           , time_stamp(), IS_RELEASE() ? GAME_VERSION : LONG_VERSION
           );
@@ -346,10 +372,12 @@ main (int argc, char **argv)
         }
     }
 
-    /* The lexer needs the master_name */
-    init_lexer();
-
     reset_machine(MY_TRUE); /* Cold reset the machine */
+    init_lexer();
+      /* The lexer needs the master_name, but also the VM 
+       * to throw errors.
+       */
+
     RESET_LIMITS;
     CLEAR_EVAL_COST;
     {
@@ -535,8 +563,6 @@ vdebug_message(const char *fmt, va_list va)
 
 {
     static FILE *fp = NULL;
-    char deb[100];
-    char *file;
 
     if (fp == NULL || reopen_debug_log) {
         if (fp != NULL)
@@ -546,13 +572,9 @@ vdebug_message(const char *fmt, va_list va)
         }
         reopen_debug_log = MY_FALSE;
 
-        if ( !(file = debug_file) ) {
-            sprintf(deb,"%s.debug.log", query_host_name());
-            file = deb;
-        }
-        fp = fopen(file, "w");
+        fp = fopen(debug_file, "w");
         if (fp == NULL) {
-            perror(file);
+            perror(debug_file);
             abort();
         }
     }

@@ -1393,7 +1393,7 @@ f_upper_case (svalue_t *sp)
 
     /* That's it */
     return sp;
-}
+} /* f_upper_case() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -2637,7 +2637,7 @@ f_process_string(svalue_t *sp)
     }
 
     return sp;
-}
+} /* f_process_string() */
 
 #endif /* F_PROCESS_STRING */
 

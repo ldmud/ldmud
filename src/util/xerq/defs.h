@@ -5,6 +5,7 @@
  * system includes, datatypes and external definitions.
  */
 
+#define __NO_DRIVER_SOURCE__
 #include "driver.h"
 
 #ifdef USE_IPV6

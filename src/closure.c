@@ -5071,10 +5071,10 @@ symbol_efun (svalue_t *sp)
  * parse_command to lookup the (simul)efuns find_living() and find_player()
  * at runtime.
  *
- * The function takes the string svalue <sp> and looks up the efun or operator
- * given by <sp>->u.string. If the efun/operator is found, the value <sp>
- * is turned into the proper closure value, otherwise it is set to the
- * numeric value 0.
+ * The function takes the string/symbol svalue <sp> and looks up the efun
+ * or operator given by <sp>->u.string. If the efun/operator is found, the
+ * value <sp> is turned into the proper closure value, otherwise it is set
+ * to the numeric value 0.
  *
  * Accepted symbols are:
  *
@@ -5210,7 +5210,7 @@ symbol_efun (svalue_t *sp)
 
                 /* Got the reserved word: return the closure value */
                 
-                free_string_svalue(sp);
+                free_svalue(sp);
                 sp->type = T_CLOSURE;
                 sp->x.closure_type = (short)(code + CLOSURE_OPERATOR);
                 sp->u.ob = ref_object(current_object, "symbol_efun");
@@ -5232,7 +5232,7 @@ symbol_efun (svalue_t *sp)
                 free_shared_identifier(p);
 
 undefined_function:
-            free_string_svalue(sp);
+            free_svalue(sp);
             put_number(sp, 0);
             return;
         }
@@ -5301,7 +5301,7 @@ undefined_function:
          * Thus, we have to test for (*end || i < 0) .
          */
 
-        free_string_svalue(sp);
+        free_svalue(sp);
         if (*end || i < 0)
         {
             put_number(sp, 0);

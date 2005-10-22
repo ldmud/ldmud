@@ -381,11 +381,17 @@
  * code segments.
  */
 
+#if defined(__DRIVER_SOURCE__)
+
 /* Enable basic run time sanity checks. This will use more time
  * and space, but nevertheless you are strongly encouraged to keep
  * it defined.
+ * The check for __DRIVER_SOURCE__ is necessary as config.h is
+ * also included by the erqs.
  */
 #define DEBUG
+
+#endif
 
 /* Enable debug output from the LPC compiler.
  */
