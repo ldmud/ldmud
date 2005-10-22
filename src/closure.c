@@ -3424,7 +3424,14 @@ compile_value (svalue_t *value, int opt_flags)
                     if (num_arg == min-1 && 0 != (def = instrs[f].Default))
                     {
                     	/* We have a default argument */
-                        STORE_CODE(p, (bytecode_t)(def));
+                        if (instrs[def].prefix)
+                        {
+                            STORE_CODE(p, instrs[def].prefix);
+                            current.code_left--;
+                            max--;
+                            min--;
+                        }
+                        STORE_CODE(p, instrs[def].opcode);
                         current.code_left--;
                         max--;
                         min--;

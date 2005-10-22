@@ -203,7 +203,9 @@ struct interactive_s {
    */
 #define NOECHO_ACK    /* 16 */ NOECHO_ACKSHIFT(NOECHO)
   /* noecho negotiation complete (acknowledged)
-   * TODO: We need a _NACK flag, too.
+   * TODO: We need a _NACK flag, too, for when the negotiation is complete
+   * TODO:: but the client refused to go into NOECHO. For the time being
+   * TODO:: we might use (NOECHO_REQ|NOECHO) == (NOECHO_REQ) as check.
    */
 #define NOECHO_STALE     64
   /* Set prior to performing a noecho input, this bit causes the deactivation
@@ -227,7 +229,9 @@ struct interactive_s {
    */
 #define CHARMODE_ACK  /* 32 */ NOECHO_ACKSHIFT(CHARMODE)
   /* Charmode negotiation complete (acknowledged)
-   * TODO: We need a _NACK flag, too.
+   * TODO: We need a _NACK flag, too, for when the negotiation is complete
+   * TODO:: but the client refused to go into CHARMODE. For the time being
+   * TODO:: we can use (CHARMODE_REQ|CHARMODE) == CHARMODE_REQ as check.
    */
 #define CHARMODE_MASK    (CHARMODE|CHARMODE_ACK)
   /* Mask for active charmode states.

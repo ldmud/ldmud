@@ -390,6 +390,9 @@ erq_cmd (void)
     int len, mesg_len;
     char request;
 
+    /* Clear the buffer so that errors can be detected more easily */
+    memset(buf, 0, sizeof(buf));
+
     /* Read the message header */
     if (pos < 9)
     {

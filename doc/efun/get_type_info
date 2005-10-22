@@ -4,8 +4,8 @@ SYNOPSIS
 DESCRIPTION
 	Returns info about the type of arg, as controlled by the flag.
 
-	If the optional argument <flag>flag is not a number, an array is
-	returned, whose first element is an integer denoting the data
+	If the optional argument <flag> is not given, an array is
+	returned whose first element is an integer denoting the data
 	type, as defined in <lpctypes.h>. The second entry can contain
 	additional information about arg.
 

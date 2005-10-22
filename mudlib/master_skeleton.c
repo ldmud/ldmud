@@ -493,7 +493,7 @@ mixed include_file (string file, string compiled_file, int sys_include)
 //   0:      use the normal include filename generation (""-includes are used
 //           as they are, <>-includes are handled according to H_INCLUDE_DIRS).
 //   <path>: the full absolute pathname of the file to include without
-//           parentdir parts ("/../"). Leading slashes ("/") are ignored.
+//           parentdir parts ("/../"). Leading slashes ("/") may be omitted.
 //   else:   The include directive is not legal.
 
 //---------------------------------------------------------------------------

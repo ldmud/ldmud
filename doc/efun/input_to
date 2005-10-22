@@ -32,18 +32,22 @@ DESCRIPTION
 
           INPUT_CHARMODE  (2):
               The connection is switched from line- into charmode to
-              retrieve a single character(!) from the player; newlines
-              read as two characters, "\r" followed by "\n".
-
+              retrieve a single character(!) from the player.
+              
               After execution of <fun>, the connection is switched
               back into linemode unless a subsequent input_to( , 2)
               has been issued.
 
+              Lineends are received exactly as the client sent them:
+              "\n", "\r" followed by "\n", or in case of some Windows
+              clients, just "\r".
+
               Note that the players frontend is free to stay in
               linemode all the time: even if you request a single
               character, the player might be forced to type (and send)
-              that character plus the return key. You might even get
-              multiple 'single' characters together as one string.
+              that character plus the return key. Usually your function
+              will then receive the complete input line (including the
+              newline character sequence!) in one call.
 
               If you plan to stay in charmode a longer time , you can
               reduce the call overhead by using set_combine_charset()
@@ -82,6 +86,9 @@ HISTORY
         The limited "stacking" of input_to()s issued from !-commands
         was implemented in LDMud 3.2.8.
         Since LDMud 3.2.8 the function can be given as a closure.
+        LDMud 3.3 changed the handling of newline sequences in charmode
+          to verbatim passing. Earlier drivers passed an empty string
+          instead.
 
 SEE ALSO
         call_other(E), sscanf(E), privilege_violation(M),

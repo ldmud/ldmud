@@ -1,6 +1,35 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+02-Apr-2001 (Lars Duening)  (3.3.34)
+    - (lex) When generating names for inline closures, the compiler
+        makes sure that the name hasn't been used yet (reported by Dan).
+
+30-Mar-2001 (Lars Duening)
+    - (lex.c) The include path and filenames returned by the master the
+        and H_INCLUDE_DIRS closure can now start with leading slashes
+        (suggested by DaFire).
+    - (xerq) The incoming data buffer is cleared before each new command,
+        in order to detect errors more easily (suggested by Gawain).
+    - (comm.c) When using charmode against non-charmode clients (TinyFugue),
+        the line end wasn't handled properly. The solution is to receive
+        the data in charmode, but to pass it on to the user as if in
+        linemode.
+    - (comm.c) Newline sequences received in charmode are passed to the
+        mudlib as-is. Older drivers used to pass empty strings in their
+        place, which made handling clients which refused to go into charmode
+        difficult.
+
+27-Mar-2001 (Lars Duening)
+    - (interpret.c) All <op>= assignment operators can now operate on
+        indexed strings on the left hand side.
+
+22-Mar-2001 (Lars Duening)
+    - (closure.c) Default arguments were not properly stored by
+        prefix/bytecode (reported by Zwirch).
+    - (efuns.c) The optional argument to get_type_info() was no longer
+        optional (reported by Zwirch).
+
 21-Mar-2001 (Lars Duening)  (3.3.33)
     - (stralloc-away) Deleted these files.
     - (mstrings.c) Repeating a string 0 times left clobbered memory.

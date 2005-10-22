@@ -181,7 +181,7 @@ extern string_t *last_lex_string;
 extern ident_t *all_efuns;
 extern struct inline_fun * first_inline_fun;
 extern Bool insert_inline_fun_now;
-extern int next_inline_fun;
+extern unsigned int next_inline_fun;
 
 /* Values of pragma_strict_types */
 
@@ -193,7 +193,10 @@ extern int next_inline_fun;
 /* --- Prototypes --- */
 
 extern void init_lexer(void);
-extern ident_t *make_shared_identifier(char *, int, int);
+extern ident_t *lookfor_shared_identifier(char *, int, int, Bool);
+#define make_shared_identifier(s,n,d) lookfor_shared_identifier(s,n,d, MY_TRUE)
+#define find_shared_identifier(s,n,d) lookfor_shared_identifier(s,n,d, MY_FALSE)
+extern ident_t *make_global_identifier(char *, int);
 extern void free_shared_identifier(ident_t*);
 extern int yylex(void);
 extern void end_new_file(void);

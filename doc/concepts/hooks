@@ -298,7 +298,7 @@ DESCRIPTION
 	  to be searched. The directories are searched in the order
 	  they appear in the array. The directory name and the name of
 	  the actual include file are concatenated, therefore the
-	  directory names have to end in '/'.
+	  directory names have to end in '/'. Leading slashes may be omitted.
 
 	  If the setting is a closure, it is called as
 
@@ -307,7 +307,7 @@ DESCRIPTION
 	  with the name of the desired include file as first, and the
 	  name of the compiled LPC file as second argument.
 	  Result has to be the complete path name of the include file
-	  to use.
+	  to use. Leading slashes may be omitted.
 	  If the closure is a lambda closure, it is bound to
 	  this_object() prior to execution.
 

@@ -4773,15 +4773,15 @@ f_filter (svalue_t *sp, int num_arg)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_get_type_info (svalue_t *sp)
+f_get_type_info (svalue_t *sp, int num_arg)
 
 /* EFUN get_type_info()
  *
- *   mixed get_type_info(mixed arg, int flag)
+ *   mixed get_type_info(mixed arg [, int flag])
  *
  * Returns info about the type of arg, as controlled by the flag.
  *
- * If the optional argument flag is not a number, an array is
+ * If the optional argument flag is not given, an array is
  * returned, whose first element is an integer denoting the data
  * type, as defined in <lpctypes.h>. The second entry can contain
  * additional information about arg.
@@ -4805,8 +4805,10 @@ f_get_type_info (svalue_t *sp)
 
 {
     mp_int i, j;
+    svalue_t *argp;
 
-    i = sp[-1].type;
+    argp = sp - num_arg + 1;
+    i = argp->type;
 
     /* Determine the second return value */
     switch(i)
@@ -4818,10 +4820,10 @@ f_get_type_info (svalue_t *sp)
         j = (mstr_tabled(sp[-1].u.str)) ? 0 : 1;
         break;
     case T_MAPPING:
-        j = sp[-1].u.map->num_values;
+        j = argp->u.map->num_values;
         break;
     case T_CLOSURE:
-        if ( sp->type == T_NUMBER && sp->u.number == 2)
+        if (num_arg == 2 && sp->type == T_NUMBER && sp->u.number == 2)
         {
             object_t *ob;
 
@@ -4851,17 +4853,20 @@ f_get_type_info (svalue_t *sp)
         }
     case T_SYMBOL:
     case T_QUOTED_ARRAY:
-        j = sp[-1].x.generic;
+        j = argp->x.generic;
         break;
     }
 
     /* Depending on flag, return the proper value */
-    if (sp->type == T_NUMBER)
+    if (num_arg == 2)
     {
-        free_svalue(--sp);
-        if (sp[1].u.number != 1)
+        p_int flagvalue = sp->u.number;
+
+        free_svalue(sp--);
+        free_svalue(sp);
+        if (flagvalue != 1)
         {
-            if (sp[1].u.number)
+            if (flagvalue)
                 j = -1;
             else
                 j = i;
@@ -4875,8 +4880,9 @@ f_get_type_info (svalue_t *sp)
         v = allocate_array(2);
         v->item[0].u.number = i;
         v->item[1].u.number = j;
+        if (num_arg == 2)
+            free_svalue(sp--);
         free_svalue(sp);
-        free_svalue(--sp);
         put_array(sp,v);
     }
 

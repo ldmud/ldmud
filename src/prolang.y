@@ -10021,40 +10021,9 @@ copy_functions (program_t *from, fulltype_t type)
                 break;
 
             /* Visible: create a new identifier for it */
-            p = make_shared_identifier(get_txt(fun.name), I_TYPE_GLOBAL, 0);
-            if (!p) {
-                yyerrorf("Out of memory: identifier '%s'", get_txt(fun.name));
+            p = make_global_identifier(get_txt(fun.name), I_TYPE_GLOBAL);
+            if (!p)
                 break;
-            }
-
-            if (p->type > I_TYPE_GLOBAL)
-            {
-                /* Somebody created a #define for this name.
-                 * Now fake the ident-table entry.
-                 */
-                ident_t *q;
-
-                do {
-                    q = p;
-                    p = p->inferior;
-                }
-                while (p && p->type > I_TYPE_GLOBAL);
-
-                if (!p)
-                {
-                    p = xalloc(sizeof(ident_t));
-                    if (!p) {
-                        yyerrorf("Out of memory: identifier (%lu bytes)"
-                                , (unsigned long) sizeof(ident_t));
-                        break;
-                    }
-                    p->name = q->name;
-                    p->type = I_TYPE_UNKNOWN;
-                    p->inferior = NULL;
-                    p->hash = q->hash;
-                    q->inferior = p;
-                }
-            }
 
             if (p->type != I_TYPE_UNKNOWN)
             {
@@ -10472,42 +10441,10 @@ copy_variables (program_t *from, fulltype_t type
             ident_t *p;
             fulltype_t new_type;
 
-            p = make_shared_identifier(get_txt(from->variable_names[j].name),
-                I_TYPE_GLOBAL, 0);
-            if (!p) {
-                yyerrorf("Out of memory: identifier '%s'"
-                        , get_txt(from->variable_names[j].name));
+            p = make_global_identifier(get_txt(from->variable_names[j].name)
+                                      , I_TYPE_GLOBAL);
+            if (!p)
                 return;
-            }
-
-            if (p->type > I_TYPE_GLOBAL)
-            {
-                /* There is a #define for this name - fake
-                 * a proper entry in the ident table.
-                 */
-
-                ident_t *q;
-
-                do {
-                    q = p;
-                    p = p->inferior;
-                } while (p && p->type > I_TYPE_GLOBAL);
-
-                if (!p)
-                {
-                    p = xalloc(sizeof(ident_t));
-                    if (!p) {
-                        yyerrorf("Out of memory: identifier (%lu bytes)"
-                                , (unsigned long) sizeof(ident_t));
-                        return;
-                    }
-                    p->name = q->name;
-                    p->type = I_TYPE_UNKNOWN;
-                    p->inferior = NULL;
-                    p->hash = q->hash;
-                    q->inferior = p;
-                }
-            }
 
             new_type = type;
 
@@ -10978,40 +10915,10 @@ epilog (void)
     {
         ident_t *ip;
 
-        ip = make_shared_identifier(get_txt(STR_VARINIT), I_TYPE_UNKNOWN, 0);
-        switch (0) { default:
-            if (!ip)
-            {
-                yyerrorf("Out of memory: identifer '%s'", get_txt(STR_VARINIT));
-                break;
-            }
-
-            if (ip->type > I_TYPE_GLOBAL)
-            {
-                /* Somebody created a #define with this name.
-                 * Fake an ident-table entry.
-                 */
-                do {
-                    q = ip;
-                    ip = ip->inferior;
-                } while (ip && ip->type > I_TYPE_GLOBAL);
-                if (!ip)
-                {
-                    ip = xalloc(sizeof(ident_t));
-                    if (!ip) {
-                        yyerrorf("Out of memory: identifer (%lu bytes)"
-                                , (unsigned long) sizeof(ident_t));
-                        break;
-                    }
-                    ip->name = q->name;
-                    ip->type = I_TYPE_UNKNOWN;
-                    ip->inferior = NULL;
-                    ip->hash = q->hash;
-                    q->inferior = ip;
-                }
-            }
+        ip = make_global_identifier(get_txt(STR_VARINIT), I_TYPE_UNKNOWN);
+        if (ip)
             define_new_function(MY_FALSE, ip, 0, 0, first_initializer_start, TYPE_MOD_PROTECTED, 0);
-        }
+
         /* ref count for ip->name was incremented by transfer_init_control() */
 
         /* Change the last jump after the last initializer into a

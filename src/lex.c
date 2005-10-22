@@ -372,7 +372,7 @@ Bool insert_inline_fun_now = MY_FALSE;
    * or after a global variable definition.
    */
 
-int next_inline_fun = 0;
+unsigned int next_inline_fun = 0;
   /* The running count of inline functions, used to 'name' the next
    * function to generate.
    */
@@ -824,21 +824,33 @@ init_lexer(void)
 
 /*-------------------------------------------------------------------------*/
 ident_t *
-make_shared_identifier (char *s, int n, int depth)
+lookfor_shared_identifier (char *s, int n, int depth, Bool bCreate)
 
-/* Find and/or add identifier <s> of type <n> to the ident_table, and
- * return a pointer to the found/generated struct ident. New generated
- * entries have their type set to I_TYPE_UNKNOWN regardless of <n>.
- * Local identifiers (<n> == I_TYPE_LOCAL) are additionally distinguished by
- * their definition <depth>.
+/* Aliases: make_shared_identifier(): bCreate passed as MY_TRUE
+ *          find_shared_identifier(): bCreate passed as MY_FALSE
  *
- * If an identifier with the same name but a lower type exists in the table,
+ * Find and/or add identifier <s> of type <n> to the ident_table, and
+ * return a pointer to the found/generated struct ident. Local identifiers
+ * (<n> == I_TYPE_LOCAL) are additionally distinguished by their definition
+ * <depth>.
+ *
+ * If bCreate is FALSE, the function just checks if the given identfier
+ * exists in the table. The identifier is considered found, if there 
+ * is an entry in the table for this very name, and with a type equal
+ * or greater than <n>. If <n> is LOCAL and the found identifier is LOCAL
+ * as well, the identifier is considered found if <depth> is equal or smaller
+ * than the depth of the found identifier. The result is the pointer to the
+ * found identifier, or NULL if not found.
+ *
+ * If bCreate is TRUE, the identifier is created if not found. If an
+ * identifier with the same name but a lower type exists in the table,
  * it is shifted down: a new entry for this name created and put into the
  * table, the original entry is referenced by the .inferior pointer in the
  * new entry. The same happens when a new LOCAL of greater depth is
- * added to an existing LOCAL of smaller depth.
- *
- * Return NULL when out of memory.
+ * added to an existing LOCAL of smaller depth.  New generated
+ * entries have their type set to I_TYPE_UNKNOWN regardless of <n>.
+ * The result is the pointer to the found/new entry, or NULL when out
+ * of memory.
  */
 
 {
@@ -880,21 +892,26 @@ make_shared_identifier (char *s, int n, int depth)
                  && depth > curr->u.local.depth)
                )
             {
-                ident_t *inferior = curr;
+                if (bCreate)
+                {
+                    ident_t *inferior = curr;
 
 #if defined(LEXDEBUG)
-                printf("%s     shifting down inferior.\n", time_stamp());
+                    printf("%s     shifting down inferior.\n", time_stamp());
 #endif
-                curr = xalloc(sizeof *curr);
-                if ( NULL != curr )
-                {
-                    curr->name = inferior->name;
-                    curr->next = inferior->next;
-                    curr->type = I_TYPE_UNKNOWN;
-                    curr->inferior = inferior;
-                    curr->hash = (short)h;
-                    ident_table[h] = curr;
+                    curr = xalloc(sizeof *curr);
+                    if ( NULL != curr )
+                    {
+                        curr->name = inferior->name;
+                        curr->next = inferior->next;
+                        curr->type = I_TYPE_UNKNOWN;
+                        curr->inferior = inferior;
+                        curr->hash = (short)h;
+                        ident_table[h] = curr;
+                    }
                 }
+                else
+                    curr = NULL;
             }
 
             /* Return the found (or generated) entry */
@@ -905,27 +922,86 @@ make_shared_identifier (char *s, int n, int depth)
         curr = curr->next;
     }
 
-    /* Identifier is not in table, so create a new entry */
-
-    str = new_tabled(s);
-    if (!str)
-        return NULL;
-    curr = xalloc(sizeof *curr);
-    if (!curr)
+    if (bCreate)
     {
-        free_mstring(str);
+        /* Identifier is not in table, so create a new entry */
+
+        str = new_tabled(s);
+        if (!str)
+            return NULL;
+        curr = xalloc(sizeof *curr);
+        if (!curr)
+        {
+            free_mstring(str);
+            return NULL;
+        }
+
+        curr->name = str;
+        curr->next = ident_table[h];
+        curr->type = I_TYPE_UNKNOWN;
+        curr->inferior = NULL;
+        curr->hash = (short)h;
+        ident_table[h] = curr;
+    }
+    /* else curr is NULL */
+
+    return curr;
+} /* lookfor_shared_identifier() */
+
+/*-------------------------------------------------------------------------*/
+ident_t *
+make_global_identifier (char *s, int n)
+
+/* Create an identifier <s> on level I_TYPE_GLOBAL, after searching for it
+ * using type <n>.
+ *
+ * The difference to make_shared_identifier() is that if an identifier for
+ * this name already exists and is of higher level than I_TYPE_GLOBAL (e.g.
+ * somebody created a #define for this name), the function will insert
+ * an appropriate I_TYPE_GLOBAL entry into the inferior list.
+ *
+ * Result is the pointer to the identifier, or NULL when out of memory
+ * (yyerror() is called in that situation, too).
+ */
+
+{
+    ident_t *ip, *q;
+
+    ip = make_shared_identifier(s, n, 0);
+    if (!ip)
+    {
+        yyerrorf("Out of memory: identifer '%s'", s);
         return NULL;
     }
 
-    curr->name = str;
-    curr->next = ident_table[h];
-    curr->type = I_TYPE_UNKNOWN;
-    curr->inferior = NULL;
-    curr->hash = (short)h;
-    ident_table[h] = curr;
+    if (ip->type > I_TYPE_GLOBAL)
+    {
+        /* Somebody created a #define with this name.
+         * Fake an ident-table entry.
+         */
+        do {
+            q = ip;
+            ip = ip->inferior;
+        } while (ip && ip->type > I_TYPE_GLOBAL);
 
-    return curr;
-} /* make_shared_identifier() */
+        if (!ip)
+        {
+            ip = xalloc(sizeof(ident_t));
+            if (!ip) {
+                yyerrorf("Out of memory: identifier (%lu bytes)"
+                        , (unsigned long) sizeof(ident_t));
+                return NULL;
+            }
+            ip->name = q->name;
+            ip->type = I_TYPE_UNKNOWN;
+            ip->inferior = NULL;
+            ip->hash = q->hash;
+            q->inferior = ip;
+        }
+    }
+
+    return NULL;
+} /* make_global_identifier() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1611,6 +1687,8 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
 
     if (closure_hook[H_INCLUDE_DIRS].type == T_POINTER)
     {
+        char * cp;
+
         /* H_INCLUDE_DIRS is a vector of include directories.
          */
 
@@ -1620,8 +1698,10 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
             return -1;
         }
 
+        for (cp = name; *cp == '/'; cp++) NOOP;
+
         /* The filename must not specifiy parent directories */
-        if (!check_no_parentdirs(name))
+        if (!check_no_parentdirs(cp))
             return -1;
 
         /* Search all include dirs specified.
@@ -1664,7 +1744,10 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
         if (svp && svp->type == T_STRING
          && mstrsize(svp->u.str) < INC_OPEN_BUFSIZE)
         {
-            strcpy(buf, get_txt(svp->u.str));
+            char * cp;
+
+            for (cp = get_txt(svp->u.str); *cp == '/'; cp++) NOOP;
+            strcpy(buf, cp);
             if (legal_path(buf))
             {
                 if (!stat(buf, &aStat)
@@ -2800,15 +2883,27 @@ yylex1 (void)
                 strbuf_zero(textbuf);
                 fun->next = NULL; /* Terminate the list properly */
 
-                /* Create the name of the new inline function */
-                sprintf(name, "__inline_%s_%d_%04x", current_file
-                             , current_line, next_inline_fun++);
-
-                /* Convert all non-alnums to '_' */
-                for (start = name; *start != '\0'; start++)
+                /* Create the name of the new inline function.
+                 * We have to make sure the name is really unique.
+                 */
+                do
                 {
-                    if (!isalnum((unsigned)(*start)))
-                        *start = '_';
+                    sprintf(name, "__inline_%s_%d_%04x", current_file
+                                 , current_line, next_inline_fun++);
+
+                    /* Convert all non-alnums to '_' */
+                    for (start = name; *start != '\0'; start++)
+                    {
+                        if (!isalnum((unsigned)(*start)))
+                            *start = '_';
+                    }
+                } while (    find_shared_identifier(name, 0, 0)
+                          && next_inline_fun != 0);
+
+                if (next_inline_fun == 0)
+                {
+                    yyerror("Can't generate unique name for inline closure.");
+                    return -1;
                 }
 
                 /* Create the function header in the string buffer.

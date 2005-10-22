@@ -279,7 +279,7 @@ object  to_object(null|object|string|closure);
 mixed   copy(mixed);
 mixed   deep_copy(mixed);
 int     ed(void|string, void|null|string);
-mixed   get_type_info(mixed, int default: F_CONST0);
+mixed   get_type_info(mixed, void|int);
 mixed   quote(mixed *|quoted_array|symbol|string);
 
 string  save_value(mixed);

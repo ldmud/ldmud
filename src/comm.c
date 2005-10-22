@@ -1546,6 +1546,37 @@ if (sending_telnet_command)
 }
 
 /*-------------------------------------------------------------------------*/
+static INLINE void
+reset_input_buffer (interactive_t *ip)
+
+/* When returning from CHARMODE to LINEMODE, the input buffer variables
+ * need to be reset. This function takes care of it.
+ */
+
+{
+    if (ip->command_start)
+    {
+        DTN(("reset input buffer: cmd_start %d, tn_start %d, tn_end %d\n", ip->ob->name,  ip->command_start, ip->tn_start, ip->tn_end));
+        ip->tn_start -= ip->command_start;
+        ip->tn_end -= ip->command_start;
+        if (ip->tn_start < 0)
+            ip->tn_start = 0;
+        if (ip->tn_end <= 0)
+            ip->tn_end = 0;
+        else
+        {
+            move_memory( ip->text, ip->text + ip->command_start
+                       , ip->tn_end
+                       );
+        }
+        ip->text_end = ip->tn_end;
+        if (ip->command_end)
+            ip->command_end = ip->tn_end;
+        ip->command_start = 0;
+    }
+} /* reset_input_buffer() */
+
+/*-------------------------------------------------------------------------*/
 static void
 remove_flush_entry (interactive_t *ip)
 
@@ -1741,6 +1772,7 @@ get_message (char *buff)
 
             for (retries = 6;;)
             {
+                check_alarm();
                 timeout.tv_sec = twait;
                 timeout.tv_usec = 0;
                 res = socket_select(nfds, &readfds, 0, 0, &timeout);
@@ -2124,8 +2156,6 @@ get_message (char *buff)
                     current_interactive = NULL;
                     current_object = NULL;
                     trace_level = 0;
-                    udp_buf[sizeof(udp_buf) - 1] = '\0';
-                    udp_buf[cnt] = '\0';
 #ifndef USE_IPV6
                     st = inet_ntoa(addr.sin_addr);
 #else
@@ -2237,7 +2267,7 @@ get_message (char *buff)
             /* if ip->text[0] does not hold a valid character, the outcome
              * of the comparison to '!' does not matter.
              */
-            if (ip->noecho & CHARMODE_REQ)
+            if ((ip->noecho & (CHARMODE_REQ|CHARMODE)) == (CHARMODE_REQ|CHARMODE))
             {
                 DTN(("CHARMODE_REQ\n"));
                 if (ip->text[0] != '!' || find_no_bang(ip) & IGNORE_BANG )
@@ -2248,6 +2278,8 @@ get_message (char *buff)
                      */
 
                     int destix;  /* Save index */
+                    Bool end_of_line = MY_FALSE;
+
                     DTN(("  Unescaped input\n"));
                     
                     if (ip->tn_state != TS_READY)
@@ -2269,8 +2301,8 @@ get_message (char *buff)
                             comm_fatal(ip, "comm: data length < 0: %ld\n", (long)length);
                             continue;
                         }
-                        DT(("'%s'     save machine state %d, set to %d (READY)\n"
-                          , ip->ob->name, ip->tn_state, TS_READY));
+                        DTN(("    save machine state %d, set to %d (READY)\n"
+                          , ip->tn_state, TS_READY));
                         ip->save_tn_state = ip->tn_state;
                         ip->chars_ready = length;
                         ip->tn_state = TS_READY;
@@ -2283,9 +2315,10 @@ get_message (char *buff)
                          * At the moment it is TS_INVALID, so the next
                          * character received would be thrown away.
                          */
-                        DT(("'%s'     save machine state %d (DATA)\n"
-                          , ip->ob->name, TS_DATA));
+                        DTN(("    save machine state %d (DATA)\n"
+                          , TS_DATA));
                         ip->save_tn_state = TS_DATA;
+                        end_of_line = MY_TRUE;
                         /* tn_state is TS_READY */
                     }
 
@@ -2293,7 +2326,12 @@ get_message (char *buff)
                      * the buff[] as possible.
                      */
                     DTN(("  %d chars ready\n", ip->chars_ready));
-                    for (destix = 0; destix < ip->chars_ready; )
+                    if (end_of_line)
+                    {
+                        buff[0] = '\n';
+                        destix = 1;
+                    }
+                    else for (destix = 0; destix < ip->chars_ready; )
                     {
                         char ch;
 
@@ -2319,14 +2357,14 @@ get_message (char *buff)
                     }
 
                     /* destix is now the number of characters stored in
-                     * buff[], and it is at least 1.
+                     * buff[], and is at least 1.
                      */
                     
                     if (!buff[destix-1])
                     {
                         /* End of line. Reinitialise the telnet machine
                          */
-                        DTN(("    reinit telnet machine\n"));
+                        DTN(("    end of line: reinit telnet machine\n"));
                         buff[destix-1] = '\n';
                         ip->command_start = 0;
                         ip->tn_state = TS_DATA;
@@ -2335,7 +2373,8 @@ get_message (char *buff)
 
                     buff[destix] = '\0';
 
-                    ip->chars_ready -= destix;
+                    if (!end_of_line)
+                        ip->chars_ready -= destix;
                     DTN(("  %d chars left ready\n", ip->chars_ready));
                     if (!ip->chars_ready)
                     {
@@ -2377,7 +2416,9 @@ get_message (char *buff)
                     IncCmdGiver;
                     CmdsGiven = 0;
                     ip->last_time = current_time;
+
                     DTN(("--- return with char command ---\n"));
+
                     return MY_TRUE;
                 }
                 else if (ip->tn_state != TS_READY)
@@ -2459,6 +2500,14 @@ get_message (char *buff)
                     command_giver = ip->ob;
                 }
                 ip->last_time = current_time;
+
+                if ((ip->noecho & (CHARMODE_REQ|CHARMODE)) == CHARMODE_REQ)
+                {
+                    DTN(("   clear CHARMODE as it was refused anyway\n", ip->ob->name));
+                    ip->noecho &= ~(CHARMODE_REQ|CHARMODE|CHARMODE_ACK);
+                    reset_input_buffer(ip);
+                }
+
                 DTN(("--- return with line command ---\n"));
                 return MY_TRUE;
             } /* if (have a command) */
@@ -2970,31 +3019,13 @@ set_noecho (interactive_t *ip, char noecho)
                     }
                     if (ip->save_tn_state != TS_INVALID)
                     {
-                        DTN(("set_noecho():     0 chars ready, saved state %d\n", i->save_tn_state));
+                        DTN(("set_noecho():     0 chars ready, saved state %d\n", ip->save_tn_state));
                         ip->chars_ready = 0;
                         ip->tn_state = ip->save_tn_state;
                     }
                 }
-                if (ip->command_start)
-                {
-                    DTN(("set_noecho():     cmd_start %d, tn_start %d, tn_end %d\n", ip->command_start, ip->tn_start, ip->tn_end));
-                    ip->tn_start -= ip->command_start;
-                    ip->tn_end -= ip->command_start;
-                    if (ip->tn_start < 0)
-                        ip->tn_start = 0;
-                    if (ip->tn_end <= 0)
-                        ip->tn_end = 0;
-                    else
-                    {
-                        move_memory( ip->text, ip->text + ip->command_start
-                                   , ip->tn_end
-                                   );
-                    }
-                    ip->text_end = ip->tn_end;
-                    if (ip->command_end)
-                        ip->command_end = ip->tn_end;
-                    ip->command_start = 0;
-                }
+
+                reset_input_buffer(ip);
             }
             else if (confirm & ~old & CHARMODE_MASK)
             {
@@ -3958,7 +3989,7 @@ telnet_neg (interactive_t *ip)
     do {
         ch = (*from++ & 0xff);
         DTN(("t_n: processing %02x '%c'\n"
-            , ip->ob->name, (unsigned char)ch, ch));
+            , (unsigned char)ch, ch));
         switch(ip->tn_state)
         {
         case TS_READY:
@@ -4053,8 +4084,9 @@ telnet_neg (interactive_t *ip)
                      * can proceed now, else we have to wait for the
                      * next character to make our decisions.
                      */
-                    if ( !(ip->noecho & CHARMODE_REQ) ||
-                         (ip->text[0] == '!' && ! (find_no_bang(ip) & IGNORE_BANG)) )
+                    if ( !(ip->noecho & CHARMODE_REQ)
+                     || (ip->text[0] == '!' && ! (find_no_bang(ip) & IGNORE_BANG))
+                       )
                     {
                         ip->gobble_char = '\n';
                         goto full_newline;
@@ -4091,9 +4123,20 @@ telnet_neg (interactive_t *ip)
                                 *cp = *(cp-1);
                         }
                             
-                        ip->tn_state = TS_DATA;
-                        *to++ = '\r';
-                        goto ts_data;
+                        if ((ip->noecho & (CHARMODE_REQ|CHARMODE)) != (CHARMODE_REQ))
+                        {
+                            *to++ = '\r';
+                            ip->tn_state = TS_DATA;
+                            goto ts_data;
+                        }
+                        else
+                        {
+                            /* The client refused to go into char mode
+                             * and instead sent us a complete line.
+                             * Handle it as usual.
+                             */
+                            /* FALLTHROUGH to full_newline */
+                        }
                     }
                 } /* if (from >= end) or not */
 
@@ -4105,6 +4148,18 @@ telnet_neg (interactive_t *ip)
                     ip->tn_state = TS_READY;
                     ip->command_end = 0;
                     ip->tn_end = (short)(from - first);
+                    /*if ((ip->noecho & (CHARMODE_REQ|CHARMODE)) == (CHARMODE_REQ|CHARMODE) */
+                    if (ip->noecho & CHARMODE_REQ
+                     && (ip->text[0] != '!' || find_no_bang(ip) & IGNORE_BANG))
+                    {
+                        /* In charmode, we need to return the NL.
+                         * We will also append the NUL in case the client
+                         * refused to use charmode, because then get_message()
+                         * will treat the data as if in linemode and expect
+                         * a trailing NUL.
+                         */
+                        *to++ = '\n';
+                    }
                     *to = '\0';
                     return;
                 }

@@ -9536,6 +9536,18 @@ again:
             break;
         }
 
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            sp--;
+            if (sp->type != T_NUMBER)
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
+            sp->u.number = *argp->u.charp *= sp->u.number;
+            break;
+        }
+
         if (argp->type == T_FLOAT)
         {
             STORE_DOUBLE_USED
@@ -9705,6 +9717,20 @@ again:
             break;
         }
 
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            sp--;
+            if (sp->type != T_NUMBER)
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
+            if (sp->u.number == 0)
+                ERROR("Division by 0\n");
+            sp->u.number = *argp->u.charp /= sp->u.number;
+            break;
+        }
+
         if (argp->type == T_FLOAT)
         {
             STORE_DOUBLE_USED
@@ -9780,6 +9806,21 @@ again:
             sp->u.number = argp->u.number %= sp->u.number;
             break;
         }
+
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            sp--;
+            if (sp->type != T_NUMBER)
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
+            if (sp->u.number == 0)
+                ERROR("Division by 0\n");
+            sp->u.number = *argp->u.charp %= sp->u.number;
+            break;
+        }
+
         OP_ARG_ERROR(1, TF_NUMBER, argp->type);
         /* NOTREACHED */
     }
@@ -9819,6 +9860,18 @@ again:
             }
             sp--;
             sp->u.number = argp->u.number &= sp->u.number;
+            break;
+        }
+
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            sp--;
+            if (sp->type != T_NUMBER)
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
+            sp->u.number = *argp->u.charp &= sp->u.number;
             break;
         }
 
@@ -9905,6 +9958,19 @@ again:
             sp->u.number = argp->u.number |= sp->u.number;
             break;
         }
+
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            sp--;
+            if (sp->type != T_NUMBER)
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
+            sp->u.number = *argp->u.charp |= sp->u.number;
+            break;
+        }
+
         OP_ARG_ERROR(1, TF_NUMBER, argp->type);
         /* NOTREACHED */
         break;
@@ -9945,6 +10011,19 @@ again:
             sp->u.number = argp->u.number ^= sp->u.number;
             break;
         }
+
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            sp--;
+            if (sp->type != T_NUMBER)
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
+            sp->u.number = *argp->u.charp ^= sp->u.number;
+            break;
+        }
+
         OP_ARG_ERROR(1, TF_NUMBER, argp->type);
         /* NOTREACHED */
         break;
@@ -9988,6 +10067,21 @@ again:
             sp->u.number = argp->u.number;
             break;
         }
+
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            sp--;
+            if (sp->type != T_NUMBER)
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
+            i = sp->u.number;
+            *argp->u.charp <<= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
+            sp->u.number = *argp->u.charp;
+            break;
+        }
+
         OP_ARG_ERROR(1, TF_NUMBER, argp->type);
         /* NOTREACHED */
         break;
@@ -10029,6 +10123,21 @@ again:
             sp->u.number = argp->u.number;
             break;
         }
+
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            sp--;
+            if (sp->type != T_NUMBER)
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
+            i = sp->u.number;
+            *argp->u.charp >>= (uint)i > MAX_SHIFT ? MAX_SHIFT : i;
+            sp->u.number = *argp->u.charp;
+            break;
+        }
+
         OP_ARG_ERROR(1, TF_NUMBER, argp->type);
         /* NOTREACHED */ break;
     }
@@ -10071,6 +10180,24 @@ again:
             sp->u.number = argp->u.number;
             break;
         }
+
+        if (argp->type == T_CHAR_LVALUE)
+        {
+            sp--;
+            if (sp->type != T_NUMBER)
+            {
+                OP_ARG_ERROR(2, TF_NUMBER, sp->type);
+                /* NOTREACHED */
+            }
+            i = sp->u.number;
+            if ((uint)i > MAX_SHIFT)
+                *argp->u.charp = 0;
+            else
+                *argp->u.charp = (p_uint)*argp->u.charp >> i;
+            sp->u.number = *argp->u.charp;
+            break;
+        }
+
         OP_ARG_ERROR(1, TF_NUMBER, argp->type);
         /* NOTREACHED */
         break;

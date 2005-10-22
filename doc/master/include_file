@@ -18,7 +18,7 @@ DESCRIPTION
 
           <path>: the full absolute pathname of the file to include,
                   without parentdir parts ("/../"). Leading slashes ("/")
-                  are ignored.
+                  may be omitted.
 
           else: The include directive is not legal.
 
