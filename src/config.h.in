@@ -421,7 +421,7 @@
 
 /* Enable debug output from the LPC compiler.
  */
-@cdef_yydebug@ YYDEBUG 1
+@cdef_yydebug@ YYDEBUG
 
 /* Disable inlining.
  */

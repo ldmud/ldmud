@@ -84,7 +84,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-12-Aug-2002 (Lars Duening) -- upcoming Release 3.2.9
+13-Aug-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -365,9 +365,6 @@ For a detailed list of all changes see the file CHANGELOG.
            of the given width.
        + Duplicate inherits of a program on the toplevel raise a warning,
            resp. an error if pragma 'pedantic' is in effect.
-       + The operations <map> += <map> and <map> -= <map>
-           now implement the copy-on-write semantic to mirror the
-           behaviour of the related array operations (suggested by Dafire).
        + New preprocessor macros __CATCH_EVAL_COST__ and
            __MASTER_EVAL_COST__ for the corresponding evalcost
            limits.

@@ -10688,17 +10688,6 @@ again:
             else
             {
                 check_map_for_destr(u2.map);
-                if (argp->u.map->ref > 1)
-                {
-                    /* The target mapping has more than one user - we
-                     * need to implement the copy-on-write semantic.
-                     */
-                    mapping_t *m;
-                    check_map_for_destr(argp->u.map);
-                    m = copy_mapping(argp->u.map);
-                    free_mapping(argp->u.map);
-                    argp->u.map = m;
-                }
                 add_to_mapping(argp->u.map, u2.map);
                 sp -= 2;
                 free_mapping(u2.map);
@@ -10977,17 +10966,6 @@ again:
                      */
                     deref_mapping(m);
                     m = copy_mapping(m);
-                }
-                if (argp->u.map->ref > 1)
-                {
-                    /* The target mapping has more than one user - we
-                     * need to implement the copy-on-write semantic.
-                     */
-                    mapping_t *mtmp;
-                    check_map_for_destr(argp->u.map);
-                    mtmp = copy_mapping(argp->u.map);
-                    free_mapping(argp->u.map);
-                    argp->u.map = mtmp;
                 }
 
                 walk_mapping(m, sub_from_mapping_filter, argp->u.map);

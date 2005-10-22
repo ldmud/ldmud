@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Aug-2002 (Lars Duening)  (3.3.220)
+    - (configure) The VERBOSE_OPCPROF define in config.h got clobbered.
+    - (interpret.c) I removed the copy-on-write for mappings again - 
+         it broke more than it fixed.
+
 13-Aug-2002 (Lars Duening)  (3.3.219)
     - (regexp, mregex) Changed the original RE package to return
          error codes instead of calling regerror(). This puts it more

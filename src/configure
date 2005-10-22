@@ -2321,7 +2321,7 @@ if test "x$cdef_wizlist_file" = "x#undef"; then
 fi
 
 if test "x$cdef_opcprof" = "x#undef"; then
-  cdef_verbose_opcprof=
+  cdef_verbose_opcprof="#undef"
 fi
 
 

@@ -26,13 +26,6 @@ EXAMPLES
         m_add(m, "bar", 1) --> ([ "foo":1;2, "bar":1;0 ])
 
 
-        mapping a, b;
-
-        a = b = ([0]);
-        m_add(b, 1);
-        a += ([2]);
-          --> a = ([ 0, 1, 2 ]), b = ([ 0, 1 ])
-
 HISTORY
         Introduced in LDMud 3.2.9.
 
