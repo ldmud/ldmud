@@ -1916,8 +1916,10 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
          */
         if (!complete)
         {
-            if (funp->flags & TYPE_MOD_NO_MASK
-             && !((funp->flags|flags) & (NAME_PROTOTYPE|NAME_UNDEFINED)) )
+            if ((funp->flags & TYPE_MOD_NO_MASK)
+             && !(funp->flags & (NAME_PROTOTYPE|NAME_UNDEFINED)) 
+             && ((flags & (NAME_PROTOTYPE|NAME_UNDEFINED)) == (NAME_PROTOTYPE|NAME_UNDEFINED))
+               )
                 yyerrorf("Illegal to redefine 'nomask' function \"%s\""
                         , get_txt(p->name));
 
