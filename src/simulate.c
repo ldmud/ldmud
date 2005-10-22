@@ -2386,6 +2386,33 @@ check_all_object_shadows (void)
         check_object_shadow(ob, sh);
 } /* check_object_shadows() */
 
+void
+update_object_sent(object_t *obj, sentence_t *new_sent)
+{
+    object_shadow_t *sh;
+    if (!(obj->flags & O_DESTRUCTED))
+    {
+        obj->sent = new_sent;
+        return;
+    }
+    for (sh = newly_destructed_obj_shadows; sh != NULL; sh = sh->next)
+        if (sh->obj == obj)
+            break;
+    if (sh == NULL)
+        for (sh = newly_destructed_obj_shadows; sh != NULL; sh = sh->next)
+            if (sh->obj == obj)
+                break;
+    if (sh == NULL)
+    {
+        fatal("DEBUG: Obj %p '%s': ref %ld, flags %x, sent %p; no shadow found\n"
+             , obj, get_txt(obj->name), obj->ref, obj->flags, obj->sent
+             );
+    }
+    check_object_shadow(obj, sh);
+    obj->sent = new_sent;
+    sh->sent = new_sent;
+}
+
 #endif /* CHECK_OBJECT_REF */
 /*-------------------------------------------------------------------------*/
 static void
@@ -2691,7 +2718,11 @@ check_shadow_sent (object_t *ob)
          && !sh->shadowed_by
            )
         {
+#ifdef CHECK_OBJECT_REF
+            update_object_sent(ob, sh->sent.next);
+#else
             ob->sent = sh->sent.next;
+#endif /* CHECK_OBJECT_REF */
             free_shadow_sent(sh);
             ob->flags &= ~O_SHADOW;
         }
@@ -2712,7 +2743,11 @@ assert_shadow_sent (object_t *ob)
 
         sh = new_shadow_sent();
         sh->sent.next = ob->sent;
+#ifdef CHECK_OBJECT_REF
+        update_object_sent(ob, (sentence_t *)sh);
+#else
         ob->sent = (sentence_t *)sh;
+#endif /* CHECK_OBJECT_REF */
         ob->flags |= O_SHADOW;
     }
 } /* assert_shadow_sent() */

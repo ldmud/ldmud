@@ -527,7 +527,7 @@ string  traceprefix(string|int);
 
         /* Inventories (TODO: should be optional) */
 
-object *all_environment(void|object);
+object *all_environment(void|null|object);
 object *all_inventory(object default: F_THIS_OBJECT);
 object *deep_inventory(object default: F_THIS_OBJECT);
 object  environment(void|object|string);

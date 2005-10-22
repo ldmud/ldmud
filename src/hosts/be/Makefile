@@ -109,7 +109,7 @@ endif
 
 # Generated source files (overlaps with of SRCS) which need to be
 # present for mkdepend to work.
-    GENSRCS = make_func.c stdstrings.c lang.c instrs.h
+    GENSRCS = make_func.c stdstrings.c lang.c instrs.h pcre/chartables.c
 
 # Macros for MkDepend:
     SKELETON = $(SRCS) mkfunc.c pcre/dftables.c
@@ -148,16 +148,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 181
+  SETVERFLAGS += d 182
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.181
+  VSTRING = 3.3.0-pre.182
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 181
+  SETVERFLAGS += d 182
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.181
+  VSTRING = 3.3.0-dev.182
 endif
 
 else
@@ -165,12 +165,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 181
+SETVERFLAGS = -app 3 3 182
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.181
+  VSTRING = 3.3.182
 
 endif
 

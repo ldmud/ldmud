@@ -3204,8 +3204,13 @@ f_all_environment (svalue_t *sp, int num_arg)
     /* Get the arg from the stack, if any */
     if (num_arg)
     {
-        o = ref_object(sp->u.ob, "all_environment");
-        free_object_svalue(sp);
+        if (sp->type == T_NUMBER) /* destructed object */
+            o = NULL;
+        else
+        {
+            o = ref_object(sp->u.ob, "all_environment");
+            free_object_svalue(sp);
+        }
     }
     else
     {
@@ -3217,7 +3222,7 @@ f_all_environment (svalue_t *sp, int num_arg)
     /* Default return value: 0 */
     put_number(sp, 0);
 
-    if (!(o->flags & O_DESTRUCTED))
+    if (o != NULL && !(o->flags & O_DESTRUCTED))
     {
         mp_int num;
         object_t *env;
@@ -3246,7 +3251,7 @@ f_all_environment (svalue_t *sp, int num_arg)
         }
     }
 
-    if (num_arg)
+    if (num_arg && o != NULL)
         free_object(o, "all_environment");
 
     return sp;

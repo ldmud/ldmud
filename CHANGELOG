@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Mar-2002 (Lars Duening)  (3.3.182)
+    - (actions.c, simulate.c) The CHECK_OBJECT_REF check was overzealous
+        and didn't track properly the changes in object sentences. Sorry.
+    - (func_spec, object.c) Efun all_environment() did not accept destructed
+        objects as argument as documented (reported by Pulami and Gnomi).
+
 09-Mar-2002 (Lars Duening)  (3.3.181)
     - (xalloc) The implementation of the heap/stack check didn't work
         on architectures with really big address spaces - corrected that.

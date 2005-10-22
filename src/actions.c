@@ -356,7 +356,14 @@ remove_action_sent (object_t *ob, object_t *player)
                                  , time_stamp());
             }
 #endif
+#ifdef CHECK_OBJECT_REF
+            if (s == &player->sent)
+                update_object_sent(player, tmp->sent.next);
+            else
+                *s = tmp->sent.next;
+#else
             *s = tmp->sent.next;
+#endif /* CHECK_OBJECT_REF */
             free_action_sent(tmp);
         }
         else
@@ -401,7 +408,14 @@ remove_shadow_action_sent (object_t *ob, object_t *player)
                                  , time_stamp());
             }
 #endif
+#ifdef CHECK_OBJECT_REF
+            if (s == &player->sent)
+                update_object_sent(player, tmp->sent.next);
+            else
+                *s = tmp->sent.next;
+#else
             *s = tmp->sent.next;
+#endif /* CHECK_OBJECT_REF */
             free_action_sent(tmp);
         }
         else
@@ -444,11 +458,25 @@ remove_environment_sent (object_t *player)
                 s = (action_t *)s->sent.next;
                 free_action_sent(tmp);
                 if (!s) {
+#ifdef CHECK_OBJECT_REF
+                if (p == &player->sent)
+                    update_object_sent(player, NULL);
+                else
                     *p = NULL;
+#else
+                    *p = NULL;
+#endif /* CHECK_OBJECT_REF */
                     return;
                 }
             } while (s->ob == ob);
+#ifdef CHECK_OBJECT_REF
+            if (p == &player->sent)
+                update_object_sent(player, (sentence_t *)s);
+            else
+                *p = (sentence_t *)s;
+#else
             *p = (sentence_t *)s;
+#endif /* CHECK_OBJECT_REF */
         }
         else
         {
@@ -1347,7 +1375,11 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
     else
     {
         p->sent.next = command_giver->sent;
+#ifdef CHECK_OBJECT_REF
+        update_object_sent(command_giver, (sentence_t *)p);
+#else
         command_giver->sent = (sentence_t *)p;
+#endif /* CHECK_OBJECT_REF */
     }
 
     return MY_FALSE;
@@ -1572,7 +1604,14 @@ f_remove_action (svalue_t *sp)
     {
         if (s->ob == ob && s->verb == verb)
         {
+#ifdef CHECK_OBJECT_REF
+            if (sentp == &ob->sent)
+                update_object_sent(ob, s->sent.next);
+            else
+                *sentp = s->sent.next;
+#else
             *sentp = s->sent.next;
+#endif /* CHECK_OBJECT_REF */
             free_action_sent(s);
             break;
         }

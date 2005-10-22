@@ -147,6 +147,7 @@ object_shadow_t * destructed_obj_shadows;
 object_shadow_t * newly_destructed_obj_shadows;
 extern void check_object_shadow (object_t *ob, object_shadow_t *sh);
 extern void check_all_object_shadows (void);
+extern void update_object_sent(object_t *obj, sentence_t *new_sent);
 #endif /* CHECK_OBJECT_REF */
 
 /* --- Macros --- */
