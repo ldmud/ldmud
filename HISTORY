@@ -43,9 +43,11 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-13-Jul-2001 (Lars Duening) -- upcoming Release 3.2.9
+15-Jul-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
+       + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
+           handling.
        + allocate(): Accepts an optional initialisation value and can
            create multi-dimensional arrays.
        + clones(): If the driver is compiled with DYNAMIC_COSTS, the cost
@@ -235,6 +237,8 @@ For a detailed list of all changes see the file CHANGELOG.
            'b = 0 || &a; b = 0 || &a;' are detected.
        + Bugfix: When destructing an object, references through closures
            are removed from the local variables as well.
+       + Bugfix: Removing or destructing a shadow now properly
+           removes all associated actions.
 
     - Other Changes:
        + New driver option '--pidfile <filename>' to write the pid of the

@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Jul-2001 (Lars Duening)  (3.3.76)
+    - (actions, simulate) Removing or destructing a shadow now properly
+        removes all associated actions (reported by Nathan).
+    - (actions.c) New add_action() flag AA_IMM_ARGS implements the sane
+        NOSPACE argument handling.
+
 15-Jul-2001 (Lars Duening)  (3.3.75)
     - (configure) When testing for mySQL, the driver automatically checks
          in /usr/local/include as well (some systems don't have it the

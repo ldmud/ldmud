@@ -44,7 +44,13 @@ DESCRIPTION
         If argument <flag> is AA_NOSPACE (2), then again the arguments
         may follow the verb without separating space. In contrast to
         AA_SHORT, all characters following the verb are passed as
-        the argument string.
+        the argument string. However, note that the characters immediately
+        following the given verb are passed as argument AND as result
+        of query_verb().
+
+        If argument <flag> is AA_IMM_ARGS (3), then again the arguments
+        may follow the verb without separating space. All characters following
+        the given verb are passed as argument, and only as argument.
 
         If argument <flag> is negative, the verb given by the player
         has to match only the leading -<flag> characters of the verb <cmd>.
@@ -75,9 +81,11 @@ EXAMPLES
           be recognized. To get the real word which was typed in
           you have to call the efun query_verb().
 
+
         add_action("...", "cmd");
         add_action("...", "xcmd", AA_SHORT);
         add_action("...", "scmd", AA_NOSPACE);
+        add_action("...", "icmd", AA_IMM_ARGS);
 
           When given the following commands, the driver will parse it
           as described below. 'verb' is what query_verb() would return,
@@ -85,32 +93,30 @@ EXAMPLES
 
           "cmd"          -> verb "cmd",     arg 0
           "cmd foo bar"  -> verb "cmd",     arg "foo bar"
+
           "xcmd"         -> verb "xcmd",    arg 0
           "xcmd foo"     -> verb "xcmd",    arg "foo"
           "xcmdfoo"      -> verb "xcmdfoo", arg 0
           "xcmd foo bar" -> verb "xcmd",    arg "foo bar"
           "xcmdfoo bar"  -> verb "xcmdfoo", arg "bar"
+
           "scmd"         -> verb "scmd",    arg 0
           "scmd foo"     -> verb "scmd",    arg " foo"
           "scmdfoo"      -> verb "scmdfoo", arg "foo"
           "scmd foo bar" -> verb "scmd",    arg " foo bar"
           "scmdfoo bar"  -> verb "scmdfoo", arg "foo bar"
 
-        Note: it would be more logical if the behaviour for AA_NOSPACE
-        would be like this:
-
-          "scmd"         -> verb "scmd",    arg 0
-          "scmd foo"     -> verb "scmd",    arg " foo"
-          "scmdfoo"      -> verb "scmd",    arg "foo"
-          "scmd foo bar" -> verb "scmd",    arg " foo bar"
-          "scmdfoo bar"  -> verb "scmd",    arg "foo bar"
-
-        However, that would break too much existing mudlib code.
+          "icmd"         -> verb "icmd",    arg 0
+          "icmd foo"     -> verb "icmd",    arg " foo"
+          "icmdfoo"      -> verb "icmd",    arg "foo"
+          "icmd foo bar" -> verb "icmd",    arg " foo bar"
+          "icmdfoo bar"  -> verb "icmd",    arg "foo bar"
 
 
 HISTORY
         The flag < 0 argument was supported since 3.2@127, but not
         really implemented before LDMud 3.2.8.
+        LDMud 3.2.9 introduced the AA_IMM_ARGS flag.
         LDMud 3.3 removed the historical add_action(fun) notation.
 
 SEE ALSO

@@ -199,6 +199,8 @@ new_action_sent(void)
     }
     p->verb = NULL;
     p->function = NULL;
+    p->ob = NULL;
+    p->shadow_ob = NULL;
     return p;
 } /* new_action_sent() */
 
@@ -364,6 +366,51 @@ remove_action_sent (object_t *ob, object_t *player)
 
 /*-------------------------------------------------------------------------*/
 void
+remove_shadow_action_sent (object_t *ob, object_t *player)
+
+/* Remove all actions defined by <ob> and attached to <player>.
+ */
+
+{
+    sentence_t **s;
+
+    /* A simple list walk */
+    for (s = &player->sent; *s;)
+    {
+        action_t *tmp;
+
+        tmp = (action_t *)*s;
+
+        if (tmp->shadow_ob == ob)
+        {
+#ifdef DEBUG
+            if (d_flag > 1)
+            {
+                if (tmp->function && tmp->verb)
+                    debug_message("%s --Unlinking sentence fun='%s', verb='%s'\n"
+                                 , time_stamp(), get_txt(tmp->function)
+                                 , get_txt(tmp->verb));
+                else if (tmp->function)
+                    debug_message("%s --Unlinking sentence fun='%s', verb=0\n"
+                                 , time_stamp(), get_txt(tmp->function));
+                else if (tmp->verb)
+                    debug_message("%s --Unlinking sentence fun=0, verb='%s'\n"
+                                 , time_stamp(), get_txt(tmp->verb));
+                else 
+                    debug_message("%s --Unlinking sentence fun=0, verb=0\n"
+                                 , time_stamp());
+            }
+#endif
+            *s = tmp->sent.next;
+            free_action_sent(tmp);
+        }
+        else
+            s = &((*s)->next);
+    }
+} /* remove_shadow_action_sent() */
+
+/*-------------------------------------------------------------------------*/
+void
 remove_environment_sent (object_t *player)
 
 /* Remove all actions on <player> defined by objects with the same
@@ -412,6 +459,35 @@ remove_environment_sent (object_t *player)
         }
     }
 } /* remove_environment_sent() */
+
+/*-------------------------------------------------------------------------*/
+void
+remove_shadow_actions (object_t *shadow, object_t *target)
+
+/* Remove all shadow actions defined by <shadow> and attached to <target> or
+ * an object in <target>'s vicinity.
+ */
+
+{
+    object_t *item;
+
+    remove_shadow_action_sent(shadow, target);
+    for (item = target->contains; item; item = item->next_inv)
+    {
+        if (shadow != item)
+            remove_shadow_action_sent(shadow, item);
+    }
+    if (target->super)
+    {
+        remove_shadow_action_sent(shadow, target->super);
+
+        for (item = target->super->contains; item; item = item->next_inv)
+        {
+            if (shadow != item && target != item)
+                remove_shadow_action_sent(shadow, item);
+        }
+    }
+} /* remove_shadow_actions() */
 
 /*-------------------------------------------------------------------------*/
 static Bool
@@ -831,7 +907,7 @@ parse_command (char *buff, Bool from_efun)
                     continue;
             }
         }
-        else if (type == SENT_NO_SPACE)
+        else if (type == SENT_OLD_NO_SPACE || type == SENT_NO_SPACE)
         {
             /* The arguments may follow the verb without space,
              * that means we just have to check if buff[] begins
@@ -914,17 +990,40 @@ parse_command (char *buff, Bool from_efun)
         marker_sent->function = NULL;
 
         /* Push the argument and call the command function.
-         *
-         * For NO_SPACE commands it would be logical to cut off the
-         * actual verb part from the first word and add it to the arguments,
-         * but this would break all existing mudlibs.
          */
-        if (s->type == SENT_NO_SPACE)
+        if (s->type == SENT_OLD_NO_SPACE)
         {
             if (strlen(buff) > mstrsize(sa->verb))
             {
                 push_c_string(inter_sp, &buff[mstrsize(sa->verb)]);
                 ret = sapply(sa->function, sa->ob, 1);
+            }
+            else
+            {
+                ret = sapply(sa->function, sa->ob, 0);
+            }
+        }
+        else if (s->type == SENT_NO_SPACE)
+        {
+            if (strlen(buff) > mstrsize(sa->verb))
+            {
+                /* We need to cut off the verb right where the
+                 * arguments start. On the other hand, we can't modify
+                 * the last_verb permanently, as this sentence might
+                 * fail and other sentences want the full one.
+                 */
+                char ch;
+                size_t len = mstrsize(sa->verb);
+
+                push_string(inter_sp, last_verb);
+                ch = buff[len];
+                buff[len] = '\0';
+                last_verb = new_tabled(buff);
+                buff[len] = ch;
+                push_c_string(inter_sp, &buff[len]);
+                ret = sapply(sa->function, sa->ob, 1);
+                free_mstring(last_verb);
+                last_verb = inter_sp->u.str; inter_sp--;
             }
             else
             {
@@ -1107,18 +1206,20 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
 
 {
     action_t *p;
-    object_t *ob;
+    object_t *ob, *shadow_ob;
     string_t *str;
 
     /* Can't take actions from destructed objects */
     if (current_object->flags & O_DESTRUCTED)
         return MY_TRUE;
 
+    shadow_ob = NULL;
     ob = current_object;
 
     /* Check if the call comes from a shadow of the current object */
     if (ob->flags & O_SHADOW && O_GET_SHADOW(ob)->shadowing)
     {
+        shadow_ob = ob;
         str = find_tabled(func->u.str);
         do
         {
@@ -1175,6 +1276,7 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
     /* Set ->function to the function name, made tabled */
     p->function = make_tabled(func->u.str);
     p->ob = ob;
+    p->shadow_ob = shadow_ob;
 
     /* Set ->verb to the command verb, made tabled */
     p->verb = make_tabled(cmd->u.str);
@@ -1188,6 +1290,10 @@ e_add_action (svalue_t *func, svalue_t *cmd, int flag)
             p->sent.type = SENT_SHORT_VERB;
         }
         else if (flag == AA_NOSPACE)
+        {
+            p->sent.type = SENT_OLD_NO_SPACE;
+        }
+        else if (flag == AA_IMM_ARGS)
         {
             p->sent.type = SENT_NO_SPACE;
         }

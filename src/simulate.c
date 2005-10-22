@@ -2060,6 +2060,12 @@ destruct (object_t *ob)
             shadow_sent->shadowing = NULL;
             shadowing_sent->shadowed_by = shadow_sent->shadowed_by;
             check_shadow_sent(shadowing);
+
+            /* This object, the shadow, may have added actions to
+             * the shadowee, or it's vicinity. Take care to remove
+             * them all.
+             */
+            remove_shadow_actions(ob, shadowing);
         }
 
         if ( NULL != (shadowed_by = shadow_sent->shadowed_by) )
@@ -2071,6 +2077,14 @@ destruct (object_t *ob)
             shadow_sent->shadowed_by = NULL;
             shadowed_by_sent->shadowing = shadowing;
             check_shadow_sent(shadowed_by);
+
+            /* Our shadows may have added actions to us or to our
+             * environment. Take care to remove them all.
+             */
+            do {
+                remove_shadow_actions(shadowed_by, ob);
+                shadowed_by = O_GET_SHADOW(shadowed_by)->shadowed_by;
+            } while (shadowed_by != NULL);
         }
 
         check_shadow_sent(ob);
@@ -3820,6 +3834,7 @@ f_unshadow (svalue_t *sp)
             /* Our victim is no longer shadowed, so maybe it
              * doesn't need its shadow sentence anymore.
              */
+            remove_shadow_actions(current_object, shadowing);
             check_shadow_sent(shadowing);
         }
 
