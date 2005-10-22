@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Aug-2001 (Lars Duening)  (3.3.89)
+    - (interpret.c) The lambda protection had a bug: when a non-lambda closure
+         was called from within an executed lambda, the lambda closure was
+         accidentally freed (reported by Fiona).
+    - (sprintf.c) *blush* I completely forgot to add the terminator 0 after
+         creating the quoted representation of a string (thanks, Menaures!).
+
 21-Aug-2001 (Lars Duening)  (3.3.88)
     - (prolang.y) The 'private' correction caused the driver to crash
          under obscure circumstances. I implemented the correction now

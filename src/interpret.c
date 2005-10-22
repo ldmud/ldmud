@@ -14991,7 +14991,6 @@ call_lambda (svalue_t *lsvp, int num_arg)
 #  define CLEAN_CSP \
         previous_ob = csp->prev_ob; \
         current_object = csp->ob; \
-        current_lambda = csp->lambda; \
         pop_control_stack();
   /* Macro to undo all the call preparations in case the closure
    * can't be called after all.

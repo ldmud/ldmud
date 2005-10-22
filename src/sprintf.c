@@ -661,6 +661,7 @@ svalue_to_string ( fmt_state_t *st
                         break;
                     }
                 } /* for() */
+                *dest = '\0';
 
                 stradd(st, &str, tmpstr);
             }

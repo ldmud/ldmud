@@ -203,8 +203,8 @@ simulate.o : simulate.c ../mudlib/sys/rtlimits.h ../mudlib/sys/files.h \
 sprintf.o : sprintf.c xalloc.h swap.h svalue.h stdstrings.h simul_efun.h \
     simulate.h sent.h ptrtable.h object.h mstrings.h mapping.h main.h \
     instrs.h interpret.h exec.h comm.h closure.h array.h actions.h \
-    sprintf.h typedefs.h driver.h strfuns.h port.h config.h hosts/unix.h \
-    hosts/be/be.h machine.h
+    sprintf.h my-alloca.h typedefs.h driver.h strfuns.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 stdstrings.o : stdstrings.c mstrings.h stdstrings.h typedefs.h driver.h \
     port.h config.h hosts/unix.h hosts/be/be.h machine.h
