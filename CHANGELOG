@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+29-Nov-2001 (Lars Duening)  (3.3.134)
+    - (prolang, lex.c) Storing the line number info for the end of an
+        include file used the wrong line for rollbacks (reported by
+        Guandalug).
+
 28-Nov-2001 (Lars Duening)  (3.3.133)
     - (prolang.y) Another correction to the bugfix of Gimli's problem
         (reported by Freaky).

@@ -11635,16 +11635,17 @@ store_include_info (char *name, char * filename, char delim, int depth)
 
 /*-------------------------------------------------------------------------*/
 void
-store_include_end (mp_uint inc_offset)
+store_include_end (mp_uint inc_offset, int include_line)
 
 /* The current include ended. <inc_offset> has to be the offset returned by
- * store_include_info() for this include file.
+ * store_include_info() for this include file, <include_line> is the
+ * line number of the #include statement in the including file.
  */
 
 {
     unsigned char c;
 
-    stored_lines = current_line-1;
+    stored_lines = include_line;
     if (last_include_start == mem_block[A_LINENUMBERS].current_size)
     {
         include_t * inc = (include_t *)(mem_block[A_INCLUDES].block + inc_offset);
@@ -11671,12 +11672,11 @@ store_include_end (mp_uint inc_offset)
 
         inc->depth = -inc->depth;
 
-        /* If we return to the auto_include_string, current_line has been
+        /* If we return to the auto_include_string, include_line has been
          * negative, and hence stored_lines became negative.  However,
          * actually, the line number information has been unwinded to 0.  */
         if (stored_lines < 0)
             stored_lines = 0;
-
     }
     else
     {

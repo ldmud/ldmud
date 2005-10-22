@@ -2853,7 +2853,7 @@ yylex1 (void)
                 xfree(current_file);
                 nexpands = 0;
 
-                store_include_end(p->inc_offset);
+                store_include_end(p->inc_offset, p->line);
 
                 /* Restore the previous state */
                 current_file = p->file;
