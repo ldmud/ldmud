@@ -363,6 +363,7 @@ string  invert_bits(string);
 int     last_bit(string);
 int     next_bit(string, int, int default: F_CONST0);
 int     count_bits(string);
+string  copy_bits(string,string,void|int,void|int,void|int);
 
 
         /* Arrays and Mappings */

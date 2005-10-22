@@ -59,6 +59,8 @@ DESCRIPTION
       
       __IPV6__ :      support for IP v 6
       __MYSQL__ :     support for mySQL
+      __ALISTS__:     support for alists
+      __PCRE__:       support for PCRE instead of traditional regexps.
       __DEPRECATED__: support for obsolete and deprecated efuns.
 
 
@@ -74,7 +76,7 @@ HISTORY
          __VERSION_MINOR__, __VERSION_MICRO__, __VERSION_PATCH__,
          __INT_MAX__, __INT_MIN__, __FLOAT_MIN__, __FLOAT_MAX__,
          and __WIZLIST__.
-    3.3 made __LPC_NOSAVE__ always defined.
+    3.3 made __LPC_NOSAVE__ always defined and added __ALISTS__, __PCRE__.
 
 SEE ALSO
     pragma(LPC), preprocessor(LPC)

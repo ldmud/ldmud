@@ -69,7 +69,7 @@ For a detailed list of all changes see the file CHANGELOG.
            something different from '!'.
 
 
-07-Feb-2002 (Lars Duening) -- Release 3.2.9
+09-Feb-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -124,6 +124,11 @@ For a detailed list of all changes see the file CHANGELOG.
            special characters in strings.
        + printf(), sprintf(): New format modifier '$' implements flush
            formatting for strings and columns of strings.
+       + printf(), sprintf(): In justified column formatting, when a word is
+           too long to fit on a line by itself and there are at least two
+           characters space left on the current line, the long word is begun
+           immediately.  Previously, such long words were always printed on a
+           line of their own.
        + query_udp_port(), send_udp(): Renamed from query_imp_port() and
            send_imp().
        + regexp functions: more compatible with 8-bit characters.
@@ -138,14 +143,14 @@ For a detailed list of all changes see the file CHANGELOG.
        + sin(), cos(), tan(), atan(), atan2(), log(), exp(), sqrt(), pow():
            Integers are accepted as arguments, too.
        + sizeof(): Now also returns the length of strings.
-       + (s)printf(): In justified column formatting, when a word is too
-           to fit on a line by itself and there are at least two characters
-           space left on the current line, the long word is begun immediately.
-           Previously, such long words were always printed on a line of
-           their own.
        + terminal_colour(): Colour keys can now be mapped using a closure.
            The pattern "%%^^" is recognized as second notation for literal
            "%^" besides "%^%^".
+       + terminal_colour(): In wrapped formatting, when a word is
+           too long to fit on a line by itself and there are at least two
+           characters space left on the current line, the long word is begun
+           immediately.  Previously, such long words were always printed on a
+           line of their own.
        + add_verb(), add_xverb(), efun308(), file_name(), map_array(),
          filter_array(), filter_mapping(), map_mapping(), m_sizeof(),
          send_imp(), set_auto_include_string():
@@ -186,6 +191,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + to_string(): Can handle operator closures now.
 
     - New efuns:
+       + copy_bits(): To copy ranges of bitstrings.
        + db_affected_rows(), db_conv_string(), db_close(), db_connect(),
          db_exec(), db_fetch(), db_handles(), db_coldefs(), db_insert_id(),
          db_error():

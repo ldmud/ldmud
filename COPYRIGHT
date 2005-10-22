@@ -55,3 +55,6 @@ Inc.
 The Apache-compatible MD5 password encryption is Copyright (C) 2000 Apache
 Software Foundation.
 
+The PCRE (Perl Compatible Regular Expression) is Copyright (C) 1997-2001 by
+Philip Hazel. LDMud contains just the files required for the driver; see
+pcre/LICENCE for the licence terms and the location of the full package.

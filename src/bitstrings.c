@@ -17,6 +17,7 @@
 #include "driver.h"
 #include "typedefs.h"
 
+
 #include "bitstrings.h"
 
 #include "interpret.h"
@@ -26,6 +27,75 @@
 #include "simulate.h"
 #include "svalue.h"
 #include "xalloc.h"
+
+/*-------------------------------------------------------------------------*/
+#if 0
+
+#include <stdio.h>
+
+static void
+printbits (string_t *bstr)
+
+/* Auxiliary function for debugging: print the data from a bitstring */
+
+{
+    long len = (long)mstrsize(bstr);
+    char *cp = get_txt(bstr);
+
+    while (len > 0)
+    {
+        int bit;
+
+        for (bit = 0; bit < 6; bit++)
+        {
+            if ((*cp-' ') & (1 << bit)) putchar('1'); else putchar('.');
+        }
+        if (len > 1) putchar(' ');
+        len--;
+        cp++;
+    }
+} /* printbits() */
+
+#endif
+
+/*-------------------------------------------------------------------------*/
+static INLINE p_int 
+last_bit (string_t *str)
+
+/* Return the number of the last set bit in bitstring <str>.
+ */
+
+{
+    mp_int   pos;
+    long     len;
+    char   * cstr;
+    int      c;
+
+    pos = -1;
+
+    /* Get the arguments */
+    cstr = get_txt(str);
+    len = (long)mstrsize(str);
+
+    /* First, find the last non-zero character */
+    c = 0;
+    while (len-- > 0 && (c = cstr[len]) == ' ') NOOP;
+
+    if (len >= 0)
+    {
+        int pattern;
+
+        /* Found a character, now determine the bit position */
+        c -= ' ';
+        pos = 6 * len + 5;
+        for ( pattern = 1 << 5
+            ; pattern && !(c & pattern)
+            ; pattern >>= 1, pos--)
+            NOOP;
+    }
+
+    return pos;
+} /* last_bit() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
@@ -47,11 +117,11 @@ f_clear_bit (svalue_t *sp)
 
     /* Get the arguments */
     bitnum = (size_t)sp->u.number;
-    sp = strp = sp-1;
     if (sp->u.number < 0)
         error("clear_bit: negative bit number: %ld\n", (long)sp->u.number);
     if (bitnum > MAX_BITS)
         error("clear_bit: too big bit number: %ld\n", (long)bitnum);
+    sp = strp = sp-1;
 
     len = mstrsize(strp->u.str);
     ind = bitnum/6;
@@ -98,11 +168,11 @@ f_set_bit (svalue_t *sp)
     svalue_t *strp;
 
     bitnum = (size_t)sp->u.number;
-    sp = strp = sp-1;
     if (sp->u.number < 0)
         error("set_bit: negative bit number: %ld\n", (long)sp->u.number);
     if (bitnum > MAX_BITS)
         error("set_bit: too big bit number: %ld\n", (long)bitnum);
+    sp = strp = sp-1;
 
     len = mstrsize(strp->u.str);
     ind = bitnum/6;
@@ -383,32 +453,8 @@ f_last_bit (svalue_t *sp)
 
 {
     mp_int   pos;
-    long     len;
-    char   * str;
-    int      c;
 
-    pos = -1;
-
-    /* Get the arguments */
-    str = get_txt(sp->u.str);
-    len = (long)mstrsize(sp->u.str);
-
-    /* First, find the last non-zero character */
-    c = 0;
-    while (len-- > 0 && (c = str[len]) == ' ') NOOP;
-
-    if (len >= 0)
-    {
-        int pattern;
-
-        /* Found a character, now determine the bit position */
-        c -= ' ';
-        pos = 6 * len + 5;
-        for ( pattern = 1 << 5
-            ; pattern && !(c & pattern)
-            ; pattern >>= 1, pos--)
-            NOOP;
-    }
+    pos = last_bit(sp->u.str);
 
     /* Clear the stack and push the result */
     free_svalue(sp);
@@ -555,6 +601,426 @@ f_count_bits (svalue_t *sp)
 
     return sp;
 } /* f_count_bits() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+copy_bits ( string_t * dest, p_int deststart
+          , string_t * src,  p_int srcstart
+          , p_int len
+          )
+
+/* Copy the bitrange <src>[<srcstart>..<srcstart>+<len>[ into the
+ * <dest> string starting at <deststart>.
+ * <dest> is supposed to be allocated big enough.
+ */
+
+{
+    char * pDest, * pSrc;
+
+    if (len < 1)
+        return;
+
+    pDest = get_txt(dest) + deststart / 6;
+    pSrc = get_txt(src) + srcstart / 6;
+
+    /* Special case: both source and target bit range start on the same bit.
+     */
+    if (deststart % 6 == srcstart % 6)
+    {
+        /* Copy the first few bits until the next byte boundary.
+         * Make sure not to overwrite preexisting bytes
+         */
+        if (deststart % 6 != 0)
+        {
+            int getmask, storemask;
+
+            storemask = (1 << deststart % 6) - 1;
+              /* storemask is now 00011111 through 00000001 */
+            getmask = ~storemask;
+              /* getmask   is now 11100000 through 11111110 */
+
+            if (len < 6 - deststart % 6)
+            {
+                /* A really small copy: we don't even need all bits from
+                 * the src byte.
+                 */
+                int len2 = 6 - deststart % 6 - len;
+                int lenmask;
+
+                lenmask = (1 << len2) - 1;
+                lenmask <<= 6 - len2;
+                  /* lenmask has now 1-bits for the bits we need not to copy */
+                storemask &= ~lenmask;
+            }
+
+            *pDest = ' ' + (  ((*pDest - ' ') & storemask)
+                            | ((*pSrc - ' ') & getmask)
+                           );
+
+            len -= 6 - deststart % 6; /* might become negative here */
+            pDest++;
+            pSrc++;
+        }
+
+        /* Do a fast byte copy */
+        if (len >= 6)
+        {
+            memcpy(pDest, pSrc, len / 6);
+        }
+
+        /* Copy the remaining bytes, if any */
+        if (len > 0 && len % 6 != 0)
+        {
+            int mask;
+
+            mask = (1 << (len % 6)) - 1;
+              /* mask is now 00011111 through 00000001 */
+            pDest[len / 6] = ((pSrc[len / 6] - ' ') & mask) + ' ';
+        }
+    }
+    else
+    {
+        /* Copy enough bits so that deststart points to a byte boundary */
+        if (deststart % 6 != 0)
+        {
+            /* Since these are going to be at max five bits, we copy
+             * them in a loop bit by bit.
+             */
+
+            int getmask, getbit;
+            int storemask, storebit;
+            char src_bits, dest_bits;
+
+            getbit = srcstart % 6;
+            getmask = 1 << getbit;
+            storebit = deststart % 6;
+            storemask = 1 << storebit;
+
+            src_bits = *pSrc - ' ';
+            dest_bits = *pDest - ' ';
+
+            while (len > 0 && storebit != 6)
+            {
+                if (0 != (src_bits & getmask))
+                    dest_bits = dest_bits | storemask;
+                else
+                    dest_bits = dest_bits & (~storemask);
+
+                srcstart++;
+                getbit++; getmask <<= 1;
+                if (getbit == 6)
+                {
+                    getbit = 0;
+                    getmask = 0x01;
+                    pSrc++;
+                    src_bits = *pSrc - ' ';
+                }
+
+                deststart++;
+                storebit++; storemask <<= 1;
+
+                len--;
+            }
+
+            *pDest = dest_bits + ' ';
+            pDest++;
+        } /* if need to align deststart */
+
+        /* deststart now points to byte boundary, that means we can
+         * now copy the bits by blockwise selection from the src string.
+         */
+        if (len >= 6)
+        {
+            int getmask1, getmask2, len2;
+            int getshift1, getshift2;
+
+            len2 = 6 - srcstart % 6; /* Number of bits in first byte */
+
+            getmask1 = (1 << len2) - 1;
+            getmask1 <<= 6 - len2;
+              /* getmask1 has now the mask for the high order bits of the
+               * first src byte
+               */
+            getshift1 = 6 - len2;
+            getshift2 = len2;
+
+            len2 = 6 - len2;  /* Number of bits in second byte */
+
+            getmask2 = (1 << len2) - 1;
+              /* getmask2 has now the mask for the low order bits of the
+               * second src byte
+               */
+
+            while (len >= 6)
+            {
+                *pDest = ' ' + ( ((pSrc[0]-' ') & getmask1) >> getshift1
+                                |((pSrc[1]-' ') & getmask2) << getshift2
+                               );
+                len -= 6;
+                pDest++;
+                pSrc++;
+                srcstart += 6;
+                deststart += 6;
+            }
+        } /* if >= 6 bits left */
+
+        /* deststart still points to byte boundary, but there are
+         * less than 6 bits left to copy.
+         */
+        if (len > 0)
+        {
+            /* Since these are going to be at max five bits, we copy
+             * them in a loop bit by bit.
+             */
+
+            int getmask, getbit;
+            int storemask, storebit;
+            char src_bits, dest_bits;
+
+            getbit = srcstart % 6;
+            getmask = 1 << getbit;
+            storebit = 0;
+            storemask = 0x01;
+
+            src_bits = *pSrc - ' ';
+            dest_bits = 0;
+
+            while (len > 0)
+            {
+                if (0 != (src_bits & getmask))
+                    dest_bits |= storemask;
+
+                srcstart++;
+                getbit++; getmask <<= 1;
+                if (getbit == 6)
+                {
+                    getbit = 0;
+                    getmask = 0x01;
+                    pSrc++;
+                    src_bits = *pSrc - ' ';
+                }
+
+                deststart++;
+                storebit++; storemask <<= 1;
+
+                len--;
+            }
+
+            *pDest = dest_bits + ' ';
+        } /* if (1..5 bits left) */
+    } /* case selection */
+} /* copy_bits() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_copy_bits (svalue_t *sp, int num_arg)
+
+/* EFUN copy_bits()
+ *
+ *     string copy_bits(string src, string dest
+ *                     [, int srcstart [, int deststart [, int copylen ]]]
+ *                      )
+ *
+ * Copy the bitrange [<srcstart>..<srcstart>+<copylen>[ from bitstring <src>
+ * and copy it into the bitstring <dest> starting at <deststart>, overwriting
+ * the original bits at those positions.
+ * The resulting combined string is returned, the input strings remain
+ * unaffected.
+ *
+ * If <srcstart> is not given, <src> is copied from the start.
+ *   If <srcstart> is negative, it is counted from one past the last set
+ *   bit in the string (ie. '-1' will index the last set bit).
+ * If <deststart> is not given, <dest> will be overwritten from the start.
+ *   If <deststart> is negative, it is counted from one past the last set
+ *   bit in the string (ie. '-1' will index the last set bit).
+ * If <copylen> is not given, it is assumed to be infinite, ie. the result
+ *   will consist of <dest> up to position <deststart>, followed by
+ *   the data copied from <src>.
+ *   If <copylen> is negative, the function will copy the abs(<copylen>)
+ *   bits _before_ <srcstart> in to the result.
+ *
+ * None of the range limits can become negative.
+ */
+
+{
+    p_int srcstart, deststart, copylen;
+    p_int srclen, destlen, resultlen;
+    Bool copyall;
+    string_t *src, *dest, *result;
+
+    /* Get the optional command arguments */
+    srcstart = deststart = copylen = 0;
+    copyall = MY_TRUE;
+
+    switch (num_arg)
+    {
+    case 5:
+        copyall = MY_FALSE;
+        copylen = sp->u.number;
+        sp--;
+        num_arg--;
+        /* FALL THROUGH */
+
+    case 4:
+        deststart = sp->u.number;
+        sp--;
+        num_arg--;
+        /* FALL THROUGH */
+
+    case 3:
+        srcstart = sp->u.number;
+        sp--;
+        num_arg--;
+        /* FALL THROUGH */
+    }
+    inter_sp = sp;
+
+    /* Get the fixed command arguments and check for consistency */
+    dest = sp->u.str;
+    src = sp[-1].u.str;
+
+    sp++; /* We might need to save a precautionary reference to the result */
+
+    srclen = last_bit(src)+1;
+    destlen = last_bit(dest)+1;
+
+    if (srcstart < 0 && srcstart + srclen < 0)
+        error("Bad argument 3 to copy_bits(): Index %ld is out of range "
+              "(last bit: %ld).\n"
+             , (long)srcstart, (long)srclen);
+    if (srcstart < 0)
+        srcstart += srclen;
+
+    if (deststart < 0 && deststart + destlen < 0)
+        error("Bad argument 4 to copy_bits(): Index %ld is out of range "
+              "(last bit: %ld).\n"
+             , (long)deststart, (long)destlen);
+
+    if (copylen < 0)
+    {
+        if (srcstart + copylen < 0)
+            error("Bad argument 5 to copy_bits(): Length %ld out of range "
+                  "(start index: %ld).\n"
+                 , (long)copylen, (long)srcstart);
+
+        srcstart += copylen;
+        copylen = -copylen;
+    }
+
+    /* Test the input strings for sanity */
+    {
+        char *cp;
+        long len;
+
+        len = (long)mstrsize(src);
+        cp = get_txt(src);
+        for ( ; len > 0; len--, cp++)
+        {
+            int c = *cp - ' ';
+            if (c < 0 || c > 0x3f)
+                error("Bad argument 1 to copy_bits(): String contains "
+                      "illegal character %d\n", c + ' ');
+        }
+
+        len = (long)mstrsize(dest);
+        cp = get_txt(dest);
+        for ( ; len > 0; len--, cp++)
+        {
+            int c = *cp - ' ';
+            if (c < 0 || c > 0x3f)
+                error("Bad argument 2 to copy_bits(): String contains "
+                      "illegal character %d\n", c + ' ');
+        }
+    }
+
+    /* Do the copying - some constellations are really simple */
+    if (copyall)
+    {
+        if (srcstart == 0 && deststart == 0)
+            result = ref_mstring(src);
+        else
+        {
+            copylen = srclen - srcstart;
+            resultlen = deststart + copylen;
+
+            /* Get the result string and store the reference on the stack
+             * for error cleanups.
+             */
+            memsafe(result = alloc_mstring((resultlen + 5) / 6)
+                   , (resultlen + 5) / 6, "new bitstring");
+            memset(get_txt(result), ' ', (resultlen + 5) / 6);
+            inter_sp = sp; put_string(sp, result);
+
+            /* Copy the first part of dest into the result */
+            if (deststart > 0)
+            {
+                if (deststart > destlen)
+                    copy_bits(result, 0, dest, 0, destlen);
+                else
+                    copy_bits(result, 0, dest, 0, deststart);
+            }
+
+            /* Now append the src */
+            copy_bits(result, deststart, src, srcstart, copylen);
+        }
+    }
+    else if (copylen == 0)
+        result = ref_mstring(dest);
+    else if (srcstart == 0 && deststart == 0
+          && copylen >= destlen && copylen >= srclen)
+    {
+        result = ref_mstring(src);
+    }
+    else
+    {
+        p_int destendlen;
+
+        /* Get the length to copy and the length of the result */
+        if (srcstart + copylen >= srclen)
+            copylen = srclen - srcstart;
+
+        resultlen = deststart + copylen;
+        if (resultlen < destlen)
+            resultlen = destlen;
+
+        destendlen = destlen - (deststart + copylen);
+
+        /* Get the result string and store the reference on the stack
+         * for error cleanups.
+         */
+        memsafe(result = alloc_mstring((resultlen + 5) / 6)
+               , (resultlen + 5) / 6, "new bitstring");
+        memset(get_txt(result), ' ', (resultlen + 5) / 6);
+        inter_sp = sp; put_string(sp, result);
+
+        /* Copy the first part of dest into the result */
+        if (deststart > 0)
+        {
+            if (deststart > destlen)
+                copy_bits(result, 0, dest, 0, destlen);
+            else
+                copy_bits(result, 0, dest, 0, deststart);
+        }
+
+        /* Copy the source part into the result */
+        copy_bits(result, deststart, src, srcstart, copylen);
+
+        /* Copy the remainder of dest into the result */
+        if (destendlen > 0)
+        {
+            copy_bits( result, deststart + copylen, dest, deststart + copylen
+                     , destendlen);
+        }
+    }
+    
+    /* Clean up the stack and push the result */
+    sp--; /* The result reference for error cleanup */
+    free_svalue(sp--);
+    free_svalue(sp);
+
+    put_string(sp, result);
+    return sp;
+} /* f_copy_bits() */
 
 /***************************************************************************/
 

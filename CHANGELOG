@@ -1,6 +1,23 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Feb-2002 (Lars Duening)  (3.3.166)
+    - (config.h, autoconf, lex.c) New configuration parameter --use-pcre
+         (disabled by default) to enable the use of PCRE instead of
+         traditional regexps. If enable, the LPC macro __PCRE__ is defined.
+         This is just the basic configuration framework, the PCRE code has not
+         yet been integrated.
+    - (pcre/, Makefiles) Included the PCRE code into the driver distribution,
+         and it is even compiled and linked, but not yet used by the driver.
+    - (bitstrings, func_spec) New efun copy_bits() to copy ranges of
+         bitstrings (based on code provided by Menaures).
+    - (bitstrings.c) And nobody noticed that set_bit() was broken :-)
+    - (efuns.c) Efun terminal_colour(): In wrapped formatting, when a
+         word is too long to fit on a line by itself and there are at least
+         two characters space left on the current line, the long word is begun
+         immediately.  Previously, such long words were always printed on a
+         line of their own (suggested by Fiona).
+
 07-Feb-2002 (Lars Duening)  (3.3.165)
     - (ed, comm, efuns) Modified the print_prompt() routine so that
          the editor prompt is take directly from the editor buffer.

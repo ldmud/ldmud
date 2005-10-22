@@ -21,4 +21,4 @@ EXAMPLES
 
 SEE ALSO
         set_bit(E), clear_bit(E), last_bit(E), next_bit(E), count_bits(E),
-        and_bits(E), or_bits(E), xor_bits(E), invert_bits(E)
+        and_bits(E), or_bits(E), xor_bits(E), invert_bits(E), copy_bits(E)

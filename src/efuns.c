@@ -1112,13 +1112,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 
 /* Implementation of the efun terminal_colour().
  * See f_terminal_colour() for the complete description.
- * TODO: When asked to wrap "the verylongword is" on 6, terminal_colour()
- * TODO:: will produce: "the   "/"verylo"/"ngword"/"is" instead of
- * TODO:: "the ve"/"rylong"/"word"/"is". To produce the desired result,
- * TODO:: the wrapper would have to count ahead if the next word is still
- * TODO:: too long to wrap. With the current data layout that is not so
- * TODO:: simple. I marked the positions with 'TODO: Better wrap'.
- * TODO:: And instead of computing the wrapping twice, the first pass
+ * TODO: Instead of computing the wrapping twice, the first pass
  * TODO:: should record what to break where.
  */
 
@@ -1561,9 +1555,53 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                             if (space)
                             {
                                 /* Break the line at the last space */
-                                /* TODO: Better wrap - see above */
-                                col -= space;
-                                space = 0;
+                                int next_word_len = 0;
+
+                                if (col - space > 2)
+                                {
+                                    /* Check if the following word is too
+                                     * long to be put on one line. If it
+                                     * is, don't bother breaking at the last
+                                     * space.
+                                     */
+                                    int test_z = z;
+                                    int test_i = i;
+                                    Bool done = MY_FALSE;
+
+                                    next_word_len = space;
+                                    for ( ; !done && test_i <  num; test_i++)
+                                    {
+                                        if (lens[test_i] < 0)
+                                            continue;
+                                        for ( ; !done && test_z < lens[test_i]; test_z++)
+                                        {
+                                            char testc = parts[test_i][test_z];
+                                            if (testc == ' ' || testc == '\n')
+                                            {
+                                                done = MY_TRUE;
+                                                break;
+                                            }
+                                            next_word_len++;
+                                        }
+                                        test_z = 0;
+                                    }
+                                }
+
+                                if (next_word_len+indent > wrap)
+                                {
+                                    /* Word is too long, just treat it
+                                     * as if there is no space within range.
+                                     */
+                                    space = 0;
+                                    j++;
+                                    col = 1;
+                                }
+                                else
+                                {
+                                    /* It makes sense to break properly */
+                                    col -= space;
+                                    space = 0;
+                                }
                             }
                             else
                             {
@@ -1729,10 +1767,53 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                         if (space)
                         {
                             /* Break at last space */
-                            /* TODO: Better wrap - see above */
-                            col -= space;
-                            space = 0;
-                            kind = 1;
+                            int next_word_len = 0;
+
+                            if (col - space > 2)
+                            {
+                                /* Check if the following word is too
+                                 * long to be put on one line. If it
+                                 * is, don't bother breaking at the last
+                                 * space.
+                                 */
+                                int test_k = k;
+                                int test_i = i;
+                                Bool done = MY_FALSE;
+
+                                next_word_len = space;
+                                for ( ; !done && test_i <  num; test_i++)
+                                {
+                                    if (lens[test_i] < 0)
+                                        continue;
+                                    for ( ; !done && test_k < lens[test_i]; test_k++)
+                                    {
+                                        char testc = parts[test_i][test_k];
+                                        if (testc == ' ' || testc == '\n')
+                                        {
+                                            done = MY_TRUE;
+                                            break;
+                                        }
+                                        next_word_len++;
+                                    }
+                                    test_k = 0;
+                                }
+                            }
+
+                            if (next_word_len + indent > wrap)
+                            {
+                                /* Word is too long: treat it as if there
+                                 * is no space within range.
+                                 */
+                                space = 0;
+                                col = 1;
+                                kind = 2;
+                            }
+                            else
+                            {
+                                col -= space;
+                                space = 0;
+                                kind = 1;
+                            }
                         }
                         else
                         {

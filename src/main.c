@@ -51,6 +51,9 @@
 #include "object.h"
 #include "otable.h"
 #include "patchlevel.h"
+#ifdef USE_PCRE
+#include "pcre/pcre.h"
+#endif
 #include "random.h"
 #include "rxcache.h"
 #include "simulate.h"
@@ -1089,6 +1092,12 @@ options (void)
   fputs("          mySQL: not supported.\n", stdout);
 #else
   fputs("          mySQL: supported.\n", stdout);
+#endif
+
+#ifndef USE_PCRE
+  fputs("        regexps: traditional.\n", stdout);
+#else
+  printf("        regexps: PCRE %d.%d.\n", PCRE_MAJOR, PCRE_MINOR);
 #endif
 
 #ifndef USE_ALISTS

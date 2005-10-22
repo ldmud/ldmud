@@ -307,6 +307,11 @@
  */
 @cdef_use_mysql@ USE_MYSQL
 
+/* Define this if you want PCRE instead of traditional regexps.
+ */
+
+@cdef_use_pcre@ USE_PCRE
+
 /* Define this if you want the obsolete and deprecated efuns.
  */
 @cdef_use_deprecated@ USE_DEPRECATED

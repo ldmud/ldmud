@@ -294,6 +294,10 @@ enable_use_mysql=no
 
 enable_use_alists=no
 
+# Enable PCRE instead of traditional regexps
+
+enable_use_pcre=no
+
 # Enable obsolete and deprecated efuns.
 
 enable_use_deprecated=yes

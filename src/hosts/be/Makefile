@@ -104,14 +104,15 @@ endif
            pkg-alists.c pkg-mysql.c port.c \
            ptrtable.c random.c \
            regexp.c rxcache.c simulate.c simul_efun.c stdstrings.c \
-           strfuns.c sprintf.c swap.c wiz_list.c xalloc.c
+           strfuns.c sprintf.c swap.c wiz_list.c xalloc.c \
+           pcre-get.c pcre-maketables.c pcre-pcre.c pcre-study.c
 
 # Generated source files (overlaps with of SRCS) which need to be
 # present for mkdepend to work.
     GENSRCS = make_func.c stdstrings.c lang.c instrs.h
 
 # Macros for MkDepend:
-    SKELETON = $(SRCS) mkfunc.c
+    SKELETON = $(SRCS) mkfunc.c pcre/dftables.c
     EXCEPT = -x efun_defs.c
     SELECT = -S instrs.h -S stdstrings.h -S make_func.c -S lang.c -S lang.h -S efun_defs.c
 
@@ -147,16 +148,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 165
+  SETVERFLAGS += d 166
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.165
+  VSTRING = 3.3.0-pre.166
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 165
+  SETVERFLAGS += d 166
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.165
+  VSTRING = 3.3.0-dev.166
 endif
 
 else
@@ -164,12 +165,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 165
+SETVERFLAGS = -app 3 3 166
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.165
+  VSTRING = 3.3.166
 
 endif
 
@@ -322,10 +323,11 @@ endif
 
 clean :: FORCE
 	-rm -f $(YACCTAB)h $(YACCTAB)c make_func.c $(OBJ)/mkfunc
+	-rm -f $(OBJ)/dftables pcre/chartables.c
 	-rm -f *~ efun_defs.c instrs.h lang.y lang.h lang.c y.output tags TAGS
 	-rm -f stdstrings.c stdstrings.h
 	-rm -f hosts/*~ hosts/*/*~ bugs/*~ done/*~ $(OBJ)/*.o
-	-rm -f wk/*~ settings/*~
+	-rm -f pcre/*~ wk/*~ settings/*~
 
 cleanall :: clean
 	-rm -f $(OBJ_CROSS)/*.o
@@ -347,7 +349,7 @@ depend: $(SRCS) $(GENSRCS) $(OBJ)
           echo mkdepend utility not available.; \
         fi"
 
-.PHONY dependall: depend depend-generic depend-amiga
+.PHONY dependall: depend depend-generic
 
 depend-generic: $(SRCS) $(GENSRCS) $(OBJ)
 	@$(SHELL) -ec "if type mkdepend > /dev/null 2>&1; then \
@@ -363,16 +365,7 @@ depend-generic: $(SRCS) $(GENSRCS) $(OBJ)
 
 AMIGASRCS:= 
 
-depend-amiga: $(SRCS) $(GENSRCS) $(AMIGASRCS)  $(OBJ)
-	@$(SHELL) -ec "if type mkdepend > /dev/null 2>&1; then \
-          echo Updating dependencies in hosts/amiga/Makefile.; \
-          mkdepend $(SKELETON) $(AMIGASRCS) -I. $(EXCEPT) -m -p .c+:%n.o -Ihosts/amiga -fhosts/amiga/Makefile; \
-          mkdepend $(SKELETON) $(AMIGASRCS) $(SELECT) -m -I. $(EXCEPT) -p .c+:%n.o -Ihosts/amiga -fhosts/amiga/Makefile; \
-        else\
-          echo mkdepend utility not available.; \
-        fi"
-
-# Special rules for making mkfunc, depending on whether we're
+# Special rules for making mkfunc and dftables, depending on whether we're
 # crosscompiling or not.
 
 make_func.c : make_func.y
@@ -388,6 +381,19 @@ $(OBJ)/mkfunc : $(OBJ)/mkfunc.o $(OBJ)/hash.o
 
 ifneq ($(CPU), $(NATIVE))
 $(OBJ_NATIVE)/mkfunc :
+	@[ -d $(OBJ_NATIVE) ] || mkdir $(OBJ_NATIVE) > /dev/null 2>&1
+	make CPU=$(NATIVE) $@
+endif
+
+$(OBJ)/dftables.o : pcre/dftables.c pcre/maketables.c pcre/config.h
+	$(CC) $(INCLUDES) $(CFLAGS) -c $< -o $@
+
+$(OBJ)/dftables : $(OBJ)/dftables.o
+	$(LD) -o $@ $^ $(LDFLAGS)
+	$(MIMESET) -f $@
+
+ifneq ($(CPU), $(NATIVE))
+$(OBJ_NATIVE)/dftables :
 	@[ -d $(OBJ_NATIVE) ] || mkdir $(OBJ_NATIVE) > /dev/null 2>&1
 	make CPU=$(NATIVE) $@
 endif
@@ -410,6 +416,9 @@ lang.c lang.h : lang.y
 	$(YACC) -d -v lang.y
 	mv $(YACCTAB)c lang.c
 	mv $(YACCTAB)h lang.h
+
+pcre/chartables.c : $(OBJ_NATIVE)/dftables
+	$(OBJ_NATIVE)/dftables > pcre/chartables.c
 
 # Be Resource Mangling
 
@@ -547,11 +556,11 @@ $(OBJ)/lex.o : efun_defs.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
     config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/main.o : xalloc.h wiz_list.h swap.h svalue.h stdstrings.h \
-    simul_efun.h simulate.h rxcache.h random.h patchlevel.h otable.h \
-    object.h mstrings.h mapping.h lex.h interpret.h gcollect.h filestat.h \
-    comm.h array.h backend.h main.h my-alloca.h typedefs.h driver.h \
-    ptrtable.h exec.h strfuns.h sent.h regexp.h instrs.h port.h config.h \
-    hosts/unix.h hosts/be/be.h machine.h
+    simul_efun.h simulate.h rxcache.h random.h pcre/pcre.h patchlevel.h \
+    otable.h object.h mstrings.h mapping.h lex.h interpret.h gcollect.h \
+    filestat.h comm.h array.h backend.h main.h my-alloca.h typedefs.h \
+    driver.h ptrtable.h exec.h strfuns.h sent.h regexp.h instrs.h port.h \
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/mapping.o : xalloc.h wiz_list.h svalue.h smalloc.h simulate.h \
     object.h mstrings.h main.h interpret.h gcollect.h closure.h backend.h \
@@ -604,6 +613,23 @@ $(OBJ)/parser.o : lang.c pkg-alists.h ../mudlib/sys/driver_hook.h xalloc.h \
     interpret.h gcollect.h exec.h closure.h backend.h array.h prolang.h \
     my-alloca.h typedefs.h driver.h ptrtable.h strfuns.h sent.h port.h \
     config.h hosts/unix.h hosts/be/be.h machine.h
+
+$(OBJ)/pcre-get.o : pcre/get.c driver.h pcre/internal.h port.h config.h \
+    pcre/pcre.h pcre/config.h hosts/unix.h hosts/be/be.h machine.h
+
+$(OBJ)/pcre-maketables.o : pcre/maketables.c driver.h pcre/internal.h \
+    port.h config.h pcre/pcre.h pcre/config.h hosts/unix.h hosts/be/be.h \
+    machine.h
+
+$(OBJ)/pcre-pcre.o : pcre/pcre.c driver.h pcre/chartables.c pcre/internal.h \
+    port.h config.h pcre/pcre.h pcre/config.h hosts/unix.h hosts/be/be.h \
+    machine.h
+
+$(OBJ)/pcre-study.o : pcre/study.c driver.h pcre/internal.h port.h config.h \
+    pcre/pcre.h pcre/config.h hosts/unix.h hosts/be/be.h machine.h
+
+$(OBJ)/dftables.o : pcre/maketables.c pcre/internal.h pcre/pcre.h \
+    pcre/config.h
 
 $(OBJ)/pkg-alists.o : xalloc.h svalue.h simulate.h mstrings.h main.h \
     interpret.h array.h my-alloca.h pkg-alists.h typedefs.h driver.h \

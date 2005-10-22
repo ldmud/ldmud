@@ -84,7 +84,8 @@ SRC = access_check.c actions.c array.c backend.c bitstrings.c call_out.c \
       lex.c main.c mapping.c md5.c mempools.c mstrings.c object.c otable.c\
       parser.c parse.c parse_old.c pkg-alists.c pkg-mysql.c port.c ptrtable.c \
       random.c regexp.c rxcache.c simulate.c simul_efun.c stdstrings.c \
-      strfuns.c sprintf.c swap.c wiz_list.c xalloc.c
+      strfuns.c sprintf.c swap.c wiz_list.c xalloc.c \
+      pcre-get.c pcre-maketables.c pcre-pcre.c pcre-study.c
 OBJ = access_check.o actions.o array.o backend.o bitstrings.o call_out.o \
       closure.o comm.o \
       dumpstat.o ed.o efuns.o files.o gcollect.o hash.o heartbeat.o \
@@ -92,7 +93,8 @@ OBJ = access_check.o actions.o array.o backend.o bitstrings.o call_out.o \
       lex.o main.o mapping.o md5.o mempools.o mstrings.o object.o otable.o \
       parser.o parse.o parse_old.o pkg-alists.o pkg-mysql.o port.o ptrtable.o \
       random.o regexp.o rxcache.o simulate.o simul_efun.o stdstrings.o \
-      strfuns.o sprintf.o swap.o wiz_list.o xalloc.o @ALLOCA@
+      strfuns.o sprintf.o swap.o wiz_list.o xalloc.o @ALLOCA@ \
+      pcre-get.o pcre-maketables.o pcre-pcre.o pcre-study.o
 
 driver: $(OBJ)
 	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) $(OBJ) -o $@ $(LIBS)
@@ -112,6 +114,7 @@ lint: *.c
 
 clean:
 	$(RM) $(YACCTAB)h $(YACCTAB)c make_func.c *.o mkfunc@EXEEXT@
+	$(RM) dftables@EXEEXT@ pcre/chartables.c
 	$(RM) stdstrings.c stdstrings.h
 	$(RM) efun_defs.c instrs.h lang.y lang.h lang.c y.output tags TAGS
 	$(RM) driver core mudlib/core mudlib/debug.log lpmud.log driver
@@ -139,6 +142,12 @@ mkfunc.o : mkfunc.c make_func.c driver.h config.h machine.h port.h
 mkfunc@EXEEXT@: mkfunc.o hash.o exec.h
 	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) mkfunc.o hash.o -o mkfunc@EXEEXT@
 
+dftables.o : pcre/dftables.c pcre/maketables.c pcre/config.h
+	$(CC) $(CFLAGS) -c dftables.c -o dftables.o
+
+dftables@EXEEXT@ : dftables.o
+	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) dftables.o -o dftables@EXEEXT@
+
 lang.y: mkfunc@EXEEXT@ prolang.y config.h
 	$(RM) lang.y
 	./mkfunc@EXEEXT@ lang
@@ -158,6 +167,9 @@ lang.c lang.h: lang.y
 	@MOVE_YACC_TAB@ lang.c
 	@CLEAN_YACC_TAB@
 	$(MV) $(YACCTAB)h lang.h
+
+pcre/chartables.c : dftables@EXEEXT@
+	dftables@EXEEXT@ > pcre/chartables.c
 
 #--------------------------------------------------------
 # Dependencies, manual and automatic.
@@ -267,11 +279,11 @@ lex.o : efun_defs.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
     config.h hosts/unix.h hosts/be/be.h machine.h
 
 main.o : xalloc.h wiz_list.h swap.h svalue.h stdstrings.h simul_efun.h \
-    simulate.h rxcache.h random.h patchlevel.h otable.h object.h mstrings.h \
-    mapping.h lex.h interpret.h gcollect.h filestat.h comm.h array.h \
-    backend.h main.h my-alloca.h typedefs.h driver.h ptrtable.h exec.h \
-    strfuns.h sent.h regexp.h instrs.h port.h config.h hosts/unix.h \
-    hosts/be/be.h machine.h
+    simulate.h rxcache.h random.h pcre/pcre.h patchlevel.h otable.h \
+    object.h mstrings.h mapping.h lex.h interpret.h gcollect.h filestat.h \
+    comm.h array.h backend.h main.h my-alloca.h typedefs.h driver.h \
+    ptrtable.h exec.h strfuns.h sent.h regexp.h instrs.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 mapping.o : xalloc.h wiz_list.h svalue.h smalloc.h simulate.h object.h \
     mstrings.h main.h interpret.h gcollect.h closure.h backend.h array.h \
@@ -323,6 +335,20 @@ parser.o : lang.c pkg-alists.h ../mudlib/sys/driver_hook.h xalloc.h \
     interpret.h gcollect.h exec.h closure.h backend.h array.h prolang.h \
     my-alloca.h typedefs.h driver.h ptrtable.h strfuns.h sent.h port.h \
     config.h hosts/unix.h hosts/be/be.h machine.h
+
+pcre-get.o : pcre/get.c driver.h pcre/internal.h port.h config.h \
+    pcre/pcre.h pcre/config.h hosts/unix.h hosts/be/be.h machine.h
+
+pcre-maketables.o : pcre/maketables.c driver.h pcre/internal.h port.h \
+    config.h pcre/pcre.h pcre/config.h hosts/unix.h hosts/be/be.h machine.h
+
+pcre-pcre.o : pcre/pcre.c driver.h pcre/chartables.c pcre/internal.h port.h \
+    config.h pcre/pcre.h pcre/config.h hosts/unix.h hosts/be/be.h machine.h
+
+pcre-study.o : pcre/study.c driver.h pcre/internal.h port.h config.h \
+    pcre/pcre.h pcre/config.h hosts/unix.h hosts/be/be.h machine.h
+
+dftables.o : pcre/maketables.c pcre/internal.h pcre/pcre.h pcre/config.h
 
 pkg-alists.o : xalloc.h svalue.h simulate.h mstrings.h main.h interpret.h \
     array.h my-alloca.h pkg-alists.h typedefs.h driver.h strfuns.h sent.h \
