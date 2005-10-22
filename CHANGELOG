@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Oct-2001 (Lars Duening)  (3.3.107)
+    - (efuns, md5) Renamed efun md5_encrypt() to md5(), and added a new,
+        Apache compatible password encryption efun md5_crypt (provided by
+        Dafire).
+
 03-Oct-2001 (Lars Duening)  (3.3.106)
     - (prolang.y) Prototypes no longer modify the definition of inherited
         functions in strange ways (reported by Fiona).

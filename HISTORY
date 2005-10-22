@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-16-Jul-2001 (Lars Duening) -- Development Release 3.3
+04-Oct-2001 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -19,6 +19,8 @@ For a detailed list of all changes see the file CHANGELOG.
     - Corrected efuns:
 
     - New efuns:
+       + md5_crypt(): Compute an Apache-compatible password encryption using
+           the MD5 message digest algorithm.
 
     - Master Object:
 
@@ -45,7 +47,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-03-Oct-2001 (Lars Duening) -- upcoming Release 3.2.9
+04-Oct-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -138,7 +140,7 @@ For a detailed list of all changes see the file CHANGELOG.
            Optional: mySQL support.
        + gmtime(), localtime(): Return the time broken up into its
            constituents.
-       + md5_encrypt(): Compute the MD5 message digest for a string.
+       + md5(): Compute the MD5 message digest for a string.
        + min(), max(): To select the minimum resp. maximum among a bunch
            of numbers or strings.
        + sgn(): Return the sign of a numeric argument.

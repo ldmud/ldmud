@@ -1,6 +1,6 @@
 SYNOPSIS
 
-        string md5_encrypt(string arg)
+        string md5(string arg)
 
 DESCRIPTION
         Create and return a MD5 message digest from the string <arg>.
@@ -8,10 +8,10 @@ DESCRIPTION
 EXAMPLES
         string s;
 
-        s = md5_encrypt("Hello, world!");
+        s = md5("Hello, world!");
 
 HISTORY
         Introduced in LDMud 3.2.9
 
 SEE ALSO
-        crypt(E)
+        crypt(E), md5_crypt(E)

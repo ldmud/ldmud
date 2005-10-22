@@ -12,7 +12,8 @@
  *    efun: capitalize()
  *    efun: crypt()
  *    efun: make_shared_string()
- *    efun: md5_encrypt()
+ *    efun: md5()
+ *    efun: md5_crypt()
  *    efun: regexp()
  *    efun: regexplode()
  *    efun: regreplace()
@@ -324,11 +325,11 @@ f_make_shared_string (svalue_t *sp)
 
 /*--------------------------------------------------------------------*/
 svalue_t *
-f_md5_encrypt (svalue_t *sp)
+f_md5 (svalue_t *sp)
 
-/* EFUN: md5_encrypt()
+/* EFUN: md5()
  *
- *   string md5_encrypt(string arg)
+ *   string md5(string arg)
  *
  * Create and return a MD5 message digest from the string <arg>.
  */
@@ -355,7 +356,65 @@ f_md5_encrypt (svalue_t *sp)
     put_string(sp, s_digest);
 
     return sp;
-} /* f_md5_encrypt() */
+} /* f_md5() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_md5_crypt(svalue_t *sp)
+
+/* EFUN md5_crypt()
+ *
+ *   string md5_crypt(string str, null|int seed)
+ *   string md5_crypt(string str, string seed)
+ *
+ * Crypt the string <str> using the first two characters
+ * from the string <seed> as a seed. If <seed> is equal 0, then
+ * a random seed is used.
+ *
+ * The result has the first two characters as the seed.
+ *
+ * The efun uses the MD5 algorithm for encryption, and is compatible
+ * with the Apache webserver.
+ */
+
+{
+    char *salt;
+    char *res;
+    char temp[3];
+    char crypted [120];
+    static char choise[] =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789./";
+
+    if (sp->type == T_STRING && mstrsize(sp->u.str) >= 2)
+    {
+        salt = get_txt(sp->u.str);
+    }
+    else if (sp->type == T_NUMBER)
+    {
+        temp[0] = choise[random_number((sizeof choise) - 1)];
+        temp[1] = choise[random_number((sizeof choise) - 1)];
+        temp[2] = choise[random_number((sizeof choise) - 1)];
+        temp[3] = choise[random_number((sizeof choise) - 1)];
+        temp[4] = choise[random_number((sizeof choise) - 1)];
+        temp[5] = choise[random_number((sizeof choise) - 1)];
+        temp[6] = choise[random_number((sizeof choise) - 1)];
+        temp[7] = choise[random_number((sizeof choise) - 1)];
+        temp[8] = choise[random_number((sizeof choise) - 1)];
+        temp[9] = '\0';
+        salt = temp;
+    }
+    else /* it can't be anything but a too short string */
+        error("Bad argument 2 to md5_crypt(): string too short.\n");
+
+    MD5Encode((unsigned char *)get_txt((sp-1)->u.str)
+             ,(unsigned char *)salt
+             , crypted
+             , sizeof(crypted));   
+    sp = pop_n_elems(2, sp);
+    push_c_string(sp, crypted);
+
+    return sp;
+} /* f_md5_crypt() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

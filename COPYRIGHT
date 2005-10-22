@@ -51,3 +51,7 @@ gain.
 
 The MD5 message digest algorithm is Copyright (C) 1991-2, RSA Data Security,
 Inc.
+
+The Apache-compatible MD5 password encryption is Copyright (C) 2000 Apache
+Software Foundation.
+
