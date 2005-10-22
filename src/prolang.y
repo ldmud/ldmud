@@ -3514,7 +3514,7 @@ inheritance:
           if (ob->prog->flags & P_NO_INHERIT)
           {
               yyerror("Illegal to inherit an object which sets "
-                      "'#pragma no_inherit'.\n");
+                      "'#pragma no_inherit'.");
               YYACCEPT;
           }
 
@@ -3523,31 +3523,56 @@ inheritance:
 
           /* Set up the inherit structure */
           inherit.prog = ob->prog;
-          inherit.inherit_type = INHERIT_TYPE_NORMAL;
+          if ($1[1] & TYPE_MOD_VIRTUAL)
+              inherit.inherit_type = INHERIT_TYPE_VIRTUAL;
+          else
+              inherit.inherit_type = INHERIT_TYPE_NORMAL;
           inherit.function_index_offset = FUNCTION_COUNT;
           inherit.inherit_depth = 1;
 
           /* If it's a virtual inherit, check if it has been
            * inherited virtually before. If yes, don't bother to insert it
            * again.
+           * For all types of inherits, check if the same program has already
+           * been inherited at the toplevel.
            */
-          if ($1[1] & TYPE_MOD_VIRTUAL)
           {
               inherit_t *inheritp;
               int j;
+              Bool duplicate_toplevel = MY_FALSE;
 
-              inherit.inherit_type = INHERIT_TYPE_VIRTUAL;
               inheritp = (inherit_t *)(mem_block[A_INHERITS].block);
               j = mem_block[A_INHERITS].current_size;
               for (; (j -= sizeof(inherit_t)) >= 0; inheritp++)
               {
-                  if (inheritp->prog == ob->prog
-                   && !(inheritp->variable_index_offset & NON_VIRTUAL_OFFSET_TAG) )
+                  if (inheritp->prog == ob->prog)
                   {
-                      inherit.inherit_type |= INHERIT_TYPE_DUPLICATE;
-                      inheritp->inherit_depth = 1;
-                      break;
+                      /* Check for duplicate virtual inherit */
+                      if (($1[1] & TYPE_MOD_VIRTUAL)
+                       && !(inheritp->variable_index_offset & NON_VIRTUAL_OFFSET_TAG)
+                       && !(inherit.inherit_type & INHERIT_TYPE_DUPLICATE)
+                         )
+                      {
+                          inherit.inherit_type |= INHERIT_TYPE_DUPLICATE;
+                          inheritp->inherit_depth = 1;
+                      }
+
+                      /* Check for duplicate toplevel inherit */
+                      if (inheritp->inherit_depth == 1)
+                          duplicate_toplevel = MY_TRUE;
                   }
+              }
+              if  (duplicate_toplevel)
+              {
+                  if (pragma_pedantic)
+                  {
+                      yyerrorf("Program '%s' already inherited"
+                              , get_txt(inherit.prog->name));
+                      YYACCEPT;
+                  }
+                  else
+                      yywarnf("Program '%s' already inherited"
+                             , get_txt(inherit.prog->name));
               }
           }
 

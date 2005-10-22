@@ -1,6 +1,25 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Aug-2002 (Lars Duening)  (3.3.215)
+    - (prolang.y) Inheriting the same program twice at the top level
+         now raises a warning, resp. an error in pedantic mode.
+    - (simulate.c) If a closure is called from limited() and self-destructs,
+         the driver would try to free the now-invalid closure argument
+         and crash (this happened a lot in EotL) (thanks, Casey!).
+    - (interpret.c) In DEBUG mode, the functions free_object_svalue() and
+         free_string_svalue() check that they really get the proper data type.
+    - (efuns.c) Efuns filter() and map(): when used with multi-value
+         mappings, the driver checks if the called function kept a reference
+         to the passed array with the values. If yes, a new array is
+         created for the next iteration to avoid overwriting the old
+         one (reported by Fiona).
+    - (interpret.c) When collecting the traceback in a catch(), the
+         file and line information was used, but not initialized, occasionally
+         crashing the driver. In addition, in a couple of cases when the
+         file and line information can't be determined, the file was
+         left undefined (thanks, Gnomi!)
+
 16-Jul-2002 (Lars Duening)  (3.3.214)
     - (efuns.c) regmatch() returns 0 instead of the empty string for
          non-matches (suggested by Fiona).

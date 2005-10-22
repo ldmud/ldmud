@@ -20,13 +20,17 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 214)
-(Parent-Version lpmud 3-3 213)
-(Version-Log "regmatch() returns 0 instead of the empty string for non-matches.
-regmatch() can take and return a start index for matches.")
+(Project-Version lpmud 3-3 215)
+(Parent-Version lpmud 3-3 214)
+(Version-Log "Duplicate inherits of a program on the toplevel raise a warning, resp. an error if pragma 'pedantic' is in effect.
+Calling a self-destructing closure from limited() crashed the driver.
+Applying map() and filter() on multi-value mappings now recognizes if the
+value array is used by the callee.
+The traceback from within a crash used uninitialized variables in the catch
+frame.")
 (New-Version-Log
 "")
-(Checkin-Time "Tue, 16 Jul 2002 15:27:55 -0600")
+(Checkin-Time "Mon, 05 Aug 2002 13:55:08 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -59,9 +63,9 @@ regmatch() can take and return a start index for matches.")
   ;; Information about the driver and the distribution in general
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.6 644))
-  (CREDITS (lpmud/d/22_CREDITS 1.70.1.41 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.277 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.257 644))
+  (CREDITS (lpmud/d/22_CREDITS 1.70.1.42 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.278 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.258 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.14 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -143,13 +147,13 @@ regmatch() can take and return a start index for matches.")
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.6 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.23 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.25 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.26 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.10 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.11 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.9 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.10 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.12 644))
-  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.44 644))
+  (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.45 644))
   (src/md5.h (lpmud/L/18_md5.h 1.2 644))
   (src/md5.c (lpmud/L/19_md5.c 1.5 644))
   (src/mempools.h (lpmud/D/48_mempools.h 1.2.1.3 644))
@@ -211,7 +215,7 @@ regmatch() can take and return a start index for matches.")
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.11 644))
   (src/port.c (lpmud/39_port.c 1.17.1.6 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.14 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.23 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.24 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.1 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -222,7 +226,7 @@ regmatch() can take and return a start index for matches.")
   (src/simul_efun.h (lpmud/f/17_simul_efun 1.5.1.5 644))
   (src/simul_efun.c (lpmud/32_simul_efun 1.20.1.12 644))
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.26 644))
-  (src/simulate.c (lpmud/31_simulate.c 1.88.1.76 644))
+  (src/simulate.c (lpmud/31_simulate.c 1.88.1.77 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.9 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.48 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.2 644))
@@ -453,7 +457,7 @@ regmatch() can take and return a start index for matches.")
   (src/bugs/ferrycode/cog.c (lpmud/U/6_cog.c 1.1 644))
   (src/bugs/ferrycode/carrack.c (lpmud/U/7_carrack.c 1.1 644))
 
-  (src/bugs/b-summary (lpmud/C/34_b-summary 1.47.1.32 644) :no-keywords)
+  (src/bugs/b-summary (lpmud/C/34_b-summary 1.47.1.33 644) :no-keywords)
   (src/bugs/b-990217-1 (lpmud/k/10_b-990217-1 1.3 644) :no-keywords)
   (src/bugs/b-990605 (lpmud/t/4_b-990605 1.1 644) :no-keywords)
   (src/bugs/b-000214 (lpmud/F/41_b-000214 1.1 644) :no-keywords)
@@ -486,6 +490,7 @@ regmatch() can take and return a start index for matches.")
   (src/bugs/b-020415 (lpmud/V/38_b-020415 1.2 644) :no-keywords)
   (src/bugs/b-020425-0 (lpmud/V/39_b-020425-0 1.1 644) :no-keywords)
   (src/bugs/b-020506 (lpmud/V/41_b-020506 1.1 644) :no-keywords)
+  (src/bugs/b-020801 (lpmud/W/12_b-020801 1.1 644) :no-keywords)
 
   (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.70 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)

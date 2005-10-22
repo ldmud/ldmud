@@ -4680,8 +4680,8 @@ f_limited (svalue_t * sp, int num_arg)
         call_lambda(argp, cl_args);
         sp = inter_sp;
         
-        /* Over write the closure with the result */
-        free_closure(argp);
+        /* Overwrite the closure with the result */
+        free_svalue(argp); /* The closure might have self-destructed */
         *argp = *sp;
         sp--;
 

@@ -12,6 +12,7 @@ b-020318: Illegal instruction
 b-020331: Back stack at F_RETURN (maybe fixed)
 b-020415: Crasher with corrupted Memory
 b-020425-0: GC crashes on 'object referenced as something else'
+b-020801: nmap crashes LDMud
 
 
 Efuns
@@ -45,7 +46,7 @@ b-020223: Memory corruption (in stress test)
 b-020304: Memory Leaks in Darkwind
 b-020314: Memory leaks in OSB and FinalFrontier
 b-020306: LDMud vs TinyFugue prompt
-b-020506: Small block  statistics wrong in OSB
+b-020506: Small block statistics wrong in OSB
 
 Installation
 --------------------------------------------------------------------------

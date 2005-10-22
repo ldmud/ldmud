@@ -860,6 +860,17 @@ free_string_svalue (svalue_t *v)
  */
 
 {
+#ifdef DEBUG
+    if (v->type != T_STRING)
+    {
+        fatal("free_string_svalue(): Expected string, "
+              "received svalue type (%d:%hd)\n"
+            , v->type, v->x.generic);
+        /* NOTREACHED */
+        return;
+    }
+#endif
+
     free_mstring(v->u.str);
 }
 
@@ -874,6 +885,17 @@ free_object_svalue (svalue_t *v)
 
 {
     object_t *ob = v->u.ob;
+
+#ifdef DEBUG
+    if (v->type != T_OBJECT)
+    {
+        fatal("free_object_svalue(): Expected object, "
+              "received svalue type (%d:%hd)\n"
+            , v->type, v->x.generic);
+        /* NOTREACHED */
+        return;
+    }
+#endif
 
     free_object(ob, "free_object_svalue");
 }
@@ -16495,6 +16517,7 @@ get_line_number (bytecode_p p, program_t *progp, string_t **namep)
               , time_stamp(), offset, get_txt(progp->name));
         debug_message("%s get_line_number(): Illegal offset %d in object %s\n"
                      , time_stamp(), offset, get_txt(progp->name));
+        *namep = ref_mstring(STR_UNDEFINED);
         return 0;
     }
 
@@ -16911,6 +16934,8 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
                 goto not_catch;
             last_catch = pc2;
             name = STR_CATCH;
+            file = NULL;
+            line = 0;
             goto name_computed;
         }
 
@@ -17017,11 +17042,19 @@ name_computed: /* Jump target from the catch detection */
             ret = p->extern_call ? (p->ob ? p->ob->name : NULL) : ob->name;
 
         if (sbuf)
-            strbuf_addf(sbuf, "'%15s' in '%20s' ('%20s') line %d\n"
-                       , get_txt(name), get_txt(file), get_txt(ob->name), line);
+        {
+            if (file != NULL)
+                strbuf_addf(sbuf, "'%15s' in '%20s' ('%20s') line %d\n"
+                           , get_txt(name), get_txt(file)
+                           , get_txt(ob->name), line);
+            else
+                strbuf_addf(sbuf, "'%15s' in %22s ('%20s')\n"
+                           , get_txt(name), "", get_txt(ob->name));
+        }
+
         if (rvec)
         {
-            NEW_ENTRY(entry, TRACE_TYPE_LFUN, file);
+            NEW_ENTRY(entry, TRACE_TYPE_LFUN, file != NULL ? file : STR_EMPTY);
             put_ref_string(entry->vec->item+TRACE_NAME, name);
             PUT_LOC(entry, line);
         }

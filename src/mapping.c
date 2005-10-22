@@ -3700,6 +3700,24 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
     {
         svalue_t *data;
 
+        /* Check if somebody took a reference to the old dvec.
+         * If yes, we need to create a new one.
+         */
+        if (dvec->ref > 1)
+        {
+            free_array(dvec);
+            dvec = allocate_array(num_values);
+            if (!dvec)
+            {
+                put_number(dvec_sp, 0);
+                inter_sp = sp;
+                free_callback(&cb);
+                error("Out of memory\n");
+            }
+            else
+                put_array(dvec_sp, dvec);
+        }
+
         /* Push the key */
         assign_svalue_no_free((inter_sp = sp + 1), read_pointer);
 
@@ -3915,6 +3933,23 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
     for (; --i >= 0; key++) {
         svalue_t *v;
         svalue_t *data;
+
+        /* Check if somebody took a reference to the old dvec.
+         * If yes, we need to create a new one.
+         */
+        if (dvec->ref > 1)
+        {
+            free_array(dvec);
+            dvec = allocate_array(num_values);
+            if (!dvec)
+            {
+                put_number(dvec_sp, 0);
+                inter_sp = sp;
+                error("Out of memory\n");
+            }
+            else
+                put_array(dvec_sp, dvec);
+        }
 
         /* Push the key */
         assign_svalue_no_free((inter_sp = sp + 1), key);

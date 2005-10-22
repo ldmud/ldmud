@@ -84,7 +84,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package.
 
 
-15-Jun-2002 (Lars Duening) -- upcoming Release 3.2.9
+04-Aug-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -187,6 +187,10 @@ For a detailed list of all changes see the file CHANGELOG.
        + call_resolved(): Now accepts a destructed object as second parameter
            as it should.
        + deep_copy(): Didn't handle quoted arrays properly.
+       + filter(), map(): When used on multi-value mappings, the driver did
+           not recognize when the called closure kept a reference to the
+           array with the values, overwriting the values in the next
+           iteration.
        + functionlist(): The filter flags didn't really work.
        + input_to(): The option IGNORE_BANG didn't work. In charmode, !-escapes
            after the first received data are now recognized. 
@@ -296,6 +300,9 @@ For a detailed list of all changes see the file CHANGELOG.
        + If a method in a virtual inherit is rendered invisible, but also made
          available again through a parallel inherit of the same program, the
          compiler resolved the visible function to the wrong inheritance.
+       + Calling a self-destructing closure from limited().
+       + Runtime errors in a catch occasionally crashed in the traceback
+         collection.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.
@@ -351,6 +358,8 @@ For a detailed list of all changes see the file CHANGELOG.
            calls to undefined functions even if typechecking is off.
        + The notation ([:<expr>]) can be used to create empty mappings
            of the given width.
+       + Duplicate inherits of a program on the toplevel raise a warning,
+           resp. an error if pragma 'pedantic' is in effect.
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.
        + Bugfix: Right shift by 32 or more bits was computed incorrectly.
