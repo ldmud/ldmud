@@ -128,8 +128,10 @@ extern POINTER xalloc(size_t size);
 
 #if defined(MALLOC_TRACE)
 #  define xalloc_traced(size,  file, line) xalloc((size))
+#  define xalloc_pass(size)  xalloc((size))
 #else
 #  define xalloc_traced(size,  file, line) xalloc((size))
+#  define xalloc_pass(size)  xalloc((size))
 #endif
 
 #define xfree    free

@@ -147,16 +147,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 113
+  SETVERFLAGS += d 114
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.113
+  VSTRING = 3.3.0-pre.114
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 113
+  SETVERFLAGS += d 114
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.113
+  VSTRING = 3.3.0-dev.114
 endif
 
 else
@@ -164,12 +164,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 113
+SETVERFLAGS = -app 3 3 114
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.113
+  VSTRING = 3.3.114
 
 endif
 
@@ -337,12 +337,12 @@ clobberall :: clobber cleanall
 	-rm -rf $(OBJ_CROSS)
 
 depend: $(SRCS) $(GENSRCS) $(OBJ)
-	-@$(SHELL) -ec "if type mkdepend > /dev/null 2>&1; then \
+	@$(SHELL) -ec "if type mkdepend > /dev/null 2>&1; then \
           echo Updating dependencies.; \
-          mkdepend $(SKELETON) -I. $(EXCEPT) -p .c:$$\(OBJ\)/%n.o -fMakefile; \
-          mkdepend $(SKELETON) -I. $(EXCEPT) $(SELECT) -p .c:$$\(OBJ\)/%n.o -fMakefile; \
-          mkdepend $(SKELETON) -I. $(EXCEPT) -p .c:$$\(OBJ\)/%n.o -fhosts/be/Makefile; \
-          mkdepend $(SKELETON) -I. $(EXCEPT) $(SELECT) -p .c:$$\(OBJ\)/%n.o -fhosts/be/Makefile; \
+          mkdepend $(SKELETON) -I. $(EXCEPT) -m -p .c:$$\(OBJ\)/%n.o -fMakefile; \
+          mkdepend $(SKELETON) -I. $(EXCEPT) $(SELECT) -m -p .c:$$\(OBJ\)/%n.o -fMakefile; \
+          mkdepend $(SKELETON) -I. $(EXCEPT) -m -p .c:$$\(OBJ\)/%n.o -fhosts/be/Makefile; \
+          mkdepend $(SKELETON) -I. $(EXCEPT) $(SELECT) -m -p .c:$$\(OBJ\)/%n.o -fhosts/be/Makefile; \
         else\
           echo mkdepend utility not available.; \
         fi"
@@ -350,13 +350,13 @@ depend: $(SRCS) $(GENSRCS) $(OBJ)
 .PHONY dependall: depend depend-generic depend-amiga
 
 depend-generic: $(SRCS) $(GENSRCS) $(OBJ)
-	-@$(SHELL) -ec "if type mkdepend > /dev/null 2>&1; then \
+	@$(SHELL) -ec "if type mkdepend > /dev/null 2>&1; then \
           echo Updating dependencies in Makefile.in.; \
-          mkdepend $(SKELETON) -I. $(EXCEPT) -p .c:%n.o -fMakefile.in; \
-          mkdepend $(SKELETON) $(SELECT) -I. $(EXCEPT) -p .c:%n.o -fMakefile.in; \
+          mkdepend $(SKELETON) -I. $(EXCEPT) -m -p .c:%n.o -fMakefile.in; \
+          mkdepend $(SKELETON) $(SELECT) -I. $(EXCEPT) -m -p .c:%n.o -fMakefile.in; \
           echo Updating dependencies in hosts/os2/Makefile.; \
-          mkdepend $(SKELETON) -I. $(EXCEPT) -p .c:%n.o -fhosts/os2/Makefile; \
-          mkdepend $(SKELETON) $(SELECT) -I. $(EXCEPT) -p .c:%n.o -fhosts/os2/Makefile; \
+          mkdepend $(SKELETON) -I. $(EXCEPT) -m -p .c:%n.o -fhosts/os2/Makefile; \
+          mkdepend $(SKELETON) $(SELECT) -I. $(EXCEPT) -m -p .c:%n.o -fhosts/os2/Makefile; \
         else\
           echo mkdepend utility not available.; \
         fi"
@@ -364,10 +364,10 @@ depend-generic: $(SRCS) $(GENSRCS) $(OBJ)
 AMIGASRCS:= 
 
 depend-amiga: $(SRCS) $(GENSRCS) $(AMIGASRCS)  $(OBJ)
-	-@$(SHELL) -ec "if type mkdepend > /dev/null 2>&1; then \
+	@$(SHELL) -ec "if type mkdepend > /dev/null 2>&1; then \
           echo Updating dependencies in hosts/amiga/Makefile.; \
-          mkdepend $(SKELETON) $(AMIGASRCS) -I. $(EXCEPT) -p .c+:%n.o -Ihosts/amiga -fhosts/amiga/Makefile; \
-          mkdepend $(SKELETON) $(AMIGASRCS) $(SELECT) -I. $(EXCEPT) -p .c+:%n.o -Ihosts/amiga -fhosts/amiga/Makefile; \
+          mkdepend $(SKELETON) $(AMIGASRCS) -I. $(EXCEPT) -m -p .c+:%n.o -Ihosts/amiga -fhosts/amiga/Makefile; \
+          mkdepend $(SKELETON) $(AMIGASRCS) $(SELECT) -m -I. $(EXCEPT) -p .c+:%n.o -Ihosts/amiga -fhosts/amiga/Makefile; \
         else\
           echo mkdepend utility not available.; \
         fi"
@@ -573,11 +573,12 @@ $(OBJ)/mstrings.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h \
     typedefs.h sent.h exec.h port.h config.h hosts/unix.h hosts/be/be.h \
     machine.h
 
-$(OBJ)/object.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h svalue.h \
-    swap.h strfuns.h stdstrings.h simul_efun.h simulate.h sent.h random.h \
-    ptrtable.h prolang.h otable.h mstrings.h mapping.h main.h instrs.h \
-    interpret.h filestat.h exec.h comm.h closure.h backend.h array.h \
-    actions.h object.h my-alloca.h typedefs.h driver.h port.h config.h \
+$(OBJ)/object.o : ../mudlib/sys/functionlist.h ../mudlib/sys/driver_hook.h \
+    xalloc.h wiz_list.h svalue.h swap.h strfuns.h stdstrings.h simul_efun.h \
+    simulate.h sent.h random.h ptrtable.h prolang.h otable.h mstrings.h \
+    mempools.h mapping.h main.h instrs.h interpret.h filestat.h exec.h \
+    comm.h closure.h backend.h array.h actions.h object.h my-alloca.h \
+    typedefs.h driver.h ../mudlib/sys/lpctypes.h port.h config.h \
     hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/otable.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h simulate.h \
@@ -645,8 +646,8 @@ $(OBJ)/simulate.o : ../mudlib/sys/rtlimits.h ../mudlib/sys/files.h \
     regexp.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/sprintf.o : xalloc.h swap.h svalue.h stdstrings.h simul_efun.h \
-    simulate.h sent.h ptrtable.h object.h mstrings.h mapping.h main.h \
-    instrs.h interpret.h exec.h comm.h closure.h array.h actions.h \
+    simulate.h sent.h random.h ptrtable.h object.h mstrings.h mapping.h \
+    main.h instrs.h interpret.h exec.h comm.h closure.h array.h actions.h \
     sprintf.h my-alloca.h typedefs.h driver.h strfuns.h port.h config.h \
     hosts/unix.h hosts/be/be.h machine.h
 
@@ -669,10 +670,10 @@ $(OBJ)/wiz_list.o : xalloc.h svalue.h stdstrings.h simulate.h object.h \
     strfuns.h sent.h exec.h instrs.h port.h config.h hosts/unix.h \
     hosts/be/be.h machine.h
 
-$(OBJ)/xalloc.o : smalloc.c simulate.h interpret.h xalloc.h driver.h \
+$(OBJ)/xalloc.o : smalloc.c main.h simulate.h interpret.h xalloc.h driver.h \
     ../mudlib/sys/debug_info.h object.h exec.h svalue.h stdstrings.h \
-    mstrings.h main.h gcollect.h backend.h smalloc.h typedefs.h strfuns.h \
-    sent.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    mstrings.h gcollect.h backend.h smalloc.h typedefs.h strfuns.h sent.h \
+    instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 # --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS PRECEDE ---
 # --- DO NOT MODIFY THIS LINE -- SELECTED AUTO-DEPENDS FOLLOW ---

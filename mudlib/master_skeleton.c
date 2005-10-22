@@ -421,7 +421,10 @@ void disconnect (object obj)
 // This called by the gamedriver to handle the removal of an IP connection,
 // either because the connection is already lost ('netdeath') or due to
 // calls to exec() or remove_interactive().
-// The connection will be unbound upon return from this call.
+//
+// The connection will be unbound upon return from this call, so
+// for the time of this call, interactive(ob) will still return TRUE
+// even if the actual network connection has already been lost.
 
 
 //---------------------------------------------------------------------------

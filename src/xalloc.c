@@ -19,6 +19,7 @@
 
 #include "interpret.h"
 #include "simulate.h"
+#include "main.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -130,7 +131,7 @@ dump_malloc_trace (int d, void *adr)
 {
 #define WRITES(d, s) write((d), (s), strlen(s))
     WRITES(d, "No malloc trace.\n");
-#undf WRITES
+#undef WRITES
 } /* dump_malloc_trace() */
 
 #endif /* MALLOC_sysmalloc */

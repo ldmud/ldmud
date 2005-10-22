@@ -14040,7 +14040,7 @@ again:
                 /* Call the function with the remaining args on the stack.
                  */
                 inter_sp = sp; /* was clobbered by the previous loop */
-                if (!int_apply(arg[1].u.str, ob, num_arg-2, MY_FALSE, MY_TRUE))
+                if (!int_apply(arg[1].u.str, ob, num_arg-2, MY_FALSE, b_use_default))
                 {
                     /* Function not found, Assign 0 as result.
                      */
@@ -14061,7 +14061,7 @@ again:
                 }
             } /* for (objects in array) */
 
-            /* Remove the function call arguments from the stack.
+            /* Remove the original function call arguments from the stack.
              */
             pop_n_elems(num_arg-2);
 
@@ -16507,7 +16507,6 @@ invalidate_apply_low_cache (void)
     }
 }
 
-#ifdef GC_SUPPORT
 
 /*-------------------------------------------------------------------------*/
 size_t
@@ -16524,6 +16523,9 @@ interpreter_overhead (void)
 
     return sum;
 } /* interpreter_overhead() */
+
+
+#ifdef GC_SUPPORT
 
 /*-------------------------------------------------------------------------*/
 void

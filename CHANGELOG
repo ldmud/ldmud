@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Oct-2001 (Lars Duening)  (3.3.114)
+    - (efuns.c) Removed a free-memory access in efun strstr() (thanks,
+        Tomba!)
+    - (Makefiles) Updated my MkDepend tool, so that it no longer adds
+        non-existing include files to the dependencies.
+    - (interpret.c) Oops, call_other()/call_direct() on array of objects
+        always used default functions even if they shouldn't. This also
+        caused the double freeing of svalues. (reported by Dafire)
+    - (interpret.c, swap.c, xalloc) Didn't compile when using sysmalloc
+        as allocator (reported by Tomba).
+
 12-Oct-2001 (Lars Duening)  (3.3.113)
     - (sprintf.c) Improved the flushing algorithm: spaces are more
         evenly distributed, newlines in columns didn't work properly

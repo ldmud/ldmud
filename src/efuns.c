@@ -892,7 +892,7 @@ f_strstr (svalue_t *sp)
 {
     char *found;
     string_t *base, *pattern;
-    p_int start;
+    p_int start, rc;
 
     base = sp[-2].u.str;
     pattern = sp[-1].u.str;
@@ -908,11 +908,12 @@ f_strstr (svalue_t *sp)
     }
 
     found = mstring_mstr_n_str(base, start, get_txt(pattern), mstrsize(pattern));
+    rc = found ? (found - get_txt(base)) : -1;
 
     sp--;
     free_svalue(sp--);
-    free_string_svalue(sp);
-    put_number(sp, found ? (found - get_txt(base)) : -1);
+    free_string_svalue(sp); /* Frees base ! */
+    put_number(sp, rc);
 
     return sp;
 } /* f_strstr() */

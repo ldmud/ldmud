@@ -1,4 +1,4 @@
-Short: mccp patch :)
+Short: MCCP patch :)
 From:   "Bastian Hoyer" <dafire@dafire.de>
 Date:   Thu Oct 11 21:02:00 2001
 Type: Patch
@@ -28,15 +28,26 @@ und da bearbeitet
 6. neue efun query_mccp(object) (default this_player) gibt 0 wenn kein
 mccp laeuft, ansonsten TELOPT_COMPRESS oder TELOPT_COMPRESS2
 
+--- And on 13.10.2001 Bastian wrote about the new patch:
+
+ich hab jetzt in der add_message funktion den patch so umgebaut das er mit 
+compression praktisch genauso schreibt wie ohne.. also ich verwende auch die 
+6 retry schleife :)
+
+Ausserdem hab ich ein paar Sicherungen ausgebaut, weil ich davon ausgehen 
+kann, das der message puffer von 1024 bytes immer in den zlib buffer von 8192 
+bytes passt :)
+
+Was noch fehlt ist ein erkennen der zlib im configure.. mal sehen ob ich das 
+hinbekomme :)
+
 ------------------------------------------------------------------
-diff -c5 -r 3-3/src/comm.c 3-3.daf/src/comm.c
-*** 3-3/src/comm.c	Thu Oct 11 20:12:35 2001
---- 3-3.daf/src/comm.c	Thu Oct 11 20:27:15 2001
+diff -r -c3 3-3/src/comm.c 3-3.daf/src/comm.c
+*** 3-3/src/comm.c	Sat Oct 13 20:57:28 2001
+--- 3-3.daf/src/comm.c	Sat Oct 13 21:29:39 2001
 ***************
-*** 406,415 ****
---- 406,418 ----
-  
-  /*-------------------------------------------------------------------------*/
+*** 408,413 ****
+--- 408,416 ----
   
   /* Forward declarations */
   
@@ -46,106 +57,124 @@ diff -c5 -r 3-3/src/comm.c 3-3.daf/src/comm.c
   static void free_input_to(input_to_t *);
   static void telnet_neg(interactive_t *);
   static void send_will(int);
-  static void send_wont(int);
-  static void send_do(int);
 ***************
-*** 1469,1483 ****
+*** 1466,1485 ****
+           * If it is enough, send it, else terminate the outer loop
+           * (because *source must be exhausted for this to happen).
+           */
           chunk = dest - ip->message_buf;
           if (chunk < min_length)
           {
               break;
           }
+  
+!         /* Write .message_buf[] to the network. */
 ! 
-          /* Write .message_buf[] to the network. */
-  
-!         for (retries = 6;;) {
-  
-              if ((n = (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk)) != -1)
-              {
+          for (retries = 6;;) {
+! 
+!             if ((n = (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk)) != -1)
+!             {
                   break;
-              }
+!             }
               switch (errno) {
---- 1472,1532 ----
+                case EINTR:
+                  if (--retries)
+--- 1469,1525 ----
+           * If it is enough, send it, else terminate the outer loop
+           * (because *source must be exhausted for this to happen).
+           */
++ 
           chunk = dest - ip->message_buf;
           if (chunk < min_length)
           {
               break;
           }
-!         
-          /* Write .message_buf[] to the network. */
++         
 +         
 +         if (ip->out_compress)
 +         {
-+            int iBlck, iPtr, iWrt = 0;
-  
-!            ip->out_compress->next_in = (unsigned char *) ip->message_buf;
-!            ip->out_compress->avail_in = chunk;
-  
-+            while (ip->out_compress->avail_in)
++            
++            ip->out_compress->next_in = (unsigned char *) ip->message_buf;
++            ip->out_compress->avail_in = chunk;
++            
++            ip->out_compress->avail_out = COMPRESS_BUF_SIZE -
++                                          (ip->out_compress->next_out -
++                                           ip->out_compress_buf);
++            
 +            {
-+               ip->out_compress->avail_out = COMPRESS_BUF_SIZE -
-+                                             (ip->out_compress->next_out -
-+                                              ip->out_compress_buf);
++               int status = deflate(ip->out_compress, Z_SYNC_FLUSH);
 +               
-+               if (ip->out_compress->avail_out)
-+               {
-+                  int status = deflate(ip->out_compress, Z_SYNC_FLUSH);
-+                  
-+                  if (status != Z_OK)
-+                     return;
-+               }
-+               
-+               length = ip->out_compress->next_out - ip->out_compress_buf;
-+               if (length > 0)
-+               {
-+                  for (iPtr = 0; iPtr < length; iPtr += iWrt)
-+                  {
-+                     iBlck = UMIN(length - iPtr, 4096);
-+                     if ((iWrt = write(ip->socket, ip->out_compress_buf + iPtr, iBlck)) < 0)
-+                     {
-+                        perror("Text_to_socket (compressed):");
-+                        return;
-+                     }
-+                  }
-+                  if (iWrt <= 0) break;
-+                  if (iPtr > 0)
-+                  {
-+                     if (iPtr < length)
-+                        memmove(ip->out_compress_buf, ip->out_compress_buf + iPtr, length - iPtr);
-+                     
-+                     ip->out_compress->next_out = ip->out_compress_buf + length - iPtr;
-+                  }
-+               }
++               if (status != Z_OK)
++                  return;
 +            }
-+            n=chunk;
++ 
++            /* ok.. perhaps i should take care that all data in message_buf
++               is compressed, but i guess there is no chance that 1024 byte compressed
++               won't fit into the 8192 byte buffer */
++            
++            length = ip->out_compress->next_out - ip->out_compress_buf;
++         }
+  
+!         /* now sending the buffer... */
+!         
+          for (retries = 6;;) {
+!            
+!            if (!ip->out_compress) /* here we choose the correct buffer */
+!            {
+!               if ((n = (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk)) != -1)
+!               {
+                  break;
+!               }
+!            }
+!            else
+!            {
+!               if ((n = (int)socket_write(ip->socket, ip->out_compress_buf, (size_t)length)) != -1)
+!               {
+!                  break;
+!               }
+!            }
+!            
+              switch (errno) {
+                case EINTR:
+                  if (--retries)
+***************
+*** 1539,1548 ****
+          inet_packets++;
+          inet_volume += n;
+  #endif
+-         if (n != chunk)
+-             fprintf(stderr, "%s write socket: wrote %ld, should be %ld.\n"
+-                           , time_stamp(), (long)n, (long)chunk);
+  
+          /* Continue with the processing of source */
+          dest = &ip->message_buf[0];
+      } while (srclen != 0);
+--- 1579,1600 ----
+          inet_packets++;
+          inet_volume += n;
+  #endif
+  
++         if (ip->out_compress)
++         {
++            /* we update the compressed buffer here */
++            ip->out_compress->next_out = ip->out_compress_buf + length - n;
++            if (n != length)
++               fprintf(stderr, "%s write socket (compressed): wrote %ld, should be %ld.\n"
++                       , time_stamp(), (long)n, (long)chunk);
 +         }
 +         else
-+         for (retries = 6;;) {
-+            
-              if ((n = (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk)) != -1)
-              {
-                  break;
-              }
-              switch (errno) {
++         {  
++            if (n != chunk)
++               fprintf(stderr, "%s write socket: wrote %ld, should be %ld.\n"
++                       , time_stamp(), (long)n, (long)chunk);
++         }
++         
+          /* Continue with the processing of source */
+          dest = &ip->message_buf[0];
+      } while (srclen != 0);
 ***************
-*** 2461,2470 ****
---- 2510,2520 ----
-                          comm_fatal(ip, "comm: data length < 0: %ld\n", (long)length);
-                          continue;
-                      }
-                      if (length > ip->chars_ready)
-                      {
-+                        printf("PROBLEM?\n");
-                          socket_write(ip->socket, ip->text + ip->chars_ready
-                                      , (size_t)(length - ip->chars_ready));
-                          ip->chars_ready = length;
-                      }
-                  }
-***************
-*** 2873,2882 ****
---- 2923,2934 ----
-      master_ob->flags |= O_ONCE_INTERACTIVE;
-      new_interactive->ob = master_ob;
+*** 2875,2880 ****
+--- 2927,2934 ----
   
       /* Initialize the rest of the interactive structure */
   
@@ -154,13 +183,9 @@ diff -c5 -r 3-3/src/comm.c 3-3.daf/src/comm.c
       new_interactive->input_to = NULL;
       put_ref_string(&new_interactive->prompt, STR_DEFAULT_PROMPT);
       new_interactive->modify_command = NULL;
-      new_interactive->msg_discarded = MY_FALSE;
-      new_interactive->set_input_to = MY_FALSE;
 ***************
-*** 2961,2970 ****
---- 3013,3026 ----
-      }
-  #ifdef ERQ_DEMON
+*** 2963,2970 ****
+--- 3017,3029 ----
       (void) lookup_ip_entry(new_interactive->addr.sin_addr, MY_TRUE);
       /* TODO: We could pass the retrieved hostname right to login */
   #endif
@@ -170,13 +195,31 @@ diff -c5 -r 3-3/src/comm.c 3-3.daf/src/comm.c
 +     
       logon(ob);
       flush_all_player_mess();
++ 
   } /* new_player() */
   
   /*-------------------------------------------------------------------------*/
 ***************
-*** 3987,4005 ****
-      telopts_do[TELOPT_SGA] = reply_to_do_sga;
-      telopts_dont[TELOPT_SGA] = reply_to_dont_sga;
+*** 3904,3910 ****
+      }
+  } /* reply_h_telnet_neg() */
+  
+! /*-------------------------------------------------------------------------*/
+  void
+  init_telopts (void)
+  
+--- 3963,3971 ----
+      }
+  } /* reply_h_telnet_neg() */
+  
+! /*-
+! 
+!   -----------------------------------------------------------------------*/
+  void
+  init_telopts (void)
+  
+***************
+*** 3989,4003 ****
   
       /* Mud specific protocols */
   
@@ -192,11 +235,7 @@ diff -c5 -r 3-3/src/comm.c 3-3.daf/src/comm.c
   
       telopts_do[TELOPT_MSP] = reply_h_telnet_neg;
       telopts_dont[TELOPT_MSP] = reply_h_telnet_neg;
-      telopts_will[TELOPT_MSP] = reply_h_telnet_neg;
-      telopts_wont[TELOPT_MSP] = reply_h_telnet_neg;
---- 4043,4061 ----
-      telopts_do[TELOPT_SGA] = reply_to_do_sga;
-      telopts_dont[TELOPT_SGA] = reply_to_dont_sga;
+--- 4050,4064 ----
   
       /* Mud specific protocols */
   
@@ -212,13 +251,9 @@ diff -c5 -r 3-3/src/comm.c 3-3.daf/src/comm.c
   
       telopts_do[TELOPT_MSP] = reply_h_telnet_neg;
       telopts_dont[TELOPT_MSP] = reply_h_telnet_neg;
-      telopts_will[TELOPT_MSP] = reply_h_telnet_neg;
-      telopts_wont[TELOPT_MSP] = reply_h_telnet_neg;
 ***************
-*** 5656,5665 ****
---- 5712,5725 ----
-   *
-   * The idea behind the flag settings is that sending command
+*** 5661,5666 ****
+--- 5722,5731 ----
    * codes for colours and other things needs to bypass the allowed
    * charset filters, but isn't important enough to waste bandwith
    * on a synchronous transmission.
@@ -229,12 +264,8 @@ diff -c5 -r 3-3/src/comm.c 3-3.daf/src/comm.c
    */
   
   {
-      string_t *msg;
-      mp_int wrote = 0, i;
 ***************
-*** 5703,5723 ****
-       && !ip->do_close)
-      {
+*** 5708,5714 ****
           save_command_giver = command_giver;
           command_giver = current_object;
   
@@ -242,21 +273,7 @@ diff -c5 -r 3-3/src/comm.c 3-3.daf/src/comm.c
           {
               /* Write before flush... */
   
-              sending_telnet_command = MY_TRUE; /* turn of IAC quoting */
-  
-              add_message(FMT_STRING, msg);
-  
-              sending_telnet_command = MY_FALSE;
-  
-!             if (sp->u.number & 2)
-                  add_message(message_flush);
-              wrote = 0;
-          }
-          else
-          {
---- 5763,5783 ----
-       && !ip->do_close)
-      {
+--- 5773,5779 ----
           save_command_giver = command_giver;
           command_giver = current_object;
   
@@ -264,23 +281,26 @@ diff -c5 -r 3-3/src/comm.c 3-3.daf/src/comm.c
           {
               /* Write before flush... */
   
-              sending_telnet_command = MY_TRUE; /* turn of IAC quoting */
-  
-              add_message(FMT_STRING, msg);
+***************
+*** 5718,5724 ****
   
               sending_telnet_command = MY_FALSE;
   
-!             if (sp->u.number & 2||ip->out_compress)
+!             if (sp->u.number & 2)
                   add_message(message_flush);
               wrote = 0;
           }
-          else
-          {
-***************
-*** 6520,6525 ****
---- 6580,6792 ----
+--- 5783,5789 ----
   
-      return sp;
+              sending_telnet_command = MY_FALSE;
+  
+!             if ((sp->u.number & 2)||ip->out_compress)
+                  add_message(message_flush);
+              wrote = 0;
+          }
+***************
+*** 6515,6518 ****
+--- 6580,6790 ----
   } /* f_query_udp_port() */
   
   /***************************************************************************/
@@ -492,14 +512,12 @@ diff -c5 -r 3-3/src/comm.c 3-3.daf/src/comm.c
 +   return 1;
 + }
   
-diff -c5 -r 3-3/src/comm.h 3-3.daf/src/comm.h
-*** 3-3/src/comm.h	Thu Oct 11 20:12:35 2001
+diff -r -c3 3-3/src/comm.h 3-3.daf/src/comm.h
+*** 3-3/src/comm.h	Sat Oct 13 20:57:14 2001
 --- 3-3.daf/src/comm.h	Thu Oct 11 15:46:22 2001
 ***************
-*** 2,11 ****
---- 2,12 ----
-  #define COMM_H__ 1
-  
+*** 4,9 ****
+--- 4,10 ----
   #include "driver.h"
   #include "typedefs.h"
   #include <sys/types.h>
@@ -507,13 +525,9 @@ diff -c5 -r 3-3/src/comm.h 3-3.daf/src/comm.h
   
   #include "simulate.h"   /* callback_t for input_to_t */
   #include "svalue.h"
-  
-  /* TODO: Make the following a separate "my-socket.h" include, also
 ***************
-*** 165,174 ****
---- 166,180 ----
-         * and a terminating '\0'.
-         */
+*** 167,172 ****
+--- 168,178 ----
   
       char message_buf[MAX_SOCKET_PACKET_SIZE];
         /* The send buffer. */
@@ -525,13 +539,9 @@ diff -c5 -r 3-3/src/comm.h 3-3.daf/src/comm.h
   };
   
   /* --- Bitflags and masks for interactive.noecho ---
-   *
-   * 'noecho' is a historical misnomer as it actually represents several
 ***************
-*** 313,319 ****
---- 319,328 ----
-  extern svalue_t *f_users(svalue_t *sp);
-  
+*** 315,319 ****
+--- 321,328 ----
   #if defined(ACCESS_CONTROL)
   extern void refresh_access_data(void (*add_entry)(struct sockaddr_in *, int, long*) );
   #endif /* ACCESS_CONTROL */
@@ -540,14 +550,12 @@ diff -c5 -r 3-3/src/comm.h 3-3.daf/src/comm.h
 + #define UMIN(a,b) ((a) < (b) ? (a) : (b))
   
   #endif /* COMM_H__ */
-diff -c5 -r 3-3/src/func_spec 3-3.daf/src/func_spec
-*** 3-3/src/func_spec	Thu Oct 11 20:12:44 2001
---- 3-3.daf/src/func_spec	Thu Oct 11 20:08:29 2001
+diff -r -c3 3-3/src/func_spec 3-3.daf/src/func_spec
+*** 3-3/src/func_spec	Sat Oct 13 20:57:28 2001
+--- 3-3.daf/src/func_spec	Sat Oct 13 18:05:43 2001
 ***************
-*** 464,473 ****
---- 464,474 ----
-  int     query_mud_port(int|object default: F_THIS_PLAYER);
-  int     set_buffer_size(int);
+*** 471,476 ****
+--- 471,477 ----
   void    set_combine_charset(int *|string);
   void    set_connection_charset(int *|string, int default: F_CONST1);
   mixed   set_prompt(string|closure|int, object default: F_THIS_PLAYER);
@@ -555,6 +563,4 @@ diff -c5 -r 3-3/src/func_spec 3-3.daf/src/func_spec
   
   void    write(mixed);
   object *users();
-  
-  #ifdef ERQ_DEMON
 ------------------------------------------------------------------

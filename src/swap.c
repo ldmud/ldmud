@@ -1442,8 +1442,8 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
                         clear_memory_reference(cm);
                         m->ref = 0;
                     }
-                }
 #endif
+                }
             }
             else
             {

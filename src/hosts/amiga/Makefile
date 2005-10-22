@@ -135,8 +135,8 @@ object.o : object.c ../mudlib/sys/functionlist.h \
     ptrtable.h prolang.h otable.h mstrings.h mempools.h mapping.h main.h \
     instrs.h interpret.h filestat.h exec.h comm.h closure.h backend.h \
     array.h actions.h object.h my-alloca.h typedefs.h driver.h \
-    /sys/lpctypes.h ../mudlib/sys/lpctypes.h port.h config.h hosts/unix.h \
-    hosts/be/be.h machine.h
+    ../mudlib/sys/lpctypes.h port.h config.h hosts/unix.h hosts/be/be.h \
+    machine.h
 
 otable.o : otable.c ../mudlib/sys/debug_info.h xalloc.h svalue.h simulate.h \
     strfuns.h object.h mstrings.h hash.h gcollect.h backend.h otable.h \

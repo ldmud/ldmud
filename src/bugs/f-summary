@@ -207,7 +207,7 @@ f-010216: Possible implementation of T_ERROR
 f-010318: Runtime ERQ Executable directory specification
 f-010707: Fast Callouts
 f-010928-0: Make telnet negotiation options more configurable
-p-011012: mccp patch
+p-011012: MCCP patch
 
 
 Installation
