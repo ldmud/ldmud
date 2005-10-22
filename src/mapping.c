@@ -288,6 +288,10 @@ static void remove_empty_mappings (void);
 #if 0
 
 /* TODO: Remove these defines when the statistics prove to be correct */
+
+#define LOG_ALLOC(where,add,alloc) \
+printf("DEBUG: %s: m %p user %p total %ld + %ld (alloc %ld) = %ld\n", where, m, m->user, m->user->mapping_total, add, alloc, m->user->mapping_total + (add))
+
 #define LOG_ADD(where,add) \
 printf("DEBUG: %s: m %p user %p total %ld + %ld = %ld\n", where, m, m->user, m->user->mapping_total, add, m->user->mapping_total + (add))
 
@@ -299,6 +303,7 @@ printf("DEBUG: %s: m %p user %p total %ld - %ld = %ld\n", where, (m), (m)->user,
 
 #else
 
+#define LOG_ALLOC(where,add,alloc)
 #define LOG_ADD(where,add)
 #define LOG_SUB(where,add)
 #define LOG_SUB_M(where,m,add)
@@ -321,7 +326,7 @@ new_map_chain (mapping_t * m)
     rc = xalloc(SIZEOF_MCH(rc, m->num_values));
     if (rc)
     {
-        LOG_ADD("new_map_chain", SIZEOF_MCH(rc, m->num_values));
+        LOG_ALLOC("new_map_chain", SIZEOF_MCH(rc, m->num_values), SIZEOF_MCH(rc, m->num_values));
         m->user->mapping_total += SIZEOF_MCH(rc, m->num_values);
     }
 
@@ -410,7 +415,7 @@ get_new_hash ( mapping_t *m, mp_int hash_size)
     mcp = hm->chains;
     do *mcp++ = NULL; while (--hash_size >= 0);
 
-    LOG_ADD("get_new_hash", SIZEOF_MH(hm));
+    LOG_ALLOC("get_new_hash", SIZEOF_MH(hm), sizeof *hm + sizeof *mcp * hm->mask);
     m->user->mapping_total += SIZEOF_MH(hm);
 
     return hm;
@@ -456,6 +461,7 @@ get_new_mapping ( wiz_list_t * user, mp_int num_values
     mapping_cond_t *cm;
     mapping_hash_t *hm;
     mapping_t *m;
+/* DEBUG: */  size_t cm_size;
 
     /* Allocate the structures */
     m = xalloc(sizeof *m);
@@ -469,8 +475,8 @@ get_new_mapping ( wiz_list_t * user, mp_int num_values
     cm = NULL;
     if (cond_size > 0)
     {
-        size_t cm_size = (size_t)cond_size;
 
+        /* size_t */ cm_size = (size_t)cond_size;
         cm = xalloc(sizeof(*cm) + sizeof(svalue_t) * cm_size * (num_values+1) - 1);
         if (!cm)
         {
@@ -515,7 +521,7 @@ get_new_mapping ( wiz_list_t * user, mp_int num_values
     m->user->mapping_total += sizeof *m;
     if (cm)
     {
-        LOG_ADD("get_new_mapping - cond", SIZEOF_MC(cm, num_values));
+        LOG_ALLOC("get_new_mapping - cond", SIZEOF_MC(cm, num_values), sizeof(*cm) + sizeof(svalue_t) * cm_size * (num_values+1) - 1);
         m->user->mapping_total += SIZEOF_MC(cm, num_values);
     }
     /* hm has already been counted */
@@ -1155,9 +1161,6 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
                 return NULL;
             }
 
-            LOG_ADD("get_map_lvalue - existing hash", SIZEOF_MH(hm) - SIZEOF_MH(hm2));
-            m->user->mapping_total += SIZEOF_MH(hm) - SIZEOF_MH(hm2);
-
             /* Initialise the new structure except for the chains */
 
             *hm = *hm2;
@@ -1183,6 +1186,9 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
                 }
             }
             m->hash = hm;
+
+            LOG_ALLOC("get_map_lvalue - existing hash", SIZEOF_MH(hm) - SIZEOF_MH(hm2), sizeof *hm - sizeof *mcp + sizeof *mcp * size);
+            m->user->mapping_total += SIZEOF_MH(hm) - SIZEOF_MH(hm2);
 
             /* Away, old data! */
 
@@ -1576,7 +1582,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
 
         /* Plug the new hash into the new mapping */
         m2->hash = hm2;
-        LOG_ADD("copy_mapping - hash", SIZEOF_MH(hm2));
+        LOG_ALLOC("copy_mapping - hash", SIZEOF_MH(hm2), sizeof *hm - sizeof *mcp + sizeof *mcp * size);
         m->user->mapping_total += SIZEOF_MH(hm2);
     }
 
@@ -2805,7 +2811,7 @@ clean_stale_mappings (void)
             }
 
             /* Replace the old keyblock by the new one. */
-            LOG_ADD("clean_stale - new keyblock", SIZEOF_MC(cm2, num_values));
+            LOG_ALLOC("clean_stale - new keyblock", SIZEOF_MC(cm2, num_values), size);
             m->user->mapping_total += SIZEOF_MC(cm2, num_values);
             m->cond = cm2;
         }

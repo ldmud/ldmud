@@ -5146,6 +5146,7 @@ _expand_define (struct defn *p, ident_t * macro)
         /* --- Function Macro --- */
 
         int c;
+        int brakcnt = 0; /* Number of pending open '[' */
         int parcnt = 0;  /* Number of pending open' (' */
         Bool dquote = MY_FALSE; /* true: in "" */
         Bool squote = MY_FALSE; /* true: in '' */
@@ -5236,6 +5237,24 @@ _expand_define (struct defn *p, ident_t * macro)
                     *q++ = (char)c;
                     continue;
 
+                  case '[' :
+                    /* Begin of array/mapping index.
+                     */
+                    if (!squote && !dquote)
+                        brakcnt++;
+                    *q++ = (char)c;
+                    continue;
+
+                  case ']' :
+                    /* End of array/mapping index.
+                     */
+                    if (!squote && !dquote && brakcnt > 0)
+                    {
+                        brakcnt--;
+                    }
+                    *q++ = (char)c;
+                    continue;
+
                   case '(' :
                     /* Begin of nested expression.
                      */
@@ -5313,7 +5332,7 @@ _expand_define (struct defn *p, ident_t * macro)
                   case ',':
                     /* Argument separation
                      */
-                    if (!parcnt && !dquote && !squote)
+                    if (!parcnt && !dquote && !squote && !brakcnt)
                     {
                         *q++ = '\0';
                         args[++n] = q;
@@ -6224,7 +6243,8 @@ show_lexer_status (strbuf_t * sbuf, Bool verbose UNUSED)
     if (auto_include_string)
         sum += mstr_mem_size(auto_include_string);
 
-    strbuf_addf(sbuf, "Lexer structures\t\t\t %8lu\n", sum);
+    if (sbuf)
+        strbuf_addf(sbuf, "Lexer structures\t\t\t %8lu\n", sum);
     return sum;
 } /* show_lexer_status() */
 

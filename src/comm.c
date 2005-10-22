@@ -5018,9 +5018,10 @@ show_comm_status (strbuf_t * sbuf, Bool verbose UNUSED)
         sum += ed_buffer_size(O_GET_EDBUFFER(pl->ob));
     }
 
-    strbuf_addf(sbuf, "Comm structures\t\t\t\t %8lu\n", sum);
+    if (sbuf)
+        strbuf_addf(sbuf, "Comm structures\t\t\t\t %8lu\n", sum);
     return sum;
-} /* show_lexer_status() */
+} /* show_comm_status() */
 
 #ifdef GC_SUPPORT
 

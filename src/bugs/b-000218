@@ -3,6 +3,7 @@ Short: Finalfrontier: illegal mapping size
 Date:    Fri Feb 18 17:43:10 2000
 Type: Bug
 State: Possibly fixed in 3.2.9-dev.320 /3.3.85
+See also: b-000207, b-000822
 
 The mapping code had a bug which clobbered memory when a mapping was added to
 itself using 'm += m'. The correction in 3.2.9-dev.320 might have fixed this.

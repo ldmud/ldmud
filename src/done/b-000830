@@ -2,7 +2,7 @@ Short: malloc status is inconsistent
 From: Bastian Hoyer" <bastian.hoyer@uni-essen.de>
 Date: Tue, 29 Aug 2000 08:20:50 +0200
 Type: Bug
-State: New
+State: Done - fixed in 3.2.9-dev.330/3.3.96
 
 Der 228er laeuft jetzt ueber 2 tage, da dachte ich mir schick ich dir mal
 ein paar infos ;)

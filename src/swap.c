@@ -1252,6 +1252,7 @@ swap_variables (object_t *ob)
     total_vb_bytes_swapped += total_size - sizeof total_size;
     xfree(block->start);
     xfree(ob->variables);
+    tot_alloc_object_size -= ob->prog->num_variables * sizeof (svalue_t);
 
     /* Mark the variables as swapped */
     ob->variables = (svalue_t *)(swap_num | 1);
@@ -1649,6 +1650,7 @@ load_ob_from_swap (object_t *ob)
             xfree(block);
             return result | -0x80;
         }
+        tot_alloc_object_size += ob->prog->num_variables * sizeof (svalue_t);
 
         fread(block, size, 1, swap_file);
 

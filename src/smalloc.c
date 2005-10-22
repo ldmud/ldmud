@@ -630,7 +630,11 @@ smalloc (size_t size
 
 #ifdef DEBUG
     if (size == 0)
-        fatal("Malloc size = 0.\n");
+#       ifndef MALLOC_TRACE
+            fatal("Malloc size = 0.\n");
+#       else
+            fatal("(%s, %d) Malloc size = 0.\n", file, line);
+#       endif
 #endif
 
     if (size > SMALL_BLOCK_MAX_BYTES)
@@ -3674,7 +3678,7 @@ consolidate_freelists (void)
                 /* If we're in the first chunk, this is the new unused space
                  * to use (if it's big enough).
                  */
-                DEB2("  Unused %x, size %d\n", block, (size & M_MASK));
+                DEB3("  Unused %x, size %d, end-block %d\n", block, (size & M_MASK), (p_int)(end-block));
                 if (chunk == last_small_chunk && (end - block) > OVERHEAD)
                 {
                     unused_size = (end - block) * SINT;
@@ -3684,7 +3688,10 @@ consolidate_freelists (void)
                 }
                 else
                 {
-                    count_up(small_chunk_wasted, (end - block) * SINT);
+                    /* Don't count up small_chunk_wasted, as its value
+                     * already includes this wasted space.
+                     */
+                    NOOP;
                 }
                 break;
             }

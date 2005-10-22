@@ -2,7 +2,7 @@ Short: erq: object for reply destructed
 From: Holger@Wunderland
 Date: 990217
 Type: Bug
-State: Unclassified
+State: Done - fixed in 3.2.9-dev.325/3.3.90
 
 The driver seems to 'bug' when an object is destructed for which a reply
 from the erq is expected. Investigate this.

@@ -2,7 +2,7 @@ Short: OSB shows inconsistent malloc statistics
 From: Lars
 Date: 2001-07-13
 Type: Bug
-State: New
+State: Done - fixed in 3.2.9-dev.330/3.3.96
 
 Total:                                    2542658                              
 > malloc                                                                       

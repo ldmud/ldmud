@@ -1042,12 +1042,17 @@ f_read_bytes (svalue_t *sp, int num_arg)
         if ((start+len) > size)
             len = (size - start);
 
+        if (len <= 0)
+        {
+            close(f);
+            break;;
+        }
+
         /* Seek and read */
         if ((size = (long)lseek(f,start, 0)) < 0) {
             close(f);
             break;;
         }
-
 
         str = xalloc((size_t)len);
         if (!str) {

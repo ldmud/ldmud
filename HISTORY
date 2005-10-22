@@ -45,7 +45,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-27-Aug-2001 (Lars Duening) -- upcoming Release 3.2.9
+29-Aug-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -237,7 +237,8 @@ For a detailed list of all changes see the file CHANGELOG.
            is simply treated as escaped character.
        + Bugfix: When defining a function of the same name as an inherited
            private function, the latter is no longer redefined.
-
+       + Bugfix: Multi-dimensional mapping indices in macro calls are no
+           longer confused with multiple macro arguments.
 
     - Runtime:
        + Attempts to set a single string character to 0 now raise
