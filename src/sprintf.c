@@ -1772,7 +1772,10 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                                     ERROR(ERR_INVALID_STAR);
                                 if ((int)(fs = carg->u.number) < 0)
                                 {
-                                    fs = -fs;
+                                    if (fs == PINT_MIN)
+                                        fs = PINT_MAX;
+                                    else
+                                        fs = -fs;
                                     finfo |= INFO_A_LEFT;
                                 }
 

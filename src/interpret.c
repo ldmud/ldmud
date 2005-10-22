@@ -9087,8 +9087,10 @@ again:
                 
                 slen = mstrsize(sp->u.str);
                 if (slen > (size_t)PINT_MAX
-                 || PINT_MAX / (p_int)slen < sp[-1].u.number
-                 || PINT_MAX / sp[-1].u.number < (p_int)slen
+                 || (   slen != 0           
+                     && PINT_MAX / (p_int)slen < sp[-1].u.number)
+                 || (   sp[-1].u.number != 0
+                     && PINT_MAX / sp[-1].u.number < (p_int)slen)
                    )
                     ERRORF(("Result string too long (%lu * %ld).\n"
                            , (unsigned long)slen, (long)sp[-1].u.number
@@ -9200,8 +9202,10 @@ again:
                 
                 slen = mstrsize(sp[-1].u.str);
                 if (slen > (size_t)PINT_MAX
-                 || PINT_MAX / (p_int)slen < sp->u.number
-                 || PINT_MAX / sp->u.number < (p_int)slen
+                 || (   slen != 0           
+                     && PINT_MAX / (p_int)slen < sp->u.number)
+                 || (   sp->u.number != 0
+                     && PINT_MAX / sp->u.number < (p_int)slen)
                    )
                     ERRORF(("Result string too long (%ld * %lu).\n"
                            , (long)sp->u.number, (unsigned long)slen
@@ -10729,8 +10733,10 @@ again:
             len = mstrsize(argp->u.str);
 
             if (len > (size_t)PINT_MAX
-             || PINT_MAX / (p_int)len < sp->u.number
-             || PINT_MAX / sp->u.number < (p_int)len
+             || (   len != 0           
+                 && PINT_MAX / (p_int)len < sp->u.number)
+             || (   sp->u.number != 0
+                 && PINT_MAX / sp->u.number < (p_int)len)
                )
                 ERRORF(("Result string too long (%ld * %lu).\n"
                        , (long)sp->u.number, (unsigned long)len

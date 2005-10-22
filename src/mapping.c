@@ -467,7 +467,8 @@ get_new_mapping ( wiz_list_t * user, mp_int num_values
     if (num_values > 0)
     {
         if (num_values > SSIZE_MAX /* TODO: SIZET_MAX, see port.h */
-         || (SSIZE_MAX - sizeof(map_chain_t)) / num_values < sizeof(svalue_t)
+         || (   num_values != 0 
+             && (SSIZE_MAX - sizeof(map_chain_t)) / num_values < sizeof(svalue_t))
            )
             return NULL;
     }
@@ -1509,7 +1510,8 @@ resize_mapping (mapping_t *m, mp_int new_width)
     if (new_width > 0)
     {
         if (new_width > SSIZE_MAX /* TODO: SIZET_MAX, see port.h */
-         || (SSIZE_MAX - sizeof(map_chain_t)) / new_width < sizeof(svalue_t)
+         || (   new_width != 0
+             && (SSIZE_MAX - sizeof(map_chain_t)) / new_width < sizeof(svalue_t))
            )
         {
             error("Mapping width too big (%ld)\n", new_width);

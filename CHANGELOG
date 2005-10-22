@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+11-Dec-2001 (Lars Duening)  (3.3.138)
+    - (interpret.c, mapping.c) Oops, the new checks also introduced
+         divisions by 0 (reported by Menaures).
+    - (sprintf.c) Runtime fieldsize specification by '%*' didn't check
+         if the size was given as MIN_INT: it would try to negate it
+         to get the positive number, but fail and cause the formatting
+         routines to crash under circumstances (reported by Menaures).
+
 10-Dec-2001 (Lars Duening)  (3.3.137)
     - (interpret.c) gcc 2.91 on Linux/x86 generates buggy code for
          MIN_INT % -1, so this case is now explicitely check for
