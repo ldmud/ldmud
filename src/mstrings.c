@@ -1005,7 +1005,8 @@ mstring_mstr_n_str ( const string_t * const pStr, size_t start
     if (start >= mstrsize(pStr))
         return NULL;
 
-    left = mstrsize(pStr);
+    /* Initialize 'characters remaining' and 'current position' */
+    left = mstrsize(pStr) - start;
     cp = get_txt(pStr)+start;
 
     /* Special case: strstr("text", "") */

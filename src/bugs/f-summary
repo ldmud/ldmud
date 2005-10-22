@@ -243,6 +243,7 @@ f-020309: Stack size watch
 f-020311: Add Berkeley DB to the driver
 f-020331-1: Hook for input_to()
 f-020420-0: Better isolate the error routine calls
+f-020714: Better buffering of data sent to players
 
 
 Installation
@@ -265,3 +266,4 @@ f-010828: Save loadable dump
 f-011124: Logging idea: Shared Library
 f-020206: Use OpenSSL or sshwrapper with the driver.
 f-020302: Detection of Telnet-Clients
+f-020611: Use of XML in save_object()

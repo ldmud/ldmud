@@ -20,12 +20,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 211)
-(Parent-Version lpmud 3-3 210)
-(Version-Log "Corrected yesterday's bugfix.")
+(Project-Version lpmud 3-3 212)
+(Parent-Version lpmud 3-3 211)
+(Version-Log "Applied provided bugfixes to strstr() and get_dir().")
 (New-Version-Log
 "")
-(Checkin-Time "Thu, 06 Jun 2002 01:04:42 -0600")
+(Checkin-Time "Mon, 15 Jul 2002 00:47:54 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -59,7 +59,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.6 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.40 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.274 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.275 644))
   (HISTORY (lpmud/f/49_HISTORY 1.256 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.14 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -133,7 +133,7 @@
   (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.30 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.21 644))
   (src/files.h (lpmud/I/49_files.h 1.1 644))
-  (src/files.c (lpmud/I/50_files.c 1.14 644))
+  (src/files.c (lpmud/I/50_files.c 1.15 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.9 644))
   (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.60 644))
@@ -156,7 +156,7 @@
   (src/mregex.h (lpmud/e/29_rxcache.h 1.7.1.9 644))
   (src/mregex.c (lpmud/e/30_rxcache.c 1.11.1.20 644))
   (src/mstrings.h (lpmud/I/35_mstrings.h 1.17 644))
-  (src/mstrings.c (lpmud/I/36_mstrings.c 1.21.1.8 644))
+  (src/mstrings.c (lpmud/I/36_mstrings.c 1.21.1.9 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/object.h (lpmud/44_object.h 1.34.1.15 644))
@@ -364,7 +364,7 @@
   (etc/icon-16x16.xpm (lpmud/s/43_icon-16x16 1.1 644) :no-keywords)
   (etc/pb-ldmud.jpg (lpmud/N/11_pb-ldmud.j 1.1 644) :no-keywords)
   (etc/pb-ldmud329.png (lpmud/V/28_pb-ldmud32 1.1 644) :no-keywords)
-  (etc/memusage (lpmud/Q/30_memusage 1.1 744) :no-keywords)
+  (etc/memusage (lpmud/Q/30_memusage 1.2 755) :no-keywords)
   (etc/startmud.pl (lpmud/M/27_startmud.p 1.2 744) :no-keywords)
   (etc/start_mud (lpmud/M/45_start_mud 1.1 644))
   (etc/mudloop (lpmud/M/46_mudloop 1.1 644))
@@ -486,7 +486,7 @@
   (src/bugs/b-020425-0 (lpmud/V/39_b-020425-0 1.1 644) :no-keywords)
   (src/bugs/b-020506 (lpmud/V/41_b-020506 1.1 644) :no-keywords)
 
-  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.67 644) :no-keywords)
+  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.68 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
   (src/bugs/f-981027-1 (lpmud/g/28_f-981027-1 1.2 644) :no-keywords)
   (src/bugs/f-981027-2 (lpmud/g/27_f-981027-2 1.2 644) :no-keywords)
@@ -708,6 +708,8 @@
   (src/bugs/f-020507-2 (lpmud/V/49_f-020507-2 1.1 644) :no-keywords)
   (src/bugs/f-020507-3 (lpmud/V/50_f-020507-3 1.1 644) :no-keywords)
   (src/bugs/f-020528 (lpmud/W/2_f-020528 1.1 644) :no-keywords)
+  (src/bugs/f-020611 (lpmud/W/4_f-020611 1.1 644) :no-keywords)
+  (src/bugs/f-020714 (lpmud/W/5_f-020714 1.1 644) :no-keywords)
 
   (src/bugs/p-981027-1 (lpmud/g/25_p-981027-1 1.2 644) :no-keywords)
   (src/bugs/doomdark/strutil.c (lpmud/g/31_strutil.c 1.2 644) :no-keywords)

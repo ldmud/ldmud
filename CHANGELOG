@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Jul-2002 (Lars Duening)  (3.3.212)
+    - (etc/memusage) Fiona updated the script to make it more robust and
+         work with the new OBJ_DUMP format. Furthermore the constants
+         for $DOMAINS and so on do work now.
+    - (files.c) When GETDIR_PATH was used with get_dir(), the resulting
+         strings had trailing NUL characters (thanks, Guandalug!)
+    - (mstrings.c) Under some circumstances, strstr() returned positions
+         after the end of the string. Found by Acius and fixed by Guandalug
+         (thanks!).
+
 05-Jun-2002 (Lars Duening)  (3.3.211)
     - (prolang.y) Oops, yesterday's bugfix was not quite corrected.
 

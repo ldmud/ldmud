@@ -946,14 +946,14 @@ f_get_dir (svalue_t *sp)
 
                     if (compat_mode)
                     {
-                        memsafe(result = alloc_mstring(namelen+pathlen+2)
+                        memsafe(result = alloc_mstring(namelen+pathlen+1)
                                , namelen+pathlen+2
                                , "getdir() names");
                         name = get_txt(result);
                     }
                     else
                     {
-                        memsafe(result = alloc_mstring(namelen+pathlen+3)
+                        memsafe(result = alloc_mstring(namelen+pathlen+2)
                                , namelen+pathlen+3
                                , "getdir() names");
                         name = get_txt(result);
