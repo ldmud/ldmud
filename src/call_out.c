@@ -519,6 +519,11 @@ found:
                 put_number(fun, delay);
                 return;
             }
+
+            /* All other types of closures can't be found */
+            free_svalue(fun);
+            put_number(fun, -1);
+            return;
         }
         fatal("find_call_out() got %s, expected string/closure.\n"
              , typename(fun->type));

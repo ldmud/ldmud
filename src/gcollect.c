@@ -1433,16 +1433,22 @@ show_mstring (int d, void *block, int depth)
         if (str->info.tabled)
         {
             WRITES(d, "Tabled string: ");
+            show_mstring_data(d, str->str, depth);
         }
         else if (NULL == str->link)
         {
             WRITES(d, "Untabled string: ");
+            show_mstring_data(d, str->str, depth);
         }
         else
         {
-            WRITES(d, "Ind. tabled string: ");
+            WRITES(d, "Ind. tabled string: <not printing data>");
         }
-        show_mstring_data(d, str->str, depth);
+        /* TODO: This is how it should be 
+         * TODO:: show_mstring_data(d, str->str, depth); 
+         * TODO:: alas it crashes the driver when destructed leaked objects
+         * TODO:: are found 'cause their name is no langer value (though
+         * TODO:: the reason for that is yet unknown). See 3.3.168 mails/bugs.
     }
 } /* show_mstring() */
 

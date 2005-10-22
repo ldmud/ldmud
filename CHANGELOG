@@ -1,6 +1,31 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Feb-2002 (Lars Duening)  (3.3.169)
+    - (prolang.y) In a for() loop, variables may now be declared without
+        initialisation (e.g. 'for (int i; ...)') (suggested by Pulami).
+    - (gcollect.c) Since the GC seems to crash when trying to print the
+        name for destructed leaked objects, I temporarily disabled the
+        printing of these names so that we can figure out why the object
+        was leaked in the first place.
+    - (interpret.c) Corrected a crasher in efun referencep() (reported by
+        Menaures).
+    - (call_out.c) Looking up call_outs by closure didn't fully handle
+        all closure types, causing the driver to fatal (reported by Menaures).
+    - (efuns.c) Efun clones() didn't check its arguments well enough
+        (reported by Menaures).
+    - (random.c) Tentatively modified the scaling of the raw random number
+        to the desired range so as to avoid overflow problems (investigated
+        by Collin Baillie for an Alpha machine). 
+
+15-Feb-2002 (Lars Duening)
+    - (simul_efun.c) simul-efuns shadowing real efuns were not properly
+        discarded, making it impossible to reactive them (which in a 
+        way was lucky as it made it possible to find the call_other bug).
+    - (interpret.c) The error handling for a secure call did not
+        properly roll back the control stack, leaking any closure
+        referenced from it (b-990505-0).
+
 13-Feb-2002 (Lars Duening)  (3.3.168)
     - (bitstrings.c) Efun copy_bits(): I accidentally had deleted the lines
         handling negative deststart values. The efun was also

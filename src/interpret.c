@@ -14041,7 +14041,7 @@ again:
 
         int i;
 
-        i = sp->u.lvalue->type == T_LVALUE;
+        i = (sp->type == T_LVALUE && sp->u.lvalue->type == T_LVALUE);
         free_svalue(sp);
         put_number(sp, i);
         break;
@@ -15233,8 +15233,14 @@ secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
 {
     if (csp != save_csp)
     {
-        /* could be error before push */
-        csp = save_csp+1;
+        /* Could be error before push.
+         * We have to unroll the control stack in case it references
+         * lambda closures.
+         */
+
+        while (csp > save_csp+1)
+            pop_control_stack();
+       
         previous_ob = csp->prev_ob;
         current_object = csp->ob;
         pop_control_stack();

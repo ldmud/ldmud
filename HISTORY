@@ -69,7 +69,7 @@ For a detailed list of all changes see the file CHANGELOG.
            something different from '!'.
 
 
-11-Feb-2002 (Lars Duening) -- Release 3.2.9
+17-Feb-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -263,6 +263,9 @@ For a detailed list of all changes see the file CHANGELOG.
        + Too long error messages overwrote the stack.
        + When players were already destructed in notify_shutdown(),
            the following remove_player() was passed the destructed objects.
+       + If call_other() was implemented by a sefun which required
+           call_other() to be called itself, the compiler generated
+           invalid bytecode.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.
@@ -310,6 +313,8 @@ For a detailed list of all changes see the file CHANGELOG.
            numeric overflows.
        + The wildcarded supercall "*":: no longer throws an
          error if none of the inherited objects defines the called function.
+       + In a for() statement, variables may now be declared without
+          initialisation (e.g. 'for (int i; ...)').
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.
        + Bugfix: Right shift by 32 or more bits was computed incorrectly.

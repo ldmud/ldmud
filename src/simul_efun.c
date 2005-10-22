@@ -72,6 +72,8 @@ vector_t *simul_efun_vector  = NULL;
    * using a normal apply() from interpret.c:call_simul_efun().
    */
 
+#define SIZE_SEFUN_TABLE (sizeof simul_efun_table / sizeof simul_efun_table[0])
+
 simul_efun_table_t simul_efun_table[256];
   /* The table holding the information for all simul-efuns which
    * can be called directly with the SIMUL_EFUN instruction.
@@ -118,17 +120,23 @@ invalidate_simul_efuns (void)
     int                 i, j;
 
     /* Invalidate the simul_efun table */
-    for (entry = simul_efun_table, i = 256; --i >= 0; )
+    for (entry = simul_efun_table, i = SIZE_SEFUN_TABLE; --i >= 0; )
     {
         entry->funstart = NULL;
         entry++;
     }
 
-    /* Mark all simulefun identifier entries as non-existing.
-     * Remove all sefun shadows for efuns.
+    /* Remove all sefun shadows for efuns.
+     * If they are listed in the table, move then into the inactive list.
      */
     for (id = all_efuns; id; id = id->next_all)
     {
+        j = id->u.global.sim_efun;
+        if ((size_t)j < SIZE_SEFUN_TABLE)
+        {
+            simul_efunp[j].offset.func = all_discarded_simul_efun;
+            all_discarded_simul_efun = j;
+        }
         id->u.global.sim_efun = I_GLOBAL_SEFUN_OTHER;
     }
 
@@ -381,7 +389,7 @@ get_simul_efun_object (void)
             simul_efunp[j].type  = type;
 
             /* If possible, make an entry in the simul_efun table */
-            if ((size_t)j < (sizeof simul_efun_table / sizeof simul_efun_table[0]))
+            if ((size_t)j < SIZE_SEFUN_TABLE)
             {
                 simul_efun_table[j].funstart = funstart;
                 simul_efun_table[j].program = inherit_progp;

@@ -3268,7 +3268,7 @@ f_clones (svalue_t *sp, int num_arg)
             
             if (sp->type == T_OBJECT)
                 reference = sp->u.ob;
-            else /* it's a string */
+            else if (sp->type == T_STRING)
             {
                 reference = get_object(sp->u.str);
                 if (!reference)
@@ -3277,6 +3277,11 @@ f_clones (svalue_t *sp, int num_arg)
                     /* NOTREACHED */
                     return sp;
                 }
+            }
+            else
+            {
+                vefun_exp_arg_error(1, TF_STRING|TF_OBJECT, sp->type, sp);
+                /* NOTREACHED */
             }
         }
 

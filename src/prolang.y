@@ -4853,6 +4853,49 @@ expr_decl:
               *dest = $2;
           }
       }
+
+    | local_name_lvalue
+      {
+          /* We got a "int <name>" type expression.
+           * Compile it as if it was a "int <name> = 0" expression.
+           */
+
+          p_int length;
+%line
+          /* Insert the implied push of number 0 */
+          ins_f_code(F_CONST0);
+
+          /* Add the bytecode to create the lvalue and do the
+           * assignment.
+           */
+          length = $1.length;
+          if (length)
+          {
+              add_to_mem_block(A_PROGRAM, $1.u.p, length+1);
+              yfree($1.u.p);
+              last_expression = CURRENT_PROGRAM_SIZE-1;
+              mem_block[A_PROGRAM].block[last_expression] =  F_ASSIGN;
+          }
+          else
+          {
+              bytecode_p source, dest;
+              mp_uint current_size;
+
+              source = $1.u.simple;
+              current_size = CURRENT_PROGRAM_SIZE;
+              CURRENT_PROGRAM_SIZE = (last_expression = current_size + 2) + 1;
+              if (current_size + 3 > mem_block[A_PROGRAM].max_size
+               && !realloc_a_program())
+              {
+                  yyerrorf("Out of memory: program size %lu", current_size+3);
+                  YYACCEPT;
+              }
+              dest = PROGRAM_BLOCK + current_size;
+              *dest++ = *source++;
+              *dest++ = *source;
+              *dest = F_ASSIGN;
+          }
+      }
 ; /* expr_decl */
 
 

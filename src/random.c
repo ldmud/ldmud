@@ -198,7 +198,11 @@ random_number (uint32 n)
 #else
     } while (rmax && rc > rmax);
 
-    return rmax ? ((rc * n) / rmax) : rc;
+    if (!rmax)
+        return rc;
+    if (rmax / n < rc && rmax / n > 0)
+        return rc / (rmax / n);
+    return (rc * n) / rmax;
 #endif
 }
 
