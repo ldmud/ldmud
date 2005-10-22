@@ -20,14 +20,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 231)
-(Parent-Version lpmud 3-3 230)
-(Version-Log "Corrected a couple of warnings.
-External master calls now get the same eval-cost benefits in error handling as
-normal call-others do.")
+(Project-Version lpmud 3-3 232)
+(Parent-Version lpmud 3-3 231)
+(Version-Log "Bugfix to terminal_colour().")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 21 Aug 2002 12:07:36 -0600")
+(Checkin-Time "Sat, 24 Aug 2002 00:06:23 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -63,7 +61,7 @@ normal call-others do.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.7 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.44 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.294 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.295 644))
   (HISTORY (lpmud/f/49_HISTORY 1.266 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.16 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -135,7 +133,7 @@ normal call-others do.")
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.23 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.16 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.38 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.39 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.21 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.17 644))

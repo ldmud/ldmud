@@ -1519,6 +1519,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 
         cp = instr;
         do {
+            char * last_cp = cp;
             cp = memchr(cp, TC_FIRST_CHAR, (size_t)left);
             if (cp)
             {
@@ -1544,10 +1545,12 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                     }
                     break;
                 }
+
+                /* Single '%': skip it and continue searching */
                 cp++;
-                left -= (cp - instr);
+                left -= (cp - last_cp);
             }
-        } while (cp && left >= 0);
+        } while (cp && left > 0);
     }
     else
         cp = NULL;
@@ -1645,7 +1648,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
          * Loop invariant: instr points to the begin of the last delimited
          * segment, left is the number of characters left in the string.
          */
-        while (cp)
+        while (cp && left > 0)
         {
             /* Skip the delimiter found last and search the next */
             cp += 2;
@@ -1654,8 +1657,10 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 
             do
             {
+                char * last_cp = cp;
                 cp = memchr(cp, TC_FIRST_CHAR, left);
                 if (cp) {
+                    left -= (cp - last_cp);
                     if (cp[1] == TC_SECOND_CHAR)
                     {
                         /* Check for the special escape '%%^^'.
@@ -1670,12 +1675,14 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                             cp--;
                             cp[1] = TC_SECOND_CHAR;
                             cp[2] = TC_FIRST_CHAR;
+                            left++;
                         }
                         break;
                     }
                     cp++;
+                    left--;
                 }
-            } while (cp);
+            } while (cp && left > 0);
 
             if (cp)
             {
@@ -1683,7 +1690,6 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                  */
                 parts[num] = instr;
                 lens[num] = cp - instr;
-                left -= lens[num];
                 num++;
                 if (num % NSTRSEGS == 0)
                 {

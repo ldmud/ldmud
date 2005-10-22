@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Aug-2002 (Lars Duening)  (3.3.232)
+   - (efuns.c) Efun terminal_colour(): the bugfix to handle single '%'
+        was incomplete (reported by Markus).
+
 21-Aug-2002 (Lars Duening)  (3.3.231)
    - (comm.c, object.c, simulate.c, swap.c) Corrected some warnings
         (reported by Dafire).
