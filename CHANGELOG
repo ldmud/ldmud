@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-May-2002 (Lars Duening)  (3.3.208)
+    - (mapping.c) 'mapping += mapping' now throws an error when the
+         mappings are of differing width (reported by Alfe and Coogan).
+    - (prolang.y) New notation '([:<expr>])' as shortcut for
+         m_allocate(0, <expr>) (suggested by Alfe).
+
 06-May-2002 (Lars Duening)  (3.3.207)
     - (smalloc.c) With CHECK_OBJECT_GC_REF, small chunks could lead to
          misleading diagnostics during the GC.

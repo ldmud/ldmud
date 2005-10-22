@@ -15,7 +15,7 @@ DESCRIPTION
                         'var'. The new value of 'var' is the result.
 
         var += expr        Assign the value of 'expr' + 'var' to 'var'.
-                        This is equivalente to "var = var + expr".
+                        This is mostly equivalent to "var = var + expr".
 
         var -= expr        Similar to '+=' above.
         var &= expr

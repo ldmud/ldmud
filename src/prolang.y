@@ -7300,6 +7300,25 @@ expr4:
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+    | '(' '[' ':' note_start
+
+          /* Generate an empty mapping of given width */
+
+      {
+          ins_f_code(F_CONST0);
+      }
+
+      expr0 ']' ')'
+
+      {
+          ins_f_code(F_M_ALLOCATE);
+
+          $$.type = TYPE_MAPPING;
+          $$.start = $4.start;
+          $$.code = -1;
+      }
+
+    /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
     | '(' '[' note_start m_expr_list ']' ')'
       {
           /* Generate a mapping */

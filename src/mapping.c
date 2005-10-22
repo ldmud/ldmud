@@ -3306,6 +3306,8 @@ add_to_mapping (mapping_t *m1, mapping_t *m2)
         }
         else
         {
+            error("Mappings to be added are of different width: %ld vs. %ld\n"
+                 , (long)m1->num_values, (long)m2->num_values);
             return;
         }
     }
