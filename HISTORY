@@ -84,7 +84,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package.
 
 
-04-Jun-2002 (Lars Duening) -- upcoming Release 3.2.9
+15-Jun-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -470,6 +470,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + New editor command 'T' to perform Tab <-> Whitespace conversion.
        + Builtin command 'dumpallobj' now also creates a dump of all
            destructed objects in the file <mudlib>/DEST_OBJ_DUMP.
+       + Character conversions are now done with regards to the locale
+           selected by the LANG environment variable.
 
 
 20-Aug-2000 (Lars Duening) -- Release 3.2.8

@@ -1,4 +1,5 @@
 SYNOPSIS
+        void walk_mapping(mapping m, string func, mixed extra,...)
         void walk_mapping(mapping m, string func, string|object ob
                                                 , mixed extra,...)
         void walk_mapping(mapping m, closure cl, mixed extra,...)

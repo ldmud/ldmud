@@ -28,6 +28,7 @@
 
 #include "my-alloca.h"
 #include <stdio.h>
+#include <locale.h>
 #include <math.h>
 #include <setjmp.h>
 #include <signal.h>
@@ -193,6 +194,7 @@ main (int argc, char **argv)
 
     /* Initialisations */
 
+    setlocale(LC_CTYPE, ""); /* Use the locale defined in the LANG env var */
     get_stack_direction();
     init_interpret();
     rx_init();

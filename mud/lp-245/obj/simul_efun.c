@@ -304,7 +304,10 @@ varargs void wizlist(string name)
     if (!name) {
         name = this_player()->query_real_name();
         if (!name)
+        {
+            write("Need to provide a name or 'ALL' to the wizlist function.\n");
             return;
+        }
     }
     a = transpose_array(wizlist_info());
     cmds = a[WL_COMMANDS];
@@ -317,7 +320,10 @@ varargs void wizlist(string name)
     a[WL_COMMANDS] = cmds;
 
     if ((pos = member(a[WL_NAME], name)) < 0 && name != "ALL")
+    {
+        write("No wizlist info for '"+name+"' found.\n");
         return;
+    }
     b = allocate(sizeof(cmds));
     for (i = sizeof(cmds); i;) {
         b[<i] = i;

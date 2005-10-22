@@ -2357,6 +2357,7 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
 
         if (((flags ^ VARIABLE(n)->flags) & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE))
             == TYPE_MOD_STATIC
+         && !(flags & NAME_INHERITED)
            )
         {
             yywarnf("Redefining inherited %s variable '%s' with a %s variable"
@@ -11669,6 +11670,10 @@ copy_variables (program_t *from, fulltype_t type
                     inherit.function_index_offset;
                 funp2 = (function_t *)mem_block[A_FUNCTIONS].block +
                     inheritp2->function_index_offset;
+                    /* Usually funp2 == funp, but if the program is inherited
+                     * virtually several times with differing visibilities,
+                     * the two pointers differ.
+                     */
                 for (k = inherit.prog->num_functions; --k >= 0; funp++, funp2++)
                 {
                     if ( !(funp->flags & NAME_CROSS_DEFINED)

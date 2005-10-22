@@ -161,7 +161,7 @@ f_capitalize(svalue_t *sp)
         memsafe(new = dup_mstring(sp->u.str), mstrsize(sp->u.str), "result string");
         free_mstring(sp->u.str);
         sp->u.str = new;
-        get_txt(sp->u.str)[0] += 'A' - 'a';
+        get_txt(sp->u.str)[0] = toupper((unsigned char)get_txt(sp->u.str)[0]);
     }
     return sp;
 } /* f_capitalize() */
@@ -299,7 +299,7 @@ f_lower_case (svalue_t *sp)
         {
             c = *s;
             if (c != '\0' && isupper((unsigned char)c))
-                *s = (char)tolower(c);
+                *s = (char)tolower((unsigned char)c);
         }
     }
 
@@ -882,9 +882,14 @@ f_regreplace (svalue_t *sp)
          */
         start = match->end;
 
-        if (start == mstrsize(text)
-         || (match->start == start && ++start == mstrsize(text)) )
+        if (start > mstrsize(text))
             break;
+        if (match->start == start)
+        {
+            ++reslen; /* Empty match leaves old char in place */
+            if (++start > mstrsize(text))
+                break;
+        }
 
         /* If RE_GLOBAL is not set, don't look for a second match */
         if (num_matches && (flags & RE_GLOBAL) == 0)
@@ -1332,7 +1337,7 @@ f_upper_case (svalue_t *sp)
             c = *s;
 
             if ('\0' != c && islower((unsigned char)c))
-                *s = (char)toupper(c);
+                *s = (char)toupper((unsigned char)c);
         }
     }
 

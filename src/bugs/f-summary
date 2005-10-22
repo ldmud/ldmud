@@ -266,4 +266,5 @@ f-010828: Save loadable dump
 f-011124: Logging idea: Shared Library
 f-020206: Use OpenSSL or sshwrapper with the driver.
 f-020302: Detection of Telnet-Clients
+f-020604: External modules in LPC
 f-020611: Use of XML in save_object()

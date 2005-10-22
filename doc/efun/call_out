@@ -23,7 +23,7 @@ DESCRIPTION
         The execution of the call_out()s implies a simple (not
         exhaustive) measure against rabbits: the evaluation costs of
         those call_outs() executing at the same time are summed up on
-        a per-user base. If the summed-up costs exceed the given maximum,
+        a per-UID base. If the summed-up costs exceed the given maximum,
         a 'too long evaluation' error will occur and any remaining
         call_outs() of this user scheduled for the same time are
         discarded.

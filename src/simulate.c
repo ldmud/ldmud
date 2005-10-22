@@ -3375,6 +3375,7 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
  * callbacks for efuns like map_array() and accepts these forms:
  *
  *   (string fun)
+ *   (string fun, mixed extra, ...) TODO: This form is UGLY!
  *   (string fun, string|object obj, mixed extra, ...)
  *   (closure cl, mixed extra, ...)
  *
@@ -3419,8 +3420,9 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
             }
             else
             {
+                /* TODO: It would be better to throw an error here */
                 ob = current_object;
-                first_arg = 2;
+                first_arg = 1;
             }
         }
         else

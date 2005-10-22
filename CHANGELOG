@@ -1,7 +1,25 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-15-Jul-2002 (Lars Duening)  (3.3.212)
+15-Jul-2002 (Lars Duening)  (3.3.213)
+    - (mud/lp-245) The wizlist() simul-efun didn't print proper failure
+         notices (reported by Vandergnome).
+    - (gcollect.c) In a GC the list of destructed objects was handled
+         last, by which time the list might already have been clobbered.
+         Moving the handling first should plug a memory leak (reported by
+         Dafire).
+    - (prolang.y) If a variable was inherited multiple times, the driver
+         generated a senseless warning (reported by Zora).
+    - (efuns.c, main.c) Added some support for locales; in
+         particular the driver now uses the locale defined in the LANG
+         environment variable for character conversions (thanks, Oskar!).
+    - (simulate.c) Efun callbacks misparsed the arguments when only the
+         function name and extra arguments, but no object was provided.
+    - (efuns.c) Corrected a bug in regreplace() was caused by matches
+         on null-string patterns (reported by Dafire, fixed by Fiona -
+         thanks!).
+
+14-Jul-2002 (Lars Duening)  (3.3.212)
     - (etc/memusage) Fiona updated the script to make it more robust and
          work with the new OBJ_DUMP format. Furthermore the constants
          for $DOMAINS and so on do work now.

@@ -1069,7 +1069,6 @@ garbage_collection(void)
     }
 
     remove_destructed_objects(); /* After reducing all object references! */
-    num_destructed = 0; /* The destructed_objs pointer will be cleared below */
 
     if (dobj_count != tot_alloc_object)
     {
@@ -1204,7 +1203,7 @@ garbage_collection(void)
 
     null_vector.ref = 0;
 
-    /* Finally, walk the of destructed objects and clear all references
+    /* Finally, walk the list of destructed objects and clear all references
      * in them.
      */
     for (ob = destructed_objs; ob;  ob = ob->next_all)
@@ -1230,6 +1229,27 @@ garbage_collection(void)
     stale_lambda_closures = NULL;
     stale_misc_closures = NULL;
     stale_mappings = NULL;
+
+
+    /* Handle the known destructed objects first, as later calls to
+     * reference_destructed_object() will clobber the list.
+     */
+    for (ob = destructed_objs; ob; )
+    {
+        object_t *next = ob->next_all;
+
+        dprintf1(gcollect_outfd
+                , "Freeing destructed object '%s'\n"
+                , (p_int)ob->name
+                );
+        reference_destructed_object(ob); /* Clobbers .next_all */
+
+        ob = next;
+    }
+
+    num_destructed = 0;
+    destructed_objs = NULL;
+
 
     /* Process the list of all objects.
      */
@@ -1403,27 +1423,6 @@ garbage_collection(void)
         free_object(ob, "garbage collection");
         dobj_count++;
     }
-
-    /* Finally, walk the of destructed objects and check if the above
-     * processing missed any of them.
-     */
-    for (ob = destructed_objs; ob; )
-    {
-        object_t *next = ob->next_all;
-
-        if (TEST_REF(ob))
-        {
-            dprintf1(gcollect_outfd
-                    , "Freeing destructed object '%s'\n"
-                    , (p_int)get_txt(ob->name)
-                    );
-            ob->ref = 0; /* Since it was never reached by the clear pass */
-            reference_destructed_object(ob);
-        }
-
-        ob = next;
-    }
-    destructed_objs = NULL;
 
     for (l = stale_lambda_closures; l; )
     {
