@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Jan-2002 (Lars Duening)  (3.3.156)
+    - (object.c) Made an error message more informative.
+
+24-Jan-2002 (Lars Duening)
+    - (interpret.c) If a value of the wrong type is passed to a switch,
+        the driver no longer throws a runtime error but instead
+        jumps to the 'default' case (suggested by Pulami).
+
 23-Jan-2002 (Lars Duening)  (3.3.155)
     - (prolang.y) The '::' operator did not recognize the separate
         namespaces of local variables and functions (reported by

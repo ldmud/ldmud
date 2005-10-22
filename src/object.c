@@ -246,7 +246,9 @@ _free_object (object_t *ob)
 #endif /* DEBUG */
 
     if (ob->sent)
-        fatal("Tried to free an object with sentences.\n");
+        fatal("free_object: Object '%s' (ref %ld, flags %08x) "
+              "still has sentences.\n"
+             , get_txt(ob->name), ob->ref, ob->flags);
 
     /* If the program is freed, then we can also free the variable
      * declarations.

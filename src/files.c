@@ -654,6 +654,7 @@ f_file_size (svalue_t *sp)
     struct stat st;
     string_t * file;
 
+    st.st_mode = 0; /* Silences ZeroFault/AIX under high optimizations */
     file = check_valid_path(sp->u.str, current_object, STR_FILE_SIZE, MY_FALSE);
     if (!file || ixstat(get_txt(file), &st) == -1)
         len = FSIZE_NOFILE;

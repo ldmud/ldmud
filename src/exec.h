@@ -705,7 +705,7 @@ struct program_s
        * variables.
        */
     inherit_t *inherit;
-      /* Array [.num_inherited] of descriptors for inherited programs.
+      /* Array [.num_inherited] of descriptors for (directly) inherited programs.
        */
     include_t *includes;
       /* Array [.num_includes] of descriptors for included files.
@@ -763,7 +763,7 @@ struct program_s
     unsigned short num_variables;
       /* Number of variables (inherited and own) of this program */
     unsigned short num_inherited;
-      /* Number of inherited programs */
+      /* Number of (directly) inherited programs */
 };
 
 

@@ -7639,6 +7639,7 @@ again:
          *   TODO: This code still makes too many un-macro'ed mem accesses.
          */
 
+        Bool useDefault; /* TRUE: Immediately jump to the default case */
         mp_int offset;  /* Length of instruction and range-table area */
         mp_int def_offs;  /* Offset to code for the 'default' case */
         int tablen; /* Number of single case entries, multiplied by 4 */
@@ -7799,6 +7800,7 @@ again:
         /* Get the search value from the argument passed on the
          * stack. This also does the type checking.
          */
+        useDefault = MY_FALSE;
         if (type & SWITCH_TYPE)
         {
             /* String switch */
@@ -7821,311 +7823,321 @@ again:
             }
             else
             {
-                BAD_ARG_ERROR(1, T_STRING, sp->type);
-                /* No string - bad wizard! */
+                /* Non-string value for string switch: use default */
+                useDefault = MY_TRUE;
             }
+        }
+        else if (sp->type == T_NUMBER)
+        {
+            /* Numeric switch and number given */
+            s = sp->u.number;
         }
         else
         {
-            /* Numeric switch */
-
-            TYPE_TEST1(sp, T_NUMBER);
-            s = sp->u.number;
+            /* Non-number value for numeric switch: use default */
+            useDefault = MY_TRUE;
         }
         pop_stack();
 
-        /* Setup the binary search:
-         *   l points roughly into the middle of the table,
-         *   d is 1/4 of the (assumed) total size of the table
-         */
-        i = type & SWITCH_START;
-        l = tabstart + off_tab[i];
-        d = (mp_int)((off_tab[i]+sizeof(p_int)) >> 1 & ~(sizeof(p_int)-1));
-          /* '+sizeof()' to make the off_tab[] value even and non-0 */
-
-        /* Binary search for the value <s> in the table, starting at
-         * position <l> and first subdivision size <d>.
-         * The algorithm runs until <d> falls below the size of a case value
-         * (sizeof(p_int)).
-         *
-         * After the loop terminates, o1 will be the jump offset relative
-         * to the pc, which might be the 'default' offset if the value <s>
-         * was not found.
-         */
-        for(;;)
+        if (useDefault)
         {
-            r = *(p_int*)l; /* Get the case value */
+            o1 = def_offs;
+        }
+        else
+        {
+            /* Setup the binary search:
+             *   l points roughly into the middle of the table,
+             *   d is 1/4 of the (assumed) total size of the table
+             */
+            i = type & SWITCH_START;
+            l = tabstart + off_tab[i];
+            d = (mp_int)((off_tab[i]+sizeof(p_int)) >> 1 & ~(sizeof(p_int)-1));
+              /* '+sizeof()' to make the off_tab[] value even and non-0 */
 
-            if (s < r)
+            /* Binary search for the value <s> in the table, starting at
+             * position <l> and first subdivision size <d>.
+             * The algorithm runs until <d> falls below the size of a case value
+             * (sizeof(p_int)).
+             *
+             * After the loop terminates, o1 will be the jump offset relative
+             * to the pc, which might be the 'default' offset if the value <s>
+             * was not found.
+             */
+            for(;;)
             {
+                r = *(p_int*)l; /* Get the case value */
 
-                /* --- s < r --- */
-
-                if (d < (mp_int)sizeof(p_int))
+                if (s < r)
                 {
-                    if (!d)
+
+                    /* --- s < r --- */
+
+                    if (d < (mp_int)sizeof(p_int))
                     {
-                        /* End of search: s not found.
-                         *
-                         * Set p2 to the offset matching <l> and retrieve
-                         * o0 and o1 from there.
-                         *
-                         * s might still be in a range, then <l>/<p2> point to
-                         * the entries for the upper bound.
-                         */
-                        p2 =   tabstart + tablen
-                             + ((p_int*)l - (p_int*)tabstart)*len;
-                        o0 = EXTRACT_UCHAR(p2-1);
-                        o1 = EXTRACT_UCHAR(p2);
-                        if (len > 1)
+                        if (!d)
                         {
-                            o0 += EXTRACT_UCHAR(p2-2) << 8;
-                            o1 = EXTRACT_UCHAR(p2+1) + (o1 << 8);
-                            if (len > 2)
+                            /* End of search: s not found.
+                             *
+                             * Set p2 to the offset matching <l> and retrieve
+                             * o0 and o1 from there.
+                             *
+                             * s might still be in a range, then <l>/<p2> point to
+                             * the entries for the upper bound.
+                             */
+                            p2 =   tabstart + tablen
+                                 + ((p_int*)l - (p_int*)tabstart)*len;
+                            o0 = EXTRACT_UCHAR(p2-1);
+                            o1 = EXTRACT_UCHAR(p2);
+                            if (len > 1)
                             {
-                                o0 += EXTRACT_UCHAR(p2-3) << 16;
-                                o1 = EXTRACT_UCHAR(p2+2) + (o1 << 8);
-                            }
-                        }
-                        /* Because the pre-table alignment area is in the
-                         * indexing underflow memory region, we can't make
-                         * useful predictions on the peeked o0 value in case
-                         * of underflow.
-                         */
-
-                        /* Test for a range */
-
-                        if (o0 <= 1 && l > tabstart)
-                        {
-                            /* No indexing underflow: test if s is in range */
-
-                            r = ((p_int*)l)[-1]; /* the lower bound */
-                            if (s >= r)
-                            {
-                                /* s is in the range */
-                                if (!o0)
+                                o0 += EXTRACT_UCHAR(p2-2) << 8;
+                                o1 = EXTRACT_UCHAR(p2+1) + (o1 << 8);
+                                if (len > 2)
                                 {
-                                    /* Look up the real jump offset */
-                                    l = pc + o1 + (s-r) * len;
-                                    o1 = 0;
-                                    i = len;
-                                    do {
-                                        o1 = (o1 << 8) + *l++;
-                                    } while (--i);
+                                    o0 += EXTRACT_UCHAR(p2-3) << 16;
+                                    o1 = EXTRACT_UCHAR(p2+2) + (o1 << 8);
+                                }
+                            }
+                            /* Because the pre-table alignment area is in the
+                             * indexing underflow memory region, we can't make
+                             * useful predictions on the peeked o0 value in case
+                             * of underflow.
+                             */
+
+                            /* Test for a range */
+
+                            if (o0 <= 1 && l > tabstart)
+                            {
+                                /* No indexing underflow: test if s is in range */
+
+                                r = ((p_int*)l)[-1]; /* the lower bound */
+                                if (s >= r)
+                                {
+                                    /* s is in the range */
+                                    if (!o0)
+                                    {
+                                        /* Look up the real jump offset */
+                                        l = pc + o1 + (s-r) * len;
+                                        o1 = 0;
+                                        i = len;
+                                        do {
+                                            o1 = (o1 << 8) + *l++;
+                                        } while (--i);
+                                        break;
+                                    }
+                                    /* o1 holds jump destination */
                                     break;
                                 }
-                                /* o1 holds jump destination */
-                                break;
+                                /* s is not in the range */
                             }
-                            /* s is not in the range */
-                        }
 
-                        /* <s> not found at all: use 'default' address */
-                        o1 = def_offs;
+                            /* <s> not found at all: use 'default' address */
+                            o1 = def_offs;
 
-                        /* o1 holds jump destination */
-                        break;
-                    } /* if (!d) */
-
-                    /* Here is 0 < d < sizeof(p_int).
-                     * Set d = 0 and finish the loop in the next
-                     * iteration.
-                     * TODO: Why the delay?
-                     */
-                    d = 0;
-                }
-                else
-                {
-                    /* Move <l> down and half the partition size <d>. */
-                    l -= d;
-                    d >>= 1;
-                }
-            }
-            else if (s > r)
-            {
-
-                /* --- s > r --- */
-
-                if (d < (mp_int)sizeof(p_int))
-                {
-                    if (!d)
-                    {
-                        /* End of search: s not found.
-                         *
-                         * Set p2 to the offset matching <l> and retrieve
-                         * o0 and o1 from there.
-                         *
-                         * s might still be in a range, then <l> points to
-                         * the entry of the lower bound, and <p2> is set to
-                         * the entry for the upper bound.
-                         */
-                        p2 = tabstart + tablen
-                             + (((p_int*)l - (p_int*)tabstart) + 1)*len;
-                        o0 = EXTRACT_UCHAR(p2-1);
-                        o1 = EXTRACT_UCHAR(p2);
-                        if (len > 1)
-                        {
-                            o0 += EXTRACT_UCHAR(p2-2) << 8;
-                            o1 = EXTRACT_UCHAR(p2+1) + (o1 << 8);
-                            if (len > 2)
-                            {
-                                o0 += EXTRACT_UCHAR(p2-3) << 16;
-                                o1 = EXTRACT_UCHAR(p2+2) + (o1 << 8);
-                            }
-                        }
-
-                        /* Test for a range */
-
-                        if (o0 <= 1)
-                        {
-                            /* It is a range. */
-
-                            if (s <= ((p_int*)l)[1])
-                            {
-                                /* s is in the range, and r is already correct
-                                 * (ie the upper bound)
-                                 */
-                                if (!o0)
-                                {
-                                    /* Lookup the real jump offset */
-                                    l = pc + o1 + (s-r) * len;
-                                    o1 = 0;
-                                    i = len;
-                                    do {
-                                        o1 = (o1 << 8) + *l++;
-                                    } while (--i);
-                                    break;
-                                }
-                                /* o1 holds jump destination */
-                                break;
-                            }
-                            /* s is not in the range */
-                        }
-
-                        /* <s> not found at all: use 'default' address */
-                        o1 = def_offs;
-
-                        /* o1 holds jump destination */
-                        break;
-                    } /* !d */
-
-                    /* Here is 0 < d < sizeof(p_int).
-                     * Set d = 0 and finish the loop in the next
-                     * iteration.
-                     * TODO: Why the delay?
-                     */
-                    d = 0;
-                }
-                else
-                {
-                    /* Move <l> up, and half the partition size <d>
-                     * If this would push l beyond the table, repeat the
-                     * steps 'move <l> down and half the partition size'
-                     * until <l> is within the table again.
-                     */
-
-                    l += d;
-                    while (l >= end_tab)
-                    {
-                        d >>= 1;
-                        if (d <= (mp_int)sizeof(p_int)/2)
-                        {
-                            /* We can't move l further - finish the loop */
-                            l -= sizeof(p_int);
-                            d = 0;
+                            /* o1 holds jump destination */
                             break;
-                        }
-                        l -= d;
-                    }
-                    d >>= 1;
-                }
-            }
-            else
-            {
-                /* --- s == r --- */
+                        } /* if (!d) */
 
-                /* End of search: s found.
-                 *
-                 * Set p2 to the offset matching <l> and retrieve
-                 * o0 and o1 from there.
-                 *
-                 * We don't distinguish between a singular case match
-                 * and a match with an upper range bound, but we have
-                 * to take extra steps in case <s> matched a lower range
-                 * bound. In that light, o0 need not be an exact value.
-                 */
-                p2 = tabstart + tablen + ((p_int*)l - (p_int*)tabstart)*len;
-                o0 = EXTRACT_UCHAR(p2-1);
-                o1 = EXTRACT_UCHAR(p2);
-                if (len > 1)
-                {
-                    o0 |= EXTRACT_UCHAR(p2-2);
-                    o1 = EXTRACT_UCHAR(p2+1) + (o1 << 8);
-                    if (len > 2)
-                    {
-                        o0 |= EXTRACT_UCHAR(p2-3);
-                        o1 = EXTRACT_UCHAR(p2+2) + (o1 << 8);
-                    }
-                }
-
-                /* Test if <s> matched the end of a range with a lookup table.
-                 */
-                /* TODO: Does this mean that the compiler never creates
-                 * TODO:: an ordinary range at the beginning of v[]?
-                 */
-                if (!o0 && l > tabstart)
-                {
-                    r = ((p_int*)l)[-1]; /* the lower bound */
-                    l = pc + o1 + (s-r) * len;
-                    o1 = 0;
-                    i = len;
-                    do
-                    {
-                        o1 = (o1 << 8) + *l++;
-                    } while (--i);
-                    /* o1 holds jump destination */
-                    break;
-                }
-
-                /* Test if <s> matched the start of a range */
-                if (o1 <= 1)
-                {
-                    /* Yup. Realign p2 and reget o1 */
-                    p2 += len;
-
-                    /* Set l to point to the jump offset */
-                    if (o1)
-                    {
-                        /* start of ordinary range */
-                        l = p2;
+                        /* Here is 0 < d < sizeof(p_int).
+                         * Set d = 0 and finish the loop in the next
+                         * iteration.
+                         * TODO: Why the delay?
+                         */
+                        d = 0;
                     }
                     else
                     {
-                        /* start of range with lookup table */
-                        i = len;
-                        do {
-                            o1 = (o1 << 8) + *p2++;
-                        } while (--i);
-                        l = pc + o1;
+                        /* Move <l> down and half the partition size <d>. */
+                        l -= d;
+                        d >>= 1;
+                    }
+                }
+                else if (s > r)
+                {
+
+                    /* --- s > r --- */
+
+                    if (d < (mp_int)sizeof(p_int))
+                    {
+                        if (!d)
+                        {
+                            /* End of search: s not found.
+                             *
+                             * Set p2 to the offset matching <l> and retrieve
+                             * o0 and o1 from there.
+                             *
+                             * s might still be in a range, then <l> points to
+                             * the entry of the lower bound, and <p2> is set to
+                             * the entry for the upper bound.
+                             */
+                            p2 = tabstart + tablen
+                                 + (((p_int*)l - (p_int*)tabstart) + 1)*len;
+                            o0 = EXTRACT_UCHAR(p2-1);
+                            o1 = EXTRACT_UCHAR(p2);
+                            if (len > 1)
+                            {
+                                o0 += EXTRACT_UCHAR(p2-2) << 8;
+                                o1 = EXTRACT_UCHAR(p2+1) + (o1 << 8);
+                                if (len > 2)
+                                {
+                                    o0 += EXTRACT_UCHAR(p2-3) << 16;
+                                    o1 = EXTRACT_UCHAR(p2+2) + (o1 << 8);
+                                }
+                            }
+
+                            /* Test for a range */
+
+                            if (o0 <= 1)
+                            {
+                                /* It is a range. */
+
+                                if (s <= ((p_int*)l)[1])
+                                {
+                                    /* s is in the range, and r is already correct
+                                     * (ie the upper bound)
+                                     */
+                                    if (!o0)
+                                    {
+                                        /* Lookup the real jump offset */
+                                        l = pc + o1 + (s-r) * len;
+                                        o1 = 0;
+                                        i = len;
+                                        do {
+                                            o1 = (o1 << 8) + *l++;
+                                        } while (--i);
+                                        break;
+                                    }
+                                    /* o1 holds jump destination */
+                                    break;
+                                }
+                                /* s is not in the range */
+                            }
+
+                            /* <s> not found at all: use 'default' address */
+                            o1 = def_offs;
+
+                            /* o1 holds jump destination */
+                            break;
+                        } /* !d */
+
+                        /* Here is 0 < d < sizeof(p_int).
+                         * Set d = 0 and finish the loop in the next
+                         * iteration.
+                         * TODO: Why the delay?
+                         */
+                        d = 0;
+                    }
+                    else
+                    {
+                        /* Move <l> up, and half the partition size <d>
+                         * If this would push l beyond the table, repeat the
+                         * steps 'move <l> down and half the partition size'
+                         * until <l> is within the table again.
+                         */
+
+                        l += d;
+                        while (l >= end_tab)
+                        {
+                            d >>= 1;
+                            if (d <= (mp_int)sizeof(p_int)/2)
+                            {
+                                /* We can't move l further - finish the loop */
+                                l -= sizeof(p_int);
+                                d = 0;
+                                break;
+                            }
+                            l -= d;
+                        }
+                        d >>= 1;
+                    }
+                }
+                else
+                {
+                    /* --- s == r --- */
+
+                    /* End of search: s found.
+                     *
+                     * Set p2 to the offset matching <l> and retrieve
+                     * o0 and o1 from there.
+                     *
+                     * We don't distinguish between a singular case match
+                     * and a match with an upper range bound, but we have
+                     * to take extra steps in case <s> matched a lower range
+                     * bound. In that light, o0 need not be an exact value.
+                     */
+                    p2 = tabstart + tablen + ((p_int*)l - (p_int*)tabstart)*len;
+                    o0 = EXTRACT_UCHAR(p2-1);
+                    o1 = EXTRACT_UCHAR(p2);
+                    if (len > 1)
+                    {
+                        o0 |= EXTRACT_UCHAR(p2-2);
+                        o1 = EXTRACT_UCHAR(p2+1) + (o1 << 8);
+                        if (len > 2)
+                        {
+                            o0 |= EXTRACT_UCHAR(p2-3);
+                            o1 = EXTRACT_UCHAR(p2+2) + (o1 << 8);
+                        }
                     }
 
-                    /* Get the jump offset from where <l> points */
-                    o1 = 0;
-                    i = len;
-                    do {
-                        o1 = (o1 << 8) + *l++;
-                    } while (--i);
+                    /* Test if <s> matched the end of a range with a lookup table.
+                     */
+                    /* TODO: Does this mean that the compiler never creates
+                     * TODO:: an ordinary range at the beginning of v[]?
+                     */
+                    if (!o0 && l > tabstart)
+                    {
+                        r = ((p_int*)l)[-1]; /* the lower bound */
+                        l = pc + o1 + (s-r) * len;
+                        o1 = 0;
+                        i = len;
+                        do
+                        {
+                            o1 = (o1 << 8) + *l++;
+                        } while (--i);
+                        /* o1 holds jump destination */
+                        break;
+                    }
 
-                    /* o1 holds jump destination */
+                    /* Test if <s> matched the start of a range */
+                    if (o1 <= 1)
+                    {
+                        /* Yup. Realign p2 and reget o1 */
+                        p2 += len;
+
+                        /* Set l to point to the jump offset */
+                        if (o1)
+                        {
+                            /* start of ordinary range */
+                            l = p2;
+                        }
+                        else
+                        {
+                            /* start of range with lookup table */
+                            i = len;
+                            do {
+                                o1 = (o1 << 8) + *p2++;
+                            } while (--i);
+                            l = pc + o1;
+                        }
+
+                        /* Get the jump offset from where <l> points */
+                        o1 = 0;
+                        i = len;
+                        do {
+                            o1 = (o1 << 8) + *l++;
+                        } while (--i);
+
+                        /* o1 holds jump destination */
+                        break;
+                    }
+
+                    /* At this point, s was a match with a singular case, and
+                     * o1 already holds the jump destination.
+                     */
                     break;
                 }
-
-                /* At this point, s was a match with a singular case, and
-                 * o1 already holds the jump destination.
-                 */
-                break;
-            }
-        } /* binary search */
+            } /* binary search */
+        } /* if (useDefault) */
 
         /* o1 is now the offset to jump to. */
         pc += o1;

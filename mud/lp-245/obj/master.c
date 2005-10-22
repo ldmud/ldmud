@@ -1473,7 +1473,6 @@ mixed valid_read  (string path, string euid, string fun, object caller)
 {
     string user;
 
-debug_message(sprintf("valid_read fun %O path %O\n", fun, path));
     switch ( fun ) {
         case "restore_object": return 1;
         case "ed_start":

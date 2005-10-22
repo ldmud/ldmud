@@ -317,6 +317,9 @@ make_new_tabled (const char * const pTxt, size_t size, int idx MTRACE_DECL)
     string->str = sdata;
     string->info.tabled = MY_TRUE;
     string->info.ref = 1;
+      /* An uninitialized memory read at this point is ok: it's because
+       * the bitfield is initialized in parts.
+       */
 
     mstr_added++;
     if (NULL == stringtable[idx])
@@ -377,6 +380,9 @@ mstring_alloc_string (size_t iSize MTRACE_DECL)
     string->str = sdata;
     string->info.tabled = MY_FALSE;
     string->info.ref = 1;
+      /* An uninitialized memory read at this point is ok: it's because
+       * the bitfield is initialized in parts.
+       */
 
     {
         size_t msize;
@@ -634,6 +640,9 @@ mstring_table_inplace (string_t * pStr MTRACE_DECL)
         string->str = pStr->str;
         string->info.tabled = MY_TRUE;
         string->info.ref = 1;
+          /* An uninitialized memory read at this point is ok: it's because
+           * the bitfield is initialized in parts.
+           */
 
         mstr_added++;
         if (NULL == stringtable[idx])
