@@ -1,3 +1,4 @@
+#include "input_to.h"
 #include "log.h"
 #include "living.h"
 
@@ -53,7 +54,7 @@ static logon() {
     cat("/WELCOME");
     write("Version: " + version() + "\n");
     write("What is your name: ");
-    input_to("logon2");
+    input_to("logon2", INPUT_PROMPT, "What is your name: ");
     call_out("time_out", 120);
     return 1;
 }
@@ -114,8 +115,7 @@ static logon2(str) {
     }
     str = lower_case(str);
     if (!valid_name(str)) {
-        input_to("logon2");
-        write("Give name again: ");
+        input_to("logon2", INPUT_PROMPT, "Give name again: ");
         return;
     }
     if (restore_object("banish/" + str)) {

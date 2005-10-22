@@ -1551,6 +1551,9 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 left -= (cp - last_cp);
             }
         } while (cp && left > 0);
+
+        if (left <= 0)
+            cp = NULL;
     }
     else
         cp = NULL;
@@ -1572,7 +1575,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
             parts[0] = instr;
             lens = CALLOCATE(1, p_int);
             lens[0] = mstrsize(text);
-            savestr = NULL;  /* should be NULL anyway */
+            savestr = NULL;  /* should be NULL already anyway */
             no_keys = MY_TRUE;
         }
         else
@@ -1683,6 +1686,8 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                     left--;
                 }
             } while (cp && left > 0);
+            if (left <= 0)
+                cp = NULL;
 
             if (cp)
             {
@@ -1703,7 +1708,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
         if (*instr)
         {
             parts[num] = instr;
-            lens[num] = left;
+            lens[num] = strlen(instr); /* Note: left is 0 here */
             num++;
         }
     } /* if (delimiter found or not) */

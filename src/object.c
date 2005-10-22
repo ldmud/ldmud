@@ -6517,6 +6517,7 @@ f_restore_object (svalue_t *sp)
     int restored_version; /* Formatversion of the saved data */
     char *name;      /* Full name of the file to read */
     char *file;      /* Filename passed, NULL if restoring from a string */
+    int   lineno;    /* Line number in file, for error messages */
     string_t *var;
     char *buff;      /* Current line read from the savefile
                       * resp. a copy of the string passed.
@@ -6548,6 +6549,7 @@ f_restore_object (svalue_t *sp)
     name = NULL;
     file = NULL;
     f = NULL;
+    lineno = 0;
     if (get_txt(sp->u.str)[0] == '#')
     {
         /* We need a copy of the value string because we're
@@ -6693,6 +6695,7 @@ f_restore_object (svalue_t *sp)
         if (file)
         {
             /* Get the next line from the text */
+            lineno++;
             if (fgets(buff, (int)st.st_size + 1, f) == NULL)
                 break;
             cur = buff;
@@ -6737,8 +6740,13 @@ f_restore_object (svalue_t *sp)
 
             free_shared_restored_values();
             xfree(buff);
-            error("Illegal format (version line) when restoring %s.\n"
-                  , file ? name : get_txt(current_object->name));
+            if (file)
+                error("Illegal format (version line) when restoring %s "
+                      "from %s line %d.\n"
+                      , get_txt(current_object->name), name, lineno);
+            else
+                error("Illegal format (version line) when restoring %s.\n"
+                      , get_txt(current_object->name));
             /* NOTREACHED */
             return sp;
         }
@@ -6815,8 +6823,13 @@ f_restore_object (svalue_t *sp)
                             free_svalue(&tmp->v);
                         while (NULL != (tmp = tmp->next));
                     }
-                    error("Stack overflow in restore_object('%s')\n"
-                         , file ? name : get_txt(current_object->name));
+                    if (file)
+                        error("Stack overflow when restoring %s "
+                              "from %s line %d.\n"
+                              , get_txt(current_object->name), name, lineno);
+                    else
+                        error("Stack overflow when restoring %s.\n"
+                              , get_txt(current_object->name));
                     /* NOTREACHED */
                     return sp;
                 }
@@ -6855,8 +6868,13 @@ f_restore_object (svalue_t *sp)
             }
             free_shared_restored_values();
             xfree(buff);
-            error("Illegal format (value string) when restoring %s.\n"
-                 , file ? name : get_txt(current_object->name));
+            if (file)
+                error("Illegal format (value string) when restoring %s "
+                      "from %s line %d.\n"
+                      , get_txt(current_object->name), name, lineno);
+            else
+                error("Illegal format (value string) when restoring %s.\n"
+                      , get_txt(current_object->name));
             /* NOTREACHED */
             return sp;
         }
