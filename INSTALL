@@ -164,10 +164,9 @@ mySQL
 
   Before you compile the driver, you have to add the username and password
   of the Mud user to the driver (if you haven't done so already, now would
-  be a good time to set up this user in the mySQL database).
-  Enter this username and password in the file pkg-mysql.c, function
-  mysql_real_connect(), and compile the driver (the username and
-  password are built into the driver for security reasons).
+  be a good time to set up this user in the mySQL database).  You will then
+  need to modify your mudlib to use this username and password in the
+  db_connect() call(s).
   If you chose to not create either a username and/or a password,
   leave the corresponding entry at 0.
 

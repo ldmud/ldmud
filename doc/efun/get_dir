@@ -75,8 +75,8 @@ EXAMPLES
                                          name, its size and its modification
                                          date, sorted by names, for example
                                          ({
-                                             "sword.c", 1283, 998153903,
                                              "axe.c"  ,  927, 994539583,
+                                             "sword.c", 1283, 998153903,
                                              }).
 
         get_dir("/obj/sword.c", GETDIR_NAMES|GETDIR_PATH)

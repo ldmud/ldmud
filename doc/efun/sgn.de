@@ -1,8 +1,8 @@
 SYNOPSIS
         int sgn (int|float arg)
 
-DESCRIPTION
-        Return the sign of the argument.
+BESCHREIBUNG
+        Liefert das Vorzeichen des Argumentes.
 
         arg  sgn(arg)
         --------------
@@ -10,8 +10,8 @@ DESCRIPTION
           0   0
         < 0  -1
 
-HISTORY
-        Introduced in LDMud 3.2.9.
+AENDERUNGEN
+        Eingefuehrt in LDMud 3.2.9.
 
-SEE ALSO
+SIEHE AUCH
         abs(E)

@@ -148,16 +148,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 179
+  SETVERFLAGS += d 180
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.179
+  VSTRING = 3.3.0-pre.180
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 179
+  SETVERFLAGS += d 180
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.179
+  VSTRING = 3.3.0-dev.180
 endif
 
 else
@@ -165,12 +165,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 179
+SETVERFLAGS = -app 3 3 180
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.179
+  VSTRING = 3.3.180
 
 endif
 
@@ -499,9 +499,9 @@ $(OBJ)/comm.o : util/erq/erq.h ../mudlib/sys/input_to.h \
     access_check.h comm.h telnet.h my-alloca.h typedefs.h driver.h \
     strfuns.h instrs.h config.h port.h hosts/unix.h hosts/be/be.h machine.h
 
-$(OBJ)/dumpstat.o : svalue.h smalloc.h stdstrings.h simulate.h ptrtable.h \
-    object.h mstrings.h mapping.h filestat.h exec.h closure.h array.h \
-    dumpstat.h typedefs.h driver.h strfuns.h sent.h instrs.h port.h \
+$(OBJ)/dumpstat.o : xalloc.h svalue.h smalloc.h stdstrings.h simulate.h \
+    ptrtable.h object.h mstrings.h mapping.h filestat.h exec.h closure.h \
+    array.h dumpstat.h typedefs.h driver.h strfuns.h sent.h instrs.h port.h \
     config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/ed.o : xalloc.h svalue.h stdstrings.h simulate.h rxcache.h object.h \

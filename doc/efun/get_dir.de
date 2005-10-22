@@ -52,7 +52,7 @@ BESCHREIBUNG
         Die Eintraege in der Bitmaske koennen miteinander kombiniert
         werden.
 
-BEISPIELE:
+BEISPIELE
         Funktion                         Rueckgabewert
         -------------------------------------------------------------------
         get_dir("/obj/.")                Alle Dateien, die im Verzeichnis
@@ -86,8 +86,8 @@ BEISPIELE:
                                          Groesse und den Zeitpunkt der
                                          letzten Aenderung enthaelt, z.B.
                                          ({
-                                             "schwert.c", 1283, 998153903,
                                              "axt.c"    ,  927, 994539583,
+                                             "schwert.c", 1283, 998153903,
                                              }).
 
         get_dir("/obj/schwert.c", GETDIR_NAMES|GETDIR_PATH)
@@ -105,8 +105,8 @@ BEISPIELE:
             ({ "axt.c"    ,  927, 994539583 }),
             }).
 
-AENDERUNGEN:
+AENDERUNGEN
         LDMud 3.2.9: GETDIR_PATH eingefuehrt.
 
-VERWEISE:
+SIEHE AUCH
         cat(E), mkdir(E), rmdir(E), file_size(E)

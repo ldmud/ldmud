@@ -651,6 +651,9 @@ error (const char *fmt, ...)
     string_t *malloced_file = NULL;  /* copy of program name */
     string_t *malloced_name = NULL;  /* copy of the object name */
     char      fixed_fmt[10000];
+      /* Note: When changing this buffer, also change the HEAP_STACK_GAP
+       * limit in xalloc.c!
+       */
     mp_int    line_number = 0;
     va_list   va;
 

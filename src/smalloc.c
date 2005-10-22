@@ -628,6 +628,8 @@ smalloc (size_t size
     size_t orig_size = size;
 #endif
 
+    assert_stack_gap();
+
     smalloc_size = size;
 
     if (size == 0)
@@ -958,6 +960,8 @@ xfree (POINTER ptr)
     if (!ptr)
         return;
 
+    assert_stack_gap();
+
     /* Get the real block address and size */
     block = (word_t *) ptr;
     block -= OVERHEAD;
@@ -1217,8 +1221,9 @@ remove_from_free_list (word_t *ptr)
               "magic match failed: expected %lx, "
               "found %lx\n"
              , ptr
+             , (unsigned long)LFMAGIC
              , (unsigned long)ptr[M_MAGIC]
-             , (unsigned long)LFMAGIC);
+             );
 #endif
     fake((do_check_avl(),"remove_from_free_list called"));
     p = (struct free_block *)(ptr+OVERHEAD);
@@ -1791,7 +1796,7 @@ remove_from_free_list (word_t *ptr)
 #ifdef MALLOC_TRACE
    if (ptr[M_MAGIC] != LFMAGIC)
        fatal("remove_from_free_list: block %p magic match failed: "
-             "expected %lx, found %lx\n", ptr, ptr[M_MAGIC], LFMAGIC);
+             "expected %lx, found %lx\n", ptr, LFMAGIC, ptr[M_MAGIC]);
 #endif
    count_back(large_free_stat, *ptr & M_MASK);
 
@@ -2387,7 +2392,9 @@ large_free (char *ptr)
               "expected %lx, found %lx\n"
              , ptr, p
              , (unsigned long)(size * SINT)
-             , (unsigned long)p[M_MAGIC], (unsigned long)LAMAGIC);
+             , (unsigned long)LAMAGIC
+             , (unsigned long)p[M_MAGIC]
+             );
 #endif
 
     /* If the next block is free, coagulate */
@@ -2446,6 +2453,7 @@ esbrk (word_t size)
         *heap_start = PREV_BLOCK;
         fake("Allocated little fake block");
         count_up(large_wasted_stat, SINT);
+        assert_stack_gap();
     }
 
     /* Get the new block */
@@ -2467,6 +2475,7 @@ esbrk (word_t size)
     block = malloc(size);
     if (!block)
         return NULL;
+    assert_stack_gap();
 
     p = (word_t *)(block + size) - 1;
 

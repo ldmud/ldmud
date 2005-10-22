@@ -5039,6 +5039,8 @@ save_svalue (svalue_t *v, char delimiter, Bool writable)
 {
     Bool rc = MY_TRUE;
 
+    assert_stack_gap();
+
     switch(v->type)
     {
     case T_STRING:
@@ -6104,6 +6106,8 @@ restore_svalue (svalue_t *svp, char **pt, char delimiter)
 
 {
     char *cp;
+
+    assert_stack_gap();
 
     switch( *(cp = *pt) )
     {

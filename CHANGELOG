@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Mar-2002 (Lars Duening)  (3.3.180)
+    - (xalloc, smalloc.c interpret.c, efuns.c, object.c) Added check
+        to prevent the stack from growing into the heap.
+    - (smalloc.c) Some expected/found magic word logs were reversed.
+    - (doc/efun) Pulami provided a whole bunch of german translations.
+    - (efuns.c) to_int() on closures didn't work as advertised
+        (reported by Pulami)
+
 06-Mar-2002 (Lars Duening)  (3.3.179)
     - (simulate, interpret.c, gcollect.c) With CHECK_OBJECT_REF, the
         driver continually checks the consistency of the list of

@@ -828,6 +828,118 @@ In den logfiles taucht aber nichts mehr auf..
 dafire
 
 ----------
+Date: Thu, 7 Mar 2002 17:40:26 +0000 (GMT)
+From: <pixie@loki.cgc.ns.ca>
+Subject: Re: object reference counts
+
+Here's the backtrace from dev 412.  Attached is the log.
+
+(gdb) backtrace full
+#0  0x973c4 in fatal (
+    fmt=0xc60b0 "DEBUG: Obj %p '%s': ref %ld, flags %x, sent %p; shadow
+ref %ld,
+ flags %x, sent %p\n") at simulate.c:590
+        va = 0xc6
+        ts = 0x0
+        in_fatal = 1
+#1  0x99910 in check_object_shadow (ob=0x7444fc, sh=0x647a98)
+    at simulate.c:2406
+No locals.
+#2  0x99974 in check_all_object_shadows () at simulate.c:2428
+        sh = (object_shadow_t *) 0x647a98
+        ob = (object_t *) 0x7444fc
+#3  0x4467c in eval_instruction (
+    first_instruction=0x2d1da7 "p$\003p2T\001\026\023\aV\004\004\003MX",
+    initial_sp=0x16bc00) at interpret.c:6116
+        pc = 0x2d1da7 "p$\003p2T\001\026\023\aV\004\004\003MX"
+        fp = (svalue_t *) 0xf9b10
+        sp = (svalue_t *) 0xf9b08
+        num_arg = 2958888
+        instruction = -14429776
+        expected_stack = (svalue_t *) 0xff23d1b0
+#4  0x65904 in apply_low (fun=0x101810 "", ob=0x3019b0, num_arg=1,
+    b_ign_prot=1) at interpret.c:20696
+        funstart = 0x2d1da5 ""
+        fx = 2956709
+        progp = (program_t *) 0xfd800
+        save_csp = (struct control_stack *) 0x101810
+        ix = 1729
+#5  0x65ae8 in sapply_int (fun=0x1707b0 "notify_shutdown", ob=0x3019b0,
+    num_arg=1, b_find_static=1) at interpret.c:20808
+        expected_sp = (svalue_t *) 0xf9b08
+#6  0x66058 in apply_master_ob (fun=0x1707b0 "notify_shutdown", num_arg=1)
+    at interpret.c:21071
+        eval_cost_reserve = 512
+        reserve_used = 0
+        error_recovery_info = {rt = {last = 0xdd5cc, type = 2}, con =
+{text = {
+      0, -4264608, 417768, -4264424, 619776, 0, 0, 0, 768, 43062906, 0,
+      -14882092}}}
+        save_sp = (svalue_t *) 0xf9b10
+        save_csp = (struct control_stack *) 0x1017d0
+        result = (svalue_t *) 0x1707b0
+#7  0x97508 in fatal (
+    fmt=0xc60b0 "DEBUG: Obj %p '%s': ref %ld, flags %x, sent %p; shadow
+ref %ld,
+ flags %x, sent %p\n") at simulate.c:648
+        va = 0xffbeeed0
+        ts = 0xc57d0 "%s LDMud aborting on fatal error.\n"
+        in_fatal = 1
+#8  0x99910 in check_object_shadow (ob=0xdee30, sh=0x647a98) at
+simulate.c:2406
+No locals.
+#9  0x99cd4 in remove_destructed_objects () at simulate.c:2606
+        victim = (object_t *) 0xdd400
+        ob = (object_t *) 0x7444fc
+        sh = (object_shadow_t *) 0x647a98
+        prev = (object_shadow_t *) 0x0
+#10 0x1a1b4 in backend () at backend.c:343
+        buff =
+"quit\000e\000pmud.log3\000\000\005\220)\23050\0002\000>|)*\
+000\000\000\001\000\000\000(:\023\\(w\000\000\000\000:\005\220\000\000\020\2
+26/usr/sh4246lib/zoneinfo/GMT\000\000\000\000\000\000\000\000\026\000\017\233\02
+0\000\000\000\000\000\000\000\005\000\000\000\000\000\000\000I,L\0
+00+\b", '\000' <repeats 28 times>,
+"/usr/share/lib/zon\000\004nfo/GMT\000*r\22
+4", '\000' <repeats 24 times>, "\030\023\004p"...
+#11 0x73848 in main (argc=0, argv=0xffbefd9c) at main.c:428
+        i = 904192
+        set = {__sigbits = {8192, 0, 0, 0}}
+(gdb)
+
+
+
+Date: Wed, 6 Mar 2002 23:51:34 +0000 (GMT)
+From: <pixie@loki.cgc.ns.ca>
+Subject: 411 crash
+
+Just crashed again.  It happened just after I logged out.  Here's the
+backtrace.  Attached is the log file.
+
+(gdb) backtrace full
+#0  0xff1cee8c in ?? ()
+No symbol table info available.
+#1  0x7be1c in _free_object (ob=0x540014, file=0xc5da8 "simulate.c",
+line=2465)
+    at object.c:267
+No locals.
+#2  0x99934 in remove_object (ob=0x540014) at simulate.c:2465
+        sent = (sentence_t *) 0xc5da8
+#3  0x999d0 in handle_newly_destructed_objects () at simulate.c:2498
+No locals.
+#4  0x1a1ac in backend () at backend.c:339
+        buff = "quit\000/lpmud.log0\000.ca 6789cider\000what's causing the
+crashes.\000at'll\000usr/sh4246lib/zonein
+fo/GMT\000\000\000\000\000\000\000\000\026\000\017\227p\000\000\000\000\000\000\000\005\000\000\000\000\
+000\000\000I,L\000+h", '\000' <repeats 28 times>,
+"/usr/share/lib/zon\000\004nfo/GMT\000*r\224", '\000' <repeats
+ 24 times>, "\030\023\004p"...
+#5  0x73760 in main (argc=0, argv=0xffbefd9c) at main.c:428
+        i = 903168
+        set = {__sigbits = {8192, 0, 0, 0}}
+(gdb)
+
+
 Date: Wed, 6 Mar 2002 14:15:50 +0000 (GMT)
 Subject: 410 backtrace
 In-Reply-To: <00039b7cd93c602e_mailit@localhost>

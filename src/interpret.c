@@ -912,7 +912,18 @@ free_svalue (svalue_t *v)
  */
 
 {
-    switch (v->type)
+    ph_int type = v->type;
+
+    v->type = T_INVALID;
+      /* If freeing the value throws an error, it is most likely that
+       * we ran out of stack. To avoid the error handling running
+       * out of stack on the same value again, we mask it before we free
+       * it - at the risk of leaking memory.
+       */
+
+    assert_stack_gap();
+
+    switch (type)
     {
     default:
         fatal("(free_svalue) Illegal svalue %p type %d\n", v, v->type);

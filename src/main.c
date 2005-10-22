@@ -193,6 +193,7 @@ main (int argc, char **argv)
 
     /* Initialisations */
 
+    get_stack_direction();
     init_interpret();
     rx_init();
 

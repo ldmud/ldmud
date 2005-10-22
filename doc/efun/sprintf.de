@@ -107,7 +107,7 @@ ERWEITERTE MODI
           sprintf("%@s", ({"aaa","bbb"})) ist somit dasselbe wie
           sprintf("%s%s", "aaa", "bbb"). Allerdings passt es sich
           immer an die Elementzahl der uebergebenden Arrays an.
-          Dies ist nuetzlich um Ergebnisse von map_array() oder aehnlich
+          Dies ist nuetzlich um Ergebnisse von map() oder aehnlich
           auszugeben.
           sprintf("%@s", map_objects(all_inventory(), "short"));
           Der Argumenttyp-Kennzeichner muss hierbei immer dem Typen

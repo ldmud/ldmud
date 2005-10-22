@@ -4471,7 +4471,8 @@ f_to_int (svalue_t *sp)
  *
  * Floats are truncated to integer values, strings with leadings
  * digits are converted to integers up to the first non-digit.
- * variable-closures are converted into their function index.
+ * variable- and lfun-closures are converted into their variable
+ * resp.function index.
  * Integers are just returned.
  */
 
@@ -4501,8 +4502,10 @@ f_to_int (svalue_t *sp)
         break;
 
     case T_CLOSURE:
-        if (sp->x.closure_type != CLOSURE_IDENTIFIER)
-            error("Bad arg 1 to to_int(): not a lfun closure.\n");
+        if (sp->x.closure_type != CLOSURE_IDENTIFIER
+         && sp->x.closure_type != CLOSURE_LFUN
+           )
+            error("Bad arg 1 to to_int(): not a lfun or variable closure.\n");
         n = sp->u.lambda->function.index;
         free_closure(sp);
         break;
@@ -5152,6 +5155,7 @@ copy_svalue (svalue_t *dest, svalue_t *src
  */
 
 {
+    assert_stack_gap();
     switch (src->type)
     {
     default:

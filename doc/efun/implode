@@ -5,12 +5,19 @@ DESCRIPTION
         Concatenate all strings found in array arr, with the string
         del between each element. Only strings are used from the array.
 
-EXAMPLE
-        string str;
-        str = implode( ({"foo", "bar", ""}), "*");
-        
-        str will now look like "foo*bar*". This can be used as a
-        search&replace function of strings.
+EXAMPLES
+        function                                        returns
+        -------------------------------------------------------------------
+        implode(({ "foo", "bar", "" }), "*")            "foo*bar*"
+        implode(({ "a", 2, this_object(), "c" }), "b")  "abc"
+
+        Together with explode() this can be used as a search and replace
+        function of strings:
+        implode(explode("a short text", " "), "_")      "a_short_text"
+
+        But nowadays You can also use
+        regreplace("a short text", " ", "_", 1)
+        instead.
 
 SEE ALSO
-        explode(E)
+        explode(E), regreplace(E)

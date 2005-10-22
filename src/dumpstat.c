@@ -25,6 +25,7 @@
 #include "stdstrings.h"
 #include "smalloc.h" /* malloced_size() */
 #include "svalue.h"
+#include "xalloc.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -81,6 +82,8 @@ svalue_size (svalue_t *v, mp_int * pTotal)
 
 {
     mp_int i, composite, total, overhead;
+
+    assert_stack_gap();
 
     *pTotal = 0;
 

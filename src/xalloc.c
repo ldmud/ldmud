@@ -23,6 +23,15 @@
 
 /*-------------------------------------------------------------------------*/
 
+/* Minimum boundary between stack and heap, should be sufficient for
+ * error handling (which needs about 10..15KByte).
+ * If the gap falls below this value, an error is generated and the
+ * gap is no longer checked except for true overlap with the heap.
+ */
+
+#define HEAP_STACK_GAP (20480)
+
+
 /* -- Global Variables/Arguments dealing with memory -- */
 
 Bool out_of_memory = MY_FALSE;              /* True: we are out of memory */
@@ -40,6 +49,11 @@ mp_int min_malloced       = MIN_MALLOCED;           /* Allocation limits */
 mp_int min_small_malloced = MIN_SMALL_MALLOCED;     /* Allocation limits */
 mp_int max_malloced       = MAX_MALLOCED; 
 
+int stack_direction = 0; /*  0: Unknown stack behaviour
+                          * +1: Stack grows upward
+                          * -1: Stack grows downward
+                          */
+
 /*-------------------------------------------------------------------------*/
 
 /* Include the allocator source */
@@ -53,6 +67,8 @@ mp_int max_malloced       = MAX_MALLOCED;
 /* ======================================================================= */
 
 #ifdef MALLOC_sysmalloc
+
+static char * heap_end = NULL;
 
 /*-------------------------------------------------------------------------*/
 POINTER
@@ -117,6 +133,20 @@ xalloc (size_t size)
         (void)dump_trace(MY_FALSE, NULL);
         exit(2);
     }
+
+    if (stack_direction > 0)
+    {
+        if (heap_end == NULL || heap_end < (char*)p)
+            heap_end = p;
+        assert_stack_gap();
+    }
+    else if (stack_direction < 0)
+    {
+        if (heap_end == NULL || heap_end > (char*)p + size)
+            heap_end = p;
+        assert_stack_gap();
+    }
+
     return p;
 } /* xalloc() */
 
@@ -147,6 +177,83 @@ dump_malloc_trace (int d, void *adr)
 #endif /* MALLOC_sysmalloc */
 
 /* ======================================================================= */
+
+/*-------------------------------------------------------------------------*/
+void
+get_stack_direction (void)
+
+/* Find the direction of the stackgrowth and store the result (+1 or -1)
+ * into the global stack_direction.
+ */
+
+{
+    static char *addr = NULL;  /* address of first `local', once known */
+    char         local;        /* to get stack address */
+
+    if (addr == NULL)  /* initial call */
+    {
+        addr = &local;
+        get_stack_direction ();  /* recurse once */
+    }
+    else  /* second entry */
+    if (&local > addr)
+        stack_direction = 1;    /* stack grew upward */
+    else
+        stack_direction = -1;   /* stack grew downward */
+} /* get_stack_direction() */
+
+/*-------------------------------------------------------------------------*/
+void
+assert_stack_gap (void)
+
+/* Test if the stack is far enough away from the heap area and throw
+ * an error if not.
+ */
+
+{
+    static enum { Normal, Error, Fatal } condition = Normal;
+    ptrdiff_t gap;
+    
+    if (stack_direction == 0 || condition == Fatal || heap_end == NULL)
+        return;
+
+    if (stack_direction < 0)
+        gap = (char *)&gap - (char *)heap_end;
+    else
+        gap = (char *)heap_end - (char *)&gap;
+
+    /* If the gap is big enough, mark that condition and return */
+    if (gap >= HEAP_STACK_GAP && gap > 0)
+    {
+        condition = Normal;
+        return;
+    }
+
+    /* If the gap is too small, but not yet fatal, mark the condition */
+    if (gap > 0)
+    {
+        /* Throw an error only if the condition was normal before,
+         * otherwise the error handling would again get an error.
+         */
+        if (condition == Normal)
+        {
+            condition = Error;
+            error("Out of memory: Gap between stack and heap: %ld.\n"
+                 , (long)gap);
+            /* NOTREACHED */
+        }
+        return;
+    }
+
+    /* Stack and Heap overlap: irrecoverable failure */
+    if (condition != Fatal)
+    {
+        condition = Fatal;
+        fatal("Out of memory: Stack overlaps heap by %ld.\n"
+             , -((long)gap));
+        /* NOTREACHED */
+    }
+} /* assert_stack_gap() */
 
 /*-------------------------------------------------------------------------*/
 void

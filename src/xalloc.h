@@ -75,6 +75,7 @@ extern mp_int reserved_system_size;
 extern mp_int min_malloced;
 extern mp_int min_small_malloced;
 extern mp_int max_malloced;
+extern int stack_direction;
 
 
 /* --- SMalloc --- */
@@ -149,6 +150,8 @@ extern POINTER xalloc(size_t size);
 extern void dump_lpc_trace (int d, void *p);
 extern void dump_malloc_trace (int d, void *adr);
 
+extern void get_stack_direction (void);
+extern void assert_stack_gap(void);
 extern void reserve_memory (void);
 
 #ifndef string_copy
