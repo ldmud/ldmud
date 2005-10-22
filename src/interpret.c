@@ -13661,13 +13661,21 @@ again:
          *
          *   int sizeof(mixed arr)
          *
-         * Returns the number of elements of an array or or the number of
-         * keys in a mapping.
+         * Returns the number of elements of an array, the number of
+         * keys in a mapping, or the number of characters in a string.
          *
          * For scalar values (like integers), 0 is returned.
          */
 
         long i;
+
+        if (sp->type == T_STRING)
+        {
+            i = (long)mstrsize(sp->u.str);
+            free_svalue(sp);
+            put_number(sp, i);
+            break;
+        }
 
         if (sp->type == T_POINTER)
         {

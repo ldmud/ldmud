@@ -8379,7 +8379,10 @@ function_call:
 
                   if (ix < 0)
                   {
-                      yyerror("function not defined by inheritance as specified");
+                      if (ix < -1)
+                          yyerror("wildcarded call to inherited function can't pass arguments");
+                      else
+                          yyerror("function not defined by inheritance as specified");
                       $$.type = TYPE_ANY;
                       if ($1.super)
                           yfree($1.super);
@@ -10217,8 +10220,8 @@ insert_inherited (char *super_name, string_t *real_name
  * the program pointer and the function_t information. Also compile
  * the function call(s).
  *
- * Result is -1 if the function wasn't found, otherwise the
- * function index.
+ * Result is -1 if the function wasn't found, -2 if it was a wildcarded
+ * supercall to a function with arguments, otherwise the function index.
  *
  * <super_name> can be an empty string, the (partial) name of one
  * of the inherits, or a wildcarded name (and no args). In the latter
@@ -10382,7 +10385,7 @@ insert_inherited (char *super_name, string_t *real_name
     } /* if (foundp) */
 
     /* Inherit not found, maybe it's a wildcarded call */
-    if (strpbrk(super_name, "*?") && !num_arg)
+    if (strpbrk(super_name, "*?"))
     {
         Bool *was_called;  /* Flags which inh. fun has been called already */
         inherit_t *ip0;
@@ -10390,6 +10393,10 @@ insert_inherited (char *super_name, string_t *real_name
         int ip_index;
         int first_index;
         short i;
+
+        /* Wildcarded supercalls only work without arguments */
+        if (num_arg)
+            return -2;
 
         *super_p = NULL;
         num_inherits = INHERIT_COUNT;

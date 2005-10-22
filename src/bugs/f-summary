@@ -142,6 +142,7 @@ p-000316: Binary codefile support
 f-000906: Revamp the bytecode design
 f-001102: Separate Programs from Blueprints
 f-010726: Add location to defined identifiers
+f-010801: Proper inline compilation of inline closures
 
 
 Runtime

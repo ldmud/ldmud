@@ -1,0 +1,32 @@
+Short: Proper inline compilation of inline closures
+From: Lars
+Date: 2001-08-01
+Type: Feature
+Status: New
+
+Instead of recognizing an inline closure in the lexer, it could be compiled
+right when it is encountered. The resulting code would look like this:
+
+The LPC code
+
+  void fun() {
+      ...
+      (: 2 + 3 :)
+      ...
+  }
+
+would be compiled as
+
+      FUNCTION "fun"
+      ...
+      JUMP cont
+      FUNCTION "inline_closure_..."
+      ...
+      RETURN ** of inline closure
+cont: ...
+      RETURN ** of fun()
+
+To do this, the function_body needs to return somehow if the last statement
+was terminated with a ';' or not. To do this it might become necessary to
+allow ':)' as alternative to ';' as expression terminator - the expression
+production would record the fact in a flag.

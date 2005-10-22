@@ -45,7 +45,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-24-Jul-2001 (Lars Duening) -- upcoming Release 3.2.9
+01-Aug-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -94,6 +94,7 @@ For a detailed list of all changes see the file CHANGELOG.
            empty string matched once too often at string end.
        + sin(), cos(), tan(), atan(), atan2(), log(), exp(), sqrt(), pow():
            Integers are accepted as arguments, too.
+       + sizeof(): Now also returns the length of strings.
        + terminal_colour(): Colour keys can now be mapped using a closure.
        + add_verb(), add_xverb(), efun308(), file_name(), map_array(),
          filter_array(), filter_mapping(), map_mapping(), m_sizeof(),

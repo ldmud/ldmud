@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+01-Aug-2001 (Lars Duening)  (3.3.82)
+    - (prolang.y) The error message for the case that a wildcarded super
+         call tried to pass arguments was confusing (reported by Gimli).
+    - (interpret.c) Efun sizeof() can be used on strings (suggested by Niels).
+
 31-Jul-2001 (Lars Duening)  (3.3.81)
     - (pkg-mysql.c) Fixed a syntax error. It sucks that I can't compile
          this file at home, doesn't it?
