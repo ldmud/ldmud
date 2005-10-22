@@ -45,7 +45,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-28-Sep-2001 (Lars Duening) -- upcoming Release 3.2.9
+03-Oct-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -249,6 +249,8 @@ For a detailed list of all changes see the file CHANGELOG.
            weren't caught, and instead silently increased the length of
            the string/array. As a special case, assignments to a range
            [i..i-1] which merely insert elements are still allowed.
+       + Bugfix: Prototypes could modify the definition of inherited
+           functions in strange ways.
 
     - Runtime:
        + Attempts to set a single string character to 0 now raise

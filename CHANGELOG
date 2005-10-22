@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Oct-2001 (Lars Duening)  (3.3.106)
+    - (prolang.y) Prototypes no longer modify the definition of inherited
+        functions in strange ways (reported by Fiona).
+
 01-Oct-2001 (Lars Duening)  (3.3.105)
     - (prolang.y) The check for redefinition of 'nomask' functions no longer
         worked (reported by Gimli).

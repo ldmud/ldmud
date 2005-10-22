@@ -22,12 +22,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 105)
-(Parent-Version lpmud 3-3 104)
-(Version-Log "The check for redefinition of 'nomask' functions no longer worked.")
+(Project-Version lpmud 3-3 106)
+(Parent-Version lpmud 3-3 105)
+(Version-Log "Prototypes could modify the definition of inherited functions.")
 (New-Version-Log
 "")
-(Checkin-Time "Mon, 01 Oct 2001 20:22:21 -0600")
+(Checkin-Time "Wed, 03 Oct 2001 21:22:01 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -60,8 +60,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.3 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.27 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.168 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.204 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.169 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.205 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -171,7 +171,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.9 644))
   (src/port.c (lpmud/39_port.c 1.17.1.6 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.12 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.71 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.72 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
