@@ -13,6 +13,7 @@ with_max_local=50
 with_max_cost=1000000
 
 with_apply_cache_bits=14
+with_rxcache_table=4096
 
 enable_compat_mode=no
 enable_strict_euids=no

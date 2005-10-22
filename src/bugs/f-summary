@@ -108,6 +108,7 @@ f-011029: Efun copy_object()
 f-011229-0: Add support for PostgreSQL
 f-011229-1: Add support for Berkeley DB
 f-011230: Implement seeded randoms
+f-020127: Bitstring efuns for shifting and copying
 
 
 Language

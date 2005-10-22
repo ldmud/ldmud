@@ -165,7 +165,9 @@ DESCRIPTION
 
         all call both inherited create()s. The function called this way
         must not take arguments, and the single results from all calls are
-        combined into one array used as final result.
+        combined into one array used as final result. If there is no such
+        function inherited at all, the statement will just return
+        an empty array.
 
 SEE ALSO
         types(LPC), modifiers(LPC), varargs(LPC), references(LPC),

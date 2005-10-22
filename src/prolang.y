@@ -705,6 +705,10 @@ static Bool got_ellipsis[COMPILER_STACK_SIZE];
 static void insert_pop_value(void);
 static void arrange_protected_lvalue(p_int, int, p_int, int);
 static int insert_inherited(char *, string_t *, program_t **, function_t *, int, bytecode_p);
+  /* Returnvalues from insert_inherited(): */
+#  define INHERITED_NOT_FOUND            (-1)
+#  define INHERITED_WILDCARDED_ARGS      (-2)
+#  define INHERITED_WILDCARDED_NOT_FOUND (-3)
 static void store_line_number_relocation(int relocated_from);
 int yyparse(void);
 %ifdef INITIALIZATION_BY___INIT
@@ -8500,10 +8504,23 @@ function_call:
 
                   if (ix < 0)
                   {
-                      if (ix < -1)
-                          yyerror("wildcarded call to inherited function can't pass arguments");
-                      else
+                      switch(ix) {
+                      case INHERITED_NOT_FOUND:
                           yyerror("function not defined by inheritance as specified");
+                          break;
+                      case INHERITED_WILDCARDED_ARGS:
+                          yyerror("wildcarded call to inherited function can't pass arguments");
+                          break;
+                      case INHERITED_WILDCARDED_NOT_FOUND:
+                          /* Not an error, but we can't do argument
+                           * checks either.
+                           */
+                          break;
+                      default:
+                          fatal("Unknown return code %d from insert_inherited()\n", ix);
+                          break;
+                      }
+
                       $$.type = TYPE_ANY;
                       if ($1.super)
                           yfree($1.super);
@@ -10400,6 +10417,13 @@ insert_inherited (char *super_name, string_t *real_name
  * the program pointer and the function_t information. Also compile
  * the function call(s).
  *
+ * Result is the function index, or one of the negative error codes:
+ * INHERITED_NOT_FOUND (-1): the function wasn't found.
+ * INHERITED_WILDCARDED_ARGS (-2): it was a wildcarded supercall with
+ *   arguments
+ * INHERITED_WILDCARDED_NOT_FOUND (-3): it was a wildcarded supercall,
+ *   but not a single function was found.
+
  * Result is -1 if the function wasn't found, -2 if it was a wildcarded
  * supercall to a function with arguments, otherwise the function index.
  *
@@ -10576,7 +10600,7 @@ insert_inherited (char *super_name, string_t *real_name
 
         /* Wildcarded supercalls only work without arguments */
         if (num_arg)
-            return -2;
+            return INHERITED_WILDCARDED_ARGS;
 
         *super_p = NULL;
         num_inherits = INHERIT_COUNT;
@@ -10589,7 +10613,8 @@ insert_inherited (char *super_name, string_t *real_name
          * it does, generate the function call.
          */
         ip0 = (inherit_t *)mem_block[A_INHERITS].block;
-        first_index = -1;
+        first_index = num_inherits > 0 ? INHERITED_WILDCARDED_NOT_FOUND
+                                       : INHERITED_NOT_FOUND;
         for (; num_inherits > 0; ip0++, num_inherits--)
         {
             funflag_t flags;
@@ -10689,7 +10714,7 @@ insert_inherited (char *super_name, string_t *real_name
         } /* for() */
 
         /* The calls above left their results on the stack.
-         * Combine them into a single array.
+         * Combine them into a single array (which might be empty).
          */
         {
             PREPARE_INSERT(3)
@@ -10702,7 +10727,7 @@ insert_inherited (char *super_name, string_t *real_name
     }
 
     /* No such function */
-    return -1;
+    return INHERITED_NOT_FOUND;
 } /* insert_inherited() */
 
 /*-------------------------------------------------------------------------*/

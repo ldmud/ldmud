@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Jan-2002 (Lars Duening)  (3.3.157)
+    - (prolang.y) The wildcarded supercall "*":: no longer throws an
+         error if none of the inherited objects defines the called function.
+         It fits into the semantics of the '*' wildcard ("any or none"), and
+         it is practical for supercalls like "*"::reset() (suggested by
+         Zonk@Finalfrontier via Dafire).
+
 25-Jan-2002 (Lars Duening)  (3.3.156)
     - (object.c) Made an error message more informative.
 
