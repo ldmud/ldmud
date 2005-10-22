@@ -986,6 +986,20 @@ garbage_collection(void)
                 , (long)time_stamp(), dobj_count - tot_alloc_object);
     }
 
+#ifdef CHECK_OBJECT_REF
+    while (newly_destructed_obj_shadows != NULL)
+    {
+        object_shadow_t *sh = newly_destructed_obj_shadows;
+        newly_destructed_obj_shadows = sh->next;
+        xfree(sh);
+    }
+    while (destructed_obj_shadows != NULL)
+    {
+        object_shadow_t *sh = destructed_obj_shadows;
+        destructed_obj_shadows = sh->next;
+        xfree(sh);
+    }
+#endif /* CHECK_OBJECT_REF */
     /* --- Pass 1: clear the M_REF flag in all malloced blocks ---
      */
     clear_M_REF_flags();

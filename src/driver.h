@@ -30,7 +30,8 @@
 #define CHECK_MAPPING_TOTAL
 
 /* Activate object refcount check code. It will produce a decent
- * amount of log output.
+ * amount of log output. It will also fatal() the driver as soon
+ * as it detects an inconsistency in the list of destructed objects.
  */
 #define CHECK_OBJECT_REF
 

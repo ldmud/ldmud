@@ -240,7 +240,7 @@ _free_object (object_t *ob, const char * file, int line)
 
 #ifdef CHECK_OBJECT_REF
     if (strchr(get_txt(ob->name), '#') == NULL)
-        printf("DEBUG: (%s:%d) free_object(%p '%s') ref %d flags %x\n"
+        printf("DEBUG: (%s:%d) free_object(%p '%s') ref %ld flags %x\n"
               , file, line, ob, get_txt(ob->name), ob->ref, ob->flags);
 #endif
     if (d_flag)
@@ -504,7 +504,7 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line)
 
 #ifdef CHECK_OBJECT_REF
     if (strchr(get_txt(progp->name), '#') == NULL)
-        printf("DEBUG: (%s:%d) free_prog(%p '%s') ref %d\n"
+        printf("DEBUG: (%s:%d) free_prog(%p '%s') ref %ld\n"
               , file, line, progp, get_txt(progp->name), progp->ref);
 #endif
     if (d_flag)
@@ -518,7 +518,7 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line)
         progp->blueprint = NULL;
 #ifdef CHECK_OBJECT_REF
     if (strchr(get_txt(blueprint->name), '#') == NULL)
-        printf("DEBUG: (%s:%d) free_prog(%p '%s') ref %d : blueprint (%p '%s') ref %d, flags %x\n"
+        printf("DEBUG: (%s:%d) free_prog(%p '%s') ref %ld : blueprint (%p '%s') ref %ld, flags %x\n"
               , file, line, progp, get_txt(progp->name), progp->ref
               , blueprint, get_txt(blueprint->name), blueprint->ref, blueprint->flags);
 #endif

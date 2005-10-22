@@ -6781,6 +6781,9 @@ eval_instruction (bytecode_p first_instruction
 
 again:
     /* Get the next instruction and increment the pc */
+#ifdef CHECK_OBJECT_REF
+    check_all_object_shadows();
+#endif /* CHECK_OBJECT_REF */
 
     instruction = LOAD_CODE(pc);
       /* If this a xcode, the second byte will be added later */
@@ -15552,18 +15555,41 @@ assert_master_ob_loaded (void)
                     newly_destructed_objs = ob->next_all;
                     newly_removed = MY_TRUE;
                     num_newly_destructed--;
+#ifdef CHECK_OBJECT_REF
+                    {
+                        object_shadow_t * sh = newly_destructed_obj_shadows;
+                        newly_destructed_obj_shadows = sh->next;
+                        xfree(sh);
+                    }
+#endif /* CHECK_OBJECT_REF */
                 }
                 else
                 {
+#ifdef CHECK_OBJECT_REF
+                    object_shadow_t *sprev;
+#endif /* CHECK_OBJECT_REF */
                     for ( prev = newly_destructed_objs
+#ifdef CHECK_OBJECT_REF
+                        , sprev = newly_destructed_obj_shadows
+#endif /* CHECK_OBJECT_REF */
                         ; prev && prev->next_all != ob
                         ; prev = prev->next_all
+#ifdef CHECK_OBJECT_REF
+                        , sprev = sprev->next
+#endif /* CHECK_OBJECT_REF */
                         ) NOOP;
                     if (prev)
                     {
                         prev->next_all = ob->next_all;
                         newly_removed = MY_TRUE;
                         num_newly_destructed--;
+#ifdef CHECK_OBJECT_REF
+                        {
+                            object_shadow_t *sh = sprev->next;
+                            sprev->next = sh->next;
+                            xfree(sh);
+                        }
+#endif /* CHECK_OBJECT_REF */
                     }
                 }
             }
@@ -15575,12 +15601,28 @@ assert_master_ob_loaded (void)
                     if (destructed_objs)
                         destructed_objs->prev_all = NULL;
                     num_destructed--;
+#ifdef CHECK_OBJECT_REF
+                    {
+                        object_shadow_t * sh = destructed_obj_shadows;
+                        destructed_obj_shadows = sh->next;
+                        xfree(sh);
+                    }
+#endif /* CHECK_OBJECT_REF */
                 }
                 else
                 {
+#ifdef CHECK_OBJECT_REF
+                    object_shadow_t *sprev;
+#endif /* CHECK_OBJECT_REF */
                     for ( prev = destructed_objs
+#ifdef CHECK_OBJECT_REF
+                        , sprev = destructed_obj_shadows
+#endif /* CHECK_OBJECT_REF */
                         ; prev && prev->next_all != ob
                         ; prev = prev->next_all
+#ifdef CHECK_OBJECT_REF
+                        , sprev = sprev->next
+#endif /* CHECK_OBJECT_REF */
                         ) NOOP;
                     if (prev)
                     {
@@ -15588,6 +15630,13 @@ assert_master_ob_loaded (void)
                         if (prev->next_all)
                             prev->next_all->prev_all = prev;
                         num_destructed--;
+#ifdef CHECK_OBJECT_REF
+                        {
+                            object_shadow_t *sh = sprev->next;
+                            sprev->next = sh->next;
+                            xfree(sh);
+                        }
+#endif /* CHECK_OBJECT_REF */
                     }
                 }
             }

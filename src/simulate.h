@@ -135,6 +135,19 @@ struct callback_s {
        */
 };
 
+#ifdef CHECK_OBJECT_REF
+typedef struct object_shadow_s {
+    struct object_shadow_s * next;
+    object_t * obj;
+    unsigned short flags;
+    p_int ref;
+    sentence_t *sent;
+} object_shadow_t;
+object_shadow_t * destructed_obj_shadows;
+object_shadow_t * newly_destructed_obj_shadows;
+extern void check_object_shadow (object_t *ob, object_shadow_t *sh);
+extern void check_all_object_shadows (void);
+#endif /* CHECK_OBJECT_REF */
 
 /* --- Macros --- */
 

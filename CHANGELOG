@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Mar-2002 (Lars Duening)  (3.3.179)
+    - (simulate, interpret.c, gcollect.c) With CHECK_OBJECT_REF, the
+        driver continually checks the consistency of the list of
+        destructed objects.
+    - (doc/efun/get_dir) Updated the manpage and added the german
+        version (both provided by Pulami).
+
 05-Mar-2002 (Lars Duening)  (3.3.178)
     - (efuns.c) deep_copy() didn't handle quoted arrays properly (reported
         by Gnomi).

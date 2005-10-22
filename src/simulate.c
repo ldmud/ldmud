@@ -159,6 +159,11 @@ object_t *obj_list_end = NULL;
    * cleared.
    */
 
+#ifdef CHECK_OBJECT_REF
+object_shadow_t * destructed_obj_shadows = NULL;
+object_shadow_t * newly_destructed_obj_shadows = NULL;
+#endif /* CHECK_OBJECT_REF */
+
 object_t *destructed_objs = NULL;
   /* List holding destructed but not yet fully dereferenced objects.
    * Only the name and the program pointer are guarantueed to be valid.
@@ -2176,10 +2181,16 @@ destruct (object_t *ob)
 
 {
     object_t **pp, *item, *next;
+#ifdef CHECK_OBJECT_REF
+    object_shadow_t *shadow;
+#endif /* CHECK_OBJECT_REF */
 
     if (ob->flags & O_DESTRUCTED)
         return;
 
+#ifdef CHECK_OBJECT_REF
+    xallocate(shadow, sizeof(*shadow), "destructed object shadow");
+#endif /* CHECK_OBJECT_REF */
     ob->time_reset = 0;
 
     /* We need the object in memory */
@@ -2326,11 +2337,60 @@ destruct (object_t *ob)
     ob->next_all = newly_destructed_objs;
     newly_destructed_objs = ob;
     num_newly_destructed++;
+#ifdef CHECK_OBJECT_REF
+    shadow->obj = ob;
+    shadow->ref = ob->ref;
+    shadow->flags = ob->flags;
+    shadow->sent = ob->sent;
+    shadow->next = newly_destructed_obj_shadows;
+    newly_destructed_obj_shadows = shadow;
+#endif /* CHECK_OBJECT_REF */
 } /* destruct() */
 
+#ifdef CHECK_OBJECT_REF
+/*-------------------------------------------------------------------------*/
+void
+check_object_shadow (object_t *ob, object_shadow_t *sh)
+{
+    if (sh->obj != ob)
+        fatal("DEBUG: Obj %p '%s', shadow %p -> obj %p '%s'\n"
+             , ob, get_txt(ob->name), sh, sh->obj, get_txt(sh->obj->name));
+    if ((sh->flags & O_DESTRUCTED) != (ob->flags & O_DESTRUCTED)
+     || sh->sent != ob->sent
+       )
+        fatal("DEBUG: Obj %p '%s': ref %ld, flags %x, sent %p; shadow ref %ld, flags %x, sent %p\n"
+             , ob, get_txt(ob->name), ob->ref, ob->flags, ob->sent
+             , sh->ref, sh->flags, sh->sent
+             );
+} /* check_object_shadow() */
+
+void
+check_all_object_shadows (void)
+{
+    object_shadow_t *sh;
+    object_t * ob;
+
+    for (ob = newly_destructed_objs, sh = newly_destructed_obj_shadows
+        ; ob != NULL
+        ; ob = ob->next_all, sh = sh->next
+        )
+        check_object_shadow(ob, sh);
+
+    for (ob = destructed_objs, sh = destructed_obj_shadows
+        ; ob != NULL 
+        ; ob = ob->next_all, sh = sh->next
+        )
+        check_object_shadow(ob, sh);
+} /* check_object_shadows() */
+
+#endif /* CHECK_OBJECT_REF */
 /*-------------------------------------------------------------------------*/
 static void
-remove_object (object_t *ob)
+remove_object (object_t *ob
+#ifdef CHECK_OBJECT_REF
+              , object_shadow_t *sh
+#endif /* CHECK_OBJECT_REF */
+              )
 
 /* This function is called from outside any execution thread to finally
  * remove object <ob>. <ob> must have been unlinked from all object lists
@@ -2351,6 +2411,9 @@ remove_object (object_t *ob)
 {
     sentence_t *sent;
 
+#ifdef CHECK_OBJECT_REF
+    check_object_shadow(ob, sh);
+#endif
     if (d_flag > 1)
     {
         debug_message("%s remove_object: object %s (ref %ld)\n"
@@ -2413,11 +2476,19 @@ remove_object (object_t *ob)
                 free_action_sent((action_t *)sent);
         } while ( NULL != (sent = next) );
         ob->sent = NULL;
+#ifdef CHECK_OBJECT_REF
+        sh->sent = NULL;
+#endif /* CHECK_OBJECT_REF */
     }
 
     /* Either free the object, or link it up for future freeing. */
     if (ob->ref <= 1)
+    {
         free_object(ob, "destruct_object");
+#ifdef CHECK_OBJECT_REF
+        xfree(sh);
+#endif /* CHECK_OBJECT_REF */
+    }
     else
     {
         if (destructed_objs != NULL)
@@ -2426,6 +2497,10 @@ remove_object (object_t *ob)
         destructed_objs = ob;
         ob->prev_all = NULL;
         num_destructed++;
+#ifdef CHECK_OBJECT_REF
+        sh->next = destructed_obj_shadows;
+        destructed_obj_shadows = sh;
+#endif /* CHECK_OBJECT_REF */
     }
 } /* remove_object() */
 
@@ -2442,6 +2517,10 @@ handle_newly_destructed_objects (void)
     while (newly_destructed_objs)
     {
         object_t *ob = newly_destructed_objs;
+#ifdef CHECK_OBJECT_REF
+        object_shadow_t *sh = newly_destructed_obj_shadows;
+        newly_destructed_obj_shadows = sh->next;
+#endif /* CHECK_OBJECT_REF */
 
         newly_destructed_objs = ob->next_all;
 #ifdef DEBUG
@@ -2450,7 +2529,11 @@ handle_newly_destructed_objects (void)
                  , ob, ob->name ? get_txt(ob->name) : "<null>"
                  );
 #endif
+#ifdef CHECK_OBJECT_REF
+        remove_object(ob, sh);
+#else
         remove_object(ob);
+#endif /* CHECK_OBJECT_REF */
         num_newly_destructed--;
     }
 }  /* handle_newly_destructed_objects() */
@@ -2465,17 +2548,28 @@ remove_destructed_objects (void)
 
 {
     object_t *ob;
+#ifdef CHECK_OBJECT_REF
+    object_shadow_t *sh = destructed_obj_shadows;
+    object_shadow_t *prev = NULL;
+#endif /* CHECK_OBJECT_REF */
 
     for (ob = destructed_objs; ob != NULL; )
     {
         object_t *victim;
 
+#ifdef CHECK_OBJECT_REF
+        check_object_shadow(ob, sh);
+#endif /* CHECK_OBJECT_REF */
         /* Check if only the list reference remains.
          * If not, go to the next object.
          */
         if (ob->ref > 1)
         {
             ob = ob->next_all;
+#ifdef CHECK_OBJECT_REF
+            prev = sh;
+            sh = sh->next;
+#endif /* CHECK_OBJECT_REF */
             continue;
         }
 
@@ -2491,6 +2585,21 @@ remove_destructed_objects (void)
 
         free_object(victim, "remove_destructed_objects");
         num_destructed--;
+#ifdef CHECK_OBJECT_REF
+        {
+            object_shadow_t * next = sh->next;
+            if (prev == NULL)
+            {
+                destructed_obj_shadows = next;
+            }
+            else
+            {
+                prev->next = next;
+            }
+            xfree(sh);
+            sh = next;
+        }
+#endif /* CHECK_OBJECT_REF */
     }
 }  /* remove_destructed_objects() */
   

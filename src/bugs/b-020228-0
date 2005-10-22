@@ -828,6 +828,41 @@ In den logfiles taucht aber nichts mehr auf..
 dafire
 
 ----------
+Date: Wed, 6 Mar 2002 14:15:50 +0000 (GMT)
+Subject: 410 backtrace
+In-Reply-To: <00039b7cd93c602e_mailit@localhost>
+
+
+Here's the trace from the 410 crash. 
+
+(gdb) backtrace full
+#0  0xff1b3304 in ?? ()
+No symbol table info available.
+#1  0xff2050a4 in ?? ()
+No symbol table info available.
+#2  0x96f30 in fatal (
+    fmt=0xbc3b0 "Object 0x%lx %s ref count 0, but not destructed.\n")
+    at simulate.c:615
+        va = 0xffbee678
+        ts = 0x121be8 "2002.03.06 07:02:55"
+        in_fatal = 1
+#3  0x7ba70 in _free_object (ob=0x40edbc) at object.c:237
+No locals.
+#4  0x9966c in remove_destructed_objects () at simulate.c:2532
+        victim = (object_t *) 0x40edbc
+        ob = (object_t *) 0x5b3f78
+#5  0x1a154 in backend () at backend.c:343
+        buff = "quit\000s\000,d\n\000BUGS\000away\000iton\");\000\n\000
+200 elements of the list are used.\000e\000a
+yers/caper/obj/oars\"),environment(this_player()) ); }\000\000land?
+Otherwise, one has to leave the island in order
+ to have armor repair"...
+#6  0x73458 in main (argc=0, argv=0xffbef534) at main.c:428
+        i = 901120
+        set = {__sigbits = {8192, 0, 0, 0}}
+(gdb)
+
+
 Date: Fri, 22 Feb 2002 05:54:01 +0000 (GMT)
 From: <pixie@loki.cgc.ns.ca>
 Subject: dev 404 driver
