@@ -4705,7 +4705,7 @@ f_save_object (svalue_t *sp, int numarg)
         i = 0; /* Result from efun */
     
         unlink(name);
-#if !defined(MSDOS_FS) && !defined(AMIGA) && !defined(OS2) && !defined(__BEOS__)
+#if !defined(MSDOS_FS) && !defined(AMIGA) && !(defined(OS2) || defined(__EMX__)) && !defined(__BEOS__)
         if (link(tmp_name, name) == -1)
 #else
         close(f);
@@ -4718,7 +4718,7 @@ f_save_object (svalue_t *sp, int numarg)
             add_message("Failed to save object !\n");
             i = 1;
         }
-#if !defined(MSDOS_FS) && !defined(AMIGA) && !defined(OS2) && !defined(__BEOS__)
+#if !defined(MSDOS_FS) && !defined(AMIGA) && !(defined(__EMX__) || defined(OS2)) && !defined(__BEOS__)
         close(f);
         unlink(tmp_name);
 #endif

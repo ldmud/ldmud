@@ -198,7 +198,7 @@ extern int errno;
 #    undef USE_MYSQL
 #endif
 
-#if defined( MSDOS ) || defined(__CYGWIN__)
+#if defined( MSDOS ) || defined(__CYGWIN__) || defined(__EMX__) || defined(OS2)
 #define MSDOS_FS
 #endif
 
@@ -315,7 +315,7 @@ typedef signed long ssize_t;
 #    define strrchr rindex
 #endif
 
-#if !defined(__BEOS__) && !defined(__CYGWIN__)
+#if !defined(__BEOS__) && !defined(__CYGWIN__) && !(defined(__EMX__) || defined(OS2))
 #    define O_BINARY 0
 #    define O_TEXT 0
 #endif
@@ -404,7 +404,7 @@ extern char *crypt(const char *, const char *);
 #    define crypt(pass, salt) _crypt(pass, salt)
 #endif
 
-#if defined(__CYGWIN__)
+#if defined(__CYGWIN__) || defined(__EMX__) || defined(OS2)
 extern void init_rusage(void);
 #else
 #define init_rusage()

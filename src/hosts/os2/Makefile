@@ -1,34 +1,35 @@
+# Generated automatically from Makefile.in by configure.
 # TODO: Add some of the symbols in here to configure
 # These lines are needed on some machines.
 MAKE=make
-SHELL=@CONFIG_SHELL@
-INSTALL=@INSTALL@
-mkinstalldirs=$(SHELL) @top_srcdir@/mkinstalldirs
+SHELL=E:\bin\bash.exe
+INSTALL=./install-sh -c
+mkinstalldirs=$(SHELL) ./mkinstalldirs
 #
-CC=@CC@
+CC=gcc.exe
 #
-YACC = @YACC@
-YACCTAB = @YACCTAB@
+YACC = yacc.exe
+YACCTAB = y.tab.
 #
 RM = rm -f
 MV = mv
 CP = cp
 #
 # some standard stuff...
-prefix= @prefix@
-exec_prefix= @exec_prefix@
+prefix= /mud
+exec_prefix= ${prefix}
 #
 #
 # Set MUD_LIB to the directory which contains the mud data. Was formerly
 # defined in config.h !
-MUD_LIB = @libdir@
+MUD_LIB = ${exec_prefix}/lib
 #
 # Set BINDIR to the directory where you want to install the executables.
-BINDIR = @bindir@
+BINDIR = ${exec_prefix}/bin
 #
 # Set ERQ_DIR to directory which contains the stuff which ERQ can
 # execute (hopefully) savely. Was formerly defined in config.h!
-ERQ_DIR= @libexecdir@
+ERQ_DIR= ${exec_prefix}/libexec
 #
 # Typical profiling, warning and optimizing options.
 #   -DOPCPROF: enable usage statistics of VM instructions
@@ -47,9 +48,9 @@ WARN= # no warning options - will work with all compilers :-)
 # Optimization and source level debugging options.
 # adding a -fomit-frame-pointer on the NeXT (gcc version 1.93 (68k, MIT syntax))
 # will corrupt the driver.
-OPTIMIZE = @OCFLAGS@ # high optimization
-#OPTIMIZE= @MCFLAGS@ # for better debugging
-#OPTIMIZE= @DCFLAGS@ # no optimization; for frequent recompilations.
+OPTIMIZE = -O4 -fomit-frame-pointer  -g -fstrength-reduce -fno-force-mem -fno-force-addr -fno-inline-functions # high optimization
+#OPTIMIZE= -O2 -g -fstrength-reduce -fno-force-mem -fno-force-addr -fno-inline-functions # for better debugging
+#OPTIMIZE= -g # no optimization; for frequent recompilations.
 #
 # Debugging options:
 #   -DDEBUG: Enable run time debugging. It will use more time and space.
@@ -65,11 +66,11 @@ DEBUG = -DDEBUG -DTRACE_CODE # -DDEBUG_TELNET
 #
 MPATH=-DMUD_LIB='"$(MUD_LIB)"' -DBINDIR='"$(BINDIR)"' -DERQ_DIR='"$(ERQ_DIR)"'
 #
-CFLAGS= @EXTRA_CFLAGS@ $(OPTIMIZE) $(DEBUG) $(WARN) $(MPATH) $(PROFIL)
+CFLAGS=  $(OPTIMIZE) $(DEBUG) $(WARN) $(MPATH) $(PROFIL)
 #
-LIBS=@LIBS@ @PKGLIBS@
+LIBS=-lsocket -lm
 #
-LDFLAGS=@LDFLAGS@
+LDFLAGS=-Zbsd-signals -Zexe
 #
 #Note that, if you use smalloc with SBRK_OK(which is the default), and
 #don't link statically, it could happen that the system malloc is linked
@@ -91,10 +92,10 @@ OBJ = access_check.o actions.o array.o backend.o bitstrings.o call_out.o \
       lex.o main.o mapping.o md5.o mempools.o mstrings.o object.o otable.o \
       parser.o parse.o parse_old.o pkg-alists.o pkg-mysql.o port.o ptrtable.o \
       random.o regexp.o rxcache.o simulate.o simul_efun.o stdstrings.o \
-      strfuns.o sprintf.o swap.o wiz_list.o xalloc.o @ALLOCA@
+      strfuns.o sprintf.o swap.o wiz_list.o xalloc.o 
 
 driver: $(OBJ)
-	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) $(OBJ) -o $@ $(LIBS)
+	$(CC) $(OPTIMIZE) $(LDFLAGS) $(OBJ) -o $@ $(LIBS)
 
 install: driver
 	$(mkinstalldirs) $(BINDIR)
@@ -110,7 +111,7 @@ lint: *.c
 	lint *.c
 
 clean:
-	$(RM) $(YACCTAB)h $(YACCTAB)c make_func.c *.o mkfunc@EXEEXT@
+	$(RM) $(YACCTAB)h $(YACCTAB)c make_func.c *.o mkfunc
 	$(RM) stdstrings.c stdstrings.h
 	$(RM) efun_defs.c instrs.h lang.y lang.h lang.c y.output tags TAGS
 	$(RM) driver core mudlib/core mudlib/debug.log lpmud.log driver
@@ -129,33 +130,33 @@ TAGS: $(SRC)
 
 make_func.c: make_func.y
 	$(YACC) make_func.y
-	@MOVE_YACC_TAB@ make_func.c
-	@CLEAN_YACC_TAB@
+	$(MV) $(YACCTAB)c make_func.c
+	
 
 mkfunc.o : mkfunc.c make_func.c driver.h config.h machine.h port.h
 	  $(CC) $(CFLAGS) -DYACC='"$(YACC)"' -c mkfunc.c
 
-mkfunc@EXEEXT@: mkfunc.o hash.o exec.h
-	$(CC) @OPTIMIZE_LINKING@ $(LDFLAGS) mkfunc.o hash.o -o mkfunc@EXEEXT@
+mkfunc: mkfunc.o hash.o exec.h
+	$(CC) $(OPTIMIZE) $(LDFLAGS) mkfunc.o hash.o -o mkfunc
 
-lang.y: mkfunc@EXEEXT@ prolang.y config.h
+lang.y: mkfunc prolang.y config.h
 	$(RM) lang.y
-	./mkfunc@EXEEXT@ lang
+	./mkfunc lang
 
-efun_defs.c instrs.h: func_spec mkfunc@EXEEXT@ config.h
+efun_defs.c instrs.h: func_spec mkfunc config.h
 	$(RM) instrs.h
 	$(RM) efun_defs.c
-	./mkfunc@EXEEXT@ instrs
+	./mkfunc instrs
 
-stdstrings.c stdstrings.h: string_spec mkfunc@EXEEXT@ config.h
+stdstrings.c stdstrings.h: string_spec mkfunc config.h
 	$(RM) stdstrings.c
 	$(RM) stdstrings.h
-	./mkfunc@EXEEXT@ strings
+	./mkfunc strings
 
 lang.c lang.h: lang.y
 	$(YACC) -d -v lang.y
-	@MOVE_YACC_TAB@ lang.c
-	@CLEAN_YACC_TAB@
+	$(MV) $(YACCTAB)c lang.c
+	
 	$(MV) $(YACCTAB)h lang.h
 
 #--------------------------------------------------------

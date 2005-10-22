@@ -147,16 +147,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 69
+  SETVERFLAGS += d 70
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.69
+  VSTRING = 3.3.0-pre.70
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 69
+  SETVERFLAGS += d 70
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.69
+  VSTRING = 3.3.0-dev.70
 endif
 
 else
@@ -164,12 +164,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 69
+SETVERFLAGS = -app 3 3 70
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.69
+  VSTRING = 3.3.70
 
 endif
 
@@ -354,6 +354,9 @@ depend-generic: $(SRCS) $(GENSRCS) $(OBJ)
           echo Updating dependencies in Makefile.in.; \
           mkdepend $(SKELETON) -I. $(EXCEPT) -p .c:%n.o -fMakefile.in; \
           mkdepend $(SKELETON) $(SELECT) -I. $(EXCEPT) -p .c:%n.o -fMakefile.in; \
+          echo Updating dependencies in hosts/os2/Makefile.; \
+          mkdepend $(SKELETON) -I. $(EXCEPT) -p .c:%n.o -fhosts/os2/Makefile; \
+          mkdepend $(SKELETON) $(SELECT) -I. $(EXCEPT) -p .c:%n.o -fhosts/os2/Makefile; \
         else\
           echo mkdepend utility not available.; \
         fi"
@@ -442,19 +445,19 @@ rmapp ::
 # --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS FOLLOW ---
 $(OBJ)/access_check.o : xalloc.h filestat.h comm.h access_check.h driver.h \
     svalue.h simulate.h typedefs.h config.h port.h strfuns.h sent.h exec.h \
-    hosts/unix.h machine.h
+    hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/actions.o : ../mudlib/sys/driver_hook.h ../mudlib/sys/commands.h \
     xalloc.h wiz_list.h svalue.h simulate.h sent.h stdstrings.h object.h \
     mstrings.h mapping.h interpret.h exec.h efuns.h dumpstat.h comm.h \
     closure.h backend.h array.h actions.h typedefs.h driver.h strfuns.h \
-    instrs.h main.h port.h config.h hosts/unix.h machine.h
+    instrs.h main.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/array.o : xalloc.h wiz_list.h swap.h svalue.h simulate.h \
     stdstrings.h rxcache.h regexp.h object.h mstrings.h mempools.h \
     mapping.h main.h interpret.h instrs.h closure.h backend.h array.h \
     my-alloca.h typedefs.h driver.h strfuns.h sent.h exec.h port.h config.h \
-    hosts/unix.h machine.h
+    hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/backend.o : ../mudlib/sys/debug_message.h \
     ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h svalue.h \
@@ -462,40 +465,40 @@ $(OBJ)/backend.o : ../mudlib/sys/debug_message.h \
     mstrings.h mapping.h main.h lex.h interpret.h heartbeat.h gcollect.h \
     filestat.h exec.h ed.h comm.h closure.h call_out.h array.h actions.h \
     backend.h my-alloca.h typedefs.h driver.h strfuns.h sent.h instrs.h \
-    port.h config.h hosts/unix.h machine.h
+    port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/bitstrings.o : xalloc.h svalue.h simulate.h mstrings.h main.h lex.h \
     interpret.h bitstrings.h typedefs.h driver.h strfuns.h sent.h exec.h \
-    instrs.h port.h config.h hosts/unix.h machine.h
+    instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/call_out.o : ../mudlib/sys/debug_info.h xalloc.h wiz_list.h swap.h \
     svalue.h strfuns.h stdstrings.h simulate.h object.h mstrings.h main.h \
     interpret.h gcollect.h exec.h comm.h closure.h backend.h array.h \
     actions.h call_out.h typedefs.h driver.h sent.h instrs.h port.h \
-    config.h hosts/unix.h machine.h
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/closure.o : xalloc.h switch.h swap.h svalue.h stdstrings.h \
     simul_efun.h simulate.h prolang.h object.h mstrings.h main.h lex.h \
     lang.h interpret.h instrs.h exec.h backend.h array.h closure.h \
     my-alloca.h typedefs.h driver.h ptrtable.h strfuns.h sent.h port.h \
-    config.h hosts/unix.h machine.h
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/comm.o : util/erq/erq.h ../mudlib/sys/driver_hook.h xalloc.h \
     wiz_list.h swap.h svalue.h stdstrings.h simulate.h sent.h object.h \
     mstrings.h main.h interpret.h gcollect.h filestat.h exec.h ed.h \
     closure.h backend.h array.h actions.h access_check.h comm.h telnet.h \
     my-alloca.h typedefs.h driver.h strfuns.h instrs.h config.h port.h \
-    hosts/unix.h machine.h
+    hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/dumpstat.o : svalue.h smalloc.h stdstrings.h simulate.h ptrtable.h \
     object.h mstrings.h mapping.h filestat.h exec.h closure.h array.h \
     dumpstat.h typedefs.h driver.h strfuns.h sent.h instrs.h port.h \
-    config.h hosts/unix.h machine.h
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/ed.o : xalloc.h svalue.h stdstrings.h simulate.h rxcache.h regexp.h \
     object.h mstrings.h main.h interpret.h gcollect.h filestat.h comm.h \
     closure.h actions.h ed.h typedefs.h driver.h strfuns.h sent.h exec.h \
-    instrs.h port.h config.h hosts/unix.h machine.h
+    instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/efuns.o : ../mudlib/sys/strings.h ../mudlib/sys/objectinfo.h \
     ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h swap.h \
@@ -503,12 +506,13 @@ $(OBJ)/efuns.o : ../mudlib/sys/strings.h ../mudlib/sys/objectinfo.h \
     ptrtable.h otable.h object.h mstrings.h md5.h mapping.h main.h \
     interpret.h instrs.h heartbeat.h dumpstat.h comm.h closure.h call_out.h \
     backend.h array.h actions.h efuns.h my-rusage.h my-alloca.h typedefs.h \
-    driver.h sent.h exec.h regexp.h port.h config.h hosts/unix.h machine.h
+    driver.h sent.h exec.h regexp.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h \
     simulate.h mstrings.h main.h lex.h interpret.h filestat.h comm.h \
     array.h files.h my-alloca.h typedefs.h driver.h strfuns.h sent.h exec.h \
-    instrs.h port.h config.h hosts/unix.h machine.h
+    instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/gcollect.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h \
     stdstrings.h smalloc.h simul_efun.h simulate.h sent.h rxcache.h \
@@ -516,14 +520,15 @@ $(OBJ)/gcollect.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h \
     interpret.h instrs.h heartbeat.h filestat.h exec.h ed.h comm.h \
     closure.h call_out.h backend.h array.h actions.h gcollect.h typedefs.h \
     driver.h svalue.h ptrtable.h strfuns.h regexp.h port.h config.h \
-    hosts/unix.h machine.h
+    hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/hash.o : hash.h
 
 $(OBJ)/heartbeat.o : ../mudlib/sys/debug_info.h xalloc.h wiz_list.h \
     svalue.h strfuns.h simulate.h sent.h object.h mstrings.h interpret.h \
     gcollect.h comm.h backend.h array.h actions.h heartbeat.h typedefs.h \
-    driver.h exec.h instrs.h main.h port.h config.h hosts/unix.h machine.h
+    driver.h exec.h instrs.h main.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/interpret.o : ../mudlib/sys/trace.h ../mudlib/sys/debug_info.h \
     ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h switch.h swap.h \
@@ -532,97 +537,102 @@ $(OBJ)/interpret.o : ../mudlib/sys/trace.h ../mudlib/sys/debug_info.h \
     mapping.h main.h lex.h instrs.h heartbeat.h gcollect.h filestat.h \
     exec.h efuns.h ed.h comm.h closure.h call_out.h backend.h array.h \
     actions.h interpret.h my-alloca.h typedefs.h driver.h strfuns.h port.h \
-    config.h hosts/unix.h machine.h
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/lex.o : efun_defs.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
     svalue.h strfuns.h stdstrings.h simul_efun.h simulate.h prolang.h \
     patchlevel.h object.h mstrings.h mempools.h main.h lang.h interpret.h \
     instrs.h hash.h gcollect.h filestat.h exec.h comm.h closure.h backend.h \
     array.h lex.h my-alloca.h typedefs.h driver.h ptrtable.h sent.h port.h \
-    config.h hosts/unix.h machine.h
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/main.o : xalloc.h wiz_list.h swap.h svalue.h stdstrings.h \
     simul_efun.h simulate.h rxcache.h random.h patchlevel.h otable.h \
     object.h mstrings.h mapping.h lex.h interpret.h gcollect.h filestat.h \
     comm.h array.h backend.h main.h my-alloca.h typedefs.h driver.h \
     ptrtable.h exec.h strfuns.h sent.h regexp.h instrs.h port.h config.h \
-    hosts/unix.h machine.h
+    hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/mapping.o : xalloc.h wiz_list.h svalue.h smalloc.h simulate.h \
     object.h mstrings.h main.h interpret.h gcollect.h closure.h backend.h \
     array.h mapping.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
-    exec.h instrs.h port.h config.h hosts/unix.h machine.h
+    exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/md5.o : md5.h machine.h
 
 $(OBJ)/mempools.o : xalloc.h gcollect.h mempools.h driver.h typedefs.h \
-    port.h config.h hosts/unix.h machine.h
+    port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/mkfunc.o : make_func.c ../mudlib/sys/driver_hook.h hash.h exec.h \
-    my-alloca.h driver.h typedefs.h port.h config.h hosts/unix.h machine.h
+    my-alloca.h driver.h typedefs.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/mstrings.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h \
     stdstrings.h simulate.h main.h hash.h gcollect.h mstrings.h driver.h \
-    typedefs.h sent.h exec.h port.h config.h hosts/unix.h machine.h
+    typedefs.h sent.h exec.h port.h config.h hosts/unix.h hosts/be/be.h \
+    machine.h
 
 $(OBJ)/object.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h svalue.h \
     swap.h strfuns.h stdstrings.h simul_efun.h simulate.h sent.h random.h \
     ptrtable.h prolang.h otable.h mstrings.h mapping.h main.h instrs.h \
     interpret.h filestat.h exec.h comm.h closure.h backend.h array.h \
     actions.h object.h my-alloca.h typedefs.h driver.h port.h config.h \
-    hosts/unix.h machine.h
+    hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/otable.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h simulate.h \
     strfuns.h object.h mstrings.h hash.h gcollect.h backend.h otable.h \
     typedefs.h driver.h sent.h exec.h instrs.h main.h port.h config.h \
-    hosts/unix.h machine.h
+    hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/parse.o : xalloc.h wiz_list.h svalue.h stdstrings.h simulate.h \
     object.h mstrings.h main.h interpret.h instrs.h gcollect.h closure.h \
     array.h actions.h parse.h typedefs.h driver.h strfuns.h sent.h exec.h \
-    port.h config.h hosts/unix.h machine.h
+    port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/parse_old.o : xalloc.h wiz_list.h svalue.h stdstrings.h simulate.h \
     random.h object.h mstrings.h main.h gcollect.h interpret.h closure.h \
     array.h actions.h parse.h my-alloca.h typedefs.h driver.h strfuns.h \
-    sent.h exec.h instrs.h port.h config.h hosts/unix.h machine.h
+    sent.h exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h \
+    machine.h
 
 $(OBJ)/parser.o : lang.c pkg-alists.h ../mudlib/sys/driver_hook.h xalloc.h \
     wiz_list.h switch.h swap.h svalue.h stdstrings.h simul_efun.h \
     simulate.h object.h mstrings.h mapping.h main.h lex.h instrs.h \
     interpret.h gcollect.h exec.h closure.h backend.h array.h prolang.h \
     my-alloca.h typedefs.h driver.h ptrtable.h strfuns.h sent.h port.h \
-    config.h hosts/unix.h machine.h
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/pkg-alists.o : xalloc.h svalue.h simulate.h mstrings.h main.h \
     interpret.h array.h my-alloca.h pkg-alists.h typedefs.h driver.h \
-    strfuns.h sent.h exec.h instrs.h port.h config.h hosts/unix.h machine.h
+    strfuns.h sent.h exec.h instrs.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/pkg-mysql.o : xalloc.h svalue.h mstrings.h interpret.h array.h \
     pkg-mysql.h my-alloca.h typedefs.h driver.h instrs.h port.h config.h \
-    exec.h hosts/unix.h machine.h
+    exec.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/port.o : hosts/crypt.c main.h backend.h my-rusage.h driver.h \
-    typedefs.h port.h config.h hosts/unix.h machine.h
+    typedefs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/ptrtable.o : simulate.h mempools.h ptrtable.h driver.h svalue.h \
     strfuns.h sent.h exec.h typedefs.h port.h config.h hosts/unix.h \
-    machine.h
+    hosts/be/be.h machine.h
 
-$(OBJ)/random.o : random.h driver.h port.h config.h hosts/unix.h machine.h
+$(OBJ)/random.o : random.h driver.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/regexp.o : main.h xalloc.h simulate.h comm.h regexp.h driver.h \
     typedefs.h svalue.h strfuns.h sent.h exec.h port.h config.h \
-    hosts/unix.h machine.h
+    hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/rxcache.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h \
     regexp.h mstrings.h hash.h gcollect.h rxcache.h driver.h typedefs.h \
-    port.h config.h hosts/unix.h machine.h
+    port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/simul_efun.o : xalloc.h swap.h svalue.h stdstrings.h simulate.h \
     ptrtable.h object.h mstrings.h lex.h interpret.h instrs.h gcollect.h \
     exec.h array.h simul_efun.h my-alloca.h typedefs.h driver.h strfuns.h \
-    sent.h port.h config.h hosts/unix.h machine.h
+    sent.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/simulate.o : ../mudlib/sys/rtlimits.h ../mudlib/sys/files.h \
     ../mudlib/sys/driver_hook.h ../mudlib/sys/debug_info.h xalloc.h \
@@ -631,36 +641,37 @@ $(OBJ)/simulate.o : ../mudlib/sys/rtlimits.h ../mudlib/sys/files.h \
     mapping.h main.h lex.h instrs.h interpret.h heartbeat.h gcollect.h \
     filestat.h exec.h ed.h dumpstat.h comm.h closure.h call_out.h backend.h \
     array.h actions.h simulate.h my-alloca.h typedefs.h driver.h ptrtable.h \
-    regexp.h port.h config.h hosts/unix.h machine.h
+    regexp.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/sprintf.o : xalloc.h swap.h svalue.h stdstrings.h simul_efun.h \
     simulate.h sent.h ptrtable.h object.h mstrings.h mapping.h main.h \
     instrs.h interpret.h exec.h comm.h closure.h array.h actions.h \
     sprintf.h typedefs.h driver.h strfuns.h port.h config.h hosts/unix.h \
-    machine.h
+    hosts/be/be.h machine.h
 
 $(OBJ)/stdstrings.o : mstrings.h stdstrings.h typedefs.h driver.h port.h \
-    config.h hosts/unix.h machine.h
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/strfuns.o : xalloc.h svalue.h stdstrings.h simulate.h mstrings.h \
     comm.h strfuns.h my-alloca.h typedefs.h driver.h sent.h exec.h port.h \
-    config.h hosts/unix.h machine.h
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/swap.o : ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h \
     strfuns.h stdstrings.h simul_efun.h simulate.h random.h prolang.h \
     otable.h object.h mstrings.h mapping.h main.h interpret.h gcollect.h \
     exec.h comm.h backend.h array.h swap.h typedefs.h driver.h ptrtable.h \
-    sent.h instrs.h port.h config.h hosts/unix.h machine.h
+    sent.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/wiz_list.o : xalloc.h svalue.h stdstrings.h simulate.h object.h \
     mstrings.h mapping.h main.h interpret.h gcollect.h backend.h array.h \
     ../mudlib/sys/wizlist.h wiz_list.h my-alloca.h typedefs.h driver.h \
-    strfuns.h sent.h exec.h instrs.h port.h config.h hosts/unix.h machine.h
+    strfuns.h sent.h exec.h instrs.h port.h config.h hosts/unix.h \
+    hosts/be/be.h machine.h
 
 $(OBJ)/xalloc.o : smalloc.c simulate.h interpret.h xalloc.h driver.h \
     ../mudlib/sys/debug_info.h object.h exec.h svalue.h stdstrings.h \
     mstrings.h main.h gcollect.h backend.h smalloc.h typedefs.h strfuns.h \
-    sent.h instrs.h port.h config.h hosts/unix.h machine.h
+    sent.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 # --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS PRECEDE ---
 # --- DO NOT MODIFY THIS LINE -- SELECTED AUTO-DEPENDS FOLLOW ---

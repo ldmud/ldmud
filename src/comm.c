@@ -81,7 +81,7 @@
 
 #include <signal.h>
 
-#ifdef _AIX
+#if defined(_AIX) || defined(__EMX__) || defined(OS2)
 #    include <sys/select.h>
 #endif
 

@@ -145,6 +145,17 @@ time_stamp (void)
 } /* time_stamp() */
 
 /*-------------------------------------------------------------------------*/
+/* Some UNIX functions which are not supported on all platforms. */
+
+#if defined(__EMX__) || defined(OS2)
+int socketpair (int a, int b, int c, int *d)
+{
+    errno = EPERM;
+    return -1;
+}
+#endif
+
+/*-------------------------------------------------------------------------*/
 #ifdef STRTOL_BROKEN
 
 #define DIGIT(x)        (isdigit(x) ? (x) - '0' : \
@@ -346,7 +357,7 @@ getrusage (int who, struct rusage *rusage)
 }
 #endif /* getrusage implemented using times() */
 
-#if defined(__CYGWIN__)
+#if defined(__CYGWIN__) || defined(__EMX__) || defined(OS2)
 /*-----------------------------------------------------------------------
 ** void init_rusage (void)
 ** int getrusage (int who, struct rusage *rusage)

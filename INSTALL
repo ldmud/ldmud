@@ -6,6 +6,7 @@ Topics covered:
   - mySQL
   - BeOS
   - Window 95/98/NT
+  - OS/2
 
 
 Unix or Unix-like system
@@ -261,3 +262,30 @@ Windows 95/98/NT
 
   Brandon Mathis points out, "that to compile under Windows you have to
   use 'tar -xvfz' and not WinZIP to extract the source".
+
+
+OS/2
+----
+
+  The OS/2 port uses the EMX (a gcc version) to compile the gamedriver.
+  To compile the driver, copy the machine.h and Makefile from the hosts/os2
+  directory into the top directory and make as under Unix. The Makefile
+  is configured to install the driver in /mud - edit the variable 'prefix'
+  if you want a different directory.
+
+  Important: the Makefile must be save using the Unix lineend convention,
+  otherwise the make program will stop with an error. In the EPM editor
+  this can be achieved using the 'save -u' command.
+
+  If you have the full GNU suite installed, you can also configure the
+  driver as under Unix. Following caveats regarding the configure script:
+   - the ac_exeext variable may not be set to '.exe' as it should be;
+   - the calls to the program conftest may lack the ${ac_exeext} extension.
+
+  Additionally, configure does not properly recognize the settings for
+  HAVE_GETRUSAGE, GETRUSAGE_RESTRICTED, GETRUSAGE_VIA_SYSCALL and RUSAGE_USEC.
+  Copy these values from the provided machine.h
+
+  To recreate the configure script from configure.in, you need autoconf
+  version 2.50 or newer.
+

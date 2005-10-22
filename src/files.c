@@ -50,6 +50,10 @@ extern int lstat PROT((CONST char *, struct stat *));
 extern int fchmod PROT((int, int));
 #endif
 
+#if defined(OS2) || defined(__EMX__)
+#    define lstat stat
+#endif
+
 /*-------------------------------------------------------------------------*/
 
 #include "files.h"

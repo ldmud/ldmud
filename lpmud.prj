@@ -22,15 +22,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 69)
-(Parent-Version lpmud 3-3 68)
-(Version-Log "Relaxed typechecking of redefined functions.
-Character constants in inline closures weren't recognized.
-Added a manpage for comments.
-Improved the mySQL configuration.")
+(Project-Version lpmud 3-3 70)
+(Parent-Version lpmud 3-3 69)
+(Version-Log "Added new port to OS/2")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 01 Jul 2001 00:27:19 -0600")
+(Checkin-Time "Sun, 01 Jul 2001 01:46:07 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -62,21 +59,21 @@ Improved the mySQL configuration.")
   ;; Information about the driver and the distribution in general
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.3 644))
-  (CREDITS (lpmud/d/22_CREDITS 1.70.1.18 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.132 644))
+  (CREDITS (lpmud/d/22_CREDITS 1.70.1.19 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.133 644))
   (HISTORY (lpmud/f/49_HISTORY 1.186 644))
-  (INSTALL (lpmud/d/18_INSTALL 1.11.1.11 644))
+  (INSTALL (lpmud/d/18_INSTALL 1.11.1.12 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.29 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.30 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.8 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.3 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.28 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.29 644))
   (src/mkinstalldirs (lpmud/C/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/C/5_install-sh 1.2 755))
 
-  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.17 644))
+  (src/autoconf/configure.in (lpmud/d/7_configure. 1.20.1.9.1.18 644))
   (src/autoconf/acconfig.h (lpmud/d/10_acconfig.h 1.6.1.3 644))
 
   (src/settings/README (lpmud/C/22_README 1.14.1.3 644))
@@ -123,7 +120,7 @@ Improved the mySQL configuration.")
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.13 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.5 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.29 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.36 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.37 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.12 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.6 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.7 644))
@@ -134,7 +131,7 @@ Improved the mySQL configuration.")
   (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.30 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.12 644))
   (src/files.h (lpmud/I/49_files.h 1.1 644))
-  (src/files.c (lpmud/I/50_files.c 1.9 644))
+  (src/files.c (lpmud/I/50_files.c 1.10 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.3 644))
   (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.25 644))
@@ -159,7 +156,7 @@ Improved the mySQL configuration.")
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.7 644))
   (src/object.h (lpmud/44_object.h 1.34.1.7 644))
-  (src/object.c (lpmud/45_object.c 1.62.1.33 644))
+  (src/object.c (lpmud/45_object.c 1.62.1.34 644))
   (src/otable.h (lpmud/f/27_otable.h 1.8.1.4 644))
   (src/otable.c (lpmud/43_otable.c 1.22.1.3 644))
   (src/parser.c (lpmud/L/13_parser.c 1.1 644))
@@ -171,8 +168,8 @@ Improved the mySQL configuration.")
   (src/pkg-alists.h (lpmud/L/39_pkg-alists 1.2 644))
   (src/pkg-mysql.c (lpmud/J/1_pkg-mysql. 1.12 644))
   (src/pkg-mysql.h (lpmud/J/2_pkg-mysql. 1.2 644))
-  (src/port.h (lpmud/38_port.h 1.30.1.4.1.7 644))
-  (src/port.c (lpmud/39_port.c 1.17.1.5 644))
+  (src/port.h (lpmud/38_port.h 1.30.1.4.1.8 644))
+  (src/port.c (lpmud/39_port.c 1.17.1.6 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.12 644))
   (src/prolang.y (lpmud/37_prolang.y 1.65.1.61 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
@@ -215,7 +212,7 @@ Improved the mySQL configuration.")
   ;; Generic host files
   (src/hosts/README (lpmud/h/10_README 1.2 644))
   (src/hosts/crypt.c (lpmud/b/29_crypt.c 1.6 644))
-  (src/hosts/defines.txt (lpmud/b/28_defines 1.6.1.1 644))
+  (src/hosts/defines.txt (lpmud/b/28_defines 1.6.1.2 644))
   (src/hosts/unix.h (lpmud/d/37_unix.h 1.8 644))
 
   ;; Host: Amiga
@@ -227,7 +224,7 @@ Improved the mySQL configuration.")
   (src/hosts/amiga/config.h (lpmud/c/7_config.h 1.23.1.8 644))
   (src/hosts/amiga/README.Amiga (lpmud/c/12_README.Ami 1.4 644))
   (src/hosts/amiga/README (lpmud/c/13_README 1.4 644))
-  (src/hosts/amiga/Makefile (lpmud/c/24_Makefile 1.29.1.20 644))
+  (src/hosts/amiga/Makefile (lpmud/c/24_Makefile 1.29.1.21 644))
 
   ;; Host: BeOS
   (src/hosts/be/socketinc.h (lpmud/e/32_socketinc. 1.3 644))
@@ -235,7 +232,7 @@ Improved the mySQL configuration.")
   (src/hosts/be/config.h (lpmud/e/34_config.h 1.32.1.8 644))
   (src/hosts/be/be.h (lpmud/e/35_be.h 1.7 644))
   (src/hosts/be/beyacc (lpmud/I/39_beyacc 1.1 744))
-  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.41 644))
+  (src/hosts/be/Makefile (lpmud/e/37_Makefile 1.60.1.42 644))
   (src/hosts/be/icon-32x32.raw (lpmud/s/37_icon-32x32 1.1 644) :no-keywords)
   (src/hosts/be/icon-16x16.raw (lpmud/s/38_icon-16x16 1.1 644) :no-keywords)
   (src/hosts/be/driver.rsrc (lpmud/s/39_driver.rsr 1.1 644) :no-keywords)
@@ -245,6 +242,10 @@ Improved the mySQL configuration.")
   (src/hosts/GnuWin32/socket.h (lpmud/e/16_socket.h 1.1 644))
   (src/hosts/GnuWin32/socket.c (lpmud/e/17_socket.c 1.1 644))
   (src/hosts/GnuWin32/GnuWin32.h (lpmud/e/18_GnuWin32.h 1.1 644))
+
+  ;; Host: OS/2
+  (src/hosts/os2/machine.h (lpmud/M/36_machine.h 1.1 644))
+  (src/hosts/os2/Makefile (lpmud/M/37_Makefile 1.1 644))
 
   ;; Host: Win32
   (src/hosts/win32/tubmud.bmp (lpmud/g/20_tubmud.bmp 1.1 644) :no-keywords)
