@@ -59,7 +59,7 @@ For a detailed list of all changes see the file CHANGELOG.
            something different from '!'.
 
 
-12-Dec-2001 (Lars Duening) -- upcoming Release 3.2.9
+28-Dec-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -225,6 +225,11 @@ For a detailed list of all changes see the file CHANGELOG.
        + Remove a couple crashers when handling numbers at the numerical
            limits.
        + Using set_this_object() before the simul-efun object was loaded.
+       + Updating the simul-efun object could crash the driver when the
+           update changed the signature of sefuns which had already been
+           used by objects: executing the calls after the update could
+           mess up the interpreter stack or cause it to execute garbage
+           bytecode.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.

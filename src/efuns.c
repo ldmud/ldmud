@@ -2074,7 +2074,20 @@ f_process_string(svalue_t *sp)
  * Both filename and args are optional.
  *
  * TODO: OSB has a bugfix for this function to handle spaces in
- * TODO:: arguments.
+ * TODO:: arguments. Basically using the new explode solves the problem.
+ * TODO:: public string process_string(string str) 
+ * TODO:: {
+ * TODO::   int il;
+ * TODO::   string * parts;
+ * TODO::   string tmp;
+ * TODO::   parts = explode(str, "@@");
+ * TODO::   for ( il = 1; il < sizeof(parts); il += 2) {
+ * TODO::     tmp = process_value(parts[il]);
+ * TODO::     if (stringp(tmp))
+ * TODO::       parts[il] = tmp;
+ * TODO::   }
+ * TODO::   return implode(parts, "");
+ * TODO:: }
  */
 
 {

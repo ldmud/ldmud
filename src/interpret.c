@@ -13019,6 +13019,7 @@ again:
         inter_sp = sp;
         inter_pc = pc;
         call_simul_efun(code, ob, num_arg);
+        sp = inter_sp;
         /*
          * The result of the function call is on the stack.
          */

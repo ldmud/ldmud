@@ -304,7 +304,9 @@ get_simul_efun_object (void)
                     /* We are reusing an earlier sefun */
 
                     j &= ~-0x8000;
-                    if (simul_efunp[j].num_arg != num_arg)
+                    if (simul_efunp[j].num_arg != num_arg
+                     || 0 != ((simul_efunp[j].flags ^ flags) & TYPE_MOD_XVARARGS) 
+                       )
                     {
                         /* Numbers of arguments changed: discard the earlier
                          * sefun.
@@ -319,7 +321,9 @@ get_simul_efun_object (void)
                          */
                         while ( (j = simul_efunp[last = j].offset.func) >= 0)
                         {
-                            if (num_arg != simul_efunp[j].num_arg)
+                            if (num_arg != simul_efunp[j].num_arg
+                             || 0 != ((simul_efunp[j].flags ^ flags) & TYPE_MOD_XVARARGS) 
+                               )
                                 continue;
                             if (!mstreq(function_name, simul_efunp[j].name))
                                 continue;

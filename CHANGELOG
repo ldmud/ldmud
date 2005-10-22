@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Dec-2001 (Lars Duening)  (3.3.145)
+    - (interpret.c) When calling a simul_efun in a vanished object, the
+        local stackpointer of eval_instruction() was not synchronized
+        with inter_sp after the call (reported by Gnomi).
+    - (simul_efun.c) When reloading a simul_efun object, the check for
+        old sefuns to reactivate ignored changes in the TYPE_MOD_XVARARGS
+        flag. Since the exact format of the F_SIMUL_EFUN instruction depends
+        on this flag, this could trip the bytecode interpreter (reported by
+        Gnomi).
+
 21-Dec-2001 (Lars Duening)  (3.3.144)
     - (simulate.c) When checking the refcounts, the extra_refs in objects
         named in callbacks weren't counted corrected (reported by Tomba).
@@ -77,7 +87,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
         its purpose: when for such a closure the bound object l->ob
         differs from the code object l->function.alien.ob, this fact
         needs to be recorded in order to prevent security holes. So the
-        code fragment has been deactivated again with a small change: the
+        code fragment has been activated again with a small change: the
         second control frame will be created only if the two objects
         differ (unknowingly suggested by Menaures).
 
