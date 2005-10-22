@@ -20,12 +20,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 132)
-(Parent-Version lpmud 3-3 131)
-(Version-Log "Corrected the cross-define bugfix.")
+(Project-Version lpmud 3-3 133)
+(Parent-Version lpmud 3-3 132)
+(Version-Log "Another correction to the bugfix to Gimli's problem.")
 (New-Version-Log
 "")
-(Checkin-Time "Tue, 27 Nov 2001 20:03:21 -0700")
+(Checkin-Time "Wed, 28 Nov 2001 22:24:21 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -58,7 +58,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.4 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.32 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.195 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.196 644))
   (HISTORY (lpmud/f/49_HISTORY 1.224 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -170,7 +170,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.9 644))
   (src/port.c (lpmud/39_port.c 1.17.1.6 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.13 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.81 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.82 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -417,7 +417,7 @@
   (src/bugs/b-010801-0 (lpmud/N/17_b-010801-0 1.1 644) :no-keywords)
   (src/bugs/b-010831 (lpmud/N/35_b-010831 1.1 644) :no-keywords)
 
-  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.43 644) :no-keywords)
+  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.44 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
   (src/bugs/f-981027-1 (lpmud/g/28_f-981027-1 1.2 644) :no-keywords)
   (src/bugs/f-981027-2 (lpmud/g/27_f-981027-2 1.2 644) :no-keywords)
@@ -582,6 +582,7 @@
   (src/bugs/f-010615-2 (lpmud/M/32_f-010615-2 1.1 644) :no-keywords)
   (src/bugs/f-010701 (lpmud/M/39_f-010701 1.1 644) :no-keywords)
   (src/bugs/f-010713-0 (lpmud/N/6_f-010713-0 1.1 644))
+  (src/bugs/f-010723 (lpmud/P/30_f-010723 1.1 644) :no-keywords)
   (src/bugs/f-010726 (lpmud/N/14_f-010726 1.1 644) :no-keywords)
   (src/bugs/f-010801 (lpmud/N/18_f-010801 1.1 644) :no-keywords)
   (src/bugs/f-010802 (lpmud/N/19_f-010802 1.1 644) :no-keywords)
@@ -602,7 +603,7 @@
   (src/bugs/f-011016-0 (lpmud/O/11_f-011016-0 1.2 644) :no-keywords)
   (src/bugs/f-011016-1 (lpmud/O/12_f-011016-1 1.1 644) :no-keywords)
   (src/bugs/f-011029 (lpmud/P/24_f-011029 1.1 644) :no-keywords)
-  (src/bugs/f-011124 (lpmud/P/28_f-011124 1.1 644) :no-keywords)
+  (src/bugs/f-011124 (lpmud/P/28_f-011124 1.2 644) :no-keywords)
 
   (src/bugs/p-981027-1 (lpmud/g/25_p-981027-1 1.2 644) :no-keywords)
   (src/bugs/doomdark/strutil.c (lpmud/g/31_strutil.c 1.2 644) :no-keywords)

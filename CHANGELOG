@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Nov-2001 (Lars Duening)  (3.3.133)
+    - (prolang.y) Another correction to the bugfix of Gimli's problem
+        (reported by Freaky).
+
 27-Nov-2001 (Lars Duening)  (3.3.132)
     - (prolang.y) The bugfix to Gimlis problem unfortunately broke a couple
         of muds. This version works better (reported by many people).

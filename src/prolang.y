@@ -10946,10 +10946,17 @@ copy_functions (program_t *from, fulltype_t type)
                         }
                         else if ( (fun.flags & TYPE_MOD_PRIVATE) == 0
                               ||  (OldFunction->flags & TYPE_MOD_PRIVATE) == 0
+                              ||  ((OldFunction->flags|fun.flags)
+                                   & TYPE_MOD_VIRTUAL) != 0
                                 )
                         {
-                            /* At least one of the functions is visible:
-                             * prefer the first one.
+                            /* At least one of the functions is visible
+                             * or redefinable: prefer the first one.
+                             * TODO: The whole if-condition is more a kludge,
+                             * TODO:: developed iteratively from .367
+                             * TODO:: through .370. It should be reconsidered,
+                             * TODO:: which of course implies a deeper
+                             * TODO:: analysis of the going ons here.
                              */
                             cross_define( OldFunction, &fun
                                         , n - current_func_index );
@@ -10986,7 +10993,7 @@ copy_functions (program_t *from, fulltype_t type)
                 }
                 else /* n < 0: not an lfun */
                 {
-                    if (1 || n != -2
+                    if (n != -2
                      || (fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN)) == 0
                        )
                      {

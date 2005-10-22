@@ -1,0 +1,35 @@
+Short: Extension for present_clone()
+From: Andy <Andreas.Klauer@epost.de>
+Date: Mon, 23 Jul 2001 21:37:21 +0200
+Type: Feature
+State: New
+
+Hi Lars,
+
+bei present() gibt es die Form "<id> <n>" fuer den String, um zu pruefen, ob es
+ein n-tes Objekt gibt, das auf <id> passt.
+
+Bei present_clone ist es leider nicht moeglich, eine solche Nummer anzugeben.
+Das finde ich schade, da ich diese Funktion oft verwende (schliesslich ist sie
+ja zum einen viel billiger als present, zum anderen braucht man dem Objekt dann
+keine zusaetzliche ID geben...).
+
+Wie waere es mit einem extra-Argument int number nach environment (um die
+Kompatibilitaet zu wahren).
+
+Als neuer Parameter deswegen, damit man im Falle dass man ein Objekt uebergibt,
+diese Nummer dennoch mit angeben kann.
+
+Man koennte auch bei einem String die Form "<id> <n>" belassen und nur bei
+uebergebenem Objekt einen Zusatzparameter number zulassen.
+
+Ich faende es jedenfalls schoen, wenn man die Funktion auf diese Weise
+erweitern wuerde und sie somit gleichwertig mit present() machen wuerde.
+
+Waere auch gut, wenn diese Funktion etwas bekannter werden wuerde, da meistens
+present dazu verwendet wird, um zu schauen, ob ein Objekt im reset geklont
+werden muss oder nicht (was dazu dann noch schieflaeuft, wenn ein anderes
+Objekt diese id besitzt...)
+
+Gruss
+Menaures@UNItopia
