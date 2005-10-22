@@ -234,9 +234,11 @@ For a detailed list of all changes see the file CHANGELOG.
            option ('--no-compat' resp. '--compat').
        + New driver options '--min-malloced' and '--min-small-malloced' to
            specify the size of the initial block allocations.
-       + New driver options '--wizlist-file' and '--no-wizlist-file' to
-           control from where the driver reads the initial wizlist
-           information.
+       + New driver options '--wizlist-file <filename>' and
+           '--no-wizlist-file' to control from where the driver reads the
+           initial wizlist information.
+       + New driver option '--args <filename>' reads the commandline
+           arguments from a textfile. These argument files can be nested.
        + Removed a couple of fatal race-conditions in the xerq.
        + New configuration option 'use-deprecated' allows
            to disable obsolete and deprecated efuns. If enabled, the macro

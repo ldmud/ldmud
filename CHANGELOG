@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+29-Jun-2001 (Lars Duening)  (3.3.67)
+    - (main.c) Commandline arguments can now be read from a textfile, using
+        new commandline option '--args'. These argument files can be nested.
+        (suggested by Elric)
+
 28-Jun-2001 (Lars Duening)  (3.3.66)
     - (configure) The evaluation of the '--with-wizlist-file' configuration
         option was less than flawless.

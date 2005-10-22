@@ -210,6 +210,11 @@ DESCRIPTION
       --longhelp
         Display a long command help and exit.
 
+      --args <filename>
+        The driver reads and parses the given file and treats its contents
+        as if given on the commandline right where the --args option
+        occured. The file itself can again contain --args options.
+
 
 DESCRIPTION -- Argument Parser
     The parser analyses the commandline arguments given with the driver
@@ -235,3 +240,17 @@ DESCRIPTION -- Argument Parser
 
     The option '--' marks the end of options. All following command arguments
     are considered proper arguments even if they start with a '-' or '--'.
+
+    The arguments are usually taken from the commandline; but the parser
+    is also able to read them from a textfiles, which can be nested. The
+    content of the textfiles is broken down into words delimited by whitespace,
+    which are then treated as given on the commandline at the place where
+    the instruction to read the textfile stood.
+
+    The file parser recognizes simple double-quoted strings, which must be
+    contained on a single line. Additionally, the '#' character given by
+    itself is a comment marker - everthing after the '#' until the end
+    of the current line is ignored.
+
+HISTORY
+    LDMud 3.2.9 added the --args option.

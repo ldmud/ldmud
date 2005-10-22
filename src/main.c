@@ -32,6 +32,7 @@
 #include <setjmp.h>
 #include <signal.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <ctype.h>
 #include <stdarg.h>
@@ -700,6 +701,17 @@ dprintf3 (int fd, char *s, p_int a, p_int b, p_int c)
  *
  * The option '--' marks the end of options. All following command arguments
  * are considered proper arguments even if they start with a '-' or '--'.
+ *
+ * The arguments are usually taken from the commandline; but the parser
+ * is also able to read them from a textfiles, which can be nested. The
+ * content of the textfiles is broken down into words delimited by whitespace,
+ * which are then treated as given on the commandline at the place where
+ * the instruction to read the textfile stood.
+ *
+ * The file parser recognizes simple double-quoted strings, which must be
+ * contained on a single line. Additionally, the '#' character given by
+ * itself is a comment marker - everthing after the '#' until the end
+ * of the current line is ignored.
  *-------------------------------------------------------------------------
  * Internally every option recognized by the program is associated with
  * an id number, defined as the enum OptNumber. The parser itself uses the
@@ -729,10 +741,25 @@ dprintf3 (int fd, char *s, p_int a, p_int b, p_int c)
  * Parameter <eOption> denotes the recognized option, and pValue points
  * to the beginning of the value string if the option takes a value.
  * Proper arguments are parsed with eOption==cArgument and pValue
- * pointing to the argument string. The handler has to return 0 if the
- * option/argument was processed correctly, and non-zero else.
+ * pointing to the argument string. The handler has to return one of the
+ * following values:
+ *    hrSuccess: if the option/argument was processed correctly.
+ *    hrError:   if the option/argument couldn't be processed.
+ *    hrArgFile: if the given value is the name of an arguments file
+ *               to include.
  *-------------------------------------------------------------------------
  */
+
+/* Handler return values */
+
+typedef enum HandlerResult {
+    hrSuccess = 0  /* Argument parsed */
+  , hrError        /* Error parsing argument */
+  , hrArgFile      /* Value of this argument is the filename of an argument
+                    * file.
+                    */
+} HandlerResult;
+
 /* Desription of short ('-') options */
 
 typedef struct ShortOpt {
@@ -753,7 +780,8 @@ typedef struct LongOpt {
 
 typedef enum OptNumber {
    cUnknown = 0     /* unknown option                     */
- , cArgument        /* normal argument (for us: filename) */
+ , cArgument        /* normal argument (for us: portnumber) */
+ , cArgFile         /* --args               */
  , cInherited       /* --inherit            */
  , cUdpPort         /* --udp                */
  , cTrace           /* --list-compiles      */
@@ -840,7 +868,8 @@ static ShortOpt aShortOpts[]
     };
 
 static LongOpt aLongOpts[]
-  = { { "cleanup-time",       cCleanupTime,    MY_TRUE }
+  = { { "args",               cArgFile,        MY_TRUE }
+    , { "cleanup-time",       cCleanupTime,    MY_TRUE }
     , { "compat",             cCompat,         MY_FALSE }
     , { "no-compat",          cNoCompat,       MY_FALSE }
     , { "debug",              cDebug,          MY_FALSE }
@@ -1277,6 +1306,7 @@ shortusage (void)
 "Usage: driver [options] [<portnumber>...]\n"
 "\nOptions are:\n"
 "\n"
+"  --args <filename\n"
 "  -P|--inherit <fd-number>\n"
 "  -u|--udp <portnumber>\n"
 "  -D|--define <macro>[=<text>]\n"
@@ -1348,6 +1378,10 @@ usage (void)
   fputs("\n"
 "Usage: driver [options] [<portnumber>...]\n"
 "\nOptions are:\n"
+"\n"
+"  --args <filename>\n"
+"    Read the options from <filename> as if they were given on the\n"
+"    commandline.\n"
 "\n"
 "  -P|--inherit <fd-number>\n"
 "    Inherit filedescriptor <fd-number> from the parent process\n"
@@ -1529,7 +1563,8 @@ eval_arg (int eOption, const char * pValue)
 /* Callback from getargs() for the first scan of the commandline
  * arguments. <eOption> is the option recognized, <pValue> a value
  * or NULL.
- * Return 0 on success, non-zero on a failure.
+ * Return hrSuccess on success, hrError on a failure.
+ * Return hrArgFile if the given value is the name of an arguments file.
  */
 
 {
@@ -1543,6 +1578,9 @@ eval_arg (int eOption, const char * pValue)
         else
             fprintf(stderr, "Illegal portnumber '%s' ignored.\n", pValue);
         break;
+
+    case cArgFile:
+        return hrArgFile;
 
     case cInherited:
         if (numports >= MAXNUMPORTS)
@@ -1712,7 +1750,7 @@ eval_arg (int eOption, const char * pValue)
     case cMaster:
         if (strlen(pValue) >= sizeof(master_name)) {
             fprintf(stderr, "Too long master name '%s'\n", pValue);
-            return 1;
+            return hrError;
         }
         strcpy(master_name, pValue);
         break;
@@ -1722,7 +1760,7 @@ eval_arg (int eOption, const char * pValue)
         if (min_malloced < 0)
         {
             fprintf(stderr, "Illegal value '%s' for --min-malloc\n", pValue);
-            return 1;
+            return hrError;
         }
         break;
 
@@ -1731,7 +1769,7 @@ eval_arg (int eOption, const char * pValue)
         if (min_small_malloced < 0)
         {
             fprintf(stderr, "Illegal value '%s' for --min-small-malloc\n", pValue);
-            return 1;
+            return hrError;
         }
         break;
 
@@ -1746,7 +1784,7 @@ eval_arg (int eOption, const char * pValue)
             if (max_malloced < 0)
             {
                 fprintf(stderr, "Illegal value '%s' for --max-malloc\n", pValue);
-                return 1;
+                return hrError;
             }
         }
         break;
@@ -1754,7 +1792,7 @@ eval_arg (int eOption, const char * pValue)
     case cMudlib:
         if (chdir(pValue) == -1) {
             fprintf(stderr, "Bad mudlib directory: %s\n", pValue);
-            return 1;
+            return hrError;
         }
         new_mudlib = 1;
         break;
@@ -1828,11 +1866,11 @@ eval_arg (int eOption, const char * pValue)
 
     case cHelp:
         shortusage();
-        return 1;
+        return hrError;
 
     case cLongHelp:
         usage();
-        return 1;
+        return hrError;
 
     case cPidFile:
         {
@@ -1843,7 +1881,7 @@ eval_arg (int eOption, const char * pValue)
             {
                 fprintf(stderr, "Can't open pidfile '%s': %s.\n"
                        , pValue, strerror(errno));
-                return 1;
+                return hrError;
             }
             fprintf(pidfile, "%ld\n", (long)getpid());
             fclose(pidfile);
@@ -1864,7 +1902,7 @@ eval_arg (int eOption, const char * pValue)
             if (n < 0 || n > 2 || end == NULL || *end != '\0')
             {
                 fprintf(stderr, "Bad check-state level: %s\n", pValue);
-                return 1;
+                return hrError;
             }
             check_state_level = n;
             break;
@@ -1897,7 +1935,7 @@ eval_arg (int eOption, const char * pValue)
             if (!fdata)
             {
                 fprintf(stderr, "Out of memory for '-f %s'.\n", pValue);
-                return 1;
+                return hrError;
             }
 
             fdata->next = NULL;
@@ -1915,11 +1953,283 @@ eval_arg (int eOption, const char * pValue)
         /* This shouldn't happen. */
         fprintf(stderr, "%s driver: (eval_arg) Internal error, eOption is %d\n"
                       , time_stamp(), eOption);
-        return 1;
+        return hrError;
     } /* switch */
 
-  return 0;
+  return hrSuccess;
 } /* eval_arg() */
+
+/*-------------------------------------------------------------------------*/
+static Bool
+open_arg_file (InputSource ** ppInput, const char * pName)
+
+/* Try to open the file <pName> as new input source.
+ * If successful, add the source to the list starting at *ppInput and
+ * return MY_TRUE.
+ * On failure, print an error message and return MY_FALSE.
+ */
+
+{
+    InputSource * pSrc;
+    size_t        size, left;
+    FILE        * f;
+    struct stat   st;
+    char        * pData;
+
+    /* Auxiliary structure to store the found argument words. */
+    typedef struct Marker {
+        struct Marker * next;
+        char          * pArg;
+    } Marker;
+
+    Marker * mHead = NULL;
+    Marker * mTail = NULL;
+
+    /* If this is a nested include, make sure that we don't get caught
+     * in a recursion.
+     */
+    for (pSrc = *ppInput; pSrc && pSrc->name != NULL; pSrc = pSrc->next)
+    {
+        if (!strcmp(pSrc->name, pName))
+        {
+            fprintf(stderr
+                   , "driver: Recursion in nested argument files: %s\n"
+                   , pName);
+            for (pSrc = *ppInput; pSrc && pSrc->name != NULL; pSrc = pSrc->next)
+                fprintf(stderr, "          included by %s\n", pSrc->name);
+            return MY_FALSE;
+        }
+    }
+    
+    /* If the file would be opened in text mode, the size from fstat would
+     * not match the number of characters that we can read.
+     */
+    f = fopen(pName, "rb");
+    if (f == NULL)
+    {
+        int err = errno;
+        fprintf( stderr
+               , "driver: Can't open argument file '%s' for reading: (%d) %s\n"
+               , pName, err, strerror(err)
+               );
+        return MY_FALSE;
+    }
+
+    /* Check if the file is small enough to be read. */
+
+    if (fstat(fileno(f), &st) == -1)
+    {
+        int err = errno;
+        fprintf( stderr
+               , "driver: Can't stat argument file '%s': (%d) %s\n"
+               , pName, err, strerror(err)
+               );
+        fclose(f);
+        return MY_FALSE;
+    }
+
+    size = (size_t)st.st_size;
+
+    /* Get a new input source structure and read in the file. */
+    {
+        size_t len = strlen(pName);
+
+        pSrc = malloc(sizeof(*pSrc) + len + 1 + size);
+        if (pSrc == NULL)
+        {
+            fprintf( stderr
+                   , "driver: Out of memory reading argument file '%s'\n"
+                   , pName
+                   );
+            fclose(f);
+            return MY_FALSE;
+        }
+
+        pSrc->arg = 0;
+        pSrc->argc = 0;
+        pSrc->argv = NULL;
+        pSrc->next = NULL;
+
+        strcpy(pSrc->data, pName);
+        pSrc->data[len] = '\0';
+        pSrc->name = pSrc->data;
+
+        pData = &(pSrc->data[len+1]);
+
+        if (1 != fread(pData, size, 1, f))
+        {
+            int err = errno;
+            fprintf( stderr
+                   , "driver: Error reading argument file '%s': (%d) %s\n"
+                   , pName, err, strerror(err)
+                   );
+            free(pSrc);
+            fclose(f);
+            return MY_FALSE;
+        }
+
+        /* Ensure a terminating 0 */
+        pData[size] = '\0';
+    }
+    
+    fclose(f);
+    
+    /* Now scan the read data and search for words.
+     * Store the found words in the Marker list, and insert the
+     * \0 terminators.
+     */
+
+    for (left = 0; left < size && *pData != '\0'; left++, pData++)
+    {
+        Marker *pMarker;
+        Bool    endFound, quoted;
+
+        char c = *pData;
+
+        if (isascii(c) && (isspace(c) || c == '\r' || c == '\n'))
+            continue;
+
+        /* Found a non-space. If it is a '#', it is a comment - skip it. */
+        if (c == '#')
+        {
+            for ( left++, pData++
+                ; left < size && *pData != '\0'
+                ; left++, pData++)
+                if (*pData == '\r' || *pData == '\n')
+                    break;
+            /* pData now points to the lineend character, or to the end
+             * of the file. Either way, continuing the outer loop will
+             * do the right thing.
+             */
+            continue;
+        }
+
+        /* It is a true new word. Store it's starting position in
+         * a new marker. Oh, and count it.
+         */
+        pSrc->argc++;
+
+        pMarker = alloca(sizeof(*pMarker));
+        if (pMarker == NULL)
+        {
+            fprintf( stderr
+                   , "driver: Out of memory reading argument file '%s'\n"
+                   , pName
+                   );
+            free(pSrc);
+            return MY_FALSE;
+        }
+
+        pMarker->pArg = pData;
+        pMarker->next = NULL;
+
+        if (mTail)
+            mTail->next = pMarker;
+        mTail = pMarker;
+        if (!mHead)
+            mHead = pMarker;
+
+        /* Now search for the end of the word.
+         * Look at the first character again in case it's a quote.
+         */
+        for ( endFound = MY_FALSE, quoted = MY_FALSE
+            ; left < size && *pData != '\0'
+            ; left++, pData++
+            )
+        {
+            c = *pData;
+
+            /* Line end always terminates the search */
+            if (c == '\r' || c == '\n')
+            {
+                if (quoted)
+                {
+                    fprintf( stderr
+                           , "driver: Error in argument file '%s': "
+                             "Quoted string spans more than one line.\n"
+                           , pName
+                           );
+                    free(pSrc);
+                    return MY_FALSE;
+                }
+                endFound = MY_TRUE;
+                break;
+            }
+
+            /* Space outside of a quoted string also terminates */
+            if (!quoted && isascii(c) && isspace(c))
+            {
+                endFound = MY_TRUE;
+                break;
+            }
+
+            /* If it's a '"', toggle the quoted flag. */
+            if (c == '"')
+                quoted = !quoted;
+
+            /* Anyway, it's not a space here, so continue the search */
+        }
+
+        /* One possible error: end of file in a quoted string */
+        if (!endFound && quoted)
+        {
+            fprintf( stderr
+                   , "driver: Error in argument file '%s': "
+                     "Unexpected end of file in quoted string.\n"
+                   , pName
+                   );
+            free(pSrc);
+            return MY_FALSE;
+        }
+
+        /* pData now points to the first character after the found word
+         * It is a space (or the terminating '\0' at the end of the file),
+         * so we can put the '\0' for the argument word in it.
+         */
+        *pData = '\0';
+    }
+
+    /* We found all the arguments. Now setup an argv array. */
+
+    if (pSrc->argc == 0)
+    {
+        fprintf( stderr
+               , "driver: Warning: Argument file '%s' contained no data.\n"
+               , pName);
+        /* We will setup an empty InputSource - no need to abort argument
+         * parsing because of this.
+         */
+    }
+
+    {
+        int i;
+
+        pSrc->argv = malloc(sizeof(pSrc->argv[0]) * (pSrc->argc+1));
+        if (pSrc->argv == NULL)
+        {
+            fprintf( stderr
+                   , "driver: Out of memory reading argument file '%s'\n"
+                   , pName
+                   );
+            free(pSrc);
+            return MY_FALSE;
+        }
+
+        for (i = 0; i < pSrc->argc; i++, mHead = mHead->next)
+        {
+            pSrc->argv[i] = mHead->pArg;
+        }
+
+        pSrc->argv[pSrc->argc] = NULL; /* Just in case */
+
+    }
+
+    /* Link the now complete InputSource structure into the list */
+    pSrc->next = *ppInput;
+    *ppInput = pSrc;
+
+    return MY_TRUE;
+} /* open_arg_file() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -1936,7 +2246,7 @@ free_sources (InputSource * pInput)
 
         pInput = pInput->next;
 
-        if (pSrc->name != NULL)
+        if (pSrc->name != NULL && pSrc->argv)
             /* Not the commandline */
             free(pSrc->argv);
 
@@ -1950,7 +2260,7 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
 
 /* Get the arguments from the commandline and pass them
  * as (number, optional value) to the opt_eval callback.
- * If opt_eval() returns non-zero, argument scanning is terminated.
+ * If opt_eval() returns hrError, argument scanning is terminated.
  * In that case, or if getargs() detects an error itself, getargs() returns
  * non-zero.
  * A zero return means 'success' in both cases.
@@ -2100,7 +2410,7 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
           if (cUnknown == eOption)
           {
             if (pInput->name != NULL)
-                fprintf(stderr, "driver: (%s) Unknown option '");
+                fprintf(stderr, "driver: (%s) Unknown option '", pInput->name);
             else
                 fputs("driver: Unknown option '", stderr);
             if (bShort)
@@ -2142,10 +2452,24 @@ getargs (int argc, char ** argv, int (*opt_eval)(int, const char *) )
         /* --- The option evaluation --- */
 
         i = (*opt_eval)(eOption, pValue);
-        if (i)
+        if (i == hrError)
         {
           free_sources(pInput);
-          return i;
+          return 1;
+        }
+
+        if (i == hrArgFile)
+        {
+            pInput->arg = iArg+1;
+            if (!open_arg_file(&pInput, pValue))
+                return 1;
+
+            /* We have a new input source here, so reset the loop
+             * parameters.
+             */
+            iArg = -1;
+            bCont = MY_FALSE;
+            bDone = MY_FALSE;
         }
 
       } /* for (iArg) */
