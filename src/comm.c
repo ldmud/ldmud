@@ -3451,7 +3451,7 @@ print_prompt (void)
              ? prompt->u.ob
              : prompt->u.lambda->ob;
 
-        if (ob->flags & O_DESTRUCTED)
+        if (ob && ob->flags & O_DESTRUCTED)
         {
             free_svalue(prompt);
             put_ref_string(prompt, STR_DEFAULT_PROMPT);
@@ -5313,7 +5313,7 @@ query_ip_name (svalue_t *sp, Bool lookup)
         }
         else
         {
-            transfer_svalue(sp, &const0);
+            assign_svalue(sp, &const0);
         }
     }
 
@@ -6655,6 +6655,13 @@ f_set_prompt (svalue_t *sp)
 
     if (sp->type == T_STRING || sp->type == T_CLOSURE)
     {
+        if (sp->type == T_CLOSURE && sp->x.closure_type == CLOSURE_UNBOUND_LAMBDA)
+        {
+            inter_sp = sp;
+            error("Bad arg 1 for set_prompt(): lambda closure not bound\n");
+            /* NOTREACHED */
+        }
+
         if (sp->type == T_STRING)
         {
             string_t *str = make_tabled_from(sp->u.str);

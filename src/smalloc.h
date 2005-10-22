@@ -79,6 +79,13 @@ extern void store_print_block_dispatch_info(void *block, void (*func)(int, void 
 extern int is_freed(void *p, p_uint minsize);
 #endif /* MALLOC_TRACE */
 
+#ifdef CHECK_OBJECT_GC_REF
+extern void note_object_allocation_info ( void *block );
+extern void note_program_allocation_info ( void *block );
+extern Bool is_object_allocation ( void *block );
+extern Bool is_program_allocation ( void *block );
+#endif /* CHECK_OBJECT_RC_REF */
+
 #endif /* MALLOC_smalloc */
 
 #endif /* SMALLOC_H__ */

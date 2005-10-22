@@ -35,6 +35,15 @@
  */
 #define CHECK_OBJECT_REF
 
+/* Activate object referencing checking code during the GC. It will
+ * print error messages to gcout when an object or program is
+ * referenced as something else. No penalty for using.
+ * Requires MALLOC_TRACE to work. Incompatible with DUMP_GC_REFS.
+ */
+#ifdef MALLOC_TRACE
+#    define CHECK_OBJECT_GC_REF
+#endif
+
 /* Deactivate the tracking of blueprints. This will disable the
  * efuns blueprint(), but probably avoid the object refcount bug.
  */

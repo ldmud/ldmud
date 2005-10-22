@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Apr-2002 (Lars Duening)  (3.3.204)
+    - (comm.c) Using unbound lambdas for prompts crashed the driver
+         (reported by Gnomi).
+    - (driver.h, gcollect, smalloc) When macro CHECK_OBJECT_GC_REF is
+         activated, every supposedly non-object memory reference in a GC is
+         checked if it points to an object. If yes, a diagnostic is printed
+         to gcollect out. Requires MALLOC_TRACE to work.
+
 21-Apr-2002 (Lars Duening)  (3.3.203)
     - (exec.h, prolang.y, interpret.c, object.c, swap.c) Linenumbers are
          now kept in a separate memory block, which makes swapping them

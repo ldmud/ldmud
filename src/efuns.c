@@ -3780,7 +3780,7 @@ f_object_info (svalue_t *sp, int num_args)
     if (num_args == 3)
     {
         value = argp[2].u.number;
-        transfer_svalue_no_free(&result, &const0);
+        assign_svalue_no_free(&result, &const0);
     }
     else
         value = -1;

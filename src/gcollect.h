@@ -49,7 +49,7 @@ extern mapping_t *stale_mappings;
 
 #define GC_REF_DUMP(type,p,txt,fun) fun(p)
 
-#endif
+#endif /* DUMP_GC_REFS */
 
 /* --- Prototypes --- */
 
@@ -58,9 +58,14 @@ extern void clear_inherit_ref(program_t *p);
 extern void clear_object_ref (object_t *p);
 extern void gc_mark_program_ref(program_t *p);
 extern void gc_reference_destructed_object(object_t *ob);
+#ifdef CHECK_OBJECT_GC_REF
+extern void gc_note_malloced_block_ref(void *p, const char * file, int line);
+extern void gc_count_ref_in_vector(svalue_t *svp, size_t num, const char * file, int line);
+#else
 extern void gc_note_malloced_block_ref(void *p);
-extern void gc_count_ref_from_string(string_t *p);
 extern void gc_count_ref_in_vector(svalue_t *svp, size_t num);
+#endif
+extern void gc_count_ref_from_string(string_t *p);
 extern void clear_ref_in_vector(svalue_t *svp, size_t num);
 
 #define mark_program_ref(p) \
@@ -69,8 +74,12 @@ extern void clear_ref_in_vector(svalue_t *svp, size_t num);
 #define reference_destructed_object(p) \
     GC_REF_DUMP(object_t*, p, "Ref dest' object", gc_reference_destructed_object)
 
+#ifdef CHECK_OBJECT_GC_REF
+#define note_malloced_block_ref(p) gc_note_malloced_block_ref(p, __FILE__, __LINE__)
+#else
 #define note_malloced_block_ref(p) \
     GC_REF_DUMP(void*, p, "Note malloced block", gc_note_malloced_block_ref)
+#endif
 
 #define count_ref_from_string(p) \
     GC_REF_DUMP(string_t*, p, "Ref from string", gc_count_ref_from_string)
@@ -85,11 +94,15 @@ extern void clear_ref_in_vector(svalue_t *svp, size_t num);
 
 #else
 
+#ifdef CHECK_OBJECT_GC_REF
+#define count_ref_in_vector(p, num)     gc_count_ref_in_vector(p, num, __FILE__, __LINE__)
+#else
 #define count_ref_in_vector(p, num)     gc_count_ref_in_vector(p, num)
+#endif
 
 #endif /* DUMP_GC_REFS */
 
-#else
+#else /* no GC_SUPPORT */
 
 #define gc_status (0)
 

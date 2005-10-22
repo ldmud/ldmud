@@ -3142,6 +3142,44 @@ static struct {
    * blockaddress, 0).
    */
 
+#ifdef CHECK_OBJECT_GC_REF
+/*-------------------------------------------------------------------------*/
+/* Some extra variables to explicitely store the location of program
+ * and object allocations.
+ */
+
+static char * object_file;
+static word_t object_line;
+static char * program_file;
+static word_t program_line;
+
+void
+note_object_allocation_info ( void *block )
+{
+    object_file = (char *)((word_t*)block)[M_FILE-OVERHEAD];
+    object_line = ((word_t*)block)[M_LINE-OVERHEAD];
+}
+void
+note_program_allocation_info ( void *block )
+{
+    program_file = (char *)((word_t*)block)[M_FILE-OVERHEAD];
+    program_line = ((word_t*)block)[M_LINE-OVERHEAD];
+}
+
+Bool
+is_object_allocation ( void *block )
+{
+    return (object_file == (char *)((word_t*)block)[M_FILE-OVERHEAD])
+        && (object_line == ((word_t*)block)[M_LINE-OVERHEAD]);
+}
+Bool
+is_program_allocation ( void *block )
+{
+    return (program_file == (char *)((word_t*)block)[M_FILE-OVERHEAD])
+        && (program_line == ((word_t*)block)[M_LINE-OVERHEAD]);
+}
+#endif
+
 /*-------------------------------------------------------------------------*/
 void
 store_print_block_dispatch_info (void *block

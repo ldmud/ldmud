@@ -153,9 +153,31 @@ static lambda_t *stale_lambda_closures;
   /* Clear the memory block marker for <p>
    */
 
+#ifdef CHECK_OBJECT_GC_REF
+unsigned long gc_mark_ref(void * p, const char * file, int line)
+{
+    if (is_object_allocation(p))
+    {
+        dprintf3(gout, "DEBUG: Object %x referenced as something else from %s:%d\n"
+               , (p_int)p, (p_int)file, (p_int)line);
+    }
+    if (is_program_allocation(p))
+    {
+        dprintf3(gout, "DEBUG: Program %x referenced as something else from %s:%d\n"
+               , (p_int)p, (p_int)file, (p_int)line);
+    }
+    return ( ((p_uint *)(p))[-SMALLOC_OVERHEAD] |= M_REF );
+}
+
+#define MARK_REF(p) gc_mark_ref(p, __FILE__, __LINE__)
+#define MARK_PLAIN_REF(p) ( ((p_uint *)(p))[-SMALLOC_OVERHEAD] |= M_REF )
+
+#else
 #define MARK_REF(p) ( ((p_uint *)(p))[-SMALLOC_OVERHEAD] |= M_REF )
   /* Set the memory block marker for <p>
    */
+#define MARK_PLAIN_REF(p) MARK_REF(p)
+#endif
 
 #define TEST_REF(p) ( !( ((p_uint *)(p))[-SMALLOC_OVERHEAD] & M_REF ) )
   /* Check the memory block marker for <p>, return TRUE if _not_ set.
@@ -231,7 +253,11 @@ clear_memory_reference (void *p)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-gc_note_ref (void *p)
+gc_note_ref (void *p
+#ifdef CHECK_OBJECT_GC_REF
+            , const char * file, int line
+#endif
+            )
 
 /* Note the reference to memory block <p>.
  *
@@ -244,14 +270,25 @@ gc_note_ref (void *p)
 {
     if (TEST_REF(p))
     {
+#ifdef CHECK_OBJECT_GC_REF
+        gc_mark_ref(p, file, line);
+#else
         MARK_REF(p);
+#endif
         return;
     }
 } /* gc_note_ref() */
 
+#ifdef CHECK_OBJECT_GC_REF
+void gc_note_malloced_block_ref (void *p, const char * file, int line) { gc_note_ref(p, file, line); }
+#define note_ref(p) gc_note_ref(p, __FILE__, __LINE__)
+#define passed_note_ref(p) gc_note_ref(p, file, line)
+#else
 void gc_note_malloced_block_ref (void *p) { gc_note_ref(p); }
 
 #define note_ref(p) GC_REF_DUMP(void*, p, "Note ref", gc_note_ref)
+#define passed_note_ref(p) note_ref(p)
+#endif
 
 /*-------------------------------------------------------------------------*/
 void
@@ -323,7 +360,11 @@ gc_mark_program_ref (program_t *p)
  */
 
 {
+#ifdef CHECK_OBJECT_GC_REF
+    if (TEST_REF(p) && ( MARK_PLAIN_REF(p),MY_TRUE ) )
+#else
     if (CHECK_REF(p))  /* ...then mark referenced data */
+#endif
     {
         int i;
 
@@ -434,7 +475,7 @@ mark_object_ref (object_t *ob)
  */
 
 {
-    MARK_REF(ob); ob->ref++;
+    MARK_PLAIN_REF(ob); ob->ref++;
     mark_program_ref(ob->prog);
     MARK_MSTRING_REF(ob->name);
     MARK_MSTRING_REF(ob->load_name);
@@ -612,7 +653,11 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
 
 /*-------------------------------------------------------------------------*/
 void
-gc_count_ref_in_vector (svalue_t *svp, size_t num)
+gc_count_ref_in_vector (svalue_t *svp, size_t num
+#ifdef CHECK_OBJECT_GC_REF
+            , const char * file, int line
+#endif
+                       )
 
 /* Count the references the <num> elements of vector <p>.
  */
@@ -649,7 +694,11 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num)
             if (p->u.vec != &null_vector && CHECK_REF(p->u.vec))
             {
                 count_array_size(p->u.vec);
+#ifdef CHECK_OBJECT_GC_REF
+                gc_count_ref_in_vector(&p->u.vec->item[0], VEC_SIZE(p->u.vec), file, line);
+#else
                 count_ref_in_vector(&p->u.vec->item[0], VEC_SIZE(p->u.vec));
+#endif
             }
             p->u.vec->ref++;
             continue;
@@ -661,7 +710,7 @@ gc_count_ref_in_vector (svalue_t *svp, size_t num)
 
                 m = p->u.map;
                 if (m->cond)
-                    note_ref(m->cond);
+                    passed_note_ref(m->cond);
                 /* hash mappings have been eleminated at the start */
                 count_ref_in_mapping(m);
                 count_mapping_size(m);
@@ -1743,6 +1792,10 @@ setup_print_block_dispatcher (void)
     free_array(a);
     free_array(b);
     store_print_block_dispatch_info((char *)master_ob, show_object);
+#ifdef CHECK_OBJECT_GC_REF
+    note_object_allocation_info((char*)master_ob);
+    note_program_allocation_info((char*)(master_ob->prog));
+#endif
 
     tmp_closure.type = T_CLOSURE;
     tmp_closure.x.closure_type = CLOSURE_EFUN + F_ALLOCATE;
