@@ -585,7 +585,7 @@ static void large_free(char *);
             fatal("allocation from free list for %lu bytes: " \
                   "block %p magic match failed, " \
                   "expected %lx, found %lx\n" \
-                 , block, (unsigned long) size \
+                 , (unsigned long) size, block \
                  , SIZE_MOD_INDEX(sfmagic, size), block[M_MAGIC]); \
         block[M_MAGIC] = SIZE_MOD_INDEX(samagic, size); \
       } while(0)

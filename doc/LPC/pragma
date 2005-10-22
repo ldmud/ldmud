@@ -3,7 +3,8 @@ NAME
 
 DESCRIPTION
         The preprocessor directive #pragma can be used to select
-        several compilation options.
+        several compilation options. Multiple options can be selected
+        in one #pragma directive by separating them with commas.
 
         combine_strings: Perform the addition of string literals at
                 compile time instead of run time, e.g. "foo"+"bar"
@@ -63,10 +64,15 @@ DESCRIPTION
         show_code_window: shows some bytes starting at or near the
                 last point set_code_window was called.
 
+EXAMPLES
+        #pragma strict_types
+        #pragma no_clone, no_inherit
+
 HISTORY
         LDMud 3.2.7 added local_scopes, no_local_scopes, no_clone
         and no_inherit.
         LDMud 3.2.8 added weak_types, pedantic and sloppy.
+        LDMud 3.2.9 allowed to specify multiple pragmas in one directive.
 
 SEE ALSO
         inheritance(LPC), initialisation(LPC), objects(C),

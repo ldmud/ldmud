@@ -2134,94 +2134,179 @@ static void
 handle_pragma (char *str)
 
 /* Handle the pragma <str>. Unknown pragmas are ignored.
+ * One pragma string can contain multiple actual pragmas, separated
+ * with space and/or comma.
  */
 
 {
+    char * base, * next;
+
 #if defined(LEXDEBUG)
     printf("%s handle pragma:'%s'\n", time_stamp(), str);
 #endif
-    if (strcmp(str, "strict_types") == 0)
+
+    /* Loop over the pragma(s).
+     * If valid, base points to the first character of the pragma name,
+     * or to spaces before it.
+     */
+    for ( base = str, next = NULL
+        ; base != NULL && *base != '\0'
+        ; base = next
+        )
     {
-        pragma_strict_types = PRAGMA_STRICT_TYPES;
-        instrs[F_CALL_OTHER].ret_type = TYPE_UNKNOWN;
-    }
-    else if (strcmp(str, "strong_types") == 0)
-    {
-        pragma_strict_types = PRAGMA_STRONG_TYPES;
-        instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
-    }
-    else if (strcmp(str, "weak_types") == 0)
-    {
-        pragma_strict_types = PRAGMA_WEAK_TYPES;
-        instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
-    }
-    else if (strcmp(str, "save_types") == 0)
-    {
-        pragma_save_types = MY_TRUE;
-    }
-    else if (strcmp(str, "combine_strings") == 0)
-    {
-        pragma_combine_strings = MY_TRUE;
-    }
-    else if (strcmp(str, "no_combine_strings") == 0)
-    {
-        pragma_combine_strings = MY_FALSE;
-    }
-    else if (strcmp(str, "verbose_errors") == 0)
-    {
-        pragma_verbose_errors = MY_TRUE;
-    }
-    else if (strcmp(str, "no_clone") == 0)
-    {
-        pragma_no_clone = MY_TRUE;
-    }
-    else if (strcmp(str, "no_inherit") == 0)
-    {
-        pragma_no_inherit = MY_TRUE;
-    }
-    else if (strcmp(str, "no_shadow") == 0)
-    {
-        pragma_no_shadow = MY_TRUE;
-    }
-    else if (strcmp(str, "pedantic") == 0)
-    {
-        pragma_pedantic = MY_TRUE;
-    }
-    else if (strcmp(str, "sloppy") == 0)
-    {
-        pragma_pedantic = MY_FALSE;
-    }
-    else if (strcmp(str, "no_local_scopes") == 0)
-    {
-        pragma_use_local_scopes = MY_FALSE;
-    }
-    else if (strcmp(str, "local_scopes") == 0)
-    {
-        pragma_use_local_scopes = MY_TRUE;
-    }
-#if defined( DEBUG ) && defined ( TRACE_CODE )
-    else if (strcmp(str, "set_code_window") == 0)
-    {
-        set_code_window();
-    }
-    else if (strcmp(str, "show_code_window") == 0)
-    {
-        show_code_window();
-    }
-#endif
-    else if (master_ob)
-    {
-        /* Calling yywarnf() without a master can cause the game
-         * to shut down, because yywarnf() eventually tries to call
-         * a master lfun.
+        size_t namelen;
+        Bool validPragma;
+
+        /* Skip spaces */
+        base = base + strspn(base, " \t");
+        if ('\0' == *base)
+            break;
+
+        /* Find next delimiter, if any, and determine the
+         * length of the pragma name.
          */
-        yywarnf("Unknown #pragma '%s'", str);
-    }
-    else
-    {
-        debug_message("Warning: Unknown #pragma '%s': file %s, line %d\n"
-                     , str, current_file, current_line);
-    }
+        next = strpbrk(base, " \t,");
+        if (NULL == next)
+            namelen = strlen(base);
+        else
+            namelen = next - base;
+
+        /* Evaluate the found pragma name */
+        validPragma = MY_FALSE;
+
+        if (strncmp(base, "strict_types", namelen) == 0)
+        {
+            pragma_strict_types = PRAGMA_STRICT_TYPES;
+            instrs[F_CALL_OTHER].ret_type = TYPE_UNKNOWN;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "strong_types", namelen) == 0)
+        {
+            pragma_strict_types = PRAGMA_STRONG_TYPES;
+            instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "weak_types", namelen) == 0)
+        {
+            pragma_strict_types = PRAGMA_WEAK_TYPES;
+            instrs[F_CALL_OTHER].ret_type = TYPE_ANY;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "save_types", namelen) == 0)
+        {
+            pragma_save_types = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "combine_strings", namelen) == 0)
+        {
+            pragma_combine_strings = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_combine_strings", namelen) == 0)
+        {
+            pragma_combine_strings = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "verbose_errors", namelen) == 0)
+        {
+            pragma_verbose_errors = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_clone", namelen) == 0)
+        {
+            pragma_no_clone = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_inherit", namelen) == 0)
+        {
+            pragma_no_inherit = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_shadow", namelen) == 0)
+        {
+            pragma_no_shadow = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "pedantic", namelen) == 0)
+        {
+            pragma_pedantic = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "sloppy", namelen) == 0)
+        {
+            pragma_pedantic = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "no_local_scopes", namelen) == 0)
+        {
+            pragma_use_local_scopes = MY_FALSE;
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "local_scopes", namelen) == 0)
+        {
+            pragma_use_local_scopes = MY_TRUE;
+            validPragma = MY_TRUE;
+        }
+#if defined( DEBUG ) && defined ( TRACE_CODE )
+        else if (strncmp(base, "set_code_window", namelen) == 0)
+        {
+            set_code_window();
+            validPragma = MY_TRUE;
+        }
+        else if (strncmp(base, "show_code_window", namelen) == 0)
+        {
+            show_code_window();
+            validPragma = MY_TRUE;
+        }
+#endif
+
+        /* Advance next to the next scanning position so that the
+         * for loop increment works.
+         */
+        if (NULL != next)
+        {
+            /* Skip spaces */
+            next = next + strspn(next, " \t");
+
+            if (',' == *next)
+            {
+                /* Skip the one allowed comma */
+                next++;
+            }
+            else
+                validPragma = MY_FALSE;
+
+            if ('\0' == *next)
+            {
+                /* End of string */
+                next = NULL;
+            }
+
+            /* If next now points to something else but space or a pragma
+             * name, the next loop iteration will complain about an illegal
+             * pragma.
+             */
+        }
+
+        /* Finally check if the pragma was valid */
+        if (!validPragma)
+        {
+            if (master_ob)
+            {
+                /* Calling yywarnf() without a master can cause the game
+                 * to shut down, because yywarnf() eventually tries to call
+                 * a master lfun.
+                 */
+                yywarnf("Unknown #pragma '%.*s'", (int)namelen, base);
+            }
+            else
+            {
+                debug_message("Warning: Unknown #pragma '%.*s': file %s, line %d\n"
+                             , (int)namelen, base, current_file, current_line);
+            }
+        }
+
+    } /* for (base) */
 } /* handle_pragma() */
 
 /*-------------------------------------------------------------------------*/
@@ -3876,7 +3961,6 @@ yylex1 (void)
                 }
                 else if (strncmp("pragma", yytext, wlen) == 0)
                 {
-                    deltrail(sp);
                     handle_pragma(sp);
                 }
                 else if (strncmp("line", yytext, wlen) == 0)

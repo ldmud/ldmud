@@ -1,7 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-08-Sep-2001 (Lars Duening)
+26-Sep-2001 (Lars Duening)  (3.3.101)
+    - (interpret.c) Assignments to negative length ranges (eg. [3..2]) are
+        caught and throw an error (reported by Gimli).
+    - (gcollect.c) Printing memory information during a GC is more robust
+        against string NULL pointers (reported by Freaky).
+    - (lex.c) It is possible to specify multiple pragmas in one #pragma
+        statement, separated by commas (suggested by Largo).
+
+08-Sep-2001 (Lars Duening)  (3.3.100)
     - (interpret.c) The test if a function call should be trace or not
         was done against the command_giver, not against the
         current_interactive as documented (reported by Gnomi).

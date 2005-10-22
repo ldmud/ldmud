@@ -133,6 +133,7 @@ f-010610-2: Label (loop-) statements
 f-010713-0: Better Inline closure syntax
 f-010805: Explicite namespace qualifier for simul efuns
 f-010825-3: Make > indexing default with an option ?
+f-010917: default arguments for functions
 
 
 Compiler

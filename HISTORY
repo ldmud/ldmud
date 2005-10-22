@@ -45,7 +45,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-08-Sep-2001 (Lars Duening) -- upcoming Release 3.2.9
+26-Sep-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -239,6 +239,9 @@ For a detailed list of all changes see the file CHANGELOG.
            private function, the latter is no longer redefined.
        + Bugfix: Multi-dimensional mapping indices in macro calls are no
            longer confused with multiple macro arguments.
+       + Bugfix: Assignments to negative length ranges (e.g. [3..2])
+           weren't caught, and instead silently increased the length of
+           the string/array.
 
     - Runtime:
        + Attempts to set a single string character to 0 now raise
@@ -436,6 +439,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + New pragma "weak_types" to turn off type checking.
        + New pragmas "pedantic" and "sloppy" turn on resp. off the
            treatment of certain warnings as errors.
+       + It is possible to specify multiple pragmas in one '#pragma'
+           directive, separated by comma.
        + Inherited functions are looked up using a breadth search.
        + Local variables can be initialized in their definition, for example:
              int i = 3;

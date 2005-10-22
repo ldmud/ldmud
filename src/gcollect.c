@@ -63,7 +63,10 @@
 #include "typedefs.h"
 
 #include <sys/types.h>
+#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
+#include <time.h>
 #include <stdio.h>
 
 #include "gcollect.h"
@@ -1311,18 +1314,25 @@ show_string (int d, char *block, int depth UNUSED)
 #endif
     size_t len;
 
-    WRITES(d, "\"");
-    if ((len = strlen(block)) < 70)
+    if (block == NULL)
     {
-        write(d, block, len);
-        WRITES(d, "\"");
+        WRITES(d, "<null>");
     }
     else
     {
-        write(d, block, 50);
-        WRITES(d, "\" (truncated, length ");writed(d, len);WRITES(d, ")");
+        WRITES(d, "\"");
+        if ((len = strlen(block)) < 70)
+        {
+            write(d, block, len);
+            WRITES(d, "\"");
+        }
+        else
+        {
+            write(d, block, 50);
+            WRITES(d, "\" (truncated, length ");writed(d, len);WRITES(d, ")");
+        }
     }
-}
+} /* show_string() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1361,23 +1371,30 @@ show_mstring (int d, void *block, int depth)
  */
 
 {
-    string_t *str;
-
-    str = (string_t *)block;
-    if (str->info.tabled)
+    if (block == NULL)
     {
-        WRITES(d, "Tabled string: ");
-    }
-    else if (NULL == str->link)
-    {
-        WRITES(d, "Untabled string: ");
+        WRITES(d, "<null>");
     }
     else
     {
-        WRITES(d, "Ind. tabled string: ");
+        string_t *str;
+
+        str = (string_t *)block;
+        if (str->info.tabled)
+        {
+            WRITES(d, "Tabled string: ");
+        }
+        else if (NULL == str->link)
+        {
+            WRITES(d, "Untabled string: ");
+        }
+        else
+        {
+            WRITES(d, "Ind. tabled string: ");
+        }
+        show_mstring_data(d, str->str, depth);
     }
-    show_mstring_data(d, str->str, depth);
-}
+} /* show_mstring() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -1433,7 +1450,10 @@ show_cl_literal (int d, void *block, int depth UNUSED)
     obj = l->ob;
     if (obj)
     {
-        show_mstring(d, obj->name, 0);
+        if (obj->name)
+            show_mstring(d, obj->name, 0);
+        else
+            WRITES(d, "(no name)");
         if (obj->flags & O_DESTRUCTED)
             WRITES(d, " (destructed)");
     }

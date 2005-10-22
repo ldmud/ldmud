@@ -1768,6 +1768,11 @@ transfer_pointer_range (svalue_t *source)
         sv = source->u.vec;
         ssize = (mp_int)VEC_SIZE(sv);
 
+        if (index1 >= index2)
+            error("Illegal range [%ld..%ld] for assignment.\n"
+                 , index1, index2-1
+                 );
+
         if (ssize + index1 - index2 == 0)
         {
             /* <source> fits exactly into the target range */
@@ -1877,6 +1882,11 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
         sv = source->u.vec;
         ssize = (mp_int)VEC_SIZE(sv);
 
+        if (index1 >= index2)
+            error("Illegal range [%ld..%ld] for assignment.\n"
+                 , index1, index2-1
+                 );
+
         if (ssize + index1 - index2 == 0)
         {
             /* <source> fits exactly into the target range */
@@ -1979,6 +1989,11 @@ assign_string_range (svalue_t *source, Bool do_free)
         ss = source->u.str;
         ssize = (mp_int)mstrsize(ss);
 
+        if (index1 >= index2)
+            error("Illegal range [%ld..%ld] for assignment.\n"
+                 , index1, index2-1
+                 );
+
         /* Create the new string */
         rs = alloc_mstring((size_t)(dsize + ssize + index1 - index2));
         if (!rs)
@@ -2044,6 +2059,11 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
         index2 = dest->index2;
         dsvp = dest->lvalue;
         ds = dest->v.u.str;
+
+        if (index1 >= index2)
+            error("Illegal range [%ld..%ld] for assignment.\n"
+                 , index1, index2-1
+                 );
 
         /* If the lvalue is no longer valid, free it */
         if (dsvp->u.str != ds)
