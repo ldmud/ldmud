@@ -119,6 +119,20 @@ xalloc (size_t size)
     return p;
 } /* xalloc() */
 
+/*-------------------------------------------------------------------------*/
+void
+dump_malloc_trace (int d, void *adr)
+
+/* Stand in for the malloc trace dump routine which the stdlib allocator
+ * lacks.
+ */
+
+{
+#define WRITES(d, s) write((d), (s), strlen(s))
+    WRITES(d, "No malloc trace.\n");
+#undf WRITES
+} /* dump_malloc_trace() */
+
 #endif /* MALLOC_sysmalloc */
 
 /* ======================================================================= */

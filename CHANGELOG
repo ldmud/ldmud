@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Sep-2001 (Lars Duening)  (3.3.98)
+    - (xalloc, smalloc) New helper function dump_malloc_trace() to, well, dump
+        the malloc trace if there is one.
+
 31-Aug-2001 (Lars Duening)  (3.3.97)
     - (lex.c) The lfuns implementing inline closures are now 'private nomask', 
         which is the real solution unlike the one implemented in

@@ -3220,6 +3220,34 @@ write_lpc_trace (int d, word_t *p)
 #endif /* MALLOC_LPC_TRACE */
 
 /*-------------------------------------------------------------------------*/
+void
+dump_malloc_trace (int d, void *adr)
+
+/* Write the allocation information (file, linenumber, object and such) of
+ * the memory block <adr> onto file <d>. 
+ * <adr> is the address returned by xalloc(), ie. pointing after the memory
+ * block header.
+ */
+
+{
+#if !defined(MALLOC_TRACE) && !defined(MALLOC_LPC_TRACE)
+    WRITES(d, "No malloc trace.\n");
+#else
+    word_t *p = ((word_t *)adr) - OVERHEAD;
+    word_t size = *p;
+
+#    ifdef MALLOC_TRACE
+        dprintf3(d, " %s %d size 0x%x\n",
+                  p[M_FILE], p[M_LINE], size & M_MASK
+                );
+#    endif
+#    ifdef MALLOC_LPC_TRACE
+        write_lpc_trace(d, p);
+#    endif
+#endif
+} /* dump_malloc_trace() */
+
+/*-------------------------------------------------------------------------*/
 static void
 print_block (int d, word_t *block)
 

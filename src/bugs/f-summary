@@ -103,6 +103,7 @@ f-010717: Blocksatz in sprintf()
 f-010825-0: New shadows efuns
 f-010825-1: New object list efuns
 f-010825-2: efun query_input_to()
+f-010903: get_dir() should return full pathnames
 
 
 Language
