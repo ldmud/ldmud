@@ -11,6 +11,11 @@ DESCRIPTION
         this_interactive() is appended to the array, or 0 if there is no
         current interactive.
 
+        Note: calls to 'alien lfun closures' (see symbol_function(E))
+        generate two entries on the stack if the bound object differs
+        from the closure object: the first is for the bound object,
+        the second for the closure object.
+
 EXAMPLE
         interactive object A enters a command which causes
         a call to a function in object B, that one calls a

@@ -854,6 +854,7 @@ static Bool did_swap;
                 RESET_LIMITS;
                 CLEAR_EVAL_COST;
                 command_giver = 0;
+                previous_ob = NULL;
                 trace_level = 0;
                 reset_object(obj, H_RESET);
                 if (obj->flags & O_DESTRUCTED)
@@ -925,6 +926,7 @@ static Bool did_swap;
             RESET_LIMITS;
             CLEAR_EVAL_COST;
             command_giver = NULL;
+            previous_ob = NULL;
             trace_level = 0;
             if (driver_hook[H_CLEAN_UP].type == T_CLOSURE)
             {

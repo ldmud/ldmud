@@ -86,6 +86,8 @@ Bool check_string_table_flag = MY_FALSE;
 
 Bool strict_euids = MY_FALSE;  /* Enforce use of the euids */
 
+static uint32 random_seed = 0;  /* The seed for the pseudo-random generator. */
+
 /* -- Configuration options -- */
 
 long time_to_reset          = TIME_TO_RESET;
@@ -193,7 +195,8 @@ main (int argc, char **argv)
     put_number(&const1, 1);
 
     current_time = get_current_time();
-    seed_random((uint32)current_time);
+    random_seed = (uint32)current_time;
+    seed_random(random_seed);
 
     dummy_current_object_for_loads = NULL_object;
 #ifdef DEBUG
@@ -271,10 +274,10 @@ main (int argc, char **argv)
         consts[i] = exp(- i / 900.0);
     mstring_init(); /* Also initializes the standard strings */
 
-    printf("%s Random seed: %lx\n"
-          , time_stamp(), (unsigned long)current_time);
-    debug_message("%s Random seed: %lx\n"
-                 , time_stamp(), (unsigned long)current_time);
+    printf("%s Random seed: 0x%lx\n"
+          , time_stamp(), (unsigned long)random_seed);
+    debug_message("%s Random seed: 0x%lx\n"
+                 , time_stamp(), (unsigned long)random_seed);
 
     /* If the master_name hasn't been set, select a sensible default */
     if ('\0' == master_name[0])
@@ -837,6 +840,7 @@ typedef enum OptNumber {
  , cNoHeart         /* --no-heart           */
  , cNoPreload       /* --no-preload         */
  , cPidFile         /* --pidfile            */
+ , cRandomSeed      /* --random-seed        */
  , cResetTime       /* --reset-time         */
  , cReserved        /* -r                   */
  , cReserveUser     /* --reserve-user       */
@@ -925,6 +929,7 @@ static LongOpt aLongOpts[]
     , { "no-heart",           cNoHeart,        MY_FALSE }
     , { "no-preload",         cNoPreload,      MY_FALSE }
     , { "pidfile",            cPidFile,        MY_TRUE }
+    , { "random-seed",        cRandomSeed,     MY_TRUE }
     , { "reset-time",         cResetTime,      MY_TRUE }
     , { "reserve-user",       cReserveUser,    MY_TRUE }
     , { "reserve-master",     cReserveMaster,  MY_TRUE }
@@ -1380,6 +1385,7 @@ shortusage (void)
 #ifdef YYDEBUG
 "  --y|--yydebug\n"
 #endif
+"  --random-seed <num>\n"
 #ifdef DEBUG
 "  --check-refcounts\n"
 "  --check-state <lvl>\n"
@@ -1552,6 +1558,10 @@ usage (void)
 "    Enable debugging of the LPC compiler.\n"
 "\n"
 #endif
+"  --random-seed <num>\n"
+"    Seed value for the random number generator. If not given, the\n"
+"    driver chooses a seed value on its own.\n"
+"\n"
 #ifdef DEBUG
 "  --check-refcounts\n"
 "    Every backend cycle, all refcounts in the system are checked.\n"
@@ -1892,6 +1902,11 @@ eval_arg (int eOption, const char * pValue)
         if (debug_file != NULL)
             free(debug_file);
         debug_file = strdup(pValue);
+        break;
+
+    case cRandomSeed:
+        random_seed = strtoul(pValue, (char **)0, 0);
+        seed_random(random_seed);
         break;
 
     case cReserved:

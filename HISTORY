@@ -57,7 +57,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-25-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
+05-Dec-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -328,6 +328,8 @@ For a detailed list of all changes see the file CHANGELOG.
            objects and closures.
        + Bugfix: If H_INCLUDE_DIRS was set to an array of directory names,
            the names couldn't have leading '/'.
+       + Bugfix: Before calling reset() or clean_up() from the backend, the
+           previous_object is cleared.
 
     - Other Changes:
        + New driver option '--pidfile <filename>' to write the pid of the
@@ -344,6 +346,9 @@ For a detailed list of all changes see the file CHANGELOG.
            initial wizlist information.
        + New driver option '--args <filename>' reads the commandline
            arguments from a textfile. These argument files can be nested.
+       + New driver option '--random-seed <num>' sets the seed value
+           for the random number generator for debugging purposes.
+           If not given, the driver chooses a seed value on its own.
        + Removed a couple of fatal race-conditions in the xerq.
        + New configuration option 'use-deprecated' allows
            to disable obsolete and deprecated efuns. If enabled, the macro

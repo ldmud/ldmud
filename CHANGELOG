@@ -1,6 +1,23 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Dec-2001 (Lars Duening)  (3.3.136)
+    - (backend.c) Before calling reset() or clean_up() from the backend,
+        the previous_object is cleared (reported by Gnomi).
+    - (main.c) New commandline option:
+          --random-seed <num>
+            Seed value for the random number generator. If not given, the
+            driver chooses a seed value on its own.
+            This option is for debugging.
+    - (interpret.c) The mysterious code in calling alien lfun closures to
+        create a second control frame, deactivated in 3.3.83, revealed
+        its purpose: when for such a closure the bound object l->ob
+        differs from the code object l->function.alien.ob, this fact
+        needs to be recorded in order to prevent security holes. So the
+        code fragment has been deactivated again with a small change: the
+        second control frame will be created only if the two objects
+        differ (unknowingly suggested by Menaures).
+
 04-Dec-2001 (Lars Duening)  (3.3.135)
     - (interpret.c) When doing a call_other on an array, inter_sp
         was incorrect while getting the object. An error there

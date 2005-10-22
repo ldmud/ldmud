@@ -15,7 +15,10 @@ DESCRIPTION
         second element is returned.
 
         If <arg> is a closure, the <flag> setting 2 lets the efun
-        return the object the closure is bound to.
+        return the object of the closure (which for 'alien lfun closures' is
+        the object the lfun is defined in, not the object the closure is
+        bound to).
+
         For every other <flag> setting, -1 is returned.
 
         The secondary information is:
@@ -37,5 +40,4 @@ HISTORY
         In the 3.2 branch, the 'flag' argument could be of any type.
 
 SEE ALSO
-        debug_info(E), typeof(E)
-
+        debug_info(E), typeof(E), to_object(E)

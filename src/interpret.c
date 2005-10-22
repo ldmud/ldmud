@@ -15371,23 +15371,27 @@ call_lambda (svalue_t *lsvp, int num_arg)
             return;
         }
 
+        /* If the object creating the closure wasn't the one in which
+         * it will be executed, we need to record the fact in a second
+         * 'dummy' control frame. If we didn't, major security holes
+         * open up.
+         */
+
+        if (l->ob != l->function.alien.ob)
+        {
+            csp->extern_call = MY_TRUE;
+            csp->funstart = NULL;
+            push_control_stack(sp, 0, inter_fp);
+            csp->ob = current_object;
+            csp->prev_ob = previous_ob;
+            csp->num_local_variables = num_arg;
+            previous_ob = current_object;
+        }
+
         /* Finish the setup of the control frame.
          * This is a real inter-object call.
          */
         csp->extern_call = MY_TRUE;
-#if 0
-TODO: Formerly, a funcall() on an alien lfun created a second control frame,
-TODO:: supposedly to "properly capture the control flow". This seemed a bit
-TODO:: nonsensical, and indeed caused confusing duplicate entries in
-TODO:: caller_stack(). However, if there are complaints, we might need
-TODO:: to reactivate this code. (July 2001)
-        csp->funstart = NULL;
-        push_control_stack(sp, 0, inter_fp);
-        csp->ob = current_object;
-        csp->prev_ob = previous_ob;
-        csp->num_local_variables = num_arg;
-        previous_ob = current_object;
-#endif
         current_object = l->function.alien.ob;
         current_prog = current_object->prog;
         /* inter_sp == sp */
@@ -15395,12 +15399,16 @@ TODO:: to reactivate this code. (July 2001)
         funstart = current_prog->program + (flags & FUNSTART_MASK);
         csp->funstart = funstart;
         eval_instruction(FUNCTION_CODE(funstart), inter_sp);
+
+        /* If necessary, remove the second control frame */
+        if (l->ob != l->function.alien.ob)
+        {
+            current_object = csp->ob;
+            previous_ob = csp->prev_ob;
+            pop_control_stack();
+        }
+
         /* The result is on the stack (inter_sp) */
-#if 0
-        current_object = csp->ob;
-        previous_ob = csp->prev_ob;
-        pop_control_stack();
-#endif
         return;
       }
 

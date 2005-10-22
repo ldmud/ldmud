@@ -183,6 +183,11 @@ DESCRIPTION
         Enable debugging of the LPC compiler.
         Only available if compiled with YYDEBUG.
 
+      --random-seed <num>
+        Seed value for the random number generator. If not given, the
+        driver chooses a seed value on its own.
+        This option is for debugging.
+
       --check-state <lvl>
         Perform a regular simplistic check of the virtual machine according
         to <lvl>:
@@ -258,4 +263,4 @@ DESCRIPTION -- Argument Parser
     of the current line is ignored.
 
 HISTORY
-    LDMud 3.2.9 added the --args option.
+    LDMud 3.2.9 added the --args and --random-seed options.
