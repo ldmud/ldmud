@@ -44,5 +44,5 @@ HISTORY
         Modified in LDMud 3.2.6 to take an object as argument.
 
 SEE ALSO
-        clonep(E), destruct(E), clones(E), load_name(E), load_object(E),
-        move_object(E), uids(C), program_name(E)
+        blueprint(E), clonep(E), destruct(E), clones(E), load_name(E),
+        load_object(E), move_object(E), uids(C), program_name(E)

@@ -1987,10 +1987,7 @@ f_filter_objects (svalue_t *sp, int num_arg)
         free_svalue(sp--);
     } while(--num_arg >= 0);
 
-    /* sp now points at the former <arr> argument, so the .type is
-     * already correct.
-     */
-    sp->u.vec = w;
+    put_array(sp, w);
     return sp;
 }
 

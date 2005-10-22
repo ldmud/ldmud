@@ -26,6 +26,7 @@
  *
  * Objects:
  *    TODO: Move into object.c.
+ *    efun: blueprint()
  *    efun: clones()
  *    efun: object_info()
  *    efun: present_clone()
@@ -3200,6 +3201,64 @@ match_skipped:
 
 /*=========================================================================*/
 /*                              OBJECTS                                    */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_blueprint (svalue_t *sp)
+
+/* EFUN blueprint()
+ *
+ *   object blueprint ()
+ *   object blueprint (string|object ob)
+ *
+ * The efuns returns the blueprint for the given object <ob>, or for
+ * the current object if <ob> is not specified.
+ *
+ * If the blueprint is destructed, the efun returns 0.
+ * For objects with replaced programs, the efun returns the blueprint
+ * for the replacement program.
+ */
+
+{
+    object_t * obj, * blueprint;
+
+    if (sp->type == T_OBJECT)
+        obj = sp->u.ob;
+    else if (sp->type == T_STRING)
+    {
+        obj = get_object(sp->u.str);
+        if (!obj)
+        {
+            error("Object not found: %s\n", get_txt(sp->u.str));
+            /* NOTREACHED */
+            return sp;
+        }
+    }
+    else
+    {
+        efun_gen_arg_error(1, sp->type, sp);
+        /* NOTREACHED */
+        return sp;
+    }
+
+    if ((obj->flags & O_SWAPPED) && load_ob_from_swap(obj) < 0)
+        error("Out of memory: unswap object '%s'.\n", obj->name);
+
+    blueprint = NULL;
+    if (obj->prog != NULL
+     && obj->prog->blueprint != NULL
+     && !(obj->prog->blueprint->flags & O_DESTRUCTED)
+       )
+        blueprint = ref_object(obj->prog->blueprint, "blueprint()");
+
+    free_svalue(sp);
+    if (blueprint != NULL)
+        put_object(sp, blueprint);
+    else
+        put_number(sp, 0);
+
+    return sp;
+} /* f_blueprint() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

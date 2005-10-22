@@ -73,7 +73,7 @@ For a detailed list of all changes see the file CHANGELOG.
            the maximum number of keys.
 
 
-05-Mar-2002 (Lars Duening) -- upcoming Release 3.2.9
+16-Mar-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -197,6 +197,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + to_string(): Can handle operator closures now.
 
     - New efuns:
+       + blueprint(): Return the blueprint object.
        + copy_bits(): To copy ranges of bitstrings.
        + db_affected_rows(), db_conv_string(), db_close(), db_connect(),
          db_exec(), db_fetch(), db_handles(), db_coldefs(), db_insert_id(),

@@ -98,7 +98,7 @@ f-010701: On save/restore object, pass full filename to valid_write/read
 f-010723: Extension for present_clone()
 f-010825-0: New shadows efuns
 f-010825-1: New object list efuns
-f-010825-2: efun query_input_to()
+f-010825-2: efun query_input_to() or query_input_pending()
 f-010903: get_dir() should return full pathnames
 f-010908: caller_stack should include function names
 f-011011: Another sort of deep_call_other() ?
@@ -110,6 +110,8 @@ f-011229-1: Add support for Berkeley DB
 f-011230: Implement seeded randoms
 f-020127: Bitstring efuns for shifting and copying
 f-020310: inherits() returns all programs inheriting a given program
+f-020312: Filename argument to garbage_collection()
+f-020315: Let query_verb() return the action verb as defined.
 
 
 Language
@@ -222,7 +224,7 @@ f-010928-0: Make telnet negotiation options more configurable
 p-011012: MCCP patch
 f-020131-0: privilege_violation("limited") should pass limits
 f-020220: Heartbeat functionality
-f-020223: New config value: MAX_MAPPING_SIZE
+f-020311: Add Berkeley DB to the driver
 
 
 Installation

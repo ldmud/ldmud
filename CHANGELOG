@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Mar-2002 (Lars Duening)  (3.3.184)
+    - (array.c) And this should be the last piece of code which made
+        assumptions about free_svalue().
+    - (func_spec, efuns) New efun blueprint().
+
+12-Mar-2002 (Lars Duening)
+    - (Makefiles) Changed default optimization level from High (-O4)
+        to Medium (-O2), since compilers get notoriously unreliable
+        at high optimization.
+
 11-Mar-2002 (Lars Duening)  (3.3.183)
     - (simulate.c) The CHECK_OBJECT_REF check was still overzealous;
         unfortunately not with the FF mudlib I tested it with. Hmpf.

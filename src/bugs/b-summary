@@ -37,6 +37,7 @@ b-010115-1: Make sure that all master calls use leading slashes.
 b-010610-1: CRT doesn't work well in charmode
 b-011113: status for actions wrong
 b-020223: Memory corruption (in stress test)
+b-020315: Memory leaks in OSB
 
 Installation
 --------------------------------------------------------------------------

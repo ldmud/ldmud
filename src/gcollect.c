@@ -1304,9 +1304,9 @@ garbage_collection(void)
     for (ob = gc_obj_list_destructed; ob; ob = next_ob)
     {
 #ifdef DEBUG
-        writes(1, "DEBUG: GC frees destructed '");
-        writes(1, get_txt(ob->name));
-        writes(1, "'\n");
+        writes(gcollect_outfd, "DEBUG: GC frees destructed '");
+        writes(gcollect_outfd, get_txt(ob->name));
+        writes(gcollect_outfd, "'\n");
 #endif
         next_ob = ob->next_all;
         free_object(ob, "garbage collection");

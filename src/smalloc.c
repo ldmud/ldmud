@@ -3375,7 +3375,10 @@ print_block (int d, word_t *block)
     /* Print a hexdump, but not more than 70 characters */
     size = ((*block & M_MASK) - OVERHEAD)*SINT;
     if (size > 70)
+    {
+        write(d, "\n", 1);
         return;
+    }
     write(d, (char *)(block+OVERHEAD), size);
     write(d, "\n\n", 2);
 } /* print_block() */

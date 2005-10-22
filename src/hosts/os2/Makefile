@@ -48,8 +48,8 @@ WARN= # no warning options - will work with all compilers :-)
 # Optimization and source level debugging options.
 # adding a -fomit-frame-pointer on the NeXT (gcc version 1.93 (68k, MIT syntax))
 # will corrupt the driver.
-OPTIMIZE = -O4 -fomit-frame-pointer  -g -fstrength-reduce -fno-force-mem -fno-force-addr -fno-inline-functions # high optimization
-#OPTIMIZE= -O2 -g -fstrength-reduce -fno-force-mem -fno-force-addr -fno-inline-functions # medium optimization
+#OPTIMIZE = -O4 -fomit-frame-pointer  -g -fstrength-reduce -fno-force-mem -fno-force-addr -fno-inline-functions # high optimization
+OPTIMIZE= -O2 -g -fstrength-reduce -fno-force-mem -fno-force-addr -fno-inline-functions # medium optimization
 #OPTIMIZE= -O -g # low optimization
 #OPTIMIZE= -g # no optimization; for frequent recompilations.
 #

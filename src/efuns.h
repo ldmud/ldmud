@@ -66,6 +66,7 @@ extern svalue_t *f_unquote (svalue_t *sp);
 extern svalue_t *f_gmtime (svalue_t *sp);
 extern svalue_t *f_localtime (svalue_t *sp);
 
+extern svalue_t *f_blueprint (svalue_t *sp);
 extern svalue_t *f_clones (svalue_t *sp, int num_args);
 extern svalue_t *f_object_info (svalue_t *sp, int num_args);
 extern svalue_t *f_present_clone (svalue_t *sp);

@@ -15045,6 +15045,7 @@ static int
 int_apply (string_t *fun, object_t *ob, int num_arg
           , Bool b_ign_prot, Bool b_use_default
           )
+
 /* The wrapper around apply_low() to handle default methods.
  *
  * Call function <fun> in <ob>ject with <num_arg> arguments pushed
@@ -15122,7 +15123,7 @@ int_apply (string_t *fun, object_t *ob, int num_arg
             else /* hook->type == T_CLOSURE */
             {
                 call_lambda(hook, num_arg+num_extra);
-                rc = 1; /* This call obviousy succeeds */
+                rc = 1; /* This call obviously succeeds */
             }
 
             /* Evaluate the result and clean up the stack */
