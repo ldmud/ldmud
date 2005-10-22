@@ -988,15 +988,17 @@ f_regreplace (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t*
-f_regmatch (svalue_t *sp)
+f_regmatch (svalue_t *sp, int num_arg)
 
 /* EFUN regmatch()
  *
  *     string    regmatch (string txt, string pattern)
  *     string[*] regmatch (string txt, string pattern, int flags)
+ *     string[*] regmatch (string txt, string pattern, int flags, int start)
  *
  * Match the string <txt> against <pattern>, which is interpreted according
- * to the RE options given in <flags>.
+ * to the RE options given in <flags>. If <start> is given, it is the start
+ * position for the match and must be in the range [0..strlen(txt)].
  *
  * If there is no match, the result is 0. If there is a match, the exact
  * result is determined by the flag RE_MATCH_SUBS:
@@ -1007,13 +1009,18 @@ f_regmatch (svalue_t *sp)
  * string(s) of the first match. Entry [0] is the full string matching the
  * <pattern>, following entries are the string segments matching
  * parenthesized subexpressions in <pattern>. If a particular subexpression
- * didn't have a match, the corresponding array entry will be the empty
- * string.
+ * didn't have a match, the corresponding array entry will be 0.
+ * The last entry in the array will be the new start index in case you
+ * want to repeat the match on the remaining parts of the string. This new
+ * index is usually equal the length of the match, but at least one higher
+ * than the original start index.
  */
 
 {
+    svalue_t *argp;     /* Arguments */
     regexp_t *reg;      /* The compiled RE */
     int       flags;    /* RE options */
+    size_t    startpos; /* Match start argument */
     string_t *text;     /* Input string */
     string_t *pattern;  /* Delimiter pattern from the vm stack */
     int       rc;       /* Result from rx_exec() */
@@ -1026,9 +1033,43 @@ f_regmatch (svalue_t *sp)
     inter_sp = sp;
 
     /* Extract the arguments */
-    flags = sp->u.number;
-    pattern = sp[-1].u.str;
-    text = sp[-2].u.str;
+    argp = sp - num_arg + 1;
+    text = argp[0].u.str;
+    pattern = argp[1].u.str;
+    flags = startpos = 0;
+    if (num_arg > 2)
+    {
+        flags = argp[2].u.number;
+        if (num_arg > 3)
+        {
+            startpos = (size_t)argp[3].u.number;
+            if (startpos > mstrsize(text))
+            {
+                error("regmatch(): Start index out of range: %ld, "
+                      "should be in [0..%ld]\n"
+                     , (long)argp[3].u.number, (long)mstrsize(text)
+                     );
+                /* NOTREACHED */
+                startpos = 0;
+            }
+
+            if (startpos == mstrsize(text))
+            {
+                /* No match possible - return right here */
+                sp -= 2; /* No need to free_svalue() the known two integers */
+                free_svalue(sp); /* Pattern */
+                sp--;
+                free_svalue(sp); /* Text */
+                put_number(sp, 0);
+                return sp;
+            }
+
+            sp--;
+        }
+        sp--;
+
+        num_arg = 2;
+    }
 
     reg = rx_compile(pattern, flags, MY_FALSE);
     if (reg == 0) {
@@ -1037,7 +1078,7 @@ f_regmatch (svalue_t *sp)
         return sp;
     }
 
-    rc = rx_exec(reg, text, 0);
+    rc = rx_exec(reg, text, startpos);
     if (rc < 0)
     {
         free_regexp(reg);
@@ -1055,14 +1096,14 @@ f_regmatch (svalue_t *sp)
             int num_matches = rx_num_matches(reg);
             int i;
 
-            if (max_array_size && num_matches > max_array_size-1 ) {
+            if (max_array_size && num_matches+1 > max_array_size-1 ) {
                 free_regexp(reg);
                 inter_sp = sp;
-                error("Illegal array size: %d", num_matches);
+                error("Illegal array size: %d", num_matches+1);
                 /* NOTREACHED */
                 return sp;
             }
-            result = allocate_array(num_matches);
+            result = allocate_array(num_matches+1);
             if (!result)
             {
                 free_regexp(reg);
@@ -1079,7 +1120,7 @@ f_regmatch (svalue_t *sp)
                  || start >= end
                    )
                 {
-                    put_ref_string(&(result->item[i]), STR_EMPTY);
+                    put_number(&(result->item[i]), 0);
                 }
                 else
                 {
@@ -1097,6 +1138,17 @@ f_regmatch (svalue_t *sp)
                     put_string(&(result->item[i]), str);
                 }
             } /* for (i) */
+
+            /* As last element, store the length of the match to give
+             * the new starting position.
+             */
+            {
+                size_t new_start;
+                new_start = mstrsize(result->item[0].u.str);
+                if (new_start == 0)
+                    new_start++;
+                put_number(&(result->item[num_matches]), (long)(startpos+new_start));
+            }
         }
         else
         {
@@ -1105,7 +1157,7 @@ f_regmatch (svalue_t *sp)
             rx_get_match(reg, text, &start, &end);
             if (start >= end)
             {
-                resstr = ref_mstring(STR_EMPTY);
+                resstr = NULL;
             }
             else
             {
@@ -1124,11 +1176,9 @@ f_regmatch (svalue_t *sp)
 
     /* Cleanup */
     free_regexp(reg);
-    free_svalue(sp);
+    free_svalue(sp); /* Pattern */
     sp--;
-    free_svalue(sp);
-    sp--;
-    free_svalue(sp);
+    free_svalue(sp); /* Text */
 
     /* Return the result */
     if (result)

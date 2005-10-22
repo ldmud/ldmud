@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Jul-2002 (Lars Duening)  (3.3.214)
+    - (efuns.c) regmatch() returns 0 instead of the empty string for
+         non-matches (suggested by Fiona).
+    - (efuns.c) regmatch() takes and returns a start index for repeated
+         matches over the same string (suggested by Fiona).
+
 15-Jul-2002 (Lars Duening)  (3.3.213)
     - (mud/lp-245) The wizlist() simul-efun didn't print proper failure
          notices (reported by Vandergnome).

@@ -24,7 +24,7 @@ extern svalue_t *f_md5_crypt(svalue_t *sp);
 extern svalue_t *f_regexp(svalue_t *);
 extern svalue_t *f_regexplode(svalue_t *sp);
 extern svalue_t* f_regreplace (svalue_t *sp);
-extern svalue_t* f_regmatch (svalue_t *sp);
+extern svalue_t* f_regmatch (svalue_t *sp, int num_arg);
 extern svalue_t *f_strstr(svalue_t *);
 extern svalue_t *f_trim(svalue_t *, int num_arg);
 extern svalue_t *f_upper_case(svalue_t *);

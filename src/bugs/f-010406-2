@@ -2,9 +2,9 @@ Short: PCRE Implementation Notes
 Date: 2002-03-27
 From: Lars
 Type: Memo
-See: f-010406-0
+See: f-010406-0, f-020523
 
- - Teach ed() the PCRE options in PERL modifier syntax
+ - Teach ed() the PCRE options in PERL modifier syntax (f-020523)
  - Since PCRE returns error codes, regexp.[ch] might do it as well.
  - Make PCRE the config default, explicitely turn it off for the given
      muds.

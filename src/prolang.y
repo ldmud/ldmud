@@ -11643,6 +11643,7 @@ copy_variables (program_t *from, fulltype_t type
                     /* First occurence of these virtual variables, we're
                      * going to copy them into our variables.
                      */
+                    inheritp2 = &inherit;
                     variable_index_offset += new_bound - last_bound;
                     inherit.variable_index_offset =
                       variable_index_offset - progp->num_variables;
