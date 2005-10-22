@@ -22,14 +22,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 49)
-(Parent-Version lpmud 3-3 48)
-(Version-Log "Pre-increment or -decrement of an undefined variable crashed the
-LPC compiler.
-Alists are now an optional package.")
+(Project-Version lpmud 3-3 50)
+(Parent-Version lpmud 3-3 49)
+(Version-Log "Oops, forgot to recreate the configure script.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 25 Apr 2001 22:03:18 -0600")
+(Checkin-Time "Wed, 25 Apr 2001 23:04:15 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -62,16 +60,16 @@ Alists are now an optional package.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.3 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.14 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.112 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.113 644))
   (HISTORY (lpmud/f/49_HISTORY 1.169 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.10 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
   ;; Configuration
-  (src/configure (lpmud/d/0_configure 1.19.1.22 755))
+  (src/configure (lpmud/d/0_configure 1.19.1.23 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.6 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.2 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.25 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.26 644))
   (src/mkinstalldirs (lpmud/C/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/C/5_install-sh 1.2 755))
 
@@ -252,9 +250,9 @@ Alists are now an optional package.")
   (src/hosts/amiga/NetIncl/errno.h (lpmud/c/21_errno.h 1.1 644))
   (src/hosts/amiga/NetIncl/README (lpmud/c/22_README 1.1 644))
   (src/hosts/amiga/NetIncl/FILES (lpmud/c/23_FILES 1.1 644))
-  (src/hosts/amiga/Makefile (lpmud/c/24_Makefile 1.29.1.17 644))
+  (src/hosts/amiga/Makefile (lpmud/c/24_Makefile 1.29.1.18 644))
   (src/hosts/amiga/INSTALL (lpmud/c/25_INSTALL 1.2 644))
-  (src/hosts/amiga/DMakefile (lpmud/c/26_DMakefile 1.27.1.17 644))
+  (src/hosts/amiga/DMakefile (lpmud/c/26_DMakefile 1.27.1.18 644))
   (src/hosts/amiga/CHANGELOG (lpmud/c/27_CHANGELOG 1.2 644))
   (src/hosts/amiga/config.h-compat (lpmud/e/12_config.h-c 1.21.1.5 644))
   (src/hosts/amiga/amiga.h (lpmud/e/13_amiga.h 1.2 644))
@@ -300,7 +298,7 @@ Alists are now an optional package.")
   (src/hosts/os2/machine.h (lpmud/b/20_machine.h 1.6.1.1 644))
   (src/hosts/os2/config.h (lpmud/b/21_config.h 1.22.1.5 644))
   (src/hosts/os2/client.c (lpmud/b/22_client.c 1.2 644))
-  (src/hosts/os2/Makefile (lpmud/b/23_Makefile 1.24.1.17 644))
+  (src/hosts/os2/Makefile (lpmud/b/23_Makefile 1.24.1.18 644))
 
   ;; Host: Win32
   (src/hosts/win32/tubmud.bmp (lpmud/g/20_tubmud.bmp 1.1 644) :no-keywords)

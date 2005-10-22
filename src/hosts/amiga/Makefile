@@ -588,9 +588,9 @@ main.o : main.c xalloc.h wiz_list.h swap.h svalue.h stdstrings.h \
     ./hosts/amiga/ixfile.h
 
 mapping.o : mapping.c xalloc.h wiz_list.h svalue.h smalloc.h simulate.h \
-    regexp.h object.h mstrings.h main.h interpret.h gcollect.h closure.h \
-    backend.h array.h mapping.h my-alloca.h typedefs.h driver.h strfuns.h \
-    sent.h exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h \
+    object.h mstrings.h main.h interpret.h gcollect.h closure.h backend.h \
+    array.h mapping.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
+    exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h \
     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
@@ -645,6 +645,11 @@ parser.o : parser.c lang.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
     driver.h ptrtable.h strfuns.h sent.h port.h config.h hosts/unix.h \
     hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
+
+pkg-alists.o : pkg-alists.c xalloc.h svalue.h mstrings.h main.h array.h \
+    my-alloca.h typedefs.h driver.h instrs.h port.h config.h exec.h \
+    hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
+    machine.h ./hosts/amiga/ixfile.h
 
 pkg-mysql.o : pkg-mysql.c xalloc.h svalue.h mstrings.h interpret.h array.h \
     pkg-mysql.h my-alloca.h typedefs.h driver.h instrs.h port.h config.h \
@@ -706,9 +711,9 @@ stdstrings.o : stdstrings.c mstrings.h stdstrings.h typedefs.h driver.h \
     hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
 
 strfuns.o : strfuns.c xalloc.h svalue.h stdstrings.h simulate.h mstrings.h \
-    comm.h strfuns.h typedefs.h driver.h sent.h exec.h port.h config.h \
-    hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
-    machine.h ./hosts/amiga/ixfile.h
+    comm.h strfuns.h my-alloca.h typedefs.h driver.h sent.h exec.h port.h \
+    config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
+    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
 
 swap.o : swap.c hosts/amiga/socket.h ../mudlib/sys/debug_info.h xalloc.h \
     wiz_list.h svalue.h strfuns.h stdstrings.h simul_efun.h simulate.h \
@@ -783,6 +788,8 @@ parse.o : parse.c stdstrings.h instrs.h
 parse_old.o : parse_old.c stdstrings.h instrs.h
 
 parser.o : parser.c lang.c stdstrings.h instrs.h
+
+pkg-alists.o : pkg-alists.c instrs.h
 
 pkg-mysql.o : pkg-mysql.c instrs.h
 

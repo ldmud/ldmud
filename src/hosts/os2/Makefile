@@ -287,12 +287,11 @@ main.o : xalloc.h wiz_list.h swap.h svalue.h stdstrings.h simul_efun.h \
     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
-mapping.o : xalloc.h wiz_list.h svalue.h smalloc.h simulate.h regexp.h \
-    object.h mstrings.h main.h interpret.h gcollect.h closure.h backend.h \
-    array.h mapping.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
-    exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h \
-    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
-    ./hosts/amiga/ixfile.h
+mapping.o : xalloc.h wiz_list.h svalue.h smalloc.h simulate.h object.h \
+    mstrings.h main.h interpret.h gcollect.h closure.h backend.h array.h \
+    mapping.h my-alloca.h typedefs.h driver.h strfuns.h sent.h exec.h \
+    instrs.h port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
+    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
 
 md5.o : md5.h machine.h
 
@@ -343,6 +342,11 @@ parser.o : lang.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h switch.h \
     mstrings.h mapping.h main.h lex.h instrs.h interpret.h gcollect.h \
     exec.h closure.h backend.h array.h prolang.h my-alloca.h typedefs.h \
     driver.h ptrtable.h strfuns.h sent.h port.h config.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
+
+pkg-alists.o : xalloc.h svalue.h mstrings.h main.h array.h my-alloca.h \
+    typedefs.h driver.h instrs.h port.h config.h exec.h hosts/unix.h \
     hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
@@ -403,7 +407,7 @@ stdstrings.o : mstrings.h stdstrings.h typedefs.h driver.h port.h config.h \
     machine.h ./hosts/amiga/ixfile.h
 
 strfuns.o : xalloc.h svalue.h stdstrings.h simulate.h mstrings.h comm.h \
-    strfuns.h typedefs.h driver.h sent.h exec.h port.h config.h \
+    strfuns.h my-alloca.h typedefs.h driver.h sent.h exec.h port.h config.h \
     hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
     machine.h ./hosts/amiga/ixfile.h
 
@@ -480,6 +484,8 @@ parse.o : stdstrings.h instrs.h
 parse_old.o : stdstrings.h instrs.h
 
 parser.o : lang.c stdstrings.h instrs.h
+
+pkg-alists.o : instrs.h
 
 pkg-mysql.o : instrs.h
 
