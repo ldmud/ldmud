@@ -2,7 +2,8 @@ Short: set_auto_include_string() should accept a closure
 Date: 2001-10-16
 From: Lars
 Type: Feature
-State: New
+State: Done - implemented in 3.2.9-dev.361/3.3.125
+See also: f-000505
 
 set_auto_include_string() should accept a closure which is called with the
 current compiled file and the current including file as arguments and returns

@@ -1,5 +1,5 @@
-#ifndef _DEBUG_INFO_H_
-#define _DEBUG_INFO_H_ 1
+#ifndef LPC_DEBUG_INFO_H_
+#define LPC_DEBUG_INFO_H_ 1
 
 /* Request values for efun debug_info().
  */
@@ -134,7 +134,7 @@
 
 #define DID_MEM_NAME            0
 #define DID_MEM_SBRK            1
-#define DID_MEM_SBKR_SIZE       2
+#define DID_MEM_SBRK_SIZE       2
 #define DID_MEM_LARGE           3
 #define DID_MEM_LARGE_SIZE      4
 #define DID_MEM_LFREE           5
@@ -157,8 +157,12 @@
 #define DID_MEM_PERM_SIZE      22
 #define DID_MEM_CLIB           23
 #define DID_MEM_CLIB_SIZE      24
+#define DID_MEM_OVERHEAD       25
+#define DID_MEM_ALLOCATED      26
+#define DID_MEM_USED           27
+#define DID_MEM_TOTAL_UNUSED   28
  
-#define DID_MEMORY_MAX         25
+#define DID_MEMORY_MAX         29
 
 
 /* Indices into the subarrays resulting from debug_info(DINFO_TRACE, 0)
@@ -180,4 +184,4 @@
 #define TRACE_TYPE_LAMBDA  3
 #define TRACE_TYPE_LFUN    4
 
-#endif /* _DEBUG_INFO_H_ */
+#endif /* LPC_DEBUG_INFO_H_ */

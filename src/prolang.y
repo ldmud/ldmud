@@ -191,6 +191,7 @@ short hook_type_map[NUM_DRIVER_HOOKS] =
     H_COMMAND:        SH(T_CLOSURE) SH(T_STRING), \
     H_SEND_NOTIFY_FAIL: SH(T_CLOSURE) SH(T_STRING), \
     H_DEFAULT_METHOD: SH(T_CLOSURE) SH(T_STRING), \
+    H_AUTO_INCLUDE:   SH(T_CLOSURE) SH(T_STRING), \
 
 #undef SH
 
@@ -3465,6 +3466,7 @@ inheritance:
               inherit_t *inheritp;
               int j;
 
+              inherit.inherit_type = INHERIT_TYPE_VIRTUAL;
               inheritp = (inherit_t *)(mem_block[A_INHERITS].block);
               j = mem_block[A_INHERITS].current_size;
               for (; (j -= sizeof(inherit_t)) >= 0; inheritp++)

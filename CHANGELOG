@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Nov-2001 (Lars Duening)  (3.3.125)
+    - (func_spec, prolang.y, make_func, lex, simulate) Replaced the efun
+        set_auto_include_string() with the driver hook H_AUTO_INCLUDE.
+        Additionally, a closure can be used to generate the auto include
+        data (f-000505, f-011026-2, f-990316-1).
+    - (simulate.c) Removed a small memory leak in set_driver_hook():
+        replacing hooks leaked the old hook data.
+    - (comm) Efun input_to() now accepts a prompt parameter, specifying
+        the prompt to print.
+    - (object.c, exec.h, mudlib/sys/inherit_list.h) New flag for efun
+        inherit_list() allows to tag virtual inherits in the result 
+        (rest of f-991020-0).
+    - (doc/concepts/hooks) Corrected the docs for the MODIFY_COMMAND hooks.
+
 16-Nov-2001 (Lars Duening)  (3.3.124)
     - (sys/debug_info.h, smalloc.c) Efun debug_info(): macro DID_SBRK_SIZE was
         typoed as DID_SBKR_SIZE.

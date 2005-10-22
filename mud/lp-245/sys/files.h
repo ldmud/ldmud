@@ -1,5 +1,5 @@
-#ifndef _FILES_H_
-#define _FILES_H_ 1
+#ifndef LPC_FILES_H_
+#define LPC_FILES_H_ 1
 
 /* Definitions and macros for the various file efuns */
 
@@ -21,4 +21,4 @@
 
 #define GETDIR_ALL        7  /* return names, sizes and dates */
 
-#endif /* _FILES_H_ */
+#endif /* LPC_FILES_H_ */

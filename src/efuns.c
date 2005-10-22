@@ -3580,7 +3580,9 @@ f_object_info (svalue_t *sp, int num_args)
 
             for (inheritp = prog->inherit; i--; inheritp++)
             {
-                if (inheritp->inherit_type == INHERIT_TYPE_NORMAL)
+                if (inheritp->inherit_type == INHERIT_TYPE_NORMAL
+                 || inheritp->inherit_type == INHERIT_TYPE_VIRTUAL
+                   )
                     cnt++;
             }
             ST_NUMBER(OIM_NUM_INHERITED, cnt);
@@ -6028,7 +6030,9 @@ f_debug_info (svalue_t *sp, int num_arg)
 
             for (inheritp = pg->inherit; i--; inheritp++)
             {
-                if (inheritp->inherit_type == INHERIT_TYPE_NORMAL)
+                if (inheritp->inherit_type == INHERIT_TYPE_NORMAL
+                 || inheritp->inherit_type == INHERIT_TYPE_VIRTUAL
+                   )
                     cnt++;
             }
             add_message("num inherits %3d (%4ld)\n", cnt

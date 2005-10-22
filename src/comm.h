@@ -81,9 +81,9 @@
 
 struct input_to_s {
     input_to_t *next;
+    svalue_t    prompt;     /* the prompt, may be 0 */
     char        noecho;     /* the requested "noecho" state */
     callback_t  fun;        /* The function to call, and its args */
-    /* TODO: add: svalue_t prompt */
 };
 
 /* --- struct interactive_s: an interactive connection
@@ -175,9 +175,6 @@ struct interactive_s {
  * input modes: echo/noecho, linemode/charmode, and ignore '!' escape.
  * Echo and Charmode additionally distinguish between 'required'
  * and 'granted'.
- *
- * The values of NOECHO_REQ, CHARMODE_REQ and IGNORE_BANG have to match
- * those in mudlib/sys/input_to.h.
  *
  * TODO: I admit that I'm not completely sure what the xxx_REQ, xxx and
  * xxx_ACK really mean - but I'm too tired to find out. Until it

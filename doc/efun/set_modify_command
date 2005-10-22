@@ -21,13 +21,12 @@ DESCRIPTION
         set_modify_command(), if any.
 
         This mechanism is intended to expand aliases on quicktypers
-        or the like.
+        or the like. See hooks(C), H_MODIFY_COMMAND_FNAME for details.
 
 HISTORY
         Up to 3.2.1@108 the lfun called was hardcoded as
         'modify_command'. The hook H_MODIFY_COMMAND_FNAME introduced
         in 3.2.1@109 allows to change the name.
-
 
 SEE ALSO
         command(E), hooks(C), modify_command(A)

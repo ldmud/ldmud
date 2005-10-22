@@ -163,8 +163,7 @@ int f_echo (string arg)
 
 {
     debug_message(sprintf("%O: f_echo()\n", this_object()));
-    write("Please enter a line: ");
-    input_to("echoline");
+    input_to("echoline", 4, "Please enter a line: ");
     return 1;
 }
 

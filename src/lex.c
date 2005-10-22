@@ -284,16 +284,6 @@ static mp_int inc_list_maxlen;
   /* The lenght of the longest name in <inc_list>.
    */
 
-static string_t * auto_include_string = NULL;
-  /* Shared string to be compiled as the very first thing in every lpc
-   * source file. It may contain any text which is valid in a file.
-   */
-
-static int auto_include_start;
-  /* Number of 'lines' contained in <auto_include_string>, stored
-   * as negative value.
-   */
-
 static int nexpands;
   /* Number of macro expansions on this line so far.
    */
@@ -4401,9 +4391,12 @@ start_new_file (int fd)
 
 /* Start the compilation/lexing of the lpc file opened on file <fd>.
  * This must not be called for included files.
+ * The global <current_file> contains the name of the file to be compiled.
  */
 
 {
+    string_t * auto_include_string = NULL;
+
     free_defines();
 
     yyin_des = fd;
@@ -4421,10 +4414,34 @@ start_new_file (int fd)
 
     lex_fatal = MY_FALSE;
 
-    if (auto_include_string)
+    if (driver_hook[H_AUTO_INCLUDE].type == T_STRING)
     {
-        add_input(get_txt(auto_include_string));
-        current_line = auto_include_start;
+        auto_include_string = driver_hook[H_AUTO_INCLUDE].u.str;
+    }
+    else if (driver_hook[H_AUTO_INCLUDE].type == T_CLOSURE)
+    {
+        svalue_t *svp;
+
+        /* Setup and call the closure */
+        push_c_string(inter_sp, current_file);
+        svp = secure_call_lambda(driver_hook+H_AUTO_INCLUDE, 1);
+        if (svp && svp->type == T_STRING)
+        {
+            auto_include_string = svp->u.str;
+        }
+    }
+
+    if (auto_include_string != NULL)
+    {
+        char * tmp;
+
+        tmp = get_txt(auto_include_string);
+        add_input("\n");
+        add_input(tmp);
+
+        /* Count the number of lines of the added string */
+        for (current_line = -1; *tmp
+            ; current_line -= *tmp++ == '\n') NOOP;
     }
 
     pragma_strict_types = PRAGMA_WEAK_TYPES;
@@ -4938,7 +4955,7 @@ add_define (char *name, short nargs, char *exps)
         char buf[200+NSIZE];
 
         if (current_line <= 0)
-            sprintf(buf, "(in auto_include_string) Redefinition of #define %s", name);
+            sprintf(buf, "(in auto include text) Redefinition of #define %s", name);
         else
             sprintf(buf, "Redefinition of #define %s", name);
 
@@ -6381,8 +6398,6 @@ show_lexer_status (strbuf_t * sbuf, Bool verbose UNUSED)
     sum += mempool_size(lexpool);
     sum += defbuf_len;
     sum += 2 * DEFMAX; /* for the buffers in _expand_define() */
-    if (auto_include_string)
-        sum += mstr_mem_size(auto_include_string);
 
     if (sbuf)
         strbuf_addf(sbuf, "Lexer structures\t\t\t %8lu\n", sum);
@@ -6417,9 +6432,6 @@ count_lex_refs (void)
         if (!id->u.define.special)
             note_malloced_block_ref(id->u.define.exps.str);
     }
-
-    if (auto_include_string)
-        count_ref_from_string(auto_include_string);
 
     if (defbuf_len)
         note_malloced_block_ref(defbuf);
@@ -6490,55 +6502,6 @@ lex_error_context (void)
     }
     return buf;
 } /* lex_error_context() */
-
-/*-------------------------------------------------------------------------*/
-void
-clear_auto_include_string (void)
-
-/* Clear the auto_include_string if any.
- */
-
-{
-    if (auto_include_string)
-    {
-        free_mstring(auto_include_string);
-        auto_include_string = NULL;
-    }
-} /* clear_auto_include_string() */
-
-/*-------------------------------------------------------------------------*/
-svalue_t *
-f_set_auto_include_string (svalue_t *sp)
-
-/* EFUN set_auto_include_string()
- *
- *    void set_auto_include_string(string arg)
- *
- * The arg will be automatically included into every compiled LPC
- * object. This is useful to enforce global definitions, e.g.
- * ``#pragma combine_strings'' or ``#pragma strict_types''.  The
- * calling object needs to be privileged by the master object.
- *
- * Note that the auto-include-string is cleared when the master
- * object is reloaded.
- */
-
-{
-    char *s;
-
-    if (privilege_violation(STR_SET_AUTO_INCLUDE, sp, sp) > 0)
-    {
-        clear_auto_include_string();
-        memsafe(auto_include_string = mstr_add(STR_NEWLINE, sp->u.str)
-               , mstrsize(sp->u.str)+1, "new auto_include_string");
-
-        /* Count the number of lines of the added string */
-        for (auto_include_start = 0, s = get_txt(auto_include_string)+1; *s
-            ; auto_include_start -= (*s++ == '\n')) NOOP;
-    }
-    free_svalue(sp);
-    return sp - 1;
-} /* set_auto_include_string() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

@@ -600,10 +600,11 @@ struct inherit_s
     unsigned short inherit_type;            /* Type of inherit */
 
 #   define INHERIT_TYPE_NORMAL      0x0000  /* Type: Normal inherit */
-#   define INHERIT_TYPE_EXTRA       0x0001  /* Type: Extra inherit added by
-                                             * copy_variables()
-                                             */
-#   define INHERIT_TYPE_DUPLICATE   0x0002  /* Flag: Duplicate virtual inherit */
+#   define INHERIT_TYPE_VIRTUAL     0x0001  /* Type: Virtual inherit */
+#   define INHERIT_TYPE_EXTRA       0x0002  /* Type: Extra inherit added by
+                                              * copy_variables()
+                                              */
+#   define INHERIT_TYPE_DUPLICATE   0x0004  /* Flag: Duplicate virt inherit */
     unsigned short inherit_depth;           /* Depth of inherit */
 };
 

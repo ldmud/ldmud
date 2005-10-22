@@ -66,7 +66,6 @@ f-981229-15: set_environment(): third arg specifying where in the list
 f-990203-10: shutdown(), garbage_collection() should be privileged
 f-990211:   top(): statistics efun
 f-990424-1: call_out(): uses handles in parallel to names.
-f-991020-0: More functionality for inherit_list() 
 f-000113-1: LDmud: efun reverse()
 f-000113-2: More file efuns
 f-000207: Finalfrontier efuns
@@ -78,7 +77,6 @@ f-000401-0: get_dir() should return the full pathname
 f-000405: sort_array(&arr) sorts in-place
 f-000406: Get rid of save_object()
 f-000421: Expand cat() and tail() to take limits
-f-000505: Improve set_auto_include_string()
 f-000530: New input_to() efuns
 f-000616: Allow to set a certain umask
 f-000627: Search efun
@@ -105,7 +103,6 @@ f-010908: caller_stack should include function names
 f-011011: Another sort of deep_call_other() ?
 f-011015-1: Left, Center, and Flush formatting for terminal_colour()
 f-011016-0: sprintf() and colour strings
-f-011016-2: set_auto_include_string() should accept a closure
 
 
 Language
@@ -182,7 +179,6 @@ f-990203-29: Sort of 'idle' detection.
 f-990204-3: Commandline socket specification
 f-990204-6: Persistant object names
 f-990313:  Better handling of ASSIGN_EVAL_COST.
-f-990316-1: set_auto_include_string() should accept closure. Make it a hook?
 f-990319-0: Can catch_msg() be removed?
 f-990417-0: Can the driver find private functions in the master?
 f-990424-0: Precompiled binaries.

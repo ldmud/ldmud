@@ -147,16 +147,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 124
+  SETVERFLAGS += d 125
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.124
+  VSTRING = 3.3.0-pre.125
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 124
+  SETVERFLAGS += d 125
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.124
+  VSTRING = 3.3.0-dev.125
 endif
 
 else
@@ -164,12 +164,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 124
+SETVERFLAGS = -app 3 3 125
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.124
+  VSTRING = 3.3.125
 
 endif
 
@@ -455,8 +455,8 @@ $(OBJ)/actions.o : ../mudlib/sys/driver_hook.h ../mudlib/sys/commands.h \
 
 $(OBJ)/array.o : xalloc.h wiz_list.h swap.h svalue.h simulate.h \
     stdstrings.h rxcache.h regexp.h object.h mstrings.h mempools.h \
-    mapping.h main.h interpret.h instrs.h closure.h backend.h array.h \
-    my-alloca.h typedefs.h driver.h strfuns.h sent.h exec.h port.h config.h \
+    mapping.h main.h interpret.h closure.h backend.h array.h my-alloca.h \
+    typedefs.h driver.h strfuns.h sent.h exec.h instrs.h port.h config.h \
     hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/backend.o : ../mudlib/sys/debug_message.h \
@@ -483,12 +483,12 @@ $(OBJ)/closure.o : xalloc.h switch.h swap.h svalue.h stdstrings.h \
     my-alloca.h typedefs.h driver.h ptrtable.h strfuns.h sent.h port.h \
     config.h hosts/unix.h hosts/be/be.h machine.h
 
-$(OBJ)/comm.o : util/erq/erq.h ../mudlib/sys/driver_hook.h xalloc.h \
-    wiz_list.h swap.h svalue.h stdstrings.h simulate.h sent.h object.h \
-    mstrings.h main.h interpret.h gcollect.h filestat.h exec.h ed.h \
-    closure.h backend.h array.h actions.h access_check.h comm.h telnet.h \
-    my-alloca.h typedefs.h driver.h strfuns.h instrs.h config.h port.h \
-    hosts/unix.h hosts/be/be.h machine.h
+$(OBJ)/comm.o : util/erq/erq.h ../mudlib/sys/input_to.h \
+    ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h swap.h svalue.h \
+    stdstrings.h simulate.h sent.h object.h mstrings.h main.h interpret.h \
+    gcollect.h filestat.h exec.h ed.h closure.h backend.h array.h actions.h \
+    access_check.h comm.h telnet.h my-alloca.h typedefs.h driver.h \
+    strfuns.h instrs.h config.h port.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/dumpstat.o : svalue.h smalloc.h stdstrings.h simulate.h ptrtable.h \
     object.h mstrings.h mapping.h filestat.h exec.h closure.h array.h \
@@ -573,13 +573,13 @@ $(OBJ)/mstrings.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h \
     typedefs.h sent.h exec.h port.h config.h hosts/unix.h hosts/be/be.h \
     machine.h
 
-$(OBJ)/object.o : ../mudlib/sys/functionlist.h ../mudlib/sys/driver_hook.h \
-    xalloc.h wiz_list.h svalue.h swap.h strfuns.h stdstrings.h simul_efun.h \
-    simulate.h sent.h random.h ptrtable.h prolang.h otable.h mstrings.h \
-    mempools.h mapping.h main.h instrs.h interpret.h filestat.h exec.h \
-    comm.h closure.h backend.h array.h actions.h object.h my-alloca.h \
-    typedefs.h driver.h port.h config.h hosts/unix.h hosts/be/be.h \
-    machine.h
+$(OBJ)/object.o : ../mudlib/sys/inherit_list.h ../mudlib/sys/functionlist.h \
+    ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h svalue.h swap.h \
+    strfuns.h stdstrings.h simul_efun.h simulate.h sent.h random.h \
+    ptrtable.h prolang.h otable.h mstrings.h mempools.h mapping.h main.h \
+    instrs.h interpret.h filestat.h exec.h comm.h closure.h backend.h \
+    array.h actions.h object.h my-alloca.h typedefs.h driver.h port.h \
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/otable.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h simulate.h \
     strfuns.h object.h mstrings.h hash.h gcollect.h backend.h otable.h \

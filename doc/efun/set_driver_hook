@@ -60,6 +60,11 @@ DESCRIPTION
           Semi-mandatory hook specifying the directories where <>-type
           include files are searched.
 
+        H_AUTO_INCLUDE
+          arg: lambda closure, lfun closure, string
+          Optional hook to specify a string to be included before the
+          source of every compiled LPC object.
+
         H_TELNET_NEG
           arg: lambda closure, lfun closure, string.
           Optional hook to specifiy how to perform a single telnet

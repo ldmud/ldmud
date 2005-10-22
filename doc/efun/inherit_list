@@ -1,4 +1,6 @@
 SYNOPSIS
+        #include <sys/inherit_list.h>
+
         string *inherit_list ()
         string *inherit_list (object ob)
         string *inherit_list (object ob, int flags)
@@ -7,15 +9,14 @@ SYNOPSIS
 DESCRIPTION
         Returns the names of all files inherited by <ob>, including
         <ob>s own filename. If <ob> is omitted, it defaults to the current
-        object. The value of <flags> determines if the result is a flat list
-        of names, or a tree structure representing the inheritance structure.
+        object. The value of <flags> determines the structure of the output.
 
-        <flag> = 0 (default):
+        <flag> = INHLIST_FLAT (0, default):
           The result is an array of filenames, starting the with the filename
           of <ob> itself, followed by the names of all inherited objects
           in breadth order.
 
-        <flag> = 1:
+        <flag> = INHLIST_TREE (1):
           The result is an array starting the with the filename
           of <ob> itself, followed by the all directly inherited
           objects. If one of the inherited objects has no inherits by itself,
@@ -23,6 +24,13 @@ DESCRIPTION
           object has inherits by itself, a subvector will be created and
           stored in the result vector. The subvector(s) have the same
           structure as the main result vector.
+
+        <flag> = INHLIST_TAG_VIRTUAL (2):
+          All names in the result are prefixed with a tag: "  " (two spaces)
+          for normal inherits, "v " for virtual inherits.
+
+        All flags can be combined with binary-|, just _FLAT and _TREE are
+        mutually exclusive.
 
         If objects, including <ob>, had been undergone a replace_program(),
         the returned filenames will reflect the actual active program.
@@ -48,6 +56,7 @@ EXAMPLES
 HISTORY
         Before 3.2.8, the returned names never started with a '/'.
         LDMud 3.2.9/3.3.111 added the tree representation.
+        LDMud 3.2.9/3.3.125 added the tagging of virtual inherits.
 
 
 SEE ALSO

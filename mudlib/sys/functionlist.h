@@ -21,7 +21,7 @@
 #define NAME_UNDEFINED      0x00000200 /* Not defined yet                */
 #define NAME_TYPES_LOST     0x00000100 /* inherited, no save_types       */
 
-/* Return value flag types for function_list() */
+/* Return value flag types for functionlist() */
 
 #define RETURN_FUNCTION_NAME	0x01
 #define RETURN_FUNCTION_FLAGS	0x02

@@ -253,7 +253,7 @@ void inaugurate_master (int arg)
 // mudwho or wizlist handling has to be initialized here.
 //
 // Besides that, do whatever you feel you need to do,
-// e.g. set_auto_include_string(), or give the master a decent euid.
+// e.g. set_driver_hook(), or give the master a decent euid.
 
 
 //---------------------------------------------------------------------------
@@ -801,8 +801,6 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 //   rename_object     : The current object <who> renames object <arg>
 //                       to name <arg2>.
 //   send_udp          : Send UDP-data to host <arg>.
-//   set_auto_include_string : Set the string automatically included by
-//                       the compiler.
 //   get_extra_wizinfo : Get the additional wiz-list info for wizard <arg>.
 //   set_extra_wizinfo : Set the additional wiz-list info for wizard <arg>.
 //   set_extra_wizinfo_size : Set the size of the additional wizard info

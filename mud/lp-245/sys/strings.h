@@ -1,5 +1,5 @@
-#ifndef _STRINGS_H_
-#define _STRINGS_H_ 1
+#ifndef LPC_STRINGS_H_
+#define LPC_STRINGS_H_ 1
 
 /* 'where' argument values for trim() */
 
@@ -7,4 +7,4 @@
 #define TRIM_RIGHT 0x02
 #define TRIM_BOTH  (TRIM_LEFT|TRIM_RIGHT)
 
-#endif /* _STRINGS_H_ */
+#endif /* LPC_STRINGS_H_ */

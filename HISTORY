@@ -10,7 +10,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
          allocate_mapping(), copy_mappng(), efun308(), extract(), file_name(),
          filter_array(), filter_mapping(), m_sizeof(), map_array(),
-         map_mapping(), mapping_contains() and member_array().
+         map_mapping(), mapping_contains(), member_array(),
+         set_auto_include_string().
        + add_action(): Historical usage with just one argument no longer
            supported.
        + assoc(), insert_alist(), order_alist(), intersect_alist(): Optional
@@ -55,7 +56,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-16-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
+17-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -83,7 +84,10 @@ For a detailed list of all changes see the file CHANGELOG.
        + filter(), map(), sort_array(), walk_mapping(): Protected lvalues
             (e.g. &(i[0])) are not allowed as callback parameters.
        + inherit_list(): the inherited objects can be returned in a 
-           tree reflecting the inheritance structure.
+           tree reflecting the inheritance structure. Virtual inherits
+           can be returned tagged as such.
+       + input_to(): New option INPUT_PROMPT to specify a prompt for this
+           input_to.
        + lambda(): Simul efuns with extended varargs weren't compiled
             correctly.
        + load_name(), object_name(), program_name(): 0 is now accepted
@@ -122,7 +126,7 @@ For a detailed list of all changes see the file CHANGELOG.
            "%^" besides "%^%^".
        + add_verb(), add_xverb(), efun308(), file_name(), map_array(),
          filter_array(), filter_mapping(), map_mapping(), m_sizeof(),
-         send_imp():
+         send_imp(), set_auto_include_string():
            Available only if driver is compiled with support for
            deprecated efuns.
 
@@ -282,6 +286,8 @@ For a detailed list of all changes see the file CHANGELOG.
            apply())!
        + The protocols MCP, MSP and MXP can now be negotiated through
            the H_TELNET_NEG hook.
+       + New optional driver hook  H_AUTO_INCLUDE to set a string or
+           closure for auto-include information.
        + Bugfix: IPv6 name lookup works again, and also with both xerq and erq.
        + Bugfix: The driver now longer gets a confused when a client like
            TinyFugue refuses to use CHARMODE.

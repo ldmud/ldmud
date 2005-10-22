@@ -269,7 +269,7 @@ DESCRIPTION
           be ignored. In case of the closure/lfun setting this may
           mean that the closure/lfun already executed it.
           If the result is 0, the originally given command is to be
-          used (not available for closure settings).
+          used.
 
           It is possible for the hook to change the command giver
           (this_player()) for the execution of the command. This means that
@@ -287,6 +287,19 @@ DESCRIPTION
           If set_modify_command() is used for an interactive user, all
           newly entered commands are first passed to the function
           named by this hook.
+
+          The function is called as
+
+            int|string <name>(string cmd)
+
+          If the result is a string, it is the new command to execute
+          instead of the given one. Note that it is not possible to
+          make several commands from one this way!
+          If the result is a non-zero number, the given command is to
+          be ignored. In case of the closure/lfun setting this may
+          mean that the closure/lfun already executed it.
+          If the result is 0, the originally given command is to be
+          used.
 
           It is possible for the hook to change the command giver
           (this_player()) for the execution of the command. This means that
@@ -372,6 +385,23 @@ DESCRIPTION
           this_object() prior to execution.
 
           See also: master apply include_file()
+
+
+        H_AUTO_INCLUDE
+          Optional hook specifying a string to be included before
+          the source of every compiled LPC object.
+          Hook setting can be a string or a closure.
+
+          If the setting is a string, it will be automatically included before
+          the source of every compiled LPC object.
+
+          If the setting is a closure, it is called as
+            
+            string <closure>(string current_file)
+
+          with the name of the compiled LPC file as argument. If the result
+          is a string, it will be included before the source of the
+          compiled object.
 
 
         H_TELNET_NEG
@@ -470,7 +500,7 @@ HISTORY
         The hooks for no-echo negotiation and erq-lossage notification
             were introduced in 3.2.1@85.
         H_COMMAND was introduced in 3.2.7.
-        H_SEND_NOTIFY_FAIL was introduced in 3.2.9.
+        H_SEND_NOTIFY_FAIL and H_AUTO_INCLUDE were introduced in 3.2.9.
         H_DEFAULT_METHOD was introduced in 3.3.113.
 
 SEE ALSO

@@ -116,6 +116,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/driver_hook.h"
+#include "../mudlib/sys/input_to.h"
 
 /* if driver is compiled for ERQ demon then include the necessary file
  */
@@ -3240,6 +3241,7 @@ call_function_interactive (interactive_t *i, char *str)
     current_it = *it;
     i->input_to = it->next;
     xfree(it);
+    free_svalue(&current_it.prompt); /* Don't need this anymore */
 
     /* Activate the local error recovery context */
 
@@ -3383,12 +3385,11 @@ print_prompt (void)
  * by input_to. If the prompt is set to a closure, the closure
  * is called and expected to return the actual prompt string or
  * to print the prompt itself.
- * TODO: Add a prompt to "input_to()" - best make it a completely new
- * TODO:: efun. Or special parameters to set_prompt().
  */
 
 {
     interactive_t *ip;
+    svalue_t *prompt = NULL;
 
 #ifdef DEBUG
     if (command_giver == 0)
@@ -3400,55 +3401,58 @@ print_prompt (void)
 
     if (ip->input_to == NULL)
     {
-        svalue_t *prompt;
-
         prompt = &ip->prompt;
-        if (prompt->type == T_CLOSURE)
+    }
+    else
+    {
+        prompt = &ip->input_to->prompt;
+    }
+
+    if (prompt->type == T_CLOSURE)
+    {
+        object_t *ob;
+        
+        /* Needed for clean error recovery */
+
+        previous_ob = 0;
+        current_object = command_giver;
+
+        /* Check if the object the closure is bound to still exists.
+         * If not, restore the prompt, then throw an error.
+         */
+        ob = !CLOSURE_MALLOCED(prompt->x.closure_type)
+             ? prompt->u.ob
+             : prompt->u.lambda->ob;
+
+        if (ob->flags & O_DESTRUCTED)
         {
-            object_t *ob;
-            
-            /* Needed for clean error recovery */
+            free_svalue(prompt);
+            put_ref_string(prompt, STR_DEFAULT_PROMPT);
+            add_message(FMT_STRING, prompt->u.str);
+            error("Prompt of %s was a closure bound to a now-destructed object - default prompt restored.\n", get_txt(command_giver->name));
+            /* NOTREACHED */
+        }
 
-            previous_ob = 0;
-            current_object = command_giver;
-
-            /* Check if the object the closure is bound to still exists.
-             * If not, restore the prompt, then throw an error.
-             */
-            ob = !CLOSURE_MALLOCED(prompt->x.closure_type)
-                 ? prompt->u.ob
-                 : prompt->u.lambda->ob;
-
-            if (ob->flags & O_DESTRUCTED)
-            {
-                free_svalue(prompt);
-                put_ref_string(prompt, STR_DEFAULT_PROMPT);
-                add_message(FMT_STRING, prompt->u.str);
-                error("Prompt of %s was a closure bound to a now-destructed object - default prompt restored.\n", get_txt(command_giver->name));
-                /* NOTREACHED */
-            }
-
-            call_lambda(prompt, 0);
-            prompt = inter_sp;
-            if (prompt->type != T_STRING)
-            {
-                free_svalue(prompt);
-            }
-            else
-            {
-                /* beware: add_message() might cause an error. Thus, the LPC
-                 * stack has to include the prompt to free it then.
-                 */
-                add_message(FMT_STRING, prompt->u.str);
-                free_string_svalue(prompt);
-            }
-            inter_sp--;
+        call_lambda(prompt, 0);
+        prompt = inter_sp;
+        if (prompt->type != T_STRING)
+        {
+            free_svalue(prompt);
         }
         else
         {
+            /* beware: add_message() might cause an error. Thus, the LPC
+             * stack has to include the prompt to free it then.
+             */
             add_message(FMT_STRING, prompt->u.str);
+            free_svalue(prompt);
         }
-    } /* if (no input_to) */
+        inter_sp--;
+    }
+    else if (prompt->type == T_STRING)
+    {
+        add_message(FMT_STRING, prompt->u.str);
+    }
 } /* print_prompt() */
 
 /*-------------------------------------------------------------------------*/
@@ -5430,8 +5434,10 @@ count_comm_extra_refs (void)
             }
         } /* end of snoop-processing */
 
-        for ( it = all_players[i]->input_to; it; it = it->next) {
+        for ( it = all_players[i]->input_to; it; it = it->next)
+        {
             count_callback_extra_refs(&(it->fun));
+            count_extra_ref_in_vector(&it->prompt, 1);
         }
         if ( NULL != (ob = all_players[i]->modify_command) )
             count_extra_ref_in_object(ob);
@@ -5969,8 +5975,10 @@ f_input_to (svalue_t *sp, int num_arg)
  */
 
 {
-    svalue_t *arg;  /* Pointer to the arguments of the efun */
-    int flags;           /* The flags passed to input_to() */
+    svalue_t *arg;       /* Pointer to the arguments of the efun */
+    svalue_t *extra_arg; /* Pointer to the extra arguments of the efun */
+    int iflags;          /* The flags passed to input_to() */
+    int flags;           /* The flags as required for .noecho */
     input_to_t *it;
     int extra;           /* Number of extra arguments */
     int error_index;
@@ -5979,30 +5987,66 @@ f_input_to (svalue_t *sp, int num_arg)
 
     /* Extract the arguments */
 
-    flags = 0;
+    iflags = 0;
     extra = 0;
+    extra_arg = arg + 1;
+
     if (num_arg > 1)
     {
-        flags = arg[1].u.number & (NOECHO_REQ|CHARMODE_REQ|IGNORE_BANG);
+        iflags = arg[1].u.number;
         extra = num_arg - 2;
+        extra_arg = arg + 2;
     }
+
+    /* Setup the flags required for 'noecho' */
+    flags =   ((iflags & INPUT_NOECHO)      ? NOECHO_REQ   : 0)
+            | ((iflags & INPUT_CHARMODE)    ? CHARMODE_REQ : 0)
+            | ((iflags & INPUT_IGNORE_BANG) ? IGNORE_BANG  : 0)
+          ;
 
     /* Allocate and setup the input_to structure */
 
     xallocate(it, sizeof *it, "new input_to");
+    put_number(&(it->prompt), 0);
+
+    /* If SET_PROMPT was specified, collect it */
+
+    if (iflags & INPUT_PROMPT)
+    {
+        if (num_arg <= 2)
+        {
+            error("Missing prompt argument to input_to().\n");
+            /* NOTREACHED */
+        }
+
+        if (arg[2].type != T_STRING && arg[2].type != T_CLOSURE)
+        {
+            free_input_to(it);
+            vefun_bad_arg(3, arg-1);
+            /* NOTREACHED */
+        }
+
+        transfer_svalue(&(it->prompt), arg+2);
+        extra--;
+        extra_arg++;
+    }
+    else
+        put_number(&(it->prompt), 0);
+
+    /* Parse the extra args for the call */
 
     if (arg[0].type == T_STRING)
     {
         error_index = setup_function_callback(&(it->fun), current_object
                                              , arg[0].u.str
-                                             , extra, arg + 2
+                                             , extra, extra_arg
                                              , MY_TRUE
                                              );
         free_string_svalue(arg);
     }
     else
         error_index = setup_closure_callback(&(it->fun), arg
-                                            , extra, arg + 2
+                                            , extra, extra_arg
                                             , MY_TRUE
                                             );
 
@@ -6022,7 +6066,8 @@ f_input_to (svalue_t *sp, int num_arg)
     if (!(flags & IGNORE_BANG)
      || privilege_violation4(STR_INPUT_TO, command_giver, 0, flags, sp))
     {
-        if (set_call(command_giver, it, (char)flags)) {
+        if (set_call(command_giver, it, (char)flags))
+        {
             put_number(arg, 1);
             return arg;
         }
@@ -6044,6 +6089,7 @@ free_input_to (input_to_t *it)
 
 {
     free_callback(&(it->fun));
+    free_svalue(&(it->prompt));
     xfree(it);
 } /* free_input_to() */
 

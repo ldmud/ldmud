@@ -206,8 +206,6 @@ extern char *get_f_name(int n);
 extern void free_defines(void);
 extern size_t show_lexer_status (strbuf_t * sbuf, Bool verbose);
 extern void set_inc_list(vector_t *v);
-extern void clear_auto_include_string(void);
-extern svalue_t *f_set_auto_include_string(svalue_t *sp);
 extern void remove_unknown_identifier(void);
 extern char *lex_error_context(void);
 extern svalue_t *f_expand_define(svalue_t *sp);

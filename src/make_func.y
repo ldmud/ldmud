@@ -1586,6 +1586,8 @@ name_to_hook(char *name)
         return H_SEND_NOTIFY_FAIL;
     if ( !strcmp(name, "DEFAULT_METHOD") )
         return H_DEFAULT_METHOD;
+    if ( !strcmp(name, "AUTO_INCLUDE") )
+        return H_AUTO_INCLUDE;
     return -1;
 }
 

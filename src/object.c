@@ -195,6 +195,7 @@
 
 #include "../mudlib/sys/driver_hook.h"
 #include "../mudlib/sys/functionlist.h"
+#include "../mudlib/sys/inherit_list.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -1756,6 +1757,7 @@ f_inherit_list (svalue_t *sp, int num_arg)
     /* Local structure to hold the found programs */
     struct iinfo {
         struct iinfo * next;     /* Next structure in flat list */
+        SBool          virtual;  /* TRUE: Virtual inherit */
         program_t    * prog;     /* Program found */
           /* The following members are used to recreate the inherit tree */
         int            count;    /* Number of direct inherits */
@@ -1832,7 +1834,9 @@ f_inherit_list (svalue_t *sp, int num_arg)
          */
         for (inheritp = &next->prog->inherit[0]; cnt--; inheritp++)
         {
-            if (inheritp->inherit_type == INHERIT_TYPE_NORMAL)
+            if (inheritp->inherit_type == INHERIT_TYPE_NORMAL
+             || inheritp->inherit_type == INHERIT_TYPE_VIRTUAL
+               )
             {
                 count++;
                 next->count++;
@@ -1860,7 +1864,7 @@ f_inherit_list (svalue_t *sp, int num_arg)
      * Depending on the flags value, this can be a flat list or a tree.
      */
 
-    if (!flags)
+    if (!(flags & INHLIST_TREE))
     {
         /* Get the result array */
         vec = allocate_array(count);
@@ -1871,18 +1875,36 @@ f_inherit_list (svalue_t *sp, int num_arg)
         for (svp = vec->item, next = begin; next != NULL; svp++, next = next->next)
         {
             string_t *str;
+            size_t slen;  /* Also used for error reporting */
+
+            slen = mstrsize(next->prog->name);
 
             if (compat_mode)
                 str = ref_mstring(next->prog->name);
             else
                 str = add_slash(next->prog->name);
 
+            if (str && (flags & INHLIST_TAG_VIRTUAL))
+            {
+                string_t * str2;
+
+                slen = mstrsize(str) + 2;
+
+                if (next->virtual)
+                    str2 = mstr_add_to_txt("v ", 2, str);
+                else
+                    str2 = mstr_add_to_txt("  ", 2, str);
+
+                free_mstring(str);
+                str = str2;
+            }
+
             if (!str)
             {
                 free_array(vec);
                 mempool_delete(pool);
                 error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
-                     , (unsigned long)mstrsize(next->prog->name));
+                     , (unsigned long)slen);
             }
             put_string(svp, str);
         }
@@ -1903,17 +1925,35 @@ f_inherit_list (svalue_t *sp, int num_arg)
         for (next = begin; next != NULL; next = next->next)
         {
             string_t *str;
+            size_t slen;  /* Also used for error reporting */
+
+            slen = mstrsize(next->prog->name);
 
             if (compat_mode)
                 str = ref_mstring(next->prog->name);
             else
                 str = add_slash(next->prog->name);
 
+            if (str && (flags & INHLIST_TAG_VIRTUAL))
+            {
+                string_t * str2;
+
+                slen = mstrsize(str) + 2;
+
+                if (next->virtual)
+                    str2 = mstr_add_to_txt("v ", 2, str);
+                else
+                    str2 = mstr_add_to_txt("  ", 2, str);
+
+                free_mstring(str);
+                str = str2;
+            }
+
             if (!str)
             {
                 mempool_delete(pool);
                 error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
-                     , (unsigned long)mstrsize(next->prog->name));
+                     , (unsigned long)slen);
             }
 
             /* If this child has no inherits, we just copy the

@@ -24,8 +24,9 @@
 #define H_COMMAND               17
 #define H_SEND_NOTIFY_FAIL      18
 #define H_DEFAULT_METHOD        19
+#define H_AUTO_INCLUDE          20
 
-#define NUM_DRIVER_HOOKS        20  /* Number of hooks */
+#define NUM_DRIVER_HOOKS        21  /* Number of hooks */
 
 #endif /* LPC_DRIVER_HOOK_ */
 

@@ -1,5 +1,5 @@
-#ifndef LPCTYPES_H
-#define LPCTYPES_H
+#ifndef LPC_LPCTYPES_H
+#define LPC_LPCTYPES_H
 
 /* compile time types, from functionlist() */
 
@@ -11,11 +11,9 @@
 #define TYPE_MAPPING    5
 #define TYPE_FLOAT      6
 #define TYPE_ANY        7       /* Will match any type */
-#define TYPE_SPACE      8
-#define TYPE_CLOSURE    9
-#define TYPE_SYMBOL    10
-#define TYPE_QUOTED_ARRAY 11
-#define TYPE_TERM      12
+#define TYPE_CLOSURE    8
+#define TYPE_SYMBOL     9 
+#define TYPE_QUOTED_ARRAY 10
 
 #define TYPE_MOD_POINTER        0x0040  /* Pointer to a basic type        */
 
@@ -33,6 +31,8 @@
 #define T_SYMBOL        0x9
 #define T_QUOTED_ARRAY  0xa
 
+#ifndef __DRIVER_SOURCE__
+
 #define CLOSURE_IS_LFUN(x)		(((x)&~1) == 0)
 #define CLOSURE_IS_IDENTIFIER(x)	((x) == 2)
 #define CLOSURE_IS_BOUND_LAMBDA(x)	((x) == 4)
@@ -42,4 +42,6 @@
 #define CLOSURE_IS_EFUN(x)	 (((x) & 0xf800) == 0xf000)
 #define CLOSURE_IS_OPERATOR(x)	 (((x) & 0xf800) == 0xe800)
 
-#endif /* LPCTYPES_H */
+#endif /* __DRIVER_SOURCE__ */
+
+#endif /* LPC_LPCTYPES_H */

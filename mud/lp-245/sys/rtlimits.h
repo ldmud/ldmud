@@ -1,5 +1,5 @@
-#ifndef __RTLIMITS_H__
-#define __RTLIMITS_H__
+#ifndef LPC_RTLIMITS_H_
+#define LPC_RTLIMITS_H_
 
 /* Runtime limit index/tag values */
 
@@ -18,4 +18,4 @@
 #define LIMIT_KEEP       (-1)  /* Keep the old limit setting */
 #define LIMIT_DEFAULT    (-2)  /* Use the default setting */
 
-#endif /* __RTLIMITS_H__ */
+#endif /* LPC_RTLIMITS_H_ */

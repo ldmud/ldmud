@@ -1012,6 +1012,7 @@ garbage_collection(void)
         {
             clear_memory_reference(it);
             clear_ref_in_callback(&(it->fun));
+            clear_ref_in_vector(&(it->prompt), 1);
         }
         clear_ref_in_vector(&all_players[i]->prompt, 1);
 
@@ -1175,6 +1176,7 @@ garbage_collection(void)
              */
             note_ref(it);
             count_ref_in_callback(&(it->fun));
+            count_ref_in_vector(&(it->prompt), 1);
         } /* end of input_to processing */
 
         if ( NULL != (ob = all_players[i]->modify_command) )

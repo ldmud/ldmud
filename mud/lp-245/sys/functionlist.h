@@ -1,7 +1,9 @@
-#ifndef FUNCTIONLIST_H
-#define FUNCTIONLIST_H
+#ifndef LPC_FUNCTIONLIST_H
+#define LPC_FUNCTIONLIST_H
 
+#ifndef __DRIVER_SOURCE__
 #include "/sys/lpctypes.h"
+#endif
 
 #define NAME_INHERITED      0x80000000 /* Defined by inheritance         */
 #define TYPE_MOD_STATIC     0x40000000 /* Static function or variable    */
@@ -19,10 +21,19 @@
 #define NAME_UNDEFINED      0x00000200 /* Not defined yet                */
 #define NAME_TYPES_LOST     0x00000100 /* inherited, no save_types       */
 
+/* Return value flag types for functionlist() */
+
 #define RETURN_FUNCTION_NAME	0x01
 #define RETURN_FUNCTION_FLAGS	0x02
 #define RETURN_FUNCTION_TYPE	0x04
 #define RETURN_FUNCTION_NUMARG	0x08
 #define RETURN_FUNCTION_ARGTYPE 0x10 /* not implemented */
 
-#endif /* FUNCTIONLIST_H */
+/* Return value flag types for function_exists() */
+
+#define FEXISTS_PROGNAME  (0)
+#define FEXISTS_FILENAME  (1)
+#define FEXISTS_LINENO    (2)
+#define FEXISTS_ALL       (3)
+
+#endif /* LPC_FUNCTIONLIST_H */

@@ -15198,7 +15198,6 @@ assert_master_ob_loaded (void)
          */
         master_ob = NULL;
         inside = MY_TRUE;
-        clear_auto_include_string();
         if (!current_object)
         {
             current_object = &dummy_current_object_for_loads;

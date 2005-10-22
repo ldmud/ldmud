@@ -1,7 +1,7 @@
 Short: More functionality for inherit_list() 
 Date: 991020
 Type: Feature
-State: Unclassified
+State: Done - implemented in 3.2.9 and 3.3.125.
 From: Lars
 See also: b-981028-3.
 
@@ -10,6 +10,7 @@ how: flat/depth/width search, flat or nested result, with or without flags.
 This may require a redesign in the handling of inherit structures.
 
 --- LDMud 3.2.9-dev.355/3.3.111 implements the return of a tree structure.
+--- LDMud 3.2.9-dev.362 and 3.3.125 implement the tagging of virtual inherits.
 
 A particular nasty scenario is:
 

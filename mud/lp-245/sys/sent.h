@@ -1,5 +1,5 @@
-#ifndef _SYS_SENT_H_
-#define _SYS_SENT_H_
+#ifndef LPC_SENT_H_
+#define LPC_SENT_H_
 
 #define SENT_PLAIN	0
 #define SENT_SHORT_VERB	1

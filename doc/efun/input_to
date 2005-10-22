@@ -3,6 +3,7 @@ SYNOPSIS
 
         void input_to(string|closure fun)
         void input_to(string|closure fun, int flag, ...)
+        void input_to(string|closure fun, int flag, string|closure prompt, ...)
 
 DESCRIPTION
         Enable next line of user input to be sent to the function <fun>
@@ -55,19 +56,27 @@ DESCRIPTION
               instead of one-by-one. In a screen-oriented editor for
               example this would be most of the printable characters.
 
+          INPUT_PROMPT (4):
+              The argument following the <flag> argument is used as
+              prompt for the input. If this flag is not given, and thus
+              no prompt specified, nothing will be printed.
+
           INPUT_IGNORE_BANG  (128):
               Input lines starting with '!' will _not_ be parsed as
               commands, but are given to the function as well. Usage
               of this option is privileged.
 
-        The optional 3rd and following args will be passed as second and
+        The optional trailing args will be passed as second and
         subsequent args to the function fun.
 
 EXAMPLE
         void func() {
            ...
-           write("Please enter your name:");
-           input_to("enter_name");
+           input_to("enter_name", INPUT_PROMPT, "Please enter your name:");
+           /* The traditional way of doing this was:
+            *   write("Please enter your name:");
+            *   input_to("enter_name");
+            */
            ...
         }
         enter_name(string str) {
@@ -86,6 +95,7 @@ HISTORY
         The limited "stacking" of input_to()s issued from !-commands
         was implemented in LDMud 3.2.8.
         Since LDMud 3.2.8 the function can be given as a closure.
+        LDMud 3.2.9/3.3.125 introduced the INPUT_PROMPT flag and argument.
         LDMud 3.3 changed the handling of newline sequences in charmode
           to verbatim passing. Earlier drivers passed an empty string
           instead.
