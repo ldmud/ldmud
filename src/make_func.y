@@ -1584,10 +1584,14 @@ name_to_hook(char *name)
         return H_COMMAND;
     if ( !strcmp(name, "SEND_NOTIFY_FAIL") )
         return H_SEND_NOTIFY_FAIL;
-    if ( !strcmp(name, "DEFAULT_METHOD") )
-        return H_DEFAULT_METHOD;
     if ( !strcmp(name, "AUTO_INCLUDE") )
         return H_AUTO_INCLUDE;
+    if ( !strcmp(name, "DEFAULT_METHOD") )
+        return H_DEFAULT_METHOD;
+    if ( !strcmp(name, "DEFAULT_PROMPT") )
+        return H_DEFAULT_PROMPT;
+    if ( !strcmp(name, "PRINT_PROMPT") )
+        return H_PRINT_PROMPT;
     return -1;
 }
 

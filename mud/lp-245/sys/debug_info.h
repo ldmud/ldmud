@@ -97,15 +97,21 @@
 #define DID_ST_STR_SEARCHLEN      54
 #define DID_ST_STR_SEARCHES_BYVALUE   55
 #define DID_ST_STR_SEARCHLEN_BYVALUE  56
+#define DID_ST_STR_CHAINS         57
+#define DID_ST_STR_ADDED          58
+#define DID_ST_STR_DELETED        59
+#define DID_ST_STR_COLLISIONS     60
+#define DID_ST_STR_FOUND          61
+#define DID_ST_STR_FOUND_BYVALUE  62
 
-#define DID_ST_RX_CACHED          57
-#define DID_ST_RX_TABLE           56
-#define DID_ST_RX_TABLE_SIZE      57
-#define DID_ST_RX_REQUESTS        58
-#define DID_ST_RX_REQ_FOUND       59
-#define DID_ST_RX_REQ_COLL        60
+#define DID_ST_RX_CACHED          63
+#define DID_ST_RX_TABLE           64
+#define DID_ST_RX_TABLE_SIZE      65
+#define DID_ST_RX_REQUESTS        66
+#define DID_ST_RX_REQ_FOUND       67
+#define DID_ST_RX_REQ_COLL        68
 
-#define DID_STATUS_MAX            61 /* Total number of entries */
+#define DID_STATUS_MAX            69 /* Total number of entries */
 
 
 /* Indices into the array resulting from debug_info(DINFO_DATA, DID_SWAP)

@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-01-Feb-2002 (Lars Duening) -- Development Release 3.3
+06-Feb-2002 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -59,13 +59,17 @@ For a detailed list of all changes see the file CHANGELOG.
            instead).
        + The driver hook H_DEFAULT_METHOD can be used to resolve
           call_other()/call_resolved()s to non-existing functions.
+       + The driver hook H_DEFAULT_PROMPT can be used to specify a
+          default prompt different from "> ".
+       + The driver hook H_PRINT_PROMPT can be used to do special magic
+          when printing the prompt.
 
     - Other Changes:
        + The input escape character can be configured at compile time to
            something different from '!'.
 
 
-03-Feb-2002 (Lars Duening) -- Release 3.2.9
+06-Feb-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -134,6 +138,11 @@ For a detailed list of all changes see the file CHANGELOG.
        + sin(), cos(), tan(), atan(), atan2(), log(), exp(), sqrt(), pow():
            Integers are accepted as arguments, too.
        + sizeof(): Now also returns the length of strings.
+       + (s)printf(): In justified column formatting, when a word is too
+           to fit on a line by itself and there are at least two characters
+           space left on the current line, the long word is begun immediately.
+           Previously, such long words were always printed on a line of
+           their own.
        + terminal_colour(): Colour keys can now be mapped using a closure.
            The pattern "%%^^" is recognized as second notation for literal
            "%^" besides "%^%^".

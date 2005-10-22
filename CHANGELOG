@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Feb-2002 (Lars Duening)  (3.3.163)
+    - (prolang.y, make_func.y, comm.c) New optional driver hook
+         H_DEFAULT_PROMPT to specify a prompt different from the
+         usual one.
+    - (prolang.y, make_func.y, comm.c) New optional driver hook
+         H_PRINT_PROMPT to do special magic when printing a prompt
+         (suggested by Markus Peter).
+    - (sprintf.c) In justified column formatting, when a word is too
+         to fit on a line by itself and there are at least two characters
+         space left on the current line, the long word is begun immediately.
+         Previously, such long words were always printed on a line of
+         their own (suggested by Fiona).
+
 06-Feb-2002 (Lars Duening)  (3.3.162)
     - (bugs) Added more information about memory leaks.
 

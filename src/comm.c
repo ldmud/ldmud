@@ -2881,7 +2881,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     /* Initialize the rest of the interactive structure */
 
     new_interactive->input_to = NULL;
-    put_ref_string(&new_interactive->prompt, STR_DEFAULT_PROMPT);
+    put_number(&new_interactive->prompt, 0);
     new_interactive->modify_command = NULL;
     new_interactive->msg_discarded = MY_FALSE;
     new_interactive->set_input_to = MY_FALSE;
@@ -3382,6 +3382,60 @@ query_prompt (object_t *ob)
 }
 
 /*-------------------------------------------------------------------------*/
+static void
+print_prompt_string (string_t *prompt)
+
+/* Print the string <prompt> to the current command_giver.
+ * This function checks if the driver hook H_PRINT_PROMPT is set and in that
+ * case passes the string through the set function. If it is not set,
+ * the prompt is printed via add_message().
+ */
+
+{
+    svalue_t *hook = &driver_hook[H_PRINT_PROMPT];
+
+    if (hook->type == T_CLOSURE)
+    {
+        object_t *ob;
+        
+        /* Needed for clean error recovery */
+
+        previous_ob = 0;
+        current_object = command_giver;
+
+        /* Check if the object the closure is bound to still exists.
+         * If not, erase the hook, print the prompt using add_message(),
+         * then throw an error.
+         */
+        ob = !CLOSURE_MALLOCED(hook->x.closure_type)
+             ? hook->u.ob
+             : hook->u.lambda->ob;
+
+        if (ob->flags & O_DESTRUCTED)
+        {
+            free_svalue(hook);
+            put_number(hook, 0);
+            add_message(FMT_STRING, prompt);
+            error("H_PRINT_PROMPT for %s was a closure bound to a now-destructed object - hook removed.\n", get_txt(command_giver->name));
+            /* NOTREACHED */
+        }
+
+        push_ref_string(inter_sp, prompt);
+        call_lambda(hook, 1);
+        free_svalue(inter_sp--);
+    }
+    else if (hook->type == T_STRING)
+    {
+        push_ref_string(inter_sp, prompt);
+        (void)sapply(hook->u.str, command_giver, 1);
+    }
+    else
+    {
+        add_message(FMT_STRING, prompt);
+    }
+} /* print_prompt_string() */
+
+/*-------------------------------------------------------------------------*/
 void
 print_prompt (void)
 
@@ -3394,6 +3448,7 @@ print_prompt (void)
 {
     interactive_t *ip;
     svalue_t *prompt = NULL;
+    Bool usingDefaultPrompt = MY_FALSE;
 
 #ifdef DEBUG
     if (command_giver == 0)
@@ -3406,6 +3461,11 @@ print_prompt (void)
     if (ip->input_to == NULL)
     {
         prompt = &ip->prompt;
+        if (prompt->type != T_CLOSURE && prompt->type != T_STRING)
+        {
+            prompt = &driver_hook[H_DEFAULT_PROMPT];
+            usingDefaultPrompt = MY_TRUE;
+        }
     }
     else
     {
@@ -3422,7 +3482,8 @@ print_prompt (void)
         current_object = command_giver;
 
         /* Check if the object the closure is bound to still exists.
-         * If not, restore the prompt, then throw an error.
+         * If not, restore the prompt to the default (this also works with
+         * the default prompt driver hook), then throw an error.
          */
         ob = !CLOSURE_MALLOCED(prompt->x.closure_type)
              ? prompt->u.ob
@@ -3432,7 +3493,7 @@ print_prompt (void)
         {
             free_svalue(prompt);
             put_ref_string(prompt, STR_DEFAULT_PROMPT);
-            add_message(FMT_STRING, prompt->u.str);
+            print_prompt_string(prompt->u.str);
             error("Prompt of %s was a closure bound to a now-destructed object - default prompt restored.\n", get_txt(command_giver->name));
             /* NOTREACHED */
         }
@@ -3445,17 +3506,24 @@ print_prompt (void)
         }
         else
         {
-            /* beware: add_message() might cause an error. Thus, the LPC
-             * stack has to include the prompt to free it then.
+            /* beware: print_prompt_string() might cause an error.
+             * Thus, the LPC stack has to include the prompt to free it then.
              */
-            add_message(FMT_STRING, prompt->u.str);
+            print_prompt_string(prompt->u.str);
             free_svalue(prompt);
         }
         inter_sp--;
     }
     else if (prompt->type == T_STRING)
     {
-        add_message(FMT_STRING, prompt->u.str);
+        print_prompt_string(prompt->u.str);
+    }
+    else if (usingDefaultPrompt)
+    {
+        /* No prompt nor default prompt given, and it's not an input_to:
+         * print the usual prompt.
+         */
+        print_prompt_string(STR_DEFAULT_PROMPT);
     }
 } /* print_prompt() */
 
@@ -6117,8 +6185,6 @@ f_input_to (svalue_t *sp, int num_arg)
         extra--;
         extra_arg++;
     }
-    else
-        put_number(&(it->prompt), 0);
 
     /* Parse the extra args for the call */
 

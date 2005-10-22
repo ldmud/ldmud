@@ -202,6 +202,38 @@ DESCRIPTION
           to return 0.
 
 
+        H_DEFAULT_PROMPT
+          Optional hook for the command prompt. If this hook is not used,
+          the driver will use "> " as the command prompt.
+
+          The hook can be given as string or as closure. If it is a closure,
+          it is called as:
+          
+              string <closure>()
+
+          with the commandgiver being the calling object. If the result is
+          a string, it will be printed, otherwise ignored.
+
+
+        H_PRINT_PROMPT
+          Optional hook to print the current command prompt. If this hook is
+          not set, the driver will just print the prompt to the user.
+
+          The hook is called with the prompt string as single argument
+          and has to print the prompt using the write() efun.
+
+          If the hook is a string, it is the name of an lfun in the command
+          giver:
+
+              void <name>(string prompt).
+          
+          If the hook is a closure, it is called as:
+
+              void <closure>(string prompt)
+
+          with the command giver as previous object.
+
+
         H_COMMAND
           Optional hook to parse and execute commands. If this hook is used,
           it bypasses the normal command parsing done by the driver (including
@@ -509,6 +541,7 @@ HISTORY
         H_COMMAND was introduced in 3.2.7.
         H_SEND_NOTIFY_FAIL and H_AUTO_INCLUDE were introduced in 3.2.9.
         H_DEFAULT_METHOD was introduced in 3.3.113.
+        H_DEFAULT_PROMPT and H_PRINT_PROMPT were introduced in 3.3.163.
 
 SEE ALSO
         native(C), set_driver_hook(E)

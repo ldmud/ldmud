@@ -147,16 +147,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 162
+  SETVERFLAGS += d 163
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.162
+  VSTRING = 3.3.0-pre.163
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 162
+  SETVERFLAGS += d 163
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.162
+  VSTRING = 3.3.0-dev.163
 endif
 
 else
@@ -164,12 +164,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 162
+SETVERFLAGS = -app 3 3 163
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.162
+  VSTRING = 3.3.163
 
 endif
 

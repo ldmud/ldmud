@@ -1112,6 +1112,14 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 
 /* Implementation of the efun terminal_colour().
  * See f_terminal_colour() for the complete description.
+ * TODO: When asked to wrap "the verylongword is" on 6, terminal_colour()
+ * TODO:: will produce: "the   "/"verylo"/"ngword"/"is" instead of
+ * TODO:: "the ve"/"rylong"/"word"/"is". To produce the desired result,
+ * TODO:: the wrapper would have to count ahead if the next word is still
+ * TODO:: too long to wrap. With the current data layout that is not so
+ * TODO:: simple. I marked the positions with 'TODO: Better wrap'.
+ * TODO:: And instead of computing the wrapping twice, the first pass
+ * TODO:: should record what to break where.
  */
 
 {
@@ -1553,6 +1561,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                             if (space)
                             {
                                 /* Break the line at the last space */
+                                /* TODO: Better wrap - see above */
                                 col -= space;
                                 space = 0;
                             }
@@ -1720,6 +1729,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                         if (space)
                         {
                             /* Break at last space */
+                            /* TODO: Better wrap - see above */
                             col -= space;
                             space = 0;
                             kind = 1;

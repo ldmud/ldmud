@@ -1340,9 +1340,37 @@ add_column (fmt_state_t *st, cst **column)
                 break;
             }
             if (*p == ' ')
+            {
+                /* If went more than one character back, check if
+                 * the next word is longer than permitted. If that is
+                 * the case we might as well start breaking it up right
+                 * here.
+                 */
+                if (save-2 > done)
+                {
+                    char *p2;
+
+                    length = COL->pres;
+                    if ((COL->info & INFO_A) == INFO_A_JUSTIFY
+                     && length > COL->size)
+                        length = COL->size;
+                    for ( p2 = p+1, length--
+                        ; length && *p2 && *p2 !='\n' && *p2 != ' '
+                        ; p2++, length--) NOOP;
+                    if (*p2 && *p2 != '\n' && *p2 != ' ')
+                    {
+                        /* Yup, the next word is far too long. */
+                        p += save - done;
+                        done = save - 1;
+                    }
+                    /* else: the next word is not too long */
+                }
+                /* else: breaking too long word here would look silly anyway
+                 */
                 break;
-        }
-    }
+            } /* if (p == ' ') */
+        } /* for (done) */
+    } /* if (breaking needed) */
 
     /* On justified formatting, don't format the last line that way, nor
      * justified lines ending in NL.

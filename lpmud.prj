@@ -20,12 +20,14 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 162)
-(Parent-Version lpmud 3-3 161)
-(Version-Log "Added more information about memory leaks in bugs/.")
+(Project-Version lpmud 3-3 163)
+(Parent-Version lpmud 3-3 162)
+(Version-Log "New driver hooks H_DEFAULT_PROMPT and H_PRINT_PROMPT.
+(s)printf(): Improved the formatting of too-long words:
+they are no longer always printed on a line on their own.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 06 Feb 2002 08:03:53 -0700")
+(Checkin-Time "Wed, 06 Feb 2002 19:37:12 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -58,8 +60,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.4 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.35 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.225 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.237 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.226 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.238 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -121,7 +123,7 @@
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.17 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.5 644))
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.33 644))
-  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.4 644))
+  (src/comm.c (lpmud/d/2_comm1.c 1.69.1.48.1.5 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.16 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.8 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.8 644))
@@ -129,7 +131,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.4 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.15 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.11 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.10 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.11 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.17 644))
   (src/files.h (lpmud/I/49_files.h 1.1 644))
   (src/files.c (lpmud/I/50_files.c 1.13 644))
@@ -172,7 +174,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.11 644))
   (src/port.c (lpmud/39_port.c 1.17.1.6 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.14 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.5 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.6 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -189,7 +191,7 @@
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.7 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.41 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.2 644))
-  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.33 644))
+  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.34 644))
   (src/strfuns.h (lpmud/B/51_strfuns.h 1.11.1.4 644))
   (src/strfuns.c (lpmud/C/0_strfuns.c 1.9.1.10 644))
   (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.15 644))
@@ -208,7 +210,7 @@
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.45.1.1 644))
   (src/string_spec (lpmud/F/6_string_spe 1.14.1.1 644))
   (src/mkfunc.c (lpmud/L/14_mkfunc.c 1.1 644))
-  (src/make_func.y (lpmud/b/7_make_func. 1.25.1.22 644))
+  (src/make_func.y (lpmud/b/7_make_func. 1.25.1.23 644))
 
   ;; Generic host files
   (src/hosts/README (lpmud/h/10_README 1.2 644))
@@ -336,7 +338,7 @@
   ;; Driver-related include files for the mudlib
   (mudlib/sys/commands.h (lpmud/D/15_commands.h 1.3.1.2 644))
   (mudlib/sys/debug_info.h (lpmud/t/6_debug_info 1.12 644))
-  (mudlib/sys/driver_hook.h (lpmud/d/30_driver_hoo 1.2.1.5 644))
+  (mudlib/sys/driver_hook.h (lpmud/d/30_driver_hoo 1.2.1.6 644))
   (mudlib/sys/debug_message.h (lpmud/K/8_debug_mess 1.3 644))
   (mudlib/sys/erq.h (lpmud/d/29_erq.h 1.5.1.2 644))
   (mudlib/sys/files.h (lpmud/t/7_files.h 1.1.1.1 644))
@@ -433,7 +435,7 @@
   (src/bugs/b-010831 (lpmud/N/35_b-010831 1.1 644) :no-keywords)
   (src/bugs/b-020205-0 (lpmud/Q/40_b-020205-0 1.1 644) :no-keywords)
 
-  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.50 644) :no-keywords)
+  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.51 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
   (src/bugs/f-981027-1 (lpmud/g/28_f-981027-1 1.2 644) :no-keywords)
   (src/bugs/f-981027-2 (lpmud/g/27_f-981027-2 1.2 644) :no-keywords)
@@ -629,6 +631,7 @@
   (src/bugs/f-020131-0 (lpmud/Q/33_f-020131-0 1.1 644) :no-keywords)
   (src/bugs/f-020203-0 (lpmud/Q/37_f-020203-0 1.1 644) :no-keywords)
   (src/bugs/f-020203-1 (lpmud/Q/38_f-020203-1 1.1 644) :no-keywords)
+  (src/bugs/f-020206 (lpmud/Q/41_f-020206 1.1 644) :no-keywords)
 
   (src/bugs/p-981027-1 (lpmud/g/25_p-981027-1 1.2 644) :no-keywords)
   (src/bugs/doomdark/strutil.c (lpmud/g/31_strutil.c 1.2 644) :no-keywords)
@@ -751,7 +754,7 @@
   (doc/concepts/concepts (lpmud/n/31_concepts 1.2 644))
   (doc/concepts/erq (lpmud/n/32_erq 1.6 644))
   (doc/concepts/files (lpmud/n/33_files 1.2 644))
-  (doc/concepts/hooks (lpmud/h/9_hooks 1.10.1.11 644))
+  (doc/concepts/hooks (lpmud/h/9_hooks 1.10.1.12 644))
   (doc/concepts/imp (lpmud/n/34_imp 1.4 644))
   (doc/concepts/intermud (lpmud/M/48_intermud 1.5 644))
   (doc/concepts/intermud.basic (lpmud/M/49_intermud.b 1.2 644))
@@ -974,7 +977,7 @@
   (doc/efun/set_buffer_size (lpmud/q/8_set_buffer 1.2 644))
   (doc/efun/set_combine_charset (lpmud/F/4_set_combin 1.3 644))
   (doc/efun/set_connection_charset (lpmud/q/9_set_connec 1.4 644))
-  (doc/efun/set_driver_hook (lpmud/q/10_set_driver 1.6 644))
+  (doc/efun/set_driver_hook (lpmud/q/10_set_driver 1.7 644))
   (doc/efun/set_environment (lpmud/l/4_set_enviro 1.3 644))
   (doc/efun/set_extra_wizinfo (lpmud/q/11_set_extra_ 1.4 644))
   (doc/efun/set_extra_wizinfo_size (lpmud/q/12_set_extra_ 1.3 644))
@@ -984,7 +987,7 @@
   (doc/efun/set_limits (lpmud/D/36_set_limits 1.2 644))
   (doc/efun/set_modify_command (lpmud/q/17_set_modify 1.2.1.2 644))
   (doc/efun/set_next_reset (lpmud/l/5_set_next_r 1.5 644))
-  (doc/efun/set_prompt (lpmud/q/18_set_prompt 1.2.1.1 644))
+  (doc/efun/set_prompt (lpmud/q/18_set_prompt 1.2.1.1.1.1 644))
   (doc/efun/set_this_object (lpmud/c/37_set_this_o 1.5 644))
   (doc/efun/set_this_player (lpmud/m/18_set_this_p 1.3 644))
   (doc/efun/seteuid (lpmud/q/19_seteuid 1.3 644))
@@ -1182,8 +1185,8 @@
   (mud/lp-245/sys/functionlist.h (lpmud/t/19_functionli 1.2.1.3 644))
   (mud/lp-245/sys/files.h (lpmud/t/20_files.h 1.1.1.1 644))
   (mud/lp-245/sys/erq.h (lpmud/t/21_erq.h 1.2.1.2 644))
-  (mud/lp-245/sys/driver_hook.h (lpmud/t/22_driver_hoo 1.2.1.2 644))
-  (mud/lp-245/sys/debug_info.h (lpmud/t/23_debug_info 1.3.1.4 644))
+  (mud/lp-245/sys/driver_hook.h (lpmud/t/22_driver_hoo 1.2.1.3 644))
+  (mud/lp-245/sys/debug_info.h (lpmud/t/23_debug_info 1.3.1.5 644))
   (mud/lp-245/sys/debug_message.h (lpmud/L/37_debug_mess 1.2 644))
   (mud/lp-245/sys/commands.h (lpmud/D/31_commands.h 1.2.1.1 644))
   (mud/lp-245/secure/master.c (lpmud/J/44_master.c 1.1 644))

@@ -34,6 +34,14 @@ DESCRIPTION
           arg: lambda closure, lfun closure, function name.
           Optional hook for default method implementation.
 
+        H_DEFAULT_PROMPT
+          arg: lambda closure, lfun closure, prompt string.
+          Optional hook for the default command prompt.
+
+        H_PRINT_PROMPT
+          arg: lambda closure, lfun closure, function name.
+          Optional hook to print the command prompt.
+
         H_MODIFY_COMMAND
           arg: lambda closure, lfun closure, function name, mapping
           Optional hook for modifying player commands before the

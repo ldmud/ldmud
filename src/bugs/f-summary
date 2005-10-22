@@ -239,3 +239,4 @@ f-010615-1: Strong and weak links
 f-010615-2: Efficient vector implementation
 f-010828: Save loadable dump
 f-011124: Logging idea: Shared Library
+f-020206: Use OpenSSL or sshwrapper with the driver.
