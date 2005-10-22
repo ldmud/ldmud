@@ -22,14 +22,14 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 37)
-(Parent-Version lpmud 3-3 36)
-(Version-Log "Implemented the '...' argument operator.
-Removed an occasional crasher in object.c.
-")
+(Project-Version lpmud 3-3 38)
+(Parent-Version lpmud 3-3 37)
+(Version-Log "Removed a warning from md5.c
+Bugfixed the '...' implementation.
+Adapted smalloc for systems which return memory in multiples of 64.")
 (New-Version-Log
 "")
-(Checkin-Time "Fri, 06 Apr 2001 00:18:47 -0600")
+(Checkin-Time "Sat, 07 Apr 2001 02:52:30 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -62,7 +62,7 @@ Removed an occasional crasher in object.c.
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.3 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.12 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.100 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.101 644))
   (HISTORY (lpmud/f/49_HISTORY 1.162 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.9 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -121,7 +121,7 @@ Removed an occasional crasher in object.c.
   (src/call_out.h (lpmud/f/45_call_out.h 1.7.1.4 644))
   (src/call_out.c (lpmud/d/5_call_out.c 1.34.1.10 644))
   (src/closure.h (lpmud/f/44_closure.h 1.7.1.4 644))
-  (src/closure.c (lpmud/d/4_closure.c 1.41.1.23 644))
+  (src/closure.c (lpmud/d/4_closure.c 1.41.1.24 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.34 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.12 644))
   (src/driver.h (lpmud/f/36_driver.h 1.15.1.6 644))
@@ -142,7 +142,7 @@ Removed an occasional crasher in object.c.
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.5 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.16 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.55 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.56 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.8 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.39 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.5 644))
@@ -150,11 +150,11 @@ Removed an occasional crasher in object.c.
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.5 644))
   (src/mapping.c (lpmud/b/6_mapping.c 1.36.1.15 644))
   (src/md5.h (lpmud/L/18_md5.h 1.1 644))
-  (src/md5.c (lpmud/L/19_md5.c 1.2 644))
+  (src/md5.c (lpmud/L/19_md5.c 1.3 644))
   (src/mempools.h (lpmud/D/48_mempools.h 1.2.1.3 644))
   (src/mempools.c (lpmud/D/49_mempools.c 1.2.1.3 644))
   (src/mstrings.h (lpmud/I/35_mstrings.h 1.14 644))
-  (src/mstrings.c (lpmud/I/36_mstrings.c 1.18 644))
+  (src/mstrings.c (lpmud/I/36_mstrings.c 1.19 644))
   (src/my-alloca.h (lpmud/f/29_my-alloca. 1.3.1.2 644))
   (src/my-rusage.h (lpmud/f/28_my-rusage. 1.6 644))
   (src/object.h (lpmud/44_object.h 1.34.1.6 644))
@@ -171,7 +171,7 @@ Removed an occasional crasher in object.c.
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.5 644))
   (src/port.c (lpmud/39_port.c 1.17.1.4 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.12 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.46 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.47 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -186,7 +186,7 @@ Removed an occasional crasher in object.c.
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.15 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.31 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.7 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.24 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.25 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.2 644))
   (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.15 644))
   (src/strfuns.h (lpmud/B/51_strfuns.h 1.11.1.3 644))
@@ -460,7 +460,7 @@ Removed an occasional crasher in object.c.
   (src/bugs/b-010115 (lpmud/K/14_b-010115 1.2 644) :no-keywords)
   (src/bugs/b-010115-1 (lpmud/K/15_b-010115-1 1.1 644) :no-keywords)
 
-  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.13 644) :no-keywords)
+  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.14 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
   (src/bugs/f-981027-1 (lpmud/g/28_f-981027-1 1.2 644) :no-keywords)
   (src/bugs/f-981027-2 (lpmud/g/27_f-981027-2 1.2 644) :no-keywords)
@@ -543,7 +543,6 @@ Removed an occasional crasher in object.c.
   (src/bugs/MudCompress/AR-code.html (lpmud/m/50_AR-code.ht 1.2 644) :no-keywords)
   (src/bugs/f-990330-0 (lpmud/m/51_f-990330-0 1.1 644) :no-keywords)
   (src/bugs/f-990417-0 (lpmud/s/34_f-990417-0 1.1 644) :no-keywords)
-  (src/bugs/f-990417-9 (lpmud/D/7_f-990417-9 1.1 644) :no-keywords)
   (src/bugs/f-990424-1 (lpmud/s/45_f-990424-1 1.1 644) :no-keywords)
   (src/bugs/f-990424-0 (lpmud/s/46_f-990424-0 1.1 644) :no-keywords)
   (src/bugs/f-990629-0 (lpmud/t/10_f-990629-0 1.1.1.1 644) :no-keywords)
@@ -616,12 +615,14 @@ Removed an occasional crasher in object.c.
   (src/bugs/f-010309-1 (lpmud/K/47_f-010309-1 1.1 644) :no-keywords)
   (src/bugs/f-010318 (lpmud/L/7_f-010318 1.1 644) :no-keywords)
   (src/bugs/f-010320 (lpmud/L/8_f-010320 1.1 644) :no-keywords)
+  (src/bugs/f-010406-0 (lpmud/L/21_f-010406-0 1.1 644) :no-keywords)
+  (src/bugs/f-010406-1 (lpmud/L/22_f-010406-1 1.1 644) :no-keywords)
 
   (src/bugs/p-981027-1 (lpmud/g/25_p-981027-1 1.2 644) :no-keywords)
   (src/bugs/doomdark/strutil.c (lpmud/g/31_strutil.c 1.2 644) :no-keywords)
   (src/bugs/doomdark/interpret.c-diff (lpmud/g/32_interpret. 1.2 644) :no-keywords)
   (src/bugs/p-990204-1 (lpmud/j/25_p-990204-1 1.4 644) :no-keywords)
-  (src/bugs/p-990204-0 (lpmud/j/26_p-990204-0 1.4 644) :no-keywords)
+  (src/bugs/p-990204-0 (lpmud/j/26_p-990204-0 1.5 644) :no-keywords)
   (src/bugs/p-990330-0 (lpmud/l/31_DeadOfNigh 1.5 644) :no-keywords)
   (src/bugs/p-990417-1 (lpmud/s/35_p-990417-1 1.2 644) :no-keywords)
   (src/bugs/p-990423-0 (lpmud/s/47_p-990423-0 1.2 644) :no-keywords)
@@ -648,6 +649,7 @@ Removed an occasional crasher in object.c.
   (src/done/f-981229-00 (lpmud/j/21_f-981229-0 1.1.1.1 644) :no-keywords)
   (src/done/f-981229-09a (lpmud/L/9_f-981229-0 1.1 644) :no-keywords)
   (src/done/f-990203-04 (lpmud/i/37_f-990203-0 1.1.1.1 644) :no-keywords)
+  (src/done/f-990417-9 (lpmud/L/23_f-990417-9 1.1 644) :no-keywords)
   (src/done/f-000716 (lpmud/I/33_f-000716 1.2.1.2 644) :no-keywords)
   (src/done/f-000918 (lpmud/K/40_f-000918 1.1 644) :no-keywords)
   

@@ -3299,10 +3299,11 @@ inheritance:
                   /* We inherited a __INIT() function: create a call */
               
                   transfer_init_control();
+                  ins_f_code(F_SAVE_ARG_FRAME);
                   ins_f_code(F_CALL_EXPLICIT_INHERITED);
                   ins_short(INHERIT_COUNT);
                   ins_short(initializer);
-                  ins_byte(0);        /* Actual number of arguments */
+                  ins_f_code(F_RESTORE_ARG_FRAME);
                   ins_f_code(F_POP_VALUE);
                   add_new_init_jump();
               }
@@ -7831,7 +7832,6 @@ function_call:
            * proper instructions to call the function.
            */
 %line
-          PREPARE_INSERT(10)
           int        f = 0;             /* Function index */
           Bool       efun_override;     /* TRUE on explicite efun calls */
           int        simul_efun;
@@ -7856,6 +7856,8 @@ function_call:
           if ( (simul_efun = $<function_call_head>2.simul_efun) >= 0)
           {
               /* SIMUL EFUN */
+
+              PREPARE_INSERT(5)
 
               function_t *funp;
 
@@ -7894,8 +7896,7 @@ function_call:
                    * corrected at runtime.
                    */
                   add_f_code(F_CALL_OTHER);
-                  add_byte($4 + 2);
-                  CURRENT_PROGRAM_SIZE += 2;
+                  CURRENT_PROGRAM_SIZE++;
                   ap_needed = MY_TRUE;
               }
               else
@@ -7919,6 +7920,9 @@ function_call:
                   )
           {
               /* LFUN or INHERITED LFUN */
+
+              PREPARE_INSERT(6)
+
               function_t *funp;
               function_t  inherited_function;
 
@@ -7968,13 +7972,13 @@ function_call:
               {
                   /* Normal lfun in this program */
 
+                  ap_needed = MY_TRUE;
                   add_f_code(F_CALL_FUNCTION_BY_ADDRESS);
                   add_short(f);
                   funp = FUNCTION(f);
                   arg_types = (vartype_t *)mem_block[A_ARGUMENT_TYPES].block;
                   first_arg = ARGUMENT_INDEX(f);
-                  add_byte($4);        /* Actual number of arguments */
-                  CURRENT_PROGRAM_SIZE += 4;
+                  CURRENT_PROGRAM_SIZE += 3;
               }
 
               /* Verify that the function has been defined already.
@@ -8072,6 +8076,8 @@ function_call:
           else if ( (f = lookup_predef($1.real)) != -1 )
           {
               /* EFUN */
+
+              PREPARE_INSERT(8)
 
               fulltype_t *argp;
               int min, max, def, num_arg;
@@ -8231,6 +8237,8 @@ function_call:
                * maybe it's resolved through (cross-)inheritance.
                * epilog() will take care of it.
                */
+              PREPARE_INSERT(4)
+
               function_t *funp;
   
               f = define_new_function(MY_FALSE,
@@ -8239,8 +8247,7 @@ function_call:
               ap_needed = MY_TRUE;
               add_f_code(F_CALL_FUNCTION_BY_ADDRESS);
               add_short(f);
-              add_byte($4);        /* Number of actual arguments */
-              CURRENT_PROGRAM_SIZE += 4;
+              CURRENT_PROGRAM_SIZE += 3;
               funp = FUNCTION(f);
               if (exact_types)
               {
@@ -8253,6 +8260,8 @@ function_call:
           if (ap_needed)
           {
               /* Restore the previous arg frame pointer */
+
+              PREPARE_INSERT(2)
 
               add_f_code(F_RESTORE_ARG_FRAME);
               CURRENT_PROGRAM_SIZE++;
@@ -8298,18 +8307,21 @@ function_call:
               char *p, *q;
               p_int left;
 
+              if (CURRENT_PROGRAM_SIZE + 1 >= mem_block[A_PROGRAM].max_size)
+                  realloc_a_program();
+
               /* Move the generated code forward by 1 */
-              p = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE;
+              p = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE - 1;
               q = p + 1;
               for (left = CURRENT_PROGRAM_SIZE - $1.start
                   ; left > 0
-                  ; left--, p++, q++)
+                  ; left--, p--, q--)
                   *q = *p;
 
-              /* p now points to program[$1.start].
+              /* p now points to program[$1.start]-1.
                * Store the instruction there.
                */
-              p[0] = F_SAVE_ARG_FRAME;
+              p[1] = F_SAVE_ARG_FRAME;
               CURRENT_PROGRAM_SIZE += 1;
           }
 
@@ -8337,21 +8349,24 @@ function_call:
               char *p, *q;
               p_int left;
 
+              if (CURRENT_PROGRAM_SIZE + 6 >= mem_block[A_PROGRAM].max_size)
+                  realloc_a_program();
+
               /* Move the generated code forward by 6 */
-              p = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE;
+              p = mem_block[A_PROGRAM].block + CURRENT_PROGRAM_SIZE - 1;
               q = p + 6;
               for (left = CURRENT_PROGRAM_SIZE - $1.start
                   ; left > 0
-                  ; left--, p++, q++)
+                  ; left--, p--, q--)
                   *q = *p;
 
-              /* p now points to program[$1.start].
+              /* p now points to program[$1.start]-1.
                * Store the first two call-other args there.
                */
-              p[0] = F_STRING;
+              p[1] = F_STRING;
               upd_short($1.start+1, store_prog_string(
                         ref_mstring(query_simul_efun_file_name())));
-              p[3] = F_STRING;
+              p[4] = F_STRING;
               upd_short($1.start+4, store_prog_string(ref_mstring(STR_CALL_OTHER)));
 
               CURRENT_PROGRAM_SIZE += 6;
@@ -8439,8 +8454,7 @@ function_call:
                    * detected and corrected at runtime.
                    */
                   add_f_code(F_CALL_OTHER);
-                  add_byte(num_arg + 2);
-                  CURRENT_PROGRAM_SIZE += 2;
+                  CURRENT_PROGRAM_SIZE++;
               }
               else
               {
@@ -8488,8 +8502,8 @@ function_call:
           }
           else /* true call_other */
           {
-              ins_f_code(F_CALL_OTHER);
-              ins_byte($7 + 2);
+              add_f_code(F_CALL_OTHER);
+              CURRENT_PROGRAM_SIZE++;
               $$.type = instrs[F_CALL_OTHER].ret_type;
           }
           $$.code = -1;
@@ -8756,6 +8770,7 @@ inline_fun:
 catch:
       L_CATCH
       {
+          ins_f_code(F_SAVE_ARG_FRAME);
           $<address>$ = CURRENT_PROGRAM_SIZE;
           ins_f_code(F_CATCH);
           ins_byte(0);
@@ -8819,6 +8834,9 @@ catch:
           {
               mem_block[A_PROGRAM].block[start+1] = offset;
           }
+
+          /* Restore the argument frame */
+          ins_f_code(F_RESTORE_ARG_FRAME);
 
           $$.start = start;
           $$.type  = TYPE_ANY;
@@ -9860,7 +9878,6 @@ insert_inherited (char *super_name, string_t *real_name
         add_f_code(F_CALL_EXPLICIT_INHERITED);
         add_short(ip - (inherit_t *)mem_block[A_INHERITS].block);
         add_short(found_ix);
-        add_byte(num_arg);
 
         /* Return the program pointer */
         *super_p = ip->prog;
@@ -9884,7 +9901,7 @@ insert_inherited (char *super_name, string_t *real_name
             if (FUNCTION_NUM_ARGS(funstart) & ~0x7f)
                 fun_p->type |= TYPE_MOD_XVARARGS;
         }
-        CURRENT_PROGRAM_SIZE += 6;
+        CURRENT_PROGRAM_SIZE += 5;
         return found_ix;
     } /* if (foundp) */
 
@@ -9977,7 +9994,6 @@ insert_inherited (char *super_name, string_t *real_name
             add_f_code(F_CALL_EXPLICIT_INHERITED);
             add_short(ip_index);
             add_short(i);
-            add_byte(num_arg);
 
             /* Mark this function as called */
             was_called[ip_index] = MY_TRUE;
@@ -10005,7 +10021,7 @@ insert_inherited (char *super_name, string_t *real_name
                 fun_p->num_arg = FUNCTION_NUM_ARGS(funstart);
             }
             calls++;
-            CURRENT_PROGRAM_SIZE += 6;
+            CURRENT_PROGRAM_SIZE += 5;
         } /* for() */
 
         /* The calls above left their results on the stack.
@@ -10017,6 +10033,7 @@ insert_inherited (char *super_name, string_t *real_name
             add_short(calls);
             CURRENT_PROGRAM_SIZE += 3;
         }
+
         return first_index;
     }
 

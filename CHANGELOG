@@ -1,11 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Apr-2001 (Lars Duening)  (3.3.38)
+    - (md5.c) Removed a compiler warning.
+    - (closure.c, interpret.c, prolang.y) Bugfixes in the '...' code
+         generation.
+    - (interpret.c) Indexing beyond the bounds of a rvalue string 
+         returns -1 as 'character' value.
+    - (smalloc.c) On Darwin, we get the memory from the system only
+        in multiples of 64 Bytes, which caused the creation of too-small
+        large blocks. Fixed that.
+
 05-Apr-2001 (Lars Duening)  (3.3.37)
     - (object.c) Removed an occasional crasher from restore_object()
         (reported by Freaky).
     - (func_spec, prolang.y, interpret.c) Reworked and completed the
-        support for the '...' argument operator.
+        support for the '...' argument operator (f-990417-9).
     - (object.c) The error messages for save_object() and restore_object()
         also print the filename in question.
 

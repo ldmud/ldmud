@@ -983,7 +983,7 @@ mstring_del_slash (string_t *str MTRACE_DECL)
     if (txt == get_txt(str))
         return ref_mstring(str);
 
-    return new_mstring(txt);
+    return mstring_new_string(txt MTRACE_PASS);
 } /* mstring_del_slash() */
 
 /*-------------------------------------------------------------------------*/

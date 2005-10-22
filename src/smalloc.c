@@ -1913,7 +1913,7 @@ retry:
         word_t minsplit;
         word_t tempsize;
 
-        ptr += OVERHEAD;
+        ptr += OVERHEAD;  /* 'NULL' including overhead */
         minsplit = size + SMALL_BLOCK_MAX + OVERHEAD + 1;
           /* The split-off block must still count as 'large' */
         q = free_tree;
@@ -2086,10 +2086,29 @@ found_fit:
          || block_size > CHUNK_SIZE - SMALL_BLOCK_MAX_BYTES - OVERHEAD*SINT )
         {
             chunk_size = block_size;
+            
         }
         else
         {
             chunk_size = CHUNK_SIZE;
+        }
+
+        /* Some systems like Darwin don't like odd sbrk()/malloc()s, therefore
+         * we round up to the next multiple - 64 seems to work fine. That of
+         * course might give an overhang of less than SMALL_BLOCK_MAX_BYTES,
+         * so we have to add that then, too.
+         */
+#       define ALLOC_MULTIPLE 63  /* Ok, the (multiple-1) */
+
+        if ((chunk_size & ALLOC_MULTIPLE) != 0)
+        {
+#           if SMALL_BLOCK_MAX_BYTES > ALLOC_MULTIPLE
+                chunk_size += SMALL_BLOCK_MAX_BYTES + ALLOC_MULTIPLE;
+#           else
+                chunk_size += ALLOC_MULTIPLE;
+#           endif
+                
+            chunk_size &= ~ALLOC_MULTIPLE;
         }
 
         if (force_more)

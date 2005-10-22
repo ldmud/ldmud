@@ -3382,20 +3382,39 @@ compile_value (svalue_t *value, int opt_flags)
             {
             	/* This is compiled as:
             	 *
+                 *   optional <save_arg_frame>
             	 *   <arg1>
             	 *   <arg2>
             	 *   ...
             	 *   <argN>
             	 *   <efun>
+                 *   optional <restore_arg_frame>
             	 */
             	 
                 mp_int i;
                 bytecode_p p;
                 int f;
+                Bool needs_ap;
                 mp_int num_arg;
                 mp_int min;
                 mp_int max;
                 mp_int def;
+
+                /* Get the instruction code */
+                f = type - CLOSURE_EFUN;
+                min = instrs[f].min_arg;
+                max = instrs[f].max_arg;
+
+                /* Handle the arg frame for varargs efuns */
+                needs_ap = MY_FALSE;
+                if (f >= EFUNV_OFFSET || f == F_CALL_OTHER)
+                {
+                    needs_ap = MY_TRUE;
+                    if (current.code_left < 1)
+                        realloc_code();
+                    current.code_left--;
+                    STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
+                }
 
                 /* Compile the arguments */
                 num_arg = (mp_int)VEC_SIZE(block) - 1;
@@ -3408,12 +3427,9 @@ compile_value (svalue_t *value, int opt_flags)
                  * correct number of arguments.
                  */
                 argp = block->item;
-                if (current.code_left < 5)
+                if (current.code_left < 6)
                     realloc_code();
 
-                f = type - CLOSURE_EFUN;
-                min = instrs[f].min_arg;
-                max = instrs[f].max_arg;
                 p = current.codep;
                 if (num_arg < min)
                 {
@@ -3469,21 +3485,14 @@ compile_value (svalue_t *value, int opt_flags)
                 STORE_CODE(p, instrs[f].opcode);
                 current.code_left--;
 
-                /* Store the number of arguments if required */
-                if (min != max)
-                {
-                    STORE_UINT8(p, (bytecode_t)num_arg);
-                    if (num_arg > 0xff)
-                        lambda_error("Too many arguments to efun closure\n");
-                    current.code_left--;
-                }
-
                 /* Note the type of the result, and add a CONST0 if
-                 * the caller expects one from a void efun.
+                 * the caller expects one from a void efun. Always
+                 * add the CONST0 for void varargs efuns.
                  */
                 if ( instrs[f].ret_type == TYPE_VOID )
                 {
-                    if (opt_flags & (ZERO_ACCEPTED|VOID_ACCEPTED))
+                    if (f < EFUNV_OFFSET
+                     && (opt_flags & (ZERO_ACCEPTED|VOID_ACCEPTED)))
                     {
                         opt_flags = VOID_GIVEN;
                     }
@@ -3493,6 +3502,14 @@ compile_value (svalue_t *value, int opt_flags)
                         current.code_left--;
                     }
                 }
+
+                /* Handle the arg frame for varargs efuns */
+                if (needs_ap)
+                {
+                    current.code_left--;
+                    STORE_CODE(p, F_RESTORE_ARG_FRAME);
+                }
+
                 current.codep = p;
                 break;
             }
@@ -3504,29 +3521,50 @@ compile_value (svalue_t *value, int opt_flags)
             /* This is compiled as:
              *    sefun <= 0xff             sefun > 0xff
              *
+             *    opt. SAVE_ARG_FRAME       SAVE_ARG_FRAME
              *                              <sefun_object_name>
              *                              <sefun_name>
              *    <arg1>                    <arg1>
              *    ...                       ...
              *    <argN>                    <argN>
-             *    SIMUL_EFUN <sefun> N+2    CALL_OTHER N+2
+             *    SIMUL_EFUN <sefun>        CALL_OTHER 
+             *    opt. RESTORE_ARG_FRAME    RESTORE_ARG_FRAME
              */
              
             int simul_efun;
             mp_int num_arg;
             int i;
+            Bool needs_ap;
 
             simul_efun = type - CLOSURE_SIMUL_EFUN;
             
+            needs_ap = MY_FALSE;
+
             if (simul_efun > 0xff)
             {
             	/* We have to call the sefun by name */
                 static svalue_t string_sv = { T_STRING };
 
+                if (current.code_left < 1)
+                    realloc_code();
+                current.code_left -= 1;
+                STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
+                needs_ap = MY_TRUE;
+                
                 string_sv.u.str = query_simul_efun_file_name();
                 compile_value(&string_sv, 0);
                 string_sv.u.str = simul_efunp[simul_efun].name;
                 compile_value(&string_sv, 0);
+            }
+            else if (simul_efunp[simul_efun].num_arg == 0xff)
+            {
+                /* varargs efuns need the arg frame */
+
+                if (current.code_left < 1)
+                    realloc_code();
+                current.code_left -= 1;
+                STORE_CODE(current.codep, F_SAVE_ARG_FRAME);
+                needs_ap = MY_TRUE;
             }
 
             /* Compile the arguments */
@@ -3545,10 +3583,9 @@ compile_value (svalue_t *value, int opt_flags)
             if (simul_efun > 0xff)
             {
             	/* We need the call_other */
-                current.code_left -= 2;
+                current.code_left -= 1;
                 STORE_CODE(current.codep, F_CALL_OTHER);
-                STORE_CODE(current.codep, (bytecode_t)(num_arg + 2));
-                if (num_arg + 2 > 0xff)
+                if (num_arg + 1 > 0xff)
                     lambda_error("Argument number overflow\n");
             }
             else
@@ -3570,7 +3607,7 @@ compile_value (svalue_t *value, int opt_flags)
                      * push 0s onto the stack for missing args
                      */
                     i = funp->num_arg - num_arg;
-                    if (i > 1 && current.code_left < i + 2)
+                    if (i > 1 && current.code_left < i + 3)
                         realloc_code();
                     current.code_left -= i;
                     while ( --i >= 0 ) {
@@ -3580,15 +3617,13 @@ compile_value (svalue_t *value, int opt_flags)
                 
                 STORE_CODE(current.codep, F_SIMUL_EFUN);
                 STORE_UINT8(current.codep, (bytecode_t)simul_efun);
+                current.code_left -= 2;
 
-                /* For a varargs sefun, add the number of arguments */
-                if (funp->num_arg == 0xff)
+                if (needs_ap)
                 {
-                    STORE_UINT8(current.codep, (bytecode_t)num_arg);
-                    current.code_left -= 3;
+                    STORE_UINT8(current.codep, F_RESTORE_ARG_FRAME);
+                    current.code_left--;
                 }
-                else
-                    current.code_left -= 2;
             }
             break;
           } /* CLOSURE_SIMUL_EFUN */
@@ -3616,6 +3651,11 @@ compile_value (svalue_t *value, int opt_flags)
 
             block_size = (mp_int)VEC_SIZE(block);
             
+            if (current.code_left < 1)
+                realloc_code();
+            current.code_left -= 1;
+            STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
+
             l = argp->u.lambda;
             insert_value_push(argp);
             
@@ -3629,7 +3669,7 @@ compile_value (svalue_t *value, int opt_flags)
             current.code_left -= 3;
             STORE_CODE(current.codep, instrs[F_FUNCALL].prefix);
             STORE_CODE(current.codep, instrs[F_FUNCALL].opcode);
-            STORE_UINT8(current.codep, (bytecode_t)block_size);
+            STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
             break;
           } /* CLOSURE_ALIEN_LFUN */
           
@@ -3655,6 +3695,11 @@ compile_value (svalue_t *value, int opt_flags)
             {
             	/* Compile it like an alien lfun */
             	
+                if (current.code_left < 1)
+                    realloc_code();
+                current.code_left -= 1;
+                STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
+
                 insert_value_push(argp);
                 for (i = block_size; --i; )
                 {
@@ -3665,12 +3710,17 @@ compile_value (svalue_t *value, int opt_flags)
                 current.code_left -= 3;
                 STORE_CODE(current.codep, instrs[F_FUNCALL].prefix);
                 STORE_CODE(current.codep, instrs[F_FUNCALL].opcode);
-                STORE_CODE(current.codep, (bytecode_t)block_size);
+                STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
             }
             else
             {
             	/* Intra-object call: we can call by address */
             	
+                if (current.code_left < 1)
+                    realloc_code();
+                current.code_left -= 1;
+                STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
+
                 for (i = block_size; --i; )
                 {
                     compile_value(++argp, 0);
@@ -3681,7 +3731,7 @@ compile_value (svalue_t *value, int opt_flags)
                 current.code_left -= 4;
                 STORE_CODE(current.codep, F_CALL_FUNCTION_BY_ADDRESS);
                 STORE_SHORT(current.codep, l->function.index);
-                STORE_UINT8(current.codep, (bytecode_t)(block_size - 1));
+                STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
                 if (block_size > 0x100)
                     lambda_error("Too many arguments to lfun closure\n");
             }
@@ -3711,13 +3761,18 @@ compile_value (svalue_t *value, int opt_flags)
             {
             	/* We need the FUNCALL */
             	
+                if (current.code_left < 1)
+                    realloc_code();
+                current.code_left -= 1;
+                STORE_CODE(current.codep, instrs[F_SAVE_ARG_FRAME].opcode);
+
                 insert_value_push(argp);
                 if (current.code_left < 3)
                     realloc_code();
                 current.code_left -= 3;
                 STORE_CODE(current.codep, instrs[F_FUNCALL].prefix);
                 STORE_CODE(current.codep, instrs[F_FUNCALL].opcode);
-                STORE_UINT8(current.codep, 1);
+                STORE_CODE(current.codep, instrs[F_RESTORE_ARG_FRAME].opcode);
             }
             else
             {

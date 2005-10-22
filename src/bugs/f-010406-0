@@ -1,0 +1,61 @@
+Short: Improved RegExps, using PCRE
+From: Lars, Fini
+Date: 20010406
+State: New
+
+> Mhm, ich kenne die Perl REs zwar nicht so gut (willst du nur die 
+> Funktionalitaet in efuns verpackt, oder auch Sprachaenderungen); aber gerade 
+> gestern habe ich die PCRE ("Perl Compatible Regular Expressions") Library 
+> gefunden, was eine zukuenftige Implementierung erheblich vereinfacht.
+
+Aehm, ich wollte nur dass man bei den vorhandenen efuns auch
+'vernuenftige' RE benutzen kann. Was mir zb extrem fehlt ist ein 'non
+greedy *' Operator, also der beliebig viele, jedoch so wenig wie moeglich
+Wiederholungen der vor RE nimmt. In Perl macht man das mit einem
+angehaengten '?'. Mal sehen ob ich ein Beispiel finde...
+
+      $skill = $1   if ( /"skills":(.*?]\))/ );
+
+Das Perlskript liest ein LPC .o-File ein. Dort gibt es ein Mapping
+(properties), welches mit dem Schluessel 'skills' ein Mapping hat, was die
+Skills repraesentiert. Ich will also beliebige Zeichen haben bis zum
+ersten Auftreten von ']'. In diesem Fall koennte man auch schreiben
+[^\]]* aber es gibt andere Faelle (zb kann man mit REs sehr schoen Strings
+aus Savefiles rausholen, unter Beachtung von gequoteten " usw, da geht das
+nicht oder nur mit erheblichem Aufwand. (Ganz unten haenge ich dir maln
+Beispiel ran, was die \" beachtet und so weiter und '?' nutzt)
+
+Also wenn die reg*(E) das (auch) nehmen wuerden waer das schon ganz schoen
+klasse. Wenn man da das PCRE einbinden koennte (muesste man bestimmt
+wieder einen neuen Schalter einbauen, welche Art von Regexps man denn will
+grumpf)...
+
+Aenderungen an efuns, da faellt mir ein, ein regexplode welches nicht die
+delimiter mitliefert waer auch bequem (analog Perls split, dort kann man
+beides haben wie man will). Schoen waer in dem Zusammenhang auch ein
+'Suche in dem String str nach Regexp RE und liefer mir das'. ZZ ist das
+sehr aufwenidig in einem String was zu suchen und das dann zu benutzen.
+Natuerlich kann ich strs = regexplode(str, RE); machen und dann die
+Groesse von strs pruefen und mein Zielstring ist dann strs[1]. ;o)
+Aber ziel = xxx(str, RE); (Irgendwie scheint mir das zu keiner vorhandenen
+Efun zu passen).
+
+
+Knuddels und Gruss aus dem verregneten Hamburg
+
+  Fini
+
+
+----
+Wieder eine Property. Im Mapping ist hinter dem Schluessel 'explored' ein
+LPC-Bitstring. Wenn man den komplett haben will muss man wissen wo er
+zuende ist, also schoen alle " zaehlen und dabei \" ignorieren.
+
+      $explo = $1   if ( /"explored":"(.*?[^\\]+?(\\\\)*?)"/ );
+
+Ich glaub irgendwann muss ich maln Perl Package schreiben was einfach
+jedes .o File einlesen kann und ein entsprechendes Mapping (hash)
+zurueckliefert in dem alle Vars dann abgebildet werden *grueble* ich
+schick dir das dann ;o) Mal sehen ob beim Driver die Docu zu den Savefiles
+schon gut genug ist ;o))
+

@@ -89,11 +89,12 @@ f-001220-0: Extend the debug_info() method to handle interactives.
 f-010307: Short(est) Path Algorithms
 f-010223: Useful coloured string efuns
 f-010320: limited() vs resetting of runtime costs
+f-010406-0: Improved RegExps, using PCRE
 
 
 Language
 --------------------------------------------------------------------------
-p-990204-0: '...' operator for varargs passing and expanding
+p-990204-0: Patches for FinalFrontier
 f-981229-17: anonymous function syntax
 f-990203-02: dito
 p-990710-0: Handles (objects associated with a string)
@@ -113,6 +114,7 @@ f-000430-1: C++-style variable definitions
 f-000430-2: C-style prototypes
 f-010309-1: foreach() should allow dummy variables
 f-010309-2:'yield' to convert statements into expressions
+f-010406-1: References in foreach()
 
 
 Compiler

@@ -1,8 +1,15 @@
 Short: '...' syntax element
 From: Lars, Daniel Schild, Stefan
 Type: Feature
-State: Acknowledged
+State: Done - implemented in 3.3.37
 
+The existing implementation differs from the one given here: instead of
+counting arguments we keep a pointer to the start of the arguments around.
+Additionally it is possible to save and restore this pointer on the stack,
+allowing for nested function calls ( f( m..., b(n...), o...) ). And efuns
+are supported as well.
+
+--------------------------------------------------------------------------
 Alternative varargs declaration: foo(a,b, c...) ?
 
 New function call syntax: foo(a,b,c...): if c is an array, it is flattened

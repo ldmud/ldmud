@@ -4216,9 +4216,7 @@ push_rindexed_value (svalue_t *sp, bytecode_p pc)
 
         if ( (ind = (mp_int)mstrsize(vec->u.str) - ind) < 0 )
         {
-            debug_message("Index for [<] out of bounds: %ld, string size: %lu\n"
-                   , (long)i->u.number, (unsigned long)mstrsize(vec->u.str));
-            ind = 0;
+            ind = -1;
         }
         else
             ind = get_txt(vec->u.str)[ind];
@@ -5826,18 +5824,16 @@ eval_instruction (bytecode_p first_instruction
     svalue_t *expected_stack; /* Expected stack at the instr end */
 #endif
 
-static svalue_t *ap;
-  /* Argument frame pointer: pointer to first outgoing argument to be passed to
-   * called function. This variable is static in order to survive longjmp()s,
-   * its actual scope is just within one execution of eval_instruction().
-   */
-
-static Bool use_ap;
-  /* TRUE if the next simul_efun/efun call is to determine the number of
-   * arguments from the current *ap value. This variable is static in order
-   * to survive longjmp()s, its actual scope is just within one execution
-   * of eval_instruction().
-   */
+    svalue_t *ap;
+      /* Argument frame pointer: pointer to first outgoing argument to be
+       * passed to called function.
+       */
+    Bool use_ap;
+      /* TRUE if the next simul_efun/efun call is to determine the number of
+       * arguments from the current *ap value. This variable is static in order
+       * to survive longjmp()s, its actual scope is just within one execution
+       * of eval_instruction().
+       */
 
 
     /* Handy macros:
@@ -5974,6 +5970,7 @@ again:
         printf(" %3d %s %s\n", GET_CODE(pc)+EFUNV_OFFSET, get_f_name(instruction), get_f_name(GET_CODE(pc)+EFUNV_OFFSET));
     else
         printf(" %3d %s\n", instruction, get_f_name(instruction));
+    fflush(stdout);
 #endif
 
 #   ifdef TRACE_CODE
@@ -6058,7 +6055,9 @@ again:
     /* Get the expected number of arguments and determined the expected
      * stack setting.
      */
-    if (instrs[instruction].min_arg != instrs[instruction].max_arg)
+    if (instrs[instruction].min_arg != instrs[instruction].max_arg
+     && instruction != F_CALL_OTHER
+       )
     {
         num_arg = GET_UINT8(pc);
         pc++;
@@ -7423,6 +7422,8 @@ again:
         fp = inter_fp;
 
         /* Not really necessary, but tells gcc to complain less */
+        ap = NULL; /* Will be restored with a restore_arg_frame */
+        use_ap = MY_FALSE;
         instruction = F_CATCH;
         num_arg = -1;
 #ifdef DEBUG
@@ -10726,7 +10727,7 @@ again:
         }
 
         /* Save all important global stack machine registers */
-        push_control_stack(sp, pc+1, fp);
+        push_control_stack(sp, pc, fp);
 
         /* Set the current program back to the objects program _after_
          * the control stack push, since here is where we search for
@@ -10800,7 +10801,7 @@ again:
 #endif
 
         /* Save all important global stack machine registers */
-        push_control_stack(sp, pc+1, fp);
+        push_control_stack(sp, pc, fp);
 
         /* If we do an explicit call into a virtually inherited base class we
          * have to find the first instance of the inherited variables.
@@ -12435,7 +12436,7 @@ again:
 
     /* --- Efuns: Functions and Closures --- */
 
-    CASE(F_CALL_OTHER);             /* --- call_other <nargs>  --- */
+    CASE(F_CALL_OTHER);             /* --- call_other          --- */
     {
         /* EFUN call_other()
          *
