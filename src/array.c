@@ -154,7 +154,10 @@ _allocate_array(mp_int n MTRACE_DECL)
 
     p->ref = 1;
     p->size = n;
-    (p->user = current_object->user)->size_array += n;
+    if (current_object)
+        (p->user = current_object->user)->size_array += n;
+    else
+        (p->user = &default_wizlist_entry)->size_array += n;
 
     svp = p->item;
     for (i = n; --i >= 0; )
@@ -210,7 +213,10 @@ _allocate_array_unlimited(mp_int n MTRACE_DECL)
 
     p->ref = 1;
     p->size = n;
-    (p->user = current_object->user)->size_array += n;
+    if (current_object)
+        (p->user = current_object->user)->size_array += n;
+    else
+        (p->user = &default_wizlist_entry)->size_array += n;
 
     svp = p->item;
     for (i = n; --i >= 0; )
@@ -263,7 +269,10 @@ _allocate_uninit_array (mp_int n MTRACE_DECL)
 
     p->ref = 1;
     p->size = n;
-    (p->user = current_object->user)->size_array += n;
+    if (current_object)
+        (p->user = current_object->user)->size_array += n;
+    else
+        (p->user = &default_wizlist_entry)->size_array += n;
 
     return p;
 }

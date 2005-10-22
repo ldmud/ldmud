@@ -10743,7 +10743,9 @@ copy_functions (program_t *from, fulltype_t type)
          * and definitiability. The switch() allows us to abort
          * easily without using gotos.
          */
-        switch (0) { default:
+        switch (0) {
+            Bool forcenew;
+        default:
             /* Test if the function is visible at all */
             if ( (fun.flags & (NAME_HIDDEN|TYPE_MOD_NO_MASK|NAME_UNDEFINED) ) ==
                  (NAME_HIDDEN|TYPE_MOD_NO_MASK) )
@@ -10753,6 +10755,8 @@ copy_functions (program_t *from, fulltype_t type)
             p = make_global_identifier(get_txt(fun.name), I_TYPE_GLOBAL);
             if (!p)
                 break;
+
+            forcenew = MY_FALSE;
 
             if (p->type != I_TYPE_UNKNOWN)
             {
@@ -10824,7 +10828,7 @@ copy_functions (program_t *from, fulltype_t type)
                               get_txt(fun.name));
                         }
                         else if ((   fun.flags & TYPE_MOD_NO_MASK
-                                  || OldFunction->flags & (NAME_HIDDEN|NAME_UNDEFINED))
+                                  || OldFunction->flags & (NAME_HIDDEN|NAME_UNDEFINED|TYPE_MOD_PRIVATE))
                               && !(fun.flags & (NAME_HIDDEN|NAME_UNDEFINED))
                                 )
                         {
@@ -10849,16 +10853,23 @@ copy_functions (program_t *from, fulltype_t type)
                          * inherit this one.
                          */
 #ifdef DEBUG
-                        /* The definition we picked before should be cross-defined
-                         * to the definition we have now.
+                        /* The definition we picked before should be
+                         * cross-defined to the definition we have now; or
+                         * it should be nominally invisible so we can redefine
+                         * it.
                          */
-                        if ( !(FUNCTION(n)->flags & NAME_CROSS_DEFINED)
-                         ||   FUNCTION(n)->offset.func
-                           != MAKE_CROSSDEF_OFFSET(((int32)current_func_index) - n)
+                        if ((   !(FUNCTION(n)->flags & NAME_CROSS_DEFINED)
+                             ||   FUNCTION(n)->offset.func
+                                != MAKE_CROSSDEF_OFFSET(((int32)current_func_index) - n)
+                            )
+                         && ((FUNCTION(n)->flags & TYPE_MOD_PRIVATE) == 0
+                            )
                            )
                         {
                             fatal(
-                              "inconsistent function definition within superclass\n"
+                              "Inconsistent definition of %s() within "
+                              "superclass '%s'.\n"
+                            , get_txt(fun.name), get_txt(from->name)
                             );
                         }
 #endif

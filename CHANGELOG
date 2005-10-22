@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+23-Aug-2001 (Lars Duening)  (3.3.90)
+    - (array.c) ERQ callbacks for a destructed object don't have a
+        current_object at the time the error occurs. The error handling code
+        allocates an array, but the array code was still assuming that
+        current_object is always valid (reported by Fiona).
+    - (prolang.y) Redefining an inherited private function with a non-private
+        one, and then inheriting the redefinition didn't work (reported by
+        Menaures).
+
 22-Aug-2001 (Lars Duening)  (3.3.89)
     - (interpret.c) The lambda protection had a bug: when a non-lambda closure
          was called from within an executed lambda, the lambda closure was
