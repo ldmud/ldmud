@@ -982,23 +982,36 @@ void slow_shut_down (int minutes)
 }
 
 //---------------------------------------------------------------------------
-void notify_shutdown ()
+varargs void notify_shutdown (string crash_reason)
 
-// Notify the master about an immediate shutdown.
+// Notify the master about an immediate shutdown. If <crash_reason> is 0,
+// it is a normal shutdown, otherwise it is a crash and <crash_reason>
+// gives a hint at the reason.
 //
-// If the gamedriver shuts down, this is the last function called before
-// the mud shuts down the udp connections and the accepting socket for new
-// players.
 // The function has the opportunity to perform any cleanup operation, like
 // informing the mudwho server that the mud is down. This can not be done
 // when remove_player() is called because the udp connectivity is already
 // gone then.
+//
+// If the gamedriver shuts down normally , this is the last function called
+// before the mud shuts down the udp connections and the accepting socket
+// for new players.
+//
+// If the gamedriver crashes, this is the last function called before the
+// mud attempts to dump core and exit. WARNING: Since the driver is in
+// an unstable state, this function may not be able to run to completion!
+// The following crash reasons are defined:
+//   "Fatal Error": an internal sanity check failed.
 
 {
     if (previous_object() && previous_object() != this_object())
         return;
-    filter(users(), #'tell_object,
-      "Game driver shouts: LPmud shutting down immediately.\n");
+    if (!crash_reason)
+        filter(users(), #'tell_object,
+          "Game driver shouts: LPmud shutting down immediately.\n");
+    else
+        filter(users(), #'tell_object,
+          "Game driver shouts: PANIC! "+ crash_reason+"!\n");
     save_wiz_file();
     mudwho_shutdown();
 }

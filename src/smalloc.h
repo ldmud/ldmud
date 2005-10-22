@@ -70,6 +70,9 @@ extern void free_unreferenced_memory(void);
 extern void consolidate_freelists (void);
 extern void *malloc_increment_size(void *p, size_t size);
 extern void walk_new_small_malloced( void (*func)(POINTER, long) );
+#ifdef CHECK_MAPPING_TOTAL
+extern mp_int available_memory(void);
+#endif /* CHECK_MAPPING_TOTAL */
 
 #ifdef MALLOC_TRACE
 extern void store_print_block_dispatch_info(void *block, void (*func)(int, void *, int) );

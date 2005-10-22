@@ -6487,7 +6487,7 @@ show_lexer_status (strbuf_t * sbuf, Bool verbose UNUSED)
     sum += 2 * DEFMAX; /* for the buffers in _expand_define() */
 
     if (sbuf)
-        strbuf_addf(sbuf, "Lexer structures\t\t\t %8lu\n", sum);
+        strbuf_addf(sbuf, "Lexer structures\t\t\t %9lu\n", sum);
     return sum;
 } /* show_lexer_status() */
 

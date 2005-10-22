@@ -23,6 +23,12 @@
  */
 /* #define DUMP_GC_REFS */
 
+/* Activate total mapping size consistency check code. It shouldn't
+ * have any noticeable speed impact. This define was used to find
+ * the inaccuracy in the mapping statistic.
+ */
+#define CHECK_MAPPING_TOTAL
+
 
 /* TODO: Some TODO defines */
 

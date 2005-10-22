@@ -537,6 +537,7 @@ get_new_mapping ( wiz_list_t * user, mp_int num_values
     /* hm has already been counted */
 
     num_mappings++;
+    check_total_mapping_size();
 
     return m;
 
@@ -619,6 +620,7 @@ _free_mapping (mapping_t *m, Bool no_data)
 
         LOG_SUB("free_mapping cond", SIZEOF_MC(m->cond, m->num_values));
         m->user->mapping_total -= SIZEOF_MC(m->cond, m->num_values);
+        check_total_mapping_size();
         xfree(m->cond);
         m->cond = NULL;
     }
@@ -639,6 +641,7 @@ _free_mapping (mapping_t *m, Bool no_data)
 #endif
         LOG_SUB("free_mapping hash", SIZEOF_MH(hm));
         m->user->mapping_total -= SIZEOF_MH(hm);
+        check_total_mapping_size();
 
         mcp = hm->chains;
 
@@ -686,6 +689,7 @@ _free_mapping (mapping_t *m, Bool no_data)
 
         LOG_SUB("free_mapping base", sizeof(*m));
         m->user->mapping_total -= sizeof(*m);
+        check_total_mapping_size();
         xfree(m);
     }
 } /* free_mapping() */
@@ -773,6 +777,7 @@ remove_empty_mappings (void)
         {
             LOG_SUB("remove_empty_mappings", (sizeof(*m) + SIZEOF_MH(hm)));
             m->user->mapping_total -= sizeof(*m) + SIZEOF_MH(hm);
+            check_total_mapping_size();
             xfree(m);
             *mp = m = hm->next_dirty;
             xfree(hm);
@@ -1207,6 +1212,7 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
 
             LOG_ALLOC("get_map_lvalue - existing hash", SIZEOF_MH(hm) - SIZEOF_MH(hm2), sizeof *hm - sizeof *mcp + sizeof *mcp * size);
             m->user->mapping_total += SIZEOF_MH(hm) - SIZEOF_MH(hm2);
+            check_total_mapping_size();
 
             /* Away, old data! */
 
@@ -1618,6 +1624,7 @@ resize_mapping (mapping_t *m, mp_int new_width)
         m2->hash = hm2;
         LOG_ALLOC("copy_mapping - hash", SIZEOF_MH(hm2), sizeof *hm - sizeof *mcp + sizeof *mcp * size);
         m->user->mapping_total += SIZEOF_MH(hm2);
+        check_total_mapping_size();
     }
 
 
@@ -2116,6 +2123,7 @@ compact_mappings (mp_int num)
             LOG_SUB("compact_mappings: empty mapping", sizeof(*m) + SIZEOF_MH(hm));
             m->user->mapping_total -= sizeof(*m) + SIZEOF_MH(hm);
             xfree(m);
+            check_total_mapping_size();
             m = hm->next_dirty;
             xfree(hm);
             empty_mapping_load -= 2;
@@ -2133,6 +2141,7 @@ compact_mappings (mp_int num)
             LOG_SUB("compact_mappings: no need to", SIZEOF_MH(hm));
             m->user->mapping_total -= SIZEOF_MH(hm);
             m->hash = NULL;
+            check_total_mapping_size();
 
             /* the ref count has been incremented above; on the other
              * hand, the last real reference might have gone with the
@@ -2438,6 +2447,7 @@ compact_mappings (mp_int num)
 
         LOG_SUB("compact_mappings - remove old hash", SIZEOF_MH(hm));
         m->user->mapping_total -= SIZEOF_MH(hm);
+        check_total_mapping_size();
           /* The memorysize for the map_chain_t structure has already been
            * subtracted.
            */
@@ -2464,6 +2474,56 @@ compact_mappings (mp_int num)
     dirty_mapping_head_hash.next_dirty = m;
 
 } /* compact_mappings() */
+
+/*-------------------------------------------------------------------------*/
+#ifdef CHECK_MAPPING_TOTAL
+void
+m_check_total_mapping_size (const char * file, int line)
+
+/* Check the sanity of the total amount of memory recorded for all
+ * mappings in the system. If the value becomes bogus, log a message.
+ */
+
+{
+    static mp_int last_size = 0;
+    static Bool last_size_ok = MY_TRUE;
+    wiz_list_t *wl;
+    mp_int total;
+#ifdef MALLOC_smalloc
+    mp_int available;
+#endif
+    Bool this_size_ok = MY_TRUE;
+
+#ifdef MALLOC_smalloc
+    available = available_memory();
+#endif
+    total = default_wizlist_entry.mapping_total;
+    for (wl = all_wiz; wl; wl = wl->next)
+    {
+        total += wl->mapping_total;
+    }
+
+    if (total < 0
+#ifdef MALLOC_smalloc
+     || total > available
+#endif
+       )
+        this_size_ok = MY_FALSE;
+
+    if (last_size_ok && !this_size_ok)
+    {
+        dprintf3(gcollect_outfd, "DEBUG: (%s : %d) Invalid total mapping size %d"
+                  , (p_int)file, (p_int)line, (p_int)total);
+#ifdef MALLOC_smalloc
+        dprintf1(gcollect_outfd, " (avail %d)", (p_int)available);
+#endif
+        dprintf1(gcollect_outfd, ", was %d\n", (p_int)last_size);
+    }
+
+    last_size_ok = this_size_ok;
+    last_size = total;
+}
+#endif /* CHECK_MAPPING_TOTAL */
 
 /*-------------------------------------------------------------------------*/
 mp_int
@@ -2582,10 +2642,12 @@ set_mapping_user (mapping_t *m, object_t *owner)
                     );
     LOG_SUB("set_mapping_user", total);
     m->user->mapping_total -= total;
+    check_total_mapping_size();
     user = owner->user;
     m->user = user;
     LOG_ADD("set_mapping_user", total);
     m->user->mapping_total += total;
+    check_total_mapping_size();
 
 
     /* Walk the mapping to set all owners */
@@ -2653,6 +2715,7 @@ clear_mapping_size (void)
     default_wizlist_entry.mapping_total = 0;
     for (wl = all_wiz; wl; wl = wl->next)
         wl->mapping_total = 0;
+    check_total_mapping_size();
 } /* clear_mapping_size(void) */
 
 /*-------------------------------------------------------------------------*/
@@ -2668,12 +2731,37 @@ count_mapping_size (mapping_t *m)
     num_mappings++;
 
     total = sizeof(*m);
+    dprintf3(gcollect_outfd, "DEBUG: map '%s' %d (num values %d)"
+                           , (p_int)(m->user->name ? get_txt(m->user->name) : "<0>")
+                           , (p_int)total, (p_int)m->num_values);
     if (m->cond != NULL)
-        total += SIZEOF_MC(m->cond, m->num_values);
+    {
+        mp_int subtotal;
+        
+        subtotal = SIZEOF_MC(m->cond, m->num_values);
+        total += subtotal;
+        dprintf2(gcollect_outfd, " + %d (size %d)"
+                               , (p_int)subtotal
+                               , (p_int)m->cond->size
+                               );
+    }
     if (m->hash != NULL)
-        total += SIZEOF_MH_ALL(m->hash, m->num_values);
+    {
+        mp_int subtotal;
+        subtotal = SIZEOF_MH_ALL(m->hash, m->num_values);
+        total += subtotal;
+        dprintf4(gcollect_outfd, " + %d (hash %d, mask %d, used %d)"
+                               , (p_int)subtotal
+                               , (p_int)sizeof(m->hash)
+                               , (p_int)m->hash->mask
+                               , (p_int)m->hash->used
+                               );
+    }
+
+    dprintf1(gcollect_outfd, " = %d\n", (p_int)total);
 
     m->user->mapping_total += total;
+    check_total_mapping_size();
 } /* count_mapping_size(void) */
 
 /*-------------------------------------------------------------------------*/
@@ -2886,6 +2974,7 @@ clean_stale_mappings (void)
             xfree(cm);
         }
 
+        check_total_mapping_size();
         free_mapping(m); /* Undo the ref held by the stale-mapping list */
     }
 } /* clean_stale_mappings() */

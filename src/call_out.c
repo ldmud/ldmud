@@ -564,7 +564,7 @@ found:
 
 /*-------------------------------------------------------------------------*/
 size_t
-print_call_out_usage (strbuf_t *sbuf, Bool verbose)
+call_out_status (strbuf_t *sbuf, Bool verbose)
 
 /* Compute and return the amount of memory used by callouts.
  * If <verbose> is true, write detailed statistics to the current user.
@@ -576,7 +576,7 @@ print_call_out_usage (strbuf_t *sbuf, Bool verbose)
     {
         strbuf_add(sbuf, "\nCall out information:\n");
         strbuf_add(sbuf,"---------------------\n");
-        strbuf_addf(sbuf, "Number of allocated call outs: %8ld, %8ld bytes\n",
+        strbuf_addf(sbuf, "Number of allocated call outs: %8ld, %9ld bytes\n",
                     num_call, num_call * sizeof (struct call));
         strbuf_addf(sbuf, "Current length: %ld\n", num_callouts);
     }

@@ -5181,7 +5181,7 @@ show_comm_status (strbuf_t * sbuf, Bool verbose UNUSED)
     }
 
     if (sbuf)
-        strbuf_addf(sbuf, "Comm structures\t\t\t\t %8lu\n", sum);
+        strbuf_addf(sbuf, "Comm structures\t\t\t\t %9lu\n", sum);
     return sum;
 } /* show_comm_status() */
 

@@ -5,6 +5,7 @@ b-010911: String table corrupt
 b-011220: LDMud instability in Alatia
 b-020228-1: Crash in terminal_colour()
 b-020228-0: Refcount errors when handling destructed objects
+b-020303-0: Crasher on corrupt string.
 
 
 Efuns
@@ -24,6 +25,7 @@ b-010410: Branchpatching messes up line number information
 b-010603-0: Failed assignments leave behind empty mapping entries.
 b-010610-0: Type tracking fails on arrays
 b-010801-0: #' recognition in lexer insufficient
+b-020303-1: Problem with virtual inherits
 
 
 Runtime

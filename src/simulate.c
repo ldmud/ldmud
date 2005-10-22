@@ -501,6 +501,28 @@ unroll_context_stack (void)
 } /* unroll_context_stack() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE void dump_core(void) NORETURN;
+
+static INLINE void
+dump_core(void)
+
+/* A wrapper around abort() to make sure that we indeed dump a core.
+ */
+
+{
+#if !defined(__BEOS__)
+    /* we want a core dump, and abort() seems to fail for linux and sun */
+    (void)signal(SIGFPE, SIG_DFL);
+    {
+        int a = 0;  /* avoids a pesky diagnostic */
+        *((char*)0) = 0/a;
+        *((char*)fatal) = 0/a;
+    }
+#endif
+    abort();
+} /* dump_core() */
+
+/*-------------------------------------------------------------------------*/
 void
 fatal (const char *fmt, ...)
 
@@ -515,7 +537,7 @@ fatal (const char *fmt, ...)
 
     /* Prevent double fatal. */
     if (in_fatal)
-        abort();
+        dump_core();
     in_fatal = MY_TRUE;
 
     ts = time_stamp();
@@ -545,16 +567,12 @@ fatal (const char *fmt, ...)
 
     va_end(va);
 
-#if !defined(__BEOS__)
-    /* we want a core dump, and abort() seems to fail for linux and sun */
-    (void)signal(SIGFPE, SIG_DFL);
-    {
-        int a = 0;  /* avoids a pesky diagnostic */
-        *((char*)0) = 0/a;
-        *((char*)fatal) = 0/a;
-    }
-#endif
-    abort();
+    /* Before shutting down, try to inform the game about it */
+    push_ref_string(inter_sp, STR_FATAL_ERROR);
+    apply_master_ob(STR_SHUTDOWN, 1);
+
+    /* Dump core and exit */
+    dump_core();
 } /* fatal() */
 
 /*-------------------------------------------------------------------------*/
@@ -2616,26 +2634,26 @@ status_parse (strbuf_t * sbuf, char * buff)
             res += reserved_system_size;
         if (!verbose)
         {
-            strbuf_addf(sbuf, "Actions:\t\t\t%8ld %8ld\n"
+            strbuf_addf(sbuf, "Actions:\t\t\t%8ld %9ld\n"
                             , alloc_action_sent
                             , alloc_action_sent * sizeof (action_t));
-            strbuf_addf(sbuf, "Shadows:\t\t\t%8ld %8ld\n"
+            strbuf_addf(sbuf, "Shadows:\t\t\t%8ld %9ld\n"
                             , alloc_shadow_sent
                             , alloc_shadow_sent * sizeof (shadow_t));
-            strbuf_addf(sbuf, "Objects:\t\t\t%8d %8d (%ld swapped, %ld Kbytes)\n"
+            strbuf_addf(sbuf, "Objects:\t\t\t%8d %9d (%ld swapped, %ld Kbytes)\n"
                             , tot_alloc_object, tot_alloc_object_size
                             , num_vb_swapped, total_vb_bytes_swapped / 1024);
-            strbuf_addf(sbuf, "Arrays:\t\t\t\t%8ld %8ld\n"
+            strbuf_addf(sbuf, "Arrays:\t\t\t\t%8ld %9ld\n"
                             , (long)num_arrays, total_array_size() );
-            strbuf_addf(sbuf, "Mappings:\t\t\t%8ld %8ld\n"
+            strbuf_addf(sbuf, "Mappings:\t\t\t%8ld %9ld\n"
                              , num_mappings, total_mapping_size() );
-            strbuf_addf(sbuf, "Prog blocks:\t\t\t%8ld %8ld (%ld swapped, %ld Kbytes)\n"
+            strbuf_addf(sbuf, "Prog blocks:\t\t\t%8ld %9ld (%ld swapped, %ld Kbytes)\n"
                             , total_num_prog_blocks + num_swapped - num_unswapped
                             , total_prog_block_size + total_bytes_swapped
                                                     - total_bytes_unswapped
                             , num_swapped - num_unswapped
                             , (total_bytes_swapped - total_bytes_unswapped) / 1024);
-            strbuf_addf(sbuf, "Memory reserved:\t\t\t %8d\n", res);
+            strbuf_addf(sbuf, "Memory reserved:\t\t\t %9d\n", res);
         }
         if (verbose) {
 #ifdef COMM_STAT
@@ -2734,7 +2752,7 @@ status_parse (strbuf_t * sbuf, char * buff)
         tot += show_otable_status(sbuf, verbose);
         tot += heart_beat_status(sbuf, verbose);
         tot += add_string_status(sbuf, verbose);
-        tot += print_call_out_usage(sbuf, verbose);
+        tot += call_out_status(sbuf, verbose);
         tot += total_mapping_size();
         tot += rxcache_status(sbuf, verbose);
         if (verbose)
@@ -2752,14 +2770,14 @@ status_parse (strbuf_t * sbuf, char * buff)
             other += swap_overhead();
             other += num_simul_efun * sizeof(function_t);
             other += interpreter_overhead();
-            strbuf_addf(sbuf, "Other structures\t\t\t %8lu\n", other);
+            strbuf_addf(sbuf, "Other structures\t\t\t %9lu\n", other);
             tot += other;
         }
         tot += res;
 
         if (!verbose) {
-            strbuf_add(sbuf, "\t\t\t\t\t --------\n");
-            strbuf_addf(sbuf, "Total:\t\t\t\t\t %8d\n", tot);
+            strbuf_add(sbuf, "\t\t\t\t\t ---------\n");
+            strbuf_addf(sbuf, "Total:\t\t\t\t\t %9d\n", tot);
         }
         return MY_TRUE;
     }

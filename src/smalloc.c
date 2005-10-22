@@ -2964,6 +2964,23 @@ smalloc_dinfo_data (svalue_t *svp, int value)
 #undef ST_NUMBER
 } /* smalloc_dinfo_data() */
 
+/*-------------------------------------------------------------------------*/
+#ifdef CHECK_MAPPING_TOTAL
+mp_int
+available_memory(void)
+
+/* Return the amount of memory actually used by the driver. */
+
+{
+    return large_alloc_stat.size * SINT
+           - small_free_stat.size
+           - small_chunk_wasted.size
+           - unused_size
+           - large_alloc_stat.counter * OVERHEAD * SINT
+           - small_alloc_stat.counter * OVERHEAD * SINT;
+} /* available_memory() */
+#endif /* CHECK_MAPPING_TOTAL */
+
 /*=========================================================================*/
 #ifdef SBRK_OK
 

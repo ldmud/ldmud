@@ -285,7 +285,7 @@ show_otable_status (strbuf_t * sbuf, Bool verbose)
     }
     /* objs_in_table * sizeof(object_t) is already accounted for
        in tot_alloc_object_size.  */
-    strbuf_addf(sbuf, "hash table overhead\t\t\t %8ld\n",
+    strbuf_addf(sbuf, "hash table overhead\t\t\t %9ld\n",
                 (long)(OTABLE_SIZE * sizeof(object_t *)));
     return OTABLE_SIZE * sizeof(object_t *);
 }

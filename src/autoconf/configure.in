@@ -368,9 +368,7 @@ dnl Checking for programs
 
 AC_PROG_INSTALL
 AC_CONFIG_HEADER(machine.h)
-dnl bison -y is incompatible in functionality & Copyright
-dnl TODO: (Mubo: copyright changed, this should no longer be a problem, but...)
-AC_CHECK_PROGS(YACC, byacc, yacc)
+AC_CHECK_PROGS(YACC, byacc "bison -y", yacc)
 AC_PROG_CPP
 
 dnl Recognize some unusual systems.

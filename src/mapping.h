@@ -213,4 +213,11 @@ extern void clear_mapping_size (void);
 extern void count_mapping_size (mapping_t *m);
 #endif
 
+#ifdef CHECK_MAPPING_TOTAL
+extern void m_check_total_mapping_size (const char * file, int line);
+#define check_total_mapping_size() m_check_total_mapping_size(__FILE__, __LINE__)
+#else
+#define check_total_mapping_size() NOOP
+#endif
+
 #endif /* MAPPING_H__ */

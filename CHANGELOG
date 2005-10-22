@@ -1,6 +1,18 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Mar-2002 (Lars Duening)  (3.3.176)
+    - (simulate.c) When the driver runs on a fatal error, it calls
+        the master lfun notify_shutdown() with "Fatal Error" as argument
+        before it dumps core.
+    - (configure) Added a check for 'bison -y' when looking for YACC.
+    - (driver.h, mapping, smalloc) If debug macro CHECK_MAPPING_TOTAL
+        is defined, ever change in the registered mapping size statistics
+        is accompanied with a sanity check. If the check fails, a
+        DEBUG message is generated on stderr. Also added diagnostic
+        statements to count_mapping_size() in order to find the place where
+        the mappings statistics is screwed up.
+
 01-Mar-2002 (Lars Duening)  (3.3.175)
     - (rxcache, ed.c, efuns.c, regexp) Extended the rxcache module
         into a wrapper around the regexp structure to hide the actual

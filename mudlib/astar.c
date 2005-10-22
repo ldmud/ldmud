@@ -114,7 +114,7 @@ string find_path( string map, int startx, int starty, int goalx, int goaly, mapp
       split_map[i] += sprintf( "%" + (map_width-strlen(split_map[i])) + "'\27's", "" );
 
    // Sanity check
-   if( goalx < 0  || goalx >= map_width || goaly < 0 | goaly >= sizeof(split_map) )
+   if( goalx < 0  || goalx >= map_width || goaly < 0 || goaly >= sizeof(split_map) )
       return 0;
    // Setup initial state.
    start = startx + starty * map_width;

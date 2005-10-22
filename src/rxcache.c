@@ -276,7 +276,7 @@ rxcache_status (strbuf_t *sbuf, Bool verbose)
     }
     else
     {
-        strbuf_addf(sbuf, "Regexp cache:\t\t\t%8ld %8lu\n", iNumXEntries, iXSizeAlloc);
+        strbuf_addf(sbuf, "Regexp cache:\t\t\t%8ld %9lu\n", iNumXEntries, iXSizeAlloc);
     }
 
     return iXSizeAlloc;

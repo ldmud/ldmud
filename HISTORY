@@ -73,7 +73,7 @@ For a detailed list of all changes see the file CHANGELOG.
            the maximum number of keys.
 
 
-20-Feb-2002 (Lars Duening) -- Release 3.2.9
+03-Mar-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -222,6 +222,8 @@ For a detailed list of all changes see the file CHANGELOG.
            with leading slashes.
        + If a master is forced to reload via SIGUSR1, all inherited objects
            (if any) are reloaded as well.
+       + notify_shutdown(): Is now called too when the driver crashes.
+           In that case it is passed a string denoting the type of crash.
        + Bugfix: slow_shut_down() was not called with previous_object(),
            this_player() and this_interactive() being 0.
        + Bugfix: When reactivating a destructed master, the lfuns
