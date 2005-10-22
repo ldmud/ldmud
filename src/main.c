@@ -178,6 +178,7 @@ main (int argc, char **argv)
     /* On some systems, SIGALRM is sometimes blocked.
      * The reasons are unknown, but this seems to be the cure.
      */
+    sigemptyset(&set);
     sigaddset(&set, SIGALRM);
     sigprocmask(SIG_UNBLOCK, &set, 0);
 

@@ -16,6 +16,7 @@
  *   by Ian Phillipps.
  *
  * help files and '^' added by Ted Gaunt.
+ * Tab conversion added by Andreas Klauer.
  *
  * Original indentation algorithm replaced with adapted version from DGD
  *   editor by Dworkin (Felix A. Croes), 920510.
@@ -40,7 +41,7 @@
  *---------------------------------------------------------------------------
  */
 
-#define ED_VERSION 5        /* used only in the "set" function, for id */
+#define ED_VERSION 6        /* used only in outputs for id */
 
 #include "driver.h"
 #include "typedefs.h"
@@ -66,6 +67,10 @@
 #include "xalloc.h"
 
 /*-------------------------------------------------------------------------*/
+
+/* Default TAB size */
+# define DEFAULT_TABSIZE   8
+
 
 /* #defines for non-printing ASCII characters */
 
@@ -1846,6 +1851,199 @@ subst (regexp *pat, char *sub, Bool gflg, Bool pflag)
     return (( nchngd == 0 && !gflg ) ? SUB_FAIL : nchngd);
 }
 
+/*-------------------------------------------------------------------------*/
+static void
+detab_line (char *buf, int tabsize)
+
+/* replace all possible '\t'ab characters with whitespace ' '
+ * in the given string <buf> and replace the current line with
+ * the result. <tabsize> is the desired tab spacing.
+ */
+
+{
+    int i;                /* i: index of buffer */
+    int h;                 /* h: index of result */
+    int space;             /* counter for whitspace */
+    char result[MAXLINE];  /* the detabbed result */
+
+    for (i = 0, h = 0; buf[i] != '\0'; i++)
+    {
+        if (h == MAXLINE )
+        {
+            add_message("line too long.\n");
+            return;
+        }
+
+        switch (buf[i])
+        {
+        case '\t':
+            /* replace \t by up tu tabsize spaces, depending on position */
+
+            for (space = tabsize - (h % tabsize); space--; h++)
+            {
+              if (h == MAXLINE)
+              {
+                  add_message("line too long.\n");
+                  return;
+              }
+
+              result[h] = ' ';
+            }
+
+            break;
+
+        default:
+            result[h] = buf[i];
+            h++;
+            break;
+        }
+    }
+
+    /* terminate result string */
+
+    result[h] = '\0';
+
+    /* replace current line by result */
+
+    del(P_CURLN,P_CURLN);
+    ins(result);
+} /* detab_line() */
+
+/*-------------------------------------------------------------------------*/
+static void
+tab_line (char *buf, int tabsize)
+
+/* replace whitespace ' ' with '\t'ab-characters where it makes sense
+ * in the given string <buf> and replace the current line with the result.
+ * the result. <tabsize> is the desired tab spacing.
+ *
+ * TODO: whitespace to tab replacement makes only sense if the '\t'ab-char
+ * TODO:: replaces more than one whitespace ' '. Not everyone may share
+ * TODO:: this opinion, so it maybe this should be optional.
+ */
+
+{
+    int i;                 /* i: index of buffer */
+    int h;                 /* h: index of result */
+    int space, pos;        /* whitespace & position counter */
+    char result[MAXLINE];  /* the tabbed result */
+
+    for (i = 0, h = 0, space = 0, pos = 0; buf[i] != '\0'; i++)
+    {
+        switch (buf[i])
+        {
+        case ' ':
+            pos++;
+            space++;
+
+            if (! (pos % tabsize))
+            {
+                if (space == 1)
+                {
+                    /* makes no sense to replace 1 space by '\t'ab */
+                    result[h] = ' ';
+                    h++;
+                }
+                else
+                {
+                    result[h] = '\t';
+                    h++;
+                }
+
+                pos = 0;
+                space = 0;
+            }
+            break;
+
+        case '\t':
+            if (!space && (pos % tabsize) == tabsize - 1)
+            {
+                /* remove unnecessary tabs */
+                result[h] = ' ';
+                h++;
+                pos++;
+            }
+            else
+            {
+                /* don't put unnecessary spaces in result */
+                result[h] = '\t';
+                h++;
+                pos = 0;
+                space = 0;
+            }
+            break;
+
+        default:
+            /* add spaces which couldn't be replaced */
+            for (; space--; h++)
+            {
+                result[h] = ' ';
+            }
+
+            result[h] = buf[i];
+            h++;
+
+            pos++;
+            space = 0;
+
+            break;
+        }
+    }
+
+    /* terminate result string */
+
+    result[h] = '\0';
+
+    /* replace current line by result */
+
+    del(P_CURLN,P_CURLN);
+    ins(result);
+} /* tab_line() */
+
+/*-------------------------------------------------------------------------*/
+static int
+tab_conversion (int from, int to, int tabsize, Bool do_detab)
+
+/* Perform tab character conversion on the given range [<from>, <to>].
+ * <tabsize> is the desired tab spacing, or 0 for the default.
+ * <do_detab> is TRUE for the Tab->Whitespace conversion, and FALSE
+ * for the Whitespace->Tab conversion.
+ */
+
+{
+    from = (from < 1) ? 1 : from;
+    to = (to > P_LASTLN) ? P_LASTLN : to;
+
+    if (tabsize <= 0)
+    {
+        tabsize = DEFAULT_TABSIZE;
+    }
+
+    if (to != 0)
+    {
+        _setCurLn( from );
+        while( P_CURLN <= to )
+        {
+            if (do_detab)
+            {
+                detab_line( gettxtl( P_CURPTR ), tabsize );
+            }
+
+            else
+            {
+                tab_line( gettxtl( P_CURPTR ), tabsize );
+            }
+
+            if( P_CURLN == to )
+                break;
+
+            nextCurLn();
+        }
+    }
+
+    return ED_OK;
+} /* tab_conversion() */
+
 /*=========================================================================*/
 /*
  * Adapted indent code from DGD editor (v0.1).
@@ -2682,6 +2880,37 @@ docmd (Bool glob)
             return ERR;
         P_FCHANGED = TRUE;
         break;
+
+    case 'T':
+      {
+        int tabsize;
+        Bool do_detab;
+
+        switch(*inptr)
+        {
+          case '+':
+              do_detab = MY_FALSE;
+              break;
+
+          case '-':
+              do_detab = MY_TRUE;
+              break;
+
+          default:
+              return ERR;
+        }
+
+        *inptr++;
+        tabsize = atoi(inptr);
+
+        if (deflt(P_CURLN,P_CURLN) < 0)
+            return ERR;
+
+        if (tab_conversion(P_LINE1, P_LINE2, tabsize, do_detab) < 0)
+            return ERR;
+
+        break;
+      }
 
     case 'W':
     case 'w':
@@ -3546,6 +3775,17 @@ print_help (char arg)
                    );
         break;
 
+    case 'T':
+        add_message(
+"Command: T  Usage: T{+|-}[width] or [range]T{+|-}[width]\n"
+"Replace whitespace or tabs in the current line or in the specified range.\n"
+"T+ means that whitespace will be replaced by tabs,\n"
+"T- means that tabs will be replaced by whitespace.\n"
+"The width option specifies the number of spaces a tab character represents.\n"
+"(Default value for width: 8)\n"
+                   );
+        break;
+
     case 'v':
         add_message(
 "Command: v   Usage: v/re/p\n"
@@ -3704,6 +3944,7 @@ print_help2 (void)
 "s\tsearch and replace\n"
 "set\tquery, change or save option settings\n"
 "t\tmove copy of line(s) to specified line\n"
+"T\ttab / detab line(s), see help\n"
 "v\tSearch and execute command on any non-matching line.\n"
 "x\tsave file and quit\n"
 "w\twrite to current file (or specified file)\n"

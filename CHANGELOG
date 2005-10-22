@@ -1,6 +1,23 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Nov-2001 (Lars Duening)  (3.3.130)
+    - (lex.c) The auto-include strings needed to be prefixed with a newline
+         internally - yet, the newline was added after the string (reported
+         by Heiko).
+
+23-Nov-2001 (Lars Duening)
+    - (object.c) Efun say() could leak object references (reported by Tomba).
+    - (mudlib/sys/functionlist.h) Changed the absolute include of lpctypes.h
+        into a <> include (suggested by Heiko).
+
+21-Nov-2001 (Lars Duening)
+    - (pkg-mysql.c) Using the mysql->thread_id as handle proved to be
+        unreliable as the thread_id may change. Instead an explicit
+        handle is now used (thanks, Fuchur!).
+    - (ed.c) Added command 'T' to perform Tab <-> Whitespace conversion
+        (thanks, Menaures!).
+
 20-Nov-2001 (Lars Duening)  (3.3.129)
     - (sprintf.c) Printing a table modified the internal precision information
         without making a backup. If now the table was applied to an array

@@ -52,10 +52,15 @@ struct db_dat_s
     MYSQL     *mysql_dat;
     MYSQL_RES *mysql_result;
     MYSQL_ROW  mysql_row;
+    int32      handle;
 };
 
 static db_dat_t *my_dat;
   /* List of connection handles, newest first.
+   */
+
+static int32 next_handle = 1;
+  /* Handle to identify mySQL connections.
    */
 
 static void raise_db_error (db_dat_t *dat) NORETURN;
@@ -85,6 +90,7 @@ allocate_new_dat(void)
         my_dat->next = NULL;
         my_dat->mysql_dat = NULL;
         my_dat->mysql_result = NULL;
+        my_dat->handle = next_handle++;
         return my_dat;
     }
 
@@ -100,6 +106,7 @@ allocate_new_dat(void)
     tmp->prev = NULL;
     tmp->mysql_dat = NULL;
     tmp->mysql_result = NULL;
+    tmp->handle = next_handle++;
     my_dat = tmp;
 
     return my_dat;
@@ -124,7 +131,7 @@ find_dat_by_handle (unsigned int i)
         return NULL;
 
     tmp = my_dat;
-    while (   ((id = tmp->mysql_dat->thread_id) != i)
+    while (   ((id = tmp->handle) != i)
            && (tmp = tmp->next) )
        NOOP;
 
@@ -175,7 +182,7 @@ remove_dat (db_dat_t *dat)
             mysql_free_result(dat->mysql_result);
             dat->mysql_result = NULL;
         }
-        i = dat->mysql_dat->thread_id;
+        i = dat->handle;
         mysql_close(dat->mysql_dat);
     }
 
@@ -419,7 +426,7 @@ f_db_connect (svalue_t *sp, int num_args)
         free_string_svalue(sp);
     }
 
-    sock = (signed)tmp->mysql_dat->thread_id;
+    sock = (signed)tmp->handle;
     put_number(sp, sock);
     return sp;
 } /* f_db_connect() */
@@ -676,7 +683,7 @@ f_db_handles (svalue_t *sp)
     tmp = my_dat;
     for (i = 0; i < elems; i++)
     {
-        put_number(v->item+i, tmp->mysql_dat->thread_id);
+        put_number(v->item+i, tmp->handle);
         tmp = tmp->next;
     }
 

@@ -1,0 +1,30 @@
+Short: Logging idea: Shared Library
+From: Christian Welzel <gawain@wh9.tu-dresden.de>
+Date: Wed, 21 Nov 2001 18:33:30 +0100
+Type: Feature
+State: New
+
+Hai Lars!
+
+Wir hatten uns mal vor langer zeit ueber den driver und sein komisches 
+logging unterhalten... du meintest, ein neues log-konzept waere noetig...
+
+heute hatte ich die idee, dass der driver ja in eine mysql-datenbank loggen 
+koennte. problem ist natuerlich diese schwaeche im driver ... 
+
+meine vorschlaege dazu:
+die logging-funs werden nicht mehr in den driver-kompiliert, sondern in eine 
+externe shared-lib. diese kann man dann beim start des drivers per dlopen() 
+oeffnen. dann gibt es drei neue funktionen: (sys)log_open(), (sys)log(), 
+(sys)log_close(); eine neue config_option: (SYS)LOG_METHOD. 
+(sys)log_open() laedt abhaengig von SYS)LOG_METHOD die entsprechende 
+shared-lib, (sys)log() loggt die daten (in dem die bibliotheksfunktion 
+aufgerufen wird) und (sys)log_close() schliesst die lib wieder...
+dazu wird bei (sys)log die syntax vom system-syslog genommen und auch dessen 
+headerfile (im groben)... so kann das ausgabe-modul entscheiden, wo was wie 
+hingeloggt werden soll... und man kann das logging an seine beduerfnisse 
+einfach anpassen...
+
+was meinst du dazu ?
+
+--- It would be nice as additional feature.

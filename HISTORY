@@ -57,7 +57,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-20-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
+21-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -354,6 +354,7 @@ For a detailed list of all changes see the file CHANGELOG.
            with the callable executables.
        + Commandline option '--erq' can now be used to pass simple arguments
            to the erq.
+       + New editor command 'T' to perform Tab <-> Whitespace conversion.
 
 
 20-Aug-2000 (Lars Duening) -- Release 3.2.8

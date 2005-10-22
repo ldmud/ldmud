@@ -3993,6 +3993,18 @@ f_say (svalue_t *sp, int num_arg)
         free_svalue(sp--);
     }
 
+    /* We may have received object references in vtmp - clear them */
+    if (vtmp.v.item[0].type != T_NUMBER)
+    {
+        free_svalue(&(vtmp.v.item[0]));
+        vtmp.v.item[0].type = T_NUMBER;
+    }
+    if (vtmp.v.item[1].type != T_NUMBER)
+    {
+        free_svalue(&(vtmp.v.item[0]));
+        vtmp.v.item[1].type = T_NUMBER;
+    }
+
     free_svalue(sp--);
 
     return sp;

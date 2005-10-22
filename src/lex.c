@@ -1463,11 +1463,14 @@ add_auto_include (const char * obj_file, const char *cur_file, Bool sys_include)
 
     if (auto_include_string != NULL)
     {
+        /* Add the auto include string and prefix it with a newline
+         * for proper recognition of #directives.
+         */
         char * tmp;
 
         tmp = get_txt(auto_include_string);
-        add_input("\n");
         add_input(tmp);
+        add_input("\n");  /* Remember that add_input() is a LIFO */
 
         /* Count the number of lines of the added string */
         for (current_line--; *tmp
