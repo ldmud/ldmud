@@ -1214,6 +1214,7 @@ f_garbage_collection (svalue_t *sp, int num_arg)
 {
     if (num_arg > 0)
     {
+#ifdef GC_SUPPORT
         Bool change_default = MY_FALSE;
         svalue_t * argp = sp - num_arg + 1;
         int fd;
@@ -1270,6 +1271,7 @@ f_garbage_collection (svalue_t *sp, int num_arg)
 
         /* Clean up */
         free_mstring(path);
+#endif
         sp = pop_n_elems(num_arg, sp);
     }
 

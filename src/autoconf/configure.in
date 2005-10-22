@@ -457,6 +457,7 @@ fi
 AC_CHECK_LIB(m,main)
 AC_CHECK_LIB(socket,main)
 AC_CHECK_LIB(ucb,main, LIBS="$LIBS -lc -lucb")
+AC_CHECK_LIB(crypto,main, LIBS="$LIBS -lcrypto")
 AC_CHECK_LIB(crypt,main, LIBS="$LIBS -lcrypt")
 if test $ac_cv_lib_socket_main = "yes" || test $ac_cv_lib_ucb_main = "yes"; then
       AC_CHECK_LIB(nsl,main)
@@ -1268,7 +1269,7 @@ for TESTFLAG in -qstrict -qipa -ipo; do
   fi
 done
 changequote([,])dnl
-for TESTFLAG in -fomit-frame-pointer; do
+for TESTFLAG in -fomit-frame-pointer -funroll-all-loops; do
   if eval $tcomp; then
     CFLAGS="$CFLAGS $TESTFLAG"
   fi

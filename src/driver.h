@@ -149,7 +149,7 @@ extern unsigned char _my_ctype[];
 #define lexdigit( c) (_my_ctype[(unsigned char)(c)]&_MCTd)
 
 #ifndef MAXINT
-#    define MAXINT (0x7fffffff)
+#    define MAXINT (0x7fffffffU)
 #endif
 
 /* A define to point out empty loop bodies. */

@@ -5,18 +5,26 @@ SYNOPSIS
 
 DESCRIPTION
         Tell the parser to initiate a garbage collection after the
-        current execution ended.
+        current execution ended. Depending on the type of memory
+        allocator used, this GC is more less thorough.
 
-        With the <filename> argument a log file for the GC output
-        different from the default log file can be specified.
+        If the 'smalloc' memory allocator is used, the GC produces
+        output to a log file. The default name of the log file is
+        specified at program start, but can be modified at runtime:
 
-        If <flag> is not given or 0, the output from the next
-        and only the next GC will go into the log file. If the file
-        already exists, the new output will be appended.
+            With the <filename> argument a log file for the GC output
+            different from the default log file can be specified.
 
-        If <flag> is 1, the <filename> will be used as the new
-        default log file for all following GCs. If the file already
-        exists, it will be overwritten from the start.
+            If <flag> is not given or 0, the output from the next
+            and only the next GC will go into the log file. If the file
+            already exists, the new output will be appended.
+
+            If <flag> is 1, the <filename> will be used as the new
+            default log file for all following GCs. If the file already
+            exists, it will be overwritten from the start.
+
+        If a different memory allocator is used, the GC does not produce
+        output and the <filename> and <flag> arguments are ignored.
 
 EXAMPLES
         garbage_collection()

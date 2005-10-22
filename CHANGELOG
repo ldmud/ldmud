@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Jun-2002 (Lars Duening)  (3.3.210)
+    - (prolang.y) If a method in a virtual inherit is rendered invisible,
+         but also made available again through a parallel inherit of the same
+         program, the compiler resolved the visible function to the
+         wrong inheritance, causing the driver to crash (b-020530).
+
+17-May-2002 (Lars Duening)
+    - (backend.c) The new arguments to garbage_collection() are ignored
+         when the memory allocator doesn support a GC.
+
 13-May-2002 (Lars Duening)  (3.3.209)
     - (hash.c) The hash functions were still incorrect for 0-length
          strings, causing FinalFrontier to crash on boot (reported

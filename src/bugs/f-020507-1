@@ -7,3 +7,7 @@ State: New
 'mapping += mapping' should work like repeated calls to m_add(): the width of
 the destination mapping is unchanged (unless generic empty mapping), the width
 of the data added will be adjusted.
+
+Possible way: + and += keep sizes and fail on size mismatch (with special
+consideration of the empty mapping); | and |= merge even mappings is different
+size.

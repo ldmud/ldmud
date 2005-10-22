@@ -8,7 +8,6 @@ Normal: 1000 Iterations.
   3.2.6,         -DDEBUG -DTRACE_CODE -O0:   7.1
   3.2.6,         -O1                     :  42.1
 
-
 UNItopia: PII/350MHz/100MHz Frontsidebus/256MB, RH Linux 5.1
 
   3.2.8-dev.154, -DDEBUG -DTRACE_CODE -O0: 209.8
@@ -42,11 +41,13 @@ Camelot: SUN Sparc/?/?, Solaris 5.7, gcc 2.8
   3.2.8-dev.155, -DDEBUG -DTRACE_CODE -DNO_INLINES -O4:  51.3
   3.2.8-dev.155, -DDEBUG -DTRACE_CODE -O0:               28.3
 
+
 Themis: IBM RS6000/?/?, AIX 3.4, xlc
 
   3.2.8-dev.164,                      -O4:              476.2
   3.2.8-dev.164,                      -O4/-O:           384.6
   3.2.8-dev.164, -DDEBUG -DTRACE_CODE -O4/-O:            82.2
+
 
 New Themis: IBM RS6000/?/?, AIX 3.4, xlc
 
@@ -61,4 +62,39 @@ New Themis: IBM RS6000/?/?, AIX 3.4, xlc
   3.3.25,        -DDEBUG -DTRACE_CODE -O2:              645.2
   3.3.25,                             -O4:             1260.6
   3.3.25,        -DDEBUG -DTRACE_CODE -O4:              681.9
+
+
+New Themis: IBM RS6000/?/?, AIX 3.4, LDMud 3.3.206
+
+                                      o0        o2        o4
+  Gcc 3.1                           473.9     877.2     877.2
+  Gcc 3.1, DEBUG                    366.3     621.1     625.0
+  Gcc 3.1, DEBUG, TRACE,            227.8     436.7     438.6
+  Gcc 3.1, DEBUG, TRACE, MTRACE     223.7     432.9     434.8
+  Gcc 3.1, DEBUG, TRACE, malloc     226.2     432.9     432.9
+
+                                      o0        o2        o4
+  xlc                               473.9     934.6     990.1
+  xlc, DEBUG                        381.7     684.9     709.2
+  xlc, DEBUG, TRACE,                250.0     510.2     568.2
+  xlc, DEBUG, TRACE, MTRACE         250.0     510.2     546.4
+  xlc, DEBUG, TRACE, malloc         250.0     485.4     540.5
+
+                                      o0        o2        o4
+  xlc ipa                           854.7    1000.0     970.9
+  xlc ipa, DEBUG                    641.0     746.3     714.3
+  xlc ipa, DEBUG, TRACE,            454.5     591.7     568.2
+  xlc ipa, DEBUG, TRACE, MTRACE     446.4     584.8     543.5
+  xlc ipa, DEBUG, TRACE, malloc     452.5     574.7     540.5
+
+
+
+Vader: PIII/766MHz/768MByte, Beos 5.0, LDMud 3.3.206:
+
+                                         o0        o1        o2        o4
+  Gcc 2.95.2                           829.2    1067.2    1059.3    1082.3
+  Gcc 2.95.2, DEBUG                    712.8     932.0     926.4     854.0
+  Gcc 2.95.2, DEBUG, TRACE,            464.0     598.8     576.7     564.0
+  Gcc 2.95.2, DEBUG, TRACE, MTRACE     433.5     572.4     540.5     517.6
+  Gcc 2.95.2, DEBUG, TRACE, malloc     438.6     575.7     549.5     539.1
 

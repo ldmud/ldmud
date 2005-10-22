@@ -158,6 +158,7 @@ f-020326-0: select() statement to complement switch()
 f-020507-0: Distinguish between generic and specific empty mappings
 f-020507-1: Rethink the 'mapping += mapping' semantics.
 f-020507-3: Range operators on 2d mappings
+f-020528: Inline-Closures with runtime arguments
 
 
 Compiler

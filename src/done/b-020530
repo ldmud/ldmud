@@ -1,0 +1,71 @@
+Short: Visibility redefinition of a virtual inherit crashes driver
+From: Bardioc
+Date: 2002-05-30
+Type: Bug
+State: Done - fixed in 3.2.9-dev.439 / 3.3.210
+
+Given the following files, the driver crashes when loading "/player":
+
+---------------- living-stats.c -----------------------------------------
+#pragma no_clone
+
+private int strength;
+
+public varargs void set_experience(int value, status add) { }
+    
+---------------- player-stats.c -----------------------------------------
+#pragma no_clone
+
+default private;
+
+virtual inherit "/living-stats";
+
+varargs void set_experience(int value, status add) { }
+
+---------------------- living.c -----------------------------------------
+virtual inherit "/living-stats";
+
+---------------------- player.c -----------------------------------------
+inherit "/player-stats";
+inherit "/living";
+
+-------------------------------------------------------------------------
+
+Problem is that the first inheritance of living-stats::set_experience() is
+redefined with a private method; so the second inheritance of that method
+causes the compiler to crossdefine the first occurance to the second.
+
+At the same time the code handling the virtual variables found that
+living-stats was inherited twice and gave the visible second occurance the
+first inherit as environment.
+
+This means we have this inheritance structure:
+
+ inherit[0] 'living-stats.c' fun offset 0, var offset 0
+ inherit[1] 'player-stats.c' fun offset 0, var offset 65535
+ inherit[2] 'living-stats.c' fun offset 1, var offset 0
+ inherit[3] 'living.c' fun offset 1, var offset 65535 
+
+These functions:
+
+ [0] 'set_experience'
+   flags 94080900 -> 940a0001 (ie: cross defined to function #1)
+ [1] 'set_experience'
+   flags 8e000100 -> 8e000000 (ie: inherited from inherit #0)
+
+And these function names:
+
+  name [0] 1 'set_experience'
+
+The error is obvious: The visible set_experience() function is inherited from
+inherit #2, which holds the proper function index offset; however the compiler
+stores it as if it was inherited from inherit #0. Any attempt to resolve the
+function will therefore end up with a wrong function index (here: 1 instead of
+0) for the original program.
+
+The solution was to modify the inherit-index twiddling in the copy_variables()
+method to check if the method is active in the found virtual inherit. If
+not, the inherit-index stays as it is. In fact, this check already existed,
+but only for the method as it is in the originating program; the check did
+not take into account that through the inheritance a visible method might
+become cross-defined.

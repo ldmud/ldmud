@@ -81,6 +81,13 @@
 #   -DVERBOSE_OPCPROF: with OPCPROF, the dump of the statistics includes
 #              the names of the instructions
 #   -p -DMARK: together they enable the profiling of VM instructions.
+#
+# Typical gcc optimisation settings.
+#   OPTIMIZE = -O4 -fomit-frame-pointer -funroll-all-loops  -g -fstrength-reduce -fno-force-mem -fno-force-addr -fno-inline-functions
+#   OPTIMIZE = -O2 -g -fstrength-reduce -fno-force-mem -fno-force-addr -fno-inline-functions
+#   OPTIMIZE = -O -g 
+#   OPTIMIZE = -g
+
     PROFIL =
     WARN =
 ifndef O
@@ -147,16 +154,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 209
+  SETVERFLAGS += d 210
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.209
+  VSTRING = 3.3.0-pre.210
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 209
+  SETVERFLAGS += d 210
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.209
+  VSTRING = 3.3.0-dev.210
 endif
 
 else
@@ -164,12 +171,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 209
+SETVERFLAGS = -app 3 3 210
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.209
+  VSTRING = 3.3.210
 
 endif
 

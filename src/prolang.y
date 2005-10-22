@@ -11605,7 +11605,7 @@ copy_variables (program_t *from, fulltype_t type
                 inherit_t inherit, *inheritp2;
                 int k, inherit_index;
                 funflag_t *flagp;
-                function_t *funp;
+                function_t *funp, *funp2;
 
 #ifdef INITIALIZATION_BY___INIT
                 if (variables_initialized)
@@ -11665,9 +11665,11 @@ copy_variables (program_t *from, fulltype_t type
                 flagp = from->functions + inheritp->function_index_offset;
                 funp = (function_t *)mem_block[A_FUNCTIONS].block +
                     inherit.function_index_offset;
-                for (k = inherit.prog->num_functions; --k >= 0; funp++)
+                funp2 = funp - fun_index_offset;
+                for (k = inherit.prog->num_functions; --k >= 0; funp++, funp2++)
                 {
                     if ( !(funp->flags & NAME_CROSS_DEFINED)
+                     &&  !(funp2->flags & NAME_CROSS_DEFINED)
                      && (*flagp & (NAME_INHERITED|NAME_CROSS_DEFINED)) ==
                            NAME_INHERITED
                      && (*flagp & INHERIT_MASK) == inheritc )

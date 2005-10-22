@@ -84,7 +84,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package.
 
 
-13-May-2002 (Lars Duening) -- upcoming Release 3.2.9
+04-Jun-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -293,6 +293,9 @@ For a detailed list of all changes see the file CHANGELOG.
        + If call_other() was implemented by a sefun which required
            call_other() to be called itself, the compiler generated
            invalid bytecode.
+       + If a method in a virtual inherit is rendered invisible, but also made
+         available again through a parallel inherit of the same program, the
+         compiler resolved the visible function to the wrong inheritance.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.
