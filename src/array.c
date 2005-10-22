@@ -1358,18 +1358,45 @@ match_arrays (vector_t *vec1, vector_t *vec2)
             if (d == 0)
             {
                 /* Elements match */
-                flag1[*index1] = MY_TRUE;
-                flag2[*index2] = MY_TRUE;
+                svalue_t *test_val = vec1->item+*index1;
+
+                /* Important here is to remember that there might
+                 * be several elements of the same value in a row.
+                 * The side-by-side comparison itself is not able
+                 * to handle it, so we have to check here manually
+                 * for it.
+                 * The loops will leave index1/index2 point to the
+                 * first element after the sequence of matching ones.
+                 */
+                do {
+                    flag1[*index1] = MY_TRUE;
+                    index1++;
+                    len1--;
+                    if (len1 != 0)
+                        d = compare_single(test_val, vec1->item + *index1);
+                }
+                while (len1 != 0 && d == 0);
+
+                do {
+                    flag2[*index2] = MY_TRUE;
+                    index2++;
+                    len2--;
+                    if (len2 != 0)
+                        d = compare_single(test_val, vec2->item + *index2);
+                }
+                while (len2 != 0 && d == 0);
+
+                continue; /* Next iteration of the main loop */
             }
 
-            /* Advance in array(s) */
-            if (d >= 0)
+            /* Else advance in array(s) */
+            if (d > 0)
             {
                 index1++;
                 len1--;
             }
 
-            if (d <= 0)
+            if (d < 0)
             {
                 index2++;
                 len2--;

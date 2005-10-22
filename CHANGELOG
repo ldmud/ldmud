@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Aug-2002 (Lars Duening) (3.3.224)
+  - (array.c) In the array-array operations, the algorithm didn't
+        handle multiple occurances of the same value well (reported
+        by Markus).
+
 15-Aug-2002 (Lars Duening) (3.3.224)
    - (array.c) In the array-array operations, a comparison was made
         using unallocated memory (reported by Markus).

@@ -2,7 +2,7 @@
 #
 # Settings for the SPiN mudlib.
 
-exec ./configure --prefix=/home/mud  --enable-erq=xerq --with-setting=spin $*
+exec ./configure --prefix=/home/mud  --enable-erq=xerq --with-setting=theland $*
 
 exit 1
 

@@ -5,6 +5,8 @@
 #
 # configure will strip this part from the script.
 
+export EXTRA_CFLAGS="-mcpu=i686 -march=i686"
+exec ./configure --prefix=/home/mud --libdir=/home/mud/mudlib --libexecdir=/home/mud/erq --enable-erq=xerq --with-setting=avalon $*
 exec ./configure --prefix=/home/mud --libdir=/home/mud/mudlib --libexecdir=/home/mud/erq --with-setting=avalon $*
 exit 1
 
