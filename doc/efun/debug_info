@@ -40,7 +40,7 @@ DESCRIPTION
 
             Result is 1 on success, or 0 if an error occured.
 
-            <arg2> == "objects": dump information about all objects.
+            <arg2> == "objects": dump information about all live objects.
               Default filename is '/OBJ_DUMP', the valid_write() will read
               'objdump' for the function.
 
@@ -60,6 +60,17 @@ DESCRIPTION
                    'PROG SWAPPED' if only the program is swapped
                    'VAR SWAPPED' if only the variabes are swapped
                    'SWAPPED' if both program and variables are swapped
+
+             <arg2> == "destructed": dump information about all destructed
+               objects.  Default filename is '/DEST_OBJ_DUMP', the
+               valid_write() will read 'objdump' for the function.
+
+              For every object, a line is written into the file with the
+              following information in the given order:
+                - object name
+                - number of references
+                - 'NEW' if the object was destructed in this executiong
+                  thread, nothing if it is older already.
 
             <arg2> == "opcodes": dump usage information about the opcodes.
               Default filename is '/OPC_DUMP', the valid_write() will read
@@ -91,7 +102,7 @@ DESCRIPTION
 
               int DID_ST_OBJECTS
               int DID_ST_OBJECTS_SIZE
-                  Number and size of swapped-in objects.
+                  Total number and size of objects.
 
               int DID_ST_OBJECTS_SWAPPED
               int DID_ST_OBJECTS_SWAP_SIZE
@@ -99,6 +110,14 @@ DESCRIPTION
 
               int DID_ST_OBJECTS_LIST
                   Number of objects in the object list.
+
+              int DID_ST_OBJECTS_NEWLY_DEST
+                  Number of newly destructed objects (ie. objects destructed
+                  in this execution thread).
+
+              int DID_ST_OBJECTS_DESTRUCTED
+                  Number of destructed but still referenced objects, not
+                  counting the DID_ST_OBJECTS_NEWLY_DEST.
 
               int DID_ST_OBJECTS_PROCESSED
                   Number of listed objects processed in the last backend
@@ -414,10 +433,11 @@ HISTORY
         DINFO_DUMP introduced with 3.2.7.
         LDMud 3.2.8 added the data size of the object to the result of
           DINFO_MEMORY; the DINFO_DATA request; the DID_MEM_WASTED* stats.
-        LDMud 3.2.9 added DINFO_TRACE; the indexing feature for DINFO_DATA,
-          the DID_MEM_CLIB*, DID_MEM_PERM*, DID_MEM_OVERHEAD,
-          DID_MEM_ALLOCATED, DID_MEM_USED and DID_MEM_TOTAL_UNUSED stats,
-          and DID_ST_HBEAT_CALLS_TOTAL.
+        LDMud 3.2.9 added DINFO_TRACE; the indexing feature for DINFO_DATA;
+          the 'destructed' DINFO_DUMP; the DID_MEM_CLIB*, DID_MEM_PERM*,
+          DID_ST_OBJECTS_NEWLY_DEST, DID_ST_OBJECTS_DEST, DID_MEM_OVERHEAD,
+          DID_MEM_ALLOCATED, DID_MEM_USED, DID_MEM_TOTAL_UNUSED, and
+          DID_ST_HBEAT_CALLS_TOTAL stats.
         LDMud 3.3 replaced the string related DID_ST_ constants according to
         the new string implementation.
 

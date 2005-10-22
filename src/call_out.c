@@ -634,7 +634,8 @@ count_extra_ref_from_call_outs (void)
 void
 remove_stale_call_outs (void)
 
-/* GC Support: Remove all callouts referencing destructed objects.
+/* GC and statistics support: Remove all callouts referencing destructed
+ * objects.
  */
 
 {

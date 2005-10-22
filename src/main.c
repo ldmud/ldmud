@@ -464,7 +464,7 @@ main (int argc, char **argv)
     apply_master_ob(STR_SHUTDOWN, 0);
     ipc_remove();
     remove_all_players();
-    remove_destructed_objects();
+    handle_newly_destructed_objects();
       /* Will perform the remove_interactive calls */
     unlink_swap_file();
 #ifdef DEALLOCATE_MEMORY_AT_SHUTDOWN

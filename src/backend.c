@@ -321,7 +321,11 @@ cleanup_stuff (void)
         }
     }
 
-    /* Remove all destructed objects.
+    /* Finish up all newly destructed objects.
+     */
+    handle_newly_destructed_objects();
+
+    /* Remove all unreferenced destructed objects.
      */
     remove_destructed_objects();
 } /* cleanup_stuff() */

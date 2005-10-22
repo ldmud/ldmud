@@ -169,10 +169,12 @@ extern int32  max_byte_xfer;
 extern int32  max_callouts;
 
 extern object_t *obj_list;
-extern object_t *destructed_objs;
 extern object_t *obj_list_end;
 extern object_t *master_ob;
-extern p_int new_destructed;
+extern object_t *destructed_objs;
+extern object_t *newly_destructed_objs;
+extern long num_destructed;
+extern long num_newly_destructed;
 
 extern object_t *current_object;
 extern object_t *current_interactive;
@@ -216,7 +218,8 @@ extern void set_svalue_user(svalue_t *svp, object_t *owner);
 extern void destruct_object(svalue_t *v);
 extern void destruct(object_t *ob);
 extern void deep_destruct (object_t *ob);
-extern void remove_destruct_objects(void);
+extern void handle_newly_destructed_objects(void);
+extern void remove_destructed_objects (void);
 extern void print_svalue(svalue_t *arg);
 extern const char *make_name_sane(const char *pName, Bool addSlash);
 extern object_t *lookfor_object(string_t *str, Bool bLoad);

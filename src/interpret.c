@@ -15368,9 +15368,10 @@ assert_master_ob_loaded (void)
         {
             object_t *ob;
             object_t *prev;
-            Bool removed = MY_FALSE;
-              /* TRUE if the old master was already on the list of
-               * destructed objects.
+            Bool newly_removed = MY_FALSE;
+              /* TRUE if the old master was on the list of newly
+               * destructed objects. That is important to know
+               * because then it still has all its variables.
                */
 
             /* A recursive call while loading the master, or there
@@ -15410,15 +15411,38 @@ assert_master_ob_loaded (void)
             destructed_master_ob = NULL;
 
             /* Remove the destructed master from the list
-             * of destructed objects
+             * of newly destructed objects or destructed objects.
              */
-            if (new_destructed)
+            if (newly_destructed_objs != NULL)
+            {
+                if (ob == newly_destructed_objs)
+                {
+                    newly_destructed_objs = ob->next_all;
+                    newly_removed = MY_TRUE;
+                    num_newly_destructed--;
+                }
+                else
+                {
+                    for ( prev = newly_destructed_objs
+                        ; prev && prev->next_all != ob
+                        ; prev = prev->next_all
+                        ) NOOP;
+                    if (prev)
+                    {
+                        prev->next_all = ob->next_all;
+                        newly_removed = MY_TRUE;
+                        num_newly_destructed--;
+                    }
+                }
+            }
+            if (!newly_removed && destructed_objs != NULL)
             {
                 if (ob == destructed_objs)
                 {
                     destructed_objs = ob->next_all;
-                    removed = MY_TRUE;
-                    new_destructed--;
+                    if (destructed_objs)
+                        destructed_objs->prev_all = NULL;
+                    num_destructed--;
                 }
                 else
                 {
@@ -15429,18 +15453,19 @@ assert_master_ob_loaded (void)
                     if (prev)
                     {
                         prev->next_all = ob->next_all;
-                        removed = MY_TRUE;
-                        new_destructed--;
+                        if (prev->next_all)
+                            prev->next_all->prev_all = prev;
+                        num_destructed--;
                     }
                 }
             }
             ob->flags &= ~O_DESTRUCTED;
 
             /* Restore the old masters variable space.
-             * Remember: as long as the objects are in the 'destructed'
+             * Remember: as long as the objects are in the 'newly destructed'
              * list, they still have all variables.
              */
-            if (!removed && ob->prog->num_variables)
+            if (!newly_removed && ob->prog->num_variables)
             {
                 int save_privilege = malloc_privilege;
                 int j;
@@ -15472,9 +15497,9 @@ assert_master_ob_loaded (void)
             master_ob = ref_object(ob, "assert_master_ob_loaded");
             if (current_object == &dummy_current_object_for_loads)
                 current_object = master_ob;
-            push_number(inter_sp, removed);
+            push_number(inter_sp, newly_removed);
             sapply_int(STR_REACTIVATE, ob, 1, MY_TRUE, MY_FALSE);
-            push_number(inter_sp, 2 - (removed ? 1 : 0));
+            push_number(inter_sp, 2 - (newly_removed ? 1 : 0));
             sapply_int(STR_INAUGURATE, ob, 1, MY_TRUE, MY_FALSE);
             fprintf(stderr, "%s Old master reactivated.\n", time_stamp());
             inside = MY_FALSE;

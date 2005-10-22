@@ -626,6 +626,7 @@ special_parse (char *buff)
             }
             add_message("Dumping to /OBJ_DUMP ... ");
             dumpstat(STR_OBJDUMP_FNAME);
+            dumpstat_dest(STR_DESTOBJDUMP_FNAME);
             add_message("done\n");
             if (no_curobj)
             {

@@ -45,11 +45,6 @@
  *     void reference_destructed_object(object_t *ob)
  *         Note the reference to a destructed object <ob>.
  *
- *     void mark_object_ref(object_t *ob)
- *         To be called for destructed objects which are not
- *         handled by reference_destructed_object(): mark the
- *         object as referenced and increase its refcount.
- *
  *     void count_ref_from_string(string_t *p);
  *         Count the reference to string <p>.
  *
@@ -413,7 +408,7 @@ gc_mark_program_ref (program_t *p)
 } /* gc_mark_program_ref() */
 
 /*-------------------------------------------------------------------------*/
-void
+static void
 mark_object_ref (object_t *ob)
 
 /* Mark the object <ob> as referenced and increase its refcount.
@@ -959,9 +954,10 @@ garbage_collection(void)
     malloc_privilege = MALLOC_SYSTEM;
     if (obj_list_replace)
         replace_programs();
-    remove_destructed_objects();
+    handle_newly_destructed_objects();
     free_interpreter_temporaries();
     free_action_temporaries();
+    remove_stale_player_data();
     remove_stale_call_outs();
     free_defines();
     free_all_local_names();
@@ -975,6 +971,10 @@ garbage_collection(void)
         free_array(current_error_trace);
         current_error_trace = NULL;
     }
+
+    remove_destructed_objects(); /* After reducing all object references */
+    destructed_objs = NULL; /* All destructed objects will be freed */
+    num_destructed = 0;
 
     if (dobj_count != tot_alloc_object)
     {
@@ -1065,26 +1065,9 @@ garbage_collection(void)
         }
         clear_ref_in_vector(&all_players[i]->prompt, 1);
 
-        if ( NULL != (ob = all_players[i]->snoop_by) )
-        {
-            if (!O_IS_INTERACTIVE(ob))
-            {
-                /* snooping monster */
-                if (ob->flags & O_DESTRUCTED && ob->ref) {
-                    ob->ref = 0;
-                    ob->prog->ref = 0;
-                    clear_inherit_ref(ob->prog);
-                }
-            }
-        } /* end of snoop-processing */
-
-        if ( NULL != (ob = all_players[i]->modify_command) ) {
-            if (ob->flags & O_DESTRUCTED && ob->ref) {
-                ob->ref = 0;
-                ob->prog->ref = 0;
-                clear_inherit_ref(ob->prog);
-            }
-        }
+        /* snoop_by and modify_command are known to be NULL or non-destructed
+         * objects.
+         */
     }
 
     /* Process the driver hooks */
@@ -1195,29 +1178,21 @@ garbage_collection(void)
 
         note_ref(all_players[i]);
 
-        /* There are no destructed interactives */
+        /* There are no destructed interactives, or interactives
+         * referencing destructed objects.
+         */
 
         all_players[i]->ob->ref++;
         if ( NULL != (ob = all_players[i]->snoop_by) )
         {
             if (!O_IS_INTERACTIVE(ob))
             {
-                /* snooping monster */
-                if (ob->flags & O_DESTRUCTED) {
-                    all_players[i]->snoop_by = 0;
-                    reference_destructed_object(ob);
-                } else {
-                    ob->ref++;
-                }
+                ob->ref++;
             }
         } /* end of snoop-processing */
 
         for ( it = all_players[i]->input_to; it != NULL; it = it->next)
         {
-            /* To avoid calling too high-level functions, we want the
-             * input_to_t not to be freed by now.
-             * Thus, we reference the object even if it is destructed.
-             */
             note_ref(it);
             count_ref_in_callback(&(it->fun));
             count_ref_in_vector(&(it->prompt), 1);
@@ -1225,15 +1200,7 @@ garbage_collection(void)
 
         if ( NULL != (ob = all_players[i]->modify_command) )
         {
-            if (ob->flags & O_DESTRUCTED)
-            {
-                all_players[i]->modify_command = 0;
-                reference_destructed_object(ob);
-            }
-            else
-            {
-                ob->ref++;
-            }
+            ob->ref++;
         }
 
         count_ref_in_vector(&all_players[i]->prompt, 1);
@@ -1733,9 +1700,10 @@ garbage_collection (void)
 
 {
     assert_master_ob_loaded();
-    remove_destructed_objects();
+    handle_newly_destructed_objects();
     free_interpreter_temporaries();
     free_action_temporaries();
+    remove_stale_player_data();
     remove_stale_call_outs();
     free_defines();
     free_all_local_names();
@@ -1749,6 +1717,7 @@ garbage_collection (void)
         free_array(current_error_trace);
         current_error_trace = NULL;
     }
+    remove_destructed_objects();
 
     reallocate_reserved_areas();
     time_last_gc = time(NULL);

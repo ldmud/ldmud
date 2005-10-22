@@ -5689,9 +5689,13 @@ f_debug_info (svalue_t *sp, int num_arg)
  *     it can write the files. The file in question is always written anew.
  *     Result is 1 on success, or 0 if an error occured.
  *
- *     <arg2> == "objects": dump information about all objects. Default
+ *     <arg2> == "objects": dump information about all live objects. Default
  *       filename is '/OBJ_DUMP', the valid_write() will read 'objdump' for
  *       the function.
+ *
+ *     <arg2> == "destructed": dump information about all destructed objects.
+ *       Default filename is '/DEST_OBJ_DUMP', the valid_write() will read
+ *       'objdump' for the function.
  *
  *     <arg2> == "opcodes": dump the usage statistics of the opcodes. Default
  *       filename is '/OPC_DUMP', the valid_write() will read 'opcdump' for
@@ -5719,8 +5723,7 @@ f_debug_info (svalue_t *sp, int num_arg)
  *            Number and size of allocated shadows.
  *
  *        int DID_ST_OBJECTS
- *        int DID_ST_OBJECTS_SIZE
- *            Number and size of swapped-in objects.
+ *            Total number and size of objects.
  *
  *        int DID_ST_OBJECTS_SWAPPED
  *        int DID_ST_OBJECTS_SWAP_SIZE
@@ -5728,6 +5731,14 @@ f_debug_info (svalue_t *sp, int num_arg)
  *
  *        int DID_ST_OBJECTS_LIST
  *            Number of objects in the object list.
+ *
+ *        int DID_ST_OBJECTS_NEWLY_DEST
+ *            Number of newly destructed objects (ie. objects destructed
+ *            in this execution thread).
+ *
+ *        int DID_ST_OBJECTS_DESTRUCTED
+ *            Number of destructed but still referenced objects, not
+ *            counting the DID_ST_OBJECTS_NEWLY_DEST.
  *
  *        int DID_ST_OBJECTS_PROCESSED
  *            Number of listed objects processed in the last backend
@@ -6261,7 +6272,13 @@ f_debug_info (svalue_t *sp, int num_arg)
 
         if (!strcmp(get_txt(arg[1].u.str), "objects"))
         {
-            res.u.number = dumpstat(fname ? fname : STR_OBJDUMP) ? 1 : 0;
+            res.u.number = dumpstat(fname ? fname : STR_OBJDUMP_FNAME) ? 1 : 0;
+            break;
+        }
+
+        if (!strcmp(get_txt(arg[1].u.str), "destructed"))
+        {
+            res.u.number = dumpstat_dest(fname ? fname : STR_DESTOBJDUMP_FNAME) ? 1 : 0;
             break;
         }
 

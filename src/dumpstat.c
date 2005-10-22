@@ -272,8 +272,8 @@ program_string_size (program_t *prog, mp_int * pOverhead, mp_int * pData)
 Bool
 dumpstat (string_t *fname)
 
-/* Called by the command parser, this function dumps statistics about
- * all objects into the file $MUDLIB/<fname>.
+/* This function dumps statistics about all listed objects into the file
+ * $MUDLIB/<fname>. It is called by the command parser or from debug_info.
  * Return TRUE on success, FALSE if <fname> can't be written.
  */
 
@@ -335,7 +335,55 @@ dumpstat (string_t *fname)
     }
     fclose(f);
     return MY_TRUE;
-}
+} /* dumpstat() */
+
+/*-------------------------------------------------------------------------*/
+Bool
+dumpstat_dest(string_t *fname)
+
+/* this function dumps statistics about all destructed objects into the file
+ * $MUDLIB/<fname>. It is called by the commandparser and by debug_info().
+ * Return TRUE on success, FALSE if <fname> can't be written.
+ */
+
+{
+    FILE *f;
+    object_t *ob;
+
+    fname = check_valid_path(fname, current_object, STR_OBJDUMP, MY_TRUE);
+    if (!fname)
+        return MY_FALSE;
+    f = fopen(get_txt(fname), "w");
+    if (!f)
+        return MY_FALSE;
+    FCOUNT_WRITE(get_txt(fname));
+
+    for (ob = newly_destructed_objs; ob; ob = ob->next_all)
+    {
+#ifdef DEBUG
+        if (!(ob->flags & O_DESTRUCTED)) /* TODO: Can't happen */
+            continue;
+#endif
+        fprintf(f, "%-20s ref %2ld NEW\n"
+                 , get_txt(ob->name)
+                 , ob->ref
+        );
+    }
+
+    for (ob = destructed_objs; ob; ob = ob->next_all)
+    {
+#ifdef DEBUG
+        if (!(ob->flags & O_DESTRUCTED)) /* TODO: Can't happen */
+            continue;
+#endif
+        fprintf(f, "%-20s ref %2ld\n"
+                 , get_txt(ob->name)
+                 , ob->ref
+        );
+    }
+    fclose(f);
+    return MY_TRUE;
+} /* dumpstat_dest() */
 
 /***************************************************************************/
 

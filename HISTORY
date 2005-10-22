@@ -59,7 +59,7 @@ For a detailed list of all changes see the file CHANGELOG.
            something different from '!'.
 
 
-31-Dec-2001 (Lars Duening) -- upcoming Release 3.2.9
+01-Jan-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -76,10 +76,12 @@ For a detailed list of all changes see the file CHANGELOG.
             and size of permanent and clib allocations, the amount of
             memory allocated and available, and the amount of memory
             unused (where applicable).
-            Argument (DINFO_DATA, DID_STATUS) also returns
-            the total number of heartbeat calls.
+            Argument (DINFO_DATA, DID_STATUS) also returns the number
+            of destructed objects and the total number of heartbeat calls.
             Single values of (DINFO_DATA) can be returned instead of the
             whole array.
+            Argument (DINFO_DUMP, "destructed") creates a dump
+            of all destructed objects, by default in <mudlib>/DEST_OBJ_DUMP.
        + debug_message(): New second argument determines where to
             log the message, and if to prepend a timestamp.
        + exec(): If this_interactive() points to one of the involved
@@ -387,6 +389,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Commandline option '--erq' can now be used to pass simple arguments
            to the erq.
        + New editor command 'T' to perform Tab <-> Whitespace conversion.
+       + Builtin command 'dumpallobj' now also creates a dump of all
+           destructed objects in the file <mudlib>/DEST_OBJ_DUMP.
 
 
 20-Aug-2000 (Lars Duening) -- Release 3.2.8

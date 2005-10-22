@@ -220,15 +220,15 @@ void
 _free_object (object_t *ob)
 
 /* Deallocate/dereference all memory and structures held by <ob>.
- * At the time of call, the object must be have no refcounts lefts,
- * must be destructed and removed from the object table and list.
+ * At the time of call, the object must be have at no refcount left,
+ * must be destructed and removed from the object table and lists.
  */
 
 {
 
 #ifdef DEBUG
 
-    /* Decrement and check the reference count */
+    /* Check the reference count */
 
     if (ob->ref > 0)
         fatal("Object with %ld refs passed to _free_object()\n", ob->ref);

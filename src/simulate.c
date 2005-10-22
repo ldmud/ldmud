@@ -135,7 +135,9 @@ static sentence_t * free_sent = NULL;
    */
 
 object_t *obj_list = NULL;
-  /* Head of the list of all objects
+  /* Head of the list of all objects. The reference by this list
+   * is counted.
+   * The first object in the list has its .prev_all member cleared.
    */
 
 object_t *obj_list_end = NULL;
@@ -144,18 +146,38 @@ object_t *obj_list_end = NULL;
    */
 
 object_t *destructed_objs = NULL;
+  /* List holding destructed but not yet fully dereferenced objects.
+   * Only the name and the program pointer are guarantueed to be valid.
+   * The reference by this list is counted.
+   * Objects with only the list reference left are finally freed by
+   * the function remove_destructed_objs() called from the backend.
+#ifdef MALLOC_smalloc
+   * They are also freed by a GC.
+#endif
+   * TODO: If this turns out to be not soon enough, modify the free_object()
+   * TODO:: call to recognize the destructed+one-ref-left situation.
+   *
+   * This list is not exactly necessary, as destructed objects would be
+   * deallcoated automatically once the last reference is gone, but it
+   * helps mud admins to figure out where all the memory goes.
+   */
+
+long num_destructed = 0;
+  /* Statistics: Number of objects in the destructed_objs list.
+   */
+
+object_t *newly_destructed_objs = NULL;
   /* List holding objects destructed in this execution thread.
-   * They are no longer part of the obj_list.
+   * They are no longer part of the obj_list, but since programs may still
+   * be executing in them, the aren't fully destructed yet.
+   */
+
+long num_newly_destructed = 0;
+  /* Statistics: Number of objects in the newly_destructed_objs list.
    */
 
 object_t *master_ob = NULL;
   /* The master object.
-   */
-
-p_int new_destructed = 0;
-  /* Number of destructed objects which are still in the object
-   * list. A value != 0 serves as flag that there are objects
-   * to clean up.
    */
 
 object_t *current_object;
@@ -1970,7 +1992,7 @@ deep_destruct (object_t *ob)
  *
  * The objects are still kept around until the end of the execution because
  * it might still hold a running program. The destruction will be completed
- * from the backend by a call to remove_object().
+ * from the backend by a call to handle_newly_destructed_objects().
  */
 
 {
@@ -2016,7 +2038,7 @@ destruct (object_t *ob)
  *
  * The object is still kept around until the end of the execution because
  * it might still hold a running program. The destruction will be completed
- * from the backend by a call to remove_object().
+ * from the backend by a call to handle_newly_destructed_objects().
  */
 
 {
@@ -2160,14 +2182,14 @@ destruct (object_t *ob)
     ob->contains = NULL;
     ob->flags &= ~O_ENABLE_COMMANDS;
     ob->flags |= O_DESTRUCTED;  /* must come last! */
-    new_destructed++;
     if (command_giver == ob)
         command_giver = NULL;
 
-    /* Put the object into the list of destructed objects */
+    /* Put the object into the list of newly destructed objects */
     ob->prev_all = NULL;
-    ob->next_all = destructed_objs;
-    destructed_objs = ob;
+    ob->next_all = newly_destructed_objs;
+    newly_destructed_objs = ob;
+    num_newly_destructed++;
 } /* destruct() */
 
 /*-------------------------------------------------------------------------*/
@@ -2175,13 +2197,18 @@ static void
 remove_object (object_t *ob)
 
 /* This function is called from outside any execution thread to finally
- * remove object <ob>. <ob> must have been unlinked from the object list
- * with destruct() already.
+ * remove object <ob>. <ob> must have been unlinked from all object lists
+ * already (but the associated reference count must still exist).
  *
- * The function frees all variables and remaining sentences in the object
- * and then calls free_object(). The object structure and the program
- * will be freed as soon as there are no further references to the object
- * (the program must remain behind in case it was inherited).
+ * The function frees all variables and remaining sentences in the object.
+ * If then only one reference (from the original object list) remains, the
+ * object is freed immediately with a call to free_object(). If more
+ * references exist, the object is linked into the destructed_objs list
+ * for freeing at a future date.
+ *
+ * The object structure and the program will be freed as soon as there
+ * are no further references to the object (the program will remain behind
+ * in case it was inherited).
  * TODO: Distinguish data- and inheritance references?
  */
 
@@ -2250,23 +2277,35 @@ remove_object (object_t *ob)
         ob->sent = NULL;
     }
 
-    free_object(ob, "destruct_object");
+    /* Either free the object, or link it up for future freeing. */
+    if (ob->ref <= 1)
+        free_object(ob, "destruct_object");
+    else
+    {
+        if (destructed_objs != NULL)
+            destructed_objs->prev_all = ob;
+        ob->next_all = destructed_objs;
+        destructed_objs = ob;
+        ob->prev_all = NULL;
+        num_destructed++;
+    }
 } /* remove_object() */
 
 /*-------------------------------------------------------------------------*/
 void
-remove_destructed_objects (void)
-
-/* Remove all destructed objects which are kept pending for deallocation
- * in the destructed_objs list.
+handle_newly_destructed_objects (void)
+  
+/* Finish up all newly destructed objects kept in the newly_destructed_objs
+ * list: deallocate as many associated resources and, if there are
+ * more than one references to the object, put it into the destructed_objs list.
  */
 
 {
-    while (destructed_objs)
+    while (newly_destructed_objs)
     {
-        object_t *ob = destructed_objs;
+        object_t *ob = newly_destructed_objs;
 
-        destructed_objs = ob->next_all;
+        newly_destructed_objs = ob->next_all;
 #ifdef DEBUG
         if (!(ob->flags & O_DESTRUCTED))
             fatal("Non-destructed object %p '%s' in list of destructed objects.\n"
@@ -2274,14 +2313,49 @@ remove_destructed_objects (void)
                  );
 #endif
         remove_object(ob);
-        new_destructed--;
+        num_newly_destructed--;
     }
-#ifdef DEBUG
-    if (new_destructed)
-        fatal("new_destructed is %ld instead of 0.\n", new_destructed);
-#endif
-}  /* remove_destructed_objects() */
+}  /* handle_newly_destructed_objects() */
 
+/*-------------------------------------------------------------------------*/
+void
+remove_destructed_objects (void)
+
+/* Scan the list of destructed objects and free those with no references
+ * remaining.
+ */
+
+{
+    object_t *ob;
+
+    for (ob = destructed_objs; ob != NULL; )
+    {
+        object_t *victim;
+
+        /* Check if only the list reference remains.
+         * If not, go to the next object.
+         */
+        if (ob->ref > 1)
+        {
+            ob = ob->next_all;
+            continue;
+        }
+
+        /* This object can be freed - remove it from the list */
+        victim = ob;
+        if (ob->prev_all != NULL)
+            ob->prev_all->next_all = ob->next_all;
+        if (ob->next_all != NULL)
+            ob->next_all->prev_all = ob->prev_all;
+        if (destructed_objs == ob)
+            destructed_objs = ob->next_all;
+        ob = ob->next_all;
+
+        free_object(victim, "remove_destructed_objects");
+        num_destructed--;
+    }
+}  /* remove_destructed_objects() */
+  
 /*-------------------------------------------------------------------------*/
 static INLINE shadow_t *
 new_shadow_sent(void)
@@ -2475,19 +2549,71 @@ status_parse (strbuf_t * sbuf, char * buff)
         tot += tot_alloc_object_size;
         if (verbose)
         {
+#ifdef DEBUG
+            long count;
+            object_t *ob;
+#endif
+
             strbuf_add(sbuf, "\nObject status:\n");
             strbuf_add(sbuf, "--------------\n");
             strbuf_addf(sbuf, "Objects total:\t\t\t %8ld\n"
                              , (long)tot_alloc_object);
+#ifndef DEBUG
             strbuf_addf(sbuf, "Objects in list:\t\t %8ld\n"
                              , (long)num_listed_objs);
+            strbuf_addf(sbuf, "Objects newly destructed:\t\t %8ld\n"
+                             , (long)num_newly_destructed);
+            strbuf_addf(sbuf, "Objects destructed:\t\t %8ld\n"
+                             , (long)num_destructed);
+#else
+            for (count = 0, ob = obj_list; ob != NULL; ob = ob->next_all)
+                count++;
+            if (count != num_listed_objs)
+            {
+                debug_message("DEBUG: num_listed_objs mismatch: listed %ld, counted %ld\n"
+                             , (long)num_listed_objs, count);
+                strbuf_addf(sbuf, "Objects in list:\t\t %8ld (counted %ld)\n"
+                                 , (long)num_listed_objs, count);
+            }
+            else
+                strbuf_addf(sbuf, "Objects in list:\t\t %8ld\n"
+                                 , (long)num_listed_objs);
+            for (count = 0, ob = newly_destructed_objs; ob != NULL; ob = ob->next_all)
+                count++;
+            if (count != num_newly_destructed)
+            {
+                debug_message("DEBUG: num_newly_destructed mismatch: listed %ld, counted %ld\n"
+                             , (long)num_newly_destructed, count);
+                strbuf_addf(sbuf, "Objects newly destructed:\t\t %8ld (counted %ld)\n"
+                                 , (long)num_newly_destructed, count);
+            }
+            else
+                strbuf_addf(sbuf, "Objects newly destructed:\t %8ld\n"
+                                 , (long)num_newly_destructed);
+            for (count = 0, ob = destructed_objs; ob != NULL; ob = ob->next_all)
+                count++;
+            if (count != num_destructed)
+            {
+                debug_message("DEBUG: num_destructed mismatch: listed %ld, counted %ld\n"
+                             , (long)num_destructed, count);
+                strbuf_addf(sbuf, "Objects destructed:\t\t %8ld (counted %ld)\n"
+                                 , (long)num_destructed, count);
+            }
+            else
+                strbuf_addf(sbuf, "Objects destructed:\t\t %8ld\n"
+                                 , (long)num_destructed);
+#endif
+
             strbuf_addf(sbuf, "Objects processed in last cycle: "
                                "%8ld (%5.1f%% - avg. %5.1f%%)\n"
                        , (long)num_last_processed
                        , (float)num_last_processed / (float)num_listed_objs * 100.0
-                       , (avg_in_list || avg_last_processed > avg_in_list)
-                         ? 100.0
-                         : 100.0 * (float)avg_last_processed / avg_in_list
+                       , !avg_in_list
+                         ? 0.0
+                         : ((avg_in_list || avg_last_processed > avg_in_list)
+                            ? 100.0
+                            : 100.0 * (float)avg_last_processed / avg_in_list
+                           )
                        );
         }
         tot += show_otable_status(sbuf, verbose);
@@ -2499,7 +2625,10 @@ status_parse (strbuf_t * sbuf, char * buff)
         tot += rxcache_status(sbuf, verbose);
 #endif
         if (verbose)
-            strbuf_addf(sbuf, "\n");
+        {
+            strbuf_add(sbuf, "\nOther:\n");
+            strbuf_add(sbuf, "------\n");
+        }
         tot += show_lexer_status(sbuf, verbose);
         tot += show_comm_status(sbuf, verbose);
         if (!verbose)
@@ -2577,11 +2706,16 @@ dinfo_data_status (svalue_t *svp, int value)
     ST_NUMBER(DID_ST_OBJECTS_SWAPPED,   num_vb_swapped);
     ST_NUMBER(DID_ST_OBJECTS_SWAP_SIZE, total_vb_bytes_swapped);
     ST_NUMBER(DID_ST_OBJECTS_LIST,      num_listed_objs);
+    ST_NUMBER(DID_ST_OBJECTS_NEWLY_DEST, num_newly_destructed);
+    ST_NUMBER(DID_ST_OBJECTS_DESTRUCTED, num_destructed);
     ST_NUMBER(DID_ST_OBJECTS_PROCESSED, num_last_processed);
     ST_DOUBLE(DID_ST_OBJECTS_AVG_PROC
-             , (avg_in_list || avg_last_processed > avg_in_list)
-               ? 1.0
-               : (double)avg_last_processed / avg_in_list
+             , !avg_in_list
+               ? 0.0
+               : ((avg_in_list || avg_last_processed > avg_in_list)
+                  ? 1.0
+                  : (double)avg_last_processed / avg_in_list
+                 )
              );
         
     ST_NUMBER(DID_ST_ARRAYS,         num_arrays);
@@ -3186,7 +3320,13 @@ clear_ref_in_callback (callback_t *cb)
     if (cb->is_lambda)
         clear_ref_in_vector(&(cb->function.lambda), 1);
     else
+    {
+#ifdef DEBUG
+        if (!callback_object(cb))
+            fatal("GC run on callback with stale object.\n");
+#endif
         clear_object_ref(cb->function.named.ob);
+    }
 } /* clear_ref_in_callback() */
 
 /*-------------------------------------------------------------------------*/
@@ -3207,17 +3347,15 @@ count_ref_in_callback (callback_t *cb)
             note_malloced_block_ref(cb->arg.u.lvalue);
     }
 
+#ifdef DEBUG
+    if (!callback_object(cb))
+        fatal("GC run on callback with stale object.\n");
+#endif
     if (cb->is_lambda)
         count_ref_in_vector(&(cb->function.lambda), 1);
     else
     {
-        object_t *ob;
-
-        ob = cb->function.named.ob;
-        if (!ob->ref) /* No refs after GC: object destructed */
-            mark_object_ref(ob);
-        else
-            ob->ref++;
+        cb->function.named.ob->ref++;
         count_ref_from_string(cb->function.named.name);
     }
 } /* count_ref_in_callback() */

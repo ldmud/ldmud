@@ -277,6 +277,7 @@ extern svalue_t *f_send_erq(svalue_t *sp);
 #endif
 
 extern size_t show_comm_status (strbuf_t * sbuf, Bool verbose);
+extern void remove_stale_player_data (void);
 
 #ifdef GC_SUPPORT
 extern void  clear_comm_refs(void);

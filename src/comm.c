@@ -5043,6 +5043,74 @@ lookup_ip_entry (struct in_addr addr, Bool useErq)
 /*=========================================================================*/
 
 /*-------------------------------------------------------------------------*/
+void
+remove_stale_player_data (void)
+
+/* GC and statistics support: Remove all input_to and prompt infos
+ * referencing destructed objects.
+ */
+
+{
+    int i;
+
+    for(i = 0 ; i < MAX_PLAYERS; i++)
+    {
+        input_to_t * it, * prev;
+        object_t *ob;
+
+        if (all_players[i] == NULL)
+            continue;
+
+        /* Remove stale input_to data */
+        for ( prev = NULL, it = all_players[i]->input_to; it != NULL; )
+        {
+            input_to_t *tmp;
+            ob = callback_object(&(it->fun));
+            if (ob)
+            {
+                prev = it;
+                it = it->next;
+            }
+            else
+            {
+                /* The object has selfdestructed */
+
+                if (prev == NULL)
+                {
+                    set_noecho(all_players[i], it->next ? it->next->noecho : 0);
+                    all_players[i]->input_to = it->next;
+                }
+                else
+                {
+                    prev->next = it->next;
+                }
+
+                tmp = it;
+                it = it->next;
+
+                free_input_to(tmp);
+            }
+        }
+
+        /* Remove stale snooping monsters */
+        ob = all_players[i]->snoop_by;
+        if (ob && !O_IS_INTERACTIVE(ob) && !check_object(ob))
+        {
+            free_object(ob, "remove_stale_player_data");
+            all_players[i]->snoop_by = NULL;
+        }
+
+        /* Remove a stale modify_command object */
+        ob = all_players[i]->modify_command;
+        if (ob && !check_object(ob))
+        {
+            free_object(ob, "remove_stale_player_data");
+            all_players[i]->modify_command = NULL;
+        }
+    } /* for (i) */
+} /* remove_stale_player_data() */
+
+/*-------------------------------------------------------------------------*/
 size_t
 show_comm_status (strbuf_t * sbuf, Bool verbose UNUSED)
 
@@ -5055,6 +5123,8 @@ show_comm_status (strbuf_t * sbuf, Bool verbose UNUSED)
 #endif
     size_t sum;
     int i;
+
+    remove_stale_player_data();
 
     sum = 0;
 
