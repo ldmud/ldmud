@@ -24,4 +24,4 @@ HISTORY
           flag.
 
 SEE ALSO
-        explode(E), regexp(E), regmatch(E), regreplace(E)
+        explode(E), regexp(E), regmatch(E), regreplace(E), regexp(C)

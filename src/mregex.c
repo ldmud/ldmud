@@ -652,14 +652,20 @@ rx_sub (regexp_t *prog, string_t *source, string_t *subst)
             if (c == '&')
                 no = 0;
             else if (c == '\\' && '0' <= *src && *src <= '9')
+            {
                 no = *src++ - '0';
+                left--;
+            }
             else
                 no = -1;
 
             if (no < 0) /* Ordinary character. */
             {
                 if (c == '\\' && (*src == '\\' || *src == '&'))
+                {
                     c = *src++;
+                    left--;
+                }
                 if (copyPass)
                     *dst++ = c;
                 else

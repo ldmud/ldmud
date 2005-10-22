@@ -5,7 +5,6 @@ Type: Memo
 See: f-010406-0
 
  - Teach ed() the PCRE options in PERL modifier syntax
- - Document the regexp patterns and options in a (C) manpage.
  - Since PCRE returns error codes, regexp.[ch] might do it as well.
  - Make PCRE the config default, explicitely turn it off for the given
      muds.
@@ -43,24 +42,5 @@ letztens in eine 'unendliche' Schleife schicken. Wie man dort dann
 nachtraeglich Evalkosten pro Backtrack einbaut *gruebel*...
 Uebrigens ist der Pcre-Automat etwa doppelt so schnell bei der Schleife,
 20 '=' nach den XX dauern bei mir 2 bzw 4 Sekunden.
----------------------------------------------------------------------------
-
-Die komplette Umstellung birgt aber ein paar Inkompatibilitaeten:
-
-*  \< und \> sind nicht vorhanden. Eventuell kann man diese durch
-   \b (word boundary) ersetzen. Emulieren waere moeglich mit \W\b
-   sowie \b\W
-
-*  ( und ) werden wie im 'normalen' Modus behandelt, excompat muss
-   emuliert werden (verwendet nur regreplace, ed)
-
-Wie arbeitet der Driver mit Multilines?
-   ^      matcht Stringanfang
-   $      matcht Stringende; matcht nicht auf \n vor Stringende
-   .      matcht \n; matcht nicht Stringende
-   [^x]   matcht auf \n
-
-Dies entspricht etwa /s bei Perl und
-PCRE_DOLLAR_ENDONLY | PCRE_DOTALL bei Pcre
 
 ----------------------------------------------------------------------------

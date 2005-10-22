@@ -33,4 +33,4 @@ HISTORY
         Introduced in LDMud 3.3.198.
 
 SEE ALSO
-        regexplode(E), regreplace(E), regexp(E)
+        regexplode(E), regreplace(E), regexp(E), regexp(C)

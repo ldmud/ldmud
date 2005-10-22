@@ -298,6 +298,7 @@ make_new_tabled (const char * const pTxt, size_t size, int idx MTRACE_DECL)
     /* Get the memory for a new one */
 
     sdata = xalloc_pass(size + sizeof(*sdata));
+      /* sizeof(*sdata) includes the extra data byte */
     if (!sdata)
         return NULL;
 

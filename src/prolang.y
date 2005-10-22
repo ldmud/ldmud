@@ -5692,10 +5692,11 @@ expr0:
       lvalue L_ASSIGN expr0 %prec L_ASSIGN
       {
           p_int length;
-          vartype_t type1, type2;
+          vartype_t type1, type2, restype;
 %line
           type1 = $1.type;
           type2 = $3.type;
+          restype = type2; /* Assume normal assignment */
 
           /* Check the validity of the assignment */
           if (exact_types
@@ -5777,6 +5778,11 @@ expr0:
               {
                   yyerrorf("Bad assignment %s", get_two_types(type1, type2));
               }
+
+              /* Operator assignment: result type is determined by assigned-to
+               * type.
+               */
+              restype = type1;
           }
 
           if (type2 & TYPE_MOD_REFERENCE)
@@ -5810,7 +5816,7 @@ expr0:
               *dest++ = *source;
               *dest = $2;
           }
-          $$.type = type1;
+          $$.type = restype;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
