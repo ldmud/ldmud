@@ -577,12 +577,14 @@ f_regreplace (svalue_t *sp)
 
 /* EFUN regreplace()
  *
- *     string regreplace (string txt, string pattern, string replace
+ *     string regreplace (string txt, string pattern, closure|string replace
  *                                                  , int flags)
  *
  * Search through <txt> for one/all occurences of <pattern> and replace them
- * with the <replace> pattern, returning the result. <flags> is the bit-or
- * of these values:
+ * with the <replace> pattern, returning the result.
+ * <replace> can be a string, or a closure returning a string. If it is
+ * a closure, it will be called with the matched substring as argument.
+ * <flags> is the bit-or of these values:
  *   F_GLOBAL   = 1: when given, all occurences of <pattern> are replace,
  *                   else just the first
  *   F_EXCOMPAT = 2: when given, the expressions are ex-compatible,
@@ -600,7 +602,9 @@ f_regreplace (svalue_t *sp)
 
     struct regexp *pat;
     int   flags;
-    char *oldbuf, *buf, *curr, *new, *start, *old, *sub;
+    char *oldbuf, *buf, *curr, *new, *start, *old, *sub, *match = NULL;
+    size_t matchsize = 0;
+    svalue_t *subclosure = NULL;
     long  space;
     size_t  origspace;
 
@@ -612,7 +616,17 @@ f_regreplace (svalue_t *sp)
 
     /* Extract the arguments */
     flags = sp->u.number;
-    sub = get_txt(sp[-1].u.str);
+    if (sp[-1].type == T_STRING)
+    {
+        sub = get_txt(sp[-1].u.str);
+        subclosure = NULL;
+    }
+    else /* it's a closure */
+    {
+        sub = NULL;
+        subclosure = sp-1;
+    }
+
     start = curr = get_txt(sp[-3].u.str);
 
     space = (long)(origspace = (mstrsize(sp[-3].u.str) + 1)*2);
@@ -656,7 +670,57 @@ f_regreplace (svalue_t *sp)
             strncpy(new,curr,(size_t)diff);
             new += diff;
             old  = new;
-            *old = '\0';
+
+            /* Determine the replacement pattern.
+             */
+            if (subclosure != NULL)
+            {
+                size_t patsize = pat->endp[0] - pat->startp[0];
+
+                if (patsize+1 > matchsize)
+                {
+                    char * nmatch;
+
+                    matchsize = patsize+1;
+                    if (match)
+                        nmatch = rexalloc(match, matchsize);
+                    else
+                        nmatch = xalloc(matchsize);
+                    if (!nmatch)
+                    {
+                        xfree(buf);
+                        if (pat)
+                            REGFREE(pat);
+                        error("Out of memory for matched string (%lu bytes)\n"
+                             , (unsigned long)patsize+1);
+                        /* NOTREACHED */
+                        return NULL;
+                    }
+                    match = nmatch;
+                }
+
+                memcpy(match, pat->startp[0], patsize);
+                match[patsize] = '\0';
+
+                push_c_string(inter_sp, match);
+                call_lambda(subclosure, 1);
+                transfer_svalue(&apply_return_value, inter_sp);
+                inter_sp--;
+
+                if (apply_return_value.type != T_STRING)
+                {
+                    xfree(buf);
+                    if (pat)
+                        REGFREE(pat);
+                    if (match)
+                        xfree(match);
+                    error("Invalid type for replacement pattern: %s, expected string.\n", typename(apply_return_value.type));
+                    /* NOTREACHED */
+                    return NULL;
+                }
+
+                sub = get_txt(apply_return_value.u.str);
+            }
 
             /* Now what may have happen here. We *could*
              * be out of mem (as in 'space') or it could be
@@ -667,6 +731,7 @@ f_regreplace (svalue_t *sp)
              * if not, increase space. The player could get
              * some irritating messages from regerror()
              */
+            *old = '\0';
             while (NULL == (new = regsub(pat, sub, new, space, 1)) )
             {
                 int xold;
@@ -676,6 +741,8 @@ f_regreplace (svalue_t *sp)
                     xfree(buf);
                     if (pat)
                         REGFREE(pat);
+                    if (match)
+                        xfree(match);
                     error("Internal error in regreplace().\n");
                     /* NOTREACHED */
                     return NULL;
@@ -717,6 +784,8 @@ f_regreplace (svalue_t *sp)
         strcpy(buf,start);
     }
 
+    if (match)
+        xfree(match);
     if (pat)
         REGFREE(pat);
 
@@ -965,7 +1034,7 @@ at_end (int i, int imax, int z, p_int *lens)
 
 /*-------------------------------------------------------------------------*/
 static string_t *
-e_terminal_colour ( string_t * text, mapping_t * map
+e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                   , int indent, int wrap
                   )
 
@@ -1027,10 +1096,10 @@ e_terminal_colour ( string_t * text, mapping_t * map
     /* Find the first occurance of the magic character pair.
      * If found, duplicate the input string into instr and
      * let cp point into that copy at the delimiter.
-     * If not found, cp will be NULL.
+     * If not found (or no mapping/closure given), cp will be NULL.
      */
 
-    if (map != NULL)
+    if (map != NULL || cl != NULL)
     {
         cp = instr;
         do {
@@ -1089,6 +1158,23 @@ e_terminal_colour ( string_t * text, mapping_t * map
          */
 
         p_int left;
+
+        /* If we got a mapping, do a one-time lookup for the default
+         * entry and store it in <cl>.
+         */
+        if (map != NULL)
+        {
+            cl = get_map_value(map, &const0);
+            if (cl->type == T_NUMBER && cl->u.number == 0)
+                cl = NULL; /* No default entry */
+
+            if (cl && cl->type != T_STRING && cl->type != T_CLOSURE)
+            {
+                error("(terminal_colour) Illegal type for default entry: %s, expected string or closure.\n", typename(cl->type));
+                /* NOTREACHED */
+                return text;
+            }
+        }
 
         /* cp here points to the first delimiter found */
 
@@ -1198,7 +1284,7 @@ e_terminal_colour ( string_t * text, mapping_t * map
                 str = NULL;
             else
                 str = find_tabled_str_n(parts[i], lens[i]);
-            if (str != NULL)
+            if (str != NULL && map != NULL)
             {
                 svalue_t mkey;
 
@@ -1211,6 +1297,34 @@ e_terminal_colour ( string_t * text, mapping_t * map
 
                 /* now look for mapping data */
                 mdata = get_map_value(map, &mkey);
+                if (mdata->type == T_NUMBER && mdata->u.number == 0)
+                    mdata = NULL; /* No entry */
+            }
+
+            /* If the map lookup didn't find anything, try the
+             * <cl>osure (which might be the default entry)
+             */
+            if (mdata == NULL && cl != NULL)
+            {
+                if (cl->type == T_STRING)
+                {
+                    mdata = cl;
+                }
+                else
+                {
+                    /* It's a closure */
+                    push_ref_string(inter_sp, str);
+                    call_lambda(cl, 1);
+                    transfer_svalue(&apply_return_value, inter_sp);
+                    inter_sp--;
+                    mdata = &apply_return_value;
+                    if (mdata->type != T_STRING)
+                    {
+                        error("(terminal_colour) Closure did not return a string.\n");
+                        /* NOTREACHED */
+                        return NULL;
+                    }
+                }
             }
         }
         else if (!(i % 2) && !no_keys
@@ -1606,16 +1720,22 @@ f_terminal_colour (svalue_t *sp, int num_arg)
 
 /* EFUN terminal_colour()
  *
- *   varargs string terminal_colour( string str, mapping map,
+ *   varargs string terminal_colour( string str, mapping|closure map,
  *                                   int wrap, int indent )
  *
  * Expands all colour-defines from the input-string and replaces them by the
  * apropriate values found for the color-key inside the given mapping. The
- * mapping has the format "KEY" : "value", non-string contents are ignored.
+ * mapping has the format "KEY" : "value", non-string contents are ignored
+ * with one exception: the entry (0 : value) is used for otherwise
+ * unrecognized tags, if existing; <value> may be a string or a closure (see
+ * below).
  *
  * If <map> is given as 0, no keyword detection or replacement will be
  * performed and the efun acts just as a text wrapper and indenter (assuming
  * that <wrap> and <indent> are given).
+ *
+ * If <map> is given as a closure, it is called for each KEY with the key
+ * as argument, and it has to return the replacement string.
  *
  * The parameters wrap and indent are both optional, if only wrap is given
  * then the str will be linewrapped at the column given with wrap.  If indent
@@ -1639,6 +1759,7 @@ f_terminal_colour (svalue_t *sp, int num_arg)
     int        wrap = 0;
     string_t * str;
     mapping_t * map = NULL;
+    svalue_t * cl = NULL;
 
     if ( num_arg >= 3 )
     {
@@ -1671,13 +1792,22 @@ f_terminal_colour (svalue_t *sp, int num_arg)
             /* NOTREACHED */
             return sp;
         }
+        cl = NULL;
+    }
+    else if (sp->type == T_CLOSURE)
+    {
+        map = NULL;
+        cl = sp;
     }
     else
+    {
         map = NULL;
+        cl = NULL;
+    }
 
     inter_sp = sp;
 
-    str = e_terminal_colour(sp[-1].u.str, map, indent, wrap);
+    str = e_terminal_colour(sp[-1].u.str, map, cl, indent, wrap);
 
     free_svalue(sp--);
     free_svalue(sp);

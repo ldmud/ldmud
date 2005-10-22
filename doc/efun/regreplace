@@ -4,7 +4,13 @@ SYNOPSIS
 DESCRIPTION
         This function looks through txt looking for the regular
         expression pattern. If it finds it, it replaces it by the
-        replacepattern. The flag is a bitmask, where bit 0 specifies
+        replacepattern.
+        
+        The replacepattern can be a constant string, or a closure taking
+        the matched substring as argument and returning the replacement
+        pattern string.
+        
+        The flag is a bitmask, where bit 0 specifies
         that the search and replace should repeat as often as the
         pattern matches, and bit 1 (mask 2) specifies if the regular
         expressions are 'ex' compatible or not. The function returns
@@ -30,14 +36,16 @@ EXAMPLE
          */
         txt = regreplace(txt, "<underline>", "<ESC>[5m", 1);
 
+        /* Put the word HOUSE into lower case. */
+        txt = regreplace(txt, "HOUSE", #'lower_case, 1);
+
 HISTORY
         Introduced in 3.2.1@125
+        The use of a closure as replacepattern was introduced in 
+        LDMud 3.2.9.
 
 AUTHOR
-        Marcus@TAPPMud contributed the efun and the man page
+        Marcus@TAPPMud contributed the original efun and man page
         
 SEE ALSO
         regexp(E), regexplode(E), sscanf(E), trim(E)
-
-
-

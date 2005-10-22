@@ -93,7 +93,6 @@ f-010406-0: Improved RegExps, using PCRE
 f-010411: Extend map(),filter(),... for strings.
 f-010516-0: Allow add_actions() on closures
 f-010516-1: Add a priority to notify_fail()
-f-010516-2: Allow a closure in regreplace()
 
 
 Language

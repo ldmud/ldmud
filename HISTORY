@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-06-May-2001 (Lars Duening) -- Development Release 3.3
+24-May-2001 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -42,7 +42,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-16-May-2001 (Lars Duening) -- upcoming Release 3.2.9
+24-May-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + allocate(): Accepts an optional initialisation value and can
@@ -76,8 +76,11 @@ For a detailed list of all changes see the file CHANGELOG.
        + regexp functions: more compatible with 8-bit characters.
        + regexp functions: New metacharacters '+' allows to specifiy 'at
            least one match'.
+       + regreplace(): Accepts a closure to produce the replacement string
+           instead of just a constant string.
        + sin(), cos(), tan(), atan(), atan2(), log(), exp(), sqrt(), pow():
            Integers are accepted as arguments, too.
+       + terminal_colour(): Colour keys can now be mapped using a closure.
        + add_verb(), add_xverb(), efun308(), file_name(), map_array(),
          filter_array(), filter_mapping(), map_mapping(), m_sizeof(),
          send_imp():

@@ -12,18 +12,28 @@ DESCRIPTION
 
          - 'optional'
 
-           A mud's maintainer is free to deactivate these efun(s) when
-           compiling the driver.
+           A mud's maintainer is free to deactivate these efuns when
+           compiling the driver:
+
+             assoc()
+             break_point()
+             db_*()
+             insert_alist()
+             intersect_alist()
+             process_string()
+             rusage()
+             set_is_wizard()
+             set_light()
 
          - 'preliminary'
 
            The behaviour of these efuns is not fixed yet, and may change
-           with further releases.
+           with further releases:
 
          - 'deprecated' or 'obsolete'
 
-           This efun should no longer be used, it is merely provided
-           for backwards compatibility.
+           These efuns should no longer be used, they are merely provided
+           for backwards compatibility:
 
 SEE ALSO
         efuns(LPC), applied(A), master(M), lpc(LPC), concepts(C), driver(D)

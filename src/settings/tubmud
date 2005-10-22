@@ -40,5 +40,5 @@ enable_strict_euids=no
 enable_use_alists=yes
 
 enable_lpc_nosave=yes
-enable_supply_parse_command=yes
+enable_supply_parse_command=no
 enable_initialization_by___init=no

@@ -111,6 +111,10 @@
 
 #include "../mudlib/sys/driver_hook.h"
 
+#ifdef USE_ALISTS
+#include "pkg-alists.h"  /* order_alist() */
+#endif
+
 #define lint  /* redef again to prevent spurious warnings */
 
 #define YYMAXDEPTH        600

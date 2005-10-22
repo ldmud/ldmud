@@ -61,7 +61,7 @@
 #include "xalloc.h"
 
 /*-------------------------------------------------------------------------*/
-static vector_t *
+vector_t *
 order_alist (svalue_t *inlists, int listnum, Bool reuse)
 
 /* Order the alist <inlists> and return a new vector with it. The sorting
@@ -76,6 +76,8 @@ order_alist (svalue_t *inlists, int listnum, Bool reuse)
  *
  * As a side effect, strings in the key vector are made shared, and
  * destructed objects in key and data vectors are replaced by svalue 0s.
+ *
+ * This function is also called by the compiler for constant expressions.
  */
 
 {

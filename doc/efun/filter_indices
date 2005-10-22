@@ -6,7 +6,7 @@ DESCRIPTION
         ob->func() is called resp. cl applied to every element in the
         mapping, with first argument being the key of the
         element, and then the extra args that were given to
-        filter_mapping (these args must not be protected references like
+        filter_indices (these args must not be protected references like
         &(i[0]). If the function returns true, the element is
         added to the result mapping. ob can also be an object_name of an
         object.

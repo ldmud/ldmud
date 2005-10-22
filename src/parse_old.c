@@ -3,6 +3,7 @@
  * (C) Copyright 1990 JnA (jna@cd.chalmers.se)
  *
  *---------------------------------------------------------------------------
+ * TODO: Remove this efun.
  * EFUN parse_command
  *
  *     int parse_command (string cmd, object  env, string fmt, mixed &var, ...)

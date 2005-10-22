@@ -271,6 +271,34 @@ handle_usr1 (int sig UNUSED)
 } /* handle_usr1() */
 
 /*-------------------------------------------------------------------------*/
+static INLINE void
+cleanup_stuff (void)
+
+/* Perform a number of clean up operations: replacing programs, freeing
+ * driver hooks, and removing destructed object.
+ * They are collected in one function so that they can be easily called from
+ * various places (backend loop and the process_objects loops); especially
+ * since it is not advisable to remove destructed objects before replacing
+ * the programs.
+ */
+
+{
+    /* Replace programs */
+    if (obj_list_replace)
+    {
+        replace_programs();
+    }
+
+    /* Free older driver hooks
+     */
+    free_old_driver_hooks();
+
+    /* Remove all destructed objects.
+     */
+    remove_destructed_objects();
+} /* cleanup_stuff() */
+
+/*-------------------------------------------------------------------------*/
 void
 backend (void)
 
@@ -329,19 +357,8 @@ backend (void)
         alloca(0); /* free alloca'd values from deeper levels of nesting */
 #endif
 
-        /* Replace programs */
-        if (obj_list_replace)
-        {
-            replace_programs();
-        }
-
-        /* Free older driver hooks
-         */
-        free_old_driver_hooks();
-
-        /* Remove all destructed objects.
-         */
-        remove_destructed_objects();
+        /* Replace programs, remove destructed objects, and similar stuff */
+        cleanup_stuff();
 
 #ifdef DEBUG
         if (check_a_lot_ref_counts_flag)
@@ -832,8 +849,10 @@ static Bool did_swap;
             did_swap = MY_TRUE;
 
             /* Remove all pending destructed objects, to get a true refcount.
+             * But make sure that we don't clobber anything else while
+             * doing so.
              */
-            remove_destructed_objects();
+            cleanup_stuff();
 
             /* Supply a flag to the object that says if this program
              * is inherited by other objects. Cloned objects might as well

@@ -1,3 +1,4 @@
+DEPRECATED
 SYNOPSIS
         int parse_command (string cmd, object  env, string fmt, mixed &var, ...)
         int parse_command (string cmd, object* arr, string fmt, mixed &var, ...)

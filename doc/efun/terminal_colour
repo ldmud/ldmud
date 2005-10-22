@@ -1,13 +1,23 @@
 SYNOPSIS
-        varargs string terminal_colour( string str, null|mapping map,
-                                        int wrap, int indent )
+        varargs string terminal_colour( string str
+                                      , null|mapping|closure map
+                                      , int wrap, int indent )
 
 DESCRIPTION
         If <map> is given as a non-0 value, this efun expands all
         colour-defines of the form "%^KEY%^" from the
         input-string and replaces them by the apropriate values found
-        for the color-key inside the given mapping. The mapping has the
-        format "KEY" : "value", non-string contents are ignored.
+        for the color-key specified by <map>.
+        
+        If <map> is a mapping, the entries queries have the
+        format "KEY" : "value", non-string contents are ignored with one
+        exception: if the mapping contains an entry 0:value, it is used
+        for all otherwise unrecognized keys. The value in this case can be
+        a string, or a closure. If it is a closure, it takes the key as
+        argument and has to return the replacement string.
+
+        If <map> is given as a closure, it is called with the KEYs to
+        replace, and has to return the replacement string.
 
         The special key "%^%^" is always replaced with the literal "%^".
 
@@ -65,10 +75,12 @@ EXAMPLES
         
             "this is the first line\n   and this is the indented second one"
 
-AUTHOR
+HISTORY
         Efun idea and initial implementation taken from MudOS; the key
         recognition strategy (including pure wrapping mode) was straightened
         out in LDMud 3.2.8.
+        LDMud 3.2.9/3.3.58 added the use of closures to specify the colour
+        mappings.
         
 SEE ALSO
         sprintf(E)

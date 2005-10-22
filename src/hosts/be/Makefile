@@ -147,16 +147,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 57
+  SETVERFLAGS += d 58
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.57
+  VSTRING = 3.3.0-pre.58
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 57
+  SETVERFLAGS += d 58
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.57
+  VSTRING = 3.3.0-dev.58
 endif
 
 else
@@ -164,12 +164,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 57
+SETVERFLAGS = -app 3 3 58
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.57
+  VSTRING = 3.3.58
 
 endif
 
@@ -587,12 +587,12 @@ $(OBJ)/parse_old.o : xalloc.h wiz_list.h svalue.h stdstrings.h simulate.h \
     array.h actions.h parse.h my-alloca.h typedefs.h driver.h strfuns.h \
     sent.h exec.h instrs.h port.h config.h hosts/unix.h machine.h
 
-$(OBJ)/parser.o : lang.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
-    switch.h swap.h svalue.h stdstrings.h simul_efun.h simulate.h object.h \
-    mstrings.h mapping.h main.h lex.h instrs.h interpret.h gcollect.h \
-    exec.h closure.h backend.h array.h prolang.h my-alloca.h typedefs.h \
-    driver.h ptrtable.h strfuns.h sent.h port.h config.h hosts/unix.h \
-    machine.h
+$(OBJ)/parser.o : lang.c pkg-alists.h ../mudlib/sys/driver_hook.h xalloc.h \
+    wiz_list.h switch.h swap.h svalue.h stdstrings.h simul_efun.h \
+    simulate.h object.h mstrings.h mapping.h main.h lex.h instrs.h \
+    interpret.h gcollect.h exec.h closure.h backend.h array.h prolang.h \
+    my-alloca.h typedefs.h driver.h ptrtable.h strfuns.h sent.h port.h \
+    config.h hosts/unix.h machine.h
 
 $(OBJ)/pkg-alists.o : xalloc.h svalue.h simulate.h mstrings.h main.h \
     interpret.h array.h my-alloca.h pkg-alists.h typedefs.h driver.h \

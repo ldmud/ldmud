@@ -3133,14 +3133,11 @@ e_say (svalue_t *v, vector_t *avoid)
     else
         origin = current_object;
 
-    /* Sort the avoid vector for fast lookups
+    /* Sort the avoid vector for fast lookups.
+     * The caller will free the original <avoid>.
      */
-    {
-        vector_t * tmp = order_array(avoid);
-        free_array(avoid);
-        avoid = tmp;
-        push_array(inter_sp, avoid); /* In case of errors */
-    }
+    avoid = order_array(avoid);
+    push_array(inter_sp, avoid); /* In case of errors */
 
     /* Collect the list of propable recipients.
      * First, look in the environment.
