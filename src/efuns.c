@@ -3009,6 +3009,9 @@ f_clones (svalue_t *sp, int num_arg)
  *   == 0: (default) return the clones of the current blueprint only.
  *   == 1: return the clones of the previous blueprints only.
  *   == 2: return all clones of the blueprint.
+ *
+ * If the driver is compiled with DYNAMIC_COSTS, the cost of this
+ * efun is proportional to the number of objects in the game.
  */
  
 {
@@ -3018,6 +3021,7 @@ f_clones (svalue_t *sp, int num_arg)
     mp_int     load_id;  /* The load_id of the reference */
     object_t **ores;     /* Table pointing to the found objects */
     size_t     found;    /* Number of objects found */
+    size_t     checked;  /* Number of objects checked */
     size_t     osize;    /* Size of ores[] */
     vector_t  *res;      /* Result vector */
     svalue_t  *svp;
@@ -3134,6 +3138,7 @@ f_clones (svalue_t *sp, int num_arg)
     /* Prepare the table with the object pointers */
     osize = 256;
     found = 0;
+    checked = 0;
     xallocate(ores, sizeof(*ores) * osize, "initial object table");
 
     /* Loop through the object list */
@@ -3167,6 +3172,10 @@ f_clones (svalue_t *sp, int num_arg)
             ores[found++] = ob;
         }
     }
+
+#if defined(DYNAMIC_COSTS)
+    eval_cost += checked / 100 + found / 256;
+#endif /* DYNAMIC_COSTS */
 
     /* Create the result and put it onto the stack */
     if (max_array_size && found > max_array_size)

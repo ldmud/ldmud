@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Jun-2001 (Lars Duening)  (3.3.64)
+    - (backend.c) cleanup_stuff() also executes a clear_state() to
+         avoid dangling object references (reported by Gnomi).
+    - (pkg-mysql.c) Added efun db_error() to return the most recent
+         error string (thanks to Casey and Dafire).
+    - (efuns.c) If the driver is compiled with DYNAMIC_COSTS, the cost
+         of efun clones() is proportional to the number of objects
+         in the game.
+
 13-Jun-2001 (Lars Duening)  (3.3.63)
     - (prolang.y) Global variables can no longer be redefined (reported
          by Coogan).

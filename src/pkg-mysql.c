@@ -416,6 +416,50 @@ f_db_connect (svalue_t *sp, int num_args)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_db_error (svalue_t *sp)
+
+/* EFUN db_error()
+ *
+ *   string db_error(int handle)
+ *
+ * Return a string describing the error which occured during the last
+ * database transaction. If the last transaction was successful, 0
+ * is returned.
+ */
+
+{
+    db_dat_t     *dat;
+    unsigned int  handle;
+    unsigned int  err_no;
+    char         *errmsg;
+
+    handle = (unsigned int)sp[-1].u.number;
+
+    if ( !(dat = find_dat_by_handle(handle)) )
+    {
+        error("Illegal handle for database.\n");
+        /* NOTREACHED */
+        return sp;
+    }
+
+    errmsg = mysql_error(dat->mysql_dat);
+
+    if (errmsg[0] == '\0')
+    {
+        free_svalue(sp);
+        put_number(sp, 0);
+    }
+    else
+    {
+        free_svalue(sp);
+        put_c_string(sp, errmsg);
+    }
+
+    return sp;
+} /* f_db_error() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_db_exec (svalue_t *sp)
 
 /* EFUN db_exec()

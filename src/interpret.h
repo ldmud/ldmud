@@ -159,7 +159,6 @@ extern void remove_object_from_stack(object_t *ob);
 extern void call_lambda(svalue_t *lsvp, int num_arg);
 extern void free_interpreter_temporaries(void);
 extern void invalidate_apply_low_cache(void);
-extern void add_eval_cost(int num);
 extern void push_referenced_mapping(mapping_t *m);
 extern void m_indices_filter (svalue_t *key, svalue_t *data, void *extra);
 extern void m_values_filter (svalue_t *key, svalue_t *data, void *extra);

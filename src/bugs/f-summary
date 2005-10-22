@@ -204,3 +204,9 @@ f-000814: configure-with_portno should take a string
 Other
 --------------------------------------------------------------------------
 p-000630: Morgengrauen diffs
+
+Future
+--------------------------------------------------------------------------
+f-010615-0: Implementing ID# based svalues
+f-010615-1: Strong and weak links
+f-010615-2:Efficient vector implementation

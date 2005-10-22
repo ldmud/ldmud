@@ -15,4 +15,5 @@ HISTORY
 
 SEE ALSO
         db_conv_string(E), db_close(E), db_coldefs(E), db_connect(E),
-        db_exec(E), db_fetch(E), db_insert_id(E), db_handles(E), mysql(C)
+        db_exec(E), db_error(E), db_fetch(E), db_insert_id(E), db_handles(E),
+        mysql(C)

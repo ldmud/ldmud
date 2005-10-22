@@ -1,0 +1,13 @@
+Short: Implementing ID# based svalues
+From: Lars
+Date: 2001-06-15
+Type: Idea
+
+If identifying values by id#, an svalue could be extended to hold 
+either the id'ed and the real values:
+
+  T_OBJECT: the string by id
+  T_M_OBJECT: the object pointer itself
+
+During an execution, all id'd values are as needed transformed into 
+normal svalues. Afterwards, all changes can be made back into id's.

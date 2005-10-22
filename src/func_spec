@@ -585,6 +585,7 @@ string *db_coldefs(int);
 string  db_conv_string(string);
 int     db_close(int);
 int     db_connect(string, void|string, void|string);
+string  db_error(int);
 int     db_exec(int, string);
 mixed   db_fetch(int);
 int    *db_handles();

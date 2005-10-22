@@ -1,0 +1,9 @@
+Short: Strong and weak links
+From: Lars
+Date: 2001-06-15
+Type: Idea
+
+Distinguish between root-objects (never gc'ed) and non-root objects 
+(can be gc'ed when the strong link count falls to 0).
+
+Introduce weak object links?

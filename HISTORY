@@ -43,11 +43,13 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-13-Jun-2001 (Lars Duening) -- upcoming Release 3.2.9
+17-Jun-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + allocate(): Accepts an optional initialisation value and can
            create multi-dimensional arrays.
+       + clones(): If the driver is compiled with DYNAMIC_COSTS, the cost
+           is proportional to the number of objects in the game.
        + ctime(): Accepts the output of new efun utime() as well.
        + debug_info(): New argument DINFO_TRACE to return the current
             or the last error call stack.
@@ -104,7 +106,8 @@ For a detailed list of all changes see the file CHANGELOG.
 
     - New efuns:
        + db_affected_rows(), db_conv_string(), db_close(), db_connect(),
-         db_exec(), db_fetch(), db_handles(), db_coldefs(), db_insert_id():
+         db_exec(), db_fetch(), db_handles(), db_coldefs(), db_insert_id(),
+         db_error():
            Optional: mySQL support.
        + md5_encrypt(): Compute the MD5 message digest for a string.
        + min(), max(): To select the minimum resp. maximum among a bunch

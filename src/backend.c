@@ -283,6 +283,9 @@ cleanup_stuff (void)
  */
 
 {
+    /* Reset the VM to avoid dangling references to invalid objects */
+    clear_state();
+
     /* Replace programs */
     if (obj_list_replace)
     {
