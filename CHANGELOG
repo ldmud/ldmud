@@ -8,6 +8,8 @@ See the file HISTORY for a user-oriented summary of all the changes.
          if the size was given as MIN_INT: it would try to negate it
          to get the positive number, but fail and cause the formatting
          routines to crash under circumstances (reported by Menaures).
+    - (interpret.c) Additions, subtractions and multiplications now
+         check for numeric overflows.
 
 10-Dec-2001 (Lars Duening)  (3.3.137)
     - (interpret.c) gcc 2.91 on Linux/x86 generates buggy code for

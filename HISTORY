@@ -57,7 +57,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-05-Dec-2001 (Lars Duening) -- upcoming Release 3.2.9
+11-Dec-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -257,6 +257,8 @@ For a detailed list of all changes see the file CHANGELOG.
            the re-engineering of existing code easier.
        + It is possible to specify multiple pragmas in one '#pragma'
            directive, separated by comma.
+       + Additions, subtractions and multiplications now check for
+           numeric overflows.
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.
        + Bugfix: Right shift by 32 or more bits was computed incorrectly.

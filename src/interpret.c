@@ -8812,8 +8812,20 @@ again:
 
             case T_NUMBER:
               {
-                int i;
-                i = sp->u.number + (sp-1)->u.number;
+                p_int i;
+                p_int right = sp->u.number;
+                p_int left = (sp-1)->u.number;
+
+                if ((left >= 0 && right >= 0 && PINT_MAX - left < right)
+                 || (left < 0 && right < 0 && PINT_MIN - left > right)
+                   )
+                {
+                    ERRORF(("Numeric overflow: %ld + %ld\n"
+                           , (long)left, (long)right));
+                    /* NOTREACHED */
+                    break;
+                }
+                i = left + right;
                 sp--;
                 sp->u.number = i;
                 break;
@@ -8943,13 +8955,26 @@ again:
          *   mapping     - mapping            -> mapping
          */
 
-        int i;
+        p_int i;
 
         if ((sp-1)->type == T_NUMBER)
         {
             if (sp->type == T_NUMBER)
             {
-                i = (sp-1)->u.number - sp->u.number;
+                p_int left = (sp-1)->u.number;
+                p_int right = sp->u.number;
+
+                if ((left >= 0 && right < 0 && PINT_MAX + right < left)
+                 || (left < 0 && right >= 0 && PINT_MIN + right > left)
+                   )
+                {
+                    ERRORF(("Numeric overflow: %ld - %ld\n"
+                           , (long)left, (long)right));
+                    /* NOTREACHED */
+                    break;
+                }
+
+                i = left - right;
                 sp--;
                 sp->u.number = i;
                 break;
@@ -9054,14 +9079,53 @@ again:
          *   int         * array              -> array
          */
 
-        int i;
+        p_int i;
 
         switch ( sp[-1].type )
         {
         case T_NUMBER:
             if (sp->type == T_NUMBER)
             {
-                i = (sp-1)->u.number * sp->u.number;
+                p_int left = (sp-1)->u.number;
+                p_int right = sp->u.number;
+
+                if (left > 0 && right > 0)
+                {
+                    if ((left != 0 && PINT_MAX / left < right)
+                     || (right != 0 && PINT_MAX / right < left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld * %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+                else if (left < 0 && right < 0)
+                {
+                    if ((left != 0 && PINT_MAX / left > right)
+                     || (right != 0 && PINT_MAX / right > left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld * %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+                else if (left != 0 && right != 0)
+                {
+                    if ((left > 0 && PINT_MIN / left > right)
+                     || (right > 0 && PINT_MIN / right > left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld * %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+                i = left * right;
                 sp--;
                 sp->u.number = i;
                 break;
@@ -10282,6 +10346,19 @@ again:
         case T_NUMBER:  /* Add to a number */
             if (type2 == T_NUMBER)
             {
+                p_int left = argp->u.number;
+                p_int right = u2.number;
+
+                if ((left >= 0 && right >= 0 && PINT_MAX - left < right)
+                 || (left < 0 && right < 0 && PINT_MIN - left > right)
+                   )
+                {
+                    ERRORF(("Numeric overflow: %ld += %ld\n"
+                           , (long)left, (long)right));
+                    /* NOTREACHED */
+                    break;
+                }
+
                 if (instruction == F_VOID_ADD_EQ)
                 {
                     argp->u.number += u2.number;
@@ -10354,6 +10431,19 @@ again:
         case T_CHAR_LVALUE:  /* Add to a character in a string */
             if (type2 == T_NUMBER)
             {
+                p_int left = *argp->u.charp;
+                p_int right = u2.number;
+
+                if ((left >= 0 && right >= 0 && PINT_MAX - left < right)
+                 || (left < 0 && right < 0 && PINT_MIN - left > right)
+                   )
+                {
+                    ERRORF(("Numeric overflow: %ld += %ld\n"
+                           , (long)left, (long)right));
+                    /* NOTREACHED */
+                    break;
+                }
+
                 if (instruction == F_VOID_ADD_EQ)
                 {
                     *argp->u.charp += u2.number;
@@ -10499,6 +10589,21 @@ again:
                 OP_ARG_ERROR(2, TF_NUMBER, type2);
                 /* NOTREACHED */
             }
+            {
+                p_int left = argp->u.number;
+                p_int right = u2.number;
+
+                if ((left >= 0 && right < 0 && PINT_MAX + right < left)
+                 || (left < 0 && right >= 0 && PINT_MIN + right > left)
+                   )
+                {
+                    ERRORF(("Numeric overflow: %ld -= %ld\n"
+                           , (long)left, (long)right));
+                    /* NOTREACHED */
+                    break;
+                }
+            }
+
             sp--;
             sp->u.number = argp->u.number -= u2.number;
             break;
@@ -10509,6 +10614,22 @@ again:
                 OP_ARG_ERROR(2, TF_NUMBER, type2);
                 /* NOTREACHED */
             }
+
+            {
+                p_int left = *argp->u.charp;
+                p_int right = u2.number;
+
+                if ((left >= 0 && right < 0 && PINT_MAX + right < left)
+                 || (left < 0 && right >= 0 && PINT_MIN + right > left)
+                   )
+                {
+                    ERRORF(("Numeric overflow: %ld -= %ld\n"
+                           , (long)left, (long)right));
+                    /* NOTREACHED */
+                    break;
+                }
+            }
+
             sp--;
             sp->u.number = *argp->u.charp -= u2.number;
             break;
@@ -10670,6 +10791,47 @@ again:
                 OP_ARG_ERROR(2, TF_NUMBER, sp->type);
                 /* NOTREACHED */
             }
+            {
+                p_int left = argp->u.number;
+                p_int right = sp->u.number;
+
+                if (left > 0 && right > 0)
+                {
+                    if ((left != 0 && PINT_MAX / left < right)
+                     || (right != 0 && PINT_MAX / right < left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld *= %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+                else if (left < 0 && right < 0)
+                {
+                    if ((left != 0 && PINT_MAX / left > right)
+                     || (right != 0 && PINT_MAX / right > left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld *= %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+                else if (left != 0 && right != 0)
+                {
+                    if ((left > 0 && PINT_MIN / left > right)
+                     || (right > 0 && PINT_MIN / right > left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld *= %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+            }
             sp->u.number = argp->u.number *= sp->u.number;
             break;
         }
@@ -10681,6 +10843,47 @@ again:
             {
                 OP_ARG_ERROR(2, TF_NUMBER, sp->type);
                 /* NOTREACHED */
+            }
+            {
+                p_int left = *argp->u.charp;
+                p_int right = sp->u.number;
+
+                if (left > 0 && right > 0)
+                {
+                    if ((left != 0 && PINT_MAX / left < right)
+                     || (right != 0 && PINT_MAX / right < left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld *= %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+                else if (left < 0 && right < 0)
+                {
+                    if ((left != 0 && PINT_MAX / left > right)
+                     || (right != 0 && PINT_MAX / right > left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld *= %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
+                else if (left != 0 && right != 0)
+                {
+                    if ((left > 0 && PINT_MIN / left > right)
+                     || (right > 0 && PINT_MIN / right > left)
+                       )
+                    {
+                        ERRORF(("Numeric overflow: %ld *= %ld\n"
+                               , (long)left, (long)right));
+                        /* NOTREACHED */
+                        break;
+                    }
+                }
             }
             sp->u.number = *argp->u.charp *= sp->u.number;
             break;
