@@ -13,6 +13,7 @@ destructed.
 Swapping? Replace programs? Something else?
 
 3.2.9-dev.411/3.3.178 adds a trace of blueprint allocations/deallocations.
+3.2.9-dev.423/3.3.188 disables all blueprint code
 
 
 
@@ -1601,4 +1602,1299 @@ dem crash. lpmud.log sichern wir nicht.
 Was tun?
 
 Coogan.
+
+------------------------------------------------------------------------
+From     :   Markus Peter <warp@spin.de>
+Date     :   Wed Mar 27 13:28:31 2002
+
+hallo
+
+mal wieder ein crash (mittlerweile 3.3.186):
+Program terminated with signal 11, Segmentation fault.
+#0  0x080be5da in fatal (fmt=0x80e5040 <Address 0x80e5040 out of bounds>)
+    at simulate.c:523
+523             *((char*)0) = 0/a;
+(gdb) bt
+#0  0x080be5da in fatal (fmt=0x80e5040 <Address 0x80e5040 out of bounds>)
+    at simulate.c:523
+Cannot access memory at address 0x80be3f8
+(gdb) info local
+fmt = 0x80e5040 <Address 0x80e5040 out of bounds>
+va = 0xbfffe038
+ts = 0x8115748 "\002"
+in_fatal = 1
+
+        ----------- err.log ---------------
+2002.03.27 00:08:45 [xerq] Demon started
+2002.03.27 00:08:45 LDMud 3.3.186 (3-3.186)
+2002.03.27 00:08:45 Random seed: 0x3ca0ff7d
+DEBUG: new_object(0x82f14b8 'kernel/master') ref 2 flags 300
+DEBUG: new_object(0x82e6370 'kernel/lifecycle') ref 54 flags 300
+DEBUG: new_object(0x82f1b5c 'kernel/simul_efun') ref 157 flags 300
+Loading init file /etc/init_file
+Preloading: daemon/boot
+DEBUG: new_object(0x82f1884 'kernel/daemon') ref 21 flags 300
+DEBUG: new_object(0x82f1c00 'daemon/boot') ref 32 flags 300
+Preloading: kernel/login
+DEBUG: new_object(0x82f5fa4 'kernel/login') ref 10 flags 300
+Preloading: daemon/aliasd
+DEBUG: new_object(0x82f4a0c 'daemon/aliasd') ref 32 flags 300
+Preloading: daemon/sould
+DEBUG: new_object(0x82f61dc 'daemon/sould') ref 41 flags 300
+Preloading: daemon/strings
+DEBUG: new_object(0x82f67b8 'daemon/strings') ref 54 flags 300
+Preloading: daemon/parserd
+DEBUG: new_object(0x82fb324 'command/combat') ref 10 flags 300
+DEBUG: new_object(0x82fc320 'command/communication') ref 10 flags 300
+DEBUG: new_object(0x82f6894 'command/fs') ref 10 flags 300
+DEBUG: new_object(0x82fef78 'command/interaction') ref 10 flags 300
+DEBUG: new_object(0x83011ac 'command/intermud') ref 21 flags 300
+DEBUG: new_object(0x8301b70 'command/mail') ref 10 flags 300
+DEBUG: new_object(0x830323c 'command/misc') ref 21 flags 300
+DEBUG: new_object(0x8301a00 'command/move') ref 54 flags 300
+DEBUG: new_object(0x8308528 'command/objects') ref 54 flags 300
+DEBUG: new_object(0x830a094 'daemon/language') ref 157 flags 300
+DEBUG: new_object(0x830c87c 'command/report') ref 10 flags 300
+DEBUG: new_object(0x830c788 'command/score') ref 21 flags 300
+DEBUG: new_object(0x830e844 'command/sense') ref 10 flags 300
+DEBUG: new_object(0x830e790 'command/trade') ref 54 flags 300
+DEBUG: new_object(0x83146bc 'command/wiz') ref 24 flags 300
+DEBUG: new_object(0x831b3a8 'command/wizobj') ref 21 flags 300
+DEBUG: new_object(0x831c8f4 'dom/admin/lib/security') ref 10 flags 300
+DEBUG: new_object(0x831cb1c 'dom/admin/command/admin') ref 10 flags 300
+DEBUG: new_object(0x82faedc 'daemon/parserd') ref 545 flags 300
+Preloading: daemon/userd
+DEBUG: new_object(0x831cd34 'daemon/userd') ref 35 flags 300
+Preloading: daemon/saved
+DEBUG: new_object(0x831ca38 'daemon/saved') ref 21 flags 300
+Preloading: daemon/banishd
+DEBUG: new_object(0x831ce38 'daemon/banishd') ref 24 flags 300
+Preloading: daemon/channeld
+DEBUG: new_object(0x831cdd4 'std/modules/save') ref 10 flags 300
+DEBUG: new_object(0x831ce9c 'daemon/channeld') ref 42 flags 300
+Preloading: daemon/language
+Preloading: std/player
+DEBUG: new_object(0x831d210 'std/container/container') ref 10 flags 300
+DEBUG: new_object(0x831d594 'std/basic/property') ref 10 flags 300
+DEBUG: new_object(0x831d5f8 'std/basic/hooks') ref 10 flags 300
+DEBUG: new_object(0x831d65c 'std/base') ref 72 flags 300
+DEBUG: new_object(0x831d728 'std/basic/resistances') ref 10 flags 300
+DEBUG: new_object(0x8320f80 'std/living') ref 82 flags 300
+DEBUG: new_object(0x83266e4 'std/player') ref 69 flags 300
+Preloading: std/room
+DEBUG: new_object(0x831d78c 'std/object/fakeitems') ref 10 flags 300
+DEBUG: new_object(0x83268a0 'std/basic/add_object') ref 15 flags 300
+DEBUG: new_object(0x8327080 'dom/world/servers/room') ref 109 flags 700
+DEBUG: new_object(0x8326d44 'std/room') ref 326 flags 300
+Preloading: daemon/autodoc
+DEBUG: new_object(0x8327520 'daemon/autodoc') ref 21 flags 300
+Preloading: daemon/net
+DEBUG: new_object(0x832738c 'daemon/net') ref 47 flags 300
+Preloading: dom/world/servers/timed
+DEBUG: new_object(0x8328600 'daemon/cron') ref 48 flags 300
+DEBUG: new_object(0x8328228 'dom/world/servers/timed') ref 599 flags 300
+Preloading: dom/world/servers/map
+DEBUG: new_object(0x83290e8 'dom/world/servers/map') ref 56 flags 300
+Preloading: dom/world/servers/bankd
+DEBUG: new_object(0x8329084 'dom/world/servers/bankd') ref 46 flags 300
+2002.03.27 00:08:45 LDMud ready for users.
+2002.03.27 00:08:49 [xerq] command: open_tcp
+2002.03.27 00:08:49 [xerq] command: listen
+2002.03.27 00:08:49 [xerq] command: send
+2002.03.27 00:08:58 [xerq] command: send
+2002.03.27 00:09:11 [xerq] command: rlookup
+DEBUG: new_object(0x8331f8c 'daemon/socketd') ref 37 flags 300
+DEBUG: new_object(0x8333f50 'daemon/erqd') ref 29 flags 300
+DEBUG: new_object(0x83363f4 'daemon/intermud3/services') ref 312 flags 300
+DEBUG: new_object(0x8335050 'daemon/intermud3/i3d') ref 93 flags 700
+DEBUG: (simulate.c:2621) free_object(0x832738c 'daemon/net') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82c3cb0 'daemon/net.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x82f1c00 'daemon/boot') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x81af854 'daemon/boot.c') ref 0
+DEBUG: new_object(0x82f1c00 'daemon/intermud0/inetd') ref 61 flags 300
+DEBUG: new_object(0x832738c 'daemon/intermud0/incoming/ping') ref 10 flags 300
+DEBUG: new_object(0x83b0298 'daemon/intermud0/incoming/reply') ref 10 flags 300
+DEBUG: new_object(0x83af8d4 'kernel/inet') ref 10 flags 300
+DEBUG: new_object(0x83b581c 'daemon/boot') ref 32 flags 300
+DEBUG: new_object(0x83b5880 'dom/admin/servers/wizards') ref 65 flags 300
+DEBUG: new_object(0x83b59a0 'kernel/player_dummy') ref 10 flags 300
+DEBUG: new_object(0x83b5bfc 'std/object/material') ref 15 flags 300
+DEBUG: new_object(0x83b5c60 'std/object') ref 87 flags 300
+DEBUG: new_object(0x83b5e34 'std/disease') ref 116 flags 300
+DEBUG: new_object(0x83b5e98 'std/disease/flu') ref 122 flags 300
+DEBUG: new_object(0x83b60e8 'daemon/skilld') ref 1348 flags 300
+DEBUG: new_object(0x83b6644 'daemon/termcap') ref 427 flags 300
+DEBUG: new_object(0x83b7fc0 'daemon/genermsgd') ref 21 flags 300
+DEBUG: new_object(0x83b8358 'daemon/files') ref 10 flags 300
+DEBUG: new_object(0x83b852c 'std/sublocation') ref 233 flags 300
+DEBUG: new_object(0x83b8740 'std/chair') ref 146 flags 300
+DEBUG: new_object(0x83b87a4 'home/warpi/obj/sofa') ref 189 flags 300
+DEBUG: new_object(0x83b7514 'home/warpi/workroom') ref 89 flags 300
+DEBUG: new_object(0x83b8978 'std/basic/proxy') ref 10 flags 300
+DEBUG: new_object(0x83b89dc 'std/money') ref 93 flags 300
+DEBUG: new_object(0x83b91a0 'daemon/mail') ref 21 flags 300
+DEBUG: new_object(0x83b9204 'daemon/mail/mailbox') ref 15 flags 300
+DEBUG: (object.c:940) free_prog(0x82e06c4 'home/warpi/workroom.c') ref 0
+DEBUG: (object.c:940) free_prog(0x82e06c4 'home/warpi/workroom.c') ref 0 : blueprint (0x83b7514 'home/warpi/workroom') ref 3, flags 1200
+DEBUG: new_object(0x83b5754 'std/basic/mcp') ref 69 flags 300
+DEBUG: new_object(0x837fc5c 'daemon/mcp') ref 24 flags 300
+DEBUG: new_object(0x837a1e8 'daemon/boot') ref 32 flags 300
+DEBUG: (simulate.c:2621) free_object(0x837a1e8 'daemon/boot') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x833aad4 'daemon/boot.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83b581c 'daemon/boot') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82d89ec 'daemon/boot.c') ref 0
+DEBUG: new_object(0x83bb994 'std/modules/nutrition_effect') ref 18 flags 300
+DEBUG: new_object(0x83bba78 'std/modules/drinkable') ref 24 flags 300
+DEBUG: new_object(0x83bbb9c 'std/liquid') ref 153 flags 300
+DEBUG: new_object(0x83bbc50 'std/liquid/beer') ref 159 flags 300
+DEBUG: new_object(0x83bbfbc 'std/pen') ref 117 flags 300
+DEBUG: new_object(0x83bc114 'std/modules/writeable') ref 10 flags 300
+DEBUG: new_object(0x83bc1b8 'std/paper') ref 160 flags 300
+DEBUG: new_object(0x83bccd0 'std/container') ref 87 flags 300
+DEBUG: new_object(0x83bcd64 'std/liquid_container') ref 152 flags 700
+DEBUG: new_object(0x83bce2c 'home/antihec/obj/starkbeer') ref 159 flags 300
+DEBUG: new_object(0x83bcef4 'home/firebat/liquid/alcohol') ref 159 flags 300
+DEBUG: new_object(0x83bd00c 'std/modules/usable') ref 10 flags 300
+DEBUG: new_object(0x83bd070 'home/firebat/obj/saltcellar') ref 93 flags 300
+DEBUG: (swap.c:689) free_prog(0x82cc3dc 'daemon/autodoc.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82c0808 'dom/admin/command/admin.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82c1008 'command/wizobj.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82c4010 'command/wiz.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82bcef4 'command/trade.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82bb64c 'command/score.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81a825c 'command/report.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82bd650 'command/objects.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81a6a94 'command/move.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82ba5f0 'command/misc.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81acbbc 'command/mail.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81ed82c 'command/intermud.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82b8dec 'command/fs.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81aa944 'command/combat.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81efa60 'daemon/erqd.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82dba1c 'daemon/intermud0/incoming/reply.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x835055c 'command/fs.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82b85f4 'command/interaction.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834e67c 'command/move.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x833ca1c 'daemon/mail/mailbox.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82e0e7c 'daemon/mail.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82d1e48 'daemon/skilld.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82c85a4 'kernel/player_dummy.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82c053c 'kernel/inet.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82d0b3c 'dom/world/servers/bankd.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81ea934 'dom/world/servers/map.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82d0394 'daemon/cron.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82cf8ac 'dom/world/servers/timed.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82cbdac 'dom/world/servers/room.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81ef608 'daemon/banishd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d1e48 'command/trade.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82bbdb4 'command/sense.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82b5b78 'command/communication.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81a8aa4 'kernel/login.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x8338bbc 'daemon/genermsgd.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81ee898 'daemon/language.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82b2d9c 'daemon/parserd.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81e98f8 'daemon/strings.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81aae48 'daemon/sould.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81a9694 'daemon/aliasd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aae48 'dom/world/servers/timed.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82e0e7c 'dom/world/servers/map.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81a8aa4 'command/communication.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834ba88 'command/combat.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'command/sense.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ea878 'dom/admin/command/admin.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'daemon/genermsgd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82bd650 'command/objects.c') ref 0
+]Done.
+2002.03.27 00:48:19 daemon/intermud0/inetd.c: Illegal to redeclare local name line 88 
+2002.03.27 00:48:19 daemon/intermud0/inetd.c: Bad assignment ( string vs string *) line 90 
+2002.03.27 00:48:19 daemon/intermud0/inetd.c: Variable name not declared ! line 98 
+2002.03.27 00:48:19 daemon/intermud0/inetd.c: Bad arg 1 type to lower_case(): got int, expected string; line 98 
+2002.03.27 00:48:19 daemon/intermud0/inetd.c: Variable name not declared ! line 99 
+2002.03.27 00:48:19 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107 
+2002.03.27 00:48:19 Error in loading object: 'daemon/intermud0/inetd'.
+2002.03.27 00:48:47 daemon/intermud0/inetd.c: Illegal to redeclare local name line 88 
+2002.03.27 00:48:47 daemon/intermud0/inetd.c: Bad assignment ( string vs string *) line 90 
+2002.03.27 00:48:47 daemon/intermud0/inetd.c: Variable name not declared ! line 98 
+2002.03.27 00:48:47 daemon/intermud0/inetd.c: Bad arg 1 type to lower_case(): got int, expected string; line 98 
+2002.03.27 00:48:47 daemon/intermud0/inetd.c: Variable name not declared ! line 99 
+2002.03.27 00:48:47 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107 
+2002.03.27 00:48:47 Error in loading object: 'daemon/intermud0/inetd'.
+2002.03.27 00:48:48 daemon/intermud0/inetd.c: Illegal to redeclare local name line 88 
+2002.03.27 00:48:48 daemon/intermud0/inetd.c: Bad assignment ( string vs string *) line 90 
+2002.03.27 00:48:48 daemon/intermud0/inetd.c: Variable name not declared ! line 98 
+2002.03.27 00:48:48 daemon/intermud0/inetd.c: Bad arg 1 type to lower_case(): got int, expected string; line 98 
+2002.03.27 00:48:48 daemon/intermud0/inetd.c: Variable name not declared ! line 99 
+2002.03.27 00:48:48 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107 
+2002.03.27 00:48:48 Error in loading object: 'daemon/intermud0/inetd'.
+2002.03.27 00:49:12 daemon/intermud0/inetd.c: Bad assignment ( string vs string *) line 90 
+2002.03.27 00:49:12 daemon/intermud0/inetd.c: Variable name not declared ! line 98 
+2002.03.27 00:49:12 daemon/intermud0/inetd.c: Bad arg 1 type to lower_case(): got int, expected string; line 98 
+2002.03.27 00:49:12 daemon/intermud0/inetd.c: Variable name not declared ! line 99 
+2002.03.27 00:49:12 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107 
+2002.03.27 00:49:12 daemon/intermud0/inetd.c: Bad arg 1 type to explode(): got int, expected string; line 108 
+2002.03.27 00:49:12 Error in loading object: 'daemon/intermud0/inetd'.
+2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable name not declared ! line 98 
+2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable name not declared ! line 99 
+2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107 
+2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 109 
+2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 109 
+2002.03.27 00:49:32 daemon/intermud0/inetd.c: Variable name not declared ! line 117 
+2002.03.27 00:49:32 Error in loading object: 'daemon/intermud0/inetd'.
+2002.03.27 00:49:44 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 107 
+2002.03.27 00:49:44 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 109 
+2002.03.27 00:49:44 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 109 
+2002.03.27 00:49:44 daemon/intermud0/inetd.c: Variable local_cmds not declared ! line 121 
+2002.03.27 00:49:44 Error in loading object: 'daemon/intermud0/inetd'.
+DEBUG: (swap.c:669) free_prog(0x81ea878 'daemon/mail.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81a9bf4 'kernel/player_dummy.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81a6a94 'command/mail.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82bce50 'dom/world/servers/bankd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81a6a94 'command/score.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833ca1c 'daemon/banishd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82bce50 'daemon/skilld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834ba88 'command/report.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8339e24 'command/intermud.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ee7f4 'command/wizobj.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81a6a94 'daemon/cron.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ea878 'dom/world/servers/room.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82db990 'daemon/intermud0/incoming/reply.c') ref 0
+DEBUG: new_object(0x83b581c 'daemon/intermud') ref 21 flags 300
+DEBUG: new_object(0x83a94b0 'daemon/man') ref 21 flags 300
+DEBUG: new_object(0x837a1e8 'daemon/getopt') ref 10 flags 300
+DEBUG: new_object(0x83bb670 'daemon/intermud0/inetd') ref 882 flags 300
+DEBUG: (simulate.c:2621) free_object(0x82f1c00 'daemon/intermud0/inetd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82de228 'daemon/intermud0/inetd.c') ref 0
+DEBUG: new_object(0x82f1c00 'kernel/wiztool') ref 21 flags 300
+DEBUG: new_object(0x839986c 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: new_object(0x83b57b8 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x839986c 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82db990 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: new_object(0x839986c 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x83b57b8 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x834ba88 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: new_object(0x83b57b8 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x839986c 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82db990 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83b57b8 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x834ba88 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: new_object(0x83b57b8 'daemon/intermud0/inetd') ref 3736 flags 300
+DEBUG: (swap.c:669) free_prog(0x81acb30 'command/interaction.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aae48 'daemon/language.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8352cbc 'daemon/sould.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'daemon/genermsgd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834cdd0 'command/misc.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83bb670 'daemon/intermud0/inetd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82b8d64 'daemon/intermud0/inetd.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83b57b8 'daemon/intermud0/inetd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x834872c 'daemon/intermud0/inetd.c') ref 0
+DEBUG: new_object(0x83b57b8 'daemon/intermud0/inetd') ref 3714 flags 300
+DEBUG: new_object(0x84c7768 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2517) free_object(0x84c7768 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8353be4 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: new_object(0x84c7768 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2517) free_object(0x84c7768 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8353be4 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: new_object(0x84c7768 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x84c7768 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8353be4 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: new_object(0x84c7768 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x84c7768 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x83392cc 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: new_object(0x84c7768 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: new_object(0x84d9144 'daemon/intermud0/incoming/query') ref 10 flags 300
+2002.03.27 00:51:46 Caught error: Too deep recursion.
+2002.03.27 00:51:46 ... execution continues.
+2002.03.27 00:51:46 Caught error: Too deep recursion.
+2002.03.27 00:51:46 ... execution continues.
+DEBUG: (simulate.c:2621) free_object(0x84c7768 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x83392cc 'home/warpi/.tool.cmd.c') ref 0
+2002.03.27 00:51:58 Caught error: Too deep recursion.
+2002.03.27 00:51:58 ... execution continues.
+2002.03.27 00:52:10 Caught error: Too deep recursion.
+2002.03.27 00:52:10 ... execution continues.
+2002.03.27 00:52:10 Caught error: Too deep recursion.
+2002.03.27 00:52:10 ... execution continues.
+DEBUG: new_object(0x873fee0 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x873fee0 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x83392cc 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81ea878 'daemon/intermud.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8339e24 'command/intermud.c') ref 0
+DEBUG: new_object(0x84cb950 'daemon/intermud0/inetd') ref 3190 flags 300
+DEBUG: (simulate.c:2621) free_object(0x83b57b8 'daemon/intermud0/inetd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82be658 'daemon/intermud0/inetd.c') ref 0
+DEBUG: new_object(0x83b57b8 'daemon/intermud0/incoming/channel') ref 10 flags 300
+DEBUG: new_object(0x873ece0 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: new_object(0x873ec7c 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x873ece0 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8353be4 'home/warpi/.tool.cmd.c') ref 0
+2002.03.27 00:57:59 [xerq] command: send
+2002.03.27 00:57:59 [xerq] command: send
+DEBUG: new_object(0x873eaf8 'daemon/channeld/err_chan') ref 10 flags 300
+2002.03.27 00:55:06 Error in master_ob->receive_udp()
+DEBUG: (simulate.c:2621) free_object(0x873ec7c 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82bc45c 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x8354d64 'daemon/man.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82c3f5c 'command/wiz.c') ref 0
+DEBUG: new_object(0x873ece0 'daemon/intermud0/inetd') ref 3190 flags 300
+DEBUG: (simulate.c:2621) free_object(0x84cb950 'daemon/intermud0/inetd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8374018 'daemon/intermud0/inetd.c') ref 0
+DEBUG: new_object(0x874fc54 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2517) free_object(0x874fc54 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8353be4 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: new_object(0x874fc54 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2517) free_object(0x874fc54 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8353be4 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: new_object(0x874fc54 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x874fc54 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8353be4 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: new_object(0x874fc54 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x874fc54 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8353be4 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ea7e8 'daemon/intermud.c') ref 0
+DEBUG: new_object(0x873d8b8 'daemon/intermud0/inetd') ref 3190 flags 300
+DEBUG: (simulate.c:2621) free_object(0x873ece0 'daemon/intermud0/inetd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82b8d64 'daemon/intermud0/inetd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aca5c 'daemon/man.c') ref 0
+DEBUG: new_object(0x874b054 'daemon/intermud0/incoming/who') ref 10 flags 300
+DEBUG: (swap.c:669) free_prog(0x8352cbc 'daemon/sould.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81ab64c 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ab4c8 'dom/admin/command/admin.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82de4ec 'command/trade.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'command/score.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82bfc10 'command/report.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82b8d64 'command/objects.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'command/move.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'command/mail.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82bfc10 'command/combat.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82bfc10 'daemon/erqd.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x8320f80 'std/living') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x8327520 'daemon/autodoc') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x834ae78 'daemon/autodoc.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83b5e34 'std/disease') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x83b5e98 'std/disease/flu') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x83b852c 'std/sublocation') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x83b8740 'std/chair') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x83b87a4 'home/warpi/obj/sofa') ref 0 flags 210
+DEBUG: (swap.c:689) free_prog(0x83477a8 'daemon/channeld/err_chan.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82c8508 'kernel/wiztool.c') ref 0
+DEBUG: new_object(0x874ac54 'daemon/intermud0/inetd') ref 3070 flags 300
+DEBUG: (simulate.c:2621) free_object(0x873d8b8 'daemon/intermud0/inetd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82be654 'daemon/intermud0/inetd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834ae78 'kernel/login.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'daemon/skilld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82bd124 'kernel/player_dummy.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833a8e8 'kernel/inet.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'dom/world/servers/bankd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'dom/world/servers/map.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'dom/world/servers/room.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'daemon/banishd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'command/sense.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83b91a0 'daemon/mail') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x81ab4c8 'daemon/mail.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83b9204 'daemon/mail/mailbox') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82de4ec 'daemon/mail/mailbox.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83bc1b8 'std/paper') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x83bccd0 'std/container') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x83bcd64 'std/liquid_container') ref 0 flags 610
+DEBUG: (simulate.c:2621) free_object(0x83bce2c 'home/antihec/obj/starkbeer') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x83bcef4 'home/firebat/liquid/alcohol') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x83bd070 'home/firebat/obj/saltcellar') ref 0 flags 210
+DEBUG: (swap.c:669) free_prog(0x8349384 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: new_object(0x83bd070 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2517) free_object(0x83bd070 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8353be4 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d0f64 'daemon/channeld/err_chan.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x83497ac 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8339e24 'command/intermud.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ea7e8 'daemon/intermud.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81aca5c 'daemon/intermud0/incoming/who.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833cbe4 'daemon/intermud0/incoming/who.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82cfe54 'command/communication.c') ref 0
+DEBUG: new_object(0x83bd070 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x83bd070 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x83392cc 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: new_object(0x83bcef4 'daemon/channeld/wiz_only') ref 10 flags 300
+DEBUG: (swap.c:669) free_prog(0x82b56f4 'command/fs.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81aa854 'daemon/getopt.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82db264 'daemon/intermud0/incoming/reply.c') ref 0
+DEBUG: new_object(0x83b9310 'daemon/autodoc') ref 21 flags 300
+DEBUG: (swap.c:669) free_prog(0x82b8d64 'command/interaction.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83b9310 'daemon/autodoc') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82b9d6c 'daemon/autodoc.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x8355d6c 'home/firebat/obj/saltcellar.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x834be80 'home/firebat/liquid/alcohol.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x834a70c 'home/antihec/obj/starkbeer.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x834f568 'std/liquid_container.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x8352694 'std/paper.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8355b58 'home/antihec/obj/starkbeer.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8339e24 'dom/world/servers/map.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ab4c8 'dom/world/servers/room.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81e88f0 'command/sense.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82c8508 'kernel/wiztool.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x8339558 'daemon/files.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ee7f4 'command/wizobj.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81e88f0 'daemon/man.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82c39e4 'command/wiz.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'command/intermud.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ea7e8 'daemon/intermud.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82c87b0 'daemon/channeld/wiz_only.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83487a4 'command/communication.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82b2d9c 'daemon/parserd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ed82c 'daemon/strings.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8352cbc 'daemon/sould.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82b84fc 'daemon/aliasd.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x833ae2c 'home/warpi/obj/sofa.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834ae78 'daemon/genermsgd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834cdd0 'daemon/language.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8350c24 'command/misc.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81a969c 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82de4ec 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834a70c 'home/firebat/obj/saltcellar.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834bd5c 'home/firebat/liquid/alcohol.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8355b58 'home/antihec/obj/starkbeer.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834f4d8 'std/liquid_container.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81a8aa4 'std/paper.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82c2638 'daemon/saved.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82db0bc 'daemon/channeld/wiz_only.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x873eaf8 'daemon/channeld/err_chan') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82df594 'daemon/channeld/err_chan.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x874b054 'daemon/intermud0/incoming/who') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x833cbe4 'daemon/intermud0/incoming/who.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834bd5c 'home/firebat/obj/saltcellar.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ea7e8 'home/firebat/liquid/alcohol.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82c2638 'home/antihec/obj/starkbeer.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833ad54 'std/liquid_container.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ab4c8 'std/paper.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ed82c 'daemon/saved.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82de4ec 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'command/fs.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82c8508 'daemon/getopt.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83b0298 'daemon/intermud0/incoming/reply') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8347518 'daemon/intermud0/incoming/reply.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aa854 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82c2e84 'daemon/channeld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834bd5c 'home/firebat/obj/saltcellar.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ea7e8 'home/firebat/liquid/alcohol.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82c2638 'home/antihec/obj/starkbeer.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833ad54 'std/liquid_container.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ab4c8 'std/paper.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8355b58 'daemon/saved.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aca5c 'kernel/wiztool.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81e88f0 'daemon/files.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ee7f4 'command/wizobj.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833ad54 'std/liquid_container.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8355b58 'command/intermud.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82db264 'daemon/intermud.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834cdd0 'command/misc.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8352694 'command/communication.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83755b8 'daemon/parserd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8355b58 'daemon/strings.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82ccf30 'daemon/sould.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ea7e8 'daemon/aliasd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ed82c 'daemon/genermsgd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82ccf30 'daemon/language.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83bcef4 'daemon/channeld/wiz_only') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82db0bc 'daemon/channeld/wiz_only.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834bd5c 'home/firebat/liquid/alcohol.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834bd5c 'home/firebat/obj/saltcellar.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8355b58 'home/firebat/liquid/alcohol.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81e88f0 'home/antihec/obj/starkbeer.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833ad54 'std/liquid_container.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ab4c8 'std/paper.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82b83f0 'daemon/saved.c') ref 0
+DEBUG: new_object(0x83bd070 'std/sublocation') ref 233 flags 300
+DEBUG: new_object(0x83bcef4 'std/chair') ref 146 flags 300
+DEBUG: new_object(0x83b0298 'home/warpi/obj/sofa') ref 189 flags 300
+DEBUG: new_object(0x838a5d4 'daemon/fingerd') ref 21 flags 300
+DEBUG: (object.c:272) free_prog(0x81ea7e8 'home/warpi/obj/sofa.c') ref 0
+DEBUG: (object.c:582) free_prog(0x82dcd60 'std/chair.c') ref 0
+DEBUG: (object.c:582) free_prog(0x833b62c 'std/sublocation.c') ref 0
+DEBUG: (object.c:272) free_prog(0x82e2774 'std/disease/flu.c') ref 0
+DEBUG: (object.c:582) free_prog(0x82e16c8 'std/disease.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aa854 'daemon/channeld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82b83f0 'daemon/saved.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x84d9144 'daemon/intermud0/incoming/query') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82e26e8 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: new_object(0x84d9144 'daemon/autodoc') ref 21 flags 300
+DEBUG: (swap.c:689) free_prog(0x82e06c4 'daemon/mcp.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8354b08 'daemon/files.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82d1660 'daemon/fingerd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82ccf30 'daemon/language.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83487a4 'command/communication.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83755b8 'daemon/parserd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ed82c 'daemon/strings.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'daemon/aliasd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834bd5c 'home/firebat/obj/saltcellar.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8355b58 'home/firebat/liquid/alcohol.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81e88f0 'home/antihec/obj/starkbeer.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833ad54 'std/liquid_container.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ab4c8 'std/paper.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82dda0c 'daemon/termcap.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82b7188 'dom/admin/servers/wizards.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81e926c 'dom/world/servers/bankd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82de4ec 'daemon/banishd.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x84d9144 'daemon/autodoc') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82b8d64 'daemon/autodoc.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82d8cc0 'daemon/intermud3/services.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82d7804 'daemon/intermud3/i3d.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82d28a8 'daemon/socketd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d28a8 'daemon/language.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82dcd60 'std/liquid_container.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ed82c 'daemon/strings.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ed82c 'daemon/fingerd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82c8508 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8352694 'daemon/channeld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d8bb8 'daemon/intermud3/services.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833d6b8 'daemon/intermud3/i3d.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d28a8 'daemon/socketd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aca5c 'daemon/saved.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834bd5c 'daemon/mcp.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834bd5c 'home/firebat/obj/saltcellar.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'home/firebat/liquid/alcohol.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'home/antihec/obj/starkbeer.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82dcc84 'std/liquid_container.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'std/paper.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8342002.03.27 03:54:14 [xerq] command: send
+2002.03.27 04:49:19 [xerq] command: rlookup
+bd5c 'daemon/termcap.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x835055c 'dom/admin/servers/wizards.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82cfe54 'daemon/intermud3/services.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ed82c 'daemon/intermud3/i3d.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d28a8 'daemon/socketd.c') ref 0
+DEBUG: new_object(0x83b9310 'std/sublocation') ref 233 flags 300
+DEBUG: new_object(0x83b73b0 'std/chair') ref 146 flags 300
+DEBUG: new_object(0x830190c 'home/warpi/obj/sofa') ref 189 flags 300
+DEBUG: (simulate.c:2621) free_object(0x838a5d4 'daemon/fingerd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8352694 'daemon/fingerd.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83bd070 'std/sublocation') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x83bcef4 'std/chair') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x83b0298 'home/warpi/obj/sofa') ref 0 flags 210
+DEBUG: (swap.c:669) free_prog(0x82dd82c 'daemon/files.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aca5c 'daemon/strings.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82c8508 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: new_object(0x83bce2c 'daemon/intermud0/incoming/query') ref 10 flags 300
+DEBUG: new_object(0x83bcef4 'daemon/autodoc') ref 21 flags 300
+DEBUG: (simulate.c:2621) free_object(0x83bcef4 'daemon/autodoc') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x834ccf4 'daemon/autodoc.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81e926c 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: new_object(0x83bd070 'kernel/http') ref 10 flags 300
+DEBUG: (swap.c:669) free_prog(0x82c8508 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x833cef4 'std/basic/mcp.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834d8d4 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83b9310 'std/sublocation') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x83b73b0 'std/chair') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x830190c 'home/warpi/obj/sofa') ref 0 flags 210
+DEBUG: (swap.c:669) free_prog(0x81aca5c 'daemon/termcap.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82df594 'kernel/inet.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82b83f0 'daemon/saved.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81e88f0 'daemon/strings.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833d6b8 'daemon/genermsgd.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81ea7e8 'home/warpi/obj/sofa.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8355b58 'dom/admin/servers/wizards.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81e926c 'dom/world/servers/bankd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ea7e8 'home/warpi/obj/sofa.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82c8508 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82cfe54 'daemon/intermud3/services.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8354b08 'daemon/intermud3/i3d.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d28a8 'daemon/socketd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338ac8 'daemon/channeld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833cbe4 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82cfe54 'daemon/intermud3/services.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833d468 'daemon/intermud3/i3d.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d28a8 'daemon/socketd.c') ref 0
+DEBUG: new_object(0x83b73b0 'daemon/autodoc') ref 21 flags 300
+DEBUG: (simulate.c:2621) free_object(0x83b73b0 'daemon/autodoc') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8348fa8 'daemon/autodoc.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82c8508 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ea7e8 'daemon/channeld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833cbe4 'daemon/intermud3/services.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ed82c 'daemon/intermud3/i3d.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8347058 'daemon/socketd.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83bce2c 'daemon/intermud0/incoming/query') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x81ea7e8 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: new_o2002.03.27 08:10:45 [xerq] command: send
+2002.03.27 08:33:18 [xerq] command: send
+2002.03.27 08:33:18 [xerq] command: send
+2002.03.27 08:33:39 [xerq] command: send
+2002.03.27 08:33:39 [xerq] command: send
+bject(0x83b5efc 'daemon/intermud0/incoming/query') ref 10 flags 300
+DEBUG: (swap.c:689) free_prog(0x82cd734 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82e06c4 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833cbe4 'daemon/intermud3/services.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8354b08 'daemon/intermud3/i3d.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8350c24 'daemon/socketd.c') ref 0
+2002.03.27 07:17:49 Caught error: Too deep recursion.
+2002.03.27 07:17:49 ... execution continues.
+DEBUG: (swap.c:669) free_prog(0x82c8508 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: new_object(0x83b8e84 'daemon/autodoc') ref 21 flags 300
+DEBUG: (swap.c:669) free_prog(0x82e06c4 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833cbe4 'daemon/intermud3/services.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8347058 'daemon/intermud3/i3d.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82ccf30 'daemon/socketd.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83b8e84 'daemon/autodoc') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x83487a4 'daemon/autodoc.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ed82c 'daemon/channeld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82c8508 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833cbe4 'daemon/intermud3/services.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8347058 'daemon/intermud3/i3d.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82ccf30 'daemon/socketd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82e06c4 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81e88f0 'daemon/strings.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833cbe4 'daemon/intermud3/services.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8347058 'daemon/intermud3/i3d.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d28a8 'daemon/socketd.c') ref 0
+DEBUG: new_object(0x83b73b0 'daemon/mail') ref 21 flags 300
+DEBUG: new_object(0x83b8808 'daemon/mail/mailbox') ref 15 flags 300
+DEBUG: new_object(0x874c8d4 'daemon/fingerd') ref 21 flags 300
+DEBUG: (object.c:272) free_prog(0x8352694 'home/firebat/obj/saltcellar.c') ref 0
+DEBUG: (object.c:272) free_prog(0x82dd82c 'home/firebat/liquid/alcohol.c') ref 0
+DEBUG: (object.c:272) free_prog(0x82de1a0 'home/antihec/obj/starkbeer.c') ref 0
+DEBUG: (object.c:272) free_prog(0x82d765c 'std/liquid_container.c') ref 0
+DEBUG: (object.c:582) free_prog(0x8353dec 'std/container.c') ref 0
+DEBUG: (object.c:272) free_prog(0x82e16c8 'std/paper.c') ref 0
+DEBUG: (object.c:272) free_prog(0x83392cc 'home/warpi/obj/sofa.c') ref 0
+DEBUG: (object.c:582) free_prog(0x8352e98 'std/chair.c') ref 0
+DEBUG: (object.c:582) free_prog(0x8339acc 'std/sublocation.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x834ee80 'std/modules/usable.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x8352360 'std/modules/writeable.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x8351d68 'std/pen.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x834c66c 'std/liquid/beer.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82c8508 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: new_object(0x874c7d4 'std/sublocation') ref 233 flags 300
+DEBUG: new_object(0x83b8e84 'std/chair') ref 146 flags 300
+DEBUG: new_object(0x8389b70 'home/warpi/obj/sofa') ref 189 flags 300
+DEBUG: (object.c:272) free_prog(0x8338ac8 'home/warpi/obj/sofa.c') ref 0
+DEBUG: (object.c:582) free_prog(0x834f3f8 'std/chair.c') ref 0
+DEBUG: (object.c:582) free_prog(0x82dcc84 'std/sublocation.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82ccf30 'kernel/login.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82df594 'kernel/inet.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x81ef7fc 'daemon/mail/mailbox.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82d1660 'daemon/mail.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82e25dc 'daemon/channeld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82b83f0 'daemon/saved.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ed82c 'command/sense.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834bd5c 'daemon/skilld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82bd124 'kernel/player_dummy.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81a2002.03.27 08:51:13 [xerq] command: rlookup
+2002.03.27 09:30:36 [xerq] command: rlookup
+2002.03.27 09:34:03 comm: write EWOULDBLOCK. Message discarded.
+2002.03.27 09:34:06 comm: write EWOULDBLOCK. Message discarded.
+2002.03.27 09:37:25 comm: write EWOULDBLOCK. Message discarded.
+2002.03.27 09:37:28 comm: write EWOULDBLOCK. Message discarded.
+2002.03.27 09:38:25 comm: write EWOULDBLOCK. Message discarded.
+2002.03.27 09:38:28 comm: write EWOULDBLOCK. Message discarded.
+2002.03.27 09:43:15 comm: write EWOULDBLOCK. Message discarded.
+2002.03.27 09:43:20 comm: write EWOULDBLOCK. Message discarded.
+2002.03.27 09:44:31 [xerq] command: rlookup
+2002.03.27 09:44:44 comm: write EWOULDBLOCK. Message discarded.
+2002.03.27 09:44:48 comm: write EWOULDBLOCK. Message discarded.
+2002.03.27 09:45:00 comm: write EWOULDBLOCK. Message discarded.
+2002.03.27 09:45:04 comm: write EWOULDBLOCK. Message discarded.
+2002.03.27 09:45:16 comm: write EWOULDBLOCK. Message discarded.
+a854 'dom/world/servers/map.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8354b08 'dom/world/servers/room.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81e88f0 'daemon/banishd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833ad54 'daemon/language.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83487a4 'command/communication.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aad90 'dom/world/servers/bankd.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x83755b8 'daemon/fingerd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834c260 'command/intermud.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81a92c0 'daemon/strings.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82e16c8 'daemon/intermud.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82e16c8 'daemon/mail.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834a594 'command/misc.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d8bb8 'daemon/parserd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ab294 'daemon/aliasd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81a92c0 'daemon/strings.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82de1a0 'daemon/fingerd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833cbe4 'daemon/intermud3/services.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8351d68 'daemon/intermud3/i3d.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ee7f4 'daemon/socketd.c') ref 0
+DEBUG: new_object(0x84d9144 'daemon/autodoc') ref 21 flags 300
+DEBUG: (simulate.c:2621) free_object(0x84d9144 'daemon/autodoc') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x834a444 'daemon/autodoc.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8353cf0 'daemon/saved.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83b5efc 'daemon/intermud0/incoming/query') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x834ed6c 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834bd5c 'kernel/login.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82cdbe0 'kernel/inet.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82bd650 'command/wiz.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82e25dc 'daemon/channeld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82c8508 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8351d68 'daemon/language.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8339c30 'daemon/genermsgd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ea7e8 'command/interaction.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aa854 'daemon/sould.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8353cf0 'daemon/saved.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ea2e8 'daemon/language.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833ad54 'command/misc.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d8bb8 'daemon/parserd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81a92c0 'daemon/aliasd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81a8aa4 'daemon/files.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8347058 'daemon/termcap.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82e06c4 'dom/admin/servers/wizards.c') ref 0
+DEBUG: new_object(0x83b9268 'daemon/intermud0/incoming/query') ref 10 flags 300
+DEBUG: new_object(0x874b054 'std/basic/cgi') ref 54 flags 300
+DEBUG: new_object(0x83bd0d4 'dom/web/docs/index') ref 54 flags 300
+DEBUG: new_object(0x873d8b8 'dom/web/docs/man') ref 54 flags 300
+DEBUG: (simulate.c:2621) free_object(0x83b73b0 'daemon/mail') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82dddcc 'daemon/mail.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83b8808 'daemon/mail/mailbox') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82e06c4 'daemon/mail/mailbox.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x874c8d4 'daemon/fingerd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x81acc7c 'daemon/fingerd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8353cf0 'daemon/saved.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x874c7d4 'std/sublocation') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x83b8e84 'std/chair') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x8389b70 'home/warpi/obj/sofa') ref 0 flags 210
+DEBUG: (swap.c:689) free_prog(0x8377cd4 'home/warpi/obj/sofa.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d360c 'daemon/termcap.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x834ed6c 'daemon/intermud02002.03.27 09:48:55 comm: write EWOULDBLOCK. Message discarded.
+2002.03.27 09:48:58 comm: write EWOULDBLOCK. Message discarded.
+2002.03.27 09:49:05 [xerq] command: send
+2002.03.27 09:49:25 [xerq] command: send
+/incoming/query.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82dc468 'dom/web/docs/index.c') ref 0
+DEBUG: new_object(0x874c7d4 'dom/web/docs/who') ref 54 flags 300
+DEBUG: new_object(0x874c854 'dom/web/docs/finger') ref 54 flags 300
+DEBUG: new_object(0x83b8808 'daemon/fingerd') ref 21 flags 300
+DEBUG: new_object(0x83bce90 'home/firebat/public_html/index') ref 54 flags 300
+DEBUG: (swap.c:669) free_prog(0x8353cf0 'daemon/saved.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aa854 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82dc994 'kernel/login.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82c7dd4 'dom/web/docs/man.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82df6e4 'daemon/man.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x834b444 'dom/web/docs/who.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x8351c2c 'daemon/fingerd.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x833b248 'dom/web/docs/finger.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ab44c 'daemon/language.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834ac78 'daemon/strings.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x83525d8 'home/firebat/public_html/index.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8350c24 'dom/web/docs/index.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82cd598 'daemon/banishd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8352894 'kernel/player_dummy.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81a84a4 'kernel/inet.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ed82c 'daemon/files.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82ccf30 'daemon/termcap.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81e9458 'dom/admin/servers/wizards.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8353cf0 'daemon/saved.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8353cf0 'daemon/strings.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ed82c 'daemon/fingerd.c') ref 0
+DEBUG: new_object(0x8389b70 'std/sublocation') ref 233 flags 300
+DEBUG: new_object(0x83b5efc 'std/chair') ref 146 flags 300
+DEBUG: new_object(0x83b8e84 'home/warpi/obj/sofa') ref 189 flags 300
+DEBUG: (swap.c:669) free_prog(0x81e93c0 'dom/admin/servers/wizards.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d13a8 'daemon/channeld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d0fd4 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833b248 'home/firebat/public_html/index.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81e93c0 'dom/web/docs/who.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aa854 'dom/web/docs/finger.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8353cf0 'daemon/saved.c') ref 0
+DEBUG: new_object(0x874c8d4 'daemon/autodoc') ref 21 flags 300
+DEBUG: (simulate.c:2621) free_object(0x874c8d4 'daemon/autodoc') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82cfe54 'daemon/autodoc.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82dd82c 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: new_object(0x83b73b0 'home/mrks/obj/paper') ref 160 flags 300
+DEBUG: new_object(0x83bbe30 'std/container') ref 87 flags 300
+DEBUG: new_object(0x83bbdcc 'std/liquid_container') ref 152 flags 700
+DEBUG: new_object(0x874cdd4 'std/modules/wieldable') ref 10 flags 300
+DEBUG: new_object(0x874cf54 'std/weapon') ref 125 flags 300
+DEBUG: new_object(0x874d554 'home/warpi/knueppel') ref 131 flags 300
+DEBUG: new_object(0x8749a54 'home/struggle/vodka') ref 159 flags 300
+DEBUG: new_object(0x83b5e98 'home/tetley/vodka') ref 159 flags 300
+DEBUG: new_object(0x874aed4 'home/firebat/liquid/alcohol') ref 159 flags 300
+DEBUG: new_object(0x874efd4 'daemon/mail') ref 21 flags 300
+DEBUG: new_object(0x874f054 'daemon/mail/mailbox') ref 15 flags 300
+DEBUG: (object.c:272) free_prog(0x8351b58 'home/warpi/obj/sofa.c') ref 0
+DEBUG: (object.c:582) free_prog(0x82bf660 'std/chair.c') ref 0
+DEBUG: (object.c:582) free_prog(0x82bad74 'std/sublocation.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x873d8b8 'dom/web/docs/man') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82b7240 'dom/web/docs/man.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x874c7d4 'dom/web/docs/who') ref 0 flags 610
+DEBUG: (object.c:272) free_prog(0x82bac64 'dom/web/docs/who.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x874c854 'dom/web/docs/finger') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x834311c 'dom/web/docs/finger.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83b8808 'daemon/fingerd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x83439f0 'daemon/fingerd.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x874b054 'std/basic/cgi') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x83bce90 'home/firebat/public_html/index') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82b7240 'home/firebat/public_html/index.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83bd0d4 'dom/web/docs/index') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82b7240 'dom/web/docs/index.c') ref 0
+DEBUG: (object.c:582) free_prog(0x81aca5c 'std/basic/cgi.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82ba180 'kernel/login.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81a84a4 'kernel/inet.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82ccf30 'daemon/mcp.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82b3180 'dom/world/servers/bankd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83395dc 'dom/world/servers/map.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83383b8 'dom/world/servers/room.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x833f3f8 'daemon/mail/mailbox.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x8343418 'daemon/mail.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82dd82c 'daemon/banishd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82b3b88 'command/sense.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82b3684 'daemon/skilld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82dcbfc 'kernel/player_dummy.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338960 'daemon/language.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833f8d0 'daemon/parserd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834ac78 'daemon/strings.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8342228 'daemon/sould.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833cbe4 'daemon/aliasd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ed82c 'daemon/files.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8346bd8 'daemon/genermsgd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8377ac4 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834ac78 'daemon/mail.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8352338 'daemon/termcap.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81e93c0 'dom/admin/servers/wizards.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8346bd8 'dom/admin/servers/wizards.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8377ac4 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x8389b70 'std/sublocation') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x83b5efc 'std/chair') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x83b8e84 'home/warpi/obj/sofa') ref 0 flags 210
+DEBUG: (swap.c:689) free_prog(0x8375dbc 'home/warpi/obj/sofa.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83755b8 'daemon/channeld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8345d08 'daemon/intermud0/incoming/channel.c') ref 0
+]ÿ]ü]ÿ]ü]Player object initialized.
+DEBUG: (swap.c:689) free_prog(0x82b45a8 'home/tetley/vodka.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82da72c 'home/struggle/vodka.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d0af4 'std/liquid/beer.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82df6e4 'std/basic/mcp.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82cfe54 'home/warpi/knueppel.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82b5c38 'home/firebat/liquid/alcohol.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82beb84 'std/liquid_container.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82c45a8 'home/mrks/obj/paper.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ab30c 'std/pen.c') ref 0
+]Player object initialized.
+DEBUG: new_object(0x83bce90 'home/firebat/.tool.cmd') ref 10 flags 300
+DEBUG: new_object(0x874b054 'std/living') ref 82 flags 300
+DEBUG: new_object(0x874c254 'std/basic/chat') ref 10 flags 300
+DEBUG: new_object(0x874c854 'std/npc') ref 142 flags 300
+DEBUG: new_object(0x83b8808 'dom/world/servers/raced') ref 160 flags 300
+DEBUG: (simulate.c:2621) free_object(0x83bce90 'home/firebat/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8346a60 'home/firebat/.tool.cmd.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83bbe30 'std/container') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x874cf54 'std/weapon') ref 0 flags 210
+DEBUG: (swap.c:669) free_prog(0x833cbe4 'command/wiz.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d9004 'kernel/inet.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82ddcdc 'kernel/login.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82cd4d8 'daemon/mcp.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82bd650 'daemon/banishd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83388f4 'dom/world/servers/bankd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83383b8 'dom/world/servers/map.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82ccf30 'dom/world/servers/room.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83513f0 'daemon/mail/mailbox.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8338df8 'daemon/mail.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83755b8 'daemon/channeld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8353cf0 'daemon/saved.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8375c88 'command/sense.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aa854 'kernel/player_dummy.c') ref 0
+DEBUG: new_object(0x874cf54 'std/disease') ref 116 flags 300
+DEBUG: new_object(0x8389b70 'std/disease/flu') ref 122 flags 300
+DEBUG: new_object(0x83bd394 'daemon/shutd') ref 21 flags 300
+DEBUG: (swap.c:669) free_prog(0x8340f58 'command/interaction.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x835bfd0 'dom/world/servers/raced.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83415b0 'command/wizobj.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82beb84 'kernel/wiztool.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83597bc 'daemon/sould.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83473e8 'daemon/genermsgd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8342a40 'command/objects.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83620f8 'command/objects.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x83b9268 'daemon/intermud0/incoming/query') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82d7d8c 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: new_object(0x874f254 'daemon/autodoc') ref 21 flags 300
+DEBUG: (simulate.c:2621) free_object(0x874f254 'daemon/autodoc') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x83661b8 'daemon/autodoc.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8361b10 'dom/world/servers/raced.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d9004 'kernel/inet.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d8954 'dom/world/servers/bankd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82cd4a0 'daemon/mail/mailbox.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82ccf30 'daemon/mail.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82bd550 'daemon/banishd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ab30c 'kernel/login.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x835a410 'daemon/mcp.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82bf524 'daemon/skilld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aa854 'kernel/player_dummy.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x835a990 'command/communication.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x836490c 'daemon/shutd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83513f0 'dom/world/servers/map.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83383b8 'dom/world/servers/room.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833cbe4 'command/misc.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8375c88 'command/sense.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8353cf0 'daemon/saved.c') ref 0
+DEBUG: new_object(0x874f0d4 'std/container') ref 87 flags 300
+DEBUG: new_object(0x8748e1c 'home/warpi/obj/bag') ref 93 flags 300
+DEBUG: new_object(0x8748e9c 'std/weapon') ref 125 flags 300
+DEBUG: new_object(0x8748d1c 'home/mrks/knue2002.03.27 12:38:58 comm: write EWOULDBLOCK. Message discarded.
+ppel') ref 131 flags 300
+DEBUG: new_object(0x874fbd4 'home/mrks/obj/pen') ref 117 flags 300
+DEBUG: (swap.c:669) free_prog(0x83415b0 'daemon/shutd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8360f48 'command/communication.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83477cc 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: new_object(0x874f854 'daemon/channeld/wiz_only') ref 10 flags 300
+DEBUG: new_object(0x83b593c 'daemon/channeld/read_only') ref 10 flags 300
+DEBUG: new_object(0x874f7d4 'daemon/channeld/intermud0') ref 10 flags 300
+DEBUG: (swap.c:669) free_prog(0x8338a8c 'kernel/inet.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833cbe4 'kernel/login.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x835b5c0 'daemon/banishd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aa854 'dom/world/servers/bankd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83426d4 'daemon/mail/mailbox.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83659b4 'daemon/mail.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82bf494 'daemon/skilld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82b9a14 'kernel/player_dummy.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8340f58 'command/interaction.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x835baa0 'daemon/genermsgd.c') ref 0
+DEBUG: new_object(0x874f5d4 'daemon/intermud0/incoming/channel') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x83b57b8 'tmp/ctool') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8346a70 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x874d554 'home/warpi/knueppel') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x874aed4 'home/firebat/liquid/alcohol') ref 0 flags 210
+DEBUG: (swap.c:669) free_prog(0x8346a70 'dom/world/servers/raced.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x874b054 'std/living') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x874c854 'std/npc') ref 0 flags 210
+DEBUG: new_object(0x874c854 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2517) free_object(0x874c854 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82b9ecc 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x835cd20 'daemon/channeld/read_only.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83597bc 'daemon/sould.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833f70c 'home/firebat/liquid/alcohol.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82ba180 'home/warpi/knueppel.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83513f0 'dom/world/servers/map.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83383b8 'dom/world/servers/room.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82ccf30 'command/sense.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d28a8 'daemon/language.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82cd7dc 'daemon/channeld/intermud0.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x82bb644 'daemon/channeld/wiz_only.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833cbe4 'command/wiz.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834361c 'daemon/man.c') ref 0
+DEBUG: new_object(0x874b054 'daemon/channeld') ref 42 flags 300
+DEBUG: new_object(0x874c4d4 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x831ce9c 'tmp/ctool') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8376ecc 'daemon/channeld.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x874c4d4 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x83620f8 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ee168 'daemon/intermud3/services.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x834f3f8 'daemon/intermud3/i3d.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81ea2e8 'daemon/socketd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83659b4 'daemon/shutd.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x874cf54 'std/disease') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x8389b70 'std/disease/flu') ref 0 flags 210
+DEBUG: new_object(0x873db74 'daemon/intermud0/inetd') ref 3070 flags 300
+DEBUG: (simulate.c:2621) free_object(0x874ac54 'daemon/intermud0/inetd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8374018 'daemon/intermud0/inetd.c') ref 0
+DEBUG: new_object(0x874ac54 'daemon/intermud0/incoming/reply') ref 10 flags 300
+DEBUG: new_object(0x874aed4 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: new_object(0x87478bc 'daemon/intermud0/incoming/query') ref 10 flags 300
+2002.03.27 12:52:54 Caught error: Too deep recursion.
+2002.03.27 12:52:54 ... execution continues.
+DEBUG: (simulate.c:2621) free_object(0x874aed4 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8364e18 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: new_object(0x87474bc 'home/firebat/obj/saltcellar') ref 93 flags 300
+DEBUG: new_object(0x874585c 'home/firebat/liquid/alcohol') ref 159 flags 300
+DEBUG: new_object(0x87472bc 'home/antihec/obj/starkbeer') ref 159 flags 300
+DEBUG: new_object(0x87464fc 'std/paper') ref 160 flags 300
+DEBUG: new_object(0x87475bc 'daemon/intermud0/incoming/query') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x87478bc 'tmp/ctool') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8375020 'daemon/intermud0/incoming/query.c') ref 0
+DEBUG: new_object(0x87478bc 'daemon/intermud0/inetd') ref 3070 flags 300
+DEBUG: (simulate.c:2621) free_object(0x873db74 'daemon/intermud0/inetd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x836b2e4 'daemon/intermud0/inetd.c') ref 0
+DEBUG: new_object(0x873db74 'home/warpi/.tool.cmd') ref 10 flags 300
+2002.03.27 12:58:01 Caught error: Too deep recursion.
+2002.03.27 12:58:01 ... execution continues.
+DEBUG: (simulate.c:2621) free_object(0x873db74 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82cd734 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833f70c 'home/firebat/liquid/alcohol.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83473e8 'home/warpi/knueppel.c') ref 0
+DEBUG: new_object(0x84cbbec 'home/warpi/knueppel') ref 131 flags 300
+DEBUG: new_object(0x873f24c 'daemon/intermud0/inetd') ref 3070 flags 300
+DEBUG: (simulate.c:2621) free_object(0x87478bc 'daemon/intermud0/inetd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x836fd40 'daemon/intermud0/inetd.c') ref 0
+DEBUG: new_object(0x876ff6c 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x876ff6c 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x8364b4c 'home/warpi/.tool.cmd.c') ref 0
+]Player object initialized.
+2002.03.27 13:12:27 [xerq] command: send
+DEBUG: new_object(0x87803a8 'std/disease') ref 116 flags 300
+DEBUG: new_object(0x878042c 'std/disease/flu') ref 122 flags 300
+DEBUG: (object.c:272) free_prog(0x8338bbc 'std/disease/flu.c') ref 0
+DEBUG: (object.c:582) free_prog(0x836510c 'std/disease.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82b9a14 'daemon/channeld/intermud0.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8367c40 'command/objects.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82e0b74 'daemon/channeld/read_only.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82bb644 'daemon/channeld/wiz_only.c') ref 0
+DEBUG: new_object(0x876b49c 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x876b49c 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82b9a14 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: new_object(0x876b49c 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x876b49c 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82b9a14 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: new_object(0x876b598 'home/warpi/.tool.cmd') ref 10 flags 300
+DEBUG: (simulate.c:2621) free_object(0x876b598 'home/warpi/.tool.cmd') ref 0 flags 210
+DEBUG: (object.c:272) free_prog(0x82b9a14 'home/warpi/.tool.cmd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83597bc 'daemon/sould.c') ref 0
+DEBUG: new_object(0x876b49c 'daemon/userd') ref 35 flags 300
+DEBUG: (simulate.c:2621) free_object(0x874f0d4 'std/container') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x8748d1c 'home/mrks/knueppel') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x874fbd4 'home/mrks/obj/pen') ref 0 flags 210
+DEBUG: (simulate.c:2621) free_object(0x831cd34 'tmp/ctool') ref 0 flags 610
+DEBUG: (object.c:272) free_prog(0x82b75ec 'daemon/userd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x833f70c 'home/firebat/liquid/alcohol.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83c14d0 'home/warpi/knueppel.c') ref 0
+DEBUG: new_object(0x831cd34 'daemon/userd') ref 35 flags 300
+DEBUG: new_object(0x8748d1c 'daemon/userd') ref 35 flags 300
+DEBUG: (swap.c:669) free_prog(0x835a410 'command/fs.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8344d7c 'daemon/getopt.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x876b49c 'tmp/ctool') ref 0 flags 610
+DEBUG: (object.c:272) free_prog(0x83cab2c 'daemon/userd.c') ref 0
+DEBUG: (simulate.c:2621) free_object(0x831cd34 'tmp/ctool') ref 0 flags 610
+DEBUG: (object.c:272) free_prog(0x8367c40 'daemon/userd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83659b4 'command/interaction.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x8341994 'daemon/intermud0/incoming/channel.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82b9ecc 'daemon/genermsgd.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x8344624 'daemon/channeld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d81ec 'daemon/skilld.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83620f8 'kernel/player_dummy.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82d9004 'kernel/inet.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x83513f0 'dom/world/servers/bankd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x81aa854 'dom/world/servers/map.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82bf398 'dom/world/servers/room.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82b7168 'daemon/mail/mailbox.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x82dca84 'daemon/mail.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8376ecc 'daemon/banishd.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x8346a70 'command/sense.c') ref 0
+DEBUG: (swap.c:669) free_prog(0x835ba34 'kernel/login.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x83661b8 'home/mrks/obj/pen.c') ref 0
+DEBUG: (swap.c:689) free_prog(0x8342ed8 'home/mrks/knueppel.c') ref 0
+DEBUG: (object.c:272) free_prog(0x836fd40 'home/warpi/knueppel.c') ref 0
+2002.03.27 13:26:22 Object 0x874d554 home/tetley/vodka#485 ref count 0, but not destructed.
+std/liquid_container#304 std/base.c line 306
+82c6f05:  23          return                     (1: 34)	line 306
+82c7195:  92          restore_arg_frame          (2: 34)	line 460
+82c7196:  99          branch_when_zero           (1: 33)
+82c71a8:  91          save_arg_frame             (0: 32)	line 461
+82c71a9:  91          save_arg_frame             (1: 33)
+82c71aa: 377       15 environment                (2: 34)
+82c71ac:  92          restore_arg_frame          (3: 35)
+82c71ad:  10        6 cstring0                   (2: 34)
+82c71af:  91          save_arg_frame             (3: 35)
+82c71b0: 103          call_function              (4: 36)
+std/liquid_container#304 std/container/container.c line 61
+81a7b3f:  91          save_arg_frame             (0: 36)	line 61
+81a7b40: 103          call_function              (1: 37)
+std/liquid_container#304 std/base.c line 217
+82c6d43:   8        5 identifier                 (0: 37)	line 217
+82c6d45:  23          return                     (1: 38)
+std/liquid_container#304 std/container/container.c line 61
+81a7b43:  92          restore_arg_frame          (2: 38)	line 61
+81a7b44:   8        0 identifier                 (1: 37)
+81a7b46:  18        2 clit                       (2: 38)
+81a7b48:  44          /                          (3: 39)
+81a7b49:  41          +                          (2: 38)
+81a7b4a:  23          return                     (1: 37)
+std/liquid_container#304 std/base.c line 461
+82c71b3:  92          restore_arg_frame          (5: 37)	line 461
+82c71b4: 174          negate                     (4: 36)
+82c71b5: 167          call_other                 (4: 36)
+std/player#303 std/container/container.c line 53
+81a7b1b:  28        0 local                      (0: 36)	line 53
+81a7b1d: 106        0 push_identifier_lvalue     (1: 37)
+81a7b1f:  76          (void)+=                   (2: 38)
+81a7b20:  91          save_arg_frame             (0: 36)	line 54
+81a7b21: 377       15 environment                (1: 37)
+81a7b23:  92          restore_arg_frame          (2: 38)
+81a7b24:  99       15 branch_when_zero           (1: 37)
+81a7b26:  91          save_arg_frame             (0: 36)	line 55
+81a7b27:  91          save_arg_frame             (1: 37)
+81a7b28: 377       15 environment                (2: 38)
+81a7b2a:  92          restore_arg_frame          (3: 39)
+81a7b2b:  10        2 cstring0                   (2: 38)
+81a7b2d:  28        0 local                      (3: 39)
+81a7b2f:  18        2 clit                       (4: 40)
+81a7b31:  44          /                          (5: 41)
+81a7b32: 167          call_other                 (4: 40)
+home/warpi/workroom std/container/container.c line 53
+81a7b1b:  28        0 local                      (0: 40)	line 53
+81a7b1d: 106        0 push_identifier_lvalue     (1: 41)
+81a7b1f:  76          (void)+=                   (2: 42)
+81a7b20:  91          save_arg_frame             (0: 40)	line 54
+81a7b21: 377       15 environment                (1: 41)
+81a7b23:  92          restore_arg_frame          (2: 42)
+81a7b24:  99          branch_when_zero           (1: 41)
+81a7b35:  24          return0                    (0: 40)	line 56
+std/player#303 std/container/container.c line 55
+81a7b33:  92          restore_arg_frame          (2: 38)	line 55
+81a7b34:  88          pop_value                  (1: 37)
+81a7b35:  24          return0                    (0: 36)	line 56
+std/liquid_container#304 std/base.c line 461
+82c71b6:  92          restore_arg_frame          (2: 34)	line 461
+82c71b7:  88          pop_value                  (1: 33)
+82c71b8:  91          save_arg_frame             (0: 32)	line 463
+82c71b9: 184          this_object                (1: 33)
+82c71ba: 223       15 deep_inventory             (2: 34)
+82c71bc:  10       31 cstring0                   (2: 34)
+82c71be: 380       18 filter_objects             (3: 35)
+82c71c0:  92          restore_arg_frame          (2: 34)
+82c71c1:  88          pop_value                  (1: 33)
+82c71c2: 184          this_object                (0: 32)	line 464
+82c71c3: 224          destruct                   (1: 33)
+kernel/master kernel/master.c line 263
+81ae38f:  90      769 clear_locals               (0: 38)	line 263
+81ae392:  28        0 local                      (0: 38)	line 267
+81ae394: 236       28 interactive                (1: 39)
+81ae396:  99          branch_when_zero           (1: 39)
+81ae39a:  91          save_arg_frame             (0: 38)	line 269
+81ae39b:  28        0 local                      (1: 39)
+81ae39d: 377       15 environment                (2: 40)
+81ae39f:  92          restore_arg_frame          (2: 40)
+81ae3a0: 111        1 push_local_variable_lvalue (1: 39)
+81ae3a2:  40          (void)=                    (2: 40)
+81ae3a3:  28        1 local                      (0: 38)	line 270
+81ae3a5: 100          branch_when_non_zero       (1: 39)
+81ae3d4:  98          branch                     (0: 38)	line 278
+81ae3e2:  28        0 local                      (0: 38)
+81ae3e4: 230       22 first_inventory            (1: 39)
+81ae3e6: 102       17 bbranch_when_non_zero      (1: 39)
+81ae3e8:  91          save_arg_frame             (0: 38)	line 281
+81ae3e9:  29       10 catch                      (1: 39)
+81ae3eb:  91          save_arg_frame             (1: 39)
+81ae3ec:  28        0 local                      (2: 40)
+81ae3ee:  10       97 cstring0                   (3: 41)
+81ae3f0:  10      151 cstring0                   (4: 42)
+81ae3f2: 167          call_other                 (5: 43)
+std/liquid_container#304 std/basic/hooks.c line 58
+82c66b7:   8        0 identifier                 (0: 43)	line 58
+82c66b9:  59          !                          (1: 44)
+82c66ba:  38          ||                         (1: 44)
+82c66c2:  99        1 branch_when_zero           (1: 44)
+82c66c4:  24          return0                    (0: 43)
+kernel/master kernel/master.c line 281
+81ae3f3:  92          restore_arg_frame          (3: 41)	line 281
+81ae3f4: 162          end_catch                  (2: 40)
+81ae3f5:  92          restore_arg_frame          (2: 40)
+81ae3f6:  88          pop_value                  (1: 39)
+81ae3f7:  91          save_arg_frame             (0: 38)	line 282
+81ae3f8:  29       10 catch                      (1: 39)
+81ae3fa:  91          save_arg_frame             (1: 39)
+81ae3fb:  28        0 local                      (2: 40)
+81ae3fd:  10       97 cstring0                   (3: 41)
+81ae3ff:  10      152 cstring0                   (4: 42)
+81ae401: 167          call_other                 (5: 43)
+std/liquid_container#304 std/basic/hooks.c line 58
+82c66b7:   8        0 identifier                 (0: 43)	line 58
+82c66b9:  59          !                          (1: 44)
+82c66ba:  38          ||                         (1: 44)
+82c66c2:  99        1 branch_when_zero           (1: 44)
+82c66c4:  24          return0                    (0: 43)
+kernel/master kernel/master.c line 282
+81ae402:  92          restore_arg_frame          (3: 41)	line 282
+81ae403: 162          end_catch                  (2: 40)
+81ae404:  92          restore_arg_frame          (2: 40)
+81ae405:  88          pop_value                  (1: 39)
+81ae406:  24          return0                    (0: 38)	line 283
+std/liquid_container#304 std/base.c line 464
+82c71c5:  15          const0                     (0: 32)	line 464
+82c71c6:  88          pop_value                  (1: 33)
+82c71c7:  24          return0                    (0: 32)	line 465
+std/player#303 std/base.c line 463
+82c71c0:  92          restore_arg_frame          (2: 31)	line 463
+82c71c1:  88          pop_value                  (1: 30)
+82c71c2: 184          this_object                (0: 29)	line 464
+82c71c3: 224          destruct                   (1: 30)
+kernel/master kernel/master.c line 263
+81ae38f:  90      769 clear_locals               (0: 35)	line 263
+81ae392:  28        0 local                      (0: 35)	line 267
+81ae394: 236       28 interactive                (1: 36)
+81ae396:  99          branch_when_zero           (1: 36)
+81ae39a:  91          save_arg_frame             (0: 35)	line 269
+81ae39b:  28        0 local                      (1: 36)
+81ae39d: 377       15 environment                (2: 37)
+81ae39f:  92          restore_arg_frame          (2: 37)
+81ae3a0: 111        1 push_local_variable_lvalue (1: 36)
+81ae3a2:  40          (void)=                    (2: 37)
+81ae3a3:  28        1 local                      (0: 35)	line 270
+81ae3a5: 100          branch_when_non_zero       (1: 36)
+81ae3d4:  98          branch                     (0: 35)	line 278
+81ae3e2:  28        0 local                      (0: 35)
+81ae3e4: 230       22 first_inventory            (1: 36)
+81ae3e6: 102       17 bbranch_when_non_zero      (1: 36)
+81ae3e8:  91          save_arg_frame             (0: 35)	line 281
+81ae3e9:  29       10 catch                      (1: 36)
+81ae3eb:  91          save_arg_frame             (1: 36)
+81ae3ec:  28        0 local                      (2: 37)
+81ae3ee:  10       97 cstring0                   (3: 38)
+81ae3f0:  10      151 cstring0                   (4: 39)
+81ae3f2: 167          call_other                 (5: 40)
+std/player#303 std/basic/hooks.c line 58
+82c66b7:   8        0 identifier                 (0: 40)	line 58
+82c66b9:  59          !                          (1: 41)
+82c66ba:  38          ||                         (1: 41)
+82c66c2:  99        1 branch_when_zero           (1: 41)
+82c66c4:  24          return0                    (0: 40)
+kernel/master kernel/master.c line 281
+81ae3f3:  92          restore_arg_frame          (3: 38)	line 281
+81ae3f4: 162          end_catch                  (2: 37)
+81ae3f5:  92          restore_arg_frame          (2: 37)
+81ae3f6:  88          pop_value                  (1: 36)
+81ae3f7:  91          save_arg_frame             (0: 35)	line 282
+81ae3f8:  29       10 catch                      (1: 36)
+81ae3fa:  91          save_arg_frame             (1: 36)
+81ae3fb:  28        0 local                      (2: 37)
+81ae3fd:  10       97 cstring0                   (3: 38)
+81ae3ff:  10      152 cstring0                   (4: 39)
+81ae401: 167          call_other                 (5: 40)
+std/player#303 std/basic/hooks.c line 58
+82c66b7:   8        0 identifier                 (0: 40)	line 58
+82c66b9:  59          !                          (1: 41)
+82c66ba:  38          ||                         (1: 41)
+82c66c2:  99        1 branch_when_zero           (1: 41)
+82c66c4:  24          return0                    (0: 40)
+kernel/master kernel/master.c line 282
+81ae402:  92          restore_arg_frame          (3: 38)	line 282
+81ae403: 162          end_catch                  (2: 37)
+81ae404:  92          restore_arg_frame          (2: 37)
+81ae405:  88          pop_value                  (1: 36)
+81ae406:  24          return0                    (0: 35)	line 283
+std/player#303 std/base.c line 464
+82c71c5:  15          const0                     (0: 29)	line 464
+82c71c6:  88          pop_value                  (1: 30)
+82c71c7:  24          return0                    (0: 29)	line 465
+std/player#303 std/player.c line 498
+82d55c3:  92          restore_arg_frame          (3: 30)	line 498
+82d55c4: 162          end_catch                  (2: 29)
+82d55c5:  92          restore_arg_frame          (2: 29)
+82d55c6:  88          pop_value                  (1: 28)
+82d55c7: 184          this_object                (0: 27)	line 499
+82d55c8:  99          branch_when_zero           (1: 28)
+82d55d5: 184          this_object                (0: 27)	line 501
+82d55d6:  99          branch_when_zero           (1: 28)
+82d55dd:  24          return0                    (0: 27)	line 503
+std/player#303 <lambda ?> line 0
+84794b6:  92          restore_arg_frame          (2: 25)	line 0
+84794b7:  23          return                     (1: 24)
+std/player#303 std/player.c line 277
+82d507c:  92          restore_arg_frame          (2: 23)	line 277
+82d507d:  23          return                     (1: 22)
+82d56f8:  92          restore_arg_frame          (2: 18)	line 536
+82d56f9:  88          pop_value                  (1: 17)
+82d56fa:  16          const1                     (0: 16)	line 537
+82d56fb:  23          return                     (1: 17)
+daemon/userd daemon/userd.c line 171
+83cbb1e:  92          restore_arg_frame          (2: 13)	line 171
+83cbb1f:  88          pop_value                  (1: 12)
+83cbb20:  24          return0                    (0: 11)	line 172
+83cbaeb:  92          restore_arg_frame          (2:  1)	line 175
+83cbaec: 106        0 push_identifier_lvalue     (1:  0)
+83cbaee:  40          (void)=                    (2:  1)
+83cbaef:  91          save_arg_frame             (0: -1)	line 176
+83cbaf0:  10        1 cstring0                   (1:  0)
+83cbaf2:  18       60 clit                       (2:  1)
+83cbaf4: 369        7 call_out                   (3:  2)
+83cbaf6:  15          const0                     (1:  0)
+83cbaf7:  92          restore_arg_frame          (2:  1)
+83cbaf8:  88          pop_value                  (1:  0)
+83cbaf9:  24          return0                    (0: -1)	line 177
+No program counter.
+No program to trace.
+2002.03.27 13:26:22 LDMud aborting on fatal error.
+[xerq] read: Resource temporarily unavailable
+2002.03.27 13:26:23 [xerq] Demon exiting.
 

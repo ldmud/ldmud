@@ -97,6 +97,7 @@ struct command_context_s
     action_t * marker;       /* the marker sentence */
     char * cmd;              /* the full command, a stack buffer */
     string_t * verb;         /* the tabled verb */
+    string_t * action_verb;  /* the tabled action verb */
     svalue_t errmsg;         /* the error message */
     object_t * errobj;       /* object which set the error message */
 };
@@ -114,7 +115,12 @@ object_t *command_giver;
 
 static string_t *last_verb = NULL;
   /* During a command execution, this is the tabled string with the
-   * command verb.
+   * given command verb.
+   */
+
+static string_t *last_action_verb = NULL;
+  /* During a command execution, this is the tabled string with the
+   * command verb as specified in the action definition.
    */
 
 static char *last_command = NULL;
@@ -174,6 +180,10 @@ free_action_temporaries (void)
     if (last_verb)
         free_mstring(last_verb);
     last_verb = NULL;
+
+    if (last_action_verb)
+        free_mstring(last_action_verb);
+    last_action_verb = NULL;
 
 } /* free_action_temporaries() */
 
@@ -259,6 +269,7 @@ save_command_context (struct command_context_s * context)
 {
     context->rt.type = COMMAND_CONTEXT;
     context->verb = last_verb;
+    context->action_verb = last_action_verb;
     context->cmd = last_command;
     context->mark_player = marked_command_giver;
     if (marked_command_giver)
@@ -272,6 +283,7 @@ save_command_context (struct command_context_s * context)
 
     command_giver = NULL;
     last_verb = NULL;
+    last_action_verb = NULL;
     last_command = NULL;
     marked_command_giver = NULL;
     command_marker = NULL;
@@ -292,6 +304,9 @@ _restore_command_context (struct command_context_s * context)
     if (last_verb)
         free_mstring(last_verb);
 
+    if (last_action_verb)
+        free_mstring(last_action_verb);
+
     if (command_marker)
         free_action_sent(command_marker);
     else if (marked_command_giver && !(O_DESTRUCTED & marked_command_giver->flags))
@@ -299,6 +314,7 @@ _restore_command_context (struct command_context_s * context)
 
     /* Restore the previous context */
     last_verb = context->verb;
+    last_action_verb = context->action_verb;
     last_command = context->cmd;
     command_giver = check_object(context->this_player);
     if (context->this_player)
@@ -820,8 +836,8 @@ static Bool
 parse_command (char *buff, Bool from_efun)
 
 /* Take the command in <buff> and execute it.
- * The command_giver and marked_command_giver are set, last_verb
- * and last_command may be set (and will be overwritten).
+ * The command_giver and marked_command_giver are set, last_verb,
+ * last_action_verb and last_command may be set (and will be overwritten).
  *
  * The command will be searched in the list of marked_command_giver.
  *
@@ -964,6 +980,10 @@ parse_command (char *buff, Bool from_efun)
         /*
          * Now we have found a special sentence!
          */
+
+        if (last_action_verb)
+            free_mstring(last_action_verb);
+        last_action_verb = ref_mstring(sa->verb);
 
 #ifdef DEBUG
         if (d_flag > 1)
@@ -1991,19 +2011,36 @@ f_query_verb (svalue_t *sp)
 /* EFUN query_verb()
  *
  *   string query_verb(void)
+ *   string query_verb(int flag)
  *
- * Give the name of the current command, or 0 if not executing
- * from a command. This allows add_action() of several commands
+ * Return the verb of the current command, of 0 if not executing from
+ * a command. If <flag> is 0 or not given, the verb as given by the user
+ * is returned; if <flag> is non-0, the verb as specified in the
+ * add_action() statement is returned.
+ *
+ * This efun allows add_action() of several commands
  * to the same function. query_verb() returns 0 when invoked by a
  * function which was started by a call_out or the heart beat.
  * Also when a user logs in query_verb() returns 0.
  */
 
 {
-    if (!last_verb)
-        push_number(sp, 0);
+    p_int flag = sp->u.number;
+    free_svalue(sp);
+    if (flag == 0)
+    {
+        if (!last_verb)
+            put_number(sp, 0);
+        else
+            put_ref_string(sp, last_verb);
+    }
     else
-        push_ref_string(sp, last_verb);
+    {
+        if (!last_action_verb)
+            put_number(sp, 0);
+        else
+            put_ref_string(sp, last_action_verb);
+    }
     
     return sp;
 } /* f_query_verb() */

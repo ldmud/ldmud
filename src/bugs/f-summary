@@ -111,7 +111,6 @@ f-011230: Implement seeded randoms
 f-020127: Bitstring efuns for shifting and copying
 f-020310: inherits() returns all programs inheriting a given program
 f-020312: Filename argument to garbage_collection()
-f-020315: Let query_verb() return the action verb as defined.
 
 
 Language

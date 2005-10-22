@@ -30,7 +30,6 @@ b-020303-1: Problem with virtual inherits
 
 Runtime
 --------------------------------------------------------------------------
-b-990505-0: Memory leak in call_lambda()/send_erq()?
 b-020205-0: Memoryleaks in Unitopia - set_prompt() and the soul (maybe fixed)
 b-990605: In a lot of error places, inter_sp/inter_pc are wrong.
 b-010115-1: Make sure that all master calls use leading slashes.

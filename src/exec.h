@@ -661,10 +661,12 @@ struct program_s
       /* Name of file that defined prog (untabled, no leading '/',
        * but a trailing '.c', no embedded '\0')
        */
+#ifndef NO_BLUEPRINT
     object_t       *blueprint;
       /* Counted pointer to the (possibly destructed) blueprint object,
        * or NULL if the blueprint has been destructed in a previous cycle.
        */
+#endif /* !NO_BLUEPRINT */
     int32           id_number;
       /* The id-number is unique among all programs and used to store
        * information for this program without actually pointing to

@@ -1,6 +1,18 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Mar-2002 (Lars Duening)  (3.3.188)
+    - (wiz_list.c) Don't call master::get_wiz_name() when there is no
+         master. Otherwise a simple warning during the initial master
+         load would abort the driver (reported by Frank Syse).
+    - (driver.h, lots of files) If debug macro NO_BLUEPRINT is defined,
+         the driver no longer tracks the blueprint for a program structure.
+         This somewhat disables the blueprint() efun, but if it solves
+         the object refcount problem, I know at least where to look.
+    - (func_spec, actions.c) Efun query_verb() now takes an optional
+         flag to return the verb as specified in the add_action() instead
+         of the verb given by the user (suggested by Dafire).
+
 26-Mar-2002 (Lars Duening)  (3.3.187)
     - (array.c, mapping.c) Made sure that the callback structures are
          properly released on errors.

@@ -17787,10 +17787,12 @@ count_inherits (program_t *progp)
             continue;
         }
         progp2->extra_ref = 1;
+#ifndef NO_BLUEPRINT
         if (progp2->blueprint)
         {
             count_extra_ref_in_object(progp2->blueprint);
         }
+#endif /* !NO_BLUEPRINT */
         count_inherits(progp2);
     }
 } /* count_inherits() */
@@ -17869,10 +17871,12 @@ count_extra_ref_in_object (object_t *ob)
         if (NULL != register_pointer(ptable, ob->prog))
         {
             ob->prog->extra_ref = 1;
+#ifndef NO_BLUEPRINT
             if (ob->prog->blueprint)
             {
                 count_extra_ref_in_object(ob->prog->blueprint);
             }
+#endif /* !NO_BLUEPRINT */
             count_inherits(ob->prog);
         }
     }

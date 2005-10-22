@@ -3242,14 +3242,16 @@ f_blueprint (svalue_t *sp)
     }
 
     if ((obj->flags & O_SWAPPED) && load_ob_from_swap(obj) < 0)
-        error("Out of memory: unswap object '%s'.\n", obj->name);
+        error("Out of memory: unswap object '%s'.\n", get_txt(obj->name));
 
     blueprint = NULL;
+#ifndef NO_BLUEPRINT
     if (obj->prog != NULL
      && obj->prog->blueprint != NULL
      && !(obj->prog->blueprint->flags & O_DESTRUCTED)
        )
         blueprint = ref_object(obj->prog->blueprint, "blueprint()");
+#endif /* !NO_BLUEPRINT */
 
     free_svalue(sp);
     if (blueprint != NULL)

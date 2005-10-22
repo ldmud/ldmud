@@ -304,6 +304,7 @@ clear_object_ref (object_t *p)
         p->name->info.ref = 0;
         p->prog->ref = 0;
         p->prog->name->info.ref = 0;
+#ifndef NO_BLUEPRINT
         if (p->prog->blueprint
          && (p->prog->blueprint->flags & O_DESTRUCTED)
          && p->prog->blueprint->ref
@@ -314,6 +315,7 @@ clear_object_ref (object_t *p)
 #endif
             p->prog->blueprint->ref = 0;
         }
+#endif /* !NO_BLUEPRINT */
         clear_inherit_ref(p->prog);
     }
 } /* clear_object_ref() */
@@ -345,6 +347,7 @@ gc_mark_program_ref (program_t *p)
 
         MARK_MSTRING_REF(p->name);
 
+#ifndef NO_BLUEPRINT
         /* Mark the blueprint object, if any */
         if (p->blueprint)
         {
@@ -361,6 +364,7 @@ gc_mark_program_ref (program_t *p)
                  */
             }
         }
+#endif /* !NO_BLUEPRINT */
 
         if (p->swap_num != -1 && p->line_numbers)
             note_ref(p->line_numbers);

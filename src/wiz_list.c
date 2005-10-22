@@ -300,6 +300,10 @@ get_wiz_name (const char *file)
 {
     svalue_t *ret;
 
+    /* Don't call the master if it isn't loaded! */
+    if (!master_ob)
+        return NULL;
+
     push_c_string(inter_sp, file);
     ret = apply_master_ob(STR_GET_WNAME, 1);
     if (ret == 0 || ret->type != T_STRING)

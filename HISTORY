@@ -73,7 +73,7 @@ For a detailed list of all changes see the file CHANGELOG.
            the maximum number of keys.
 
 
-16-Mar-2002 (Lars Duening) -- upcoming Release 3.2.9
+27-Mar-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -136,6 +136,8 @@ For a detailed list of all changes see the file CHANGELOG.
            line of their own.
        + query_udp_port(), send_udp(): Renamed from query_imp_port() and
            send_imp().
+       + query_verb(): Added an optional flag argument to return the
+           verb as given in the add_action() statement.
        + regexp functions: more compatible with 8-bit characters.
        + regexp functions: New metacharacters '+' allows to specifiy 'at
            least one match'.

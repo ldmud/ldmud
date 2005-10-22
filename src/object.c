@@ -238,7 +238,7 @@ _free_object (object_t *ob, const char * file, int line)
     if (ob->ref > 0)
         fatal("Object with %ld refs passed to _free_object()\n", ob->ref);
 
-#ifdef CHECK_OBJECT_REF
+#if 0 && defined(CHECK_OBJECT_REF)
     if (strchr(get_txt(ob->name), '#') == NULL)
         printf("DEBUG: (%s:%d) free_object(%p '%s') ref %ld flags %x\n"
               , file, line, ob, get_txt(ob->name), ob->ref, ob->flags);
@@ -502,7 +502,7 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line)
     if (progp->ref > 0)
         return;
 
-#ifdef CHECK_OBJECT_REF
+#if 0 && defined(CHECK_OBJECT_REF)
     if (strchr(get_txt(progp->name), '#') == NULL)
         printf("DEBUG: (%s:%d) free_prog(%p '%s') ref %ld\n"
               , file, line, progp, get_txt(progp->name), progp->ref);
@@ -512,11 +512,12 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line)
     if (progp->ref < 0)
         fatal("Negative ref count for prog ref.\n");
 
+#ifndef NO_BLUEPRINT
     if (free_all && progp->blueprint)
     {
         object_t * blueprint = progp->blueprint;
         progp->blueprint = NULL;
-#ifdef CHECK_OBJECT_REF
+#if 0 && defined(CHECK_OBJECT_REF)
     if (strchr(get_txt(blueprint->name), '#') == NULL)
         printf("DEBUG: (%s:%d) free_prog(%p '%s') ref %ld : blueprint (%p '%s') ref %ld, flags %x\n"
               , file, line, progp, get_txt(progp->name), progp->ref
@@ -524,6 +525,7 @@ _free_prog (program_t *progp, Bool free_all, const char * file, int line)
 #endif
         free_object(blueprint, "free_prog");
     }
+#endif /* !NO_BLUEPRINT */
 
     /* Update the statistics */
     total_prog_block_size -= progp->total_size;

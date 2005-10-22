@@ -222,14 +222,14 @@ comm.o : util/erq/erq.h ../mudlib/sys/input_to.h \
     access_check.h comm.h telnet.h my-alloca.h typedefs.h driver.h \
     strfuns.h instrs.h config.h port.h hosts/unix.h hosts/be/be.h machine.h
 
-dumpstat.o : svalue.h smalloc.h stdstrings.h simulate.h ptrtable.h object.h \
-    mstrings.h mapping.h filestat.h exec.h closure.h array.h dumpstat.h \
-    typedefs.h driver.h strfuns.h sent.h instrs.h port.h config.h \
-    hosts/unix.h hosts/be/be.h machine.h
+dumpstat.o : xalloc.h svalue.h smalloc.h stdstrings.h simulate.h ptrtable.h \
+    object.h mstrings.h mapping.h filestat.h exec.h closure.h array.h \
+    dumpstat.h typedefs.h driver.h strfuns.h sent.h instrs.h port.h \
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
-ed.o : xalloc.h svalue.h stdstrings.h simulate.h rxcache.h regexp.h \
-    object.h mstrings.h main.h interpret.h gcollect.h filestat.h comm.h \
-    closure.h actions.h ed.h typedefs.h driver.h strfuns.h sent.h exec.h \
+ed.o : xalloc.h svalue.h stdstrings.h simulate.h rxcache.h object.h \
+    mstrings.h main.h interpret.h gcollect.h filestat.h comm.h closure.h \
+    actions.h ed.h typedefs.h driver.h strfuns.h sent.h exec.h regexp.h \
     instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 efuns.o : ../mudlib/sys/time.h ../mudlib/sys/strings.h \
@@ -372,9 +372,10 @@ regexp.o : main.h xalloc.h simulate.h comm.h regexp.h driver.h typedefs.h \
     svalue.h strfuns.h sent.h exec.h port.h config.h hosts/unix.h \
     hosts/be/be.h machine.h
 
-rxcache.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h regexp.h \
-    mstrings.h hash.h gcollect.h rxcache.h driver.h typedefs.h port.h \
-    config.h hosts/unix.h hosts/be/be.h machine.h
+rxcache.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h \
+    simulate.h regexp.h mstrings.h hash.h gcollect.h rxcache.h driver.h \
+    typedefs.h sent.h exec.h port.h config.h hosts/unix.h hosts/be/be.h \
+    machine.h
 
 simul_efun.o : xalloc.h swap.h svalue.h stdstrings.h simulate.h ptrtable.h \
     object.h mstrings.h lex.h interpret.h instrs.h gcollect.h exec.h \

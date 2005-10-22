@@ -555,7 +555,7 @@ int     notify_fail(string|closure);
 mixed  *query_actions(object|string, int|object|string default: F_CONST1);
 string  query_command();
 mixed   query_notify_fail(int default: F_CONST0);
-string  query_verb();
+string  query_verb(int default: F_CONST0);
 int     remove_action(string, object default: F_THIS_PLAYER);
 void    set_this_player(null|object);
 object  set_modify_command(object|string default: F_THIS_OBJECT);

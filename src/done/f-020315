@@ -2,7 +2,7 @@ Short: Let query_verb() return the action verb as defined.
 From: Bastian Hoyer <dafire@dafire.de>
 Date: Mon, 11 Mar 2002 15:32:19 +0100
 Type: Feature
-State: New
+State: Done - implemented in 3.2.9-dev.423/3.3.188 .
 
 Hmm.. wenn ich im moment sowas hab:
 
