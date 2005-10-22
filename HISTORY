@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-13-Apr-2001 (Lars Duening) -- Development Release 3.3
+17-Apr-2001 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -107,8 +107,6 @@ For a detailed list of all changes see the file CHANGELOG.
        + The operators '++' and '--' can now be used on floats, too.
        + Closures bound to destructed objects are now treated uniformly
            like destructed objects and are replaced by 0s where required.
-       + Lfun and variable closures can now be compared with '==' and '!=',
-           and are treated correctly in alist and array operations.
        + Closures can now sensibly be used in '==' and '!=' comparisons,
            in array intersections, and as keys in mappings.
        + Inline closures inherit the visibility of their defining function.
@@ -117,6 +115,7 @@ For a detailed list of all changes see the file CHANGELOG.
            It is meant for objects like wizard tools.
        + New operator '...' to flatten array arguments in function call
            argument lists.
+       + Global functions are no longer hidden by local variables.
        + Bugfix: It is no longer possible to prematurely end an inline closure
            function by inserting a free '}'.
        + Bugfix: Adding mappings of different width throws an error, unless

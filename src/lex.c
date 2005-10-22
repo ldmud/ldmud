@@ -3297,7 +3297,7 @@ yylex1 (void)
                         free_shared_identifier(p);
                     c = *yyp;
                     *yyp = '\0';
-                    yyerrorf("Undefined function: %s", wordstart);
+                    yyerrorf("Undefined function: %.50s", wordstart);
                     *yyp = c;
                     yylval.closure.number = CLOSURE_EFUN_OFFS;
                     return L_CLOSURE;
@@ -3406,7 +3406,7 @@ yylex1 (void)
                     /* None of these all */
                     c = *yyp;
                     *yyp = 0;
-                    yyerrorf("Undefined function: %s", wordstart);
+                    yyerrorf("Undefined function: %.50s", wordstart);
                     *yyp = c;
                     yylval.closure.number = CLOSURE_EFUN_OFFS;
 

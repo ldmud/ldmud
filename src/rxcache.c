@@ -83,6 +83,8 @@ static RxHashEntry xtable[RXCACHE_TABLE];  /* The Expression Hashtable */
 static uint32 iNumXRequests   = 0;  /* Number of calls to regcomp() */
 static uint32 iNumXFound      = 0;  /* Number of calls satisfied from table */
 static uint32 iNumXCollisions = 0;  /* Number of hashcollisions */
+static uint32 iNumXEntries    = 0;  /* Number of used cache entries */
+static uint32 iXSizeAlloc     = 0;  /* Dynamic memory held in regexp structs */
 
 /*--------------------------------------------------------------------*/
 void rxcache_init(void)
@@ -140,12 +142,18 @@ regcomp_cache (string_t * expr, Bool excompat, Bool from_ed)
     if (NULL != pHash->pString)
     {
         iNumXCollisions++;
+        iNumXEntries--;
+        iXSizeAlloc -= pHash->pRegexp->regalloc;
+
         free_mstring(pHash->pString);
         rx_free(pHash->pRegexp);
     }
     pHash->pString = expr; /* refs are transferred */
     pHash->hString = hExpr;
     pHash->pRegexp = pRegexp;
+
+    iNumXEntries++;
+    iXSizeAlloc += pRegexp->regalloc;
 
     return rx_dup(pRegexp);
 } /* regcomp_cache() */
@@ -159,25 +167,11 @@ rxcache_status (strbuf_t *sbuf, Bool verbose)
  */
 
 {
-    int    i;
-
-    uint32 iNumXEntries = 0;      /* Number of used cache entries */
-    uint32 iXSizeAlloc = 0;       /* Dynamic memory held in regexp structures */
-    uint32 iNumXReq;              /* Number of regcomp() requests, made non-zero */
+    uint32 iNumXReq;  /* Number of regcomp() requests, made non-zero */
 
 #if defined(__MWERKS__) && !defined(WARN_ALL)
 #    pragma warn_largeargs off
 #endif
-
-    /* Scan the whole tables, counting entries */
-    for (i = 0; i < RXCACHE_TABLE; i++)
-    {
-        if (NULL != xtable[i].pString)
-        {
-            iNumXEntries++;
-            iXSizeAlloc += xtable[i].pRegexp->regalloc;
-        }
-    }
 
     /* In verbose mode, print the statistics */
     if (verbose)
@@ -223,21 +217,6 @@ rxcache_dinfo_status (svalue_t *svp, int value)
     if (value == -1) svp[which].u.number = code; \
     else if (value == which) svp->u.number = code
     
-    int    i;
-
-    uint32 iNumXEntries = 0;      /* Number of used cache entries */
-    uint32 iXSizeAlloc = 0;       /* Dynamic memory held in regexp structures */
-
-    /* Scan the whole tables, counting entries */
-    for (i = 0; i < RXCACHE_TABLE; i++)
-    {
-        if (NULL != xtable[i].pString)
-        {
-            iNumXEntries++;
-            iXSizeAlloc += xtable[i].pRegexp->regalloc;
-        }
-    }
-
     ST_NUMBER(DID_ST_RX_CACHED, iNumXEntries);
     ST_NUMBER(DID_ST_RX_TABLE, RXCACHE_TABLE);
     ST_NUMBER(DID_ST_RX_TABLE_SIZE, iXSizeAlloc);

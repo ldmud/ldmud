@@ -760,8 +760,11 @@ yywarn (const char *str)
                   , time_stamp(), current_file, str, current_line, context);
     fflush(stderr);
     parse_error(MY_TRUE, current_file, current_line, str, context);
-    if (num_parse_error == 0)
+    if (master_ob && num_parse_error == 0)
         save_error(str, current_file, current_line);
+    /* TODO: Introduce a 'master_is_loading' flag to prevent this call while
+     * TODO:: the master is inactive.
+     */
 } /* yywarn() */
 
 /*-------------------------------------------------------------------------*/
@@ -1622,7 +1625,12 @@ add_local_name (ident_t *ident, fulltype_t type, int depth)
     {
         if (ident->type != I_TYPE_UNKNOWN)
         {
-            /* We're overlaying some other definition */
+            /* We're overlaying some other definition.
+             * If it's a global, it's ok.
+             */
+            if (ident->type != I_TYPE_GLOBAL)
+                yywarnf( "Variable '%s' shadows previous declaration"
+                       , get_txt(ident->name));
             ident = make_shared_identifier(get_txt(ident->name), I_TYPE_LOCAL, depth);
         }
 
@@ -1700,6 +1708,35 @@ leave_block_scope (void)
 
 /*-------------------------------------------------------------------------*/
 static ident_t *
+lookup_local (int num)
+
+/* Lookup the ident_t structure for local variable <num>.
+ */
+
+{
+    ident_t *p, *q;
+
+    /* First, find the previous declaration of this local */
+    q = NULL;
+    for (p = all_locals; p != NULL; p = p->next_all)
+    {
+        if (p->u.local.num == num)
+        {
+            q = p;
+            break;
+        }
+    }
+
+    /* q should be set here and point to the previous declaration.
+     */
+    if (!q)
+        fatal("Local identifier %ld not found in list.\n", (long)num);
+
+    return q;
+} /* lookup_local() */
+
+/*-------------------------------------------------------------------------*/
+static ident_t *
 redeclare_local (int num, fulltype_t type, int depth)
 
 /* Redeclare a local name, identified by <num>, to <type> at <depth>.
@@ -1749,8 +1786,6 @@ redeclare_local (int num, fulltype_t type, int depth)
     }
     else
     {
-        yywarnf( "Variable '%s' shadows previous declaration"
-               , get_txt(q->name));
         q = add_local_name(q, type, depth);
     }
 
@@ -1968,6 +2003,10 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
          } /* if (!complete) */
         
+        /* Remember the heart_beat() function */
+        if (mstreq(p->name, STR_HEART_BEAT))
+            heart_beat = num;
+
         /* If it was yet another prototype, then simply return. */
         if (flags & NAME_PROTOTYPE)
         {
@@ -8256,7 +8295,7 @@ function_call:
               funp = FUNCTION(f);
               if (exact_types)
               {
-                  yyerrorf("Undefined function %.50s", get_txt($1.real->name));
+                  yyerrorf("Undefined function '%.50s'", get_txt($1.real->name));
               }
               $$.type = TYPE_ANY;  /* Just a guess */
           }
@@ -8613,6 +8652,28 @@ function_name:
       {
           $$.super = NULL;
           $$.real  = $1;
+      }
+
+    | L_LOCAL
+      {
+          ident_t *lvar = lookup_local($1);
+          ident_t *fun = find_shared_identifier(get_txt(lvar->name), I_TYPE_UNKNOWN, 0);
+
+          /* Search the inferior list for this identifier for a global
+           * (function) definition.
+           */
+
+          while (fun && fun->type > I_TYPE_GLOBAL)
+              fun = fun->inferior;
+
+          if (!fun || fun->type != I_TYPE_GLOBAL)
+          {
+              yyerrorf("Undefined function '%.50s'\n", get_txt(lvar->name));
+              YYACCEPT;
+          }
+
+          $$.super = NULL;
+          $$.real  = fun;
       }
 
     | L_COLON_COLON L_IDENTIFIER

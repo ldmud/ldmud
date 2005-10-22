@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Apr-2001 (Lars Duening)  (3.3.43)
+    - (prolang.y) Redefining an inherited private heart_beat() didn't work:
+         the new heart_beat() wasn't called (reported by Gnomi).
+    - (rxcache.c) The status functions were far too slow, because they
+         counted the number of entries on each call (reported by Sissi).
+    - (prolang.y) Function calls can distinguish between variables and
+         functions of the same name (suggested by Gnomi).
+    - (prolang.y) Warnings while loading the master caused the load to
+         fail.
+
 16-Apr-2001 (Lars Duening)  (3.3.42)
     - (object.c) Ooops, didn't compile in COMPAT mode (reported by Ralph).
 
