@@ -26,6 +26,12 @@ DESCRIPTION
         Complexity: O(lg(n) + a*n) where n is the number of keys and
         s is a very small constant (for block move);
 
+        The function is available only if the driver is compiled with
+        alist support. In that case, __ALISTS__ is defined.
+
+HISTORY
+        LDMud 3.3 made this an optional efun.
+
 SEE ALSO
         alists(LPC), assoc(E), order_alist(E)
 

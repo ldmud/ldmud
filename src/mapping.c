@@ -3396,7 +3396,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
         if (!callback_object(&cb))
             error("Object used by %s destructed"
-                 , bFull ? "map" : "map_mapping");
+                 , bFull ? "filter" : "filter_mapping");
 
 
         v = apply_callback(&cb, 1 + bFull);

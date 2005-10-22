@@ -271,6 +271,10 @@ enable_lpc_nosave=yes
 
 enable_use_mysql=no
 
+# Enable support for alists.
+
+enable_use_alists=no
+
 # Enable obsolete and deprecated efuns.
 
 enable_use_deprecated=yes

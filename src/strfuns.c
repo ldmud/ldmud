@@ -16,6 +16,7 @@
 #include "driver.h"
 #include "typedefs.h"
 
+#include "my-alloca.h"
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -504,6 +505,58 @@ intersect_strings (const string_t * p_left, const string_t * p_right, Bool bSubt
 
     return result;
 } /* intersect_strings() */
+
+/*-------------------------------------------------------------------------*/
+string_t *
+trim_all_spaces (const string_t * txt)
+
+/* Trim the input string <txt> by removing all leading and trailing
+ * space, and by folding embedded space runs into just one each.
+ * Return the new string with one ref; the refcount of <txt> is not changed.
+ *
+ * Throw an error when out of memory.
+ */
+
+{
+    char * dest, * src;
+    size_t dest_ix, src_ix, srclen;
+    string_t * rc;
+
+    dest = alloca(mstrsize(txt));
+    if (dest == NULL)
+        error("Stack overflow (%ld bytes)\n", mstrsize(txt));
+
+    src = get_txt(txt);
+    srclen = mstrsize(txt);
+    src_ix = 0;
+    dest_ix = 0;
+
+    /* Blank out trailing spaces */
+    while (srclen > 0 && src[srclen-1] == ' ')
+        srclen--;
+
+    /* Skip leading spaces */
+    while (src_ix < srclen && *src == ' ')
+        src_ix++, src++;
+      
+    /* Copy characters, but fold embedded spaces. */
+    for ( ; src_ix < srclen; src_ix++, src++, dest_ix++)
+    {
+        dest[dest_ix] = *src;
+
+        /* If this and the next character is a space, forward
+         * src until the last space in this run.
+         */
+        if (' ' == *src)
+        {
+            while (src_ix+1 < srclen && ' ' == src[1])
+                src_ix++, src++;
+        }
+    }
+
+    memsafe(rc = new_n_mstring(dest, dest_ix), dest_ix, "trimmed result");
+    return rc;
+} /* trim_all_spaces() */
 
 /*--------------------------------------------------------------------*/
 char *

@@ -13,3 +13,4 @@ with_master_name=obj/master
 enable_compat_mode=yes
 enable_strict_euids=no
 enable_lpc_nosave=no
+enable_use_alists=yes

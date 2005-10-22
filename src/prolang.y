@@ -1009,7 +1009,7 @@ get_type_name (fulltype_t type)
     }
     
     if (type >= sizeof type_name / sizeof type_name[0])
-        fatal("Bad type\n");
+        fatal("Bad type %ld\n", (long)type);
 
     strcat(buff, type_name[type]);
     if (pointer)
@@ -6278,7 +6278,11 @@ expr0:
 
               CURRENT_PROGRAM_SIZE += 2;
           }
-          /* TODO: else: variable not declared - try to recover */
+          else
+          {
+              /* Variable not declared - try to recover */
+              YYACCEPT;
+          }
 
           last_expression = CURRENT_PROGRAM_SIZE;
 

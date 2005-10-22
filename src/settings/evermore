@@ -17,6 +17,7 @@ with_portno=7777
 with_udp_port=7780
 enable_compat_mode=yes
 with_master_name=kernel/master
+enable_use_alists=yes
 enable_supply_parse_command=no
 enable_initialization_by___init=no
 enable_dynamic_costs=yes

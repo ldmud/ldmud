@@ -22,6 +22,12 @@ DESCRIPTION
         Keys have to be of type integer, string or object. Types can
         be mixed.
 
+        The function is available only if the driver is compiled with
+        alist support. In that case, __ALISTS__ is defined.
+
+HISTORY
+        LDMud 3.3 made this an optional efun.
+
 SEE ALSO
         alists(LPC), mappings(LPC), insert_alist(E), assoc(E),
         transpose_array(E)

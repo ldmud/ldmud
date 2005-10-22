@@ -22,6 +22,7 @@ with_time_to_swap=900
 with_time_to_swap_variables=3600
 
 enable_strict_euids=yes
+enable_use_alists=yes
 
 with_portno=2010
 

@@ -18,4 +18,5 @@ with_udp_port=4246
 enable_compat_mode=yes
 enable_strict_euids=no
 enable_lpc_nosave=yes
+enable_use_alists=yes
 

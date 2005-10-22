@@ -52,48 +52,6 @@
  * This module contains both low-level and efun-level functions.
  * The latter are collected in the lower half of the source.
  *---------------------------------------------------------------------------
- * One special application of arrays are alists: associative lists.
- * Alists allow the association of data (single values or tuples) with
- * a key value, which is then used to locate the data in the alist structure.
- *
- * Nowadays the same functionality is offered by mappings in a much more
- * efficient manner, so this usage of alists is deprecated. However, for
- * reasons explained below, alists can be used as an efficient way to
- * construct lookup arrays.
- *
- * It might be historically interesting to know that the very first
- * implementations of mappings were mere syntactic sugar for alists.
- * Furthermore, the LPMud variant of alists offers only a part of the
- * functionality of 'real' alists.
- *
- * Alists are implemented by a vector of vectors. A typical alist
- * for (key:data1,...,dataN) tuples looks like this:
- *
- *   alist = ({ ({ key values })
- *            , ({ data1 values })
- *            , ...
- *            , ({ dataN values })
- *           })
- *
- * All subarrays are of the same length, and all the values for one tuple
- * is found at the same index. For example, if the key for a tuple
- * is found in alist[0][3], the data values are found in alist[1..N][3].
- *
- * The key value array is sorted to allow fast lookups, the sorting order
- * uses the internal representation of the key values (which usually has
- * nothing in common with the meaning of the key values). Three things
- * however can be guaranteed:
- *
- *   - integer key values appear in rising order in the key array, though
- *     not necessarily consecutive.
- *   - removing one or more keys does not break the order of the
- *     other keys.
- *   - all strings used as key values are made shared strings.
- *
- * TODO: order_alist() should be generalized into a sort_array() function
- * TODO:: since it is used for more than just alists (similar assoc() into
- * TODO:: a lookup function). Alists themselves are pretty outdated by now.
- *---------------------------------------------------------------------------
  */
 
 #include "driver.h"
@@ -629,139 +587,6 @@ explode_string (string_t *str, string_t *del)
 } /* explode_string() */
 
 /*-------------------------------------------------------------------------*/
-vector_t *
-old_explode_string (string_t *str, string_t *del)
-
-/* Explode the string <str> by delimiter string <del> and return an array
- * of the (unshared) strings found between the delimiters.
- *
- * This is the old behaviour: leading and trailing occurences of <del>
- * in <str> are ignored.
- *
- *   explode("xyz", "")         -> { "xyz" }
- *   explode("###", "##")       -> { "", "#" }
- *   explode(" the  fox ", " ") -> { "the", "", "fox" }
- *
- * This function used to implement the explode() efun. Now the parse_command
- * parser and the efun process_string() are the only parts still using it.
- */
-
-{
-    char *p, *beg, *strtxt, *deltxt;
-    size_t num, len, txtlen, left;
-    vector_t *ret;
-
-    len = mstrsize(del);
-    deltxt = get_txt(del);
-
-    /* Take care of the case where the delimiter is an
-     * empty string. Then, return an array with only one element,
-     * which is the original string.
-     */
-    if (len == 0)
-    {
-        ret = allocate_array(1);
-        put_ref_string(ret->item, str);
-        return ret;
-    }
-
-    /* Skip leading 'del' strings, if any.
-     */
-    strtxt = get_txt(str);
-    txtlen = mstrsize(str);
-    while (txtlen >= len && memcmp(strtxt, deltxt, (size_t)len) == 0)
-    {
-        strtxt += len;
-        txtlen -= len;
-        if (txtlen <= 0)
-            return allocate_array(0);
-    }
-
-    /* Find number of occurences of the delimiter 'del' by doing a first
-     * scan of the string.
-     *
-     * The found number + 1 is then the number of needed array elements.
-     * Remember that explode("###","##") -> { "","#" }.
-     * TODO: Implement a strncmp() which returns the number of matching
-     *   characters in case of a mismatch.
-     * TODO: Remember the found positions so that we don't have to
-     *   do the comparisons again.
-     */
-    for (p = strtxt, num = 1, left = txtlen; left > 0;)
-    {
-        if (left >= len && memcmp(p, deltxt, len) == 0)
-        {
-            p += len;
-            left -= len;
-            if (*p)
-                num++;
-        }
-        else
-        {
-            p += 1;
-            left -= 1;
-        }
-    }
-
-    ret = allocate_array(num);
-
-    /* Extract the <num> strings into the result array <ret>.
-     */
-
-    for (p = strtxt, beg = strtxt, num = 0, left = txtlen; left > 0; )
-    {
-        if (left >= len && memcmp(p, deltxt, len) == 0)
-        {
-            ptrdiff_t bufflen;
-            string_t *buff;
-
-            bufflen = p - beg;
-            buff = new_n_mstring(beg, (size_t)bufflen);
-            if (!buff)
-            {
-                free_array(ret);
-                outofmem(bufflen, "buffer in old explode()");
-            }
-
-            put_string(ret->item + num, buff);
-
-            num++;
-            left -= p - beg + len;
-            beg = p + len;
-            p = beg;
-        }
-        else
-        {
-            p += 1;
-            left -= 1;
-        }
-    }
-
-    /* Copy last occurence, if there was not a 'del' at the end.
-     */
-    if (beg - strtxt < txtlen)
-    {
-        ptrdiff_t bufflen;
-        string_t *buff;
-
-        if (num >= VEC_SIZE(ret))
-            fatal("Index out of bounds in old explode(): estimated %ld, got %ld.\n", (long)num, VEC_SIZE(ret));
-
-        bufflen = p - beg;
-        buff = new_n_mstring(beg, (size_t)bufflen);
-        if (!buff)
-        {
-            free_array(ret);
-            outofmem(bufflen, "buffer in old explode()");
-        }
-
-        put_string(ret->item + num, buff);
-    }
-
-    return ret;
-} /* old_explode_string() */
-
-/*-------------------------------------------------------------------------*/
 string_t *
 arr_implode_string (vector_t *arr, string_t *del MTRACE_DECL)
 
@@ -907,17 +732,240 @@ add_array (vector_t *p, vector_t *q)
 }
 
 /*-------------------------------------------------------------------------*/
-static int
-compare_single (svalue_t *svp, vector_t *v)
+static INLINE int
+array_cmp (svalue_t *p1, svalue_t *p2)
+
+/* Array order function.
+ *
+ * Compare the svalues <p1> and <p2> and return an integer with the
+ * following meaning:
+ *
+ *   > 0: <p1> 'is greater than' <p2>
+ *   = 0: <p1> 'is equal to' <p2>
+ *   < 0: <p1> 'is less than' <p2>
+ *
+ * The relation need not make sense with the actual interpretation
+ * of <p1>/<p2>, as long as it defines a deterministic order relation.
+ * Especially, it works for strings because the caller makes sure
+ * that only directly tabled strings are used.
+ *
+ * TODO: Is the assumption '.number is big enough to hold everything
+ * TODO:: in the svalue' true for future hardware?
+ * TODO: Reinterpreting the pointers as 'integer' may not be portable
+ * TODO:: enough.
+ */
+
+{
+    register int d;
+
+    /* Avoid a numeric overflow by first comparing the values halfed. */
+    if ( 0 != (d = p1->type - p2->type) ) return d;
+
+    if (p1->type == T_CLOSURE)
+        return closure_cmp(p1, p2);
+
+    if ( 0 != (d = (p1->u.number >> 1) - (p2->u.number >> 1)) ) return d;
+    if ( 0 != (d = p1->u.number - p2->u.number) ) return d;
+    switch (p1->type) {
+      case T_FLOAT:
+      case T_SYMBOL:
+      case T_QUOTED_ARRAY:
+        if ( 0 != (d = p1->x.generic - p2->x.generic) ) return d;
+        break;
+    }
+    return 0;
+} /* array_cmp() */
+
+/*-------------------------------------------------------------------------*/
+ptrdiff_t *
+get_array_order (vector_t * vec )
+
+/* Determine the order of the elements in vector <vec> and return the
+ * sorted indices (actually svalue_t* pointer diffs). The order is
+ * determined by array_cmp().
+ * 
+ * As a side effect, strings in the key vector are made shared, and
+ * destructed objects in key and data vectors are replaced by svalue 0s.
+ */
+
+{
+    ptrdiff_t * sorted;
+      /* The vector elements in sorted order, given as the offsets of the array
+       * element in question to the start of the vector. This way,
+       * sorted[] needs only to be <keynum> elements long.
+       * sorted[] is created from root[] after sorting.
+       */
+
+    svalue_t **root;
+      /* Auxiliary array with the sorted keys as svalue* into inlists[0].vec.
+       * This way the sorting is given by the order of the pointers, while
+       * the original position is given by (pointer-inlists[0].vec->item).
+       * The very first element is a dummy (heapsort uses array indexing
+       * starting with index 1), the next <keynum> elements are scratch
+       * area, the final <keynum> elements hold the sorted keys in reverse
+       * order.
+       */
+    svalue_t **root2;   /* Aux pointer into *root. */
+    svalue_t *inpnt;    /* Pointer to the value to copy into the result */
+    mp_int keynum;      /* Number of keys */
+    int j;
+
+    keynum = (mp_int)VEC_SIZE(vec);
+
+    /* Allocate the auxiliary array. */
+    root = (svalue_t **)alloca(keynum * sizeof(svalue_t *[2])
+                                           + sizeof(svalue_t)
+                              );
+    if (!root)
+    {
+        error("Stack overflow in get_array_order()");
+        /* NOTREACHED */
+        return NULL;
+    }
+
+    xallocate(sorted, keynum * sizeof(ptrdiff_t) + sizeof(ptrdiff_t)
+             , "sorted index array");
+      /* The extra sizeof(ptrdiff_t) is just to have something in
+       * case keynum is 0.
+       */
+
+    /*
+     * Heapsort inlists[0].vec into *root.
+     * TODO: For small arrays a simpler sort like linear insertion or
+     * TODO:: even bubblesort might be faster (less overhead). Best solution
+     * TODO:: would be to offer both algorithms and determine the threshhold
+     * TODO:: at startup.
+     */
+
+    /* Heapify the keys into the first half of root */
+    for ( j = 1, inpnt = vec->item
+        ; j <= keynum
+        ; j++, inpnt++)
+    {
+        int curix, parix;
+
+        /* make sure that strings can be compared by their pointer */
+        if (inpnt->type == T_STRING)
+        {
+            if (!mstr_d_tabled(inpnt->u.str))
+            {
+                inpnt->u.str = make_tabled(inpnt->u.str);
+            }
+        }
+        else if (destructed_object_ref(inpnt))
+        {
+            free_svalue(inpnt);
+            put_number(inpnt, 0);
+        }
+
+        /* propagate the new element up in the heap as much as necessary */
+        for (curix = j; 0 != (parix = curix>>1); ) {
+            if ( array_cmp(root[parix], inpnt) > 0 ) {
+                root[curix] = root[parix];
+                curix = parix;
+            } else {
+                break;
+            }
+        }
+        root[curix] = inpnt;
+    }
+
+    root++; /* Adjust root to ignore the heapsort-dummy element */
+
+    /* Sort the heaped keys from the first into the second half of root. */
+    root2 = &root[keynum];
+    for(j = keynum; --j >= 0; ) {
+        int curix;
+
+        *root2++ = *root;
+        for (curix=0; ; ) {
+            int child, child2;
+
+            child = curix+curix+1;
+            child2 = child+1;
+            if (child2 >= keynum) {
+                if (child2 == keynum && root[child]) {
+                    root[curix] = root[child];
+                    curix = child;
+                }
+                break;
+            }
+            if (root[child2]) {
+                if (!root[child] || array_cmp(root[child], root[child2]) > 0)
+                {
+                    root[curix] = root[child2];
+                    curix = child2;
+                    continue;
+                }
+            } else if (!root[child]) {
+                break;
+            }
+            root[curix] = root[child];
+            curix = child;
+        }
+        root[curix] = 0;
+    }
+
+    /* Compute the sorted offsets from root[] into sorted[].
+     * Note that root[] is in reverse order.
+     */
+    for (root = &root[keynum], j = 0; j < keynum; j++)
+        sorted[j] = root[keynum-j-1] - vec->item;
+
+    return sorted;
+} /* get_array_order() */
+
+/*-------------------------------------------------------------------------*/
+vector_t *
+order_array (vector_t *vec)
+
+/* Order the array <vec> and return a new vector with the sorted data.
+ * The sorting order is the internal order defined by array_cmp().
+ *
+ * This function and lookup_array() are used in several places for internal
+ * lookup functions (e.g. in sort_array()).
+ *
+ * As a side effect, strings in the key vector are made shared, and
+ * destructed objects in key and data vectors are replaced by svalue 0s.
+ */
+
+{
+    vector_t  * out;     /* The result vector of vectors */
+    svalue_t  * outpnt;  /* Next result value element to fill in */
+    ptrdiff_t * sorted;  /* The vector elements in sorted order */
+    long        keynum;  /* Number of keys */
+    long j;
+
+    keynum = (long)VEC_SIZE(vec);
+
+    sorted = get_array_order(vec);
+
+    /* Copy the elements from the in-vector to the result vector.
+     */
+    out = allocate_array(VEC_SIZE(vec));
+    outpnt = out->item;
+    for (j = keynum; --j >= 0; )
+    {
+         assign_svalue_no_free(outpnt++, vec->item + sorted[j]);
+    }
+
+    xfree(sorted);
+
+    return out;
+} /* order_array() */
+
+/*-------------------------------------------------------------------------*/
+static long
+compare_single (svalue_t *svp, vector_t *vec)
 
 /* Compare *svp and v->item[0], return 0 if equal, and -1 if not.
  *
  * The function is used by subtract_array() and must match the signature
- * of assoc().
+ * of lookup_key().
  */
 
 {
-    svalue_t *p2 = &v->item[0];
+    svalue_t *p2 = &vec->item[0];
 
     if (svp->type != p2->type)
         return -1;
@@ -959,15 +1007,12 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
  * and return the resulting difference vector.
  * <subtrahend> and <minuend> are freed.
  *
- * The function uses order_alist()/assoc()/compare_single() on
+ * The function uses order_array()/lookup_key()/compare_single() on
  * <subtrahend> for faster operation, and recognizes subtrahends with
  * only one element and/or one reference.
  */
 
 {
-    svalue_t ltmp = { T_POINTER };
-      /* Temporary svalue to pass vectors to order_alist(). */
-
     vector_t *difference;    /* Resulting difference vector,
                                 with extra zeroes at the end */
     vector_t *vtmpp;         /* {( Ordered <subtrahend> }) */
@@ -977,9 +1022,9 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
     mp_int minuend_size    = (mp_int)VEC_SIZE(minuend);
     mp_int subtrahend_size = (mp_int)VEC_SIZE(subtrahend);
 
-    int (*assoc_function)(svalue_t *, vector_t *);
+    long (*lookup_function)(svalue_t *, vector_t *);
       /* Function to find an svalue in a sorted vector.
-       * Use of this indirection allows to replace assoc() with
+       * Use of this indirection allows to replace lookup() with
        * faster functions for special cases.
        */
 
@@ -1003,16 +1048,15 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
         {
             assign_svalue(&subtrahend->item[0], &const0);
         }
-        assoc_function = &compare_single;
+        lookup_function = &compare_single;
         vtmpp = subtrahend;
     }
     else
     {
-        ltmp.u.vec = subtrahend;
-        vtmpp = order_alist(&ltmp, 1, 1);
-        free_array(ltmp.u.vec);
-        assoc_function = &assoc;
-        subtrahend = vtmpp->item[0].u.vec;
+        vtmpp = order_array(subtrahend);
+        free_array(subtrahend);
+        lookup_function = &lookup_key;
+        subtrahend = vtmpp;
     }
 
     /* Scan minuend and look up every element in the ordered subtrahend.
@@ -1026,13 +1070,13 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
         {
             if (destructed_object_ref(source))
                 assign_svalue(source, &const0);
-            if ( (*assoc_function)(source, subtrahend) >-1 ) break;
+            if ( (*lookup_function)(source, subtrahend) >-1 ) break;
         }
         for (dest = source++; i-- > 0 ; source++)
         {
             if (destructed_object_ref(source))
                 assign_svalue(source, &const0);
-            if ( (*assoc_function)(source, subtrahend) < 0 )
+            if ( (*lookup_function)(source, subtrahend) < 0 )
                 assign_svalue(dest++, source);
         }
         free_array(vtmpp);
@@ -1047,7 +1091,7 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
         ; source++) {
         if (destructed_object_ref(source))
             assign_svalue(source, &const0);
-        if ( (*assoc_function)(source, subtrahend) < 0 )
+        if ( (*lookup_function)(source, subtrahend) < 0 )
             assign_svalue_no_free(dest++, source);
     }
 
@@ -1056,287 +1100,22 @@ subtract_array (vector_t *minuend, vector_t *subtrahend)
 
     /* Shrink the difference vector to the needed size and return it. */
     return shrink_array(difference, dest-difference->item);
-}
-
-/*-------------------------------------------------------------------------*/
-static INLINE int
-alist_cmp (svalue_t *p1, svalue_t *p2)
-
-/* Alist comparison function.
- *
- * Compare the svalues <p1> and <p2> and return an integer with the
- * following meaning:
- *
- *   > 0: <p1> 'is greater than' <p2>
- *   = 0: <p1> 'is equal to' <p2>
- *   < 0: <p1> 'is less than' <p2>
- *
- * The relation need not make sense with the actual interpretation
- * of <p1>/<p2>, as long as it defines a deterministic order relation.
- * Especially, it works for strings because the caller makes sure
- * that only directly tabled strings are used.
- *
- * TODO: Is the assumption '.number is big enough to hold everything
- * TODO:: in the svalue' true for future hardware?
- * TODO: Reinterpreting the pointers as 'integer' may not be portable
- * TODO:: enough.
- */
-
-{
-    register int d;
-
-    /* Avoid a numeric overflow by first comparing the values halfed. */
-    if ( 0 != (d = p1->type - p2->type) ) return d;
-
-    if (p1->type == T_CLOSURE)
-        return closure_cmp(p1, p2);
-
-    if ( 0 != (d = (p1->u.number >> 1) - (p2->u.number >> 1)) ) return d;
-    if ( 0 != (d = p1->u.number - p2->u.number) ) return d;
-    switch (p1->type) {
-      case T_FLOAT:
-      case T_SYMBOL:
-      case T_QUOTED_ARRAY:
-        if ( 0 != (d = p1->x.generic - p2->x.generic) ) return d;
-        break;
-    }
-    return 0;
-}
-
-/*-------------------------------------------------------------------------*/
-vector_t *
-order_alist (svalue_t *inlists, int listnum, Bool reuse)
-
-/* Order the alist <inlists> and return a new vector with it. The sorting
- * order is the internal order defined by alist_cmp().
- *
- * <inlists> is a vector of <listnum> vectors:
- *   <inlists> = ({ ({ keys }), ({ data1 }), ..., ({ data<listnum-1> }) })
- *
- * If <reuse> is true, the vectors of <inlists> are reused for the
- * vectors of the result when possible, and their entries in <inlists> are
- * set to T_INVALID.
- *
- * This function and assoc() are used in several places for internal
- * lookup functions (e.g. in sort_array()).
- *
- * As a side effect, strings in the key vector are made shared, and
- * destructed objects in key and data vectors are replaced by svalue 0s.
- */
-
-{
-    vector_t *outlist;   /* The result vector of vectors */
-    vector_t *v;         /* Aux vector pointer */
-    svalue_t *outlists;  /* Next element in outlist to fill in */
-    ptrdiff_t * sorted;
-      /* The vector elements in sorted order, given as the offsets of the array
-       * element in question to the start of the vector. This way,
-       * sorted[] needs only to be <keynum> elements long.
-       * sorted[] is created from root[] after sorting.
-       */
-
-    svalue_t **root;
-      /* Auxiliary array with the sorted keys as svalue* into inlists[0].vec.
-       * This way the sorting is given by the order of the pointers, while
-       * the original position is given by (pointer-inlists[0].vec->item).
-       * The very first element is a dummy (heapsort uses array indexing
-       * starting with index 1), the next <keynum> elements are scratch
-       * area, the final <keynum> elements hold the sorted keys in reverse
-       * order.
-       */
-    svalue_t **root2;   /* Aux pointer into *root. */
-    svalue_t *inpnt;    /* Pointer to the value to copy into the result */
-    mp_int keynum;      /* Number of keys */
-    int i, j;
-
-    keynum = (mp_int)VEC_SIZE(inlists[0].u.vec);
-
-    /* Allocate the auxiliary array. */
-    root = (svalue_t **)alloca(keynum * sizeof(svalue_t *[2])
-                                           + sizeof(svalue_t)
-                                   );
-    sorted = alloca(keynum * sizeof(ptrdiff_t) + sizeof(ptrdiff_t));
-    /* TODO: keynum may be 0, so the c-alloca() would return NULL without
-     * the extra sizeof(ptrdiff_t) :-(
-     */
-
-    if (!root || !sorted)
-    {
-        error("Stack overflow in order_alist()");
-        /* NOTREACHED */
-        return NULL;
-    }
-
-    /*
-     * Heapsort inlists[0].vec into *root.
-     * TODO: For small arrays a simpler sort like linear insertion or
-     * TODO:: even bubblesort might be faster (less overhead). Best solution
-     * TODO:: would be to offer both algorithms and determine the threshhold
-     * TODO:: at startup.
-     */
-
-    /* Heapify the keys into the first half of root */
-    for ( j = 1, inpnt = inlists->u.vec->item
-        ; j <= keynum
-        ; j++, inpnt++)
-    {
-        int curix, parix;
-
-        /* make sure that strings can be compared by their pointer */
-        if (inpnt->type == T_STRING)
-        {
-            if (!mstr_d_tabled(inpnt->u.str))
-            {
-                inpnt->u.str = make_tabled(inpnt->u.str);
-            }
-        }
-        else if (destructed_object_ref(inpnt))
-        {
-            free_svalue(inpnt);
-            put_number(inpnt, 0);
-        }
-
-        /* propagate the new element up in the heap as much as necessary */
-        for (curix = j; 0 != (parix = curix>>1); ) {
-            if ( alist_cmp(root[parix], inpnt) > 0 ) {
-                root[curix] = root[parix];
-                curix = parix;
-            } else {
-                break;
-            }
-        }
-        root[curix] = inpnt;
-    }
-
-    root++; /* Adjust root to ignore the heapsort-dummy element */
-
-    /* Sort the heaped keys from the first into the second half of root. */
-    root2 = &root[keynum];
-    for(j = keynum; --j >= 0; ) {
-        int curix;
-
-        *root2++ = *root;
-        for (curix=0; ; ) {
-            int child, child2;
-
-            child = curix+curix+1;
-            child2 = child+1;
-            if (child2 >= keynum) {
-                if (child2 == keynum && root[child]) {
-                    root[curix] = root[child];
-                    curix = child;
-                }
-                break;
-            }
-            if (root[child2]) {
-                if (!root[child] || alist_cmp(root[child], root[child2]) > 0)
-                {
-                    root[curix] = root[child2];
-                    curix = child2;
-                    continue;
-                }
-            } else if (!root[child]) {
-                break;
-            }
-            root[curix] = root[child];
-            curix = child;
-        }
-        root[curix] = 0;
-    }
-
-    /* Compute the sorted offsets from root[] into sorted[].
-     * Note that root[] is in reverse order.
-     */
-    for (root = &root[keynum], j = 0; j < keynum; j++)
-        sorted[j] = root[keynum-j-1] - inlists[0].u.vec->item;
-
-    /*
-     * Generate the result vectors from the sorted keys in root.
-     */
-
-    outlist = allocate_array(listnum);
-    outlists = outlist->item;
-
-    /* Copy the elements from all inlist vectors into the outlist
-     * vectors.
-     *
-     * At the beginning of every loop v points to the vector to
-     * use as the next 'out' vector. It may be a re-used 'in' vector
-     * from the previous run.
-     */
-    v = allocate_array(keynum);
-    for (i = listnum; --i >= 0; ) {
-
-        svalue_t *outpnt; /* Next result value element to fill in */
-
-        /* Set the new array v as the next 'out' vector, and init outpnt
-         * and offs.
-         */
-        put_array(outlists + i, v);
-        outpnt = v->item;
-
-        v = inlists[i].u.vec; /* Next vector to fill if reusable */
-
-        /* Copy the elements.
-         * For a reusable 'in' vector, a simple memory copy is sufficient.
-         * For a new vector, a full assignment is due to keep the refcounters
-         * happy.
-         */
-        if (reuse && inlists[i].u.vec->ref == 1) {
-
-            if (i)/* not the last iteration */
-                inlists[i].type = T_INVALID;
-
-            for (j = keynum; --j >= 0; ) {
-                inpnt = inlists[i].u.vec->item + sorted[j];
-                if (destructed_object_ref(inpnt))
-                {
-                    free_svalue(inpnt);
-                    put_number(outpnt, 0);
-                    outpnt++;
-                } else {
-                    *outpnt++ = *inpnt;
-                }
-                inpnt->type = T_INVALID;
-            }
-
-        } else {
-
-            if (i) /* not the last iteration */
-                v = allocate_array(keynum);
-
-            for (j = keynum; --j >= 0; ) {
-                inpnt = inlists[i].u.vec->item + sorted[j];
-                if (destructed_object_ref(inpnt))
-                {
-                    put_number(outpnt, 0);
-                    outpnt++;
-                } else {
-                    assign_svalue_no_free(outpnt++, inpnt);
-                }
-            }
-        } /* if (reuse) */
-    } /* for (listnum) */
-
-    return outlist;
-}
+} /* subtract_array() */
 
 /*-------------------------------------------------------------------------*/
 Bool
-is_alist (vector_t *v)
+is_ordered (vector_t *v)
 
-/* Determine if <v> satisfies the conditions for being an alist key vector.
+/* Determine if <v> satisfies the conditions for being an ordered vector.
  * Return true if yes, false if not.
  *
  * The conditions are:
  *   - every string is shared
- *   - all elements are sorted according to alist_cmp().
+ *   - all elements are sorted according to array_cmp().
  *
- * Note that an ordinary array can do this by chance.
- *
- * This predicate is currently used just by the swapper to avoid swapping
- * out alist values. This is because the internal order is based on
- * pointer values and thus unreproducible.
+ * This predicate is currently used just by the swapper, historically
+ * to avoid swapping out alist values. This is because the internal order
+ * is based on pointer values and thus unreproducible.
  */
 
 {
@@ -1346,14 +1125,14 @@ is_alist (vector_t *v)
     for (svp = v->item, i = (mp_int)VEC_SIZE(v); --i > 0; svp++) {
         if (svp->type == T_STRING && !mstr_d_tabled(svp->u.str))
             return MY_FALSE;
-        if (alist_cmp(svp, svp+1) > 0)
+        if (array_cmp(svp, svp+1) > 0)
             return MY_FALSE;
     }
     if (svp->type == T_STRING && !mstr_d_tabled(svp->u.str))
         return MY_FALSE;
 
     return MY_TRUE;
-}
+} /* is_ordered() */
 
 /*=========================================================================*/
 
@@ -2273,283 +2052,24 @@ f_map_objects (svalue_t *sp, int num_arg)
 } /* f_map_objects() */
 
 /*-------------------------------------------------------------------------*/
-static int
-search_alist (svalue_t *key, vector_t *keylist)
+long
+lookup_key (svalue_t *key, vector_t *vec)
 
-/* Helper for insert_alist() and assoc().
+/* Lookup up value <key> in ordered vector <vec> and return it's position.
+ * If not found, return as negative number the position at which the
+ * key would have to be inserted, incremented by 1. That is:
+ *   -1          -> key should be at position 0,
+ *   -2          -> key should be at position 1,
+ *   -len(vec)-1 -> key should be appended to the vector.
  *
- * Search for <key> in the alist key vector <keylist> and return its position.
- * If <key> is not found, return the position at which the <key> would
- * have to be inserted (this might be sizeof(<keylist>), ie. the element
- * beyond the current end).
- *
- * The key vector must be sorted according to alist_cmd(), else the
- * binary search will return surely interesting but useless results.
+ * <vec> be sorted according to array_cmp(), else the result will be
+ * interesting, but useless.
  */
 
 {
     mp_int i, o, d, keynum;
-
-    if ( !(keynum = (mp_int)VEC_SIZE(keylist)) )
-        return 0;
-
-    /* Simple binary search */
-
-    i = keynum >> 1;
-    o = (i+2) >> 1;
-    for (;;) {
-        d = alist_cmp(key, &keylist->item[i]);
-        if (d<0) {
-            i -= o;
-            if (i<0) {
-                i = 0;
-            }
-        } else if (d>0) {
-            i += o;
-            if (i >= keynum) {
-                i = keynum-1;
-            }
-        } else {
-            return i;
-        }
-        if (o<=1) {
-            if (alist_cmp(key, &keylist->item[i]) > 0) return i+1;
-            return i;
-        }
-        o = (o+1) >> 1;
-    }
-
-    return 0;
-}
-
-
-/*-------------------------------------------------------------------------*/
-#ifdef F_INSERT_ALIST
-
-static svalue_t *
-insert_alist (svalue_t *key, svalue_t * /* TODO: bool */ key_data, vector_t *list)
-
-/* Implementation of efun insert_alist()
- *
- * The function can be used in two ways:
- *
- * 1. Insert/replace a (new) <key>:<keydata> tuple into the alist <list>.
- *    <key> and <key_data> have to point to an array of svalues. The first
- *    element is the key value, the following values the associated
- *    data values. The function will read as many elements from the
- *    array as necessary to fill the alist <list>.
- *    Result is a fresh copy of the modified alist.
- *
- * 2. Lookup a <key> in the alist <list> and return its index+1. The
- *    result is 0 if the key is not found.
- *    <key_data> must be NULL, <key> points to the svalue to be looked
- *    up, and <list> points to an alist with at least the key vector.
- *
- * If <list> is no alist, the result can be wrong (case 2.) or not
- * an alist either (case 1.).
- *
- * If the <key> is a string, it is made shared.
- *
- * TODO: Make the hidden flag 'key_data' a real flag.
- */
-
-{
-    static svalue_t stmp; /* Result value */
-    mp_int i,j,ix;
-    mp_int keynum, list_size;  /* Number of keys, number of alist vectors */
-    int new_member;            /* Flag if a new tuple is given */
-
-    /* If key is a string, make it shared */
-    if (key->type == T_STRING && !mstr_d_tabled(key->u.str))
-    {
-        key->u.str = make_tabled(key->u.str);
-    }
-
-    keynum = (mp_int)VEC_SIZE(list->item[0].u.vec);
-
-    /* Locate the key */
-    ix = search_alist(key, list->item[0].u.vec);
-
-    /* If its just a lookup: return the result.
-     */
-    if (key_data == NULL) {
-         put_number(&stmp, ix);
-         return &stmp;
-    }
-
-    /* Prepare the result alist vector */
-    put_array(&stmp, allocate_array(list_size = (mp_int)VEC_SIZE(list)));
-
-    new_member = ix == keynum || alist_cmp(key, &list->item[0].u.vec->item[ix]);
-
-    /* Loop over all key/data vectors in <list>, insert/replace the
-     * new value and put the new vector into <stmp>.
-     */
-    for (i = 0; i < list_size; i++) {
-        vector_t *vtmp;
-
-        if (new_member) {
-
-            svalue_t *pstmp = list->item[i].u.vec->item;
-
-            vtmp = allocate_array(keynum+1);
-            for (j=0; j < ix; j++) {
-               assign_svalue_no_free(&vtmp->item[j], pstmp++);
-            }
-            assign_svalue_no_free(&vtmp->item[ix], i ? &key_data[i] : key );
-            for (j = ix+1; j <= keynum; j++) {
-               assign_svalue_no_free(&vtmp->item[j], pstmp++);
-            }
-
-        } else {
-
-            vtmp = slice_array(list->item[i].u.vec, 0, keynum-1);
-            if (i)
-                assign_svalue(&vtmp->item[ix], &key_data[i]);
-                /* No need to assign the key value: it's already there. */
-
-        }
-
-        stmp.u.vec->item[i].type=T_POINTER;
-        stmp.u.vec->item[i].u.vec=vtmp;
-    }
-
-    /* Done */
-    return &stmp;
-} /* insert_alist() */
-
-#endif
-
-/*-------------------------------------------------------------------------*/
-#ifdef F_INSERT_ALIST
-
-svalue_t *
-f_insert_alist (svalue_t *sp, int num_arg)
-
-/* EFUN insert_alist()
- *
- *   mixed* insert_alist (mixed key, mixed data..., mixed * alist)
- *   int    insert_alist (mixed key, mixed * keys)
- *
- * 1. Form: Alist Insertion
- *
- *   The <key> and all following <data> values are inserted
- *   into the <alist>. If an entry for <key> already exists
- *   in the list, just the data values are replaced. The number
- *   of <data> values must match the number of data arrays
- *   in the alist, naturally.
- *
- *   Result is the updated <alist>.
- *
- * 2. Form: Key Insertion
- *
- *   Insert the <key> into the (ordered) array of <keys>, so that
- *   subsequent assoc()s can perform quick lookups. Result is the
- *   index at which <key> was inserted (or already found).
- *
- *   CAVEAT: when working with string keys, the index might no longer
- *     be valid after the next call to insert_alist().
- */
-/* When the key list of an alist contains destructed objects
-   it is better not to free them till the next reordering by
-   order_alist to retain the alist property.
- */
-
-{
-    int i;
-    vector_t *list;
-    long listsize;
-    size_t keynum;
-    svalue_t *key,*key_data,*ret;
-    static LOCAL_VEC1(insert_alist_vec, T_NUMBER);
-      /* Mock-alist for the insert_alist() key-insertion form.
-       */
-
-    if (sp->type != T_POINTER)
-        vefun_arg_error(num_arg, T_POINTER, sp->type, sp);
-
-    /* Make up an alist if only a key-insertion is required */
-    if ( !(listsize = (long)VEC_SIZE(sp->u.vec))
-     ||  sp->u.vec->item[0].type != T_POINTER )
-    {
-        list = &insert_alist_vec.v;
-        *list->item = *sp;
-        listsize = 1;
-    }
-    else
-        list = sp->u.vec;
-
-    /* Check the validity of the alist */
-    keynum = VEC_SIZE(list->item[0].u.vec);
-    for (i = 1; i < listsize; i++)
-    {
-        if (list->item[i].type != T_POINTER
-         || VEC_SIZE(list->item[i].u.vec) != keynum)
-        {
-            error("Type or size mismatch of the data arrays.\n");
-            /* NOTREACHED */
-            return sp;
-        }
-    }
-
-    /* Get and test the data to insert */
-    if (num_arg == 2)
-    {
-        if (sp[-1].type != T_POINTER)
-        {
-            key_data = NULL;
-            key = sp-1;
-        }
-        else
-        {
-            if (VEC_SIZE(sp[-1].u.vec) != (size_t)listsize)
-            {
-                error("Size mismatch of the data arrays.\n");
-                /* NOTREACHED */
-                return sp;
-            }
-            key_data = key = sp[-1].u.vec->item;
-        }
-    }
-    else
-    {
-        if (num_arg - 1 != listsize)
-        {
-            error("Not enough data given.\n");
-            /* NOTREACHED */
-            return sp;
-        }
-        key_data = key = sp-num_arg+1;
-    }
-
-    /* Do the insertion */
-    ret = insert_alist(key,key_data,list);
-    sp = pop_n_elems(num_arg, sp);
-    sp++;
-    *sp = *ret;
-
-    return sp;
-} /* f_insert_alist() */
-
-#endif /* F_INSERT_ALIST */
-
-/*-------------------------------------------------------------------------*/
-int
-assoc (svalue_t *key, vector_t *list)
-
-/* EFUN assoc(), also used for internal vector lookups.
- *
- * Lookup <key> in the alist key vector <list> and return its position.
- * If it is not found, return -1.
- *
- * The key vector must be sorted according to alist_cmd(), else the
- * result will be interesting, but useless.
- */
-
-{
-    int i;
     svalue_t shared_string_key; 
-      /* The svalue used to pass the shared search key to search_alist().
+      /* The svalue used to shared search key during the search.
        * It does not count as reference!
        */
 
@@ -2563,133 +2083,59 @@ assoc (svalue_t *key, vector_t *list)
         key = &shared_string_key;
     }
 
-    i = search_alist(key, list);
-    if (i == (int)VEC_SIZE(list) || alist_cmp(key, &list->item[i]))
-        i = -1;
+    if ( !(keynum = (mp_int)VEC_SIZE(vec)) )
+        return -1;
 
-    return i;
-} /* assoc() */
+    /* Simple binary search */
+
+    i = keynum >> 1;
+    o = (i+2) >> 1;
+    for (;;) {
+        d = array_cmp(key, &vec->item[i]);
+        if (d < 0)
+        {
+            i -= o;
+            if (i < 0)
+            {
+                i = 0;
+            }
+        }
+        else if (d > 0) 
+        {
+            i += o;
+            if (i >= keynum)
+            {
+                i = keynum-1;
+            }
+        }
+        else
+        {
+            /* Found! */
+            return i;
+        }
+
+        if (o <= 1)
+        {
+            /* Not found at all */
+            d = array_cmp(key, &vec->item[i]);
+            if (d > 0) return -(i+1)-1;
+            return -i-1;
+        }
+        o = (o+1) >> 1;
+    }
+
+    /* NOTREACHED */
+    return -1;
+} /* lookup_key() */
 
 /*-------------------------------------------------------------------------*/
-#ifdef F_ASSOC
+vector_t *
+intersect_ordered_arr (vector_t *a1, vector_t *a2)
 
-svalue_t *
-f_assoc (svalue_t *sp, int num_arg)
-
-/* EFUN assoc()
+/* Compute the intersection of the two ordered arrays <a1> and <a2>.
  *
- *     int   assoc (mixed key, mixed *keys)
- *     mixed assoc (mixed key, mixed *alist [, mixed fail] )
- *     mixed assoc (mixed key, mixed *keys, mixed *data [, mixed fail])
- *
- * Search for <key> in the <alist> resp. in the <keys>.
- *
- * When the key list of an alist contains destructed objects
- * it is better not to free them till the next reordering by
- * order_alist to retain the alist property.
- */
-
-{
-    svalue_t *args;
-    vector_t *keys,*data;
-    svalue_t *fail_val;
-    int ix;
-
-    args = sp -num_arg +1;
-
-    /* Analyse the arguments */
-    if ( !VEC_SIZE(args[1].u.vec)
-     ||  args[1].u.vec->item[0].type != T_POINTER )
-    {
-        keys = args[1].u.vec;
-        if (num_arg == 2)
-        {
-            data = NULL;
-        }
-        else
-        {
-            if (args[2].type != T_POINTER
-             || VEC_SIZE(args[2].u.vec) != VEC_SIZE(keys))
-            {
-                error("Number of values in key and data arrays differ.\n");
-                /* NOTREACHED */
-                return sp;
-            }
-            data = args[2].u.vec;
-        }
-        if (num_arg == 4)
-        {
-            fail_val = &args[3];
-        }
-        else
-        {
-            fail_val = &const0;
-        }
-    }
-    else
-    {
-        keys = args[1].u.vec->item[0].u.vec;
-        if (VEC_SIZE(args[1].u.vec) > 1)
-        {
-            if (args[1].u.vec->item[1].type != T_POINTER
-             || VEC_SIZE(args[1].u.vec->item[1].u.vec) != VEC_SIZE(keys))
-            {
-                error("Number of values in key and data arrays differ.\n");
-                /* NOTREACHED */
-                return sp;
-            }
-            data = args[1].u.vec->item[1].u.vec;
-        }
-        else
-        {
-            data = NULL;
-        }
-
-        if (num_arg == 3) fail_val = &args[2];
-        else if (num_arg == 2) fail_val = &const0;
-        else
-        {
-            error("too many args to efun assoc\n");
-            /* NOTREACHED */
-            return sp;
-        }
-    }
-
-    /* Call assoc() and push the result */
-    ix = assoc(&args[0],keys);
-    if (data == NULL)
-    {
-        sp = pop_n_elems(num_arg, sp);
-        push_number(sp, ix);
-    }
-    else
-    {
-        assign_svalue(args
-                     , ix == -1
-                       ? fail_val
-                       : (destructed_object_ref(&data->item[ix])
-                         ? &const0
-                         : &data->item[ix])
-                     );
-        sp = pop_n_elems(num_arg-1, sp);
-    }
-
-    return sp;
-} /* f_assoc() */
-
-#endif
-
-/*-------------------------------------------------------------------------*/
-static vector_t *
-intersect_alist (vector_t *a1, vector_t *a2)
-
-/* Used by efun intersect_alist() and by generic array intersection.
- *
- * Perform a fast intersection of the alist key vectors <a1> and <a2>.
  * The result is a new sorted(!) vector with all elements, which are present
  * in both input vectors.
- *
- * TODO: Maybe rename the fun.
  */
 
 {
@@ -2700,7 +2146,7 @@ intersect_alist (vector_t *a1, vector_t *a2)
     a2s = (mp_int)VEC_SIZE(a2);
     a3 = allocate_array( a1s < a2s ? a1s : a2s);
     for (i1=i2=l=0; i1 < a1s && i2 < a2s; ) {
-        d = alist_cmp(&a1->item[i1], &a2->item[i2]);
+        d = array_cmp(&a1->item[i1], &a2->item[i2]);
         if (d<0)
             i1++;
         else if (d>0)
@@ -2710,43 +2156,8 @@ intersect_alist (vector_t *a1, vector_t *a2)
         }
     }
     return shrink_array(a3, l);
-}
+} /* intersect_ordered_arr() */
 
-/*-------------------------------------------------------------------------*/
-#ifdef F_INTERSECT_ALIST
-
-svalue_t *
-f_intersect_alist (svalue_t *sp)
-
-/* EFUN intersect_alist()
- *
- *   mixed * intersect_alist (mixed * list1, mixed * list2)
- *
- * Does a fast set intersection on alist key vectors (NOT on full
- * alists!).
- *
- * The result is a new sorted(!) vector with all elements, which are present
- * in both input vectors.
- *
- * The operator '&' does set intersection on arrays in
- * general.
- *
- * TODO: Maybe rename the efun.
- */
-
-{
-    vector_t *rc;
-
-    rc = intersect_alist(sp[-1].u.vec, sp->u.vec);
-
-    free_svalue(sp--);
-    free_array(sp->u.vec);
-    sp->u.vec = rc;
-
-    return sp;
-} /* f_intersect_alist() */
-
-#endif /* F_INTERSECT_ALIST */
 
 /*-------------------------------------------------------------------------*/
 vector_t *
@@ -2758,100 +2169,29 @@ intersect_array (vector_t *a1, vector_t *a2)
  * The result is a new vector with all elements which are present in both
  * input vectors.
  *
- * The result vector is also sorted according to alist_cmp(), but
+ * The result vector is also sorted according to array_cmp(), but
  * don't rely on it.
  */
 
 {
     vector_t *vtmpp1, *vtmpp2, *vtmpp3;
-    static svalue_t ltmp = { T_POINTER };
 
-    /* Order the two ingoing lists and then perform an alist intersection.
+    /* Order the two ingoing lists and then perform the intersection.
      */
 
-    ltmp.u.vec = a1;
-    vtmpp1 = order_alist(&ltmp, 1, 1);
-    free_array(ltmp.u.vec);
+    vtmpp1 = order_array(a1);
+    free_array(a1);
 
-    ltmp.u.vec = a2;
-    vtmpp2 = order_alist(&ltmp, 1, 1);
-    free_array(ltmp.u.vec);
+    vtmpp2 = order_array(a2);
+    free_array(a2);
 
-    vtmpp3 = intersect_alist(vtmpp1->item[0].u.vec, vtmpp2->item[0].u.vec);
+    vtmpp3 = intersect_ordered_arr(vtmpp1, vtmpp2);
 
     free_array(vtmpp1);
     free_array(vtmpp2);
 
     return vtmpp3;
-}
-
-/*-------------------------------------------------------------------------*/
-#ifdef F_ORDER_ALIST
-
-svalue_t *
-f_order_alist (svalue_t *sp, int num_arg)
-
-/* EFUN order_alist()
- *
- *   mixed *order_alist(mixed *keys, mixed *|void data, ...)
- *
- * Creates an alist.
- *
- * Either takes an array containing keys, and others containing
- * the associated data, where all arrays are to be of the same
- * length, or takes a single array that contains as first member
- * the array of keys and has an arbitrary number of other members
- * containing data, each of wich has to be of the same length as
- * the key array. Returns an array holding the sorted key array
- * and the data arrays; the same permutation that is applied to
- * the key array is applied to all data arrays.
- */
-
-{
-    int i;
-    svalue_t *args;
-    vector_t *list;
-    long listsize;
-    Bool reuse;
-    size_t keynum;
-
-    args = sp-num_arg+1;
-
-    /* Get the key array to order */
-    if (num_arg == 1
-      && ((list = args->u.vec), (listsize = (long)VEC_SIZE(list)))
-      && list->item[0].type == T_POINTER)
-    {
-        args     = list->item;
-        reuse = (list->ref == 1);
-    }
-    else
-    {
-        listsize = num_arg;
-        reuse = MY_TRUE;
-    }
-    keynum = VEC_SIZE(args[0].u.vec);
-
-    /* Get the data arrays to order */
-    for (i = 0; i < listsize; i++)
-    {
-        if (args[i].type != T_POINTER
-         || VEC_SIZE(args[i].u.vec) != keynum)
-        {
-            error("bad data array %d in call to order_alist\n",i);
-        }
-    }
-
-    /* Create the alist */
-    list = order_alist(args, listsize, reuse);
-    sp = pop_n_elems(num_arg, sp);
-    sp++;
-    put_array(sp, list);
-
-    return sp;
-} /* f_order_alist() */
-
-#endif /* F_ORDER_ALIST */
+} /* intersect_array() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

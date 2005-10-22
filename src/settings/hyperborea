@@ -9,6 +9,7 @@ exit 1
 
 # --- The actual settings ---
 
+enable_use_alists=yes
 enable_compat_mode=yes
 enable_use_system_crypt=no
 with_master_name=obj/master

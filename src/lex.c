@@ -792,6 +792,9 @@ init_lexer(void)
 #ifdef USE_MYSQL
     add_permanent_define("__MYSQL__", -1, string_copy(""), MY_FALSE);
 #endif
+#ifdef USE_ALISTS
+    add_permanent_define("__ALISTS__", -1, string_copy(""), MY_FALSE);
+#endif
 #ifdef USE_LPC_NOSAVE
     add_permanent_define("__LPC_NOSAVE__", -1, string_copy(""), MY_FALSE);
 #endif

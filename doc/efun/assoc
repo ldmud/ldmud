@@ -37,6 +37,12 @@ DESCRIPTION
           it matches <key>. This form of lookup is therefore used
           primarily with multidimensional alists.
 
+        The function is available only if the driver is compiled with
+        alist support. In that case, __ALISTS__ is defined.
+
+HISTORY
+        LDMud 3.3 made this an optional efun.
+
 SEE ALSO
         alists(LPC), insert_alist(E), order_alist(E)
 

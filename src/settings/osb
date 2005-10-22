@@ -17,6 +17,7 @@ with_apply_cache_bits=14
 enable_compat_mode=no
 enable_strict_euids=no
 
+enable_use_alists=no
 enable_supply_parse_command=yes
 enable_initialization_by___init=no
 enable_use_system_crypt=no

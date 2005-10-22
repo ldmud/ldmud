@@ -7328,6 +7328,7 @@ again:
          */
         int i;
         svalue_t *arg;
+        string_t *str;
 
         assign_eval_cost();
         num_arg = LOAD_UINT8(pc);
@@ -7344,6 +7345,15 @@ again:
 
         inter_sp = sp;
         inter_pc = pc;
+
+        str = trim_all_spaces(arg[0].u.str);
+        free_mstring(arg[0].u.str);
+        arg[0].u.str = str;
+
+        str = trim_all_spaces(arg[2].u.str);
+        free_mstring(arg[2].u.str);
+        arg[2].u.str = str;
+
         if (compat_mode)
             i = e_old_parse_command(arg[0].u.str, &arg[1], arg[2].u.str
                                    , &arg[3], num_arg-3);

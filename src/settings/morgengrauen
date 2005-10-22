@@ -52,6 +52,7 @@ enable_strict_euids=yes
 
 enable_supply_parse_command=no
 enable_initialization_by___init=yes
+enable_use_alists=yes
 
 with_min_malloced=0x80000
 with_max_malloced=0x1f000000

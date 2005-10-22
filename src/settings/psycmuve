@@ -88,6 +88,7 @@ with_time_to_clean_up=9000
 enable_compat_mode=yes
 enable_strict_euids=no
 enable_initialization_by___init=no
+enable_use_alists=yes
 
 #-- EXTRAS
 

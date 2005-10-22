@@ -81,7 +81,7 @@ SRC = access_check.c actions.c array.c backend.c bitstrings.c call_out.c \
       dumpstat.c ed.c efuns.c files.c gcollect.c hash.c heartbeat.c \
       interpret.c \
       lex.c main.c mapping.c md5.c mempools.c mstrings.c object.c otable.c\
-      parser.c parse.c parse_old.c pkg-mysql.c port.c ptrtable.c \
+      parser.c parse.c parse_old.c pkg-alists.c pkg-mysql.c port.c ptrtable.c \
       random.c regexp.c rxcache.c simulate.c simul_efun.c stdstrings.c \
       strfuns.c sprintf.c swap.c wiz_list.c xalloc.c
 OBJ = access_check.o actions.o array.o backend.o bitstrings.o call_out.o \
@@ -89,7 +89,7 @@ OBJ = access_check.o actions.o array.o backend.o bitstrings.o call_out.o \
       dumpstat.o ed.o efuns.o files.o gcollect.o hash.o heartbeat.o \
       interpret.o \
       lex.o main.o mapping.o md5.o mempools.o mstrings.o object.o otable.o \
-      parser.o parse.o parse_old.o pkg-mysql.o port.o ptrtable.o \
+      parser.o parse.o parse_old.o pkg-alists.o pkg-mysql.o port.o ptrtable.o \
       random.o regexp.o rxcache.o simulate.o simul_efun.o stdstrings.o \
       strfuns.o sprintf.o swap.o wiz_list.o xalloc.o @ALLOCA@
 

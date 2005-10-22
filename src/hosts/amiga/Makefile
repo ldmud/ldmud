@@ -237,13 +237,15 @@ SRC=lex.c md5.c main.c interpret.c simulate.c object.c backend.c array.c\
     comm.c ed.c regexp.c mapping.c wiz_list.c swap.c xalloc.c\
     call_out.c otable.c dumpstat.c mstrings.c hash.c port.c files.c\
     parser.c ptrtable.c heartbeat.c actions.c mempools.c bitstrings.c \
-    pkg-mysql.c access_check.c parse_old.c parse.c prolang.y rxcache.c\
+    pkg-alists.c pkg-mysql.c access_check.c parse_old.c parse.c prolang.y \
+    rxcache.c\
     simul_efun.c strfuns.c sprintf.c gcollect.c closure.c random.c efuns.c\
     $(XSRC)
 OBJ=parser.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
     comm.o ed.o regexp.o mapping.o wiz_list.o swap.o xalloc.o md5.o\
     call_out.o otable.o dumpstat.o mstrings.o hash.o port.o files.o \
-    pkg-mysql.o ptrtable.o heartbeat.o actions.o mempools.o bitstrings.o \
+    pkg-alists.o pkg-mysql.o ptrtable.o heartbeat.o actions.o mempools.o \
+    bitstrings.o \
     access_check.o parse_old.o parse.o simul_efun.o strfuns.o sprintf.o\
     efuns.o gcollect.o closure.o random.o rxcache.o $(XOBJ)
 

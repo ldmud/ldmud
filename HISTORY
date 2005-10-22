@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-22-Apr-2001 (Lars Duening) -- Development Release 3.3
+25-Apr-2001 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -13,6 +13,8 @@ For a detailed list of all changes see the file CHANGELOG.
          map_mapping(), mapping_contains() and member_array().
        + add_action(): Historical usage with just one argument no longer
            supported.
+       + assoc(), insert_alist(), order_alist(), intersect_alist(): Optional
+           as package 'alists'.
 
     - Corrected efuns:
 
@@ -40,7 +42,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-17-Apr-2001 (Lars Duening) -- upcoming Release 3.2.9
+25-Apr-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + allocate(): Accepts an optional initialisation value and can
@@ -130,6 +132,8 @@ For a detailed list of all changes see the file CHANGELOG.
            could crash under extremely unlucky circumstances.
        + #define'ing the name of an inline closure was not detected.
        + Assignments of computed strings sometimes crashed the driver.
+       + Pre-increment or -decrement on an undefined variable, where
+           the result was used in a typechecked context.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.

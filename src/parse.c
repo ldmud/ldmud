@@ -465,7 +465,7 @@ parse_to_plural (string_t *str)
      * pluralize the last word in the string, and the last word
      * before each 'of'.
      */
-    words = old_explode_string(str, STR_SPACE);
+    words = explode_string(str, STR_SPACE);
 
     for (changed = MY_FALSE, il = 1; il < VEC_SIZE(words); il++)
     {
@@ -749,7 +749,7 @@ find_string (string_t *str, vector_t *wvec, size_t *cix_in)
         if (*cix_in + 1 == VEC_SIZE(wvec))
             continue;
 
-        split = old_explode_string(str, STR_SPACE);
+        split = explode_string(str, STR_SPACE);
 
         /* Now: wvec->size - *cix_in = 2: One extra word
          *                           = 3: Two extra words
@@ -1386,7 +1386,7 @@ prepos_parse (vector_t *wvec, size_t *cix_in, Bool *fail, svalue_t *prepos)
       {
           /* Multiword match */
           
-          tvec = old_explode_string(tmp, STR_SPACE);
+          tvec = explode_string(tmp, STR_SPACE);
           for (tix = 0; tix < VEC_SIZE(tvec); tix++)
           {
               if (*cix_in+tix >= VEC_SIZE(wvec)
@@ -1656,11 +1656,11 @@ e_parse_command ( string_t *cmd          /* Command to parse */
     
     xallocate(old, sizeof *old, "parse context");
         
-    wvec = old_explode_string(cmd, STR_SPACE);
+    wvec = explode_string(cmd, STR_SPACE);
     if (!wvec)
         wvec = allocate_array(0);
 
-    patvec = old_explode_string(pattern, STR_SPACE);
+    patvec = explode_string(pattern, STR_SPACE);
     if (!patvec)
         patvec = allocate_array(0);
 

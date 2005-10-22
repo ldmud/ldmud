@@ -288,6 +288,10 @@
  */
 @cdef_use_ipv6@ USE_IPV6
 
+/* Define this if you want alist support.
+ */
+@cdef_use_alists@ USE_ALISTS
+
 /* Define this if you want mySQL support (assuming that your host
  * actually offers this.
  */

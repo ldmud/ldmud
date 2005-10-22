@@ -3075,7 +3075,6 @@ e_say (svalue_t *v, vector_t *avoid)
  */
  
 {
-    static svalue_t ltmp = { T_POINTER };
     static svalue_t stmp = { T_OBJECT };
 
     object_t *ob;
@@ -3136,10 +3135,12 @@ e_say (svalue_t *v, vector_t *avoid)
 
     /* Sort the avoid vector for fast lookups
      */
-    ltmp.u.vec = avoid;
-    avoid = order_alist(&ltmp, 1, 1);
-    push_array(inter_sp, avoid); /* in case of errors... */
-    avoid = avoid->item[0].u.vec;
+    {
+        vector_t * tmp = order_array(avoid);
+        free_array(avoid);
+        avoid = tmp;
+        push_array(inter_sp, avoid); /* In case of errors */
+    }
 
     /* Collect the list of propable recipients.
      * First, look in the environment.
@@ -3228,7 +3229,7 @@ e_say (svalue_t *v, vector_t *avoid)
             if (ob->flags & O_DESTRUCTED)
                 continue;
             stmp.u.ob = ob;
-            if (assoc(&stmp, avoid) >= 0)
+            if (lookup_key(&stmp, avoid) >= 0)
                 continue;
             push_ref_array(inter_sp, v->u.vec);
             push_ref_object(inter_sp, origin, "say");
@@ -3253,7 +3254,7 @@ e_say (svalue_t *v, vector_t *avoid)
         if (ob->flags & O_DESTRUCTED)
             continue;
         stmp.u.ob = ob;
-        if (assoc(&stmp, avoid) >= 0)
+        if (lookup_key(&stmp, avoid) >= 0)
             continue;
         if (!(O_SET_INTERACTIVE(ip, ob)))
         {
@@ -3355,7 +3356,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
 /* Implementation of the EFUN tell_room().
  *
  * Value <v> is sent to all living objects in <room>, except those
- * in <avoid>. <avoid> has to be in order_alist() order.
+ * in <avoid>. <avoid> has to be in order_array() order.
  */
 
 {
@@ -3438,7 +3439,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
             if (ob->flags & O_DESTRUCTED)
                 continue;
             stmp.u.ob = ob;
-            if (assoc(&stmp, avoid) >= 0)
+            if (lookup_key(&stmp, avoid) >= 0)
                 continue;
             push_ref_array(inter_sp, v->u.vec);
             push_ref_object(inter_sp, origin, "tell_room");
@@ -3461,7 +3462,7 @@ e_tell_room (object_t *room, svalue_t *v, vector_t *avoid)
 
         if (ob->flags & O_DESTRUCTED) continue;
         stmp.u.ob = ob;
-        if (assoc(&stmp, avoid) >= 0) continue;
+        if (lookup_key(&stmp, avoid) >= 0) continue;
         if (!(O_SET_INTERACTIVE(ip, ob)))
         {
             tell_npc_str(ob, message);
@@ -3526,17 +3527,9 @@ f_tell_room (svalue_t *sp, int num_arg)
         /* Sort the list of objects to exclude for faster
          * operation.
          */
-
-        vector_t *vtmpp;
-        static svalue_t stmp = { T_POINTER };
-
-        stmp.u.vec = arg[2].u.vec;
-        vtmpp = order_alist(&stmp, 1, MY_TRUE);
-        avoid = vtmpp->item[0].u.vec;
+        avoid = order_array(arg[2].u.vec);
         sp->u.vec = avoid; /* in case of an error, this will be freed. */
         sp--;
-        vtmpp->item[0].u.vec = stmp.u.vec;
-        free_array(vtmpp);
     }
 
     e_tell_room(ob, sp, avoid);

@@ -45,6 +45,7 @@ enable_access_control=no
 # --- Language ---
 enable_supply_parse_command=no
 enable_use_mysql=yes
+enable_use_alists=yes
 
 # --- Runtime limits ---
 with_catch_reserved_cost=10000

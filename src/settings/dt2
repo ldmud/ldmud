@@ -9,6 +9,8 @@ exit 1
 
 # --- The actual settings ---
 
+enable_use_alists=yes
+
 with_portno=7680
 with_udp_port=8889
 

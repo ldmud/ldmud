@@ -102,13 +102,14 @@ extern void free_empty_vector(vector_t *p);
 extern void check_for_destr(vector_t *v);
 extern string_t *arr_implode_string(vector_t *, string_t * MTRACE_DECL);
 extern vector_t *explode_string(string_t *str, string_t *del);
-extern vector_t *old_explode_string(string_t *str, string_t *del);
 extern vector_t *slice_array(vector_t *p, mp_int from, mp_int to);
 extern vector_t *add_array(vector_t *p, vector_t *q);
+extern ptrdiff_t *get_array_order (vector_t * vec );
+extern vector_t *order_array (vector_t *vec);
+extern long lookup_key (svalue_t *key, vector_t *vec);
 extern vector_t *subtract_array(vector_t *minuend, vector_t *subtrahend);
-extern vector_t *order_alist(svalue_t *inlists, int listnum, Bool reuse);
-extern int assoc(svalue_t *key, vector_t *list);
-extern int is_alist(vector_t *v);
+extern Bool is_ordered(vector_t *v);
+extern vector_t * intersect_ordered_arr (vector_t *a1, vector_t *a2);
 extern vector_t *intersect_array(vector_t *a1, vector_t *a2);
 
 extern svalue_t *f_allocate(svalue_t *sp, int num_arg);
@@ -116,20 +117,6 @@ extern svalue_t *x_filter_array(svalue_t *sp, int num_arg);
 extern svalue_t *f_sort_array(svalue_t *sp, int num_arg);
 extern svalue_t *x_map_array(svalue_t *sp, int num_arg);
 extern svalue_t *f_transpose_array(svalue_t *sp);
-
-#ifdef F_MEMBER_ARRAY
-extern svalue_t *f_member_array(svalue_t *sp);
-#endif
-
-extern svalue_t *f_assoc(svalue_t *sp, int num_arg);
-extern svalue_t *f_intersect_alist(svalue_t *sp);
-#ifdef F_INSERT_ALIST
-extern svalue_t *f_insert_alist(svalue_t *sp, int num_arg);
-#endif
-
-#ifdef F_ORDER_ALIST
-extern svalue_t *f_order_alist(svalue_t *sp, int num_arg);
-#endif
 
 extern svalue_t *f_filter_objects(svalue_t *sp, int num_arg);
 extern svalue_t *f_map_objects(svalue_t *sp, int num_arg);

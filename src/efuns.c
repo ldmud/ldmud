@@ -1818,7 +1818,6 @@ f_process_string(svalue_t *sp)
     vector_t   *vec;           /* Arg string exploded by '@@' */
     object_t   *old_cur;       /* Old current object */
     wiz_list_t *old_eff_user;  /* Old euid */
-    int         pr_start;      /* Index of the first pr-spec in vec */
     int         il;            /* Index in vec */
     Bool        changed;       /* True if there was a replacement */
     Bool        ch_last;       /* True if the last vec-entry was replaced */
@@ -1862,15 +1861,12 @@ f_process_string(svalue_t *sp)
     }
 
     /* Explode the argument by the '@@' */
-    /* TODO: Rewrite to use new explode_string() */
-    vec = old_explode_string(str, STR_ATAT);
+    vec = explode_string(str, STR_ATAT);
     if (!vec)
         return sp;
     push_array(inter_sp, vec); /* automatic free in case of errors */
 
-    pr_start = ((get_txt(str)[0]=='@') && (get_txt(str)[1]=='@')) ? 0 : 1;
-
-    for ( ch_last = MY_FALSE, changed = MY_FALSE, il = pr_start
+    for ( ch_last = MY_FALSE, changed = MY_FALSE, il = 1
         ; (size_t)il < VEC_SIZE(vec)
         ; il++)
     {

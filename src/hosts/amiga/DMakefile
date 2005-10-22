@@ -209,7 +209,8 @@ YFLAGS= $(TMP)
 SRC=lex.c md5.c main.c simulate.c object.c backend.c array.c \
     comm.c ed.c regexp.c mapping.c wiz_list.c swap.c \
     call_out.c otable.c dumpstat.c mstrings.c hash.c port.c \
-    pkg-mysql.c ptrtable.c heartbeat.c actions.c mempools.c files.c\
+    pkg-alists.c pkg-mysql.c ptrtable.c heartbeat.c actions.c mempools.c \
+    files.c\
     access_check.c parse_old.c parse.c random.c rxcache.c \
     simul_efun.c strfuns.c sprintf.c gcollect.c closure.c efuns.c \
     stdstrings.c xalloc.c bitstrings.c parser.c

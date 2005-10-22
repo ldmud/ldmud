@@ -291,6 +291,10 @@
  */
 #undef USE_IPV6
 
+/* Define this if you want alist support.
+ */
+#undef USE_ALISTS
+
 /* Define this if you want mySQL support (assuming that your host
  * actually offers this.
  */

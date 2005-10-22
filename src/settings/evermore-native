@@ -31,6 +31,7 @@ enable_lpc_nosave=yes
 enable_dynamic_costs=yes
 enable_use_mysql=yes
 enable_use_deprecated=no
+enable_use_alists=yes
 with_max_players=70
 with_max_local=100
 enable_align_functions=yes

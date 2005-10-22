@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+25-Apr-2001 (Lars Duening)  (3.3.49)
+    - (efuns.c, array, parse.c, parse_old.c, interpret.c) 
+         Removed the last uses of old_explode_string().
+    - (array, pkg-alists, object.c, swap.c, configuration) Alists are
+         now an optional package. By default alists are not supported,
+         however, I edited all settings/ files to include support.
+         (suggested by Freaky)
+    - (prolang.y) Pre-increment or -decrement failed to terminate
+         the parser reduction, causing an internal fatal error when the
+         result was used somewhere (reported by Dafire).
+
 24-Apr-2001 (Lars Duening)  (3.3.48)
     - (efuns.c) Efun sgn() used on negative integers still returned +1 -
          a simple typo (thanks, Fiona!).

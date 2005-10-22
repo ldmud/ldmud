@@ -530,20 +530,55 @@ object  set_modify_command(object|string default: F_THIS_OBJECT);
 void    export_uid(object);
 string  geteuid(object default: F_THIS_OBJECT);
 int     seteuid(string|null);
-
-#ifndef COMPAT_MODE
 string  getuid(object default: F_THIS_OBJECT);
-#else
-string  creator (object); /* Same function, different name */
-#endif
 
 
         /* Technical efuns */
 
 
-#ifdef USE_MYSQL
+        /* Functions only used in compatibility mode. */
+
+#ifdef COMPAT_MODE
+int     transfer(object, object|string);
+string  creator F_GETUID (object);
+#endif
+
+
+/* The following functions are optional. Comment out the ones not wanted.
+ * Beware that some may be used in mudlib 2.4.5.
+ */
+
+        /* Arrays and Mappings */
+
+        /* Strings */
+
+string  process_string(string);
+
+        /* Objects */
+
+int     set_light(int);
+int     set_is_wizard(object, int default: F_CONST1);
+
+
+        /* Packages */
+
+
+        /* Alists */
+
+#ifdef USE_ALISTS
+
+mixed   assoc(mixed, mixed *, mixed|void, mixed|void);
+mixed   insert_alist(mixed, mixed, ...);
+mixed  *intersect_alist(mixed *,mixed *);
+mixed  *order_alist(mixed *, void|mixed *, ...);
+
+#endif /* USE_ALISTS */
+
 
         /* mySQL-Support */
+
+#ifdef USE_MYSQL
+
 
 int     db_affected_rows(int);
 string *db_coldefs(int);
@@ -557,34 +592,5 @@ int     db_insert_id(int);
 
 #endif /* USE_MYSQL */
 
-
-        /* Functions only used in compatibility mode. */
-
-#ifdef COMPAT_MODE
-int     transfer(object, object|string);
-#endif
-
-
-/* The following functions are optional. Comment out the ones not wanted.
- * Beware that some may be used in mudlib 2.4.5.
- */
-
-        /* Arrays and Mappings */
-
-        /* Alists */
-
-mixed   assoc(mixed, mixed *, mixed|void, mixed|void);
-mixed   insert_alist(mixed, mixed, ...);
-mixed  *intersect_alist(mixed *,mixed *);
-mixed  *order_alist(mixed *, void|mixed *, ...);
-
-        /* Strings */
-
-string  process_string(string);
-
-        /* Objects */
-
-int     set_light(int);
-int     set_is_wizard(object, int default: F_CONST1);
 
 /***************************************************************************/

@@ -100,7 +100,8 @@ endif
            comm.c dumpstat.c ed.c efuns.c files.c gcollect.c hash.c \
            heartbeat.c \
            interpret.c lex.c main.c mapping.c md5.c mempools.c mstrings.c \
-           object.c otable.c parser.c parse.c parse_old.c pkg-mysql.c port.c \
+           object.c otable.c parser.c parse.c parse_old.c \
+           pkg-alists.c pkg-mysql.c port.c \
            ptrtable.c random.c \
            regexp.c rxcache.c simulate.c simul_efun.c stdstrings.c \
            strfuns.c sprintf.c swap.c wiz_list.c xalloc.c
@@ -146,16 +147,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 48
+  SETVERFLAGS += d 49
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.48
+  VSTRING = 3.3.0-pre.49
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 48
+  SETVERFLAGS += d 49
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.48
+  VSTRING = 3.3.0-dev.49
 endif
 
 else
@@ -163,12 +164,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 48
+SETVERFLAGS = -app 3 3 49
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.48
+  VSTRING = 3.3.49
 
 endif
 
@@ -638,6 +639,11 @@ $(OBJ)/parser.o : lang.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
     hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
+$(OBJ)/pkg-alists.o : xalloc.h svalue.h mstrings.h main.h array.h \
+    my-alloca.h typedefs.h driver.h instrs.h port.h config.h exec.h \
+    hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
+    machine.h ./hosts/amiga/ixfile.h
+
 $(OBJ)/pkg-mysql.o : xalloc.h svalue.h mstrings.h interpret.h array.h \
     pkg-mysql.h my-alloca.h typedefs.h driver.h instrs.h port.h config.h \
     exec.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
@@ -696,9 +702,9 @@ $(OBJ)/stdstrings.o : mstrings.h stdstrings.h typedefs.h driver.h port.h \
     hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
 
 $(OBJ)/strfuns.o : xalloc.h svalue.h stdstrings.h simulate.h mstrings.h \
-    comm.h strfuns.h typedefs.h driver.h sent.h exec.h port.h config.h \
-    hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h \
-    machine.h ./hosts/amiga/ixfile.h
+    comm.h strfuns.h my-alloca.h typedefs.h driver.h sent.h exec.h port.h \
+    config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
+    hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
 
 $(OBJ)/swap.o : hosts/amiga/socket.h ../mudlib/sys/debug_info.h xalloc.h \
     wiz_list.h svalue.h strfuns.h stdstrings.h simul_efun.h simulate.h \
@@ -773,6 +779,8 @@ $(OBJ)/parse.o : stdstrings.h instrs.h
 $(OBJ)/parse_old.o : stdstrings.h instrs.h
 
 $(OBJ)/parser.o : lang.c stdstrings.h instrs.h
+
+$(OBJ)/pkg-alists.o : instrs.h
 
 $(OBJ)/pkg-mysql.o : instrs.h
 

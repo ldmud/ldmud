@@ -871,7 +871,7 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
             if (svp->u.vec->ref > 1 || !size || swapping_alist)
                 goto swap_opaque;
 
-            if (size > 1 && is_alist(svp->u.vec))
+            if (size > 1 && is_ordered(svp->u.vec))
                 swapping_alist = MY_TRUE;
 
             CHECK_SPACE(1 + sizeof(size) + sizeof(wiz_list_t *))
