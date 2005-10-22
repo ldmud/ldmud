@@ -205,6 +205,8 @@ extern svalue_t *f_widthof (svalue_t *sp);
 #ifdef GC_SUPPORT
 extern void count_ref_in_mapping(mapping_t *m);
 extern void clean_stale_mappings(void);
+extern void clear_mapping_size (void);
+extern void count_mapping_size (mapping_t *m);
 #endif
 
 #endif /* MAPPING_H__ */

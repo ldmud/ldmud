@@ -2598,6 +2598,44 @@ set_mapping_user (mapping_t *m, object_t *owner)
 
 /*-------------------------------------------------------------------------*/
 void
+clear_mapping_size (void)
+
+/* Clear the statistics about the number and memory usage of all mappings
+ * in the game.
+ */
+
+{
+    wiz_list_t *wl;
+
+    num_mappings = 0;
+    default_wizlist_entry.mapping_total = 0;
+    for (wl = all_wiz; wl; wl = wl->next)
+        wl->mapping_total = 0;
+} /* clear_mapping_size(void) */
+
+/*-------------------------------------------------------------------------*/
+void
+count_mapping_size (mapping_t *m)
+
+/* Add the mapping <m> to the statistics.
+ */
+
+{
+    mp_int total;
+
+    num_mappings++;
+
+    total = sizeof(*m);
+    if (m->cond != NULL)
+        total += SIZEOF_MC(m->cond, m->num_values);
+    if (m->hash != NULL)
+        total += SIZEOF_MH_ALL(m->hash, m->num_values);
+
+    m->user->mapping_total += total;
+} /* count_mapping_size(void) */
+
+/*-------------------------------------------------------------------------*/
+void
 count_ref_in_mapping (mapping_t *m)
 
 /* GC support: Count all references by the mapping <m>.

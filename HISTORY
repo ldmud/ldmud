@@ -45,7 +45,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-15-Jul-2001 (Lars Duening) -- upcoming Release 3.2.9
+17-Jul-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -78,8 +78,9 @@ For a detailed list of all changes see the file CHANGELOG.
            Single values can be returned instead of the whole array.
        + printf(), sprintf(): A leading zero in the field size will now print
            only leading zeros and not interfere with the pad string option.
-       + printf(), sprintf(): New format modifier '$' allows to keep padding
-           white space before a line end.
+       + printf(), sprintf(): If an explicite pad string is defined, even
+           if it is space, the efuns won't remove white space before a line
+           end.
        + query_udp_port(), send_udp(): Renamed from query_imp_port() and
            send_imp().
        + regexp functions: more compatible with 8-bit characters.
@@ -266,6 +267,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Swapping is now a standard feature, though it still can be
            disabled by specifying swapping times of 0.
        + The ERQ_EXECUTE command now recognizes quoted arguments.
+       + The special command "malloc" is now under the control of the
+           IS_WIZARD flag, too.
 
 
 20-Aug-2000 (Lars Duening) -- Release 3.2.8

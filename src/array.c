@@ -417,6 +417,40 @@ total_array_size (void)
 }
 
 /*-------------------------------------------------------------------------*/
+#if defined(GC_SUPPORT)
+
+void
+clear_array_size (void)
+
+/* Clear the statistics about the number and memory usage of all vectors
+ * in the game.
+ */
+
+{
+    wiz_list_t *wl;
+
+    num_arrays = 0;
+    default_wizlist_entry.size_array = 0;
+    for (wl = all_wiz; wl; wl = wl->next)
+        wl->size_array = 0;
+} /* clear_array_size(void) */
+
+
+/*-------------------------------------------------------------------------*/
+void
+count_array_size (vector_t *vec)
+
+/* Add the vector <vec> to the statistics.
+ */
+
+{
+    num_arrays++;
+    vec->user->size_array += VEC_SIZE(vec);
+} /* count_array_size(void) */
+
+#endif /* GC_SUPPORT */
+
+/*-------------------------------------------------------------------------*/
 vector_t *
 explode_string (string_t *str, string_t *del)
 

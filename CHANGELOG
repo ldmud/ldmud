@@ -1,6 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+17-Jul-2001 (Lars Duening)  (3.3.78)
+    - (array, gcollect.c, mapping) The GC now recounts the number of arrays 
+        and mappings in the game (reported by Niels).
+    - (prolang.y) If the compiler detects a function call with too many
+        arguments, the subsequent argument type checks were wrong
+        (reported by Fiona).
+    - (sprintf.c) Instead of using the new modifier '$', the efun now
+        uses the existence of an explicite pad string specification
+        as flag whether to remove pad space before new lines or not.
+        This is actually more logical to use than a modifier (suggested
+        by Largo).
+    - (actions.c) The special command 'malloc' now follows the
+        'is_wizard' handling of the other special commands (thanks,
+        Niels).
+
 16-Jul-2001 (Lars Duening)  (3.3.77)
     - (mapping.c) Removed an extraneous increment in the mapping statistics:
         the hash part of a new mapping was counted twice.

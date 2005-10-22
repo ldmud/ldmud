@@ -14,7 +14,6 @@
  *        NB: std (s)printf() defaults to right justification, which is
  *            unnatural in the context of a mainly string based language
  *            but has been retained for "compatability" ;)
- *  "$"   pad whitespace before a line end is kept
  *  "|"   centered within field size.
  *  "="   column mode if strings are greater than field size.  this is only
  *        meaningful with strings, all other types are ignored. The strings
@@ -36,9 +35,10 @@
  *  "'X'" The char(s) between the single-quotes are used to pad to field
  *        size (defaults to space) (if both a zero (in front of field
  *        size) and a pad string are specified, the one specified second
- *        overrules).  NOTE:  to include "'" in the pad string, you must
- *        use "\\'" (as the backslash has to be escaped past the
- *        interpreter), similarly, to include "\" requires "\\\\".
+ *        overrules).
+ *        To include "'" in the pad string, you must use "\\'" (as the
+ *        backslash has to be escaped past the interpreter), similarly, to
+ *        include "\" requires "\\\\".
  * The following are the possible type specifiers.
  *  "%"   in which case no arguments are interpreted, and a "%" is inserted, and
  *        all modifiers are ignored.
@@ -1571,7 +1571,6 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                 case '+': finfo |= INFO_PP_PLUS; break;
                 case '-': finfo |= INFO_J_LEFT; break;
                 case '|': finfo |= INFO_J_CENTRE; break;
-                case '$': finfo |= INFO_PS_KEEP; break;
                 case '@': finfo |= INFO_ARRAY; break;
                 case '=': finfo |= INFO_COLS; break;
                 case '#': finfo |= INFO_TABLE; break;
@@ -1600,6 +1599,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                     break;
                 case '\'':
                     pad = &(format_str[++fpos]);
+                    finfo |= INFO_PS_KEEP;
                     while (1)
                     {
                         if (!format_str[fpos])

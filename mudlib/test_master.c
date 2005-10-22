@@ -28,6 +28,14 @@ void inaugurate_master (int arg)
 }
 
 //---------------------------------------------------------------------------
+string get_master_uid()
+
+// Return the master uid.
+{
+    return " R O O T ";
+}
+
+//---------------------------------------------------------------------------
 void flag (string arg)
 
 // Evaluate an argument given as option '-f' to the driver.
@@ -101,6 +109,7 @@ static nomask mixed logon ()
     add_action("f_echo", "echo");
     add_action("f_flag", "flag");
     add_action("f_gc", "gc");
+    add_action("f_upd", "upd");
     add_action("f_quit", "quit");
 
     return 1; // To verify that the connection was accepted.
@@ -119,6 +128,7 @@ int f_help (string arg)
 "  flag     - passes the argument to the flag() function\n"
 "  echo     - tests the input_to() function\n"
 "  gc       - performes a garbage collection\n"
+"  upd      - reloads the master object\n"
 "  quit     - terminates the connection, but leaves the driver running\n"
     );
     return 1;
@@ -177,6 +187,21 @@ int f_shutdown (string arg)
     debug_message(sprintf("%O: f_shutdown()\n", this_object()));
     write("Shutting down.\n");
     shutdown();
+    return 1;
+}
+
+//---------------------------------------------------------------------------
+int f_upd (string arg)
+
+// The 'upd' command.
+
+{
+    debug_message(sprintf("%O: f_upd()\n", this_object()));
+    write("Removing old master...\n");
+    destruct(find_object(__MASTER_OBJECT__));
+    write("Loading master again...\n");
+    load_object(__MASTER_OBJECT__);
+    write("...done.\n");
     return 1;
 }
 

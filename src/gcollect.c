@@ -573,6 +573,7 @@ count_ref_in_vector (svalue_t *svp, size_t num)
             /* Don't use CHECK_REF on the null vector */
             if (p->u.vec != &null_vector && CHECK_REF(p->u.vec))
             {
+                count_array_size(p->u.vec);
                 count_ref_in_vector(&p->u.vec->item[0], VEC_SIZE(p->u.vec));
             }
             p->u.vec->ref++;
@@ -588,6 +589,7 @@ count_ref_in_vector (svalue_t *svp, size_t num)
                     note_ref(m->cond);
                 /* hash mappings have been eleminated at the start */
                 count_ref_in_mapping(m);
+                count_mapping_size(m);
             }
             p->u.map->ref++;
             continue;
@@ -923,6 +925,9 @@ garbage_collection(void)
     {
         debug_message("%s start of garbage_collection\n", time_stamp());
     }
+
+    clear_array_size();
+    clear_mapping_size();
 
     /* Process the list of all objects */
 

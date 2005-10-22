@@ -8545,6 +8545,7 @@ function_call:
               else if (num_arg > max && max != -1)
               {
                   yyerrorf("Too many arguments to %s", instrs[f].name);
+                  pop_arg_stack (num_arg - max);
                   num_arg = max;
               }
 

@@ -599,20 +599,20 @@ special_parse (char *buff)
  */
 
 {
-    if (strcmp(buff, "malloc") == 0)
-    {
-        strbuf_t sbuf;
-
-        status_parse(&sbuf, "malloc");
-        strbuf_send(&sbuf);
-        return 1;
-    }
-
 #ifdef O_IS_WIZARD
     if (!is_wizard_used || command_giver->flags & O_IS_WIZARD)
 #endif
     {
         Bool no_curobj = MY_FALSE;
+
+        if (strcmp(buff, "malloc") == 0)
+        {
+            strbuf_t sbuf;
+
+            status_parse(&sbuf, "malloc");
+            strbuf_send(&sbuf);
+            return 1;
+        }
 
         if (strcmp(buff, "dumpallobj") == 0) {
 
