@@ -686,6 +686,19 @@ dprintf3 (int fd, char *s, p_int a, p_int b, p_int c)
     dprintf2(fd, s, b, c);
 } /* dprintf3() */
 
+/*-------------------------------------------------------------------------*/
+void
+dprintf4 (int fd, char *s, p_int a, p_int b, p_int c, p_int d)
+
+/* Write a message <s> to <fd>. <s> may contain three %-style formatter.
+ * for the arguments <a>, <b>, <c> and <d>.
+ */
+
+{
+    s = dprintf_first(fd, s, a);
+    dprintf3(fd, s, b, c, d);
+} /* dprintf4() */
+
 /*=========================================================================*/
 /*                        The argument parser                              */
 /*=========================================================================*/

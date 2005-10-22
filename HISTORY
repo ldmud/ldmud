@@ -55,7 +55,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-24-Oct-2001 (Lars Duening) -- upcoming Release 3.2.9
+14-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -294,6 +294,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Bugfix: The tracing checks weren't done against the current
            interactive as documented, but instead against the current
            commandgiver.
+       + Bugfix: The automatic mapping compaction did not remove destructed
+           objects and closures.
 
     - Other Changes:
        + New driver option '--pidfile <filename>' to write the pid of the

@@ -176,8 +176,14 @@ static lambda_t *stale_lambda_closures;
 
 static void clear_map_ref_filter (svalue_t *, svalue_t *, void *);
 static void clear_ref_in_closure (lambda_t *l, ph_int type);
-static void count_ref_in_closure (svalue_t *csvp);
-static void MARK_MSTRING_REF (string_t * str);
+static void gc_count_ref_in_closure (svalue_t *csvp);
+static void gc_MARK_MSTRING_REF (string_t * str);
+
+#define count_ref_in_closure(p) \
+  GC_REF_DUMP(svalue_t*, p, "Count ref in closure", gc_count_ref_in_closure)
+
+#define MARK_MSTRING_REF(str) \
+  GC_REF_DUMP(string_t*, str, "Mark string", gc_MARK_MSTRING_REF)
 
 #endif /* MALLOC_smalloc */
 
@@ -227,7 +233,7 @@ clear_memory_reference (void *p)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-note_ref (void *p)
+gc_note_ref (void *p)
 
 /* Note the reference to memory block <p>.
  *
@@ -243,9 +249,11 @@ note_ref (void *p)
         MARK_REF(p);
         return;
     }
-} /* note_ref() */
+} /* gc_note_ref() */
 
-void note_malloced_block_ref (void *p) { note_ref(p); }
+void gc_note_malloced_block_ref (void *p) { gc_note_ref(p); }
+
+#define note_ref(p) GC_REF_DUMP(void*, p, "Note ref", gc_note_ref)
 
 /*-------------------------------------------------------------------------*/
 void
@@ -275,7 +283,7 @@ clear_inherit_ref (program_t *p)
 
 /*-------------------------------------------------------------------------*/
 void
-mark_program_ref (program_t *p)
+gc_mark_program_ref (program_t *p)
 
 /* Set the marker of program <p> and of all data referenced by <p>.
  */
@@ -360,13 +368,16 @@ mark_program_ref (program_t *p)
     else
     {
         if (!p->ref++)
-            fatal("Program block referenced as something else\n");
+        {
+            dump_malloc_trace(1, p);
+            fatal("Program block %p referenced as something else\n", p);
+        }
     }
-} /* mark_program_ref() */
+} /* gc_mark_program_ref() */
 
 /*-------------------------------------------------------------------------*/
 void
-reference_destructed_object (object_t *ob)
+gc_reference_destructed_object (object_t *ob)
 
 /* Note the reference to a destructed object <ob>. The referee has to
  * replace its reference by a svalue.number 0 since all these objects
@@ -398,14 +409,15 @@ reference_destructed_object (object_t *ob)
         if (!ob->ref)
         {
             write_malloc_trace(ob);
-            fatal("Destructed object referenced as something else\n");
+            dump_malloc_trace(1, ob);
+            fatal("Destructed object %p referenced as something else\n", ob);
         }
     }
 }
 
 /*-------------------------------------------------------------------------*/
 static void
-MARK_MSTRING_REF (string_t * str)
+gc_MARK_MSTRING_REF (string_t * str)
 
 /* Increment the refcount of mstring <str>. How it works:
  * If MSTRING_REFS() is 0, the refcount either overflowed or it is
@@ -444,18 +456,18 @@ MARK_MSTRING_REF (string_t * str)
     {
         MARK_MSTRING_REF(str->link);
     }
-} /* MARK_MSTRING_REF(str) */
+} /* gc_MARK_MSTRING_REF(str) */
 
 /*-------------------------------------------------------------------------*/
 void
-count_ref_from_string (string_t *p)
+gc_count_ref_from_string (string_t *p)
 
 /* Count the reference to mstring <p>.
  */
 
 {
-   MARK_MSTRING_REF(p);
-} /* count_ref_from_string() */
+   gc_MARK_MSTRING_REF(p);
+} /* gc_count_ref_from_string() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -550,7 +562,7 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
 
 /*-------------------------------------------------------------------------*/
 void
-count_ref_in_vector (svalue_t *svp, size_t num)
+gc_count_ref_in_vector (svalue_t *svp, size_t num)
 
 /* Count the references the <num> elements of vector <p>.
  */
@@ -643,7 +655,7 @@ count_ref_in_vector (svalue_t *svp, size_t num)
             continue;
         }
     } /* for */
-}
+} /* gc_count_ref_in_vector() */
 
 /*-------------------------------------------------------------------------*/
 static void
@@ -670,7 +682,7 @@ remove_unreferenced_string (string_t *string)
 
 /*-------------------------------------------------------------------------*/
 static void
-note_action_ref (action_t *p)
+gc_note_action_ref (action_t *p)
 
 /* Mark the strings of function and verb of all sentences in list <p>.
  */
@@ -685,9 +697,12 @@ note_action_ref (action_t *p)
     } while ( NULL != (p = (action_t *)p->sent.next) );
 }
 
+#define note_action_ref(p) \
+    GC_REF_DUMP(action_t*, p, "Note action ref", gc_note_action_ref)
+
 /*-------------------------------------------------------------------------*/
 static void
-count_ref_in_closure (svalue_t *csvp)
+gc_count_ref_in_closure (svalue_t *csvp)
 
 /* Count the reference to closure <csvp> and all referenced data.
  * Closures using a destructed object are stored in the stale_ lists
@@ -858,19 +873,6 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
 } /* clear_ref_in_closure() */
 
 /*-------------------------------------------------------------------------*/
-static void
-remove_uids (int smart UNUSED)
-
-/* ??? */
-
-{
-#ifdef __MWERKS__
-#    pragma unused(smart)
-#endif
-    NOOP
-}
-
-/*-------------------------------------------------------------------------*/
 void
 garbage_collection(void)
 
@@ -888,6 +890,12 @@ garbage_collection(void)
     lambda_t *l, *next_l;
     int i;
     long dobj_count;
+
+    if (gcollect_outfd != 1 && gcollect_outfd != 2)
+    {
+        dprintf1(gcollect_outfd, "\n%s --- Garbage Collection ---\n"
+                               , (long)time_stamp());
+    }
 
     /* --- Pass 0: dispose of some unnecessary stuff ---
      */
@@ -960,7 +968,7 @@ garbage_collection(void)
         else
         {
             /* Take special care of inherited programs, the associated
-             * objects might me destructed.
+             * objects might be destructed.
              */
             ob->prog->ref = 0;
         }
@@ -981,7 +989,9 @@ garbage_collection(void)
             } /* end of ed-buffer processing */
         }
         if (was_swapped)
+        {
             swap(ob, was_swapped);
+        }
     }
     if (d_flag > 3)
     {
@@ -1071,6 +1081,9 @@ garbage_collection(void)
             was_swapped = load_ob_from_swap(ob);
             if (was_swapped & 1)
             {
+#ifdef DUMP_GC_REFS
+                dprintf1(gcollect_outfd, "Clear ref of swapped-in program %x\n", (long)ob->prog);
+#endif
                 CLEAR_REF(ob->prog);
                 ob->prog->ref = 0;
             }
@@ -1286,7 +1299,9 @@ W("DEBUG: GC frees destructed '"); W(get_txt(ob->name)); W("'\n");
             malloc_privilege = MALLOC_MASTER;
             res = apply_master_ob(STR_QUOTA_DEMON, 0);
         }
-        remove_uids(res && (res->type != T_NUMBER || res->u.number) );
+        /* Once: remove_uids(res && (res->type != T_NUMBER || res->u.number) );
+         * but that function was never implemented.
+         */
     }
 
     /* Reconsolidate the free lists */

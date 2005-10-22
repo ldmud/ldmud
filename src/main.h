@@ -58,6 +58,7 @@ extern char *dprintf_first(int fd, char *s, p_int a);
 extern void dprintf1(int fd, char *s, p_int a);
 extern void dprintf2(int fd, char *s, p_int a, p_int b);
 extern void dprintf3(int fd, char *s, p_int a, p_int b, p_int c);
+extern void dprintf4(int fd, char *s, p_int a, p_int b, p_int c, p_int d);
 
 
 #endif /* MAIN_H__ */

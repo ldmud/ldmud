@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Nov-2001 (Lars Duening)  (3.3.122)
+    - (gcollect.c) Tweaks to the information dumped on fatals.
+    - (driver.h, gcollect) New debug macro DUMP_GC_REFS (in driver.h)
+        instructs the GC to list all found references on the gcollect_outfd.
+        Off by default, this macro should be defined only by people
+        getting fatal()s like 'First reference to destructed object, but
+        ref count != 0'.
+    - (main) New function dprintf4().
+    - (mapping.c) compact_mappings() did not remove destructed elements
+        from the mappings (reported by Menaures).
+    - (efuns.c, interpret.c) Put back in some of the check_map_for_destr()
+        calls, as they are required in order to get an accurate count
+        of the number of entries.
+
 13-Nov-2001 (Lars Duening)  (3.3.121)
     - (gcollect.c, smalloc.c) Removed a compilation problem when
         MALLOC_LPC_TRACE is not defined (reported by Menaures).

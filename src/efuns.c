@@ -4966,6 +4966,9 @@ copy_svalue (svalue_t *dest, svalue_t *src
              * in the table, too.
              */
             size = (mp_int)MAP_SIZE(old);
+              /* Doesn't matter if this is too big due to destructed
+               * elements.
+               */
             info.width = old->num_values;
             new = allocate_mapping(size, info.width);
             if (!new)

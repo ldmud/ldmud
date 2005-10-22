@@ -15,16 +15,71 @@ extern lambda_t *stale_misc_closures;
 extern mapping_t *stale_mappings;
 
 
+/* --- Macros --- */
+
+/* void GC_REF_DUMP(type, pointer, txt, function)
+ *
+ * In order to be able to dump the references found in a GC, the
+ * macro DUMP_GC_REFS is used to define the 'ref_this' functions as
+ * wrapper around the actual function to call.
+ *
+ * If DUMP_GC_REFS is not defined, the wrapper is just the function call.
+ *
+ * <type> is the type of <pointer>, which is the structure referenced.
+ * <txt> is the descriptive text to print, <function> the actual function
+ * to call.
+ */
+
+#ifdef DUMP_GC_REFS
+
+#define GC_REF_DUMP(type,p,txt,fun) \
+    do { type p_ = p; \
+         dprintf3(gcollect_outfd, txt " %x: %s %d\n", (long)p_, (long)__FILE__, (long)__LINE__); \
+         fun(p_); \
+    } while(0)
+
+#else
+
+#define GC_REF_DUMP(type,p,txt,fun) fun(p)
+
+#endif
+
 /* --- Prototypes --- */
 
 extern void clear_memory_reference(void *p);
 extern void clear_inherit_ref(program_t *p);
-extern void mark_program_ref(program_t *p);
-extern void reference_destructed_object(object_t *ob);
-extern void note_malloced_block_ref(void *p);
-extern void count_ref_from_string(string_t *p);
-extern void count_ref_in_vector(svalue_t *svp, size_t num);
+extern void gc_mark_program_ref(program_t *p);
+extern void gc_reference_destructed_object(object_t *ob);
+extern void gc_note_malloced_block_ref(void *p);
+extern void gc_count_ref_from_string(string_t *p);
+extern void gc_count_ref_in_vector(svalue_t *svp, size_t num);
 extern void clear_ref_in_vector(svalue_t *svp, size_t num);
+
+#define mark_program_ref(p) \
+    GC_REF_DUMP(program_t*, p, "Mark program", gc_mark_program_ref)
+
+#define reference_destructed_object(p) \
+    GC_REF_DUMP(object_t*, p, "Ref dest' object", gc_reference_destructed_object)
+
+#define note_malloced_block_ref(p) \
+    GC_REF_DUMP(void*, p, "Note malloced block", gc_note_malloced_block_ref)
+
+#define count_ref_from_string(p) \
+    GC_REF_DUMP(string_t*, p, "Ref from string", gc_count_ref_from_string)
+
+#ifdef DUMP_GC_REFS
+
+#define count_ref_in_vector(p, num) \
+    do { svalue_t *p_ = p; size_t num_ = num; \
+         dprintf4(gcollect_outfd, "Count ref in vector %x size %d: %s %d\n", (long)p_, (long)num_, (long)__FILE__, (long)__LINE__); \
+         gc_count_ref_in_vector(p_, num_); \
+    } while(0)
+
+#else
+
+#define count_ref_in_vector(p, num)     gc_count_ref_in_vector(p, num)
+
+#endif /* DUMP_GC_REFS */
 
 #else
 

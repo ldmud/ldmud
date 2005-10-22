@@ -13819,6 +13819,7 @@ again:
         if (sp->type == T_MAPPING)
         {
             mapping_t *m = sp->u.map;
+            check_map_for_destr(m); /* Don't count the destructed keys! */
             i = (long)MAP_SIZE(m);
             free_svalue(sp);
             put_number(sp, i);

@@ -2072,6 +2072,8 @@ compact_mappings (mp_int num)
                    * mappings referenced by a deleted value
                    */
 
+        check_map_for_destr(m);
+
         hm = m->hash;
         cm = m->cond;
 

@@ -14,6 +14,16 @@
 
 #include "config.h"
 
+/* DEBUG: Some debug defines */
+
+/* Sometimes the GC stumbles over invalid references to memory
+ * blocks (namely 'Program referenced as something else'). Define
+ * this macro to get a detailed dump of all found references
+ * (Warning: LOTS of output!).
+ */
+/* #define DUMP_GC_REFS */
+
+
 /* TODO: Some TODO defines */
 
 /* NO_NEGATIVE_RANGES: If defined, assignments to negative ranges
