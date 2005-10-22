@@ -1,6 +1,30 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Jun-2001 (Lars Duening)  (3.3.65)
+    - (simulate.c) When parsing callback arguments, the pattern 'function,
+      object, extra' was parsed such that 'object' became part of the
+      'extra' arguments (reported by Marthin).
+    - (lex.c) It is now possible to use symbols in inline closures, ie.
+        "(: 'a :)" (reported by Menaures).
+    - (main.c, lex.c, wiz_list, configure) The name of the WIZLIST file
+        can now be configured at compile time and with commandline option
+        '--wizlist-file'. The LPC macro __WIZLIST__ expands to the selected
+        name.  The WIZLIST file can also be disabled completely
+        ('--no-wizlist-file'), in which case __WIZLIST__ is not defined
+        at all (based on a patch from Elric).
+    - (call_out.c) Corrected a fatal refcount bug in the garbage collection
+        of call_outs with destructed command givers (reported by Gnomi).
+
+22-Jun-2001 (Lars Duening)
+    - (sprintf.c) Column-formatting a string with one newline
+         printed one newline too few if the formatstring didn't end
+         immediately (reported by Gnomi).
+
+21-Jun-2001 (Lars Duening)
+    - (make_func.y, lex.c) Identifier names can use the extended alpha
+         characters from the ISO 8859-1 alphabet (suggested by Elric).
+
 17-Jun-2001 (Lars Duening)  (3.3.64)
     - (backend.c) cleanup_stuff() also executes a clear_state() to
          avoid dangling object references (reported by Gnomi).

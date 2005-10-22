@@ -1492,7 +1492,6 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                     finfo |= INFO_T_ERROR;
                     break;
                 }
-
                 if ((format_str[fpos] >= '0' && format_str[fpos] <= '9')
                  || (format_str[fpos] == '*'))
                 {
@@ -1739,8 +1738,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                             (*temp)->start = st->bpos - st->line_start;
 
                             /* Format the first line from the column */
-                            if (2 == add_column(st, temp)
-                              && !format_str[fpos])
+                            if (2 == add_column(st, temp))
                             {
                                 ADD_CHAR('\n');
                             }

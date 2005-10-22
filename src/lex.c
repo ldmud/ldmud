@@ -59,6 +59,7 @@
 #include "stdstrings.h"
 #include "strfuns.h"
 #include "svalue.h"
+#include "wiz_list.h" /* wizlist_name[] */
 #include "xalloc.h"
 
 #include "../mudlib/sys/driver_hook.h"
@@ -72,12 +73,12 @@
  * TODO:: should disallow it, too.
  */
 
-#if defined(hpux) && !defined(__GNUC__)
-/* This compilers handling of (char) is broken */
-#    define CHAR_EOF EOF
-#else
-#    define CHAR_EOF ((char)EOF)
-#endif
+/* We can't use the EOF character directly, as in its (char) representation
+ * clashes with ISO-8859 character 0xFF. Instead we use ascii SOH (0x01),
+ * which in turn is not allowed as input character.
+ */
+
+#define CHAR_EOF ((char)0x01)
 
 /*-------------------------------------------------------------------------*/
 
@@ -208,8 +209,8 @@ static Mempool lexpool = NULL;
  * linebufstart.
  *
  * If there are less than MAXLINE bytes left to read, the end of the file
- * is marked in the buffer with the EOF character (a \0 sentinel is not
- * necessary as compilation and thus lexing will end with the EOF
+ * is marked in the buffer with the CHAR_EOF character (a \0 sentinel is not
+ * necessary as compilation and thus lexing will end with the CHAR_EOF
  * character).
  *
  * When including files, a new area of MAXLINE bytes is reserved in defbuf,
@@ -790,6 +791,23 @@ init_lexer(void)
 #ifdef USE_DEPRECATED
     add_permanent_define("__DEPRECATED__", -1, string_copy(""), MY_FALSE);
 #endif
+    if (wizlist_name[0] != '\0')
+    {
+        if (compat_mode)
+        {
+            mtext[0] = '"';
+            strcpy(mtext+1, wizlist_name);
+            strcat(mtext+1, "\"");
+        }
+        else
+        {
+            mtext[0] = '"';
+            mtext[1] = '/';
+            strcpy(mtext+2, wizlist_name);
+            strcat(mtext+2, "\"");
+        }
+        add_permanent_define("__WIZLIST__", -1, string_copy(mtext), MY_FALSE);
+    }
 
     /* Add the permanent macro definitions given on the commandline */
 
@@ -1123,7 +1141,7 @@ _myfilbuf (void)
  * line left in the buffer, they are copied right before linebufstart.
  * The end of the last complete line in the buffer is marked with a '\0'
  * sentinel, or, if the file is exhausted, the end of data is marked
- * with the EOF char.
+ * with the CHAR_EOF char.
  *
  * outp is set to point to the new data (which may be the copied remnants
  * from the incomplete line) and also returned as result.
@@ -1170,7 +1188,7 @@ _myfilbuf (void)
         p += i;
         if (p - outp ? p[-1] != '\n' : current_line == 1)
             *p++ = '\n';
-        *p++ = EOF;
+        *p++ = CHAR_EOF;
         return outp;
     }
 
@@ -1304,7 +1322,7 @@ skip_to (char *token, char *atoken)
  *   #elif    : returns false, the statement is rewritten to #if and
  *                outp is set to point to the '#' in the new statement.
  * If an end of file occurs, an error is generated and the function returns
- * true after setting outp to the character before the EOF.
+ * true after setting outp to the character before the CHAR_EOF.
  *
  * Nested #if ... #endif blocks are skipped altogether.
  *
@@ -2029,7 +2047,7 @@ skip_comment (void)
                 nexpands = 0;
                 if ((c = *p) == CHAR_EOF) {
                     outp = p - 1;
-                    lexerror("End of file in a comment");
+                    lexerror("End of file (or 0x01 character) in a comment");
                     return;
                 }
                 current_line++;
@@ -2056,7 +2074,7 @@ skip_comment (void)
                 if ((c = *p) == CHAR_EOF)
                 {
                     outp = p - 1;
-                    lexerror("End of file in a comment");
+                    lexerror("End of file (or 0x01 character) in a comment");
                     return;
                 }
                 current_line++;
@@ -2528,7 +2546,7 @@ yylex1 (void)
     yyp = outp;
 
     for(;;) {
-        switch(c = *yyp++)
+        switch((unsigned char)(c = *yyp++))
         {
 
         /* --- End Of File --- */
@@ -3039,13 +3057,66 @@ yylex1 (void)
                       {
                         char delimiter = yyp[-1];
 
+                        if (delimiter == '\''
+                         && ( (    yyp[1] != '\''
+                               || (   *yyp == '\''
+                                   && (   yyp[1] == '('
+                                       || isalunum(yyp[1])
+                                       || yyp[1] == '\'')
+                                      )
+                                  )
+                            )
+                           )
+                        {
+                            /* Skip the symbol or quoted aggregate
+                             *
+                             * The test rejects all sequences of the form
+                             *   'x'
+                             * and
+                             *   '''x, with x indicating that the ' character
+                             *         itself is meant as the desired constant.
+                             *
+                             * It accepts all forms of quoted symbols, with
+                             * one or more leading ' characters.
+                             */
+
+                            /* Skip all leading quotes.
+                             */
+                            while (*yyp == '\'')
+                            {
+                                yyp++;
+                            }
+
+                            /* If the first non-quote is not an alnum, it must
+                             * be a quoted aggregrate or an error.
+                             */
+                            if (!isalpha((unsigned char)*yyp) && *yyp != '_')
+                            {
+                                if (*yyp == '(' && yyp[1] == '{')
+                                {
+                                    yyp += 2;
+                                }
+                                else
+                                {
+                                    lexerror("Illegal character constant");
+                                    return -1;
+                                }
+                            }
+                            else
+                            {
+                                /* Find the end of the symbol. */
+                                while (isalunum(*++yyp)) NOOP;
+                            }
+                        }
+                        else /* Normal string or character */
                         while ((c = *yyp++) != delimiter)
                         {
                             if (c == CHAR_EOF)
                             {
                                 /* Just in case... */
                                 current_line = first_line;
-                                lexerror("Unexpected end of file in string.\n");
+                                lexerror("Unexpected end of file "
+                                         "(or 0x01 character) in string.\n");
                                 return -1;
                             }
                             else if (c == '\\')
@@ -3880,7 +3951,7 @@ yylex1 (void)
                         if (*p == CHAR_EOF )
                         {
                             outp = p;
-                            lexerror("End of file in string");
+                            lexerror("End of file (or 0x01 character) in string");
                             return string("", 0);
                         }
                         if (!*p)
@@ -3961,6 +4032,22 @@ yylex1 (void)
         case 'j':case 'k':case 'l':case 'm':case 'n':case 'o':case 'p':
         case 'q':case 'r':case 's':case 't':case 'u':case 'v':case 'w':
         case 'x':case 'y':case 'z':case '_':case '$':
+        case 0xC0:case 0xC1:case 0xC2:case 0xC3:
+        case 0xC4:case 0xC5:case 0xC6:case 0xC7:
+        case 0xC8:case 0xC9:case 0xCA:case 0xCB:
+        case 0xCC:case 0xCD:case 0xCE:case 0xCF:
+        case 0xD0:case 0xD1:case 0xD2:case 0xD3:
+        case 0xD4:case 0xD5:case 0xD6:case 0xD7:
+        case 0xD8:case 0xD9:case 0xDA:case 0xDB:
+        case 0xDC:case 0xDD:case 0xDE:case 0xDF:
+        case 0xE0:case 0xE1:case 0xE2:case 0xE3:
+        case 0xE4:case 0xE5:case 0xE6:case 0xE7:
+        case 0xE8:case 0xE9:case 0xEA:case 0xEB:
+        case 0xEC:case 0xED:case 0xEE:case 0xEF:
+        case 0xF0:case 0xF1:case 0xF2:case 0xF3:
+        case 0xF4:case 0xF5:case 0xF6:case 0xF7:
+        case 0xF8:case 0xF9:case 0xFA:case 0xFB:
+        case 0xFC:case 0xFD:case 0xFE:case 0xFF:
         {
             ident_t *p;
             char *wordstart = yyp-1;
@@ -5116,7 +5203,7 @@ _expand_define (struct defn *p, ident_t * macro)
                     continue;
 
                   case CHAR_EOF:
-                        lexerror("Unexpected end of file");
+                        lexerror("Unexpected end of file (or a spurious 0x01 character)");
                         DEMUTEX;
                         return MY_FALSE;
 

@@ -208,6 +208,17 @@ main (int argc, char **argv)
     HOST_DEPENDENT_INIT
 #endif
 
+    /* Select a sensible default for the wizlist file.
+     * This must be done before the parsing of the arguments so
+     * that the name can be removed by commandline option.
+     */
+#ifdef WIZLIST_FILE
+    if ('\0' == wizlist_name[0])
+    {
+        name_wizlist_file(WIZLIST_FILE);
+    }
+#endif
+
     /* First scan of the arguments.
      * This evaluates everything but the 'f' arguments.
      */
@@ -759,6 +770,8 @@ typedef enum OptNumber {
  , cSwapVars        /* --swap-variables     */
  , cSwapFile        /* --swap-file          */
  , cSwapCompact     /* --swap-compact       */
+ , cWizlistFile     /* --wizlist-file       */
+ , cNoWizlistFile   /* --no-wizlist-file    */
 #ifdef GC_SUPPORT
  , cGcollectFD      /* --gcollect-outfd     */
 #endif
@@ -842,6 +855,8 @@ static LongOpt aLongOpts[]
     , { "swap-variables",     cSwapVars,       MY_TRUE }
     , { "swap-file",          cSwapFile,       MY_TRUE }
     , { "swap-compact",       cSwapCompact,    MY_FALSE }
+    , { "wizlist-file",       cWizlistFile,    MY_TRUE }
+    , { "no-wizlist-file",    cNoWizlistFile,  MY_FALSE }
 #ifdef GC_SUPPORT
     , { "gcollect-outfd",     cGcollectFD,     MY_TRUE }
     , { "gcollect_outfd",     cGcollectFD,     MY_TRUE } /* TODO: COMPAT */
@@ -964,6 +979,12 @@ options (void)
         , stdout);
 #else
   fputs(" Access control: disabled.\n", stdout);
+#endif
+
+#ifdef WIZLIST_FILE
+  fputs("        Wizlist: saved in <mudlib>/" WIZLIST_FILE "\n", stdout);
+#else
+  fputs("        Wizlist: not saved\n", stdout);
 #endif
 
     /* Print the language options, nicely indented. */
@@ -1248,6 +1269,8 @@ shortusage (void)
 "  -r m<size> | --reserve-master <size>\n"
 "  -r s<size> | --reserve-system <size>\n"
 "  --pidfile <filename>\n"
+"  --wizlist-file <filename>\n"
+"  --no-wizlist-file\n"
 #ifdef GC_SUPPORT
 "  --gcollect-outfd <filename>|<num>\n"
 #endif
@@ -1399,6 +1422,11 @@ usage (void)
 "  --strict-euids\n"
 "  --no-strict-euids\n"
 "    Enforce/don't enforce the proper use of euids.\n"
+"\n"
+"  --wizlist-file <filename>\n"
+"  --no-wizlist-file\n"
+"    Read and save the wizlist in the named file (always interpreted\n"
+"    relative the mudlib); resp. don't read or save the wizlist.\n"
 "\n"
 "  --pidfile <filename>\n"
 "    Write the pid of the driver process into <filename>.\n"
@@ -1621,6 +1649,14 @@ firstscan (int eOption, const char * pValue)
             name_swap_file(pValue);
         else /* cSwapCompact */
             swap_compact_mode = MY_TRUE;
+        break;
+
+    case cWizlistFile:
+    case cNoWizlistFile:
+        if (cWizlistFile == eOption)
+            name_wizlist_file(pValue);
+        else /* cNoWizlistFile */
+            name_wizlist_file("");
         break;
 
 #ifdef YYDEBUG

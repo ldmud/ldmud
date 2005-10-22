@@ -2939,7 +2939,10 @@ setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs)
                 first_arg = 2;
             }
             else
+            {
                 ob = current_object;
+                first_arg = 2;
+            }
         }
         else
             ob = current_object;

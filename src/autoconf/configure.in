@@ -152,6 +152,7 @@ AC_MY_ARG_WITH(min-malloced,0,,)
 AC_MY_ARG_WITH(min-small-malloced,0,,)
 AC_MY_ARG_WITH(max-malloced,0x4000000,,)
 AC_MY_ARG_WITH(total-trace-length,0x1000,,)
+AC_MY_ARG_WITH(wizlist-file,WIZLIST,,[name of the wizlist file])
 
 AC_ARG_WITH(setting,[  --with-setting=SETTING  include a predefined setting],[
 if test -f "settings/$withval" ; then
@@ -204,6 +205,12 @@ else
   enable_use_mysql="yes"
 fi
 
+if test "x$with_wizlist_file" != "x"; then
+  cdef_wizlist_file="#define"
+else
+  cdef_wizlist_file="#undef"
+fi
+
 AC_CDEF_FROM_ENABLE(access_control)
 AC_CDEF_FROM_ENABLE(access_log)
 AC_CDEF_FROM_ENABLE(align_functions)
@@ -226,6 +233,7 @@ AC_CDEF_FROM_ENABLE(rxcache_table)
 AC_STRING_VAL_FROM_WITH(access_file)
 AC_STRING_VAL_FROM_WITH(access_log)
 AC_STRING_VAL_FROM_WITH(swap_file)
+AC_STRING_VAL_FROM_WITH(wizlist_file)
 AC_STRING_VAL_FROM_WITH(master_name)
 
 AC_INT_VAL_FROM_WITH(erq_max_reply)
@@ -1431,6 +1439,7 @@ AC_SUBST(cdef_malloc_lpc_trace)
 AC_SUBST(cdef_dynamic_costs)
 
 AC_SUBST(cdef_rxcache_table)
+AC_SUBST(cdef_wizlist_file)
 
 dnl second: valued defines
 dnl
@@ -1478,6 +1487,7 @@ AC_SUBST(val_min_malloced)
 AC_SUBST(val_min_small_malloced)
 AC_SUBST(val_max_malloced)
 AC_SUBST(val_total_trace_length)
+AC_SUBST(val_wizlist_file)
 
 dnl finally: some remaining stuff
 dnl

@@ -127,6 +127,12 @@
 #define MASTER_RESERVED_COST    1024 /* must be power of 2 */
 /* TODO: Check that at runtime */
 
+/* Where to save the WIZLIST information.
+ * If not defined, and neither given on the commandline, the driver will
+ * not create the WIZLIST file.
+ */
+#define WIZLIST_FILE              "WIZLIST"
+
 /*
  * Where to swap out objects. This file is not used if TIME_TO_SWAP is 0.
  * If the mudlib is mounted via nfs but your /tmp isn't, and isn't purged
@@ -134,6 +140,12 @@
  * The hostname will be appended to the filename defined here.
  */
 #define SWAP_FILE                 "/tmp/_ldmud.swap"
+
+/* Where to save the WIZLIST information.
+ * If not defined, and neither given on the commandline, the driver will
+ * not read the WIZLIST file.
+ */
+#define WIZLIST_FILE              "WIZLIST"
 
 /* This is the maximum array size allowed for one single array.
  * If 0, any size is allowed.

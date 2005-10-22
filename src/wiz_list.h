@@ -33,9 +33,11 @@ struct wiz_list_s
 
 extern wiz_list_t *all_wiz;
 extern wiz_list_t default_wizlist_entry;
+extern char wizlist_name[];
 
 /* --- Prototypes --- */
 
+extern void name_wizlist_file (const char *name);
 extern size_t wiz_list_size (void);
 extern wiz_list_t *add_name(string_t *str);
 extern void wiz_decay(void);

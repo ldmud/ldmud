@@ -212,6 +212,15 @@ enable_apply_cache_stat=yes
 
 with_swap_file=LP_SWAP.3
 
+# --- Wizlist ---
+
+# The name of the file (relative to the mudlib) to hold the Wizlist
+# information. The driver reads it on startup.
+# If disabled ('without_wizlist_file'), a wizlist file can still be
+# given on the commandline.
+
+with_wizlist_file=WIZLIST
+
 # --- Access Control ---
 
 # Enable this to have access control.

@@ -43,7 +43,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-17-Jun-2001 (Lars Duening) -- upcoming Release 3.2.9
+27-Jun-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + allocate(): Accepts an optional initialisation value and can
@@ -98,10 +98,16 @@ For a detailed list of all changes see the file CHANGELOG.
        + functionlist(): The filter flags didn't really work.
        + input_to(): The option IGNORE_BANG didn't work. In charmode, !-escapes
            after the first received data are now recognized. 
+       + map() and other efuns taking callbacks arguments: The pattern
+           'function, object, extra' was parsed such that 'object' became
+           part of the 'extra' arguments.
        + object_info(): The returned OIB_NAME now starts with a '/' in plain
            mode.
        + printf(), sprintf(): The formatter "%^" will print "%^", for
            compatibility with terminal_colour().
+       + printf(), sprintf(): Column-formatting a string with one
+           newline printed one newline too few if the formatstring didn't
+           end immediately.
        + sscanf(): the format '%s%d' failed to parse 'ab1cd' correctly.
 
     - New efuns:
@@ -153,6 +159,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + New LPC defines __VERSION_MAJOR__, __VERSION_MINOR__,
          __VERSION_MICRO__, __VERSION_PATCH__ expand to the various parts
          of the driver version.
+       + New LPC defines specifies from where the driver read the initial
+           wizlist information.
        + Numbers can also be specified as binary patterns with the '0b'
            prefix, and as octals with the '0o' prefix.
        + Floating point numbers can now also be specified in the
@@ -176,6 +184,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + If operands of different types are given to '?:', the result
            will have the type 'mixed'.
        + Integers and floats can now be compared against each other.
+       + Identifier names can use the extended alpha characters from the
+           ISO 8859-1 alphabet.
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.
        + Bugfix: Right shift by 32 or more bits was computed incorrectly.
@@ -193,6 +203,8 @@ For a detailed list of all changes see the file CHANGELOG.
            a conversion operation.
        + Bugfix: Global variables can no longer be redefined in the same
            scope.
+       + Bugfix: It is now possible to use symbols in inline closures, ie.
+           "(: 'a :)".
 
 
     - Runtime:
@@ -222,6 +234,9 @@ For a detailed list of all changes see the file CHANGELOG.
            option ('--no-compat' resp. '--compat').
        + New driver options '--min-malloced' and '--min-small-malloced' to
            specify the size of the initial block allocations.
+       + New driver options '--wizlist-file' and '--no-wizlist-file' to
+           control from where the driver reads the initial wizlist
+           information.
        + Removed a couple of fatal race-conditions in the xerq.
        + New configuration option 'use-deprecated' allows
            to disable obsolete and deprecated efuns. If enabled, the macro

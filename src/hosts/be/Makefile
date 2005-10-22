@@ -147,16 +147,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 64
+  SETVERFLAGS += d 65
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.64
+  VSTRING = 3.3.0-pre.65
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 64
+  SETVERFLAGS += d 65
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.64
+  VSTRING = 3.3.0-dev.65
 endif
 
 else
@@ -164,12 +164,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 64
+SETVERFLAGS = -app 3 3 65
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.64
+  VSTRING = 3.3.65
 
 endif
 
@@ -534,12 +534,12 @@ $(OBJ)/interpret.o : ../mudlib/sys/trace.h ../mudlib/sys/debug_info.h \
     actions.h interpret.h my-alloca.h typedefs.h driver.h strfuns.h port.h \
     config.h hosts/unix.h machine.h
 
-$(OBJ)/lex.o : efun_defs.c ../mudlib/sys/driver_hook.h xalloc.h svalue.h \
-    strfuns.h stdstrings.h simul_efun.h simulate.h prolang.h patchlevel.h \
-    object.h mstrings.h mempools.h main.h lang.h interpret.h instrs.h \
-    hash.h gcollect.h filestat.h exec.h comm.h closure.h backend.h array.h \
-    lex.h my-alloca.h typedefs.h driver.h ptrtable.h sent.h port.h config.h \
-    hosts/unix.h machine.h
+$(OBJ)/lex.o : efun_defs.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
+    svalue.h strfuns.h stdstrings.h simul_efun.h simulate.h prolang.h \
+    patchlevel.h object.h mstrings.h mempools.h main.h lang.h interpret.h \
+    instrs.h hash.h gcollect.h filestat.h exec.h comm.h closure.h backend.h \
+    array.h lex.h my-alloca.h typedefs.h driver.h ptrtable.h sent.h port.h \
+    config.h hosts/unix.h machine.h
 
 $(OBJ)/main.o : xalloc.h wiz_list.h swap.h svalue.h stdstrings.h \
     simul_efun.h simulate.h rxcache.h random.h patchlevel.h otable.h \

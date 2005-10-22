@@ -135,6 +135,12 @@
  */
 #define SWAP_FILE                 @val_swap_file@
 
+/* Where to save the WIZLIST information.
+ * If not defined, and neither given on the commandline, the driver will
+ * not read the WIZLIST file.
+ */
+@cdef_wizlist_file@ WIZLIST_FILE              @val_wizlist_file@
+
 /* This is the maximum array size allowed for one single array.
  * If 0, any size is allowed.
  */

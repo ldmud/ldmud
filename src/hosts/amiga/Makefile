@@ -93,12 +93,12 @@ interpret.o : interpret.c ../mudlib/sys/trace.h ../mudlib/sys/debug_info.h \
     actions.h interpret.h my-alloca.h typedefs.h driver.h strfuns.h port.h \
     config.h hosts/unix.h machine.h
 
-lex.o : lex.c efun_defs.c ../mudlib/sys/driver_hook.h xalloc.h svalue.h \
-    strfuns.h stdstrings.h simul_efun.h simulate.h prolang.h patchlevel.h \
-    object.h mstrings.h mempools.h main.h lang.h interpret.h instrs.h \
-    hash.h gcollect.h filestat.h exec.h comm.h closure.h backend.h array.h \
-    lex.h my-alloca.h typedefs.h driver.h ptrtable.h sent.h port.h config.h \
-    hosts/unix.h machine.h
+lex.o : lex.c efun_defs.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
+    svalue.h strfuns.h stdstrings.h simul_efun.h simulate.h prolang.h \
+    patchlevel.h object.h mstrings.h mempools.h main.h lang.h interpret.h \
+    instrs.h hash.h gcollect.h filestat.h exec.h comm.h closure.h backend.h \
+    array.h lex.h my-alloca.h typedefs.h driver.h ptrtable.h sent.h port.h \
+    config.h hosts/unix.h machine.h
 
 main.o : main.c xalloc.h wiz_list.h swap.h svalue.h stdstrings.h \
     simul_efun.h simulate.h rxcache.h random.h patchlevel.h otable.h \
@@ -147,12 +147,12 @@ parse_old.o : parse_old.c xalloc.h wiz_list.h svalue.h stdstrings.h \
     closure.h array.h actions.h parse.h my-alloca.h typedefs.h driver.h \
     strfuns.h sent.h exec.h instrs.h port.h config.h hosts/unix.h machine.h
 
-parser.o : parser.c lang.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
-    switch.h swap.h svalue.h stdstrings.h simul_efun.h simulate.h object.h \
-    mstrings.h mapping.h main.h lex.h instrs.h interpret.h gcollect.h \
-    exec.h closure.h backend.h array.h prolang.h my-alloca.h typedefs.h \
-    driver.h ptrtable.h strfuns.h sent.h port.h config.h hosts/unix.h \
-    machine.h
+parser.o : parser.c lang.c pkg-alists.h ../mudlib/sys/driver_hook.h \
+    xalloc.h wiz_list.h switch.h swap.h svalue.h stdstrings.h simul_efun.h \
+    simulate.h object.h mstrings.h mapping.h main.h lex.h instrs.h \
+    interpret.h gcollect.h exec.h closure.h backend.h array.h prolang.h \
+    my-alloca.h typedefs.h driver.h ptrtable.h strfuns.h sent.h port.h \
+    config.h hosts/unix.h machine.h
 
 pkg-alists.o : pkg-alists.c xalloc.h svalue.h simulate.h mstrings.h main.h \
     interpret.h array.h my-alloca.h pkg-alists.h typedefs.h driver.h \

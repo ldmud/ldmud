@@ -4,8 +4,7 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/usr/home/quovadis --libexec=/usr/home/quovadis/erq 
---libdir=/usr/home/quovadis/mudlib --with-setting=quovadis $*
+exec ./configure --prefix=/home/dale --libexec=/home/dale/erq --libdir=/home/dale/mudlib --with-setting=quovadis $*
 exit 1
 
 # --- The actual settings ---
@@ -16,7 +15,7 @@ enable_strict_euids=no
 enable_supply_parse_command=yes
 enable_initialization_by___init=yes
 enable_use_system_crypt=no
-enable_use_mysql=yes
+enable_use_mysql=no
 enable_erq=xerq
 
 enable_lpc_nosave=no
@@ -27,8 +26,8 @@ with_time_to_swap=900
 with_time_to_swap_variables=1800
 with_time_to_reset=1800
 
-with_portno=4023
-with_udp_port=4017
+with_portno=2345
+with_udp_port=2346
 
 with_master_name=secure/master
 
@@ -37,6 +36,7 @@ with_swap_file=etc/LP_SWAP.3
 enable_access_control=yes
 
 with_access_file=etc/ACCESS.ALLOW
+with_wizlist_file=etc/WIZLIST
 
 enable_catch_udp_port=yes
 enable_udp_send=yes

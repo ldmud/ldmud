@@ -1945,9 +1945,10 @@ void save_wiz_file()
  */
 
 {
-    rm("/WIZLIST");
+#ifdef __WIZLIST__
+    rm(__WIZLIST__);
     write_file(
-      "/WIZLIST",
+      __WIZLIST__,
       implode(
         map(wizlist_info(),
           lambda(({'a}),
@@ -1960,6 +1961,7 @@ void save_wiz_file()
         ), ""
       )
     );
+#endif
 }
 
 //---------------------------------------------------------------------------

@@ -680,6 +680,7 @@ clear_ref_from_call_outs (void)
         if (NULL != (ob = cop->command_giver) && ob->flags & O_DESTRUCTED)
         {
             ob->ref = 0;
+            ob->prog->ref = 0;
             clear_inherit_ref(ob->prog);
         }
     }

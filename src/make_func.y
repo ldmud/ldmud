@@ -267,7 +267,7 @@
 /*-------------------------------------------------------------------------*/
 
 #undef isalunum
-#define isalunum(c) (isascii((unsigned char)c) && (isalnum((unsigned char)c) || (c) == '_' ))
+#define isalunum(c) (isascii((unsigned char)c) && (isalnum((unsigned char)c) || (c) == '_'))
 
 #define lexwhite(c) (isascii((unsigned char)c) && isspace((unsigned char)c) && (c) != '\n')
 
@@ -2861,12 +2861,16 @@ create_efun_defs (void)
     do {
         if (!(c & 0xf))
             fprintf(fpw, "\n    ");
-        fprintf(fpw, "%d,", !isascii(c) ? 0 :
-                ( make_func_isescaped(c)   ? _MCTe : 0 ) |
-                ( isdigit ((unsigned)c)              ? _MCTd : 0 ) |
-                ( isspace ((unsigned)c) && c != '\n' ? _MCTs : 0 ) |
-                ( isxdigit((unsigned)c)              ? _MCTx : 0 ) |
-                ( isalnum ((unsigned)c) || c == '_'  ? _MCTa : 0 ) );
+        fprintf(fpw, "%d,"
+               ,  ( (isascii(c) && make_func_isescaped(c)) ? _MCTe : 0 )
+                | ( (isascii(c) && isdigit ((unsigned)c))  ? _MCTd : 0 )
+                | ( (isascii(c) && isspace ((unsigned)c) && c != '\n')
+                    ? _MCTs : 0 )
+                | ( (isascii(c) && isxdigit((unsigned)c))  ? _MCTx : 0 )
+                | ( ((isascii(c) && (isalnum ((unsigned)c) || c == '_'))
+                   || ((c) >= 0xC0 && (c) <= 0xFF))
+                    ? _MCTa : 0 )
+               );
         c++;
     } while (c != '\0');
     fprintf(fpw, "\n};\n");

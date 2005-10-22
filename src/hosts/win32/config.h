@@ -135,6 +135,12 @@
  */
 #define SWAP_FILE                 "LP_SWAP.3"
 
+/* Where to save the WIZLIST information.
+ * If not defined, and neither given on the commandline, the driver will
+ * not read the WIZLIST file.
+ */
+#define WIZLIST_FILE              "WIZLIST"
+
 /* This is the maximum array size allowed for one single array.
  * If 0, any size is allowed.
  */

@@ -164,6 +164,11 @@ DESCRIPTION
       --pidfile <filename>\n"
         Write the pid of the driver process into <filename>.\n"
 
+      --wizlist-file <filename>
+      --no-wizlist-file
+        Read and save the wizlist in the named file (always interpreted
+        relative the mudlib); resp. don't read or save the wizlist.
+
       --gcollect-outfd <filename>|<num>
         Garbage collector output (like a log of all reclaimed memory blocks)
         is sent to <filename> (or inherited fd <num>) instead of stderr.

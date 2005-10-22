@@ -139,6 +139,25 @@ static int number_of_wiz = 0;
   /* Number of entries in the list.
    */
 
+char wizlist_name[MAXPATHLEN+1] = "";
+  /* Name of the wizlist file, relative to the mudlib directory.
+   */
+
+/*-------------------------------------------------------------------------*/
+void
+name_wizlist_file (const char *name)
+
+/* Set the swap file name to a copy of <name>.
+ */
+ 
+{
+    /* Skip leading '/' */
+    while (*name == '/') name++;
+
+    xstrncpy(wizlist_name, name, sizeof wizlist_name);
+    wizlist_name[sizeof wizlist_name - 1] = '\0';
+} /* name_wizlist_file()*/
+
 /*-------------------------------------------------------------------------*/
 size_t
 wiz_list_size (void)
@@ -292,7 +311,7 @@ get_wiz_name (const char *file)
 void
 load_wiz_file (void)
 
-/* Load the old wizlist from the file "WIZLIST" and add it's data to
+/* Load the old wizlist from the wizlist file and add it's data to
  * the wizlist already in memory.
  *
  * This function is called at driver start up.
@@ -304,7 +323,10 @@ load_wiz_file (void)
     char buff[1000];
     FILE *f;
 
-    f = fopen("WIZLIST", "r");
+    if (wizlist_name[0] == '\0')
+        return;
+
+    f = fopen(wizlist_name, "r");
     if (f == NULL)
         return;
 
@@ -316,14 +338,16 @@ load_wiz_file (void)
         p = strchr(buff, ' ');
         if (p == 0)
         {
-            fprintf(stderr, "%s Bad WIZLIST file.\n", time_stamp());
+            fprintf(stderr, "%s Bad WIZLIST file '%s'.\n"
+                          , time_stamp(), wizlist_name);
             break;
         }
         *p = '\0';
         p++;
         if (*p == '\0')
         {
-            fprintf(stderr, "%s Bad WIZLIST file.\n", time_stamp());
+            fprintf(stderr, "%s Bad WIZLIST file '%s'.\n"
+                          , time_stamp(), wizlist_name);
             break;
         }
         score = atoi(p);
