@@ -13,6 +13,20 @@
  *            a fifo pattern.
  *            
  * Note: the GC will deallocate all memory pools.
+ * TODO: Implement a clear-ref/mark-ref call for the pools in case somebody
+ * TODO:: wants to keep on to a pool for longer.
+ * TODO: A small-block pool, to manage lots of small blocks of equal size
+ * TODO:: without the overhead of smalloc. Initialized with the block size,
+ * TODO:: the number of initial blocks, and the number of blocks each
+ * TODO:: the pool has to grow. These blocks can be freed and are then
+ * TODO:: kept in a freelist for later reuse. To help compacting the pool
+ * TODO:: a method alloc_before(void *) would allocate a free small block
+ * TODO:: before the given one - if there is no such free block, the
+ * TODO:: method would return NULL. With this method a user of the
+ * TODO:: can compact its data at the front of the pool blocks.
+ * TODO:: The last unused pool block is freed only if either another small
+ * TODO:: block is freed, or the method flush_free_pool_blocks() (or so)
+ * TODO:: is called.
  *---------------------------------------------------------------------------
  * Memory pools can be made dependant from other pools. This means that
  * whenever the 'superior' pool is reset or deleted, all pools depending
@@ -183,7 +197,7 @@ new_pool (size_t iSize, pooltype_t type)
       /* If this assert fails, sizeof(union align) is not a power of 2 */
 
     /* Round iSize up to the next integral of sizeof(union align) */
-    iSize = ROUND(iSize + (type == FIFOPOOL ? SIZEOF_FIFO_T : 0));
+    iSize = ROUND(iSize);
 
     pPool = xalloc(sizeof(*pPool));
     if (!pPool)
@@ -200,19 +214,6 @@ new_pool (size_t iSize, pooltype_t type)
     pBlock->length = sizeof(*pBlock) - sizeof(pBlock->u) + iSize;
     pBlock->pMark = pBlock->u.data + iSize;
 
-    /* For fifopools, add a sentinel (pseudo-used block) at the end
-     * of the arena.
-     */
-    if (FIFOPOOL == type)
-    {
-        fifo_t *p = (fifo_t *)(pBlock->pMark - SIZEOF_FIFO_T);
-
-        p->length = 1;
-        p->pBlock = pBlock;
-
-        /* Update the pMark pointer */
-        pBlock->pMark = (char *)p;
-    }
     /* Setup the pool */
     pPool->type = type;
     pPool->iAllocSize = iSize;
@@ -236,7 +237,7 @@ new_mempool (size_t iSize)
 
 {
     return new_pool(iSize, MEMPOOL);
-}
+} /* new_mempool() */
 
 /*-------------------------------------------------------------------------*/
 Mempool
@@ -249,8 +250,26 @@ new_fifopool (size_t iSize)
  */
 
 {
-    return new_pool(iSize, FIFOPOOL);
-}
+    Mempool pPool;
+
+    iSize += SIZEOF_FIFO_T; /* Include space for the sentinel block */
+
+    pPool = new_pool(iSize, FIFOPOOL);
+    if (pPool)
+    {
+        /* Add a sentinel (pseudo-used block) at the end of the arena.
+         */
+        struct memblock_s * pBlock = pPool->pBlocks;
+        fifo_t *p = (fifo_t *)(pBlock->pMark - SIZEOF_FIFO_T);
+
+        p->length = 1;
+        p->pBlock = pBlock;
+
+        /* Update the pMark pointer */
+        pBlock->pMark = (char *)p;
+    }
+    return pPool;
+} /* new_fifopool() */
 
 /*-------------------------------------------------------------------------*/
 void

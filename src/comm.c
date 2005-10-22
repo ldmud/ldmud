@@ -3021,7 +3021,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     }
 #endif /* ACCESS_CONTROL */
 
-    if (d_flag > 1)
+    if (d_flag)
         debug_message("%s New player at socket %d.\n"
                      , time_stamp(), new_socket);
 

@@ -60,6 +60,13 @@ void flag (string arg)
         return;
     }
 
+    if (arg == "dhry2")
+    {
+        limited( (: load_object("dhrystone2")->main(1000) :) );
+        shutdown();
+        return;
+    }
+
     if (arg == "shutdown")
     {
         shutdown();

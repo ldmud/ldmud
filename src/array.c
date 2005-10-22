@@ -918,7 +918,7 @@ get_array_order (vector_t * vec )
     /* Make sure that strings can be compared by their pointer,
      * and null out destructed objects.
      */
-    for ( j = 0, inpnt = vec->item; j <= keynum; j++, inpnt++)
+    for ( j = 0, inpnt = vec->item; j < keynum; j++, inpnt++)
     {
         if (inpnt->type == T_STRING)
         {
@@ -978,7 +978,7 @@ get_array_order (vector_t * vec )
                 sorted[1] = 0;
                 sorted[0] = 1;
             }
-            d = array_cmp(vec->item + sorted[0], vec->item + sorted[2]);
+            d = array_cmp(vec->item + sorted[0], vec->item + 2);
             if (d < 0)
             {
                 ptrdiff_t tmp = sorted[2];

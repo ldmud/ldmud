@@ -6,6 +6,15 @@
  * TODO:: failure codes (errno like) instead of throwing errors. In addition,
  * TODO:: provide wrapper functions which do throw error()s, so that every
  * TODO:: caller can handle the errors himself (like the swapper).
+ *
+ * TODO: A better mapping implementation would utilise the to-be-written
+ * TODO:: small block pools. The mapping entries would be unified to
+ * TODO:: (hash header:key:values) tuples and stored in a pool.
+ * TODO:: The 'compacted' part of the mapping would obviously go away,
+ * TODO:: and all indexing would be done through hash table.
+ * TODO:: The pool is not absolutely required, but would increase locality
+ * TODO:: and reduce overhead if MALLOC_TRACE is in effect.
+ *
  * Mappings, or 'associative arrays', are similar to normal arrays, with
  * the principal difference that they can use every value to index their
  * stored data, whereas arrays only index with integer values. On the
@@ -58,11 +67,14 @@
  *
  * Mappings maintain two refcounts: the main refcount for all references,
  * and in the hash structure a protector refcount for references as
- * PROTECTED_MAPPING. The latter references are used for mappings which are
- * passed fully or in part as a reference to a function. As long as the
- * protector refcount is not 0, all entry deletions are not executed
- * immediately. Instead, the 'deleted' entries are kept in a separate list
- * until all protective references are removed.
+ * PROTECTED_MAPPING. The latter references are used for 'dirty' mappings
+ * (ie. mappings with a hash part) which are passed fully or in part as a
+ * reference to a function. As long as the protector refcount is not 0, all
+ * entry deletions are not executed immediately. Instead, the 'deleted'
+ * entries are kept in a separate list until all protective references
+ * are removed. PROTECTED_MAPPINGs don't need to protect the condensed
+ * part of a mapping as that changes only during compact_mapping()s
+ * in the backend.
  *
  *
  * -- mapping_t --
@@ -1479,6 +1491,10 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
                 free_map_chain(m, mc, MY_FALSE);
             }
             hm->used--;
+            /* TODO: Reduce the size of the hashtable if the average
+             * TODO:: number of entries per chain is <= 1 (or better <= 0.5
+             * TODO:: to provide some breathing space for new entries).
+             */
         }
         else
             fatal("Mapping entry found in neither condensed nor hash index.\n");
