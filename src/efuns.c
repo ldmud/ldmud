@@ -639,7 +639,7 @@ f_regexplode (svalue_t *sp)
         len = match->start - start;
         if (len)
         {
-            memsafe(txt = mstr_extract(text, start, match->start), (size_t)len, "text before delimiter");
+            memsafe(txt = mstr_extract(text, start, match->start-1), (size_t)len, "text before delimiter");
             put_string(svp, txt);
         }
         else
@@ -650,7 +650,7 @@ f_regexplode (svalue_t *sp)
         len = match->end - match->start;
         if (len)
         {
-            memsafe(txt = mstr_extract(text, match->start, match->end), (size_t)len, "matched delimiter");
+            memsafe(txt = mstr_extract(text, match->start, match->end-1), (size_t)len, "matched delimiter");
             put_string(svp, txt);
         }
         else
@@ -668,7 +668,7 @@ f_regexplode (svalue_t *sp)
         len = mstrsize(text) - start;
         if (len > 0)
         {
-            memsafe(txt = mstr_extract(text, start, mstrsize(text)), (size_t)len, "remaining text");
+            memsafe(txt = mstr_extract(text, start, mstrsize(text)-1), (size_t)len, "remaining text");
             put_string(svp, txt);
         }
         else

@@ -16,7 +16,418 @@ Swapping? Replace programs? Something else?
 3.2.9-dev.423/3.3.188 disables all blueprint code. Doesn't seem to help
   Evermore, but seemed to help Markus Peter. Strange.
 
+3.2.9-dev.426/3.3.196: A hunch: when a program is
+         swapped for the first time, the driver writes the struct as it
+         is to the disk. On later swap-ins, this data is read directly
+         into memory, but never written again. If in the meantime
+         the prog->blueprint pointer changed, this change will be lost
+         after the next swap in. It would require a rare sequence of
+         activities to make this a problem, but it's possible. The change
+         is therefore to remove the swap block whenever prog->blueprint
+         changes; let's see if this helps.
 
+----------------------------------------------------------------------------
+Date: Wed, 3 Apr 2002 15:09:52 +0000 (GMT)
+From: <pixie@loki.cgc.ns.ca>
+
+Hello,
+
+I tried out the 425 version ( I noticed that this isn't on the website yet
+so perhaps I downloaded the diffs prematurely ) and just had a crash.
+Here is the backtrace plus the log file is attached.
+
+(gdb) bt full
+#0  0x981e0 in fatal (
+    fmt=0xc78c0 "DEBUG: Obj %p '%s', shadow %p -> obj %p '%s'\n")
+    at simulate.c:590
+        va = 0xd2dcd8
+        ts = 0x826458 ""
+        in_fatal = 1
+#1  0x9a69c in check_object_shadow (ob=0x785a18, sh=0xd2dcd8)
+    at simulate.c:2416
+No locals.
+#2  0x9a768 in check_all_object_shadows () at simulate.c:2443
+        sh = (object_shadow_t *) 0xd2dcd8
+        ob = (object_t *) 0x785a18
+#3  0x46aac in eval_instruction (first_instruction=0xfb400 "",
+    initial_sp=0x2d3781) at interpret.c:7432
+        offset = 2963329
+        pc = 0x0
+        fp = (svalue_t *) 0xfb468
+        sp = (svalue_t *) 0xfb468
+        num_arg = -1
+        instruction = 22
+        expected_stack = (svalue_t *) 0x0
+#4  0x67c5c in call_lambda (lsvp=0xdd, num_arg=2) at interpret.c:21897
+        code = "\0262\030"
+---Type <return> to continue, or q <return> to quit---
+        p = 0xffbee259 "\0262\030"
+        min = 2
+        max = 2
+        def = 0
+        i = 221
+        sp = (svalue_t *) 0xfb470
+        l = (lambda_t *) 0x2
+#5  0x9c59c in execute_callback (cb=0xffbee348, nargs=1, keep=1,
+toplevel=0)
+    at simulate.c:3610
+        ob = (object_t *) 0x303390
+        num_arg = 1
+#6  0x17660 in x_filter_array (sp=0x170800, num_arg=3) at array.c:1723
+        error_index = -4267192
+        cb = {function = {named = {name = 0x8f0dd "\004
+\b\200@\b\022\200",
+      ob = 0x303390}, lambda = {type = 8, x = {string_type = -3875,
+        exponent = -3875, closure_type = -3875, quotes = -3875,
+        num_arg = -3875, extern_args = -3875, generic = -3875}, u = {
+        string = 0x303390 "\006", number = 3158928, ob = 0x303390,
+        vec = 0x303390, map = 0x303390, lambda = 0x303390, mantissa =
+3158928,
+        cb = 0x303390, lvalue = 0x303390, protected_lvalue = 0x303390,
+        protected_char_lvalue = 0x303390, protected_range_lvalue =
+0x303390,
+        error_handler = 0x303390, const_list = 0x303390}}}, is_lambda = 1,
+  num_arg = 1, arg = {type = 3, x = {string_type = 2, exponent = 2,
+---Type <return> to continue, or q <return> to quit---
+      closure_type = 2, quotes = 2, num_arg = 2, extern_args = 2,
+      generic = 2}, u = {
+      string = 0x301eb4 "Game driver shouts: LPmud shutting down
+immediately.\n"
+, number = 3153588, ob = 0x301eb4, vec = 0x301eb4, map = 0x301eb4,
+      lambda = 0x301eb4, mantissa = 3153588, cb = 0x301eb4, lvalue =
+0x301eb4,
+      protected_lvalue = 0x301eb4, protected_char_lvalue = 0x301eb4,
+      protected_range_lvalue = 0x301eb4, error_handler = 0x301eb4,
+      const_list = 0x301eb4}}}
+        arg = (svalue_t *) 0xfb458
+        p = (vector_t *) 0x3c2abc
+        p_size = 1
+        vec = (vector_t *) 0x0
+        v = (svalue_t *) 0x3
+        w = (svalue_t *) 0x3c2acc
+        flags = 0xffbee340 ""
+        res = 0
+        cnt = 0
+#7  0x17734 in f_filter_array (sp=0xfb468, num_arg=3) at array.c:1757
+No locals.
+#8  0x4506c in eval_instruction (
+    first_instruction=0x8 <Address 0x8 out of bounds>, initial_sp=0x3)
+    at interpret.c:6361
+        code = 4
+---Type <return> to continue, or q <return> to quit---
+        numarg = 3
+        pc = 0x2d3781 "MX"
+        fp = (svalue_t *) 0xfb458
+        sp = (svalue_t *) 0xfb468
+        num_arg = -1
+        instruction = 4
+        expected_stack = (svalue_t *) 0x0
+#9  0x65f28 in apply_low (fun=0x1031d8 "", ob=0x303390, num_arg=1,
+    b_ign_prot=1) at interpret.c:20807
+        funstart = 0x2d376d ""
+        fx = 2963309
+        progp = (program_t *) 0x16d400
+        save_csp = (struct control_stack *) 0x1031d8
+        ix = 11
+#10 0x6610c in sapply_int (fun=0x172178 "notify_shutdown", ob=0x303390,
+    num_arg=1, b_find_static=1) at interpret.c:20919
+        expected_sp = (svalue_t *) 0xfb450
+#11 0x6667c in apply_master_ob (fun=0x172178 "notify_shutdown", num_arg=1)
+    at interpret.c:21182
+        eval_cost_reserve = 512
+        reserve_used = 0
+        error_recovery_info = {rt = {last = 0xdeefc, type = 2}, con =
+{text = {
+      0, -4264960, 419340, -4264776, 623388, 0, 0, 0, 673, 4870897, 0,
+---Type <return> to continue, or q <return> to quit---
+      -14882092}}}
+        save_sp = (svalue_t *) 0xfb458
+        save_csp = (struct control_stack *) 0x103198
+        result = (svalue_t *) 0x172178
+#12 0x98324 in fatal (
+    fmt=0xbe490 "Object 0x%lx %s ref count 0, but not destructed.\n")
+    at simulate.c:648
+        va = 0xffbeed70
+        ts = 0xc7040 "%s LDMud aborting on fatal error.\n"
+        in_fatal = 1
+#13 0x7cd1c in _free_object (ob=0xb6fa64, file=0xbe510 "object.c",
+line=521)
+    at object.c:252
+No locals.
+#14 0x7d110 in _free_prog (progp=0x643dfc, free_all=1,
+    file=0xbe510 "object.c", line=272) at object.c:521
+No locals.
+#15 0x7cd80 in _free_object (ob=0x48ed8c, file=0xc7890 "simulate.c",
+line=2680)
+    at object.c:272
+No locals.
+#16 0x9ac24 in remove_destructed_objects () at simulate.c:2680
+        victim = (object_t *) 0x48ed8c
+        ob = (object_t *) 0x785a18
+        sh = (object_shadow_t *) 0xd2dcd8
+---Type <return> to continue, or q <return> to quit---
+        prev = (object_shadow_t *) 0xaebd90
+#17 0x1a360 in backend () at backend.c:343
+        buff = "d\000re
+here\000ins/bards/guild/bardroom\000\000\000\000\001\00
+0\000\000(:\023\\(w\000\000\000\000:\005\220\000\000$\006/usr/sh9222lib/zone
+info/GMT\000\000\000\000\000\000\000\000\026\000\017X\000\000\000\000\000\000\0
+00\005\000\000\000\000``\000\000\000I,L\000+ \000\000\000\000\000\0
+00\000\000\000\000P\001", '\000' <repeats 16 times>,
+"/usr/share/lib/zon\000\004
+\000\000P\001GMT\000*r\224", '\000' <repeats 24 times>...
+#18 0x73e88 in main (argc=0, argv=0xffbefd14) at main.c:429
+        i = 910336
+        set = {__sigbits = {8192, 0, 0, 0}}
+
+
+
+Restart 39. Mon Apr  1 17:27:58 GMT 2002
+2002.04.01 17:27:58 LDMud 3.2.9-dev.425 (3-2-dev.425)
+2002.04.01 17:27:58 Random seed: 0x3ca8989e
+Loading init file /room/init_file
+Preloading file: /obj/daemons/shutdown 0.03
+Preloading file: /room/church 0.39
+Preloading file: closed/wiz_soul 0.01
+Preloading file: /domains/ptown/sites/treehouse/lobby 0.33
+Preloading file: /obj/daemons/transit 0.05
+Preloading file: room/quest_init 0.02
+Preloading file: players/murdock/init_room 0.03
+Preloading file: players/malakai/init_room 0.04
+Preloading file: players/fantasma/init_room 0.02
+Preloading file: players/origo/init_room 0.00
+Preloading file: players/caper/init_room 0.02
+Preloading file: players/benny/init_room 0.01
+Preloading file: players/gabriel/init_room 0.03
+Preloading file: players/bellem/init_room 0.00
+Preloading file: players/mektor/init_room 0.00
+Preloading file: players/alhanna/Rooms/init_room 0.01
+Preloading file: players/heron/init_room 0.05
+Preloading file: domains/bards/guild/entry 0.05
+2002.04.01 17:28:01 LDMud ready for users.
+2002.04.02 22:02:03 Object 0xb6fa64 domains/ptown/obj/special/egg_hunt/easter_egg#19386 ref count 0, but not destructed.
+domains/ptown/sites/blue_carpet std/room/room_items.c line 72
+1e4460:  84          branch_when_zero           (1:  4)	line 72
+1e44a2:  27        0 local                      (0:  3)	line 84
+1e44a4:  13          const0                     (1:  4)
+1e44a5: 100          index                      (2:  5)
+1e44a6:  27        0 local                      (1:  4)
+1e44a8:  14          const1                     (2:  5)
+1e44a9: 100          index                      (3:  6)
+1e44aa: 111      257 m_caggregate               (2:  5)
+1e44ad:  90        1 push_identifier_lvalue     (1:  4)
+1e44af:  65          (void)+=                   (2:  5)
+1e44b0:  22          return0                    (0:  3)	line 86
+domains/ptown/sites/blue_carpet domains/ptown/sites/blue_carpet.c line 55
+2ef23e:  77          pop_value                  (1:  1)	line 55
+2ef23f:   7       18 cstring0                   (0:  0)	line 56
+2ef241:  88          call_function_by_address   (1:  1)
+domains/ptown/sites/blue_carpet std/room/room_items.c line 131
+1e454b:  27        0 local                      (0:  2)	line 131
+1e454d: 216          stringp                    (1:  3)
+1e454e:  84        8 branch_when_zero           (1:  3)
+1e4550:  27        0 local                      (0:  2)	line 132
+1e4552: 109        1 aggregate                  (1:  3)
+1e4555:  95        0 push_local_variable_lvalue (1:  3)
+1e4557:  39          (void)=                    (2:  4)
+1e4558:   5        0 identifier                 (0:  2)	line 134
+1e455a: 213          sizeof                     (1:  3)
+1e455b:  85          branch_when_non_zero       (1:  3)
+1e4563:   5        1 identifier                 (0:  2)	line 138
+1e4565: 213          sizeof                     (1:  3)
+1e4566:  85          branch_when_non_zero       (1:  3)
+1e456e:  79      257 clear_locals               (0:  2)	line 142
+1e4571:  95        1 push_local_variable_lvalue (0:  2)
+1e4573:  27        0 local                      (1:  3)
+1e4575: 117          foreach                    (2:  4)
+1e4598: 118          foreach_next               (0:  6)	line 148
+1e4579:   5        0 identifier                 (0:  6)	line 143
+1e457b:  27        1 local                      (1:  7)
+1e457d: 176          member                     (2:  8)
+1e457e:  84        8 branch_when_zero           (1:  7)
+1e4580:   5        0 identifier                 (0:  6)	line 144
+1e4582:  27        1 local                      (1:  7)
+1e4584: 172          m_delete                   (2:  8)
+1e4585:  77          pop_value                  (1:  7)
+1e4586:  83          branch                     (0:  6)	line 145
+1e4598: 118       34 foreach_next               (0:  6)	line 148
+1e459b: 119          foreach_end                (0:  6)
+1e459c:  22          return0                    (0:  2)	line 149
+domains/ptown/sites/blue_carpet domains/ptown/sites/blue_carpet.c line 56
+2ef245:  77          pop_value                  (1:  1)	line 56
+2ef246:   7       18 cstring0                   (0:  0)	line 57
+2ef248:   7       19 cstring0                   (1:  1)
+2ef24a: 108          simul_efun                 (2:  2)	line 61
+kernel/simul_efun kernel/simul_efun.c line 1428
+2d5edf:  27        1 local                      (0:  3)	line 1428
+2d5ee1:  13          const0                     (1:  4)
+2d5ee2:  47          <                          (2:  5)
+2d5ee3:  84          branch_when_zero           (1:  4)
+2d5ee9:  27        0 local                      (0:  3)	line 1432
+2d5eeb:  85 50798357 branch_when_non_zero       (1:  4)
+2d5ef0:  27        0 local                      (0:  3)	line 1435
+2d5ef2: 216          stringp                    (1:  4)
+2d5ef3:  85          branch_when_non_zero       (1:  4)
+2d5efe:  27        0 local                      (0:  3)	line 1439
+2d5f00:  14          const1                     (1:  4)
+2d5f01: 101          rindex                     (2:  5)
+2d5f02:  16       10 clit                       (1:  4)
+2d5f04:  49          ==                         (2:  5)
+2d5f05:  84          branch_when_zero           (1:  4)
+2d5f10:   7      192 cstring0                   (0:  3)	line 1441
+2d5f12:  27        1 local                      (1:  4)
+2d5f14:  37        2 ||                         (2:  5)
+2d5f16:  16       70 clit                       (1:  4)
+2d5f18:  27        0 local                      (2:  5)
+2d5f1a: 215        3 sprintf                    (3:  6)
+2d5f1c:  21          return                     (1:  4)
+domains/ptown/sites/blue_carpet domains/ptown/sites/blue_carpet.c line 61
+2ef24d: 109        2 aggregate                  (2:  2)	line 61
+2ef250:  88          call_function_by_address   (1:  1)
+domains/ptown/sites/blue_carpet std/room/room_items.c line 22
+1e436f:  27        1 local                      (0:  3)	line 22
+1e4371:  58          !                          (1:  4)
+1e4372:  36        3 &&                         (1:  4)
+1e4374:  27        0 local                      (0:  3)
+1e4376: 188          pointerp                   (1:  4)
+1e4377:  84       40 branch_when_zero           (1:  4)
+1e4379:  79      513 clear_locals               (0:  3)	line 23
+1e437c:  14          const1                     (0:  3)
+1e437d:  95        2 push_local_variable_lvalue (1:  4)
+1e437f:  39          (void)=                    (2:  5)
+1e4380:  83          branch                     (0:  3)
+1e4398:  27        2 local                      (0:  3)
+1e439a:  27        0 local                      (1:  4)
+1e439c: 213          sizeof                     (2:  5)
+1e439d:  47          <                          (2:  5)
+1e439e:  87          bbranch_when_non_zero      (1:  4)
+1e4382:  27        0 local                      (0:  3)	line 24
+1e4384:  27        2 local                      (1:  4)
+1e4386:  14          const1                     (2:  5)
+1e4387:  41          -                          (3:  6)
+1e4388: 100          index                      (2:  5)
+1e4389:  27        0 local                      (1:  4)
+1e438b:  27        2 local                      (2:  5)
+1e438d: 100          index                      (3:  6)
+1e438e:  88          call_function_by_address   (2:  5)
+1e436f:  27        1 local                      (0:  6)	line 22
+1e4371:  58          !                          (1:  7)
+1e4372:  36 52101308 &&                         (1:  7)
+1e4377:  84          branch_when_zero           (1:  7)
+1e43a1:  27        0 local                      (0:  6)	line 30
+1e43a3: 188          pointerp                   (1:  7)
+1e43a4:  84          branch_when_zero           (1:  7)
+1e43ba:  27        1 local                      (0:  6)	line 35
+1e43bc:  58          !                          (1:  7)
+1e43bd:  37       10 ||                         (1:  7)
+1e43bf:  27        1 local                      (0:  6)
+1e43c1: 216          stringp                    (1:  7)
+1e43c2:  58          !                          (1:  7)
+1e43c3:  36          &&                         (1:  7)
+1e43c9:  84          branch_when_zero           (1:  7)
+1e43d0:   5        0 identifier                 (0:  6)	line 39
+1e43d2: 213          sizeof                     (1:  7)
+1e43d3:  85          branch_when_non_zero       (1:  7)
+1e43db:  27        0 local                      (0:  6)	line 42
+1e43dd:  27        1 local                      (1:  7)
+1e43df: 111      257 m_caggregate               (2:  8)
+1e43e2:  90        0 push_identifier_lvalue     (1:  7)
+1e43e4:  65          (void)+=                   (2:  8)
+1e43e5:  22          return0                    (0:  6)	line 43
+1e4392:  77          pop_value                  (1:  4)	line 24
+1e4393:  16        2 clit                       (0:  3)	line 23
+1e4395:  95        2 push_local_variable_lvalue (1:  4)
+1e4397:  65          (void)+=                   (2:  5)
+1e4398:  27        2 local                      (0:  3)
+1e439a:  27        0 local                      (1:  4)
+1e439c: 213          sizeof                     (2:  5)
+1e439d:  47          <                          (2:  5)
+1e439e:  87       29 bbranch_when_non_zero      (1:  4)
+1e43a0:  22          return0                    (0:  3)	line 26
+domains/ptown/sites/blue_carpet domains/ptown/sites/blue_carpet.c line 61
+2ef254:  77          pop_value                  (1:  1)	line 61
+2ef255:  27        0 local                      (0:  0)	line 62
+2ef257: 142          destruct                   (1:  1)
+kernel/master kernel/master.c line 843
+2d365b:  79      260 clear_locals               (0:  9)	line 843
+2d365e:  27        0 local                      (0:  9)	line 848
+2d3660: 414      158 query_shadowing            (1: 10)
+2d3662:  85       39 branch_when_non_zero       (1: 10)
+2d3664:  27        0 local                      (0:  9)
+2d3666:  13          const0                     (1: 10)
+2d3667: 439      183 shadow                     (2: 11)
+2d3669:  95        3 push_local_variable_lvalue (1: 10)
+2d366b:  39          (void)=                    (2: 11)
+2d366c:  83          branch                     (0:  9)
+2d3687:  27        3 local                      (0:  9)
+2d3689:  87       28 bbranch_when_non_zero      (1: 10)
+2d368b:  27        0 local                      (0:  9)	line 854
+2d368d: 146        1 environment                (1: 10)
+2d368f:  95        1 push_local_variable_lvalue (1: 10)
+2d3691:  39          (void)=                    (2: 11)
+2d3692:  27        1 local                      (0:  9)	line 856
+2d3694:  84      120 branch_when_zero           (1: 10)
+2d3696:  79     1283 clear_locals               (0:  9)	line 857
+2d3699: 226          this_object                (0:  9)	line 861
+2d369a:  95        7 push_local_variable_lvalue (1: 10)
+2d369c:  39          (void)=                    (2: 11)
+2d369d:  27        0 local                      (0:  9)	line 862
+2d369f: 211          set_this_object            (1: 10)
+domains/ptown/obj/special/blue_carpet_ob#19473 kernel/master.c line 863
+2d36a0:  27        0 local                      (0:  9)	line 863
+2d36a2: 168          living                     (1: 10)
+2d36a3:  84          branch_when_zero           (1: 10)
+2d36c1:  28       12 catch                      (0:  9)	line 867
+2d36c3:  27        0 local                      (0:  9)
+2d36c5:   7       81 cstring0                   (1: 10)
+2d36c7: 127          call_other                 (2: 11)
+domains/ptown/obj/special/blue_carpet_ob#19473 std/move.c line 57
+1f48af:   5        0 identifier                 (0: 11)	line 57
+1f48b1:  21          return                     (1: 12)
+domains/ptown/obj/special/blue_carpet_ob#19473 kernel/master.c line 867
+2d36c9:  95        6 push_local_variable_lvalue (1: 10)	line 867
+2d36cb:  39          (void)=                    (2: 11)
+2d36cc:  13          const0                     (0:  9)
+2d36cd: 257        1 end_catch                  (1: 10)
+2d36cf:  95        5 push_local_variable_lvalue (1: 10)
+2d36d1:  38          =                          (2: 11)
+2d36d2:  84          branch_when_zero           (1: 10)
+2d36e1:  27        6 local                      (0:  9)	line 872
+2d36e3:  36 52102820 &&                         (1: 10)
+2d36e8:  84          branch_when_zero           (1: 10)
+2d370b:  27        7 local                      (0:  9)	line 879
+2d370d: 211          set_this_object            (1: 10)
+kernel/master kernel/master.c line 882
+2d370e:  27        1 local                      (0:  9)	line 882
+2d3710:  85          branch_when_non_zero       (1: 10)
+2d3738:  83          branch                     (0:  9)	line 890
+2d3744:  27        0 local                      (0:  9)
+2d3746: 153          first_inventory            (1: 10)
+2d3747:  87       14 bbranch_when_non_zero      (1: 10)
+2d3749:  22          return0                    (0:  9)	line 893
+domains/ptown/sites/blue_carpet domains/ptown/sites/blue_carpet.c line 63
+2ef258:  90       23 push_identifier_lvalue     (0:  0)	line 63
+2ef25a:  30          ++                         (1:  1)
+2ef25b:   5       23 identifier                 (0:  0)	line 64
+2ef25d:   5       22 identifier                 (1:  1)
+2ef25f: 213          sizeof                     (2:  2)
+2ef260:  49          ==                         (2:  2)
+2ef261:  84          branch_when_zero           (1:  1)
+2ef267:   7       20 cstring0                   (0:  0)	line 65
+2ef269:  16       25 clit                       (1:  1)
+2ef26b: 128        2 call_out                   (2:  2)
+2ef26d:  22          return0                    (0:  0)	line 66
+players/gabriel/cloud players/gabriel/cloud.c line 13
+3e10ef:  27        0 local                      (0:  0)	line 13
+3e10f1:  85          branch_when_non_zero       (1:  1)
+3e1115:  22          return0                    (0:  0)	line 20
+5af4e7:   0 128   0   0   0 128   0   0
+No program to trace.
+2002.04.02 22:02:03 LDMud aborting on fatal error.
+2002.04.02 22:02:06 [erq] read: EOF
+2002.04.02 22:02:06 [erq] Read 0, should be 9!
+2002.04.02 22:02:06 [erq] Giving up.
+Exit status:  139
 ----------------------------------------------------------------------------
 Date: Mon, 1 Apr 2002 20:38:49 +0200 (CEST)
 From: Markus Peter <warp@spin.de>

@@ -2472,6 +2472,7 @@ remove_object (object_t *ob
     if (ob->prog->blueprint == ob)
     {
         ob->prog->blueprint = NULL;
+        remove_prog_swap(ob->prog);
         free_object(ob, "remove_object: blueprint reference");
     }
 #endif /* !NO_BLUEPRINT */

@@ -355,6 +355,7 @@ gc_mark_program_ref (program_t *p)
             {
                 reference_destructed_object(p->blueprint);
                 p->blueprint = NULL;
+                remove_prog_swap(p);
             }
             else
             {

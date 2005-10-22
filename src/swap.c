@@ -1750,9 +1750,10 @@ load_line_numbers_from_swap (program_t *prog)
 
 /*-------------------------------------------------------------------------*/
 void
-remove_swap_file (program_t *prog)
+remove_prog_swap (program_t *prog)
 
-/* Program <prog> is going to be deleted - remove its swapfile entry.
+/* Program <prog> is going to be deleted - remove its swapfile entry if
+ * it has one.
  */
 
 {
@@ -1760,6 +1761,9 @@ remove_swap_file (program_t *prog)
     program_t tmp_prog;
 
     swap_num = prog->swap_num;
+
+    if (swap_num == -1) /* then program not swapped */
+        return;
 
     /* This test is good not only for debugging, but also when the
      * processor is on fire, to stop subsequent damage.
@@ -1783,7 +1787,7 @@ remove_swap_file (program_t *prog)
     num_unswapped--;
     num_swapped--;
     prog->swap_num = -1;
-} /* remove_swap_file() */
+} /* remove_prog_swap() */
 
 /*-------------------------------------------------------------------------*/
 void

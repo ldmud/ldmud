@@ -1,7 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-02-Apr-2002 (Lars Duening)
+03-Apr-2002 (Lars Duening)  (3.3.196)
+    - (efuns.c, rxcache.c) The old regexp code is usable again.
+    - (prolang.y) '<string> *= <int>' didn't compile (reported by Menaures).
+    - (swap, gcollect.c, object.c, simulate.c) A hunch: when a program is
+         swapped for the first time, the driver writes the struct as it
+         is to the disk. On later swap-ins, this data is read directly
+         into memory, but never written again. If in the meantime
+         the prog->blueprint pointer changed, this change will be lost
+         after the next swap in. It would require a rare sequence of
+         activities to make this a problem, but it's possible. The change
+         is therefore to remove the swap block whenever prog->blueprint
+         changes; let's see if this helps.
+
+02-Apr-2002 (Lars Duening)  (3.3.195)
     - (efuns.c) Efun regexplode() did not remove all its arguments
          (maybe b-020331).
     - (efuns.c) Efun regexplode() misinterpreted how to extract

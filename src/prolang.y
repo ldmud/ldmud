@@ -5701,7 +5701,7 @@ expr0:
            && !compatible_types($1.type, type2)
            && !(   $1.type == TYPE_STRING
                 && (type2 == TYPE_NUMBER || type2 == TYPE_FLOAT)
-                && $2 == F_ADD_EQ))
+                && ($2 == F_ADD_EQ || $2 == F_MULT_EQ)))
           {
               yyerrorf("Bad assignment %s", get_two_types($1.type, $3.type));
           }

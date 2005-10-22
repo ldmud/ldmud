@@ -1297,6 +1297,14 @@ mstring_extract (const string_t *str, size_t start, long end MTRACE_DECL)
     if (end < 0)
         end = (long)len-1;
 
+    if (end >= len)
+    {
+        error("(mstring_extract) end %ld >= len %lu\n"
+             , end, (unsigned long) len);
+        /* NOTREACHED */
+        return NULL;
+    }
+
     if (end < (long)start)
     {
         error("(mstring_extract) end %ld < start %lu\n"

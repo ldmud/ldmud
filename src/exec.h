@@ -645,6 +645,10 @@ struct include_s
 
 /* TODO: We seem to need a datatype for program offsets (right now: unsigned short).
  * TODO:: It shows up in quite a lot of places.
+ * TODO: Replace the on program_s structure with a header/data couple. The
+ * TODO:: header keeps vars likes refs, blueprint, swap_num, *data; and the
+ * TODO:: data keeps the static bytecodes and similar. This way we can swap
+ * TODO:: the program even for clones.
  */
 
 struct program_s
