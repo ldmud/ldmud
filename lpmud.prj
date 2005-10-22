@@ -20,12 +20,13 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 128)
-(Parent-Version lpmud 3-3 127)
-(Version-Log "Implemented include_list() properly.")
+(Project-Version lpmud 3-3 129)
+(Parent-Version lpmud 3-3 128)
+(Version-Log "Corrected a crasher in sprintf().
+Corrected doc/efun/snoop.")
 (New-Version-Log
 "")
-(Checkin-Time "Tue, 20 Nov 2001 21:23:09 -0700")
+(Checkin-Time "Tue, 20 Nov 2001 21:47:26 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -58,8 +59,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.4 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.31 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.191 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.221 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.192 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.222 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -187,7 +188,7 @@
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.7 644))
   (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.37 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.2 644))
-  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.30 644))
+  (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.31 644))
   (src/strfuns.h (lpmud/B/51_strfuns.h 1.11.1.4 644))
   (src/strfuns.c (lpmud/C/0_strfuns.c 1.9.1.10 644))
   (src/svalue.h (lpmud/f/39_datatypes. 1.34.1.15 644))
@@ -967,7 +968,7 @@
   (doc/efun/sin (lpmud/q/23_sin 1.1.1.2 644))
   (doc/efun/sizeof (lpmud/l/39_sizeof 1.3.1.3 644))
   (doc/efun/slice_array (lpmud/q/24_slice_arra 1.3 644))
-  (doc/efun/snoop (lpmud/q/25_snoop 1.4 644))
+  (doc/efun/snoop (lpmud/q/25_snoop 1.5 644))
   (doc/efun/sort_array (lpmud/c/36_sort_array 1.6.1.1 644))
   (doc/efun/sprintf (lpmud/c/35_sprintf 1.3.1.13 644))
   (doc/efun/sprintf.de (lpmud/L/36_sprintf.de 1.2 644))

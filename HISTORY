@@ -57,7 +57,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-19-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
+20-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -213,6 +213,9 @@ For a detailed list of all changes see the file CHANGELOG.
          as both columns and as a table. sprintf() then formatted it as
          columns, but any error (like buffer overflow) would crash the
          driver.
+       + Formatting sprintf("%#9999999999999@s", ({ "bla" }) * 2) clobbered
+           its internal precision information on the first line, and thus
+           crashed on the second.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.

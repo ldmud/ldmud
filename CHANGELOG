@@ -1,7 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-20-Nov-2001 (Lars Duening)
+20-Nov-2001 (Lars Duening)  (3.3.129)
+    - (sprintf.c) Printing a table modified the internal precision information
+        without making a backup. If now the table was applied to an array
+        of data ("%#99999999999@s" format string), formatting the second
+        line would cause a crash (reported by Menaures).
+    -  (doc/efun/snoop) Corrected the manpage: snooping an already snooped
+        player terminates the previous snoop (reported by Zordiac).
+
+20-Nov-2001 (Lars Duening)  (3.3.128)
     - (exec.h, lex.c, prolang, object, gcollect.c, typedefs.h) Added
         complete include file information to compiled programs.
     - (object.c) Implemented efun include_list() properly.

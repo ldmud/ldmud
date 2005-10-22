@@ -10,8 +10,7 @@ DESCRIPTION
         any other failure.
 
         The snoop is checked with the master object for validity.
-        It will also fail if the 'snoopee' is being snooped already or
-        if a snoop would result in a recursive snoop action.
+        It will also fail if a snoop would result in a recursive snoop action.
 
 SEE ALSO
         query_snoop(E)

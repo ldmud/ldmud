@@ -1996,6 +1996,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                         {
                             /* (finfo & INFO_TABLE) */
                             unsigned int n, len, max;
+                            int tpres;
                             char c, *s, *start;
                             p_uint i;
 
@@ -2039,38 +2040,39 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                              *      max = max length of the lines
                              */
 
-                            if (pres)
+                            tpres = pres;
+                            if (tpres)
                             {
-                                (*temp)->size = fs/pres;
+                                (*temp)->size = fs/tpres;
                             }
                             else
                             {
                                 len = s - start;
                                 if (len > max)
                                     max = len; /* the null terminated word */
-                                pres = fs/(max+2);
+                                tpres = fs/(max+2);
                                   /* at least two separating spaces */
-                                if (!pres)
-                                    pres = 1;
-                                (*temp)->size = fs/pres;
+                                if (!tpres)
+                                    tpres = 1;
+                                (*temp)->size = fs/tpres;
                             }
 
-                            len = n/pres; /* length of average column */
+                            len = n/tpres; /* length of average column */
 
-                            if (n < (unsigned int)pres)
-                                pres = n;
-                            if (len*pres < n)
+                            if (n < (unsigned int)tpres)
+                                tpres = n;
+                            if (len*tpres < n)
                                 len++;
-                            if (len > 1 && n%pres)
-                                pres -= (pres - n%pres)/len;
+                            if (len > 1 && n%tpres)
+                                tpres -= (tpres - n%tpres)/len;
 
-                            (*temp)->d.tab = xalloc(pres*sizeof(char *));
+                            (*temp)->d.tab = xalloc(tpres*sizeof(char *));
                             if (!(*temp)->d.tab)
                                 ERROR(ERR_NOMEM);
-                            (*temp)->nocols = pres; /* heavy sigh */
+                            (*temp)->nocols = tpres; /* heavy sigh */
                             (*temp)->d.tab[0] = TABLE;
 
-                            if (pres == 1)
+                            if (tpres == 1)
                                 goto add_table_now;
 
                             /* Subformat the table, replacing some characters
@@ -2089,7 +2091,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                                         SAVE_CHAR(((TABLE)+fs));
                                         TABLE[fs] = '\0';
                                         (*temp)->d.tab[i++] = TABLE+fs+1;
-                                        if (i >= (unsigned int)pres)
+                                        if (i >= (unsigned int)tpres)
                                             goto add_table_now;
                                         n = 0;
                                     }
