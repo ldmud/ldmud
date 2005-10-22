@@ -2361,8 +2361,8 @@ large_free (char *ptr)
         fatal("large_free: block %lx (user %lx) freed twice\n"
              , (unsigned long)p, (unsigned long)ptr);
     if (p[M_MAGIC] != LAMAGIC)
-        fatal("large_free: magic match failed: expected %lx, found %lx\n"
-             , (unsigned long)p[M_MAGIC], (unsigned long)LAMAGIC);
+        fatal("large_free(%p): magic match failed: expected %lx, found %lx\n"
+             , ptr, (unsigned long)p[M_MAGIC], (unsigned long)LAMAGIC);
 #endif
 
     /* If the next block is free, coagulate */

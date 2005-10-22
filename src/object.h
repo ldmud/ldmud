@@ -270,7 +270,7 @@ extern svalue_t *f_creator(svalue_t *sp);
 
 extern svalue_t *f_all_environment(svalue_t *sp, int num_arg);
 extern svalue_t *f_all_inventory(svalue_t *sp);
-#if defined(SUPPLY_PARSE_COMMAND) && !defined(COMPAT_MODE)
+#if defined(SUPPLY_PARSE_COMMAND)
 extern vector_t *deep_inventory(object_t *ob, Bool take_top);
   /* needed by parse.c */
 #endif

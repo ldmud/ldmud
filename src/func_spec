@@ -180,6 +180,8 @@
         map_index
         push_indexed_map_lvalue
         foreach
+        foreach_ref
+        foreach_range
         foreach_next
         foreach_end
         end_catch

@@ -220,7 +220,6 @@
 
 /* Define COMPAT_MODE if you are using the 2.4.5 mudlib or one of its
  * derivatives.
- * TODO: Make this a runtime option.
  */
 #undef COMPAT_MODE
 

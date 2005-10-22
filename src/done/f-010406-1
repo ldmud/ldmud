@@ -1,7 +1,7 @@
 Short: References in foreach()
 From: Lars, Fini
 Date: 20010406
-State: New
+State: Done - implemented in 3.3.44
 
 At the moment hard to implement because of the convoluted reference
 implementation.

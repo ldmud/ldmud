@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-17-Apr-2001 (Lars Duening) -- Development Release 3.3
+18-Apr-2001 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -13,16 +13,50 @@ For a detailed list of all changes see the file CHANGELOG.
          map_mapping(), mapping_contains() and member_array().
        + add_action(): Historical usage with just one argument no longer
            supported.
+
+    - Corrected efuns:
+
+    - New efuns:
+
+    - Master Object:
+
+    - Fixed Crashers:
+
+    - Language:
+       + Strings can hold all characters, including '\0'.
+       + New operator '...' to flatten array arguments in function call
+           argument lists.
+       + foreach() can loop over references, allowing the loop to change
+           the base data.
+       + foreach() can loop over an integer expression, implementing a counted
+           loop.
+
+    - Runtime:
+       + Revamped the string handling to use refcounted strings everywhere.
+       + If input is requested in CHARMODE, the NL characters are passed
+           verbatim to the caller (old drivers passed an empty string
+           instead).
+
+    - Other Changes:
+
+
+17-Apr-2001 (Lars Duening) -- upcoming Release 3.2.9
+
+    - Changed efuns:
        + allocate(): Accepts an optional initialisation value and can
            create multi-dimensional arrays.
        + ctime(): Accepts the output of new efun utime() as well.
+       + debug_info(): New argument DINFO_TRACE to return the current
+            or the last error call stack.
+            Argument (DINFO_DATA, DID_MEMORY) also returns the number
+            and size of permanent and clib allocations (where
+            applicable).
+            Argument (DINFO_DATA, DID_STATUS) also returns
+            the total number of heartbeat calls.
+            Single values of (DINFO_DATA) can be returned instead of the
+            whole array.
        + debug_message(): New second argument determines where to
             log the message, and if to prepend a timestamp.
-       + debug_info(): New argument DINFO_TRACE to return the current
-            call stack.
-       + debug_info(): Argument (DINFO_DATA, DID_MEMORY) also returns
-            the number and size of permanent and clib allocations (where
-            applicable).
        + exec(): If this_interactive() points to one of the involved
             objects, it is switched over as well, like this_player().
        + filter(), map(), sort_array(), walk_mapping(): Protected lvalues
@@ -40,6 +74,11 @@ For a detailed list of all changes see the file CHANGELOG.
            least one match'.
        + sin(), cos(), tan(), atan(), atan2(), log(), exp(), sqrt(), pow():
            Integers are accepted as arguments, too.
+       + add_verb(), add_xverb(), efun308(), file_name(), map_array(),
+         filter_array(), filter_mapping(), map_mapping(), m_sizeof(),
+         send_imp():
+           Available only if driver is compiled with support for
+           deprecated efuns.
 
     - Corrected efuns:
        + call_out(): In release 3.2.8 lvalues were not allowed as arguments -
@@ -90,6 +129,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + If the object for a prompt-closure is destructed, the driver
            could crash under extremely unlucky circumstances.
        + #define'ing the name of an inline closure was not detected.
+       + Assignments of computed strings sometimes crashed the driver.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.
@@ -107,39 +147,35 @@ For a detailed list of all changes see the file CHANGELOG.
        + The operators '++' and '--' can now be used on floats, too.
        + Closures bound to destructed objects are now treated uniformly
            like destructed objects and are replaced by 0s where required.
-       + Closures can now sensibly be used in '==' and '!=' comparisons,
-           in array intersections, and as keys in mappings.
+       + Lfun and variable closures can now be compared with '==' and '!=',
+           and are treated correctly in alist and array operations.
        + Inline closures inherit the visibility of their defining function.
        + Experimental: Extended the construct catch() with the keyword
            'nolog', which suppresses logging the caught error in the logfiles.
            It is meant for objects like wizard tools.
-       + New operator '...' to flatten array arguments in function call
-           argument lists.
-       + Global functions are no longer hidden by local variables.
-       + Bugfix: It is no longer possible to prematurely end an inline closure
+       + It is no longer possible to prematurely end an inline closure
            function by inserting a free '}'.
+       + Global functions are no longer hidden by local variables.
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.
        + Bugfix: Right shift by 32 or more bits was computed incorrectly.
-       + Bugfix: All <op>= assignment operators can now operate on
-           indexed strings on the left hand side.
+       + Bugfix: The type tracking of multiplications can returns the right
+           type when seeing 'mixed' operands.
+       + Bugfix: All <op>= assignment can now operate on indexed strings
+           on the left hand side.
        + Bugfix: Additions of floats to 0 yielded the wrong type.
 
     - Runtime:
-       + Revamped the string handling to use refcounted strings everywhere.
+       + Attempts to set a single string character to 0 now raise
+           a runtime error.
        + The internal alarm timing is monitored and restarted in case the
            alarm gets lost (happens often on Cygwin).
-       + IPv6 name lookup works again, and also with both xerq and erq.
-       + If input is requested in CHARMODE, the NL characters are passed
-           verbatim to the caller (old drivers passed an empty string
-           instead).
+       + Bugfix: IPv6 name lookup works again, and also with both xerq and erq.
        + Bugfix: The driver now longer gets a confused when a client like
            TinyFugue refuses to use CHARMODE.
        + Bugfix: On mapping addition or element assignment, invalid keys (like
            destructed objects) were still counted against the allowed mapping
            size.
-       + Bugfix: The type tracking of multiplications can returns the right
-           type when seeing 'mixed' operands.
 
     - Other Changes:
        + New driver option '--pidfile <filename>' to write the pid of the

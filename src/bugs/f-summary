@@ -110,12 +110,9 @@ f-990727:  Enums.
 f-990813-0: Operator ':=:' for swaps
 f-990813-1: Operator '<=>' for comparisons.
 f-000106: Special -> for array calls
-f-000221: LDMUD foreach idea
 f-000430-1: C++-style variable definitions
 f-000430-2: C-style prototypes
-f-010309-1: foreach() should allow dummy variables
 f-010309-2:'yield' to convert statements into expressions
-f-010406-1: References in foreach()
 
 
 Compiler

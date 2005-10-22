@@ -962,15 +962,11 @@ free_svalue (svalue_t *v)
           {
               struct protected_char_lvalue *p;
 
-              /* TODO: Are these checks necessary? See RANGE_LVALUE below */
               p = v->u.protected_char_lvalue;
-              if (p->lvalue->type != T_STRING
-               || get_txt(p->lvalue->u.str) != p->start)
-              {
-                  xfree(p->start);
-              }
               if (p->lvalue->type == T_STRING)
+              {
                   free_mstring(p->lvalue->u.str);
+              }
               free_protector_svalue(&p->protector);
               xfree(p);
               break;
@@ -11737,11 +11733,13 @@ again:
         break;
     }
 
-    CASE(F_FOREACH);           /* --- foreach <nargs> <offset> --- */
+    CASE(F_FOREACH);       /* --- foreach     <nargs> <offset> --- */
+    CASE(F_FOREACH_REF);   /* --- foreach_ref <nargs> <offset> --- */
+    CASE(F_FOREACH_RANGE); /* --- foreach_range <nargs> <offset> --- */
     {
         /* Initialize a foreach() loop. On the stack are <nargs>-1
-         * lvalues where the value(s) are to be stored. The last
-         * value on the stack is the value to loop over. (Do not
+         * lvalues where the (l)value(s) are to be stored. The last
+         * value on the stack is the (l)value to loop over. (Do not
          * confuse <nargs> with the normal NUM_ARG!).
          *
          * ushort <offset> is the distance to the FOREACH_NEXT
@@ -11752,8 +11750,9 @@ again:
          * the stack to store its internal status.
          *
          *   sp[0]  -> number 'next':  index of the next value to assign (0).
+         *             x.generic:      false: FOREACH, true: FOREACH_REF
          *   sp[-1] -> number 'count': number of values to loop over.
-         *             x.u.generic:    <nargs>, or -<nargs> if the value
+         *             x.generic:      <nargs>, or -<nargs> if the value
          *                             is mapping
          *   sp[-2] -> array 'm_indices': if the value is a mapping, this
          *                             is the array with the indices.
@@ -11765,51 +11764,134 @@ again:
 
         int vars_required;
         int nargs;
-        p_int count;
+        p_int count, start;
         unsigned short offset;
+        Bool gen_refs, use_range;
+        svalue_t * arg;
+
+        gen_refs = (instruction == F_FOREACH_REF);
+        use_range = (instruction == F_FOREACH_RANGE);
+        start = 0;
 
         nargs = LOAD_UINT8(pc);
         LOAD_SHORT(offset, pc);
 
-        if (sp->type != T_STRING
-         && sp->type != T_POINTER
-         && sp->type != T_MAPPING)
-            ERRORF(("foreach() got a %s, requires a string/array/mapping.\n"
+        /* Unravel the lvalue chain (if any) to get to the actual value
+         * to loop over.
+         */
+        if (gen_refs && sp->type != T_LVALUE)
+        {
+            ERRORF(("foreach() got a %s, requires a &(string/array/mapping).\n"
+                   , typename(sp->type)
+                   ));
+        }
+
+        for (arg = sp
+            ; gen_refs && arg && arg->type == T_LVALUE
+            ; arg = arg->u.lvalue)
+            NOOP;
+
+        if (use_range && arg->type != T_NUMBER)
+            ERRORF(("foreach() got a %s, requires a number for upper range bound.\n"
+                   , typename(arg->type)
+                   ));
+
+        if (arg->type != T_STRING
+         && arg->type != T_POINTER
+         && arg->type != T_NUMBER
+         && arg->type != T_MAPPING)
+            ERRORF(("foreach() got a %s, requires a (&)string/array/mapping or number.\n"
                    , typename(sp->type)
                    ));
 
+        if (gen_refs && arg->type == T_NUMBER)
+            ERROR("foreach() got a &number, requires a (&)string/array/mapping or number.\n"
+                   );
+
         /* Find out how many variables we require */
 
-        if (sp->type == T_STRING)
+        if (arg->type == T_NUMBER)
         {
-            count = (p_int)mstrsize(sp->u.str);
+            count = arg->u.number;
             vars_required = 1;
         }
-        else if (sp->type == T_POINTER)
+        else if (arg->type == T_STRING)
         {
-            check_for_destr(sp->u.vec);
-            count = (p_int)VEC_SIZE(sp->u.vec);
+            count = (p_int)mstrsize(arg->u.str);
             vars_required = 1;
+
+            if (gen_refs)
+            {
+                string_t *str;
+
+                /* If the string is tabled, i.e. not changeable, allocate
+                 * a new copy which can be changed and put it into the lvalue.
+                 */
+                if (mstr_tabled(arg->u.str))
+                {
+                    memsafe(str = dup_mstring(arg->u.str), mstrsize(arg->u.str)
+                           , "modifiable string");
+                    free_mstring(arg->u.str);
+                    arg->u.str = str;
+                }
+
+                /* Replace the string-lvalue on the stack by the string
+                 * itself - we don't need the lvalue any more.
+                 */
+                str = ref_mstring(arg->u.str);
+                free_svalue(sp);
+                put_string(sp, str);
+            }
+        }
+        else if (arg->type == T_POINTER)
+        {
+            check_for_destr(arg->u.vec);
+            count = (p_int)VEC_SIZE(arg->u.vec);
+            vars_required = 1;
+
+            if (gen_refs)
+            {
+                /* Replace the array-lvalue on the stack by the array
+                 * itself - we don't need the lvalue any more.
+                 */
+                vector_t * vec = arg->u.vec;
+
+                (void)ref_array(vec);
+                free_svalue(sp);
+                put_array(sp, vec);
+            }
         }
         else
         {
             mapping_t *m;
             vector_t  *indices;
 
-            m = sp->u.map;
+            m = arg->u.map;
             vars_required = 1 + m->num_values;
             indices = m_indices(m);
 
             count = (p_int)MAP_SIZE(m);
               /* after m_indices(), else we'd count destructed entries */
 
+            if (gen_refs)
+            {
+                /* Replace the mapping-lvalue on the stack by the mapping
+                 * itself - we don't need the lvalue any more.
+                 */
+                (void)ref_mapping(m);
+                free_svalue(sp);
+                put_mapping(sp, m);
+            }
+
             if (m->num_values == 0 || nargs-1 == 1)
             {
                 /* Special case: we can replace the mapping
-                 * by its indices only
+                 * by its indices only (and we also don't need to 
+                 * created references).
                  */
                 free_svalue(sp);
                 put_array(sp, indices);
+                gen_refs = MY_FALSE;
             }
             else
             {
@@ -11822,9 +11904,26 @@ again:
             }
         }
 
+        /* If this is a range foreach, drop the upper bound svalue
+         * from the stack (its value is stored in count) and
+         * get the lower bound svalue to be used as starting index.
+         * Since this lower bound svalue is an integer as well, we can
+         * then pretend to execute a normal foreach over an integer.
+         */
+        if (use_range)
+        {
+            free_svalue(sp); sp--;
+            if (sp->type != T_NUMBER)
+                ERRORF(("foreach() got a %s, requires a number for lower range bound.\n"
+                       , typename(sp->type)
+                       ));
+            start = sp->u.number;
+            count++; /* We want to reach the last given value as well */
+        }
+
         /* Push the count and the starting index */
         push_number(sp, count); sp->x.generic = nargs;
-        push_number(sp, 0);
+        push_number(sp, start); sp->x.generic = gen_refs;
 
 #ifdef DEBUG
         /* The <nargs> lvalues and our temporaries act as hidden
@@ -11854,6 +11953,7 @@ again:
         unsigned short offset;
         p_int     ix;
         svalue_t *lvalue;  /* Pointer to the first lvalue */
+        Bool      gen_refs;
         
 
         LOAD_SHORT(offset, pc);
@@ -11864,6 +11964,8 @@ again:
 
         if (ix >= sp[-1].u.number)
             break; /* Nope */
+
+        gen_refs = sp->x.generic;
 
         if (sp[-1].x.generic < 0)
         {
@@ -11920,7 +12022,25 @@ again:
                     /* TODO: Give type and value */
 #endif
                 dest = lvalue->u.lvalue;
-                assign_svalue(dest, values);
+                if (!gen_refs)
+                {
+                    assign_svalue(dest, values);
+                }
+                else
+                {
+                    struct protected_lvalue * prot;
+
+                    free_svalue(dest);
+
+                    prot = (struct protected_lvalue *)xalloc(sizeof *lvalue);
+                    prot->v.type = T_PROTECTED_LVALUE;
+                    prot->v.u.lvalue = values;
+                    (void)ref_mapping(m);
+                    BUILD_MAP_PROTECTOR(prot->protector, m)
+
+                    dest->type = T_LVALUE;
+                    dest->u.lvalue = &prot->v;
+                }
             }
 
             /* Ta-Da! */
@@ -11935,10 +12055,36 @@ again:
 #endif
             lvalue = lvalue->u.lvalue;
 
-            if (sp[-2].type == T_STRING)
+            if (sp[-2].type == T_NUMBER)
+            {
+                  free_svalue(lvalue);
+                  put_number(lvalue, ix);
+            }
+            else if (sp[-2].type == T_STRING)
             {
                 free_svalue(lvalue);
-                put_number(lvalue, get_txt(sp[-2].u.str)[ix]);
+                if (!gen_refs)
+                {
+                    put_number(lvalue, get_txt(sp[-2].u.str)[ix]);
+                }
+                else
+                {
+                    svalue_t * str = sp-2;
+                    struct protected_char_lvalue *val;
+
+                    /* Compute and return the result */
+
+                    (void)ref_mstring(str->u.str);
+                    val = (struct protected_char_lvalue *)xalloc(sizeof *val);
+                    val->v.type = T_PROTECTED_CHAR_LVALUE;
+                    val->v.u.charp = &(get_txt(str->u.str)[ix]);
+                    val->lvalue = str;
+                    val->start = get_txt(str->u.str);
+                    val->protector.type = T_INVALID;
+
+                    lvalue->type = T_LVALUE;
+                    lvalue->u.protected_char_lvalue = val;
+                }
             }
             else if (sp[-2].type == T_POINTER)
             {
@@ -11949,7 +12095,29 @@ again:
                      * FOREACH_END instruction.
                      */
                      
-                assign_svalue(lvalue, sp[-2].u.vec->item+ix);
+                if (!gen_refs)
+                {
+                    assign_svalue(lvalue, sp[-2].u.vec->item+ix);
+                }
+                else
+                {
+                    svalue_t * vec = sp-2;
+                    svalue_t * item;
+                    struct protected_lvalue * prot;
+
+                    free_svalue(lvalue);
+
+                    /* Compute the indexed item and set up the protector */
+
+                    item = &vec->u.vec->item[ix];
+                    prot = (struct protected_lvalue *)xalloc(sizeof *prot);
+                    prot->v.type = T_PROTECTED_LVALUE;
+                    prot->v.u.lvalue = item;
+                    put_ref_array(&(prot->protector), vec->u.vec);
+
+                    lvalue->type = T_LVALUE;
+                    lvalue->u.lvalue = &prot->v;
+                }
             }
             else
                 fatal("foreach() requires a string, array or mapping.\n");
@@ -11970,20 +12138,20 @@ again:
         int nargs;
 
         nargs = sp[-1].x.generic;
+
         if (nargs < 0)
-            pop_n_elems(-nargs + 3);
+            nargs = (-nargs) + 3;
         else
-            pop_n_elems(nargs+2);
+            nargs = nargs + 2;
+
+        pop_n_elems(nargs);
 
 #ifdef DEBUG
         /* The <nargs> lvalues and our temporaries acted as hidden
          * local variables. We now count back the variable count
          * so that a F_RETURN won't complain.
          */
-        if (nargs >= 0)
-            csp->num_local_variables -= 2 + nargs;
-        else
-            csp->num_local_variables -= 3 + (-nargs);
+        csp->num_local_variables -= nargs;
 #endif
 
         break;

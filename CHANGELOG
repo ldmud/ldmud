@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Apr-2001 (Lars Duening)  (3.3.44)
+    - (interpret.c) Corrected a crasher when freeing protected char lvalues.
+    - (func_spec, prolang.y, interpret.c) foreach() can now iterate over
+         references to arrays/mappings/strings, allowing the loop to change
+         them (f-010406-1).
+    - (prolang.y, interpret.c) foreach() can now iterate over integers
+         and integer ranges (f-000221).
+    - (object.c) Fixed another compilation problem for COMPAT mode
+         (reported by Ralph).
+
 17-Apr-2001 (Lars Duening)  (3.3.43)
     - (prolang.y) Redefining an inherited private heart_beat() didn't work:
          the new heart_beat() wasn't called (reported by Gnomi).

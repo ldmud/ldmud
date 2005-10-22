@@ -2900,6 +2900,12 @@ free_const_list_svalue (svalue_t *svp)
 %type <number> L_LOCAL
   /* Index number of the local variable */
 
+%type <number> foreach_expr
+  /* 0: Normal foreach loop value.
+   * 1: Referenced foreach loop value.
+   * 2: Integer range as loop value.
+   */
+
 %type <number> foreach_vars
   /* Number of variables given to foreach
    */
@@ -4609,7 +4615,7 @@ for_expr:
  *       ...                                   POP_VALUE
  *       PUSH_(LOCAL_)LVALUE <varn>
  *       <expr>
- *       FOREACH <numargs> c
+ *       FOREACH(_REF) <numargs> c
  *    l: <body>
  *    c: FOREACH_NEXT l
  *    e: FOREACH_END
@@ -4643,24 +4649,10 @@ foreach:
           $<address>$ = CURRENT_PROGRAM_SIZE;
       }
       
-      expr0 ')'
+      foreach_expr ')'
 
       {
-          vartype_t dtype;
-
 %line
-          dtype = $7.type & TYPE_MOD_RMASK;
-
-          if (!(dtype & TYPE_MOD_POINTER)
-           && dtype != TYPE_ANY
-           && dtype != TYPE_STRING
-           && dtype != TYPE_MAPPING
-           && (exact_types || dtype != TYPE_UNKNOWN)
-             )
-          {
-              type_error("Expression for foreach() of wrong type", $7.type);
-          }
-
           /* Fix the number of locals to clear, now that we know it
            */
           {
@@ -4676,7 +4668,19 @@ foreach:
           /* Create the FOREACH instruction, leaving the branch field
            * blank.
            */
-          ins_f_code(F_FOREACH);
+          switch ($7)
+          {
+          case 0:
+              ins_f_code(F_FOREACH); break;
+          case 1:
+              ins_f_code(F_FOREACH_REF); break;
+          case 2:
+              ins_f_code(F_FOREACH_RANGE); break;
+          default:
+              yyerrorf("Unknown foreach_expr type %ld.\n", (long)$7);
+              fatal("Unknown foreach_expr type %ld.\n", (long)$7);
+              /* NOTREACHED */
+          }
           ins_byte($4+1);
           ins_short(0);
 
@@ -4861,6 +4865,69 @@ foreach_in:
 
     | ':'
 ; /* foreach_in */
+
+foreach_expr:
+      expr0
+      {
+          vartype_t dtype;
+          Bool      gen_refs;
+
+%line
+          gen_refs = ($1.type & (~TYPE_MOD_RMASK)) != 0;
+          dtype = $1.type & TYPE_MOD_RMASK;
+
+          if (!(dtype & TYPE_MOD_POINTER)
+           && dtype != TYPE_ANY
+           && dtype != TYPE_STRING
+           && dtype != TYPE_MAPPING
+           && (dtype != TYPE_NUMBER || gen_refs)
+           && (exact_types || dtype != TYPE_UNKNOWN)
+             )
+          {
+              type_error("Expression for foreach() of wrong type", $1.type);
+          }
+
+          $$ = gen_refs ? 1 : 0;
+      }
+
+    | expr0 L_RANGE expr0
+      {
+          vartype_t dtype;
+
+%line
+          if (($1.type & (~TYPE_MOD_RMASK)) != 0)
+          {
+              type_error("Expression for foreach() of wrong type", $1.type);
+          }
+
+          dtype = $1.type & TYPE_MOD_RMASK;
+
+          if (dtype != TYPE_ANY
+           && dtype != TYPE_NUMBER
+           && (exact_types || dtype != TYPE_UNKNOWN)
+             )
+          {
+              type_error("Expression for foreach() of wrong type", $1.type);
+          }
+
+          if (($3.type & (~TYPE_MOD_RMASK)) != 0)
+          {
+              type_error("Expression for foreach() of wrong type", $3.type);
+          }
+
+          dtype = $3.type & TYPE_MOD_RMASK;
+
+          if (dtype != TYPE_ANY
+           && dtype != TYPE_NUMBER
+           && (exact_types || dtype != TYPE_UNKNOWN)
+             )
+          {
+              type_error("Expression for foreach() of wrong type", $3.type);
+          }
+
+          $$ = 2;
+      }
+; /* foreach_expr */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* The switch statement.

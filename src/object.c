@@ -2629,7 +2629,7 @@ write_deep_inventory (object_t *first, svalue_t *svp)
 } /* write_deep_inventory() */
 
 /*-------------------------------------------------------------------------*/
-#if !defined(SUPPLY_PARSE_COMMAND) || defined(COMPAT_MODE)
+#if !defined(SUPPLY_PARSE_COMMAND)
 static
 #endif
        vector_t *
