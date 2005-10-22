@@ -1397,11 +1397,12 @@ f_allocate (svalue_t *sp, int num_arg)
         }
     }
     else if (argp->type == T_POINTER
-          && (    VEC_SIZE(argp->u.vec) == 0)
+          && (    VEC_SIZE(argp->u.vec) == 0
                || (   VEC_SIZE(argp->u.vec) == 1
                    && argp->u.vec->item->type == T_NUMBER
                    && argp->u.vec->item->u.number == 0)
              )
+            )
     {
         /* Special case: result is the empty array.
          * The condition catches ( ({}) ) as well as ( ({0}) )

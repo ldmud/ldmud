@@ -570,13 +570,10 @@ count_ref_in_vector (svalue_t *svp, size_t num)
             if (CHECK_REF(p->u.map))
             {
                 mapping_t *m;
-                struct condensed_mapping *cm;
-                int num_values;
 
                 m = p->u.map;
-                cm = m->condensed;
-                num_values = m->num_values;
-                note_ref((char *)CM_MISC(cm) - cm->misc_size *(num_values + 1));
+                if (m->cond)
+                    note_ref(m->cond);
                 /* hash mappings have been eleminated at the start */
                 count_ref_in_mapping(m);
             }

@@ -920,12 +920,16 @@ swap_svalues (svalue_t *svp, mp_int num, varblock_t *block)
              * necessiates special treatment in garbage_collection(),
              * which in turn is not prepared to face swapping.
              */
-            svp2 = CM_MISC(m->condensed);
-            size = m->condensed->misc_size;
-            while ( (size -= sizeof(svalue_t)) >= 0)
+            if (m->cond)
             {
-                if ((--svp2)->type == T_OBJECT || svp2->type == T_CLOSURE)
-                    goto swap_opaque;
+                size = m->cond->size;
+                svp2 = &(m->cond->data[0]);
+                while ( --size >= 0)
+                {
+                    if (svp2->type == T_OBJECT || svp2->type == T_CLOSURE)
+                        goto swap_opaque;
+                    svp2++;
+                }
             }
 
             CHECK_SPACE(
@@ -1417,43 +1421,31 @@ read_unswapped_svalues (svalue_t *svp, mp_int num, unsigned char *p)
                  * because the garbage collector runs with
                  * malloc_privilege == MALLOC_SYSTEM .
                  */
-                struct condensed_mapping *cm;
+                mapping_cond_t *cm;
                 mp_int size;
                 svalue_t *data, *svp2;
 
-                size =
-                  sizeof *cm + num_keys * sizeof(svalue_t) * (1 + num_values);
-                cm = (struct condensed_mapping *)
-                  ( (char *)xalloc(size) + size - sizeof *cm );
-                m = (mapping_t *)xalloc(sizeof *m);
-                cm->string_size = 0;
-                cm->misc_size = num_keys * sizeof(svalue_t);
-                m->hash = 0;
-                m->condensed = cm;
-                m->num_values = num_values;
-                m->ref = 1;
-                m->user = user;
-                user->mapping_total +=
-                    sizeof *m + sizeof(char*) + size + sizeof(char*);
-                num_mappings++;
+                m = allocate_cond_mapping(user, num_keys, num_values);
                 svp->u.map = m;
-                svp2 = CM_MISC(cm);
-                size = cm->misc_size;
-                data = (svalue_t *)((char *)svp2 - size);
-                while ( (size -= sizeof(svalue_t)) >= 0) {
-                    data -= num_values;
-                    p = read_unswapped_svalues(--svp2, 1, p);
-                    p = read_unswapped_svalues(data, num_values, p);
-                }
-#ifdef GC_SUPPORT
-                if (garbage_collection_in_progress == 3)
+                if (m->cond)
                 {
-                    clear_memory_reference(m);
-                    clear_memory_reference(
-                      (char *)CM_MISC(cm) -
-                        cm->misc_size * (m->num_values + 1)
-                    );
-                    m->ref = 0;
+                    cm = m->cond;
+
+                    svp2 = &(cm->data[0]);
+                    size = cm->size;
+                    data = COND_DATA(cm, 0, num_values);
+                    while ( --size >= 0) {
+                        p = read_unswapped_svalues(svp2++, 1, p);
+                        p = read_unswapped_svalues(data, num_values, p);
+                        data += num_values;
+                    }
+#ifdef GC_SUPPORT
+                    if (garbage_collection_in_progress == 3)
+                    {
+                        clear_memory_reference(m);
+                        clear_memory_reference(cm);
+                        m->ref = 0;
+                    }
                 }
 #endif
             }

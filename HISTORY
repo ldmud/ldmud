@@ -8,7 +8,7 @@ For a detailed list of all changes see the file CHANGELOG.
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
-         allocate_mapping(), efun308(), extract(), file_name(),
+         allocate_mapping(), copy_mappng(), efun308(), extract(), file_name(),
          filter_array(), filter_mapping(), m_sizeof(), map_array(),
          map_mapping(), mapping_contains() and member_array().
        + add_action(): Historical usage with just one argument no longer

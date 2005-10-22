@@ -101,22 +101,14 @@ svalue_size (svalue_t *v, mp_int * pTotal)
     case T_MAPPING:
     {
         struct svalue_size_locals locals;
-        struct condensed_mapping *cm;
 
         if (NULL == register_pointer(ptable, v->u.map) ) return 0;
 
-        cm = v->u.map->condensed;
-        overhead = (mp_uint)(cm->string_size + cm->misc_size);
+        overhead = (mp_uint)mapping_overhead(v->u.map);
         locals.total = 0;
         locals.composite = 0;
         locals.num_values = v->u.map->num_values;
         walk_mapping(v->u.map, svalue_size_map_filter, &locals);
-        if (v->u.map->hash)
-            overhead +=
-              sizeof(struct hash_mapping) +
-                v->u.map->hash->mask * sizeof(struct map_chain *) +
-                  v->u.map->hash->used *
-                    (sizeof (struct map_chain) - sizeof(svalue_t));
     
         *pTotal = locals.total + overhead;
         return (overhead + locals.composite) / v->u.map->ref;

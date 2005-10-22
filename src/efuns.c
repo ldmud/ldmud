@@ -5183,7 +5183,7 @@ f_sgn (svalue_t *sp)
         if (sp->u.number > 0)
             sp->u.number = 1;
         else if (sp->u.number < 0)
-            sp->u.number = 1;
+            sp->u.number = -1;
         else
             sp->u.number = 0;
     }

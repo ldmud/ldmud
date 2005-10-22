@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Apr-2001 (Lars Duening)  (3.3.48)
+    - (efuns.c) Efun sgn() used on negative integers still returned +1 -
+         a simple typo (thanks, Fiona!).
+    - (mapping,dump_stat.c, func_spec, interpret.c, swap.c) I re-implemented
+         the mappings. Originally I tried to devise a better way of
+         storing mappings in memory, but in the end I ended with the scheme
+         Amylaar used already. Just that now both layout and code are
+         a bit simpler and easier to maintain. Oh, and the obsolete
+         efun copy_mapping() is gone, too.
+
 22-Apr-2001 (Lars Duening)  (3.3.47)
     - (array.c) When using a multi-dimensional allocate(), specifying
          0-sized dimensions could crash the driver (reported by Menaures).

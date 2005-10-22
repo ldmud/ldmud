@@ -2638,7 +2638,7 @@ push_rindexed_lvalue (svalue_t *sp, bytecode_p pc)
  */
 #define BUILD_MAP_PROTECTOR(dest, m)     \
 {                                        \
-    struct hash_mapping *hm;             \
+    mapping_hash_t *hm;                  \
                                          \
     if ( NULL != (hm = (m)->hash) ) {    \
         if (!hm->ref++)                  \

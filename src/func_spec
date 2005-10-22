@@ -571,8 +571,6 @@ int     transfer(object, object|string);
 
         /* Arrays and Mappings */
 
-mapping copy_mapping(mapping);
-
         /* Alists */
 
 mixed   assoc(mixed, mixed *, mixed|void, mixed|void);
