@@ -385,6 +385,7 @@ mapping map_indices(mapping, string|closure, ...);
 
 mapping m_allocate(int, int default: F_CONST1);
 int     m_contains(mixed & | mapping, mixed & | mixed, ...);
+mapping m_add(mapping, mixed, ...);
 mapping m_delete(mapping, mixed);
 mixed  *m_indices(mapping);
 mapping m_reallocate(mapping, int);

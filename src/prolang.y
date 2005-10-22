@@ -8735,6 +8735,8 @@ function_call:
                   {
                       /* There are arguments to check */
 
+                      int argno; /* Argument number for error message */
+
                       if (funp->flags & TYPE_MOD_XVARARGS)
                           num_arg--; /* last argument is checked separately */
 
@@ -8744,7 +8746,7 @@ function_call:
                       arg_types += first_arg;
                       argp = get_argument_types_start(anum_arg);
 
-                      for (i = num_arg; --i >= 0; )
+                      for (argno = 1, i = num_arg; --i >= 0; argno++)
                       {
                           fulltype_t tmp1, tmp2;
 
@@ -8753,7 +8755,7 @@ function_call:
                           if (!REDEFINED_TYPE(tmp1, tmp2))
                           {
                               yyerrorf("Bad type for argument %d of %s %s",
-                                anum_arg - i,
+                                argno,
                                 get_txt(funp->name),
                                 get_two_types(tmp2, tmp1));
                           }

@@ -1,7 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-09-Apr-2002 (Lars Duening)
+18-Apr-2002 (Lars Duening)  (3.3.201)
+    - (prolang.y) When passing a wrong argument to a varargs function, the
+         error message gave the wrong argument number (reported by Gnomi).
+    - (func_spec, mapping) New efun m_add().
+
+09-Apr-2002 (Lars Duening)  (3.3.200)
     - (prolang.y) The improved type checking on <op>= accidentally
          broke the type checking on the plain assignment (reported by Dafire).
     - (mregex.c) Substituting patterns copied garbage characters, too

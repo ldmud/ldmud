@@ -15,5 +15,5 @@ EXAMPLES
         m_values(m, 1)  --> returns ({ 2, 8, 9 })
 
 SEE ALSO
-        mappingp(E), mkmapping(E), m_indices(E), m_delete(E),
+        mappingp(E), mkmapping(E), m_indices(E), m_add(E), m_delete(E),
         sizeof(E), widthof(E), unmkmapping(E).

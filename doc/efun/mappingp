@@ -6,4 +6,5 @@ DESCRIPTION
 
 SEE ALSO
         intp(E), stringp(E), objectp(E), pointerp(E), mkmapping(E),
-        m_indices(E), m_values(E), m_delete(E), sizeof(E), widthof(E).
+        m_indices(E), m_values(E), m_add(E), m_delete(E), sizeof(E),
+        widthof(E).

@@ -3045,6 +3045,60 @@ f_m_allocate (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_m_add (svalue_t *sp, int num_arg)
+
+/* EFUN m_allocate()
+ *
+ *   mapping m_add(mapping map, mixed key, [mixed data...])
+ *
+ * Add (or replace) an entry with index <key> in mapping <map>.
+ * The modified mapping is also returned as result.
+ * 
+ * The values for the entry are taken from the <data> arguments.
+ * Unassigned entry values default to 0, extraneous <data> arguments
+ * are ignore.
+ */
+
+{
+    mapping_t *m;
+    svalue_t *argp;
+    svalue_t *entry;
+    int num_values;
+
+    argp = sp - num_arg + 1;
+    m = argp->u.map;
+
+    /* Get (or create) the mapping entry */
+    entry = get_map_lvalue(m, argp+1);
+
+    /* Transfer the given values from the stack into the mapping
+     * entry.
+     */
+    num_values = m->num_values;
+    if (num_values > num_arg - 2)
+        num_values = num_arg - 2;
+    for ( argp += 2
+        ; num_values > 0 && argp <= sp
+        ; num_values--, argp++, entry++
+        )
+    {
+        transfer_svalue_no_free(entry, argp);
+        /* And since we take out values from under sp, play it
+         * safe:
+         */
+        put_number(argp, 0);
+    }
+        
+    /* We leave the reference to the mapping on the stack as result,
+     * but pop everything else.
+     */
+    sp = pop_n_elems(num_arg-1, sp);
+
+    return sp;
+} /* f_m_add() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_m_delete (svalue_t *sp)
 
 /* EFUN m_delete()

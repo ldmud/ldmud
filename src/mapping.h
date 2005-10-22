@@ -189,6 +189,7 @@ extern void set_mapping_user(mapping_t *m, object_t *owner);
 
 extern svalue_t *f_m_allocate(svalue_t *sp);
 extern svalue_t *f_m_contains(svalue_t *sp, int num_arg);
+extern svalue_t *f_m_add(svalue_t *sp, int num_arg);
 extern svalue_t *f_m_delete(svalue_t *sp);
 extern vector_t *m_indices(mapping_t *m);
 extern svalue_t *f_m_indices(svalue_t *sp);

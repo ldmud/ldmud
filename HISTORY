@@ -82,7 +82,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package.
 
 
-27-Mar-2002 (Lars Duening) -- upcoming Release 3.2.9
+18-Apr-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -218,6 +218,8 @@ For a detailed list of all changes see the file CHANGELOG.
            constituents.
        + include_list(): (preliminary) Return the files included
            in a program file.
+       + m_add(): To add a new entry to a mapping and assign all values
+           in one go.
        + md5(): Compute the MD5 message digest for a string.
        + min(), max(): To select the minimum resp. maximum among a bunch
            of numbers or strings.
