@@ -3011,18 +3011,9 @@ yylex1 (void)
                  * later.
                  */
                 strbuf_addf(textbuf, "\n#line %d\n", current_line-1);
-
-                if (exact_types & TYPE_MOD_PUBLIC)
-                    strbuf_add(textbuf, "public ");
-                else if (exact_types & TYPE_MOD_PROTECTED)
-                    strbuf_add(textbuf, "protected ");
-                else if (exact_types & TYPE_MOD_PRIVATE)
-                    strbuf_add(textbuf, "private ");
-                else if (exact_types & TYPE_MOD_STATIC)
-                    strbuf_add(textbuf, "static ");
-
                 strbuf_addf(textbuf,
-                             "varargs mixed %s (mixed $1, mixed $2, mixed $3,"
+                             "private nomask varargs mixed %s "
+                             "(mixed $1, mixed $2, mixed $3,"
                              " mixed $4, mixed $5, mixed $6, mixed $7,"
                              " mixed $8, mixed $9) {\n"
                              "return "

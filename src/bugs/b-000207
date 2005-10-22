@@ -2,7 +2,7 @@ Date: Mon, 7 Feb 2000 17:44:28 +0100
 From: Bastian Hoyer <dafire@dafire.de>
 Short: Finalfrontier cores
 Type: Bug
-State: Possibly fixed in 3.2.9-dev.330/3.3.85
+State: Not fixed in 3.2.9-dev.330/3.3.85
 See also: f-000207 (the new efuns might be the problem), b-000822, b-000218
 
 It could be a fallout of the local variable bug fixed in 3.2.8-dev.176.

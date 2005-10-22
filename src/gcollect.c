@@ -1405,6 +1405,8 @@ show_object (int d, void *block, int depth)
     if (ob->flags & O_DESTRUCTED)
         WRITES(d, "(destructed) ");
     show_mstring(d, ob->name, 0);
+    WRITES(d, " from ");
+    show_mstring(d, ob->load_name, 0);
     WRITES(d, ", uid: ");
     show_string(d, ob->user->name ? get_txt(ob->user->name) : "0", 0);
     WRITES(d, "\n");

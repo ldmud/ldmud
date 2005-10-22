@@ -1,6 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-Aug-2001 (Lars Duening)  (3.3.97)
+    - (lex.c) The lfuns implementing inline closures are now 'private nomask', 
+        which is the real solution unlike the one implemented in
+        3.2.9-dev.260/3.3.39 (suggested by Freaky).
+    - (efuns.c) If terminal_colour() was used with a closure returning a
+        computed string, the ever call (but the first) within the same
+        formatting clobbered the result from the previous one (reported by Ben
+        and Elric).
+    - (swap.c) Oops, when adjusting the allocation statistics after
+        swapping out variables, the driver occasionally tried to dereference
+        a non-existing pointer (reported by Ben and Nostradamus).
+    - (mudlib/sys/lpcytpes.h) The values to be returned by functionlist() were
+        out of sync with what functionlist() really returned (reported by
+        Freaky).
+
 29-Aug-2001 (Lars Duening)  (3.3.96)
     - (smalloc.c) Corrected a small statistics problem in the
         freelist consolidation: some unusable space was counted
@@ -109,8 +124,7 @@ See the file HISTORY for a user-oriented summary of all the changes.
 
 13-Aug-2001 (Lars Duening)
     - (mapping.c) Adding a mapping to itself via 'm += m' freed svalues
-         first, then used them as data for assignment. This might be the cause
-         for b-000218, b-000207, and maybe b-000822 (reported by Patryn).
+         first, then used them as data for assignment (reported by Patryn).
 
 12-Aug-2001 (Lars Duening)
     - (func_spec) Somehow the change for sizeof() didn't make it into

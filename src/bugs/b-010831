@@ -1,0 +1,31 @@
+Short: memory-leak in map rooms?
+Date: Sat, 1 Sep 2001 00:34:09 +0200
+From: Freaky <Freaky@UNItopia.RUS.Uni-Stuttgart.DE>
+Type: Bug
+State: New
+
+in ldmud-3.2.9-dev.331:
+
+freeing small block 0x09a87880 (user 0x09a8789c) object.c 321
+By object: map/map
+By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
+Object: (destructed) "obj/room", uid: "Magyra"
+
+freeing small block 0x09a6a2f0 (user 0x09a6a30c) simulate.c::string_copy 16=
+40
+By object: map/map
+By program: secure/simul_efun/simul_efun.c (clone_object.inc) line:65
+obj/room^@.c^@
+
+2 small blocks freed
+2001.09.01 00:30:13 Consolidation merged 32050 blocks, freed 0 chunks holdi=
+ng 0=20
+blocks.
+2001.09.01 00:30:13 GC freed 116 destructed objects.
+
+Irgendeine Idee? (/map/map cloned /obj/room, der dann renamed wird)
+
+------
+
+Looks like something held a reference to the destructed obj/room blueprint.
+

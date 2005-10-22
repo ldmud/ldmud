@@ -2,7 +2,7 @@ From:    Dafire@FinalFrontier
 Short: Finalfrontier: illegal mapping size
 Date:    Fri Feb 18 17:43:10 2000
 Type: Bug
-State: Possibly fixed in 3.2.9-dev.320 /3.3.85
+State: Not fixed in 3.2.9-dev.320 /3.3.85
 See also: b-000207, b-000822
 
 The mapping code had a bug which clobbered memory when a mapping was added to
@@ -1751,4 +1751,42 @@ void create()
   SetProp(P_CARGO_QUAN,0);
   SetProp(P_CARGO_MAX_QUAN,20);
 }
+-----------------------------------------------------------------------------
+
+2001.08.30 17:49:53 sensor.c: contact-list: ({({OBJ(/d/Quornitum/imar/univers/inherit/planet#1857),
+    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1858), 
+    OBJ(/d/Quornitum/imar/univers/ships/seppelp.shuttle0), 
+    OBJ(/d/Quornitum/imar/univers/inherit/planet#1485), 
+    OBJ(/d/Quornitum/imar/univers/inherit/planet#1484), 
+    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1486), 
+    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1487), 
+    OBJ(/d/Quornitum/imar/univers/inherit/jumper#1488) }), 
+  ([3: 
+      ({131025, 532340, 252850 }); 
+      ({0, 0, 0 }); 7007.73; 41; 8; "Mond Ai~Hai", 
+    4: 
+      ({130500, 532500, 253000 }); 
+      ({0, 0, 0 }); 7174.58; 41; 8; "Ch~Rihan", 
+    5: 
+      ({128900, 535200, 250300 }); 
+      ({0, 0, 0 }); 11027.6; 41; 64; "Taladon -> Quornitum", 
+    6: 
+      ({126678, 531002, 243766 }); 
+      ({0, 0, 0 }); 16900.5; 41; 64; "Taladon -> Endymion", 
+    7: 
+      ({134242, 530815, 258888 }); 
+      ({0, 0, 0 }); 41.6951; 42; 64; "Taladon -> Sol", 
+    1: 
+      ({511777, 570604, 250664 }); 
+      ({0, 0, 0 }); 0; 22; 64; "Sol -> Taladon", 
+    0: ({515000,571400,254000});({0,0,0});4706.4;42;8;"Sol"])}) 
+
+          c_nr: 2
+2001.08.30 17:49:55 DEBUG: Illegal original mapping size: 1073741826
+2001.08.30 17:49:55 Current object was d/Quornitum/imar/univers/ships/seppelp.shuttle0
+2001.08.30 17:49:55 Dump of the call chain:
+' modify_command' in '   i/player/tippse.c' ('      obj/mensch#942') line 782
+'            cmd' in 'd/Quornitum/imar/univers/room/ship_room.c' ('d/Quornitum/imar/univers/ships/seppelp.shuttle0.room1') line 247
+'      nav_parse' in 'd/Quornitum/imar/univers/raumschiff/nav.c' ('d/Quornitum/imar/univers/ships/seppelp.shuttle0') line 1334
+'nav_intercept_course' in 'd/Quornitum/imar/univers/raumschiff/nav.c' ('d/Quornitum/imar/univers/ships/seppelp.shuttle0') line 470
 -----------------------------------------------------------------------------

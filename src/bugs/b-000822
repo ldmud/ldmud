@@ -2,7 +2,7 @@ Short: Crash in walk_mapping()
 Date: Tue, 22 Aug 2000 11:47:19 -0300
 From: Ron Dawson <rondawson@syd.eastlink.ca>
 Type: Bug
-State: Possibly fixed in 3.2.9-dev.330/3.3.85
+State: Not fixed in 3.2.9-dev.330/3.3.85
 See also: b-000207, b-000218
 Driver: 3.2.8
 

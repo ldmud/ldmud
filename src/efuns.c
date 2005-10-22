@@ -1092,6 +1092,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
        * is necessary to determine which parts[] to exempt from the
        * wrapping calculation.
        */
+    int num_tmp;           /* Number of temporary svalues on the stack */
     int k;                 /* Index within a string */
     int col;               /* Current print column */
     int j;                 /* Accumulated total length of result */
@@ -1103,6 +1104,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
     Bool no_keys;          /* TRUE if no delimiter in the string */
 
     instr = get_txt(text);
+    num_tmp = 0;
 
     /* Find the first occurance of the magic character pair.
      * If found, duplicate the input string into instr and
@@ -1323,12 +1325,14 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 }
                 else
                 {
-                    /* It's a closure */
+                    /* It's a closure.
+                     * We keep the result on the stack to make sure
+                     * it lives until we are done processing it.
+                     */
                     push_c_n_string(inter_sp, parts[i], lens[i]);
                     call_lambda(cl, 1);
-                    transfer_svalue(&apply_return_value, inter_sp);
-                    inter_sp--;
-                    mdata = &apply_return_value;
+                    num_tmp++;
+                    mdata = inter_sp;
                     if (mdata->type != T_STRING)
                     {
                         error("(terminal_colour) Closure did not return a string.\n");
@@ -1701,6 +1705,13 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
       xfree(parts);
     if (savestr)
       free_mstring(savestr);
+    while (num_tmp > 0)
+    {
+        free_svalue(inter_sp);
+        inter_sp--;
+        num_tmp--;
+    }
+
 
     /* now we have what we want */
 #ifdef DEBUG

@@ -5,8 +5,8 @@ b-990305-01: 3.2-dev.38 and 3.2.1@139 crash in find_string()
 b-991123-0: 3.2.7-dev.104 and 3.2.8-dev.156 crash in find_string()
 b-991214: GC crashed on lambda closure with illegal data
 b-991219: Gamedriver fatal()s.
-b-000207: Finalfrontier cores (possibly fixed).
-b-000218: Finalfrontier: illegal mapping size (possibly fixed).
+b-000207: Finalfrontier cores
+b-000218: Finalfrontier: illegal mapping size 
 b-000503: dev.185 cores in free_string().
 b-000603: Evermore: bad stack at F_RETURN
 b-000611: dev.20x crashes on Hyperborea (Maybe fixed)
@@ -15,7 +15,7 @@ b-000702: dev.200 in UNItopia cores on fast connects (Probably fixed)
 b-000701: dev.200 cores in UNItopia (due to an inherit?)
 b-000607: dev.20x fails magic match in xfree()
 b-000718: dev.216 crashes on illegal string svalue in Unitopia (Maybe fixed)
-b-000822: Crash in walk_mapping() (possibly fixed).
+b-000822: Crash in walk_mapping()
 b-000909: dev.226 crashes TubMud
 b-001016: Unitopia crashes on invalid string in reset()
 b-001016-1: Wunderland crashes after 0-ref string
@@ -55,7 +55,7 @@ b-000308: call_out freezes totally (maybe fixed)
 b-010115: Memory leaks in dev.251
 b-010115-1: Make sure that all master calls use leading slashes.
 b-010610-1: CRT doesn't work well in charmode
-
+b-010831: memory-leak in map rooms?
 
 Installation
 --------------------------------------------------------------------------
