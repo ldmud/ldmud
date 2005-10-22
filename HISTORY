@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-13-May-2002 (Lars Duening) -- Development Release 3.3
+13-Aug-2002 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -80,8 +80,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + The MAX_MAPPING configuration parameter now determines the total
            number of elements (keys + values) a mapping can hold, not just
            the maximum number of keys.
-       + The driver can be condigure to use either the traditional
-           regular expression code, or the PCRE package.
+       + The driver can be configured to use either the traditional
+           regular expression code, or the PCRE package (default).
 
 
 12-Aug-2002 (Lars Duening) -- upcoming Release 3.2.9

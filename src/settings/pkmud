@@ -40,6 +40,7 @@ with_apply_cache_bits=10
 enable_compat_mode=no
 enable_strict_euids=yes
 enable_use_alists=yes
+enable_use_pcre=no
 
 enable_supply_parse_command=no
 enable_initialization_by___init=yes

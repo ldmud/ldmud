@@ -39,7 +39,6 @@ typedef struct regexp
       /* Internal  use: length of regmust.
        */
     long regalloc;          /* Allocated total length, used by rxcache */
-    Bool from_ed;           /* TRUE if compiled for ed() */
     unsigned char program[1];  /* The compiled regexp. */
 } regexp;
 
@@ -49,11 +48,17 @@ extern Bool regnarrate;
 void regdump(regexp *rg);
 #endif
 
-extern regexp *regcomp(unsigned char *expr, Bool excompat, Bool from_ed);
-extern Bool regexec(regexp *prog, char *string, char *start);
-extern char *regsub(regexp *prog, char *source, char *dest, int n, Bool quiet);
-extern void regerror(char *);
+extern regexp *regcomp(unsigned char *expr, Bool excompat, char ** errmsg, int * erridx);
+extern int regexec(regexp *prog, char *string, char *start);
 
-#endif /* USE_PCRE */
+/* Return codes from regexec() */
+
+#define RE_MATCH            (1)
+#define RE_NOMATCH          (0)
+#define RE_ERROR_NULL       (-1)
+#define RE_ERROR_CORRUPT    (-2)
+#define RE_ERROR_BACKTRACK  (-3)
+
+#endif /* !USE_PCRE */
 
 #endif /* REGEXP_H_ */

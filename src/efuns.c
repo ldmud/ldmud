@@ -750,7 +750,7 @@ f_regreplace (svalue_t *sp)
     size_t    reslen;                  /* Result length */
 
     /* Must set inter_sp before call to rx_compile(),
-     * because it might call regerror.
+     * because it might call error().
      */
     inter_sp = sp;
 
@@ -1028,7 +1028,7 @@ v_regmatch (svalue_t *sp, int num_arg)
     string_t *resstr;   /* Result string */
 
     /* Must set inter_sp before call to rx_compile(),
-     * because it might call regerror.
+     * because it might call error().
      */
     inter_sp = sp;
 

@@ -69,3 +69,4 @@ with_max_malloced=0x6000000
 with_total_trace_length=0x1000
 enable_use_alists=yes
 enable_use_ipv6=yes
+enable_use_pcre=no

@@ -1,8 +1,7 @@
 Short: Improved RegExps, using PCRE
 From: Lars, Fini
 Date: 20010406
-State: Under implementation
-See: f-010406-2
+State: Done - implementation completed in 3.3.219
 
 First integration steps in 3.3.166. Still missing from the configuration
 framework is the detection of an existing libpcre, and a switch to select

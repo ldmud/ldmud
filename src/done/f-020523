@@ -2,7 +2,7 @@ Short: Add Perl Regex modifiers to ed()
 Date: Thu, 23 May 2002 10:00:56 -0600
 From: Lars Duening <c-lars.duening@wcom.com>
 Type: Feature
-State: New
+State: Rejected.
 See: f-010406-2
 
 i  Do case-insensitive pattern matching.
@@ -28,3 +28,6 @@ newlines within the string.
 x  Extend your pattern's legibility by permitting whitespace and 
 comments.
 
+-- This change would require a rewrite of the ed() command parser,
+and is not really necessary as the modifiers can be specified inline
+in the PCRE expression.

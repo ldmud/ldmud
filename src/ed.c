@@ -13,7 +13,8 @@
  * TurboC mods and cleanup 8/17/88 RAMontante.
  *
  * Regexp stuff replaced with Spencerian version, sundry other bugfix+speedups
- *   by Ian Phillipps.
+ *   by Ian Phillipps. Regexps replaced again to transparently use PCRE
+ *   instead of Spencer's regexps by Lars Duening.
  *
  * help files and '^' added by Ted Gaunt.
  * Tab conversion added by Andreas Klauer.
@@ -26,12 +27,6 @@
  * Per interactive user there can be one active ed session; stored as
  * a pointer to the ed_buffer in the interactive structure. The lines of
  * the text are stored linewise in a double-linked ring.
- *
- * The regular expressions are implemented using Henry Spencers package.
- * It was modified so that regsub() returns a pointer to the '\0' after
- * the destination string; and the editor knows how to deal with the
- * "private" struct regexp.reganch field. Additionally, all regexp calls
- * are wrapped up by the regexp cache for speed improvement.
  *
  * TODO: Make it possible to attach an editor to any object, and let
  * TODO:: the editor communicate via efuns - no direct io.

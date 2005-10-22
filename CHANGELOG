@@ -1,6 +1,18 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Aug-2002 (Lars Duening)  (3.3.219)
+    - (regexp, mregex) Changed the original RE package to return
+         error codes instead of calling regerror(). This puts it more
+         in line with the PCRE implementation.
+    - (configure, setting files) PCRE is now compilation default; however
+         I disabled it explicitedly in the setting files.
+    - (regexp, pcre) Whenever the RE engine has to backtrack, the eval
+         cost is incremented and checked. This will catch pathological
+         matches like regexp(({"=XX==================="}), "X(.+)+X")
+         (regexp mod provided by Fiona).
+  This completes the addition of PCRE to LDMud (f-010406-0).
+
 12-Aug-2002 (Lars Duening)  (3.3.218)
     - (lex.c) New predefined macros __CATCH_EVAL_COST__ and
          __MASTER_EVAL_COST__ to carry the corresponding

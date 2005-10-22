@@ -11,6 +11,11 @@
 
 #ifdef USE_PCRE
 
+#include "pkg-pcre.h"
+
+#include "interpret.h"
+#include "simulate.h"
+
 /* Provide a definition for NEWLINE */
 #define NEWLINE '\n'
 
@@ -18,6 +23,18 @@
 #ifdef DEBUG
 #    undef DEBUG
 #endif
+
+/* To detect a pathological case of backtracking, a call to this
+ * macro has to be inserted right after the 'bracked failed' diagnosic
+ * in match().
+ */
+
+#define LDMUD_CHECK_EVAL_COST \
+    eval_cost += 1; \
+    if (max_eval_cost && max_eval_cost < eval_cost) { \
+        md->errorcode = RE_ERROR_BACKTRACK; \
+        return FALSE; \
+    }
 
 #include "pcre/pcre.c"
 #include "pcre/get.c"

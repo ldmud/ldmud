@@ -89,6 +89,7 @@ enable_compat_mode=yes
 enable_strict_euids=no
 enable_initialization_by___init=no
 enable_use_alists=yes
+enable_use_pcre=no
 
 #-- EXTRAS
 

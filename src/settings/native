@@ -13,3 +13,4 @@ with_master_name=secure/master
 enable_compat_mode=no
 enable_strict_euids=yes
 enable_use_alists=yes
+enable_use_pcre=no

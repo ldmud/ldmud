@@ -1386,6 +1386,10 @@ NOTES
         are not available in PCRE, but can be emulate with \W\b
         and \b\W
 
+        In LDMud, backtracks are limited by the EVAL_COST runtime
+        limit, to avoid freezing the driver with a match
+        like regexp(({"=XX==================="}), "X(.+)+X").
+
 
 LIMITATIONS
         There are some size limitations in PCRE but it is hoped that

@@ -297,7 +297,7 @@ enable_use_alists=no
 
 # Enable PCRE instead of traditional regexps
 
-enable_use_pcre=no
+enable_use_pcre=yes
 
 # Enable obsolete and deprecated efuns.
 

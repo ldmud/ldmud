@@ -31,6 +31,7 @@ with_swap_file=etc/swap/LP_SWAP.3
 with_access_file=adm/etc/ACCESS.ALLOW
 
 enable_initialization_by___init=no
+enable_use_pcre=no
 
 with_max_players=100
 with_allowed_ed_cmds=3

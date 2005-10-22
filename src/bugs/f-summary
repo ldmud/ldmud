@@ -84,8 +84,6 @@ f-001220-0: Extend the debug_info() method to handle interactives.
 f-010307: Short(est) Path Algorithms
 f-010223: Useful coloured string efuns
 f-010320: limited() vs resetting of runtime costs
-f-010406-0: Improved RegExps, using PCRE
-f-010406-2: PCRE Implementation Notes
 f-010411: Extend map(),filter(),... for strings.
 f-010516-0: Allow add_actions() on closures
 f-010516-1: Add a priority to notify_fail()
@@ -118,7 +116,6 @@ f-020328-0: Introduce 'regexp' LPC datatype
 f-020331: Efun this_function()
 f-020404: New efun strreplace()
 f-020507-2: Slicing mappings
-f-020523: Add Perl Regex modifiers to ed()
 
 
 Language

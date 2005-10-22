@@ -17,4 +17,5 @@ with_portno=2000
 with_max_players=35
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
+enable_use_pcre=no
 

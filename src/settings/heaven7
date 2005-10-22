@@ -14,6 +14,7 @@ enable_compat_mode=yes
 enable_strict_euids=no
 enable_lpc_nosave=no
 enable_use_alists=yes
+enable_use_pcre=no
 
 enable_access_control=no
 with_portno=6100

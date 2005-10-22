@@ -3547,6 +3547,7 @@ for (;;)
       md->offset_vector[offset+1] = save_offset2;
       md->offset_vector[md->offset_end - number] = save_offset3;
 
+      LDMUD_CHECK_EVAL_COST
       return FALSE;
       }
 

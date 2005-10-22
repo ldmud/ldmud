@@ -35,6 +35,7 @@ enable_malloc_lpc_trace=yes
 enable_access_control=no
 enable_supply_parse_command=no
 enable_use_mysql=yes
+enable_use_pcre=no
 with_erq_dir=/RoleMUD/erq/bin
 with_swap_file=Swap_File
 

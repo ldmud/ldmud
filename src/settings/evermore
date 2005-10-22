@@ -70,10 +70,12 @@ enable_use_deprecated=no
 # we need the alists
 enable_use_alists=yes
 
+# PCRE are too new
+enable_use_pcre=no
+
 # this is far in the future
 with_max_players=70
 
 # this not
 with_max_local=100
-
 

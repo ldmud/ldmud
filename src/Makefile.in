@@ -334,9 +334,9 @@ mkfunc.o : make_func.c ../mudlib/sys/driver_hook.h hash.h exec.h \
     hosts/be/be.h machine.h
 
 mregex.o : ../mudlib/sys/regexp.h ../mudlib/sys/debug_info.h xalloc.h \
-    svalue.h strfuns.h simulate.h pcre/pcre.h comm.h regexp.h mstrings.h \
-    hash.h gcollect.h mregex.h driver.h typedefs.h sent.h exec.h port.h \
-    config.h hosts/unix.h hosts/be/be.h machine.h
+    svalue.h strfuns.h simulate.h regexp.h pkg-pcre.h mstrings.h hash.h \
+    gcollect.h comm.h mregex.h driver.h typedefs.h sent.h exec.h \
+    pcre/pcre.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 mstrings.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h \
     stdstrings.h simulate.h main.h hash.h gcollect.h mstrings.h driver.h \
@@ -384,9 +384,11 @@ pkg-mysql.o : xalloc.h svalue.h simulate.h mstrings.h interpret.h array.h \
     pkg-mysql.h my-alloca.h typedefs.h driver.h strfuns.h sent.h exec.h \
     instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
-pkg-pcre.o : pcre/study.c pcre/maketables.c pcre/get.c pcre/pcre.c driver.h \
-    pcre/internal.h pcre/chartables.c port.h config.h pcre/pcre.h \
-    pcre/config.h hosts/unix.h hosts/be/be.h machine.h
+pkg-pcre.o : pcre/study.c pcre/maketables.c pcre/get.c pcre/pcre.c \
+    simulate.h interpret.h pkg-pcre.h driver.h pcre/internal.h \
+    pcre/chartables.c svalue.h strfuns.h sent.h exec.h typedefs.h instrs.h \
+    pcre/pcre.h port.h config.h pcre/config.h hosts/unix.h hosts/be/be.h \
+    machine.h
 
 port.o : hosts/crypt.c main.h backend.h my-rusage.h driver.h typedefs.h \
     port.h config.h hosts/unix.h hosts/be/be.h machine.h
@@ -398,9 +400,9 @@ ptrtable.o : simulate.h mempools.h ptrtable.h driver.h svalue.h strfuns.h \
 random.o : random.h driver.h port.h config.h hosts/unix.h hosts/be/be.h \
     machine.h
 
-regexp.o : main.h xalloc.h simulate.h comm.h regexp.h driver.h typedefs.h \
-    svalue.h strfuns.h sent.h exec.h port.h config.h hosts/unix.h \
-    hosts/be/be.h machine.h
+regexp.o : main.h xalloc.h simulate.h interpret.h comm.h regexp.h driver.h \
+    typedefs.h svalue.h strfuns.h sent.h exec.h instrs.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 simul_efun.o : xalloc.h swap.h svalue.h stdstrings.h simulate.h ptrtable.h \
     object.h mstrings.h lex.h interpret.h instrs.h gcollect.h exec.h \
@@ -499,6 +501,10 @@ parser.o : lang.c stdstrings.h instrs.h
 pkg-alists.o : instrs.h
 
 pkg-mysql.o : instrs.h
+
+pkg-pcre.o : instrs.h
+
+regexp.o : instrs.h
 
 simul_efun.o : stdstrings.h instrs.h
 

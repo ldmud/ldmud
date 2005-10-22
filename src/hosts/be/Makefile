@@ -149,16 +149,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 218
+  SETVERFLAGS += d 219
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.218
+  VSTRING = 3.3.0-pre.219
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 218
+  SETVERFLAGS += d 219
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.218
+  VSTRING = 3.3.0-dev.219
 endif
 
 else
@@ -166,12 +166,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 218
+SETVERFLAGS = -app 3 3 219
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.218
+  VSTRING = 3.3.219
 
 endif
 
@@ -581,9 +581,9 @@ $(OBJ)/mkfunc.o : make_func.c ../mudlib/sys/driver_hook.h hash.h exec.h \
     hosts/be/be.h machine.h
 
 $(OBJ)/mregex.o : ../mudlib/sys/regexp.h ../mudlib/sys/debug_info.h \
-    xalloc.h svalue.h strfuns.h simulate.h pcre/pcre.h comm.h regexp.h \
-    mstrings.h hash.h gcollect.h mregex.h driver.h typedefs.h sent.h exec.h \
-    port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    xalloc.h svalue.h strfuns.h simulate.h regexp.h pkg-pcre.h mstrings.h \
+    hash.h gcollect.h comm.h mregex.h driver.h typedefs.h sent.h exec.h \
+    pcre/pcre.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/mstrings.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h \
     stdstrings.h simulate.h main.h hash.h gcollect.h mstrings.h driver.h \
@@ -635,8 +635,10 @@ $(OBJ)/pkg-mysql.o : xalloc.h svalue.h simulate.h mstrings.h interpret.h \
     exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/pkg-pcre.o : pcre/study.c pcre/maketables.c pcre/get.c pcre/pcre.c \
-    driver.h pcre/internal.h pcre/chartables.c port.h config.h pcre/pcre.h \
-    pcre/config.h hosts/unix.h hosts/be/be.h machine.h
+    simulate.h interpret.h pkg-pcre.h driver.h pcre/internal.h \
+    pcre/chartables.c svalue.h strfuns.h sent.h exec.h typedefs.h instrs.h \
+    pcre/pcre.h port.h config.h pcre/config.h hosts/unix.h hosts/be/be.h \
+    machine.h
 
 $(OBJ)/port.o : hosts/crypt.c main.h backend.h my-rusage.h driver.h \
     typedefs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
@@ -648,9 +650,9 @@ $(OBJ)/ptrtable.o : simulate.h mempools.h ptrtable.h driver.h svalue.h \
 $(OBJ)/random.o : random.h driver.h port.h config.h hosts/unix.h \
     hosts/be/be.h machine.h
 
-$(OBJ)/regexp.o : main.h xalloc.h simulate.h comm.h regexp.h driver.h \
-    typedefs.h svalue.h strfuns.h sent.h exec.h port.h config.h \
-    hosts/unix.h hosts/be/be.h machine.h
+$(OBJ)/regexp.o : main.h xalloc.h simulate.h interpret.h comm.h regexp.h \
+    driver.h typedefs.h svalue.h strfuns.h sent.h exec.h instrs.h port.h \
+    config.h hosts/unix.h hosts/be/be.h machine.h
 
 $(OBJ)/simul_efun.o : xalloc.h swap.h svalue.h stdstrings.h simulate.h \
     ptrtable.h object.h mstrings.h lex.h interpret.h instrs.h gcollect.h \
@@ -749,6 +751,10 @@ $(OBJ)/parser.o : lang.c stdstrings.h instrs.h
 $(OBJ)/pkg-alists.o : instrs.h
 
 $(OBJ)/pkg-mysql.o : instrs.h
+
+$(OBJ)/pkg-pcre.o : instrs.h
+
+$(OBJ)/regexp.o : instrs.h
 
 $(OBJ)/simul_efun.o : stdstrings.h instrs.h
 

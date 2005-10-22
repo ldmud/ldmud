@@ -28,6 +28,7 @@ enable_compat_mode=no
 enable_strict_euids=no
 enable_use_deprecated=yes
 enable_use_alists=yes
+enable_use_pcre=no
 with_time_to_reset=3600
 with_time_to_clean_up=7200
 

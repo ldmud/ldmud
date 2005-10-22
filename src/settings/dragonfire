@@ -19,6 +19,7 @@ exec ./configure \
 --enable-use-system-crypt=no \
 --enable-use-deprecated=no \
 --enable-use-alists=yes \
+--enable-use-pcre=no \
 --with-master-name=secure/master \
 --with-time-to-reset=1800 \
 --with-portno=1999 \

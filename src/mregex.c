@@ -41,13 +41,14 @@
 
 #include "mregex.h"
 
+#include "comm.h" /* add_message() */
 #include "gcollect.h"
 #include "hash.h"
 #include "mstrings.h"
-#include "regexp.h"
 #ifdef USE_PCRE
-#include "comm.h" /* add_message() */
-#include "pcre/pcre.h"
+#include "pkg-pcre.h"
+#else
+#include "regexp.h"
 #endif
 #include "simulate.h"
 #include "strfuns.h"
@@ -156,7 +157,7 @@ rx_error_message (int code
 #ifdef USE_PCRE
     const char* text;
 
-    if (code > 0)
+    if (code >= 0)
         return NULL;
     switch (code)
     {
@@ -172,15 +173,29 @@ rx_error_message (int code
         text = "regex memory violated"; break;
     case PCRE_ERROR_NOMEMORY:
         text = "out of memory"; break;
+    case RE_ERROR_BACKTRACK:
+        text = "too many backtracks"; break;
     default:
         text = "unknown internal error"; break;
     }
     return text;
 #else
-#ifdef __MWERKS__
-#    pragma unused(code)
-#endif
-    return NULL;
+    const char* text;
+
+    if (code >= 0)
+        return NULL;
+    switch (code)
+    {
+    case RE_ERROR_NULL:
+        text = "program or text NULL"; break;
+    case RE_ERROR_CORRUPT:
+        text = "regex memory invalid"; break;
+    case RE_ERROR_BACKTRACK:
+        text = "too many backtracks"; break;
+    default:
+        text = "unknown internal error"; break;
+    }
+    return text;
 #endif
 }  /* rx_error_message() */
 
@@ -201,12 +216,12 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
  */
 
 {
+    const char * pErrmsg;
+    int          erridx;
 #ifdef USE_PCRE
     pcre       * pProg;     /* The generated regular expression */
     pcre_extra * pHints;    /* Study data */
     int        * pSubs;     /* Capturing and work area */
-    const char * pErrmsg;
-    int          erridx;
     int          pcre_opt;  /* <opt> translated into PCRE opts */
     int          num_subs;  /* Number of capturing parentheses */
 #else
@@ -247,7 +262,6 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
     if (pHash != NULL
      && pHash->pString != NULL
      && pHash->hString == hExpr
-     && pHash->base.from_ed == from_ed
 #ifdef USE_PCRE
      && pHash->base.opt == opt
 #endif
@@ -315,9 +329,16 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
     pcre_malloc_size += num_subs * sizeof (*pSubs);
 #else
     pRegexp = regcomp((unsigned char *)get_txt(expr)
-                     , opt & RE_EXCOMPATIBLE, from_ed);
+                     , opt & RE_EXCOMPATIBLE
+                     , &pErrmsg, &erridx);
     if (NULL == pRegexp)
+    {
+        if (from_ed)
+            add_message("re: %s at offset %d\n", pErrmsg, erridx);
+        else
+            error("re: %s at offset %d\n", pErrmsg, erridx);
         return NULL;
+    }
 #endif
 
 #ifndef RXCACHE_TABLE
@@ -328,7 +349,6 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
 
         xallocate(rc, sizeof(*rc), "Regexp structure");
         rc->ref = 1;
-        rc->from_ed = from_ed;
         rc->opt = opt;
 #ifdef USE_PCRE
         rc->pProg = pProg;
@@ -357,7 +377,6 @@ rx_compile (string_t * expr, int opt, Bool from_ed)
     xtable[h] = pHash;
 
     pHash->base.ref = 1;
-    pHash->base.from_ed = from_ed;
     pHash->base.opt = opt;
     pHash->pString = expr; /* refs are transferred */
     pHash->hString = hExpr;

@@ -78,6 +78,12 @@ REGULAR EXPRESSION DETAILS
                   characters.
 
 
+NOTES
+        In LDMud, backtracks are limited by the EVAL_COST runtime
+        limit, to avoid freezing the driver with a match
+        like regexp(({"=XX==================="}), "X(.+)+X").
+
+
 AUTHOR
         Mark H. Colburn, NAPS International (mark@jhereg.mn.org)
         Henry Spencer, University of Torronto (henry@utzoo.edu)

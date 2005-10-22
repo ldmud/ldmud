@@ -34,6 +34,7 @@ enable_initialization_by___init=yes
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
 enable_use_mysql=/usr/lib/mysql
+enable_use_pcre=no
 
 with_htable_size=65536
 with_otable_size=8192

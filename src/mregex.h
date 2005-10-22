@@ -25,7 +25,6 @@
 
 struct regexp_s {
     p_uint ref;      /* Number of refs */
-    Bool   from_ed;  /* TRUE: Print error msgs directly to user */
     int    opt;      /* Additional options */
 #ifdef USE_PCRE
     pcre        * pProg;     /* The generated regular expression */

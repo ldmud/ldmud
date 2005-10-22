@@ -19,6 +19,7 @@ exec ./configure \
 --enable-malloc-trace \
 --enable-malloc-lpc-trace \
 --enable-use-system-crypt=no \
+--enable-use-pcre=no \
 --with-master-name=secure/master \
 --with-time-to-reset=900 \
 --with-portno=2345 \

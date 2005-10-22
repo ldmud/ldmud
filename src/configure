@@ -56,7 +56,7 @@ ac_help="$ac_help
   --enable-use-mysql                  default=disabled
         Enables mySQL support"
 ac_help="$ac_help
-  --enable-use-pcre                   default=disabled
+  --enable-use-pcre                   default=enabled
         Enables PCRE instead of traditional regexps"
 ac_help="$ac_help
   --enable-use-deprecated             default=enabled
@@ -848,7 +848,7 @@ if test "${enable_use_mysql+set}" = set; then
 fi
 
 
-DEFAULTenable_use_pcre=no
+DEFAULTenable_use_pcre=yes
 # Check whether --enable-use-pcre or --disable-use-pcre was given.
 if test "${enable_use_pcre+set}" = set; then
   enableval="$enable_use_pcre"

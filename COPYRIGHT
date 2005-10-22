@@ -57,5 +57,5 @@ Software Foundation.
 
 The PCRE (Perl Compatible Regular Expression) is Copyright (C) 1997-2001 by
 Philip Hazel. LDMud contains just the files required for the driver (with
-one small modification to eliminate a build problem); see pcre/LICENCE for the
-licence terms and the location of the full package.
+small modifications); see pcre/LICENCE for the licence terms and the location
+of the full package, and pcre/README.LDMUD for an explanation of the changes.

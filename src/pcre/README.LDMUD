@@ -3,3 +3,7 @@ The files README and COPYING tell you where to get the complete package.
 
 The file internal.h was modified so that it is protected against multiple
 inclusion.
+
+The file pcre.c was modified: a function macro was inserted at the place
+of the backtracking in match() where the code detects that a bracket
+match failed.
