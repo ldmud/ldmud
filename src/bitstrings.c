@@ -48,10 +48,10 @@ f_clear_bit (svalue_t *sp)
     /* Get the arguments */
     bitnum = (size_t)sp->u.number;
     sp = strp = sp-1;
+    if (sp->u.number < 0)
+        error("clear_bit: negative bit number: %ld\n", (long)sp->u.number);
     if (bitnum > MAX_BITS)
         error("clear_bit: too big bit number: %ld\n", (long)bitnum);
-    if (bitnum < 0)
-        error("clear_bit: negative bit number: %ld\n", (long)bitnum);
 
     len = mstrsize(strp->u.str);
     ind = bitnum/6;
@@ -99,10 +99,10 @@ f_set_bit (svalue_t *sp)
 
     bitnum = (size_t)sp->u.number;
     sp = strp = sp-1;
+    if (sp->u.number < 0)
+        error("set_bit: negative bit number: %ld\n", (long)sp->u.number);
     if (bitnum > MAX_BITS)
         error("set_bit: too big bit number: %ld\n", (long)bitnum);
-    if (bitnum < 0)
-        error("set_bit: negative bit number: %ld\n", (long)bitnum);
 
     len = mstrsize(strp->u.str);
     ind = bitnum/6;

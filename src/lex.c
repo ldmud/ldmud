@@ -524,7 +524,7 @@ static char optab2[]
     , 0,      0,   QMARK,   1                 /* 68: ?         */
 };
 
-#define optab1 (_optab-' ')
+#define optab1(c) (_optab[(c)-' '])
   /* Use optab1 to index _optab with raw characters.
    */
 
@@ -5878,7 +5878,7 @@ cond_get_exp (int priority, svalue_t *svp)
         else
         {
             /* Is it really an operator? */
-            x = optab1[c];
+            x = optab1(c);
             if (!x)
             {
                 yyerror("illegal character in #if");
@@ -5983,7 +5983,7 @@ cond_get_exp (int priority, svalue_t *svp)
         }
 
         /* Can it be an operator at all? */
-        x = optab1[c];
+        x = optab1(c);
         if (!x)
             break;
 

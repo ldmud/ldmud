@@ -1163,7 +1163,7 @@ static char optab2[]=
 0,'<',LSHIFT,9,'=',LEQ,8,0,LESS,8,0,'>',RSHIFT,9,'=',GEQ,8,0,GREAT,8,
 0,'=',EQ,7,0,0,0,'&',LAND,3,0,BAND,6,0,'|',LOR,2,0,BOR,4,
 0,0,XOR,5,0,0,QMARK,1};
-#define optab1 (_optab-' ')
+#define optab1(c) (_optab[(c)-' '])
 
 /*-------------------------------------------------------------------------*/
 static char
@@ -1815,7 +1815,7 @@ cond_get_exp (int priority)
     {
         /* It is an unary operator */
 
-        x = optab1[c];
+        x = optab1(c);
         if (!x)
         {
             yyerror("illegal character in #if");
@@ -1898,7 +1898,7 @@ cond_get_exp (int priority)
             break;
 
         /* Can it be an operator at all? */
-        x = optab1[c];
+        x = optab1(c);
         if (!x)
             break;
 

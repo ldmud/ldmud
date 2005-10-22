@@ -1739,7 +1739,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                     }
                     else
                         continue;
-                }
+                } /* if (type of c) */
 
                 /* If we get here, we ended a line, and kind tells us why:
                  *   kind == 0: hard line break
@@ -1790,7 +1790,10 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                     cp += indent;
                     col += indent;
                 }
-            }
+
+                /* Since we're in a new line, all the 'garbage' is gone. */
+                space_garbage = 0;
+            } /* for(k = 0.. lens[i] */
         } /* for(i = 0..num) */
 
         /* Append the last fragment from the tmpmem to the result */

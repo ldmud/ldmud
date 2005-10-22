@@ -157,8 +157,10 @@ extern SOCKET_T accept(SOCKET_T, struct sockaddr *, int *);
 extern int select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 #endif /* SunOS4 */
 
-#ifdef _AIX
-typedef unsigned long length_t;  /* *sigh* */
+#if defined(_AIX)
+typedef unsigned long length_t;
+#elif defined(__INTEL_COMPILER)
+typedef socklen_t length_t;
 #else
 typedef int length_t;
 #endif
@@ -4520,14 +4522,17 @@ start_erq_demon (const char *suffix, size_t suffixlen)
     char c;
 
     /* Create the freelist in pending_erq[] */
-    erqp = pending_erq - 1;
-    do {
-        erqp[1].u.lvalue = erqp;
-        erqp++;
-        erqp->type = T_INVALID;
-    } while (erqp < &pending_erq[MAX_PENDING_ERQ]);
-    free_erq = erqp - 1;
+    pending_erq[0].type = T_INVALID;
     pending_erq[0].u.lvalue = NULL;
+
+    erqp = pending_erq + 1;
+    while (erqp < &pending_erq[MAX_PENDING_ERQ])
+    {
+        erqp->u.lvalue = erqp - 1;
+        erqp->type = T_INVALID;
+        erqp++;
+    }
+    free_erq = &pending_erq[MAX_PENDING_ERQ-1];
 
     /* Create the sockets to talk to the ERQ */
 /* TODO: Add tests to configure if the system really implements AF_UNIX or socketpair() */

@@ -6149,7 +6149,7 @@ pop_control_stack (void)
 
 {
 #ifdef DEBUG
-    if (csp == control_stack - 1)
+    if (csp < control_stack)
         fatal("Popped out of the control stack");
 #endif
 
@@ -6440,7 +6440,7 @@ reset_machine (Bool first)
         if (current_lambda.type == T_CLOSURE)
             free_closure(&current_lambda);
         put_number(&current_lambda, 0);
-        while (csp != control_stack - 1)
+        while (csp >= control_stack)
         {
             if (csp->lambda.type == T_CLOSURE)
                 free_closure(&csp->lambda);
@@ -8262,7 +8262,11 @@ again:
 
         /* Perform the catch() */
         if (!catch_instruction(instruction, offset
+#ifndef __INTEL_COMPILER
                               , (volatile svalue_t ** volatile) &inter_sp
+#else
+                              , (svalue_t ** volatile) &inter_sp
+#endif
                               , inter_pc, inter_fp))
             return MY_FALSE; /* Guarded code terminated with 'return' itself */
 

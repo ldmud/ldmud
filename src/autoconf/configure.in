@@ -1252,7 +1252,7 @@ for TESTFLAG in -O4 -O3 -O2 -O; do
     fi
   fi
 done
-for TESTFLAG in -qstrict -qipa; do
+for TESTFLAG in -qstrict -qipa -ipo; do
   if eval $tcomp; then
     if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
       :
