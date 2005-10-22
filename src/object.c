@@ -1287,11 +1287,11 @@ f_functionlist (svalue_t *sp)
  *     The name RETURN_FUNCTION_ARGTYPE is defined but not implemented.
  *
  *   Control of listed functions:
- *     NAME_INHERITED      list if defined by inheritance
- *     TYPE_MOD_STATIC     list if static function
- *     TYPE_MOD_PRIVATE    list if private
- *     TYPE_MOD_PROTECTED  list if protected
- *     NAME_HIDDEN         list if not visible through inheritance
+ *     NAME_INHERITED      don't list if defined by inheritance
+ *     TYPE_MOD_STATIC     don't list if static function
+ *     TYPE_MOD_PRIVATE    don't list if private
+ *     TYPE_MOD_PROTECTED  don't list if protected
+ *     NAME_HIDDEN         don't list if not visible through inheritance
  *
  * The 'flags' information consists of the bin-or of the list control
  * flags given above, plus the following:
@@ -1334,6 +1334,7 @@ f_functionlist (svalue_t *sp)
 #define VISTAG_INVIS '\0'  /* Function should not be listed */
 #define VISTAG_VIS   '\1'  /* Function matches the <flags> list criterium */
 #define VISTAG_ALL   '\2'  /* Function should be listed, no list restrictions */
+#define VISTAG_NAMED '\4'  /* Function is neither hidden nor private */
 
     vector_t *list;       /* Result vector */
     svalue_t *svp;        /* Last element in list which was filled in. */
@@ -1379,6 +1380,10 @@ f_functionlist (svalue_t *sp)
         return NULL;
     }
 
+    /* Preset the visibility. By default, if there is any listing
+     * modifier, the functions are not visible. If there is none, the functions
+     * are visible.
+     */
     memset(
       vis_tags,
       mode_flags &
@@ -1389,22 +1394,48 @@ f_functionlist (svalue_t *sp)
       num_functions
     );
 
+    /* Count how many named functions need to be listed in the result.
+     * Flag every function to list in vistag[].
+     */
+    num_functions = 0;
+
+    /* First, check all functions for which we have a name */
     flags = mode_flags &
         (TYPE_MOD_PRIVATE|TYPE_MOD_STATIC|TYPE_MOD_PROTECTED|NAME_INHERITED);
-
-    /* Count how many functions need to be listed in the result.
-     * Flag every function to list in vistag[].
-     * TODO: Document me properly when the layout of programs and functions
-     * TODO:: is clear.
-     */
     fun = prog->functions;
-    num_functions = 0;
     j = prog->num_function_names;
     for (ixp = prog->function_names + j; --j >= 0; ) {
         i = *--ixp;
-        if ( !(fun[i] & flags) ) {
-            vis_tags[i] = VISTAG_VIS;
+        if (!(fun[i] & flags) )
+        {
+            vis_tags[i] = VISTAG_NAMED|VISTAG_VIS;
             num_functions++;
+        }
+        else
+        {
+            vis_tags[i] |= VISTAG_NAMED;
+        }
+    }
+
+    /* If the user wants to see the hidden or private functions, we loop
+     * through the full function table and check all functions not yet
+     * touched by the previous 'named' scan.
+     * TODO: Due to the dedicated 'find hidden name' loop, this shouldn't
+     * TODO:: be necessary, nor the VISTAG_ALL at all.
+     */
+    flags = mode_flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN);
+    if (flags != (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+    {
+        fun = prog->functions;
+        for (i = prog->num_functions; --i >= 0; )
+        {
+            if (!(vis_tags[i] & VISTAG_NAMED)
+             && !(fun[i] & flags)
+               )
+            {
+                vis_tags[i] = VISTAG_VIS;
+                num_functions++;
+            }
         }
     }
 
@@ -1436,18 +1467,19 @@ f_functionlist (svalue_t *sp)
      * the result vector.
      */
 
-    for(i = prog->num_functions, fun += i; --i >= 0; ) {
+    for (i = prog->num_functions, fun += i; --i >= 0; ) {
         fun_hdr_p funstart; /* Pointer to function in the executable */
 
         fun--;
 
-        if (!vis_tags[i]) continue; /* Don't list this one */
+        if ((vis_tags[i] & (VISTAG_ALL|VISTAG_VIS)) == VISTAG_INVIS)
+            continue; /* Don't list this one */
 
         flags = *fun;
 
         active_flags = (flags & ~INHERIT_MASK);
-        if (vis_tags[i] & VISTAG_ALL)
-            active_flags |= NAME_HIDDEN; /* TODO: Why? */
+        if (!(vis_tags[i] & VISTAG_NAMED))
+            active_flags |= NAME_HIDDEN;
 
         defprog = prog;
 

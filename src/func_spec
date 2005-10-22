@@ -539,6 +539,7 @@ string  creator (object); /* Same function, different name */
         /* mySQL-Support */
 
 int     db_affected_rows(int);
+string *db_coldefs(int);
 string  db_conv_string(string);
 int     db_close(int);
 int     db_connect(string);
@@ -546,6 +547,7 @@ int     db_connect(string, void|string, void|string);
 int     db_exec(int, string);
 mixed   db_fetch(int);
 int    *db_handles();
+int     db_insert_id(int);
 
 #endif /* USE_MYSQL */
 

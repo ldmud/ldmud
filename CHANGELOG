@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+16-Mar-2001 (Lars Duening)  (3.3.31)
+    - (pkg-mysql.c) Dafire provided to new mySQL efuns: db_insert_id()
+        and db_coldefs() - thanks!.
+    - (object.c) The list control for functionlist() was documented
+        incorrectly, and also functioned incorrectly (thanks, Fiona!).
+
 15-Mar-2001 (Lars Duening)  (3.3.30)
     - (settings/unitopia) Updated (thanks, Freaky!).
     - (comm.c) The pathlength safety check in the start-erq-demon routine

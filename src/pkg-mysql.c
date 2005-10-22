@@ -623,6 +623,89 @@ f_db_handles (svalue_t *sp)
     return sp;
 } /* f_db_handles() */
 
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_db_insert_id (svalue_t *sp)
+
+/* TEFUN db_insert_id()
+ *
+ *   int db_insert_id(int handle)
+ *
+ * After inserting a line into a table with an AUTO_INCREMENT field,
+ * this efun can be used to return the (new) value of the AUTO_INCREMENT
+ * field.
+ */
+
+{
+    db_dat_t     *dat;
+    my_ulonglong  insertid;
+    unsigned int  handle;
+
+    handle = (unsigned int)sp->u.number;
+    if ( !(dat = find_dat_by_handle(handle)) )
+        error("Illegal handle for database.\n");
+    insertid = mysql_insert_id(dat->mysql_dat);
+    free_svalue(sp); /* Well, it's just a number */
+    put_number(sp, insertid);
+    return sp;
+} /* f_db_insert_id() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
+f_db_coldefs (svalue_t *sp)
+ 
+/* TEFUN db_coldefs()
+ *
+ *   string * db_coldefs(int handle)
+ *
+ * Return an array with the column names of the current table.
+ * If the database didn't return a result, the result of this efun
+ * is 0.
+ */
+
+{
+    db_dat_t     *dat;
+    vector_t     *v;
+    int           num_fields, i;
+    unsigned int  handle;
+    MYSQL_FIELD  *fields;
+     
+    handle = (unsigned int)sp->u.number;
+    if ( !(dat = find_dat_by_handle(handle)) )
+    {
+        error("Illegal handle for database.\n");
+        /* NOTREACHED */
+        return sp;
+    }
+    if (!dat->mysql_result)
+    {
+        free_svalue(sp);
+        put_number(sp, 0);
+        return sp;
+    }
+    
+    num_fields = mysql_num_fields(dat->mysql_result);
+     
+    v = allocate_array(num_fields);
+    if (!v)
+    {
+        error("Out of memory for result array (%d elements).\n", num_fields);
+        /* NOTREACHED */
+        return sp;
+    }
+ 
+    fields = mysql_fetch_fields(dat->mysql_result);
+     
+    for (i = 0; i < num_fields; i++)
+    {
+        put_c_string(v->item+i, fields[i].name);
+    }
+  
+    free_svalue(sp); /* It's a number */
+    put_array(sp, v);
+    return sp;
+} /* f_db_coldefs() */
+
 #endif /* USE_MYSQL */
 
 /***************************************************************************/

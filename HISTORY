@@ -48,8 +48,9 @@ For a detailed list of all changes see the file CHANGELOG.
            mode.
 
     - New efuns:
-       + db_affected_rows(), db_conv_string(), db_close(), db_connect(string),
-         db_exec(), db_fetch(), *db_handles(): Optional: mySQL support.
+       + db_affected_rows(), db_conv_string(), db_close(), db_connect(),
+         db_exec(), db_fetch(), db_handles(), db_coldefs(), db_insert_id():
+           Optional: mySQL support.
        + min(), max(): To select the minimum resp. maximum among a bunch
            of numbers or strings.
        + sgn(): Return the sign of a numeric argument.
