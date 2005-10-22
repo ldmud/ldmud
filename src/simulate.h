@@ -198,6 +198,7 @@ extern Bool catch_instruction (bytecode_t catch_inst, uint offset, volatile sval
 extern void purge_shadow_sent(void);
 extern void check_shadow_sent (object_t *ob);
 extern void assert_shadow_sent (object_t *ob);
+extern void init_empty_callback (callback_t *cb);
 extern int  setup_function_callback(callback_t *cb, object_t* ob, string_t *fun, int nargs, svalue_t * args, Bool use_lvalues);
 extern int  setup_closure_callback(callback_t *cb, svalue_t *cl, int nargs, svalue_t * args, Bool use_lvalues);
 extern int  setup_efun_callback ( callback_t *cb, svalue_t *args, int nargs);

@@ -6088,6 +6088,7 @@ f_input_to (svalue_t *sp, int num_arg)
     /* Allocate and setup the input_to structure */
 
     xallocate(it, sizeof *it, "new input_to");
+    init_empty_callback(&(it->fun));
     put_number(&(it->prompt), 0);
 
     /* If SET_PROMPT was specified, collect it */

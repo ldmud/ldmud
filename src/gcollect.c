@@ -972,9 +972,8 @@ garbage_collection(void)
         current_error_trace = NULL;
     }
 
-    remove_destructed_objects(); /* After reducing all object references */
-    destructed_objs = NULL; /* All destructed objects will be freed */
-    num_destructed = 0;
+    remove_destructed_objects(); /* After reducing all object references! */
+    num_destructed = 0; /* The destructed_objs pointer will be cleared below */
 
     if (dobj_count != tot_alloc_object)
     {
@@ -1275,6 +1274,26 @@ W("DEBUG: GC frees destructed '"); W(get_txt(ob->name)); W("'\n");
         free_object(ob, "garbage collection");
         dobj_count++;
     }
+
+    /* Finally, walk the of destructed objects and check if the above
+     * processing missed any of them.
+     */
+    for (ob = destructed_objs; ob; )
+    {
+        object_t *next = ob->next_all;
+
+        if (TEST_REF(ob))
+        {
+            dprintf1(gcollect_outfd
+                    , "Found leaked destructed object '%s'\n"
+                    , (p_int)get_txt(ob->name)
+                    );
+            reference_destructed_object(ob);
+        }
+
+        ob = next;
+    }
+    destructed_objs = NULL;
 
     for (l = stale_lambda_closures; l; )
     {

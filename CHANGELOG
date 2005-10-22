@@ -1,19 +1,36 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+02-Jan-2002 (Lars Duening)  (3.3.149)
+    - (simulate, comm.c) Corrected a potential crasher when bad arguments
+        are passed to efun input_to(): the embedded callback structure
+        wasn't initialized properly, so that the free_input_to() got
+        garbage data instead of pointers (reported by Menaures).
+    - (util/xerq/erq.c) Reduced the amount of crap printed in DEBUG
+        configuration.
+    - (gcollect.c) There seems to be a problem with leaking object refcounts,
+        so that destructed objects are tagged as 'referenced' even if they
+        aren't. The GC will eventually free the memory itself, but inavoidably
+        mess up the object statistics. As a first measure the GC after
+        the mark phase checks the list of destructed objects if any
+        of the objects on it haven't been referenced yet. If so, the
+        objects concerned are logged and then explicitely included into
+        the list of objects to free. This way at least the object statistics
+        will be kept in sync for the time being.
+
 02-Jan-2002 (Lars Duening)  (3.3.148)
-     - (gcollect.c, simulate, comm) The GC now removes all stale objects
-         referenced from the interactive structures during the cleanup phase.
-         As a side effect, callbacks may no longer reference destructed
-         objects during the clearing/counting phase of a GC.
-     - (actions, main.c, backend.c, efuns.c, gcollect.c, interpret.c,
-        simulate, dumpstat, string_spec, mudlib/sys/debug_info) Destructed
-         objects are now kept in a separate list in order to aid mudadmins in
-         analysing the memory usage of their muds. debug_info(DINFO_STATUS)
-         returns the statistics in the new fields DID_ST_OBJECTS_NEWLY_DEST
-         and _DEST; debug_info(DINFO_DUMP, "destructed") dumps the lists to a
-         file; and the builtin commands 'status tables' and 'dumpallobj' have
-         been updated accordingly.
+   - (gcollect.c, simulate, comm) The GC now removes all stale objects
+       referenced from the interactive structures during the cleanup phase.
+       As a side effect, callbacks may no longer reference destructed
+       objects during the clearing/counting phase of a GC.
+   - (actions, main.c, backend.c, efuns.c, gcollect.c, interpret.c,
+      simulate, dumpstat, string_spec, mudlib/sys/debug_info) Destructed
+       objects are now kept in a separate list in order to aid mudadmins in
+       analysing the memory usage of their muds. debug_info(DINFO_STATUS)
+       returns the statistics in the new fields DID_ST_OBJECTS_NEWLY_DEST
+       and _DEST; debug_info(DINFO_DUMP, "destructed") dumps the lists to a
+       file; and the builtin commands 'status tables' and 'dumpallobj' have
+       been updated accordingly.
  
 31-Dec-2001 (Lars Duening)  (3.3.147)
     - (efuns.c) to_string() can now handle operator closures (suggested

@@ -316,20 +316,22 @@ main(int argc, char *argv[])
                            , time_stamp(), (long)timeout.tv_sec));
         }
 
-#ifdef DEBUG
+#ifdef XDEBUG
         fprintf(stderr, "%s select()\n", time_stamp());
 #endif
         in_select = 1; /* so sig_child() can write reply directly */
         num = select(num_fds, &read_fds, &write_fds, 0, retries ? &timeout : 0);
         in_select = 0; /* don't want sig_child() writing now */
 
-#ifdef DEBUG
+#ifdef XDEBUG
         fprintf(stderr, "%s select() returns %d, time() %ld\n"
                       , time_stamp(), num, (long)time(NULL));
+#endif
+#ifdef DEBUG
         if (num < 0)
         {
             int myerrno = errno;
-            fprintf(stderr, "%s  errno = %d", time_stamp(), errno);
+            fprintf(stderr, "%s select() errno = %d", time_stamp(), errno);
             errno = myerrno;
             perror(" ");
         }

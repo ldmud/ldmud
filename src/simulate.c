@@ -2839,6 +2839,22 @@ check_valid_path (string_t *path, object_t *caller, string_t* call_fun, Bool wri
 } /* check_valid_path() */
 
 /*-------------------------------------------------------------------------*/
+void
+init_empty_callback (callback_t *cb)
+
+/* Initialize *<cb> to be an empty initialized callback.
+ * Use this to initialize callback structures which might be freed before
+ * completely filled in.
+ */
+
+{
+    cb->num_arg = 0;
+    cb->is_lambda = MY_FALSE;
+    cb->function.named.ob = NULL;
+    cb->function.named.name = NULL;
+} /* init_empty_callback() */
+
+/*-------------------------------------------------------------------------*/
 static INLINE void
 free_callback_args (callback_t *cb)
 
