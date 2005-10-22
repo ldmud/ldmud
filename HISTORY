@@ -55,7 +55,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-14-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
+15-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -296,6 +296,8 @@ For a detailed list of all changes see the file CHANGELOG.
            commandgiver.
        + Bugfix: The automatic mapping compaction did not remove destructed
            objects and closures.
+       + Bugfix: If H_INCLUDE_DIRS was set to an array of directory names,
+           the names couldn't have leading '/'.
 
     - Other Changes:
        + New driver option '--pidfile <filename>' to write the pid of the

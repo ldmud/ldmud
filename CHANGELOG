@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Nov-2001 (Lars Duening)  (3.3.123)
+    - (svalue.h) The definition of macros push_object() and
+        push_valid_object() lacked the 'from' argument (reported by Nathan).
+    - (lex.c) If H_INCLUDE_DIRS is set to an array of directory names,
+        the names can now have leading '/' (reported by Nathan).
+    - (interpret.c) Improved the stack overflow checking a bit, and for
+        some function calls the local variables were allocated twice.
+    - (efuns.c) member() used with closures didn't always find them
+        (reported by Gnomi).
+
 14-Nov-2001 (Lars Duening)  (3.3.122)
     - (gcollect.c) Tweaks to the information dumped on fatals.
     - (driver.h, gcollect) New debug macro DUMP_GC_REFS (in driver.h)

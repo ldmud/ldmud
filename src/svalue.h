@@ -506,12 +506,12 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
 
 #define push_ref_object(sp,val,from) \
     ( (sp)++, put_ref_object(sp,val,from) )
-#define push_object(sp,val) \
+#define push_object(sp,val,from) \
     ( (sp)++, put_object(sp,val,from) )
 
 #define push_ref_valid_object(sp,val,from) \
     ( (sp)++, put_ref_valid_object(sp,val,from) )
-#define push_valid_object(sp,val) \
+#define push_valid_object(sp,val,from) \
     ( (sp)++, put_valid_object(sp,val,from) )
 
 #define push_ref_string(sp,val) \

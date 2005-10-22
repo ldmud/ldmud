@@ -61,7 +61,7 @@ function_t *simul_efunp = NULL;
 object_t *simul_efun_object  = NULL;
   /* The primary simul_efun object.
    * The pointer is not counted in the references, and explicitely
-   * check in simulate:emergency_destruct().
+   * check in simulate:destruct().
    */
 
 vector_t *simul_efun_vector  = NULL;

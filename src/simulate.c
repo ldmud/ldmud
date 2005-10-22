@@ -480,12 +480,6 @@ fatal (const char *fmt, ...)
         abort();
     in_fatal = MY_TRUE;
 
-#   define WRITES(s) write(2, s, strlen(s))
-    WRITES("\nfatal() called with fmt '");
-    WRITES(fmt);
-    WRITES("'\n");
-#   undef WRITES
-
     ts = time_stamp();
     
     va_start(va, fmt);

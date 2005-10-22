@@ -5279,8 +5279,22 @@ f_member (svalue_t *sp)
             break;
           }
 
-        case T_FLOAT:
         case T_CLOSURE:
+          {
+            short type;
+            svalue_t *item;
+
+            type = sp->type;
+            for(item = vec->item; --cnt >= 0; item++)
+            {
+                /* TODO: Is this C99 compliant? */
+                if (item->type == type && !closure_cmp(sp, item))
+                    break;
+            }
+            break;
+          }
+
+        case T_FLOAT:
         case T_SYMBOL:
         case T_QUOTED_ARRAY:
           {

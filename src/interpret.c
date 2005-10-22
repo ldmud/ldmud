@@ -2490,6 +2490,10 @@ stack_overflow (svalue_t *sp, svalue_t *fp, bytecode_p pc)
  */
 
 {
+    if (sp >= &start_of_stack[SIZEOF_STACK])
+        fatal("Fatal stack overflow: %ld too high.\n"
+             , sp - &start_of_stack[SIZEOF_STACK]
+             );
     _pop_n_elems(sp-fp, sp);
     ERROR("stack overflow\n");
 }
@@ -6314,15 +6318,6 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp, Bool allowRefs)
                     ERROR("Varargs argument passed by reference.\n");
                 }
             }
-
-            /* Clear the local variables */
-            if ( 0 != (i = FUNCTION_NUM_VARS(funstart)) )
-            {
-                csp->num_local_variables += i;
-                do {
-                    *++sp = const0;
-                } while (--i > 0);
-            }
         }
         else
         {
@@ -6336,15 +6331,15 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp, Bool allowRefs)
 
         } /* if(varargs or fixedargs) */
 
-       /* Clear the local variables */
+        /* Clear the local variables */
 
-       if ( 0 != (i = FUNCTION_NUM_VARS(funstart)) )
-       {
-           csp->num_local_variables += i;
-           do {
-               *++sp = const0;
-           } while (--i);
-       }
+        if ( 0 != (i = FUNCTION_NUM_VARS(funstart)) )
+        {
+            csp->num_local_variables += i;
+            do {
+                *++sp = const0;
+            } while (--i);
+        }
     }
     else
     {
@@ -6362,7 +6357,11 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp, Bool allowRefs)
         }
     }
 
-    /* Check for stack overflow */
+    /* Check for stack overflow. Since the actual stack size is
+     * larger than EVALUATOR_STACK_SIZE, this check at the
+     * end should be sufficient. If not, stack_overflow() will
+     * generate a fatal error and we have to resize.
+     */
     if ( sp >= &start_of_stack[EVALUATOR_STACK_SIZE] )
         stack_overflow(sp, csp->fp, funstart);
 
@@ -14216,13 +14215,16 @@ again:
      * We better check for that.
      */
     if (sp - start_of_stack == SIZEOF_STACK - 1)
+    {
+        /* sp ist just at then end of the stack area */
         stack_overflow(sp, fp, pc);
+    }
     else if ((long)(sp - start_of_stack) > (long)(SIZEOF_STACK - 1))
     {
         /* When we come here, we already overwrote the bounds
          * of the stack :-(
          */
-        fatal("Stack overflow: %ld too high\n"
+        fatal("Fatal stack overflow: %ld too high\n"
              , (long)(sp - start_of_stack - (SIZEOF_STACK - 1))
              );
     }

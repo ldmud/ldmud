@@ -1680,12 +1680,14 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
          */
         for (i = 0; i < inc_list_size; i++)
         {
+            char * iname;
             sprintf(buf, "%s%s", get_txt(inc_list[i].u.str), name);
-            if (!stat(buf, &aStat)
+            for (iname = buf; *iname == '/'; iname++) NOOP;
+            if (!stat(iname, &aStat)
              && S_ISREG(aStat.st_mode)
-             && (fd = ixopen(buf, O_RDONLY|O_BINARY)) >= 0 )
+             && (fd = ixopen(iname, O_RDONLY|O_BINARY)) >= 0 )
             {
-                FCOUNT_INCL(buf);
+                FCOUNT_INCL(iname);
                 return fd;
             }
             if (errno == EMFILE) lexerror("File descriptors exhausted");
