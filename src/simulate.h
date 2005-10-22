@@ -232,7 +232,7 @@ extern void dinfo_data_status(svalue_t * svp, int value);
 extern void error VARPROT((const char *, ...), printf, 1, 2) NORETURN;
 extern void fatal VARPROT((const char *, ...), printf, 1, 2) NORETURN;
 extern void throw_error(void);
-extern char *limit_error_format(char *fixed_fmt, const char *fmt);
+extern char *limit_error_format(char *fixed_fmt, size_t fixed_fmt_len, const char *fmt);
 extern Bool legal_path(const char *path);
 extern Bool check_no_parentdirs(const char *path);
 extern void parse_error(Bool warning, const char *error_file, int line, const char *what, const char *context);

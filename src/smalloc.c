@@ -3259,9 +3259,6 @@ write_lpc_trace (int d, word_t *p)
 /*-------------------------------------------------------------------------*/
 void
 dump_lpc_trace (int d
-#ifndef MALLOC_LPC_TRACE
-                      UNUSED
-#endif
                , void *p
 #ifndef MALLOC_LPC_TRACE
                          UNUSED
@@ -3280,9 +3277,9 @@ dump_lpc_trace (int d
     write_lpc_trace(d, ((word_t *)p) - OVERHEAD);
 #else
 #   ifdef __MWERKS__
-#       pragma unused(d)
 #       pragma unused(p)
 #   endif
+    WRITES(d, "No malloc lpc trace.\n");
 #endif /* MALLOC_LPC_TRACE */
 } /* dump_lpc_trace() */
 

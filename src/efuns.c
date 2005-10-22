@@ -1960,7 +1960,7 @@ process_value (const char *str, Bool original)
 /* Helper function for process_string(): take a function call in <str>
  * in the form "function[:objectname]{|arg}" and try to call it.
  * If the function exists and returns a string, the result is an uncounted
- * pointer to the string.
+ * pointer to the string (which itself is referenced by apply_return_value).
  * If the function can't be called, or does not return a string, the
  * result is NULL.
  */
@@ -2075,22 +2075,6 @@ f_process_string(svalue_t *sp)
  * description, that description will not be replaced.
  *
  * Both filename and args are optional.
- *
- * TODO: OSB has a bugfix for this function to handle spaces in
- * TODO:: arguments. Basically using the new explode solves the problem.
- * TODO:: public string process_string(string str) 
- * TODO:: {
- * TODO::   int il;
- * TODO::   string * parts;
- * TODO::   string tmp;
- * TODO::   parts = explode(str, "@@");
- * TODO::   for ( il = 1; il < sizeof(parts); il += 2) {
- * TODO::     tmp = process_value(parts[il]);
- * TODO::     if (stringp(tmp))
- * TODO::       parts[il] = tmp;
- * TODO::   }
- * TODO::   return implode(parts, "");
- * TODO:: }
  */
 
 {
@@ -2150,56 +2134,19 @@ f_process_string(svalue_t *sp)
         ; il++)
     {
         string_t *p0, *p2;
-        char *p1;
 
         p0 = vec->item[il].u.str;
 
-        /* Try to interpret the entry as function call.
-         * If that succeeds, hold the result (freshly allocated) in p2.
-         */
-        p1 = strchr(get_txt(p0), ' ');
-        if (!p1)
+        /* The entry might be a function call */
+        p2 = process_value(get_txt(p0), MY_TRUE);
+        if (p2)
         {
-            /* No space, the whole entry might be a function call */
-            p2 = process_value(get_txt(p0), MY_TRUE);
-            if (p2)
-            {
-                /* Yup, it is: copy the result */
-                p2 = ref_mstring(p2);
-                ch_last = MY_TRUE;
-            }
+            /* Yup, it is: reference the result */
+            p2 = ref_mstring(p2);
+            ch_last = MY_TRUE;
+            changed = MY_TRUE;
         }
         else
-        {
-            /* There is a space: just interpret the characters before
-             * as possible function call.
-             */
-            size_t len;
-            char * tmpbuf;
-
-            len = (size_t)(p1 - get_txt(p0));
-            tmpbuf = xalloc(len + 1);
-            strncpy(tmpbuf, get_txt(p0), len);
-            tmpbuf[len] = '\0';
-            p2 = process_value(tmpbuf, MY_FALSE);
-            if (p2)
-            {
-                /* We got a result: join it with the remains after the
-                 * space and put it into p2.
-                 */
-                string_t * tmp;
-
-                len = mstrsize(p2);
-                memsafe(tmp = alloc_mstring(len+strlen(p1)), len+strlen(p1)
-                       , "intermediate result string");
-                memcpy(get_txt(tmp), get_txt(p2), len);
-                strcpy(get_txt(tmp)+len, p1);
-                p2 = tmp;
-            }
-            xfree(tmpbuf);
-        }
-        
-        if (!p2)
         {
             /* No replacement by function call */
             if (!ch_last)
@@ -2214,11 +2161,6 @@ f_process_string(svalue_t *sp)
             {
                 ch_last = MY_FALSE;
             }
-        }
-        else
-        {
-            /* Mark that we have a true replacement */
-            changed = MY_TRUE;
         }
 
         /* If we have a replacement string, put it into place. */

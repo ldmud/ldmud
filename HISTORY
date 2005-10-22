@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-24-Jan-2001 (Lars Duening) -- Development Release 3.3
+01-Feb-2002 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -20,6 +20,8 @@ For a detailed list of all changes see the file CHANGELOG.
            possible.
        + function_exists(): now also returns the filename and linenumber
            of a function.
+       + process_string(): Spaces are now allowed in function arguments
+           and no longer terminate the function specification.
 
     - Corrected efuns:
        + include_list(): Implemented it properly.
@@ -48,6 +50,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + If a value of the wrong type is passed to switch(), the driver
            no longer throws a runtime error, but instead jumpgs to
            the default case.
+       + Operator '|' can compute the union of two arrays.
 
     - Runtime:
        + Revamped the string handling to use refcounted strings everywhere.
@@ -62,7 +65,7 @@ For a detailed list of all changes see the file CHANGELOG.
            something different from '!'.
 
 
-26-Jan-2002 (Lars Duening) -- Release 3.2.9
+03-Feb-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -240,6 +243,7 @@ For a detailed list of all changes see the file CHANGELOG.
            used by objects: executing the calls after the update could
            mess up the interpreter stack or cause it to execute garbage
            bytecode.
+       + Too long error messages overwrote the stack.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.

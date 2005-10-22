@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Feb-2002 (Lars Duening)  (3.3.160)
+    - (simulate, prolang.y, lex.c) Added a limit safety check to
+        limit_error_format(), and increased the buffer sizes for the
+        error messages (reported by Gnomi).
+
+01-Feb-2002 (Lars Duening)
+    - (efuns.c) Removed the undocumented 'feature' that a process_string()
+         function call specification could be terminated with a space.
+    - (array, prolang.y, interpret.c) The '|' operator can now join
+         arrays.
+
 31-Jan-2002 (Lars Duening)  (3.3.159)
     - (interpret.c) If input_to() was used without command giver,
          a NULL pointer string was pushed onto the interpreter stack

@@ -44,6 +44,9 @@ DESCRIPTION
 
         expr1 | expr2        The result is the bitwise or of 'expr1' and
                         'expr2'.
+                        For arrays, the union set is computed: all elements
+                        from <expr1> plus all those from <expr2> which
+                        are not in <expr1>.
 
         expr1 ^ expr2        The result is the bitwise xor of 'expr1' and
                         'expr2'.

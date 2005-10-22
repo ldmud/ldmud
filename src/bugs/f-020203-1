@@ -1,0 +1,8 @@
+Short: Warn if inner variables shadow outer ones.
+From: Lars and Menaures
+Date: 2002-02-03
+Type: Feature
+State: New
+
+Issue a warning if an inner variable shadows an outer one.
+Also if an argument shadows a global.

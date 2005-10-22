@@ -10040,18 +10040,27 @@ again:
          *
          * Possible type combinations:
          *   int    | int    -> int
+         *   array  | array  -> array
          *
-         * TODO: Extend this to vectors and mappings.
+         * TODO: Extend this to mappings.
          */
 
         int i;
 
-        TYPE_TEST_LEFT((sp-1), T_NUMBER);
-        TYPE_TEST_RIGHT(sp, T_NUMBER);
-
-        i = (sp-1)->u.number | sp->u.number;
-        sp--;
-        sp->u.number = i;
+        TYPE_TEST_EXP_LEFT((sp-1), TF_NUMBER|TF_POINTER);
+        if ((sp-1)->type == T_NUMBER)
+        {
+            TYPE_TEST_RIGHT(sp, T_NUMBER);
+            i = (sp-1)->u.number | sp->u.number;
+            sp--;
+            sp->u.number = i;
+        }
+        else if ((sp-1)->type == T_POINTER)
+        {
+            TYPE_TEST_RIGHT(sp, T_POINTER);
+            sp--;
+            sp->u.vec = join_array(sp->u.vec, (sp+1)->u.vec);
+        }
 
         break;
     }
@@ -10134,7 +10143,7 @@ again:
          * the result on the stack.
          *
          * Possible type combinations:
-         *   int >> int    -> int
+         *   int >>> int    -> int
          *
          * TODO: Extend this to vectors and mappings.
          */

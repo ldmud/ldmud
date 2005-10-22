@@ -2181,6 +2181,7 @@ intersect_ordered_arr (vector_t *a1, vector_t *a2)
  *
  * The result is a new sorted(!) vector with all elements, which are present
  * in both input vectors.
+ * This function is called by intersect_array() and f_intersect_alists().
  */
 
 {
@@ -2216,6 +2217,7 @@ intersect_array (vector_t *a1, vector_t *a2)
  *
  * The result vector is also sorted according to array_cmp(), but
  * don't rely on it.
+ * TODO: Make it keep the order by intersecting over index arrays.
  */
 
 {
@@ -2237,6 +2239,82 @@ intersect_array (vector_t *a1, vector_t *a2)
 
     return vtmpp3;
 } /* intersect_array() */
+
+/*-------------------------------------------------------------------------*/
+vector_t *
+join_array (vector_t *a1, vector_t *a2)
+
+/* OPERATOR | (array union)
+ *
+ * Perform a join of the two vectors <a1> and <a2>.
+ * The result is a new vector with all elements <a1> and those elements
+ * from <a2> which are not present in <a1>.
+ *
+ * The result vector is also sorted according to array_cmp(), but
+ * don't rely on it.
+ * TODO: Make it keep the order by joining over index arrays.
+ */
+
+{
+    vector_t *vtmpp1, *vtmpp2, *vtmpp3;
+    mp_int d, l, i1, i2, a1s, a2s;
+
+    /* Order the two ingoing lists and then perform the union.
+     */
+
+    vtmpp1 = order_array(a1);
+    free_array(a1);
+
+    vtmpp2 = order_array(a2);
+    free_array(a2);
+
+    a1s = (mp_int)VEC_SIZE(vtmpp1);
+    a2s = (mp_int)VEC_SIZE(vtmpp2);
+    vtmpp3 = allocate_array( a1s + a2s);
+
+    /* Copy <a1> as is */
+    for (i1 = l = 0; i1 < a1s; i1++, l++)
+        assign_svalue_no_free(&vtmpp3->item[l], &vtmpp1->item[i1]);
+
+    /* Copy those elements from <a2> which are not in <a1>.
+     * The copy condition in this loop is that the current element
+     * indexed in <a1> is 'bigger' than the current element in <a2>.
+     */
+    for (i1=i2=0, l = a1s; i1 < a1s && i2 < a2s; )
+    {
+        d = array_cmp(&a1->item[i1], &a2->item[i2]);
+        if (d < 0)
+        {
+            /* Current element in <a1> is smaller - step forward */
+            i1++;
+        }
+        else if (d == 0)
+        {
+            /* Elements are equal - skip */
+            i1++;
+            i2++;
+        }
+        else
+        {
+            /* Element in <a1> is bigger, so this <a2> element
+             * must be unique.
+             */
+            assign_svalue_no_free(&vtmpp3->item[l++], &vtmpp2->item[i2++] );
+        }
+    }
+
+    /* Copy the remaining elements from <a2> if any.
+     * This happens if the last element in <a1> is smaller than
+     * the remaining elements in <a2>.
+     */
+    for ( ; i2 < a2s; i2++, l++)
+        assign_svalue_no_free(&vtmpp3->item[l], &vtmpp2->item[i2]);
+
+    free_array(vtmpp1);
+    free_array(vtmpp2);
+
+    return shrink_array(vtmpp3, l);
+} /* join_array() */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *

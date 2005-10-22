@@ -1283,10 +1283,10 @@ lexerrorf (char *format, ...)
 
 {
     va_list va;
-    char buff[512];
-    char fixed_fmt[200];
+    char buff[5120];
+    char fixed_fmt[1000];
 
-    format = limit_error_format(fixed_fmt, format);
+    format = limit_error_format(fixed_fmt, sizeof(fixed_fmt), format);
     va_start(va, format);
     vsprintf(buff, format, va);
     va_end(va);

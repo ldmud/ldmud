@@ -4,20 +4,24 @@ SYNOPSIS
 
 DESCRIPTION
         Searches string str for occurences of a "value by function
-        call", which is @@ followed by an implicit function call. See
+        call", which is an implicit function call surrounded by @@. See
         "value_by_function_call" in the principles section.
         
         The value should contain a string like this:
         @@function[:filename][|arg|arg]@@
         
-        function must return a string or else the string which should be
+        <function> must return a string or else the string which should be
         processed will be returned unchanged.
         
-        Note that process_string() does not recurse over returned
+        process_string() does not recurse over returned
         replacement values. If a function returns another function
         description, that description will not be replaced.
 
-        Note that both filename and args are optional.
+        Both the filename and the args are optional.
+
+        Consecutive function calls can be written adjacent:
+
+          @@function1@@function2@@
 
 EXAMPLE
         string foo(string str) {
@@ -35,6 +39,9 @@ BUGS
 HISTORY
         Because of the security problems, process_string() is an
         optional efun since 3.2.1@34
+        LDMud 3.3.160 removed the undocumented 'feature' that a function call
+        declaration could be terminated by a space. In turn this now allows
+        the use of arguments with spaces.
 
 SEE ALSO
         notify_fail(E), closures(LPC), get_bb_uid(M)

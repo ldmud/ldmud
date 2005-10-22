@@ -113,6 +113,7 @@ extern vector_t *subtract_array(vector_t *minuend, vector_t *subtrahend);
 extern Bool is_ordered(vector_t *v);
 extern vector_t * intersect_ordered_arr (vector_t *a1, vector_t *a2);
 extern vector_t *intersect_array(vector_t *a1, vector_t *a2);
+extern vector_t *join_array(vector_t *a1, vector_t *a2);
 
 extern svalue_t *f_allocate(svalue_t *sp, int num_arg);
 extern svalue_t *x_filter_array(svalue_t *sp, int num_arg);

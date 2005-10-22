@@ -557,19 +557,19 @@ fatal (const char *fmt, ...)
 
 /*-------------------------------------------------------------------------*/
 char *
-limit_error_format (char *fixed_fmt, const char *fmt)
+limit_error_format (char *fixed_fmt, size_t fixed_fmt_len, const char *fmt)
 
 /* Safety function for error messages: in the error message <fmt>
  * every '%s' spec is changed to '%.200s' to avoid buffer overflows.
- * The modified format string is stored in <fixed_fmt> which is
- * also returned as result.
+ * The modified format string is stored in <fixed_fmt> (a caller provided
+ * buffer of size <fixed_fmd_len>) which is also returned as result.
  */
 
 {
     char *ffptr;
 
     ffptr = fixed_fmt;
-    while (*fmt)
+    while (*fmt && ffptr < fixed_fmt + fixed_fmt_len-1)
     {
       if ((*ffptr++=*fmt++)=='%')
       {
@@ -582,6 +582,19 @@ limit_error_format (char *fixed_fmt, const char *fmt)
         }
       }
     }
+
+    if (*fmt)
+    {
+        /* We reached the end of the fixed_fmt buffer before
+         * the <fmt> string was complete: mark this error message
+         * as truncated.
+         * ffptr points to the last byte in the <fixed_fmt> buffer.
+         */
+        ffptr[-3] = '.';
+        ffptr[-2] = '.';
+        ffptr[-1] = '.';
+    }
+
     *ffptr = '\0';
     return fixed_fmt;
 } /* limit_error_format() */
@@ -612,7 +625,7 @@ error (const char *fmt, ...)
     string_t *malloced_error;        /* copy of emsg_buf+1 */
     string_t *malloced_file = NULL;  /* copy of program name */
     string_t *malloced_name = NULL;  /* copy of the object name */
-    char      fixed_fmt[200];
+    char      fixed_fmt[10000];
     mp_int    line_number = 0;
     va_list   va;
 
@@ -629,7 +642,7 @@ error (const char *fmt, ...)
     va_start(va, fmt);
 
     /* Make fmt sane */
-    fmt = limit_error_format(fixed_fmt, fmt);
+    fmt = limit_error_format(fixed_fmt, sizeof(fixed_fmt), fmt);
 
     if (current_object)
         assign_eval_cost();
