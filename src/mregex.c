@@ -620,6 +620,11 @@ rx_sub (regexp_t *prog, string_t *source, string_t *subst)
     size_t len;        /* Computed length of the result */
     string_t * result; /* Result string */
 
+#ifndef USE_PCRE
+#ifdef __MWERKS__
+#    pragma unused(source)
+#endif
+#endif
     result = NULL;
 
     /* Make two passes over the the string: one to compute the size

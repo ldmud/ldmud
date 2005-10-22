@@ -10452,6 +10452,9 @@ again:
          *   float        + (float,int)        -> float
          *   vector       + vector             -> vector
          *   mapping      + mapping            -> mapping
+         * TODO: This type mapping should be documented in 2-dim-arrays,
+         * TODO:: one each for F_ADD_EQ, F_MULT_EQ, etc. This would
+         * TODO:: also make the checks in the compiler simpler.
          */
 
         short type2;         /* type and value of sp[-1] */

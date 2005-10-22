@@ -35,8 +35,8 @@ For a detailed list of all changes see the file CHANGELOG.
            are not resolved by a default method.
        + md5_crypt(): Compute an Apache-compatible password encryption using
            the MD5 message digest algorithm.
-       + regmatch(): To match a string against a regexp and retrieve the
-           match results for subexpressions.
+       + regmatch(): To match a string against a regexp and optionally retrieve
+           the match results for subexpressions.
 
     - Master Object:
 

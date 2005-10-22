@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+08-Apr-2002 (Lars Duening)  (3.3.199)
+    - (efuns.c) The length computation for the result of regreplace()
+         was wrong when using closure-substitutions (reported by Markus Peter
+         and Dafire).
+    - (prolang.y) Improved the type checking on the <op>= operators
+         to match what the VM actually implements (reported by Menaures).
+
 05-Apr-2002 (Lars Duening)  (3.3.198)
     - (efuns, rxcache, ed.c) Implemented regexp substitution and
          made ed and regreplace() work with PCRE.

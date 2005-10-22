@@ -771,7 +771,8 @@ f_regreplace (svalue_t *sp)
     text = sp[-3].u.str;
 
     reg = rx_compile(pattern, flags, MY_FALSE);
-    if (reg == 0) {
+    if (reg == 0)
+    {
         error("Unrecognized search pattern");
         /* NOTREACHED */
         return sp;
@@ -874,7 +875,7 @@ f_regreplace (svalue_t *sp)
 
         /* Count the length(s) */
         reslen += match->start - start;
-        reslen += mstrsize(sub);
+        reslen += mstrsize(match->sub);
 
         /* Prepare for the next match 
          * Avoid another rx_exec() call if we are at the end.

@@ -5692,18 +5692,91 @@ expr0:
       lvalue L_ASSIGN expr0 %prec L_ASSIGN
       {
           p_int length;
-          vartype_t type2;
+          vartype_t type1, type2;
 %line
+          type1 = $1.type;
           type2 = $3.type;
 
           /* Check the validity of the assignment */
           if (exact_types
            && !compatible_types($1.type, type2)
-           && !(   $1.type == TYPE_STRING
-                && (type2 == TYPE_NUMBER || type2 == TYPE_FLOAT)
-                && ($2 == F_ADD_EQ || $2 == F_MULT_EQ)))
+             )
           {
-              yyerrorf("Bad assignment %s", get_two_types($1.type, $3.type));
+              Bool ok = MY_FALSE;
+
+              switch($2)
+              {
+              case F_ADD_EQ:
+                  switch(type1)
+                  {
+                  case TYPE_STRING:
+                      if (type2 == TYPE_NUMBER || type2 == TYPE_FLOAT)
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
+                  case TYPE_FLOAT:
+                      if (type2 == TYPE_NUMBER)
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
+                  }
+                  break;
+                  
+              case F_SUB_EQ:
+                  switch(type1)
+                  {
+                  case TYPE_FLOAT:
+                      if (type2 == TYPE_NUMBER)
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
+                  }
+                  break;
+                  
+              case F_MULT_EQ:
+                  switch(type1)
+                  {
+                  case TYPE_STRING:
+                      if (type2 == TYPE_NUMBER)
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
+                  case TYPE_FLOAT:
+                      if (type2 == TYPE_NUMBER)
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
+                  default:
+                      if ((type1 & TYPE_MOD_POINTER) && type2 == TYPE_NUMBER)
+                      {
+                          ok = MY_TRUE;
+                      }
+                  }
+                  break;
+                  
+              case F_DIV_EQ:
+                  switch(type1)
+                  {
+                  case TYPE_FLOAT:
+                      if (type2 == TYPE_NUMBER)
+                      {
+                          ok = MY_TRUE;
+                      }
+                      break;
+                  }
+                  break;
+                  
+              } /* switch(assign op) */
+
+              if (!ok)
+              {
+                  yyerrorf("Bad assignment %s", get_two_types(type1, type2));
+              }
           }
 
           if (type2 & TYPE_MOD_REFERENCE)
@@ -5737,7 +5810,7 @@ expr0:
               *dest++ = *source;
               *dest = $2;
           }
-          $$.type = type2;
+          $$.type = type1;
       }
 
     /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
