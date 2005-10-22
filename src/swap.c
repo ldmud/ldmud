@@ -1807,13 +1807,14 @@ load_line_numbers_from_swap (program_t *prog)
 
     if (tmp_numbers.size > sizeof(tmp_numbers))
     {
-        fread(lines->line_numbers+1, tmp_numbers.size - sizeof(tmp_numbers)
+        fread(lines+1, tmp_numbers.size - sizeof(tmp_numbers)
              , 1, swap_file);
-
-        prog->line_numbers = lines;
-        total_prog_block_size += lines->size;
-        total_bytes_unswapped += lines->size;
     }
+
+    prog->line_numbers = lines;
+    total_prog_block_size += lines->size;
+    total_bytes_unswapped += lines->size;
+
     return MY_TRUE;
 } /* load_line_numbers_from_swap() */
 

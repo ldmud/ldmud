@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Apr-2002 (Lars Duening)  (3.3.205)
+    - (prolang.y) Hiding an inherited private nosave variable with an
+         inherited non-private variable didn't work (reported by Gnomi).
+    - (prolang.y, lex.c, simulate.c) Compiler error and warning messages
+         all have the format '<file> line <line>: <text>' now.
+    - (prolang.y, swap.c) Oops, the linenumber structure was allocated too
+         small on creation, and read in incorrectly from swap.
+    - (driver.h) Deactivated the debug defines CHECK_MAPPING_TOTAL
+         and CHECK_OBJECT_REF since these bugs seem to be fixed.
+
 25-Apr-2002 (Lars Duening)  (3.3.204)
     - (comm.c) Using unbound lambdas for prompts crashed the driver
          (reported by Gnomi).

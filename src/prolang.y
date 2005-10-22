@@ -740,8 +740,8 @@ yyerror (const char *str)
     if (num_parse_error > 5)
         return;
     context = lex_error_context();
-    fprintf(stderr, "%s %s: %s line %d %s\n"
-                  , time_stamp(), current_file, str, current_line, context);
+    fprintf(stderr, "%s %s line %d: %s%s.\n"
+                  , time_stamp(), current_file, current_line, str, context);
     /* TODO: lex should implement a function get_include_stack() which
      * TODO:: returns an svalue-array with the current include stack.
      * TODO:: This could be printed, and also passed to parse_error().
@@ -784,8 +784,8 @@ yywarn (const char *str)
     char *context;
 
     context = lex_error_context();
-    fprintf(stderr, "%s %s: Warning: %s line %d %s\n"
-                  , time_stamp(), current_file, str, current_line, context);
+    fprintf(stderr, "%s %s line %d: Warning: %s%s.\n"
+                  , time_stamp(), current_file, current_line, str, context);
     /* TODO: lex should implement a function get_include_stack() which
      * TODO:: returns an svalue-array with the current include stack.
      * TODO:: This could be printed, and also passed to parse_error().
@@ -2330,13 +2330,15 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
                         , get_txt(name->name));
         }
 
-        if ((flags ^ VARIABLE(n)->flags) & TYPE_MOD_STATIC)
+        if (((flags ^ VARIABLE(n)->flags) & (TYPE_MOD_STATIC|TYPE_MOD_PRIVATE))
+            == TYPE_MOD_STATIC
+           )
         {
-            yywarnf("Redefining inherited%s variable '%s' with a%s variable.\n"
+            yywarnf("Redefining inherited %s variable '%s' with a %s variable"
                    , (VARIABLE(n)->flags & TYPE_MOD_STATIC)
-                     ? " static" : " non-static"
+                     ? "nosave" : "non-nosave"
                    , get_txt(name->name)
-                   , (flags & TYPE_MOD_STATIC) ? " static" : " non-static"
+                   , (flags & TYPE_MOD_STATIC) ? "nosave" : "non-nosave"
                    );
         }
 
@@ -12645,7 +12647,7 @@ epilog (void)
             size_t linenumber_size;
 
             linenumber_size = mem_block[A_LINENUMBERS].current_size
-                              + sizeof(prog->line_numbers);
+                              + sizeof(linenumbers_t);
 
             if ( !(prog->line_numbers = xalloc(linenumber_size)) )
             {

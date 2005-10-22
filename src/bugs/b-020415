@@ -4,8 +4,10 @@ Date: 2002-04-15
 Type: Bug
 State: New
 Driver: 3.2.9-dev.423, -dev.432
+See also: b-020115
 
 
+------------------------------------------------------------------------------
 Date: Mon, 15 Apr 2002 17:11:36 +0200
 From: Christian Mudra <mudra@informatik.uni-kl.de>
 To: Lars Duening <lars@bearnip.com>
@@ -4673,3 +4675,4 @@ secure/master secure/master.c line 3192
 [xerq] read: Undefined error: 0
 2002.04.22 16:08:14 [xerq] Demon exiting.
 
+------------------------------------------------------------------------------

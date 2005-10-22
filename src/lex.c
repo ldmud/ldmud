@@ -6573,7 +6573,7 @@ lex_error_context (void)
  */
 
 {
-    static char buf[20];
+    static char buf[21];
     char *end;
     mp_int len;
 
@@ -6581,8 +6581,8 @@ lex_error_context (void)
         return "";
 
     strcpy(buf, ((signed char)yychar == -1 || yychar == CHAR_EOF)
-                ? (len = 5, "near ")
-                : (len = 7, "before "));
+                ? (len = 6, " near ")
+                : (len = 8, " before "));
 
     if (!yychar || !*outp)
     {

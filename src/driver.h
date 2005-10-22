@@ -27,13 +27,13 @@
  * have any noticeable speed impact. This define was used to find
  * the inaccuracy in the mapping statistic.
  */
-#define CHECK_MAPPING_TOTAL
+/* #define CHECK_MAPPING_TOTAL */
 
 /* Activate object refcount check code. It will produce a decent
  * amount of log output. It will also fatal() the driver as soon
  * as it detects an inconsistency in the list of destructed objects.
  */
-#define CHECK_OBJECT_REF
+/* #define CHECK_OBJECT_REF */
 
 /* Activate object referencing checking code during the GC. It will
  * print error messages to gcout when an object or program is

@@ -1003,7 +1003,7 @@ parse_error (Bool warning, const char *error_file, int line, const char *what
         what = "...[too long error message]...";
     if (strlen(what) + strlen(error_file) > sizeof buff - 100)
         error_file = "...[too long filename]...";
-    sprintf(buff, "%s line %d %s:%s\n", error_file, line, context, what);
+    sprintf(buff, "%s line %d%s: %s\n", error_file, line, context, what);
 
     /* Don't call the master if it isn't loaded! */
     if (master_ob && !(master_ob->flags & O_DESTRUCTED) )
