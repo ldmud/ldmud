@@ -4365,14 +4365,16 @@ v_tell_room (svalue_t *sp, int num_arg)
          * operation.
          */
         avoid = order_array(arg[2].u.vec);
+        free_array(arg[2].u.vec);
         sp->u.vec = avoid; /* in case of an error, this will be freed. */
-        sp--;
     }
 
-    e_tell_room(ob, sp, avoid);
+    e_tell_room(ob, arg+1, avoid);
 
     if (num_arg > 2)
-        free_array(avoid);
+    {
+        free_svalue(sp--);
+    }
     free_svalue(sp--);
     free_svalue(sp--);
 

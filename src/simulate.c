@@ -3154,6 +3154,8 @@ check_valid_path (string_t *path, object_t *caller, string_t* call_fun, Bool wri
     if (legal_path(get_txt(path)))
         return path;
 
+    /* Push the path onto the VM stack so that error() can free it */
+    push_string(inter_sp, path);
     error("Illegal path %s for %s() by %s\n", get_txt(path), get_txt(call_fun)
          , get_txt(caller->name));
     return NULL;

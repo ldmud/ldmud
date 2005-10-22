@@ -1307,7 +1307,8 @@ for TESTFLAG in -qstrict -qipa -ipo; do
   fi
 done
 changequote([,])dnl
-for TESTFLAG in -fomit-frame-pointer -funroll-all-loops; do
+# -funroll-all-loops causes some versions of gcc to produce buggy code
+for TESTFLAG in -fomit-frame-pointer; do
   if eval $tcomp; then
     CFLAGS="$CFLAGS $TESTFLAG"
   fi

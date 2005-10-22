@@ -1,3 +1,6 @@
+gcc 3.0
+  Optimization option -funroll-all-loops seems to create buggy code.
+
 gcc 2.91.66 19990314/Linux (egcs-1.1.2) on Linux/x86:
   Computing MIN_LONG % -1 causes a floating point exception.
 

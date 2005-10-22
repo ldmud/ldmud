@@ -1975,7 +1975,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                     if (j > MAX_STRING_LENGTH)
                     {
                         /* Reduce this part to fit; all the following
-                         * parts will be reduced to shreds^W0.
+                         * parts will be reduced to shreds.
                          */
                         indent_overflows = MY_TRUE;
                         lens[i] -= (j - MAX_STRING_LENGTH);
@@ -2052,7 +2052,8 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 
             if (pt - tmpmem + ((l < 0) ? -l : l) >= tmpmem_size)
             {
-                error("Partial string too long (%ld+%ld >= %ld).\n"
+                error("Partial string '%s' too long (%ld+%ld >= %ld).\n"
+                     , p
                      , (long)(pt - tmpmem), (long)((l < 0) ? -l : l)
                      , (long)tmpmem_size);
                 /* NOTREACHED */
