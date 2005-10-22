@@ -3,6 +3,9 @@ Miscellaneous files for the driver:
   icon-32x32.xpm : The 'official' icon for the driver.
   icon-16x16.xpm
 
+  pb-ldmud.jpg   : A neat 'powered by' button by Elric - some editing required.
+                   
+
 The following scripts are just working examples - use them to roll your own:
 
   startmud.pl : A simple start/keep-alive script

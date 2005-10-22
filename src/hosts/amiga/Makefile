@@ -56,14 +56,14 @@ ed.o : ed.c xalloc.h svalue.h stdstrings.h simulate.h rxcache.h regexp.h \
     closure.h actions.h ed.h typedefs.h driver.h strfuns.h sent.h exec.h \
     instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
-efuns.o : efuns.c ../mudlib/sys/strings.h ../mudlib/sys/objectinfo.h \
-    ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h swap.h \
-    strfuns.h smalloc.h simulate.h stdstrings.h rxcache.h random.h \
-    ptrtable.h otable.h object.h mstrings.h md5.h mapping.h main.h \
-    interpret.h instrs.h heartbeat.h dumpstat.h comm.h closure.h call_out.h \
-    backend.h array.h actions.h efuns.h my-rusage.h my-alloca.h typedefs.h \
-    driver.h sent.h exec.h regexp.h port.h config.h hosts/unix.h \
-    hosts/be/be.h machine.h
+efuns.o : efuns.c ../mudlib/sys/time.h ../mudlib/sys/strings.h \
+    ../mudlib/sys/objectinfo.h ../mudlib/sys/debug_info.h xalloc.h \
+    wiz_list.h svalue.h swap.h strfuns.h smalloc.h simulate.h stdstrings.h \
+    rxcache.h random.h ptrtable.h otable.h object.h mstrings.h md5.h \
+    mapping.h main.h interpret.h instrs.h heartbeat.h dumpstat.h comm.h \
+    closure.h call_out.h backend.h array.h actions.h efuns.h my-rusage.h \
+    my-alloca.h typedefs.h driver.h sent.h exec.h regexp.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 files.o : files.c ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h \
     simulate.h mstrings.h main.h lex.h interpret.h filestat.h comm.h \

@@ -421,6 +421,7 @@ static void new_player(SOCKET_T new_socket, struct sockaddr_in *addr, size_t len
 
 static long read_32(char *);
 static Bool send_erq(int handle, int request, const char *arg, size_t arglen);
+static void shutdown_erq_demon(void);
 static void stop_erq_demon(Bool);
 static string_t * lookup_ip_entry (struct in_addr addr, Bool useErq);
 static void add_ip_entry(struct in_addr addr, const char *name);
@@ -1079,7 +1080,12 @@ ipc_remove (void)
 
     if (udp_s >= 0)
         socket_close(udp_s);
-}
+
+#ifdef ERQ_DEMON
+    shutdown_erq_demon();
+#endif
+
+} /* ipc_remove() */
 
 /*-------------------------------------------------------------------------*/
 void
@@ -1814,6 +1820,7 @@ get_message (char *buff)
             if (urgent_data)
             {
                 DTN(("telnet wants to sync\n"));
+                check_alarm();
                 urgent_data = MY_FALSE;
                 timeout.tv_sec = 0;
                 timeout.tv_usec = 0;
@@ -4514,6 +4521,25 @@ start_erq_demon (const char *suffix, size_t suffixlen)
 
 /*-------------------------------------------------------------------------*/
 static void
+shutdown_erq_demon (void)
+
+/* Close the connection to the ERQ.
+ * This method is to be used directly only on game shutdown, otherwise
+ * use stop_erq_demon() instead.
+ */
+
+{
+    if (erq_demon < 0)
+        return;
+
+    socket_close(erq_demon);
+    erq_demon = FLAG_NO_ERQ;
+    erq_pending_len = 0;
+    input_from_erq = &buf_from_erq[0];
+} /* shutdown_erq_demon() */
+
+/*-------------------------------------------------------------------------*/
+static void
 stop_erq_demon (Bool notify)
 
 /* Close the connection to the ERQ and inform all pending requests
@@ -4527,10 +4553,7 @@ stop_erq_demon (Bool notify)
     if (erq_demon < 0)
         return;
 
-    socket_close(erq_demon);
-    erq_demon = FLAG_NO_ERQ;
-    erq_pending_len = 0;
-    input_from_erq = &buf_from_erq[0];
+    shutdown_erq_demon();
 
     /* Inform all pending requests about the loss.
      */

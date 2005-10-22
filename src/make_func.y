@@ -467,23 +467,23 @@ static int curr_lpc_type_size = 0;
 
 /* Forward declarations */
 
-static void yyerror(char *);
+static void yyerror(const char *);
 static int yylex(void);
 int yyparse(void);
 int ungetc(int c, FILE *f);
-static char *type_str(int);
+static const char *type_str(int);
 static long type2flag (int n);
-static char *etype(long);
-static char *ctype(int);
+static const char *etype(long);
+static const char *ctype(int);
 #ifndef toupper
 int toupper(int);
 #endif
-static int fatal(char *str);
+static int fatal(const char *str);
 static int cond_get_exp(int);
 
 /*-------------------------------------------------------------------------*/
 static char *
-mystrdup (char *str)
+mystrdup (const char *str)
 
 /* Copy <str> into a freshly allocated memory block and return that one.
  *
@@ -500,7 +500,7 @@ mystrdup (char *str)
 
 /*-------------------------------------------------------------------------*/
 static int
-fatal (char *str)
+fatal (const char *str)
 
 /* Print <str> on stderr, flush stdout and exit the program with
  * exitcode 1.
@@ -553,7 +553,7 @@ check_for_duplicate_instr (const char *f_name, const char *key, int redef_ok)
 
     rc = 0;
 
-    for (i = 0; i < num_buff; i++)
+    for (i = 0; i < (size_t)num_buff; i++)
     {
         if (!strcmp(f_name, instr[i].f_name))
         {
@@ -597,7 +597,7 @@ check_for_duplicate_string (const char *key, const char *buf)
 
     rc = 0;
 
-    for (i = 0; i < num_buff; i++)
+    for (i = 0; i < (size_t)num_buff; i++)
     {
         if (!strcmp(key, instr[i].key))
         {
@@ -1009,8 +1009,8 @@ stringdef: ID NAME
 /* The recognized type names */
 
 struct type {
-    char *name;  /* name of the type */
-    int   num;   /* the type's parser code */
+    const char *name;  /* name of the type */
+    int         num;   /* the type's parser code */
 };
 
 static struct type types[]
@@ -1162,7 +1162,7 @@ myungetc (char c)
 
 /*-------------------------------------------------------------------------*/
 static void
-add_input (char *p)
+add_input (const char *p)
 
 /* Insert text <p> at the current point in the input stream so that
  * the next mygetc()s will read it.
@@ -1178,7 +1178,7 @@ add_input (char *p)
 
 /*-------------------------------------------------------------------------*/
 static void
-add_define (char * name, int num_arg, char *exps)
+add_define (const char * name, int num_arg, const char *exps)
 
 /* Add the definition for the macro <name> with <num_arg> arguments
  * and replacement text <exps> to the table of macros.
@@ -1203,7 +1203,7 @@ add_define (char * name, int num_arg, char *exps)
 
 /*-------------------------------------------------------------------------*/
 static struct defn *
-lookup_define (char *s)
+lookup_define (const char *s)
 
 /* Lookup the macro <s> and return a pointer to its defn structure.
  * Return NULL if the macro is not defined.
@@ -1285,7 +1285,7 @@ nextword (char *str)
 
 /*-------------------------------------------------------------------------*/
 static Bool
-skip_to (char mark, char *token, char *atoken)
+skip_to (char mark, const char *token, const char *atoken)
 
 /* Skip the file fpr linewise until one of the following control statements
  * is encountered:
@@ -1403,7 +1403,7 @@ handle_cond (char mark, int c)
 
 /*-------------------------------------------------------------------------*/
 static void
-handle_if (char mark, char *str)
+handle_if (char mark, const char *str)
 
 /* Evaluate the <mark>if condition <str>
  */
@@ -1439,7 +1439,7 @@ handle_else (char mark)
 
         iftop = p->next;
         free((char *)p);
-        skip_to(mark, "endif", (char *)0);
+        skip_to(mark, "endif", (const char *)0);
     }
     else
     {
@@ -1662,11 +1662,11 @@ handle_map (char *str, int size, int (* name_to_index)(char *) )
     /* Write the generated map */
 
     fprintf(fpw, "{");
-    fprintf(fpw, output_del);
+    fputs(output_del, fpw);
     for (i = 0; i < size; i++)
     {
         fprintf(fpw, "%s,", map[i]);
-        fprintf(fpw, output_del);
+        fputs(output_del, fpw);
     }
     fprintf(fpw, "};\n");
 } /* handle_map() */
@@ -2017,7 +2017,7 @@ ident (char c)
 } /* ident() */
 
 /*-------------------------------------------------------------------------*/
-static char *
+static const char *
 type_str (int n)
 
 /* Create a string representation of type <n> in a static buffer
@@ -2035,7 +2035,7 @@ type_str (int n)
             if (n & MF_TYPE_MOD_REFERENCE)
             {
                 static char buff[100];
-                char *str;
+                const char *str;
 
                 str = type_str(n & ~MF_TYPE_MOD_REFERENCE);
                 if (strlen(str) + 3 > sizeof buff)
@@ -2250,7 +2250,7 @@ yylex (void)
 
 /*-------------------------------------------------------------------------*/
 static void
-yyerror (char *str)
+yyerror (const char *str)
 
 /* Print the error message <str> with information about the current
  * parsing position and exit.
@@ -2264,7 +2264,7 @@ yyerror (char *str)
 /*=========================================================================*/
 
 /*-------------------------------------------------------------------------*/
-static char *
+static const char *
 etype (long n)
 
 /* Express type <n> (in bitfield encoding) in the runtime type symbols
@@ -2353,7 +2353,7 @@ type2flag (int n)
 } /* type2flag() */
 
 /*-------------------------------------------------------------------------*/
-static char *
+static const char *
 ctype (int n)
 
 /* Express type <n> in the compiler type symbols of exec.h.
@@ -2362,7 +2362,7 @@ ctype (int n)
 
 {
     static char buff[100];        /* 100 is such a comfortable size :-) */
-    char *p;
+    const char *p = NULL;
 
     buff[0] = '\0';
     if (n & MF_TYPE_MOD_REFERENCE)
@@ -2529,7 +2529,7 @@ read_config (void)
      * those which are not supported on the host system.
      */
     {
-        char * defnames[] = {
+        const char * defnames[] = {
 #ifndef HAS_IPV6
                              "USE_IPV6",
 #endif

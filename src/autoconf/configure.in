@@ -380,6 +380,13 @@ yes
 ],
 [ EXTRA_CFLAGS="${EXTRA_CFLAGS} -DOS2" ])
 
+AC_EGREP_CPP(yes,[
+#if defined(__CYGWIN32__) || defined(__CYGWIN__)
+yes
+#endif
+],
+[ EXTRA_CFLAGS="${EXTRA_CFLAGS} -DMSWIN" ])
+
 dnl Checking for headers
 
 AC_CHECK_HEADERS(sys/rusage.h sys/time.h unistd.h stdlib.h libc.h memory.h)
@@ -526,12 +533,11 @@ fi
 fi
 
 AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
-saveflags="$CFLAGS"
-if test $enable_use_mysql = yes; then
-  if test "x$mysql_path" != "x"; then
-      CFLAGS="$CFLAGS -I$mysql_path"
-  fi
-fi
+for TESTPATH in "" "$mysql_path" "/usr/local/include"; do
+    saveflags="$CFLAGS"
+    if test "x$TESTPATH" != "x"; then
+        CFLAGS="$CFLAGS -I$TESTPATH"
+    fi
 AC_TRY_COMPILE([
 #include <sys/types.h>
 #include <mysql/mysql.h>
@@ -543,10 +549,18 @@ struct MYSQL * foo(void)
     
     return &var;
 }
-],,lp_cv_has_mysql=yes,
+],,
+lp_cv_has_mysql=yes
+if test "x$TESTPATH" != "x"; then
+    EXTRA_CFLAGS="-I$TESTPATH $EXTRA_CFLAGS"
+fi
+break;
+,
 lp_cv_has_mysql=no
 CFLAGS="$saveflags"
-))
+)
+done
+)
 
 if test $lp_cv_has_mysql = yes; then
   saveflags="$CFLAGS"
@@ -556,8 +570,6 @@ if test $enable_use_mysql = yes; then
       AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -lmysqlclient")
   else
       LIBS="$LIBS -L$mysql_path"
-      CFLAGS="$CFLAGS -I$mysql_path"
-      EXTRA_CFLAGS="$EXTRA_CFLAGS -I$mysql_path"
       AC_CHECK_LIB(mysqlclient,main, PKGLIBS="$PKGLIBS -L$mysql_path -lmysqlclient")
   fi
   # On some systems, mysqlclient requires the compression libz.
@@ -1107,6 +1119,43 @@ cat > conftest.c <<EOF
 double d = 4.5;
 main() { printf("hello world\n"); }
 EOF
+AC_MSG_CHECKING(low optimization CFLAGS)
+changequote(,)dnl
+for TESTFLAG in -O; do
+  if eval $tcomp; then
+    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+      :
+      #the [e]grep option -v will not give a failure exit status on the atari
+    else
+      if eval $tcomp; then
+        CFLAGS=$TESTFLAG
+        break
+      fi
+    fi
+  fi
+done
+for TESTFLAG in -qmaxmem=65536; do
+  if eval $tcomp; then
+    if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
+      :
+      #the [e]grep option -v will not give a failure exit status on the atari
+    else
+      if eval $tcomp; then
+        CFLAGS="$CFLAGS $TESTFLAG"
+        break
+      fi
+    fi
+  fi
+done
+changequote([,])dnl
+for TESTFLAG in -g; do
+  if eval $tcomp; then
+    CFLAGS="$CFLAGS $TESTFLAG"
+  fi
+done
+LCFLAGS=$CFLAGS
+AC_MSG_RESULT($LCFLAGS)
+
 AC_MSG_CHECKING(medium optimization CFLAGS)
 changequote(,)dnl
 for TESTFLAG in -O2 -O; do
@@ -1401,6 +1450,7 @@ done
 
 LIBS="${SAVE_LIBS}"
 CFLAGS="${SAVE_CFLAGS}"
+
 case "$EXTRA_CFLAGS" in
  *-Dsolaris*)
   if test $ac_cv_lib_ucb_main = "yes"; then
@@ -1409,8 +1459,11 @@ case "$EXTRA_CFLAGS" in
         -ltcpip -lsocket -lnsl -lgcc -lc /usr/ucblib/libucb.a"
       LDFLAGS= "-u dgettext -lintl"
   fi ;;
- *-Dsolaris*)
+ *-DOS2*)
       LDFLAGS= "$LDFLAGS -Zbsd-signals -Zexe"
+      ;;
+ *-MSWIN*)
+      LDFLAGS= "$LDFLAGS -luser32 -lwinmm -lkernel32 -lwsock32"
       ;;
 esac
 
@@ -1437,6 +1490,7 @@ fi
 dnl
 
 AC_SUBST(OCFLAGS)
+AC_SUBST(LCFLAGS)
 AC_SUBST(MCFLAGS)
 AC_SUBST(DCFLAGS)
 AC_SUBST(LDFLAGS)

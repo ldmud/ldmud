@@ -862,7 +862,7 @@ svalue_to_string ( fmt_state_t *st
 
                 case CLOSURE_SIMUL_EFUN:
                   {
-                    stradd(st, &str, "#'");
+                    stradd(st, &str, "#'<sefun>");
                     stradd(st, &str, get_txt(simul_efunp[type - CLOSURE_SIMUL_EFUN].name));
                     break;
                   }

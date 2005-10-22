@@ -333,7 +333,7 @@ remove_action_sent (object_t *ob, object_t *player)
         action_t *tmp;
 
         tmp = (action_t *)*s;
-        
+
         if (tmp->ob == ob)
         {
 #ifdef DEBUG

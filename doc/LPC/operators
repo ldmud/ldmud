@@ -54,9 +54,11 @@ DESCRIPTION
                         (all elements resp. characters from expr1 which
                         which are also in the expr2) is computed.
 
-        expr1 == expr2        Compare values. Valid for strings and numbers.
+        expr1 == expr2        Compare values. Valid for strings, numbers,
+                              objects and closures.
 
-        expr1 != expr1        Compare values. Valid for strings and numbers.
+        expr1 != expr1        Compare values. Valid for strings, numbers,
+                              objects and closures.
 
         expr1 > expr2        Valid for strings and numbers.
 

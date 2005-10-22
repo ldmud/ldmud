@@ -76,7 +76,7 @@ struct object_s
 #define O_RESET_STATE        0x100  /* Object in a 'reset':ed state ? */
 #define O_WILL_CLEAN_UP      0x200  /* clean_up will be called next time */
 #define O_LAMBDA_REFERENCED  0x400  /* be careful with replace_program() */
-#define O_SHADOW             0x800  /* Is the object shadowed? */
+#define O_SHADOW             0x800  /* Is the object shadowed/shadowing? */
 #define O_REPLACED           0x1000 /* Was the program replaced? */
 
 

@@ -446,8 +446,16 @@ closure_eq (svalue_t * left, svalue_t * right)
 {
     int i;
 
-    i = left->u.generic  == right->u.generic &&
-        left->x.generic == right->x.generic;
+    /* Operator, Efun and Simul efun closures don't have a .u.lambda
+     * part.
+     */
+    i = left->x.generic == right->x.generic;
+
+    if (i
+     && (   left->x.closure_type >= 0
+         || right->x.closure_type >= 0)
+       )
+        i = left->u.lambda  == right->u.lambda;
     
     /* Lfun- and identifier closure can be equal even if
      * their pointers differ.

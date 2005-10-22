@@ -2055,6 +2055,7 @@ destruct (object_t *ob)
         {
             shadow_t *shadowing_sent;
 
+            /* Remove the shadow sent from the chain */
             shadowing_sent = O_GET_SHADOW(shadowing);
             shadow_sent->shadowing = NULL;
             shadowing_sent->shadowed_by = shadow_sent->shadowed_by;
@@ -2065,6 +2066,7 @@ destruct (object_t *ob)
         {
             shadow_t *shadowed_by_sent;
 
+            /* Remove the shadow sent from the chain */
             shadowed_by_sent = O_GET_SHADOW(shadowed_by);
             shadow_sent->shadowed_by = NULL;
             shadowed_by_sent->shadowing = shadowing;

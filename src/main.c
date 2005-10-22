@@ -333,7 +333,11 @@ main (int argc, char **argv)
                  , (unsigned long)strlen(BINDIR)+6);
         }
         strcpy(erq_file, BINDIR);
+#ifndef MSDOS_FS
         strcat(erq_file, "/erq");
+#else
+        strcat(erq_file, "\\erq");
+#endif
     }
     else if (*erq_file != '/')
     {
@@ -345,7 +349,11 @@ main (int argc, char **argv)
                  , (unsigned long)(strlen(BINDIR)+2+strlen(erq_file)));
         }
         strcpy(tmp, BINDIR);
+#ifndef MSDOS_FS
         strcat(tmp, "/");
+#else
+        strcat(tmp, "\\");
+#endif
         strcat(tmp, erq_file);
         free(erq_file);
         erq_file = tmp;

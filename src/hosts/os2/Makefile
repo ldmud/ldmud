@@ -49,7 +49,8 @@ WARN= # no warning options - will work with all compilers :-)
 # adding a -fomit-frame-pointer on the NeXT (gcc version 1.93 (68k, MIT syntax))
 # will corrupt the driver.
 OPTIMIZE = -O4 -fomit-frame-pointer  -g -fstrength-reduce -fno-force-mem -fno-force-addr -fno-inline-functions # high optimization
-#OPTIMIZE= -O2 -g -fstrength-reduce -fno-force-mem -fno-force-addr -fno-inline-functions # for better debugging
+#OPTIMIZE= -O2 -g -fstrength-reduce -fno-force-mem -fno-force-addr -fno-inline-functions # medium optimization
+#OPTIMIZE= -O -g # low optimization
 #OPTIMIZE= -g # no optimization; for frequent recompilations.
 #
 # Debugging options:
@@ -220,14 +221,14 @@ ed.o : xalloc.h svalue.h stdstrings.h simulate.h rxcache.h regexp.h \
     closure.h actions.h ed.h typedefs.h driver.h strfuns.h sent.h exec.h \
     instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
-efuns.o : ../mudlib/sys/strings.h ../mudlib/sys/objectinfo.h \
-    ../mudlib/sys/debug_info.h xalloc.h wiz_list.h svalue.h swap.h \
-    strfuns.h smalloc.h simulate.h stdstrings.h rxcache.h random.h \
-    ptrtable.h otable.h object.h mstrings.h md5.h mapping.h main.h \
-    interpret.h instrs.h heartbeat.h dumpstat.h comm.h closure.h call_out.h \
-    backend.h array.h actions.h efuns.h my-rusage.h my-alloca.h typedefs.h \
-    driver.h sent.h exec.h regexp.h port.h config.h hosts/unix.h \
-    hosts/be/be.h machine.h
+efuns.o : ../mudlib/sys/time.h ../mudlib/sys/strings.h \
+    ../mudlib/sys/objectinfo.h ../mudlib/sys/debug_info.h xalloc.h \
+    wiz_list.h svalue.h swap.h strfuns.h smalloc.h simulate.h stdstrings.h \
+    rxcache.h random.h ptrtable.h otable.h object.h mstrings.h md5.h \
+    mapping.h main.h interpret.h instrs.h heartbeat.h dumpstat.h comm.h \
+    closure.h call_out.h backend.h array.h actions.h efuns.h my-rusage.h \
+    my-alloca.h typedefs.h driver.h sent.h exec.h regexp.h port.h config.h \
+    hosts/unix.h hosts/be/be.h machine.h
 
 files.o : ../mudlib/sys/files.h xalloc.h svalue.h stdstrings.h simulate.h \
     mstrings.h main.h lex.h interpret.h filestat.h comm.h array.h files.h \

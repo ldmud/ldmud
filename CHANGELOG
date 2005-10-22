@@ -1,6 +1,22 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+15-Jul-2001 (Lars Duening)  (3.3.75)
+    - (configure) When testing for mySQL, the driver automatically checks
+         in /usr/local/include as well (some systems don't have it the
+         default include path).
+    - (configure) Added a check for 'minimal optimization' options.
+    - (configure) When compiling on Windows, link in a couple of more
+         libraries. This might not be fully correct yet.
+    - (make_func.y) Removed a couple of warnings under gcc 3.0 (thanks,
+        Largo!).
+    - (comm.c) On a regular shutdown, stop the erq demon explicitely.
+    - (main.c) When compiling for MSDOS_FS, the erq pathname wasn't built
+        correctly (reported by Coogan).
+    - (sprintf.c) Simul-efun closures printed with %O are marked as such.
+    - (closure.c) Comparison of operator, efun, and simul-efun closures
+        was instable (reported by Nathan).
+
 13-Jul-2001 (Lars Duening)  (3.3.74)
     - (comm.c, parse.c, parse_old.c) Removed a couple of
         undefined behaviours, detected by gcc 3.0 (thanks, Largo!)
