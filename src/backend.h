@@ -19,6 +19,7 @@ extern long avg_in_list;
 
 extern Bool extra_jobs_to_do;
 extern Bool garbage_collect_to_do;
+extern Bool mud_is_up;
 
 /* --- Prototypes --- */
 

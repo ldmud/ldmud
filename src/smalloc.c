@@ -504,7 +504,7 @@ static void large_free(char *);
    */
 
 #define s_next_ptr(p)  ((word_t **) (p+OVERHEAD))
-  /* Pointer to the 'next link' filed in the small shunk.
+  /* Pointer to the 'next link' filed in the small chunk.
    */
 
 #define SIZE_INDEX(u_array, size) \

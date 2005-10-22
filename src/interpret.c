@@ -7488,7 +7488,9 @@ again:
                  , (long)(sp - (fp + csp->num_local_variables)));
 #endif
         while (sp != fp)
+        {
             free_svalue(--sp);
+        }
         *sp = *svp;
 
         /* Restore the previous execution context */
@@ -13992,6 +13994,7 @@ again:
                 int i;
                 
                 ASSIGN_EVAL_COST
+                inter_sp = sp; /* Might be clobbered from previous loop */
 
                 if (svp->type == T_OBJECT)
                     ob = svp->u.ob;
@@ -14049,7 +14052,7 @@ again:
                     
                 /* Call the function with the remaining args on the stack.
                  */
-                inter_sp = sp; /* was clobbered by the previous loop */
+                inter_sp = sp; /* update to new setting */
                 if (!int_apply(arg[1].u.str, ob, num_arg-2, MY_FALSE, b_use_default))
                 {
                     /* Function not found, Assign 0 as result.

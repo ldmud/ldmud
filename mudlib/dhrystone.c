@@ -28,7 +28,7 @@ mapping alloc_record() {
 mapping copy_record(mapping rec) {
   mapping r;
 
-  r = copy_mapping(rec);
+  r = copy(rec);
   r["var_1"] = ({}) + rec["var_1"];
   return r;
 }

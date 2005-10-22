@@ -829,7 +829,10 @@ yalloc (size_t size)
 
     p = xalloc(size+sizeof(char*));
     if (!p)
+    {
+        fatal("Out of memory in compiler.\n");
         return NULL;
+    }
     *p++ = last_yalloced;
     last_yalloced = (char *)p;
     return p;

@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Dec-2001 (Lars Duening)  (3.3.135)
+    - (interpret.c) When doing a call_other on an array, inter_sp
+        was incorrect while getting the object. An error there
+        then could clobber memory.
+    - (backend) Added in internal flag 'mud_is_up' for debugging.
+    - (main.c) The initial random seed is printed for debugging
+        purposes.
+
 29-Nov-2001 (Lars Duening)  (3.3.134)
     - (prolang, lex.c) Storing the line number info for the end of an
         include file used the wrong line for rollbacks (reported by

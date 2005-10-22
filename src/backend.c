@@ -134,6 +134,11 @@ Bool garbage_collect_to_do = MY_FALSE;
  * TODO:: struct.
  */
 
+Bool mud_is_up = MY_FALSE;
+  /* True: the driver is finished with the initial processing
+   * and has entered the main loop.
+   */
+
 static double load_av = 0.0;
   /* The load average (player commands/second), weighted over the
    * last period of time.
@@ -379,6 +384,8 @@ backend (void)
         /* Execute pending deallocations */
         alloca(0); /* free alloca'd values from deeper levels of nesting */
 #endif
+
+        mud_is_up = MY_TRUE;
 
         /* Replace programs, remove destructed objects, and similar stuff */
         cleanup_stuff();

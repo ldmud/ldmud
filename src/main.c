@@ -271,6 +271,11 @@ main (int argc, char **argv)
         consts[i] = exp(- i / 900.0);
     mstring_init(); /* Also initializes the standard strings */
 
+    printf("%s Random seed: %lx\n"
+          , time_stamp(), (unsigned long)current_time);
+    debug_message("%s Random seed: %lx\n"
+                 , time_stamp(), (unsigned long)current_time);
+
     /* If the master_name hasn't been set, select a sensible default */
     if ('\0' == master_name[0])
     {
