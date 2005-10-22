@@ -18,7 +18,11 @@
     } else {}
 
 
-/* void outofmem(size_t size, const char * txt)
+/* void outofmem(const char * txt)
+ *   Throw an 'out of memory' error for an allocation of unknown size with the
+ *   description <txt>.
+ *
+ * void outofmem(size_t size, const char * txt)
  *   Throw an 'out of memory' error for an allocation of <size> with the
  *   description <txt>.
  *
@@ -29,6 +33,9 @@
  * TODO:: outofmem_gen(txt but no length)..., then convert all out-of-mem
  * TODO:: descriptions.
  */
+
+#define outofmemory(txt) \
+    error("(%s:%d) Out of memory for %s\n", __FILE__, __LINE__, txt)
 
 #define outofmem(size,txt) \
     error("(%s:%d) Out of memory (%lu bytes) for %s\n"\

@@ -2729,6 +2729,12 @@ push_indexed_lvalue (svalue_t *sp, bytecode_p pc)
         /* Compute the indexed element */
 
         item = get_map_lvalue(m, i);
+        if (!item)
+        {
+            outofmemory("indexed lvalue");
+            /* NOTREACHED */
+            return NULL;
+        }
 
         if (m->ref == 1)
         {
@@ -2997,6 +3003,12 @@ push_protected_indexed_lvalue (svalue_t *sp, bytecode_p pc)
         /* Compute the indexed item and set up the protector */
 
         item = get_map_lvalue(m, i);
+        if (!item)
+        {
+            outofmemory("indexed lvalue");
+            /* NOTREACHED */
+            return NULL;
+        }
 
         lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
         lvalue->v.type = T_PROTECTED_LVALUE;
@@ -3203,7 +3215,14 @@ push_protected_indexed_map_lvalue (svalue_t *sp, bytecode_p pc)
 
         /* Compute the indexed element and setup the protector */
 
-        item = get_map_lvalue(m, i) + sp->u.number;
+        item = get_map_lvalue(m, i);
+        if (!item)
+        {
+            outofmemory("indexed lvalue");
+            /* NOTREACHED */
+            return NULL;
+        }
+        item += sp->u.number;
 
         lvalue = (struct protected_lvalue *)xalloc(sizeof *lvalue);
         lvalue->v.type = T_PROTECTED_LVALUE;
@@ -3358,6 +3377,12 @@ index_lvalue (svalue_t *sp, bytecode_p pc)
 
         /* Compute the element */
         item = get_map_lvalue(m, i);
+        if (!item)
+        {
+            outofmemory("indexed lvalue");
+            /* NOTREACHED */
+            return NULL;
+        }
 
         /* Remove the arguments and push the result. */
 
@@ -3750,6 +3775,12 @@ protected_index_lvalue (svalue_t *sp, bytecode_p pc)
 
             /* Compute the indexed element */
             item = get_map_lvalue(m, i);
+            if (!item)
+            {
+                outofmemory("indexed lvalue");
+                /* NOTREACHED */
+                return NULL;
+            }
 
             /* Build the protector */
             ref_mapping(m);
@@ -9018,7 +9049,7 @@ again:
             inter_sp = sp;
             m = add_mapping((sp-1)->u.map,sp->u.map);
             if (!m) {
-                ERROR("Out of memory.n");
+                ERROR("Out of memory.\n");
             }
             pop_n_elems(2);
             push_mapping(sp, m);
@@ -13251,6 +13282,12 @@ again:
         {
             /* Create/reget the mapping entry */
             data = get_map_lvalue_unchecked(m, value);
+            if (!data)
+            {
+                outofmemory("literal mapping");
+                /* NOTREACHED */
+                return MY_FALSE;
+            }
             free_svalue(value++);
             for (j = num_values; --j >= 0;)
             {
@@ -13396,6 +13433,12 @@ again:
 
         sp--; /* the key */
         data = get_map_lvalue(m, sp);
+        if (!data)
+        {
+            outofmemory("indexed lvalue");
+            /* NOTREACHED */
+            return MY_FALSE;
+        }
         pop_stack();
 
         if (!m->ref)

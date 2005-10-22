@@ -1920,6 +1920,11 @@ add_mapping (mapping_t *m1, mapping_t *m2)
 
                 src = &(mc->data[0]);
                 dest = get_map_lvalue_unchecked(m3, src);
+                if (!dest)
+                {
+                    free_mapping(m3);
+                    return NULL;
+                }
                 for (src++, i = num_values; --i >= 0; )
                     assign_svalue(dest++, src++);
             }
@@ -1945,6 +1950,11 @@ add_mapping (mapping_t *m1, mapping_t *m2)
 
                 src = &(mc->data[0]);
                 dest = get_map_lvalue_unchecked(m3, src);
+                if (!dest)
+                {
+                    free_mapping(m3);
+                    return NULL;
+                }
                 for (src++, i = num_values; --i >= 0; )
                     assign_svalue(dest++, src++);
             }
@@ -2678,6 +2688,12 @@ set_mapping_user (mapping_t *m, object_t *owner)
 
         /* Create a new entry in the mapping for the new key */
         dest = get_map_lvalue_unchecked(m, &new_key);
+        if (!dest)
+        {
+            outofmemory("key with new owner");
+            /* NOTREACHED */
+            return;
+        }
         free_svalue(&new_key);
 
         /* Move the values from the old entry to the new one, invalidating
@@ -3172,6 +3188,12 @@ add_to_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
     int i;
 
     data2 = get_map_lvalue_unchecked((mapping_t *)extra, key);
+    if (!data2)
+    {
+        outofmemory("entry added to mapping");
+        /* NOTREACHED */
+        return;
+    }
     if (data2 != data) /* this should always be true */
     {
         for (i = ((mapping_t *)extra)->num_values; --i >= 0;)
@@ -3662,6 +3684,12 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
          * Therefore assign the pair to the new mapping.
          */
         v = get_map_lvalue_unchecked(m, read_pointer);
+        if (!v)
+        {
+            outofmemory("filtered entry");
+            /* NOTREACHED */
+            return NULL;
+        }
         for (j = num_values, data = read_pointer[1].u.lvalue; --j >= 0; )
         {
             assign_svalue_no_free(v++, data++);
@@ -3854,6 +3882,12 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
         /* Call the filter function */
         v = get_map_lvalue_unchecked(m, key);
+        if (!v)
+        {
+            outofmemory("mapped entry");
+            /* NOTREACHED */
+            return NULL;
+        }
 
         if (!callback_object(&cb))
             error("Object used by %s destructed"
@@ -4072,6 +4106,12 @@ f_mkmapping (svalue_t *sp, int num_arg)
         svalue_t *dest;
 
         dest = get_map_lvalue_unchecked(m, --key);
+        if (!dest)
+        {
+            outofmemory("new mapping entry");
+            /* NOTREACHED */
+            return NULL;
+        }
         for (i = -num_values; ++i <= 0; )
         {
             /* If a key value appears multiple times, we have to free

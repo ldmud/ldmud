@@ -5901,6 +5901,12 @@ restore_mapping (svalue_t *svp, char **str)
             return MY_FALSE;
         }
         data = get_map_lvalue_unchecked(z, &key);
+        if (!data)
+        {
+            outofmemory("restored mapping entry");
+            /* NOTREACHED */
+            return MY_FALSE;
+        }
         free_svalue(&key);
         while (--i >= 0) {
             if (data->type != T_INVALID && data->type != T_NUMBER)

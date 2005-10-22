@@ -13,6 +13,7 @@
 
 #include "driver.h"
 
+#include <stddef.h>
 #include <stdio.h>
 
 #include "xalloc.h"
@@ -217,40 +218,59 @@ assert_stack_gap (void)
     if (stack_direction == 0 || condition == Fatal || heap_end == NULL)
         return;
 
+    /* First check if heap and stack overlap. We do this first to
+     * rule out negative 'gap' values which can be caused by overflows.
+     */
+    gap = 0;
+    if (stack_direction < 0)
+        gap = (ptrdiff_t)((char *)heap_end >= (char *)&gap);
+    else
+        gap = (ptrdiff_t)((char *)&gap >= (char *)heap_end);
+    if (gap != 0)
+    {
+        /* Stack and Heap overlap: irrecoverable failure */
+        if (condition != Fatal)
+        {
+            condition = Fatal;
+            if (stack_direction < 0)
+                gap = (char *)heap_end - (char *)&gap;
+            else
+                gap = (char *)&gap - (char *)heap_end;
+            fatal("Out of memory: Stack overlaps heap by %ld.\n"
+                 , (long)gap);
+            /* NOTREACHED */
+        }
+        return; /* Recursive call during fatal() handling */
+    }
+
+    /* Heap and stack don't overlap - do the normal gap checking.
+     * Note that on machines with big address spaces the computation
+     * may overflow.
+     */
     if (stack_direction < 0)
         gap = (char *)&gap - (char *)heap_end;
     else
         gap = (char *)heap_end - (char *)&gap;
 
+    if (gap < 0)
+        gap = HEAP_STACK_GAP + 1;
+
     /* If the gap is big enough, mark that condition and return */
-    if (gap >= HEAP_STACK_GAP && gap > 0)
+    if (gap >= HEAP_STACK_GAP)
     {
         condition = Normal;
         return;
     }
 
-    /* If the gap is too small, but not yet fatal, mark the condition */
-    if (gap > 0)
+    /* The gap is too small.
+     * Throw an error only if the condition was normal before,
+     * otherwise the error handling would again get an error.
+     */
+    if (condition == Normal)
     {
-        /* Throw an error only if the condition was normal before,
-         * otherwise the error handling would again get an error.
-         */
-        if (condition == Normal)
-        {
-            condition = Error;
-            error("Out of memory: Gap between stack and heap: %ld.\n"
-                 , (long)gap);
-            /* NOTREACHED */
-        }
-        return;
-    }
-
-    /* Stack and Heap overlap: irrecoverable failure */
-    if (condition != Fatal)
-    {
-        condition = Fatal;
-        fatal("Out of memory: Stack overlaps heap by %ld.\n"
-             , -((long)gap));
+        condition = Error;
+        error("Out of memory: Gap between stack and heap: %ld.\n"
+             , (long)gap);
         /* NOTREACHED */
     }
 } /* assert_stack_gap() */

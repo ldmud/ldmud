@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-Mar-2002 (Lars Duening)  (3.3.181)
+    - (xalloc) The implementation of the heap/stack check didn't work
+        on architectures with really big address spaces - corrected that.
+    - (mapping.c, interpret.c, object.c, efuns.c) When adding new values
+        to mapping, the code didn't check if the memory could be allocated
+        (reported by Menaures).
+    - (doc/efun) More german translations from Pulami.
+
 07-Mar-2002 (Lars Duening)  (3.3.180)
     - (xalloc, smalloc.c interpret.c, efuns.c, object.c) Added check
         to prevent the stack from growing into the heap.

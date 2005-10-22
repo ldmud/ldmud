@@ -5135,6 +5135,12 @@ deep_copy_mapping (svalue_t *key, svalue_t *val, void *extra)
 
     copy_svalue(&newkey, key, info->ptable);
     newdata = get_map_lvalue_unchecked(info->dest, &newkey);
+    if (!newdata)
+    {
+        outofmemory("copied mapping value");
+        /* NOTREACHED */
+        return;
+    }
     for (i = info->width; i-- > 0; newdata++, val++)
         copy_svalue(newdata, val, info->ptable);
 
