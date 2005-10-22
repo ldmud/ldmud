@@ -13,6 +13,28 @@ to both Henry's regexp and to PCRE into one pcre-like interface, also
 providing a mregex_t type.
 
 ----------------------
+Ach, dann ging mein pcre-Patch nicht mehr. Ich habs also von Hand machen
+muessen und dabei ist mir aufgefallen, dass ich sogar in der
+Non-Pcre-Sektion etwas geaendert habe. Und zwar in array.c bei Zeile 2871:
+
+        if (!match)
+        {
++ #ifndef USE_PCRE
++             REGFREE(reg);
++ #else
++             pcregex_free(reg);
++ #endif
+            error("Stack overflow in regexplode()");
+            /* NOTREACHED */
+            return NULL;
+        }
+
+Das ist vielleicht eigentlich nicht noetig, aber irgendwas war da doch mit
+einem Refcount und so, das kommt dann wohl durcheinander. Kann mich nur
+dunkel an irgendson Refcount erinnern, ich glaub den brauchte man wegen
+rekursiven REs die kollidieren oder so *denk*
+
+------------
 
 > Mhm, ich kenne die Perl REs zwar nicht so gut (willst du nur die 
 > Funktionalitaet in efuns verpackt, oder auch Sprachaenderungen); aber gerade 

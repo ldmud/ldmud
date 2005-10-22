@@ -676,6 +676,9 @@ void check_alarm (void)
     static mp_int last_alarm_time = 0;
     mp_int curtime = get_current_time();
 
+    if (t_flag)  /* Timing turned off? */
+        return;
+
     if (!last_alarm_time) /* initialize it */
         last_alarm_time = curtime;
 

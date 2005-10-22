@@ -1,0 +1,1423 @@
+Short: Refcount errors when handling destructed objects
+From: Bastian Hoyer
+Date: 2002-02-28
+Type: Bug
+State: New
+Driver: 3.2.9-dev.404
+
+
+Date: Thu, 28 Feb 2002 14:42:38 GMT
+Subject: Crash heute (3-2.404)
+
+Hallo Lars,
+
+heute gabs auch einen Crash :).. anbei der trace...
+Das entsprechende core-file ist core.020228-15:17.restart.
+
+Gruss
+   Bastian
+
+(gdb) bt
+#0  0x80d8e42 in fatal (fmt=0x8112900 "xfree: block %lx size %lu (user %lx)
+freed twice\n")
+     at simulate.c:622
+#1  0x80edd59 in xfree (ptr=0xa8cbd10) at smalloc.c:970
+#2  0x80b7978 in _free_object (ob=0xa8cbd10) at object.c:282
+#3  0x80dbc54 in remove_destructed_objects () at simulate.c:2502
+#4  0x8056e63 in cleanup_stuff () at backend.c:343
+#5  0x80547ec in backend () at backend.c:412
+#6  0x80ad052 in main (argc=9, argv=0xbffffa8c) at main.c:428
+#7  0x400d8baf in __libc_start_main () from /lib/libc.so.6
+
+#2  0x80b7978 in _free_object (ob=0xa8cbd10) at object.c:282
+282         xfree(ob);
+(gdb) print *ob
+$1 = {flags = 13244, ref = -1, total_light = 0, time_reset = 0, time_of_ref
+= 1014905859,
+   load_time = 1014902257, load_id = 7, extra_ref = 0, prog = 0x0, name =
+0x0, load_name = 0x0,
+   next_all = 0xd874b84, prev_all = 0x0, next_hash = 0x0, next_inv = 0x0,
+contains = 0x0, super = 0x0,
+   sent = 0x0, user = 0x9363484, eff_user = 0x9363484, extra_num_variables
+= 67, variables = 0xc78ef78,
+   ticks = 11910, gigaticks = 0}
+
+----------
+
+Date: Thu, 28 Feb 2002 14:38:18 GMT
+Subject: crash gestern :) 3-2.404
+
+Hallo Lars,
+
+hier ist der crash gestern.. :) wenn du noch fragen hast oder mehr aus
+infos aus dem core file hast kein thema :)
+Das Core-file ist core.020227-21:45.restart. (bitte mit angeben) *g*
+
+Bastian
+
+(gdb) bt
+#0  0x80d8e42 in fatal (
+     fmt=0x810ab20 "Object 0x%lx %s ref count 0, but not destructed.\n")
+     at simulate.c:622
+#1  0x80b7815 in _free_object (ob=0x10549fbc) at object.c:237
+#2  0x80dbc54 in remove_destructed_objects () at simulate.c:2502
+#3  0x8056e63 in cleanup_stuff () at backend.c:343
+#4  0x80547ec in backend () at backend.c:412
+#5  0x80ad052 in main (argc=9, argv=0xbffffa8c) at main.c:428
+#6  0x400d8baf in __libc_start_main () from /lib/libc.so.6
+
+#1  0x80b7815 in _free_object (ob=0x10549fbc) at object.c:237
+237             fatal("Object 0x%lx %s ref count 0, but not destructed.\n"
+(gdb) print *ob
+$1 = {flags = 65064, ref = -1, total_light = 0, time_reset = 0,
+   time_of_ref = 1014842710, load_time = 1014839104, load_id = 10,
+   extra_ref = 0, prog = 0x0, name = 0x0, load_name = 0x0,
+   next_all = 0xb28c7f8, prev_all = 0x0, next_hash = 0x0, next_inv = 0x0,
+   contains = 0x0, super = 0x0, sent = 0x0, user = 0x8e52360,
+   eff_user = 0x8e52360, extra_num_variables = 67, variables = 0xdbaee78,
+   ticks = 13171, gigaticks = 0}
+
+----------
+
+Subject: crash in 404
+Date: Wed, 20 Feb 2002 00:13:54 +0100
+
+crash in 3-2.404 :)
+
+Gruss
+  Bastian
+
+#0  0x80d8e42 in fatal (
+    fmt=0x8112900 "xfree: block %lx size %lu (user %lx) freed twice\n")
+    at simulate.c:622
+622             *((char*)0) = 0/a;
+(gdb) bt
+#0  0x80d8e42 in fatal (
+    fmt=0x8112900 "xfree: block %lx size %lu (user %lx) freed twice\n")
+    at simulate.c:622
+#1  0x80edd59 in xfree (ptr=0xa04b768) at smalloc.c:970
+#2  0x80b7978 in _free_object (ob=0xa04b768) at object.c:282
+(gdb) p *ob
+$1 = {flags = 10172, ref = -1, total_light = 0, time_reset = =
+0,
+  time_of_ref = 1014153506, load_time = 1014148204, load_id = 2,
+  extra_ref = 0, prog = 0x0, name = 0x0, load_name = 0x0,
+  next_all = 0xe9fb7ac, prev_all = 0xdfaf844, next_hash = 0x0, =
+next_inv
+= 0x0,
+  contains = 0x0, super = 0x0, sent = 0x0, user = 0x9e5a854,
+  eff_user = 0x9e5a854, extra_num_variables = 210, variables =
+0xa10d2fc,
+  ticks = 4635, gigaticks = 0}
+#3  0x80b7ca6 in free_prog (progp=0xbbda5ac, free_all=1) at object.c:484
+(gdb) p *progp
+$2 = {ref = 0, total_size = 4664, extra_ref = 0,
+  program = 0xbbda600 "=F8=C8 \b\a", name = 0xa04b730
+"d/Sol/zonk/obj/rechner.c",
+  blueprint = 0x0, id_number = 52758, load_time = 1014066083,
+  line_numbers = 0x0, function_names = 0xbbdaf08, functions = =
+0xbbdb084,
+  strings = 0xbbdb3b0, variable_names = 0xbbdb4e0, inherit = =
+0xbbdb7c0,
+  flags = 0, heart_beat = -1, argument_types = 0x0, type_start = =
+0x0,
+  swap_num = 2697468, num_function_names = 190, num_functions = =
+203,
+  num_strings = 76, num_includes = 0, num_variables = 92, =
+num_inherited
+= 3}
+#4  0x80b7887 in _free_object (ob=0xeaaa804) at object.c:257
+(gdb) p *ob
+$3 = {flags = 1560, ref = 0, total_light = 0, time_reset = 0,
+  time_of_ref = 1014159288, load_time = 1014130124, load_id = 53,
+  extra_ref = 0, prog = 0xbbda5ac,
+  name = 0xe530750 "d/Sol/zonk/obj/rechner#39343",
+  load_name = 0x9ece2c0 "/d/Sol/zonk/obj/rechner", next_all = 0x0,
+  prev_all = 0x0, next_hash = 0x0, next_inv = 0x0, contains = =
+0x0,
+  super = 0x0, sent = 0x0, user = 0x9357250, eff_user = =
+0x9357250,
+  extra_num_variables = 92, variables = 0x8bfa084, ticks = 6665,
+gigaticks = 0}
+#5  0x80dbabb in remove_object (ob=0xeaaa804) at simulate.c:2430
+$4 = {flags = 1560, ref = 0, total_light = 0, time_reset = 0,
+  time_of_ref = 1014159288, load_time = 1014130124, load_id = 53,
+  extra_ref = 0, prog = 0xbbda5ac,
+  name = 0xe530750 "d/Sol/zonk/obj/rechner#39343",
+  load_name = 0x9ece2c0 "/d/Sol/zonk/obj/rechner", next_all = 0x0,
+  prev_all = 0x0, next_hash = 0x0, next_inv = 0x0, contains = =
+0x0,
+  super = 0x0, sent = 0x0, user = 0x9357250, eff_user = =
+0x9357250,
+  extra_num_variables = 92, variables = 0x8bfa084, ticks = 6665,
+gigaticks = 0}
+#6  0x80dbb6c in handle_newly_destructed_objects () at simulate.c:2463
+#7  0x8056e5e in cleanup_stuff () at backend.c:339
+#8  0x80547ec in backend () at backend.c:412
+#9  0x80ad052 in main (argc=9, argv=0xbffffa8c) at main.c:428
+#10 0x400d8baf in __libc_start_main () from /lib/libc.so.6
+
+debug log:
+
+2002.02.19 23:54:50 xfree: block a04b74c size 92 (user a04b768) freed
+twice
+2002.02.19 23:54:50 Dump of the call chain:
+No program to trace.
+
+stdout:
+secure/simul_efun/simul_efun secure/simul_efun/simul_efun.c (living.inc)
+line 51
+8a06005:  27        0 local                      (0: 42)        line 51
+8a06007:  36        6 &&                         (1: 43)
+8a06009:  27        0 local                      (0: 42)
+8a0600b: 218          strlen                     (1: 43)
+8a0600c:  16        2 clit                       (1: 43)
+8a0600e:  45          >                          (2: 44)
+8a0600f:  36        8 &&                         (1: 43)
+8a06011:  27        0 local                      (0: 42)
+8a06013:  14          const1                     (1: 43)
+8a06014:  14          const1                     (2: 44)
+8a06015:  62          <..<                       (3: 45)
+8a06016:   7        0 cstring0                   (1: 43)
+8a06018:  49          ==                         (2: 44)
+8a06019:  84          branch_when_zero           (1: 43)
+8a06059:  27        2 local                      (0: 42)        line 68
+8a0605b: 189          pointerp                   (1: 43)
+8a0605c:  84          branch_when_zero           (1: 43)
+8a060fa:  27        4 local                      (0: 42)        line 99
+8a060fc:  36          &&                         (1: 43)
+8a06104:  36          &&                         (1: 43)
+8a0610c:  36    -7167 &&                         (1: 43)
+8a0610f:  84          branch_when_zero           (1: 43)
+8a06128:  27        2 local                      (0: 42)        line 105
+8a0612a:  36          &&                         (1: 43)
+8a06130:  36          &&                         (1: 43)
+8a06134:  21          return                     (1: 43)
+secure/simul_efun/simul_efun secure/simul_efun/simul_efun.c (util.inc)
+line 137
+8a06951:  95        0 push_local_variable_lvalue (1: 37)        line 137
+8a06953:  39          (void)=                    (2: 38)
+8a06954:  27        0 local                      (0: 36)        line 139
+8a06956: 186          objectp                    (1: 37)
+8a06957:  85        1 branch_when_non_zero       (1: 37)
+8a06959:  22          return0                    (0: 36)        line 141
+secure/master secure/master.c (/secure/master/check_level.inc) line 24
+8249598:   7        9 cstring0                   (1: 34)        line 24
+824959a:  40          +                          (2: 35)
+824959b:  21          return                     (1: 34)
+secure/master secure/master.c (/secure/master/valid_read.inc) line 103
+824b38c:   7       11 cstring0                   (1: 33)        line 103
+824b38e:  49          ==                         (2: 34)
+824b38f:  37        5 ||                         (1: 33)
+824b391:  27        1 local                      (0: 32)        line 104
+824b393:   7       58 cstring0                   (1: 33)
+824b395:  49          ==                         (2: 34)
+824b396:  84          branch_when_zero           (1: 33)
+824b3ad:  27        0 local                      (0: 32)        line 112
+824b3af:   8       48 cstring1                   (1: 33)
+824b3b1:  13          const0                     (2: 34)
+824b3b2: 310       54 strstr                     (3: 35)
+824b3b4:  85          branch_when_non_zero       (1: 33)
+824b3ce:  27        0 local                      (0: 32)        line 123
+824b3d0:   8       51 cstring1                   (1: 33)
+824b3d2:  13          const0                     (2: 34)
+824b3d3: 310       54 strstr                     (3: 35)
+824b3d5:  58          !                          (1: 33)
+824b3d6:  36          &&                         (1: 33)
+824b3dd:  84     5633 branch_when_zero           (1: 33)
+824b3e0:  27        0 local                      (0: 32)        line 128
+824b3e2:   8       52 cstring1                   (1: 33)
+824b3e4:  13          const0                     (2: 34)
+824b3e5: 310       54 strstr                     (3: 35)
+824b3e7:  58          !                          (1: 33)
+824b3e8:  36          &&                         (1: 33)
+824b3ef:  84     5633 branch_when_zero           (1: 33)
+824b3f2:  27        0 local                      (0: 32)        line 133
+824b3f4:   8       53 cstring1                   (1: 33)
+824b3f6:  13          const0                     (2: 34)
+824b3f7: 310       54 strstr                     (3: 35)
+824b3f9:  58          !                          (1: 33)
+824b3fa:  36          &&                         (1: 33)
+824b401:  84     5633 branch_when_zero           (1: 33)
+824b404:  27        0 local                      (0: 32)        line 137
+824b406:   8       54 cstring1                   (1: 33)
+824b408:  13          const0                     (2: 34)
+824b409: 310       54 strstr                     (3: 35)
+824b40b:  58          !                          (1: 33)
+824b40c:  36          &&                         (1: 33)
+824b413:  84     5633 branch_when_zero           (1: 33)
+824b416:  27        0 local                      (0: 32)        line 141
+824b418:   8       55 cstring1                   (1: 33)
+824b41a:  13          const0                     (2: 34)
+824b41b: 310       54 strstr                     (3: 35)
+824b41d:  85          branch_when_non_zero       (1: 33)
+824b44d:  14          const1                     (0: 32)        line 152
+824b44e:  21          return                     (1: 33)
+obj/player#62562 i/player/more.c line 158
+8a0ee40:  95        1 push_local_variable_lvalue (1: 23)        line 158
+8a0ee42:  39          (void)=                    (2: 24)
+8a0ee43:  27        1 local                      (0: 22)        line 160
+8a0ee45:  36       15 &&                         (1: 23)
+8a0ee47:  27        1 local                      (0: 22)
+8a0ee49:   7        5 cstring0                   (1: 23)
+8a0ee4b: 148          explode                    (2: 24)
+8a0ee4c: 214          sizeof                     (1: 23)
+8a0ee4d:  95        2 push_local_variable_lvalue (1: 23)
+8a0ee4f:  38          =                          (2: 24)
+8a0ee50:  11      513 number                     (1: 23)
+8a0ee55:  47          <                          (2: 24)
+8a0ee56:  84        5 branch_when_zero           (1: 23)
+8a0ee58:  27        2 local                      (0: 22)        line 162
+8a0ee5a:  14          const1                     (1: 23)
+8a0ee5b:  41          -                          (2: 24)
+8a0ee5c:  21          return                     (1: 23)
+8a0f0e9:  90        6 push_identifier_lvalue     (1: 18)        line 375
+8a0f0eb:  39          (void)=                    (2: 19)
+8a0f0ec:  27        2 local                      (0: 17)        line 377
+8a0f0ee:   5        6 identifier                 (1: 18)
+8a0f0f0:  45          >                          (2: 19)
+8a0f0f1:  84          branch_when_zero           (1: 18)
+8a0f0ff:  27        2 local                      (0: 17)        line 380
+8a0f101:  14          const1                     (1: 18)
+8a0f102:  41          -                          (2: 19)
+8a0f103:  90        5 push_identifier_lvalue     (1: 18)
+8a0f105:  65          (void)+=                   (2: 19)
+8a0f106:  83          branch                     (0: 17)        line 382
+8a0f134:  27        1 local                      (0: 17)        line 396
+8a0f136: 217          stringp                    (1: 18)
+8a0f137:  84        7 branch_when_zero           (1: 18)
+8a0f139:  27        1 local                      (0: 17)        line 397
+8a0f13b:  90        2 push_identifier_lvalue     (1: 18)
+8a0f13d:  39          (void)=                    (2: 19)
+8a0f13e:  83          branch                     (0: 17)        line 398
+8a0f145:  13          const0                     (0: 17)        line 401
+8a0f146:  90        1 push_identifier_lvalue     (1: 18)
+8a0f148:  39          (void)=                    (2: 19)
+8a0f149: 112          previous_object0           (0: 17)        line 409
+8a0f14a:  90        8 push_identifier_lvalue     (1: 18)
+8a0f14c:  39          (void)=                    (2: 19)
+8a0f14d:   5        7 identifier                 (0: 17)        line 412
+8a0f14f:  16       16 clit                       (1: 18)
+8a0f151:  52          &                          (2: 19)
+8a0f152:  36          &&                         (1: 18)
+8a0f159:  84          branch_when_zero           (1: 18)
+8a0f16d:   5        2 identifier                 (0: 17)        line 420
+8a0f16f: 418      162 process_string             (1: 18)
+8a0f171:   5        5 identifier                 (1: 18)
+8a0f173:   5        6 identifier                 (2: 19)
+8a0f175: 191        3 printf                     (3: 20)
+8a0f177:   7       22 cstring0                   (0: 17)        line 421
+8a0f179: 161        1 input_to                   (1: 18)
+8a0f17b:  77          pop_value                  (1: 18)
+8a0f17c:  22          return0                    (0: 17)        line 423
+obj/newsreader#62574 obj/newsreader.c line 1572
+8bd83d4:  77          pop_value                  (1: 11)        line
+1572
+8bd83d5:  14          const1                     (0: 10)
+8bd83d6:  21          return                     (1: 11)        line
+1574
+obj/player#62562 i/player/more.c line 194
+8a0eefe:  95        1 push_local_variable_lvalue (1:  5)        line 194
+8a0ef00:  39          (void)=                    (2:  6)
+8a0ef01:  27        1 local                      (0:  4)        line 196
+8a0ef03:  13          const0                     (1:  5)
+8a0ef04:  50          !=                         (2:  6)
+8a0ef05:  84        3 branch_when_zero           (1:  5)
+8a0ef07:  27        1 local                      (0:  4)        line 198
+8a0ef09:  21          return                     (1:  5)
+8a0efdc:  95        1 push_local_variable_lvalue (1:  2)        line 270
+8a0efde:  39          (void)=                    (2:  3)
+8a0efdf:  27        1 local                      (0:  1)        line 272
+8a0efe1:  16        2 clit                       (1:  2)
+8a0efe3:  49          ==                         (2:  3)
+8a0efe4:  84          branch_when_zero           (1:  2)
+8a0eff6:  27        1 local                      (0:  1)        line 280
+8a0eff8:  14          const1                     (1:  2)
+8a0eff9:  49          ==                         (2:  3)
+8a0effa:  84       18 branch_when_zero           (1:  2)
+8a0effc:   5        8 identifier                 (0:  1)        line 282
+8a0effe:  84       13 branch_when_zero           (1:  2)
+8a0f000:   5        8 identifier                 (0:  1)        line 283
+8a0f002:   7       23 cstring0                   (1:  2)
+8a0f004:  27        0 local                      (2:  3)
+8a0f006:   5        5 identifier                 (3:  4)
+8a0f008:   5        6 identifier                 (4:  5)
+8a0f00a: 128          call_other                 (5:  6)
+obj/newsreader#62574 obj/newsreader.c line 1544
+8bd8317:  27        0 local                      (0:  4)        line
+1544
+8bd8319:   7      142 cstring0                   (1:  5)
+8bd831b:  50          !=                         (2:  6)
+8bd831c:  36        5 &&                         (1:  5)
+8bd831e:  27        0 local                      (0:  4)
+8bd8320:   7      222 cstring0                   (1:  5)
+8bd8322:  50          !=                         (2:  6)
+8bd8323:  36        5 &&                         (1:  5)
+8bd8325:  27        0 local                      (0:  4)
+8bd8327:   7        5 cstring0                   (1:  5)
+8bd8329:  50          !=                         (2:  6)
+8bd832a:  36        5 &&                         (1:  5)
+8bd832c:  27        0 local                      (0:  4)
+8bd832e:   7      191 cstring0                   (1:  5)
+8bd8330:  50          !=                         (2:  6)
+8bd8331:  36        5 &&                         (1:  5)
+8bd8333:  27        0 local                      (0:  4)
+8bd8335:   7      196 cstring0                   (1:  5)
+8bd8337:  50          !=                         (2:  6)
+8bd8338:  36        5 &&                         (1:  5)
+8bd833a:  27        0 local                      (0:  4)
+8bd833c:   7      204 cstring0                   (1:  5)
+8bd833e:  50          !=                         (2:  6)
+8bd833f:  36        5 &&                         (1:  5)
+8bd8341:  27        0 local                      (0:  4)
+8bd8343:   7      166 cstring0                   (1:  5)
+8bd8345:  50          !=                         (2:  6)
+8bd8346:  36          &&                         (1:  5)
+8bd834d:  36          &&                         (1:  5)
+8bd8354:  84          branch_when_zero           (1:  5)
+8bd835d:  22          return0                    (0:  4)        line
+1546
+obj/player#62562 i/player/more.c line 283
+8a0f00c:  77          pop_value                  (1:  2)        line 283
+8a0f00d:  22          return0                    (0:  1)        line 285
+8a08ca7:  77  27   0 152  95   2  39  27
+No program to trace.
+2002.02.19 23:54:50 LDMud aborting on fatal error.
+
+----------
+
+Subject: Ups :) nochmal ...
+Date: Sat, 16 Feb 2002 02:37:52 +0100
+
+Also wie ich in meiner mail gerade schon schreiben wollte hatten wir den
+crash vom 12. nochmal ..  Diesmal hats aber im stdout und stderr noch
+was ausgegeben.. Ich hab auch versucht nochmal das rauszusuchen was du
+letzte mal wissen wolltest :)
+
+Gruss
+  Bastian
+
+Core:
+#0  0x80d7b12 in fatal (
+    fmt=0x8109420 "Object 0x%lx %s ref count 0, but not =
+destructed.\n")
+    at simulate.c:622
+622             *((char*)0) = 0/a;
+(gdb) bt
+#0  0x80d7b12 in fatal (
+    fmt=0x8109420 "Object 0x%lx %s ref count 0, but not =
+destructed.\n")
+    at simulate.c:622
+#1  0x80b65f5 in _free_object (ob=0xa79add4) at object.c:237
+#2  0x80b6a86 in free_prog (progp=0xaf6bc84, free_all=1) at =
+object.c:484
+#3  0x80b6667 in _free_object (ob=0xe54a120) at object.c:257
+#4  0x80da769 in remove_object (ob=0xe54a120) at simulate.c:2430
+#5  0x80da81c in handle_newly_destructed_objects () at simulate.c:2463
+#6  0x8056e3e in cleanup_stuff () at backend.c:339
+#7  0x8055314 in process_objects () at backend.c:934
+#8  0x8054dae in backend () at backend.c:637
+#9  0x80abe42 in main (argc=9, argv=0xbffffa8c) at main.c:428
+#10 0x400d8baf in __libc_start_main () from /lib/libc.so.6
+(gdb)
+
+(gdb) up
+#1  0x80b65f5 in _free_object (ob=0xa79add4) at object.c:237
+237             fatal("Object 0x%lx %s ref count 0, but not
+destructed.\n"
+(gdb) print *ob
+$1 = {flags = 5, ref = 0, total_light = 28787, time_reset = =
+151486464,
+  time_of_ref = 3, load_time = 261149656, load_id = 131074, =
+extra_ref =
+1,
+  prog = 0x50004, name = 0xc7aa160 "\002",
+  load_name = 0x4 <Address 0x4 out of bounds>, next_all = 0x9e9b20c,
+  prev_all = 0x3, next_hash = 0xfeccc70, next_inv = 0x3000000a,
+  contains = 0xe4ec1ac, super = 0x5, sent = 0x8a07dbb, user = =
+0x81038f0,
+  eff_user = 0x13d9, extra_num_variables = -1234715668, variables =
+=
+0x90cec8c,
+  ticks = 538976288, gigaticks = 3224608}
+(gdb) up
+#2  0x80b6a86 in free_prog (progp=0xaf6bc84, free_all=1) at =
+object.c:484
+484             free_object(blueprint, "free_prog");
+(gdb) print *progp
+$2 = {ref = 0, total_size = 2780, extra_ref = 0,
+  program = 0xaf6bcd8 "=B8=B1 \b\a",
+  name = 0xa72a7c4 "d/Taladon/tphei/chrihan/obj/rebobj/tliste.c",
+  blueprint = 0x0, id_number = 111841, load_time = 1013532237,
+  line_numbers = 0x0, function_names = 0xaf6bf80, functions = =
+0xaf6c0f8,
+  strings = 0xaf6c418, variable_names = 0xaf6c4e4, inherit = =
+0xaf6c73c,
+  flags = 0, heart_beat = -1, argument_types = 0x0, type_start = =
+0x0,
+  swap_num = 5377448, num_function_names = 187, num_functions = =
+200,
+  num_strings = 51, num_includes = 1, num_variables = 75, =
+num_inherited
+= 3}
+(gdb) up
+#3  0x80b6667 in _free_object (ob=0xe54a120) at object.c:257
+257             free_prog(prog, MY_TRUE);
+(gdb) print *ob
+$3 = {flags = 536, ref = 0, total_light = 0, time_reset = 0,
+  time_of_ref = 1013822072, load_time = 1013616773, load_id = 97,
+  extra_ref = 0, prog = 0xaf6bc84,
+  name = 0xce3e988 "d/Taladon/tphei/chrihan/obj/rebobj/tliste#47258",
+  load_name = 0x9a4fb18 "/d/Taladon/tphei/chrihan/obj/rebobj/tliste",
+  next_all = 0xef6ad44, prev_all = 0x0, next_hash = 0x0, next_inv =
+= 0x0,
+  contains = 0x0, super = 0x0, sent = 0x0, user = 0x9070520,
+  eff_user = 0x9070520, extra_num_variables = 75, variables = =
+0xaf84e30,
+  ticks = 202709, gigaticks = 0}
+
+Stderr:
+2002.02.16 01:56:14 [xerq] command: rlookup
+2002.02.16 01:56:14 [xerq] select()
+2002.02.16 02:14:34 Object 0xa79add4 =02 ref count 0, but not =
+destructed.
+2002.02.16 02:14:36 [xerq] select() returns 1, time() 1013822076
+[xerq] read: Success
+2002.02.16 02:14:36 [xerq] Demon exiting.
+
+Stdout:
+d/Sol/overlord/snob/npc/diener#154210 i/monster/communicate.c line 529
+8b54c13:  39          (void)=                    (2: 27)	line 529
+8b54c14:   7       31 cstring0                   (0: 25)	line 530
+8b54c16:  13          const0                     (1: 26)
+8b54c17:  27        1 local                      (2: 27)
+8b54c19: 129        3 call_out                   (3: 28)
+8b54c1b:  83          branch                     (0: 25)	line 532
+8b54c36:  22          return0                    (0: 25)	line 539
+obj/akaardianer#150916 i/player/tippse.c line 1899
+8a24453:  79      515 clear_locals               (0: 28)	line
+1899
+8a24456:  88          call_function_by_address   (0: 28)	line
+1900
+obj/akaardianer#150916 i/player/telnet.c line 313
+8a21b77:   5        9 identifier                 (0: 28)	line 313
+8a21b79:  84          branch_when_zero           (1: 29)
+8a21b84:  16       79 clit                       (0: 28)	line 314
+8a21b86:  21          return                     (1: 29)
+obj/akaardianer#150916 i/player/tippse.c line 1900
+8a2445a:  95        4 push_local_variable_lvalue (1: 29)	line
+1900
+8a2445c:  39          (void)=                    (2: 30)
+8a2445d:   5       48 identifier                 (0: 28)	line
+1902
+8a2445f:  84     5633 branch_when_zero           (1: 29)
+8a24462:  14          const1                     (0: 28)	line
+1903
+8a24463:  90       48 push_identifier_lvalue     (1: 29)
+8a24465:  39          (void)=                    (2: 30)
+8a24466: 146        0 environment                (0: 28)	line
+1904
+8a24468:  95        3 push_local_variable_lvalue (1: 29)
+8a2446a:  38          =                          (2: 30)
+8a2446b:  36       12 &&                         (1: 29)
+8a2446d:  27        3 local                      (0: 28)
+8a2446f:   7      251 cstring0                   (1: 29)
+8a24471:  27        0 local                      (2: 30)
+8a24473: 128          call_other                 (3: 31)
+d/Sol/overlord/kneipe/bar i/room/connect.c line 816
+8a14567:  79      257 clear_locals               (0: 32)	line 816
+8a1456a:   5        7 identifier                 (0: 32)	line 817
+8a1456c:  27        0 local                      (1: 33)
+8a1456e: 177          member                     (2: 34)
+8a1456f:  95        1 push_local_variable_lvalue (1: 33)
+8a14571:  38          =                          (2: 34)
+8a14572:  13          const0                     (1: 33)
+8a14573:  46          >=                         (2: 34)
+8a14574:  84        6 branch_when_zero           (1: 33)
+8a14576:   5        8 identifier                 (0: 32)	line 818
+8a14578:  27        1 local                      (1: 33)
+8a1457a: 100          index                      (2: 34)
+8a1457b:  21          return                     (1: 33)
+obj/akaardianer#150916 i/player/tippse.c line 1904
+8a24475:  95        3 push_local_variable_lvalue (1: 29)	line
+1904
+8a24477:  38          =                          (2: 30)
+8a24478: 176          mappingp                   (1: 29)
+8a24479:  36          &&                         (1: 29)	line
+1905
+8a24480:  84          branch_when_zero           (1: 29)
+8a244a3:  27        0 local                      (0: 28)	line
+1908
+8a244a5:  19       69 closure                    (1: 29)
+8a244a8:  27        4 local                      (2: 30)
+8a244aa:  27        1 local                      (3: 31)
+8a244ac: 224        4 terminal_colour            (4: 32)
+8a244ae:  95        0 push_local_variable_lvalue (1: 29)
+8a244b0:  39          (void)=                    (2: 30)
+8a244b1:   5        6 identifier                 (0: 28)	line
+1910
+8a244b3:  84          branch_when_zero           (1: 29)
+8a244dc:   5       44 identifier                 (0: 28)	line
+1916
+8a244de:  36        2 &&                         (1: 29)
+8a244e0:   5       49 identifier                 (0: 28)
+8a244e2:  36        2 &&                         (1: 29)
+8a244e4:   5       46 identifier                 (0: 28)
+8a244e6:  36          &&                         (1: 29)
+8a244f0:  36          &&                         (1: 29)
+8a244f7:  84          branch_when_zero           (1: 29)
+8a24506: 227          this_object                (0: 28)	line
+1921
+8a24507:  27        0 local                      (1: 29)
+8a24509: 222          tell_object                (2: 30)
+8a2450a:  13          const0                     (0: 28)	line
+1922
+8a2450b:  90       48 push_identifier_lvalue     (1: 29)
+8a2450d:  39          (void)=                    (2: 30)
+8a2450e:  22          return0                    (0: 28)	line
+1923
+d/Sol/overlord/kneipe/npc/kellner2 i/monster/communicate.c line 506
+8b54b9f:   5        6 identifier                 (0: 25)	line 506
+8b54ba1:  36        3 &&                         (1: 26)
+8b54ba3:  27        0 local                      (0: 25)	line 507
+8b54ba5: 217          stringp                    (1: 26)
+8b54ba6:  36        1 &&                         (1: 26)
+8b54ba8: 228          this_player                (0: 25)	line 508
+8b54ba9:  36       18 &&                         (1: 26)
+8b54bab:   5        2 identifier                 (0: 25)	line 509
+8b54bad:  58          !                          (1: 26)
+8b54bae:  37        4 ||                         (1: 26)
+8b54bb0:  88          call_function_by_address   (0: 25)	line 512
+8b54b77:  79      512 clear_locals               (0: 27)	line 495
+8b54b7a:  13          const0                     (0: 27)	line 497
+8b54b7b:  95        0 push_local_variable_lvalue (1: 28)
+8b54b7d:  39          (void)=                    (2: 29)
+8b54b7e:  83          branch                     (0: 27)	line 498
+8b54b89:  95        0 push_local_variable_lvalue (0: 27)
+8b54b8b:  32          x++                        (1: 28)
+8b54b8c: 297       41 previous_object            (1: 28)
+8b54b8e:  95        1 push_local_variable_lvalue (1: 28)
+8b54b90:  38          =                          (2: 29)
+8b54b91:  87          bbranch_when_non_zero      (1: 28)
+8b54b80:  27        1 local                      (0: 27)	line 499
+8b54b82: 108          simul_efun                 (1: 28)
+secure/simul_efun/simul_efun secure/simul_efun/simul_efun.c (util.inc)
+line 134
+8a05a1f:  79      257 clear_locals               (0: 29)	line 134
+8a05a22:  27        0 local                      (0: 29)	line 136
+8a05a24: 217          stringp                    (1: 30)
+8a05a25:  84          branch_when_zero           (1: 30)
+8a05a30:  27        0 local                      (0: 29)	line 139
+8a05a32: 186          objectp                    (1: 30)
+8a05a33:  85     5633 branch_when_non_zero       (1: 30)
+8a05a36:  27        0 local                      (0: 29)	line 143
+8a05a38: 185          object_name                (1: 30)
+8a05a39:   7       46 cstring0                   (1: 30)
+8a05a3b:  95        1 push_local_variable_lvalue (2: 31)
+8a05a3d:  25        3 sscanf                     (3: 32)
+8a05a3f:  14          const1                     (1: 30)
+8a05a40:  49          ==                         (2: 31)
+8a05a41:  37       11 ||                         (1: 30)
+8a05a43:  27        0 local                      (0: 29)	line 144
+8a05a45: 185          object_name                (1: 30)
+8a05a46:   7       47 cstring0                   (1: 30)
+8a05a48:  95        1 push_local_variable_lvalue (2: 31)
+8a05a4a:  25        3 sscanf                     (3: 32)
+8a05a4c:  14          const1                     (1: 30)
+8a05a4d:  49          ==                         (2: 31)
+8a05a4e:  37          ||                         (1: 30)
+8a05a5b:  37          ||                         (1: 30)	line 145
+8a05a68:  37          ||                         (1: 30)	line 146
+8a05a75:  37          ||                         (1: 30)	line 147
+8a05a82:  37          ||                         (1: 30)	line 148
+8a05a8f:  84        8 branch_when_zero           (1: 30)	line 149
+8a05a91:  27        0 local                      (0: 29)	line 150
+8a05a93:   7       53 cstring0                   (1: 30)
+8a05a95: 128          call_other                 (2: 31)
+obj/akaardianer#154167 i/player/login.c line 158
+8a1ee2f:   5        3 identifier                 (0: 31)	line 158
+8a1ee31:  21          return                     (1: 32)
+secure/simul_efun/simul_efun secure/simul_efun/simul_efun.c (util.inc)
+line 150
+8a05a97:  83     3329 branch                     (1: 30)	line 150
+8a05a9a:  21          return                     (1: 30)
+d/Sol/overlord/kneipe/npc/kellner2 i/monster/communicate.c line 499
+8b54b85:  84        2 branch_when_zero           (1: 28)	line 499
+8b54b87:  14          const1                     (0: 27)
+8b54b88:  21          return                     (1: 28)
+8b54bb4:  37          ||                         (1: 26)	line 512
+8b54bbd:  36       14 &&                         (1: 26)	line 514
+8b54bbf: 112          previous_object0           (0: 25)	line 515
+8b54bc0: 227          this_object                (1: 26)
+8b54bc1:  50          !=                         (2: 27)
+8b54bc2:  37          ||                         (1: 26)
+8b54bc9:  37          ||                         (1: 26)	line 516
+8b54bcd:  36        7 &&                         (1: 26)
+8b54bcf: 228          this_player                (0: 25)	line 517
+8b54bd0: 227          this_object                (1: 26)
+8b54bd1:  50          !=                         (2: 27)
+8b54bd2:  37          ||                         (1: 26)
+8b54bd6:  84       94 branch_when_zero           (1: 26)
+8b54bd8:  79      257 clear_locals               (0: 25)	line 519
+8b54bdb:  27        0 local                      (0: 25)	line 521
+8b54bdd:  19       10 closure                    (1: 26)
+8b54be0: 224        2 terminal_colour            (2: 27)
+8b54be2:  95        0 push_local_variable_lvalue (1: 26)
+8b54be4:  39          (void)=                    (2: 27)
+8b54be5: 228          this_player                (0: 25)	line 523
+8b54be6:   5       12 identifier                 (1: 26)
+8b54be8: 178          member_array               (2: 27)
+8b54be9:  95        1 push_local_variable_lvalue (1: 26)
+8b54beb:  38          =                          (2: 27)
+8b54bec:  13          const0                     (1: 26)
+8b54bed:  46          >=                         (2: 27)
+8b54bee:  84          branch_when_zero           (1: 26)
+8b54bfa:  13          const0                     (0: 25)	line 526
+8b54bfb:   5       11 identifier                 (1: 26)
+8b54bfd: 178          member_array               (2: 27)
+8b54bfe:  95        1 push_local_variable_lvalue (1: 26)
+8b54c00:  38          =                          (2: 27)
+8b54c01:  13          const0                     (1: 26)
+8b54c02:  46          >=                         (2: 27)
+8b54c03:  84       24 branch_when_zero           (1: 26)
+8b54c05: 228          this_player                (0: 25)	line 528
+8b54c06:  27        1 local                      (1: 26)
+8b54c08:  90       12 push_identifier_lvalue     (2: 27)
+8b54c0a:  98          index_lvalue               (3: 28)
+8b54c0b:  39          (void)=                    (2: 27)
+8b54c0c:  27        0 local                      (0: 25)	line 529
+8b54c0e:  27        1 local                      (1: 26)
+8b54c10:  90       11 push_identifier_lvalue     (2: 27)
+8b54c12:  98          index_lvalue               (3: 28)
+8b54c13:  39          (void)=                    (2: 27)
+8b54c14:   7       31 cstring0                   (0: 25)	line 530
+8b54c16:  13          const0                     (1: 26)
+8b54c17:  27        1 local                      (2: 27)
+8b54c19: 129        3 call_out                   (3: 28)
+8b54c1b:  83          branch                     (0: 25)	line 532
+8b54c36:  22          return0                    (0: 25)	line 539
+obj/akaardianer#154167 secure/simul_efun/simul_efun.c (communicate.inc)
+line 194
+8a0871b:  83          branch                     (0: 20)	line 194
+8a08723:  27        5 local                      (0: 20)	line 196
+8a08725: 212          set_this_object            (1: 21)
+secure/simul_efun/simul_efun secure/simul_efun/simul_efun.c
+(communicate.inc) line 198
+8a08726:  22          return0                    (0: 20)	line 198
+obj/akaardianer#154167 i/message.c line 44
+8a038ff:  77          pop_value                  (1: 14)	line 44
+8a03900:  22          return0                    (0: 13)	line 46
+d/Sol/knoerry/obj/tabakpfeife#154208 d/Sol/knoerry/obj/tabakpfeife.c
+line 370
+9ddd404:  77          pop_value                  (1:  9)	line 370
+9ddd405:  22          return0                    (0:  8)	line 371
+9ddd679:  77          pop_value                  (1:  9)	line 467
+9ddd67a:  23          break                      (0:  8)
+9ddd6b3:  23          break                      (0:  8)	line 472
+9ddd70d:   7       37 cstring0                   (0:  8)	line 485
+9ddd70f:  16       30 clit                       (1:  9)
+9ddd711:  95        0 push_local_variable_lvalue (2: 10)
+9ddd713:  34          ++x                        (3: 11)
+9ddd714: 129        3 call_out                   (3: 11)
+9ddd716:  22          return0                    (0:  8)	line 486
+b744c1a:  95   0  39   7   2  13   7   3
+No program to trace.
+2002.02.16 02:14:34 LDMud aborting on fatal error.
+****************************************\c
+****************************************
+
+----------
+Subject: Crash in 3.2.9-400
+Date: Tue, 12 Feb 2002 17:51:07 +0100
+
+
+Hmm.. Wir hatten im final heute wieder einen crash im final.. 
+Ich hab aber beim compilieren alle optimierungen weggelassen und
+offenbar hat das auch dem core file gutgetan:
+
+> Was war nochmal die letzte Version, die ihr vor  .400 verwendet 
+> hattet?
+
+Hmm.. Also davor haben wir den 389 benutzt... Aber der ist wohl auch
+oefter abgeschmiert, aber da waren die core files unbrauchbar... Davor
+lief ziemlich lange der 3.2.9-378 :)
+Hmm.. Eine GC lassen wir eigentlich nie laufen :) Weiss natuerlich nicht
+obs daran trotzdem liegen kann :)
+
+#0  0x4010bb0e in vfprintf () from /lib/libc.so.6
+(gdb) bt
+#0  0x4010bb0e in vfprintf () from /lib/libc.so.6
+#1  0x4010eaf9 in buffered_vfprintf () from /lib/libc.so.6
+#2  0x4010a17f in vfprintf () from /lib/libc.so.6
+#3  0x80d79ef in fatal (
+    fmt=0x8109420 "Object 0x%lx %s ref count 0, but not destructed.\n")
+    at simulate.c:591
+#4  0x80b65f5 in _free_object (ob=0xb0d9228) at object.c:237
+(gdb) print *ob
+$1 = {flags = 59072, ref = 0, total_light = 23592, time_reset =
+=
+1768058223, time_of_ref = 1769234798,
+  load_time = 1046244975, load_id = 2083072558, extra_ref = =
+2000444456,
+prog = 0x3e5c7361,
+  name = 0x3c5c2a2e <Address 0x3c5c2a2e out of bounds>,
+  load_name = 0x74736174 <Address 0x74736174 out of bounds>, next_all =
+=
+0x65666e65,
+  prev_all = 0x3e5c646c, next_hash = 0x7c292a2e, next_inv = =
+0x633c5c28,
+contains = 0x5c65646f,
+  super = 0x292a2e3e, sent = 0x3c5c287c, user = 0x64617473, =
+eff_user =
+0x72657674,
+  extra_num_variables = 1953259895, variables = 0x5c676e75, ticks =
+=
+690630206, gigaticks = 0}
+#5  0x80b6a86 in free_prog (progp=0xc328e9c, free_all=1) at object.c:484
+(gdb) print *progp
+$2 = {ref = 0, total_size = 1760, extra_ref = 0, program = =
+0xc328ef0 "=B8=B1
+\b\a",
+  name = 0x9b836d0 "d/Taladon/magix/labs/i/exit.c", blueprint = 0x0,
+id_number = 61704,
+  load_time = 1013519806, line_numbers = 0x0, function_names =
+0xc328f1c, functions = 0xc329070,
+  strings = 0xc329348, variable_names = 0xc329350, inherit = =
+0xc329570,
+flags = 0, heart_beat = -1,
+  argument_types = 0x0, type_start = 0x0, swap_num = 16567452,
+num_function_names = 170,
+  num_functions = 182, num_strings = 2, num_includes = 0, =
+num_variables
+= 68, num_inherited = 1}
+#6  0x80b6667 in _free_object (ob=0xd553b10) at object.c:257
+(gdb) print *ob
+$3 = {flags = 536, ref = 0, total_light = 1, time_reset = 0, =
+time_of_ref
+= 1013532136,
+  load_time = 1013527991, load_id = 5, extra_ref = 0, prog = =
+0xc328e9c,
+  name = 0xbecd7a8 "d/Taladon/magix/labs/room/z0y0x7",
+  load_name = 0xce9a9a4 "/d/Taladon/magix/labs/i/exit", next_all =
+0xea2995c, prev_all = 0x0,
+  next_hash = 0x0, next_inv = 0x0, contains = 0x0, super = 0x0, =
+sent =
+0x0, user = 0x96e0de0,
+  eff_user = 0x96e0de0, extra_num_variables = 68, variables = =
+0xa274ce4,
+ticks = 4928, gigaticks = 0}
+#7  0x80da769 in remove_object (ob=0xd553b10) at simulate.c:2430
+#8  0x80da81c in handle_newly_destructed_objects () at simulate.c:2463
+#9  0x8056e3e in cleanup_stuff () at backend.c:339
+#10 0x80547cc in backend () at backend.c:412
+#11 0x80abe42 in main (argc=9, argv=0xbffffa8c) at main.c:428
+#12 0x400d8baf in __libc_start_main () from /lib/libc.so.6
+
+In den logfiles taucht aber nichts mehr auf..
+
+dafire
+
+----------
+Date: Fri, 22 Feb 2002 05:54:01 +0000 (GMT)
+From: <pixie@loki.cgc.ns.ca>
+Subject: dev 404 driver
+
+
+Not sure if this will help in debugging dev 404, but here is the log file
+from a crash we had tonight.  This "init_room" is moving a cloud object
+around the mud that players can climb up on to (simple up add_action) to
+the cloud.  
+
+- Ron (Caper@PixieMud)
+
+2002.02.22 05:01:08 free_object: Object 'east' (ref -1, flags 0000007d) still has sentences.
+players/gabriel/init_room players/gabriel/init_room.c line 65
+33d040:   5       24 identifier                 (0: -1)	line 65
+33d042:  16       25 clit                       (1:  0)
+33d044:  49          ==                         (2:  1)
+33d045:  84          branch_when_zero           (1:  0)
+33d04c:   5       24 identifier                 (0: -1)	line 66
+33d04e:  16       26 clit                       (1:  0)
+33d050:  49          ==                         (2:  1)
+33d051:  84          branch_when_zero           (1:  0)
+33d058:   5       24 identifier                 (0: -1)	line 67
+33d05a:  16       27 clit                       (1:  0)
+33d05c:  49          ==                         (2:  1)
+33d05d:  84          branch_when_zero           (1:  0)
+33d064:   5       24 identifier                 (0: -1)	line 68
+33d066:  16       28 clit                       (1:  0)
+33d068:  49          ==                         (2:  1)
+33d069:  84          branch_when_zero           (1:  0)
+33d070:   5       24 identifier                 (0: -1)	line 69
+33d072:  16       29 clit                       (1:  0)
+33d074:  49          ==                         (2:  1)
+33d075:  84          branch_when_zero           (1:  0)
+33d07c:   5       24 identifier                 (0: -1)	line 70
+33d07e:  16       30 clit                       (1:  0)
+33d080:  49          ==                         (2:  1)
+33d081:  84          branch_when_zero           (1:  0)
+33d088:   5       24 identifier                 (0: -1)	line 71
+33d08a:  16       31 clit                       (1:  0)
+33d08c:  49          ==                         (2:  1)
+33d08d:  84          branch_when_zero           (1:  0)
+33d094:   5       24 identifier                 (0: -1)	line 72
+33d096:  16       32 clit                       (1:  0)
+33d098:  49          ==                         (2:  1)
+33d099:  84          branch_when_zero           (1:  0)
+33d0a0:   5       24 identifier                 (0: -1)	line 73
+33d0a2:  16       23 clit                       (1:  0)
+33d0a4:  49          ==                         (2:  1)
+33d0a5:  84          branch_when_zero           (1:  0)
+33d0ac:   5       24 identifier                 (0: -1)	line 74
+33d0ae:  16       34 clit                       (1:  0)
+33d0b0:  49          ==                         (2:  1)
+33d0b1:  84          branch_when_zero           (1:  0)
+33d0b8:   5       24 identifier                 (0: -1)	line 76
+33d0ba:  16       35 clit                       (1:  0)
+33d0bc:  49          ==                         (2:  1)
+33d0bd:  84          branch_when_zero           (1:  0)
+33d0c4:   5       24 identifier                 (0: -1)	line 77
+33d0c6:  16       36 clit                       (1:  0)
+33d0c8:  49          ==                         (2:  1)
+33d0c9:  84          branch_when_zero           (1:  0)
+33d0d0:   5       24 identifier                 (0: -1)	line 78
+33d0d2:  16       37 clit                       (1:  0)
+33d0d4:  49          ==                         (2:  1)
+33d0d5:  84          branch_when_zero           (1:  0)
+33d0dc:   5       24 identifier                 (0: -1)	line 79
+33d0de:  16       38 clit                       (1:  0)
+33d0e0:  49          ==                         (2:  1)
+33d0e1:  84          branch_when_zero           (1:  0)
+33d0e8:   5       23 identifier                 (0: -1)	line 80
+33d0ea:  85          branch_when_non_zero       (1:  0)
+33d0f2:   5       23 identifier                 (0: -1)	line 82
+33d0f4: 146        1 environment                (1:  0)
+33d0f6:  84        8 branch_when_zero           (1:  0)
+33d0f8:   5       23 identifier                 (0: -1)	line 83
+33d0fa: 146        1 environment                (1:  0)
+33d0fc:   7       30 cstring0                   (1:  0)
+33d0fe: 222        2 tell_room                  (2:  1)
+33d100:   5       23 identifier                 (0: -1)	line 85
+33d102:   5       25 identifier                 (1:  0)
+33d104: 108          simul_efun                 (2:  1)
+kernel/simul_efun kernel/simul_efun.c line 818
+2cf783:  27        1 local                      (0:  1)	line 818
+2cf785:  84        6 branch_when_zero           (1:  2)
+2cf787:  27        0 local                      (0:  1)	line 819
+2cf789:  27        1 local                      (1:  2)
+2cf78b: 180          move_object                (2:  3)
+kernel/simul_efun <lambda ?> line 0
+300c6b: 113        0 lambda_cconstant           (0:  5)	line 0
+300c6d:  27        0 local                      (1:  6)
+300c6f:  27        1 local                      (2:  7)
+300c71: 155          funcall                    (3:  8)
+kernel/master kernel/master.c line 110
+1f1e27:  79      514 clear_locals               (0: 10)	line 110
+1f1e2a:  27        0 local                      (0: 10)	line 113
+1f1e2c: 168          living                     (1: 11)
+1f1e2d:  36          &&                         (1: 11)
+1f1e33:  84          branch_when_zero           (1: 11)
+1f1e44:  27        0 local                      (0: 10)	line 118
+1f1e46:  27        1 local                      (1: 11)
+1f1e48: 430      174 set_environment            (2: 12)
+1f1e4a:  27        0 local                      (0: 10)	line 119
+1f1e4c: 168          living                     (1: 11)
+1f1e4d:  84          branch_when_zero           (1: 11)
+1f1e70:  27        1 local                      (0: 10)	line 127
+1f1e72: 121          all_inventory              (1: 11)
+1f1e73:  95        2 push_local_variable_lvalue (1: 11)
+1f1e75:  39          (void)=                    (2: 12)
+1f1e76:  13          const0                     (0: 10)	line 128
+1f1e77:  27        2 local                      (1: 11)
+1f1e79:  27        0 local                      (2: 12)
+1f1e7b: 176          member                     (3: 13)
+1f1e7c:  95        2 push_local_variable_lvalue (2: 12)
+1f1e7e:  98          index_lvalue               (3: 13)
+1f1e7f:  39          (void)=                    (2: 12)
+1f1e80:  13          const0                     (0: 10)	line 129
+1f1e81:  95        3 push_local_variable_lvalue (1: 11)
+1f1e83:  39          (void)=                    (2: 12)
+1f1e84:  83          branch                     (0: 10)
+1f1eb0:  27        3 local                      (0: 10)
+1f1eb2:  27        2 local                      (1: 11)
+1f1eb4: 213          sizeof                     (2: 12)
+1f1eb5:  47          <                          (2: 12)
+1f1eb6:  87          bbranch_when_non_zero      (1: 11)
+1f1e86:  27        2 local                      (0: 10)	line 131
+1f1e88:  27        3 local                      (1: 11)
+1f1e8a: 100          index                      (2: 12)
+1f1e8b: 168          living                     (1: 11)
+1f1e8c:  84          branch_when_zero           (1: 11)
+1f1e9c:  27        0 local                      (0: 10)	line 135
+1f1e9e:  85          branch_when_non_zero       (1: 11)
+1f1ead:  95        3 push_local_variable_lvalue (0: 10)	line 129
+1f1eaf:  30          ++                         (1: 11)
+1f1eb0:  27        3 local                      (0: 10)
+1f1eb2:  27        2 local                      (1: 11)
+1f1eb4: 213          sizeof                     (2: 12)
+1f1eb5:  47          <                          (2: 12)
+1f1eb6:  87          bbranch_when_non_zero      (1: 11)
+1f1e86:  27        2 local                      (0: 10)	line 131
+1f1e88:  27        3 local                      (1: 11)
+1f1e8a: 100          index                      (2: 12)
+1f1e8b: 168          living                     (1: 11)
+1f1e8c:  84          branch_when_zero           (1: 11)
+1f1e9c:  27        0 local                      (0: 10)	line 135
+1f1e9e:  85          branch_when_non_zero       (1: 11)
+1f1ead:  95        3 push_local_variable_lvalue (0: 10)	line 129
+1f1eaf:  30          ++                         (1: 11)
+1f1eb0:  27        3 local                      (0: 10)
+1f1eb2:  27        2 local                      (1: 11)
+1f1eb4: 213          sizeof                     (2: 12)
+1f1eb5:  47          <                          (2: 12)
+1f1eb6:  87          bbranch_when_non_zero      (1: 11)
+1f1e86:  27        2 local                      (0: 10)	line 131
+1f1e88:  27        3 local                      (1: 11)
+1f1e8a: 100          index                      (2: 12)
+1f1e8b: 168          living                     (1: 11)
+1f1e8c:  84          branch_when_zero           (1: 11)
+1f1e9c:  27        0 local                      (0: 10)	line 135
+1f1e9e:  85          branch_when_non_zero       (1: 11)
+1f1ead:  95        3 push_local_variable_lvalue (0: 10)	line 129
+1f1eaf:  30          ++                         (1: 11)
+1f1eb0:  27        3 local                      (0: 10)
+1f1eb2:  27        2 local                      (1: 11)
+1f1eb4: 213          sizeof                     (2: 12)
+1f1eb5:  47          <                          (2: 12)
+1f1eb6:  87          bbranch_when_non_zero      (1: 11)
+1f1e86:  27        2 local                      (0: 10)	line 131
+1f1e88:  27        3 local                      (1: 11)
+1f1e8a: 100          index                      (2: 12)
+1f1e8b: 168          living                     (1: 11)
+1f1e8c:  84          branch_when_zero           (1: 11)
+1f1e9c:  27        0 local                      (0: 10)	line 135
+1f1e9e:  85          branch_when_non_zero       (1: 11)
+1f1ead:  95        3 push_local_variable_lvalue (0: 10)	line 129
+1f1eaf:  30          ++                         (1: 11)
+1f1eb0:  27        3 local                      (0: 10)
+1f1eb2:  27        2 local                      (1: 11)
+1f1eb4: 213          sizeof                     (2: 12)
+1f1eb5:  47          <                          (2: 12)
+1f1eb6:  87          bbranch_when_non_zero      (1: 11)
+1f1e86:  27        2 local                      (0: 10)	line 131
+1f1e88:  27        3 local                      (1: 11)
+1f1e8a: 100          index                      (2: 12)
+1f1e8b: 168          living                     (1: 11)
+1f1e8c:  84          branch_when_zero           (1: 11)
+1f1e9c:  27        0 local                      (0: 10)	line 135
+1f1e9e:  85          branch_when_non_zero       (1: 11)
+1f1ead:  95        3 push_local_variable_lvalue (0: 10)	line 129
+1f1eaf:  30          ++                         (1: 11)
+1f1eb0:  27        3 local                      (0: 10)
+1f1eb2:  27        2 local                      (1: 11)
+1f1eb4: 213          sizeof                     (2: 12)
+1f1eb5:  47          <                          (2: 12)
+1f1eb6:  87       49 bbranch_when_non_zero      (1: 11)
+1f1eb8:  27        0 local                      (0: 10)	line 138
+1f1eba: 168          living                     (1: 11)
+1f1ebb:  84          branch_when_zero           (1: 11)
+1f1ec9:  27        1 local                      (0: 10)	line 142
+1f1ecb: 168          living                     (1: 11)
+1f1ecc:  36          &&                         (1: 11)
+1f1ed0:  84          branch_when_zero           (1: 11)
+1f1edd:  22          return0                    (0: 10)	line 146
+kernel/simul_efun <lambda ?> line 0
+300c73:  21          return                     (1:  6)	line 0
+kernel/simul_efun kernel/simul_efun.c line 819
+2cf78c:  22          return0                    (0:  1)	line 819
+players/gabriel/init_room players/gabriel/init_room.c line 85
+33d107:  77          pop_value                  (1:  0)	line 85
+33d108:   5       23 identifier                 (0: -1)	line 86
+33d10a: 146        1 environment                (1:  0)
+33d10c:   7       31 cstring0                   (1:  0)
+33d10e: 222        2 tell_room                  (2:  1)
+33d110:  14          const1                     (0: -1)	line 87
+33d111:  90       24 push_identifier_lvalue     (1:  0)
+33d113:  65          (void)+=                   (2:  1)
+33d114:   7        0 cstring0                   (0: -1)	line 88
+33d116:  16       30 clit                       (1:  0)
+33d118: 128        2 call_out                   (2:  1)
+33d11a:  22          return0                    (0: -1)	line 89
+36aaf3:  95   0  39 226   7  10 127   2
+No program to trace.
+2002.02.22 05:01:08 LDMud aborting on fatal error.
+2002.02.22 05:01:10 [erq] read: EOF
+2002.02.22 05:01:10 [erq] Read 0, should be 9!
+2002.02.22 05:01:10 [erq] Giving up.
+Exit status:  136
+
+
+Here is line 80-90 in ~gabriel/init_room.c
+
+     80   if (!cloud) $
+     81    this_object()->reset();$
+     82   if (environment(cloud)) $
+     83   tell_room(environment(cloud),"A cloud floats away.\n");$
+     84 $
+     85  move_object(cloud,GO);$
+     86  tell_room(environment(cloud),"A cloud floats into view.\n");$
+     87  count += 1;$
+     88  call_out("move_cloud",30);$
+     89  return;
+
+"GO" is simple the next destination along the clouds route.
+
+
+And here is the function refered to in simul_efun:
+
+    817 varargs void move_object(object ob, mixed dest) {$
+    818   if(dest)$
+    819     return efun::move_object(ob, dest);$
+    820   return efun::move_object(ob, previous_object());$
+    821 }$
+    822 $
+
+
+
+----------
+Date: Fri, 25 Jan 2002 15:01:58 +0100 (MET)
+From: Erzmagier des Wunderlandes <mud@hurrikap.rz.uni-leipzig.de>
+Subject: Ldmud: crash
+
+Hallo Mateese!
+
+Hmm, der 389 scheint nix zu taugen, zumindest bei uns nicht. Den Fehler
+hatte ich dir ja schon berichtet, er ist jetzt insgesamt drei Mal
+aufgetreten. Und zwar:
+
+2002.01.18 12:03:47 LDMud 3.2.9-dev.389 (3-2-dev.389) (crash)
+2002.01.22 05:24:33 LDMud 3.2.9-dev.389 (3-2-dev.389) (crash)
+2002.01.23 17:54:53 LDMud 3.2.9-dev.389 (3-2-dev.389) (crash)
+2002.01.25 06:21:41 LDMud 3.2.9-dev.389 (3-2-dev.389) (dann eben gekillt)
+
+Wir laufen jetzt wieder mit einem 386, der funktionierte wenn ich mich
+recht erinnere naemlich ganz gut.
+
+Die Logs vom letzten mal:
+  2002.01.25 06:21:40 Tried to free an object with sentences.
+  [xerq] read: Resource temporarily unavailable
+  2002.01.25 06:21:41 [xerq] Demon exiting.
+
+  ]]^A]]^A]Time out
+  No program to trace.
+  2002.01.25 06:21:40 LDMud aborting on fatal error.
+
+  2002.01.25 04:05:14 Error in process_objects().
+  2002.01.25 06:21:40 Tried to free an object with sentences.
+  2002.01.25 06:21:40 Dump of the call chain:
+  No program to trace.
+
+Ich habe ueberlegt ob ich den 390 ausprobieren sollte, dort sind ja auch
+Fehler behoben; nur die Spieler bei uns sind gerade nicht in der Stimmung
+irgendetwas auszuprobieren.
+
+Ich weiss, kein DEBUG und kein coredump, nicht wirklich etwas wo man was
+mit anfangen koennte. Naja. Auf jeden Fall nen schoenes Wochenende,
+
+> Welche Version hattet ihr davor?
+Fuer wirklich lange einen 277 (Laufzeit endete als wir auf einen neuen
+Rechner umziehen mussten), dann fuer ne Woche oder so (ich weiss nicht
+mehr wie lange wirklich) einen 385 (Laufzeit endete als ich die Simuls
+zerstoert hatte). Dann hatte ich den 389 gemacht.
+
+----------
+Subject: Crash 389 :)
+Date: Sat, 26 Jan 2002 18:02:01 +0100
+
+Der 3-2.389 ist heute gecrashed... Im debug log sieht man :
+
+2002.01.26 14:26:32 xfree: block b5fdbe4 size 92 (user b5fdc00) freed
+twice
+2002.01.26 14:26:32 Dump of the call chain:
+No program to trace.
+
+Strerr:
+
+2002.01.26 14:26:32 xfree: block b5fdbe4 size 92 (user b5fdc00) freed
+twice
+2002.01.26 14:26:33 [xerq] select() returns 1, time() 1012051593
+[xerq] read: Success
+2002.01.26 14:26:33 [xerq] Demon exiting.
+
+Stdout
+
+MCCP NEG (85) STATE (5)
+obj/mensch#529461 i/player/tippse.c line 1900
+f09e006:  86          call_function_by_address   (0: 44)	line
+1900
+obj/mensch#529461 i/player/telnet.c line 297
+ef3c493:   5        9 identifier                 (0: 44)	line 297
+ef3c495:  82          branch_when_zero           (1: 45)
+ef3c4a0:  14       79 clit                       (0: 44)	line 298
+ef3c4a2:  19          return                     (1: 45)
+obj/mensch#529461 i/player/tippse.c line 1900
+f09e00a:  93        4 push_local_variable_lvalue (1: 45)	line
+1900
+f09e00c:  37          (void)=                    (2: 46)
+f09e00d:   5       48 identifier                 (0: 44)	line
+1902
+f09e00f:  82     5121 branch_when_zero           (1: 45)
+f09e012:  13          const1                     (0: 44)	line
+1903
+f09e013:  88       48 push_identifier_lvalue     (1: 45)
+f09e015:  37          (void)=                    (2: 46)
+f09e016: 144        0 environment                (0: 44)	line
+1904
+f09e018:  93        3 push_local_variable_lvalue (1: 45)
+f09e01a:  36          =                          (2: 46)
+f09e01b:  34       12 &&                         (1: 45)
+f09e01d:  25        3 local                      (0: 44)
+f09e01f:   7      251 cstring0                   (1: 45)
+f09e021:  25        0 local                      (2: 46)
+f09e023: 126          call_other                 (3: 47)
+d/Quornitum/imar/univers/planets/taladon i/room/connect.c line 816
+89ee51f:  77      257 clear_locals               (0: 48)	line 816
+89ee522:   5        7 identifier                 (0: 48)	line 817
+89ee524:  25        0 local                      (1: 49)
+89ee526: 175          member                     (2: 50)
+89ee527:  93        1 push_local_variable_lvalue (1: 49)
+89ee529:  36          =                          (2: 50)
+89ee52a:  12          const0                     (1: 49)
+89ee52b:  44          >=                         (2: 50)
+89ee52c:  82          branch_when_zero           (1: 49)
+89ee534:  20          return0                    (0: 48)	line 819
+obj/mensch#529461 i/player/tippse.c line 1904
+f09e025:  93        3 push_local_variable_lvalue (1: 45)	line
+1904
+f09e027:  36          =                          (2: 46)
+f09e028: 174          mappingp                   (1: 45)
+f09e029:  34          &&                         (1: 45)	line
+1905
+f09e030:  82          branch_when_zero           (1: 45)
+f09e053:  25        0 local                      (0: 44)	line
+1908
+f09e055:  17       69 closure                    (1: 45)
+f09e058:  25        4 local                      (2: 46)
+f09e05a:  25        1 local                      (3: 47)
+f09e05c: 222        4 terminal_colour            (4: 48)
+f09e05e:  93        0 push_local_variable_lvalue (1: 45)
+f09e060:  37          (void)=                    (2: 46)
+f09e061:   5        6 identifier                 (0: 44)	line
+1910
+f09e063:  82          branch_when_zero           (1: 45)
+f09e08c:   5       44 identifier                 (0: 44)	line
+1916
+f09e08e:  34        2 &&                         (1: 45)
+f09e090:   5       49 identifier                 (0: 44)
+f09e092:  34        2 &&                         (1: 45)
+f09e094:   5       46 identifier                 (0: 44)
+f09e096:  34        8 &&                         (1: 45)
+f09e098:  25        0 local                      (0: 44)
+f09e09a:  12          const0                     (1: 45)
+f09e09b:  12          const0                     (2: 46)
+f09e09c:  57          ..                         (3: 47)
+f09e09d:   7       76 cstring0                   (1: 45)
+f09e09f:  48          !=                         (2: 46)
+f09e0a0:  34          &&                         (1: 45)
+f09e0a7:  82          branch_when_zero           (1: 45)
+f09e0b6: 225          this_object                (0: 44)	line
+1921
+f09e0b7:  25        0 local                      (1: 45)
+f09e0b9: 220          tell_object                (2: 46)
+f09e0ba:  12          const0                     (0: 44)	line
+1922
+f09e0bb:  88       48 push_identifier_lvalue     (1: 45)
+f09e0bd:  37          (void)=                    (2: 46)
+f09e0be:  20          return0                    (0: 44)	line
+1923
+d/Quornitum/imar/univers/werft/datenbank#85963 i/object/menue.c line
+1380
+900f603:  20          return0                    (0: 37)	line
+1380
+900fa10:  93        1 push_local_variable_lvalue (1: 12)	line
+1652
+900fa12:  37          (void)=                    (2: 13)
+900fa13:  21          break                      (0: 11)	line
+1653
+900fa1d:  25        1 local                      (0: 11)	line
+1657
+900fa1f:  13          const1                     (1: 12)
+900fa20:  47          ==                         (2: 13)
+900fa21:  82     5121 branch_when_zero           (1: 12)
+900fa24:  86          call_function_by_address   (0: 11)	line
+1660
+900f60f:  77      512 clear_locals               (0: 13)	line
+1385
+900f612:   5       14 identifier                 (0: 13)	line
+1388
+900f614:  82          branch_when_zero           (1: 14)
+900f623:   7       81 cstring0                   (0: 13)	line
+1391
+900f625:   5        8 identifier                 (1: 14)
+900f627:  38          +                          (2: 15)
+900f628:   7       82 cstring0                   (1: 14)
+900f62a:  38          +                          (2: 15)
+900f62b:  93        0 push_local_variable_lvalue (1: 14)
+900f62d:  37          (void)=                    (2: 15)
+900f62e:   5       10 identifier                 (0: 13)	line
+1393
+900f630: 106          simul_efun                 (1: 14)
+secure/simul_efun/simul_efun secure/simul_efun/simul_efun.c (living.inc)
+line 46
+89e641b:  77     1281 clear_locals               (0: 19)	line 46
+89e641e:   5       36 identifier                 (0: 19)	line 51
+89e6420:  25        0 local                      (1: 20)
+89e6422:  98          index                      (2: 21)
+89e6423:  93        2 push_local_variable_lvalue (1: 20)
+89e6425:  36          =                          (2: 21)
+89e6426:  56          !                          (1: 20)
+89e6427:  34          &&                         (1: 20)
+89e642b:  34          &&                         (1: 20)
+89e6433:  34          &&                         (1: 20)
+89e643d:  82          branch_when_zero           (1: 20)
+89e647e:  25        2 local                      (0: 19)	line 68
+89e6480: 187          pointerp                   (1: 20)
+89e6481:  82          branch_when_zero           (1: 20)
+89e651f:  25        4 local                      (0: 19)	line 99
+89e6521:  34          &&                         (1: 20)
+89e6529:  34          &&                         (1: 20)
+89e6531:  34    -7679 &&                         (1: 20)
+89e6534:  82          branch_when_zero           (1: 20)
+89e654d:  25        2 local                      (0: 19)	line 105
+89e654f:  34        4 &&                         (1: 20)
+89e6551:  25        2 local                      (0: 19)
+89e6553: 304       48 query_once_interactive     (1: 20)
+89e6555:  34        2 &&                         (1: 20)
+89e6557:  25        2 local                      (0: 19)
+89e6559:  19          return                     (1: 20)
+d/Quornitum/imar/univers/werft/datenbank#85963 i/object/menue.c line
+1393
+900f632:  93        1 push_local_variable_lvalue (1: 14)	line
+1393
+900f634:  36          =                          (2: 15)
+900f635:  83          branch_when_non_zero       (1: 14)
+900f63c:  25        1 local                      (0: 13)	line
+1398
+900f63e:   7       83 cstring0                   (1: 14)
+900f640: 126          call_other                 (2: 15)
+obj/mensch#529461 i/player/tippse.c line 1830
+f09decb:  12          const0                     (0: 15)	line
+1830
+f09decc:  88       46 push_identifier_lvalue     (1: 16)
+f09dece:  37          (void)=                    (2: 17)
+f09decf:  20          return0                    (0: 15)
+d/Quornitum/imar/univers/werft/datenbank#85963 i/object/menue.c line
+1398
+900f642:  75          pop_value                  (1: 14)	line
+1398
+900f643:  25        1 local                      (0: 13)	line
+1399
+900f645:  25        0 local                      (1: 14)
+900f647: 220          tell_object                (2: 15)
+obj/mensch#529461 i/player/tippse.c line 1899
+f09e003:  77      515 clear_locals               (0: 20)	line
+1899
+f09e006:  86          call_function_by_address   (0: 20)	line
+1900
+obj/mensch#529461 i/player/telnet.c line 297
+ef3c493:   5        9 identifier                 (0: 20)	line 297
+ef3c495:  82          branch_when_zero           (1: 21)
+ef3c4a0:  14       79 clit                       (0: 20)	line 298
+ef3c4a2:  19          return                     (1: 21)
+obj/mensch#529461 i/player/tippse.c line 1900
+f09e00a:  93        4 push_local_variable_lvalue (1: 21)	line
+1900
+f09e00c:  37          (void)=                    (2: 22)
+f09e00d:   5       48 identifier                 (0: 20)	line
+1902
+f09e00f:  82     5121 branch_when_zero           (1: 21)
+f09e012:  13          const1                     (0: 20)	line
+1903
+f09e013:  88       48 push_identifier_lvalue     (1: 21)
+f09e015:  37          (void)=                    (2: 22)
+f09e016: 144        0 environment                (0: 20)	line
+1904
+f09e018:  93        3 push_local_variable_lvalue (1: 21)
+f09e01a:  36          =                          (2: 22)
+f09e01b:  34       12 &&                         (1: 21)
+f09e01d:  25        3 local                      (0: 20)
+f09e01f:   7      251 cstring0                   (1: 21)
+f09e021:  25        0 local                      (2: 22)
+f09e023: 126          call_other                 (3: 23)
+d/Quornitum/imar/univers/planets/taladon i/room/connect.c line 816
+89ee51f:  77      257 clear_locals               (0: 24)	line 816
+89ee522:   5        7 identifier                 (0: 24)	line 817
+89ee524:  25        0 local                      (1: 25)
+89ee526: 175          member                     (2: 26)
+89ee527:  93        1 push_local_variable_lvalue (1: 25)
+89ee529:  36          =                          (2: 26)
+89ee52a:  12          const0                     (1: 25)
+89ee52b:  44          >=                         (2: 26)
+89ee52c:  82          branch_when_zero           (1: 25)
+89ee534:  20          return0                    (0: 24)	line 819
+obj/mensch#529461 i/player/tippse.c line 1904
+f09e025:  93        3 push_local_variable_lvalue (1: 21)	line
+1904
+f09e027:  36          =                          (2: 22)
+f09e028: 174          mappingp                   (1: 21)
+f09e029:  34          &&                         (1: 21)	line
+1905
+f09e030:  82          branch_when_zero           (1: 21)
+f09e053:  25        0 local                      (0: 20)	line
+1908
+f09e055:  17       69 closure                    (1: 21)
+f09e058:  25        4 local                      (2: 22)
+f09e05a:  25        1 local                      (3: 23)
+f09e05c: 222        4 terminal_colour            (4: 24)
+f09e05e:  93        0 push_local_variable_lvalue (1: 21)
+f09e060:  37          (void)=                    (2: 22)
+f09e061:   5        6 identifier                 (0: 20)	line
+1910
+f09e063:  82          branch_when_zero           (1: 21)
+f09e08c:   5       44 identifier                 (0: 20)	line
+1916
+f09e08e:  34        2 &&                         (1: 21)
+f09e090:   5       49 identifier                 (0: 20)
+f09e092:  34        2 &&                         (1: 21)
+f09e094:   5       46 identifier                 (0: 20)
+f09e096:  34          &&                         (1: 21)
+f09e0a0:  34          &&                         (1: 21)
+f09e0a7:  82          branch_when_zero           (1: 21)
+f09e0b6: 225          this_object                (0: 20)	line
+1921
+f09e0b7:  25        0 local                      (1: 21)
+f09e0b9: 220          tell_object                (2: 22)
+f09e0ba:  12          const0                     (0: 20)	line
+1922
+f09e0bb:  88       48 push_identifier_lvalue     (1: 21)
+f09e0bd:  37          (void)=                    (2: 22)
+f09e0be:  20          return0                    (0: 20)	line
+1923
+d/Quornitum/imar/univers/werft/datenbank#85963 i/object/menue.c line
+1400
+900f648:  25        1 local                      (0: 13)	line
+1400
+900f64a:   7       84 cstring0                   (1: 14)
+900f64c: 126          call_other                 (2: 15)
+obj/mensch#529461 i/player/tippse.c line 1831
+f09ded7:  13          const1                     (0: 15)	line
+1831
+f09ded8:  88       46 push_identifier_lvalue     (1: 16)
+f09deda:  37          (void)=                    (2: 17)
+f09dedb:  20          return0                    (0: 15)
+d/Quornitum/imar/univers/werft/datenbank#85963 i/object/menue.c line
+1400
+900f64e:  75          pop_value                  (1: 14)	line
+1400
+900f64f:   7       85 cstring0                   (0: 13)	line
+1401
+900f651: 159        1 input_to                   (1: 14)
+900f653:  75          pop_value                  (1: 14)
+900f654:  20          return0                    (0: 13)	line
+1402
+900fa28:  75          pop_value                  (1: 12)	line
+1660
+900fa29:  20          return0                    (0: 11)	line
+1661
+bfffab9e:  52  50  46  49 255 191 100 173
+No program to trace.
+2002.01.26 14:26:32 LDMud aborting on fatal error.
+****************************************\c
+****************************************
+
+----------

@@ -10,7 +10,7 @@ exit 1
 # --- The actual settings ---
 
 with_max_array_size=16000
-with_max_mapping_size=16000
+with_max_mapping_size=48000
 with_read_file_max_size=3000000
 with_max_byte_transfer=500000
 

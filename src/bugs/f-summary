@@ -219,6 +219,8 @@ f-010707: Fast Callouts
 f-010928-0: Make telnet negotiation options more configurable
 p-011012: MCCP patch
 f-020131-0: privilege_violation("limited") should pass limits
+f-020220: Heartbeat functionality
+f-020223: New config value: MAX_MAPPING_SIZE
 
 
 Installation

@@ -6130,9 +6130,16 @@ f_debug_info (svalue_t *sp, int num_arg)
  *     explained below), or a printable string. Omitting <arg2> defaults
  *     to DIT_CURRENT.
  *
- *     <arg2> == DIT_CURRENT (0) or == DIT_ERROR (1): Return the information in
- *        array form. For DIT_CURRENT, the current call trace is returned,
- *        for DIT_ERROR the trace of the last uncaught error.
+ *     <arg2> == DIT_CURRENT (0): Current call trace
+ *            == DIT_ERROR   (1): Most recent error call trace (caught or
+ *                                uncaught)
+ *            == DIT_UNCAUGHT_ERROR (2): Most recent uncaught-error call trace
+ *        Return the information in array form.
+ *
+ *        The error traces are changed only when an appropriate error
+ *        occurs; in addition a GC deletes them. After an uncaught
+ *        error, both error traces point to the same array (so the '=='
+ *        operator holds true).
  *
  *        If the array has just one entry, the trace information is not
  *        available and the one entry is string with the reason.
@@ -6166,7 +6173,7 @@ f_debug_info (svalue_t *sp, int num_arg)
  *                          closure code.
  *            _TYPE_LFUN:   the line number.
  *
- *     <arg2> == DIT_STR_CURRENT (2): Return the information about the current
+ *     <arg2> == DIT_STR_CURRENT (3): Return the information about the current
  *        call trace as printable string.
  *
  * TODO: debug_info() and all associated routines are almost big enough
@@ -6529,6 +6536,19 @@ f_debug_info (svalue_t *sp, int num_arg)
         {
             if (current_error_trace)
                 put_ref_array(&res, current_error_trace);
+            else
+            {
+                vector_t *vec;
+
+                vec = allocate_uninit_array(1);
+                put_ref_string(vec->item, STR_NO_TRACE);
+                put_array(&res, vec);
+            }
+        }
+        else if (sp->u.number == DIT_UNCAUGHT_ERROR)
+        {
+            if (uncaught_error_trace)
+                put_ref_array(&res, uncaught_error_trace);
             else
             {
                 vector_t *vec;

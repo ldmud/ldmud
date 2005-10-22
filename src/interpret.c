@@ -9008,11 +9008,12 @@ again:
             }
             pop_n_elems(2);
             push_mapping(sp, m);
-            if (max_mapping_size && MAP_SIZE(m) > max_mapping_size)
+            if (max_mapping_size && MAP_TOTAL_SIZE(m) > max_mapping_size)
             {
                 check_map_for_destr(m);
-                if (max_mapping_size && MAP_SIZE(m) > max_mapping_size)
-                    ERRORF(("Illegal mapping size: %ld\n", MAP_SIZE(m)));
+                if (max_mapping_size && MAP_TOTAL_SIZE(m) > max_mapping_size)
+                    ERRORF(("Illegal mapping size: %ld elements (%ld x %ld)\n"
+                           , MAP_TOTAL_SIZE(m), MAP_SIZE(m), m->num_values));
             }
             break;
           }
@@ -10599,11 +10600,15 @@ again:
                 add_to_mapping(argp->u.map, u2.map);
                 sp -= 2;
                 free_mapping(u2.map);
-                if (max_mapping_size && MAP_SIZE(argp->u.map) > max_mapping_size)
+                if (max_mapping_size && MAP_TOTAL_SIZE(argp->u.map) > max_mapping_size)
                 {
                     check_map_for_destr(argp->u.map);
-                    if (max_mapping_size && MAP_SIZE(argp->u.map) > max_mapping_size)
-                        ERRORF(("Illegal mapping size: %ld\n", MAP_SIZE(argp->u.map)));
+                    if (max_mapping_size && MAP_TOTAL_SIZE(argp->u.map) > max_mapping_size)
+                        ERRORF(("Illegal mapping size: %ld elements "
+                                "(%ld x %ld)\n"
+                               , MAP_TOTAL_SIZE(argp->u.map)
+                               , MAP_SIZE(argp->u.map)
+                               , argp->u.map->num_values));
                 }
             }
             break;
@@ -13216,8 +13221,9 @@ again:
             num_values = num[1];
         }
 
-        if (max_mapping_size && i > max_mapping_size)
-            ERRORF(("Illegal mapping size: %ld\n", (long)i));
+        if (max_mapping_size && i * (1+num_values) > max_mapping_size)
+            ERRORF(("Illegal mapping size: %ld elements (%ld x %ld)\n"
+                   , (long)(i * (1+num_values)), (long)i, (long)num_values));
 
         /* Get the mapping */
         m = allocate_mapping(i, num_values);
@@ -15257,8 +15263,16 @@ secure_apply_error (svalue_t *save_sp, struct control_stack *save_csp)
             free_mstring(current_error);
             free_mstring(current_error_file);
             free_mstring(current_error_object_name);
-            free_array(current_error_trace);
-            current_error_trace = NULL;
+            if (current_error_trace)
+            {
+                free_array(current_error_trace);
+                current_error_trace = NULL;
+            }
+            if (uncaught_error_trace)
+            {
+                free_array(uncaught_error_trace);
+                uncaught_error_trace = NULL;
+            }
         }
     }
     else if (!out_of_memory)

@@ -5836,11 +5836,14 @@ restore_mapping (svalue_t *svp, char **str)
         return MY_FALSE;
     }
 
-    if (max_mapping_size && siz > max_mapping_size)
+    if (max_mapping_size && siz * (1+tmp_par.num_values) > max_mapping_size)
     {
         *svp = const0;
         free_shared_restored_values();
-        error("Illegal mapping size: %ld.\n", (long int)siz);
+        error("Illegal mapping size: %ld elements (%ld x %ld).\n"
+             , (long int)siz * (1+tmp_par.num_values)
+             , (long int)siz
+             , (long int)1+tmp_par.num_values );
         return MY_FALSE;
     }
 

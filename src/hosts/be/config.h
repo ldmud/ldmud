@@ -139,10 +139,11 @@
  */
 #define MAX_ARRAY_SIZE            3000
 
-/* This is the maximum array size allowed for one single mapping.
+/* This is the maximum size (number keys and values) allowed for one
+ * single mapping.
  * If 0, any size is allowed.
  */
-#define MAX_MAPPING_SIZE            5000
+#define MAX_MAPPING_SIZE            15000
 
 /* This is the maximum number of callouts allowed at one time.
  * If 0, any number is allowed.

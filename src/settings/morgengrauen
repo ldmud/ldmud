@@ -37,7 +37,7 @@ with_master_reserved_cost=1024
 with_swap_file=/home/mud/mud/swapfiles/SwapFile
 
 with_max_array_size=100000
-# with_max_mapping_size=100000 ?
+# with_max_mapping_size=300000 ?
 with_max_players=225
 
 with_reserved_user_size=8500000

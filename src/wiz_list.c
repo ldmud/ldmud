@@ -119,7 +119,7 @@ wiz_list_t default_wizlist_entry
     , 0             /* mapping_total */
     , { T_NUMBER }  /* extra */
     , 0             /* last_call_out */
-    , 0             /* int call_out_cost */
+    , 0             /* call_out_cost */
     , NULL          /* error file_name */
     , NULL          /* error_message */
     , 0             /* error line_number */
@@ -461,6 +461,7 @@ f_wizlist_info (svalue_t *sp)
  *   int    w[WL_HEART_BEATS] = Total count of heart_beats.
  *   int    w[WL_CALL_OUT]    = Reserved for call_out() (unused yet).
  *   int    w[WL_ARRAY_TOTAL] = Total size of arrays in elements.
+ *   int    w[WL_MAPPING_TOTAL] = Total size of mappings in elements.
  *   mixed  w[WL_EXTRA]       = Extra wizlist-info if set.
  */
 
@@ -489,6 +490,7 @@ f_wizlist_info (svalue_t *sp)
             put_number(&(svp[WL_HEART_BEATS]), w->heart_beats);
             put_number(&(svp[WL_CALL_OUT]), 0); /* TODO: Implement me */
             put_number(&(svp[WL_ARRAY_TOTAL]), w->size_array);
+            put_number(&(svp[WL_MAPPING_TOTAL]), w->mapping_total);
             if (w->extra.type == T_POINTER)
             {
                 vector_t *v = w->extra.u.vec;

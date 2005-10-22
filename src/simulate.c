@@ -236,11 +236,13 @@ mp_int    current_error_line_number;
    * line number in the program.
    */
 
+vector_t *uncaught_error_trace = NULL;
 vector_t *current_error_trace = NULL;
-  /* When a non-caught error occured, this variable holds the
-   * call chain in the format used by efun debug_info() for evaluation
-   * by the mudlib.
-   * The variable is kept until the next error, or until a GC.
+  /* When an error occured, these variables hold the call chain in the
+   * format used by efun debug_info() for evaluation by the mudlib.
+   * The variables are kept until the next error, or until a GC.
+   * 'uncaught_error_trace': the most recent uncaught error
+   * 'current_error_trace': the most recent error, caught or uncaught.
    */
 
 /* --- Runtime limits --- */
@@ -683,7 +685,9 @@ error (const char *fmt, ...)
              */
             debug_message("%s Caught error: %s", ts, emsg_buf + 1);
             printf("%s Caught error: %s", ts, emsg_buf + 1);
-            dump_trace(MY_FALSE, NULL);
+            if (current_error_trace)
+                free_array(current_error_trace);
+            dump_trace(MY_FALSE, &current_error_trace);
             debug_message("%s ... execution continues.\n", ts);
             printf("%s ... execution continues.\n", ts);
         }
@@ -742,10 +746,13 @@ error (const char *fmt, ...)
     }
 
     /* Dump the backtrace */
+    if (uncaught_error_trace)
+        free_array(uncaught_error_trace);
     if (current_error_trace)
         free_array(current_error_trace);
 
     object_name = dump_trace(num_error == 3, &current_error_trace);
+    uncaught_error_trace = ref_array(current_error_trace);
     fflush(stdout);
 
     if (rt->type == ERROR_RECOVERY_APPLY)
@@ -771,6 +778,11 @@ error (const char *fmt, ...)
             {
                 free_array(current_error_trace);
                 current_error_trace = NULL;
+            }
+            if (uncaught_error_trace)
+            {
+                free_array(uncaught_error_trace);
+                uncaught_error_trace = NULL;
             }
         }
         unroll_context_stack();

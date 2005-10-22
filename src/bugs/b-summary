@@ -1,6 +1,10 @@
 Crasher
 --------------------------------------------------------------------------
 b-000909: dev.226 crashes TubMud
+b-010911: String table corrupt
+b-011220: LDMud instability in Alatia
+b-020228-1: Crash in terminal_colour()
+b-020228-0: Refcount errors when handling destructed objects
 
 
 Efuns
@@ -30,6 +34,7 @@ b-990605: In a lot of error places, inter_sp/inter_pc are wrong.
 b-010115-1: Make sure that all master calls use leading slashes.
 b-010610-1: CRT doesn't work well in charmode
 b-011113: status for actions wrong
+b-020223: Memory corruption (in stress test)
 
 Installation
 --------------------------------------------------------------------------

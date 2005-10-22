@@ -17,7 +17,11 @@ DESCRIPTION
           int    w[WL_HEART_BEATS] = Total count of heart_beats.
           int    w[WL_CALL_OUT]    = Reserved for call_out() (unused yet).
           int    w[WL_ARRAY_TOTAL] = Total size of arrays in elements.
+          int    w[WL_MAPPING_TOTAL] = Total size of mappings in elements.
           mixed  w[WL_EXTRA]       = Extra wizlist-info if set.
+
+HISTORY
+        LDMud 3.3.174 added WL_MAPPING_TOTAL.
 
 SEE ALSO
         privilege_violation(M), set_extra_wizinfo_size(E)

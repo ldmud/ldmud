@@ -1,6 +1,24 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Feb-2002 (Lars Duening)  (3.3.174)
+    - (simulate, efuns.c, gcollect.c, interpret.c) In addition to the
+        last uncaught-error trace, debug_info() can now also return
+        the last error trace in general.
+    - (mapping, interpret.c, object.c, setting files) The MAX_MAPPING
+        configuration parameter now determines the total number of
+        elements (keys + values) a mapping can hold, not just the maximum
+        number of keys. The current max-mapping settings have been tripled
+        to account for this change (f-020223).
+
+27-Feb-2002 (Lars Duening)
+    - (wizlist.c) Efun wizlist_info() now returns the total number
+        of mappings per user, too.
+    - (smalloc.c) Corrected the statistics adjustment during the freelist
+        consolidation.
+    - (backend.c) The check_alarm() method did not recognize the '--no-heart'
+        option, eventually turning the alarm() back on (reported by Dafire).
+
 26-Feb-2002 (Lars Duening)  (3.3.173)
     - (efuns.c) Adjusted the terminal_colour() sanity check to acknowledge
         a certain boundary condition; added a test to make sure that

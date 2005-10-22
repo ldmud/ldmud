@@ -1542,7 +1542,7 @@ usage (void)
 "    Set to 0, any number of callouts is allowed.\n"
 "\n"
 "  --max-mapping <size>\n"
-"    The maximum number of elements a mapping can hold.\n"
+"    The maximum number of elements (keys+values) a mapping can hold.\n"
 "    Set to 0, mappings of any size are allowed.\n"
 "\n"
 "  --max-bytes <size>\n"

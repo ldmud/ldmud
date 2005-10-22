@@ -134,7 +134,11 @@ struct mvf_info
 /* --- Macros --- */
 
 #define MAP_SIZE(m) ((m)->num_entries)
-  /* Size of a given mapping <m>.
+  /* Size (number of keys) of a given mapping <m>.
+   */
+
+#define MAP_TOTAL_SIZE(m) ((m)->num_entries * (1+(m)->num_values))
+  /* Size (number of keys and values) of a given mapping <m>.
    */
 
 /* mapping_t *ref_mapping(mapping_t *m)

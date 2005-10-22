@@ -954,6 +954,11 @@ garbage_collection(void)
         free_array(current_error_trace);
         current_error_trace = NULL;
     }
+    if (uncaught_error_trace)
+    {
+        free_array(uncaught_error_trace);
+        uncaught_error_trace = NULL;
+    }
 
     remove_destructed_objects(); /* After reducing all object references! */
     num_destructed = 0; /* The destructed_objs pointer will be cleared below */
@@ -1746,6 +1751,11 @@ garbage_collection (void)
     {
         free_array(current_error_trace);
         current_error_trace = NULL;
+    }
+    if (uncaught_error_trace)
+    {
+        free_array(uncaught_error_trace);
+        uncaught_error_trace = NULL;
     }
     remove_destructed_objects();
 

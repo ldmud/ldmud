@@ -11,7 +11,7 @@ exit 1
 
 with_master_name=kernel/master
 with_max_array_size=10000
-with_max_mapping_size=10000
+with_max_mapping_size=30000
 with_time_to_reset=3600
 with_portno=2000
 with_udp_port=4246

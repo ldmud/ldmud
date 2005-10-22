@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-06-Feb-2002 (Lars Duening) -- Development Release 3.3
+28-Feb-2002 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -22,6 +22,7 @@ For a detailed list of all changes see the file CHANGELOG.
            of a function.
        + process_string(): Spaces are now allowed in function arguments
            and no longer terminate the function specification.
+       + wizlist_info(): Added the number of mappings to the result.
 
     - Corrected efuns:
        + include_list(): Implemented it properly.
@@ -67,6 +68,9 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
        + The input escape character can be configured at compile time to
            something different from '!'.
+       + The MAX_MAPPING configuration parameter now determines the total
+           number of elements (keys + values) a mapping can hold, not just
+           the maximum number of keys.
 
 
 20-Feb-2002 (Lars Duening) -- Release 3.2.9

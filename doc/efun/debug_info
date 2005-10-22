@@ -406,10 +406,17 @@ DESCRIPTION
             explained below), or a printable string. Omitting <arg2> defaults
             to DIT_CURRENT.
  
-            <arg2> == DIT_CURRENT (0) or == DIT_ERROR (1): Return the
-               information in array form. For DIT_CURRENT, the current call
-               trace is returned, for DIT_ERROR the trace of the last 
-               uncaught error.
+            <arg2> == DIT_CURRENT (0): Current call trace
+                   == DIT_ERROR   (1): Most recent error call trace (caught
+                                       or uncaught)
+                   == DIT_UNCAUGHT_ERROR (2): Most recent uncaught-error call
+                                              trace
+               Return the information in array form.
+
+               The error traces are changed only when an appropriate error
+               occurs; in addition a GC deletes them. After an uncaught
+               error, both error traces point to the same array (so the '=='
+               operator holds true).
 
                If the array has more than one entries, the first entry is 0 or
                the name of the object with the heartbeat which started the
@@ -441,7 +448,7 @@ DESCRIPTION
                                  closure code.
                    _TYPE_LFUN:   the line number.
 
-            <arg2> == DIT_STR_CURRENT (2): Return the information about the
+            <arg2> == DIT_STR_CURRENT (3): Return the information about the
                current call trace as printable string.
 
 HISTORY

@@ -1107,15 +1107,16 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
     {
         mp_int msize;
 
-        msize = (mp_int)MAP_SIZE(m);
+        msize = (mp_int)MAP_TOTAL_SIZE(m);
         if (msize >= max_mapping_size)
         {
             check_map_for_destr(m);
-            msize = (mp_int)MAP_SIZE(m);
+            msize = (mp_int)MAP_TOTAL_SIZE(m);
         }
         if (msize >= max_mapping_size)
         {
-            error("Illegal mapping size: %ld\n", msize+1);
+            error("Illegal mapping size: %ld elements (%ld x %ld)\n"
+                 , msize+1, (long)MAP_SIZE(m), (long)m->num_values);
             return NULL;
         }
     }
@@ -2916,8 +2917,11 @@ f_m_allocate (svalue_t *sp)
     if (sp->u.number < 0)
         error("Illegal mapping width: %ld\n", sp->u.number);
 
-    if (max_mapping_size && sp[-1].u.number > max_mapping_size)
-        error("Illegal mapping size: %ld\n", sp[-1].u.number);
+    if (max_mapping_size
+     && sp[-1].u.number * (1 + sp->u.number) > max_mapping_size)
+        error("Illegal mapping size: %ld elements (%ld x %ld).\n"
+             , sp[-1].u.number * (1+sp->u.number)
+             , sp[-1].u.number, sp->u.number);
 
     sp--;
 
@@ -3960,8 +3964,9 @@ f_mkmapping (svalue_t *sp, int num_arg)
             length = (long)VEC_SIZE(sp[i].u.vec);
     }
 
-    if (max_mapping_size && length > max_mapping_size)
-        error("Illegal mapping size: %ld\n", length);
+    if (max_mapping_size && length * num_arg > max_mapping_size)
+        error("Illegal mapping size: %ld elements (%ld x %ld)\n"
+             , length * num_arg, length, num_arg);
 
     /* Allocate the mapping */
     num_values = num_arg - 1;

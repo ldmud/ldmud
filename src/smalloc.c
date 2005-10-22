@@ -3777,12 +3777,23 @@ consolidate_freelists (void)
                  * to use (if it's big enough).
                  */
                 DEB3("  Unused %x, size %d, end-block %d\n", block, (size & M_MASK), (p_int)(end-block));
-                if (chunk == last_small_chunk && (end - block) > OVERHEAD)
+                if (chunk == last_small_chunk)
                 {
-                    unused_size = (end - block) * SINT;
-                    next_unused = block;
-                    DEB2("    New 'next_unused' space: %x, size %d\n", next_unused
-                        , unused_size);
+                    if ((end - block) > OVERHEAD)
+                    {
+                        unused_size = (end - block) * SINT;
+                        next_unused = block;
+                        DEB2("    New 'next_unused' space: %x, size %d\n", next_unused
+                            , unused_size);
+                    }
+                    else
+                    {
+                        /* The space is too small to be used: add it to the
+                         * wasted space as the allocator hasn't detected this
+                         * situation yet.
+                         */
+                        count_up(small_chunk_wasted, SINT*(end - block));
+                    }
                 }
                 else
                 {

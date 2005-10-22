@@ -71,7 +71,8 @@ DESCRIPTION
 
         expr1 <= expr2        Valid for strings and numbers.
 
-        expr1 << expr2        Shift 'expr1' left by 'expr2' bits.
+        expr1 << expr2        Shift 'expr1' left by 'expr2' bits; the sign
+                              bit is not preserved.
 
         expr1 >> expr2        Shift 'expr1' right by 'expr2' bits.
                         This shift preserves the sign of 'expr1'.

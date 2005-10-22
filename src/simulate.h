@@ -187,6 +187,7 @@ extern string_t *current_error;
 extern string_t *current_error_file;
 extern string_t *current_error_object_name;
 extern mp_int current_error_line_number;
+extern vector_t *uncaught_error_trace;
 extern vector_t *current_error_trace;
 
 extern int game_is_being_shut_down;

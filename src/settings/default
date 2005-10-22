@@ -46,7 +46,7 @@ with_max_array_size=3000
 
 # Maximum size of mapping. If 0, any size is allowed.
 
-with_max_mapping_size=5000
+with_max_mapping_size=15000
 
 # Maximum size of a file to be read with read_file()
 # If 0, any size is allowed.

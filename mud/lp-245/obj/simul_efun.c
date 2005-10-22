@@ -338,10 +338,11 @@ varargs void wizlist(string name)
         total_cmd = 1;
     for (i = sizeof(a); i; ) {
         b = a[<i--];
-        printf("%-15s %5d %2d%% (%d)\t[%4dk,%5d] %6d %d\n",
+        printf("%-15s %5d %2d%% (%d)\t[%4dk,%5d] %6d %d %d\n",
           b[WL_NAME], b[WL_COMMANDS], b[WL_COMMANDS] * 100 / total_cmd, b[<1],
           b[WL_EVAL_COST] / 1000,
-          b[WL_HEART_BEATS], b[WL_EXTRA], b[WL_ARRAY_TOTAL]
+          b[WL_HEART_BEATS], b[WL_EXTRA], b[WL_ARRAY_TOTAL],
+          b[WL_MAPPING_TOTAL]
         );
     }
     printf("\nTotal         %7d     (%d)\n\n", total_cmd, sizeof(cmds));
