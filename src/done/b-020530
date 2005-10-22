@@ -2,7 +2,7 @@ Short: Visibility redefinition of a virtual inherit crashes driver
 From: Bardioc
 Date: 2002-05-30
 Type: Bug
-State: Done - fixed in 3.2.9-dev.439 / 3.3.210
+State: Done - fixed in 3.2.9-dev.439+440 / 3.3.210+211
 
 Given the following files, the driver crashes when loading "/player":
 

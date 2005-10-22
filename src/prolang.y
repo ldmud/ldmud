@@ -11139,7 +11139,7 @@ copy_functions (program_t *from, fulltype_t type)
         inherit_t *ip;
         fun_hdr_p  funstart;
         funflag_t  flags;
-        int i2;
+        int i2; /* The index of the real function */
 
         flags = from->functions[i];
         fun_p->offset.inherit = NEW_INHERITED_INDEX;
@@ -11150,6 +11150,8 @@ copy_functions (program_t *from, fulltype_t type)
             /* The inherit-index has to be recomputed */
             fun_p->flags =
                 (flags & ~INHERIT_MASK) | NAME_INHERITED | NAME_HIDDEN;
+
+            /* If cross-defined, get the real function index */
             if (flags & NAME_CROSS_DEFINED)
             {
                 fun_p->offset.func = flags & INHERIT_MASK;
@@ -11665,7 +11667,8 @@ copy_variables (program_t *from, fulltype_t type
                 flagp = from->functions + inheritp->function_index_offset;
                 funp = (function_t *)mem_block[A_FUNCTIONS].block +
                     inherit.function_index_offset;
-                funp2 = funp - fun_index_offset;
+                funp2 = (function_t *)mem_block[A_FUNCTIONS].block +
+                    inheritp2->function_index_offset;
                 for (k = inherit.prog->num_functions; --k >= 0; funp++, funp2++)
                 {
                     if ( !(funp->flags & NAME_CROSS_DEFINED)

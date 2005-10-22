@@ -1,6 +1,9 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+05-Jun-2002 (Lars Duening)  (3.3.211)
+    - (prolang.y) Oops, yesterday's bugfix was not quite corrected.
+
 04-Jun-2002 (Lars Duening)  (3.3.210)
     - (prolang.y) If a method in a virtual inherit is rendered invisible,
          but also made available again through a parallel inherit of the same

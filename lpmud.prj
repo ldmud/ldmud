@@ -20,14 +20,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 210)
-(Parent-Version lpmud 3-3 209)
-(Version-Log "The arguments to garbage_collection() are ignored when the allocator doesn't
-support a GC.
-Fixed a crasher in virtual inheritance.")
+(Project-Version lpmud 3-3 211)
+(Parent-Version lpmud 3-3 210)
+(Version-Log "Corrected yesterday's bugfix.")
 (New-Version-Log
 "")
-(Checkin-Time "Wed, 05 Jun 2002 01:35:01 -0600")
+(Checkin-Time "Thu, 06 Jun 2002 01:04:42 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -61,7 +59,7 @@ Fixed a crasher in virtual inheritance.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.6 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.40 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.273 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.274 644))
   (HISTORY (lpmud/f/49_HISTORY 1.256 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.14 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -212,7 +210,7 @@ Fixed a crasher in virtual inheritance.")
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.11 644))
   (src/port.c (lpmud/39_port.c 1.17.1.6 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.14 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.20 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.84.1.21 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7.1.1 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -748,7 +746,7 @@ Fixed a crasher in virtual inheritance.")
   (src/done/b-020324 (lpmud/U/14_b-020324 1.2 644) :no-keywords)
   (src/done/b-020326-0 (lpmud/T/21_b-020326-0 1.2 644) :no-keywords)
   (src/done/b-020328-0 (lpmud/U/15_b-020328-0 1.2 644) :no-keywords)
-  (src/done/b-020530 (lpmud/W/3_b-020530 1.1 644) :no-keywords)
+  (src/done/b-020530 (lpmud/W/3_b-020530 1.2 644) :no-keywords)
 
   (src/done/f-981229-00 (lpmud/j/21_f-981229-0 1.1.1.1 644) :no-keywords)
   (src/done/f-981229-09a (lpmud/L/9_f-981229-0 1.1 644) :no-keywords)
