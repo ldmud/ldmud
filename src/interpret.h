@@ -122,6 +122,7 @@ extern void transfer_svalue_no_free(svalue_t *dest, svalue_t *v);
 extern void transfer_svalue(svalue_t *dest, svalue_t *v);
 
 extern void put_c_string (svalue_t *sp, const char *p);
+extern void put_c_n_string (svalue_t *sp, const char *p, size_t len);
 
 extern void push_svalue(svalue_t *v);
 extern void push_svalue_block(int num, svalue_t *v);

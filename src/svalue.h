@@ -520,6 +520,8 @@ double READ_DOUBLE(struct svalue *svalue_pnt)
     ( (sp)++, put_string(sp,val) )
 #define push_c_string(sp,txt) \
     ( (sp)++, put_c_string(sp, txt) )
+#define push_c_n_string(sp,txt,len) \
+    ( (sp)++, put_c_n_string(sp, txt, len) )
 
 
 #define psh_callback(sp,val) \

@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Jul-2001 (Lars Duening)  (3.3.80)
+    - (lex.c) The redefinition of a macro messed up the list of defines,
+        eventually crashing the driver (reported by Freaky).
+    - (efuns.c) Using terminal_colour() with a closure as lookup method
+        an a non-tabled keyword crashed the driver (reported by Elric).
+    - (simulate.c) Clones no longer inherit the current O_WILL_CLEAN_UP
+        flag from their blueprint - it didn't make sense (thanks, Niels!).
+
 25-Jul-2001 (Lars Duening)  (3.3.79)
     - (sprintf.c) Printing numbers with leading zeroes and a sign character
         printed the sign in the wrong place (reported by Dafire).

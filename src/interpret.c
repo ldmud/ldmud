@@ -2291,6 +2291,20 @@ put_c_string (svalue_t *sp, const char *p)
 
 /*-------------------------------------------------------------------------*/
 void
+put_c_n_string (svalue_t *sp, const char *p, size_t len)
+
+/* Put a copy of first <len> characters of the C string *<p> into <sp>.
+ */
+
+{
+    string_t * str;
+
+    memsafe(str = new_n_mstring(p, len), len, "string");
+    put_string(sp, str);
+} /* put_c_string() */
+
+/*-------------------------------------------------------------------------*/
+void
 push_svalue (svalue_t *v)
 
 /* Push the svalue <v> onto the stack as defined by <inter_sp>.

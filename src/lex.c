@@ -4787,7 +4787,11 @@ add_define (char *name, short nargs, char *exps)
     if (p->type != I_TYPE_UNKNOWN)
     {
         char buf[200+NSIZE];
-        sprintf(buf, "Redefinition of #define %s", name);
+
+        if (current_line <= 0)
+            sprintf(buf, "(in auto_include_string) Redefinition of #define %s", name);
+        else
+            sprintf(buf, "Redefinition of #define %s", name);
 
         if (nargs != p->u.define.nargs
          || p->u.define.special
@@ -4801,29 +4805,31 @@ add_define (char *name, short nargs, char *exps)
             yywarn(buf);
         }
     }
-
-    /* New macro: initialise the ident.u.define and
-     * add it to the list of defines.
-     */
-
-    p->type = I_TYPE_DEFINE;
-    p->u.define.nargs = nargs;
-    p->u.define.permanent = MY_FALSE;
-    p->u.define.special = MY_FALSE;
-    if ( !(p->u.define.exps.str = xalloc(strlen(exps)+1)) )
+    else
     {
-        free_shared_identifier(p);
-        lexerrorf("Out of memory for new macro '%s'", name);
-        return;
-    }
-    strcpy(p->u.define.exps.str, exps);
+        /* New macro: initialise the ident.u.define and
+         * add it to the list of defines.
+         */
 
-    p->next_all = all_defines;
-    all_defines = p;
+        p->type = I_TYPE_DEFINE;
+        p->u.define.nargs = nargs;
+        p->u.define.permanent = MY_FALSE;
+        p->u.define.special = MY_FALSE;
+        if ( !(p->u.define.exps.str = xalloc(strlen(exps)+1)) )
+        {
+            free_shared_identifier(p);
+            lexerrorf("Out of memory for new macro '%s'", name);
+            return;
+        }
+        strcpy(p->u.define.exps.str, exps);
+
+        p->next_all = all_defines;
+        all_defines = p;
 #if defined(LEXDEBUG)
-    fprintf(stderr, "%s define '%s' %d '%s'\n"
-           , time_stamp(), name, nargs, exps);
+        fprintf(stderr, "%s define '%s' %d '%s'\n"
+               , time_stamp(), name, nargs, exps);
 #endif
+    }
 } /* add_define() */
 
 /*-------------------------------------------------------------------------*/

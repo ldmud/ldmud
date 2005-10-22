@@ -1785,7 +1785,7 @@ clone_object (string_t *str1)
     new_ob->name = make_new_name(name);
     tot_alloc_object_size += mstrsize(new_ob->name);
     new_ob->load_name = ref_mstring(ob->load_name);
-    new_ob->flags |= O_CLONE | (ob->flags & O_WILL_CLEAN_UP ) ;
+    new_ob->flags |= O_CLONE | O_WILL_CLEAN_UP;
     new_ob->prog = ob->prog;
     reference_prog (ob->prog, "clone_object");
     new_ob->ticks = new_ob->gigaticks = 0;

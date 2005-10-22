@@ -1315,7 +1315,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
             /* If the map lookup didn't find anything, try the
              * <cl>osure (which might be the default entry)
              */
-            if (mdata == NULL && cl != NULL)
+            if (mdata == NULL && cl != NULL && parts[i][0] != '\0')
             {
                 if (cl->type == T_STRING)
                 {
@@ -1324,7 +1324,7 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 else
                 {
                     /* It's a closure */
-                    push_ref_string(inter_sp, str);
+                    push_c_n_string(inter_sp, parts[i], lens[i]);
                     call_lambda(cl, 1);
                     transfer_svalue(&apply_return_value, inter_sp);
                     inter_sp--;

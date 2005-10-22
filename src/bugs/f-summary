@@ -141,6 +141,7 @@ b-000217-1: F_M_CAGGREGATE acts strange
 p-000316: Binary codefile support
 f-000906: Revamp the bytecode design
 f-001102: Separate Programs from Blueprints
+f-010726: Add location to defined identifiers
 
 
 Runtime
