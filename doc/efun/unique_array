@@ -1,30 +1,30 @@
 SYNOPSIS
-	mixed unique_array(object *obarr, string seperator)
-	mixed unique_array(object *obarr, string seperator, mixed skip)
+        mixed unique_array(object *obarr, string seperator)
+        mixed unique_array(object *obarr, string seperator, mixed skip)
 
 DESCRIPTION
-	Groups objects together for which the separator function
-	returns the same value. obarr should be an array of objects,
-	other types are ignored. The separator function is called only
-	once in each object in obarr. If no separator function is
-	given, 0 is used instead of a return value.
-	If a 3rd argument is given and this argument matches the
-	return value of the separator function this object will not be
-	included in the returned array. The returned array is an array
-	of arrays of objects in the form:
-	
-	({ ({ Same1:1, Same1:2, ... Same1:N }),
-	   ({ Same2:1, Same2:2, ... Same2:N }),
-	      ....
-	   ({ SameM:1, SameM:2, ... SameM:N }) })
+        Groups objects together for which the separator function
+        returns the same value. obarr should be an array of objects,
+        other types are ignored. The separator function is called only
+        once in each object in obarr. If no separator function is
+        given, 0 is used instead of a return value.
+        If a 3rd argument is given and this argument matches the
+        return value of the separator function this object will not be
+        included in the returned array. The returned array is an array
+        of arrays of objects in the form:
+        
+        ({ ({ Same1:1, Same1:2, ... Same1:N }),
+           ({ Same2:1, Same2:2, ... Same2:N }),
+              ....
+           ({ SameM:1, SameM:2, ... SameM:N }) })
 
 EXAMPLE
-	mixed *arr;
-	arr=unique_array(users(), "_query_level", -1);
-	
-	This will return an array of arrays holding all user objects
-	grouped together by their user levels. Wizards have a user
-	level of -1 so they will not appear in the the returned array.
-	
+        mixed *arr;
+        arr=unique_array(users(), "_query_level", -1);
+        
+        This will return an array of arrays holding all user objects
+        grouped together by their user levels. Wizards have a user
+        level of -1 so they will not appear in the the returned array.
+        
 SEE ALSO
-	filter_array(E), map_array(E)
+        filter(E), map(E)

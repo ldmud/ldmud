@@ -1,43 +1,43 @@
 SYNOPSIS
-	string regreplace(string txt, string pattern, string replacepattern, int flags)
+        string regreplace(string txt, string pattern, string replacepattern, int flags)
 
 DESCRIPTION
-	This function looks through txt looking for the regular
-	expression pattern. If it finds it, it replaces it by the
-	replacepattern. The flag is a bitmask, where bit 0 specifies
-	that the search and replace should repeat as often as the
-	pattern matches, and bit 1 (mask 2) specifies if the regular
-	expressions are 'ex' compatible or not. The function returns
-	the modified string (or the original if it wasn't modified).
+        This function looks through txt looking for the regular
+        expression pattern. If it finds it, it replaces it by the
+        replacepattern. The flag is a bitmask, where bit 0 specifies
+        that the search and replace should repeat as often as the
+        pattern matches, and bit 1 (mask 2) specifies if the regular
+        expressions are 'ex' compatible or not. The function returns
+        the modified string (or the original if it wasn't modified).
 
-	The function behaves like the s/pattern/replacepattern/flags
-	in editors as ed/vi or sed. The power of this function lies in
-	replacing variable strings (as opposed to regexplode, where
-	you can explode by regular expression, but not implode...)
+        The function behaves like the s/pattern/replacepattern/flags
+        in editors as ed/vi or sed. The power of this function lies in
+        replacing variable strings (as opposed to regexplode, where
+        you can explode by regular expression, but not implode...)
 
 EXAMPLE
-	string msgin;
+        string msgin;
 
-	/* Checks msgin for the string 'tells you: ' and all following
-	 * characters and encloses those characters by <underline>
+        /* Checks msgin for the string 'tells you: ' and all following
+         * characters and encloses those characters by <underline>
          * and </underline>. global.
-	 */
-	msgin = regreplace(msgin, "tells you: (.*)",
-		 "tells you: <underline>\\1</underline>", 1);
-	
-	/* replaces all <underline> html tags by the vt100 escape
-	 * sequence for underline.
-	 */
-	txt = regreplace(txt, "<underline>", "<ESC>[5m", 1);
+         */
+        msgin = regreplace(msgin, "tells you: (.*)",
+                 "tells you: <underline>\\1</underline>", 1);
+        
+        /* replaces all <underline> html tags by the vt100 escape
+         * sequence for underline.
+         */
+        txt = regreplace(txt, "<underline>", "<ESC>[5m", 1);
 
 HISTORY
-	Introduced in 3.2.1@125
+        Introduced in 3.2.1@125
 
 AUTHOR
-	Marcus@TAPPMud contributed the efun and the man page
-	
+        Marcus@TAPPMud contributed the efun and the man page
+        
 SEE ALSO
-	regexp(E), regexplode(E), sscanf(E), trim(E)
+        regexp(E), regexplode(E), sscanf(E), trim(E)
 
 
 

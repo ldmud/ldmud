@@ -1,9 +1,9 @@
 SYNOPSIS
-	void garbage_collection(void)
+        void garbage_collection(void)
 
 DESCRIPTION
-	Tell the parser to initiate a garbage collection after the
-	current execution ended.
+        Tell the parser to initiate a garbage collection after the
+        current execution ended.
 
 SEE ALSO
-	getrusage(E)
+        getrusage(E)

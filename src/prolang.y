@@ -77,6 +77,8 @@
  *---------------------------------------------------------------------------
  */
 
+#undef lint  /* undef so that precompiled headers can be used */
+
 #include "driver.h"
 #include "typedefs.h"
 
@@ -108,6 +110,8 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/driver_hook.h"
+
+#define lint  /* redef again to prevent spurious warnings */
 
 #define YYMAXDEPTH        600
 

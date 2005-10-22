@@ -1,13 +1,13 @@
 SYNOPSIS
-	unknown call_other(object ob, string fun, mixed arg, ...)
-	unknown call_other(object *ob, string fun, mixed arg, ...)
+        unknown call_other(object ob, string fun, mixed arg, ...)
+        unknown call_other(object *ob, string fun, mixed arg, ...)
 
-	ob->fun (mixed arg, ...)
-	ob->"fun" (mixed arg, ...)
-	ob->(fun) (mixed arg, ...)
+        ob->fun (mixed arg, ...)
+        ob->"fun" (mixed arg, ...)
+        ob->(fun) (mixed arg, ...)
 
 DESCRIPTION
-	Call a member function <fun> in another object <ob> with an
+        Call a member function <fun> in another object <ob> with an
         the argument(s) <arg...>. Result is the value returned from
         the called function (or 0 for non-existing or void functions).
 
@@ -19,48 +19,48 @@ DESCRIPTION
         cause an error.
 
         The object(s) can be given directly or via a string (i.e. its
-        file_name). If it is given by a string and the object does not
+        object_name). If it is given by a string and the object does not
         exist yet, it will be loaded.
-	
-	ob->fun(args) and "ob_name"->fun(args) is equivalent to
-	call_other(ob, "fun", args). Nowadays the ob_name string can
-	also be a variable.
+        
+        ob->fun(args) and "ob_name"->fun(args) is equivalent to
+        call_other(ob, "fun", args). Nowadays the ob_name string can
+        also be a variable.
 
         ob->fun(args) and ob->"fun"(args) are equivalent to
         call_other(ob, "fun", args). ob->(fun)(args) are equivalent
         to call_other(ob, fun, args) where fun is a runtime expression
         returning the function name.
 
-	If ob does not define a publicly accessible function of the
-	specified name, call_other() will return 0, which is
-	indistinguishable from a function returning 0. "publicly
+        If ob does not define a publicly accessible function of the
+        specified name, call_other() will return 0, which is
+        indistinguishable from a function returning 0. "publicly
         accessible" means "public" when calling other objects, and
         "public" or "static" when calling this_object(). "private"
         and "protected" function can never be called with call_other().
 
-	The return type of call_other() is 'any' be default. However,
-	if your LPC code uses #pragma strict_types, the return type is
-	'unknown', and the result of call_other() must be casted to
-	the appropriate type before you can use it for anything.
+        The return type of call_other() is 'any' be default. However,
+        if your LPC code uses #pragma strict_types, the return type is
+        'unknown', and the result of call_other() must be casted to
+        the appropriate type before you can use it for anything.
 
 EXAMPLES
 
         // All the following statements call the lfun QueryProp()
         // in the current player with the argument P_SHORT.
-	string str, fun;
+        string str, fun;
 
-	str = (string)call_other(this_player(), "QueryProp", P_SHORT);
+        str = (string)call_other(this_player(), "QueryProp", P_SHORT);
         fun = "QueryProp";
-	str = (string)call_other(this_player(), fun, P_SHORT);
+        str = (string)call_other(this_player(), fun, P_SHORT);
 
-	str = (string)this_player()->QueryProp(P_SHORT);
-	str = (string)this_player()->"QueryProp"(P_SHORT);
+        str = (string)this_player()->QueryProp(P_SHORT);
+        str = (string)this_player()->"QueryProp"(P_SHORT);
         fun = "QueryProp";
-	str = (string)this_player()->(fun)(P_SHORT);
-	
-	You have to do explicit type casting because of the unknown
-	return type, if you have set #pragma strict_types.
-	
+        str = (string)this_player()->(fun)(P_SHORT);
+        
+        You have to do explicit type casting because of the unknown
+        return type, if you have set #pragma strict_types.
+        
         // This statement calls the lfun short() in all interactive users
         // and stores the collected results in a variable.
         string * s;
@@ -68,11 +68,11 @@ EXAMPLES
         s = (string *)users()->short();
 
 
-	!Compat: call_other("/users/luser/thing", "???", 0);
-	 Compat: call_other("users/luser/thing", "???", 0);
-	
-	This looks a bit weird but it was used very often to just load
-	the object by calling a not existing function like "???".
+        !Compat: call_other("/users/luser/thing", "???", 0);
+         Compat: call_other("users/luser/thing", "???", 0);
+        
+        This looks a bit weird but it was used very often to just load
+        the object by calling a not existing function like "???".
         Fortunately nowadays there is an efun load_object() for this
         purpose.
 
@@ -85,6 +85,6 @@ HISTORY
          - call_other can be applied on arrays of objects.
 
 SEE ALSO
-	function_exists(E), call_resolved(E), create(E), pragma(LPC),
-	extern_call(E), functions(LPC)
+        function_exists(E), call_resolved(E), create(E), pragma(LPC),
+        extern_call(E), functions(LPC)
 

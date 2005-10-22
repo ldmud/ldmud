@@ -1,8 +1,8 @@
 SYNOPSIS
-	float atan2 (int|float y, int|float x)
+        float atan2 (int|float y, int|float x)
 
 DESCRIPTION
-	Returns the argument's arcus tangent as if computed from <y>/<x>,
+        Returns the argument's arcus tangent as if computed from <y>/<x>,
         except that the signs of both arguments are used to determine the
         quadrant of the result.
 

@@ -1,29 +1,29 @@
 SYNOPSIS
-	string *explode(string str, string del)
+        string *explode(string str, string del)
 
 DESCRIPTION
-	Return an array of strings, created when the string str is
+        Return an array of strings, created when the string str is
       split into substrings as divided by del.
 
 EXAMPLES
-	string *strs;
-	strs = explode(" ab cd ef ", " ");
-	
-	This will return an array with five strings ({""
-	"ab","cd","ef" ""}).
+        string *strs;
+        strs = explode(" ab cd ef ", " ");
+        
+        This will return an array with five strings ({""
+        "ab","cd","ef" ""}).
 
-	Not that the behaviour has changed at some point. In former
-	times it used to be an array with three strings
-	({"ab","cd","ef"}), i.e. the empty strings were ignored.
-	The new behaviour is more consistent, because now
-	implode(explode(stri, "c"), "c") == str is always true.
-	
-	strs=explode("abc", "abc");   returns ({"",""})
-	
-	explode("", "")		      returns ({}).
-	
-	strs = explode("abc", "xyz"); returns ({ "abc" })
-	strs = explode("abc", "");    returns ({"a","b","c"})
+        Not that the behaviour has changed at some point. In former
+        times it used to be an array with three strings
+        ({"ab","cd","ef"}), i.e. the empty strings were ignored.
+        The new behaviour is more consistent, because now
+        implode(explode(stri, "c"), "c") == str is always true.
+        
+        strs=explode("abc", "abc");   returns ({"",""})
+        
+        explode("", "")                      returns ({}).
+        
+        strs = explode("abc", "xyz"); returns ({ "abc" })
+        strs = explode("abc", "");    returns ({"a","b","c"})
 
 SEE ALSO
-	sscanf(E), extract(E), implode(E), regexplode(E)
+        sscanf(E), extract(E), implode(E), regexplode(E)

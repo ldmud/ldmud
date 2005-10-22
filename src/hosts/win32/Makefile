@@ -81,13 +81,13 @@ MFLAGS = "BINDIR=$(BINDIR)" "MUD_LIB=$(MUD_LIB)"
 #
 SRC = access_check.c actions.c array.c backend.c call_out.c closure.c comm.c \
       dumpstat.c ed.c efuns.c gcollect.c hash.c heartbeat.c interpret.c \
-      lang.c lex.c main.c mapping.c mempools.c object.c otable.c parse.c \
+      parser.c lex.c main.c mapping.c mempools.c object.c otable.c parse.c \
       parse_old.c pkg-mysql.c port.c ptrtable.c \
       random.c regexp.c rxcache.c simulate.c simul_efun.c stdstrings.c \
       stralloc.c strfuns.c sprintf.c swap.c wiz_list.c xalloc.c
 OBJ = access_check.o actions.o array.o backend.o call_out.o closure.o comm.o \
       dumpstat.o ed.o efuns.o gcollect.o hash.o heartbeat.o interpret.o \
-      lang.o lex.o main.o mapping.o mempools.o object.o otable.o parse.o \
+      parser.o lex.o main.o mapping.o mempools.o object.o otable.o parse.o \
       parse_old.o pkg-mysql.o port.o ptrtable.o \
       random.o regexp.o rxcache.o simulate.o simul_efun.o stdstrings.o \
       stralloc.o strfuns.o sprintf.o swap.o wiz_list.o xalloc.o 
@@ -113,7 +113,7 @@ lint: *.c
 	lint *.c
 
 clean:
-	$(RM) $(YACCTAB)h $(YACCTAB)c make_func.c *.o make_func
+	$(RM) $(YACCTAB)h $(YACCTAB)c make_func.c *.o mkfunc
 	$(RM) stdstrings.c stdstrings.h
 	$(RM) efun_defs.c instrs.h lang.y lang.h lang.c y.output tags TAGS
 	$(RM) parse core mudlib/core mudlib/debug.log lpmud.log driver
@@ -135,25 +135,25 @@ make_func.c: make_func.y
 	$(MV) $(YACCTAB)c make_func.c
 	
 
-make_func.o : make_func.c driver.h config.h machine.h port.h
-	  $(CC) $(CFLAGS) -DYACC='"$(YACC)"' -c make_func.c
+mkfunc.o : mkfunc.c make_func.c driver.h config.h machine.h port.h
+	  $(CC) $(CFLAGS) -DYACC='"$(YACC)"' -c mkfunc.c
 
-make_func: make_func.o hash.o exec.h
-	$(CC) $(OPTIMIZE) $(LDFLAGS) make_func.o hash.o -o make_func
+mkfunc: mkfunc.o hash.o exec.h
+	$(CC) $(OPTIMIZE) $(LDFLAGS) mkfunc.o hash.o -o mkfunc
 
-lang.y: make_func prolang.y config.h
+lang.y: mkfunc prolang.y config.h
 	$(RM) lang.y
-	./make_func lang
+	./mkfunc lang
 
-efun_defs.c instrs.h: func_spec make_func config.h
+efun_defs.c instrs.h: func_spec mkfunc config.h
 	$(RM) instrs.h
 	$(RM) efun_defs.c
-	./make_func instrs
+	./mkfunc instrs
 
-stdstrings.c stdstrings.h: string_spec make_func config.h
+stdstrings.c stdstrings.h: string_spec mkfunc config.h
 	$(RM) stdstrings.c
 	$(RM) stdstrings.h
-	./make_func strings
+	./mkfunc strings
 
 lang.c lang.h: lang.y
 	$(YACC) -d -v lang.y

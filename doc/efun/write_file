@@ -1,9 +1,9 @@
 SYNOPSIS
-	int write_file(string file, string str)
+        int write_file(string file, string str)
 
 DESCRIPTION
-	Append the string str to the file file. Returns 1 for success
-	and 0 if any failure occured.
+        Append the string str to the file file. Returns 1 for success
+        and 0 if any failure occured.
 
 SEE ALSO
-	file_size(E), cat(E), log_file(E), write_bytes(E), read_file(E)
+        file_size(E), cat(E), log_file(E), write_bytes(E), read_file(E)

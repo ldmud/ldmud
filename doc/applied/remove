@@ -1,18 +1,18 @@
 SYNOPSIS
-	int remove(void)
+        int remove(void)
 
 DESCRIPTION
-	remove() does some housekeeping to ensure consistency and then
-	destruct the current object.
+        remove() does some housekeeping to ensure consistency and then
+        destruct the current object.
 
-	This lfun is not applied by the parser, but by other objects
-	to tell the current object to self-destruct. remove() should
-	be supplied by the base classes of the library.  Return 1 if
-	actually self-destructed, 0 otherwise.
+        This lfun is not applied by the parser, but by other objects
+        to tell the current object to self-destruct. remove() should
+        be supplied by the base classes of the library.  Return 1 if
+        actually self-destructed, 0 otherwise.
 
 NOTE
-	Your actual mudlib may name this lfun differently, "remove" is
-	just the traditional name.
+        Your actual mudlib may name this lfun differently, "remove" is
+        just the traditional name.
 
 SEE ALSO
-	destruct(E)
+        destruct(E)

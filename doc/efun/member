@@ -1,13 +1,13 @@
 SYNOPSIS
-	int member(mixed *array, mixed elem)
-	int member(mapping m, mixed key)
-	int member(string s, int elem)
+        int member(mixed *array, mixed elem)
+        int member(mapping m, mixed key)
+        int member(string s, int elem)
 
 DESCRIPTION
-	For arrays and strings, returns the index of the second arg in
-	the first arg, or -1 if none found. For mappings it checks, if
-	key is present in mapping m and returns 1 if so, 0 if key is
-	not in m.
+        For arrays and strings, returns the index of the second arg in
+        the first arg, or -1 if none found. For mappings it checks, if
+        key is present in mapping m and returns 1 if so, 0 if key is
+        not in m.
 
 SEE ALSO
-	member_array(E), mappings(LPC)
+        mappings(LPC)

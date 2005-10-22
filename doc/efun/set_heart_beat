@@ -1,16 +1,16 @@
 SYNOPSIS
-	int set_heart_beat(int flag)
+        int set_heart_beat(int flag)
 
 DESCRIPTION
-	Enable or disable heart beat. The driver will apply
-	the lfun heart_beat() to the current object every 2 seconds,
-	if it is enabled. If the heart beat is not needed for the
-	moment, then do disable it. This will reduce system overhead.
-	
-	Return true for success, and false for failure.
+        Enable or disable heart beat. The driver will apply
+        the lfun heart_beat() to the current object every 2 seconds,
+        if it is enabled. If the heart beat is not needed for the
+        moment, then do disable it. This will reduce system overhead.
+        
+        Return true for success, and false for failure.
 
-	Disabling an already disabled heart beat (and vice versa
-	enabling and enabled heart beat) counts as failure.
+        Disabling an already disabled heart beat (and vice versa
+        enabling and enabled heart beat) counts as failure.
 
 SEE ALSO
-	heart_beat(A), call_out(E)
+        heart_beat(A), call_out(E)

@@ -1000,7 +1000,7 @@ make_global_identifier (char *s, int n)
         }
     }
 
-    return NULL;
+    return ip;
 } /* make_global_identifier() */
 
 /*-------------------------------------------------------------------------*/

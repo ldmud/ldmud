@@ -1,10 +1,10 @@
 SYNOPSIS
-	void tail(string file)
+        void tail(string file)
 
 DESCRIPTION
-	Print out the tail of a file. There is no specific amount of
-	lines given to the output. Only a maximum of 1000 bytes will
-	be printed.
-	
+        Print out the tail of a file. There is no specific amount of
+        lines given to the output. Only a maximum of 1000 bytes will
+        be printed.
+        
 SEE ALSO
-	cat(E), ed(E)
+        cat(E), ed(E)

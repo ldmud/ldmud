@@ -126,7 +126,7 @@ DESCRIPTION -- non-compat mode
                - Would normally return: "all"
 
 
-	int parse_command(string, object|object*, string, destargs...)
+        int parse_command(string, object|object*, string, destargs...)
 
 DESCRIPTION -- compat mode
 

@@ -1,5 +1,5 @@
 SYNOPSIS
-    mixed include_file (string file, string compiled_file, int sys_include)
+        mixed include_file (string file, string compiled_file, int sys_include)
 
 DESCRIPTION
         Generate the pathname of an included file.

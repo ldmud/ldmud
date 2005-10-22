@@ -1,8 +1,8 @@
 SYNOPSIS
-	string *inherit_list(object ob)
+        string *inherit_list(object ob)
 
 DESCRIPTION
-	Returns the names of all files currently inherited by <ob>, including
+        Returns the names of all files currently inherited by <ob>, including
         <ob>s own filename. If <ob> is omitted, it defaults to the current
         object.
 
@@ -10,11 +10,11 @@ DESCRIPTION
         <ob>s 'own filename' is that of the object providing the replacement
         program.
 
-	The returned names always begin with '/' (absolute path),
-	except when the parser runs in COMPAT mode.
+        The returned names always begin with '/' (absolute path),
+        except when the parser runs in COMPAT mode.
 
 HISTORY
         Before 3.2.8, the returned names never started with a '/'.
 
 SEE ALSO
-	debug_info(E)
+        debug_info(E)

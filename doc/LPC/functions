@@ -1,5 +1,5 @@
 CONCEPT
-	functions
+        functions
 
 DESCRIPTION
         Functions are named blocks of code which are be called with
@@ -154,5 +154,5 @@ DESCRIPTION
         combined into one array used as final result.
 
 SEE ALSO
-	types(LPC), modifiers(LPC), varargs(LPC), references(LPC),
+        types(LPC), modifiers(LPC), varargs(LPC), references(LPC),
         call_other(E), simul_efun(C), call_out(E)

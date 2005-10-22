@@ -82,15 +82,15 @@ ROPT= -mRR
 XSRC=
 XOBJ=
 
-# interpret.c and lang.c need lots of RAM to compile, so it might be
+# interpret.c and parser.c need lots of RAM to compile, so it might be
 # wise to put the temporaries somewhere else than into T: in RAM:.
-# Set IOPT/LOPT to the options to do so for interpret.c resp. lang.c.
+# Set IOPT/LOPT to the options to do so for interpret.c resp. parser.c.
 
 IOPT= -T DTMP:
 LOPT= -T DTMP:
 
 # DICE 2.xx/3.0 has problems in compiling the switch() in interpret.c and
-# lang.c (it insists on using branches even in the large code model)
+# parser.c (it insists on using branches even in the large code model)
 # and thus needs some afterpatching.
 # The proper rules are selected by the filenames of the object files to
 # generate. If no afterpatching is needed, the filenames end with '.o', else
@@ -98,11 +98,11 @@ LOPT= -T DTMP:
 # Set the next to macros appropriately.
 
 INTERPRET= interpret.ox
-LANG= lang.ox
+LANG= parser.ox
 
 # The special rules for afterpatching put the intermediate assembler
 # files into the directory defined by DTMP.
-# Set IOPT2/LOPT2 to speed up the compiling of interpret.c/lang.c if
+# Set IOPT2/LOPT2 to speed up the compiling of interpret.c/parser.c if
 # possible or necessary. AOPT2 holds extra options for the assembler.
 
 DTMP= DTMP:
@@ -212,7 +212,7 @@ SRC=lex.c main.c simulate.c object.c backend.c array.c \
     pkg-mysql.c ptrtable.c heartbeat.c actions.c mempools.c files.c\
     access_check.c parse_old.c parse.c random.c rxcache.c \
     simul_efun.c strfuns.c sprintf.c gcollect.c closure.c efuns.c \
-    stdstrings.c xalloc.c bitstrings.c
+    stdstrings.c xalloc.c bitstrings.c parser.c
 OBJ= $(SRC:*.?:%1.o)
 
 driver: $(INTERPRET) $(LANG) $(OBJ) $(XOBJ)
@@ -221,7 +221,7 @@ driver: $(INTERPRET) $(LANG) $(OBJ) $(XOBJ)
 clean:
 	$(RMF) *.o *.ox *.a lang.c lang.h lang.y instrs.h efun_defs.c y.output
 	$(RMF) stdstrings.c stdstrings.h
-	$(RMF) make_func.c make_func
+	$(RMF) make_func.c mkfunc
 	$(RMF) driver astrip dstol PlayMud
 
 
@@ -231,32 +231,32 @@ $(OBJ) : $(SRC)
 	$(CC) $(CFLAGS) -c %(right) -o %(left)
 
 
-# Making of lang.o
+# Making of parser.o
 
 make_func.c: make_func.y
 	$(RM) make_func.c
 	$(YACC) $(YFLAGS) make_func.y
 	$(MV) $(YTAB).c make_func.c
 
-make_func.o : make_func.c driver.h config.h machine.h port.h
-	$(CC) $(CFLAGS) -DYACC="$(YACC)" -c make_func.c
+mkfunc.o : mkfunc.c make_func.c driver.h config.h machine.h port.h
+	$(CC) $(CFLAGS) -DYACC="$(YACC)" -c mkfunc.c
 
-make_func: make_func.o hash.o ixfile.o exec.h
-	$(CC) make_func.o hash.o ixfile.o -o make_func $(LIBS)
+mkfunc: mkfunc.o hash.o ixfile.o exec.h
+	$(CC) mkfunc.o hash.o ixfile.o -o mkfunc $(LIBS)
 
-efun_defs.c instrs.h: make_func
+efun_defs.c instrs.h: mkfunc
 	$(RMF) efun_defs.c
 	$(RMF) instrs.h
-	make_func instrs
+	mkfunc instrs
 
-stdstrings.c stdstrings.h: string_spec make_func config.h
+stdstrings.c stdstrings.h: string_spec mkfunc config.h
 	$(RMF) stdstrings.c
 	$(RMF) stdstrings.h
-	./make_func strings
+	./mkfunc strings
 
-lang.y: make_func
+lang.y: mkfunc
 	$(RMF) lang.y
-	make_func lang
+	mkfunc lang
 
 efun_defs.c instrs.h: func_spec
 
@@ -271,45 +271,45 @@ lang.c lang.h: lang.y
 	$(MV) $(YTAB).h lang.h
 
 
-#  Normal rule for lang.o
+#  Normal rule for parser.o
 
-lang.o : lang.c simul_efun.h mapping.h swap.h backend.h array.h \
+parser.o : parser.c lang.c simul_efun.h mapping.h swap.h backend.h array.h \
     closure.h main.h simulate.h  switch.h instrs.h config.h \
     exec.h object.h interpret.h lex.h prolang.h lint.h sent.h smalloc.h \
     port.h machine.h lang.h hosts/amiga/patchfloat.h \
     astrip
-	$(CC) $(LOPT) $(CFLAGS) -c lang.c -o %(left)
+	$(CC) $(LOPT) $(CFLAGS) -c parser.c -o %(left)
 
-#  Rules for lang.o with afterpatching
-#  I prefer compiling lang.c in two steps, in case the three iterations
+#  Rules for parser.o with afterpatching
+#  I prefer compiling parser.c in two steps, in case the three iterations
 #  over the assembler source aren't enough.
 
-lang.a : simul_efun.h mapping.h swap.h backend.h array.h \
+parser.a : simul_efun.h mapping.h swap.h backend.h array.h \
     closure.h main.h simulate.h  switch.h instrs.h config.h \
     exec.h object.h interpret.h lex.h prolang.h lint.h sent.h smalloc.h \
     port.h machine.h lang.h hosts/amiga/patchfloat.h \
     astrip
-	$(CC) $(LOPT2) $(CFLAGS) -a lang.c -o $(DTMP)lang.x
-	astrip $(DTMP)lang.x lang.a
-	$(RM) $(DTMP)lang.x
+	$(CC) $(LOPT2) $(CFLAGS) -a parser.c -o $(DTMP)parser.x
+	astrip $(DTMP)parser.x parser.a
+	$(RM) $(DTMP)parser.x
 
-lang.ox: lang.a dstol
-	echo ".key letter*Nfailat 21*Ndelete $(DTMP)lang.err >NIL:" >T:tryasm
-	echo "$(AS) $(DTMP)lang.<letter> -o lang.ox -E $(DTMP)lang.err" >>T:tryasm
+parser.ox: parser.a dstol
+	echo ".key letter*Nfailat 21*Ndelete $(DTMP)parser.err >NIL:" >T:tryasm
+	echo "$(AS) $(DTMP)parser.<letter> -o parser.ox -E $(DTMP)parser.err" >>T:tryasm
 	echo "echo *"..to ignore the failure of das*" >NIL:" >>T:tryasm
-	$(CP) lang.a $(DTMP)
+	$(CP) parser.a $(DTMP)
 	execute T:tryasm a ``
-	$(RM) $(DTMP)lang.a
-	dstol lang.a $(DTMP)lang.err $(DTMP)lang.d z
+	$(RM) $(DTMP)parser.a
+	dstol parser.a $(DTMP)parser.err $(DTMP)parser.d z
 	execute T:tryasm d ``
-	dstol $(DTMP)lang.d $(DTMP)lang.err $(DTMP)lang.e y
-	$(RM) $(DTMP)lang.d
+	dstol $(DTMP)parser.d $(DTMP)parser.err $(DTMP)parser.e y
+	$(RM) $(DTMP)parser.d
 	execute T:tryasm e ``
-	dstol $(DTMP)lang.e $(DTMP)lang.err $(DTMP)lang.f x
-	$(RM) $(DTMP)lang.err $(DTMP)lang.e
-	astrip $(DTMP)lang.f $(DTMP)lang.g redebug
-	$(AS) $(DTMP)lang.g -o lang.ox $(AOPT2)
-	$(RM) $(DTMP)lang.f $(DTMP)lang.g T:tryasm
+	dstol $(DTMP)parser.e $(DTMP)parser.err $(DTMP)parser.f x
+	$(RM) $(DTMP)parser.err $(DTMP)parser.e
+	astrip $(DTMP)parser.f $(DTMP)parser.g redebug
+	$(AS) $(DTMP)parser.g -o parser.ox $(AOPT2)
+	$(RM) $(DTMP)parser.f $(DTMP)parser.g T:tryasm
 
 
 # Making of interpret.o
@@ -382,7 +382,7 @@ netclean:
 osclean:
 	-$(RM) $(XOBJ)
 	-$(RM) backend.o interpret.o object.o otable.o simulate.o stralloc.o
-	-$(RM) interpret.a lang.a astrip dstol PlayMud driver
+	-$(RM) interpret.a parser.a astrip dstol PlayMud driver
 
 amiga.o : hosts/amiga/amiga.c
 	$(CC) $(CFLAGS) -Ihosts/amiga -c %(right) -o %(left)
@@ -538,14 +538,6 @@ interpret.o : interpret.c ../mudlib/sys/trace.h ../mudlib/sys/debug_info.h \
     config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
     hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
 
-lang.o : lang.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h switch.h \
-    swap.h svalue.h stdstrings.h simul_efun.h simulate.h object.h \
-    mstrings.h mapping.h main.h lex.h instrs.h interpret.h gcollect.h \
-    exec.h closure.h backend.h array.h prolang.h my-alloca.h typedefs.h \
-    driver.h ptrtable.h strfuns.h sent.h port.h config.h hosts/unix.h \
-    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
-    ./hosts/amiga/ixfile.h
-
 lex.o : lex.c efun_defs.c hosts/amiga/socket.h ../mudlib/sys/driver_hook.h \
     xalloc.h svalue.h strfuns.h stdstrings.h simul_efun.h simulate.h \
     prolang.h ./patchlevel.h object.h mstrings.h mempools.h main.h lang.h \
@@ -566,11 +558,6 @@ main.o : main.c xalloc.h wiz_list.h swap.h svalue.h stdstrings.h \
     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
-make_func.o : make_func.c ../mudlib/sys/driver_hook.h hash.h exec.h \
-    my-alloca.h driver.h typedefs.h port.h config.h hosts/unix.h \
-    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
-    ./hosts/amiga/ixfile.h
-
 mapping.o : mapping.c xalloc.h wiz_list.h svalue.h smalloc.h simulate.h \
     regexp.h object.h mstrings.h main.h interpret.h gcollect.h closure.h \
     backend.h array.h mapping.h my-alloca.h typedefs.h driver.h strfuns.h \
@@ -581,6 +568,11 @@ mapping.o : mapping.c xalloc.h wiz_list.h svalue.h smalloc.h simulate.h \
 mempools.o : mempools.c xalloc.h gcollect.h mempools.h driver.h typedefs.h \
     port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
     hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
+
+mkfunc.o : mkfunc.c make_func.c ../mudlib/sys/driver_hook.h hash.h exec.h \
+    my-alloca.h driver.h typedefs.h port.h config.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
 
 mstrings.o : mstrings.c ../mudlib/sys/debug_info.h xalloc.h svalue.h \
     strfuns.h stdstrings.h simulate.h main.h hash.h gcollect.h mstrings.h \
@@ -612,6 +604,14 @@ parse_old.o : parse_old.c xalloc.h wiz_list.h svalue.h stdstrings.h \
     simulate.h random.h object.h mstrings.h main.h gcollect.h interpret.h \
     closure.h array.h actions.h parse.h my-alloca.h typedefs.h driver.h \
     strfuns.h sent.h exec.h instrs.h port.h config.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
+
+parser.o : parser.c lang.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
+    switch.h swap.h svalue.h stdstrings.h simul_efun.h simulate.h object.h \
+    mstrings.h mapping.h main.h lex.h instrs.h interpret.h gcollect.h \
+    exec.h closure.h backend.h array.h prolang.h my-alloca.h typedefs.h \
+    driver.h ptrtable.h strfuns.h sent.h port.h config.h hosts/unix.h \
     hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
@@ -733,13 +733,13 @@ heartbeat.o : heartbeat.c instrs.h
 
 interpret.o : interpret.c stdstrings.h instrs.h
 
-lang.o : lang.c stdstrings.h instrs.h
-
 lex.o : lex.c efun_defs.c stdstrings.h lang.h instrs.h
 
 main.o : main.c stdstrings.h instrs.h
 
 mapping.o : mapping.c instrs.h
+
+mkfunc.o : mkfunc.c make_func.c
 
 mstrings.o : mstrings.c stdstrings.h
 
@@ -750,6 +750,8 @@ otable.o : otable.c instrs.h
 parse.o : parse.c stdstrings.h instrs.h
 
 parse_old.o : parse_old.c stdstrings.h instrs.h
+
+parser.o : parser.c lang.c stdstrings.h instrs.h
 
 pkg-mysql.o : pkg-mysql.c instrs.h
 

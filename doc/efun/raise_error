@@ -1,13 +1,13 @@
 SYNOPSIS
-	void raise_error(string arg)
+        void raise_error(string arg)
 
 DESCRIPTION
-	Abort execution. If the current program execution was
-	initiated by catch(), that catch expression will return arg as
-	error code, else the arg will printed as error message.	 This
-	is very similar to throw(), but while throw() is intended to
-	be called inside catch(), raise_error() can be called
-	anywhere.
+        Abort execution. If the current program execution was
+        initiated by catch(), that catch expression will return arg as
+        error code, else the arg will printed as error message. This
+        is very similar to throw(), but while throw() is intended to
+        be called inside catch(), raise_error() can be called
+        anywhere.
 
 SEE ALSO
-	catch(E), throw(E)
+        catch(E), throw(E)

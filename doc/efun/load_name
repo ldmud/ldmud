@@ -1,7 +1,7 @@
 SYNOPSIS
-	string load_name()
-	string load_name(object obj)
-	string load_name(string obj)
+        string load_name()
+        string load_name(object obj)
+        string load_name(string obj)
 
 DESCRIPTION
         Return the load name for the object <obj> which may be given
@@ -26,17 +26,17 @@ DESCRIPTION
         in COMPAT mode.
 
 EXAMPLE
-	object o;
-	o = clone_object("/std/thing");
-	write(load_name(o));  --> writes "/std/thing" in !compat mode
-	                             and "std/thing"  in compat mode
+        object o;
+        o = clone_object("/std/thing");
+        write(load_name(o));  --> writes "/std/thing" in !compat mode
+                                     and "std/thing"  in compat mode
         write(load_name("/std/thing"));  --> same as above
         write(load_name("/std/thing#4n5")); --> writes 0 
 
 HISTORY
-	Introduced in LDMud 3.2.6.
+        Introduced in LDMud 3.2.6.
         Strings are accepted as arguments since 3.2.8.
 
 SEE ALSO
-	clone_object(E), clonep(E), object_name(E), load_object(E),
+        clone_object(E), clonep(E), object_name(E), load_object(E),
         replace_program(E), program_name(E), present_clone(E)

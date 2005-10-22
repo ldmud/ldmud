@@ -2,22 +2,22 @@ Closure Guide for LPC
 
 Table of Contents
 
-	1 Indroduction, Overview and Efun-Closures
+        1 Indroduction, Overview and Efun-Closures
 
-	2 Lfun-, Inline and Lambda-Closures
-	2.1 Lfun-Closures
+        2 Lfun-, Inline and Lambda-Closures
+        2.1 Lfun-Closures
         2.2 Inline-Closures
-	2.3 Lambda-Closures
+        2.3 Lambda-Closures
         2.3.1 Advantages of Lambda-Closures
-	2.3.2 Free Variables in Lambda-Closure Constructs
-	2.3.3 Special Efun-Closures and Operator-Closures for Lambdas
-	2.4 Closures with Strange Names
-	2.5 Operator-Closures
-	2.6 Variable-Closures
+        2.3.2 Free Variables in Lambda-Closure Constructs
+        2.3.3 Special Efun-Closures and Operator-Closures for Lambdas
+        2.4 Closures with Strange Names
+        2.5 Operator-Closures
+        2.6 Variable-Closures
 
-	3 Examples
-	3.1 Lfun-Closure
-	3.2 Lambda-Closure
+        3 Examples
+        3.1 Lfun-Closure
+        3.2 Lambda-Closure
 
 1 Introduction, Overview and Efun-Closures
 

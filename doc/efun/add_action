@@ -1,70 +1,70 @@
 SYNOPSIS
         #include <commands.h>
 
-	void add_action(string fun, string cmd)
-	void add_action(string fun, string cmd, int flag)
+        void add_action(string fun, string cmd)
+        void add_action(string fun, string cmd, int flag)
 
 DESCRIPTION
-	Set up a local function fun to be called when user input
-	matches the command cmd. Functions called by a user command
-	will get the arguments as a string. It must then return 0 if
-	it was the wrong command, otherwise 1.
-	
-	If it was the wrong command, the parser will continue
-	searching for another command, until one returns 1 or give an
-	error message to the user.
-	
-	For example, there can be a wand and a rod. Both of these
-	objects define as command "wave". One of them will be randomly
-	called first, and it must look at the argument, and match
-	against "wand" or "rod" respectively.
-	
-	If second argument cmd is not given, it must be given by
-	add_(x)verb(). Support of add_(x)verb() is for historical reasons.
-	
-	The function associated to a command will be called with a
-	string as argument which stands for the given words behind the
-	typed command. The verb entered can be retrieved using the
+        Set up a local function fun to be called when user input
+        matches the command cmd. Functions called by a user command
+        will get the arguments as a string. It must then return 0 if
+        it was the wrong command, otherwise 1.
+        
+        If it was the wrong command, the parser will continue
+        searching for another command, until one returns 1 or give an
+        error message to the user.
+        
+        For example, there can be a wand and a rod. Both of these
+        objects define as command "wave". One of them will be randomly
+        called first, and it must look at the argument, and match
+        against "wand" or "rod" respectively.
+        
+        If second argument cmd is not given, it must be given by
+        add_(x)verb(). Support of add_(x)verb() is for historical reasons.
+        
+        The function associated to a command will be called with a
+        string as argument which stands for the given words behind the
+        typed command. The verb entered can be retrieved using the
         query_verb() efun and is always the first word in the input
         line up to the first space.
-	
-	Always have add_action() called only from an init() routine.
-	The object defining these commands must be present to the
-	user, either being the user, being carried by the user,
-	being the room around the user, or being an object in the
-	same room as the user.
-	
-	If argument <flag> is AA_SHORT (1), then the arguments may
+        
+        Always have add_action() called only from an init() routine.
+        The object defining these commands must be present to the
+        user, either being the user, being carried by the user,
+        being the room around the user, or being an object in the
+        same room as the user.
+        
+        If argument <flag> is AA_SHORT (1), then the arguments may
         follow the verb without separating space. Any arguments after
         the first space are passed as argument string.
 
         If argument <flag> is AA_NOSPACE (2), then again the arguments
-        may follow the verb without separating space. In contract to
+        may follow the verb without separating space. In contrast to
         AA_SHORT, all characters following the verb are passed as
         the argument string.
 
         If argument <flag> is negative, the verb given by the player
         has to match only the leading -<flag> characters of the verb <cmd>.
 
-	Never use one of the functions 'create' 'reset' 'init' 'exit'
-	'heart_beat' etc as the first argument to add_action(). In
-	general, a function with a name defined in /doc/applied should
-	have the behaviour defined there.
+        Never use one of the functions 'create' 'reset' 'init' 'exit'
+        'heart_beat' etc as the first argument to add_action(). In
+        general, a function with a name defined in /doc/applied should
+        have the behaviour defined there.
 
 EXAMPLES
-	add_action("GoInside", "enter");
-	
-	  When typing "enter" the function GoInside() will be invoked.
-	
-	add_action("DisFunc", "dis", 1);
-	
-	  Whenever you type in a command which starts with "dis" the
-	  function DisFunc() will be called. To get the real word which
-	  was typed in (because until now you only know that it was a
-	  command beginning with "dis") you have to call the efun
-	  query_verb().
+        add_action("GoInside", "enter");
+        
+          When typing "enter" the function GoInside() will be invoked.
+        
+        add_action("DisFunc", "dis", 1);
+        
+          Whenever you type in a command which starts with "dis" the
+          function DisFunc() will be called. To get the real word which
+          was typed in (because until now you only know that it was a
+          command beginning with "dis") you have to call the efun
+          query_verb().
 
-	add_action("DisFunc", "disconnect", 2);
+        add_action("DisFunc", "disconnect", 2);
 
           The function DisFunc() will be called for all commands which
           use "disconnect" or a shortened form like "di", "dis" or
@@ -94,9 +94,9 @@ EXAMPLES
           "scmdfoo bar"  -> verb "scmdfoo", arg "foo bar"
 
 HISTORY
-	The flag < 0 argument was supported since 3.2@127, but not
+        The flag < 0 argument was supported since 3.2@127, but not
         really implemented before LDMud 3.2.8.
-    LDMud 3.3 removed the historical add_action(fun) notation.
+        LDMud 3.3 removed the historical add_action(fun) notation.
 
 SEE ALSO
-	query_verb(E), query_command(E), init(A)
+        query_verb(E), query_command(E), init(A)

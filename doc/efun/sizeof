@@ -1,15 +1,12 @@
 SYNOPSIS
-	int sizeof(mixed arr)
+        int sizeof(mixed arr)
 
 DESCRIPTION
-	Returns the number of elements of an array or or the number of
+        Returns the number of elements of an array or or the number of
         keys in a mapping.
 
-	For scalar values (like integers), 0 is returned.
-
-        Note: this efun is also available under the name 'm_sizeof(E)'.
-        Usage of that name however is deprecated.
+        For scalar values (like integers), 0 is returned.
 
 SEE ALSO
-	strlen(E), allocate(E), pointerp(E),
-	mappingp(E), allocate_mapping(E), widthof(E)
+        strlen(E), allocate(E), pointerp(E),
+    mappingp(E), m_allocate(E), widthof(E)

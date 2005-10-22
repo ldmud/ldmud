@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Apr-2001 (Lars Duening)  (3.3.35)
+    - (lex) Corrected a bug in yesterday's change.
+    - (doc/) Cleaned up the files a bit.
+    - (erq, xerq) Fixed (hopefully) a type mismatch under Darwin.
+    - (make_func, parser) Wrapped the parsers into a file defining 'lint'
+        to avoid spurious warnings, and under Darwin to enable to compile
+        them in the first place. As a result, make_func is now called
+        'mkfunc', and the lpc parser is 'parser.[co]'.
+
 02-Apr-2001 (Lars Duening)  (3.3.34)
     - (lex) When generating names for inline closures, the compiler
         makes sure that the name hasn't been used yet (reported by Dan).

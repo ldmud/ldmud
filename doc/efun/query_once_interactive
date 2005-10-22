@@ -1,8 +1,8 @@
 SYNOPSIS
-	int query_once_interactive(object ob)
+        int query_once_interactive(object ob)
 
 DESCRIPTION
-	True if the object is or once was interactive.
+        True if the object is or once was interactive.
 
 SEE ALSO
-	remove_interactive(E)
+        remove_interactive(E)

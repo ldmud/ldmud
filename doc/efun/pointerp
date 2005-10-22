@@ -1,8 +1,8 @@
 SYNOPSIS
-	int pointerp(mixed arg)
+        int pointerp(mixed arg)
 
 DESCRIPTION
-	Return 1 if arg is a pointer, i.e. an array.
+        Return 1 if arg is a pointer, i.e. an array.
 
 SEE ALSO
-	intp(E), stringp(E), objectp(E)
+        intp(E), stringp(E), objectp(E)

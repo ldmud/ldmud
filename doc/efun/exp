@@ -1,8 +1,8 @@
 SYNOPSIS
-	float exp(int|float)
+        float exp(int|float)
 
 DESCRIPTION
-	The exponential function.
+        The exponential function.
 
 HISTORY
         LDMud 3.2.9 added integers as arguments.

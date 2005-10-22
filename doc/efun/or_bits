@@ -8,9 +8,9 @@ DESTRIPTION
         bit in <str1> or <str2> (or both) is set.
 
 EXAMPLES
-	string s1, s2, s3;
+        string s1, s2, s3;
 
-	s1 = set_bit("", 3); s1 = set_bit(s1, 15);  -> s1 is "( ("
+        s1 = set_bit("", 3); s1 = set_bit(s1, 15);  -> s1 is "( ("
         s2 = set_bit("", 3); s2 = set_bit(s2, 4);   -> s2 is "8"
 
         s3 = or_bits(s1, s2);

@@ -1,14 +1,14 @@
 SYNOPSIS
-	float to_float(int)
-	float to_float(string)
-	float to_float(float)
+        float to_float(int)
+        float to_float(string)
+        float to_float(float)
 
         (float)<value>
 
 DESCRIPTION
-	Ints are expanded to floats, strings are converted up to the
-	first character that doesnt belong into a float.
-	Floats are just returned.
+        Ints are expanded to floats, strings are converted up to the
+        first character that doesnt belong into a float.
+        Floats are just returned.
 
 SEE ALSO
-	to_string(E), to_int(E), sscanf(E)
+        to_string(E), to_int(E), sscanf(E)

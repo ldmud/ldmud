@@ -94,6 +94,12 @@ time_t time(time_t *);
 #    define SIGTERM 15
 #endif
 
+#ifdef _AIX
+typedef unsigned long length_t;  /* *sigh* */
+#else
+typedef int length_t;
+#endif
+
 #define AUTH_PORT 113 /* according to RFC 931 */
 
 #include "config.h"
@@ -1636,7 +1642,7 @@ main (int argc, char **argv)
             
             for (next_child = udp_sockets; (child = next_child); )
             {
-                size_t length;
+                length_t length;
                 long replylen;
                 char replyheader[16];
                 char replybuf[ERQ_BUFSIZE];
@@ -2330,6 +2336,7 @@ main (int argc, char **argv)
                     struct sockaddr_in host_ip_addr;
                     long tmp2;
                     int tmp;
+                    length_t len;
                     int n;
 
                     if (msglen != sizeof(union ticket_u) + 4)
@@ -2369,10 +2376,10 @@ main (int argc, char **argv)
                         break;
                     }
 
-                    tmp = sizeof(host_ip_addr);
+                    len = sizeof(host_ip_addr);
                     s = accept( parent->socket
                               , (struct sockaddr *) &host_ip_addr
-                              , (size_t *)&tmp);
+                              , &len);
                     if (s < 0)
                     {
                         header[8] = ERQ_E_UNKNOWN;

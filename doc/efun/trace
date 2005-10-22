@@ -38,8 +38,8 @@ DESCRIPTION
 EXAMPLE
         object obj;
         string prefix;
-        obj=find_player("deepthought");
-        prefix=file_name(obj);
+        obj=find_player("wessex");
+        prefix=object_name(obj);
         prefix=prefix[1..strlen(prefix)-1]; /* cut off the leading "/" */
         traceprefix(prefix);
           /* From here on, only code in the object "std/player#69"

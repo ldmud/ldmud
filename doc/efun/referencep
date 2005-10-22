@@ -1,9 +1,9 @@
 SYNOPSIS
-	int referencep(mixed arg)
+        int referencep(mixed arg)
 
 DESCRIPTION
-	returns true if arg was passed by reference to the current
-	function, instead of the usual call-by-value.
+        returns true if arg was passed by reference to the current
+        function, instead of the usual call-by-value.
 
 SEE ALSO
-	references(LPC)
+        references(LPC)

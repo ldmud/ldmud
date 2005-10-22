@@ -7,7 +7,7 @@ SYNOPSIS
 
 DESCRIPTION
         The argument is converted into an object, if possible.
-        For strings, the object with a matching file_name() is
+        For strings, the object with a matching object_name() is
         returned, or 0 if there is none, as find_object() does.
         For (bound!) closures, the object holding the closure is
         returned.

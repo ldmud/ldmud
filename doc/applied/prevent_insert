@@ -1,15 +1,15 @@
 SYNOPSIS
-	int prevent_insert()
+        int prevent_insert()
 
 DESCRIPTION
-	In compat mode, this function is used by the efun transfer().
+        In compat mode, this function is used by the efun transfer().
 
-	Define this function in objects that are neither living nor
-	rooms if you want to prevent to put something into current
-	object.
+        Define this function in objects that are neither living nor
+        rooms if you want to prevent to put something into current
+        object.
 
-	Return true if ok, otherwise 0. That means that default is
-	that it is not possible to put something into an object.
+        Return true if ok, otherwise 0. That means that default is
+        that it is not possible to put something into an object.
 
 SEE ALSO
-	transfer(E), can_put_and_get(A)
+        transfer(E), can_put_and_get(A)

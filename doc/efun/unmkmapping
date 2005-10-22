@@ -1,5 +1,5 @@
 SYNOPSIS
-	mixed* unmkmapping(mapping map)
+        mixed* unmkmapping(mapping map)
 
 DESCRIPTION
         Take mapping <map> and return an array of arrays with the keys
@@ -25,5 +25,5 @@ HISTORY
         Introduced in LDMud 3.2.6.
 
 SEE ALSO
-	mappings(LPC), mappingp(E), m_indices(E), m_values(E),
-	m_delete(E), sizeof(E), widthof(E).
+        mappings(LPC), mappingp(E), m_indices(E), m_values(E),
+        m_delete(E), sizeof(E), widthof(E).

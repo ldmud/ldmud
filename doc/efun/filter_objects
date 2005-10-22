@@ -1,12 +1,12 @@
 SYNOPSIS
-	object *filter_objects(object *arr, string fun, mixed extra, ...)
+        object *filter_objects(object *arr, string fun, mixed extra, ...)
 
 DESCRIPTION
-	Similar to filter_array() but calls arr[n]->fun(extra, ...).
-	If the call returns != 0, the object arr[n] ist included in
-	the returned array.
-	0-entries in arr are ignored.
+        Similar to filter_array() but calls arr[n]->fun(extra, ...).
+        If the call returns != 0, the object arr[n] ist included in
+        the returned array.
+        0-entries in arr are ignored.
 
 SEE ALSO
-	filter_array(E), map_array(E), map_objects(E)
+        filter(E), map(E), map_objects(E)
 

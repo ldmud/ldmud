@@ -1,8 +1,8 @@
 SYNOPSIS
-	void remove_interactive(object ob)
+        void remove_interactive(object ob)
 
 DESCRIPTION
-	Close the connection to the interactive object ob.
+        Close the connection to the interactive object ob.
 
 SEE ALSO
-	connect(M), logon(A), disconnect(M)
+        connect(M), logon(A), disconnect(M)

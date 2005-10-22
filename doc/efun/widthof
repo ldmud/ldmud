@@ -1,5 +1,5 @@
 SYNOPSIS
-	int widthof (mapping map)
+        int widthof (mapping map)
 
 DESCRIPTION
         Returns the number of values per key of mapping <map>.
@@ -14,4 +14,4 @@ HISTORY
 
 SEE ALSO
         sizeof(E), mkmapping(E), m_reallocate(E), m_values(E),
-	unmkmapping(E)
+        unmkmapping(E)

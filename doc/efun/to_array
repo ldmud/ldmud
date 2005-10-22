@@ -1,16 +1,16 @@
 SYNOPSIS
-	mixed *to_array(string)
-	mixed *to_array(symbol)
-	mixed *to_array(quotedarray)
-	mixed *to_array(mixed *)
+        mixed *to_array(string)
+        mixed *to_array(symbol)
+        mixed *to_array(quotedarray)
+        mixed *to_array(mixed *)
 
         (int*)<value>
 
 DESCRIPTION
-	Strings and symbols are converted to an int array that
-	consists of the args characters.
-	Quoted arrays are ``dequoted'', and arrays are left as they
-	are.
+        Strings and symbols are converted to an int array that
+        consists of the args characters.
+        Quoted arrays are ``dequoted'', and arrays are left as they
+        are.
 
 SEE ALSO
-	to_int(E), to_string(E)
+        to_int(E), to_string(E)

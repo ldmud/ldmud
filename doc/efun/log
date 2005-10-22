@@ -1,8 +1,8 @@
 SYNOPSIS
-	float log(int|float arg)
+        float log(int|float arg)
 
 DESCRIPTION
-	Returns the natural logarithm of its argument.
+        Returns the natural logarithm of its argument.
 
 HISTORY
         LDMud 3.2.9 added integers as arguments.

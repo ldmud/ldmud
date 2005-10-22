@@ -1,6 +1,6 @@
 SYNOPSIS
-	mixed query_notify_fail()
-	mixed query_notify_fail(int flag)
+        mixed query_notify_fail()
+        mixed query_notify_fail(int flag)
 
 DESCRIPTION
         If <flag> is not given or 0: return the string or closure which

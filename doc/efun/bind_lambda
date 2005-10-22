@@ -1,14 +1,14 @@
 SYNOPSIS
-	closure bind_lambda(closure, object ob)
+        closure bind_lambda(closure, object ob)
 
 DESCRIPTION
-	Binds an unbound closure to an object and return it.
+        Binds an unbound closure to an object and return it.
 
         If the optional argument ob is not this_object(), the privilege
         violation ("bind_lambda", this_object(), ob) occurs.
 
 HISTORY
-	Introduced in 3.2@82.
+        Introduced in 3.2@82.
 
 SEE ALSO
-	lambda(E), unbound_lambda(E), apply(E), funcall(E), closures(LPC)
+        lambda(E), unbound_lambda(E), apply(E), funcall(E), closures(LPC)

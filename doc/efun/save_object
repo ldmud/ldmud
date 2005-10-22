@@ -1,6 +1,6 @@
 SYNOPSIS
-	int    save_object (string name)
-	string save_object ()
+        int    save_object (string name)
+        string save_object ()
 
 DESCRIPTION
         Encode the publicly visible variables of the current object
@@ -22,4 +22,4 @@ HISTORY
         may be moved into a different efun in future.
 
 SEE ALSO
-	restore_object(E), save_value(E)
+        restore_object(E), save_value(E)

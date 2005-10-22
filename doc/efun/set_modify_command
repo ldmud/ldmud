@@ -7,7 +7,7 @@ DESCRIPTION
         All commands for the current object (that must obviously be
         interactive) will be passed to ob->modify_command() before
         actually being executed. The argument can be passed an object
-        or a file_name.
+        or an object_name.
 
         When set_modify_command() was called, the parser won't expand
         the standard abbreviations n,e,s,w,nw,sw,ne,se for that user

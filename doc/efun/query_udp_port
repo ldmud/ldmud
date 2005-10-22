@@ -1,11 +1,11 @@
 SYNOPSIS
-	int query_udp_port(void)
+        int query_udp_port(void)
 
 DESCRIPTION
-	Returns the port number of the UDP socket.
+        Returns the port number of the UDP socket.
 
 HISTORY
         LDMud 3.2.9 renamed this efun from query_imp_mud().
 
 SEE ALSO
-	send_udp(E), receive_udp(M)
+        send_udp(E), receive_udp(M)

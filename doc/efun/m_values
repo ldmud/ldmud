@@ -1,9 +1,9 @@
 SYNOPSIS
-	mixed *m_values(mapping map)
-	mixed *m_values(mapping map, int index)
+        mixed *m_values(mapping map)
+        mixed *m_values(mapping map, int index)
 
 DESCRIPTION
-	Returns an array with the values of mapping 'map'.
+        Returns an array with the values of mapping 'map'.
         If <index> is given as a number between 0 and the width of
         the mapping, the values from the given column are returned,
         else the values of the first column.
@@ -15,5 +15,5 @@ EXAMPLES
         m_values(m, 1)  --> returns ({ 2, 8, 9 })
 
 SEE ALSO
-	mappingp(E), mkmapping(E), m_indices(E), m_delete(E),
-	sizeof(E), widthof(E), unmkmapping(E).
+        mappingp(E), mkmapping(E), m_indices(E), m_delete(E),
+        sizeof(E), widthof(E), unmkmapping(E).

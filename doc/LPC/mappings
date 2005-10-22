@@ -1,8 +1,8 @@
 CONCEPT
-	mappings
+        mappings
 
 LAST UPDATE
-	Mon, 15 Mar 1999
+        Mon, 15 Mar 1999
 
 DESCRIPTION
 
@@ -420,12 +420,12 @@ DESCRIPTION
   applications which use mappings.
 
   And Hyps further comment on this:
-	The function mapping_to_alist() is also not that
-	clever because insert_alist() allways creates a new
-	alist.  A second (optional) argument to m_values() to
-	specify the value column would be better. Besides
-	this, the conversion of a mapping into an alist could
-	be done by to_array().
+        The function mapping_to_alist() is also not that
+        clever because insert_alist() allways creates a new
+        alist.  A second (optional) argument to m_values() to
+        specify the value column would be better. Besides
+        this, the conversion of a mapping into an alist could
+        be done by to_array().
 
 SEE ALSO
-	alists(LPC), closures(LPC), mkmapping(E), walk_mapping(E)
+        alists(LPC), closures(LPC), mkmapping(E), walk_mapping(E)

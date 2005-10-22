@@ -1,5 +1,5 @@
 CONCEPT
-	    mysql - mySQL support
+            mysql - mySQL support
 
 DESCRIPTION
         On hosts with the mySQL package installed, the driver can be

@@ -1,6 +1,6 @@
 SYNOPSIS
-	void set_combine_charset (int* bitvector)
-	void set_combine_charset (string charset)
+        void set_combine_charset (int* bitvector)
+        void set_combine_charset (string charset)
 
 DESCRIPTION
         Set the set of characters which can be combined into a single string
@@ -33,7 +33,7 @@ EXAMPLE
 
 
 HISTORY
-	Introduced in LDMud 3.2.8.
+        Introduced in LDMud 3.2.8.
 
 SEE ALSO
-	input_to(E)
+        input_to(E)

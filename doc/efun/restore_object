@@ -16,7 +16,7 @@ DESCRIPTION
         check_valid_path().
 
         Return 1 on success, 0 if there was nothing to restore.
-	
+        
         Variables that has the type modifer 'nosave' will not be restored.
         Example: nosave int xxx;
         
@@ -33,4 +33,4 @@ HISTORY
         may be moved in future into a separate efun.
 
 SEE ALSO
-	    save_object(E), restore_value(E), valid_read(M)
+        save_object(E), restore_value(E), valid_read(M)

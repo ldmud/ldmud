@@ -179,6 +179,8 @@
  *---------------------------------------------------------------------------
  */
 
+#undef lint  /* undef so that precompiled headers can be used */
+
 #include "driver.h"
 
 #include "my-alloca.h"
@@ -191,6 +193,8 @@
 #include "hash.h"
 
 #include "../mudlib/sys/driver_hook.h"
+
+#define lint  /* redef again to prevent spurious warnings */
 
 /* driver.h defines its own memory management functions,
  * which we don't need.

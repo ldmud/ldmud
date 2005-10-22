@@ -1,14 +1,14 @@
 SYNOPSIS
-	int symbolp(mixed arg)
+        int symbolp(mixed arg)
 
 DESCRIPTION
-	Returns true, if arg is a symbol.
+        Returns true, if arg is a symbol.
 
 EXAMPLE
-	symbolp('foo) returns 1.
+        symbolp('foo) returns 1.
 
 HISTORY
-	Introduced in 3.2@70
+        Introduced in 3.2@70
 
 SEE ALSO
-	intp(E)
+        intp(E)

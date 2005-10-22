@@ -95,13 +95,12 @@ endif
     YACCTAB = y.tab.
 
 # The C source files.
-# Though lang.c is listed, it is in fact generated from prolang.y
     SRCS = access_check.c actions.c array.c backend.c bitstrings.c \
            call_out.c closure.c \
            comm.c dumpstat.c ed.c efuns.c files.c gcollect.c hash.c \
            heartbeat.c \
-           interpret.c lang.c lex.c main.c mapping.c mempools.c mstrings.c \
-           object.c otable.c parse.c parse_old.c pkg-mysql.c port.c \
+           interpret.c lex.c main.c mapping.c mempools.c mstrings.c \
+           object.c otable.c parser.c parse.c parse_old.c pkg-mysql.c port.c \
            ptrtable.c random.c \
            regexp.c rxcache.c simulate.c simul_efun.c stdstrings.c \
            strfuns.c sprintf.c swap.c wiz_list.c xalloc.c
@@ -111,15 +110,14 @@ endif
     GENSRCS = make_func.c stdstrings.c lang.c instrs.h
 
 # Macros for MkDepend:
-    SKELETON = $(SRCS) make_func.c
+    SKELETON = $(SRCS) mkfunc.c
     EXCEPT = -x efun_defs.c
-    SELECT = -S instrs.h -S stdstrings.h -S lang.h -S efun_defs.c
+    SELECT = -S instrs.h -S stdstrings.h -S make_func.c -S lang.c -S lang.h -S efun_defs.c
 
 # Initialize the CFLAGS with the values above
     CFLAGS += $(OPTIMIZE) $(DEBUG) $(WARN) $(PROFIL)
     CFLAGS += -DMUD_LIB='"$(MUDLIB)"' -DBINDIR='"$(BINDIR)"'
     CFLAGS += -DERQ_DIR='"$(ERQDIR)"'
-    CFLAGS += -Dlint
 
 # Add additional flags if given
 
@@ -148,16 +146,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 34
+  SETVERFLAGS += d 35
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.34
+  VSTRING = 3.3.0-pre.35
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 34
+  SETVERFLAGS += d 35
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.34
+  VSTRING = 3.3.0-dev.35
 endif
 
 else
@@ -165,12 +163,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 34
+SETVERFLAGS = -app 3 3 35
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.34
+  VSTRING = 3.3.35
 
 endif
 
@@ -322,7 +320,7 @@ ifneq ($(CPU), $(NATIVE))
 endif
 
 clean :: FORCE
-	-rm -f $(YACCTAB)h $(YACCTAB)c make_func.c $(OBJ)/make_func
+	-rm -f $(YACCTAB)h $(YACCTAB)c make_func.c $(OBJ)/mkfunc
 	-rm -f *~ efun_defs.c instrs.h lang.y lang.h lang.c y.output tags TAGS
 	-rm -f stdstrings.c stdstrings.h
 	-rm -f hosts/*~ hosts/*/*~ bugs/*~ done/*~ $(OBJ)/*.o
@@ -376,39 +374,39 @@ depend-amiga: $(SRCS) $(GENSRCS) $(AMIGASRCS)  $(OBJ)
           echo mkdepend utility not available.; \
         fi"
 
-# Special rules for making make_func, depending on whether we're
+# Special rules for making mkfunc, depending on whether we're
 # crosscompiling or not.
 
 make_func.c : make_func.y
 	$(YACC) make_func.y
 	mv $(YACCTAB)c make_func.c
 
-$(OBJ)/make_func.o : make_func.c driver.h config.h machine.h port.h
+$(OBJ)/mkfunc.o : mkfunc.c make_func.c driver.h config.h machine.h port.h
 	$(CC) $(INCLUDES) $(CFLAGS) -DYACC='"$(YACC)"' -c $< -o $@
 
-$(OBJ)/make_func : $(OBJ)/make_func.o $(OBJ)/hash.o
+$(OBJ)/mkfunc : $(OBJ)/mkfunc.o $(OBJ)/hash.o
 	$(LD) -o $@ $^ $(LDFLAGS)
 	$(MIMESET) -f $@
 
 ifneq ($(CPU), $(NATIVE))
-$(OBJ_NATIVE)/make_func :
+$(OBJ_NATIVE)/mkfunc :
 	@[ -d $(OBJ_NATIVE) ] || mkdir $(OBJ_NATIVE) > /dev/null 2>&1
 	make CPU=$(NATIVE) $@
 endif
 
 # The making of the compiler and associated files.
 
-efun_defs.c instrs.h : func_spec config.h $(OBJ_NATIVE)/make_func
+efun_defs.c instrs.h : func_spec config.h $(OBJ_NATIVE)/mkfunc
 	-rm -f efun_defs.c instrs.h
-	$(OBJ_NATIVE)/make_func instrs
+	$(OBJ_NATIVE)/mkfunc instrs
 
-stdstrings.c stdstrings.h: string_spec $(OBJ_NATIVE)/make_func config.h
+stdstrings.c stdstrings.h: string_spec $(OBJ_NATIVE)/mkfunc config.h
 	rm -f stdstrings.c stdstrings.h
-	$(OBJ_NATIVE)/make_func strings
+	$(OBJ_NATIVE)/mkfunc strings
 
-lang.y : prolang.y config.h $(OBJ_NATIVE)/make_func
+lang.y : prolang.y config.h $(OBJ_NATIVE)/mkfunc
 	-rm -f lang.y
-	$(OBJ_NATIVE)/make_func lang
+	$(OBJ_NATIVE)/mkfunc lang
 
 lang.c lang.h : lang.y
 	$(YACC) -d -v lang.y
@@ -561,14 +559,6 @@ $(OBJ)/interpret.o : ../mudlib/sys/trace.h ../mudlib/sys/debug_info.h \
     config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
     hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
 
-$(OBJ)/lang.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h switch.h \
-    swap.h svalue.h stdstrings.h simul_efun.h simulate.h object.h \
-    mstrings.h mapping.h main.h lex.h instrs.h interpret.h gcollect.h \
-    exec.h closure.h backend.h array.h prolang.h my-alloca.h typedefs.h \
-    driver.h ptrtable.h strfuns.h sent.h port.h config.h hosts/unix.h \
-    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
-    ./hosts/amiga/ixfile.h
-
 $(OBJ)/lex.o : efun_defs.c hosts/amiga/socket.h ../mudlib/sys/driver_hook.h \
     xalloc.h svalue.h strfuns.h stdstrings.h simul_efun.h simulate.h \
     prolang.h patchlevel.h object.h mstrings.h mempools.h main.h lang.h \
@@ -589,11 +579,6 @@ $(OBJ)/main.o : xalloc.h wiz_list.h swap.h svalue.h stdstrings.h \
     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
-$(OBJ)/make_func.o : ../mudlib/sys/driver_hook.h hash.h exec.h my-alloca.h \
-    driver.h typedefs.h port.h config.h hosts/unix.h hosts/be/be.h \
-    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
-    ./hosts/amiga/ixfile.h
-
 $(OBJ)/mapping.o : xalloc.h wiz_list.h svalue.h smalloc.h simulate.h \
     regexp.h object.h mstrings.h main.h interpret.h gcollect.h closure.h \
     backend.h array.h mapping.h my-alloca.h typedefs.h driver.h strfuns.h \
@@ -604,6 +589,11 @@ $(OBJ)/mapping.o : xalloc.h wiz_list.h svalue.h smalloc.h simulate.h \
 $(OBJ)/mempools.o : xalloc.h gcollect.h mempools.h driver.h typedefs.h \
     port.h config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
     hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
+
+$(OBJ)/mkfunc.o : make_func.c ../mudlib/sys/driver_hook.h hash.h exec.h \
+    my-alloca.h driver.h typedefs.h port.h config.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
 
 $(OBJ)/mstrings.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h \
     stdstrings.h simulate.h main.h hash.h gcollect.h mstrings.h driver.h \
@@ -636,6 +626,14 @@ $(OBJ)/parse_old.o : xalloc.h wiz_list.h svalue.h stdstrings.h simulate.h \
     array.h actions.h parse.h my-alloca.h typedefs.h driver.h strfuns.h \
     sent.h exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h \
     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
+
+$(OBJ)/parser.o : lang.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h \
+    switch.h swap.h svalue.h stdstrings.h simul_efun.h simulate.h object.h \
+    mstrings.h mapping.h main.h lex.h instrs.h interpret.h gcollect.h \
+    exec.h closure.h backend.h array.h prolang.h my-alloca.h typedefs.h \
+    driver.h ptrtable.h strfuns.h sent.h port.h config.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
 $(OBJ)/pkg-mysql.o : xalloc.h svalue.h interpret.h array.h pkg-mysql.h \
@@ -754,13 +752,13 @@ $(OBJ)/heartbeat.o : instrs.h
 
 $(OBJ)/interpret.o : stdstrings.h instrs.h
 
-$(OBJ)/lang.o : stdstrings.h instrs.h
-
 $(OBJ)/lex.o : efun_defs.c stdstrings.h lang.h instrs.h
 
 $(OBJ)/main.o : stdstrings.h instrs.h
 
 $(OBJ)/mapping.o : instrs.h
+
+$(OBJ)/mkfunc.o : make_func.c
 
 $(OBJ)/mstrings.o : stdstrings.h
 
@@ -771,6 +769,8 @@ $(OBJ)/otable.o : instrs.h
 $(OBJ)/parse.o : stdstrings.h instrs.h
 
 $(OBJ)/parse_old.o : stdstrings.h instrs.h
+
+$(OBJ)/parser.o : lang.c stdstrings.h instrs.h
 
 $(OBJ)/pkg-mysql.o : instrs.h
 

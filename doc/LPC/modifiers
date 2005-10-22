@@ -1,5 +1,5 @@
 CONCEPT
-	modifiers
+        modifiers
 
 DESCRIPTION
         A modifier changes the syntactic and/or semantic behaviour of
@@ -133,4 +133,4 @@ HISTORY
         with LDMud 3.2.8. 'static' is still recognized as an alias.
 
 SEE ALSO
-	    closures(LPC), inheritance(LPC), functions(LPC), types(LPC)
+            closures(LPC), inheritance(LPC), functions(LPC), types(LPC)

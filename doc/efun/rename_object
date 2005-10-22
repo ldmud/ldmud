@@ -1,13 +1,13 @@
 SYNOPSIS
-	void rename_object (object ob, string new_name);
+        void rename_object (object ob, string new_name);
 
 DESCRIPTION
-	Give the current object a new file_name. Causes a privilege
-	violation. The new name must not contain a # character, except
-	at the end, to avoid confusion with clone numbers.
+        Give the current object a new object_name. Causes a privilege
+        violation. The new name must not contain a # character, except
+        at the end, to avoid confusion with clone numbers.
 
 HISTORY
-	Introduced in 3.2@55.
+        Introduced in 3.2@55.
 
 SEE ALSO
-	creator(E), object_name(E), load_name(E).
+        creator(E), object_name(E), load_name(E).

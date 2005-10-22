@@ -59,7 +59,7 @@ Style
     Every module must include "drivers.h" which in turn includes the
     portability headers and provides common defines.
 
-    Use the driver provided types and macros like BOOL or p_int.
+    Use the driver provided types and macros like Bool or p_int.
 
     Code should be written defensively and readable. This is not the IOCCC.
 

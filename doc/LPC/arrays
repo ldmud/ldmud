@@ -1,32 +1,32 @@
 CONCEPT
-	arrays
+        arrays
 
 DESCRIPTION
-	There is support for arrays. The arrays can't be declared, but
-	be should allocated dynamically with the function 'allocate()'
-	(see efun/allocate).
+        There is support for arrays. The arrays can't be declared, but
+        be should allocated dynamically with the function 'allocate()'
+        (see efun/allocate).
 
-	Arrays are stored by reference, so all assignments of whole
-	arrays will just copy the address. The array will be
-	deallocated when no variable points to it any longer.
+        Arrays are stored by reference, so all assignments of whole
+        arrays will just copy the address. The array will be
+        deallocated when no variable points to it any longer.
 
-	When a variable points to an array, items can be accessed with
-	indexing: 'arr[3]' as an example. The name of the array being
-	indexed can be any expression, even a function call:
-	'func()[2]'. It can also be another array, if this array has
-	pointers to arrays:
+        When a variable points to an array, items can be accessed with
+        indexing: 'arr[3]' as an example. The name of the array being
+        indexed can be any expression, even a function call:
+        'func()[2]'. It can also be another array, if this array has
+        pointers to arrays:
 
-	arr = allocate(2);
-	arr[0] = allocate(3);
-	arr[1] = allocate(3);
+        arr = allocate(2);
+        arr[0] = allocate(3);
+        arr[1] = allocate(3);
 
-	Now 'arr[1][2]' is a valid value.
+        Now 'arr[1][2]' is a valid value.
 
-	The 'sizeof()' function (in true C, not a function) will give
-	the number of elements in an array (see efun/sizeof).
+        The 'sizeof()' function (in true C, not a function) will give
+        the number of elements in an array (see efun/sizeof).
 
 NOTE
-	Nowadays it is most of the time preferable to use an array
-	constructor, a list surrounded by '({' and '})',
-	e.g. ({ 1, "xx", 2 }) will be construct a new array with
-	size 3, initialized with 1, "xx" and 2 respectively.
+        Nowadays it is most of the time preferable to use an array
+        constructor, a list surrounded by '({' and '})',
+        e.g. ({ 1, "xx", 2 }) will be construct a new array with
+        size 3, initialized with 1, "xx" and 2 respectively.

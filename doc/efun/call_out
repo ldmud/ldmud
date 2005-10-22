@@ -1,44 +1,44 @@
 SYNOPSIS
-	void call_out(string fun, int delay, mixed arg, ...)
-	void call_out(closure cl, int delay, mixed arg, ...)
+        void call_out(string fun, int delay, mixed arg, ...)
+        void call_out(closure cl, int delay, mixed arg, ...)
 
 DESCRIPTION
-	Set up a call to function fun in the current object, or to
+        Set up a call to function fun in the current object, or to
         closure cl. The call will take place in delay seconds, with the
-	remaining argument list provided. delay can be a minimum time
-	of one second.
-	
-	call_out() saves and restores the current user. It is now
-	possible to use say() or write() which rely on a current
-	user to be something useful.
+        remaining argument list provided. delay can be a minimum time
+        of one second.
+        
+        call_out() saves and restores the current user. It is now
+        possible to use say() or write() which rely on a current
+        user to be something useful.
 
         call_out() can only call functions which are publicly accessible,
         i.e. "public" and "static" functions. "private" and "protected"
         functions can't be called.
 
-	The execution of the call_out()s implies a simple (not
-	exhaustive) measure against rabbits: the evaluation costs of
-	those call_outs() executing at the same time are summed up on
-	a per-user base. If the summed-up costs exceed the given maximum,
-	a 'too long evaluation' error will occur and any remaining
-	call_outs() of this user scheduled for the same time are
-	discarded.
+        The execution of the call_out()s implies a simple (not
+        exhaustive) measure against rabbits: the evaluation costs of
+        those call_outs() executing at the same time are summed up on
+        a per-user base. If the summed-up costs exceed the given maximum,
+        a 'too long evaluation' error will occur and any remaining
+        call_outs() of this user scheduled for the same time are
+        discarded.
 
 EXAMPLE
-	call_out("RefreshMe", 10);
-	
-	This will call the function RefreshMe() in 10 seconds without
-	any arguments. The function RefreshMe() can then call out
-	itself again which will result in a loop (not in a recursion)
-	which can be used to check or set up things in the object in
-	intervals. Be aware that callouts are stored in a linear
-	list, and so are somewhat expensive for the driver.
+        call_out("RefreshMe", 10);
+        
+        This will call the function RefreshMe() in 10 seconds without
+        any arguments. The function RefreshMe() can then call out
+        itself again which will result in a loop (not in a recursion)
+        which can be used to check or set up things in the object in
+        intervals. Be aware that callouts are stored in a linear
+        list, and so are somewhat expensive for the driver.
 
-	And YES: self-replicating call_out()s, where each call_out()
-	creates two or more other call_out()s in a loop (so called
-	'rabbits') slow the mud down very fast, and are even able
-	to crash it. No need to try it yourself.
+        And YES: self-replicating call_out()s, where each call_out()
+        creates two or more other call_out()s in a loop (so called
+        'rabbits') slow the mud down very fast, and are even able
+        to crash it. No need to try it yourself.
 
 SEE ALSO
-	remove_call_out(E), call_out_info(E), find_call_out(E),
-	this_player(E), reset(A), heart_beat(A)
+        remove_call_out(E), call_out_info(E), find_call_out(E),
+        this_player(E), reset(A), heart_beat(A)

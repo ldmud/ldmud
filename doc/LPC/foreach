@@ -1,5 +1,5 @@
 NAME
-	foreach
+        foreach
 
 SYNTAX
         foreach (<var> : <expr>) <statement>;
@@ -26,9 +26,9 @@ DESCRIPTION
         Every <var> specification can declare a new local variable, whose
         scope is the whole foreach() statement.
 
-	A 'break' in the 'statement' will terminate the loop. A
-	'continue' will continue the execution from the beginning of
-	the loop.
+        A 'break' in the 'statement' will terminate the loop. A
+        'continue' will continue the execution from the beginning of
+        the loop.
 
 
         WHAT HAPPENS IF <expr> IS CHANGED IN THE LOOP?

@@ -1,30 +1,30 @@
 SYNOPSIS
-	mixed * map(mixed *arg, string func, string|object ob
+        mixed * map(mixed *arg, string func, string|object ob
                                            , mixed extra...)
-	mixed * map(mixed *arg, closure cl, mixed extra...)
-	mixed * map(mixed *arg, mapping m)
+        mixed * map(mixed *arg, closure cl, mixed extra...)
+        mixed * map(mixed *arg, mapping m)
 
-	mapping map(mapping arg, string func, string|object ob
+        mapping map(mapping arg, string func, string|object ob
                                             , mixed extra...)
-	mapping map(mapping arg, closure cl, mixed extra...)
+        mapping map(mapping arg, closure cl, mixed extra...)
 
 
 DESCRIPTION
-	Call the function <ob>-><func>() resp. the closure <cl> for
-	every element of the array or mapping <arg>, and return a result
-	made up from the returned values.
+        Call the function <ob>-><func>() resp. the closure <cl> for
+        every element of the array or mapping <arg>, and return a result
+        made up from the returned values.
 
-	If <ob> is omitted, or neither a string nor an object, it
+        If <ob> is omitted, or neither a string nor an object, it
         defaults to this_object().
 
 
-	If <arg> is an array, the function will be called with each
-	of the array elements as first parameter, followed by the
-	<extra> arguments. The result of the efun is an array with
-	all the results returned from the function calls. Thus the
-	operation could be described as:
+        If <arg> is an array, the function will be called with each
+        of the array elements as first parameter, followed by the
+        <extra> arguments. The result of the efun is an array with
+        all the results returned from the function calls. Thus the
+        operation could be described as:
 
-	  foreach(index) result[index] = ob->func(arg[index], extra...)
+          foreach(index) result[index] = ob->func(arg[index], extra...)
 
         If <arg> is an array, and a mapping is specified instead
         of a function, the result is an array with the values found
@@ -38,34 +38,34 @@ DESCRIPTION
                  result[index] = arg[index]
 
 
-	If <arg> is a mapping, the function will be called with
-	each of the mapping keys as first, and (if existing) the
-	associated values as second parameter, followed by the <extra>
+        If <arg> is a mapping, the function will be called with
+        each of the mapping keys as first, and (if existing) the
+        associated values as second parameter, followed by the <extra>
         arguments (these must not be protected references like &(i[0]). The
         result of the efun is a mapping of all results of the function calls,
         stored under their corresponding key.
 
-	Depending on the width of the mapping <arg>, the operation can
-	be described as:
+        Depending on the width of the mapping <arg>, the operation can
+        be described as:
 
-	  foreach (key in arg)
-	    switch (widthof(arg))
-	    case 0:
+          foreach (key in arg)
+            switch (widthof(arg))
+            case 0:
               result[key] = ob->func(key, 0, extra...)
-	    case 1:
+            case 1:
               result[key] = ob->func(key, arg[key], extra...)
-	    else  :
+            else  :
               result[key] = ob->func( key
                                     , ({ arg[key,0] ...arg[key,width-1] })
                                     , extra...)
 
-	The advantage of this approach is that the two types of
-	multi-dimensional mappings (mappings with multiple values
-	per key, and mappings of arrays) can be treated in the same way.
+        The advantage of this approach is that the two types of
+        multi-dimensional mappings (mappings with multiple values
+        per key, and mappings of arrays) can be treated in the same way.
 
 
-	Note that map() used with arrays behaves like map_array(), but used
-	with mappings generalises map_indices()!
+        Note that map() used with arrays behaves like map_array(), but used
+        with mappings generalises map_indices()!
 
 
 EXAMPLES
@@ -77,9 +77,9 @@ EXAMPLES
 
 
 HISTORY
-	Introduced in LDMud 3.2.6, obsoletes map_array().
+        Introduced in LDMud 3.2.6, obsoletes map_array().
         LDMud 3.2.8 added the feature of mapping an array through a mapping.
 
 SEE ALSO
-	filter(E), filter_indices(E), map_indices(E), map_objects(E)
+        filter(E), filter_indices(E), map_indices(E), map_objects(E)
 

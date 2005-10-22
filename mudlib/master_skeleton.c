@@ -821,7 +821,7 @@ int privilege_violation (string op, mixed who, mixed arg, mixed arg2)
 // wizlist field. While a toplevel array, if found, will be copied, this does
 // not apply to nested arrays or to any mappings. You might also have some
 // sensitive closures there.
-// send_udp() should be watched as it could be abused to mess up the IMP.
+// send_udp() should be watched as it could be abused.
 // The xxx_extra_wizinfo operations are necessary for a proper wizlist and
 // should therefore be restricted to admins.
 // All other operations are potential sources for direct security breaches -

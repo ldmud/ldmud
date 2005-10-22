@@ -1,8 +1,8 @@
 CONCEPT
-	objects
+        objects
 
 LAST UPDATED
-	never
+        never
 
 DESCRIPTION
         An object consists of a collection of functions (also called
@@ -18,28 +18,28 @@ DESCRIPTION
         directory structure) that describes how the object is to interact
         with the gamedriver and the rest of the objects in the mud.
 
-	Since 3.2.1@94, objects can have more than 256 global variables.
-	Since 3.2.1@117, inherited functions may be specified by
-	wildcards '*' and '?'. Example:
+        Since 3.2.1@94, objects can have more than 256 global variables.
+        Since 3.2.1@117, inherited functions may be specified by
+        wildcards '*' and '?'. Example:
 
-	  inherit "foo";
-	  inherit "bar";
-	  inherit "baz";
-	  inherit "ball";
+          inherit "foo";
+          inherit "bar";
+          inherit "baz";
+          inherit "ball";
 
-	  reset() {
-	    "ba?"::reset();
-	    // calls bar::reset() and baz::reset()
+          reset() {
+            "ba?"::reset();
+            // calls bar::reset() and baz::reset()
 
-	    "ba*"::reset();
-	    // calls bar::reset(), baz::reset() and ball::reset()
+            "ba*"::reset();
+            // calls bar::reset(), baz::reset() and ball::reset()
 
-	    "*"::reset();
-	    // calls every inherited reset() function.
-	  }
+            "*"::reset();
+            // calls every inherited reset() function.
+          }
 
 AUTHOR
-	Someone
+        Someone
 
 SEE ALSO
-	files(C), inheritance(C), create(A), reset(A)
+        files(C), inheritance(C), create(A), reset(A)

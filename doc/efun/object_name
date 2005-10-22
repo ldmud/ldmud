@@ -1,10 +1,10 @@
 SYNOPSIS
-	string object_name()
-	string object_name(object ob)
+        string object_name()
+        string object_name(object ob)
 
 DESCRIPTION
-	Get the name of an object <ob> or, if no argument is given, of
-	the current object.
+        Get the name of an object <ob> or, if no argument is given, of
+        the current object.
 
         This name is the name under which the object is stored in the
         muds object table. It is initialised at the creation of the
@@ -17,16 +17,16 @@ DESCRIPTION
 
         The name of an object can be changed with rename_object(), and
         object_name() will reflect any of these changes.
-	
-	The returned name always begins with '/' (absolute path),
-	except when the parser runs in COMPAT mode.
+        
+        The returned name always begins with '/' (absolute path),
+        except when the parser runs in COMPAT mode.
 
 EXAMPLES
-		find_object(object_name(ob)) == ob
-	
-	This is guaranteed to be true for all objects ob that are not
-	destructed.
-	
+            find_object(object_name(ob)) == ob
+        
+        This is guaranteed to be true for all objects ob that are not
+        destructed.
+        
 SEE ALSO
-	clone_object(E), load_name(E), load_object(E), find_object(E),
+        clone_object(E), load_name(E), load_object(E), find_object(E),
         object_time(E), program_name(E), rename_object(E)

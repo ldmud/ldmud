@@ -1,9 +1,9 @@
 NAME
-	block
+        block
 
 DESCRIPTION
-	A block is a special statment, that begins with '{', contains
-	a list of statements, and ends with '}'.
+        A block is a special statment, that begins with '{', contains
+        a list of statements, and ends with '}'.
     
         The block may define local variables. If for a variable no
         initialisation is given, the variable is initialised to 0 every

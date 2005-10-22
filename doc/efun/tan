@@ -1,8 +1,8 @@
 SYNOPSIS
-	float tan(int|float)
+        float tan(int|float)
 
 DESCRIPTION
-	Returns the tangent of the argument.
+        Returns the tangent of the argument.
 
 HISTORY
         LDMud 3.2.9 added integers as arguments.

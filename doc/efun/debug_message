@@ -1,11 +1,11 @@
 SYNOPSIS
         #include <debug_message.h>
 
-	void debug_message(string text)
-	void debug_message(string text, int flags)
+        void debug_message(string text)
+        void debug_message(string text, int flags)
 
 DESCRIPTION
-	Prints the given text to stdout, stderr, the <host>.debug.log file,
+        Prints the given text to stdout, stderr, the <host>.debug.log file,
         or any combination of these.
         
         The parameter <flags> is a combination of bitflags determining the
@@ -30,8 +30,8 @@ EXAMPLE
                      , DMSG_STDOUT | DMSG_STAMP);
 
 HISTORY
-	Introduced in 3.2.1@34
+        Introduced in 3.2.1@34
         LDMud 3.2.9 introduced the <flags> parameter.
 
 SEE ALSO
-	last_instructions(E)
+        last_instructions(E)

@@ -1,23 +1,23 @@
 SYNOPSIS
-	object find_object(string str)
+        object find_object(string str)
 
 DESCRIPTION
-	Find an object with the file_name str. If the object isn't loaded,
-	it will not be found.
+        Find an object with the object_name str. If the object isn't loaded,
+        it will not be found.
 
 EXAMPLE
-	object obj;
-	obj = find_object("std/thing");
-	obj = find_object("std/thing.c");
-	obj = find_object("/std/thing");
-	obj = find_object("/std/thing.c");
-	
-	All four statements are equal.
+        object obj;
+        obj = find_object("std/thing");
+        obj = find_object("std/thing.c");
+        obj = find_object("/std/thing");
+        obj = find_object("/std/thing.c");
+        
+        All four statements are equal.
 
-	obj = find_object("/std/thing#42");
+        obj = find_object("/std/thing#42");
 
-	returns the clone whose file_name is "std/thing#42", if
-	it exists.
+        returns the clone whose object_name is "std/thing#42", if
+        it exists.
 
 SEE ALSO
-	find_living(E), find_player(E), file_name(E), to_object(E)
+        object_name(E), to_object(E)

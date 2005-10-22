@@ -1,5 +1,5 @@
 SYNOPSIS
-	string save_value (mixed value)
+        string save_value (mixed value)
 
 DESCRIPTION
         Encode the <value> into a string suitable for restoration with
@@ -17,4 +17,4 @@ HISTORY
         Introduced in LDMud 3.2.8.
 
 SEE ALSO
-	restore_value(E), restore_object(E), save_object(E)
+        restore_value(E), restore_object(E), save_object(E)

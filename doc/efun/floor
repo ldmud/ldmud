@@ -1,5 +1,5 @@
 SYNOPSIS
-	float floor (float arg)
+        float floor (float arg)
 
 DESCRIPTION
         Round the <arg>ument downwards the nearest whole number, returning
@@ -10,7 +10,7 @@ EXAMPLES
         floor(-4.5) - return -5
 
 HISTORY
-	Introduced in LDMud 3.2.7.
+        Introduced in LDMud 3.2.7.
 
 SEE ALSO
         abs(E), ceil(E)

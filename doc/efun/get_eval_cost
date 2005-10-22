@@ -9,7 +9,7 @@ DESCRIPTION
         is reduced with each executed statement.
 
 HISTORY
-	The initial value was made available as macro in LDMud 3.2.6.
+        The initial value was made available as macro in LDMud 3.2.6.
 
 SEE ALSO
         getrusage(E), command(E), query_limits(E)

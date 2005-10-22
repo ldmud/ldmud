@@ -1,5 +1,5 @@
 SYNOPSIS
-	mixed restore_value (string str)
+        mixed restore_value (string str)
 
 DESCRIPTION
         Decode the string representation <str> of a value back into the value
@@ -10,4 +10,4 @@ HISTORY
         Introduced in LDMud 3.2.8.
 
 SEE ALSO
-	save_value(E), restore_object(E), save_object(E)
+        save_value(E), restore_object(E), save_object(E)

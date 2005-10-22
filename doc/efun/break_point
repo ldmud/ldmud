@@ -1,6 +1,6 @@
 OPTIONAL
 SYNOPSIS
-	void break_point()
+        void break_point()
 
 DESCRIPTION
         This function is for system internal use and should never be called by
@@ -8,4 +8,4 @@ DESCRIPTION
         the driver when it detects corruption.
 
 SEE ALSO
-	shutdown(E), swap(E)
+        shutdown(E), swap(E)

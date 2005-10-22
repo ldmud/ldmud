@@ -6,9 +6,9 @@ DESTRIPTION
         as result.
 
 EXAMPLES
-	string s;
+        string s;
 
-	s = set_bit("", 3); s = set_bit(s, 15);
+        s = set_bit("", 3); s = set_bit(s, 15);
 
         count_bits(s) --> returns 2
 

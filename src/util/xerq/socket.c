@@ -10,6 +10,12 @@
 
 #include "defs.h"
 
+#ifdef _AIX
+typedef unsigned long length_t;  /* *sigh* */
+#else
+typedef int length_t;
+#endif
+
 static int send_auth (auth_t *ap);
 
 /*-------------------------------------------------------------------------*/
@@ -268,7 +274,7 @@ read_socket (socket_t *sp, int rw)
         /* Read the data message and pass it on */
         
         struct sockaddr_in addr;
-        size_t len;
+        length_t len;
 
         do {
             char r[] = { ERQ_STDOUT };
@@ -722,7 +728,7 @@ erq_accept (char *mesg, int msglen)
     struct sockaddr_in addr;
     socket_t *sp;
     int fd;
-    size_t tmp;
+    length_t tmp;
 
     if (msglen != 9+TICKET_SIZE)
     {

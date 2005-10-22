@@ -71,9 +71,9 @@ SRC=lex.c main.c interpret.c simulate.c object.c backend.c array.c\
     comm.c ed.c regexp.c mapping.c wiz_list.c swap.c xalloc.c\
     call_out.c otable.c dumpstat.c mstrings.c hash.c port.c files.c\
     pkg-mysql.c ptrtable.c heartbeat.c actions.c mempools.c bitstrings.c \
-    access_check.c parse_old.c parse.c prolang.y\
+    access_check.c parse_old.c parse.c prolang.y parser.c\
     efuns.c simul_efun.c strfuns.c sprintf.c gcollect.c closure.c
-OBJ=lang.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
+OBJ=parser.o lex.o main.o interpret.o simulate.o object.o backend.o array.o\
     comm.o ed.o regexp.o mapping.o wiz_list.o swap.o xalloc.o\
     call_out.o otable.o dumpstat.o mstrings.o hash.o port.o files.o\
     pkg-mysql.o ptrtable.o heartbeat.o actions.o mempools.o bitstrings.o \
@@ -100,7 +100,7 @@ parse: driver
 #	lint *.c
 
 #clean:
-#	$(RM) $(YACCTAB)h $(YACCTAB)c make_func.c *.o make_func efun_defs.c lang.y
+#	$(RM) $(YACCTAB)h $(YACCTAB)c make_func.c *.o mkfunc efun_defs.c lang.y
 #	$(RM) lang.h lang.c y.output tags TAGS frontend.c frontend
 #	$(RM) parse core mudlib/core mudlib/debug.log lpmud.log
 #	(cd util ; echo "Cleaning in util." ; $(MAKE) clean)
@@ -126,12 +126,12 @@ parse: driver
 #	$(YACC) make_func.y
 #	$(MV) $(YACCTAB)c make_func.c
 	
-make_func.o : make_func.c
-	$(CC) $(CFLAGS) -DYACC='"$(YACC)"' -c make_func.c
+mkfunc.o : mkfunc.c make_func.c
+	$(CC) $(CFLAGS) -DYACC='"$(YACC)"' -c mkfunc.c
 
-make_func: make_func.o hash.o
-	$(CC) $(OPTIMIZE) $(LDFLAGS) make_func.o hash.o -o make_func
-	fixstk 96k make_func
+mkfunc: mkfunc.o hash.o
+	$(CC) $(OPTIMIZE) $(LDFLAGS) mkfunc.o hash.o -o mkfunc
+	fixstk 96k mkfunc
 
 interpret.s : interpret.c
 	$(CC) $(CFLAGS) -S interpret.c
@@ -139,10 +139,10 @@ interpret.s : interpret.c
 interpret.o : interpret.s
 	$(CC) $(CFLAGS) -c interpret.s
 
-#lang.y efun_defs.c instrs.h: func_spec make_func prolang.y config.h
+#lang.y efun_defs.c instrs.h: func_spec mkfunc prolang.y config.h
 #	$(RM) efun_defs.c
 #	$(RM) lang.y
-#	./make_func
+#	./mkfunc
 
 lang.c lang.h: lang.y
 	$(YACC) -d -v lang.y
@@ -265,14 +265,6 @@ interpret.o : ../mudlib/sys/trace.h ../mudlib/sys/debug_info.h \
     config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
     hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
 
-lang.o : ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h switch.h swap.h \
-    svalue.h stdstrings.h simul_efun.h simulate.h object.h mstrings.h \
-    mapping.h main.h lex.h instrs.h interpret.h gcollect.h exec.h closure.h \
-    backend.h array.h prolang.h my-alloca.h typedefs.h driver.h ptrtable.h \
-    strfuns.h sent.h port.h config.h hosts/unix.h hosts/be/be.h \
-    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
-    ./hosts/amiga/ixfile.h
-
 lex.o : efun_defs.c hosts/amiga/socket.h ../mudlib/sys/driver_hook.h \
     xalloc.h svalue.h strfuns.h stdstrings.h simul_efun.h simulate.h \
     prolang.h patchlevel.h object.h mstrings.h mempools.h main.h lang.h \
@@ -293,11 +285,6 @@ main.o : xalloc.h wiz_list.h swap.h svalue.h stdstrings.h simul_efun.h \
     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
-make_func.o : ../mudlib/sys/driver_hook.h hash.h exec.h my-alloca.h \
-    driver.h typedefs.h port.h config.h hosts/unix.h hosts/be/be.h \
-    hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
-    ./hosts/amiga/ixfile.h
-
 mapping.o : xalloc.h wiz_list.h svalue.h smalloc.h simulate.h regexp.h \
     object.h mstrings.h main.h interpret.h gcollect.h closure.h backend.h \
     array.h mapping.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
@@ -308,6 +295,11 @@ mapping.o : xalloc.h wiz_list.h svalue.h smalloc.h simulate.h regexp.h \
 mempools.o : xalloc.h gcollect.h mempools.h driver.h typedefs.h port.h \
     config.h hosts/unix.h hosts/be/be.h hosts/amiga/amiga.h \
     hosts/amiga/patchfloat.h machine.h ./hosts/amiga/ixfile.h
+
+mkfunc.o : make_func.c ../mudlib/sys/driver_hook.h hash.h exec.h \
+    my-alloca.h driver.h typedefs.h port.h config.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
 
 mstrings.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h strfuns.h \
     stdstrings.h simulate.h main.h hash.h gcollect.h mstrings.h driver.h \
@@ -340,6 +332,14 @@ parse_old.o : xalloc.h wiz_list.h svalue.h stdstrings.h simulate.h random.h \
     actions.h parse.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
     exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h \
     hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
+    ./hosts/amiga/ixfile.h
+
+parser.o : lang.c ../mudlib/sys/driver_hook.h xalloc.h wiz_list.h switch.h \
+    swap.h svalue.h stdstrings.h simul_efun.h simulate.h object.h \
+    mstrings.h mapping.h main.h lex.h instrs.h interpret.h gcollect.h \
+    exec.h closure.h backend.h array.h prolang.h my-alloca.h typedefs.h \
+    driver.h ptrtable.h strfuns.h sent.h port.h config.h hosts/unix.h \
+    hosts/be/be.h hosts/amiga/amiga.h hosts/amiga/patchfloat.h machine.h \
     ./hosts/amiga/ixfile.h
 
 pkg-mysql.o : xalloc.h svalue.h interpret.h array.h pkg-mysql.h my-alloca.h \
@@ -457,13 +457,13 @@ heartbeat.o : instrs.h
 
 interpret.o : stdstrings.h instrs.h
 
-lang.o : stdstrings.h instrs.h
-
 lex.o : efun_defs.c stdstrings.h lang.h instrs.h
 
 main.o : stdstrings.h instrs.h
 
 mapping.o : instrs.h
+
+mkfunc.o : make_func.c
 
 mstrings.o : stdstrings.h
 
@@ -474,6 +474,8 @@ otable.o : instrs.h
 parse.o : stdstrings.h instrs.h
 
 parse_old.o : stdstrings.h instrs.h
+
+parser.o : lang.c stdstrings.h instrs.h
 
 pkg-mysql.o : instrs.h
 

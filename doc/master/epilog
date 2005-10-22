@@ -1,24 +1,16 @@
 SYNOPSIS
-	void epilog(void)		/* compat in 3.2 */
-	string *epilog(int eflag)	/* !compat or 3.2.1 */
+        string *epilog(int eflag)
 
 DESCRIPTION
-	Perform final actions before opening the system to users.
-	The semantics of this function differ for compat and !compat
-	mode, and between 3.2 and 3.2.1.
+        Perform final actions before opening the system to users.
 
-	Compat in 3.2: the objects from the INIT_FILE (#defined to
-	"room/init_file" at compile time in the parser) are already
-	loaded at this time. Normally there is nothing left to do for
-	this function.
+        The argument is the number of -e options that were
+        given to the parser on the commandline. Normally it is just 0
+        or 1. The function should return an array of strings, which
+        traditionally denote the objects to be preloaded with
+        master->preload(). Any other return value is interpreted as
+        ``no object to preload''. The resulting strings will be passed
+        one at a time as arguments to preload().
 
-	!Compat and 3.2.1: the argument is the number of -e options that were
-	given to the parser on the commandline. Normally it is just 0
-	or 1. The function should return an array of strings, which
-	traditionally denote the objects to be preloaded with
-	master->preload(). Any other return value is interpreted as
-	``no object to preload''. The resulting strings will be passed
-	one at a time as arguments to preload().
-
-SEE ALSO	
-	preload(M), master(M)
+SEE ALSO        
+        preload(M), master(M)
