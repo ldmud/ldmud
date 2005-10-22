@@ -233,7 +233,6 @@ extern void remove_all_objects(void);
 #endif
 extern void do_free_sub_strings(int num_strings, string_t ** strings, int num_variables, variable_t *variable_names);
 extern void free_prog(program_t *progp, Bool free_sub_strings);
-extern string_t *function_exists(string_t *fun, object_t *ob);
 extern void reset_object(object_t *ob, int arg);
 extern void replace_programs(void);
 extern Bool shadow_catch_message(object_t *ob, const char *str);
@@ -245,7 +244,7 @@ extern object_t *get_empty_object(int num_var);
 extern object_t *get_empty_object(int num_var, variable_t * variables, svalue_t *initialisers);
 #endif
 
-extern svalue_t *f_function_exists(svalue_t *sp);
+extern svalue_t *f_function_exists(svalue_t *sp, int num_arg);
 extern svalue_t *f_functionlist(svalue_t *sp);
 extern svalue_t *f_inherit_list(svalue_t *sp);
 extern svalue_t *f_load_name(svalue_t *sp);

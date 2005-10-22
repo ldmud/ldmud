@@ -378,10 +378,10 @@ reference_destructed_object (object_t *ob)
         ob->next_all = gc_obj_list_destructed;
         gc_obj_list_destructed = ob;
         MARK_REF(ob);
+        ob->ref++;
         mark_program_ref(ob->prog);
         MARK_MSTRING_REF(ob->name);
         MARK_MSTRING_REF(ob->load_name);
-        ob->ref++;
     }
     else
     {

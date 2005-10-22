@@ -1,6 +1,18 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-Oct-2001 (Lars Duening)  (3.3.110)
+    - (gcollect.c) Increased the refcount of an destructed referenced
+        object before recursing into the substructures - I have the
+        feeling that there was a possible race condition, but I can't
+        prove it.
+    - (object) Efun function_exists() can now also return the filename
+        and linenumber where a function was defined (based on a patch
+        p-010928-0 by Andre).
+    - (object.c) Removed the fixed table in inherit_list() and replaced
+        it by a pooled list. It also already gathering the information
+        about the shape of the inheritance tree.
+
 08-Oct-2001 (Lars Duening)  (3.3.109)
     - (prolang.y) Function definition errors and warnings now all print
         the name of the function involved (suggested by Freaky).

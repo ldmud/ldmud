@@ -426,7 +426,7 @@ int     input_to(string|closure, void|int, ...);
 int     interactive(object default: F_THIS_OBJECT);
 string  load_name(null|string|object default: F_THIS_OBJECT);
 object  load_object(string);
-string  function_exists(string, object default: F_THIS_OBJECT);
+mixed   function_exists(string, void|int|object, void|int);
 mixed  *object_info(object, int, void|int);
 string  object_name(null|object default: F_THIS_OBJECT);
 int     object_time(object default: F_THIS_OBJECT);

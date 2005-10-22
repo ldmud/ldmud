@@ -147,16 +147,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 109
+  SETVERFLAGS += d 110
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.109
+  VSTRING = 3.3.0-pre.110
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 109
+  SETVERFLAGS += d 110
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.109
+  VSTRING = 3.3.0-dev.110
 endif
 
 else
@@ -164,12 +164,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 109
+SETVERFLAGS = -app 3 3 110
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.109
+  VSTRING = 3.3.110
 
 endif
 
@@ -337,7 +337,7 @@ clobberall :: clobber cleanall
 	-rm -rf $(OBJ_CROSS)
 
 depend: $(SRCS) $(GENSRCS) $(OBJ)
-	@$(SHELL) -ec "if type mkdepend > /dev/null 2>&1; then \
+	-@$(SHELL) -ec "if type mkdepend > /dev/null 2>&1; then \
           echo Updating dependencies.; \
           mkdepend $(SKELETON) -I. $(EXCEPT) -p .c:$$\(OBJ\)/%n.o -fMakefile; \
           mkdepend $(SKELETON) -I. $(EXCEPT) $(SELECT) -p .c:$$\(OBJ\)/%n.o -fMakefile; \
@@ -350,7 +350,7 @@ depend: $(SRCS) $(GENSRCS) $(OBJ)
 .PHONY dependall: depend depend-generic depend-amiga
 
 depend-generic: $(SRCS) $(GENSRCS) $(OBJ)
-	@$(SHELL) -ec "if type mkdepend > /dev/null 2>&1; then \
+	-@$(SHELL) -ec "if type mkdepend > /dev/null 2>&1; then \
           echo Updating dependencies in Makefile.in.; \
           mkdepend $(SKELETON) -I. $(EXCEPT) -p .c:%n.o -fMakefile.in; \
           mkdepend $(SKELETON) $(SELECT) -I. $(EXCEPT) -p .c:%n.o -fMakefile.in; \
@@ -364,7 +364,7 @@ depend-generic: $(SRCS) $(GENSRCS) $(OBJ)
 AMIGASRCS:= 
 
 depend-amiga: $(SRCS) $(GENSRCS) $(AMIGASRCS)  $(OBJ)
-	@$(SHELL) -ec "if type mkdepend > /dev/null 2>&1; then \
+	-@$(SHELL) -ec "if type mkdepend > /dev/null 2>&1; then \
           echo Updating dependencies in hosts/amiga/Makefile.; \
           mkdepend $(SKELETON) $(AMIGASRCS) -I. $(EXCEPT) -p .c+:%n.o -Ihosts/amiga -fhosts/amiga/Makefile; \
           mkdepend $(SKELETON) $(AMIGASRCS) $(SELECT) -I. $(EXCEPT) -p .c+:%n.o -Ihosts/amiga -fhosts/amiga/Makefile; \

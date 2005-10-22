@@ -31,6 +31,8 @@
 #define T_SYMBOL        0x9
 #define T_QUOTED_ARRAY  0xa
 
+#ifndef __DRIVER_SOURCE__
+
 #define CLOSURE_IS_LFUN(x)		(((x)&~1) == 0)
 #define CLOSURE_IS_IDENTIFIER(x)	((x) == 2)
 #define CLOSURE_IS_BOUND_LAMBDA(x)	((x) == 4)
@@ -39,5 +41,7 @@
 #define CLOSURE_IS_SIMUL_EFUN(x) (((x) & 0xf800) == 0xf800)
 #define CLOSURE_IS_EFUN(x)	 (((x) & 0xf800) == 0xf000)
 #define CLOSURE_IS_OPERATOR(x)	 (((x) & 0xf800) == 0xe800)
+
+#endif /* __DRIVER_SOURCE__ */
 
 #endif /* LPC_LPCTYPES_H */

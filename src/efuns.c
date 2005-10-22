@@ -379,7 +379,6 @@ f_md5_crypt(svalue_t *sp)
 
 {
     char *salt;
-    char *res;
     char temp[3];
     char crypted [120];
     static char choise[] =

@@ -177,6 +177,7 @@
 #include "instrs.h"
 #include "main.h"
 #include "mapping.h"
+#include "mempools.h"
 #include "mstrings.h"
 #include "otable.h"
 #include "prolang.h"
@@ -193,6 +194,7 @@
 #include "xalloc.h"
 
 #include "../mudlib/sys/driver_hook.h"
+#include "../mudlib/sys/functionlist.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -539,17 +541,23 @@ free_prog (program_t *progp, Bool free_sub_strings)
 
     /* Remove the program structure */
     xfree(progp);
-}
+} /* free_prog() */
 
 /*-------------------------------------------------------------------------*/
-string_t *
-function_exists (string_t *fun, object_t *ob)
+static string_t *
+function_exists (string_t *fun, object_t *ob, Bool show_hidden
+                , string_t ** prog_name, uint32 * prog_line
+                )
 
 /* Search for the function <fun> in the object <ob>. If existing, return
  * the name of the program (without added reference), if not return NULL.
  *
+ * If <prog_name> and <prog_line> are both non-NULL, they are set to
+ * the name of the program _file_ and the line where the function is found.
+ * The program file name will have one reference added.
+ *
  * Visibility rules apply: static and protected functions can't be
- * found from the outside.
+ * found from the outside unless <show_hidden> is true.
  */
 
 {
@@ -563,6 +571,9 @@ function_exists (string_t *fun, object_t *ob)
     if (ob->flags & O_DESTRUCTED)
         fatal("function_exists() on destructed object\n");
 #endif
+
+    if (prog_name)
+        *prog_name = NULL;
 
     /* Make the program resident */
     if (O_PROG_SWAPPED(ob))
@@ -582,8 +593,10 @@ function_exists (string_t *fun, object_t *ob)
     /* Is it visible for the caller? */
     flags = progp->functions[ix];
 
-    if (flags & TYPE_MOD_PRIVATE
-     || (flags & TYPE_MOD_STATIC && current_object != ob))
+    if (!show_hidden
+     && (   flags & TYPE_MOD_PRIVATE
+         || (flags & TYPE_MOD_STATIC && current_object != ob))
+       )
         return NULL;
 
     /* Resolve inheritance */
@@ -604,6 +617,9 @@ function_exists (string_t *fun, object_t *ob)
     {
         return NULL;
     }
+
+    if(prog_line && prog_name)
+      *prog_line = get_line_number(funstart, progp, prog_name);
 
     /* We got it. */
     return progp->name;
@@ -1215,42 +1231,198 @@ renumber_programs (void)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_function_exists (svalue_t *sp)
+f_function_exists (svalue_t *sp, int num_arg)
 
 /* EXEC function_exists()
  *
- *   string function_exists(string str, object ob)
+ *   mixed function_exists (string str [, int flags])
+ *   mixed function_exists (string str , object ob, [, int flags])
  *
- * Return the file name of the object that defines the function
- * str in object ob. The returned value can be different from
- * file_name(ob) if the function is defined in an inherited
- * object. In native mode, the returned name always begins with a
- * '/' (absolute path). 0 is returned if the function was not
- * defined, or was defined as static.
+ * Look up a function <str> in the current object, respectively
+ * in the object <ob>. Depending on the value of <flags>, one
+ * of the following informations is returned:
+ * 
+ * <flags> == FEXISTS_PROGNAME (0, default):
+ *   Return the name of the program the function is defined in.
+ *   This can be either object_name(ob), or the name of an inherited
+ *   program. If !compat mode, the returned name always begins
+ *   with a '/'.
+ *
+ * <flags> == FEXISTS_FILENAME (1):
+ *   Return the name of the file the function is defined in (this
+ *   may be an include file). If !compat mode, the returned name
+ *   always begins with a '/'.
+ *
+ * <flags> == FEXISTS_LINENO (2):
+ *   Return the line number within the source file.
+ *
+ * <flags> == FEXISTS_ALL (3):
+ *   Return an array with all the above information. The above
+ *   flag values are the indices into that array.
+ *
+ * The <flags> value can be or-ed to NAME_HIDDEN to return
+ * information about static and protected functions in other objects.
+ * It is not possible to return information about private functions.
+ *
+ * If the function cannot be found (because it doesn't exist or
+ * it is not visible to the caller), the result is 0.
  */
 
 {
-    string_t *str, *res;
+    string_t *str, *prog_name;
+    uint32 prog_line, flags;
+    svalue_t *argp;
+    object_t *ob;
 
-    str = function_exists((sp-1)->u.str, sp->u.ob);
-    free_svalue(sp);
-    free_svalue(--sp);
+    /* Evaluate arguments */
+    argp = sp - num_arg + 1;
+    
+    ob = NULL;
+    flags = 0;
+
+    if (num_arg < 2)
+    {
+        ob = current_object;
+        flags = 0;
+    }
+
+    if (num_arg >= 2)
+    {
+        if (argp[1].type == T_NUMBER)
+        {
+            ob = current_object;
+            flags = argp[1].u.number;
+
+            if ((flags & ~NAME_HIDDEN) < 0
+             || (flags & ~NAME_HIDDEN) > FEXISTS_ALL
+               )
+            {
+                error("Bad argument 2 to function_exists(): value %ld (%ld sans NAME_HIDDEN) out of range %d..%d .\n"
+                     , (long)flags, (long)(flags & ~NAME_HIDDEN)
+                     , FEXISTS_ALL, FEXISTS_LINENO);
+                /* NOTREACHED */
+                return sp;
+            }
+        }
+        else if (argp[1].type == T_OBJECT)
+        {
+            ob = argp[1].u.ob;
+            flags = 0;
+        }
+    }
+
+    if (num_arg >= 3)
+    {
+        /* The last argument must be a number. On the other
+         * side, we can't have two numbers at once.
+         */
+        if (argp[1].type != T_OBJECT)
+        {
+            error("Bad argument 2 to function_exists(): got %s, expected object.\n", typename(argp[1].type));
+            /* NOTREACHED */
+            return sp;
+        }
+
+        flags = argp[2].u.number;
+
+        if ((flags & ~NAME_HIDDEN) < 0
+         || (flags & ~NAME_HIDDEN) > FEXISTS_ALL
+           )
+        {
+            error("Bad argument 2 to function_exists(): eff. value %ld (sans NAME_HIDDEN) out of range %d..%d .\n"
+                 , (long)(flags & ~NAME_HIDDEN)
+                 , FEXISTS_ALL, FEXISTS_LINENO);
+            /* NOTREACHED */
+            return sp;
+        }
+    }
+
+    /* Get the information */
+    prog_name = NULL;
+    str = function_exists(argp->u.str, ob, (flags & NAME_HIDDEN)
+                         , &prog_name, &prog_line);
+    sp = pop_n_elems(num_arg, sp);
+
     if (str)
     {
-        res = cvt_progname(str);
-
-        if (!res)
+        switch (flags & ~NAME_HIDDEN)
         {
-            sp--;
-            inter_sp = sp;
-            error("Out of memory\n");
+        case FEXISTS_ALL:
+          {
+            string_t *res;
+            vector_t *vec;
+
+            res = cvt_progname(str);
+            if (!res)
+            {
+                error("Out of memory\n");
+            }
+            vec = allocate_uninit_array(FEXISTS_LINENO+1);
+            put_string(vec->item+FEXISTS_PROGNAME, res);
+            if (prog_name)
+            {
+                res = add_slash(prog_name);
+                if (!res)
+                {
+                    error("Out of memory\n");
+                }
+                put_string(vec->item+FEXISTS_FILENAME, res);
+            }
+            else
+                put_number(vec->item+FEXISTS_FILENAME, 0);
+            put_number(vec->item+FEXISTS_LINENO, prog_line);
+
+            push_array(sp, vec);
+            break;
+          }
+        case FEXISTS_PROGNAME:
+          {
+            string_t *res;
+
+            res = cvt_progname(str);
+            if (!res)
+            {
+                error("Out of memory\n");
+            }
+            push_string(sp, res);
+            break;
+          }
+
+        case FEXISTS_FILENAME:
+            if (prog_name)
+            {
+                string_t *res;
+
+                res = add_slash(prog_name);
+                if (!res)
+                {
+                    error("Out of memory\n");
+                }
+                push_string(sp, res);
+            }
+            else
+                push_number(sp, 0);
+            break;
+
+        case FEXISTS_LINENO:
+            push_number(sp, prog_line);
+            break;
+
+        default:
+            fatal("function_exists(): flags value %ld (from %ld) not implemented.\n"
+                 , flags & ~NAME_HIDDEN, flags);
+            /* NOTREACHED */
         }
-        put_string(sp, res);
     }
     else
     {
-        put_number(sp, 0);
+        push_number(sp, 0);
     }
+
+    /* Clean up */
+    if (prog_name)
+        free_mstring(prog_name);
+    /* str had no ref on its own */
 
     return sp;
 } /* f_function_exists() */
@@ -1576,87 +1748,135 @@ f_inherit_list (svalue_t *sp)
  *
  * Return a list with the filenames of all programs inherited by <ob>, include
  * <ob>'s program itself.
- * TODO: Must be fixed so that any number of files can be returned, not just 256.
  */
 
 {
+    /* Local structure to hold the found programs */
+    struct iinfo {
+        struct iinfo * next;     /* Next structure in flat list */
+        program_t    * prog;     /* Program found */
+          /* The following members are used to recrate the inherit tree */
+        int            count;    /* Number of direct inherits */
+        struct iinfo * first;    /* First inherited program */
+        struct iinfo * last;     /* Last inherited program */
+        struct iinfo * sibling;  /* Next sibling inherit */
+    } *begin, *end;         /* Flat list of all found inherits */      
+    struct iinfo * next;    /* Next program to analyze */
+    Mempool   pool;         /* The memory pool to allocate from */
     object_t *ob;           /* Analyzed object */
     vector_t *vec;          /* Result vector */
     svalue_t *svp;          /* Pointer to next vec entry to fill in */
-    program_t *pr;          /* Next program to count */
-    program_t **prp;        /* Pointer to pr->inherit[x].prog */
-      /* Incrementing prp by sizeof(inherit) bytes walks along the
-       * the vector of inherited programs.
-       */
-    program_t *plist[256];  /* Table of found programs */
-    int next;               /* Next free entry in plist[] */
-    int cur;                /* Current plist[] entry analyzed */
+    int       count;        /* Total number of inherits found */
+
+    /* Get the memory pool */
+    memsafe(pool = new_mempool(sizeof(*begin) * 64)
+           , sizeof(*begin) * 64, "memory pool");
 
     /* Get the argument */
     ob = sp->u.ob;
 
-    inter_sp = sp;
-      /* three possibilities for 'out of memory' follow, so clean
-       * up the stack now.
-       */
-
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0) {
+            mempool_delete(pool);
             error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
             /* NOTREACHED */
             return NULL;
         }
 
-    /* Perform a breadth search on ob's inherit tree and store the
-     * program pointers into plist[] while counting them.
+    /* Perform a breadth search on ob's inherit tree and append the
+     * found programs to the iinfo list while counting them.
      */
 
-    plist[0] = ob->prog;
-    next = 1;
-    for (cur = 0; cur < next; cur++)
+    begin = mempool_alloc(pool, sizeof(*begin));
+    if (NULL == begin)
+    {
+        mempool_delete(pool);
+        outofmem(sizeof(*begin), "allocation from mempool");
+    }
+
+    begin->next = NULL;
+    begin->prog = ob->prog;
+    begin->count = 0;
+    begin->first = NULL;
+    begin->last = NULL;
+    begin->sibling = NULL;
+
+    end = begin;
+
+    count = 1;
+
+    for (next = begin; next != NULL; next = next->next)
     {
         int cnt;
         inherit_t *inheritp;
 
-        pr = plist[cur];
-        cnt = pr->num_inherited;
-        if (next + cnt > (int)(sizeof plist/sizeof *plist))
-            break;
+        cnt = next->prog->num_inherited;
 
         /* Store the inherited programs in the list.
          */
-        for (inheritp = &pr->inherit[0]; cnt--; inheritp++)
+        for (inheritp = &next->prog->inherit[0]; cnt--; inheritp++)
         {
             if (inheritp->inherit_type == INHERIT_TYPE_NORMAL)
-                plist[next++] = inheritp->prog;
+            {
+                count++;
+                next->count++;
+
+                end->next = mempool_alloc(pool, sizeof(*end));
+                if (NULL == end->next)
+                {
+                    mempool_delete(pool);
+                    outofmem(sizeof(*end), "allocation from mempool");
+                }
+                end = end->next;
+                end->next = NULL;
+                end->prog = inheritp->prog;
+
+                /* Handle the tree-based information */
+                end->first = NULL;
+                end->last = NULL;
+                end->sibling = NULL;
+                end->count = 0;
+
+                if (next->first == NULL)
+                {
+                    next->first = end;
+                    next->last = end;
+                }
+                else
+                {
+                    next->last->sibling = end;
+                    next->last = end;
+                }
+            }
         }
     }
 
-    /* next is also the actual number of files found :-) */
-    vec = allocate_array(next);
+    /* Get the result array */
+    vec = allocate_array(count);
 
-    /* Take the filenames of the program and copy them into
+    /* Take the filenames of the programs and copy them into
      * the result vector.
      */
-    for (svp = vec->item, prp = plist; --next >= 0; svp++) {
+    for (svp = vec->item, next = begin; next != NULL; svp++, next = next->next)
+    {
         string_t *str;
 
-        pr = *prp++;
-
         if (compat_mode)
-            str = ref_mstring(pr->name);
+            str = ref_mstring(next->prog->name);
         else
-            str = add_slash(pr->name);
+            str = add_slash(next->prog->name);
 
         if (!str)
         {
             free_array(vec);
+            mempool_delete(pool);
             error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
-                 , (unsigned long)mstrsize(pr->name));
+                 , (unsigned long)mstrsize(next->prog->name));
         }
         put_string(svp, str);
     }
 
+    mempool_delete(pool);
     free_object_svalue(sp);
 
     put_array(sp, vec);

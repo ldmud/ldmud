@@ -2,7 +2,7 @@ Short: New efuns function_file() and function_line()
 From: Andre Meiske
 Date: 2001-09-28
 Type: Patch
-State: New
+State: Done - implemented in 3.3.110
 
 We've got two new efuns for inclusion into the driver:
 - function_file
