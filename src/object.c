@@ -665,20 +665,21 @@ reset_object (object_t *ob, int arg)
             previous_ob = ob;
 
         l = closure_hook[arg].u.lambda;
+        free_object(l->ob, "reset_object");
         if (l->function.code[1] && arg != H_RESET)
         {
             /* closure accepts arguments, presumably one, so
              * give it the target object and bind to the current
              * object.
              */
-            l->ob = current_object;
+            l->ob = ref_object(current_object, "reset_object");
             push_ref_object(inter_sp, ob, "reset");
             call_lambda(&closure_hook[arg], 1);
         }
         else
         {
             /* no arguments, just bind to target */
-            l->ob = ob;
+            l->ob = ref_object(ob, "reset_object");
             call_lambda(&closure_hook[arg], 0);
         }
 
@@ -2462,11 +2463,16 @@ move_object (void)
     lambda_t *l;
     object_t *save_command = command_giver;
 
-    if (NULL != ( l = closure_hook[H_MOVE_OBJECT1].u.lambda) ) {
-        l->ob = inter_sp[-1].u.ob;
+    if (NULL != ( l = closure_hook[H_MOVE_OBJECT1].u.lambda) )
+    {
+        free_object(l->ob, "move_object");
+        l->ob = ref_object(inter_sp[-1].u.ob, "move_object");
         call_lambda(&closure_hook[H_MOVE_OBJECT1], 2);
-    } else if (NULL != ( l = closure_hook[H_MOVE_OBJECT0].u.lambda) ) {
-        l->ob = current_object;
+    }
+    else if (NULL != ( l = closure_hook[H_MOVE_OBJECT0].u.lambda) )
+    {
+        free_object(l->ob, "move_object");
+        l->ob = ref_object(current_object, "move_object");
         call_lambda(&closure_hook[H_MOVE_OBJECT0], 2);
     }
     else

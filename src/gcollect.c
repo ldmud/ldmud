@@ -1019,13 +1019,6 @@ garbage_collection(void)
 
     /* Process the driver hooks */
 
-    for (i = NUM_CLOSURE_HOOKS; --i >= 0; ) {
-        if (closure_hook[i].type == T_CLOSURE
-        &&  closure_hook[i].x.closure_type == CLOSURE_LAMBDA)
-        {
-            closure_hook[i].x.closure_type = CLOSURE_UNBOUND_LAMBDA;
-        }
-    }
     clear_ref_in_vector(closure_hook, NUM_CLOSURE_HOOKS);
 
     /* Let the modules process their data */
@@ -1221,14 +1214,6 @@ garbage_collection(void)
     /* Process the driver hooks */
 
     count_ref_in_vector(closure_hook, NUM_CLOSURE_HOOKS);
-    for (i = NUM_CLOSURE_HOOKS; --i >= 0; )
-    {
-        if (closure_hook[i].type == T_CLOSURE &&
-            closure_hook[i].x.closure_type == CLOSURE_UNBOUND_LAMBDA)
-        {
-            closure_hook[i].x.closure_type = CLOSURE_LAMBDA;
-        }
-    }
 
     garbage_collection_in_progress = 0;
 

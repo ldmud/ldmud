@@ -534,7 +534,10 @@ call_modify_command (char *buff)
 
             l = closure_hook[H_MODIFY_COMMAND].u.lambda;
             if (closure_hook[H_MODIFY_COMMAND].x.closure_type == CLOSURE_LAMBDA)
-                l->ob = command_giver;
+            {
+                free_object(l->ob, "call_modify_command");
+                l->ob = ref_object(command_giver, "call_modify_command");
+            }
             push_c_string(inter_sp, buff);
             push_ref_object(inter_sp, command_giver, "call_modify_command");
             call_lambda(&closure_hook[H_MODIFY_COMMAND], 2);
@@ -724,7 +727,10 @@ notify_no_command (char *command, object_t *save_command_giver)
     else if (closure_hook[H_NOTIFY_FAIL].type == T_CLOSURE)
     {
         if (closure_hook[H_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
-            closure_hook[H_NOTIFY_FAIL].u.lambda->ob = command_giver;
+        {
+            free_object(closure_hook[H_NOTIFY_FAIL].u.lambda->ob, "notify_no_command");
+            closure_hook[H_NOTIFY_FAIL].u.lambda->ob = ref_object(command_giver, "notify_no_command");
+        }
         push_c_string(inter_sp, command);
         push_ref_valid_object(inter_sp, save_command_giver, "notify_no_command");
         call_lambda(&closure_hook[H_NOTIFY_FAIL], 2);
@@ -763,7 +769,10 @@ notify_no_command (char *command, object_t *save_command_giver)
         else
         {
             if (closure_hook[H_SEND_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
-                closure_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob = command_giver;
+            {
+                free_object(closure_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob, "notify_no_command");
+                closure_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob = ref_object(command_giver, "notify_no_command");
+            }
             call_lambda(&closure_hook[H_SEND_NOTIFY_FAIL], 3);
             pop_stack();
         }
@@ -1176,7 +1185,10 @@ execute_command (char *str, object_t *ob)
 
         l = closure_hook[H_COMMAND].u.lambda;
         if (closure_hook[H_COMMAND].x.closure_type == CLOSURE_LAMBDA)
-            l->ob = ob;
+        {
+            free_object(l->ob, "execute_command");
+            l->ob = ref_object(ob, "execute_command");
+        }
         push_c_string(inter_sp, str);
         push_ref_object(inter_sp, ob, "execute_command");
         call_lambda(&closure_hook[H_COMMAND], 2);

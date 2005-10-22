@@ -283,6 +283,8 @@ cleanup_stuff (void)
  */
 
 {
+    int i;
+
     /* Reset the VM to avoid dangling references to invalid objects */
     clear_state();
 
@@ -297,6 +299,23 @@ cleanup_stuff (void)
      */
     free_old_driver_hooks();
 #endif
+
+    /* Rebind all bindable closures back to the master */
+    for  (i = 0; i < NUM_CLOSURE_HOOKS; i++)
+    {
+        if (closure_hook[i].type == T_CLOSURE
+         && closure_hook[i].x.closure_type == CLOSURE_LAMBDA)
+        {
+            lambda_t *l;
+
+            l = closure_hook[i].u.lambda;
+            if (l->ob != master_ob)
+            {
+                free_object(l->ob, "backend");
+                l->ob = ref_object(master_ob, "backend");
+            }
+        }
+    }
 
     /* Remove all destructed objects.
      */
@@ -894,7 +913,10 @@ static Bool did_swap;
 
                 l = closure_hook[H_CLEAN_UP].u.lambda;
                 if (closure_hook[H_CLEAN_UP].x.closure_type == CLOSURE_LAMBDA)
-                    l->ob = obj;
+                {
+                    free_object(l->ob, "clean_up");
+                    l->ob = ref_object(obj, "clean_up");
+                }
                 push_ref_object(inter_sp, obj, "clean up");
                 call_lambda(&closure_hook[H_CLEAN_UP], 2);
                 svp = inter_sp;

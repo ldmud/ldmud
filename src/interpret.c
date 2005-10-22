@@ -1096,7 +1096,46 @@ object_t * get_object_ref (svalue_t *v) { return _get_object_ref(v); }
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
-_assign_svalue_no_free (svalue_t *to, svalue_t *from)
+check_for_ref_loop (svalue_t * dest)
+
+/* <dest> has just been assigned to - check if this created a reference loop.
+ * If yes, free <dest> and throw an error.
+ */
+
+{
+    if (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
+    {
+        /* rover1 will scan the lvalue chain in two-steps, rover2 will
+         * scan it step by step. If there is a loop, the two will eventually
+         * meet again.
+         */
+        svalue_t * rover1, * rover2;
+
+        rover1 = rover2 = dest;
+        do {
+            if (rover1->type == T_LVALUE || rover1->type == T_PROTECTED_LVALUE)
+                rover1 = rover1->u.lvalue;
+            if (rover1->type == T_LVALUE || rover1->type == T_PROTECTED_LVALUE)
+                rover1 = rover1->u.lvalue;
+            if (rover2->type == T_LVALUE || rover2->type == T_PROTECTED_LVALUE)
+                rover2 = rover2->u.lvalue;
+            if (rover1 == rover2)
+            {
+                free_svalue(dest);
+                error("Assignment would create reference loop.\n");
+            }
+        } while (rover1
+             && (rover1->type == T_LVALUE || rover1->type == T_PROTECTED_LVALUE)
+             && rover2
+             && (rover2->type == T_LVALUE || rover2->type == T_PROTECTED_LVALUE)
+                );
+    }
+
+} /* check_for_ref_loop() */
+
+/*-------------------------------------------------------------------------*/
+static INLINE void
+inl_assign_svalue_no_free (svalue_t *to, svalue_t *from)
 
 /* Put a duplicate of svalue <from> into svalue <to>, meaning that the original
  * value is either copied when appropriate, or its refcount is increased.
@@ -1152,12 +1191,18 @@ _assign_svalue_no_free (svalue_t *to, svalue_t *from)
         (void)ref_mapping(to->u.map);
         break;
     }
-} /* _assign_svalue_no_free() */
+
+    /* Protection against endless reference loops */
+    if (to->type == T_LVALUE || to->type == T_PROTECTED_LVALUE)
+    {
+        check_for_ref_loop(to);
+    }
+} /* inl_assign_svalue_no_free() */
 
 void assign_svalue_no_free (svalue_t *to, svalue_t *from)
-{ _assign_svalue_no_free(to,from); }
+{ inl_assign_svalue_no_free(to,from); }
 
-#define assign_svalue_no_free(to,from) _assign_svalue_no_free(to,from)
+#define assign_svalue_no_free(to,from) inl_assign_svalue_no_free(to,from)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -1210,6 +1255,12 @@ assign_checked_svalue_no_free (svalue_t *to, svalue_t *from)
         break;
     }
     *to = *from;
+
+    /* Protection against endless reference loops */
+    if (to->type == T_LVALUE || to->type == T_PROTECTED_LVALUE)
+    {
+        check_for_ref_loop(to);
+    }
 } /* assign_checked_svalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
@@ -1262,6 +1313,12 @@ assign_from_lvalue:
         return;
     }
     *to = *from;
+
+    /* Protection against endless reference loops */
+    if (to->type == T_LVALUE || to->type == T_PROTECTED_LVALUE)
+    {
+        check_for_ref_loop(to);
+    }
 } /* assign_local_svalue_no_free() */
 
 /*-------------------------------------------------------------------------*/
@@ -1345,6 +1402,12 @@ void assign_lrvalue_no_free (svalue_t *to, svalue_t *from)
     case T_LVALUE:
         to->u.lvalue = from;
         break;
+    }
+
+    /* Protection against endless reference loops */
+    if (to->type == T_LVALUE || to->type == T_PROTECTED_LVALUE)
+    {
+        check_for_ref_loop(to);
     }
 } /* assign_lrvalue_no_free() */
 
@@ -1510,6 +1573,13 @@ inl_transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
     {
         *dest = *v;
     }
+
+    /* Protection against endless reference loops */
+    if (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
+    {
+        v->type = T_INVALID;
+        check_for_ref_loop(dest);
+    }
 } /* inl_transfer_svalue_no_free() */
 
 void transfer_svalue_no_free (svalue_t *dest, svalue_t *v)
@@ -1534,30 +1604,9 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
  */
 
 {
-
     /* Unravel the T_LVALUE chain, if any. */
     while (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
         dest = dest->u.lvalue;
-
-    /* Ad-hoc protection against endless reference loops,
-     * e.g. created by 'b = 0 || &a; b = 0 || &a;'
-     * We have to check for this before we free the dest value, otherwise
-     * the error() call will free dest again during the stack cleanup.
-     */
-    if (v->type == T_LVALUE || v->type == T_PROTECTED_LVALUE)
-    {
-        svalue_t * rover;
-
-        for ( rover = v
-            ; rover->type == T_LVALUE || rover->type == T_PROTECTED_LVALUE
-            ; rover = rover->u.lvalue)
-        {
-            if (rover == dest || rover->u.lvalue == dest)
-                error("Assignment would create reference loop.\n");
-        }
-        
-    }
-
 
     /* Free the <dest> svalue.
      * If a T_xxx_LVALUE is found, the transfer will be done here
@@ -1668,6 +1717,14 @@ inl_transfer_svalue (svalue_t *dest, svalue_t *v)
     {
         *dest = *v;
     }
+
+    /* Protection against endless reference loops */
+    if (dest->type == T_LVALUE || dest->type == T_PROTECTED_LVALUE)
+    {
+        v->type = T_INVALID;
+        check_for_ref_loop(dest);
+    }
+
 } /* inl_transfer_svalue() */
 
 void transfer_svalue (svalue_t *dest, svalue_t *v)
@@ -14952,7 +15009,9 @@ assert_master_ob_loaded (void)
         /* Free the closure hooks.
          */
         for (i = NUM_CLOSURE_HOOKS; i--;)
+        {
             assign_svalue(closure_hook+i, &const0);
+        }
 #endif
 
         init_telopts();
@@ -16973,7 +17032,9 @@ count_extra_ref_in_object (object_t *ob)
 {
     ob->extra_ref++;
     if ( NULL == register_pointer(ptable, ob) )
+    {
         return;
+    }
 
     ob->extra_ref = 1;
     if ( !O_PROG_SWAPPED(ob) )
@@ -17003,7 +17064,9 @@ count_extra_ref_in_object (object_t *ob)
             return;
         ob->prog->extra_ref = 1;
         if (ob->prog->blueprint)
+        {
             count_extra_ref_in_object(ob->prog->blueprint);
+        }
         count_inherits(ob->prog);
     }
 
@@ -17172,7 +17235,6 @@ check_a_lot_ref_counts (program_t *search_prog)
 
 {
     object_t *ob;
-    int i;
 
     check_a_lot_ref_counts_search_prog = search_prog;
 
@@ -17238,7 +17300,9 @@ check_a_lot_ref_counts (program_t *search_prog)
         for (j = TOTAL_TRACE_LENGTH; --j >= 0; )
         {
             if ( NULL != (ob = previous_objects[j]) )
+            {
                 count_extra_ref_in_object(ob);
+            }
         }
     }
 #endif
@@ -17246,31 +17310,7 @@ check_a_lot_ref_counts (program_t *search_prog)
     count_extra_ref_in_vector(&indexing_quickfix, 1);
     count_extra_ref_in_vector(&last_indexing_protector, 1);
     null_vector.extra_ref++;
-
-    /* To cound the closure hooks properly, we have to fiddle the
-     * types a bit.
-     */
-    for (i = NUM_CLOSURE_HOOKS; --i >= 0; )
-    {
-        if (closure_hook[i].type == T_CLOSURE
-         && closure_hook[i].x.closure_type == CLOSURE_LAMBDA)
-        {
-            closure_hook[i].x.closure_type = CLOSURE_UNBOUND_LAMBDA;
-        }
-    }
-
     count_extra_ref_in_vector(closure_hook, NUM_CLOSURE_HOOKS);
-
-    /* Undo the type fiddling.
-     */
-    for (i = NUM_CLOSURE_HOOKS; --i >= 0; )
-    {
-        if (closure_hook[i].type == T_CLOSURE
-         && closure_hook[i].x.closure_type == CLOSURE_UNBOUND_LAMBDA)
-        {
-            closure_hook[i].x.closure_type = CLOSURE_LAMBDA;
-        }
-    }
 
     /* Done with the counting */
     free_pointer_table(ptable);
@@ -17296,7 +17336,7 @@ check_a_lot_ref_counts (program_t *search_prog)
             continue;
 
         if (ob->ref != ob->extra_ref)
-             fatal("Bad ref count in object %s, %ld - %ld\n"
+             fatal("Bad ref count in object %s: listed %ld - counted %ld\n"
                   , get_txt(ob->name), ob->ref, ob->extra_ref);
 
         if ( !(ob->flags & O_SWAPPED) )
@@ -17307,7 +17347,8 @@ check_a_lot_ref_counts (program_t *search_prog)
                 if (time_to_swap + 1 > 0
                  && ob->prog->ref > ob->prog->extra_ref)
                 {
-                    debug_message("%s high ref count in prog %s, %ld - %ld\n"
+                    debug_message("%s high ref count in prog %s: "
+                                  "listed %ld - counted %ld\n"
                                  , time_stamp()
                                  , get_txt(ob->prog->name), ob->prog->ref
                                  , ob->prog->extra_ref);
@@ -17315,7 +17356,7 @@ check_a_lot_ref_counts (program_t *search_prog)
                 else
                 {
                     check_a_lot_ref_counts(ob->prog);
-                    fatal("Bad ref count in prog %s, %ld - %ld\n"
+                    fatal("Bad ref count in prog %s: listed %ld - counted %ld\n"
                          , get_txt(ob->prog->name)
                          , ob->prog->ref, ob->prog->extra_ref);
                 }

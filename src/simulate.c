@@ -1054,7 +1054,10 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
     if ( NULL != (l = closure_hook[hook].u.lambda) )
     {
         if (closure_hook[hook].x.closure_type == CLOSURE_LAMBDA)
-            l->ob = ob;
+        {
+            free_object(l->ob, "give_uid_to_object");
+            l->ob = ref_object(ob, "give_uid_to_object");
+        }
         call_lambda(&closure_hook[hook], numarg);
         ret = inter_sp;
         xfree(ret[-1].u.lvalue); /* free error context */
@@ -3315,11 +3318,6 @@ free_old_driver_hooks (void)
 
     for (i = num_old_hooks; i--;)
     {
-        if (old_hooks[i].type == T_CLOSURE
-         && old_hooks[i].x.closure_type == CLOSURE_LAMBDA)
-        {
-            old_hooks[i].x.closure_type = CLOSURE_UNBOUND_LAMBDA;
-        }
         free_svalue(&old_hooks[i]);
     }
 
@@ -3986,7 +3984,7 @@ f_set_driver_hook (svalue_t *sp)
         {
             closure_hook[n] = *sp;
             closure_hook[n].x.closure_type = CLOSURE_LAMBDA;
-            closure_hook[n].u.lambda->ob = master_ob;
+            closure_hook[n].u.lambda->ob = ref_object(master_ob, "hook closure");
             break;
         }
         else if (!CLOSURE_IS_LFUN(sp->x.closure_type))
@@ -4012,6 +4010,9 @@ default_test:
 #ifdef USE_FREE_CLOSURE_HOOK
     if (old.type != T_NUMBER)
         free_closure_hooks(&old, 1); /* free it in the backend */
+#else
+    if (old.type != T_NUMBER)
+        free_svalue(&old);
 #endif
 
     return sp - 2;

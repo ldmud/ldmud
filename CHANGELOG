@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Aug-2001 (Lars Duening)  (3.3.92)
+    - (interpret.c) Improved the check for reference loop creation on
+        assignment (suggested by Menaures).
+    - (many files) When reloading the master object, the driver freed
+        through the driver hooks some object references it shouldn't free.
+        If a lambda driver hook is bound to an object, this reference is
+        now counted. This makes rebinding the hook closure a bit more
+        laborsome, but overall the handling is safer since consistent
+        (reported by Tomba).
+
 26-Aug-2001 (Lars Duening)  (3.3.91)
     - (interpret.c) Efun sscanf() didn't check its arguments (reported by
         Tomba).

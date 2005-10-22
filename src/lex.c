@@ -1708,7 +1708,10 @@ inc_open (char *buf, char *name, mp_int namelen, char delim)
         push_c_string(inter_sp, name);
         push_c_string(inter_sp, current_file);
         if (closure_hook[H_INCLUDE_DIRS].x.closure_type == CLOSURE_LAMBDA)
-            closure_hook[H_INCLUDE_DIRS].u.lambda->ob = current_object;
+        {
+            free_object(closure_hook[H_INCLUDE_DIRS].u.lambda->ob, "inc_open");
+            closure_hook[H_INCLUDE_DIRS].u.lambda->ob = ref_object(current_object, "inc_open");
+        }
         svp = secure_call_lambda(&closure_hook[H_INCLUDE_DIRS], 2);
 
         /* The result must be legal relative pathname */

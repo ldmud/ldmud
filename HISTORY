@@ -45,7 +45,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-26-Aug-2001 (Lars Duening) -- upcoming Release 3.2.9
+27-Aug-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -257,7 +257,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + Bugfix: On mapping addition or element assignment, invalid keys (like
            destructed objects) were still counted against the allowed mapping
            size.
-       + Bugfix: Simple reference loops as created by
+       + Bugfix: Most reference loops as created by for example
            'b = 0 || &a; b = 0 || &a;' are detected.
        + Bugfix: When destructing an object, references through closures
            are removed from the local variables as well.

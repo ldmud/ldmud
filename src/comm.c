@@ -2993,7 +2993,10 @@ set_noecho (interactive_t *ip, char noecho)
         {
             DTN(("set_noecho():   calling H_NOECHO\n"));
             if (closure_hook[H_NOECHO].x.closure_type == CLOSURE_LAMBDA)
-                closure_hook[H_NOECHO].u.lambda->ob = ob;
+            {
+                free_object(closure_hook[H_NOECHO].u.lambda->ob, "set_noecho");
+                closure_hook[H_NOECHO].u.lambda->ob = ref_object(ob, "set_noecho");
+            }
             push_number(inter_sp, noecho);
             push_ref_object(inter_sp, ob, "set_no_echo");
             secure_call_lambda(&closure_hook[H_NOECHO], 2);
@@ -3817,7 +3820,10 @@ h_telnet_neg (int n)
     else if (closure_hook[H_TELNET_NEG].type == T_CLOSURE)
     {
         if (closure_hook[H_TELNET_NEG].x.closure_type == CLOSURE_LAMBDA)
-            closure_hook[H_TELNET_NEG].u.lambda->ob = command_giver;
+        {
+            free_object(closure_hook[H_TELNET_NEG].u.lambda->ob, "h_telnet_neg");
+            closure_hook[H_TELNET_NEG].u.lambda->ob = ref_object(command_giver, "h_telnet_neg");
+        }
         svp = secure_call_lambda(&closure_hook[H_TELNET_NEG], n);
     }
     else

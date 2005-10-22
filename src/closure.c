@@ -5406,7 +5406,7 @@ f_bind_lambda (svalue_t *sp, int num_arg)
 
             obp = &l->ob;
             free_object(*obp, "bind_lambda");
-            *obp = ob;
+            *obp = ob; /* Adopt the reference */
             break;
         }
         else
@@ -5420,7 +5420,7 @@ f_bind_lambda (svalue_t *sp, int num_arg)
             l->ref--;
             l2 = xalloc(sizeof *l);
             l2->ref = 1;
-            l2->ob = ob;
+            l2->ob = ob; /* Adopt the reference */
             l2->function.lambda = l->function.lambda;
             l->function.lambda->ref++;
             sp->u.lambda = l2;
