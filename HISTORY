@@ -45,7 +45,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-14-Aug-2001 (Lars Duening) -- upcoming Release 3.2.9
+19-Aug-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -86,6 +86,10 @@ For a detailed list of all changes see the file CHANGELOG.
            end.
        + printf(), sprintf(): Printing numbers with leading zeroes and a
            sign character printed the sign in the wrong place.
+       + printf(), sprintf(): When printing closures with %O, the program name
+           for inherited lfun closures is printed as well.
+       + printf(), sprintf(): New format specifier 'Q' act like 'O', but quotes
+           special characters in strings.
        + query_udp_port(), send_udp(): Renamed from query_imp_port() and
            send_imp().
        + regexp functions: more compatible with 8-bit characters.
@@ -229,6 +233,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Bugfix: Escaped character constants are now only parsed up to a
            maximum length. If no valid digits are found, the whole item
            is simply treated as escaped character.
+       + Bugfix: When defining a function of the same name as an inherited
+           private function, the latter is no longer redefined.
 
 
     - Runtime:

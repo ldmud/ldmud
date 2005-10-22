@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+19-Aug-2001 (Lars Duening)  (3.3.87)
+    - (prolang.y) Defining a function which is also a private function in an
+         inherited object no longer redefines the inherited one (reported by
+         Bardioc and Menaures).
+    - (sprintf.c) Closures on inherited lfuns are printed with the defining
+         program for the %O format.
+    - (sprintf.c) New format specifier 'Q' acts like 'O', except that special
+         characters in strings are quoted (suggested by Menaures).
+
 15-Aug-2001 (Lars Duening)  (3.3.86)
     - (interpret.c) Holding a reference on a lambda works much better
          if the code actually increment the correct refcount.

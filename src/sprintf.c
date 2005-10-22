@@ -43,6 +43,7 @@
  *  "%"   in which case no arguments are interpreted, and a "%" is inserted, and
  *        all modifiers are ignored.
  *  "O"   the argument is an LPC datatype.
+ *  "Q"   the argument is an LPC datatype, strings are printed in LPC notation.
  *  "s"   the argument is a string.
  *  "d"   the integer arg is printed in decimal.
  *  "i"   as d.
@@ -124,9 +125,10 @@ typedef unsigned int format_info;
 #define INFO_T_ERROR  0x1
 #define INFO_T_NULL   0x2
 #define INFO_T_LPC    0x3
-#define INFO_T_STRING 0x4
-#define INFO_T_INT    0x5
-#define INFO_T_FLOAT  0x6
+#define INFO_T_QLPC   0x4
+#define INFO_T_STRING 0x5
+#define INFO_T_INT    0x6
+#define INFO_T_FLOAT  0x7
 
 #define INFO_J        0x30
 #define INFO_J_CENTRE 0x10
@@ -248,6 +250,7 @@ struct stsf_locals
     sprintf_buffer_t *spb;  /* Target buffer */
     int indent;             /* Indentation */
     int num_values;         /* Mapping width */
+    Bool quote;             /* TRUE: Quote strings */
     fmt_state_t      *st;   /* sprintf state */
 };
 
@@ -295,7 +298,7 @@ struct fmt_state
 
 static sprintf_buffer_t *svalue_to_string(fmt_state_t *
                                          , svalue_t *, sprintf_buffer_t *
-                                         , int, Bool);
+                                         , int, Bool, Bool);
 
 /*-------------------------------------------------------------------------*/
 /* Macros */
@@ -522,11 +525,11 @@ svalue_to_string_filter(svalue_t *key, svalue_t *data, void *extra)
 
     i = locals->num_values;
     locals->spb =
-      svalue_to_string(locals->st, key, locals->spb, locals->indent, !i);
+      svalue_to_string(locals->st, key, locals->spb, locals->indent, !i, locals->quote);
     while (--i >= 0)
     {
         stradd(locals->st, &locals->spb, delimiter);
-        locals->spb = svalue_to_string(locals->st, data++, locals->spb, 1, !i);
+        locals->spb = svalue_to_string(locals->st, data++, locals->spb, 1, !i, locals->quote);
         delimiter = ";";
     }
 } /* svalue_to_string_filter() */
@@ -535,7 +538,7 @@ svalue_to_string_filter(svalue_t *key, svalue_t *data, void *extra)
 static sprintf_buffer_t *
 svalue_to_string ( fmt_state_t *st
                  , svalue_t *obj, sprintf_buffer_t *str
-                 , int indent, Bool trailing)
+                 , int indent, Bool trailing, Bool quoteStrings)
 
 /* Print the value <obj> into the buffer <str> with indentation <indent>.
  * If <trailing> is true, add ",\n" after the printed value.
@@ -556,7 +559,7 @@ svalue_to_string ( fmt_state_t *st
 
     case T_LVALUE:
         stradd(st, &str, "lvalue: ");
-        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing);
+        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings);
         break;
 
     case T_NUMBER:
@@ -574,7 +577,95 @@ svalue_to_string ( fmt_state_t *st
 
     case T_STRING:
         stradd(st, &str, "\"");
-        stradd(st, &str, get_txt(obj->u.str));
+
+        if (!quoteStrings)
+        {
+            stradd(st, &str, get_txt(obj->u.str));
+        }
+        else
+        {
+            size_t len;
+
+            /* Compute the size of the result string */
+            for (len = 0, i = mstrsize(obj->u.str); i > 0; --i)
+            {
+                unsigned char c = (unsigned char) get_txt(obj->u.str)[i];
+
+                switch(c)
+                {
+                case '"':
+                case '\n':
+                case '\r':
+                case '\t':
+                case '\a':
+                case 0x1b:
+                case 0x08:
+                case '\\':
+                    len += 2; break;
+                default:
+                    if (c >= 0x20 && c < 0x7F)
+                    {
+                       len++;
+                    }
+                    else
+                    {
+                       len += 4;
+                    }
+                    break;
+                }
+            }
+
+            if ( len == mstrsize(obj->u.str) )
+            {
+                /* No special characters found */
+                stradd(st, &str, get_txt(obj->u.str));
+            }
+            else
+            {
+                char * tmpstr, *dest;
+                unsigned char *src;
+
+                /* Allocate the temporary string */
+                tmpstr = alloca(len+1);
+
+                src = (unsigned char *)get_txt(obj->u.str);
+                dest = tmpstr;
+                for (i = mstrsize(obj->u.str); i > 0; --i)
+                {
+                    unsigned char c = *src++;
+
+                    switch(c)
+                    {
+                    case '"': strcpy(dest, "\\\""); dest += 2; break;
+                    case '\n': strcpy(dest, "\\n"); dest += 2; break;
+                    case '\r': strcpy(dest, "\\r"); dest += 2; break;
+                    case '\t': strcpy(dest, "\\t"); dest += 2; break;
+                    case '\a': strcpy(dest, "\\a"); dest += 2; break;
+                    case 0x1b: strcpy(dest, "\\e"); dest += 2; break;
+                    case 0x08: strcpy(dest, "\\b"); dest += 2; break;
+                    case '\\': strcpy(dest, "\\\\"); dest += 2; break;
+                    default:
+                        if (c >= 0x20 && c < 0x7F)
+                        {
+                           *dest++ = (char)c;
+                        }
+                        else
+                        {
+                           static char hex[] = "0123456789abcdef";
+                           *dest++ = '\\';
+                           *dest++ = 'x';
+                           *dest++ = hex[c >> 4];
+                           *dest++ = hex[c & 0xf];
+                        }
+                        break;
+                    }
+                } /* for() */
+
+                stradd(st, &str, tmpstr);
+            }
+
+        } 
+
         stradd(st, &str, "\"");
         break;
 
@@ -612,8 +703,8 @@ svalue_to_string ( fmt_state_t *st
                 numadd(st, &str, size);
                 stradd(st, &str, " */\n");
                 for (i = 0; i < size-1; i++)
-                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE);
-                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE);
+                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings);
+                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings);
                 stradd(st, &str, "\n");
                 add_indent(st, &str, indent);
                 stradd(st, &str, "})");
@@ -647,6 +738,7 @@ svalue_to_string ( fmt_state_t *st
             locals.indent = indent + 2;
             locals.num_values = obj->u.map->num_values;
             locals.st = st;
+            locals.quote = quoteStrings;
             check_map_for_destr(obj->u.map);
             walk_mapping(obj->u.map, svalue_to_string_filter, &locals);
             str = locals.spb;
@@ -709,6 +801,7 @@ svalue_to_string ( fmt_state_t *st
             funflag_t flags;
             string_t *function_name;
             object_t *ob;
+            Bool is_inherited;
 
             l = obj->u.lambda;
             if (type == CLOSURE_LFUN)
@@ -731,19 +824,28 @@ svalue_to_string ( fmt_state_t *st
                 load_ob_from_swap(ob);
             stradd(st, &str, "#'");
             stradd(st, &str, get_txt(ob->name));
-            stradd(st, &str, "->");
             prog = ob->prog;
             flags = prog->functions[ix];
+            is_inherited = MY_FALSE;
             while (flags & NAME_INHERITED)
             {
                 inherit_t *inheritp;
 
+                is_inherited = MY_TRUE;
                 inheritp = &prog->inherit[flags & INHERIT_MASK];
                 ix -= inheritp->function_index_offset;
                 prog = inheritp->prog;
                 flags = prog->functions[ix];
             }
 
+            if (is_inherited)
+            {
+                stradd(st, &str, "(");
+                stradd(st, &str, get_txt(prog->name));
+                str->offset -= 2; /* Remove the '.c' after the program name */
+                stradd(st, &str, ")");
+            }
+            stradd(st, &str, "->");
             memcpy(&function_name
                   , FUNCTION_NAMEP(prog->program + (flags & FUNSTART_MASK))
                   , sizeof function_name
@@ -933,7 +1035,7 @@ svalue_to_string ( fmt_state_t *st
   case T_PROTECTED_CHAR_LVALUE:
     {
         stradd(st, &str, "prot char: ");
-        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing);
+        str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings);
         break;
     }
 
@@ -977,8 +1079,8 @@ svalue_to_string ( fmt_state_t *st
                 numadd(st, &str, size);
                 stradd(st, &str, " */\n");
                 for (i = 0; i < size-1; i++)
-                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE);
-                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE);
+                    str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_TRUE, quoteStrings);
+                str = svalue_to_string(st, &(obj->u.vec->item[i]), str, indent+2, MY_FALSE, quoteStrings);
                 stradd(st, &str, "\n");
                 add_indent(st, &str, indent);
                 stradd(st, &str, "})");
@@ -996,7 +1098,7 @@ svalue_to_string ( fmt_state_t *st
 
   case T_PROTECTED_LVALUE:              
       stradd(st, &str, "prot lvalue: ");
-      str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing);
+      str = svalue_to_string(st, obj->u.lvalue, str, indent+2, trailing, quoteStrings);
       break;
 
   default:
@@ -1578,6 +1680,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                 case ':': pres = -2; break;
                 case '%': finfo |= INFO_T_NULL; break; /* never reached */
                 case 'O': finfo |= INFO_T_LPC; break;
+                case 'Q': finfo |= INFO_T_QLPC; break;
                 case 's': finfo |= INFO_T_STRING; break;
                 case 'i': finfo |= INFO_T_INT; format_char = 'd'; break;
                 case 'd':
@@ -1665,6 +1768,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                   }
 
                 case INFO_T_LPC:
+                case INFO_T_QLPC:
                   {
                     sprintf_buffer_t *b;
 #                   define CLEANSIZ 0x200
@@ -1690,7 +1794,8 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                     b->offset = -CLEANSIZ+(p_int)sizeof(sprintf_buffer_t);
                     b->size = CLEANSIZ;
                     b->start = &st->tmp;
-                    svalue_to_string(st, carg, b, 0, MY_FALSE);
+                    svalue_to_string(st, carg, b, 0, MY_FALSE
+                                    , (finfo & INFO_T) == INFO_T_QLPC);
 
                     /* Store the created result in .clean and pass it
                      * to case INFO_T_STRING is 'the' carg.

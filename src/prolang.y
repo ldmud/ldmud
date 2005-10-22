@@ -1885,7 +1885,9 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
 
     flags |= type & ~TYPE_MOD_MASK; /* Move the visibility-info into flags */
     
-    if (p->type == I_TYPE_GLOBAL && (num = p->u.global.function) >= 0)
+    if (p->type == I_TYPE_GLOBAL
+     && (num = p->u.global.function) >= 0
+     )
     {
         /* The function was already defined. It may be one of several reasons:
          *
@@ -10739,6 +10741,10 @@ copy_functions (program_t *from, fulltype_t type)
             if ( (fun.flags & (NAME_HIDDEN|TYPE_MOD_NO_MASK|NAME_UNDEFINED) ) ==
                  (NAME_HIDDEN|TYPE_MOD_NO_MASK) )
                 break;
+            if ( (fun.flags & (NAME_INHERITED|TYPE_MOD_PRIVATE) ) ==
+                 (NAME_INHERITED|TYPE_MOD_PRIVATE) )
+                break;
+
 
             /* Visible: create a new identifier for it */
             p = make_global_identifier(get_txt(fun.name), I_TYPE_GLOBAL);
