@@ -19,8 +19,6 @@ For a detailed list of all changes see the file CHANGELOG.
            possible.
        + function_exists(): now also returns the filename and linenumber
            of a function.
-       + inherit_list(): the inherited objects can be returned in a 
-           tree reflecting the inheritance structure.
 
     - Corrected efuns:
 
@@ -57,7 +55,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-17-Oct-2001 (Lars Duening) -- upcoming Release 3.2.9
+24-Oct-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -83,6 +81,8 @@ For a detailed list of all changes see the file CHANGELOG.
             objects, it is switched over as well, like this_player().
        + filter(), map(), sort_array(), walk_mapping(): Protected lvalues
             (e.g. &(i[0])) are not allowed as callback parameters.
+       + inherit_list(): the inherited objects can be returned in a 
+           tree reflecting the inheritance structure.
        + lambda(): Simul efuns with extended varargs weren't compiled
             correctly.
        + load_name(), object_name(), program_name(): 0 is now accepted
@@ -155,6 +155,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + md5(): Compute the MD5 message digest for a string.
        + min(), max(): To select the minimum resp. maximum among a bunch
            of numbers or strings.
+       + remove_input_to(): Remove a pending input_to.
        + sgn(): Return the sign of a numeric argument.
        + utime(): Return the current time in microsecond resolution.
 

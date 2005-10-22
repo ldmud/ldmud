@@ -1,6 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+24-Oct-2001 (Lars Duening)  (3.3.119)
+    - (efuns.c) If a closure is used with regreplace(), it will be
+        passed the position of the found substring, too (suggested
+        by Alfe).
+    - (comm.c) New efun remove_input_to() (part of f-000530).
+
+23-Oct-2001 (Lars Duening)
+    - (doc/efun/terminal_colour) Improved the explanation of the key
+        recognition strategy, and added a MudOS simulation function
+        courtesy of Fiona.
+
+22-Oct-2001 (Lars Duening)
+    - (md5.c) Changed two function calls from the generic to the MD5
+        versions (thanks, Gawain!)
+
 21-Oct-2001 (Lars Duening)  (3.3.118)
     - (actions.c) Removed a crasher when add_action() was performed between
         two objects with no environment (thanks, Fuchur!).

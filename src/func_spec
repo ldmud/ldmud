@@ -444,6 +444,7 @@ int     query_idle(object);
 int     query_once_interactive(object);
 object  query_shadowing(object);
 object  query_snoop(object);
+int     remove_input_to(object, void|object|string|closure);
 void    remove_interactive(object);
 void    rename_object(object, string);
 int     restore_object(string);

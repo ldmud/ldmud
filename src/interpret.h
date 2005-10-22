@@ -170,6 +170,7 @@ extern void m_unmake_filter ( svalue_t *key, svalue_t *data, void *extra);
 extern int last_instructions(int length, Bool verbose, svalue_t **svpp);
 extern svalue_t *f_apply (svalue_t *sp, int num_arg);
 extern svalue_t *f_funcall (svalue_t *sp, int num_arg);
+extern svalue_t *f_call_direct_resolved (svalue_t *sp, int num_arg);
 extern svalue_t *f_call_resolved (svalue_t *sp, int num_arg);
 extern svalue_t *f_caller_stack_depth (svalue_t *sp);
 extern svalue_t *f_caller_stack (svalue_t *sp);

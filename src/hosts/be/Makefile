@@ -147,16 +147,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 118
+  SETVERFLAGS += d 119
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.118
+  VSTRING = 3.3.0-pre.119
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 118
+  SETVERFLAGS += d 119
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.118
+  VSTRING = 3.3.0-dev.119
 endif
 
 else
@@ -164,12 +164,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 118
+SETVERFLAGS = -app 3 3 119
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.118
+  VSTRING = 3.3.119
 
 endif
 
@@ -578,8 +578,8 @@ $(OBJ)/object.o : ../mudlib/sys/functionlist.h ../mudlib/sys/driver_hook.h \
     simulate.h sent.h random.h ptrtable.h prolang.h otable.h mstrings.h \
     mempools.h mapping.h main.h instrs.h interpret.h filestat.h exec.h \
     comm.h closure.h backend.h array.h actions.h object.h my-alloca.h \
-    typedefs.h driver.h ../mudlib/sys/lpctypes.h port.h config.h \
-    hosts/unix.h hosts/be/be.h machine.h
+    typedefs.h driver.h port.h config.h hosts/unix.h hosts/be/be.h \
+    machine.h
 
 $(OBJ)/otable.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h simulate.h \
     strfuns.h object.h mstrings.h hash.h gcollect.h backend.h otable.h \

@@ -531,7 +531,7 @@ MD5Encode(unsigned char *pw,
     /*
      * Don't leave anything around in vm they could use.
      */
-    memset(final, 0, sizeof(final));
+    MD5_memset(final, 0, sizeof(final));
 
     /*
      * Then something really weird...
@@ -599,7 +599,7 @@ MD5Encode(unsigned char *pw,
     /*
      * Don't leave anything around in vm they could use.
      */
-    memset(final, 0, sizeof(final));
+    MD5_memset(final, 0, sizeof(final));
 
     xstrncpy(result, passwd, nbytes - 1);
     result[nbytes-1] = '\0';

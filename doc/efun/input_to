@@ -91,5 +91,5 @@ HISTORY
           instead.
 
 SEE ALSO
-        call_other(E), sscanf(E), privilege_violation(M),
-        set_combine_charset(E)
+        remove_input_to(E), query_input_pending(E),
+        privilege_violation(M), set_combine_charset(E)

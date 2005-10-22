@@ -305,6 +305,7 @@ extern svalue_t *f_query_input_pending(svalue_t *sp);
 extern svalue_t *f_query_ip_name(svalue_t *sp);
 extern svalue_t *f_query_ip_number(svalue_t *sp);
 extern svalue_t *f_query_mud_port(svalue_t *sp);
+extern svalue_t *f_remove_input_to (svalue_t *sp, int num_arg);
 extern svalue_t *f_set_buffer_size(svalue_t *sp);
 extern svalue_t *f_set_combine_charset(svalue_t *sp);
 extern svalue_t *f_set_connection_charset(svalue_t *sp);

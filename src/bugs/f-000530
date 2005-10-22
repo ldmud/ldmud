@@ -16,7 +16,7 @@ command-giving selves.
 
 Note:
   Better would be something like
-    remove_input_to(void|string|closre)
+    remove_input_to(void|string|closre) (implemented in 3.2.9-dev.355/3.3.119)
   and of course
     input_to_list()
 

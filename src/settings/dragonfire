@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Settings for a compat-mode driver for Dragonfire mud.
+# by Nostradamus
+# configure will strip this part from the script.
+
+exec ./configure \
+--prefix=/home/lars \
+--bindir=/home/lars/bin \
+--libdir=/home/lars/mudlib \
+--libexec=/home/lars/libexec \
+--enable-compat-mode \
+--enable-erq=xerq \
+--enable-lpc-nosave \
+--enable-dynamic-costs \
+--enable-use-mysql \
+--enable-malloc-trace \
+--enable-malloc-lpc-trace \
+--enable-use-system-crypt=no \
+--enable-use-deprecated=no \
+--enable-use-alists=yes \
+--with-master-name=secure/master \
+--with-time-to-reset=1800 \
+--with-portno=1999 \
+--with-udp-port=2000 \
+--with-max-cost=2100000 \
+--with-swap-file=LP_SWAP.3 $*
+exit 1

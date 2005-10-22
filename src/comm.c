@@ -6085,6 +6085,127 @@ f_query_input_pending (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_remove_input_to (svalue_t *sp, int num_arg)
+
+/* EFUN: remove_input_to()
+ *
+ *   int remove_input_to (object player)
+ *   int remove_input_to (object player, string|closure|object fun)
+ *
+ * Remove a pending input_to from the interactive <player> object.
+ * If the optional <fun> is not given, the most recently added input_to
+ * is removed.
+ *
+ * If the optional <fun> is given, the efun tries to find and remove the
+ * most recently added input_to matching the <fun> argument:
+ *  - <fun> is a string: the input_to functionname has to match
+ *  - <fun> is an object: the object the input_to function is bound to has
+ *                        to match
+ *  - <fun> is a closure: the input_to closure has to match.
+ * 
+ * Return 1 on success, or 0 on failure (no input_to found, object is not
+ * interactive or has no input_to pending).
+ */
+
+{
+    svalue_t      *arg;  /* Pointer to the arguments of the efun */
+    int            rc;   /* Resultvalue */
+
+    /* Get the arguments */
+    arg = sp - num_arg + 1;
+
+    /* Process the command, bailing out whenever necessary */
+    do {
+        input_to_t * prev;
+        input_to_t    *it;
+        interactive_t *ip;
+
+        /* Get the interactive object.
+         * If there is none, or if it is closing down or doesn't have
+         * an input_to set, fail.
+         */
+        if (!(O_SET_INTERACTIVE(ip, arg[0].u.ob))
+         || ip->closing || ip->input_to == NULL
+           )
+        {
+            rc = 0;
+            break;
+        }
+
+        /* If no filter argument has been given, just remove
+         * the first input to.
+         */
+        if (num_arg < 2)
+        {
+            it = ip->input_to;
+            ip->input_to = it->next;
+            free_input_to(it);
+            rc = 1;
+            break;
+        }
+
+        /* There is a filter argument: search for the right input_to */
+
+        for (prev = NULL, it = ip->input_to
+            ; it != NULL
+            ; prev = it, it = it->next)
+        {
+            Bool found = MY_FALSE;
+
+            switch (arg[1].type)
+            {
+            case T_STRING:
+                if (!it->fun.is_lambda
+                 && mstreq(it->fun.function.named.name, arg[1].u.str))
+                    found = MY_TRUE;
+                break;
+                
+            case T_OBJECT:
+                if (callback_object(&(it->fun)) == arg[1].u.ob)
+                    found = MY_TRUE;
+                break;
+
+            case T_CLOSURE:
+                if (it->fun.is_lambda
+                 && closure_eq(&(it->fun.function.lambda), arg+1))
+                    found = MY_TRUE;
+                break;
+
+            default:
+                fatal("Unsupported argument type %d\n", arg[1].type);
+                break;
+            }
+
+            if (found)
+                break;
+        }
+
+        if (it != NULL)
+        {
+            /* We found the input_to: remove it */
+            if (prev == NULL)
+                ip->input_to = it->next;
+            else
+                prev->next = it->next;
+
+            free_input_to(it);
+            rc = 1;
+            break;
+        }
+
+        /* At this point, nothing worked: failure */
+        rc = 0;
+    } while (0);
+
+    /* Return the result */
+    sp = pop_n_elems(num_arg, sp);
+    push_number(sp, rc);
+
+    return sp;
+} /* f_remove_input_to() */
+
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_query_ip_name (svalue_t *sp)
 
 /* EFUN query_ip_name()

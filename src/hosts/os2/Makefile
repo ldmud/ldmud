@@ -299,8 +299,8 @@ object.o : ../mudlib/sys/functionlist.h ../mudlib/sys/driver_hook.h \
     simulate.h sent.h random.h ptrtable.h prolang.h otable.h mstrings.h \
     mempools.h mapping.h main.h instrs.h interpret.h filestat.h exec.h \
     comm.h closure.h backend.h array.h actions.h object.h my-alloca.h \
-    typedefs.h driver.h ../mudlib/sys/lpctypes.h port.h config.h \
-    hosts/unix.h hosts/be/be.h machine.h
+    typedefs.h driver.h port.h config.h hosts/unix.h hosts/be/be.h \
+    machine.h
 
 otable.o : ../mudlib/sys/debug_info.h xalloc.h svalue.h simulate.h \
     strfuns.h object.h mstrings.h hash.h gcollect.h backend.h otable.h \
@@ -389,10 +389,10 @@ wiz_list.o : xalloc.h svalue.h stdstrings.h simulate.h object.h mstrings.h \
     strfuns.h sent.h exec.h instrs.h port.h config.h hosts/unix.h \
     hosts/be/be.h machine.h
 
-xalloc.o : smalloc.c simulate.h interpret.h xalloc.h driver.h \
+xalloc.o : smalloc.c main.h simulate.h interpret.h xalloc.h driver.h \
     ../mudlib/sys/debug_info.h object.h exec.h svalue.h stdstrings.h \
-    mstrings.h main.h gcollect.h backend.h smalloc.h typedefs.h strfuns.h \
-    sent.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
+    mstrings.h gcollect.h backend.h smalloc.h typedefs.h strfuns.h sent.h \
+    instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
 # --- DO NOT MODIFY THIS LINE -- AUTO-DEPENDS PRECEDE ---
 # --- DO NOT MODIFY THIS LINE -- SELECTED AUTO-DEPENDS FOLLOW ---

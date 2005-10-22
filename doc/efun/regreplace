@@ -1,5 +1,6 @@
 SYNOPSIS
-        string regreplace(string txt, string pattern, string replacepattern, int flags)
+        string regreplace( string txt, string pattern
+                         , closure|string replacepattern, int flags)
 
 DESCRIPTION
         This function looks through txt looking for the regular
@@ -7,8 +8,8 @@ DESCRIPTION
         replacepattern.
         
         The replacepattern can be a constant string, or a closure taking
-        the matched substring as argument and returning the replacement
-        pattern string.
+        the matched substring and the position at which it was found
+        as arguments and returning the replacement pattern string.
         
         The flag is a bitmask, where bit 0 specifies
         that the search and replace should repeat as often as the

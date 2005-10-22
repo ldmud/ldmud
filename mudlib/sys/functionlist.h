@@ -1,9 +1,7 @@
 #ifndef LPC_FUNCTIONLIST_H
 #define LPC_FUNCTIONLIST_H
 
-#ifdef __DRIVER_SOURCE__
-#include "lpctypes.h"
-#else
+#ifndef __DRIVER_SOURCE__
 #include "/sys/lpctypes.h"
 #endif
 
@@ -32,7 +30,6 @@
 #define RETURN_FUNCTION_ARGTYPE 0x10 /* not implemented */
 
 /* Return value flag types for function_exists() */
-
 
 #define FEXISTS_PROGNAME  (0)
 #define FEXISTS_FILENAME  (1)

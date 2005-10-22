@@ -7,4 +7,4 @@ DESCRIPTION
         else 0.
 
 SEE ALSO
-        input_to(E)
+        input_to(E), remove_input_to(E)

@@ -1668,7 +1668,7 @@ eval_arg (int eOption, const char * pValue)
 
             /* Skip leading spaces */
             *begin_arg++ = '\0';
-            while (*begin_arg == ' ') cp++;
+            while (*begin_arg == ' ') begin_arg++;
 
             /* Count the arguments */
             for (num_args = 0, cp = begin_arg; *cp != '\0'; )
@@ -1681,7 +1681,7 @@ eval_arg (int eOption, const char * pValue)
                 while (*cp == ' ') cp++;
             }
 
-            if (num_args != 0);
+            if (num_args != 0)
             {
                 /* There are arguments!
                  * Put them into the argument array.

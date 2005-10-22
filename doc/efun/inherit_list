@@ -47,7 +47,7 @@ EXAMPLES
 
 HISTORY
         Before 3.2.8, the returned names never started with a '/'.
-        LDMud 3.3.111 added the tree representation.
+        LDMud 3.2.9/3.3.111 added the tree representation.
 
 
 SEE ALSO

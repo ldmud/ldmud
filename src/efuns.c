@@ -648,7 +648,8 @@ f_regreplace (svalue_t *sp)
  * Search through <txt> for one/all occurences of <pattern> and replace them
  * with the <replace> pattern, returning the result.
  * <replace> can be a string, or a closure returning a string. If it is
- * a closure, it will be called with the matched substring as argument.
+ * a closure, it will be called with the matched substring and
+ * the position at which it was found as arguments.
  * <flags> is the bit-or of these values:
  *   F_GLOBAL   = 1: when given, all occurences of <pattern> are replace,
  *                   else just the first
@@ -768,7 +769,8 @@ f_regreplace (svalue_t *sp)
                 match[patsize] = '\0';
 
                 push_c_string(inter_sp, match);
-                call_lambda(subclosure, 1);
+                push_number(inter_sp, pat->startp[0] - start);
+                call_lambda(subclosure, 2);
                 transfer_svalue(&apply_return_value, inter_sp);
                 inter_sp--;
 
