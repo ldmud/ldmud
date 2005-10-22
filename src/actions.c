@@ -604,11 +604,20 @@ notify_no_command (char *command, object_t *save_command_giver)
 {
     svalue_t *svp;
 
+    Bool      useHook;
+
+    useHook = (   closure_hook[H_SEND_NOTIFY_FAIL].type == T_CLOSURE
+               || closure_hook[H_SEND_NOTIFY_FAIL].type == T_STRING
+              );
+
     svp = &error_msg;
 
     if (svp->type == T_STRING)
     {
-        tell_object(command_giver, svp->u.str);
+        if (!useHook)
+            tell_object(command_giver, svp->u.str);
+        else
+            push_svalue(svp);
     }
     else if (svp->type == T_CLOSURE)
     {
@@ -616,12 +625,25 @@ notify_no_command (char *command, object_t *save_command_giver)
         call_lambda(svp, 1);
         /* add_message might cause an error, thus, we free the closure first. */
         if (inter_sp->type == T_STRING)
-            tell_object(command_giver, inter_sp->u.str);
-        pop_stack();
+        {
+            if (!useHook)
+            {
+                tell_object(command_giver, inter_sp->u.str);
+                pop_stack();
+            }
+        }
+        else
+        {
+            pop_stack();
+            useHook = MY_FALSE;
+        }
     }
     else if (closure_hook[H_NOTIFY_FAIL].type == T_STRING)
     {
-        tell_object(command_giver, closure_hook[H_NOTIFY_FAIL].u.str);
+        if (!useHook)
+            tell_object(command_giver, closure_hook[H_NOTIFY_FAIL].u.str);
+        else
+            push_svalue(&closure_hook[H_NOTIFY_FAIL]);
     }
     else if (closure_hook[H_NOTIFY_FAIL].type == T_CLOSURE)
     {
@@ -631,8 +653,44 @@ notify_no_command (char *command, object_t *save_command_giver)
         push_ref_valid_object(inter_sp, save_command_giver, "notify_no_command");
         call_lambda(&closure_hook[H_NOTIFY_FAIL], 2);
         if (inter_sp->type == T_STRING)
-            tell_object(command_giver, inter_sp->u.str);
-        pop_stack();
+        {
+            if (!useHook)
+            {
+                tell_object(command_giver, inter_sp->u.str);
+                pop_stack();
+            }
+        }
+        else
+        {
+            pop_stack();
+            useHook = MY_FALSE;
+        }
+    }
+
+    /* If the output has to go through a hook, push the remaining
+     * arguments and call the hook.
+     */
+    if (useHook)
+    {
+        if (error_obj != NULL)
+            push_ref_valid_object(inter_sp, error_obj, "notify-fail error_obj");
+        else
+            push_number(inter_sp, 0);
+        push_ref_valid_object(inter_sp, save_command_giver, "notify-fail save_command_giver");
+
+        if (closure_hook[H_SEND_NOTIFY_FAIL].type == T_STRING)
+        {
+            (void)sapply_int( closure_hook[H_SEND_NOTIFY_FAIL].u.str
+                            , command_giver, 3, MY_TRUE
+                            );
+        }
+        else
+        {
+            if (closure_hook[H_SEND_NOTIFY_FAIL].x.closure_type == CLOSURE_LAMBDA)
+                closure_hook[H_SEND_NOTIFY_FAIL].u.lambda->ob = command_giver;
+            call_lambda(&closure_hook[H_SEND_NOTIFY_FAIL], 3);
+            pop_stack();
+        }
     }
 
     free_svalue(svp); /* remember: this is &error_msg */

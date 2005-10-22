@@ -37,9 +37,14 @@ DESCRIPTION
 
         H_NOTIFY_FAIL
           arg: lambda closure, lfun closure, string.
-          Mandatory hook to issue the default message if an entered
+          Mandatory hook to generate the default message if an entered
           command couldn't be parsed and no notify_fail() command is
           in effect.
+
+        H_SEND_NOTIFY_FAIL
+          arg: lambda closure, lfun closure, string.
+          Optional hook to deliver the notify fail message from a failed
+          command.
 
         H_NO_IPC_SLOT
           arg: string.

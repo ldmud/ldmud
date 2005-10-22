@@ -1,6 +1,18 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+29-Jun-2001 (Lars Duening)  (3.3.68)
+    - (prolang.y) Accidentally it was no longer possible to redefine 
+        privately inherited variables (reported by Gnomi).
+    - (actions.c, simulate.c) New hook H_SEND_NOTIFY_FAIL to deliver
+        the notify fail message. It is meant for those muds who want
+        control over the command flow without having to implement everything
+        themselves via the H_COMMAND hook. This hook is still experimental
+        and may change in details (suggested by Gnomi).
+    - (prolang.y) It is now possible to define a default visibility
+        for functions and variables (see doc/LPC/modifiers) (suggested
+        by Freaky).
+
 29-Jun-2001 (Lars Duening)  (3.3.67)
     - (main.c) Commandline arguments can now be read from a textfile, using
         new commandline option '--args'. These argument files can be nested.

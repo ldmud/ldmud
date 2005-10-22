@@ -43,7 +43,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-27-Jun-2001 (Lars Duening) -- upcoming Release 3.2.9
+29-Jun-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + allocate(): Accepts an optional initialisation value and can
@@ -186,6 +186,9 @@ For a detailed list of all changes see the file CHANGELOG.
        + Integers and floats can now be compared against each other.
        + Identifier names can use the extended alpha characters from the
            ISO 8859-1 alphabet.
+       + Experimental: The 'default' statement allows to set a default
+           visibility for variables and functions. It is meant to make
+           the re-engineering of existing code easier.
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.
        + Bugfix: Right shift by 32 or more bits was computed incorrectly.
@@ -213,6 +216,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + The internal alarm timing is monitored and restarted in case the
            alarm gets lost (happens often on Cygwin).
        + Normal runtime errors are no longer reported on the console.
+       + New optional driver hook H_SEND_NOTIFY_FAIL to send a notify fail
+           message to the proper receiver.
        + Bugfix: IPv6 name lookup works again, and also with both xerq and erq.
        + Bugfix: The driver now longer gets a confused when a client like
            TinyFugue refuses to use CHARMODE.

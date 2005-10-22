@@ -1555,6 +1555,8 @@ name_to_hook(char *name)
         return H_MODIFY_COMMAND_FNAME;
     if ( !strcmp(name, "COMMAND") )
         return H_COMMAND;
+    if ( !strcmp(name, "SEND_NOTIFY_FAIL") )
+        return H_SEND_NOTIFY_FAIL;
     return -1;
 }
 

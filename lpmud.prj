@@ -22,12 +22,14 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 67)
-(Parent-Version lpmud 3-3 66)
-(Version-Log "Commandline options can be read from a textfile.")
+(Project-Version lpmud 3-3 68)
+(Parent-Version lpmud 3-3 67)
+(Version-Log "privately inherited variables couldn't be redefined.
+New experimental hook H_SEND_NOTIFY_FAIL.
+Implemented experimental default visibility for functions and variables.")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 30 Jun 2001 14:31:28 -0600")
+(Checkin-Time "Sat, 30 Jun 2001 14:45:22 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -60,8 +62,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.3 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.18 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.130 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.185 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.131 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.186 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.10 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -109,7 +111,7 @@
   (src/access_check.c (lpmud/d/14_access_che 1.15.1.3 644))
   (src/alloca.c (lpmud/d/13_alloca.c 1.10 644))
   (src/actions.h (lpmud/D/11_actions.h 1.6.1.3 644))
-  (src/actions.c (lpmud/D/12_actions.c 1.15.1.18 644))
+  (src/actions.c (lpmud/D/12_actions.c 1.15.1.19 644))
   (src/array.h (lpmud/f/47_array.h 1.18.1.14 644))
   (src/array.c (lpmud/d/12_array.c 1.46.1.29 644))
   (src/backend.h (lpmud/f/46_backend.h 1.20.1.3 644))
@@ -171,7 +173,7 @@
   (src/port.h (lpmud/38_port.h 1.30.1.4.1.7 644))
   (src/port.c (lpmud/39_port.c 1.17.1.5 644))
   (src/prolang.h (lpmud/f/19_prolang.h 1.12 644))
-  (src/prolang.y (lpmud/37_prolang.y 1.65.1.59 644))
+  (src/prolang.y (lpmud/37_prolang.y 1.65.1.60 644))
   (src/ptrtable.h (lpmud/m/26_ptrtable.h 1.4 644))
   (src/ptrtable.c (lpmud/m/27_ptrtable.c 1.7 644))
   (src/random.h (lpmud/f/18_random.h 1.3 644))
@@ -207,7 +209,7 @@
   (src/func_spec (lpmud/c/31_func_spec 1.53.1.32 644))
   (src/string_spec (lpmud/F/6_string_spe 1.13 644))
   (src/mkfunc.c (lpmud/L/14_mkfunc.c 1.1 644))
-  (src/make_func.y (lpmud/b/7_make_func. 1.25.1.14 644))
+  (src/make_func.y (lpmud/b/7_make_func. 1.25.1.15 644))
 
   ;; Generic host files
   (src/hosts/README (lpmud/h/10_README 1.2 644))
@@ -327,7 +329,7 @@
   ;; Driver-related include files for the mudlib
   (mudlib/sys/commands.h (lpmud/D/15_commands.h 1.3 644))
   (mudlib/sys/debug_info.h (lpmud/t/6_debug_info 1.8 644))
-  (mudlib/sys/driver_hook.h (lpmud/d/30_driver_hoo 1.2 644))
+  (mudlib/sys/driver_hook.h (lpmud/d/30_driver_hoo 1.2.1.1 644))
   (mudlib/sys/debug_message.h (lpmud/K/8_debug_mess 1.2 644))
   (mudlib/sys/erq.h (lpmud/d/29_erq.h 1.5.1.1 644))
   (mudlib/sys/files.h (lpmud/t/7_files.h 1.1 644))
@@ -684,7 +686,7 @@
   (doc/concepts/concepts (lpmud/n/31_concepts 1.2 644))
   (doc/concepts/erq (lpmud/n/32_erq 1.5 644))
   (doc/concepts/files (lpmud/n/33_files 1.2 644))
-  (doc/concepts/hooks (lpmud/h/9_hooks 1.10.1.5 644))
+  (doc/concepts/hooks (lpmud/h/9_hooks 1.10.1.6 644))
   (doc/concepts/imp (lpmud/n/34_imp 1.3 644))
   (doc/concepts/memory (lpmud/n/35_memory 1.2 644))
   (doc/concepts/mysql (lpmud/F/18_HOWTO 1.1.1.4 644))
@@ -899,7 +901,7 @@
   (doc/efun/set_buffer_size (lpmud/q/8_set_buffer 1.2 644))
   (doc/efun/set_combine_charset (lpmud/F/4_set_combin 1.3 644))
   (doc/efun/set_connection_charset (lpmud/q/9_set_connec 1.4 644))
-  (doc/efun/set_driver_hook (lpmud/q/10_set_driver 1.3 644))
+  (doc/efun/set_driver_hook (lpmud/q/10_set_driver 1.4 644))
   (doc/efun/set_environment (lpmud/l/4_set_enviro 1.3 644))
   (doc/efun/set_extra_wizinfo (lpmud/q/11_set_extra_ 1.4 644))
   (doc/efun/set_extra_wizinfo_size (lpmud/q/12_set_extra_ 1.3 644))
@@ -995,7 +997,7 @@
   (doc/LPC/lfuns (lpmud/r/31_lfuns 1.3 644))
   (doc/LPC/lpc (lpmud/r/32_lpc 1.2 644))
   (doc/LPC/mappings (lpmud/l/42_mappings 1.4 644))
-  (doc/LPC/modifiers (lpmud/s/48_modifiers 1.6 644))
+  (doc/LPC/modifiers (lpmud/s/48_modifiers 1.7 644))
   (doc/LPC/operators (lpmud/m/0_operators 1.9.1.3 644))
   (doc/LPC/pragma (lpmud/r/33_pragma 1.8 644))
   (doc/LPC/preprocessor (lpmud/r/34_preprocess 1.3 644))

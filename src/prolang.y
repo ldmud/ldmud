@@ -189,6 +189,7 @@ short hook_type_map[NUM_CLOSURE_HOOKS] =
     H_ERQ_STOP:       SH(T_CLOSURE), \
     H_MODIFY_COMMAND_FNAME: SH(T_STRING), \
     H_COMMAND:        SH(T_CLOSURE) SH(T_STRING), \
+    H_SEND_NOTIFY_FAIL: SH(T_CLOSURE) SH(T_STRING), \
 
 #undef SH
 
@@ -540,6 +541,11 @@ static ident_t *all_locals = NULL;
    * Otherwise it's the full return type of the function, including
    * visibility. The lexer reads this variable when scanning an
    * inline closure.
+   */
+
+static fulltype_t default_varmod;
+static fulltype_t default_funmod;
+  /* Default visibility modifiers for variables resp. function.
    */
 
 static int heart_beat;
@@ -2186,13 +2192,26 @@ define_variable (ident_t *name, fulltype_t flags, svalue_t *svp)
     /* If the variable already exists, make sure that we can redefine it */
     if ( (n = name->u.global.variable) >= 0)
     {
+        /* Visible nomask variables can't be redefined */
         if ( VARIABLE(n)->flags & TYPE_MOD_NO_MASK && !(flags & NAME_HIDDEN))
             yyerrorf( "Illegal to redefine 'nomask' variable '%s'"
                     , get_txt(name->name));
 
-        if ( !(flags & NAME_INHERITED))
-            yyerrorf( "Illegal to redefine global variable '%s'"
-                    , get_txt(name->name));
+        /* We can redefine inherited variables if they are private or hidden
+         */
+        if (  (   !(VARIABLE(n)->flags & NAME_INHERITED)
+               || !(VARIABLE(n)->flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN))
+              )
+            && !(flags & NAME_INHERITED)
+           )
+        {
+            if (VARIABLE(n)->flags & NAME_INHERITED)
+                yyerrorf("Illegal to redefine inherited variable '%s'"
+                        , get_txt(name->name));
+            else
+                yyerrorf("Illegal to redefine global variable '%s'"
+                        , get_txt(name->name));
+        }
 
         /* Make sure that at least one of the two definitions is 'static'.
          * The variable which has not been inherited gets first pick.
@@ -2984,6 +3003,7 @@ note_start: { $$.start = CURRENT_PROGRAM_SIZE; }
  * Function definitions
  * Variable definitions
  * Inheritance
+ * Default visibility
  */
 
 def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
@@ -2992,6 +3012,12 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
           use_local_scopes = pragma_use_local_scopes;
           block_depth = 1;
           init_scope(block_depth);
+
+          if (!($1 & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                     | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC)))
+          {
+              $1 |= default_funmod;
+          }
 
           $2 |= $1; /* $2 is now the complete type */
 
@@ -3140,6 +3166,7 @@ def:  type optional_star L_IDENTIFIER  /* Function definition or prototype */
       }
 
     | inheritance 
+    | default_visibility
 ; /* def */
 
 
@@ -3499,6 +3526,41 @@ inheritance_qualifier:
 ; /* inheritance_qualifier */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
+/* Default visibility.
+ * 
+ * We use the inheritance modifier notation to specify the default
+ * visibility of functions and variables.
+ */
+
+default_visibility:
+    L_DEFAULT inheritance_qualifiers ';'
+      {
+          if ($2[0] & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                       | TYPE_MOD_PROTECTED | TYPE_MOD_STATIC)
+             )
+          {
+              yyerror("Default visibility specification for functions "
+                      "accepts only 'private', 'protected', 'public' or "
+                      "'static'");
+              YYACCEPT;
+          }
+
+          if ($2[1] & ~( TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                       | TYPE_MOD_PROTECTED)
+             )
+          {
+              yyerror("Default visibility specification for variables "
+                      "accepts only 'private', 'protected' or 'public'"
+                      );
+              YYACCEPT;
+          }
+
+          default_funmod = $2[0];
+          default_varmod = $2[1];
+      }
+; /* default_visibility */
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
 /* Type specifications and casts
  *
  * The type rules are used to parse variable and function types, casts,
@@ -3636,15 +3698,23 @@ new_name:
       optional_star L_IDENTIFIER
       {
 %line
-          if (current_type & TYPE_MOD_VARARGS)
+          fulltype_t actual_type = current_type;
+
+          if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                              | TYPE_MOD_PROTECTED)))
+          {
+              actual_type |= default_varmod;
+          }
+
+          if (actual_type & TYPE_MOD_VARARGS)
           {
               yyerror("can't declare a variable as varargs");
-              current_type &= ~TYPE_MOD_VARARGS;
+              actual_type &= ~TYPE_MOD_VARARGS;
           }
 %ifdef INITIALIZATION_BY___INIT
-            define_variable($2, current_type | $1);
+            define_variable($2, actual_type | $1);
 %else /* then !INITIALIZATION_BY___INIT */
-            define_variable($2, current_type | $1, &const0);
+            define_variable($2, actual_type | $1, &const0);
 %endif
       }
 
@@ -3654,7 +3724,15 @@ new_name:
 
     | optional_star L_IDENTIFIER
       {
-          define_variable($2, current_type | $1);
+          fulltype_t actual_type = current_type;
+
+          if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                              | TYPE_MOD_PROTECTED)))
+          {
+              actual_type |= default_varmod;
+          }
+
+          define_variable($2, actual_type | $1);
           $<number>$ = verify_declared($2); /* Is the var declared? */
           transfer_init_control();          /* Prepare INIT code */
       }
@@ -3664,6 +3742,14 @@ new_name:
       {
           int i = $<number>3;
           PREPARE_INSERT(4)
+
+          fulltype_t actual_type = current_type;
+
+          if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                              | TYPE_MOD_PROTECTED)))
+          {
+              actual_type |= default_varmod;
+          }
 
 #ifdef DEBUG
           if (i & VIRTUAL_VAR_TAG)
@@ -3697,10 +3783,10 @@ new_name:
               yyerror("Illegal initialization");
 
           /* Do the types match? */
-          if (!compatible_types((current_type | $1) & TYPE_MOD_MASK, $5.type))
+          if (!compatible_types((actual_type | $1) & TYPE_MOD_MASK, $5.type))
           {
               yyerrorf("Type mismatch %s when initializing %s"
-                      , get_two_types(current_type | $1, $5.type)
+                      , get_two_types(actual_type | $1, $5.type)
                       , get_txt($2->name));
           }
 
@@ -3718,9 +3804,17 @@ new_name:
           /* svalue_constant can contain identifiers, so define the variable
            * now, lest the identifier could get freed by a name clash.
            */
-          int n;
 %line
-          define_variable($2, current_type | $1 | NAME_INITIALIZED, &const0);
+          int n;
+          fulltype_t actual_type = current_type;
+
+          if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                              | TYPE_MOD_PROTECTED)))
+          {
+              actual_type |= default_varmod;
+          }
+
+          define_variable($2, actual_type | $1 | NAME_INITIALIZED, &const0);
           n = $2->u.global.variable;
           $<initialized>$ = currently_initialized
             = n & VIRTUAL_VAR_TAG ? V_VAR_VALUE(n) : NV_VAR_VALUE(n);
@@ -3735,11 +3829,19 @@ new_name:
            * we just have to check the validity.
            */
            
+          fulltype_t actual_type = current_type;
+
+          if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
+                              | TYPE_MOD_PROTECTED))
+          {
+              actual_type |= default_varmod;
+          }
+
           if ($4 != F_ASSIGN)
               yyerror("Illegal initialization");
 
           if (exact_types)
-              if (!TYPE( current_type | $1 , type_rtoc($<initialized>3)) )
+              if (!TYPE( actual_type | $1 , type_rtoc($<initialized>3)) )
               {
                   yyerror("Bad initializer type");
               }
@@ -11201,6 +11303,8 @@ prolog(void)
     num_parse_error  = 0;
     block_depth      = 0;
     use_local_scopes = MY_TRUE;
+    default_varmod = 0;
+    default_funmod = 0;
 
     free_all_local_names();   /* In case of earlier error */
 

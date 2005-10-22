@@ -277,6 +277,29 @@ DESCRIPTION
           unless the H_MODIFY_COMMAND hook changed it.
 
 
+        H_SEND_NOTIFY_FAIL
+          Optional hook to send the notify fail message, regardless
+          of how it was determined, to the player. If the hook is not
+          set, the message is delivered using tell_object() internally.
+          Hook setting can be a string or a closure.
+
+          If the hook is a string, it is the name of a (possibly static)
+          function to call in the current command giver. If the hook
+          is a closure, it is the function to be called. Lambda closures
+          are bound to the current command giver first.
+
+          The function is called as
+
+            void <function>(string msg, object msgobj, object orig_cmd_giver)
+
+          <msg> is the notify fail message to be delivered.
+          <msgobj> is the object which set the message. It is 0 for the
+          default message.
+          <orig_cmd_giver> is the object for which the original command
+          was first received. It is usually identical with the current
+          command giver this_player().
+
+
         H_NO_IPC_SLOT
           Optional hook specifying the message given to logins
           rejected due to space limitations (MAX_PLAYER).
@@ -410,6 +433,7 @@ HISTORY
         The hooks for no-echo negotiation and erq-lossage notification
             were introduced in 3.2.1@85.
         H_COMMAND was introduced in 3.2.7.
+        H_SEND_NOTIFY_FAIL was introduced in 3.2.9.
 
 SEE ALSO
         native(C), set_driver_hook(E)

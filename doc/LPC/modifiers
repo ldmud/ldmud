@@ -125,9 +125,50 @@ DESCRIPTION
                        \ /                     |   |
                         D                      D   D
 
+
+        To simplify the adoption of existing code, LPC allows to specify
+        a default visibility for functions and variables, using a syntax
+        similar to the inherit syntax:
+
+          default private;
+            
+            All variables and functions are by default private.
+
+          default private variables public functions;
+
+            All variables are by default private, but functions are public.
+
+        Only the modifiers 'private', 'public' and 'protected' (and 'static'
+        for functions only) are allowed here.
+
+        The default visibility thus set affects only variables/functions with
+        no explicite visibility:
+
+          default private;
+
+          int private_var;
+          public int public_var;
+
+        The definition is valid from the point of the 'default' statement
+        until the end of the file, or until the next 'default' statement:
+
+          default private;
+
+          int private_var;
+
+          default public;
+
+          int public_var;
+
+        Note that this default visibility does not affect inherits.
+
+
 HISTORY
         The modifier 'static' for variables was renamed to 'nosave'
         with LDMud 3.2.8. 'static' is still recognized as an alias.
+
+        The default visibility was added in LDMud 3.2.9 as experimental
+        feature.
 
 SEE ALSO
             closures(LPC), inheritance(LPC), functions(LPC), types(LPC)
