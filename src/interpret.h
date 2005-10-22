@@ -6,6 +6,7 @@
 #include "driver.h"
 #include "typedefs.h"
 #include "instrs.h"
+#include "svalue.h"
 
 /* --- Types --- */
 
@@ -24,6 +25,7 @@ struct control_stack {
     object_t   *ob;         /* Current object */
     object_t   *prev_ob;    /* Save previous object */
     program_t  *prog;       /* Current program, NULL in the bottom entry */
+    svalue_t    lambda;     /* Current lambda, counted, or svalue-0 if none */
     bytecode_p  pc;         /* Program counter, points to next bytecode */
     svalue_t   *fp;         /* Frame pointer: first arg on stack */
     bytecode_p  funstart;

@@ -896,7 +896,9 @@ garbage_collection(void)
     free_defines();
     free_all_local_names();
     remove_unknown_identifier();
+#ifdef USE_FREE_CLOSURE_HOOK
     free_old_driver_hooks();
+#endif
     purge_action_sent();
     purge_shadow_sent();
     check_wizlist_for_destr();

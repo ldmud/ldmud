@@ -1917,6 +1917,7 @@ f_notify_fail (svalue_t *sp)
 {
     if (command_giver && !(command_giver->flags & O_DESTRUCTED))
     {
+#ifdef USE_FREE_CLOSURE_HOOK
         if (error_msg.type == T_CLOSURE)
             /* It might be the closure we're just executing, so
              * keep it around for now.
@@ -1927,6 +1928,9 @@ f_notify_fail (svalue_t *sp)
         else
             free_svalue(&error_msg);
         transfer_svalue_no_free(&error_msg, sp);
+#else
+        transfer_svalue(&error_msg, sp);
+#endif
         if (error_obj)
             free_object(error_obj, "notify_fail");
         error_obj = ref_object(current_object, "notify_fail");

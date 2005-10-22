@@ -4133,7 +4133,10 @@ f_ceil (svalue_t *sp)
     if (sp->type == T_FLOAT)
         d = ceil(READ_DOUBLE(sp));
     else
+    {
         d = sp->u.number;
+        sp->type = T_FLOAT;
+    }
 
     STORE_DOUBLE(sp, d);
 
@@ -4158,9 +4161,12 @@ f_floor (svalue_t *sp)
     double d;
 
     if (sp->type == T_FLOAT)
-        d = ceil(READ_DOUBLE(sp));
+        d = floor(READ_DOUBLE(sp));
     else
+    {
         d = sp->u.number;
+        sp->type = T_FLOAT;
+    }
 
     STORE_DOUBLE(sp, d);
 

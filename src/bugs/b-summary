@@ -6,7 +6,7 @@ b-991123-0: 3.2.7-dev.104 and 3.2.8-dev.156 crash in find_string()
 b-991214: GC crashed on lambda closure with illegal data
 b-991219: Gamedriver fatal()s.
 b-000207: Finalfrontier cores
-b-000218: Finalfrontier: illegal mapping size
+b-000218: Finalfrontier: illegal mapping size (possibly fixed).
 b-000503: dev.185 cores in free_string().
 b-000603: Evermore: bad stack at F_RETURN
 b-000611: dev.20x crashes on Hyperborea (Maybe fixed)

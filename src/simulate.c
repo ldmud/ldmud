@@ -174,6 +174,7 @@ svalue_t closure_hook[NUM_CLOSURE_HOOKS];
   /* The table with all driver hooks.
    */
 
+#ifdef USE_FREE_CLOSURE_HOOK
 static svalue_t *old_hooks = NULL;
   /* Array of entries holding all the old driver hook closures replaced
    * during this and the previous execution threads. The closures are
@@ -188,6 +189,7 @@ static int num_old_hooks = 0;
 static int max_old_hooks = 0;
   /* The allocated length of <old_hooks>
    */
+#endif
 
 Bool game_is_being_shut_down = MY_FALSE;
   /* TRUE if a shutdown was requested resp. is in progress.
@@ -3243,6 +3245,7 @@ init_closure_hooks()
     }
 } /* init_closure_hooks() */
 
+#ifdef USE_FREE_CLOSURE_HOOK
 /*-------------------------------------------------------------------------*/
 void
 free_closure_hooks (svalue_t *svp, int count)
@@ -3306,6 +3309,7 @@ free_old_driver_hooks (void)
     old_hooks = NULL;
     num_old_hooks = max_old_hooks = 0;
 } /* free_old_driver_hooks() */
+#endif
 
 /*-------------------------------------------------------------------------*/
 Bool
@@ -3987,8 +3991,10 @@ default_test:
         break;
     }
 
+#ifdef USE_FREE_CLOSURE_HOOK
     if (old.type != T_NUMBER)
         free_closure_hooks(&old, 1); /* free it in the backend */
+#endif
 
     return sp - 2;
 } /* f_set_driver_hook() */

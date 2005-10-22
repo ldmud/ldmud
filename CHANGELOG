@@ -1,6 +1,26 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+14-Aug-2001 (Lars Duening)  (3.3.85)
+    - (interpret) The VM now holds a reference on a lambda while it is
+         executed, preventing premature destructions (reported by Dan
+         and Fiona).
+    - (simulate, actions.c, backend.c, comm.c, gcollect.c) Since the VM
+         now protects lambdas during their execution, the free_closure_hooks()
+         hack is no longer needed. For now, the code has been just
+         deactivated.
+    - (efuns.c) Corrected late-night errors in efuns ceil() and floor()
+         (reported by Niels).
+
+13-Aug-2001 (Lars Duening)
+    - (mapping.c) Adding a mapping to itself via 'm += m' freed svalues
+         first, then used them as data for assignment. This might be
+         the cause for b-000218 (reported by Patryn).
+
+12-Aug-2001 (Lars Duening)
+    - (func_spec) Somehow the change for sizeof() didn't make it into
+         the distribution (reported by Menaures).
+
 07-Aug-2001 (Lars Duening)  (3.3.84)
     - (lex.c) The recognition of numeric character constants was slightly
          wrong (thanks, Fiona).

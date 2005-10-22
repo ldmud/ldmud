@@ -292,9 +292,11 @@ cleanup_stuff (void)
         replace_programs();
     }
 
+#ifdef USE_FREE_CLOSURE_HOOK
     /* Free older driver hooks
      */
     free_old_driver_hooks();
+#endif
 
     /* Remove all destructed objects.
      */

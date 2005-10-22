@@ -249,7 +249,7 @@ int     strlen(null|string);
 
         /* Arrays and Mapings */
 
-int     sizeof(null|mixed|mixed *|mapping);
+int     sizeof(null|string|mixed|mixed *|mapping);
 
         /* Functions and Closures */
 

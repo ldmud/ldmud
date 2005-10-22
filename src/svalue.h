@@ -60,7 +60,7 @@ union u {
     callback_t *cb;
       /* T_CALLBACK: A callback structure referenced from the stack
        *   to allow proper cleanup during error recoveries. The interpreter
-       * knows how to free it, but that's all.
+       *   knows how to free it, but that's all.
        */
       
     void *generic;

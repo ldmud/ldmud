@@ -492,6 +492,12 @@ program_t *current_prog;
    * differ when executing an inherited program.
    */
 
+static svalue_t current_lambda;
+  /* If the VM is executing a lambda, this variable holds a counted
+   * reference to it to make sure that it isn't destructed while it is
+   * still executing.
+   */
+
 static string_t **current_strings;
   /* Pointer to the string literal block of the current program for
    * faster access.
@@ -6016,6 +6022,7 @@ push_control_stack ( svalue_t   *sp
     /* csp->funstart  has to be set later, it is used only for tracebacks. */
     csp->fp = fp;
     csp->prog = current_prog;
+    csp->lambda = current_lambda; put_number(&current_lambda, 0);
     /* csp->extern_call = MY_FALSE; It is set by eval_instruction() */
     csp->catch_call = MY_FALSE;
     csp->pc = pc;
@@ -6043,6 +6050,9 @@ pop_control_stack (void)
     {
         current_strings = current_prog->strings;
     }
+    if (current_lambda.type == T_CLOSURE)
+        free_closure(&current_lambda);
+    current_lambda = csp->lambda;
     inter_pc = csp->pc;
     inter_fp = csp->fp;
     function_index_offset = csp->function_index_offset;
@@ -6317,13 +6327,27 @@ reset_machine (Bool first)
     traceing_recursion = -1;
     if (first)
     {
+        csp = control_stack - 1;
+        /* TODO: This is illegal according to ISO C */
         inter_sp = start_of_stack - 1;
         /* TODO: This is illegal according to ISO C */
         tracedepth = 0;
+        put_number(&current_lambda, 0);
     }
     else
+    {
         inter_sp = _pop_n_elems(inter_sp - start_of_stack + 1, inter_sp);
-}
+        if (current_lambda.type == T_CLOSURE)
+            free_closure(&current_lambda);
+        put_number(&current_lambda, 0);
+        while (csp != control_stack - 1)
+        {
+            if (csp->lambda.type == T_CLOSURE)
+                free_closure(&csp->lambda);
+            csp--;
+        }
+    }
+} /* reset_machine() */
 
 /*-------------------------------------------------------------------------*/
 #ifdef DEBUG
@@ -7375,6 +7399,9 @@ again:
         function_index_offset = csp->function_index_offset;
         current_variables     = csp->current_variables;
         break_sp = csp->break_sp;
+        if (current_lambda.type == T_CLOSURE)
+            free_closure(&current_lambda);
+        current_lambda = csp->lambda;
 
         if (csp->extern_call)
         {
@@ -14909,12 +14936,19 @@ assert_master_ob_loaded (void)
             current_object = &dummy_current_object_for_loads;
         }
 
+#ifdef USE_FREE_CLOSURE_HOOK
         /* don't free the closure hooks now since they might be
          * still in use - the backend will take care of them.
          */
         free_closure_hooks(closure_hook, NUM_CLOSURE_HOOKS);
         for (i = NUM_CLOSURE_HOOKS; i--;)
             closure_hook[i] = const0;
+#else
+        /* Free the closure hooks.
+         */
+        for (i = NUM_CLOSURE_HOOKS; i--;)
+            assign_svalue(closure_hook+i, &const0);
+#endif
 
         init_telopts();
 
@@ -14958,6 +14992,7 @@ call_lambda (svalue_t *lsvp, int num_arg)
 #  define CLEAN_CSP \
         previous_ob = csp->prev_ob; \
         current_object = csp->ob; \
+        current_lambda = csp->lambda; \
         pop_control_stack();
   /* Macro to undo all the call preparations in case the closure
    * can't be called after all.
@@ -15083,7 +15118,7 @@ TODO: Formerly, a funcall() on an alien lfun created a second control frame,
 TODO:: supposedly to "properly capture the control flow". This seemed a bit
 TODO:: nonsensical, and indeed caused confusing duplicate entries in
 TODO:: caller_stack(). However, if there are complaints, we might need
-TODO:: to reactivate this code.
+TODO:: to reactivate this code. (July 2001)
         csp->funstart = NULL;
         push_control_stack(sp, 0, inter_fp);
         csp->ob = current_object;
@@ -15202,6 +15237,7 @@ TODO:: to reactivate this code.
         /* Finish the setup */
 
         current_prog = current_object->prog;
+        current_lambda = *lsvp; l->ref++;
         variable_index_offset = 0;
         function_index_offset = 0;
         funstart = l->function.code + 1;

@@ -3017,9 +3017,12 @@ add_to_mapping_filter (svalue_t *key, svalue_t *data, void *extra)
     int i;
 
     data2 = get_map_lvalue_unchecked((mapping_t *)extra, key);
-    for (i = ((mapping_t *)extra)->num_values; --i >= 0;)
+    if (data2 != data) /* this should always be true */
     {
-        assign_svalue(data2++, data++);
+        for (i = ((mapping_t *)extra)->num_values; --i >= 0;)
+        {
+            assign_svalue(data2++, data++);
+        }
     }
 } /* add_to_mapping_filter() */
 
@@ -3039,6 +3042,10 @@ add_to_mapping (mapping_t *m1, mapping_t *m2)
  */
 
 {
+    /* Adding a mapping to itself doesn't change its content. */
+    if (m1 == m2)
+        return;
+
     if (m2->num_values != m1->num_values)
     {
         /* If one of the two mappings is empty, we can adjust its width
@@ -3080,7 +3087,8 @@ sub_from_mapping_filter ( svalue_t *key, svalue_t *data UNUSED
                         , void *extra)
 
 /* Auxiliary to subtract_mapping(): Delete <key> from mapping <extra>.
- * Also called by interpret.c as part of F_SUB_EQ.
+ * Also called by interpret.c as part of F_SUB_EQ (which then makes sure
+ * that subtrahend and minuend are not identical).
  */
 
 {
@@ -3104,6 +3112,8 @@ subtract_mapping (mapping_t *minuend, mapping_t *subtrahend)
     /* TODO: This could be done faster, especially if there the mappings are
      * mainly condensed. On the other hand, the priority of fast mapping
      * subtraction is unknown.
+     * Also, by providing a copy of the minuend it is safe to subtract
+     * a mapping from itself.
      */
     minuend = copy_mapping(minuend);
     walk_mapping(subtrahend, sub_from_mapping_filter, minuend);

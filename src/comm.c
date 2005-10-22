@@ -6350,6 +6350,7 @@ f_set_prompt (svalue_t *sp)
         sp[1] = *prompt;
         *prompt = *sp;
         *sp = sp[1];
+#ifdef USE_FREE_CLOSURE_HOOK
         if (sp->type == T_CLOSURE)
         {
             /* In case the prompt is changed from within the prompt
@@ -6358,6 +6359,7 @@ f_set_prompt (svalue_t *sp)
             addref_closure(sp, "unset_prompt");
             free_closure_hooks(sp, 1);
         }
+#endif
     }
     else /* It's a number */
     {

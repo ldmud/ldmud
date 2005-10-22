@@ -11,6 +11,12 @@
 #include "strfuns.h"    /* strbuf_t */
 #include "svalue.h"
 
+/* TODO: Since the VM now keeps a reference on lambda during their
+ * TODO:: execution, the free_closure_hook() is no longer needed.
+ * TODO:: Just in case we keep the code around for now. (14-Aug-01)
+ */
+/* #define USE_FREE_CLOSURE_HOOK */
+
 /* --- Types --- */
 
 /* --- struct rt_context_s: runtime context information
@@ -212,8 +218,10 @@ extern void clear_ref_in_callback (callback_t *cb);
 extern void count_ref_in_callback (callback_t *cb);
 #endif
 extern void init_closure_hooks(void);
+#ifdef USE_FREE_CLOSURE_HOOK
 extern void free_closure_hooks(svalue_t* svp, int count);
 extern void free_old_driver_hooks (void);
+#endif
 extern void set_svalue_user(svalue_t *svp, object_t *owner);
 extern void destruct_object(svalue_t *v);
 extern void destruct(object_t *ob);
