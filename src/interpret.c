@@ -12617,6 +12617,10 @@ again:
         /* Correct the number of arguments on the stack */
         if (num_arg != def_narg && def_narg != SIMUL_EFUN_VARARGS)
         {
+            /* If it's an XVARARGS, we don't require the last argument. */
+            if (simul_efunp[code].flags & TYPE_MOD_XVARARGS)
+                def_narg--;
+
             /* Add eventually missing arguments */
             while (num_arg < def_narg)
             {

@@ -1740,11 +1740,13 @@ f_functionlist (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_inherit_list (svalue_t *sp)
+f_inherit_list (svalue_t *sp, int num_arg)
 
 /* EFUN inherit_list()
  *
- *   string* inherit_list (object ob = this_object())
+ *   string* inherit_list ()
+ *   string* inherit_list (object ob)
+ *   string* inherit_list (object ob, int flags)
  *
  * Return a list with the filenames of all programs inherited by <ob>, include
  * <ob>'s program itself.
@@ -1755,25 +1757,39 @@ f_inherit_list (svalue_t *sp)
     struct iinfo {
         struct iinfo * next;     /* Next structure in flat list */
         program_t    * prog;     /* Program found */
-          /* The following members are used to recrate the inherit tree */
+          /* The following members are used to recreate the inherit tree */
         int            count;    /* Number of direct inherits */
-        struct iinfo * first;    /* First inherited program */
-        struct iinfo * last;     /* Last inherited program */
-        struct iinfo * sibling;  /* Next sibling inherit */
+        struct iinfo * parent;   /* Parent program, or NULL */
+          /* These members are used to create the result tree */
+        size_t         index;    /* # of this inherited program */
+        vector_t     * vec;      /* Result vector for this program */
     } *begin, *end;         /* Flat list of all found inherits */      
     struct iinfo * next;    /* Next program to analyze */
+
     Mempool   pool;         /* The memory pool to allocate from */
     object_t *ob;           /* Analyzed object */
     vector_t *vec;          /* Result vector */
     svalue_t *svp;          /* Pointer to next vec entry to fill in */
     int       count;        /* Total number of inherits found */
+    svalue_t *argp;         /* Arguments */
+    p_int     flags;
 
     /* Get the memory pool */
     memsafe(pool = new_mempool(sizeof(*begin) * 64)
            , sizeof(*begin) * 64, "memory pool");
 
-    /* Get the argument */
-    ob = sp->u.ob;
+    /* Get the arguments */
+    argp = sp - num_arg + 1;
+
+    if (num_arg >= 1)
+        ob = argp[0].u.ob;
+    else
+        ob = current_object;
+
+    if (num_arg >= 2)
+        flags = argp[1].u.number;
+    else
+        flags = 0;
 
     if (O_PROG_SWAPPED(ob))
         if (load_ob_from_swap(ob) < 0) {
@@ -1797,9 +1813,9 @@ f_inherit_list (svalue_t *sp)
     begin->next = NULL;
     begin->prog = ob->prog;
     begin->count = 0;
-    begin->first = NULL;
-    begin->last = NULL;
-    begin->sibling = NULL;
+    begin->parent = NULL;
+    begin->vec = NULL;
+    begin->index = 0;
 
     end = begin;
 
@@ -1832,54 +1848,105 @@ f_inherit_list (svalue_t *sp)
                 end->prog = inheritp->prog;
 
                 /* Handle the tree-based information */
-                end->first = NULL;
-                end->last = NULL;
-                end->sibling = NULL;
+                end->parent = next;
                 end->count = 0;
-
-                if (next->first == NULL)
-                {
-                    next->first = end;
-                    next->last = end;
-                }
-                else
-                {
-                    next->last->sibling = end;
-                    next->last = end;
-                }
+                end->index = next->count;
+                end->vec = NULL;
             }
         }
     }
 
-    /* Get the result array */
-    vec = allocate_array(count);
-
-    /* Take the filenames of the programs and copy them into
-     * the result vector.
+    /* Create the result.
+     * Depending on the flags value, this can be a flat list or a tree.
      */
-    for (svp = vec->item, next = begin; next != NULL; svp++, next = next->next)
+
+    if (!flags)
     {
-        string_t *str;
+        /* Get the result array */
+        vec = allocate_array(count);
 
-        if (compat_mode)
-            str = ref_mstring(next->prog->name);
-        else
-            str = add_slash(next->prog->name);
-
-        if (!str)
+        /* Take the filenames of the programs and copy them into
+         * the result vector.
+         */
+        for (svp = vec->item, next = begin; next != NULL; svp++, next = next->next)
         {
-            free_array(vec);
-            mempool_delete(pool);
-            error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
-                 , (unsigned long)mstrsize(next->prog->name));
+            string_t *str;
+
+            if (compat_mode)
+                str = ref_mstring(next->prog->name);
+            else
+                str = add_slash(next->prog->name);
+
+            if (!str)
+            {
+                free_array(vec);
+                mempool_delete(pool);
+                error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
+                     , (unsigned long)mstrsize(next->prog->name));
+            }
+            put_string(svp, str);
         }
-        put_string(svp, str);
+    }
+    else 
+    {
+        /* Get the top result array and keep a reference to it on the
+         * stack so that it will be deallocated on an error.
+         */
+        vec = allocate_array(begin->count+1);
+        begin->vec = vec;
+        push_array(sp, vec); inter_sp = sp;
+
+        /* Loop through all filenames and copy them into their result
+         * vector. Since the list in breadth-order, we can create the
+         * sub-vectors when we encounter them.
+         */
+        for (next = begin; next != NULL; next = next->next)
+        {
+            string_t *str;
+
+            if (compat_mode)
+                str = ref_mstring(next->prog->name);
+            else
+                str = add_slash(next->prog->name);
+
+            if (!str)
+            {
+                mempool_delete(pool);
+                error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
+                     , (unsigned long)mstrsize(next->prog->name));
+            }
+
+            /* If this child has no inherits, we just copy the
+             * name into its proper place in the parent vector.
+             * Same for the name of the top program.
+             *
+             * Otherwise we create a vector for this program
+             * and store the name in there.
+             */
+            if (begin == next)
+            {
+                put_string(next->vec->item, str);
+            }
+            else if (next->count == 0)
+            {
+                put_string(&next->parent->vec->item[next->index], str);
+            }
+            else
+            {
+                next->vec = allocate_array(next->count+1);
+                put_array(&next->parent->vec->item[next->index], next->vec);
+                put_string(next->vec->item, str);
+            }
+        }
+
+        sp--; /* Remove the temporary storage of vec on the stack */
     }
 
     mempool_delete(pool);
-    free_object_svalue(sp);
 
-    put_array(sp, vec);
+    sp = pop_n_elems(num_arg, sp);
+
+    push_array(sp, vec);
     return sp;
 } /* f_inherit_list() */
 

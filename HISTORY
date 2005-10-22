@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-09-Oct-2001 (Lars Duening) -- Development Release 3.3
+10-Oct-2001 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -17,6 +17,8 @@ For a detailed list of all changes see the file CHANGELOG.
            as package 'alists'.
        + function_exists(): now also returns the filename and linenumber
            of a function.
+       + inherit_list(): the inherited objects can be returned in a 
+           tree reflecting the inheritance structure.
 
     - Corrected efuns:
 

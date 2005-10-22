@@ -9,6 +9,8 @@ inherit_list() should offer options which control which data is returned
 how: flat/depth/width search, flat or nested result, with or without flags.
 This may require a redesign in the handling of inherit structures.
 
+--- LDMud 3.3.111 implements the return of a tree structure.
+
 A particular nasty scenario is:
 
   ------ c.c ------

@@ -1,6 +1,12 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Oct-2001 (Lars Duening)  (3.3.111)
+    - (object.c) Efun inherit_list() can now return the inheritance
+        structure as a tree (part of f-991020-0).
+    - (interpret.c) Simul-efuns with an varargs argument as weren't able
+        to receive no extra arguments (reported by Tomba).
+
 09-Oct-2001 (Lars Duening)  (3.3.110)
     - (gcollect.c) Increased the refcount of an destructed referenced
         object before recursing into the substructures - I have the
