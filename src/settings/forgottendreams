@@ -14,6 +14,7 @@ enable_strict_euids=yes
 enable_supply_parse_command=no
 enable_initialization_by___init=no
 enable_use_mysql=yes
+enable_use_alists=yes
 enable_lpc_nosave=yes
 enable_use_deprecated=no
 enable_dynamic_costs=yes

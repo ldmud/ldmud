@@ -104,6 +104,7 @@ struct interactive_s {
     svalue_t prompt;            /* The prompt to print. */
     struct sockaddr_in addr;    /* Address of connected user */
 
+    CBool msg_discarded;        /* True if an earlier msg had been discarded */
     CBool set_input_to;         /* True if input_to was set in this cycle */
     CBool closing;              /* True when closing this socket. */
     char do_close;              /* Bitflags: Close this down; Proto-ERQ. */

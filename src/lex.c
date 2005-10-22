@@ -1204,7 +1204,7 @@ mygetc (void)
 
 {
 #if 0
-    fprintf(stderr, "c='%c' %x", *outp, *outp);
+    fprintf(stderr, "c='%c' %x, ", *outp, *outp);
 #endif
 #if defined(LEXDEBUG)
     putc(*outp, stderr);
@@ -4624,13 +4624,14 @@ refill (Bool quote)
             lexerror("Line too long");
             break;
         }
-    } while (c != '\n');
+    } while (c != '\n' && c != CHAR_EOF);
 
     /* Refill the input buffer */
     myfilbuf();
 
-    /* Replace the trailing \n by a newline */
-    p[-1] = ' ';
+    /* Replace the trailing \n by a space */
+    if (p[-1] == '\n')
+        p[-1] = ' ';
     *p = '\0';
 
     nexpands = 0;
@@ -4743,7 +4744,7 @@ handle_define (char *yyt, Bool quote)
          * macro argument marking as necessary.
          */
 
-        for (inid = MY_FALSE, q = mtext; *p; )
+        for (inid = MY_FALSE, q = mtext; *p && *p != CHAR_EOF; )
         {
             /* Identifiers are parsed until complete, with the first
              * character pointed to by <ids>.
@@ -4825,6 +4826,14 @@ handle_define (char *yyt, Bool quote)
             }
         }
 
+        /* If the defined was ended by EOF instead of lineend,
+         * we have to pass on the EOF to the caller.
+         */
+        if (*p == CHAR_EOF)
+        {
+            myungetc(*p);
+        }
+
         /* Terminate the text and add the macro */
         *--q = '\0';
         add_define(namebuf, arg, mtext);
@@ -4836,7 +4845,7 @@ handle_define (char *yyt, Bool quote)
         /* Parse the replacement text into mtext[].
          */
 
-        for (q = mtext; *p; )
+        for (q = mtext; *p && *p != CHAR_EOF; )
         {
             *q = *p++;
             if (q < mtext+MLEN-2)
@@ -4865,6 +4874,14 @@ handle_define (char *yyt, Bool quote)
                     p = yytext;
                 }
             }
+        }
+
+        /* If the defined was ended by EOF instead of lineend,
+         * we have to pass on the EOF to the caller.
+         */
+        if (*p == CHAR_EOF)
+        {
+            myungetc(*p);
         }
 
         /* Terminate the text and add the macro */

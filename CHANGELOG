@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+06-Oct-2001 (Lars Duening)  (3.3.108)
+    - (prolang.y) Warnings about redefinition of visibility apply
+        to prototype/functions only, but no longer to redefinitions
+        of inherited functions.
+
+05-Oct-2001 (Lars Duening)
+    - (lex.c) Termination of a macro definition in an include file
+        with End-of-file confused the lexer (reported by Tomi).
+    - (comm) If a message had to be discarded due to contention (EWOULDBLOCK),
+        the user will receive a information message at the next possible
+        opportunity.
+    - (comm.c) Efun binary_message() wrote random data (thanks, Andre!).
+
 04-Oct-2001 (Lars Duening)  (3.3.107)
     - (efuns, md5) Renamed efun md5_encrypt() to md5(), and added a new,
         Apache compatible password encryption efun md5_crypt (provided by

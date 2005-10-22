@@ -147,16 +147,16 @@ endif
 # $Format: "ifeq ($ReleaseType$, pre)"$
 ifeq (dev, pre)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 107
+  SETVERFLAGS += d 108
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-pre.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-pre.107
+  VSTRING = 3.3.0-pre.108
 endif
 # $Format: "ifeq ($ReleaseType$, dev)"$
 ifeq (dev, dev)
 # $Format: "  SETVERFLAGS += d $ProjectMinorVersion$"$
-  SETVERFLAGS += d 107
+  SETVERFLAGS += d 108
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ReleaseMicro$-dev.$ProjectMinorVersion$"$
-  VSTRING = 3.3.0-dev.107
+  VSTRING = 3.3.0-dev.108
 endif
 
 else
@@ -164,12 +164,12 @@ else
 # --- Development Versions ---
 
 # $Format: "SETVERFLAGS = -app $ReleaseMajor$ $ReleaseMinor$ $ProjectMinorVersion$"$
-SETVERFLAGS = -app 3 3 107
+SETVERFLAGS = -app 3 3 108
 
 # $Format: "  SETVERFLAGS += f"$
   SETVERFLAGS += f
 # $Format: "  VSTRING = $ReleaseMajor$.$ReleaseMinor$.$ProjectMinorVersion$"$
-  VSTRING = 3.3.107
+  VSTRING = 3.3.108
 
 endif
 
@@ -558,7 +558,8 @@ $(OBJ)/mapping.o : xalloc.h wiz_list.h svalue.h smalloc.h simulate.h \
     array.h mapping.h my-alloca.h typedefs.h driver.h strfuns.h sent.h \
     exec.h instrs.h port.h config.h hosts/unix.h hosts/be/be.h machine.h
 
-$(OBJ)/md5.o : md5.h machine.h
+$(OBJ)/md5.o : strfuns.h md5.h machine.h typedefs.h driver.h port.h \
+    config.h hosts/unix.h hosts/be/be.h
 
 $(OBJ)/mempools.o : xalloc.h gcollect.h mempools.h driver.h typedefs.h \
     port.h config.h hosts/unix.h hosts/be/be.h machine.h

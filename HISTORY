@@ -47,7 +47,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-04-Oct-2001 (Lars Duening) -- upcoming Release 3.2.9
+05-Oct-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -253,6 +253,8 @@ For a detailed list of all changes see the file CHANGELOG.
            [i..i-1] which merely insert elements are still allowed.
        + Bugfix: Prototypes could modify the definition of inherited
            functions in strange ways.
+       + Bugfix: Termination of a macro definition with End-of-file in
+           an include file confused the lexer.
 
     - Runtime:
        + Attempts to set a single string character to 0 now raise

@@ -632,6 +632,7 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
       dump_bytes(&(ip->prompt), sizeof(ip->prompt), 21);
     fprintf(stderr, "  .addr:             ");
       dump_bytes(&(ip->addr), sizeof(ip->addr), 21);
+    fprintf(stderr, "  .msg_discarded:     %02x\n", (unsigned char)ip->msg_discarded);
     fprintf(stderr, "  .set_input_to:      %02x\n", (unsigned char)ip->set_input_to);
     fprintf(stderr, "  .closing:           %02x\n", (unsigned char)ip->closing);
     fprintf(stderr, "  .do_close:          %02x", (unsigned char)ip->do_close);
@@ -1208,6 +1209,15 @@ add_message (const char *fmt, ...)
         return;
     }
 
+    /* First, if a previous call had to discard the message, inform the user.
+     */
+    if (ip->msg_discarded)
+    {
+        ip->msg_discarded = MY_FALSE;
+        add_message("%s", "\n*** Text lost in transmission ***\n");
+        /* msg_discarded might be TRUE again now */
+    }
+
     old_message_length = ip->message_length;
 
     /* --- Compose the final message --- */
@@ -1458,18 +1468,23 @@ if (sending_telnet_command)
          */
         chunk = dest - ip->message_buf;
         if (chunk < min_length)
+        {
             break;
+        }
 
         /* Write .message_buf[] to the network. */
 
         for (retries = 6;;) {
-            if ((n = (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk)) != -1)
-                break;
 
+            if ((n = (int)socket_write(ip->socket, ip->message_buf, (size_t)chunk)) != -1)
+            {
+                break;
+            }
             switch (errno) {
               case EINTR:
                 if (--retries)
                     continue;
+                ip->msg_discarded = MY_TRUE;
                 fprintf(stderr,
                   "%s comm: write EINTR. Message discarded.\n", time_stamp());
                 if (old_message_length)
@@ -1477,6 +1492,7 @@ if (sending_telnet_command)
                 return;
 
               case EWOULDBLOCK:
+                ip->msg_discarded = MY_TRUE;
                 if (d_flag)
                     fprintf(stderr,
                       "%s comm: write EWOULDBLOCK. Message discarded.\n", time_stamp());
@@ -2862,6 +2878,7 @@ new_player (SOCKET_T new_socket, struct sockaddr_in *addr, size_t addrlen
     new_interactive->input_to = NULL;
     put_ref_string(&new_interactive->prompt, STR_DEFAULT_PROMPT);
     new_interactive->modify_command = NULL;
+    new_interactive->msg_discarded = MY_FALSE;
     new_interactive->set_input_to = MY_FALSE;
     new_interactive->closing = MY_FALSE;
     new_interactive->do_close = 0;
@@ -5712,7 +5729,7 @@ f_binary_message (svalue_t *sp)
              */
 
             for (i = 6; i > 0; i--) {
-                wrote = (mp_int)socket_write(ip->socket, msg, mstrsize(msg));
+                wrote = (mp_int)socket_write(ip->socket, get_txt(msg), mstrsize(msg));
                 if (wrote != -1 || errno != EINTR || i != 1)
                     break;
             }

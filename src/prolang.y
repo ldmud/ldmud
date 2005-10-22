@@ -2008,21 +2008,30 @@ define_new_function ( Bool complete, ident_t *p, int num_arg, int num_local
                 /* If it's a prototype->function redefinition, check if the
                  * visibility is conserved.
                  */
-#               define TYPE_MOD_VIS \
-                       (TYPE_MOD_STATIC | TYPE_MOD_NO_MASK \
-                       | TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC \
-                       | TYPE_MOD_PROTECTED)
-                if (!(funp->flags & NAME_TYPES_LOST)
-                 && ((funp->flags ^ flags) & TYPE_MOD_VIS)
-                   )
                 {
-                    char buff[100];
+#                   define TYPE_MOD_VIS \
+                           ( TYPE_MOD_NO_MASK \
+                           | TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC \
+                           | TYPE_MOD_PROTECTED)
+                    fulltype_t f1 = funp->flags;
+                    fulltype_t f2 = flags;
 
-                    strcpy(buff, get_visibility(funp->flags));
-                    yywarnf("Redefinition changes visibility from '%s' to '%s'."
-                           , buff, get_visibility(flags));
+                    /* Smooth out irrelevant differences */
+                    if (f1 & TYPE_MOD_STATIC) f1 |= TYPE_MOD_PROTECTED;
+                    if (f2 & TYPE_MOD_STATIC) f2 |= TYPE_MOD_PROTECTED;
+
+                    if (!(f1 & (NAME_INHERITED|NAME_TYPES_LOST))
+                     && ((f1 ^ f2) & TYPE_MOD_VIS)
+                       )
+                    {
+                        char buff[100];
+
+                        strcpy(buff, get_visibility(funp->flags));
+                        yywarnf("Inconsistent function declaration: Visibility changed from '%s' to '%s'"
+                               , buff, get_visibility(flags));
+                    }
+#                   undef TYPE_MOD_VIS
                 }
-#               undef TYPE_MOD_VIS
 
                 /* Check if the 'varargs' attribute is conserved */
 
