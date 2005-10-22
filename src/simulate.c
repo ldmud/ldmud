@@ -2331,7 +2331,7 @@ remove_object (object_t *ob)
     if (ob->prog->blueprint == ob)
     {
         ob->prog->blueprint = NULL;
-        deref_object(ob, "remove_object: blueprint reference");
+        free_object(ob, "remove_object: blueprint reference");
     }
 
     /* We must deallocate variables here, not in 'free_object()'.

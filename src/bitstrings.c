@@ -895,6 +895,8 @@ f_copy_bits (svalue_t *sp, int num_arg)
         error("Bad argument 4 to copy_bits(): Index %ld is out of range "
               "(last bit: %ld).\n"
              , (long)deststart, (long)destlen);
+    if (deststart < 0)
+        deststart += destlen;
 
     if (!copyall && copylen < 0)
     {
@@ -944,6 +946,12 @@ f_copy_bits (svalue_t *sp, int num_arg)
                 copylen = srclen - srcstart;
             else
                 copylen = 0;
+
+            if (PINT_MAX - copylen < deststart)
+                error("copy_bits: result length exceeds numerical limit: "
+                      "%ld + %ld\n"
+                     , (long)deststart, (long)copylen
+                     );
             resultlen = deststart + copylen;
             if (resultlen > MAX_BITS || resultlen < 0)
                 error("copy_bits: Result too big: %lu bits\n"
@@ -984,8 +992,13 @@ f_copy_bits (svalue_t *sp, int num_arg)
 
         /* Get the length to copy and the length of the result */
         srccopylen = copylen;
-        if (srcstart + copylen >= srclen)
+        if (srcstart >= srclen - copylen)
             srccopylen = srclen - srcstart;
+
+        if (PINT_MAX - copylen < deststart)
+            error("copy_bits: result length exceeds numerical limit: %ld + %ld\n"
+                 , (long)deststart, (long)copylen
+                 );
 
         resultlen = deststart + copylen;
         if (resultlen < destlen)

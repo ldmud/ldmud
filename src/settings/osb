@@ -22,6 +22,8 @@ enable_use_alists=yes
 enable_supply_parse_command=no
 enable_initialization_by___init=yes
 enable_use_system_crypt=no
+enable_malloc_trace=yes
+enable_malloc_lpc_trace=yes
 
 enable_use_mysql=/usr/local/lib/mysql
 

@@ -1,6 +1,17 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Feb-2002 (Lars Duening)  (3.3.168)
+    - (bitstrings.c) Efun copy_bits(): I accidentally had deleted the lines
+        handling negative deststart values. The efun was also
+        prone to numerical overflow effects (reported by Menaures).
+    - (gcollect.c) Hmm, clear_object_ref() unconditionally cleared
+        the blueprint reference - this should happen only for
+        destructed blueprints. Dunno if this was responsible for
+        the recent crashes in FinalFrontier.
+    - (sprintf.c) sprintf("%-=10s", "a\nb\n") printed two extra
+        newlines at the end instead of just one (reported by Gnomi).
+         
 11-Feb-2002 (Lars Duening)  (3.3.167)
     - (Makefiles) Corrected the compilation and call to dftables (reported
          by Menaures).

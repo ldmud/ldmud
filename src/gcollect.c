@@ -298,7 +298,10 @@ clear_object_ref (object_t *p)
     {
         p->ref = 0;
         p->prog->ref = 0;
-        if (p->prog->blueprint)
+        if (p->prog->blueprint
+         && (p->prog->blueprint->flags & O_DESTRUCTED)
+         && p->prog->blueprint->ref
+           )
             p->prog->blueprint->ref = 0;
         clear_inherit_ref(p->prog);
     }
@@ -551,14 +554,7 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
              * cleared by the obj_list because it is no longer a member
              * Alas, swapped objects must not have prog->ref cleared.
              */
-            if (p->u.ob->flags & O_DESTRUCTED && p->u.ob->ref)
-            {
-                p->u.ob->ref = 0;
-                p->u.ob->prog->ref = 0;
-                if (p->u.ob->prog->blueprint)
-                    p->u.ob->prog->blueprint->ref = 0;
-                clear_inherit_ref(p->u.ob->prog);
-            }
+            clear_object_ref(p->u.ob);
             continue;
 
         case T_POINTER:
@@ -594,14 +590,8 @@ clear_ref_in_vector (svalue_t *svp, size_t num)
                     clear_ref_in_closure(l, p->x.closure_type);
                 }
             }
-            else if (p->u.ob->flags & O_DESTRUCTED && p->u.ob->ref)
-            {
-                p->u.ob->ref = 0;
-                p->u.ob->prog->ref = 0;
-                if (p->u.ob->prog->blueprint)
-                    p->u.ob->prog->blueprint->ref = 0;
-                clear_inherit_ref(p->u.ob->prog);
-            }
+            else
+                clear_object_ref(p->u.ob);
             continue;
         }
     }
@@ -897,26 +887,11 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
         }
     }
 
-    if (type != CLOSURE_UNBOUND_LAMBDA && l->ob->flags & O_DESTRUCTED
-     && l->ob->ref /* block against bad efficency due to multiple refs */ )
-    {
-        l->ob->ref = 0;
-        l->ob->prog->ref = 0;
-        if (l->ob->prog->blueprint)
-            l->ob->prog->blueprint->ref = 0;
-        clear_inherit_ref(l->ob->prog);
-    }
+    if (type != CLOSURE_UNBOUND_LAMBDA)
+        clear_object_ref(l->ob);
 
-    if (type == CLOSURE_ALIEN_LFUN
-     && l->function.alien.ob->flags & O_DESTRUCTED
-     && l->function.alien.ob->ref)
-    {
-        l->function.alien.ob->ref = 0;
-        l->function.alien.ob->prog->ref = 0;
-        if (l->function.alien.ob->prog->blueprint)
-            l->function.alien.ob->prog->blueprint->ref = 0;
-        clear_inherit_ref(l->function.alien.ob->prog);
-    }
+    if (type == CLOSURE_ALIEN_LFUN)
+        clear_object_ref(l->function.alien.ob);
 } /* clear_ref_in_closure() */
 
 /*-------------------------------------------------------------------------*/

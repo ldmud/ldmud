@@ -1727,7 +1727,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                 st->line_start = st->bpos;
             } /* while (csts) */
 
-            if (column_stat == 2)
+            if (column_stat == 2 && format_str[fpos] != '\n')
                 ADD_CHAR('\n');
 
             if (!format_str[fpos])
