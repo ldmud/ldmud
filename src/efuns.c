@@ -1515,9 +1515,11 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
 
     if (map != NULL || cl != NULL)
     {
+        p_int left = mstrsize(text);
+
         cp = instr;
         do {
-            cp = memchr(cp, TC_FIRST_CHAR, mstrsize(text));
+            cp = memchr(cp, TC_FIRST_CHAR, (size_t)left);
             if (cp)
             {
                 if (cp[1] == TC_SECOND_CHAR)
@@ -1543,8 +1545,9 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                     break;
                 }
                 cp++;
+                left -= (cp - instr);
             }
-        } while (cp);
+        } while (cp && left >= 0);
     }
     else
         cp = NULL;

@@ -20,12 +20,13 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 226)
-(Parent-Version lpmud 3-3 225)
-(Version-Log "Corrected a bug in the new array operations.")
+(Project-Version lpmud 3-3 227)
+(Parent-Version lpmud 3-3 226)
+(Version-Log "Corrected an error in the argument error printing for vefuns.
+Corrected a fatal bug in terminal_colour().")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 17 Aug 2002 11:08:09 -0600")
+(Checkin-Time "Sun, 18 Aug 2002 00:55:40 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -60,7 +61,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.7 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.42 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.289 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.290 644))
   (HISTORY (lpmud/f/49_HISTORY 1.263 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.15 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -132,7 +133,7 @@
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.6 644))
   (src/ed.c (lpmud/c/33_ed.c 1.32.1.22 644))
   (src/efuns.h (lpmud/l/20_efuns.h 1.13.1.16 644))
-  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.35 644))
+  (src/efuns.c (lpmud/l/21_efuns.c 1.42.1.47.1.36 644))
   (src/exec.h (lpmud/c/32_exec.h 1.34.1.21 644))
   (src/files.h (lpmud/i/49_files.h 1.2 644))
   (src/files.c (lpmud/i/50_files.c 1.16 644))
@@ -144,7 +145,7 @@
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.6 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.24 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.31 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.32 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.10 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.12 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.11 644))
@@ -477,7 +478,7 @@
   (src/bugs/b-020205-0 (lpmud/q/40_b-020205-0 1.5 644) :no-keywords)
   (src/bugs/b-020223 (lpmud/r/50_b-020223 1.1 644) :no-keywords)
   (src/bugs/b-020228-0 (lpmud/r/51_b-020228-0 1.11 644) :no-keywords)
-  (src/bugs/b-020228-1 (lpmud/s/0_b-020228-1 1.2 644) :no-keywords)
+  (src/bugs/b-020228-1 (lpmud/s/0_b-020228-1 1.3 644) :no-keywords)
   (src/bugs/b-020303-0 (lpmud/s/5_b-020303-0 1.1 644) :no-keywords)
   (src/bugs/b-020304 (lpmud/u/10_b-020304 1.1 644) :no-keywords)
   (src/bugs/b-020306 (lpmud/u/11_b-020306 1.1 644) :no-keywords)

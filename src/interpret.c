@@ -5554,7 +5554,7 @@ vefun_bad_arg (int arg, svalue_t *sp)
 
 {
     inter_sp = sp;
-    raise_bad_arg(-3, arg);
+    raise_bad_arg(-2, arg);
     /* NOTREACHED */
 } /* vefun_bad_arg() */
 
@@ -5615,7 +5615,7 @@ vefun_gen_arg_error (int arg, int got, svalue_t *sp)
 
 {
     inter_sp = sp;
-    raise_arg_error(-3, arg, 0, got);
+    raise_arg_error(-2, arg, 0, got);
     /* NOTREACHED */
 } /* vefun_gen_arg_error() */
 
@@ -5663,7 +5663,7 @@ vefun_arg_error (int arg, int expected, int got, svalue_t *sp)
 
 {
     inter_sp = sp;
-    raise_arg_error(-3, arg, 1 << expected, got);
+    raise_arg_error(-2, arg, 1 << expected, got);
     /* NOTREACHED */
 } /* vefun_arg_error() */
 
@@ -5679,7 +5679,7 @@ vefun_exp_arg_error (int arg, long expected, int got, svalue_t *sp)
 
 {
     inter_sp = sp;
-    raise_arg_error(-3, arg, expected, got);
+    raise_arg_error(-2, arg, expected, got);
     /* NOTREACHED */
 } /* vefun_exp_arg_error() */
 

@@ -1,12 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-17-Aug-2002 (Lars Duening) (3.3.225)
+18-Aug-2002 (Lars Duening)  (3.3.227)
+   - (interpret.c) vefun argument error messages printed the wrong
+        instruction name since they still expected a 'num_args'
+        bytecode (reported by Markus).
+   - (efuns.c) Efun terminal_colour(): when checking for the existance
+        of a '%^' marker in the text, a single '%' caused the code
+        to search random memory (reported by Markus) (b-020228-1).
+
+17-Aug-2002 (Lars Duening) (3.3.226)
   - (array.c) In the array-array operations, the optimized handling
         for handling short arrays didn't clean out destructed 
         object references (reported by Markus).
 
-16-Aug-2002 (Lars Duening) (3.3.224)
+16-Aug-2002 (Lars Duening) (3.3.225)
   - (array.c) In the array-array operations, the algorithm didn't
         handle multiple occurances of the same value well (reported
         by Markus).

@@ -3,7 +3,7 @@ Date: Sun, 24 Feb 2002 14:22:38 +0100 (CET)
 From: Markus Peter <warp@spin.de>
 Type: Bug
 State: New
-Driver: 3.3.171
+Driver: 3.3.171, 3.3.226
 
 Hallo
 
@@ -108,10 +108,9 @@ map = (mapping_t *) 0x8417ffc
 cl = (svalue_t *) 0x25252525
 
 die speicheradressen sind alle ungueltig
-
--- 
-Markus Peter - SPiN AG
-warp@spin.de
-
-
-
+-----
+The memory addresses were invalid because the driver was compiled with
+optimization. A test with a driver without optimization ended in a crash
+when formatting the text 'Your load is 0%\n'. As it turned out, the
+search algorithm for the occurance of a '%^' in the input string didn't
+know when to stop after finding a single '%' and search random memory.
