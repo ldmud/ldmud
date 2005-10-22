@@ -5842,7 +5842,10 @@ privilege_violation4 ( string_t *what,    object_t *whom
     push_ref_valid_object(sp, current_object, "privilege_violation");
     if (!whom)
     {
-        push_ref_string(sp, how_str);
+        if (how_str)
+            push_ref_string(sp, how_str);
+        else
+            push_number(sp, 0);
         push_number(sp, how_num);
     }
     else
@@ -7825,6 +7828,7 @@ again:
             {
                 /* Non-string value for string switch: use default */
                 useDefault = MY_TRUE;
+                s = 0;
             }
         }
         else if (sp->type == T_NUMBER)
@@ -7836,6 +7840,7 @@ again:
         {
             /* Non-number value for numeric switch: use default */
             useDefault = MY_TRUE;
+            s = 0;
         }
         pop_stack();
 

@@ -216,6 +216,7 @@ f-010318: Runtime ERQ Executable directory specification
 f-010707: Fast Callouts
 f-010928-0: Make telnet negotiation options more configurable
 p-011012: MCCP patch
+f-020131-0: privilege_violation("limited") should pass limits
 
 
 Installation

@@ -1,7 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
-30-Jan-2002 (Lars Duening)  (3..3.158)
+31-Jan-2002 (Lars Duening)  (3.3.159)
+    - (interpret.c) If input_to() was used without command giver,
+         a NULL pointer string was pushed onto the interpreter stack
+         due to a missing check in the privilege_violation4()
+         function (reported by Menaures).
+
+30-Jan-2002 (Lars Duening)  (3.3.158)
     - (gcollect.c) The GC forgot to clear the refcounts in the known
          destructed objects, thus sometimes causing a 'First reference
          to program, but refcount != 0' fatal error (reported by Coogan,
