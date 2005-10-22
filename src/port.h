@@ -212,7 +212,7 @@ extern int errno;
  *   int32  : an integer with 32 bits
  *   PTRTYPE: a type to use with constant pointer arithmetic.
  * The unsigned versions use 'uint' instead of 'int'.
- * TODO: Add a type 'uchar', '(u)int8' and '(u)int16'., unless not already
+ * TODO: Add a type 'u/schar', '(u/s)int8' and '(u/s)int16'., unless not already
  * TODO:: defined by STDC.
  * TODO: inttypes.h and stdint.h have many interesting types...
  */

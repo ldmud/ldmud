@@ -1125,6 +1125,20 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                            , "working string");
                     cp = get_txt(savestr) + (cp - instr);
                     instr = get_txt(savestr);
+
+                    /* Check for the special escape '%%^^'.
+                     * If found, modify it to '%^%^, and let cp
+                     * point to it.
+                     */
+                    if (cp > get_txt(savestr)
+                     && cp[-1] == TC_FIRST_CHAR
+                     && cp[2] == TC_SECOND_CHAR
+                       )
+                    {
+                        cp--;
+                        cp[1] = TC_SECOND_CHAR;
+                        cp[2] = TC_FIRST_CHAR;
+                    }
                     break;
                 }
                 cp++;
@@ -1239,7 +1253,22 @@ e_terminal_colour ( string_t * text, mapping_t * map, svalue_t * cl
                 cp = memchr(cp, TC_FIRST_CHAR, left);
                 if (cp) {
                     if (cp[1] == TC_SECOND_CHAR)
+                    {
+                        /* Check for the special escape '%%^^'.
+                         * If found, modify it to '%^%^, and let cp
+                         * point to it.
+                         */
+                        if (cp > get_txt(savestr)
+                         && cp[-1] == TC_FIRST_CHAR
+                         && cp[2] == TC_SECOND_CHAR
+                           )
+                        {
+                            cp--;
+                            cp[1] = TC_SECOND_CHAR;
+                            cp[2] = TC_FIRST_CHAR;
+                        }
                         break;
+                    }
                     cp++;
                 }
             } while (cp);

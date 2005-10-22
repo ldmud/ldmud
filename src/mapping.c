@@ -2986,8 +2986,8 @@ f_m_values (svalue_t *sp)
 
     m = sp->u.map;
     if (num < 0 || num >= m->num_values)
-        error("Illegal index %d to m_values(): should be in 0..%d.\n"
-             , num, m->num_values-1);
+        error("Illegal index %d to m_values(): should be in 0..%ld.\n"
+             , num, (long)m->num_values-1);
 
     /* Get the size of the mapping */
     check_map_for_destr(m);

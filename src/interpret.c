@@ -6839,7 +6839,7 @@ again:
          * an error.
          */
 
-        printf("%s eval_cost too big %ld\n", time_stamp(), eval_cost);
+        printf("%s eval_cost too big %ld\n", time_stamp(), (long)eval_cost);
 
         assign_eval_cost();
 

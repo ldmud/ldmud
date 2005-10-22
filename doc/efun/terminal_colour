@@ -19,7 +19,8 @@ DESCRIPTION
         If <map> is given as a closure, it is called with the KEYs to
         replace, and has to return the replacement string.
 
-        The special key "%^%^" is always replaced with the literal "%^".
+        The special keys "%^%^" and "%%^^" are always replaced with the
+        literal "%^".
 
         The parameters wrap and indent are both optional, if only wrap is
         given then the str will be linewrapped at the column given with
@@ -29,7 +30,6 @@ DESCRIPTION
         The wrapper itself ignores the length of the color macros and that
         what they contain, it wraps the string based on the length of the
         other chars inside. Therefore it is color-aware.
-
 
         If <map> is given as 0, the efun does no colour-define detection
         and replacement at all, but still does linewrapping and indentation
@@ -81,7 +81,8 @@ HISTORY
         out in LDMud 3.2.8.
         LDMud 3.2.9/3.3.58 added the use of closures to specify the colour
         mappings.
+        LDMud 3.2.9/3.3.102 officialized the "%%^^" replacement pattern for
+        better MudOS compatibility.
         
 SEE ALSO
         sprintf(E)
-

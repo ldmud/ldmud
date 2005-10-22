@@ -28,7 +28,7 @@ with_max_players=70
 
 with_reserved_user_size=800000
 
-with_catch_reserved_cost=0x20000
+with_catch_reserved_cost=0x8000
 with_master_reserved_cost=0x2000
 
 with_max_array_size=0

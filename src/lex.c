@@ -738,7 +738,7 @@ init_lexer(void)
     sprintf(mtext, "%d", ERQ_MAX_REPLY);
     add_permanent_define("__ERQ_MAX_REPLY__", -1, string_copy(mtext), MY_FALSE);
 #endif
-    sprintf(mtext, "%ld", def_eval_cost);
+    sprintf(mtext, "%ld", (long)def_eval_cost);
     add_permanent_define("__MAX_EVAL_COST__", -1, string_copy(mtext), MY_FALSE);
 #ifdef USE_IPV6
     add_permanent_define("__IPV6__", -1, string_copy(""), MY_FALSE);
@@ -2273,8 +2273,19 @@ handle_pragma (char *str)
                 /* Skip the one allowed comma */
                 next++;
             }
-            else
-                validPragma = MY_FALSE;
+            else if ('\0' != *next && '\r' != *next)
+            {
+                if (master_ob)
+                {
+                    yywarnf("Missing comma between #pragma options");
+                }
+                else
+                {
+                    debug_message("Warning: Missing comma between #pragma options"
+                                  ": file %s, line %d\n"
+                                 , current_file, current_line);
+                }
+            }
 
             if ('\0' == *next || '\r' == *next)
             {
@@ -6392,13 +6403,15 @@ lex_error_context (void)
     if (!pragma_verbose_errors)
         return "";
 
-    strcpy(buf, yychar == -1 ? (len = 5, "near ") : (len = 7, "before "));
+    strcpy(buf, ((signed char)yychar == -1 || yychar == CHAR_EOF)
+                ? (len = 5, "near ")
+                : (len = 7, "before "));
 
     if (!yychar || !*outp)
     {
         strcpy(buf+len, "end of line");
     }
-    else if (*outp == -1)
+    else if ((signed char)*outp == -1 || *outp == CHAR_EOF)
     {
         strcpy(buf+len, "end of file");
     }

@@ -1019,7 +1019,7 @@ xfree (POINTER ptr)
 
 #if defined (sun) || defined(AMIGA) || defined(__linux__) || defined(__BEOS__)
     /* there is a type signed char */
-    typedef /*signed*/ char balance_t;
+    typedef signed char balance_t;
 #   define BALANCE_T_BITS 8
 #else
     typedef short balance_t;
@@ -3195,6 +3195,9 @@ write_lpc_trace (int d, word_t *p)
     /* Try to find the program which allocated this block */
     if ( 0 != (id = p[M_PROG]) )
     {
+        pc = NULL;
+        prog = NULL;
+
         WRITES(d, "By program: ");
         for ( o = obj_list
             ;    o
@@ -3232,7 +3235,11 @@ write_lpc_trace (int d, word_t *p)
 
 /*-------------------------------------------------------------------------*/
 void
-dump_malloc_trace (int d, void *adr)
+dump_malloc_trace (int d, void *adr
+#if !defined(MALLOC_TRACE) && !defined(MALLOC_LPC_TRACE)
+                                    UNUSED
+#endif
+                  )
 
 /* Write the allocation information (file, linenumber, object and such) of
  * the memory block <adr> onto file <d>. 
@@ -3242,6 +3249,9 @@ dump_malloc_trace (int d, void *adr)
 
 {
 #if !defined(MALLOC_TRACE) && !defined(MALLOC_LPC_TRACE)
+#   ifdef __MWERKS__
+#       pragma unused(adr)
+#   endif
     WRITES(d, "No malloc trace.\n");
 #else
     word_t *p = ((word_t *)adr) - OVERHEAD;

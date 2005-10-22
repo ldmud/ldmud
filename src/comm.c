@@ -3969,7 +3969,29 @@ init_telopts (void)
      */
     telopts_do[TELOPT_SGA] = reply_to_do_sga;
     telopts_dont[TELOPT_SGA] = reply_to_dont_sga;
-}
+
+    /* Mud specific protocols */
+
+    telopts_do[TELOPT_COMPRESS] = reply_h_telnet_neg;
+    telopts_dont[TELOPT_COMPRESS] = reply_h_telnet_neg;
+    telopts_will[TELOPT_COMPRESS] = reply_h_telnet_neg;
+    telopts_wont[TELOPT_COMPRESS] = reply_h_telnet_neg;
+
+    telopts_do[TELOPT_COMPRESS2] = reply_h_telnet_neg;
+    telopts_dont[TELOPT_COMPRESS2] = reply_h_telnet_neg;
+    telopts_will[TELOPT_COMPRESS2] = reply_h_telnet_neg;
+    telopts_wont[TELOPT_COMPRESS2] = reply_h_telnet_neg;
+
+    telopts_do[TELOPT_MSP] = reply_h_telnet_neg;
+    telopts_dont[TELOPT_MSP] = reply_h_telnet_neg;
+    telopts_will[TELOPT_MSP] = reply_h_telnet_neg;
+    telopts_wont[TELOPT_MSP] = reply_h_telnet_neg;
+
+    telopts_do[TELOPT_MXP] = reply_h_telnet_neg;
+    telopts_dont[TELOPT_MXP] = reply_h_telnet_neg;
+    telopts_will[TELOPT_MXP] = reply_h_telnet_neg;
+    telopts_wont[TELOPT_MXP] = reply_h_telnet_neg;
+} /* init_telopts() */
 
 /*-------------------------------------------------------------------------*/
 void

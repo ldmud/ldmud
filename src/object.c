@@ -4255,7 +4255,7 @@ save_mapping (mapping_t *m)
 
         MY_PUTC(':')
         source = number_buffer;
-        (void)sprintf(source, "%d", m->num_values);
+        (void)sprintf(source, "%ld", (long)m->num_values);
         c = *source++;
         do MY_PUTC(c) while ( '\0' != (c = *source++) );
     }

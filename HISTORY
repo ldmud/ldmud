@@ -45,7 +45,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-27-Sep-2001 (Lars Duening) -- upcoming Release 3.2.9
+28-Sep-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -103,6 +103,8 @@ For a detailed list of all changes see the file CHANGELOG.
            Integers are accepted as arguments, too.
        + sizeof(): Now also returns the length of strings.
        + terminal_colour(): Colour keys can now be mapped using a closure.
+           The pattern "%%^^" is recognized as second notation for literal
+           "%^" besides "%^%^".
        + add_verb(), add_xverb(), efun308(), file_name(), map_array(),
          filter_array(), filter_mapping(), map_mapping(), m_sizeof(),
          send_imp():
@@ -258,6 +260,8 @@ For a detailed list of all changes see the file CHANGELOG.
            reference parameters in a varargs parameter. However, the only
            permitted use is to pass them flat in a function call (using
            apply())!
+       + The protocols MCP, MSP and MXP can now be negotiated through
+           the H_TELNET_NEG hook.
        + Bugfix: IPv6 name lookup works again, and also with both xerq and erq.
        + Bugfix: The driver now longer gets a confused when a client like
            TinyFugue refuses to use CHARMODE.

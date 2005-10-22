@@ -99,25 +99,44 @@ char *telcmds[] = {
 #define  TELOPT_AUTHENTICATION 37       /* authentication */
 #define  TELOPT_ENCRYPT       38        /* authentication */
 #define	 TELOPT_NEWENV        39        /* Environment opt for Port ID */
+
+/* Inofficial, mud specific telnet options */
+#define  TELOPT_COMPRESS      85        /* Mud Compression Protocol, v.1 */
+#define  TELOPT_COMPRESS2     86        /* Mud Compression Protocol, v.2 */
+#define  TELOPT_MSP           90        /* Mud Sound Protocol */
+#define  TELOPT_MXP           91        /* Mud Extension Protocol */
 #define  TELOPT_EXOPL        255        /* extended-options-list */
 
 #define  NTELOPTS            256        /* was: (1+TELOPT_NEWENV) */
 
 #ifdef TELOPTS
-char *telopts[NTELOPTS] = {
-        "BINARY", "ECHO", "RCP", "SUPPRESS GO AHEAD", "NAME",
-        "STATUS", "TIMING MARK", "RCTE", "NAOL", "NAOP",
-        "NAOCRD", "NAOHTS", "NAOHTD", "NAOFFD", "NAOVTS",
-        "NAOVTD", "NAOLFD", "EXTEND ASCII", "LOGOUT", "BYTE MACRO",
-        "DATA ENTRY TERMINAL", "SUPDUP", "SUPDUP OUTPUT",
-        "SEND LOCATION", "TERMINAL TYPE", "END OF RECORD",
-        "TACACS UID", "OUTPUT MARKING", "TTYLOC",
-        "3270 REGIME", "X.3 PAD", "NAWS", "TSPEED", "LFLOW",
-        "LINEMODE", "XDISPLOC", "ENVIRON", "AUTH", "ENCRYPT",
-        "NEWENV"
+char *telopts[NTELOPTS]
+ = { "BINARY", "ECHO", "RCP", "SUPPRESS GO AHEAD"
+   , "NAME", "STATUS", "TIMING MARK", "RCTE"
+   , "NAOL", "NAOP", "NAOCRD", "NAOHTS"
+   , "NAOHTD", "NAOFFD", "NAOVTS", "NAOVTD"
+   , "NAOLFD", "EXTEND ASCII", "LOGOUT", "BYTE MACRO"
+   , "DATA ENTRY TERMINAL", "SUPDUP", "SUPDUP OUTPUT", "SEND LOCATION"
+   , "TERMINAL TYPE", "END OF RECORD", "TACACS UID", "OUTPUT MARKING"
+   , "TTYLOC", "3270 REGIME", "X.3 PAD", "NAWS"
+   , "TSPEED", "LFLOW", "LINEMODE", "XDISPLOC"
+   , "ENVIRON", "AUTH", "ENCRYPT", "NEWENV"
+   , "TELOPT 40", "TELOPT 41", "TELOPT 42", "TELOPT 43"
+   , "TELOPT 44", "TELOPT 45", "TELOPT 46", "TELOPT 47"
+   , "TELOPT 48", "TELOPT 49", "TELOPT 50", "TELOPT 51"
+   , "TELOPT 52", "TELOPT 53", "TELOPT 54", "TELOPT 55"
+   , "TELOPT 56", "TELOPT 57", "TELOPT 58", "TELOPT 59"
+   , "TELOPT 60", "TELOPT 61", "TELOPT 62", "TELOPT 63"
+   , "TELOPT 64", "TELOPT 65", "TELOPT 66", "TELOPT 67"
+   , "TELOPT 68", "TELOPT 69", "TELOPT 70", "TELOPT 71" 
+   , "TELOPT 72", "TELOPT 73", "TELOPT 74", "TELOPT 75"
+   , "TELOPT 76", "TELOPT 77", "TELOPT 78", "TELOPT 79"
+   , "TELOPT 80", "TELOPT 81", "TELOPT 82", "TELOPT 83"
+   , "TELOPT 84", "MUD COMPRESS", "MUD COMPRESS2", "TELOPT 87"
+   , "TELOPT 88", "TELOPT 89", "MUD SOUND", "MUD EXTENSION"
 };
 #define  TELOPT_FIRST   TELOPT_BINARY
-#define  TELOPT_LAST    TELOPT_LINEMODE
+#define  TELOPT_LAST    TELOPT_MXP
 #define  TELOPT_OK(x)   ((x) <= TELOPT_LAST && (x) >= TELOPT_FIRST)
 #define  TELOPT(x)      telopts[(x)-TELOPT_FIRST]
 #endif

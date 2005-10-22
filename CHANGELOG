@@ -1,6 +1,19 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+28-Sep-2001 (Lars Duening)  (3.3.103)
+    - (lex.c) Spaces before the lineend caused the lexer to complain about
+        an unrecognized pragma, even though the pragma had been recognized
+        (reported by Dafire and Slava).
+    - (efuns.c) Efun terminal_colour(): The escape sequence '%%^^' is
+        now recognized and replaced by '%^' as is '%^%^' already. This is
+        for compatibility with MudOS drivers (suggested by Fiona).
+    - (telnet.h, comm.c) Added support for mudlib negotiation of MCP, MSP
+        and MXP through the normal H_TELNET_NEG hook (suggested by Markus
+        Peter).
+    - (interpret.c, lex.c, smalloc.c) Made it work on Linux s/390 (a machine
+        where char's are by default unsigned) (provided by Freaky).
+
 27-Sep-2001 (Lars Duening)  (3.3.102)
     - (lex.c) Pragma recognition no longer stumbles over CRs at the line
         end (reported by Freaky and Slava).

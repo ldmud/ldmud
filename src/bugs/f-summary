@@ -105,6 +105,7 @@ f-010825-1: New object list efuns
 f-010825-2: efun query_input_to()
 f-010903: get_dir() should return full pathnames
 f-010908: caller_stack should include function names
+p-010928-0: New efuns function_file() and function_line()
 
 
 Language
@@ -206,6 +207,7 @@ f-001220-1: Possible implementation detail of the telnet machine
 f-010216: Possible implementation of T_ERROR
 f-010318: Runtime ERQ Executable directory specification
 f-010707: Fast Callouts
+f-010928-0: Make telnet negotiation options more configurable
 
 
 Installation
