@@ -6420,6 +6420,7 @@ f_expand_define (svalue_t *sp)
         {
             *end = '\0';
             res = new_mstring(outp);
+            *end = '\n';  /* Restore the newline character */
         }
         outp = &end[1];
     }

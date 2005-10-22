@@ -437,10 +437,9 @@ f_db_error (svalue_t *sp)
 {
     db_dat_t     *dat;
     unsigned int  handle;
-    unsigned int  err_no;
     char         *errmsg;
 
-    handle = (unsigned int)sp[-1].u.number;
+    handle = (unsigned int)sp->u.number;
 
     if ( !(dat = find_dat_by_handle(handle)) )
     {
@@ -481,9 +480,10 @@ f_db_exec (svalue_t *sp)
 {
     string_t     *s;
     db_dat_t     *dat;
+    unsigned int  err_no;
     unsigned int  handle;
 
-    handle = (unsigned int)sp.u.number;
+    handle = (unsigned int)sp[-1].u.number;
     s = sp->u.str;
 
     if ( !(dat = find_dat_by_handle(handle)) )

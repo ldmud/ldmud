@@ -1171,7 +1171,7 @@ for TESTFLAG in -O2 -O; do
     fi
   fi
 done
-for TESTFLAG in -qmaxmem=65536; do
+for TESTFLAG in -qmaxmem=97204; do
   if eval $tcomp; then
     if echo `eval $tcomp2` | egrep '[uU]n(recognized|known) [oO]ption' >/dev/null; then
       :

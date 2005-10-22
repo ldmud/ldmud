@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+31-Jul-2001 (Lars Duening)  (3.3.81)
+    - (pkg-mysql.c) Fixed a syntax error. It sucks that I can't compile
+         this file at home, doesn't it?
+    - (lex.c) A preprocessor statement following a macro redefinition
+         wasn't recognized because the macro parsing code clobbered
+         the newline character (thanks, Fuchur!).
+
 26-Jul-2001 (Lars Duening)  (3.3.80)
     - (lex.c) The redefinition of a macro messed up the list of defines,
         eventually crashing the driver (reported by Freaky).
