@@ -11,9 +11,7 @@ DESCRIPTION
         negative if the reset was overdue).
 
         Note that the actual time the reset occurs depends on when
-        the object will be used after the given time delay, and on the
-        granularity with which the driver checks for resettable objects
-        (typically every 3..5 minutes).
+        the object will be used after the given time delay.
 
 EXAMPLE
         set_next_reset(15*60); // Next reset in 15 Minutes or later

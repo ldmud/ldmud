@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Aug-2002 (Lars Duening)  (3.3.228)
+   - (lex.c) Added predefined macros __RESET_TIME__ and __CLEANUP_TIME__
+        (suggested by Elric).
+
 18-Aug-2002 (Lars Duening)  (3.3.227)
    - (interpret.c) vefun argument error messages printed the wrong
         instruction name since they still expected a 'num_args'

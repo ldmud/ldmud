@@ -86,7 +86,7 @@ For a detailed list of all changes see the file CHANGELOG.
            regular expression code, or the PCRE package (default).
 
 
-13-Aug-2002 (Lars Duening) -- upcoming Release 3.2.9
+18-Aug-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -370,6 +370,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + New preprocessor macros __CATCH_EVAL_COST__ and
            __MASTER_EVAL_COST__ for the corresponding evalcost
            limits.
+       + New predefined macro __RESET_TIME__ and __CLEANUP_TIME__
+           to return the default reset and cleanup interval time.
        + Bugfix: Adding mappings of different width throws an error, unless
            one of the mappings if empty.
        + Bugfix: Right shift by 32 or more bits was computed incorrectly.

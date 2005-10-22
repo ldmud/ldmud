@@ -35,6 +35,8 @@ DESCRIPTION
       __MAX_RECURSION__  : the max count of nested function calls
                            (this is config.h:MAX_USER_TRACE).
       __MAX_EVAL_COST__  : the max evaluation cost.
+      __RESET_TIME__     : default interval time between object resets.
+      __CLEANUP_TIME__   : default interval time between object cleanups.
       __EFUN_DEFINED__(name) : if the efun 'name' exists, this
                                macro evaluates to " 1 ", else to " 0 ".
       __WIZLIST__        : the name of the (mudlib) file from where the
@@ -75,7 +77,8 @@ HISTORY
     3.2.9 added __LDMUD__, __MYSQL__, __DEPRECATED__, __VERSION_MAJOR__,
          __VERSION_MINOR__, __VERSION_MICRO__, __VERSION_PATCH__,
          __INT_MAX__, __INT_MIN__, __FLOAT_MIN__, __FLOAT_MAX__,
-         and __WIZLIST__.
+        __CATCH_EVAL_COST__, __MASTER_EVAL_COST__, __RESET_TIME__,
+        __CLEANUP_TIME__, and __WIZLIST__.
     3.3 made __LPC_NOSAVE__ always defined and added __ALISTS__, __PCRE__.
 
 SEE ALSO
