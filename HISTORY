@@ -45,7 +45,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-06-Aug-2001 (Lars Duening) -- upcoming Release 3.2.9
+14-Aug-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -169,6 +169,7 @@ For a detailed list of all changes see the file CHANGELOG.
        + Assignments of computed strings sometimes crashed the driver.
        + Pre-increment or -decrement on an undefined variable, where
            the result was used in a typechecked context.
+       + Adding a mapping to itself with '+='.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.

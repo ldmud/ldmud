@@ -6322,8 +6322,6 @@ reset_machine (Bool first)
  */
 
 {
-    csp = control_stack - 1;
-    /* TODO: This is illegal according to ISO C */
     traceing_recursion = -1;
     if (first)
     {
@@ -13682,7 +13680,8 @@ again:
          * Returns the number of elements of an array, the number of
          * keys in a mapping, or the number of characters in a string.
          *
-         * For scalar values (like integers), 0 is returned.
+         * As a special case, the number 0 can be passed, and the function
+         * will return 0.
          */
 
         long i;
@@ -15237,7 +15236,7 @@ TODO:: to reactivate this code. (July 2001)
         /* Finish the setup */
 
         current_prog = current_object->prog;
-        current_lambda = *lsvp; l->ref++;
+        current_lambda = *lsvp; addref_closure(lsvp, "call_lambda()");
         variable_index_offset = 0;
         function_index_offset = 0;
         funstart = l->function.code + 1;

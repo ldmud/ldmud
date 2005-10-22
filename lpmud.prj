@@ -22,14 +22,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 85)
-(Parent-Version lpmud 3-3 84)
-(Version-Log "Corrected the entry for sizeof() in func_spec.
-Adding a mapping to itself clobbered memory.
-The VM how holds a reference on a lambda while it is executed.")
+(Project-Version lpmud 3-3 86)
+(Parent-Version lpmud 3-3 85)
+(Version-Log "Holding a reference to a lambda was buggy.")
 (New-Version-Log
 "")
-(Checkin-Time "Tue, 14 Aug 2001 22:06:22 -0600")
+(Checkin-Time "Wed, 15 Aug 2001 20:23:53 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -62,8 +60,8 @@ The VM how holds a reference on a lambda while it is executed.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.3 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.24 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.148 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.194 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.149 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.195 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -101,7 +99,7 @@ The VM how holds a reference on a lambda while it is executed.")
   (src/settings/silberland (lpmud/C/26_silberland 1.4.1.2 744))
   (src/settings/sticklib (lpmud/D/14_sticklib 1.2.1.1.1.2 744))
   (src/settings/tubmud (lpmud/C/27_tubmud 1.7.1.6 744))
-  (src/settings/unitopia (lpmud/C/7_unitopia 1.6.1.4.1.7 744))
+  (src/settings/unitopia (lpmud/C/7_unitopia 1.6.1.4.1.8 744))
   (src/settings/wunderland (lpmud/D/24_wunderland 1.3.1.2 744))
 
   (src/C_COMPILER_BUGS (lpmud/d/21_C_COMPILER 1.6.1.2 644))
@@ -142,7 +140,7 @@ The VM how holds a reference on a lambda while it is executed.")
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.6 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.20 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.73 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.74 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.8 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.53 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.5 644))
@@ -941,7 +939,7 @@ The VM how holds a reference on a lambda while it is executed.")
   (doc/efun/shadow (lpmud/q/20_shadow 1.3 644))
   (doc/efun/shutdown (lpmud/q/22_shutdown 1.2 644))
   (doc/efun/sin (lpmud/q/23_sin 1.1.1.2 644))
-  (doc/efun/sizeof (lpmud/l/39_sizeof 1.3.1.2 644))
+  (doc/efun/sizeof (lpmud/l/39_sizeof 1.3.1.3 644))
   (doc/efun/slice_array (lpmud/q/24_slice_arra 1.3 644))
   (doc/efun/snoop (lpmud/q/25_snoop 1.4 644))
   (doc/efun/sort_array (lpmud/c/36_sort_array 1.6.1.1 644))

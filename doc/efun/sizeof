@@ -7,7 +7,8 @@ DESCRIPTION
         Returns the number of elements of an array, the number of characters
         in a string, or the number of keys in a mapping.
 
-        For scalar values (like integers), 0 is returned.
+        As a special case, the number 0 can be passed, and the function
+        will return 0.
 
 HISTORY
         LDMud 3.2.9 added strings to the possible parameters.
