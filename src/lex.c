@@ -770,6 +770,10 @@ init_lexer(void)
     add_permanent_define("__INT_MAX__", -1, string_copy(mtext), MY_FALSE);
     sprintf(mtext, "(%ld)", PINT_MIN);
     add_permanent_define("__INT_MIN__", -1, string_copy(mtext), MY_FALSE);
+    sprintf(mtext, "(%g)", DBL_MAX);
+    add_permanent_define("__FLOAT_MAX__", -1, string_copy(mtext), MY_FALSE);
+    sprintf(mtext, "(%g)", DBL_MIN);
+    add_permanent_define("__FLOAT_MIN__", -1, string_copy(mtext), MY_FALSE);
 
     /* Add the permanent macro definitions given on the commandline */
 

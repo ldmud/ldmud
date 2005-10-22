@@ -4139,9 +4139,17 @@ f_atan (svalue_t *sp)
     double d;
 
     if (sp->type != T_FLOAT)
+    {
         d = atan((double)(sp->u.number));
+        if (d < DBL_MIN || d > DBL_MAX)
+            error("Numeric overflow: atan(%ld)\n", (long)sp->u.number);
+    }
     else 
+    {
         d = atan(READ_DOUBLE(sp));
+        if (d < DBL_MIN || d > DBL_MAX)
+            error("Numeric overflow: atan(%g)\n", READ_DOUBLE(sp));
+    }
     sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
 
@@ -4172,6 +4180,8 @@ f_atan2 (svalue_t *sp)
     else
         y = READ_DOUBLE(sp-1);
     d = atan2(y, x);
+    if (d < DBL_MIN || d > DBL_MAX)
+        error("Numeric overflow: atan(%g, %g)\n", y, x);
     sp--;
     sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
@@ -4192,7 +4202,7 @@ f_log (svalue_t *sp)
 
 {
     STORE_DOUBLE_USED
-    double d;
+    double d, e;
 
     d = READ_DOUBLE(sp);
     if (sp->type != T_FLOAT)
@@ -4201,9 +4211,11 @@ f_log (svalue_t *sp)
         d = READ_DOUBLE(sp);
     if (d <= 0.)
         error("Bad arg 1 for log(): value %f out of range\n", d);
-    d = log(d);
+    e = log(d);
+    if (e < DBL_MIN || e > DBL_MAX)
+        error("Numeric overflow: log(%g)\n", d);
     sp->type = T_FLOAT;
-    STORE_DOUBLE(sp, d);
+    STORE_DOUBLE(sp, e);
 
     return sp;
 } /* f_log() */
@@ -4224,9 +4236,17 @@ f_exp (svalue_t *sp)
     double d;
 
     if (sp->type != T_FLOAT)
+    {
         d = exp((double)sp->u.number);
+        if (d < DBL_MIN || d > DBL_MAX)
+            error("Numeric overflow: exp(%ld)\n", (long)sp->u.number);
+    }
     else 
+    {
         d = exp(READ_DOUBLE(sp));
+        if (d < DBL_MIN || d > DBL_MAX)
+            error("Numeric overflow: exp(%g)\n", READ_DOUBLE(sp));
+    }
     sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
 
@@ -4246,7 +4266,7 @@ f_sqrt (svalue_t *sp)
 
 {
     STORE_DOUBLE_USED
-    double d;
+    double d, e;
 
     if (sp->type != T_FLOAT)
         d = (double)sp->u.number;
@@ -4254,9 +4274,11 @@ f_sqrt (svalue_t *sp)
         d = READ_DOUBLE(sp);
     if (d < 0.)
         error("Bad arg 1 for sqrt(): value %f out of range\n", d);
-    d = sqrt(d);
+    e = sqrt(d);
+    if (e < DBL_MIN || e > DBL_MAX)
+        error("Numeric overflow: sqrt(%g)\n", d);
     sp->type = T_FLOAT;
-    STORE_DOUBLE(sp, d);
+    STORE_DOUBLE(sp, e);
 
     return sp;
 } /* f_sqrt() */
@@ -4279,7 +4301,11 @@ f_ceil (svalue_t *sp)
     double d;
 
     if (sp->type == T_FLOAT)
+    {
         d = ceil(READ_DOUBLE(sp));
+        if (d < DBL_MIN || d > DBL_MAX)
+            error("Numeric overflow: ceil(%g)\n", READ_DOUBLE(sp));
+    }
     else
     {
         d = sp->u.number;
@@ -4309,7 +4335,11 @@ f_floor (svalue_t *sp)
     double d;
 
     if (sp->type == T_FLOAT)
+    {
         d = floor(READ_DOUBLE(sp));
+        if (d < DBL_MIN || d > DBL_MAX)
+            error("Numeric overflow: floor(%g)\n", READ_DOUBLE(sp));
+    }
     else
     {
         d = sp->u.number;
@@ -4349,6 +4379,8 @@ f_pow (svalue_t *sp)
     if (x < 0.0  && y != (double)((long)y))
         error("Can't raise negative number to fractional powers.\n");
     d = pow(x, y);
+    if (d < DBL_MIN || d > DBL_MAX)
+        error("Numeric overflow: pow(%g, %g)\n", x, y);
     sp--;
     sp->type = T_FLOAT;
     STORE_DOUBLE(sp, d);
@@ -4383,8 +4415,15 @@ f_to_int (svalue_t *sp)
         break;
 
     case T_FLOAT:
-        n = (long)READ_DOUBLE(sp);
+      {
+        double d;
+
+        d = READ_DOUBLE(sp);
+        if (d < DBL_MIN || d > DBL_MAX)
+            error("Numeric overflow: to_int(%g)\n", d);
+        n = (long)d;
         break;
+      }
 
     case T_STRING:
         n = strtol(get_txt(sp->u.str), NULL, 10);

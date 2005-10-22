@@ -59,7 +59,7 @@ For a detailed list of all changes see the file CHANGELOG.
            something different from '!'.
 
 
-01-Jan-2002 (Lars Duening) -- upcoming Release 3.2.9
+10-Jan-2002 (Lars Duening) -- Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -247,6 +247,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + New LPC define __WIZLIST__ specifies from where the driver read the
            initial wizlist information.
        + New LPC defines __INT_MAX__ and __INT_MIN__ give the integer number
+           limits.
+       + New LPC defines __FLOAT_MAX__ and __FLOAT_MIN__ give the float number
            limits.
        + Numbers can also be specified as binary patterns with the '0b'
            prefix, and as octals with the '0o' prefix.

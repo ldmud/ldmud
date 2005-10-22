@@ -100,6 +100,7 @@ extern int errno;
 #endif
 
 #include <math.h>
+#include <float.h>
 
 #ifdef __BEOS__
      /* BeOS defines some standard non-standard types itself (like int32).

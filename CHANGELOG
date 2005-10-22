@@ -1,6 +1,14 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+10-Jan-2002 (Lars Duening)  (3.3.152)
+    - (lex.c) Added new predefined macros __FLOAT_MIN__ and __FLOAT_MAX__
+        for the float value limits.
+    - (interpret.c, efuns.c) Added checks for numeric overflows to float
+        operations.  Btw, <int> / <float> returned a wrong result.
+    - (configure.in) Reduced the default size of the RXCACHE table to 8192
+        instead of 16384 entries.
+
 08-Jan-2002 (Lars Duening)  (3..3.151)
     - (efuns.c) Efun terminal_colour() removed a crasher which happened
         when too many control sequences appeared in a line (reported by Peng).
