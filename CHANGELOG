@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+03-Jul-2001 (Lars Duening)  (3.3.72)
+    - (prolang.y) How embarrassing! The code for !INITIALIZATION_BY_INIT
+        had a bad syntax error - and I didn't notice it (thanks, Bardioc!)
+
 01-Jul-2001 (Lars Duening)  (3.3.71)
     - (configure) 'with_wizlist_file=no' didn't work from settings files
         (reported by Freaky).

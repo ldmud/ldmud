@@ -2550,7 +2550,7 @@ copy_svalue (svalue_t *svp)
             return &const0;
         /* FALLTHROUGH */
     case T_SYMBOL:
-        ref_mstring(svp->u.str);
+        (void)ref_mstring(svp->u.str);
         break;
     case T_POINTER:
     case T_QUOTED_ARRAY:
@@ -3843,7 +3843,7 @@ new_name:
           fulltype_t actual_type = current_type;
 
           if (!(actual_type & (TYPE_MOD_PRIVATE | TYPE_MOD_PUBLIC
-                              | TYPE_MOD_PROTECTED))
+                              | TYPE_MOD_PROTECTED)))
           {
               actual_type |= default_varmod;
           }
