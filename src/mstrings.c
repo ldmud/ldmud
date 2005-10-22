@@ -267,7 +267,6 @@ move_to_head (string_t *s, int idx)
      */
 
     if (rover && prev)
-
     {
         prev->link = s->link;
         s->link = stringtable[idx];
@@ -512,7 +511,7 @@ mstring_new_n_tabled (const char * const pTxt, size_t size MTRACE_DECL)
 
     /* No: create a new one */
     return make_new_tabled(pTxt, size, idx MTRACE_PASS);
-} /* mstring_new_tabled() */
+} /* mstring_new_n_tabled() */
 
 /*-------------------------------------------------------------------------*/
 string_t *
@@ -887,7 +886,7 @@ mstring_free (string_t *s)
         mstr_itabled_size -= msize;
 
         free_mstring(s->link);
-        free(s);
+        xfree(s);
     }
 } /* mstring_free() */
 

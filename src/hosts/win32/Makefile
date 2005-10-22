@@ -57,14 +57,13 @@ OPTIMIZE= -O2 -g -fstrength-reduce -fno-force-mem -fno-force-addr -fno-inline-fu
 #   -DDEBUG: Enable run time debugging. It will use more time and space.
 #            Nevertheless you are strongly encouraged to keep it defined.
 #   -DYYDEBUG[=1]: Debug output for the LPC compiler.
-#   -DTRACE_CODE: Enable the LPC code tracing.
 #   -DNO_INLINES: Disable inlining
 #   -DCHECK_STRINGS: Enable the shared string checking.
 #   -DKEEP_STRINGS: Shared strings are never really freed.
 #   -DDEBUG_TELNET: Activates debug prints in the telnet machine
 #   -DDEBUG_SMALLOC_ALLOCS: Activates allocation debug prints in smalloc.
-#DEBUG = -DDEBUG -DTRACE_CODE
-DEBUG = -DDEBUG -DTRACE_CODE -DCHECK_STRINGS # -DKEEP_STRINGS -DDEBUG_TELNET
+#DEBUG = -DDEBUG
+DEBUG = -DDEBUG -DCHECK_STRINGS # -DKEEP_STRINGS -DDEBUG_TELNET
 #DEBUG=
 #
 MPATH=-DMUD_LIB='"$(MUD_LIB)"' -DBINDIR='"$(BINDIR)"' -DERQ_DIR='"$(ERQ_DIR)"'

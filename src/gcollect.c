@@ -115,9 +115,14 @@ time_t time_last_gc = 0;
 
 #if defined(GC_SUPPORT)
 
+int default_gcollect_outfd = 2;
+  /* The default file (default is stderr) to dump the reclaimed blocks on.
+   */
+
 int gcollect_outfd = 2;
 #define gout gcollect_outfd
-  /* The file (default is stderr) to dump the reclaimed blocks on.
+  /* The current file (default is stderr) to dump the reclaimed blocks on.
+   * After the GC, this will be reset to <default_gcollect_outfd>.
    */
 
 gc_status_t gc_status = gcInactive;
@@ -967,6 +972,43 @@ clear_ref_in_closure (lambda_t *l, ph_int type)
 
 /*-------------------------------------------------------------------------*/
 void
+restore_default_gc_log (void)
+
+/* If gcollect_outfd was redirected to some other file, that file is
+ * closed and the default log file is restored.
+ */
+
+{
+    if (gcollect_outfd != default_gcollect_outfd)
+    {
+        if (gcollect_outfd != 1 && gcollect_outfd != 2)
+            close(gcollect_outfd);
+        gcollect_outfd = default_gcollect_outfd;
+    }
+} /* restore_default_gc_log() */
+
+/*-------------------------------------------------------------------------*/
+void
+new_default_gc_log (int fd)
+
+/* Redirect the default and the current log file to file <fd>. If the
+ * current log file is identical to the default log file, it is
+ * redirected, too.
+ */
+
+{
+    if (default_gcollect_outfd != fd)
+    {
+        restore_default_gc_log();
+
+        if (default_gcollect_outfd != 1 && default_gcollect_outfd != 2)
+            close(default_gcollect_outfd);
+        default_gcollect_outfd = gcollect_outfd = fd;
+    }
+} /* new_default_gc_log() */
+
+/*-------------------------------------------------------------------------*/
+void
 garbage_collection(void)
 
 /* The Mark-Sweep garbage collector.
@@ -1446,6 +1488,11 @@ garbage_collection(void)
         }
     }
 #endif
+
+    /* If the GC log was redirected, close that file and set the
+     * logging back to the default file.
+     */
+    restore_default_gc_log();
 } /* garbage_collection() */
 
 

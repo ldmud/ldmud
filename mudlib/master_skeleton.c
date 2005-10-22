@@ -1009,10 +1009,11 @@ mixed valid_write (string path, string euid, string fun, object caller)
 //
 //
 // valid_write() is called for these operations:
-//   copy_file    (for the target file resp. directory name)
-//   ed_start     (when writing a file)
-//   rename_from  (for each the old name of a rename())
-//   rename_to    (for the new name of a rename())
+//   copy_file           (for the target file resp. directory name)
+//   ed_start            (when writing a file)
+//   garbage_collection  (for the log filename)
+//   rename_from         (for each the old name of a rename())
+//   rename_to           (for the new name of a rename())
 //   mkdir
 //   objdump
 //   opcdump

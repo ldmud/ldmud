@@ -511,7 +511,7 @@ int     write_file(string, string);
 mixed   debug_info(int, ...);
 void    debug_message(string, int default: F_CONST0);
 string  expand_define(string, null|string default: F_CONST0);
-void    garbage_collection();
+void    garbage_collection(void|string, void|int);
 mixed  *get_error_file(string, int default: F_CONST1);
 int     get_eval_cost();
 #ifdef TRACE_CODE

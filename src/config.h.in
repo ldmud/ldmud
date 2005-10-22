@@ -370,6 +370,10 @@
  */
 @cdef_malloc_lpc_trace@ MALLOC_LPC_TRACE
 
+/* Trace the most recently executed bytecode instructions?
+ */
+@cdef_trace_code@ TRACE_CODE
+
 /* If using TRACE_CODE , how many instructions should be kept? */
 #define TOTAL_TRACE_LENGTH      @val_total_trace_length@
 

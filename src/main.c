@@ -1998,10 +1998,11 @@ eval_arg (int eOption, const char * pValue)
 #ifdef GC_SUPPORT
     case cGcollectFD:
         if (isdigit((unsigned char)*pValue)) {
-            gcollect_outfd = strtol(pValue, (char **)0, 0);
+            default_gcollect_outfd = strtol(pValue, (char **)0, 0);
         } else {
-            gcollect_outfd = ixopen3(pValue, O_CREAT|O_TRUNC|O_WRONLY, 0640);
+            default_gcollect_outfd = ixopen3(pValue, O_CREAT|O_TRUNC|O_WRONLY, 0640);
         }
+        gcollect_outfd = default_gcollect_outfd;
         break;
 #endif
 

@@ -200,9 +200,10 @@ enable_malloc_trace=no
 
 enable_malloc_lpc_trace=no
 
-# If the driver is compiled using TRACE_CODE, this is the number of
-# instructions kept.
+# If TRACE_CODE is enable, the driver keeps a log of TOTAL_TRACE_LENGTH
+# most recently execute bytecode instructions.
 
+enable_trace_code=yes
 with_total_trace_length=4096
 
 # Enable these for runtime statistics:

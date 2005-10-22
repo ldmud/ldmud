@@ -1,6 +1,18 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-May-2002 (Lars Duening)  (3.3.209)
+    - (hash.c) The hash functions were still incorrect for 0-length
+         strings, causing FinalFrontier to crash on boot (reported
+         by Dafire).
+    - (config.h.in, Makefile.in, autoconf/configure.in) TRACE_CODE
+         is now configurable through the configure script, and thus
+         is located in config.h and no longer in Makefile.
+    - (gcollect, interpret.c, func_spec) Optional filename argument
+         to efun garbage_collection() can specify a new GC log file
+         for the next GC. The filename is validated through
+         master::valid_write() (f-020312).
+
 07-May-2002 (Lars Duening)  (3.3.208)
     - (mapping.c) 'mapping += mapping' now throws an error when the
          mappings are of differing width (reported by Alfe and Coogan).

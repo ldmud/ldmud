@@ -17,6 +17,7 @@ typedef enum { gcInactive = 0, gcClearRefs, gcCountRefs } gc_status_t;
 extern gc_status_t gc_status;
 
 extern int gcollect_outfd;
+extern int default_gcollect_outfd;
 extern object_t *gc_obj_list_destructed;
 extern lambda_t *stale_misc_closures;
 extern mapping_t *stale_mappings;
@@ -67,6 +68,9 @@ extern void gc_count_ref_in_vector(svalue_t *svp, size_t num);
 #endif
 extern void gc_count_ref_from_string(string_t *p);
 extern void clear_ref_in_vector(svalue_t *svp, size_t num);
+
+extern void restore_default_gc_log (void);
+extern void new_default_gc_log (int fd);
 
 #define mark_program_ref(p) \
     GC_REF_DUMP(program_t*, p, "Mark program", gc_mark_program_ref)

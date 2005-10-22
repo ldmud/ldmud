@@ -101,6 +101,7 @@ AC_MY_ARG_ENABLE(apply-cache_stat,yes,,)
 AC_MY_ARG_ENABLE(malloc-trace,no,,)
 AC_MY_ARG_ENABLE(malloc-lpc-trace,no,,)
 AC_MY_ARG_ENABLE(dynamic-costs,no,,)
+AC_MY_ARG_ENABLE(trace-code,yes,,[trace the most recently executed bytecode])
 
 AC_MY_ARG_ENABLE(rxcache_table,yes,,)
 
@@ -224,6 +225,7 @@ AC_CDEF_FROM_ENABLE(apply_cache_stat)
 AC_CDEF_FROM_ENABLE(malloc_trace)
 AC_CDEF_FROM_ENABLE(malloc_lpc_trace)
 AC_CDEF_FROM_ENABLE(dynamic_costs)
+AC_CDEF_FROM_ENABLE(trace_code)
 
 AC_CDEF_FROM_ENABLE(rxcache_table)
 
@@ -1551,6 +1553,7 @@ AC_SUBST(cdef_use_alists)
 AC_SUBST(cdef_use_pcre)
 AC_SUBST(cdef_use_deprecated)
 AC_SUBST(cdef_comm_stat)
+AC_SUBST(cdef_trace_code)
 AC_SUBST(cdef_apply_cache_stat)
 AC_SUBST(cdef_malloc_trace)
 AC_SUBST(cdef_malloc_lpc_trace)

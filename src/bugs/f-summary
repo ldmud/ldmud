@@ -114,11 +114,11 @@ f-011230: Implement seeded randoms
 f-020127: Bitstring efuns for shifting and copying
 f-020307: Default 'option' parameter for regexp functions
 f-020310: inherits() returns all programs inheriting a given program
-f-020312: Filename argument to garbage_collection()
 f-020327-0: Use PCRE and traditional regexps in parallel
 f-020328-0: Introduce 'regexp' LPC datatype
 f-020331: Efun this_function()
 f-020404: New efun strreplace()
+f-020507-2: Slicing mappings
 
 
 Language
@@ -155,6 +155,9 @@ f-020203-0: Ordered Arrays
 f-020209: Tuple return values
 f-020305: Constructor and Destructor
 f-020326-0: select() statement to complement switch()
+f-020507-0: Distinguish between generic and specific empty mappings
+f-020507-1: Rethink the 'mapping += mapping' semantics.
+f-020507-3: Range operators on 2d mappings
 
 
 Compiler

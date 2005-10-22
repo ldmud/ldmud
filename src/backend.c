@@ -1191,17 +1191,88 @@ static int acc = 0;    /* Sum of lines for this backend loop */
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
-f_garbage_collection (svalue_t *sp)
+f_garbage_collection (svalue_t *sp, int num_arg)
 
 /* EFUN garbage_collection()
  *
- *   void garbage_collection(void)
+ *   void garbage_collection ()
+ *   void garbage_collection (string filename)
+ *   void garbage_collection (string filename, int flag)
  *
  * Tell the parser to initiate a garbage collection after the
  * current execution ended.
+ *
+ * With the <filename> argument a log file for the GC output
+ * different from the default log file can be specified.
+ *
+ * If <flag> is not given or 0, the output from the next
+ * and only the next GC will go into the log file.
+ * If <flag> is 1, the <filename> will be used as the new
+ * default log file for all following GCs.
  */
 
 {
+    if (num_arg > 0)
+    {
+        Bool change_default = MY_FALSE;
+        svalue_t * argp = sp - num_arg + 1;
+        int fd;
+        string_t * path;
+
+        if (num_arg > 1)
+        {
+            change_default = argp[1].u.number != 0;
+        }
+
+        restore_default_gc_log();
+
+        path = check_valid_path( argp[0].u.str, current_object
+                               , STR_GARBAGE_COLLECTION, MY_TRUE);
+        if (path == NULL)
+        {
+            if (change_default)
+            {
+                error("Illegal use of garbage_collection(): "
+                      "No privilege to use file '%s' as default log.\n"
+                     , get_txt(argp[0].u.str));
+            }
+            else
+            {
+                error("Illegal use of garbage_collection(): "
+                      "No privilege to use file '%s' as default log.\n"
+                     , get_txt(argp[0].u.str));
+            }
+            /* NOTREACHED */
+            return NULL;
+        }
+
+        if (change_default)
+            fd = ixopen3(get_txt(path), O_CREAT|O_TRUNC|O_WRONLY, 0640);
+        else
+            fd = ixopen3(get_txt(path), O_CREAT|O_APPEND|O_WRONLY, 0640);
+
+        if (fd < 0)
+        {
+            /* Store the <path> on the stack to the error handling
+             * can free it.
+             */
+            sp++; put_string(sp, path);
+            error("Can't open GC log file '%s': errno %d\n"
+                  , get_txt(path), errno);
+            /* NOTREACHED */
+            return sp;
+        }
+
+        if (change_default)
+            new_default_gc_log(fd);
+        else
+            gcollect_outfd = fd;
+
+        /* Clean up */
+        free_mstring(path);
+        sp = pop_n_elems(num_arg, sp);
+    }
+
     extra_jobs_to_do = garbage_collect_to_do = MY_TRUE;
     time_last_gc = 0;  /* mark it as an 'unconditional' GC */
 

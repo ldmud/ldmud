@@ -65,7 +65,9 @@ whashmem (const char *s, size_t len, int maxn)
     if (i > len)
         i = len;
 
-    if ( '\0' != (c = *p++) ) {
+    if ( i > 0 )
+    {
+        c = *p++;
         for (hi = T[c], lo = (unsigned char)(c + 1)
             ; --i > 0; )
         {
@@ -76,7 +78,7 @@ whashmem (const char *s, size_t len, int maxn)
         return (unsigned short)((hi << 8) + lo);
     }
     return 0;
-}
+} /* whashmem() */
 
 /*-------------------------------------------------------------------------*/
 unsigned short
@@ -91,7 +93,8 @@ whashstr (const char *s, int maxn)
     register unsigned char *p = (unsigned char *)s;
     register long i = maxn;
 
-    if ( '\0' != (c = *p++) ) {
+    if ( i > 0 && '\0' != (c = *p++) )
+    {
         for (hi = T[c], lo = (unsigned char)(c + 1)
             ; --i > 0 && '\0' != (c = *p++); )
         {
@@ -101,7 +104,7 @@ whashstr (const char *s, int maxn)
         return (unsigned short)((hi << 8) + lo);
     }
     return 0;
-}
+} /* whashstr() */
 
 /*-------------------------------------------------------------------------*/
 unsigned char
@@ -119,7 +122,7 @@ chashstr (const char *s, int maxn)
     for (h = 0, i = maxn, p = (unsigned char *)s; *p && --i >= 0; p++)
         h = T[h ^ *p];
     return h;
-}
+} /* chashstr() */
 
 /***************************************************************************/
 

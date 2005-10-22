@@ -372,6 +372,10 @@
  */
 #undef MALLOC_LPC_TRACE
 
+/* Trace the most recently executed bytecode instructions?
+ */
+#define TRACE_CODE
+
 /* If using TRACE_CODE , how many instructions should be kept? */
 #define TOTAL_TRACE_LENGTH      0x1000
 

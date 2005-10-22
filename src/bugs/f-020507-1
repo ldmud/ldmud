@@ -1,0 +1,9 @@
+Short: Rethink the 'mapping += mapping' semantics.
+From: Lars
+Date: 2002-05-07
+Type: Feature
+State: New
+
+'mapping += mapping' should work like repeated calls to m_add(): the width of
+the destination mapping is unchanged (unless generic empty mapping), the width
+of the data added will be adjusted.
