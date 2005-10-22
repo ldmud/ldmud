@@ -10,9 +10,7 @@
  *------------------------------------------------------------------
  */
 
-#if !defined(__NO_DRIVER_SOURCE__)
 #define __DRIVER_SOURCE__
-#endif
 
 #include "config.h"
 

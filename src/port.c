@@ -357,7 +357,7 @@ getrusage (int who, struct rusage *rusage)
 }
 #endif /* getrusage implemented using times() */
 
-#if defined(__CYGWIN__) || defined(__EMX__) || defined(OS2)
+#if defined(CYGWIN) || defined(__EMX__) || defined(OS2)
 /*-----------------------------------------------------------------------
 ** void init_rusage (void)
 ** int getrusage (int who, struct rusage *rusage)

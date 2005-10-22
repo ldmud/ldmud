@@ -29,9 +29,6 @@
  *---------------------------------------------------------------------------
  */
  
-/* #define DEBUG */
-/* #define DEBUG2 */
-
 #include <sys/types.h>
 #include <errno.h>
 #include <netdb.h>
@@ -112,6 +109,10 @@ typedef int length_t;
 
 #define randomize_tickets(n) srandom(n)
 #define get_ticket()         random()
+
+#ifndef ERQ_DEBUG
+#  define ERQ_DEBUG 0
+#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -390,7 +391,7 @@ readn (int s, void *buf, long expected)
            }
         }
         total += num;
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
         if (total < expected)
             fprintf(stderr, "%s read fragment %ld\n", time_stamp(), num);
 #endif
@@ -606,7 +607,7 @@ count_sigcld (int sig)
     {
         call_signal_again++;
     }
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
     write(2, "child terminated\n", 17);
 #endif
     childs_terminated++;
@@ -654,7 +655,7 @@ kill_child (child_t *child)
  */
 
 {
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
     fprintf(stderr, "%s kill_child called\n", time_stamp());
 #endif
     kill(child->u.c.pid, SIGKILL);
@@ -722,7 +723,7 @@ get_subserver (void)
 {
     struct child_s *child;
 
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
     fprintf(stderr, "%s get_subserver called\n", time_stamp());
 #endif
 
@@ -872,7 +873,7 @@ start_subserver (long server_num, long seed)
                     }
                     else
                     {
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                         fprintf(stderr,
                           "%s %d bytes from socket no. %d\n", time_stamp(), num, n);
                         fprintf(stderr,
@@ -1176,7 +1177,7 @@ start_subserver (long server_num, long seed)
              * is possible.
              */
              
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
             if (child) {
                 fprintf(stderr, "%s ERQ_SPAWN: busy\n", time_stamp());
                 abort();
@@ -1273,7 +1274,7 @@ start_subserver (long server_num, long seed)
             if (!child) {
 no_child:
                 /* could happen due to a race condition */
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                 fprintf(stderr, "%s ERQ_SEND/ERQ_KILL: No child\n", time_stamp());
 #endif
                 header[8] = CHILD_FREE;
@@ -1283,7 +1284,7 @@ no_child:
             header[8] = CHILD_LISTEN;
             if (memcmp(buf, ticket.c, sizeof ticket)) {
 bad_ticket:
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                 fprintf(stderr, "%s ticket.s.rnd: %x vs. %x\n",
                   time_stamp(), ((struct ticket_s *)buf)->rnd, ticket.s.rnd);
                 fprintf(stderr, "%s ticket.s.seq: %x vs. %x\n",
@@ -1295,13 +1296,13 @@ notify_bad_ticket:
                 int sig;
 
                 sig = msglen >= 4 ? read_32(buf+sizeof ticket) : SIGKILL;
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                 fprintf(stderr, "%s len: %d sig: %d\n", time_stamp(), msglen, sig);
 #endif
                 if (sig >= 0)
                     sig = kill(child, sig);
                 header[9] = sig < 0 ? ERQ_E_ILLEGAL : ERQ_OK;
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                 if (sig < 0)
                     perror("kill");
 #endif
@@ -1430,18 +1431,8 @@ main (int argc, char **argv)
 
     /* Print information about this daemon to help debugging */
     {
-        fprintf(stderr, "Amylaar ERQ (%s), compiled %s"
-#if defined(DEBUG)
-                        " (DEBUG)"
-#  if defined(DEBUG2)
-                        " (DEBUG, DEBUG2)"
-#  else
-#  endif
-#elif defined(DEBUG2)
-                        " (DEBUG2)"
-#endif
-                        "\n"
-                      , argv[0], __DATE__
+        fprintf(stderr, "%s Amylaar ERQ %s: Path '%s', debuglevel %d\n"
+                      , time_stamp(), __DATE__, argv[0], ERQ_DEBUG
                 );
     }
 
@@ -1528,7 +1519,7 @@ main (int argc, char **argv)
             {
                 if (child->u.s.last_recv + 3 < time(NULL))
                 {
-#ifdef DEBUG2
+#if ERQ_DEBUG > 1
                     fprintf(stderr,"%s Uncorking child\n", time_stamp());
 #endif
                     child->u.s.bytes_recv = 0;
@@ -1538,7 +1529,7 @@ main (int argc, char **argv)
                     still_corked = 1;
             }
         } /* for(tcpsockets) */
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
         fprintf(stderr,"%s still_corked = %d\n", time_stamp(), still_corked);
 #endif
 
@@ -1549,11 +1540,11 @@ main (int argc, char **argv)
         timeout.tv_sec = (still_corked ? 3 : TIME_TO_CHECK_CHILDS);
         timeout.tv_usec = 0;
 
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
         fprintf(stderr, "%s calling select (nfds = %d)\n", time_stamp(), nfds);
 #endif
         num_ready = select(nfds, &readfds, &writefds, 0, &timeout);
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
         fprintf(stderr, "%s select returns %d\n", time_stamp(), num_ready);
 #endif
         if (num_ready < 0 && errno != EINTR)
@@ -1574,7 +1565,7 @@ main (int argc, char **argv)
                 next_child = child->next_free;
                 if (child->u.c.last_used > expired)
                     continue;
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                 fprintf(stderr, "%s Max child idle time expired.\n", time_stamp());
 #endif
                 kill_child(child);
@@ -1632,7 +1623,7 @@ main (int argc, char **argv)
                 s = child->socket;
                 if (!FD_ISSET(s, &readfds))
                     continue;
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                 fprintf(stderr, "%s query child %d\n", time_stamp(), child - &childs[0]);
 #endif
                 /* Read the standard erq header plus the one-byte
@@ -1681,7 +1672,7 @@ main (int argc, char **argv)
                     free_childs = child;
                 }
             }
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
             fprintf(stderr, "%s queried all children\n", time_stamp());
 #endif
 
@@ -1824,7 +1815,7 @@ main (int argc, char **argv)
                     {
                         /* Cork the bottle. Let the MUD swallow first */
                         FD_CLR(s, &current_fds);
-#ifdef DEBUG2
+#if ERQ_DEBUG > 1
                         fprintf(stderr,"%s Corking child.\n", time_stamp());
 #endif
                     }
@@ -1898,7 +1889,7 @@ main (int argc, char **argv)
                     perror("read");
                 break;
             }
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
             fprintf(stderr, "%s read command %d\n", time_stamp(), header[8]);
 #endif
 
@@ -1940,7 +1931,7 @@ main (int argc, char **argv)
             bad_ticket:
                 default:
                   {
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                     fprintf(stderr, "%s Ticket rejected n: 0x%x nxt: 0x%x state: %d\n",
                         time_stamp(), n, next_child_index,
                         (unsigned long)n >= (unsigned long)next_child_index ?
@@ -1987,7 +1978,7 @@ main (int argc, char **argv)
                      || memcmp(buf+4, child->u.s.ticket.c,
                           sizeof(union ticket_u)))
                     {
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
                         fprintf(stderr,"%s Ticket mismatch. (%d, %d)\n", time_stamp(), msglen,sizeof(union ticket_u));
 #endif
                         goto bad_ticket;

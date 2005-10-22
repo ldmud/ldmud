@@ -20,10 +20,12 @@ extern char *_crypt(char *, char *);
 extern int ioctl(int, ...); /* should be in <ioctl.h> */
 #endif
 
-#if defined(SunOS4) || defined(ultrix) || defined(__CYGWIN__)
-#if !defined(__CYGWIN32__)
+#if defined(USING_CYGWIN) && !defined(__CYGWIN32__)
 extern int gethostname(char *, int);
 #endif
+
+#if defined(SunOS4) || defined(ultrix)
+extern int gethostname(char *, int);
 extern char *getdomainname(char *, int);
 #endif
 
@@ -33,7 +35,7 @@ extern void perror(const char *);
 extern long int strtol(const char *, char **, int);
 #endif
 
-#if defined(__CYGWIN__) || defined(sun)
+#if defined(USING_CYGWIN) || defined(sun)
 extern time_t time(time_t *tloc);
 #endif
 

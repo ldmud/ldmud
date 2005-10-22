@@ -127,6 +127,7 @@ AC_MY_ARG_WITH(access-log,access.allow.log,,[access log file])
 
 AC_MY_ARG_WITH(erq-max-reply,1024,,)
 AC_MY_ARG_WITH(erq-max-send,1024,,)
+AC_MY_ARG_WITH(erq-debug,0,,[ERQ debug level])
 
 AC_MY_ARG_WITH(read-file-max-size,50000,[BYTES],
   [maximum size of a file allowed to be read by 'read_file()'])
@@ -272,6 +273,7 @@ AC_STRING_VAL_FROM_WITH(input_escape)
 
 AC_INT_VAL_FROM_WITH(erq_max_reply)
 AC_INT_VAL_FROM_WITH(erq_max_send)
+AC_INT_VAL_FROM_WITH(erq_debug)
 AC_INT_VAL_FROM_WITH(read_file_max_size)
 AC_INT_VAL_FROM_WITH(time_to_clean_up)
 AC_INT_VAL_FROM_WITH(time_to_swap)
@@ -1625,6 +1627,7 @@ AC_SUBST(val_access_file)
 AC_SUBST(val_access_log)
 AC_SUBST(val_erq_max_reply)
 AC_SUBST(val_erq_max_send)
+AC_SUBST(val_erq_debug)
 AC_SUBST(val_read_file_max_size)
 AC_SUBST(val_time_to_clean_up)
 AC_SUBST(val_time_to_swap)

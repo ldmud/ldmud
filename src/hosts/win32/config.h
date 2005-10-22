@@ -384,17 +384,16 @@
  * code segments.
  */
 
-#if defined(__DRIVER_SOURCE__)
-
 /* Enable basic run time sanity checks. This will use more time
  * and space, but nevertheless you are strongly encouraged to keep
  * it defined.
- * The check for __DRIVER_SOURCE__ is necessary as config.h is
- * also included by the erqs.
  */
 #define DEBUG
 
-#endif
+/* The DEBUG level for the ERQ daemon: 0 means 'no debug', 1 means
+ * 'standard debug', 2 means 'verbose debug'.
+ */
+#define ERQ_DEBUG 0
 
 /* Enable debug output from the LPC compiler.
  */

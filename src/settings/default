@@ -446,6 +446,13 @@ enable_debug_telnet=no
 # Activate allocation debug prints in the smalloc module (lots of output).
 enable_debug_smalloc_allocs=no
 
+# The DEBUG level for the ERQ daemon:
+#   0 : no debug output
+#   1 : standard debug output
+#   2 : verbose debug output
+with_erq_debug=0
+
+
 # --- Specific Debugging ---
 # These options have been introduced to debug specific problems and will
 # be removed again later.

@@ -31,7 +31,7 @@
 #    endif /* NDIR */
 #endif /* not (HAVE_DIRENT_H or _POSIX_VERSION) */
 
-#if defined(__CYGWIN__)
+#if defined(CYGWIN)
 extern int lstat(const char *, struct stat *);
 #endif
 

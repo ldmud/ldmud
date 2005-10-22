@@ -27,16 +27,20 @@
 #include "typedefs.h"
 
 #include "my-alloca.h"
-#include <stdio.h>
+#include <ctype.h>
+#include <fcntl.h>
+#ifdef HAVE_NETDB_H
+#    include <netdb.h>
+     /* MAXHOSTNAMELEN on Solaris */
+#endif
 #include <locale.h>
 #include <math.h>
 #include <setjmp.h>
 #include <signal.h>
-#include <fcntl.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <ctype.h>
-#include <stdarg.h>
 
 #include "main.h"
 

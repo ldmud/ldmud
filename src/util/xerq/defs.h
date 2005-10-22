@@ -5,8 +5,11 @@
  * system includes, datatypes and external definitions.
  */
 
-#define __NO_DRIVER_SOURCE__
 #include "driver.h"
+
+#ifndef ERQ_DEBUG
+#  define ERQ_DEBUG 0
+#endif
 
 #ifdef USE_IPV6
 #    define __IPV6__

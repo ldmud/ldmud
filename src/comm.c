@@ -178,7 +178,7 @@ typedef socklen_t length_t;
 typedef int length_t;
 #endif
 
-#if defined(__CYGWIN__)
+#if defined(CYGWIN)
 extern int socketpair(int, int, int, int[2]);
 #endif
 
@@ -2347,7 +2347,7 @@ get_message (char *buff)
          *   to prevent freezing.
          * TODO: Always use the readfds information.
          */
-#if !defined(__BEOS__) && !defined(__CYGWIN__)
+#if !defined(__BEOS__) && !defined(CYGWIN)
         if (udp_s >= 0)
 #else
         if (udp_s >= 0 && FD_ISSET(udp_s, &readfds))

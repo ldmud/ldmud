@@ -60,15 +60,18 @@ Thats it.
 #    define _GNU_SOURCE
 #endif
 
-#if defined(__CYGWIN32__) && !defined(__CYGWIN__)
-#    define __CYGWIN__
+#if defined(__CYGWIN32__) || defined(__CYGWIN__)
+#    define CYGWIN
+      /* #define __CYGWIN__ messes up the Cygwin headers */
 #endif
 
 /*------------------------------------------------------------------
  * Standard system headers.
  */
 
+#include <sys/types.h>
 #include <limits.h>
+
 #include <errno.h>
 #ifdef __SASC
 #    include <sys/errno.h>
@@ -114,8 +117,6 @@ extern int errno;
 #ifdef HAVE_SYS_PARAM_H
 #    include <sys/param.h>
 #endif
-
-#include <sys/types.h>
 
 
 /*------------------------------------------------------------------
@@ -227,7 +228,7 @@ extern int errno;
 #    undef USE_MYSQL
 #endif
 
-#if defined( MSDOS ) || defined(__CYGWIN__) || defined(__EMX__) || defined(OS2)
+#if defined( MSDOS ) || defined(CYGWIN) || defined(__EMX__) || defined(OS2)
 #define MSDOS_FS
 #endif
 
@@ -368,7 +369,7 @@ typedef signed long ssize_t;
 #    define strrchr rindex
 #endif
 
-#if !defined(__BEOS__) && !defined(__CYGWIN__) && !(defined(__EMX__) || defined(OS2))
+#if !defined(__BEOS__) && !defined(CYGWIN) && !(defined(__EMX__) || defined(OS2))
 #    define O_BINARY 0
 #    define O_TEXT 0
 #endif
@@ -457,7 +458,7 @@ extern char *crypt(const char *, const char *);
 #    define crypt(pass, salt) _crypt(pass, salt)
 #endif
 
-#if defined(__CYGWIN__) || defined(__EMX__) || defined(OS2)
+#if defined(CYGWIN) || defined(__EMX__) || defined(OS2)
 extern void init_rusage(void);
 #else
 #define init_rusage()

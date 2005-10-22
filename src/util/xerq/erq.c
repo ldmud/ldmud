@@ -154,18 +154,8 @@ main(int argc, char *argv[])
 
     /* Print information about this daemon to help debugging */
     {
-        fprintf(stderr, "XERQ (%s), compiled %s"
-#if defined(DEBUG)
-                        " (DEBUG)"
-#  if defined(XDEBUG)
-                        " (DEBUG, XDEBUG)"
-#  else
-#  endif
-#elif defined(XDEBUG)
-                        " (XDEBUG)"
-#endif
-                        "\n"
-                      , argv[0], __DATE__
+        fprintf(stderr, "%s XERQ %s: Path '%s', debuglevel %d\n"
+                      , time_stamp(), __DATE__, argv[0], ERQ_DEBUG
                 );
     }
 
@@ -333,18 +323,18 @@ main(int argc, char *argv[])
                            , time_stamp(), (long)timeout.tv_sec));
         }
 
-#ifdef XDEBUG
+#if ERQ_DEBUG > 1
         fprintf(stderr, "%s select()\n", time_stamp());
 #endif
         in_select = 1; /* so sig_child() can write reply directly */
         num = select(num_fds, &read_fds, &write_fds, 0, retries ? &timeout : 0);
         in_select = 0; /* don't want sig_child() writing now */
 
-#ifdef XDEBUG
+#if ERQ_DEBUG > 1
         fprintf(stderr, "%s select() returns %d, time() %ld\n"
                       , time_stamp(), num, (long)time(NULL));
 #endif
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
         if (num < 0)
         {
             int myerrno = errno;
@@ -493,7 +483,7 @@ erq_cmd (void)
     request = buf[8];
     if (request <= ERQ_REQUEST_MAX)
     {
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
         char *mesg, *mesgs[]={
             "rlookup","execute","fork","auth","spawn","send","kill",
             "open_udp","open_tcp","listen","accept","lookup", "rlookupv6"};
@@ -537,7 +527,7 @@ sig_child(int sig)
 
     pid = wait(&status);
 
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
     fprintf(stderr, "%s [sigchild] pid=%d status=%d\n"
                   , time_stamp(), pid, status);
 #endif
@@ -550,7 +540,7 @@ sig_child(int sig)
 
         chp->status = CHILD_EXITED;
         chp->return_code = status;
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
         fprintf(stderr, "%s [sigchild] Caught SIGCLD for pid %d, child %p.\n"
                       , time_stamp(), pid, chp);
 #endif
@@ -573,7 +563,7 @@ sig_child(int sig)
                           , time_stamp(), pending_pid);
         }
 
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
         fprintf(stderr, "%s [sigchild] SIGCLD for unknown pid %d received.\n"
                       , time_stamp(), pid);
 #endif
@@ -814,7 +804,7 @@ write1 (void *mesg, int len)
         perror(" ");
         die();
     }
-#ifdef DEBUG
+#if ERQ_DEBUG > 0
     if (l != len)
         fprintf( stderr
                , "%s Driver-erq socket blocked, queueing %d bytes\n"
