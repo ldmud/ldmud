@@ -1,6 +1,26 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+12-Dec-2001 (Lars Duening)  (3.3.140)
+    - (call_out.c) Efun call_out_info() did not return the target object
+         if the call_out is a closure (reported by Menaures).
+    - (interpret.c) The increment and decrement operators were missing the
+         overflow checks (reported by Freaky).
+    - (lex.c) New LPC defines __INT_MAX__ and __INT_MIN__ for the numeric
+         integer limits.
+    - (interpret.c) Another overflow check, this time for __INT_MIN__ / -1
+         (reported by Menaures).
+    - (object.c) Corrected the bugfix to the say() refcount problem
+         (thanks, Tomba!)
+
+11-Dec-2001 (Lars Duening)
+    - (comm.c) TELOPT_TM can now be negotiated from the mudlib as well
+         (reported by Peng).
+
+11-Dec-2001 (Lars Duening)  (3.3.139)
+    - (interpret.c) Additions, subtractions and multiplications now
+         check for numeric overflows.
+
 11-Dec-2001 (Lars Duening)  (3.3.138)
     - (interpret.c, mapping.c) Oops, the new checks also introduced
          divisions by 0 (reported by Menaures).
@@ -8,8 +28,6 @@ See the file HISTORY for a user-oriented summary of all the changes.
          if the size was given as MIN_INT: it would try to negate it
          to get the positive number, but fail and cause the formatting
          routines to crash under circumstances (reported by Menaures).
-    - (interpret.c) Additions, subtractions and multiplications now
-         check for numeric overflows.
 
 10-Dec-2001 (Lars Duening)  (3.3.137)
     - (interpret.c) gcc 2.91 on Linux/x86 generates buggy code for

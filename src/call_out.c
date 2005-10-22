@@ -764,8 +764,13 @@ get_all_call_outs (void)
 
         if (cop->fun.is_lambda)
         {
+            if (cop->fun.function.lambda.x.closure_type == CLOSURE_ALIEN_LFUN)
+                put_ref_object( vv->item
+                              , cop->fun.function.lambda.u.lambda->function.alien.ob
+                              , "get_all_call_outs");
+            else
+                put_ref_object(vv->item, ob, "get_all_call_outs");
             assign_svalue_no_free(&vv->item[1], &cop->fun.function.lambda);
-            /* assuming that item[0] was inited to 0 */
         }
         else
         {

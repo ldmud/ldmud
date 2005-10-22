@@ -6,8 +6,8 @@ DESCRIPTION
         array in which every entry is itself an array describing one
         call_out. Each of these arrays consists of 3 or more elements:
         
-        1. The object
-        2. The function
+        1. The object the function/closure is called in.
+        2. The function or closure.
         3. The delay to go
         4ff. The optional argument(s)
         

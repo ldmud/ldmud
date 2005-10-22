@@ -8300,6 +8300,12 @@ again:
         /* Now increment where we can */
         if (svp->type == T_NUMBER)
         {
+            if (svp->u.number == PINT_MAX)
+            {
+                ERRORF(("Numeric overflow: (%ld)++\n", (long)svp->u.number));
+                /* NOTREACHED */
+                break;
+            }
             svp->u.number++;
             sp--;
             break;
@@ -8354,6 +8360,12 @@ again:
         /* Now decrement where we can */
         if (svp->type == T_NUMBER)
         {
+            if (svp->u.number == PINT_MIN)
+            {
+                ERRORF(("Numeric overflow: (%ld)--\n", (long)svp->u.number));
+                /* NOTREACHED */
+                break;
+            }
             svp->u.number--;
             sp--;
             break;
@@ -8409,6 +8421,12 @@ again:
         /* Do the push and increment */
         if (svp->type == T_NUMBER)
         {
+            if (svp->u.number == PINT_MAX)
+            {
+                ERRORF(("Numeric overflow: (%ld)++\n", (long)svp->u.number));
+                /* NOTREACHED */
+                break;
+            }
             put_number(sp,  svp->u.number++ );
             break;
         }
@@ -8462,6 +8480,12 @@ again:
         /* Do the push and decrement */
         if (svp->type == T_NUMBER)
         {
+            if (svp->u.number == PINT_MIN)
+            {
+                ERRORF(("Numeric overflow: (%ld)--\n", (long)svp->u.number));
+                /* NOTREACHED */
+                break;
+            }
             put_number(sp,  svp->u.number-- );
             break;
         }
@@ -8514,6 +8538,12 @@ again:
         /* Do the increment and push */
         if (svp->type == T_NUMBER)
         {
+            if (svp->u.number == PINT_MAX)
+            {
+                ERRORF(("Numeric overflow: ++(%ld)\n", (long)svp->u.number));
+                /* NOTREACHED */
+                break;
+            }
             put_number(sp,  ++(svp->u.number) );
             break;
         }
@@ -8565,6 +8595,12 @@ again:
         /* Do the decrement and push */
         if (svp->type == T_NUMBER)
         {
+            if (svp->u.number == PINT_MIN)
+            {
+                ERRORF(("Numeric overflow: --(%ld)\n", (long)svp->u.number));
+                /* NOTREACHED */
+                break;
+            }
             put_number(sp,  --(svp->u.number) );
             break;
         }
@@ -9374,13 +9410,17 @@ again:
          *   int         / float              -> float
          */
 
-        int i;
+        p_int i;
 
         if ((sp-1)->type == T_NUMBER)
         {
             if (sp->type == T_NUMBER) {
                 if (sp->u.number == 0)
                     ERROR("Division by zero\n");
+                if ((sp-1)->u.number == PINT_MIN && sp->u.number == -1)
+                    ERRORF(("Numeric overflow: %ld / -1\n"
+                           , (long)(sp-1)->u.number
+                           ));
                 i = (sp-1)->u.number / sp->u.number;
                 sp--;
                 sp->u.number = i;
@@ -11064,7 +11104,11 @@ again:
                 /* NOTREACHED */
             }
             if (sp->u.number == 0)
-                ERROR("Division by 0\n");
+                ERROR("Division by zero\n");
+            if (argp->u.number == PINT_MIN && sp->u.number == -1)
+                ERRORF(("Numeric overflow: %ld / -1\n"
+                       , (long)argp->u.number
+                       ));
             sp->u.number = argp->u.number /= sp->u.number;
             break;
         }
@@ -11078,7 +11122,7 @@ again:
                 /* NOTREACHED */
             }
             if (sp->u.number == 0)
-                ERROR("Division by 0\n");
+                ERROR("Division by zero\n");
             sp->u.number = *argp->u.charp /= sp->u.number;
             break;
         }
@@ -11093,7 +11137,7 @@ again:
             {
                 d = READ_DOUBLE(sp);
                 if (d == 0.0)
-                    ERROR("Division by 0\n");
+                    ERROR("Division by zero\n");
                 d = READ_DOUBLE(argp) / d;
                 STORE_DOUBLE(argp, d);
                 *sp = *argp;
@@ -11103,7 +11147,7 @@ again:
                 p_int i;
                 i = sp->u.number;
                 if (i == 0)
-                    ERROR("Division by 0\n");
+                    ERROR("Division by zero\n");
                 d = READ_DOUBLE(argp) / (double)i;
                 STORE_DOUBLE(argp, d);
                 *sp = *argp;
@@ -11154,7 +11198,7 @@ again:
                 /* NOTREACHED */
             }
             if (sp->u.number == 0)
-                ERROR("Division by 0\n");
+                ERROR("Division by zero\n");
             sp->u.number = argp->u.number %= sp->u.number;
             break;
         }
@@ -11168,7 +11212,7 @@ again:
                 /* NOTREACHED */
             }
             if (sp->u.number == 0)
-                ERROR("Division by 0\n");
+                ERROR("Division by zero\n");
             sp->u.number = *argp->u.charp %= sp->u.number;
             break;
         }

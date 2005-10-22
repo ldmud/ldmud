@@ -3935,6 +3935,10 @@ init_telopts (void)
         telopts_wont[i] = reply_nil;
     }
     telopts_wont[TELOPT_SGA] = reply_to_wont_sga;
+    telopts_do[TELOPT_TM] = reply_h_telnet_neg;
+    telopts_dont[TELOPT_TM] = reply_h_telnet_neg;
+    telopts_will[TELOPT_TM] = reply_h_telnet_neg;
+    telopts_wont[TELOPT_TM] = reply_h_telnet_neg;
     telopts_do[TELOPT_NEWENV] = reply_h_telnet_neg;
     telopts_dont[TELOPT_NEWENV] = reply_h_telnet_neg;
     telopts_will[TELOPT_NEWENV] = reply_h_telnet_neg;

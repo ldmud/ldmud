@@ -41,6 +41,8 @@ DESCRIPTION
                            driver read the initial WIZLIST information.
                            It is undefined if the driver was configured
                            to not read the information.
+      __INT_MAX__        : the largest integer number
+      __INT_MIN__        : the smallest integer number
 
       __LPC_NOSAVE__     : always defined, since the 'nosave' keyword is
                            now an official LPC feature.
@@ -67,8 +69,8 @@ HISTORY
     3.2.7 added __STRICT_EUIDS__ and made __EUIDS__ standard.
     3.2.8 added __IPV6__, __LPC_NOSAVE__, __DIR__, __PATH__().
     3.2.9 added __LDMUD__, __MYSQL__, __DEPRECATED__, __VERSION_MAJOR__,
-         __VERSION_MINOR__, __VERSION_MICRO__, __VERSION_PATCH__
-         and __WIZLIST__.
+         __VERSION_MINOR__, __VERSION_MICRO__, __VERSION_PATCH__,
+         __INT_MAX__, __INT_MIN__, and __WIZLIST__.
     3.3 made __LPC_NOSAVE__ always defined.
 
 SEE ALSO

@@ -57,7 +57,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-11-Dec-2001 (Lars Duening) -- upcoming Release 3.2.9
+12-Dec-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -138,6 +138,8 @@ For a detailed list of all changes see the file CHANGELOG.
            mishandled.
        + call_out(): In release 3.2.8 lvalues were not allowed as arguments -
            now they are again.
+       + call_out_info(): Did not return the target object for closure
+           call outs.
        + call_resolved(): Now accepts a destructed object as second parameter
            as it should.
        + functionlist(): The filter flags didn't really work.
@@ -218,6 +220,8 @@ For a detailed list of all changes see the file CHANGELOG.
        + Formatting sprintf("%#9999999999999@s", ({ "bla" }) * 2) clobbered
            its internal precision information on the first line, and thus
            crashed on the second.
+       + Remove a couple crashers when handling numbers at the numerical
+           limits.
 
     - Language:
        + New operators '>>>' and '>>>=' for logical right shifts.
@@ -227,6 +231,8 @@ For a detailed list of all changes see the file CHANGELOG.
          of the driver version.
        + New LPC define __WIZLIST__ specifies from where the driver read the
            initial wizlist information.
+       + New LPC defines __INT_MAX__ and __INT_MIN__ give the integer number
+           limits.
        + Numbers can also be specified as binary patterns with the '0b'
            prefix, and as octals with the '0o' prefix.
        + Floating point numbers can now also be specified in the

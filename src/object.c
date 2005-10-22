@@ -4017,7 +4017,7 @@ f_say (svalue_t *sp, int num_arg)
     }
     if (vtmp.v.item[1].type != T_NUMBER)
     {
-        free_svalue(&(vtmp.v.item[0]));
+        free_svalue(&(vtmp.v.item[1]));
         vtmp.v.item[1].type = T_NUMBER;
     }
 
