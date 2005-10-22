@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Settings for the OSB mudlib.
+#
+# configure will strip this part from the script.
+ 
+exec ./configure \
+--prefix=/home/lars \
+--bindir=/home/lars/bin \
+--libdir=/home/lars/mudlib \
+--libexec=/home/lars/libexec \
+--enable-strict-euids \
+--enable-erq=xerq \
+--enable-lpc-nosave \
+--enable-use-alists \
+--enable-use-mysql \
+--enable-use-deprecated=no \
+--enable-dynamic-costs=yes \
+--enable-malloc-trace \
+--enable-malloc-lpc-trace \
+--enable-use-system-crypt=no \
+--with-master-name=secure/master \
+--with-time-to-reset=900 \
+--with-portno=2345 \
+--with-udp-port=2347 \
+--with-max-cost=2100000 \
+--with-swap-file=LP_SWAP.3 $*
+exit 1

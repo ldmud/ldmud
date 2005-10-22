@@ -3976,7 +3976,7 @@ f_say (svalue_t *sp, int num_arg)
  */
 
 {
-    static LOCAL_VEC2(vtmp, T_NUMBER, T_OBJECT);
+    static LOCAL_VEC2(vtmp, T_NUMBER, T_NUMBER);
       /* Default 'avoid' array passed to say() giving the object
        * to exclude in the second item. The first entry is reserved
        * for e_say() to insert its command_giver object.

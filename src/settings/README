@@ -11,6 +11,7 @@ The provided settings:
   native:   settings used for a generic native-mode driver
 
   alatia:          settings for Alatia
+  aoh:             settings for Age of Heroes
   avalon:          settings for Avalon
   bat:             settings for BatMUD
   beutelland:      settings for Beutelland
