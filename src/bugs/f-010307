@@ -407,4 +407,44 @@ included, you can assume ({ 1, 1, 1, ... }) to match the number of borders.
 -- Acius
 
 ---------------------------------------------------------------------------
+Date: Thu, 22 Mar 2001 11:49:58 +0800
+From: Trevor Phillips <phillips@central.murdoch.edu.au>
+
+Eeek! Have I ignored/missed interesting discussion on this list? Or has it been
+on some other list I'm not on??
+
+I dabbled with path finding years ago (assuming we're talking the auto-routing
+from one room to another room, useful for Monster navigation, etc...), and had
+a working model, but it was computationally intensive such that on the server
+at the time it'd give "too long eval" too often to be practical.
+
+Rooms is probably the most developed std object on our Mud, with rooms having
+dimensions (rough NS/EW/Height), as well as properties like indoors/outdoors,
+etc... The dimensions allowed an auto-mapper to fairly accurately map an area,
+keeping in perspective (given that some rooms are tiny, and others are huge),
+so it all matched up and actually looked reasonable on an auto-generated ASCII
+map. The World Co-ordinates were set at particular rooms, and then coords for
+each room were calculated based on the adjacent rooms, and room dimensions.
+
+But, I digress. As I said, path-finding held great interest to me, but was too
+slow. I planned to experiment with ERQ and an external process for calculating
+the routes in a non-realtime manner. eg; Each room's properties are logged to a
+MySQL table, and an external program uses the data to calculate a possible
+shortest route from one room to another. I never got the time to get it up and
+going, though...
+
+Anyway, I'm interested in this topic, so'd be most appreciative if you can
+forward any info on plans, etc...
+
+Thanks. ^_^
+
+-- 
+. Trevor Phillips             -           http://jurai.murdoch.edu.au/ . 
+: CWIS Systems Administrator     -           T.Phillips@murdoch.edu.au : 
+| IT Services                       -               Murdoch University | 
+ >------------------- Member of the #SAS# & #CFC# --------------------<
+| On nights such as this, evil deeds are done. And good deeds, of     /
+| course. But mostly evil, on the whole.                             /
+ \      -- (Terry Pratchett, Wyrd Sisters)                          /
+---------------------------------------------------------------------------
 

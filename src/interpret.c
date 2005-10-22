@@ -8169,7 +8169,7 @@ again:
                 if (!result)
                     ERRORF(("Out of memory (%ld bytes).\n"
                            , (long)(mstrsize(sp[-1].u.str) * sp->u.number)));
-                
+
                 DYN_STRING_COST(mstrsize(result))
 
                 /* No free_svalue(sp): it's just a number */

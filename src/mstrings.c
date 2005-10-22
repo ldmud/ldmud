@@ -1147,7 +1147,8 @@ mstring_repeat (const string_t *base, size_t num MTRACE_DECL)
     len = mstrsize(base);
     reslen = len * num;
     result = mstring_alloc_string(reslen MTRACE_PASS);
-    if (result && len)
+
+    if (result && reslen)
     {
         size_t   curlen;
         char   * txt = get_txt(result);

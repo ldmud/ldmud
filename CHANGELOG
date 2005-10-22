@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Mar-2001 (Lars Duening)  (3.3.33)
+    - (stralloc-away) Deleted these files.
+    - (mstrings.c) Repeating a string 0 times left clobbered memory.
+
 20-Mar-2001 (Lars Duening)  (3.3.32)
     - (erq, xerq/execute.c) Quoted arguments are recognized and not split into
         words (provided by Christian W., thanks!)

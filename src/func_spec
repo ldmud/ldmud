@@ -541,7 +541,6 @@ int     db_affected_rows(int);
 string *db_coldefs(int);
 string  db_conv_string(string);
 int     db_close(int);
-int     db_connect(string);
 int     db_connect(string, void|string, void|string);
 int     db_exec(int, string);
 mixed   db_fetch(int);
