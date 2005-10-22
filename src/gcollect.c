@@ -1449,6 +1449,7 @@ show_mstring (int d, void *block, int depth)
          * TODO:: alas it crashes the driver when destructed leaked objects
          * TODO:: are found 'cause their name is no langer value (though
          * TODO:: the reason for that is yet unknown). See 3.3.168 mails/bugs.
+         */
     }
 } /* show_mstring() */
 

@@ -1,6 +1,10 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Feb-2002 (Lars Duening)  (3.3.170)
+    - (gcollect.c) Oops, forgot to close a comment. Strange though that
+        my test compile didn't pick this one up (thanks, Dafire!).
+
 17-Feb-2002 (Lars Duening)  (3.3.169)
     - (prolang.y) In a for() loop, variables may now be declared without
         initialisation (e.g. 'for (int i; ...)') (suggested by Pulami).

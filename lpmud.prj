@@ -20,19 +20,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 169)
-(Parent-Version lpmud 3-3 168)
-(Version-Log "sefun shadowing efuns were not properly discarded.
-The error handling of secure calls leaked closures referenced by the control
-stack.
-In a for() statement, variables may be declared without initialisation.
-Disabled some fragile code in the GC for the time being.
-Corrected a couple of crashers found by Menaures.
-Hopefully corrected an overflow problem in the generation of random numbers
-on Alpha machines.")
+(Project-Version lpmud 3-3 170)
+(Parent-Version lpmud 3-3 169)
+(Version-Log "Forgot to close a comment in gcollect.c .")
 (New-Version-Log
 "")
-(Checkin-Time "Sun, 17 Feb 2002 21:50:59 -0700")
+(Checkin-Time "Mon, 18 Feb 2002 21:27:27 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -66,7 +59,7 @@ on Alpha machines.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.5 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.36 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.232 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.233 644))
   (HISTORY (lpmud/f/49_HISTORY 1.242 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -143,7 +136,7 @@ on Alpha machines.")
   (src/files.c (lpmud/I/50_files.c 1.13 644))
   (src/filestat.h (lpmud/f/51_filestat.h 1.7 644))
   (src/gcollect.h (lpmud/f/33_gcollect.h 1.6.1.6 644))
-  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.46 644))
+  (src/gcollect.c (lpmud/c/30_gcollect.c 1.41.1.47 644))
   (src/hash.h (lpmud/f/32_hash.h 1.5 644))
   (src/hash.c (lpmud/c/28_hash.c 1.13 644))
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
