@@ -1,23 +1,14 @@
-Short: Problems when using putty/SecureCRT
-From: Ohlsson Marthin <maohs@wmdata.com>
-Date: Tue, 26 Mar 2002 14:15:13 +0100
-Type: Bug
+Short: select() statement to complement switch()
+Date: Tue, 26 Mar 2002 11:21:59 -0700
+From: Lars Duening <c-lars.duening@wcom.com>
+Type: Feature
 State: New
 
-Hi Lars.
+Transform switch() back to it's old behaviour.
 
-I have a problem on my mud that are kinda funny.
-The players have notice that they can do "free" emotes...
+Implement select() { case... } with the following changes:
 
-It works like this.
-They use a client like putty, SecureCRT.
-First they write say they hit left arrow 9 times, then they enter what they want to do like "the world hates you"
-and press enter, now everyone in the rooms se this.
-If iam not wrong its beacuse of "colors", the trick is that they manage to do the :  
-
-Any ide how to fix this? I have tryed some other muds, and they have the same error.
-
-//
-Marthin
-
--- So far not reproducable
+ - ints, floats, symbols, #'symbols, strings are
+   allowed as values.
+ - runtime error if no match is found (read: default required)
+ - Allow typenames as labels: 'case object:'

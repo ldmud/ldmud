@@ -22,7 +22,7 @@ DESCRIPTION
             void <closure>(object item, object dest)
 
           Upon call, the hook has to perform the move itself (by using
-          efun308()) and all depending actions (like the calls to
+          set_environment()) and all depending actions (like the calls to
           init() to add actions).
 
           The difference lies in the binding of the set hook prior to

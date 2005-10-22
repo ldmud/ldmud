@@ -1763,7 +1763,6 @@ f_sort_array (svalue_t * sp, int num_arg)
     dest = alloca(size*sizeof(svalue_t));
     if (!source || !dest)
     {
-        free_callback(&cb);
         error("Stack overflow in sort_array()");
         /* NOTREACHED */
         return arg;

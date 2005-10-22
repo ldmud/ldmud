@@ -3612,6 +3612,7 @@ x_filter_mapping (svalue_t *sp, int num_arg, Bool bFull)
         if (!dvec)
         {
             inter_sp = sp;
+            free_callback(&cb);
             error("Out of memory\n");
         }
         ++sp;
@@ -3794,7 +3795,7 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
 
     error_index = setup_efun_callback(&cb, arg+1, num_arg-1);
     inter_sp = sp = arg;
-    num_arg = 1;
+    num_arg = 2;
 
     if (error_index >= 0)
     {
@@ -3803,10 +3804,13 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
         return sp;
     }
 
-    arg_m = arg[0].u.map;
-
+    sp++;
+    inter_sp = sp;
+    put_callback(sp, &cb);
 
     /* Preparations */
+
+    arg_m = arg[0].u.map;
 
     assign_eval_cost();
 
@@ -3845,10 +3849,10 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
     ++sp;
     put_mapping(sp, m);
 
-      /* Both vec, dvec and m are kept referenced on the stack so that
+      /* Both cb, vec, dvec and m are kept referenced on the stack so that
        * in case of an error they are properly dereferenced.
        * At a normal termination however, m will not be dereferenced
-       * but vec and dvec will.
+       * but cb, vec and dvec will.
        */
 
     key = vec->item;
@@ -3904,7 +3908,6 @@ x_map_mapping (svalue_t *sp, int num_arg, Bool bFull)
     /* Cleanup the temporary data except for the reference to m.
      * The arguments have been removed before already.
      */
-    free_callback(&cb);
     i = num_arg + (dvec != NULL ? 1 : 0);
     do
     {

@@ -6296,6 +6296,7 @@ f_remove_input_to (svalue_t *sp, int num_arg)
             it = ip->input_to;
             ip->input_to = it->next;
             free_input_to(it);
+            ip->set_input_to = (ip->input_to != NULL);
             rc = 1;
             break;
         }
@@ -6345,6 +6346,7 @@ f_remove_input_to (svalue_t *sp, int num_arg)
                 prev->next = it->next;
 
             free_input_to(it);
+            ip->set_input_to = (ip->input_to != NULL);
             rc = 1;
             break;
         }

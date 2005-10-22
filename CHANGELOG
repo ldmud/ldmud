@@ -1,6 +1,16 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+26-Mar-2002 (Lars Duening)  (3.3.187)
+    - (array.c, mapping.c) Made sure that the callback structures are
+         properly released on errors.
+
+25-Mar-2002 (Lars Duening)
+    - (lex.c) *sigh* 'ifstate_t' is also a system type (reported by Alwin).
+    - (comm.c) Removing the last pending input_to() did not reset the
+        'input_to pending' flag in the interactive structure (reported
+        by Gnomi).
+
 21-Mar-2002 (Lars Duening)  (3.3.186)
     - (lex.c) The lexer's 'struct ifstate' clashes with an 'enum ifstate'
         defined on some systems for the networking stack (reported by Alwin).
