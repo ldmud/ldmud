@@ -10,6 +10,7 @@ exit 1
 # --- The actual settings ---
 
 # --- Runtime limits ---
+with_max_trace=80
 
 # --- Timing ---
 with_time_to_clean_up=5400

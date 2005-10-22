@@ -938,7 +938,7 @@ free_svalue (svalue_t *v)
     switch (type)
     {
     default:
-        fatal("(free_svalue) Illegal svalue %p type %d\n", v, v->type);
+        fatal("(free_svalue) Illegal svalue %p type %d\n", v, type);
         /* NOTREACHED */
         break;
 
