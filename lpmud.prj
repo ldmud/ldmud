@@ -15,19 +15,17 @@
 ;; TODO: Maybe allow to bind the driver ports to a given IP address instead
 ;; TODO:: of INADDR_ANY? This would help on systems with more than one address.
 ;; TODO: Things to implement: structs (see f-981229-05),
-;; TODO::   generalized operators (f-990203-1), poll() instead of
-;; TODO::   select() (f-990816), compilation with lcc/lcc-win32.
-;; TODO:    stacked inputs as in f-990721-0.
+;; TODO::  general coloured efuns.
 ;; TODO: One .c-file per efun.
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 115)
-(Parent-Version lpmud 3-3 114)
-(Version-Log "Removed another bug in call_other on arrays of objects.")
+(Project-Version lpmud 3-3 116)
+(Parent-Version lpmud 3-3 115)
+(Version-Log "Assignments to negative ranges are again possible.")
 (New-Version-Log
 "")
-(Checkin-Time "Mon, 15 Oct 2001 19:19:56 -0600")
+(Checkin-Time "Wed, 17 Oct 2001 22:39:04 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -60,8 +58,8 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.4 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.29 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.178 644))
-  (HISTORY (lpmud/f/49_HISTORY 1.212 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.179 644))
+  (HISTORY (lpmud/f/49_HISTORY 1.213 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.13 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
 
@@ -122,7 +120,7 @@
   (src/closure.c (lpmud/d/4_closure.c 1.41.1.32 644))
   (src/comm.c (lpmud/d/2_comm1.c 1.69.1.45 644))
   (src/comm.h (lpmud/d/3_comm.h 1.26.1.13 644))
-  (src/driver.h (lpmud/f/36_driver.h 1.15.1.6 644))
+  (src/driver.h (lpmud/f/36_driver.h 1.15.1.7 644))
   (src/dumpstat.h (lpmud/f/35_dumpstat.h 1.7 644))
   (src/dumpstat.c (lpmud/c/34_dumpstat.c 1.20.1.7 644))
   (src/ed.h (lpmud/f/34_ed.h 1.5.1.4 644))
@@ -140,7 +138,7 @@
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.6 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.21 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.90 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.91 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.8 644))
   (src/lex.c (lpmud/b/12_lex.c 1.62.1.63 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.6 644))
@@ -416,7 +414,7 @@
   (src/bugs/b-010801-0 (lpmud/N/17_b-010801-0 1.1 644) :no-keywords)
   (src/bugs/b-010831 (lpmud/N/35_b-010831 1.1 644) :no-keywords)
 
-  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.39 644) :no-keywords)
+  (src/bugs/f-summary (lpmud/C/37_f-summary 1.39.1.40 644) :no-keywords)
   (src/bugs/f-981027-0 (lpmud/g/29_f-981027-0 1.2 644) :no-keywords)
   (src/bugs/f-981027-1 (lpmud/g/28_f-981027-1 1.2 644) :no-keywords)
   (src/bugs/f-981027-2 (lpmud/g/27_f-981027-2 1.2 644) :no-keywords)
@@ -482,7 +480,6 @@
   (src/bugs/f-990303-2 (lpmud/l/1_f-990303-2 1.1 644) :no-keywords)
   (src/bugs/f-990310-1 (lpmud/l/13_f-990310-1 1.4 644) :no-keywords)
   (src/bugs/f-990309-2 (lpmud/l/14_f-990309-2 1.1 644) :no-keywords)
-  (src/bugs/f-990309-1 (lpmud/l/15_f-990309-1 1.1.1.1 644) :no-keywords)
   (src/bugs/f-990313 (lpmud/l/35_f-990313 1.2 644) :no-keywords)
   (src/bugs/f-990316-2 (lpmud/m/2_f-990316-2 1.3 644) :no-keywords)
   (src/bugs/f-990316-1 (lpmud/m/3_f-990316-1 1.1 644) :no-keywords)
@@ -536,7 +533,6 @@
   (src/bugs/f-000110 (lpmud/G/19_f-000110 1.1 644) :no-keywords)
   (src/bugs/f-000106 (lpmud/G/20_f-000106 1.1 644) :no-keywords)
   (src/bugs/f-000306-4 (lpmud/G/27_f-000306-4 1.1 644) :no-keywords)
-  (src/bugs/f-000306-1 (lpmud/G/29_f-000306-1 1.1 644) :no-keywords)
   (src/bugs/f-000306-2 (lpmud/G/28_f-000306-2 1.1 644) :no-keywords)
   (src/bugs/f-000326 (lpmud/G/34_f-000326 1.2 644) :no-keywords)
   (src/bugs/f-000327-0 (lpmud/G/35_f-000327-0 1.1 644) :no-keywords)
@@ -557,14 +553,14 @@
   (src/bugs/f-000814-1 (lpmud/I/44_f-000814-1 1.1 644) :no-keywords)
   (src/bugs/f-000830 (lpmud/J/8_f-000830 1.2 644) :no-keywords)
   (src/bugs/f-000905-0 (lpmud/K/38_f-000905-0 1.1 644) :no-keywords)
-  (src/bugs/f-000905-1 (lpmud/J/12_f-000905-1 1.1 644) :no-keywords)
+  (src/bugs/f-000905-1 (lpmud/J/12_f-000905-1 1.2 644) :no-keywords)
   (src/bugs/f-000906 (lpmud/J/13_f-000906 1.1 644) :no-keywords)
   (src/bugs/f-001102 (lpmud/J/34_f-001102 1.1 644) :no-keywords)
   (src/bugs/f-001116 (lpmud/J/50_f-001116 1.1 644) :no-keywords)
   (src/bugs/f-001220-0 (lpmud/K/9_f-001220-0 1.1 644) :no-keywords)
   (src/bugs/f-001220-1 (lpmud/K/10_f-001220-1 1.1 644) :no-keywords)
   (src/bugs/f-010216 (lpmud/K/39_f-010216 1.1 644) :no-keywords)
-  (src/bugs/f-010223 (lpmud/L/6_f-010223 1.2 644) :no-keywords)
+  (src/bugs/f-010223 (lpmud/L/6_f-010223 1.3 644) :no-keywords)
   (src/bugs/f-010307 (lpmud/K/49_f-010307 1.3 644) :no-keywords)
   (src/bugs/f-010309-2 (lpmud/K/46_f-010309-2 1.1 644) :no-keywords)
   (src/bugs/f-010318 (lpmud/L/7_f-010318 1.1 644) :no-keywords)
@@ -601,8 +597,11 @@
   (src/bugs/f-010928-0 (lpmud/N/45_f-010928-0 1.1 644) :no-keywords)
   (src/bugs/f-011011 (lpmud/N/49_f-011011 1.1 644) :no-keywords)
   (src/bugs/f-011015-0 (lpmud/O/1_f-011015-0 1.1 644) :no-keywords)
-  (src/bugs/f-011015-1 (lpmud/O/2_f-011015-1 1.1 644) :no-keywords)
+  (src/bugs/f-011015-1 (lpmud/O/2_f-011015-1 1.2 644) :no-keywords)
   (src/bugs/f-011015-2 (lpmud/O/3_f-011015-2 1.1 644) :no-keywords)
+  (src/bugs/f-011016-0 (lpmud/O/11_f-011016-0 1.1 644) :no-keywords)
+  (src/bugs/f-011016-1 (lpmud/O/12_f-011016-1 1.1 644) :no-keywords)
+  (src/bugs/f-011016-2 (lpmud/O/13_f-011016-2 1.1 644) :no-keywords)
 
   (src/bugs/p-981027-1 (lpmud/g/25_p-981027-1 1.2 644) :no-keywords)
   (src/bugs/doomdark/strutil.c (lpmud/g/31_strutil.c 1.2 644) :no-keywords)
@@ -640,8 +639,10 @@
   (src/done/f-981229-00 (lpmud/j/21_f-981229-0 1.1.1.1 644) :no-keywords)
   (src/done/f-981229-09a (lpmud/L/9_f-981229-0 1.1 644) :no-keywords)
   (src/done/f-990203-04 (lpmud/i/37_f-990203-0 1.1.1.1 644) :no-keywords)
+  (src/done/f-990309-1 (lpmud/l/15_f-990309-1 1.1.1.2 644) :no-keywords)
   (src/done/f-990417-9 (lpmud/L/23_f-990417-9 1.1 644) :no-keywords)
   (src/done/f-000221 (lpmud/G/12_f-000221 1.2 644) :no-keywords)
+  (src/done/f-000306-1 (lpmud/G/29_f-000306-1 1.1.1.1 644) :no-keywords)
   (src/done/f-000716 (lpmud/I/33_f-000716 1.2.1.2 644) :no-keywords)
   (src/done/f-000918 (lpmud/K/40_f-000918 1.1 644) :no-keywords)
   (src/done/f-010115 (lpmud/K/16_f-010115 1.2 644) :no-keywords)

@@ -57,7 +57,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-12-Oct-2001 (Lars Duening) -- upcoming Release 3.2.9
+17-Oct-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -259,10 +259,6 @@ For a detailed list of all changes see the file CHANGELOG.
            private function, the latter is no longer redefined.
        + Bugfix: Multi-dimensional mapping indices in macro calls are no
            longer confused with multiple macro arguments.
-       + Bugfix: Assignments to negative length ranges (e.g. [3..1])
-           weren't caught, and instead silently increased the length of
-           the string/array. As a special case, assignments to a range
-           [i..i-1] which merely insert elements are still allowed.
        + Bugfix: Prototypes could modify the definition of inherited
            functions in strange ways.
        + Bugfix: Termination of a macro definition with End-of-file in

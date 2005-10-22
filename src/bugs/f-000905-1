@@ -1,6 +1,7 @@
 Short: More flexible wrapping for terminal_colour().
 Date: Tue, 05 Sep 2000 23:43:46 +0200
 From: Markus Peter <warp@spin.de>
+See also: f-011016-0
 
 >> Ich hab mich gewundert ob's moeglich waer irgendwann terminal_colour so
 >> zu  erweitern dass optional beim Wrapping odas Ende der Zeile mit z.b.
@@ -25,3 +26,5 @@ stimmt :-) sorry, da war ich leicht blind
 
 > Evtl koennte man da t_c() dazu bringen, das automatisch zu machen (1
 > anstelle des mapping uebergeben?)
+
+The change to sprintf() in f-011016-0 would implement this more directly.

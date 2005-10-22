@@ -14,6 +14,16 @@
 
 #include "config.h"
 
+/* TODO: Some TODO defines */
+
+/* NO_NEGATIVE_RANGES: If defined, assignments to negative ranges
+ *   like [4..2] are not allowed. However, they are useful at times
+ *   and so this switch should be under control of a pragma or special
+ *   syntactic construct. For now and for compatibility reasons, these
+ *   ranges remain allowed.
+ */
+/* #undef NO_NEGATIVE_RANGES */
+
 /* Verify some of the definitions in config.h */
 
 #if !defined(MALLOC_smalloc) && !defined(MALLOC_sysmalloc)

@@ -1776,10 +1776,12 @@ transfer_pointer_range (svalue_t *source)
         sv = source->u.vec;
         ssize = (mp_int)VEC_SIZE(sv);
 
+#ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
             error("Illegal range [%ld..%ld] for assignment.\n"
                  , index1, index2-1
                  );
+#endif /* NO_NEGATIVE_RANGES */
 
         if (ssize + index1 - index2 == 0)
         {
@@ -1890,10 +1892,12 @@ transfer_protected_pointer_range ( struct protected_range_lvalue *dest
         sv = source->u.vec;
         ssize = (mp_int)VEC_SIZE(sv);
 
+#ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
             error("Illegal range [%ld..%ld] for assignment.\n"
                  , index1, index2-1
                  );
+#endif /* NO_NEGATIVE_RANGES */
 
         if (ssize + index1 - index2 == 0)
         {
@@ -1997,10 +2001,12 @@ assign_string_range (svalue_t *source, Bool do_free)
         ss = source->u.str;
         ssize = (mp_int)mstrsize(ss);
 
+#ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
             error("Illegal range [%ld..%ld] for assignment.\n"
                  , index1, index2-1
                  );
+#endif /* NO_NEGATIVE_RANGES */
 
         /* Create the new string */
         rs = alloc_mstring((size_t)(dsize + ssize + index1 - index2));
@@ -2068,10 +2074,12 @@ assign_protected_string_range ( struct protected_range_lvalue *dest
         dsvp = dest->lvalue;
         ds = dest->v.u.str;
 
+#ifdef NO_NEGATIVE_RANGES
         if (index1 > index2)
             error("Illegal range [%ld..%ld] for assignment.\n"
                  , index1, index2-1
                  );
+#endif /* NO_NEGATIVE_RANGES */
 
         /* If the lvalue is no longer valid, free it */
         if (dsvp->u.str != ds)

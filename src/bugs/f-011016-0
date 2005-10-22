@@ -1,0 +1,16 @@
+Subject: sprintf() and colour strings
+From: Lars Duening, Alfe
+Date: 2001-10-16
+Type: Feature
+State: Acknowledged.
+See also: f-010223, f-011015-1, f-000905-1
+
+New format specifier  '%S' to format colour-coded strings, '%s' normal strings
+as usual.
+
+Optionally introduce an efun 
+
+  csprintf(mapping cntl, string format, mixed args...)
+
+which first applies sprintf(), and then replaces all colour strings in the
+result before returning it.

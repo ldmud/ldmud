@@ -18,7 +18,6 @@ f-990203-23: strmatch(): simple patternmatcher
 f-981229-14: stringp() returns address of string
 f-990203-11: sprintf(): new flag %b for binaries.
 f-990303-1: sprintf(): on non-efun symbols misbehaves
-f-990309-1: csprintf(): merged from sprintf() and terminal_colour()
 f-990714-3: mprintf(): generalized sprintf()
 f-990217-4: strcount(): counts occurances of pattern in text
 f-990714-0: quote_string(), unquote_string()
@@ -72,7 +71,6 @@ f-000113-1: LDmud: efun reverse()
 f-000113-2: More file efuns
 f-000207: Finalfrontier efuns
 f-000214-2: Add mappings to wizlist info
-f-000306-1: Modify terminal_colour() to take the delimiter string
 f-000306-2: Extension to command_stack()
 f-000306-4: copy_file() should return error values
 f-000326: Allow the use of masks with mkdir()
@@ -106,6 +104,8 @@ f-010903: get_dir() should return full pathnames
 f-010908: caller_stack should include function names
 f-011011: Another sort of deep_call_other() ?
 f-011015-1: Left, Center, and Flush formatting for terminal_colour()
+f-011016-0: sprintf() and colour strings
+f-011016-2: set_auto_include_string() should accept a closure
 
 
 Language
@@ -137,6 +137,7 @@ f-010825-3: Make > indexing default with an option ?
 f-010917: default arguments for functions
 f-011015-2: Comparison-by-Value for Arrays and Mappings
 f-011015-0: Long Ints on LPC Level
+f-011016-1: Make negative range assignments switchable
 
 
 Compiler

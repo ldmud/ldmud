@@ -3,7 +3,7 @@ From:  "Alexander Weidt et al." <tubmud@cs.tu-berlin.de>
 Date: Fri Feb 23 13:42:33 2001
 Type: Feature
 New: Acknowledged
-See also: f-990309-1
+See also: f-011016-0
 
 Hi Lars,,
 
@@ -134,6 +134,32 @@ varargs string coloured_sprintf(string format,varargs mixed *args) {
   return apply(#'sprintf,format,args);
 }
 
+Aber gleich zu [] noch was anderes: Wir haben hier die Notwendigkeit
+festgestellt, farbige strings mit terminal_colour()-token an definierten
+Stellen umzubrechen bzw. teilstrings zu extrahieren, und diese Extraktion
+ist in LPC recht teuer.
+
+Dies ist bisher hier so geloest in einer sefun
+subcoloured_string(string coloured_string,
+                   int start,             int stop,
+                   status start_from_back,status stop_from_back):
+
+string s = "%^BOLD_BLUE%^Test%^NORMAL%^ %^RED%^another test%^NORMAL%^";
+
+subcoloured_string(s, 2)  == "%^BOLD_BLUE%^est%^NORMAL%^ %^RED%^another test%^NORMAL%^"
+s[0..3] == "%^BOLD_BLUE%^Test%^NORMAL%^%^RED%^%^NORMAL%^"
+s[5..]  == "%^BOLD_BLUE%^%^NORMAL%^%^RED%^another test%^NORMAL%^"
+
+D.h. alle Farbtokens bleiben im resultat-string drin, und extrahiert wird
+letztlich der verbatim-teil dazwischen.
+Die sefun zerlegt zunaechst den String in farbtokens und plain text, dann
+wird das extract auf den plaintext-Stuecken vorgenommen, und danach wieder
+der farb-string zusammengesetzt. Wie gesagt, sehr teuer.
+
+Aber hierbei koennen wir wirklich wieder in Probleme laufen, wenn man das
+in [] machen wollte. Ein Datentyp 'coloured_string' waere wirklich nett.
+Und/oder natuerlich eine efun, die diese extrahierung von plain text
+aus colour-token-verseuchten strings vornimmt. :-)
 ----------------------------------------------------------------------------
 And Slava wrote in Oct 2001:
 
