@@ -957,7 +957,9 @@ static Bool did_swap;
                 goto no_clean_up;
             }
             if (obj->flags & O_DESTRUCTED)
+            {
                 continue;
+            }
 
             if (!svp
              || (svp->type == T_NUMBER && svp->u.number == 0)

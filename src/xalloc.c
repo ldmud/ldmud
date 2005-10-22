@@ -129,9 +129,7 @@ dump_lpc_trace (int d, void *adr)
  */
 
 {
-#define WRITES(d, s) write((d), (s), strlen(s))
-    WRITES(d, "No malloc lpc trace.\n");
-#undef WRITES
+    writes(d, "No malloc lpc trace.\n");
 } /* dump_lpc_trace() */
 
 /*-------------------------------------------------------------------------*/
@@ -143,9 +141,7 @@ dump_malloc_trace (int d, void *adr)
  */
 
 {
-#define WRITES(d, s) write((d), (s), strlen(s))
-    WRITES(d, "No malloc trace.\n");
-#undef WRITES
+    writes(d, "No malloc trace.\n");
 } /* dump_malloc_trace() */
 
 #endif /* MALLOC_sysmalloc */

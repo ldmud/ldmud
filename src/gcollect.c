@@ -200,7 +200,7 @@ static void gc_MARK_MSTRING_REF (string_t * str);
 
 #if defined(MALLOC_TRACE)
 
-#define WRITES(d, s) write((d), (s), strlen(s))
+#define WRITES(d, s) writes(d, s)
 
 /*-------------------------------------------------------------------------*/
 static INLINE void
@@ -279,6 +279,7 @@ clear_inherit_ref (program_t *p)
         if (p2->ref)
         {
             p2->ref = 0;
+            p2->name->info.ref = 0;
             clear_inherit_ref(p2);
         }
     }
@@ -297,7 +298,9 @@ clear_object_ref (object_t *p)
     if ((p->flags & O_DESTRUCTED) && p->ref)
     {
         p->ref = 0;
+        p->name->info.ref = 0;
         p->prog->ref = 0;
+        p->prog->name->info.ref = 0;
         if (p->prog->blueprint
          && (p->prog->blueprint->flags & O_DESTRUCTED)
          && p->prog->blueprint->ref
@@ -331,6 +334,8 @@ gc_mark_program_ref (program_t *p)
                  , p, get_txt(p->name), (long)p->ref - 1
                  );
         }
+
+        MARK_MSTRING_REF(p->name);
 
         /* Mark the blueprint object, if any */
         if (p->blueprint)
@@ -997,6 +1002,7 @@ garbage_collection(void)
              * objects might be destructed.
              */
             ob->prog->ref = 0;
+            ob->prog->name->info.ref = 0;
         }
         if (was_swapped < 0)
             fatal("Totally out of MEMORY in GC: (swapping in '%s')\n"
@@ -1004,6 +1010,7 @@ garbage_collection(void)
 
         clear_inherit_ref(ob->prog);
         ob->ref = 0;
+        ob->name->info.ref = 0;
         clear_ref_in_vector(ob->variables, ob->prog->num_variables);
         if (ob->flags & O_SHADOW)
         {
@@ -1262,8 +1269,9 @@ garbage_collection(void)
     for (ob = gc_obj_list_destructed; ob; ob = next_ob)
     {
 #ifdef DEBUG
-#define W(s) write(1,s,strlen(s)) /* DEBUG: */
-W("DEBUG: GC frees destructed '"); W(get_txt(ob->name)); W("'\n");
+        writes(1, "DEBUG: GC frees destructed '");
+        writes(1, get_txt(ob->name));
+        writes(1, "'\n");
 #endif
         next_ob = ob->next_all;
         free_object(ob, "garbage collection");

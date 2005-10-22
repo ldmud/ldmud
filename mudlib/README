@@ -15,3 +15,5 @@ Other files are:
                      test_master.
   astar.c          : an implementation of the A* pathfinding algorithm.
 
+  uni-crasher/     : A stress test program, see the README in this dir.
+

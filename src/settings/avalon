@@ -1,6 +1,7 @@
 #!/bin/sh
 #
 # Settings for the Avalon MUDlib
+# Change: 22.02.2002 Alwin@avalon enabled mysql part
 #
 # configure will strip this part from the script.
 
@@ -26,13 +27,13 @@ with_time_to_reset=2400
 
 enable_compat_mode=no
 enable_strict_euids=yes
-enable_use_alists=yes
 
 enable_supply_parse_command=no
 enable_initialization_by___init=yes
 
 enable_malloc_trace=yes
 enable_malloc_lpc_trace=yes
+enable_use_mysql=/usr/lib/mysql
 
 with_htable_size=16384
 with_otable_size=4096

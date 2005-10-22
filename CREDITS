@@ -116,7 +116,8 @@ Lars Duening thanks:
      Darwin port.
  - Bart van Driessche (bart@multi.franken.de, Hunter@FinalFrontier) did the
      new OS/2 port.
- - Menaures added the tab character conversion to the editor.
+ - Menaures added the tab character conversion to the editor, and gleefully
+     found new ways to crash the driver.
  - Acius donated the LPC implementation of the A* pathfinding algorithm.
  - for bug reports, critics, fixes, patches and other support:
      Acius (acius@bigfoot.com)

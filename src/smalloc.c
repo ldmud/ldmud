@@ -1058,8 +1058,6 @@ static struct free_block dummy =
 
 static struct free_block *free_tree = &dummy2;
 
-#define WRITES(d, s) write((d), (s), strlen(s))
-
 #ifdef DEBUG_AVL
 
 static Bool inconsistency = MY_FALSE;
@@ -1116,7 +1114,7 @@ check_avl (struct free_block *parent, struct free_block *p)
 
     if (p->balance != right - left || p->balance < -1 || p->balance > 1)
     {
-        WRITES  (2, "Inconsistency in avl node!\n");
+        writes  (2, "Inconsistency in avl node!\n");
         dprintf1(2, "node:%x\n",(p_uint)p);
         dprintf1(2, "size: %d\n", p->size);
         dprintf1(2, "left node:%x\n",(p_uint)p->left);
@@ -1129,7 +1127,7 @@ check_avl (struct free_block *parent, struct free_block *p)
 
     if (p->parent != parent)
     {
-        WRITES  (2, "Inconsistency in avl node!\n");
+        writes  (2, "Inconsistency in avl node!\n");
         dprintf1(2, "node:%x\n",(p_uint)p);
         dprintf1(2, "size: %d\n", p->size);
         dprintf1(2, "parent: %x\n", (p_uint)parent);
@@ -3134,7 +3132,7 @@ store_print_block_dispatch_info (void *block
     i = num_dispatched_types++;
     if (i >= sizeof(dispatch_table)/sizeof(dispatch_table[0]))
     {
-        WRITES(2, "dispatch_table for print_block() to small\n");
+        writes(2, "dispatch_table for print_block() to small\n");
         return;
     }
 
@@ -3202,18 +3200,18 @@ write_lpc_trace (int d, word_t *p)
     /* Try to find the object which allocated this block */
     if ( NULL != (obj = (object_t *)p[M_OBJ]) )
     {
-        WRITES(d, "By object: ");
+        writes(d, "By object: ");
         if (obj->flags & O_DESTRUCTED)
-            WRITES(d, "(destructed) ");
+            writes(d, "(destructed) ");
         for (o = obj_list; o && o != obj; o = o->next_all) NOOP;
         if (!o)
-            WRITES(d, "(not in list) ");
+            writes(d, "(not in list) ");
         else if (o->name)
-            WRITES(d, get_txt(o->name)); /* TODO: If this cores, it has to go again */
+            writes(d, get_txt(o->name)); /* TODO: If this cores, it has to go again */
     }
     else
-        WRITES(d, "No object.");
-    WRITES(d, "\n");
+        writes(d, "No object.");
+    writes(d, "\n");
 
     /* Try to find the program which allocated this block */
     if ( 0 != (id = p[M_PROG]) )
@@ -3221,7 +3219,7 @@ write_lpc_trace (int d, word_t *p)
         pc = NULL;
         prog = NULL;
 
-        WRITES(d, "By program: ");
+        writes(d, "By program: ");
         for ( o = obj_list
             ;    o
               && !(o->flags & O_DESTRUCTED)
@@ -3249,7 +3247,7 @@ write_lpc_trace (int d, word_t *p)
         }
         else
         {
-            WRITES(d, "Not found at old address.\n");
+            writes(d, "Not found at old address.\n");
         }
     }
 } /* write_lpc_trace() */
@@ -3279,7 +3277,7 @@ dump_lpc_trace (int d
 #   ifdef __MWERKS__
 #       pragma unused(p)
 #   endif
-    WRITES(d, "No malloc lpc trace.\n");
+    writes(d, "No malloc lpc trace.\n");
 #endif /* MALLOC_LPC_TRACE */
 } /* dump_lpc_trace() */
 
@@ -3303,7 +3301,7 @@ dump_malloc_trace (int d
 #   ifdef __MWERKS__
 #       pragma unused(adr)
 #   endif
-    WRITES(d, "No malloc trace.\n");
+    writes(d, "No malloc trace.\n");
 #else
     word_t *p = ((word_t *)adr) - OVERHEAD;
     word_t size = *p;
@@ -3521,7 +3519,7 @@ free_unreferenced_memory (void)
 #ifdef MALLOC_TRACE
                 dprintf2(gcollect_outfd, " %s %d", q[M_FILE], q[M_LINE]);
 #endif
-                WRITES(gcollect_outfd, "\n");
+                writes(gcollect_outfd, "\n");
 #ifdef MALLOC_LPC_TRACE
                 write_lpc_trace(gcollect_outfd, q);
 #endif

@@ -56,6 +56,7 @@ void reallocate_reserved_areas(void);
 
 extern void write_x(int d, p_uint i);
 extern void writed(int d, p_uint i);
+extern void writes (int d, const char *s);
 extern char *dprintf_first(int fd, char *s, p_int a);
 extern void dprintf1(int fd, char *s, p_int a);
 extern void dprintf2(int fd, char *s, p_int a, p_int b);

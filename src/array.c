@@ -2282,7 +2282,7 @@ join_array (vector_t *a1, vector_t *a2)
      */
     for (i1=i2=0, l = a1s; i1 < a1s && i2 < a2s; )
     {
-        d = array_cmp(&a1->item[i1], &a2->item[i2]);
+        d = array_cmp(&vtmpp1->item[i1], &vtmpp2->item[i2]);
         if (d < 0)
         {
             /* Current element in <a1> is smaller - step forward */

@@ -1363,7 +1363,7 @@ load_object_error(const char *msg, const char *name, namechain_t *chain)
     strbuf_free(&sbuf);
 
     fprintf(stderr, "%s %s", time_stamp(), buf);
-    error(buf);
+    error("%.*s", (int)strlen(buf), buf);
 } /* load_object_error() */
 
 /*-------------------------------------------------------------------------*/
@@ -4111,6 +4111,7 @@ f_set_driver_hook (svalue_t *sp)
         if ( NULL != (str = make_tabled_from(sp->u.str)) )
         {
             put_string(driver_hook + n, str);
+            free_svalue(sp);
             if (n == H_NOECHO)
                 mudlib_telopts();
         }

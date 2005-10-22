@@ -1,6 +1,21 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+22-Feb-2002 (Lars Duening)  (3.3.172)
+    - (simulate.c) Made the load_object_error() method resistant
+        against object names with printf format specifications (reported by
+        Gnomi).
+    - (mudlib/uni-crasher) Added Menaures' test object to the archive.
+
+21-Feb-2002 (Lars Duening)
+    - (array.c) Array-joins didn't work properly because the code
+        was comparing the wrong values (reported by Dafire).
+    - (simulate.c) Setting a string driver hook leaked the string.
+    - (gcollect.c) The refcounts for object and programs names weren't
+        counted correctly.
+    - (main, gcollect.c, xalloc.c, smalloc.c) Added a new low-level writes()
+        function to replace all the macros floating around.
+
 20-Feb-2002 (Lars Duening)  (3.3.171)
     - (prolang.y) Variable definitions are now normal statements and
         as such no longer restricted to the beginning of a block (f-000430-1).

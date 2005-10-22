@@ -640,6 +640,16 @@ writed (int d, p_uint i)
 }
 
 /*-------------------------------------------------------------------------*/
+void
+writes (int d, const char *s)
+
+/* Memory safe function to string <s> to fd <d>. */
+
+{
+    write(d, s, strlen(s));
+}
+
+/*-------------------------------------------------------------------------*/
 char *
 dprintf_first (int fd, char *s, p_int a)
 

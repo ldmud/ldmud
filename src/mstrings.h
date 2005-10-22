@@ -191,7 +191,7 @@ extern void   string_dinfo_status(svalue_t *svp, int value);
 
 
 #define free_mstring(s) \
-    MACRO(string_t * fmsttmp = s; if (fmsttmp != NULL) { if (fmsttmp->info.ref == 1) mstring_free(fmsttmp); else deref_mstring(fmsttmp); } )
+    MACRO(string_t * fmsttmp = s; if (fmsttmp != NULL) { if (fmsttmp->info.ref == 1) { mstring_free(fmsttmp); } else deref_mstring(fmsttmp); } )
 
   /* void free_mstring(s)
    *

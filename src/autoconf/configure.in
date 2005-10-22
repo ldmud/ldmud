@@ -537,7 +537,7 @@ fi
 fi
 
 AC_CACHE_CHECK(for mySQL,lp_cv_has_mysql,
-for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/include"; do
+for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/include" "/usr/include" "/usr/lib/mysql"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="$CFLAGS -I$TESTPATH"

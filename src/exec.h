@@ -622,13 +622,13 @@ struct inherit_s
 struct include_s
 {
     string_t   *name;
-      /* Name as it was found in the program. First and last
+      /* Name as it was found in the program (tabled string). First and last
        * character are the delimiters - either "" or <>.
        */
 
     string_t   *filename;
       /* Actual filename of the include file, in compat mode
-       * without leading slash.
+       * without leading slash (tabled string).
        */
     int         depth;
       /* The absolute value is the include depth, counting from 1 upwards.

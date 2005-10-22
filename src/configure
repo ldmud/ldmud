@@ -4293,7 +4293,7 @@ echo "configure:4293: checking for mySQL" >&5
 if eval "test \"`echo '$''{'lp_cv_has_mysql'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
-  for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/include"; do
+  for TESTPATH in "" "$mysql_path" "$mysql_path/include" "/usr/local/include" "/usr/include" "/usr/lib/mysql"; do
     saveflags="$CFLAGS"
     if test "x$TESTPATH" != "x"; then
         CFLAGS="$CFLAGS -I$TESTPATH"
