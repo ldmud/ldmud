@@ -99,6 +99,7 @@ new_pointer_table (void)
         return NULL;
     }
     memset(ptable->hash_usage, 0, sizeof ptable->hash_usage);
+    memset(ptable->table, 0, sizeof ptable->table);
     ptable->pool = pool;
 
     return ptable;

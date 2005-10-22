@@ -7,6 +7,10 @@ State: New
 The '==' operator compares mappings and arrays by reference. It would be nice
 to have a second operator which compares by value.
 
+For closures this would mean that closures are identical if their targets are
+the same. So a local lfun closure could compare equal to an alien lfun closure
+if both designate the same object::lfun.
+
 ------------------
 
 From: "Wolf Dieter Dallinger" <wolf.dieter@dallinger.de>

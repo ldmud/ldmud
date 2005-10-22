@@ -1,6 +1,15 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+04-Mar-2002 (Lars Duening)  (3.3.177)
+    - (prolang.y) Publically inheriting functions which had been inherited
+        protected before now overrides the earlier inherit (reported by
+        Gnomi).
+    - (ptrtable.c) When allocating a new ptable, the .table[] member is
+        cleared.
+    - (files.c) New get_dir() flag GETDIR_PATH adds the full absolute
+        pathname to the returned filenames (suggested by Pulami).
+
 03-Mar-2002 (Lars Duening)  (3.3.176)
     - (simulate.c) When the driver runs on a fatal error, it calls
         the master lfun notify_shutdown() with "Fatal Error" as argument

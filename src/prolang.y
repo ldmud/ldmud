@@ -11107,6 +11107,19 @@ copy_functions (program_t *from, fulltype_t type)
                                         , current_func_index - n );
                             p->u.global.function = current_func_index;
                         }
+                        else if ((   fun.flags & TYPE_MOD_NO_MASK
+                                  || OldFunction->flags & (NAME_HIDDEN|NAME_UNDEFINED|TYPE_MOD_PROTECTED))
+                              && !(fun.flags & (NAME_HIDDEN|NAME_UNDEFINED))
+                                )
+                        {
+                            /* This function is visible and existing, but the
+                             * inherited one is not, or this one is also nomask:
+                             * prefer the inherited one.
+                             */
+                            cross_define( &fun, OldFunction
+                                        , current_func_index - n );
+                            p->u.global.function = current_func_index;
+                        }
                         else if ( (fun.flags & TYPE_MOD_PRIVATE) == 0
                               ||  (OldFunction->flags & TYPE_MOD_PRIVATE) == 0
                               ||  ((OldFunction->flags|fun.flags)

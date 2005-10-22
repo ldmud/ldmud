@@ -73,7 +73,7 @@ For a detailed list of all changes see the file CHANGELOG.
            the maximum number of keys.
 
 
-03-Mar-2002 (Lars Duening) -- upcoming Release 3.2.9
+04-Mar-2002 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -102,6 +102,7 @@ For a detailed list of all changes see the file CHANGELOG.
             objects, it is switched over as well, like this_player().
        + filter(), map(), sort_array(), walk_mapping(): Protected lvalues
             (e.g. &(i[0])) are not allowed as callback parameters.
+       + get_dir(): New flag GETDIR_PATH to return the full pathnames.
        + inherit_list(): the inherited objects can be returned in a 
            tree reflecting the inheritance structure. Virtual inherits
            can be returned tagged as such.

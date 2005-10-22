@@ -676,29 +676,46 @@ f_get_dir (svalue_t *sp)
 
 /* EFUN get_dir()
  *
- *   string *get_dir(string str, int mask)
+ *     string *get_dir(string str)
+ *     string *get_dir(string str, int mask)
  *
- * This function takes a path as argument and returns an array of
- * file names and attributes in that directory.
- * 
- * The filename part of the path may contain '*' or '?' as
- * wildcards: every '*' matches an arbitrary amount of characters
- * (or just itself). Thus get_dir ("/path/ *") would return an
- * array of all files in directory "/path/", or just ({ "/path/ *"
- * }) if this file happens to exist.
+ * This function takes a path as argument and returns an array of file
+ * names and attributes in that directory.
+ *
+ * Returns 0 if the directory to search in does not exist.
+ *
+ * The filename part of the path may contain '*' or '?' as wildcards:
+ * every '*' matches an arbitrary amount of characters (or just itself).
+ * Thus get_dir("/path/ *") would return an alphabetically sorted array
+ * of all files in directory "/path/", or just ({ "/path/ *" }) if this
+ * file happens to exist.
+ *
+ * To query the content of a directory, use the directory name with a
+ * trailing '/' or '/.', for example get_dir("/path/."). Use the
+ * directory name as it is to get information about the directory itself.
  * 
  * The optional second argument mask can be used to get
  * information about the specified files.
- * 
- *   GETDIR_EMPTY (0x00)  get_dir returns an emtpy array (not very useful)
- *   GETDIR_NAMES (0x01)  put the file names into the returned array.
- *   GETDIR_SIZES (0x02)  put the file sizes into the returned array.
- *                        directories have size FSIZE_DIR (-2)
- *   GETDIR_DATES (0x04)  put the file modification dates into the returned
- *                        array.
- *   GETDIR_UNSORTED (0x20)  if this mask bit is set, the result of will
- *                           _not_ be sorted.
- * 
+ *
+ * GETDIR_EMPTY    (0x00)  get_dir returns an empty array (not very
+ *                         useful).
+ * GETDIR_NAMES    (0x01)  put the alphabetically sorted file names into
+ *                         the returned array.
+ * GETDIR_SIZES    (0x02)  put the file sizes unsorted into the returned
+ *                         array. directories have size FSIZE_DIR (-2).
+ * GETDIR_DATES    (0x04)  put the file modification dates unsorted into
+ *                         the returned array.
+ * GETDIR_PATH     (0x10)  if this mask bit is set, the filenames with
+ *                         the full path will be returned
+ *                         (GETDIR_NAMES is implied).
+ * GETDIR_UNSORTED (0x20)  if this mask bit is set, the result of will
+ *                         _not_ be sorted.
+ * GETDIR_ALL      (0x07)  GETDIR_NAMES|GETDIR_SIZES|GETDIR_DATES (see
+ *                         examples).
+ *
+ * Note: You should use GETDIR_NAMES|GETDIR_UNSORTED to get the entries
+ * in the same order as with GETDIR_SIZES and GETDIR_DATES.
+ *
  * The values of mask can be added together.
  */
 
@@ -719,11 +736,17 @@ f_get_dir (svalue_t *sp)
         XDIR           *dirp;
         int             namelen;
         Bool            do_match = MY_FALSE;
+        size_t          pathlen;
+        Bool            in_top_dir = MY_FALSE;
         struct xdirect *de;
         struct stat     st;
         char           *p; 
         char           *regexpr = 0;
         int             nqueries;
+
+        /* Adjust the mask for implied bits */
+        if (mask & GETDIR_PATH)
+            mask |= GETDIR_NAMES;
 
         if (!sp[-1].u.str)
             break;
@@ -744,6 +767,7 @@ f_get_dir (svalue_t *sp)
             path[0] = path[0] ? path[0] : '.';
             path[1] = '\0';
             p = path;
+            in_top_dir = MY_TRUE;
         }
         else
         {
@@ -756,10 +780,14 @@ f_get_dir (svalue_t *sp)
              || (p[0] == '/' && p[1] == '\0')
                )
                 *p = '\0';
+
+            in_top_dir = (p == path);
         }
 
         /* Number of data items per file */
-        nqueries = (mask & 1) + (mask>>1 & 1) + (mask>>2 & 1);
+        nqueries =   ((mask & GETDIR_NAMES) != 0)
+                   + ((mask & GETDIR_SIZES) != 0)
+                   + ((mask & GETDIR_DATES) != 0);
 
         if (strchr(p, '*') || ixstat(path, &st) < 0)
         {
@@ -778,6 +806,7 @@ f_get_dir (svalue_t *sp)
             {
                 strcpy(regexpr, p);
                 strcpy(path, ".");
+                in_top_dir = MY_TRUE;
             }
             do_match = MY_TRUE;
         }
@@ -793,7 +822,20 @@ f_get_dir (svalue_t *sp)
             stmp = v->item;
             if (mask & GETDIR_NAMES)
             {
-                put_c_string(stmp, p);
+                if (mask & GETDIR_PATH)
+                {
+                    put_c_string(stmp, path);
+                    if (!compat_mode)
+                    {
+                        string_t *tmp = stmp->u.str;
+                        stmp->u.str = add_slash(tmp);
+                        free_mstring(tmp);
+                    }
+                }
+                else
+                {
+                    put_c_string(stmp, p);
+                }
                 stmp++;
             }
             if (mask & GETDIR_SIZES){
@@ -807,6 +849,8 @@ f_get_dir (svalue_t *sp)
             }
             break;
         }
+
+        pathlen = strlen(path);
 
         if ( XOPENDIR(dirp, path) == 0)
             break;
@@ -894,11 +938,40 @@ f_get_dir (svalue_t *sp)
 
             if (mask & GETDIR_NAMES)
             {
-                string_t *name;
+                string_t *result;
 
-                memsafe(name = new_n_mstring(de->d_name, namelen), namelen
-                       , "getdir() names");
-                put_string(w->item+j, name);
+                if ((mask & GETDIR_PATH) && !in_top_dir)
+                {
+                    char * name;
+
+                    if (compat_mode)
+                    {
+                        memsafe(result = alloc_mstring(namelen+pathlen+2)
+                               , namelen+pathlen+2
+                               , "getdir() names");
+                        name = get_txt(result);
+                    }
+                    else
+                    {
+                        memsafe(result = alloc_mstring(namelen+pathlen+3)
+                               , namelen+pathlen+3
+                               , "getdir() names");
+                        name = get_txt(result);
+                        *name++ = '/';
+                    }
+                    memcpy(name, path, pathlen);
+                    name += pathlen;
+                    *name++ = '/';
+                    if (namelen)
+                        memcpy(name, de->d_name, namelen);
+                    name[namelen] = '\0';
+                }
+                else
+                {
+                    memsafe(result = new_n_mstring(de->d_name, namelen), namelen
+                           , "getdir() names");
+                }
+                put_string(w->item+j, result);
                 j++;
             }
             if (mask & GETDIR_SIZES)
