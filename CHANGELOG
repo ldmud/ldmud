@@ -1,6 +1,18 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+27-Apr-2001 (Lars Duening)  (3.3.51)
+    - (sprintf.c) Duh. A typo caused '%^' to eat the next character
+         from the format string (reported by Robert).
+    - (sprintf.c) A leading '0' used to pad the whole field with 0s.
+         Now, only leading 0s are printed and this setting and the
+         explicite pad string are independent of each other (suggested
+         by Fiona).
+    - (call_out.c) Removing call_outs, or call_outs going stale, messed
+         up the 'number of callouts' statistics (provided by Gnomi).
+    - (autoconf) Oops, the USE_ALISTS option lacked a crucial substitution.
+    - (mapping.c) Freeing mappings clobbered memory.
+
 25-Apr-2001 (Lars Duening)  (3.3.49 and 3.3.50)
     - (efuns.c, array, parse.c, parse_old.c, interpret.c) 
          Removed the last uses of old_explode_string().

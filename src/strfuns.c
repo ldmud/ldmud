@@ -524,7 +524,7 @@ trim_all_spaces (const string_t * txt)
 
     dest = alloca(mstrsize(txt));
     if (dest == NULL)
-        error("Stack overflow (%ld bytes)\n", mstrsize(txt));
+        error("Stack overflow (%ld bytes)\n", (long)mstrsize(txt));
 
     src = get_txt(txt);
     srclen = mstrsize(txt);

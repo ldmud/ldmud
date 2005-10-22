@@ -5,7 +5,7 @@ DESCRIPTION
         Most of the characters in the format string (FMT) get passed
         straight through to the output (ie: printed or put in the
         return string), to format the arguments into the string it's
-        nessasary to include an argument format string (AFS) in the
+        necessary to include an argument format string (AFS) in the
         FMT.  An AFS is a series of characters starting with a percent
         sign "%" and terminated with a argument type specifier.
         To include a "%" sign in the output, it is necessary to include a
@@ -37,11 +37,11 @@ Valid argument type specifiers are:
         number.
 
 Modifiers:
-   n        specifys the field size, if prepended with a zero then the pad
-        string is set to "0".
-  "."n        specifies the presision, for simple (not columns or tables)
+   n    specifys the field size. If the size is prepended with
+        a 0, the argument is printed with leading zeroes.
+  "."n  specifies the presision, for simple (not columns or tables)
         strings specifies the truncation length.
-  ":"n        n specifies the fs _and_ the presision, if n is prepended by a zero
+  ":"n  n specifies the fs _and_ the presision, if n is prepended by a zero
         then the pad string is set to "0".
   "'X'" the pad string is set to the char(s) between the single quotes,
         if the field size is also prepended with a zero then which ever
@@ -49,26 +49,26 @@ Modifiers:
         NOTE:  to include "'" in the pad string, you must use "\\'"
         (as the backslash has to be escaped past the interpreter),
         similarly, to include "\" requires "\\\\".
-  " "        pad positive integers with a space.
-  "+"        pad positive integers with a plus sign.
-  "-"        left adjusted within field size.
+  " "   pad positive integers with a space.
+  "+"   pad positive integers with a plus sign.
+  "-"   left adjusted within field size.
         NB: std (s)printf() defaults to right justification, which is
             unnatural in the context of a mainly string based language
             but has been retained for "compatability" ;)
-  "|"        centered within field size.
-  "="        column mode.  Ignored unless the argument type specifier is s.
+  "|"   centered within field size.
+  "="   column mode.  Ignored unless the argument type specifier is s.
         Field size must be specified, if precision is specified then it
         specifies the width for the string to be wordwrapped in, if not
         then the field size is.         The field size specifies the width of
         the column and has the effect that the last line of the column
         is padded with spaces to achieve this length.
-  "#"        table mode.  Ignored unless the argument type specifier is s.
+  "#"   table mode.  Ignored unless the argument type specifier is s.
         Field size must be specified, if presision is specified then it
         specifys the number of columns in the table, otherwise the
         number is "optimally" generated.  Table mode is passed a list
         of slash-n separated 'words' which are put in a format similar
         to that of ls.
-  "@"        the argument is an array.  the corresponding AFS (minus all
+  "@"   the argument is an array.  the corresponding AFS (minus all
         "@") is applied to each element of the array.
 
 EXAMPLES
@@ -89,7 +89,8 @@ EXAMPLES
 
 HISTORY
         LDMud 3.2.9 added the "%^" sequence for compatibility with
-          terminal_colour().
+          terminal_colour() and clarified the meaning of leading
+          0s in the field size modifier.
 
 SEE ALSO
         printf(E), terminal_colour(E)

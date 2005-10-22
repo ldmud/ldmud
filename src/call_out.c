@@ -509,6 +509,7 @@ found:
                         cop->next->delta += cop->delta;
                     *copp = cop->next;
                     free_call(cop);
+                    num_callouts--;
                 }
                 /* It is possible to have delay < 0 if we are
                  * called from inside call_out() .
@@ -543,6 +544,7 @@ found:
                     cop->next->delta += cop->delta;
                 *copp = cop->next;
                 free_call(cop);
+                num_callouts--;
             }
             if (delay < 0)
                 delay = 0;
@@ -564,6 +566,7 @@ print_call_out_usage (strbuf_t *sbuf, Bool verbose)
  */
 
 {
+    remove_stale_call_outs();
     if (verbose)
     {
         strbuf_add(sbuf, "\nCall out information:\n");
@@ -597,6 +600,7 @@ callout_dinfo_status (svalue_t *svp, int value)
     if (value == -1) svp[which].u.number = code; \
     else if (value == which) svp->u.number = code
     
+    remove_stale_call_outs();
     ST_NUMBER(DID_ST_CALLOUTS, num_callouts);
     ST_NUMBER(DID_ST_CALLOUT_SLOTS, num_call);
     ST_NUMBER(DID_ST_CALLOUT_SIZE, num_call * sizeof(struct call));

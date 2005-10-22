@@ -4,7 +4,7 @@
 #
 # configure will strip this part from the script.
 
-exec ./configure --prefix=/UNItopia/mudadm/magyra --libexecdir=/UNItopia/mudadm/magyra/erq --with-setting=unitopia $*
+exec ./configure --prefix=/UNItopia/mudadm/magyra --libexecdir=/UNItopia/mudadm/magyra/erq --libdir=/tmp --with-setting=unitopia $*
 exit 1
 
 # --- The actual settings ---
@@ -45,7 +45,7 @@ enable_access_control=no
 # --- Language ---
 enable_supply_parse_command=no
 enable_use_mysql=yes
-enable_use_alists=yes
+enable_use_deprecated=no
 
 # --- Runtime limits ---
 with_catch_reserved_cost=10000
@@ -59,3 +59,11 @@ with_htable_size=0x10000
 with_otable_size=0x4000
 with_apply_cache_bits=14
 
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.0.4 (GNU/Linux)
+Comment: For info see http://www.gnupg.org
+
+iD8DBQE66eu68UXMXiC+9cQRAu/oAJwI0pLUqdnmr9QOy2M7Zcwf5vA2VgCgwt9A
+xvkmxP3mzQRxaQXIoh51eJI=
+=9TUU
+-----END PGP SIGNATURE-----

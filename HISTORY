@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-25-Apr-2001 (Lars Duening) -- Development Release 3.3
+27-Apr-2001 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -69,6 +69,8 @@ For a detailed list of all changes see the file CHANGELOG.
            Single values can be returned instead of the whole array.
        + printf(), sprintf(): The formatter "%^" will print "%^", for
            compatibility with terminal_colour().
+       + printf(), sprintf(): A leading zero in the field size will now print
+           only leading zeros and not interfere with the pad string option.
        + query_udp_port(), send_udp(): Renamed from query_imp_port() and
            send_imp().
        + regexp functions: more compatible with 8-bit characters.

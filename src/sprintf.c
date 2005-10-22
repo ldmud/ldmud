@@ -22,8 +22,8 @@
  *  "#"   table mode, print a list of '\n' separated 'words' in a
  *        table within the field size.  only meaningful with strings.
  *   n    specifies the field size, a '*' specifies to use the corresponding
- *        arg as the field size.  if n is prepended with a zero, then is padded
- *        zeros, else it is padded with spaces (or specified pad string).
+ *        arg as the field size.  If n is prepended with a zero, then the field
+ *        is printed with leading zeros.
  *  "."n  precision of n, simple strings truncate after this (if precision is
  *        greater than field size, then field size = precision), tables use
  *        precision to specify the number of columns (if precision not specified
@@ -112,6 +112,8 @@
  *   0000000x 00000000 : array mode (INFO_ARRAY)?
  *   000000x0 00000000 : column mode (INFO_COLS)?
  *   00000x00 00000000 : table mode (INFO_TABLE)?
+ *
+ *   0000x000 00000000 : field is to be left-padded with zero
  */
 
 typedef unsigned int format_info;
@@ -135,6 +137,8 @@ typedef unsigned int format_info;
 #define INFO_ARRAY    0x100
 #define INFO_COLS     0x200
 #define INFO_TABLE    0x400
+
+#define INFO_PS_ZERO  0x800
 
 /*-------------------------------------------------------------------------*/
 
@@ -1039,7 +1043,14 @@ add_justified ( fmt_state_t *st
         break;
 
     case INFO_J_CENTRE:
-        ADD_PADDING(pad, (fs - len + 1) >> 1)
+        if (finfo & INFO_PS_ZERO)
+        {
+            ADD_PADDING("0", (fs - len + 1) >> 1)
+        }
+        else
+        {
+            ADD_PADDING(pad, (fs - len + 1) >> 1)
+        }
         ADD_STRN(str, len)
         if (is_space_pad)
             sppos = st->bpos;
@@ -1050,7 +1061,14 @@ add_justified ( fmt_state_t *st
 
     default:
       { /* std (s)printf defaults to right justification */
-        ADD_PADDING(pad, fs - len)
+        if (finfo & INFO_PS_ZERO)
+        {
+            ADD_PADDING("0", fs - len)
+        }
+        else
+        {
+            ADD_PADDING(pad, fs - len)
+        }
         ADD_STRN(str, len)
       }
     }
@@ -1457,7 +1475,6 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                 ADD_CHAR('%');
                 fpos++;
                 ADD_CHAR('^');
-                fpos++;
                 continue;
             }
 
@@ -1508,7 +1525,7 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
                                  && format_str[fpos+1] <= '9')
                              || format_str[fpos+1] == '*')
                            )
-                            pad = "0";
+                            finfo |= INFO_PS_ZERO;
                         else
                         {
                             if (format_str[fpos] == '*')

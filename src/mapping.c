@@ -536,8 +536,10 @@ _free_mapping (mapping_t *m, Bool no_data)
  *          free_empty_mapping(m) -> _free_mapping(m, TRUE)
  *
  * The mapping and all associated memory is deallocated resp. dereferenced.
+ *
  * If <no_data> is TRUE, all the svalues are assumed to be freed already
- * (the swapper uses this after swapping out a mapping).
+ * (the swapper uses this after swapping out a mapping). The function still
+ * will deallocate any map_chain entries, if existing.
  *
  * If the mapping is 'dirty' (ie. contains a hash_mapping part), it
  * is not deallocated immediately, but instead counts 1 to the empty_mapping-
@@ -566,7 +568,7 @@ _free_mapping (mapping_t *m, Bool no_data)
         p_int left = m->cond->size * (m->num_values + 1);
         svalue_t *data = &(m->cond->data[0]);
 
-        for (; left > 0; left--, data++)
+        for (; !no_data && left > 0; left--, data++)
             free_svalue(data);
 
         m->user->mapping_total -= SIZEOF_MC(m->cond, m->num_values);
@@ -602,7 +604,7 @@ _free_mapping (mapping_t *m, Bool no_data)
             for (next = *mcp++; NULL != (mc = next); )
             {
                 next = mc->next;
-                free_map_chain(m, mc, MY_FALSE);
+                free_map_chain(m, mc, no_data);
             }
         } while (--i);
 
@@ -971,11 +973,11 @@ find_map_entry ( mapping_t *m, svalue_t *map_index
         mapping_hash_t *hm = m->hash;
         map_chain_t *mc;
 
-        mp_int index = mhash(map_index) & hm->mask;
+        mp_int idx = mhash(map_index) & hm->mask;
 
         /* Look for the value in the chain determined by index */
 
-        for (mc = hm->chains[index]; mc != NULL; mc = mc->next)
+        for (mc = hm->chains[idx]; mc != NULL; mc = mc->next)
         {
             if (0 == mcompare(&(mc->data[0]), map_index))
             {
@@ -1022,9 +1024,9 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
     map_chain_t    * mc;
     mapping_hash_t * hm;
     svalue_t       * entry;
-    mp_int           index;
+    mp_int           idx;
 
-    entry = find_map_entry(m, map_index, (p_int *)&index, &mc);
+    entry = find_map_entry(m, map_index, (p_int *)&idx, &mc);
 
     /* If we found the entry, return the values */
     if (entry != NULL)
@@ -1032,7 +1034,7 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
         if (mc != NULL)
             return entry+1;
 
-        return COND_DATA(m->cond, index, m->num_values);
+        return COND_DATA(m->cond, idx, m->num_values);
     }
 
     if (!need_lvalue)
@@ -1142,9 +1144,9 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
                 for (mc2 = *mcp2++; mc2; mc2 = next)
                 {
                     next = mc2->next;
-                    index = mhash(&(mc2->data[0])) & mask;
-                    mc2->next = mcp[index];
-                    mcp[index] = mc2;
+                    idx = mhash(&(mc2->data[0])) & mask;
+                    mc2->next = mcp[idx];
+                    mcp[idx] = mc2;
                 }
             }
             m->hash = hm;
@@ -1156,9 +1158,9 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
 
         /* Finally, insert the new entry into its chain */
 
-        index = mhash(map_index) & hm->mask;
-        mc->next = hm->chains[index];
-        hm->chains[index] = mc;
+        idx = mhash(map_index) & hm->mask;
+        mc->next = hm->chains[idx];
+        hm->chains[idx] = mc;
     }
 
     /* With the new map_chain structure inserted, we can adjust
@@ -1166,8 +1168,8 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
      */
 
     assign_svalue_no_free(&(mc->data[0]), map_index);
-    for (index = m->num_values, entry = &(mc->data[1]); index > 0
-        ; index--, entry++)
+    for (idx = m->num_values, entry = &(mc->data[1]); idx > 0
+        ; idx--, entry++)
         put_number(entry, 0);
 
     hm->used++;
@@ -1303,7 +1305,7 @@ check_map_for_destr (mapping_t *m)
                 /* Scan the values of this entry (not reached
                  * if the entry was removed above
                  */
-                for (entry++, j = num_values; i > 0; --j, ++entry)
+                for (entry++, j = num_values; j > 0; --j, ++entry)
                 {
                     if (destructed_object_ref(entry))
                     {
@@ -1384,9 +1386,9 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
             /* The key is in the hash mapping */
 
             map_chain_t *prev, *mc2;
-            mp_int index = mhash(entry) & hm->mask;
+            mp_int idx = mhash(entry) & hm->mask;
 
-            for ( prev = 0, mc2 = hm->chains[index]
+            for ( prev = 0, mc2 = hm->chains[idx]
                 ; mc2 != NULL && mc2 != mc
                 ; prev = mc2, mc2 = mc2->next)
                 NOOP;
@@ -1408,7 +1410,7 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
                 if (prev)
                     prev->next = mc->next;
                 else
-                    hm->chains[index] = mc->next;
+                    hm->chains[idx] = mc->next;
 
                 free_map_chain(m, mc, MY_FALSE);
             }
@@ -2031,9 +2033,9 @@ compact_mappings (mp_int num)
         }
 
         /* If this is an empty mapping awaiting deallocation,
-         * just do that.
+         * just do that (remember that we incremented the refcount!).
          */
-        if (0 == m->ref && !m->num_entries)
+        if (1 == m->ref && !m->num_entries)
         {
             m->user->mapping_total -= sizeof(*m) + SIZEOF_MH(hm);
             xfree(m);
@@ -2096,7 +2098,8 @@ compact_mappings (mp_int num)
             last_hash = NULL;
 
             do {
-                mcp = *mcpp++;
+                mcp = *mcpp;
+                *mcpp++ = NULL; /* m no longer owns this chain */
                 while (mcp)
                 {
                     next = mcp->next;
