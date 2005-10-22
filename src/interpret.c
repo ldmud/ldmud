@@ -33,7 +33,7 @@
  *    (inter_)fp   -> |  Argument number 0
  *                    |
  *                    |
- *    start_of_stack  -----
+ *    VALUE_STACK     -----
  *
  *    The interpreter assumes that there are no destructed objects
  *    on the stack - to aid in this, the functions remove_object_from_stack()
@@ -556,10 +556,17 @@ svalue_t apply_return_value = { T_NUMBER };
 
 #define SIZEOF_STACK (EVALUATOR_STACK_SIZE<<1)
 
-static svalue_t start_of_stack[SIZEOF_STACK];
+static svalue_t value_stack_array[SIZEOF_STACK+1];
+#define VALUE_STACK (value_stack_array+1)
+
   /* The evaluator stack, sized with (hopefully) enough fudge to handle
    * function arguments and overflows.
    * The stack grows upwards, and <inter_sp> points to last valid entry.
+   *
+   * The first entry of value_stack_array[] is not used and serves as
+   * dummy so that underflows can be detected in a portable way
+   * (Standard C disallows indexing before an array). Instead, VALUE_STACK
+   * is the real bottom of the stack.
    */
 
 svalue_t catch_value = { T_INVALID } ;
@@ -567,14 +574,19 @@ svalue_t catch_value = { T_INVALID } ;
    * is executed.
    */
 
-static struct control_stack control_stack[MAX_TRACE];
+static struct control_stack control_stack_array[MAX_TRACE+2];
+#define CONTROL_STACK (control_stack_array+2)
 struct control_stack *csp;
   /* The control stack holds copies of the machine registers for previous
    * function call levels, with <csp> pointing to the last valid
    * entry, describing the last context.
-   * This also means that control_stack[0] will have almost no interesting
-   * values as it will terminate execution. Especially control_stack[0].prog
-   * is NULL to mark the bottom.
+   * This also means that CONTROL_STACK[0] (== control_stack_array[2]) will
+   * have almost no interesting values as it will terminate execution.
+   * Especially CONTROL_STACK[0].prog is NULL to mark the bottom.
+   *
+   * The first two entries of control_stack_array[] are not used and
+   * serve as dummies so that underflows can be detected in a portable
+   * way (Standard C disallows indexing before an array).
    */
 
 #ifdef APPLY_CACHE_STAT
@@ -2460,8 +2472,8 @@ _pop_stack (void)
 
 {
 #ifdef DEBUG
-    if (inter_sp < start_of_stack)
-        fatal("VM Stack underflow: %ld too low.\n", (long)(start_of_stack - inter_sp));
+    if (inter_sp < VALUE_STACK)
+        fatal("VM Stack underflow: %ld too low.\n", (long)(VALUE_STACK - inter_sp));
 #endif
     free_svalue(inter_sp--);
 }
@@ -2503,9 +2515,9 @@ stack_overflow (svalue_t *sp, svalue_t *fp, bytecode_p pc)
  */
 
 {
-    if (sp >= &start_of_stack[SIZEOF_STACK])
+    if (sp >= &VALUE_STACK[SIZEOF_STACK])
         fatal("Fatal stack overflow: %ld too high.\n"
-             , (long)(sp - &start_of_stack[SIZEOF_STACK])
+             , (long)(sp - &VALUE_STACK[SIZEOF_STACK])
              );
     sp = _pop_n_elems(sp-fp, sp);
     ERROR("stack overflow\n");
@@ -6159,9 +6171,9 @@ push_control_stack ( svalue_t   *sp
 {
 
     /* Check for overflow */
-    if (csp >= &control_stack[MAX_USER_TRACE-1])
+    if (csp >= &CONTROL_STACK[MAX_USER_TRACE-1])
     {
-        if (!num_error || csp == &control_stack[MAX_TRACE-1])
+        if (!num_error || csp == &CONTROL_STACK[MAX_TRACE-1])
         {
             ERROR("Too deep recursion.\n");
         }
@@ -6194,7 +6206,7 @@ pop_control_stack (void)
 
 {
 #ifdef DEBUG
-    if (csp < control_stack)
+    if (csp < CONTROL_STACK)
         fatal("Popped out of the control stack");
 #endif
 
@@ -6409,7 +6421,7 @@ setup_new_frame2 (fun_hdr_p funstart, svalue_t *sp, Bool allowRefs)
      * end should be sufficient. If not, stack_overflow() will
      * generate a fatal error and we have to resize.
      */
-    if ( sp >= &start_of_stack[EVALUATOR_STACK_SIZE] )
+    if ( sp >= &VALUE_STACK[EVALUATOR_STACK_SIZE] )
         stack_overflow(sp, csp->fp, funstart);
 
     /* Count the call depth for traces and handle tracing */
@@ -6472,20 +6484,18 @@ reset_machine (Bool first)
     traceing_recursion = -1;
     if (first)
     {
-        csp = control_stack - 1;
-        /* TODO: This is illegal according to ISO C */
-        inter_sp = start_of_stack - 1;
-        /* TODO: This is illegal according to ISO C */
+        csp = CONTROL_STACK - 1;
+        inter_sp = VALUE_STACK - 1;
         tracedepth = 0;
         put_number(&current_lambda, 0);
     }
     else
     {
-        inter_sp = _pop_n_elems(inter_sp - start_of_stack + 1, inter_sp);
+        inter_sp = _pop_n_elems(inter_sp - VALUE_STACK + 1, inter_sp);
         if (current_lambda.type == T_CLOSURE)
             free_closure(&current_lambda);
         put_number(&current_lambda, 0);
-        while (csp >= control_stack)
+        while (csp >= CONTROL_STACK)
         {
             if (csp->lambda.type == T_CLOSURE)
                 free_closure(&csp->lambda);
@@ -6518,20 +6528,18 @@ check_state (void)
               , time_stamp(), rt_context->type, ERROR_RECOVERY_BACKEND);
         if (!rc) rc = 1;
     }
-    if (csp != control_stack - 1) {
-        /* TODO: This can't be legal according to ISO C */
+    if (csp != CONTROL_STACK - 1) {
         debug_message("%s csp inconsistent: %p instead of %p\n"
-                     , time_stamp(), csp, control_stack-1);
+                     , time_stamp(), csp, CONTROL_STACK-1);
         printf("%s csp inconsistent: %p instead of %p\n"
-              , time_stamp(), csp, control_stack-1);
+              , time_stamp(), csp, CONTROL_STACK-1);
         if (!rc) rc = 2;
     }
-    if (inter_sp != start_of_stack - 1) {
-        /* TODO: This can't be legal according to ISO C */
+    if (inter_sp != VALUE_STACK - 1) {
         debug_message("%s sp inconsistent: %p instead of %p\n"
-                     , time_stamp(), inter_sp, start_of_stack - 1);
+                     , time_stamp(), inter_sp, VALUE_STACK - 1);
         printf("%s sp inconsistent: %p instead of %p\n"
-              , time_stamp(), inter_sp, start_of_stack - 1);
+              , time_stamp(), inter_sp, VALUE_STACK - 1);
         if (!rc) rc = 3;
     }
 
@@ -6594,7 +6602,7 @@ remove_object_from_stack (object_t *ob)
 {
     svalue_t *svp;
 
-    for (svp = start_of_stack; svp <= inter_sp; svp++)
+    for (svp = VALUE_STACK; svp <= inter_sp; svp++)
     {
         if (get_object_ref(svp) == ob)
         {
@@ -6858,7 +6866,7 @@ again:
         previous_instruction[last] = instruction;
         previous_pc[last] = pc-1;
         stack_size[last] = sp - fp - csp->num_local_variables;
-        abs_stack_size[last] = sp - start_of_stack;
+        abs_stack_size[last] = sp - VALUE_STACK;
         if (previous_objects[last])
         {
             /* Need to free the previously stored object */
@@ -7587,7 +7595,7 @@ again:
             if (trace_level)
             {
                 do_trace_return(sp);
-                if (csp == control_stack - 2)
+                if (csp == CONTROL_STACK - 2)
                     /* TODO: This can't be legal according to ISO C */
                     traceing_recursion = -1;
             }
@@ -11885,10 +11893,10 @@ again:
 
             /* Check if there is enough space on the stack.
              */
-            if (i + (sp - start_of_stack) >= EVALUATOR_STACK_SIZE)
+            if (i + (sp - VALUE_STACK) >= EVALUATOR_STACK_SIZE)
             {
                 error("VM Stack overflow: %ld too high.\n"
-                     , (long)(i + (sp - start_of_stack) - EVALUATOR_STACK_SIZE) );
+                     , (long)(i + (sp - VALUE_STACK) - EVALUATOR_STACK_SIZE) );
                 /* NOTREACHED */
                 break;
             }
@@ -14708,18 +14716,18 @@ again:
     /* Even intermediate results could exceed the stack size.
      * We better check for that.
      */
-    if (sp - start_of_stack == SIZEOF_STACK - 1)
+    if (sp - VALUE_STACK == SIZEOF_STACK - 1)
     {
         /* sp ist just at then end of the stack area */
         stack_overflow(sp, fp, pc);
     }
-    else if ((long)(sp - start_of_stack) > (long)(SIZEOF_STACK - 1))
+    else if ((long)(sp - VALUE_STACK) > (long)(SIZEOF_STACK - 1))
     {
         /* When we come here, we already overwrote the bounds
          * of the stack :-(
          */
         fatal("Fatal stack overflow: %ld too high\n"
-             , (long)(sp - start_of_stack - (SIZEOF_STACK - 1))
+             , (long)(sp - VALUE_STACK - (SIZEOF_STACK - 1))
              );
     }
 
@@ -16384,7 +16392,7 @@ call_function (program_t *progp, int fx)
     csp->ob = current_object;
     csp->prev_ob = previous_ob;
 #ifdef DEBUG
-    if (csp != control_stack)
+    if (csp != CONTROL_STACK)
         fatal("call_function with bad csp\n");
 #endif
     csp->num_local_variables = 0;
@@ -16666,13 +16674,13 @@ get_line_number_if_any (string_t **name)
  */
 
 {
-    if (csp >= &control_stack[0] && csp->funstart == SIMUL_EFUN_FUNSTART)
+    if (csp >= &CONTROL_STACK[0] && csp->funstart == SIMUL_EFUN_FUNSTART)
     {
         *name = ref_mstring(STR_SEFUN_CLOSURE);
         return 0;
     }
 
-    if (csp >= &control_stack[0] && csp->funstart == EFUN_FUNSTART)
+    if (csp >= &CONTROL_STACK[0] && csp->funstart == EFUN_FUNSTART)
     {
         static char buf[256];
         char *iname;
@@ -16790,7 +16798,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
         return NULL;
     }
 
-    if (csp < &control_stack[0])
+    if (csp < &CONTROL_STACK[0])
     {
         if (sbuf)
            strbuf_addf(sbuf, "%s\n", get_txt(STR_NO_TRACE));
@@ -16811,7 +16819,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
      * Confused now? Good.
      */
     file = ref_mstring(STR_EMPTY);
-    p = &control_stack[0];
+    p = &CONTROL_STACK[0];
     do {
         bytecode_p  dump_pc;  /* the frame's pc */
         program_t  *prog;     /* the frame's program */
@@ -16857,7 +16865,7 @@ collect_trace (strbuf_t * sbuf, vector_t ** rvec )
          * The pc should point at a F_END_CATCH instruction, or at a LBRANCH
          * to that instruction.
          */
-        if (p > &control_stack[0] && p->funstart == p[-1].funstart)
+        if (p > &CONTROL_STACK[0] && p->funstart == p[-1].funstart)
         {
             bytecode_p pc2 = p->pc;
 
@@ -17577,7 +17585,7 @@ f_caller_stack_depth (svalue_t *sp)
     for (depth = 0, done = MY_FALSE; ; depth++)
     {
         do {
-            if (p == control_stack)
+            if (p == CONTROL_STACK)
             {
                 done = MY_TRUE;
                 break;
@@ -17622,7 +17630,7 @@ f_caller_stack (svalue_t *sp)
     for (depth = 0, done = MY_FALSE; ; depth++)
     {
         do {
-            if (p == control_stack)
+            if (p == CONTROL_STACK)
             {
                 done = MY_TRUE;
                 break;
@@ -17639,7 +17647,7 @@ f_caller_stack (svalue_t *sp)
     {
         object_t *prev;
         do {
-            if (p == control_stack)
+            if (p == CONTROL_STACK)
             {
                 done = MY_TRUE;
                 break;
@@ -17725,7 +17733,7 @@ f_previous_object (svalue_t *sp)
     p = csp;
     do {
         do {
-            if (p == control_stack) {
+            if (p == CONTROL_STACK) {
                 sp->u.number = 0;
                 return sp;
             }
@@ -18082,7 +18090,7 @@ check_a_lot_ref_counts (program_t *search_prog)
 
     /* The current stack.
      */
-    count_extra_ref_in_vector(start_of_stack, (size_t)(inter_sp - start_of_stack + 1));
+    count_extra_ref_in_vector(VALUE_STACK, (size_t)(inter_sp - VALUE_STACK + 1));
     if (d_flag > 3)
     {
         debug_message("%s stack evaluated\n", time_stamp());
@@ -18173,7 +18181,7 @@ check_a_lot_ref_counts (program_t *search_prog)
         check_extra_ref_in_vector(ob->variables, (size_t)ob->extra_num_variables);
     } /* for */
 
-    check_extra_ref_in_vector(start_of_stack, (size_t)(inter_sp - start_of_stack + 1));
+    check_extra_ref_in_vector(VALUE_STACK, (size_t)(inter_sp - VALUE_STACK + 1));
 
     free_pointer_table(ptable);
 } /* check_a_lot_of_ref_counts() */
@@ -18249,10 +18257,10 @@ f_apply (svalue_t *sp, int num_arg)
         case CLOSURE_ALIEN_LFUN:
         case CLOSURE_LAMBDA:
         case CLOSURE_BOUND_LAMBDA:
-            if (num_arg + (sp - start_of_stack) < EVALUATOR_STACK_SIZE)
+            if (num_arg + (sp - VALUE_STACK) < EVALUATOR_STACK_SIZE)
                 break;
             error("VM Stack overflow: %ld too high.\n"
-                 , (long)(num_arg + (sp - start_of_stack) - EVALUATOR_STACK_SIZE) );
+                 , (long)(num_arg + (sp - VALUE_STACK) - EVALUATOR_STACK_SIZE) );
             break;
         }
 

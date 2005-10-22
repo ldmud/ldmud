@@ -20,12 +20,13 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 185)
-(Parent-Version lpmud 3-3 184)
-(Version-Log "Nicened the CHECK_OBJECT_REF during a bytecode execution.")
+(Project-Version lpmud 3-3 186)
+(Parent-Version lpmud 3-3 185)
+(Version-Log "Removed the name clash for 'struct ifstate' in lex.c.
+Removed the negative indexing on control and value stack.")
 (New-Version-Log
 "")
-(Checkin-Time "Tue, 19 Mar 2002 23:28:03 -0700")
+(Checkin-Time "Thu, 21 Mar 2002 21:08:41 -0700")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -59,7 +60,7 @@
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.5 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.38 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.248 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.249 644))
   (HISTORY (lpmud/f/49_HISTORY 1.248 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.14 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -142,9 +143,9 @@
   (src/heartbeat.h (lpmud/m/41_heartbeat. 1.6.1.4 644))
   (src/heartbeat.c (lpmud/m/42_heartbeat. 1.18.1.6 644))
   (src/interpret.h (lpmud/b/13_interpret. 1.33.1.22 644))
-  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.18 644))
+  (src/interpret.c (lpmud/b/14_interpret. 1.125.1.103.1.19 644))
   (src/lex.h (lpmud/b/11_lex.h 1.16.1.10 644))
-  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.7 644))
+  (src/lex.c (lpmud/b/12_lex.c 1.62.1.71.1.8 644))
   (src/main.h (lpmud/f/31_main.h 1.14.1.4.1.9 644))
   (src/main.c (lpmud/b/8_main.c 1.60.1.43.1.7 644))
   (src/mapping.h (lpmud/f/30_mapping.h 1.12.1.11 644))

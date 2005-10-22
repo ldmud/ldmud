@@ -190,7 +190,7 @@ struct lpc_predef_s *lpc_predefs = NULL;
    */
 
 static Mempool lexpool = NULL;
-  /* Fifopool to hold the allocations for the include and ifstate stacks.
+  /* Fifopool to hold the allocations for the include and ifstate_t stacks.
    */
 
 /*-------------------------------------------------------------------------*/
@@ -370,16 +370,18 @@ unsigned int next_inline_fun = 0;
 /* The stack to handle nested #if...#else...#endif constructs.
  */
 
-static struct ifstate
+typedef struct ifstate_s
 {
-    struct ifstate *next;
-    int             state;  /* which token to expect */
-} *iftop = NULL;
+    struct ifstate_s *next;
+    int               state;  /* which token to expect */
+} ifstate_t;
 
-/* struct ifstate.state values: */
+/* ifstate_t.state values: */
 
 #define EXPECT_ELSE  1
 #define EXPECT_ENDIF 2
+
+static ifstate_t *iftop = NULL;
 
 /*-------------------------------------------------------------------------*/
 
@@ -615,7 +617,7 @@ init_lexer(void)
     char mtext[MLEN];
 
     /* Allocate enough memory for 20 nested includes/ifs */
-    lexpool = new_fifopool(fifopool_size(sizeof(struct ifstate), 20)
+    lexpool = new_fifopool(fifopool_size(sizeof(ifstate_t), 20)
                            + fifopool_size(sizeof(struct incstate), 20));
     if (!lexpool)
         fatal("Out of memory.\n");
@@ -1446,10 +1448,10 @@ handle_cond (Bool c)
  * push a new state onto the ifstate-stack.
  */
 {
-    struct ifstate *p;
+    ifstate_t *p;
 
     if (c || skip_to("else", "endif")) {
-        p = mempool_alloc(lexpool, sizeof(struct ifstate));
+        p = mempool_alloc(lexpool, sizeof(ifstate_t));
         p->next = iftop;
         iftop = p;
         p->state = c ? EXPECT_ELSE : EXPECT_ENDIF;
@@ -2927,7 +2929,7 @@ yylex1 (void)
                 /* Oops, pending #if!
                  * Note the error and clean up the if-stack.
                  */
-                struct ifstate *p = iftop;
+                ifstate_t *p = iftop;
 
                 yyerror(p->state == EXPECT_ENDIF ? "Missing #endif" : "Missing #else");
                 while(iftop)
@@ -3982,7 +3984,7 @@ yylex1 (void)
 
                     if (iftop && iftop->state == EXPECT_ELSE)
                     {
-                        struct ifstate *p = iftop;
+                        ifstate_t *p = iftop;
 
                         iftop = p->next;
                         mempool_free(lexpool, p);
@@ -3997,7 +3999,7 @@ yylex1 (void)
                 {
                     if (iftop && iftop->state == EXPECT_ELSE)
                     {
-                        struct ifstate *p = iftop;
+                        ifstate_t *p = iftop;
 
                         iftop = p->next;
                         mempool_free(lexpool, p);
@@ -4022,7 +4024,7 @@ yylex1 (void)
                      && (   iftop->state == EXPECT_ENDIF
                          || iftop->state == EXPECT_ELSE))
                     {
-                        struct ifstate *p = iftop;
+                        ifstate_t *p = iftop;
 
                         iftop = p->next;
                         mempool_free(lexpool, p);

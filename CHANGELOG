@@ -1,6 +1,13 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+21-Mar-2002 (Lars Duening)  (3.3.186)
+    - (lex.c) The lexer's 'struct ifstate' clashes with an 'enum ifstate'
+        defined on some systems for the networking stack (reported by Alwin).
+    - (interpret.c) Removed the negative indexing on control_stack
+        and value stack by introducing dummy entries at the bottom of
+        each.
+
 19-Mar-2002 (Lars Duening)  (3.3.185)
     - (interpret.c) CHECK_OBJECT_REF: The destructed objects are now
         checked on F_RETURNs and after all efuns, in order to use
