@@ -155,7 +155,8 @@ struct svalue_s
 };
 
 #define SVALUE_FULLTYPE(svp) ((p_int *)(svp))
-  /* Return an integer with the primary and secondary type information.
+  /* Return a pointer to an integer with the primary and secondary type
+   * information.
    */
 /* TODO: Sanity test: sizeof struct { ph_int, ph_int } <= sizeof p_int */
 

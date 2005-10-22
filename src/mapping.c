@@ -97,12 +97,16 @@
  *   can use a fast binary search). The sorting order for string keys
  *   is given by their address (unique because they are shared), the
  *   sorting order for the misc keys is given by the tuple
- *   (.u.number, .x.generic, .type).
+ *   (.type, .u.number, .x.generic), with the exception of closure keys,
+ *   which are sorted by (.type, closure_cmp()). By using the .type
+ *   as the primary key, the order between closures and other types
+ *   is still correct.
  *
  *   Deleted or otherwise invalid string keys have an odd pointer
  *   value, invalid misc keys have the .type T_INVALID. Both are
- *   still kept in proper sorting order (or course!). The values for
- *   invalid keys are usually set to svalue-0.
+ *   still kept in proper sorting order (of course!) which for invalid misc
+ *   keys means that they cluster at the bottom of the condensed key block.
+ *   The values for invalid keys are usually set to svalue-0.
  *
  *   .misc_size and .string_size give the size of the .misc[] resp.
  *   .string[] arrays in byte (for speed reasons).
@@ -819,7 +823,9 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
     struct hash_mapping *hm;
     int num_values = m->num_values;
     svalue_t *svp;
+    Bool closure_index;
 
+    closure_index = (map_index->type == T_CLOSURE);
 
     /* Search in the condensed part first.
      */
@@ -948,22 +954,27 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
         key = keyend - offset;
         while ( (offset >>= 1) >= (p_int)(sizeof svp)/2)
         {
-            if ( !(u_d = (((svalue_t *)key)->u.number >> 1) -
-                       (index_u >> 1)) )
+            if ( !(u_d = ((svalue_t *)key)->type - index_type) )
             {
-                if ( !(u_d = ((svalue_t *)key)->x.generic - index_x) )
-                  if ( !(u_d = ((svalue_t *)key)->type - index_type) )
-                  {
-                      /* found */
-#ifndef FAST_MULTIPLICATION
-                      if (num_values == 1) /* speed up this case */
-                          return (svalue_t *) (key - size);
-                      else
-#endif/*FAST_MULTIPLICATION*/
-                          return (svalue_t *)
-                            (keystart - ( num_values * (keyend - key) ) );
-                  }
+                if (closure_index)
+                    u_d = closure_cmp(map_index, (svalue_t *)key);
+                else if ( !(u_d = (((svalue_t *)key)->u.number >> 1) -
+                                  (index_u >> 1)) )
+                    u_d = ((svalue_t *)key)->x.generic - index_x;
             }
+
+            if (!u_d)
+            {
+                /* found */
+#ifndef FAST_MULTIPLICATION
+                if (num_values == 1) /* speed up this case */
+                    return (svalue_t *) (key - size);
+                else
+#endif /* FAST_MULTIPLICATION */
+                    return (svalue_t *)
+                      (keystart - ( num_values * (keyend - key) ) );
+            }
+
             if (u_d > 0)
             {
                 key += offset;
@@ -1082,17 +1093,36 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
 
         /* Compute the hash value and make it a valid index */
 
-        i = index_u ^ index_type;
+        if (!closure_index
+         || (   map_index->x.closure_type != CLOSURE_LFUN
+             && map_index->x.closure_type != CLOSURE_ALIEN_LFUN
+             && map_index->x.closure_type != CLOSURE_IDENTIFIER )
+           )
+        {
+            i = index_u ^ index_type;
+        }
+        else
+        {
+            i = (p_int)(map_index->u.lambda->ob) ^ index_type;
+        }
+
         i = i ^ i >> 16;
         i = i ^ i >> 8;
         i &= hm->mask;
+
 
         /* Look for the value in the chain determined by i */
 
         for (mc = hm->chains[i];mc; mc = mc->next)
         {
-            if (mc->key.u.number != index_u ||
-                *SVALUE_FULLTYPE(&mc->key) != index_type)
+            if (*SVALUE_FULLTYPE(&mc->key) != index_type)
+                continue;
+            if (closure_index)
+            {
+                if (!closure_eq(&(mc->key), map_index))
+                    continue;
+            }
+            else if (mc->key.u.number != index_u)
                 continue;
             return mc->data;
         }
@@ -1170,7 +1200,19 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
                 for (mc = *mcp2++; mc; mc = next)
                 {
                     next = mc->next;
-                    i = mc->key.u.number ^ *SVALUE_FULLTYPE(&mc->key);
+                    if (mc->key.type != T_CLOSURE
+                     || (   mc->key.x.closure_type != CLOSURE_LFUN
+                         && mc->key.x.closure_type != CLOSURE_ALIEN_LFUN
+                         && mc->key.x.closure_type != CLOSURE_IDENTIFIER )
+                       )
+                    {
+                        i = mc->key.u.number ^ *SVALUE_FULLTYPE(&mc->key);
+                    }
+                    else
+                    {
+                        i = (p_int)(mc->key.u.lambda->ob) ^ *SVALUE_FULLTYPE(&mc->key);
+                    }
+
                     i = i ^ i >> 16;
                     i = i ^ i >> 8;
                     i &= mask;
@@ -1186,7 +1228,19 @@ _get_map_lvalue (mapping_t *m, svalue_t *map_index
 
             /* Update the hashed index i to the new structure */
 
-            i = map_index->u.number ^ *SVALUE_FULLTYPE(map_index);
+            if (!closure_index
+             || (   map_index->x.closure_type != CLOSURE_LFUN
+                 && map_index->x.closure_type != CLOSURE_ALIEN_LFUN
+                 && map_index->x.closure_type != CLOSURE_IDENTIFIER )
+               )
+            {
+                i = map_index->u.number ^ *SVALUE_FULLTYPE(map_index);
+            }
+            else
+            {
+                i = (p_int)(map_index->u.lambda->ob) ^ *SVALUE_FULLTYPE(map_index);
+            }
+
             i = i ^ i >> 16;
             i = i ^ i >> 8;
             i &= mask;
@@ -1226,6 +1280,7 @@ check_map_for_destr (mapping_t *m)
     struct condensed_mapping *cm;
     struct hash_mapping *hm;
     svalue_t *svp;
+    svalue_t *keystart;
     mp_int i, j;
     int num_values;
 
@@ -1236,20 +1291,60 @@ check_map_for_destr (mapping_t *m)
     /* Scan the condensed part for destructed object references used as keys.
      */
 
+    keystart = CM_MISC(cm) - (cm->misc_size / sizeof *keystart);
+
     for (svp = CM_MISC(cm),i = cm->misc_size; (i -= sizeof *svp) >= 0; )
     {
         --svp;
         if (destructed_object_ref(svp))
         {
             svalue_t dest_key = *svp;
+            svalue_t *pos = NULL;
             svalue_t *data = NULL;
+
+            /* Find the new position for the key ith its future INVALID
+             * type.
+             */
+            for (pos = keystart
+                ; pos->type == T_INVALID
+                  && pos->u.number < svp->u.number
+                  && pos->x.generic < svp->x.generic
+                ; ++pos)
+                NOOP;
+
+            if (pos != svp)
+            {
+                /* Rotate the key and the values to their new position */
+                svalue_t tmp = *svp;
+                svalue_t *rover;
+
+                /* Let data point at the first value of the next key */
+                data = (svalue_t *)((char *)svp - i -
+                  num_values * ((char *)CM_MISC(cm) - (char *)svp - 1));
+
+                for (rover = svp; rover != pos; --rover)
+                {
+                    rover[0] = rover[-1];
+
+                    for (j = num_values; j > 0; --j, --data)
+                    {
+                        data[-1] = data[-1-num_values];
+                    }
+                }
+
+                *pos = tmp;
+
+                /* Since svp now points to a new key, we have to revisit it */
+                svp++;
+                i += sizeof *svp;
+            }
 
             /* Clear all associated values */
 
             if ( 0 != (j = num_values) )
             {
-                data = (svalue_t *)((char *)svp - i -
-                  num_values * ((char *)CM_MISC(cm) - (char *)svp));
+                data = (svalue_t *)((char *)pos - i -
+                  num_values * ((char *)CM_MISC(cm) - (char *)pos));
                 do {
                     free_svalue(data);
                     put_number(data, 0);
@@ -1257,29 +1352,11 @@ check_map_for_destr (mapping_t *m)
                 } while (--j);
             }
 
-            /* If the following keys have a matching (.u.number, x.generic)
-             * move them forward to replace this no longer valid entry.
-             * This is necessary to keep the sorting relation intact.
-             */
-            while ( &svp[1] < CM_MISC(cm)
-             &&      svp[1].u.number == svp[0].u.number
-             &&      svp[1].x.generic == svp[0].x.generic)
-            {
-                *SVALUE_FULLTYPE(&svp[0]) = *SVALUE_FULLTYPE(&svp[1]);
-                svp++;
-                i += sizeof *svp;
-                for (j = num_values; --j >= 0; data++)
-                    data[-num_values] = data[0];
-                put_number(data, 0);
-            }
-
             /* Get rid of the 'destructed' svalue */
             free_svalue(&dest_key);
 
-            /* Invalidate the svalue entry. If keys have been moved, svp
-             * will point to the vacated entry after the moved keys.
-             */
-            svp[0].type = T_INVALID;
+            /* Invalidate the svalue entry. */
+            pos->type = T_INVALID;
 
             /* Count the deleted entry in the hash part.
              * Create it if necessary.
@@ -1418,7 +1495,9 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
     struct condensed_mapping *cm = m->condensed;
     struct hash_mapping *hm;
     int num_values = m->num_values;
-    svalue_t *svp;
+    Bool closure_index;
+
+    closure_index = (map_index->type == T_CLOSURE);
 
     /* Search in the condensed part first.
      */
@@ -1488,6 +1567,7 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
             if ( str == *(string_t **)key )
             {
                 int i;
+                svalue_t *svp;
 
                 /* Deallocate the string and mark the pointer as 'invalid'
                  */
@@ -1580,83 +1660,99 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
          * would denote a partition smaller than a svalue.
          */
         key = keyend - offset;
-        while ( (offset >>= 1) >= (p_int)(sizeof svp)/2) {
-            if ( !(u_d = (((svalue_t *)key)->u.number >> 1) -
-                         (index_u >> 1)) )
+        while ( (offset >>= 1) >= (p_int)(sizeof (svalue_t*))/2) {
+            if ( !(u_d = ((svalue_t *)key)->type - index_type) )
             {
-              if ( !(u_d = ((svalue_t *)key)->x.generic - index_x) )
-                if ( !(u_d = ((svalue_t *)key)->type - index_type) )
+                if (closure_index)
+                    u_d = closure_cmp(map_index, (svalue_t *)key);
+                else if ( !(u_d = (((svalue_t *)key)->u.number >> 1) -
+                                  (index_u >> 1)) )
+                    u_d = ((svalue_t *)key)->x.generic - index_x;
+            }
+
+            if (!u_d)
+            {
+                int i;
+                svalue_t *pos, *svp;
+
+                /* Find the new position for the key ith its future INVALID
+                 * type.
+                 */
+                for (pos = (svalue_t *)keystart
+                    ; pos->type == T_INVALID
+                      && pos->u.number < ((svalue_t *)key)->u.number
+                      && pos->x.generic < ((svalue_t *)key)->x.generic
+                    ; ++pos)
+                    NOOP;
+
+                if (pos != (svalue_t *)key)
                 {
-                    int i;
+                    /* Rotate the key and the values to their new position */
+                    svalue_t tmp = *(svalue_t *)key;
+                    svalue_t *rover;
 
-                    /* Deallocate the found key and zero out
-                     * its associated values
-                     */
-
-                    free_svalue( (svalue_t *)key );
+                    /* Let svp point at the first value of the next key */
                     svp = (svalue_t *)
-                      (keystart - ( num_values * (keyend - key) ) );
-                    for (i = num_values; --i >= 0 ;svp++) {
-                        free_svalue(svp);
-                        put_number(svp, 0);
-                    }
+                      (keystart - ( num_values * (keyend - key - 1) ) );
 
-                    /* If the following keys have a matching (.u.number,
-                     * x.generic) move them forward to replace this no
-                     * longer valid entry.
-                     * This is necessary to keep the sorting relation
-                     * intact.
-                     */
-                    while ( ((svalue_t *)key+1)->u.number == index_u
-                     &&     ((svalue_t *)key+1)->x.generic == index_x
-                     &&     key + sizeof(svalue_t) < keyend)
+                    for (rover = (svalue_t *)key; rover != pos; --rover)
                     {
-                        svalue_t *svp2;
+                        int j;
 
-                        *((svalue_t *)key) = *((svalue_t *)key+1);
-                        key += sizeof(svalue_t);
-                        svp2 = svp - num_values;
-                        for (i = num_values; --i >= 0 ;svp++, svp2++)
+                        rover[0] = rover[-1];
+
+                        for (j = num_values; j > 0; --j, --svp)
                         {
-                            *svp2 = *svp;
-                            put_number(svp, 0);
+                            svp[-1] = svp[-1-num_values];
                         }
                     }
 
-                    /* key is now the last of its (.u.number, x.generic)
-                     * kind: make it invalid
-                     */
-                    ((svalue_t *)key)->type = T_INVALID;
-
-                    /* Count the deleted entry in the hash part.
-                     * Create it if necessary.
-                     */
-                    if ( !(hm = m->hash) )
-                    {
-                        hm = (struct hash_mapping *)xalloc(sizeof *hm);
-                        if (!hm)
-                        {
-                            outofmem(sizeof *hm, "hash mapping");
-                            /* NOTREACHED */
-                            return;
-                        }
-                        m->hash = hm;
-                        hm->mask = hm->used = hm->condensed_deleted = 0;
-                        hm->chains[0] = 0;
-                        last_dirty_mapping->hash->next_dirty = m;
-                        last_dirty_mapping = m;
-#ifdef DEBUG
-                        hm->next_dirty = 0;
-                        hm->deleted = 0;
-#endif
-                        hm->ref = 0;
-                        num_dirty_mappings++;
-                        extra_jobs_to_do = MY_TRUE;
-                    }
-
-                    hm->condensed_deleted++;
-                    return;
+                    *pos = tmp;
                 }
+
+                /* Deallocate the found key and zero out
+                 * its associated values
+                 */
+
+                free_svalue( pos );
+                svp = (svalue_t *)
+                  (keystart - ( num_values * (keyend - (char *)pos) ) );
+                for (i = num_values; --i >= 0 ;svp++) {
+                    free_svalue(svp);
+                    put_number(svp, 0);
+                }
+
+                /* Invalidate the svalue entry.  */
+                pos->type = T_INVALID;
+
+                /* Count the deleted entry in the hash part.
+                 * Create it if necessary.
+                 */
+                if ( !(hm = m->hash) )
+                {
+                    hm = (struct hash_mapping *)xalloc(sizeof *hm);
+                    if (!hm)
+                    {
+                        outofmem(sizeof *hm, "hash mapping");
+                        /* NOTREACHED */
+                        return;
+                    }
+                    m->hash = hm;
+                    hm->mask = hm->used = hm->condensed_deleted = 0;
+                    hm->chains[0] = 0;
+                    last_dirty_mapping->hash->next_dirty = m;
+                    last_dirty_mapping = m;
+#ifdef DEBUG
+                    hm->next_dirty = 0;
+                    hm->deleted = 0;
+#endif
+                    hm->ref = 0;
+                    num_dirty_mappings++;
+                    extra_jobs_to_do = MY_TRUE;
+                }
+
+                hm->condensed_deleted++;
+                return;
             }
 
             if (u_d > 0) {
@@ -1665,7 +1761,7 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
                 /* u_d < 0 */
                 key -= offset;
                 while (key < keystart) {
-                    if ( (offset >>= 1) < (p_int)(sizeof svp) )
+                    if ( (offset >>= 1) < (p_int)(sizeof (svalue_t*)) )
                         break;
                     key += offset;
                 }
@@ -1692,42 +1788,60 @@ remove_mapping (mapping_t *m, svalue_t *map_index)
 
         /* Index and walk the proper chain */
 
-        i = index_u ^ index_type;
+        if (!closure_index
+         || (   map_index->x.closure_type != CLOSURE_LFUN
+             && map_index->x.closure_type != CLOSURE_ALIEN_LFUN
+             && map_index->x.closure_type != CLOSURE_IDENTIFIER )
+           )
+        {
+            i = index_u ^ index_type;
+        }
+        else
+        {
+            i = (p_int)(map_index->u.lambda->ob) ^ index_type;
+        }
         i = i ^ i >> 16;
         i = i ^ i >> 8;
         i &= hm->mask;
 
-        for(mcp = &hm->chains[i]; NULL != (mc = *mcp); )
+        for (mcp = &hm->chains[i]; NULL != (mc = *mcp); mcp = &mc->next)
         {
-            if (mc->key.u.number == index_u
-             && *SVALUE_FULLTYPE(&mc->key) == index_type)
+            int j;
+
+            if (*SVALUE_FULLTYPE(&mc->key) != index_type)
+                continue;
+            if (closure_index)
             {
-                int j;
-
-                *mcp = mc->next;
-
-                /* If the mapping is a protector mapping, move
-                 * the entry into the 'deleted' list, else
-                 * just deallocate it.
-                 */
-                if (hm->ref)
-                {
-                    mc->next = hm->deleted;
-                    hm->deleted = mc;
-                } else {
-                    svp = &mc->key;
-                    j = num_values;
-                    do {
-                        free_svalue(svp++);
-                    } while (--j >= 0);
-                    xfree( (char *)mc );
-                }
-                hm->used--;
-                return;
+                if (!closure_eq(&(mc->key), map_index))
+                    continue;
             }
-            mcp = &mc->next;
-        }
-    }
+            else if (mc->key.u.number != index_u)
+                continue;
+
+            *mcp = mc->next;
+
+            /* If the mapping is a protector mapping, move
+             * the entry into the 'deleted' list, else
+             * just deallocate it.
+             */
+            if (hm->ref)
+            {
+                mc->next = hm->deleted;
+                hm->deleted = mc;
+            } else {
+                svalue_t *svp;
+
+                svp = &mc->key;
+                j = num_values;
+                do {
+                    free_svalue(svp++);
+                } while (--j >= 0);
+                xfree( (char *)mc );
+            }
+            hm->used--;
+            return;
+        } /* for() */
+    } /* if (hash mapping) */
 
     /* Here, the key was not found at all. Just return. */
 
@@ -2307,16 +2421,22 @@ add_mapping (mapping_t *m1, mapping_t *m2)
     svp3 = CM_MISC(cm3);
     data3 = (svalue_t *)( (char *)svp3 - misc_size );
     for(;size1 && size2; ) {
-        if ( !(u_d = (svp1->u.number >> 1) - (svp2->u.number >> 1)) )
-          if ( !(u_d = svp1->x.generic - svp2->x.generic) )
-            if ( !(u_d = svp1->type - svp2->type) )
-            {
-                /* Create a 'deleted' entry for the overwritten cm1-entry */
-                dirty += svp1->type != T_INVALID;
-                svp1--;
-                data1 -= num_values;
-                size1 -= sizeof *svp1;
-            }
+        if ( !(u_d = svp1->type - svp2->type) )
+        {
+            if (svp1->type == T_CLOSURE)
+                u_d = closure_cmp(svp2, svp1);
+            else if ( !(u_d = (svp1->u.number >> 1) - (svp2->u.number >> 1)) )
+                u_d = svp1->x.generic - svp2->x.generic;
+        }
+
+        if (!u_d)
+        {
+            /* Create a 'deleted' entry for the overwritten cm1-entry */
+            dirty += svp1->type != T_INVALID;
+            svp1--;
+            data1 -= num_values;
+            size1 -= sizeof *svp1;
+        }
         if (u_d < 0)
         {
             /* Copy from cm1 */
@@ -2672,11 +2792,18 @@ compact_mappings (mp_int num)
                     {
                         p_int d;
 
-                        if ( !(d = (last_misc->key.u.number >> 1) -
-                                   (mcp->key.u.number >> 1) ) )
-                          if ( !(d = last_misc->key.x.generic -
-                                     mcp->key.x.generic ) )
-                            d = last_misc->key.type - mcp->key.type;
+                        if (! (d = last_misc->key.type - mcp->key.type))
+                        {
+                            if (last_misc->key.type == T_CLOSURE)
+                            {
+                                d = closure_cmp(&mcp->key, &last_misc->key);
+                            }
+                            else if ( !(d = (last_misc->key.u.number >> 1) -
+                                            (mcp->key.u.number >> 1) ) )
+                                d = last_misc->key.x.generic -
+                                     mcp->key.x.generic;
+                        }
+
                         if (d > 0) {
                             last_misc->next = misc_hook1;
                             mcp->next = last_misc;
@@ -2889,12 +3016,18 @@ compact_mappings (mp_int num)
                 while (1) {
                     p_int d;
 
-                    if (!(d = (misc_hook2->key.u.number >> 1) -
-                              (misc_hook1->key.u.number >> 1) ))
-                      if (!(d = misc_hook2->key.x.generic -
-                                misc_hook1->key.x.generic))
-                          d = misc_hook2->key.type -
-                              misc_hook1->key.type;
+                    if (! (d = misc_hook2->key.type - misc_hook1->key.type))
+                    {
+                        if (misc_hook1->key.type == T_CLOSURE)
+                        {
+                            d = closure_cmp(&misc_hook1->key, &misc_hook2->key);
+                        }
+                        else if ( !(d = (misc_hook2->key.u.number >> 1) -
+                                        (misc_hook1->key.u.number >> 1) ) )
+                            d = misc_hook2->key.x.generic -
+                                misc_hook1->key.x.generic;
+                    }
+
                     if (d < 0)
                     {
                         *out1 = misc_hook2;
@@ -2968,20 +3101,34 @@ compact_mappings (mp_int num)
               /* Auxiliaries */
 
 
-            /* Count the number of deleted misc-keyed entries */
+            /* Count the number of deleted misc-keyed entries.
+             * As a safety measure, also free their associated
+             * values, which should be svalue-0 by now anyway.
+             */
 
             misc_deleted = 0;
             if (hm->condensed_deleted)
             {
                 svalue_t *svp;
+                svalue_t *data;
                 mp_int size;
 
-                svp = CM_MISC(cm);
                 size = cm->misc_size;
-                while ( (size -= sizeof(svalue_t)) >= 0)
+                svp = CM_MISC(cm) - (size / sizeof(svalue_t));
+                data = svp - (size / sizeof(svalue_t)) * num_values;
+
+                while ( (size -= sizeof(svalue_t)) >= 0
+                     && (svp++)->type == T_INVALID
+                      )
                 {
-                    if ( (--svp)->type == T_INVALID )
-                        misc_deleted++;
+                    int i;
+
+                    misc_deleted++;
+
+                    for (i = num_values; --i >= 0; )
+                    {
+                        free_svalue(data++);
+                    }
                 }
             }
 
@@ -3169,35 +3316,30 @@ compact_mappings (mp_int num)
             data1 = (svalue_t *)((char *)key1 - cm->misc_size);
             key2 = CM_MISC(cm2);
             data2 = (svalue_t *)((char *)key2 - cm2->misc_size);
-            count1 = cm->misc_size;
+            count1 = cm->misc_size - misc_deleted * sizeof(svalue_t);
 
-            /* For all leading invalid keys, free the associated
-             * values (this is more a safety measure as the values should
-             * be svalue-0 anyway).
+            /* Do the actual merge.
+             * Note that count1 already excludes the deleted keys "at
+             * the end".
              */
-            while (count1 && key1[-1].type == T_INVALID)
-            {
-                int i;
-
-                key1--;
-                i = num_values;
-                while (--i >= 0) {
-                    free_svalue(--data1);
-                }
-                count1 -= sizeof(svalue_t);
-            }
-
-            /* Do the actual merge */
             if (misc_hook1 && count1)
             {
                 while (1)
                 {
                     p_int d;
 
-                    if (!(d = (misc_hook1->key.u.number >> 1) -
-                              (key1[-1].u.number >> 1) ))
-                      if (!(d = misc_hook1->key.x.generic - key1[-1].x.generic))
-                          d = misc_hook1->key.type - key1[-1].type;
+                    if (! (d = misc_hook1->key.type - key1[-1].type))
+                    {
+                        if (misc_hook1->key.type == T_CLOSURE)
+                        {
+                            d = closure_cmp(&key1[-1], &misc_hook1->key);
+                        }
+                        else if ( !(d = (misc_hook1->key.u.number >> 1) -
+                                        (key1[-1].u.number >> 1) ) )
+                            d = misc_hook1->key.x.generic -
+                                key1[-1].x.generic;
+                    }
+
                     if (d < 0)
                     {
                         /* Take entry from misc_hook1 */
@@ -3231,22 +3373,6 @@ compact_mappings (mp_int num)
                         }
                         if (! (count1 -= sizeof(svalue_t)) )
                             break;
-
-                        /* Skip eventual following invalid entries in cm */
-                        if (key1[-1].type == T_INVALID)
-                        {
-                            do {
-                                key1--;
-                                i = num_values;
-                                while (--i >= 0) {
-                                    free_svalue(--data1);
-                                }
-                                if (! (count1 -= sizeof(svalue_t)) )
-                                    break;
-                            } while (key1[-1].type == T_INVALID);
-                            if (!count1)
-                                break;
-                        }
                     }
                 } /* while(1) */
             } /* if (misc_hook1 && count1) */
@@ -3269,22 +3395,6 @@ compact_mappings (mp_int num)
                     }
                     if (! (count1 -= sizeof(svalue_t)) )
                         break;
-
-                    /* Skip eventual following invalid entries in cm */
-                    if (key1[-1].type == T_INVALID)
-                    {
-                        do {
-                            key1--;
-                            i = num_values;
-                            while (--i >= 0) {
-                                free_svalue(--data1);
-                            }
-                            if (! (count1 -= sizeof(svalue_t)) )
-                                break;
-                        } while (key1[-1].type == T_INVALID);
-                        if (!count1)
-                            break;
-                    }
                 }
             }
             else
@@ -3670,7 +3780,7 @@ clean_stale_mappings (void)
         memcpy((char *)cm2, (char *)cm, (size_t)preserved_size);
         cm2->misc_size = (p_int)(size - num_deleted * sizeof(svalue_t));
 
-        /* Copy the date for all valid misc-keys into the new
+        /* Copy the data for all valid misc-keys into the new
          * condensed part.
          */
         data = svp;

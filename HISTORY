@@ -4,7 +4,7 @@ the host system.
 
 For a detailed list of all changes see the file CHANGELOG.
 
-11-Apr-2001 (Lars Duening) -- Development Release 3.3
+13-Apr-2001 (Lars Duening) -- Development Release 3.3
 
     - Changed efuns:
        + Removed obsolete and deprecated efuns: add_verb(), add_xverb(),
@@ -31,6 +31,8 @@ For a detailed list of all changes see the file CHANGELOG.
            NO_INHERIT, NO_SHADOW and NO_CLONE, and gives a better account
            of the memory used for strings and variables.
            Single values can be returned instead of the whole array.
+       + printf(), sprintf(): The formatter "%^" will print "%^", for
+           compatibility with terminal_colour().
        + query_udp_port(), send_udp(): Renamed from query_imp_port() and
            send_imp().
        + regexp functions: more compatible with 8-bit characters.
@@ -105,8 +107,10 @@ For a detailed list of all changes see the file CHANGELOG.
        + The operators '++' and '--' can now be used on floats, too.
        + Closures bound to destructed objects are now treated uniformly
            like destructed objects and are replaced by 0s where required.
-       + The equality operators '==' and '!=' now return a sensible result
-           for lfun and variable closures.
+       + Lfun and variable closures can now be compared with '==' and '!=',
+           and are treated correctly in alist and array operations.
+       + Closures can now sensibly be used in '==' and '!=' comparisons,
+           in array intersections, and as keys in mappings.
        + Inline closures inherit the visibility of their defining function.
        + Experimental: Extended the construct catch() with the keyword
            'nolog', which suppresses logging the caught error in the logfiles.

@@ -8743,30 +8743,7 @@ again:
             break;
 
         case T_CLOSURE:
-            i = (sp-1)->u.generic == sp->u.generic &&
-                (sp-1)->x.generic == sp->x.generic;
-            
-            /* Lfun- and identifier closure can be equal even if
-             * their pointers differ.
-             */
-            if (!i
-             && (sp-1)->x.closure_type == sp->x.closure_type
-             && (   (sp-1)->x.closure_type == CLOSURE_LFUN
-                 || (sp-1)->x.closure_type == CLOSURE_ALIEN_LFUN
-                 || (sp-1)->x.closure_type == CLOSURE_IDENTIFIER
-                )
-             && (sp-1)->u.lambda->ob == sp->u.lambda->ob
-               )
-            {
-                if ((sp-1)->x.closure_type == CLOSURE_ALIEN_LFUN)
-                    i =    (   (sp-1)->u.lambda->function.alien.ob 
-                            == sp->u.lambda->function.alien.ob)
-                        && (   (sp-1)->u.lambda->function.alien.index 
-                            == sp->u.lambda->function.alien.index);
-                else
-                    i =    (sp-1)->u.lambda->function.index
-                        == sp->u.lambda->function.index;
-            }
+            i = closure_eq(sp-1, sp);
             break;
 
         case T_SYMBOL:
@@ -8831,30 +8808,7 @@ again:
             break;
 
         case T_CLOSURE:
-            i = (sp-1)->u.generic  != sp->u.generic ||
-                (sp-1)->x.generic != sp->x.generic;
-
-            /* Lfun- and identifier closure can be equal even if
-             * their lambda pointers differ.
-             */
-            if (i
-             && (sp-1)->x.closure_type == sp->x.closure_type
-             && (   (sp-1)->x.closure_type == CLOSURE_LFUN
-                 || (sp-1)->x.closure_type == CLOSURE_ALIEN_LFUN
-                 || (sp-1)->x.closure_type == CLOSURE_IDENTIFIER
-                )
-             && (sp-1)->u.lambda->ob == sp->u.lambda->ob
-               )
-            {
-                if ((sp-1)->x.closure_type == CLOSURE_ALIEN_LFUN)
-                    i =    (   (sp-1)->u.lambda->function.alien.ob 
-                            != sp->u.lambda->function.alien.ob)
-                        || (   (sp-1)->u.lambda->function.alien.index 
-                            != sp->u.lambda->function.alien.index);
-                else
-                    i =    (sp-1)->u.lambda->function.index
-                        != sp->u.lambda->function.index;
-            }
+            i = !closure_eq(sp-1, sp);
             break;
 
         case T_SYMBOL:

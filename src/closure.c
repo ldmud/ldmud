@@ -437,6 +437,107 @@ find_function (string_t *name, program_t *prog)
 
 /*-------------------------------------------------------------------------*/
 Bool
+closure_eq (svalue_t * left, svalue_t * right)
+
+/* Compare the two closure svalues <left> and <right> and return TRUE if
+ * they refer to the same closure.
+ */
+
+{
+    int i;
+
+    i = left->u.generic  == right->u.generic &&
+        left->x.generic == right->x.generic;
+    
+    /* Lfun- and identifier closure can be equal even if
+     * their pointers differ.
+     */
+    if (!i
+     && left->x.closure_type == right->x.closure_type
+     && (   left->x.closure_type == CLOSURE_LFUN
+         || left->x.closure_type == CLOSURE_ALIEN_LFUN
+         || left->x.closure_type == CLOSURE_IDENTIFIER
+        )
+     && left->u.lambda->ob == right->u.lambda->ob
+       )
+    {
+        if (left->x.closure_type == CLOSURE_ALIEN_LFUN)
+            i =    (   left->u.lambda->function.alien.ob 
+                    == right->u.lambda->function.alien.ob)
+                && (   left->u.lambda->function.alien.index 
+                    == right->u.lambda->function.alien.index);
+        else
+            i =    left->u.lambda->function.index
+                == right->u.lambda->function.index;
+    }
+    
+    return (Bool)i;
+} /* closure_eq() */
+
+/*-------------------------------------------------------------------------*/
+int
+closure_cmp (svalue_t * left, svalue_t * right)
+
+/* Compare the two closure svalues <left> and <right> and return a value
+ * describing their relation:
+ *  -1: <left> is 'smaller' than <right>
+ *   0: the closures are equal
+ *   1: <left> is 'greater' than <right>
+ */
+
+{
+    if (closure_eq(left, right)) return 0;
+
+    /* First comparison criterium is the closure_type */
+    if (left->x.closure_type != right->x.closure_type)
+    {
+        return (left->x.closure_type < right->x.closure_type) ? -1 : 1;
+    }
+
+    /* The types are identical and determine the next comparison.
+     * For lfun/identifier closure, we compare the actual closure data,
+     * for other closures a comparison of the lambda pointer is sufficient.
+     */
+    if (left->x.closure_type == CLOSURE_LFUN
+     || left->x.closure_type == CLOSURE_ALIEN_LFUN
+     || left->x.closure_type == CLOSURE_IDENTIFIER 
+       )
+    {
+        if (left->u.lambda->ob != right->u.lambda->ob)
+        {
+            return (left->u.lambda->ob < right->u.lambda->ob) ? -1 : 1;
+        }
+
+        if (left->x.closure_type == CLOSURE_ALIEN_LFUN)
+        {
+            if ( left->u.lambda->function.alien.ob
+              != right->u.lambda->function.alien.ob)
+            {
+                return (  left->u.lambda->function.alien.ob
+                        < right->u.lambda->function.alien.ob)
+                       ? -1 : 1;
+            }
+
+            /* This is the only field left, so it is guaranteed to differ */
+            return (  left->u.lambda->function.alien.index
+                    < right->u.lambda->function.alien.index)
+                   ? -1 : 1;
+        }
+        else
+        {
+            /* This is the only field left, so it is guaranteed to differ */
+            return (  left->u.lambda->function.index
+                    < right->u.lambda->function.index)
+                   ? -1 : 1;
+        }
+    }
+
+    /* Normal closure: compare the lambda pointers */
+    return (left->u.lambda < right->u.lambda) ? -1 : 1;
+} /* closure_cmp() */
+
+/*-------------------------------------------------------------------------*/
+Bool
 lambda_ref_replace_program( lambda_t *l, int type
                           , p_int size, vector_t *args, svalue_t *block)
 

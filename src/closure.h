@@ -71,6 +71,8 @@ struct lambda_s
 /* --- Prototypes --- */
 
 extern long      find_function(string_t *name, program_t *prog);
+extern Bool      closure_eq (svalue_t * left, svalue_t * right);
+extern int       closure_cmp (svalue_t * left, svalue_t * right);
 extern Bool      lambda_ref_replace_program(lambda_t *l, int type, p_int size, vector_t *args, svalue_t *block);
 extern void      set_closure_user(svalue_t *svp, object_t *owner);
 extern void      replace_program_lambda_adjust(replace_ob_t *r_ob);

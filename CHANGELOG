@@ -1,6 +1,22 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+13-Apr-2001 (Lars Duening)  (3.3.41)
+    - (simulate.c) Made the 'illegal object to load' error message
+         more informative (suggested by Freaky).
+    - (mapping.c) Modified to mapping code to be able to use closures
+         as proper keys.
+
+12-Apr-2001 (Lars Duening)
+    - (pkg-mysql.c) Forgot to include mstrings.h here (reported by 
+        Gawain and Bardioc)
+    - (sprintf.c) The formatter "%^" will print "%^" for compatibility
+         with terminal_colour().
+    - (closure.c, array.c) Introduced a total order on closure svalues
+         which allows their use in alists and array operations like
+         intersection. The same will have to be done later for their use in
+         mappings (reported by Gnomi).
+
 11-Apr-2001 (Lars Duening)  (3.3.40)
     - (prolang.y, interpret.c, func_spec) Wildcarded calls to inherited
         functions confused arguments with results and messed up the stack.

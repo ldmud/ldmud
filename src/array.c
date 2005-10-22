@@ -926,6 +926,11 @@ compare_single (svalue_t *svp, vector_t *v)
         return mstreq(svp->u.str, p2->u.str) ? 0 : -1;
     }
 
+    if (svp->type == T_CLOSURE)
+    {
+        return closure_cmp(svp, p2);
+    }
+
     /* All other types have to be equal by address, visible in u.number */
     /* TODO: This comparison is not valid according to ISO C */
     if (svp->u.number != p2->u.number)
@@ -934,7 +939,6 @@ compare_single (svalue_t *svp, vector_t *v)
     switch (svp->type)
     {
     case T_FLOAT:
-    case T_CLOSURE:
     case T_SYMBOL:
     case T_QUOTED_ARRAY:
         return svp->x.generic != p2->x.generic ? -1 : 0;
@@ -1081,15 +1085,19 @@ alist_cmp (svalue_t *p1, svalue_t *p2)
     register int d;
 
     /* Avoid a numeric overflow by first comparing the values halfed. */
+    if ( 0 != (d = p1->type - p2->type) ) return d;
+
+    if (p1->type == T_CLOSURE)
+        return closure_cmp(p1, p2);
+
     if ( 0 != (d = (p1->u.number >> 1) - (p2->u.number >> 1)) ) return d;
     if ( 0 != (d = p1->u.number - p2->u.number) ) return d;
-    if ( 0 != (d = p1->type - p2->type) ) return d;
     switch (p1->type) {
       case T_FLOAT:
-      case T_CLOSURE:
       case T_SYMBOL:
       case T_QUOTED_ARRAY:
         if ( 0 != (d = p1->x.generic - p2->x.generic) ) return d;
+        break;
     }
     return 0;
 }

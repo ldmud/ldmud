@@ -51,6 +51,8 @@
  *  "X"   the integer arg is printed in hex (in capitals).
  * "e","E","f","F","g","G"
  *        floating point formatting like in C.
+ *  "^"   prints "%^" for compatibility with terminal_colour() strings.
+ *        No modifiers are allowed.
  *---------------------------------------------------------------------------
  */
 
@@ -1442,9 +1444,19 @@ static char buff[BUFF_SIZE]; /* The buffer to return the result */
         if (format_str[fpos] == '%')
         {
             /* Another format entry */
+
             if (format_str[fpos+1] == '%')
             {
                 ADD_CHAR('%');
+                fpos++;
+                continue;
+            }
+
+            if (format_str[fpos+1] == '^')
+            {
+                ADD_CHAR('%');
+                fpos++;
+                ADD_CHAR('^');
                 fpos++;
                 continue;
             }

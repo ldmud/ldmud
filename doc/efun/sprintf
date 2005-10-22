@@ -7,9 +7,9 @@ DESCRIPTION
         return string), to format the arguments into the string it's
         nessasary to include an argument format string (AFS) in the
         FMT.  An AFS is a series of characters starting with a percent
-        sign "%" and terminated with a argument type specifier.         To
-        include a "%" sign in the output, it is necessary to include a
-        double percent sign "%%".
+        sign "%" and terminated with a argument type specifier.
+        To include a "%" sign in the output, it is necessary to include a
+        double percent sign "%%". The sequence "%^" will output "%^" again.
 
 Valid argument type specifiers are:
   "s" : the argument is a string.
@@ -87,5 +87,9 @@ EXAMPLES
         sprintf("%-*#s\n", 80, implode(get_dir("~/."), "\n"));
 
 
+HISTORY
+        LDMud 3.2.9 added the "%^" sequence for compatibility with
+          terminal_colour().
+
 SEE ALSO
-        printf(E)
+        printf(E), terminal_colour(E)

@@ -35,6 +35,7 @@
 
 #include "array.h"
 #include "interpret.h"
+#include "mstrings.h"
 #include "svalue.h"
 #include "xalloc.h"
 

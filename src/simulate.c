@@ -1040,7 +1040,7 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
 
 {
     lambda_t *l;
-    char *err;
+    char *err, errtxt[1024];
     svalue_t arg, *ret;
 
     ob->user = &default_wizlist_entry;  /* Default uid */
@@ -1089,7 +1089,9 @@ give_uid_to_object (object_t *ob, int hook, int numarg)
         else
         {
             pop_stack(); /* deallocate result */
-            err = "Illegal object to load.\n";
+            sprintf(errtxt, "Object '%.900s' illegal to load (no uid).\n"
+                          , get_txt(ob->name));
+            err = errtxt;
         }
     }
     else

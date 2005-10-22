@@ -6,4 +6,4 @@ DESCRIPTION
         the result string to the user.
 
 SEE ALSO
-        sprintf(E), write(E)
+        sprintf(E), write(E), terminal_colour(E)
