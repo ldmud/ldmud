@@ -22,14 +22,12 @@
 ;; TODO: The regexp() functions and sscanf() should be able to handle '\0' as
 ;; TODO:: data byte, not as terminator.
               
-(Project-Version lpmud 3-3 38)
-(Parent-Version lpmud 3-3 37)
-(Version-Log "Removed a warning from md5.c
-Bugfixed the '...' implementation.
-Adapted smalloc for systems which return memory in multiples of 64.")
+(Project-Version lpmud 3-3 39)
+(Parent-Version lpmud 3-3 38)
+(Version-Log "Small correction to Makefile.in and smalloc.c")
 (New-Version-Log
 "")
-(Checkin-Time "Sat, 07 Apr 2001 02:52:30 -0600")
+(Checkin-Time "Sun, 08 Apr 2001 23:09:01 -0600")
 (Checkin-Login lars)
 (Populate-Ignore ("~$" "\\.o$" "core$" "\\.emacs" "\\.a$" "\\.deps"
                   "\\.gz$" "\\.orig$" "\\.rej$" "\\.xSYM" "^driver$"
@@ -62,7 +60,7 @@ Adapted smalloc for systems which return memory in multiples of 64.")
   (README (lpmud/n/0_README 1.4.1.1 644))
   (COPYRIGHT (lpmud/d/20_Copyright 1.10.1.3 644))
   (CREDITS (lpmud/d/22_CREDITS 1.70.1.12 644))
-  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.101 644))
+  (CHANGELOG (lpmud/e/38_CHANGELOG. 1.157.1.102 644))
   (HISTORY (lpmud/f/49_HISTORY 1.162 644))
   (INSTALL (lpmud/d/18_INSTALL 1.11.1.9 644))
   (COPYING.LIB (lpmud/k/14_COPYING.LI 1.2 644))
@@ -71,7 +69,7 @@ Adapted smalloc for systems which return memory in multiples of 64.")
   (src/configure (lpmud/d/0_configure 1.19.1.21 755))
   (src/config.h.in (lpmud/d/1_config.h 1.41.1.4.1.3 644))
   (src/machine.h.in (lpmud/b/9_machine.h. 1.9.1.2 644))
-  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.21 644))
+  (src/Makefile.in (lpmud/d/17_Makefile.i 1.37.1.22 644))
   (src/mkinstalldirs (lpmud/C/4_mkinstalld 1.1 644))
   (src/install-sh (lpmud/C/5_install-sh 1.2 644))
 
@@ -186,7 +184,7 @@ Adapted smalloc for systems which return memory in multiples of 64.")
   (src/simulate.h (lpmud/f/16_simulate.h 1.25.1.15 644))
   (src/simulate.c (lpmud/31_simulate.c 1.88.1.31 644))
   (src/smalloc.h (lpmud/29_smalloc.h 1.16.1.7 644))
-  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.25 644))
+  (src/smalloc.c (lpmud/30_smalloc.c 1.31.1.26 644))
   (src/sprintf.h (lpmud/f/15_sprintf.h 1.3.1.2 644))
   (src/sprintf.c (lpmud/28_sprintf.c 1.31.1.15 644))
   (src/strfuns.h (lpmud/B/51_strfuns.h 1.11.1.3 644))

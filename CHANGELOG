@@ -1,6 +1,11 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+07-Apr-2001 (Lars Duening)  (3.3.39)
+    - (smalloc.c) The multiple-of allocation was not quite correct.
+    - (Makefile.in) The pkg-mysql file was missing from the build
+         rules (reported by Dafire).
+
 06-Apr-2001 (Lars Duening)  (3.3.38)
     - (md5.c) Removed a compiler warning.
     - (closure.c, interpret.c, prolang.y) Bugfixes in the '...' code

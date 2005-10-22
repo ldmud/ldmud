@@ -2096,14 +2096,14 @@ found_fit:
         /* Some systems like Darwin don't like odd sbrk()/malloc()s, therefore
          * we round up to the next multiple - 64 seems to work fine. That of
          * course might give an overhang of less than SMALL_BLOCK_MAX_BYTES,
-         * so we have to add that then, too.
+         * so we have to add that and its own 64-Byte-fudge factor then, too.
          */
 #       define ALLOC_MULTIPLE 63  /* Ok, the (multiple-1) */
 
         if ((chunk_size & ALLOC_MULTIPLE) != 0)
         {
 #           if SMALL_BLOCK_MAX_BYTES > ALLOC_MULTIPLE
-                chunk_size += SMALL_BLOCK_MAX_BYTES + ALLOC_MULTIPLE;
+                chunk_size += SMALL_BLOCK_MAX_BYTES + 2 * ALLOC_MULTIPLE;
 #           else
                 chunk_size += ALLOC_MULTIPLE;
 #           endif
