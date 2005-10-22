@@ -426,6 +426,7 @@ void    destruct(null|object);
 int     exec(object, object);
 object  find_object(string);
 mixed  *functionlist(object|string, int default: F_CONST1);
+string *include_list(void|object, void|int);
 string *inherit_list(void|object, void|int);
 int     input_to(string|closure, void|int, ...);
 int     interactive(object default: F_THIS_OBJECT);

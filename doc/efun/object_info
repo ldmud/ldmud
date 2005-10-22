@@ -84,6 +84,7 @@ DESCRIPTION
                                        data sharing.
           int    [OIM_SIZE_STRINGS_TOTAL]: unmodified size needed for the
                                        string data.
+          int    [OIM_NUM_INCLUDES]:   number of included files in the program.
           int    [OIM_NUM_INHERITED]:  number of inherited programs.
           int    [OIM_SIZE_INHERITED]: size needed for the inherit structs.
           int    [OIM_TOTAL_SIZE]:     total size of the program.
@@ -112,9 +113,10 @@ HISTORY
               is not available.
           - basic result OIB_APPROVED is gone.
         LDMud 3.2.8 added OIM_DATA_SIZE to the result of OINFO_MEMORY.
-        LDMud 3.2.9 added the index mechanism, OIM_NO_INHERIT, OIM_NO_SHADOW,
-          OIM_NO_CLONE, OIM_SIZE_STRINGS_DATA, OIM_SIZE_STRINGS_TOTAL, and
-          OIM_DATA_SIZE_TOTAL to the result of OINFO_MEMORY.
+        LDMud 3.2.9 added the index mechanism, OIM_NUM_INCLUDES,
+          OIM_NO_INHERIT, OIM_NO_SHADOW, OIM_NO_CLONE, OIM_SIZE_STRINGS_DATA,
+          OIM_SIZE_STRINGS_TOTAL, and OIM_DATA_SIZE_TOTAL to the result
+          of OINFO_MEMORY.
 
 SEE ALSO
         debug_info(E)

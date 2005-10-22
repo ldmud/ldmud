@@ -397,11 +397,15 @@ DESCRIPTION
 
           If the setting is a closure, it is called as
             
-            string <closure>(string current_file)
+            string <closure>(string base_file, string current_file)
 
-          with the name of the compiled LPC file as argument. If the result
-          is a string, it will be included before the source of the
-          compiled object.
+          for every file opened by the compiler. <base_file> will be the
+          filename of the compiled object, <current_file> the name of a file
+          included directly or indirectly by the <base_file>. When the
+          <base_file> itself is opened, <current_file> will be 0.
+
+          If the result is a string, it will be included before the actual
+          text of the file.
 
 
         H_TELNET_NEG

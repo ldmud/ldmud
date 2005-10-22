@@ -56,7 +56,7 @@ For a detailed list of all changes see the file CHANGELOG.
     - Other Changes:
 
 
-17-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
+18-Nov-2001 (Lars Duening) -- upcoming Release 3.2.9
 
     - Changed efuns:
        + add_action(): New flag AA_IMM_ARGS implements the sane NOSPACE
@@ -157,6 +157,7 @@ For a detailed list of all changes see the file CHANGELOG.
            Optional: mySQL support.
        + gmtime(), localtime(): Return the time broken up into its
            constituents.
+       + include_list(): Return the files included in a program file.
        + md5(): Compute the MD5 message digest for a string.
        + min(), max(): To select the minimum resp. maximum among a bunch
            of numbers or strings.
@@ -271,6 +272,7 @@ For a detailed list of all changes see the file CHANGELOG.
            functions in strange ways.
        + Bugfix: Termination of a macro definition with End-of-file in
            an include file confused the lexer.
+       + Bugfix: Inherited private functions no longer hide (simul-)efuns.
 
     - Runtime:
        + Attempts to set a single string character to 0 now raise

@@ -103,6 +103,7 @@ f-010908: caller_stack should include function names
 f-011011: Another sort of deep_call_other() ?
 f-011015-1: Left, Center, and Flush formatting for terminal_colour()
 f-011016-0: sprintf() and colour strings
+f-011029: Efun copy_object()
 
 
 Language

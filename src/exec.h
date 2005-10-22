@@ -726,7 +726,9 @@ struct program_s
     unsigned short num_functions;
       /* Number of functions (inherited and own) of this program */
     unsigned short num_strings;
-      /* Number of shared strings used by the program */
+      /* Number of shared strings (including filenames) used by the program */
+    unsigned short num_includes;
+      /* Number of stored include filenames */
     unsigned short num_variables;
       /* Number of variables (inherited and own) of this program */
     unsigned short num_inherited;

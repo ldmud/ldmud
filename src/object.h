@@ -246,6 +246,7 @@ extern object_t *get_empty_object(int num_var, variable_t * variables, svalue_t 
 
 extern svalue_t *f_function_exists(svalue_t *sp, int num_arg);
 extern svalue_t *f_functionlist(svalue_t *sp);
+extern svalue_t *f_include_list (svalue_t *sp, int num_arg);
 extern svalue_t *f_inherit_list(svalue_t *sp, int num_arg);
 extern svalue_t *f_load_name(svalue_t *sp);
 extern svalue_t *f_object_name(svalue_t *sp);

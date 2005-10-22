@@ -1,6 +1,20 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+18-Nov-2001 (Lars Duening)  (3.3.126)
+    - (object.c) Efun inherit_list: the tagging of virtual inherits
+        returned a random value for the main program (reported by Freaky).
+    - (prolang.y) Inherited private functions could hide simul-efuns
+        or efuns (reported by Gnomi).
+    - (lex.c) If H_AUTO_INCLUDE is set to a closure, it will be called
+        for all files opened by the lexer. A second argument passed to
+        the closure determines whether the call is for the object file
+        itself or for an included file (suggested by Freaky).
+    - (func_spec, array, exec.h, prolang.y) New efun include_list()
+        to return the filenames read when compiling a program.
+    - (efuns.c) Added the number of included files to the result
+        of object_info(OINFO_MEMORY).
+
 17-Nov-2001 (Lars Duening)  (3.3.125)
     - (func_spec, prolang.y, make_func, lex, simulate) Replaced the efun
         set_auto_include_string() with the driver hook H_AUTO_INCLUDE.

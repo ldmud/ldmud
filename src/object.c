@@ -1741,6 +1741,121 @@ f_functionlist (svalue_t *sp)
 
 /*-------------------------------------------------------------------------*/
 svalue_t *
+f_include_list (svalue_t *sp, int num_arg)
+
+/* EFUN include_list()
+ *
+ *   string* include_list ()
+ *   string* include_list (object ob)
+ *   string* include_list (object ob, int flags)
+ *
+ * Return a list with the names of all files included by the program 
+ * of object <ob>, including <ob>'s program file itself.
+ * TODO: To implement a tree-structured return, the lexer needs to
+ * TODO:: store the include depth for every included file. This information
+ * TODO:: can be stored in a new array in the program structure and
+ * TODO:: swapped with the lineinformation.
+ */
+
+{
+    object_t  *ob;             /* Analyzed object */
+    vector_t  *vec;            /* Result vector */
+    svalue_t  *svp;            /* Pointer to next vec entry to fill in */
+    int        count;          /* Total number of includes */
+    svalue_t  *argp;           /* Arguments */
+    string_t **include_names;  /* Pointer to the include names */
+
+    /* Get the arguments */
+    argp = sp - num_arg + 1;
+
+    if (num_arg >= 1)
+        ob = argp[0].u.ob;
+    else
+        ob = current_object;
+
+#if 0
+    TODO: Not yet
+    if (num_arg >= 2)
+        flags = argp[1].u.number;
+    else
+        flags = 0;
+#endif
+
+    if (O_PROG_SWAPPED(ob))
+        if (load_ob_from_swap(ob) < 0)
+        {
+            error("Out of memory: unswap object '%s'\n", get_txt(ob->name));
+            /* NOTREACHED */
+            return NULL;
+        }
+
+    /* Get the location and number of the include file names,
+     * and allocate the result vector.
+     */
+
+    include_names = ob->prog->strings + ob->prog->num_strings - 1;
+    count = ob->prog->num_includes;
+
+    vec = allocate_array(count+1);
+    svp = vec->item;
+
+    /* Store the program name itself */
+
+    {
+        string_t *str;
+        size_t slen;  /* Also used for error reporting */
+
+        slen = mstrsize(ob->prog->name);
+
+        if (compat_mode)
+            str = ref_mstring(ob->prog->name);
+        else
+            str = add_slash(ob->prog->name);
+
+        if (!str)
+        {
+            free_array(vec);
+            error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
+                 , (unsigned long)slen);
+        }
+        put_string(svp, str);
+        svp++;
+    }
+
+    /* Now copy all include names from the program into the array */
+
+    for ( ; count > 0; count--, svp++, include_names--)
+    {
+        string_t *str;
+        size_t slen;  /* Also used for error reporting */
+
+        slen = mstrsize(*include_names);
+
+        if (compat_mode)
+            str = ref_mstring(*include_names);
+        else
+            str = add_slash(*include_names);
+
+        if (!str)
+        {
+            free_array(vec);
+            error("(inherit_list) Out of memory: (%lu bytes) for filename\n"
+                 , (unsigned long)slen);
+        }
+        put_string(svp, str);
+    }
+
+    /* Done */
+
+    sp = pop_n_elems(num_arg, sp);
+
+    sp++;
+    put_array(sp, vec);
+    return sp;
+} /* f_include_list() */
+ 
+/*-------------------------------------------------------------------------*/
+svalue_t *
 f_inherit_list (svalue_t *sp, int num_arg)
 
 /* EFUN inherit_list()
@@ -1814,6 +1929,7 @@ f_inherit_list (svalue_t *sp, int num_arg)
 
     begin->next = NULL;
     begin->prog = ob->prog;
+    begin->virtual = MY_FALSE;
     begin->count = 0;
     begin->parent = NULL;
     begin->vec = NULL;

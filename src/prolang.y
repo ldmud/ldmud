@@ -10968,23 +10968,36 @@ copy_functions (program_t *from, fulltype_t type)
                 }
                 else /* n < 0: not an lfun */
                 {
-                    if (n == -2)
-                    {
-                        /* This inherited function shadows an efun */
+                    if (n != -2
+                     || fun.flags & (TYPE_MOD_PRIVATE|NAME_HIDDEN) == 0
+                       )
+                     {
+                        /* This is not an inherited private function shadowing
+                         * a (simul-)efun.
+                         */
 
-                        efun_shadow_t *q;
+                        if (n == -2)
+                        {
+                            /* This inherited function shadows an efun */
 
-                        q = xalloc(sizeof(efun_shadow_t));
-                        if (!q) {
-                            yyerrorf("Out of memory: efun shadow (%lu bytes)"
-                                    , (unsigned long) sizeof(efun_shadow_t));
-                            break;
+                            efun_shadow_t *q;
+
+                            q = xalloc(sizeof(efun_shadow_t));
+                            if (!q) {
+                                yyerrorf("Out of memory: efun shadow (%lu bytes)"
+                                        , (unsigned long) sizeof(efun_shadow_t));
+                                break;
+                            }
+                            q->shadow = p;
+                            q->next = all_efun_shadows;
+                            all_efun_shadows = q;
                         }
-                        q->shadow = p;
-                        q->next = all_efun_shadows;
-                        all_efun_shadows = q;
+                        p->u.global.function = current_func_index;
                     }
-                    p->u.global.function = current_func_index;
+                    /* else: inherited private function must not hide
+                     * the (simul-)efun and is thusly not added to
+                     * the symbol-table.
+                     */
                 }
             }
             else /* p is I_TYPE_UNKNOWN */
@@ -11690,6 +11703,7 @@ epilog (void)
     int          size, i;
     mp_int       num_functions;
     mp_int       num_strings;
+    mp_int       num_includes;
     mp_int       num_variables;
     bytecode_p   p;
     ident_t     *g, *q;
@@ -11775,6 +11789,7 @@ epilog (void)
     /* Add the names of the include files in reversed order
      * to the program strings.
      */
+    num_includes = mem_block[A_INCLUDE_NAMES].current_size / sizeof(char *);
     while (mem_block[A_INCLUDE_NAMES].current_size)
     {
         add_to_mem_block(
@@ -12182,6 +12197,7 @@ epilog (void)
          */
         prog->strings = (string_t **)p;
         prog->num_strings = num_strings;
+        prog->num_includes = num_includes;
         if (mem_block[A_STRINGS].current_size)
             memcpy(p, mem_block[A_STRINGS].block,
                    mem_block[A_STRINGS].current_size);

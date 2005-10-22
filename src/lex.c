@@ -140,6 +140,10 @@ char *current_file;
   /* Name of the file currently compiled.
    */
 
+static char *object_file;
+  /* Name of the file for which the lexer was originally called.
+   */
+
 Bool pragma_use_local_scopes;
   /* True: treat all local scopes as one.
    */
@@ -821,7 +825,7 @@ lookfor_shared_identifier (char *s, int n, int depth, Bool bCreate)
     string_t *str;
 
 #if defined(LEXDEBUG)
-    printf("%s make_shared_identifier called: %s\n", time_stamp(), s);
+    printf("%s lookfor_shared_identifier called: %s\n", time_stamp(), s);
 #endif
 
     h = identhash(s);  /* the identifiers hash code */
@@ -1412,6 +1416,59 @@ handle_cond (Bool c)
 
 /*-------------------------------------------------------------------------*/
 static void
+add_auto_include (const char * obj_file, const char *cur_file)
+
+/* A new file <cur_file> was opened while compiling object <object_file>.
+ * Add the auto-include information if available.
+ *
+ * If <cur_file> is NULL, then the <object_file> itself has just been
+ * opened, otherwise <cur_file> is an included file.
+ *
+ * The global <current_line> must be valid and will be modified.
+ */
+
+{
+    string_t * auto_include_string = NULL;
+
+    if (driver_hook[H_AUTO_INCLUDE].type == T_STRING
+     && cur_file == NULL
+       )
+    {
+        auto_include_string = driver_hook[H_AUTO_INCLUDE].u.str;
+    }
+    else if (driver_hook[H_AUTO_INCLUDE].type == T_CLOSURE)
+    {
+        svalue_t *svp;
+
+        /* Setup and call the closure */
+        push_c_string(inter_sp, obj_file);
+        if (cur_file != NULL)
+            push_c_string(inter_sp, (char *)cur_file);
+        else
+            push_number(inter_sp, 0);
+        svp = secure_call_lambda(driver_hook+H_AUTO_INCLUDE, 2);
+        if (svp && svp->type == T_STRING)
+        {
+            auto_include_string = svp->u.str;
+        }
+    }
+
+    if (auto_include_string != NULL)
+    {
+        char * tmp;
+
+        tmp = get_txt(auto_include_string);
+        add_input("\n");
+        add_input(tmp);
+
+        /* Count the number of lines of the added string */
+        for (current_line--; *tmp
+            ; current_line -= *tmp++ == '\n') NOOP;
+    }
+} /* add_auto_include() */
+
+/*-------------------------------------------------------------------------*/
+static void
 merge (char *name, mp_int namelen, char *deststart)
 
 /* Take the given include file <name> of length <namelen>, make it
@@ -1975,6 +2032,8 @@ handle_include (char *name)
         *(outp = linebufend) = '\0';
         yyin_des = fd;
         _myfilbuf();
+
+        add_auto_include(object_file, current_file);
     }
     else
     {
@@ -4395,7 +4454,7 @@ start_new_file (int fd)
  */
 
 {
-    string_t * auto_include_string = NULL;
+    object_file = current_file;
 
     free_defines();
 
@@ -4414,35 +4473,7 @@ start_new_file (int fd)
 
     lex_fatal = MY_FALSE;
 
-    if (driver_hook[H_AUTO_INCLUDE].type == T_STRING)
-    {
-        auto_include_string = driver_hook[H_AUTO_INCLUDE].u.str;
-    }
-    else if (driver_hook[H_AUTO_INCLUDE].type == T_CLOSURE)
-    {
-        svalue_t *svp;
-
-        /* Setup and call the closure */
-        push_c_string(inter_sp, current_file);
-        svp = secure_call_lambda(driver_hook+H_AUTO_INCLUDE, 1);
-        if (svp && svp->type == T_STRING)
-        {
-            auto_include_string = svp->u.str;
-        }
-    }
-
-    if (auto_include_string != NULL)
-    {
-        char * tmp;
-
-        tmp = get_txt(auto_include_string);
-        add_input("\n");
-        add_input(tmp);
-
-        /* Count the number of lines of the added string */
-        for (current_line = -1; *tmp
-            ; current_line -= *tmp++ == '\n') NOOP;
-    }
+    add_auto_include(object_file, NULL);
 
     pragma_strict_types = PRAGMA_WEAK_TYPES;
     instrs[F_CALL_OTHER].ret_type = TYPE_ANY;

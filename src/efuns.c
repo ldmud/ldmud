@@ -3573,6 +3573,8 @@ f_object_info (svalue_t *sp, int num_args)
         ST_NUMBER(OIM_SIZE_STRINGS_DATA, v1);
         ST_NUMBER(OIM_SIZE_STRINGS_TOTAL, v2);
           /* Number of strings and the memory usage */
+
+        ST_NUMBER(OIM_NUM_INCLUDES, prog->num_includes);
         {
             int i = prog->num_inherited;
             int cnt = 0;
