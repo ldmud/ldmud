@@ -24,7 +24,7 @@ Valid argument type specifiers are:
    e,E,f,F,g,G like in c.
   "O" : the argument is an LPC datatype to be printed in an arbituary
         format, this is for debugging purposes.         If the argument is an
-        object then the function object_name() on the master object
+        object then the function printf_obj_name() on the master object
         is called with the object as a parameter, the string returned
         is included in brackets at the end of object file name.         If
         0 is returned then nothing is appended after the file name.

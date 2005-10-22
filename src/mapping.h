@@ -65,7 +65,7 @@ struct mapping_hash_s {
 };
 
 #define SIZEOF_MH_ALL(hm, nv) ( \
-    sizeof(*(hm)) + sizeof(map_chain_t *) * ((hm)->mask + 1) \
+    sizeof(*(hm)) + sizeof(map_chain_t *) * (hm)->mask \
                   + (sizeof(map_chain_t) + sizeof(svalue_t) * (nv)) * ((hm)->used) \
                       )
   /* Allocation size of a given mapping_hash_t structure for a mapping
@@ -73,7 +73,7 @@ struct mapping_hash_s {
    */
 
 #define SIZEOF_MH(hm) ( \
-    sizeof(*(hm)) + sizeof(map_chain_t *) * ((hm)->mask + 1) \
+    sizeof(*(hm)) + sizeof(map_chain_t *) * (hm)->mask \
                       )
   /* Allocation size of a given mapping_hash_t structure, excluding
    * the map_chain structures.
@@ -95,7 +95,7 @@ struct mapping_cond_s {
 };
 
 #define SIZEOF_MC(cm, nv) ( \
-    sizeof(*(cm)) + sizeof(svalue_t) * (((cm)->size * (nv)+1) - 1) \
+    sizeof(*(cm)) + sizeof(svalue_t) * (((cm)->size * ((nv)+1)) - 1) \
                       )
   /* Allocation size of a given mapping_cond_t structure for
    * a mapping with <nv> values per key.
@@ -208,48 +208,3 @@ extern void clean_stale_mappings(void);
 #endif
 
 #endif /* MAPPING_H__ */
-
-#if 0
-/* --- struct mvf_info: structure used by m_values()/unmkmapping() ---
- *
- * This structure is passed by reference to the filter functions used
- * by the two efuns and passes information from one filter call to the
- * next.
- */
-struct mvf_info
-{
-    svalue_t * svp;
-      /* m_values_filter: Pointer to next result vector entry
-       * m_unmake_filter: Pointer to result array of svalues
-       */
-    int             num;
-      /* m_values_filter: Column to retrieve.
-       * m_unmake_filter: Next row to retrieve
-       */
-    int             width;
-      /* m_unmake_filter: width of the mapping
-       */
-};
-
-/* --- Macros --- */
-
-#define CM_MISC(m) ((svalue_t *)(m))
-  /* For condensed_mapping <m>, return a pointer to the svalue
-   * after the last misc key in that mapping.
-   */
-
-#define CM_STRING(m) ((string_t **)((m)+1))
-  /* For condensed_mapping <m>, return a pointer to the first
-   * string key in that mapping.
-   */
-
-#define MAP_CHAIN_SIZE(n) (\
-        (sizeof(struct map_chain) - sizeof(svalue_t) ) +\
-                sizeof(svalue_t)*(n) )
-  /* Size of a map_chain structure for <n> values
-   */
-
-/* --- Prototypes --- */
-
-#endif
-

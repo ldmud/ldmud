@@ -1,6 +1,31 @@
 This file lists all changes made to the game driver in all gory detail.
 See the file HISTORY for a user-oriented summary of all the changes.
 
+09-Jun-2001 (Lars Duening)  (3.3.61)
+    - (mstrings.c) strstr("text", "") errorenously returned 'not found'
+         instead of 0 (reported by Bardioc).
+    - (mapping) Corrected the SIZEOF_ macros (most of them gave a too
+         big number, but SIZEOF_MC undercalculated for wide mappings);
+         and corrected one calculation in the total statistic (instigated
+         by Bardioc).
+    - (configure, lex.c) 'nosave' is now a permanent feature in LPC; the
+         configuration option 'use-nosave' no longer exists (suggested
+         by Coogan).
+    - (main.c) Improved the formatting of the language options in the
+         '--options' output.
+    - (pkg-mysql.c) In the call to mysql_real_connect(), the arguments
+         for database and user/password were given in the wrong order
+         (thanks, Malcom!).
+
+07-Jun-2001 (Lars Duening)
+    - (comm.c) The driver forgot that it is in noecho/charmode mode after
+         the second consecutive input_to call, sending out unnecessary
+         telnet negotiations.
+    - (interpret.c) When an object is destructed, all references to it
+         are removed from the stack - including references through
+         closures. Before, only direct T_OBJECT references were removed
+         (reported by Gnomi).
+
 04-Jun-2001 (Lars Duening)  (3.3.60)
     - (prolang.y) The type on function return is too strict (or the
          type tracking in general too lacking) unfortunately,

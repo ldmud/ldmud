@@ -513,6 +513,30 @@ inet6_addr (char *to_host)
 #endif /* USE_IPV6 */
 
 /*-------------------------------------------------------------------------*/
+static char *
+decode_noecho (char noecho)
+
+/* Decode the <noecho> flag byte into a string.
+ * Result is a pointer to a static buffer.
+ */
+
+{
+    static char buf[100];
+    strcpy(buf, "(");
+    if (noecho & NOECHO_REQ) strcat(buf, "NOECHO_REQ, ");
+    if (noecho & CHARMODE_REQ) strcat(buf, "CHARMODE_REQ, ");
+    if (noecho & NOECHO) strcat(buf, "NOECHO, ");
+    if (noecho & CHARMODE) strcat(buf, "CHARMODE, ");
+    if (noecho & NOECHO_ACK) strcat(buf, "NOECHO_ACK, ");
+    if (noecho & CHARMODE_ACK) strcat(buf, "CHARMODE_ACK, ");
+    if (noecho & NOECHO_STALE) strcat(buf, "NOECHO_STALE, ");
+    if (noecho & IGNORE_BANG) strcat(buf, "IGNORE_BANG");
+    strcat(buf, ")");
+
+    return buf;
+} /* decode_noecho() */
+
+/*-------------------------------------------------------------------------*/
 static void
 dump_bytes (void * data, size_t length, int indent)
 
@@ -617,17 +641,7 @@ comm_fatal (interactive_t *ip, char *fmt, ...)
       if (ip->do_close & (FLAG_DO_CLOSE|FLAG_PROTO_ERQ)) fprintf(stderr, ")");
       putc('\n', stderr);
     fprintf(stderr, "  .noecho:            %02x", (unsigned char)ip->noecho);
-      if (ip->noecho) fprintf(stderr, " (");
-      if (ip->noecho & NOECHO_REQ) fprintf(stderr, "NOECHO_REQ, ");
-      if (ip->noecho & CHARMODE_REQ) fprintf(stderr, "CHARMODE_REQ, ");
-      if (ip->noecho & NOECHO) fprintf(stderr, "NOECHO, ");
-      if (ip->noecho & CHARMODE) fprintf(stderr, "CHARMODE, ");
-      if (ip->noecho & NOECHO_ACK) fprintf(stderr, "NOECHO_ACK, ");
-      if (ip->noecho & CHARMODE_ACK) fprintf(stderr, "CHARMODE_ACK, ");
-      if (ip->noecho & NOECHO_STALE) fprintf(stderr, "NOECHO_STALE, ");
-      if (ip->noecho & IGNORE_BANG) fprintf(stderr, "IGNORE_BANK");
-      if (ip->noecho) putc(')', stderr);
-      putc('\n', stderr);
+      fprintf(stderr, " %s\n", decode_noecho(ip->noecho));
     fprintf(stderr, "  .tn_state:          %d", ip->tn_state);
       switch(ip->tn_state) {
       case TS_DATA:    fprintf(stderr, " (TS_DATA)\n"); break;
@@ -2408,7 +2422,7 @@ get_message (char *buff)
                     CmdsGiven = 0;
                     ip->last_time = current_time;
 
-                    DTN(("--- return with char command ---\n"));
+                    DTN(("--- return with char command %02x '%c' ---\n", buff[0], buff[0]));
 
                     return MY_TRUE;
                 }
@@ -2946,8 +2960,15 @@ set_noecho (interactive_t *ip, char noecho)
 
     confirm = (char)(
       noecho | CHARMODE_REQ_TO_CHARMODE(noecho & (NOECHO_REQ|CHARMODE_REQ)));
-    DTN(("set_noecho(%02x) old %02x -> confirm: %02x -> %02x\n"
-       , noecho, old, confirm, confirm | NOECHO_ACKSHIFT(confirm)));
+    DTN(("set_noecho(%02x) old %02x %s\n"
+       , noecho, old, decode_noecho(old)));
+    DTN(("  -> confirm: %02x %s\n"
+       , confirm, decode_noecho(confirm)));
+    DTN(("           -> %02x %s\n"
+       , confirm | NOECHO_ACKSHIFT(confirm)
+       , decode_noecho(confirm | NOECHO_ACKSHIFT(confirm))
+       ));
+
     ip->noecho = confirm;
 
     confirm |= NOECHO_ACKSHIFT(confirm);
@@ -2986,6 +3007,13 @@ set_noecho (interactive_t *ip, char noecho)
                 DTN(("set_noecho():   WILL TELOPT_ECHO\n"));
                 send_will(TELOPT_ECHO);
             }
+            else /* No change in NOECHO mode */ if (confirm & NOECHO)
+            {
+                /* Since we stay in NOECHO mode, we need the ACK flag set. */
+                DTN(("set_noecho():   Staying in NOECHO mode\n"));
+                ip->noecho |= NOECHO_ACKSHIFT(NOECHO);
+            }
+
             if (ip->supress_go_ahead && !(confirm & (NOECHO|CHARMODE)))
             {
                 DTN(("set_noecho():   WONT TELOPT_SGA\n"));
@@ -3029,9 +3057,36 @@ set_noecho (interactive_t *ip, char noecho)
                 send_will(TELOPT_SGA);
                 ip->supress_go_ahead = MY_TRUE;
             }
+            else /* No change in CHARMODE mode */ if (confirm & CHARMODE)
+            {
+                /* Since we stay in CHARMODE mode, we need the ACK flag set. */
+                DTN(("set_noecho():   Staying in CHARMODE mode\n"));
+                ip->noecho |= NOECHO_ACKSHIFT(CHARMODE);
+            }
+
             command_giver = save;
         }
     }
+    else
+    {
+        /* No change in modes.
+         * However, if we stay in NOECHO/CHARMODE, we need to set
+         * the ACK flags.
+         */
+        if (confirm & CHARMODE)
+        {
+            /* Since we stay in CHARMODE mode, we need the ACK flag set. */
+            DTN(("set_noecho():   Staying in CHARMODE mode\n"));
+            ip->noecho |= NOECHO_ACKSHIFT(CHARMODE);
+        }
+        if (confirm & NOECHO)
+        {
+            /* Since we stay in NOECHO mode, we need the ACK flag set. */
+            DTN(("set_noecho():   Staying in NOECHO mode\n"));
+            ip->noecho |= NOECHO_ACKSHIFT(NOECHO);
+        }
+    }
+
 } /* set_noecho() */
 
 /*-------------------------------------------------------------------------*/

@@ -300,10 +300,6 @@
  */
 #undef USE_MYSQL
 
-/* Define this if you want the 'nosave' keyword.
- */
-#define USE_LPC_NOSAVE
-
 /* Maximum size of a socket send buffer.
  */
 #define SET_BUFFER_SIZE_MAX      65536

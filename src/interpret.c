@@ -5727,7 +5727,7 @@ void
 remove_object_from_stack (object_t *ob)
 
 /* Object <ob> was/will be destructed, so remove all references from
- * the stack.
+ * to it from the stack (this includes references through closures).
  */
 
 {
@@ -5735,14 +5735,42 @@ remove_object_from_stack (object_t *ob)
 
     for (svp = start_of_stack; svp <= inter_sp; svp++)
     {
-        if (svp->type != T_OBJECT)
-            continue;
-        if (svp->u.ob != ob)
-            continue;
-        free_object(ob, "remove_object_from_stack");
-        put_number(svp, 0);
-    }
-}
+        if (svp->type == T_OBJECT)
+        {
+            if (svp->u.ob == ob)
+            {
+                free_object(ob, "remove_object_from_stack");
+                put_number(svp, 0);
+            }
+        }
+        else if (svp->type == T_CLOSURE)
+        {
+            ph_int type = svp->x.closure_type;
+
+            if (!CLOSURE_MALLOCED(type))
+            {
+                /* A simple closure */
+                if (svp->u.ob == ob)
+                {
+                    free_svalue(svp);
+                    put_number(svp, 0);
+                }
+            }
+            else if (!CLOSURE_HAS_CODE(type) || type != CLOSURE_UNBOUND_LAMBDA)
+            {
+                /* A lambda or alien-lfun closure */
+                lambda_t * l = svp->u.lambda;
+
+                if (ob == ((type == CLOSURE_ALIEN_LFUN) ? l->function.alien.ob
+                                                        : l->ob))
+                {
+                    free_svalue(svp);
+                    put_number(svp, 0);
+                }
+            }
+        } /* if object or closure */
+    } /* foreach svp in stack */
+} /* remove_object_from_stack() */
 
 /*-------------------------------------------------------------------------*/
 static INLINE void

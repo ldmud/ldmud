@@ -1,6 +1,6 @@
 SYNOPSIS
         mixed catch (expr, expr, ...)
-        mixed catch (expr, expr, ... ; nolog)  EXPERIMENTAL
+        mixed catch (expr, expr, ... ; nolog)
 
 DESCRIPTION
         Evaluate the expressions. If there is no error, 0 is returned.
@@ -13,8 +13,6 @@ DESCRIPTION
 
         Normally, the caught error will be logged in the error logs for easier
         debugging. If the keyword 'nolog' is given, this log is suppressed.
-        This is an experimental feature which might not survive for all
-        times.
 
         Catch is not really an efun, but a compiler directive.
 
@@ -26,6 +24,7 @@ EXAMPLE
 
 HISTORY
         LDMud 3.2.9 introduced the 'nolog' catch() as experimental feature.
+        LDMud 3.3 implemented it as official form.
 
 SEE ALSO
         throw(E), raise_error(E)

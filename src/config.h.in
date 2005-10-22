@@ -297,10 +297,6 @@
  */
 @cdef_use_mysql@ USE_MYSQL
 
-/* Define this if you want the 'nosave' keyword.
- */
-@cdef_lpc_nosave@ USE_LPC_NOSAVE
-
 /* Define this if you want the obsolete and deprecated efuns.
  */
 @cdef_use_deprecated@ USE_DEPRECATED

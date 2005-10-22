@@ -25,7 +25,7 @@ DESCRIPTION
              set_is_wizard()
              set_light()
 
-         - 'preliminary'
+         - 'preliminary' or 'experimental'
 
            The behaviour of these efuns is not fixed yet, and may change
            with further releases:

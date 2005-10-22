@@ -387,9 +387,9 @@ f_db_connect (svalue_t *sp, int num_args)
      * TCP (that's something for ERQ wizards :-).
      */
     if ( !mysql_real_connect( tmp->mysql_dat, "localhost"
-                            , get_txt(database)
                             , user ? get_txt(user) : NULL
                             , password ? get_txt(password) : NULL
+                            , get_txt(database)
                             , 0, 0, 0))
     {
         raise_db_error(tmp);

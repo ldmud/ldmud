@@ -715,7 +715,7 @@ remove_empty_mappings (void)
         hm = m->hash;
         if (!m->ref && !m->num_entries)
         {
-            m->user->mapping_total -= sizeof(*m) - SIZEOF_MH(hm);
+            m->user->mapping_total -= sizeof(*m) + SIZEOF_MH(hm);
             xfree(m);
             *mp = m = hm->next_dirty;
             xfree(hm);

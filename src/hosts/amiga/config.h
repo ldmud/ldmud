@@ -302,10 +302,6 @@
  */
 #undef USE_MYSQL
 
-/* Define this if you want the 'nosave' keyword.
- */
-#define USE_LPC_NOSAVE
-
 /* Define this if you want the obsolete and deprecated efuns.
  */
 #define USE_DEPRECATED

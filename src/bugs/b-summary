@@ -37,6 +37,7 @@ Compiler
 b-990217-1: virtual inherits need cleaner implementation.
 b-010410: Branchpatching messes up line number information
 b-010603-0: Failed assignments leave behind empty mapping entries.
+b-010610-0: Type tracking fails on arrays
 
 
 Runtime
@@ -54,6 +55,7 @@ b-000308: call_out freezes totally (maybe fixed)
 b-000830: malloc status is inconsistent
 b-010115: Memory leaks in dev.251
 b-010115-1: Make sure that all master calls use leading slashes.
+b-010610-1: CRT doesn't work well in charmode
 
 
 Installation

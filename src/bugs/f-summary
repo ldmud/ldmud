@@ -121,6 +121,9 @@ f-000106: Special -> for array calls
 f-000430-1: C++-style variable definitions
 f-000430-2: C-style prototypes
 f-010309-2:'yield' to convert statements into expressions
+f-010610-0: Casts should just check types, not convert them.
+f-010610-1: Allow reversed foreach()
+f-010610-2: Label (loop-) statements
 
 
 Compiler

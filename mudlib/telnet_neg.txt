@@ -74,7 +74,7 @@ int    snt;         // special flag
 // --------------------------------------------
 
 // --------------- NAWS Variables -------------
-int do_naws_sent, will_naws_rcvd;
+nosave int do_naws_sent, will_naws_rcvd;
 // --------------------------------------------
 
 

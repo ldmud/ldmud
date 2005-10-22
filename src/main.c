@@ -966,26 +966,33 @@ options (void)
   fputs(" Access control: disabled.\n", stdout);
 #endif
 
-  fputs("       Language: "
+    /* Print the language options, nicely indented. */
+    {
+        char * optstrings[] = { "" /* have at least one string in here */
 #ifdef SUPPLY_PARSE_COMMAND
-                         "parse_command() enabled\n"
+                              , "parse_command() enabled\n"
 #endif
 #ifdef INITIALIZATION_BY___INIT
-        "                 "
-                          "initialization by __INIT()\n"
+                              , "initialization by __INIT()\n"
 #else
-        "                 "
-                          "static initialization\n"
-#endif
-#ifdef USE_LPC_NOSAVE
-        "                 "
-                          "'nosave' enabled\n"
+                              , "static initialization\n"
 #endif
 #ifdef USE_DEPRECATED
-        "                 "
-                          "obsolete and deprecated efuns enabled\n"
+                              , "obsolete and deprecated efuns enabled\n"
 #endif
-       , stdout);
+                              };
+        size_t nStrings = sizeof(optstrings) / sizeof(optstrings[0]);
+        size_t i;
+
+        for (i = 1; i < nStrings; i++)
+        {
+            if (1 == i)
+                fputs("       Language: ", stdout);
+            else
+                fputs("                 ", stdout);
+            fputs(optstrings[i], stdout);
+        }
+    } /* print language options */
 
   printf(" Runtime limits: max read file size:     %7d\n"
          "                 max byte read/write:    %7d\n"

@@ -437,9 +437,7 @@ static struct s_reswords reswords[]
    , { "mapping",        L_MAPPING       }
    , { "mixed",          L_MIXED         }
    , { "nomask",         L_NO_MASK       }
-#ifdef USE_LPC_NOSAVE
    , { "nosave",         L_NOSAVE        }
-#endif
    , { "object",         L_OBJECT        }
 #ifdef SUPPLY_PARSE_COMMAND
    , { "parse_command",  L_PARSE_COMMAND }
@@ -788,9 +786,7 @@ init_lexer(void)
 #ifdef USE_ALISTS
     add_permanent_define("__ALISTS__", -1, string_copy(""), MY_FALSE);
 #endif
-#ifdef USE_LPC_NOSAVE
     add_permanent_define("__LPC_NOSAVE__", -1, string_copy(""), MY_FALSE);
-#endif
 #ifdef USE_DEPRECATED
     add_permanent_define("__DEPRECATED__", -1, string_copy(""), MY_FALSE);
 #endif

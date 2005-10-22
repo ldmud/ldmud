@@ -1,0 +1,14 @@
+Short: Label (loop-) statements
+Date: 2001-06-04
+From: Lars
+Type: Feature
+State: New
+
+Allow to label loop and other conditional statements, so that berak and
+continue can terminate them directly.
+
+loop : foreach() {
+         ...
+         break loop;
+       }
+

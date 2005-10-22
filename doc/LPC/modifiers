@@ -80,9 +80,6 @@ DESCRIPTION
                      at the inherit statement (see below).
                      Note that nosave and private do not overlap in any
                      way. They are absolutely independant.
-                     The driver may be compiled to not recognize this
-                     keyword ('static' is then to be used). If 'nosave'
-                     is available, the macro __LPC_NOSAVE__ is defined.
         static    -- the old name for 'nosave'. Its use is deprecated.
         public    -- declares the variable public. It cannot be declared
                      private or static by inheriting. No error will occur,

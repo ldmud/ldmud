@@ -1,0 +1,27 @@
+Short: CRT doesn't work well in charmode
+From: Elric <elric@www.lpmud.com>
+Date: Thu, 07 Jun 2001 12:17:35 -0600
+Type: Bug
+State: New
+
+Elric wrote:
+> Hey Lars, I am making a full screen editor that acts and looks similar to
+> Pico. So far so good except for a problem when i press return. Ok I use
+> CRT in Windows to telnet (http://www.vandyke.com) and it only sends \r in
+> charmode. The problem is when I press return it doesn't send anything, I
+> press it again and receive chr(13) now if i press any key is sends the
+> missing chr(13) then the key i pressed. It's like it is buffering a
+> chr(13).
+> Charmode works fine when i use real pico so I think its something
+> with the driver, perhaps some negotiation or its just expecting \r\n and
+> only gets \r so it gets confused.
+
+If CRT expects some additional negotiation, I don't know which one. I 
+compared CRT against normal unix telnet, and while they get exactly 
+the same control messages, CRT insists on sending the CR only after 
+you type a second key (the driver then receives the CR and the next 
+key in one go). 
+
+I will have to read up on telnet linemode negotiation, but that'll 
+take time as the information is scattered over 10 RFCs.
+

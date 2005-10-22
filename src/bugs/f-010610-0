@@ -1,0 +1,7 @@
+Short: Casts should just check types, not convert them.
+From: Lars
+Date: 2001-06-10
+State: New
+
+A cast just should generate an instruction to check the casted type
+at runtime, but otherwise not convert it.
